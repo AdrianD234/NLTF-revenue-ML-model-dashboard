@@ -1,0 +1,12 @@
+.pytest_cache/
+.pytest_tmp/
+test-output/
+__pycache__/
+model_dashboard/__pycache__/
+tests/__pycache__/
+.uv-cache/
+output/
+*.log
+*.pyc
+artifacts/screenshots/*.png
+artifacts/logs/

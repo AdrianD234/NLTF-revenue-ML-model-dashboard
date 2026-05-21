@@ -1,0 +1,4 @@
+stream,stream_label,model,model_short,quarterly_mape,annual_mape,quarterly_bias_pct,benchmark_role,purity_flag
+HEAVY_RUC,Heavy RUC volume,HEAVY_RUC__schiff_no_lead__SCHIFF_OLS__noylag__w40,Heavy RUC - Schiff OLS,11.48264346093783,11.717803544852805,10.711248839683964,Pure Schiff structural benchmark,Pure Schiff OLS
+LIGHT_RUC,Light RUC volume,LIGHT_RUC__schiff__SCHIFF_OLS__noylag__w40,Light RUC - Schiff OLS,15.153126534376286,13.76767036585144,5.331497979001418,Pure Schiff structural benchmark,Pure Schiff OLS
+PED,PED VKT per capita,PED__schiff__SCHIFF_OLS__noylag__w40,PED - Schiff OLS,3.3526421981105123,3.329358273539804,0.5030347756222722,Pure Schiff structural benchmark,Pure Schiff OLS

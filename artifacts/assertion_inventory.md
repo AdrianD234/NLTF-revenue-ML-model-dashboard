@@ -1,0 +1,134 @@
+# Assertion Inventory
+
+New or strengthened assertions supporting the product-hardening sprint.
+
+- [x] Governance story winner metrics match the loaded finalist CSV rows.
+- [x] Governance story includes decision status values.
+- [x] Management conclusion mentions Stage 2 uncertainty testing.
+- [x] Data-quality warning panel is generated from loaded run state.
+- [x] Management summary export contains Stage 1 summary and stream decisions.
+- [x] PED stress story uses the loaded 2020-21 stress bucket.
+- [x] Error flags distinguish root-cause Ray errors from Ray/Tune traceback mentions.
+- [x] Error type classification counts missing-HyperOpt root causes.
+- [x] Percent-unit diagnostics detect mixed proportion/percentage-looking columns.
+- [x] Run health summary interprets missing-HyperOpt diagnostics.
+- [x] Model aliases convert dense identifiers into readable labels.
+- [x] Schiff purity classifier separates pure Schiff, residual, blend, ensemble, and non-Schiff rows.
+- [x] Model Inventory summary reports filtered rows, stream coverage, source families, variants, and best rows.
+- [x] Model Detail summary links selected model to MAPE, Schiff, stress, and component evidence.
+- [x] Inventory rank options include quarterly MAPE, annual MAPE, governance score, and bias when available.
+- [x] Inventory visuals render family performance and Schiff-class mix figures.
+- [x] Core charts render from real loaded data.
+- [x] Candidate landscape focuses the competitive frontier.
+- [x] Candidate landscape includes an efficient-frontier trace.
+- [x] Candidate landscape hover includes Schiff class evidence.
+- [x] Candidate outlier filter preserves finalists and Schiff benchmark rows.
+- [x] Ensemble composition uses recommended weighted finalists where names match.
+- [x] Ensemble single-component finalist selection is explained.
+- [x] Ensemble method readout covers static and prequential support.
+- [x] Ensemble fallback scores normalise origin-level weights.
+- [x] Sidebar filters change candidate results.
+- [x] Stress checks cover required horizon/stress buckets.
+- [x] Stress checks include supplemental 2020-21 loaded bucket where present.
+- [x] Stress chart includes 10 percent high-risk guide.
+- [x] Stress chart includes a high-risk band.
+- [x] Forecast readout summarises selected rows.
+- [x] Forecast percent-error and horizon MAPE charts render.
+- [x] Error-type chart renders from errors.csv classification.
+- [x] Browser check asserts management conclusion, export button, and decision status.
+- [x] Browser check asserts efficient frontier and candidate detail expander.
+- [x] Browser check asserts forecast percent-error and horizon charts.
+- [x] Browser check asserts Model Detail and inventory visuals.
+- [x] Browser check asserts run-audit error-type chart.
+- [x] Browser check saves both `mcp-*` and `final-*` screenshots.
+- [x] Loaded-run summary must contain `schiff_class` before inventory Schiff-mix visuals can pass.
+- [x] Streamlit loader cache key must include the schema-version token for governance-field changes.
+- [x] Schema diagnostics must be filtered out of global management-page warnings.
+- [x] Browser check asserts Run Audit still exposes schema diagnostics after they are demoted from page-level warnings.
+- [x] Enterprise decision brief must summarise readiness, benchmark result, watch point, and next gate from loaded run data.
+- [x] Browser check asserts the first-screen enterprise readiness view and Stage 2 gate are visible.
+- [x] Streamlit smoke asserts the first four primary governance tabs are Overview, Diagnostics, Scenario Comparison, and Schiff Benchmark.
+- [x] Empty Stream, Source family, and Variant selections return empty frames rather than silently widening results.
+- [x] Candidate Landscape export columns are present in loaded run data.
+- [x] Browser check asserts WAKA KOTAHI text masthead and Governance filters are visible.
+- [x] Browser check clicks Reset Filters and asserts default filter states return.
+- [x] Browser check asserts the current-view JSON export control exists.
+- [x] Browser check asserts Overview contains all five report-style chart modules.
+- [x] Browser check asserts Diagnostics page contains test matrix, autocorrelation, heteroscedasticity, residual proxy, and summary sections.
+- [x] Browser check asserts Scenario A/B controls and decision lens exist.
+- [x] Browser check asserts Schiff Benchmark contains paper replication notes and pure-Schiff benchmark language.
+- [x] Browser check asserts Candidate Landscape has a page-local download control.
+- [x] Browser check asserts Model Detail selector includes every filtered candidate after search/rank filters.
+- [x] Visual-reference script asserts final screenshots exist and meet minimum screenshot-density checks.
+- [x] Browser check asserts the clipped `‹nchmark` navigation defect is absent.
+- [x] Browser check asserts full filter-chip values remain readable.
+- [x] Browser check captures final screenshots at a 1680 x 940 management-review viewport.
+- [x] Streamlit smoke asserts the primary governance navigation exposes the four required pages.
+- [x] Browser check asserts the overview grid contains finalist accuracy, candidate landscape, ensemble composition, stress checks, and error distribution modules.
+- [x] Browser check asserts the ensemble composition view contains PED, Light RUC, and Heavy RUC stream panels.
+- [x] Unit test asserts Scenario Comparison KPI cards are sourced from loaded finalist, paired-Schiff, and governance-story data.
+- [x] Unit test asserts Scenario Comparison keeps one best paired challenger row per stream.
+- [x] Unit test asserts Scenario Comparison management chart labels use stream names instead of raw model IDs.
+- [x] Browser check asserts Forecast Vintage and Date Window values are readable in the compact filter row.
+- [x] Browser check asserts all five numbered Overview modules are visible above the first viewport fold.
+- [x] Unit test asserts the Diagnostics central-error window trims extreme forecast-error tails.
+- [x] Browser check asserts all six numbered Diagnostics panels are visible above the first viewport fold.
+- [x] Browser check asserts compact Scenario A and Scenario B control values are readable.
+- [x] Browser check asserts all six numbered Scenario Comparison panels are visible above the first viewport fold.
+- [x] Browser check asserts Scenario Comparison explicitly labels the central finalist error-distribution view.
+- [x] Browser check asserts the Schiff benchmark chart, replication notes, and all three stream cross-validation panels are visible above the first viewport fold.
+- [x] Browser check asserts residual Streamlit deployment chrome is not visible in the dashboard body.
+- [x] Unit test asserts the Overview stress chart uses the six reference/report stress buckets and excludes the extra 2020-21 bucket.
+- [x] Browser check asserts the Overview forecast-error chart is labelled as a central absolute percentage error view.
+- [x] Unit test asserts the residual-vs-fitted diagnostic proxy is populated and labelled.
+- [x] Browser check asserts the Diagnostics residual-style scatter description is visible.
+- [x] Unit test asserts the Scenario Comparison decision-lens summary is concise and contains pure-Schiff and Stage 2 language.
+- [x] Browser check asserts the concise Stage 2 decision text is visible in Scenario Comparison.
+- [x] Unit test asserts the Schiff compact summary lifts the best paired gain and pure-Schiff wording.
+- [x] Browser check asserts the Schiff Benchmark page shows the best paired challenger summary.
+- [x] Unit test asserts the Overview Governance Score KPI names pure-Schiff coverage and logged diagnostics.
+- [x] Browser check asserts the Overview first-screen KPI copy includes beat pure Schiff and logged diagnostics.
+- [x] Unit test asserts Diagnostics KPI cards use reference-style Diagnostic Coverage, Missing Outputs, Logged Diagnostics, and Ray Root Causes labels.
+- [x] Browser check asserts the Diagnostics page exposes Diagnostic Coverage and Logged Diagnostics cards.
+- [x] Unit test asserts Scenario Comparison gain is labelled in percentage points and includes Scenario A versus pure-Schiff wording.
+- [x] Browser check asserts Scenario Comparison exposes the Scenario A versus pure-Schiff KPI copy.
+- [x] Unit test asserts the Overview candidate-landscape frontier note is backed by loaded candidate and pure-Schiff row counts.
+- [x] Browser check asserts the Overview candidate-landscape frontier note is visible in the chart card.
+- [x] Unit test asserts Schiff Benchmark KPI cards use pure-Schiff structural benchmark language.
+- [x] Browser check asserts Schiff Benchmark exposes Pure-Schiff Streams and structural benchmark only copy.
+- [x] Unit test asserts the Diagnostics provenance note names available proxy evidence and unavailable classical diagnostics.
+- [x] Browser check asserts the Diagnostics provenance note is visible.
+- [x] Unit test asserts the Scenario Comparison decision rule explains positive paired gain and 55% win-rate threshold.
+- [x] Browser check asserts the Scenario Comparison decision lens displays the 55% win-rate rule.
+- [x] Unit test asserts the Overview stress-watch note names the weakest visible stress bucket and MAPE.
+- [x] Browser check asserts the Overview stress-watch note is visible.
+- [x] Unit test asserts the Scenario Comparison drilldown note names full forecast-error tails and row counts.
+- [x] Browser check asserts the Scenario Comparison drilldown cue is visible.
+- [x] Unit test asserts the run-evidence caption names run folder, file coverage, stage filter, and data-as-of evidence.
+- [x] Browser check asserts the run-evidence caption is visible after Streamlit rendering.
+- [x] Unit test asserts the run-evidence caption includes model-family scope and all-family count.
+- [x] Browser check asserts the model-family scope evidence is visible.
+- [x] Unit test asserts the Overview forecast-error distribution note names prediction-row count and full-tail location.
+- [x] Browser check asserts the Overview forecast-error distribution evidence note is visible.
+- [x] Browser check at 820px asserts the governance page labels remain visible, the page chip and filters have no horizontal overflow, and full filter values remain present.
+- [x] Browser check at 820px asserts the Overview chart row stacks by comparing the first and second chart-title y positions, preventing squeezed multi-chart rows in the in-app browser.
+- [x] Browser check at 1680px asserts desktop nav y-position, right-side placement relative to the Governance title, and compact filter-band y-position.
+- [x] Narrow-browser check asserts the nav sits below the Governance title instead of overlapping the masthead after the desktop nav lift.
+- [x] Narrow-browser check asserts the first two Overview chart cards sit on the same dashboard row at 820px, preventing a sparse one-column Overview.
+- [x] Unit test asserts the Diagnostics autocorrelation chart is a lag-based residual ACF bar chart with explicit lag and ACF axis labels.
+- [x] Browser check asserts the Diagnostics page exposes the residual ACF-by-lag explanation.
+- [x] Browser check asserts Scenario Comparison uses a compact Edit control and does not expose the long Scenario settings label.
+- [x] Browser screenshot review asserts Schiff Benchmark compact notes move cross-validation panels into the in-app viewport.
+- [x] Browser check asserts Diagnostics and Schiff Benchmark use the dense icon governance KPI card row at the in-app browser width.
+- [x] Browser check clicks visible primary navigation text and verifies the expected page body replaces stale prior-page content.
+- [x] Browser check asserts the filter band, first KPI row, and first Overview chart stay within the reference-density vertical position targets.
+- [x] Unit test asserts the compact Diagnostics evidence strip is data-backed and short enough for the first viewport.
+- [x] Browser check asserts Diagnostics has the compact evidence strip, diagnostic-specific captions, top diagnostic panels above the fold, and no visible stale Overview captions.
+- [x] Browser check asserts Scenario Comparison keeps the first three scenario panels above the in-app fold and lifts Improvement vs Benchmark into the first viewport.
+- [x] Browser check asserts every visible primary Governance filter dropdown opens directly without using the More button.
+- [x] Browser check asserts changing the Stream dropdown updates the active chip and KPI/chart data region.
+- [x] Browser check asserts Reset Filters restores default Stream and Horizon chips after multiple filter changes.
+- [x] Browser hover check asserts Candidate Landscape tooltips use Stream, Model, Quarterly MAPE, Annual MAPE and reject raw internal column names.
+- [x] Browser hover check asserts Finalist Accuracy tooltips use human-readable model/source labels and two-decimal MAPE.
+- [x] Browser hover check asserts Ensemble Composition tooltips use Weight/Component labels and one-decimal weights.
+- [x] Browser hover check asserts Stress Checks tooltips use readable stress-window labels such as 1–4 quarters and reject raw horizon metric names.

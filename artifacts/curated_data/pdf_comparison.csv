@@ -1,0 +1,4 @@
+stream,stream_label,latest_quarterly_mape,pdf_quarterly_mape,quarterly_difference_pp,latest_annual_mape,pdf_annual_mape,annual_difference_pp,interpretation
+HEAVY_RUC,Heavy RUC volume,3.5609226862385333,3.8,-0.2390773137614665,3.171406050511395,3.07,0.1014060505113949,Latest arbitration broadly matches the previous PDF finalist; review annual trade-off
+LIGHT_RUC,Light RUC volume,9.147545354091871,9.16,-0.0124546459081287,5.999498868354417,6.25,-0.2505011316455832,Latest arbitration improves on PDF quarterly and annual MAPE
+PED,PED VKT per capita,2.4735782411978,2.48,-0.0064217588021997,2.3870893939736244,2.42,-0.0329106060263755,Latest arbitration improves on PDF quarterly and annual MAPE

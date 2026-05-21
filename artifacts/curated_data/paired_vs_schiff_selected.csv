@@ -1,0 +1,4 @@
+stream,baseline,challenger,n_common_pairs,baseline_mape,challenger_mape,mape_improvement_pct_points,challenger_win_rate,stream_label
+HEAVY_RUC,HEAVY_RUC__schiff_no_lead__SCHIFF_OLS__noylag__w40,HEAVY_RUC__solver_static_convex_top18,438,11.48264346093783,3.5609226862385333,7.921720774699298,62.55707762557078,Heavy RUC volume
+LIGHT_RUC,LIGHT_RUC__schiff__SCHIFF_OLS__noylag__w40,LIGHT_RUC__solver_static_convex_top18,438,15.153126534376286,9.147545354091871,6.005581180284414,74.20091324200914,Light RUC volume
+PED,PED__schiff__SCHIFF_OLS__noylag__w40,PED__solver_static_convex_top18,606,3.3526421981105123,2.4735782411978,0.879063956912712,69.96699669966998,PED VKT per capita

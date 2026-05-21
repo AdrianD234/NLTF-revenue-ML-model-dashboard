@@ -1,0 +1,14 @@
+[run_selection]
+default_parent = "C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Revenue Modeling - Strategic Review\\04 Models\\Inputs"
+bespoke_solver_parent = "C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Revenue Modeling - Strategic Review\\04 Models\\Inputs\\bespoke_solver_stage1_outputs"
+ignored_run_folders = ["run_20260519_150434"]
+
+[display]
+top_n_candidates = 50
+show_schiff_benchmarks = true
+show_finalists = true
+show_screen_candidates = true
+show_final_candidates = true
+show_static_solver_ensembles = true
+show_prequential_ensembles = true
+

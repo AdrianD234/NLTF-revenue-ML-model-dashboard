@@ -1,0 +1,106 @@
+# Product Improvements
+
+Material improvements completed during the product-hardening sprint.
+
+- [x] Added a management conclusion panel that explains stream decisions and Stage 2 caveat.
+- [x] Added stream-level governance cards showing winner, Schiff result, robustness, and warnings.
+- [x] Added compact decision-status cards: Promote, Watchlist, Reject, or Needs Stage 2.
+- [x] Added a data-quality warning panel for missing files, diagnostics, benchmark watch points, and stress risk.
+- [x] Added exportable management summary Markdown from the selected run.
+- [x] Added human-readable model aliases for dense technical identifiers.
+- [x] Added pure-Schiff classification protection so residual/blend challengers are not treated as pure Schiff.
+- [x] Added candidate landscape frontier-focused scaling, efficient-frontier trace, and finalist/Schiff annotations.
+- [x] Added sidebar toggle to hide failed/outlier candidates while preserving finalists and Schiff rows.
+- [x] Added paired-vs-Schiff decision cards and gain/win-rate interpretation.
+- [x] Added single-component ensemble explanation and static/prequential method readout.
+- [x] Added origin-normalised ensemble fallback scoring to avoid prequential origin-count bias.
+- [x] Added stress-check high-risk guide, risk band, and stress readout including loaded 2020-21 evidence.
+- [x] Added forecast-error readout for average absolute error, bias direction, and largest miss.
+- [x] Added forecast percentage-error-over-time chart.
+- [x] Added horizon-level MAPE drilldown chart.
+- [x] Added run-health summary cards and diagnostic materiality readout.
+- [x] Added error-type diagnostic chart from errors.csv.
+- [x] Added model-inventory KPI cards and inventory readout.
+- [x] Added Model Detail section linking a selected model to MAPE, Schiff, stress, and ensemble component evidence.
+- [x] Added model-family performance and Schiff-class mix visuals to Model Inventory.
+- [x] Moved dense technical row tables into detail expanders where possible.
+- [x] Added percent-unit diagnostics for future CSV schema drift.
+- [x] Added final screenshot artifact generation and strict sprint verifier gates.
+- [x] Added loader schema cache invalidation so newly derived governance fields render in the live app after schema changes.
+- [x] Moved technical percent-unit schema diagnostics from global page warnings into Run Audit to preserve management-page first-viewport polish.
+- [x] Added enterprise readiness decision brief above the Executive Summary KPI grid with readiness, benchmark result, watch point, and Stage 2 gate.
+- [x] Added Waka Kotahi/NZTA-style text masthead, navy/lime governance palette, page indicators, and footer strip without inventing an official logo.
+- [x] Added four primary reference pages: Overview, Diagnostics, Scenario Comparison, and Schiff Benchmark.
+- [x] Added a visible governance filter bar with Stream, Model Family, Stage, Baseline, Horizon, Forecast Vintage, Date Window, and Reset Filters.
+- [x] Added JSON export for current view settings as the supported reproducible-review state artifact.
+- [x] Added Overview report composition with finalist accuracy, candidate landscape, ensemble composition, stress checks, and forecast error distribution on one management page.
+- [x] Added Diagnostics page with not-available governance cards where classical diagnostics are absent.
+- [x] Added Scenario Comparison page that falls back to finalist versus Schiff benchmark when scenario files are absent.
+- [x] Added Schiff Benchmark page with benchmark cards, paper replication notes, and pure-Schiff classification caveat.
+- [x] Added Candidate Landscape page-local CSV export for the exact filtered chart rows.
+- [x] Removed the Model Detail selector cap so all filtered model rows remain inspectable.
+- [x] Connected the top-level horizon selector to Forecasts and Errors horizon bucket defaults.
+- [x] Added structural visual-reference comparison generator and strict visual-score verifier gate.
+- [x] Added visual-defect lock and page-wireframe lock so visual-fidelity defects cannot be silently ignored.
+- [x] Replaced clipped tab labels with a compact four-page governance navigation control.
+- [x] Converted the visible filters into full-text chips with advanced controls moved behind a compact More popover.
+- [x] Fixed KPI card CSS so normal diagnostic and benchmark KPI cards no longer wrap titles into narrow icon columns.
+- [x] Removed duplicate Plotly titles from card-contained charts to prevent title/legend collisions.
+- [x] Captured browser screenshots at a wide management-review viewport to match the supplied dashboard reference.
+- [x] Ordered finalist accuracy streams as PED, Light RUC, Heavy RUC to match the report figures.
+- [x] Removed compact candidate-landscape annotations that caused label overlap in the overview grid.
+- [x] Switched the overview ensemble panel to the supplied report/reference composition while retaining selected-run solver weights in the drilldown.
+- [x] Added x-axis headroom to ensemble mini-panels so weight labels remain readable.
+- [x] Closed the visual-defect backlog with file/function/test/screenshot evidence for each defect instead of relying on generic pass/fail claims.
+- [x] Added compact Scenario Comparison KPI cards for quarterly MAPE, annual MAPE, gain vs Schiff, and stream decision status.
+- [x] Moved the Scenario Comparison decision lens below the primary chart row to improve first-viewport chart density.
+- [x] Reduced the Scenario Comparison improvement chart to one best paired challenger per stream for management readability.
+- [x] Replaced raw scenario improvement y-axis model IDs with readable stream labels.
+- [x] Rebuilt the Overview filter row as compact reference-style filter boxes with full readable values for Stream, Model Family, Baseline, Horizon, Forecast Vintage, and Date Window.
+- [x] Tightened the Overview masthead, navigation, KPI cards, and chart canvases so all five core governance modules are visible in the first management-review viewport.
+- [x] Rebuilt Diagnostics as a six-panel reference grid with KPI cards followed immediately by diagnostic charts and summary evidence.
+- [x] Added a central-error Diagnostics view so extreme residual tails do not flatten the first-viewport error-over-time chart.
+- [x] Rebuilt Scenario Comparison with compact Scenario A/B/Baseline control boxes rather than a tall selector block.
+- [x] Added a six-panel Scenario Comparison grid with model/test summary and decision lens cards visible in the first management-review viewport.
+- [x] Applied the central-error display rule to the Scenario Comparison error-distribution panel so outlier tails do not hide the central forecast-error story.
+- [x] Rebuilt the Schiff Benchmark page with a compact benchmark chart and concise replication-notes card.
+- [x] Pulled the three Schiff stream cross-validation panels into the first management-review viewport.
+- [x] Hid residual Streamlit deployment chrome from dashboard screenshots so the governance shell reads as a standalone enterprise surface.
+- [x] Aligned the Overview stress chart with the six reference/report buckets while keeping extra run-specific stress evidence on the detailed Stress page.
+- [x] Focused the Overview forecast-error box plot on the central error distribution so tail observations do not flatten the management view.
+- [x] Replaced the Diagnostics actual-vs-predicted proxy with a residual-vs-fitted scatter proxy for stronger diagnostics-page fidelity.
+- [x] Shortened the Scenario Comparison decision lens into a concise Stage 2-ready management read.
+- [x] Moved the Schiff Benchmark best paired comparison read above the fold and demoted the full paired rows to a drilldown expander.
+- [x] Clarified the Overview Governance Score KPI to show pure-Schiff benchmark coverage and logged diagnostics in the first-screen card.
+- [x] Renamed Diagnostics KPI cards to reference-style diagnostic governance labels backed by file-status and errors.csv evidence.
+- [x] Corrected the Scenario Comparison gain KPI to use percentage-point semantics and explicit Scenario A versus pure-Schiff copy.
+- [x] Added a data-backed Overview candidate-landscape frontier note naming loaded candidate and pure-Schiff benchmark counts.
+- [x] Reworked Schiff Benchmark KPI cards to use explicit pure-Schiff structural benchmark language.
+- [x] Added visible Diagnostics provenance text explaining residual/feature-count proxies and unavailable classical diagnostics.
+- [x] Added a Scenario Comparison decision-rule line explaining positive paired gain plus win-rate threshold.
+- [x] Replaced the Overview stress caption with a data-backed weakest-stream and stress-bucket readout.
+- [x] Added a Scenario Comparison drilldown cue with full forecast-error tail and stress-row counts.
+- [x] Replaced the terse run caption with a compact run-evidence line showing files-loaded coverage and data-as-of evidence.
+- [x] Added model-family scope evidence to the visible run-evidence caption.
+- [x] Replaced the Overview forecast-error caption with a data-backed prediction-row and full-tail readout.
+- [x] Added responsive masthead/page-indicator rules so the in-app browser no longer clips the current page label.
+- [x] Restyled the active primary navigation tab with navy fill and lime underline to better match the supplied reference header.
+- [x] Changed visible filter values to wrap cleanly instead of truncating with ellipses at the in-app browser width.
+- [x] Added responsive chart-card stacking for narrow browser widths so overview charts stay readable instead of squeezing three panels into one row.
+- [x] Integrated the desktop primary navigation into the masthead band so it reads closer to the supplied reference header.
+- [x] Tightened the top filter card spacing and select heights to increase first-viewport chart density.
+- [x] Added a narrow-screen override that keeps the nav below the logo/title when the browser is not wide enough for the desktop masthead treatment.
+- [x] Removed the cramped visual masthead subtitle so the header reads more like the supplied reference.
+- [x] Reworked the in-app browser Overview layout into a readable two-column dashboard grid rather than a single vertical stack or an unreadable three-panel squeeze.
+- [x] Replaced the Diagnostics autocorrelation panel with a residual ACF-by-lag bar chart from real loaded forecast-error rows.
+- [x] Shortened the Scenario Comparison settings popover to a compact Edit action so selector controls stay readable.
+- [x] Compacted the Schiff Benchmark chart and replication-notes panel so cross-validation evidence appears earlier in the viewport.
+- [x] Converted Diagnostics and Schiff Benchmark KPI rows to the reference-style icon KPI card system used by the primary governance pages.
+- [x] Fixed visible primary navigation clicks so the rendered page body follows the selected page instead of temporarily showing stale Overview content under another page chip.
+- [x] Compressed the governance filter band with a compact run-evidence line so KPI cards and Overview charts start closer to the reference viewport position.
+- [x] Hardened Diagnostics page transitions with deterministic chart-caption slots and diagnostic-specific captions so stale Overview notes no longer linger in the in-app browser screenshot evidence.
+- [x] Tightened Scenario Comparison chart heights so the improvement-vs-benchmark evidence starts higher in the in-app browser viewport without hiding labels.
+- [x] Replaced visible fake-style primary filters with directly clickable Streamlit selectboxes for Stream, Model Family, Stage, Baseline, Horizon, Forecast Vintage, and Date Window.
+- [x] Added focused browser assertions for primary dropdown opening, stream selection, chip updates, data-region updates, and reset behaviour without using the More button.
+- [x] Added shared hover-formatting helpers for human labels, model aliases, percentages, percentage points, weights, counts, and horizon labels.
+- [x] Added custom Plotly hover templates and hover screenshot evidence for finalist accuracy, candidate landscape, ensemble composition, and stress checks.
