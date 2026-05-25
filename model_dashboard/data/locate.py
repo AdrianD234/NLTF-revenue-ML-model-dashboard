@@ -36,7 +36,13 @@ def candidate_search_roots(data_root: str | Path, repo_root: str | Path | None =
     candidates.extend([DEFAULT_INFORMATION_PACK_ROOT, DEFAULT_DIAGNOSTIC_AUDIT_ROOT])
     if repo_root is not None:
         repo_path = Path(repo_root).expanduser()
-        candidates.extend([repo_path / "data", repo_path / "tests" / "fixtures" / "mini_parquet"])
+        repo_data = repo_path / "data"
+        candidates.append(repo_data)
+        mini_fixture = repo_path / "tests" / "fixtures" / "mini_parquet"
+        requested_is_repo_default = requested == repo_data or str(requested).lower() in {"data", ".\\data"}
+        requested_is_mini_fixture = requested.name.lower() == "mini_parquet"
+        if requested_is_mini_fixture or requested_is_repo_default or not requested.exists():
+            candidates.append(mini_fixture)
 
     roots: list[Path] = []
     seen: set[str] = set()

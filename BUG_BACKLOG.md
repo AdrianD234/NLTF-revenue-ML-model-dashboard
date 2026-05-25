@@ -71,6 +71,27 @@ Backlog state for the Stage 1 Model Governance Dashboard Parquet refresh and vis
 - [x] Added a regression test proving generated artifacts are ignored by governed file discovery.
 - [x] Tightened verifier compile scope to `app.py`, `model_dashboard`, and `scripts`.
 - [x] Ran `scripts/verify_dashboard.ps1` against `tests/fixtures/mini_parquet`; the sequential verifier passed through Playwright and 120 gates.
+- [x] Moved governed Parquet dashboard orchestration from `model_dashboard/data_loader.py` to `model_dashboard/data/parquet_loader.py`.
+- [x] Added a regression test proving Parquet load, finalist, Schiff, stress, horizon and ensemble frame orchestration definitions no longer live in `data_loader.py`.
+- [x] Updated the 80/120 gate cache evidence to inspect `model_dashboard/data/parquet_loader.py`.
+- [x] Re-ran `scripts/verify_dashboard.ps1` against `tests/fixtures/mini_parquet`; the sequential verifier passed through Playwright and 120 gates after the Parquet loader split.
+- [x] Moved legacy run-folder and curated CSV/XLSX review loading from `model_dashboard/data_loader.py` to `model_dashboard/data/legacy_loader.py`.
+- [x] Reduced `model_dashboard/data_loader.py` to a compatibility facade for current import sites.
+- [x] Added a regression test proving legacy review loading definitions no longer live in `data_loader.py`.
+- [x] Re-ran `scripts/verify_dashboard.ps1` against `tests/fixtures/mini_parquet`; the sequential verifier passed through Playwright and 120 gates after the legacy loader split.
+- [x] Moved chart source-table implementation from top-level `model_dashboard/chart_sources.py` to `model_dashboard/data/chart_sources.py`.
+- [x] Reduced top-level `model_dashboard/chart_sources.py` to a compatibility facade for current import sites.
+- [x] Added a regression test proving chart-source builder definitions live in the data package.
+- [x] Tightened explicit external-root discovery so the mini fixture is not mixed into the active diagnostic audit pack.
+- [x] Added focused regression coverage for fixture fallback isolation.
+
+## Open External Pack Reconciliation Items
+
+- [ ] Derive diagnostic ACF source rows from aggregate H1 residual diagnostics when selected quarterly prediction rows are absent from the active audit pack.
+- [ ] Document missing Scenario/Schiff horizon source rows for streams without real 1-12 horizon evidence under the active audit pack.
+- [ ] Update feature-completeness tests to accept explicit missing-data states for absent selected prediction CSVs while continuing to fail fixture mixing or invented values.
+- [ ] Re-run `scripts/verify_dashboard.ps1` against the active external diagnostic audit pack after the missing-data handling repair.
+- [ ] Regenerate and inspect browser screenshots from the active external diagnostic audit pack before closing the broader visual/data governance objective.
 
 ## Closure Evidence
 
@@ -80,7 +101,7 @@ Backlog state for the Stage 1 Model Governance Dashboard Parquet refresh and vis
 - Mandatory frontend interaction verification passed with 5 tests.
 - Chart source validation passed for 16 primary chart source tables.
 - 120-gate extension validation passed with 20 added source/semantic gates.
-- Fresh after-screenshots exist for Overview, Diagnostics, Scenario Comparison, and Schiff Benchmark.
+- Fresh after-screenshots exist for Overview, Diagnostics, Scenario Comparison, and Schiff Benchmark from the latest passing fixture-backed verifier path.
 - Performance benchmark measured warm cached Parquet load at under 0.01 seconds.
 
-No unchecked backlog items remain.
+Unchecked external-pack reconciliation items remain; this checkpoint is not a final completion state.

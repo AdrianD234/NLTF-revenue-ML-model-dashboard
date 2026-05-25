@@ -154,13 +154,13 @@ def build_diagnostic_acf_source_table(qpred: pd.DataFrame, max_lag: int = 12) ->
 def _status_row(dataset: str, found: Path, rows: int | None, columns: int | None) -> dict[str, Any]:
     stat = found.stat()
     return {
-        "dataset": dataset,
-        "found": True,
-        "path": str(found),
-        "rows": rows,
-        "columns": columns,
-        "modified": pd.to_datetime(stat.st_mtime, unit="s").isoformat(),
-        "size": _format_size(stat.st_size),
+        "Dataset": dataset.replace("_", " ").title(),
+        "File": found.name,
+        "Found?": "Yes",
+        "Rows": f"{rows:,}" if rows is not None else "-",
+        "Columns": f"{columns:,}" if columns is not None else "-",
+        "Size": _format_size(stat.st_size),
+        "Last modified": pd.to_datetime(stat.st_mtime, unit="s").strftime("%Y-%m-%d %H:%M"),
     }
 
 

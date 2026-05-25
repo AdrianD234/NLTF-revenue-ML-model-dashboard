@@ -981,8 +981,8 @@ def main() -> int:
         },
         {
             "name": "The app does not parse Excel on every filter interaction",
-            "status": "PASS" if text_has_all(ROOT / "model_dashboard" / "data_loader.py", ("parquet_pack_signature",)) and text_has_all(ROOT / "app.py", ("st.cache_data",)) else "FAIL",
-            "evidence": "cache signature and st.cache_data evidence checked in code",
+            "status": "PASS" if text_has_all(ROOT / "model_dashboard" / "data" / "parquet_loader.py", ("parquet_pack_signature",)) and text_has_all(ROOT / "app.py", ("st.cache_data",)) else "FAIL",
+            "evidence": "Parquet cache signature and st.cache_data evidence checked in code",
         },
         {
             "name": "The Parquet is cached using st.cache_data",
