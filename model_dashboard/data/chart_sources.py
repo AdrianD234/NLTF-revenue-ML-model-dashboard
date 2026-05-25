@@ -7,6 +7,7 @@ import pandas as pd
 
 from ..labels import STRESS_BUCKET_ORDER, format_percent, format_pp, format_count, humanize_label
 from ..metrics import best_by_stream
+from .diagnostics import DEFAULT_ACF_RESIDUAL_SCOPE, select_diagnostic_acf_scope
 
 
 CORE_COLUMNS = [
@@ -207,9 +208,7 @@ def _normalise_direct_acf(acf: pd.DataFrame) -> pd.DataFrame:
     columns = ["stream_label", "lag", "acf_value", "residual_source", "calculation_method", "source_column"]
     if acf is None or acf.empty:
         return pd.DataFrame(columns=columns)
-    out = acf.copy()
-    if "residual_source" not in out.columns and "residual_scope" in out.columns:
-        out["residual_source"] = out["residual_scope"]
+    out = select_diagnostic_acf_scope(acf, DEFAULT_ACF_RESIDUAL_SCOPE)
     for column in columns:
         if column not in out.columns:
             out[column] = pd.NA

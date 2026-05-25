@@ -281,8 +281,34 @@ def test_no_stale_finalist_values_visible(page: Page) -> None:
 def test_rendered_plotly_trace_data_matches_chart_sources_where_possible(page: Page) -> None:
     open_dashboard(page)
 
-    stress_source = pd.read_csv(CHART_SOURCE_DIR / "overview_stress_horizon_checks.csv")
+    candidate_source = pd.read_csv(CHART_SOURCE_DIR / "overview_candidate_search_frontier.csv")
     click_page(page, "Overview")
+    body_text = page.locator("body").inner_text(timeout=60000)
+    assert "287 plotted candidates from 300 curated rows" in body_text
+    assert "278 loaded candidates" not in body_text
+    candidate_plot = page.evaluate(
+        """() => {
+            const pointCount = (trace) => {
+                if (Number.isFinite(trace._length)) return trace._length;
+                if (trace.x && Number.isFinite(trace.x.length)) return trace.x.length;
+                return Array.from(trace.x || []).length;
+            };
+            const plot = [...document.querySelectorAll('.js-plotly-plot')].find((candidate) => {
+                const xTitle = candidate.layout?.xaxis?.title?.text || '';
+                const yTitle = candidate.layout?.yaxis?.title?.text || '';
+                return xTitle.includes('Quarterly MAPE') && yTitle.includes('Annual MAPE')
+                    && (candidate.data || []).some((trace) => trace.name === 'Finalist')
+                    && (candidate.data || []).some((trace) => trace.name === 'Schiff');
+            });
+            if (!plot) return null;
+            return (plot._fullData || plot.data || [])
+                .filter((trace) => String(trace.mode || '').includes('markers'))
+                .reduce((total, trace) => total + pointCount(trace), 0);
+        }"""
+    )
+    assert candidate_plot == len(candidate_source)
+
+    stress_source = pd.read_csv(CHART_SOURCE_DIR / "overview_stress_horizon_checks.csv")
     stress_plot = page.evaluate(
         """() => {
             const plot = [...document.querySelectorAll('.js-plotly-plot')].find((candidate) => {
@@ -320,6 +346,33 @@ def test_rendered_plotly_trace_data_matches_chart_sources_where_possible(page: P
                 assert browser_value_missing(rendered_value), f"{trace['name']} {bucket} should render as a gap."
             else:
                 assert float(rendered_value) == pytest.approx(float(source_value), abs=0.001)
+
+    click_page(page, "Diagnostics")
+    acf_source = pd.read_csv(CHART_SOURCE_DIR / "diagnostics_residual_autocorrelation.csv")
+    assert set(acf_source["notes"]) == {"All selected quarterly residuals averaged by target period"}
+    assert not acf_source.duplicated(["stream_label", "lag"]).any()
+    acf_plot = page.evaluate(
+        """() => {
+            const plot = [...document.querySelectorAll('.js-plotly-plot')].find((candidate) => {
+                const xTitle = candidate.layout?.xaxis?.title?.text || '';
+                const yTitle = candidate.layout?.yaxis?.title?.text || '';
+                return xTitle.includes('Lag') && yTitle.includes('Residual ACF');
+            });
+            if (!plot) return null;
+            return (plot._fullData || plot.data || []).map((trace) => ({
+                name: trace.name,
+                x: Array.from(trace.x || []),
+                y: Array.from(trace.y?._inputArray || trace.y || []),
+            }));
+        }"""
+    )
+    assert acf_plot is not None
+    for trace in acf_plot:
+        source_rows = acf_source[acf_source["stream_label"].eq(trace["name"])].sort_values("lag")
+        if source_rows.empty:
+            continue
+        assert trace["x"] == source_rows["lag"].astype(int).tolist()
+        assert [float(value) for value in trace["y"]] == pytest.approx(source_rows["metric_value"].astype(float).tolist(), abs=0.001)
 
     click_page(page, "Schiff Benchmark")
     expect(page.locator("body")).to_contain_text("3. Full-sample Gain vs Schiff", timeout=90000)

@@ -12,6 +12,8 @@ from model_dashboard.metrics import coerce_numeric, period_key
 from .locate import locate_dashboard_file
 
 
+DEFAULT_ACF_RESIDUAL_SCOPE = "All selected quarterly residuals averaged by target period"
+
 DIAGNOSTIC_NUMERIC_COLUMNS = [
     "durbin_watson",
     "adj_r2",
@@ -162,7 +164,7 @@ def build_diagnostic_acf_source_table(
                     "stream_label": stream,
                     "lag": lag,
                     "acf_value": series.autocorr(lag=lag) if len(series) > lag + 1 else pd.NA,
-                    "residual_source": "All selected quarterly prediction residuals, averaged by target period",
+                    "residual_source": DEFAULT_ACF_RESIDUAL_SCOPE,
                     "calculation_method": "pandas Series.autocorr on mean signed forecast error percentage by lag",
                     "source_column": "error_pct",
                 }
@@ -201,6 +203,30 @@ def _acf_source_from_diagnostics(diagnostics: pd.DataFrame | None, columns: list
     return pd.DataFrame(rows, columns=columns).drop_duplicates(subset=["stream_label", "lag"], keep="last")
 
 
+def select_diagnostic_acf_scope(
+    acf: pd.DataFrame | None,
+    residual_scope: str = DEFAULT_ACF_RESIDUAL_SCOPE,
+) -> pd.DataFrame:
+    """Return one governed ACF residual scope so charted lags are not mixed."""
+    columns = ["stream_label", "lag", "acf_value", "residual_source", "calculation_method", "source_column"]
+    if acf is None or acf.empty:
+        return pd.DataFrame(columns=columns)
+    out = acf.copy()
+    if "residual_source" not in out.columns and "residual_scope" in out.columns:
+        out["residual_source"] = out["residual_scope"]
+    for column in columns:
+        if column not in out.columns:
+            out[column] = pd.NA
+    selected = out[out["residual_source"].astype(str).eq(residual_scope)].copy()
+    if selected.empty:
+        selected = out.copy()
+    selected["lag"] = pd.to_numeric(selected["lag"], errors="coerce")
+    selected["acf_value"] = pd.to_numeric(selected["acf_value"], errors="coerce")
+    selected = selected.dropna(subset=["stream_label", "lag", "acf_value"])
+    selected = selected.sort_values(["stream_label", "lag"]).drop_duplicates(["stream_label", "lag"], keep="last")
+    return selected[columns]
+
+
 def _status_row(dataset: str, found: Path, rows: int | None, columns: int | None) -> dict[str, Any]:
     stat = found.stat()
     return {
@@ -223,7 +249,9 @@ def _format_size(size: int) -> str:
 
 
 __all__ = [
+    "DEFAULT_ACF_RESIDUAL_SCOPE",
     "build_diagnostic_acf_source_table",
     "build_diagnostic_frame",
     "load_diagnostic_audit_tables",
+    "select_diagnostic_acf_scope",
 ]

@@ -135,9 +135,8 @@ def test_horizon_and_diagnostic_source_tables_have_required_semantics(parquet_da
     acf = chart_source("diagnostics_residual_autocorrelation.csv")
     assert EXPECTED_STREAMS.issubset(set(acf["stream_label"]))
     acf_notes = " ".join(acf["notes"].dropna().astype(str))
-    assert (
-        "H1 residual diagnostics" in acf_notes
-    )
+    assert "All selected quarterly residuals averaged by target period" in acf_notes
+    assert not acf.duplicated(["stream_label", "lag"]).any()
 
     pass_matrix = chart_source("diagnostics_pass_matrix.csv")
     assert "Calibration R2" in set(pass_matrix["metric_name"])

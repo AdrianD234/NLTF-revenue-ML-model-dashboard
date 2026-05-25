@@ -10,6 +10,7 @@ import pandas as pd
 
 from .data.chart_sources import write_chart_source_tables
 from .data.config import DashboardData, DEFAULT_EVIDENCE_PACK_ROOT
+from .data.diagnostics import DEFAULT_ACF_RESIDUAL_SCOPE, select_diagnostic_acf_scope
 from .data.manifest import write_data_source_manifest
 from .data.transforms import normalise_parquet_candidate
 from .labels import STRESS_BUCKET_ORDER
@@ -480,10 +481,69 @@ def _write_compat_source_tables(repo_root: Path, data: dict[str, pd.DataFrame]) 
                 }
             )
     _write_csv_atomic(pd.DataFrame(horizon_rows), artifacts / "horizon_comparison_source_table.csv")
-    _write_csv_atomic(
-        data["diagnostic_acf"][["stream_label", "lag", "acf_value", "residual_source", "calculation_method"]],
-        artifacts / "diagnostic_acf_source_table.csv",
-    )
+    acf_source = select_diagnostic_acf_scope(data["diagnostic_acf"], DEFAULT_ACF_RESIDUAL_SCOPE)
+    _write_csv_atomic(acf_source, artifacts / "diagnostic_acf_source_table.csv")
+    _write_csv_atomic(_diagnostic_kpi_source_table(data["diagnostic_df"]), artifacts / "diagnostics_kpi_source_table.csv")
+    _write_diagnostic_status_rules(artifacts / "diagnostic_status_rules.md")
+
+
+def _diagnostic_kpi_source_table(diagnostics: pd.DataFrame) -> pd.DataFrame:
+    columns = [
+        "kpi",
+        "basis",
+        "stream_label",
+        "model",
+        "role",
+        "source_column",
+        "value",
+        "source_file",
+    ]
+    if diagnostics is None or diagnostics.empty:
+        return pd.DataFrame(columns=columns)
+    data = diagnostics.copy()
+    if "role" in data.columns:
+        finalists = data[data["role"].astype(str).str.contains("finalist", case=False, na=False)].copy()
+        if not finalists.empty:
+            data = finalists
+    rows: list[dict[str, Any]] = []
+    for _, row in data.iterrows():
+        for kpi, column in [
+            ("Mean Durbin-Watson", "durbin_watson"),
+            ("Mean calibration R2", "calibration_r2" if "calibration_r2" in data.columns else "adj_r2"),
+            ("Heteroscedasticity Pass", "breusch_pagan_pvalue"),
+            ("Heteroscedasticity Pass", "white_pvalue"),
+        ]:
+            if column not in data.columns:
+                continue
+            rows.append(
+                {
+                    "kpi": kpi,
+                    "basis": "Current finalist rows only",
+                    "stream_label": row.get("stream_label"),
+                    "model": row.get("model"),
+                    "role": row.get("role"),
+                    "source_column": column,
+                    "value": row.get(column),
+                    "source_file": "diagnostic_tests.parquet",
+                }
+            )
+    return pd.DataFrame(rows, columns=columns)
+
+
+def _write_diagnostic_status_rules(path: Path) -> None:
+    content = """# Diagnostic Status Rules
+
+Status: PASS
+
+Diagnostic Pass Matrix uses Pass / Watch / Fail semantics.
+
+- Core diagnostics: Durbin-Watson, ADF, KPSS, Breusch-Pagan, White and Cointegration.
+- Overall = Fail when one or more core diagnostics fail.
+- Overall = Watch when all core diagnostics pass but a non-core diagnostic such as Jarque-Bera is cautionary.
+- Overall = Pass when core diagnostics pass and no non-core caution is present.
+- Normality is advisory evidence. Jarque-Bera alone must not force Overall = Fail.
+"""
+    path.write_text(content, encoding="utf-8")
 
 
 def _write_csv_atomic(frame: pd.DataFrame, path: Path) -> None:

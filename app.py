@@ -22,7 +22,11 @@ from model_dashboard.data_loader import (
     resolve_evidence_pack_root,
     run_signature,
 )
-from model_dashboard.data.diagnostics import build_diagnostic_acf_source_table
+from model_dashboard.data.diagnostics import (
+    DEFAULT_ACF_RESIDUAL_SCOPE,
+    build_diagnostic_acf_source_table,
+    select_diagnostic_acf_scope,
+)
 from model_dashboard.labels import (
     DEFAULT_INPUT_PARENT,
     IGNORED_RUN_FOLDER_NAMES,
@@ -623,8 +627,10 @@ def render_overview(loaded: LoadedRun, controls: dict[str, Any]) -> None:
     stress_frame = overview_stress_frame(loaded, recommended)
     story = governance_story_summary(recommended, loaded.data.get("paired_vs_schiff", pd.DataFrame()), stress_frame, errors)
 
-    kpis = overview_kpi_cards(summary, recommended, story, errors)
-    gov_kpi_grid(kpis)
+    candidate_mode = st.session_state.get("candidate_frontier_mode", "Curated cone sample")
+    candidate_landscape = build_candidate_landscape_frame(loaded, controls, candidate_mode)
+    candidate_context = candidate_frontier_count_context(loaded, controls, candidate_landscape)
+    gov_kpi_grid(overview_kpi_cards(summary, recommended, story, errors, candidate_context))
     accuracy_subtitle = "Quarterly and annual MAPE by stream. Lower is better."
     if not best.empty and {"stream_label", "quarterly_mape", "annual_mape"}.issubset(best.columns):
         finalist_read = "; ".join(
@@ -645,13 +651,12 @@ def render_overview(loaded: LoadedRun, controls: dict[str, Any]) -> None:
         )
     with upper[1]:
         landscape = overview_candidate_landscape_frame(loaded, controls)
-        if controls.get("hide_outliers") and {"quarterly_mape", "annual_mape"}.issubset(landscape.columns):
-            landscape = hide_candidate_outliers(landscape)
+        candidate_context = candidate_frontier_count_context(loaded, controls, landscape)
         chart_card(
             "2. Candidate Search Frontier",
             "Each dot is a candidate model. Lower-left is better.",
             compact_figure(plot_candidate_landscape(landscape), 260),
-            overview_frontier_note(landscape),
+            overview_frontier_note(landscape, candidate_context),
         )
 
     lower = st.columns([1.0, 1.0])
@@ -705,14 +710,18 @@ def compact_figure(fig: Any, height: int, showlegend: bool | None = None) -> Any
 
 
 def overview_candidate_landscape_frame(loaded: LoadedRun, controls: dict[str, Any]) -> pd.DataFrame:
-    candidate = loaded.data.get("candidate_df", loaded.data.get("summary", pd.DataFrame()))
-    summary = loaded.data.get("summary", pd.DataFrame())
     mode = st.selectbox(
         "Candidate frontier mode",
         ["Curated cone sample", "Competitive frontier", "Top candidates only", "Show outliers"],
         key="candidate_frontier_mode",
         label_visibility="collapsed",
     )
+    return build_candidate_landscape_frame(loaded, controls, mode)
+
+
+def build_candidate_landscape_frame(loaded: LoadedRun, controls: dict[str, Any], mode: str) -> pd.DataFrame:
+    candidate = loaded.data.get("candidate_df", loaded.data.get("summary", pd.DataFrame()))
+    summary = loaded.data.get("summary", pd.DataFrame())
     if candidate.empty:
         return summary
     if mode == "Competitive frontier":
@@ -739,7 +748,50 @@ def overview_candidate_landscape_frame(loaded: LoadedRun, controls: dict[str, An
     return common_filter(landscape, controls)
 
 
-def overview_frontier_note(summary: pd.DataFrame) -> str:
+def candidate_frontier_count_context(
+    loaded: LoadedRun,
+    controls: dict[str, Any],
+    plotted: pd.DataFrame | None = None,
+) -> dict[str, Any]:
+    """Return precise candidate-count context for the KPI and frontier caption."""
+    candidate = loaded.data.get("candidate_df", pd.DataFrame())
+    if candidate is None or candidate.empty:
+        plotted_count = len(plotted) if plotted is not None else 0
+        return {
+            "count": plotted_count,
+            "label": f"{format_count(plotted_count)} filtered plotted candidates",
+            "subtext": "filtered plotted candidates",
+            "filtered": True,
+            "total_curated": 0,
+            "default_plotted": plotted_count,
+        }
+    mask = pd.Series(False, index=candidate.index)
+    for column in ["plot_default_include", "is_plot_candidate"]:
+        if column in candidate.columns:
+            mask = mask | candidate[column].fillna(False).astype(bool)
+    default_plotted = candidate[mask].copy() if mask.any() else candidate.copy()
+    filtered_default = common_filter(default_plotted, controls)
+    plotted_frame = plotted if plotted is not None else filtered_default
+    plotted_count = len(plotted_frame)
+    total_curated = len(candidate)
+    is_filtered = plotted_count != len(default_plotted)
+    if is_filtered:
+        label = f"{format_count(plotted_count)} filtered plotted candidates"
+        subtext = "filtered plotted candidates"
+    else:
+        label = f"{format_count(plotted_count)} plotted candidates from {format_count(total_curated)} curated rows"
+        subtext = f"from {format_count(total_curated)} curated rows"
+    return {
+        "count": plotted_count,
+        "label": label,
+        "subtext": subtext,
+        "filtered": is_filtered,
+        "total_curated": total_curated,
+        "default_plotted": len(default_plotted),
+    }
+
+
+def overview_frontier_note(summary: pd.DataFrame, count_context: dict[str, Any] | None = None) -> str:
     """Return a compact manager note for the Overview candidate landscape."""
     if summary is None or summary.empty:
         return "Frontier read: lower-left is better; no candidate rows are available for this filter."
@@ -747,7 +799,8 @@ def overview_frontier_note(summary: pd.DataFrame) -> str:
     if "schiff_class" in summary.columns:
         pure_schiff = int(summary["schiff_class"].astype(str).eq("Pure Schiff benchmark").sum())
     suffix = f"; {pure_schiff} pure-Schiff benchmark rows anchor the comparison" if pure_schiff else ""
-    return f"Frontier read: lower-left is better across {format_count(len(summary))} loaded candidates{suffix}."
+    label = str(count_context.get("label")) if count_context else f"{format_count(len(summary))} plotted candidates"
+    return f"Frontier read: lower-left is better across {label}{suffix}."
 
 
 def overview_stress_watch_note(stress_frame: pd.DataFrame) -> str:
@@ -809,6 +862,7 @@ def overview_kpi_cards(
     recommended: pd.DataFrame,
     story: pd.DataFrame,
     errors: pd.DataFrame,
+    candidate_context: dict[str, Any] | None = None,
 ) -> list[tuple[str, str, str, str, str, str]]:
     finalists = best_by_stream(recommended)
     schiff = best_by_stream(summary[summary["is_schiff"]]) if not summary.empty and "is_schiff" in summary.columns else pd.DataFrame()
@@ -820,10 +874,12 @@ def overview_kpi_cards(
     a_delta = schiff_a - finalist_a if pd.notna(schiff_a) and pd.notna(finalist_a) else float("nan")
     beats = int((story.get("schiff_status", pd.Series(dtype=str)) == "Beats Schiff").sum()) if story is not None and not story.empty else 0
     total = len(story) if story is not None else 0
+    candidate_count = int(candidate_context.get("count", len(summary))) if candidate_context else len(summary)
+    candidate_subtext = str(candidate_context.get("subtext", "default curated cone rows")) if candidate_context else "default curated cone rows"
     return [
         ("Quarterly MAPE", format_percent(finalist_q), f"vs. Schiff {format_percent(schiff_q)}", f"{q_delta:.2f} pp gain" if pd.notna(q_delta) else "-", "good", "Q"),
         ("Annual MAPE", format_percent(finalist_a), f"vs. Schiff {format_percent(schiff_a)}", f"{a_delta:.2f} pp gain" if pd.notna(a_delta) else "-", "good", "A"),
-        ("Plotted candidates", format_count(len(summary)), "default curated cone rows", f"{format_count(len(recommended))} finalists", "good", "#"),
+        ("Plotted candidates", format_count(candidate_count), candidate_subtext, f"{format_count(len(recommended))} finalists", "good", "#"),
         (
             "Benchmark Pass",
             f"{beats}/{total}",
@@ -881,8 +937,8 @@ def diagnostic_kpi_cards(diagnostic_df: pd.DataFrame) -> list[tuple[str, str, st
     hetero_total = int(max(len(finalists), 0))
     return [
         ("Diagnostics Coverage", f"{available}/9", "diagnostic fields available", "", "good" if available >= 6 else "mixed", "D"),
-        ("Mean Durbin-Watson", f"{dw:.2f}" if pd.notna(dw) else "-", "Near 2.0 is ideal", "", "good", "DW"),
-        ("Mean calibration R2", f"{adj_r2:.2f}" if pd.notna(adj_r2) else "-", "Mincer-Zarnowitz calibration", "", "good", "R2"),
+        ("Mean Durbin-Watson", f"{dw:.2f}" if pd.notna(dw) else "-", "Current finalists only; near 2.0 is ideal", "", "good", "DW"),
+        ("Mean calibration R2", f"{adj_r2:.2f}" if pd.notna(adj_r2) else "-", "Current finalists only; Mincer-Zarnowitz calibration", "", "good", "R2"),
         ("Heteroscedasticity Pass", f"{hetero_pass}/{hetero_total}", "Breusch-Pagan or White across streams", "", "good" if hetero_total and hetero_pass == hetero_total else "mixed", "H"),
     ]
 
@@ -899,15 +955,17 @@ def render_diagnostics(loaded: LoadedRun, controls: dict[str, Any]) -> None:
     qpred = common_filter(loaded.data.get("quarterly_predictions", pd.DataFrame()), controls, include_source_variant=False)
     diagnostic_qpred = central_error_window(qpred)
     supplied_acf = loaded.data.get("diagnostic_acf", pd.DataFrame())
-    acf_source = common_filter(supplied_acf, controls, include_source_variant=False) if not supplied_acf.empty else build_diagnostic_acf_source_table(qpred, diagnostic_df)
+    if not supplied_acf.empty:
+        acf_source = select_diagnostic_acf_scope(supplied_acf, DEFAULT_ACF_RESIDUAL_SCOPE)
+        acf_source = common_filter(acf_source, controls, include_source_variant=False)
+    else:
+        acf_source = build_diagnostic_acf_source_table(qpred, diagnostic_df)
     residual_scope = (
         ", ".join(sorted(acf_source["residual_source"].dropna().astype(str).unique()))
         if not acf_source.empty and "residual_source" in acf_source.columns
         else "selected residuals"
     )
-    acf_subtitle = (
-        f"Residual ACF by lag using {residual_scope}."
-    )
+    acf_subtitle = f"Residual ACF by lag using {residual_scope}."
     error_distribution = loaded.data.get("error_distribution", pd.DataFrame())
     error_distribution = (
         common_filter(error_distribution, controls, include_source_variant=False)

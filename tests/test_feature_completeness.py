@@ -263,7 +263,7 @@ def test_overview_frontier_note_is_data_backed(loaded_validation_run: LoadedRun)
     note = overview_frontier_note(loaded_validation_run.data["summary"])
 
     assert "Frontier read: lower-left is better" in note
-    assert "loaded candidates" in note
+    assert "plotted candidates" in note
     assert str(len(loaded_validation_run.data["summary"])) in note
     assert "pure-Schiff benchmark rows" in note
 

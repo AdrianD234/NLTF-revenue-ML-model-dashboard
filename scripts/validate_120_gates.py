@@ -166,13 +166,11 @@ def main() -> int:
         if not EXPECTED_STREAMS.issubset(set(table["stream_label"])):
             raise AssertionError("ACF source table missing streams.")
         notes = " ".join(table["notes"].dropna().astype(str))
-        if (
-            "All selected quarterly prediction residuals" not in notes
-            and "H1 residual diagnostics from diagnostic audit pack" not in notes
-            and "H1 residual diagnostics" not in notes
-        ):
-            raise AssertionError("ACF residual source is not documented on every row.")
-        return "ACF chart source table exists and documents residual source."
+        if "All selected quarterly residuals averaged by target period" not in notes:
+            raise AssertionError("ACF residual source is not the governed all-residual plotted scope.")
+        if table.duplicated(["stream_label", "lag"]).any():
+            raise AssertionError("ACF source table mixes duplicate stream/lag rows.")
+        return "ACF chart source table uses one documented residual scope."
 
     def check_r2_label() -> str:
         app_text = read_text("app.py")

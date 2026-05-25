@@ -1317,7 +1317,7 @@ def plot_schiff_finalist_mape(comparison: pd.DataFrame) -> go.Figure:
         comparison[["finalist_quarterly_mape", "schiff_quarterly_mape", "finalist_annual_mape", "schiff_annual_mape"]].stack(),
         errors="coerce",
     ).max()
-    fig = make_subplots(rows=1, cols=2, subplot_titles=["Quarterly MAPE", "Annual MAPE"], shared_yaxes=True, horizontal_spacing=0.10)
+    fig = make_subplots(rows=1, cols=2, subplot_titles=["Quarterly MAPE", "Annual MAPE"], shared_yaxes=True, horizontal_spacing=0.14)
     for col, (schiff_col, finalist_col) in enumerate(
         [
             ("schiff_quarterly_mape", "finalist_quarterly_mape"),
@@ -1325,30 +1325,47 @@ def plot_schiff_finalist_mape(comparison: pd.DataFrame) -> go.Figure:
         ],
         start=1,
     ):
+        for _, row in comparison.iterrows():
+            fig.add_trace(
+                go.Scatter(
+                    x=[row[schiff_col], row[finalist_col]],
+                    y=[row["stream_label"], row["stream_label"]],
+                    mode="lines",
+                    line={"color": "#CBD5E1", "width": 2},
+                    hoverinfo="skip",
+                    showlegend=False,
+                ),
+                row=1,
+                col=col,
+            )
         for label, column, color in [
             ("Schiff (pure)", schiff_col, "#002B5C"),
             ("Finalist (refined)", finalist_col, "#A7C800"),
         ]:
-            fig.add_bar(
-                x=comparison["stream_label"],
-                y=comparison[column],
+            fig.add_trace(
+                go.Scatter(
+                    x=comparison[column],
+                    y=comparison["stream_label"],
+                    mode="markers+text",
                 name=label,
-                marker_color=color,
+                    marker={"color": color, "size": 12, "line": {"width": 1, "color": "#0f172a"}},
                 text=comparison[column].map(lambda value: format_percent(value)),
-                textposition="outside",
-                customdata=comparison[["stream_label"]].to_numpy(),
-                hovertemplate="<b>%{customdata[0]}</b><br>" + label + ": %{y:.2f}%<extra></extra>",
+                    textposition="top center",
+                    customdata=comparison[["stream_label"]].to_numpy(),
+                    hovertemplate="<b>%{customdata[0]}</b><br>" + label + ": %{x:.2f}%<extra></extra>",
                 showlegend=col == 1,
+                ),
+                row=1,
+                col=col,
             )
-        fig.update_yaxes(title_text="MAPE (%)", row=1, col=col)
+        fig.update_xaxes(title_text="MAPE (%)", row=1, col=col)
         if pd.notna(max_value):
-            fig.update_yaxes(range=[0, float(max_value) * 1.28], row=1, col=col)
+            fig.update_xaxes(range=[0, float(max_value) * 1.18], row=1, col=col)
     for annotation in fig.layout.annotations:
         annotation.y = 1.08
         annotation.font = {"size": 13, "color": "#002B5C"}
     fig = apply_layout(fig, "Schiff versus finalist MAPE", height=380)
     fig.update_layout(
-        barmode="group",
         legend={"orientation": "h", "yanchor": "bottom", "y": 1.16, "xanchor": "center", "x": 0.5, "font": {"size": 10}},
         margin={"l": 42, "r": 20, "t": 66, "b": 48},
     )

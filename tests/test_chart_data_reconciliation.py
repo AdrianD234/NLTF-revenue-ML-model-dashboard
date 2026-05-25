@@ -7,7 +7,11 @@ import pandas as pd
 import pytest
 
 from app import (
+    DEFAULT_ACF_RESIDUAL_SCOPE,
+    build_candidate_landscape_frame,
+    candidate_frontier_count_context,
     diagnostic_kpi_cards,
+    overview_frontier_note,
     overview_kpi_cards,
     scenario_comparison_frame,
     scenario_horizon_frame,
@@ -16,6 +20,7 @@ from model_dashboard.data_loader import DEFAULT_EVIDENCE_PACK_ROOT, LoadedRun, l
 from model_dashboard.metrics import governance_story_summary
 from model_dashboard.plots import (
     plot_autocorrelation_diagnostics,
+    plot_candidate_landscape,
     plot_diagnostic_pass_matrix,
     plot_improvement_vs_benchmark,
     plot_residual_vs_fitted,
@@ -142,10 +147,10 @@ def test_acf_source_table_exists(parquet_dashboard: LoadedRun) -> None:
 def test_acf_chart_uses_documented_residual_source(parquet_dashboard: LoadedRun) -> None:
     table = read_source_table("diagnostic_acf_source_table.csv")
     source = set(table["residual_source"].dropna().astype(str))
-    assert source
-    assert all("residual" in value.lower() or "h1" in value.lower() for value in source)
+    assert source == {DEFAULT_ACF_RESIDUAL_SCOPE}
+    assert not table.duplicated(["stream_label", "lag"]).any()
     app_text = (ROOT / "app.py").read_text(encoding="utf-8")
-    assert "residual_scope" in app_text
+    assert "DEFAULT_ACF_RESIDUAL_SCOPE" in app_text
 
 
 def test_acf_lag1_matches_source_table(parquet_dashboard: LoadedRun) -> None:
@@ -159,11 +164,40 @@ def test_acf_lag1_matches_source_table(parquet_dashboard: LoadedRun) -> None:
         assert list(map(float, trace.y)) == pytest.approx(source_rows["acf_value"].astype(float).tolist(), abs=1e-12)
 
 
+def test_acf_plotted_scope_equals_selected_scope(parquet_dashboard: LoadedRun) -> None:
+    table = read_source_table("diagnostic_acf_source_table.csv")
+    raw = parquet_dashboard.data["diagnostic_acf"]
+    expected = raw[raw["residual_source"].astype(str).eq(DEFAULT_ACF_RESIDUAL_SCOPE)].copy()
+    expected["lag"] = pd.to_numeric(expected["lag"], errors="coerce")
+    expected["acf_value"] = pd.to_numeric(expected["acf_value"], errors="coerce")
+    expected = expected.dropna(subset=["stream_label", "lag", "acf_value"]).sort_values(["stream_label", "lag"])
+    actual = table.sort_values(["stream_label", "lag"])
+    assert len(actual) == 36
+    assert not actual.duplicated(["stream_label", "lag"]).any()
+    assert list(actual["stream_label"]) == list(expected["stream_label"])
+    assert list(actual["lag"]) == list(expected["lag"])
+    assert actual["acf_value"].astype(float).tolist() == pytest.approx(expected["acf_value"].astype(float).tolist(), abs=1e-12)
+
+
 def test_r2_kpi_label_matches_source_field(parquet_dashboard: LoadedRun) -> None:
     cards = diagnostic_kpi_cards(parquet_dashboard.data["diagnostic_df"])
     titles = [card[0] for card in cards]
     assert "Mean calibration R2" in titles
     assert "Mean Adjusted R2" not in titles
+
+
+def test_diagnostics_kpi_basis_is_current_finalists_only(parquet_dashboard: LoadedRun) -> None:
+    diagnostics = parquet_dashboard.data["diagnostic_df"]
+    finalists = diagnostics[diagnostics["role"].astype(str).str.contains("finalist", case=False, na=False)]
+    cards = {card[0]: card for card in diagnostic_kpi_cards(diagnostics)}
+    expected_dw = pd.to_numeric(finalists["durbin_watson"], errors="coerce").mean()
+    expected_r2 = pd.to_numeric(finalists["adj_r2"], errors="coerce").mean()
+    assert cards["Mean Durbin-Watson"][1] == f"{expected_dw:.2f}"
+    assert cards["Mean calibration R2"][1] == f"{expected_r2:.2f}"
+    assert "Current finalists only" in cards["Mean Durbin-Watson"][2]
+    assert "Current finalists only" in cards["Mean calibration R2"][2]
+    kpi_source = pd.read_csv(ARTIFACTS / "diagnostics_kpi_source_table.csv")
+    assert set(kpi_source["basis"]) == {"Current finalist rows only"}
 
 
 def test_residual_vs_fitted_axis_label_not_misleading(parquet_dashboard: LoadedRun) -> None:
@@ -211,10 +245,56 @@ def test_diagnostic_overall_status_does_not_hard_fail_on_normality_only() -> Non
     assert overall_values == ["Watch"]
 
 
+def test_diagnostic_status_rules_document_core_failure_basis() -> None:
+    rules = (ARTIFACTS / "diagnostic_status_rules.md").read_text(encoding="utf-8")
+    assert "Overall = Fail when one or more core diagnostics fail" in rules
+    assert "Jarque-Bera alone must not force Overall = Fail" in rules
+
+
 def test_candidate_count_label_matches_count_source(parquet_dashboard: LoadedRun) -> None:
     data = parquet_dashboard.data
     story = governance_story_summary(data["recommended"], data["paired_vs_schiff"], data["stress"], data["errors"])
-    cards = overview_kpi_cards(data["summary"], data["recommended"], story, data["errors"])
+    context = candidate_frontier_count_context(parquet_dashboard, default_controls(), data["summary"])
+    cards = overview_kpi_cards(data["summary"], data["recommended"], story, data["errors"], context)
     titles = [card[0] for card in cards]
     assert "Plotted candidates" in titles
     assert "Candidate Models" not in titles
+    candidate = data["candidate_df"]
+    source_count = int(
+        (
+            candidate["plot_default_include"].fillna(False).astype(bool)
+            | candidate["is_plot_candidate"].fillna(False).astype(bool)
+        ).sum()
+    )
+    assert context["count"] == source_count == len(data["summary"]) == 287
+    assert context["label"] == "287 plotted candidates from 300 curated rows"
+    assert overview_frontier_note(data["summary"], context).startswith(
+        "Frontier read: lower-left is better across 287 plotted candidates from 300 curated rows"
+    )
+
+
+def test_candidate_frontier_count_matches_source_table_and_trace_points(parquet_dashboard: LoadedRun) -> None:
+    controls = default_controls()
+    landscape = build_candidate_landscape_frame(parquet_dashboard, controls, "Curated cone sample")
+    context = candidate_frontier_count_context(parquet_dashboard, controls, landscape)
+    source = pd.read_csv(ARTIFACTS / "chart_sources" / "overview_candidate_search_frontier.csv")
+    fig = plot_candidate_landscape(landscape)
+    rendered_marker_points = sum(len(trace.x) for trace in fig.data if getattr(trace, "mode", "") and "markers" in str(trace.mode))
+    assert len(source) == context["count"] == rendered_marker_points == 287
+
+
+def default_controls() -> dict[str, object]:
+    return {
+        "stage": "all",
+        "streams": ["PED VKT per capita", "Light RUC volume", "Heavy RUC volume"],
+        "source_families": None,
+        "variants": None,
+        "top_n": 50,
+        "show_schiff": True,
+        "show_finalists": True,
+        "show_screen": True,
+        "show_final": True,
+        "show_static": True,
+        "show_prequential": True,
+        "hide_outliers": True,
+    }

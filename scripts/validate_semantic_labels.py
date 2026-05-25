@@ -42,8 +42,8 @@ def validate() -> list[tuple[str, str, str]]:
 
     record(
         "Candidate count label is precise",
-        "Plotted candidates" in app_text and "Candidate Models" not in app_text,
-        "Overview KPI should identify plotted/default candidate rows rather than a vague candidate count.",
+        "Plotted candidates" in app_text and "plotted candidates from" in app_text and "loaded candidates" not in app_text and "Candidate Models" not in app_text,
+        "Overview KPI and frontier caption identify plotted candidate rows rather than vague loaded/model counts.",
     )
     record(
         "Calibration R2 is not labelled adjusted R2",

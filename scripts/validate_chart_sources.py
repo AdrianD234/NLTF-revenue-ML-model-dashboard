@@ -136,13 +136,11 @@ def validate() -> list[tuple[str, str, str]]:
     acf = read_table("diagnostics_residual_autocorrelation.csv")
     acf_notes = " ".join(acf["notes"].dropna().astype(str))
     record(
-        "ACF source table documents residual source",
+        "ACF source table uses one documented residual scope",
         EXPECTED_STREAMS.issubset(set(acf["stream_label"]))
-        and (
-            "All selected quarterly residuals" in acf_notes
-            or "H1 residual diagnostics" in acf_notes
-        ),
-        f"rows={len(acf):,}",
+        and "All selected quarterly residuals averaged by target period" in acf_notes
+        and not acf.duplicated(["stream_label", "lag"]).any(),
+        f"rows={len(acf):,}; scopes={sorted(set(acf['notes'].dropna().astype(str)))}",
     )
 
     pass_matrix = read_table("diagnostics_pass_matrix.csv")
