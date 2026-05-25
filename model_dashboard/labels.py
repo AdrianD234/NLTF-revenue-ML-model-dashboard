@@ -6,12 +6,9 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+from .data.config import DEFAULT_BESPOKE_PARENT, DEFAULT_INPUT_PARENT
 
-PROJECT_ROOT = Path(
-    r"C:\Users\Adrian Desilvestro\OneDrive\Documents\Playground\Revenue Modeling - Strategic Review"
-)
-DEFAULT_INPUT_PARENT = PROJECT_ROOT / "04 Models" / "Inputs"
-DEFAULT_BESPOKE_PARENT = DEFAULT_INPUT_PARENT / "bespoke_solver_stage1_outputs"
+
 IGNORED_RUN_FOLDER_NAMES = {"run_20260519_150434"}
 
 STREAM_LABELS = {

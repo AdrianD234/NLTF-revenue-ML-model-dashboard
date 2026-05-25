@@ -1,6 +1,6 @@
 param(
     [string]$Python = "",
-    [string]$DataRoot = "C:\Users\Adrian Desilvestro\OneDrive\Documents\Playground\Revenue Modeling - Strategic Review\04 Models\model_diagnostic_audit_pack",
+    [string]$DataRoot = "",
     [int]$Port = 8501,
     [int]$StartupTimeoutSeconds = 90
 )
@@ -21,12 +21,22 @@ if ([string]::IsNullOrWhiteSpace($Python)) {
         $Python = $pathPython.Source
     }
     else {
-        $Python = "C:\Users\Adrian Desilvestro\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe"
+        $Python = "python"
     }
 }
 
-if (-not (Test-Path -LiteralPath $Python)) {
+if ($Python -ne "python" -and -not (Test-Path -LiteralPath $Python)) {
     throw "Python executable not found: $Python"
+}
+
+if ([string]::IsNullOrWhiteSpace($DataRoot)) {
+    $DataRoot = $env:MODEL_DIAGNOSTIC_DATA_ROOT
+}
+if ([string]::IsNullOrWhiteSpace($DataRoot)) {
+    $DataRoot = $env:STAGE1_DASHBOARD_DATA_ROOT
+}
+if ([string]::IsNullOrWhiteSpace($DataRoot)) {
+    $DataRoot = "data"
 }
 
 function Invoke-Checked {

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import datetime
 import json
 from pathlib import Path
 from typing import Any
@@ -9,6 +7,19 @@ from typing import Any
 import pandas as pd
 
 from .chart_sources import write_chart_source_tables
+from .data.config import (
+    DEFAULT_DIAGNOSTIC_AUDIT_ROOT,
+    DEFAULT_DIAGNOSTIC_DATA_ROOT,
+    DEFAULT_INFORMATION_PACK_ROOT,
+    DashboardData,
+    PARQUET_CANDIDATE_FILE,
+    PARQUET_METADATA_FILE,
+    PARQUET_CSV_MIRROR_FILE,
+)
+from .data.legacy_loader import legacy_review_warning
+from .data.locate import candidate_search_roots as governed_candidate_search_roots
+from .data.locate import locate_dashboard_file as governed_locate_dashboard_file
+from .data.manifest import build_data_source_manifest, write_data_source_manifest
 from .labels import IGNORED_RUN_FOLDER_NAMES, STRESS_BUCKET_ORDER, humanize_label, schiff_class, stream_label
 from .metrics import (
     add_stream_fields,
@@ -28,15 +39,7 @@ from .metrics import (
 from .schema import FILE_ALIASES, SHEET_HINTS, WORKBOOK_ALIASES, WORKBOOK_DATASETS
 
 
-DEFAULT_INFORMATION_PACK_ROOT = Path(
-    r"C:\Users\Adrian Desilvestro\OneDrive\Documents\Playground\Revenue Modeling - Strategic Review\04 Models\information pack"
-)
-DEFAULT_DIAGNOSTIC_AUDIT_ROOT = Path(
-    r"C:\Users\Adrian Desilvestro\OneDrive\Documents\Playground\Revenue Modeling - Strategic Review\04 Models\model_diagnostic_audit_pack"
-)
-DEFAULT_DIAGNOSTIC_DATA_ROOT = DEFAULT_INFORMATION_PACK_ROOT
-PARQUET_CANDIDATE_FILE = "stage1_curated_candidate_cone.parquet"
-PARQUET_METADATA_FILE = "stage1_curated_candidate_cone_metadata.json"
+LoadedRun = DashboardData
 
 CORE_PARQUET_COLUMNS = [
     "stream",
@@ -154,15 +157,6 @@ STALE_FINALIST_VALUES = {
     "HEAVY_RUC": 12.38,
 }
 
-
-@dataclass(frozen=True)
-class LoadedRun:
-    run_dir: Path
-    data: dict[str, pd.DataFrame]
-    file_status: pd.DataFrame
-    warnings: tuple[str, ...]
-
-
 CURATED_FILE_MAP = {
     "finalist_accuracy": "finalist_accuracy.csv",
     "candidate_landscape": "candidate_landscape_sample.csv",
@@ -242,34 +236,11 @@ def parquet_pack_signature(data_root: str | Path, repo_root: str | Path | None =
 
 
 def _candidate_search_roots(data_root: str | Path, repo_root: str | Path | None = None) -> list[Path]:
-    candidates = [
-        Path(data_root).expanduser(),
-        DEFAULT_INFORMATION_PACK_ROOT,
-        DEFAULT_DIAGNOSTIC_AUDIT_ROOT,
-    ]
-    if repo_root is not None:
-        candidates.append(Path(repo_root).expanduser())
-    roots: list[Path] = []
-    seen: set[str] = set()
-    for root in candidates:
-        key = str(root).lower()
-        if key not in seen:
-            roots.append(root)
-            seen.add(key)
-    return roots
+    return governed_candidate_search_roots(data_root, repo_root)
 
 
 def locate_dashboard_file(filename: str, roots: list[Path] | tuple[Path, ...]) -> Path | None:
-    for root in roots:
-        if not root.exists():
-            continue
-        direct = root / filename
-        if direct.exists() and direct.is_file():
-            return direct
-        matches = sorted(root.rglob(filename), key=lambda path: (len(path.parts), str(path).lower()))
-        if matches:
-            return matches[0]
-    return None
+    return governed_locate_dashboard_file(filename, roots)
 
 
 def curated_manifest_matches(curated_dir: Path, run_dir: str | Path) -> bool:
@@ -294,6 +265,19 @@ def load_parquet_dashboard(
     warnings: list[str] = []
     parquet_path = locate_dashboard_file(PARQUET_CANDIDATE_FILE, roots)
     metadata_path = locate_dashboard_file(PARQUET_METADATA_FILE, roots)
+    csv_mirror_path = locate_dashboard_file(PARQUET_CSV_MIRROR_FILE, roots)
+    diagnostic_paths = {
+        filename: path
+        for filename in [
+            "model_diagnostic_audit_tables.xlsx",
+            "model_diagnostic_audit_report.md",
+            "diagnostic_pass_matrix.csv",
+            "h1_residual_diagnostics_our_vs_schiff.csv",
+            "model_summary_our_vs_schiff.csv",
+            "paired_common_forecast_pairs_our_vs_schiff.csv",
+        ]
+        if (path := locate_dashboard_file(filename, roots)) is not None
+    }
     repo_path = Path(repo_root).expanduser() if repo_root is not None else Path.cwd()
     if parquet_path is None:
         message = (
@@ -310,12 +294,22 @@ def load_parquet_dashboard(
         raw_candidate = pd.read_parquet(parquet_path)
         source_path = parquet_path
 
+    source_manifest = build_data_source_manifest(
+        requested_data_root=data_root,
+        search_roots=roots,
+        parquet_path=parquet_path,
+        metadata_path=metadata_path,
+        csv_mirror_path=csv_mirror_path,
+        diagnostic_paths=diagnostic_paths,
+        source_mode="parquet" if parquet_path is not None else "legacy_csv_preview",
+    )
+    write_data_source_manifest(repo_path, source_manifest)
     metadata = _read_json_file(metadata_path) if metadata_path else {}
     candidate = normalise_parquet_candidate(raw_candidate)
     data, status_rows, build_warnings = _build_dashboard_frames(candidate, roots, repo_path, metadata, source_path)
     warnings.extend(build_warnings)
     status = pd.DataFrame(status_rows)
-    return LoadedRun(source_path.parent, data, status, tuple(warnings))
+    return LoadedRun(source_path.parent, data, status, tuple(warnings), source_manifest)
 
 
 def _load_csv_preview_candidate(repo_root: Path) -> pd.DataFrame:
@@ -1034,13 +1028,25 @@ def _write_reconciliation_source_tables(repo_root: Path, data: dict[str, pd.Data
     write_chart_source_tables(repo_root, data)
 
 
-def load_curated_run(curated_dir: str | Path, run_dir: str | Path) -> LoadedRun:
+def load_curated_run(
+    curated_dir: str | Path,
+    run_dir: str | Path,
+    data_root: str | Path | None = None,
+    artifact_root: str | Path | None = None,
+) -> LoadedRun:
     curated_path = Path(curated_dir).expanduser()
     run_path = Path(run_dir).expanduser()
-    warnings: list[str] = []
+    warnings: list[str] = [legacy_review_warning(run_path)]
+    manifest = {
+        "source_mode": "legacy_curated_review",
+        "requested_data_root": str(Path(data_root).expanduser()) if data_root is not None else "",
+        "legacy_run_dir": str(run_path),
+        "curated_dir": str(curated_path),
+    }
+    write_data_source_manifest(artifact_root or Path.cwd(), manifest)
     if not curated_path.exists() or not curated_path.is_dir():
         warnings.append(f"Curated data directory does not exist: {curated_path}")
-        return LoadedRun(run_path, {}, _empty_status_frame(), tuple(warnings))
+        return LoadedRun(run_path, {}, _empty_status_frame(), tuple(warnings), manifest)
 
     if not curated_manifest_matches(curated_path, run_path):
         warnings.append(f"Curated manifest does not match active run folder: {run_path}")
@@ -1106,7 +1112,7 @@ def load_curated_run(curated_dir: str | Path, run_dir: str | Path) -> LoadedRun:
         "curated_manifest": pd.DataFrame([_load_manifest_row(curated_path)]),
     }
     status = pd.DataFrame(status_rows)
-    return LoadedRun(run_path, data, status, tuple(warnings))
+    return LoadedRun(run_path, data, status, tuple(warnings), manifest)
 
 
 def _load_manifest_row(curated_dir: Path) -> dict[str, Any]:
@@ -1122,12 +1128,22 @@ def _load_manifest_row(curated_dir: Path) -> dict[str, Any]:
     return row
 
 
-def load_run(run_dir: str | Path) -> LoadedRun:
+def load_run(
+    run_dir: str | Path,
+    data_root: str | Path | None = None,
+    artifact_root: str | Path | None = None,
+) -> LoadedRun:
     path = Path(run_dir).expanduser()
-    warnings: list[str] = []
+    warnings: list[str] = [legacy_review_warning(path)]
+    manifest = {
+        "source_mode": "legacy_run_folder_review",
+        "requested_data_root": str(Path(data_root).expanduser()) if data_root is not None else "",
+        "legacy_run_dir": str(path),
+    }
+    write_data_source_manifest(artifact_root or Path.cwd(), manifest)
     if not path.exists() or not path.is_dir():
         warnings.append(f"Run folder does not exist or is not a directory: {path}")
-        return LoadedRun(path, {}, _empty_status_frame(), tuple(warnings))
+        return LoadedRun(path, {}, _empty_status_frame(), tuple(warnings), manifest)
 
     raw_data: dict[str, pd.DataFrame] = {}
     status_rows: list[dict[str, Any]] = []
@@ -1183,7 +1199,7 @@ def load_run(run_dir: str | Path) -> LoadedRun:
         warnings.extend(percent_unit_warnings(frame, dataset))
 
     status = pd.DataFrame(status_rows)
-    return LoadedRun(path, data, status, tuple(warnings))
+    return LoadedRun(path, data, status, tuple(warnings), manifest)
 
 
 def _read_tabular_dataset(

@@ -22,7 +22,6 @@ from model_dashboard.data_loader import (
     run_signature,
 )
 from model_dashboard.labels import (
-    DEFAULT_BESPOKE_PARENT,
     DEFAULT_INPUT_PARENT,
     IGNORED_RUN_FOLDER_NAMES,
     TERM_HELP,
@@ -92,12 +91,7 @@ from model_dashboard.ui import (
 )
 
 
-LOADER_SCHEMA_VERSION = "stage1-governance-loader-v7-schiff-class-source-table-reconciliation"
-LATEST_ARBITRATION_RUN = (
-    DEFAULT_INPUT_PARENT
-    / "stage1_finalist_arbitration_outputs"
-    / "run_20260520_002339"
-)
+LOADER_SCHEMA_VERSION = "stage1-governance-loader-v8-parquet-contract"
 CURATED_DATA_DIR = Path("artifacts") / "curated_data"
 
 
@@ -211,35 +205,17 @@ def render_primary_navigation(pages: list[str]) -> str:
 
 
 def render_run_sidebar() -> str:
-    default_runs = [
-        Path(path)
-        for path in cached_discover_run_folders(
-            str(DEFAULT_INPUT_PARENT),
-            tuple(sorted(IGNORED_RUN_FOLDER_NAMES)),
-            directory_signature(DEFAULT_INPUT_PARENT),
-        )
-    ]
-    configured_run = os.environ.get("MODEL_RUN_DIR") or os.environ.get("STAGE1_MODEL_RUN_DIR")
-    preferred_run = Path(configured_run).expanduser() if configured_run else LATEST_ARBITRATION_RUN
-    default_active = preferred_run if preferred_run.exists() else default_runs[0] if default_runs else preferred_run
-    if not default_active.exists():
-        default_active = DEFAULT_BESPOKE_PARENT
-    active_candidate = Path(str(st.session_state.get("active_run_path", default_active))).expanduser()
-    if (
-        not active_candidate.is_dir()
-        or not active_candidate.name.startswith("run_")
-        or active_candidate.name in IGNORED_RUN_FOLDER_NAMES
-    ):
-        active_path = str(default_active)
-        st.session_state["active_run_path"] = active_path
-    else:
-        active_path = str(active_candidate)
-    return active_path
+    data_root = Path(
+        os.environ.get("MODEL_DIAGNOSTIC_DATA_ROOT")
+        or os.environ.get("STAGE1_DASHBOARD_DATA_ROOT")
+        or DEFAULT_DIAGNOSTIC_DATA_ROOT
+    ).expanduser()
+    st.session_state["active_data_root"] = str(data_root)
+    return str(data_root)
 
 
 def load_active_run(active_path: str) -> LoadedRun | None:
-    path = Path(active_path).expanduser()
-    data_root = Path(os.environ.get("MODEL_DIAGNOSTIC_DATA_ROOT") or DEFAULT_DIAGNOSTIC_DATA_ROOT).expanduser()
+    data_root = Path(active_path).expanduser()
     repo_root = Path(__file__).resolve().parent
     with st.spinner(f"Loading Parquet-backed dashboard data from {data_root}..."):
         try:
@@ -254,25 +230,11 @@ def load_active_run(active_path: str) -> LoadedRun | None:
         except Exception as exc:
             warning_panel(f"Parquet dashboard pack could not be loaded: {exc}")
 
-    with st.spinner(f"Loading fallback run outputs from {path}..."):
-        curated_path = CURATED_DATA_DIR
-        if curated_manifest_matches(curated_path, path):
-            loaded = cached_load_curated_run(
-                str(curated_path),
-                str(path),
-                curated_signature(curated_path),
-                run_signature(path),
-                LOADER_SCHEMA_VERSION,
-            )
-        else:
-            loaded = cached_load_run(str(path), run_signature(path), LOADER_SCHEMA_VERSION)
-    if not path.exists() or not path.is_dir():
-        warning_panel(f"Active run folder is not available: {path}")
-        return None
-    if not loaded.data or not any(not frame.empty for frame in loaded.data.values()):
-        warning_panel("No readable model-run outputs were found.")
-        return None
-    return loaded
+    warning_panel(
+        "No governed Parquet dashboard data was loaded. Legacy run-folder CSV/XLSX outputs are available "
+        "only through review utilities, not the main dashboard path."
+    )
+    return None
 
 
 def is_schema_diagnostic_warning(text: str) -> bool:
@@ -507,35 +469,29 @@ def render_top_filter_bar(loaded: LoadedRun, controls: dict[str, Any]) -> dict[s
 
 
 def render_advanced_controls(loaded: LoadedRun, controls: dict[str, Any]) -> dict[str, Any]:
-    st.markdown("**Run and advanced controls**")
-    parent_text = st.text_input("Run parent folder", value=str(DEFAULT_INPUT_PARENT), key="run_parent_inline")
-    parent_path = Path(parent_text).expanduser()
-    refresh_discovery = st.button("Refresh run list", key="refresh_run_list_inline")
-    if refresh_discovery:
-        st.session_state["discovered_run_paths"] = list(
-            cached_discover_run_folders(
-                str(parent_path),
-                tuple(sorted(IGNORED_RUN_FOLDER_NAMES)),
-                directory_signature(parent_path),
+    st.markdown("**Advanced controls**")
+    with st.expander("Legacy run-folder review", expanded=False):
+        st.caption("Legacy CSV/XLSX run folders are review-only and do not replace the governed Parquet dashboard source.")
+        parent_text = st.text_input("Run parent folder", value=str(DEFAULT_INPUT_PARENT), key="run_parent_inline")
+        parent_path = Path(parent_text).expanduser()
+        refresh_discovery = st.button("Refresh run list", key="refresh_run_list_inline")
+        if refresh_discovery:
+            st.session_state["discovered_run_paths"] = list(
+                cached_discover_run_folders(
+                    str(parent_path),
+                    tuple(sorted(IGNORED_RUN_FOLDER_NAMES)),
+                    directory_signature(parent_path),
+                )
             )
-        )
-    elif "discovered_run_paths" not in st.session_state:
-        active_run = str(st.session_state.get("active_run_path", ""))
-        st.session_state["discovered_run_paths"] = [active_run] if active_run else []
-    discovered = [Path(path) for path in st.session_state.get("discovered_run_paths", [])]
-    if discovered:
-        labels = [f"{path.parent.name} / {path.name}" for path in discovered]
-        current = str(st.session_state.get("active_run_path", ""))
-        current_index = next((idx for idx, path in enumerate(discovered) if str(path) == current), 0)
-        selected_label = st.selectbox("Completed model run", labels, index=current_index, key="completed_run_inline")
-        selected_path = discovered[labels.index(selected_label)]
-        if st.button("Load selected run", type="primary", key="load_selected_run_inline"):
-            st.session_state["active_run_path"] = str(selected_path)
-            st.rerun()
-    manual_path = st.text_input("Manual run folder path", value=str(st.session_state.get("active_run_path", "")), key="manual_run_inline")
-    if st.button("Load manual path", key="load_manual_run_inline"):
-        st.session_state["active_run_path"] = manual_path
-        st.rerun()
+        elif "discovered_run_paths" not in st.session_state:
+            st.session_state["discovered_run_paths"] = []
+        discovered = [Path(path) for path in st.session_state.get("discovered_run_paths", [])]
+        if discovered:
+            labels = [f"{path.parent.name} / {path.name}" for path in discovered]
+            selected_label = st.selectbox("Completed model run", labels, key="completed_run_inline")
+            selected_path = discovered[labels.index(selected_label)]
+            st.caption(f"Selected for review only: {selected_path}")
+        st.text_input("Manual run folder path for review", value="", key="manual_run_inline")
 
     controls = dict(controls)
     controls["top_n"] = st.slider(
@@ -603,7 +559,7 @@ def run_evidence_caption(
     else:
         family_label = family_choice
     curated = loaded.data.get("curated_manifest", pd.DataFrame())
-    source_label = "Latest arbitration run"
+    source_label = "Governed Parquet data pack"
     curated_rows = ""
     if not curated.empty and "row_counts" in curated.columns:
         try:
@@ -674,7 +630,7 @@ def render_overview(loaded: LoadedRun, controls: dict[str, Any]) -> None:
             if pd.notna(row.get("quarterly_mape")) and pd.notna(row.get("annual_mape"))
         )
         if finalist_read:
-            accuracy_subtitle = f"Latest arbitration finalists: {finalist_read}. Lower is better."
+            accuracy_subtitle = f"Current Parquet finalists: {finalist_read}. Lower is better."
 
     upper = st.columns([1.0, 1.0])
     with upper[0]:
