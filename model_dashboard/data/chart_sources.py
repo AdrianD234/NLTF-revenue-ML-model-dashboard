@@ -84,68 +84,112 @@ def write_chart_source_tables(repo_root: Path, data: dict[str, pd.DataFrame]) ->
     output_dir.mkdir(parents=True, exist_ok=True)
     tables = build_chart_source_tables(data)
     for filename, frame in tables.items():
-        frame.to_csv(output_dir / filename, index=False)
+        _write_csv_atomic(frame, output_dir / filename)
     return tables
+
+
+def _write_csv_atomic(frame: pd.DataFrame, path: Path) -> None:
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    frame.to_csv(tmp, index=False)
+    tmp.replace(path)
 
 
 def build_chart_source_tables(data: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     source_file = _source_file_from_manifest(data)
+    source_files = _chart_contract_source_files(data, source_file)
     recommended = data.get("recommended", pd.DataFrame())
     summary = data.get("summary", pd.DataFrame())
     weights = data.get("weights", pd.DataFrame())
     stress = data.get("stress", pd.DataFrame())
     diagnostics = data.get("diagnostic_df", data.get("diagnostic", pd.DataFrame()))
     qpred = data.get("quarterly_predictions", pd.DataFrame())
+    error_distribution = data.get("error_distribution", pd.DataFrame())
+    pass_matrix = data.get("diagnostic_pass_matrix", pd.DataFrame())
     paired = data.get("paired_vs_schiff", pd.DataFrame())
     schiff = data.get("schiff_df", data.get("schiff_benchmark", pd.DataFrame()))
     horizon = data.get("horizon_df", pd.DataFrame())
-    comparison = _scenario_comparison(recommended, schiff if not schiff.empty else summary, paired)
+    comparison = _scenario_comparison_from_pack(data.get("scenario_comparison", pd.DataFrame()))
+    if comparison.empty:
+        comparison = _scenario_comparison(recommended, schiff if not schiff.empty else summary, paired)
     horizon_source = _horizon_source(horizon, qpred, recommended)
-    acf_source = _acf_source(qpred, diagnostics)
+    acf_source = _normalise_direct_acf(data.get("diagnostic_acf", pd.DataFrame()))
+    if acf_source.empty:
+        acf_source = _acf_source(qpred, diagnostics)
     diagnostic_window = _central_error_window(qpred)
+    error_window = error_distribution if error_distribution is not None and not error_distribution.empty else diagnostic_window
+    matrix_source = pass_matrix if pass_matrix is not None and not pass_matrix.empty else diagnostics
 
     return {
-        "overview_finalist_forecast_accuracy.csv": _overview_finalist_accuracy(recommended, source_file),
-        "overview_candidate_search_frontier.csv": _overview_candidate_frontier(summary, source_file),
-        "overview_ensemble_composition.csv": _overview_ensemble(weights, source_file),
-        "overview_stress_horizon_checks.csv": _overview_stress(stress, source_file),
-        "diagnostics_residual_autocorrelation.csv": _diagnostics_acf(acf_source, source_file),
-        "diagnostics_residual_vs_fitted.csv": _diagnostics_residual_vs_fitted(diagnostic_window, source_file),
-        "diagnostics_pass_matrix.csv": _diagnostics_pass_matrix(diagnostics, source_file),
-        "diagnostics_error_distribution_by_horizon.csv": _diagnostics_error_distribution(diagnostic_window, source_file),
-        "scenario_stream_comparison.csv": _scenario_stream_comparison_source(comparison, source_file),
+        "overview_finalist_forecast_accuracy.csv": _overview_finalist_accuracy(recommended, source_files["overview_finalist_forecast_accuracy"]),
+        "overview_candidate_search_frontier.csv": _overview_candidate_frontier(summary, source_files["overview_candidate_search_frontier"]),
+        "overview_ensemble_composition.csv": _overview_ensemble(weights, source_files["overview_ensemble_composition"]),
+        "overview_stress_horizon_checks.csv": _overview_stress(stress, source_files["overview_stress_horizon_checks"]),
+        "diagnostics_residual_autocorrelation.csv": _diagnostics_acf(acf_source, source_files["diagnostics_residual_autocorrelation"]),
+        "diagnostics_residual_vs_fitted.csv": _diagnostics_residual_vs_fitted(diagnostic_window, source_files["diagnostics_residual_vs_fitted"]),
+        "diagnostics_pass_matrix.csv": _diagnostics_pass_matrix(matrix_source, source_files["diagnostics_pass_matrix"]),
+        "diagnostics_error_distribution_by_horizon.csv": _diagnostics_error_distribution(error_window, source_files["diagnostics_error_distribution_by_horizon"]),
+        "scenario_stream_comparison.csv": _scenario_stream_comparison_source(comparison, source_files["scenario_stream_comparison"]),
         "scenario_improvement_vs_benchmark.csv": _scenario_gain_source(
             comparison,
             "Scenario Comparison",
             "scenario_improvement_vs_benchmark",
             "2. Improvement vs Benchmark",
-            source_file,
+            source_files["scenario_improvement_vs_benchmark"],
         ),
         "scenario_horizon_comparison.csv": _horizon_chart_source(
             horizon_source,
             "Scenario Comparison",
             "scenario_horizon_comparison",
             "3. Horizon Comparison",
-            source_file,
+            source_files["scenario_horizon_comparison"],
         ),
-        "scenario_decision_summary.csv": _scenario_decision_source(comparison, source_file),
-        "schiff_vs_finalist_mape.csv": _schiff_mape_source(comparison, source_file),
+        "scenario_decision_summary.csv": _scenario_decision_source(comparison, source_files["scenario_decision_summary"]),
+        "schiff_vs_finalist_mape.csv": _schiff_mape_source(comparison, source_files["schiff_vs_finalist_mape"]),
         "schiff_benchmark_horizon_profiles.csv": _horizon_chart_source(
             horizon_source,
             "Schiff Benchmark",
             "schiff_benchmark_horizon_profiles",
             "2. Benchmark Horizon Profiles",
-            source_file,
+            source_files["schiff_benchmark_horizon_profiles"],
         ),
         "schiff_paired_or_fullsample_gain.csv": _scenario_gain_source(
             comparison,
             "Schiff Benchmark",
             "schiff_paired_or_fullsample_gain",
             "3. Full-sample Gain vs Schiff",
-            source_file,
+            source_files["schiff_paired_or_fullsample_gain"],
         ),
-        "schiff_benchmark_summary.csv": _schiff_summary_source(comparison, source_file),
+        "schiff_benchmark_summary.csv": _schiff_summary_source(comparison, source_files["schiff_benchmark_summary"]),
     }
+
+
+def _chart_contract_source_files(data: dict[str, pd.DataFrame], default: str) -> dict[str, str]:
+    aliases = {
+        "overview_finalist_forecast_accuracy": "finalist_forecast_accuracy",
+        "overview_candidate_search_frontier": "candidate_search_frontier",
+        "overview_ensemble_composition": "finalist_ensemble_composition",
+        "overview_stress_horizon_checks": "stress_horizon_checks",
+        "diagnostics_residual_autocorrelation": "residual_autocorrelation_by_lag",
+        "diagnostics_residual_vs_fitted": "residual_vs_fitted",
+        "diagnostics_pass_matrix": "diagnostic_pass_matrix",
+        "diagnostics_error_distribution_by_horizon": "error_distribution_by_horizon",
+        "scenario_stream_comparison": "stream_comparison",
+        "scenario_improvement_vs_benchmark": "improvement_vs_benchmark",
+        "scenario_horizon_comparison": "horizon_comparison",
+        "scenario_decision_summary": "decision_summary",
+        "schiff_vs_finalist_mape": "schiff_vs_finalist_mape",
+        "schiff_benchmark_horizon_profiles": "benchmark_horizon_profiles",
+        "schiff_paired_or_fullsample_gain": "fullsample_gain_vs_schiff",
+        "schiff_benchmark_summary": "benchmark_summary",
+    }
+    result = {chart_id: default for _, chart_id in CHART_SOURCE_FILES.values()}
+    contract = data.get("chart_contract", pd.DataFrame())
+    if contract is None or contract.empty or not {"chart_id", "source_table"}.issubset(contract.columns):
+        return result
+    lookup = dict(zip(contract["chart_id"].astype(str), contract["source_table"].astype(str), strict=False))
+    for chart_id, contract_id in aliases.items():
+        result[chart_id] = lookup.get(contract_id, default)
+    return result
 
 
 def _source_file_from_manifest(data: dict[str, pd.DataFrame]) -> str:
@@ -157,6 +201,59 @@ def _source_file_from_manifest(data: dict[str, pd.DataFrame]) -> str:
                 if not value.empty and value.iloc[0]:
                     return value.iloc[0]
     return "Parquet candidate cone and diagnostic audit pack"
+
+
+def _normalise_direct_acf(acf: pd.DataFrame) -> pd.DataFrame:
+    columns = ["stream_label", "lag", "acf_value", "residual_source", "calculation_method", "source_column"]
+    if acf is None or acf.empty:
+        return pd.DataFrame(columns=columns)
+    out = acf.copy()
+    if "residual_source" not in out.columns and "residual_scope" in out.columns:
+        out["residual_source"] = out["residual_scope"]
+    for column in columns:
+        if column not in out.columns:
+            out[column] = pd.NA
+    return out[columns]
+
+
+def _scenario_comparison_from_pack(comparison: pd.DataFrame) -> pd.DataFrame:
+    if comparison is None or comparison.empty:
+        return pd.DataFrame()
+    out = comparison.copy()
+    rename = {
+        "full_sample_qtr_gain_pp": "quarterly_gain_pp",
+        "full_sample_annual_gain_pp": "annual_gain_pp",
+        "paired_win_rate_pct": "paired_win_rate_pct",
+    }
+    for source, target in rename.items():
+        if source in out.columns and target not in out.columns:
+            out[target] = out[source]
+    if "win_rate" not in out.columns and "paired_win_rate_pct" in out.columns:
+        out["win_rate"] = out["paired_win_rate_pct"]
+    for column in [
+        "stream",
+        "stream_label",
+        "finalist_model",
+        "finalist_model_short",
+        "schiff_model",
+        "schiff_model_short",
+        "finalist_quarterly_mape",
+        "schiff_quarterly_mape",
+        "quarterly_gain_pp",
+        "finalist_annual_mape",
+        "schiff_annual_mape",
+        "annual_gain_pp",
+        "paired_common_pairs",
+        "paired_finalist_mape",
+        "paired_schiff_mape",
+        "paired_gain_pp",
+        "paired_win_rate_pct",
+        "recommendation",
+    ]:
+        if column not in out.columns:
+            out[column] = pd.NA
+    out["paired_model_mape"] = out.get("paired_finalist_mape", pd.Series(pd.NA, index=out.index))
+    return out
 
 
 def _standardize(rows: list[dict[str, Any]]) -> pd.DataFrame:
@@ -542,6 +639,26 @@ def _diagnostics_pass_matrix(diagnostics: pd.DataFrame, source_file: str) -> pd.
     rows: list[dict[str, Any]] = []
     if diagnostics is None or diagnostics.empty:
         return _standardize(rows)
+    if {"diagnostic_test", "pass_status"}.issubset(diagnostics.columns):
+        for _, row in diagnostics.iterrows():
+            rows.append(
+                _base_row(
+                    "Diagnostics",
+                    "diagnostics_pass_matrix",
+                    "3. Diagnostic Pass Matrix",
+                    row,
+                    str(row.get("diagnostic_test")),
+                    pd.NA,
+                    str(row.get("pass_status")),
+                    "pass_status",
+                    source_file,
+                    "Diagnostic pass matrix supplied by diagnostic_pass_matrix.parquet with Pass / Watch / Fail semantics.",
+                    diagnostic_test=row.get("diagnostic_test"),
+                    pass_status=row.get("pass_status"),
+                    value_available=row.get("value_available", True),
+                )
+            )
+        return _standardize(rows)
     data = diagnostics.copy()
     if "role" in data.columns:
         data = data[data["role"].astype(str).str.contains("finalist", case=False, na=False)]
@@ -807,8 +924,8 @@ def _horizon_source(horizon: pd.DataFrame, qpred: pd.DataFrame, recommended: pd.
                     "scenario": row.get("scenario_role", row.get("scenario")),
                     "horizon": row.get("horizon"),
                     "mape": row.get("mape"),
-                    "source_column": f"mape_h{int(row.get('horizon')):02d}" if pd.notna(pd.to_numeric(row.get("horizon"), errors="coerce")) else "",
-                    "source": "Parquet candidate horizon fields",
+                    "source_column": row.get("source_column", "mape"),
+                    "source": row.get("source_file", "horizon_profiles.parquet"),
                 }
             )
     missing_streams = required_streams.difference(existing_streams)

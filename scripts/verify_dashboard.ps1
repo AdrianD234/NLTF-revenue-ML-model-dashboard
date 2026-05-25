@@ -30,13 +30,13 @@ if ($Python -ne "python" -and -not (Test-Path -LiteralPath $Python)) {
 }
 
 if ([string]::IsNullOrWhiteSpace($DataRoot)) {
-    $DataRoot = $env:MODEL_DIAGNOSTIC_DATA_ROOT
+    $DataRoot = $env:DASHBOARD_EVIDENCE_PACK_ROOT
 }
 if ([string]::IsNullOrWhiteSpace($DataRoot)) {
-    $DataRoot = $env:STAGE1_DASHBOARD_DATA_ROOT
+    $DataRoot = $env:STAGE1_DASHBOARD_EVIDENCE_PACK_ROOT
 }
 if ([string]::IsNullOrWhiteSpace($DataRoot)) {
-    $DataRoot = "data"
+    $DataRoot = "data\dashboard_evidence_pack"
 }
 
 function Invoke-Checked {
@@ -50,7 +50,7 @@ function Invoke-Checked {
     }
 }
 
-$env:MODEL_DIAGNOSTIC_DATA_ROOT = $DataRoot
+$env:DASHBOARD_EVIDENCE_PACK_ROOT = $DataRoot
 
 Invoke-Checked -FilePath $Python -Arguments @("-m", "compileall", "app.py", "model_dashboard", "scripts")
 Invoke-Checked -FilePath $Python -Arguments @("-m", "pytest", "-q")

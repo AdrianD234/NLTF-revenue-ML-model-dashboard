@@ -15,16 +15,12 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from model_dashboard.data.config import (  # noqa: E402
-    DEFAULT_DIAGNOSTIC_DATA_ROOT,
-    PARQUET_CANDIDATE_FILE,
-    PARQUET_METADATA_FILE,
-)
-from model_dashboard.data.locate import candidate_search_roots, locate_dashboard_file  # noqa: E402
-from model_dashboard.data.transforms import normalise_parquet_candidate  # noqa: E402
-from model_dashboard.data_loader import STALE_FINALIST_VALUES, load_parquet_dashboard  # noqa: E402
+from model_dashboard.data.config import DEFAULT_EVIDENCE_PACK_ROOT  # noqa: E402
+from model_dashboard.data_loader import STALE_FINALIST_VALUES  # noqa: E402
+from model_dashboard.evidence_pack import load_evidence_pack, resolve_evidence_pack_root  # noqa: E402
 
-CSV_MIRROR_FILE = "stage1_curated_candidate_cone.csv"
+EVIDENCE_CANDIDATE_FILE = "candidate_cone.parquet"
+EVIDENCE_MANIFEST_FILE = "manifest.json"
 EXPECTED_STREAMS = ("PED", "LIGHT_RUC", "HEAVY_RUC")
 USER_LABEL_COLUMNS = (
     "stream_label",
@@ -68,7 +64,7 @@ class Gate:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run the locked 100-gate Stage 1 dashboard validation suite.")
-    parser.add_argument("--data-root", default=str(DEFAULT_DIAGNOSTIC_DATA_ROOT))
+    parser.add_argument("--data-root", default=str(DEFAULT_EVIDENCE_PACK_ROOT))
     parser.add_argument("--repo-root", default=str(ROOT))
     parser.add_argument("--max-default-rows", type=int, default=400)
     return parser.parse_args()
@@ -158,28 +154,32 @@ def text_has_all(path: Path, needles: tuple[str, ...]) -> bool:
 
 def main() -> int:
     args = parse_args()
-    roots = candidate_search_roots(args.data_root, args.repo_root)
-    parquet_path = locate_dashboard_file(PARQUET_CANDIDATE_FILE, roots)
-    metadata_path = locate_dashboard_file(PARQUET_METADATA_FILE, roots)
-    csv_mirror_path = locate_dashboard_file(CSV_MIRROR_FILE, roots)
+    pack_root = resolve_evidence_pack_root(args.data_root)
+    data_dir = pack_root / "data"
+    parquet_path = data_dir / EVIDENCE_CANDIDATE_FILE
+    metadata_path = pack_root / EVIDENCE_MANIFEST_FILE
+    csv_mirror_path: Path | None = None
 
     raw: pd.DataFrame | None = None
     candidate_df: pd.DataFrame | None = None
     loaded: Any | None = None
     load_error = ""
-    if parquet_path is not None:
-        try:
-            raw = pd.read_parquet(parquet_path)
-            candidate_df = normalise_parquet_candidate(raw)
-            candidate_df["_gate_stream_key"] = [
-                stream_key(row.get("stream"), row.get("stream_label")) for _, row in candidate_df.iterrows()
-            ]
-            loaded = load_parquet_dashboard(args.data_root, args.repo_root, allow_csv_preview=False)
-        except Exception as exc:  # reported through gates
-            load_error = f"{type(exc).__name__}: {exc}"
+    try:
+        raw = pd.read_parquet(parquet_path)
+        loaded = load_evidence_pack(args.data_root, args.repo_root)
+        candidate_df = loaded.data.get("candidate_df", pd.DataFrame()).copy()
+        candidate_df["_gate_stream_key"] = [
+            stream_key(row.get("stream"), row.get("stream_label")) for _, row in candidate_df.iterrows()
+        ]
+    except Exception as exc:  # reported through gates
+        load_error = f"{type(exc).__name__}: {exc}"
 
     schema_payload = load_schema_payload()
-    schema_is_parquet_pass = schema_payload.get("status") == "passed" and bool(schema_payload.get("parquet_path"))
+    schema_is_parquet_pass = (
+        schema_payload.get("status") == "passed"
+        and schema_payload.get("source_mode") == "dashboard_evidence_pack"
+        and bool(schema_payload.get("parquet_path"))
+    )
     data_loaded = candidate_df is not None and load_error == ""
 
     def fail(reason: str) -> tuple[bool, str]:
@@ -308,13 +308,15 @@ def main() -> int:
         return ok(f"{page} screenshot, visual reviewer PASS, and closed backlog evidence are present.")
 
     def check_parquet_found() -> tuple[bool, str]:
-        if parquet_path is None:
-            return fail(f"{PARQUET_CANDIDATE_FILE} not found under: " + "; ".join(str(root) for root in roots))
-        return ok(f"Resolved Parquet path: {parquet_path}")
+        if not parquet_path.exists():
+            return fail(f"{EVIDENCE_CANDIDATE_FILE} not found in evidence pack data folder: {data_dir}")
+        if not metadata_path.exists():
+            return fail(f"{EVIDENCE_MANIFEST_FILE} not found in evidence pack: {pack_root}")
+        return ok(f"Resolved evidence-pack candidate Parquet path: {parquet_path}")
 
     def check_parquet_loads() -> tuple[bool, str]:
-        if parquet_path is None:
-            return fail("Parquet file is missing.")
+        if not parquet_path.exists():
+            return fail("Evidence-pack candidate Parquet file is missing.")
         if load_error:
             return fail(load_error)
         return ok(f"Parquet loaded with shape {tuple(raw.shape) if raw is not None else 'unknown'}.")
@@ -358,11 +360,11 @@ def main() -> int:
         return fail("User-facing label columns contain raw underscores: " + ", ".join(bad)) if bad else ok("User-facing label columns are clean.")
 
     def check_metadata() -> tuple[bool, str]:
-        if metadata_path is not None:
-            return ok(f"Metadata JSON found: {metadata_path}")
+        if metadata_path.exists():
+            return ok(f"Evidence-pack manifest JSON found: {metadata_path}")
         if file_nonempty("artifacts/data_schema.json") and "metadata_path" in schema_payload:
-            return ok("Metadata JSON is absent but explicitly recorded in data_schema.json.")
-        return fail("Metadata JSON missing and no graceful missing-state artifact recorded.")
+            return ok("Manifest JSON is absent but explicitly recorded in data_schema.json.")
+        return fail("Manifest JSON missing and no graceful missing-state artifact recorded.")
 
     def check_csv_mirror() -> tuple[bool, str]:
         if csv_mirror_path is not None:
@@ -537,8 +539,9 @@ def main() -> int:
             source = read_csv_artifact("artifacts/ensemble_composition_source_table.csv")
             if source.empty:
                 return fail("ensemble_composition_source_table.csv is missing or empty.")
-            if not source["source"].astype(str).str.contains("Parquet ensemble_components_json", regex=False).all():
-                return fail("Ensemble source table is not backed by Parquet ensemble_components_json.")
+            source_text = " ".join(source.get("source", pd.Series(dtype=str)).dropna().astype(str).unique())
+            if "ensemble_components.parquet" not in source_text and "Parquet ensemble_components_json" not in source_text:
+                return fail("Ensemble source table is not backed by evidence-pack component rows.")
             stale_weights = {
                 "PED VKT per capita": [57.1, 38.7, 4.2],
                 "Light RUC volume": [23.2, 21.8, 20.3, 17.2, 11.7, 5.8],
@@ -980,14 +983,14 @@ def main() -> int:
             "evidence": "performance review required after Parquet-backed run",
         },
         {
-            "name": "The app does not parse Excel on every filter interaction",
-            "status": "PASS" if text_has_all(ROOT / "model_dashboard" / "data" / "parquet_loader.py", ("parquet_pack_signature",)) and text_has_all(ROOT / "app.py", ("st.cache_data",)) else "FAIL",
-            "evidence": "Parquet cache signature and st.cache_data evidence checked in code",
+            "name": "The app does not parse legacy files on every filter interaction",
+            "status": "PASS" if text_has_all(ROOT / "model_dashboard" / "evidence_pack.py", ("evidence_pack_signature", "load_evidence_pack")) and text_has_all(ROOT / "app.py", ("st.cache_data",)) else "FAIL",
+            "evidence": "Evidence-pack cache signature and st.cache_data evidence checked in code",
         },
         {
-            "name": "The Parquet is cached using st.cache_data",
-            "status": "PASS" if "cached_load_parquet" in safe_read(ROOT / "app.py") and "st.cache_data" in safe_read(ROOT / "app.py") else "FAIL",
-            "evidence": "app.py must cache Parquet load through st.cache_data",
+            "name": "The evidence pack is cached using st.cache_data",
+            "status": "PASS" if "cached_load_evidence_pack" in safe_read(ROOT / "app.py") and "st.cache_data" in safe_read(ROOT / "app.py") else "FAIL",
+            "evidence": "app.py must cache evidence-pack load through st.cache_data",
         },
         {
             "name": "Full dense tables are behind expanders/downloads and not rendered by default",

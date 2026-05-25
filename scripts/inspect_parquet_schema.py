@@ -12,26 +12,19 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from model_dashboard.data.config import (  # noqa: E402
-    DEFAULT_DIAGNOSTIC_DATA_ROOT,
-    PARQUET_CANDIDATE_FILE,
-    PARQUET_METADATA_FILE,
+from model_dashboard.data.config import DEFAULT_EVIDENCE_PACK_ROOT  # noqa: E402
+from model_dashboard.evidence_pack import (  # noqa: E402
+    REQUIRED_EVIDENCE_TABLES,
+    load_evidence_pack,
+    resolve_evidence_pack_root,
 )
-from model_dashboard.data.locate import candidate_search_roots, locate_dashboard_file  # noqa: E402
-from model_dashboard.data.transforms import normalise_parquet_candidate  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Inspect the Stage 1 Parquet dashboard schema.")
-    parser.add_argument("--data-root", default=str(DEFAULT_DIAGNOSTIC_DATA_ROOT))
+    parser = argparse.ArgumentParser(description="Inspect the Stage 1 dashboard evidence-pack schema.")
+    parser.add_argument("--data-root", default=str(DEFAULT_EVIDENCE_PACK_ROOT))
     parser.add_argument("--repo-root", default=str(ROOT))
     return parser.parse_args()
-
-
-def bool_count(df: pd.DataFrame, column: str) -> int:
-    if column not in df.columns:
-        return 0
-    return int(df[column].fillna(False).astype(bool).sum())
 
 
 def write_outputs(report: str, payload: dict[str, Any]) -> None:
@@ -55,36 +48,33 @@ def markdown_table(df: pd.DataFrame) -> str:
     return "\n".join(lines)
 
 
-def discover_support_files(roots: list[Path]) -> list[dict[str, Any]]:
-    patterns = (
-        "model_diagnostic_audit_tables.xlsx",
-        "model_diagnostic_audit_report.md",
-        "*selected*.csv",
-        "*prediction*.csv",
-        "*diagnostic*.csv",
-        "*residual*.csv",
-        "*acf*.csv",
-        "*schiff*.csv",
-        "*.png",
-    )
-    found: dict[str, Path] = {}
-    ignored_parts = {".git", "__pycache__", "test-output", ".pytest_cache", ".uv-cache", ".venv"}
-    for root in roots:
-        if not root.exists():
+def table_payload(data_dir: Path) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for filename in REQUIRED_EVIDENCE_TABLES:
+        path = data_dir / filename
+        if not path.exists():
+            rows.append(
+                {
+                    "file": filename,
+                    "path": str(path),
+                    "status": "missing",
+                    "rows": None,
+                    "columns": None,
+                    "column_names": [],
+                    "size": None,
+                }
+            )
             continue
-        for pattern in patterns:
-            for path in root.rglob(pattern):
-                if path.is_file() and not ignored_parts.intersection(path.parts):
-                    found[str(path).lower()] = path
-    rows = []
-    for path in sorted(found.values(), key=lambda item: str(item).lower()):
-        stat = path.stat()
+        frame = pd.read_parquet(path)
         rows.append(
             {
+                "file": filename,
                 "path": str(path),
-                "name": path.name,
-                "size": stat.st_size,
-                "modified": stat.st_mtime,
+                "status": "present",
+                "rows": int(len(frame)),
+                "columns": int(len(frame.columns)),
+                "column_names": list(frame.columns),
+                "size": int(path.stat().st_size),
             }
         )
     return rows
@@ -92,101 +82,158 @@ def discover_support_files(roots: list[Path]) -> list[dict[str, Any]]:
 
 def main() -> int:
     args = parse_args()
-    roots = candidate_search_roots(args.data_root, args.repo_root)
-    parquet_path = locate_dashboard_file(PARQUET_CANDIDATE_FILE, roots)
-    metadata_path = locate_dashboard_file(PARQUET_METADATA_FILE, roots)
-    csv_mirror_path = locate_dashboard_file("stage1_curated_candidate_cone.csv", roots)
-    support_files = discover_support_files(roots)
-    support_lines = (
-        [f"- `{row['path']}` ({row['size']:,} bytes)" for row in support_files]
-        if support_files
-        else ["None."]
-    )
-    if parquet_path is None:
+    pack_root = resolve_evidence_pack_root(args.data_root)
+    manifest_path = pack_root / "manifest.json"
+    data_dir = pack_root / "data"
+    candidate_path = data_dir / "candidate_cone.parquet"
+
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        payload = {
+            "status": "failed",
+            "source_mode": "dashboard_evidence_pack",
+            "requested_data_root": str(args.data_root),
+            "resolved_root": str(pack_root),
+            "manifest_path": str(manifest_path),
+            "data_dir": str(data_dir),
+            "parquet_path": str(candidate_path) if candidate_path.exists() else None,
+            "metadata_path": str(manifest_path) if manifest_path.exists() else None,
+            "csv_mirror_path": None,
+            "error": f"{type(exc).__name__}: {exc}",
+        }
         report = "\n".join(
             [
                 "# Data Schema Report",
                 "",
-                f"Status: **failed**. `{PARQUET_CANDIDATE_FILE}` was not found.",
-                f"Metadata path: `{metadata_path}`" if metadata_path else "Metadata path: not found.",
-                f"CSV mirror path: `{csv_mirror_path}`" if csv_mirror_path else "CSV mirror path: not found.",
-                "",
-                "Searched roots:",
-                *[f"- `{root}`" for root in roots],
-                "",
-                "## Diagnostic And Support Files Found",
-                *support_lines,
+                "Status: **failed**.",
+                f"Requested root: `{args.data_root}`",
+                f"Resolved root: `{pack_root}`",
+                f"Manifest path: `{manifest_path}`",
+                f"Error: {payload['error']}",
             ]
         )
-        write_outputs(
-            report,
-            {
-                "status": "failed",
-                "parquet_path": None,
-                "metadata_path": str(metadata_path) if metadata_path else None,
-                "csv_mirror_path": str(csv_mirror_path) if csv_mirror_path else None,
-                "support_files": support_files,
-                "searched_roots": [str(root) for root in roots],
-            },
-        )
+        write_outputs(report, payload)
         print(report)
         return 1
 
-    raw = pd.read_parquet(parquet_path)
-    df = normalise_parquet_candidate(raw)
-    stream_counts = df.groupby("stream_label", dropna=False).size().to_dict() if "stream_label" in df.columns else {}
-    flagged = {
-        "current_recommended": bool_count(df, "is_current_recommended"),
-        "pure_schiff": bool_count(df, "is_pure_schiff"),
-        "pdf_reference": bool_count(df, "is_pdf_reference"),
-        "frontier": bool_count(df, "is_frontier"),
-        "distribution_sample": bool_count(df, "is_distribution_sample"),
-        "plot_default_include": bool_count(df, "plot_default_include"),
-    }
-    current = df.loc[df["is_current_recommended"], ["stream", "stream_label", "model", "quarterly_mape", "annual_mape"]]
-    schiff = df.loc[df["is_pure_schiff"], ["stream", "stream_label", "model", "quarterly_mape", "annual_mape"]]
+    try:
+        loaded = load_evidence_pack(pack_root, args.repo_root)
+        tables = table_payload(data_dir)
+        missing = [row["file"] for row in tables if row["status"] != "present"]
+        candidate = loaded.data.get("candidate_df", pd.DataFrame())
+        finalists = loaded.data.get("recommended", pd.DataFrame())
+        schiff = loaded.data.get("schiff_benchmark", pd.DataFrame())
+    except Exception as exc:
+        tables = table_payload(data_dir) if data_dir.exists() else []
+        missing = [row["file"] for row in tables if row["status"] != "present"]
+        payload = {
+            "status": "failed",
+            "source_mode": "dashboard_evidence_pack",
+            "requested_data_root": str(args.data_root),
+            "resolved_root": str(pack_root),
+            "manifest_path": str(manifest_path),
+            "data_dir": str(data_dir),
+            "parquet_path": str(candidate_path) if candidate_path.exists() else None,
+            "metadata_path": str(manifest_path),
+            "csv_mirror_path": None,
+            "required_files": list(REQUIRED_EVIDENCE_TABLES),
+            "missing_required_files": missing,
+            "tables": tables,
+            "error": f"{type(exc).__name__}: {exc}",
+        }
+        report = "\n".join(
+            [
+                "# Data Schema Report",
+                "",
+                "Status: **failed**.",
+                f"Resolved evidence pack: `{pack_root}`",
+                f"Manifest path: `{manifest_path}`",
+                f"Candidate path: `{candidate_path if candidate_path.exists() else 'not found'}`",
+                f"Error: {payload['error']}",
+                "",
+                "## Required Tables",
+                *[f"- {row['file']}: {row['status']}" for row in tables],
+            ]
+        )
+        write_outputs(report, payload)
+        print(report)
+        return 1
 
+    table_frame = pd.DataFrame(
+        [
+            {
+                "file": row["file"],
+                "rows": row["rows"],
+                "columns": row["columns"],
+                "size": row["size"],
+            }
+            for row in tables
+        ]
+    )
+    stream_counts = (
+        candidate.groupby("stream_label", dropna=False).size().to_dict() if "stream_label" in candidate.columns else {}
+    )
+    flag_counts = {
+        column: int(candidate[column].fillna(False).astype(bool).sum())
+        for column in [
+            "plot_default_include",
+            "is_plot_candidate",
+            "is_current_recommended",
+            "is_pure_schiff",
+            "is_pdf_reference",
+            "is_frontier",
+            "is_distribution_sample",
+        ]
+        if column in candidate.columns
+    }
+    current = finalists[[c for c in ["stream", "stream_label", "model", "quarterly_mape", "annual_mape"] if c in finalists.columns]]
+    pure_schiff = schiff[[c for c in ["stream", "stream_label", "model", "quarterly_mape", "annual_mape"] if c in schiff.columns]]
     payload: dict[str, Any] = {
         "status": "passed",
-        "parquet_path": str(parquet_path),
-        "metadata_path": str(metadata_path) if metadata_path else None,
-        "csv_mirror_path": str(csv_mirror_path) if csv_mirror_path else None,
-        "support_files": support_files,
-        "shape": list(raw.shape),
-        "columns": list(raw.columns),
-        "normalised_columns": list(df.columns),
+        "source_mode": "dashboard_evidence_pack",
+        "schema_version": manifest.get("schema_version"),
+        "requested_data_root": str(args.data_root),
+        "resolved_root": str(pack_root),
+        "manifest_path": str(manifest_path),
+        "data_dir": str(data_dir),
+        "parquet_path": str(candidate_path),
+        "metadata_path": str(manifest_path),
+        "csv_mirror_path": None,
+        "required_files": list(REQUIRED_EVIDENCE_TABLES),
+        "missing_required_files": missing,
+        "tables": tables,
         "stream_counts": stream_counts,
-        "flagged_counts": flagged,
+        "flagged_counts": flag_counts,
         "current_recommended_rows": current.to_dict(orient="records"),
-        "pure_schiff_rows": schiff.to_dict(orient="records"),
+        "pure_schiff_rows": pure_schiff.to_dict(orient="records"),
     }
     report = "\n".join(
         [
             "# Data Schema Report",
             "",
-            f"Status: **passed**. Resolved Parquet path: `{parquet_path}`.",
-            f"Metadata path: `{metadata_path}`" if metadata_path else "Metadata path: not found.",
-            f"CSV mirror path: `{csv_mirror_path}`" if csv_mirror_path else "CSV mirror path: not found.",
-            f"Rows: {len(df):,}",
-            f"Columns: {len(raw.columns):,}",
+            "Status: **passed**.",
+            f"Source mode: `{payload['source_mode']}`",
+            f"Schema version: `{payload['schema_version']}`",
+            f"Requested root: `{args.data_root}`",
+            f"Resolved evidence pack: `{pack_root}`",
+            f"Manifest path: `{manifest_path}`",
+            f"Candidate path: `{candidate_path}`",
             "",
-            "## Columns",
-            *[f"- `{column}`" for column in raw.columns],
+            "## Required Tables",
+            markdown_table(table_frame),
             "",
             "## Row Counts By Stream",
             *[f"- {stream}: {count:,}" for stream, count in stream_counts.items()],
             "",
-            "## Flagged Rows",
-            *[f"- {key.replace('_', ' ').title()}: {value:,}" for key, value in flagged.items()],
+            "## Flagged Candidate Rows",
+            *[f"- {key.replace('_', ' ').title()}: {value:,}" for key, value in flag_counts.items()],
             "",
-            "## Current Recommended Rows",
+            "## Current Finalist Rows",
             markdown_table(current),
             "",
             "## Pure Schiff Rows",
-            markdown_table(schiff),
-            "",
-            "## Diagnostic And Support Files Found",
-            *support_lines,
+            markdown_table(pure_schiff),
         ]
     )
     write_outputs(report, payload)

@@ -16,9 +16,9 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 DEFAULT_PARQUET_DATA_ROOT = Path(
-    os.environ.get("MODEL_DIAGNOSTIC_DATA_ROOT")
-    or os.environ.get("STAGE1_DASHBOARD_DATA_ROOT")
-    or "data"
+    os.environ.get("DASHBOARD_EVIDENCE_PACK_ROOT")
+    or os.environ.get("STAGE1_DASHBOARD_EVIDENCE_PACK_ROOT")
+    or Path("data") / "dashboard_evidence_pack"
 )
 
 
@@ -292,12 +292,12 @@ def benchmark_parquet_backend(data_root: Path, repo_root: Path, repeats: int) ->
     modules = load_dashboard_modules()
     results: dict[str, Any] = {
         "timestamp": now_iso(),
-        "source_mode": "parquet",
+        "source_mode": "dashboard_evidence_pack",
         "data_root": str(data_root),
         "repo_root": str(repo_root),
         "benchmarks": [],
         "module_status": {name: "ok" if not isinstance(module, str) else module for name, module in modules.items()},
-        "notes": ["Parquet-backed dashboard benchmark path."],
+        "notes": ["Evidence-pack Parquet dashboard benchmark path."],
     }
 
     loader = modules.get("model_dashboard.data_loader")
@@ -307,16 +307,16 @@ def benchmark_parquet_backend(data_root: Path, repo_root: Path, repeats: int) ->
         return results
 
     def load_uncached() -> Any:
-        return loader.load_parquet_dashboard(data_root, repo_root, allow_csv_preview=False)
+        return loader.load_evidence_pack(data_root, repo_root)
 
     try:
-        cold = timed("load_parquet_dashboard_uncached", load_uncached, repeats=max(1, min(repeats, 2)))
+        cold = timed("load_evidence_pack_uncached", load_uncached, repeats=max(1, min(repeats, 2)))
         loaded = load_uncached()
     except Exception as exc:
-        results["notes"].append(f"Parquet benchmark failed: {type(exc).__name__}: {exc}")
+        results["notes"].append(f"Evidence-pack benchmark failed: {type(exc).__name__}: {exc}")
         results["benchmarks"].append(
             {
-                "label": "load_parquet_dashboard_uncached",
+                "label": "load_evidence_pack_uncached",
                 "repeats": 0,
                 "min_sec": None,
                 "median_sec": None,
@@ -330,24 +330,24 @@ def benchmark_parquet_backend(data_root: Path, repo_root: Path, repeats: int) ->
     results["benchmarks"].append(cold)
     results["row_counts"] = row_counts(loaded)
 
-    if not isinstance(app_module, str) and hasattr(app_module, "cached_load_parquet_dashboard"):
+    if not isinstance(app_module, str) and hasattr(app_module, "cached_load_evidence_pack"):
         try:
-            app_module.cached_load_parquet_dashboard.clear()
+            app_module.cached_load_evidence_pack.clear()
         except Exception:
-            results["notes"].append("Could not clear Streamlit Parquet cache before warm-load benchmark.")
+            results["notes"].append("Could not clear Streamlit evidence-pack cache before warm-load benchmark.")
 
-        pack_sig = loader.parquet_pack_signature(data_root, repo_root)
+        pack_sig = loader.evidence_pack_signature(data_root)
 
         def cached_call() -> Any:
-            return app_module.cached_load_parquet_dashboard(
+            return app_module.cached_load_evidence_pack(
                 str(data_root),
                 str(repo_root),
                 pack_sig,
                 app_module.LOADER_SCHEMA_VERSION,
             )
 
-        results["benchmarks"].append(timed("cached_load_parquet_first_call", cached_call, repeats=1))
-        results["benchmarks"].append(timed("cached_load_parquet_warm_call", cached_call, repeats=repeats))
+        results["benchmarks"].append(timed("cached_load_evidence_pack_first_call", cached_call, repeats=1))
+        results["benchmarks"].append(timed("cached_load_evidence_pack_warm_call", cached_call, repeats=repeats))
 
     return results
 
@@ -415,7 +415,7 @@ def main() -> None:
     parser.add_argument(
         "--data-root",
         default=None,
-        help="Benchmark the Parquet-backed dashboard data pack. Defaults to MODEL_DIAGNOSTIC_DATA_ROOT, STAGE1_DASHBOARD_DATA_ROOT, or data/.",
+        help="Benchmark the dashboard evidence pack. Defaults to DASHBOARD_EVIDENCE_PACK_ROOT, STAGE1_DASHBOARD_EVIDENCE_PACK_ROOT, or data/dashboard_evidence_pack.",
     )
     parser.add_argument("--repo-root", default=str(ROOT))
     parser.add_argument("--out-dir", default="artifacts")

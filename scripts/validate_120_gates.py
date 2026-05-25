@@ -14,8 +14,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from model_dashboard.chart_sources import CHART_SOURCE_FILES, CORE_COLUMNS  # noqa: E402
-from model_dashboard.data.config import DEFAULT_DIAGNOSTIC_DATA_ROOT  # noqa: E402
-from model_dashboard.data_loader import load_parquet_dashboard  # noqa: E402
+from model_dashboard.data.config import DEFAULT_EVIDENCE_PACK_ROOT  # noqa: E402
+from model_dashboard.evidence_pack import load_evidence_pack  # noqa: E402
 from model_dashboard.labels import STRESS_BUCKET_ORDER  # noqa: E402
 from model_dashboard.metrics import best_by_stream  # noqa: E402
 
@@ -25,7 +25,7 @@ EXPECTED_STREAMS = {"PED VKT per capita", "Light RUC volume", "Heavy RUC volume"
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Validate extended 120-gate dashboard suite.")
-    parser.add_argument("--data-root", default=str(DEFAULT_DIAGNOSTIC_DATA_ROOT))
+    parser.add_argument("--data-root", default=str(DEFAULT_EVIDENCE_PACK_ROOT))
     parser.add_argument("--repo-root", default=str(ROOT))
     return parser.parse_args()
 
@@ -55,7 +55,7 @@ def main() -> int:
     repo_root = Path(args.repo_root).expanduser()
     artifacts = repo_root / "artifacts"
     artifacts.mkdir(exist_ok=True)
-    loaded = load_parquet_dashboard(args.data_root, repo_root, allow_csv_preview=False)
+    loaded = load_evidence_pack(args.data_root, repo_root)
     loaded_data = loaded.data
 
     def check_all_chart_sources_exist() -> str:
@@ -122,9 +122,12 @@ def main() -> int:
                 raise AssertionError(f"{stream} stress bucket order is {buckets}")
         heavy = table[table["stream_label"].eq("Heavy RUC volume")].set_index("stress_bucket")
         for bucket in ["2024+", "2022-23"]:
-            if pd.notna(pd.to_numeric(heavy.loc[bucket, "metric_value"], errors="coerce")):
-                raise AssertionError(f"Heavy RUC {bucket} should remain a gap unless enriched from a valid source.")
-        return "Stress aliases coalesce and Heavy RUC missing windows remain explicit gaps."
+            value = pd.to_numeric(heavy.loc[bucket, "metric_value"], errors="coerce")
+            source_file = str(heavy.loc[bucket, "source_file"])
+            notes = str(heavy.loc[bucket, "notes"])
+            if pd.notna(value) and "stress_horizon.parquet" not in source_file and "stress_horizon.parquet" not in notes:
+                raise AssertionError(f"Heavy RUC {bucket} is populated without stress_horizon.parquet source evidence.")
+        return "Stress buckets reconcile to stress_horizon.parquet, with Heavy RUC policy windows either sourced or explicit gaps."
 
     def check_full_sample_gain_label() -> str:
         gain = read_source("schiff_paired_or_fullsample_gain.csv")
@@ -166,6 +169,7 @@ def main() -> int:
         if (
             "All selected quarterly prediction residuals" not in notes
             and "H1 residual diagnostics from diagnostic audit pack" not in notes
+            and "H1 residual diagnostics" not in notes
         ):
             raise AssertionError("ACF residual source is not documented on every row.")
         return "ACF chart source table exists and documents residual source."

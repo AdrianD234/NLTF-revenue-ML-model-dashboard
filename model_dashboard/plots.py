@@ -815,7 +815,7 @@ def plot_autocorrelation_diagnostics(
     max_lag: int = 12,
     acf_source: pd.DataFrame | None = None,
 ) -> go.Figure:
-    if (qpred is None or qpred.empty) and acf_source is not None and not acf_source.empty:
+    if acf_source is not None and not acf_source.empty:
         required_source = {"stream_label", "lag", "acf_value", "residual_source"}
         if required_source.issubset(acf_source.columns):
             source = acf_source.dropna(subset=["stream_label", "lag", "acf_value"]).copy()
@@ -1479,6 +1479,8 @@ def plot_diagnostic_pass_matrix(diagnostics: pd.DataFrame) -> go.Figure:
         rows = rows[rows["role"].astype(str).str.contains("finalist", case=False, na=False)]
     if rows.empty:
         return empty_figure("Finalist diagnostic rows are not available.")
+    if {"diagnostic_test", "pass_status", "stream_label"}.issubset(rows.columns):
+        return _plot_long_diagnostic_pass_matrix(rows)
     tests = [
         ("Calibration R2", "adj_r2", lambda value: pd.notna(value) and float(value) >= 0.70),
         ("Durbin-Watson", "durbin_watson", lambda value: pd.notna(value) and 1.5 <= float(value) <= 2.5),
@@ -1563,6 +1565,88 @@ def plot_diagnostic_pass_matrix(diagnostics: pd.DataFrame) -> go.Figure:
     )
     fig.add_annotation(
         text="Green = pass, amber = caution, red = fail, grey = unavailable",
+        x=0,
+        y=-0.08,
+        xref="paper",
+        yref="paper",
+        showarrow=False,
+        align="left",
+        font={"size": 11, "color": "#64748B"},
+    )
+    return apply_layout(fig, "Diagnostic pass matrix", height=360)
+
+
+def _plot_long_diagnostic_pass_matrix(rows: pd.DataFrame) -> go.Figure:
+    data = rows.copy()
+    test_order = [
+        "Calibration R2",
+        "Durbin-Watson",
+        "ADF",
+        "KPSS",
+        "Breusch-Pagan",
+        "White",
+        "Jarque-Bera",
+        "Cointegration",
+        "Overall",
+    ]
+    stream_order = [stream for stream in STREAM_ORDER if stream in set(data["stream_label"].astype(str))]
+    stream_order.extend(sorted(set(data["stream_label"].dropna().astype(str)).difference(stream_order)))
+    pivot = (
+        data.assign(
+            diagnostic_test=pd.Categorical(data["diagnostic_test"].astype(str), categories=test_order, ordered=True),
+            stream_label=pd.Categorical(data["stream_label"].astype(str), categories=stream_order, ordered=True),
+        )
+        .sort_values(["stream_label", "diagnostic_test"])
+        .pivot_table(index="stream_label", columns="diagnostic_test", values="pass_status", aggfunc="first", observed=False)
+        .reindex(index=stream_order, columns=test_order)
+        .fillna("Unavailable")
+    )
+
+    def status_style(status: str) -> tuple[str, str]:
+        if status == "Pass":
+            return "#DDF4DD", "#166534"
+        if status in {"Watch", "Caution"}:
+            return "#FEF3C7", "#92400E"
+        if status == "Fail":
+            return "#FEE2E2", "#991B1B"
+        return "#F1F5F9", "#64748B"
+
+    headers = ["Stream"] + test_order
+    values = [list(pivot.index.astype(str))] + [pivot[column].astype(str).tolist() for column in test_order]
+    fill_rows: list[list[str]] = [["#FFFFFF"] * len(pivot)]
+    font_rows: list[list[str]] = [["#0F172A"] * len(pivot)]
+    for column in test_order:
+        fills: list[str] = []
+        fonts: list[str] = []
+        for status in pivot[column].astype(str):
+            fill, font = status_style(status)
+            fills.append(fill)
+            fonts.append(font)
+        fill_rows.append(fills)
+        font_rows.append(fonts)
+    fig = go.Figure(
+        data=[
+            go.Table(
+                header={
+                    "values": headers,
+                    "fill_color": "#EAF2F8",
+                    "line_color": "#D7DEE8",
+                    "align": "center",
+                    "font": {"color": "#002B5C", "size": 11},
+                },
+                cells={
+                    "values": values,
+                    "height": 30,
+                    "fill_color": fill_rows,
+                    "line_color": "#E2E8F0",
+                    "align": "center",
+                    "font": {"size": 11, "color": font_rows},
+                },
+            )
+        ]
+    )
+    fig.add_annotation(
+        text="Green = pass, amber = watch, red = fail, grey = unavailable",
         x=0,
         y=-0.08,
         xref="paper",

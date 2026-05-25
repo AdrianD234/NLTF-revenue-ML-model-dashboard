@@ -12,8 +12,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from model_dashboard.chart_sources import CHART_SOURCE_FILES, CORE_COLUMNS  # noqa: E402
-from model_dashboard.data.config import DEFAULT_DIAGNOSTIC_DATA_ROOT  # noqa: E402
-from model_dashboard.data_loader import load_parquet_dashboard  # noqa: E402
+from model_dashboard.data.config import DEFAULT_EVIDENCE_PACK_ROOT  # noqa: E402
+from model_dashboard.evidence_pack import load_evidence_pack  # noqa: E402
 from model_dashboard.labels import STRESS_BUCKET_ORDER  # noqa: E402
 
 
@@ -23,7 +23,7 @@ CHART_SOURCE_DIR = ROOT / "artifacts" / "chart_sources"
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Validate dashboard chart source tables.")
-    parser.add_argument("--data-root", default=str(DEFAULT_DIAGNOSTIC_DATA_ROOT))
+    parser.add_argument("--data-root", default=str(DEFAULT_EVIDENCE_PACK_ROOT))
     parser.add_argument("--repo-root", default=str(ROOT))
     return parser.parse_args()
 
@@ -45,7 +45,7 @@ def approx(actual: Any, expected: float, tolerance: float = 0.001) -> bool:
 def validate() -> list[tuple[str, str, str]]:
     args = parse_args()
     repo_root = Path(args.repo_root).expanduser()
-    loaded = load_parquet_dashboard(args.data_root, repo_root, allow_csv_preview=False)
+    loaded = load_evidence_pack(args.data_root, repo_root)
     loaded_weights = loaded.data.get("weights", pd.DataFrame())
 
     findings: list[tuple[str, str, str]] = []
@@ -109,11 +109,7 @@ def validate() -> list[tuple[str, str, str]]:
         pd.notna(pd.to_numeric(heavy.loc[bucket, "metric_value"], errors="coerce"))
         for bucket in ["1-4 qtrs", "5-8 qtrs", "9-12 qtrs", "Annual"]
     )
-    heavy_gaps = all(
-        pd.isna(pd.to_numeric(heavy.loc[bucket, "metric_value"], errors="coerce"))
-        for bucket in ["2024+", "2022-23"]
-    )
-    record("Stress chart source coalesces aliases and preserves missing gaps", stress_ok and heavy_core and heavy_gaps, "Six buckets per stream; Heavy RUC policy windows remain gaps.")
+    record("Stress chart source uses evidence-pack rows and six-bucket order", stress_ok and heavy_core, "Six finalist buckets per stream from stress_horizon.parquet.")
 
     scenario = read_table("scenario_decision_summary.csv")
     scenario_terms = {"Full-sample Qtr Gain", "Full-sample Annual Gain", "Paired Win Rate"}
@@ -143,8 +139,8 @@ def validate() -> list[tuple[str, str, str]]:
         "ACF source table documents residual source",
         EXPECTED_STREAMS.issubset(set(acf["stream_label"]))
         and (
-            "All selected quarterly prediction residuals" in acf_notes
-            or "H1 residual diagnostics from diagnostic audit pack" in acf_notes
+            "All selected quarterly residuals" in acf_notes
+            or "H1 residual diagnostics" in acf_notes
         ),
         f"rows={len(acf):,}",
     )

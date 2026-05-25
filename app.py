@@ -10,15 +10,15 @@ import pandas as pd
 import streamlit as st
 
 from model_dashboard.data_loader import (
-    DEFAULT_DIAGNOSTIC_DATA_ROOT,
+    DEFAULT_EVIDENCE_PACK_ROOT,
     LoadedRun,
     curated_manifest_matches,
     curated_signature,
     discover_run_folders,
+    evidence_pack_signature,
     load_curated_run,
-    load_parquet_dashboard,
+    load_evidence_pack,
     load_run,
-    parquet_pack_signature,
     run_signature,
 )
 from model_dashboard.data.diagnostics import build_diagnostic_acf_source_table
@@ -129,7 +129,7 @@ def cached_discover_run_folders(
 
 
 @st.cache_data(show_spinner=False)
-def cached_load_parquet_dashboard(
+def cached_load_evidence_pack(
     data_root: str,
     repo_root: str,
     pack_sig: tuple[tuple[str, int, int], ...],
@@ -137,7 +137,7 @@ def cached_load_parquet_dashboard(
 ) -> LoadedRun:
     del pack_sig
     del schema_version
-    return load_parquet_dashboard(data_root, repo_root, allow_csv_preview=True)
+    return load_evidence_pack(data_root, repo_root)
 
 
 def directory_signature(path: Path) -> tuple[bool, int, int]:
@@ -207,9 +207,9 @@ def render_primary_navigation(pages: list[str]) -> str:
 
 def render_run_sidebar() -> str:
     data_root = Path(
-        os.environ.get("MODEL_DIAGNOSTIC_DATA_ROOT")
-        or os.environ.get("STAGE1_DASHBOARD_DATA_ROOT")
-        or DEFAULT_DIAGNOSTIC_DATA_ROOT
+        os.environ.get("DASHBOARD_EVIDENCE_PACK_ROOT")
+        or os.environ.get("STAGE1_DASHBOARD_EVIDENCE_PACK_ROOT")
+        or DEFAULT_EVIDENCE_PACK_ROOT
     ).expanduser()
     st.session_state["active_data_root"] = str(data_root)
     return str(data_root)
@@ -218,22 +218,23 @@ def render_run_sidebar() -> str:
 def load_active_run(active_path: str) -> LoadedRun | None:
     data_root = Path(active_path).expanduser()
     repo_root = Path(__file__).resolve().parent
-    with st.spinner(f"Loading Parquet-backed dashboard data from {data_root}..."):
+    with st.spinner(f"Loading dashboard evidence pack from {data_root}..."):
         try:
-            loaded = cached_load_parquet_dashboard(
+            loaded = cached_load_evidence_pack(
                 str(data_root),
                 str(repo_root),
-                parquet_pack_signature(data_root, repo_root),
+                evidence_pack_signature(data_root),
                 LOADER_SCHEMA_VERSION,
             )
             if loaded.data and any(not frame.empty for frame in loaded.data.values() if isinstance(frame, pd.DataFrame)):
                 return loaded
         except Exception as exc:
-            warning_panel(f"Parquet dashboard pack could not be loaded: {exc}")
+            warning_panel(f"Dashboard evidence pack could not be loaded: {exc}")
 
     warning_panel(
-        "No governed Parquet dashboard data was loaded. Legacy run-folder CSV/XLSX outputs are available "
-        "only through review utilities, not the main dashboard path."
+        "No governed evidence pack was loaded. Set DASHBOARD_EVIDENCE_PACK_ROOT to the folder containing "
+        "manifest.json and data/*.parquet. Legacy run-folder CSV/XLSX outputs are available only through "
+        "review utilities, not the main dashboard path."
     )
     return None
 
@@ -606,7 +607,7 @@ def common_filter(df: pd.DataFrame, controls: dict[str, Any], include_source_var
 
 def render_overview(loaded: LoadedRun, controls: dict[str, Any]) -> None:
     summary = common_filter(loaded.data.get("summary", pd.DataFrame()), controls)
-    recommended = common_filter(loaded.data.get("recommended", pd.DataFrame()), controls)
+    recommended = common_filter(loaded.data.get("recommended", pd.DataFrame()), controls, include_source_variant=False)
     errors = loaded.data.get("errors", pd.DataFrame())
     best = best_by_stream(recommended)
     raw_qpred = loaded.data.get("quarterly_predictions", pd.DataFrame())
@@ -895,12 +896,24 @@ def render_diagnostics(loaded: LoadedRun, controls: dict[str, Any]) -> None:
 
     qpred = common_filter(loaded.data.get("quarterly_predictions", pd.DataFrame()), controls, include_source_variant=False)
     diagnostic_qpred = central_error_window(qpred)
-    acf_source = build_diagnostic_acf_source_table(qpred, diagnostic_df)
-    acf_subtitle = (
-        "Residual ACF by lag using H1 residual diagnostics from the diagnostic audit pack."
-        if qpred.empty and not acf_source.empty
-        else "Residual ACF by lag using all selected quarterly residuals averaged by target period."
+    supplied_acf = loaded.data.get("diagnostic_acf", pd.DataFrame())
+    acf_source = common_filter(supplied_acf, controls, include_source_variant=False) if not supplied_acf.empty else build_diagnostic_acf_source_table(qpred, diagnostic_df)
+    residual_scope = (
+        ", ".join(sorted(acf_source["residual_source"].dropna().astype(str).unique()))
+        if not acf_source.empty and "residual_source" in acf_source.columns
+        else "selected residuals"
     )
+    acf_subtitle = (
+        f"Residual ACF by lag using {residual_scope}."
+    )
+    error_distribution = loaded.data.get("error_distribution", pd.DataFrame())
+    error_distribution = (
+        common_filter(error_distribution, controls, include_source_variant=False)
+        if not error_distribution.empty
+        else diagnostic_qpred
+    )
+    pass_matrix = loaded.data.get("diagnostic_pass_matrix", pd.DataFrame())
+    pass_matrix = common_filter(pass_matrix, controls, include_source_variant=False) if not pass_matrix.empty else diagnostic_df
     top = st.columns([1.0, 1.0])
     with top[0]:
         chart_card(
@@ -920,13 +933,13 @@ def render_diagnostics(loaded: LoadedRun, controls: dict[str, Any]) -> None:
         chart_card(
             "3. Diagnostic Pass Matrix",
             "Calibration R2 and key statistical diagnostics by stream.",
-            compact_figure(plot_diagnostic_pass_matrix(diagnostic_df), 260),
+            compact_figure(plot_diagnostic_pass_matrix(pass_matrix), 260),
         )
     with bottom[1]:
         chart_card(
             "4. Error Distribution by Horizon",
             "Absolute percentage error (%) by forecast horizon.",
-            compact_figure(plot_error_distribution(diagnostic_qpred), 260),
+            compact_figure(plot_error_distribution(error_distribution), 260),
         )
 
     with st.expander("Diagnostics governance notes", expanded=False):
@@ -980,7 +993,7 @@ def central_error_window(qpred: pd.DataFrame, lower: float = 0.01, upper: float 
 
 
 def render_scenario_comparison(loaded: LoadedRun, controls: dict[str, Any]) -> None:
-    recommended = common_filter(loaded.data.get("recommended", pd.DataFrame()), controls)
+    recommended = common_filter(loaded.data.get("recommended", pd.DataFrame()), controls, include_source_variant=False)
     summary = common_filter(loaded.data.get("summary", pd.DataFrame()), controls)
     paired = common_filter(loaded.data.get("paired_vs_schiff", pd.DataFrame()), controls, include_source_variant=False)
     qpred = common_filter(loaded.data.get("quarterly_predictions", pd.DataFrame()), controls, include_source_variant=False)
@@ -1008,7 +1021,9 @@ def render_scenario_comparison(loaded: LoadedRun, controls: dict[str, Any]) -> N
                 scenario_b = st.selectbox("Scenario B", ["Schiff Structural Benchmark", "Best pure Schiff by stream"], key="scenario_b_choice")
                 baseline = st.selectbox("Scenario baseline", ["Baseline FY25", "Latest loaded run"], key="scenario_baseline_choice")
 
-    comparison = scenario_comparison_frame(recommended, loaded.data.get("schiff_df", summary), paired)
+    comparison = evidence_scenario_comparison_frame(loaded, controls)
+    if comparison.empty:
+        comparison = scenario_comparison_frame(recommended, loaded.data.get("schiff_df", summary), paired)
     scenario_stress_frame = loaded.data.get("stress", pd.DataFrame())
     story = governance_story_summary(
         recommended,
@@ -1092,6 +1107,39 @@ def scenario_kpi_cards(
         ("Gain vs Schiff", gain_value, f"{gain_source}; {format_percent(win_rate, 1)} paired win", gain_delta, "good" if pd.notna(gain) and gain > 0 else "mixed", "B"),
         ("Decision status", f"{beats}/{total}", "streams beat pure Schiff", "", "good" if total and beats >= 2 else "mixed", "D"),
     ]
+
+
+def evidence_scenario_comparison_frame(loaded: LoadedRun, controls: dict[str, Any]) -> pd.DataFrame:
+    comparison = loaded.data.get("scenario_comparison", pd.DataFrame())
+    if comparison is None or comparison.empty:
+        return pd.DataFrame()
+    data = common_filter(comparison, controls, include_source_variant=False).copy()
+    rename_map = {
+        "full_sample_qtr_gain_pp": "quarterly_gain_pp",
+        "full_sample_annual_gain_pp": "annual_gain_pp",
+        "paired_win_rate_pct": "win_rate",
+    }
+    for source, target in rename_map.items():
+        if source in data.columns and target not in data.columns:
+            data[target] = data[source]
+    required = [
+        "stream",
+        "stream_label",
+        "finalist_model",
+        "schiff_model",
+        "finalist_quarterly_mape",
+        "schiff_quarterly_mape",
+        "quarterly_gain_pp",
+        "finalist_annual_mape",
+        "schiff_annual_mape",
+        "annual_gain_pp",
+        "win_rate",
+        "recommendation",
+    ]
+    for column in required:
+        if column not in data.columns:
+            data[column] = pd.NA
+    return data[required + [column for column in data.columns if column not in required]]
 
 
 def scenario_comparison_frame(recommended: pd.DataFrame, schiff_rows: pd.DataFrame, paired: pd.DataFrame) -> pd.DataFrame:
@@ -1274,9 +1322,11 @@ def scenario_decision_lens_summary(story: pd.DataFrame) -> str:
 def render_schiff_benchmark_page(loaded: LoadedRun, controls: dict[str, Any]) -> None:
     summary = common_filter(loaded.data.get("summary", pd.DataFrame()), controls)
     paired = common_filter(loaded.data.get("paired_vs_schiff", pd.DataFrame()), controls, include_source_variant=False)
-    recommended = common_filter(loaded.data.get("recommended", pd.DataFrame()), controls)
-    schiff_rows = common_filter(loaded.data.get("schiff_df", pd.DataFrame()), controls)
-    comparison = scenario_comparison_frame(recommended, schiff_rows if not schiff_rows.empty else summary, paired)
+    recommended = common_filter(loaded.data.get("recommended", pd.DataFrame()), controls, include_source_variant=False)
+    schiff_rows = common_filter(loaded.data.get("schiff_df", pd.DataFrame()), controls, include_source_variant=False)
+    comparison = evidence_scenario_comparison_frame(loaded, controls)
+    if comparison.empty:
+        comparison = scenario_comparison_frame(recommended, schiff_rows if not schiff_rows.empty else summary, paired)
     gov_kpi_grid(
         basic_cards_as_governance_kpis(
             schiff_kpi_cards(schiff_rows if not schiff_rows.empty else summary, paired, recommended),
@@ -1389,7 +1439,7 @@ def qpred_for_stream(loaded: LoadedRun, controls: dict[str, Any], stream: str) -
 def render_executive_summary(loaded: LoadedRun, controls: dict[str, Any]) -> None:
     section_title("Executive Summary")
     summary = common_filter(loaded.data.get("summary", pd.DataFrame()), controls)
-    recommended = common_filter(loaded.data.get("recommended", pd.DataFrame()), controls)
+    recommended = common_filter(loaded.data.get("recommended", pd.DataFrame()), controls, include_source_variant=False)
     qpred = common_filter(loaded.data.get("quarterly_predictions", pd.DataFrame()), controls, include_source_variant=False)
     errors = loaded.data.get("errors", pd.DataFrame())
     best = best_by_stream(recommended)
@@ -1648,7 +1698,7 @@ def render_schiff_comparison(loaded: LoadedRun, controls: dict[str, Any]) -> Non
     section_title("Schiff Benchmark Comparison")
     paired = common_filter(loaded.data.get("paired_vs_schiff", pd.DataFrame()), controls, include_source_variant=False)
     summary = common_filter(loaded.data.get("summary", pd.DataFrame()), controls)
-    recommended = common_filter(loaded.data.get("recommended", pd.DataFrame()), controls)
+    recommended = common_filter(loaded.data.get("recommended", pd.DataFrame()), controls, include_source_variant=False)
     if paired.empty:
         warning_panel("paired_vs_schiff.csv is missing and no Schiff comparison could be reconstructed.")
     else:
@@ -1704,7 +1754,7 @@ def schiff_interpretation(row: pd.Series) -> str:
 def render_ensemble_composition(loaded: LoadedRun, controls: dict[str, Any]) -> None:
     section_title("Ensemble Composition")
     weights = common_filter(loaded.data.get("weights", pd.DataFrame()), controls, include_source_variant=False)
-    recommended = common_filter(loaded.data.get("recommended", pd.DataFrame()), controls)
+    recommended = common_filter(loaded.data.get("recommended", pd.DataFrame()), controls, include_source_variant=False)
     if weights.empty:
         warning_panel("ensemble_weights.csv was not found or has no readable rows.")
         return
@@ -1909,7 +1959,7 @@ def filter_ensemble_methods(weights: pd.DataFrame, controls: dict[str, Any]) -> 
 def render_forecasts_and_errors(loaded: LoadedRun, controls: dict[str, Any]) -> None:
     section_title("Forecasts and Errors")
     qpred = common_filter(loaded.data.get("quarterly_predictions", pd.DataFrame()), controls, include_source_variant=False)
-    recommended = common_filter(loaded.data.get("recommended", pd.DataFrame()), controls)
+    recommended = common_filter(loaded.data.get("recommended", pd.DataFrame()), controls, include_source_variant=False)
     if qpred.empty:
         warning_panel("quarterly_predictions.csv or an equivalent file was not found.")
         return
@@ -1977,7 +2027,7 @@ def default_model_index(model_options: list[str], recommended: pd.DataFrame, str
 
 def render_stress_checks(loaded: LoadedRun, controls: dict[str, Any]) -> None:
     section_title("Stress and Horizon Checks")
-    recommended = common_filter(loaded.data.get("recommended", pd.DataFrame()), controls)
+    recommended = common_filter(loaded.data.get("recommended", pd.DataFrame()), controls, include_source_variant=False)
     stress = loaded.data.get("stress", pd.DataFrame())
     qpred = loaded.data.get("quarterly_predictions", pd.DataFrame())
     annual = loaded.data.get("annual_predictions", pd.DataFrame())

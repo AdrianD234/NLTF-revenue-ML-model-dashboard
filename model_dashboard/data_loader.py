@@ -3,11 +3,18 @@ from __future__ import annotations
 from .data.config import (
     DEFAULT_DIAGNOSTIC_AUDIT_ROOT,
     DEFAULT_DIAGNOSTIC_DATA_ROOT,
+    DEFAULT_EVIDENCE_PACK_ROOT,
     DEFAULT_INFORMATION_PACK_ROOT,
     DashboardData,
     PARQUET_CANDIDATE_FILE,
     PARQUET_CSV_MIRROR_FILE,
     PARQUET_METADATA_FILE,
+)
+from .evidence_pack import (
+    DashboardEvidencePack,
+    evidence_pack_signature,
+    load_evidence_pack,
+    resolve_evidence_pack_root,
 )
 from .data.legacy_loader import (
     curated_manifest_matches,
@@ -40,7 +47,9 @@ STALE_FINALIST_VALUES = {
 __all__ = [
     "DEFAULT_DIAGNOSTIC_AUDIT_ROOT",
     "DEFAULT_DIAGNOSTIC_DATA_ROOT",
+    "DEFAULT_EVIDENCE_PACK_ROOT",
     "DEFAULT_INFORMATION_PACK_ROOT",
+    "DashboardEvidencePack",
     "DashboardData",
     "LoadedRun",
     "PARQUET_CANDIDATE_FILE",
@@ -55,10 +64,13 @@ __all__ = [
     "discover_run_folders",
     "legacy_review_warning",
     "load_curated_run",
+    "load_evidence_pack",
     "load_parquet_dashboard",
     "load_run",
     "locate_dashboard_file",
     "parquet_pack_signature",
+    "evidence_pack_signature",
+    "resolve_evidence_pack_root",
     "run_has_outputs",
     "run_signature",
 ]

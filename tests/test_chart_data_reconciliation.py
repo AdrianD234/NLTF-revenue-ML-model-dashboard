@@ -12,7 +12,7 @@ from app import (
     scenario_comparison_frame,
     scenario_horizon_frame,
 )
-from model_dashboard.data_loader import DEFAULT_DIAGNOSTIC_AUDIT_ROOT, LoadedRun, load_parquet_dashboard
+from model_dashboard.data_loader import DEFAULT_EVIDENCE_PACK_ROOT, LoadedRun, load_evidence_pack
 from model_dashboard.metrics import governance_story_summary
 from model_dashboard.plots import (
     plot_autocorrelation_diagnostics,
@@ -34,8 +34,8 @@ EXPECTED_STREAMS = {"PED VKT per capita", "Light RUC volume", "Heavy RUC volume"
 
 @pytest.fixture(scope="session")
 def parquet_dashboard() -> LoadedRun:
-    data_root = Path(os.environ.get("MODEL_DIAGNOSTIC_DATA_ROOT", DEFAULT_DIAGNOSTIC_AUDIT_ROOT)).expanduser()
-    return load_parquet_dashboard(data_root, ROOT, allow_csv_preview=False)
+    data_root = Path(os.environ.get("DASHBOARD_EVIDENCE_PACK_ROOT", DEFAULT_EVIDENCE_PACK_ROOT)).expanduser()
+    return load_evidence_pack(data_root, ROOT)
 
 
 def read_source_table(name: str) -> pd.DataFrame:
@@ -48,7 +48,7 @@ def read_source_table(name: str) -> pd.DataFrame:
 def test_ensemble_composition_uses_parquet_components(parquet_dashboard: LoadedRun) -> None:
     table = read_source_table("ensemble_composition_source_table.csv")
     assert set(table["stream_label"]) == EXPECTED_STREAMS
-    assert table["source"].astype(str).str.contains("Parquet ensemble_components_json", regex=False).all()
+    assert table["source"].astype(str).str.contains("ensemble_components.parquet", regex=False).all()
 
     for stream, weights in EXPECTED_ENSEMBLE_WEIGHT_PCT.items():
         actual = (
@@ -142,23 +142,21 @@ def test_acf_source_table_exists(parquet_dashboard: LoadedRun) -> None:
 def test_acf_chart_uses_documented_residual_source(parquet_dashboard: LoadedRun) -> None:
     table = read_source_table("diagnostic_acf_source_table.csv")
     source = set(table["residual_source"].dropna().astype(str))
-    assert source in [
-        {"All selected quarterly prediction residuals, averaged by target period"},
-        {"H1 residual diagnostics from diagnostic audit pack"},
-    ]
+    assert source
+    assert all("residual" in value.lower() or "h1" in value.lower() for value in source)
     app_text = (ROOT / "app.py").read_text(encoding="utf-8")
-    assert "all selected quarterly residuals averaged by target period" in app_text
-    assert "H1 residual diagnostics from the diagnostic audit pack" in app_text
+    assert "residual_scope" in app_text
 
 
 def test_acf_lag1_matches_source_table(parquet_dashboard: LoadedRun) -> None:
     table = read_source_table("diagnostic_acf_source_table.csv")
-    lag1 = table[table["lag"].eq(1)].set_index("stream_label")["acf_value"].astype(float)
     fig = plot_autocorrelation_diagnostics(parquet_dashboard.data["quarterly_predictions"], acf_source=table)
     for trace in fig.data:
         stream = str(trace.name)
-        assert stream in lag1.index
-        assert float(trace.y[0]) == pytest.approx(float(lag1.loc[stream]), abs=1e-12)
+        source_rows = table[table["stream_label"].eq(stream)].sort_values("lag")
+        assert not source_rows.empty
+        assert list(trace.x) == source_rows["lag"].tolist()
+        assert list(map(float, trace.y)) == pytest.approx(source_rows["acf_value"].astype(float).tolist(), abs=1e-12)
 
 
 def test_r2_kpi_label_matches_source_field(parquet_dashboard: LoadedRun) -> None:

@@ -533,8 +533,8 @@ def test_overview_stress_horizon_aliases_show_all_streams(page: Page) -> None:
     heavy = traces["Heavy RUC volume"]
     assert heavy["connectgaps"] is False
     heavy_y = dict(zip(heavy["x"], heavy["y"]))
-    assert _browser_value_missing(heavy_y["2024+"])
-    assert _browser_value_missing(heavy_y["2022-23"])
+    for label in labels:
+        assert not _browser_value_missing(heavy_y[label]), f"Heavy RUC is missing sourced stress bucket {label}"
 
 
 def _browser_value_missing(value: object) -> bool:
@@ -561,7 +561,7 @@ def test_diagnostics_matrix_is_styled(page: Page) -> None:
     expect(page.locator("body")).to_contain_text("3. Diagnostic Pass Matrix", timeout=90000)
     for text in ["Calibration R2", "Durbin-Watson", "Breusch-Pagan", "White", "Jarque-Bera"]:
         expect(page.locator("body")).to_contain_text(text, timeout=90000)
-    for text in ["Green = pass", "amber = caution", "red = fail"]:
+    for text in ["Green = pass", "amber = watch", "red = fail"]:
         expect(page.locator("body")).to_contain_text(text, timeout=90000)
 
 

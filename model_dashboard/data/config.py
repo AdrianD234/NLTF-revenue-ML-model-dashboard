@@ -34,6 +34,11 @@ DEFAULT_BESPOKE_PARENT = env_path(
     "STAGE1_BESPOKE_PARENT",
     default=DEFAULT_INPUT_PARENT / "bespoke_solver_stage1_outputs",
 )
+DEFAULT_EVIDENCE_PACK_ROOT = env_path(
+    "DASHBOARD_EVIDENCE_PACK_ROOT",
+    "STAGE1_DASHBOARD_EVIDENCE_PACK_ROOT",
+    default=Path("data") / "dashboard_evidence_pack",
+)
 
 
 @dataclass(frozen=True)

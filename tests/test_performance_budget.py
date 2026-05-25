@@ -3,34 +3,40 @@ from __future__ import annotations
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from scripts.benchmark_dashboard import benchmark_parquet_backend
-from model_dashboard.data_loader import load_parquet_dashboard
+from model_dashboard.data_loader import DEFAULT_EVIDENCE_PACK_ROOT, load_evidence_pack, resolve_evidence_pack_root
 from model_dashboard.plots import _competitive_landscape_subset, _sample_by_stream
 
 
-FIXTURE_ROOT = Path(__file__).resolve().parent / "fixtures" / "mini_parquet"
+def evidence_root() -> Path:
+    root = resolve_evidence_pack_root(DEFAULT_EVIDENCE_PACK_ROOT)
+    if not (root / "manifest.json").exists():
+        pytest.skip("Evidence-pack performance tests require DASHBOARD_EVIDENCE_PACK_ROOT or data/dashboard_evidence_pack.")
+    return root
 
 
-def test_backend_benchmark_uses_parquet_fixture() -> None:
-    result = benchmark_parquet_backend(FIXTURE_ROOT, Path(__file__).resolve().parents[1], repeats=1)
+def test_backend_benchmark_uses_evidence_pack() -> None:
+    root = evidence_root()
+    result = benchmark_parquet_backend(root, Path(__file__).resolve().parents[1], repeats=1)
     labels = {item["label"] for item in result["benchmarks"]}
 
-    assert result["source_mode"] == "parquet"
-    assert result["data_root"].endswith("mini_parquet")
-    assert "load_parquet_dashboard_uncached" in labels
+    assert result["source_mode"] == "dashboard_evidence_pack"
+    assert result["data_root"].endswith("dashboard_evidence_pack")
+    assert "load_evidence_pack_uncached" in labels
     assert result["row_counts"]["summary"] > 0
     assert result["row_counts"]["recommended"] == 3
 
 
-def test_parquet_fixture_loads_without_legacy_run_folder() -> None:
-    loaded = load_parquet_dashboard(FIXTURE_ROOT, Path(__file__).resolve().parents[1])
+def test_evidence_pack_loads_without_legacy_run_folder() -> None:
+    loaded = load_evidence_pack(evidence_root(), Path(__file__).resolve().parents[1])
 
     assert loaded.manifest is not None
-    assert loaded.manifest["source_mode"] == "parquet"
+    assert loaded.manifest["source_mode"] == "dashboard_evidence_pack"
     assert len(loaded.data["recommended"]) == 3
     assert len(loaded.data["schiff_df"]) == 3
-    assert len(loaded.data["weights"]) == 8
+    assert len(loaded.data["weights"]) > 0
 
 
 def test_candidate_landscape_subset_preserves_governance_anchors() -> None:

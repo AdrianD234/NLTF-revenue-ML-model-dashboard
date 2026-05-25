@@ -31,6 +31,8 @@ EXPECTED_STRESS_MAPE = {
     ("Heavy RUC volume", "1-4 qtrs"): 2.802065,
     ("Heavy RUC volume", "5-8 qtrs"): 3.543246,
     ("Heavy RUC volume", "9-12 qtrs"): 4.268496,
+    ("Heavy RUC volume", "2024+"): 2.118209,
+    ("Heavy RUC volume", "2022-23"): 2.793099,
     ("Heavy RUC volume", "Annual"): 3.019980,
 }
 

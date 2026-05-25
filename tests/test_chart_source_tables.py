@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 
 from model_dashboard.chart_sources import CHART_SOURCE_FILES, CORE_COLUMNS
-from model_dashboard.data_loader import DEFAULT_DIAGNOSTIC_AUDIT_ROOT, LoadedRun, load_parquet_dashboard
+from model_dashboard.data_loader import DEFAULT_EVIDENCE_PACK_ROOT, LoadedRun, load_evidence_pack
 from model_dashboard.labels import STRESS_BUCKET_ORDER
 from tests.fixtures.expected_values import (
     EXPECTED_ENSEMBLE_WEIGHT_PCT,
@@ -24,8 +24,8 @@ EXPECTED_STREAMS = {"PED VKT per capita", "Light RUC volume", "Heavy RUC volume"
 
 @pytest.fixture(scope="session")
 def parquet_dashboard() -> LoadedRun:
-    data_root = Path(os.environ.get("MODEL_DIAGNOSTIC_DATA_ROOT", DEFAULT_DIAGNOSTIC_AUDIT_ROOT)).expanduser()
-    return load_parquet_dashboard(data_root, ROOT, allow_csv_preview=False)
+    data_root = Path(os.environ.get("DASHBOARD_EVIDENCE_PACK_ROOT", DEFAULT_EVIDENCE_PACK_ROOT)).expanduser()
+    return load_evidence_pack(data_root, ROOT)
 
 
 def chart_source(name: str) -> pd.DataFrame:
@@ -98,8 +98,8 @@ def test_stress_chart_source_alias_order_and_missing_gaps(parquet_dashboard: Loa
 
     for bucket in ["2024+", "2022-23"]:
         row = indexed.loc[("Heavy RUC volume", bucket)]
-        assert pd.isna(pd.to_numeric(row["metric_value"], errors="coerce"))
-        assert str(row["value_available"]).lower() == "false"
+        assert pd.notna(pd.to_numeric(row["metric_value"], errors="coerce"))
+        assert str(row["value_available"]).lower() == "true"
 
 
 def test_scenario_and_schiff_source_tables_keep_full_sample_and_paired_separate(
@@ -136,8 +136,7 @@ def test_horizon_and_diagnostic_source_tables_have_required_semantics(parquet_da
     assert EXPECTED_STREAMS.issubset(set(acf["stream_label"]))
     acf_notes = " ".join(acf["notes"].dropna().astype(str))
     assert (
-        "All selected quarterly prediction residuals" in acf_notes
-        or "H1 residual diagnostics from diagnostic audit pack" in acf_notes
+        "H1 residual diagnostics" in acf_notes
     )
 
     pass_matrix = chart_source("diagnostics_pass_matrix.csv")

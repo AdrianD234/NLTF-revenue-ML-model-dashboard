@@ -10,13 +10,13 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from model_dashboard.data.config import DEFAULT_DIAGNOSTIC_DATA_ROOT  # noqa: E402
-from model_dashboard.data_loader import load_parquet_dashboard  # noqa: E402
+from model_dashboard.data.config import DEFAULT_EVIDENCE_PACK_ROOT  # noqa: E402
+from model_dashboard.evidence_pack import load_evidence_pack  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Validate dashboard semantic labels.")
-    parser.add_argument("--data-root", default=str(DEFAULT_DIAGNOSTIC_DATA_ROOT))
+    parser.add_argument("--data-root", default=str(DEFAULT_EVIDENCE_PACK_ROOT))
     parser.add_argument("--repo-root", default=str(ROOT))
     return parser.parse_args()
 
@@ -28,7 +28,7 @@ def read_text(path: Path) -> str:
 def validate() -> list[tuple[str, str, str]]:
     args = parse_args()
     repo_root = Path(args.repo_root).expanduser()
-    load_parquet_dashboard(args.data_root, repo_root, allow_csv_preview=False)
+    load_evidence_pack(args.data_root, repo_root)
 
     app_text = read_text(repo_root / "app.py")
     plot_text = read_text(repo_root / "model_dashboard" / "plots.py")
