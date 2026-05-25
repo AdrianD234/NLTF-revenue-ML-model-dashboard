@@ -265,7 +265,7 @@ def test_overview_frontier_note_is_data_backed(loaded_validation_run: LoadedRun)
     assert "Frontier read: lower-left is better" in note
     assert "plotted candidates" in note
     assert str(len(loaded_validation_run.data["summary"])) in note
-    assert "pure-Schiff benchmark rows" in note
+    assert "plotted pure-Schiff anchor rows" in note
 
 
 def test_overview_stress_watch_note_names_worst_visible_bucket(loaded_validation_run: LoadedRun) -> None:

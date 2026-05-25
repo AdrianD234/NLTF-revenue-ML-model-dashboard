@@ -796,9 +796,19 @@ def overview_frontier_note(summary: pd.DataFrame, count_context: dict[str, Any] 
     if summary is None or summary.empty:
         return "Frontier read: lower-left is better; no candidate rows are available for this filter."
     pure_schiff = 0
+    benchmark_streams = 0
     if "schiff_class" in summary.columns:
         pure_schiff = int(summary["schiff_class"].astype(str).eq("Pure Schiff benchmark").sum())
-    suffix = f"; {pure_schiff} pure-Schiff benchmark rows anchor the comparison" if pure_schiff else ""
+        if "stream_label" in summary.columns:
+            benchmark_streams = int(
+                summary.loc[
+                    summary["schiff_class"].astype(str).eq("Pure Schiff benchmark"),
+                    "stream_label",
+                ]
+                .dropna()
+                .nunique()
+            )
+    suffix = f"; {pure_schiff} plotted pure-Schiff anchor rows / {benchmark_streams} benchmark streams" if pure_schiff else ""
     label = str(count_context.get("label")) if count_context else f"{format_count(len(summary))} plotted candidates"
     return f"Frontier read: lower-left is better across {label}{suffix}."
 

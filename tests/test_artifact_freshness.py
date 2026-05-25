@@ -141,8 +141,10 @@ def test_fixture_fallback_does_not_mix_with_explicit_external_root(tmp_path: Pat
     assert locate_dashboard_file("quarterly_predictions_selected.csv", roots) is None
 
 
-def test_agent_state_does_not_claim_completion_during_cleanup_goal() -> None:
+def test_agent_state_records_baseline_acceptance() -> None:
     text = (ROOT / ".agent_state.md").read_text(encoding="utf-8")
 
-    assert "Status: IN PROGRESS" in text
+    assert "Status: BASELINE_ACCEPTED" in text or "Status: VERIFIED" in text
     assert "Status: COMPLETE" not in text
+    assert "Latest verified commit:" in text
+    assert "BUG_BACKLOG.md: no unchecked items" in text

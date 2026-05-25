@@ -18,7 +18,10 @@ def test_readme_describes_parquet_first_runtime() -> None:
 
     assert "default data source is the curated Parquet dashboard pack" in text
     assert "Legacy run-folder CSV/XLSX outputs are retained only for review" in text
+    assert "DASHBOARD_EVIDENCE_PACK_ROOT" in text
+    assert "STAGE1_DASHBOARD_EVIDENCE_PACK_ROOT" in text
     assert "MODEL_DIAGNOSTIC_DATA_ROOT" in text
+    assert text.index("DASHBOARD_EVIDENCE_PACK_ROOT") < text.index("MODEL_DIAGNOSTIC_DATA_ROOT")
     assert ("MODEL" + "_RUN_DIR") not in text
 
 

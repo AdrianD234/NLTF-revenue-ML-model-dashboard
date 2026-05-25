@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import time
 from typing import Any
 
 import pandas as pd
@@ -92,7 +93,14 @@ def write_chart_source_tables(repo_root: Path, data: dict[str, pd.DataFrame]) ->
 def _write_csv_atomic(frame: pd.DataFrame, path: Path) -> None:
     tmp = path.with_suffix(path.suffix + ".tmp")
     frame.to_csv(tmp, index=False)
-    tmp.replace(path)
+    for attempt in range(6):
+        try:
+            tmp.replace(path)
+            return
+        except PermissionError:
+            if attempt == 5:
+                raise
+            time.sleep(0.25 * (attempt + 1))
 
 
 def build_chart_source_tables(data: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:

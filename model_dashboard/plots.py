@@ -304,22 +304,6 @@ def plot_candidate_landscape(summary: pd.DataFrame) -> go.Figure:
         fig.update_xaxes(range=[0, x_limit])
     if y_limit is not None:
         fig.update_yaxes(range=[0, y_limit])
-    if (
-        full_count > len(data)
-        or
-        (x_limit is not None and data["quarterly_mape"].max() > x_limit)
-        or (y_limit is not None and data["annual_mape"].max() > y_limit)
-    ):
-        fig.add_annotation(
-            text=f"Axis focuses on the competitive frontier; plotting {len(data):,} of {full_count:,} candidates with full rows in inventory/downloads.",
-            x=0.0,
-            y=-0.18,
-            xref="paper",
-            yref="paper",
-            showarrow=False,
-            align="left",
-            font={"size": 11, "color": "#64748b"},
-        )
     fig.update_layout(
         legend={
             "orientation": "h",

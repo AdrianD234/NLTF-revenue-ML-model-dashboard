@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 import json
 from pathlib import Path
+import time
 from typing import Any
 
 import pandas as pd
@@ -549,7 +550,14 @@ Diagnostic Pass Matrix uses Pass / Watch / Fail semantics.
 def _write_csv_atomic(frame: pd.DataFrame, path: Path) -> None:
     tmp = path.with_suffix(path.suffix + ".tmp")
     frame.to_csv(tmp, index=False)
-    tmp.replace(path)
+    for attempt in range(6):
+        try:
+            tmp.replace(path)
+            return
+        except PermissionError:
+            if attempt == 5:
+                raise
+            time.sleep(0.25 * (attempt + 1))
 
 
 def _format_size(size: int) -> str:

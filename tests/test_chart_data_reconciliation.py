@@ -271,6 +271,7 @@ def test_candidate_count_label_matches_count_source(parquet_dashboard: LoadedRun
     assert overview_frontier_note(data["summary"], context).startswith(
         "Frontier read: lower-left is better across 287 plotted candidates from 300 curated rows"
     )
+    assert "5 plotted pure-Schiff anchor rows / 3 benchmark streams" in overview_frontier_note(data["summary"], context)
 
 
 def test_candidate_frontier_count_matches_source_table_and_trace_points(parquet_dashboard: LoadedRun) -> None:
