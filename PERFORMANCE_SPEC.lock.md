@@ -84,3 +84,15 @@ The performance sprint is not complete unless:
 - at least 50 optimisation loops are completed, unless stretch targets are reached and at least 15 loops are complete;
 - `PERF_DEFECT_BACKLOG.lock.md` has no unresolved items;
 - all functionality and visual requirements still pass.
+
+## Parquet refresh performance lock
+
+The current 80-gate Parquet refresh must measure performance against the Parquet-backed data pack, not only the previous CSV curated preview.
+
+Additional locked requirements:
+
+- Parquet loading must be cached with `st.cache_data`.
+- The cache key must include file path, modified timestamp, file size, and loader schema version.
+- Diagnostic Excel parsing must not happen on ordinary filter interactions.
+- `scripts/benchmark_dashboard.py` must write `artifacts/performance_review.md` or equivalent performance artifacts for the Parquet-backed run before gates are closed.
+- `scripts/validate_80_gates.py` must fail performance supporting checks until current Parquet-backed performance evidence exists.

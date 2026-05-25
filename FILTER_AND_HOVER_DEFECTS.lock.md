@@ -51,3 +51,14 @@ Do not remove, weaken, or mark items complete without browser-test or screenshot
 - `artifacts/screenshots/hover-stress-checks.png`
 - `artifacts/hover_review.md`
 - `artifacts/logs/filter_hover_live_qa.json`
+
+## Parquet refresh lock
+
+The earlier hover/filter evidence is not sufficient for the current Parquet refresh sprint.
+
+For this sprint, filter and hover items remain open in `BUG_BACKLOG.md` until:
+
+- `scripts/validate_80_gates.py` passes gate 79 and gate 80;
+- the four final screenshots are regenerated from the Parquet-backed app;
+- hover evidence is regenerated against the Parquet-backed candidate frontier, stress chart, finalist accuracy chart, and ensemble/missing-data panel;
+- `artifacts/filter_interaction_review.md` and `artifacts/hover_review.md` explicitly name the Parquet source path used for the browser pass.

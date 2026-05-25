@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import base64
+from functools import lru_cache
 import html
+from pathlib import Path
 import re
 from typing import Any, Iterable
 
@@ -8,6 +11,28 @@ import pandas as pd
 import streamlit as st
 
 from .labels import POWERBI_BLUE, POWERBI_GREEN, POWERBI_TEXT, model_alias
+
+
+LOGO_ASSET_PATH = Path(__file__).resolve().parents[1] / "assets" / "nz-transport-agency-waka-kotahi.png"
+
+
+@lru_cache(maxsize=1)
+def _brand_logo_src() -> str | None:
+    try:
+        encoded = base64.b64encode(LOGO_ASSET_PATH.read_bytes()).decode("ascii")
+    except OSError:
+        return None
+    return f"data:image/png;base64,{encoded}"
+
+
+def _brand_logo_html() -> str:
+    src = _brand_logo_src()
+    if src:
+        return f'<img class="brand-logo" src="{html.escape(src)}" alt="NZ Transport Agency Waka Kotahi logo">'
+    return (
+        "<div class='brand-fallback-lockup'><div class='brand-mark'></div><div>NZ TRANSPORT AGENCY"
+        "<span class='brand-small'>WAKA KOTAHI</span></div></div>"
+    )
 
 
 def inject_theme() -> None:
@@ -57,7 +82,7 @@ def inject_theme() -> None:
                 align-items: center;
                 display: grid;
                 gap: 0.72rem;
-                grid-template-columns: 205px minmax(0, 1fr) minmax(142px, auto);
+                grid-template-columns: 250px minmax(0, 1fr) minmax(142px, auto);
                 margin-bottom: 0;
             }}
             .brand-lockup {{
@@ -65,9 +90,24 @@ def inject_theme() -> None:
                 color: var(--pbi-blue);
                 display: flex;
                 font-weight: 750;
-                gap: 0.65rem;
+                gap: 0;
                 letter-spacing: 0;
                 line-height: 1.1;
+                min-width: 0;
+            }}
+            .brand-logo {{
+                display: block;
+                height: auto;
+                max-height: 46px;
+                max-width: 240px;
+                object-fit: contain;
+                object-position: left center;
+                width: 100%;
+            }}
+            .brand-fallback-lockup {{
+                align-items: center;
+                display: flex;
+                gap: 0.65rem;
             }}
             .brand-mark {{
                 border: 4px solid var(--pbi-green);
@@ -284,7 +324,11 @@ def inject_theme() -> None:
                 }}
                 .governance-masthead {{
                     gap: 0.46rem;
-                    grid-template-columns: 168px minmax(0, 1fr) minmax(112px, auto);
+                    grid-template-columns: 190px minmax(0, 1fr) minmax(112px, auto);
+                }}
+                .brand-logo {{
+                    max-height: 36px;
+                    max-width: 182px;
                 }}
                 .brand-mark {{
                     border-width: 3px;
@@ -738,8 +782,7 @@ def inject_theme() -> None:
 def header(title: str, subtitle: str | None = None, page_chip: str = "NLTF Stage 1") -> None:
     st.markdown(
         "<div class='gov-header governance-shell'><div class='governance-masthead'>"
-        "<div class='brand-lockup'><div class='brand-mark'></div><div>WAKA KOTAHI"
-        "<span class='brand-small'>NZ TRANSPORT AGENCY</span></div></div>"
+        f"<div class='brand-lockup'>{_brand_logo_html()}</div>"
         "<div>"
         f"<div class='pbi-header'>{html.escape(title)}</div>"
         f"<div class='pbi-subtle masthead-subtitle'>{html.escape(subtitle or '')}</div>"

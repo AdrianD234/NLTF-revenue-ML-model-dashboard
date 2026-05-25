@@ -1,225 +1,32 @@
 {
-  "timestamp": "2026-05-21T13:49:37",
+  "timestamp": "2026-05-21T23:41:02",
   "run_dir": "C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Revenue Modeling - Strategic Review\\04 Models\\Inputs\\stage1_finalist_arbitration_outputs\\run_20260520_002339",
+  "data_root": "C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Revenue Modeling - Strategic Review\\04 Models\\information pack",
+  "repo_root": "C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Repos\\NLTF-revenue-ML-model-dashboard",
   "benchmarks": [
     {
-      "label": "load_run_uncached",
-      "repeats": 1,
-      "min_sec": 0.049324899999191985,
-      "median_sec": 0.049324899999191985,
-      "max_sec": 0.049324899999191985,
+      "label": "load_parquet_dashboard_uncached",
+      "repeats": 2,
+      "min_sec": 0.0941869999805931,
+      "median_sec": 0.18762704999244306,
+      "max_sec": 0.281067100004293,
       "result_type": "LoadedRun"
     },
     {
-      "label": "cached_load_run_first_call",
+      "label": "cached_load_parquet_first_call",
       "repeats": 1,
-      "min_sec": 0.04519159998744726,
-      "median_sec": 0.04519159998744726,
-      "max_sec": 0.04519159998744726,
+      "min_sec": 0.10204870000598021,
+      "median_sec": 0.10204870000598021,
+      "max_sec": 0.10204870000598021,
       "result_type": "LoadedRun"
     },
     {
-      "label": "cached_load_run_warm_call",
-      "repeats": 1,
-      "min_sec": 0.0021735000191256404,
-      "median_sec": 0.0021735000191256404,
-      "max_sec": 0.0021735000191256404,
+      "label": "cached_load_parquet_warm_call",
+      "repeats": 3,
+      "min_sec": 0.006392999988747761,
+      "median_sec": 0.006714399991324171,
+      "max_sec": 0.006946699984837323,
       "result_type": "LoadedRun"
-    },
-    {
-      "label": "summary_generation_prep",
-      "repeats": 1,
-      "min_sec": 0.0015101000026334077,
-      "median_sec": 0.0015101000026334077,
-      "max_sec": 0.0015101000026334077,
-      "result_type": "int",
-      "result_value": 14
-    },
-    {
-      "label": "best_by_stream_recommended",
-      "repeats": 1,
-      "min_sec": 0.0010500999924261123,
-      "median_sec": 0.0010500999924261123,
-      "max_sec": 0.0010500999924261123,
-      "result_type": "DataFrame"
-    },
-    {
-      "label": "governance_story_summary",
-      "repeats": 1,
-      "min_sec": 0.010061999986646697,
-      "median_sec": 0.010061999986646697,
-      "max_sec": 0.010061999986646697,
-      "result_type": "DataFrame"
-    },
-    {
-      "label": "filter_summary_common_controls",
-      "repeats": 1,
-      "min_sec": 0.0009780999971553683,
-      "median_sec": 0.0009780999971553683,
-      "max_sec": 0.0009780999971553683,
-      "result_type": "DataFrame"
-    },
-    {
-      "label": "filter_qpred_common_controls",
-      "repeats": 1,
-      "min_sec": 0.0004922999942209572,
-      "median_sec": 0.0004922999942209572,
-      "max_sec": 0.0004922999942209572,
-      "result_type": "DataFrame"
-    },
-    {
-      "label": "stress_summary_prep",
-      "repeats": 1,
-      "min_sec": 0.0007619999814778566,
-      "median_sec": 0.0007619999814778566,
-      "max_sec": 0.0007619999814778566,
-      "result_type": "int",
-      "result_value": 18
-    },
-    {
-      "label": "model_inventory_prep",
-      "repeats": 1,
-      "min_sec": 0.0006557000160682946,
-      "median_sec": 0.0006557000160682946,
-      "max_sec": 0.0006557000160682946,
-      "result_type": "int",
-      "result_value": 100
-    },
-    {
-      "label": "run_audit_prep",
-      "repeats": 1,
-      "min_sec": 6.499991286545992e-06,
-      "median_sec": 6.499991286545992e-06,
-      "max_sec": 6.499991286545992e-06,
-      "result_type": "int",
-      "result_value": 9
-    },
-    {
-      "label": "candidate_landscape_data_prep",
-      "repeats": 1,
-      "min_sec": 0.0005973000079393387,
-      "median_sec": 0.0005973000079393387,
-      "max_sec": 0.0005973000079393387,
-      "result_type": "int",
-      "result_value": 293
-    },
-    {
-      "label": "ensemble_composition_data_prep",
-      "repeats": 1,
-      "min_sec": 0.0004340999876148999,
-      "median_sec": 0.0004340999876148999,
-      "max_sec": 0.0004340999876148999,
-      "result_type": "int",
-      "result_value": 12
-    },
-    {
-      "label": "overview_page_render_proxy",
-      "repeats": 1,
-      "min_sec": 0.27304719999665394,
-      "median_sec": 0.27304719999665394,
-      "max_sec": 0.27304719999665394,
-      "result_type": "int",
-      "result_value": 151267
-    },
-    {
-      "label": "forecasts_and_errors_render_proxy",
-      "repeats": 1,
-      "min_sec": 0.07528439999441616,
-      "median_sec": 0.07528439999441616,
-      "max_sec": 0.07528439999441616,
-      "result_type": "int",
-      "result_value": 353806
-    },
-    {
-      "label": "plot_finalist_accuracy",
-      "repeats": 1,
-      "min_sec": 0.01404870001715608,
-      "median_sec": 0.01404870001715608,
-      "max_sec": 0.01404870001715608,
-      "result_type": "Figure"
-    },
-    {
-      "label": "plot_candidate_landscape",
-      "repeats": 1,
-      "min_sec": 0.0551590999821201,
-      "median_sec": 0.0551590999821201,
-      "max_sec": 0.0551590999821201,
-      "result_type": "Figure"
-    },
-    {
-      "label": "plot_ensemble_composition",
-      "repeats": 1,
-      "min_sec": 0.028362900018692017,
-      "median_sec": 0.028362900018692017,
-      "max_sec": 0.028362900018692017,
-      "result_type": "tuple"
-    },
-    {
-      "label": "plot_horizon_mape",
-      "repeats": 1,
-      "min_sec": 0.022432500001741573,
-      "median_sec": 0.022432500001741573,
-      "max_sec": 0.022432500001741573,
-      "result_type": "Figure"
-    },
-    {
-      "label": "plot_stress_checks",
-      "repeats": 1,
-      "min_sec": 0.02664530000765808,
-      "median_sec": 0.02664530000765808,
-      "max_sec": 0.02664530000765808,
-      "result_type": "Figure"
-    },
-    {
-      "label": "plot_inventory_family_performance",
-      "repeats": 1,
-      "min_sec": 0.022384800016880035,
-      "median_sec": 0.022384800016880035,
-      "max_sec": 0.022384800016880035,
-      "result_type": "Figure"
-    },
-    {
-      "label": "plot_error_types",
-      "repeats": 1,
-      "min_sec": 0.006685699976515025,
-      "median_sec": 0.006685699976515025,
-      "max_sec": 0.006685699976515025,
-      "result_type": "Figure"
-    },
-    {
-      "label": "plot_error_distribution",
-      "repeats": 1,
-      "min_sec": 0.01683569999295287,
-      "median_sec": 0.01683569999295287,
-      "max_sec": 0.01683569999295287,
-      "result_type": "Figure"
-    },
-    {
-      "label": "plot_error_distribution_json_bytes",
-      "repeats": 1,
-      "min_sec": 0.019349100010003895,
-      "median_sec": 0.019349100010003895,
-      "max_sec": 0.019349100010003895,
-      "result_type": "int",
-      "result_value": 9981
-    },
-    {
-      "label": "plot_candidate_landscape_json_bytes",
-      "repeats": 1,
-      "min_sec": 0.08963679999578744,
-      "median_sec": 0.08963679999578744,
-      "max_sec": 0.08963679999578744,
-      "result_type": "int",
-      "result_value": 107777
-    },
-    {
-      "label": "plot_residual_vs_fitted_json_bytes",
-      "repeats": 1,
-      "min_sec": 0.035185800021281466,
-      "median_sec": 0.035185800021281466,
-      "max_sec": 0.035185800021281466,
-      "result_type": "int",
-      "result_value": 276539
     }
   ],
   "module_status": {
@@ -228,23 +35,37 @@
     "model_dashboard.plots": "ok",
     "app": "ok"
   },
-  "notes": [],
+  "notes": [
+    "Parquet-backed dashboard benchmark path."
+  ],
   "row_counts": {
+    "candidate_df": 300,
+    "finalists_df": 3,
+    "schiff_df": 5,
+    "pdf_reference_df": 14,
+    "frontier_df": 2,
+    "distribution_df": 300,
+    "stress_df": 10,
+    "horizon_df": 24,
+    "diagnostic_df": 8,
+    "ensemble_df": 12,
+    "paired_df": 3,
     "recommended": 3,
-    "summary": 293,
+    "summary": 287,
     "quarterly_predictions": 3036,
     "annual_predictions": 530,
     "quarterly_summary": 0,
     "annual_summary": 0,
     "paired_vs_schiff": 3,
-    "stress": 18,
+    "stress": 10,
     "weights": 12,
     "features": 0,
     "variant_features": 0,
     "leaderboards": 0,
     "errors": 0,
-    "schiff_benchmark": 3,
-    "pdf_comparison": 3,
-    "curated_manifest": 1
+    "schiff_benchmark": 5,
+    "pdf_comparison": 14,
+    "curated_manifest": 1,
+    "audit_tables": 8
   }
 }

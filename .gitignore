@@ -1,6 +1,7 @@
 .pytest_cache/
 .pytest_tmp/
 test-output/
+.venv/
 __pycache__/
 model_dashboard/__pycache__/
 tests/__pycache__/

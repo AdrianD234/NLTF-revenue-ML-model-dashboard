@@ -1,49 +1,54 @@
 # Data Correctness Review
 
-Reviewer: simulated data correctness reviewer
+Status: **PASS** for the Parquet-backed Stage 1 dashboard validation run on 2026-05-22.
 
-Source-of-truth run:
+Retained latest arbitration smoke run: `run_20260520_002339`.
 
-`C:\Users\Adrian Desilvestro\OneDrive\Documents\Playground\Revenue Modeling - Strategic Review\04 Models\Inputs\stage1_finalist_arbitration_outputs\run_20260520_002339`
+Primary data root:
 
-## Verdict
+`C:\Users\Adrian Desilvestro\OneDrive\Documents\Playground\Revenue Modeling - Strategic Review\04 Models\model_diagnostic_audit_pack`
 
-Pass. The dashboard is wired to the curated latest-arbitration data pack and the headline finalist metrics reconcile to the expected source-of-truth values within 0.01 percentage points.
+Resolved primary Parquet:
 
-## Latest finalist checks
+`C:\Users\Adrian Desilvestro\OneDrive\Documents\Playground\Revenue Modeling - Strategic Review\04 Models\information pack\stage1_curated_candidate_cone.parquet`
 
-| Stream | Expected model | Quarterly MAPE | Annual MAPE | Quarterly bias | Status |
-|---|---|---:|---:|---:|---|
-| PED VKT per capita | `PED__solver_static_convex_top18` | 2.47358 | 2.38709 | 1.50491 | Pass |
-| Light RUC volume | `LIGHT_RUC__solver_static_convex_top18` | 9.14755 | 5.99950 | 0.738125 | Pass |
-| Heavy RUC volume | `HEAVY_RUC__solver_static_convex_top18` | 3.56092 | 3.17141 | 0.165850 | Pass |
+## Current Finalist Checks
 
-## Stale-value rejection
+| Stream | Quarterly MAPE | Annual MAPE | Status |
+|---|---:|---:|---|
+| PED VKT per capita | 2.473245 | 2.385625 | PASS |
+| Light RUC volume | 9.147545 | 5.999499 | PASS |
+| Heavy RUC volume | 3.484368 | 3.019980 | PASS |
 
-The older AutoGluon balanced-run finalist values are not current finalist values in `artifacts/curated_data/finalist_accuracy.csv`.
+## Pure Schiff And Gain Checks
 
-| Stale value | Current use | Status |
-|---:|---|---|
-| 5.49% | Rejected as stale current-finalist value | Pass |
-| 11.55% | Rejected as stale current-finalist value | Pass |
-| 12.38% | Rejected as stale current-finalist value | Pass |
+| Stream | Schiff Qtr | Schiff Annual | Full-sample Qtr Gain | Full-sample Annual Gain | Paired Win Rate | Status |
+|---|---:|---:|---:|---:|---:|---|
+| PED VKT per capita | 3.082117 | 2.965758 | +0.608873 | +0.580133 | 63.201320 | PASS |
+| Light RUC volume | 11.546786 | 7.843683 | +2.399241 | +1.844184 | 50.555556 | PASS |
+| Heavy RUC volume | 11.482643 | 11.717804 | +7.998276 | +8.697824 | 64.155251 | PASS |
 
-Historical prediction-error rows may naturally contain similar percentages as individual forecast errors; those are not current finalist headline metrics.
+Light RUC paired common-grid quarterly gain is recorded separately as -1.159120 pp. It is not labelled as the full-sample gain.
 
-## Curated file checks
+## Source Table Evidence
 
-- `finalist_accuracy.csv`: 3 rows.
-- `candidate_landscape_sample.csv`: 293 rows.
-- `schiff_benchmark.csv`: 3 rows.
-- `pdf_comparison.csv`: 3 rows.
-- `stress_horizon.csv`: 18 rows.
-- `ensemble_composition.csv`: 12 positive-weight rows.
-- `annual_predictions_selected.csv`: 530 rows.
-- `quarterly_predictions_selected.csv`: 3,036 rows.
+- `artifacts/chart_sources/overview_finalist_forecast_accuracy.csv`
+- `artifacts/chart_sources/overview_candidate_search_frontier.csv`
+- `artifacts/chart_sources/overview_ensemble_composition.csv`
+- `artifacts/chart_sources/overview_stress_horizon_checks.csv`
+- `artifacts/chart_sources/diagnostics_residual_autocorrelation.csv`
+- `artifacts/chart_sources/diagnostics_residual_vs_fitted.csv`
+- `artifacts/chart_sources/diagnostics_pass_matrix.csv`
+- `artifacts/chart_sources/diagnostics_error_distribution_by_horizon.csv`
+- `artifacts/chart_sources/scenario_stream_comparison.csv`
+- `artifacts/chart_sources/scenario_improvement_vs_benchmark.csv`
+- `artifacts/chart_sources/scenario_horizon_comparison.csv`
+- `artifacts/chart_sources/scenario_decision_summary.csv`
+- `artifacts/chart_sources/schiff_vs_finalist_mape.csv`
+- `artifacts/chart_sources/schiff_benchmark_horizon_profiles.csv`
+- `artifacts/chart_sources/schiff_paired_or_fullsample_gain.csv`
+- `artifacts/chart_sources/schiff_benchmark_summary.csv`
 
-## Evidence
+## Stale-Value Rejection
 
-- `artifacts/curated_data/verification_report.md`
-- `tests/test_latest_arbitration_values.py`
-- `tests/test_no_stale_finalist_values.py`
-- `tests/test_curated_data.py`
+The old finalist values 5.49%, 11.55% as a Light RUC finalist value, and 12.38% are rejected by data validation and browser DOM checks. The 11.55% value may appear only as the Light RUC pure-Schiff benchmark value.

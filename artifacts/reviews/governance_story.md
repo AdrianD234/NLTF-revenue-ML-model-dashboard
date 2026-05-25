@@ -1,5 +1,7 @@
 # Governance Story Review
 
+Current Parquet refresh status: **pass**. The current finalists, pure Schiff rows, paired gains, diagnostics, chart source tables, and browser screenshots reconcile to the Parquet-backed data pack.
+
 Reviewer: simulated governance/story reviewer
 
 ## Verdict
@@ -22,7 +24,7 @@ Pass. The dashboard answers the management questions using the latest arbitratio
 |---|---|---:|---:|---|
 | PED VKT per capita | PED - Static solver | 2.47% | 2.39% | Strong Stage 1 volume mapping result |
 | Light RUC volume | Light RUC - Static solver | 9.15% | 6.00% | Watchlist stream; stress-window effects remain important |
-| Heavy RUC volume | Heavy RUC - Static solver | 3.56% | 3.17% | Material improvement over the structural benchmark |
+| Heavy RUC volume | Heavy RUC - Static solver | 3.48% | 3.02% | Material improvement over the structural benchmark |
 
 ## Caveats
 

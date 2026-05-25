@@ -68,7 +68,14 @@ def test_dashboard_interaction_performance(page: Page) -> None:
         if option.count() > 0:
             option.first.click()
             break
-    expect(page.locator("body")).to_contain_text("Stream:", timeout=60000)
+    page.wait_for_function(
+        """() => {
+            const combo = document.querySelectorAll('[role="combobox"]')[0];
+            const label = combo ? combo.getAttribute('aria-label') || '' : '';
+            return label.startsWith('Selected ') && !label.includes('Selected All Streams.');
+        }""",
+        timeout=60000,
+    )
     expect(page.get_by_text("1. Finalist Forecast Accuracy").first).to_be_visible(timeout=90000)
     timings["primary_filter_select_sec"] = time.perf_counter() - t0
 

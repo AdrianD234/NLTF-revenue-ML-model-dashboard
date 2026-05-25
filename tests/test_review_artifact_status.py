@@ -47,7 +47,7 @@ def test_visual_review_artifact_is_current_pass_review() -> None:
     assert "Status: pass for the current verification pass." in text
     assert "run_20260520_002339" in text
     assert "VISUAL_DEFECT_BACKLOG.lock.md" in text
-    assert "fewer than 20 recursive audit loops" in text.lower()
+    assert "20-pass regression loop" in text.lower()
 
 
 def test_interaction_review_artifact_is_current_pass_review() -> None:
@@ -55,7 +55,7 @@ def test_interaction_review_artifact_is_current_pass_review() -> None:
     assert "Status: pass for the current verification pass." in text
     assert "run_20260520_002339" in text
     assert "Strict verifier browser e2e passed" in text
-    assert "fewer than 20 recursive audit loops" in text.lower()
+    assert "20-pass regression loop" in text.lower()
 
 
 def test_ux_and_layout_reviews_are_current_pass_reviews() -> None:
@@ -63,4 +63,4 @@ def test_ux_and_layout_reviews_are_current_pass_reviews() -> None:
         text = (ROOT / "artifacts" / "reviews" / name).read_text(encoding="utf-8")
         assert "Status: pass for the current verification pass." in text
         assert "run_20260520_002339" in text
-        assert "fewer than 20 recursive audit loops" in text.lower()
+        assert "20-pass regression loop" in text.lower()

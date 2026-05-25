@@ -2,3 +2,9 @@ streamlit
 pandas
 plotly
 openpyxl
+pyarrow
+pytest
+playwright
+pytest-playwright
+kaleido
+pillow

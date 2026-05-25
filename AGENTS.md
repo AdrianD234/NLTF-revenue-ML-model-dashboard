@@ -188,3 +188,26 @@ Before declaring completion:
 - update `artifacts/data_validation_review.md`, `artifacts/cone_landscape_review.md`, `artifacts/filter_interaction_review.md`, reviewer files, and `.agent_state.md`.
 
 Do not mark this sprint complete while `artifacts/recursive_audit_loops.json` has fewer than 20 documented recursive audit loops unless the task is explicitly left as in progress in `.agent_state.md`.
+
+## Hundred-gate Parquet visual conformance rule
+
+This dashboard task is not complete unless all 100 validation gates in `EIGHTY_GATE_VALIDATION.lock.md`, `VISUAL_LAYOUT_GATES.lock.md`, and `VISUAL_TARGET_CONFORMANCE.lock.md` pass.
+
+Passing pytest is necessary but not sufficient.
+
+The agent must run `scripts/run_recursive_dashboard_validation.ps1`.
+
+The agent must not claim completion if:
+
+- fewer than 100 gates exist;
+- any gate fails;
+- `BUG_BACKLOG.md` has unchecked items;
+- `PAGE_BY_PAGE_VISUAL_DELTA.lock.md` has unchecked items;
+- the visual reviewer artifacts do not mark all four pages PASS;
+- target/current screenshot matrix does not mark all four pages PASS;
+- stale data is visible;
+- current finalist values do not reconcile;
+- screenshots are missing;
+- filters or hovers fail browser checks.
+
+If interrupted, write `.agent_state.md` and mark the task in progress.

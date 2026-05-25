@@ -1,0 +1,330 @@
+from __future__ import annotations
+
+import os
+from pathlib import Path
+import math
+import re
+
+import pandas as pd
+import pytest
+from playwright.sync_api import Page, expect
+
+
+SCREENSHOT_DIR = Path("artifacts/screenshots")
+SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
+CHART_SOURCE_DIR = Path("artifacts/chart_sources")
+
+APP_URL = os.environ.get("STAGE1_DASHBOARD_URL", "http://localhost:8501")
+TARGET_VIEWPORT = {"width": 2048, "height": 1005}
+
+PAGES = [
+    ("Overview", "final-overview.png"),
+    ("Diagnostics", "final-diagnostics.png"),
+    ("Scenario Comparison", "final-scenario-comparison.png"),
+    ("Schiff Benchmark", "final-schiff-benchmark.png"),
+]
+
+PAGE_PANELS = {
+    "Overview": [
+        "1. Finalist Forecast Accuracy",
+        "2. Candidate Search Frontier",
+        "3. Finalist Ensemble Composition",
+        "4. Stress and Horizon Checks",
+    ],
+    "Diagnostics": [
+        "1. Residual Autocorrelation by Lag",
+        "2. Residual vs Fitted",
+        "3. Diagnostic Pass Matrix",
+        "4. Error Distribution by Horizon",
+    ],
+    "Scenario Comparison": [
+        "1. Stream Comparison: Scenario A vs Scenario B",
+        "2. Improvement vs Benchmark",
+        "3. Horizon Comparison",
+        "4. Decision Summary",
+    ],
+    "Schiff Benchmark": [
+        "1. Schiff vs Finalist MAPE",
+        "2. Benchmark Horizon Profiles",
+        "3. Full-sample Gain vs Schiff",
+        "4. Benchmark Summary",
+    ],
+}
+
+FILTER_LABELS = [
+    "Stream",
+    "Model Family",
+    "Stage",
+    "Baseline",
+    "Horizon",
+    "Forecast Vintage",
+    "Date Window",
+]
+
+RAW_HOVER_TERMS = [
+    "quarterly_mape",
+    "annual_mape",
+    "source_family",
+    "model_kind",
+    "mape_h01_04",
+    "candidate_role",
+    "stream_label",
+]
+
+
+def require_frontend_hard_gate() -> None:
+    if os.environ.get("STAGE1_REQUIRE_FRONTEND_INTERACTIONS") != "1":
+        pytest.skip("frontend interaction hard gate is run by verify_dashboard.ps1 after Streamlit starts")
+
+
+def assert_no_streamlit_exception(page: Page) -> None:
+    body = page.locator("body").inner_text(timeout=60000)
+    assert "Traceback" not in body
+    assert "StreamlitAPIException" not in body
+    assert "Uncaught app exception" not in body
+    assert "stException" not in body
+
+
+def open_dashboard(page: Page) -> None:
+    require_frontend_hard_gate()
+    page.set_viewport_size(TARGET_VIEWPORT)
+    page.goto(APP_URL, wait_until="domcontentloaded")
+    expect(page.get_by_text("NTLF Revenue Modelling").first).to_be_visible(timeout=90000)
+    expect(page.get_by_text("GOVERNANCE FILTERS")).to_be_visible(timeout=90000)
+    expect(page.locator(".js-plotly-plot").first).to_be_visible(timeout=90000)
+    assert_no_streamlit_exception(page)
+
+
+def click_page(page: Page, page_name: str) -> None:
+    page.locator("div[data-testid='stRadio'] label").filter(has_text=page_name).first.click()
+    expect(page.locator("body")).to_contain_text(page_name, timeout=90000)
+    for panel in PAGE_PANELS[page_name]:
+        expect(page.locator("body")).to_contain_text(panel, timeout=90000)
+    assert_no_streamlit_exception(page)
+
+
+def primary_combobox(page: Page, index: int):
+    combo = page.get_by_role("combobox").nth(index)
+    expect(combo).to_be_visible(timeout=30000)
+    return combo
+
+
+def expect_combobox_value(page: Page, index: int, value: str) -> None:
+    page.wait_for_function(
+        """([index, value]) => {
+            const combo = document.querySelectorAll('[role="combobox"]')[index];
+            return combo && (combo.getAttribute('aria-label') || '').includes(`Selected ${value}.`);
+        }""",
+        arg=[index, value],
+        timeout=60000,
+    )
+    aria_label = primary_combobox(page, index).get_attribute("aria-label") or ""
+    assert value in aria_label, f"Expected combobox {index} to be {value!r}; aria-label was {aria_label!r}"
+
+
+def open_combobox(page: Page, index: int) -> None:
+    primary_combobox(page, index).click()
+    expect(page.get_by_role("option").first).to_be_visible(timeout=10000)
+
+
+def select_first_non_default_option(page: Page, index: int, blocked: tuple[str, ...]) -> str:
+    open_combobox(page, index)
+    options = page.get_by_role("option")
+    for option_index in range(options.count()):
+        option = options.nth(option_index)
+        text = option.inner_text(timeout=5000).strip()
+        if text and not any(token.lower() in text.lower() for token in blocked):
+            option.click()
+            expect_combobox_value(page, index, text)
+            return text
+    raise AssertionError(f"No non-default option found for combobox {index}")
+
+
+def hover_text(page: Page) -> str:
+    page.wait_for_timeout(450)
+    return page.evaluate(
+        """() => Array.from(document.querySelectorAll('.hoverlayer'))
+            .map((node) => node.textContent || '')
+            .join('\\n')
+            .trim()"""
+    )
+
+
+def hover_plotly_chart(page: Page, plot_index: int) -> str:
+    plot = page.locator(".js-plotly-plot").nth(plot_index)
+    expect(plot).to_be_visible(timeout=60000)
+    for selector in [".scatterlayer .trace .points path", ".barlayer .point", ".barlayer path"]:
+        points = plot.locator(selector)
+        for point_index in range(min(points.count(), 12)):
+            point = points.nth(point_index)
+            box = point.bounding_box()
+            if not box:
+                continue
+            page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+            text = hover_text(page)
+            if text:
+                return text
+    box = plot.bounding_box()
+    assert box is not None, "Plotly plot has no bounding box."
+    for x_frac, y_frac in [(0.35, 0.45), (0.50, 0.50), (0.65, 0.55), (0.72, 0.40)]:
+        page.mouse.move(box["x"] + box["width"] * x_frac, box["y"] + box["height"] * y_frac)
+        text = hover_text(page)
+        if text:
+            return text
+    text = page.evaluate(
+        """(plotIndex) => {
+            const plot = document.querySelectorAll('.js-plotly-plot')[plotIndex];
+            if (!plot || !window.Plotly || !window.Plotly.Fx) return '';
+            const traces = plot.data || plot._fullData || [];
+            for (let curveNumber = 0; curveNumber < traces.length; curveNumber += 1) {
+                const trace = traces[curveNumber];
+                const length = (trace.x || trace.y || trace.customdata || []).length || 0;
+                if (!length) continue;
+                window.Plotly.Fx.hover(plot, [{curveNumber, pointNumber: 0}], ['xy']);
+                const text = Array.from(document.querySelectorAll('.hoverlayer'))
+                    .map((node) => node.textContent || '')
+                    .join('\\n')
+                    .trim();
+                if (text) return text;
+            }
+            return '';
+        }""",
+        plot_index,
+    )
+    assert text, f"No hover text appeared for Plotly chart {plot_index}"
+    return text
+
+
+def assert_human_hover(text: str) -> None:
+    assert text.strip(), "Hover text is empty."
+    assert "_" not in text, f"Hover text contains underscores: {text}"
+    for raw in RAW_HOVER_TERMS:
+        assert raw not in text, f"Hover text contains raw column name {raw}: {text}"
+    assert not re.search(r"\d+\.\d{4,}", text), f"Hover has excessive decimals: {text}"
+
+
+def browser_value_missing(value: object) -> bool:
+    return value is None or (isinstance(value, float) and math.isnan(value))
+
+
+def test_all_pages_click_render_screenshot_and_console_clean(page: Page) -> None:
+    console_errors: list[str] = []
+    page_errors: list[str] = []
+    failed_requests: list[str] = []
+    page.on("console", lambda msg: console_errors.append(msg.text) if msg.type == "error" else None)
+    page.on("pageerror", lambda exc: page_errors.append(str(exc)))
+    page.on(
+        "requestfailed",
+        lambda req: failed_requests.append(f"{req.resource_type}:{req.url}:{req.failure}"),
+    )
+
+    open_dashboard(page)
+    for page_name, screenshot_name in PAGES:
+        click_page(page, page_name)
+        page.screenshot(path=str(SCREENSHOT_DIR / screenshot_name), full_page=True)
+
+    assert page_errors == []
+    assert console_errors == []
+    assert failed_requests == []
+
+
+def test_primary_filters_click_change_and_reset(page: Page) -> None:
+    open_dashboard(page)
+    dropdowns = page.get_by_role("combobox")
+    assert dropdowns.count() >= 7, "Expected seven real primary dropdown controls."
+    for index, label in enumerate(FILTER_LABELS):
+        aria_label = primary_combobox(page, index).get_attribute("aria-label") or ""
+        assert label in aria_label, f"Expected filter {index} to be {label}; aria-label was {aria_label!r}"
+        open_combobox(page, index)
+        assert page.get_by_role("option").count() > 0, f"{label} dropdown did not open an option list."
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(150)
+
+    before = page.locator("body").inner_text(timeout=60000)
+    stream_value = select_first_non_default_option(page, 0, ("All Streams",))
+    expect_combobox_value(page, 0, stream_value)
+    after_stream = page.locator("body").inner_text(timeout=60000)
+    assert before != after_stream
+
+    horizon_value = select_first_non_default_option(page, 4, ("1-12 Quarters",))
+    expect_combobox_value(page, 4, horizon_value)
+    after_horizon = page.locator("body").inner_text(timeout=60000)
+    assert after_stream != after_horizon
+
+    page.get_by_role("button", name="Reset Filters").click()
+    expect_combobox_value(page, 0, "All Streams")
+    expect_combobox_value(page, 1, "All Families")
+    expect_combobox_value(page, 4, "1-12 Quarters")
+    assert_no_streamlit_exception(page)
+
+
+def test_plotly_hovers_are_human_readable_on_all_pages(page: Page) -> None:
+    open_dashboard(page)
+    hover_targets = [
+        ("Overview", 1),
+        ("Diagnostics", 0),
+        ("Scenario Comparison", 1),
+        ("Schiff Benchmark", 0),
+    ]
+    for page_name, plot_index in hover_targets:
+        click_page(page, page_name)
+        assert_human_hover(hover_plotly_chart(page, plot_index))
+
+
+def test_no_stale_finalist_values_visible(page: Page) -> None:
+    open_dashboard(page)
+    body = page.locator("body").inner_text(timeout=60000)
+    for value in ["5.49%", "11.55%", "12.38%"]:
+        assert value not in body, f"Stale finalist value still visible: {value}"
+
+
+def test_rendered_plotly_trace_data_matches_chart_sources_where_possible(page: Page) -> None:
+    open_dashboard(page)
+
+    stress_source = pd.read_csv(CHART_SOURCE_DIR / "overview_stress_horizon_checks.csv")
+    click_page(page, "Overview")
+    stress_plot = page.evaluate(
+        """() => {
+            const plot = [...document.querySelectorAll('.js-plotly-plot')].find((candidate) => {
+                const categories = Array.from(candidate.layout?.xaxis?.categoryarray || []);
+                return categories.includes('1-4 qtrs')
+                    && categories.includes('2022-23')
+                    && categories.includes('Annual')
+                    && (candidate.data || []).some((trace) => trace.name === 'PED VKT per capita');
+            });
+            if (!plot) return null;
+            return {
+                categories: Array.from(plot.layout?.xaxis?.categoryarray || []),
+                traces: (plot.data || []).map((trace) => ({
+                    name: trace.name,
+                    x: Array.from(trace.x || []),
+                    y: Array.from(trace.y?._inputArray || trace.y || []),
+                    connectgaps: trace.connectgaps,
+                })),
+            };
+        }"""
+    )
+    assert stress_plot is not None, "Could not find rendered Stress and Horizon Plotly chart."
+    expected_buckets = ["1-4 qtrs", "5-8 qtrs", "9-12 qtrs", "2024+", "2022-23", "Annual"]
+    assert stress_plot["categories"] == expected_buckets
+    for trace in stress_plot["traces"]:
+        if trace["name"] not in {"PED VKT per capita", "Light RUC volume", "Heavy RUC volume"}:
+            continue
+        assert trace["connectgaps"] is False
+        source_rows = stress_source[stress_source["stream_label"].eq(trace["name"])].set_index("stress_bucket")
+        rendered = dict(zip(trace["x"], trace["y"]))
+        for bucket in expected_buckets:
+            source_value = pd.to_numeric(source_rows.loc[bucket, "metric_value"], errors="coerce")
+            rendered_value = rendered[bucket]
+            if pd.isna(source_value):
+                assert browser_value_missing(rendered_value), f"{trace['name']} {bucket} should render as a gap."
+            else:
+                assert float(rendered_value) == pytest.approx(float(source_value), abs=0.001)
+
+    click_page(page, "Schiff Benchmark")
+    expect(page.locator("body")).to_contain_text("3. Full-sample Gain vs Schiff", timeout=90000)
+    assert "Paired Gain vs Schiff" not in page.locator("body").inner_text(timeout=60000)
+    schiff_gain = pd.read_csv(CHART_SOURCE_DIR / "schiff_paired_or_fullsample_gain.csv")
+    light = schiff_gain[schiff_gain["stream_label"].eq("Light RUC volume")]
+    assert float(light[light["metric_name"].eq("Full-sample quarterly gain")]["metric_value"].iloc[0]) > 0
+    assert float(light["paired_gain_pp"].dropna().iloc[0]) < 0

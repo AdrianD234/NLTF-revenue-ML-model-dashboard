@@ -1,5 +1,7 @@
 # Cone Landscape Review
 
+Current Parquet refresh status: **pass**. The candidate cone is backed by `stage1_curated_candidate_cone.parquet`, and gates 21-30 passed against the curated Parquet candidate rows.
+
 Reviewer: simulated cone landscape reviewer
 
 ## Verdict
@@ -10,15 +12,15 @@ Pass. The Candidate Search Landscape uses a curated optimisation-cone sample rat
 
 | Check | Result | Status |
 |---|---:|---|
-| Total curated rows | 293 | Pass |
+| Total curated rows | 300 | Pass |
 | Hard cap | 400 | Pass |
 | Recommended finalist rows | 3 | Pass |
-| Pure Schiff benchmark rows | 3 | Pass |
-| Previous PDF/reference rows | 3 | Pass |
-| Distribution sample rows | 149 | Pass |
-| Pareto/frontier rows | 8 | Pass |
-| Top quarterly rows per stream | 15 | Pass |
-| Top annual rows per stream | 15 | Pass |
+| Pure Schiff benchmark rows | 5 | Pass |
+| Previous PDF/reference rows | 14 | Pass |
+| Distribution sample rows | 300 | Pass |
+| Pareto/frontier rows | 2 | Pass |
+| Top quarterly rows | 6 | Pass |
+| Top annual rows | 10 | Pass |
 
 ## Stream coverage
 
@@ -36,6 +38,7 @@ The chart preserves the management story: weaker/noisier candidates define the o
 
 - `CONE_LANDSCAPE_VALIDATION.lock.md`
 - `CANDIDATE_LANDSCAPE_SAMPLING_SPEC.lock.md`
-- `artifacts/curated_data/candidate_landscape_sample.csv`
+- `artifacts/chart_sources/overview_candidate_search_frontier.csv`
+- `artifacts/data_schema_report.md`
 - `tests/test_curated_data.py`
 - `tests/test_filter_and_hover.py`

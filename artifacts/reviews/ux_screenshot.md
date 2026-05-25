@@ -60,4 +60,4 @@ Pass. The current screenshot set is management-readable, nonblank, data-backed, 
 
 ## Conclusion
 
-The current UX/screenshot review passes. The only remaining blocker to overall sprint closure is the recursive audit-loop quota: fewer than 20 recursive audit loops have been completed.
+The current UX/screenshot review passes. Additional regression evidence: the focused 20-pass regression loop passed chart-source validation, semantic-label validation, visual conformance validation, and mandatory frontend Playwright interactions against `http://localhost:8501`.

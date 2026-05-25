@@ -25,13 +25,19 @@ PRIMARY_FILTERS = [
 def test_primary_filters_are_clickable(page: Page) -> None:
     open_dashboard(page)
     before_kpi_row = page.locator(".gov-kpi-grid").first.inner_text(timeout=60000)
-    candidate_card = page.locator(".gov-chart-card").filter(has_text="Candidate Search Landscape").first
+    candidate_card = page.locator(".gov-chart-card").filter(has_text="Candidate Search Frontier").first
     before_candidate_card = candidate_card.inner_text(timeout=60000)
     stream_combo = primary_combobox(page, "Stream", 0)
     stream_combo.click()
     selected = click_option_if_present(page, ["Light RUC volume", "PED VKT per capita", "Heavy RUC volume"])
     assert selected is not None, "Stream dropdown did not expose selectable stream options."
-    expect(page.locator("body")).to_contain_text(f"Stream: {selected}", timeout=60000)
+    expect_filter_value(page, "Stream", 0, selected)
+    expected_qtr_mape = {
+        "Light RUC volume": "9.15%",
+        "PED VKT per capita": "2.47%",
+        "Heavy RUC volume": "3.48%",
+    }[selected]
+    expect(page.locator(".gov-kpi-grid").first).to_contain_text(expected_qtr_mape, timeout=60000)
     after_kpi_row = page.locator(".gov-kpi-grid").first.inner_text(timeout=60000)
     after_candidate_card = candidate_card.inner_text(timeout=60000)
     assert before_kpi_row != after_kpi_row or before_candidate_card != after_candidate_card, (
@@ -62,15 +68,16 @@ def test_reset_filters_restores_defaults(page: Page) -> None:
     primary_combobox(page, "Horizon", 4).click()
     horizon_value = click_option_if_present(page, ["1-4 quarters", "5-8 quarters", "9-12 quarters"])
     assert horizon_value is not None
-    expect(page.locator("body")).to_contain_text(f"Stream: {stream_value}", timeout=60000)
+    expect_filter_value(page, "Stream", 0, stream_value)
     page.get_by_role("button", name="Reset Filters").click()
-    expect(page.locator("body")).to_contain_text("Stream: All Streams", timeout=60000)
-    expect(page.locator("body")).to_contain_text("Horizon: 1-12 Quarters", timeout=60000)
+    expect_filter_value(page, "Stream", 0, "All Streams")
+    expect_filter_value(page, "Horizon", 4, "1-12 Quarters")
 
 
 def test_candidate_landscape_hover_is_human_readable(page: Page) -> None:
     open_dashboard(page)
     tooltip = hover_plotly_element(page, plot_index=1, selectors=[".scatterlayer .trace .points path"])
+    save_hover_screenshot(page, "hover-candidate-landscape.png")
     assert_human_hover(
         tooltip,
         required=["Stream", "Quarterly MAPE", "Annual MAPE", "Model"],
@@ -81,6 +88,7 @@ def test_candidate_landscape_hover_is_human_readable(page: Page) -> None:
 def test_finalist_accuracy_hover_is_human_readable(page: Page) -> None:
     open_dashboard(page)
     tooltip = hover_plotly_element(page, plot_index=0, selectors=[".barlayer .point", ".barlayer path"])
+    save_hover_screenshot(page, "hover-finalist-accuracy.png")
     assert_human_hover(
         tooltip,
         required=["Quarterly MAPE", "Model", "Source"],
@@ -91,6 +99,7 @@ def test_finalist_accuracy_hover_is_human_readable(page: Page) -> None:
 def test_ensemble_hover_is_human_readable(page: Page) -> None:
     open_dashboard(page)
     tooltip = hover_plotly_element(page, plot_index=2, selectors=[".barlayer .point", ".barlayer path"])
+    save_hover_screenshot(page, "hover-ensemble-composition.png")
     assert_human_hover(
         tooltip,
         required=["Weight", "Component"],
@@ -103,6 +112,7 @@ def test_ensemble_hover_is_human_readable(page: Page) -> None:
 def test_stress_hover_is_human_readable(page: Page) -> None:
     open_dashboard(page)
     tooltip = hover_plotly_element(page, plot_index=3, selectors=[".scatterlayer .trace .points path"])
+    save_hover_screenshot(page, "hover-stress-checks.png")
     assert_human_hover(
         tooltip,
         required=["Stress window", "MAPE", "Model"],
@@ -126,7 +136,7 @@ def test_hover_screenshots_exist_after_verification() -> None:
 def open_dashboard(page: Page) -> None:
     page.set_viewport_size({"width": 1680, "height": 940})
     page.goto(os.environ.get("STAGE1_DASHBOARD_URL", "http://localhost:8501"), wait_until="domcontentloaded")
-    expect(page.get_by_text("Governance").first).to_be_visible(timeout=90000)
+    expect(page.get_by_text("NTLF Revenue Modelling").first).to_be_visible(timeout=90000)
     expect(page.get_by_text("GOVERNANCE FILTERS")).to_be_visible(timeout=90000)
     expect(page.locator(".js-plotly-plot").first).to_be_visible(timeout=90000)
     expect(page.locator("body")).to_contain_text("Page 1 of 4 - Overview", timeout=90000)
@@ -138,6 +148,19 @@ def primary_combobox(page: Page, label: str, index: int):
     name = combos.nth(index).get_attribute("aria-label") or ""
     assert label in name, f"Expected combobox {index} to be {label!r}; aria-label was {name!r}"
     return combos.nth(index)
+
+
+def expect_filter_value(page: Page, label: str, index: int, value: str) -> None:
+    page.wait_for_function(
+        """([index, value]) => {
+            const combo = document.querySelectorAll('[role="combobox"]')[index];
+            return combo && (combo.getAttribute('aria-label') || '').includes(`Selected ${value}.`);
+        }""",
+        arg=[index, value],
+        timeout=60000,
+    )
+    aria_label = primary_combobox(page, label, index).get_attribute("aria-label") or ""
+    assert value in aria_label, f"Expected {label} filter to be {value!r}; aria-label was {aria_label!r}"
 
 
 def click_option_if_present(page: Page, names: list[str]) -> str | None:
@@ -232,6 +255,12 @@ def hover_text(page: Page) -> str:
             .join('\\n')
             .trim()"""
     )
+
+
+def save_hover_screenshot(page: Page, filename: str) -> None:
+    shot_dir = Path(__file__).resolve().parents[1] / "artifacts" / "screenshots"
+    shot_dir.mkdir(parents=True, exist_ok=True)
+    page.screenshot(path=shot_dir / filename, full_page=True)
 
 
 def assert_human_hover(

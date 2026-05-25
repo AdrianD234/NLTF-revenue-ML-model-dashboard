@@ -14,6 +14,10 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+LATEST_ARBITRATION_RUN_DIR = Path(
+    r"C:\Users\Adrian Desilvestro\OneDrive\Documents\Playground\Revenue Modeling - Strategic Review\04 Models\Inputs\stage1_finalist_arbitration_outputs\run_20260520_002339"
+)
+
 
 def now_iso() -> str:
     return datetime.now().isoformat(timespec="seconds")
@@ -281,6 +285,70 @@ def benchmark_backend(run_dir: Path, repeats: int) -> dict[str, Any]:
     return results
 
 
+def benchmark_parquet_backend(data_root: Path, repo_root: Path, repeats: int) -> dict[str, Any]:
+    modules = load_dashboard_modules()
+    results: dict[str, Any] = {
+        "timestamp": now_iso(),
+        "run_dir": str(LATEST_ARBITRATION_RUN_DIR),
+        "data_root": str(data_root),
+        "repo_root": str(repo_root),
+        "benchmarks": [],
+        "module_status": {name: "ok" if not isinstance(module, str) else module for name, module in modules.items()},
+        "notes": ["Parquet-backed dashboard benchmark path."],
+    }
+
+    loader = modules.get("model_dashboard.data_loader")
+    app_module = modules.get("app")
+    if isinstance(loader, str):
+        results["notes"].append("data_loader import failed; no Parquet benchmarks were run.")
+        return results
+
+    def load_uncached() -> Any:
+        return loader.load_parquet_dashboard(data_root, repo_root, allow_csv_preview=False)
+
+    try:
+        cold = timed("load_parquet_dashboard_uncached", load_uncached, repeats=max(1, min(repeats, 2)))
+        loaded = load_uncached()
+    except Exception as exc:
+        results["notes"].append(f"Parquet benchmark failed: {type(exc).__name__}: {exc}")
+        results["benchmarks"].append(
+            {
+                "label": "load_parquet_dashboard_uncached",
+                "repeats": 0,
+                "min_sec": None,
+                "median_sec": None,
+                "max_sec": None,
+                "result_type": "ERROR",
+                "error": f"{type(exc).__name__}: {exc}",
+            }
+        )
+        return results
+
+    results["benchmarks"].append(cold)
+    results["row_counts"] = row_counts(loaded)
+
+    if not isinstance(app_module, str) and hasattr(app_module, "cached_load_parquet_dashboard"):
+        try:
+            app_module.cached_load_parquet_dashboard.clear()
+        except Exception:
+            results["notes"].append("Could not clear Streamlit Parquet cache before warm-load benchmark.")
+
+        pack_sig = loader.parquet_pack_signature(data_root, repo_root)
+
+        def cached_call() -> Any:
+            return app_module.cached_load_parquet_dashboard(
+                str(data_root),
+                str(repo_root),
+                pack_sig,
+                app_module.LOADER_SCHEMA_VERSION,
+            )
+
+        results["benchmarks"].append(timed("cached_load_parquet_first_call", cached_call, repeats=1))
+        results["benchmarks"].append(timed("cached_load_parquet_warm_call", cached_call, repeats=repeats))
+
+    return results
+
+
 def append_history(history_path: Path, result: dict[str, Any]) -> None:
     if history_path.exists():
         try:
@@ -295,9 +363,54 @@ def append_history(history_path: Path, result: dict[str, Any]) -> None:
     history_path.write_text(json.dumps(history, indent=2), encoding="utf-8")
 
 
+def write_performance_review(out_dir: Path, result: dict[str, Any]) -> None:
+    status = "in progress"
+    if result.get("benchmarks") and not any(bench.get("result_type") == "ERROR" for bench in result["benchmarks"]):
+        status = "measured"
+    rows = []
+    for bench in result.get("benchmarks", []):
+        rows.append(
+            "| {label} | {median} | {max_value} | {kind} |".format(
+                label=bench.get("label", "unknown"),
+                median="n/a" if bench.get("median_sec") is None else f"{bench.get('median_sec'):.3f}s",
+                max_value="n/a" if bench.get("max_sec") is None else f"{bench.get('max_sec'):.3f}s",
+                kind=bench.get("result_type", "unknown"),
+            )
+        )
+    review = "\n".join(
+        [
+            "# Performance Review",
+            "",
+            f"Status: **{status}**.",
+            f"Generated: {result.get('timestamp', now_iso())}",
+            "",
+            "This artifact must be regenerated after the Parquet-backed app and browser pass are available.",
+            "",
+            "## Source",
+            "",
+            f"- Run dir: `{result.get('run_dir', 'n/a')}`",
+            f"- Data root: `{result.get('data_root', 'n/a')}`",
+            "",
+            "## Benchmarks",
+            "",
+            "| Benchmark | Median | Max | Result |",
+            "| --- | ---: | ---: | --- |",
+            *rows,
+            "",
+            "## Notes",
+            "",
+            *[f"- {note}" for note in result.get("notes", [])],
+            "",
+        ]
+    )
+    (out_dir / "performance_review.md").write_text(review, encoding="utf-8")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--run-dir", required=True)
+    parser.add_argument("--run-dir")
+    parser.add_argument("--data-root", help="Benchmark the Parquet-backed dashboard data pack instead of an old run folder.")
+    parser.add_argument("--repo-root", default=str(ROOT))
     parser.add_argument("--out-dir", default="artifacts")
     parser.add_argument("--repeats", type=int, default=3)
     parser.add_argument(
@@ -307,10 +420,15 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    run_dir = Path(args.run_dir).expanduser()
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    results = benchmark_backend(run_dir, max(1, args.repeats))
+    if args.data_root:
+        results = benchmark_parquet_backend(Path(args.data_root).expanduser(), Path(args.repo_root).expanduser(), max(1, args.repeats))
+    else:
+        if not args.run_dir:
+            raise SystemExit("--run-dir is required unless --data-root is supplied.")
+        run_dir = Path(args.run_dir).expanduser()
+        results = benchmark_backend(run_dir, max(1, args.repeats))
 
     latest_path = out_dir / "performance_latest.json"
     baseline_path = out_dir / "performance_baseline.json"
@@ -319,6 +437,7 @@ def main() -> None:
     if args.refresh_baseline or not baseline_path.exists():
         baseline_path.write_text(json.dumps(results, indent=2), encoding="utf-8")
     append_history(history_path, results)
+    write_performance_review(out_dir, results)
     print(json.dumps(results, indent=2))
 
 

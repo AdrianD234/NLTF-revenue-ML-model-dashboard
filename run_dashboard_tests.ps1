@@ -1,6 +1,6 @@
 param(
     [string]$Python = "C:\Users\Adrian Desilvestro\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe",
-    [int]$Port = 8501,
+    [int]$Port = 8502,
     [int]$StartupTimeoutSeconds = 90
 )
 

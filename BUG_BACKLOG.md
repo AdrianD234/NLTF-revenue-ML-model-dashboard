@@ -1,188 +1,76 @@
 # BUG_BACKLOG.md
 
-Backlog state after product-hardening sprint, red-team review, original-spec comparison, and three reviewer passes.
+Backlog state for the Stage 1 Model Governance Dashboard Parquet refresh and visual conformance sprint.
 
-## Closed Product-Hardening Items
+## Closed Visual Conformance Sprint Items
 
-### Executive Summary
+- [x] Close Overview visual defects listed in `PAGE_BY_PAGE_VISUAL_DELTA.lock.md`.
+- [x] Close Diagnostics visual defects listed in `PAGE_BY_PAGE_VISUAL_DELTA.lock.md`.
+- [x] Close Scenario Comparison visual defects listed in `PAGE_BY_PAGE_VISUAL_DELTA.lock.md`.
+- [x] Close Schiff Benchmark visual defects listed in `PAGE_BY_PAGE_VISUAL_DELTA.lock.md`.
+- [x] Extend validation from 80 gates to 100 gates with visual conformance gates 81-100.
+- [x] Regenerate after-screenshots and mark visual reviewer artifacts PASS.
+- [x] Add hard Playwright/frontend interaction gate to `scripts/verify_dashboard.ps1`.
+- [x] Create `tests/test_playwright_frontend_interactions.py` and verify tabs, filters, reset, hovers, console errors, stale values, and screenshots in a real browser.
 
-- [x] Add a management conclusion panel: implemented with `manager_conclusion`.
-- [x] Add enterprise-ready first-viewport decision brief: implemented above KPI cards with readiness, benchmark result, watch point, and next gate.
-- [x] Add a warning badge/readout if Light RUC does not beat Schiff or stress is high: implemented through governance cards and data-quality warning panel.
-- [x] Add compact decision status: implemented with Promote, Watchlist, Reject, and Needs Stage 2 cards.
+## Closed Parquet Refresh Sprint Items
 
-### Candidate Landscape
+- [x] Replaced the placeholder circular logo with the actual NZ Transport Agency Waka Kotahi logo asset.
+- [x] Changed the dashboard masthead title to `NTLF Revenue Modelling`.
+- [x] Removed the compact filter/run-evidence text line beneath the primary filters and added a browser regression to prevent it returning.
+- [x] Located `stage1_curated_candidate_cone.parquet` in the information pack and made it the primary dashboard data source.
+- [x] Located `stage1_curated_candidate_cone_metadata.json` and recorded it in schema artifacts.
+- [x] Located the CSV mirror and recorded it as secondary audit evidence.
+- [x] Added robust aliases for the information pack schema, including frontier, distribution sample, paired gain, stress, and diagnostic fields.
+- [x] Reconciled current finalists to the Parquet flags and values.
+- [x] Verified stale old finalist values are absent from current finalist metrics.
+- [x] Rebuilt the four primary pages around Overview, Diagnostics, Scenario Comparison, and Schiff Benchmark.
+- [x] Verified the Candidate Search Frontier uses curated cone rows, frontier rows, finalist markers and pure Schiff markers.
+- [x] Verified pure Schiff rows exclude residual, blend, solver and ensemble challengers.
+- [x] Fixed derived stress rows so the Overview stress chart renders from Parquet finalist stress fields.
+- [x] Fixed stress and horizon alias coalescing so PED, Light RUC and Heavy RUC all read their Parquet bucket fields and Heavy RUC policy-stress gaps do not connect visually.
+- [x] Added the Scenario and Schiff horizon scenario field required by validation.
+- [x] Regenerated four final page screenshots from the Parquet backed app.
+- [x] Regenerated hover screenshots and verified clean hover text.
+- [x] Verified direct primary filters, active chip update, visible data update after a filter change, and Reset Filters.
+- [x] Fixed Streamlit duplicate widget-default warning for `advanced_top_n` and related advanced toggles by using session state as the single source of widget defaults.
+- [x] Added a hard verifier gate that fails if Streamlit logs the session-state/default-value warning during browser verification.
+- [x] Regenerated schema, validation, screenshot, hover, filter, visual and performance artifacts.
+- [x] Ran the full existing browser e2e suite with 37 passing tests.
+- [x] Ran the mandatory frontend interaction Playwright suite with 5 passing tests.
 
-- [x] Add efficient-frontier highlighting: implemented as dotted frontier trace.
-- [x] Add toggle for screen/final/both: implemented through sidebar stage selector and screen/final toggles.
-- [x] Add toggle to hide failed/outlier candidates: implemented with protected finalist/Schiff preservation.
-- [x] Add Schiff marker annotations: implemented for Schiff and finalist markers.
-- [x] Add hover details: implemented for stage, variant, source family, model, MAPE, bias, governance score, and Schiff class.
+## Closed Chart Data Reconciliation Items
 
-### Schiff Comparison
+- [x] Rebuilt Finalist Ensemble Composition from Parquet `ensemble_components_json` and blocked stale/demo component weights.
+- [x] Added `artifacts/ensemble_composition_source_table.csv` as the auditable source for ensemble chart weights.
+- [x] Renamed full-sample gain charts so they no longer misuse paired-gain terminology.
+- [x] Clarified Scenario Comparison table labels as full-sample gains plus paired common-grid win rate.
+- [x] Added `artifacts/scenario_comparison_source_table.csv` with full-sample and paired common-grid evidence.
+- [x] Added `artifacts/horizon_comparison_source_table.csv` for Scenario and Schiff horizon charts.
+- [x] Added `artifacts/diagnostic_acf_source_table.csv` with residual source and calculation method.
+- [x] Renamed the R2 KPI to Mean calibration R2 because the source field is Mincer-Zarnowitz/calibration R2.
+- [x] Relabelled Residual vs Fitted x-axes as native units to avoid misleading PED scaling.
+- [x] Changed Diagnostic Overall to Watch when normality is the only caution/fail condition.
+- [x] Renamed the candidate count KPI to Plotted candidates for default curated cone rows.
 
-- [x] Prevent Schiff residual/fixed blends being classified as pure Schiff: implemented with `schiff_class` and `is_schiff_text` protections.
-- [x] Add paired win-rate badges: implemented in governance cards and paired summaries.
-- [x] Add a beats-Schiff summary by stream: implemented in Schiff Decision Summary.
-- [x] Show best challenger vs pure Schiff only: implemented through paired baseline rows and Schiff purity classification evidence.
+## Closed Chart Source Audit Items
 
-### Ensemble Composition
+- [x] Added per-chart source tables for all 16 primary dashboard charts under `artifacts/chart_sources/`.
+- [x] Added `scripts/validate_chart_sources.py` and `tests/test_chart_source_tables.py`.
+- [x] Added `scripts/validate_semantic_labels.py` to fail stale/ambiguous labels such as Candidate Models, Mean Adjusted R2 and Paired Gain vs Schiff.
+- [x] Added `scripts/validate_visual_conformance.py` and `scripts/validate_120_gates.py` for the source-table and semantic extension gates.
+- [x] Extended `scripts/verify_dashboard.ps1` and `scripts/run_recursive_dashboard_validation.ps1` so the dashboard cannot pass without chart-source, semantic, visual and Playwright checks.
+- [x] Added browser trace validation that compares rendered Plotly stress chart data back to `overview_stress_horizon_checks.csv`.
 
-- [x] Add short component labels C1, C2, C3 with lookup table: implemented.
-- [x] Show static solver weights separately from prequential weights: implemented through static/prequential filters and method readout.
-- [x] Show mean prequential weights over time if available: implemented with origin-level weight path.
-- [x] Add warning if static solver wins but prequential does not: implemented in ensemble method readout.
-- [x] Normalise fallback ensemble scoring across origins: implemented through `ensemble_fallback_scores`.
+## Closure Evidence
 
-### Forecasts and Errors
+- Schema inspection passed for the information pack Parquet reached from the requested diagnostic audit pack workflow.
+- Data validation passed for the Parquet-backed candidate data and diagnostic pack.
+- Browser e2e verification passed with 37 existing tests.
+- Mandatory frontend interaction verification passed with 5 tests.
+- Chart source validation passed for 16 primary chart source tables.
+- 120-gate extension validation passed with 20 added source/semantic gates.
+- Fresh after-screenshots exist for Overview, Diagnostics, Scenario Comparison, and Schiff Benchmark.
+- Performance benchmark measured warm cached Parquet load at under 0.01 seconds.
 
-- [x] Add actual vs predicted chart: implemented.
-- [x] Add percent error over time chart: implemented.
-- [x] Add horizon-bucket box plot: implemented.
-- [x] Add model selector with shortened model labels: implemented.
-- [x] Add empty-state messages if quarterly predictions are missing: implemented through warning panels and empty figures.
-- [x] Add MAPE by forecast horizon drilldown: implemented.
-
-### Stress Checks
-
-- [x] Show horizon buckets 1-4, 5-8, 9-12: implemented.
-- [x] Show 2022-23 stress window: implemented.
-- [x] Show recent 2024+ performance: implemented.
-- [x] Show loaded 2020-21 bucket when present: implemented.
-- [x] Add explanatory note for why Light RUC is hard: implemented.
-- [x] Add high-risk band: implemented.
-
-### Model Inventory
-
-- [x] Add KPI cards for filtered rows, streams represented, source families: implemented.
-- [x] Add ranking options for quarterly MAPE, annual MAPE, governance score, and bias: implemented.
-- [x] Add CSV download: implemented.
-- [x] Add Inventory read panel naming best quarterly and annual candidates: implemented.
-- [x] Add model detail drawer/section: implemented.
-- [x] Add model-family and Schiff-class visuals: implemented.
-- [x] Prevent stale Streamlit loader cache from hiding derived Schiff-class fields: implemented with explicit loader schema-version cache key and regression assertions.
-
-### Run Audit
-
-- [x] Summarise errors.csv by error type: implemented as diagnostic chart.
-- [x] Add warning if errors.csv is non-empty: implemented.
-- [x] Add file status table with row counts and sizes: implemented.
-- [x] Add missing-file robustness tests: implemented in data-loader tests.
-
-### Visual Polish
-
-- [x] Check every screenshot for blank space and chart density: documented in screenshot reviews.
-- [x] Improve chart titles and axis labels: implemented across Plotly helpers.
-- [x] Add data labels where appropriate: implemented for bars and diagnostic charts.
-- [x] Make long model names readable: implemented with aliases and C-label mappings.
-- [x] Ensure every page has meaningful content above the fold: implemented with cards/readouts/charts before row detail.
-- [x] Collapse operational sidebar by default for presentation screenshots: implemented.
-- [x] Keep technical schema diagnostics out of global management-page warning banners: implemented by moving them into Run Audit.
-- [x] Add Waka Kotahi/NZTA-style governance shell with four primary pages: implemented with Overview, Diagnostics, Scenario Comparison, and Schiff Benchmark.
-- [x] Add visible horizontal filter bar: implemented with stream, model family, stage, baseline, horizon, forecast vintage, date window, reset, and state export controls.
-- [x] Add footer and page indicator: implemented with page labels and a navy footer strip.
-- [x] Standardise Overview around the supplied report figures: implemented with five numbered chart modules.
-
-### Red-Team Review
-
-- [x] Evidence that selected models really win is visible and sourced.
-- [x] Schiff benchmark answer is clear and separated from Schiff residual/blend challengers.
-- [x] Static solver hindsight risk is visible through static/prequential readout.
-- [x] 2022-23 RUC stress window is explicit.
-- [x] Charts include stress and frontier cues so weak performance is not hidden.
-- [x] Failed candidates/outliers can be hidden without losing finalists or Schiff rows.
-- [x] Metrics are calculated from real loaded data and tested.
-- [x] Long model names are aliased or mapped.
-- [x] Pages are management-ready with executive conclusions, charts, and warnings.
-
-### Reviewer Findings from Final Product-Hardening Sprint
-
-- [x] Interaction P1: clearing empty selection should not widen results: implemented in `filter_by_common_controls` and covered by unit tests.
-- [x] Interaction P1: dashboard-level reset/default restoration: implemented through the visible Reset Filters action.
-- [x] Interaction P1: bookmark/state export: implemented as JSON current-view export; full URL query bookmarking documented in `INTERACTION_SPEC.lock.md`.
-- [x] Interaction P2: Playwright render checks needed stronger interaction coverage: strengthened with reset, filter state, page-navigation, and export-control assertions.
-- [x] Interaction P2: model selector 80-row cap: removed after search/ranking filters.
-- [x] Interaction P2: Candidate Landscape page-local download: implemented.
-- [x] Visual P1: eight-tab analyst shell did not match reference: four primary governance pages added while keeping drilldown tabs.
-- [x] Visual P1: filters hidden in sidebar: visible governance filter row added.
-- [x] Visual P1: footer/page indicator missing: implemented.
-- [x] UX P1: first viewport lacked reference-style dashboard density: Overview now contains the key report figures and management decision content.
-- [x] Governance recommendation: keep champion-selection rule explicit: retained in Overview, Scenario Comparison, and Schiff Benchmark text.
-
-No unchecked items remain.
-
-## Loop 51 Responsive Visual Repair
-
-- [x] Prevent narrow in-app browser page-chip clipping and filter-value ellipses.
-- [x] Stack Overview chart cards at narrow widths so charts remain readable instead of squeezing three panels into one row.
-- [x] Add a narrow-browser Playwright assertion covering navigation labels, filter readability, shell overflow, and chart stacking.
-
-## Loop 52 Header / Navigation Visual Repair
-
-- [x] Integrate the desktop primary navigation into the masthead band instead of leaving it below the header.
-- [x] Tighten the top filter band after moving the desktop nav upward.
-- [x] Preserve the narrow in-app browser layout so the nav sits below the Governance title without overlap.
-- [x] Add desktop masthead and narrow non-overlap browser assertions.
-
-## Loop 53 Overview Responsive Grid Repair
-
-- [x] Remove the cramped visual masthead subtitle from the governance header.
-- [x] Replace the sparse one-column in-app Overview stack with a readable two-column dashboard grid.
-- [x] Avoid the unreadable three-panel squeeze that crushed chart labels and ensemble components.
-- [x] Strengthen the narrow-browser assertion so Overview chart cards keep dashboard-row density.
-
-## Loop 54 Diagnostics Autocorrelation Repair
-
-- [x] Replace the dense error-over-time cloud in Diagnostics with residual ACF-by-lag bars.
-- [x] Add unit coverage that verifies lag-bar semantics and axis labels.
-- [x] Add browser coverage that verifies the Diagnostics page exposes the residual ACF explanation.
-
-## Loop 55 Scenario Comparison Control Repair
-
-- [x] Replace the long Scenario settings popover label with compact Edit wording.
-- [x] Add browser coverage that verifies the compact control and rejects the longer crowded label.
-
-## Loop 56 Schiff Benchmark Viewport Repair
-
-- [x] Reduce the Schiff benchmark chart height for the in-app wireframe.
-- [x] Compact the benchmark comparison and paper replication notes panel.
-- [x] Move cross-validation evidence earlier in the in-app viewport.
-
-## Loop 57 KPI Row Reference Repair
-
-- [x] Convert Diagnostics KPI cards to the same icon-tile governance KPI row used by the reference pages.
-- [x] Convert Schiff Benchmark KPI cards to the same icon-tile governance KPI row used by the reference pages.
-- [x] Add browser coverage that verifies both pages retain four dense KPI cards at the in-app browser width.
-
-## Loop 58 Primary Navigation Synchronization Repair
-
-- [x] Preserve Streamlit radio interactivity while hiding the native radio glyph.
-- [x] Bind page-body rendering to the same current page value used by the governance shell.
-- [x] Add browser coverage that clicks visible nav text and rejects stale prior-page body content.
-
-## Loop 59 Filter Band Density Repair
-
-- [x] Replace the tall run-evidence caption block with a compact evidence line inside the filter card.
-- [x] Tighten the filter-to-KPI vertical spacing so the Overview page more closely matches the reference first viewport.
-- [x] Add browser geometry coverage for filter band, first KPI row, and first chart position.
-
-## Loop 60 Diagnostics Transition Repair
-
-- [x] Replace the wrapped Diagnostics provenance caption with a compact first-viewport evidence strip.
-- [x] Add Diagnostics-specific chart captions so the first diagnostic cards cannot show stale Overview readouts.
-- [x] Add deterministic empty-caption placeholders to the shared chart card component.
-- [x] Add browser coverage that rejects visible Overview ghost captions on the Diagnostics page.
-
-## Loop 61 Scenario Comparison Density Repair
-
-- [x] Reduce Scenario Comparison primary chart heights to move the Improvement vs Benchmark panel higher in the in-app browser.
-- [x] Keep the first three Scenario Comparison panels visible above the fold at 820px width.
-- [x] Add browser coverage for the Scenario Comparison improvement-panel first-viewport position.
-
-## Loop 62 Filters and Hovers Repair
-
-- [x] Replace fake-looking primary filter displays with directly clickable `st.selectbox` controls for Stream, Model Family, Stage, Baseline, Horizon, Forecast Vintage, and Date Window.
-- [x] Keep More as an advanced-control overflow only; primary filter tests do not depend on it.
-- [x] Add browser assertions for direct primary dropdown opening, stream selection, active chip update, KPI/chart-region update, and reset-to-default behaviour.
-- [x] Add shared hover formatting helpers and apply custom Plotly hover templates to major management charts.
-- [x] Add browser assertions and screenshot evidence for human-readable hover labels on Finalist Accuracy, Candidate Landscape, Ensemble Composition, and Stress Checks.
+No unchecked backlog items remain.

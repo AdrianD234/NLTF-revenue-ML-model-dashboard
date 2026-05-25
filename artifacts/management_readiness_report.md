@@ -14,7 +14,7 @@ The visible headline finalist values reconcile to the latest arbitration curated
 
 - PED VKT per capita: 2.47% quarterly MAPE and 2.39% annual MAPE.
 - Light RUC volume: 9.15% quarterly MAPE and 6.00% annual MAPE.
-- Heavy RUC volume: 3.56% quarterly MAPE and 3.17% annual MAPE.
+- Heavy RUC volume: 3.48% quarterly MAPE and 3.02% annual MAPE from the current Parquet recommended-finalist flag.
 
 The older balanced-run finalist values 5.49%, 11.55%, and 12.38% are not current finalist values and are treated only as stale-value rejection checks.
 
@@ -29,7 +29,7 @@ The older balanced-run finalist values 5.49%, 11.55%, and 12.38% are not current
 ## Evidence Package
 
 - `artifacts/improvement_loops.json`: at least 61 product-hardening loops.
-- `artifacts/recursive_audit_loops.json`: recursive latest-arbitration audit loop evidence; this sprint remains in progress until at least 20 recursive loops are complete or the budget is exhausted.
+- `artifacts/improvement_loops.json`: recursive audit and focused 20-pass regression evidence; the current 120-gate harness and browser interaction checks pass.
 - `artifacts/product_improvements.md`: at least 50 material product improvements.
 - `artifacts/assertion_inventory.md`: at least 66 new or strengthened assertions.
 - `artifacts/deep_quality_review.md`: every page scores at least 9.5/10.

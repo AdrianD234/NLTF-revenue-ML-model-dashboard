@@ -432,5 +432,40 @@
     "change": "Converted the visible governance filter row into directly clickable Streamlit selectboxes and routed major Plotly hover labels through management-readable formatting helpers.",
     "test_added": "tests/test_filter_and_hover.py verifies direct filter opening/selection/reset, KPI/chart-region updates after filter changes, and human-readable hovers for finalist accuracy, candidate landscape, ensemble composition, and stress checks.",
     "verification": "passed"
+  },
+  {
+    "loop": 63,
+    "target": "Parquet 80-gate validation harness",
+    "change": "Added the locked 80-gate validation spec, recursive validation runner, Parquet-aware benchmark path, and artifact/review status updates.",
+    "test_added": "scripts/validate_80_gates.py records all 80 gate results and supporting checks in JSON and Markdown, and scripts/run_recursive_dashboard_validation.ps1 preserves pass logs and .agent_state.md after each pass.",
+    "verification": "passed"
+  },
+  {
+    "loop": 64,
+    "target": "Information pack Parquet refresh and browser hardening",
+    "change": "Resolved the information pack Parquet, mapped its schema aliases, fixed derived stress and horizon scenario fields, updated the four-page browser tests to the new target, regenerated screenshots and hover evidence, and cleared backlog artifacts.",
+    "test_added": "Updated Playwright checks for the four target pages, direct filter interaction, reset behavior, clean hovers, current Parquet finalist values, and screenshot evidence.",
+    "verification": "passed - compileall, data validation, full pytest, browser e2e, verify_dashboard, and run_recursive_dashboard_validation all passed"
+  },
+  {
+    "loop": 65,
+    "target": "Visual conformance hard gate and mandatory browser interaction",
+    "change": "Closed the page-by-page visual delta backlog, added gates 81-100, strengthened the frontend verifier with a mandatory Playwright interaction file, refreshed after-screenshots, and corrected the recursive runner to start from the requested diagnostic audit pack root.",
+    "test_added": "tests/test_playwright_frontend_interactions.py verifies all four top-level pages, seven primary filters, two non-default filter changes, Reset Filters, Plotly hover readability, stale-value absence, screenshot generation, and console/request cleanliness.",
+    "verification": "passed - 128 pytest tests, 36 existing browser e2e tests, 4 mandatory frontend interaction tests, 100/100 gates, and scripts/run_recursive_dashboard_validation.ps1 all passed against http://localhost:8501"
+  },
+  {
+    "loop": 66,
+    "target": "Chart-source and semantic reconciliation hard gate",
+    "change": "Added auditable source tables for all 16 primary charts, enforced full-sample versus paired terminology, locked calibration R2 and native-unit residual labels, and extended validation to gates 101-120.",
+    "test_added": "tests/test_chart_source_tables.py, scripts/validate_chart_sources.py, scripts/validate_semantic_labels.py, scripts/validate_visual_conformance.py, scripts/validate_120_gates.py, and a Playwright trace/source comparison in tests/test_playwright_frontend_interactions.py.",
+    "verification": "passed - 149 pytest tests, 37 existing browser e2e tests, 5 mandatory frontend interaction tests, 100/100 original gates, 120/120 combined gates, scripts/verify_dashboard.ps1, and scripts/run_recursive_dashboard_validation.ps1 -MaxPasses 1 all passed against http://localhost:8501"
+  },
+  {
+    "loop": 67,
+    "target": "Post-pass source, semantic, visual and browser regression loop",
+    "change": "Reran a focused 20-pass regression sequence after the recursive harness passed, keeping Streamlit on localhost:8501 and rechecking chart sources, semantic labels, visual conformance and mandatory frontend Playwright interactions on every pass.",
+    "test_added": "No new test file; repeated scripts/validate_chart_sources.py, scripts/validate_semantic_labels.py, scripts/validate_visual_conformance.py and tests/test_playwright_frontend_interactions.py for 20 consecutive passes.",
+    "verification": "passed - focused regression pass 1 through 20 all passed; each pass included the 5 mandatory frontend interaction browser tests"
   }
 ]

@@ -1,5 +1,7 @@
 # Interaction and Filter Review
 
+Current Parquet refresh status: **pass**. The Parquet-backed app was rerun at `http://localhost:8501`; browser evidence covers the four primary pages, primary filters, reset, active chips, clean hovers, and regenerated screenshots.
+
 Reviewer role: interaction/filter reviewer for the Stage 1 Model Governance Dashboard.
 
 Review date: 2026-05-21.
@@ -64,6 +66,10 @@ The prior failure state is no longer current: the strict verifier passes, Playwr
 
 The dashboard implements current-view JSON export in the advanced controls rather than full URL bookmark restoration. This is documented behavior and is covered as an audit/export workflow, not a complete import/restore bookmark workflow.
 
+## Additional Regression Evidence
+
+After the 120-gate verifier passed, a focused 20-pass regression loop reran chart-source validation, semantic-label validation, visual conformance validation, and `tests/test_playwright_frontend_interactions.py` against `http://localhost:8501`. All 20 focused passes completed successfully.
+
 ## Conclusion
 
-The current interaction and filter layer passes for this recursive audit loop. The remaining reason the overall sprint cannot be closed is quota-based: fewer than 20 recursive audit loops have been completed.
+The current interaction and filter layer passes for this recursive audit loop. Primary filters are directly clickable, Reset Filters restores defaults, active chips update after non-default selections, major hovers remain readable, and browser checks produced no Streamlit exception block or critical console/page errors.

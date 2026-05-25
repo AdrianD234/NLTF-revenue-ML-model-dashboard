@@ -55,7 +55,6 @@ STRESS_BUCKET_ORDER = [
     "5-8 qtrs",
     "9-12 qtrs",
     "2024+",
-    "2020-21",
     "2022-23",
     "Annual",
 ]
@@ -224,6 +223,22 @@ def humanize_label(value: Any) -> str:
     return _humanize_text(text)
 
 
+def display_stream(value: Any) -> str:
+    return stream_label(value)
+
+
+def display_source_family(value: Any) -> str:
+    return humanize_label(value)
+
+
+def display_model_kind(value: Any) -> str:
+    return humanize_label(value)
+
+
+def short_model_label(value: Any) -> str:
+    return display_model_label(value, max_length=72)
+
+
 @lru_cache(maxsize=4096)
 def _display_model_label_text(text: str, max_length: int = 84) -> str:
     alias = _model_alias_text(text, max_length=max_length)
@@ -254,6 +269,10 @@ def format_percent(value: Any, digits: int = 2) -> str:
     return f"{number:.{digits}f}%"
 
 
+def fmt_pct(value: Any, decimals: int = 2) -> str:
+    return format_percent(value, digits=decimals)
+
+
 def format_pp(value: Any, digits: int = 2) -> str:
     try:
         if _missing(value):
@@ -265,8 +284,24 @@ def format_pp(value: Any, digits: int = 2) -> str:
     return f"{sign}{number:.{digits}f} pp"
 
 
+def fmt_pp(value: Any, decimals: int = 2) -> str:
+    return format_pp(value, digits=decimals)
+
+
 def format_weight(value: Any) -> str:
     return format_percent(value, digits=1)
+
+
+def fmt_weight(value: Any, decimals: int = 1) -> str:
+    try:
+        if _missing(value):
+            return "-"
+        number = float(value)
+    except (TypeError, ValueError):
+        return "-"
+    if abs(number) <= 1.5:
+        number *= 100.0
+    return f"{number:.{decimals}f}%"
 
 
 def format_count(value: Any) -> str:
@@ -277,6 +312,14 @@ def format_count(value: Any) -> str:
     except (TypeError, ValueError):
         return "-"
     return f"{number:,}"
+
+
+def fmt_count(value: Any) -> str:
+    return format_count(value)
+
+
+def clean_hover_text(value: Any) -> str:
+    return humanize_label(shorten_model_name(value, 110))
 
 
 def horizon_label(value: Any) -> str:

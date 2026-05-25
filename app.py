@@ -10,12 +10,15 @@ import pandas as pd
 import streamlit as st
 
 from model_dashboard.data_loader import (
+    DEFAULT_DIAGNOSTIC_DATA_ROOT,
     LoadedRun,
     curated_manifest_matches,
     curated_signature,
     discover_run_folders,
     load_curated_run,
+    load_parquet_dashboard,
     load_run,
+    parquet_pack_signature,
     run_signature,
 )
 from model_dashboard.labels import (
@@ -52,14 +55,21 @@ from model_dashboard.plots import (
     plot_error_types,
     plot_feature_counts,
     plot_finalist_accuracy,
+    plot_diagnostic_pass_matrix,
     plot_horizon_mape,
+    plot_horizon_comparison,
+    plot_improvement_vs_benchmark,
     plot_inventory_family_performance,
     plot_paired_improvement,
     plot_paired_scatter,
     plot_percent_error_over_time,
     plot_residual_vs_fitted,
+    plot_benchmark_summary_table,
+    plot_decision_summary_table,
     plot_schiff_benchmark,
     plot_schiff_class_mix,
+    plot_schiff_finalist_mape,
+    plot_scenario_stream_comparison,
     plot_stress_checks,
     plot_weight_over_time,
 )
@@ -82,7 +92,7 @@ from model_dashboard.ui import (
 )
 
 
-LOADER_SCHEMA_VERSION = "stage1-governance-loader-v4-schiff-class"
+LOADER_SCHEMA_VERSION = "stage1-governance-loader-v7-schiff-class-source-table-reconciliation"
 LATEST_ARBITRATION_RUN = (
     DEFAULT_INPUT_PARENT
     / "stage1_finalist_arbitration_outputs"
@@ -123,6 +133,18 @@ def cached_discover_run_folders(
     return tuple(str(path) for path in runs)
 
 
+@st.cache_data(show_spinner=False)
+def cached_load_parquet_dashboard(
+    data_root: str,
+    repo_root: str,
+    pack_sig: tuple[tuple[str, int, int], ...],
+    schema_version: str,
+) -> LoadedRun:
+    del pack_sig
+    del schema_version
+    return load_parquet_dashboard(data_root, repo_root, allow_csv_preview=True)
+
+
 def directory_signature(path: Path) -> tuple[bool, int, int]:
     try:
         stat = path.stat()
@@ -132,7 +154,7 @@ def directory_signature(path: Path) -> tuple[bool, int, int]:
 
 
 def main() -> None:
-    st.set_page_config(page_title="NLTF Stage 1 Model Governance", layout="wide", initial_sidebar_state="collapsed")
+    st.set_page_config(page_title="NTLF Revenue Modelling", layout="wide", initial_sidebar_state="collapsed")
     inject_theme()
     pages = ["Overview", "Diagnostics", "Scenario Comparison", "Schiff Benchmark"]
     st.session_state.setdefault("gov_page", "Overview")
@@ -143,7 +165,7 @@ def main() -> None:
     initial_index = pages.index(initial_page) + 1
     with header_slot.container():
         header(
-            "Governance",
+            "NTLF Revenue Modelling",
             "Transport Revenue Model Testbench | Refined finalist models | actual-driver Stage 1 evidence.",
             page_chip=f"Page {initial_index} of 4 - {initial_page}",
         )
@@ -160,7 +182,7 @@ def main() -> None:
     current_index = pages.index(current_page) + 1
     with header_slot.container():
         header(
-            "Governance",
+            "NTLF Revenue Modelling",
             "Transport Revenue Model Testbench | Refined finalist models | actual-driver Stage 1 evidence.",
             page_chip=f"Page {current_index} of 4 - {current_page}",
         )
@@ -217,7 +239,22 @@ def render_run_sidebar() -> str:
 
 def load_active_run(active_path: str) -> LoadedRun | None:
     path = Path(active_path).expanduser()
-    with st.spinner(f"Loading run outputs from {path}..."):
+    data_root = Path(os.environ.get("MODEL_DIAGNOSTIC_DATA_ROOT") or DEFAULT_DIAGNOSTIC_DATA_ROOT).expanduser()
+    repo_root = Path(__file__).resolve().parent
+    with st.spinner(f"Loading Parquet-backed dashboard data from {data_root}..."):
+        try:
+            loaded = cached_load_parquet_dashboard(
+                str(data_root),
+                str(repo_root),
+                parquet_pack_signature(data_root, repo_root),
+                LOADER_SCHEMA_VERSION,
+            )
+            if loaded.data and any(not frame.empty for frame in loaded.data.values() if isinstance(frame, pd.DataFrame)):
+                return loaded
+        except Exception as exc:
+            warning_panel(f"Parquet dashboard pack could not be loaded: {exc}")
+
+    with st.spinner(f"Loading fallback run outputs from {path}..."):
         curated_path = CURATED_DATA_DIR
         if curated_manifest_matches(curated_path, path):
             loaded = cached_load_curated_run(
@@ -337,6 +374,22 @@ def render_top_filter_bar(loaded: LoadedRun, controls: dict[str, Any]) -> dict[s
     for key, options in valid_defaults.items():
         if st.session_state.get(key) not in options:
             st.session_state[key] = defaults[key]
+    try:
+        advanced_top_n = int(st.session_state.get("advanced_top_n", defaults["advanced_top_n"]))
+    except (TypeError, ValueError):
+        advanced_top_n = defaults["advanced_top_n"]
+    advanced_top_n = min(200, max(10, advanced_top_n))
+    st.session_state["advanced_top_n"] = int(round(advanced_top_n / 10) * 10)
+    for key in [
+        "advanced_show_schiff",
+        "advanced_show_finalists",
+        "advanced_show_screen",
+        "advanced_show_final",
+        "advanced_show_static",
+        "advanced_show_prequential",
+        "advanced_hide_outliers",
+    ]:
+        st.session_state[key] = bool(st.session_state.get(key, defaults[key]))
 
     with st.container(border=True):
         st.markdown("<div class='filter-title'>Governance filters</div>", unsafe_allow_html=True)
@@ -442,9 +495,6 @@ def render_top_filter_bar(loaded: LoadedRun, controls: dict[str, Any]) -> dict[s
             "hide_outliers": controls.get("hide_outliers"),
         }
         st.session_state["last_view_state"] = view_state
-        evidence_line = f"{active_filter_line} | {run_evidence_caption(loaded, stage_choice, family_choice, len(family_options))}"
-        st.markdown(f"<div class='run-evidence-compact'>{html.escape(evidence_line)}</div>", unsafe_allow_html=True)
-
     updated = dict(controls)
     updated["stage"] = stage_choice
     updated["streams"] = stream_options if stream_choice == "All" else [stream_choice]
@@ -492,24 +542,22 @@ def render_advanced_controls(loaded: LoadedRun, controls: dict[str, Any]) -> dic
         "Top N candidates",
         min_value=10,
         max_value=200,
-        value=int(controls.get("top_n", 50)),
         step=10,
         key="advanced_top_n",
     )
     control_cols = st.columns(4)
     with control_cols[0]:
-        controls["show_schiff"] = st.toggle("Schiff", value=bool(controls.get("show_schiff", True)), key="advanced_show_schiff")
-        controls["show_finalists"] = st.toggle("Finalists", value=bool(controls.get("show_finalists", True)), key="advanced_show_finalists")
+        controls["show_schiff"] = st.toggle("Schiff", key="advanced_show_schiff")
+        controls["show_finalists"] = st.toggle("Finalists", key="advanced_show_finalists")
     with control_cols[1]:
-        controls["show_screen"] = st.toggle("Screen", value=bool(controls.get("show_screen", True)), key="advanced_show_screen")
-        controls["show_final"] = st.toggle("Final", value=bool(controls.get("show_final", True)), key="advanced_show_final")
+        controls["show_screen"] = st.toggle("Screen", key="advanced_show_screen")
+        controls["show_final"] = st.toggle("Final", key="advanced_show_final")
     with control_cols[2]:
-        controls["show_static"] = st.toggle("Static", value=bool(controls.get("show_static", True)), key="advanced_show_static")
-        controls["show_prequential"] = st.toggle("Prequential", value=bool(controls.get("show_prequential", True)), key="advanced_show_prequential")
+        controls["show_static"] = st.toggle("Static", key="advanced_show_static")
+        controls["show_prequential"] = st.toggle("Prequential", key="advanced_show_prequential")
     with control_cols[3]:
         controls["hide_outliers"] = st.toggle(
             "Hide outliers",
-            value=bool(controls.get("hide_outliers", True)),
             key="advanced_hide_outliers",
         )
     view_state = st.session_state.get("last_view_state", {"run_folder": str(loaded.run_dir)})
@@ -628,53 +676,41 @@ def render_overview(loaded: LoadedRun, controls: dict[str, Any]) -> None:
         if finalist_read:
             accuracy_subtitle = f"Latest arbitration finalists: {finalist_read}. Lower is better."
 
-    upper = st.columns([1.0, 1.08, 1.2])
+    upper = st.columns([1.0, 1.0])
     with upper[0]:
         chart_card(
             "1. Finalist Forecast Accuracy",
             accuracy_subtitle,
-            compact_figure(plot_finalist_accuracy(recommended), 200),
+            compact_figure(plot_finalist_accuracy(recommended), 260),
         )
     with upper[1]:
-        landscape = summary
+        landscape = overview_candidate_landscape_frame(loaded, controls)
         if controls.get("hide_outliers") and {"quarterly_mape", "annual_mape"}.issubset(landscape.columns):
             landscape = hide_candidate_outliers(landscape)
         chart_card(
-            "2. Candidate Search Landscape",
-            "Lower-left candidates form the competitive frontier.",
-            compact_figure(plot_candidate_landscape(landscape), 200, showlegend=False),
+            "2. Candidate Search Frontier",
+            "Each dot is a candidate model. Lower-left is better.",
+            compact_figure(plot_candidate_landscape(landscape), 260),
             overview_frontier_note(landscape),
         )
-    with upper[2]:
+
+    lower = st.columns([1.0, 1.0])
+    with lower[0]:
         ensemble_weights = common_filter(loaded.data.get("weights", pd.DataFrame()), controls, include_source_variant=False)
         fig, mapping = plot_ensemble_composition(ensemble_weights)
         chart_card(
             "3. Finalist Ensemble Composition",
-            "Positive solver weights for the latest arbitration finalists.",
-            compact_figure(fig, 200),
+            "Positive solver weights for PED VKT per capita, Light RUC volume and Heavy RUC volume finalists.",
+            compact_figure(fig, 260),
         )
         if not mapping.empty:
             st.caption("Component labels are deliberately short for the management view.")
-
-    lower = st.columns([1.0, 1.05])
-    with lower[0]:
+    with lower[1]:
         chart_card(
             "4. Stress and Horizon Checks",
             "MAPE across horizon buckets and policy stress windows.",
-            compact_figure(plot_stress_checks(stress_frame), 212),
+            compact_figure(plot_stress_checks(stress_frame), 260),
             overview_stress_watch_note(stress_frame),
-        )
-    with lower[1]:
-        box_data = qpred
-        box_data = central_error_window(box_data)
-        chart_card(
-            "5. Distribution of Forecast Error by Horizon Bucket",
-            "Central absolute percentage error by stream and forecast horizon.",
-            compact_figure(plot_error_distribution(box_data), 212),
-            overview_error_distribution_note(box_data),
-        )
-        st.caption(
-            "Ensemble panels shown above: PED VKT per capita, Light RUC volume, Heavy RUC volume."
         )
 
     with st.expander("Management conclusion and stream decision detail", expanded=False):
@@ -688,13 +724,59 @@ def render_overview(loaded: LoadedRun, controls: dict[str, Any]) -> None:
 
 def compact_figure(fig: Any, height: int, showlegend: bool | None = None) -> Any:
     if hasattr(fig, "update_layout"):
-        fig.update_layout(title_text="", height=height, margin={"l": 30, "r": 14, "t": 16, "b": 28})
-        fig.update_layout(legend={"orientation": "h", "yanchor": "bottom", "y": 1.0, "xanchor": "left", "x": 0.0, "font": {"size": 10}})
+        has_subplot_titles = bool(getattr(fig.layout, "annotations", None))
+        top_margin = 42 if has_subplot_titles else 18
+        fig.update_layout(title_text="", height=height, margin={"l": 30, "r": 14, "t": top_margin, "b": 30})
+        fig.update_layout(
+            legend={
+                "orientation": "h",
+                "yanchor": "bottom",
+                "y": 1.12 if has_subplot_titles else 1.0,
+                "xanchor": "center" if has_subplot_titles else "left",
+                "x": 0.5 if has_subplot_titles else 0.0,
+                "font": {"size": 10},
+            }
+        )
         if showlegend is not None:
             fig.update_layout(showlegend=showlegend)
         if showlegend is False:
             fig.layout.annotations = ()
     return fig
+
+
+def overview_candidate_landscape_frame(loaded: LoadedRun, controls: dict[str, Any]) -> pd.DataFrame:
+    candidate = loaded.data.get("candidate_df", loaded.data.get("summary", pd.DataFrame()))
+    summary = loaded.data.get("summary", pd.DataFrame())
+    mode = st.selectbox(
+        "Candidate frontier mode",
+        ["Curated cone sample", "Competitive frontier", "Top candidates only", "Show outliers"],
+        key="candidate_frontier_mode",
+        label_visibility="collapsed",
+    )
+    if candidate.empty:
+        return summary
+    if mode == "Competitive frontier":
+        mask = pd.Series(False, index=candidate.index)
+        for column in ["is_frontier", "is_current_recommended", "is_pure_schiff", "is_pdf_reference"]:
+            if column in candidate.columns:
+                mask = mask | candidate[column].fillna(False).astype(bool)
+        landscape = candidate[mask].copy()
+    elif mode == "Top candidates only":
+        mask = pd.Series(False, index=candidate.index)
+        for column in ["is_top_quarterly", "is_top_annual", "is_current_recommended", "is_pure_schiff"]:
+            if column in candidate.columns:
+                mask = mask | candidate[column].fillna(False).astype(bool)
+        landscape = candidate[mask].copy()
+    elif mode == "Show outliers":
+        landscape = candidate.copy()
+    else:
+        if not summary.empty:
+            landscape = summary
+        elif "plot_default_include" in candidate.columns:
+            landscape = candidate[candidate["plot_default_include"].fillna(False).astype(bool)].copy()
+        else:
+            landscape = candidate.copy()
+    return common_filter(landscape, controls)
 
 
 def overview_frontier_note(summary: pd.DataFrame) -> str:
@@ -714,13 +796,28 @@ def overview_stress_watch_note(stress_frame: pd.DataFrame) -> str:
         return "Stress watch: no stress rows are available for the selected filters."
     data = stress_frame.copy()
     data["_mape"] = pd.to_numeric(data["mape"], errors="coerce")
-    data = data.dropna(subset=["_mape"])
-    if data.empty:
+    missing_note = ""
+    if {"stream_label", "stress_bucket"}.issubset(data.columns):
+        heavy_missing = data[
+            data["stream_label"].astype(str).eq("Heavy RUC volume")
+            & data["stress_bucket"].astype(str).isin(["2024+", "2022-23"])
+            & data["_mape"].isna()
+        ]
+        if not heavy_missing.empty:
+            missing_buckets = " / ".join(
+                bucket for bucket in ["2024+", "2022-23"] if bucket in set(heavy_missing["stress_bucket"].astype(str))
+            )
+            missing_note = f" Data not available for Heavy RUC volume {missing_buckets}."
+    visible = data.dropna(subset=["_mape"])
+    if visible.empty:
         return "Stress watch: no numeric stress MAPE values are available for the selected filters."
-    worst = data.sort_values("_mape", ascending=False).iloc[0]
+    worst = visible.sort_values("_mape", ascending=False).iloc[0]
     stream = str(worst.get("stream_label", worst.get("stream", "selected stream")))
     bucket = str(worst.get("stress_bucket", "selected bucket"))
-    return f"Stress watch: weakest visible point is {stream} in {bucket} at {format_percent(float(worst['_mape']))} MAPE."
+    return (
+        f"Stress watch: weakest visible point is {stream} in {bucket} at {format_percent(float(worst['_mape']))} MAPE."
+        f"{missing_note}"
+    )
 
 
 def overview_error_distribution_note(qpred: pd.DataFrame) -> str:
@@ -763,18 +860,17 @@ def overview_kpi_cards(
     a_delta = schiff_a - finalist_a if pd.notna(schiff_a) and pd.notna(finalist_a) else float("nan")
     beats = int((story.get("schiff_status", pd.Series(dtype=str)) == "Beats Schiff").sum()) if story is not None and not story.empty else 0
     total = len(story) if story is not None else 0
-    score = int(round((beats / total) * 100)) if total else 0
     return [
         ("Quarterly MAPE", format_percent(finalist_q), f"vs. Schiff {format_percent(schiff_q)}", f"{q_delta:.2f} pp gain" if pd.notna(q_delta) else "-", "good", "Q"),
         ("Annual MAPE", format_percent(finalist_a), f"vs. Schiff {format_percent(schiff_a)}", f"{a_delta:.2f} pp gain" if pd.notna(a_delta) else "-", "good", "A"),
-        ("Candidate Models", format_count(len(summary)), "real loaded summary rows", f"{format_count(len(recommended))} finalists", "good", "#"),
+        ("Plotted candidates", format_count(len(summary)), "default curated cone rows", f"{format_count(len(recommended))} finalists", "good", "#"),
         (
-            "Governance Score",
-            f"{score}/100",
+            "Benchmark Pass",
+            f"{beats}/{total}",
             f"{beats}/{total} beat pure Schiff",
             f"{format_count(len(errors))} logged diagnostics",
-            "mixed" if errors is not None and not errors.empty else "good",
-            "G",
+            "good" if total and beats == total else "mixed",
+            "B",
         ),
     ]
 
@@ -800,15 +896,40 @@ def basic_cards_as_governance_kpis(
     return rendered
 
 
+def diagnostic_kpi_cards(diagnostic_df: pd.DataFrame) -> list[tuple[str, str, str, str, str, str]]:
+    finalists = diagnostic_df.copy()
+    if "role" in finalists.columns:
+        finalists = finalists[finalists["role"].astype(str).str.contains("finalist", case=False, na=False)]
+    expected_tests = [
+        "durbin_watson",
+        "adj_r2",
+        "adf_pvalue",
+        "kpss_pvalue",
+        "breusch_pagan_pvalue",
+        "white_pvalue",
+        "arch_lm_pvalue",
+        "jarque_bera_pvalue",
+        "cointegration_pvalue",
+    ]
+    available = sum(1 for column in expected_tests if column in finalists.columns and finalists[column].notna().any())
+    dw = pd.to_numeric(finalists.get("durbin_watson", pd.Series(dtype=float)), errors="coerce").mean()
+    adj_r2 = pd.to_numeric(finalists.get("adj_r2", pd.Series(dtype=float)), errors="coerce").mean()
+    bp = pd.to_numeric(finalists.get("breusch_pagan_pvalue", pd.Series(dtype=float)), errors="coerce")
+    white = pd.to_numeric(finalists.get("white_pvalue", pd.Series(dtype=float)), errors="coerce")
+    pass_mask = (bp > 0.05) | (white > 0.05)
+    hetero_pass = int(pass_mask.fillna(False).sum())
+    hetero_total = int(max(len(finalists), 0))
+    return [
+        ("Diagnostics Coverage", f"{available}/9", "diagnostic fields available", "", "good" if available >= 6 else "mixed", "D"),
+        ("Mean Durbin-Watson", f"{dw:.2f}" if pd.notna(dw) else "-", "Near 2.0 is ideal", "", "good", "DW"),
+        ("Mean calibration R2", f"{adj_r2:.2f}" if pd.notna(adj_r2) else "-", "Mincer-Zarnowitz calibration", "", "good", "R2"),
+        ("Heteroscedasticity Pass", f"{hetero_pass}/{hetero_total}", "Breusch-Pagan or White across streams", "", "good" if hetero_total and hetero_pass == hetero_total else "mixed", "H"),
+    ]
+
+
 def render_diagnostics(loaded: LoadedRun, controls: dict[str, Any]) -> None:
-    cards, readout = run_health_summary(loaded)
-    gov_kpi_grid(
-        basic_cards_as_governance_kpis(
-            cards,
-            ["D", "M", "E", "R"],
-            ["good", "mixed", "mixed", "good"],
-        )
-    )
+    diagnostic_df = loaded.data.get("diagnostic_df", pd.DataFrame())
+    gov_kpi_grid(diagnostic_kpi_cards(diagnostic_df))
     st.markdown(
         f"<div class='run-evidence-compact diagnostics-provenance-strip'>"
         f"{html.escape(diagnostics_provenance_strip(loaded))}</div>",
@@ -817,88 +938,39 @@ def render_diagnostics(loaded: LoadedRun, controls: dict[str, Any]) -> None:
 
     qpred = common_filter(loaded.data.get("quarterly_predictions", pd.DataFrame()), controls, include_source_variant=False)
     diagnostic_qpred = central_error_window(qpred)
-    errors = loaded.data.get("errors", pd.DataFrame())
-    variant_features = loaded.data.get("variant_features", pd.DataFrame())
+    top = st.columns([1.0, 1.0])
+    with top[0]:
+        chart_card(
+            "1. Residual Autocorrelation by Lag",
+            "Residual ACF by lag using all selected quarterly residuals averaged by target period.",
+            compact_figure(plot_autocorrelation_diagnostics(qpred), 260),
+        )
+    with top[1]:
+        chart_card(
+            "2. Residual vs Fitted",
+            "Residual / forecast error (%) versus fitted value in native stream units.",
+            compact_figure(plot_residual_vs_fitted(diagnostic_qpred), 260),
+        )
 
-    cols = st.columns([0.95, 1.05, 1.0])
-    with cols[0]:
-        if variant_features.empty:
-            chart_card(
-                "1. Stationarity / Test Matrix",
-                "Feature/test matrix equivalent for the selected run.",
-                compact_figure(empty_figure("Stationarity-test outputs were not produced in this run."), 200),
-                "Diagnostic read: formal stationarity files are not available; the curated pack records this as a governed gap.",
-            )
-        else:
-            chart_card(
-                "1. Stationarity / Test Matrix",
-                "Run-equivalent matrix showing model input breadth by stream/specification.",
-                compact_figure(plot_feature_counts(variant_features), 200),
-                "Diagnostic read: broad feature coverage is available; formal stationarity files were not exported in this run.",
-            )
-    with cols[1]:
-        if diagnostic_qpred.empty:
-            warning_panel("Not available in this run: quarterly prediction residuals are missing.")
-        else:
-            chart_card(
-                "2. Autocorrelation Diagnostics",
-                "Residual ACF bars by lag; low bars near zero suggest limited serial error structure.",
-                compact_figure(plot_autocorrelation_diagnostics(diagnostic_qpred), 200),
-                "Diagnostic read: residual persistence is reviewed by lag using realised Stage 1 forecast errors.",
-            )
-    with cols[2]:
-        if errors.empty:
-            chart_card(
-                "3. Heteroscedasticity / Error Diagnostics",
-                "Operational diagnostics grouped by root-cause flag.",
-                compact_figure(empty_figure("No logged error diagnostics are available."), 200),
-                "Diagnostic read: errors.csv is empty for the curated arbitration run.",
-            )
-        else:
-            chart_card(
-                "3. Heteroscedasticity / Error Diagnostics",
-                "Operational diagnostics grouped by root-cause flag.",
-                compact_figure(plot_error_types(classify_error_rows(errors)), 200),
-                "Diagnostic read: logged rows are candidate-search diagnostics; review Run Audit for materiality.",
-            )
-
-    bottom = st.columns([1.0, 1.0, 0.9])
+    bottom = st.columns([1.0, 1.0])
     with bottom[0]:
-        if qpred.empty:
-            warning_panel("Not available in this run: prediction rows are missing.")
-        else:
-            chart_card(
-                "4. Residual vs Fitted Equivalent",
-                "Residual-style scatter by fitted value; centred around zero is preferred.",
-                compact_figure(plot_residual_vs_fitted(diagnostic_qpred), 198),
-                "Diagnostic read: clusters away from zero flag streams or scale ranges needing follow-up.",
-            )
+        chart_card(
+            "3. Diagnostic Pass Matrix",
+            "Calibration R2 and key statistical diagnostics by stream.",
+            compact_figure(plot_diagnostic_pass_matrix(diagnostic_df), 260),
+        )
     with bottom[1]:
-        if diagnostic_qpred.empty:
-            warning_panel("Not available in this run: prediction-error distribution rows are missing.")
-        else:
-            chart_card(
-                "5. Residual Normality / Error Distribution",
-                "Absolute error distribution by stream and horizon for central diagnostic review.",
-                compact_figure(plot_error_distribution(diagnostic_qpred), 198),
-                "Diagnostic read: central errors are shown without extreme tails so the distribution remains legible.",
-            )
-    with bottom[2]:
-        with st.container(border=True):
-            st.markdown(
-                "<div class='gov-chart-card chart-card'>"
-                "<div class='chart-card-title'>6. Diagnostics Summary Table</div>"
-                "<div class='chart-card-subtitle'>Run-health flags from loaded file status and errors.csv.</div>"
-                "</div>",
-                unsafe_allow_html=True,
-            )
-            display_table(error_flags(errors), height=190)
+        chart_card(
+            "4. Error Distribution by Horizon",
+            "Absolute percentage error (%) by forecast horizon.",
+            compact_figure(plot_error_distribution(diagnostic_qpred), 260),
+        )
 
     with st.expander("Diagnostics governance notes", expanded=False):
-        info_panel(readout)
+        info_panel(diagnostics_provenance_note(loaded))
         info_panel(
-            "Diagnostics use the available run outputs. Classical residual-test files are not present in every Stage 1 "
-            "run, so missing tests are shown as governed not-available cards rather than blank sections."
+            "Diagnostics use Parquet fields where present and diagnostic audit tables as secondary evidence. "
+            "Missing residual-test files are shown as governed unavailable states rather than fabricated points."
         )
 
     with st.expander("Model Inventory module", expanded=False):
@@ -949,7 +1021,6 @@ def render_scenario_comparison(loaded: LoadedRun, controls: dict[str, Any]) -> N
     summary = common_filter(loaded.data.get("summary", pd.DataFrame()), controls)
     paired = common_filter(loaded.data.get("paired_vs_schiff", pd.DataFrame()), controls, include_source_variant=False)
     qpred = common_filter(loaded.data.get("quarterly_predictions", pd.DataFrame()), controls, include_source_variant=False)
-    scenario_qpred = central_error_window(qpred)
 
     st.session_state.setdefault("scenario_a_choice", "Refined Finalist Ensemble")
     st.session_state.setdefault("scenario_b_choice", "Schiff Structural Benchmark")
@@ -974,53 +1045,44 @@ def render_scenario_comparison(loaded: LoadedRun, controls: dict[str, Any]) -> N
                 scenario_b = st.selectbox("Scenario B", ["Schiff Structural Benchmark", "Best pure Schiff by stream"], key="scenario_b_choice")
                 baseline = st.selectbox("Scenario baseline", ["Baseline FY25", "Latest loaded run"], key="scenario_baseline_choice")
 
-    scenario_stress_frame = final_stress_frame(
-        loaded.data.get("stress", pd.DataFrame()),
-        loaded.data.get("quarterly_predictions", pd.DataFrame()),
-        loaded.data.get("annual_predictions", pd.DataFrame()),
-        recommended,
-        include_extra_buckets=True,
-    )
+    comparison = scenario_comparison_frame(recommended, loaded.data.get("schiff_df", summary), paired)
+    scenario_stress_frame = loaded.data.get("stress", pd.DataFrame())
     story = governance_story_summary(
         recommended,
         paired,
         scenario_stress_frame,
         loaded.data.get("errors", pd.DataFrame()),
     )
-    gov_kpi_grid(scenario_kpi_cards(recommended, paired, story))
+    gov_kpi_grid(scenario_kpi_cards(recommended, paired, story, comparison))
 
-    top = st.columns([1.0, 1.0, 1.0])
+    top = st.columns([1.0, 1.0])
     with top[0]:
-        chart_card("1. Scenario Accuracy Comparison", "Finalist accuracy by stream.", compact_figure(plot_finalist_accuracy(recommended), 194))
+        chart_card(
+            "1. Stream Comparison: Scenario A vs Scenario B",
+            "MAPE (%) - lower is better.",
+            compact_figure(plot_scenario_stream_comparison(comparison), 220),
+        )
     with top[1]:
         chart_card(
-            "2. Error by Forecast Horizon",
-            "Horizon MAPE for finalist prediction rows.",
-            compact_figure(plot_horizon_mape(qpred), 194),
-        )
-    with top[2]:
-        chart_card(
-            "3. Improvement vs Benchmark",
-            "Negative values would favour Scenario B; positive paired gain favours the challenger.",
-            compact_figure(plot_paired_improvement(scenario_paired_display_rows(paired), top_n=3), 194),
+            "2. Improvement vs Benchmark",
+            "Full-sample MAPE gain in percentage points - positive values favour Scenario A.",
+            compact_figure(plot_improvement_vs_benchmark(comparison), 220),
         )
 
-    bottom = st.columns([1.0, 0.92, 0.98])
+    bottom = st.columns([1.0, 1.0])
     with bottom[0]:
         chart_card(
-            "4. Forecast Error Distribution by Scenario",
-            "Central finalist error distribution; full tails remain in Forecasts and Errors.",
-            compact_figure(plot_error_distribution(scenario_qpred), 190),
+            "3. Horizon Comparison",
+            "MAPE (%) across forecast horizons.",
+            compact_figure(plot_horizon_comparison(scenario_horizon_frame(loaded, qpred)), 220),
         )
     with bottom[1]:
-        scenario_model_test_panel(story, paired)
-    with bottom[2]:
-        scenario_decision_lens_panel(story, scenario_a, scenario_b, baseline, len(qpred), len(scenario_stress_frame))
+        scenario_decision_summary_panel(comparison)
 
     with st.expander("Detailed scenario governance cards", expanded=False):
         governance_cards(story)
         info_panel(
-            "Decision Lens: choose the refined finalist when it improves paired MAPE, stays robust across horizon "
+            "Decision Lens: choose the refined finalist when it improves full-sample MAPE, keeps a paired win-rate edge, stays robust across horizon "
             "buckets, and has manageable run warnings. Prefer Schiff where structural interpretability dominates "
             "or the finalist does not cleanly beat the benchmark."
         )
@@ -1037,15 +1099,21 @@ def scenario_kpi_cards(
     recommended: pd.DataFrame,
     paired: pd.DataFrame,
     story: pd.DataFrame,
+    comparison: pd.DataFrame | None = None,
 ) -> list[tuple[str, str, str, str, str, str]]:
     finalists = best_by_stream(recommended)
     q_value = float(finalists["quarterly_mape"].mean()) if not finalists.empty and "quarterly_mape" in finalists.columns else float("nan")
     a_value = float(finalists["annual_mape"].mean()) if not finalists.empty and "annual_mape" in finalists.columns else float("nan")
-    gain = (
-        float(pd.to_numeric(paired["mape_improvement_pct_points"], errors="coerce").mean())
-        if not paired.empty and "mape_improvement_pct_points" in paired.columns
-        else float("nan")
-    )
+    if comparison is not None and not comparison.empty and "quarterly_gain_pp" in comparison.columns:
+        gain = float(pd.to_numeric(comparison["quarterly_gain_pp"], errors="coerce").mean())
+        gain_source = "Full-sample qtr gain"
+    else:
+        gain = (
+            float(pd.to_numeric(paired["mape_improvement_pct_points"], errors="coerce").mean())
+            if not paired.empty and "mape_improvement_pct_points" in paired.columns
+            else float("nan")
+        )
+        gain_source = "Common-pair qtr gain"
     win_rate = (
         float(pd.to_numeric(paired["challenger_win_rate"], errors="coerce").mean())
         if not paired.empty and "challenger_win_rate" in paired.columns
@@ -1058,9 +1126,99 @@ def scenario_kpi_cards(
     return [
         ("Quarterly MAPE", format_percent(q_value), "Scenario A finalist mean", "", "good", "Q"),
         ("Annual MAPE", format_percent(a_value), "Scenario A finalist mean", "", "good", "A"),
-        ("Gain vs Schiff", gain_value, f"Scenario A vs pure Schiff; {format_percent(win_rate, 1)} win rate", gain_delta, "good" if pd.notna(gain) and gain > 0 else "mixed", "B"),
+        ("Gain vs Schiff", gain_value, f"{gain_source}; {format_percent(win_rate, 1)} paired win", gain_delta, "good" if pd.notna(gain) and gain > 0 else "mixed", "B"),
         ("Decision status", f"{beats}/{total}", "streams beat pure Schiff", "", "good" if total and beats >= 2 else "mixed", "D"),
     ]
+
+
+def scenario_comparison_frame(recommended: pd.DataFrame, schiff_rows: pd.DataFrame, paired: pd.DataFrame) -> pd.DataFrame:
+    finalists = best_by_stream(recommended)
+    schiff = best_by_stream(schiff_rows[schiff_rows["is_schiff"]]) if "is_schiff" in schiff_rows.columns else best_by_stream(schiff_rows)
+    if finalists.empty or schiff.empty:
+        return pd.DataFrame()
+    rows: list[dict[str, Any]] = []
+    paired_by_stream = paired.set_index("stream_label") if not paired.empty and "stream_label" in paired.columns else pd.DataFrame()
+    for _, finalist in finalists.iterrows():
+        stream = finalist.get("stream")
+        stream_schiff = schiff[schiff["stream"].astype(str).eq(str(stream))] if "stream" in schiff.columns else pd.DataFrame()
+        if stream_schiff.empty:
+            continue
+        benchmark = stream_schiff.iloc[0]
+        win_rate = pd.NA
+        if not paired_by_stream.empty and finalist.get("stream_label") in paired_by_stream.index:
+            win_rate = paired_by_stream.loc[finalist.get("stream_label")].get("challenger_win_rate")
+        fq = pd.to_numeric(finalist.get("quarterly_mape"), errors="coerce")
+        fa = pd.to_numeric(finalist.get("annual_mape"), errors="coerce")
+        sq = pd.to_numeric(benchmark.get("quarterly_mape"), errors="coerce")
+        sa = pd.to_numeric(benchmark.get("annual_mape"), errors="coerce")
+        rows.append(
+            {
+                "stream": stream,
+                "stream_label": finalist.get("stream_label"),
+                "finalist_model": finalist.get("model"),
+                "schiff_model": benchmark.get("model"),
+                "finalist_quarterly_mape": fq,
+                "schiff_quarterly_mape": sq,
+                "quarterly_gain_pp": sq - fq if pd.notna(sq) and pd.notna(fq) else pd.NA,
+                "finalist_annual_mape": fa,
+                "schiff_annual_mape": sa,
+                "annual_gain_pp": sa - fa if pd.notna(sa) and pd.notna(fa) else pd.NA,
+                "win_rate": win_rate,
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def scenario_horizon_frame(loaded: LoadedRun, qpred: pd.DataFrame) -> pd.DataFrame:
+    horizon = loaded.data.get("horizon_df", pd.DataFrame())
+    required_streams = set(loaded.data.get("recommended", pd.DataFrame()).get("stream_label", pd.Series(dtype=str)).dropna().astype(str))
+    if horizon is not None and not horizon.empty:
+        existing_streams = set(horizon.get("stream_label", pd.Series(dtype=str)).dropna().astype(str))
+        if required_streams and required_streams.issubset(existing_streams):
+            return horizon
+    if qpred.empty or not {"selected_role", "horizon", "ape", "stream_label"}.issubset(qpred.columns):
+        return horizon if horizon is not None else pd.DataFrame()
+    data = qpred.copy()
+    data["scenario_role"] = data["selected_role"].map(
+        lambda value: "Schiff" if "schiff" in str(value).lower() else "Finalist"
+    )
+    grouped = data.groupby(["stream", "stream_label", "scenario_role", "horizon"], dropna=False)["ape"].mean().reset_index(name="mape")
+    grouped = grouped[grouped["horizon"].between(1, 12)].copy()
+    if horizon is None or horizon.empty:
+        return grouped
+    missing_streams = required_streams.difference(existing_streams)
+    if not missing_streams:
+        return horizon
+    supplement = grouped[grouped["stream_label"].astype(str).isin(missing_streams)]
+    return pd.concat([horizon, supplement], ignore_index=True)
+
+
+def scenario_decision_summary_panel(comparison: pd.DataFrame) -> None:
+    if comparison.empty:
+        chart_card("4. Decision Summary", "Executive view by stream.", empty_figure("Scenario comparison rows are not available."))
+        return
+    table = comparison.copy()
+    table["Recommendation"] = table.apply(
+        lambda row: "Promote"
+        if pd.to_numeric(row.get("quarterly_gain_pp"), errors="coerce") > 0
+        and pd.to_numeric(row.get("annual_gain_pp"), errors="coerce") > 0
+        and (pd.isna(pd.to_numeric(row.get("win_rate"), errors="coerce")) or pd.to_numeric(row.get("win_rate"), errors="coerce") >= 55)
+        else "Needs Stage 2",
+        axis=1,
+    )
+    display = table.rename(
+        columns={
+            "stream_label": "Stream",
+            "quarterly_gain_pp": "Full-sample Qtr Gain",
+            "annual_gain_pp": "Full-sample Annual Gain",
+            "win_rate": "Paired Win Rate",
+        }
+    )[["Stream", "Full-sample Qtr Gain", "Full-sample Annual Gain", "Paired Win Rate", "Recommendation"]]
+    chart_card(
+        "4. Decision Summary",
+        "Gains compare full-sample finalist versus pure Schiff MAPE; win rate uses common forecast-pair validation.",
+        compact_figure(plot_decision_summary_table(display), 240),
+    )
 
 
 def scenario_best_paired_by_stream(paired: pd.DataFrame) -> pd.DataFrame:
@@ -1130,7 +1288,7 @@ def scenario_decision_lens_panel(
 
 
 def scenario_decision_rule_text() -> str:
-    return "positive paired MAPE gain plus challenger win rate above 55%."
+    return "positive full-sample MAPE gain plus paired challenger win rate above 55%."
 
 
 def scenario_drilldown_note(qpred_rows: int, stress_rows: int) -> str:
@@ -1154,67 +1312,43 @@ def render_schiff_benchmark_page(loaded: LoadedRun, controls: dict[str, Any]) ->
     summary = common_filter(loaded.data.get("summary", pd.DataFrame()), controls)
     paired = common_filter(loaded.data.get("paired_vs_schiff", pd.DataFrame()), controls, include_source_variant=False)
     recommended = common_filter(loaded.data.get("recommended", pd.DataFrame()), controls)
-    schiff_rows = summary[summary["is_schiff"]] if not summary.empty and "is_schiff" in summary.columns else pd.DataFrame()
+    schiff_rows = common_filter(loaded.data.get("schiff_df", pd.DataFrame()), controls)
+    comparison = scenario_comparison_frame(recommended, schiff_rows if not schiff_rows.empty else summary, paired)
     gov_kpi_grid(
         basic_cards_as_governance_kpis(
-            schiff_kpi_cards(summary, paired, recommended),
+            schiff_kpi_cards(schiff_rows if not schiff_rows.empty else summary, paired, recommended),
             ["S", "Q", "F", "P"],
             ["good", "mixed", "good", "good"],
         )
     )
 
-    top = st.columns([1.25, 0.85])
+    top = st.columns([1.0, 1.0])
     with top[0]:
         chart_card(
-            "1. Schiff Structural Benchmark: Quarterly vs Annual MAPE",
-            "Pure-Schiff benchmark rows only; residual and blend challengers are not classified as pure Schiff.",
-            compact_figure(plot_schiff_benchmark(summary), 224),
+            "1. Schiff vs Finalist MAPE",
+            "Pure-Schiff structural benchmark versus refined finalist.",
+            compact_figure(plot_schiff_finalist_mape(comparison), 260),
         )
     with top[1]:
-        schiff_replication_notes_panel(paired)
-
-    row = st.columns([1.0, 1.0, 1.0])
-    with row[0]:
         chart_card(
-            "2. Light RUC Cross-Validation Results",
+            "2. Benchmark Horizon Profiles",
             "Horizon MAPE by forecast horizon.",
-            compact_figure(plot_horizon_mape(qpred_for_stream(loaded, controls, "Light RUC volume")), 188),
-        )
-    with row[1]:
-        chart_card(
-            "3. Heavy RUC Cross-Validation Results",
-            "Horizon MAPE by forecast horizon.",
-            compact_figure(plot_horizon_mape(qpred_for_stream(loaded, controls, "Heavy RUC volume")), 188),
-        )
-    with row[2]:
-        chart_card(
-            "4. PED VKT Cross-Validation Results",
-            "Horizon MAPE by forecast horizon.",
-            compact_figure(plot_horizon_mape(qpred_for_stream(loaded, controls, "PED VKT per capita")), 188),
+            compact_figure(plot_horizon_comparison(scenario_horizon_frame(loaded, loaded.data.get("quarterly_predictions", pd.DataFrame()))), 260),
         )
 
-    with st.expander("Full benchmark comparison rows", expanded=False):
-        if paired.empty:
-            warning_panel("No paired-vs-Schiff comparison file is available.")
-        else:
-            best = paired.sort_values("mape_improvement_pct_points", ascending=False).groupby("stream_label", as_index=False).head(1)
-            display = best[
-                [col for col in ["stream_label", "baseline_mape", "challenger_mape", "mape_improvement_pct_points", "challenger_win_rate", "n_common_pairs"] if col in best.columns]
-            ].rename(
-                columns={
-                    "stream_label": "Stream",
-                    "baseline_mape": "Schiff MAPE",
-                    "challenger_mape": "Refined finalist MAPE",
-                    "mape_improvement_pct_points": "Gain vs Schiff",
-                    "challenger_win_rate": "Win rate",
-                    "n_common_pairs": "Common pairs",
-                }
-            )
-            display_table(display, height=260)
-    info_panel(
-        "About the Schiff Benchmark: all MAPE values are percentages and lower is better. Use this page to test "
-        "whether a challenger genuinely beats the structural baseline rather than merely adding a Schiff residual or blend."
-    )
+    bottom = st.columns([1.0, 1.0])
+    with bottom[0]:
+        chart_card(
+            "3. Full-sample Gain vs Schiff",
+            "Full-sample MAPE gain versus pure Schiff; positive values favour the refined finalist.",
+            compact_figure(plot_improvement_vs_benchmark(comparison), 260),
+        )
+    with bottom[1]:
+        chart_card(
+            "4. Benchmark Summary",
+            "Structural benchmark versus refined finalist performance summary.",
+            compact_figure(plot_benchmark_summary_table(comparison), 260),
+        )
 
     with st.expander("Candidate and ensemble evidence drilldown", expanded=False):
         if st.toggle("Load candidate and ensemble evidence", value=False, key="lazy_schiff_candidate_ensemble"):

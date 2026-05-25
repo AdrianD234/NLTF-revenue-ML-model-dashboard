@@ -165,7 +165,7 @@ def test_scenario_kpi_cards_lift_decision_metrics(loaded_validation_run: LoadedR
     assert all(card[1] for card in cards)
     gain_card = cards[2]
     assert gain_card[1].endswith(" pp")
-    assert "Scenario A vs pure Schiff" in gain_card[2]
+    assert "paired win" in gain_card[2]
     assert gain_card[3] in {"A better", "Schiff better"}
     assert "streams beat pure Schiff" in cards[-1][2]
 
@@ -214,7 +214,7 @@ def test_scenario_decision_lens_summary_is_concise(loaded_validation_run: Loaded
 def test_scenario_decision_rule_text_explains_beats_schiff_badge() -> None:
     rule = scenario_decision_rule_text()
 
-    assert "positive paired MAPE gain" in rule
+    assert "positive full-sample MAPE gain" in rule
     assert "win rate above 55%" in rule
 
 
@@ -234,10 +234,10 @@ def test_overview_kpi_cards_explain_pure_schiff_and_diagnostics(loaded_validatio
 
     cards = overview_kpi_cards(data["summary"], data["recommended"], story, data["errors"])
 
-    governance_card = next(card for card in cards if card[0] == "Governance Score")
+    governance_card = next(card for card in cards if card[0] == "Benchmark Pass")
     assert "beat pure Schiff" in governance_card[2]
     assert "logged diagnostics" in governance_card[3]
-    assert governance_card[1].endswith("/100")
+    assert "/" in governance_card[1]
 
 
 def test_overview_frontier_note_is_data_backed(loaded_validation_run: LoadedRun) -> None:
@@ -719,7 +719,7 @@ def test_residual_vs_fitted_proxy_is_populated(loaded_validation_run: LoadedRun)
     figure = plot_residual_vs_fitted(qpred)
 
     assert len(figure.data) > 0
-    assert "Residuals vs fitted proxy" in str(figure.layout.title.text)
+    assert "Residuals vs fitted by stream" in str(figure.layout.title.text)
     assert "Fitted value" in str(figure.layout.xaxis.title.text)
 
 

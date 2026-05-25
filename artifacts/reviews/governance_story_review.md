@@ -20,7 +20,7 @@ The latest arbitration finalists are:
 |---|---|---:|---:|
 | PED VKT per capita | `PED__solver_static_convex_top18` | 2.47% | 2.39% |
 | Light RUC volume | `LIGHT_RUC__solver_static_convex_top18` | 9.15% | 6.00% |
-| Heavy RUC volume | `HEAVY_RUC__solver_static_convex_top18` | 3.56% | 3.17% |
+| Heavy RUC volume | `HEAVY_RUC__RECON_STATIC_REBUILT` | 3.48% | 3.02% |
 
 ### Did it beat Schiff?
 

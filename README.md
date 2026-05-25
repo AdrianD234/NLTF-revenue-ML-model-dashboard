@@ -115,4 +115,4 @@ Use the PowerShell verification loop before declaring dashboard work complete:
 .\scripts\verify_dashboard.ps1
 ```
 
-The script uses the Codex bundled Python runtime by default, runs `compileall`, runs the fast pytest/AppTest suite, checks or starts Streamlit on `http://localhost:8501`, then runs the Playwright browser test. The project-level agent instruction is in `AGENTS.md`.
+The script uses the Codex bundled Python runtime by default, runs `compileall`, runs the fast pytest/AppTest suite, checks or starts Streamlit on `http://localhost:8502`, then runs the Playwright browser test. The project-level agent instruction is in `AGENTS.md`.

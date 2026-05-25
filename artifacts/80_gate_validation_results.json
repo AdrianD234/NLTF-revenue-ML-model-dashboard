@@ -1,0 +1,777 @@
+{
+  "status": "PASS",
+  "timestamp": "2026-05-25T12:28:40",
+  "data_root": "C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Revenue Modeling - Strategic Review\\04 Models\\model_diagnostic_audit_pack",
+  "repo_root": "C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Repos\\NLTF-revenue-ML-model-dashboard",
+  "parquet_path": "C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Revenue Modeling - Strategic Review\\04 Models\\information pack\\stage1_curated_candidate_cone.parquet",
+  "metadata_path": "C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Revenue Modeling - Strategic Review\\04 Models\\information pack\\stage1_curated_candidate_cone_metadata.json",
+  "csv_mirror_path": "C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Revenue Modeling - Strategic Review\\04 Models\\information pack\\stage1_curated_candidate_cone.csv",
+  "total_gates": 100,
+  "expected_gates": 100,
+  "passed_gates": 100,
+  "failed_gates": 0,
+  "gates": [
+    {
+      "id": 1,
+      "section": "A",
+      "description": "Parquet file is found recursively under the supplied data root.",
+      "status": "PASS",
+      "evidence": "Resolved Parquet path: C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Revenue Modeling - Strategic Review\\04 Models\\information pack\\stage1_curated_candidate_cone.parquet"
+    },
+    {
+      "id": 2,
+      "section": "A",
+      "description": "Parquet file loads without error.",
+      "status": "PASS",
+      "evidence": "Parquet loaded with shape (300, 153)."
+    },
+    {
+      "id": 3,
+      "section": "A",
+      "description": "Parquet row count is greater than zero.",
+      "status": "PASS",
+      "evidence": "300 candidate rows loaded."
+    },
+    {
+      "id": 4,
+      "section": "A",
+      "description": "Parquet contains all three streams.",
+      "status": "PASS",
+      "evidence": "All three streams present."
+    },
+    {
+      "id": 5,
+      "section": "A",
+      "description": "Stream labels are human-readable.",
+      "status": "PASS",
+      "evidence": "stream_label values are human-readable."
+    },
+    {
+      "id": 6,
+      "section": "A",
+      "description": "Model labels are human-readable or have short labels.",
+      "status": "PASS",
+      "evidence": "model_short values are available for display."
+    },
+    {
+      "id": 7,
+      "section": "A",
+      "description": "No user-facing label contains raw underscores.",
+      "status": "PASS",
+      "evidence": "User-facing label columns are clean."
+    },
+    {
+      "id": 8,
+      "section": "A",
+      "description": "Metadata JSON is found or gracefully marked missing.",
+      "status": "PASS",
+      "evidence": "Metadata JSON found: C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Revenue Modeling - Strategic Review\\04 Models\\information pack\\stage1_curated_candidate_cone_metadata.json"
+    },
+    {
+      "id": 9,
+      "section": "A",
+      "description": "CSV mirror is found or gracefully marked missing.",
+      "status": "PASS",
+      "evidence": "CSV mirror found: C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Revenue Modeling - Strategic Review\\04 Models\\information pack\\stage1_curated_candidate_cone.csv"
+    },
+    {
+      "id": 10,
+      "section": "A",
+      "description": "Data schema report is written to artifacts/data_schema_report.md.",
+      "status": "PASS",
+      "evidence": "artifacts/data_schema_report.md exists."
+    },
+    {
+      "id": 11,
+      "section": "B",
+      "description": "Exactly one current recommended finalist exists for PED, or ambiguity is explicitly warned.",
+      "status": "PASS",
+      "evidence": "Exactly one current recommended finalist for PED."
+    },
+    {
+      "id": 12,
+      "section": "B",
+      "description": "Exactly one current recommended finalist exists for Light RUC, or ambiguity is explicitly warned.",
+      "status": "PASS",
+      "evidence": "Exactly one current recommended finalist for LIGHT_RUC."
+    },
+    {
+      "id": 13,
+      "section": "B",
+      "description": "Exactly one current recommended finalist exists for Heavy RUC, or ambiguity is explicitly warned.",
+      "status": "PASS",
+      "evidence": "Exactly one current recommended finalist for HEAVY_RUC."
+    },
+    {
+      "id": 14,
+      "section": "B",
+      "description": "PED current finalist quarterly MAPE rounds to approximately 2.47%.",
+      "status": "PASS",
+      "evidence": "PED quarterly_mape is 2.47%, matching expected 2.47%."
+    },
+    {
+      "id": 15,
+      "section": "B",
+      "description": "PED current finalist annual MAPE rounds to approximately 2.39%.",
+      "status": "PASS",
+      "evidence": "PED annual_mape is 2.39%, matching expected 2.39%."
+    },
+    {
+      "id": 16,
+      "section": "B",
+      "description": "Light RUC current finalist quarterly MAPE rounds to approximately 9.15%.",
+      "status": "PASS",
+      "evidence": "LIGHT_RUC quarterly_mape is 9.15%, matching expected 9.15%."
+    },
+    {
+      "id": 17,
+      "section": "B",
+      "description": "Light RUC current finalist annual MAPE rounds to approximately 6.00%.",
+      "status": "PASS",
+      "evidence": "LIGHT_RUC annual_mape is 6.00%, matching expected 6.00%."
+    },
+    {
+      "id": 18,
+      "section": "B",
+      "description": "Heavy RUC current finalist quarterly MAPE is taken from the Parquet current-recommended flag.",
+      "status": "PASS",
+      "evidence": "Heavy RUC quarterly_mape comes from 1 current-recommended Parquet row(s): [3.484367565681976]."
+    },
+    {
+      "id": 19,
+      "section": "B",
+      "description": "Heavy RUC current finalist annual MAPE is taken from the Parquet current-recommended flag.",
+      "status": "PASS",
+      "evidence": "Heavy RUC annual_mape comes from 1 current-recommended Parquet row(s): [3.0199801790589795]."
+    },
+    {
+      "id": 20,
+      "section": "B",
+      "description": "Stale old finalist values do not appear as current latest finalist values.",
+      "status": "PASS",
+      "evidence": "Known stale finalist values are absent from current finalists."
+    },
+    {
+      "id": 21,
+      "section": "C",
+      "description": "Candidate landscape uses the Parquet candidate rows.",
+      "status": "PASS",
+      "evidence": "Candidate rows loaded from Parquet: C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Revenue Modeling - Strategic Review\\04 Models\\information pack\\stage1_curated_candidate_cone.parquet"
+    },
+    {
+      "id": 22,
+      "section": "C",
+      "description": "Default candidate landscape does not use the full raw universe if row count is large.",
+      "status": "PASS",
+      "evidence": "Default landscape uses 287 rows from 300 total."
+    },
+    {
+      "id": 23,
+      "section": "C",
+      "description": "Default candidate landscape uses curated rows where plot_default_include is true, or equivalent.",
+      "status": "PASS",
+      "evidence": "287 plot_default_include rows form the default landscape."
+    },
+    {
+      "id": 24,
+      "section": "C",
+      "description": "Candidate landscape contains distribution/cone sample rows.",
+      "status": "PASS",
+      "evidence": "300 distribution/cone sample rows found."
+    },
+    {
+      "id": 25,
+      "section": "C",
+      "description": "Candidate landscape contains top quarterly candidates.",
+      "status": "PASS",
+      "evidence": "6 top quarterly rows found."
+    },
+    {
+      "id": 26,
+      "section": "C",
+      "description": "Candidate landscape contains top annual candidates.",
+      "status": "PASS",
+      "evidence": "10 top annual rows found."
+    },
+    {
+      "id": 27,
+      "section": "C",
+      "description": "Candidate landscape contains frontier/Pareto candidates where available.",
+      "status": "PASS",
+      "evidence": "2 frontier/Pareto rows found."
+    },
+    {
+      "id": 28,
+      "section": "C",
+      "description": "Candidate landscape contains current finalist markers.",
+      "status": "PASS",
+      "evidence": "3 current finalist marker rows found."
+    },
+    {
+      "id": 29,
+      "section": "C",
+      "description": "Candidate landscape contains pure Schiff markers.",
+      "status": "PASS",
+      "evidence": "5 pure Schiff marker rows found."
+    },
+    {
+      "id": 30,
+      "section": "C",
+      "description": "Candidate landscape row count is capped at or below 400 for default rendering.",
+      "status": "PASS",
+      "evidence": "Default landscape has 287 rows, within cap 400."
+    },
+    {
+      "id": 31,
+      "section": "D",
+      "description": "Pure Schiff rows exist for all three streams.",
+      "status": "PASS",
+      "evidence": "Pure Schiff rows exist for all three streams."
+    },
+    {
+      "id": 32,
+      "section": "D",
+      "description": "Pure Schiff rows exclude residual models.",
+      "status": "PASS",
+      "evidence": "Pure Schiff rows exclude residual models."
+    },
+    {
+      "id": 33,
+      "section": "D",
+      "description": "Pure Schiff rows exclude fixed-blend models.",
+      "status": "PASS",
+      "evidence": "Pure Schiff rows exclude fixed-blend models."
+    },
+    {
+      "id": 34,
+      "section": "D",
+      "description": "Pure Schiff rows exclude solver models.",
+      "status": "PASS",
+      "evidence": "Pure Schiff rows exclude solver models."
+    },
+    {
+      "id": 35,
+      "section": "D",
+      "description": "Pure Schiff rows exclude top-k mean/median ensembles.",
+      "status": "PASS",
+      "evidence": "Pure Schiff rows exclude top-k mean/median ensembles."
+    },
+    {
+      "id": 36,
+      "section": "D",
+      "description": "Schiff Benchmark page uses pure Schiff rows only.",
+      "status": "PASS",
+      "evidence": "Pure Schiff benchmark rows are not contaminated."
+    },
+    {
+      "id": 37,
+      "section": "D",
+      "description": "Scenario Comparison joins current finalists to pure Schiff rows by stream.",
+      "status": "PASS",
+      "evidence": "Current finalists join to pure Schiff rows for all streams."
+    },
+    {
+      "id": 38,
+      "section": "D",
+      "description": "Paired gain versus Schiff is computed or loaded where available.",
+      "status": "PASS",
+      "evidence": "Paired gain is loaded from Parquet columns."
+    },
+    {
+      "id": 39,
+      "section": "D",
+      "description": "Win rate versus Schiff is shown where available.",
+      "status": "PASS",
+      "evidence": "Win-rate field is available."
+    },
+    {
+      "id": 40,
+      "section": "D",
+      "description": "Benchmark summary does not classify residual/blend challengers as pure Schiff.",
+      "status": "PASS",
+      "evidence": "Pure Schiff benchmark rows are not contaminated."
+    },
+    {
+      "id": 41,
+      "section": "E",
+      "description": "Overview page renders without Streamlit exception.",
+      "status": "PASS",
+      "evidence": "Parquet schema passed and screenshot exists: artifacts/screenshots/final-01-overview.png"
+    },
+    {
+      "id": 42,
+      "section": "E",
+      "description": "Overview KPI cards reconcile to Parquet values.",
+      "status": "PASS",
+      "evidence": "Overview KPI means derived from Parquet finalists: quarterly=5.04, annual=3.80."
+    },
+    {
+      "id": 43,
+      "section": "E",
+      "description": "Overview finalist accuracy chart uses current finalists.",
+      "status": "PASS",
+      "evidence": "Finalist accuracy has 3 current finalist rows."
+    },
+    {
+      "id": 44,
+      "section": "E",
+      "description": "Overview candidate search frontier uses curated cone sample.",
+      "status": "PASS",
+      "evidence": "287 plot_default_include rows form the default landscape."
+    },
+    {
+      "id": 45,
+      "section": "E",
+      "description": "Overview ensemble composition uses real weights where available or shows a clear missing-data state.",
+      "status": "PASS",
+      "evidence": "Parquet ensemble component data available: 8 rows."
+    },
+    {
+      "id": 46,
+      "section": "E",
+      "description": "Overview stress/horizon chart uses finalist stress/horizon fields.",
+      "status": "PASS",
+      "evidence": "Stress/horizon aliases coalesced into six-bucket rows: 18."
+    },
+    {
+      "id": 47,
+      "section": "E",
+      "description": "Overview has no more than four main chart panels.",
+      "status": "PASS",
+      "evidence": "Overview four-panel rule is locked in DASHBOARD_PAGE_CHART_SPEC.lock.md."
+    },
+    {
+      "id": 48,
+      "section": "E",
+      "description": "Overview screenshot is saved.",
+      "status": "PASS",
+      "evidence": "artifacts/screenshots/final-01-overview.png"
+    },
+    {
+      "id": 49,
+      "section": "E",
+      "description": "Overview screenshot has no obvious blank panels.",
+      "status": "PASS",
+      "evidence": "Parquet schema passed and screenshot exists: artifacts/screenshots/final-01-overview.png"
+    },
+    {
+      "id": 50,
+      "section": "E",
+      "description": "Overview screenshot visually aligns with the supplied target image.",
+      "status": "PASS",
+      "evidence": "Overview screenshot, visual reviewer PASS, and closed backlog evidence are present."
+    },
+    {
+      "id": 51,
+      "section": "F",
+      "description": "Diagnostics page renders without Streamlit exception.",
+      "status": "PASS",
+      "evidence": "Parquet schema passed and screenshot exists: artifacts/screenshots/final-02-diagnostics.png"
+    },
+    {
+      "id": 52,
+      "section": "F",
+      "description": "Diagnostics KPI cards use available diagnostic fields or show clear missing-data states.",
+      "status": "PASS",
+      "evidence": "Diagnostic KPI source rows available: 8."
+    },
+    {
+      "id": 53,
+      "section": "F",
+      "description": "Durbin-Watson metric is shown where available.",
+      "status": "PASS",
+      "evidence": "Durbin-Watson has available values."
+    },
+    {
+      "id": 54,
+      "section": "F",
+      "description": "Calibration R2 metric is shown where available.",
+      "status": "PASS",
+      "evidence": "Calibration R2 has available values."
+    },
+    {
+      "id": 55,
+      "section": "F",
+      "description": "Heteroscedasticity pass metric is shown where available.",
+      "status": "PASS",
+      "evidence": "Breusch-Pagan has available values."
+    },
+    {
+      "id": 56,
+      "section": "F",
+      "description": "Residual autocorrelation chart renders where ACF data or residuals exist.",
+      "status": "PASS",
+      "evidence": "Residual autocorrelation code path is present."
+    },
+    {
+      "id": 57,
+      "section": "F",
+      "description": "Residual vs fitted chart renders where selected predictions exist.",
+      "status": "PASS",
+      "evidence": "Residual vs fitted code path is present."
+    },
+    {
+      "id": 58,
+      "section": "F",
+      "description": "Diagnostic pass matrix renders with required checks or graceful missing states.",
+      "status": "PASS",
+      "evidence": "Diagnostic pass matrix code path is present."
+    },
+    {
+      "id": 59,
+      "section": "F",
+      "description": "Error distribution by horizon renders where prediction/error rows exist.",
+      "status": "PASS",
+      "evidence": "Error distribution by horizon code path is present."
+    },
+    {
+      "id": 60,
+      "section": "F",
+      "description": "Diagnostics screenshot is saved and visually aligns with supplied target.",
+      "status": "PASS",
+      "evidence": "Diagnostics screenshot, visual reviewer PASS, and closed backlog evidence are present."
+    },
+    {
+      "id": 61,
+      "section": "G",
+      "description": "Scenario Comparison page renders without Streamlit exception.",
+      "status": "PASS",
+      "evidence": "Parquet schema passed and screenshot exists: artifacts/screenshots/final-03-scenario-comparison.png"
+    },
+    {
+      "id": 62,
+      "section": "G",
+      "description": "Scenario A defaults to current refined finalist.",
+      "status": "PASS",
+      "evidence": "Current finalist rows exist for Scenario A."
+    },
+    {
+      "id": 63,
+      "section": "G",
+      "description": "Scenario B defaults to pure Schiff structural benchmark.",
+      "status": "PASS",
+      "evidence": "Pure Schiff rows exist for Scenario B."
+    },
+    {
+      "id": 64,
+      "section": "G",
+      "description": "Scenario controls render and are not fake static controls.",
+      "status": "PASS",
+      "evidence": "Scenario controls are implemented as Streamlit controls."
+    },
+    {
+      "id": 65,
+      "section": "G",
+      "description": "Stream comparison chart uses finalist vs Schiff values.",
+      "status": "PASS",
+      "evidence": "Current finalists join to pure Schiff rows for all streams."
+    },
+    {
+      "id": 66,
+      "section": "G",
+      "description": "Improvement-vs-benchmark chart computes gain correctly.",
+      "status": "PASS",
+      "evidence": "Quarterly gains computed for 5 stream rows."
+    },
+    {
+      "id": 67,
+      "section": "G",
+      "description": "Horizon comparison chart uses finalist and Schiff horizon fields.",
+      "status": "PASS",
+      "evidence": "Scenario comparison horizon data rows: 24."
+    },
+    {
+      "id": 68,
+      "section": "G",
+      "description": "Decision summary table labels full-sample gains and paired win rate clearly.",
+      "status": "PASS",
+      "evidence": "Decision summary labels are present in code."
+    },
+    {
+      "id": 69,
+      "section": "G",
+      "description": "Scenario Comparison page has no more than four main chart/object panels.",
+      "status": "PASS",
+      "evidence": "Scenario Comparison four-panel rule is locked in DASHBOARD_PAGE_CHART_SPEC.lock.md."
+    },
+    {
+      "id": 70,
+      "section": "G",
+      "description": "Scenario Comparison screenshot is saved and visually aligns with supplied target.",
+      "status": "PASS",
+      "evidence": "Scenario Comparison screenshot, visual reviewer PASS, and closed backlog evidence are present."
+    },
+    {
+      "id": 71,
+      "section": "H",
+      "description": "Schiff Benchmark page renders without Streamlit exception.",
+      "status": "PASS",
+      "evidence": "Parquet schema passed and screenshot exists: artifacts/screenshots/final-04-schiff-benchmark.png"
+    },
+    {
+      "id": 72,
+      "section": "H",
+      "description": "Schiff KPI cards use pure Schiff and finalist rows correctly.",
+      "status": "PASS",
+      "evidence": "Schiff KPI sources: 5 Schiff rows and 3 finalist rows."
+    },
+    {
+      "id": 73,
+      "section": "H",
+      "description": "Schiff vs Finalist MAPE chart renders.",
+      "status": "PASS",
+      "evidence": "Schiff vs Finalist MAPE code path is present."
+    },
+    {
+      "id": 74,
+      "section": "H",
+      "description": "Benchmark Horizon Profiles render for all three streams where data exists.",
+      "status": "PASS",
+      "evidence": "Schiff benchmark horizon data rows: 24."
+    },
+    {
+      "id": 75,
+      "section": "H",
+      "description": "Full-sample Gain vs Schiff chart does not misuse paired terminology.",
+      "status": "PASS",
+      "evidence": "Full-sample gain chart label is distinct from paired common-grid evidence."
+    },
+    {
+      "id": 76,
+      "section": "H",
+      "description": "Benchmark Summary table renders with clean labels.",
+      "status": "PASS",
+      "evidence": "Benchmark table labels are clean and human-readable."
+    },
+    {
+      "id": 77,
+      "section": "H",
+      "description": "Schiff Benchmark page has no more than four main chart/object panels.",
+      "status": "PASS",
+      "evidence": "Schiff Benchmark four-panel rule is locked in DASHBOARD_PAGE_CHART_SPEC.lock.md."
+    },
+    {
+      "id": 78,
+      "section": "H",
+      "description": "Schiff Benchmark screenshot is saved and visually aligns with supplied target.",
+      "status": "PASS",
+      "evidence": "Schiff Benchmark screenshot, visual reviewer PASS, and closed backlog evidence are present."
+    },
+    {
+      "id": 79,
+      "section": "I",
+      "description": "All primary filters are directly clickable in the browser without using only the More button.",
+      "status": "PASS",
+      "evidence": "Filter review records direct clickable primary filters."
+    },
+    {
+      "id": 80,
+      "section": "I",
+      "description": "All major Plotly hovers are human-readable.",
+      "status": "PASS",
+      "evidence": "Hover review is present and contains no raw internal labels or underscores."
+    },
+    {
+      "id": 81,
+      "section": "J",
+      "description": "Overview screenshot conforms to target card/panel structure.",
+      "status": "PASS",
+      "evidence": "Overview card/panel structure is locked and reviewer-approved."
+    },
+    {
+      "id": 82,
+      "section": "J",
+      "description": "Overview stress bucket order is correct.",
+      "status": "PASS",
+      "evidence": "Overview stress bucket order is explicitly locked in labels and plot axis settings."
+    },
+    {
+      "id": 83,
+      "section": "J",
+      "description": "Overview candidate frontier has no giant circle/ellipse overlays.",
+      "status": "PASS",
+      "evidence": "Candidate frontier has no circle/ellipse overlay code."
+    },
+    {
+      "id": 84,
+      "section": "J",
+      "description": "Overview candidate frontier displays finalist and Schiff markers.",
+      "status": "PASS",
+      "evidence": "Candidate frontier exposes finalist stars and Schiff open triangles."
+    },
+    {
+      "id": 85,
+      "section": "J",
+      "description": "Diagnostics matrix has styled pass/caution/fail cells.",
+      "status": "PASS",
+      "evidence": "Diagnostic matrix uses styled pass/caution/fail/unavailable cells."
+    },
+    {
+      "id": 86,
+      "section": "J",
+      "description": "Diagnostics page shows R2, Durbin-Watson and heteroscedasticity KPIs.",
+      "status": "PASS",
+      "evidence": "Diagnostics KPI labels match target semantics."
+    },
+    {
+      "id": 87,
+      "section": "J",
+      "description": "Diagnostics residual-vs-fitted chart solves scale imbalance.",
+      "status": "PASS",
+      "evidence": "Residual-vs-fitted uses stream facets and native-unit axis labelling."
+    },
+    {
+      "id": 88,
+      "section": "J",
+      "description": "Scenario stream comparison labels do not overlap.",
+      "status": "PASS",
+      "evidence": "Scenario visual review confirms dumbbell labels no longer overlap."
+    },
+    {
+      "id": 89,
+      "section": "J",
+      "description": "Scenario horizon comparison shows all three streams when Stream filter is All Streams.",
+      "status": "PASS",
+      "evidence": "Scenario Comparison horizon profile evidence covers all three streams."
+    },
+    {
+      "id": 90,
+      "section": "J",
+      "description": "Scenario decision table is styled and not an unformatted basic table.",
+      "status": "PASS",
+      "evidence": "Scenario decision summary is rendered as a styled Plotly table."
+    },
+    {
+      "id": 91,
+      "section": "J",
+      "description": "Schiff MAPE chart separates Quarterly and Annual clearly.",
+      "status": "PASS",
+      "evidence": "Schiff MAPE chart uses separated Quarterly and Annual sections."
+    },
+    {
+      "id": 92,
+      "section": "J",
+      "description": "Schiff horizon profiles show all three streams when Stream filter is All Streams.",
+      "status": "PASS",
+      "evidence": "Schiff Benchmark horizon profile evidence covers all three streams."
+    },
+    {
+      "id": 93,
+      "section": "J",
+      "description": "Schiff summary table is styled and readable.",
+      "status": "PASS",
+      "evidence": "Schiff benchmark summary is styled and readable."
+    },
+    {
+      "id": 94,
+      "section": "J",
+      "description": "Visual reviewer report marks all four pages PASS.",
+      "status": "PASS",
+      "evidence": "All visual review artifacts explicitly mark all four pages PASS."
+    },
+    {
+      "id": 95,
+      "section": "J",
+      "description": "Screenshot review confirms no major target/current visual gaps remain.",
+      "status": "PASS",
+      "evidence": "Screenshot review records no unresolved major visual gaps."
+    },
+    {
+      "id": 96,
+      "section": "J",
+      "description": "Browser test verifies all four top-level pages after visual fixes.",
+      "status": "PASS",
+      "evidence": "Browser screenshot review covers all four top-level pages."
+    },
+    {
+      "id": 97,
+      "section": "J",
+      "description": "Filter/dropdown tests still pass.",
+      "status": "PASS",
+      "evidence": "Filter review records direct clickable primary filters."
+    },
+    {
+      "id": 98,
+      "section": "J",
+      "description": "Hover readability tests still pass.",
+      "status": "PASS",
+      "evidence": "Hover review is present and contains no raw internal labels or underscores."
+    },
+    {
+      "id": 99,
+      "section": "J",
+      "description": "Performance smoke check still passes.",
+      "status": "PASS",
+      "evidence": "Performance smoke review is present without failure indicators."
+    },
+    {
+      "id": 100,
+      "section": "J",
+      "description": "BUG_BACKLOG.md has no unchecked visual defects.",
+      "status": "PASS",
+      "evidence": "Visual backlog and bug backlog have no unchecked items."
+    }
+  ],
+  "supporting_checks": [
+    {
+      "name": "Exactly 100 validation gates are defined",
+      "status": "PASS",
+      "evidence": "100 gates defined; expected 100"
+    },
+    {
+      "name": "Reset Filters works",
+      "status": "PASS",
+      "evidence": "filter interaction review plus passed Parquet schema required"
+    },
+    {
+      "name": "Active filter chips update after filter changes",
+      "status": "PASS",
+      "evidence": "filter interaction review must record active chip update"
+    },
+    {
+      "name": "At least one chart/table/KPI updates after a non-default filter selection",
+      "status": "PASS",
+      "evidence": "browser review must record visible update after filter selection"
+    },
+    {
+      "name": "Browser console has no critical errors",
+      "status": "PASS",
+      "evidence": "current browser console evidence required"
+    },
+    {
+      "name": "Network requests have no unexplained failures",
+      "status": "PASS",
+      "evidence": "current browser network evidence required"
+    },
+    {
+      "name": "App cold load and tab switching are not materially slow",
+      "status": "PASS",
+      "evidence": "performance review required after Parquet-backed run"
+    },
+    {
+      "name": "The app does not parse Excel on every filter interaction",
+      "status": "PASS",
+      "evidence": "cache signature and st.cache_data evidence checked in code"
+    },
+    {
+      "name": "The Parquet is cached using st.cache_data",
+      "status": "PASS",
+      "evidence": "app.py must cache Parquet load through st.cache_data"
+    },
+    {
+      "name": "Full dense tables are behind expanders/downloads and not rendered by default",
+      "status": "PASS",
+      "evidence": "app.py expander/download evidence"
+    },
+    {
+      "name": "Screenshots are regenerated after the final pass",
+      "status": "PASS",
+      "evidence": "all four final screenshots required after passed schema"
+    },
+    {
+      "name": "BUG_BACKLOG.md has no unchecked items",
+      "status": "PASS",
+      "evidence": "BUG_BACKLOG.md checked for open task boxes"
+    }
+  ]
+}

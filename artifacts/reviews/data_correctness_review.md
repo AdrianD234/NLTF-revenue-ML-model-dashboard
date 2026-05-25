@@ -14,7 +14,7 @@ The dashboard now defaults to:
 |---|---|---:|---:|---:|---|
 | PED VKT per capita | `PED__solver_static_convex_top18` | 2.47358 | 2.38709 | 1.50491 | Pass |
 | Light RUC volume | `LIGHT_RUC__solver_static_convex_top18` | 9.14755 | 5.99950 | 0.738125 | Pass |
-| Heavy RUC volume | `HEAVY_RUC__solver_static_convex_top18` | 3.56092 | 3.17141 | 0.165850 | Pass |
+| Heavy RUC volume | `HEAVY_RUC__RECON_STATIC_REBUILT` | 3.48437 | 3.01998 | Current Parquet | Pass |
 
 ## Data-pack checks
 

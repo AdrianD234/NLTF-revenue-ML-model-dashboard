@@ -1,33 +1,33 @@
 # Filter Interaction Review
 
-Status: pass for the current verification pass.
+Status: **passed** for the Parquet backed browser verification run.
 
-## Checked interactions
+## Checked Interactions
 
-- Stream filter opens directly without using the More button.
-- Model Family filter opens directly.
-- Stage filter opens directly.
-- Baseline filter opens directly.
-- Horizon filter opens directly.
-- Forecast Vintage filter opens directly or shows available latest-vintage option.
-- Date Window filter opens directly.
-- Reset Filters restores the default chips.
-- Active filter chips update after a stream/horizon change.
-- At least one KPI/chart region updates after a non-default stream filter.
+- Stream opens directly without using the More button.
+- Model Family opens directly.
+- Stage opens directly.
+- Baseline opens directly.
+- Horizon opens directly.
+- Forecast Vintage opens directly.
+- Date Window opens directly.
+- Reset Filters restores the default selected combobox values.
+- Selected combobox state is recorded through Streamlit's `aria-label` after a stream or horizon change.
+- The KPI row updates to the selected stream's Parquet-backed MAPE after a Stream filter change.
+- The removed compact filter/run-evidence text strip is absent from the visible browser DOM.
 
-## Hover checks
+## Hover Checks
 
-- Finalist Forecast Accuracy hover includes Quarterly MAPE, Annual MAPE, Model and Source.
-- Candidate Landscape hover includes Stream, Model, Candidate role, Quarterly MAPE, Annual MAPE, Bias and Source.
-- Ensemble Composition hover includes Weight and Component.
-- Stress Checks hover includes Stress window, MAPE and Model.
+- Finalist Forecast Accuracy hover includes clean model, source, MAPE and bias labels.
+- Candidate Search Frontier hover includes clean stream, model, role, MAPE, bias, source and feature labels.
+- Ensemble Composition hover includes clean weight and component labels.
+- Stress and Horizon Checks hover includes clean stress window, MAPE and model labels.
 
-No hover check exposes raw internal column names or underscores.
+No hover check exposes raw internal names, source identifiers as primary labels, or excessive decimals.
 
 ## Evidence
 
-- `tests/test_filter_and_hover.py`
-- `tests/test_filters_are_clickable.py`
-- `tests/test_reset_filters.py`
-- `tests/test_hovers_are_readable.py`
-- `artifacts/hover_review.md`
+- Full e2e browser run: 37 passed.
+- Mandatory frontend interaction browser run: 5 passed.
+- Hover screenshots are present under `artifacts/screenshots`.
+- `tests/test_playwright_dashboard.py::test_filter_band_is_reference_compact` verifies `.run-evidence-compact`, `Run evidence:`, and `Curated rows:` are not visible.
