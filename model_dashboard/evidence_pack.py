@@ -14,7 +14,7 @@ from .data.config import DashboardData, DEFAULT_EVIDENCE_PACK_ROOT
 from .data.diagnostics import DEFAULT_ACF_RESIDUAL_SCOPE, select_diagnostic_acf_scope
 from .data.manifest import write_data_source_manifest
 from .data.transforms import normalise_parquet_candidate
-from .labels import STRESS_BUCKET_ORDER
+from .labels import STRESS_BUCKET_ORDER, is_legacy_schiff_style_text
 from .metrics import add_stream_fields, normalise_paired, normalise_predictions, normalise_stress, normalise_weights, scale_percent_columns
 
 
@@ -48,13 +48,11 @@ def resolve_evidence_pack_root(root: str | Path | None = None) -> Path:
     or one level up as stage1_dashboard_evidence_pack_v1/dashboard_evidence_pack.
     """
     requested = Path(root or DEFAULT_EVIDENCE_PACK_ROOT).expanduser()
-    downloads = Path.home() / "Downloads"
     candidates = [
         requested,
         requested / "dashboard_evidence_pack",
         requested / "stage1_dashboard_evidence_pack_v1" / "dashboard_evidence_pack",
-        downloads / "dashboard_evidence_pack",
-        downloads / "stage1_dashboard_evidence_pack_v1" / "dashboard_evidence_pack",
+        requested / "stage1_dashboard_evidence_pack_schiff_spec_v2" / "dashboard_evidence_pack",
     ]
     for candidate in candidates:
         if (candidate / "manifest.json").exists() and (candidate / "data").is_dir():
@@ -114,12 +112,14 @@ def load_evidence_pack(root: str | Path | None = None, repo_root: str | Path | N
     summary = candidate[default_mask].copy() if default_mask.any() else candidate.copy()
     if "is_extreme_outlier" in summary.columns:
         summary = summary[~summary["is_extreme_outlier"].fillna(False).astype(bool)].copy()
+    if "is_legacy_schiff_style" in summary.columns:
+        summary = summary[~summary["is_legacy_schiff_style"].fillna(False).astype(bool)].copy()
 
     curated_manifest = pd.DataFrame(
         [
             {
                 "created_at": manifest.get("created_at"),
-                "source": "dashboard_evidence_pack_v1",
+                "source": manifest.get("schema_version", "dashboard_evidence_pack"),
                 "source_file": "manifest.json",
                 "parquet_path": str(pack_root),
                 "metadata_path": str(manifest_path),
@@ -182,6 +182,16 @@ def _normalise_candidate(frame: pd.DataFrame) -> pd.DataFrame:
     out["stage"] = "final"
     out["variant"] = out.get("feature_set", pd.Series("Evidence pack", index=out.index)).fillna("Evidence pack")
     out["source_file"] = "candidate_cone.parquet"
+    out["is_legacy_schiff_style"] = out.apply(
+        lambda row: is_legacy_schiff_style_text(
+            row.get("model"),
+            row.get("model_short"),
+            row.get("candidate_role"),
+            row.get("source_family"),
+            row.get("feature_set"),
+        ),
+        axis=1,
+    )
     return out
 
 

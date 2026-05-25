@@ -30,9 +30,11 @@ from model_dashboard.data.diagnostics import (
 from model_dashboard.labels import (
     DEFAULT_INPUT_PARENT,
     IGNORED_RUN_FOLDER_NAMES,
+    SCHIFF_SPEC_BENCHMARK_LABEL,
     TERM_HELP,
     format_count,
     format_percent,
+    is_legacy_schiff_style_text,
     model_alias,
     shorten_model_name,
 )
@@ -390,7 +392,7 @@ def render_top_filter_bar(loaded: LoadedRun, controls: dict[str, Any]) -> dict[s
                 "Baseline",
                 baseline_options,
                 key="top_baseline",
-                format_func=lambda value: {"Finalist": "Refined Finalist", "Schiff": "Schiff Benchmark"}.get(str(value), str(value)),
+                format_func=lambda value: {"Finalist": "Refined Finalist", "Schiff": SCHIFF_SPEC_BENCHMARK_LABEL}.get(str(value), str(value)),
             )
         with filter_cols[4]:
             st.selectbox(
@@ -434,7 +436,7 @@ def render_top_filter_bar(loaded: LoadedRun, controls: dict[str, Any]) -> dict[s
         date_choice = st.session_state["top_date_window"]
         baseline_label = {
             "Finalist": "Refined Finalist",
-            "Schiff": "Schiff Benchmark",
+            "Schiff": SCHIFF_SPEC_BENCHMARK_LABEL,
         }.get(str(baseline_choice), str(baseline_choice))
         horizon_label = "1-12 Quarters" if horizon_choice == "1-12 qtrs" else str(horizon_choice).replace("qtrs", "quarters")
         date_label = "All target periods" if date_choice == "All" else str(date_choice)
@@ -724,6 +726,7 @@ def build_candidate_landscape_frame(loaded: LoadedRun, controls: dict[str, Any],
     summary = loaded.data.get("summary", pd.DataFrame())
     if candidate.empty:
         return summary
+    candidate = exclude_legacy_schiff_style_rows(candidate)
     if mode == "Competitive frontier":
         mask = pd.Series(False, index=candidate.index)
         for column in ["is_frontier", "is_current_recommended", "is_pure_schiff", "is_pdf_reference"]:
@@ -748,6 +751,20 @@ def build_candidate_landscape_frame(loaded: LoadedRun, controls: dict[str, Any],
     return common_filter(landscape, controls)
 
 
+def exclude_legacy_schiff_style_rows(frame: pd.DataFrame) -> pd.DataFrame:
+    if frame is None or frame.empty:
+        return pd.DataFrame() if frame is None else frame
+    if "is_legacy_schiff_style" in frame.columns:
+        return frame[~frame["is_legacy_schiff_style"].fillna(False).astype(bool)].copy()
+    model_text = frame.get("model", pd.Series("", index=frame.index)).astype(str)
+    role_text = frame.get("candidate_role", pd.Series("", index=frame.index)).astype(str)
+    mask = [
+        is_legacy_schiff_style_text(model, role)
+        for model, role in zip(model_text, role_text, strict=False)
+    ]
+    return frame[~pd.Series(mask, index=frame.index)].copy()
+
+
 def candidate_frontier_count_context(
     loaded: LoadedRun,
     controls: dict[str, Any],
@@ -770,6 +787,7 @@ def candidate_frontier_count_context(
         if column in candidate.columns:
             mask = mask | candidate[column].fillna(False).astype(bool)
     default_plotted = candidate[mask].copy() if mask.any() else candidate.copy()
+    default_plotted = exclude_legacy_schiff_style_rows(default_plotted)
     filtered_default = common_filter(default_plotted, controls)
     plotted_frame = plotted if plotted is not None else filtered_default
     plotted_count = len(plotted_frame)
@@ -795,20 +813,22 @@ def overview_frontier_note(summary: pd.DataFrame, count_context: dict[str, Any] 
     """Return a compact manager note for the Overview candidate landscape."""
     if summary is None or summary.empty:
         return "Frontier read: lower-left is better; no candidate rows are available for this filter."
-    pure_schiff = 0
+    schiff_spec = 0
     benchmark_streams = 0
-    if "schiff_class" in summary.columns:
-        pure_schiff = int(summary["schiff_class"].astype(str).eq("Pure Schiff benchmark").sum())
-        if "stream_label" in summary.columns:
-            benchmark_streams = int(
-                summary.loc[
-                    summary["schiff_class"].astype(str).eq("Pure Schiff benchmark"),
-                    "stream_label",
-                ]
-                .dropna()
-                .nunique()
-            )
-    suffix = f"; {pure_schiff} plotted pure-Schiff anchor rows / {benchmark_streams} benchmark streams" if pure_schiff else ""
+    if "is_pure_schiff" in summary.columns:
+        anchor_mask = summary["is_pure_schiff"].fillna(False).astype(bool)
+    elif "schiff_class" in summary.columns:
+        anchor_mask = summary["schiff_class"].astype(str).eq(SCHIFF_SPEC_BENCHMARK_LABEL)
+    else:
+        anchor_mask = pd.Series(False, index=summary.index)
+    schiff_spec = int(anchor_mask.sum())
+    if "stream_label" in summary.columns:
+        benchmark_streams = int(summary.loc[anchor_mask, "stream_label"].dropna().nunique())
+    suffix = (
+        f"; {schiff_spec} plotted Schiff specification anchor rows / {benchmark_streams} benchmark streams"
+        if schiff_spec
+        else ""
+    )
     label = str(count_context.get("label")) if count_context else f"{format_count(len(summary))} plotted candidates"
     return f"Frontier read: lower-left is better across {label}{suffix}."
 
@@ -887,13 +907,13 @@ def overview_kpi_cards(
     candidate_count = int(candidate_context.get("count", len(summary))) if candidate_context else len(summary)
     candidate_subtext = str(candidate_context.get("subtext", "default curated cone rows")) if candidate_context else "default curated cone rows"
     return [
-        ("Quarterly MAPE", format_percent(finalist_q), f"vs. Schiff {format_percent(schiff_q)}", f"{q_delta:.2f} pp gain" if pd.notna(q_delta) else "-", "good", "Q"),
-        ("Annual MAPE", format_percent(finalist_a), f"vs. Schiff {format_percent(schiff_a)}", f"{a_delta:.2f} pp gain" if pd.notna(a_delta) else "-", "good", "A"),
+        ("Quarterly MAPE", format_percent(finalist_q), f"vs. Schiff spec {format_percent(schiff_q)}", f"{q_delta:.2f} pp gain" if pd.notna(q_delta) else "-", "good", "Q"),
+        ("Annual MAPE", format_percent(finalist_a), f"vs. Schiff spec {format_percent(schiff_a)}", f"{a_delta:.2f} pp gain" if pd.notna(a_delta) else "-", "good", "A"),
         ("Plotted candidates", format_count(candidate_count), candidate_subtext, f"{format_count(len(recommended))} finalists", "good", "#"),
         (
             "Benchmark Pass",
             f"{beats}/{total}",
-            f"{beats}/{total} beat pure Schiff",
+            f"{beats}/{total} beat Schiff specification benchmark",
             f"{format_count(len(errors))} logged diagnostics",
             "good" if total and beats == total else "mixed",
             "B",
@@ -1069,7 +1089,7 @@ def render_scenario_comparison(loaded: LoadedRun, controls: dict[str, Any]) -> N
     qpred = common_filter(loaded.data.get("quarterly_predictions", pd.DataFrame()), controls, include_source_variant=False)
 
     st.session_state.setdefault("scenario_a_choice", "Refined Finalist Ensemble")
-    st.session_state.setdefault("scenario_b_choice", "Schiff Structural Benchmark")
+    st.session_state.setdefault("scenario_b_choice", SCHIFF_SPEC_BENCHMARK_LABEL)
     st.session_state.setdefault("scenario_baseline_choice", "Baseline FY25")
     scenario_a = str(st.session_state["scenario_a_choice"])
     scenario_b = str(st.session_state["scenario_b_choice"])
@@ -1088,7 +1108,7 @@ def render_scenario_comparison(loaded: LoadedRun, controls: dict[str, Any]) -> N
         with scenario_cols[1]:
             with st.popover("Edit", use_container_width=True):
                 scenario_a = st.selectbox("Scenario A", ["Refined Finalist Ensemble", "Best finalist by stream"], key="scenario_a_choice")
-                scenario_b = st.selectbox("Scenario B", ["Schiff Structural Benchmark", "Best pure Schiff by stream"], key="scenario_b_choice")
+                scenario_b = st.selectbox("Scenario B", [SCHIFF_SPEC_BENCHMARK_LABEL, "Best Schiff specification by stream"], key="scenario_b_choice")
                 baseline = st.selectbox("Scenario baseline", ["Baseline FY25", "Latest loaded run"], key="scenario_baseline_choice")
 
     comparison = evidence_scenario_comparison_frame(loaded, controls)
@@ -1131,7 +1151,7 @@ def render_scenario_comparison(loaded: LoadedRun, controls: dict[str, Any]) -> N
         governance_cards(story)
         info_panel(
             "Decision Lens: choose the refined finalist when it improves full-sample MAPE, keeps a paired win-rate edge, stays robust across horizon "
-            "buckets, and has manageable run warnings. Prefer Schiff where structural interpretability dominates "
+            "buckets, and has manageable run warnings. Prefer the Schiff specification benchmark where structural interpretability dominates "
             "or the finalist does not cleanly beat the benchmark."
         )
 
@@ -1174,8 +1194,8 @@ def scenario_kpi_cards(
     return [
         ("Quarterly MAPE", format_percent(q_value), "Scenario A finalist mean", "", "good", "Q"),
         ("Annual MAPE", format_percent(a_value), "Scenario A finalist mean", "", "good", "A"),
-        ("Gain vs Schiff", gain_value, f"{gain_source}; {format_percent(win_rate, 1)} paired win", gain_delta, "good" if pd.notna(gain) and gain > 0 else "mixed", "B"),
-        ("Decision status", f"{beats}/{total}", "streams beat pure Schiff", "", "good" if total and beats >= 2 else "mixed", "D"),
+        ("Gain vs Schiff spec", gain_value, f"{gain_source}; {format_percent(win_rate, 1)} paired win", gain_delta, "good" if pd.notna(gain) and gain > 0 else "mixed", "B"),
+        ("Decision status", f"{beats}/{total}", "streams beat Schiff specification", "", "good" if total and beats >= 2 else "mixed", "D"),
     ]
 
 
@@ -1297,7 +1317,7 @@ def scenario_decision_summary_panel(comparison: pd.DataFrame) -> None:
     )[["Stream", "Full-sample Qtr Gain", "Full-sample Annual Gain", "Paired Win Rate", "Recommendation"]]
     chart_card(
         "4. Decision Summary",
-        "Gains compare full-sample finalist versus pure Schiff MAPE; win rate uses common forecast-pair validation.",
+        "Gains compare full-sample finalist versus the Schiff specification benchmark; win rate uses common forecast-pair validation.",
         compact_figure(plot_decision_summary_table(display), 240),
     )
 
@@ -1361,8 +1381,8 @@ def scenario_decision_lens_panel(
         st.markdown("#### 6. Decision Lens")
         st.caption(f"{scenario_a} versus {scenario_b}; baseline: {baseline}.")
         st.markdown(f"**Decision rule:** {scenario_decision_rule_text()}")
-        st.markdown(f"**Choose Scenario A when:** paired evidence beats pure Schiff in {beats}/{total} streams and annual checks remain credible.")
-        st.markdown(f"**Use Scenario B when:** structural interpretability is preferred or a stream does not beat Schiff.")
+        st.markdown(f"**Choose Scenario A when:** paired evidence beats the Schiff specification benchmark in {beats}/{total} streams and annual checks remain credible.")
+        st.markdown(f"**Use Scenario B when:** structural interpretability is preferred or a stream does not beat the Schiff specification benchmark.")
         st.markdown(f"**Watch point:** {watch}")
         st.markdown(f"**Management read:** {conclusion}")
         st.markdown(f"**Drilldown:** {scenario_drilldown_note(qpred_rows, stress_rows)}")
@@ -1386,7 +1406,7 @@ def scenario_decision_lens_summary(story: pd.DataFrame) -> str:
     total = len(story)
     watch_streams = story.loc[story.astype(str).apply(lambda row: row.str.contains("Watch|High-risk|mixed", case=False, na=False).any(), axis=1), "stream_label"] if "stream_label" in story.columns else pd.Series(dtype=str)
     watch = ", ".join(watch_streams.dropna().astype(str).head(2)) if not watch_streams.empty else "no major watch stream"
-    return f"{beats}/{total} streams beat pure Schiff; treat {watch} as the management watch point before Stage 2."
+    return f"{beats}/{total} streams beat the Schiff specification benchmark; treat {watch} as the management watch point before Stage 2."
 
 
 def render_schiff_benchmark_page(loaded: LoadedRun, controls: dict[str, Any]) -> None:
@@ -1409,7 +1429,7 @@ def render_schiff_benchmark_page(loaded: LoadedRun, controls: dict[str, Any]) ->
     with top[0]:
         chart_card(
             "1. Schiff vs Finalist MAPE",
-            "Pure-Schiff structural benchmark versus refined finalist.",
+            "Schiff specification benchmark versus refined finalist.",
             compact_figure(plot_schiff_finalist_mape(comparison), 260),
         )
     with top[1]:
@@ -1423,7 +1443,7 @@ def render_schiff_benchmark_page(loaded: LoadedRun, controls: dict[str, Any]) ->
     with bottom[0]:
         chart_card(
             "3. Full-sample Gain vs Schiff",
-            "Full-sample MAPE gain versus pure Schiff; positive values favour the refined finalist.",
+            "Full-sample MAPE gain versus the Schiff specification benchmark; positive values favour the refined finalist.",
             compact_figure(plot_improvement_vs_benchmark(comparison), 260),
         )
     with bottom[1]:
@@ -1447,12 +1467,12 @@ def schiff_kpi_cards(summary: pd.DataFrame, paired: pd.DataFrame, recommended: p
     rec_best = best_by_stream(recommended)
     return [
         (
-            "Pure-Schiff Streams",
+            "Schiff Spec Streams",
             format_count(schiff_best["stream_label"].nunique()) if "stream_label" in schiff_best.columns else "0",
-            "structural benchmark only",
+            "Schiff specification benchmark only",
         ),
         (
-            "Best Pure-Schiff Qtr MAPE",
+            "Best Schiff Spec Qtr MAPE",
             format_percent(schiff_best["quarterly_mape"].min()) if "quarterly_mape" in schiff_best.columns and not schiff_best.empty else "-",
             "lower is better",
         ),
@@ -1461,7 +1481,7 @@ def schiff_kpi_cards(summary: pd.DataFrame, paired: pd.DataFrame, recommended: p
             format_percent(rec_best["quarterly_mape"].min()) if "quarterly_mape" in rec_best.columns and not rec_best.empty else "-",
             "refined finalist set",
         ),
-        ("Paired Comparisons", format_count(len(paired)), "pure-Schiff common pairs"),
+        ("Paired Comparisons", format_count(len(paired)), "Schiff specification common pairs"),
     ]
 
 
@@ -1477,7 +1497,7 @@ def schiff_replication_notes_panel(paired: pd.DataFrame) -> None:
             unsafe_allow_html=True,
         )
         st.markdown(
-            "- **Quarterly vs annual MAPE:** pure-Schiff rows only.\n"
+            "- **Quarterly vs annual MAPE:** Schiff specification benchmark rows only.\n"
             "- **Cross-validation windows:** rolling-origin Stage 1 forecast rows.\n"
             "- **Benchmark purity:** residual/blend challengers are separated.\n"
             "- **Decision use:** test genuine improvement over the structural model."
@@ -1486,17 +1506,17 @@ def schiff_replication_notes_panel(paired: pd.DataFrame) -> None:
 
 def schiff_compact_summary(paired: pd.DataFrame) -> str:
     if paired.empty or "mape_improvement_pct_points" not in paired.columns:
-        return "No paired-vs-Schiff comparison rows are available in this run."
+        return "No paired-vs-Schiff specification comparison rows are available in this run."
     data = paired.copy()
     data["_gain"] = pd.to_numeric(data["mape_improvement_pct_points"], errors="coerce")
     data = data.dropna(subset=["_gain"]).sort_values("_gain", ascending=False)
     if data.empty:
-        return "Paired-vs-Schiff rows are present but no numeric gain column could be read."
+        return "Paired-vs-Schiff specification rows are present but no numeric gain column could be read."
     best = data.iloc[0]
     stream = str(best.get("stream_label", "best stream"))
     win = pd.to_numeric(best.get("challenger_win_rate"), errors="coerce")
     win_text = f", {format_percent(float(win), 1)} win rate" if pd.notna(win) else ""
-    return f"Best paired challenger: {stream} gains {format_percent(float(best['_gain']))} vs pure Schiff{win_text}."
+    return f"Best paired challenger: {stream} gains {format_percent(float(best['_gain']))} vs Schiff specification benchmark{win_text}."
 
 
 def qpred_for_stream(loaded: LoadedRun, controls: dict[str, Any], stream: str) -> pd.DataFrame:
@@ -1540,7 +1560,7 @@ def render_executive_summary(loaded: LoadedRun, controls: dict[str, Any]) -> Non
     section_title("Management Answer")
     info_panel(
         "The cards below answer the review questions directly: which model won, whether the evidence beats the "
-        "Schiff structural benchmark, whether stress checks are stable, and what run warnings need attention."
+        "Schiff specification benchmark, whether stress checks are stable, and what run warnings need attention."
     )
     info_panel("Manager conclusion: " + manager_conclusion(story))
     governance_cards(story)
@@ -1590,13 +1610,13 @@ def enterprise_decision_brief(story: pd.DataFrame, loaded: LoadedRun) -> tuple[s
     readiness = "Management-ready Stage 1 evidence" if total and beats else "Needs governance review"
     weak_stream = ", ".join(mixed_streams or high_risk_streams) or "No benchmark watch point"
     narrative = (
-        f"{beats} of {total} stream finalists beat the pure Schiff benchmark on the paired rule. "
+        f"{beats} of {total} stream finalists beat the Schiff specification benchmark on the paired rule. "
         "Treat this as Stage 1 model-form evidence: it supports the challenger shortlist, while Stage 2 must still "
         "test vintage macro, fuel-price, and policy-input uncertainty."
     )
     cards = [
         ("Readiness", readiness, top_decision),
-        ("Benchmark result", f"{beats}/{total} beat Schiff", "pure-Schiff comparison rule"),
+        ("Benchmark result", f"{beats}/{total} beat Schiff spec", "Schiff specification comparison rule"),
         ("Watch point", weak_stream, "benchmark or stress caveat"),
         ("Next gate", "Stage 2 uncertainty", f"{diagnostics:,} logged diagnostics in Run Audit"),
     ]
@@ -1684,7 +1704,7 @@ def render_candidate_landscape(loaded: LoadedRun, controls: dict[str, Any]) -> N
     section_title("Candidate Landscape")
     info_panel(
         "This view checks whether the selected finalists sit near the efficient frontier and whether the Schiff "
-        "structural benchmark was actually beaten on quarterly and annual accuracy."
+        "specification benchmark was actually beaten on quarterly and annual accuracy."
     )
     summary = common_filter(loaded.data.get("summary", pd.DataFrame()), controls)
     if summary.empty:

@@ -6,7 +6,7 @@ from typing import Any
 
 import pandas as pd
 
-from ..labels import STRESS_BUCKET_ORDER, format_percent, format_pp, format_count, humanize_label
+from ..labels import SCHIFF_SPEC_BENCHMARK_LABEL, STRESS_BUCKET_ORDER, format_percent, format_pp, format_count, humanize_label
 from ..metrics import best_by_stream
 from .diagnostics import DEFAULT_ACF_RESIDUAL_SCOPE, select_diagnostic_acf_scope
 
@@ -330,7 +330,7 @@ def _point_type(row: pd.Series) -> str:
     if bool(_row_get(row, "is_current_recommended", False)) or bool(_row_get(row, "is_recommended_finalist", False)):
         return "Selected finalist"
     if bool(_row_get(row, "is_pure_schiff", False)) or bool(_row_get(row, "is_schiff", False)):
-        return "Schiff benchmark"
+        return SCHIFF_SPEC_BENCHMARK_LABEL
     if bool(_row_get(row, "is_pdf_reference", False)):
         return "PDF reference"
     if bool(_row_get(row, "is_frontier", False)):
@@ -838,7 +838,7 @@ def _scenario_stream_comparison_source(comparison: pd.DataFrame, source_file: st
                     format_percent(value),
                     value_col,
                     source_file,
-                    "Scenario A current finalist versus Scenario B pure Schiff full-sample MAPE.",
+                    "Scenario A current finalist versus Scenario B Schiff specification full-sample MAPE.",
                     scenario=scenario,
                     scenario_role=scenario,
                 )
@@ -871,7 +871,7 @@ def _scenario_gain_source(
                     format_pp(value),
                     column,
                     source_file,
-                    "Full-sample Schiff MAPE minus current finalist MAPE. This is not paired common-grid gain.",
+                    "Full-sample Schiff specification MAPE minus current finalist MAPE. This is not paired common-grid gain.",
                     paired_common_pairs=row.get("paired_common_pairs"),
                     paired_model_mape=row.get("paired_model_mape"),
                     paired_schiff_mape=row.get("paired_schiff_mape"),
@@ -1032,7 +1032,7 @@ def _schiff_mape_source(comparison: pd.DataFrame, source_file: str) -> pd.DataFr
                     format_percent(value),
                     column,
                     source_file,
-                    "Pure Schiff full-sample MAPE compared with current finalist full-sample MAPE.",
+                    "Schiff specification full-sample MAPE compared with current finalist full-sample MAPE.",
                     scenario=scenario,
                     scenario_role=scenario,
                 )
@@ -1044,10 +1044,10 @@ def _schiff_summary_source(comparison: pd.DataFrame, source_file: str) -> pd.Dat
     rows: list[dict[str, Any]] = []
     for _, row in comparison.iterrows():
         for metric, column, formatter in [
-            ("Schiff Qtr", "schiff_quarterly_mape", format_percent),
+            ("Schiff Spec Qtr", "schiff_quarterly_mape", format_percent),
             ("Finalist Qtr", "finalist_quarterly_mape", format_percent),
             ("Full-sample Qtr Gain", "quarterly_gain_pp", format_pp),
-            ("Schiff Annual", "schiff_annual_mape", format_percent),
+            ("Schiff Spec Annual", "schiff_annual_mape", format_percent),
             ("Finalist Annual", "finalist_annual_mape", format_percent),
             ("Full-sample Annual Gain", "annual_gain_pp", format_pp),
             ("Paired Win Rate", "paired_win_rate_pct", format_percent),

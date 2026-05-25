@@ -10,6 +10,7 @@ from plotly.subplots import make_subplots
 
 from .labels import (
     METRIC_COLORS,
+    SCHIFF_SPEC_BENCHMARK_LABEL,
     STRESS_BUCKET_ORDER,
     STREAM_COLORS,
     display_model_label,
@@ -144,9 +145,9 @@ def plot_candidate_landscape(summary: pd.DataFrame) -> go.Figure:
     if "is_pdf_reference" in data.columns:
         data.loc[data["is_pdf_reference"].astype(bool), "point_type"] = "PDF reference"
     if "is_schiff" in data.columns:
-        data.loc[data["is_schiff"].astype(bool), "point_type"] = "Schiff benchmark"
+        data.loc[data["is_schiff"].astype(bool), "point_type"] = SCHIFF_SPEC_BENCHMARK_LABEL
     if "is_pure_schiff" in data.columns:
-        data.loc[data["is_pure_schiff"].astype(bool), "point_type"] = "Schiff benchmark"
+        data.loc[data["is_pure_schiff"].astype(bool), "point_type"] = SCHIFF_SPEC_BENCHMARK_LABEL
     if "is_finalist" in data.columns:
         data.loc[data["is_finalist"].astype(bool), "point_type"] = "Selected finalist"
     if "is_recommended_finalist" in data.columns:
@@ -168,7 +169,7 @@ def plot_candidate_landscape(summary: pd.DataFrame) -> go.Figure:
         "Candidate": "circle",
         "Frontier candidate": "circle",
         "PDF reference": "diamond-open",
-        "Schiff benchmark": "triangle-up-open",
+        SCHIFF_SPEC_BENCHMARK_LABEL: "triangle-up-open",
         "Selected finalist": "star",
     }
     size_map = {
@@ -176,7 +177,7 @@ def plot_candidate_landscape(summary: pd.DataFrame) -> go.Figure:
         "Candidate": 8,
         "Frontier candidate": 10,
         "PDF reference": 13,
-        "Schiff benchmark": 14,
+        SCHIFF_SPEC_BENCHMARK_LABEL: 14,
         "Selected finalist": 17,
     }
     fig = go.Figure()
@@ -235,7 +236,7 @@ def plot_candidate_landscape(summary: pd.DataFrame) -> go.Figure:
         )
     special_specs = [
         ("Selected finalist", "Finalist", "star", 18, "#0f172a", 1.4),
-        ("Schiff benchmark", "Schiff", "triangle-up-open", 15, "#0f172a", 1.5),
+        (SCHIFF_SPEC_BENCHMARK_LABEL, SCHIFF_SPEC_BENCHMARK_LABEL, "triangle-up-open", 15, "#0f172a", 1.5),
         ("PDF reference", "PDF reference", "diamond-open", 13, "#0f172a", 1.2),
     ]
     for point_type, legend_name, symbol, size, line_color, line_width in special_specs:
@@ -275,7 +276,7 @@ def plot_candidate_landscape(summary: pd.DataFrame) -> go.Figure:
             )
         )
     annotation_rows = []
-    for point_type in ["Selected finalist", "Schiff benchmark"]:
+    for point_type in ["Selected finalist", SCHIFF_SPEC_BENCHMARK_LABEL]:
         subset = data[data["point_type"] == point_type].sort_values(["stream_label", "quarterly_mape", "annual_mape"])
         if subset.empty:
             continue
@@ -286,7 +287,7 @@ def plot_candidate_landscape(summary: pd.DataFrame) -> go.Figure:
         fig.add_annotation(
             x=row["quarterly_mape"],
             y=row["annual_mape"],
-            text=f"{stream_short} finalist" if row["point_type"] == "Selected finalist" else f"{stream_short} Schiff",
+            text=f"{stream_short} finalist" if row["point_type"] == "Selected finalist" else f"{stream_short} Schiff spec",
             showarrow=True,
             arrowhead=2,
             ax=18,
@@ -297,7 +298,7 @@ def plot_candidate_landscape(summary: pd.DataFrame) -> go.Figure:
         )
     fig.update_layout(xaxis_title="Quarterly MAPE (%)", yaxis_title="Annual MAPE (%)")
     fig = apply_layout(fig, "Candidate search landscape", height=580)
-    critical_points = data[data["point_type"].isin(["Schiff benchmark", "Selected finalist"])]
+    critical_points = data[data["point_type"].isin([SCHIFF_SPEC_BENCHMARK_LABEL, "Selected finalist"])]
     x_limit = _frontier_axis_limit(full_data["quarterly_mape"], critical_points["quarterly_mape"])
     y_limit = _frontier_axis_limit(full_data["annual_mape"], critical_points["annual_mape"])
     if x_limit is not None:
@@ -398,10 +399,10 @@ def _axis_stream_label(value: Any) -> str:
 
 def plot_schiff_benchmark(summary: pd.DataFrame) -> go.Figure:
     if summary.empty or "is_schiff" not in summary.columns:
-        return empty_figure("No Schiff benchmark rows were detected.")
+        return empty_figure("No Schiff specification benchmark rows were detected.")
     schiff = summary[summary["is_schiff"]].copy()
     if schiff.empty:
-        return empty_figure("No Schiff benchmark rows were detected.")
+        return empty_figure("No Schiff specification benchmark rows were detected.")
     schiff = best_by_stream(schiff)
     schiff["_hover_model"] = _safe_series(schiff, "model").map(display_model_label)
     schiff["_hover_full_model"] = _safe_series(schiff, "model").map(_clean_hover_text)
@@ -426,7 +427,7 @@ def plot_schiff_benchmark(summary: pd.DataFrame) -> go.Figure:
                 ),
             )
     fig.update_layout(barmode="group", yaxis_title="MAPE (%)", xaxis_title="")
-    return apply_layout(fig, "Schiff structural benchmark: quarterly and annual MAPE", height=420)
+    return apply_layout(fig, "Schiff specification benchmark: quarterly and annual MAPE", height=420)
 
 
 def plot_paired_improvement(paired: pd.DataFrame, top_n: int = 30) -> go.Figure:
@@ -450,7 +451,7 @@ def plot_paired_improvement(paired: pd.DataFrame, top_n: int = 30) -> go.Figure:
         color="stream_label",
         orientation="h",
         color_discrete_map=STREAM_COLORS,
-        labels={"mape_improvement_pct_points": "MAPE gain vs Schiff (percentage points)", "challenger_short": ""},
+        labels={"mape_improvement_pct_points": "MAPE gain vs Schiff specification benchmark (percentage points)", "challenger_short": ""},
         custom_data=[
             "stream_label",
             "challenger_short",
@@ -467,7 +468,7 @@ def plot_paired_improvement(paired: pd.DataFrame, top_n: int = 30) -> go.Figure:
             "<b>%{customdata[1]}</b><br>"
             "Stream: %{customdata[0]}<br>"
             "Stage: %{customdata[2]}<br>"
-            "Schiff MAPE: %{customdata[3]}<br>"
+            "Schiff specification MAPE: %{customdata[3]}<br>"
             "Challenger MAPE: %{customdata[4]}<br>"
             "Gain vs Schiff: %{customdata[5]}<br>"
             "Win rate: %{customdata[6]}<br>"
@@ -1232,8 +1233,8 @@ def plot_improvement_vs_benchmark(comparison: pd.DataFrame) -> go.Figure:
             hovertemplate="<b>%{customdata[0]}</b><br>" + label + ": %{x:.2f} pp<extra></extra>",
         )
     fig.add_vline(x=0, line_color="#64748B", line_width=1)
-    fig.update_layout(barmode="group", xaxis_title="Full-sample gain vs Schiff (percentage points)", yaxis_title="")
-    return apply_layout(fig, "Full-sample gain versus Schiff", height=360)
+    fig.update_layout(barmode="group", xaxis_title="Full-sample gain vs Schiff specification benchmark (percentage points)", yaxis_title="")
+    return apply_layout(fig, "Full-sample gain versus Schiff specification benchmark", height=360)
 
 
 def plot_horizon_comparison(horizon: pd.DataFrame) -> go.Figure:
@@ -1323,7 +1324,7 @@ def plot_schiff_finalist_mape(comparison: pd.DataFrame) -> go.Figure:
                 col=col,
             )
         for label, column, color in [
-            ("Schiff (pure)", schiff_col, "#002B5C"),
+            ("Schiff specification", schiff_col, "#002B5C"),
             ("Finalist (refined)", finalist_col, "#A7C800"),
         ]:
             fig.add_trace(
@@ -1348,7 +1349,7 @@ def plot_schiff_finalist_mape(comparison: pd.DataFrame) -> go.Figure:
     for annotation in fig.layout.annotations:
         annotation.y = 1.08
         annotation.font = {"size": 13, "color": "#002B5C"}
-    fig = apply_layout(fig, "Schiff versus finalist MAPE", height=380)
+    fig = apply_layout(fig, "Schiff specification versus finalist MAPE", height=380)
     fig.update_layout(
         legend={"orientation": "h", "yanchor": "bottom", "y": 1.16, "xanchor": "center", "x": 0.5, "font": {"size": 10}},
         margin={"l": 42, "r": 20, "t": 66, "b": 48},
@@ -1362,10 +1363,10 @@ def plot_benchmark_summary_table(comparison: pd.DataFrame) -> go.Figure:
     display = comparison.copy()
     headers = [
         "Stream",
-        "Schiff Qtr",
+        "Schiff Spec Qtr",
         "Finalist Qtr",
         "Full-sample Qtr Gain",
-        "Schiff Annual",
+        "Schiff Spec Annual",
         "Finalist Annual",
         "Full-sample Annual Gain",
         "Paired Win Rate",
@@ -1746,7 +1747,7 @@ def plot_schiff_class_mix(summary: pd.DataFrame) -> go.Figure:
         )
     )
     fig.update_traces(textposition="inside")
-    return apply_layout(fig, "Pure Schiff versus challenger mix", height=360)
+    return apply_layout(fig, "Schiff specification and legacy-style mix", height=360)
 
 
 def plot_error_types(error_types: pd.DataFrame) -> go.Figure:

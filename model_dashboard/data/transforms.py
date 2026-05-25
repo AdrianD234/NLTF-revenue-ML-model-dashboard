@@ -6,7 +6,7 @@ from typing import Any
 
 import pandas as pd
 
-from model_dashboard.labels import humanize_label, schiff_class, stream_label
+from model_dashboard.labels import SCHIFF_SPEC_BENCHMARK_LABEL, humanize_label, schiff_class, stream_label
 from model_dashboard.metrics import add_stream_fields, coerce_numeric, scale_percent_columns
 
 
@@ -197,7 +197,7 @@ def normalise_parquet_candidate(df: pd.DataFrame) -> pd.DataFrame:
     out["stage"] = "final"
     out["variant"] = out["feature_set"].fillna("curated").map(humanize_label)
     out["schiff_class"] = out.apply(
-        lambda row: "Pure Schiff benchmark"
+        lambda row: SCHIFF_SPEC_BENCHMARK_LABEL
         if bool(row.get("is_pure_schiff"))
         else schiff_class(row.get("model"), row.get("source_family"), row.get("feature_set")),
         axis=1,

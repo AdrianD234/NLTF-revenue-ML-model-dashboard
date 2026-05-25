@@ -11,6 +11,9 @@ from .data.config import DEFAULT_BESPOKE_PARENT, DEFAULT_INPUT_PARENT
 
 IGNORED_RUN_FOLDER_NAMES = {"run_20260519_150434"}
 
+SCHIFF_SPEC_BENCHMARK_LABEL = "Schiff specification benchmark"
+LEGACY_SCHIFF_STYLE_LABEL = "legacy Schiff-style benchmark"
+
 STREAM_LABELS = {
     "PED": "PED VKT per capita",
     "PED VKT per capita": "PED VKT per capita",
@@ -82,7 +85,7 @@ TERM_HELP = {
     "Annual MAPE": "MAPE after quarterly forecasts are aggregated to June-year annual totals or averages.",
     "Bias": "Average signed percentage error. Positive bias means the model tends to over-forecast.",
     "P90 APE": "The 90th percentile absolute percentage error. A tail-risk measure.",
-    "Schiff benchmark": "The structural econometric specification based on Aaron Schiff's modelling logic.",
+    "Schiff benchmark": "The Schiff specification benchmark scored on the current workbook evidence pack.",
     "GBM": "Gradient boosting model. A tree-based method that builds many small trees sequentially.",
     "Shallow GBM": "A GBM with small tree depth, often depth 1 or 2.",
     "Differenced features": "Inputs such as quarterly or annual changes in prices or GDP rather than only levels.",
@@ -120,7 +123,14 @@ def is_schiff_text(*parts: Any) -> bool:
         return True
     if any(token in model for token in ["schiff_resid", "fixedblend_schiff", "prequential", "ensemble"]):
         return False
-    return any(token in text for token in ["schiff_ols", "schiff benchmark", "schiff structural benchmark"])
+    return any(token in text for token in ["schiff_spec", "schiff_ols", "schiff benchmark", "schiff structural benchmark"])
+
+
+def is_legacy_schiff_style_text(*parts: Any) -> bool:
+    text = " ".join("" if part is None else str(part).lower() for part in parts)
+    if "schiff_spec" in text:
+        return False
+    return any(token in text for token in ["schiff_ols", "fixedblend_schiff1.00", "schiff structural benchmark"])
 
 
 def schiff_class(value: Any, source_family: Any = "", variant: Any = "") -> str:
@@ -131,8 +141,10 @@ def schiff_class(value: Any, source_family: Any = "", variant: Any = "") -> str:
         return "Schiff blend challenger"
     if "prequential" in text or "ensemble" in text or "solver_static" in text:
         return "Ensemble challenger"
+    if "schiff_spec" in text:
+        return SCHIFF_SPEC_BENCHMARK_LABEL
     if is_schiff_text(value, source_family, variant):
-        return "Pure Schiff benchmark"
+        return LEGACY_SCHIFF_STYLE_LABEL
     return "Non-Schiff challenger"
 
 

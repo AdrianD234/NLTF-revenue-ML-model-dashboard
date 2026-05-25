@@ -1,7 +1,7 @@
 {
-  "schema_version": "dashboard_evidence_pack_v1",
-  "created_at": "2026-05-25",
-  "description": "Single governed evidence pack for Stage 1 Governance Dashboard. Parquet-first; contains candidate cone, finalists, Schiff benchmark, stress/horizon, residual predictions, diagnostics, ensemble components, scenario comparison and chart contract.",
+  "schema_version": "dashboard_evidence_pack_schiff_spec_v2",
+  "created_at": "2026-05-25T22:48:16.622848+00:00",
+  "description": "Single governed evidence pack with Schiff specification benchmark replacing older Schiff-style benchmark rows.",
   "source_paths": {
     "candidate_cone": "/mnt/data/curated_candidate_cone_outputs/stage1_curated_candidate_cone.parquet",
     "diagnostic_audit_tables": "/mnt/data/model_diagnostic_audit_pack/model_diagnostic_audit_tables.xlsx",
@@ -45,15 +45,15 @@
   "row_counts": [
     {
       "file": "annual_predictions.parquet",
-      "rows": 508,
+      "rows": 545,
       "columns": 13,
-      "size_bytes": 23376
+      "size_bytes": 24888
     },
     {
       "file": "candidate_cone.parquet",
       "rows": 300,
       "columns": 158,
-      "size_bytes": 212471
+      "size_bytes": 213154
     },
     {
       "file": "chart_contract.parquet",
@@ -77,7 +77,7 @@
       "file": "diagnostic_tests.parquet",
       "rows": 6,
       "columns": 37,
-      "size_bytes": 23057
+      "size_bytes": 23073
     },
     {
       "file": "ensemble_components.parquet",
@@ -87,9 +87,9 @@
     },
     {
       "file": "error_distribution.parquet",
-      "rows": 1482,
+      "rows": 2940,
       "columns": 14,
-      "size_bytes": 54374
+      "size_bytes": 96798
     },
     {
       "file": "finalists.parquet",
@@ -101,7 +101,7 @@
       "file": "horizon_profiles.parquet",
       "rows": 72,
       "columns": 13,
-      "size_bytes": 10920
+      "size_bytes": 10939
     },
     {
       "file": "invalid_predictions_zero_actual.parquet",
@@ -113,31 +113,31 @@
       "file": "paired_vs_schiff.parquet",
       "rows": 3,
       "columns": 7,
-      "size_bytes": 5152
+      "size_bytes": 5133
     },
     {
       "file": "residual_predictions.parquet",
-      "rows": 2886,
+      "rows": 2940,
       "columns": 31,
-      "size_bytes": 114207
+      "size_bytes": 129683
     },
     {
       "file": "scenario_comparison.parquet",
       "rows": 3,
       "columns": 15,
-      "size_bytes": 10926
+      "size_bytes": 11034
     },
     {
       "file": "schiff_benchmark.parquet",
       "rows": 3,
       "columns": 17,
-      "size_bytes": 11197
+      "size_bytes": 11241
     },
     {
       "file": "stress_horizon.parquet",
       "rows": 36,
       "columns": 13,
-      "size_bytes": 9678
+      "size_bytes": 9879
     }
   ],
   "important_semantics": {
@@ -145,7 +145,68 @@
     "paired_gain": "schiff common-grid MAPE minus finalist common-grid MAPE; Light RUC paired gain is negative",
     "residual_predictions": "actual <= 0 rows excluded from MAPE/residual charts and stored separately in invalid_predictions_zero_actual.parquet",
     "horizon_profiles": "true row-level horizon profiles, not interpolation; use horizon_profiles.parquet",
-    "candidate_cone": "default cone chart should use candidate_cone.parquet rows where plot_default_include/is_plot_candidate is true"
+    "candidate_cone": "default cone chart should use candidate_cone.parquet rows where plot_default_include/is_plot_candidate is true",
+    "schiff_benchmark": "Default Schiff rows are final Schiff specification benchmarks rebuilt and scored on the current workbook evidence pack; old Schiff-style rows are not default."
   },
-  "required_dashboard_rule": "Default app must use this evidence pack only. Legacy run folders or fixtures must not mix into production pages."
+  "required_dashboard_rule": "Default app must use this evidence pack only. Legacy run folders or fixtures must not mix into production pages.",
+  "schiff_benchmark_class": "Schiff specification benchmark",
+  "canonical_schiff_spec_metrics": [
+    {
+      "stream": "HEAVY_RUC",
+      "stream_label": "Heavy RUC volume",
+      "role": "Schiff specification benchmark",
+      "model": "HEAVY_RUC__SCHIFF_SPEC_FINAL_AR1_EXPANDING",
+      "n_quarterly_pairs": 426,
+      "quarterly_mape": 7.800196102220403,
+      "quarterly_bias_pct": 7.566395170214154,
+      "quarterly_p90_ape": 19.210889353341614,
+      "n_annual_pairs": 73,
+      "annual_mape": 8.112774746196978,
+      "annual_bias_pct": 8.022347356971537,
+      "annual_p90_ape": 23.12235652909773,
+      "scenario": "Schiff",
+      "is_current_recommended": false,
+      "is_pure_schiff": true,
+      "model_short": "Heavy RUC Schiff spec final AR1 expanding",
+      "candidate_uid": "a43b1640212ea56b"
+    },
+    {
+      "stream": "LIGHT_RUC",
+      "stream_label": "Light RUC volume",
+      "role": "Schiff specification benchmark",
+      "model": "LIGHT_RUC__SCHIFF_SPEC_FINAL_OLS_EXPANDING",
+      "n_quarterly_pairs": 426,
+      "quarterly_mape": 8.412939078097963,
+      "quarterly_bias_pct": 2.066447356553397,
+      "quarterly_p90_ape": 17.360700970159282,
+      "n_annual_pairs": 80,
+      "annual_mape": 5.000571382586559,
+      "annual_bias_pct": 1.1109347647208865,
+      "annual_p90_ape": 10.542616232545917,
+      "scenario": "Schiff",
+      "is_current_recommended": false,
+      "is_pure_schiff": true,
+      "model_short": "Light RUC Schiff spec final OLS expanding",
+      "candidate_uid": "1587a79c479e00a0"
+    },
+    {
+      "stream": "PED",
+      "stream_label": "PED VKT per capita",
+      "role": "Schiff specification benchmark",
+      "model": "PED__SCHIFF_SPEC_FINAL_OLS_EXPANDING",
+      "n_quarterly_pairs": 606,
+      "quarterly_mape": 4.091570459286396,
+      "quarterly_bias_pct": 1.1491743079811023,
+      "quarterly_p90_ape": 10.834482213479651,
+      "n_annual_pairs": 114,
+      "annual_mape": 4.132012480513341,
+      "annual_bias_pct": 1.2811482084735824,
+      "annual_p90_ape": 10.90169878748795,
+      "scenario": "Schiff",
+      "is_current_recommended": false,
+      "is_pure_schiff": true,
+      "model_short": "PED Schiff spec final OLS expanding",
+      "candidate_uid": "1d59e72762e8e156"
+    }
+  ]
 }
