@@ -19,6 +19,7 @@ from model_dashboard.data_loader import (
     load_curated_run,
     load_evidence_pack,
     load_run,
+    resolve_evidence_pack_root,
     run_signature,
 )
 from model_dashboard.data.diagnostics import build_diagnostic_acf_source_table
@@ -206,11 +207,12 @@ def render_primary_navigation(pages: list[str]) -> str:
 
 
 def render_run_sidebar() -> str:
-    data_root = Path(
+    requested_root = Path(
         os.environ.get("DASHBOARD_EVIDENCE_PACK_ROOT")
         or os.environ.get("STAGE1_DASHBOARD_EVIDENCE_PACK_ROOT")
         or DEFAULT_EVIDENCE_PACK_ROOT
     ).expanduser()
+    data_root = resolve_evidence_pack_root(requested_root)
     st.session_state["active_data_root"] = str(data_root)
     return str(data_root)
 

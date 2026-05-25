@@ -1,0 +1,17 @@
+file,rows,columns,size_bytes
+annual_predictions.parquet,508,13,23376
+candidate_cone.parquet,300,158,212471
+chart_contract.parquet,16,4,4353
+diagnostic_acf.parquet,39,11,8296
+diagnostic_pass_matrix.parquet,27,8,5679
+diagnostic_tests.parquet,6,37,23057
+ensemble_components.parquet,8,12,9402
+error_distribution.parquet,1482,14,54374
+finalists.parquet,3,18,14690
+horizon_profiles.parquet,72,13,10920
+invalid_predictions_zero_actual.parquet,24,31,20791
+paired_vs_schiff.parquet,3,7,5152
+residual_predictions.parquet,2886,31,114207
+scenario_comparison.parquet,3,15,10926
+schiff_benchmark.parquet,3,17,11197
+stress_horizon.parquet,36,13,9678

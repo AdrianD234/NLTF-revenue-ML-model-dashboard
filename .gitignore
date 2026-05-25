@@ -19,3 +19,5 @@ artifacts/**
 !artifacts/.gitkeep
 data/**
 !data/.gitkeep
+!data/dashboard_evidence_pack/
+!data/dashboard_evidence_pack/**

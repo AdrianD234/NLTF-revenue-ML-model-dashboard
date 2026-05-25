@@ -32,6 +32,17 @@ def test_evidence_pack_required_files_load(evidence_pack_root: Path, evidence_pa
     assert evidence_pack.manifest["source_mode"] == "dashboard_evidence_pack"
 
 
+def test_resolve_evidence_pack_root_finds_downloads_wrapper(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    pack = tmp_path / "Downloads" / "stage1_dashboard_evidence_pack_v1" / "dashboard_evidence_pack"
+    (pack / "data").mkdir(parents=True)
+    (pack / "manifest.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+
+    resolved = resolve_evidence_pack_root(tmp_path / "missing_default" / "dashboard_evidence_pack")
+
+    assert resolved == pack
+
+
 def test_default_app_uses_evidence_pack_not_legacy_or_mini(evidence_pack) -> None:
     manifest_text = str(evidence_pack.manifest)
     assert "mini_parquet" not in manifest_text

@@ -46,9 +46,13 @@ def resolve_evidence_pack_root(root: str | Path | None = None) -> Path:
     or one level up as stage1_dashboard_evidence_pack_v1/dashboard_evidence_pack.
     """
     requested = Path(root or DEFAULT_EVIDENCE_PACK_ROOT).expanduser()
+    downloads = Path.home() / "Downloads"
     candidates = [
         requested,
         requested / "dashboard_evidence_pack",
+        requested / "stage1_dashboard_evidence_pack_v1" / "dashboard_evidence_pack",
+        downloads / "dashboard_evidence_pack",
+        downloads / "stage1_dashboard_evidence_pack_v1" / "dashboard_evidence_pack",
     ]
     for candidate in candidates:
         if (candidate / "manifest.json").exists() and (candidate / "data").is_dir():
