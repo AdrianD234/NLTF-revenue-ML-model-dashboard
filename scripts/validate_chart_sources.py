@@ -12,7 +12,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from model_dashboard.chart_sources import CHART_SOURCE_FILES, CORE_COLUMNS  # noqa: E402
-from model_dashboard.data_loader import DEFAULT_DIAGNOSTIC_DATA_ROOT, load_parquet_dashboard  # noqa: E402
+from model_dashboard.data.config import DEFAULT_DIAGNOSTIC_DATA_ROOT  # noqa: E402
+from model_dashboard.data_loader import load_parquet_dashboard  # noqa: E402
 from model_dashboard.labels import STRESS_BUCKET_ORDER  # noqa: E402
 
 

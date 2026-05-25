@@ -52,7 +52,7 @@ function Invoke-Checked {
 
 $env:MODEL_DIAGNOSTIC_DATA_ROOT = $DataRoot
 
-Invoke-Checked -FilePath $Python -Arguments @("-m", "compileall", ".")
+Invoke-Checked -FilePath $Python -Arguments @("-m", "compileall", "app.py", "model_dashboard", "scripts")
 Invoke-Checked -FilePath $Python -Arguments @("-m", "pytest", "-q")
 Invoke-Checked -FilePath $Python -Arguments @("scripts\inspect_parquet_schema.py", "--data-root", $DataRoot)
 Invoke-Checked -FilePath $Python -Arguments @("scripts\validate_dashboard_data.py", "--data-root", $DataRoot)
@@ -206,7 +206,7 @@ try {
         throw "BUG_BACKLOG.md contains unchecked items."
     }
 
-    Write-Host "Parquet-backed dashboard verification passed with the 100-gate visual conformance suite."
+    Write-Host "Parquet-backed dashboard verification passed with the 120-gate visual conformance suite."
 }
 finally {
     Stop-PortListeners -Port $Port

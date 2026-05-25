@@ -21,11 +21,16 @@ from .data.legacy_loader import legacy_review_warning
 from .data.locate import candidate_search_roots as governed_candidate_search_roots
 from .data.locate import locate_dashboard_file as governed_locate_dashboard_file
 from .data.manifest import build_data_source_manifest, write_data_source_manifest
-from .labels import IGNORED_RUN_FOLDER_NAMES, STRESS_BUCKET_ORDER, humanize_label, schiff_class, stream_label
+from .data.diagnostics import (
+    build_diagnostic_acf_source_table,
+    build_diagnostic_frame,
+    load_diagnostic_audit_tables,
+)
+from .data.transforms import CORE_PARQUET_COLUMNS, STRESS_BUCKET_SOURCES, normalise_parquet_candidate
+from .labels import IGNORED_RUN_FOLDER_NAMES, STRESS_BUCKET_ORDER, humanize_label
 from .metrics import (
-    add_stream_fields,
     best_by_stream,
-    coerce_numeric,
+    add_stream_fields,
     derive_paired_from_summary,
     normalise_paired,
     normalise_predictions,
@@ -33,124 +38,12 @@ from .metrics import (
     normalise_stress,
     normalise_summary,
     normalise_weights,
-    period_key,
     percent_unit_warnings,
-    scale_percent_columns,
 )
 from .schema import FILE_ALIASES, SHEET_HINTS, WORKBOOK_ALIASES, WORKBOOK_DATASETS
 
 
 LoadedRun = DashboardData
-
-CORE_PARQUET_COLUMNS = [
-    "stream",
-    "stream_label",
-    "model",
-    "model_short",
-    "source_run",
-    "source_file",
-    "source_family",
-    "model_kind",
-    "feature_set",
-    "quarterly_mape",
-    "annual_mape",
-    "quarterly_bias_pct",
-    "annual_bias_pct",
-    "quarterly_p90_ape",
-    "annual_p90_ape",
-    "mape_h01",
-    "mape_h02",
-    "mape_h03",
-    "mape_h04",
-    "mape_h05",
-    "mape_h06",
-    "mape_h07",
-    "mape_h08",
-    "mape_h09",
-    "mape_h10",
-    "mape_h11",
-    "mape_h12",
-    "mape_h01_04",
-    "mape_h05_08",
-    "mape_h09_12",
-    "stress_1_4_qtrs_mape",
-    "stress_5_8_qtrs_mape",
-    "stress_9_12_qtrs_mape",
-    "performance_rank",
-    "performance_percentile",
-    "performance_decile",
-    "selection_score",
-    "candidate_role",
-    "include_reason",
-    "is_current_recommended",
-    "is_pure_schiff",
-    "is_pdf_reference",
-    "is_frontier",
-    "is_top_quarterly",
-    "is_top_annual",
-    "is_distribution_sample",
-    "is_extreme_outlier",
-    "plot_default_include",
-    "paired_gain_vs_schiff_pp",
-    "paired_win_rate",
-    "paired_common_pairs",
-    "stress_2024_plus_mape",
-    "stress_2022_23_mape",
-    "stress_annual_mape",
-    "durbin_watson",
-    "adj_r2",
-    "adf_pvalue",
-    "kpss_pvalue",
-    "breusch_pagan_pvalue",
-    "white_pvalue",
-    "arch_lm_pvalue",
-    "jarque_bera_pvalue",
-    "skewness",
-    "kurtosis",
-    "cointegration_pvalue",
-]
-
-COLUMN_ALIASES = {
-    "source_run": ["source_run", "run_source", "run_id"],
-    "performance_rank": ["performance_rank", "performance_rank_within_stream"],
-    "is_current_recommended": ["is_current_recommended", "is_recommended_finalist", "current_recommended"],
-    "is_frontier": ["is_frontier", "is_pareto_frontier", "pareto_frontier"],
-    "is_distribution_sample": ["is_distribution_sample", "is_curated_cone_sample", "distribution_sample"],
-    "paired_gain_vs_schiff_pp": [
-        "paired_gain_vs_schiff_pp",
-        "paired_improvement_pp",
-        "mape_improvement_pp",
-        "mape_improvement_pct_points",
-    ],
-    "paired_win_rate": ["paired_win_rate", "paired_win_rate_pct", "our_win_rate_pct", "challenger_win_rate"],
-    "paired_common_pairs": ["paired_common_pairs", "n_common_pairs"],
-    "stress_1_4_qtrs_mape": ["stress_1_4_qtrs_mape", "mape_h01_04", "h1_4_mape"],
-    "stress_5_8_qtrs_mape": ["stress_5_8_qtrs_mape", "mape_h05_08", "h5_8_mape"],
-    "stress_9_12_qtrs_mape": ["stress_9_12_qtrs_mape", "mape_h09_12", "h9_12_mape"],
-    "stress_2024_plus_mape": ["stress_2024_plus_mape", "stress_2024plus_mape", "recent_2024_plus_mape"],
-    "stress_2022_23_mape": ["stress_2022_23_mape", "policy_2022_23_mape"],
-    "stress_annual_mape": ["stress_annual_mape", "annual_mape", "annual_mape_filled"],
-    "durbin_watson": ["durbin_watson", "dw", "diag_durbin_watson"],
-    "adj_r2": ["adj_r2", "adjusted_r2", "mz_r2", "diag_mz_r2"],
-    "adf_pvalue": ["adf_pvalue", "adf_p_resid", "diag_adf_p_resid"],
-    "kpss_pvalue": ["kpss_pvalue", "kpss_p_resid", "diag_kpss_p_resid"],
-    "breusch_pagan_pvalue": ["breusch_pagan_pvalue", "breusch_pagan_p", "diag_breusch_pagan_p"],
-    "white_pvalue": ["white_pvalue", "white_p", "diag_white_p"],
-    "arch_lm_pvalue": ["arch_lm_pvalue", "arch_lm_p", "diag_arch_lm_p"],
-    "jarque_bera_pvalue": ["jarque_bera_pvalue", "jarque_bera_p", "diag_jarque_bera_p"],
-    "skewness": ["skewness", "skew_resid", "diag_skew_resid"],
-    "kurtosis": ["kurtosis", "kurtosis_resid", "diag_kurtosis_resid"],
-    "cointegration_pvalue": ["cointegration_pvalue", "coint_p_actual_pred", "diag_coint_p_actual_pred"],
-}
-
-STRESS_BUCKET_SOURCES = [
-    ("1-4 qtrs", ["stress_1_4_qtrs_mape", "mape_h01_04", "h1_4_mape"]),
-    ("5-8 qtrs", ["stress_5_8_qtrs_mape", "mape_h05_08", "h5_8_mape"]),
-    ("9-12 qtrs", ["stress_9_12_qtrs_mape", "mape_h09_12", "h9_12_mape"]),
-    ("2024+", ["stress_2024plus_mape", "recent_2024_plus_mape", "stress_2024_plus_mape"]),
-    ("2022-23", ["stress_2022_23_mape", "policy_2022_23_mape"]),
-    ("Annual", ["stress_annual_mape", "annual_mape", "annual_mape_filled"]),
-]
 
 STALE_FINALIST_VALUES = {
     "PED": 5.49,
@@ -320,109 +213,6 @@ def _load_csv_preview_candidate(repo_root: Path) -> pd.DataFrame:
     return pd.read_csv(path, low_memory=False)
 
 
-def normalise_parquet_candidate(df: pd.DataFrame) -> pd.DataFrame:
-    if df is None or df.empty:
-        return pd.DataFrame()
-    out = df.copy()
-    out.columns = [str(col).strip() for col in out.columns]
-    for canonical, aliases in COLUMN_ALIASES.items():
-        values = out[canonical] if canonical in out.columns else pd.Series(pd.NA, index=out.index)
-        for alias in aliases:
-            existing = first_existing_column(out, [alias])
-            if existing is not None:
-                values = values.combine_first(out[existing])
-        out[canonical] = values
-    for column in CORE_PARQUET_COLUMNS:
-        if column not in out.columns:
-            out[column] = pd.NA
-    if "stream_label" in out.columns:
-        out["stream_label"] = out["stream_label"].where(out["stream_label"].notna(), out["stream"].map(stream_label))
-    if "model_short" in out.columns:
-        out["model_short"] = out["model_short"].where(out["model_short"].notna(), out["model"].map(humanize_label))
-    bool_columns = [
-        "is_current_recommended",
-        "is_pure_schiff",
-        "is_pdf_reference",
-        "is_frontier",
-        "is_top_quarterly",
-        "is_top_annual",
-        "is_distribution_sample",
-        "is_extreme_outlier",
-        "plot_default_include",
-    ]
-    for column in bool_columns:
-        out[column] = out[column].map(_coerce_bool).fillna(False).astype(bool)
-    if not out["plot_default_include"].any():
-        out["plot_default_include"] = (
-            out["is_current_recommended"]
-            | out["is_pure_schiff"]
-            | out["is_pdf_reference"]
-            | out["is_frontier"]
-            | out["is_distribution_sample"]
-            | out["is_top_quarterly"]
-            | out["is_top_annual"]
-        )
-    if "candidate_role" in out.columns:
-        out["candidate_role"] = out["candidate_role"].fillna("Candidate")
-    for column in ["stream_label", "model_short", "source_family", "model_kind", "feature_set", "candidate_role", "include_reason"]:
-        if column in out.columns:
-            out[column] = out[column].map(humanize_label)
-    numeric_columns = [
-        column
-        for column in CORE_PARQUET_COLUMNS
-        if column
-        not in {
-            "stream",
-            "stream_label",
-            "model",
-            "model_short",
-            "source_run",
-            "source_file",
-            "source_family",
-            "model_kind",
-            "feature_set",
-            "candidate_role",
-            "include_reason",
-        }
-        and not column.startswith("is_")
-        and column != "plot_default_include"
-    ]
-    out = coerce_numeric(out, numeric_columns)
-    out = scale_percent_columns(out)
-    out = add_stream_fields(out)
-    out["is_recommended_finalist"] = out["is_current_recommended"]
-    out["is_finalist"] = out["is_current_recommended"]
-    out["is_schiff"] = out["is_pure_schiff"]
-    out["stage"] = "final"
-    out["variant"] = out["feature_set"].fillna("curated").map(humanize_label)
-    out["schiff_class"] = out.apply(
-        lambda row: "Pure Schiff benchmark"
-        if bool(row.get("is_pure_schiff"))
-        else schiff_class(row.get("model"), row.get("source_family"), row.get("feature_set")),
-        axis=1,
-    )
-    return out
-
-
-def first_existing_column(df: pd.DataFrame, candidates: list[str]) -> str | None:
-    lower = {str(col).lower(): col for col in df.columns}
-    for candidate in candidates:
-        hit = lower.get(candidate.lower())
-        if hit is not None:
-            return hit
-    return None
-
-
-def _coerce_bool(value: Any) -> bool:
-    if isinstance(value, bool):
-        return value
-    if value is None or pd.isna(value):
-        return False
-    if isinstance(value, (int, float)):
-        return bool(value)
-    return str(value).strip().lower() in {"1", "true", "yes", "y", "current"}
-
-
 def _read_json_file(path: Path | None) -> dict[str, Any]:
     if path is None or not path.exists():
         return {}
@@ -454,10 +244,10 @@ def _build_dashboard_frames(
     if "is_extreme_outlier" in default_candidate.columns:
         default_candidate = default_candidate[~default_candidate["is_extreme_outlier"].fillna(False).astype(bool)].copy()
 
-    audit_tables, audit_status, audit_warnings = _load_diagnostic_audit_tables(roots)
+    audit_tables, audit_status, audit_warnings = load_diagnostic_audit_tables(roots)
     status_rows.extend(audit_status)
     warnings.extend(audit_warnings)
-    diagnostic = _diagnostic_frame(candidate, audit_tables)
+    diagnostic = build_diagnostic_frame(candidate, audit_tables)
     paired = _paired_frame(recommended, schiff, audit_tables)
     stress = _stress_frame(recommended)
     horizon = _horizon_frame(pd.concat([recommended, schiff], ignore_index=True))
@@ -559,119 +349,6 @@ def _load_optional_pack_csv(roots: list[Path], filename: str) -> pd.DataFrame:
         return pd.read_csv(path, low_memory=False)
     except Exception:
         return pd.DataFrame()
-
-
-def _load_diagnostic_audit_tables(roots: list[Path]) -> tuple[dict[str, pd.DataFrame], list[dict[str, Any]], list[str]]:
-    tables: dict[str, pd.DataFrame] = {}
-    status: list[dict[str, Any]] = []
-    warnings: list[str] = []
-    workbook = locate_dashboard_file("model_diagnostic_audit_tables.xlsx", roots)
-    if workbook is not None:
-        try:
-            excel = pd.ExcelFile(workbook)
-            for sheet in excel.sheet_names:
-                key = sheet.strip().lower().replace(" ", "_")
-                tables[key] = excel.parse(sheet)
-            status.append(_status_row("diagnostic audit workbook", workbook, sum(len(df) for df in tables.values()), len(tables)))
-        except Exception as exc:
-            warnings.append(f"Could not read diagnostic audit workbook: {exc}")
-    for filename in [
-        "model_summary_our_vs_schiff.csv",
-        "paired_common_forecast_pairs_our_vs_schiff.csv",
-        "h1_residual_diagnostics_our_vs_schiff.csv",
-        "diagnostic_pass_matrix.csv",
-    ]:
-        path = locate_dashboard_file(filename, roots)
-        if path is None:
-            continue
-        try:
-            key = path.stem
-            tables[key] = pd.read_csv(path, low_memory=False)
-            status.append(_status_row(key, path, len(tables[key]), len(tables[key].columns)))
-        except Exception as exc:
-            warnings.append(f"Could not read {filename}: {exc}")
-    return tables, status, warnings
-
-
-def _diagnostic_frame(candidate: pd.DataFrame, audit_tables: dict[str, pd.DataFrame]) -> pd.DataFrame:
-    roles = candidate[
-        candidate.get("is_current_recommended", pd.Series(False, index=candidate.index)).fillna(False).astype(bool)
-        | candidate.get("is_pure_schiff", pd.Series(False, index=candidate.index)).fillna(False).astype(bool)
-    ].copy()
-    if not roles.empty:
-        roles["role"] = roles.apply(
-            lambda row: "Our finalist" if bool(row.get("is_current_recommended", False)) else "Schiff benchmark",
-            axis=1,
-        )
-    diag = roles[
-        [
-            col
-            for col in [
-                "stream",
-                "stream_label",
-                "model",
-                "model_short",
-                "role",
-                "is_current_recommended",
-                "is_pure_schiff",
-                "durbin_watson",
-                "adj_r2",
-                "adf_pvalue",
-                "kpss_pvalue",
-                "breusch_pagan_pvalue",
-                "white_pvalue",
-                "arch_lm_pvalue",
-                "jarque_bera_pvalue",
-                "skewness",
-                "kurtosis",
-                "cointegration_pvalue",
-            ]
-            if col in roles.columns
-        ]
-    ].copy()
-    h1 = audit_tables.get("h1_residual_diagnostics_our_vs_schiff", audit_tables.get("h1_diagnostics", pd.DataFrame()))
-    if not h1.empty:
-        h1_norm = h1.rename(
-            columns={
-                "adf_p_resid": "adf_pvalue",
-                "kpss_p_resid": "kpss_pvalue",
-                "breusch_pagan_p": "breusch_pagan_pvalue",
-                "white_p": "white_pvalue",
-                "arch_lm_p": "arch_lm_pvalue",
-                "jarque_bera_p": "jarque_bera_pvalue",
-                "skew_resid": "skewness",
-                "kurtosis_resid": "kurtosis",
-                "coint_p_actual_pred": "cointegration_pvalue",
-                "mz_r2": "adj_r2",
-            }
-        )
-        keep_cols = [col for col in diag.columns if col in h1_norm.columns]
-        if keep_cols:
-            diag = pd.concat([diag, h1_norm[keep_cols]], ignore_index=True).drop_duplicates(
-                subset=[col for col in ["stream", "model"] if col in keep_cols],
-                keep="last",
-            )
-    if "role" not in diag.columns:
-        diag["role"] = diag.apply(
-            lambda row: "Our finalist" if bool(row.get("is_current_recommended", False)) else "Schiff benchmark",
-            axis=1,
-        )
-    return coerce_numeric(
-        diag,
-        [
-            "durbin_watson",
-            "adj_r2",
-            "adf_pvalue",
-            "kpss_pvalue",
-            "breusch_pagan_pvalue",
-            "white_pvalue",
-            "arch_lm_pvalue",
-            "jarque_bera_pvalue",
-            "skewness",
-            "kurtosis",
-            "cointegration_pvalue",
-        ],
-    )
 
 
 def _paired_frame(
@@ -966,42 +643,6 @@ def build_horizon_comparison_source_table(
                         "source": "quarterly_predictions_selected.csv grouped mean APE",
                     }
                 )
-    return pd.DataFrame(rows, columns=columns)
-
-
-def build_diagnostic_acf_source_table(qpred: pd.DataFrame, max_lag: int = 12) -> pd.DataFrame:
-    columns = ["stream_label", "lag", "acf_value", "residual_source", "calculation_method"]
-    if qpred is None or qpred.empty or not {"error_pct", "stream_label"}.issubset(qpred.columns):
-        return pd.DataFrame(columns=columns)
-    data = qpred.dropna(subset=["error_pct", "stream_label"]).copy()
-    if data.empty:
-        return pd.DataFrame(columns=columns)
-    if "target_period" in data.columns:
-        data["_period_key"] = data["target_period"].map(period_key)
-        grouped = (
-            data.groupby(["stream_label", "target_period", "_period_key"], dropna=False)["error_pct"]
-            .mean()
-            .reset_index()
-            .sort_values(["stream_label", "_period_key"])
-        )
-    else:
-        data["_period_key"] = range(len(data))
-        grouped = data.sort_values(["stream_label", "_period_key"])
-    rows: list[dict[str, Any]] = []
-    for stream, stream_rows in grouped.groupby("stream_label", dropna=False):
-        series = pd.to_numeric(stream_rows["error_pct"], errors="coerce").dropna()
-        if len(series) < 4:
-            continue
-        for lag in range(1, max_lag + 1):
-            rows.append(
-                {
-                    "stream_label": stream,
-                    "lag": lag,
-                    "acf_value": series.autocorr(lag=lag) if len(series) > lag + 1 else pd.NA,
-                    "residual_source": "All selected quarterly prediction residuals, averaged by target period",
-                    "calculation_method": "pandas Series.autocorr on mean signed forecast error percentage by lag",
-                }
-            )
     return pd.DataFrame(rows, columns=columns)
 
 

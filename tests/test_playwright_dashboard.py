@@ -172,7 +172,7 @@ def test_latest_arbitration_values_are_visible_not_stale(page: Page) -> None:
     wait_dashboard_ready(page)
     body = page.locator("body").inner_text(timeout=60000)
 
-    assert "Latest arbitration finalists:" in body
+    assert "Current Parquet finalists:" in body
     for expected in ["2.47%", "2.39%", "9.15%", "6.00%", "3.48%", "3.02%"]:
         assert expected in body
 
@@ -691,17 +691,33 @@ def assert_visible_text(page: Page, text: str) -> None:
 
 def assert_visible_text_absent(page: Page, text: str) -> None:
     visible = page.evaluate(
-        """(needle) => Array.from(document.querySelectorAll('body *')).some((node) => {
-            const value = (node.textContent || '').trim();
-            if (value !== needle && !value.split(/\\s+/).includes(needle)) return false;
+        """(needle) => {
+            const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+            let textNode = walker.nextNode();
+            while (textNode) {
+                const value = (textNode.nodeValue || '').trim();
+                if (value !== needle && !value.split(/\\s+/).includes(needle)) {
+                    textNode = walker.nextNode();
+                    continue;
+                }
+                const node = textNode.parentElement;
+                if (!node) {
+                    textNode = walker.nextNode();
+                    continue;
+                }
             const style = window.getComputedStyle(node);
             const rect = node.getBoundingClientRect();
-            return style.display !== 'none'
+                if (style.display !== 'none'
                 && style.visibility !== 'hidden'
                 && Number(style.opacity || 1) > 0.01
                 && rect.width > 1
-                && rect.height > 1;
-        })""",
+                    && rect.height > 1) {
+                    return true;
+                }
+                textNode = walker.nextNode();
+            }
+            return false;
+        }""",
         text,
     )
     assert not visible, f"Expected text {text!r} to be hidden"

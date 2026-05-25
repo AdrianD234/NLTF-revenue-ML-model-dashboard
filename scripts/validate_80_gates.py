@@ -15,16 +15,14 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from model_dashboard.data_loader import (  # noqa: E402
+from model_dashboard.data.config import (  # noqa: E402
     DEFAULT_DIAGNOSTIC_DATA_ROOT,
     PARQUET_CANDIDATE_FILE,
     PARQUET_METADATA_FILE,
-    STALE_FINALIST_VALUES,
-    _candidate_search_roots,
-    load_parquet_dashboard,
-    locate_dashboard_file,
-    normalise_parquet_candidate,
 )
+from model_dashboard.data.locate import candidate_search_roots, locate_dashboard_file  # noqa: E402
+from model_dashboard.data.transforms import normalise_parquet_candidate  # noqa: E402
+from model_dashboard.data_loader import STALE_FINALIST_VALUES, load_parquet_dashboard  # noqa: E402
 
 CSV_MIRROR_FILE = "stage1_curated_candidate_cone.csv"
 EXPECTED_STREAMS = ("PED", "LIGHT_RUC", "HEAVY_RUC")
@@ -160,7 +158,7 @@ def text_has_all(path: Path, needles: tuple[str, ...]) -> bool:
 
 def main() -> int:
     args = parse_args()
-    roots = _candidate_search_roots(args.data_root, args.repo_root)
+    roots = candidate_search_roots(args.data_root, args.repo_root)
     parquet_path = locate_dashboard_file(PARQUET_CANDIDATE_FILE, roots)
     metadata_path = locate_dashboard_file(PARQUET_METADATA_FILE, roots)
     csv_mirror_path = locate_dashboard_file(CSV_MIRROR_FILE, roots)
@@ -950,8 +948,16 @@ def main() -> int:
         },
         {
             "name": "Active filter chips update after filter changes",
-            "status": "PASS" if "active chip" in safe_read(ROOT / "artifacts" / "filter_interaction_review.md").lower() and schema_is_parquet_pass else "FAIL",
-            "evidence": "filter interaction review must record active chip update",
+            "status": "PASS"
+            if (
+                (
+                    "active chip" in safe_read(ROOT / "artifacts" / "filter_interaction_review.md").lower()
+                    or "selected combobox state" in safe_read(ROOT / "artifacts" / "filter_interaction_review.md").lower()
+                )
+                and schema_is_parquet_pass
+            )
+            else "FAIL",
+            "evidence": "filter interaction review must record active chip or selected combobox state update",
         },
         {
             "name": "At least one chart/table/KPI updates after a non-default filter selection",

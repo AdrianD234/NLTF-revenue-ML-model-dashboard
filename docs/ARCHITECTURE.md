@@ -15,6 +15,7 @@ The dashboard runtime has one governed data path:
 Parquet candidate pack
   + diagnostic audit support files
   -> model_dashboard.data.locate
+  -> model_dashboard.data.transforms
   -> model_dashboard.data_loader.load_parquet_dashboard
   -> DashboardData
   -> chart source tables
@@ -29,7 +30,9 @@ Parquet candidate pack
 - `app.py` consumes `DashboardData`; it must not silently fall back to old run folders.
 - `model_dashboard/data/config.py` owns runtime defaults and environment variable lookup.
 - `model_dashboard/data/locate.py` owns file discovery.
-- `model_dashboard/data/parquet_loader.py`, `transforms.py`, `diagnostics.py`, and `chart_sources.py` are the target homes for loader responsibilities as the legacy monolith is reduced.
+- `model_dashboard/data/transforms.py` owns Parquet schema aliases and candidate normalization.
+- `model_dashboard/data/diagnostics.py` owns diagnostic audit-table loading, diagnostic frame construction, and diagnostic ACF source tables.
+- `model_dashboard/data/parquet_loader.py` and `chart_sources.py` are the next target homes for remaining loader responsibilities as the legacy monolith is reduced.
 - `model_dashboard/data/legacy_loader.py` is review-only and must not replace the Parquet app path.
 
 ## Generated Outputs

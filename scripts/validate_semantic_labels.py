@@ -10,7 +10,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from model_dashboard.data_loader import DEFAULT_DIAGNOSTIC_DATA_ROOT, load_parquet_dashboard  # noqa: E402
+from model_dashboard.data.config import DEFAULT_DIAGNOSTIC_DATA_ROOT  # noqa: E402
+from model_dashboard.data_loader import load_parquet_dashboard  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:

@@ -10,16 +10,10 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from model_dashboard.data_loader import (  # noqa: E402
-    CORE_PARQUET_COLUMNS,
-    DEFAULT_DIAGNOSTIC_DATA_ROOT,
-    PARQUET_CANDIDATE_FILE,
-    STALE_FINALIST_VALUES,
-    _candidate_search_roots,
-    locate_dashboard_file,
-    load_parquet_dashboard,
-    normalise_parquet_candidate,
-)
+from model_dashboard.data.config import DEFAULT_DIAGNOSTIC_DATA_ROOT, PARQUET_CANDIDATE_FILE  # noqa: E402
+from model_dashboard.data.locate import candidate_search_roots, locate_dashboard_file  # noqa: E402
+from model_dashboard.data.transforms import CORE_PARQUET_COLUMNS, normalise_parquet_candidate  # noqa: E402
+from model_dashboard.data_loader import STALE_FINALIST_VALUES, load_parquet_dashboard  # noqa: E402
 from model_dashboard.labels import STRESS_BUCKET_ORDER  # noqa: E402
 
 STREAMS = {"PED", "LIGHT_RUC", "HEAVY_RUC"}
@@ -45,7 +39,7 @@ def has_underscores(series: pd.Series) -> bool:
 def validate() -> tuple[bool, list[str]]:
     args = parse_args()
     findings: list[str] = []
-    roots = _candidate_search_roots(args.data_root, args.repo_root)
+    roots = candidate_search_roots(args.data_root, args.repo_root)
     parquet_path = locate_dashboard_file(PARQUET_CANDIDATE_FILE, roots)
     if parquet_path is None:
         fail(f"Missing required Parquet file: {PARQUET_CANDIDATE_FILE}. Searched: {', '.join(str(root) for root in roots)}", findings)

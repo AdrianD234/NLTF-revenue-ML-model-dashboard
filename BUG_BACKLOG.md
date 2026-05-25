@@ -62,6 +62,16 @@ Backlog state for the Stage 1 Model Governance Dashboard Parquet refresh and vis
 - [x] Extended `scripts/verify_dashboard.ps1` and `scripts/run_recursive_dashboard_validation.ps1` so the dashboard cannot pass without chart-source, semantic, visual and Playwright checks.
 - [x] Added browser trace validation that compares rendered Plotly stress chart data back to `overview_stress_horizon_checks.csv`.
 
+## Closed Repo Cleanup Sprint Items
+
+- [x] Moved Parquet schema aliases and candidate normalization from `model_dashboard/data_loader.py` to `model_dashboard/data/transforms.py`.
+- [x] Moved diagnostic audit loading, diagnostic frame construction and ACF source-table construction to `model_dashboard/data/diagnostics.py`.
+- [x] Updated schema/data/gate validation scripts to import governed data config, locator, and transform modules directly.
+- [x] Removed whole-repo recursive lookup from default data discovery so generated `artifacts/` cannot be used as dashboard input.
+- [x] Added a regression test proving generated artifacts are ignored by governed file discovery.
+- [x] Tightened verifier compile scope to `app.py`, `model_dashboard`, and `scripts`.
+- [x] Ran `scripts/verify_dashboard.ps1` against `tests/fixtures/mini_parquet`; the sequential verifier passed through Playwright and 120 gates.
+
 ## Closure Evidence
 
 - Schema inspection passed for the information pack Parquet reached from the requested diagnostic audit pack workflow.

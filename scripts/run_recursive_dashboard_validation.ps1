@@ -150,7 +150,7 @@ for ($i = 1; $i -le $MaxPasses; $i++) {
 
     try {
         $commandResults = @()
-        $commandResults += Invoke-Logged -Label "compileall" -FilePath $Python -Arguments @("-m", "compileall", ".") -PassLog $passLog
+        $commandResults += Invoke-Logged -Label "compileall" -FilePath $Python -Arguments @("-m", "compileall", "app.py", "model_dashboard", "scripts") -PassLog $passLog
         $commandResults += Invoke-Logged -Label "inspect_parquet_schema" -FilePath $Python -Arguments @("scripts\inspect_parquet_schema.py", "--data-root", $DataRoot) -PassLog $passLog -Append
         $commandResults += Invoke-Logged -Label "validate_dashboard_data" -FilePath $Python -Arguments @("scripts\validate_dashboard_data.py", "--data-root", $DataRoot) -PassLog $passLog -Append
         $commandResults += Invoke-Logged -Label "validate_chart_sources" -FilePath $Python -Arguments @("scripts\validate_chart_sources.py", "--data-root", $DataRoot) -PassLog $passLog -Append

@@ -5,6 +5,19 @@ from pathlib import Path
 from .config import DEFAULT_DIAGNOSTIC_AUDIT_ROOT, DEFAULT_INFORMATION_PACK_ROOT
 
 
+IGNORED_RECURSIVE_DIRS = {
+    ".git",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".streamlit",
+    ".venv",
+    "__pycache__",
+    "artifacts",
+    "test-output",
+}
+
+
 def candidate_search_roots(data_root: str | Path, repo_root: str | Path | None = None) -> list[Path]:
     """Return ordered roots for a governed data pack lookup.
 
@@ -23,7 +36,7 @@ def candidate_search_roots(data_root: str | Path, repo_root: str | Path | None =
     candidates.extend([DEFAULT_INFORMATION_PACK_ROOT, DEFAULT_DIAGNOSTIC_AUDIT_ROOT])
     if repo_root is not None:
         repo_path = Path(repo_root).expanduser()
-        candidates.extend([repo_path, repo_path / "data", repo_path / "tests" / "fixtures" / "mini_parquet"])
+        candidates.extend([repo_path / "data", repo_path / "tests" / "fixtures" / "mini_parquet"])
 
     roots: list[Path] = []
     seen: set[str] = set()
@@ -42,7 +55,14 @@ def locate_dashboard_file(filename: str, roots: list[Path] | tuple[Path, ...]) -
         direct = root / filename
         if direct.exists():
             return direct
-        matches = sorted(root.rglob(filename), key=lambda path: (len(path.parts), str(path).lower()))
+        matches = sorted(
+            (path for path in root.rglob(filename) if not _is_ignored_generated_path(path)),
+            key=lambda path: (len(path.parts), str(path).lower()),
+        )
         if matches:
             return matches[0]
     return None
+
+
+def _is_ignored_generated_path(path: Path) -> bool:
+    return any(part.lower() in IGNORED_RECURSIVE_DIRS for part in path.parts)
