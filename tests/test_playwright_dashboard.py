@@ -41,7 +41,7 @@ def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
         "Annual MAPE",
         "Plotted candidates",
         "Benchmark Pass",
-        "beat pure Schiff",
+        "beat Schiff specification benchmark",
         "logged diagnostics",
         "Frontier read: lower-left is better",
         "Stress watch:",
@@ -97,10 +97,10 @@ def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
             "mcp-04-schiff-benchmark.png",
             [
                 "Schiff vs Finalist MAPE",
-                "Pure-Schiff Streams",
-                "structural benchmark only",
+                "Schiff Specification Streams",
+                "Schiff specification benchmark only",
                 "Benchmark Horizon Profiles",
-                "Full-sample Gain vs Schiff",
+                "Full-sample Gain vs Schiff specification benchmark",
                 "Benchmark Summary",
                 "Candidate and ensemble evidence drilldown",
             ],
@@ -124,7 +124,7 @@ def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
         if tab_label == "Scenario Comparison":
             page.evaluate("window.scrollTo(0, 0)")
             expect(page.locator("body")).to_contain_text("Scenario A: Refined Finalist Ensemble", timeout=60000)
-            expect(page.locator("body")).to_contain_text("Scenario B: Schiff Structural Benchmark", timeout=60000)
+            expect(page.locator("body")).to_contain_text("Scenario B: Schiff specification benchmark", timeout=60000)
             expect(page.get_by_role("button", name="Edit")).to_be_visible(timeout=60000)
             assert "Scenario settings" not in page.locator("body").inner_text(timeout=60000)
             for title in [
@@ -139,7 +139,7 @@ def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
             for title in [
                 "1. Schiff vs Finalist MAPE",
                 "2. Benchmark Horizon Profiles",
-                "3. Full-sample Gain vs Schiff",
+                "3. Full-sample Gain vs Schiff specification benchmark",
                 "4. Benchmark Summary",
             ]:
                 assert_text_above_fold(page, title)
@@ -338,7 +338,7 @@ def test_primary_reference_pages_use_icon_kpi_rows(page: Page) -> None:
 
     for tab_label, left_label, right_label in [
         ("Diagnostics", "Diagnostics Coverage", "Heteroscedasticity Pass"),
-        ("Schiff Benchmark", "Pure-Schiff Streams", "Paired Comparisons"),
+        ("Schiff Benchmark", "Schiff Specification Streams", "Paired Comparisons"),
     ]:
         click_governance_nav(page, tab_label)
         expect(page.locator("body")).to_contain_text(left_label, timeout=60000)

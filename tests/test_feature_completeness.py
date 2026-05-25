@@ -157,7 +157,7 @@ def test_enterprise_decision_brief_summarises_readiness_and_next_gate(loaded_val
     title, narrative, cards = enterprise_decision_brief(story, loaded_validation_run)
 
     assert title == "Stage 1 governance decision brief"
-    assert "beat the pure Schiff benchmark" in narrative
+    assert "beat the Schiff specification benchmark" in narrative
     assert "Stage 2" in narrative
     assert len(cards) == 4
     assert {card[0] for card in cards} == {"Readiness", "Benchmark result", "Watch point", "Next gate"}
@@ -180,13 +180,14 @@ def test_scenario_kpi_cards_lift_decision_metrics(loaded_validation_run: LoadedR
 
     cards = scenario_kpi_cards(data["recommended"], data["paired_vs_schiff"], story)
 
-    assert [card[0] for card in cards] == ["Quarterly MAPE", "Annual MAPE", "Gain vs Schiff", "Decision status"]
+    assert [card[0] for card in cards] == ["Quarterly MAPE", "Annual MAPE", "Gain vs benchmark", "Decision status"]
     assert all(card[1] for card in cards)
     gain_card = cards[2]
     assert gain_card[1].endswith(" pp")
+    assert "Schiff specification benchmark" in gain_card[2]
     assert "paired win" in gain_card[2]
-    assert gain_card[3] in {"A better", "Schiff better"}
-    assert "streams beat pure Schiff" in cards[-1][2]
+    assert gain_card[3] in {"A better", "Benchmark better"}
+    assert "streams beat Schiff specification" in cards[-1][2]
 
 
 def test_scenario_best_paired_by_stream_keeps_one_manager_row_per_stream(loaded_validation_run: LoadedRun) -> None:
@@ -226,7 +227,7 @@ def test_scenario_decision_lens_summary_is_concise(loaded_validation_run: Loaded
     summary = scenario_decision_lens_summary(story)
 
     assert len(summary) < 180
-    assert "pure Schiff" in summary
+    assert "Schiff specification benchmark" in summary
     assert "Stage 2" in summary
 
 
@@ -246,7 +247,7 @@ def test_scenario_drilldown_note_names_full_tail_evidence() -> None:
     assert "336 stress rows" in note
 
 
-def test_overview_kpi_cards_explain_pure_schiff_and_diagnostics(loaded_validation_run: LoadedRun) -> None:
+def test_overview_kpi_cards_explain_schiff_specification_and_diagnostics(loaded_validation_run: LoadedRun) -> None:
     data = loaded_validation_run.data
     stress_frame = overview_stress_frame(loaded_validation_run, data["recommended"])
     story = governance_story_summary(data["recommended"], data["paired_vs_schiff"], stress_frame, data["errors"])
@@ -254,7 +255,7 @@ def test_overview_kpi_cards_explain_pure_schiff_and_diagnostics(loaded_validatio
     cards = overview_kpi_cards(data["summary"], data["recommended"], story, data["errors"])
 
     governance_card = next(card for card in cards if card[0] == "Benchmark Pass")
-    assert "beat pure Schiff" in governance_card[2]
+    assert "beat Schiff specification benchmark" in governance_card[2]
     assert "logged diagnostics" in governance_card[3]
     assert "/" in governance_card[1]
 
@@ -265,7 +266,7 @@ def test_overview_frontier_note_is_data_backed(loaded_validation_run: LoadedRun)
     assert "Frontier read: lower-left is better" in note
     assert "plotted candidates" in note
     assert str(len(loaded_validation_run.data["summary"])) in note
-    assert "plotted pure-Schiff anchor rows" in note
+    assert "plotted Schiff specification anchor rows" in note
 
 
 def test_overview_stress_watch_note_names_worst_visible_bucket(loaded_validation_run: LoadedRun) -> None:
@@ -432,7 +433,8 @@ def test_model_aliases_make_dense_model_names_readable() -> None:
 
 
 def test_schiff_purity_classifier_separates_residuals_and_blends() -> None:
-    assert schiff_class("PED__struct_log_only__SCHIFF_OLS") == "Pure Schiff benchmark"
+    assert schiff_class("PED__SCHIFF_SPEC_FINAL_OLS_EXPANDING") == "Schiff specification benchmark"
+    assert schiff_class("PED__struct_log_only__SCHIFF_OLS") == "legacy Schiff-style benchmark"
     assert schiff_class("PED__struct_log_only__SCHIFF_RESID_GBR__max_depth_2") == "Schiff residual challenger"
     assert schiff_class("PED__fixedblend_schiff") == "Schiff blend challenger"
     assert schiff_class("PED__screen__solver_static_convex_top19") == "Ensemble challenger"
@@ -442,21 +444,21 @@ def test_schiff_compact_summary_lifts_best_paired_gain(loaded_validation_run: Lo
     summary = schiff_compact_summary(loaded_validation_run.data["paired_vs_schiff"])
 
     assert "Best paired challenger:" in summary
-    assert "pure Schiff" in summary
+    assert "Schiff specification benchmark" in summary
     assert "%" in summary
 
 
-def test_schiff_kpi_cards_keep_pure_benchmark_language(loaded_validation_run: LoadedRun) -> None:
+def test_schiff_kpi_cards_keep_schiff_specification_language(loaded_validation_run: LoadedRun) -> None:
     data = loaded_validation_run.data
     cards = schiff_kpi_cards(data["summary"], data["paired_vs_schiff"], data["recommended"])
     titles = [card[0] for card in cards]
     subtexts = [card[2] for card in cards]
 
-    assert "Pure-Schiff Streams" in titles
-    assert "Best Pure-Schiff Qtr MAPE" in titles
+    assert "Schiff Specification Streams" in titles
+    assert "Best Schiff Specification Qtr MAPE" in titles
     assert "Paired Comparisons" in titles
-    assert "structural benchmark only" in subtexts
-    assert "pure-Schiff common pairs" in subtexts
+    assert "Schiff specification benchmark only" in subtexts
+    assert "Schiff specification common pairs" in subtexts
 
 
 def test_inventory_summary_lifts_key_counts_and_best_rows(loaded_validation_run: LoadedRun) -> None:
@@ -505,7 +507,7 @@ def test_inventory_visuals_show_family_performance_and_schiff_mix(loaded_validat
     assert len(family_fig.data) > 0
     assert "Model family performance by stream" in str(family_fig.layout.title.text)
     assert len(mix_fig.data) > 0
-    assert "Pure Schiff versus challenger mix" in str(mix_fig.layout.title.text)
+    assert "Schiff specification and legacy-style mix" in str(mix_fig.layout.title.text)
 
 
 def test_loader_schema_version_invalidates_streamlit_cache_for_schema_changes() -> None:

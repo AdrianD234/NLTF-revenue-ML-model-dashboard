@@ -39,35 +39,37 @@ EXPECTED_STRESS_MAPE = {
 EXPECTED_SCENARIO_COMPARISON = {
     "PED VKT per capita": {
         "scenario_a_quarterly_mape": 2.473245,
-        "scenario_b_quarterly_mape": 3.082117,
-        "full_sample_qtr_gain_pp": 0.608873,
+        "scenario_b_quarterly_mape": 4.091570,
+        "full_sample_qtr_gain_pp": 1.618326,
         "scenario_a_annual_mape": 2.385625,
-        "scenario_b_annual_mape": 2.965758,
-        "full_sample_annual_gain_pp": 0.580133,
-        "paired_win_rate_pct": 63.201320,
+        "scenario_b_annual_mape": 4.132012,
+        "full_sample_annual_gain_pp": 1.746388,
+        "paired_gain_pp": 1.618326,
+        "paired_win_rate_pct": 76.732673,
     },
     "Light RUC volume": {
         "scenario_a_quarterly_mape": 9.147545,
-        "scenario_b_quarterly_mape": 11.546786,
-        "full_sample_qtr_gain_pp": 2.399241,
+        "scenario_b_quarterly_mape": 8.412939,
+        "full_sample_qtr_gain_pp": -0.734606,
         "scenario_a_annual_mape": 5.999499,
-        "scenario_b_annual_mape": 7.843683,
-        "full_sample_annual_gain_pp": 1.844184,
-        "paired_gain_pp": -1.159120,
-        "paired_win_rate_pct": 50.555556,
+        "scenario_b_annual_mape": 5.000571,
+        "full_sample_annual_gain_pp": -0.998927,
+        "paired_gain_pp": -0.761294,
+        "paired_win_rate_pct": 46.713615,
     },
     "Heavy RUC volume": {
         "scenario_a_quarterly_mape": 3.484368,
-        "scenario_b_quarterly_mape": 11.482643,
-        "full_sample_qtr_gain_pp": 7.998276,
+        "scenario_b_quarterly_mape": 7.800196,
+        "full_sample_qtr_gain_pp": 4.315829,
         "scenario_a_annual_mape": 3.019980,
-        "scenario_b_annual_mape": 11.717804,
-        "full_sample_annual_gain_pp": 8.697824,
-        "paired_win_rate_pct": 64.155251,
+        "scenario_b_annual_mape": 8.112775,
+        "full_sample_annual_gain_pp": 5.092795,
+        "paired_gain_pp": 4.327505,
+        "paired_win_rate_pct": 65.492958,
     },
 }
 
-EXPECTED_LIGHT_PAIRED_GAIN_PP = -1.159120
+EXPECTED_LIGHT_PAIRED_GAIN_PP = -0.761294
 
 EXPECTED_FIXTURE_FINALISTS = {
     "PED": {"quarterly_mape": 2.473245, "annual_mape": 2.385625},

@@ -210,6 +210,8 @@ def main() -> int:
         if df is None:
             return pd.DataFrame()
         default = df[bool_col(df, "plot_default_include") & ~bool_col(df, "is_extreme_outlier")].copy()
+        if "is_legacy_schiff_style" in default.columns:
+            default = default[~bool_col(default, "is_legacy_schiff_style")].copy()
         return default
 
     def finalist_for(stream: str) -> pd.DataFrame:
@@ -508,9 +510,9 @@ def main() -> int:
         full_gain = pd.to_numeric(light.iloc[0].get("full_sample_qtr_gain_pp"), errors="coerce")
         if pd.isna(paired_gain) or paired_gain >= 0:
             return fail("Light RUC paired common-grid gain is not recorded as negative.")
-        if pd.isna(full_gain) or full_gain <= 0:
-            return fail("Light RUC full-sample gain is not recorded as positive.")
-        return ok("Full-sample gain chart label is distinct from paired common-grid evidence.")
+        if pd.isna(full_gain) or full_gain >= 0:
+            return fail("Light RUC full-sample gain is not recorded as negative under the Schiff specification benchmark.")
+        return ok("Full-sample gain chart label is distinct from paired common-grid evidence and preserves Light RUC benchmark weakness.")
 
     def check_win_rate() -> tuple[bool, str]:
         joined = joined_finalist_schiff()
@@ -659,10 +661,10 @@ def main() -> int:
     def check_clean_table_labels() -> tuple[bool, str]:
         text = safe_read(ROOT / "model_dashboard/plots.py") + safe_read(ROOT / "app.py")
         required = (
-            "Schiff Qtr",
+            "Schiff Spec Qtr",
             "Finalist Qtr",
             "Full-sample Qtr Gain",
-            "Schiff Annual",
+            "Schiff Spec Annual",
             "Finalist Annual",
             "Full-sample Annual Gain",
             "Paired Win Rate",
@@ -783,7 +785,7 @@ def main() -> int:
 
     def check_schiff_summary_styled() -> tuple[bool, str]:
         plots = safe_read(ROOT / "model_dashboard/plots.py")
-        required = ("plot_benchmark_summary_table", "gain_colors", "fill_color", "Schiff Qtr", "Finalist Annual")
+        required = ("plot_benchmark_summary_table", "gain_colors", "fill_color", "Schiff Spec Qtr", "Finalist Annual")
         missing = [item for item in required if item not in plots]
         return fail("Styled Schiff summary table evidence missing: " + ", ".join(missing)) if missing else ok("Schiff benchmark summary is styled and readable.")
 

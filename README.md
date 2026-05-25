@@ -27,7 +27,8 @@ $env:STAGE1_DASHBOARD_EVIDENCE_PACK_ROOT = "C:\path\to\dashboard_evidence_pack"
 
 ## Governance Contract
 
-- Parquet candidate data is the single source of truth for finalists, candidate frontier rows, pure Schiff rows, stress buckets, and ensemble component weights.
+- Parquet candidate data is the single source of truth for finalists, candidate frontier rows, Schiff specification benchmark rows, stress buckets, and ensemble component weights.
+- The default benchmark is the Schiff specification benchmark from `data/dashboard_evidence_pack`. Legacy Schiff-style benchmark rows are review-only and must not appear in default dashboard pages.
 - Diagnostic audit support files are loaded only when present and must degrade gracefully when absent.
 - Every visible executive chart writes a source table under `artifacts/chart_sources/` during validation.
 - Full-sample gain and paired common-grid gain are distinct metrics. A chart labelled as paired gain must not show full-sample gains.
@@ -38,6 +39,7 @@ See:
 - `docs/ARCHITECTURE.md`
 - `docs/DATA_CONTRACT.md`
 - `docs/GOVERNANCE_RULES.md`
+- `docs/SCHIFF_SPECIFICATION_BENCHMARK.md`
 
 ## Verification
 

@@ -119,10 +119,13 @@ def validate() -> list[tuple[str, str, str]]:
     gain_text = " ".join(gain["chart_title"].astype(str).unique()) + " " + " ".join(gain["calculation_basis"].astype(str).unique())
     light_gain = gain[gain["stream_label"].eq("Light RUC volume")]
     light_paired_negative = float(light_gain["paired_gain_pp"].dropna().iloc[0]) < 0
+    light_full_negative = float(
+        light_gain[light_gain["metric_name"].eq("Full-sample quarterly gain")]["metric_value"].dropna().iloc[0]
+    ) < 0
     record(
-        "Schiff gain chart is labelled full-sample and preserves Light RUC paired weakness",
-        "Full-sample" in gain_text and "Paired Gain vs Schiff" not in gain_text and light_paired_negative,
-        f"Light paired gain={float(light_gain['paired_gain_pp'].dropna().iloc[0]):.3f} pp.",
+        "Schiff gain chart is labelled full-sample and preserves Light RUC benchmark weakness",
+        "Full-sample" in gain_text and "Paired Gain vs Schiff" not in gain_text and light_paired_negative and light_full_negative,
+        f"Light full-sample qtr gain={float(light_gain[light_gain['metric_name'].eq('Full-sample quarterly gain')]['metric_value'].dropna().iloc[0]):.3f} pp; paired gain={float(light_gain['paired_gain_pp'].dropna().iloc[0]):.3f} pp.",
     )
 
     for filename in ["scenario_horizon_comparison.csv", "schiff_benchmark_horizon_profiles.csv"]:

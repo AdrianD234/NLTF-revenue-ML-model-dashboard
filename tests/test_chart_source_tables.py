@@ -8,7 +8,7 @@ import pytest
 
 from model_dashboard.chart_sources import CHART_SOURCE_FILES, CORE_COLUMNS
 from model_dashboard.data_loader import DEFAULT_EVIDENCE_PACK_ROOT, LoadedRun, load_evidence_pack
-from model_dashboard.labels import STRESS_BUCKET_ORDER
+from model_dashboard.labels import SCHIFF_SPEC_BENCHMARK_LABEL, STRESS_BUCKET_ORDER
 from tests.fixtures.expected_values import (
     EXPECTED_ENSEMBLE_WEIGHT_PCT,
     EXPECTED_FINALIST_MAPE,
@@ -55,8 +55,10 @@ def test_overview_source_tables_reconcile_to_current_parquet(parquet_dashboard: 
 
     candidate = chart_source("overview_candidate_search_frontier.csv")
     assert len(candidate) <= 400
-    assert {"Selected finalist", "Schiff benchmark"}.issubset(set(candidate["point_type"]))
+    assert {"Selected finalist", SCHIFF_SPEC_BENCHMARK_LABEL}.issubset(set(candidate["point_type"]))
     assert candidate["calculation_basis"].str.contains("Default curated candidate rows", regex=False).all()
+    row_text = candidate.fillna("").astype(str).agg(lambda row: " ".join(row.to_list()), axis=1)
+    assert not row_text.str.contains("20.50|20.499", regex=True).any()
 
 
 def test_ensemble_chart_source_uses_current_parquet_components(parquet_dashboard: LoadedRun) -> None:
@@ -114,7 +116,7 @@ def test_scenario_and_schiff_source_tables_keep_full_sample_and_paired_separate(
     assert schiff_gain["calculation_basis"].str.contains("not paired common-grid gain", regex=False).all()
 
     light = scenario_gain[scenario_gain["stream_label"].eq("Light RUC volume")]
-    assert float(light[light["metric_name"].eq("Full-sample quarterly gain")]["metric_value"].iloc[0]) > 0
+    assert float(light[light["metric_name"].eq("Full-sample quarterly gain")]["metric_value"].iloc[0]) < 0
     assert float(light["paired_gain_pp"].dropna().iloc[0]) == pytest.approx(EXPECTED_LIGHT_PAIRED_GAIN_PP, abs=0.0008)
 
     decision = chart_source("scenario_decision_summary.csv")

@@ -7,7 +7,7 @@ from typing import Any, Iterable
 import numpy as np
 import pandas as pd
 
-from .labels import STRESS_BUCKET_ORDER, STRESS_SLICE_LABELS, is_schiff_text, schiff_class, stream_key, stream_label
+from .labels import SCHIFF_SPEC_BENCHMARK_LABEL, STRESS_BUCKET_ORDER, STRESS_SLICE_LABELS, is_schiff_text, schiff_class, stream_key, stream_label
 from .schema import PREDICTION_COLUMN_ALIASES
 
 
@@ -315,8 +315,8 @@ def governance_story_summary(
             schiff_status = "Not verified"
             gain = float("nan")
             win_rate = float("nan")
-            paired_note = "No paired Schiff row"
-            schiff_summary = "No paired Schiff comparison is available."
+            paired_note = "No paired Schiff specification benchmark row"
+            schiff_summary = "No paired Schiff specification benchmark comparison is available."
 
         robustness, robustness_tone = _robustness_label(stress_row)
         warning_count = _error_count_for_stream(errors, stream)
@@ -348,7 +348,7 @@ def governance_story_summary(
 
 def _decision_status(schiff_status: str, robustness_tone: str, warning_count: int) -> str:
     if schiff_status == "Does not beat Schiff":
-        return "Reject"
+        return "Needs Stage 2"
     if robustness_tone == "bad":
         return "Watchlist"
     if schiff_status == "Average gain, mixed wins" or warning_count > 0:
@@ -366,7 +366,7 @@ def manager_conclusion(story: pd.DataFrame) -> str:
     ) if "robustness_tone" in story.columns else ""
     warnings = int(pd.to_numeric(story.get("warning_count", pd.Series(dtype=float)), errors="coerce").fillna(0).sum())
     parts = [
-        f"{beat_count} of {len(story)} selected stream finalists beat Schiff on the paired comparison rule.",
+        f"{beat_count} of {len(story)} selected stream finalists beat the {SCHIFF_SPEC_BENCHMARK_LABEL} on the paired comparison rule.",
     ]
     if mixed:
         parts.append(f"Treat {mixed} as a benchmark watch point rather than a clean structural-model win.")
@@ -441,17 +441,17 @@ def classify_error_rows(errors: pd.DataFrame) -> pd.DataFrame:
 
 def _paired_row_for_finalist(paired: pd.DataFrame, finalist: pd.Series) -> tuple[pd.Series | None, str]:
     if paired is None or paired.empty or "stream_label" not in paired.columns:
-        return None, "No paired Schiff row"
+        return None, "No paired Schiff specification benchmark row"
     stream = finalist.get("stream_label")
     stream_rows = paired[paired["stream_label"] == stream].copy()
     if stream_rows.empty:
-        return None, "No paired Schiff row for stream"
+        return None, "No paired Schiff specification benchmark row for stream"
     model = str(finalist.get("model", ""))
     if "challenger" in stream_rows.columns:
         exact = stream_rows[stream_rows["challenger"].astype(str) == model]
         if not exact.empty:
             ranked = _sort_paired_rows(exact)
-            return ranked.iloc[0], "Finalist paired against Schiff"
+            return ranked.iloc[0], "Finalist paired against Schiff specification benchmark"
     ranked = _sort_paired_rows(stream_rows)
     return ranked.iloc[0], "Best available paired challenger for stream"
 

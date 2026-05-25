@@ -9,6 +9,7 @@ import pytest
 from model_dashboard.chart_sources import CHART_SOURCE_FILES
 from model_dashboard.data.config import DEFAULT_EVIDENCE_PACK_ROOT
 from model_dashboard.evidence_pack import REQUIRED_EVIDENCE_TABLES, load_evidence_pack, resolve_evidence_pack_root
+from model_dashboard.labels import SCHIFF_SPEC_BENCHMARK_LABEL
 from tests.fixtures.expected_values import EXPECTED_FINALIST_MAPE, EXPECTED_LIGHT_PAIRED_GAIN_PP
 
 
@@ -32,13 +33,12 @@ def test_evidence_pack_required_files_load(evidence_pack_root: Path, evidence_pa
     assert evidence_pack.manifest["source_mode"] == "dashboard_evidence_pack"
 
 
-def test_resolve_evidence_pack_root_finds_downloads_wrapper(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    pack = tmp_path / "Downloads" / "stage1_dashboard_evidence_pack_v1" / "dashboard_evidence_pack"
+def test_resolve_evidence_pack_root_finds_explicit_schiff_spec_wrapper(tmp_path: Path) -> None:
+    pack = tmp_path / "stage1_dashboard_evidence_pack_schiff_spec_v2" / "dashboard_evidence_pack"
     (pack / "data").mkdir(parents=True)
     (pack / "manifest.json").write_text("{}", encoding="utf-8")
-    monkeypatch.setattr(Path, "home", lambda: tmp_path)
 
-    resolved = resolve_evidence_pack_root(tmp_path / "missing_default" / "dashboard_evidence_pack")
+    resolved = resolve_evidence_pack_root(tmp_path)
 
     assert resolved == pack
 
@@ -98,7 +98,9 @@ def test_finalist_values_and_stale_values(evidence_pack) -> None:
 def test_candidate_frontier_plots_more_than_100_rows(evidence_pack) -> None:
     frontier = pd.read_csv(ROOT / "artifacts" / "chart_sources" / "overview_candidate_search_frontier.csv")
     assert len(frontier) > 100
-    assert {"Selected finalist", "Schiff benchmark"}.issubset(set(frontier["point_type"]))
+    assert {"Selected finalist", SCHIFF_SPEC_BENCHMARK_LABEL}.issubset(set(frontier["point_type"]))
+    row_text = frontier.fillna("").astype(str).agg(lambda row: " ".join(row.to_list()), axis=1)
+    assert not row_text.str.contains("20.50|20.499", regex=True).any()
 
 
 def test_full_sample_vs_paired_semantics_are_enforced(evidence_pack) -> None:
@@ -108,6 +110,6 @@ def test_full_sample_vs_paired_semantics_are_enforced(evidence_pack) -> None:
     light = gain[gain["stream_label"].eq("Light RUC volume")]
     full_sample = light[light["metric_name"].eq("Full-sample quarterly gain")]["metric_value"].astype(float).iloc[0]
     paired = light["paired_gain_pp"].dropna().astype(float).iloc[0]
-    assert full_sample == pytest.approx(2.399241, abs=0.001)
+    assert full_sample == pytest.approx(-0.734606, abs=0.001)
     assert paired == pytest.approx(EXPECTED_LIGHT_PAIRED_GAIN_PP, abs=0.001)
-    assert full_sample > 0 and paired < 0
+    assert full_sample < 0 and paired < 0

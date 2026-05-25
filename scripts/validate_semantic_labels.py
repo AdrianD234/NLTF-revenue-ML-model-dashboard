@@ -52,7 +52,7 @@ def validate() -> list[tuple[str, str, str]]:
     )
     record(
         "Full-sample gain chart is not labelled paired",
-        "3. Full-sample Gain vs Schiff" in app_text and "Paired Gain vs Schiff" not in app_text,
+        "3. Full-sample Gain vs Schiff specification benchmark" in app_text and "Paired Gain vs Schiff" not in app_text,
         "Schiff gain chart title inspected in app.py.",
     )
     record(
@@ -76,12 +76,12 @@ def validate() -> list[tuple[str, str, str]]:
             errors="coerce",
         ).dropna()
         record(
-            "Light RUC paired weakness is not hidden by full-sample gain label",
-            not paired_gain.empty and float(paired_gain.iloc[0]) < 0 and not full_gain.empty and float(full_gain.iloc[0]) > 0,
+            "Light RUC benchmark weakness is not hidden by full-sample gain label",
+            not paired_gain.empty and float(paired_gain.iloc[0]) < 0 and not full_gain.empty and float(full_gain.iloc[0]) < 0,
             f"paired_gain={float(paired_gain.iloc[0]) if not paired_gain.empty else 'missing'}; full_sample_gain={float(full_gain.iloc[0]) if not full_gain.empty else 'missing'}",
         )
     else:
-        record("Light RUC paired weakness is not hidden by full-sample gain label", False, "Missing Schiff gain source table.")
+        record("Light RUC benchmark weakness is not hidden by full-sample gain label", False, "Missing Schiff gain source table.")
 
     stale_spec_terms = [
         "Candidate Models",

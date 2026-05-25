@@ -46,7 +46,7 @@ PAGE_PANELS = {
     "Schiff Benchmark": [
         "1. Schiff vs Finalist MAPE",
         "2. Benchmark Horizon Profiles",
-        "3. Full-sample Gain vs Schiff",
+        "3. Full-sample Gain vs Schiff specification benchmark",
         "4. Benchmark Summary",
     ],
 }
@@ -284,7 +284,7 @@ def test_rendered_plotly_trace_data_matches_chart_sources_where_possible(page: P
     candidate_source = pd.read_csv(CHART_SOURCE_DIR / "overview_candidate_search_frontier.csv")
     click_page(page, "Overview")
     body_text = page.locator("body").inner_text(timeout=60000)
-    assert "287 plotted candidates from 300 curated rows" in body_text
+    assert "286 plotted candidates from 300 curated rows" in body_text
     assert "278 loaded candidates" not in body_text
     candidate_plot = page.evaluate(
         """() => {
@@ -297,8 +297,8 @@ def test_rendered_plotly_trace_data_matches_chart_sources_where_possible(page: P
                 const xTitle = candidate.layout?.xaxis?.title?.text || '';
                 const yTitle = candidate.layout?.yaxis?.title?.text || '';
                 return xTitle.includes('Quarterly MAPE') && yTitle.includes('Annual MAPE')
-                    && (candidate.data || []).some((trace) => trace.name === 'Finalist')
-                    && (candidate.data || []).some((trace) => trace.name === 'Schiff');
+                    && (candidate.data || []).some((trace) => String(trace.name || '').includes('Finalist'))
+                    && (candidate.data || []).some((trace) => String(trace.name || '').includes('Schiff'));
             });
             if (!plot) return null;
             return (plot._fullData || plot.data || [])
@@ -375,9 +375,9 @@ def test_rendered_plotly_trace_data_matches_chart_sources_where_possible(page: P
         assert [float(value) for value in trace["y"]] == pytest.approx(source_rows["metric_value"].astype(float).tolist(), abs=0.001)
 
     click_page(page, "Schiff Benchmark")
-    expect(page.locator("body")).to_contain_text("3. Full-sample Gain vs Schiff", timeout=90000)
+    expect(page.locator("body")).to_contain_text("3. Full-sample Gain vs Schiff specification benchmark", timeout=90000)
     assert "Paired Gain vs Schiff" not in page.locator("body").inner_text(timeout=60000)
     schiff_gain = pd.read_csv(CHART_SOURCE_DIR / "schiff_paired_or_fullsample_gain.csv")
     light = schiff_gain[schiff_gain["stream_label"].eq("Light RUC volume")]
-    assert float(light[light["metric_name"].eq("Full-sample quarterly gain")]["metric_value"].iloc[0]) > 0
+    assert float(light[light["metric_name"].eq("Full-sample quarterly gain")]["metric_value"].iloc[0]) < 0
     assert float(light["paired_gain_pp"].dropna().iloc[0]) < 0

@@ -287,7 +287,7 @@ def plot_candidate_landscape(summary: pd.DataFrame) -> go.Figure:
         fig.add_annotation(
             x=row["quarterly_mape"],
             y=row["annual_mape"],
-            text=f"{stream_short} finalist" if row["point_type"] == "Selected finalist" else f"{stream_short} Schiff spec",
+            text=f"{stream_short} finalist" if row["point_type"] == "Selected finalist" else f"{stream_short} Schiff specification",
             showarrow=True,
             arrowhead=2,
             ax=18,
@@ -468,15 +468,15 @@ def plot_paired_improvement(paired: pd.DataFrame, top_n: int = 30) -> go.Figure:
             "<b>%{customdata[1]}</b><br>"
             "Stream: %{customdata[0]}<br>"
             "Stage: %{customdata[2]}<br>"
-            "Schiff specification MAPE: %{customdata[3]}<br>"
+            "Schiff specification benchmark MAPE: %{customdata[3]}<br>"
             "Challenger MAPE: %{customdata[4]}<br>"
-            "Gain vs Schiff: %{customdata[5]}<br>"
+            "Gain vs Schiff specification benchmark: %{customdata[5]}<br>"
             "Win rate: %{customdata[6]}<br>"
             "Common pairs: %{customdata[7]}<extra></extra>"
         )
     )
     fig.add_vline(x=0, line_width=1, line_color="#64748B")
-    return apply_layout(fig, "Paired gain versus Schiff", height=max(420, min(900, 120 + top_n * 22)))
+    return apply_layout(fig, "Paired gain versus Schiff specification benchmark", height=max(420, min(900, 120 + top_n * 22)))
 
 
 def plot_paired_scatter(paired: pd.DataFrame) -> go.Figure:
@@ -498,7 +498,7 @@ def plot_paired_scatter(paired: pd.DataFrame) -> go.Figure:
         color_discrete_map=STREAM_COLORS,
         hover_name="challenger_short",
         custom_data=["stream_label", "challenger_short", "_hover_stage", "_hover_baseline", "_hover_gain", "_hover_win_rate"],
-        labels={"baseline_mape": "Schiff MAPE (%)", "challenger_mape": "Challenger MAPE (%)"},
+        labels={"baseline_mape": "Schiff specification benchmark MAPE (%)", "challenger_mape": "Challenger MAPE (%)"},
     )
     fig.update_traces(
         hovertemplate=(
@@ -506,9 +506,9 @@ def plot_paired_scatter(paired: pd.DataFrame) -> go.Figure:
             "Stream: %{customdata[0]}<br>"
             "Stage: %{customdata[2]}<br>"
             "Baseline: %{customdata[3]}<br>"
-            "Schiff MAPE: %{x:.2f}%<br>"
+            "Schiff specification benchmark MAPE: %{x:.2f}%<br>"
             "Challenger MAPE: %{y:.2f}%<br>"
-            "Gain vs Schiff: %{customdata[4]}<br>"
+            "Gain vs Schiff specification benchmark: %{customdata[4]}<br>"
             "Win rate: %{customdata[5]}<extra></extra>"
         )
     )

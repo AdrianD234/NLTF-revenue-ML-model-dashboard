@@ -25,6 +25,7 @@ from model_dashboard.plots import (
     plot_improvement_vs_benchmark,
     plot_residual_vs_fitted,
 )
+from model_dashboard.labels import SCHIFF_SPEC_BENCHMARK_LABEL
 from tests.fixtures.expected_values import (
     EXPECTED_ENSEMBLE_WEIGHT_PCT,
     EXPECTED_LIGHT_PAIRED_GAIN_PP,
@@ -110,9 +111,11 @@ def test_scenario_gain_labels_are_full_sample_not_paired(parquet_dashboard: Load
 def test_light_ruc_paired_gain_is_not_misreported_as_positive(parquet_dashboard: LoadedRun) -> None:
     table = read_source_table("scenario_comparison_source_table.csv").set_index("stream_label")
     light = table.loc["Light RUC volume"]
-    assert float(light["full_sample_qtr_gain_pp"]) > 0
+    assert float(light["full_sample_qtr_gain_pp"]) == pytest.approx(-0.734606, abs=0.0008)
+    assert float(light["full_sample_qtr_gain_pp"]) < 0
     assert float(light["paired_gain_pp"]) == pytest.approx(EXPECTED_LIGHT_PAIRED_GAIN_PP, abs=0.0008)
     assert float(light["paired_gain_pp"]) < 0
+    assert light["recommendation"] == "Needs Stage 2"
 
 
 def test_horizon_source_table_exists(parquet_dashboard: LoadedRun) -> None:
@@ -266,12 +269,12 @@ def test_candidate_count_label_matches_count_source(parquet_dashboard: LoadedRun
             | candidate["is_plot_candidate"].fillna(False).astype(bool)
         ).sum()
     )
-    assert context["count"] == source_count == len(data["summary"]) == 287
-    assert context["label"] == "287 plotted candidates from 300 curated rows"
+    assert context["count"] == source_count - 1 == len(data["summary"]) == 286
+    assert context["label"] == "286 plotted candidates from 300 curated rows"
     assert overview_frontier_note(data["summary"], context).startswith(
-        "Frontier read: lower-left is better across 287 plotted candidates from 300 curated rows"
+        "Frontier read: lower-left is better across 286 plotted candidates from 300 curated rows"
     )
-    assert "5 plotted pure-Schiff anchor rows / 3 benchmark streams" in overview_frontier_note(data["summary"], context)
+    assert "5 plotted Schiff specification anchor rows / 3 benchmark streams" in overview_frontier_note(data["summary"], context)
 
 
 def test_candidate_frontier_count_matches_source_table_and_trace_points(parquet_dashboard: LoadedRun) -> None:
@@ -281,7 +284,8 @@ def test_candidate_frontier_count_matches_source_table_and_trace_points(parquet_
     source = pd.read_csv(ARTIFACTS / "chart_sources" / "overview_candidate_search_frontier.csv")
     fig = plot_candidate_landscape(landscape)
     rendered_marker_points = sum(len(trace.x) for trace in fig.data if getattr(trace, "mode", "") and "markers" in str(trace.mode))
-    assert len(source) == context["count"] == rendered_marker_points == 287
+    assert len(source) == context["count"] == rendered_marker_points == 286
+    assert SCHIFF_SPEC_BENCHMARK_LABEL in set(source["point_type"])
 
 
 def default_controls() -> dict[str, object]:

@@ -22,7 +22,7 @@ from .diagnostics import (
 from .locate import candidate_search_roots, locate_dashboard_file
 from .manifest import build_data_source_manifest, write_data_source_manifest
 from .transforms import STRESS_BUCKET_SOURCES, normalise_parquet_candidate
-from ..labels import STRESS_BUCKET_ORDER, humanize_label
+from ..labels import SCHIFF_SPEC_BENCHMARK_LABEL, STRESS_BUCKET_ORDER, humanize_label
 from ..metrics import (
     add_stream_fields,
     best_by_stream,
@@ -289,7 +289,7 @@ def _paired_frame(
                 "our_win_rate_pct": "challenger_win_rate",
             }
         ).copy()
-        out["baseline"] = "Pure Schiff benchmark"
+        out["baseline"] = SCHIFF_SPEC_BENCHMARK_LABEL
         out["challenger"] = "Current finalist"
         return normalise_paired(out)
     rows: list[dict[str, Any]] = []

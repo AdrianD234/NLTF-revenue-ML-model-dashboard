@@ -12,7 +12,7 @@ if str(ROOT) not in sys.path:
 
 from model_dashboard.data.config import DEFAULT_EVIDENCE_PACK_ROOT  # noqa: E402
 from model_dashboard.evidence_pack import REQUIRED_EVIDENCE_TABLES, load_evidence_pack, resolve_evidence_pack_root  # noqa: E402
-from model_dashboard.labels import STRESS_BUCKET_ORDER  # noqa: E402
+from model_dashboard.labels import SCHIFF_SPEC_BENCHMARK_LABEL, STRESS_BUCKET_ORDER  # noqa: E402
 
 
 EXPECTED_STREAMS = {"PED VKT per capita", "Light RUC volume", "Heavy RUC volume"}
@@ -20,6 +20,11 @@ EXPECTED_FINALISTS = {
     "PED VKT per capita": (2.473245, 2.385625),
     "Light RUC volume": (9.147545, 5.999499),
     "Heavy RUC volume": (3.484368, 3.019980),
+}
+EXPECTED_SCHIFF_SPEC = {
+    "PED VKT per capita": (4.091570, 4.132012),
+    "Light RUC volume": (8.412939, 5.000571),
+    "Heavy RUC volume": (7.800196, 8.112775),
 }
 
 
@@ -56,17 +61,37 @@ def validate() -> tuple[str, list[str]]:
             raise AssertionError(f"{stream} annual finalist MAPE does not reconcile.")
     findings.append("- [pass] Current finalist quarterly and annual MAPE reconcile to the evidence pack.")
 
+    schiff = loaded.data["schiff_df"]
+    for stream, (qtr, annual) in EXPECTED_SCHIFF_SPEC.items():
+        rows = schiff[schiff["stream_label"].eq(stream)]
+        if len(rows) != 1:
+            raise AssertionError(f"Expected exactly one Schiff specification benchmark row for {stream}; found {len(rows)}.")
+        row = rows.iloc[0]
+        if abs(float(row["quarterly_mape"]) - qtr) > 0.001:
+            raise AssertionError(f"{stream} Schiff specification quarterly MAPE does not reconcile.")
+        if abs(float(row["annual_mape"]) - annual) > 0.001:
+            raise AssertionError(f"{stream} Schiff specification annual MAPE does not reconcile.")
+    findings.append("- [pass] Schiff specification benchmark quarterly and annual MAPE reconcile to the evidence pack.")
+
     summary = loaded.data["summary"]
     if len(summary) < args.min_default_candidates:
         raise AssertionError(f"Default candidate frontier has {len(summary):,} rows; expected >100.")
-    if not {"Selected finalist", "Schiff benchmark"}.issubset(set(pd.read_csv(repo_root / "artifacts" / "chart_sources" / "overview_candidate_search_frontier.csv")["point_type"])):
+    if "mape_h12" in summary.columns:
+        stale_h12 = pd.to_numeric(summary["mape_h12"], errors="coerce").round(2).eq(20.50)
+        if stale_h12.any():
+            raise AssertionError("Default candidate summary still contains the old Heavy RUC 20.50 H12 Schiff-style value.")
+    frontier = pd.read_csv(repo_root / "artifacts" / "chart_sources" / "overview_candidate_search_frontier.csv")
+    if not {"Selected finalist", SCHIFF_SPEC_BENCHMARK_LABEL}.issubset(set(frontier["point_type"])):
         raise AssertionError("Candidate frontier source table is missing finalist or Schiff marker rows.")
+    frontier_text = frontier.fillna("").astype(str).agg(lambda row: " ".join(row.to_list()), axis=1)
+    if frontier_text.str.contains(r"20\.50|20\.499", regex=True).any():
+        raise AssertionError("Candidate frontier source table still contains the old Heavy RUC 20.50 H12 Schiff-style value.")
     findings.append(f"- [pass] Candidate frontier default rows: {len(summary):,}.")
 
     scenario = loaded.data["scenario_comparison"].set_index("stream_label")
     light = scenario.loc["Light RUC volume"]
-    if not (float(light["full_sample_qtr_gain_pp"]) > 0 and float(light["paired_gain_pp"]) < 0):
-        raise AssertionError("Light RUC full-sample gain and paired weakness are not both preserved.")
+    if not (float(light["full_sample_qtr_gain_pp"]) < 0 and float(light["paired_gain_pp"]) < 0):
+        raise AssertionError("Light RUC Schiff specification weakness is not preserved in both full-sample and paired comparisons.")
     findings.append("- [pass] Full-sample gain and paired gain semantics are separated.")
 
     stress = loaded.data["stress"]

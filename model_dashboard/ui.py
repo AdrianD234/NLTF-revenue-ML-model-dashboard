@@ -926,12 +926,17 @@ def governance_cards(df: pd.DataFrame) -> None:
         st.caption("No finalist governance summary is available.")
         return
     cards = []
+    status_labels = {
+        "Beats Schiff": "Beats Schiff specification benchmark",
+        "Does not beat Schiff": "Does not beat Schiff specification benchmark",
+    }
     for _, row in df.iterrows():
         stream = html.escape(str(row.get("stream_label", "Unknown")))
         model = html.escape(model_alias(row.get("winning_model", ""), 68))
         q_mape = _format_percent(row.get("quarterly_mape"))
         annual_mape = _format_percent(row.get("annual_mape"))
-        schiff = badge(str(row.get("schiff_status", "Not verified")), str(row.get("schiff_tone", "mixed")))
+        schiff_status = status_labels.get(str(row.get("schiff_status", "Not verified")), str(row.get("schiff_status", "Not verified")))
+        schiff = badge(schiff_status, str(row.get("schiff_tone", "mixed")))
         robustness = badge(str(row.get("robustness_status", "Not verified")), str(row.get("robustness_tone", "mixed")))
         schiff_summary = html.escape(str(row.get("schiff_summary", row.get("schiff_evidence", ""))))
         warning = html.escape(str(row.get("warning_summary", "No warning summary available.")))
@@ -942,7 +947,7 @@ def governance_cards(df: pd.DataFrame) -> None:
             "<div class='story-question'>Which model won?</div>"
             f"<div class='story-model'>{model}</div>"
             f"<div class='story-stat'>Quarterly MAPE {q_mape} | Annual MAPE {annual_mape}</div>"
-            "<div class='story-question'>Did it beat Schiff?</div>"
+            "<div class='story-question'>Did it beat the Schiff specification benchmark?</div>"
             f"<div class='story-stat'>{schiff_summary}</div>"
             "<div class='story-question'>Warnings</div>"
             f"<div class='story-stat'>{warning}</div>"

@@ -6,27 +6,31 @@ Current finalists are selected from Parquet rows where `is_current_recommended` 
 
 Legacy run-folder CSV/XLSX data cannot override current Parquet finalist values in the main dashboard path.
 
-## Pure Schiff Benchmarks
+## Schiff Specification Benchmark
 
-Pure Schiff benchmark rows must be structural Schiff rows only. They must exclude rows whose model identity indicates residual, blend, fixed blend, solver, convex solver, ensemble, top-k mean, top-k median, GBM, local, or similar non-pure challenger logic.
+The default benchmark is the Schiff specification benchmark from `data/dashboard_evidence_pack`.
+
+Legacy Schiff-style benchmark rows are retained only for review utilities. They must not be mixed into default Scenario Comparison, Schiff Benchmark, candidate frontier, horizon, stress, residual, annual, error-distribution, paired-comparison, or chart-source-table paths.
+
+Schiff specification benchmark rows must exclude rows whose model identity indicates residual, blend, fixed blend, solver, convex solver, ensemble, top-k mean, top-k median, GBM, local, or similar non-benchmark challenger logic.
 
 ## Full-Sample vs Paired Metrics
 
 Full-sample gain compares aggregate MAPE values:
 
 ```text
-Schiff full-sample MAPE - finalist full-sample MAPE
+Schiff specification benchmark full-sample MAPE - finalist full-sample MAPE
 ```
 
 Paired common-grid gain compares the same forecast pairs:
 
 ```text
-Schiff common-grid MAPE - finalist common-grid MAPE
+Schiff specification benchmark common-grid MAPE - finalist common-grid MAPE
 ```
 
 Paired win rate is also a common-pair metric.
 
-Charts and tables must label these concepts explicitly. If Light RUC shows a gain near `+2.40 pp`, that is full-sample quarterly gain and must not be labelled paired gain. The paired Light RUC quarterly comparison is negative in the current audit pack and must not be hidden by naming.
+Charts and tables must label these concepts explicitly. Under the Schiff specification benchmark, Light RUC has negative full-sample quarterly gain of about `-0.73 pp`, negative full-sample annual gain of about `-1.00 pp`, and negative paired common-grid gain of about `-0.76 pp`. That benchmark weakness must not be hidden by naming or by stale legacy values such as the old Light RUC `+2.40 pp` gain.
 
 ## Stress Buckets
 

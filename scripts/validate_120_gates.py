@@ -21,6 +21,11 @@ from model_dashboard.metrics import best_by_stream  # noqa: E402
 
 
 EXPECTED_STREAMS = {"PED VKT per capita", "Light RUC volume", "Heavy RUC volume"}
+EXPECTED_SCHIFF_SPEC = {
+    "PED VKT per capita": (4.091570, 4.132012),
+    "Light RUC volume": (8.412939, 5.000571),
+    "Heavy RUC volume": (7.800196, 8.112775),
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -112,7 +117,20 @@ def main() -> int:
             actual = pd.to_numeric(table.loc[key, "metric_value"], errors="coerce")
             if pd.isna(actual) or abs(float(actual) - expected_value) > 0.001:
                 raise AssertionError(f"{key} expected {expected_value}, got {actual}")
-        return f"Finalist accuracy source table reconciles to {len(finalists):,} current DashboardData finalists."
+        schiff = best_by_stream(loaded_data.get("schiff_df", pd.DataFrame())).set_index("stream_label")
+        for stream, (qtr, annual) in EXPECTED_SCHIFF_SPEC.items():
+            if stream not in schiff.index:
+                raise AssertionError(f"Missing Schiff specification benchmark row for {stream}.")
+            if abs(float(schiff.loc[stream, "quarterly_mape"]) - qtr) > 0.001:
+                raise AssertionError(f"{stream} Schiff specification quarterly MAPE does not reconcile.")
+            if abs(float(schiff.loc[stream, "annual_mape"]) - annual) > 0.001:
+                raise AssertionError(f"{stream} Schiff specification annual MAPE does not reconcile.")
+        summary = loaded_data.get("summary", pd.DataFrame())
+        if "mape_h12" in summary.columns:
+            stale_h12 = pd.to_numeric(summary["mape_h12"], errors="coerce").round(2).eq(20.50)
+            if stale_h12.any():
+                raise AssertionError("Default summary still contains the old Heavy RUC 20.50 H12 Schiff-style value.")
+        return f"Finalist and Schiff specification benchmark source values reconcile to DashboardData."
 
     def check_stress() -> str:
         table = read_source("overview_stress_horizon_checks.csv")
@@ -132,8 +150,16 @@ def main() -> int:
     def check_full_sample_gain_label() -> str:
         gain = read_source("schiff_paired_or_fullsample_gain.csv")
         text = " ".join(gain["chart_title"].astype(str).unique()) + " " + " ".join(gain["calculation_basis"].astype(str).unique())
-        if "Full-sample" not in text or "Paired Gain vs Schiff" in text:
+        if "Full-sample" not in text or "Schiff specification benchmark" not in text or "Paired Gain vs Schiff" in text:
             raise AssertionError(text)
+        light_full = pd.to_numeric(
+            gain[gain["stream_label"].eq("Light RUC volume") & gain["metric_name"].eq("Full-sample quarterly gain")][
+                "metric_value"
+            ],
+            errors="coerce",
+        ).dropna()
+        if light_full.empty or abs(float(light_full.iloc[0]) - (-0.734606)) > 0.001:
+            raise AssertionError(f"Light RUC full-sample gain is stale or missing: {light_full.to_list()}")
         return "Gain chart is labelled full-sample, not paired."
 
     def check_light_paired_gain() -> str:
@@ -141,9 +167,9 @@ def main() -> int:
         light = gain[gain["stream_label"].eq("Light RUC volume")]
         paired = pd.to_numeric(light["paired_gain_pp"], errors="coerce").dropna()
         full = pd.to_numeric(light[light["metric_name"].eq("Full-sample quarterly gain")]["metric_value"], errors="coerce").dropna()
-        if paired.empty or full.empty or float(paired.iloc[0]) >= 0 or float(full.iloc[0]) <= 0:
+        if paired.empty or full.empty or float(paired.iloc[0]) >= 0 or float(full.iloc[0]) >= 0:
             raise AssertionError(f"paired={paired.to_list()}; full={full.to_list()}")
-        return "Light RUC paired common-grid gain is negative while full-sample gain is positive and labelled."
+        return "Light RUC loses to the Schiff specification benchmark in both full-sample and paired comparisons."
 
     def check_decision_labels() -> str:
         table = read_source("scenario_decision_summary.csv")

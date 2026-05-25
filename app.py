@@ -513,7 +513,7 @@ def render_advanced_controls(loaded: LoadedRun, controls: dict[str, Any]) -> dic
     )
     control_cols = st.columns(4)
     with control_cols[0]:
-        controls["show_schiff"] = st.toggle("Schiff", key="advanced_show_schiff")
+        controls["show_schiff"] = st.toggle(SCHIFF_SPEC_BENCHMARK_LABEL, key="advanced_show_schiff")
         controls["show_finalists"] = st.toggle("Finalists", key="advanced_show_finalists")
     with control_cols[1]:
         controls["show_screen"] = st.toggle("Screen", key="advanced_show_screen")
@@ -907,8 +907,8 @@ def overview_kpi_cards(
     candidate_count = int(candidate_context.get("count", len(summary))) if candidate_context else len(summary)
     candidate_subtext = str(candidate_context.get("subtext", "default curated cone rows")) if candidate_context else "default curated cone rows"
     return [
-        ("Quarterly MAPE", format_percent(finalist_q), f"vs. Schiff spec {format_percent(schiff_q)}", f"{q_delta:.2f} pp gain" if pd.notna(q_delta) else "-", "good", "Q"),
-        ("Annual MAPE", format_percent(finalist_a), f"vs. Schiff spec {format_percent(schiff_a)}", f"{a_delta:.2f} pp gain" if pd.notna(a_delta) else "-", "good", "A"),
+        ("Quarterly MAPE", format_percent(finalist_q), f"vs. Schiff specification benchmark {format_percent(schiff_q)}", f"{q_delta:.2f} pp gain" if pd.notna(q_delta) else "-", "good", "Q"),
+        ("Annual MAPE", format_percent(finalist_a), f"vs. Schiff specification benchmark {format_percent(schiff_a)}", f"{a_delta:.2f} pp gain" if pd.notna(a_delta) else "-", "good", "A"),
         ("Plotted candidates", format_count(candidate_count), candidate_subtext, f"{format_count(len(recommended))} finalists", "good", "#"),
         (
             "Benchmark Pass",
@@ -1128,13 +1128,13 @@ def render_scenario_comparison(loaded: LoadedRun, controls: dict[str, Any]) -> N
         chart_card(
             "1. Stream Comparison: Scenario A vs Scenario B",
             "MAPE (%) - lower is better.",
-            compact_figure(plot_scenario_stream_comparison(comparison), 220),
+            compact_figure(plot_scenario_stream_comparison(comparison), 210),
         )
     with top[1]:
         chart_card(
             "2. Improvement vs Benchmark",
             "Full-sample MAPE gain in percentage points - positive values favour Scenario A.",
-            compact_figure(plot_improvement_vs_benchmark(comparison), 220),
+            compact_figure(plot_improvement_vs_benchmark(comparison), 210),
         )
 
     bottom = st.columns([1.0, 1.0])
@@ -1190,11 +1190,11 @@ def scenario_kpi_cards(
     beats = int((story.get("schiff_status", pd.Series(dtype=str)) == "Beats Schiff").sum()) if story is not None and not story.empty else 0
     total = len(story) if story is not None else 0
     gain_value = f"{gain:.2f} pp" if pd.notna(gain) else "-"
-    gain_delta = "A better" if pd.notna(gain) and gain > 0 else "Schiff better" if pd.notna(gain) else ""
+    gain_delta = "A better" if pd.notna(gain) and gain > 0 else "Benchmark better" if pd.notna(gain) else ""
     return [
         ("Quarterly MAPE", format_percent(q_value), "Scenario A finalist mean", "", "good", "Q"),
         ("Annual MAPE", format_percent(a_value), "Scenario A finalist mean", "", "good", "A"),
-        ("Gain vs Schiff spec", gain_value, f"{gain_source}; {format_percent(win_rate, 1)} paired win", gain_delta, "good" if pd.notna(gain) and gain > 0 else "mixed", "B"),
+        ("Gain vs benchmark", gain_value, f"{gain_source} vs Schiff specification benchmark; {format_percent(win_rate, 1)} paired win", gain_delta, "good" if pd.notna(gain) and gain > 0 else "mixed", "B"),
         ("Decision status", f"{beats}/{total}", "streams beat Schiff specification", "", "good" if total and beats >= 2 else "mixed", "D"),
     ]
 
@@ -1442,7 +1442,7 @@ def render_schiff_benchmark_page(loaded: LoadedRun, controls: dict[str, Any]) ->
     bottom = st.columns([1.0, 1.0])
     with bottom[0]:
         chart_card(
-            "3. Full-sample Gain vs Schiff",
+            "3. Full-sample Gain vs Schiff specification benchmark",
             "Full-sample MAPE gain versus the Schiff specification benchmark; positive values favour the refined finalist.",
             compact_figure(plot_improvement_vs_benchmark(comparison), 260),
         )
@@ -1467,12 +1467,12 @@ def schiff_kpi_cards(summary: pd.DataFrame, paired: pd.DataFrame, recommended: p
     rec_best = best_by_stream(recommended)
     return [
         (
-            "Schiff Spec Streams",
+            "Schiff Specification Streams",
             format_count(schiff_best["stream_label"].nunique()) if "stream_label" in schiff_best.columns else "0",
             "Schiff specification benchmark only",
         ),
         (
-            "Best Schiff Spec Qtr MAPE",
+            "Best Schiff Specification Qtr MAPE",
             format_percent(schiff_best["quarterly_mape"].min()) if "quarterly_mape" in schiff_best.columns and not schiff_best.empty else "-",
             "lower is better",
         ),
@@ -1616,7 +1616,7 @@ def enterprise_decision_brief(story: pd.DataFrame, loaded: LoadedRun) -> tuple[s
     )
     cards = [
         ("Readiness", readiness, top_decision),
-        ("Benchmark result", f"{beats}/{total} beat Schiff spec", "Schiff specification comparison rule"),
+        ("Benchmark result", f"{beats}/{total} beat Schiff specification benchmark", "Schiff specification comparison rule"),
         ("Watch point", weak_stream, "benchmark or stress caveat"),
         ("Next gate", "Stage 2 uncertainty", f"{diagnostics:,} logged diagnostics in Run Audit"),
     ]
@@ -1646,7 +1646,7 @@ def data_quality_warning_readout(loaded: LoadedRun, story: pd.DataFrame) -> str:
     if not errors.empty:
         parts.append(f"{len(errors):,} diagnostic rows are logged; review Run Audit before production use.")
     if mixed:
-        parts.append(f"Benchmark watch point: {', '.join(mixed)} does not show a clean Schiff win.")
+        parts.append(f"Benchmark watch point: {', '.join(mixed)} does not show a clean Schiff specification benchmark win.")
     if high_risk:
         parts.append(f"Stress watch point: {', '.join(high_risk)} crosses the high-risk guide.")
     if len(parts) == 1:
@@ -1719,7 +1719,7 @@ def render_candidate_landscape(loaded: LoadedRun, controls: dict[str, Any]) -> N
         summary = hide_candidate_outliers(summary)
     st.plotly_chart(plot_candidate_landscape(summary), width="stretch")
     st.caption(
-        "Frontier read: finalists and Schiff markers should sit near the lower-left area where both quarterly and "
+        "Frontier read: finalists and Schiff specification benchmark markers should sit near the lower-left area where both quarterly and "
         "annual MAPE are low. Out-of-range candidates remain available in the table below."
     )
     export_columns = [
@@ -2130,7 +2130,7 @@ def render_stress_checks(loaded: LoadedRun, controls: dict[str, Any]) -> None:
     info_panel(stress_readout(stress_frame))
     info_panel(
         "Light RUC remains a weak-stream watch point. The 2022-23 RUC discount and purchase-timing period is "
-        "difficult to model, so a mixed Schiff result should not be presented as a clean benchmark win. Heavy RUC "
+        "difficult to model, so a mixed Schiff specification benchmark result should not be presented as a clean benchmark win. Heavy RUC "
         "can also show high stress-period risk, so this page separates Stage 1 model-form evidence from full "
         "end-to-end forecast uncertainty."
     )
