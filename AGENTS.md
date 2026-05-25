@@ -168,19 +168,16 @@ Do not finish a performance task while `PERF_DEFECT_BACKLOG.lock.md` has uncheck
 Do not finish without before/after timings.
 Do not remove functionality to improve speed.
 
-## Latest arbitration data-quality rule
+## Parquet data-quality rule
 
-For latest Stage 1 arbitration dashboard work, the source-of-truth run is:
+For Stage 1 governance dashboard work, the source of truth is the curated Parquet candidate pack resolved from `MODEL_DIAGNOSTIC_DATA_ROOT`, `STAGE1_DASHBOARD_DATA_ROOT`, CLI arguments, or the Streamlit data-root control.
 
-`C:\Users\Adrian Desilvestro\OneDrive\Documents\Playground\Revenue Modeling - Strategic Review\04 Models\Inputs\stage1_finalist_arbitration_outputs\run_20260520_002339`
-
-The app must prefer the verified curated data pack in `artifacts/curated_data/`.
+Legacy run-folder CSV/XLSX outputs are review-only. They must not become the main app path or override Parquet-backed finalists.
 
 Before declaring completion:
 
-- rebuild curated data with `scripts/build_curated_dashboard_data.py`;
-- verify curated data with `scripts/verify_curated_dashboard_data.py`;
-- prove the latest finalist values match `LATEST_RUN_SOURCE_OF_TRUTH.lock.md`;
+- write `artifacts/data_source_manifest.json` for the active data root;
+- prove the current finalist values reconcile to Parquet `is_current_recommended` rows;
 - prove the older AutoGluon balanced-run finalist values are not current latest finalist values;
 - prove the candidate landscape is a capped curated cone/frontier sample, not a raw candidate dump;
 - prove pure Schiff excludes residuals, blends, solvers, ensembles, top/mean/median variants, and convex solver rows;

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -457,12 +458,12 @@ def _build_dashboard_frames(
     status_rows.extend(audit_status)
     warnings.extend(audit_warnings)
     diagnostic = _diagnostic_frame(candidate, audit_tables)
-    paired = _paired_frame(recommended, schiff, audit_tables, repo_root)
+    paired = _paired_frame(recommended, schiff, audit_tables)
     stress = _stress_frame(recommended)
     horizon = _horizon_frame(pd.concat([recommended, schiff], ignore_index=True))
     weights = _ensemble_frame(candidate, repo_root)
-    quarterly_predictions = _load_optional_repo_csv(repo_root, "quarterly_predictions_selected.csv")
-    annual_predictions = _load_optional_repo_csv(repo_root, "annual_predictions_selected.csv")
+    quarterly_predictions = _load_optional_pack_csv(roots, "quarterly_predictions_selected.csv")
+    annual_predictions = _load_optional_pack_csv(roots, "annual_predictions_selected.csv")
     if not quarterly_predictions.empty:
         quarterly_predictions = normalise_predictions(quarterly_predictions, annual=False)
     if not annual_predictions.empty:
@@ -548,8 +549,10 @@ def _pure_schiff_rows(candidate: pd.DataFrame) -> pd.DataFrame:
     return schiff[~schiff["model"].astype(str).str.contains(bad_pattern, regex=True, na=False)].copy()
 
 
-def _load_optional_repo_csv(repo_root: Path, filename: str) -> pd.DataFrame:
-    path = repo_root / "artifacts" / "curated_data" / filename
+def _load_optional_pack_csv(roots: list[Path], filename: str) -> pd.DataFrame:
+    path = locate_dashboard_file(filename, roots)
+    if path is None:
+        return pd.DataFrame()
     if not path.exists():
         return pd.DataFrame()
     try:
@@ -675,7 +678,6 @@ def _paired_frame(
     recommended: pd.DataFrame,
     schiff: pd.DataFrame,
     audit_tables: dict[str, pd.DataFrame],
-    repo_root: Path,
 ) -> pd.DataFrame:
     audit = audit_tables.get("paired_common_forecast_pairs_our_vs_schiff", audit_tables.get("paired_vs_schiff", pd.DataFrame()))
     if not audit.empty:
@@ -690,9 +692,6 @@ def _paired_frame(
         out["baseline"] = "Pure Schiff benchmark"
         out["challenger"] = "Current finalist"
         return normalise_paired(out)
-    repo_paired = _load_optional_repo_csv(repo_root, "paired_vs_schiff_selected.csv")
-    if not repo_paired.empty:
-        return normalise_paired(repo_paired)
     rows: list[dict[str, Any]] = []
     for _, finalist in recommended.iterrows():
         stream = finalist.get("stream")

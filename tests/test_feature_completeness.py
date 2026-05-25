@@ -41,8 +41,8 @@ from app import (
     schiff_compact_summary,
     schiff_kpi_cards,
 )
-from model_dashboard.data_loader import LoadedRun, curated_manifest_matches, discover_run_folders, load_curated_run, load_run
-from model_dashboard.labels import DEFAULT_INPUT_PARENT, IGNORED_RUN_FOLDER_NAMES, model_alias, schiff_class
+from model_dashboard.data_loader import LoadedRun, load_parquet_dashboard
+from model_dashboard.labels import model_alias, schiff_class
 from model_dashboard.metrics import (
     best_by_stream,
     filter_by_common_controls,
@@ -75,20 +75,15 @@ from model_dashboard.plots import (
 
 @pytest.fixture(scope="session")
 def loaded_validation_run() -> LoadedRun:
-    configured = os.environ.get("MODEL_RUN_DIR") or os.environ.get("STAGE1_MODEL_RUN_DIR")
-    preferred = (
-        Path(configured).expanduser()
-        if configured
-        else Path(DEFAULT_INPUT_PARENT) / "stage1_finalist_arbitration_outputs" / "run_20260520_002339"
-    )
-    if preferred.exists():
-        curated_dir = Path(__file__).resolve().parents[1] / "artifacts" / "curated_data"
-        if curated_manifest_matches(curated_dir, preferred):
-            return load_curated_run(curated_dir, preferred)
-        return load_run(preferred)
-    runs = discover_run_folders(Path(DEFAULT_INPUT_PARENT), IGNORED_RUN_FOLDER_NAMES)
-    assert runs, f"No completed run folders found under {DEFAULT_INPUT_PARENT}"
-    return load_run(runs[0])
+    configured = os.environ.get("MODEL_DIAGNOSTIC_DATA_ROOT") or os.environ.get("STAGE1_DASHBOARD_DATA_ROOT")
+    if not configured:
+        pytest.skip("Full feature-completeness tests require MODEL_DIAGNOSTIC_DATA_ROOT or STAGE1_DASHBOARD_DATA_ROOT.")
+    data_root = Path(configured).expanduser()
+    if data_root.name == "mini_parquet":
+        pytest.skip("Full feature-completeness tests require the external dashboard data pack, not the mini fixture.")
+    if not data_root.exists():
+        pytest.skip(f"Configured dashboard data root does not exist: {data_root}")
+    return load_parquet_dashboard(data_root, Path(__file__).resolve().parents[1])
 
 
 def test_validation_run_has_real_data_for_all_core_pages(loaded_validation_run: LoadedRun) -> None:

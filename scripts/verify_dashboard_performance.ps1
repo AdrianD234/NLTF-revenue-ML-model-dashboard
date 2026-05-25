@@ -1,5 +1,6 @@
 param(
-    [string]$Python = "C:\Users\Adrian Desilvestro\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe",
+    [string]$Python = "",
+    [string]$DataRoot = "",
     [int]$Port = 8502,
     [int]$StartupTimeoutSeconds = 90
 )
@@ -10,15 +11,34 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Root = Split-Path -Parent $ScriptDir
 Set-Location $Root
 
-if (-not (Test-Path -LiteralPath $Python)) {
+if ([string]::IsNullOrWhiteSpace($Python)) {
+    $venvPython = Join-Path $Root ".venv\Scripts\python.exe"
+    $pathPython = Get-Command python -ErrorAction SilentlyContinue
+    if (Test-Path -LiteralPath $venvPython) {
+        $Python = $venvPython
+    }
+    elseif ($pathPython -and (Test-Path -LiteralPath $pathPython.Source)) {
+        $Python = $pathPython.Source
+    }
+    else {
+        $Python = "python"
+    }
+}
+
+if ($Python -ne "python" -and -not (Test-Path -LiteralPath $Python)) {
     throw "Python executable not found: $Python"
 }
 
-$runDir = $env:MODEL_RUN_DIR
-if ([string]::IsNullOrWhiteSpace($runDir)) {
-    $runDir = "C:\Users\Adrian Desilvestro\OneDrive\Documents\Playground\Revenue Modeling - Strategic Review\04 Models\Inputs\stage1_finalist_arbitration_outputs\run_20260520_002339"
+if ([string]::IsNullOrWhiteSpace($DataRoot)) {
+    $DataRoot = $env:MODEL_DIAGNOSTIC_DATA_ROOT
 }
-$env:MODEL_RUN_DIR = $runDir
+if ([string]::IsNullOrWhiteSpace($DataRoot)) {
+    $DataRoot = $env:STAGE1_DASHBOARD_DATA_ROOT
+}
+if ([string]::IsNullOrWhiteSpace($DataRoot)) {
+    $DataRoot = "data"
+}
+$env:MODEL_DIAGNOSTIC_DATA_ROOT = $DataRoot
 
 New-Item -ItemType Directory -Force -Path "artifacts/logs" | Out-Null
 
@@ -45,7 +65,7 @@ function Test-StreamlitHealth {
 }
 
 Write-Host "Running backend performance benchmark"
-& $Python scripts\benchmark_dashboard.py --run-dir "$runDir" --out-dir artifacts --repeats 3 |
+& $Python scripts\benchmark_dashboard.py --data-root "$DataRoot" --out-dir artifacts --repeats 3 |
     Tee-Object -FilePath "artifacts/logs/performance_benchmark.log"
 if ($LASTEXITCODE -ne 0) {
     throw "Backend performance benchmark failed."

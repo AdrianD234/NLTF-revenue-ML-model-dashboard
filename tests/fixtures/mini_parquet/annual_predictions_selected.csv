@@ -1,0 +1,4 @@
+stream,stream_label,model,selected_role,horizon,ape,error_pct,actual,pred
+PED,PED VKT per capita,PED_current_fixture_model,Finalist,12,2.385625,2.385625,1000,1023.8562499999999
+LIGHT_RUC,Light RUC volume,LIGHT_RUC_current_fixture_model,Finalist,12,5.999499,5.999499,1000,1059.9949900000001
+HEAVY_RUC,Heavy RUC volume,HEAVY_RUC_current_fixture_model,Finalist,12,3.01998,3.01998,1000,1030.1998

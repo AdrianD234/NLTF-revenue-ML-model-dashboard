@@ -91,7 +91,7 @@ from model_dashboard.ui import (
 )
 
 
-LOADER_SCHEMA_VERSION = "stage1-governance-loader-v8-parquet-contract"
+LOADER_SCHEMA_VERSION = "stage1-governance-loader-v9-parquet-contract-schiff-class"
 CURATED_DATA_DIR = Path("artifacts") / "curated_data"
 
 

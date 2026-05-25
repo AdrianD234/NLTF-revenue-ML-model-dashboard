@@ -8,6 +8,14 @@ tests/__pycache__/
 .uv-cache/
 output/
 *.log
+*.out
+*.err
 *.pyc
-artifacts/screenshots/*.png
-artifacts/logs/
+*.xlsx
+*.xls
+*.parquet
+!tests/fixtures/**/*.parquet
+artifacts/**
+!artifacts/.gitkeep
+data/**
+!data/.gitkeep

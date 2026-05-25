@@ -1,7 +1,7 @@
 param(
     [int]$MaxPasses = 120,
-    [string]$Python = "C:\Users\Adrian Desilvestro\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe",
-    [string]$DataRoot = "C:\Users\Adrian Desilvestro\OneDrive\Documents\Playground\Revenue Modeling - Strategic Review\04 Models\model_diagnostic_audit_pack",
+    [string]$Python = "",
+    [string]$DataRoot = "",
     [int]$VerifierPort = 8501
 )
 
@@ -11,9 +11,34 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Root = Split-Path -Parent $ScriptDir
 Set-Location $Root
 
-if (-not (Test-Path -LiteralPath $Python)) {
+if ([string]::IsNullOrWhiteSpace($Python)) {
+    $venvPython = Join-Path $Root ".venv\Scripts\python.exe"
+    $pathPython = Get-Command python -ErrorAction SilentlyContinue
+    if (Test-Path -LiteralPath $venvPython) {
+        $Python = $venvPython
+    }
+    elseif ($pathPython -and (Test-Path -LiteralPath $pathPython.Source)) {
+        $Python = $pathPython.Source
+    }
+    else {
+        $Python = "python"
+    }
+}
+
+if ($Python -ne "python" -and -not (Test-Path -LiteralPath $Python)) {
     throw "Python executable not found: $Python"
 }
+
+if ([string]::IsNullOrWhiteSpace($DataRoot)) {
+    $DataRoot = $env:MODEL_DIAGNOSTIC_DATA_ROOT
+}
+if ([string]::IsNullOrWhiteSpace($DataRoot)) {
+    $DataRoot = $env:STAGE1_DASHBOARD_DATA_ROOT
+}
+if ([string]::IsNullOrWhiteSpace($DataRoot)) {
+    $DataRoot = "data"
+}
+$env:MODEL_DIAGNOSTIC_DATA_ROOT = $DataRoot
 
 New-Item -ItemType Directory -Force -Path "artifacts/logs" | Out-Null
 New-Item -ItemType Directory -Force -Path "artifacts/screenshots" | Out-Null
@@ -93,7 +118,7 @@ Current loop number: $PassNumber of $MaxPasses executed in the latest run
 Passed gates: $passed
 Failed gates: $failed
 Latest log: $PassLog
-Retained CSV-preview smoke-test run: run_20260520_002339
+Active data root: $DataRoot
 
 ## Failed Gates
 

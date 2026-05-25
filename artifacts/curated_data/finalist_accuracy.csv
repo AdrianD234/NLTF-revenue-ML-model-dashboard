@@ -1,4 +1,0 @@
-stream,stream_label,model,model_short,source_family,model_kind,feature_set,quarterly_mape,annual_mape,quarterly_bias_pct,governance_score,finalist_role
-HEAVY_RUC,Heavy RUC volume,HEAVY_RUC__solver_static_convex_top18,Heavy RUC - Static solver,Posthoc Ensemble,Solver Static Convex,Ensemble,3.5609226862385333,3.171406050511395,0.1658499895943206,0.0014264264264264,Latest arbitration finalist
-LIGHT_RUC,Light RUC volume,LIGHT_RUC__solver_static_convex_top18,Light RUC - Static solver,Posthoc Ensemble,Solver Static Convex,Ensemble,9.147545354091871,5.999498868354417,0.7381252017566522,0.0031380337636544,Latest arbitration finalist
-PED,PED VKT per capita,PED__solver_static_convex_top18,PED - Static solver,Posthoc Ensemble,Solver Static Convex,Ensemble,2.4735782411978,2.3870893939736244,1.5049095070308187,0.0674311926605504,Latest arbitration finalist

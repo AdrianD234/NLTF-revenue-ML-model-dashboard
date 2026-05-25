@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import importlib
 import json
+import os
 import statistics
 import sys
 import time
@@ -14,8 +15,10 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-LATEST_ARBITRATION_RUN_DIR = Path(
-    r"C:\Users\Adrian Desilvestro\OneDrive\Documents\Playground\Revenue Modeling - Strategic Review\04 Models\Inputs\stage1_finalist_arbitration_outputs\run_20260520_002339"
+DEFAULT_PARQUET_DATA_ROOT = Path(
+    os.environ.get("MODEL_DIAGNOSTIC_DATA_ROOT")
+    or os.environ.get("STAGE1_DASHBOARD_DATA_ROOT")
+    or "data"
 )
 
 
@@ -289,7 +292,7 @@ def benchmark_parquet_backend(data_root: Path, repo_root: Path, repeats: int) ->
     modules = load_dashboard_modules()
     results: dict[str, Any] = {
         "timestamp": now_iso(),
-        "run_dir": str(LATEST_ARBITRATION_RUN_DIR),
+        "source_mode": "parquet",
         "data_root": str(data_root),
         "repo_root": str(repo_root),
         "benchmarks": [],
@@ -409,7 +412,11 @@ def write_performance_review(out_dir: Path, result: dict[str, Any]) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--run-dir")
-    parser.add_argument("--data-root", help="Benchmark the Parquet-backed dashboard data pack instead of an old run folder.")
+    parser.add_argument(
+        "--data-root",
+        default=None,
+        help="Benchmark the Parquet-backed dashboard data pack. Defaults to MODEL_DIAGNOSTIC_DATA_ROOT, STAGE1_DASHBOARD_DATA_ROOT, or data/.",
+    )
     parser.add_argument("--repo-root", default=str(ROOT))
     parser.add_argument("--out-dir", default="artifacts")
     parser.add_argument("--repeats", type=int, default=3)
@@ -422,13 +429,12 @@ def main() -> None:
 
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    if args.data_root:
-        results = benchmark_parquet_backend(Path(args.data_root).expanduser(), Path(args.repo_root).expanduser(), max(1, args.repeats))
-    else:
-        if not args.run_dir:
-            raise SystemExit("--run-dir is required unless --data-root is supplied.")
+    if args.run_dir and args.data_root is None:
         run_dir = Path(args.run_dir).expanduser()
         results = benchmark_backend(run_dir, max(1, args.repeats))
+    else:
+        data_root = Path(args.data_root or DEFAULT_PARQUET_DATA_ROOT).expanduser()
+        results = benchmark_parquet_backend(data_root, Path(args.repo_root).expanduser(), max(1, args.repeats))
 
     latest_path = out_dir / "performance_latest.json"
     baseline_path = out_dir / "performance_baseline.json"

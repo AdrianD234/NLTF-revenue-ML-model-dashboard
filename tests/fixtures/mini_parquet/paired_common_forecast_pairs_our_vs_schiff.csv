@@ -1,0 +1,4 @@
+stream,stream_label,our_model,schiff_model,n_common_pairs,our_mape_common,schiff_mape_common,mape_improvement_pp,our_win_rate_pct
+PED,PED VKT per capita,PED_current_fixture_model,PED_pure_schiff_fixture,100,2.473245,3.082117,0.608873,63.20132
+LIGHT_RUC,Light RUC volume,LIGHT_RUC_current_fixture_model,LIGHT_RUC_pure_schiff_fixture,100,12.705906,11.546786,-1.15912,50.555556
+HEAVY_RUC,Heavy RUC volume,HEAVY_RUC_current_fixture_model,HEAVY_RUC_pure_schiff_fixture,100,4.0,12.0,8.0,64.155251
