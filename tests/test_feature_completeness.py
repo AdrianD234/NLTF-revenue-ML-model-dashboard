@@ -42,6 +42,7 @@ from app import (
     schiff_kpi_cards,
 )
 from model_dashboard.data_loader import LoadedRun, load_parquet_dashboard
+from model_dashboard.data.diagnostics import build_diagnostic_acf_source_table
 from model_dashboard.labels import model_alias, schiff_class
 from model_dashboard.metrics import (
     best_by_stream,
@@ -84,6 +85,13 @@ def loaded_validation_run() -> LoadedRun:
     if not data_root.exists():
         pytest.skip(f"Configured dashboard data root does not exist: {data_root}")
     return load_parquet_dashboard(data_root, Path(__file__).resolve().parents[1])
+
+
+def selected_predictions_missing(loaded: LoadedRun) -> bool:
+    qpred = loaded.data["quarterly_predictions"]
+    status = loaded.file_status
+    rows = status[status["Dataset"].astype(str).eq("Quarterly Predictions Selected")]
+    return qpred.empty and not rows.empty and rows["Found?"].iloc[0] == "No"
 
 
 def test_validation_run_has_real_data_for_all_core_pages(loaded_validation_run: LoadedRun) -> None:
@@ -528,9 +536,10 @@ def test_core_charts_are_populated_from_real_run_data(loaded_validation_run: Loa
         plot_candidate_landscape(data["summary"].head(100)),
         plot_schiff_benchmark(data["summary"]),
         plot_paired_improvement(data["paired_vs_schiff"], top_n=20),
-        plot_error_distribution(data["quarterly_predictions"].head(5_000)),
         plot_stress_checks(stress_frame),
     ]
+    if not selected_predictions_missing(loaded_validation_run):
+        figures.append(plot_error_distribution(data["quarterly_predictions"].head(5_000)))
 
     for figure in figures:
         assert len(figure.data) > 0
@@ -710,6 +719,9 @@ def test_forecast_error_readout_summarises_selected_rows(loaded_validation_run: 
     readout = forecast_error_readout(qpred)
 
     assert "Forecast read:" in readout
+    if selected_predictions_missing(loaded_validation_run):
+        assert "no forecast-error rows" in readout
+        return
     assert "absolute error" in readout
     assert "Largest miss" in readout
 
@@ -719,6 +731,10 @@ def test_forecast_error_charts_include_time_and_horizon_views(loaded_validation_
     percent_fig = plot_percent_error_over_time(qpred)
     horizon_fig = plot_horizon_mape(qpred)
 
+    if selected_predictions_missing(loaded_validation_run):
+        assert len(percent_fig.data) == 0
+        assert len(horizon_fig.data) == 0
+        return
     assert len(percent_fig.data) > 0
     assert "Forecast percentage error over time" in str(percent_fig.layout.title.text)
     assert len(horizon_fig.data) > 0
@@ -729,6 +745,10 @@ def test_residual_vs_fitted_proxy_is_populated(loaded_validation_run: LoadedRun)
     qpred = central_error_window(loaded_validation_run.data["quarterly_predictions"].head(5_000))
     figure = plot_residual_vs_fitted(qpred)
 
+    if selected_predictions_missing(loaded_validation_run):
+        assert len(figure.data) == 0
+        assert "Prediction rows need fitted values" in str(figure.layout.annotations)
+        return
     assert len(figure.data) > 0
     assert "Residuals vs fitted by stream" in str(figure.layout.title.text)
     assert "Fitted value" in str(figure.layout.xaxis.title.text)
@@ -736,7 +756,8 @@ def test_residual_vs_fitted_proxy_is_populated(loaded_validation_run: LoadedRun)
 
 def test_autocorrelation_diagnostics_uses_lag_bars(loaded_validation_run: LoadedRun) -> None:
     qpred = central_error_window(loaded_validation_run.data["quarterly_predictions"].head(20_000))
-    figure = plot_autocorrelation_diagnostics(qpred)
+    acf_source = build_diagnostic_acf_source_table(qpred, loaded_validation_run.data["diagnostic_df"])
+    figure = plot_autocorrelation_diagnostics(qpred, acf_source=acf_source)
 
     assert len(figure.data) > 0
     assert all(getattr(trace, "type", "") == "bar" for trace in figure.data)

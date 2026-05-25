@@ -101,7 +101,7 @@ def build_chart_source_tables(data: dict[str, pd.DataFrame]) -> dict[str, pd.Dat
     horizon = data.get("horizon_df", pd.DataFrame())
     comparison = _scenario_comparison(recommended, schiff if not schiff.empty else summary, paired)
     horizon_source = _horizon_source(horizon, qpred, recommended)
-    acf_source = _acf_source(qpred)
+    acf_source = _acf_source(qpred, diagnostics)
     diagnostic_window = _central_error_window(qpred)
 
     return {
@@ -356,13 +356,13 @@ def _overview_stress(stress: pd.DataFrame, source_file: str) -> pd.DataFrame:
     return _standardize(rows)
 
 
-def _acf_source(qpred: pd.DataFrame, max_lag: int = 12) -> pd.DataFrame:
-    columns = ["stream_label", "lag", "acf_value", "residual_source", "calculation_method"]
+def _acf_source(qpred: pd.DataFrame, diagnostics: pd.DataFrame | None = None, max_lag: int = 12) -> pd.DataFrame:
+    columns = ["stream_label", "lag", "acf_value", "residual_source", "calculation_method", "source_column"]
     if qpred is None or qpred.empty or not {"error_pct", "stream_label"}.issubset(qpred.columns):
-        return pd.DataFrame(columns=columns)
+        return _acf_source_from_diagnostics(diagnostics, columns)
     data = qpred.dropna(subset=["error_pct", "stream_label"]).copy()
     if data.empty:
-        return pd.DataFrame(columns=columns)
+        return _acf_source_from_diagnostics(diagnostics, columns)
     if "target_period" in data.columns:
         data["_period_key"] = data["target_period"].map(_period_key)
         grouped = (
@@ -387,9 +387,39 @@ def _acf_source(qpred: pd.DataFrame, max_lag: int = 12) -> pd.DataFrame:
                     "acf_value": series.autocorr(lag=lag) if len(series) > lag + 1 else pd.NA,
                     "residual_source": "All selected quarterly prediction residuals, averaged by target period",
                     "calculation_method": "pandas Series.autocorr on mean signed forecast error percentage by lag",
+                    "source_column": "error_pct",
                 }
             )
-    return pd.DataFrame(rows, columns=columns)
+    frame = pd.DataFrame(rows, columns=columns)
+    if frame.empty:
+        return _acf_source_from_diagnostics(diagnostics, columns)
+    return frame
+
+
+def _acf_source_from_diagnostics(diagnostics: pd.DataFrame | None, columns: list[str]) -> pd.DataFrame:
+    if diagnostics is None or diagnostics.empty or "acf1_resid" not in diagnostics.columns or "stream_label" not in diagnostics.columns:
+        return pd.DataFrame(columns=columns)
+    data = diagnostics.copy()
+    if "role" in data.columns:
+        finalist_rows = data[data["role"].astype(str).str.contains("finalist", case=False, na=False)]
+        if not finalist_rows.empty:
+            data = finalist_rows
+    rows: list[dict[str, Any]] = []
+    for _, row in data.dropna(subset=["stream_label"]).iterrows():
+        value = pd.to_numeric(row.get("acf1_resid"), errors="coerce")
+        if pd.isna(value):
+            continue
+        rows.append(
+            {
+                "stream_label": row.get("stream_label"),
+                "lag": 1,
+                "acf_value": float(value),
+                "residual_source": "H1 residual diagnostics from diagnostic audit pack",
+                "calculation_method": "Lag 1 residual autocorrelation supplied by H1 residual diagnostics audit table",
+                "source_column": "acf1_resid",
+            }
+        )
+    return pd.DataFrame(rows, columns=columns).drop_duplicates(subset=["stream_label", "lag"], keep="last")
 
 
 def _period_key(value: Any) -> str:
@@ -412,7 +442,7 @@ def _diagnostics_acf(acf: pd.DataFrame, source_file: str) -> pd.DataFrame:
                 "Residual ACF",
                 value,
                 f"{value:.3f}" if pd.notna(value) else "-",
-                "error_pct",
+                str(row.get("source_column", "error_pct")),
                 source_file,
                 str(row.get("calculation_method")),
                 str(row.get("residual_source")),
@@ -449,6 +479,22 @@ def _horizon_bucket(value: Any) -> str:
 def _diagnostics_residual_vs_fitted(qpred: pd.DataFrame, source_file: str) -> pd.DataFrame:
     rows: list[dict[str, Any]] = []
     if qpred is None or qpred.empty:
+        rows.append(
+            _base_row(
+                "Diagnostics",
+                "diagnostics_residual_vs_fitted",
+                "2. Residual vs Fitted",
+                {},
+                "Missing selected prediction rows",
+                pd.NA,
+                "-",
+                "",
+                source_file,
+                "Residual vs fitted native stream units are unavailable because selected prediction rows are missing.",
+                "Missing: quarterly_predictions_selected.csv was not supplied by the diagnostic audit pack.",
+                value_available=False,
+            )
+        )
         return _standardize(rows)
     for _, row in qpred.iterrows():
         pred = _num(row.get("pred"))
@@ -552,6 +598,22 @@ def _diagnostics_pass_matrix(diagnostics: pd.DataFrame, source_file: str) -> pd.
 def _diagnostics_error_distribution(qpred: pd.DataFrame, source_file: str) -> pd.DataFrame:
     rows: list[dict[str, Any]] = []
     if qpred is None or qpred.empty:
+        rows.append(
+            _base_row(
+                "Diagnostics",
+                "diagnostics_error_distribution_by_horizon",
+                "4. Error Distribution by Horizon",
+                {},
+                "Missing selected prediction rows",
+                pd.NA,
+                "-",
+                "",
+                source_file,
+                "Absolute percentage error by horizon is unavailable because selected prediction rows are missing.",
+                "Missing: quarterly_predictions_selected.csv was not supplied by the diagnostic audit pack.",
+                value_available=False,
+            )
+        )
         return _standardize(rows)
     for _, row in qpred.iterrows():
         abs_error = _num(row.get("abs_error_pct", abs(_num(row.get("error_pct")))))
@@ -767,6 +829,25 @@ def _horizon_source(horizon: pd.DataFrame, qpred: pd.DataFrame, recommended: pd.
                     "mape": row.get("mape"),
                     "source_column": "ape",
                     "source": "quarterly_predictions_selected.csv grouped mean APE",
+                }
+            )
+    resolved_streams = {str(row.get("stream_label")) for row in rows if pd.notna(row.get("mape"))}
+    unresolved_streams = sorted(required_streams.difference(resolved_streams))
+    for stream_label in unresolved_streams:
+        stream_rows = recommended[recommended["stream_label"].astype(str).eq(stream_label)] if recommended is not None and not recommended.empty else pd.DataFrame()
+        template = stream_rows.iloc[0] if not stream_rows.empty else {}
+        for scenario in ["Finalist", "Schiff"]:
+            rows.append(
+                {
+                    "stream": _row_get(template, "stream"),
+                    "stream_label": stream_label,
+                    "model": _row_get(template, "model"),
+                    "model_short": _row_get(template, "model_short"),
+                    "scenario": scenario,
+                    "horizon": pd.NA,
+                    "mape": pd.NA,
+                    "source_column": "",
+                    "source": "Missing: no Parquet horizon fields or selected prediction source available",
                 }
             )
     return pd.DataFrame(rows, columns=["stream", "stream_label", "model", "model_short"] + columns[2:])

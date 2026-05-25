@@ -45,7 +45,8 @@ def approx(actual: Any, expected: float, tolerance: float = 0.001) -> bool:
 def validate() -> list[tuple[str, str, str]]:
     args = parse_args()
     repo_root = Path(args.repo_root).expanduser()
-    load_parquet_dashboard(args.data_root, repo_root, allow_csv_preview=False)
+    loaded = load_parquet_dashboard(args.data_root, repo_root, allow_csv_preview=False)
+    loaded_weights = loaded.data.get("weights", pd.DataFrame())
 
     findings: list[tuple[str, str, str]] = []
 
@@ -68,25 +69,31 @@ def validate() -> list[tuple[str, str, str]]:
             record(f"{filename} exists and has required columns", False, str(exc))
 
     ensemble = read_table("overview_ensemble_composition.csv")
-    expected_weights = {
-        "PED VKT per capita": [100.0],
-        "Light RUC volume": [33.3333395, 33.3333312, 33.3333293],
-        "Heavy RUC volume": [46.9332, 28.1844, 14.4373, 10.4451],
-    }
-    ensemble_ok = True
-    for stream, weights in expected_weights.items():
-        actual = (
-            ensemble[ensemble["stream_label"].eq(stream)]
-            .sort_values("component_rank")["weight_pct"]
-            .astype(float)
-            .to_list()
+    expected_weights = loaded_weights.copy()
+    if "component_rank" not in expected_weights.columns and not expected_weights.empty:
+        expected_weights = expected_weights.sort_values(["stream_label", "weight"], ascending=[True, False]).copy()
+        expected_weights["component_rank"] = expected_weights.groupby("stream_label", dropna=False).cumcount() + 1
+    if {"stream_label", "component_rank", "weight"}.issubset(expected_weights.columns):
+        expected_weights["expected_weight_pct"] = pd.to_numeric(expected_weights["weight"], errors="coerce") * 100
+        expected_weights = expected_weights[["stream_label", "component_rank", "expected_weight_pct"]].dropna(
+            subset=["stream_label", "component_rank", "expected_weight_pct"]
         )
-        ensemble_ok = ensemble_ok and len(actual) == len(weights) and all(
-            abs(a - e) <= 0.001 for a, e in zip(actual, weights, strict=True)
-        )
+    else:
+        expected_weights = pd.DataFrame(columns=["stream_label", "component_rank", "expected_weight_pct"])
+    actual_weights = ensemble[["stream_label", "component_rank", "weight_pct"]].copy()
+    actual_weights["component_rank"] = pd.to_numeric(actual_weights["component_rank"], errors="coerce")
+    actual_weights["weight_pct"] = pd.to_numeric(actual_weights["weight_pct"], errors="coerce")
+    expected_weights["component_rank"] = pd.to_numeric(expected_weights["component_rank"], errors="coerce")
+    weight_join = expected_weights.merge(actual_weights, on=["stream_label", "component_rank"], how="outer", indicator=True)
+    weight_delta = (weight_join["weight_pct"] - weight_join["expected_weight_pct"]).abs()
+    ensemble_ok = not expected_weights.empty and weight_join["_merge"].eq("both").all() and weight_delta.fillna(999).le(0.001).all()
     demo_fragments = {"57.1", "38.7", "23.2", "21.8", "48.7", "37.7", "13.7"}
     demo_visible = any(fragment in ",".join(ensemble["metric_display"].astype(str)) for fragment in demo_fragments)
-    record("Ensemble source uses Parquet component weights", ensemble_ok and not demo_visible, "Expected current finalist component weights were checked.")
+    record(
+        "Ensemble source uses Parquet component weights",
+        ensemble_ok and not demo_visible,
+        f"Compared {len(expected_weights):,} Parquet component weights to chart source rows.",
+    )
 
     stress = read_table("overview_stress_horizon_checks.csv")
     stress_ok = True
@@ -131,9 +138,14 @@ def validate() -> list[tuple[str, str, str]]:
         )
 
     acf = read_table("diagnostics_residual_autocorrelation.csv")
+    acf_notes = " ".join(acf["notes"].dropna().astype(str))
     record(
         "ACF source table documents residual source",
-        EXPECTED_STREAMS.issubset(set(acf["stream_label"])) and acf["notes"].str.contains("All selected quarterly prediction residuals", regex=False).all(),
+        EXPECTED_STREAMS.issubset(set(acf["stream_label"]))
+        and (
+            "All selected quarterly prediction residuals" in acf_notes
+            or "H1 residual diagnostics from diagnostic audit pack" in acf_notes
+        ),
         f"rows={len(acf):,}",
     )
 

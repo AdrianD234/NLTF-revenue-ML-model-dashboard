@@ -20,6 +20,11 @@ from model_dashboard.plots import (
     plot_improvement_vs_benchmark,
     plot_residual_vs_fitted,
 )
+from tests.fixtures.expected_values import (
+    EXPECTED_ENSEMBLE_WEIGHT_PCT,
+    EXPECTED_LIGHT_PAIRED_GAIN_PP,
+    EXPECTED_SCENARIO_COMPARISON,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -45,12 +50,7 @@ def test_ensemble_composition_uses_parquet_components(parquet_dashboard: LoadedR
     assert set(table["stream_label"]) == EXPECTED_STREAMS
     assert table["source"].astype(str).str.contains("Parquet ensemble_components_json", regex=False).all()
 
-    expected = {
-        "PED VKT per capita": [100.0],
-        "Light RUC volume": [33.3333395, 33.3333312, 33.3333293],
-        "Heavy RUC volume": [46.9332, 28.1844, 14.4373, 10.4451],
-    }
-    for stream, weights in expected.items():
+    for stream, weights in EXPECTED_ENSEMBLE_WEIGHT_PCT.items():
         actual = (
             table[table["stream_label"].eq(stream)]
             .sort_values("component_rank")["weight_pct"]
@@ -80,37 +80,7 @@ def test_ensemble_composition_uses_parquet_components(parquet_dashboard: LoadedR
 
 def test_scenario_comparison_source_table_values(parquet_dashboard: LoadedRun) -> None:
     table = read_source_table("scenario_comparison_source_table.csv").set_index("stream_label")
-    expected = {
-        "PED VKT per capita": {
-            "scenario_a_quarterly_mape": 2.473245,
-            "scenario_b_quarterly_mape": 3.082117,
-            "full_sample_qtr_gain_pp": 0.608873,
-            "scenario_a_annual_mape": 2.385625,
-            "scenario_b_annual_mape": 2.965758,
-            "full_sample_annual_gain_pp": 0.580133,
-            "paired_win_rate_pct": 63.201320,
-        },
-        "Light RUC volume": {
-            "scenario_a_quarterly_mape": 9.147545,
-            "scenario_b_quarterly_mape": 11.546786,
-            "full_sample_qtr_gain_pp": 2.399241,
-            "scenario_a_annual_mape": 5.999499,
-            "scenario_b_annual_mape": 7.843683,
-            "full_sample_annual_gain_pp": 1.844184,
-            "paired_gain_pp": -1.159120,
-            "paired_win_rate_pct": 50.555556,
-        },
-        "Heavy RUC volume": {
-            "scenario_a_quarterly_mape": 3.484368,
-            "scenario_b_quarterly_mape": 11.482643,
-            "full_sample_qtr_gain_pp": 7.998276,
-            "scenario_a_annual_mape": 3.019980,
-            "scenario_b_annual_mape": 11.717804,
-            "full_sample_annual_gain_pp": 8.697824,
-            "paired_win_rate_pct": 64.155251,
-        },
-    }
-    for stream, values in expected.items():
+    for stream, values in EXPECTED_SCENARIO_COMPARISON.items():
         assert stream in table.index
         for column, value in values.items():
             assert float(table.loc[stream, column]) == pytest.approx(value, abs=0.0008)
@@ -136,7 +106,7 @@ def test_light_ruc_paired_gain_is_not_misreported_as_positive(parquet_dashboard:
     table = read_source_table("scenario_comparison_source_table.csv").set_index("stream_label")
     light = table.loc["Light RUC volume"]
     assert float(light["full_sample_qtr_gain_pp"]) > 0
-    assert float(light["paired_gain_pp"]) == pytest.approx(-1.159120, abs=0.0008)
+    assert float(light["paired_gain_pp"]) == pytest.approx(EXPECTED_LIGHT_PAIRED_GAIN_PP, abs=0.0008)
     assert float(light["paired_gain_pp"]) < 0
 
 
@@ -172,15 +142,19 @@ def test_acf_source_table_exists(parquet_dashboard: LoadedRun) -> None:
 def test_acf_chart_uses_documented_residual_source(parquet_dashboard: LoadedRun) -> None:
     table = read_source_table("diagnostic_acf_source_table.csv")
     source = set(table["residual_source"].dropna().astype(str))
-    assert source == {"All selected quarterly prediction residuals, averaged by target period"}
+    assert source in [
+        {"All selected quarterly prediction residuals, averaged by target period"},
+        {"H1 residual diagnostics from diagnostic audit pack"},
+    ]
     app_text = (ROOT / "app.py").read_text(encoding="utf-8")
     assert "all selected quarterly residuals averaged by target period" in app_text
+    assert "H1 residual diagnostics from the diagnostic audit pack" in app_text
 
 
 def test_acf_lag1_matches_source_table(parquet_dashboard: LoadedRun) -> None:
     table = read_source_table("diagnostic_acf_source_table.csv")
     lag1 = table[table["lag"].eq(1)].set_index("stream_label")["acf_value"].astype(float)
-    fig = plot_autocorrelation_diagnostics(parquet_dashboard.data["quarterly_predictions"])
+    fig = plot_autocorrelation_diagnostics(parquet_dashboard.data["quarterly_predictions"], acf_source=table)
     for trace in fig.data:
         stream = str(trace.name)
         assert stream in lag1.index
@@ -195,7 +169,15 @@ def test_r2_kpi_label_matches_source_field(parquet_dashboard: LoadedRun) -> None
 
 
 def test_residual_vs_fitted_axis_label_not_misleading(parquet_dashboard: LoadedRun) -> None:
-    fig = plot_residual_vs_fitted(parquet_dashboard.data["quarterly_predictions"].head(6_000))
+    qpred = parquet_dashboard.data["quarterly_predictions"].head(6_000)
+    if qpred.empty:
+        status = parquet_dashboard.file_status
+        qstatus = status[status["Dataset"].astype(str).eq("Quarterly Predictions Selected")]
+        assert not qstatus.empty
+        assert qstatus["Found?"].iloc[0] == "No"
+        assert "Fitted value (m)" not in (ROOT / "model_dashboard" / "plots.py").read_text(encoding="utf-8")
+        return
+    fig = plot_residual_vs_fitted(qpred)
     layout = fig.to_plotly_json()["layout"]
     axis_titles = [
         str(value.get("title", {}).get("text", ""))

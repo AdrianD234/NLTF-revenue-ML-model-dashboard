@@ -21,6 +21,7 @@ from model_dashboard.data_loader import (
     parquet_pack_signature,
     run_signature,
 )
+from model_dashboard.data.diagnostics import build_diagnostic_acf_source_table
 from model_dashboard.labels import (
     DEFAULT_INPUT_PARENT,
     IGNORED_RUN_FOLDER_NAMES,
@@ -894,12 +895,18 @@ def render_diagnostics(loaded: LoadedRun, controls: dict[str, Any]) -> None:
 
     qpred = common_filter(loaded.data.get("quarterly_predictions", pd.DataFrame()), controls, include_source_variant=False)
     diagnostic_qpred = central_error_window(qpred)
+    acf_source = build_diagnostic_acf_source_table(qpred, diagnostic_df)
+    acf_subtitle = (
+        "Residual ACF by lag using H1 residual diagnostics from the diagnostic audit pack."
+        if qpred.empty and not acf_source.empty
+        else "Residual ACF by lag using all selected quarterly residuals averaged by target period."
+    )
     top = st.columns([1.0, 1.0])
     with top[0]:
         chart_card(
             "1. Residual Autocorrelation by Lag",
-            "Residual ACF by lag using all selected quarterly residuals averaged by target period.",
-            compact_figure(plot_autocorrelation_diagnostics(qpred), 260),
+            acf_subtitle,
+            compact_figure(plot_autocorrelation_diagnostics(qpred, acf_source=acf_source), 260),
         )
     with top[1]:
         chart_card(

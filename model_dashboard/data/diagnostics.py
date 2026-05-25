@@ -24,6 +24,7 @@ DIAGNOSTIC_NUMERIC_COLUMNS = [
     "skewness",
     "kurtosis",
     "cointegration_pvalue",
+    "acf1_resid",
 ]
 
 
@@ -101,7 +102,20 @@ def build_diagnostic_frame(candidate: pd.DataFrame, audit_tables: dict[str, pd.D
                 "mz_r2": "adj_r2",
             }
         )
-        keep_cols = [col for col in diag.columns if col in h1_norm.columns]
+        keep_cols = [
+            col
+            for col in [
+                "stream",
+                "stream_label",
+                "model",
+                "model_short",
+                "role",
+                "is_current_recommended",
+                "is_pure_schiff",
+                *DIAGNOSTIC_NUMERIC_COLUMNS,
+            ]
+            if col in h1_norm.columns
+        ]
         if keep_cols:
             diag = pd.concat([diag, h1_norm[keep_cols]], ignore_index=True).drop_duplicates(
                 subset=[col for col in ["stream", "model"] if col in keep_cols],
@@ -115,13 +129,17 @@ def build_diagnostic_frame(candidate: pd.DataFrame, audit_tables: dict[str, pd.D
     return coerce_numeric(diag, DIAGNOSTIC_NUMERIC_COLUMNS)
 
 
-def build_diagnostic_acf_source_table(qpred: pd.DataFrame, max_lag: int = 12) -> pd.DataFrame:
-    columns = ["stream_label", "lag", "acf_value", "residual_source", "calculation_method"]
+def build_diagnostic_acf_source_table(
+    qpred: pd.DataFrame,
+    diagnostics: pd.DataFrame | None = None,
+    max_lag: int = 12,
+) -> pd.DataFrame:
+    columns = ["stream_label", "lag", "acf_value", "residual_source", "calculation_method", "source_column"]
     if qpred is None or qpred.empty or not {"error_pct", "stream_label"}.issubset(qpred.columns):
-        return pd.DataFrame(columns=columns)
+        return _acf_source_from_diagnostics(diagnostics, columns)
     data = qpred.dropna(subset=["error_pct", "stream_label"]).copy()
     if data.empty:
-        return pd.DataFrame(columns=columns)
+        return _acf_source_from_diagnostics(diagnostics, columns)
     if "target_period" in data.columns:
         data["_period_key"] = data["target_period"].map(period_key)
         grouped = (
@@ -146,9 +164,41 @@ def build_diagnostic_acf_source_table(qpred: pd.DataFrame, max_lag: int = 12) ->
                     "acf_value": series.autocorr(lag=lag) if len(series) > lag + 1 else pd.NA,
                     "residual_source": "All selected quarterly prediction residuals, averaged by target period",
                     "calculation_method": "pandas Series.autocorr on mean signed forecast error percentage by lag",
+                    "source_column": "error_pct",
                 }
             )
-    return pd.DataFrame(rows, columns=columns)
+    frame = pd.DataFrame(rows, columns=columns)
+    if frame.empty:
+        return _acf_source_from_diagnostics(diagnostics, columns)
+    return frame
+
+
+def _acf_source_from_diagnostics(diagnostics: pd.DataFrame | None, columns: list[str]) -> pd.DataFrame:
+    if diagnostics is None or diagnostics.empty or "acf1_resid" not in diagnostics.columns:
+        return pd.DataFrame(columns=columns)
+    data = diagnostics.copy()
+    if "role" in data.columns:
+        finalist_rows = data[data["role"].astype(str).str.contains("finalist", case=False, na=False)]
+        if not finalist_rows.empty:
+            data = finalist_rows
+    if "stream_label" not in data.columns:
+        return pd.DataFrame(columns=columns)
+    rows: list[dict[str, Any]] = []
+    for _, row in data.dropna(subset=["stream_label"]).iterrows():
+        value = pd.to_numeric(row.get("acf1_resid"), errors="coerce")
+        if pd.isna(value):
+            continue
+        rows.append(
+            {
+                "stream_label": row.get("stream_label"),
+                "lag": 1,
+                "acf_value": float(value),
+                "residual_source": "H1 residual diagnostics from diagnostic audit pack",
+                "calculation_method": "Lag 1 residual autocorrelation supplied by H1 residual diagnostics audit table",
+                "source_column": "acf1_resid",
+            }
+        )
+    return pd.DataFrame(rows, columns=columns).drop_duplicates(subset=["stream_label", "lag"], keep="last")
 
 
 def _status_row(dataset: str, found: Path, rows: int | None, columns: int | None) -> dict[str, Any]:

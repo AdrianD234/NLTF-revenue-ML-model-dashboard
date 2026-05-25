@@ -810,9 +810,48 @@ def _sample_by_stream(data: pd.DataFrame, max_rows: int = 6000) -> pd.DataFrame:
     return sampled
 
 
-def plot_autocorrelation_diagnostics(qpred: pd.DataFrame, max_lag: int = 12) -> go.Figure:
+def plot_autocorrelation_diagnostics(
+    qpred: pd.DataFrame,
+    max_lag: int = 12,
+    acf_source: pd.DataFrame | None = None,
+) -> go.Figure:
+    if (qpred is None or qpred.empty) and acf_source is not None and not acf_source.empty:
+        required_source = {"stream_label", "lag", "acf_value", "residual_source"}
+        if required_source.issubset(acf_source.columns):
+            source = acf_source.dropna(subset=["stream_label", "lag", "acf_value"]).copy()
+            if not source.empty:
+                fig = go.Figure()
+                source["_stream_order"] = source["stream_label"].map(_stream_order_value)
+                source = source.sort_values(["_stream_order", "lag"])
+                for stream, stream_rows in source.groupby("stream_label", dropna=False):
+                    fig.add_bar(
+                        x=stream_rows["lag"],
+                        y=stream_rows["acf_value"],
+                        name=str(stream),
+                        marker_color=STREAM_COLORS.get(str(stream), "#1f77b4"),
+                        customdata=stream_rows[["stream_label", "residual_source", "calculation_method"]]
+                        .fillna("-")
+                        .to_numpy(),
+                        hovertemplate=(
+                            "<b>%{customdata[0]}</b><br>"
+                            "Lag: %{x}<br>"
+                            "ACF: %{y:.2f}<br>"
+                            "Residual source: %{customdata[1]}<br>"
+                            "Method: %{customdata[2]}<extra></extra>"
+                        ),
+                    )
+                fig.add_hline(y=0, line_color="#64748B", line_width=1)
+                fig.add_hline(y=0.45, line_dash="dash", line_color="#94A3B8", annotation_text="approx. caution band")
+                fig.add_hline(y=-0.45, line_dash="dash", line_color="#94A3B8")
+                fig.update_layout(
+                    barmode="group",
+                    xaxis_title="Lag (quarters)",
+                    yaxis_title="Residual ACF",
+                    yaxis_range=[-1, 1],
+                )
+                return apply_layout(fig, "Residual ACF by lag", height=360)
     required = {"error_pct", "stream_label"}
-    if qpred.empty or not required.issubset(qpred.columns):
+    if qpred is None or qpred.empty or not required.issubset(qpred.columns):
         return empty_figure("Prediction rows need signed forecast errors for autocorrelation diagnostics.")
     data = qpred.dropna(subset=["error_pct", "stream_label"]).copy()
     if data.empty:

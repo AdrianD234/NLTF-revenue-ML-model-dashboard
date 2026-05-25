@@ -565,6 +565,22 @@ def build_horizon_comparison_source_table(
                         "source": "quarterly_predictions_selected.csv grouped mean APE",
                     }
                 )
+    resolved_streams = {str(row.get("stream_label")) for row in rows if pd.notna(row.get("mape"))}
+    unresolved_streams = sorted(required_streams.difference(resolved_streams))
+    for stream_label in unresolved_streams:
+        for page in ["Scenario Comparison", "Schiff Benchmark"]:
+            for scenario in ["Finalist", "Schiff"]:
+                rows.append(
+                    {
+                        "page": page,
+                        "stream_label": stream_label,
+                        "scenario": scenario,
+                        "horizon": pd.NA,
+                        "mape": pd.NA,
+                        "source_column": "",
+                        "source": "Missing: no Parquet horizon fields or selected prediction source available",
+                    }
+                )
     return pd.DataFrame(rows, columns=columns)
 
 
@@ -583,7 +599,10 @@ def _write_reconciliation_source_tables(repo_root: Path, data: dict[str, pd.Data
             data.get("quarterly_predictions", pd.DataFrame()),
             data.get("recommended", pd.DataFrame()),
         ),
-        "diagnostic_acf_source_table.csv": build_diagnostic_acf_source_table(data.get("quarterly_predictions", pd.DataFrame())),
+        "diagnostic_acf_source_table.csv": build_diagnostic_acf_source_table(
+            data.get("quarterly_predictions", pd.DataFrame()),
+            data.get("diagnostic_df", pd.DataFrame()),
+        ),
     }
     for filename, frame in source_tables.items():
         frame.to_csv(artifacts / filename, index=False)

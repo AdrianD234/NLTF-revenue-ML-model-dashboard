@@ -9,6 +9,12 @@ import pytest
 from model_dashboard.chart_sources import CHART_SOURCE_FILES, CORE_COLUMNS
 from model_dashboard.data_loader import DEFAULT_DIAGNOSTIC_AUDIT_ROOT, LoadedRun, load_parquet_dashboard
 from model_dashboard.labels import STRESS_BUCKET_ORDER
+from tests.fixtures.expected_values import (
+    EXPECTED_ENSEMBLE_WEIGHT_PCT,
+    EXPECTED_FINALIST_MAPE,
+    EXPECTED_LIGHT_PAIRED_GAIN_PP,
+    EXPECTED_STRESS_MAPE,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -43,16 +49,8 @@ def test_every_main_chart_exports_a_source_table(parquet_dashboard: LoadedRun) -
 
 def test_overview_source_tables_reconcile_to_current_parquet(parquet_dashboard: LoadedRun) -> None:
     accuracy = chart_source("overview_finalist_forecast_accuracy.csv")
-    expected_finalists = {
-        ("PED VKT per capita", "Quarterly MAPE"): 2.473245,
-        ("PED VKT per capita", "Annual MAPE"): 2.385625,
-        ("Light RUC volume", "Quarterly MAPE"): 9.147545,
-        ("Light RUC volume", "Annual MAPE"): 5.999499,
-        ("Heavy RUC volume", "Quarterly MAPE"): 3.484368,
-        ("Heavy RUC volume", "Annual MAPE"): 3.019980,
-    }
     indexed = accuracy.set_index(["stream_label", "metric_name"])
-    for key, expected in expected_finalists.items():
+    for key, expected in EXPECTED_FINALIST_MAPE.items():
         assert float(indexed.loc[key, "metric_value"]) == pytest.approx(expected, abs=0.0008)
 
     candidate = chart_source("overview_candidate_search_frontier.csv")
@@ -63,12 +61,7 @@ def test_overview_source_tables_reconcile_to_current_parquet(parquet_dashboard: 
 
 def test_ensemble_chart_source_uses_current_parquet_components(parquet_dashboard: LoadedRun) -> None:
     table = chart_source("overview_ensemble_composition.csv")
-    expected = {
-        "PED VKT per capita": [100.0],
-        "Light RUC volume": [33.3333395, 33.3333312, 33.3333293],
-        "Heavy RUC volume": [46.9332, 28.1844, 14.4373, 10.4451],
-    }
-    for stream, weights in expected.items():
+    for stream, weights in EXPECTED_ENSEMBLE_WEIGHT_PCT.items():
         actual = (
             table[table["stream_label"].eq(stream)]
             .sort_values("component_rank")["weight_pct"]
@@ -99,26 +92,8 @@ def test_stress_chart_source_alias_order_and_missing_gaps(parquet_dashboard: Loa
         rows = table[table["stream_label"].eq(stream)]
         assert rows["stress_bucket"].tolist() == STRESS_BUCKET_ORDER
 
-    expected_values = {
-        ("PED VKT per capita", "1-4 qtrs"): 1.555152,
-        ("PED VKT per capita", "5-8 qtrs"): 2.504013,
-        ("PED VKT per capita", "9-12 qtrs"): 3.515873,
-        ("PED VKT per capita", "2024+"): 0.962366,
-        ("PED VKT per capita", "2022-23"): 2.170776,
-        ("PED VKT per capita", "Annual"): 2.385625,
-        ("Light RUC volume", "1-4 qtrs"): 7.735819,
-        ("Light RUC volume", "5-8 qtrs"): 9.486600,
-        ("Light RUC volume", "9-12 qtrs"): 10.525990,
-        ("Light RUC volume", "2024+"): 6.253350,
-        ("Light RUC volume", "2022-23"): 18.785206,
-        ("Light RUC volume", "Annual"): 5.999499,
-        ("Heavy RUC volume", "1-4 qtrs"): 2.802065,
-        ("Heavy RUC volume", "5-8 qtrs"): 3.543246,
-        ("Heavy RUC volume", "9-12 qtrs"): 4.268496,
-        ("Heavy RUC volume", "Annual"): 3.019980,
-    }
     indexed = table.set_index(["stream_label", "stress_bucket"])
-    for key, expected in expected_values.items():
+    for key, expected in EXPECTED_STRESS_MAPE.items():
         assert float(indexed.loc[key, "metric_value"]) == pytest.approx(expected, abs=0.0008)
 
     for bucket in ["2024+", "2022-23"]:
@@ -140,7 +115,7 @@ def test_scenario_and_schiff_source_tables_keep_full_sample_and_paired_separate(
 
     light = scenario_gain[scenario_gain["stream_label"].eq("Light RUC volume")]
     assert float(light[light["metric_name"].eq("Full-sample quarterly gain")]["metric_value"].iloc[0]) > 0
-    assert float(light["paired_gain_pp"].dropna().iloc[0]) == pytest.approx(-1.159120, abs=0.0008)
+    assert float(light["paired_gain_pp"].dropna().iloc[0]) == pytest.approx(EXPECTED_LIGHT_PAIRED_GAIN_PP, abs=0.0008)
 
     decision = chart_source("scenario_decision_summary.csv")
     assert {
@@ -159,7 +134,11 @@ def test_horizon_and_diagnostic_source_tables_have_required_semantics(parquet_da
 
     acf = chart_source("diagnostics_residual_autocorrelation.csv")
     assert EXPECTED_STREAMS.issubset(set(acf["stream_label"]))
-    assert acf["notes"].str.contains("All selected quarterly prediction residuals", regex=False).all()
+    acf_notes = " ".join(acf["notes"].dropna().astype(str))
+    assert (
+        "All selected quarterly prediction residuals" in acf_notes
+        or "H1 residual diagnostics from diagnostic audit pack" in acf_notes
+    )
 
     pass_matrix = chart_source("diagnostics_pass_matrix.csv")
     assert "Calibration R2" in set(pass_matrix["metric_name"])

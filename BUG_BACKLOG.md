@@ -85,13 +85,17 @@ Backlog state for the Stage 1 Model Governance Dashboard Parquet refresh and vis
 - [x] Tightened explicit external-root discovery so the mini fixture is not mixed into the active diagnostic audit pack.
 - [x] Added focused regression coverage for fixture fallback isolation.
 
-## Open External Pack Reconciliation Items
+## Closed External Pack Reconciliation Items
 
-- [ ] Derive diagnostic ACF source rows from aggregate H1 residual diagnostics when selected quarterly prediction rows are absent from the active audit pack.
-- [ ] Document missing Scenario/Schiff horizon source rows for streams without real 1-12 horizon evidence under the active audit pack.
-- [ ] Update feature-completeness tests to accept explicit missing-data states for absent selected prediction CSVs while continuing to fail fixture mixing or invented values.
-- [ ] Re-run `scripts/verify_dashboard.ps1` against the active external diagnostic audit pack after the missing-data handling repair.
-- [ ] Regenerate and inspect browser screenshots from the active external diagnostic audit pack before closing the broader visual/data governance objective.
+- [x] Derived diagnostic ACF source rows from aggregate H1 residual diagnostics when selected quarterly prediction rows are absent from the active audit pack.
+- [x] Documented missing Scenario/Schiff horizon source rows for streams without real 1-12 horizon evidence under the active audit pack.
+- [x] Updated feature-completeness tests to accept explicit missing-data states for absent selected prediction CSVs while continuing to fail fixture mixing or invented values.
+- [x] Re-ran focused external-pack chart reconciliation tests: 26 passed.
+- [x] Re-ran `scripts/validate_chart_sources.py` against the active external diagnostic audit pack; all 16 chart source checks passed.
+- [x] Re-ran `scripts/validate_semantic_labels.py`; semantic label validation passed.
+- [x] Re-ran `scripts/verify_dashboard.ps1` against the active external diagnostic audit pack; the full verifier passed through Playwright, visual conformance, 100 gates and 120 gates.
+- [x] Removed active-run expected component/finalist constants from verifier scripts; source-table checks now compare against active `DashboardData`.
+- [x] Moved active expected numeric values used by tests into `tests/fixtures/expected_values.py`.
 
 ## Closure Evidence
 
@@ -101,7 +105,7 @@ Backlog state for the Stage 1 Model Governance Dashboard Parquet refresh and vis
 - Mandatory frontend interaction verification passed with 5 tests.
 - Chart source validation passed for 16 primary chart source tables.
 - 120-gate extension validation passed with 20 added source/semantic gates.
-- Fresh after-screenshots exist for Overview, Diagnostics, Scenario Comparison, and Schiff Benchmark from the latest passing fixture-backed verifier path.
+- Fresh after-screenshots exist for Overview, Diagnostics, Scenario Comparison, and Schiff Benchmark from the latest active external-pack verifier path.
 - Performance benchmark measured warm cached Parquet load at under 0.01 seconds.
 
-Unchecked external-pack reconciliation items remain; this checkpoint is not a final completion state.
+No unchecked backlog items remain.

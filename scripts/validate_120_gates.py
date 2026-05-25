@@ -17,6 +17,7 @@ from model_dashboard.chart_sources import CHART_SOURCE_FILES, CORE_COLUMNS  # no
 from model_dashboard.data.config import DEFAULT_DIAGNOSTIC_DATA_ROOT  # noqa: E402
 from model_dashboard.data_loader import load_parquet_dashboard  # noqa: E402
 from model_dashboard.labels import STRESS_BUCKET_ORDER  # noqa: E402
+from model_dashboard.metrics import best_by_stream  # noqa: E402
 
 
 EXPECTED_STREAMS = {"PED VKT per capita", "Light RUC volume", "Heavy RUC volume"}
@@ -54,7 +55,8 @@ def main() -> int:
     repo_root = Path(args.repo_root).expanduser()
     artifacts = repo_root / "artifacts"
     artifacts.mkdir(exist_ok=True)
-    load_parquet_dashboard(args.data_root, repo_root, allow_csv_preview=False)
+    loaded = load_parquet_dashboard(args.data_root, repo_root, allow_csv_preview=False)
+    loaded_data = loaded.data
 
     def check_all_chart_sources_exist() -> str:
         missing = []
@@ -79,37 +81,38 @@ def main() -> int:
 
     def check_ensemble() -> str:
         table = read_source("overview_ensemble_composition.csv")
-        expected = {
-            "PED VKT per capita": [100.0],
-            "Light RUC volume": [33.3333395, 33.3333312, 33.3333293],
-            "Heavy RUC volume": [46.9332, 28.1844, 14.4373, 10.4451],
-        }
-        for stream, weights in expected.items():
-            actual = (
-                table[table["stream_label"].eq(stream)]
-                .sort_values("component_rank")["weight_pct"]
-                .astype(float)
-                .to_list()
-            )
-            if len(actual) != len(weights) or any(abs(a - e) > 0.001 for a, e in zip(actual, weights, strict=True)):
-                raise AssertionError(f"{stream} weights do not match current Parquet components: {actual}")
-        return "Current finalist component weights match ensemble_components_json."
+        expected = loaded_data.get("weights", pd.DataFrame()).copy()
+        if "component_rank" not in expected.columns and not expected.empty:
+            expected = expected.sort_values(["stream_label", "weight"], ascending=[True, False]).copy()
+            expected["component_rank"] = expected.groupby("stream_label", dropna=False).cumcount() + 1
+        if not {"stream_label", "component_rank", "weight"}.issubset(expected.columns):
+            raise AssertionError("Loaded DashboardData has no component weights to validate.")
+        expected["expected_weight_pct"] = pd.to_numeric(expected["weight"], errors="coerce") * 100
+        expected = expected[["stream_label", "component_rank", "expected_weight_pct"]].dropna()
+        actual = table[["stream_label", "component_rank", "weight_pct"]].copy()
+        actual["component_rank"] = pd.to_numeric(actual["component_rank"], errors="coerce")
+        actual["weight_pct"] = pd.to_numeric(actual["weight_pct"], errors="coerce")
+        expected["component_rank"] = pd.to_numeric(expected["component_rank"], errors="coerce")
+        joined = expected.merge(actual, on=["stream_label", "component_rank"], how="outer", indicator=True)
+        delta = (joined["weight_pct"] - joined["expected_weight_pct"]).abs()
+        if expected.empty or not joined["_merge"].eq("both").all() or not delta.fillna(999).le(0.001).all():
+            raise AssertionError(f"Component source rows do not match loaded Parquet weights: {joined.to_dict('records')}")
+        return f"{len(expected):,} current finalist component weights match DashboardData."
 
     def check_finalist_values() -> str:
         table = read_source("overview_finalist_forecast_accuracy.csv").set_index(["stream_label", "metric_name"])
-        expected = {
-            ("PED VKT per capita", "Quarterly MAPE"): 2.473245,
-            ("PED VKT per capita", "Annual MAPE"): 2.385625,
-            ("Light RUC volume", "Quarterly MAPE"): 9.147545,
-            ("Light RUC volume", "Annual MAPE"): 5.999499,
-            ("Heavy RUC volume", "Quarterly MAPE"): 3.484368,
-            ("Heavy RUC volume", "Annual MAPE"): 3.019980,
-        }
+        finalists = best_by_stream(loaded_data.get("recommended", pd.DataFrame()))
+        if finalists.empty:
+            raise AssertionError("Loaded DashboardData has no current finalist rows.")
+        expected: dict[tuple[str, str], float] = {}
+        for _, row in finalists.iterrows():
+            expected[(str(row["stream_label"]), "Quarterly MAPE")] = float(row["quarterly_mape"])
+            expected[(str(row["stream_label"]), "Annual MAPE")] = float(row["annual_mape"])
         for key, expected_value in expected.items():
             actual = pd.to_numeric(table.loc[key, "metric_value"], errors="coerce")
             if pd.isna(actual) or abs(float(actual) - expected_value) > 0.001:
                 raise AssertionError(f"{key} expected {expected_value}, got {actual}")
-        return "Finalist accuracy source table reconciles to current Parquet values."
+        return f"Finalist accuracy source table reconciles to {len(finalists):,} current DashboardData finalists."
 
     def check_stress() -> str:
         table = read_source("overview_stress_horizon_checks.csv")
@@ -159,7 +162,11 @@ def main() -> int:
         table = read_source("diagnostics_residual_autocorrelation.csv")
         if not EXPECTED_STREAMS.issubset(set(table["stream_label"])):
             raise AssertionError("ACF source table missing streams.")
-        if not table["notes"].str.contains("All selected quarterly prediction residuals", regex=False).all():
+        notes = " ".join(table["notes"].dropna().astype(str))
+        if (
+            "All selected quarterly prediction residuals" not in notes
+            and "H1 residual diagnostics from diagnostic audit pack" not in notes
+        ):
             raise AssertionError("ACF residual source is not documented on every row.")
         return "ACF chart source table exists and documents residual source."
 

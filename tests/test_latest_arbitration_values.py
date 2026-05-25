@@ -5,15 +5,10 @@ from pathlib import Path
 import pandas as pd
 
 from model_dashboard.data_loader import load_parquet_dashboard
+from tests.fixtures.expected_values import EXPECTED_FIXTURE_FINALISTS
 
 
 FIXTURE_ROOT = Path(__file__).resolve().parent / "fixtures" / "mini_parquet"
-
-EXPECTED_FIXTURE_FINALISTS = {
-    "PED": {"quarterly_mape": 2.473245, "annual_mape": 2.385625},
-    "LIGHT_RUC": {"quarterly_mape": 9.147545, "annual_mape": 5.999499},
-    "HEAVY_RUC": {"quarterly_mape": 3.484368, "annual_mape": 3.019980},
-}
 
 
 def test_mini_parquet_finalists_are_selected_from_current_recommended_flags() -> None:
