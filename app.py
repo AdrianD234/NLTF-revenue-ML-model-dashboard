@@ -1868,7 +1868,7 @@ def management_summary_markdown(loaded: LoadedRun, story: pd.DataFrame) -> str:
 def render_candidate_landscape(loaded: LoadedRun, controls: dict[str, Any]) -> None:
     section_title("Candidate Landscape")
     info_panel(
-        "This view checks whether the selected finalists sit near the efficient frontier and whether the Schiff "
+        "This view checks whether the selected finalists sit in the lower-left candidate cluster and whether the Schiff "
         "specification benchmark was actually beaten on quarterly and annual accuracy."
     )
     summary = common_filter(loaded.data.get("summary", pd.DataFrame()), controls)

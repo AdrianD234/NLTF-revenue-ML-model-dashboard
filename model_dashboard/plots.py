@@ -280,18 +280,6 @@ def plot_candidate_landscape(summary: pd.DataFrame) -> go.Figure:
                 hovertemplate=hover_template,
             )
         )
-    frontier = _efficient_frontier(data)
-    if len(frontier) >= 2:
-        fig.add_trace(
-            go.Scatter(
-                x=frontier["quarterly_mape"],
-                y=frontier["annual_mape"],
-                mode="lines",
-                name="Efficient frontier",
-                line={"color": "#0f172a", "width": 2, "dash": "dot"},
-                hoverinfo="skip",
-            )
-        )
     annotation_rows = []
     for point_type in ["Selected finalist", SCHIFF_SPEC_BENCHMARK_LABEL]:
         subset = data[data["point_type"] == point_type].sort_values(["stream_label", "quarterly_mape", "annual_mape"])
@@ -348,7 +336,7 @@ def _competitive_landscape_subset(data: pd.DataFrame, max_rows: int = 420) -> pd
     for _, stream_rows in data.groupby("stream_label", dropna=False):
         keep.loc[stream_rows.nsmallest(40, "quarterly_mape").index] = True
         keep.loc[stream_rows.nsmallest(40, "annual_mape").index] = True
-        frontier = _efficient_frontier(stream_rows)
+        frontier = _lower_left_candidate_subset(stream_rows)
         keep.loc[frontier.index.intersection(data.index)] = True
     subset = data[keep].copy()
     if len(subset) > max_rows:
@@ -367,7 +355,7 @@ def _competitive_landscape_subset(data: pd.DataFrame, max_rows: int = 420) -> pd
     return subset.sort_values(["stream_label", "quarterly_mape", "annual_mape"])
 
 
-def _efficient_frontier(data: pd.DataFrame) -> pd.DataFrame:
+def _lower_left_candidate_subset(data: pd.DataFrame) -> pd.DataFrame:
     cols = ["quarterly_mape", "annual_mape"]
     if data.empty or not set(cols).issubset(data.columns):
         return pd.DataFrame(columns=cols)

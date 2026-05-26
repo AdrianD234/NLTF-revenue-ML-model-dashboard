@@ -102,7 +102,7 @@ Locked product specification for the NLTF Stage 1 Model Governance Dashboard, tr
 - Mark Schiff benchmarks as triangles.
 - Hover fields must include stream, stage, variant, source family, model, quarterly MAPE, annual MAPE, bias, and governance score where available.
 - Filters must include stage, stream, source family, variant, Schiff-only, finalists-only, all.
-- Show whether finalists sit near the efficient frontier and whether Schiff was beaten.
+- Show whether finalists sit in the lower-left candidate frontier cluster and whether Schiff was beaten.
 
 ## Page 3 Schiff Benchmark Comparison
 

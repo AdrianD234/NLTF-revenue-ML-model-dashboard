@@ -563,7 +563,8 @@ def test_candidate_landscape_focuses_competitive_frontier(loaded_validation_run:
     assert figure.layout.xaxis.range[1] < 40
     assert figure.layout.yaxis.range[1] < 25
     assert any("competitive frontier" in annotation.text for annotation in figure.layout.annotations)
-    assert any(trace.name == "Efficient frontier" for trace in figure.data)
+    assert not any(trace.name == "Efficient frontier" for trace in figure.data)
+    assert not any(getattr(trace, "mode", "") == "lines" for trace in figure.data)
     assert "Schiff class" in str(figure.data[0].hovertemplate)
 
 

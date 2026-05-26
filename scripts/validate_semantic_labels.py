@@ -55,6 +55,11 @@ def validate() -> list[tuple[str, str, str]]:
         "Candidate frontier title/caption makes clear that v6 has balanced all-stream visualization samples excluded from governance scoring.",
     )
     record(
+        "Candidate frontier has no dotted efficient-frontier line",
+        "Efficient frontier" not in plot_text and '"dash": "dot"' not in plot_text,
+        "Candidate Search Frontier uses candidate dots and explicit finalist/Schiff markers without a dotted connecting line.",
+    )
+    record(
         "Default stress chart excludes policy windows",
         "policy windows are excluded from the default view" in app_text
         and "OVERVIEW_STRESS_BUCKET_ORDER" in app_text,

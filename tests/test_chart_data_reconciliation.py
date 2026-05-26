@@ -287,6 +287,20 @@ def test_candidate_frontier_count_matches_source_table_and_trace_points(parquet_
     assert SCHIFF_SPEC_BENCHMARK_LABEL in set(source["point_type"])
 
 
+def test_candidate_frontier_has_no_dotted_efficient_frontier_trace(parquet_dashboard: LoadedRun) -> None:
+    controls = default_controls()
+    landscape = build_candidate_landscape_frame(parquet_dashboard, controls, "Balanced all-stream frontier view")
+    fig = plot_candidate_landscape(landscape)
+
+    trace_names = {str(getattr(trace, "name", "")) for trace in fig.data}
+    assert "Efficient frontier" not in trace_names
+    for trace in fig.data:
+        mode = str(getattr(trace, "mode", ""))
+        assert mode != "lines"
+        line = getattr(trace, "line", None)
+        assert getattr(line, "dash", None) not in {"dot", "dashdot"}
+
+
 def default_controls() -> dict[str, object]:
     return {
         "stage": "all",
