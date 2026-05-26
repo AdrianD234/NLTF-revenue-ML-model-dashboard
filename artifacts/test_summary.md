@@ -8,6 +8,12 @@ Status: **passed** for the v4 GBM Light RUC evidence-pack migration, score-basis
 
 The default dashboard source is the repo evidence pack at `data/dashboard_evidence_pack`. Legacy run folders, mini fixtures, old CSV/XLSX artifacts and previous diagnostic-pack paths are review-only and are not used by the default four-page dashboard.
 
+Slim v4 source root used for the committed pack:
+
+`C:\Users\Adrian Desilvestro\Downloads\stage1_dashboard_evidence_pack_dual_scorecard_gbm_light_v4_slim\dashboard_evidence_pack`
+
+The repo pack contains only root metadata files, `docs/`, and governed `data/*.parquet` files. Raw `sources/`, `tables_csv/`, logs, screenshots and CSV mirrors are intentionally absent from the committed evidence pack.
+
 ## Latest Full Verifier Command
 
 ```powershell
@@ -41,6 +47,9 @@ pwsh -File scripts\verify_dashboard.ps1 -Python ".\.venv\Scripts\python.exe" -Da
 - Source tables include `score_basis` and `score_basis_label`.
 - Paper-style and operational metrics are not mixed silently.
 - Light RUC operational annual weakness versus Schiff remains visible as an annual-watch note.
+- Overview Stress and Horizon Checks defaults to `1-4 qtrs`, `5-8 qtrs`, `9-12 qtrs` and `Annual`; policy windows remain available in source data but are excluded from the Paper-style Overview chart.
+- Candidate Search Frontier explicitly describes the Light RUC challenger frontier with PED/Heavy finalist and Schiff anchors.
+- Ensemble Composition renders all three stream finalists from governed component rows, not demo weights.
 
 ## Default Paper-Style Finalists
 

@@ -261,11 +261,17 @@ def test_overview_kpi_cards_explain_schiff_specification_and_diagnostics(loaded_
 
 
 def test_overview_frontier_note_is_data_backed(loaded_validation_run: LoadedRun) -> None:
-    note = overview_frontier_note(loaded_validation_run.data["summary"])
+    context = {
+        "label": "400 filtered plotted candidates",
+        "coverage": "Coverage: Light RUC 888 challenger rows; PED 2 anchors; Heavy RUC 2 anchors.",
+    }
+    note = overview_frontier_note(loaded_validation_run.data["summary"], context)
 
-    assert "Frontier read: lower-left is better" in note
+    assert "Frontier read:" in note
+    assert "lower-left is better" in note
+    assert "Light RUC challenger frontier with PED/Heavy anchors" in note
     assert "plotted candidates" in note
-    assert str(len(loaded_validation_run.data["summary"])) in note
+    assert "Light RUC 888 challenger rows" in note
     assert "plotted Schiff specification anchor rows" in note
 
 
@@ -693,7 +699,9 @@ def test_overview_stress_frame_matches_reference_buckets(loaded_validation_run: 
     buckets = list(frame["stress_bucket"].dropna().astype(str).unique())
 
     assert "2020-21" not in buckets
-    for bucket in ["1-4 qtrs", "5-8 qtrs", "9-12 qtrs", "2024+", "2022-23", "Annual"]:
+    assert "2024+" not in buckets
+    assert "2022-23" not in buckets
+    for bucket in ["1-4 qtrs", "5-8 qtrs", "9-12 qtrs", "Annual"]:
         assert bucket in buckets
 
 

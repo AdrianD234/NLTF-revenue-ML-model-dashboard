@@ -409,6 +409,8 @@ def _ensemble_frame(candidate: pd.DataFrame) -> pd.DataFrame:
                     "method": "Parquet ensemble_components_json",
                     "source": "Parquet ensemble_components_json",
                     "role": "Current recommended finalist component",
+                    "score_basis": "schiff_paper_horizon_mean",
+                    "score_basis_label": "Paper-style horizon MAPE",
                 }
             )
     return normalise_weights(pd.DataFrame(rows))

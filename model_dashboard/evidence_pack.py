@@ -351,6 +351,8 @@ def _normalise_ensemble_components(frame: pd.DataFrame) -> pd.DataFrame:
         out["weight_pct"] = out["weight"] * 100.0
     out["source"] = "ensemble_components.parquet"
     out["source_file"] = "ensemble_components.parquet"
+    out["score_basis"] = PAPER_SCORE_BASIS
+    out["score_basis_label"] = "Paper-style horizon MAPE"
     return normalise_weights(out)
 
 

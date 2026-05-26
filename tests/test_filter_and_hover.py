@@ -118,7 +118,7 @@ def test_stress_hover_is_human_readable(page: Page) -> None:
         required=["Stress window", "MAPE", "Model"],
         forbidden=["mape_h01_04", "source_family", "model_kind"],
     )
-    assert any(label in tooltip for label in ["1–4 quarters", "5–8 quarters", "9–12 quarters", "2022-23", "2024+"])
+    assert any(label in tooltip for label in ["1–4 quarters", "5–8 quarters", "9–12 quarters", "Annual"])
 
 
 def test_hover_screenshots_exist_after_verification() -> None:

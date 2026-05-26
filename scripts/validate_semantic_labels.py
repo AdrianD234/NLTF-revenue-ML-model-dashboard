@@ -46,6 +46,19 @@ def validate() -> list[tuple[str, str, str]]:
         "Overview KPI and frontier caption identify plotted candidate rows rather than vague loaded/model counts.",
     )
     record(
+        "Frontier label explains Light-only challenger coverage",
+        "Light RUC challenger frontier with PED/Heavy anchors" in app_text
+        and "Coverage: Light RUC" in app_text
+        and "Curated cone sample" not in app_text,
+        "Candidate frontier title/caption makes clear that v4 has Light RUC challengers plus PED/Heavy anchors.",
+    )
+    record(
+        "Default stress chart excludes policy windows",
+        "policy windows are excluded from the default view" in app_text
+        and "OVERVIEW_STRESS_BUCKET_ORDER" in app_text,
+        "Overview stress subtitle and bucket filtering keep 2024+/2022-23 out of Paper-style default.",
+    )
+    record(
         "Calibration R2 is not labelled adjusted R2",
         "Mean calibration R2" in app_text and "Mean Adjusted R2" not in app_text,
         "Diagnostics KPI title inspected in app.py.",

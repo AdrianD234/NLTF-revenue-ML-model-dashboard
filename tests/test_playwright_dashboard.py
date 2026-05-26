@@ -43,7 +43,7 @@ def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
         "Benchmark Pass",
         "beat Schiff specification benchmark",
         "logged diagnostics",
-        "Frontier read: lower-left is better",
+        "Frontier read: Light RUC challenger frontier",
         "Stress watch:",
         "1. Finalist Forecast Accuracy",
         "2. Candidate Search Frontier",
@@ -460,7 +460,7 @@ def test_overview_stress_bucket_order(page: Page) -> None:
     wait_dashboard_ready(page)
     expect(page.locator("body")).to_contain_text("4. Stress and Horizon Checks", timeout=90000)
 
-    labels = ["1-4 qtrs", "5-8 qtrs", "9-12 qtrs", "2024+", "2022-23", "Annual"]
+    labels = ["1-4 qtrs", "5-8 qtrs", "9-12 qtrs", "Annual"]
     boxes = []
     for label in labels:
         locator = page.get_by_text(label, exact=True).first
@@ -478,7 +478,7 @@ def test_overview_stress_horizon_aliases_show_all_streams(page: Page) -> None:
     expect(page.locator("body")).to_contain_text("4. Stress and Horizon Checks", timeout=90000)
     page.get_by_text("4. Stress and Horizon Checks", exact=False).first.scroll_into_view_if_needed()
 
-    labels = ["1-4 qtrs", "5-8 qtrs", "9-12 qtrs", "2024+", "2022-23", "Annual"]
+    labels = ["1-4 qtrs", "5-8 qtrs", "9-12 qtrs", "Annual"]
     for label in labels[:3]:
         expect(page.get_by_text(label, exact=True).first).to_be_visible(timeout=90000)
     for stream in ["PED VKT per capita", "Light RUC volume", "Heavy RUC volume"]:
@@ -533,9 +533,10 @@ def test_overview_stress_horizon_aliases_show_all_streams(page: Page) -> None:
     heavy = traces["Heavy RUC volume"]
     assert heavy["connectgaps"] is False
     heavy_y = dict(zip(heavy["x"], heavy["y"]))
-    for label in ["1-4 qtrs", "5-8 qtrs", "9-12 qtrs", "2022-23", "Annual"]:
+    for label in ["1-4 qtrs", "5-8 qtrs", "9-12 qtrs", "Annual"]:
         assert not _browser_value_missing(heavy_y[label]), f"Heavy RUC is missing sourced stress bucket {label}"
-    assert _browser_value_missing(heavy_y["2024+"]), "Heavy RUC 2024+ should remain a visible missing-data gap"
+    assert "2024+" not in stress_plot["categories"]
+    assert "2022-23" not in stress_plot["categories"]
 
 
 def _browser_value_missing(value: object) -> bool:

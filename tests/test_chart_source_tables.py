@@ -8,7 +8,7 @@ import pytest
 
 from model_dashboard.chart_sources import CHART_SOURCE_FILES, CORE_COLUMNS
 from model_dashboard.data_loader import DEFAULT_EVIDENCE_PACK_ROOT, LoadedRun, load_evidence_pack
-from model_dashboard.labels import SCHIFF_SPEC_BENCHMARK_LABEL, STRESS_BUCKET_ORDER
+from model_dashboard.labels import OVERVIEW_STRESS_BUCKET_ORDER, SCHIFF_SPEC_BENCHMARK_LABEL
 from tests.fixtures.expected_values import (
     EXPECTED_ENSEMBLE_WEIGHT_PCT,
     EXPECTED_FINALIST_MAPE,
@@ -94,24 +94,20 @@ def test_stress_chart_source_alias_order_and_missing_gaps(parquet_dashboard: Loa
     table = chart_source("overview_stress_horizon_checks.csv")
     for stream in EXPECTED_STREAMS:
         rows = table[table["stream_label"].eq(stream)]
-        assert rows["stress_bucket"].tolist() == STRESS_BUCKET_ORDER
+        assert rows["stress_bucket"].tolist() == OVERVIEW_STRESS_BUCKET_ORDER
 
     indexed = table.set_index(["stream_label", "stress_bucket"])
     for key, expected in EXPECTED_STRESS_MAPE.items():
+        if key[1] not in OVERVIEW_STRESS_BUCKET_ORDER:
+            continue
         value = pd.to_numeric(indexed.loc[key, "metric_value"], errors="coerce")
         if pd.isna(expected):
             assert pd.isna(value)
         else:
             assert float(value) == pytest.approx(expected, abs=0.0008)
 
-    for bucket in ["2024+", "2022-23"]:
-        row = indexed.loc[("Heavy RUC volume", bucket)]
-        if bucket == "2024+":
-            assert pd.isna(pd.to_numeric(row["metric_value"], errors="coerce"))
-            assert str(row["value_available"]).lower() == "false"
-        else:
-            assert pd.notna(pd.to_numeric(row["metric_value"], errors="coerce"))
-            assert str(row["value_available"]).lower() == "true"
+    assert "2024+" not in set(table["stress_bucket"].astype(str))
+    assert "2022-23" not in set(table["stress_bucket"].astype(str))
 
 
 def test_scenario_and_schiff_source_tables_keep_full_sample_and_paired_separate(

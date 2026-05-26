@@ -287,6 +287,7 @@ def test_rendered_plotly_trace_data_matches_chart_sources_where_possible(page: P
     expect(page.locator(".js-plotly-plot").nth(1)).to_be_visible(timeout=90000)
     body_text = page.locator("body").inner_text(timeout=60000)
     assert "400 filtered plotted candidates" in body_text
+    assert "Light RUC challenger frontier with PED/Heavy anchors" in body_text
     assert "278 loaded candidates" not in body_text
     candidate_plot = page.evaluate(
         """() => {
@@ -315,8 +316,9 @@ def test_rendered_plotly_trace_data_matches_chart_sources_where_possible(page: P
             const plot = [...document.querySelectorAll('.js-plotly-plot')].find((candidate) => {
                 const categories = Array.from(candidate.layout?.xaxis?.categoryarray || []);
                 return categories.includes('1-4 qtrs')
-                    && categories.includes('2022-23')
                     && categories.includes('Annual')
+                    && !categories.includes('2022-23')
+                    && !categories.includes('2024+')
                     && (candidate.data || []).some((trace) => trace.name === 'PED VKT per capita');
             });
             if (!plot) return null;
@@ -332,7 +334,7 @@ def test_rendered_plotly_trace_data_matches_chart_sources_where_possible(page: P
         }"""
     )
     assert stress_plot is not None, "Could not find rendered Stress and Horizon Plotly chart."
-    expected_buckets = ["1-4 qtrs", "5-8 qtrs", "9-12 qtrs", "2024+", "2022-23", "Annual"]
+    expected_buckets = ["1-4 qtrs", "5-8 qtrs", "9-12 qtrs", "Annual"]
     assert stress_plot["categories"] == expected_buckets
     for trace in stress_plot["traces"]:
         if trace["name"] not in {"PED VKT per capita", "Light RUC volume", "Heavy RUC volume"}:

@@ -266,15 +266,16 @@ def test_candidate_count_label_matches_count_source(parquet_dashboard: LoadedRun
     assert "Candidate Models" not in titles
     assert context["count"] == len(data["summary"]) == 400
     assert context["label"] == "400 filtered plotted candidates"
-    assert overview_frontier_note(data["summary"], context).startswith(
-        "Frontier read: lower-left is better across 400 filtered plotted candidates"
-    )
-    assert "3 plotted Schiff specification anchor rows / 3 benchmark streams" in overview_frontier_note(data["summary"], context)
+    note = overview_frontier_note(data["summary"], context)
+    assert note.startswith("Frontier read: Light RUC challenger frontier with PED/Heavy anchors")
+    assert "400 filtered plotted candidates" in note
+    assert "Light RUC 888 challenger rows" in note
+    assert "3 plotted Schiff specification anchor rows / 3 benchmark streams" in note
 
 
 def test_candidate_frontier_count_matches_source_table_and_trace_points(parquet_dashboard: LoadedRun) -> None:
     controls = default_controls()
-    landscape = build_candidate_landscape_frame(parquet_dashboard, controls, "Curated cone sample")
+    landscape = build_candidate_landscape_frame(parquet_dashboard, controls, "Light RUC challenger frontier")
     context = candidate_frontier_count_context(parquet_dashboard, controls, landscape)
     source = pd.read_csv(ARTIFACTS / "chart_sources" / "overview_candidate_search_frontier.csv")
     fig = plot_candidate_landscape(landscape)

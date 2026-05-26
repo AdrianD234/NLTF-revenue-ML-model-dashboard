@@ -373,11 +373,17 @@ def main() -> int:
         return fail("Manifest JSON missing and no graceful missing-state artifact recorded.")
 
     def check_csv_mirror() -> tuple[bool, str]:
+        forbidden_dirs = [pack_root / name for name in ["sources", "tables_csv", "logs", "screenshots"] if (pack_root / name).exists()]
+        if forbidden_dirs:
+            return fail("Slim evidence pack contains forbidden raw-output directories: " + ", ".join(str(path) for path in forbidden_dirs))
+        oversized = [path for path in pack_root.rglob("*") if path.is_file() and path.stat().st_size > 50 * 1024 * 1024]
+        if oversized:
+            return fail("Slim evidence pack contains file(s) above 50 MB: " + ", ".join(str(path) for path in oversized))
         if csv_mirror_path is not None:
-            return ok(f"CSV mirror found: {csv_mirror_path}")
+            return fail(f"Slim evidence pack should not include CSV mirror files: {csv_mirror_path}")
         if file_nonempty("artifacts/data_schema.json") and "csv_mirror_path" in schema_payload:
-            return ok("CSV mirror is absent but explicitly recorded in data_schema.json.")
-        return fail("CSV mirror missing and no graceful missing-state artifact recorded.")
+            return ok("CSV mirrors/raw source directories are absent as required for the slim evidence pack.")
+        return ok("CSV mirrors/raw source directories are absent as required for the slim evidence pack.")
 
     def check_schema_report() -> tuple[bool, str]:
         return ok("artifacts/data_schema_report.md exists.") if file_nonempty("artifacts/data_schema_report.md") else fail("artifacts/data_schema_report.md missing.")
@@ -728,15 +734,18 @@ def main() -> int:
         return fail("Overview panel code missing: " + ", ".join(missing)) if missing else ok("Overview card/panel structure is locked and reviewer-approved.")
 
     def check_stress_bucket_order_visual() -> tuple[bool, str]:
-        expected_labels = ["1-4 qtrs", "5-8 qtrs", "9-12 qtrs", "2024+", "2022-23", "Annual"]
+        expected_labels = ["1-4 qtrs", "5-8 qtrs", "9-12 qtrs", "Annual"]
         try:
-            from model_dashboard.labels import STRESS_BUCKET_ORDER as actual_order  # noqa: PLC0415
+            from model_dashboard.labels import OVERVIEW_STRESS_BUCKET_ORDER as actual_order  # noqa: PLC0415
         except Exception as exc:
-            return fail(f"Could not import STRESS_BUCKET_ORDER: {exc}")
-        text = safe_read(ROOT / "model_dashboard/plots.py")
-        if list(actual_order) != expected_labels or "categoryarray=STRESS_BUCKET_ORDER" not in text:
-            return fail("Stress bucket order is not locked into labels and Plotly category array.")
-        return ok("Overview stress bucket order is explicitly locked in labels and plot axis settings.")
+            return fail(f"Could not import OVERVIEW_STRESS_BUCKET_ORDER: {exc}")
+        text = safe_read(ROOT / "app.py") + safe_read(ROOT / "model_dashboard/plots.py")
+        if list(actual_order) != expected_labels or "policy windows are excluded from the default view" not in text:
+            return fail("Overview default stress bucket order is not locked to horizon-only buckets.")
+        source = read_csv_artifact("artifacts/chart_sources/overview_stress_horizon_checks.csv")
+        if not source.empty and source["stress_bucket"].astype(str).isin(["2024+", "2022-23"]).any():
+            return fail("Overview default stress source table still contains policy windows.")
+        return ok("Overview default stress chart is locked to horizon buckets only.")
 
     def check_candidate_no_giant_overlay() -> tuple[bool, str]:
         plots = safe_read(ROOT / "model_dashboard/plots.py")

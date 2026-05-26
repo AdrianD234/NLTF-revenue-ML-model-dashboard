@@ -6,7 +6,15 @@ from typing import Any
 
 import pandas as pd
 
-from ..labels import SCHIFF_SPEC_BENCHMARK_LABEL, STRESS_BUCKET_ORDER, format_percent, format_pp, format_count, humanize_label
+from ..labels import (
+    OVERVIEW_STRESS_BUCKET_ORDER,
+    SCHIFF_SPEC_BENCHMARK_LABEL,
+    STRESS_BUCKET_ORDER,
+    format_count,
+    format_percent,
+    format_pp,
+    humanize_label,
+)
 from ..metrics import best_by_stream
 from ..score_basis import PAPER_SCORE_BASIS, score_basis_label
 from .diagnostics import DEFAULT_ACF_RESIDUAL_SCOPE, select_diagnostic_acf_scope
@@ -453,7 +461,8 @@ def _overview_stress(stress: pd.DataFrame, source_file: str) -> pd.DataFrame:
     if stress is None or stress.empty:
         return _standardize(rows)
     data = stress.copy()
-    data["stress_bucket"] = pd.Categorical(data["stress_bucket"].astype(str), categories=STRESS_BUCKET_ORDER, ordered=True)
+    data = data[data["stress_bucket"].astype(str).isin(OVERVIEW_STRESS_BUCKET_ORDER)].copy()
+    data["stress_bucket"] = pd.Categorical(data["stress_bucket"].astype(str), categories=OVERVIEW_STRESS_BUCKET_ORDER, ordered=True)
     for _, row in data.sort_values(["stream_label", "stress_bucket"]).iterrows():
         value = _num(row.get("mape"))
         rows.append(
@@ -467,7 +476,7 @@ def _overview_stress(stress: pd.DataFrame, source_file: str) -> pd.DataFrame:
                 format_percent(value),
                 str(row.get("source_column", "")),
                 source_file,
-                "First non-null stress or horizon alias by bucket; missing values remain gaps with connectgaps=False.",
+                "Default Overview uses paper-style horizon buckets only; policy windows are excluded from the main line chart.",
                 stress_bucket=str(row.get("stress_bucket")),
                 value_available=bool(pd.notna(row.get("mape"))),
             )

@@ -14,7 +14,7 @@ if str(ROOT) not in sys.path:
 from model_dashboard.chart_sources import CHART_SOURCE_FILES, CORE_COLUMNS  # noqa: E402
 from model_dashboard.data.config import DEFAULT_EVIDENCE_PACK_ROOT  # noqa: E402
 from model_dashboard.evidence_pack import load_evidence_pack  # noqa: E402
-from model_dashboard.labels import STRESS_BUCKET_ORDER  # noqa: E402
+from model_dashboard.labels import OVERVIEW_STRESS_BUCKET_ORDER  # noqa: E402
 
 
 EXPECTED_STREAMS = {"PED VKT per capita", "Light RUC volume", "Heavy RUC volume"}
@@ -100,7 +100,7 @@ def validate() -> list[tuple[str, str, str]]:
     stress_ok = True
     for stream in EXPECTED_STREAMS:
         stream_rows = stress[stress["stream_label"].eq(stream)]
-        stress_ok = stress_ok and stream_rows["stress_bucket"].tolist() == list(STRESS_BUCKET_ORDER)
+        stress_ok = stress_ok and stream_rows["stress_bucket"].tolist() == list(OVERVIEW_STRESS_BUCKET_ORDER)
     for stream in ["PED VKT per capita", "Light RUC volume"]:
         for bucket in ["1-4 qtrs", "5-8 qtrs", "9-12 qtrs", "Annual"]:
             row = stress[stress["stream_label"].eq(stream) & stress["stress_bucket"].eq(bucket)]
@@ -110,7 +110,12 @@ def validate() -> list[tuple[str, str, str]]:
         pd.notna(pd.to_numeric(heavy.loc[bucket, "metric_value"], errors="coerce"))
         for bucket in ["1-4 qtrs", "5-8 qtrs", "9-12 qtrs", "Annual"]
     )
-    record("Stress chart source uses evidence-pack rows and six-bucket order", stress_ok and heavy_core, "Six finalist buckets per stream from stress_horizon.parquet.")
+    policy_hidden = not stress["stress_bucket"].astype(str).isin(["2024+", "2022-23"]).any()
+    record(
+        "Stress chart source uses default paper horizon buckets only",
+        stress_ok and heavy_core and policy_hidden,
+        "Overview default source table includes 1-4, 5-8, 9-12 and Annual only; policy windows stay out of the main chart.",
+    )
 
     scenario = read_table("scenario_decision_summary.csv")
     scenario_terms = {"Full-sample Qtr Gain", "Full-sample Annual Gain", "Paired Win Rate"}

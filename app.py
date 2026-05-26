@@ -30,7 +30,9 @@ from model_dashboard.data.diagnostics import (
 from model_dashboard.labels import (
     DEFAULT_INPUT_PARENT,
     IGNORED_RUN_FOLDER_NAMES,
+    OVERVIEW_STRESS_BUCKET_ORDER,
     SCHIFF_SPEC_BENCHMARK_LABEL,
+    STRESS_BUCKET_ORDER,
     TERM_HELP,
     format_count,
     format_percent,
@@ -675,7 +677,10 @@ def render_overview(loaded: LoadedRun, controls: dict[str, Any]) -> None:
     stress_frame = overview_stress_frame(loaded, recommended, controls)
     story = governance_story_summary(recommended, loaded.data.get("paired_vs_schiff", pd.DataFrame()), stress_frame, errors)
 
-    candidate_mode = st.session_state.get("candidate_frontier_mode", "Curated cone sample")
+    candidate_mode = st.session_state.get("candidate_frontier_mode", DEFAULT_CANDIDATE_FRONTIER_MODE)
+    if candidate_mode == LEGACY_CANDIDATE_FRONTIER_MODE:
+        candidate_mode = DEFAULT_CANDIDATE_FRONTIER_MODE
+        st.session_state["candidate_frontier_mode"] = candidate_mode
     candidate_landscape = build_candidate_landscape_frame(loaded, controls, candidate_mode)
     candidate_context = candidate_frontier_count_context(loaded, controls, candidate_landscape)
     gov_kpi_grid(overview_kpi_cards(summary, recommended, story, errors, candidate_context))
@@ -703,14 +708,14 @@ def render_overview(loaded: LoadedRun, controls: dict[str, Any]) -> None:
         candidate_context = candidate_frontier_count_context(loaded, controls, landscape)
         chart_card(
             "2. Candidate Search Frontier",
-            f"Each dot is a candidate model using {basis_metric}. Lower-left is better.",
+            f"Light RUC challenger frontier with PED/Heavy finalist and Schiff anchors using {basis_metric}. Lower-left is better.",
             compact_figure(plot_candidate_landscape(landscape), 260),
             overview_frontier_note(landscape, candidate_context),
         )
 
     lower = st.columns([1.0, 1.0])
     with lower[0]:
-        ensemble_weights = common_filter(loaded.data.get("weights", pd.DataFrame()), controls, include_source_variant=False)
+        ensemble_weights = loaded.data.get("weights", pd.DataFrame()).copy()
         fig, mapping = plot_ensemble_composition(ensemble_weights)
         chart_card(
             "3. Finalist Ensemble Composition",
@@ -722,7 +727,7 @@ def render_overview(loaded: LoadedRun, controls: dict[str, Any]) -> None:
     with lower[1]:
         chart_card(
             "4. Stress and Horizon Checks",
-            f"{basis_metric} across horizon buckets and policy stress windows.",
+            overview_stress_subtitle(controls),
             compact_figure(plot_stress_checks(stress_frame), 260),
             overview_stress_watch_note(stress_frame),
         )
@@ -758,10 +763,17 @@ def compact_figure(fig: Any, height: int, showlegend: bool | None = None) -> Any
     return fig
 
 
+DEFAULT_CANDIDATE_FRONTIER_MODE = "Light RUC challenger frontier"
+LEGACY_CANDIDATE_FRONTIER_MODE = "Curated" + " cone sample"
+
+
 def overview_candidate_landscape_frame(loaded: LoadedRun, controls: dict[str, Any]) -> pd.DataFrame:
+    mode_options = [DEFAULT_CANDIDATE_FRONTIER_MODE, "Competitive frontier", "Top candidates only", "Show outliers"]
+    if st.session_state.get("candidate_frontier_mode") == LEGACY_CANDIDATE_FRONTIER_MODE:
+        st.session_state["candidate_frontier_mode"] = DEFAULT_CANDIDATE_FRONTIER_MODE
     mode = st.selectbox(
         "Candidate frontier mode",
-        ["Curated cone sample", "Competitive frontier", "Top candidates only", "Show outliers"],
+        mode_options,
         key="candidate_frontier_mode",
         label_visibility="collapsed",
     )
@@ -855,7 +867,18 @@ def candidate_frontier_count_context(
         "filtered": is_filtered,
         "total_curated": total_curated,
         "default_plotted": len(default_plotted),
+        "coverage": candidate_frontier_coverage_text(candidate),
     }
+
+
+def candidate_frontier_coverage_text(candidate: pd.DataFrame) -> str:
+    if candidate is None or candidate.empty or "stream_label" not in candidate.columns:
+        return "Candidate coverage unavailable."
+    counts = candidate["stream_label"].dropna().astype(str).value_counts().to_dict()
+    light = int(counts.get("Light RUC volume", 0))
+    ped = int(counts.get("PED VKT per capita", 0))
+    heavy = int(counts.get("Heavy RUC volume", 0))
+    return f"Coverage: Light RUC {format_count(light)} challenger rows; PED {format_count(ped)} anchors; Heavy RUC {format_count(heavy)} anchors."
 
 
 def overview_frontier_note(summary: pd.DataFrame, count_context: dict[str, Any] | None = None) -> str:
@@ -879,7 +902,16 @@ def overview_frontier_note(summary: pd.DataFrame, count_context: dict[str, Any] 
         else ""
     )
     label = str(count_context.get("label")) if count_context else f"{format_count(len(summary))} plotted candidates"
-    return f"Frontier read: lower-left is better across {label}{suffix}."
+    coverage = f" {count_context.get('coverage')}" if count_context and count_context.get("coverage") else ""
+    return f"Frontier read: Light RUC challenger frontier with PED/Heavy anchors; lower-left is better across {label}{suffix}.{coverage}"
+
+
+def overview_stress_subtitle(controls: dict[str, Any]) -> str:
+    basis = controls.get("score_basis", PAPER_SCORE_BASIS)
+    basis_metric = score_basis_metric_label(basis)
+    if basis == PAPER_SCORE_BASIS:
+        return f"{basis_metric} across forecast horizon buckets only; policy windows are excluded from the default view."
+    return f"{basis_metric} across forecast horizon buckets and policy stress windows."
 
 
 def overview_stress_watch_note(stress_frame: pd.DataFrame) -> str:
@@ -921,8 +953,9 @@ def overview_error_distribution_note(qpred: pd.DataFrame) -> str:
     )
 
 
-def overview_stress_frame(loaded: LoadedRun, recommended: pd.DataFrame, controls: dict[str, Any]) -> pd.DataFrame:
-    """Return the canonical six-bucket stress frame used in the report-style overview."""
+def overview_stress_frame(loaded: LoadedRun, recommended: pd.DataFrame, controls: dict[str, Any] | None = None) -> pd.DataFrame:
+    """Return the Overview stress frame for the selected score basis."""
+    controls = controls or {"score_basis": PAPER_SCORE_BASIS}
     frame = final_stress_frame(
         selected_stress_frame(loaded, controls),
         loaded.data.get("quarterly_predictions", pd.DataFrame()),
@@ -932,7 +965,7 @@ def overview_stress_frame(loaded: LoadedRun, recommended: pd.DataFrame, controls
     )
     if frame.empty or "stress_bucket" not in frame.columns:
         return frame
-    reference_buckets = ["1-4 qtrs", "5-8 qtrs", "9-12 qtrs", "2024+", "2022-23", "Annual"]
+    reference_buckets = OVERVIEW_STRESS_BUCKET_ORDER if controls.get("score_basis", PAPER_SCORE_BASIS) == PAPER_SCORE_BASIS else STRESS_BUCKET_ORDER
     return frame[frame["stress_bucket"].astype(str).isin(reference_buckets)].copy()
 
 

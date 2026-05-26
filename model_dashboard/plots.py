@@ -10,6 +10,7 @@ from plotly.subplots import make_subplots
 
 from .labels import (
     METRIC_COLORS,
+    OVERVIEW_STRESS_BUCKET_ORDER,
     SCHIFF_SPEC_BENCHMARK_LABEL,
     STRESS_BUCKET_ORDER,
     STREAM_COLORS,
@@ -1101,7 +1102,10 @@ def plot_stress_checks(stress: pd.DataFrame) -> go.Figure:
         return empty_figure("No recognised stress buckets were available.")
     data["mape"] = pd.to_numeric(data["mape"], errors="coerce")
     basis_label = _basis_metric_label(data)
-    data["stress_bucket"] = pd.Categorical(data["stress_bucket"].astype(str), categories=STRESS_BUCKET_ORDER, ordered=True)
+    present_order = [bucket for bucket in STRESS_BUCKET_ORDER if bucket in set(data["stress_bucket"].astype(str))]
+    if not present_order:
+        present_order = list(OVERVIEW_STRESS_BUCKET_ORDER)
+    data["stress_bucket"] = pd.Categorical(data["stress_bucket"].astype(str), categories=present_order, ordered=True)
     data = data.sort_values(["stream_label", "stress_bucket"])
     data["_hover_bucket"] = data["stress_bucket"].astype(str).map(horizon_label)
     data["_hover_mape"] = data["mape"].map(format_percent)
@@ -1146,7 +1150,7 @@ def plot_stress_checks(stress: pd.DataFrame) -> go.Figure:
         annotation_text="High-risk zone",
         annotation_position="top left",
     )
-    fig.update_xaxes(type="category", categoryorder="array", categoryarray=STRESS_BUCKET_ORDER)
+    fig.update_xaxes(type="category", categoryorder="array", categoryarray=present_order)
     return apply_layout(fig, "Stress and horizon checks for finalist models", height=500)
 
 

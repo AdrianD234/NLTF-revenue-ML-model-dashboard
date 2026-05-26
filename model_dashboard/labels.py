@@ -59,6 +59,13 @@ STRESS_BUCKET_ORDER = [
     "Annual",
 ]
 
+OVERVIEW_STRESS_BUCKET_ORDER = [
+    "1-4 qtrs",
+    "5-8 qtrs",
+    "9-12 qtrs",
+    "Annual",
+]
+
 STRESS_SLICE_LABELS = {
     "horizon_1_4": "1-4 qtrs",
     "horizon_5_8": "5-8 qtrs",

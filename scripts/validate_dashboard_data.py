@@ -12,7 +12,7 @@ if str(ROOT) not in sys.path:
 
 from model_dashboard.data.config import DEFAULT_EVIDENCE_PACK_ROOT  # noqa: E402
 from model_dashboard.evidence_pack import REQUIRED_EVIDENCE_TABLES, load_evidence_pack, resolve_evidence_pack_root  # noqa: E402
-from model_dashboard.labels import SCHIFF_SPEC_BENCHMARK_LABEL, STRESS_BUCKET_ORDER  # noqa: E402
+from model_dashboard.labels import OVERVIEW_STRESS_BUCKET_ORDER, SCHIFF_SPEC_BENCHMARK_LABEL, STRESS_BUCKET_ORDER  # noqa: E402
 
 
 EXPECTED_STREAMS = {"PED VKT per capita", "Light RUC volume", "Heavy RUC volume"}
@@ -48,7 +48,26 @@ def validate() -> tuple[str, list[str]]:
     missing = [name for name in REQUIRED_EVIDENCE_TABLES if not (pack_root / "data" / name).exists()]
     if missing:
         raise AssertionError("Missing required evidence-pack files: " + ", ".join(missing))
+    forbidden_dirs = [pack_root / name for name in ["sources", "tables_csv", "logs", "screenshots"] if (pack_root / name).exists()]
+    if forbidden_dirs:
+        raise AssertionError("Slim evidence pack contains forbidden raw-output directories: " + ", ".join(str(path) for path in forbidden_dirs))
+    oversized = [path for path in pack_root.rglob("*") if path.is_file() and path.stat().st_size > 50 * 1024 * 1024]
+    if oversized:
+        raise AssertionError("Slim evidence pack contains file(s) above 50 MB: " + ", ".join(str(path) for path in oversized))
+    allowed_root_files = {"manifest.json", "README.md", "data_inventory.csv"}
+    for path in pack_root.rglob("*"):
+        if not path.is_file():
+            continue
+        rel = path.relative_to(pack_root)
+        if rel.parts[0] == "data" and path.suffix == ".parquet":
+            continue
+        if rel.parts[0] == "docs":
+            continue
+        if len(rel.parts) == 1 and rel.name in allowed_root_files:
+            continue
+        raise AssertionError(f"Slim evidence pack contains a non-slim file: {rel}")
     findings.append(f"- [pass] Evidence pack resolved: `{pack_root}`.")
+    findings.append("- [pass] Slim evidence pack contains only root metadata, docs, and data/*.parquet files under 50 MB.")
     findings.append(f"- [pass] Required Parquet files present: {len(REQUIRED_EVIDENCE_TABLES)}.")
 
     loaded = load_evidence_pack(pack_root, repo_root)
@@ -112,7 +131,12 @@ def validate() -> tuple[str, list[str]]:
         rows = stress[stress["stream_label"].eq(stream)]
         if rows["stress_bucket"].astype(str).tolist() != list(STRESS_BUCKET_ORDER):
             raise AssertionError(f"Stress bucket order is wrong for {stream}.")
-    findings.append("- [pass] Stress/horizon rows use the required six-bucket order.")
+    overview_stress = pd.read_csv(repo_root / "artifacts" / "chart_sources" / "overview_stress_horizon_checks.csv")
+    for stream in EXPECTED_STREAMS:
+        rows = overview_stress[overview_stress["stream_label"].eq(stream)]
+        if rows["stress_bucket"].astype(str).tolist() != list(OVERVIEW_STRESS_BUCKET_ORDER):
+            raise AssertionError(f"Overview default stress chart still exposes policy windows for {stream}.")
+    findings.append("- [pass] Stress/horizon rows preserve source policy windows, while Overview default shows horizon buckets only.")
 
     acf = loaded.data["diagnostic_acf"]
     if not EXPECTED_STREAMS.issubset(set(acf["stream_label"])):

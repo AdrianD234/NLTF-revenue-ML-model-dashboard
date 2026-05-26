@@ -16,7 +16,7 @@ if str(ROOT) not in sys.path:
 from model_dashboard.chart_sources import CHART_SOURCE_FILES, CORE_COLUMNS  # noqa: E402
 from model_dashboard.data.config import DEFAULT_EVIDENCE_PACK_ROOT  # noqa: E402
 from model_dashboard.evidence_pack import load_evidence_pack  # noqa: E402
-from model_dashboard.labels import STRESS_BUCKET_ORDER  # noqa: E402
+from model_dashboard.labels import OVERVIEW_STRESS_BUCKET_ORDER  # noqa: E402
 from model_dashboard.metrics import best_by_stream  # noqa: E402
 
 
@@ -136,16 +136,11 @@ def main() -> int:
         table = read_source("overview_stress_horizon_checks.csv")
         for stream in EXPECTED_STREAMS:
             buckets = table[table["stream_label"].eq(stream)]["stress_bucket"].tolist()
-            if buckets != list(STRESS_BUCKET_ORDER):
+            if buckets != list(OVERVIEW_STRESS_BUCKET_ORDER):
                 raise AssertionError(f"{stream} stress bucket order is {buckets}")
-        heavy = table[table["stream_label"].eq("Heavy RUC volume")].set_index("stress_bucket")
-        for bucket in ["2024+", "2022-23"]:
-            value = pd.to_numeric(heavy.loc[bucket, "metric_value"], errors="coerce")
-            source_file = str(heavy.loc[bucket, "source_file"])
-            notes = str(heavy.loc[bucket, "notes"])
-            if pd.notna(value) and "stress_horizon.parquet" not in source_file and "stress_horizon.parquet" not in notes:
-                raise AssertionError(f"Heavy RUC {bucket} is populated without stress_horizon.parquet source evidence.")
-        return "Stress buckets reconcile to stress_horizon.parquet, with Heavy RUC policy windows either sourced or explicit gaps."
+        if table["stress_bucket"].astype(str).isin(["2024+", "2022-23"]).any():
+            raise AssertionError("Overview default stress source table still contains policy windows.")
+        return "Overview default stress source reconciles to paper-style horizon buckets only."
 
     def check_full_sample_gain_label() -> str:
         gain = read_source("schiff_paired_or_fullsample_gain.csv")
