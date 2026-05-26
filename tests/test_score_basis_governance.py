@@ -14,10 +14,12 @@ from model_dashboard.score_basis import (
     project_scenario_comparison_frame,
     project_score_basis_frame,
 )
-from app import overview_stress_frame
+from app import build_candidate_landscape_frame, overview_stress_frame
 
 
 ROOT = Path(__file__).resolve().parents[1]
+EXPECTED_STREAMS = {"PED VKT per capita", "Light RUC volume", "Heavy RUC volume"}
+EXPECTED_BALANCED_FRONTIER_COUNTS = {"PED VKT per capita": 132, "Light RUC volume": 136, "Heavy RUC volume": 132}
 
 
 @pytest.fixture(scope="session")
@@ -25,7 +27,7 @@ def evidence_pack():
     return load_evidence_pack(DEFAULT_EVIDENCE_PACK_ROOT, ROOT)
 
 
-def test_v5_default_score_basis_is_paper_style(evidence_pack) -> None:
+def test_v6_default_score_basis_is_paper_style(evidence_pack) -> None:
     finalists = evidence_pack.data["recommended"].set_index("stream_label")
     assert set(finalists["score_basis"]) == {PAPER_SCORE_BASIS}
     assert float(finalists.loc["PED VKT per capita", "quarterly_mape"]) == pytest.approx(3.237144, abs=0.001)
@@ -86,6 +88,33 @@ def test_chart_sources_include_score_basis_and_no_old_light_default_values(evide
     ]
     assert not finalist.empty
     assert set(finalist["model"].astype(str)) == {"dynamic_RESID_GBR_n150_d1_lr0.05_w36"}
+
+
+def test_candidate_frontier_balanced_under_both_score_bases(evidence_pack) -> None:
+    controls = {
+        "stage": "all",
+        "streams": sorted(EXPECTED_STREAMS),
+        "source_families": None,
+        "variants": None,
+        "top_n": 50,
+        "show_schiff": True,
+        "show_finalists": True,
+        "show_screen": True,
+        "show_final": True,
+        "show_static": True,
+        "show_prequential": True,
+        "hide_outliers": True,
+    }
+    for basis in [PAPER_SCORE_BASIS, OPERATIONAL_SCORE_BASIS]:
+        frame = build_candidate_landscape_frame(
+            evidence_pack,
+            {**controls, "score_basis": basis},
+            "Balanced all-stream frontier view",
+        )
+        assert len(frame) == 400
+        assert frame["stream_label"].value_counts().to_dict() == EXPECTED_BALANCED_FRONTIER_COUNTS
+        assert set(frame["stream_label"]) == EXPECTED_STREAMS
+        assert frame[["quarterly_mape", "annual_mape"]].notna().all().all()
 
 
 def test_ensemble_composition_renders_all_streams_under_both_score_bases(evidence_pack) -> None:

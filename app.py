@@ -615,12 +615,27 @@ def run_evidence_caption(
 
 
 def run_footer_label(loaded: LoadedRun) -> str:
+    pack_label = data_pack_version_label(loaded)
     if loaded.file_status.empty or "Last modified" not in loaded.file_status.columns:
-        return "Data as of: selected run"
+        return f"Data as of: selected run | {pack_label}"
     modified = loaded.file_status.loc[loaded.file_status["Found?"].eq("Yes"), "Last modified"].dropna()
     if modified.empty:
-        return "Data as of: selected run"
-    return f"Data as of: {modified.max()}"
+        return f"Data as of: selected run | {pack_label}"
+    return f"Data as of: {modified.max()} | {pack_label}"
+
+
+def data_pack_version_label(loaded: LoadedRun) -> str:
+    manifest = loaded.manifest or {}
+    schema = str(manifest.get("schema_version") or "unknown-schema")
+    created = str(manifest.get("created_at") or "unknown-date")
+    resolved_root = str(manifest.get("resolved_root") or loaded.run_dir)
+    row_counts = manifest.get("row_counts", {}) if isinstance(manifest, dict) else {}
+    candidate_rows = "-"
+    if isinstance(row_counts, dict):
+        candidate_rows = format_count(int(row_counts.get("candidate_cone", row_counts.get("candidate_cone.parquet", 0)) or 0))
+    evidence_hash = str(manifest.get("evidence_hash") or "")[:12]
+    hash_text = f" | hash {evidence_hash}" if evidence_hash else ""
+    return f"Data pack version: {schema} | created {created} | root {resolved_root} | candidate rows {candidate_rows}{hash_text}"
 
 
 def common_filter(df: pd.DataFrame, controls: dict[str, Any], include_source_variant: bool = True) -> pd.DataFrame:
@@ -709,7 +724,7 @@ def render_overview(loaded: LoadedRun, controls: dict[str, Any]) -> None:
         candidate_context = candidate_frontier_count_context(loaded, controls, landscape)
         chart_card(
             "2. Candidate Search Frontier",
-            f"{CANDIDATE_FRONTIER_CAPTION} Using {basis_metric}. Lower-left is better.",
+            CANDIDATE_FRONTIER_CAPTION,
             compact_figure(plot_candidate_landscape(landscape), 260),
             overview_frontier_note(landscape, candidate_context),
         )
@@ -764,17 +779,18 @@ def compact_figure(fig: Any, height: int, showlegend: bool | None = None) -> Any
     return fig
 
 
-DEFAULT_CANDIDATE_FRONTIER_MODE = "All-stream frontier view"
+DEFAULT_CANDIDATE_FRONTIER_MODE = "Balanced all-stream frontier view"
+PREVIOUS_CANDIDATE_FRONTIER_MODE = "All-stream frontier view"
 LEGACY_CANDIDATE_FRONTIER_MODE = "Curated" + " cone sample"
 CANDIDATE_FRONTIER_CAPTION = (
-    "All-stream frontier view; Light RUC uses challenger-search rows, PED/Heavy use visual frontier samples "
-    "anchored to finalist and Schiff specification points."
+    "Balanced all-stream frontier view; visual frontier samples are anchored to current finalists and Schiff "
+    "specification benchmarks and are excluded from governance scoring."
 )
 
 
 def overview_candidate_landscape_frame(loaded: LoadedRun, controls: dict[str, Any]) -> pd.DataFrame:
     mode_options = [DEFAULT_CANDIDATE_FRONTIER_MODE, "Competitive frontier", "Top candidates only", "Show outliers"]
-    if st.session_state.get("candidate_frontier_mode") == LEGACY_CANDIDATE_FRONTIER_MODE:
+    if st.session_state.get("candidate_frontier_mode") in {LEGACY_CANDIDATE_FRONTIER_MODE, PREVIOUS_CANDIDATE_FRONTIER_MODE}:
         st.session_state["candidate_frontier_mode"] = DEFAULT_CANDIDATE_FRONTIER_MODE
     mode = st.selectbox(
         "Candidate frontier mode",
@@ -888,7 +904,7 @@ def candidate_frontier_coverage_text(candidate: pd.DataFrame) -> str:
     light = int(counts.get("Light RUC volume", 0))
     ped = int(counts.get("PED VKT per capita", 0))
     heavy = int(counts.get("Heavy RUC volume", 0))
-    return f"Coverage: Light RUC {format_count(light)} challenger-search rows; PED {format_count(ped)} frontier/anchor rows; Heavy RUC {format_count(heavy)} frontier/anchor rows."
+    return f"Coverage: PED {format_count(ped)} frontier rows; Light RUC {format_count(light)} frontier rows; Heavy RUC {format_count(heavy)} frontier rows."
 
 
 def overview_frontier_note(summary: pd.DataFrame, count_context: dict[str, Any] | None = None) -> str:

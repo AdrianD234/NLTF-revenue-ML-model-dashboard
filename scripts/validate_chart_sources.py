@@ -15,9 +15,11 @@ from model_dashboard.chart_sources import CHART_SOURCE_FILES, CORE_COLUMNS  # no
 from model_dashboard.data.config import DEFAULT_EVIDENCE_PACK_ROOT  # noqa: E402
 from model_dashboard.evidence_pack import load_evidence_pack  # noqa: E402
 from model_dashboard.labels import OVERVIEW_STRESS_BUCKET_ORDER  # noqa: E402
+from model_dashboard.score_basis import OPERATIONAL_SCORE_BASIS, PAPER_SCORE_BASIS, project_score_basis_frame  # noqa: E402
 
 
 EXPECTED_STREAMS = {"PED VKT per capita", "Light RUC volume", "Heavy RUC volume"}
+EXPECTED_FRONTIER_COUNTS = {"PED VKT per capita": 132, "Light RUC volume": 136, "Heavy RUC volume": 132}
 CHART_SOURCE_DIR = ROOT / "artifacts" / "chart_sources"
 
 
@@ -144,14 +146,40 @@ def validate() -> list[tuple[str, str, str]]:
     frontier = read_table("overview_candidate_search_frontier.csv")
     frontier_streams = set(frontier["stream_label"].dropna().astype(str))
     frontier_has_required_streams = EXPECTED_STREAMS.issubset(frontier_streams)
+    frontier_counts = frontier["stream_label"].dropna().astype(str).value_counts().to_dict()
+    balanced_counts = frontier_counts == EXPECTED_FRONTIER_COUNTS
     frontier_has_sample_contract = {"frontier_sample_class", "frontier_sample_note"}.issubset(frontier.columns)
     sample_classes = set(frontier.get("frontier_sample_class", pd.Series(dtype=str)).dropna().astype(str))
-    has_visual_samples = "visual_frontier_sample" in sample_classes
+    has_visual_samples = "balanced_visual_frontier_sample" in sample_classes and "anchor" in sample_classes
     has_frontier_notes = frontier.get("frontier_sample_note", pd.Series(dtype=str)).dropna().astype(str).str.len().gt(0).any()
     record(
-        "Candidate frontier source includes all streams and v5 visual sample metadata",
-        frontier_has_required_streams and frontier_has_sample_contract and has_visual_samples and has_frontier_notes,
-        f"streams={sorted(frontier_streams)}; sample_classes={sorted(sample_classes)}.",
+        "Candidate frontier source includes balanced v6 all-stream sample metadata",
+        len(frontier) == 400 and balanced_counts and frontier_has_required_streams and frontier_has_sample_contract and has_visual_samples and has_frontier_notes,
+        f"rows={len(frontier):,}; counts={frontier_counts}; sample_classes={sorted(sample_classes)}.",
+    )
+
+    candidate = loaded.data.get("candidate_df", pd.DataFrame())
+    score_basis_failures: list[str] = []
+    if candidate.empty:
+        score_basis_failures.append("candidate_df empty")
+    else:
+        mask = pd.Series(False, index=candidate.index)
+        for column in ["plot_default_include", "is_plot_candidate"]:
+            if column in candidate.columns:
+                mask = mask | candidate[column].fillna(False).astype(bool)
+        plotted = candidate[mask].copy() if mask.any() else candidate.copy()
+        for basis in [PAPER_SCORE_BASIS, OPERATIONAL_SCORE_BASIS]:
+            projected = project_score_basis_frame(plotted, basis)
+            projected = projected.dropna(subset=["quarterly_mape", "annual_mape"])
+            counts = projected["stream_label"].dropna().astype(str).value_counts().to_dict()
+            if len(projected) != 400 or counts != EXPECTED_FRONTIER_COUNTS:
+                score_basis_failures.append(f"{basis}: rows={len(projected)}, counts={counts}")
+    record(
+        "Candidate frontier has balanced all-stream rows under both score bases",
+        not score_basis_failures,
+        "Paper and Operational score-basis projections both contain 400 rows with PED 132, Light RUC 136, Heavy RUC 132."
+        if not score_basis_failures
+        else "; ".join(score_basis_failures),
     )
 
     contamination: list[str] = []
@@ -161,7 +189,11 @@ def validate() -> list[tuple[str, str, str]]:
         table = read_table(filename)
         text = table.fillna("").astype(str)
         sample_col_present = "frontier_sample_class" in table.columns and table["frontier_sample_class"].dropna().astype(str).str.len().gt(0).any()
-        visual_model_present = text.apply(lambda row: row.str.contains("VISUAL_FRONTIER_SAMPLE", case=False, regex=False).any(), axis=1).any()
+        visual_model_present = text.apply(
+            lambda row: row.str.contains("VISUAL_FRONTIER_SAMPLE", case=False, regex=False).any()
+            or row.str.contains("balanced_frontier", case=False, regex=False).any(),
+            axis=1,
+        ).any()
         if sample_col_present or visual_model_present:
             contamination.append(filename)
     record(

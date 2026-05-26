@@ -20,6 +20,7 @@ from tests.fixtures.expected_values import (
 ROOT = Path(__file__).resolve().parents[1]
 CHART_SOURCE_DIR = ROOT / "artifacts" / "chart_sources"
 EXPECTED_STREAMS = {"PED VKT per capita", "Light RUC volume", "Heavy RUC volume"}
+EXPECTED_BALANCED_FRONTIER_COUNTS = {"PED VKT per capita": 132, "Light RUC volume": 136, "Heavy RUC volume": 132}
 
 
 @pytest.fixture(scope="session")
@@ -56,11 +57,15 @@ def test_overview_source_tables_reconcile_to_current_parquet(parquet_dashboard: 
         assert float(indexed.loc[key, "metric_value"]) == pytest.approx(expected, abs=0.0008)
 
     candidate = chart_source("overview_candidate_search_frontier.csv")
-    assert len(candidate) <= 400
+    assert len(candidate) == 400
+    assert candidate["stream_label"].value_counts().to_dict() == EXPECTED_BALANCED_FRONTIER_COUNTS
     assert {"Selected finalist", SCHIFF_SPEC_BENCHMARK_LABEL}.issubset(set(candidate["point_type"]))
     assert candidate["calculation_basis"].str.contains("Default all-stream frontier rows", regex=False).all()
+    assert {"frontier_sample_class", "frontier_sample_note"}.issubset(candidate.columns)
+    assert set(candidate["frontier_sample_class"].dropna()) == {"balanced_visual_frontier_sample", "anchor"}
+    assert candidate["frontier_sample_note"].dropna().astype(str).str.len().gt(0).all()
     row_text = candidate.fillna("").astype(str).agg(lambda row: " ".join(row.to_list()), axis=1)
-    assert not row_text.str.contains("20.50|20.499", regex=True).any()
+    assert not row_text.str.contains(r"20\.50|20\.499", regex=True).any()
 
 
 def test_overview_kpi_annual_benchmark_uses_schiff_benchmark_source(parquet_dashboard: LoadedRun) -> None:

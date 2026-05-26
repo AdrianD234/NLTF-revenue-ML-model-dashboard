@@ -118,7 +118,7 @@ def validate() -> tuple[str, list[str]]:
     if not (float(light["full_sample_qtr_gain_pp"]) > 0 and float(light["full_sample_annual_gain_pp"]) > 0):
         raise AssertionError("Light RUC paper-style quarterly and annual gains are not both preserved.")
     if abs(float(light["full_sample_qtr_gain_pp"]) - 3.158190) > 0.001:
-        raise AssertionError("Old Light RUC gain is still present instead of the v5 +3.158 pp paper-style gain.")
+        raise AssertionError("Old Light RUC gain is still present instead of the v6 +3.158 pp paper-style gain.")
     light_rec = finalists[finalists["stream_label"].eq("Light RUC volume")].iloc[0]
     light_schiff = schiff[schiff["stream_label"].eq("Light RUC volume")].iloc[0]
     op_annual_gain = float(light_schiff["operational_annual_mape"]) - float(light_rec["operational_annual_mape"])

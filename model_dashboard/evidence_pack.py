@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import hashlib
 import json
 from pathlib import Path
 import time
@@ -542,10 +543,13 @@ def _build_manifest_artifact(
     data_dir: Path,
     tables: dict[str, pd.DataFrame],
 ) -> dict[str, Any]:
+    evidence_hash = _evidence_pack_hash(pack_root)
     return {
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
         "source_mode": "dashboard_evidence_pack",
         "schema_version": manifest.get("schema_version"),
+        "created_at": manifest.get("created_at"),
+        "evidence_hash": evidence_hash,
         "requested_data_root": str(Path(requested_root or DEFAULT_EVIDENCE_PACK_ROOT).expanduser()),
         "resolved_root": str(pack_root),
         "manifest_path": str(pack_root / "manifest.json"),
@@ -556,6 +560,18 @@ def _build_manifest_artifact(
         "row_counts": {name: int(len(frame)) for name, frame in tables.items()},
         "required_dashboard_rule": manifest.get("required_dashboard_rule"),
     }
+
+
+def _evidence_pack_hash(pack_root: Path) -> str:
+    digest = hashlib.sha256()
+    paths = [pack_root / "manifest.json"]
+    paths.extend(pack_root / "data" / name for name in REQUIRED_EVIDENCE_TABLES)
+    for path in paths:
+        if not path.exists():
+            continue
+        digest.update(path.name.encode("utf-8"))
+        digest.update(path.read_bytes())
+    return digest.hexdigest()[:12]
 
 
 def _file_status(pack_root: Path, tables: dict[str, pd.DataFrame]) -> pd.DataFrame:

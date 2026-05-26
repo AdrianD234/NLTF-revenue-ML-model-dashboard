@@ -286,9 +286,9 @@ def test_rendered_plotly_trace_data_matches_chart_sources_where_possible(page: P
     page.get_by_text("2. Candidate Search Frontier", exact=False).first.scroll_into_view_if_needed()
     expect(page.locator(".js-plotly-plot").nth(1)).to_be_visible(timeout=90000)
     body_text = page.locator("body").inner_text(timeout=60000)
-    assert "400 plotted candidates from 1,092 curated rows" in body_text
-    assert "All-stream frontier view" in body_text
-    assert "PED/Heavy use visual frontier samples" in body_text
+    assert "400 plotted candidates from 400 curated rows" in body_text
+    assert "Balanced all-stream frontier view" in body_text
+    assert "excluded from governance scoring" in body_text
     assert "278 loaded candidates" not in body_text
     candidate_plot = page.evaluate(
         """() => {

@@ -46,12 +46,13 @@ def validate() -> list[tuple[str, str, str]]:
         "Overview KPI and frontier caption identify plotted candidate rows rather than vague loaded/model counts.",
     )
     record(
-        "Frontier label explains all-stream v5 frontier coverage",
-        "All-stream frontier view; Light RUC uses challenger-search rows" in app_text
-        and "PED/Heavy use visual frontier samples" in app_text
-        and "Coverage: Light RUC" in app_text
+        "Frontier label explains balanced v6 frontier coverage",
+        "Balanced all-stream frontier view; visual frontier samples are anchored to current finalists and Schiff " in app_text
+        and "specification benchmarks and are excluded from governance scoring." in app_text
+        and "All-stream frontier view; Light RUC uses challenger-search rows" not in app_text
+        and "Coverage: PED" in app_text
         and "Curated cone sample" not in app_text,
-        "Candidate frontier title/caption makes clear that v5 has Light RUC challengers plus PED/Heavy visual frontier samples.",
+        "Candidate frontier title/caption makes clear that v6 has balanced all-stream visualization samples excluded from governance scoring.",
     )
     record(
         "Default stress chart excludes policy windows",

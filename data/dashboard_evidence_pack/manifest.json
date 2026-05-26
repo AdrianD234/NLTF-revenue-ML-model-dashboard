@@ -1,7 +1,7 @@
 {
-  "schema_version": "dashboard_evidence_pack_v5_frontier_sample",
+  "schema_version": "dashboard_evidence_pack_v6_balanced_frontier",
   "created_at": "2026-05-26",
-  "description": "v5 pack based on v4 GBM Light RUC evidence pack with transparent all-stream visual frontier sample rows added to candidate_cone for dashboard frontier continuity.",
+  "description": "Dual scorecard evidence pack with balanced all-stream candidate frontier visualization samples.",
   "default_score_basis": "schiff_paper_horizon_mean",
   "operational_score_basis": "current_grid_operational_pooled",
   "selected_light_ruc_model": "schiff_w36_OLS",
@@ -13,7 +13,8 @@
     "paper_grid": "Schiff-style test grid with horizon-specific MAPE and 2020/2021 test targets excluded",
     "light_ruc_finalist": "dynamic residual GBM selected as accuracy-challenger finalist; paper-style metrics default, operational annual MAPE retained as watch item.",
     "toggle_required": "Dashboard should expose Operational pooled MAPE and Paper-style horizon MAPE scorecards.",
-    "candidate_frontier": "candidate_cone includes actual Light RUC challenger rows and transparent PED/Heavy visual frontier sample rows for chart continuity; visual samples are not model-selection evidence."
+    "candidate_frontier": "candidate_cone includes actual Light RUC challenger rows and transparent PED/Heavy visual frontier sample rows for chart continuity; visual samples are not model-selection evidence.",
+    "candidate_cone": "Default frontier chart uses balanced all-stream visual frontier samples plus true finalist and Schiff specification anchors; frontier samples are visualization-only and excluded from governance scoring."
   },
   "row_counts": [
     {
@@ -21,12 +22,6 @@
       "rows": 130,
       "columns": 17,
       "size_bytes": 14956
-    },
-    {
-      "file": "candidate_cone.parquet",
-      "rows": 1092,
-      "columns": 54,
-      "size_bytes": 196867
     },
     {
       "file": "chart_contract.parquet",
@@ -153,6 +148,12 @@
       "rows": 36,
       "columns": 15,
       "size_bytes": 10915
+    },
+    {
+      "file": "candidate_cone.parquet",
+      "rows": 400,
+      "columns": 54,
+      "size_bytes": 69336
     }
   ],
   "canonical_finalists": {

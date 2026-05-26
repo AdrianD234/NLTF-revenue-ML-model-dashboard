@@ -500,7 +500,7 @@ def _overview_candidate_frontier(summary: pd.DataFrame, source_file: str) -> pd.
                 source_column,
                 source_file,
                 "Default all-stream frontier rows; x and y use the selected score basis.",
-                "Light RUC uses challenger-search rows; PED/Heavy use visual frontier samples anchored to finalist and Schiff specification points.",
+                "Balanced all-stream frontier view; visual frontier samples are anchored to current finalists and Schiff specification benchmarks and are excluded from governance scoring.",
                 quarterly_mape=qtr,
                 annual_mape=annual,
                 point_type=role,

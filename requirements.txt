@@ -1,10 +1,6 @@
 streamlit
 pandas
 plotly
-openpyxl
 pyarrow
-pytest
-playwright
-pytest-playwright
-kaleido
+openpyxl
 pillow

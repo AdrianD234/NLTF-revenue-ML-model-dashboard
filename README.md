@@ -1,38 +1,80 @@
 # NLTF Revenue Modelling Dashboard
 
-Streamlit dashboard for Stage 1 revenue-model governance. The default data source is the curated Parquet dashboard pack under `data/dashboard_evidence_pack`.
+Streamlit dashboard for Stage 1 revenue-model governance. The default data source is the curated Parquet dashboard pack under `data/dashboard_evidence_pack`; this bundled evidence pack is also the production Streamlit Cloud data source.
 
-Legacy run-folder CSV/XLSX outputs are retained only for review and migration checks. They are not the primary application path.
+Legacy run-folder CSV/XLSX outputs are retained only for review and migration checks. They do not feed the primary four dashboard pages.
 
 ## Run Locally
 
-The app runs from the bundled evidence pack by default:
+The app runs from the bundled evidence pack by default. Do not set an evidence-pack environment variable unless you are intentionally reviewing another governed pack.
 
 ```powershell
-cd "<repo-root>"
-.venv\Scripts\python.exe -m streamlit run app.py --server.port 8501 --server.headless true
+cd "C:\Users\Adrian Desilvestro\OneDrive\Documents\Playground\Repos\NLTF-revenue-ML-model-dashboard"
+.\.venv\Scripts\python.exe -m streamlit run app.py --server.port 8501 --server.headless true
 ```
 
-If the virtual environment is not available, replace `.venv\Scripts\python.exe` with `python`.
+If the virtual environment is not available, replace `.\.venv\Scripts\python.exe` with `python`.
 
-To use a different governed evidence pack, set one of these primary environment variables before launch:
+To review a different governed evidence pack locally:
 
 ```powershell
 $env:DASHBOARD_EVIDENCE_PACK_ROOT = "C:\path\to\dashboard_evidence_pack"
-# or
-$env:STAGE1_DASHBOARD_EVIDENCE_PACK_ROOT = "C:\path\to\dashboard_evidence_pack"
+.\.venv\Scripts\python.exe -m streamlit run app.py --server.port 8501 --server.headless true
+```
+
+Unset the variable to return to the production bundled pack:
+
+```powershell
+Remove-Item Env:\DASHBOARD_EVIDENCE_PACK_ROOT -ErrorAction SilentlyContinue
+Remove-Item Env:\STAGE1_DASHBOARD_EVIDENCE_PACK_ROOT -ErrorAction SilentlyContinue
 ```
 
 `MODEL_DIAGNOSTIC_DATA_ROOT` is legacy diagnostic/run-folder support for review utilities. It is not the primary dashboard data path.
 
+## Streamlit Cloud
+
+Use these deployment fields:
+
+- Repo: `https://github.com/AdrianD234/NLTF-revenue-ML-model-dashboard`
+- Branch: `main`
+- Main file path: `app.py`
+- Secrets: none required
+- Data source: bundled `data/dashboard_evidence_pack`
+
+Streamlit Cloud installs `requirements.txt`, reads `runtime.txt`, and chooses the server port. `.streamlit/config.toml` intentionally has no `[server] port`.
+
+The app footer displays `Data pack version`, including the manifest schema, created date, resolved root, candidate row count, and evidence hash. Use that footer to confirm the deployed app is using the same bundled pack as local.
+
+## Evidence-Pack Update Workflow
+
+Use the update script for governed evidence-pack replacements:
+
+```powershell
+pwsh -File scripts\update_evidence_pack.ps1 `
+  -SourcePack "C:\Users\Adrian Desilvestro\Downloads\stage1_dashboard_evidence_pack_dual_scorecard_gbm_light_v6_balanced_frontier\dashboard_evidence_pack" `
+  -Verify
+```
+
+The script validates `manifest.json`, `docs/*`, `data_inventory.csv`, and `data/*.parquet`, rejects raw-output folders, rejects files over 50 MB, replaces `data/dashboard_evidence_pack`, optionally runs the verifier, and prints the exact `git add` / `git commit` commands.
+
+Only these evidence-pack paths should be committed:
+
+- `data/dashboard_evidence_pack/manifest.json`
+- `data/dashboard_evidence_pack/README.md`
+- `data/dashboard_evidence_pack/data_inventory.csv`
+- `data/dashboard_evidence_pack/docs/*`
+- `data/dashboard_evidence_pack/data/*.parquet`
+
+Do not commit `sources/`, `tables_csv/`, logs, screenshots, raw mirrors, XLSX files, CSV mirrors, or files above 50 MB.
+
 ## Governance Contract
 
-- Parquet candidate data is the single source of truth for finalists, candidate frontier rows, Schiff specification benchmark rows, stress buckets, and ensemble component weights.
+- Parquet candidate data is the single source of truth for finalists, Candidate Search Frontier rows, Schiff specification benchmark rows, stress buckets, and ensemble component weights.
 - The default benchmark is the Schiff specification benchmark from `data/dashboard_evidence_pack`. Legacy Schiff-style benchmark rows are review-only and must not appear in default dashboard pages.
-- Diagnostic audit support files are loaded only when present and must degrade gracefully when absent.
+- Candidate Search Frontier visualization samples are excluded from KPI values, finalist selection, benchmark pass, diagnostics, scenario comparison, stress, and model-governance metrics.
 - Every visible executive chart writes a source table under `artifacts/chart_sources/` during validation.
 - Full-sample gain and paired common-grid gain are distinct metrics. A chart labelled as paired gain must not show full-sample gains.
-- Generated artifacts, screenshots, logs, and caches are regenerated by the verifier. The governed default evidence pack is versioned under `data/dashboard_evidence_pack`.
+- Generated artifacts, screenshots, logs, and caches are regenerated by the verifier.
 
 See:
 
@@ -40,6 +82,7 @@ See:
 - `docs/DATA_CONTRACT.md`
 - `docs/GOVERNANCE_RULES.md`
 - `docs/SCHIFF_SPECIFICATION_BENCHMARK.md`
+- `docs/STREAMLIT_CLOUD_DEPLOYMENT.md`
 
 ## Verification
 
@@ -49,4 +92,10 @@ Run the dashboard verifier before claiming completion:
 pwsh -File scripts\verify_dashboard.ps1 -DataRoot "data\dashboard_evidence_pack" -Port 8501
 ```
 
-The verifier runs compile, pytest, Parquet schema/data validation, chart-source validation, semantic-label validation, Streamlit startup, Playwright browser interaction tests, screenshot checks, and the gate validators.
+The verifier runs compile, pytest, Parquet schema/data validation, chart-source validation, semantic-label validation, Streamlit deploy-readiness checks, Streamlit startup, Playwright browser interaction tests, screenshot checks, and the gate validators.
+
+For a deployment-only smoke check:
+
+```powershell
+python scripts\check_streamlit_deploy_readiness.py
+```

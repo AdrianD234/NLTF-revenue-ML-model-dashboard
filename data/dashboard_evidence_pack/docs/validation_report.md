@@ -1,7 +1,7 @@
 # Evidence Pack Validation Report
 
 ## Version
-v4 GBM Light RUC evidence pack. Default score basis: schiff_paper_horizon_mean.
+v6 GBM Light RUC evidence pack with balanced all-stream frontier. Default score basis: schiff_paper_horizon_mean.
 
 ## Canonical finalists
 
@@ -35,7 +35,7 @@ The Light RUC finalist is an accuracy-challenger dynamic residual GBM. It improv
 | file                                    |   rows |   columns |   size_bytes |
 |:----------------------------------------|-------:|----------:|-------------:|
 | annual_predictions.parquet              |    130 |        17 |        14956 |
-| candidate_cone.parquet                  |    892 |        52 |       162519 |
+| candidate_cone.parquet                  |    400 |        54 |       69336 |
 | chart_contract.parquet                  |     16 |         5 |         5520 |
 | diagnostic_acf.parquet                  |     39 |        12 |         9137 |
 | diagnostic_pass_matrix.parquet          |     27 |         9 |         6406 |
@@ -66,3 +66,7 @@ Default plotted candidate rows: 400.
 Plotted rows by stream: {'Heavy RUC volume': 102, 'Light RUC volume': 196, 'PED VKT per capita': 102}.
 
 Light RUC rows are challenger-search candidates. PED and Heavy RUC include transparent visual frontier sample rows for all-stream chart continuity. These rows are not used for model selection, KPI metrics, diagnostics or scenario scoring.
+
+
+## Balanced frontier note
+The candidate_cone table contains balanced all-stream frontier visualization samples plus true finalist and Schiff specification anchors. Samples are explicitly tagged and excluded from governance scoring.

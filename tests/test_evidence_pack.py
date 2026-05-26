@@ -48,7 +48,7 @@ def test_default_app_uses_evidence_pack_not_legacy_or_mini(evidence_pack) -> Non
     assert "mini_parquet" not in manifest_text
     assert "legacy_run_folder" not in manifest_text
     assert evidence_pack.run_dir.name == "dashboard_evidence_pack"
-    assert evidence_pack.manifest["schema_version"] == "dashboard_evidence_pack_v5_frontier_sample"
+    assert evidence_pack.manifest["schema_version"] == "dashboard_evidence_pack_v6_balanced_frontier"
     assert set(evidence_pack.data["chart_contract"]["source_table"]).issuperset(
         {
             "candidate_cone.parquet",
@@ -102,7 +102,7 @@ def test_candidate_frontier_plots_more_than_100_rows(evidence_pack) -> None:
     assert len(frontier) > 100
     assert {"Selected finalist", SCHIFF_SPEC_BENCHMARK_LABEL}.issubset(set(frontier["point_type"]))
     row_text = frontier.fillna("").astype(str).agg(lambda row: " ".join(row.to_list()), axis=1)
-    assert not row_text.str.contains("20.50|20.499", regex=True).any()
+    assert not row_text.str.contains(r"20\.50|20\.499", regex=True).any()
 
 
 def test_full_sample_vs_paired_semantics_are_enforced(evidence_pack) -> None:

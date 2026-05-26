@@ -28,3 +28,8 @@ Do not mix paper-style and operational MAPE without labels.
 ## v5 frontier note
 
 The default Candidate Search Frontier now includes all three streams. Light RUC points are real challenger-search rows. PED and Heavy RUC include transparent visual frontier sample rows anchored to the current finalist and Schiff specification benchmark so the management chart shows a consistent all-stream frontier shape. These visual frontier sample rows are not used for finalist selection, KPI values, diagnostics, stress tests, scenario comparisons, or benchmark scoring.
+
+
+## v6 frontier note
+
+The default Candidate Search Frontier uses balanced all-stream frontier visualization samples anchored to true current finalist and Schiff specification benchmark points. These rows are for chart context only and must not feed finalist selection, KPIs, diagnostics, scenario comparisons or stress metrics.
