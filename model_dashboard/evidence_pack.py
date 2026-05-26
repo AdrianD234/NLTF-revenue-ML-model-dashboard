@@ -16,6 +16,7 @@ from .data.manifest import write_data_source_manifest
 from .data.transforms import normalise_parquet_candidate
 from .labels import STRESS_BUCKET_ORDER, is_legacy_schiff_style_text
 from .metrics import add_stream_fields, normalise_paired, normalise_predictions, normalise_stress, normalise_weights, scale_percent_columns
+from .score_basis import PAPER_SCORE_BASIS, filter_score_basis_rows, project_scenario_comparison_frame, project_score_basis_frame
 
 
 REQUIRED_EVIDENCE_TABLES = (
@@ -33,6 +34,17 @@ REQUIRED_EVIDENCE_TABLES = (
     "error_distribution.parquet",
     "annual_predictions.parquet",
     "chart_contract.parquet",
+)
+
+V3_EVIDENCE_TABLES = (
+    "scorecard_model_summary.parquet",
+    "scorecard_predictions.parquet",
+    "scorecard_horizon_profiles.parquet",
+    "scorecard_stress_horizon.parquet",
+    "scorecard_annual_metric_summary.parquet",
+    "scorecard_annual_predictions.parquet",
+    "light_ruc_candidate_scorecard.parquet",
+    "invalid_predictions_zero_actual.parquet",
 )
 
 
@@ -62,7 +74,7 @@ def resolve_evidence_pack_root(root: str | Path | None = None) -> Path:
 
 def evidence_pack_signature(root: str | Path | None = None) -> tuple[tuple[str, int, int], ...]:
     pack_root = resolve_evidence_pack_root(root)
-    paths = [pack_root / "manifest.json", *[pack_root / "data" / name for name in REQUIRED_EVIDENCE_TABLES]]
+    paths = [pack_root / "manifest.json", *[pack_root / "data" / name for name in REQUIRED_EVIDENCE_TABLES + V3_EVIDENCE_TABLES]]
     signature: list[tuple[str, int, int]] = []
     for path in paths:
         if not path.exists():
@@ -87,23 +99,55 @@ def load_evidence_pack(root: str | Path | None = None, repo_root: str | Path | N
 
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     raw = {name: pd.read_parquet(data_dir / name) for name in REQUIRED_EVIDENCE_TABLES}
+    for name in V3_EVIDENCE_TABLES:
+        path = data_dir / name
+        if path.exists():
+            raw[name] = pd.read_parquet(path)
     tables = {name.removesuffix(".parquet"): frame for name, frame in raw.items()}
+    default_score_basis = str(manifest.get("default_score_basis") or PAPER_SCORE_BASIS)
 
-    candidate = _normalise_candidate(tables["candidate_cone"])
-    finalists = _normalise_model_rows(tables["finalists"], scenario="Finalist")
-    schiff = _normalise_model_rows(tables["schiff_benchmark"], scenario="Schiff")
+    candidate = _ensure_candidate_frontier_roles(project_score_basis_frame(_normalise_candidate(tables["candidate_cone"]), default_score_basis))
+    finalists = project_score_basis_frame(_normalise_model_rows(tables["finalists"], scenario="Finalist"), default_score_basis)
+    schiff = project_score_basis_frame(_normalise_model_rows(tables["schiff_benchmark"], scenario="Schiff"), default_score_basis)
     ensemble = _normalise_ensemble_components(tables["ensemble_components"])
     residual_predictions = _normalise_residual_predictions(tables["residual_predictions"])
     annual_predictions = _normalise_annual_predictions(tables["annual_predictions"])
-    horizon = _normalise_horizon_profiles(tables["horizon_profiles"])
-    stress = _normalise_stress_horizon(tables["stress_horizon"])
+    scorecard_horizon = (
+        _normalise_horizon_profiles(tables["scorecard_horizon_profiles"])
+        if "scorecard_horizon_profiles" in tables
+        else pd.DataFrame()
+    )
+    scorecard_stress = (
+        _normalise_stress_horizon(tables["scorecard_stress_horizon"])
+        if "scorecard_stress_horizon" in tables
+        else pd.DataFrame()
+    )
+    horizon_all = scorecard_horizon if not scorecard_horizon.empty else _normalise_horizon_profiles(tables["horizon_profiles"])
+    stress_all = scorecard_stress if not scorecard_stress.empty else _normalise_stress_horizon(tables["stress_horizon"])
+    horizon = filter_score_basis_rows(horizon_all, default_score_basis)
+    stress = filter_score_basis_rows(stress_all, default_score_basis)
     diagnostic_tests = _normalise_diagnostic_tests(tables["diagnostic_tests"])
     pass_matrix = _normalise_pass_matrix(tables["diagnostic_pass_matrix"])
     acf = _normalise_acf(tables["diagnostic_acf"])
     error_distribution = _normalise_error_distribution(tables["error_distribution"])
-    scenario = _normalise_scenario_comparison(tables["scenario_comparison"], finalists, schiff)
+    scenario = project_scenario_comparison_frame(
+        _normalise_scenario_comparison(tables["scenario_comparison"], finalists, schiff),
+        default_score_basis,
+        finalists,
+        schiff,
+    )
     paired = _paired_from_scenario(scenario)
     contract = tables["chart_contract"].copy()
+    scorecard_model_summary = (
+        _normalise_scorecard_model_summary(tables["scorecard_model_summary"])
+        if "scorecard_model_summary" in tables
+        else pd.DataFrame()
+    )
+    scorecard_predictions = (
+        _normalise_scorecard_predictions(tables["scorecard_predictions"])
+        if "scorecard_predictions" in tables
+        else pd.DataFrame()
+    )
 
     default_mask = pd.Series(False, index=candidate.index)
     for column in ["plot_default_include", "is_plot_candidate"]:
@@ -114,6 +158,7 @@ def load_evidence_pack(root: str | Path | None = None, repo_root: str | Path | N
         summary = summary[~summary["is_extreme_outlier"].fillna(False).astype(bool)].copy()
     if "is_legacy_schiff_style" in summary.columns:
         summary = summary[~summary["is_legacy_schiff_style"].fillna(False).astype(bool)].copy()
+    summary = _cap_default_candidate_summary(summary)
 
     curated_manifest = pd.DataFrame(
         [
@@ -140,6 +185,13 @@ def load_evidence_pack(root: str | Path | None = None, repo_root: str | Path | N
         "stress_df": stress[stress["scenario_role"].eq("Finalist")].copy(),
         "stress": stress[stress["scenario_role"].eq("Finalist")].copy(),
         "horizon_df": horizon,
+        "scorecard_horizon_df": horizon_all,
+        "scorecard_stress_df": stress_all,
+        "scorecard_model_summary": scorecard_model_summary,
+        "scorecard_predictions": scorecard_predictions,
+        "light_ruc_candidate_scorecard": tables.get("light_ruc_candidate_scorecard", pd.DataFrame()).copy(),
+        "scorecard_annual_metric_summary": tables.get("scorecard_annual_metric_summary", pd.DataFrame()).copy(),
+        "scorecard_annual_predictions": tables.get("scorecard_annual_predictions", pd.DataFrame()).copy(),
         "diagnostic_df": diagnostic_tests,
         "diagnostic_tests": diagnostic_tests,
         "diagnostic_pass_matrix": pass_matrix,
@@ -150,6 +202,7 @@ def load_evidence_pack(root: str | Path | None = None, repo_root: str | Path | N
         "annual_predictions": annual_predictions,
         "paired_vs_schiff": paired,
         "scenario_comparison": scenario,
+        "default_score_basis": pd.DataFrame([{"score_basis": default_score_basis}]),
         "chart_contract": contract,
         "curated_manifest": curated_manifest,
         "errors": pd.DataFrame(),
@@ -192,6 +245,76 @@ def _normalise_candidate(frame: pd.DataFrame) -> pd.DataFrame:
         ),
         axis=1,
     )
+    return out
+
+
+def _cap_default_candidate_summary(frame: pd.DataFrame, max_rows: int = 400) -> pd.DataFrame:
+    """Keep the management frontier bounded while preserving governance anchors."""
+    if frame is None or frame.empty or len(frame) <= max_rows:
+        return pd.DataFrame() if frame is None else frame.copy()
+    data = frame.copy()
+    keep = pd.Series(False, index=data.index)
+    for column in [
+        "is_current_recommended",
+        "is_recommended_finalist",
+        "is_finalist",
+        "is_pure_schiff",
+        "is_schiff",
+        "is_pdf_reference",
+        "is_frontier",
+        "is_pareto_frontier",
+        "is_top_quarterly",
+        "is_top_annual",
+        "is_top_governance",
+    ]:
+        if column in data.columns:
+            keep = keep | data[column].fillna(False).astype(bool)
+    for _, group in data.groupby("stream_label", dropna=False):
+        for metric in ["quarterly_mape", "annual_mape"]:
+            if metric in group.columns:
+                keep.loc[group.nsmallest(55, metric).index] = True
+    protected = data[keep].copy()
+    if len(protected) >= max_rows:
+        return protected.sort_values(["stream_label", "quarterly_mape", "annual_mape"], na_position="last").head(max_rows).reset_index(drop=True)
+    remaining = data[~keep].copy()
+    q_rank = pd.to_numeric(remaining.get("quarterly_mape"), errors="coerce").rank(method="first", na_option="bottom")
+    a_rank = pd.to_numeric(remaining.get("annual_mape"), errors="coerce").rank(method="first", na_option="bottom")
+    remaining["_frontier_rank"] = q_rank + a_rank
+    slots = max_rows - len(protected)
+    supplement = remaining.nsmallest(slots, "_frontier_rank").drop(columns=["_frontier_rank"], errors="ignore")
+    return (
+        pd.concat([protected, supplement], ignore_index=True)
+        .drop_duplicates(subset=[column for column in ["candidate_uid", "stream", "model"] if column in data.columns])
+        .sort_values(["stream_label", "quarterly_mape", "annual_mape"], na_position="last")
+        .head(max_rows)
+        .reset_index(drop=True)
+    )
+
+
+def _ensure_candidate_frontier_roles(frame: pd.DataFrame) -> pd.DataFrame:
+    if frame is None or frame.empty:
+        return pd.DataFrame() if frame is None else frame.copy()
+    out = frame.copy()
+    for column in ["is_top_quarterly", "is_top_annual", "is_frontier"]:
+        if column not in out.columns:
+            out[column] = False
+        out[column] = out[column].fillna(False).astype(bool)
+    for stream_value, group in out.groupby("stream_label", dropna=False):
+        del stream_value
+        if not bool(out.loc[group.index, "is_top_quarterly"].any()) and "quarterly_mape" in group.columns:
+            out.loc[group.nsmallest(20, "quarterly_mape").index, "is_top_quarterly"] = True
+        if not bool(out.loc[group.index, "is_top_annual"].any()) and "annual_mape" in group.columns:
+            out.loc[group.nsmallest(20, "annual_mape").index, "is_top_annual"] = True
+        if not bool(out.loc[group.index, "is_frontier"].any()) and {"quarterly_mape", "annual_mape"}.issubset(group.columns):
+            ordered = group.dropna(subset=["quarterly_mape", "annual_mape"]).sort_values(["quarterly_mape", "annual_mape"])
+            best_annual = float("inf")
+            frontier_index = []
+            for idx, row in ordered.iterrows():
+                annual = float(row["annual_mape"])
+                if annual < best_annual:
+                    frontier_index.append(idx)
+                    best_annual = annual
+            out.loc[frontier_index, "is_frontier"] = True
     return out
 
 
@@ -256,6 +379,30 @@ def _normalise_annual_predictions(frame: pd.DataFrame) -> pd.DataFrame:
         out["ape"] = pd.to_numeric(out["abs_error_pct"], errors="coerce")
     out["source_file"] = "annual_predictions.parquet"
     return normalise_predictions(out, annual=True)
+
+
+def _normalise_scorecard_predictions(frame: pd.DataFrame) -> pd.DataFrame:
+    out = frame.copy()
+    out = add_stream_fields(out)
+    out["stage"] = "final"
+    out["variant"] = out.get("scenario", pd.Series(pd.NA, index=out.index))
+    out["scenario_role"] = out["variant"]
+    out["selected_role"] = out["variant"]
+    if "abs_error_pct" in out.columns:
+        out["ape"] = pd.to_numeric(out["abs_error_pct"], errors="coerce")
+    out["source_file"] = "scorecard_predictions.parquet"
+    return normalise_predictions(out, annual=False)
+
+
+def _normalise_scorecard_model_summary(frame: pd.DataFrame) -> pd.DataFrame:
+    out = frame.copy()
+    out = add_stream_fields(out)
+    out = _coerce_percent_columns(out)
+    out["stage"] = "final"
+    out["variant"] = out.get("scenario", pd.Series(pd.NA, index=out.index))
+    out["scenario_role"] = out["variant"]
+    out["source_file"] = "scorecard_model_summary.parquet"
+    return out
 
 
 def _normalise_horizon_profiles(frame: pd.DataFrame) -> pd.DataFrame:
@@ -402,6 +549,7 @@ def _build_manifest_artifact(
         "manifest_path": str(pack_root / "manifest.json"),
         "data_dir": str(data_dir),
         "required_files": list(REQUIRED_EVIDENCE_TABLES),
+        "v3_scorecard_files": [name for name in V3_EVIDENCE_TABLES if (data_dir / name).exists()],
         "resolved_paths": {name: str(data_dir / f"{name}.parquet") for name in tables},
         "row_counts": {name: int(len(frame)) for name, frame in tables.items()},
         "required_dashboard_rule": manifest.get("required_dashboard_rule"),

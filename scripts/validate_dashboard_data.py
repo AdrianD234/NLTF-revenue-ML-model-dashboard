@@ -17,14 +17,14 @@ from model_dashboard.labels import SCHIFF_SPEC_BENCHMARK_LABEL, STRESS_BUCKET_OR
 
 EXPECTED_STREAMS = {"PED VKT per capita", "Light RUC volume", "Heavy RUC volume"}
 EXPECTED_FINALISTS = {
-    "PED VKT per capita": (2.473245, 2.385625),
-    "Light RUC volume": (9.147545, 5.999499),
-    "Heavy RUC volume": (3.484368, 3.019980),
+    "PED VKT per capita": (3.237144, 2.033294),
+    "Light RUC volume": (6.065145, 3.425189),
+    "Heavy RUC volume": (2.809473, 2.061102),
 }
 EXPECTED_SCHIFF_SPEC = {
-    "PED VKT per capita": (4.091570, 4.132012),
-    "Light RUC volume": (8.412939, 5.000571),
-    "Heavy RUC volume": (7.800196, 8.112775),
+    "PED VKT per capita": (4.674917, 3.585729),
+    "Light RUC volume": (8.521397, 2.702000),
+    "Heavy RUC volume": (8.761652, 8.879508),
 }
 
 
@@ -90,9 +90,11 @@ def validate() -> tuple[str, list[str]]:
 
     scenario = loaded.data["scenario_comparison"].set_index("stream_label")
     light = scenario.loc["Light RUC volume"]
-    if not (float(light["full_sample_qtr_gain_pp"]) < 0 and float(light["paired_gain_pp"]) < 0):
-        raise AssertionError("Light RUC Schiff specification weakness is not preserved in both full-sample and paired comparisons.")
-    findings.append("- [pass] Full-sample gain and paired gain semantics are separated.")
+    if not (float(light["full_sample_qtr_gain_pp"]) > 0 and float(light["full_sample_annual_gain_pp"]) < 0):
+        raise AssertionError("Light RUC paper-style quarterly gain and annual weakness are not both preserved.")
+    if abs(float(light["full_sample_qtr_gain_pp"]) - 2.456252) > 0.001:
+        raise AssertionError("Old Light RUC +2.40 pp gain is still present instead of the v3 +2.456 pp paper-style gain.")
+    findings.append("- [pass] Full-sample gain and paired win-rate semantics are separated; Light RUC annual watch remains visible.")
 
     stress = loaded.data["stress"]
     for stream in EXPECTED_STREAMS:

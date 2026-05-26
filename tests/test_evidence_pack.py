@@ -48,6 +48,7 @@ def test_default_app_uses_evidence_pack_not_legacy_or_mini(evidence_pack) -> Non
     assert "mini_parquet" not in manifest_text
     assert "legacy_run_folder" not in manifest_text
     assert evidence_pack.run_dir.name == "dashboard_evidence_pack"
+    assert evidence_pack.manifest["schema_version"] == "dashboard_evidence_pack_v3_dual_scorecard"
     assert set(evidence_pack.data["chart_contract"]["source_table"]).issuperset(
         {
             "candidate_cone.parquet",
@@ -93,6 +94,7 @@ def test_finalist_values_and_stale_values(evidence_pack) -> None:
     assert "12.38" not in finalist_text
     light = evidence_pack.data["recommended"][evidence_pack.data["recommended"]["stream_label"].eq("Light RUC volume")]
     assert not light["quarterly_mape"].astype(str).str.contains("11.55", regex=False).any()
+    assert not light["quarterly_mape"].astype(str).str.contains("9.15", regex=False).any()
 
 
 def test_candidate_frontier_plots_more_than_100_rows(evidence_pack) -> None:
@@ -110,6 +112,8 @@ def test_full_sample_vs_paired_semantics_are_enforced(evidence_pack) -> None:
     light = gain[gain["stream_label"].eq("Light RUC volume")]
     full_sample = light[light["metric_name"].eq("Full-sample quarterly gain")]["metric_value"].astype(float).iloc[0]
     paired = light["paired_gain_pp"].dropna().astype(float).iloc[0]
-    assert full_sample == pytest.approx(-0.734606, abs=0.001)
+    annual = light[light["metric_name"].eq("Full-sample annual gain")]["metric_value"].astype(float).iloc[0]
+    assert full_sample == pytest.approx(2.456252, abs=0.001)
+    assert annual == pytest.approx(-0.723188, abs=0.001)
     assert paired == pytest.approx(EXPECTED_LIGHT_PAIRED_GAIN_PP, abs=0.001)
-    assert full_sample < 0 and paired < 0
+    assert full_sample > 0 and annual < 0 and paired > 0

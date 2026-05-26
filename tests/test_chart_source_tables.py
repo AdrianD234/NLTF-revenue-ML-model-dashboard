@@ -44,6 +44,8 @@ def test_every_main_chart_exports_a_source_table(parquet_dashboard: LoadedRun) -
         assert set(table["chart_id"].dropna()) == {chart_id}, filename
         assert table["chart_title"].dropna().astype(str).str.len().gt(0).all(), filename
         assert table["metric_name"].dropna().astype(str).str.len().gt(0).all(), filename
+        assert "score_basis" in table.columns, filename
+        assert set(table["score_basis"].dropna().astype(str)) == {"schiff_paper_horizon_mean"}, filename
         assert table["calculation_basis"].dropna().astype(str).str.len().gt(0).all(), filename
 
 
@@ -96,12 +98,20 @@ def test_stress_chart_source_alias_order_and_missing_gaps(parquet_dashboard: Loa
 
     indexed = table.set_index(["stream_label", "stress_bucket"])
     for key, expected in EXPECTED_STRESS_MAPE.items():
-        assert float(indexed.loc[key, "metric_value"]) == pytest.approx(expected, abs=0.0008)
+        value = pd.to_numeric(indexed.loc[key, "metric_value"], errors="coerce")
+        if pd.isna(expected):
+            assert pd.isna(value)
+        else:
+            assert float(value) == pytest.approx(expected, abs=0.0008)
 
     for bucket in ["2024+", "2022-23"]:
         row = indexed.loc[("Heavy RUC volume", bucket)]
-        assert pd.notna(pd.to_numeric(row["metric_value"], errors="coerce"))
-        assert str(row["value_available"]).lower() == "true"
+        if bucket == "2024+":
+            assert pd.isna(pd.to_numeric(row["metric_value"], errors="coerce"))
+            assert str(row["value_available"]).lower() == "false"
+        else:
+            assert pd.notna(pd.to_numeric(row["metric_value"], errors="coerce"))
+            assert str(row["value_available"]).lower() == "true"
 
 
 def test_scenario_and_schiff_source_tables_keep_full_sample_and_paired_separate(
@@ -116,7 +126,8 @@ def test_scenario_and_schiff_source_tables_keep_full_sample_and_paired_separate(
     assert schiff_gain["calculation_basis"].str.contains("not paired common-grid gain", regex=False).all()
 
     light = scenario_gain[scenario_gain["stream_label"].eq("Light RUC volume")]
-    assert float(light[light["metric_name"].eq("Full-sample quarterly gain")]["metric_value"].iloc[0]) < 0
+    assert float(light[light["metric_name"].eq("Full-sample quarterly gain")]["metric_value"].iloc[0]) == pytest.approx(2.456252, abs=0.0008)
+    assert float(light[light["metric_name"].eq("Full-sample annual gain")]["metric_value"].iloc[0]) == pytest.approx(-0.723188, abs=0.0008)
     assert float(light["paired_gain_pp"].dropna().iloc[0]) == pytest.approx(EXPECTED_LIGHT_PAIRED_GAIN_PP, abs=0.0008)
 
     decision = chart_source("scenario_decision_summary.csv")

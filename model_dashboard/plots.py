@@ -24,6 +24,7 @@ from .labels import (
     shorten_model_name,
 )
 from .metrics import best_by_stream, period_key
+from .score_basis import PAPER_SCORE_BASIS, score_basis_metric_label
 
 STREAM_ORDER = ["PED VKT per capita", "Light RUC volume", "Heavy RUC volume"]
 
@@ -75,6 +76,7 @@ def plot_finalist_accuracy(recommended: pd.DataFrame) -> go.Figure:
     finalists = best_by_stream(recommended).copy()
     if finalists.empty or "quarterly_mape" not in finalists.columns:
         return empty_figure("Recommended finalist data is not available.")
+    basis_label = _basis_metric_label(finalists)
     stream_order = ["PED VKT per capita", "Light RUC volume", "Heavy RUC volume"]
     finalists["_stream_order"] = finalists["stream_label"].map(
         {stream: idx for idx, stream in enumerate(stream_order)}
@@ -122,8 +124,21 @@ def plot_finalist_accuracy(recommended: pd.DataFrame) -> go.Figure:
                 "Variant: %{customdata[4]}<extra></extra>"
             ),
         )
-    fig.update_layout(barmode="group", yaxis_title="MAPE (%)", xaxis_title="")
+    fig.update_layout(barmode="group", yaxis_title=f"{basis_label} (%)", xaxis_title="")
     return apply_layout(fig, "Finalist forecast accuracy", height=420)
+
+
+def _basis_metric_label(data: pd.DataFrame) -> str:
+    if data is not None and not data.empty and "score_basis" in data.columns:
+        values = data["score_basis"].dropna().astype(str)
+        if not values.empty:
+            return score_basis_metric_label(values.iloc[0])
+    return score_basis_metric_label(PAPER_SCORE_BASIS)
+
+
+def _annual_basis_metric_label(data: pd.DataFrame) -> str:
+    label = _basis_metric_label(data)
+    return label.replace("MAPE", "annual MAPE")
 
 
 def plot_candidate_landscape(summary: pd.DataFrame) -> go.Figure:
@@ -133,6 +148,7 @@ def plot_candidate_landscape(summary: pd.DataFrame) -> go.Figure:
     data = summary.dropna(subset=["quarterly_mape", "annual_mape"]).copy()
     if data.empty:
         return empty_figure("No candidate rows have both quarterly and annual MAPE.")
+    basis_label = _basis_metric_label(data)
     full_data = data.copy()
     full_count = len(data)
     if "candidate_role" not in data.columns:
@@ -296,7 +312,7 @@ def plot_candidate_landscape(summary: pd.DataFrame) -> go.Figure:
             bgcolor="rgba(255,255,255,0.82)",
             bordercolor="rgba(15,23,42,0.18)",
         )
-    fig.update_layout(xaxis_title="Quarterly MAPE (%)", yaxis_title="Annual MAPE (%)")
+    fig.update_layout(xaxis_title=f"{basis_label} (%)", yaxis_title=f"{_annual_basis_metric_label(data)} (%)")
     fig = apply_layout(fig, "Candidate search landscape", height=580)
     critical_points = data[data["point_type"].isin([SCHIFF_SPEC_BENCHMARK_LABEL, "Selected finalist"])]
     x_limit = _frontier_axis_limit(full_data["quarterly_mape"], critical_points["quarterly_mape"])
@@ -1084,6 +1100,7 @@ def plot_stress_checks(stress: pd.DataFrame) -> go.Figure:
     if data.empty:
         return empty_figure("No recognised stress buckets were available.")
     data["mape"] = pd.to_numeric(data["mape"], errors="coerce")
+    basis_label = _basis_metric_label(data)
     data["stress_bucket"] = pd.Categorical(data["stress_bucket"].astype(str), categories=STRESS_BUCKET_ORDER, ordered=True)
     data = data.sort_values(["stream_label", "stress_bucket"])
     data["_hover_bucket"] = data["stress_bucket"].astype(str).map(horizon_label)
@@ -1098,7 +1115,7 @@ def plot_stress_checks(stress: pd.DataFrame) -> go.Figure:
         color="stream_label",
         markers=True,
         color_discrete_map=STREAM_COLORS,
-        labels={"stress_bucket": "Stress bucket", "mape": "MAPE (%)", "stream_label": ""},
+        labels={"stress_bucket": "Stress bucket", "mape": f"{basis_label} (%)", "stream_label": ""},
         custom_data=["stream_label", "_hover_bucket", "_hover_mape", "_hover_model", "_hover_variant", "_hover_pairs"],
     )
     fig.update_traces(
@@ -1106,7 +1123,7 @@ def plot_stress_checks(stress: pd.DataFrame) -> go.Figure:
         hovertemplate=(
             "<b>%{customdata[0]}</b><br>"
             "Stress window: %{customdata[1]}<br>"
-            "MAPE: %{customdata[2]}<br>"
+            f"{basis_label}: %{{customdata[2]}}<br>"
             "Model: %{customdata[3]}<br>"
             "Variant: %{customdata[4]}<br>"
             "Rows: %{customdata[5]}<extra></extra>"
@@ -1144,6 +1161,7 @@ def plot_scenario_stream_comparison(comparison: pd.DataFrame) -> go.Figure:
     if comparison.empty or not required.issubset(comparison.columns):
         return empty_figure("Scenario comparison needs finalist and Schiff MAPE columns.")
     comparison = comparison.copy()
+    basis_label = _basis_metric_label(comparison)
     comparison["_stream_order"] = comparison["stream_label"].map(_stream_order_value)
     comparison = comparison.sort_values("_stream_order", ascending=False)
     fig = make_subplots(
@@ -1198,7 +1216,7 @@ def plot_scenario_stream_comparison(comparison: pd.DataFrame) -> go.Figure:
                 yref=f"y{col}" if col > 1 else "y",
                 line={"color": "#64748B", "width": 1},
             )
-        fig.update_xaxes(title_text="MAPE (%)", ticksuffix="%", row=1, col=col)
+        fig.update_xaxes(title_text=f"{basis_label} (%)", ticksuffix="%", row=1, col=col)
     for annotation in fig.layout.annotations:
         annotation.y = 1.08
         annotation.font = {"size": 13, "color": "#002B5C"}
@@ -1216,6 +1234,7 @@ def plot_improvement_vs_benchmark(comparison: pd.DataFrame) -> go.Figure:
     if comparison.empty or not required.issubset(comparison.columns):
         return empty_figure("Benchmark gain columns are not available.")
     data = comparison.copy()
+    basis_label = _basis_metric_label(data)
     fig = go.Figure()
     for label, column, color in [
         ("Full-sample quarterly gain (pp)", "quarterly_gain_pp", "#002B5C"),
@@ -1233,7 +1252,7 @@ def plot_improvement_vs_benchmark(comparison: pd.DataFrame) -> go.Figure:
             hovertemplate="<b>%{customdata[0]}</b><br>" + label + ": %{x:.2f} pp<extra></extra>",
         )
     fig.add_vline(x=0, line_color="#64748B", line_width=1)
-    fig.update_layout(barmode="group", xaxis_title="Full-sample gain vs Schiff specification benchmark (percentage points)", yaxis_title="")
+    fig.update_layout(barmode="group", xaxis_title=f"Full-sample {basis_label} gain vs Schiff specification benchmark (percentage points)", yaxis_title="")
     return apply_layout(fig, "Full-sample gain versus Schiff specification benchmark", height=360)
 
 
@@ -1242,6 +1261,7 @@ def plot_horizon_comparison(horizon: pd.DataFrame) -> go.Figure:
     if horizon.empty or not required.issubset(horizon.columns):
         return empty_figure("Horizon comparison data is not available.")
     horizon = horizon.copy()
+    basis_label = _basis_metric_label(horizon)
     horizon["_stream_order"] = horizon["stream_label"].map(_stream_order_value)
     horizon = horizon.sort_values(["_stream_order", "scenario_role", "horizon"])
     streams = [stream for stream in STREAM_ORDER if stream in set(horizon["stream_label"].astype(str))]
@@ -1268,7 +1288,7 @@ def plot_horizon_comparison(horizon: pd.DataFrame) -> go.Figure:
                         "<b>%{customdata[0]}</b><br>"
                         "Scenario: %{customdata[1]}<br>"
                         "Horizon: %{x} quarters<br>"
-                        "MAPE: %{y:.2f}%<extra></extra>"
+                        f"{basis_label}: %{{y:.2f}}%<extra></extra>"
                     ),
                     showlegend=col == 1,
                 ),
@@ -1276,7 +1296,7 @@ def plot_horizon_comparison(horizon: pd.DataFrame) -> go.Figure:
                 col=col,
             )
         fig.update_xaxes(title_text="Forecast horizon (quarters)", dtick=3, row=1, col=col)
-    fig.update_yaxes(title_text="MAPE (%)", row=1, col=1)
+    fig.update_yaxes(title_text=f"{basis_label} (%)", row=1, col=1)
     for annotation in fig.layout.annotations:
         annotation.font = {"size": 12, "color": "#002B5C"}
         annotation.y = 1.08
@@ -1296,6 +1316,7 @@ def plot_schiff_finalist_mape(comparison: pd.DataFrame) -> go.Figure:
     if comparison.empty or not required.issubset(comparison.columns):
         return empty_figure("Schiff and finalist comparison rows are not available.")
     comparison = comparison.copy()
+    basis_label = _basis_metric_label(comparison)
     comparison["_stream_order"] = comparison["stream_label"].map(_stream_order_value)
     comparison = comparison.sort_values("_stream_order")
     max_value = pd.to_numeric(
@@ -1343,7 +1364,7 @@ def plot_schiff_finalist_mape(comparison: pd.DataFrame) -> go.Figure:
                 row=1,
                 col=col,
             )
-        fig.update_xaxes(title_text="MAPE (%)", row=1, col=col)
+        fig.update_xaxes(title_text=f"{basis_label} (%)", row=1, col=col)
         if pd.notna(max_value):
             fig.update_xaxes(range=[0, float(max_value) * 1.18], row=1, col=col)
     for annotation in fig.layout.annotations:

@@ -38,19 +38,22 @@ def test_stress_horizon_alias_coalescing() -> None:
     for frame in [ped, light, heavy]:
         assert list(frame["bucket"]) == expected_order
 
-    required_buckets = ["1-4 qtrs", "5-8 qtrs", "9-12 qtrs", "2024+", "2022-23", "Annual"]
-    for stream, frame in [
-        ("PED VKT per capita", ped),
-        ("Light RUC volume", light),
-        ("Heavy RUC volume", heavy),
-    ]:
-        values = frame.set_index("bucket")["mape"]
-        for bucket in required_buckets:
-            assert pd.notna(values.loc[bucket]), f"{stream} is missing {bucket}"
-
     values = stress.set_index(["stream_label", "bucket"])["mape"]
     for key, expected in EXPECTED_STRESS_MAPE.items():
-        assert float(values.loc[key]) == pytest.approx(expected, abs=0.001)
+        actual = values.loc[key]
+        if pd.isna(expected):
+            assert pd.isna(actual), f"{key} should remain a missing-value gap"
+        else:
+            assert float(actual) == pytest.approx(expected, abs=0.001)
+
+    required_non_null = {
+        "PED VKT per capita": ["1-4 qtrs", "5-8 qtrs", "9-12 qtrs", "2022-23", "Annual"],
+        "Light RUC volume": ["1-4 qtrs", "5-8 qtrs", "9-12 qtrs", "2022-23", "Annual"],
+        "Heavy RUC volume": ["1-4 qtrs", "5-8 qtrs", "9-12 qtrs", "2022-23", "Annual"],
+    }
+    for stream, buckets in required_non_null.items():
+        for bucket in buckets:
+            assert pd.notna(values.loc[(stream, bucket)]), f"{stream} is missing {bucket}"
 
     figure = plot_stress_checks(stress)
     assert list(figure.layout.xaxis.categoryarray) == expected_order

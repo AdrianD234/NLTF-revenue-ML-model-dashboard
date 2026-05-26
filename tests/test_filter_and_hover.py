@@ -33,9 +33,9 @@ def test_primary_filters_are_clickable(page: Page) -> None:
     assert selected is not None, "Stream dropdown did not expose selectable stream options."
     expect_filter_value(page, "Stream", 0, selected)
     expected_qtr_mape = {
-        "Light RUC volume": "9.15%",
-        "PED VKT per capita": "2.47%",
-        "Heavy RUC volume": "3.48%",
+        "Light RUC volume": "6.07%",
+        "PED VKT per capita": "3.24%",
+        "Heavy RUC volume": "2.81%",
     }[selected]
     expect(page.locator(".gov-kpi-grid").first).to_contain_text(expected_qtr_mape, timeout=60000)
     after_kpi_row = page.locator(".gov-kpi-grid").first.inner_text(timeout=60000)

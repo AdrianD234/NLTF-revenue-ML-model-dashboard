@@ -22,9 +22,9 @@ from model_dashboard.metrics import best_by_stream  # noqa: E402
 
 EXPECTED_STREAMS = {"PED VKT per capita", "Light RUC volume", "Heavy RUC volume"}
 EXPECTED_SCHIFF_SPEC = {
-    "PED VKT per capita": (4.091570, 4.132012),
-    "Light RUC volume": (8.412939, 5.000571),
-    "Heavy RUC volume": (7.800196, 8.112775),
+    "PED VKT per capita": (4.674917, 3.585729),
+    "Light RUC volume": (8.521397, 2.702000),
+    "Heavy RUC volume": (8.761652, 8.879508),
 }
 
 
@@ -158,7 +158,7 @@ def main() -> int:
             ],
             errors="coerce",
         ).dropna()
-        if light_full.empty or abs(float(light_full.iloc[0]) - (-0.734606)) > 0.001:
+        if light_full.empty or abs(float(light_full.iloc[0]) - 2.456252) > 0.001:
             raise AssertionError(f"Light RUC full-sample gain is stale or missing: {light_full.to_list()}")
         return "Gain chart is labelled full-sample, not paired."
 
@@ -166,10 +166,24 @@ def main() -> int:
         gain = read_source("schiff_paired_or_fullsample_gain.csv")
         light = gain[gain["stream_label"].eq("Light RUC volume")]
         paired = pd.to_numeric(light["paired_gain_pp"], errors="coerce").dropna()
-        full = pd.to_numeric(light[light["metric_name"].eq("Full-sample quarterly gain")]["metric_value"], errors="coerce").dropna()
-        if paired.empty or full.empty or float(paired.iloc[0]) >= 0 or float(full.iloc[0]) >= 0:
-            raise AssertionError(f"paired={paired.to_list()}; full={full.to_list()}")
-        return "Light RUC loses to the Schiff specification benchmark in both full-sample and paired comparisons."
+        full_qtr = pd.to_numeric(
+            light[light["metric_name"].eq("Full-sample quarterly gain")]["metric_value"], errors="coerce"
+        ).dropna()
+        full_annual = pd.to_numeric(
+            light[light["metric_name"].eq("Full-sample annual gain")]["metric_value"], errors="coerce"
+        ).dropna()
+        if (
+            paired.empty
+            or full_qtr.empty
+            or full_annual.empty
+            or abs(float(paired.iloc[0]) - 2.172930) > 0.001
+            or abs(float(full_qtr.iloc[0]) - 2.456252) > 0.001
+            or abs(float(full_annual.iloc[0]) - (-0.723188)) > 0.001
+        ):
+            raise AssertionError(
+                f"paired={paired.to_list()}; full_qtr={full_qtr.to_list()}; full_annual={full_annual.to_list()}"
+            )
+        return "Light RUC quarterly gains and annual watch condition are preserved."
 
     def check_decision_labels() -> str:
         table = read_source("scenario_decision_summary.csv")
@@ -286,7 +300,7 @@ def main() -> int:
         (104, "Ensemble composition source uses Parquet component weights.", check_ensemble),
         (105, "Stress source coalesces aliases and preserves Heavy RUC gaps.", check_stress),
         (106, "Schiff gain chart is labelled full-sample when showing full-sample gains.", check_full_sample_gain_label),
-        (107, "Light RUC paired common-grid weakness is preserved.", check_light_paired_gain),
+        (107, "Light RUC annual watch condition is preserved.", check_light_paired_gain),
         (108, "Scenario decision labels separate full-sample gains and paired win rate.", check_decision_labels),
         (109, "Horizon chart sources include all streams and scenarios.", check_horizon_sources),
         (110, "ACF chart source table exists and documents residual source.", check_acf_source),

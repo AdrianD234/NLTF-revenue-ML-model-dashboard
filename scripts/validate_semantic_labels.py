@@ -71,17 +71,26 @@ def validate() -> list[tuple[str, str, str]]:
         gain = pd.read_csv(gain_source)
         light = gain[gain["stream_label"].eq("Light RUC volume")]
         paired_gain = pd.to_numeric(light["paired_gain_pp"], errors="coerce").dropna()
-        full_gain = pd.to_numeric(
+        full_qtr_gain = pd.to_numeric(
             light[light["metric_name"].eq("Full-sample quarterly gain")]["metric_value"],
             errors="coerce",
         ).dropna()
+        full_annual_gain = pd.to_numeric(
+            light[light["metric_name"].eq("Full-sample annual gain")]["metric_value"],
+            errors="coerce",
+        ).dropna()
         record(
-            "Light RUC benchmark weakness is not hidden by full-sample gain label",
-            not paired_gain.empty and float(paired_gain.iloc[0]) < 0 and not full_gain.empty and float(full_gain.iloc[0]) < 0,
-            f"paired_gain={float(paired_gain.iloc[0]) if not paired_gain.empty else 'missing'}; full_sample_gain={float(full_gain.iloc[0]) if not full_gain.empty else 'missing'}",
+            "Light RUC annual watch is not hidden by full-sample gain label",
+            not paired_gain.empty
+            and float(paired_gain.iloc[0]) > 0
+            and not full_qtr_gain.empty
+            and float(full_qtr_gain.iloc[0]) > 0
+            and not full_annual_gain.empty
+            and float(full_annual_gain.iloc[0]) < 0,
+            f"paired_gain={float(paired_gain.iloc[0]) if not paired_gain.empty else 'missing'}; full_qtr_gain={float(full_qtr_gain.iloc[0]) if not full_qtr_gain.empty else 'missing'}; full_annual_gain={float(full_annual_gain.iloc[0]) if not full_annual_gain.empty else 'missing'}",
         )
     else:
-        record("Light RUC benchmark weakness is not hidden by full-sample gain label", False, "Missing Schiff gain source table.")
+        record("Light RUC annual watch is not hidden by full-sample gain label", False, "Missing Schiff gain source table.")
 
     stale_spec_terms = [
         "Candidate Models",

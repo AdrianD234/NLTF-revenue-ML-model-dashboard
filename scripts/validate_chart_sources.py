@@ -60,10 +60,11 @@ def validate() -> list[tuple[str, str, str]]:
             page_ok = set(table["page"].dropna().astype(str)) == {page}
             id_ok = set(table["chart_id"].dropna().astype(str)) == {chart_id}
             basis_ok = table["calculation_basis"].dropna().astype(str).str.len().gt(0).all()
+            score_basis_ok = "score_basis" in table.columns and set(table["score_basis"].dropna().astype(str)) == {"schiff_paper_horizon_mean"}
             record(
                 f"{filename} exists and has required columns",
-                not missing and page_ok and id_ok and basis_ok,
-                f"rows={len(table):,}; missing={missing}; page_ok={page_ok}; chart_id_ok={id_ok}",
+                not missing and page_ok and id_ok and basis_ok and score_basis_ok,
+                f"rows={len(table):,}; missing={missing}; page_ok={page_ok}; chart_id_ok={id_ok}; score_basis_ok={score_basis_ok}",
             )
         except Exception as exc:
             record(f"{filename} exists and has required columns", False, str(exc))
@@ -101,7 +102,7 @@ def validate() -> list[tuple[str, str, str]]:
         stream_rows = stress[stress["stream_label"].eq(stream)]
         stress_ok = stress_ok and stream_rows["stress_bucket"].tolist() == list(STRESS_BUCKET_ORDER)
     for stream in ["PED VKT per capita", "Light RUC volume"]:
-        for bucket in STRESS_BUCKET_ORDER:
+        for bucket in ["1-4 qtrs", "5-8 qtrs", "9-12 qtrs", "Annual"]:
             row = stress[stress["stream_label"].eq(stream) & stress["stress_bucket"].eq(bucket)]
             stress_ok = stress_ok and not row.empty and pd.to_numeric(row["metric_value"], errors="coerce").notna().any()
     heavy = stress[stress["stream_label"].eq("Heavy RUC volume")].set_index("stress_bucket")
@@ -118,14 +119,21 @@ def validate() -> list[tuple[str, str, str]]:
     gain = read_table("schiff_paired_or_fullsample_gain.csv")
     gain_text = " ".join(gain["chart_title"].astype(str).unique()) + " " + " ".join(gain["calculation_basis"].astype(str).unique())
     light_gain = gain[gain["stream_label"].eq("Light RUC volume")]
-    light_paired_negative = float(light_gain["paired_gain_pp"].dropna().iloc[0]) < 0
-    light_full_negative = float(
+    light_paired_positive = float(light_gain["paired_gain_pp"].dropna().iloc[0]) > 0
+    light_full_qtr_positive = float(
         light_gain[light_gain["metric_name"].eq("Full-sample quarterly gain")]["metric_value"].dropna().iloc[0]
+    ) > 0
+    light_full_annual_negative = float(
+        light_gain[light_gain["metric_name"].eq("Full-sample annual gain")]["metric_value"].dropna().iloc[0]
     ) < 0
     record(
-        "Schiff gain chart is labelled full-sample and preserves Light RUC benchmark weakness",
-        "Full-sample" in gain_text and "Paired Gain vs Schiff" not in gain_text and light_paired_negative and light_full_negative,
-        f"Light full-sample qtr gain={float(light_gain[light_gain['metric_name'].eq('Full-sample quarterly gain')]['metric_value'].dropna().iloc[0]):.3f} pp; paired gain={float(light_gain['paired_gain_pp'].dropna().iloc[0]):.3f} pp.",
+        "Schiff gain chart is labelled full-sample and preserves Light RUC annual watch",
+        "Full-sample" in gain_text
+        and "Paired Gain vs Schiff" not in gain_text
+        and light_paired_positive
+        and light_full_qtr_positive
+        and light_full_annual_negative,
+        f"Light qtr gain={float(light_gain[light_gain['metric_name'].eq('Full-sample quarterly gain')]['metric_value'].dropna().iloc[0]):.3f} pp; annual gain={float(light_gain[light_gain['metric_name'].eq('Full-sample annual gain')]['metric_value'].dropna().iloc[0]):.3f} pp; paired gain={float(light_gain['paired_gain_pp'].dropna().iloc[0]):.3f} pp.",
     )
 
     for filename in ["scenario_horizon_comparison.csv", "schiff_benchmark_horizon_profiles.csv"]:

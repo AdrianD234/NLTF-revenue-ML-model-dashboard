@@ -8,6 +8,7 @@ import pandas as pd
 
 from ..labels import SCHIFF_SPEC_BENCHMARK_LABEL, STRESS_BUCKET_ORDER, format_percent, format_pp, format_count, humanize_label
 from ..metrics import best_by_stream
+from ..score_basis import PAPER_SCORE_BASIS, score_basis_label
 from .diagnostics import DEFAULT_ACF_RESIDUAL_SCOPE, select_diagnostic_acf_scope
 
 
@@ -24,6 +25,8 @@ CORE_COLUMNS = [
     "metric_display",
     "source_column",
     "source_file",
+    "score_basis",
+    "score_basis_label",
     "calculation_basis",
     "notes",
 ]
@@ -301,6 +304,7 @@ def _base_row(
     notes: str = "",
     **extra: Any,
 ) -> dict[str, Any]:
+    basis = _row_get(row, "score_basis", _row_get(row, "default_score_basis", PAPER_SCORE_BASIS))
     payload = {
         "page": page,
         "chart_id": chart_id,
@@ -314,6 +318,8 @@ def _base_row(
         "metric_display": metric_display,
         "source_column": source_column,
         "source_file": _row_get(row, "source_file", source_file) or source_file,
+        "score_basis": basis,
+        "score_basis_label": _row_get(row, "score_basis_label", score_basis_label(basis)),
         "calculation_basis": calculation_basis,
         "notes": notes,
     }
@@ -346,6 +352,11 @@ def _overview_finalist_accuracy(recommended: pd.DataFrame, source_file: str) -> 
     for _, row in finalists.iterrows():
         for metric_name, column in [("Quarterly MAPE", "quarterly_mape"), ("Annual MAPE", "annual_mape")]:
             value = _num(row.get(column))
+            source_column = _row_get(
+                row,
+                "quarterly_mape_source_column" if column == "quarterly_mape" else "annual_mape_source_column",
+                column,
+            )
             rows.append(
                 _base_row(
                     "Overview",
@@ -355,9 +366,9 @@ def _overview_finalist_accuracy(recommended: pd.DataFrame, source_file: str) -> 
                     metric_name,
                     value,
                     format_percent(value),
-                    column,
+                    str(source_column),
                     source_file,
-                    "Current recommended finalist row selected from Parquet is_current_recommended flag.",
+                    "Current recommended finalist row selected from Parquet is_current_recommended flag and projected to the selected score basis.",
                     quarterly_mape=row.get("quarterly_mape"),
                     annual_mape=row.get("annual_mape"),
                 )
@@ -377,6 +388,10 @@ def _overview_candidate_frontier(summary: pd.DataFrame, source_file: str) -> pd.
         qtr = _num(row.get("quarterly_mape"))
         annual = _num(row.get("annual_mape"))
         role = _point_type(row)
+        source_column = (
+            f"{_row_get(row, 'quarterly_mape_source_column', 'quarterly_mape')};"
+            f"{_row_get(row, 'annual_mape_source_column', 'annual_mape')}"
+        )
         rows.append(
             _base_row(
                 "Overview",
@@ -386,9 +401,9 @@ def _overview_candidate_frontier(summary: pd.DataFrame, source_file: str) -> pd.
                 "Candidate frontier point",
                 qtr,
                 f"Qtr {format_percent(qtr)} / Annual {format_percent(annual)}",
-                "quarterly_mape;annual_mape",
+                source_column,
                 source_file,
-                "Default curated candidate rows; x = quarterly_mape and y = annual_mape.",
+                "Default curated candidate rows; x and y use the selected score basis.",
                 "plot_default_include rows with outlier guard used by the management view.",
                 quarterly_mape=qtr,
                 annual_mape=annual,

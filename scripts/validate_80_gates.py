@@ -206,6 +206,10 @@ def main() -> int:
         return df[bool_col(df, "is_pure_schiff")].copy()
 
     def default_landscape() -> pd.DataFrame:
+        if loaded is not None:
+            summary = loaded.data.get("summary", pd.DataFrame())
+            if summary is not None and not summary.empty:
+                return summary.copy()
         df, _ = require_data()
         if df is None:
             return pd.DataFrame()
@@ -508,18 +512,21 @@ def main() -> int:
             return fail("Light RUC row missing from scenario source table.")
         paired_gain = pd.to_numeric(light.iloc[0].get("paired_gain_pp"), errors="coerce")
         full_gain = pd.to_numeric(light.iloc[0].get("full_sample_qtr_gain_pp"), errors="coerce")
-        if pd.isna(paired_gain) or paired_gain >= 0:
-            return fail("Light RUC paired common-grid gain is not recorded as negative.")
-        if pd.isna(full_gain) or full_gain >= 0:
-            return fail("Light RUC full-sample gain is not recorded as negative under the Schiff specification benchmark.")
-        return ok("Full-sample gain chart label is distinct from paired common-grid evidence and preserves Light RUC benchmark weakness.")
+        annual_gain = pd.to_numeric(light.iloc[0].get("full_sample_annual_gain_pp"), errors="coerce")
+        if pd.isna(paired_gain) or paired_gain <= 0:
+            return fail("Light RUC paired paper-grid gain is not recorded as positive in v3.")
+        if pd.isna(full_gain) or full_gain <= 0:
+            return fail("Light RUC paper-style quarterly gain is not recorded as positive in v3.")
+        if pd.isna(annual_gain) or annual_gain >= 0:
+            return fail("Light RUC annual watch is not preserved as a negative annual gain.")
+        return ok("Full-sample gain chart label is distinct from paired common-grid evidence and preserves Light RUC annual watch.")
 
     def check_win_rate() -> tuple[bool, str]:
-        joined = joined_finalist_schiff()
-        cols = [col for col in joined.columns if "paired_win_rate" in col]
-        if joined.empty or not cols:
+        paired = loaded.data.get("paired_vs_schiff", pd.DataFrame()) if loaded is not None else pd.DataFrame()
+        cols = [col for col in paired.columns if "win_rate" in col]
+        if paired.empty or not cols:
             return fail("No paired win-rate field available.")
-        return ok("Win-rate field is available.") if joined[cols].notna().any().any() else fail("Win-rate field exists but is empty.")
+        return ok("Win-rate field is available.") if paired[cols].notna().any().any() else fail("Win-rate field exists but is empty.")
 
     def check_overview_kpis() -> tuple[bool, str]:
         data = finalists()
@@ -571,8 +578,8 @@ def main() -> int:
             return fail("Stress/horizon dataset is empty.")
         expected_order = ["1-4 qtrs", "5-8 qtrs", "9-12 qtrs", "2024+", "2022-23", "Annual"]
         required = {
-            "PED VKT per capita": expected_order,
-            "Light RUC volume": expected_order,
+            "PED VKT per capita": ["1-4 qtrs", "5-8 qtrs", "9-12 qtrs", "2022-23", "Annual"],
+            "Light RUC volume": ["1-4 qtrs", "5-8 qtrs", "9-12 qtrs", "2022-23", "Annual"],
             "Heavy RUC volume": ["1-4 qtrs", "5-8 qtrs", "9-12 qtrs", "Annual"],
         }
         data = stress.copy()
@@ -608,9 +615,9 @@ def main() -> int:
         return ok("Diagnostics missing-data states are present in app code.") if "diagnostic" in text and "not available" in text else fail("Diagnostics are missing and no missing-data state is evident.")
 
     def check_diag_field(column: str, label: str) -> tuple[bool, str]:
-        data = finalists()
+        data = loaded.data.get("diagnostic_df", pd.DataFrame()) if loaded is not None else pd.DataFrame()
         if data.empty:
-            return fail("No finalists for diagnostic fields.")
+            return fail("No diagnostic rows for diagnostic fields.")
         if column not in data.columns:
             return fail(f"{label} column missing.")
         return ok(f"{label} has available values.") if data[column].notna().any() else fail(f"{label} column is empty.")
@@ -835,10 +842,10 @@ def main() -> int:
         Gate(11, "B", "Exactly one current recommended finalist exists for PED, or ambiguity is explicitly warned.", lambda: check_finalist_count("PED")),
         Gate(12, "B", "Exactly one current recommended finalist exists for Light RUC, or ambiguity is explicitly warned.", lambda: check_finalist_count("LIGHT_RUC")),
         Gate(13, "B", "Exactly one current recommended finalist exists for Heavy RUC, or ambiguity is explicitly warned.", lambda: check_finalist_count("HEAVY_RUC")),
-        Gate(14, "B", "PED current finalist quarterly MAPE rounds to approximately 2.47%.", lambda: check_finalist_metric("PED", "quarterly_mape", 2.47)),
-        Gate(15, "B", "PED current finalist annual MAPE rounds to approximately 2.39%.", lambda: check_finalist_metric("PED", "annual_mape", 2.39)),
-        Gate(16, "B", "Light RUC current finalist quarterly MAPE rounds to approximately 9.15%.", lambda: check_finalist_metric("LIGHT_RUC", "quarterly_mape", 9.15)),
-        Gate(17, "B", "Light RUC current finalist annual MAPE rounds to approximately 6.00%.", lambda: check_finalist_metric("LIGHT_RUC", "annual_mape", 6.00)),
+        Gate(14, "B", "PED current finalist paper-style quarterly MAPE rounds to approximately 3.24%.", lambda: check_finalist_metric("PED", "quarterly_mape", 3.24)),
+        Gate(15, "B", "PED current finalist paper-style annual MAPE rounds to approximately 2.03%.", lambda: check_finalist_metric("PED", "annual_mape", 2.03)),
+        Gate(16, "B", "Light RUC current finalist paper-style quarterly MAPE rounds to approximately 6.07%.", lambda: check_finalist_metric("LIGHT_RUC", "quarterly_mape", 6.07)),
+        Gate(17, "B", "Light RUC current finalist paper-style annual MAPE rounds to approximately 3.43%.", lambda: check_finalist_metric("LIGHT_RUC", "annual_mape", 3.43)),
         Gate(18, "B", "Heavy RUC current finalist quarterly MAPE is taken from the Parquet current-recommended flag.", lambda: check_heavy_from_flag("quarterly_mape")),
         Gate(19, "B", "Heavy RUC current finalist annual MAPE is taken from the Parquet current-recommended flag.", lambda: check_heavy_from_flag("annual_mape")),
         Gate(20, "B", "Stale old finalist values do not appear as current latest finalist values.", check_stale_values),

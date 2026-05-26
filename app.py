@@ -81,6 +81,18 @@ from model_dashboard.plots import (
     plot_weight_over_time,
 )
 from model_dashboard.schema import INVENTORY_COLUMNS
+from model_dashboard.score_basis import (
+    PAPER_SCORE_BASIS,
+    PAPER_SCORE_LABEL,
+    SCORE_BASIS_OPTIONS,
+    OPERATIONAL_SCORE_BASIS,
+    project_scenario_comparison_frame,
+    project_score_basis_frame,
+    filter_score_basis_rows,
+    score_basis_key,
+    score_basis_label,
+    score_basis_metric_label,
+)
 from model_dashboard.ui import (
     chart_card,
     dataframe_download,
@@ -321,6 +333,7 @@ def render_top_filter_bar(loaded: LoadedRun, controls: dict[str, Any]) -> dict[s
         "top_stage": "all",
         "top_baseline": "Finalist",
         "top_horizon": "1-12 qtrs",
+        "top_score_basis": PAPER_SCORE_LABEL,
         "top_vintage": "Latest",
         "top_date_window": "All",
         "advanced_top_n": 50,
@@ -340,6 +353,7 @@ def render_top_filter_bar(loaded: LoadedRun, controls: dict[str, Any]) -> dict[s
         "top_stage": ["all"] + stage_options,
         "top_baseline": baseline_options,
         "top_horizon": horizon_options,
+        "top_score_basis": SCORE_BASIS_OPTIONS,
         "top_vintage": ["Latest"],
         "top_date_window": date_options,
     }
@@ -365,7 +379,7 @@ def render_top_filter_bar(loaded: LoadedRun, controls: dict[str, Any]) -> dict[s
 
     with st.container(border=True):
         st.markdown("<div class='filter-title'>Governance filters</div>", unsafe_allow_html=True)
-        filter_cols = st.columns([1.05, 1.2, 0.78, 1.05, 0.95, 1.0, 1.04, 0.72, 0.48])
+        filter_cols = st.columns([1.0, 1.12, 0.72, 1.0, 1.15, 0.86, 0.9, 0.94, 0.68, 0.46])
         with filter_cols[0]:
             st.selectbox(
                 "Stream",
@@ -416,6 +430,13 @@ def render_top_filter_bar(loaded: LoadedRun, controls: dict[str, Any]) -> dict[s
                 format_func=lambda value: "All target periods" if value == "All" else str(value),
             )
         with filter_cols[7]:
+            st.selectbox(
+                "Score Basis",
+                SCORE_BASIS_OPTIONS,
+                key="top_score_basis",
+                help="Default governance reporting uses paper-style horizon MAPE. Operational pooled MAPE is available explicitly for operational scorecard checks.",
+            )
+        with filter_cols[8]:
             st.button(
                 "Reset Filters",
                 type="primary",
@@ -423,7 +444,7 @@ def render_top_filter_bar(loaded: LoadedRun, controls: dict[str, Any]) -> dict[s
                 on_click=reset_top_filter_state,
                 args=(defaults,),
             )
-        with filter_cols[8]:
+        with filter_cols[9]:
             with st.popover("More", use_container_width=True):
                 controls = render_advanced_controls(loaded, controls)
 
@@ -431,6 +452,7 @@ def render_top_filter_bar(loaded: LoadedRun, controls: dict[str, Any]) -> dict[s
         family_choice = st.session_state["top_family"]
         stage_choice = st.session_state["top_stage"]
         baseline_choice = st.session_state["top_baseline"]
+        score_basis_choice = st.session_state["top_score_basis"]
         horizon_choice = st.session_state["top_horizon"]
         vintage_choice = st.session_state["top_vintage"]
         date_choice = st.session_state["top_date_window"]
@@ -445,6 +467,7 @@ def render_top_filter_bar(loaded: LoadedRun, controls: dict[str, Any]) -> dict[s
             ("Model Family", "All Families" if family_choice == "All" else str(family_choice).replace("_", " ")),
             ("Stage", "All stages" if stage_choice == "all" else str(stage_choice).replace("_", " ").title()),
             ("Baseline", baseline_label),
+            ("Score Basis", score_basis_choice),
             ("Horizon", horizon_label),
             ("Forecast Vintage", vintage_choice),
             ("Date Window", date_label),
@@ -458,6 +481,7 @@ def render_top_filter_bar(loaded: LoadedRun, controls: dict[str, Any]) -> dict[s
             "model_family": "All Families" if family_choice == "All" else family_choice,
             "stage": stage_choice,
             "baseline": baseline_label,
+            "score_basis": score_basis_choice,
             "horizon": horizon_label,
             "forecast_vintage": vintage_choice,
             "date_window": date_label,
@@ -472,6 +496,8 @@ def render_top_filter_bar(loaded: LoadedRun, controls: dict[str, Any]) -> dict[s
     updated["streams"] = stream_options if stream_choice == "All" else [stream_choice]
     updated["source_families"] = family_options if family_choice == "All" else [family_choice]
     updated["baseline"] = baseline_label
+    updated["score_basis"] = score_basis_key(score_basis_choice)
+    updated["score_basis_label"] = score_basis_label(score_basis_choice)
     updated["horizon_bucket_filter"] = [] if horizon_choice == "1-12 qtrs" else [horizon_choice]
     updated["date_window"] = "All target periods" if date_choice == "All" else date_choice
     updated["forecast_vintage"] = vintage_choice
@@ -610,12 +636,32 @@ def common_filter(df: pd.DataFrame, controls: dict[str, Any], include_source_var
     )
     if not controls["show_finalists"] and "is_finalist" in out.columns:
         out = out[~out["is_finalist"]]
+    if "score_basis" in out.columns and controls.get("score_basis"):
+        out = out[out["score_basis"].astype(str).eq(str(controls["score_basis"]))].copy()
     return out
 
 
+def score_basis_projected(frame: pd.DataFrame, controls: dict[str, Any]) -> pd.DataFrame:
+    return project_score_basis_frame(frame, controls.get("score_basis", PAPER_SCORE_BASIS))
+
+
+def selected_horizon_frame(loaded: LoadedRun, controls: dict[str, Any]) -> pd.DataFrame:
+    source = loaded.data.get("scorecard_horizon_df", pd.DataFrame())
+    if source is None or source.empty:
+        source = loaded.data.get("horizon_df", pd.DataFrame())
+    return filter_score_basis_rows(source, controls.get("score_basis", PAPER_SCORE_BASIS))
+
+
+def selected_stress_frame(loaded: LoadedRun, controls: dict[str, Any]) -> pd.DataFrame:
+    source = loaded.data.get("scorecard_stress_df", pd.DataFrame())
+    if source is None or source.empty:
+        source = loaded.data.get("stress", pd.DataFrame())
+    return filter_score_basis_rows(source, controls.get("score_basis", PAPER_SCORE_BASIS))
+
+
 def render_overview(loaded: LoadedRun, controls: dict[str, Any]) -> None:
-    summary = common_filter(loaded.data.get("summary", pd.DataFrame()), controls)
-    recommended = common_filter(loaded.data.get("recommended", pd.DataFrame()), controls, include_source_variant=False)
+    summary = common_filter(score_basis_projected(loaded.data.get("summary", pd.DataFrame()), controls), controls)
+    recommended = common_filter(score_basis_projected(loaded.data.get("recommended", pd.DataFrame()), controls), controls, include_source_variant=False)
     errors = loaded.data.get("errors", pd.DataFrame())
     best = best_by_stream(recommended)
     raw_qpred = loaded.data.get("quarterly_predictions", pd.DataFrame())
@@ -626,14 +672,15 @@ def render_overview(loaded: LoadedRun, controls: dict[str, Any]) -> None:
         best_keys = model_key_set(best) if not best.empty else set()
         qpred = filter_to_model_keys(raw_qpred, best_keys) if best_keys else raw_qpred
     qpred = common_filter(qpred, controls, include_source_variant=False)
-    stress_frame = overview_stress_frame(loaded, recommended)
+    stress_frame = overview_stress_frame(loaded, recommended, controls)
     story = governance_story_summary(recommended, loaded.data.get("paired_vs_schiff", pd.DataFrame()), stress_frame, errors)
 
     candidate_mode = st.session_state.get("candidate_frontier_mode", "Curated cone sample")
     candidate_landscape = build_candidate_landscape_frame(loaded, controls, candidate_mode)
     candidate_context = candidate_frontier_count_context(loaded, controls, candidate_landscape)
     gov_kpi_grid(overview_kpi_cards(summary, recommended, story, errors, candidate_context))
-    accuracy_subtitle = "Quarterly and annual MAPE by stream. Lower is better."
+    basis_metric = score_basis_metric_label(controls.get("score_basis", PAPER_SCORE_BASIS))
+    accuracy_subtitle = f"{basis_metric} by stream. Lower is better."
     if not best.empty and {"stream_label", "quarterly_mape", "annual_mape"}.issubset(best.columns):
         finalist_read = "; ".join(
             f"{str(row['stream_label']).replace(' VKT per capita', '').replace(' volume', '')}: "
@@ -642,7 +689,7 @@ def render_overview(loaded: LoadedRun, controls: dict[str, Any]) -> None:
             if pd.notna(row.get("quarterly_mape")) and pd.notna(row.get("annual_mape"))
         )
         if finalist_read:
-            accuracy_subtitle = f"Current Parquet finalists: {finalist_read}. Lower is better."
+            accuracy_subtitle = f"Current Parquet finalists using {basis_metric}: {finalist_read}. Lower is better."
 
     upper = st.columns([1.0, 1.0])
     with upper[0]:
@@ -656,7 +703,7 @@ def render_overview(loaded: LoadedRun, controls: dict[str, Any]) -> None:
         candidate_context = candidate_frontier_count_context(loaded, controls, landscape)
         chart_card(
             "2. Candidate Search Frontier",
-            "Each dot is a candidate model. Lower-left is better.",
+            f"Each dot is a candidate model using {basis_metric}. Lower-left is better.",
             compact_figure(plot_candidate_landscape(landscape), 260),
             overview_frontier_note(landscape, candidate_context),
         )
@@ -675,7 +722,7 @@ def render_overview(loaded: LoadedRun, controls: dict[str, Any]) -> None:
     with lower[1]:
         chart_card(
             "4. Stress and Horizon Checks",
-            "MAPE across horizon buckets and policy stress windows.",
+            f"{basis_metric} across horizon buckets and policy stress windows.",
             compact_figure(plot_stress_checks(stress_frame), 260),
             overview_stress_watch_note(stress_frame),
         )
@@ -748,6 +795,7 @@ def build_candidate_landscape_frame(loaded: LoadedRun, controls: dict[str, Any],
             landscape = candidate[candidate["plot_default_include"].fillna(False).astype(bool)].copy()
         else:
             landscape = candidate.copy()
+    landscape = score_basis_projected(landscape, controls)
     return common_filter(landscape, controls)
 
 
@@ -788,6 +836,7 @@ def candidate_frontier_count_context(
             mask = mask | candidate[column].fillna(False).astype(bool)
     default_plotted = candidate[mask].copy() if mask.any() else candidate.copy()
     default_plotted = exclude_legacy_schiff_style_rows(default_plotted)
+    default_plotted = score_basis_projected(default_plotted, controls)
     filtered_default = common_filter(default_plotted, controls)
     plotted_frame = plotted if plotted is not None else filtered_default
     plotted_count = len(plotted_frame)
@@ -872,10 +921,10 @@ def overview_error_distribution_note(qpred: pd.DataFrame) -> str:
     )
 
 
-def overview_stress_frame(loaded: LoadedRun, recommended: pd.DataFrame) -> pd.DataFrame:
+def overview_stress_frame(loaded: LoadedRun, recommended: pd.DataFrame, controls: dict[str, Any]) -> pd.DataFrame:
     """Return the canonical six-bucket stress frame used in the report-style overview."""
     frame = final_stress_frame(
-        loaded.data.get("stress", pd.DataFrame()),
+        selected_stress_frame(loaded, controls),
         loaded.data.get("quarterly_predictions", pd.DataFrame()),
         loaded.data.get("annual_predictions", pd.DataFrame()),
         recommended,
@@ -1083,8 +1132,8 @@ def central_error_window(qpred: pd.DataFrame, lower: float = 0.01, upper: float 
 
 
 def render_scenario_comparison(loaded: LoadedRun, controls: dict[str, Any]) -> None:
-    recommended = common_filter(loaded.data.get("recommended", pd.DataFrame()), controls, include_source_variant=False)
-    summary = common_filter(loaded.data.get("summary", pd.DataFrame()), controls)
+    recommended = common_filter(score_basis_projected(loaded.data.get("recommended", pd.DataFrame()), controls), controls, include_source_variant=False)
+    summary = common_filter(score_basis_projected(loaded.data.get("summary", pd.DataFrame()), controls), controls)
     paired = common_filter(loaded.data.get("paired_vs_schiff", pd.DataFrame()), controls, include_source_variant=False)
     qpred = common_filter(loaded.data.get("quarterly_predictions", pd.DataFrame()), controls, include_source_variant=False)
 
@@ -1114,7 +1163,7 @@ def render_scenario_comparison(loaded: LoadedRun, controls: dict[str, Any]) -> N
     comparison = evidence_scenario_comparison_frame(loaded, controls)
     if comparison.empty:
         comparison = scenario_comparison_frame(recommended, loaded.data.get("schiff_df", summary), paired)
-    scenario_stress_frame = loaded.data.get("stress", pd.DataFrame())
+    scenario_stress_frame = selected_stress_frame(loaded, controls)
     story = governance_story_summary(
         recommended,
         paired,
@@ -1127,13 +1176,13 @@ def render_scenario_comparison(loaded: LoadedRun, controls: dict[str, Any]) -> N
     with top[0]:
         chart_card(
             "1. Stream Comparison: Scenario A vs Scenario B",
-            "MAPE (%) - lower is better.",
+            f"{score_basis_metric_label(controls.get('score_basis', PAPER_SCORE_BASIS))} - lower is better.",
             compact_figure(plot_scenario_stream_comparison(comparison), 210),
         )
     with top[1]:
         chart_card(
             "2. Improvement vs Benchmark",
-            "Full-sample MAPE gain in percentage points - positive values favour Scenario A.",
+            f"Full-sample {score_basis_metric_label(controls.get('score_basis', PAPER_SCORE_BASIS))} gain in percentage points - positive values favour Scenario A.",
             compact_figure(plot_improvement_vs_benchmark(comparison), 210),
         )
 
@@ -1141,8 +1190,8 @@ def render_scenario_comparison(loaded: LoadedRun, controls: dict[str, Any]) -> N
     with bottom[0]:
         chart_card(
             "3. Horizon Comparison",
-            "MAPE (%) across forecast horizons.",
-            compact_figure(plot_horizon_comparison(scenario_horizon_frame(loaded, qpred)), 220),
+            f"{score_basis_metric_label(controls.get('score_basis', PAPER_SCORE_BASIS))} across forecast horizons.",
+            compact_figure(plot_horizon_comparison(scenario_horizon_frame(loaded, qpred, controls)), 220),
         )
     with bottom[1]:
         scenario_decision_summary_panel(comparison)
@@ -1203,7 +1252,13 @@ def evidence_scenario_comparison_frame(loaded: LoadedRun, controls: dict[str, An
     comparison = loaded.data.get("scenario_comparison", pd.DataFrame())
     if comparison is None or comparison.empty:
         return pd.DataFrame()
-    data = common_filter(comparison, controls, include_source_variant=False).copy()
+    data = project_scenario_comparison_frame(
+        comparison,
+        controls.get("score_basis", PAPER_SCORE_BASIS),
+        loaded.data.get("recommended", pd.DataFrame()),
+        loaded.data.get("schiff_df", pd.DataFrame()),
+    )
+    data = common_filter(data, controls, include_source_variant=False).copy()
     rename_map = {
         "full_sample_qtr_gain_pp": "quarterly_gain_pp",
         "full_sample_annual_gain_pp": "annual_gain_pp",
@@ -1270,8 +1325,9 @@ def scenario_comparison_frame(recommended: pd.DataFrame, schiff_rows: pd.DataFra
     return pd.DataFrame(rows)
 
 
-def scenario_horizon_frame(loaded: LoadedRun, qpred: pd.DataFrame) -> pd.DataFrame:
-    horizon = loaded.data.get("horizon_df", pd.DataFrame())
+def scenario_horizon_frame(loaded: LoadedRun, qpred: pd.DataFrame, controls: dict[str, Any] | None = None) -> pd.DataFrame:
+    controls = controls or {"score_basis": PAPER_SCORE_BASIS}
+    horizon = selected_horizon_frame(loaded, controls)
     required_streams = set(loaded.data.get("recommended", pd.DataFrame()).get("stream_label", pd.Series(dtype=str)).dropna().astype(str))
     if horizon is not None and not horizon.empty:
         existing_streams = set(horizon.get("stream_label", pd.Series(dtype=str)).dropna().astype(str))
@@ -1299,14 +1355,20 @@ def scenario_decision_summary_panel(comparison: pd.DataFrame) -> None:
         chart_card("4. Decision Summary", "Executive view by stream.", empty_figure("Scenario comparison rows are not available."))
         return
     table = comparison.copy()
-    table["Recommendation"] = table.apply(
-        lambda row: "Promote"
-        if pd.to_numeric(row.get("quarterly_gain_pp"), errors="coerce") > 0
-        and pd.to_numeric(row.get("annual_gain_pp"), errors="coerce") > 0
-        and (pd.isna(pd.to_numeric(row.get("win_rate"), errors="coerce")) or pd.to_numeric(row.get("win_rate"), errors="coerce") >= 55)
-        else "Needs Stage 2",
-        axis=1,
-    )
+    def recommendation_label(row: pd.Series) -> str:
+        supplied = str(row.get("recommendation", "") or "").strip()
+        q_gain = pd.to_numeric(row.get("quarterly_gain_pp"), errors="coerce")
+        annual_gain = pd.to_numeric(row.get("annual_gain_pp"), errors="coerce")
+        win_rate = pd.to_numeric(row.get("win_rate"), errors="coerce")
+        if supplied:
+            if supplied == "Promote" and pd.notna(annual_gain) and annual_gain < 0:
+                return "Promote - Annual Watch"
+            return supplied
+        if pd.notna(q_gain) and q_gain > 0 and (pd.isna(win_rate) or win_rate >= 55):
+            return "Promote - Annual Watch" if pd.notna(annual_gain) and annual_gain < 0 else "Promote"
+        return "Needs Stage 2"
+
+    table["Recommendation"] = table.apply(recommendation_label, axis=1)
     display = table.rename(
         columns={
             "stream_label": "Stream",
@@ -1410,10 +1472,10 @@ def scenario_decision_lens_summary(story: pd.DataFrame) -> str:
 
 
 def render_schiff_benchmark_page(loaded: LoadedRun, controls: dict[str, Any]) -> None:
-    summary = common_filter(loaded.data.get("summary", pd.DataFrame()), controls)
+    summary = common_filter(score_basis_projected(loaded.data.get("summary", pd.DataFrame()), controls), controls)
     paired = common_filter(loaded.data.get("paired_vs_schiff", pd.DataFrame()), controls, include_source_variant=False)
-    recommended = common_filter(loaded.data.get("recommended", pd.DataFrame()), controls, include_source_variant=False)
-    schiff_rows = common_filter(loaded.data.get("schiff_df", pd.DataFrame()), controls, include_source_variant=False)
+    recommended = common_filter(score_basis_projected(loaded.data.get("recommended", pd.DataFrame()), controls), controls, include_source_variant=False)
+    schiff_rows = common_filter(score_basis_projected(loaded.data.get("schiff_df", pd.DataFrame()), controls), controls, include_source_variant=False)
     comparison = evidence_scenario_comparison_frame(loaded, controls)
     if comparison.empty:
         comparison = scenario_comparison_frame(recommended, schiff_rows if not schiff_rows.empty else summary, paired)
@@ -1429,21 +1491,21 @@ def render_schiff_benchmark_page(loaded: LoadedRun, controls: dict[str, Any]) ->
     with top[0]:
         chart_card(
             "1. Schiff vs Finalist MAPE",
-            "Schiff specification benchmark versus refined finalist.",
+            f"Schiff specification benchmark versus refined finalist using {score_basis_metric_label(controls.get('score_basis', PAPER_SCORE_BASIS))}.",
             compact_figure(plot_schiff_finalist_mape(comparison), 260),
         )
     with top[1]:
         chart_card(
             "2. Benchmark Horizon Profiles",
-            "Horizon MAPE by forecast horizon.",
-            compact_figure(plot_horizon_comparison(scenario_horizon_frame(loaded, loaded.data.get("quarterly_predictions", pd.DataFrame()))), 260),
+            f"{score_basis_metric_label(controls.get('score_basis', PAPER_SCORE_BASIS))} by forecast horizon.",
+            compact_figure(plot_horizon_comparison(scenario_horizon_frame(loaded, loaded.data.get("quarterly_predictions", pd.DataFrame()), controls)), 260),
         )
 
     bottom = st.columns([1.0, 1.0])
     with bottom[0]:
         chart_card(
             "3. Full-sample Gain vs Schiff specification benchmark",
-            "Full-sample MAPE gain versus the Schiff specification benchmark; positive values favour the refined finalist.",
+            f"Full-sample {score_basis_metric_label(controls.get('score_basis', PAPER_SCORE_BASIS))} gain versus the Schiff specification benchmark; positive values favour the refined finalist.",
             compact_figure(plot_improvement_vs_benchmark(comparison), 260),
         )
     with bottom[1]:

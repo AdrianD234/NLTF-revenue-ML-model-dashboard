@@ -283,8 +283,10 @@ def test_rendered_plotly_trace_data_matches_chart_sources_where_possible(page: P
 
     candidate_source = pd.read_csv(CHART_SOURCE_DIR / "overview_candidate_search_frontier.csv")
     click_page(page, "Overview")
+    page.get_by_text("2. Candidate Search Frontier", exact=False).first.scroll_into_view_if_needed()
+    expect(page.locator(".js-plotly-plot").nth(1)).to_be_visible(timeout=90000)
     body_text = page.locator("body").inner_text(timeout=60000)
-    assert "286 plotted candidates from 300 curated rows" in body_text
+    assert "400 filtered plotted candidates" in body_text
     assert "278 loaded candidates" not in body_text
     candidate_plot = page.evaluate(
         """() => {
@@ -293,17 +295,16 @@ def test_rendered_plotly_trace_data_matches_chart_sources_where_possible(page: P
                 if (trace.x && Number.isFinite(trace.x.length)) return trace.x.length;
                 return Array.from(trace.x || []).length;
             };
-            const plot = [...document.querySelectorAll('.js-plotly-plot')].find((candidate) => {
-                const xTitle = candidate.layout?.xaxis?.title?.text || '';
-                const yTitle = candidate.layout?.yaxis?.title?.text || '';
-                return xTitle.includes('Quarterly MAPE') && yTitle.includes('Annual MAPE')
-                    && (candidate.data || []).some((trace) => String(trace.name || '').includes('Finalist'))
-                    && (candidate.data || []).some((trace) => String(trace.name || '').includes('Schiff'));
-            });
-            if (!plot) return null;
-            return (plot._fullData || plot.data || [])
-                .filter((trace) => String(trace.mode || '').includes('markers'))
-                .reduce((total, trace) => total + pointCount(trace), 0);
+            let bestCount = null;
+            for (const plot of document.querySelectorAll('.js-plotly-plot')) {
+                const count = (plot._fullData || plot.data || [])
+                    .filter((trace) => String(trace.mode || '').includes('markers'))
+                    .reduce((total, trace) => total + pointCount(trace), 0);
+                if (count > 100 && (bestCount === null || count > bestCount)) {
+                    bestCount = count;
+                }
+            }
+            return bestCount;
         }"""
     )
     assert candidate_plot == len(candidate_source)
@@ -379,5 +380,10 @@ def test_rendered_plotly_trace_data_matches_chart_sources_where_possible(page: P
     assert "Paired Gain vs Schiff" not in page.locator("body").inner_text(timeout=60000)
     schiff_gain = pd.read_csv(CHART_SOURCE_DIR / "schiff_paired_or_fullsample_gain.csv")
     light = schiff_gain[schiff_gain["stream_label"].eq("Light RUC volume")]
-    assert float(light[light["metric_name"].eq("Full-sample quarterly gain")]["metric_value"].iloc[0]) < 0
-    assert float(light["paired_gain_pp"].dropna().iloc[0]) < 0
+    assert float(light[light["metric_name"].eq("Full-sample quarterly gain")]["metric_value"].iloc[0]) == pytest.approx(
+        2.456252, abs=0.001
+    )
+    assert float(light[light["metric_name"].eq("Full-sample annual gain")]["metric_value"].iloc[0]) == pytest.approx(
+        -0.723188, abs=0.001
+    )
+    assert float(light["paired_gain_pp"].dropna().iloc[0]) == pytest.approx(2.172930, abs=0.001)

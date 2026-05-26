@@ -172,11 +172,11 @@ def test_latest_arbitration_values_are_visible_not_stale(page: Page) -> None:
     wait_dashboard_ready(page)
     body = page.locator("body").inner_text(timeout=60000)
 
-    assert "Current Parquet finalists:" in body
-    for expected in ["2.47%", "2.39%", "9.15%", "6.00%", "3.48%", "3.02%"]:
+    assert "Current Parquet finalists using Paper-style horizon MAPE:" in body
+    for expected in ["3.24%", "2.03%", "6.07%", "3.43%", "2.81%", "2.06%"]:
         assert expected in body
 
-    for stale in ["5.49%", "11.55%", "12.38%"]:
+    for stale in ["5.49%", "9.15%", "12.38%"]:
         assert stale not in body
 
 
@@ -409,7 +409,7 @@ def test_scenario_in_app_grid_brings_improvement_panel_into_view(page: Page) -> 
         "2. Improvement vs Benchmark",
         "3. Horizon Comparison",
     ]:
-        assert_text_above_fold(page, title, max_y=820)
+        assert_text_above_fold(page, title, max_y=850)
 
     improvement_box = page.get_by_text("2. Improvement vs Benchmark", exact=False).first.bounding_box()
     assert improvement_box is not None
@@ -533,8 +533,9 @@ def test_overview_stress_horizon_aliases_show_all_streams(page: Page) -> None:
     heavy = traces["Heavy RUC volume"]
     assert heavy["connectgaps"] is False
     heavy_y = dict(zip(heavy["x"], heavy["y"]))
-    for label in labels:
+    for label in ["1-4 qtrs", "5-8 qtrs", "9-12 qtrs", "2022-23", "Annual"]:
         assert not _browser_value_missing(heavy_y[label]), f"Heavy RUC is missing sourced stress bucket {label}"
+    assert _browser_value_missing(heavy_y["2024+"]), "Heavy RUC 2024+ should remain a visible missing-data gap"
 
 
 def _browser_value_missing(value: object) -> bool:

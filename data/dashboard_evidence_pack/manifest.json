@@ -1,212 +1,192 @@
 {
-  "schema_version": "dashboard_evidence_pack_schiff_spec_v2",
-  "created_at": "2026-05-25T22:48:16.622848+00:00",
-  "description": "Single governed evidence pack with Schiff specification benchmark replacing older Schiff-style benchmark rows.",
-  "source_paths": {
-    "candidate_cone": "/mnt/data/curated_candidate_cone_outputs/stage1_curated_candidate_cone.parquet",
-    "diagnostic_audit_tables": "/mnt/data/model_diagnostic_audit_pack/model_diagnostic_audit_tables.xlsx",
-    "candidate_rescue_zip": "/mnt/data/candidate_rescue_outputs_run_20260521_163105_20260521_163707.zip",
-    "heavy_fullgrid_closure_zip": "/mnt/data/heavy_ruc_fullgrid_rescue_closure_run_20260521_171358_20260521_175036.zip"
-  },
-  "canonical_finalists": {
-    "PED VKT per capita": {
-      "model": "PED__RESCUE_static_annual_weighted_top12_capnone",
-      "quarterly_mape": 2.473244583116969,
-      "annual_mape": 2.385624944203042
-    },
-    "Light RUC volume": {
-      "model": "LIGHT_RUC__RESCUE_static_bias_penalty_top25_cap0p4",
-      "quarterly_mape": 9.147545354091868,
-      "annual_mape": 5.999498868354416
-    },
-    "Heavy RUC volume": {
-      "model": "HEAVY_RUC__RECON_STATIC_REBUILT",
-      "quarterly_mape": 3.484367565681977,
-      "annual_mape": 3.01998017905898
-    }
-  },
-  "pure_schiff": {
-    "PED VKT per capita": {
-      "model": "PED__schiff__SCHIFF_OLS__noylag__w64",
-      "quarterly_mape": 3.08211723207954,
-      "annual_mape": 2.965757956236625
-    },
-    "Light RUC volume": {
-      "model": "LIGHT_RUC__schiff__SCHIFF_OLS__noylag__w40",
-      "quarterly_mape": 11.54678631596883,
-      "annual_mape": 7.8436832473184
-    },
-    "Heavy RUC volume": {
-      "model": "HEAVY_RUC__schiff_no_lead__SCHIFF_OLS__noylag__w40",
-      "quarterly_mape": 11.48264346093783,
-      "annual_mape": 11.71780354485281
-    }
+  "schema_version": "dashboard_evidence_pack_v3_dual_scorecard",
+  "created_at": "2026-05-26 updated annual metrics from model summaries",
+  "description": "Dual-scorecard Stage 1 dashboard evidence pack. Default primary MAPE is Schiff-paper horizon mean; operational pooled score is retained side-by-side.",
+  "default_score_basis": "schiff_paper_horizon_mean",
+  "operational_score_basis": "current_grid_operational_pooled",
+  "selected_light_ruc_model": "schiff_w36_OLS",
+  "selected_light_ruc_reason": "Best dual-scorecard governance decision score in Light RUC 2026-05-26 search",
+  "required_dashboard_rule": "Default app must use score_basis labels and must not mix operational pooled and paper horizon MAPE without explicit toggle/label.",
+  "important_semantics": {
+    "default_quarterly_mape": "paper_style_horizon_mean / schiff_paper_horizon_mean",
+    "operational_pooled_mape": "mean APE over current evidence grid row-level predictions",
+    "paper_grid": "Schiff-style test grid with horizon-specific MAPE and 2020/2021 test targets excluded",
+    "light_ruc_finalist": "schiff_w36_OLS selected by best dual-scorecard decision score",
+    "toggle_required": "Dashboard should expose Operational pooled MAPE and Paper-style horizon MAPE scorecards."
   },
   "row_counts": [
     {
-      "file": "annual_predictions.parquet",
-      "rows": 545,
-      "columns": 13,
-      "size_bytes": 24888
-    },
-    {
       "file": "candidate_cone.parquet",
-      "rows": 300,
-      "columns": 158,
-      "size_bytes": 213154
-    },
-    {
-      "file": "chart_contract.parquet",
-      "rows": 16,
-      "columns": 4,
-      "size_bytes": 4353
-    },
-    {
-      "file": "diagnostic_acf.parquet",
-      "rows": 39,
-      "columns": 11,
-      "size_bytes": 8296
-    },
-    {
-      "file": "diagnostic_pass_matrix.parquet",
-      "rows": 27,
-      "columns": 8,
-      "size_bytes": 5679
-    },
-    {
-      "file": "diagnostic_tests.parquet",
-      "rows": 6,
-      "columns": 37,
-      "size_bytes": 23073
-    },
-    {
-      "file": "ensemble_components.parquet",
-      "rows": 8,
-      "columns": 12,
-      "size_bytes": 9402
-    },
-    {
-      "file": "error_distribution.parquet",
-      "rows": 2940,
-      "columns": 14,
-      "size_bytes": 96798
+      "rows": 891,
+      "columns": 52,
+      "size_bytes": 161790
     },
     {
       "file": "finalists.parquet",
       "rows": 3,
-      "columns": 18,
-      "size_bytes": 14690
+      "columns": 33,
+      "size_bytes": 24946
+    },
+    {
+      "file": "schiff_benchmark.parquet",
+      "rows": 3,
+      "columns": 31,
+      "size_bytes": 20768
+    },
+    {
+      "file": "ensemble_components.parquet",
+      "rows": 6,
+      "columns": 15,
+      "size_bytes": 11069
+    },
+    {
+      "file": "residual_predictions.parquet",
+      "rows": 756,
+      "columns": 22,
+      "size_bytes": 37025
     },
     {
       "file": "horizon_profiles.parquet",
       "rows": 72,
-      "columns": 13,
-      "size_bytes": 10939
+      "columns": 15,
+      "size_bytes": 11621
+    },
+    {
+      "file": "stress_horizon.parquet",
+      "rows": 36,
+      "columns": 15,
+      "size_bytes": 10676
+    },
+    {
+      "file": "scenario_comparison.parquet",
+      "rows": 3,
+      "columns": 19,
+      "size_bytes": 14020
+    },
+    {
+      "file": "diagnostic_tests.parquet",
+      "rows": 6,
+      "columns": 38,
+      "size_bytes": 23772
+    },
+    {
+      "file": "diagnostic_pass_matrix.parquet",
+      "rows": 27,
+      "columns": 9,
+      "size_bytes": 6378
+    },
+    {
+      "file": "diagnostic_acf.parquet",
+      "rows": 39,
+      "columns": 12,
+      "size_bytes": 8995
+    },
+    {
+      "file": "error_distribution.parquet",
+      "rows": 756,
+      "columns": 22,
+      "size_bytes": 36861
+    },
+    {
+      "file": "annual_predictions.parquet",
+      "rows": 144,
+      "columns": 17,
+      "size_bytes": 15076
+    },
+    {
+      "file": "paired_vs_schiff.parquet",
+      "rows": 3,
+      "columns": 22,
+      "size_bytes": 15723
+    },
+    {
+      "file": "chart_contract.parquet",
+      "rows": 16,
+      "columns": 5,
+      "size_bytes": 5520
+    },
+    {
+      "file": "scorecard_predictions.parquet",
+      "rows": 3696,
+      "columns": 22,
+      "size_bytes": 108501
+    },
+    {
+      "file": "scorecard_model_summary.parquet",
+      "rows": 12,
+      "columns": 32,
+      "size_bytes": 22193
+    },
+    {
+      "file": "scorecard_horizon_profiles.parquet",
+      "rows": 144,
+      "columns": 15,
+      "size_bytes": 13167
+    },
+    {
+      "file": "scorecard_stress_horizon.parquet",
+      "rows": 72,
+      "columns": 15,
+      "size_bytes": 11601
+    },
+    {
+      "file": "scorecard_annual_predictions.parquet",
+      "rows": 689,
+      "columns": 17,
+      "size_bytes": 28666
+    },
+    {
+      "file": "light_ruc_candidate_scorecard.parquet",
+      "rows": 886,
+      "columns": 14,
+      "size_bytes": 97958
     },
     {
       "file": "invalid_predictions_zero_actual.parquet",
       "rows": 24,
       "columns": 31,
       "size_bytes": 20791
-    },
-    {
-      "file": "paired_vs_schiff.parquet",
-      "rows": 3,
-      "columns": 7,
-      "size_bytes": 5133
-    },
-    {
-      "file": "residual_predictions.parquet",
-      "rows": 2940,
-      "columns": 31,
-      "size_bytes": 129683
-    },
-    {
-      "file": "scenario_comparison.parquet",
-      "rows": 3,
-      "columns": 15,
-      "size_bytes": 11034
-    },
-    {
-      "file": "schiff_benchmark.parquet",
-      "rows": 3,
-      "columns": 17,
-      "size_bytes": 11241
-    },
-    {
-      "file": "stress_horizon.parquet",
-      "rows": 36,
-      "columns": 13,
-      "size_bytes": 9879
     }
   ],
-  "important_semantics": {
-    "full_sample_gain": "schiff full-sample MAPE minus finalist full-sample MAPE; may be positive for Light RUC",
-    "paired_gain": "schiff common-grid MAPE minus finalist common-grid MAPE; Light RUC paired gain is negative",
-    "residual_predictions": "actual <= 0 rows excluded from MAPE/residual charts and stored separately in invalid_predictions_zero_actual.parquet",
-    "horizon_profiles": "true row-level horizon profiles, not interpolation; use horizon_profiles.parquet",
-    "candidate_cone": "default cone chart should use candidate_cone.parquet rows where plot_default_include/is_plot_candidate is true",
-    "schiff_benchmark": "Default Schiff rows are final Schiff specification benchmarks rebuilt and scored on the current workbook evidence pack; old Schiff-style rows are not default."
-  },
-  "required_dashboard_rule": "Default app must use this evidence pack only. Legacy run folders or fixtures must not mix into production pages.",
-  "schiff_benchmark_class": "Schiff specification benchmark",
-  "canonical_schiff_spec_metrics": [
-    {
-      "stream": "HEAVY_RUC",
-      "stream_label": "Heavy RUC volume",
-      "role": "Schiff specification benchmark",
-      "model": "HEAVY_RUC__SCHIFF_SPEC_FINAL_AR1_EXPANDING",
-      "n_quarterly_pairs": 426,
-      "quarterly_mape": 7.800196102220403,
-      "quarterly_bias_pct": 7.566395170214154,
-      "quarterly_p90_ape": 19.210889353341614,
-      "n_annual_pairs": 73,
-      "annual_mape": 8.112774746196978,
-      "annual_bias_pct": 8.022347356971537,
-      "annual_p90_ape": 23.12235652909773,
-      "scenario": "Schiff",
-      "is_current_recommended": false,
-      "is_pure_schiff": true,
-      "model_short": "Heavy RUC Schiff spec final AR1 expanding",
-      "candidate_uid": "a43b1640212ea56b"
+  "canonical_finalists": {
+    "PED VKT per capita": {
+      "model": "PED__RESCUE_static_annual_weighted_top12_capnone",
+      "paper_horizon_mean_mape": 3.237143790424483,
+      "paper_annual_mape": 2.033293734597686,
+      "operational_pooled_mape": 2.473244583116969,
+      "operational_annual_mape": 2.239648058288008
     },
-    {
-      "stream": "LIGHT_RUC",
-      "stream_label": "Light RUC volume",
-      "role": "Schiff specification benchmark",
-      "model": "LIGHT_RUC__SCHIFF_SPEC_FINAL_OLS_EXPANDING",
-      "n_quarterly_pairs": 426,
-      "quarterly_mape": 8.412939078097963,
-      "quarterly_bias_pct": 2.066447356553397,
-      "quarterly_p90_ape": 17.360700970159282,
-      "n_annual_pairs": 80,
-      "annual_mape": 5.000571382586559,
-      "annual_bias_pct": 1.1109347647208865,
-      "annual_p90_ape": 10.542616232545917,
-      "scenario": "Schiff",
-      "is_current_recommended": false,
-      "is_pure_schiff": true,
-      "model_short": "Light RUC Schiff spec final OLS expanding",
-      "candidate_uid": "1587a79c479e00a0"
+    "Light RUC volume": {
+      "model": "schiff_w36_OLS",
+      "paper_horizon_mean_mape": 6.065145238328004,
+      "paper_annual_mape": 3.425188552624322,
+      "operational_pooled_mape": 7.743951945505308,
+      "operational_annual_mape": 6.281636499776239
     },
-    {
-      "stream": "PED",
-      "stream_label": "PED VKT per capita",
-      "role": "Schiff specification benchmark",
-      "model": "PED__SCHIFF_SPEC_FINAL_OLS_EXPANDING",
-      "n_quarterly_pairs": 606,
-      "quarterly_mape": 4.091570459286396,
-      "quarterly_bias_pct": 1.1491743079811023,
-      "quarterly_p90_ape": 10.834482213479651,
-      "n_annual_pairs": 114,
-      "annual_mape": 4.132012480513341,
-      "annual_bias_pct": 1.2811482084735824,
-      "annual_p90_ape": 10.90169878748795,
-      "scenario": "Schiff",
-      "is_current_recommended": false,
-      "is_pure_schiff": true,
-      "model_short": "PED Schiff spec final OLS expanding",
-      "candidate_uid": "1d59e72762e8e156"
+    "Heavy RUC volume": {
+      "model": "HEAVY_RUC__RECON_STATIC_REBUILT",
+      "paper_horizon_mean_mape": 2.8094728159657563,
+      "paper_annual_mape": 2.061102375292297,
+      "operational_pooled_mape": 3.4843675656819766,
+      "operational_annual_mape": 2.7845962414849983
     }
-  ]
+  },
+  "schiff_specification_benchmarks": {
+    "PED VKT per capita": {
+      "model": "PED__SCHIFF_SPEC_FROM_WORKBOOK",
+      "paper_horizon_mean_mape": 4.6749169871805245,
+      "operational_pooled_mape": 4.165909755893547
+    },
+    "Light RUC volume": {
+      "model": "LIGHT_RUC__SCHIFF_SPEC_FROM_WORKBOOK",
+      "paper_horizon_mean_mape": 8.52139709000687,
+      "operational_pooled_mape": 9.527167640611022
+    },
+    "Heavy RUC volume": {
+      "model": "HEAVY_RUC__SCHIFF_SPEC_FROM_WORKBOOK",
+      "paper_horizon_mean_mape": 8.761651777033487,
+      "operational_pooled_mape": 7.800196102221683
+    }
+  },
+  "annual_metric_note": "Annual MAPE fields use the model-summary annual scorecard values; row-level annual_predictions are retained for audit but may use a broader aggregation basis."
 }

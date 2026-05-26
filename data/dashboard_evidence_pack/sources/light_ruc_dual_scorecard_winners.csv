@@ -1,0 +1,5 @@
+metric,best_model,best_value
+operational_pooled_mape,ENSEMBLE_dual_top5_mean,7.69203801095848
+paper_horizon_mean_mape,schiff_w36_Ridge_a0.1,6.051505285199674
+decision_score,schiff_w36_OLS,16.19596123930674
+operational_annual_mape,schiff_w44_OLS,5.557808410944123
