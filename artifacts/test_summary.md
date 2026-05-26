@@ -1,6 +1,6 @@
 # Test Summary
 
-Status: **passed** for the v3 dual-scorecard evidence-pack migration, score-basis governance, visual conformance and browser verification pass.
+Status: **passed** for the v4 GBM Light RUC evidence-pack migration, score-basis governance, semantic chart reconciliation, visual conformance and browser verification pass.
 
 ## Data Root Used
 
@@ -19,8 +19,8 @@ pwsh -File scripts\verify_dashboard.ps1 -Python ".\.venv\Scripts\python.exe" -Da
 | Check | Result |
 | --- | --- |
 | Compile | Passed |
-| Full pytest | 123 passed, 46 skipped, 38 deselected |
-| Schema inspection | Passed against `dashboard_evidence_pack_v3_dual_scorecard` and 14 required Parquet tables |
+| Full pytest | 124 passed, 46 skipped, 38 deselected |
+| Schema inspection | Passed against `dashboard_evidence_pack_v4_gbm_light` and 14 required Parquet tables |
 | Data validation | Passed |
 | Chart source validation | Passed for 16 primary chart source tables |
 | Semantic label validation | Passed |
@@ -33,19 +33,20 @@ pwsh -File scripts\verify_dashboard.ps1 -Python ".\.venv\Scripts\python.exe" -Da
 | 120-gate validation | 120 passed, 0 failed |
 | Backlog | No unchecked items |
 
-## V3 Score-Basis Checks
+## V4 Score-Basis Checks
 
-- `manifest.json` schema is `dashboard_evidence_pack_v3_dual_scorecard`.
+- `manifest.json` schema is `dashboard_evidence_pack_v4_gbm_light`.
 - Default score basis is `schiff_paper_horizon_mean` / Paper-style horizon MAPE.
 - Operational score basis is `current_grid_operational_pooled` and is exposed only through the explicit Score Basis selector.
 - Source tables include `score_basis` and `score_basis_label`.
 - Paper-style and operational metrics are not mixed silently.
+- Light RUC operational annual weakness versus Schiff remains visible as an annual-watch note.
 
 ## Default Paper-Style Finalists
 
-- PED VKT per capita: quarterly MAPE 3.24%, annual MAPE 2.03%.
-- Light RUC volume: quarterly MAPE 6.07%, annual MAPE 3.43%; current finalist `schiff_w36_OLS`.
-- Heavy RUC volume: quarterly MAPE 2.81%, annual MAPE 2.06%.
+- PED VKT per capita: quarterly MAPE 3.24%, annual MAPE 2.03%; current finalist `PED__RESCUE_static_annual_weighted_top12_capnone`.
+- Light RUC volume: quarterly MAPE 5.36%, annual MAPE 1.27%; current finalist `dynamic_RESID_GBR_n150_d1_lr0.05_w36`.
+- Heavy RUC volume: quarterly MAPE 2.81%, annual MAPE 2.06%; current finalist `HEAVY_RUC__RECON_STATIC_REBUILT`.
 - Stale default finalist values such as 5.49%, 9.15% and 12.38% are not visible as current default finalist metrics.
 
 ## Schiff Specification Benchmark
@@ -58,7 +59,7 @@ pwsh -File scripts\verify_dashboard.ps1 -Python ".\.venv\Scripts\python.exe" -Da
 
 - Scenario comparison defaults to paper-style full-sample gains and paired win rate.
 - PED: +1.438 pp quarterly, +1.552 pp annual, paired win rate 69.05%.
-- Light RUC: +2.456 pp quarterly, -0.723 pp annual, paired win rate 55.56%; shown as Promote with annual watch/caveat.
+- Light RUC: +3.158 pp quarterly, +1.428 pp annual, paired win rate 62.70%; operational annual MAPE is weaker than the Schiff specification benchmark and is flagged as an annual watch.
 - Heavy RUC: +5.952 pp quarterly, +6.818 pp annual, paired win rate 62.70%.
 - Full-sample gain charts are not labelled as paired gain.
 

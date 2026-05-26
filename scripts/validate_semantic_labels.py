@@ -80,17 +80,23 @@ def validate() -> list[tuple[str, str, str]]:
             errors="coerce",
         ).dropna()
         record(
-            "Light RUC annual watch is not hidden by full-sample gain label",
+            "Light RUC paper gains are not hidden by full-sample gain label",
             not paired_gain.empty
             and float(paired_gain.iloc[0]) > 0
             and not full_qtr_gain.empty
             and float(full_qtr_gain.iloc[0]) > 0
             and not full_annual_gain.empty
-            and float(full_annual_gain.iloc[0]) < 0,
+            and float(full_annual_gain.iloc[0]) > 0,
             f"paired_gain={float(paired_gain.iloc[0]) if not paired_gain.empty else 'missing'}; full_qtr_gain={float(full_qtr_gain.iloc[0]) if not full_qtr_gain.empty else 'missing'}; full_annual_gain={float(full_annual_gain.iloc[0]) if not full_annual_gain.empty else 'missing'}",
         )
     else:
-        record("Light RUC annual watch is not hidden by full-sample gain label", False, "Missing Schiff gain source table.")
+        record("Light RUC paper gains are not hidden by full-sample gain label", False, "Missing Schiff gain source table.")
+
+    record(
+        "Light RUC operational annual watch is visible",
+        "Operational annual watch" in app_text and "Light RUC" in app_text,
+        "App text contains the visible operational annual watch note.",
+    )
 
     stale_spec_terms = [
         "Candidate Models",

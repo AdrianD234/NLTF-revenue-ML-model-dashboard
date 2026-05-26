@@ -274,7 +274,7 @@ def test_plotly_hovers_are_human_readable_on_all_pages(page: Page) -> None:
 def test_no_stale_finalist_values_visible(page: Page) -> None:
     open_dashboard(page)
     body = page.locator("body").inner_text(timeout=60000)
-    for value in ["5.49%", "11.55%", "12.38%"]:
+    for value in ["5.49%", "9.15%", "12.38%", "+2.40 pp"]:
         assert value not in body, f"Stale finalist value still visible: {value}"
 
 
@@ -381,9 +381,9 @@ def test_rendered_plotly_trace_data_matches_chart_sources_where_possible(page: P
     schiff_gain = pd.read_csv(CHART_SOURCE_DIR / "schiff_paired_or_fullsample_gain.csv")
     light = schiff_gain[schiff_gain["stream_label"].eq("Light RUC volume")]
     assert float(light[light["metric_name"].eq("Full-sample quarterly gain")]["metric_value"].iloc[0]) == pytest.approx(
-        2.456252, abs=0.001
+        3.158190, abs=0.001
     )
     assert float(light[light["metric_name"].eq("Full-sample annual gain")]["metric_value"].iloc[0]) == pytest.approx(
-        -0.723188, abs=0.001
+        1.428227, abs=0.001
     )
-    assert float(light["paired_gain_pp"].dropna().iloc[0]) == pytest.approx(2.172930, abs=0.001)
+    assert float(light["paired_gain_pp"].dropna().iloc[0]) == pytest.approx(2.932205, abs=0.001)

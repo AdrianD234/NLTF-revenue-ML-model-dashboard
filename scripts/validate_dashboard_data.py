@@ -18,8 +18,11 @@ from model_dashboard.labels import SCHIFF_SPEC_BENCHMARK_LABEL, STRESS_BUCKET_OR
 EXPECTED_STREAMS = {"PED VKT per capita", "Light RUC volume", "Heavy RUC volume"}
 EXPECTED_FINALISTS = {
     "PED VKT per capita": (3.237144, 2.033294),
-    "Light RUC volume": (6.065145, 3.425189),
+    "Light RUC volume": (5.363207, 1.273774),
     "Heavy RUC volume": (2.809473, 2.061102),
+}
+EXPECTED_FINALIST_MODELS = {
+    "Light RUC volume": "dynamic_RESID_GBR_n150_d1_lr0.05_w36",
 }
 EXPECTED_SCHIFF_SPEC = {
     "PED VKT per capita": (4.674917, 3.585729),
@@ -59,6 +62,9 @@ def validate() -> tuple[str, list[str]]:
             raise AssertionError(f"{stream} quarterly finalist MAPE does not reconcile.")
         if abs(float(row["annual_mape"]) - annual) > 0.001:
             raise AssertionError(f"{stream} annual finalist MAPE does not reconcile.")
+        expected_model = EXPECTED_FINALIST_MODELS.get(stream)
+        if expected_model and str(row.get("model")) != expected_model:
+            raise AssertionError(f"{stream} finalist model is {row.get('model')}, expected {expected_model}.")
     findings.append("- [pass] Current finalist quarterly and annual MAPE reconcile to the evidence pack.")
 
     schiff = loaded.data["schiff_df"]
@@ -90,11 +96,16 @@ def validate() -> tuple[str, list[str]]:
 
     scenario = loaded.data["scenario_comparison"].set_index("stream_label")
     light = scenario.loc["Light RUC volume"]
-    if not (float(light["full_sample_qtr_gain_pp"]) > 0 and float(light["full_sample_annual_gain_pp"]) < 0):
-        raise AssertionError("Light RUC paper-style quarterly gain and annual weakness are not both preserved.")
-    if abs(float(light["full_sample_qtr_gain_pp"]) - 2.456252) > 0.001:
-        raise AssertionError("Old Light RUC +2.40 pp gain is still present instead of the v3 +2.456 pp paper-style gain.")
-    findings.append("- [pass] Full-sample gain and paired win-rate semantics are separated; Light RUC annual watch remains visible.")
+    if not (float(light["full_sample_qtr_gain_pp"]) > 0 and float(light["full_sample_annual_gain_pp"]) > 0):
+        raise AssertionError("Light RUC paper-style quarterly and annual gains are not both preserved.")
+    if abs(float(light["full_sample_qtr_gain_pp"]) - 3.158190) > 0.001:
+        raise AssertionError("Old Light RUC gain is still present instead of the v4 +3.158 pp paper-style gain.")
+    light_rec = finalists[finalists["stream_label"].eq("Light RUC volume")].iloc[0]
+    light_schiff = schiff[schiff["stream_label"].eq("Light RUC volume")].iloc[0]
+    op_annual_gain = float(light_schiff["operational_annual_mape"]) - float(light_rec["operational_annual_mape"])
+    if op_annual_gain >= 0:
+        raise AssertionError("Light RUC operational annual watch is not preserved.")
+    findings.append("- [pass] Full-sample gain and paired win-rate semantics are separated; Light RUC operational annual watch remains visible.")
 
     stress = loaded.data["stress"]
     for stream in EXPECTED_STREAMS:

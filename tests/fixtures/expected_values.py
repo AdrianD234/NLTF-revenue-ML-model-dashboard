@@ -3,8 +3,8 @@ from __future__ import annotations
 EXPECTED_FINALIST_MAPE = {
     ("PED VKT per capita", "Quarterly MAPE"): 3.237144,
     ("PED VKT per capita", "Annual MAPE"): 2.033294,
-    ("Light RUC volume", "Quarterly MAPE"): 6.065145,
-    ("Light RUC volume", "Annual MAPE"): 3.425189,
+    ("Light RUC volume", "Quarterly MAPE"): 5.363207,
+    ("Light RUC volume", "Annual MAPE"): 1.273774,
     ("Heavy RUC volume", "Quarterly MAPE"): 2.809473,
     ("Heavy RUC volume", "Annual MAPE"): 2.061102,
 }
@@ -22,12 +22,12 @@ EXPECTED_STRESS_MAPE = {
     ("PED VKT per capita", "2024+"): float("nan"),
     ("PED VKT per capita", "2022-23"): 3.481973,
     ("PED VKT per capita", "Annual"): 2.033294,
-    ("Light RUC volume", "1-4 qtrs"): 4.853169,
-    ("Light RUC volume", "5-8 qtrs"): 4.889726,
-    ("Light RUC volume", "9-12 qtrs"): 8.191310,
+    ("Light RUC volume", "1-4 qtrs"): 4.179904,
+    ("Light RUC volume", "5-8 qtrs"): 3.780027,
+    ("Light RUC volume", "9-12 qtrs"): 7.806239,
     ("Light RUC volume", "2024+"): float("nan"),
-    ("Light RUC volume", "2022-23"): 9.478586,
-    ("Light RUC volume", "Annual"): 2.753807,
+    ("Light RUC volume", "2022-23"): 9.100548,
+    ("Light RUC volume", "Annual"): 1.273774,
     ("Heavy RUC volume", "1-4 qtrs"): 2.275400,
     ("Heavy RUC volume", "5-8 qtrs"): 2.499037,
     ("Heavy RUC volume", "9-12 qtrs"): 3.481058,
@@ -48,14 +48,14 @@ EXPECTED_SCENARIO_COMPARISON = {
         "paired_win_rate_pct": 69.047619,
     },
     "Light RUC volume": {
-        "scenario_a_quarterly_mape": 6.065145,
+        "scenario_a_quarterly_mape": 5.363207,
         "scenario_b_quarterly_mape": 8.521397,
-        "full_sample_qtr_gain_pp": 2.456252,
-        "scenario_a_annual_mape": 3.425189,
+        "full_sample_qtr_gain_pp": 3.158190,
+        "scenario_a_annual_mape": 1.273774,
         "scenario_b_annual_mape": 2.702000,
-        "full_sample_annual_gain_pp": -0.723188,
-        "paired_gain_pp": 2.172930,
-        "paired_win_rate_pct": 55.555556,
+        "full_sample_annual_gain_pp": 1.428227,
+        "paired_gain_pp": 2.932205,
+        "paired_win_rate_pct": 62.698413,
     },
     "Heavy RUC volume": {
         "scenario_a_quarterly_mape": 2.809473,
@@ -69,7 +69,7 @@ EXPECTED_SCENARIO_COMPARISON = {
     },
 }
 
-EXPECTED_LIGHT_PAIRED_GAIN_PP = 2.172930
+EXPECTED_LIGHT_PAIRED_GAIN_PP = 2.932205
 
 EXPECTED_FIXTURE_FINALISTS = {
     "PED": {"quarterly_mape": 2.473245, "annual_mape": 2.385625},

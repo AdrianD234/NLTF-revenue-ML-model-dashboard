@@ -436,6 +436,8 @@ def build_ensemble_composition_source_table(weights: pd.DataFrame) -> pd.DataFra
         "weight",
         "weight_pct",
         "source",
+        "score_basis",
+        "score_basis_label",
     ]
     if weights is None or weights.empty:
         return pd.DataFrame(columns=columns)
@@ -449,6 +451,10 @@ def build_ensemble_composition_source_table(weights: pd.DataFrame) -> pd.DataFra
         out["model_short"] = out.get("ensemble_short", pd.Series("", index=out.index))
     if "source" not in out.columns:
         out["source"] = "Parquet ensemble_components_json"
+    if "score_basis" not in out.columns:
+        out["score_basis"] = "schiff_paper_horizon_mean"
+    out["score_basis"] = out["score_basis"].fillna("schiff_paper_horizon_mean")
+    out["score_basis_label"] = "Paper-style horizon MAPE"
     return out.reindex(columns=columns).sort_values(["stream_label", "component_rank"]).reset_index(drop=True)
 
 
@@ -473,6 +479,8 @@ def build_scenario_comparison_source_table(
         "paired_gain_pp",
         "paired_win_rate_pct",
         "recommendation",
+        "score_basis",
+        "score_basis_label",
     ]
     finalists = best_by_stream(recommended)
     if schiff_rows is None or schiff_rows.empty:
@@ -517,6 +525,8 @@ def build_scenario_comparison_source_table(
                 "paired_gain_pp": paired_gain,
                 "paired_win_rate_pct": win_rate,
                 "recommendation": recommendation,
+                "score_basis": finalist.get("score_basis", "schiff_paper_horizon_mean"),
+                "score_basis_label": finalist.get("score_basis_label", "Paper-style horizon MAPE"),
             }
         )
     return pd.DataFrame(rows, columns=columns)
@@ -527,7 +537,7 @@ def build_horizon_comparison_source_table(
     qpred: pd.DataFrame,
     recommended: pd.DataFrame,
 ) -> pd.DataFrame:
-    columns = ["page", "stream_label", "scenario", "horizon", "mape", "source_column", "source"]
+    columns = ["page", "stream_label", "scenario", "horizon", "mape", "source_column", "source", "score_basis", "score_basis_label"]
     rows: list[dict[str, Any]] = []
     required_streams = set(recommended.get("stream_label", pd.Series(dtype=str)).dropna().astype(str)) if recommended is not None and not recommended.empty else set()
     existing_streams: set[str] = set()
@@ -544,6 +554,8 @@ def build_horizon_comparison_source_table(
                         "mape": row.get("mape"),
                         "source_column": f"mape_h{int(row.get('horizon')):02d}" if pd.notna(pd.to_numeric(row.get("horizon"), errors="coerce")) else "",
                         "source": "Parquet candidate horizon fields",
+                        "score_basis": row.get("score_basis", "schiff_paper_horizon_mean"),
+                        "score_basis_label": row.get("score_basis_label", "Paper-style horizon MAPE"),
                     }
                 )
     missing_streams = required_streams.difference(existing_streams)
@@ -563,6 +575,8 @@ def build_horizon_comparison_source_table(
                         "mape": row.get("mape"),
                         "source_column": "ape",
                         "source": "quarterly_predictions_selected.csv grouped mean APE",
+                        "score_basis": "schiff_paper_horizon_mean",
+                        "score_basis_label": "Paper-style horizon MAPE",
                     }
                 )
     resolved_streams = {str(row.get("stream_label")) for row in rows if pd.notna(row.get("mape"))}
@@ -579,6 +593,8 @@ def build_horizon_comparison_source_table(
                         "mape": pd.NA,
                         "source_column": "",
                         "source": "Missing: no Parquet horizon fields or selected prediction source available",
+                        "score_basis": "schiff_paper_horizon_mean",
+                        "score_basis_label": "Paper-style horizon MAPE",
                     }
                 )
     return pd.DataFrame(rows, columns=columns)

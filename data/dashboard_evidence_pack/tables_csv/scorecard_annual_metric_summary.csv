@@ -3,11 +3,11 @@ PED VKT per capita,Finalist,current_grid_operational_pooled,114,2.23964805828800
 PED VKT per capita,Finalist,schiff_paper_horizon_mean,24,2.033293734597686,1.827489258624052,model_summary_not_raw_annual_rows
 PED VKT per capita,Schiff,current_grid_operational_pooled,114,4.206617985893764,1.1146997542922672,model_summary_not_raw_annual_rows
 PED VKT per capita,Schiff,schiff_paper_horizon_mean,24,3.5857289049779326,2.8477481967256373,model_summary_not_raw_annual_rows
-Light RUC volume,Finalist,current_grid_operational_pooled,78,6.281636499776239,1.729838121957983,model_summary_not_raw_annual_rows
-Light RUC volume,Finalist,schiff_paper_horizon_mean,10,3.425188552624322,-3.425188552624322,model_summary_not_raw_annual_rows
 Light RUC volume,Schiff,current_grid_operational_pooled,80,5.547477717280171,2.7756599989718715,model_summary_not_raw_annual_rows
 Light RUC volume,Schiff,schiff_paper_horizon_mean,24,2.702000321793147,-1.2512124526158803,model_summary_not_raw_annual_rows
 Heavy RUC volume,Finalist,current_grid_operational_pooled,82,2.7845962414849983,-0.2668643775276722,model_summary_not_raw_annual_rows
 Heavy RUC volume,Finalist,schiff_paper_horizon_mean,24,2.061102375292297,-1.0290864443226877,model_summary_not_raw_annual_rows
 Heavy RUC volume,Schiff,current_grid_operational_pooled,73,8.112774746198832,8.02234735697522,model_summary_not_raw_annual_rows
 Heavy RUC volume,Schiff,schiff_paper_horizon_mean,24,8.8795079281538,8.732776361505834,model_summary_not_raw_annual_rows
+Light RUC volume,Finalist,current_grid_operational_pooled,69,6.774905891667214,2.5144511300971164,light_ruc_model_summary.csv
+Light RUC volume,Finalist,schiff_paper_horizon_mean,10,1.2737736398959618,-1.023445896208342,light_ruc_model_summary.csv

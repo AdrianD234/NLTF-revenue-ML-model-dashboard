@@ -126,8 +126,8 @@ def test_scenario_and_schiff_source_tables_keep_full_sample_and_paired_separate(
     assert schiff_gain["calculation_basis"].str.contains("not paired common-grid gain", regex=False).all()
 
     light = scenario_gain[scenario_gain["stream_label"].eq("Light RUC volume")]
-    assert float(light[light["metric_name"].eq("Full-sample quarterly gain")]["metric_value"].iloc[0]) == pytest.approx(2.456252, abs=0.0008)
-    assert float(light[light["metric_name"].eq("Full-sample annual gain")]["metric_value"].iloc[0]) == pytest.approx(-0.723188, abs=0.0008)
+    assert float(light[light["metric_name"].eq("Full-sample quarterly gain")]["metric_value"].iloc[0]) == pytest.approx(3.158190, abs=0.0008)
+    assert float(light[light["metric_name"].eq("Full-sample annual gain")]["metric_value"].iloc[0]) == pytest.approx(1.428227, abs=0.0008)
     assert float(light["paired_gain_pp"].dropna().iloc[0]) == pytest.approx(EXPECTED_LIGHT_PAIRED_GAIN_PP, abs=0.0008)
 
     decision = chart_source("scenario_decision_summary.csv")

@@ -179,6 +179,8 @@ def _model_alias_text(text: str, max_length: int = 72) -> str:
         family = "Prequential"
     elif "fixedblend" in lower:
         family = "Fixed blend"
+    elif "resid_gbr" in lower or ("gbr" in lower and "resid" in lower):
+        family = "Dynamic residual GBM" if "dynamic" in lower else "Residual GBM"
     elif "__ag__naive" in lower or lower.endswith("naive"):
         family = "Naive"
     elif "__ag__theta" in lower or "theta" in lower:
@@ -197,6 +199,18 @@ def _model_alias_text(text: str, max_length: int = 72) -> str:
         variant = "policy no-leads"
     elif "posthoc_ensemble" in lower:
         variant = "post-hoc"
+    elif "resid_gbr" in lower or ("gbr" in lower and "resid" in lower):
+        parts_for_variant = []
+        trees = re.search(r"(?:^|_)n(\d+)(?:_|$)", lower)
+        depth = re.search(r"(?:^|_)d(\d+)(?:_|$)", lower)
+        window = re.search(r"(?:^|_)w(\d+)(?:_|$)", lower)
+        if trees:
+            parts_for_variant.append(f"{trees.group(1)} trees")
+        if depth:
+            parts_for_variant.append(f"depth {depth.group(1)}")
+        if window:
+            parts_for_variant.append(f"window {window.group(1)}")
+        variant = ", ".join(parts_for_variant)
 
     parts = [part for part in [stream, family, variant] if part]
     return shorten_model_name(" - ".join(parts), max_length)

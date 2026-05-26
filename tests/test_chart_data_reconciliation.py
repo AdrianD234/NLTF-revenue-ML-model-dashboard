@@ -111,10 +111,10 @@ def test_scenario_gain_labels_are_full_sample_not_paired(parquet_dashboard: Load
 def test_light_ruc_paired_gain_is_not_misreported_as_positive(parquet_dashboard: LoadedRun) -> None:
     table = read_source_table("scenario_comparison_source_table.csv").set_index("stream_label")
     light = table.loc["Light RUC volume"]
-    assert float(light["full_sample_qtr_gain_pp"]) == pytest.approx(2.456252, abs=0.0008)
+    assert float(light["full_sample_qtr_gain_pp"]) == pytest.approx(3.158190, abs=0.0008)
     assert float(light["full_sample_qtr_gain_pp"]) > 0
-    assert float(light["full_sample_annual_gain_pp"]) == pytest.approx(-0.723188, abs=0.0008)
-    assert float(light["full_sample_annual_gain_pp"]) < 0
+    assert float(light["full_sample_annual_gain_pp"]) == pytest.approx(1.428227, abs=0.0008)
+    assert float(light["full_sample_annual_gain_pp"]) > 0
     assert float(light["paired_gain_pp"]) == pytest.approx(EXPECTED_LIGHT_PAIRED_GAIN_PP, abs=0.0008)
     assert float(light["paired_gain_pp"]) > 0
     assert light["recommendation"] == "Promote"

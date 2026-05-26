@@ -33,7 +33,7 @@ def test_primary_filters_are_clickable(page: Page) -> None:
     assert selected is not None, "Stream dropdown did not expose selectable stream options."
     expect_filter_value(page, "Stream", 0, selected)
     expected_qtr_mape = {
-        "Light RUC volume": "6.07%",
+        "Light RUC volume": "5.36%",
         "PED VKT per capita": "3.24%",
         "Heavy RUC volume": "2.81%",
     }[selected]

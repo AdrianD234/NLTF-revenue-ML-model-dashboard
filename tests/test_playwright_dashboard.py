@@ -173,7 +173,7 @@ def test_latest_arbitration_values_are_visible_not_stale(page: Page) -> None:
     body = page.locator("body").inner_text(timeout=60000)
 
     assert "Current Parquet finalists using Paper-style horizon MAPE:" in body
-    for expected in ["3.24%", "2.03%", "6.07%", "3.43%", "2.81%", "2.06%"]:
+    for expected in ["3.24%", "2.03%", "5.36%", "1.27%", "2.81%", "2.06%"]:
         assert expected in body
 
     for stale in ["5.49%", "9.15%", "12.38%"]:

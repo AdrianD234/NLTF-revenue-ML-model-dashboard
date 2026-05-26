@@ -514,12 +514,23 @@ def main() -> int:
         full_gain = pd.to_numeric(light.iloc[0].get("full_sample_qtr_gain_pp"), errors="coerce")
         annual_gain = pd.to_numeric(light.iloc[0].get("full_sample_annual_gain_pp"), errors="coerce")
         if pd.isna(paired_gain) or paired_gain <= 0:
-            return fail("Light RUC paired paper-grid gain is not recorded as positive in v3.")
+            return fail("Light RUC paired paper-grid gain is not recorded as positive in v4.")
         if pd.isna(full_gain) or full_gain <= 0:
-            return fail("Light RUC paper-style quarterly gain is not recorded as positive in v3.")
-        if pd.isna(annual_gain) or annual_gain >= 0:
-            return fail("Light RUC annual watch is not preserved as a negative annual gain.")
-        return ok("Full-sample gain chart label is distinct from paired common-grid evidence and preserves Light RUC annual watch.")
+            return fail("Light RUC paper-style quarterly gain is not recorded as positive in v4.")
+        if pd.isna(annual_gain) or annual_gain <= 0:
+            return fail("Light RUC paper-style annual gain is not recorded as positive in v4.")
+        rec = loaded.data.get("recommended", pd.DataFrame()) if loaded is not None else pd.DataFrame()
+        schiff = loaded.data.get("schiff_df", pd.DataFrame()) if loaded is not None else pd.DataFrame()
+        rec_light = rec[rec.get("stream_label", pd.Series(dtype=str)).astype(str).eq("Light RUC volume")]
+        schiff_light = schiff[schiff.get("stream_label", pd.Series(dtype=str)).astype(str).eq("Light RUC volume")]
+        if rec_light.empty or schiff_light.empty:
+            return fail("Light RUC operational annual watch rows are missing.")
+        op_annual_gap = pd.to_numeric(rec_light.iloc[0].get("operational_annual_mape"), errors="coerce") - pd.to_numeric(
+            schiff_light.iloc[0].get("operational_annual_mape"), errors="coerce"
+        )
+        if pd.isna(op_annual_gap) or op_annual_gap <= 0:
+            return fail("Light RUC operational annual watch is not preserved.")
+        return ok("Full-sample gain chart label is distinct from paired common-grid evidence and preserves Light RUC operational annual watch.")
 
     def check_win_rate() -> tuple[bool, str]:
         paired = loaded.data.get("paired_vs_schiff", pd.DataFrame()) if loaded is not None else pd.DataFrame()
@@ -844,8 +855,8 @@ def main() -> int:
         Gate(13, "B", "Exactly one current recommended finalist exists for Heavy RUC, or ambiguity is explicitly warned.", lambda: check_finalist_count("HEAVY_RUC")),
         Gate(14, "B", "PED current finalist paper-style quarterly MAPE rounds to approximately 3.24%.", lambda: check_finalist_metric("PED", "quarterly_mape", 3.24)),
         Gate(15, "B", "PED current finalist paper-style annual MAPE rounds to approximately 2.03%.", lambda: check_finalist_metric("PED", "annual_mape", 2.03)),
-        Gate(16, "B", "Light RUC current finalist paper-style quarterly MAPE rounds to approximately 6.07%.", lambda: check_finalist_metric("LIGHT_RUC", "quarterly_mape", 6.07)),
-        Gate(17, "B", "Light RUC current finalist paper-style annual MAPE rounds to approximately 3.43%.", lambda: check_finalist_metric("LIGHT_RUC", "annual_mape", 3.43)),
+        Gate(16, "B", "Light RUC current finalist paper-style quarterly MAPE rounds to approximately 5.36%.", lambda: check_finalist_metric("LIGHT_RUC", "quarterly_mape", 5.36)),
+        Gate(17, "B", "Light RUC current finalist paper-style annual MAPE rounds to approximately 1.27%.", lambda: check_finalist_metric("LIGHT_RUC", "annual_mape", 1.27)),
         Gate(18, "B", "Heavy RUC current finalist quarterly MAPE is taken from the Parquet current-recommended flag.", lambda: check_heavy_from_flag("quarterly_mape")),
         Gate(19, "B", "Heavy RUC current finalist annual MAPE is taken from the Parquet current-recommended flag.", lambda: check_heavy_from_flag("annual_mape")),
         Gate(20, "B", "Stale old finalist values do not appear as current latest finalist values.", check_stale_values),

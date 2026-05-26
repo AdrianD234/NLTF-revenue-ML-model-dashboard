@@ -1,9 +1,25 @@
-# Stage 1 Dashboard Evidence Pack v3 - Dual Scorecard
+# Stage 1 Dashboard Evidence Pack v4 — GBM Light RUC finalist
 
-Default score basis: `schiff_paper_horizon_mean`. Operational pooled MAPE is retained in parallel.
+This is a Parquet-first evidence pack for the NLTF Stage 1 Governance Dashboard.
 
-Selected Light RUC finalist: `schiff_w36_OLS` (Light RUC Schiff-spec OLS W36).
+## Current finalists
 
-Use this full folder to replace `data/dashboard_evidence_pack` in the dashboard repo.
+- PED: `PED__RESCUE_static_annual_weighted_top12_capnone`
+- Light RUC: `dynamic_RESID_GBR_n150_d1_lr0.05_w36`
+- Heavy RUC: `HEAVY_RUC__RECON_STATIC_REBUILT`
 
-Important rule: never compare operational pooled MAPE with paper-style horizon MAPE without an explicit score-basis label or toggle.
+Default score basis is `schiff_paper_horizon_mean`. Operational metrics are retained in `operational_*` columns and scorecard tables.
+
+## Key governance caveat
+
+The Light RUC finalist is a dynamic residual GBM accuracy challenger. It improves the default paper-style horizon MAPE and operational quarterly MAPE, but operational annual MAPE remains a watch item.
+
+## Default paper-style Light RUC metrics
+
+- Paper horizon mean MAPE: 5.363%
+- Paper pooled MAPE: 4.795%
+- Paper annual MAPE: 1.274%
+- Operational pooled MAPE: 8.273%
+- Operational annual MAPE: 6.775%
+
+Do not mix paper-style and operational MAPE without labels.

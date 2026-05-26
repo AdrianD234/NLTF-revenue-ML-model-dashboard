@@ -158,7 +158,7 @@ def main() -> int:
             ],
             errors="coerce",
         ).dropna()
-        if light_full.empty or abs(float(light_full.iloc[0]) - 2.456252) > 0.001:
+        if light_full.empty or abs(float(light_full.iloc[0]) - 3.158190) > 0.001:
             raise AssertionError(f"Light RUC full-sample gain is stale or missing: {light_full.to_list()}")
         return "Gain chart is labelled full-sample, not paired."
 
@@ -176,14 +176,25 @@ def main() -> int:
             paired.empty
             or full_qtr.empty
             or full_annual.empty
-            or abs(float(paired.iloc[0]) - 2.172930) > 0.001
-            or abs(float(full_qtr.iloc[0]) - 2.456252) > 0.001
-            or abs(float(full_annual.iloc[0]) - (-0.723188)) > 0.001
+            or abs(float(paired.iloc[0]) - 2.932205) > 0.001
+            or abs(float(full_qtr.iloc[0]) - 3.158190) > 0.001
+            or abs(float(full_annual.iloc[0]) - 1.428227) > 0.001
         ):
             raise AssertionError(
                 f"paired={paired.to_list()}; full_qtr={full_qtr.to_list()}; full_annual={full_annual.to_list()}"
             )
-        return "Light RUC quarterly gains and annual watch condition are preserved."
+        rec = loaded_data.get("recommended", pd.DataFrame())
+        schiff = loaded_data.get("schiff_df", pd.DataFrame())
+        rec_light = rec[rec.get("stream_label", pd.Series(dtype=str)).astype(str).eq("Light RUC volume")]
+        schiff_light = schiff[schiff.get("stream_label", pd.Series(dtype=str)).astype(str).eq("Light RUC volume")]
+        if rec_light.empty or schiff_light.empty:
+            raise AssertionError("Light RUC operational annual watch rows are missing.")
+        op_gap = pd.to_numeric(rec_light.iloc[0].get("operational_annual_mape"), errors="coerce") - pd.to_numeric(
+            schiff_light.iloc[0].get("operational_annual_mape"), errors="coerce"
+        )
+        if pd.isna(op_gap) or float(op_gap) <= 0:
+            raise AssertionError(f"Light RUC operational annual watch gap is missing or non-positive: {op_gap}")
+        return "Light RUC paper gains and operational annual watch condition are preserved."
 
     def check_decision_labels() -> str:
         table = read_source("scenario_decision_summary.csv")
@@ -300,7 +311,7 @@ def main() -> int:
         (104, "Ensemble composition source uses Parquet component weights.", check_ensemble),
         (105, "Stress source coalesces aliases and preserves Heavy RUC gaps.", check_stress),
         (106, "Schiff gain chart is labelled full-sample when showing full-sample gains.", check_full_sample_gain_label),
-        (107, "Light RUC annual watch condition is preserved.", check_light_paired_gain),
+        (107, "Light RUC paper gains and operational annual watch condition are preserved.", check_light_paired_gain),
         (108, "Scenario decision labels separate full-sample gains and paired win rate.", check_decision_labels),
         (109, "Horizon chart sources include all streams and scenarios.", check_horizon_sources),
         (110, "ACF chart source table exists and documents residual source.", check_acf_source),

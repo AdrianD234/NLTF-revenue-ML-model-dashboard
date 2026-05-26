@@ -567,7 +567,7 @@ def plot_ensemble_composition(weights: pd.DataFrame) -> tuple[go.Figure, pd.Data
     grouped = grouped.sort_values(["stream_label", "weight_pct"], ascending=[True, False])
     grouped["_hover_ensemble"] = _safe_series(grouped, "ensemble").map(display_model_label)
     grouped["_hover_component"] = _safe_series(grouped, "component_model").map(display_model_label)
-    grouped["_hover_full_component"] = _safe_series(grouped, "component_model").map(_clean_hover_text)
+    grouped["_hover_full_component"] = _safe_series(grouped, "component_model").map(display_model_label)
     grouped["_hover_weight"] = grouped["weight_pct"].map(format_weight)
     grouped["component_label"] = ""
     mapping_rows: list[dict[str, Any]] = []

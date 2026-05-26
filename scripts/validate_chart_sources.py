@@ -123,16 +123,16 @@ def validate() -> list[tuple[str, str, str]]:
     light_full_qtr_positive = float(
         light_gain[light_gain["metric_name"].eq("Full-sample quarterly gain")]["metric_value"].dropna().iloc[0]
     ) > 0
-    light_full_annual_negative = float(
+    light_full_annual_positive = float(
         light_gain[light_gain["metric_name"].eq("Full-sample annual gain")]["metric_value"].dropna().iloc[0]
-    ) < 0
+    ) > 0
     record(
-        "Schiff gain chart is labelled full-sample and preserves Light RUC annual watch",
+        "Schiff gain chart is labelled full-sample and preserves Light RUC paper gains",
         "Full-sample" in gain_text
         and "Paired Gain vs Schiff" not in gain_text
         and light_paired_positive
         and light_full_qtr_positive
-        and light_full_annual_negative,
+        and light_full_annual_positive,
         f"Light qtr gain={float(light_gain[light_gain['metric_name'].eq('Full-sample quarterly gain')]['metric_value'].dropna().iloc[0]):.3f} pp; annual gain={float(light_gain[light_gain['metric_name'].eq('Full-sample annual gain')]['metric_value'].dropna().iloc[0]):.3f} pp; paired gain={float(light_gain['paired_gain_pp'].dropna().iloc[0]):.3f} pp.",
     )
 

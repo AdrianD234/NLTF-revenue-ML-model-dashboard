@@ -1,7 +1,7 @@
 {
-  "schema_version": "dashboard_evidence_pack_v3_dual_scorecard",
-  "created_at": "2026-05-26 updated annual metrics from model summaries",
-  "description": "Dual-scorecard Stage 1 dashboard evidence pack. Default primary MAPE is Schiff-paper horizon mean; operational pooled score is retained side-by-side.",
+  "schema_version": "dashboard_evidence_pack_v4_gbm_light",
+  "created_at": "2026-05-26",
+  "description": "Dual-scorecard evidence pack v4. Light RUC finalist changed to dynamic residual GBM W36 accuracy challenger; PED and Heavy RUC unchanged.",
   "default_score_basis": "schiff_paper_horizon_mean",
   "operational_score_basis": "current_grid_operational_pooled",
   "selected_light_ruc_model": "schiff_w36_OLS",
@@ -11,93 +11,21 @@
     "default_quarterly_mape": "paper_style_horizon_mean / schiff_paper_horizon_mean",
     "operational_pooled_mape": "mean APE over current evidence grid row-level predictions",
     "paper_grid": "Schiff-style test grid with horizon-specific MAPE and 2020/2021 test targets excluded",
-    "light_ruc_finalist": "schiff_w36_OLS selected by best dual-scorecard decision score",
+    "light_ruc_finalist": "dynamic residual GBM selected as accuracy-challenger finalist; paper-style metrics default, operational annual MAPE retained as watch item.",
     "toggle_required": "Dashboard should expose Operational pooled MAPE and Paper-style horizon MAPE scorecards."
   },
   "row_counts": [
     {
-      "file": "candidate_cone.parquet",
-      "rows": 891,
-      "columns": 52,
-      "size_bytes": 161790
-    },
-    {
-      "file": "finalists.parquet",
-      "rows": 3,
-      "columns": 33,
-      "size_bytes": 24946
-    },
-    {
-      "file": "schiff_benchmark.parquet",
-      "rows": 3,
-      "columns": 31,
-      "size_bytes": 20768
-    },
-    {
-      "file": "ensemble_components.parquet",
-      "rows": 6,
-      "columns": 15,
-      "size_bytes": 11069
-    },
-    {
-      "file": "residual_predictions.parquet",
-      "rows": 756,
-      "columns": 22,
-      "size_bytes": 37025
-    },
-    {
-      "file": "horizon_profiles.parquet",
-      "rows": 72,
-      "columns": 15,
-      "size_bytes": 11621
-    },
-    {
-      "file": "stress_horizon.parquet",
-      "rows": 36,
-      "columns": 15,
-      "size_bytes": 10676
-    },
-    {
-      "file": "scenario_comparison.parquet",
-      "rows": 3,
-      "columns": 19,
-      "size_bytes": 14020
-    },
-    {
-      "file": "diagnostic_tests.parquet",
-      "rows": 6,
-      "columns": 38,
-      "size_bytes": 23772
-    },
-    {
-      "file": "diagnostic_pass_matrix.parquet",
-      "rows": 27,
-      "columns": 9,
-      "size_bytes": 6378
-    },
-    {
-      "file": "diagnostic_acf.parquet",
-      "rows": 39,
-      "columns": 12,
-      "size_bytes": 8995
-    },
-    {
-      "file": "error_distribution.parquet",
-      "rows": 756,
-      "columns": 22,
-      "size_bytes": 36861
-    },
-    {
       "file": "annual_predictions.parquet",
-      "rows": 144,
+      "rows": 130,
       "columns": 17,
-      "size_bytes": 15076
+      "size_bytes": 14956
     },
     {
-      "file": "paired_vs_schiff.parquet",
-      "rows": 3,
-      "columns": 22,
-      "size_bytes": 15723
+      "file": "candidate_cone.parquet",
+      "rows": 892,
+      "columns": 52,
+      "size_bytes": 162519
     },
     {
       "file": "chart_contract.parquet",
@@ -106,46 +34,124 @@
       "size_bytes": 5520
     },
     {
-      "file": "scorecard_predictions.parquet",
-      "rows": 3696,
-      "columns": 22,
-      "size_bytes": 108501
+      "file": "diagnostic_acf.parquet",
+      "rows": 39,
+      "columns": 12,
+      "size_bytes": 9137
     },
     {
-      "file": "scorecard_model_summary.parquet",
-      "rows": 12,
-      "columns": 32,
-      "size_bytes": 22193
+      "file": "diagnostic_pass_matrix.parquet",
+      "rows": 27,
+      "columns": 9,
+      "size_bytes": 6406
     },
     {
-      "file": "scorecard_horizon_profiles.parquet",
-      "rows": 144,
+      "file": "diagnostic_tests.parquet",
+      "rows": 6,
+      "columns": 38,
+      "size_bytes": 23770
+    },
+    {
+      "file": "ensemble_components.parquet",
+      "rows": 6,
       "columns": 15,
-      "size_bytes": 13167
+      "size_bytes": 11241
     },
     {
-      "file": "scorecard_stress_horizon.parquet",
+      "file": "error_distribution.parquet",
+      "rows": 756,
+      "columns": 23,
+      "size_bytes": 38554
+    },
+    {
+      "file": "finalists.parquet",
+      "rows": 3,
+      "columns": 33,
+      "size_bytes": 25604
+    },
+    {
+      "file": "horizon_profiles.parquet",
       "rows": 72,
-      "columns": 15,
-      "size_bytes": 11601
-    },
-    {
-      "file": "scorecard_annual_predictions.parquet",
-      "rows": 689,
-      "columns": 17,
-      "size_bytes": 28666
-    },
-    {
-      "file": "light_ruc_candidate_scorecard.parquet",
-      "rows": 886,
-      "columns": 14,
-      "size_bytes": 97958
+      "columns": 16,
+      "size_bytes": 12424
     },
     {
       "file": "invalid_predictions_zero_actual.parquet",
       "rows": 24,
       "columns": 31,
       "size_bytes": 20791
+    },
+    {
+      "file": "light_ruc_candidate_scorecard.parquet",
+      "rows": 887,
+      "columns": 14,
+      "size_bytes": 98060
+    },
+    {
+      "file": "paired_vs_schiff.parquet",
+      "rows": 3,
+      "columns": 22,
+      "size_bytes": 15805
+    },
+    {
+      "file": "residual_predictions.parquet",
+      "rows": 756,
+      "columns": 22,
+      "size_bytes": 36896
+    },
+    {
+      "file": "scenario_comparison.parquet",
+      "rows": 3,
+      "columns": 19,
+      "size_bytes": 14102
+    },
+    {
+      "file": "schiff_benchmark.parquet",
+      "rows": 3,
+      "columns": 31,
+      "size_bytes": 20540
+    },
+    {
+      "file": "scorecard_annual_metric_summary.parquet",
+      "rows": 12,
+      "columns": 7,
+      "size_bytes": 5264
+    },
+    {
+      "file": "scorecard_annual_predictions.parquet",
+      "rows": 662,
+      "columns": 17,
+      "size_bytes": 28632
+    },
+    {
+      "file": "scorecard_horizon_profiles.parquet",
+      "rows": 144,
+      "columns": 16,
+      "size_bytes": 14003
+    },
+    {
+      "file": "scorecard_model_summary.parquet",
+      "rows": 12,
+      "columns": 33,
+      "size_bytes": 22973
+    },
+    {
+      "file": "scorecard_predictions.parquet",
+      "rows": 3648,
+      "columns": 22,
+      "size_bytes": 107000
+    },
+    {
+      "file": "scorecard_stress_horizon.parquet",
+      "rows": 72,
+      "columns": 15,
+      "size_bytes": 11860
+    },
+    {
+      "file": "stress_horizon.parquet",
+      "rows": 36,
+      "columns": 15,
+      "size_bytes": 10915
     }
   ],
   "canonical_finalists": {
@@ -157,11 +163,11 @@
       "operational_annual_mape": 2.239648058288008
     },
     "Light RUC volume": {
-      "model": "schiff_w36_OLS",
-      "paper_horizon_mean_mape": 6.065145238328004,
-      "paper_annual_mape": 3.425188552624322,
-      "operational_pooled_mape": 7.743951945505308,
-      "operational_annual_mape": 6.281636499776239
+      "model": "dynamic_RESID_GBR_n150_d1_lr0.05_w36",
+      "quarterly_mape": 5.363206773795227,
+      "annual_mape": 1.2737736398959618,
+      "operational_pooled_mape": 8.272972483557215,
+      "selection_note": "Dynamic residual GBM W36 selected as accuracy challenger."
     },
     "Heavy RUC volume": {
       "model": "HEAVY_RUC__RECON_STATIC_REBUILT",

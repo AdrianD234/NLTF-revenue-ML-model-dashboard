@@ -1171,19 +1171,23 @@ def render_scenario_comparison(loaded: LoadedRun, controls: dict[str, Any]) -> N
         loaded.data.get("errors", pd.DataFrame()),
     )
     gov_kpi_grid(scenario_kpi_cards(recommended, paired, story, comparison))
+    watch_note = light_operational_annual_watch_note(
+        loaded.data.get("recommended", pd.DataFrame()),
+        loaded.data.get("schiff_df", pd.DataFrame()),
+    )
 
     top = st.columns([1.0, 1.0])
     with top[0]:
         chart_card(
             "1. Stream Comparison: Scenario A vs Scenario B",
             f"{score_basis_metric_label(controls.get('score_basis', PAPER_SCORE_BASIS))} - lower is better.",
-            compact_figure(plot_scenario_stream_comparison(comparison), 210),
+            compact_figure(plot_scenario_stream_comparison(comparison), 180),
         )
     with top[1]:
         chart_card(
             "2. Improvement vs Benchmark",
             f"Full-sample {score_basis_metric_label(controls.get('score_basis', PAPER_SCORE_BASIS))} gain in percentage points - positive values favour Scenario A.",
-            compact_figure(plot_improvement_vs_benchmark(comparison), 210),
+            compact_figure(plot_improvement_vs_benchmark(comparison), 180),
         )
 
     bottom = st.columns([1.0, 1.0])
@@ -1194,7 +1198,7 @@ def render_scenario_comparison(loaded: LoadedRun, controls: dict[str, Any]) -> N
             compact_figure(plot_horizon_comparison(scenario_horizon_frame(loaded, qpred, controls)), 220),
         )
     with bottom[1]:
-        scenario_decision_summary_panel(comparison)
+        scenario_decision_summary_panel(comparison, watch_note)
 
     with st.expander("Detailed scenario governance cards", expanded=False):
         governance_cards(story)
@@ -1350,7 +1354,30 @@ def scenario_horizon_frame(loaded: LoadedRun, qpred: pd.DataFrame, controls: dic
     return pd.concat([horizon, supplement], ignore_index=True)
 
 
-def scenario_decision_summary_panel(comparison: pd.DataFrame) -> None:
+def light_operational_annual_watch_note(recommended: pd.DataFrame, schiff_df: pd.DataFrame) -> str:
+    if recommended.empty or schiff_df.empty:
+        return ""
+    finalist = recommended[recommended.get("stream_label", pd.Series(dtype=str)).astype(str).eq("Light RUC volume")]
+    benchmark = schiff_df[schiff_df.get("stream_label", pd.Series(dtype=str)).astype(str).eq("Light RUC volume")]
+    if finalist.empty or benchmark.empty:
+        return ""
+    finalist_annual = pd.to_numeric(finalist.iloc[0].get("operational_annual_mape"), errors="coerce")
+    benchmark_annual = pd.to_numeric(benchmark.iloc[0].get("operational_annual_mape"), errors="coerce")
+    finalist_qtr = pd.to_numeric(finalist.iloc[0].get("operational_pooled_mape"), errors="coerce")
+    benchmark_qtr = pd.to_numeric(benchmark.iloc[0].get("operational_pooled_mape"), errors="coerce")
+    if pd.isna(finalist_annual) or pd.isna(benchmark_annual) or finalist_annual <= benchmark_annual:
+        return ""
+    qtr_gain = benchmark_qtr - finalist_qtr if pd.notna(finalist_qtr) and pd.notna(benchmark_qtr) else pd.NA
+    annual_gap = finalist_annual - benchmark_annual
+    qtr_text = f" Operational quarterly gain remains {qtr_gain:.2f} pp." if pd.notna(qtr_gain) else ""
+    return (
+        "Operational annual watch: Light RUC GBM improves paper-style accuracy, but its operational annual MAPE "
+        f"({format_percent(finalist_annual)}) is weaker than the Schiff specification benchmark "
+        f"({format_percent(benchmark_annual)}), a {annual_gap:.2f} pp annual gap.{qtr_text}"
+    )
+
+
+def scenario_decision_summary_panel(comparison: pd.DataFrame, watch_note: str = "") -> None:
     if comparison.empty:
         chart_card("4. Decision Summary", "Executive view by stream.", empty_figure("Scenario comparison rows are not available."))
         return
@@ -1377,9 +1404,15 @@ def scenario_decision_summary_panel(comparison: pd.DataFrame) -> None:
             "win_rate": "Paired Win Rate",
         }
     )[["Stream", "Full-sample Qtr Gain", "Full-sample Annual Gain", "Paired Win Rate", "Recommendation"]]
+    subtitle = (
+        "Gains compare full-sample finalist versus the Schiff specification benchmark; "
+        "win rate uses common forecast-pair validation."
+    )
+    if watch_note:
+        subtitle = f"{subtitle} {watch_note}"
     chart_card(
         "4. Decision Summary",
-        "Gains compare full-sample finalist versus the Schiff specification benchmark; win rate uses common forecast-pair validation.",
+        subtitle,
         compact_figure(plot_decision_summary_table(display), 240),
     )
 
@@ -1486,6 +1519,10 @@ def render_schiff_benchmark_page(loaded: LoadedRun, controls: dict[str, Any]) ->
             ["good", "mixed", "good", "good"],
         )
     )
+    watch_note = light_operational_annual_watch_note(
+        loaded.data.get("recommended", pd.DataFrame()),
+        loaded.data.get("schiff_df", pd.DataFrame()),
+    )
 
     top = st.columns([1.0, 1.0])
     with top[0]:
@@ -1509,9 +1546,12 @@ def render_schiff_benchmark_page(loaded: LoadedRun, controls: dict[str, Any]) ->
             compact_figure(plot_improvement_vs_benchmark(comparison), 260),
         )
     with bottom[1]:
+        summary_subtitle = "Structural benchmark versus refined finalist performance summary."
+        if watch_note:
+            summary_subtitle = f"{summary_subtitle} {watch_note}"
         chart_card(
             "4. Benchmark Summary",
-            "Structural benchmark versus refined finalist performance summary.",
+            summary_subtitle,
             compact_figure(plot_benchmark_summary_table(comparison), 260),
         )
 

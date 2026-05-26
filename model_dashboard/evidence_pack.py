@@ -581,9 +581,24 @@ def _write_compat_source_tables(repo_root: Path, data: dict[str, pd.DataFrame]) 
     ensemble = data["weights"].copy()
     ensemble["weight_pct"] = pd.to_numeric(ensemble["weight"], errors="coerce") * 100.0
     ensemble.rename(columns={"ensemble_short": "model_short"}, inplace=True)
+    if "score_basis" not in ensemble.columns:
+        ensemble["score_basis"] = PAPER_SCORE_BASIS
+    ensemble["score_basis"] = ensemble["score_basis"].fillna(PAPER_SCORE_BASIS)
+    ensemble["score_basis_label"] = "Paper-style horizon MAPE"
     _write_csv_atomic(
         ensemble[
-        ["stream_label", "model_short", "component_rank", "component_short", "component_model", "weight", "weight_pct", "source"]
+        [
+            "stream_label",
+            "model_short",
+            "component_rank",
+            "component_short",
+            "component_model",
+            "weight",
+            "weight_pct",
+            "source",
+            "score_basis",
+            "score_basis_label",
+        ]
         ],
         artifacts / "ensemble_composition_source_table.csv",
     )
@@ -602,6 +617,10 @@ def _write_compat_source_tables(repo_root: Path, data: dict[str, pd.DataFrame]) 
         },
         inplace=True,
     )
+    if "score_basis" not in scenario.columns:
+        scenario["score_basis"] = scenario.get("default_score_basis", PAPER_SCORE_BASIS)
+    scenario["score_basis"] = scenario["score_basis"].fillna(PAPER_SCORE_BASIS)
+    scenario["score_basis_label"] = "Paper-style horizon MAPE"
     _write_csv_atomic(
         scenario[
         [
@@ -620,6 +639,8 @@ def _write_compat_source_tables(repo_root: Path, data: dict[str, pd.DataFrame]) 
             "paired_gain_pp",
             "paired_win_rate_pct",
             "recommendation",
+            "score_basis",
+            "score_basis_label",
         ]
         ],
         artifacts / "scenario_comparison_source_table.csv",
@@ -637,6 +658,8 @@ def _write_compat_source_tables(repo_root: Path, data: dict[str, pd.DataFrame]) 
                     "mape": row.get("mape"),
                     "source_column": row.get("source_column", "mape"),
                     "source": "horizon_profiles.parquet",
+                    "score_basis": row.get("score_basis", PAPER_SCORE_BASIS),
+                    "score_basis_label": row.get("score_basis_label", "Paper-style horizon MAPE"),
                 }
             )
     _write_csv_atomic(pd.DataFrame(horizon_rows), artifacts / "horizon_comparison_source_table.csv")
