@@ -1,6 +1,6 @@
 # Test Summary
 
-Status: **passed** for the v4 GBM Light RUC evidence-pack migration, score-basis governance, semantic chart reconciliation, visual conformance and browser verification pass.
+Status: **passed** for the v5 all-stream frontier evidence-pack migration, score-basis governance, semantic chart reconciliation, visual conformance and browser verification pass.
 
 ## Data Root Used
 
@@ -8,9 +8,9 @@ Status: **passed** for the v4 GBM Light RUC evidence-pack migration, score-basis
 
 The default dashboard source is the repo evidence pack at `data/dashboard_evidence_pack`. Legacy run folders, mini fixtures, old CSV/XLSX artifacts and previous diagnostic-pack paths are review-only and are not used by the default four-page dashboard.
 
-Slim v4 source root used for the committed pack:
+Slim v5 source root used for the committed pack:
 
-`C:\Users\Adrian Desilvestro\Downloads\stage1_dashboard_evidence_pack_dual_scorecard_gbm_light_v4_slim\dashboard_evidence_pack`
+`C:\Users\Adrian Desilvestro\Downloads\stage1_dashboard_evidence_pack_dual_scorecard_gbm_light_v5_frontier\dashboard_evidence_pack`
 
 The repo pack contains only root metadata files, `docs/`, and governed `data/*.parquet` files. Raw `sources/`, `tables_csv/`, logs, screenshots and CSV mirrors are intentionally absent from the committed evidence pack.
 
@@ -25,31 +25,33 @@ pwsh -File scripts\verify_dashboard.ps1 -Python ".\.venv\Scripts\python.exe" -Da
 | Check | Result |
 | --- | --- |
 | Compile | Passed |
-| Full pytest | 124 passed, 46 skipped, 38 deselected |
-| Schema inspection | Passed against `dashboard_evidence_pack_v4_gbm_light` and 14 required Parquet tables |
+| Full pytest | 127 passed, 46 skipped, 39 deselected |
+| Schema inspection | Passed against `dashboard_evidence_pack_v5_frontier_sample` and 14 required Parquet tables |
 | Data validation | Passed |
-| Chart source validation | Passed for 16 primary chart source tables |
+| Chart source validation | Passed for 16 primary chart source tables plus the Overview KPI source table |
 | Semantic label validation | Passed |
 | Chart-data reconciliation tests | 18 passed |
-| Per-chart source-table tests | 6 passed |
-| Existing browser e2e | 37 passed |
+| Per-chart source-table tests | 7 passed |
+| Existing browser e2e | 38 passed |
 | Mandatory frontend interaction Playwright suite | 5 passed |
 | Visual conformance validation | Passed |
 | 100-gate validation | 100 passed, 0 failed, 0 supporting failures |
 | 120-gate validation | 120 passed, 0 failed |
 | Backlog | No unchecked items |
 
-## V4 Score-Basis Checks
+## V5 Score-Basis And Frontier Checks
 
-- `manifest.json` schema is `dashboard_evidence_pack_v4_gbm_light`.
+- `manifest.json` schema is `dashboard_evidence_pack_v5_frontier_sample`.
 - Default score basis is `schiff_paper_horizon_mean` / Paper-style horizon MAPE.
 - Operational score basis is `current_grid_operational_pooled` and is exposed only through the explicit Score Basis selector.
 - Source tables include `score_basis` and `score_basis_label`.
 - Paper-style and operational metrics are not mixed silently.
 - Light RUC operational annual weakness versus Schiff remains visible as an annual-watch note.
 - Overview Stress and Horizon Checks defaults to `1-4 qtrs`, `5-8 qtrs`, `9-12 qtrs` and `Annual`; policy windows remain available in source data but are excluded from the Paper-style Overview chart.
-- Candidate Search Frontier explicitly describes the Light RUC challenger frontier with PED/Heavy finalist and Schiff anchors.
+- Candidate Search Frontier explicitly describes the all-stream frontier view: Light RUC challenger-search rows plus PED/Heavy visual frontier samples anchored to finalist and Schiff specification points.
 - Ensemble Composition renders all three stream finalists from governed component rows, not demo weights.
+- Overview KPI Cards source table reconciles the Annual KPI benchmark to `schiff_benchmark.parquet` `annual_mape`: Schiff annual mean 5.06%, finalist annual mean 1.79%, gain 3.27 pp.
+- Ensemble Composition is browser-tested under both Paper-style horizon MAPE and Operational pooled MAPE so score-basis selection cannot hide PED or Heavy RUC components.
 
 ## Default Paper-Style Finalists
 

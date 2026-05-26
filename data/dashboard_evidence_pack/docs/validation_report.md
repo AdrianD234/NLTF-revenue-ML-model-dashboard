@@ -57,3 +57,12 @@ The Light RUC finalist is an accuracy-challenger dynamic residual GBM. It improv
 | scorecard_predictions.parquet           |   3648 |        22 |       107000 |
 | scorecard_stress_horizon.parquet        |     72 |        15 |        11860 |
 | stress_horizon.parquet                  |     36 |        15 |        10915 |
+
+
+## v5 Candidate Frontier Coverage
+
+Default plotted candidate rows: 400.
+
+Plotted rows by stream: {'Heavy RUC volume': 102, 'Light RUC volume': 196, 'PED VKT per capita': 102}.
+
+Light RUC rows are challenger-search candidates. PED and Heavy RUC include transparent visual frontier sample rows for all-stream chart continuity. These rows are not used for model selection, KPI metrics, diagnostics or scenario scoring.

@@ -520,11 +520,11 @@ def main() -> int:
         full_gain = pd.to_numeric(light.iloc[0].get("full_sample_qtr_gain_pp"), errors="coerce")
         annual_gain = pd.to_numeric(light.iloc[0].get("full_sample_annual_gain_pp"), errors="coerce")
         if pd.isna(paired_gain) or paired_gain <= 0:
-            return fail("Light RUC paired paper-grid gain is not recorded as positive in v4.")
+            return fail("Light RUC paired paper-grid gain is not recorded as positive in the v5 evidence pack.")
         if pd.isna(full_gain) or full_gain <= 0:
-            return fail("Light RUC paper-style quarterly gain is not recorded as positive in v4.")
+            return fail("Light RUC paper-style quarterly gain is not recorded as positive in the v5 evidence pack.")
         if pd.isna(annual_gain) or annual_gain <= 0:
-            return fail("Light RUC paper-style annual gain is not recorded as positive in v4.")
+            return fail("Light RUC paper-style annual gain is not recorded as positive in the v5 evidence pack.")
         rec = loaded.data.get("recommended", pd.DataFrame()) if loaded is not None else pd.DataFrame()
         schiff = loaded.data.get("schiff_df", pd.DataFrame()) if loaded is not None else pd.DataFrame()
         rec_light = rec[rec.get("stream_label", pd.Series(dtype=str)).astype(str).eq("Light RUC volume")]

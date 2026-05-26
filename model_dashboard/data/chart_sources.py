@@ -60,6 +60,8 @@ EXTRA_COLUMNS = [
     "abs_error_pct",
     "horizon_bucket",
     "point_type",
+    "frontier_sample_class",
+    "frontier_sample_note",
     "x_metric",
     "y_metric",
     "value_available",
@@ -140,6 +142,11 @@ def build_chart_source_tables(data: dict[str, pd.DataFrame]) -> dict[str, pd.Dat
     matrix_source = pass_matrix if pass_matrix is not None and not pass_matrix.empty else diagnostics
 
     return {
+        "overview_kpi_cards.csv": _overview_kpi_cards_source(
+            recommended,
+            schiff,
+            f"{source_files['overview_finalist_forecast_accuracy']};{source_files['schiff_vs_finalist_mape']}",
+        ),
         "overview_finalist_forecast_accuracy.csv": _overview_finalist_accuracy(recommended, source_files["overview_finalist_forecast_accuracy"]),
         "overview_candidate_search_frontier.csv": _overview_candidate_frontier(summary, source_files["overview_candidate_search_frontier"]),
         "overview_ensemble_composition.csv": _overview_ensemble(weights, source_files["overview_ensemble_composition"]),
@@ -221,6 +228,18 @@ def _source_file_from_manifest(data: dict[str, pd.DataFrame]) -> str:
                 if not value.empty and value.iloc[0]:
                     return value.iloc[0]
     return "Parquet candidate cone and diagnostic audit pack"
+
+
+def _aggregate_row(score_basis: Any = PAPER_SCORE_BASIS) -> dict[str, Any]:
+    basis = score_basis if pd.notna(score_basis) else PAPER_SCORE_BASIS
+    return {
+        "stream": "All Streams",
+        "stream_label": "All Streams",
+        "model": "Current finalist and Schiff specification benchmark stream means",
+        "model_short": "All-stream KPI aggregate",
+        "score_basis": basis,
+        "score_basis_label": score_basis_label(basis),
+    }
 
 
 def _normalise_direct_acf(acf: pd.DataFrame) -> pd.DataFrame:
@@ -354,6 +373,75 @@ def _point_type(row: pd.Series) -> str:
     return "Candidate"
 
 
+def _overview_kpi_cards_source(recommended: pd.DataFrame, schiff_rows: pd.DataFrame, source_file: str) -> pd.DataFrame:
+    rows: list[dict[str, Any]] = []
+    finalists = best_by_stream(recommended)
+    schiff = best_by_stream(schiff_rows)
+    if finalists.empty:
+        return _standardize(rows)
+
+    basis_values = finalists["score_basis"].dropna().astype(str) if "score_basis" in finalists.columns else pd.Series(dtype=str)
+    basis = basis_values.iloc[0] if not basis_values.empty else PAPER_SCORE_BASIS
+    aggregate = _aggregate_row(basis)
+
+    def add_stream_rows(frame: pd.DataFrame, role: str, source_name: str) -> None:
+        for _, row in frame.iterrows():
+            for metric_name, column in [("Quarterly MAPE", "quarterly_mape"), ("Annual MAPE", "annual_mape")]:
+                value = _num(row.get(column))
+                rows.append(
+                    _base_row(
+                        "Overview",
+                        "overview_kpi_cards",
+                        "Overview KPI Cards",
+                        row,
+                        f"{role} {metric_name}",
+                        value,
+                        format_percent(value),
+                        str(_row_get(row, f"{column}_source_column", column)),
+                        source_name,
+                        f"Stream-level {role.lower()} value used to compute the Overview KPI simple stream mean.",
+                        f"{role} stream value; aggregate KPI rows use a simple mean across the three stream rows.",
+                    )
+                )
+
+    add_stream_rows(finalists, "Finalist", "finalists.parquet")
+    add_stream_rows(schiff, "Schiff specification benchmark", "schiff_benchmark.parquet")
+
+    finalist_q = float(finalists["quarterly_mape"].mean()) if "quarterly_mape" in finalists.columns else float("nan")
+    finalist_a = float(finalists["annual_mape"].mean()) if "annual_mape" in finalists.columns else float("nan")
+    schiff_q = float(schiff["quarterly_mape"].mean()) if not schiff.empty and "quarterly_mape" in schiff.columns else float("nan")
+    schiff_a = float(schiff["annual_mape"].mean()) if not schiff.empty and "annual_mape" in schiff.columns else float("nan")
+    q_gain = schiff_q - finalist_q if pd.notna(schiff_q) and pd.notna(finalist_q) else float("nan")
+    annual_gain = schiff_a - finalist_a if pd.notna(schiff_a) and pd.notna(finalist_a) else float("nan")
+
+    aggregates = [
+        ("Finalist quarterly MAPE mean", finalist_q, "quarterly_mape", "finalists.parquet", "Simple stream mean of current finalist quarterly_mape values."),
+        ("Schiff specification quarterly MAPE mean", schiff_q, "quarterly_mape", "schiff_benchmark.parquet", "Simple stream mean of Schiff specification quarterly_mape values."),
+        ("Quarterly gain vs Schiff specification benchmark", q_gain, "quarterly_mape", source_file, "Schiff specification quarterly mean minus finalist quarterly mean."),
+        ("Finalist annual MAPE mean", finalist_a, "annual_mape", "finalists.parquet", "Simple stream mean of current finalist annual_mape values."),
+        ("Schiff specification annual MAPE mean", schiff_a, "annual_mape", "schiff_benchmark.parquet", "Simple stream mean of Schiff specification annual_mape values."),
+        ("Annual gain vs Schiff specification benchmark", annual_gain, "annual_mape", source_file, "Schiff specification annual mean minus finalist annual mean."),
+    ]
+    for metric_name, value, source_column, source_name, basis_text in aggregates:
+        rows.append(
+            _base_row(
+                "Overview",
+                "overview_kpi_cards",
+                "Overview KPI Cards",
+                aggregate,
+                metric_name,
+                value,
+                format_pp(value) if "gain" in metric_name.lower() else format_percent(value),
+                source_column,
+                source_name,
+                basis_text,
+                "Overview KPI benchmark uses the explicit schiff_benchmark.parquet rows, not candidate-cone challenger rows.",
+            )
+        )
+
+    return _standardize(rows)
+
+
 def _overview_finalist_accuracy(recommended: pd.DataFrame, source_file: str) -> pd.DataFrame:
     rows: list[dict[str, Any]] = []
     finalists = best_by_stream(recommended)
@@ -411,11 +499,13 @@ def _overview_candidate_frontier(summary: pd.DataFrame, source_file: str) -> pd.
                 f"Qtr {format_percent(qtr)} / Annual {format_percent(annual)}",
                 source_column,
                 source_file,
-                "Default curated candidate rows; x and y use the selected score basis.",
-                "plot_default_include rows with outlier guard used by the management view.",
+                "Default all-stream frontier rows; x and y use the selected score basis.",
+                "Light RUC uses challenger-search rows; PED/Heavy use visual frontier samples anchored to finalist and Schiff specification points.",
                 quarterly_mape=qtr,
                 annual_mape=annual,
                 point_type=role,
+                frontier_sample_class=row.get("frontier_sample_class"),
+                frontier_sample_note=row.get("frontier_sample_note"),
                 x_metric=qtr,
                 y_metric=annual,
             )

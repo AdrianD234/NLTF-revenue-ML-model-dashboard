@@ -43,7 +43,8 @@ def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
         "Benchmark Pass",
         "beat Schiff specification benchmark",
         "logged diagnostics",
-        "Frontier read: Light RUC challenger frontier",
+        "Frontier read: All-stream frontier view",
+        "PED/Heavy use visual frontier samples",
         "Stress watch:",
         "1. Finalist Forecast Accuracy",
         "2. Candidate Search Frontier",
@@ -454,6 +455,19 @@ def test_ensemble_composition_has_three_stream_panels(page: Page) -> None:
     assert "Heavy RUC volume" in body
 
 
+def test_ensemble_composition_has_three_stream_panels_under_both_score_bases(page: Page) -> None:
+    page.set_viewport_size({"width": 1680, "height": 940})
+    page.goto(os.environ.get("STAGE1_DASHBOARD_URL", "http://localhost:8501"), wait_until="domcontentloaded")
+    wait_dashboard_ready(page)
+
+    assert_ensemble_plot_has_all_streams(page)
+
+    select_combobox_option(page, 7, "Operational pooled MAPE")
+    expect_filter_value(page, "Score Basis", 7, "Operational pooled MAPE")
+    wait_dashboard_ready(page)
+    assert_ensemble_plot_has_all_streams(page)
+
+
 def test_overview_stress_bucket_order(page: Page) -> None:
     page.set_viewport_size({"width": 1680, "height": 940})
     page.goto(os.environ.get("STAGE1_DASHBOARD_URL", "http://localhost:8501"), wait_until="domcontentloaded")
@@ -739,3 +753,29 @@ def expect_filter_value(page: Page, label: str, index: int, value: str) -> None:
     aria_label = combo.get_attribute("aria-label") or ""
     assert label in aria_label, f"Expected filter {index} to be {label}; aria-label was {aria_label!r}"
     assert value in aria_label, f"Expected filter {index} to be {value!r}; aria-label was {aria_label!r}"
+
+
+def select_combobox_option(page: Page, index: int, value: str) -> None:
+    combo = page.get_by_role("combobox").nth(index)
+    expect(combo).to_be_visible(timeout=30000)
+    combo.click()
+    option = page.get_by_role("option", name=value)
+    expect(option.first).to_be_visible(timeout=30000)
+    option.first.click()
+
+
+def assert_ensemble_plot_has_all_streams(page: Page) -> None:
+    page.get_by_text("3. Finalist Ensemble Composition", exact=False).first.scroll_into_view_if_needed()
+    page.wait_for_function(
+        """() => {
+            const expected = ['PED VKT per capita', 'Light RUC volume', 'Heavy RUC volume'];
+            return [...document.querySelectorAll('.js-plotly-plot')].some((plot) => {
+                const traces = plot.data || [];
+                if (traces.length < 3 || !traces.every((trace) => String(trace.type || '') === 'bar')) return false;
+                const names = new Set(traces.map((trace) => String(trace.name || '')));
+                const hasComponentLabels = traces.some((trace) => Array.from(trace.y || []).some((label) => /^C\\d+$/.test(String(label))));
+                return expected.every((stream) => names.has(stream)) && hasComponentLabels;
+            });
+        }""",
+        timeout=90000,
+    )

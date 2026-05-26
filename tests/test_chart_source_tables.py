@@ -58,9 +58,37 @@ def test_overview_source_tables_reconcile_to_current_parquet(parquet_dashboard: 
     candidate = chart_source("overview_candidate_search_frontier.csv")
     assert len(candidate) <= 400
     assert {"Selected finalist", SCHIFF_SPEC_BENCHMARK_LABEL}.issubset(set(candidate["point_type"]))
-    assert candidate["calculation_basis"].str.contains("Default curated candidate rows", regex=False).all()
+    assert candidate["calculation_basis"].str.contains("Default all-stream frontier rows", regex=False).all()
     row_text = candidate.fillna("").astype(str).agg(lambda row: " ".join(row.to_list()), axis=1)
     assert not row_text.str.contains("20.50|20.499", regex=True).any()
+
+
+def test_overview_kpi_annual_benchmark_uses_schiff_benchmark_source(parquet_dashboard: LoadedRun) -> None:
+    source = chart_source("overview_kpi_cards.csv")
+    schiff = parquet_dashboard.data["schiff_df"]
+    finalists = parquet_dashboard.data["recommended"]
+
+    annual_stream_rows = source[
+        source["metric_name"].eq("Schiff specification benchmark Annual MAPE")
+        & source["source_file"].eq("schiff_benchmark.parquet")
+    ]
+    assert set(annual_stream_rows["stream_label"]) == EXPECTED_STREAMS
+    assert annual_stream_rows["metric_value"].astype(float).mean() == pytest.approx(float(schiff["annual_mape"].mean()), abs=0.0008)
+
+    annual_mean = source[source["metric_name"].eq("Schiff specification annual MAPE mean")].iloc[0]
+    finalist_mean = source[source["metric_name"].eq("Finalist annual MAPE mean")].iloc[0]
+    annual_gain = source[source["metric_name"].eq("Annual gain vs Schiff specification benchmark")].iloc[0]
+
+    assert annual_mean["source_file"] == "schiff_benchmark.parquet"
+    assert annual_mean["source_column"] == "annual_mape"
+    assert float(annual_mean["metric_value"]) == pytest.approx(5.055746, abs=0.0008)
+    assert float(annual_mean["metric_value"]) == pytest.approx(float(schiff["annual_mape"].mean()), abs=0.0008)
+    assert float(finalist_mean["metric_value"]) == pytest.approx(float(finalists["annual_mape"].mean()), abs=0.0008)
+    assert float(annual_gain["metric_value"]) == pytest.approx(
+        float(schiff["annual_mape"].mean() - finalists["annual_mape"].mean()),
+        abs=0.0008,
+    )
+    assert str(annual_mean["calculation_basis"]).startswith("Simple stream mean of Schiff specification annual_mape")
 
 
 def test_ensemble_chart_source_uses_current_parquet_components(parquet_dashboard: LoadedRun) -> None:

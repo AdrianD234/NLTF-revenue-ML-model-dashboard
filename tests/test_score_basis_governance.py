@@ -6,12 +6,15 @@ import pandas as pd
 import pytest
 
 from model_dashboard.data_loader import DEFAULT_EVIDENCE_PACK_ROOT, load_evidence_pack
+from model_dashboard.labels import OVERVIEW_STRESS_BUCKET_ORDER, STRESS_BUCKET_ORDER
+from model_dashboard.plots import plot_ensemble_composition
 from model_dashboard.score_basis import (
     OPERATIONAL_SCORE_BASIS,
     PAPER_SCORE_BASIS,
     project_scenario_comparison_frame,
     project_score_basis_frame,
 )
+from app import overview_stress_frame
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -22,7 +25,7 @@ def evidence_pack():
     return load_evidence_pack(DEFAULT_EVIDENCE_PACK_ROOT, ROOT)
 
 
-def test_v4_default_score_basis_is_paper_style(evidence_pack) -> None:
+def test_v5_default_score_basis_is_paper_style(evidence_pack) -> None:
     finalists = evidence_pack.data["recommended"].set_index("stream_label")
     assert set(finalists["score_basis"]) == {PAPER_SCORE_BASIS}
     assert float(finalists.loc["PED VKT per capita", "quarterly_mape"]) == pytest.approx(3.237144, abs=0.001)
@@ -83,6 +86,31 @@ def test_chart_sources_include_score_basis_and_no_old_light_default_values(evide
     ]
     assert not finalist.empty
     assert set(finalist["model"].astype(str)) == {"dynamic_RESID_GBR_n150_d1_lr0.05_w36"}
+
+
+def test_ensemble_composition_renders_all_streams_under_both_score_bases(evidence_pack) -> None:
+    expected_streams = {"PED VKT per capita", "Light RUC volume", "Heavy RUC volume"}
+    weights = evidence_pack.data["weights"]
+    # Component weights are score-basis invariant. Operational mode must not filter
+    # them out just because the component table itself is paper-basis tagged.
+    assert weights[weights["score_basis"].astype(str).eq(OPERATIONAL_SCORE_BASIS)].empty
+
+    for _basis in [PAPER_SCORE_BASIS, OPERATIONAL_SCORE_BASIS]:
+        fig, mapping = plot_ensemble_composition(weights.copy())
+        assert set(mapping["Stream"]) == expected_streams
+        assert len(fig.data) == 3
+
+
+def test_overview_stress_buckets_follow_selected_score_basis(evidence_pack) -> None:
+    paper_recommended = project_score_basis_frame(evidence_pack.data["recommended"], PAPER_SCORE_BASIS)
+    operational_recommended = project_score_basis_frame(evidence_pack.data["recommended"], OPERATIONAL_SCORE_BASIS)
+
+    paper = overview_stress_frame(evidence_pack, paper_recommended, {"score_basis": PAPER_SCORE_BASIS})
+    operational = overview_stress_frame(evidence_pack, operational_recommended, {"score_basis": OPERATIONAL_SCORE_BASIS})
+
+    assert paper["stress_bucket"].drop_duplicates().tolist() == OVERVIEW_STRESS_BUCKET_ORDER
+    assert not paper["stress_bucket"].astype(str).isin(["2024+", "2022-23"]).any()
+    assert set(STRESS_BUCKET_ORDER).issubset(set(operational["stress_bucket"].astype(str)))
 
 
 def test_light_operational_annual_watch_is_visible_in_app_text() -> None:

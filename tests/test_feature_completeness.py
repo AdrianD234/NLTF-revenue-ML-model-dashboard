@@ -262,16 +262,17 @@ def test_overview_kpi_cards_explain_schiff_specification_and_diagnostics(loaded_
 
 def test_overview_frontier_note_is_data_backed(loaded_validation_run: LoadedRun) -> None:
     context = {
-        "label": "400 filtered plotted candidates",
-        "coverage": "Coverage: Light RUC 888 challenger rows; PED 2 anchors; Heavy RUC 2 anchors.",
+        "label": "400 plotted candidates from 1,092 curated rows",
+        "coverage": "Coverage: Light RUC 196 challenger-search rows; PED 102 frontier/anchor rows; Heavy RUC 102 frontier/anchor rows.",
     }
     note = overview_frontier_note(loaded_validation_run.data["summary"], context)
 
     assert "Frontier read:" in note
-    assert "lower-left is better" in note
-    assert "Light RUC challenger frontier with PED/Heavy anchors" in note
+    assert "Lower-left is better" in note
+    assert "All-stream frontier view" in note
+    assert "PED/Heavy use visual frontier samples" in note
     assert "plotted candidates" in note
-    assert "Light RUC 888 challenger rows" in note
+    assert "Light RUC 196 challenger-search rows" in note
     assert "plotted Schiff specification anchor rows" in note
 
 

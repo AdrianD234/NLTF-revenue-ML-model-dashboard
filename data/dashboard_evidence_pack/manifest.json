@@ -1,7 +1,7 @@
 {
-  "schema_version": "dashboard_evidence_pack_v4_gbm_light",
+  "schema_version": "dashboard_evidence_pack_v5_frontier_sample",
   "created_at": "2026-05-26",
-  "description": "Dual-scorecard evidence pack v4. Light RUC finalist changed to dynamic residual GBM W36 accuracy challenger; PED and Heavy RUC unchanged.",
+  "description": "v5 pack based on v4 GBM Light RUC evidence pack with transparent all-stream visual frontier sample rows added to candidate_cone for dashboard frontier continuity.",
   "default_score_basis": "schiff_paper_horizon_mean",
   "operational_score_basis": "current_grid_operational_pooled",
   "selected_light_ruc_model": "schiff_w36_OLS",
@@ -12,7 +12,8 @@
     "operational_pooled_mape": "mean APE over current evidence grid row-level predictions",
     "paper_grid": "Schiff-style test grid with horizon-specific MAPE and 2020/2021 test targets excluded",
     "light_ruc_finalist": "dynamic residual GBM selected as accuracy-challenger finalist; paper-style metrics default, operational annual MAPE retained as watch item.",
-    "toggle_required": "Dashboard should expose Operational pooled MAPE and Paper-style horizon MAPE scorecards."
+    "toggle_required": "Dashboard should expose Operational pooled MAPE and Paper-style horizon MAPE scorecards.",
+    "candidate_frontier": "candidate_cone includes actual Light RUC challenger rows and transparent PED/Heavy visual frontier sample rows for chart continuity; visual samples are not model-selection evidence."
   },
   "row_counts": [
     {
@@ -23,9 +24,9 @@
     },
     {
       "file": "candidate_cone.parquet",
-      "rows": 892,
-      "columns": 52,
-      "size_bytes": 162519
+      "rows": 1092,
+      "columns": 54,
+      "size_bytes": 196867
     },
     {
       "file": "chart_contract.parquet",

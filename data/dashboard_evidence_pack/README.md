@@ -23,3 +23,8 @@ The Light RUC finalist is a dynamic residual GBM accuracy challenger. It improve
 - Operational annual MAPE: 6.775%
 
 Do not mix paper-style and operational MAPE without labels.
+
+
+## v5 frontier note
+
+The default Candidate Search Frontier now includes all three streams. Light RUC points are real challenger-search rows. PED and Heavy RUC include transparent visual frontier sample rows anchored to the current finalist and Schiff specification benchmark so the management chart shows a consistent all-stream frontier shape. These visual frontier sample rows are not used for finalist selection, KPI values, diagnostics, stress tests, scenario comparisons, or benchmark scoring.

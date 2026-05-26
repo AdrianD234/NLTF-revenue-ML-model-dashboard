@@ -664,6 +664,7 @@ def selected_stress_frame(loaded: LoadedRun, controls: dict[str, Any]) -> pd.Dat
 def render_overview(loaded: LoadedRun, controls: dict[str, Any]) -> None:
     summary = common_filter(score_basis_projected(loaded.data.get("summary", pd.DataFrame()), controls), controls)
     recommended = common_filter(score_basis_projected(loaded.data.get("recommended", pd.DataFrame()), controls), controls, include_source_variant=False)
+    schiff_rows = common_filter(score_basis_projected(loaded.data.get("schiff_df", pd.DataFrame()), controls), controls, include_source_variant=False)
     errors = loaded.data.get("errors", pd.DataFrame())
     best = best_by_stream(recommended)
     raw_qpred = loaded.data.get("quarterly_predictions", pd.DataFrame())
@@ -683,7 +684,7 @@ def render_overview(loaded: LoadedRun, controls: dict[str, Any]) -> None:
         st.session_state["candidate_frontier_mode"] = candidate_mode
     candidate_landscape = build_candidate_landscape_frame(loaded, controls, candidate_mode)
     candidate_context = candidate_frontier_count_context(loaded, controls, candidate_landscape)
-    gov_kpi_grid(overview_kpi_cards(summary, recommended, story, errors, candidate_context))
+    gov_kpi_grid(overview_kpi_cards(summary, recommended, story, errors, candidate_context, schiff_rows=schiff_rows))
     basis_metric = score_basis_metric_label(controls.get("score_basis", PAPER_SCORE_BASIS))
     accuracy_subtitle = f"{basis_metric} by stream. Lower is better."
     if not best.empty and {"stream_label", "quarterly_mape", "annual_mape"}.issubset(best.columns):
@@ -708,7 +709,7 @@ def render_overview(loaded: LoadedRun, controls: dict[str, Any]) -> None:
         candidate_context = candidate_frontier_count_context(loaded, controls, landscape)
         chart_card(
             "2. Candidate Search Frontier",
-            f"Light RUC challenger frontier with PED/Heavy finalist and Schiff anchors using {basis_metric}. Lower-left is better.",
+            f"{CANDIDATE_FRONTIER_CAPTION} Using {basis_metric}. Lower-left is better.",
             compact_figure(plot_candidate_landscape(landscape), 260),
             overview_frontier_note(landscape, candidate_context),
         )
@@ -763,8 +764,12 @@ def compact_figure(fig: Any, height: int, showlegend: bool | None = None) -> Any
     return fig
 
 
-DEFAULT_CANDIDATE_FRONTIER_MODE = "Light RUC challenger frontier"
+DEFAULT_CANDIDATE_FRONTIER_MODE = "All-stream frontier view"
 LEGACY_CANDIDATE_FRONTIER_MODE = "Curated" + " cone sample"
+CANDIDATE_FRONTIER_CAPTION = (
+    "All-stream frontier view; Light RUC uses challenger-search rows, PED/Heavy use visual frontier samples "
+    "anchored to finalist and Schiff specification points."
+)
 
 
 def overview_candidate_landscape_frame(loaded: LoadedRun, controls: dict[str, Any]) -> pd.DataFrame:
@@ -874,11 +879,16 @@ def candidate_frontier_count_context(
 def candidate_frontier_coverage_text(candidate: pd.DataFrame) -> str:
     if candidate is None or candidate.empty or "stream_label" not in candidate.columns:
         return "Candidate coverage unavailable."
-    counts = candidate["stream_label"].dropna().astype(str).value_counts().to_dict()
+    mask = pd.Series(False, index=candidate.index)
+    for column in ["plot_default_include", "is_plot_candidate"]:
+        if column in candidate.columns:
+            mask = mask | candidate[column].fillna(False).astype(bool)
+    plotted = candidate[mask].copy() if mask.any() else candidate.copy()
+    counts = plotted["stream_label"].dropna().astype(str).value_counts().to_dict()
     light = int(counts.get("Light RUC volume", 0))
     ped = int(counts.get("PED VKT per capita", 0))
     heavy = int(counts.get("Heavy RUC volume", 0))
-    return f"Coverage: Light RUC {format_count(light)} challenger rows; PED {format_count(ped)} anchors; Heavy RUC {format_count(heavy)} anchors."
+    return f"Coverage: Light RUC {format_count(light)} challenger-search rows; PED {format_count(ped)} frontier/anchor rows; Heavy RUC {format_count(heavy)} frontier/anchor rows."
 
 
 def overview_frontier_note(summary: pd.DataFrame, count_context: dict[str, Any] | None = None) -> str:
@@ -903,7 +913,7 @@ def overview_frontier_note(summary: pd.DataFrame, count_context: dict[str, Any] 
     )
     label = str(count_context.get("label")) if count_context else f"{format_count(len(summary))} plotted candidates"
     coverage = f" {count_context.get('coverage')}" if count_context and count_context.get("coverage") else ""
-    return f"Frontier read: Light RUC challenger frontier with PED/Heavy anchors; lower-left is better across {label}{suffix}.{coverage}"
+    return f"Frontier read: {CANDIDATE_FRONTIER_CAPTION} Lower-left is better across {label}{suffix}.{coverage}"
 
 
 def overview_stress_subtitle(controls: dict[str, Any]) -> str:
@@ -975,9 +985,13 @@ def overview_kpi_cards(
     story: pd.DataFrame,
     errors: pd.DataFrame,
     candidate_context: dict[str, Any] | None = None,
+    schiff_rows: pd.DataFrame | None = None,
 ) -> list[tuple[str, str, str, str, str, str]]:
     finalists = best_by_stream(recommended)
-    schiff = best_by_stream(summary[summary["is_schiff"]]) if not summary.empty and "is_schiff" in summary.columns else pd.DataFrame()
+    if schiff_rows is not None and not schiff_rows.empty:
+        schiff = best_by_stream(schiff_rows)
+    else:
+        schiff = best_by_stream(summary[summary["is_schiff"]]) if not summary.empty and "is_schiff" in summary.columns else pd.DataFrame()
     finalist_q = float(finalists["quarterly_mape"].mean()) if not finalists.empty and "quarterly_mape" in finalists.columns else float("nan")
     finalist_a = float(finalists["annual_mape"].mean()) if not finalists.empty and "annual_mape" in finalists.columns else float("nan")
     schiff_q = float(schiff["quarterly_mape"].mean()) if not schiff.empty and "quarterly_mape" in schiff.columns else float("nan")

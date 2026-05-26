@@ -69,6 +69,30 @@ def validate() -> list[tuple[str, str, str]]:
         except Exception as exc:
             record(f"{filename} exists and has required columns", False, str(exc))
 
+    kpi = read_table("overview_kpi_cards.csv")
+    schiff = loaded.data.get("schiff_df", pd.DataFrame())
+    finalists = loaded.data.get("recommended", pd.DataFrame())
+    annual_mean_row = kpi[kpi["metric_name"].eq("Schiff specification annual MAPE mean")]
+    annual_gain_row = kpi[kpi["metric_name"].eq("Annual gain vs Schiff specification benchmark")]
+    expected_schiff_annual = float(pd.to_numeric(schiff["annual_mape"], errors="coerce").mean()) if "annual_mape" in schiff.columns else float("nan")
+    expected_finalist_annual = float(pd.to_numeric(finalists["annual_mape"], errors="coerce").mean()) if "annual_mape" in finalists.columns else float("nan")
+    expected_gain = expected_schiff_annual - expected_finalist_annual
+    kpi_ok = (
+        not annual_mean_row.empty
+        and not annual_gain_row.empty
+        and annual_mean_row["source_file"].astype(str).eq("schiff_benchmark.parquet").all()
+        and annual_mean_row["source_column"].astype(str).eq("annual_mape").all()
+        and approx(annual_mean_row["metric_value"].iloc[0], expected_schiff_annual)
+        and approx(annual_gain_row["metric_value"].iloc[0], expected_gain)
+        and "score_basis" in kpi.columns
+        and set(kpi["score_basis"].dropna().astype(str)) == {"schiff_paper_horizon_mean"}
+    )
+    record(
+        "Overview annual KPI benchmark source reconciles to Schiff benchmark annual_mape",
+        kpi_ok,
+        f"Schiff annual mean={expected_schiff_annual:.3f}; finalist annual mean={expected_finalist_annual:.3f}; gain={expected_gain:.3f}.",
+    )
+
     ensemble = read_table("overview_ensemble_composition.csv")
     expected_weights = loaded_weights.copy()
     if "component_rank" not in expected_weights.columns and not expected_weights.empty:
@@ -115,6 +139,37 @@ def validate() -> list[tuple[str, str, str]]:
         "Stress chart source uses default paper horizon buckets only",
         stress_ok and heavy_core and policy_hidden,
         "Overview default source table includes 1-4, 5-8, 9-12 and Annual only; policy windows stay out of the main chart.",
+    )
+
+    frontier = read_table("overview_candidate_search_frontier.csv")
+    frontier_streams = set(frontier["stream_label"].dropna().astype(str))
+    frontier_has_required_streams = EXPECTED_STREAMS.issubset(frontier_streams)
+    frontier_has_sample_contract = {"frontier_sample_class", "frontier_sample_note"}.issubset(frontier.columns)
+    sample_classes = set(frontier.get("frontier_sample_class", pd.Series(dtype=str)).dropna().astype(str))
+    has_visual_samples = "visual_frontier_sample" in sample_classes
+    has_frontier_notes = frontier.get("frontier_sample_note", pd.Series(dtype=str)).dropna().astype(str).str.len().gt(0).any()
+    record(
+        "Candidate frontier source includes all streams and v5 visual sample metadata",
+        frontier_has_required_streams and frontier_has_sample_contract and has_visual_samples and has_frontier_notes,
+        f"streams={sorted(frontier_streams)}; sample_classes={sorted(sample_classes)}.",
+    )
+
+    contamination: list[str] = []
+    for filename in CHART_SOURCE_FILES:
+        if filename == "overview_candidate_search_frontier.csv":
+            continue
+        table = read_table(filename)
+        text = table.fillna("").astype(str)
+        sample_col_present = "frontier_sample_class" in table.columns and table["frontier_sample_class"].dropna().astype(str).str.len().gt(0).any()
+        visual_model_present = text.apply(lambda row: row.str.contains("VISUAL_FRONTIER_SAMPLE", case=False, regex=False).any(), axis=1).any()
+        if sample_col_present or visual_model_present:
+            contamination.append(filename)
+    record(
+        "Visual frontier sample rows are isolated to Candidate Search Frontier",
+        not contamination,
+        "No non-frontier source table contains visual frontier sample metadata or VISUAL_FRONTIER_SAMPLE model rows."
+        if not contamination
+        else "Contaminated tables: " + ", ".join(contamination),
     )
 
     scenario = read_table("scenario_decision_summary.csv")

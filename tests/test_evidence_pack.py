@@ -48,7 +48,7 @@ def test_default_app_uses_evidence_pack_not_legacy_or_mini(evidence_pack) -> Non
     assert "mini_parquet" not in manifest_text
     assert "legacy_run_folder" not in manifest_text
     assert evidence_pack.run_dir.name == "dashboard_evidence_pack"
-    assert evidence_pack.manifest["schema_version"] == "dashboard_evidence_pack_v4_gbm_light"
+    assert evidence_pack.manifest["schema_version"] == "dashboard_evidence_pack_v5_frontier_sample"
     assert set(evidence_pack.data["chart_contract"]["source_table"]).issuperset(
         {
             "candidate_cone.parquet",

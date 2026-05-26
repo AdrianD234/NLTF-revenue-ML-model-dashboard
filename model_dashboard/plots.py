@@ -314,7 +314,7 @@ def plot_candidate_landscape(summary: pd.DataFrame) -> go.Figure:
             bordercolor="rgba(15,23,42,0.18)",
         )
     fig.update_layout(xaxis_title=f"{basis_label} (%)", yaxis_title=f"{_annual_basis_metric_label(data)} (%)")
-    fig = apply_layout(fig, "Candidate search landscape", height=580)
+    fig = apply_layout(fig, "Candidate Search Frontier", height=580)
     critical_points = data[data["point_type"].isin([SCHIFF_SPEC_BENCHMARK_LABEL, "Selected finalist"])]
     x_limit = _frontier_axis_limit(full_data["quarterly_mape"], critical_points["quarterly_mape"])
     y_limit = _frontier_axis_limit(full_data["annual_mape"], critical_points["annual_mape"])
