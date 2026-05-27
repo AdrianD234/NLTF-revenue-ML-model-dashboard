@@ -23,6 +23,11 @@ LIGHT_RUC_REPRO_MODEL = "dynamic_RESID_GBR_n150_d1_lr0.05_w36"
 LIGHT_RUC_REPRO_DESCRIPTION = (
     "Two-stage OLS base plus GBM residual correction, exactly replayed against evidence predictions."
 )
+PED_REPRO_MODEL = "PED__RESCUE_static_annual_weighted_top12_capnone"
+PED_REPRO_DESCRIPTION = (
+    "PED finalist exactly replays the stored HPO/static-solver component prediction; "
+    "inner HPO/static-solver rebuild remains a future audit layer."
+)
 
 COMMON_REQUIRED_REPRO_FILES = (
     "manifest.json",
@@ -73,8 +78,8 @@ REPRODUCIBILITY_STREAM_CONFIGS: dict[str, ReproducibilityStreamConfig] = {
         stream_label="PED VKT per capita",
         stream_key="ped",
         root=REPRODUCIBILITY_BASE_ROOT / "ped",
-        model="",
-        description="No auxiliary PED exact-replay pack is present in this repository snapshot.",
+        model=PED_REPRO_MODEL,
+        description=PED_REPRO_DESCRIPTION,
         report_file="ped_reproducibility_report.md",
     ),
     LIGHT_RUC_REPRO_CONFIG.stream_label: LIGHT_RUC_REPRO_CONFIG,
@@ -89,6 +94,8 @@ REPRODUCIBILITY_STREAM_CONFIGS: dict[str, ReproducibilityStreamConfig] = {
 }
 
 REQUIRED_LIGHT_RUC_REPRO_FILES = LIGHT_RUC_REPRO_CONFIG.required_files
+PED_REPRO_ROOT = REPRODUCIBILITY_STREAM_CONFIGS["PED VKT per capita"].root
+REQUIRED_PED_REPRO_FILES = REPRODUCIBILITY_STREAM_CONFIGS["PED VKT per capita"].required_files
 HEAVY_RUC_REPRO_ROOT = REPRODUCIBILITY_STREAM_CONFIGS["Heavy RUC volume"].root
 HEAVY_RUC_REPRO_MODEL = REPRODUCIBILITY_STREAM_CONFIGS["Heavy RUC volume"].model
 REQUIRED_HEAVY_RUC_REPRO_FILES = REPRODUCIBILITY_STREAM_CONFIGS["Heavy RUC volume"].required_files
@@ -191,19 +198,31 @@ def load_light_ruc_reproducibility_pack(root: str | Path | None = None) -> Light
 
 def reproducibility_replay_summary(pack: ReproducibilityPack) -> dict[str, Any]:
     registry = pack.table("model_registry")
-    metric = pack.table("evidence_metric_comparison")
     source_workbook = str(pack.manifest.get("source_workbook", ""))
     source_sheet = str(pack.manifest.get("source_sheet", "Light RUC Inputs"))
+    workbook_provenance = pack.manifest.get("workbook_provenance", {})
+    if isinstance(workbook_provenance, dict):
+        source_workbook = str(workbook_provenance.get("workbook", source_workbook))
+        source_sheet = str(workbook_provenance.get("sheet", source_sheet))
     model = str(pack.manifest.get("model", pack.config.model))
     if not registry.empty:
-        source_workbook = str(registry["source_workbook"].dropna().astype(str).iloc[0])
-        source_sheet = str(registry["source_sheet"].dropna().astype(str).iloc[0])
-        model = str(registry["finalist_model"].dropna().astype(str).iloc[0])
+        if "source_workbook" in registry.columns and registry["source_workbook"].notna().any():
+            source_workbook = str(registry["source_workbook"].dropna().astype(str).iloc[0])
+        if "source_sheet" in registry.columns and registry["source_sheet"].notna().any():
+            source_sheet = str(registry["source_sheet"].dropna().astype(str).iloc[0])
+        if "finalist_model" in registry.columns and registry["finalist_model"].notna().any():
+            model = str(registry["finalist_model"].dropna().astype(str).iloc[0])
+        elif "model" in registry.columns and registry["model"].notna().any():
+            model = str(registry["model"].dropna().astype(str).iloc[0])
     pred_comparison = pack.table("evidence_prediction_comparison")
-    max_delta = pd.to_numeric(pred_comparison.get("max_abs_pred_delta", pd.Series(dtype=float)), errors="coerce").max()
-    if pd.isna(max_delta):
-        max_delta = pd.to_numeric(metric.get("max_abs_pred_delta", pd.Series(dtype=float)), errors="coerce").max()
-    status = "Exact weighted-ensemble replay" if _is_weighted_ensemble_pack(pack) else "Exact prediction replay"
+    metric = pack.table("evidence_metric_comparison")
+    max_delta = _max_abs_delta(pred_comparison, metric)
+    if _is_ped_component_pack(pack):
+        status = "Exact component-prediction replay"
+    elif _is_weighted_ensemble_pack(pack):
+        status = "Exact weighted-ensemble replay"
+    else:
+        status = "Exact prediction replay"
     return {
         "status": status,
         "model": model,
@@ -222,6 +241,34 @@ def reproducibility_registry_view(pack: ReproducibilityPack) -> pd.DataFrame:
     registry = pack.table("model_registry")
     if registry.empty:
         return pd.DataFrame()
+    if _is_ped_component_pack(pack):
+        scorecard = pack.table("scorecard_summary")
+        score_bases = (
+            scorecard["score_basis"].dropna().astype(str).drop_duplicates().map(_score_basis_label).tolist()
+            if "score_basis" in scorecard.columns
+            else ["Operational pooled", "Paper-style horizon mean"]
+        )
+        view = registry.copy()
+        view["Score basis"] = ", ".join(score_bases)
+        keep = [
+            "target",
+            "model_role",
+            "model",
+            "algorithm",
+            "Score basis",
+            "source_parent_run",
+            "reproducibility_status",
+        ]
+        return view[[col for col in keep if col in view.columns]].rename(
+            columns={
+                "target": "Target",
+                "model_role": "Role",
+                "model": "Component model",
+                "algorithm": "Algorithm",
+                "source_parent_run": "Source run",
+                "reproducibility_status": "Reproducibility status",
+            }
+        )
     if _is_weighted_ensemble_pack(pack):
         view = registry.copy()
         scorecard = pack.table("scorecard_summary")
@@ -286,6 +333,36 @@ def reproducibility_component_trace_view(pack: ReproducibilityPack, limit: int =
     components = pack.table("component_predictions")
     if components.empty:
         return pd.DataFrame()
+    if _is_ped_component_pack(pack):
+        view = components.copy()
+        view["Component"] = view["component_model"].map(_component_label_map(pack))
+        view["Component model"] = view["component_model"].astype(str)
+        view["Score basis"] = view["score_basis"].map(_score_basis_label)
+        view["Weight"] = pd.to_numeric(view["component_weight"], errors="coerce")
+        view["Component prediction"] = pd.to_numeric(view["component_pred"], errors="coerce")
+        view["Final prediction"] = pd.to_numeric(view["rebuilt_pred"], errors="coerce")
+        view["Actual"] = pd.to_numeric(view["actual"], errors="coerce")
+        view["Error (%)"] = ((view["Final prediction"] - view["Actual"]) / view["Actual"]) * 100
+        keep = [
+            "Score basis",
+            "origin",
+            "target_period",
+            "horizon",
+            "Component",
+            "Component model",
+            "Weight",
+            "Component prediction",
+            "Final prediction",
+            "Actual",
+            "Error (%)",
+        ]
+        return view[[col for col in keep if col in view.columns]].rename(
+            columns={
+                "origin": "Origin",
+                "target_period": "Target period",
+                "horizon": "Horizon",
+            }
+        ).sort_values(["Score basis", "Origin", "Horizon", "Component"]).head(limit)
     if _is_weighted_ensemble_pack(pack):
         view = components.copy()
         view["Component"] = view["component_model"].map(_component_label_map(pack))
@@ -373,6 +450,21 @@ def reproducibility_coefficients_view(pack: ReproducibilityPack, limit: int = 42
     if coefficients.empty:
         return pd.DataFrame()
     view = coefficients.copy()
+    if _is_ped_component_pack(pack):
+        keep = [
+            "component_model",
+            "coefficient_status",
+            "feature",
+            "coefficient",
+            "notes",
+        ]
+        return view[[col for col in keep if col in view.columns]].rename(
+            columns={
+                "component_model": "Component model",
+                "coefficient_status": "Status",
+                "notes": "Notes",
+            }
+        ).head(limit)
     if _is_weighted_ensemble_pack(pack):
         view["Component"] = view["component_model"].map(_component_label_map(pack))
         keep = [
@@ -425,6 +517,8 @@ def reproducibility_sensitivity_view(pack: ReproducibilityPack, limit_per_basis:
         view["score_basis"] = "replay_pack"
     if "scenario_name" not in view.columns:
         view["scenario_name"] = view.get("scenario_variable", pd.Series(dtype=str)).astype(str)
+    if "delta_pct" not in view.columns:
+        view["delta_pct"] = pd.NA
     view["delta_pct"] = pd.to_numeric(view["delta_pct"], errors="coerce")
     grouped = (
         view.groupby(["score_basis", "scenario_variable", "scenario_name", "perturbation"], as_index=False)
@@ -446,6 +540,15 @@ def reproducibility_training_window_view(pack: ReproducibilityPack) -> pd.DataFr
     if data.empty:
         return pd.DataFrame()
     view = data.copy()
+    if _is_ped_component_pack(pack):
+        keep = ["origin", "window_status", "notes"]
+        return view[[col for col in keep if col in view.columns]].rename(
+            columns={
+                "origin": "Origin",
+                "window_status": "Window status",
+                "notes": "Notes",
+            }
+        ).sort_values(["Origin"])
     if _is_weighted_ensemble_pack(pack):
         view["Component"] = view["component_model"].map(_component_label_map(pack))
         keep = [
@@ -501,7 +604,7 @@ def plot_reproducibility_feature_importance(data: pd.DataFrame, stream_label: st
             "Origins: %{customdata[2]:.0f}<extra></extra>"
         )
     )
-    return apply_layout(fig, "Feature importance from residual GBM", height=360)
+    return apply_layout(fig, "Feature importance / component weight evidence", height=360)
 
 
 def plot_light_ruc_feature_importance(data: pd.DataFrame) -> go.Figure:
@@ -548,6 +651,20 @@ def plot_light_ruc_sensitivities(data: pd.DataFrame) -> go.Figure:
 
 def reproducibility_ensemble_weight_view(pack: ReproducibilityPack) -> pd.DataFrame:
     registry = pack.table("model_registry")
+    components = pack.table("component_predictions")
+    if _is_ped_component_pack(pack) and not components.empty and "component_weight" in components.columns:
+        component = _first_row(components.sort_values("component_rank") if "component_rank" in components.columns else components)
+        return pd.DataFrame(
+            [
+                {
+                    "Component": "C1",
+                    "Component model": component.get("component_model", "PED__HPOREFINE_solver_static_convex_top18"),
+                    "Algorithm": "HPO/static-solver component",
+                    "Window": "Inherited from HPO component",
+                    "Weight": float(component.get("component_weight", 1.0)),
+                }
+            ]
+        )
     if registry.empty or "component_weight" not in registry.columns:
         return pd.DataFrame()
     view = registry.copy()
@@ -564,8 +681,89 @@ def reproducibility_ensemble_equation(pack: ReproducibilityPack) -> str:
     weights = reproducibility_ensemble_weight_view(pack)
     if weights.empty:
         return ""
+    if len(weights) == 1 and abs(float(weights["Weight"].iloc[0]) - 1.0) <= 1e-12:
+        return "Prediction = 1.0*C1"
     terms = [f"{row.Weight:.6f}*{row.Component}" for row in weights.itertuples(index=False)]
     return "Prediction = " + " + ".join(terms)
+
+
+def reproducibility_scorecard_view(pack: ReproducibilityPack) -> pd.DataFrame:
+    data = pack.table("scorecard_summary")
+    if data.empty:
+        return pd.DataFrame()
+    view = data.copy()
+    view["Score basis"] = view["score_basis"].map(_score_basis_label)
+    keep = [
+        "Score basis",
+        "pooled_mape",
+        "quarterly_pooled_mape",
+        "horizon_mean_mape",
+        "annual_mape",
+        "bias_pct",
+        "quarterly_bias_pct",
+        "n_pairs",
+        "n_quarterly_pairs",
+        "n_origins",
+    ]
+    keep = [col for col in keep if col in view.columns]
+    return view[keep].rename(
+        columns={
+            "pooled_mape": "Pooled MAPE",
+            "quarterly_pooled_mape": "Pooled MAPE",
+            "horizon_mean_mape": "Horizon mean MAPE",
+            "annual_mape": "Annual MAPE",
+            "bias_pct": "Bias (%)",
+            "quarterly_bias_pct": "Bias (%)",
+            "n_pairs": "Pairs",
+            "n_quarterly_pairs": "Pairs",
+            "n_origins": "Origins",
+        }
+    )
+
+
+def reproducibility_horizon_view(pack: ReproducibilityPack) -> pd.DataFrame:
+    data = pack.table("horizon_profiles")
+    if data.empty:
+        return pd.DataFrame()
+    view = data.copy()
+    view["Score basis"] = view["score_basis"].map(_score_basis_label)
+    keep = ["Score basis", "horizon", "mape", "bias_pct", "n"]
+    return view[[col for col in keep if col in view.columns]].rename(
+        columns={"horizon": "Horizon", "mape": "MAPE", "bias_pct": "Bias (%)", "n": "Rows"}
+    )
+
+
+def reproducibility_annual_view(pack: ReproducibilityPack) -> pd.DataFrame:
+    data = pack.table("annual_predictions")
+    if data.empty:
+        return pd.DataFrame()
+    view = data.copy()
+    if "score_basis" in view.columns:
+        view["Score basis"] = view["score_basis"].map(_score_basis_label)
+    keep = ["Score basis", "origin", "target_year", "actual", "pred", "ape", "error_pct", "value_available"]
+    return view[[col for col in keep if col in view.columns]].rename(
+        columns={
+            "origin": "Origin",
+            "target_year": "Target year",
+            "actual": "Actual",
+            "pred": "Prediction",
+            "ape": "Absolute error (%)",
+            "error_pct": "Error (%)",
+            "value_available": "Available",
+        }
+    ).head(240)
+
+
+def reproducibility_stress_view(pack: ReproducibilityPack) -> pd.DataFrame:
+    data = pack.table("stress_horizon")
+    if data.empty:
+        return pd.DataFrame()
+    view = data.copy()
+    view["Score basis"] = view["score_basis"].map(_score_basis_label)
+    keep = ["Score basis", "stress_bucket", "mape", "bias_pct", "n"]
+    return view[[col for col in keep if col in view.columns]].rename(
+        columns={"stress_bucket": "Stress bucket", "mape": "MAPE", "bias_pct": "Bias (%)", "n": "Rows"}
+    )
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -607,6 +805,10 @@ def _score_basis_label(value: Any) -> str:
     return SCORE_BASIS_LABELS.get(str(value), str(value).replace("_", " ").title())
 
 
+def _is_ped_component_pack(pack: ReproducibilityPack) -> bool:
+    return pack.config.stream_key == "ped"
+
+
 def _is_weighted_ensemble_pack(pack: ReproducibilityPack) -> bool:
     registry = pack.table("model_registry")
     return "component_weight" in registry.columns and "ensemble_formula" in registry.columns
@@ -622,6 +824,7 @@ def _component_label_map(pack: ReproducibilityPack) -> dict[str, str]:
 def _short_component(value: Any) -> str:
     text = str(value)
     replacements = {
+        "PED__HPOREFINE_solver_static_convex_top18": "C1 HPO/static-solver component",
         "HEAVY_RUC__dynamic_no_leads__Elastic_alpha0_005_l1_ratio0_2__ylag__w64": "C1 ElasticNet ylag w64",
         "HEAVY_RUC__schiff__GBR_learning_rate0_06_max_depth1_n_estimators650__noylag__w64": "C2 Schiff GBR no ylag w64",
         "HEAVY_RUC__dynamic_no_leads__GBR_learning_rate0_08_max_depth1_n_estimators400__ylag__w52": "C3 dynamic GBR ylag w52",
@@ -637,3 +840,28 @@ def _algorithm_label(value: Any) -> str:
     if text == "gbr":
         return "Gradient Boosting"
     return str(value).replace("_", " ").title()
+
+
+def _max_abs_delta(*frames: pd.DataFrame) -> Any:
+    candidates = [
+        "max_abs_pred_delta",
+        "max_abs_pred_delta_vs_evidence",
+        "pred_delta_vs_evidence",
+        "abs_pred_delta",
+        "delta_quarterly_pooled_mape",
+    ]
+    values: list[float] = []
+    for frame in frames:
+        if frame.empty:
+            continue
+        for column in candidates:
+            if column in frame.columns:
+                series = pd.to_numeric(frame[column], errors="coerce").abs().dropna()
+                values.extend(float(value) for value in series)
+    return max(values) if values else pd.NA
+
+
+def _optional_numeric(frame: pd.DataFrame, column: str) -> pd.Series:
+    if column not in frame.columns:
+        return pd.Series([pd.NA] * len(frame), index=frame.index)
+    return pd.to_numeric(frame[column], errors="coerce")

@@ -14,8 +14,12 @@ from model_dashboard.light_ruc_reproducibility import (
     HEAVY_RUC_REPRO_ROOT,
     LIGHT_RUC_REPRO_MODEL,
     LIGHT_RUC_REPRO_ROOT,
+    PED_REPRO_DESCRIPTION,
+    PED_REPRO_MODEL,
+    PED_REPRO_ROOT,
     REQUIRED_HEAVY_RUC_REPRO_FILES,
     REQUIRED_LIGHT_RUC_REPRO_FILES,
+    REQUIRED_PED_REPRO_FILES,
     REPRODUCIBILITY_STREAM_CONFIGS,
     light_ruc_component_trace_view,
     light_ruc_feature_importance_view,
@@ -26,7 +30,9 @@ from model_dashboard.light_ruc_reproducibility import (
     reproducibility_ensemble_equation,
     reproducibility_ensemble_weight_view,
     reproducibility_feature_importance_view,
+    reproducibility_registry_view,
     reproducibility_replay_summary,
+    reproducibility_scorecard_view,
     reproducibility_sensitivity_view,
     load_reproducibility_pack,
     load_light_ruc_reproducibility_pack,
@@ -53,7 +59,11 @@ def test_light_ruc_reproducibility_copy_contains_only_allowed_files() -> None:
 
 def test_reproducibility_stream_configs_are_generic() -> None:
     assert {"PED VKT per capita", "Light RUC volume", "Heavy RUC volume"}.issubset(REPRODUCIBILITY_STREAM_CONFIGS)
+    ped = load_reproducibility_pack("PED VKT per capita")
     heavy = load_reproducibility_pack("Heavy RUC volume")
+    assert ped.root.name == "ped"
+    assert ped.available
+    assert not ped.missing_files
     assert heavy.root.name == "heavy_ruc"
     assert heavy.available
     assert not heavy.missing_files
@@ -64,6 +74,13 @@ def test_heavy_ruc_reproducibility_copy_contains_only_allowed_files() -> None:
     assert set(REQUIRED_HEAVY_RUC_REPRO_FILES).issubset(names)
     assert not {path.name for path in HEAVY_RUC_REPRO_ROOT.glob("*.csv")}
     assert not {path.name for path in HEAVY_RUC_REPRO_ROOT.glob("*.xlsx")}
+
+
+def test_ped_reproducibility_copy_contains_only_allowed_files() -> None:
+    names = {path.name for path in PED_REPRO_ROOT.iterdir() if path.is_file()}
+    assert set(REQUIRED_PED_REPRO_FILES).issubset(names)
+    assert not {path.name for path in PED_REPRO_ROOT.glob("*.csv")}
+    assert not {path.name for path in PED_REPRO_ROOT.glob("*.xlsx")}
 
 
 def test_light_ruc_replay_delta_and_recipe_are_exact() -> None:
@@ -134,6 +151,28 @@ def test_heavy_ruc_weighted_ensemble_rebuilds_final_prediction() -> None:
     assert float(delta.max()) <= 1e-5
 
 
+def test_ped_component_replay_rebuilds_final_prediction() -> None:
+    pack = load_reproducibility_pack("PED VKT per capita")
+    summary = reproducibility_replay_summary(pack)
+    weights = reproducibility_ensemble_weight_view(pack)
+    components = pack.table("component_predictions")
+    prediction_comparison = pack.table("evidence_prediction_comparison")
+
+    assert summary["status"] == "Exact component-prediction replay"
+    assert summary["model"] == PED_REPRO_MODEL
+    assert summary["source_sheet"] == "PED Inputs"
+    assert summary["description"] == PED_REPRO_DESCRIPTION
+    assert float(pd.to_numeric(prediction_comparison["pred_delta_vs_evidence"], errors="coerce").abs().max()) <= 1e-8
+    assert list(weights["Weight"]) == [1.0]
+    assert reproducibility_ensemble_equation(pack) == "Prediction = 1.0*C1"
+
+    delta = (
+        pd.to_numeric(components["component_pred"], errors="coerce")
+        - pd.to_numeric(components["rebuilt_pred"], errors="coerce")
+    ).abs()
+    assert float(delta.max()) <= 1e-8
+
+
 def test_light_ruc_auxiliary_views_have_governance_content() -> None:
     pack = load_light_ruc_reproducibility_pack()
     registry = light_ruc_registry_view(pack)
@@ -172,6 +211,31 @@ def test_heavy_ruc_auxiliary_views_have_weighted_ensemble_content() -> None:
     assert "not_available_from_parent_output" in sensitivities["scenario_variable"].astype(str).str.cat(sep=" | ")
 
 
+def test_ped_auxiliary_views_have_component_replay_content_and_caveat() -> None:
+    pack = load_reproducibility_pack("PED VKT per capita")
+    registry = reproducibility_registry_view(pack)
+    component_trace = reproducibility_component_trace_view(pack)
+    feature_importance = reproducibility_feature_importance_view(pack)
+    sensitivities = reproducibility_sensitivity_view(pack)
+    scorecard = reproducibility_scorecard_view(pack)
+
+    assert not registry.empty
+    assert "inner model refit not replayed" in registry["Reproducibility status"].astype(str).str.cat(sep=" | ")
+    assert not component_trace.empty
+    assert {"Component", "Weight", "Component prediction", "Final prediction", "Actual", "Error (%)"}.issubset(
+        component_trace.columns
+    )
+    assert set(component_trace["Component"]) == {"C1"}
+    assert not feature_importance.empty
+    assert set(feature_importance["feature_label"]) == {"C1"}
+    assert not sensitivities.empty
+    assert "Not available from replay-only parent predictions" in sensitivities["scenario_variable"].astype(str).str.cat(sep=" | ")
+    assert not scorecard.empty
+    assert float(scorecard.loc[scorecard["Score basis"].eq("Operational pooled"), "Pooled MAPE"].iloc[0]) == pytest.approx(
+        2.473244, abs=0.000001
+    )
+
+
 def test_light_ruc_replay_scorecard_metrics_match_audit_facts() -> None:
     pack = load_light_ruc_reproducibility_pack()
     scorecard = pack.table("scorecard_summary").set_index("score_basis")
@@ -197,10 +261,19 @@ def test_reproducibility_pack_does_not_modify_main_chart_source_tables() -> None
     assert before, "Expected existing main chart-source tables."
 
     pack = load_light_ruc_reproducibility_pack()
+    ped_pack = load_reproducibility_pack("PED VKT per capita")
+    heavy_pack = load_reproducibility_pack("Heavy RUC volume")
     _ = light_ruc_registry_view(pack)
     _ = light_ruc_component_trace_view(pack)
     _ = light_ruc_feature_importance_view(pack)
     _ = light_ruc_sensitivity_view(pack)
+    _ = reproducibility_component_trace_view(ped_pack)
+    _ = reproducibility_feature_importance_view(ped_pack)
+    _ = reproducibility_sensitivity_view(ped_pack)
+    _ = reproducibility_scorecard_view(ped_pack)
+    _ = reproducibility_component_trace_view(heavy_pack)
+    _ = reproducibility_feature_importance_view(heavy_pack)
+    _ = reproducibility_sensitivity_view(heavy_pack)
 
     after = _chart_source_hashes()
     assert after == before

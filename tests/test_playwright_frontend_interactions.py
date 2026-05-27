@@ -351,6 +351,44 @@ def test_reproducibility_detail_stream_selector_renders_heavy_pack(page: Page) -
     assert_no_streamlit_exception(page)
 
 
+def test_reproducibility_detail_stream_selector_renders_ped_pack(page: Page) -> None:
+    open_dashboard(page)
+    click_page(page, "Diagnostics")
+
+    expander = page.get_by_text("Model Explainability / Reproducibility", exact=False).first
+    expander.scroll_into_view_if_needed()
+    expander.click()
+
+    stream_select = page.get_by_label("Reproducibility stream")
+    expect(stream_select).to_be_visible(timeout=30000)
+    stream_select.click()
+    page.get_by_text("PED VKT per capita", exact=True).last.click()
+
+    load_label = page.get_by_text("Load reproducibility detail", exact=False).first
+    expect(load_label).to_be_visible(timeout=30000)
+    load_label.click()
+
+    body = page.locator("body")
+    expect(body).to_contain_text("Exact component-prediction replay", timeout=60000)
+    expect(body).to_contain_text("PED__RESCUE_static_annual_weighted_top12_capnone", timeout=60000)
+    expect(body).to_contain_text("Prediction = 1.0*C1", timeout=60000)
+    expect(body).to_contain_text(
+        "PED finalist exactly replays the stored HPO/static-solver component prediction",
+        timeout=60000,
+    )
+    expect(body).to_contain_text("inner HPO/static-solver rebuild remains a future audit layer", timeout=60000)
+    expect(body).to_contain_text("Component trace", timeout=60000)
+
+    scorecard_expander = page.get_by_text("Scorecard, horizon, annual and stress trace", exact=False).first
+    scorecard_expander.scroll_into_view_if_needed()
+    scorecard_expander.click()
+    expect(body).to_contain_text("Scorecard summary", timeout=30000)
+    expect(body).to_contain_text("Operational pooled", timeout=30000)
+    assert "black box" not in body.inner_text(timeout=60000).lower()
+    assert "full workbook refit reproducibility" not in body.inner_text(timeout=60000).lower()
+    assert_no_streamlit_exception(page)
+
+
 def test_no_stale_finalist_values_visible(page: Page) -> None:
     open_dashboard(page)
     body = page.locator("body").inner_text(timeout=60000)

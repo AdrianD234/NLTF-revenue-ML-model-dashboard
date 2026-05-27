@@ -47,10 +47,14 @@ from model_dashboard.light_ruc_reproducibility import (
     reproducibility_feature_importance_view,
     reproducibility_ensemble_equation,
     reproducibility_ensemble_weight_view,
+    reproducibility_annual_view,
+    reproducibility_horizon_view,
     reproducibility_pack_signature,
     reproducibility_registry_view,
     reproducibility_replay_summary,
     reproducibility_sensitivity_view,
+    reproducibility_scorecard_view,
+    reproducibility_stress_view,
     reproducibility_stream_labels,
     reproducibility_training_window_view,
     load_reproducibility_pack,
@@ -1273,9 +1277,13 @@ def render_reproducibility_detail(stream_label: str) -> None:
         "Target period",
         "Horizon",
         "Actual",
+        "Component",
+        "Component prediction",
+        "Weighted contribution",
         "Base log prediction",
         "Residual log prediction",
         "Final prediction",
+        "Error (%)",
     ]
     component_view = component_trace[[col for col in component_cols if col in component_trace.columns]]
     display_table(component_view, height=320, max_rows=240)
@@ -1299,6 +1307,16 @@ def render_reproducibility_detail(stream_label: str) -> None:
 
     with st.expander("OLS coefficients by origin/window", expanded=False):
         display_table(reproducibility_coefficients_view(pack), height=420, max_rows=420)
+
+    with st.expander("Scorecard, horizon, annual and stress trace", expanded=False):
+        section_title("Scorecard summary")
+        display_table(reproducibility_scorecard_view(pack), height=150, max_rows=20)
+        section_title("Horizon profile")
+        display_table(reproducibility_horizon_view(pack), height=280, max_rows=120)
+        section_title("Annual replay")
+        display_table(reproducibility_annual_view(pack), height=280, max_rows=240)
+        section_title("Stress buckets")
+        display_table(reproducibility_stress_view(pack), height=180, max_rows=60)
 
     with st.expander("Rolling training window trace", expanded=False):
         display_table(reproducibility_training_window_view(pack), height=320, max_rows=200)

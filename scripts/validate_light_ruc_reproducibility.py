@@ -20,8 +20,12 @@ from model_dashboard.light_ruc_reproducibility import (  # noqa: E402
     LIGHT_RUC_REPRO_DESCRIPTION,
     LIGHT_RUC_REPRO_MODEL,
     LIGHT_RUC_REPRO_ROOT,
+    PED_REPRO_DESCRIPTION,
+    PED_REPRO_MODEL,
+    PED_REPRO_ROOT,
     REQUIRED_HEAVY_RUC_REPRO_FILES,
     REQUIRED_LIGHT_RUC_REPRO_FILES,
+    REQUIRED_PED_REPRO_FILES,
     light_ruc_coefficients_view,
     light_ruc_component_trace_view,
     light_ruc_feature_importance_view,
@@ -38,7 +42,9 @@ from model_dashboard.light_ruc_reproducibility import (  # noqa: E402
     reproducibility_feature_importance_view,
     reproducibility_registry_view,
     reproducibility_replay_summary,
+    reproducibility_scorecard_view,
     reproducibility_sensitivity_view,
+    reproducibility_stress_view,
     reproducibility_training_window_view,
 )
 
@@ -56,12 +62,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--data-root", default=str(DEFAULT_EVIDENCE_PACK_ROOT))
     parser.add_argument("--repro-root", default=str(LIGHT_RUC_REPRO_ROOT))
     parser.add_argument("--heavy-repro-root", default=str(HEAVY_RUC_REPRO_ROOT))
+    parser.add_argument("--ped-repro-root", default=str(PED_REPRO_ROOT))
     return parser.parse_args()
 
 
-def validate(data_root: str | Path, repro_root: str | Path, heavy_repro_root: str | Path | None = None) -> list[dict[str, str]]:
+def validate(
+    data_root: str | Path,
+    repro_root: str | Path,
+    heavy_repro_root: str | Path | None = None,
+    ped_repro_root: str | Path | None = None,
+) -> list[dict[str, str]]:
     pack = load_light_ruc_reproducibility_pack(repro_root)
     heavy_pack = load_reproducibility_pack("Heavy RUC volume", heavy_repro_root or HEAVY_RUC_REPRO_ROOT)
+    ped_pack = load_reproducibility_pack("PED VKT per capita", ped_repro_root or PED_REPRO_ROOT)
     findings: list[dict[str, str]] = []
 
     def record(name: str, passed: bool, evidence: str) -> None:
@@ -221,6 +234,7 @@ def validate(data_root: str | Path, repro_root: str | Path, heavy_repro_root: st
     )
 
     _validate_heavy_pack(heavy_pack, record)
+    _validate_ped_pack(ped_pack, record)
 
     dashboard = load_evidence_pack(data_root, ROOT)
     recommended = dashboard.data["recommended"].set_index("stream_label")
@@ -252,6 +266,16 @@ def validate(data_root: str | Path, repro_root: str | Path, heavy_repro_root: st
     _ = reproducibility_training_window_view(heavy_pack)
     _ = reproducibility_ensemble_weight_view(heavy_pack)
     _ = reproducibility_ensemble_equation(heavy_pack)
+    _ = reproducibility_registry_view(ped_pack)
+    _ = reproducibility_component_trace_view(ped_pack)
+    _ = reproducibility_feature_importance_view(ped_pack)
+    _ = reproducibility_sensitivity_view(ped_pack)
+    _ = reproducibility_coefficients_view(ped_pack)
+    _ = reproducibility_training_window_view(ped_pack)
+    _ = reproducibility_ensemble_weight_view(ped_pack)
+    _ = reproducibility_ensemble_equation(ped_pack)
+    _ = reproducibility_scorecard_view(ped_pack)
+    _ = reproducibility_stress_view(ped_pack)
     after_hashes = _chart_source_hashes()
     record(
         "Auxiliary reproducibility views do not alter main chart-source tables",
@@ -266,6 +290,106 @@ def validate(data_root: str | Path, repro_root: str | Path, heavy_repro_root: st
     )
 
     return findings
+
+
+def _validate_ped_pack(ped_pack: object, record: object) -> None:
+    root = Path(ped_pack.root)
+    record(
+        "PED required auxiliary audit files exist",
+        not ped_pack.missing_files,
+        "missing=" + ", ".join(ped_pack.missing_files) if ped_pack.missing_files else f"files={len(REQUIRED_PED_REPRO_FILES)}",
+    )
+    disallowed = sorted(path.name for path in root.glob("*") if path.suffix.lower() in {".csv", ".xlsx", ".xls"})
+    record(
+        "PED auxiliary audit copy excludes CSV/XLSX mirrors",
+        not disallowed,
+        "disallowed=" + ", ".join(disallowed) if disallowed else "No CSV/XLSX mirrors found in PED auxiliary pack.",
+    )
+    registry = ped_pack.table("model_registry")
+    record(
+        "PED model registry exists and identifies the finalist",
+        root.joinpath("model_registry.parquet").exists()
+        and not registry.empty
+        and PED_REPRO_MODEL in set(registry.get("model", pd.Series(dtype=str)).astype(str)),
+        f"path={root / 'model_registry.parquet'}; rows={len(registry)}",
+    )
+    summary = reproducibility_replay_summary(ped_pack) if ped_pack.available else {}
+    record(
+        "PED exact component-prediction replay status is documented",
+        summary.get("status") == "Exact component-prediction replay"
+        and summary.get("model") == PED_REPRO_MODEL
+        and summary.get("source_sheet") == "PED Inputs"
+        and summary.get("description") == PED_REPRO_DESCRIPTION,
+        str(summary),
+    )
+    prediction_comparison = ped_pack.table("evidence_prediction_comparison")
+    max_delta = pd.to_numeric(
+        prediction_comparison.get("pred_delta_vs_evidence", pd.Series(dtype=float)),
+        errors="coerce",
+    ).abs().max()
+    record(
+        "PED evidence prediction replay delta is below 1e-8",
+        pd.notna(max_delta) and float(max_delta) <= 1e-8,
+        f"max_abs_pred_delta={max_delta}",
+    )
+    weights = pd.to_numeric(ped_pack.table("component_predictions").get("component_weight", pd.Series(dtype=float)), errors="coerce")
+    record(
+        "PED component weight is exactly one",
+        not weights.empty and float(weights.dropna().max()) == 1.0 and float(weights.dropna().min()) == 1.0,
+        f"min_weight={weights.dropna().min() if not weights.dropna().empty else 'missing'}; max_weight={weights.dropna().max() if not weights.dropna().empty else 'missing'}",
+    )
+    component_delta = _ped_component_delta(ped_pack.table("component_predictions"))
+    record(
+        "PED component prediction equals final prediction",
+        pd.notna(component_delta) and float(component_delta) <= 1e-8,
+        f"max_abs_delta={component_delta}",
+    )
+    scorecard = ped_pack.table("scorecard_summary")
+    expected_metrics = {
+        ("current_grid_operational_pooled", "pooled_mape"): 2.473244,
+        ("current_grid_operational_pooled", "horizon_mean_mape"): 2.53072,
+        ("current_grid_operational_pooled", "bias_pct"): 1.51532,
+        ("schiff_paper_horizon_mean", "pooled_mape"): 2.65961,
+        ("schiff_paper_horizon_mean", "horizon_mean_mape"): 3.23714,
+        ("schiff_paper_horizon_mean", "bias_pct"): 1.97304,
+    }
+    metric_ok = not scorecard.empty
+    metric_evidence: list[str] = []
+    if metric_ok:
+        indexed = scorecard.set_index("score_basis")
+        for (basis, column), expected in expected_metrics.items():
+            actual = float(pd.to_numeric(indexed.loc[basis, column], errors="coerce"))
+            metric_ok = metric_ok and abs(actual - expected) <= 0.001
+            metric_evidence.append(f"{basis}.{column}={actual:.6f}")
+    annual = ped_pack.table("annual_predictions")
+    annual_text = f"annual_rows={len(annual)}"
+    record(
+        "PED scorecard metrics match audit facts",
+        metric_ok,
+        "; ".join(metric_evidence) + f"; {annual_text}" if metric_evidence else f"scorecard missing; {annual_text}",
+    )
+    feature_importance = ped_pack.table("feature_importance_global")
+    sensitivities = ped_pack.table("scenario_sensitivities")
+    record("PED feature importance rows exist", not feature_importance.empty, f"rows={len(feature_importance)}")
+    record("PED scenario sensitivity rows exist", not sensitivities.empty, f"rows={len(sensitivities)}")
+    equation = reproducibility_ensemble_equation(ped_pack)
+    record(
+        "PED ensemble equation is one hundred percent component replay",
+        equation == "Prediction = 1.0*C1",
+        equation,
+    )
+    text = "\n".join(
+        [
+            (ROOT / "app.py").read_text(encoding="utf-8"),
+            (ROOT / "model_dashboard" / "light_ruc_reproducibility.py").read_text(encoding="utf-8"),
+        ]
+    ).lower()
+    forbidden = ["full workbook refit reproducibility", "first-principles refit reproducibility"]
+    record(
+        "PED UI does not claim full workbook refit reproducibility",
+        not any(phrase in text for phrase in forbidden) and "inner hpo/static-solver rebuild remains a future audit layer" in text,
+        "Required caveat text is present and forbidden full-refit claims are absent.",
+    )
 
 
 def _validate_heavy_pack(heavy_pack: object, record: object) -> None:
@@ -355,6 +479,20 @@ def _heavy_weighted_component_delta(components: pd.DataFrame) -> float | pd.NA:
     return float((pd.to_numeric(grouped["rebuilt"], errors="coerce") - pd.to_numeric(grouped["final_pred"], errors="coerce")).abs().max())
 
 
+def _ped_component_delta(components: pd.DataFrame) -> float | pd.NA:
+    required = {"component_pred", "rebuilt_pred"}
+    if components.empty or not required.issubset(components.columns):
+        return pd.NA
+    return float(
+        (
+            pd.to_numeric(components["component_pred"], errors="coerce")
+            - pd.to_numeric(components["rebuilt_pred"], errors="coerce")
+        )
+        .abs()
+        .max()
+    )
+
+
 def _chart_source_hashes() -> dict[str, str]:
     source_dir = ROOT / "artifacts" / "chart_sources"
     if not source_dir.exists():
@@ -387,7 +525,7 @@ def main() -> int:
     args = parse_args()
     artifacts = ROOT / "artifacts"
     artifacts.mkdir(exist_ok=True)
-    findings = validate(args.data_root, args.repro_root, args.heavy_repro_root)
+    findings = validate(args.data_root, args.repro_root, args.heavy_repro_root, args.ped_repro_root)
     failed = [row for row in findings if row["status"] != "PASS"]
     status = "passed" if not failed else "failed"
     lines = [
