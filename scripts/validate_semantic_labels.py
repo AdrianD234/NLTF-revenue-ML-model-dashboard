@@ -11,7 +11,9 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from model_dashboard.data.config import DEFAULT_EVIDENCE_PACK_ROOT  # noqa: E402
+from model_dashboard.diagnostic_matrix import DIAGNOSTIC_TOOLTIP_COPY  # noqa: E402
 from model_dashboard.evidence_pack import load_evidence_pack  # noqa: E402
+from model_dashboard.labels import model_hover_description, model_hover_title  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
@@ -85,6 +87,25 @@ def validate() -> list[tuple[str, str, str]]:
         "Fitted value, native units" in (app_text + plot_text) and "Fitted value (m)" not in (app_text + plot_text),
         "Residual axis title inspected in app.py/plot helpers.",
     )
+    diagnostic_matrix_text = read_text(repo_root / "model_dashboard" / "diagnostic_matrix.py")
+    tooltip_requirements = {
+        "ADF": "Augmented Dickey-Fuller test",
+        "KPSS": "Kwiatkowski-Phillips-Schmidt-Shin test",
+        "White": "White test",
+        "Jarque-Bera": "Jarque-Bera test",
+        "Cointegration": "Cointegration test",
+    }
+    record(
+        "Diagnostic pass matrix headers and cells expose plain-English tooltips",
+        all(phrase in DIAGNOSTIC_TOOLTIP_COPY.get(label, "") for label, phrase in tooltip_requirements.items())
+        and "diagnostic_pass_matrix_html" in app_text
+        and "html_chart_card" in app_text
+        and "tabindex='0'" in diagnostic_matrix_text
+        and "role='tooltip'" in diagnostic_matrix_text
+        and ".diag-tooltip-trigger:hover .diag-tooltip-text" in read_text(repo_root / "model_dashboard" / "ui.py")
+        and ".diag-tooltip-trigger:focus .diag-tooltip-text" in read_text(repo_root / "model_dashboard" / "ui.py"),
+        "Diagnostic matrix tooltips are centralized, keyboard focusable, and rendered by the dashboard.",
+    )
 
     gain_source = repo_root / "artifacts" / "chart_sources" / "schiff_paired_or_fullsample_gain.csv"
     if gain_source.exists():
@@ -134,6 +155,27 @@ def validate() -> list[tuple[str, str, str]]:
         "Screenshot review does not describe the full-sample chart as paired",
         "Paired Gain vs Schiff" not in screenshot_review,
         "artifacts/screenshot_review.md label wording inspected.",
+    )
+
+    hover_bad_terms = ["Full model", "Full component"]
+    stale_hover_terms = [term for term in hover_bad_terms if term in plot_text]
+    heavy_detail = model_hover_description(
+        "HEAVY_RUC__dynamic_no_leads__Elastic_alpha0_005_l1_ratio0_2__ylag__w64",
+        weight=0.469332,
+    )
+    light_detail = model_hover_description("dynamic_RESID_GBR_n150_d1_lr0.05_w36")
+    record(
+        "Model hovers use management-friendly descriptions",
+        "Model detail" in plot_text
+        and "Component detail" in plot_text
+        and not stale_hover_terms
+        and model_hover_title("HEAVY_RUC__dynamic_no_leads__Elastic_alpha0_005_l1_ratio0_2__ylag__w64")
+        == "Dynamic ElasticNet model"
+        and "Uses no lead variables" in heavy_detail
+        and "Ensemble weight: 46.9%" in heavy_detail
+        and model_hover_title("dynamic_RESID_GBR_n150_d1_lr0.05_w36") == "Dynamic residual GBM"
+        and "two-stage model" in light_detail,
+        "Hover templates use Model detail/Component detail and helper translations for Heavy RUC ElasticNet and Light RUC residual GBM.",
     )
 
     return findings

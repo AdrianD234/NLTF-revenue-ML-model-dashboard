@@ -58,6 +58,8 @@ Invoke-Checked -FilePath $Python -Arguments @("scripts\inspect_parquet_schema.py
 Invoke-Checked -FilePath $Python -Arguments @("scripts\validate_dashboard_data.py", "--data-root", $DataRoot)
 Invoke-Checked -FilePath $Python -Arguments @("scripts\validate_chart_sources.py", "--data-root", $DataRoot)
 Invoke-Checked -FilePath $Python -Arguments @("scripts\validate_semantic_labels.py", "--data-root", $DataRoot)
+Invoke-Checked -FilePath $Python -Arguments @("scripts\validate_reproducibility_audit_pack.py", "--data-root", $DataRoot)
+Invoke-Checked -FilePath $Python -Arguments @("scripts\validate_light_ruc_reproducibility.py", "--data-root", $DataRoot)
 Invoke-Checked -FilePath $Python -Arguments @("scripts\check_streamlit_deploy_readiness.py")
 Invoke-Checked -FilePath $Python -Arguments @("-m", "pytest", "-q", "tests/test_chart_data_reconciliation.py")
 Invoke-Checked -FilePath $Python -Arguments @("-m", "pytest", "-q", "tests/test_chart_source_tables.py")

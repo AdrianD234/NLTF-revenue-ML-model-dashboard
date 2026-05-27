@@ -597,7 +597,7 @@ def test_ensemble_composition_uses_recommended_weighted_finalists(loaded_validat
     assert not plot_data.empty
     assert len(figure.data) > 0
     assert not mapping.empty
-    assert {"Label", "Full component model name", "Average weight (%)"}.issubset(mapping.columns)
+    assert {"Label", "Component model identifier", "Average weight (%)"}.issubset(mapping.columns)
 
 
 def test_ensemble_composition_explains_single_component_finalists(loaded_validation_run: LoadedRun) -> None:

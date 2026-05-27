@@ -271,6 +271,57 @@ def test_plotly_hovers_are_human_readable_on_all_pages(page: Page) -> None:
         assert_human_hover(hover_plotly_chart(page, plot_index))
 
 
+def test_diagnostic_pass_matrix_tooltips_hover_and_focus(page: Page) -> None:
+    open_dashboard(page)
+    click_page(page, "Diagnostics")
+
+    matrix = page.locator(".diagnostic-tooltip-matrix")
+    expect(matrix).to_be_visible(timeout=90000)
+
+    adf_header = matrix.locator(".diag-header-tooltip").filter(has_text="ADF").first
+    expect(adf_header).to_be_visible(timeout=60000)
+    adf_header.hover()
+    expect(adf_header.locator(".diag-tooltip-text")).to_be_visible(timeout=10000)
+    expect(adf_header.locator(".diag-tooltip-text")).to_contain_text("Augmented Dickey-Fuller test", timeout=10000)
+
+    kpss_header = matrix.locator(".diag-header-tooltip").filter(has_text="KPSS").first
+    kpss_header.focus()
+    expect(kpss_header.locator(".diag-tooltip-text")).to_be_visible(timeout=10000)
+    expect(kpss_header.locator(".diag-tooltip-text")).to_contain_text("Kwiatkowski-Phillips-Schmidt-Shin test", timeout=10000)
+
+    white_cell = matrix.locator("td").filter(has_text=re.compile(r"Pass|Watch|Fail")).nth(5)
+    white_trigger = white_cell.locator(".diag-tooltip-trigger")
+    white_trigger.focus()
+    expect(white_trigger.locator(".diag-tooltip-text")).to_be_visible(timeout=10000)
+    expect(white_trigger.locator(".diag-tooltip-text")).to_contain_text("Status:", timeout=10000)
+    assert_no_streamlit_exception(page)
+
+
+def test_light_ruc_reproducibility_detail_renders(page: Page) -> None:
+    open_dashboard(page)
+    click_page(page, "Diagnostics")
+
+    expander = page.get_by_text("Model Explainability / Reproducibility", exact=False).first
+    expander.scroll_into_view_if_needed()
+    expander.click()
+    load_label = page.get_by_text("Load Light RUC reproducibility detail", exact=False).first
+    expect(load_label).to_be_visible(timeout=30000)
+    load_label.click()
+
+    body = page.locator("body")
+    expect(body).to_contain_text("Exact prediction replay", timeout=60000)
+    expect(body).to_contain_text("dynamic_RESID_GBR_n150_d1_lr0.05_w36", timeout=60000)
+    expect(body).to_contain_text(
+        "Two-stage OLS base plus GBM residual correction, exactly replayed against evidence predictions.",
+        timeout=60000,
+    )
+    expect(body).to_contain_text("Feature importance", timeout=60000)
+    expect(body).to_contain_text("Scenario sensitivities", timeout=60000)
+    expect(body).to_contain_text("GDP, diesel price, RUC price and other perturbations", timeout=60000)
+    assert "black box" not in body.inner_text(timeout=60000).lower()
+    assert_no_streamlit_exception(page)
+
+
 def test_no_stale_finalist_values_visible(page: Page) -> None:
     open_dashboard(page)
     body = page.locator("body").inner_text(timeout=60000)

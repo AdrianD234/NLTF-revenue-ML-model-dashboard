@@ -14,7 +14,8 @@
     "light_ruc_finalist": "dynamic residual GBM selected as accuracy-challenger finalist; paper-style metrics default, operational annual MAPE retained as watch item.",
     "toggle_required": "Dashboard should expose Operational pooled MAPE and Paper-style horizon MAPE scorecards.",
     "candidate_frontier": "candidate_cone includes actual Light RUC challenger rows and transparent PED/Heavy visual frontier sample rows for chart continuity; visual samples are not model-selection evidence.",
-    "candidate_cone": "Default frontier chart uses balanced all-stream visual frontier samples plus true finalist and Schiff specification anchors; frontier samples are visualization-only and excluded from governance scoring."
+    "candidate_cone": "Default frontier chart uses balanced all-stream visual frontier samples plus true finalist and Schiff specification anchors; frontier samples are visualization-only and excluded from governance scoring.",
+    "reproducibility_audit": "Reproducibility tables document finalist/component traceability and explicitly mark incomplete rebuild gaps."
   },
   "row_counts": [
     {
@@ -24,10 +25,22 @@
       "size_bytes": 14956
     },
     {
+      "file": "candidate_cone.parquet",
+      "rows": 400,
+      "columns": 54,
+      "size_bytes": 69336
+    },
+    {
       "file": "chart_contract.parquet",
       "rows": 16,
       "columns": 5,
       "size_bytes": 5520
+    },
+    {
+      "file": "component_predictions.parquet",
+      "rows": 3504,
+      "columns": 18,
+      "size_bytes": 139605
     },
     {
       "file": "diagnostic_acf.parquet",
@@ -60,6 +73,12 @@
       "size_bytes": 38554
     },
     {
+      "file": "feature_importance.parquet",
+      "rows": 4,
+      "columns": 11,
+      "size_bytes": 8006
+    },
+    {
       "file": "finalists.parquet",
       "rows": 3,
       "columns": 33,
@@ -84,6 +103,18 @@
       "size_bytes": 98060
     },
     {
+      "file": "model_coefficients.parquet",
+      "rows": 4,
+      "columns": 14,
+      "size_bytes": 9491
+    },
+    {
+      "file": "model_registry.parquet",
+      "rows": 12,
+      "columns": 27,
+      "size_bytes": 27072
+    },
+    {
       "file": "paired_vs_schiff.parquet",
       "rows": 3,
       "columns": 22,
@@ -100,6 +131,12 @@
       "rows": 3,
       "columns": 19,
       "size_bytes": 14102
+    },
+    {
+      "file": "scenario_sensitivities.parquet",
+      "rows": 15,
+      "columns": 13,
+      "size_bytes": 9254
     },
     {
       "file": "schiff_benchmark.parquet",
@@ -144,16 +181,16 @@
       "size_bytes": 11860
     },
     {
+      "file": "shap_summary.parquet",
+      "rows": 4,
+      "columns": 11,
+      "size_bytes": 7750
+    },
+    {
       "file": "stress_horizon.parquet",
       "rows": 36,
       "columns": 15,
       "size_bytes": 10915
-    },
-    {
-      "file": "candidate_cone.parquet",
-      "rows": 400,
-      "columns": 54,
-      "size_bytes": 69336
     }
   ],
   "canonical_finalists": {
@@ -196,5 +233,6 @@
       "operational_pooled_mape": 7.800196102221683
     }
   },
-  "annual_metric_note": "Annual MAPE fields use the model-summary annual scorecard values; row-level annual_predictions are retained for audit but may use a broader aggregation basis."
+  "annual_metric_note": "Annual MAPE fields use the model-summary annual scorecard values; row-level annual_predictions are retained for audit but may use a broader aggregation basis.",
+  "reproducibility_audit_created_at": "2026-05-27"
 }

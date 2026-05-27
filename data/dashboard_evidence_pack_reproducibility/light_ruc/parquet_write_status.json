@@ -1,0 +1,212 @@
+[
+  {
+    "table": "model_registry",
+    "parquet_written": true,
+    "path": "C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Revenue Modeling - Strategic Review\\04 Models\\Inputs\\light_ruc_reproducibility_audit_outputs\\light_ruc_exact_repro_audit_20260527_190838\\data\\model_registry.parquet",
+    "rows": 3,
+    "columns": 24
+  },
+  {
+    "table": "model_registry",
+    "parquet_written": true,
+    "path": "C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Revenue Modeling - Strategic Review\\04 Models\\Inputs\\light_ruc_reproducibility_audit_outputs\\light_ruc_exact_repro_audit_20260527_190838\\dashboard_evidence_pack_additions\\data\\model_registry.parquet",
+    "rows": 3,
+    "columns": 24
+  },
+  {
+    "table": "rebuilt_predictions",
+    "parquet_written": true,
+    "path": "C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Revenue Modeling - Strategic Review\\04 Models\\Inputs\\light_ruc_reproducibility_audit_outputs\\light_ruc_exact_repro_audit_20260527_190838\\data\\rebuilt_predictions.parquet",
+    "rows": 516,
+    "columns": 21
+  },
+  {
+    "table": "rebuilt_predictions",
+    "parquet_written": true,
+    "path": "C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Revenue Modeling - Strategic Review\\04 Models\\Inputs\\light_ruc_reproducibility_audit_outputs\\light_ruc_exact_repro_audit_20260527_190838\\dashboard_evidence_pack_additions\\data\\rebuilt_predictions.parquet",
+    "rows": 516,
+    "columns": 21
+  },
+  {
+    "table": "component_predictions",
+    "parquet_written": true,
+    "path": "C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Revenue Modeling - Strategic Review\\04 Models\\Inputs\\light_ruc_reproducibility_audit_outputs\\light_ruc_exact_repro_audit_20260527_190838\\data\\component_predictions.parquet",
+    "rows": 1548,
+    "columns": 15
+  },
+  {
+    "table": "component_predictions",
+    "parquet_written": true,
+    "path": "C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Revenue Modeling - Strategic Review\\04 Models\\Inputs\\light_ruc_reproducibility_audit_outputs\\light_ruc_exact_repro_audit_20260527_190838\\dashboard_evidence_pack_additions\\data\\component_predictions.parquet",
+    "rows": 1548,
+    "columns": 15
+  },
+  {
+    "table": "model_coefficients",
+    "parquet_written": true,
+    "path": "C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Revenue Modeling - Strategic Review\\04 Models\\Inputs\\light_ruc_reproducibility_audit_outputs\\light_ruc_exact_repro_audit_20260527_190838\\data\\model_coefficients.parquet",
+    "rows": 558,
+    "columns": 10
+  },
+  {
+    "table": "model_coefficients",
+    "parquet_written": true,
+    "path": "C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Revenue Modeling - Strategic Review\\04 Models\\Inputs\\light_ruc_reproducibility_audit_outputs\\light_ruc_exact_repro_audit_20260527_190838\\dashboard_evidence_pack_additions\\data\\model_coefficients.parquet",
+    "rows": 558,
+    "columns": 10
+  },
+  {
+    "table": "feature_importance",
+    "parquet_written": true,
+    "path": "C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Revenue Modeling - Strategic Review\\04 Models\\Inputs\\light_ruc_reproducibility_audit_outputs\\light_ruc_exact_repro_audit_20260527_190838\\data\\feature_importance.parquet",
+    "rows": 1426,
+    "columns": 11
+  },
+  {
+    "table": "feature_importance",
+    "parquet_written": true,
+    "path": "C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Revenue Modeling - Strategic Review\\04 Models\\Inputs\\light_ruc_reproducibility_audit_outputs\\light_ruc_exact_repro_audit_20260527_190838\\dashboard_evidence_pack_additions\\data\\feature_importance.parquet",
+    "rows": 1426,
+    "columns": 11
+  },
+  {
+    "table": "feature_importance_global",
+    "parquet_written": true,
+    "path": "C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Revenue Modeling - Strategic Review\\04 Models\\Inputs\\light_ruc_reproducibility_audit_outputs\\light_ruc_exact_repro_audit_20260527_190838\\data\\feature_importance_global.parquet",
+    "rows": 46,
+    "columns": 10
+  },
+  {
+    "table": "feature_importance_global",
+    "parquet_written": true,
+    "path": "C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Revenue Modeling - Strategic Review\\04 Models\\Inputs\\light_ruc_reproducibility_audit_outputs\\light_ruc_exact_repro_audit_20260527_190838\\dashboard_evidence_pack_additions\\data\\feature_importance_global.parquet",
+    "rows": 46,
+    "columns": 10
+  },
+  {
+    "table": "scenario_sensitivities",
+    "parquet_written": true,
+    "path": "C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Revenue Modeling - Strategic Review\\04 Models\\Inputs\\light_ruc_reproducibility_audit_outputs\\light_ruc_exact_repro_audit_20260527_190838\\data\\scenario_sensitivities.parquet",
+    "rows": 1548,
+    "columns": 15
+  },
+  {
+    "table": "scenario_sensitivities",
+    "parquet_written": true,
+    "path": "C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Revenue Modeling - Strategic Review\\04 Models\\Inputs\\light_ruc_reproducibility_audit_outputs\\light_ruc_exact_repro_audit_20260527_190838\\dashboard_evidence_pack_additions\\data\\scenario_sensitivities.parquet",
+    "rows": 1548,
+    "columns": 15
+  },
+  {
+    "table": "future_forecasts",
+    "parquet_written": true,
+    "path": "C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Revenue Modeling - Strategic Review\\04 Models\\Inputs\\light_ruc_reproducibility_audit_outputs\\light_ruc_exact_repro_audit_20260527_190838\\data\\future_forecasts.parquet",
+    "rows": 12,
+    "columns": 8
+  },
+  {
+    "table": "future_forecasts",
+    "parquet_written": true,
+    "path": "C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Revenue Modeling - Strategic Review\\04 Models\\Inputs\\light_ruc_reproducibility_audit_outputs\\light_ruc_exact_repro_audit_20260527_190838\\dashboard_evidence_pack_additions\\data\\future_forecasts.parquet",
+    "rows": 12,
+    "columns": 8
+  },
+  {
+    "table": "scorecard_summary",
+    "parquet_written": true,
+    "path": "C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Revenue Modeling - Strategic Review\\04 Models\\Inputs\\light_ruc_reproducibility_audit_outputs\\light_ruc_exact_repro_audit_20260527_190838\\data\\scorecard_summary.parquet",
+    "rows": 2,
+    "columns": 30
+  },
+  {
+    "table": "scorecard_summary",
+    "parquet_written": true,
+    "path": "C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Revenue Modeling - Strategic Review\\04 Models\\Inputs\\light_ruc_reproducibility_audit_outputs\\light_ruc_exact_repro_audit_20260527_190838\\dashboard_evidence_pack_additions\\data\\scorecard_summary.parquet",
+    "rows": 2,
+    "columns": 30
+  },
+  {
+    "table": "annual_predictions",
+    "parquet_written": true,
+    "path": "C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Revenue Modeling - Strategic Review\\04 Models\\Inputs\\light_ruc_reproducibility_audit_outputs\\light_ruc_exact_repro_audit_20260527_190838\\data\\annual_predictions.parquet",
+    "rows": 79,
+    "columns": 12
+  },
+  {
+    "table": "annual_predictions",
+    "parquet_written": true,
+    "path": "C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Revenue Modeling - Strategic Review\\04 Models\\Inputs\\light_ruc_reproducibility_audit_outputs\\light_ruc_exact_repro_audit_20260527_190838\\dashboard_evidence_pack_additions\\data\\annual_predictions.parquet",
+    "rows": 79,
+    "columns": 12
+  },
+  {
+    "table": "horizon_profiles",
+    "parquet_written": true,
+    "path": "C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Revenue Modeling - Strategic Review\\04 Models\\Inputs\\light_ruc_reproducibility_audit_outputs\\light_ruc_exact_repro_audit_20260527_190838\\data\\horizon_profiles.parquet",
+    "rows": 24,
+    "columns": 9
+  },
+  {
+    "table": "horizon_profiles",
+    "parquet_written": true,
+    "path": "C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Revenue Modeling - Strategic Review\\04 Models\\Inputs\\light_ruc_reproducibility_audit_outputs\\light_ruc_exact_repro_audit_20260527_190838\\dashboard_evidence_pack_additions\\data\\horizon_profiles.parquet",
+    "rows": 24,
+    "columns": 9
+  },
+  {
+    "table": "stress_horizon",
+    "parquet_written": true,
+    "path": "C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Revenue Modeling - Strategic Review\\04 Models\\Inputs\\light_ruc_reproducibility_audit_outputs\\light_ruc_exact_repro_audit_20260527_190838\\data\\stress_horizon.parquet",
+    "rows": 12,
+    "columns": 9
+  },
+  {
+    "table": "stress_horizon",
+    "parquet_written": true,
+    "path": "C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Revenue Modeling - Strategic Review\\04 Models\\Inputs\\light_ruc_reproducibility_audit_outputs\\light_ruc_exact_repro_audit_20260527_190838\\dashboard_evidence_pack_additions\\data\\stress_horizon.parquet",
+    "rows": 12,
+    "columns": 9
+  },
+  {
+    "table": "training_window_trace",
+    "parquet_written": true,
+    "path": "C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Revenue Modeling - Strategic Review\\04 Models\\Inputs\\light_ruc_reproducibility_audit_outputs\\light_ruc_exact_repro_audit_20260527_190838\\data\\training_window_trace.parquet",
+    "rows": 62,
+    "columns": 11
+  },
+  {
+    "table": "training_window_trace",
+    "parquet_written": true,
+    "path": "C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Revenue Modeling - Strategic Review\\04 Models\\Inputs\\light_ruc_reproducibility_audit_outputs\\light_ruc_exact_repro_audit_20260527_190838\\dashboard_evidence_pack_additions\\data\\training_window_trace.parquet",
+    "rows": 62,
+    "columns": 11
+  },
+  {
+    "table": "evidence_prediction_comparison",
+    "parquet_written": true,
+    "path": "C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Revenue Modeling - Strategic Review\\04 Models\\Inputs\\light_ruc_reproducibility_audit_outputs\\light_ruc_exact_repro_audit_20260527_190838\\data\\evidence_prediction_comparison.parquet",
+    "rows": 1032,
+    "columns": 28
+  },
+  {
+    "table": "evidence_prediction_comparison",
+    "parquet_written": true,
+    "path": "C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Revenue Modeling - Strategic Review\\04 Models\\Inputs\\light_ruc_reproducibility_audit_outputs\\light_ruc_exact_repro_audit_20260527_190838\\dashboard_evidence_pack_additions\\data\\evidence_prediction_comparison.parquet",
+    "rows": 1032,
+    "columns": 28
+  },
+  {
+    "table": "evidence_metric_comparison",
+    "parquet_written": true,
+    "path": "C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Revenue Modeling - Strategic Review\\04 Models\\Inputs\\light_ruc_reproducibility_audit_outputs\\light_ruc_exact_repro_audit_20260527_190838\\data\\evidence_metric_comparison.parquet",
+    "rows": 4,
+    "columns": 9
+  },
+  {
+    "table": "evidence_metric_comparison",
+    "parquet_written": true,
+    "path": "C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Revenue Modeling - Strategic Review\\04 Models\\Inputs\\light_ruc_reproducibility_audit_outputs\\light_ruc_exact_repro_audit_20260527_190838\\dashboard_evidence_pack_additions\\data\\evidence_metric_comparison.parquet",
+    "rows": 4,
+    "columns": 9
+  }
+]

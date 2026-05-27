@@ -280,6 +280,176 @@ def display_model_label(value: Any, max_length: int = 84) -> str:
     return _display_model_label_text(text, max_length=max_length)
 
 
+def model_hover_title(value: Any) -> str:
+    """Return a management-friendly model family title for chart hovers."""
+    text = "" if value is None else str(value).strip()
+    if not text:
+        return "Model"
+    lower = text.lower()
+    if "dynamic_no_leads" in lower and "elastic" in lower:
+        return "Dynamic ElasticNet model"
+    if "resid_gbr" in lower or ("resid" in lower and "gbr" in lower):
+        return "Dynamic residual GBM" if "dynamic" in lower else "Residual GBM"
+    if "schiff_spec_from_workbook" in lower or "schiff specification" in lower:
+        return SCHIFF_SPEC_BENCHMARK_LABEL
+    if "schiff" in lower and "gbr" in lower:
+        return "Schiff-feature GBM"
+    if "gbr" in lower or "gbm" in lower:
+        return "Gradient-boosted tree model"
+    if "hpo" in lower and "solver" in lower:
+        return "Static solver ensemble"
+    if "solver_static" in lower or "weighted_top" in lower:
+        return "Static weighted ensemble"
+    if "recon_static_rebuilt" in lower:
+        return "Reconstructed finalist ensemble"
+    if "elastic" in lower:
+        return "ElasticNet model"
+    if "ridge" in lower:
+        return "Ridge regression model"
+    if "ols" in lower:
+        return "OLS regression model"
+    return display_model_label(text)
+
+
+def model_hover_description(value: Any, *, weight: Any = None) -> str:
+    """Translate dense model identifiers into concise management hover copy."""
+    text = "" if value is None else str(value).strip()
+    if not text:
+        return "-"
+    lower = text.lower()
+    parts: list[str] = []
+
+    if "dynamic_no_leads" in lower and "elastic" in lower:
+        lag_phrase = "includes target lags" if "ylag" in lower and "noylag" not in lower else "does not include target lags"
+        window = _extract_window(lower)
+        parts.append(
+            "Uses no lead variables, "
+            + lag_phrase
+            + (f", trained on a {window}-quarter rolling window." if window else ".")
+        )
+        alpha = _extract_decimal_token(lower, "alpha")
+        l1_ratio = _extract_decimal_token(lower, "l1_ratio")
+        hp = []
+        if alpha is not None:
+            hp.append(f"alpha = {_format_param(alpha)}")
+        if l1_ratio is not None:
+            hp.append(f"L1 ratio = {_format_param(l1_ratio)}")
+        if hp:
+            parts.append("Hyperparameters: " + ", ".join(hp) + ".")
+    elif "resid_gbr" in lower or ("resid" in lower and "gbr" in lower):
+        parts.append("A two-stage model: a base economic model plus a shallow gradient-boosted residual correction.")
+        hp = _gbm_hyperparameter_sentence(lower)
+        if hp:
+            parts.append(hp)
+    elif "schiff_spec_from_workbook" in lower or "schiff specification" in lower:
+        parts.append("Structural benchmark specification sourced from the workbook evidence pack.")
+    elif "schiff" in lower and "gbr" in lower:
+        parts.append("Gradient-boosted tree model using the Schiff-style feature set.")
+        hp = _gbm_hyperparameter_sentence(lower)
+        if hp:
+            parts.append(hp)
+    elif "gbr" in lower or "gbm" in lower:
+        parts.append("Gradient-boosted tree model for nonlinear accuracy improvement.")
+        hp = _gbm_hyperparameter_sentence(lower)
+        if hp:
+            parts.append(hp)
+    elif "hpo" in lower and "solver" in lower:
+        parts.append("Optimisation-selected blend of high-performing candidate forecasts.")
+        top_k = re.search(r"top[-_]?(\d+)", lower)
+        if top_k:
+            parts.append(f"Uses the top {top_k.group(1)} candidate forecasts in the solver pool.")
+    elif "solver_static" in lower or "weighted_top" in lower:
+        parts.append("Static weighted ensemble selected from the finalist candidate set.")
+    elif "recon_static_rebuilt" in lower:
+        parts.append("Reconstructed finalist ensemble validated against the evidence-pack final predictions.")
+    elif "elastic" in lower:
+        parts.append("Regularised linear model balancing ridge and lasso penalties.")
+        alpha = _extract_decimal_token(lower, "alpha")
+        l1_ratio = _extract_decimal_token(lower, "l1_ratio")
+        hp = []
+        if alpha is not None:
+            hp.append(f"alpha = {_format_param(alpha)}")
+        if l1_ratio is not None:
+            hp.append(f"L1 ratio = {_format_param(l1_ratio)}")
+        if hp:
+            parts.append("Hyperparameters: " + ", ".join(hp) + ".")
+    else:
+        parts.append("Curated finalist or benchmark model from the governed evidence pack.")
+
+    weight_text = _format_hover_weight(weight)
+    if weight_text:
+        parts.append(f"Ensemble weight: {weight_text}.")
+
+    return " ".join(parts)
+
+
+def _extract_window(text: str) -> int | None:
+    match = re.search(r"(?:^|_)w(\d+)(?:_|$)", text)
+    return int(match.group(1)) if match else None
+
+
+def _extract_decimal_token(text: str, name: str) -> float | None:
+    match = re.search(rf"{re.escape(name)}([0-9]+(?:[_.][0-9]+)?)", text)
+    if not match:
+        return None
+    raw = match.group(1).replace("_", ".")
+    try:
+        return float(raw)
+    except ValueError:
+        return None
+
+
+def _extract_int_token(text: str, name: str) -> int | None:
+    match = re.search(rf"{re.escape(name)}(\d+)", text)
+    if not match:
+        return None
+    return int(match.group(1))
+
+
+def _gbm_hyperparameter_sentence(text: str) -> str:
+    trees = _extract_int_token(text, "n_estimators")
+    if trees is None:
+        n_short = re.search(r"(?:^|_)n(\d+)(?:_|$)", text)
+        trees = int(n_short.group(1)) if n_short else None
+    depth = _extract_int_token(text, "max_depth")
+    if depth is None:
+        d_short = re.search(r"(?:^|_)d(\d+)(?:_|$)", text)
+        depth = int(d_short.group(1)) if d_short else None
+    learning_rate = _extract_decimal_token(text, "learning_rate")
+    if learning_rate is None:
+        lr_short = re.search(r"(?:^|_)lr([0-9]+(?:\.[0-9]+)?)(?:_|$)", text)
+        learning_rate = float(lr_short.group(1)) if lr_short else None
+    window = _extract_window(text)
+    bits = []
+    if trees is not None:
+        bits.append(f"{trees} trees")
+    if depth is not None:
+        bits.append(f"depth {depth}")
+    if learning_rate is not None:
+        bits.append(f"learning rate {_format_param(learning_rate)}")
+    if window is not None:
+        bits.append(f"{window}-quarter rolling window")
+    return ", ".join(bits).capitalize() + "." if bits else ""
+
+
+def _format_param(value: float) -> str:
+    return f"{value:.6g}"
+
+
+def _format_hover_weight(value: Any) -> str:
+    if value is None:
+        return ""
+    try:
+        if _missing(value):
+            return ""
+        number = float(value)
+    except (TypeError, ValueError):
+        return ""
+    if abs(number) <= 1.5:
+        number *= 100.0
+    return f"{number:.1f}%"
+
+
 def _missing(value: Any) -> bool:
     if value is None:
         return True

@@ -14,14 +14,14 @@ from .labels import (
     SCHIFF_SPEC_BENCHMARK_LABEL,
     STRESS_BUCKET_ORDER,
     STREAM_COLORS,
-    display_model_label,
     format_count,
     format_percent,
     format_pp,
     format_weight,
     horizon_label,
     humanize_label,
-    model_alias,
+    model_hover_description,
+    model_hover_title,
     shorten_model_name,
 )
 from .metrics import best_by_stream, period_key
@@ -73,6 +73,21 @@ def _safe_series(data: pd.DataFrame, column: str, default: Any = "") -> pd.Serie
     return pd.Series([default] * len(data), index=data.index)
 
 
+def _model_hover_title_series(data: pd.DataFrame, column: str = "model") -> pd.Series:
+    return _safe_series(data, column).map(model_hover_title)
+
+
+def _model_hover_detail_series(data: pd.DataFrame, column: str = "model", weight_column: str | None = None) -> pd.Series:
+    models = _safe_series(data, column)
+    if weight_column and weight_column in data.columns:
+        weights = data[weight_column]
+        return pd.Series(
+            [model_hover_description(model, weight=weight) for model, weight in zip(models, weights, strict=False)],
+            index=data.index,
+        )
+    return models.map(model_hover_description)
+
+
 def plot_finalist_accuracy(recommended: pd.DataFrame) -> go.Figure:
     finalists = best_by_stream(recommended).copy()
     if finalists.empty or "quarterly_mape" not in finalists.columns:
@@ -85,8 +100,8 @@ def plot_finalist_accuracy(recommended: pd.DataFrame) -> go.Figure:
     finalists = finalists.sort_values(["_stream_order", "stream_label"])
     finalists["stream_plot_label"] = finalists["stream_label"].map(_axis_stream_label)
     finalists["_hover_stream"] = finalists["stream_label"].astype(str)
-    finalists["_hover_model"] = _safe_series(finalists, "model").map(display_model_label)
-    finalists["_hover_full_model"] = _safe_series(finalists, "model").map(_clean_hover_text)
+    finalists["_hover_model"] = _model_hover_title_series(finalists)
+    finalists["_hover_model_detail"] = _model_hover_detail_series(finalists)
     finalists["_hover_source"] = _safe_series(finalists, "source_family").map(humanize_label)
     finalists["_hover_variant"] = _safe_series(finalists, "variant").map(humanize_label)
     finalists["_hover_quarterly_mape"] = _safe_series(finalists, "quarterly_mape").map(format_percent)
@@ -107,7 +122,7 @@ def plot_finalist_accuracy(recommended: pd.DataFrame) -> go.Figure:
                 [
                     "_hover_stream",
                     "_hover_model",
-                    "_hover_full_model",
+                    "_hover_model_detail",
                     "_hover_source",
                     "_hover_variant",
                     "_hover_quarterly_mape",
@@ -120,7 +135,7 @@ def plot_finalist_accuracy(recommended: pd.DataFrame) -> go.Figure:
                 "Quarterly MAPE: %{customdata[5]}<br>"
                 "Annual MAPE: %{customdata[6]}<br>"
                 "Model: %{customdata[1]}<br>"
-                "Full model: %{customdata[2]}<br>"
+                "Model detail: %{customdata[2]}<br>"
                 "Source: %{customdata[3]}<br>"
                 "Variant: %{customdata[4]}<extra></extra>"
             ),
@@ -171,8 +186,8 @@ def plot_candidate_landscape(summary: pd.DataFrame) -> go.Figure:
         data.loc[data["is_recommended_finalist"].astype(bool), "point_type"] = "Selected finalist"
     if "is_current_recommended" in data.columns:
         data.loc[data["is_current_recommended"].astype(bool), "point_type"] = "Selected finalist"
-    data["model_short"] = _safe_series(data, "model").map(display_model_label)
-    data["_hover_full_model"] = _safe_series(data, "model").map(_clean_hover_text)
+    data["model_short"] = _model_hover_title_series(data)
+    data["_hover_model_detail"] = _model_hover_detail_series(data)
     data["_hover_stage"] = _safe_series(data, "stage").map(humanize_label)
     data["_hover_variant"] = _safe_series(data, "variant").map(humanize_label)
     data["_hover_source"] = _safe_series(data, "source_family").map(humanize_label)
@@ -201,7 +216,7 @@ def plot_candidate_landscape(summary: pd.DataFrame) -> go.Figure:
     hover_columns = [
         "stream_label",
         "model_short",
-        "_hover_full_model",
+        "_hover_model_detail",
         "_hover_stage",
         "_hover_variant",
         "_hover_source",
@@ -225,7 +240,7 @@ def plot_candidate_landscape(summary: pd.DataFrame) -> go.Figure:
         "Feature set: %{customdata[6]}<br>"
         "Governance score: %{customdata[9]}<br>"
         "Schiff class: %{customdata[10]}<br>"
-        "Full model: %{customdata[2]}<extra></extra>"
+        "Model detail: %{customdata[2]}<extra></extra>"
     )
     base = data[data["point_type"].isin(["Distribution sample", "Candidate", "Frontier candidate"])].copy()
     base["_stream_order"] = base["stream_label"].map(_stream_order_value)
@@ -409,8 +424,8 @@ def plot_schiff_benchmark(summary: pd.DataFrame) -> go.Figure:
     if schiff.empty:
         return empty_figure("No Schiff specification benchmark rows were detected.")
     schiff = best_by_stream(schiff)
-    schiff["_hover_model"] = _safe_series(schiff, "model").map(display_model_label)
-    schiff["_hover_full_model"] = _safe_series(schiff, "model").map(_clean_hover_text)
+    schiff["_hover_model"] = _model_hover_title_series(schiff)
+    schiff["_hover_model_detail"] = _model_hover_detail_series(schiff)
     schiff["_hover_source"] = _safe_series(schiff, "source_family").map(humanize_label)
     fig = go.Figure()
     for metric, column in [("Quarterly MAPE", "quarterly_mape"), ("Annual MAPE", "annual_mape")]:
@@ -422,12 +437,12 @@ def plot_schiff_benchmark(summary: pd.DataFrame) -> go.Figure:
                 marker_color=METRIC_COLORS[metric],
                 text=[f"{value:.2f}%" if pd.notna(value) else "" for value in schiff[column]],
                 textposition="outside",
-                customdata=schiff[["_hover_model", "_hover_full_model", "_hover_source"]].fillna("-").to_numpy(),
+                customdata=schiff[["_hover_model", "_hover_model_detail", "_hover_source"]].fillna("-").to_numpy(),
                 hovertemplate=(
                     "<b>%{x}</b><br>"
                     f"{metric}: %{{y:.2f}}%<br>"
                     "Model: %{customdata[0]}<br>"
-                    "Full model: %{customdata[1]}<br>"
+                    "Model detail: %{customdata[1]}<br>"
                     "Source: %{customdata[2]}<extra></extra>"
                 ),
             )
@@ -441,7 +456,8 @@ def plot_paired_improvement(paired: pd.DataFrame, top_n: int = 30) -> go.Figure:
     data = paired.dropna(subset=["mape_improvement_pct_points"]).copy()
     if data.empty:
         return empty_figure("Paired comparison rows do not include improvement values.")
-    data["challenger_short"] = data["challenger"].map(display_model_label)
+    data["challenger_short"] = data["challenger"].map(model_hover_title)
+    data["_hover_challenger_detail"] = data["challenger"].map(model_hover_description)
     data["_hover_stage"] = _safe_series(data, "stage").map(humanize_label)
     data["_hover_baseline_mape"] = _safe_series(data, "baseline_mape").map(format_percent)
     data["_hover_challenger_mape"] = _safe_series(data, "challenger_mape").map(format_percent)
@@ -466,6 +482,7 @@ def plot_paired_improvement(paired: pd.DataFrame, top_n: int = 30) -> go.Figure:
             "_hover_gain",
             "_hover_win_rate",
             "_hover_pairs",
+            "_hover_challenger_detail",
         ],
     )
     fig.update_traces(
@@ -477,7 +494,8 @@ def plot_paired_improvement(paired: pd.DataFrame, top_n: int = 30) -> go.Figure:
             "Challenger MAPE: %{customdata[4]}<br>"
             "Gain vs Schiff specification benchmark: %{customdata[5]}<br>"
             "Win rate: %{customdata[6]}<br>"
-            "Common pairs: %{customdata[7]}<extra></extra>"
+            "Common pairs: %{customdata[7]}<br>"
+            "Model detail: %{customdata[8]}<extra></extra>"
         )
     )
     fig.add_vline(x=0, line_width=1, line_color="#64748B")
@@ -490,9 +508,11 @@ def plot_paired_scatter(paired: pd.DataFrame) -> go.Figure:
     data = paired.dropna(subset=["baseline_mape", "challenger_mape"]).copy()
     if data.empty:
         return empty_figure("No paired rows have both baseline and challenger MAPE.")
-    data["challenger_short"] = data["challenger"].map(display_model_label)
+    data["challenger_short"] = data["challenger"].map(model_hover_title)
     data["_hover_stage"] = _safe_series(data, "stage").map(humanize_label)
-    data["_hover_baseline"] = _safe_series(data, "baseline").map(display_model_label)
+    data["_hover_baseline"] = _safe_series(data, "baseline").map(model_hover_title)
+    data["_hover_challenger_detail"] = data["challenger"].map(model_hover_description)
+    data["_hover_baseline_detail"] = _safe_series(data, "baseline").map(model_hover_description)
     data["_hover_gain"] = _safe_series(data, "mape_improvement_pct_points").map(format_pp)
     data["_hover_win_rate"] = _safe_series(data, "challenger_win_rate").map(format_percent)
     fig = px.scatter(
@@ -502,7 +522,16 @@ def plot_paired_scatter(paired: pd.DataFrame) -> go.Figure:
         color="stream_label",
         color_discrete_map=STREAM_COLORS,
         hover_name="challenger_short",
-        custom_data=["stream_label", "challenger_short", "_hover_stage", "_hover_baseline", "_hover_gain", "_hover_win_rate"],
+        custom_data=[
+            "stream_label",
+            "challenger_short",
+            "_hover_stage",
+            "_hover_baseline",
+            "_hover_gain",
+            "_hover_win_rate",
+            "_hover_challenger_detail",
+            "_hover_baseline_detail",
+        ],
         labels={"baseline_mape": "Schiff specification benchmark MAPE (%)", "challenger_mape": "Challenger MAPE (%)"},
     )
     fig.update_traces(
@@ -514,7 +543,9 @@ def plot_paired_scatter(paired: pd.DataFrame) -> go.Figure:
             "Schiff specification benchmark MAPE: %{x:.2f}%<br>"
             "Challenger MAPE: %{y:.2f}%<br>"
             "Gain vs Schiff specification benchmark: %{customdata[4]}<br>"
-            "Win rate: %{customdata[5]}<extra></extra>"
+            "Win rate: %{customdata[5]}<br>"
+            "Challenger detail: %{customdata[6]}<br>"
+            "Baseline detail: %{customdata[7]}<extra></extra>"
         )
     )
     max_value = max(data["baseline_mape"].max(), data["challenger_mape"].max())
@@ -554,9 +585,10 @@ def plot_ensemble_composition(weights: pd.DataFrame) -> tuple[go.Figure, pd.Data
     if grouped.empty:
         return empty_figure("No non-zero ensemble weights were available."), pd.DataFrame()
     grouped = grouped.sort_values(["stream_label", "weight_pct"], ascending=[True, False])
-    grouped["_hover_ensemble"] = _safe_series(grouped, "ensemble").map(display_model_label)
-    grouped["_hover_component"] = _safe_series(grouped, "component_model").map(display_model_label)
-    grouped["_hover_full_component"] = _safe_series(grouped, "component_model").map(display_model_label)
+    grouped["_hover_ensemble"] = _safe_series(grouped, "ensemble").map(model_hover_title)
+    grouped["_hover_ensemble_detail"] = _safe_series(grouped, "ensemble").map(model_hover_description)
+    grouped["_hover_component"] = _safe_series(grouped, "component_model").map(model_hover_title)
+    grouped["_hover_component_detail"] = _model_hover_detail_series(grouped, "component_model", "weight_pct")
     grouped["_hover_weight"] = grouped["weight_pct"].map(format_weight)
     grouped["component_label"] = ""
     mapping_rows: list[dict[str, Any]] = []
@@ -569,7 +601,7 @@ def plot_ensemble_composition(weights: pd.DataFrame) -> tuple[go.Figure, pd.Data
                     "Stream": grouped.loc[row_index, "stream_label"],
                     "Ensemble": ensemble,
                     "Label": label,
-                    "Full component model name": grouped.loc[row_index, "component_model"],
+                    "Component model identifier": grouped.loc[row_index, "component_model"],
                     "Average weight (%)": grouped.loc[row_index, "weight_pct"],
                 }
             )
@@ -596,7 +628,7 @@ def plot_ensemble_composition(weights: pd.DataFrame) -> tuple[go.Figure, pd.Data
                 textposition="outside",
                 cliponaxis=False,
                 customdata=stream_data[
-                    ["stream_label", "_hover_ensemble", "_hover_component", "_hover_full_component", "_hover_weight"]
+                    ["stream_label", "_hover_ensemble", "_hover_component", "_hover_component_detail", "_hover_weight", "_hover_ensemble_detail"]
                 ].fillna("-").to_numpy(),
                 hovertemplate=(
                     "<b>%{y}</b><br>"
@@ -604,7 +636,8 @@ def plot_ensemble_composition(weights: pd.DataFrame) -> tuple[go.Figure, pd.Data
                     "Weight: %{customdata[4]}<br>"
                     "Ensemble: %{customdata[1]}<br>"
                     "Component: %{customdata[2]}<br>"
-                    "Full component: %{customdata[3]}<extra></extra>"
+                    "Component detail: %{customdata[3]}<br>"
+                    "Ensemble detail: %{customdata[5]}<extra></extra>"
                 ),
                 name=str(stream),
                 showlegend=False,
@@ -627,15 +660,16 @@ def plot_weight_over_time(weights: pd.DataFrame, label_mapping: pd.DataFrame) ->
         return empty_figure("No origin-level weight history for the selected ensemble.")
     label_lookup = dict(
         zip(
-            label_mapping["Full component model name"],
+            label_mapping["Component model identifier"],
             label_mapping["Label"],
             strict=False,
         )
     )
-    data["component_label"] = data["component_model"].map(label_lookup).fillna(data["component_model"].map(shorten_model_name))
+    data["component_label"] = data["component_model"].map(label_lookup).fillna(data["component_model"].map(model_hover_title))
     weight_values = pd.to_numeric(data["weight"], errors="coerce")
     data["_hover_weight_value"] = weight_values * 100.0 if weight_values.max() <= 1.5 else weight_values
-    data["_hover_component"] = _safe_series(data, "component_model").map(display_model_label)
+    data["_hover_component"] = _safe_series(data, "component_model").map(model_hover_title)
+    data["_hover_component_detail"] = _model_hover_detail_series(data, "component_model", "_hover_weight_value")
     data["_hover_weight"] = data["_hover_weight_value"].map(format_weight)
     data["origin_key"] = data["origin"].map(period_key)
     data = data.sort_values(["component_label", "origin_key"])
@@ -646,7 +680,7 @@ def plot_weight_over_time(weights: pd.DataFrame, label_mapping: pd.DataFrame) ->
         color="component_label",
         markers=True,
         labels={"origin": "Forecast origin", "weight": "Weight"},
-        custom_data=["_hover_component", "_hover_weight"],
+        custom_data=["_hover_component", "_hover_weight", "_hover_component_detail"],
     )
     fig.update_traces(
         line={"width": 2.1},
@@ -654,7 +688,8 @@ def plot_weight_over_time(weights: pd.DataFrame, label_mapping: pd.DataFrame) ->
         hovertemplate=(
             "<b>%{customdata[0]}</b><br>"
             "Forecast origin: %{x}<br>"
-            "Weight: %{customdata[1]}<extra></extra>"
+            "Weight: %{customdata[1]}<br>"
+            "Component detail: %{customdata[2]}<extra></extra>"
         )
     )
     if data["weight"].max() <= 1.5:
@@ -674,12 +709,14 @@ def plot_actual_vs_predicted(qpred: pd.DataFrame) -> go.Figure:
         x = list(range(len(data)))
     fig = go.Figure()
     hover_stream = _safe_series(data, "stream_label").astype(str)
-    hover_model = _safe_series(data, "model").map(display_model_label)
+    hover_model = _model_hover_title_series(data)
+    hover_model_detail = _model_hover_detail_series(data)
     hover_horizon = _safe_series(data, "horizon").map(format_count)
     customdata = pd.DataFrame(
         {
             "stream": hover_stream,
             "model": hover_model,
+            "model_detail": hover_model_detail,
             "horizon": hover_horizon,
         },
         index=data.index,
@@ -697,7 +734,8 @@ def plot_actual_vs_predicted(qpred: pd.DataFrame) -> go.Figure:
                 "Target period: %{x}<br>"
                 "Actual: %{y:,.0f}<br>"
                 "Model: %{customdata[1]}<br>"
-                "Horizon: %{customdata[2]} quarters<extra></extra>"
+                "Model detail: %{customdata[2]}<br>"
+                "Horizon: %{customdata[3]} quarters<extra></extra>"
             ),
         )
     )
@@ -714,7 +752,8 @@ def plot_actual_vs_predicted(qpred: pd.DataFrame) -> go.Figure:
                 "Target period: %{x}<br>"
                 "Predicted: %{y:,.0f}<br>"
                 "Model: %{customdata[1]}<br>"
-                "Horizon: %{customdata[2]} quarters<extra></extra>"
+                "Model detail: %{customdata[2]}<br>"
+                "Horizon: %{customdata[3]} quarters<extra></extra>"
             ),
         )
     )
@@ -732,7 +771,8 @@ def plot_residual_vs_fitted(qpred: pd.DataFrame) -> go.Figure:
     full_count = len(data)
     data = _sample_by_stream(data, max_rows=6000)
     data["pred_native"] = pd.to_numeric(data["pred"], errors="coerce")
-    data["_hover_model"] = _safe_series(data, "model").map(display_model_label)
+    data["_hover_model"] = _model_hover_title_series(data)
+    data["_hover_model_detail"] = _model_hover_detail_series(data)
     data["_hover_period"] = _safe_series(data, "target_period").map(_clean_hover_text)
     data["_hover_horizon"] = _safe_series(data, "horizon").map(format_count)
     data["_hover_error"] = data["error_pct"].map(format_percent)
@@ -753,14 +793,17 @@ def plot_residual_vs_fitted(qpred: pd.DataFrame) -> go.Figure:
                     "opacity": 0.52,
                     "line": {"width": 0},
                 },
-                customdata=stream_rows[["stream_label", "_hover_period", "_hover_model", "_hover_horizon", "_hover_error"]].to_numpy(),
+                customdata=stream_rows[
+                    ["stream_label", "_hover_period", "_hover_model", "_hover_model_detail", "_hover_horizon", "_hover_error"]
+                ].to_numpy(),
                 hovertemplate=(
                     "<b>%{customdata[0]}</b><br>"
                     "Target period: %{customdata[1]}<br>"
                     "Fitted value: %{x:,.4g} native units<br>"
-                    "Forecast error: %{customdata[4]}<br>"
+                    "Forecast error: %{customdata[5]}<br>"
                     "Model: %{customdata[2]}<br>"
-                    "Horizon: %{customdata[3]} quarters<extra></extra>"
+                    "Model detail: %{customdata[3]}<br>"
+                    "Horizon: %{customdata[4]} quarters<extra></extra>"
                 ),
                 showlegend=False,
             ),
@@ -916,7 +959,8 @@ def plot_percent_error_over_time(qpred: pd.DataFrame) -> go.Figure:
             customdata=pd.DataFrame(
                 {
                     "stream": _safe_series(data, "stream_label").astype(str),
-                    "model": _safe_series(data, "model").map(display_model_label),
+                    "model": _model_hover_title_series(data),
+                    "model_detail": _model_hover_detail_series(data),
                     "horizon": _safe_series(data, "horizon").map(format_count),
                 },
                 index=data.index,
@@ -926,7 +970,8 @@ def plot_percent_error_over_time(qpred: pd.DataFrame) -> go.Figure:
                 "Target period: %{x}<br>"
                 "Forecast error: %{y:.2f}%<br>"
                 "Model: %{customdata[1]}<br>"
-                "Horizon: %{customdata[2]} quarters<extra></extra>"
+                "Model detail: %{customdata[2]}<br>"
+                "Horizon: %{customdata[3]} quarters<extra></extra>"
             ),
         )
     )
@@ -1097,7 +1142,8 @@ def plot_stress_checks(stress: pd.DataFrame) -> go.Figure:
     data = data.sort_values(["stream_label", "stress_bucket"])
     data["_hover_bucket"] = data["stress_bucket"].astype(str).map(horizon_label)
     data["_hover_mape"] = data["mape"].map(format_percent)
-    data["_hover_model"] = _safe_series(data, "model").map(display_model_label)
+    data["_hover_model"] = _model_hover_title_series(data)
+    data["_hover_model_detail"] = _model_hover_detail_series(data)
     data["_hover_variant"] = _safe_series(data, "variant").map(humanize_label)
     data["_hover_pairs"] = _safe_series(data, "n_pairs").map(format_count)
     fig = px.line(
@@ -1108,7 +1154,15 @@ def plot_stress_checks(stress: pd.DataFrame) -> go.Figure:
         markers=True,
         color_discrete_map=STREAM_COLORS,
         labels={"stress_bucket": "Stress bucket", "mape": f"{basis_label} (%)", "stream_label": ""},
-        custom_data=["stream_label", "_hover_bucket", "_hover_mape", "_hover_model", "_hover_variant", "_hover_pairs"],
+        custom_data=[
+            "stream_label",
+            "_hover_bucket",
+            "_hover_mape",
+            "_hover_model",
+            "_hover_model_detail",
+            "_hover_variant",
+            "_hover_pairs",
+        ],
     )
     fig.update_traces(
         connectgaps=False,
@@ -1117,8 +1171,9 @@ def plot_stress_checks(stress: pd.DataFrame) -> go.Figure:
             "Stress window: %{customdata[1]}<br>"
             f"{basis_label}: %{{customdata[2]}}<br>"
             "Model: %{customdata[3]}<br>"
-            "Variant: %{customdata[4]}<br>"
-            "Rows: %{customdata[5]}<extra></extra>"
+            "Model detail: %{customdata[4]}<br>"
+            "Variant: %{customdata[5]}<br>"
+            "Rows: %{customdata[6]}<extra></extra>"
         )
     )
     fig.add_hline(

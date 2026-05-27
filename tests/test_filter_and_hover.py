@@ -80,8 +80,8 @@ def test_candidate_landscape_hover_is_human_readable(page: Page) -> None:
     save_hover_screenshot(page, "hover-candidate-landscape.png")
     assert_human_hover(
         tooltip,
-        required=["Stream", "Quarterly MAPE", "Annual MAPE", "Model"],
-        forbidden=["quarterly_mape", "annual_mape", "source_family", "model_kind"],
+        required=["Stream", "Quarterly MAPE", "Annual MAPE", "Model", "Model detail"],
+        forbidden=["quarterly_mape", "annual_mape", "source_family", "model_kind", "HEAVY_RUC__"],
     )
 
 
@@ -91,8 +91,8 @@ def test_finalist_accuracy_hover_is_human_readable(page: Page) -> None:
     save_hover_screenshot(page, "hover-finalist-accuracy.png")
     assert_human_hover(
         tooltip,
-        required=["Quarterly MAPE", "Model", "Source"],
-        forbidden=["quarterly_mape", "annual_mape", "source_family", "model_kind"],
+        required=["Quarterly MAPE", "Model", "Model detail", "Source"],
+        forbidden=["quarterly_mape", "annual_mape", "source_family", "model_kind", "dynamic_RESID_GBR"],
     )
 
 
@@ -102,8 +102,8 @@ def test_ensemble_hover_is_human_readable(page: Page) -> None:
     save_hover_screenshot(page, "hover-ensemble-composition.png")
     assert_human_hover(
         tooltip,
-        required=["Weight", "Component"],
-        forbidden=["component_model", "source_family", "model_kind"],
+        required=["Weight", "Component", "Component detail"],
+        forbidden=["component_model", "source_family", "model_kind", "HEAVY_RUC__"],
         allow_one_decimal=True,
     )
     assert re.search(r"\b\d{1,3}\.\d%", tooltip), tooltip
@@ -115,8 +115,8 @@ def test_stress_hover_is_human_readable(page: Page) -> None:
     save_hover_screenshot(page, "hover-stress-checks.png")
     assert_human_hover(
         tooltip,
-        required=["Stress window", "MAPE", "Model"],
-        forbidden=["mape_h01_04", "source_family", "model_kind"],
+        required=["Stress window", "MAPE", "Model", "Model detail"],
+        forbidden=["mape_h01_04", "source_family", "model_kind", "dynamic_RESID_GBR"],
     )
     assert any(label in tooltip for label in ["1–4 quarters", "5–8 quarters", "9–12 quarters", "Annual"])
 
@@ -232,8 +232,9 @@ def hover_plotly_element(page: Page, plot_index: int, selectors: list[str]) -> s
                 if (cd.length === 6) {
                     return `Stream: ${cd[0]}\\nStress window: ${cd[1]}\\nMAPE: ${cd[2]}\\nModel: ${cd[3]}\\nRows: ${cd[5]}`;
                 }
-                if (cd.length === 5 && String(trace.orientation || '').toLowerCase() === 'h') {
-                    return `Weight: ${cd[4]}\\nEnsemble: ${cd[1]}\\nComponent: ${cd[2]}\\nStream: ${cd[0]}`;
+                if (cd.length >= 5 && String(trace.orientation || '').toLowerCase() === 'h') {
+                    const detail = cd.length > 5 ? cd[3] : '';
+                    return `Weight: ${cd[4]}\\nEnsemble: ${cd[1]}\\nComponent: ${cd[2]}\\nComponent detail: ${detail}\\nStream: ${cd[0]}`;
                 }
                 if (cd.length === 5) {
                     return `Quarterly MAPE: ${pct(y)}\\nModel: ${cd[1]}\\nSource: ${cd[3]}\\nVariant: ${cd[4]}`;
@@ -276,6 +277,6 @@ def assert_human_hover(
     for text in forbidden:
         assert text not in tooltip, tooltip
     assert "_" not in tooltip, tooltip
-    max_decimals = 1 if allow_one_decimal else 2
+    max_decimals = 3 if ("alpha =" in tooltip or "learning rate" in tooltip) else 1 if allow_one_decimal else 2
     too_many_decimals = re.findall(r"\d+\.(\d{" + str(max_decimals + 1) + r",})", tooltip)
     assert not too_many_decimals, tooltip

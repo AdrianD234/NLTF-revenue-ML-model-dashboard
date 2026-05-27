@@ -646,13 +646,13 @@ def wait_dashboard_ready(page: Page) -> None:
 
 
 def rendered_surface_count(page: Page) -> int:
-    return page.locator(".js-plotly-plot, svg.main-svg, canvas, [data-testid='stDataFrame']").count()
+    return page.locator(".js-plotly-plot, svg.main-svg, canvas, [data-testid='stDataFrame'], .diagnostic-tooltip-matrix").count()
 
 
 def wait_for_rendered_surfaces(page: Page) -> None:
     page.wait_for_function(
         """() => document.querySelectorAll(
-            '.js-plotly-plot, svg.main-svg, canvas, [data-testid="stDataFrame"]'
+            '.js-plotly-plot, svg.main-svg, canvas, [data-testid="stDataFrame"], .diagnostic-tooltip-matrix'
         ).length >= 4""",
         timeout=90000,
     )

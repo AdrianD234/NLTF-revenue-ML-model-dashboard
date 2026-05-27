@@ -48,6 +48,15 @@ V3_EVIDENCE_TABLES = (
     "invalid_predictions_zero_actual.parquet",
 )
 
+REPRODUCIBILITY_EVIDENCE_TABLES = (
+    "model_registry.parquet",
+    "component_predictions.parquet",
+    "model_coefficients.parquet",
+    "feature_importance.parquet",
+    "scenario_sensitivities.parquet",
+    "shap_summary.parquet",
+)
+
 
 @dataclass(frozen=True)
 class DashboardEvidencePack(DashboardData):
@@ -75,7 +84,10 @@ def resolve_evidence_pack_root(root: str | Path | None = None) -> Path:
 
 def evidence_pack_signature(root: str | Path | None = None) -> tuple[tuple[str, int, int], ...]:
     pack_root = resolve_evidence_pack_root(root)
-    paths = [pack_root / "manifest.json", *[pack_root / "data" / name for name in REQUIRED_EVIDENCE_TABLES + V3_EVIDENCE_TABLES]]
+    paths = [
+        pack_root / "manifest.json",
+        *[pack_root / "data" / name for name in REQUIRED_EVIDENCE_TABLES + V3_EVIDENCE_TABLES + REPRODUCIBILITY_EVIDENCE_TABLES],
+    ]
     signature: list[tuple[str, int, int]] = []
     for path in paths:
         if not path.exists():
@@ -101,6 +113,10 @@ def load_evidence_pack(root: str | Path | None = None, repo_root: str | Path | N
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     raw = {name: pd.read_parquet(data_dir / name) for name in REQUIRED_EVIDENCE_TABLES}
     for name in V3_EVIDENCE_TABLES:
+        path = data_dir / name
+        if path.exists():
+            raw[name] = pd.read_parquet(path)
+    for name in REPRODUCIBILITY_EVIDENCE_TABLES:
         path = data_dir / name
         if path.exists():
             raw[name] = pd.read_parquet(path)
@@ -193,6 +209,12 @@ def load_evidence_pack(root: str | Path | None = None, repo_root: str | Path | N
         "light_ruc_candidate_scorecard": tables.get("light_ruc_candidate_scorecard", pd.DataFrame()).copy(),
         "scorecard_annual_metric_summary": tables.get("scorecard_annual_metric_summary", pd.DataFrame()).copy(),
         "scorecard_annual_predictions": tables.get("scorecard_annual_predictions", pd.DataFrame()).copy(),
+        "model_registry": tables.get("model_registry", pd.DataFrame()).copy(),
+        "component_predictions": tables.get("component_predictions", pd.DataFrame()).copy(),
+        "model_coefficients": tables.get("model_coefficients", pd.DataFrame()).copy(),
+        "feature_importance": tables.get("feature_importance", pd.DataFrame()).copy(),
+        "scenario_sensitivities": tables.get("scenario_sensitivities", pd.DataFrame()).copy(),
+        "shap_summary": tables.get("shap_summary", pd.DataFrame()).copy(),
         "diagnostic_df": diagnostic_tests,
         "diagnostic_tests": diagnostic_tests,
         "diagnostic_pass_matrix": pass_matrix,
@@ -770,6 +792,7 @@ def _format_size(size: int) -> str:
 __all__ = [
     "DashboardEvidencePack",
     "REQUIRED_EVIDENCE_TABLES",
+    "REPRODUCIBILITY_EVIDENCE_TABLES",
     "evidence_pack_signature",
     "load_evidence_pack",
     "resolve_evidence_pack_root",

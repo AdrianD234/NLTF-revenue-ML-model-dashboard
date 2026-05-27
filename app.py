@@ -27,6 +27,7 @@ from model_dashboard.data.diagnostics import (
     build_diagnostic_acf_source_table,
     select_diagnostic_acf_scope,
 )
+from model_dashboard.diagnostic_matrix import diagnostic_pass_matrix_html
 from model_dashboard.labels import (
     DEFAULT_INPUT_PARENT,
     IGNORED_RUN_FOLDER_NAMES,
@@ -39,6 +40,20 @@ from model_dashboard.labels import (
     is_legacy_schiff_style_text,
     model_alias,
     shorten_model_name,
+)
+from model_dashboard.light_ruc_reproducibility import (
+    LIGHT_RUC_REPRO_DESCRIPTION,
+    light_ruc_coefficients_view,
+    light_ruc_component_trace_view,
+    light_ruc_feature_importance_view,
+    light_ruc_registry_view,
+    light_ruc_replay_summary,
+    light_ruc_repro_signature,
+    light_ruc_sensitivity_view,
+    light_ruc_training_window_view,
+    load_light_ruc_reproducibility_pack,
+    plot_light_ruc_feature_importance,
+    plot_light_ruc_sensitivities,
 )
 from model_dashboard.metrics import (
     best_by_stream,
@@ -64,7 +79,6 @@ from model_dashboard.plots import (
     plot_error_types,
     plot_feature_counts,
     plot_finalist_accuracy,
-    plot_diagnostic_pass_matrix,
     plot_horizon_mape,
     plot_horizon_comparison,
     plot_improvement_vs_benchmark,
@@ -102,6 +116,7 @@ from model_dashboard.ui import (
     display_table,
     footer_strip,
     header,
+    html_chart_card,
     info_panel,
     inject_theme,
     kpi_grid,
@@ -159,6 +174,12 @@ def cached_load_evidence_pack(
     del pack_sig
     del schema_version
     return load_evidence_pack(data_root, repo_root)
+
+
+@st.cache_data(show_spinner=False)
+def cached_load_light_ruc_reproducibility(signature: tuple[tuple[str, int, int], ...]) -> Any:
+    del signature
+    return load_light_ruc_reproducibility_pack()
 
 
 def directory_signature(path: Path) -> tuple[bool, int, int]:
@@ -1132,10 +1153,10 @@ def render_diagnostics(loaded: LoadedRun, controls: dict[str, Any]) -> None:
 
     bottom = st.columns([1.0, 1.0])
     with bottom[0]:
-        chart_card(
+        html_chart_card(
             "3. Diagnostic Pass Matrix",
             "Calibration R2 and key statistical diagnostics by stream.",
-            compact_figure(plot_diagnostic_pass_matrix(pass_matrix), 260),
+            diagnostic_pass_matrix_html(pass_matrix),
         )
     with bottom[1]:
         chart_card(
@@ -1150,6 +1171,15 @@ def render_diagnostics(loaded: LoadedRun, controls: dict[str, Any]) -> None:
             "Diagnostics use Parquet fields where present and diagnostic audit tables as secondary evidence. "
             "Missing residual-test files are shown as governed unavailable states rather than fabricated points."
         )
+
+    with st.expander("Model Explainability / Reproducibility", expanded=False):
+        if st.toggle("Load Light RUC reproducibility detail", value=False, key="lazy_light_ruc_reproducibility"):
+            render_light_ruc_reproducibility_detail()
+        else:
+            info_panel(
+                "Light RUC reproducibility evidence is lazy-loaded from an auxiliary read-only pack. "
+                "It does not feed KPI, finalist, scenario, stress, diagnostic or score-basis calculations."
+            )
 
     with st.expander("Model Inventory module", expanded=False):
         if st.toggle("Load Model Inventory module", value=False, key="lazy_diagnostics_inventory"):
@@ -1181,6 +1211,81 @@ def diagnostics_provenance_strip(loaded: LoadedRun) -> str:
         f"Diagnostics evidence: {format_count(qpred_rows)} residual rows | "
         f"{format_count(feature_rows)} feature-count rows | proxy panels shown where classical test files are absent."
     )
+
+
+def render_light_ruc_reproducibility_detail() -> None:
+    try:
+        pack = cached_load_light_ruc_reproducibility(light_ruc_repro_signature())
+    except Exception as exc:
+        warning_panel(f"Light RUC reproducibility audit pack could not be loaded: {exc}")
+        return
+    if not pack.available:
+        missing = ", ".join(pack.missing_files[:8])
+        if len(pack.missing_files) > 8:
+            missing += ", ..."
+        warning_panel(
+            "Light RUC reproducibility audit pack is not available. "
+            f"Expected read-only auxiliary files under `{pack.root}`. Missing: {missing or 'required audit tables'}."
+        )
+        return
+
+    summary = light_ruc_replay_summary(pack)
+    delta = pd.to_numeric(pd.Series([summary.get("max_abs_pred_delta")]), errors="coerce").iloc[0]
+    delta_text = f"{delta:.2e}" if pd.notna(delta) else "-"
+    kpi_grid(
+        [
+            ("Replay status", str(summary["status"]), f"max abs prediction delta {delta_text}"),
+            ("Model", str(summary["model"]), "Light RUC finalist"),
+            ("Workbook", str(summary["workbook"]), str(summary["source_sheet"])),
+            ("Audit role", "Auxiliary governance", "read-only; not used for main calculations"),
+        ]
+    )
+    info_panel(LIGHT_RUC_REPRO_DESCRIPTION)
+    info_panel(
+        "SHAP is not supplied by this audit pack and is treated as future optional evidence only. "
+        "This panel uses feature importance and scenario sensitivities from the exact replay pack."
+    )
+
+    section_title("Registry")
+    display_table(light_ruc_registry_view(pack), height=150, max_rows=20)
+
+    section_title("Component trace")
+    component_trace = light_ruc_component_trace_view(pack)
+    component_cols = [
+        "Score basis",
+        "Origin",
+        "Target period",
+        "Horizon",
+        "Actual",
+        "Base log prediction",
+        "Residual log prediction",
+        "Final prediction",
+    ]
+    component_view = component_trace[[col for col in component_cols if col in component_trace.columns]]
+    display_table(component_view, height=320, max_rows=240)
+
+    chart_cols = st.columns(2)
+    with chart_cols[0]:
+        section_title("Feature importance")
+        st.plotly_chart(
+            plot_light_ruc_feature_importance(light_ruc_feature_importance_view(pack)),
+            width="stretch",
+            key="light_ruc_repro_feature_importance",
+        )
+    with chart_cols[1]:
+        section_title("Scenario sensitivities")
+        info_panel("Scenario sensitivities cover GDP, diesel price, RUC price and other perturbations.")
+        st.plotly_chart(
+            plot_light_ruc_sensitivities(light_ruc_sensitivity_view(pack)),
+            width="stretch",
+            key="light_ruc_repro_scenario_sensitivities",
+        )
+
+    with st.expander("OLS coefficients by origin/window", expanded=False):
+        display_table(light_ruc_coefficients_view(pack), height=420, max_rows=420)
+
+    with st.expander("Rolling training window trace", expanded=False):
+        display_table(light_ruc_training_window_view(pack), height=320, max_rows=200)
 
 
 def central_error_window(qpred: pd.DataFrame, lower: float = 0.01, upper: float = 0.99) -> pd.DataFrame:

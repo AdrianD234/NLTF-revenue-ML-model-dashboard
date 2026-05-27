@@ -767,6 +767,122 @@ def inject_theme() -> None:
                 font-size: 0.82rem;
                 margin: -0.15rem 0 0.45rem;
             }}
+            .diagnostic-tooltip-matrix {{
+                margin-top: 0.36rem;
+                overflow: visible;
+                width: 100%;
+            }}
+            .diagnostic-pass-matrix {{
+                border-collapse: separate;
+                border-spacing: 0;
+                font-size: 0.76rem;
+                table-layout: fixed;
+                width: 100%;
+            }}
+            .diagnostic-pass-matrix th,
+            .diagnostic-pass-matrix td {{
+                border-bottom: 1px solid #E2E8F0;
+                border-right: 1px solid #E2E8F0;
+                padding: 0.42rem 0.28rem;
+                text-align: center;
+                vertical-align: middle;
+            }}
+            .diagnostic-pass-matrix th:first-child,
+            .diagnostic-pass-matrix td:first-child {{
+                border-left: 1px solid #E2E8F0;
+            }}
+            .diagnostic-pass-matrix thead th {{
+                background: #EAF2F8;
+                border-top: 1px solid #D7DEE8;
+                color: var(--pbi-blue);
+                font-weight: 700;
+            }}
+            .diagnostic-pass-matrix thead th:first-child {{
+                border-top-left-radius: 8px;
+            }}
+            .diagnostic-pass-matrix thead th:last-child {{
+                border-top-right-radius: 8px;
+            }}
+            .diagnostic-pass-matrix tbody th {{
+                background: #FFFFFF;
+                color: #0F172A;
+                font-weight: 500;
+                line-height: 1.18;
+            }}
+            .diag-status-pass {{
+                background: #DDF4DD;
+                color: #166534;
+            }}
+            .diag-status-watch {{
+                background: #FEF3C7;
+                color: #92400E;
+            }}
+            .diag-status-fail {{
+                background: #FEE2E2;
+                color: #991B1B;
+            }}
+            .diag-status-unavailable {{
+                background: #F1F5F9;
+                color: #64748B;
+            }}
+            .diag-tooltip-trigger {{
+                border-radius: 4px;
+                cursor: help;
+                display: inline-block;
+                outline: none;
+                position: relative;
+            }}
+            .diag-tooltip-trigger:focus {{
+                box-shadow: 0 0 0 2px rgba(0, 43, 92, 0.28);
+            }}
+            .diag-tooltip-text {{
+                background: #0F172A;
+                border-radius: 7px;
+                box-shadow: 0 10px 28px rgba(15, 23, 42, 0.22);
+                color: #F8FAFC;
+                font-weight: 500;
+                left: 50%;
+                line-height: 1.32;
+                max-width: 320px;
+                min-width: 230px;
+                opacity: 0;
+                padding: 0.58rem 0.66rem;
+                pointer-events: none;
+                position: absolute;
+                text-align: left;
+                top: calc(100% + 0.44rem);
+                transform: translateX(-50%);
+                transition: opacity 120ms ease, visibility 120ms ease;
+                visibility: hidden;
+                white-space: normal;
+                z-index: 9999;
+            }}
+            .diag-tooltip-text::before {{
+                border-bottom: 6px solid #0F172A;
+                border-left: 6px solid transparent;
+                border-right: 6px solid transparent;
+                content: "";
+                left: 50%;
+                position: absolute;
+                top: -6px;
+                transform: translateX(-50%);
+            }}
+            .diag-tooltip-trigger:hover .diag-tooltip-text,
+            .diag-tooltip-trigger:focus .diag-tooltip-text,
+            .diag-tooltip-trigger:focus-within .diag-tooltip-text {{
+                opacity: 1;
+                visibility: visible;
+            }}
+            .diag-info {{
+                color: #64748B;
+                font-size: 0.72rem;
+                margin-left: 0.12rem;
+            }}
+            .diagnostic-matrix-legend {{
+                color: #64748B;
+                font-size: 0.76rem;
+                margin-top: 0.34rem;
+            }}
             .chart-card-caption-placeholder {{
                 height: 0;
                 margin: 0;
@@ -844,6 +960,22 @@ def chart_card(title: str, subtitle: str, figure: Any, caption: str | None = Non
             unsafe_allow_html=True,
         )
         st.plotly_chart(figure, width="stretch", key=key)
+        if caption:
+            st.caption(caption)
+        else:
+            st.markdown("<div class='chart-card-caption-placeholder'></div>", unsafe_allow_html=True)
+
+
+def html_chart_card(title: str, subtitle: str, body_html: str, caption: str | None = None) -> None:
+    with st.container(border=True):
+        st.markdown(
+            "<div class='gov-chart-card chart-card'>"
+            f"<div class='chart-card-title'>{html.escape(title)}</div>"
+            f"<div class='chart-card-subtitle'>{html.escape(subtitle)}</div>"
+            f"{body_html}"
+            "</div>",
+            unsafe_allow_html=True,
+        )
         if caption:
             st.caption(caption)
         else:
