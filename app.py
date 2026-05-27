@@ -42,18 +42,20 @@ from model_dashboard.labels import (
     shorten_model_name,
 )
 from model_dashboard.light_ruc_reproducibility import (
-    LIGHT_RUC_REPRO_DESCRIPTION,
-    light_ruc_coefficients_view,
-    light_ruc_component_trace_view,
-    light_ruc_feature_importance_view,
-    light_ruc_registry_view,
-    light_ruc_replay_summary,
-    light_ruc_repro_signature,
-    light_ruc_sensitivity_view,
-    light_ruc_training_window_view,
-    load_light_ruc_reproducibility_pack,
-    plot_light_ruc_feature_importance,
-    plot_light_ruc_sensitivities,
+    reproducibility_coefficients_view,
+    reproducibility_component_trace_view,
+    reproducibility_feature_importance_view,
+    reproducibility_ensemble_equation,
+    reproducibility_ensemble_weight_view,
+    reproducibility_pack_signature,
+    reproducibility_registry_view,
+    reproducibility_replay_summary,
+    reproducibility_sensitivity_view,
+    reproducibility_stream_labels,
+    reproducibility_training_window_view,
+    load_reproducibility_pack,
+    plot_reproducibility_feature_importance,
+    plot_reproducibility_sensitivities,
 )
 from model_dashboard.metrics import (
     best_by_stream,
@@ -177,9 +179,9 @@ def cached_load_evidence_pack(
 
 
 @st.cache_data(show_spinner=False)
-def cached_load_light_ruc_reproducibility(signature: tuple[tuple[str, int, int], ...]) -> Any:
+def cached_load_reproducibility_pack(stream_label: str, signature: tuple[tuple[str, int, int], ...]) -> Any:
     del signature
-    return load_light_ruc_reproducibility_pack()
+    return load_reproducibility_pack(stream_label)
 
 
 def directory_signature(path: Path) -> tuple[bool, int, int]:
@@ -1173,12 +1175,20 @@ def render_diagnostics(loaded: LoadedRun, controls: dict[str, Any]) -> None:
         )
 
     with st.expander("Model Explainability / Reproducibility", expanded=False):
-        if st.toggle("Load Light RUC reproducibility detail", value=False, key="lazy_light_ruc_reproducibility"):
-            render_light_ruc_reproducibility_detail()
+        stream_options = reproducibility_stream_labels()
+        default_stream = "Light RUC volume" if "Light RUC volume" in stream_options else stream_options[0]
+        selected_repro_stream = st.selectbox(
+            "Reproducibility stream",
+            options=stream_options,
+            index=stream_options.index(default_stream),
+            key="reproducibility_stream_selector",
+        )
+        if st.toggle("Load reproducibility detail", value=False, key="lazy_reproducibility_detail"):
+            render_reproducibility_detail(str(selected_repro_stream))
         else:
             info_panel(
-                "Light RUC reproducibility evidence is lazy-loaded from an auxiliary read-only pack. "
-                "It does not feed KPI, finalist, scenario, stress, diagnostic or score-basis calculations."
+                "Stream-specific reproducibility evidence is lazy-loaded from auxiliary read-only packs. "
+                "These packs do not feed KPI, finalist, scenario, stress, diagnostic or score-basis calculations."
             )
 
     with st.expander("Model Inventory module", expanded=False):
@@ -1213,44 +1223,50 @@ def diagnostics_provenance_strip(loaded: LoadedRun) -> str:
     )
 
 
-def render_light_ruc_reproducibility_detail() -> None:
+def render_reproducibility_detail(stream_label: str) -> None:
     try:
-        pack = cached_load_light_ruc_reproducibility(light_ruc_repro_signature())
+        pack = cached_load_reproducibility_pack(stream_label, reproducibility_pack_signature(stream_label))
     except Exception as exc:
-        warning_panel(f"Light RUC reproducibility audit pack could not be loaded: {exc}")
+        warning_panel(f"{stream_label} reproducibility audit pack could not be loaded: {exc}")
         return
     if not pack.available:
         missing = ", ".join(pack.missing_files[:8])
         if len(pack.missing_files) > 8:
             missing += ", ..."
         warning_panel(
-            "Light RUC reproducibility audit pack is not available. "
+            f"{stream_label} reproducibility audit pack is not available. "
             f"Expected read-only auxiliary files under `{pack.root}`. Missing: {missing or 'required audit tables'}."
         )
         return
 
-    summary = light_ruc_replay_summary(pack)
+    summary = reproducibility_replay_summary(pack)
     delta = pd.to_numeric(pd.Series([summary.get("max_abs_pred_delta")]), errors="coerce").iloc[0]
     delta_text = f"{delta:.2e}" if pd.notna(delta) else "-"
     kpi_grid(
         [
             ("Replay status", str(summary["status"]), f"max abs prediction delta {delta_text}"),
-            ("Model", str(summary["model"]), "Light RUC finalist"),
+            ("Model", str(summary["model"]), f"{stream_label} finalist"),
             ("Workbook", str(summary["workbook"]), str(summary["source_sheet"])),
             ("Audit role", "Auxiliary governance", "read-only; not used for main calculations"),
         ]
     )
-    info_panel(LIGHT_RUC_REPRO_DESCRIPTION)
+    info_panel(str(summary["description"]))
     info_panel(
         "SHAP is not supplied by this audit pack and is treated as future optional evidence only. "
         "This panel uses feature importance and scenario sensitivities from the exact replay pack."
     )
 
     section_title("Registry")
-    display_table(light_ruc_registry_view(pack), height=150, max_rows=20)
+    display_table(reproducibility_registry_view(pack), height=150, max_rows=20)
+
+    weight_view = reproducibility_ensemble_weight_view(pack)
+    if not weight_view.empty:
+        section_title("Ensemble equation")
+        info_panel(reproducibility_ensemble_equation(pack))
+        display_table(weight_view, height=190, max_rows=12)
 
     section_title("Component trace")
-    component_trace = light_ruc_component_trace_view(pack)
+    component_trace = reproducibility_component_trace_view(pack)
     component_cols = [
         "Score basis",
         "Origin",
@@ -1268,24 +1284,28 @@ def render_light_ruc_reproducibility_detail() -> None:
     with chart_cols[0]:
         section_title("Feature importance")
         st.plotly_chart(
-            plot_light_ruc_feature_importance(light_ruc_feature_importance_view(pack)),
+            plot_reproducibility_feature_importance(reproducibility_feature_importance_view(pack), stream_label),
             width="stretch",
-            key="light_ruc_repro_feature_importance",
+            key=f"{_widget_key(stream_label)}_repro_feature_importance",
         )
     with chart_cols[1]:
         section_title("Scenario sensitivities")
         info_panel("Scenario sensitivities cover GDP, diesel price, RUC price and other perturbations.")
         st.plotly_chart(
-            plot_light_ruc_sensitivities(light_ruc_sensitivity_view(pack)),
+            plot_reproducibility_sensitivities(reproducibility_sensitivity_view(pack), stream_label),
             width="stretch",
-            key="light_ruc_repro_scenario_sensitivities",
+            key=f"{_widget_key(stream_label)}_repro_scenario_sensitivities",
         )
 
     with st.expander("OLS coefficients by origin/window", expanded=False):
-        display_table(light_ruc_coefficients_view(pack), height=420, max_rows=420)
+        display_table(reproducibility_coefficients_view(pack), height=420, max_rows=420)
 
     with st.expander("Rolling training window trace", expanded=False):
-        display_table(light_ruc_training_window_view(pack), height=320, max_rows=200)
+        display_table(reproducibility_training_window_view(pack), height=320, max_rows=200)
+
+
+def _widget_key(value: str) -> str:
+    return "".join(ch if ch.isalnum() else "_" for ch in value.lower()).strip("_")
 
 
 def central_error_window(qpred: pd.DataFrame, lower: float = 0.01, upper: float = 0.99) -> pd.DataFrame:

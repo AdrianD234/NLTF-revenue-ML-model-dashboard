@@ -12,21 +12,20 @@ import plotly.graph_objects as go
 from .plots import apply_layout, empty_figure
 
 
-LIGHT_RUC_REPRO_ROOT = (
+REPRODUCIBILITY_BASE_ROOT = (
     Path(__file__).resolve().parents[1]
     / "data"
     / "dashboard_evidence_pack_reproducibility"
-    / "light_ruc"
 )
 
+LIGHT_RUC_REPRO_ROOT = REPRODUCIBILITY_BASE_ROOT / "light_ruc"
 LIGHT_RUC_REPRO_MODEL = "dynamic_RESID_GBR_n150_d1_lr0.05_w36"
 LIGHT_RUC_REPRO_DESCRIPTION = (
     "Two-stage OLS base plus GBM residual correction, exactly replayed against evidence predictions."
 )
 
-REQUIRED_LIGHT_RUC_REPRO_FILES = (
+COMMON_REQUIRED_REPRO_FILES = (
     "manifest.json",
-    "light_ruc_reproducibility_report.md",
     "parquet_write_status.json",
     "model_registry.parquet",
     "rebuilt_predictions.parquet",
@@ -45,6 +44,55 @@ REQUIRED_LIGHT_RUC_REPRO_FILES = (
     "evidence_metric_comparison.parquet",
 )
 
+
+@dataclass(frozen=True)
+class ReproducibilityStreamConfig:
+    stream_label: str
+    stream_key: str
+    root: Path
+    model: str
+    description: str
+    report_file: str
+
+    @property
+    def required_files(self) -> tuple[str, ...]:
+        return ("manifest.json", self.report_file, *COMMON_REQUIRED_REPRO_FILES[1:])
+
+
+LIGHT_RUC_REPRO_CONFIG = ReproducibilityStreamConfig(
+    stream_label="Light RUC volume",
+    stream_key="light_ruc",
+    root=LIGHT_RUC_REPRO_ROOT,
+    model=LIGHT_RUC_REPRO_MODEL,
+    description=LIGHT_RUC_REPRO_DESCRIPTION,
+    report_file="light_ruc_reproducibility_report.md",
+)
+
+REPRODUCIBILITY_STREAM_CONFIGS: dict[str, ReproducibilityStreamConfig] = {
+    "PED VKT per capita": ReproducibilityStreamConfig(
+        stream_label="PED VKT per capita",
+        stream_key="ped",
+        root=REPRODUCIBILITY_BASE_ROOT / "ped",
+        model="",
+        description="No auxiliary PED exact-replay pack is present in this repository snapshot.",
+        report_file="ped_reproducibility_report.md",
+    ),
+    LIGHT_RUC_REPRO_CONFIG.stream_label: LIGHT_RUC_REPRO_CONFIG,
+    "Heavy RUC volume": ReproducibilityStreamConfig(
+        stream_label="Heavy RUC volume",
+        stream_key="heavy_ruc",
+        root=REPRODUCIBILITY_BASE_ROOT / "heavy_ruc",
+        model="HEAVY_RUC__RECON_STATIC_REBUILT",
+        description="Four-component weighted ensemble exactly replayed against evidence predictions.",
+        report_file="heavy_ruc_reproducibility_report.md",
+    ),
+}
+
+REQUIRED_LIGHT_RUC_REPRO_FILES = LIGHT_RUC_REPRO_CONFIG.required_files
+HEAVY_RUC_REPRO_ROOT = REPRODUCIBILITY_STREAM_CONFIGS["Heavy RUC volume"].root
+HEAVY_RUC_REPRO_MODEL = REPRODUCIBILITY_STREAM_CONFIGS["Heavy RUC volume"].model
+REQUIRED_HEAVY_RUC_REPRO_FILES = REPRODUCIBILITY_STREAM_CONFIGS["Heavy RUC volume"].required_files
+
 SCORE_BASIS_LABELS = {
     "current_grid_operational_pooled": "Operational pooled",
     "schiff_paper_horizon_mean": "Paper-style horizon mean",
@@ -52,7 +100,9 @@ SCORE_BASIS_LABELS = {
 
 
 @dataclass(frozen=True)
-class LightRucReproducibilityPack:
+class ReproducibilityPack:
+    stream_label: str
+    config: ReproducibilityStreamConfig
     root: Path
     manifest: dict[str, Any]
     tables: dict[str, pd.DataFrame]
@@ -67,11 +117,26 @@ class LightRucReproducibilityPack:
         return self.tables.get(name, pd.DataFrame()).copy()
 
 
-def light_ruc_repro_signature(root: str | Path | None = None) -> tuple[tuple[str, int, int], ...]:
-    """Return a Streamlit cache signature for the auxiliary Light RUC audit pack."""
-    pack_root = Path(root).expanduser() if root else LIGHT_RUC_REPRO_ROOT
+LightRucReproducibilityPack = ReproducibilityPack
+
+
+def reproducibility_stream_labels() -> list[str]:
+    return list(REPRODUCIBILITY_STREAM_CONFIGS)
+
+
+def reproducibility_stream_config(stream_label: str) -> ReproducibilityStreamConfig:
+    return REPRODUCIBILITY_STREAM_CONFIGS.get(stream_label, LIGHT_RUC_REPRO_CONFIG)
+
+
+def reproducibility_pack_signature(
+    stream_label: str = LIGHT_RUC_REPRO_CONFIG.stream_label,
+    root: str | Path | None = None,
+) -> tuple[tuple[str, int, int], ...]:
+    """Return a Streamlit cache signature for a stream-specific auxiliary audit pack."""
+    config = reproducibility_stream_config(stream_label)
+    pack_root = Path(root).expanduser() if root else config.root
     signature: list[tuple[str, int, int]] = []
-    for name in REQUIRED_LIGHT_RUC_REPRO_FILES:
+    for name in config.required_files:
         path = pack_root / name
         if not path.exists():
             continue
@@ -80,27 +145,39 @@ def light_ruc_repro_signature(root: str | Path | None = None) -> tuple[tuple[str
     return tuple(signature)
 
 
-def load_light_ruc_reproducibility_pack(root: str | Path | None = None) -> LightRucReproducibilityPack:
-    """Load the auxiliary Light RUC reproducibility pack without touching main dashboard data."""
-    pack_root = Path(root).expanduser() if root else LIGHT_RUC_REPRO_ROOT
+def light_ruc_repro_signature(root: str | Path | None = None) -> tuple[tuple[str, int, int], ...]:
+    return reproducibility_pack_signature(LIGHT_RUC_REPRO_CONFIG.stream_label, root)
+
+
+def load_reproducibility_pack(
+    stream_label: str = LIGHT_RUC_REPRO_CONFIG.stream_label,
+    root: str | Path | None = None,
+) -> ReproducibilityPack:
+    """Load a stream-specific auxiliary reproducibility pack without touching main dashboard data."""
+    config = reproducibility_stream_config(stream_label)
+    pack_root = Path(root).expanduser() if root else config.root
     if not pack_root.exists():
-        return LightRucReproducibilityPack(
+        return ReproducibilityPack(
+            stream_label=config.stream_label,
+            config=config,
             root=pack_root,
             manifest={},
             tables={},
-            missing_files=REQUIRED_LIGHT_RUC_REPRO_FILES,
+            missing_files=config.required_files,
         )
 
-    missing = tuple(name for name in REQUIRED_LIGHT_RUC_REPRO_FILES if not (pack_root / name).exists())
+    missing = tuple(name for name in config.required_files if not (pack_root / name).exists())
     manifest = _read_json(pack_root / "manifest.json") if (pack_root / "manifest.json").exists() else {}
     tables: dict[str, pd.DataFrame] = {}
-    for name in REQUIRED_LIGHT_RUC_REPRO_FILES:
+    for name in config.required_files:
         if not name.endswith(".parquet"):
             continue
         path = pack_root / name
         if path.exists():
             tables[name.removesuffix(".parquet")] = pd.read_parquet(path)
-    return LightRucReproducibilityPack(
+    return ReproducibilityPack(
+        stream_label=config.stream_label,
+        config=config,
         root=pack_root,
         manifest=manifest,
         tables=tables,
@@ -108,31 +185,74 @@ def load_light_ruc_reproducibility_pack(root: str | Path | None = None) -> Light
     )
 
 
-def light_ruc_replay_summary(pack: LightRucReproducibilityPack) -> dict[str, Any]:
+def load_light_ruc_reproducibility_pack(root: str | Path | None = None) -> LightRucReproducibilityPack:
+    return load_reproducibility_pack(LIGHT_RUC_REPRO_CONFIG.stream_label, root)
+
+
+def reproducibility_replay_summary(pack: ReproducibilityPack) -> dict[str, Any]:
     registry = pack.table("model_registry")
     metric = pack.table("evidence_metric_comparison")
     source_workbook = str(pack.manifest.get("source_workbook", ""))
     source_sheet = str(pack.manifest.get("source_sheet", "Light RUC Inputs"))
-    model = str(pack.manifest.get("model", LIGHT_RUC_REPRO_MODEL))
+    model = str(pack.manifest.get("model", pack.config.model))
     if not registry.empty:
         source_workbook = str(registry["source_workbook"].dropna().astype(str).iloc[0])
         source_sheet = str(registry["source_sheet"].dropna().astype(str).iloc[0])
         model = str(registry["finalist_model"].dropna().astype(str).iloc[0])
-    max_delta = pd.to_numeric(metric.get("max_abs_pred_delta", pd.Series(dtype=float)), errors="coerce").max()
+    pred_comparison = pack.table("evidence_prediction_comparison")
+    max_delta = pd.to_numeric(pred_comparison.get("max_abs_pred_delta", pd.Series(dtype=float)), errors="coerce").max()
+    if pd.isna(max_delta):
+        max_delta = pd.to_numeric(metric.get("max_abs_pred_delta", pd.Series(dtype=float)), errors="coerce").max()
+    status = "Exact weighted-ensemble replay" if _is_weighted_ensemble_pack(pack) else "Exact prediction replay"
     return {
-        "status": "Exact prediction replay",
+        "status": status,
         "model": model,
         "max_abs_pred_delta": max_delta,
         "workbook": Path(source_workbook).name if source_workbook else "Master Copy revenue modelling workbook.xlsx",
         "source_sheet": source_sheet,
-        "description": LIGHT_RUC_REPRO_DESCRIPTION,
+        "description": pack.config.description,
     }
 
 
-def light_ruc_registry_view(pack: LightRucReproducibilityPack) -> pd.DataFrame:
+def light_ruc_replay_summary(pack: LightRucReproducibilityPack) -> dict[str, Any]:
+    return reproducibility_replay_summary(pack)
+
+
+def reproducibility_registry_view(pack: ReproducibilityPack) -> pd.DataFrame:
     registry = pack.table("model_registry")
     if registry.empty:
         return pd.DataFrame()
+    if _is_weighted_ensemble_pack(pack):
+        view = registry.copy()
+        scorecard = pack.table("scorecard_summary")
+        score_bases = (
+            scorecard["score_basis"].dropna().astype(str).drop_duplicates().map(_score_basis_label).tolist()
+            if "score_basis" in scorecard.columns
+            else ["Operational pooled", "Paper-style horizon mean"]
+        )
+        view["Component"] = [f"C{i}" for i in range(1, len(view) + 1)]
+        view["Weight"] = pd.to_numeric(view["component_weight"], errors="coerce")
+        view["Algorithm"] = view.get("model_kind", pd.Series(dtype=str)).astype(str).map(_algorithm_label)
+        view["Window"] = view.get("window", pd.Series(dtype=str)).astype(str).map(lambda value: f"{value} quarters" if value else "")
+        view["Hyperparameters"] = view.get("hyperparameters_json", pd.Series(dtype=str)).map(_json_summary)
+        view["Score basis"] = ", ".join(score_bases)
+        return view[
+            [
+                "target_column",
+                "Component",
+                "component_model",
+                "Algorithm",
+                "Window",
+                "Weight",
+                "Hyperparameters",
+                "Score basis",
+            ]
+        ].rename(
+            columns={
+                "target_column": "Target",
+                "component_model": "Component model",
+            }
+        )
     scorecard = pack.table("scorecard_summary")
     score_bases = (
         scorecard["score_basis"].dropna().astype(str).drop_duplicates().tolist()
@@ -158,10 +278,44 @@ def light_ruc_registry_view(pack: LightRucReproducibilityPack) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def light_ruc_component_trace_view(pack: LightRucReproducibilityPack, limit: int = 240) -> pd.DataFrame:
+def light_ruc_registry_view(pack: LightRucReproducibilityPack) -> pd.DataFrame:
+    return reproducibility_registry_view(pack)
+
+
+def reproducibility_component_trace_view(pack: ReproducibilityPack, limit: int = 240) -> pd.DataFrame:
     components = pack.table("component_predictions")
     if components.empty:
         return pd.DataFrame()
+    if _is_weighted_ensemble_pack(pack):
+        view = components.copy()
+        view["Component"] = view["component_model"].map(_component_label_map(pack))
+        view["Component model"] = view["component_model"].astype(str)
+        view["Score basis"] = view["score_basis"].map(_score_basis_label)
+        view["Weight"] = pd.to_numeric(view["component_weight"], errors="coerce")
+        view["Component prediction"] = pd.to_numeric(view["component_pred"], errors="coerce")
+        view["Weighted contribution"] = pd.to_numeric(view["weighted_component_pred"], errors="coerce")
+        view["Final prediction"] = pd.to_numeric(view["final_pred"], errors="coerce")
+        view["Actual"] = pd.to_numeric(view["actual"], errors="coerce")
+        keep = [
+            "Score basis",
+            "origin",
+            "target_period",
+            "horizon",
+            "Component",
+            "Component model",
+            "Weight",
+            "Component prediction",
+            "Weighted contribution",
+            "Final prediction",
+            "Actual",
+        ]
+        return view[keep].rename(
+            columns={
+                "origin": "Origin",
+                "target_period": "Target period",
+                "horizon": "Horizon",
+            }
+        ).sort_values(["Score basis", "Origin", "Horizon", "Component"]).head(limit)
     rows = []
     keys = ["score_basis", "grid", "origin", "target_period", "horizon"]
     for values, group in components.groupby(keys, dropna=False):
@@ -185,24 +339,60 @@ def light_ruc_component_trace_view(pack: LightRucReproducibilityPack, limit: int
     return pd.DataFrame(rows).sort_values(["score_basis", "Origin", "Horizon"]).head(limit)
 
 
-def light_ruc_feature_importance_view(pack: LightRucReproducibilityPack, limit_per_basis: int = 12) -> pd.DataFrame:
+def light_ruc_component_trace_view(pack: LightRucReproducibilityPack, limit: int = 240) -> pd.DataFrame:
+    return reproducibility_component_trace_view(pack, limit)
+
+
+def reproducibility_feature_importance_view(pack: ReproducibilityPack, limit_per_basis: int = 12) -> pd.DataFrame:
     data = pack.table("feature_importance_global")
     if data.empty:
         return pd.DataFrame()
     view = data.copy()
+    if "score_basis" not in view.columns:
+        view["score_basis"] = "ensemble_component_weight"
     view["score_basis_label"] = view["score_basis"].map(_score_basis_label)
+    if "importance_value" not in view.columns and "mean_abs_importance" in view.columns:
+        view["importance_value"] = view["mean_abs_importance"]
+    if "n_origins" not in view.columns:
+        view["n_origins"] = 0
+    view["n_origins"] = pd.to_numeric(view["n_origins"], errors="coerce").fillna(0)
     view["importance_value"] = pd.to_numeric(view["importance_value"], errors="coerce")
-    view["rank"] = pd.to_numeric(view["rank"], errors="coerce")
+    view["rank"] = pd.to_numeric(view.get("rank", pd.Series(range(1, len(view) + 1))), errors="coerce")
+    view["feature_label"] = view["feature"].astype(str).map(lambda value: _component_label_map(pack).get(value, _short_component(value)))
     view = view.sort_values(["score_basis", "rank", "importance_value"], ascending=[True, True, False])
     return view.groupby("score_basis", group_keys=False).head(limit_per_basis)
 
 
-def light_ruc_coefficients_view(pack: LightRucReproducibilityPack, limit: int = 420) -> pd.DataFrame:
+def light_ruc_feature_importance_view(pack: LightRucReproducibilityPack, limit_per_basis: int = 12) -> pd.DataFrame:
+    return reproducibility_feature_importance_view(pack, limit_per_basis)
+
+
+def reproducibility_coefficients_view(pack: ReproducibilityPack, limit: int = 420) -> pd.DataFrame:
     coefficients = pack.table("model_coefficients")
     windows = pack.table("training_window_trace")
     if coefficients.empty:
         return pd.DataFrame()
     view = coefficients.copy()
+    if _is_weighted_ensemble_pack(pack):
+        view["Component"] = view["component_model"].map(_component_label_map(pack))
+        keep = [
+            "Component",
+            "component_model",
+            "origin",
+            "feature",
+            "coefficient",
+            "intercept",
+            "coefficient_source",
+            "reproducibility_status",
+        ]
+        return view[[col for col in keep if col in view.columns]].rename(
+            columns={
+                "component_model": "Component model",
+                "origin": "Origin",
+                "coefficient_source": "Coefficient source",
+                "reproducibility_status": "Status",
+            }
+        ).sort_values([col for col in ["Component", "Origin", "feature"] if col in view.columns]).head(limit)
     join_cols = ["score_basis", "grid", "stream", "stream_label", "model", "origin"]
     if not windows.empty and set(join_cols).issubset(set(view.columns)) and set(join_cols).issubset(set(windows.columns)):
         view = view.merge(windows[join_cols + ["train_start", "train_end", "window_length", "n_train"]], on=join_cols, how="left")
@@ -222,11 +412,19 @@ def light_ruc_coefficients_view(pack: LightRucReproducibilityPack, limit: int = 
     return view[keep].sort_values([col for col in ["Score basis", "origin", "feature"] if col in keep]).head(limit)
 
 
-def light_ruc_sensitivity_view(pack: LightRucReproducibilityPack, limit_per_basis: int = 12) -> pd.DataFrame:
+def light_ruc_coefficients_view(pack: LightRucReproducibilityPack, limit: int = 420) -> pd.DataFrame:
+    return reproducibility_coefficients_view(pack, limit)
+
+
+def reproducibility_sensitivity_view(pack: ReproducibilityPack, limit_per_basis: int = 12) -> pd.DataFrame:
     data = pack.table("scenario_sensitivities")
     if data.empty:
         return pd.DataFrame()
     view = data.copy()
+    if "score_basis" not in view.columns:
+        view["score_basis"] = "replay_pack"
+    if "scenario_name" not in view.columns:
+        view["scenario_name"] = view.get("scenario_variable", pd.Series(dtype=str)).astype(str)
     view["delta_pct"] = pd.to_numeric(view["delta_pct"], errors="coerce")
     grouped = (
         view.groupby(["score_basis", "scenario_variable", "scenario_name", "perturbation"], as_index=False)
@@ -239,24 +437,51 @@ def light_ruc_sensitivity_view(pack: LightRucReproducibilityPack, limit_per_basi
     return grouped.groupby("score_basis", group_keys=False).head(limit_per_basis)
 
 
-def light_ruc_training_window_view(pack: LightRucReproducibilityPack) -> pd.DataFrame:
+def light_ruc_sensitivity_view(pack: LightRucReproducibilityPack, limit_per_basis: int = 12) -> pd.DataFrame:
+    return reproducibility_sensitivity_view(pack, limit_per_basis)
+
+
+def reproducibility_training_window_view(pack: ReproducibilityPack) -> pd.DataFrame:
     data = pack.table("training_window_trace")
     if data.empty:
         return pd.DataFrame()
     view = data.copy()
+    if _is_weighted_ensemble_pack(pack):
+        view["Component"] = view["component_model"].map(_component_label_map(pack))
+        keep = [
+            "Component",
+            "origin",
+            "window_quarters",
+            "training_start_period_inferred",
+            "training_end_period_inferred",
+            "note",
+        ]
+        return view[[col for col in keep if col in view.columns]].rename(
+            columns={
+                "origin": "Origin",
+                "window_quarters": "Window quarters",
+                "training_start_period_inferred": "Training start",
+                "training_end_period_inferred": "Training end",
+                "note": "Note",
+            }
+        ).sort_values(["Component", "Origin"])
     view["Score basis"] = view["score_basis"].map(_score_basis_label)
     keep = ["Score basis", "origin", "window_type", "window_length", "train_start", "train_end", "n_train"]
     return view[[col for col in keep if col in view.columns]].sort_values(["Score basis", "origin"])
 
 
-def plot_light_ruc_feature_importance(data: pd.DataFrame) -> go.Figure:
+def light_ruc_training_window_view(pack: LightRucReproducibilityPack) -> pd.DataFrame:
+    return reproducibility_training_window_view(pack)
+
+
+def plot_reproducibility_feature_importance(data: pd.DataFrame, stream_label: str) -> go.Figure:
     if data.empty:
-        return empty_figure("Light RUC feature-importance rows are not available.")
+        return empty_figure(f"{stream_label} feature-importance rows are not available.")
     view = data.copy().sort_values("importance_value", ascending=True)
     fig = px.bar(
         view,
         x="importance_value",
-        y="feature",
+        y="feature_label" if "feature_label" in view.columns else "feature",
         color="score_basis_label",
         orientation="h",
         barmode="group",
@@ -279,9 +504,17 @@ def plot_light_ruc_feature_importance(data: pd.DataFrame) -> go.Figure:
     return apply_layout(fig, "Feature importance from residual GBM", height=360)
 
 
-def plot_light_ruc_sensitivities(data: pd.DataFrame) -> go.Figure:
+def plot_light_ruc_feature_importance(data: pd.DataFrame) -> go.Figure:
+    return plot_reproducibility_feature_importance(data, LIGHT_RUC_REPRO_CONFIG.stream_label)
+
+
+def plot_reproducibility_sensitivities(data: pd.DataFrame, stream_label: str) -> go.Figure:
     if data.empty:
-        return empty_figure("Light RUC scenario-sensitivity rows are not available.")
+        return empty_figure(f"{stream_label} scenario-sensitivity rows are not available.")
+    if "mean_delta_pct" not in data.columns or not pd.to_numeric(data["mean_delta_pct"], errors="coerce").notna().any():
+        note = _first_value(data, "scenario_name")
+        message = str(note) if pd.notna(note) else f"{stream_label} scenario sensitivities are not numerically available."
+        return empty_figure(message)
     view = data.copy().sort_values("mean_delta_pct", ascending=True)
     view["label"] = view["scenario_variable"].astype(str) + " | " + view["score_basis_label"].astype(str)
     fig = px.bar(
@@ -307,6 +540,32 @@ def plot_light_ruc_sensitivities(data: pd.DataFrame) -> go.Figure:
         )
     )
     return apply_layout(fig, "Scenario sensitivities", height=360)
+
+
+def plot_light_ruc_sensitivities(data: pd.DataFrame) -> go.Figure:
+    return plot_reproducibility_sensitivities(data, LIGHT_RUC_REPRO_CONFIG.stream_label)
+
+
+def reproducibility_ensemble_weight_view(pack: ReproducibilityPack) -> pd.DataFrame:
+    registry = pack.table("model_registry")
+    if registry.empty or "component_weight" not in registry.columns:
+        return pd.DataFrame()
+    view = registry.copy()
+    view["Component"] = [f"C{i}" for i in range(1, len(view) + 1)]
+    view["Weight"] = pd.to_numeric(view["component_weight"], errors="coerce")
+    view["Algorithm"] = view.get("model_kind", pd.Series(dtype=str)).astype(str).map(_algorithm_label)
+    view["Window"] = view.get("window", pd.Series(dtype=str)).astype(str).map(lambda value: f"{value} quarters" if value else "")
+    return view[["Component", "component_model", "Algorithm", "Window", "Weight"]].rename(
+        columns={"component_model": "Component model"}
+    )
+
+
+def reproducibility_ensemble_equation(pack: ReproducibilityPack) -> str:
+    weights = reproducibility_ensemble_weight_view(pack)
+    if weights.empty:
+        return ""
+    terms = [f"{row.Weight:.6f}*{row.Component}" for row in weights.itertuples(index=False)]
+    return "Prediction = " + " + ".join(terms)
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -346,3 +605,35 @@ def _json_summary(value: Any) -> str:
 
 def _score_basis_label(value: Any) -> str:
     return SCORE_BASIS_LABELS.get(str(value), str(value).replace("_", " ").title())
+
+
+def _is_weighted_ensemble_pack(pack: ReproducibilityPack) -> bool:
+    registry = pack.table("model_registry")
+    return "component_weight" in registry.columns and "ensemble_formula" in registry.columns
+
+
+def _component_label_map(pack: ReproducibilityPack) -> dict[str, str]:
+    weights = reproducibility_ensemble_weight_view(pack)
+    if weights.empty:
+        return {}
+    return dict(zip(weights["Component model"].astype(str), weights["Component"].astype(str), strict=False))
+
+
+def _short_component(value: Any) -> str:
+    text = str(value)
+    replacements = {
+        "HEAVY_RUC__dynamic_no_leads__Elastic_alpha0_005_l1_ratio0_2__ylag__w64": "C1 ElasticNet ylag w64",
+        "HEAVY_RUC__schiff__GBR_learning_rate0_06_max_depth1_n_estimators650__noylag__w64": "C2 Schiff GBR no ylag w64",
+        "HEAVY_RUC__dynamic_no_leads__GBR_learning_rate0_08_max_depth1_n_estimators400__ylag__w52": "C3 dynamic GBR ylag w52",
+        "HEAVY_RUC__dynamic_no_leads__GBR_learning_rate0_08_max_depth1_n_estimators150__ylag__w40": "C4 dynamic GBR ylag w40",
+    }
+    return replacements.get(text, text)
+
+
+def _algorithm_label(value: Any) -> str:
+    text = str(value).lower()
+    if text == "elastic_net":
+        return "ElasticNet"
+    if text == "gbr":
+        return "Gradient Boosting"
+    return str(value).replace("_", " ").title()

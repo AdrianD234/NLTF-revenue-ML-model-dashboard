@@ -297,18 +297,20 @@ def test_diagnostic_pass_matrix_tooltips_hover_and_focus(page: Page) -> None:
     assert_no_streamlit_exception(page)
 
 
-def test_light_ruc_reproducibility_detail_renders(page: Page) -> None:
+def test_reproducibility_detail_stream_selector_renders_light_pack(page: Page) -> None:
     open_dashboard(page)
     click_page(page, "Diagnostics")
 
     expander = page.get_by_text("Model Explainability / Reproducibility", exact=False).first
     expander.scroll_into_view_if_needed()
     expander.click()
-    load_label = page.get_by_text("Load Light RUC reproducibility detail", exact=False).first
+    body = page.locator("body")
+    expect(body).to_contain_text("Reproducibility stream", timeout=30000)
+    expect(body).to_contain_text("Light RUC volume", timeout=30000)
+    load_label = page.get_by_text("Load reproducibility detail", exact=False).first
     expect(load_label).to_be_visible(timeout=30000)
     load_label.click()
 
-    body = page.locator("body")
     expect(body).to_contain_text("Exact prediction replay", timeout=60000)
     expect(body).to_contain_text("dynamic_RESID_GBR_n150_d1_lr0.05_w36", timeout=60000)
     expect(body).to_contain_text(
@@ -318,6 +320,33 @@ def test_light_ruc_reproducibility_detail_renders(page: Page) -> None:
     expect(body).to_contain_text("Feature importance", timeout=60000)
     expect(body).to_contain_text("Scenario sensitivities", timeout=60000)
     expect(body).to_contain_text("GDP, diesel price, RUC price and other perturbations", timeout=60000)
+    assert "black box" not in body.inner_text(timeout=60000).lower()
+    assert_no_streamlit_exception(page)
+
+
+def test_reproducibility_detail_stream_selector_renders_heavy_pack(page: Page) -> None:
+    open_dashboard(page)
+    click_page(page, "Diagnostics")
+
+    expander = page.get_by_text("Model Explainability / Reproducibility", exact=False).first
+    expander.scroll_into_view_if_needed()
+    expander.click()
+
+    stream_select = page.get_by_label("Reproducibility stream")
+    expect(stream_select).to_be_visible(timeout=30000)
+    stream_select.click()
+    page.get_by_text("Heavy RUC volume", exact=True).last.click()
+
+    load_label = page.get_by_text("Load reproducibility detail", exact=False).first
+    expect(load_label).to_be_visible(timeout=30000)
+    load_label.click()
+
+    body = page.locator("body")
+    expect(body).to_contain_text("Exact weighted-ensemble replay", timeout=60000)
+    expect(body).to_contain_text("HEAVY_RUC__RECON_STATIC_REBUILT", timeout=60000)
+    expect(body).to_contain_text("Prediction = 0.469332*C1 + 0.281844*C2 + 0.144373*C3 + 0.104451*C4", timeout=60000)
+    expect(body).to_contain_text("Feature importance", timeout=60000)
+    expect(body).to_contain_text("Scenario sensitivities", timeout=60000)
     assert "black box" not in body.inner_text(timeout=60000).lower()
     assert_no_streamlit_exception(page)
 

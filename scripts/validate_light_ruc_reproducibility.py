@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 from pathlib import Path
 import sys
 
+import numpy as np
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -13,12 +15,31 @@ if str(ROOT) not in sys.path:
 from model_dashboard.data.config import DEFAULT_EVIDENCE_PACK_ROOT  # noqa: E402
 from model_dashboard.evidence_pack import load_evidence_pack  # noqa: E402
 from model_dashboard.light_ruc_reproducibility import (  # noqa: E402
+    HEAVY_RUC_REPRO_MODEL,
+    HEAVY_RUC_REPRO_ROOT,
     LIGHT_RUC_REPRO_DESCRIPTION,
     LIGHT_RUC_REPRO_MODEL,
     LIGHT_RUC_REPRO_ROOT,
+    REQUIRED_HEAVY_RUC_REPRO_FILES,
     REQUIRED_LIGHT_RUC_REPRO_FILES,
+    light_ruc_coefficients_view,
+    light_ruc_component_trace_view,
+    light_ruc_feature_importance_view,
+    light_ruc_registry_view,
     light_ruc_replay_summary,
+    light_ruc_sensitivity_view,
+    light_ruc_training_window_view,
+    load_reproducibility_pack,
     load_light_ruc_reproducibility_pack,
+    reproducibility_coefficients_view,
+    reproducibility_component_trace_view,
+    reproducibility_ensemble_equation,
+    reproducibility_ensemble_weight_view,
+    reproducibility_feature_importance_view,
+    reproducibility_registry_view,
+    reproducibility_replay_summary,
+    reproducibility_sensitivity_view,
+    reproducibility_training_window_view,
 )
 
 
@@ -34,11 +55,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--repo-root", default=str(ROOT))
     parser.add_argument("--data-root", default=str(DEFAULT_EVIDENCE_PACK_ROOT))
     parser.add_argument("--repro-root", default=str(LIGHT_RUC_REPRO_ROOT))
+    parser.add_argument("--heavy-repro-root", default=str(HEAVY_RUC_REPRO_ROOT))
     return parser.parse_args()
 
 
-def validate(data_root: str | Path, repro_root: str | Path) -> list[dict[str, str]]:
+def validate(data_root: str | Path, repro_root: str | Path, heavy_repro_root: str | Path | None = None) -> list[dict[str, str]]:
     pack = load_light_ruc_reproducibility_pack(repro_root)
+    heavy_pack = load_reproducibility_pack("Heavy RUC volume", heavy_repro_root or HEAVY_RUC_REPRO_ROOT)
     findings: list[dict[str, str]] = []
 
     def record(name: str, passed: bool, evidence: str) -> None:
@@ -108,6 +131,40 @@ def validate(data_root: str | Path, repro_root: str | Path) -> list[dict[str, st
         f"max_abs_pred_delta={max_delta}",
     )
 
+    rebuilt = pack.table("rebuilt_predictions")
+    if {"base_log_pred", "residual_log_pred", "pred"}.issubset(rebuilt.columns):
+        rebuilt_delta = (
+            np.exp(pd.to_numeric(rebuilt["base_log_pred"], errors="coerce") + pd.to_numeric(rebuilt["residual_log_pred"], errors="coerce"))
+            - pd.to_numeric(rebuilt["pred"], errors="coerce")
+        ).abs()
+        rebuilt_max_delta = rebuilt_delta.max()
+    else:
+        rebuilt_max_delta = pd.NA
+    record(
+        "Light RUC rebuilt predictions satisfy exp(base log prediction + residual log prediction) equals final prediction",
+        pd.notna(rebuilt_max_delta) and float(rebuilt_max_delta) <= 1e-5,
+        f"max_abs_delta={rebuilt_max_delta}",
+    )
+
+    components = pack.table("component_predictions")
+    component_max_delta = pd.NA
+    if {"component_model", "component_log_value", "final_pred"}.issubset(components.columns):
+        keys = ["score_basis", "grid", "origin", "target_period", "horizon"]
+        if set(keys).issubset(components.columns):
+            pivot = components.pivot_table(index=keys, columns="component_model", values="component_log_value", aggfunc="first")
+            final = components.groupby(keys, dropna=False)["final_pred"].first()
+            if {"base_schiff_ols", "residual_gbr"}.issubset(pivot.columns):
+                rebuilt_from_components = np.exp(
+                    pd.to_numeric(pivot["base_schiff_ols"], errors="coerce")
+                    + pd.to_numeric(pivot["residual_gbr"], errors="coerce")
+                )
+                component_max_delta = (rebuilt_from_components - pd.to_numeric(final, errors="coerce")).abs().max()
+    record(
+        "Light RUC component trace satisfies exp(base component log + residual component log) equals final prediction",
+        pd.notna(component_max_delta) and float(component_max_delta) <= 1e-5,
+        f"max_abs_delta={component_max_delta}",
+    )
+
     metrics = pack.table("evidence_metric_comparison")
     record(
         "Metric comparison includes evidence pack and parent run matches",
@@ -163,6 +220,8 @@ def validate(data_root: str | Path, repro_root: str | Path) -> list[dict[str, st
         "; ".join(metric_evidence) if metric_evidence else "scorecard_summary is missing.",
     )
 
+    _validate_heavy_pack(heavy_pack, record)
+
     dashboard = load_evidence_pack(data_root, ROOT)
     recommended = dashboard.data["recommended"].set_index("stream_label")
     main_ok = True
@@ -178,14 +237,157 @@ def validate(data_root: str | Path, repro_root: str | Path) -> list[dict[str, st
         "; ".join(main_evidence),
     )
 
+    before_hashes = _chart_source_hashes()
+    _ = light_ruc_registry_view(pack)
+    _ = light_ruc_component_trace_view(pack)
+    _ = light_ruc_feature_importance_view(pack)
+    _ = light_ruc_sensitivity_view(pack)
+    _ = light_ruc_coefficients_view(pack)
+    _ = light_ruc_training_window_view(pack)
+    _ = reproducibility_registry_view(heavy_pack)
+    _ = reproducibility_component_trace_view(heavy_pack)
+    _ = reproducibility_feature_importance_view(heavy_pack)
+    _ = reproducibility_sensitivity_view(heavy_pack)
+    _ = reproducibility_coefficients_view(heavy_pack)
+    _ = reproducibility_training_window_view(heavy_pack)
+    _ = reproducibility_ensemble_weight_view(heavy_pack)
+    _ = reproducibility_ensemble_equation(heavy_pack)
+    after_hashes = _chart_source_hashes()
+    record(
+        "Auxiliary reproducibility views do not alter main chart-source tables",
+        bool(before_hashes) and before_hashes == after_hashes,
+        f"chart_source_tables={len(before_hashes)}; changed={_changed_hash_names(before_hashes, after_hashes)}",
+    )
+    auxiliary_refs = _chart_source_auxiliary_references()
+    record(
+        "Main chart-source tables do not reference auxiliary reproducibility pack files",
+        not auxiliary_refs,
+        "references=" + ", ".join(auxiliary_refs) if auxiliary_refs else "No auxiliary reproducibility paths found in chart sources.",
+    )
+
     return findings
+
+
+def _validate_heavy_pack(heavy_pack: object, record: object) -> None:
+    record(
+        "Heavy RUC required auxiliary audit files exist",
+        not heavy_pack.missing_files,
+        "missing=" + ", ".join(heavy_pack.missing_files)
+        if heavy_pack.missing_files
+        else f"files={len(REQUIRED_HEAVY_RUC_REPRO_FILES)}",
+    )
+    root = Path(heavy_pack.root)
+    disallowed = sorted(path.name for path in root.glob("*") if path.suffix.lower() in {".csv", ".xlsx", ".xls"})
+    record(
+        "Heavy RUC auxiliary audit copy excludes CSV/XLSX mirrors",
+        not disallowed,
+        "disallowed=" + ", ".join(disallowed) if disallowed else "No CSV/XLSX mirrors found in Heavy RUC auxiliary pack.",
+    )
+    registry = heavy_pack.table("model_registry")
+    record(
+        "Heavy RUC model registry exists and identifies the finalist",
+        root.joinpath("model_registry.parquet").exists()
+        and not registry.empty
+        and HEAVY_RUC_REPRO_MODEL in set(registry.get("finalist_model", pd.Series(dtype=str)).astype(str)),
+        f"path={root / 'model_registry.parquet'}; rows={len(registry)}",
+    )
+    summary = reproducibility_replay_summary(heavy_pack) if heavy_pack.available else {}
+    record(
+        "Heavy RUC exact weighted-ensemble replay status is documented",
+        summary.get("status") == "Exact weighted-ensemble replay"
+        and summary.get("model") == HEAVY_RUC_REPRO_MODEL
+        and summary.get("source_sheet") == "Heavy RUC Inputs",
+        str(summary),
+    )
+    prediction_comparison = heavy_pack.table("evidence_prediction_comparison")
+    max_delta = pd.to_numeric(prediction_comparison.get("max_abs_pred_delta", pd.Series(dtype=float)), errors="coerce").max()
+    record(
+        "Heavy RUC evidence prediction replay delta is below tolerance",
+        pd.notna(max_delta) and float(max_delta) <= 1e-5,
+        f"max_abs_pred_delta={max_delta}",
+    )
+    weights = pd.to_numeric(registry.get("component_weight", pd.Series(dtype=float)), errors="coerce")
+    record(
+        "Heavy RUC component weights sum to one",
+        not weights.empty and abs(float(weights.sum()) - 1.0) <= 1e-6,
+        f"weight_sum={float(weights.sum()) if not weights.empty else 'missing'}",
+    )
+    components = heavy_pack.table("component_predictions")
+    weighted_delta = _heavy_weighted_component_delta(components)
+    record(
+        "Heavy RUC weighted component sum equals final prediction",
+        pd.notna(weighted_delta) and float(weighted_delta) <= 1e-5,
+        f"max_abs_delta={weighted_delta}",
+    )
+    feature_importance = heavy_pack.table("feature_importance_global")
+    sensitivities = heavy_pack.table("scenario_sensitivities")
+    record(
+        "Heavy RUC feature importance rows exist",
+        not feature_importance.empty,
+        f"rows={len(feature_importance)}",
+    )
+    record(
+        "Heavy RUC scenario sensitivity rows exist",
+        not sensitivities.empty,
+        f"rows={len(sensitivities)}",
+    )
+    equation = reproducibility_ensemble_equation(heavy_pack)
+    record(
+        "Heavy RUC ensemble equation exposes all four component weights",
+        "0.469332*C1" in equation
+        and "0.281844*C2" in equation
+        and "0.144373*C3" in equation
+        and "0.104451*C4" in equation,
+        equation,
+    )
+
+
+def _heavy_weighted_component_delta(components: pd.DataFrame) -> float | pd.NA:
+    required = {"score_basis", "eval_grid", "origin", "target_period", "horizon", "weighted_component_pred", "final_pred"}
+    if components.empty or not required.issubset(components.columns):
+        return pd.NA
+    keys = ["score_basis", "eval_grid", "origin", "target_period", "horizon"]
+    grouped = (
+        components.groupby(keys, dropna=False)
+        .agg(rebuilt=("weighted_component_pred", "sum"), final_pred=("final_pred", "first"))
+        .copy()
+    )
+    return float((pd.to_numeric(grouped["rebuilt"], errors="coerce") - pd.to_numeric(grouped["final_pred"], errors="coerce")).abs().max())
+
+
+def _chart_source_hashes() -> dict[str, str]:
+    source_dir = ROOT / "artifacts" / "chart_sources"
+    if not source_dir.exists():
+        return {}
+    return {
+        path.relative_to(ROOT).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in sorted(source_dir.glob("*.csv"))
+    }
+
+
+def _changed_hash_names(before: dict[str, str], after: dict[str, str]) -> str:
+    names = sorted(set(before) | set(after))
+    changed = [name for name in names if before.get(name) != after.get(name)]
+    return ", ".join(changed) if changed else "none"
+
+
+def _chart_source_auxiliary_references() -> list[str]:
+    source_dir = ROOT / "artifacts" / "chart_sources"
+    if not source_dir.exists():
+        return []
+    references: list[str] = []
+    for path in sorted(source_dir.glob("*.csv")):
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        if "dashboard_evidence_pack_reproducibility" in text or "light_ruc_exact_reproducibility" in text:
+            references.append(path.name)
+    return references
 
 
 def main() -> int:
     args = parse_args()
     artifacts = ROOT / "artifacts"
     artifacts.mkdir(exist_ok=True)
-    findings = validate(args.data_root, args.repro_root)
+    findings = validate(args.data_root, args.repro_root, args.heavy_repro_root)
     failed = [row for row in findings if row["status"] != "PASS"]
     status = "passed" if not failed else "failed"
     lines = [
