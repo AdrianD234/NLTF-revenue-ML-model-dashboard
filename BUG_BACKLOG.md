@@ -97,6 +97,19 @@ Backlog state for the Stage 1 Model Governance Dashboard Parquet refresh and vis
 - [x] Removed active-run expected component/finalist constants from verifier scripts; source-table checks now compare against active `DashboardData`.
 - [x] Moved active expected numeric values used by tests into `tests/fixtures/expected_values.py`.
 
+## Closed Page 5 Governance & Reproducibility Items
+
+- [x] Rebuilt Page 5 as a read-only governance dashboard page with Waka Kotahi / NZTA card styling.
+- [x] Added Page 5 filter strip, segmented stream selector, reproducibility pack selector, workbook provenance, read-only status, reset button, and downloads dropdown.
+- [x] Added four top status cards for packs loaded, workbook provenance, chart-source isolation, and audit-only page role.
+- [x] Added stream replay cards for PED, Light RUC, and Heavy RUC with required wording and replay deltas.
+- [x] Replaced table-like build flow with visual process cards.
+- [x] Replaced glossary table presentation with glossary chips/cards.
+- [x] Added registry and diagrammatic component trace panels from replay-pack Parquet.
+- [x] Added feature importance, coefficients, scenario sensitivities, training-window trace, downloads, SHAP unavailable note, and read-only footer.
+- [x] Added Page 5 visual spec, visual delta backlog, screenshot review, and target/current matrix artifacts.
+- [x] Extended visual conformance validation and 120-gate matrix checks to include Page 5.
+
 ## Closure Evidence
 
 - Schema inspection passed for the information pack Parquet reached from the requested diagnostic audit pack workflow.

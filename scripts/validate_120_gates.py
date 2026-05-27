@@ -281,10 +281,13 @@ def main() -> int:
 
     def check_visual_matrix() -> str:
         matrix = read_text("artifacts/target_vs_current_screenshot_matrix.md")
-        pages = ["Overview", "Diagnostics", "Scenario Comparison", "Schiff Benchmark"]
-        if not all(page in matrix for page in pages) or matrix.count("PASS") < 4:
-            raise AssertionError("Target-vs-current matrix does not mark all four pages PASS.")
-        return "Target-vs-current matrix marks all four pages PASS."
+        pages = ["Overview", "Diagnostics", "Scenario Comparison", "Schiff Benchmark", "Governance & Reproducibility"]
+        if not all(page in matrix for page in pages) or matrix.count("PASS") < 5:
+            raise AssertionError("Target-vs-current matrix does not mark all five pages PASS.")
+        page5_matrix = read_text("artifacts/page5_target_vs_current_matrix.md")
+        if "Status: PASS" not in page5_matrix:
+            raise AssertionError("Page 5 target-vs-current matrix is missing or not PASS.")
+        return "Target-vs-current matrix marks all five pages PASS."
 
     def check_hover_terms() -> str:
         report = read_text("artifacts/hover_review.md") + read_text("artifacts/filter_interaction_review.md")

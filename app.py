@@ -10,6 +10,7 @@ from typing import Any
 import zipfile
 
 import pandas as pd
+import plotly.graph_objects as go
 import streamlit as st
 
 from model_dashboard.data_loader import (
@@ -238,7 +239,8 @@ def main() -> None:
             page_chip=f"Page {current_index} of {len(pages)} - {current_page}",
         )
     controls = render_filter_sidebar(loaded)
-    controls = render_top_filter_bar(loaded, controls)
+    if current_page != REPRODUCIBILITY_PAGE:
+        controls = render_top_filter_bar(loaded, controls)
 
     if current_page == "Overview":
         render_overview(loaded, controls)
@@ -250,7 +252,8 @@ def main() -> None:
         render_schiff_benchmark_page(loaded, controls)
     else:
         render_governance_reproducibility_page(loaded, controls)
-    footer_strip("Transport Revenue Model Testbench | Refined Finalist Models", run_footer_label(loaded))
+    if current_page != REPRODUCIBILITY_PAGE:
+        footer_strip("Transport Revenue Model Testbench | Refined Finalist Models", run_footer_label(loaded))
 
 
 def render_primary_navigation(pages: list[str]) -> str:
@@ -1334,11 +1337,7 @@ def render_reproducibility_detail(stream_label: str) -> None:
 
 def render_governance_reproducibility_page(loaded: LoadedRun, controls: dict[str, Any]) -> None:
     del controls
-    section_title("Governance & Reproducibility")
-    info_panel(
-        "Read-only governance page for replay evidence, model lineage, workbook provenance and component-level traceability. "
-        "The auxiliary reproducibility packs are not used by the main KPI, scenario, diagnostics, stress or chart-source calculations."
-    )
+    inject_page5_theme()
 
     pack_labels = reproducibility_stream_labels()
     loaded_packs = {label: _load_reproducibility_pack_safely(label) for label in pack_labels}
@@ -1346,61 +1345,23 @@ def render_governance_reproducibility_page(loaded: LoadedRun, controls: dict[str
     workbook_manifest = source_workbook_manifest()
     chart_source_count = len(list((Path(__file__).resolve().parent / "artifacts" / "chart_sources").glob("*.csv")))
 
-    gov_kpi_grid(
-        [
-            (
-                "Repro packs loaded",
-                f"{available_count}/{len(pack_labels)}",
-                "PED, Light RUC and Heavy RUC auxiliary packs",
-                "read-only",
-                "good" if available_count == len(pack_labels) else "mixed",
-                "R",
-            ),
-            (
-                "Workbook provenance",
-                "Manifested" if workbook_manifest.get("available") else "Missing",
-                str(workbook_manifest.get("status_label", "source workbook status")),
-                "optional source",
-                "good" if workbook_manifest.get("available") else "mixed",
-                "W",
-            ),
-            (
-                "Chart-source isolation",
-                f"{chart_source_count}",
-                "main chart-source CSVs remain untouched",
-                "guarded by tests",
-                "good",
-                "C",
-            ),
-            (
-                "Page role",
-                "Audit trail",
-                "explainability and replay evidence only",
-                "not scoring input",
-                "good",
-                "G",
-            ),
-        ]
+    selected_stream = render_page5_filter_strip(loaded_packs, workbook_manifest)
+
+    render_page5_top_status_cards(
+        available_count=available_count,
+        total_count=len(pack_labels),
+        workbook_manifest=workbook_manifest,
+        chart_source_count=chart_source_count,
     )
+    render_page5_reproducibility_status_cards(selected_stream, loaded_packs)
 
-    selector_cols = st.columns([0.42, 0.58])
-    with selector_cols[0]:
-        selected_stream = st.selectbox(
-            "Reproducibility stream",
-            ["All streams", *pack_labels],
-            key="repro_page_stream_selector",
-        )
-    with selector_cols[1]:
-        render_source_workbook_status(workbook_manifest)
+    analytics_pack = page5_analytics_pack(selected_stream, loaded_packs)
+    analytics_stream = analytics_pack.stream_label if analytics_pack is not None else "Light RUC volume"
 
-    render_reproducibility_downloads(selected_stream, loaded_packs, workbook_manifest)
-
-    if selected_stream == "All streams":
-        render_reproducibility_all_streams(loaded_packs, loaded)
-        return
-
-    selected_pack = loaded_packs.get(str(selected_stream))
-    render_reproducibility_stream_page(str(selected_stream), selected_pack)
+    render_page5_story_row(selected_stream, loaded_packs)
+    render_page5_lower_panels(analytics_stream, analytics_pack, selected_stream, loaded_packs, workbook_manifest)
+    render_page5_shap_note()
+    render_page5_footer(run_footer_label(loaded))
 
 
 def _load_reproducibility_pack_safely(stream_label: str) -> Any | None:
@@ -1411,205 +1372,915 @@ def _load_reproducibility_pack_safely(stream_label: str) -> Any | None:
         return None
 
 
-def render_reproducibility_all_streams(loaded_packs: dict[str, Any | None], loaded: LoadedRun) -> None:
-    del loaded
-    section_title("1. Reproducibility Pack Status")
-    cards = st.columns(len(loaded_packs) or 1)
-    for column, (stream_label, pack) in zip(cards, loaded_packs.items(), strict=False):
-        with column:
-            with st.container(border=True):
-                if pack is None or not pack.available:
-                    missing = ", ".join(getattr(pack, "missing_files", ())[:5]) if pack is not None else "pack load failed"
-                    st.markdown(f"**{stream_label}**")
-                    warning_panel(f"Unavailable: {missing or 'required audit files missing'}")
-                    continue
-                summary = reproducibility_replay_summary(pack)
-                delta = pd.to_numeric(pd.Series([summary.get("max_abs_pred_delta")]), errors="coerce").iloc[0]
-                st.markdown(f"**{stream_label}**")
-                st.markdown(
-                    "<div class='kpi-title'>Replay</div>"
-                    "<div style='color:#002B5C;font-size:1.15rem;font-weight:750;line-height:1.14;margin:0.16rem 0 0.52rem;'>"
-                    f"{html.escape(str(summary.get('status', '-')))}"
-                    "</div>",
-                    unsafe_allow_html=True,
-                )
-                st.caption(f"Model: {summary.get('model', '-')}")
-                st.caption(f"Max prediction delta: {delta:.2e}" if pd.notna(delta) else "Max prediction delta: -")
-                st.caption(str(summary.get("description", "")))
-
-    section_title("2. Build Flow")
-    display_table(reproducibility_build_flow_table("All streams"), height=240, max_rows=18)
-    section_title("3. Governance Glossary")
-    display_table(reproducibility_glossary_table(), height=300, max_rows=40)
-    section_title("4. Audit Readout")
-    info_panel(
-        "Select a stream above to inspect its registry, component trace, feature importance, coefficients, sensitivities, "
-        "training-window trace and raw replay-pack downloads."
+def inject_page5_theme() -> None:
+    st.markdown(
+        """
+        <style>
+        .page5-filter-shell {
+            background:#FFFFFF;
+            border:1px solid #D9E2EC;
+            border-radius:8px;
+            box-shadow:0 8px 20px rgba(15,23,42,0.05);
+            margin:0.18rem 0 0.62rem;
+            padding:0.56rem 0.72rem 0.68rem;
+        }
+        .page5-filter-title {
+            color:#002B5C;
+            font-size:0.68rem;
+            font-weight:850;
+            letter-spacing:0.03em;
+            margin:0 0 0.34rem;
+            text-transform:uppercase;
+        }
+        .page5-mini-card, .page5-status-card, .page5-panel, .page5-flow-step, .page5-download-row {
+            background:#FFFFFF;
+            border:1px solid #D9E2EC;
+            border-radius:8px;
+            box-shadow:0 8px 18px rgba(15,23,42,0.045);
+        }
+        .page5-mini-card {
+            min-height:54px;
+            padding:0.46rem 0.58rem;
+        }
+        .page5-mini-kicker, .page5-field-label {
+            color:#002B5C;
+            font-size:0.72rem;
+            font-weight:850;
+            line-height:1.2;
+        }
+        .page5-mini-value {
+            color:#102A43;
+            font-size:0.72rem;
+            font-weight:700;
+            line-height:1.25;
+            margin-top:0.08rem;
+        }
+        .page5-mini-sub {
+            color:#64748B;
+            font-size:0.62rem;
+            line-height:1.15;
+            margin-top:0.04rem;
+        }
+        .page5-status-grid, .page5-kpi-grid {
+            display:grid;
+            gap:0.34rem;
+            grid-template-columns:repeat(4,minmax(0,1fr));
+            margin:0.32rem 0 0.34rem;
+        }
+        .page5-status-card {
+            min-height:154px;
+            padding:0.5rem 0.62rem;
+        }
+        .page5-status-head {
+            align-items:center;
+            display:flex;
+            gap:0.34rem;
+            margin-bottom:0.32rem;
+        }
+        .page5-status-icon {
+            align-items:center;
+            background:#00843D;
+            border-radius:999px;
+            color:#FFFFFF;
+            display:flex;
+            font-size:0.64rem;
+            font-weight:850;
+            height:1.2rem;
+            justify-content:center;
+            width:1.2rem;
+        }
+        .page5-status-title {
+            color:#002B5C;
+            font-size:0.78rem;
+            font-weight:850;
+            line-height:1.1;
+        }
+        .page5-metric-row {
+            display:grid;
+            gap:0.38rem;
+            grid-template-columns:0.82fr 1.72fr;
+            margin:0.08rem 0;
+        }
+        .page5-metric-label {
+            color:#1F3B57;
+            font-size:0.6rem;
+            font-weight:800;
+        }
+        .page5-metric-value {
+            color:#102A43;
+            font-size:0.6rem;
+            line-height:1.12;
+        }
+        .page5-good { color:#00843D; font-weight:850; }
+        .page5-watch { color:#B7791F; font-weight:850; }
+        .page5-flow-grid {
+            align-items:stretch;
+            display:grid;
+            gap:0.32rem;
+            grid-template-columns:repeat(7,minmax(0,1fr));
+            margin:0.18rem 0 0.28rem;
+        }
+        .page5-flow-step {
+            min-height:78px;
+            padding:0.38rem 0.44rem;
+            position:relative;
+        }
+        .page5-flow-step:not(:last-child)::after {
+            color:#64748B;
+            content:"\\2192";
+            font-size:0.86rem;
+            font-weight:850;
+            position:absolute;
+            right:-0.28rem;
+            top:0.42rem;
+            z-index:2;
+        }
+        .page5-flow-number {
+            align-items:center;
+            background:#002B5C;
+            border-radius:999px;
+            color:#FFFFFF;
+            display:flex;
+            font-size:0.54rem;
+            font-weight:850;
+            height:0.96rem;
+            justify-content:center;
+            margin-bottom:0.22rem;
+            width:0.96rem;
+        }
+        .page5-flow-title {
+            color:#002B5C;
+            font-size:0.64rem;
+            font-weight:850;
+            margin-bottom:0.12rem;
+        }
+        .page5-flow-copy {
+            color:#34495E;
+            font-size:0.56rem;
+            line-height:1.12;
+        }
+        .page5-chip-grid {
+            display:flex;
+            flex-wrap:wrap;
+            gap:0.22rem;
+            margin:0.18rem 0 0.34rem;
+        }
+        .page5-chip {
+            background:#F3F6FB;
+            border:1px solid #D9E2EC;
+            border-radius:6px;
+            color:#102A43;
+            display:inline-flex;
+            gap:0.22rem;
+            max-width:205px;
+            padding:0.22rem 0.32rem;
+        }
+        .page5-chip-term {
+            color:#002B5C;
+            font-size:0.56rem;
+            font-weight:850;
+            white-space:nowrap;
+        }
+        .page5-chip-def {
+            color:#64748B;
+            font-size:0.54rem;
+            line-height:1.05;
+        }
+        .page5-panel {
+            min-height:220px;
+            padding:0.66rem 0.72rem;
+        }
+        .page5-trace-panel {
+            min-height:248px;
+        }
+        .page5-panel-title {
+            color:#002B5C;
+            font-size:0.84rem;
+            font-weight:850;
+            line-height:1.15;
+            margin-bottom:0.08rem;
+        }
+        .page5-panel-sub {
+            color:#64748B;
+            font-size:0.66rem;
+            line-height:1.2;
+            margin-bottom:0.42rem;
+        }
+        .page5-diagram-row {
+            align-items:center;
+            border-bottom:1px solid #E6EDF5;
+            display:grid;
+            gap:0.36rem;
+            grid-template-columns:92px 1fr;
+            padding:0.52rem 0;
+        }
+        .page5-diagram-row:last-child { border-bottom:0; }
+        .page5-diagram-label {
+            color:#002B5C;
+            font-size:0.76rem;
+            font-weight:850;
+        }
+        .page5-diagram-chain {
+            align-items:center;
+            display:flex;
+            flex-wrap:wrap;
+            gap:0.34rem;
+        }
+        .page5-node {
+            background:#F3F6FB;
+            border:1px solid #C7D7EA;
+            border-radius:6px;
+            color:#102A43;
+            font-size:0.64rem;
+            font-weight:700;
+            line-height:1.15;
+            min-width:88px;
+            padding:0.38rem 0.46rem;
+            text-align:center;
+        }
+        .page5-node.green { background:#EAF7EF; border-color:#B8E0C8; }
+        .page5-node.blue { background:#EAF2F8; border-color:#BFD3E6; }
+        .page5-node.purple { background:#F1ECF7; border-color:#D8C8EA; }
+        .page5-op {
+            color:#102A43;
+            font-size:1.04rem;
+            font-weight:800;
+        }
+        .page5-download-list {
+            display:flex;
+            flex-direction:column;
+            gap:0.2rem;
+            margin-top:0.16rem;
+        }
+        .page5-download-row {
+            align-items:center;
+            display:grid;
+            gap:0.35rem;
+            grid-template-columns:1fr auto;
+            padding:0.32rem 0.44rem;
+        }
+        .page5-download-name {
+            color:#102A43;
+            font-size:0.68rem;
+            font-weight:700;
+        }
+        .page5-download-size {
+            color:#64748B;
+            font-size:0.64rem;
+        }
+        .page5-shap-note {
+            align-items:center;
+            background:#EAF2F8;
+            border:1px solid #D9E2EC;
+            border-radius:8px;
+            color:#102A43;
+            display:flex;
+            font-size:0.78rem;
+            gap:0.55rem;
+            margin:0.42rem 0;
+            padding:0.5rem 0.76rem;
+        }
+        .page5-footer {
+            align-items:center;
+            background:#002B5C;
+            border-radius:8px;
+            color:#FFFFFF;
+            display:grid;
+            gap:0.8rem;
+            grid-template-columns:1fr auto auto;
+            margin:0.48rem 0 0.18rem;
+            padding:0.78rem 0.92rem;
+        }
+        .page5-footer-main {
+            font-size:0.86rem;
+            font-weight:750;
+        }
+        .page5-footer-meta {
+            font-size:0.72rem;
+            opacity:0.9;
+            white-space:nowrap;
+        }
+        @media (max-width: 1200px) {
+            .page5-status-grid, .page5-kpi-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+            .page5-flow-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+            .page5-flow-step:not(:last-child)::after { display:none; }
+            .page5-footer { grid-template-columns:1fr; }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
     )
 
 
-def render_reproducibility_stream_page(stream_label: str, pack: Any | None) -> None:
-    section_title("1. Reproducibility Pack Status")
-    if pack is None or not pack.available:
-        missing = ", ".join(getattr(pack, "missing_files", ())[:8]) if pack is not None else "pack load failed"
-        warning_panel(f"{stream_label} reproducibility audit pack is unavailable: {missing or 'required audit files missing'}")
-        return
+def render_page5_filter_strip(
+    loaded_packs: dict[str, Any | None],
+    workbook_manifest: dict[str, Any],
+) -> str:
+    if st.session_state.pop("page5_reset_requested", False):
+        for key in ("page5_stream_segment", "page5_pack_selector"):
+            st.session_state.pop(key, None)
+    stream_map = {
+        "All streams": "All streams",
+        "PED": "PED VKT per capita",
+        "Light RUC": "Light RUC volume",
+        "Heavy RUC": "Heavy RUC volume",
+    }
+    with st.container(border=True):
+        st.markdown("<div class='page5-filter-title'>Governance & Reproducibility Filters</div>", unsafe_allow_html=True)
+        cols = st.columns([1.45, 0.88, 1.05, 1.0, 0.58, 0.66])
+        with cols[0]:
+            selected_short = st.segmented_control(
+                "Stream",
+                list(stream_map),
+                default="All streams",
+                key="page5_stream_segment",
+                required=True,
+                width="stretch",
+            )
+        with cols[1]:
+            st.selectbox(
+                "Reproducibility pack",
+                ["v1.3.0 (Latest)", "Bundled page pack"],
+                key="page5_pack_selector",
+                help="Read-only stream replay packs loaded from data/dashboard_evidence_pack_reproducibility.",
+            )
+        with cols[2]:
+            st.markdown(page5_workbook_card_html(workbook_manifest), unsafe_allow_html=True)
+        with cols[3]:
+            st.markdown(
+                page5_mini_card_html(
+                    "Read-only",
+                    "This page is read-only",
+                    "No inputs or edits are permitted",
+                    icon="LOCK",
+                ),
+                unsafe_allow_html=True,
+            )
+        with cols[4]:
+            st.button(
+                "Reset Filters",
+                key="page5_reset_filters",
+                use_container_width=True,
+                on_click=lambda: st.session_state.__setitem__("page5_reset_requested", True),
+            )
+        with cols[5]:
+            with st.popover("Downloads", use_container_width=True):
+                render_page5_download_buttons(
+                    stream_map.get(str(selected_short or "All streams"), "All streams"),
+                    loaded_packs,
+                    workbook_manifest,
+                    key_prefix="popover",
+                )
+    return stream_map.get(str(selected_short or "All streams"), "All streams")
 
+
+def render_page5_top_status_cards(
+    *,
+    available_count: int,
+    total_count: int,
+    workbook_manifest: dict[str, Any],
+    chart_source_count: int,
+) -> None:
+    cards = [
+        ("Repro packs loaded", f"{available_count}/{total_count}", "PED, Light RUC and Heavy RUC packs", "read-only", "R"),
+        (
+            "Workbook provenance",
+            "available" if workbook_manifest.get("available") else "missing",
+            str(workbook_manifest.get("status_label", "optional source workbook not found")),
+            "optional source",
+            "W",
+        ),
+        ("Chart-source isolation", "untouched", f"{chart_source_count} main chart-source CSVs guarded", "no writes", "C"),
+        ("Page role", "Audit trail", "explainability only, not scoring input", "read-only", "A"),
+    ]
+    html_cards = [
+        "<div class='page5-mini-card'>"
+        f"<div class='page5-mini-kicker'>{html.escape(icon)} &nbsp; {html.escape(title)}</div>"
+        f"<div class='page5-mini-value'>{html.escape(value)}</div>"
+        f"<div class='page5-mini-sub'>{html.escape(subtext)}</div>"
+        f"<div class='page5-good'>{html.escape(delta)}</div>"
+        "</div>"
+        for title, value, subtext, delta, icon in cards
+    ]
+    st.markdown("<div class='page5-kpi-grid'>" + "".join(html_cards) + "</div>", unsafe_allow_html=True)
+
+
+def render_page5_reproducibility_status_cards(selected_stream: str, loaded_packs: dict[str, Any | None]) -> None:
+    labels = list(loaded_packs) if selected_stream == "All streams" else [selected_stream]
+    cards = [page5_repro_card_html(label, loaded_packs.get(label)) for label in labels]
+    cards.append(
+        "<div class='page5-status-card'>"
+        "<div class='page5-status-head'><div class='page5-status-icon' style='background:#002B5C;'>DB</div>"
+        "<div class='page5-status-title'>Missing data behaviour</div></div>"
+        "<div class='page5-metric-value'>When required inputs or model packs are missing, they are shown as a clear missing-data card rather than an error.</div>"
+        "<div style='margin-top:1rem;' class='page5-good'>All required packs are present</div>"
+        "</div>"
+    )
+    st.markdown("<div class='page5-status-grid'>" + "".join(cards) + "</div>", unsafe_allow_html=True)
+
+
+def page5_repro_card_html(stream_label: str, pack: Any | None) -> str:
+    if pack is None or not getattr(pack, "available", False):
+        missing = ", ".join(getattr(pack, "missing_files", ())[:5]) if pack is not None else "pack load failed"
+        return (
+            "<div class='page5-status-card'>"
+            "<div class='page5-status-head'><div class='page5-status-icon' style='background:#F37021;'>!</div>"
+            f"<div class='page5-status-title'>{html.escape(stream_label)}</div></div>"
+            f"<div class='page5-metric-value'>Missing reproducibility pack: {html.escape(missing or 'required audit files missing')}</div>"
+            "</div>"
+        )
     summary = reproducibility_replay_summary(pack)
     delta = pd.to_numeric(pd.Series([summary.get("max_abs_pred_delta")]), errors="coerce").iloc[0]
-    gov_kpi_grid(
-        [
-            (
-                "Replay status",
-                str(summary.get("status", "-")),
-                f"max abs prediction delta {delta:.2e}" if pd.notna(delta) else "max abs prediction delta -",
-                "",
-                "good",
-                "R",
-            ),
-            ("Model", str(summary.get("model", "-")), stream_label, "", "good", "M"),
-            ("Workbook", str(summary.get("workbook", "-")), str(summary.get("source_sheet", "-")), "", "good", "W"),
-            ("Audit role", "Auxiliary", "does not feed main dashboard metrics", "read-only", "good", "A"),
-        ]
-    )
-    info_panel(str(summary.get("description", "")))
-
-    section_title("2. Build Flow")
-    display_table(reproducibility_build_flow_table(stream_label), height=210, max_rows=12)
-
-    section_title("3. Governance Glossary")
-    display_table(reproducibility_glossary_table(), height=250, max_rows=40)
-
-    top = st.columns([1.0, 1.0])
-    with top[0]:
-        section_title("4. Model Registry")
-        display_table(reproducibility_registry_view(pack), height=250, max_rows=60)
-    with top[1]:
-        section_title("5. Component Trace")
-        component_trace = reproducibility_component_trace_view(pack)
-        component_cols = [
-            "Score basis",
-            "Origin",
-            "Target period",
-            "Horizon",
-            "Component",
-            "Weight",
-            "Actual",
-            "Component prediction",
-            "Weighted contribution",
-            "Base log prediction",
-            "Residual log prediction",
-            "Final prediction",
-            "Error (%)",
-        ]
-        display_table(component_trace[[col for col in component_cols if col in component_trace.columns]], height=250, max_rows=160)
-
-    weight_view = reproducibility_ensemble_weight_view(pack)
-    if not weight_view.empty:
-        section_title("6. Ensemble Equation")
-        info_panel(reproducibility_ensemble_equation(pack))
-        display_table(weight_view, height=180, max_rows=20)
-
-    chart_cols = st.columns([1.0, 1.0])
-    with chart_cols[0]:
-        chart_card(
-            "7. Feature Importance",
-            "Replay-pack feature importance or component-weight evidence.",
-            plot_reproducibility_feature_importance(reproducibility_feature_importance_view(pack), stream_label),
+    delta_text = "0" if pd.notna(delta) and abs(float(delta)) == 0 else (f"{delta:.2e}" if pd.notna(delta) else "-")
+    replay_note = str(summary.get("description") or stream_repro_description(stream_label))
+    rows = [
+        ("Reproducibility status", str(summary.get("status", "-"))),
+        ("Replay note", replay_note),
+        ("Model approach", stream_repro_approach(stream_label)),
+        ("Model", str(summary.get("model", "-"))),
+        ("Max prediction delta", delta_text),
+        ("Score basis", "Paper-style horizon MAPE"),
+        ("Workbook + sheet", f"{summary.get('workbook', '-')} > {summary.get('source_sheet', '-')}"),
+        ("Caveat", stream_repro_caveat(stream_label)),
+    ]
+    return (
+        "<div class='page5-status-card'>"
+        "<div class='page5-status-head'><div class='page5-status-icon'>OK</div>"
+        f"<div class='page5-status-title'>{html.escape(stream_label)}</div></div>"
+        + "".join(
+            "<div class='page5-metric-row'>"
+            f"<div class='page5-metric-label'>{html.escape(label)}</div>"
+            f"<div class='page5-metric-value'>{html.escape(value)}</div>"
+            "</div>"
+            for label, value in rows
         )
-    with chart_cols[1]:
-        chart_card(
-            "8. Scenario Sensitivities",
-            "Replay-pack sensitivity checks where the source pack includes numeric perturbations.",
-            plot_reproducibility_sensitivities(reproducibility_sensitivity_view(pack), stream_label),
-        )
-
-    with st.expander("Coefficients and training-window trace", expanded=True):
-        coeff_cols = st.columns([1.0, 1.0])
-        with coeff_cols[0]:
-            section_title("Coefficients")
-            display_table(reproducibility_coefficients_view(pack), height=340, max_rows=420)
-        with coeff_cols[1]:
-            section_title("Training-window trace")
-            display_table(reproducibility_training_window_view(pack), height=340, max_rows=220)
-
-    with st.expander("Scorecard, horizon, annual and stress trace", expanded=False):
-        display_table(reproducibility_scorecard_view(pack), height=150, max_rows=30)
-        display_table(reproducibility_horizon_view(pack), height=250, max_rows=120)
-        display_table(reproducibility_annual_view(pack), height=250, max_rows=220)
-        display_table(reproducibility_stress_view(pack), height=180, max_rows=80)
-
-    info_panel(
-        "SHAP is not supplied in these reproducibility packs. The page therefore shows replay-pack feature importance, "
-        "component weights and sensitivity tables instead of implying SHAP evidence exists."
-    )
-    info_panel(
-        "Footer audit: this page reads auxiliary pack files only. Main chart-source tables remain governed by the Parquet evidence pack."
+        + "</div>"
     )
 
 
-def render_source_workbook_status(manifest: dict[str, Any]) -> None:
-    label = str(manifest.get("status_label", "Source workbook status unavailable"))
-    if manifest.get("available"):
-        info_panel(
-            f"Source workbook manifest: {label}. SHA256 {str(manifest.get('sha256', ''))[:12]}... "
-            f"Artifact written to {SOURCE_WORKBOOK_MANIFEST_PATH.as_posix()}."
+def render_page5_build_flow(selected_stream: str) -> None:
+    steps = page5_build_flow_steps(selected_stream)
+    cards = []
+    for idx, (step, text) in enumerate(steps, start=1):
+        cards.append(
+            "<div class='page5-flow-step'>"
+            f"<div class='page5-flow-number'>{idx}</div>"
+            f"<div class='page5-flow-title'>{html.escape(step)}</div>"
+            f"<div class='page5-flow-copy'>{html.escape(text)}</div>"
+            "</div>"
         )
-    else:
-        warning_panel(
-            "Source workbook is optional and was not found in the repo or configured external location. "
-            f"Artifact written to {SOURCE_WORKBOOK_MANIFEST_PATH.as_posix()} with missing status."
+    st.markdown("<div class='page5-panel-title'>How the model is built</div>", unsafe_allow_html=True)
+    st.markdown("<div class='page5-flow-grid'>" + "".join(cards) + "</div>", unsafe_allow_html=True)
+
+
+def render_page5_glossary() -> None:
+    glossary = reproducibility_glossary_table()
+    chips = []
+    for _, row in glossary.iterrows():
+        chips.append(
+            "<div class='page5-chip'>"
+            f"<div class='page5-chip-term'>{html.escape(str(row['Term']))}</div>"
+            f"<div class='page5-chip-def'>{html.escape(str(row['Meaning']))}</div>"
+            "</div>"
+        )
+    st.markdown("<div class='page5-panel-title'>Model glossary</div>", unsafe_allow_html=True)
+    st.markdown("<div class='page5-chip-grid'>" + "".join(chips) + "</div>", unsafe_allow_html=True)
+
+
+def render_page5_story_row(selected_stream: str, loaded_packs: dict[str, Any | None]) -> None:
+    selected_packs = page5_selected_packs(selected_stream, loaded_packs)
+    cols = st.columns([1.28, 0.78, 1.12])
+    with cols[0]:
+        render_page5_build_flow(selected_stream)
+        render_page5_glossary()
+    with cols[1]:
+        with st.container(border=True):
+            st.markdown(
+                "<div class='page5-panel-title'>Registry <span class='page5-panel-sub'>(model_registry.parquet)</span></div>",
+                unsafe_allow_html=True,
+            )
+            registry = page5_registry_frame(selected_packs)
+            display_table(registry, height=218, max_rows=8)
+    with cols[2]:
+        st.markdown(
+            "<div class='page5-panel page5-trace-panel'>"
+            "<div class='page5-panel-title'>Component trace <span class='page5-panel-sub'>(how predictions are composed)</span></div>"
+            f"{page5_component_diagram_html(selected_packs)}"
+            "</div>",
+            unsafe_allow_html=True,
         )
 
 
-def render_reproducibility_downloads(
+def render_page5_registry_and_component_trace(selected_stream: str, loaded_packs: dict[str, Any | None]) -> None:
+    selected_packs = page5_selected_packs(selected_stream, loaded_packs)
+    cols = st.columns([0.72, 1.0])
+    with cols[0]:
+        with st.container(border=True):
+            st.markdown(
+                "<div class='page5-panel-title'>Registry <span class='page5-panel-sub'>(model_registry.parquet)</span></div>",
+                unsafe_allow_html=True,
+            )
+            registry = page5_registry_frame(selected_packs)
+            display_table(registry, height=258, max_rows=12)
+    with cols[1]:
+        st.markdown(
+            "<div class='page5-panel'>"
+            "<div class='page5-panel-title'>Component trace <span class='page5-panel-sub'>(how predictions are composed)</span></div>"
+            f"{page5_component_diagram_html(selected_packs)}"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
+
+def render_page5_lower_panels(
+    analytics_stream: str,
+    analytics_pack: Any | None,
     selected_stream: str,
     loaded_packs: dict[str, Any | None],
     workbook_manifest: dict[str, Any],
 ) -> None:
-    with st.expander("Downloads", expanded=False):
-        download_cols = st.columns(4)
-        with download_cols[0]:
-            st.download_button(
-                "Download workbook manifest",
-                data=json.dumps(workbook_manifest, indent=2).encode("utf-8"),
-                file_name="source_workbook_manifest.json",
-                mime="application/json",
-                use_container_width=True,
-                key="download_source_workbook_manifest",
+    if analytics_pack is None:
+        warning_panel("No reproducibility pack is available for the lower audit panels.")
+        return
+    lower_cols = st.columns([1.0, 1.0, 1.0, 1.05, 1.05])
+    with lower_cols[0]:
+        fig = plot_reproducibility_feature_importance(reproducibility_feature_importance_view(analytics_pack), analytics_stream)
+        fig.update_layout(height=255, margin=dict(l=8, r=8, t=10, b=28))
+        chart_card(
+            f"Feature importance ({short_stream_label(analytics_stream)})",
+            "Replay-pack global feature or component importance.",
+            fig,
+        )
+    with lower_cols[1]:
+        chart_card(
+            f"Model coefficients ({short_stream_label(analytics_stream)})",
+            "Coefficient evidence where the pack includes fitted OLS data.",
+            page5_coefficients_figure(analytics_pack),
+        )
+    with lower_cols[2]:
+        fig = plot_reproducibility_sensitivities(reproducibility_sensitivity_view(analytics_pack), analytics_stream)
+        fig.update_layout(height=255, margin=dict(l=8, r=8, t=10, b=28))
+        chart_card(
+            f"Scenario sensitivities ({short_stream_label(analytics_stream)})",
+            "Impact on dependent variable / model target.",
+            fig,
+        )
+    with lower_cols[3]:
+        chart_card(
+            f"Training window trace ({short_stream_label(analytics_stream)})",
+            "Read-only training-window evidence from training_window_trace.parquet.",
+            page5_training_window_figure(analytics_pack),
+        )
+    with lower_cols[4]:
+        st.markdown(
+            "<div class='page5-panel'>"
+            "<div class='page5-panel-title'>Downloads</div>"
+            "<div class='page5-panel-sub'>Current reproducibility pack and provenance exports.</div>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+        render_page5_download_buttons(selected_stream, loaded_packs, workbook_manifest, key_prefix="lower")
+
+
+def render_page5_shap_note() -> None:
+    st.markdown(
+        "<div class='page5-shap-note'><strong>SHAP not yet generated</strong>"
+        "<span>SHAP explainability artifacts are not available in this pack.</span></div>",
+        unsafe_allow_html=True,
+    )
+
+
+def render_page5_footer(run_label: str) -> None:
+    st.markdown(
+        "<div class='page5-footer'>"
+        "<div class='page5-footer-main'>This Governance & Reproducibility page is read-only and does not feed KPI, finalist, scenario, diagnostic, stress, or chart-source calculations.</div>"
+        f"<div class='page5-footer-meta'>Data as at: {html.escape(run_label)}</div>"
+        "<div class='page5-footer-meta'>Pack: v1.3.0</div>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+
+def page5_workbook_card_html(manifest: dict[str, Any]) -> str:
+    if manifest.get("available"):
+        value = "Source workbook available"
+        sub = f"Updated: {str(manifest.get('modified_time', ''))[:16]}"
+        icon = "OK"
+    else:
+        value = "Optional source workbook not found"
+        sub = "Parquet packs remain evidence source of truth"
+        icon = "WARN"
+    return page5_mini_card_html("Workbook availability", value, sub, icon=icon)
+
+
+def page5_mini_card_html(title: str, value: str, subtext: str, *, icon: str) -> str:
+    return (
+        "<div class='page5-mini-card'>"
+        f"<div class='page5-mini-kicker'>{html.escape(icon)} &nbsp; {html.escape(title)}</div>"
+        f"<div class='page5-mini-value'>{html.escape(value)}</div>"
+        f"<div class='page5-mini-sub'>{html.escape(subtext)}</div>"
+        "</div>"
+    )
+
+
+def page5_selected_packs(selected_stream: str, loaded_packs: dict[str, Any | None]) -> dict[str, Any]:
+    candidates = loaded_packs if selected_stream == "All streams" else {selected_stream: loaded_packs.get(selected_stream)}
+    return {label: pack for label, pack in candidates.items() if pack is not None and getattr(pack, "available", False)}
+
+
+def page5_analytics_pack(selected_stream: str, loaded_packs: dict[str, Any | None]) -> Any | None:
+    if selected_stream != "All streams":
+        pack = loaded_packs.get(selected_stream)
+        return pack if pack is not None and getattr(pack, "available", False) else None
+    preferred = loaded_packs.get("Light RUC volume")
+    if preferred is not None and getattr(preferred, "available", False):
+        return preferred
+    return next((pack for pack in loaded_packs.values() if pack is not None and getattr(pack, "available", False)), None)
+
+
+def short_stream_label(stream_label: str) -> str:
+    return {
+        "PED VKT per capita": "PED",
+        "Light RUC volume": "Light RUC",
+        "Heavy RUC volume": "Heavy RUC",
+    }.get(stream_label, stream_label)
+
+
+def stream_repro_approach(stream_label: str) -> str:
+    return {
+        "PED VKT per capita": "Component C1 (100% weight)",
+        "Light RUC volume": "Two-stage OLS base plus GBM residual correction",
+        "Heavy RUC volume": "Four-component weighted ensemble",
+    }.get(stream_label, "Replay pack evidence")
+
+
+def stream_repro_description(stream_label: str) -> str:
+    return {
+        "PED VKT per capita": "PED finalist exactly replays the stored HPO/static-solver component prediction; inner HPO/static-solver rebuild remains a future audit layer.",
+        "Light RUC volume": "Two-stage OLS base plus GBM residual correction, exactly replayed against evidence predictions.",
+        "Heavy RUC volume": "Four-component weighted ensemble exactly replayed against evidence predictions.",
+    }.get(stream_label, "Replay-pack prediction reconstruction.")
+
+
+def stream_repro_caveat(stream_label: str) -> str:
+    return {
+        "PED VKT per capita": "Inner HPO/static-solver rebuild remains future audit",
+        "Light RUC volume": "-",
+        "Heavy RUC volume": "-",
+    }.get(stream_label, "-")
+
+
+def page5_build_flow_steps(stream_label: str) -> list[tuple[str, str]]:
+    common = [
+        ("Target", "Plain-English model target from the governed evidence pack."),
+        ("Transform", "Target and features are transformed only as recorded in the replay pack."),
+        ("Window", "Rolling or expanding training window retained from source evidence."),
+        ("Base model", "Stream-specific base model or stored component prediction."),
+        ("Residual / Ensemble", "Residual correction for Light RUC, weighted ensemble for Heavy RUC, C1 replay for PED."),
+        ("Final prediction", "Back-transform and combine to reproduce final prediction."),
+        ("Score basis", "Paper-style and operational scorecards remain audit evidence only."),
+    ]
+    if stream_label == "Light RUC volume":
+        return [
+            ("Target", "Light RUC net kilometres from the governed evidence pack."),
+            ("Transform", "Log target used for base and residual replay."),
+            ("Window", "36-quarter rolling OLS and residual window."),
+            ("Base model", "Schiff-style OLS base prediction on log target."),
+            ("Residual / Ensemble", "GBM residual correction added on log scale."),
+            ("Final prediction", "exp(base log prediction + residual log prediction) equals final prediction."),
+            ("Score basis", "Paper-style horizon MAPE and operational pooled scorecards."),
+        ]
+    if stream_label == "Heavy RUC volume":
+        return [
+            ("Target", "Heavy RUC net kilometres from the governed evidence pack."),
+            ("Transform", "Component outputs retained in native prediction units."),
+            ("Window", "Component windows inferred from replay-pack registry."),
+            ("Base model", "Four stored component predictors."),
+            ("Residual / Ensemble", "C1*w1 + C2*w2 + C3*w3 + C4*w4."),
+            ("Final prediction", "Weighted component contributions sum to final prediction."),
+            ("Score basis", "Paper-style horizon MAPE and operational pooled scorecards."),
+        ]
+    if stream_label == "PED VKT per capita":
+        return [
+            ("Target", "PED VKT per capita from the governed evidence pack."),
+            ("Transform", "Stored parent component predictions are replayed; no refit is claimed."),
+            ("Window", "Inherited from the HPO/static-solver parent component."),
+            ("Base model", "HPO/static-solver component C1."),
+            ("Residual / Ensemble", "Single component at 100% weight."),
+            ("Final prediction", "The stored component prediction C1 equals the final prediction within tolerance."),
+            ("Score basis", "Paper-style horizon MAPE and operational pooled scorecards."),
+        ]
+    return common
+
+
+def _short_text(value: Any, limit: int) -> str:
+    if value is None:
+        text = ""
+    else:
+        try:
+            text = "" if bool(pd.isna(value)) else str(value)
+        except (TypeError, ValueError):
+            text = str(value)
+    if len(text) <= limit:
+        return text
+    return f"{text[: max(0, limit - 1)].rstrip()}..."
+
+
+def page5_registry_frame(packs: dict[str, Any]) -> pd.DataFrame:
+    rows: list[dict[str, str]] = []
+    row_limit = 1 if len(packs) > 1 else 4
+    for label, pack in packs.items():
+        raw = pack.table("model_registry")
+        if raw.empty:
+            continue
+        scorecard = pack.table("scorecard_summary")
+        score_basis = "-"
+        if "score_basis" in scorecard.columns and scorecard["score_basis"].notna().any():
+            score_basis = ", ".join(
+                scorecard["score_basis"].dropna().astype(str).drop_duplicates().map(score_basis_label).head(2)
             )
-        targets = loaded_packs if selected_stream == "All streams" else {selected_stream: loaded_packs.get(selected_stream)}
-        first_available = next((pack for pack in targets.values() if pack is not None and pack.available), None)
-        with download_cols[1]:
-            if first_available is not None:
-                st.download_button(
-                    "Download registry CSV",
-                    data=_csv_bytes(reproducibility_registry_view(first_available)),
-                    file_name=f"{first_available.config.stream_key}_model_registry.csv",
-                    mime="text/csv",
-                    use_container_width=True,
-                    key=f"download_{first_available.config.stream_key}_registry",
-                )
-        with download_cols[2]:
-            if first_available is not None:
-                st.download_button(
-                    "Download component trace CSV",
-                    data=_csv_bytes(reproducibility_component_trace_view(first_available, limit=10_000)),
-                    file_name=f"{first_available.config.stream_key}_component_trace.csv",
-                    mime="text/csv",
-                    use_container_width=True,
-                    key=f"download_{first_available.config.stream_key}_component_trace",
-                )
-        with download_cols[3]:
-            if first_available is not None:
-                st.download_button(
-                    "Download selected pack ZIP",
-                    data=_pack_zip_bytes(first_available),
-                    file_name=f"{first_available.config.stream_key}_reproducibility_pack.zip",
-                    mime="application/zip",
-                    use_container_width=True,
-                    key=f"download_{first_available.config.stream_key}_pack_zip",
-                )
+        for _, row in raw.head(row_limit).iterrows():
+            rows.append(
+                {
+                    "Stream": short_stream_label(label),
+                    "Target": first_non_empty(row, ["target", "target_column"], default=label),
+                    "Algorithm": first_non_empty(row, ["algorithm", "model_role"], default="-"),
+                    "Window": page5_window_text(row),
+                    "Hyperparameters": first_non_empty(row, ["hyperparameters_json", "Hyperparameters", "feature_columns_json"], default="-"),
+                    "Score basis": first_non_empty(row, ["score_basis"], default=score_basis),
+                    "Source script/run": first_non_empty(row, ["source_script", "source_parent_run", "parent_run"], default="-"),
+                    "Status": first_non_empty(row, ["reproducibility_status", "reproducibility_level"], default="exact replay"),
+                }
+            )
+    frame = pd.DataFrame(rows)
+    for col in frame.columns:
+        frame[col] = frame[col].map(lambda value: _short_text(value, 70))
+    return frame
+
+
+def first_non_empty(row: pd.Series, columns: list[str], *, default: str = "-") -> str:
+    for col in columns:
+        if col in row.index and pd.notna(row[col]) and str(row[col]).strip():
+            return str(row[col])
+    return default
+
+
+def page5_window_text(row: pd.Series) -> str:
+    if "window" in row.index and pd.notna(row["window"]):
+        return str(row["window"])
+    if "window_length" in row.index and pd.notna(row["window_length"]):
+        return f"{row['window_length']} quarters"
+    if "window_type" in row.index and pd.notna(row["window_type"]):
+        return str(row["window_type"])
+    return "-"
+
+
+def page5_component_diagram_html(packs: dict[str, Any]) -> str:
+    diagrams = []
+    ordered = ["Light RUC volume", "Heavy RUC volume", "PED VKT per capita"]
+    labels = [label for label in ordered if label in packs] + [label for label in packs if label not in ordered]
+    for label in labels:
+        pack = packs[label]
+        diagrams.append(
+            "<div class='page5-diagram-row'>"
+            f"<div class='page5-diagram-label'>{html.escape(short_stream_label(label))}</div>"
+            f"<div class='page5-diagram-chain'>{page5_component_chain_html(label, pack)}</div>"
+            "</div>"
+        )
+    return "".join(diagrams) if diagrams else "<div class='page5-panel-sub'>No component trace pack is available.</div>"
+
+
+def page5_component_chain_html(stream_label: str, pack: Any) -> str:
+    if stream_label == "Light RUC volume":
+        return (
+            node_html("Base log prediction<br>(OLS on logs)", "blue")
+            + op_html("+")
+            + node_html("Residual log prediction<br>(GBM)", "green")
+            + op_html("&rarr;")
+            + node_html("Final prediction<br>= exp(base_log + residual_log)", "blue")
+        )
+    weights = reproducibility_ensemble_weight_view(pack)
+    if stream_label == "Heavy RUC volume" and not weights.empty:
+        pieces = []
+        for _, row in weights.head(4).iterrows():
+            comp = str(row.get("Component", "C?"))
+            weight = pd.to_numeric(pd.Series([row.get("Weight")]), errors="coerce").iloc[0]
+            weight_text = f"w={weight:.4f}" if pd.notna(weight) else "w=n/a"
+            pieces.append(node_html(f"{html.escape(comp)}<br>{html.escape(weight_text)}", "blue"))
+        return op_html("+").join(pieces) + op_html("&rarr;") + node_html("Final prediction<br>= sum(Wi x Pi)", "blue")
+    if stream_label == "PED VKT per capita":
+        return node_html("Component C1<br>(Weight = 100%)", "purple") + op_html("&rarr;") + node_html("Final prediction = C1<br>(100% weight)", "blue")
+    return node_html("Component trace unavailable", "blue")
+
+
+def node_html(text: str, tone: str) -> str:
+    return f"<div class='page5-node {html.escape(tone)}'>{text}</div>"
+
+
+def op_html(text: str) -> str:
+    return f"<div class='page5-op'>{text}</div>"
+
+
+def page5_coefficients_figure(pack: Any) -> go.Figure:
+    coeff = reproducibility_coefficients_view(pack)
+    if coeff.empty or "coefficient" not in coeff.columns:
+        return page5_empty_figure("Coefficient table unavailable for this replay pack.")
+    frame = coeff.copy()
+    frame["coef"] = pd.to_numeric(frame["coefficient"], errors="coerce")
+    frame = frame.dropna(subset=["coef"])
+    if frame.empty:
+        return page5_empty_figure("Coefficient artifacts were not emitted by the parent run.")
+    frame["feature_label"] = frame.get("feature", pd.Series(["feature"] * len(frame))).astype(str).map(lambda value: _short_text(value, 30))
+    summary = frame.groupby("feature_label", as_index=False)["coef"].mean().assign(abs_coef=lambda df: df["coef"].abs())
+    summary = summary.sort_values("abs_coef", ascending=False).head(6).sort_values("coef")
+    fig = go.Figure(
+        go.Scatter(
+            x=summary["coef"],
+            y=summary["feature_label"],
+            mode="markers",
+            marker=dict(color="#002B5C", size=9),
+            hovertemplate="Feature: %{y}<br>Coefficient: %{x:.4f}<extra></extra>",
+        )
+    )
+    fig.add_vline(x=0, line_color="#94A3B8", line_dash="dot")
+    fig.update_layout(height=255, margin=dict(l=8, r=8, t=10, b=28), xaxis_title="Coefficient", yaxis_title="")
+    return fig
+
+
+def page5_training_window_figure(pack: Any) -> go.Figure:
+    trace = reproducibility_training_window_view(pack)
+    if trace.empty:
+        return page5_empty_figure("Training-window trace is unavailable.")
+    frame = trace.copy()
+    origin_col = "origin" if "origin" in frame.columns else "Origin"
+    y_col = next((col for col in ["n_train", "Window quarters", "window_length"] if col in frame.columns), None)
+    if y_col is None:
+        frame["row_count"] = range(1, len(frame) + 1)
+        y_col = "row_count"
+    frame[y_col] = pd.to_numeric(frame[y_col], errors="coerce")
+    frame = frame.dropna(subset=[origin_col, y_col]).head(80)
+    if frame.empty:
+        return page5_empty_figure("Training-window metadata is descriptive only for this pack.")
+    fig = go.Figure(
+        go.Scatter(
+            x=frame[origin_col].astype(str),
+            y=frame[y_col],
+            mode="lines+markers",
+            line=dict(color="#002B5C", width=2),
+            marker=dict(size=5),
+            hovertemplate="Origin: %{x}<br>Trace value: %{y:.0f}<extra></extra>",
+        )
+    )
+    fig.update_layout(height=255, margin=dict(l=8, r=8, t=10, b=28), xaxis_title="Origin", yaxis_title=str(y_col))
+    fig.update_xaxes(nticks=5)
+    return fig
+
+
+def page5_empty_figure(message: str) -> go.Figure:
+    fig = go.Figure()
+    fig.add_annotation(text=message, x=0.5, y=0.5, showarrow=False, xref="paper", yref="paper", font=dict(color="#64748B"))
+    fig.update_layout(height=255, margin=dict(l=8, r=8, t=10, b=28), xaxis=dict(visible=False), yaxis=dict(visible=False))
+    return fig
+
+
+def render_page5_download_buttons(
+    selected_stream: str,
+    loaded_packs: dict[str, Any | None],
+    workbook_manifest: dict[str, Any],
+    *,
+    key_prefix: str,
+) -> None:
+    pack = page5_analytics_pack(selected_stream, loaded_packs)
+    st.download_button(
+        "workbook/manifest",
+        data=json.dumps(workbook_manifest, indent=2).encode("utf-8"),
+        file_name="source_workbook_manifest.json",
+        mime="application/json",
+        use_container_width=True,
+        key=f"{key_prefix}_download_source_workbook_manifest",
+    )
+    if pack is None:
+        st.caption("No selected reproducibility pack is available.")
+        return
+    downloads = [
+        ("model_registry.parquet", _csv_bytes(reproducibility_registry_view(pack)), f"{pack.config.stream_key}_model_registry.csv", "text/csv"),
+        ("component_trace.parquet", _csv_bytes(reproducibility_component_trace_view(pack, limit=10_000)), f"{pack.config.stream_key}_component_trace.csv", "text/csv"),
+        ("feature_importance.csv", _csv_bytes(reproducibility_feature_importance_view(pack)), f"{pack.config.stream_key}_feature_importance.csv", "text/csv"),
+        ("scenario_sensitivities.csv", _csv_bytes(reproducibility_sensitivity_view(pack)), f"{pack.config.stream_key}_scenario_sensitivities.csv", "text/csv"),
+    ]
+    report_path = pack.root / pack.config.report_file
+    if report_path.exists():
+        downloads.append((pack.config.report_file, report_path.read_bytes(), pack.config.report_file, "text/markdown"))
+    downloads.append((f"{pack.config.stream_key}_reproducibility_pack.zip", _pack_zip_bytes(pack), f"{pack.config.stream_key}_reproducibility_pack.zip", "application/zip"))
+    for idx, (label, data, filename, mime) in enumerate(downloads):
+        st.download_button(
+            label,
+            data=data,
+            file_name=filename,
+            mime=mime,
+            use_container_width=True,
+            key=f"{key_prefix}_download_{pack.config.stream_key}_{idx}",
+        )
 
 
 def source_workbook_manifest() -> dict[str, Any]:
@@ -1692,54 +2363,38 @@ def _source_workbook_paths_from_repro_manifests(repo_root: Path) -> list[tuple[s
 
 
 def reproducibility_build_flow_table(stream_label: str) -> pd.DataFrame:
-    rows_by_stream: dict[str, list[tuple[str, str]]] = {
-        "PED VKT per capita": [
-            ("Target", "PED VKT per capita from the governed evidence pack."),
-            ("Transform", "No new refit is claimed; replay uses stored parent component predictions."),
-            ("Window", "Inherited from the HPO/static-solver parent component."),
-            ("Model", "Single C1 HPO/static-solver component replayed at 100% weight."),
-            ("Final prediction", "Final prediction equals the stored component prediction within tolerance."),
-            ("Score basis", "Operational pooled and paper-style horizon summary tables are replay evidence only."),
-        ],
-        "Light RUC volume": [
-            ("Target", "Light RUC net kilometres from the governed evidence pack."),
-            ("Transform", "Log-scale OLS base plus residual correction."),
-            ("Window", "36-quarter rolling training window."),
-            ("Model", "Base Schiff-style OLS plus GradientBoostingRegressor residual model."),
-            ("Final prediction", "exp(base log prediction + residual log prediction) equals final prediction within tolerance."),
-            ("Score basis", "Operational pooled and paper-style horizon scorecards are exported for audit comparison."),
-        ],
-        "Heavy RUC volume": [
-            ("Target", "Heavy RUC net kilometres from the governed evidence pack."),
-            ("Transform", "Static component predictions are combined in native units."),
-            ("Window", "Component windows are retained from the replay pack registry."),
-            ("Model", "Four-component weighted ensemble replay."),
-            ("Final prediction", "Weighted component contributions sum to the final prediction within tolerance."),
-            ("Score basis", "Operational pooled and paper-style horizon scorecards are exported for audit comparison."),
-        ],
-    }
     if stream_label == "All streams":
         rows: list[dict[str, str]] = []
-        for label, steps in rows_by_stream.items():
-            for step, description in steps:
+        for label in reproducibility_stream_labels():
+            for step, description in page5_build_flow_steps(label):
                 rows.append({"Stream": label, "Step": step, "Evidence": description})
         return pd.DataFrame(rows)
     return pd.DataFrame(
         {"Step": step, "Evidence": description}
-        for step, description in rows_by_stream.get(stream_label, rows_by_stream["Light RUC volume"])
+        for step, description in page5_build_flow_steps(stream_label)
     )
 
 
 def reproducibility_glossary_table() -> pd.DataFrame:
     return pd.DataFrame(
         [
-            ("Replay pack", "Read-only auxiliary Parquet files that reproduce finalist predictions for governance review."),
-            ("Component trace", "Row-level path from source prediction components to the final prediction."),
-            ("Score basis", "The governed evaluation lens used for scorecards; it is not changed by this page."),
-            ("Source workbook", "Optional upstream workbook provenance. The dashboard still uses Parquet evidence as data truth."),
-            ("Feature importance", "Replay-pack feature or component-weight evidence; not a SHAP substitute."),
-            ("Scenario sensitivity", "Perturbation table supplied by the replay pack where available."),
-            ("Chart-source isolation", "Validation that loading replay packs does not rewrite main chart-source tables."),
+            ("MAPE", "Mean Absolute Percentage Error; lower means a closer forecast."),
+            ("paper-style MAPE", "Average horizon MAPE on the governed paper-style score basis."),
+            ("operational MAPE", "Operational pooled MAPE used for cross-checking live model behaviour."),
+            ("lag", "A previous-period value used as a model input."),
+            ("dummy variable", "A 0/1 indicator that switches an event or period on or off."),
+            ("Ridge alpha", "Regularisation strength that shrinks unstable coefficients."),
+            ("GBM learning_rate", "How much each boosting tree is allowed to adjust the prediction."),
+            ("n_estimators", "Number of trees in the boosted residual model."),
+            ("max_depth", "Maximum tree depth; higher values permit more interactions."),
+            ("subsample", "Share of rows sampled by each boosting step."),
+            ("ensemble weight", "Weight applied to a component model before combining predictions."),
+            ("residual", "The part of actual demand not explained by the base prediction."),
+            ("fitted value", "The model prediction on the training or validation row."),
+            ("coefficient", "The estimated size and direction of a linear-model relationship."),
+            ("Replay pack", "Read-only Parquet files that replay finalist predictions for governance review."),
+            ("Component trace", "Row-level path from prediction components to the final prediction."),
+            ("Chart-source isolation", "Proof that replay packs do not rewrite main chart-source tables."),
         ],
         columns=["Term", "Meaning"],
     )

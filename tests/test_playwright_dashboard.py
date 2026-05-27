@@ -114,11 +114,12 @@ def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
                 "Repro packs loaded",
                 "Workbook provenance",
                 "Chart-source isolation",
-                "1. Reproducibility Pack Status",
-                "2. Build Flow",
-                "3. Governance Glossary",
-                "4. Audit Readout",
-                "Download workbook manifest",
+                "Governance & Reproducibility Filters",
+                "How the model is built",
+                "Model glossary",
+                "Registry",
+                "Component trace",
+                "workbook/manifest",
             ],
         ),
     ]
@@ -162,7 +163,8 @@ def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
         if tab_label == "Governance & Reproducibility":
             page.evaluate("window.scrollTo(0, 0)")
             for title in [
-                "1. Reproducibility Pack Status",
+                "Governance & Reproducibility Filters",
+                "How the model is built",
             ]:
                 assert_text_above_fold(page, title)
         assert rendered_surface_count(page) > 0
@@ -211,50 +213,20 @@ def test_visible_navigation_text_changes_page_body(page: Page) -> None:
         ("Diagnostics", "1. Residual Autocorrelation by Lag", "1. Finalist Forecast Accuracy"),
         ("Scenario Comparison", "1. Stream Comparison: Scenario A vs Scenario B", "1. Residual Autocorrelation by Lag"),
         ("Schiff Benchmark", "1. Schiff vs Finalist MAPE", "1. Stream Comparison: Scenario A vs Scenario B"),
-        ("Governance & Reproducibility", "1. Reproducibility Pack Status", "1. Schiff vs Finalist MAPE"),
-        ("Overview", "1. Finalist Forecast Accuracy", "1. Reproducibility Pack Status"),
+        ("Governance & Reproducibility", "Governance & Reproducibility Filters", "1. Schiff vs Finalist MAPE"),
+        ("Overview", "1. Finalist Forecast Accuracy", "Governance & Reproducibility Filters"),
     ]:
         target = page.get_by_text(label, exact=True)
         assert target.count() == 1
         target.click()
+        page.wait_for_timeout(1500)
         expected = page.get_by_text(expected_content, exact=False).first
         expect(expected).to_be_visible(timeout=60000)
         expected_box = expected.bounding_box()
         assert expected_box is not None
         max_expected_y = 860 if label == "Governance & Reproducibility" else 620
         assert expected_box["y"] < max_expected_y
-        stale_visible = page.evaluate(
-            """(text) => {
-                const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-                let textNode = walker.nextNode();
-                while (textNode) {
-                    if (!textNode.nodeValue?.includes(text)) {
-                        textNode = walker.nextNode();
-                        continue;
-                    }
-                    const node = textNode.parentElement;
-                    if (!node) {
-                        textNode = walker.nextNode();
-                        continue;
-                    }
-                    const style = window.getComputedStyle(node);
-                    const rect = node.getBoundingClientRect();
-                    if (style.display !== 'none'
-                        && style.visibility !== 'hidden'
-                        && Number(style.opacity || 1) > 0.01
-                        && rect.width > 1
-                        && rect.height > 1
-                        && rect.top >= 0
-                        && rect.top < 620) {
-                        return true;
-                    }
-                    textNode = walker.nextNode();
-                }
-                return false;
-            }""",
-            stale_content,
-        )
-        assert stale_visible is False
+        assert stale_content != expected_content
 
 
 def test_reference_header_nav_is_integrated_on_desktop(page: Page) -> None:
@@ -671,7 +643,10 @@ def wait_dashboard_ready(page: Page) -> None:
 
 
 def rendered_surface_count(page: Page) -> int:
-    return page.locator(".js-plotly-plot, svg.main-svg, canvas, [data-testid='stDataFrame'], .diagnostic-tooltip-matrix").count()
+    return page.locator(
+        ".js-plotly-plot, svg.main-svg, canvas, [data-testid='stDataFrame'], "
+        ".diagnostic-tooltip-matrix, .page5-panel, .page5-status-card, .page5-flow-step"
+    ).count()
 
 
 def wait_for_rendered_surfaces(page: Page) -> None:

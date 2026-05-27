@@ -13,16 +13,21 @@ REQUIRED_SCREENSHOTS = [
     "artifacts/screenshots/final-02-diagnostics.png",
     "artifacts/screenshots/final-03-scenario-comparison.png",
     "artifacts/screenshots/final-04-schiff-benchmark.png",
+    "artifacts/screenshots/final-05-governance-reproducibility.png",
     "artifacts/screenshots/final-overview.png",
     "artifacts/screenshots/final-diagnostics.png",
     "artifacts/screenshots/final-scenario-comparison.png",
     "artifacts/screenshots/final-schiff-benchmark.png",
+    "artifacts/screenshots/final-governance-reproducibility.png",
 ]
 
 REVIEW_FILES = [
     "artifacts/target_vs_current_screenshot_matrix.md",
+    "artifacts/page5_target_vs_current_matrix.md",
     "artifacts/visual_delta_review.md",
     "artifacts/screenshot_review.md",
+    "artifacts/page5_visual_review.md",
+    "artifacts/page5_screenshot_review.md",
     "artifacts/visual_reference_comparison.md",
     "artifacts/reviews/visual_styling.md",
     "artifacts/reviews/layout_grid.md",
@@ -43,7 +48,7 @@ def validate() -> list[tuple[str, str, str]]:
         findings.append((name, "PASS" if passed else "FAIL", evidence))
 
     missing = [path for path in REQUIRED_SCREENSHOTS if not (ROOT / path).exists()]
-    record("Final browser screenshots exist for all four pages", not missing, "missing=" + ", ".join(missing) if missing else "All required screenshots present.")
+    record("Final browser screenshots exist for all five pages", not missing, "missing=" + ", ".join(missing) if missing else "All required screenshots present.")
 
     backlog = read_text("BUG_BACKLOG.md")
     open_backlog = re.findall(r"- \[ \].*", backlog)
@@ -60,9 +65,32 @@ def validate() -> list[tuple[str, str, str]]:
     record("Visual reviewer artifacts are resolved", not unresolved, "unresolved=" + ", ".join(unresolved) if unresolved else "All reviewer artifacts are resolved.")
 
     matrix = read_text("artifacts/target_vs_current_screenshot_matrix.md")
-    required_pages = ["Overview", "Diagnostics", "Scenario Comparison", "Schiff Benchmark"]
-    matrix_ok = all(page in matrix for page in required_pages) and matrix.count("PASS") >= 4
-    record("Target-vs-current screenshot matrix marks all pages PASS", matrix_ok, "Matrix inspected for all four page PASS statuses.")
+    required_pages = ["Overview", "Diagnostics", "Scenario Comparison", "Schiff Benchmark", "Governance & Reproducibility"]
+    matrix_ok = all(page in matrix for page in required_pages) and matrix.count("PASS") >= 5
+    record("Target-vs-current screenshot matrix marks all pages PASS", matrix_ok, "Matrix inspected for all five page PASS statuses.")
+
+    page5_backlog = read_text("PAGE5_VISUAL_DELTA_BACKLOG.md")
+    page5_open = re.findall(r"- \[ \].*", page5_backlog)
+    record(
+        "Page 5 visual-delta backlog is closed",
+        bool(page5_backlog) and not page5_open and "Status: PASS" in page5_backlog,
+        f"open_items={len(page5_open)}" if page5_backlog else "PAGE5_VISUAL_DELTA_BACKLOG.md missing",
+    )
+
+    page5_spec = read_text("PAGE5_GOVERNANCE_VISUAL_SPEC.lock.md")
+    page5_terms = [
+        "Governance & Reproducibility Filters",
+        "Segmented",
+        "Build-flow",
+        "Component trace",
+        "SHAP not yet generated",
+        "read-only",
+    ]
+    record(
+        "Page 5 locked visual spec covers target sections",
+        all(term.lower() in page5_spec.lower() for term in page5_terms),
+        "PAGE5_GOVERNANCE_VISUAL_SPEC.lock.md inspected.",
+    )
 
     layout_gates = read_text("VISUAL_LAYOUT_GATES.lock.md")
     record(
@@ -74,8 +102,22 @@ def validate() -> list[tuple[str, str, str]]:
     app_text = read_text("app.py")
     record(
         "Primary pages and panel counts remain aligned to target",
-        all(term in app_text for term in ["Overview", "Diagnostics", "Scenario Comparison", "Schiff Benchmark"]),
+        all(term in app_text for term in ["Overview", "Diagnostics", "Scenario Comparison", "Schiff Benchmark", "Governance & Reproducibility"]),
         "Top-level page labels inspected.",
+    )
+
+    page5_app_terms = [
+        "Governance & Reproducibility Filters",
+        "Two-stage OLS base plus GBM residual correction, exactly replayed against evidence predictions.",
+        "Four-component weighted ensemble exactly replayed against evidence predictions.",
+        "PED finalist exactly replays the stored HPO/static-solver component prediction",
+        "Impact on dependent variable / model target",
+        "SHAP not yet generated",
+    ]
+    record(
+        "Page 5 required wording is present in app code",
+        all(term in app_text for term in page5_app_terms),
+        "Page 5 wording inspected in app.py.",
     )
 
     return findings

@@ -51,10 +51,13 @@ PAGE_PANELS = {
         "4. Benchmark Summary",
     ],
     "Governance & Reproducibility": [
-        "1. Reproducibility Pack Status",
-        "2. Build Flow",
-        "3. Governance Glossary",
-        "4. Audit Readout",
+        "Governance & Reproducibility Filters",
+        "Repro packs loaded",
+        "How the model is built",
+        "Model glossary",
+        "Registry",
+        "Component trace",
+        "SHAP not yet generated",
     ],
 }
 
@@ -283,25 +286,26 @@ def test_governance_reproducibility_page_stream_selector_and_downloads(page: Pag
     click_page(page, "Governance & Reproducibility")
     body = page.locator("body")
     expect(body).to_contain_text("Page 5 of 5 - Governance & Reproducibility", timeout=90000)
+    expect(body).to_contain_text("Governance & Reproducibility Filters", timeout=60000)
     expect(body).to_contain_text("PED VKT per capita", timeout=60000)
     expect(body).to_contain_text("Light RUC volume", timeout=60000)
     expect(body).to_contain_text("Heavy RUC volume", timeout=60000)
-    expect(body).to_contain_text("Download workbook manifest", timeout=60000)
+    expect(body).to_contain_text("workbook/manifest", timeout=60000)
 
-    selector = page.get_by_label("Reproducibility stream")
-    expect(selector).to_be_visible(timeout=30000)
-    selector.click()
-    page.get_by_text("Heavy RUC volume", exact=True).last.click()
+    page.get_by_text("Heavy RUC", exact=True).first.click()
     expect(body).to_contain_text("Exact weighted-ensemble replay", timeout=90000)
-    expect(body).to_contain_text("Component Trace", timeout=90000)
-    expect(body).to_contain_text("Feature Importance", timeout=90000)
-    expect(body).to_contain_text("Scenario Sensitivities", timeout=90000)
-    expect(body).to_contain_text("Download selected pack ZIP", timeout=60000)
+    expect(body).to_contain_text("Component trace", timeout=90000)
+    expect(body).to_contain_text("Feature importance", timeout=90000)
+    expect(body).to_contain_text("Scenario sensitivities", timeout=90000)
+    expect(body).to_contain_text("heavy_ruc_reproducibility_pack.zip", timeout=60000)
 
-    selector.click()
-    page.get_by_text("Light RUC volume", exact=True).last.click()
+    page.get_by_text("Light RUC", exact=True).first.click()
     expect(body).to_contain_text("Exact prediction replay", timeout=90000)
     expect(body).to_contain_text("exp(base log prediction + residual log prediction)", timeout=90000)
+    page.get_by_text("PED", exact=True).first.click()
+    expect(body).to_contain_text("PED finalist exactly replays the stored HPO/static-solver component prediction", timeout=90000)
+    expect(body).to_contain_text("SHAP not yet generated", timeout=60000)
+    expect(body).to_contain_text("This Governance & Reproducibility page is read-only", timeout=60000)
     assert_no_streamlit_exception(page)
 
 

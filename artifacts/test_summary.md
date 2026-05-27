@@ -1,6 +1,6 @@
 # Test Summary
 
-Status: **passed** for the v6 balanced-frontier evidence-pack migration, finalist reproducibility audit pack, management-friendly model hovers, score-basis governance, semantic chart reconciliation, visual conformance and browser verification pass.
+Status: **passed** for the v6 balanced-frontier evidence-pack migration, finalist reproducibility audit pack, Page 5 Governance & Reproducibility rebuild, management-friendly model hovers, score-basis governance, semantic chart reconciliation, visual conformance and browser verification pass.
 
 ## Data Root Used
 
@@ -25,7 +25,7 @@ pwsh -File scripts\verify_dashboard.ps1 -Python ".\.venv\Scripts\python.exe" -Da
 | Check | Result |
 | --- | --- |
 | Compile | Passed |
-| Full pytest | 151 passed, 48 skipped, 39 deselected |
+| Full pytest | 165 passed, 51 skipped, 39 deselected |
 | Schema inspection | Passed against `dashboard_evidence_pack_v6_balanced_frontier` and 14 required Parquet tables |
 | Data validation | Passed |
 | Chart source validation | Passed for 16 primary chart source tables plus the Overview KPI source table |
@@ -39,8 +39,8 @@ pwsh -File scripts\verify_dashboard.ps1 -Python ".\.venv\Scripts\python.exe" -Da
 | Chart-data reconciliation tests | 18 passed |
 | Per-chart source-table tests | 7 passed |
 | Existing browser e2e | 38 passed |
-| Mandatory frontend interaction Playwright suite | 7 passed |
-| Visual conformance validation | Passed |
+| Mandatory frontend interaction Playwright suite | 10 passed |
+| Visual conformance validation | Passed for all five pages, including Page 5-specific artifacts |
 | 100-gate validation | 100 passed, 0 failed, 0 supporting failures |
 | 120-gate validation | 120 passed, 0 failed |
 | Backlog | No unchecked items |
@@ -85,13 +85,24 @@ pwsh -File scripts\verify_dashboard.ps1 -Python ".\.venv\Scripts\python.exe" -Da
 ## Browser Evidence
 
 - Streamlit URL tested: `http://localhost:8501`.
-- Playwright clicked all four top-level pages.
+- Playwright clicked all five top-level pages.
 - Playwright clicked primary filters directly, changed non-default selections, reset filters and verified defaults returned.
 - Playwright hovered major Plotly charts and verified human-readable hover text.
 - Playwright hovered and keyboard-focused Diagnostic Pass Matrix tooltip triggers, verifying ADF and KPSS plain-English copy rendered in-browser.
+- Playwright opened Governance & Reproducibility, clicked All streams, PED, Light RUC and Heavy RUC stream controls, and verified stream-specific content changed.
 - Playwright opened the lazy Model Explainability / Reproducibility section and verified the Light RUC exact replay status, model name, feature-importance panel and scenario-sensitivity panel.
 - Browser screenshots were regenerated under `artifacts/screenshots`.
 - Browser console and Streamlit exception checks were clean in the passing verifier run.
+
+## Page 5 Governance & Reproducibility
+
+- Rebuilt Page 5 as a read-only dashboard-style audit page without changing the first four pages or their chart-source calculations.
+- Added `PAGE5_GOVERNANCE_VISUAL_SPEC.lock.md` and `PAGE5_VISUAL_DELTA_BACKLOG.md`.
+- Added Page 5 visual review artifacts: `artifacts/page5_visual_review.md`, `artifacts/page5_screenshot_review.md`, and `artifacts/page5_target_vs_current_matrix.md`.
+- Added Page 5 to visual conformance validation and the 120-gate screenshot matrix.
+- Regenerated `artifacts/screenshots/final-governance-reproducibility.png` and `artifacts/screenshots/final-05-governance-reproducibility.png`.
+- Verified the page shows segmented stream controls, pack selector, workbook provenance, read-only status, reset/downloads controls, status cards, replay cards, build-flow cards, glossary chips, registry, component trace, lower evidence panels, SHAP unavailable note and read-only footer.
+- Verified Page 5 wording avoids black-box claims and states the Light RUC, Heavy RUC and PED replay limits exactly.
 
 ## Light RUC Auxiliary Reproducibility
 
