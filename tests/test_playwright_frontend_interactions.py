@@ -362,7 +362,7 @@ def test_governance_reproducibility_page_stream_selector_and_downloads(page: Pag
     expect(body).to_contain_text("Freeze the inner HPO/static-solver registry and add feature-level component replay.", timeout=90000)
     assert page.get_by_text("Feature importance (PED)", exact=True).count() == 0
     expect(body).to_contain_text("SHAP not yet generated", timeout=60000)
-    expect(body).to_contain_text("This Governance & Reproducibility page is read-only", timeout=60000)
+    assert "This Governance & Reproducibility page is read-only" not in body.inner_text(timeout=60000)
     assert_no_streamlit_exception(page)
 
 
@@ -372,6 +372,10 @@ def test_diagnostic_pass_matrix_tooltips_hover_and_focus(page: Page) -> None:
 
     matrix = page.locator(".diagnostic-tooltip-matrix")
     expect(matrix).to_be_visible(timeout=90000)
+    assert visible_text_absent(page, "Diagnostics evidence:")
+    assert visible_text_absent(page, "Diagnostics governance notes")
+    assert visible_text_absent(page, "Model Explainability / Reproducibility")
+    assert visible_text_absent(page, "Green = pass")
 
     adf_header = matrix.locator(".diag-header-tooltip").filter(has_text="ADF").first
     expect(adf_header).to_be_visible(timeout=60000)
@@ -389,98 +393,52 @@ def test_diagnostic_pass_matrix_tooltips_hover_and_focus(page: Page) -> None:
     white_trigger.focus()
     expect(white_trigger.locator(".diag-tooltip-text")).to_be_visible(timeout=10000)
     expect(white_trigger.locator(".diag-tooltip-text")).to_contain_text("Status:", timeout=10000)
+    chart_header = page.locator(".chart-card-header").filter(has_text="3. Diagnostic Pass Matrix").first
+    legend_trigger = chart_header.locator(".chart-info-trigger").first
+    legend_trigger.hover()
+    expect(legend_trigger.locator(".chart-info-text")).to_contain_text("Green = pass", timeout=10000)
     assert_no_streamlit_exception(page)
 
 
-def test_reproducibility_detail_stream_selector_renders_light_pack(page: Page) -> None:
+def test_benchmark_and_decision_summary_tooltips_hover_and_focus(page: Page) -> None:
     open_dashboard(page)
-    click_page(page, "Diagnostics")
+    click_page(page, "Schiff Benchmark")
 
-    expander = page.get_by_text("Model Explainability / Reproducibility", exact=False).first
-    expander.scroll_into_view_if_needed()
-    expander.click()
-    body = page.locator("body")
-    expect(body).to_contain_text("Reproducibility stream", timeout=30000)
-    expect(body).to_contain_text("Light RUC volume", timeout=30000)
-    load_label = page.get_by_text("Load reproducibility detail", exact=False).first
-    expect(load_label).to_be_visible(timeout=30000)
-    load_label.click()
-
-    expect(body).to_contain_text("Exact prediction replay", timeout=60000)
-    expect(body).to_contain_text("dynamic_RESID_GBR_n150_d1_lr0.05_w36", timeout=60000)
-    expect(body).to_contain_text(
-        "Two-stage OLS base plus GBM residual correction, exactly replayed against evidence predictions.",
-        timeout=60000,
+    benchmark_table = page.locator(".summary-tooltip-table").filter(has_text="Paired Win Rate").first
+    expect(benchmark_table).to_be_visible(timeout=90000)
+    paired_header = benchmark_table.locator("th").filter(has_text="Paired Win Rate").first
+    paired_trigger = paired_header.locator(".summary-tooltip-trigger").first
+    paired_trigger.hover()
+    expect(paired_trigger.locator(".summary-tooltip-text")).to_be_visible(timeout=10000)
+    expect(paired_trigger.locator(".summary-tooltip-text")).to_contain_text(
+        "matched forecast comparisons",
+        timeout=10000,
     )
-    expect(body).to_contain_text("Feature importance", timeout=60000)
-    expect(body).to_contain_text("Scenario sensitivities", timeout=60000)
-    expect(body).to_contain_text("GDP, diesel price, RUC price and other perturbations", timeout=60000)
-    assert "black box" not in body.inner_text(timeout=60000).lower()
-    assert_no_streamlit_exception(page)
-
-
-def test_reproducibility_detail_stream_selector_renders_heavy_pack(page: Page) -> None:
-    open_dashboard(page)
-    click_page(page, "Diagnostics")
-
-    expander = page.get_by_text("Model Explainability / Reproducibility", exact=False).first
-    expander.scroll_into_view_if_needed()
-    expander.click()
-
-    stream_select = page.get_by_label("Reproducibility stream")
-    expect(stream_select).to_be_visible(timeout=30000)
-    stream_select.click()
-    page.get_by_text("Heavy RUC volume", exact=True).last.click()
-
-    load_label = page.get_by_text("Load reproducibility detail", exact=False).first
-    expect(load_label).to_be_visible(timeout=30000)
-    load_label.click()
-
-    body = page.locator("body")
-    expect(body).to_contain_text("Exact weighted-ensemble replay", timeout=60000)
-    expect(body).to_contain_text("HEAVY_RUC__RECON_STATIC_REBUILT", timeout=60000)
-    expect(body).to_contain_text("Prediction = 0.469332*C1 + 0.281844*C2 + 0.144373*C3 + 0.104451*C4", timeout=60000)
-    expect(body).to_contain_text("Feature importance", timeout=60000)
-    expect(body).to_contain_text("Scenario sensitivities", timeout=60000)
-    assert "black box" not in body.inner_text(timeout=60000).lower()
-    assert_no_streamlit_exception(page)
-
-
-def test_reproducibility_detail_stream_selector_renders_ped_pack(page: Page) -> None:
-    open_dashboard(page)
-    click_page(page, "Diagnostics")
-
-    expander = page.get_by_text("Model Explainability / Reproducibility", exact=False).first
-    expander.scroll_into_view_if_needed()
-    expander.click()
-
-    stream_select = page.get_by_label("Reproducibility stream")
-    expect(stream_select).to_be_visible(timeout=30000)
-    stream_select.click()
-    page.get_by_text("PED VKT per capita", exact=True).last.click()
-
-    load_label = page.get_by_text("Load reproducibility detail", exact=False).first
-    expect(load_label).to_be_visible(timeout=30000)
-    load_label.click()
-
-    body = page.locator("body")
-    expect(body).to_contain_text("Exact component-prediction replay", timeout=60000)
-    expect(body).to_contain_text("PED__RESCUE_static_annual_weighted_top12_capnone", timeout=60000)
-    expect(body).to_contain_text("Prediction = 1.0*C1", timeout=60000)
-    expect(body).to_contain_text(
-        "PED finalist exactly replays the stored HPO/static-solver component prediction",
-        timeout=60000,
+    paired_trigger.focus()
+    expect(paired_trigger.locator(".summary-tooltip-text")).to_contain_text(
+        "same stream, origin, target period and horizon",
+        timeout=10000,
     )
-    expect(body).to_contain_text("inner HPO/static-solver rebuild remains a future audit layer", timeout=60000)
-    expect(body).to_contain_text("Component trace", timeout=60000)
 
-    scorecard_expander = page.get_by_text("Scorecard, horizon, annual and stress trace", exact=False).first
-    scorecard_expander.scroll_into_view_if_needed()
-    scorecard_expander.click()
-    expect(body).to_contain_text("Scorecard summary", timeout=30000)
-    expect(body).to_contain_text("Operational pooled", timeout=30000)
-    assert "black box" not in body.inner_text(timeout=60000).lower()
-    assert "full workbook refit reproducibility" not in body.inner_text(timeout=60000).lower()
+    click_page(page, "Scenario Comparison")
+    decision_table = page.locator(".summary-tooltip-table").filter(has_text="Recommendation").first
+    expect(decision_table).to_be_visible(timeout=90000)
+    recommendation_header = decision_table.locator("th").filter(has_text="Recommendation").first
+    recommendation_trigger = recommendation_header.locator(".summary-tooltip-trigger").first
+    recommendation_trigger.hover()
+    expect(recommendation_trigger.locator(".summary-tooltip-text")).to_be_visible(timeout=10000)
+    expect(recommendation_trigger.locator(".summary-tooltip-text")).to_contain_text(
+        "MAPE gain, paired win rate, diagnostics and caveats",
+        timeout=10000,
+    )
+
+    promote_badge = decision_table.locator(".summary-rec-badge").filter(has_text="Promote").first
+    expect(promote_badge).to_be_visible(timeout=30000)
+    promote_badge.focus()
+    expect(promote_badge.locator(".summary-tooltip-text")).to_contain_text(
+        "Promoted because the finalist beats the Schiff specification benchmark",
+        timeout=10000,
+    )
     assert_no_streamlit_exception(page)
 
 

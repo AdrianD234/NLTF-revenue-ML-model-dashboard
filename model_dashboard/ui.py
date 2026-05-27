@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 from functools import lru_cache
 import html
 from pathlib import Path
@@ -955,6 +956,137 @@ def inject_theme() -> None:
                 font-size: 0.72rem;
                 margin-left: 0.12rem;
             }}
+            .summary-table-wrap {{
+                min-height: 220px;
+                padding: 0.4rem 0.4rem 0.1rem;
+            }}
+            .summary-tooltip-table {{
+                border-collapse: collapse;
+                color: #0F172A;
+                font-size: 0.76rem;
+                table-layout: fixed;
+                width: 100%;
+            }}
+            .summary-tooltip-table th,
+            .summary-tooltip-table td {{
+                border: 1px solid #DCE4EF;
+                line-height: 1.24;
+                padding: 0.58rem 0.54rem;
+                text-align: center;
+                vertical-align: middle;
+            }}
+            .summary-tooltip-table th {{
+                background: #EAF2F8;
+                color: var(--pbi-blue);
+                font-weight: 700;
+            }}
+            .summary-tooltip-table tbody tr:nth-child(even) td {{
+                background: #F8FAFC;
+            }}
+            .summary-tooltip-table td:first-child {{
+                color: var(--pbi-blue);
+                font-weight: 680;
+                text-align: left;
+            }}
+            .summary-gain-positive {{
+                color: #166534;
+                font-weight: 760;
+            }}
+            .summary-gain-negative {{
+                color: #991B1B;
+                font-weight: 760;
+            }}
+            .summary-tooltip-trigger {{
+                align-items: center;
+                background: #EFF6FF;
+                border: 1px solid #BFD4EA;
+                border-radius: 999px;
+                color: var(--pbi-blue);
+                cursor: help;
+                display: inline-flex;
+                font-size: 0.62rem;
+                font-weight: 800;
+                height: 0.92rem;
+                justify-content: center;
+                line-height: 1;
+                margin-left: 0.25rem;
+                outline: none;
+                position: relative;
+                top: -0.02rem;
+                width: 0.92rem;
+                z-index: 8;
+            }}
+            .summary-tooltip-trigger:focus {{
+                box-shadow: 0 0 0 2px rgba(0, 43, 92, 0.28);
+            }}
+            .summary-tooltip-text {{
+                background: #0F172A;
+                border-radius: 7px;
+                box-shadow: 0 10px 28px rgba(15, 23, 42, 0.24);
+                color: #F8FAFC;
+                font-size: 0.72rem;
+                font-weight: 500;
+                left: 50%;
+                line-height: 1.34;
+                max-width: min(360px, 74vw);
+                min-width: 260px;
+                opacity: 0;
+                padding: 0.62rem 0.72rem;
+                pointer-events: none;
+                position: absolute;
+                text-align: left;
+                top: calc(100% + 0.42rem);
+                transform: translateX(-50%);
+                transition: opacity 120ms ease, visibility 120ms ease;
+                visibility: hidden;
+                white-space: normal;
+                z-index: 9999;
+            }}
+            .summary-tooltip-text::before {{
+                border-bottom: 6px solid #0F172A;
+                border-left: 6px solid transparent;
+                border-right: 6px solid transparent;
+                content: "";
+                left: 50%;
+                position: absolute;
+                top: -6px;
+                transform: translateX(-50%);
+            }}
+            .summary-tooltip-trigger:hover .summary-tooltip-text,
+            .summary-tooltip-trigger:focus .summary-tooltip-text,
+            .summary-tooltip-trigger:focus-within .summary-tooltip-text,
+            .summary-rec-badge:hover .summary-tooltip-text,
+            .summary-rec-badge:focus .summary-tooltip-text,
+            .summary-rec-badge:focus-within .summary-tooltip-text {{
+                opacity: 1;
+                visibility: visible;
+            }}
+            .summary-rec-badge {{
+                border-radius: 999px;
+                cursor: help;
+                display: inline-block;
+                font-size: 0.72rem;
+                font-weight: 780;
+                outline: none;
+                padding: 0.18rem 0.52rem;
+                position: relative;
+                z-index: 7;
+            }}
+            .summary-rec-promote {{
+                background: rgba(22, 163, 74, 0.12);
+                color: #166534;
+            }}
+            .summary-rec-watch {{
+                background: rgba(245, 158, 11, 0.16);
+                color: #92400E;
+            }}
+            .summary-rec-stage2 {{
+                background: rgba(220, 38, 38, 0.12);
+                color: #991B1B;
+            }}
+            .summary-rec-badge:focus {{
+                box-shadow: 0 0 0 2px rgba(0, 43, 92, 0.24);
+            }}
             .diagnostic-matrix-legend {{
                 color: #64748B;
                 font-size: 0.76rem;
@@ -1022,6 +1154,20 @@ def filter_summary_grid(items: Iterable[tuple[str, str]]) -> None:
             "</div>"
         )
     st.markdown("<div class='gov-filter-grid'>" + "".join(cells) + "</div>", unsafe_allow_html=True)
+
+
+def render_info_tooltip(label: str, tooltip_text: str, *, css_class: str = "summary-tooltip") -> str:
+    safe_label = html.escape(label)
+    safe_text = html.escape(tooltip_text)
+    slug = re.sub(r"[^a-z0-9]+", "-", label.lower()).strip("-")
+    digest = hashlib.sha1(f"{label}|{tooltip_text}".encode("utf-8")).hexdigest()[:8]
+    tooltip_id = f"tooltip-{slug}-{digest}"
+    return (
+        f"<span class='{css_class}-trigger' tabindex='0' role='button' "
+        f"aria-label='{safe_label}: {safe_text}' aria-describedby='{tooltip_id}' title='{safe_text}'>?"
+        f"<span class='{css_class}-text' role='tooltip' id='{tooltip_id}'>{safe_text}</span>"
+        "</span>"
+    )
 
 
 def _chart_card_header_html(title: str, subtitle: str, caption: str | None, *, notes_as_tooltip: bool) -> str:

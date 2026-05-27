@@ -75,14 +75,11 @@ def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
                 "Mean Durbin-Watson",
                 "Mean calibration R2",
                 "Heteroscedasticity Pass",
-                "Diagnostics evidence:",
                 "Residual ACF by lag",
                 "Residual Autocorrelation by Lag",
                 "Residual vs Fitted",
                 "Diagnostic Pass Matrix",
                 "Error Distribution by Horizon",
-                "Model Inventory module",
-                "Run Audit module",
             ],
         ),
         (
@@ -97,7 +94,6 @@ def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
                     "Horizon Comparison",
                     "Improvement vs Benchmark",
                     "Decision Summary",
-                    "Forecast and stress drilldown",
                 ],
         ),
         (
@@ -111,7 +107,6 @@ def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
                 "Benchmark Horizon Profiles",
                 "Full-sample Gain vs Schiff specification benchmark",
                 "Benchmark Summary",
-                "Candidate and ensemble evidence drilldown",
             ],
         ),
         (
@@ -131,12 +126,41 @@ def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
             ],
         ),
     ]
+    forbidden_by_page = {
+        "Overview": [
+            "Component labels are deliberately short for the management view.",
+            "Management conclusion and stream decision detail",
+            "Transport Revenue Model Testbench | Refined Finalist Models",
+        ],
+        "Diagnostics": [
+            "Diagnostics evidence:",
+            "Diagnostics governance notes",
+            "Model Explainability / Reproducibility",
+            "Model Inventory module",
+            "Run Audit module",
+            "Transport Revenue Model Testbench | Refined Finalist Models",
+        ],
+        "Scenario Comparison": [
+            "Detailed scenario governance cards",
+            "Forecast and stress drilldown",
+            "Transport Revenue Model Testbench | Refined Finalist Models",
+        ],
+        "Schiff Benchmark": [
+            "Candidate and ensemble evidence drilldown",
+            "Transport Revenue Model Testbench | Refined Finalist Models",
+        ],
+        "Governance & Reproducibility": [
+            "This Governance & Reproducibility page is read-only",
+        ],
+    }
 
     for tab_label, expected_text, screenshot_name, page_texts in checks:
         click_governance_nav(page, tab_label)
         expect(page.locator("body")).to_contain_text(expected_text, timeout=60000)
         for text in page_texts:
             expect(page.locator("body")).to_contain_text(text, timeout=60000)
+        for text in forbidden_by_page.get(tab_label, []):
+            assert_visible_text_absent(page, text)
         if tab_label == "Diagnostics":
             page.evaluate("window.scrollTo(0, 0)")
             for title in [
@@ -370,8 +394,8 @@ def test_diagnostics_in_app_grid_replaces_overview_panels(page: Page) -> None:
 
     click_governance_nav(page, "Diagnostics")
     expect(page.locator("body")).to_contain_text("Page 2 of 5 - Diagnostics", timeout=60000)
-    expect(page.locator("body")).to_contain_text("Diagnostics evidence:", timeout=60000)
-    expect(page.locator("body")).to_contain_text("proxy panels shown", timeout=60000)
+    assert_visible_text_absent(page, "Diagnostics evidence:")
+    assert_visible_text_absent(page, "proxy panels shown")
     for title in [
         "1. Residual Autocorrelation by Lag",
         "2. Residual vs Fitted",
@@ -452,11 +476,7 @@ def test_ensemble_composition_has_three_stream_panels(page: Page) -> None:
     expect(page.locator("body")).to_contain_text("PED VKT per capita", timeout=90000)
     expect(page.locator("body")).to_contain_text("Light RUC volume", timeout=90000)
     expect(page.locator("body")).to_contain_text("Heavy RUC volume", timeout=90000)
-    page.evaluate("window.scrollTo(0, 760)")
-    body = page.locator("body").inner_text(timeout=60000)
-    assert "PED VKT per capita" in body
-    assert "Light RUC volume" in body
-    assert "Heavy RUC volume" in body
+    assert_ensemble_plot_has_all_streams(page)
 
 
 def test_ensemble_composition_has_three_stream_panels_under_both_score_bases(page: Page) -> None:
@@ -581,8 +601,10 @@ def test_diagnostics_matrix_is_styled(page: Page) -> None:
     expect(page.locator("body")).to_contain_text("3. Diagnostic Pass Matrix", timeout=90000)
     for text in ["Calibration R2", "Durbin-Watson", "Breusch-Pagan", "White", "Jarque-Bera"]:
         expect(page.locator("body")).to_contain_text(text, timeout=90000)
+    legend_info = chart_info_text(page, "3. Diagnostic Pass Matrix")
     for text in ["Green = pass", "amber = watch", "red = fail"]:
-        expect(page.locator("body")).to_contain_text(text, timeout=90000)
+        assert text in legend_info
+        assert_visible_text_absent(page, text)
 
 
 def test_scenario_horizon_shows_all_streams(page: Page) -> None:

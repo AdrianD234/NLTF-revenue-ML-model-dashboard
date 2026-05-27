@@ -83,6 +83,24 @@ def validate() -> list[tuple[str, str, str]]:
         "Scenario and Schiff summary labels inspected in app.py.",
     )
     record(
+        "Benchmark and decision summary fields expose governance tooltips",
+        all(
+            phrase in app_text
+            for phrase in [
+                "Schiff benchmark quarterly MAPE minus finalist quarterly MAPE",
+                "Schiff benchmark annual MAPE minus finalist annual MAPE",
+                "matched forecast comparisons",
+                "MAPE gain, paired win rate, diagnostics and caveats",
+                "Promoted because the finalist beats the Schiff specification benchmark",
+            ]
+        )
+        and "render_info_tooltip" in app_text
+        and "summary-tooltip-trigger" in read_text(repo_root / "model_dashboard" / "ui.py")
+        and ".summary-tooltip-trigger:focus .summary-tooltip-text" in read_text(repo_root / "model_dashboard" / "ui.py")
+        and ".summary-rec-badge:focus .summary-tooltip-text" in read_text(repo_root / "model_dashboard" / "ui.py"),
+        "Schiff Benchmark and Scenario recommendation summaries have accessible hover/focus copy.",
+    )
+    record(
         "Residual vs fitted axis does not use misleading million-unit label",
         "Fitted value, native units" in (app_text + plot_text) and "Fitted value (m)" not in (app_text + plot_text),
         "Residual axis title inspected in app.py/plot helpers.",

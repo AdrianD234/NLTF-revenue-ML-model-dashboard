@@ -20,7 +20,6 @@ from app import (
     inventory_summary,
     data_quality_warning_readout,
     diagnostics_provenance_note,
-    diagnostics_provenance_strip,
     management_summary_markdown,
     model_detail_summary,
     overview_error_distribution_note,
@@ -241,7 +240,7 @@ def test_scenario_decision_rule_text_explains_beats_schiff_badge() -> None:
 def test_scenario_drilldown_note_names_full_tail_evidence() -> None:
     note = scenario_drilldown_note(184_356, 336)
 
-    assert "Forecast and stress drilldown below" in note
+    assert "Forecast and stress evidence keeps" in note
     assert "full forecast-error tails" in note
     assert "184,356 prediction rows" in note
     assert "336 stress rows" in note
@@ -409,16 +408,6 @@ def test_diagnostics_provenance_note_names_proxy_evidence(loaded_validation_run:
     assert "forecast residual rows" in note
     assert "feature-count rows" in note
     assert "proxy panels are labelled as equivalents" in note
-
-
-def test_diagnostics_provenance_strip_is_compact_and_data_backed(loaded_validation_run: LoadedRun) -> None:
-    strip = diagnostics_provenance_strip(loaded_validation_run)
-
-    assert strip.startswith("Diagnostics evidence:")
-    assert "residual rows" in strip
-    assert "feature-count rows" in strip
-    assert "proxy panels" in strip
-    assert len(strip) < 145
 
 
 def test_run_evidence_caption_names_run_files_family_scope_and_data_as_of(loaded_validation_run: LoadedRun) -> None:

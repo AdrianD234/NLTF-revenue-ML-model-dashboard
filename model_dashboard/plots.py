@@ -1633,16 +1633,6 @@ def plot_diagnostic_pass_matrix(diagnostics: pd.DataFrame) -> go.Figure:
             )
         ]
     )
-    fig.add_annotation(
-        text="Green = pass, amber = caution, red = fail, grey = unavailable",
-        x=0,
-        y=-0.08,
-        xref="paper",
-        yref="paper",
-        showarrow=False,
-        align="left",
-        font={"size": 11, "color": "#64748B"},
-    )
     return apply_layout(fig, "Diagnostic pass matrix", height=360)
 
 
@@ -1714,16 +1704,6 @@ def _plot_long_diagnostic_pass_matrix(rows: pd.DataFrame) -> go.Figure:
                 },
             )
         ]
-    )
-    fig.add_annotation(
-        text="Green = pass, amber = watch, red = fail, grey = unavailable",
-        x=0,
-        y=-0.08,
-        xref="paper",
-        yref="paper",
-        showarrow=False,
-        align="left",
-        font={"size": 11, "color": "#64748B"},
     )
     return apply_layout(fig, "Diagnostic pass matrix", height=360)
 

@@ -93,7 +93,6 @@ def diagnostic_pass_matrix_html(diagnostics: pd.DataFrame) -> str:
         + "</tr></thead><tbody>"
         + "".join(body_rows)
         + "</tbody></table>"
-        "<div class='diagnostic-matrix-legend'>Green = pass, amber = watch, red = fail, grey = unavailable</div>"
         "</div>"
     )
 

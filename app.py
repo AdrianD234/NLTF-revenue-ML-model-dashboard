@@ -41,6 +41,7 @@ from model_dashboard.labels import (
     TERM_HELP,
     format_count,
     format_percent,
+    format_pp,
     is_legacy_schiff_style_text,
     model_alias,
     shorten_model_name,
@@ -124,12 +125,12 @@ from model_dashboard.ui import (
     dataframe_download,
     decision_brief,
     display_table,
-    footer_strip,
     header,
     html_chart_card,
     info_panel,
     inject_theme,
     kpi_grid,
+    render_info_tooltip,
     section_title,
     warning_panel,
     filter_summary_grid,
@@ -267,9 +268,6 @@ def main() -> None:
         render_schiff_benchmark_page(loaded, controls)
     else:
         render_governance_reproducibility_page(loaded, controls)
-    if current_page != REPRODUCIBILITY_PAGE:
-        footer_strip("Transport Revenue Model Testbench | Refined Finalist Models", run_footer_label(loaded))
-
 
 def render_primary_navigation(pages: list[str]) -> str:
     return st.radio(
@@ -789,7 +787,6 @@ def render_overview(loaded: LoadedRun, controls: dict[str, Any]) -> None:
             "3. Finalist Ensemble Composition",
             "Positive solver weights for PED VKT per capita, Light RUC volume and Heavy RUC volume finalists.",
             compact_figure(fig, 260),
-            "Component labels are deliberately short for the management view." if not mapping.empty else None,
         )
     with lower[1]:
         chart_card(
@@ -798,14 +795,6 @@ def render_overview(loaded: LoadedRun, controls: dict[str, Any]) -> None:
             compact_figure(plot_stress_checks(stress_frame), 260),
             overview_stress_watch_note(stress_frame),
         )
-
-    with st.expander("Management conclusion and stream decision detail", expanded=False):
-        title, narrative, decision_cards = enterprise_decision_brief(story, loaded)
-        decision_brief(title, narrative, decision_cards)
-        info_panel("Manager conclusion: " + manager_conclusion(story))
-        warning_panel(data_quality_warning_readout(loaded, story))
-        governance_cards(story)
-        display_decision_status(story)
 
 
 def compact_figure(fig: Any, height: int, showlegend: bool | None = None) -> Any:
@@ -1131,11 +1120,6 @@ def diagnostic_kpi_cards(diagnostic_df: pd.DataFrame) -> list[tuple[str, str, st
 def render_diagnostics(loaded: LoadedRun, controls: dict[str, Any]) -> None:
     diagnostic_df = loaded.data.get("diagnostic_df", pd.DataFrame())
     gov_kpi_grid(diagnostic_kpi_cards(diagnostic_df))
-    st.markdown(
-        f"<div class='run-evidence-compact diagnostics-provenance-strip'>"
-        f"{html.escape(diagnostics_provenance_strip(loaded))}</div>",
-        unsafe_allow_html=True,
-    )
 
     qpred = common_filter(loaded.data.get("quarterly_predictions", pd.DataFrame()), controls, include_source_variant=False)
     diagnostic_qpred = central_error_window(qpred)
@@ -1179,6 +1163,7 @@ def render_diagnostics(loaded: LoadedRun, controls: dict[str, Any]) -> None:
             "3. Diagnostic Pass Matrix",
             "Calibration R2 and key statistical diagnostics by stream.",
             diagnostic_pass_matrix_html(pass_matrix),
+            "Green = pass, amber = watch, red = fail, grey = unavailable.",
         )
     with bottom[1]:
         chart_card(
@@ -1186,41 +1171,6 @@ def render_diagnostics(loaded: LoadedRun, controls: dict[str, Any]) -> None:
             "Absolute percentage error (%) by forecast horizon.",
             compact_figure(plot_error_distribution(error_distribution), 260),
         )
-
-    with st.expander("Diagnostics governance notes", expanded=False):
-        info_panel(diagnostics_provenance_note(loaded))
-        info_panel(
-            "Diagnostics use Parquet fields where present and diagnostic audit tables as secondary evidence. "
-            "Missing residual-test files are shown as governed unavailable states rather than fabricated points."
-        )
-
-    with st.expander("Model Explainability / Reproducibility", expanded=False):
-        stream_options = reproducibility_stream_labels()
-        default_stream = "Light RUC volume" if "Light RUC volume" in stream_options else stream_options[0]
-        selected_repro_stream = st.selectbox(
-            "Reproducibility stream",
-            options=stream_options,
-            index=stream_options.index(default_stream),
-            key="reproducibility_stream_selector",
-        )
-        if st.toggle("Load reproducibility detail", value=False, key="lazy_reproducibility_detail"):
-            render_reproducibility_detail(str(selected_repro_stream))
-        else:
-            info_panel(
-                "Stream-specific reproducibility evidence is lazy-loaded from auxiliary read-only packs. "
-                "These packs do not feed KPI, finalist, scenario, stress, diagnostic or score-basis calculations."
-            )
-
-    with st.expander("Model Inventory module", expanded=False):
-        if st.toggle("Load Model Inventory module", value=False, key="lazy_diagnostics_inventory"):
-            render_model_inventory(loaded, controls)
-        else:
-            info_panel("Model Inventory is lazy-loaded to keep Diagnostics tab switches fast. Open it when candidate-level detail is needed.")
-    with st.expander("Run Audit module", expanded=False):
-        if st.toggle("Load Run Audit module", value=False, key="lazy_diagnostics_audit"):
-            render_run_audit(loaded)
-        else:
-            info_panel("Run Audit is lazy-loaded to avoid rebuilding file, feature and error tables during ordinary diagnostics review.")
 
 
 def diagnostics_provenance_note(loaded: LoadedRun) -> str:
@@ -1230,16 +1180,6 @@ def diagnostics_provenance_note(loaded: LoadedRun) -> str:
         "Diagnostics provenance: this run provides "
         f"{format_count(qpred_rows)} forecast residual rows and {format_count(feature_rows)} feature-count rows. "
         "Classical ADF, Durbin-Watson and Breusch-Pagan files are not supplied, so proxy panels are labelled as equivalents."
-    )
-
-
-def diagnostics_provenance_strip(loaded: LoadedRun) -> str:
-    """Return a compact first-viewport provenance line for Diagnostics."""
-    qpred_rows = len(loaded.data.get("quarterly_predictions", pd.DataFrame()))
-    feature_rows = len(loaded.data.get("variant_features", pd.DataFrame()))
-    return (
-        f"Diagnostics evidence: {format_count(qpred_rows)} residual rows | "
-        f"{format_count(feature_rows)} feature-count rows | proxy panels shown where classical test files are absent."
     )
 
 
@@ -1372,7 +1312,6 @@ def render_governance_reproducibility_page(loaded: LoadedRun, controls: dict[str
         panel_contract,
     )
     render_page5_shap_note()
-    render_page5_footer(run_footer_label(loaded))
 
 
 def _load_reproducibility_pack_safely(stream_label: str) -> Any | None:
@@ -2110,17 +2049,6 @@ def render_page5_shap_note() -> None:
     )
 
 
-def render_page5_footer(run_label: str) -> None:
-    st.markdown(
-        "<div class='page5-footer'>"
-        "<div class='page5-footer-main'>This Governance & Reproducibility page is read-only and does not feed KPI, finalist, scenario, diagnostic, stress, or chart-source calculations.</div>"
-        f"<div class='page5-footer-meta'>Data as at: {html.escape(run_label)}</div>"
-        "<div class='page5-footer-meta'>Pack: v1.3.0</div>"
-        "</div>",
-        unsafe_allow_html=True,
-    )
-
-
 def page5_workbook_card_html(manifest: dict[str, Any]) -> str:
     if manifest.get("available"):
         value = "Source workbook available"
@@ -2787,21 +2715,6 @@ def render_scenario_comparison(loaded: LoadedRun, controls: dict[str, Any]) -> N
     with bottom[1]:
         scenario_decision_summary_panel(comparison, watch_note)
 
-    with st.expander("Detailed scenario governance cards", expanded=False):
-        governance_cards(story)
-        info_panel(
-            "Decision Lens: choose the refined finalist when it improves full-sample MAPE, keeps a paired win-rate edge, stays robust across horizon "
-            "buckets, and has manageable run warnings. Prefer the Schiff specification benchmark where structural interpretability dominates "
-            "or the finalist does not cleanly beat the benchmark."
-        )
-
-    with st.expander("Forecast and stress drilldown", expanded=False):
-        if st.toggle("Load forecast and stress drilldown", value=False, key="lazy_scenario_forecast_stress"):
-            render_forecasts_and_errors(loaded, controls)
-            render_stress_checks(loaded, controls)
-        else:
-            info_panel("Forecast and stress drilldowns are lazy-loaded so Scenario Comparison renders the management view first.")
-
 
 def scenario_kpi_cards(
     recommended: pd.DataFrame,
@@ -2964,6 +2877,187 @@ def light_operational_annual_watch_note(recommended: pd.DataFrame, schiff_df: pd
     )
 
 
+SUMMARY_FIELD_TOOLTIPS = {
+    "Schiff Spec Qtr": (
+        "Quarterly MAPE for the Schiff specification benchmark under the active score basis. Lower is better."
+    ),
+    "Finalist Qtr": "Quarterly MAPE for the selected finalist under the active score basis. Lower is better.",
+    "Full-sample Qtr Gain": (
+        "Schiff benchmark quarterly MAPE minus finalist quarterly MAPE, in percentage points. "
+        "Positive values mean the finalist has lower error than the Schiff specification benchmark."
+    ),
+    "Schiff Spec Annual": (
+        "Annual MAPE for the Schiff specification benchmark after aggregating quarterly forecasts to annual totals. "
+        "Lower is better."
+    ),
+    "Finalist Annual": (
+        "Annual MAPE for the selected finalist after aggregating quarterly forecasts to annual totals. Lower is better."
+    ),
+    "Full-sample Annual Gain": (
+        "Schiff benchmark annual MAPE minus finalist annual MAPE, in percentage points. "
+        "Positive values mean the finalist has lower annual error. If this is negative, the stream should be shown "
+        "as an annual-watch item."
+    ),
+    "Paired Win Rate": (
+        "The share of matched forecast comparisons where the finalist has lower absolute percentage error than the "
+        "Schiff specification benchmark. The comparison uses the same stream, origin, target period and horizon "
+        "where possible. A value above 50% means the finalist wins more often than it loses; above roughly 55% is "
+        "a stronger governance signal."
+    ),
+}
+
+RECOMMENDATION_HEADER_TOOLTIP = (
+    "Recommendation is based on the combined governance read: paper-style MAPE gain, operational MAPE checks, "
+    "annual performance, paired win rate, diagnostics, and known caveats. Promote means the finalist improves the "
+    "benchmark on the main score basis and passes the consistency checks. Watch means the model is usable but has "
+    "a specific caveat. Needs Stage 2 means the result is not robust enough for full promotion. In short, it weighs "
+    "MAPE gain, paired win rate, diagnostics and caveats."
+)
+
+RECOMMENDATION_BADGE_TOOLTIPS = {
+    "promote": (
+        "Promoted because the finalist beats the Schiff specification benchmark on the main scorecard and has "
+        "acceptable paired-win and diagnostic evidence."
+    ),
+    "watch": (
+        "Governance watch item. The finalist is useful, but one or more secondary checks needs monitoring."
+    ),
+    "needs stage 2": (
+        "Not fully promoted. Further model refinement or evidence is needed before treating this as the preferred "
+        "finalist."
+    ),
+    "annual watch": (
+        "The finalist improves the primary quarterly or paper-style score, but annual aggregation is weaker and "
+        "should be monitored."
+    ),
+}
+
+
+def _summary_header(label: str) -> str:
+    tooltip = SUMMARY_FIELD_TOOLTIPS.get(label)
+    if label == "Recommendation":
+        tooltip = RECOMMENDATION_HEADER_TOOLTIP
+    if not tooltip:
+        return html.escape(label)
+    return (
+        "<span class='summary-header-label'>"
+        f"{html.escape(label)}"
+        f"{render_info_tooltip(label, tooltip)}"
+        "</span>"
+    )
+
+
+def _summary_gain_cell(value: Any) -> str:
+    number = pd.to_numeric(value, errors="coerce")
+    css_class = "summary-gain-positive" if pd.notna(number) and number >= 0 else "summary-gain-negative"
+    return f"<span class='{css_class}'>{html.escape(format_pp(value))}</span>"
+
+
+def _recommendation_badge_tooltip(value: str) -> str:
+    lower = value.lower()
+    if "annual watch" in lower:
+        if "promote" in lower:
+            return f"{RECOMMENDATION_BADGE_TOOLTIPS['promote']} {RECOMMENDATION_BADGE_TOOLTIPS['annual watch']}"
+        return RECOMMENDATION_BADGE_TOOLTIPS["annual watch"]
+    if "needs stage 2" in lower:
+        return RECOMMENDATION_BADGE_TOOLTIPS["needs stage 2"]
+    if "watch" in lower:
+        return RECOMMENDATION_BADGE_TOOLTIPS["watch"]
+    if "promote" in lower:
+        return RECOMMENDATION_BADGE_TOOLTIPS["promote"]
+    return RECOMMENDATION_HEADER_TOOLTIP
+
+
+def _recommendation_badge(value: Any) -> str:
+    text = str(value or "").strip() or "Needs Stage 2"
+    lower = text.lower()
+    if "needs stage 2" in lower:
+        tone = "summary-rec-stage2"
+    elif "watch" in lower:
+        tone = "summary-rec-watch"
+    else:
+        tone = "summary-rec-promote"
+    tooltip = _recommendation_badge_tooltip(text)
+    safe_text = html.escape(text)
+    safe_tooltip = html.escape(tooltip)
+    return (
+        f"<span class='summary-rec-badge {tone}' tabindex='0' title='{safe_tooltip}' "
+        f"aria-label='{safe_text}: {safe_tooltip}'>"
+        f"{safe_text}"
+        f"<span class='summary-tooltip-text' role='tooltip'>{safe_tooltip}</span>"
+        "</span>"
+    )
+
+
+def _summary_table_html(headers: list[str], rows: list[list[str]], *, column_widths: list[str] | None = None) -> str:
+    colgroup = ""
+    if column_widths:
+        colgroup = "<colgroup>" + "".join(f"<col style='width:{html.escape(width)}'>" for width in column_widths) + "</colgroup>"
+    header_html = "".join(f"<th scope='col'>{_summary_header(label)}</th>" for label in headers)
+    body_html = "".join(
+        "<tr>" + "".join(f"<td>{cell}</td>" for cell in row) + "</tr>"
+        for row in rows
+    )
+    return (
+        "<div class='summary-table-wrap'>"
+        "<table class='summary-tooltip-table'>"
+        f"{colgroup}<thead><tr>{header_html}</tr></thead><tbody>{body_html}</tbody>"
+        "</table>"
+        "</div>"
+    )
+
+
+def benchmark_summary_table_html(comparison: pd.DataFrame) -> str:
+    if comparison.empty:
+        return "<div class='summary-table-wrap'><p>Benchmark summary is not available.</p></div>"
+    headers = [
+        "Stream",
+        "Schiff Spec Qtr",
+        "Finalist Qtr",
+        "Full-sample Qtr Gain",
+        "Schiff Spec Annual",
+        "Finalist Annual",
+        "Full-sample Annual Gain",
+        "Paired Win Rate",
+    ]
+    rows = []
+    for _, row in comparison.iterrows():
+        rows.append(
+            [
+                html.escape(str(row.get("stream_label", "-"))),
+                html.escape(format_percent(row.get("schiff_quarterly_mape"))),
+                html.escape(format_percent(row.get("finalist_quarterly_mape"))),
+                _summary_gain_cell(row.get("quarterly_gain_pp")),
+                html.escape(format_percent(row.get("schiff_annual_mape"))),
+                html.escape(format_percent(row.get("finalist_annual_mape"))),
+                _summary_gain_cell(row.get("annual_gain_pp")),
+                html.escape(format_percent(row.get("win_rate"))),
+            ]
+        )
+    return _summary_table_html(headers, rows)
+
+
+def decision_summary_table_html(decisions: pd.DataFrame) -> str:
+    if decisions.empty:
+        return "<div class='summary-table-wrap'><p>Decision summary rows are not available.</p></div>"
+    qtr_col = "Full-sample Qtr Gain" if "Full-sample Qtr Gain" in decisions.columns else "Qtr Gain (pp)"
+    annual_col = "Full-sample Annual Gain" if "Full-sample Annual Gain" in decisions.columns else "Annual Gain (pp)"
+    win_col = "Paired Win Rate" if "Paired Win Rate" in decisions.columns else "Win Rate (%)"
+    headers = ["Stream", "Full-sample Qtr Gain", "Full-sample Annual Gain", "Paired Win Rate", "Recommendation"]
+    rows = []
+    for _, row in decisions.iterrows():
+        rows.append(
+            [
+                html.escape(str(row.get("Stream", "-"))),
+                _summary_gain_cell(row.get(qtr_col)),
+                _summary_gain_cell(row.get(annual_col)),
+                html.escape(format_percent(row.get(win_col))),
+                _recommendation_badge(row.get("Recommendation")),
+            ]
+        )
+    return _summary_table_html(headers, rows, column_widths=["26%", "18%", "20%", "16%", "20%"])
+
+
 def scenario_decision_summary_panel(comparison: pd.DataFrame, watch_note: str = "") -> None:
     if comparison.empty:
         chart_card("4. Decision Summary", "Executive view by stream.", empty_figure("Scenario comparison rows are not available."))
@@ -2997,10 +3091,10 @@ def scenario_decision_summary_panel(comparison: pd.DataFrame, watch_note: str = 
     )
     if watch_note:
         subtitle = f"{subtitle} {watch_note}"
-    chart_card(
+    html_chart_card(
         "4. Decision Summary",
         subtitle,
-        compact_figure(plot_decision_summary_table(display), 240),
+        decision_summary_table_html(display),
     )
 
 
@@ -3076,7 +3170,7 @@ def scenario_decision_rule_text() -> str:
 
 def scenario_drilldown_note(qpred_rows: int, stress_rows: int) -> str:
     return (
-        f"Forecast and stress drilldown below keeps full forecast-error tails across {format_count(qpred_rows)} "
+        f"Forecast and stress evidence keeps full forecast-error tails across {format_count(qpred_rows)} "
         f"prediction rows and {format_count(stress_rows)} stress rows."
     )
 
@@ -3136,18 +3230,11 @@ def render_schiff_benchmark_page(loaded: LoadedRun, controls: dict[str, Any]) ->
         summary_subtitle = "Structural benchmark versus refined finalist performance summary."
         if watch_note:
             summary_subtitle = f"{summary_subtitle} {watch_note}"
-        chart_card(
+        html_chart_card(
             "4. Benchmark Summary",
             summary_subtitle,
-            compact_figure(plot_benchmark_summary_table(comparison), 260),
+            benchmark_summary_table_html(comparison),
         )
-
-    with st.expander("Candidate and ensemble evidence drilldown", expanded=False):
-        if st.toggle("Load candidate and ensemble evidence", value=False, key="lazy_schiff_candidate_ensemble"):
-            render_candidate_landscape(loaded, controls)
-            render_ensemble_composition(loaded, controls)
-        else:
-            info_panel("Candidate and ensemble evidence is lazy-loaded to keep the Schiff Benchmark page focused and responsive.")
 
 
 def schiff_kpi_cards(summary: pd.DataFrame, paired: pd.DataFrame, recommended: pd.DataFrame) -> list[tuple[str, str, str]]:
