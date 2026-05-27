@@ -10,7 +10,16 @@ from typing import Any, Iterable
 import pandas as pd
 import streamlit as st
 
-from .labels import POWERBI_BLUE, POWERBI_GREEN, POWERBI_TEXT, model_alias
+try:
+    from .labels import POWERBI_BLUE, POWERBI_GREEN, POWERBI_TEXT, model_alias
+except ImportError:
+    POWERBI_BLUE = "#002B5C"
+    POWERBI_GREEN = "#A7C800"
+    POWERBI_TEXT = "#102A43"
+
+    def model_alias(value: Any, max_length: int = 72) -> str:
+        text = "" if value is None else str(value)
+        return text if len(text) <= max_length else f"{text[: max_length - 1]}..."
 
 
 LOGO_ASSET_PATH = Path(__file__).resolve().parents[1] / "assets" / "nz-transport-agency-waka-kotahi.png"

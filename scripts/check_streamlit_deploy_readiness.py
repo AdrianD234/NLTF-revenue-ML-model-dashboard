@@ -31,6 +31,23 @@ REQUIRED_PARQUET = {
 }
 ALLOWED_PACK_ROOT_FILES = {"manifest.json", "README.md", "data_inventory.csv"}
 ALLOWED_REQUIREMENTS_SUFFIXES = {".txt"}
+REQUIRED_UI_EXPORTS = {
+    "chart_card",
+    "dataframe_download",
+    "decision_brief",
+    "display_table",
+    "footer_strip",
+    "header",
+    "html_chart_card",
+    "info_panel",
+    "inject_theme",
+    "kpi_grid",
+    "section_title",
+    "warning_panel",
+    "filter_summary_grid",
+    "gov_kpi_grid",
+    "governance_cards",
+}
 
 
 def normalise_requirement(line: str) -> str | None:
@@ -140,6 +157,20 @@ def assert_default_load_resolves_repo_pack() -> None:
         raise AssertionError(f"Default evidence-pack root resolves to {resolved}, expected {expected}.")
 
 
+def assert_import_surface() -> None:
+    if str(ROOT) not in sys.path:
+        sys.path.insert(0, str(ROOT))
+
+    import app
+    import model_dashboard.ui as ui
+
+    if not hasattr(app, "main"):
+        raise AssertionError("app.py imported, but main() is missing.")
+    missing = sorted(name for name in REQUIRED_UI_EXPORTS if not hasattr(ui, name))
+    if missing:
+        raise AssertionError("model_dashboard.ui is missing exports imported by app.py: " + ", ".join(missing))
+
+
 def assert_tracked_files() -> None:
     tracked = git_tracked_files()
     if not tracked:
@@ -171,6 +202,7 @@ def validate() -> None:
     if not (ROOT / "app.py").exists():
         raise AssertionError("Missing app.py.")
     assert_requirements()
+    assert_import_surface()
     assert_pack_shape()
     assert_streamlit_config()
     assert_default_load_resolves_repo_pack()
