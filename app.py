@@ -130,7 +130,6 @@ from model_dashboard.ui import (
     info_panel,
     inject_theme,
     kpi_grid,
-    render_info_tooltip,
     section_title,
     warning_panel,
     filter_summary_grid,
@@ -161,6 +160,21 @@ PAGE5_PANEL_CONTRACT_REQUIRED_COLUMNS = (
     "missing_message",
     "notes",
 )
+
+
+def render_info_tooltip(label: str, tooltip_text: str, *, css_class: str = "summary-tooltip") -> str:
+    """Return a small accessible tooltip without depending on optional UI exports."""
+    safe_label = html.escape(label)
+    safe_text = html.escape(tooltip_text)
+    slug = "".join(char if char.isalnum() else "-" for char in label.lower()).strip("-")
+    digest = hashlib.sha1(f"{label}|{tooltip_text}".encode("utf-8")).hexdigest()[:8]
+    tooltip_id = f"tooltip-{slug}-{digest}"
+    return (
+        f"<span class='{css_class}-trigger' tabindex='0' role='button' "
+        f"aria-label='{safe_label}: {safe_text}' aria-describedby='{tooltip_id}' title='{safe_text}'>?"
+        f"<span class='{css_class}-text' role='tooltip' id='{tooltip_id}'>{safe_text}</span>"
+        "</span>"
+    )
 
 
 @st.cache_data(show_spinner=False)
