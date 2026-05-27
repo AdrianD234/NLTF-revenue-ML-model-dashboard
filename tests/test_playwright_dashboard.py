@@ -43,15 +43,23 @@ def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
         "Benchmark Pass",
         "beat Schiff specification benchmark",
         "logged diagnostics",
-        "Frontier read: Balanced all-stream frontier view",
-        "excluded from governance scoring",
-        "Stress watch:",
         "1. Finalist Forecast Accuracy",
         "2. Candidate Search Frontier",
         "3. Finalist Ensemble Composition",
         "4. Stress and Horizon Checks",
     ]:
         expect(page.locator("body")).to_contain_text(text, timeout=60000)
+    accuracy_info = chart_info_text(page, "1. Finalist Forecast Accuracy")
+    assert "Current Parquet finalists using Paper-style horizon MAPE:" in accuracy_info
+    frontier_info = chart_info_text(page, "2. Candidate Search Frontier")
+    assert "Frontier read: Balanced all-stream frontier view" in frontier_info
+    assert "excluded from governance scoring" in frontier_info
+    stress_info = chart_info_text(page, "4. Stress and Horizon Checks")
+    assert "Stress watch:" in stress_info
+    assert_visible_text_absent(page, "Frontier read:")
+    assert_visible_text_absent(page, "Stress watch:")
+    assert_visible_text_absent(page, "Balanced all-stream frontier view")
+    assert page.get_by_text("Candidate frontier mode", exact=False).count() == 0
     wait_for_rendered_surfaces(page)
     assert rendered_surface_count(page) >= 4
     save_dashboard_screenshot(page, artifact_dir, "mcp-01-overview.png")
@@ -195,10 +203,11 @@ def test_latest_arbitration_values_are_visible_not_stale(page: Page) -> None:
     page.goto(os.environ.get("STAGE1_DASHBOARD_URL", "http://localhost:8501"), wait_until="domcontentloaded")
     wait_dashboard_ready(page)
     body = page.locator("body").inner_text(timeout=60000)
+    accuracy_info = chart_info_text(page, "1. Finalist Forecast Accuracy")
 
-    assert "Current Parquet finalists using Paper-style horizon MAPE:" in body
+    assert "Current Parquet finalists using Paper-style horizon MAPE:" in accuracy_info
     for expected in ["3.24%", "2.03%", "5.36%", "1.27%", "2.81%", "2.06%"]:
-        assert expected in body
+        assert expected in accuracy_info
 
     for stale in ["5.49%", "9.15%", "12.38%"]:
         assert stale not in body
@@ -737,6 +746,21 @@ def assert_visible_text_absent(page: Page, text: str) -> None:
         text,
     )
     assert not visible, f"Expected text {text!r} to be hidden"
+
+
+def chart_info_text(page: Page, title: str) -> str:
+    info = page.evaluate(
+        """(title) => {
+            const headers = Array.from(document.querySelectorAll('.chart-card-header'));
+            const header = headers.find((node) => node.textContent && node.textContent.includes(title));
+            if (!header) return '';
+            const info = header.querySelector('.chart-info-text');
+            return info ? info.textContent.trim() : '';
+        }""",
+        title,
+    )
+    assert info, f"Expected chart information tooltip for {title!r}"
+    return str(info)
 
 
 def expect_filter_value(page: Page, label: str, index: int, value: str) -> None:

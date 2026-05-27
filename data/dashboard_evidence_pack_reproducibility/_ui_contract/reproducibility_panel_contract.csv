@@ -1,0 +1,19 @@
+stream,panel,status,display_title,evidence_file,recommendation,missing_message,notes
+PED VKT per capita,status_card,available,Exact component-prediction replay,model_registry.parquet,show status card with max delta 0 and HPO/static-solver caveat,,Do not claim first-principles workbook refit.
+PED VKT per capita,component_trace,available,Component trace,component_predictions.parquet,show C1 100% -> final prediction diagram,,C1 is the stored HPO/static-solver component.
+PED VKT per capita,feature_importance,component_weight_only,Component contribution,feature_importance_global.parquet,do not label this as feature importance; display as C1 100% component contribution or hide chart,Feature-level importance not emitted by parent HPO/static-solver run.,C1 100% is not a variable importance chart.
+PED VKT per capita,coefficients,unavailable,Model coefficients,model_coefficients.parquet,show missing-data card; do not invent coefficients,Coefficient artifacts were not emitted by the parent HPO/static-solver run.,Requires inner HPO/static-solver registry/refit audit.
+PED VKT per capita,scenario_sensitivities,unavailable,Scenario sensitivities,scenario_sensitivities.parquet,show missing-data card; do not invent sensitivities,Scenario sensitivities were not emitted by the parent HPO/static-solver run.,Requires component model replay from workbook inputs.
+PED VKT per capita,training_window_trace,available,Training window trace,training_window_trace.parquet,show trace where available,,
+Light RUC volume,status_card,available,Exact prediction replay,model_registry.parquet,show two-stage OLS base + GBM residual correction status,,
+Light RUC volume,component_trace,available,Component trace,component_predictions.parquet,show base log prediction + residual log prediction -> final prediction,,
+Light RUC volume,feature_importance,available,Feature importance,feature_importance_global.parquet,show as true feature/model importance,,Not SHAP; label as replay-pack feature importance.
+Light RUC volume,coefficients,available,OLS base coefficients,model_coefficients.parquet,show coefficient table/chart for base OLS component,,
+Light RUC volume,scenario_sensitivities,available,Scenario sensitivities,scenario_sensitivities.parquet,show perturbation effects on dependent variable/model target,,Do not label as revenue impact.
+Light RUC volume,training_window_trace,available,Training window trace,training_window_trace.parquet,show rolling 36-quarter windows,,
+Heavy RUC volume,status_card,available,Exact weighted-ensemble replay,model_registry.parquet,show four-component weighted ensemble status,,
+Heavy RUC volume,component_trace,available,Component trace,component_predictions.parquet,show weighted component contributions and final prediction equation,,
+Heavy RUC volume,feature_importance,component_weight_only,Ensemble component contribution,feature_importance_global.parquet,"label as component contribution, not feature importance; add drilldown placeholder for per-component features",Component-level feature importances were not emitted by parent component runs.,"To obtain true features, rerun component builders with feature importance capture."
+Heavy RUC volume,coefficients,unavailable,Component coefficients,model_coefficients.parquet,show missing-data card or component selector with unavailable status,Coefficient artifacts were not emitted by the parent component runs.,ElasticNet/OLS component coefficients require component-level replay.
+Heavy RUC volume,scenario_sensitivities,unavailable,Scenario sensitivities,scenario_sensitivities.parquet,show missing-data card; do not invent sensitivities,Scenario sensitivities were not emitted by the weighted-ensemble replay.,Requires perturbing inputs and replaying all four components.
+Heavy RUC volume,training_window_trace,available,Training window trace,training_window_trace.parquet,show component window trace where available,,

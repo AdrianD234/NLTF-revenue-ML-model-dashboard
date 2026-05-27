@@ -1,0 +1,26 @@
+{
+  "purpose": "UI contract to prevent component weights being mislabeled as feature importance.",
+  "global_rules": [
+    "Reproducibility panels are read-only and must not feed main scoring calculations.",
+    "Do not fake SHAP, coefficients, feature importances, or scenario sensitivities.",
+    "If panel status is unavailable, show a missing-data card.",
+    "If status is component_weight_only, label chart as component contribution, not feature importance."
+  ],
+  "streams": {
+    "PED VKT per capita": {
+      "replay_status": "Exact component-prediction replay",
+      "caveat": "Inner HPO/static-solver rebuild remains a future audit layer.",
+      "feature_importance": "Not available; C1 100% is component contribution only."
+    },
+    "Light RUC volume": {
+      "replay_status": "Exact prediction replay",
+      "caveat": "Feature importance/coefficient/sensitivity panels available from replay pack.",
+      "feature_importance": "Available from replay pack, not SHAP."
+    },
+    "Heavy RUC volume": {
+      "replay_status": "Exact weighted-ensemble replay",
+      "caveat": "Feature importance panel currently component contribution only; per-component features require component-level replay.",
+      "feature_importance": "Component contribution only."
+    }
+  }
+}

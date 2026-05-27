@@ -139,6 +139,50 @@ def validate() -> list[tuple[str, str, str]]:
         "App text contains the visible operational annual watch note.",
     )
 
+    contract_path = repo_root / "data" / "dashboard_evidence_pack_reproducibility" / "_ui_contract" / "reproducibility_panel_contract.csv"
+    if contract_path.exists():
+        panel_contract = pd.read_csv(contract_path)
+        ped_feature = panel_contract[
+            panel_contract["stream"].eq("PED VKT per capita")
+            & panel_contract["panel"].eq("feature_importance")
+        ]
+        heavy_feature = panel_contract[
+            panel_contract["stream"].eq("Heavy RUC volume")
+            & panel_contract["panel"].eq("feature_importance")
+        ]
+        light_feature = panel_contract[
+            panel_contract["stream"].eq("Light RUC volume")
+            & panel_contract["panel"].eq("feature_importance")
+        ]
+        record(
+            "Page 5 panel contract prevents component weights being labelled feature importance",
+            not ped_feature.empty
+            and not heavy_feature.empty
+            and not light_feature.empty
+            and str(ped_feature.iloc[0]["status"]) == "component_weight_only"
+            and str(heavy_feature.iloc[0]["status"]) == "component_weight_only"
+            and str(light_feature.iloc[0]["status"]) == "available"
+            and "Component contribution" in app_text
+            and "Ensemble component contribution" in app_text
+            and "Feature importance ({short_stream_label(analytics_stream)})" not in app_text,
+            "Contract CSV and app panel labels separate component contribution from true feature importance.",
+        )
+    else:
+        record(
+            "Page 5 panel contract prevents component weights being labelled feature importance",
+            False,
+            f"Missing contract file: {contract_path}",
+        )
+
+    record(
+        "Page 5 unavailable explainability panels render governance caveats",
+        "Not emitted by parent HPO/static-solver run; future inner-solver audit required." in app_text
+        and "Not emitted by parent component runs; future component-level replay required." in app_text
+        and "page5-caveat-card" in app_text
+        and "render_page5_missing_panel" in app_text,
+        "PED/Heavy coefficients and sensitivities are rendered as styled missing-data cards, not empty charts.",
+    )
+
     stale_spec_terms = [
         "Candidate Models",
         "Mean Adjusted R2",

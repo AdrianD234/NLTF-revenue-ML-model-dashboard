@@ -577,11 +577,79 @@ def inject_theme() -> None:
                 line-height: 1.2;
                 margin-bottom: 0.1rem;
             }}
+            .chart-card-header {{
+                align-items: flex-start;
+                display: flex;
+                gap: 0.5rem;
+                justify-content: space-between;
+                margin-bottom: 0.1rem;
+                position: relative;
+            }}
             .chart-card-subtitle {{
                 color: #475569;
                 font-size: 0.72rem;
                 line-height: 1.25;
                 margin-bottom: 0.08rem;
+            }}
+            .chart-info-trigger {{
+                align-items: center;
+                background: #EFF6FF;
+                border: 1px solid #BFD4EA;
+                border-radius: 999px;
+                color: var(--pbi-blue);
+                cursor: help;
+                display: inline-flex;
+                flex: 0 0 auto;
+                font-size: 0.68rem;
+                font-weight: 800;
+                height: 1.05rem;
+                justify-content: center;
+                line-height: 1;
+                margin-top: -0.02rem;
+                outline: none;
+                position: relative;
+                width: 1.05rem;
+                z-index: 4;
+            }}
+            .chart-info-trigger:focus {{
+                box-shadow: 0 0 0 2px rgba(0, 43, 92, 0.22);
+            }}
+            .chart-info-text {{
+                background: #0F172A;
+                border-radius: 7px;
+                box-shadow: 0 10px 28px rgba(15, 23, 42, 0.24);
+                color: #F8FAFC;
+                font-size: 0.72rem;
+                font-weight: 500;
+                line-height: 1.34;
+                max-width: min(420px, 72vw);
+                min-width: 280px;
+                opacity: 0;
+                padding: 0.62rem 0.72rem;
+                pointer-events: none;
+                position: absolute;
+                right: 0;
+                text-align: left;
+                top: calc(100% + 0.42rem);
+                transition: opacity 120ms ease, visibility 120ms ease;
+                visibility: hidden;
+                white-space: normal;
+                z-index: 9999;
+            }}
+            .chart-info-text::before {{
+                border-bottom: 6px solid #0F172A;
+                border-left: 6px solid transparent;
+                border-right: 6px solid transparent;
+                content: "";
+                position: absolute;
+                right: 0.32rem;
+                top: -6px;
+            }}
+            .chart-info-trigger:hover .chart-info-text,
+            .chart-info-trigger:focus .chart-info-text,
+            .chart-info-trigger:focus-within .chart-info-text {{
+                opacity: 1;
+                visibility: visible;
             }}
             .gov-footer, .footer-strip {{
                 align-items: center;
@@ -956,36 +1024,68 @@ def filter_summary_grid(items: Iterable[tuple[str, str]]) -> None:
     st.markdown("<div class='gov-filter-grid'>" + "".join(cells) + "</div>", unsafe_allow_html=True)
 
 
-def chart_card(title: str, subtitle: str, figure: Any, caption: str | None = None) -> None:
+def _chart_card_header_html(title: str, subtitle: str, caption: str | None, *, notes_as_tooltip: bool) -> str:
+    if not notes_as_tooltip:
+        return (
+            f"<div class='chart-card-title'>{html.escape(title)}</div>"
+            f"<div class='chart-card-subtitle'>{html.escape(subtitle)}</div>"
+        )
+    info_parts = [part.strip() for part in [subtitle, caption or ""] if part and part.strip()]
+    if not info_parts:
+        return f"<div class='chart-card-header'><div class='chart-card-title'>{html.escape(title)}</div></div>"
+    info_text = "\n\n".join(info_parts)
+    return (
+        "<div class='chart-card-header'>"
+        f"<div class='chart-card-title'>{html.escape(title)}</div>"
+        "<span class='chart-info-trigger' tabindex='0' aria-label='Chart information'>?"
+        f"<span class='chart-info-text' role='tooltip'>{html.escape(info_text)}</span>"
+        "</span>"
+        "</div>"
+    )
+
+
+def chart_card(
+    title: str,
+    subtitle: str,
+    figure: Any,
+    caption: str | None = None,
+    *,
+    notes_as_tooltip: bool = True,
+) -> None:
     key = "chart_card_" + re.sub(r"[^a-z0-9]+", "_", title.lower()).strip("_")
     if hasattr(figure, "update_layout"):
         figure.update_layout(title_text="")
     with st.container(border=True):
         st.markdown(
             "<div class='gov-chart-card chart-card'>"
-            f"<div class='chart-card-title'>{html.escape(title)}</div>"
-            f"<div class='chart-card-subtitle'>{html.escape(subtitle)}</div>"
+            f"{_chart_card_header_html(title, subtitle, caption, notes_as_tooltip=notes_as_tooltip)}"
             "</div>",
             unsafe_allow_html=True,
         )
         st.plotly_chart(figure, width="stretch", key=key)
-        if caption:
+        if caption and not notes_as_tooltip:
             st.caption(caption)
         else:
             st.markdown("<div class='chart-card-caption-placeholder'></div>", unsafe_allow_html=True)
 
 
-def html_chart_card(title: str, subtitle: str, body_html: str, caption: str | None = None) -> None:
+def html_chart_card(
+    title: str,
+    subtitle: str,
+    body_html: str,
+    caption: str | None = None,
+    *,
+    notes_as_tooltip: bool = True,
+) -> None:
     with st.container(border=True):
         st.markdown(
             "<div class='gov-chart-card chart-card'>"
-            f"<div class='chart-card-title'>{html.escape(title)}</div>"
-            f"<div class='chart-card-subtitle'>{html.escape(subtitle)}</div>"
+            f"{_chart_card_header_html(title, subtitle, caption, notes_as_tooltip=notes_as_tooltip)}"
             f"{body_html}"
             "</div>",
             unsafe_allow_html=True,
         )
-        if caption:
+        if caption and not notes_as_tooltip:
             st.caption(caption)
         else:
             st.markdown("<div class='chart-card-caption-placeholder'></div>", unsafe_allow_html=True)

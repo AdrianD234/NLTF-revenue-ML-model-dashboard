@@ -145,6 +145,21 @@ SOURCE_WORKBOOK_NAME = "Master Copy revenue modelling workbook.xlsx"
 SOURCE_WORKBOOK_REPO_PATH = Path("data") / "source_workbooks" / SOURCE_WORKBOOK_NAME
 SOURCE_WORKBOOK_ENV_VAR = "REPRODUCIBILITY_SOURCE_WORKBOOK_PATH"
 SOURCE_WORKBOOK_MANIFEST_PATH = Path("artifacts") / "source_workbook_manifest.json"
+PAGE5_UI_CONTRACT_ROOT = Path("data") / "dashboard_evidence_pack_reproducibility" / "_ui_contract"
+PAGE5_PANEL_CONTRACT_FILES = (
+    "reproducibility_panel_contract.parquet",
+    "reproducibility_panel_contract.csv",
+)
+PAGE5_PANEL_CONTRACT_REQUIRED_COLUMNS = (
+    "stream",
+    "panel",
+    "status",
+    "display_title",
+    "evidence_file",
+    "recommendation",
+    "missing_message",
+    "notes",
+)
 
 
 @st.cache_data(show_spinner=False)
@@ -733,11 +748,8 @@ def render_overview(loaded: LoadedRun, controls: dict[str, Any]) -> None:
     stress_frame = overview_stress_frame(loaded, recommended, controls)
     story = governance_story_summary(recommended, loaded.data.get("paired_vs_schiff", pd.DataFrame()), stress_frame, errors)
 
-    candidate_mode = st.session_state.get("candidate_frontier_mode", DEFAULT_CANDIDATE_FRONTIER_MODE)
-    if candidate_mode == LEGACY_CANDIDATE_FRONTIER_MODE:
-        candidate_mode = DEFAULT_CANDIDATE_FRONTIER_MODE
-        st.session_state["candidate_frontier_mode"] = candidate_mode
-    candidate_landscape = build_candidate_landscape_frame(loaded, controls, candidate_mode)
+    st.session_state["candidate_frontier_mode"] = DEFAULT_CANDIDATE_FRONTIER_MODE
+    candidate_landscape = build_candidate_landscape_frame(loaded, controls, DEFAULT_CANDIDATE_FRONTIER_MODE)
     candidate_context = candidate_frontier_count_context(loaded, controls, candidate_landscape)
     gov_kpi_grid(overview_kpi_cards(summary, recommended, story, errors, candidate_context, schiff_rows=schiff_rows))
     basis_metric = score_basis_metric_label(controls.get("score_basis", PAPER_SCORE_BASIS))
@@ -777,9 +789,8 @@ def render_overview(loaded: LoadedRun, controls: dict[str, Any]) -> None:
             "3. Finalist Ensemble Composition",
             "Positive solver weights for PED VKT per capita, Light RUC volume and Heavy RUC volume finalists.",
             compact_figure(fig, 260),
+            "Component labels are deliberately short for the management view." if not mapping.empty else None,
         )
-        if not mapping.empty:
-            st.caption("Component labels are deliberately short for the management view.")
     with lower[1]:
         chart_card(
             "4. Stress and Horizon Checks",
@@ -829,16 +840,8 @@ CANDIDATE_FRONTIER_CAPTION = (
 
 
 def overview_candidate_landscape_frame(loaded: LoadedRun, controls: dict[str, Any]) -> pd.DataFrame:
-    mode_options = [DEFAULT_CANDIDATE_FRONTIER_MODE, "Competitive frontier", "Top candidates only", "Show outliers"]
-    if st.session_state.get("candidate_frontier_mode") in {LEGACY_CANDIDATE_FRONTIER_MODE, PREVIOUS_CANDIDATE_FRONTIER_MODE}:
-        st.session_state["candidate_frontier_mode"] = DEFAULT_CANDIDATE_FRONTIER_MODE
-    mode = st.selectbox(
-        "Candidate frontier mode",
-        mode_options,
-        key="candidate_frontier_mode",
-        label_visibility="collapsed",
-    )
-    return build_candidate_landscape_frame(loaded, controls, mode)
+    st.session_state["candidate_frontier_mode"] = DEFAULT_CANDIDATE_FRONTIER_MODE
+    return build_candidate_landscape_frame(loaded, controls, DEFAULT_CANDIDATE_FRONTIER_MODE)
 
 
 def build_candidate_landscape_frame(loaded: LoadedRun, controls: dict[str, Any], mode: str) -> pd.DataFrame:
@@ -1346,6 +1349,7 @@ def render_governance_reproducibility_page(loaded: LoadedRun, controls: dict[str
     chart_source_count = len(list((Path(__file__).resolve().parent / "artifacts" / "chart_sources").glob("*.csv")))
 
     selected_stream = render_page5_filter_strip(loaded_packs, workbook_manifest)
+    panel_contract = page5_panel_contract_frame()
 
     render_page5_top_status_cards(
         available_count=available_count,
@@ -1359,7 +1363,14 @@ def render_governance_reproducibility_page(loaded: LoadedRun, controls: dict[str
     analytics_stream = analytics_pack.stream_label if analytics_pack is not None else "Light RUC volume"
 
     render_page5_story_row(selected_stream, loaded_packs)
-    render_page5_lower_panels(analytics_stream, analytics_pack, selected_stream, loaded_packs, workbook_manifest)
+    render_page5_lower_panels(
+        analytics_stream,
+        analytics_pack,
+        selected_stream,
+        loaded_packs,
+        workbook_manifest,
+        panel_contract,
+    )
     render_page5_shap_note()
     render_page5_footer(run_footer_label(loaded))
 
@@ -1618,6 +1629,46 @@ def inject_page5_theme() -> None:
             gap:0.35rem;
             grid-template-columns:1fr auto;
             padding:0.32rem 0.44rem;
+        }
+        .page5-caveat-card {
+            background:#FFF7ED;
+            border:1px solid rgba(234,88,12,0.24);
+            border-left:5px solid #F97316;
+            border-radius:8px;
+            box-shadow:0 8px 18px rgba(15,23,42,0.045);
+            min-height:255px;
+            padding:0.72rem 0.8rem;
+        }
+        .page5-caveat-kicker {
+            color:#9A3412;
+            font-size:0.66rem;
+            font-weight:850;
+            letter-spacing:0.02em;
+            text-transform:uppercase;
+        }
+        .page5-caveat-title {
+            color:#002B5C;
+            font-size:0.86rem;
+            font-weight:850;
+            line-height:1.18;
+            margin-top:0.18rem;
+        }
+        .page5-caveat-copy {
+            color:#7C2D12;
+            font-size:0.74rem;
+            font-weight:650;
+            line-height:1.32;
+            margin-top:0.62rem;
+        }
+        .page5-caveat-note {
+            background:rgba(255,255,255,0.72);
+            border:1px solid rgba(234,88,12,0.18);
+            border-radius:7px;
+            color:#334155;
+            font-size:0.68rem;
+            line-height:1.32;
+            margin-top:0.7rem;
+            padding:0.46rem 0.52rem;
         }
         .page5-download-name {
             color:#102A43;
@@ -1898,38 +1949,24 @@ def render_page5_lower_panels(
     selected_stream: str,
     loaded_packs: dict[str, Any | None],
     workbook_manifest: dict[str, Any],
+    panel_contract: pd.DataFrame,
 ) -> None:
     if analytics_pack is None:
         warning_panel("No reproducibility pack is available for the lower audit panels.")
         return
     lower_cols = st.columns([1.0, 1.0, 1.0, 1.05, 1.05])
     with lower_cols[0]:
-        fig = plot_reproducibility_feature_importance(reproducibility_feature_importance_view(analytics_pack), analytics_stream)
-        fig.update_layout(height=255, margin=dict(l=8, r=8, t=10, b=28))
-        chart_card(
-            f"Feature importance ({short_stream_label(analytics_stream)})",
-            "Replay-pack global feature or component importance.",
-            fig,
-        )
+        render_page5_importance_or_component_panel(analytics_stream, analytics_pack, panel_contract)
     with lower_cols[1]:
-        chart_card(
-            f"Model coefficients ({short_stream_label(analytics_stream)})",
-            "Coefficient evidence where the pack includes fitted OLS data.",
-            page5_coefficients_figure(analytics_pack),
-        )
+        render_page5_coefficients_panel(analytics_stream, analytics_pack, panel_contract)
     with lower_cols[2]:
-        fig = plot_reproducibility_sensitivities(reproducibility_sensitivity_view(analytics_pack), analytics_stream)
-        fig.update_layout(height=255, margin=dict(l=8, r=8, t=10, b=28))
-        chart_card(
-            f"Scenario sensitivities ({short_stream_label(analytics_stream)})",
-            "Impact on dependent variable / model target.",
-            fig,
-        )
+        render_page5_sensitivities_panel(analytics_stream, analytics_pack, panel_contract)
     with lower_cols[3]:
         chart_card(
             f"Training window trace ({short_stream_label(analytics_stream)})",
             "Read-only training-window evidence from training_window_trace.parquet.",
             page5_training_window_figure(analytics_pack),
+            notes_as_tooltip=False,
         )
     with lower_cols[4]:
         st.markdown(
@@ -1940,6 +1977,129 @@ def render_page5_lower_panels(
             unsafe_allow_html=True,
         )
         render_page5_download_buttons(selected_stream, loaded_packs, workbook_manifest, key_prefix="lower")
+
+
+def render_page5_importance_or_component_panel(stream_label: str, pack: Any, panel_contract: pd.DataFrame) -> None:
+    state = page5_contract_panel_state(panel_contract, stream_label, "feature_importance")
+    status = state.get("status", "")
+    title = page5_panel_title(state, stream_label)
+    if status == "component_weight_only":
+        fig = page5_component_contribution_figure(pack, stream_label)
+        if not fig.data:
+            render_page5_missing_panel(
+                title,
+                state.get("missing_message") or "Component contribution evidence is unavailable for this replay pack.",
+                page5_deeper_explainability_note(stream_label),
+            )
+            return
+        chart_card(
+            title,
+            "Component contribution is the share/weight of a model component in the final forecast; it is not variable-level feature importance.",
+            fig,
+            state.get("notes") or page5_deeper_explainability_note(stream_label),
+            notes_as_tooltip=False,
+        )
+        return
+    if status == "available":
+        fig = plot_reproducibility_feature_importance(reproducibility_feature_importance_view(pack), stream_label)
+        fig.update_layout(height=255, margin=dict(l=8, r=8, t=10, b=28))
+        chart_card(
+            title,
+            "Replay-pack variable-level feature importance where emitted by the fitted model. This is not SHAP.",
+            fig,
+            state.get("notes") or None,
+            notes_as_tooltip=False,
+        )
+        return
+    render_page5_missing_panel(title, page5_missing_panel_message(stream_label, "feature_importance", state), page5_deeper_explainability_note(stream_label))
+
+
+def render_page5_coefficients_panel(stream_label: str, pack: Any, panel_contract: pd.DataFrame) -> None:
+    state = page5_contract_panel_state(panel_contract, stream_label, "coefficients")
+    title = page5_panel_title(state, stream_label)
+    if state.get("status") == "available":
+        chart_card(
+            title,
+            "Coefficient evidence where the replay pack includes fitted OLS data.",
+            page5_coefficients_figure(pack),
+            state.get("notes") or None,
+            notes_as_tooltip=False,
+        )
+        return
+    render_page5_missing_panel(title, page5_missing_panel_message(stream_label, "coefficients", state), page5_deeper_explainability_note(stream_label))
+
+
+def render_page5_sensitivities_panel(stream_label: str, pack: Any, panel_contract: pd.DataFrame) -> None:
+    state = page5_contract_panel_state(panel_contract, stream_label, "scenario_sensitivities")
+    title = page5_panel_title(state, stream_label)
+    if state.get("status") == "available":
+        fig = plot_reproducibility_sensitivities(reproducibility_sensitivity_view(pack), stream_label)
+        fig.update_layout(height=255, margin=dict(l=8, r=8, t=10, b=28))
+        chart_card(
+            title,
+            "Impact on dependent variable / model target.",
+            fig,
+            state.get("notes") or None,
+            notes_as_tooltip=False,
+        )
+        return
+    render_page5_missing_panel(
+        title,
+        page5_missing_panel_message(stream_label, "scenario_sensitivities", state),
+        page5_deeper_explainability_note(stream_label),
+    )
+
+
+def render_page5_missing_panel(title: str, message: str, note: str = "") -> None:
+    st.markdown(page5_missing_panel_html(title, message, note), unsafe_allow_html=True)
+
+
+def page5_missing_panel_html(title: str, message: str, note: str = "") -> str:
+    note_html = f"<div class='page5-caveat-note'>{html.escape(note)}</div>" if note else ""
+    return (
+        "<div class='page5-caveat-card'>"
+        "<div class='page5-caveat-kicker'>Governance caveat</div>"
+        f"<div class='page5-caveat-title'>{html.escape(title)}</div>"
+        f"<div class='page5-caveat-copy'>{html.escape(message)}</div>"
+        f"{note_html}"
+        "</div>"
+    )
+
+
+def page5_component_contribution_figure(pack: Any, stream_label: str) -> go.Figure:
+    weights = reproducibility_ensemble_weight_view(pack)
+    if weights.empty or "Weight" not in weights.columns:
+        return page5_empty_figure("Component contribution evidence is unavailable.")
+    frame = weights.copy()
+    frame["weight"] = pd.to_numeric(frame["Weight"], errors="coerce")
+    frame = frame.dropna(subset=["weight"])
+    if frame.empty:
+        return page5_empty_figure("Component contribution evidence is unavailable.")
+    frame["weight_pct"] = frame["weight"] * 100
+    frame["Component"] = frame.get("Component", pd.Series([f"C{i + 1}" for i in range(len(frame))])).astype(str)
+    frame = frame.sort_values("weight_pct", ascending=True)
+    fig = go.Figure(
+        go.Bar(
+            x=frame["weight_pct"],
+            y=frame["Component"],
+            orientation="h",
+            marker_color="#008C82" if stream_label == "Heavy RUC volume" else "#002B5C",
+            customdata=frame.get("Component model", pd.Series([""] * len(frame))).astype(str),
+            hovertemplate=(
+                "Component: %{y}<br>"
+                "Contribution weight: %{x:.1f}%<br>"
+                "Component model: %{customdata}<extra></extra>"
+            ),
+        )
+    )
+    fig.update_layout(
+        height=255,
+        margin=dict(l=8, r=8, t=10, b=28),
+        xaxis_title="Component contribution (%)",
+        yaxis_title="",
+        showlegend=False,
+    )
+    return fig
 
 
 def render_page5_shap_note() -> None:
@@ -1996,6 +2156,133 @@ def page5_analytics_pack(selected_stream: str, loaded_packs: dict[str, Any | Non
     if preferred is not None and getattr(preferred, "available", False):
         return preferred
     return next((pack for pack in loaded_packs.values() if pack is not None and getattr(pack, "available", False)), None)
+
+
+def page5_panel_contract_signature() -> tuple[tuple[str, int, int], ...]:
+    signature: list[tuple[str, int, int]] = []
+    root = Path(__file__).resolve().parent / PAGE5_UI_CONTRACT_ROOT
+    for name in PAGE5_PANEL_CONTRACT_FILES:
+        path = root / name
+        if path.exists():
+            stat = path.stat()
+            signature.append((str(path), stat.st_size, stat.st_mtime_ns))
+    return tuple(signature)
+
+
+@st.cache_data(show_spinner=False)
+def cached_page5_panel_contract(signature: tuple[tuple[str, int, int], ...]) -> pd.DataFrame:
+    del signature
+    root = Path(__file__).resolve().parent / PAGE5_UI_CONTRACT_ROOT
+    parquet_path = root / "reproducibility_panel_contract.parquet"
+    csv_path = root / "reproducibility_panel_contract.csv"
+    if parquet_path.exists():
+        frame = pd.read_parquet(parquet_path)
+    elif csv_path.exists():
+        frame = pd.read_csv(csv_path)
+    else:
+        frame = page5_fallback_panel_contract()
+    for column in PAGE5_PANEL_CONTRACT_REQUIRED_COLUMNS:
+        if column not in frame.columns:
+            frame[column] = ""
+    frame = frame[list(PAGE5_PANEL_CONTRACT_REQUIRED_COLUMNS)].copy()
+    for column in PAGE5_PANEL_CONTRACT_REQUIRED_COLUMNS:
+        frame[column] = frame[column].where(frame[column].notna(), "").astype(str).str.strip()
+    return frame
+
+
+def page5_panel_contract_frame() -> pd.DataFrame:
+    return cached_page5_panel_contract(page5_panel_contract_signature())
+
+
+def page5_fallback_panel_contract() -> pd.DataFrame:
+    rows: list[dict[str, str]] = []
+    panels = ["status_card", "component_trace", "feature_importance", "coefficients", "scenario_sensitivities", "training_window_trace"]
+    for stream_label in reproducibility_stream_labels():
+        for panel in panels:
+            status = "available"
+            display_title = panel.replace("_", " ").title()
+            missing_message = ""
+            notes = ""
+            if stream_label == "PED VKT per capita" and panel == "feature_importance":
+                status = "component_weight_only"
+                display_title = "Component contribution"
+                notes = "C1 100% is not a variable importance chart."
+            if stream_label == "Heavy RUC volume" and panel == "feature_importance":
+                status = "component_weight_only"
+                display_title = "Ensemble component contribution"
+                notes = "C1-C4 are ensemble component weights, not variable importances."
+            if stream_label in {"PED VKT per capita", "Heavy RUC volume"} and panel in {"coefficients", "scenario_sensitivities"}:
+                status = "unavailable"
+                display_title = "Model coefficients" if panel == "coefficients" else "Scenario sensitivities"
+                missing_message = page5_missing_panel_message(stream_label, panel, {})
+            rows.append(
+                {
+                    "stream": stream_label,
+                    "panel": panel,
+                    "status": status,
+                    "display_title": display_title,
+                    "evidence_file": "",
+                    "recommendation": "",
+                    "missing_message": missing_message,
+                    "notes": notes,
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def page5_contract_panel_state(contract: pd.DataFrame, stream_label: str, panel: str) -> dict[str, str]:
+    if contract is None or contract.empty:
+        contract = page5_fallback_panel_contract()
+    row = contract[
+        contract["stream"].astype(str).eq(stream_label)
+        & contract["panel"].astype(str).eq(panel)
+    ]
+    if row.empty:
+        fallback = page5_fallback_panel_contract()
+        row = fallback[
+            fallback["stream"].astype(str).eq(stream_label)
+            & fallback["panel"].astype(str).eq(panel)
+        ]
+    if row.empty:
+        return {
+            "stream": stream_label,
+            "panel": panel,
+            "status": "unavailable",
+            "display_title": panel.replace("_", " ").title(),
+            "missing_message": "Panel contract is unavailable for this stream.",
+            "notes": "",
+            "evidence_file": "",
+            "recommendation": "",
+        }
+    return {column: str(row.iloc[0].get(column, "") or "") for column in PAGE5_PANEL_CONTRACT_REQUIRED_COLUMNS}
+
+
+def page5_panel_title(state: dict[str, str], stream_label: str) -> str:
+    display_title = state.get("display_title") or state.get("panel", "Panel").replace("_", " ").title()
+    return f"{display_title} ({short_stream_label(stream_label)})"
+
+
+def page5_missing_panel_message(stream_label: str, panel: str, state: dict[str, str]) -> str:
+    del panel
+    if stream_label == "PED VKT per capita":
+        return "Not emitted by parent HPO/static-solver run; future inner-solver audit required."
+    if stream_label == "Heavy RUC volume":
+        return "Not emitted by parent component runs; future component-level replay required."
+    return state.get("missing_message") or "Panel data was not emitted by this replay pack."
+
+
+def page5_deeper_explainability_note(stream_label: str) -> str:
+    if stream_label == "PED VKT per capita":
+        return (
+            "What would be needed for deeper explainability? Freeze the inner HPO/static-solver registry "
+            "and add feature-level component replay."
+        )
+    if stream_label == "Heavy RUC volume":
+        return (
+            "What would be needed for deeper explainability? Rerun C1-C4 component builders with "
+            "coefficients/importances and scenario perturbations."
+        )
+    return ""
 
 
 def short_stream_label(stream_label: str) -> str:
@@ -2389,6 +2676,8 @@ def reproducibility_glossary_table() -> pd.DataFrame:
             ("max_depth", "Maximum tree depth; higher values permit more interactions."),
             ("subsample", "Share of rows sampled by each boosting step."),
             ("ensemble weight", "Weight applied to a component model before combining predictions."),
+            ("component contribution", "Share or weight of a model component in the final forecast; this is not variable-level feature importance."),
+            ("feature importance", "Variable-level contribution inside a fitted model, when the replay pack emits it."),
             ("residual", "The part of actual demand not explained by the base prediction."),
             ("fitted value", "The model prediction on the training or validation row."),
             ("coefficient", "The estimated size and direction of a linear-model relationship."),

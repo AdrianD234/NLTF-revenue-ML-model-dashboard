@@ -95,6 +95,54 @@ def assert_no_streamlit_exception(page: Page) -> None:
     assert "stException" not in body
 
 
+def chart_info_text(page: Page, title: str) -> str:
+    info = page.evaluate(
+        """(title) => {
+            const headers = Array.from(document.querySelectorAll('.chart-card-header'));
+            const header = headers.find((node) => node.textContent && node.textContent.includes(title));
+            if (!header) return '';
+            const info = header.querySelector('.chart-info-text');
+            return info ? info.textContent.trim() : '';
+        }""",
+        title,
+    )
+    assert info, f"Expected chart information tooltip for {title!r}"
+    return str(info)
+
+
+def visible_text_absent(page: Page, text: str) -> bool:
+    return not page.evaluate(
+        """(needle) => {
+            const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+            let textNode = walker.nextNode();
+            while (textNode) {
+                const value = (textNode.nodeValue || '').trim();
+                if (value !== needle && !value.includes(needle)) {
+                    textNode = walker.nextNode();
+                    continue;
+                }
+                const node = textNode.parentElement;
+                if (!node) {
+                    textNode = walker.nextNode();
+                    continue;
+                }
+                const style = window.getComputedStyle(node);
+                const rect = node.getBoundingClientRect();
+                if (style.display !== 'none'
+                    && style.visibility !== 'hidden'
+                    && Number(style.opacity || 1) > 0.01
+                    && rect.width > 1
+                    && rect.height > 1) {
+                    return true;
+                }
+                textNode = walker.nextNode();
+            }
+            return false;
+        }""",
+        text,
+    )
+
+
 def open_dashboard(page: Page) -> None:
     require_frontend_hard_gate()
     page.set_viewport_size(TARGET_VIEWPORT)
@@ -295,15 +343,24 @@ def test_governance_reproducibility_page_stream_selector_and_downloads(page: Pag
     page.get_by_text("Heavy RUC", exact=True).first.click()
     expect(body).to_contain_text("Exact weighted-ensemble replay", timeout=90000)
     expect(body).to_contain_text("Component trace", timeout=90000)
-    expect(body).to_contain_text("Feature importance", timeout=90000)
-    expect(body).to_contain_text("Scenario sensitivities", timeout=90000)
+    expect(body).to_contain_text("Ensemble component contribution (Heavy RUC)", timeout=90000)
+    expect(body).to_contain_text("Not emitted by parent component runs; future component-level replay required.", timeout=90000)
+    expect(body).to_contain_text("Rerun C1-C4 component builders with coefficients/importances and scenario perturbations.", timeout=90000)
+    assert page.get_by_text("Feature importance (Heavy RUC)", exact=True).count() == 0
     expect(body).to_contain_text("heavy_ruc_reproducibility_pack.zip", timeout=60000)
 
     page.get_by_text("Light RUC", exact=True).first.click()
     expect(body).to_contain_text("Exact prediction replay", timeout=90000)
     expect(body).to_contain_text("exp(base log prediction + residual log prediction)", timeout=90000)
+    expect(body).to_contain_text("Feature importance (Light RUC)", timeout=90000)
+    expect(body).to_contain_text("OLS base coefficients (Light RUC)", timeout=90000)
+    expect(body).to_contain_text("Scenario sensitivities (Light RUC)", timeout=90000)
     page.get_by_text("PED", exact=True).first.click()
     expect(body).to_contain_text("PED finalist exactly replays the stored HPO/static-solver component prediction", timeout=90000)
+    expect(body).to_contain_text("Component contribution (PED)", timeout=90000)
+    expect(body).to_contain_text("Not emitted by parent HPO/static-solver run; future inner-solver audit required.", timeout=90000)
+    expect(body).to_contain_text("Freeze the inner HPO/static-solver registry and add feature-level component replay.", timeout=90000)
+    assert page.get_by_text("Feature importance (PED)", exact=True).count() == 0
     expect(body).to_contain_text("SHAP not yet generated", timeout=60000)
     expect(body).to_contain_text("This Governance & Reproducibility page is read-only", timeout=60000)
     assert_no_streamlit_exception(page)
@@ -442,9 +499,13 @@ def test_rendered_plotly_trace_data_matches_chart_sources_where_possible(page: P
     page.get_by_text("2. Candidate Search Frontier", exact=False).first.scroll_into_view_if_needed()
     expect(page.locator(".js-plotly-plot").nth(1)).to_be_visible(timeout=90000)
     body_text = page.locator("body").inner_text(timeout=60000)
-    assert "400 plotted candidates from 400 curated rows" in body_text
-    assert "Balanced all-stream frontier view" in body_text
-    assert "excluded from governance scoring" in body_text
+    frontier_info = chart_info_text(page, "2. Candidate Search Frontier")
+    assert "400 plotted candidates from 400 curated rows" in frontier_info
+    assert "Balanced all-stream frontier view" in frontier_info
+    assert "excluded from governance scoring" in frontier_info
+    assert visible_text_absent(page, "Balanced all-stream frontier view")
+    assert visible_text_absent(page, "Frontier read:")
+    assert "Candidate frontier mode" not in body_text
     assert "278 loaded candidates" not in body_text
     candidate_plot = page.evaluate(
         """() => {
