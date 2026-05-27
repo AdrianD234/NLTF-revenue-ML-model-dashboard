@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import hashlib
 import html
+import io
 import json
 import os
 from pathlib import Path
 from typing import Any
+import zipfile
 
 import pandas as pd
 import streamlit as st
@@ -136,6 +139,11 @@ from model_dashboard.ui import (
 
 LOADER_SCHEMA_VERSION = "stage1-governance-loader-v9-parquet-contract-schiff-class"
 CURATED_DATA_DIR = Path("artifacts") / "curated_data"
+REPRODUCIBILITY_PAGE = "Governance & Reproducibility"
+SOURCE_WORKBOOK_NAME = "Master Copy revenue modelling workbook.xlsx"
+SOURCE_WORKBOOK_REPO_PATH = Path("data") / "source_workbooks" / SOURCE_WORKBOOK_NAME
+SOURCE_WORKBOOK_ENV_VAR = "REPRODUCIBILITY_SOURCE_WORKBOOK_PATH"
+SOURCE_WORKBOOK_MANIFEST_PATH = Path("artifacts") / "source_workbook_manifest.json"
 
 
 @st.cache_data(show_spinner=False)
@@ -199,7 +207,7 @@ def directory_signature(path: Path) -> tuple[bool, int, int]:
 def main() -> None:
     st.set_page_config(page_title="NTLF Revenue Modelling", layout="wide", initial_sidebar_state="collapsed")
     inject_theme()
-    pages = ["Overview", "Diagnostics", "Scenario Comparison", "Schiff Benchmark"]
+    pages = ["Overview", "Diagnostics", "Scenario Comparison", "Schiff Benchmark", REPRODUCIBILITY_PAGE]
     st.session_state.setdefault("gov_page", "Overview")
     if st.session_state["gov_page"] not in pages:
         st.session_state["gov_page"] = "Overview"
@@ -210,7 +218,7 @@ def main() -> None:
         header(
             "NTLF Revenue Modelling",
             "Transport Revenue Model Testbench | Refined finalist models | actual-driver Stage 1 evidence.",
-            page_chip=f"Page {initial_index} of 4 - {initial_page}",
+            page_chip=f"Page {initial_index} of {len(pages)} - {initial_page}",
         )
 
     active_path = render_run_sidebar()
@@ -227,7 +235,7 @@ def main() -> None:
         header(
             "NTLF Revenue Modelling",
             "Transport Revenue Model Testbench | Refined finalist models | actual-driver Stage 1 evidence.",
-            page_chip=f"Page {current_index} of 4 - {current_page}",
+            page_chip=f"Page {current_index} of {len(pages)} - {current_page}",
         )
     controls = render_filter_sidebar(loaded)
     controls = render_top_filter_bar(loaded, controls)
@@ -238,8 +246,10 @@ def main() -> None:
         render_diagnostics(loaded, controls)
     elif current_page == "Scenario Comparison":
         render_scenario_comparison(loaded, controls)
-    else:
+    elif current_page == "Schiff Benchmark":
         render_schiff_benchmark_page(loaded, controls)
+    else:
+        render_governance_reproducibility_page(loaded, controls)
     footer_strip("Transport Revenue Model Testbench | Refined Finalist Models", run_footer_label(loaded))
 
 
@@ -1320,6 +1330,433 @@ def render_reproducibility_detail(stream_label: str) -> None:
 
     with st.expander("Rolling training window trace", expanded=False):
         display_table(reproducibility_training_window_view(pack), height=320, max_rows=200)
+
+
+def render_governance_reproducibility_page(loaded: LoadedRun, controls: dict[str, Any]) -> None:
+    del controls
+    section_title("Governance & Reproducibility")
+    info_panel(
+        "Read-only governance page for replay evidence, model lineage, workbook provenance and component-level traceability. "
+        "The auxiliary reproducibility packs are not used by the main KPI, scenario, diagnostics, stress or chart-source calculations."
+    )
+
+    pack_labels = reproducibility_stream_labels()
+    loaded_packs = {label: _load_reproducibility_pack_safely(label) for label in pack_labels}
+    available_count = sum(1 for pack in loaded_packs.values() if pack is not None and pack.available)
+    workbook_manifest = source_workbook_manifest()
+    chart_source_count = len(list((Path(__file__).resolve().parent / "artifacts" / "chart_sources").glob("*.csv")))
+
+    gov_kpi_grid(
+        [
+            (
+                "Repro packs loaded",
+                f"{available_count}/{len(pack_labels)}",
+                "PED, Light RUC and Heavy RUC auxiliary packs",
+                "read-only",
+                "good" if available_count == len(pack_labels) else "mixed",
+                "R",
+            ),
+            (
+                "Workbook provenance",
+                "Manifested" if workbook_manifest.get("available") else "Missing",
+                str(workbook_manifest.get("status_label", "source workbook status")),
+                "optional source",
+                "good" if workbook_manifest.get("available") else "mixed",
+                "W",
+            ),
+            (
+                "Chart-source isolation",
+                f"{chart_source_count}",
+                "main chart-source CSVs remain untouched",
+                "guarded by tests",
+                "good",
+                "C",
+            ),
+            (
+                "Page role",
+                "Audit trail",
+                "explainability and replay evidence only",
+                "not scoring input",
+                "good",
+                "G",
+            ),
+        ]
+    )
+
+    selector_cols = st.columns([0.42, 0.58])
+    with selector_cols[0]:
+        selected_stream = st.selectbox(
+            "Reproducibility stream",
+            ["All streams", *pack_labels],
+            key="repro_page_stream_selector",
+        )
+    with selector_cols[1]:
+        render_source_workbook_status(workbook_manifest)
+
+    render_reproducibility_downloads(selected_stream, loaded_packs, workbook_manifest)
+
+    if selected_stream == "All streams":
+        render_reproducibility_all_streams(loaded_packs, loaded)
+        return
+
+    selected_pack = loaded_packs.get(str(selected_stream))
+    render_reproducibility_stream_page(str(selected_stream), selected_pack)
+
+
+def _load_reproducibility_pack_safely(stream_label: str) -> Any | None:
+    try:
+        return cached_load_reproducibility_pack(stream_label, reproducibility_pack_signature(stream_label))
+    except Exception as exc:
+        warning_panel(f"{stream_label} reproducibility audit pack could not be loaded: {exc}")
+        return None
+
+
+def render_reproducibility_all_streams(loaded_packs: dict[str, Any | None], loaded: LoadedRun) -> None:
+    del loaded
+    section_title("1. Reproducibility Pack Status")
+    cards = st.columns(len(loaded_packs) or 1)
+    for column, (stream_label, pack) in zip(cards, loaded_packs.items(), strict=False):
+        with column:
+            with st.container(border=True):
+                if pack is None or not pack.available:
+                    missing = ", ".join(getattr(pack, "missing_files", ())[:5]) if pack is not None else "pack load failed"
+                    st.markdown(f"**{stream_label}**")
+                    warning_panel(f"Unavailable: {missing or 'required audit files missing'}")
+                    continue
+                summary = reproducibility_replay_summary(pack)
+                delta = pd.to_numeric(pd.Series([summary.get("max_abs_pred_delta")]), errors="coerce").iloc[0]
+                st.markdown(f"**{stream_label}**")
+                st.markdown(
+                    "<div class='kpi-title'>Replay</div>"
+                    "<div style='color:#002B5C;font-size:1.15rem;font-weight:750;line-height:1.14;margin:0.16rem 0 0.52rem;'>"
+                    f"{html.escape(str(summary.get('status', '-')))}"
+                    "</div>",
+                    unsafe_allow_html=True,
+                )
+                st.caption(f"Model: {summary.get('model', '-')}")
+                st.caption(f"Max prediction delta: {delta:.2e}" if pd.notna(delta) else "Max prediction delta: -")
+                st.caption(str(summary.get("description", "")))
+
+    section_title("2. Build Flow")
+    display_table(reproducibility_build_flow_table("All streams"), height=240, max_rows=18)
+    section_title("3. Governance Glossary")
+    display_table(reproducibility_glossary_table(), height=300, max_rows=40)
+    section_title("4. Audit Readout")
+    info_panel(
+        "Select a stream above to inspect its registry, component trace, feature importance, coefficients, sensitivities, "
+        "training-window trace and raw replay-pack downloads."
+    )
+
+
+def render_reproducibility_stream_page(stream_label: str, pack: Any | None) -> None:
+    section_title("1. Reproducibility Pack Status")
+    if pack is None or not pack.available:
+        missing = ", ".join(getattr(pack, "missing_files", ())[:8]) if pack is not None else "pack load failed"
+        warning_panel(f"{stream_label} reproducibility audit pack is unavailable: {missing or 'required audit files missing'}")
+        return
+
+    summary = reproducibility_replay_summary(pack)
+    delta = pd.to_numeric(pd.Series([summary.get("max_abs_pred_delta")]), errors="coerce").iloc[0]
+    gov_kpi_grid(
+        [
+            (
+                "Replay status",
+                str(summary.get("status", "-")),
+                f"max abs prediction delta {delta:.2e}" if pd.notna(delta) else "max abs prediction delta -",
+                "",
+                "good",
+                "R",
+            ),
+            ("Model", str(summary.get("model", "-")), stream_label, "", "good", "M"),
+            ("Workbook", str(summary.get("workbook", "-")), str(summary.get("source_sheet", "-")), "", "good", "W"),
+            ("Audit role", "Auxiliary", "does not feed main dashboard metrics", "read-only", "good", "A"),
+        ]
+    )
+    info_panel(str(summary.get("description", "")))
+
+    section_title("2. Build Flow")
+    display_table(reproducibility_build_flow_table(stream_label), height=210, max_rows=12)
+
+    section_title("3. Governance Glossary")
+    display_table(reproducibility_glossary_table(), height=250, max_rows=40)
+
+    top = st.columns([1.0, 1.0])
+    with top[0]:
+        section_title("4. Model Registry")
+        display_table(reproducibility_registry_view(pack), height=250, max_rows=60)
+    with top[1]:
+        section_title("5. Component Trace")
+        component_trace = reproducibility_component_trace_view(pack)
+        component_cols = [
+            "Score basis",
+            "Origin",
+            "Target period",
+            "Horizon",
+            "Component",
+            "Weight",
+            "Actual",
+            "Component prediction",
+            "Weighted contribution",
+            "Base log prediction",
+            "Residual log prediction",
+            "Final prediction",
+            "Error (%)",
+        ]
+        display_table(component_trace[[col for col in component_cols if col in component_trace.columns]], height=250, max_rows=160)
+
+    weight_view = reproducibility_ensemble_weight_view(pack)
+    if not weight_view.empty:
+        section_title("6. Ensemble Equation")
+        info_panel(reproducibility_ensemble_equation(pack))
+        display_table(weight_view, height=180, max_rows=20)
+
+    chart_cols = st.columns([1.0, 1.0])
+    with chart_cols[0]:
+        chart_card(
+            "7. Feature Importance",
+            "Replay-pack feature importance or component-weight evidence.",
+            plot_reproducibility_feature_importance(reproducibility_feature_importance_view(pack), stream_label),
+        )
+    with chart_cols[1]:
+        chart_card(
+            "8. Scenario Sensitivities",
+            "Replay-pack sensitivity checks where the source pack includes numeric perturbations.",
+            plot_reproducibility_sensitivities(reproducibility_sensitivity_view(pack), stream_label),
+        )
+
+    with st.expander("Coefficients and training-window trace", expanded=True):
+        coeff_cols = st.columns([1.0, 1.0])
+        with coeff_cols[0]:
+            section_title("Coefficients")
+            display_table(reproducibility_coefficients_view(pack), height=340, max_rows=420)
+        with coeff_cols[1]:
+            section_title("Training-window trace")
+            display_table(reproducibility_training_window_view(pack), height=340, max_rows=220)
+
+    with st.expander("Scorecard, horizon, annual and stress trace", expanded=False):
+        display_table(reproducibility_scorecard_view(pack), height=150, max_rows=30)
+        display_table(reproducibility_horizon_view(pack), height=250, max_rows=120)
+        display_table(reproducibility_annual_view(pack), height=250, max_rows=220)
+        display_table(reproducibility_stress_view(pack), height=180, max_rows=80)
+
+    info_panel(
+        "SHAP is not supplied in these reproducibility packs. The page therefore shows replay-pack feature importance, "
+        "component weights and sensitivity tables instead of implying SHAP evidence exists."
+    )
+    info_panel(
+        "Footer audit: this page reads auxiliary pack files only. Main chart-source tables remain governed by the Parquet evidence pack."
+    )
+
+
+def render_source_workbook_status(manifest: dict[str, Any]) -> None:
+    label = str(manifest.get("status_label", "Source workbook status unavailable"))
+    if manifest.get("available"):
+        info_panel(
+            f"Source workbook manifest: {label}. SHA256 {str(manifest.get('sha256', ''))[:12]}... "
+            f"Artifact written to {SOURCE_WORKBOOK_MANIFEST_PATH.as_posix()}."
+        )
+    else:
+        warning_panel(
+            "Source workbook is optional and was not found in the repo or configured external location. "
+            f"Artifact written to {SOURCE_WORKBOOK_MANIFEST_PATH.as_posix()} with missing status."
+        )
+
+
+def render_reproducibility_downloads(
+    selected_stream: str,
+    loaded_packs: dict[str, Any | None],
+    workbook_manifest: dict[str, Any],
+) -> None:
+    with st.expander("Downloads", expanded=False):
+        download_cols = st.columns(4)
+        with download_cols[0]:
+            st.download_button(
+                "Download workbook manifest",
+                data=json.dumps(workbook_manifest, indent=2).encode("utf-8"),
+                file_name="source_workbook_manifest.json",
+                mime="application/json",
+                use_container_width=True,
+                key="download_source_workbook_manifest",
+            )
+        targets = loaded_packs if selected_stream == "All streams" else {selected_stream: loaded_packs.get(selected_stream)}
+        first_available = next((pack for pack in targets.values() if pack is not None and pack.available), None)
+        with download_cols[1]:
+            if first_available is not None:
+                st.download_button(
+                    "Download registry CSV",
+                    data=_csv_bytes(reproducibility_registry_view(first_available)),
+                    file_name=f"{first_available.config.stream_key}_model_registry.csv",
+                    mime="text/csv",
+                    use_container_width=True,
+                    key=f"download_{first_available.config.stream_key}_registry",
+                )
+        with download_cols[2]:
+            if first_available is not None:
+                st.download_button(
+                    "Download component trace CSV",
+                    data=_csv_bytes(reproducibility_component_trace_view(first_available, limit=10_000)),
+                    file_name=f"{first_available.config.stream_key}_component_trace.csv",
+                    mime="text/csv",
+                    use_container_width=True,
+                    key=f"download_{first_available.config.stream_key}_component_trace",
+                )
+        with download_cols[3]:
+            if first_available is not None:
+                st.download_button(
+                    "Download selected pack ZIP",
+                    data=_pack_zip_bytes(first_available),
+                    file_name=f"{first_available.config.stream_key}_reproducibility_pack.zip",
+                    mime="application/zip",
+                    use_container_width=True,
+                    key=f"download_{first_available.config.stream_key}_pack_zip",
+                )
+
+
+def source_workbook_manifest() -> dict[str, Any]:
+    repo_root = Path(__file__).resolve().parent
+    repo_path = repo_root / SOURCE_WORKBOOK_REPO_PATH
+    candidates: list[tuple[str, Path]] = [("repo_copy", repo_path)]
+    configured_path = os.environ.get(SOURCE_WORKBOOK_ENV_VAR, "").strip()
+    if configured_path:
+        candidates.append(("environment_reference", Path(configured_path).expanduser()))
+    candidates.extend(_source_workbook_paths_from_repro_manifests(repo_root))
+    selected_label = ""
+    selected_path: Path | None = None
+    for label, path in candidates:
+        if path.exists():
+            selected_label = label
+            selected_path = path
+            break
+    if selected_path is None:
+        manifest: dict[str, Any] = {
+            "available": False,
+            "status": "missing",
+            "status_label": "workbook not found",
+            "repo_path": str(repo_path),
+            "configured_env_var": SOURCE_WORKBOOK_ENV_VAR,
+            "candidate_paths": [str(path) for _, path in candidates],
+            "note": "The workbook is optional; reproducibility page falls back to Parquet replay packs.",
+        }
+    else:
+        stat = selected_path.stat()
+        sha256 = hashlib.sha256(selected_path.read_bytes()).hexdigest()
+        manifest = {
+            "available": True,
+            "status": selected_label,
+            "status_label": "repo workbook copy" if selected_label == "repo_copy" else "external workbook reference",
+            "path": str(selected_path),
+            "repo_path": str(repo_path),
+            "configured_env_var": SOURCE_WORKBOOK_ENV_VAR,
+            "candidate_paths": [str(path) for _, path in candidates],
+            "filename": selected_path.name,
+            "size_bytes": int(stat.st_size),
+            "modified_time": pd.Timestamp(stat.st_mtime, unit="s").isoformat(),
+            "sha256": sha256,
+            "note": "Manifest only; workbook values are not used to alter dashboard chart-source tables.",
+        }
+    target = repo_root / SOURCE_WORKBOOK_MANIFEST_PATH
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    return manifest
+
+
+def _source_workbook_paths_from_repro_manifests(repo_root: Path) -> list[tuple[str, Path]]:
+    root = repo_root / "data" / "dashboard_evidence_pack_reproducibility"
+    candidates: list[tuple[str, Path]] = []
+    for manifest_path in sorted(root.glob("*/manifest.json")):
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        path_values: list[str] = []
+        source_workbook = manifest.get("source_workbook")
+        if isinstance(source_workbook, str):
+            path_values.append(source_workbook)
+        provenance = manifest.get("workbook_provenance")
+        if isinstance(provenance, dict):
+            workbook = provenance.get("workbook")
+            if isinstance(workbook, str):
+                path_values.append(workbook)
+        for raw_path in path_values:
+            path = Path(raw_path).expanduser()
+            label = f"repro_manifest_{manifest_path.parent.name}"
+            candidates.append((label, path))
+    deduped: list[tuple[str, Path]] = []
+    seen: set[str] = set()
+    for label, path in candidates:
+        key = str(path).lower()
+        if key not in seen:
+            seen.add(key)
+            deduped.append((label, path))
+    return deduped
+
+
+def reproducibility_build_flow_table(stream_label: str) -> pd.DataFrame:
+    rows_by_stream: dict[str, list[tuple[str, str]]] = {
+        "PED VKT per capita": [
+            ("Target", "PED VKT per capita from the governed evidence pack."),
+            ("Transform", "No new refit is claimed; replay uses stored parent component predictions."),
+            ("Window", "Inherited from the HPO/static-solver parent component."),
+            ("Model", "Single C1 HPO/static-solver component replayed at 100% weight."),
+            ("Final prediction", "Final prediction equals the stored component prediction within tolerance."),
+            ("Score basis", "Operational pooled and paper-style horizon summary tables are replay evidence only."),
+        ],
+        "Light RUC volume": [
+            ("Target", "Light RUC net kilometres from the governed evidence pack."),
+            ("Transform", "Log-scale OLS base plus residual correction."),
+            ("Window", "36-quarter rolling training window."),
+            ("Model", "Base Schiff-style OLS plus GradientBoostingRegressor residual model."),
+            ("Final prediction", "exp(base log prediction + residual log prediction) equals final prediction within tolerance."),
+            ("Score basis", "Operational pooled and paper-style horizon scorecards are exported for audit comparison."),
+        ],
+        "Heavy RUC volume": [
+            ("Target", "Heavy RUC net kilometres from the governed evidence pack."),
+            ("Transform", "Static component predictions are combined in native units."),
+            ("Window", "Component windows are retained from the replay pack registry."),
+            ("Model", "Four-component weighted ensemble replay."),
+            ("Final prediction", "Weighted component contributions sum to the final prediction within tolerance."),
+            ("Score basis", "Operational pooled and paper-style horizon scorecards are exported for audit comparison."),
+        ],
+    }
+    if stream_label == "All streams":
+        rows: list[dict[str, str]] = []
+        for label, steps in rows_by_stream.items():
+            for step, description in steps:
+                rows.append({"Stream": label, "Step": step, "Evidence": description})
+        return pd.DataFrame(rows)
+    return pd.DataFrame(
+        {"Step": step, "Evidence": description}
+        for step, description in rows_by_stream.get(stream_label, rows_by_stream["Light RUC volume"])
+    )
+
+
+def reproducibility_glossary_table() -> pd.DataFrame:
+    return pd.DataFrame(
+        [
+            ("Replay pack", "Read-only auxiliary Parquet files that reproduce finalist predictions for governance review."),
+            ("Component trace", "Row-level path from source prediction components to the final prediction."),
+            ("Score basis", "The governed evaluation lens used for scorecards; it is not changed by this page."),
+            ("Source workbook", "Optional upstream workbook provenance. The dashboard still uses Parquet evidence as data truth."),
+            ("Feature importance", "Replay-pack feature or component-weight evidence; not a SHAP substitute."),
+            ("Scenario sensitivity", "Perturbation table supplied by the replay pack where available."),
+            ("Chart-source isolation", "Validation that loading replay packs does not rewrite main chart-source tables."),
+        ],
+        columns=["Term", "Meaning"],
+    )
+
+
+def _csv_bytes(df: pd.DataFrame) -> bytes:
+    return df.to_csv(index=False).encode("utf-8")
+
+
+def _pack_zip_bytes(pack: Any) -> bytes:
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for name in pack.config.required_files:
+            path = pack.root / name
+            if path.exists():
+                archive.write(path, arcname=f"{pack.config.stream_key}/{name}")
+    return buffer.getvalue()
 
 
 def _widget_key(value: str) -> str:

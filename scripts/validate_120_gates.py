@@ -267,10 +267,12 @@ def main() -> int:
             "final-02-diagnostics.png",
             "final-03-scenario-comparison.png",
             "final-04-schiff-benchmark.png",
+            "final-05-governance-reproducibility.png",
             "final-overview.png",
             "final-diagnostics.png",
             "final-scenario-comparison.png",
             "final-schiff-benchmark.png",
+            "final-governance-reproducibility.png",
         ]
         missing = [name for name in required if not (repo_root / "artifacts" / "screenshots" / name).exists()]
         if missing:
@@ -316,7 +318,7 @@ def main() -> int:
         (114, "Chart source validation report passed.", check_chart_source_report),
         (115, "Semantic label validation report passed.", check_semantic_report),
         (116, "Visual conformance validation report passed.", check_visual_report),
-        (117, "Final screenshots exist for all four pages.", check_screenshots),
+        (117, "Final screenshots exist for all dashboard pages.", check_screenshots),
         (118, "Screenshot matrix marks all pages PASS.", check_visual_matrix),
         (119, "Filter and hover evidence is present.", check_hover_terms),
         (120, "Existing 100-gate validation has zero failures and backlog is closed.", lambda: check_existing_100_gates() + " " + check_backlog()),

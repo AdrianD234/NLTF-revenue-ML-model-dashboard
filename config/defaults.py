@@ -16,3 +16,7 @@ EXAMPLE_LEGACY_RUN_PARENT = (
     r"C:\Users\Adrian Desilvestro\OneDrive\Documents\Playground"
     r"\Revenue Modeling - Strategic Review\04 Models\Inputs"
 )
+EXAMPLE_REPRODUCIBILITY_SOURCE_WORKBOOK_PATH = (
+    r"C:\Users\Adrian Desilvestro\OneDrive\Documents\Playground"
+    r"\Revenue Modeling - Strategic Review\04 Models\Inputs\Master Copy revenue modelling workbook.xlsx"
+)

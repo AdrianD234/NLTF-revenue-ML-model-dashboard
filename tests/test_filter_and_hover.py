@@ -139,7 +139,7 @@ def open_dashboard(page: Page) -> None:
     expect(page.get_by_text("NTLF Revenue Modelling").first).to_be_visible(timeout=90000)
     expect(page.get_by_text("GOVERNANCE FILTERS")).to_be_visible(timeout=90000)
     expect(page.locator(".js-plotly-plot").first).to_be_visible(timeout=90000)
-    expect(page.locator("body")).to_contain_text("Page 1 of 4 - Overview", timeout=90000)
+    expect(page.locator("body")).to_contain_text("Page 1 of 5 - Overview", timeout=90000)
 
 
 def primary_combobox(page: Page, label: str, index: int):

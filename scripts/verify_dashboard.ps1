@@ -167,7 +167,8 @@ try {
         "artifacts/screenshots/final-overview.png",
         "artifacts/screenshots/final-diagnostics.png",
         "artifacts/screenshots/final-scenario-comparison.png",
-        "artifacts/screenshots/final-schiff-benchmark.png"
+        "artifacts/screenshots/final-schiff-benchmark.png",
+        "artifacts/screenshots/final-governance-reproducibility.png"
     )
 
     foreach ($shot in $requiredFrontendScreenshots) {
@@ -193,7 +194,8 @@ try {
         "artifacts/screenshots/final-01-overview.png",
         "artifacts/screenshots/final-02-diagnostics.png",
         "artifacts/screenshots/final-03-scenario-comparison.png",
-        "artifacts/screenshots/final-04-schiff-benchmark.png"
+        "artifacts/screenshots/final-04-schiff-benchmark.png",
+        "artifacts/screenshots/final-05-governance-reproducibility.png"
     )
     foreach ($artifact in $requiredScreenshots) {
         if (-not (Test-Path -LiteralPath (Join-Path $Root $artifact))) {

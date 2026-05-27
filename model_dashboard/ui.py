@@ -189,10 +189,10 @@ def inject_theme() -> None:
                 align-items: stretch;
                 border-bottom: 1px solid var(--gov-border);
                 display: flex;
-                gap: 0.72rem;
+                gap: 0.48rem;
                 justify-content: flex-end;
                 min-height: 28px;
-                padding-left: clamp(500px, 40vw, 720px);
+                padding-left: clamp(430px, 36vw, 650px);
                 padding-right: 170px;
             }}
             div[data-testid="stRadio"] div[role="radiogroup"] label {{
@@ -200,10 +200,10 @@ def inject_theme() -> None:
                 border-radius: 7px 7px 0 0;
                 color: var(--gov-navy);
                 display: flex;
-                font-size: 0.82rem;
+                font-size: 0.8rem;
                 font-weight: 700;
                 min-width: max-content;
-                padding: 0.22rem 0.58rem 0.34rem;
+                padding: 0.22rem 0.5rem 0.34rem;
                 white-space: nowrap;
             }}
             div[data-testid="stRadio"] div[role="radiogroup"] label > div:first-child {{
@@ -225,7 +225,7 @@ def inject_theme() -> None:
                 color: #FFFFFF !important;
             }}
             div[data-testid="stRadio"] div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] p {{
-                font-size: 0.82rem;
+                font-size: 0.8rem;
                 font-weight: 700;
                 white-space: nowrap;
             }}

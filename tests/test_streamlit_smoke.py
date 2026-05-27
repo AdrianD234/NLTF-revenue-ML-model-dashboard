@@ -13,4 +13,10 @@ def test_app_smoke_loads_without_exception() -> None:
 
     assert not at.exception
     assert len(at.radio) >= 1
-    assert at.radio[0].options == ["Overview", "Diagnostics", "Scenario Comparison", "Schiff Benchmark"]
+    assert at.radio[0].options == [
+        "Overview",
+        "Diagnostics",
+        "Scenario Comparison",
+        "Schiff Benchmark",
+        "Governance & Reproducibility",
+    ]

@@ -34,7 +34,7 @@ def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
     expect_filter_value(page, "Horizon", 4, "1-12 Quarters")
     expect_filter_value(page, "Forecast Vintage", 5, "Latest")
     expect_filter_value(page, "Date Window", 6, "All target periods")
-    assert page.get_by_role("radio").count() >= 4
+    assert page.get_by_role("radio").count() >= 5
 
     for text in [
         "Quarterly MAPE",
@@ -60,7 +60,7 @@ def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
     checks = [
         (
             "Diagnostics",
-            "Page 2 of 4 - Diagnostics",
+            "Page 2 of 5 - Diagnostics",
             "mcp-02-diagnostics.png",
             [
                 "Diagnostics Coverage",
@@ -79,7 +79,7 @@ def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
         ),
         (
             "Scenario Comparison",
-            "Page 3 of 4 - Scenario Comparison",
+            "Page 3 of 5 - Scenario Comparison",
             "mcp-03-scenario-comparison.png",
                 [
                     "Scenario A",
@@ -94,7 +94,7 @@ def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
         ),
         (
             "Schiff Benchmark",
-            "Page 4 of 4 - Schiff Benchmark",
+            "Page 4 of 5 - Schiff Benchmark",
             "mcp-04-schiff-benchmark.png",
             [
                 "Schiff vs Finalist MAPE",
@@ -104,6 +104,21 @@ def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
                 "Full-sample Gain vs Schiff specification benchmark",
                 "Benchmark Summary",
                 "Candidate and ensemble evidence drilldown",
+            ],
+        ),
+        (
+            "Governance & Reproducibility",
+            "Page 5 of 5 - Governance & Reproducibility",
+            "mcp-05-governance-reproducibility.png",
+            [
+                "Repro packs loaded",
+                "Workbook provenance",
+                "Chart-source isolation",
+                "1. Reproducibility Pack Status",
+                "2. Build Flow",
+                "3. Governance Glossary",
+                "4. Audit Readout",
+                "Download workbook manifest",
             ],
         ),
     ]
@@ -144,6 +159,12 @@ def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
                 "4. Benchmark Summary",
             ]:
                 assert_text_above_fold(page, title)
+        if tab_label == "Governance & Reproducibility":
+            page.evaluate("window.scrollTo(0, 0)")
+            for title in [
+                "1. Reproducibility Pack Status",
+            ]:
+                assert_text_above_fold(page, title)
         assert rendered_surface_count(page) > 0
         save_dashboard_screenshot(page, artifact_dir, screenshot_name)
         if screenshot_name == "mcp-04-schiff-benchmark.png":
@@ -163,7 +184,7 @@ def test_navigation_labels_not_clipped(page: Page) -> None:
     assert "Schiff Benchmark" in body
     expect(page.locator("body")).to_contain_text("Candidate Search Frontier", timeout=90000)
     expect(page.locator("body")).to_contain_text("Finalist Ensemble Composition", timeout=90000)
-    for label in ["Overview", "Diagnostics", "Scenario Comparison", "Schiff Benchmark"]:
+    for label in ["Overview", "Diagnostics", "Scenario Comparison", "Schiff Benchmark", "Governance & Reproducibility"]:
         expect(governance_nav_label(page, label)).to_be_visible(timeout=60000)
 
 
@@ -190,7 +211,8 @@ def test_visible_navigation_text_changes_page_body(page: Page) -> None:
         ("Diagnostics", "1. Residual Autocorrelation by Lag", "1. Finalist Forecast Accuracy"),
         ("Scenario Comparison", "1. Stream Comparison: Scenario A vs Scenario B", "1. Residual Autocorrelation by Lag"),
         ("Schiff Benchmark", "1. Schiff vs Finalist MAPE", "1. Stream Comparison: Scenario A vs Scenario B"),
-        ("Overview", "1. Finalist Forecast Accuracy", "1. Schiff vs Finalist MAPE"),
+        ("Governance & Reproducibility", "1. Reproducibility Pack Status", "1. Schiff vs Finalist MAPE"),
+        ("Overview", "1. Finalist Forecast Accuracy", "1. Reproducibility Pack Status"),
     ]:
         target = page.get_by_text(label, exact=True)
         assert target.count() == 1
@@ -199,7 +221,8 @@ def test_visible_navigation_text_changes_page_body(page: Page) -> None:
         expect(expected).to_be_visible(timeout=60000)
         expected_box = expected.bounding_box()
         assert expected_box is not None
-        assert expected_box["y"] < 620
+        max_expected_y = 860 if label == "Governance & Reproducibility" else 620
+        assert expected_box["y"] < max_expected_y
         stale_visible = page.evaluate(
             """(text) => {
                 const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
@@ -286,7 +309,7 @@ def test_governance_shell_is_readable_in_narrow_browser(page: Page) -> None:
     page.goto(os.environ.get("STAGE1_DASHBOARD_URL", "http://localhost:8501"), wait_until="domcontentloaded")
     wait_dashboard_ready(page)
 
-    for label in ["Overview", "Diagnostics", "Scenario Comparison", "Schiff Benchmark"]:
+    for label in ["Overview", "Diagnostics", "Scenario Comparison", "Schiff Benchmark", "Governance & Reproducibility"]:
         expect(governance_nav_label(page, label)).to_be_visible(timeout=60000)
 
     title_box = page.get_by_text("NTLF Revenue Modelling", exact=True).first.bounding_box()
@@ -315,7 +338,7 @@ def test_governance_shell_is_readable_in_narrow_browser(page: Page) -> None:
     assert overflow == []
 
     body = page.locator("body").inner_text(timeout=60000)
-    assert "Page 1 of 4 - Overview" in body
+    assert "Page 1 of 5 - Overview" in body
     expect_filter_value(page, "Stream", 0, "All Streams")
     expect_filter_value(page, "Model Family", 1, "All Families")
     expect_filter_value(page, "Date Window", 6, "All target periods")
@@ -365,7 +388,7 @@ def test_diagnostics_in_app_grid_replaces_overview_panels(page: Page) -> None:
     wait_dashboard_ready(page)
 
     click_governance_nav(page, "Diagnostics")
-    expect(page.locator("body")).to_contain_text("Page 2 of 4 - Diagnostics", timeout=60000)
+    expect(page.locator("body")).to_contain_text("Page 2 of 5 - Diagnostics", timeout=60000)
     expect(page.locator("body")).to_contain_text("Diagnostics evidence:", timeout=60000)
     expect(page.locator("body")).to_contain_text("proxy panels shown", timeout=60000)
     for title in [
@@ -404,7 +427,7 @@ def test_scenario_in_app_grid_brings_improvement_panel_into_view(page: Page) -> 
     wait_dashboard_ready(page)
 
     click_governance_nav(page, "Scenario Comparison")
-    expect(page.locator("body")).to_contain_text("Page 3 of 4 - Scenario Comparison", timeout=60000)
+    expect(page.locator("body")).to_contain_text("Page 3 of 5 - Scenario Comparison", timeout=60000)
     for title in [
         "1. Stream Comparison: Scenario A vs Scenario B",
         "2. Improvement vs Benchmark",
@@ -630,6 +653,7 @@ def test_visual_screenshots_are_regenerated() -> None:
         "final-02-diagnostics.png",
         "final-03-scenario-comparison.png",
         "final-04-schiff-benchmark.png",
+        "final-05-governance-reproducibility.png",
     ]:
         path = screenshot_dir / name
         assert path.exists(), f"Missing screenshot {path}"
@@ -641,8 +665,9 @@ def wait_dashboard_ready(page: Page) -> None:
     expect(page.locator("img.brand-logo[alt='NZ Transport Agency Waka Kotahi logo']")).to_be_visible(timeout=90000)
     expect(page.get_by_text("GOVERNANCE FILTERS")).to_be_visible(timeout=90000)
     expect(page.get_by_role("button", name="Reset Filters")).to_be_visible(timeout=90000)
-    expect(page.locator("body")).to_contain_text("Page 1 of 4 - Overview", timeout=90000)
+    expect(page.locator("body")).to_contain_text("Page 1 of 5 - Overview", timeout=90000)
     expect(page.locator("body")).to_contain_text("Schiff Benchmark", timeout=90000)
+    expect(page.locator("body")).to_contain_text("Governance & Reproducibility", timeout=90000)
 
 
 def rendered_surface_count(page: Page) -> int:
