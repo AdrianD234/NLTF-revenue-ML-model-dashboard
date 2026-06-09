@@ -187,7 +187,7 @@ def _apply_diagnostic_calibration_overrides(metrics: pd.DataFrame, diagnostic_te
 
 
 def _final_r2_rows(frame: pd.DataFrame, stream_key: str, source_path: Path) -> list[dict[str, Any]]:
-    final_col = _first_present(frame, ["final_pred", "rebuilt_pred", "evidence_pred", "component_pred"])
+    final_col = _first_present(frame, ["final_pred", "rebuilt_pred", "evidence_pred"])
     if final_col is None:
         return []
     data = _with_common_columns(frame, stream_key).copy()

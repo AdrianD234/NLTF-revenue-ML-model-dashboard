@@ -47,6 +47,8 @@ def test_diagnostics_r2_source_reconciles_to_scorecard_final_predictions() -> No
         assert float(source.loc[key, "forecast_r2"]) == pytest.approx(float(row["forecast_r2"]), abs=1e-12)
         assert float(source.loc[key, "calibration_r2"]) == pytest.approx(float(row["calibration_r2"]), abs=1e-12)
         assert int(source.loc[key, "n_rows"]) == int(row["n_rows"])
+        assert source.loc[key, "source_prediction_column"] == row["source_prediction_column"]
+        assert source.loc[key, "calibration_r2_source_column"] == row["calibration_r2_source_column"]
 
 
 def test_heavy_final_r2_uses_weighted_final_predictions_not_component_weights() -> None:
@@ -68,6 +70,25 @@ def test_heavy_final_r2_uses_weighted_final_predictions_not_component_weights() 
     )
 
 
+def test_light_final_r2_uses_final_predictions_after_log_correction() -> None:
+    light = pd.read_parquet(ROOT / "data/dashboard_evidence_pack_reproducibility/light_ruc/component_predictions.parquet")
+    keys = ["score_basis", "grid", "origin", "target_period", "horizon"]
+    final_rows = light[light["score_basis"].eq(OPERATIONAL_SCORE_BASIS)].drop_duplicates(subset=keys, keep="last")
+    source = pd.read_csv(CHART_SOURCE_DIR / "reproducibility_component_r2.csv")
+    light_source = source[
+        source["stream_label"].eq("Light RUC volume")
+        & source["metric_name"].eq("Forecast R2")
+        & source["score_basis"].eq(OPERATIONAL_SCORE_BASIS)
+    ]
+
+    assert len(light_source) == 1
+    assert light_source["source_prediction_column"].iloc[0] == "final_pred"
+    assert float(light_source["metric_value"].iloc[0]) == pytest.approx(
+        float(forecast_r2(final_rows["actual"], final_rows["final_pred"])),
+        abs=1e-12,
+    )
+
+
 def test_r2_source_tables_exist_and_label_metric_types() -> None:
     diagnostics = pd.read_csv(CHART_SOURCE_DIR / "diagnostics_r2_summary.csv")
     reproducibility = pd.read_csv(CHART_SOURCE_DIR / "reproducibility_component_r2.csv")
@@ -76,4 +97,10 @@ def test_r2_source_tables_exist_and_label_metric_types() -> None:
     assert not reproducibility.empty
     assert set(diagnostics["metric_name"]) == {"Forecast R2"}
     assert {"Forecast R2", "Component R2"}.issubset(set(reproducibility["metric_name"]))
+    assert "calibration_r2_source_column" in diagnostics.columns
+    assert diagnostics["calibration_r2_source_column"].dropna().isin({"pred", "calibration_r2", "mz_r2", "adj_r2"}).all()
+    assert reproducibility.loc[reproducibility["metric_value"].astype(float).lt(0), "interpretation"].str.contains(
+        "Valid but poor fit",
+        regex=False,
+    ).all()
     assert "in-sample OLS R2" not in (ROOT / "app.py").read_text(encoding="utf-8")

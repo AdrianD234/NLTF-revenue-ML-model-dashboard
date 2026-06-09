@@ -393,12 +393,16 @@ def test_diagnostic_pass_matrix_tooltips_hover_and_focus(page: Page) -> None:
     expect(calibration_kpi).to_be_visible(timeout=90000)
     tooltip_text = calibration_kpi.get_attribute("title")
     assert tooltip_text is not None
-    assert "actual-on-forecast validation regression" in tooltip_text
+    assert "Mincer-Zarnowitz / actual-on-forecast validation R2" in tooltip_text
     assert "Forecast R2 is reported in the detail panel" in tooltip_text
     calibration_kpi.hover()
     page.get_by_text("Forecast R2 versus calibration R2", exact=True).first.click()
     expect(page.locator("body")).to_contain_text("forecast_r2", timeout=60000)
     expect(page.locator("body")).to_contain_text("calibration_r2", timeout=60000)
+    expect(page.locator("body")).to_contain_text("Paper-style horizon MAPE", timeout=60000)
+    expect(page.locator("body")).to_contain_text("Operational pooled MAPE", timeout=60000)
+    expect(page.locator("body")).to_contain_text("source_prediction_column", timeout=60000)
+    expect(page.locator("body")).to_contain_text("calibration_r2_source_column", timeout=60000)
 
     matrix = page.locator(".diagnostic-tooltip-matrix")
     expect(matrix).to_be_visible(timeout=90000)

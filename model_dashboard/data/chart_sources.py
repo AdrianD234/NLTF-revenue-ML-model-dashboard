@@ -83,6 +83,7 @@ EXTRA_COLUMNS = [
     "mape",
     "interpretation",
     "source_prediction_column",
+    "calibration_r2_source_column",
 ]
 
 CHART_SOURCE_FILES = {
@@ -913,6 +914,7 @@ def _diagnostics_r2_summary(scorecard_predictions: pd.DataFrame, diagnostics: pd
                 "Forecast R2 is unavailable because scorecard prediction rows are missing.",
                 "Calibration R2 is actual-on-forecast validation R2, not in-sample training fit.",
                 value_available=False,
+                calibration_r2_source_column=pd.NA,
             )
         )
         return _standardize(rows)
@@ -944,6 +946,7 @@ def _diagnostics_r2_summary(scorecard_predictions: pd.DataFrame, diagnostics: pd
                 mape=row.get("mape"),
                 interpretation=row.get("interpretation"),
                 source_prediction_column=row.get("source_prediction_column", "pred"),
+                calibration_r2_source_column=calibration_source_column,
                 value_available=pd.notna(pd.to_numeric(forecast_value, errors="coerce")),
             )
         )

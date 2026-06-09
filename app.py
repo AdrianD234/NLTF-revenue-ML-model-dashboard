@@ -1115,6 +1115,17 @@ def basic_cards_as_governance_kpis(
     return rendered
 
 
+def diagnostic_calibration_r2_series(diagnostic_df: pd.DataFrame) -> tuple[pd.Series, str]:
+    if diagnostic_df is None or diagnostic_df.empty:
+        return pd.Series(dtype=float), ""
+    for column in ("calibration_r2", "mz_r2", "adj_r2"):
+        if column in diagnostic_df.columns:
+            values = pd.to_numeric(diagnostic_df[column], errors="coerce")
+            if values.notna().any():
+                return values, column
+    return pd.Series(dtype=float), ""
+
+
 def diagnostic_kpi_cards(diagnostic_df: pd.DataFrame) -> list[tuple[Any, ...]]:
     finalists = diagnostic_df.copy()
     if "role" in finalists.columns:
@@ -1132,23 +1143,28 @@ def diagnostic_kpi_cards(diagnostic_df: pd.DataFrame) -> list[tuple[Any, ...]]:
     ]
     available = sum(1 for column in expected_tests if column in finalists.columns and finalists[column].notna().any())
     dw = pd.to_numeric(finalists.get("durbin_watson", pd.Series(dtype=float)), errors="coerce").mean()
-    adj_r2 = pd.to_numeric(finalists.get("adj_r2", pd.Series(dtype=float)), errors="coerce").mean()
+    calibration_r2_values, calibration_r2_source_column = diagnostic_calibration_r2_series(finalists)
+    mean_calibration_r2 = calibration_r2_values.mean()
     bp = pd.to_numeric(finalists.get("breusch_pagan_pvalue", pd.Series(dtype=float)), errors="coerce")
     white = pd.to_numeric(finalists.get("white_pvalue", pd.Series(dtype=float)), errors="coerce")
     pass_mask = (bp > 0.05) | (white > 0.05)
     hetero_pass = int(pass_mask.fillna(False).sum())
     hetero_total = int(max(len(finalists), 0))
     calibration_tooltip = (
-        "Calibration R2 is from actual-on-forecast validation regression. "
+        "Calibration R2 is Mincer-Zarnowitz / actual-on-forecast validation R2. "
         "It is not the model's in-sample fit R2. Forecast R2 is reported in the detail panel."
+    )
+    calibration_subtext = (
+        "Current finalists only; Mincer-Zarnowitz calibration"
+        + (f" from {calibration_r2_source_column}" if calibration_r2_source_column else "")
     )
     return [
         ("Diagnostics Coverage", f"{available}/9", "diagnostic fields available", "", "good" if available >= 6 else "mixed", "D"),
         ("Mean Durbin-Watson", f"{dw:.2f}" if pd.notna(dw) else "-", "Current finalists only; near 2.0 is ideal", "", "good", "DW"),
         (
             "Mean calibration R2",
-            f"{adj_r2:.2f}" if pd.notna(adj_r2) else "-",
-            "Current finalists only; Mincer-Zarnowitz calibration",
+            f"{mean_calibration_r2:.2f}" if pd.notna(mean_calibration_r2) else "-",
+            calibration_subtext,
             "",
             "good",
             "R2",
@@ -1167,15 +1183,28 @@ def diagnostics_r2_detail_table(loaded: LoadedRun) -> pd.DataFrame:
             [
                 {
                     "stream": "-",
-                    "score_basis": "-",
+                    "score_basis_label": "-",
                     "forecast_r2": "-",
                     "calibration_r2": "-",
+                    "source_prediction_column": "-",
+                    "calibration_r2_source_column": "-",
                     "n_rows": 0,
                     "interpretation": "Unavailable: scorecard prediction rows are missing.",
                 }
             ]
         )
-    table = summary[["stream_label", "score_basis", "forecast_r2", "calibration_r2", "n_rows", "interpretation"]].copy()
+    table = summary[
+        [
+            "stream_label",
+            "score_basis_label",
+            "forecast_r2",
+            "calibration_r2",
+            "source_prediction_column",
+            "calibration_r2_source_column",
+            "n_rows",
+            "interpretation",
+        ]
+    ].copy()
     table = table.rename(columns={"stream_label": "stream"})
     table["forecast_r2"] = table["forecast_r2"].map(format_r2)
     table["calibration_r2"] = table["calibration_r2"].map(format_r2)

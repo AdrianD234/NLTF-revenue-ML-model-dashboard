@@ -10,6 +10,7 @@ from app import (
     DEFAULT_ACF_RESIDUAL_SCOPE,
     build_candidate_landscape_frame,
     candidate_frontier_count_context,
+    diagnostic_calibration_r2_series,
     diagnostic_kpi_cards,
     overview_frontier_note,
     overview_kpi_cards,
@@ -196,15 +197,47 @@ def test_diagnostics_kpi_basis_is_current_finalists_only(parquet_dashboard: Load
     finalists = diagnostics[diagnostics["role"].astype(str).str.contains("finalist", case=False, na=False)]
     cards = {card[0]: card for card in diagnostic_kpi_cards(diagnostics)}
     expected_dw = pd.to_numeric(finalists["durbin_watson"], errors="coerce").mean()
-    expected_r2 = pd.to_numeric(finalists["adj_r2"], errors="coerce").mean()
+    calibration_values, calibration_source_column = diagnostic_calibration_r2_series(finalists)
+    expected_r2 = calibration_values.mean()
     assert cards["Mean Durbin-Watson"][1] == f"{expected_dw:.2f}"
     assert cards["Mean calibration R2"][1] == f"{expected_r2:.2f}"
     assert "Current finalists only" in cards["Mean Durbin-Watson"][2]
     assert "Current finalists only" in cards["Mean calibration R2"][2]
-    assert "actual-on-forecast validation regression" in cards["Mean calibration R2"][6]
+    assert f"from {calibration_source_column}" in cards["Mean calibration R2"][2]
+    assert "Mincer-Zarnowitz / actual-on-forecast validation R2" in cards["Mean calibration R2"][6]
     assert "Forecast R2 is reported in the detail panel" in cards["Mean calibration R2"][6]
     kpi_source = pd.read_csv(ARTIFACTS / "diagnostics_kpi_source_table.csv")
     assert set(kpi_source["basis"]) == {"Current finalist rows only"}
+
+
+def test_diagnostics_kpi_prefers_mincer_zarnowitz_r2_before_adjusted_r2() -> None:
+    diagnostics = pd.DataFrame(
+        [
+            {
+                "role": "Our finalist",
+                "durbin_watson": 2.0,
+                "calibration_r2": 0.40,
+                "mz_r2": 0.55,
+                "adj_r2": 0.90,
+            },
+            {
+                "role": "Benchmark",
+                "durbin_watson": 1.0,
+                "calibration_r2": 0.95,
+                "mz_r2": 0.95,
+                "adj_r2": 0.95,
+            },
+        ]
+    )
+
+    cards = {card[0]: card for card in diagnostic_kpi_cards(diagnostics)}
+    assert cards["Mean calibration R2"][1] == "0.40"
+    assert "from calibration_r2" in cards["Mean calibration R2"][2]
+
+    mz_only = diagnostics.drop(columns=["calibration_r2"])
+    cards = {card[0]: card for card in diagnostic_kpi_cards(mz_only)}
+    assert cards["Mean calibration R2"][1] == "0.55"
+    assert "from mz_r2" in cards["Mean calibration R2"][2]
 
 
 def test_residual_vs_fitted_axis_label_not_misleading(parquet_dashboard: LoadedRun) -> None:
