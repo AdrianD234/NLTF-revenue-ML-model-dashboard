@@ -386,6 +386,8 @@ def test_governance_reproducibility_page_stream_selector_and_downloads(page: Pag
     expect(body).to_contain_text("HPO weights grouped by source_file", timeout=90000)
     expect(body).to_contain_text("Nested trace", timeout=90000)
     expect(body).to_contain_text("Gap register", timeout=90000)
+    expect(body).to_contain_text("Training-fit R2 is available; forecast R2 0.465", timeout=90000)
+    expect(body).to_contain_text("1.000", timeout=90000)
     assert page.get_by_text("Feature importance (PED)", exact=True).count() == 0
     expect(body).to_contain_text("SHAP not yet generated", timeout=60000)
     assert "This Governance & Reproducibility page is read-only" not in body.inner_text(timeout=60000)

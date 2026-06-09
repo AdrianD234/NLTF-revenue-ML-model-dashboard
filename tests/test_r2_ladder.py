@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 CHART_SOURCE_DIR = ROOT / "artifacts" / "chart_sources"
 LIGHT_TRAINING_FIT_DIR = ROOT / "data" / "dashboard_evidence_pack_reproducibility" / "light_ruc"
 HEAVY_TRAINING_FIT_DIR = ROOT / "data" / "dashboard_evidence_pack_reproducibility" / "heavy_ruc"
+PED_TRAINING_FIT_DIR = ROOT / "data" / "dashboard_evidence_pack_reproducibility" / "ped"
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -59,12 +60,8 @@ def test_ladder_summary_keeps_training_calibration_and_forecast_separate() -> No
     }
     assert required.issubset(summary.columns)
     assert set(summary["stream_label"]) == {"PED VKT per capita", "Light RUC volume", "Heavy RUC volume"}
-    available = summary[summary["stream_label"].isin({"Light RUC volume", "Heavy RUC volume"})]
-    other = summary[summary["stream_label"].eq("PED VKT per capita")]
-    assert available["training_fit_r2"].notna().all()
-    assert set(available["availability_status"]) == {"available"}
-    assert other["training_fit_r2"].isna().all()
-    assert set(other["availability_status"]) == {"inner_hpo_registry_missing"}
+    assert summary["training_fit_r2"].notna().all()
+    assert set(summary["availability_status"]) == {"available"}
     assert summary["notes"].str.contains("Training-fit R2 is not comparable to forecast R2", regex=False).all()
     assert summary["notes"].str.contains("Training-fit R2 is computed from fitted rows inside the rolling training windows", regex=False).all()
 
@@ -74,9 +71,9 @@ def test_unavailable_training_fit_is_blank_not_zero_and_never_from_validation_ro
     training = detail[detail["r2_type"].eq("training_fit")]
     assert not training.empty
     unavailable = training[~truthy(training["value_available"])]
-    assert not unavailable.empty
-    assert unavailable["training_fit_r2"].isna().all()
-    assert not unavailable["metric_value"].fillna("").astype(str).isin({"0", "0.0", "0.000"}).any()
+    if not unavailable.empty:
+        assert unavailable["training_fit_r2"].isna().all()
+        assert not unavailable["metric_value"].fillna("").astype(str).isin({"0", "0.0", "0.000"}).any()
     validation_tokens = "component_predictions|scorecard_predictions|rebuilt_predictions|evidence_prediction_comparison"
     available_training = training[truthy(training["value_available"])]
     assert not available_training["source_file"].fillna("").astype(str).str.contains(validation_tokens, regex=True).any()
@@ -96,7 +93,10 @@ def test_heavy_light_and_ped_specific_r2_ladder_rules() -> None:
     assert heavy["training_fit_r2"].astype(float).gt(0.99).all()
 
     ped = summary[summary["stream_label"].eq("PED VKT per capita")]
-    assert set(ped["training_fit_r2_status"]) == {"inner_hpo_registry_missing"}
+    assert set(ped["training_fit_r2_status"]) == {"available"}
+    assert set(ped["availability_status"]) == {"available"}
+    assert set(ped["training_fit_stage"]) == {"hpo_refine_final_fitted"}
+    assert ped["training_fit_r2"].astype(float).gt(0.999).all()
     assert ped["inner_hpo_weights_status"].dropna().str.startswith("available_").all()
     assert ped["nested_replay_status"].dropna().str.startswith("available_").all()
 
@@ -109,7 +109,10 @@ def test_heavy_light_and_ped_specific_r2_ladder_rules() -> None:
     assert component_validation["source_prediction_column"].eq("component_pred").all()
 
     assert not gaps["stream_label"].eq("Heavy RUC volume").any()
-    assert gaps["gap_id"].str.contains("ped_inner_hpo_training_fit_registry_missing", regex=False).any()
+    ped_gaps = gaps[gaps["stream_label"].eq("PED VKT per capita")]
+    assert set(ped_gaps["gap_status"]) == {"closed_by_ped_training_fit_export"}
+    assert set(ped_gaps["training_fit_r2_status"]) == {"available"}
+    assert not gaps["gap_id"].str.contains("ped_inner_hpo_training_fit_registry_missing", regex=False).any()
     assert not gaps["stream_label"].eq("Light RUC volume").any()
 
 
@@ -199,6 +202,66 @@ def test_heavy_summary_matches_weighted_training_fit_parquet() -> None:
         assert heavy_summary.loc[basis, "availability_status"] == "available"
 
 
+def test_ped_training_fit_r2_uses_verified_final_hpo_fitted_rows() -> None:
+    parquet_path = PED_TRAINING_FIT_DIR / "training_fit_predictions.parquet"
+    assert parquet_path.exists()
+    rows = pd.read_parquet(parquet_path)
+    assert not rows.empty
+    required = {
+        "stream",
+        "model",
+        "component_model",
+        "training_fit_stage",
+        "score_basis",
+        "origin",
+        "training_period",
+        "window_start",
+        "window_end",
+        "actual",
+        "training_fit_pred",
+        "data_scope",
+    }
+    assert required.issubset(rows.columns)
+    assert rows["data_scope"].eq("training_window_fitted_rows").all()
+    assert set(rows["sample_role"]) == {"training"}
+    assert not rows["source_file"].fillna("").astype(str).str.contains(
+        "component_predictions|scorecard_predictions|rebuilt_predictions|evidence_prediction_comparison|quarterly_predictions|annual_predictions",
+        regex=True,
+    ).any()
+    assert not (PED_TRAINING_FIT_DIR / "training_fit_predictions.csv").exists()
+
+    stages = set(rows["training_fit_stage"].astype(str))
+    assert {"hpo_refine_final_fitted", "outer_component_fitted", "static_convex_top18_fitted", "preq_convex_top18_fitted"}.issubset(stages)
+    assert "PED__diff__GBR_learning_rate0_05_max_depth1_n_estimators650__ylag__w40" in stages
+
+    final = rows[rows["training_fit_stage"].eq("hpo_refine_final_fitted")]
+    outer = rows[rows["training_fit_stage"].eq("outer_component_fitted")]
+    assert not final.empty
+    key = ["score_basis", "origin", "training_period"]
+    observed = final.set_index(key)["training_fit_pred"].sort_index()
+    expected = outer.set_index(key)["training_fit_pred"].sort_index().reindex(observed.index)
+    assert expected.notna().all()
+    assert (observed - expected).abs().max() == pytest.approx(0.0, abs=0.000001)
+
+    assert (
+        pd.PeriodIndex(final["training_period"], freq="Q").asi8
+        <= pd.PeriodIndex(final["origin"], freq="Q").asi8
+    ).all()
+
+    summary = read_source("r2_ladder_summary.csv")
+    ped_summary = summary[summary["stream_label"].eq("PED VKT per capita")].set_index("score_basis")
+    expected_r2 = {}
+    for basis, group in final.groupby("score_basis"):
+        actual = group["actual"].astype(float)
+        pred = group["training_fit_pred"].astype(float)
+        expected_r2[basis] = 1.0 - float(((actual - pred) ** 2).sum() / ((actual - actual.mean()) ** 2).sum())
+    assert set(ped_summary.index) == set(expected_r2)
+    for basis, value in expected_r2.items():
+        assert float(ped_summary.loc[basis, "training_fit_r2"]) == pytest.approx(value, abs=0.000001)
+        assert ped_summary.loc[basis, "training_fit_stage"] == "hpo_refine_final_fitted"
+        assert ped_summary.loc[basis, "availability_status"] == "available"
+
+
 def test_training_fit_rows_do_not_feed_main_kpi_scenario_or_stress_sources() -> None:
     forbidden_source = "training_fit_predictions"
     protected_sources = [
@@ -224,5 +287,7 @@ def test_training_fit_csv_mirrors_are_not_allowed() -> None:
         LIGHT_TRAINING_FIT_DIR / "training_fit_r2_summary.csv",
         HEAVY_TRAINING_FIT_DIR / "training_fit_predictions.csv",
         HEAVY_TRAINING_FIT_DIR / "training_fit_r2_summary.csv",
+        PED_TRAINING_FIT_DIR / "training_fit_predictions.csv",
+        PED_TRAINING_FIT_DIR / "training_fit_r2_summary.csv",
     ]
     assert not any(path.exists() for path in forbidden), [str(path) for path in forbidden if path.exists()]

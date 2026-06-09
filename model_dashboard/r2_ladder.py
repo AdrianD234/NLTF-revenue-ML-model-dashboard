@@ -231,17 +231,25 @@ def _missing_training_rows(
     observed: pd.DataFrame,
 ) -> pd.DataFrame:
     observed_keys = set()
+    observed_stages_by_stream_basis: dict[tuple[str, str], set[str]] = {}
     if observed is not None and not observed.empty:
         observed_keys = {
             (str(row.get("stream_label")), str(row.get("score_basis")), str(row.get("training_fit_stage", row.get("component_model"))))
             for _, row in observed.iterrows()
         }
+        for _, row in observed.iterrows():
+            key = (str(row.get("stream_label")), str(row.get("score_basis")))
+            observed_stages_by_stream_basis.setdefault(key, set()).add(str(row.get("training_fit_stage", row.get("component_model"))))
     rows: list[dict[str, Any]] = []
     score_bases = _score_bases(diagnostics, reproducibility)
     expected = _expected_training_components(repo_root)
     for stream_label, components in expected.items():
         stream_key = STREAM_TO_KEY[stream_label]
         for basis in score_bases:
+            if stream_label == "PED VKT per capita" and _ped_final_training_stage_available(
+                observed_stages_by_stream_basis.get((stream_label, str(basis)), set())
+            ):
+                continue
             for component_model, status, interpretation in components:
                 if (stream_label, basis, component_model) in observed_keys:
                     continue
@@ -416,6 +424,10 @@ def _gap_register_rows(repo_root: Path, observed: pd.DataFrame, detail: pd.DataF
         if heavy_gap is not None:
             rows.append(heavy_gap)
         for gap_id, stream_label, component, severity, status, detail_text in expected_gaps:
+            if stream_label == "PED VKT per capita" and _ped_final_training_stage_available(
+                observed_stages_by_stream_basis.get((stream_label, str(basis)), set())
+            ):
+                continue
             if (stream_label, basis, component) in observed_stage_keys:
                 continue
             rows.append(
@@ -445,7 +457,7 @@ def _gap_register_rows(repo_root: Path, observed: pd.DataFrame, detail: pd.DataF
                     "notes": R2_LADDER_NOTE,
                 }
             )
-    rows.extend(_ped_inner_hpo_gap_rows(repo_root, score_bases))
+    rows.extend(_ped_inner_hpo_gap_rows(repo_root, score_bases, observed_stages_by_stream_basis))
     return pd.DataFrame(rows)
 
 
@@ -497,7 +509,11 @@ def _heavy_training_gap(repo_root: Path, observed_stages_by_stream_basis: dict[t
     }
 
 
-def _ped_inner_hpo_gap_rows(repo_root: Path, score_bases: list[str]) -> list[dict[str, Any]]:
+def _ped_inner_hpo_gap_rows(
+    repo_root: Path,
+    score_bases: list[str],
+    observed_stages_by_stream_basis: dict[tuple[str, str], set[str]],
+) -> list[dict[str, Any]]:
     base = repo_root / "data" / "dashboard_evidence_pack_reproducibility" / "ped_inner_hpo"
     gap_path = base / "reproducibility_gap_register.parquet"
     if not gap_path.exists():
@@ -510,6 +526,7 @@ def _ped_inner_hpo_gap_rows(repo_root: Path, score_bases: list[str]) -> list[dic
     nested_status = _row_count_status(base / "nested_ensemble_trace.parquet")
     rows: list[dict[str, Any]] = []
     for basis in score_bases:
+        final_available = _ped_final_training_stage_available(observed_stages_by_stream_basis.get(("PED VKT per capita", str(basis)), set()))
         for _, gap in gaps.iterrows():
             rows.append(
                 {
@@ -521,22 +538,35 @@ def _ped_inner_hpo_gap_rows(repo_root: Path, score_bases: list[str]) -> list[dic
                     "score_basis": basis,
                     "score_basis_label": score_basis_label(basis),
                     "r2_type": "training_fit",
-                    "data_scope": TRAINING_MISSING_SCOPE,
-                    "training_fit_r2_status": "inner_hpo_registry_missing",
-                    "availability_status": "inner_hpo_registry_missing",
-                    "gap_status": "open_governance_gap",
+                    "data_scope": TRAINING_SCOPE if final_available else TRAINING_MISSING_SCOPE,
+                    "training_fit_r2_status": "available" if final_available else "inner_hpo_registry_missing",
+                    "availability_status": "available" if final_available else "inner_hpo_registry_missing",
+                    "gap_status": "closed_by_ped_training_fit_export" if final_available else "open_governance_gap",
                     "gap_severity": gap.get("severity", "medium"),
-                    "gap_detail": gap.get("detail"),
+                    "gap_detail": (
+                        "The earlier inner-HPO fitted-state gap is closed for the governed PED finalist chain by "
+                        "verified fitted rows in ped/training_fit_predictions.parquet."
+                        if final_available
+                        else gap.get("detail")
+                    ),
                     "inner_hpo_weights_status": weights_status,
                     "nested_replay_status": nested_status,
-                    "metric_name": "PED inner-HPO fitted-state gap",
+                    "metric_name": "PED inner-HPO fitted-state gap closure" if final_available else "PED inner-HPO fitted-state gap",
                     "metric_value": pd.NA,
                     "metric_display": "-",
                     "source_file": _relative_source_file(gap_path),
                     "source_column": "gap;severity;detail",
                     "value_available": False,
-                    "calculation_basis": "PED inner-HPO audit gap carried forward from the reproducibility pack.",
-                    "notes": "Nested replay and weights do not prove training-fit R2 without fitted training rows.",
+                    "calculation_basis": (
+                        "Gap register closure row; the R2 value is reported in the training-fit detail and summary tables."
+                        if final_available
+                        else "PED inner-HPO audit gap carried forward from the reproducibility pack."
+                    ),
+                    "notes": (
+                        "Verified fitted rows supersede the prior missing fitted-state gap for the current finalist chain."
+                        if final_available
+                        else "Nested replay and weights do not prove training-fit R2 without fitted training rows."
+                    ),
                 }
             )
     return rows
@@ -641,6 +671,21 @@ def _training_summary_value(detail: pd.DataFrame, stream_label: str, score_basis
                     "model": preferred["model"].dropna().iloc[0] if preferred["model"].notna().any() else pd.NA,
                     "training_fit_stage": "weighted_ensemble_final",
                 }
+        if stream_label == "PED VKT per capita" and "training_fit_stage" in preferred.columns:
+            for stage in ["hpo_refine_final_fitted", "outer_component_fitted"]:
+                stage_rows = preferred[preferred["training_fit_stage"].astype(str).eq(stage)]
+                if not stage_rows.empty:
+                    preferred = stage_rows
+                    break
+            else:
+                return {
+                    "training_fit_r2": pd.NA,
+                    "training_fit_r2_status": "inner_hpo_registry_missing",
+                    "availability_status": "component_training_available",
+                    "value_available": False,
+                    "model": preferred["model"].dropna().iloc[0] if preferred["model"].notna().any() else pd.NA,
+                    "training_fit_stage": "hpo_refine_final_fitted",
+                }
         values = pd.to_numeric(preferred["training_fit_r2"], errors="coerce").dropna()
         return {
             "training_fit_r2": float(values.mean()) if not values.empty else pd.NA,
@@ -694,6 +739,10 @@ def _stream_missing_status(stream_label: str) -> str:
     if stream_label == "PED VKT per capita":
         return "inner_hpo_registry_missing"
     return "fitted_training_rows_missing"
+
+
+def _ped_final_training_stage_available(stages: set[str]) -> bool:
+    return bool({"hpo_refine_final_fitted", "outer_component_fitted"}.intersection(stages))
 
 
 def _ped_inner_hpo_status(gap_register: pd.DataFrame) -> dict[str, str]:
