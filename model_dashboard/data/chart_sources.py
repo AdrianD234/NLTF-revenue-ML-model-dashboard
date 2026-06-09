@@ -16,13 +16,15 @@ from ..labels import (
     humanize_label,
 )
 from ..metrics import best_by_stream
-from ..r2_ladder import (
+from ..reproducibility_imports import (
+    diagnostics_r2_summary_frame,
+    format_r2,
     R2_LADDER_NOTE,
     R2_LADDER_TITLE,
     R2_TRAINING_FIT_NOTE,
+    reproducibility_component_r2_frame,
     r2_ladder_frames,
 )
-from ..reproducibility_imports import diagnostics_r2_summary_frame, format_r2, reproducibility_component_r2_frame
 from ..score_basis import PAPER_SCORE_BASIS, score_basis_label
 from .diagnostics import DEFAULT_ACF_RESIDUAL_SCOPE, select_diagnostic_acf_scope
 

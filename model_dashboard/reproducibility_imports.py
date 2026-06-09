@@ -105,6 +105,13 @@ _REPRO_SYMBOLS = {
     "plot_reproducibility_sensitivities",
 }
 _R2_SYMBOLS = {"diagnostics_r2_summary_frame", "reproducibility_component_r2_frame", "format_r2"}
+_R2_LADDER_SYMBOLS = {
+    "R2_LADDER_NOTE",
+    "R2_LADDER_TITLE",
+    "R2_TRAINING_FIT_NOTE",
+    "r2_ladder_frames",
+    "r2_ladder_summary_frame",
+}
 
 
 def _forced_fallback() -> bool:
@@ -287,13 +294,42 @@ else:
         return "-" if pd.isna(number) else f"{float(number):.3f}"
 
 
+_r2_ladder, R2_LADDER_IMPORT_ERROR = _load_symbols(".r2_ladder", _R2_LADDER_SYMBOLS)
+if R2_LADDER_IMPORT_ERROR is None:
+    globals().update(_r2_ladder)
+else:
+    R2_LADDER_TITLE = "R2 ladder: training fit vs calibration vs forecast R2"
+    R2_LADDER_NOTE = (
+        "Training-fit R2 is not comparable to forecast R2. High paper-style R2 usually measures in-sample fit, "
+        "while forecast R2 measures out-of-sample explanatory power after final model composition."
+    )
+    R2_TRAINING_FIT_NOTE = (
+        "Training-fit R2 is computed from fitted rows inside the rolling training windows. "
+        "It is not an out-of-sample forecast metric."
+    )
+
+    def r2_ladder_frames(data: dict[str, pd.DataFrame], repo_root: Path | str | None = None) -> dict[str, pd.DataFrame]:
+        del data, repo_root
+        empty = pd.DataFrame()
+        return {
+            "summary": empty,
+            "training_fit_detail": empty,
+            "gap_register": empty,
+        }
+
+    def r2_ladder_summary_frame(data: dict[str, pd.DataFrame], repo_root: Path | str | None = None) -> pd.DataFrame:
+        return r2_ladder_frames(data, repo_root=repo_root)["summary"]
+
+
 __all__ = sorted(
     {
         "R2_GOVERNANCE_INFO_TEXT",
         "REPRODUCIBILITY_IMPORT_ERROR",
         "R2_IMPORT_ERROR",
+        "R2_LADDER_IMPORT_ERROR",
         "OPTIONAL_IMPORT_FORCE_ENV",
         *_REPRO_SYMBOLS,
         *_R2_SYMBOLS,
+        *_R2_LADDER_SYMBOLS,
     }
 )

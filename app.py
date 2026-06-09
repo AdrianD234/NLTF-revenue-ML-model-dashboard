@@ -46,10 +46,12 @@ from model_dashboard.labels import (
     model_alias,
     shorten_model_name,
 )
-from model_dashboard.r2_ladder import R2_LADDER_NOTE, R2_LADDER_TITLE, R2_TRAINING_FIT_NOTE, r2_ladder_summary_frame
 from model_dashboard.reproducibility_imports import (
     PED_INNER_HPO_AUDIT_STATUS,
     R2_GOVERNANCE_INFO_TEXT,
+    R2_LADDER_NOTE,
+    R2_LADDER_TITLE,
+    R2_TRAINING_FIT_NOTE,
     diagnostics_r2_summary_frame,
     format_r2,
     load_ped_inner_hpo_audit_pack,
@@ -76,6 +78,7 @@ from model_dashboard.reproducibility_imports import (
     reproducibility_stress_view,
     reproducibility_stream_labels,
     reproducibility_training_window_view,
+    r2_ladder_summary_frame,
     load_reproducibility_pack,
     plot_reproducibility_feature_importance,
     plot_reproducibility_sensitivities,

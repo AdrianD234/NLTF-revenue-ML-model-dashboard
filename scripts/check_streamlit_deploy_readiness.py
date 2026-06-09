@@ -11,7 +11,7 @@ import tomllib
 ROOT = Path(__file__).resolve().parents[1]
 PACK_ROOT = ROOT / "data" / "dashboard_evidence_pack"
 MAX_FILE_BYTES = 50 * 1024 * 1024
-REQUIRED_RUNTIME_DEPS = {"streamlit", "pandas", "plotly", "pyarrow", "openpyxl", "pillow"}
+REQUIRED_RUNTIME_DEPS = {"streamlit", "pandas", "numpy", "plotly", "pyarrow", "openpyxl", "pillow"}
 DEV_ONLY_DEPS = {"pytest", "playwright", "pytest-playwright", "kaleido"}
 REQUIRED_PARQUET = {
     "candidate_cone.parquet",
@@ -51,6 +51,9 @@ REQUIRED_UI_EXPORTS = {
 REQUIRED_REPRODUCIBILITY_IMPORT_EXPORTS = {
     "PED_INNER_HPO_AUDIT_STATUS",
     "R2_GOVERNANCE_INFO_TEXT",
+    "R2_LADDER_NOTE",
+    "R2_LADDER_TITLE",
+    "R2_TRAINING_FIT_NOTE",
     "load_ped_inner_hpo_audit_pack",
     "ped_inner_hpo_audit_signature",
     "ped_inner_hpo_audit_summary",
@@ -78,6 +81,8 @@ REQUIRED_REPRODUCIBILITY_IMPORT_EXPORTS = {
     "plot_reproducibility_sensitivities",
     "diagnostics_r2_summary_frame",
     "reproducibility_component_r2_frame",
+    "r2_ladder_summary_frame",
+    "r2_ladder_frames",
     "format_r2",
 }
 
@@ -230,6 +235,8 @@ if missing:
     raise SystemExit('missing app startup symbols: ' + ', '.join(missing))
 if not hasattr(ri, 'load_reproducibility_pack') or not hasattr(ri, 'diagnostics_r2_summary_frame'):
     raise SystemExit('missing reproducibility/R2 compatibility exports')
+if not hasattr(ri, 'r2_ladder_summary_frame') or not hasattr(ri, 'R2_LADDER_TITLE'):
+    raise SystemExit('missing R2 ladder compatibility exports')
 print('cloud import ok')
 """
     result = subprocess.run(
