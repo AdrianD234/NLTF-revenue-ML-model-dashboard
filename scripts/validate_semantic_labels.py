@@ -88,6 +88,8 @@ def validate() -> list[tuple[str, str, str]]:
         "R2 ladder distinguishes training fit from forecast R2",
         "R2 ladder: training fit vs calibration vs forecast R2" in r2_text
         and "Training-fit R2 is not comparable to forecast R2" in r2_text
+        and "Training-fit R2 is computed from fitted rows inside the rolling training windows." in r2_text
+        and "It is not an out-of-sample forecast metric." in r2_text
         and "High paper-style R2 usually measures in-sample fit" in r2_text
         and "forecast R2 measures out-of-sample explanatory power" in r2_text,
         "R2 ladder note inspected in app.py and model_dashboard/r2_ladder.py.",

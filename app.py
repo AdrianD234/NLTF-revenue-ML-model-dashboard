@@ -46,7 +46,7 @@ from model_dashboard.labels import (
     model_alias,
     shorten_model_name,
 )
-from model_dashboard.r2_ladder import R2_LADDER_NOTE, R2_LADDER_TITLE, r2_ladder_summary_frame
+from model_dashboard.r2_ladder import R2_LADDER_NOTE, R2_LADDER_TITLE, R2_TRAINING_FIT_NOTE, r2_ladder_summary_frame
 from model_dashboard.reproducibility_imports import (
     PED_INNER_HPO_AUDIT_STATUS,
     R2_GOVERNANCE_INFO_TEXT,
@@ -1267,7 +1267,7 @@ def r2_ladder_display_table(loaded: LoadedRun, selected_stream: str = "All strea
 
 def render_r2_ladder_panel(loaded: LoadedRun, selected_stream: str = "All streams", *, expanded: bool = False) -> None:
     with st.expander(R2_LADDER_TITLE, expanded=expanded):
-        info_panel(R2_LADDER_NOTE)
+        info_panel(f"{R2_TRAINING_FIT_NOTE} {R2_LADDER_NOTE}")
         display_table(r2_ladder_display_table(loaded, selected_stream), height=260, max_rows=12)
 
 
@@ -2210,7 +2210,7 @@ def render_page5_r2_panel(selected_stream: str, loaded: LoadedRun | None = None)
     if loaded is not None:
         st.markdown(
             f"<div class='page5-panel-title'>{html.escape(R2_LADDER_TITLE)}</div>"
-            f"<div class='page5-panel-sub'>{html.escape(R2_LADDER_NOTE)}</div>",
+            f"<div class='page5-panel-sub'>{html.escape(R2_TRAINING_FIT_NOTE)} {html.escape(R2_LADDER_NOTE)}</div>",
             unsafe_allow_html=True,
         )
         display_table(r2_ladder_display_table(loaded, selected_stream), height=250, max_rows=12)

@@ -126,6 +126,7 @@ def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
                 "Component trace",
                 "Net forecast R2 after final model composition",
                 "R2 ladder: training fit vs calibration vs forecast R2",
+                "Training-fit R2 is computed from fitted rows inside the rolling training windows",
                 "Training-fit R2 is not comparable to forecast R2",
                 "workbook/manifest",
             ],

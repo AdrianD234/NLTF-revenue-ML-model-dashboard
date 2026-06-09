@@ -19,6 +19,7 @@ from ..metrics import best_by_stream
 from ..r2_ladder import (
     R2_LADDER_NOTE,
     R2_LADDER_TITLE,
+    R2_TRAINING_FIT_NOTE,
     r2_ladder_frames,
 )
 from ..reproducibility_imports import diagnostics_r2_summary_frame, format_r2, reproducibility_component_r2_frame
@@ -53,6 +54,7 @@ EXTRA_COLUMNS = [
     "component_model",
     "component_short",
     "component_rank",
+    "training_fit_stage",
     "weight",
     "weight_pct",
     "lag",
@@ -1092,7 +1094,7 @@ def _r2_ladder_summary_source(summary: pd.DataFrame) -> pd.DataFrame:
                 "training_fit_r2;calibration_r2;forecast_r2",
                 str(row.get("source_file", "scorecard_predictions.parquet;diagnostic_tests.parquet;reproducibility component_predictions.parquet")),
                 str(row.get("calculation_basis", "Training-fit, calibration and forecast R2 are separate governance ladder measures.")),
-                str(row.get("notes", R2_LADDER_NOTE)),
+                str(row.get("notes", f"{R2_TRAINING_FIT_NOTE} {R2_LADDER_NOTE}")),
                 r2_type=row.get("r2_type"),
                 data_scope=row.get("data_scope"),
                 forecast_r2=row.get("forecast_r2"),
@@ -1104,6 +1106,7 @@ def _r2_ladder_summary_source(summary: pd.DataFrame) -> pd.DataFrame:
                 calibration_r2_source_column=row.get("calibration_r2_source_column"),
                 availability_status=row.get("availability_status"),
                 training_fit_r2_status=row.get("training_fit_r2_status"),
+                training_fit_stage=row.get("training_fit_stage"),
                 inner_hpo_weights_status=row.get("inner_hpo_weights_status"),
                 nested_replay_status=row.get("nested_replay_status"),
                 value_available=row.get("value_available"),
@@ -1160,6 +1163,7 @@ def _r2_training_fit_detail_source(detail: pd.DataFrame) -> pd.DataFrame:
                 interpretation=row.get("interpretation"),
                 component_model=row.get("component_model"),
                 component_rank=row.get("component_rank"),
+                training_fit_stage=row.get("training_fit_stage"),
                 source_prediction_column=row.get("source_prediction_column"),
                 source_actual_column=row.get("source_actual_column"),
                 availability_status=row.get("availability_status"),
@@ -1218,6 +1222,7 @@ def _r2_gap_register_source(gaps: pd.DataFrame) -> pd.DataFrame:
                 inner_hpo_weights_status=row.get("inner_hpo_weights_status"),
                 nested_replay_status=row.get("nested_replay_status"),
                 component_model=row.get("component_model"),
+                training_fit_stage=row.get("training_fit_stage"),
                 value_available=row.get("value_available"),
             )
         )

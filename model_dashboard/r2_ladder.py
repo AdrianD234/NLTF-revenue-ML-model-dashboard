@@ -14,6 +14,10 @@ R2_LADDER_NOTE = (
     "Training-fit R2 is not comparable to forecast R2. High paper-style R2 usually measures in-sample fit, "
     "while forecast R2 measures out-of-sample explanatory power after final model composition."
 )
+R2_TRAINING_FIT_NOTE = (
+    "Training-fit R2 is computed from fitted rows inside the rolling training windows. "
+    "It is not an out-of-sample forecast metric."
+)
 
 STREAM_ORDER = ["PED VKT per capita", "Light RUC volume", "Heavy RUC volume"]
 STREAM_TO_KEY = {
@@ -40,10 +44,6 @@ TRAINING_FIT_CANDIDATE_FILENAMES = [
     "training_fitted_predictions.parquet",
     "fitted_training_predictions.parquet",
     "training_fit_detail.parquet",
-    "training_fit_predictions.csv",
-    "training_fitted_predictions.csv",
-    "fitted_training_predictions.csv",
-    "training_fit_detail.csv",
 ]
 
 VALIDATION_FILE_TOKENS = {
@@ -149,7 +149,7 @@ def _training_fit_rows_from_artifacts(repo_root: Path) -> pd.DataFrame:
 def _training_rows_from_frame(frame: pd.DataFrame, path: Path, stream_key: str) -> list[dict[str, Any]]:
     if frame is None or frame.empty or not _has_training_scope(frame, path):
         return []
-    actual_col = _first_present(frame, ["training_actual", "actual_train", "actual_log", "actual", "y", "target"])
+    actual_col = _first_present(frame, ["training_actual", "actual_train", "actual", "y", "target", "actual_log"])
     pred_col = _first_present(
         frame,
         [
@@ -173,10 +173,12 @@ def _training_rows_from_frame(frame: pd.DataFrame, path: Path, stream_key: str) 
     data["score_basis_label"] = data["score_basis"].map(score_basis_label)
     data["model"] = data.get("model", data.get("finalist_model", _stream_label_from_key(stream_key)))
     data["component_model"] = data.get("component_model", data.get("inner_component_model", "training_fit_component"))
-    group_cols = ["stream", "stream_label", "model", "component_model", "score_basis", "score_basis_label"]
+    if "training_fit_stage" not in data.columns:
+        data["training_fit_stage"] = data["component_model"].astype(str)
+    group_cols = ["stream", "stream_label", "model", "component_model", "training_fit_stage", "score_basis", "score_basis_label"]
     rows: list[dict[str, Any]] = []
     for keys, group in data.groupby(group_cols, dropna=False):
-        stream, stream_label, model, component_model, score_basis, basis_label = keys
+        stream, stream_label, model, component_model, training_fit_stage, score_basis, basis_label = keys
         value = forecast_r2(group[actual_col], group[pred_col])
         n_rows = _usable_pair_count(group[actual_col], group[pred_col])
         rows.append(
@@ -185,6 +187,7 @@ def _training_rows_from_frame(frame: pd.DataFrame, path: Path, stream_key: str) 
                 "stream_label": stream_label,
                 "model": model,
                 "component_model": component_model,
+                "training_fit_stage": training_fit_stage,
                 "score_basis": score_basis,
                 "score_basis_label": basis_label,
                 "metric_name": "Training-fit R2",
@@ -202,7 +205,7 @@ def _training_rows_from_frame(frame: pd.DataFrame, path: Path, stream_key: str) 
                 "training_fit_r2_status": "available",
                 "availability_status": "available",
                 "value_available": pd.notna(pd.to_numeric(value, errors="coerce")),
-                "interpretation": "Training-fit R2 computed from fitted rows in the model training window.",
+                "interpretation": R2_TRAINING_FIT_NOTE,
                 "calculation_basis": "Training-fit R2 computed as 1 - SSE/SST on fitted training rows only.",
                 "notes": "This row is never computed from validation forecast rows.",
             }
@@ -219,7 +222,7 @@ def _missing_training_rows(
     observed_keys = set()
     if observed is not None and not observed.empty:
         observed_keys = {
-            (str(row.get("stream_label")), str(row.get("score_basis")), str(row.get("component_model")))
+            (str(row.get("stream_label")), str(row.get("score_basis")), str(row.get("training_fit_stage", row.get("component_model"))))
             for _, row in observed.iterrows()
         }
     rows: list[dict[str, Any]] = []
@@ -237,6 +240,7 @@ def _missing_training_rows(
                         "stream_label": stream_label,
                         "model": _finalist_model_for_stream(repo_root, stream_key, stream_label),
                         "component_model": component_model,
+                        "training_fit_stage": component_model,
                         "score_basis": basis,
                         "score_basis_label": score_basis_label(basis),
                         "metric_name": "Training-fit R2 unavailable",
@@ -346,23 +350,30 @@ def _summary_rows(
                 "value_available": pd.notna(pd.to_numeric(forecast_value, errors="coerce")),
                 "interpretation": _summary_interpretation(stream_label, status, forecast_value, calibration_value),
                 "calculation_basis": "Training-fit, calibration and forecast R2 are reported as separate governance ladder measures.",
-                "notes": R2_LADDER_NOTE,
+                "notes": f"{R2_TRAINING_FIT_NOTE} {R2_LADDER_NOTE}",
             }
             if stream_label == "PED VKT per capita":
                 ped_status = _ped_inner_hpo_status(gap_register)
                 row.update(ped_status)
+            if training.get("training_fit_stage") is not None:
+                row["training_fit_stage"] = training.get("training_fit_stage")
             rows.append(row)
     return pd.DataFrame(rows)
 
 
 def _gap_register_rows(repo_root: Path, observed: pd.DataFrame, detail: pd.DataFrame) -> pd.DataFrame:
-    del observed
+    observed_stage_keys = set()
+    if observed is not None and not observed.empty:
+        observed_stage_keys = {
+            (str(row.get("stream_label")), str(row.get("score_basis")), str(row.get("training_fit_stage", row.get("component_model"))))
+            for _, row in observed.iterrows()
+        }
     rows: list[dict[str, Any]] = []
     expected_gaps = [
         (
             "light_ruc_base_ols_training_fit_rows_missing",
             "Light RUC volume",
-            "base_schiff_ols",
+            "base_ols",
             "medium",
             "fitted_training_rows_missing",
             "The Light RUC pack contains OLS coefficients and training-window metadata, but no OLS fitted training-row predictions.",
@@ -370,7 +381,7 @@ def _gap_register_rows(repo_root: Path, observed: pd.DataFrame, detail: pd.DataF
         (
             "light_ruc_post_gbm_training_fit_rows_missing",
             "Light RUC volume",
-            "post_gbm_residual_corrected_fit",
+            "post_gbm_final",
             "medium",
             "fitted_training_rows_missing",
             "The Light RUC pack contains rebuilt out-of-sample final_pred rows, but no in-sample post-GBM corrected fitted rows.",
@@ -395,6 +406,8 @@ def _gap_register_rows(repo_root: Path, observed: pd.DataFrame, detail: pd.DataF
     score_bases = sorted(set(detail.get("score_basis", pd.Series(SCORE_BASIS_ORDER)).dropna().astype(str)), key=_basis_sort_key)
     for basis in score_bases:
         for gap_id, stream_label, component, severity, status, detail_text in expected_gaps:
+            if (stream_label, basis, component) in observed_stage_keys:
+                continue
             rows.append(
                 {
                     "gap_id": gap_id,
@@ -402,6 +415,7 @@ def _gap_register_rows(repo_root: Path, observed: pd.DataFrame, detail: pd.DataF
                     "stream_label": stream_label,
                     "model": _first_non_missing(_finalist_model_for_stream(repo_root, STREAM_TO_KEY[stream_label], stream_label), stream_label),
                     "component_model": component,
+                    "training_fit_stage": component,
                     "score_basis": basis,
                     "score_basis_label": score_basis_label(basis),
                     "r2_type": "training_fit",
@@ -476,12 +490,12 @@ def _expected_training_components(repo_root: Path) -> dict[str, list[tuple[str, 
     return {
         "Light RUC volume": [
             (
-                "base_schiff_ols",
+                "base_ols",
                 "fitted_training_rows_missing",
                 "Light base OLS training-fit R2 requires fitted training rows, not validation component_pred rows.",
             ),
             (
-                "post_gbm_residual_corrected_fit",
+                "post_gbm_final",
                 "fitted_training_rows_missing",
                 "Light post-GBM training-fit R2 requires in-sample corrected fitted rows; final_pred validation rows are not used.",
             ),
@@ -551,12 +565,20 @@ def _training_summary_value(detail: pd.DataFrame, stream_label: str, score_basis
     ].copy()
     available = subset[subset["value_available"].fillna(False).astype(bool)] if "value_available" in subset.columns else pd.DataFrame()
     if not available.empty:
-        values = pd.to_numeric(available["training_fit_r2"], errors="coerce").dropna()
+        preferred = available.copy()
+        if stream_label == "Light RUC volume" and "training_fit_stage" in preferred.columns:
+            post_gbm = preferred[preferred["training_fit_stage"].astype(str).eq("post_gbm_final")]
+            if not post_gbm.empty:
+                preferred = post_gbm
+        values = pd.to_numeric(preferred["training_fit_r2"], errors="coerce").dropna()
         return {
             "training_fit_r2": float(values.mean()) if not values.empty else pd.NA,
             "training_fit_r2_status": "available",
             "value_available": not values.empty,
-            "model": available["model"].dropna().iloc[0] if available["model"].notna().any() else pd.NA,
+            "model": preferred["model"].dropna().iloc[0] if preferred["model"].notna().any() else pd.NA,
+            "training_fit_stage": preferred["training_fit_stage"].dropna().iloc[0]
+            if "training_fit_stage" in preferred.columns and preferred["training_fit_stage"].notna().any()
+            else pd.NA,
         }
     if not subset.empty:
         return {
@@ -746,6 +768,7 @@ def _ordered(frame: pd.DataFrame) -> pd.DataFrame:
         "stream_label",
         "model",
         "component_model",
+        "training_fit_stage",
         "score_basis",
         "score_basis_label",
         "r2_type",
