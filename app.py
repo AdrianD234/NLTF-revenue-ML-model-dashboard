@@ -179,6 +179,53 @@ PAGE5_PANEL_CONTRACT_REQUIRED_COLUMNS = (
     "notes",
 )
 
+R2_LADDER_DISPLAY_NOTE = (
+    "Training-fit R2, Calibration R2 and Forecast R2 answer different questions. "
+    "High training-fit values are not directly comparable with lower out-of-sample forecast values."
+)
+
+R2_LADDER_HEADER_TOOLTIPS = {
+    "Training-fit R2": (
+        "Training-fit R2 measures how closely the model fitted the historical rows inside its own training window. "
+        "This is the R2 most similar to the high in-sample R2 often reported in econometric papers. "
+        "It is not a forecast test: a model can fit training history extremely well and still make future forecast errors."
+    ),
+    "Calibration R2": (
+        "Calibration R2 measures whether higher forecasts line up with higher actual outcomes across validation rows. "
+        "It comes from an actual-on-forecast calibration regression. It differs from Forecast R2 because it checks "
+        "alignment of forecast levels with actual levels, rather than direct error around the final prediction."
+    ),
+    "Forecast R2": (
+        "Forecast R2, or net forecast R2, measures how much variation in future actual outcomes is explained by the "
+        "final delivered forecast. It is calculated after all model-composition steps are complete: GBM residual "
+        "correction for Light RUC, weighted ensemble blending for Heavy RUC, and component replay for PED. "
+        "It is out-of-sample, so it is usually much lower than Training-fit R2."
+    ),
+    "Score basis": (
+        "Score basis is the validation lens. Operational pooled MAPE uses the broader current evidence-pack validation "
+        "rows and pools all valid forecast errors together. Schiff paper horizon mean follows the paper-style scorecard: "
+        "errors are grouped by forecast horizon, 2020-2021 test periods are excluded where applicable, and horizon "
+        "results are averaged. The error formula is similar, but the rows and grouping differ."
+    ),
+    "Availability": (
+        "Availability explains whether fitted training-window rows were found. Available means Training-fit R2 can be "
+        "computed. Partial or missing means the dashboard can show Forecast R2 and Calibration R2, but deeper "
+        "training-fit evidence is incomplete."
+    ),
+}
+
+R2_LADDER_DISPLAY_COLUMNS = [
+    "Stream",
+    "Model",
+    "Training-fit R2",
+    "Calibration R2",
+    "Forecast R2",
+    "Rows",
+    "Score basis",
+    "Availability",
+    "Interpretation",
+]
+
 
 def render_info_tooltip(label: str, tooltip_text: str, *, css_class: str = "summary-tooltip") -> str:
     """Return a small accessible tooltip without depending on optional UI exports."""
@@ -1239,15 +1286,15 @@ def r2_ladder_display_table(loaded: LoadedRun, selected_stream: str = "All strea
         return pd.DataFrame(
             [
                 {
-                    "stream": selected_stream,
-                    "model": "-",
-                    "training_fit_r2": "-",
-                    "calibration_r2": "-",
-                    "forecast_r2": "-",
-                    "n_rows": 0,
-                    "score_basis": "-",
-                    "availability_status": "unavailable",
-                    "interpretation": "R2 ladder source rows are unavailable.",
+                    "Stream": selected_stream,
+                    "Model": "-",
+                    "Training-fit R2": "-",
+                    "Calibration R2": "-",
+                    "Forecast R2": "-",
+                    "Rows": 0,
+                    "Score basis": "-",
+                    "Availability": "unavailable",
+                    "Interpretation": "R2 ladder source rows are unavailable.",
                 }
             ]
         )
@@ -1265,15 +1312,83 @@ def r2_ladder_display_table(loaded: LoadedRun, selected_stream: str = "All strea
         ]
     ].copy()
     for column in ["training_fit_r2", "calibration_r2", "forecast_r2"]:
-        table[column] = table[column].map(format_r2)
+        table[column] = table[column].map(format_r2_for_ladder_display)
     table["n_rows"] = pd.to_numeric(table["n_rows"], errors="coerce").fillna(0).astype(int)
-    return table
+    table["score_basis"] = table["score_basis"].map(score_basis_label)
+    return table.rename(
+        columns={
+            "stream": "Stream",
+            "model": "Model",
+            "training_fit_r2": "Training-fit R2",
+            "calibration_r2": "Calibration R2",
+            "forecast_r2": "Forecast R2",
+            "n_rows": "Rows",
+            "score_basis": "Score basis",
+            "availability_status": "Availability",
+            "interpretation": "Interpretation",
+        }
+    )[R2_LADDER_DISPLAY_COLUMNS]
+
+
+def format_r2_for_ladder_display(value: Any) -> str:
+    number = pd.to_numeric(value, errors="coerce")
+    if pd.isna(number):
+        return "-"
+    value_float = float(number)
+    if value_float < 1 and f"{value_float:.4f}" == "1.0000":
+        return "0.9999"
+    return f"{value_float:.4f}"
+
+
+def render_r2_ladder_table(table: pd.DataFrame, *, max_rows: int = 12) -> None:
+    if table is None or table.empty:
+        st.caption("No rows to display.")
+        return
+    view = table.head(max_rows).copy()
+    if len(table) > len(view):
+        st.caption(f"Showing first {len(view):,} of {len(table):,} rows.")
+    header_html = "".join(
+        f"<th data-r2-ladder-header='{_r2_ladder_header_key(column)}'>{_r2_ladder_header_html(column)}</th>"
+        for column in R2_LADDER_DISPLAY_COLUMNS
+        if column in view.columns
+    )
+    rows_html = []
+    for _, row in view.iterrows():
+        cells = []
+        for column in R2_LADDER_DISPLAY_COLUMNS:
+            if column not in view.columns:
+                continue
+            text = _short_text(row.get(column, ""), 96 if column in {"Model", "Interpretation"} else 60)
+            cells.append(f"<td>{html.escape(str(text))}</td>")
+        rows_html.append("<tr>" + "".join(cells) + "</tr>")
+    st.markdown(
+        "<div class='r2-ladder-table-wrap'>"
+        "<table class='summary-tooltip-table r2-ladder-table'>"
+        "<thead><tr>"
+        + header_html
+        + "</tr></thead><tbody>"
+        + "".join(rows_html)
+        + "</tbody></table></div>",
+        unsafe_allow_html=True,
+    )
+
+
+def _r2_ladder_header_html(label: str) -> str:
+    tooltip = R2_LADDER_HEADER_TOOLTIPS.get(label)
+    safe_label = html.escape(label)
+    if not tooltip:
+        return safe_label
+    return safe_label + render_info_tooltip(label, tooltip, css_class="summary-tooltip")
+
+
+def _r2_ladder_header_key(label: str) -> str:
+    return "".join(char if char.isalnum() else "-" for char in label.lower()).strip("-")
 
 
 def render_r2_ladder_panel(loaded: LoadedRun, selected_stream: str = "All streams", *, expanded: bool = False) -> None:
     with st.expander(R2_LADDER_TITLE, expanded=expanded):
-        info_panel(f"{R2_TRAINING_FIT_NOTE} {R2_LADDER_NOTE}")
-        display_table(r2_ladder_display_table(loaded, selected_stream), height=260, max_rows=12)
+        info_panel(R2_LADDER_DISPLAY_NOTE)
+        render_r2_ladder_table(r2_ladder_display_table(loaded, selected_stream), max_rows=12)
 
 
 def render_diagnostics(loaded: LoadedRun, controls: dict[str, Any]) -> None:
@@ -2236,10 +2351,10 @@ def render_page5_r2_panel(selected_stream: str, loaded: LoadedRun | None = None)
     if loaded is not None:
         st.markdown(
             f"<div class='page5-panel-title'>{html.escape(R2_LADDER_TITLE)}</div>"
-            f"<div class='page5-panel-sub'>{html.escape(R2_TRAINING_FIT_NOTE)} {html.escape(R2_LADDER_NOTE)}</div>",
+            f"<div class='page5-panel-sub'>{html.escape(R2_LADDER_DISPLAY_NOTE)}</div>",
             unsafe_allow_html=True,
         )
-        display_table(r2_ladder_display_table(loaded, selected_stream), height=250, max_rows=12)
+        render_r2_ladder_table(r2_ladder_display_table(loaded, selected_stream), max_rows=12)
 
 
 def render_page5_importance_or_component_panel(stream_label: str, pack: Any, panel_contract: pd.DataFrame) -> None:

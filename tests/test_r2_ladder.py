@@ -5,6 +5,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+from app import R2_LADDER_HEADER_TOOLTIPS, _r2_ladder_header_html, format_r2_for_ladder_display, r2_ladder_display_table
 from model_dashboard.data_loader import DEFAULT_EVIDENCE_PACK_ROOT, load_evidence_pack
 from model_dashboard.score_basis import OPERATIONAL_SCORE_BASIS, PAPER_SCORE_BASIS
 
@@ -64,6 +65,55 @@ def test_ladder_summary_keeps_training_calibration_and_forecast_separate() -> No
     assert set(summary["availability_status"]) == {"available"}
     assert summary["notes"].str.contains("Training-fit R2 is not comparable to forecast R2", regex=False).all()
     assert summary["notes"].str.contains("Training-fit R2 is computed from fitted rows inside the rolling training windows", regex=False).all()
+
+
+def test_r2_ladder_display_headers_have_tooltips_and_clean_labels() -> None:
+    required_tooltips = {
+        "Training-fit R2",
+        "Calibration R2",
+        "Forecast R2",
+        "Score basis",
+        "Availability",
+    }
+    assert required_tooltips.issubset(R2_LADDER_HEADER_TOOLTIPS)
+    for label in required_tooltips:
+        tooltip = R2_LADDER_HEADER_TOOLTIPS[label]
+        assert "_" not in label
+        assert "_" not in tooltip
+        header = _r2_ladder_header_html(label)
+        assert "summary-tooltip-trigger" in header
+        assert "role='tooltip'" in header
+        assert "?" in header
+    assert "in-sample R2" not in R2_LADDER_HEADER_TOOLTIPS["Forecast R2"]
+    assert "Operational pooled MAPE" in R2_LADDER_HEADER_TOOLTIPS["Score basis"]
+    assert "Schiff paper horizon mean" in R2_LADDER_HEADER_TOOLTIPS["Score basis"]
+
+
+def test_r2_ladder_display_uses_four_decimals_and_no_false_perfect_ped() -> None:
+    loaded = load_evidence_pack(DEFAULT_EVIDENCE_PACK_ROOT, ROOT)
+    display = r2_ladder_display_table(loaded)
+    assert {
+        "Training-fit R2",
+        "Calibration R2",
+        "Forecast R2",
+        "Score basis",
+        "Availability",
+    }.issubset(display.columns)
+    assert not {"training_fit_r2", "calibration_r2", "forecast_r2", "score_basis", "availability_status"} & set(display.columns)
+    ped = display[display["Stream"].eq("PED VKT per capita")]
+    assert not ped.empty
+    assert set(ped["Training-fit R2"]) == {"0.9999", "0.9996"}
+    assert not ped["Training-fit R2"].astype(str).str.fullmatch(r"1\.0000?|1\.000").any()
+    for column in ["Training-fit R2", "Calibration R2", "Forecast R2"]:
+        values = display[column].astype(str)
+        numeric_values = values[values.ne("-")]
+        assert numeric_values.str.fullmatch(r"-?\d+\.\d{4}").all(), column
+    assert set(display["Score basis"]) == {"Paper-style horizon MAPE", "Operational pooled MAPE"}
+
+
+def test_r2_ladder_display_formatter_never_rounds_sub_one_to_one() -> None:
+    assert format_r2_for_ladder_display(0.99999) == "0.9999"
+    assert format_r2_for_ladder_display(1.0) == "1.0000"
 
 
 def test_unavailable_training_fit_is_blank_not_zero_and_never_from_validation_rows() -> None:

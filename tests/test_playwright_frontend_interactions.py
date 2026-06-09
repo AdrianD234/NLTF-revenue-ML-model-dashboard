@@ -358,8 +358,7 @@ def test_governance_reproducibility_page_stream_selector_and_downloads(page: Pag
     expect(body).to_contain_text("Component trace", timeout=90000)
     expect(body).to_contain_text("Net forecast R2 after final model composition", timeout=90000)
     expect(body).to_contain_text("R2 ladder: training fit vs calibration vs forecast R2", timeout=90000)
-    expect(body).to_contain_text("Training-fit R2 is computed from fitted rows inside the rolling training windows", timeout=90000)
-    expect(body).to_contain_text("Training-fit R2 is not comparable to forecast R2", timeout=90000)
+    expect(body).to_contain_text("Training-fit R2, Calibration R2 and Forecast R2 answer different questions", timeout=90000)
     expect(body).to_contain_text(r2_forecast_text, timeout=90000)
     expect(body).to_contain_text(r2_calibration_text, timeout=90000)
     expect(body).to_contain_text("Forecast R2", timeout=90000)
@@ -390,7 +389,8 @@ def test_governance_reproducibility_page_stream_selector_and_downloads(page: Pag
     expect(body).to_contain_text("Nested trace", timeout=90000)
     expect(body).to_contain_text("Gap register", timeout=90000)
     expect(body).to_contain_text("Training-fit R2 is available; forecast R2 0.465", timeout=90000)
-    expect(body).to_contain_text("1.000", timeout=90000)
+    expect(body).to_contain_text("0.9999", timeout=90000)
+    expect(body).to_contain_text("0.9996", timeout=90000)
     assert page.get_by_text("Feature importance (PED)", exact=True).count() == 0
     expect(body).to_contain_text("SHAP not yet generated", timeout=60000)
     page_text = body.inner_text(timeout=60000)
@@ -425,10 +425,44 @@ def test_diagnostic_pass_matrix_tooltips_hover_and_focus(page: Page) -> None:
     expect(page.locator("body")).to_contain_text("source_prediction_column", timeout=60000)
     expect(page.locator("body")).to_contain_text("calibration_r2_source_column", timeout=60000)
     page.get_by_text("R2 ladder: training fit vs calibration vs forecast R2", exact=True).first.click()
-    expect(page.locator("body")).to_contain_text("Training-fit R2 is computed from fitted rows inside the rolling training windows", timeout=60000)
-    expect(page.locator("body")).to_contain_text("Training-fit R2 is not comparable to forecast R2", timeout=60000)
-    expect(page.locator("body")).to_contain_text("training_fit_r2", timeout=60000)
-    expect(page.locator("body")).to_contain_text("availability_status", timeout=60000)
+    expect(page.locator("body")).to_contain_text(
+        "Training-fit R2, Calibration R2 and Forecast R2 answer different questions",
+        timeout=60000,
+    )
+    ladder = page.locator(".r2-ladder-table").first
+    expect(ladder).to_be_visible(timeout=60000)
+    expect(ladder).to_contain_text("Training-fit R2", timeout=60000)
+    expect(ladder).to_contain_text("Calibration R2", timeout=60000)
+    expect(ladder).to_contain_text("Forecast R2", timeout=60000)
+    expect(ladder).to_contain_text("Score basis", timeout=60000)
+    expect(ladder).to_contain_text("Availability", timeout=60000)
+    expect(ladder).to_contain_text("0.9999", timeout=60000)
+    ladder_text = ladder.inner_text(timeout=60000)
+    assert "training_fit_r2" not in ladder_text
+    assert "availability_status" not in ladder_text
+    assert "1.000" not in ladder_text
+    expected_tooltips = {
+        "training-fit-r2": ("Training-fit R2", "high in-sample R2 often reported in econometric papers"),
+        "calibration-r2": ("Calibration R2", "actual-on-forecast calibration regression"),
+        "forecast-r2": ("Forecast R2", "weighted ensemble blending for Heavy RUC"),
+        "score-basis": ("Score basis", "Operational pooled MAPE uses the broader current evidence-pack validation rows"),
+        "availability": ("Availability", "fitted training-window rows were found"),
+    }
+    for header_key, (label, phrase) in expected_tooltips.items():
+        header = ladder.locator(f"th[data-r2-ladder-header='{header_key}']").first
+        expect(header).to_contain_text(label, timeout=10000)
+        trigger = header.locator(".summary-tooltip-trigger").first
+        expect(trigger).to_be_visible(timeout=10000)
+        trigger.hover()
+        tooltip = trigger.locator(".summary-tooltip-text")
+        expect(tooltip).to_be_visible(timeout=10000)
+        expect(tooltip).to_contain_text(phrase, timeout=10000)
+        trigger.focus()
+        expect(tooltip).to_be_visible(timeout=10000)
+    forecast_tooltip = ladder.locator("th[data-r2-ladder-header='forecast-r2']").first.locator(".summary-tooltip-text").first.inner_text(timeout=10000)
+    assert "in-sample R2" not in forecast_tooltip
+    score_tooltip = ladder.locator("th[data-r2-ladder-header='score-basis']").first.locator(".summary-tooltip-text").first.inner_text(timeout=10000)
+    assert "Schiff paper horizon mean" in score_tooltip
 
     matrix = page.locator(".diagnostic-tooltip-matrix")
     expect(matrix).to_be_visible(timeout=90000)
