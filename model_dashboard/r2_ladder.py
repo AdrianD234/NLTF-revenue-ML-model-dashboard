@@ -173,12 +173,22 @@ def _training_rows_from_frame(frame: pd.DataFrame, path: Path, stream_key: str) 
     data["score_basis_label"] = data["score_basis"].map(score_basis_label)
     data["model"] = data.get("model", data.get("finalist_model", _stream_label_from_key(stream_key)))
     data["component_model"] = data.get("component_model", data.get("inner_component_model", "training_fit_component"))
+    data["component_label"] = data.get("component_label", data["component_model"])
     if "training_fit_stage" not in data.columns:
         data["training_fit_stage"] = data["component_model"].astype(str)
-    group_cols = ["stream", "stream_label", "model", "component_model", "training_fit_stage", "score_basis", "score_basis_label"]
+    group_cols = [
+        "stream",
+        "stream_label",
+        "model",
+        "component_model",
+        "component_label",
+        "training_fit_stage",
+        "score_basis",
+        "score_basis_label",
+    ]
     rows: list[dict[str, Any]] = []
     for keys, group in data.groupby(group_cols, dropna=False):
-        stream, stream_label, model, component_model, training_fit_stage, score_basis, basis_label = keys
+        stream, stream_label, model, component_model, component_label, training_fit_stage, score_basis, basis_label = keys
         value = forecast_r2(group[actual_col], group[pred_col])
         n_rows = _usable_pair_count(group[actual_col], group[pred_col])
         rows.append(
@@ -187,6 +197,7 @@ def _training_rows_from_frame(frame: pd.DataFrame, path: Path, stream_key: str) 
                 "stream_label": stream_label,
                 "model": model,
                 "component_model": component_model,
+                "component_label": component_label,
                 "training_fit_stage": training_fit_stage,
                 "score_basis": score_basis,
                 "score_basis_label": basis_label,
@@ -327,7 +338,7 @@ def _summary_rows(
             forecast_value = _first_non_missing(final.get("forecast_r2"), diagnostic.get("forecast_r2"))
             calibration_value = diagnostic.get("calibration_r2")
             status = training.get("training_fit_r2_status") or _stream_missing_status(stream_label)
-            availability = "available" if training.get("value_available") else status
+            availability = training.get("availability_status") or ("available" if training.get("value_available") else status)
             row = {
                 "stream_label": stream_label,
                 "stream": stream_label,
@@ -363,11 +374,15 @@ def _summary_rows(
 
 def _gap_register_rows(repo_root: Path, observed: pd.DataFrame, detail: pd.DataFrame) -> pd.DataFrame:
     observed_stage_keys = set()
+    observed_stages_by_stream_basis: dict[tuple[str, str], set[str]] = {}
     if observed is not None and not observed.empty:
         observed_stage_keys = {
             (str(row.get("stream_label")), str(row.get("score_basis")), str(row.get("training_fit_stage", row.get("component_model"))))
             for _, row in observed.iterrows()
         }
+        for _, row in observed.iterrows():
+            key = (str(row.get("stream_label")), str(row.get("score_basis")))
+            observed_stages_by_stream_basis.setdefault(key, set()).add(str(row.get("training_fit_stage", row.get("component_model"))))
     rows: list[dict[str, Any]] = []
     expected_gaps = [
         (
@@ -387,14 +402,6 @@ def _gap_register_rows(repo_root: Path, observed: pd.DataFrame, detail: pd.DataF
             "The Light RUC pack contains rebuilt out-of-sample final_pred rows, but no in-sample post-GBM corrected fitted rows.",
         ),
         (
-            "heavy_ruc_c1_c4_training_fit_rows_missing",
-            "Heavy RUC volume",
-            "C1-C4 weighted ensemble components",
-            "medium",
-            "partial_missing",
-            "Heavy RUC final and component validation R2 are available, but parent C1-C4 fitted training rows were not emitted.",
-        ),
-        (
             "ped_inner_hpo_training_fit_registry_missing",
             "PED VKT per capita",
             "PED inner HPO/static-convex components",
@@ -405,6 +412,9 @@ def _gap_register_rows(repo_root: Path, observed: pd.DataFrame, detail: pd.DataF
     ]
     score_bases = sorted(set(detail.get("score_basis", pd.Series(SCORE_BASIS_ORDER)).dropna().astype(str)), key=_basis_sort_key)
     for basis in score_bases:
+        heavy_gap = _heavy_training_gap(repo_root, observed_stages_by_stream_basis, basis)
+        if heavy_gap is not None:
+            rows.append(heavy_gap)
         for gap_id, stream_label, component, severity, status, detail_text in expected_gaps:
             if (stream_label, basis, component) in observed_stage_keys:
                 continue
@@ -437,6 +447,54 @@ def _gap_register_rows(repo_root: Path, observed: pd.DataFrame, detail: pd.DataF
             )
     rows.extend(_ped_inner_hpo_gap_rows(repo_root, score_bases))
     return pd.DataFrame(rows)
+
+
+def _heavy_training_gap(repo_root: Path, observed_stages_by_stream_basis: dict[tuple[str, str], set[str]], basis: str) -> dict[str, Any] | None:
+    stages = observed_stages_by_stream_basis.get(("Heavy RUC volume", str(basis)), set())
+    if "weighted_ensemble_final" in stages:
+        return None
+    components = set(_model_registry_components(repo_root, "heavy_ruc"))
+    if components and components.issubset(stages):
+        gap_id = "heavy_ruc_final_ensemble_training_fit_rows_missing"
+        component = "weighted_ensemble_final"
+        status = "final_ensemble_training_missing"
+        detail_text = (
+            "Heavy RUC C1-C4 fitted training rows are available, but aligned weighted-ensemble fitted rows "
+            "were not emitted."
+        )
+    else:
+        gap_id = "heavy_ruc_c1_c4_training_fit_rows_missing"
+        component = "C1-C4 weighted ensemble components"
+        status = "partial_missing"
+        detail_text = (
+            "Heavy RUC final and component validation R2 are available, but parent C1-C4 fitted training rows "
+            "were not emitted."
+        )
+    return {
+        "gap_id": gap_id,
+        "stream": "HEAVY_RUC",
+        "stream_label": "Heavy RUC volume",
+        "model": _first_non_missing(_finalist_model_for_stream(repo_root, "heavy_ruc", "Heavy RUC volume"), "Heavy RUC volume"),
+        "component_model": component,
+        "training_fit_stage": component,
+        "score_basis": basis,
+        "score_basis_label": score_basis_label(basis),
+        "r2_type": "training_fit",
+        "data_scope": TRAINING_MISSING_SCOPE,
+        "training_fit_r2_status": status,
+        "availability_status": status,
+        "gap_status": "open_governance_gap",
+        "gap_severity": "medium",
+        "gap_detail": detail_text,
+        "metric_name": "Training-fit R2 reproducibility gap",
+        "metric_value": pd.NA,
+        "metric_display": "-",
+        "source_file": _training_source_file(repo_root, "heavy_ruc"),
+        "source_column": "missing_fitted_training_rows",
+        "value_available": False,
+        "calculation_basis": "Gap register row; no final ensemble training-fit R2 is calculated without fitted training-row predictions.",
+        "notes": R2_LADDER_NOTE,
+    }
 
 
 def _ped_inner_hpo_gap_rows(repo_root: Path, score_bases: list[str]) -> list[dict[str, Any]]:
@@ -570,10 +628,24 @@ def _training_summary_value(detail: pd.DataFrame, stream_label: str, score_basis
             post_gbm = preferred[preferred["training_fit_stage"].astype(str).eq("post_gbm_final")]
             if not post_gbm.empty:
                 preferred = post_gbm
+        if stream_label == "Heavy RUC volume" and "training_fit_stage" in preferred.columns:
+            weighted = preferred[preferred["training_fit_stage"].astype(str).eq("weighted_ensemble_final")]
+            if not weighted.empty:
+                preferred = weighted
+            else:
+                return {
+                    "training_fit_r2": pd.NA,
+                    "training_fit_r2_status": "final_ensemble_training_missing",
+                    "availability_status": "component_training_available",
+                    "value_available": False,
+                    "model": preferred["model"].dropna().iloc[0] if preferred["model"].notna().any() else pd.NA,
+                    "training_fit_stage": "weighted_ensemble_final",
+                }
         values = pd.to_numeric(preferred["training_fit_r2"], errors="coerce").dropna()
         return {
             "training_fit_r2": float(values.mean()) if not values.empty else pd.NA,
             "training_fit_r2_status": "available",
+            "availability_status": "available",
             "value_available": not values.empty,
             "model": preferred["model"].dropna().iloc[0] if preferred["model"].notna().any() else pd.NA,
             "training_fit_stage": preferred["training_fit_stage"].dropna().iloc[0]
@@ -584,6 +656,9 @@ def _training_summary_value(detail: pd.DataFrame, stream_label: str, score_basis
         return {
             "training_fit_r2": pd.NA,
             "training_fit_r2_status": subset["training_fit_r2_status"].dropna().astype(str).iloc[0],
+            "availability_status": subset["availability_status"].dropna().astype(str).iloc[0]
+            if "availability_status" in subset.columns and subset["availability_status"].notna().any()
+            else subset["training_fit_r2_status"].dropna().astype(str).iloc[0],
             "value_available": False,
             "model": subset["model"].dropna().iloc[0] if subset["model"].notna().any() else pd.NA,
         }
@@ -604,6 +679,8 @@ def _summary_interpretation(stream_label: str, status: str, forecast_value: Any,
     calibration_display = format_r2(calibration_value)
     if status == "available":
         return f"Training-fit R2 is available; forecast R2 {forecast_display} and calibration R2 {calibration_display} remain out-of-sample measures."
+    if stream_label == "Heavy RUC volume" and status == "final_ensemble_training_missing":
+        return f"Component training-fit rows are available, but the weighted final ensemble training-fit R2 is missing; forecast R2 {forecast_display} remains out-of-sample."
     if stream_label == "Light RUC volume":
         return f"Forecast R2 {forecast_display} and calibration R2 {calibration_display} are available; base/post-GBM fitted training rows were not emitted."
     if stream_label == "Heavy RUC volume":
@@ -768,6 +845,7 @@ def _ordered(frame: pd.DataFrame) -> pd.DataFrame:
         "stream_label",
         "model",
         "component_model",
+        "component_label",
         "training_fit_stage",
         "score_basis",
         "score_basis_label",

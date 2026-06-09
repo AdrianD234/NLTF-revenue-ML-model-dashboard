@@ -12,6 +12,7 @@ from model_dashboard.score_basis import OPERATIONAL_SCORE_BASIS, PAPER_SCORE_BAS
 ROOT = Path(__file__).resolve().parents[1]
 CHART_SOURCE_DIR = ROOT / "artifacts" / "chart_sources"
 LIGHT_TRAINING_FIT_DIR = ROOT / "data" / "dashboard_evidence_pack_reproducibility" / "light_ruc"
+HEAVY_TRAINING_FIT_DIR = ROOT / "data" / "dashboard_evidence_pack_reproducibility" / "heavy_ruc"
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -58,12 +59,12 @@ def test_ladder_summary_keeps_training_calibration_and_forecast_separate() -> No
     }
     assert required.issubset(summary.columns)
     assert set(summary["stream_label"]) == {"PED VKT per capita", "Light RUC volume", "Heavy RUC volume"}
-    light = summary[summary["stream_label"].eq("Light RUC volume")]
-    other = summary[~summary["stream_label"].eq("Light RUC volume")]
-    assert light["training_fit_r2"].notna().all()
-    assert set(light["availability_status"]) == {"available"}
+    available = summary[summary["stream_label"].isin({"Light RUC volume", "Heavy RUC volume"})]
+    other = summary[summary["stream_label"].eq("PED VKT per capita")]
+    assert available["training_fit_r2"].notna().all()
+    assert set(available["availability_status"]) == {"available"}
     assert other["training_fit_r2"].isna().all()
-    assert other["availability_status"].isin({"partial_missing", "inner_hpo_registry_missing"}).all()
+    assert set(other["availability_status"]) == {"inner_hpo_registry_missing"}
     assert summary["notes"].str.contains("Training-fit R2 is not comparable to forecast R2", regex=False).all()
     assert summary["notes"].str.contains("Training-fit R2 is computed from fitted rows inside the rolling training windows", regex=False).all()
 
@@ -89,7 +90,10 @@ def test_heavy_light_and_ped_specific_r2_ladder_rules() -> None:
     gaps = read_source("r2_reproducibility_gap_register.csv")
 
     heavy = summary[summary["stream_label"].eq("Heavy RUC volume")]
-    assert set(heavy["training_fit_r2_status"]) == {"partial_missing"}
+    assert set(heavy["training_fit_r2_status"]) == {"available"}
+    assert set(heavy["availability_status"]) == {"available"}
+    assert set(heavy["training_fit_stage"]) == {"weighted_ensemble_final"}
+    assert heavy["training_fit_r2"].astype(float).gt(0.99).all()
 
     ped = summary[summary["stream_label"].eq("PED VKT per capita")]
     assert set(ped["training_fit_r2_status"]) == {"inner_hpo_registry_missing"}
@@ -104,7 +108,7 @@ def test_heavy_light_and_ped_specific_r2_ladder_rules() -> None:
     assert component_validation["data_scope"].eq("out_of_sample_component_prediction_rows").all()
     assert component_validation["source_prediction_column"].eq("component_pred").all()
 
-    assert gaps["gap_id"].str.contains("heavy_ruc_c1_c4_training_fit_rows_missing", regex=False).any()
+    assert not gaps["stream_label"].eq("Heavy RUC volume").any()
     assert gaps["gap_id"].str.contains("ped_inner_hpo_training_fit_registry_missing", regex=False).any()
     assert not gaps["stream_label"].eq("Light RUC volume").any()
 
@@ -150,6 +154,51 @@ def test_light_training_fit_stage_is_not_ignored_or_mixed() -> None:
     assert (stage_values["post_gbm_final"].astype(float) > stage_values["base_ols"].astype(float)).all()
 
 
+def test_heavy_training_fit_r2_uses_weighted_fitted_predictions() -> None:
+    parquet_path = HEAVY_TRAINING_FIT_DIR / "training_fit_predictions.parquet"
+    assert parquet_path.exists()
+    rows = pd.read_parquet(parquet_path)
+    assert not rows.empty
+    assert rows["data_scope"].eq("training_window_fitted_rows").all()
+    assert set(rows["sample_role"]) == {"training"}
+    assert not rows["source_file"].fillna("").astype(str).str.contains(
+        "component_predictions|scorecard_predictions|rebuilt_predictions|evidence_prediction_comparison",
+        regex=True,
+    ).any()
+
+    weighted = rows[rows["training_fit_stage"].eq("weighted_ensemble_final")]
+    components = rows[rows["component_label"].isin({"C1", "C2", "C3", "C4"})]
+    assert not weighted.empty
+    assert set(components["component_label"]) == {"C1", "C2", "C3", "C4"}
+
+    key = ["score_basis", "origin", "training_period"]
+    pred_matrix = components.pivot_table(index=key, columns="component_label", values="training_fit_pred", aggfunc="first")
+    weight_map = components.groupby("component_label")["component_weight"].first()
+    expected = pred_matrix[["C1", "C2", "C3", "C4"]].mul(weight_map[["C1", "C2", "C3", "C4"]], axis=1).sum(axis=1)
+    observed = weighted.set_index(key)["training_fit_pred"].sort_index()
+    expected = expected.reindex(observed.index)
+    assert expected.notna().all()
+    assert (observed - expected).abs().max() == pytest.approx(0.0, abs=0.000001)
+
+
+def test_heavy_summary_matches_weighted_training_fit_parquet() -> None:
+    summary = read_source("r2_ladder_summary.csv")
+    heavy_summary = summary[summary["stream_label"].eq("Heavy RUC volume")].set_index("score_basis")
+    rows = pd.read_parquet(HEAVY_TRAINING_FIT_DIR / "training_fit_predictions.parquet")
+    weighted = rows[rows["training_fit_stage"].eq("weighted_ensemble_final")]
+    expected = {}
+    for basis, group in weighted.groupby("score_basis"):
+        actual = group["actual"].astype(float)
+        pred = group["training_fit_pred"].astype(float)
+        expected[basis] = 1.0 - float(((actual - pred) ** 2).sum() / ((actual - actual.mean()) ** 2).sum())
+
+    assert set(heavy_summary.index) == set(expected)
+    for basis, value in expected.items():
+        assert float(heavy_summary.loc[basis, "training_fit_r2"]) == pytest.approx(value, abs=0.000001)
+        assert heavy_summary.loc[basis, "training_fit_stage"] == "weighted_ensemble_final"
+        assert heavy_summary.loc[basis, "availability_status"] == "available"
+
+
 def test_training_fit_rows_do_not_feed_main_kpi_scenario_or_stress_sources() -> None:
     forbidden_source = "training_fit_predictions"
     protected_sources = [
@@ -169,9 +218,11 @@ def test_training_fit_rows_do_not_feed_main_kpi_scenario_or_stress_sources() -> 
         assert forbidden_source not in text, name
 
 
-def test_light_training_fit_csv_mirrors_are_not_allowed() -> None:
+def test_training_fit_csv_mirrors_are_not_allowed() -> None:
     forbidden = [
         LIGHT_TRAINING_FIT_DIR / "training_fit_predictions.csv",
         LIGHT_TRAINING_FIT_DIR / "training_fit_r2_summary.csv",
+        HEAVY_TRAINING_FIT_DIR / "training_fit_predictions.csv",
+        HEAVY_TRAINING_FIT_DIR / "training_fit_r2_summary.csv",
     ]
     assert not any(path.exists() for path in forbidden), [str(path) for path in forbidden if path.exists()]
