@@ -97,6 +97,9 @@ def test_heavy_light_and_ped_specific_r2_ladder_rules() -> None:
     assert set(ped["availability_status"]) == {"available"}
     assert set(ped["training_fit_stage"]) == {"hpo_refine_final_fitted"}
     assert ped["training_fit_r2"].astype(float).gt(0.999).all()
+    ped_by_basis = ped.set_index("score_basis")
+    assert float(ped_by_basis.loc[OPERATIONAL_SCORE_BASIS, "training_fit_r2"]) == pytest.approx(0.999862, abs=0.000001)
+    assert float(ped_by_basis.loc[PAPER_SCORE_BASIS, "training_fit_r2"]) == pytest.approx(0.999563, abs=0.000001)
     assert ped["inner_hpo_weights_status"].dropna().str.startswith("available_").all()
     assert ped["nested_replay_status"].dropna().str.startswith("available_").all()
 

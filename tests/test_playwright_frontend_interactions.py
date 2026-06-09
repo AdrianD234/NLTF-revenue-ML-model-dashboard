@@ -383,14 +383,22 @@ def test_governance_reproducibility_page_stream_selector_and_downloads(page: Pag
     expect(body).to_contain_text("Component contribution (PED)", timeout=90000)
     expect(body).to_contain_text("Feature-level refit not attempted; inner HPO/static-solver audit remains partial.", timeout=90000)
     expect(body).to_contain_text("Feature-level refit and exact inner weighted replay remain future audit layers.", timeout=90000)
-    expect(body).to_contain_text("HPO weights grouped by source_file", timeout=90000)
+    expect(body).to_contain_text("HPO weights grouped by vendored source artifact", timeout=90000)
+    expect(body).to_contain_text("Source artifacts vendored in repo", timeout=90000)
+    expect(body).to_contain_text("SHA256", timeout=90000)
+    expect(body).to_contain_text("data/dashboard_evidence_pack_reproducibility/ped_inner_hpo/source_artifacts/", timeout=90000)
     expect(body).to_contain_text("Nested trace", timeout=90000)
     expect(body).to_contain_text("Gap register", timeout=90000)
     expect(body).to_contain_text("Training-fit R2 is available; forecast R2 0.465", timeout=90000)
     expect(body).to_contain_text("1.000", timeout=90000)
     assert page.get_by_text("Feature importance (PED)", exact=True).count() == 0
     expect(body).to_contain_text("SHAP not yet generated", timeout=60000)
-    assert "This Governance & Reproducibility page is read-only" not in body.inner_text(timeout=60000)
+    page_text = body.inner_text(timeout=60000)
+    assert "This Governance & Reproducibility page is read-only" not in page_text
+    assert "C:\\Users" not in page_text
+    assert "Downloads" not in page_text
+    assert "OneDrive" not in page_text
+    assert "AppData" not in page_text
     assert_no_streamlit_exception(page)
 
 

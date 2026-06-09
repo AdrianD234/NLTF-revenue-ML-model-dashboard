@@ -57,6 +57,8 @@ from model_dashboard.reproducibility_imports import (
     ped_inner_hpo_audit_summary,
     ped_inner_hpo_gap_register_view,
     ped_inner_hpo_nested_trace_view,
+    ped_inner_hpo_public_source_reference,
+    ped_inner_hpo_source_artifacts_view,
     ped_inner_hpo_weight_detail_view,
     ped_inner_hpo_weight_source_view,
     reproducibility_coefficients_view,
@@ -1880,7 +1882,7 @@ def render_page5_filter_strip(
                 on_click=lambda: st.session_state.__setitem__("page5_reset_requested", True),
             )
         with cols[5]:
-            with st.popover("Downloads", use_container_width=True):
+            with st.popover("Exports", use_container_width=True):
                 render_page5_download_buttons(
                     stream_map.get(str(selected_short or "All streams"), "All streams"),
                     loaded_packs,
@@ -1982,7 +1984,18 @@ def page5_repro_card_html(stream_label: str, pack: Any | None, ped_inner_hpo_pac
 
 def page5_ped_inner_status_rows(ped_inner_hpo_pack: Any | None) -> list[tuple[str, str]]:
     if ped_inner_hpo_pack is None or not getattr(ped_inner_hpo_pack, "available", False):
-        missing = ", ".join(getattr(ped_inner_hpo_pack, "missing_files", ())[:4]) if ped_inner_hpo_pack is not None else "pack load failed"
+        missing_files = list(getattr(ped_inner_hpo_pack, "missing_files", ())) if ped_inner_hpo_pack is not None else []
+        priority_missing = [
+            name
+            for name in (
+                "manifest.json",
+                "parquet_write_status.json",
+                "model_registry.parquet",
+                "source_artifacts_manifest.json",
+            )
+            if name in missing_files
+        ]
+        missing = ", ".join(priority_missing or missing_files[:4]) if ped_inner_hpo_pack is not None else "pack load failed"
         return [
             ("Inner audit status", "Missing PED inner HPO/static-solver audit pack"),
             ("Inner audit evidence", missing or "required audit files missing"),
@@ -2083,16 +2096,26 @@ def render_page5_ped_inner_hpo_audit_panel(ped_inner_hpo_pack: Any | None) -> No
         [
             ("Main status", str(summary.get("outer_status")), f"max delta {outer_delta_text}"),
             ("Inner audit status", str(summary.get("inner_status")), f"nested max delta {inner_delta_text}"),
-            ("Weight sources", f"{summary.get('weight_source_count', 0)} source_file groups", "HPO and arbitration rows are grouped separately"),
+            ("Weight sources", f"{summary.get('weight_source_count', 0)} vendored source groups", "HPO and arbitration rows are grouped separately"),
+            ("Source artifacts", str(summary.get("source_artifact_status", "source artifacts vendored in repo")), "repo-relative paths and SHA256 hashes"),
             ("Pack role", "Auxiliary governance", "read-only; does not feed main calculations"),
         ]
     )
     info_panel("PED is exact at stored component-prediction level; inner HPO/static-solver rebuild remains a future audit layer.")
     info_panel(str(summary.get("description", "")))
+    info_panel(
+        "Source artifacts vendored in repo. PED training-fit R2 was reconstructed from repo-vendored "
+        "finalist-arbitration source script, HPO refinement weights, and compact arbitration lineage artifacts."
+    )
+
+    artifacts = ped_inner_hpo_source_artifacts_view(ped_inner_hpo_pack)
+    if not artifacts.empty:
+        with st.expander("Source artifacts vendored in repo", expanded=False):
+            display_table(artifacts, height=260, max_rows=30)
 
     cols = st.columns([1.05, 1.25, 0.9])
     with cols[0]:
-        section_title("HPO weights grouped by source_file")
+        section_title("HPO weights grouped by vendored source artifact")
         info_panel("Per-source weight sums are shown separately; HPO refinement rows and arbitration lineage rows are never mixed into one total.")
         display_table(ped_inner_hpo_weight_source_view(ped_inner_hpo_pack), height=210, max_rows=8)
         with st.expander("Weight row detail", expanded=False):
@@ -2156,7 +2179,7 @@ def render_page5_lower_panels(
     with lower_cols[4]:
         st.markdown(
             "<div class='page5-panel'>"
-            "<div class='page5-panel-title'>Downloads</div>"
+            "<div class='page5-panel-title'>Exports</div>"
             "<div class='page5-panel-sub'>Current reproducibility pack and provenance exports.</div>"
             "</div>",
             unsafe_allow_html=True,
@@ -2621,7 +2644,9 @@ def page5_registry_frame(packs: dict[str, Any]) -> pd.DataFrame:
                     "Window": page5_window_text(row),
                     "Hyperparameters": first_non_empty(row, ["hyperparameters_json", "Hyperparameters", "feature_columns_json"], default="-"),
                     "Score basis": first_non_empty(row, ["score_basis"], default=score_basis),
-                    "Source script/run": first_non_empty(row, ["source_script", "source_parent_run", "parent_run"], default="-"),
+                    "Source script/run": page5_public_source_reference(
+                        first_non_empty(row, ["source_script", "source_parent_run", "parent_run", "source_run"], default="-")
+                    ),
                     "Status": first_non_empty(row, ["reproducibility_status", "reproducibility_level"], default="exact replay"),
                 }
             )
@@ -2629,6 +2654,24 @@ def page5_registry_frame(packs: dict[str, Any]) -> pd.DataFrame:
     for col in frame.columns:
         frame[col] = frame[col].map(lambda value: _short_text(value, 70))
     return frame
+
+
+def page5_public_source_reference(value: Any) -> str:
+    text = "" if value is None else str(value)
+    if not text or text == "-":
+        return "-"
+    try:
+        pack = load_ped_inner_hpo_audit_pack()
+        return ped_inner_hpo_public_source_reference(pack, text)
+    except Exception:
+        return _strip_local_source_path(text)
+
+
+def _strip_local_source_path(value: str) -> str:
+    normalised = value.replace("\\", "/")
+    if any(token in normalised.lower() for token in ["c:/users", "downloads", "onedrive", "appdata"]):
+        return Path(normalised).name or "local source path hidden"
+    return value
 
 
 def first_non_empty(row: pd.Series, columns: list[str], *, default: str = "-") -> str:

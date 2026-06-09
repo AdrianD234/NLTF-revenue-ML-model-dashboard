@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import hashlib
+import json
 
 import numpy as np
 import pandas as pd
@@ -33,6 +34,8 @@ from model_dashboard.light_ruc_reproducibility import (
     ped_inner_hpo_audit_summary,
     ped_inner_hpo_gap_register_view,
     ped_inner_hpo_nested_trace_view,
+    ped_inner_hpo_public_source_reference,
+    ped_inner_hpo_source_artifacts_view,
     ped_inner_hpo_weight_detail_view,
     ped_inner_hpo_weight_source_view,
     reproducibility_component_trace_view,
@@ -52,6 +55,11 @@ from tests.fixtures.expected_values import EXPECTED_FINALIST_MAPE
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA_ROOT = ROOT / "data" / "dashboard_evidence_pack"
+
+
+def contains_local_path_token(text: str) -> bool:
+    lowered = str(text).casefold()
+    return any(token in lowered for token in ["c:\\users", "c:/users", "downloads", "onedrive", "appdata", "adrian~1"])
 
 
 def test_light_ruc_reproducibility_validator_passes() -> None:
@@ -204,6 +212,49 @@ def test_ped_inner_hpo_audit_is_partial_and_keeps_outer_replay_exact() -> None:
     assert float(pd.to_numeric(prediction_comparison["abs_delta_rebuilt_vs_evidence"], errors="coerce").max()) <= 1e-8
 
 
+def test_ped_inner_hpo_source_artifacts_are_vendored_and_hash_backed() -> None:
+    pack = load_ped_inner_hpo_audit_pack()
+    manifest_path = PED_INNER_HPO_REPRO_ROOT / "source_artifacts_manifest.json"
+    manifest_md_path = PED_INNER_HPO_REPRO_ROOT / "source_artifacts_manifest.md"
+    source_root = PED_INNER_HPO_REPRO_ROOT / "source_artifacts"
+
+    assert "source_artifacts_manifest.json" in REQUIRED_PED_INNER_HPO_AUDIT_FILES
+    assert "source_artifacts_manifest.md" in REQUIRED_PED_INNER_HPO_AUDIT_FILES
+    assert manifest_path.exists()
+    assert manifest_md_path.exists()
+    manifest_text = manifest_path.read_text(encoding="utf-8")
+    assert not contains_local_path_token(manifest_text)
+
+    manifest = json.loads(manifest_text)
+    rows = manifest["artifacts"]
+    assert rows
+    assert manifest["local_paths_included"] is False
+    assert "source artifacts vendored in repo" in ped_inner_hpo_audit_summary(pack)["source_artifact_status"]
+
+    required_names = {
+        "scripts/stage1_finalist_arbitration.py",
+        "hpo_refinement_core_outputs/hpo_refined_ensemble_weights.csv",
+        "finalist_arbitration_run_20260520_002339/candidate_config_inventory.csv",
+        "finalist_arbitration_run_20260520_002339/ensemble_weights.csv",
+    }
+    assert required_names.issubset({row["artifact_name"] for row in rows})
+
+    for row in rows:
+        repo_path = Path(row["repo_relative_path"])
+        path = Path(__file__).resolve().parents[1] / repo_path
+        assert path.exists(), row
+        assert source_root in path.parents or path == source_root
+        assert int(row["size_bytes"]) <= 50 * 1024 * 1024
+        assert len(row["sha256"]) == 64
+        assert hashlib.sha256(path.read_bytes()).hexdigest() == row["sha256"]
+        assert not contains_local_path_token(row["repo_relative_path"])
+
+    view = ped_inner_hpo_source_artifacts_view(pack)
+    assert not view.empty
+    assert view["SHA256"].astype(str).str.fullmatch(r"[0-9a-f]{64}").all()
+    assert not contains_local_path_token(" ".join(view["Repo-relative path"].astype(str)))
+
+
 def test_ped_inner_hpo_weights_are_grouped_by_source_file() -> None:
     pack = load_ped_inner_hpo_audit_pack()
     source_view = ped_inner_hpo_weight_source_view(pack)
@@ -214,6 +265,13 @@ def test_ped_inner_hpo_weights_are_grouped_by_source_file() -> None:
     assert float(sums.loc["HPO refinement source"]) == pytest.approx(1.0, abs=1e-8)
     assert float(sums.loc["Arbitration lineage/context"]) == pytest.approx(0.4292679798198642, abs=1e-8)
     assert 1.4292679798198642 not in set(float(value) for value in source_view["Per-source weight sum"])
+    assert source_view["SHA256"].astype(str).str.fullmatch(r"[0-9a-f]{64}").all()
+    assert detail["SHA256"].astype(str).str.fullmatch(r"[0-9a-f]{64}").all()
+    assert not contains_local_path_token(" ".join(source_view["Source file"].astype(str)))
+    assert not contains_local_path_token(" ".join(detail["Source file"].astype(str)))
+    assert source_view["Source file"].astype(str).str.startswith(
+        "data/dashboard_evidence_pack_reproducibility/ped_inner_hpo/source_artifacts/"
+    ).all()
 
     hpo_actual = detail[
         detail["Source role"].eq("HPO refinement source")
@@ -227,6 +285,10 @@ def test_ped_inner_hpo_weights_are_grouped_by_source_file() -> None:
     assert float(hpo_actual["Weight within source"].sum()) == pytest.approx(1.0, abs=1e-8)
     arbitration = detail[detail["Source role"].eq("Arbitration lineage/context")]
     assert set(arbitration["Interpretation"]) == {"Lineage/context only unless separately verified"}
+    raw_local_reference = r"C:\Users\Adrian Desilvestro\Downloads\stage1_hpo_refinement_core_outputs\hpo_refined_ensemble_weights.csv"
+    assert ped_inner_hpo_public_source_reference(pack, raw_local_reference).startswith(
+        "data/dashboard_evidence_pack_reproducibility/ped_inner_hpo/source_artifacts/"
+    )
 
 
 def test_ped_inner_hpo_nested_trace_and_gap_register_show_partial_caveat() -> None:

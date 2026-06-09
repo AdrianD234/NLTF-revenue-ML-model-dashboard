@@ -81,6 +81,8 @@ _REPRO_SYMBOLS = {
     "ped_inner_hpo_audit_summary",
     "ped_inner_hpo_gap_register_view",
     "ped_inner_hpo_nested_trace_view",
+    "ped_inner_hpo_public_source_reference",
+    "ped_inner_hpo_source_artifacts_view",
     "ped_inner_hpo_weight_detail_view",
     "ped_inner_hpo_weight_source_view",
     "reproducibility_coefficients_view",
@@ -240,8 +242,17 @@ else:
 
     ped_inner_hpo_gap_register_view = _empty_frame
     ped_inner_hpo_nested_trace_view = _empty_frame
+    ped_inner_hpo_source_artifacts_view = _empty_frame
     ped_inner_hpo_weight_detail_view = _empty_frame
     ped_inner_hpo_weight_source_view = _empty_frame
+
+    def ped_inner_hpo_public_source_reference(pack: Any, source_file: Any) -> str:
+        del pack
+        text = str(source_file)
+        normalised = text.replace("\\", "/")
+        if any(token in normalised.lower() for token in ["c:/users", "downloads", "onedrive", "appdata"]):
+            return Path(normalised).name or "local source path hidden"
+        return text
     reproducibility_coefficients_view = _empty_frame
     reproducibility_component_trace_view = _empty_frame
     reproducibility_feature_importance_view = _empty_frame

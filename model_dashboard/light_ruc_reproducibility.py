@@ -58,6 +58,8 @@ PED_INNER_HPO_REPRO_ROOT = REPRODUCIBILITY_BASE_ROOT / "ped_inner_hpo"
 REQUIRED_PED_INNER_HPO_AUDIT_FILES = (
     "manifest.json",
     "parquet_write_status.json",
+    "source_artifacts_manifest.json",
+    "source_artifacts_manifest.md",
     "ped_inner_hpo_static_solver_audit_report.md",
     "model_registry.parquet",
     "outer_component_replay.parquet",
@@ -304,9 +306,41 @@ def ped_inner_hpo_audit_summary(pack: PedInnerHpoAuditPack) -> dict[str, Any]:
         "outer_max_abs_delta": outer_delta,
         "inner_status": PED_INNER_HPO_AUDIT_STATUS,
         "inner_max_abs_delta": nested_delta,
-        "description": PED_INNER_HPO_AUDIT_DESCRIPTION,
+        "description": (
+            "PED training-fit R2 was reconstructed from repo-vendored finalist-arbitration source script, "
+            "HPO refinement weights, and compact arbitration lineage artifacts. "
+            f"{PED_INNER_HPO_AUDIT_DESCRIPTION}"
+        ),
         "weight_source_count": source_count,
+        "source_artifact_status": _ped_source_artifact_status(pack),
     }
+
+
+def ped_inner_hpo_source_artifacts_view(pack: PedInnerHpoAuditPack) -> pd.DataFrame:
+    artifacts = _ped_source_artifacts(pack)
+    if not artifacts:
+        return pd.DataFrame()
+    frame = pd.DataFrame(artifacts)
+    frame["Artifact role"] = frame.get("artifact_role", pd.Series(dtype=str)).astype(str)
+    frame["Source stage"] = frame.get("source_stage", pd.Series(dtype=str)).astype(str)
+    frame["Repo-relative path"] = frame.get("repo_relative_path", pd.Series(dtype=str)).astype(str)
+    frame["SHA256"] = frame.get("sha256", pd.Series(dtype=str)).astype(str)
+    frame["Size bytes"] = pd.to_numeric(frame.get("size_bytes", pd.Series(dtype=float)), errors="coerce")
+    frame["Used by exporter"] = frame.get("used_by_exporter", pd.Series(dtype=bool)).fillna(False).astype(bool)
+    frame["Required for replay"] = frame.get("required_for_replay", pd.Series(dtype=bool)).fillna(False).astype(bool)
+    frame["Status"] = frame.get("status", pd.Series(dtype=str)).astype(str)
+    return frame[
+        [
+            "Artifact role",
+            "Source stage",
+            "Repo-relative path",
+            "SHA256",
+            "Size bytes",
+            "Used by exporter",
+            "Required for replay",
+            "Status",
+        ]
+    ].sort_values(["Required for replay", "Used by exporter", "Source stage", "Repo-relative path"], ascending=[False, False, True, True])
 
 
 def ped_inner_hpo_weight_source_view(pack: PedInnerHpoAuditPack) -> pd.DataFrame:
@@ -327,7 +361,8 @@ def ped_inner_hpo_weight_source_view(pack: PedInnerHpoAuditPack) -> pd.DataFrame
         .reset_index()
     )
     grouped["Source role"] = grouped["source_file"].map(_ped_inner_source_role)
-    grouped["Source file"] = grouped["source_file"]
+    grouped["Source file"] = grouped["source_file"].map(lambda value: ped_inner_hpo_public_source_reference(pack, value))
+    grouped["SHA256"] = grouped["source_file"].map(lambda value: _ped_source_artifact_sha(pack, value))
     grouped["Rows"] = grouped["rows"].astype(int)
     grouped["Positive rows"] = grouped["positive_rows"].astype(int)
     grouped["Per-source weight sum"] = pd.to_numeric(grouped["source_weight_sum"], errors="coerce")
@@ -336,6 +371,7 @@ def ped_inner_hpo_weight_source_view(pack: PedInnerHpoAuditPack) -> pd.DataFrame
         [
             "Source role",
             "Source file",
+            "SHA256",
             "Rows",
             "Positive rows",
             "Per-source weight sum",
@@ -350,7 +386,8 @@ def ped_inner_hpo_weight_detail_view(pack: PedInnerHpoAuditPack) -> pd.DataFrame
         return pd.DataFrame()
     frame = weights.copy()
     frame["Source role"] = frame["source_file"].fillna("").astype(str).map(_ped_inner_source_role)
-    frame["Source file"] = frame["source_file"].fillna("").astype(str)
+    frame["Source file"] = frame["source_file"].fillna("").astype(str).map(lambda value: ped_inner_hpo_public_source_reference(pack, value))
+    frame["SHA256"] = frame["source_file"].fillna("").astype(str).map(lambda value: _ped_source_artifact_sha(pack, value))
     frame["Inner component model"] = frame.get("inner_component_model", pd.Series(dtype=str)).astype(str)
     frame["Weight within source"] = pd.to_numeric(frame.get("weight", pd.Series(dtype=float)), errors="coerce")
     frame["Per-source weight sum"] = frame.groupby("Source file", dropna=False)["Weight within source"].transform("sum")
@@ -358,6 +395,7 @@ def ped_inner_hpo_weight_detail_view(pack: PedInnerHpoAuditPack) -> pd.DataFrame
     keep = [
         "Source role",
         "Source file",
+        "SHA256",
         "Inner component model",
         "Weight within source",
         "Per-source weight sum",
@@ -1003,6 +1041,94 @@ def _read_json(path: Path) -> dict[str, Any]:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return {}
+
+
+def _ped_source_artifacts(pack: PedInnerHpoAuditPack) -> list[dict[str, Any]]:
+    data = _read_json(pack.root / "source_artifacts_manifest.json")
+    artifacts = data.get("artifacts", [])
+    if not isinstance(artifacts, list):
+        return []
+    return [artifact for artifact in artifacts if isinstance(artifact, dict)]
+
+
+def _ped_source_artifact_status(pack: PedInnerHpoAuditPack) -> str:
+    artifacts = _ped_source_artifacts(pack)
+    if not artifacts:
+        return "source_artifacts_manifest_missing"
+    copied = sum(1 for artifact in artifacts if str(artifact.get("status")) == "copied")
+    required = sum(1 for artifact in artifacts if bool(artifact.get("required_for_replay")))
+    return f"source artifacts vendored in repo ({copied} copied; {required} replay-required)"
+
+
+def _ped_source_stage_hint(source_file: Any) -> str | None:
+    text = str(source_file).replace("\\", "/").lower()
+    name = Path(text).name
+    if "hpo_refinement_core_outputs" in text or name in {
+        "hpo_refined_ensemble_weights.csv",
+        "hpo_full_validation_summary.csv",
+        "hpo_trials_all_streams.csv",
+        "stage1_scoped_hpo_finalist_report.md",
+    }:
+        return "hpo_refinement"
+    if "stage1_finalist_arbitration_outputs" in text or name in {
+        "candidate_config_inventory.csv",
+        "ensemble_weights.csv",
+        "stage1_finalist_arbitration_report.md",
+        "top50_by_stream.csv",
+    }:
+        return "finalist_arbitration"
+    if "candidate_rescue" in text:
+        return "candidate_rescue"
+    return None
+
+
+def _ped_source_artifact_for_reference(pack: PedInnerHpoAuditPack, source_file: Any) -> dict[str, Any] | None:
+    text = str(source_file)
+    name = Path(text).name
+    if not name:
+        return None
+    artifacts = _ped_source_artifacts(pack)
+    candidates = [artifact for artifact in artifacts if str(artifact.get("original_basename")) == name]
+    stage_hint = _ped_source_stage_hint(source_file)
+    if stage_hint:
+        stage_matches = [artifact for artifact in candidates if str(artifact.get("source_stage")) == stage_hint]
+        if stage_matches:
+            return stage_matches[0]
+    return candidates[0] if candidates else None
+
+
+def _ped_source_artifact_sha(pack: PedInnerHpoAuditPack, source_file: Any) -> str:
+    artifact = _ped_source_artifact_for_reference(pack, source_file)
+    return str(artifact.get("sha256", "")) if artifact else ""
+
+
+def ped_inner_hpo_public_source_reference(pack: PedInnerHpoAuditPack, source_file: Any) -> str:
+    artifact = _ped_source_artifact_for_reference(pack, source_file)
+    if artifact:
+        return str(artifact.get("repo_relative_path", ""))
+    text = str(source_file)
+    normalised = text.replace("\\", "/")
+    if "stage1_hpo_refinement_core_outputs" in normalised:
+        return "data/dashboard_evidence_pack_reproducibility/ped_inner_hpo/source_artifacts/hpo_refinement_core_outputs"
+    if "stage1_finalist_arbitration_outputs" in normalised:
+        return (
+            "data/dashboard_evidence_pack_reproducibility/ped_inner_hpo/source_artifacts/"
+            "finalist_arbitration_run_20260520_002339"
+        )
+    if "candidate_rescue_outputs_run_20260521_163105_20260521_163707.zip" in normalised:
+        return (
+            "data/dashboard_evidence_pack_reproducibility/ped_inner_hpo/source_artifacts/candidate_rescue/"
+            "candidate_rescue_outputs_run_20260521_163105_20260521_163707.zip"
+        )
+    if _looks_like_local_path(normalised):
+        name = Path(normalised).name
+        return f"repo-local source artifact unavailable: {name or 'source'}"
+    return text
+
+
+def _looks_like_local_path(value: str) -> bool:
+    lower = value.lower()
+    return any(token in lower for token in ["c:/users", "downloads", "onedrive", "appdata", "adria"])
 
 
 def _first_row(frame: pd.DataFrame) -> pd.Series:

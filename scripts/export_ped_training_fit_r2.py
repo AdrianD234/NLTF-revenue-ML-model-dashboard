@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -21,21 +22,9 @@ PREQ_SOLVER_MODEL = "PED__solver_preq_convex_top18"
 DIRECT_HPO_COMPONENT = "PED__diff__GBR_learning_rate0_05_max_depth1_n_estimators650__ylag__w40"
 TRAINING_SCOPE = "training_window_fitted_rows"
 
-DEFAULT_SOURCE_SCRIPT = Path.home() / "Downloads" / "stage1_finalist_arbitration.py"
-DEFAULT_HPO_WEIGHTS = Path.home() / "Downloads" / "stage1_hpo_refinement_core_outputs" / "hpo_refined_ensemble_weights.csv"
-DEFAULT_ARBITRATION_RUN = (
-    Path.home()
-    / "OneDrive"
-    / "Documents"
-    / "Playground"
-    / "Revenue Modeling - Strategic Review"
-    / "04 Models"
-    / "Inputs"
-    / "stage1_finalist_arbitration_outputs"
-    / "run_20260520_002339"
-)
 DEFAULT_REPRO_ROOT = Path("data/dashboard_evidence_pack_reproducibility/ped")
 DEFAULT_INNER_REPRO_ROOT = Path("data/dashboard_evidence_pack_reproducibility/ped_inner_hpo")
+DEFAULT_SOURCE_ARTIFACTS_ROOT = DEFAULT_INNER_REPRO_ROOT / "source_artifacts"
 DEFAULT_OUTPUT = DEFAULT_REPRO_ROOT / "training_fit_predictions.parquet"
 
 
@@ -50,9 +39,16 @@ class ReplayEvidence:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Export PED fitted training rows for the R2 ladder.")
     parser.add_argument("--repo-root", type=Path, default=Path.cwd())
-    parser.add_argument("--source-script", type=Path, default=DEFAULT_SOURCE_SCRIPT)
-    parser.add_argument("--arbitration-run", type=Path, default=DEFAULT_ARBITRATION_RUN)
-    parser.add_argument("--hpo-weights", type=Path, default=DEFAULT_HPO_WEIGHTS)
+    parser.add_argument(
+        "--source-artifacts-root",
+        type=Path,
+        default=Path(os.environ.get("PED_HPO_SOURCE_ARTIFACTS_ROOT", str(DEFAULT_SOURCE_ARTIFACTS_ROOT))),
+        help="Repo-local PED source artifact root, or PED_HPO_SOURCE_ARTIFACTS_ROOT for development overrides.",
+    )
+    parser.add_argument("--source-script", type=Path, default=None)
+    parser.add_argument("--arbitration-run", type=Path, default=None)
+    parser.add_argument("--hpo-weights", type=Path, default=None)
+    parser.add_argument("--workbook", type=Path, default=None, help="Optional workbook override for local regeneration.")
     parser.add_argument("--repro-root", type=Path, default=DEFAULT_REPRO_ROOT)
     parser.add_argument("--inner-repro-root", type=Path, default=DEFAULT_INNER_REPRO_ROOT)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
@@ -67,21 +63,28 @@ def main() -> None:
     repro_root = _resolve(repo_root, args.repro_root)
     inner_root = _resolve(repo_root, args.inner_repro_root)
     output = _resolve(repo_root, args.output)
-    run_dir = args.arbitration_run
+    source_root = _resolve(repo_root, args.source_artifacts_root)
+    source_script = _resolve(repo_root, args.source_script) if args.source_script else source_root / "scripts" / "stage1_finalist_arbitration.py"
+    hpo_weights_path = _resolve(repo_root, args.hpo_weights) if args.hpo_weights else source_root / "hpo_refinement_core_outputs" / "hpo_refined_ensemble_weights.csv"
+    run_dir = (
+        _resolve(repo_root, args.arbitration_run)
+        if args.arbitration_run
+        else source_root / "finalist_arbitration_run_20260520_002339"
+    )
 
-    for path in [args.source_script, args.hpo_weights, run_dir / "ensemble_weights.csv", run_dir / "candidate_config_inventory.csv"]:
+    for path in [source_script, hpo_weights_path, run_dir / "ensemble_weights.csv", run_dir / "candidate_config_inventory.csv"]:
         if not path.exists():
             raise FileNotFoundError(f"Required PED source artifact not found: {path}")
 
-    module = _load_source_module(args.source_script)
+    module = _load_source_module(source_script)
     registry = pd.read_parquet(repro_root / "model_registry.parquet")
     component_predictions = pd.read_parquet(repro_root / "component_predictions.parquet")
     inner_predictions = pd.read_parquet(inner_root / "inner_component_predictions.parquet")
     _assert_registry_matches(registry)
 
-    workbook = Path(str(registry["source_workbook"].iloc[0]))
+    workbook = _resolve(repo_root, args.workbook) if args.workbook else Path(str(registry["source_workbook"].iloc[0]))
     stream_data = _build_stream_data(module, workbook)
-    hpo_weights = _hpo_weights(args.hpo_weights)
+    hpo_weights = _hpo_weights(hpo_weights_path)
     static_weights = _static_weights(run_dir / "ensemble_weights.csv")
     preq_weights = _preq_weights(run_dir / "ensemble_weights.csv")
     candidate_configs = _candidate_configs(module, run_dir / "candidate_config_inventory.csv", static_weights, preq_weights, hpo_weights)
@@ -106,7 +109,7 @@ def main() -> None:
         stream_data,
         candidate_configs,
         score_basis_origins,
-        args.source_script,
+        source_script,
         evidence,
     )
     static_rows = _weighted_training_rows(
