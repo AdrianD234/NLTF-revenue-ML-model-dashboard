@@ -27,3 +27,8 @@ data/**
 !data/dashboard_evidence_pack/data/*.parquet
 !data/dashboard_evidence_pack/docs/
 !data/dashboard_evidence_pack/docs/**
+!data/dashboard_evidence_pack_reproducibility/
+!data/dashboard_evidence_pack_reproducibility/ped_inner_hpo/
+!data/dashboard_evidence_pack_reproducibility/ped_inner_hpo/*.json
+!data/dashboard_evidence_pack_reproducibility/ped_inner_hpo/*.md
+!data/dashboard_evidence_pack_reproducibility/ped_inner_hpo/*.parquet

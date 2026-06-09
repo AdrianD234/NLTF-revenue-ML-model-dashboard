@@ -73,6 +73,14 @@ def validate() -> list[tuple[str, str, str]]:
         "Diagnostics KPI title inspected in app.py.",
     )
     record(
+        "Forecast R2 and calibration R2 are distinguished",
+        "Forecast R2 versus calibration R2" in app_text
+        and "Net forecast R2 after final model composition" in app_text
+        and "actual-on-forecast validation regression" in app_text
+        and "in-sample OLS R2" not in app_text,
+        "Diagnostics and Governance labels distinguish net forecast R2 from calibration R2.",
+    )
+    record(
         "Full-sample gain chart is not labelled paired",
         "3. Full-sample Gain vs Schiff specification benchmark" in app_text and "Paired Gain vs Schiff" not in app_text,
         "Schiff gain chart title inspected in app.py.",
@@ -194,7 +202,7 @@ def validate() -> list[tuple[str, str, str]]:
 
     record(
         "Page 5 unavailable explainability panels render governance caveats",
-        "Not emitted by parent HPO/static-solver run; future inner-solver audit required." in app_text
+        "Feature-level refit not attempted; inner HPO/static-solver audit remains partial." in app_text
         and "Not emitted by parent component runs; future component-level replay required." in app_text
         and "page5-caveat-card" in app_text
         and "render_page5_missing_panel" in app_text,

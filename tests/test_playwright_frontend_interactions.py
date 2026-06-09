@@ -16,6 +16,10 @@ CHART_SOURCE_DIR = Path("artifacts/chart_sources")
 
 APP_URL = os.environ.get("STAGE1_DASHBOARD_URL", "http://localhost:8501")
 TARGET_VIEWPORT = {"width": 2048, "height": 1005}
+pytestmark = pytest.mark.skipif(
+    os.environ.get("STAGE1_REQUIRE_FRONTEND_INTERACTIONS") != "1",
+    reason="frontend interaction hard gate is run by verify_dashboard.ps1 after Streamlit starts",
+)
 
 PAGES = [
     ("Overview", "final-overview.png"),
@@ -33,6 +37,7 @@ PAGE_PANELS = {
         "4. Stress and Horizon Checks",
     ],
     "Diagnostics": [
+        "Forecast R2 versus calibration R2",
         "1. Residual Autocorrelation by Lag",
         "2. Residual vs Fitted",
         "3. Diagnostic Pass Matrix",
@@ -57,6 +62,7 @@ PAGE_PANELS = {
         "Model glossary",
         "Registry",
         "Component trace",
+        "Net forecast R2 after final model composition",
         "SHAP not yet generated",
     ],
 }
@@ -85,6 +91,11 @@ RAW_HOVER_TERMS = [
 def require_frontend_hard_gate() -> None:
     if os.environ.get("STAGE1_REQUIRE_FRONTEND_INTERACTIONS") != "1":
         pytest.skip("frontend interaction hard gate is run by verify_dashboard.ps1 after Streamlit starts")
+
+
+@pytest.fixture(autouse=True)
+def require_frontend_interaction_gate() -> None:
+    require_frontend_hard_gate()
 
 
 def assert_no_streamlit_exception(page: Page) -> None:
@@ -343,6 +354,10 @@ def test_governance_reproducibility_page_stream_selector_and_downloads(page: Pag
     page.get_by_text("Heavy RUC", exact=True).first.click()
     expect(body).to_contain_text("Exact weighted-ensemble replay", timeout=90000)
     expect(body).to_contain_text("Component trace", timeout=90000)
+    expect(body).to_contain_text("Net forecast R2 after final model composition", timeout=90000)
+    expect(body).to_contain_text("Forecast R2", timeout=90000)
+    expect(body).to_contain_text("Component R2", timeout=90000)
+    expect(body).to_contain_text("final_pred", timeout=90000)
     expect(body).to_contain_text("Ensemble component contribution (Heavy RUC)", timeout=90000)
     expect(body).to_contain_text("Not emitted by parent component runs; future component-level replay required.", timeout=90000)
     expect(body).to_contain_text("Rerun C1-C4 component builders with coefficients/importances and scenario perturbations.", timeout=90000)
@@ -356,10 +371,14 @@ def test_governance_reproducibility_page_stream_selector_and_downloads(page: Pag
     expect(body).to_contain_text("OLS base coefficients (Light RUC)", timeout=90000)
     expect(body).to_contain_text("Scenario sensitivities (Light RUC)", timeout=90000)
     page.get_by_text("PED", exact=True).first.click()
-    expect(body).to_contain_text("PED finalist exactly replays the stored HPO/static-solver component prediction", timeout=90000)
+    expect(body).to_contain_text("PED is exact at stored component-prediction level; inner HPO/static-solver rebuild remains a future audit layer.", timeout=90000)
+    expect(body).to_contain_text("Inner HPO/static-solver audit: partial", timeout=90000)
     expect(body).to_contain_text("Component contribution (PED)", timeout=90000)
-    expect(body).to_contain_text("Not emitted by parent HPO/static-solver run; future inner-solver audit required.", timeout=90000)
-    expect(body).to_contain_text("Freeze the inner HPO/static-solver registry and add feature-level component replay.", timeout=90000)
+    expect(body).to_contain_text("Feature-level refit not attempted; inner HPO/static-solver audit remains partial.", timeout=90000)
+    expect(body).to_contain_text("Feature-level refit and exact inner weighted replay remain future audit layers.", timeout=90000)
+    expect(body).to_contain_text("HPO weights grouped by source_file", timeout=90000)
+    expect(body).to_contain_text("Nested trace", timeout=90000)
+    expect(body).to_contain_text("Gap register", timeout=90000)
     assert page.get_by_text("Feature importance (PED)", exact=True).count() == 0
     expect(body).to_contain_text("SHAP not yet generated", timeout=60000)
     assert "This Governance & Reproducibility page is read-only" not in body.inner_text(timeout=60000)
@@ -369,6 +388,17 @@ def test_governance_reproducibility_page_stream_selector_and_downloads(page: Pag
 def test_diagnostic_pass_matrix_tooltips_hover_and_focus(page: Page) -> None:
     open_dashboard(page)
     click_page(page, "Diagnostics")
+
+    calibration_kpi = page.locator(".kpi-title").filter(has_text="Mean calibration R2").first
+    expect(calibration_kpi).to_be_visible(timeout=90000)
+    tooltip_text = calibration_kpi.get_attribute("title")
+    assert tooltip_text is not None
+    assert "actual-on-forecast validation regression" in tooltip_text
+    assert "Forecast R2 is reported in the detail panel" in tooltip_text
+    calibration_kpi.hover()
+    page.get_by_text("Forecast R2 versus calibration R2", exact=True).first.click()
+    expect(page.locator("body")).to_contain_text("forecast_r2", timeout=60000)
+    expect(page.locator("body")).to_contain_text("calibration_r2", timeout=60000)
 
     matrix = page.locator(".diagnostic-tooltip-matrix")
     expect(matrix).to_be_visible(timeout=90000)

@@ -28,6 +28,7 @@ This page is complete only when Page 5 renders as a polished Waka Kotahi / NZTA-
 
 - Light RUC wording: `Two-stage OLS base plus GBM residual correction, exactly replayed against evidence predictions.`
 - Heavy RUC wording: `Four-component weighted ensemble exactly replayed against evidence predictions.`
-- PED wording: `PED finalist exactly replays the stored HPO/static-solver component prediction; inner HPO/static-solver rebuild remains a future audit layer.`
+- PED wording: `PED is exact at stored component-prediction level; inner HPO/static-solver rebuild remains a future audit layer.`
+- PED inner audit wording: `Inner HPO/static-solver audit: partial`.
 - Scenario sensitivity wording uses `impact on dependent variable / model target`.
 - SHAP wording is `SHAP not yet generated`; no fabricated SHAP output is permitted.

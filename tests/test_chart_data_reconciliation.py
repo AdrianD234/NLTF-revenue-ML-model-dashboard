@@ -201,6 +201,8 @@ def test_diagnostics_kpi_basis_is_current_finalists_only(parquet_dashboard: Load
     assert cards["Mean calibration R2"][1] == f"{expected_r2:.2f}"
     assert "Current finalists only" in cards["Mean Durbin-Watson"][2]
     assert "Current finalists only" in cards["Mean calibration R2"][2]
+    assert "actual-on-forecast validation regression" in cards["Mean calibration R2"][6]
+    assert "Forecast R2 is reported in the detail panel" in cards["Mean calibration R2"][6]
     kpi_source = pd.read_csv(ARTIFACTS / "diagnostics_kpi_source_table.csv")
     assert set(kpi_source["basis"]) == {"Current finalist rows only"}
 

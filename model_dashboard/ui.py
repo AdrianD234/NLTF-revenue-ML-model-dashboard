@@ -447,6 +447,20 @@ def inject_theme() -> None:
                 line-height: 1.25;
                 margin-bottom: 0.08rem;
             }}
+            .kpi-help {{
+                align-items: center;
+                background: #E6F4F1;
+                border: 1px solid #008C82;
+                border-radius: 999px;
+                color: #002B5C;
+                display: inline-flex;
+                font-size: 0.58rem;
+                font-weight: 800;
+                height: 0.9rem;
+                justify-content: center;
+                margin-left: 0.2rem;
+                width: 0.9rem;
+            }}
             .kpi-value {{
                 color: #0F172A;
                 font-size: 1.42rem;
@@ -1247,19 +1261,23 @@ def footer_strip(left: str, right: str) -> None:
     )
 
 
-def gov_kpi_grid(cards: Iterable[tuple[str, str, str | None, str | None, str | None, str | None]]) -> None:
+def gov_kpi_grid(cards: Iterable[tuple[Any, ...]]) -> None:
     html_cards = []
-    for title, value, subtext, delta, tone, icon in cards:
+    for card in cards:
+        title, value, subtext, delta, tone, icon, *rest = card
+        tooltip = str(rest[0]) if rest else ""
         delta_color = {
             "good": "#00843D",
             "bad": "#B42318",
             "mixed": "#F37021",
         }.get(tone or "good", "#00843D")
+        tooltip_attr = f' title="{html.escape(tooltip, quote=True)}" aria-label="{html.escape(tooltip, quote=True)}"' if tooltip else ""
+        help_html = f"<span class='kpi-help'{tooltip_attr}>?</span>" if tooltip else ""
         html_cards.append(
             "<div class='gov-kpi-card'>"
             f"<div class='gov-kpi-icon'>{html.escape(icon or '*')}</div>"
             "<div>"
-            f"<div class='kpi-title'>{html.escape(title)}</div>"
+            f"<div class='kpi-title'{tooltip_attr}>{html.escape(title)} {help_html}</div>"
             f"<div class='kpi-value'>{html.escape(value)}</div>"
             f"<div class='kpi-sub'>{html.escape(subtext or '')}</div>"
             f"<div class='gov-kpi-delta' style='color:{delta_color}'>{html.escape(delta or '')}</div>"

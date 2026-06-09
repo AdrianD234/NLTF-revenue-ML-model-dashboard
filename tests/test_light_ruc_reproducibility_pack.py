@@ -9,6 +9,8 @@ import pytest
 
 from model_dashboard.evidence_pack import load_evidence_pack
 from model_dashboard.light_ruc_reproducibility import (
+    PED_INNER_HPO_AUDIT_STATUS,
+    PED_INNER_HPO_REPRO_ROOT,
     LIGHT_RUC_REPRO_DESCRIPTION,
     HEAVY_RUC_REPRO_MODEL,
     HEAVY_RUC_REPRO_ROOT,
@@ -17,6 +19,7 @@ from model_dashboard.light_ruc_reproducibility import (
     PED_REPRO_DESCRIPTION,
     PED_REPRO_MODEL,
     PED_REPRO_ROOT,
+    REQUIRED_PED_INNER_HPO_AUDIT_FILES,
     REQUIRED_HEAVY_RUC_REPRO_FILES,
     REQUIRED_LIGHT_RUC_REPRO_FILES,
     REQUIRED_PED_REPRO_FILES,
@@ -26,6 +29,12 @@ from model_dashboard.light_ruc_reproducibility import (
     light_ruc_registry_view,
     light_ruc_replay_summary,
     light_ruc_sensitivity_view,
+    load_ped_inner_hpo_audit_pack,
+    ped_inner_hpo_audit_summary,
+    ped_inner_hpo_gap_register_view,
+    ped_inner_hpo_nested_trace_view,
+    ped_inner_hpo_weight_detail_view,
+    ped_inner_hpo_weight_source_view,
     reproducibility_component_trace_view,
     reproducibility_ensemble_equation,
     reproducibility_ensemble_weight_view,
@@ -81,6 +90,13 @@ def test_ped_reproducibility_copy_contains_only_allowed_files() -> None:
     assert set(REQUIRED_PED_REPRO_FILES).issubset(names)
     assert not {path.name for path in PED_REPRO_ROOT.glob("*.csv")}
     assert not {path.name for path in PED_REPRO_ROOT.glob("*.xlsx")}
+
+
+def test_ped_inner_hpo_copy_contains_only_allowed_files() -> None:
+    names = {path.name for path in PED_INNER_HPO_REPRO_ROOT.iterdir() if path.is_file()}
+    assert set(REQUIRED_PED_INNER_HPO_AUDIT_FILES).issubset(names)
+    assert not {path.name for path in PED_INNER_HPO_REPRO_ROOT.glob("*.csv")}
+    assert not {path.name for path in PED_INNER_HPO_REPRO_ROOT.glob("*.xlsx")}
 
 
 def test_light_ruc_replay_delta_and_recipe_are_exact() -> None:
@@ -171,6 +187,65 @@ def test_ped_component_replay_rebuilds_final_prediction() -> None:
         - pd.to_numeric(components["rebuilt_pred"], errors="coerce")
     ).abs()
     assert float(delta.max()) <= 1e-8
+
+
+def test_ped_inner_hpo_audit_is_partial_and_keeps_outer_replay_exact() -> None:
+    pack = load_ped_inner_hpo_audit_pack()
+    summary = ped_inner_hpo_audit_summary(pack)
+    prediction_comparison = pack.table("evidence_prediction_comparison")
+
+    assert pack.available
+    assert not pack.missing_files
+    assert PED_INNER_HPO_REPRO_ROOT.joinpath("model_registry.parquet").exists()
+    assert summary["outer_status"] == "Exact component-prediction replay"
+    assert float(summary["outer_max_abs_delta"]) <= 1e-8
+    assert summary["inner_status"] == PED_INNER_HPO_AUDIT_STATUS
+    assert float(summary["inner_max_abs_delta"]) > 1e-5
+    assert float(pd.to_numeric(prediction_comparison["abs_delta_rebuilt_vs_evidence"], errors="coerce").max()) <= 1e-8
+
+
+def test_ped_inner_hpo_weights_are_grouped_by_source_file() -> None:
+    pack = load_ped_inner_hpo_audit_pack()
+    source_view = ped_inner_hpo_weight_source_view(pack)
+    detail = ped_inner_hpo_weight_detail_view(pack)
+
+    assert set(source_view["Source role"]) == {"HPO refinement source", "Arbitration lineage/context"}
+    sums = source_view.set_index("Source role")["Per-source weight sum"]
+    assert float(sums.loc["HPO refinement source"]) == pytest.approx(1.0, abs=1e-8)
+    assert float(sums.loc["Arbitration lineage/context"]) == pytest.approx(0.4292679798198642, abs=1e-8)
+    assert 1.4292679798198642 not in set(float(value) for value in source_view["Per-source weight sum"])
+
+    hpo_actual = detail[
+        detail["Source role"].eq("HPO refinement source")
+        & detail["Interpretation"].eq("Actual HPOREFINE component")
+    ]
+    assert set(hpo_actual["Inner component model"]) == {
+        "PED__solver_static_convex_top18",
+        "PED__solver_preq_convex_top18",
+        "PED__diff__GBR_learning_rate0_05_max_depth1_n_estimators650__ylag__w40",
+    }
+    assert float(hpo_actual["Weight within source"].sum()) == pytest.approx(1.0, abs=1e-8)
+    arbitration = detail[detail["Source role"].eq("Arbitration lineage/context")]
+    assert set(arbitration["Interpretation"]) == {"Lineage/context only unless separately verified"}
+
+
+def test_ped_inner_hpo_nested_trace_and_gap_register_show_partial_caveat() -> None:
+    pack = load_ped_inner_hpo_audit_pack()
+    nested = ped_inner_hpo_nested_trace_view(pack)
+    gaps = ped_inner_hpo_gap_register_view(pack)
+
+    assert not nested.empty
+    assert {
+        "Rebuilt inner prediction",
+        "Stored outer component prediction",
+        "Delta",
+        "Abs delta",
+        "Max abs inner delta",
+    }.issubset(nested.columns)
+    assert float(nested["Max abs inner delta"].max()) > 1e-5
+    gap_text = gaps.fillna("").astype(str).agg(" ".join, axis=1).str.cat(sep=" | ")
+    assert "feature_level_refit_not_attempted" in gap_text
+    assert "inner_weighted_replay_mismatch" in gap_text
 
 
 def test_light_ruc_auxiliary_views_have_governance_content() -> None:

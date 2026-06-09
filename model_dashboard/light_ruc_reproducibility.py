@@ -25,8 +25,13 @@ LIGHT_RUC_REPRO_DESCRIPTION = (
 )
 PED_REPRO_MODEL = "PED__RESCUE_static_annual_weighted_top12_capnone"
 PED_REPRO_DESCRIPTION = (
-    "PED finalist exactly replays the stored HPO/static-solver component prediction; "
+    "PED is exact at stored component-prediction level; "
     "inner HPO/static-solver rebuild remains a future audit layer."
+)
+PED_INNER_HPO_AUDIT_STATUS = "Inner HPO/static-solver audit: partial"
+PED_INNER_HPO_AUDIT_DESCRIPTION = (
+    "HPO weights and component predictions were found, but the inner weighted replay "
+    "does not exactly match the stored outer component."
 )
 
 COMMON_REQUIRED_REPRO_FILES = (
@@ -47,6 +52,32 @@ COMMON_REQUIRED_REPRO_FILES = (
     "training_window_trace.parquet",
     "evidence_prediction_comparison.parquet",
     "evidence_metric_comparison.parquet",
+)
+
+PED_INNER_HPO_REPRO_ROOT = REPRODUCIBILITY_BASE_ROOT / "ped_inner_hpo"
+REQUIRED_PED_INNER_HPO_AUDIT_FILES = (
+    "manifest.json",
+    "parquet_write_status.json",
+    "ped_inner_hpo_static_solver_audit_report.md",
+    "model_registry.parquet",
+    "outer_component_replay.parquet",
+    "inner_hpo_weights.parquet",
+    "inner_component_registry.parquet",
+    "inner_component_predictions.parquet",
+    "nested_ensemble_trace.parquet",
+    "selection_audit.parquet",
+    "model_coefficients.parquet",
+    "feature_importance.parquet",
+    "feature_importance_global.parquet",
+    "scenario_sensitivities.parquet",
+    "training_window_trace.parquet",
+    "scorecard_summary.parquet",
+    "annual_predictions.parquet",
+    "horizon_profiles.parquet",
+    "stress_horizon.parquet",
+    "evidence_prediction_comparison.parquet",
+    "evidence_metric_comparison.parquet",
+    "reproducibility_gap_register.parquet",
 )
 
 
@@ -127,6 +158,22 @@ class ReproducibilityPack:
 LightRucReproducibilityPack = ReproducibilityPack
 
 
+@dataclass(frozen=True)
+class PedInnerHpoAuditPack:
+    root: Path
+    manifest: dict[str, Any]
+    tables: dict[str, pd.DataFrame]
+    missing_files: tuple[str, ...]
+
+    @property
+    def available(self) -> bool:
+        registry = self.tables.get("model_registry", pd.DataFrame())
+        return not self.missing_files and not registry.empty
+
+    def table(self, name: str) -> pd.DataFrame:
+        return self.tables.get(name, pd.DataFrame()).copy()
+
+
 def reproducibility_stream_labels() -> list[str]:
     return list(REPRODUCIBILITY_STREAM_CONFIGS)
 
@@ -194,6 +241,191 @@ def load_reproducibility_pack(
 
 def load_light_ruc_reproducibility_pack(root: str | Path | None = None) -> LightRucReproducibilityPack:
     return load_reproducibility_pack(LIGHT_RUC_REPRO_CONFIG.stream_label, root)
+
+
+def ped_inner_hpo_audit_signature(root: str | Path | None = None) -> tuple[tuple[str, int, int], ...]:
+    """Return a Streamlit cache signature for the auxiliary PED inner audit pack."""
+    pack_root = Path(root).expanduser() if root else PED_INNER_HPO_REPRO_ROOT
+    signature: list[tuple[str, int, int]] = []
+    for name in REQUIRED_PED_INNER_HPO_AUDIT_FILES:
+        path = pack_root / name
+        if not path.exists():
+            continue
+        stat = path.stat()
+        signature.append((str(path), stat.st_size, stat.st_mtime_ns))
+    return tuple(signature)
+
+
+def load_ped_inner_hpo_audit_pack(root: str | Path | None = None) -> PedInnerHpoAuditPack:
+    """Load the read-only PED inner HPO/static-solver audit pack."""
+    pack_root = Path(root).expanduser() if root else PED_INNER_HPO_REPRO_ROOT
+    if not pack_root.exists():
+        return PedInnerHpoAuditPack(
+            root=pack_root,
+            manifest={},
+            tables={},
+            missing_files=REQUIRED_PED_INNER_HPO_AUDIT_FILES,
+        )
+    missing = tuple(name for name in REQUIRED_PED_INNER_HPO_AUDIT_FILES if not (pack_root / name).exists())
+    manifest = _read_json(pack_root / "manifest.json") if (pack_root / "manifest.json").exists() else {}
+    tables: dict[str, pd.DataFrame] = {}
+    for name in REQUIRED_PED_INNER_HPO_AUDIT_FILES:
+        if not name.endswith(".parquet"):
+            continue
+        path = pack_root / name
+        if path.exists():
+            tables[name.removesuffix(".parquet")] = pd.read_parquet(path)
+    return PedInnerHpoAuditPack(
+        root=pack_root,
+        manifest=manifest,
+        tables=tables,
+        missing_files=missing,
+    )
+
+
+def ped_inner_hpo_audit_summary(pack: PedInnerHpoAuditPack) -> dict[str, Any]:
+    pred_comparison = pack.table("evidence_prediction_comparison")
+    outer_component = pack.table("outer_component_replay")
+    nested = pack.table("nested_ensemble_trace")
+    weights = pack.table("inner_hpo_weights")
+    outer_delta_candidates = [
+        _max_abs_for_columns(pred_comparison, ("abs_delta_rebuilt_vs_evidence", "delta_rebuilt_vs_evidence")),
+        _max_abs_for_columns(outer_component, ("outer_delta",)),
+    ]
+    outer_delta_values = [float(value) for value in outer_delta_candidates if pd.notna(value)]
+    outer_delta = max(outer_delta_values) if outer_delta_values else pd.NA
+    nested_delta = _max_abs_for_columns(
+        nested,
+        ("inner_replay_abs_delta_vs_outer", "inner_replay_delta_vs_outer"),
+    )
+    source_count = int(weights["source_file"].nunique()) if "source_file" in weights.columns else 0
+    return {
+        "outer_status": "Exact component-prediction replay",
+        "outer_max_abs_delta": outer_delta,
+        "inner_status": PED_INNER_HPO_AUDIT_STATUS,
+        "inner_max_abs_delta": nested_delta,
+        "description": PED_INNER_HPO_AUDIT_DESCRIPTION,
+        "weight_source_count": source_count,
+    }
+
+
+def ped_inner_hpo_weight_source_view(pack: PedInnerHpoAuditPack) -> pd.DataFrame:
+    weights = pack.table("inner_hpo_weights")
+    if weights.empty or "source_file" not in weights.columns:
+        return pd.DataFrame()
+    frame = weights.copy()
+    frame["weight"] = pd.to_numeric(frame.get("weight", pd.Series(dtype=float)), errors="coerce")
+    frame["source_file"] = frame["source_file"].fillna("").astype(str)
+    grouped = (
+        frame.groupby("source_file", dropna=False)
+        .agg(
+            rows=("inner_component_model", "count"),
+            positive_rows=("weight", lambda values: int((pd.to_numeric(values, errors="coerce") > 0).sum())),
+            source_weight_sum=("weight", "sum"),
+            components=("inner_component_model", lambda values: "; ".join(str(value) for value in values)),
+        )
+        .reset_index()
+    )
+    grouped["Source role"] = grouped["source_file"].map(_ped_inner_source_role)
+    grouped["Source file"] = grouped["source_file"]
+    grouped["Rows"] = grouped["rows"].astype(int)
+    grouped["Positive rows"] = grouped["positive_rows"].astype(int)
+    grouped["Per-source weight sum"] = pd.to_numeric(grouped["source_weight_sum"], errors="coerce")
+    grouped["Components"] = grouped["components"].astype(str)
+    return grouped[
+        [
+            "Source role",
+            "Source file",
+            "Rows",
+            "Positive rows",
+            "Per-source weight sum",
+            "Components",
+        ]
+    ].sort_values(["Source role", "Source file"])
+
+
+def ped_inner_hpo_weight_detail_view(pack: PedInnerHpoAuditPack) -> pd.DataFrame:
+    weights = pack.table("inner_hpo_weights")
+    if weights.empty or "source_file" not in weights.columns:
+        return pd.DataFrame()
+    frame = weights.copy()
+    frame["Source role"] = frame["source_file"].fillna("").astype(str).map(_ped_inner_source_role)
+    frame["Source file"] = frame["source_file"].fillna("").astype(str)
+    frame["Inner component model"] = frame.get("inner_component_model", pd.Series(dtype=str)).astype(str)
+    frame["Weight within source"] = pd.to_numeric(frame.get("weight", pd.Series(dtype=float)), errors="coerce")
+    frame["Per-source weight sum"] = frame.groupby("Source file", dropna=False)["Weight within source"].transform("sum")
+    frame["Interpretation"] = frame.apply(_ped_inner_weight_interpretation, axis=1)
+    keep = [
+        "Source role",
+        "Source file",
+        "Inner component model",
+        "Weight within source",
+        "Per-source weight sum",
+        "Interpretation",
+    ]
+    if "component_rank" in frame.columns:
+        frame["Rank"] = pd.to_numeric(frame["component_rank"], errors="coerce")
+        keep.insert(3, "Rank")
+    return frame[keep].sort_values(["Source role", "Source file", "Rank" if "Rank" in keep else "Inner component model"])
+
+
+def ped_inner_hpo_nested_trace_view(pack: PedInnerHpoAuditPack, limit: int = 240) -> pd.DataFrame:
+    trace = pack.table("nested_ensemble_trace")
+    if trace.empty:
+        return pd.DataFrame()
+    frame = trace.copy()
+    frame["Rebuilt inner prediction"] = pd.to_numeric(frame.get("rebuilt_outer_component_pred"), errors="coerce")
+    frame["Stored outer component prediction"] = pd.to_numeric(frame.get("outer_component_pred"), errors="coerce")
+    frame["Delta"] = pd.to_numeric(frame.get("inner_replay_delta_vs_outer"), errors="coerce")
+    frame["Abs delta"] = pd.to_numeric(frame.get("inner_replay_abs_delta_vs_outer"), errors="coerce")
+    frame["Max abs inner delta"] = frame["Abs delta"].max()
+    keep = [
+        "origin",
+        "target_period",
+        "horizon",
+        "Rebuilt inner prediction",
+        "Stored outer component prediction",
+        "Delta",
+        "Abs delta",
+        "Max abs inner delta",
+    ]
+    return frame[[col for col in keep if col in frame.columns]].rename(
+        columns={
+            "origin": "Origin",
+            "target_period": "Target period",
+            "horizon": "Horizon",
+        }
+    ).head(limit)
+
+
+def ped_inner_hpo_gap_register_view(pack: PedInnerHpoAuditPack) -> pd.DataFrame:
+    gaps = pack.table("reproducibility_gap_register")
+    frame = gaps.copy() if not gaps.empty else pd.DataFrame(columns=["gap", "severity", "detail"])
+    nested_delta = ped_inner_hpo_audit_summary(pack).get("inner_max_abs_delta", pd.NA)
+    gap_values = set(frame.get("gap", pd.Series(dtype=str)).astype(str))
+    if pd.notna(nested_delta) and float(nested_delta) > 1e-5 and "inner_weighted_replay_mismatch" not in gap_values:
+        mismatch = pd.DataFrame(
+            [
+                {
+                    "gap": "inner_weighted_replay_mismatch",
+                    "severity": "high",
+                    "detail": (
+                        f"Nested inner weighted replay max delta is {float(nested_delta):.6g}; "
+                        "treat arbitration-source rows as lineage/context unless separately verified."
+                    ),
+                }
+            ]
+        )
+        frame = pd.concat([frame, mismatch], ignore_index=True)
+    if frame.empty:
+        return frame
+    return frame.rename(
+        columns={
+            "gap": "Gap",
+            "severity": "Severity",
+            "detail": "Detail",
+        }
+    )
 
 
 def reproducibility_replay_summary(pack: ReproducibilityPack) -> dict[str, Any]:
@@ -859,6 +1091,36 @@ def _max_abs_delta(*frames: pd.DataFrame) -> Any:
                 series = pd.to_numeric(frame[column], errors="coerce").abs().dropna()
                 values.extend(float(value) for value in series)
     return max(values) if values else pd.NA
+
+
+def _max_abs_for_columns(frame: pd.DataFrame, columns: tuple[str, ...]) -> float | pd.NA:
+    if frame.empty:
+        return pd.NA
+    values: list[float] = []
+    for column in columns:
+        if column in frame.columns:
+            series = pd.to_numeric(frame[column], errors="coerce").abs().dropna()
+            values.extend(float(value) for value in series)
+    return max(values) if values else pd.NA
+
+
+def _ped_inner_source_role(source_file: Any) -> str:
+    name = Path(str(source_file)).name.lower()
+    if name == "hpo_refined_ensemble_weights.csv":
+        return "HPO refinement source"
+    if name == "ensemble_weights.csv":
+        return "Arbitration lineage/context"
+    return "Other source"
+
+
+def _ped_inner_weight_interpretation(row: pd.Series) -> str:
+    role = str(row.get("Source role", ""))
+    weight = pd.to_numeric(pd.Series([row.get("Weight within source")]), errors="coerce").iloc[0]
+    if role == "HPO refinement source" and pd.notna(weight) and float(weight) > 0:
+        return "Actual HPOREFINE component"
+    if role == "HPO refinement source":
+        return "Zero-weight HPO source row"
+    return "Lineage/context only unless separately verified"
 
 
 def _optional_numeric(frame: pd.DataFrame, column: str) -> pd.Series:

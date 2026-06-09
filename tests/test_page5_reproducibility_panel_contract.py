@@ -10,8 +10,10 @@ from app import (
     page5_missing_panel_message,
     page5_panel_contract_frame,
     page5_panel_title,
+    page5_ped_inner_status_rows,
+    page5_repro_card_html,
 )
-from model_dashboard.light_ruc_reproducibility import load_reproducibility_pack
+from model_dashboard.light_ruc_reproducibility import load_ped_inner_hpo_audit_pack, load_reproducibility_pack
 
 
 def test_page5_panel_contract_pack_is_loaded() -> None:
@@ -46,7 +48,7 @@ def test_page5_unavailable_panel_messages_are_governance_caveats() -> None:
     assert ped_coefficients["status"] == "unavailable"
     assert (
         page5_missing_panel_message("PED VKT per capita", "coefficients", ped_coefficients)
-        == "Not emitted by parent HPO/static-solver run; future inner-solver audit required."
+        == "Feature-level refit not attempted; inner HPO/static-solver audit remains partial."
     )
     assert heavy_sensitivities["status"] == "unavailable"
     assert (
@@ -74,3 +76,24 @@ def test_page5_component_contribution_figure_uses_pack_weights() -> None:
     assert float(ped_fig.data[0].x[0]) == pytest.approx(100.0)
     assert len(heavy_fig.data[0].x) == 4
     assert sum(float(value) for value in heavy_fig.data[0].x) == pytest.approx(100.0)
+
+
+def test_page5_ped_status_card_labels_inner_audit_partial() -> None:
+    ped_pack = load_reproducibility_pack("PED VKT per capita")
+    inner_pack = load_ped_inner_hpo_audit_pack()
+
+    html = page5_repro_card_html("PED VKT per capita", ped_pack, inner_pack)
+
+    assert "Exact component-prediction replay" in html
+    assert "PED is exact at stored component-prediction level" in html
+    assert "Inner HPO/static-solver audit: partial" in html
+    assert "Inner HPO/static-solver audit: exact" not in html
+
+
+def test_page5_ped_inner_missing_pack_status_is_clear() -> None:
+    missing_pack = load_ped_inner_hpo_audit_pack("data/dashboard_evidence_pack_reproducibility/not_a_pack")
+
+    rows = dict(page5_ped_inner_status_rows(missing_pack))
+
+    assert rows["Inner audit status"] == "Missing PED inner HPO/static-solver audit pack"
+    assert "model_registry.parquet" in rows["Inner audit evidence"]

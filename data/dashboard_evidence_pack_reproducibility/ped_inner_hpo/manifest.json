@@ -1,0 +1,192 @@
+{
+  "created_at": "2026-06-09T12:07:43",
+  "stream": "PED",
+  "stream_label": "PED VKT per capita",
+  "finalist_model": "PED__RESCUE_static_annual_weighted_top12_capnone",
+  "outer_component_model": "PED__HPOREFINE_solver_static_convex_top18",
+  "candidate_rescue_parent": "C:\\Users\\Adrian Desilvestro\\Downloads\\candidate_rescue_outputs_run_20260521_163105_20260521_163707.zip",
+  "hpo_run": "C:\\Users\\Adrian Desilvestro\\Downloads\\stage1_hpo_refinement_core_outputs",
+  "arbitration_run": "C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Revenue Modeling - Strategic Review\\04 Models\\Inputs\\stage1_finalist_arbitration_outputs\\run_20260520_002339",
+  "evidence_pack": "C:\\Users\\Adrian Desilvestro\\Downloads\\stage1_dashboard_evidence_pack_dual_scorecard_gbm_light_v6_balanced_frontier\\dashboard_evidence_pack",
+  "workbook_provenance": {
+    "workbook_path": "C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Revenue Modeling - Strategic Review\\04 Models\\Inputs\\Master Copy revenue modelling workbook.xlsx",
+    "workbook_exists": true,
+    "workbook_sha256": "0c0ea8d3f95be6ba4a92316c7b2d5b7ec765cab6062cf7918844cbcb17bb6a5d",
+    "sheet": "PED Inputs",
+    "sheet_found": true,
+    "n_columns": 31,
+    "columns_sample": [
+      "Quarter",
+      "Period",
+      "Nominal GDP (SA, NZD)",
+      "Population",
+      "Nominal GDP per capita (NZD)",
+      "GDP deflator (seasonally adjusted)",
+      "GDP rebasing factor",
+      "Real GDP per capita (NZD)",
+      "Log real GDP per capita",
+      "Petrol price (nominal, cents/litre)",
+      "CPI rebasing factor",
+      "Petrol price (real, cents/litre)",
+      "Log real petrol price",
+      "Light petrol VKT per capita (km)",
+      "Light petrol VKT total (km)",
+      "Log VKT per capita",
+      "Log total VKT",
+      "Unemployment (%)",
+      "Unemployment rate",
+      "Log unemployment rate",
+      "Trend index",
+      "Log trend index",
+      "Post-2011 dummy",
+      "2020 dummy",
+      "Post-2020 dummy",
+      "Q2 dummy",
+      "Q3 dummy",
+      "Q4 dummy",
+      "Post-2011 \u00d7 log trend",
+      "Data status",
+      "Notes"
+    ]
+  },
+  "parquet_status": [
+    {
+      "table": "model_registry",
+      "rows": 8,
+      "columns": 12,
+      "csv_written": true,
+      "parquet_written": true
+    },
+    {
+      "table": "outer_component_replay",
+      "rows": 606,
+      "columns": 16,
+      "csv_written": true,
+      "parquet_written": true
+    },
+    {
+      "table": "inner_hpo_weights",
+      "rows": 6,
+      "columns": 9,
+      "csv_written": true,
+      "parquet_written": true
+    },
+    {
+      "table": "inner_component_registry",
+      "rows": 6,
+      "columns": 12,
+      "csv_written": true,
+      "parquet_written": true
+    },
+    {
+      "table": "inner_component_predictions",
+      "rows": 3708,
+      "columns": 15,
+      "csv_written": true,
+      "parquet_written": true
+    },
+    {
+      "table": "nested_ensemble_trace",
+      "rows": 618,
+      "columns": 10,
+      "csv_written": true,
+      "parquet_written": true
+    },
+    {
+      "table": "selection_audit",
+      "rows": 7,
+      "columns": 5,
+      "csv_written": true,
+      "parquet_written": true
+    },
+    {
+      "table": "model_coefficients",
+      "rows": 1,
+      "columns": 5,
+      "csv_written": true,
+      "parquet_written": true
+    },
+    {
+      "table": "feature_importance",
+      "rows": 6,
+      "columns": 7,
+      "csv_written": true,
+      "parquet_written": true
+    },
+    {
+      "table": "feature_importance_global",
+      "rows": 6,
+      "columns": 7,
+      "csv_written": true,
+      "parquet_written": true
+    },
+    {
+      "table": "scenario_sensitivities",
+      "rows": 1,
+      "columns": 6,
+      "csv_written": true,
+      "parquet_written": true
+    },
+    {
+      "table": "training_window_trace",
+      "rows": 56,
+      "columns": 4,
+      "csv_written": true,
+      "parquet_written": true
+    },
+    {
+      "table": "scorecard_summary",
+      "rows": 2,
+      "columns": 22,
+      "csv_written": true,
+      "parquet_written": true
+    },
+    {
+      "table": "annual_predictions",
+      "rows": 138,
+      "columns": 11,
+      "csv_written": true,
+      "parquet_written": true
+    },
+    {
+      "table": "horizon_profiles",
+      "rows": 24,
+      "columns": 6,
+      "csv_written": true,
+      "parquet_written": true
+    },
+    {
+      "table": "stress_horizon",
+      "rows": 6,
+      "columns": 6,
+      "csv_written": true,
+      "parquet_written": true
+    },
+    {
+      "table": "evidence_prediction_comparison",
+      "rows": 732,
+      "columns": 11,
+      "csv_written": true,
+      "parquet_written": true
+    },
+    {
+      "table": "evidence_metric_comparison",
+      "rows": 2,
+      "columns": 9,
+      "csv_written": true,
+      "parquet_written": true
+    },
+    {
+      "table": "reproducibility_gap_register",
+      "rows": 1,
+      "columns": 3,
+      "csv_written": true,
+      "parquet_written": true
+    }
+  ],
+  "max_outer_replay_delta": 0.0,
+  "max_evidence_delta": 0.0,
+  "max_inner_replay_delta": 10.361948081296077,
+  "inner_weights_found": true,
+  "inner_component_predictions_found": true
+}

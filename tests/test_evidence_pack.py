@@ -79,7 +79,10 @@ def test_all_16_panels_use_chart_contract_source_files(evidence_pack) -> None:
         "schiff_paired_or_fullsample_gain": "fullsample_gain_vs_schiff",
         "schiff_benchmark_summary": "benchmark_summary",
     }
+    r2_source_tables = {"diagnostics_r2_summary", "reproducibility_component_r2"}
     for filename, (_, chart_id) in CHART_SOURCE_FILES.items():
+        if chart_id in r2_source_tables:
+            continue
         table = pd.read_csv(ROOT / "artifacts" / "chart_sources" / filename)
         assert set(table["source_file"].dropna()) == {contract[aliases[chart_id]]}, filename
 

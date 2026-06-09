@@ -1,0 +1,135 @@
+[
+  {
+    "table": "model_registry",
+    "rows": 8,
+    "columns": 12,
+    "csv_written": true,
+    "parquet_written": true
+  },
+  {
+    "table": "outer_component_replay",
+    "rows": 606,
+    "columns": 16,
+    "csv_written": true,
+    "parquet_written": true
+  },
+  {
+    "table": "inner_hpo_weights",
+    "rows": 6,
+    "columns": 9,
+    "csv_written": true,
+    "parquet_written": true
+  },
+  {
+    "table": "inner_component_registry",
+    "rows": 6,
+    "columns": 12,
+    "csv_written": true,
+    "parquet_written": true
+  },
+  {
+    "table": "inner_component_predictions",
+    "rows": 3708,
+    "columns": 15,
+    "csv_written": true,
+    "parquet_written": true
+  },
+  {
+    "table": "nested_ensemble_trace",
+    "rows": 618,
+    "columns": 10,
+    "csv_written": true,
+    "parquet_written": true
+  },
+  {
+    "table": "selection_audit",
+    "rows": 7,
+    "columns": 5,
+    "csv_written": true,
+    "parquet_written": true
+  },
+  {
+    "table": "model_coefficients",
+    "rows": 1,
+    "columns": 5,
+    "csv_written": true,
+    "parquet_written": true
+  },
+  {
+    "table": "feature_importance",
+    "rows": 6,
+    "columns": 7,
+    "csv_written": true,
+    "parquet_written": true
+  },
+  {
+    "table": "feature_importance_global",
+    "rows": 6,
+    "columns": 7,
+    "csv_written": true,
+    "parquet_written": true
+  },
+  {
+    "table": "scenario_sensitivities",
+    "rows": 1,
+    "columns": 6,
+    "csv_written": true,
+    "parquet_written": true
+  },
+  {
+    "table": "training_window_trace",
+    "rows": 56,
+    "columns": 4,
+    "csv_written": true,
+    "parquet_written": true
+  },
+  {
+    "table": "scorecard_summary",
+    "rows": 2,
+    "columns": 22,
+    "csv_written": true,
+    "parquet_written": true
+  },
+  {
+    "table": "annual_predictions",
+    "rows": 138,
+    "columns": 11,
+    "csv_written": true,
+    "parquet_written": true
+  },
+  {
+    "table": "horizon_profiles",
+    "rows": 24,
+    "columns": 6,
+    "csv_written": true,
+    "parquet_written": true
+  },
+  {
+    "table": "stress_horizon",
+    "rows": 6,
+    "columns": 6,
+    "csv_written": true,
+    "parquet_written": true
+  },
+  {
+    "table": "evidence_prediction_comparison",
+    "rows": 732,
+    "columns": 11,
+    "csv_written": true,
+    "parquet_written": true
+  },
+  {
+    "table": "evidence_metric_comparison",
+    "rows": 2,
+    "columns": 9,
+    "csv_written": true,
+    "parquet_written": true
+  },
+  {
+    "table": "reproducibility_gap_register",
+    "rows": 1,
+    "columns": 3,
+    "csv_written": true,
+    "parquet_written": true
+  }
+]

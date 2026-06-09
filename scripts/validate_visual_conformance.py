@@ -106,17 +106,19 @@ def validate() -> list[tuple[str, str, str]]:
         "Top-level page labels inspected.",
     )
 
+    page5_text = app_text + "\n" + read_text("model_dashboard/light_ruc_reproducibility.py")
     page5_app_terms = [
         "Governance & Reproducibility Filters",
         "Two-stage OLS base plus GBM residual correction, exactly replayed against evidence predictions.",
         "Four-component weighted ensemble exactly replayed against evidence predictions.",
-        "PED finalist exactly replays the stored HPO/static-solver component prediction",
+        "PED is exact at stored component-prediction level; inner HPO/static-solver rebuild remains a future audit layer.",
+        "Inner HPO/static-solver audit: partial",
         "Impact on dependent variable / model target",
         "SHAP not yet generated",
     ]
     record(
         "Page 5 required wording is present in app code",
-        all(term in app_text for term in page5_app_terms),
+        all(term in page5_text for term in page5_app_terms),
         "Page 5 wording inspected in app.py.",
     )
 

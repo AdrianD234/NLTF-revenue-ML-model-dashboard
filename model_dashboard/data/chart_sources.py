@@ -16,6 +16,7 @@ from ..labels import (
     humanize_label,
 )
 from ..metrics import best_by_stream
+from ..r2_metrics import diagnostics_r2_summary_frame, format_r2, reproducibility_component_r2_frame
 from ..score_basis import PAPER_SCORE_BASIS, score_basis_label
 from .diagnostics import DEFAULT_ACF_RESIDUAL_SCOPE, select_diagnostic_acf_scope
 
@@ -71,6 +72,17 @@ EXTRA_COLUMNS = [
     "paired_gain_pp",
     "paired_win_rate_pct",
     "recommendation",
+    "r2_type",
+    "forecast_r2",
+    "calibration_r2",
+    "component_r2",
+    "n_rows",
+    "sse",
+    "sst",
+    "bias_pct",
+    "mape",
+    "interpretation",
+    "source_prediction_column",
 ]
 
 CHART_SOURCE_FILES = {
@@ -82,6 +94,7 @@ CHART_SOURCE_FILES = {
     "diagnostics_residual_vs_fitted.csv": ("Diagnostics", "diagnostics_residual_vs_fitted"),
     "diagnostics_pass_matrix.csv": ("Diagnostics", "diagnostics_pass_matrix"),
     "diagnostics_error_distribution_by_horizon.csv": ("Diagnostics", "diagnostics_error_distribution_by_horizon"),
+    "diagnostics_r2_summary.csv": ("Diagnostics", "diagnostics_r2_summary"),
     "scenario_stream_comparison.csv": ("Scenario Comparison", "scenario_stream_comparison"),
     "scenario_improvement_vs_benchmark.csv": ("Scenario Comparison", "scenario_improvement_vs_benchmark"),
     "scenario_horizon_comparison.csv": ("Scenario Comparison", "scenario_horizon_comparison"),
@@ -90,6 +103,7 @@ CHART_SOURCE_FILES = {
     "schiff_benchmark_horizon_profiles.csv": ("Schiff Benchmark", "schiff_benchmark_horizon_profiles"),
     "schiff_paired_or_fullsample_gain.csv": ("Schiff Benchmark", "schiff_paired_or_fullsample_gain"),
     "schiff_benchmark_summary.csv": ("Schiff Benchmark", "schiff_benchmark_summary"),
+    "reproducibility_component_r2.csv": ("Governance & Reproducibility", "reproducibility_component_r2"),
 }
 
 
@@ -97,7 +111,7 @@ def write_chart_source_tables(repo_root: Path, data: dict[str, pd.DataFrame]) ->
     """Write one auditable source table for every primary dashboard chart."""
     output_dir = repo_root / "artifacts" / "chart_sources"
     output_dir.mkdir(parents=True, exist_ok=True)
-    tables = build_chart_source_tables(data)
+    tables = build_chart_source_tables(data, repo_root=repo_root)
     for filename, frame in tables.items():
         _write_csv_atomic(frame, output_dir / filename)
     return tables
@@ -116,7 +130,7 @@ def _write_csv_atomic(frame: pd.DataFrame, path: Path) -> None:
             time.sleep(0.25 * (attempt + 1))
 
 
-def build_chart_source_tables(data: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
+def build_chart_source_tables(data: dict[str, pd.DataFrame], repo_root: Path | None = None) -> dict[str, pd.DataFrame]:
     source_file = _source_file_from_manifest(data)
     source_files = _chart_contract_source_files(data, source_file)
     recommended = data.get("recommended", pd.DataFrame())
@@ -124,6 +138,7 @@ def build_chart_source_tables(data: dict[str, pd.DataFrame]) -> dict[str, pd.Dat
     weights = data.get("weights", pd.DataFrame())
     stress = data.get("stress", pd.DataFrame())
     diagnostics = data.get("diagnostic_df", data.get("diagnostic", pd.DataFrame()))
+    scorecard_predictions = data.get("scorecard_predictions", pd.DataFrame())
     qpred = data.get("quarterly_predictions", pd.DataFrame())
     error_distribution = data.get("error_distribution", pd.DataFrame())
     pass_matrix = data.get("diagnostic_pass_matrix", pd.DataFrame())
@@ -155,6 +170,7 @@ def build_chart_source_tables(data: dict[str, pd.DataFrame]) -> dict[str, pd.Dat
         "diagnostics_residual_vs_fitted.csv": _diagnostics_residual_vs_fitted(diagnostic_window, source_files["diagnostics_residual_vs_fitted"]),
         "diagnostics_pass_matrix.csv": _diagnostics_pass_matrix(matrix_source, source_files["diagnostics_pass_matrix"]),
         "diagnostics_error_distribution_by_horizon.csv": _diagnostics_error_distribution(error_window, source_files["diagnostics_error_distribution_by_horizon"]),
+        "diagnostics_r2_summary.csv": _diagnostics_r2_summary(scorecard_predictions, diagnostics, source_files["diagnostics_r2_summary"]),
         "scenario_stream_comparison.csv": _scenario_stream_comparison_source(comparison, source_files["scenario_stream_comparison"]),
         "scenario_improvement_vs_benchmark.csv": _scenario_gain_source(
             comparison,
@@ -187,6 +203,7 @@ def build_chart_source_tables(data: dict[str, pd.DataFrame]) -> dict[str, pd.Dat
             source_files["schiff_paired_or_fullsample_gain"],
         ),
         "schiff_benchmark_summary.csv": _schiff_summary_source(comparison, source_files["schiff_benchmark_summary"]),
+        "reproducibility_component_r2.csv": _reproducibility_component_r2(repo_root, source_files["reproducibility_component_r2"]),
     }
 
 
@@ -200,6 +217,7 @@ def _chart_contract_source_files(data: dict[str, pd.DataFrame], default: str) ->
         "diagnostics_residual_vs_fitted": "residual_vs_fitted",
         "diagnostics_pass_matrix": "diagnostic_pass_matrix",
         "diagnostics_error_distribution_by_horizon": "error_distribution_by_horizon",
+        "diagnostics_r2_summary": "scorecard_predictions",
         "scenario_stream_comparison": "stream_comparison",
         "scenario_improvement_vs_benchmark": "improvement_vs_benchmark",
         "scenario_horizon_comparison": "horizon_comparison",
@@ -208,6 +226,7 @@ def _chart_contract_source_files(data: dict[str, pd.DataFrame], default: str) ->
         "schiff_benchmark_horizon_profiles": "benchmark_horizon_profiles",
         "schiff_paired_or_fullsample_gain": "fullsample_gain_vs_schiff",
         "schiff_benchmark_summary": "benchmark_summary",
+        "reproducibility_component_r2": "component_predictions",
     }
     result = {chart_id: default for _, chart_id in CHART_SOURCE_FILES.values()}
     contract = data.get("chart_contract", pd.DataFrame())
@@ -871,6 +890,123 @@ def _diagnostics_error_distribution(qpred: pd.DataFrame, source_file: str) -> pd
                 horizon=row.get("horizon"),
                 horizon_bucket=bucket,
                 abs_error_pct=abs_error,
+            )
+        )
+    return _standardize(rows)
+
+
+def _diagnostics_r2_summary(scorecard_predictions: pd.DataFrame, diagnostics: pd.DataFrame, source_file: str) -> pd.DataFrame:
+    rows: list[dict[str, Any]] = []
+    summary = diagnostics_r2_summary_frame(scorecard_predictions, diagnostics)
+    if summary.empty:
+        rows.append(
+            _base_row(
+                "Diagnostics",
+                "diagnostics_r2_summary",
+                "Forecast R2 versus calibration R2",
+                {},
+                "Forecast R2",
+                pd.NA,
+                "-",
+                "pred",
+                "scorecard_predictions.parquet",
+                "Forecast R2 is unavailable because scorecard prediction rows are missing.",
+                "Calibration R2 is actual-on-forecast validation R2, not in-sample training fit.",
+                value_available=False,
+            )
+        )
+        return _standardize(rows)
+    for _, row in summary.iterrows():
+        forecast_value = row.get("forecast_r2")
+        calibration_value = row.get("calibration_r2")
+        calibration_source_column = str(row.get("calibration_r2_source_column", "pred"))
+        source_column = "pred" if calibration_source_column == "pred" else f"pred;{calibration_source_column}"
+        rows.append(
+            _base_row(
+                "Diagnostics",
+                "diagnostics_r2_summary",
+                "Forecast R2 versus calibration R2",
+                row,
+                "Forecast R2",
+                forecast_value,
+                format_r2(forecast_value),
+                source_column,
+                "scorecard_predictions.parquet;diagnostic_tests.parquet",
+                "Forecast R2 computed as 1 - SSE/SST from final scorecard predictions in native stream units.",
+                "Calibration R2 is actual-on-forecast validation R2 and is reported separately from net forecast R2.",
+                r2_type="forecast",
+                forecast_r2=forecast_value,
+                calibration_r2=calibration_value,
+                n_rows=row.get("n_rows"),
+                sse=row.get("sse"),
+                sst=row.get("sst"),
+                bias_pct=row.get("bias_pct"),
+                mape=row.get("mape"),
+                interpretation=row.get("interpretation"),
+                source_prediction_column=row.get("source_prediction_column", "pred"),
+                value_available=pd.notna(pd.to_numeric(forecast_value, errors="coerce")),
+            )
+        )
+    return _standardize(rows)
+
+
+def _reproducibility_component_r2(repo_root: Path | None, source_file: str) -> pd.DataFrame:
+    rows: list[dict[str, Any]] = []
+    summary = reproducibility_component_r2_frame(repo_root)
+    if summary.empty:
+        rows.append(
+            _base_row(
+                "Governance & Reproducibility",
+                "reproducibility_component_r2",
+                "Net forecast R2 after final model composition",
+                {},
+                "Forecast R2",
+                pd.NA,
+                "-",
+                "final_pred",
+                "data/dashboard_evidence_pack_reproducibility/*/component_predictions.parquet",
+                "Reproducibility component R2 is unavailable because component prediction rows are missing.",
+                "If actual variance is zero or rows are insufficient, R2 is unavailable rather than coerced to zero.",
+                value_available=False,
+            )
+        )
+        return _standardize(rows)
+    for _, row in summary.iterrows():
+        metric_name = str(row.get("metric_name", "Forecast R2"))
+        metric_value = row.get("forecast_r2")
+        component_value = pd.NA
+        forecast_value = pd.NA
+        if metric_name == "Component R2":
+            component_value = metric_value
+        else:
+            forecast_value = metric_value
+        rows.append(
+            _base_row(
+                "Governance & Reproducibility",
+                "reproducibility_component_r2",
+                "Net forecast R2 after final model composition",
+                row,
+                metric_name,
+                metric_value,
+                format_r2(metric_value),
+                str(row.get("source_prediction_column", "final_pred")),
+                str(row.get("source_file", source_file)),
+                str(row.get("calculation_basis", "Forecast R2 computed as 1 - SSE/SST from stored prediction rows.")),
+                "Negative R2 is valid but indicates poorer fit than the stream mean on these rows.",
+                r2_type=row.get("r2_type"),
+                forecast_r2=forecast_value,
+                calibration_r2=row.get("calibration_r2"),
+                component_r2=component_value,
+                n_rows=row.get("n_rows"),
+                sse=row.get("sse"),
+                sst=row.get("sst"),
+                bias_pct=row.get("bias_pct"),
+                mape=row.get("mape"),
+                interpretation=row.get("interpretation"),
+                component_model=row.get("component_model"),
+                component_rank=row.get("component_rank"),
+                source_prediction_column=row.get("source_prediction_column"),
+                value_available=pd.notna(pd.to_numeric(metric_value, errors="coerce")),
             )
         )
     return _standardize(rows)

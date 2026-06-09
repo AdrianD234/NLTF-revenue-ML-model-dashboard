@@ -11,13 +11,13 @@ from .labels import STREAM_LABELS
 DIAGNOSTIC_TOOLTIP_COPY = {
     "Calibration R2": (
         "Calibration R-squared. Shows how much observed variation in the target series is explained by the "
-        "fitted model during calibration. High R-squared means close in-sample fit, but does not by itself "
-        "prove forecast accuracy or correct specification."
+        "actual-on-forecast validation regression. High calibration R-squared means forecasts track observed "
+        "variation after fitting an intercept and slope, but it is not the model's training fit R-squared."
     ),
     "Calibration R²": (
         "Calibration R-squared. Shows how much observed variation in the target series is explained by the "
-        "fitted model during calibration. High R-squared means close in-sample fit, but does not by itself "
-        "prove forecast accuracy or correct specification."
+        "actual-on-forecast validation regression. High calibration R-squared means forecasts track observed "
+        "variation after fitting an intercept and slope, but it is not the model's training fit R-squared."
     ),
     "Durbin-Watson": (
         "Durbin-Watson test. Checks whether regression residuals are serially correlated, especially "

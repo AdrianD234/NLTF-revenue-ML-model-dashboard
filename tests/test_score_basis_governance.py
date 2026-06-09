@@ -73,10 +73,15 @@ def test_chart_sources_include_score_basis_and_no_old_light_default_values(evide
     chart_dir = ROOT / "artifacts" / "chart_sources"
     source_files = list(chart_dir.glob("*.csv"))
     assert source_files
+    multi_basis = {"diagnostics_r2_summary.csv", "reproducibility_component_r2.csv"}
     for path in source_files:
         frame = pd.read_csv(path)
         assert "score_basis" in frame.columns, path.name
-        assert set(frame["score_basis"].dropna().astype(str)) == {PAPER_SCORE_BASIS}, path.name
+        score_basis_values = set(frame["score_basis"].dropna().astype(str))
+        if path.name in multi_basis:
+            assert {PAPER_SCORE_BASIS, OPERATIONAL_SCORE_BASIS}.issubset(score_basis_values), path.name
+        else:
+            assert score_basis_values == {PAPER_SCORE_BASIS}, path.name
     text = pd.read_csv(chart_dir / "overview_finalist_forecast_accuracy.csv").to_string()
     assert "9.15%" not in text
     assert "+2.40 pp" not in text

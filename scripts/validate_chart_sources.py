@@ -21,6 +21,7 @@ from model_dashboard.score_basis import OPERATIONAL_SCORE_BASIS, PAPER_SCORE_BAS
 EXPECTED_STREAMS = {"PED VKT per capita", "Light RUC volume", "Heavy RUC volume"}
 EXPECTED_FRONTIER_COUNTS = {"PED VKT per capita": 132, "Light RUC volume": 136, "Heavy RUC volume": 132}
 CHART_SOURCE_DIR = ROOT / "artifacts" / "chart_sources"
+MULTI_SCORE_BASIS_SOURCE_FILES = {"diagnostics_r2_summary.csv", "reproducibility_component_r2.csv"}
 
 
 def parse_args() -> argparse.Namespace:
@@ -62,7 +63,11 @@ def validate() -> list[tuple[str, str, str]]:
             page_ok = set(table["page"].dropna().astype(str)) == {page}
             id_ok = set(table["chart_id"].dropna().astype(str)) == {chart_id}
             basis_ok = table["calculation_basis"].dropna().astype(str).str.len().gt(0).all()
-            score_basis_ok = "score_basis" in table.columns and set(table["score_basis"].dropna().astype(str)) == {"schiff_paper_horizon_mean"}
+            score_basis_values = set(table["score_basis"].dropna().astype(str)) if "score_basis" in table.columns else set()
+            if filename in MULTI_SCORE_BASIS_SOURCE_FILES:
+                score_basis_ok = {PAPER_SCORE_BASIS, OPERATIONAL_SCORE_BASIS}.issubset(score_basis_values)
+            else:
+                score_basis_ok = score_basis_values == {PAPER_SCORE_BASIS}
             record(
                 f"{filename} exists and has required columns",
                 not missing and page_ok and id_ok and basis_ok and score_basis_ok,

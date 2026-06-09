@@ -47,6 +47,14 @@ from model_dashboard.labels import (
     shorten_model_name,
 )
 from model_dashboard.light_ruc_reproducibility import (
+    PED_INNER_HPO_AUDIT_STATUS,
+    load_ped_inner_hpo_audit_pack,
+    ped_inner_hpo_audit_signature,
+    ped_inner_hpo_audit_summary,
+    ped_inner_hpo_gap_register_view,
+    ped_inner_hpo_nested_trace_view,
+    ped_inner_hpo_weight_detail_view,
+    ped_inner_hpo_weight_source_view,
     reproducibility_coefficients_view,
     reproducibility_component_trace_view,
     reproducibility_feature_importance_view,
@@ -80,6 +88,7 @@ from model_dashboard.metrics import (
     schiff_result_label,
     stress_readout,
 )
+from model_dashboard.r2_metrics import diagnostics_r2_summary_frame, format_r2, reproducibility_component_r2_frame
 from model_dashboard.plots import (
     empty_figure,
     plot_actual_vs_predicted,
@@ -225,6 +234,12 @@ def cached_load_evidence_pack(
 def cached_load_reproducibility_pack(stream_label: str, signature: tuple[tuple[str, int, int], ...]) -> Any:
     del signature
     return load_reproducibility_pack(stream_label)
+
+
+@st.cache_data(show_spinner=False)
+def cached_load_ped_inner_hpo_audit_pack(signature: tuple[tuple[str, int, int], ...]) -> Any:
+    del signature
+    return load_ped_inner_hpo_audit_pack()
 
 
 def directory_signature(path: Path) -> tuple[bool, int, int]:
@@ -1100,7 +1115,7 @@ def basic_cards_as_governance_kpis(
     return rendered
 
 
-def diagnostic_kpi_cards(diagnostic_df: pd.DataFrame) -> list[tuple[str, str, str, str, str, str]]:
+def diagnostic_kpi_cards(diagnostic_df: pd.DataFrame) -> list[tuple[Any, ...]]:
     finalists = diagnostic_df.copy()
     if "role" in finalists.columns:
         finalists = finalists[finalists["role"].astype(str).str.contains("finalist", case=False, na=False)]
@@ -1123,17 +1138,65 @@ def diagnostic_kpi_cards(diagnostic_df: pd.DataFrame) -> list[tuple[str, str, st
     pass_mask = (bp > 0.05) | (white > 0.05)
     hetero_pass = int(pass_mask.fillna(False).sum())
     hetero_total = int(max(len(finalists), 0))
+    calibration_tooltip = (
+        "Calibration R2 is from actual-on-forecast validation regression. "
+        "It is not the model's in-sample fit R2. Forecast R2 is reported in the detail panel."
+    )
     return [
         ("Diagnostics Coverage", f"{available}/9", "diagnostic fields available", "", "good" if available >= 6 else "mixed", "D"),
         ("Mean Durbin-Watson", f"{dw:.2f}" if pd.notna(dw) else "-", "Current finalists only; near 2.0 is ideal", "", "good", "DW"),
-        ("Mean calibration R2", f"{adj_r2:.2f}" if pd.notna(adj_r2) else "-", "Current finalists only; Mincer-Zarnowitz calibration", "", "good", "R2"),
+        (
+            "Mean calibration R2",
+            f"{adj_r2:.2f}" if pd.notna(adj_r2) else "-",
+            "Current finalists only; Mincer-Zarnowitz calibration",
+            "",
+            "good",
+            "R2",
+            calibration_tooltip,
+        ),
         ("Heteroscedasticity Pass", f"{hetero_pass}/{hetero_total}", "Breusch-Pagan or White across streams", "", "good" if hetero_total and hetero_pass == hetero_total else "mixed", "H"),
     ]
+
+
+def diagnostics_r2_detail_table(loaded: LoadedRun) -> pd.DataFrame:
+    scorecard = loaded.data.get("scorecard_predictions", pd.DataFrame())
+    diagnostics = loaded.data.get("diagnostic_df", pd.DataFrame())
+    summary = diagnostics_r2_summary_frame(scorecard, diagnostics)
+    if summary.empty:
+        return pd.DataFrame(
+            [
+                {
+                    "stream": "-",
+                    "score_basis": "-",
+                    "forecast_r2": "-",
+                    "calibration_r2": "-",
+                    "n_rows": 0,
+                    "interpretation": "Unavailable: scorecard prediction rows are missing.",
+                }
+            ]
+        )
+    table = summary[["stream_label", "score_basis", "forecast_r2", "calibration_r2", "n_rows", "interpretation"]].copy()
+    table = table.rename(columns={"stream_label": "stream"})
+    table["forecast_r2"] = table["forecast_r2"].map(format_r2)
+    table["calibration_r2"] = table["calibration_r2"].map(format_r2)
+    table["n_rows"] = pd.to_numeric(table["n_rows"], errors="coerce").fillna(0).astype(int)
+    return table
+
+
+def render_diagnostics_r2_panel(loaded: LoadedRun) -> None:
+    with st.expander("Forecast R2 versus calibration R2", expanded=False):
+        info_panel(
+            "Forecast R2 is net R2 from final predictions after model composition. "
+            "Calibration R2 is the actual-on-forecast validation regression R2. "
+            "Negative Forecast R2 is valid but indicates poorer fit than the stream mean; zero actual variance is shown as unavailable."
+        )
+        display_table(diagnostics_r2_detail_table(loaded), height=230, max_rows=12)
 
 
 def render_diagnostics(loaded: LoadedRun, controls: dict[str, Any]) -> None:
     diagnostic_df = loaded.data.get("diagnostic_df", pd.DataFrame())
     gov_kpi_grid(diagnostic_kpi_cards(diagnostic_df))
+    render_diagnostics_r2_panel(loaded)
 
     qpred = common_filter(loaded.data.get("quarterly_predictions", pd.DataFrame()), controls, include_source_variant=False)
     diagnostic_qpred = central_error_window(qpred)
@@ -1298,6 +1361,7 @@ def render_governance_reproducibility_page(loaded: LoadedRun, controls: dict[str
 
     pack_labels = reproducibility_stream_labels()
     loaded_packs = {label: _load_reproducibility_pack_safely(label) for label in pack_labels}
+    ped_inner_hpo_pack = _load_ped_inner_hpo_pack_safely()
     available_count = sum(1 for pack in loaded_packs.values() if pack is not None and pack.available)
     workbook_manifest = source_workbook_manifest()
     chart_source_count = len(list((Path(__file__).resolve().parent / "artifacts" / "chart_sources").glob("*.csv")))
@@ -1311,12 +1375,12 @@ def render_governance_reproducibility_page(loaded: LoadedRun, controls: dict[str
         workbook_manifest=workbook_manifest,
         chart_source_count=chart_source_count,
     )
-    render_page5_reproducibility_status_cards(selected_stream, loaded_packs)
+    render_page5_reproducibility_status_cards(selected_stream, loaded_packs, ped_inner_hpo_pack)
 
     analytics_pack = page5_analytics_pack(selected_stream, loaded_packs)
     analytics_stream = analytics_pack.stream_label if analytics_pack is not None else "Light RUC volume"
 
-    render_page5_story_row(selected_stream, loaded_packs)
+    render_page5_story_row(selected_stream, loaded_packs, ped_inner_hpo_pack)
     render_page5_lower_panels(
         analytics_stream,
         analytics_pack,
@@ -1333,6 +1397,14 @@ def _load_reproducibility_pack_safely(stream_label: str) -> Any | None:
         return cached_load_reproducibility_pack(stream_label, reproducibility_pack_signature(stream_label))
     except Exception as exc:
         warning_panel(f"{stream_label} reproducibility audit pack could not be loaded: {exc}")
+        return None
+
+
+def _load_ped_inner_hpo_pack_safely() -> Any | None:
+    try:
+        return cached_load_ped_inner_hpo_audit_pack(ped_inner_hpo_audit_signature())
+    except Exception as exc:
+        warning_panel(f"PED inner HPO/static-solver audit pack could not be loaded: {exc}")
         return None
 
 
@@ -1769,9 +1841,13 @@ def render_page5_top_status_cards(
     st.markdown("<div class='page5-kpi-grid'>" + "".join(html_cards) + "</div>", unsafe_allow_html=True)
 
 
-def render_page5_reproducibility_status_cards(selected_stream: str, loaded_packs: dict[str, Any | None]) -> None:
+def render_page5_reproducibility_status_cards(
+    selected_stream: str,
+    loaded_packs: dict[str, Any | None],
+    ped_inner_hpo_pack: Any | None,
+) -> None:
     labels = list(loaded_packs) if selected_stream == "All streams" else [selected_stream]
-    cards = [page5_repro_card_html(label, loaded_packs.get(label)) for label in labels]
+    cards = [page5_repro_card_html(label, loaded_packs.get(label), ped_inner_hpo_pack) for label in labels]
     cards.append(
         "<div class='page5-status-card'>"
         "<div class='page5-status-head'><div class='page5-status-icon' style='background:#002B5C;'>DB</div>"
@@ -1783,7 +1859,7 @@ def render_page5_reproducibility_status_cards(selected_stream: str, loaded_packs
     st.markdown("<div class='page5-status-grid'>" + "".join(cards) + "</div>", unsafe_allow_html=True)
 
 
-def page5_repro_card_html(stream_label: str, pack: Any | None) -> str:
+def page5_repro_card_html(stream_label: str, pack: Any | None, ped_inner_hpo_pack: Any | None = None) -> str:
     if pack is None or not getattr(pack, "available", False):
         missing = ", ".join(getattr(pack, "missing_files", ())[:5]) if pack is not None else "pack load failed"
         return (
@@ -1807,6 +1883,8 @@ def page5_repro_card_html(stream_label: str, pack: Any | None) -> str:
         ("Workbook + sheet", f"{summary.get('workbook', '-')} > {summary.get('source_sheet', '-')}"),
         ("Caveat", stream_repro_caveat(stream_label)),
     ]
+    if stream_label == "PED VKT per capita":
+        rows.extend(page5_ped_inner_status_rows(ped_inner_hpo_pack))
     return (
         "<div class='page5-status-card'>"
         "<div class='page5-status-head'><div class='page5-status-icon'>OK</div>"
@@ -1820,6 +1898,22 @@ def page5_repro_card_html(stream_label: str, pack: Any | None) -> str:
         )
         + "</div>"
     )
+
+
+def page5_ped_inner_status_rows(ped_inner_hpo_pack: Any | None) -> list[tuple[str, str]]:
+    if ped_inner_hpo_pack is None or not getattr(ped_inner_hpo_pack, "available", False):
+        missing = ", ".join(getattr(ped_inner_hpo_pack, "missing_files", ())[:4]) if ped_inner_hpo_pack is not None else "pack load failed"
+        return [
+            ("Inner audit status", "Missing PED inner HPO/static-solver audit pack"),
+            ("Inner audit evidence", missing or "required audit files missing"),
+        ]
+    summary = ped_inner_hpo_audit_summary(ped_inner_hpo_pack)
+    inner_delta = pd.to_numeric(pd.Series([summary.get("inner_max_abs_delta")]), errors="coerce").iloc[0]
+    inner_delta_text = f"{inner_delta:.2e}" if pd.notna(inner_delta) else "-"
+    return [
+        ("Inner audit status", str(summary.get("inner_status", PED_INNER_HPO_AUDIT_STATUS))),
+        ("Inner max replay delta", inner_delta_text),
+    ]
 
 
 def render_page5_build_flow(selected_stream: str) -> None:
@@ -1851,7 +1945,11 @@ def render_page5_glossary() -> None:
     st.markdown("<div class='page5-chip-grid'>" + "".join(chips) + "</div>", unsafe_allow_html=True)
 
 
-def render_page5_story_row(selected_stream: str, loaded_packs: dict[str, Any | None]) -> None:
+def render_page5_story_row(
+    selected_stream: str,
+    loaded_packs: dict[str, Any | None],
+    ped_inner_hpo_pack: Any | None = None,
+) -> None:
     selected_packs = page5_selected_packs(selected_stream, loaded_packs)
     cols = st.columns([1.28, 0.78, 1.12])
     with cols[0]:
@@ -1873,6 +1971,58 @@ def render_page5_story_row(selected_stream: str, loaded_packs: dict[str, Any | N
             "</div>",
             unsafe_allow_html=True,
         )
+    if selected_stream == "PED VKT per capita":
+        render_page5_ped_inner_hpo_audit_panel(ped_inner_hpo_pack)
+
+
+def render_page5_ped_inner_hpo_audit_panel(ped_inner_hpo_pack: Any | None) -> None:
+    st.markdown(
+        "<div class='page5-panel-title'>PED inner HPO/static-solver audit</div>"
+        "<div class='page5-panel-sub'>Read-only auxiliary governance evidence from ped_inner_hpo.</div>",
+        unsafe_allow_html=True,
+    )
+    if ped_inner_hpo_pack is None or not getattr(ped_inner_hpo_pack, "available", False):
+        missing = ", ".join(getattr(ped_inner_hpo_pack, "missing_files", ())[:8]) if ped_inner_hpo_pack is not None else "pack load failed"
+        render_page5_missing_panel(
+            "PED inner HPO/static-solver audit",
+            (
+                "Missing PED inner HPO/static-solver audit pack. "
+                f"Expected read-only files under data/dashboard_evidence_pack_reproducibility/ped_inner_hpo. "
+                f"Missing: {missing or 'required audit tables'}."
+            ),
+            "PED is exact at stored component-prediction level; inner HPO/static-solver rebuild remains a future audit layer.",
+        )
+        return
+
+    summary = ped_inner_hpo_audit_summary(ped_inner_hpo_pack)
+    outer_delta = pd.to_numeric(pd.Series([summary.get("outer_max_abs_delta")]), errors="coerce").iloc[0]
+    inner_delta = pd.to_numeric(pd.Series([summary.get("inner_max_abs_delta")]), errors="coerce").iloc[0]
+    outer_delta_text = "0" if pd.notna(outer_delta) and abs(float(outer_delta)) == 0 else (f"{outer_delta:.2e}" if pd.notna(outer_delta) else "-")
+    inner_delta_text = f"{inner_delta:.2e}" if pd.notna(inner_delta) else "-"
+    kpi_grid(
+        [
+            ("Main status", str(summary.get("outer_status")), f"max delta {outer_delta_text}"),
+            ("Inner audit status", str(summary.get("inner_status")), f"nested max delta {inner_delta_text}"),
+            ("Weight sources", f"{summary.get('weight_source_count', 0)} source_file groups", "HPO and arbitration rows are grouped separately"),
+            ("Pack role", "Auxiliary governance", "read-only; does not feed main calculations"),
+        ]
+    )
+    info_panel("PED is exact at stored component-prediction level; inner HPO/static-solver rebuild remains a future audit layer.")
+    info_panel(str(summary.get("description", "")))
+
+    cols = st.columns([1.05, 1.25, 0.9])
+    with cols[0]:
+        section_title("HPO weights grouped by source_file")
+        info_panel("Per-source weight sums are shown separately; HPO refinement rows and arbitration lineage rows are never mixed into one total.")
+        display_table(ped_inner_hpo_weight_source_view(ped_inner_hpo_pack), height=210, max_rows=8)
+        with st.expander("Weight row detail", expanded=False):
+            display_table(ped_inner_hpo_weight_detail_view(ped_inner_hpo_pack), height=260, max_rows=40)
+    with cols[1]:
+        section_title("Nested trace")
+        display_table(ped_inner_hpo_nested_trace_view(ped_inner_hpo_pack), height=310, max_rows=120)
+    with cols[2]:
+        section_title("Gap register")
+        display_table(ped_inner_hpo_gap_register_view(ped_inner_hpo_pack), height=310, max_rows=20)
 
 
 def render_page5_registry_and_component_trace(selected_stream: str, loaded_packs: dict[str, Any | None]) -> None:
@@ -1907,6 +2057,7 @@ def render_page5_lower_panels(
     if analytics_pack is None:
         warning_panel("No reproducibility pack is available for the lower audit panels.")
         return
+    render_page5_r2_panel(selected_stream)
     lower_cols = st.columns([1.0, 1.0, 1.0, 1.05, 1.05])
     with lower_cols[0]:
         render_page5_importance_or_component_panel(analytics_stream, analytics_pack, panel_contract)
@@ -1930,6 +2081,51 @@ def render_page5_lower_panels(
             unsafe_allow_html=True,
         )
         render_page5_download_buttons(selected_stream, loaded_packs, workbook_manifest, key_prefix="lower")
+
+
+def render_page5_r2_panel(selected_stream: str) -> None:
+    summary = reproducibility_component_r2_frame(Path(__file__).resolve().parent)
+    if selected_stream != "All streams" and not summary.empty:
+        summary = summary[summary["stream_label"].astype(str).eq(selected_stream)].copy()
+    if summary.empty:
+        render_page5_missing_panel(
+            "Net forecast R2 after final model composition",
+            "Reproducibility component prediction rows are unavailable, so net and component R2 cannot be calculated.",
+            "Unavailable R2 is not coerced to zero.",
+        )
+        return
+    table = summary.copy()
+    table["component_model"] = table["component_model"].fillna("Final model composition")
+    table["r2_value"] = table["forecast_r2"].map(format_r2)
+    table["n_rows"] = pd.to_numeric(table["n_rows"], errors="coerce").fillna(0).astype(int)
+    table = table.rename(
+        columns={
+            "stream_label": "Stream",
+            "score_basis": "Score basis",
+            "metric_name": "R2 metric",
+            "component_model": "Model or component",
+            "r2_value": "R2",
+            "source_prediction_column": "Prediction column",
+            "n_rows": "Rows",
+            "interpretation": "Interpretation",
+        }
+    )
+    display_cols = [
+        "Stream",
+        "Score basis",
+        "R2 metric",
+        "Model or component",
+        "R2",
+        "Rows",
+        "Prediction column",
+        "Interpretation",
+    ]
+    st.markdown(
+        "<div class='page5-panel-title'>Net forecast R2 after final model composition</div>"
+        "<div class='page5-panel-sub'>Forecast R2 uses final predictions after corrections or ensemble weights; component R2 is shown where component predictions are in target units.</div>",
+        unsafe_allow_html=True,
+    )
+    display_table(table[[column for column in display_cols if column in table.columns]], height=250, max_rows=24)
 
 
 def render_page5_importance_or_component_panel(stream_label: str, pack: Any, panel_contract: pd.DataFrame) -> None:
@@ -2207,7 +2403,7 @@ def page5_panel_title(state: dict[str, str], stream_label: str) -> str:
 def page5_missing_panel_message(stream_label: str, panel: str, state: dict[str, str]) -> str:
     del panel
     if stream_label == "PED VKT per capita":
-        return "Not emitted by parent HPO/static-solver run; future inner-solver audit required."
+        return "Feature-level refit not attempted; inner HPO/static-solver audit remains partial."
     if stream_label == "Heavy RUC volume":
         return "Not emitted by parent component runs; future component-level replay required."
     return state.get("missing_message") or "Panel data was not emitted by this replay pack."
@@ -2216,8 +2412,8 @@ def page5_missing_panel_message(stream_label: str, panel: str, state: dict[str, 
 def page5_deeper_explainability_note(stream_label: str) -> str:
     if stream_label == "PED VKT per capita":
         return (
-            "What would be needed for deeper explainability? Freeze the inner HPO/static-solver registry "
-            "and add feature-level component replay."
+            "What would be needed for deeper explainability? Feature-level refit and exact inner weighted replay "
+            "remain future audit layers."
         )
     if stream_label == "Heavy RUC volume":
         return (
@@ -2245,7 +2441,7 @@ def stream_repro_approach(stream_label: str) -> str:
 
 def stream_repro_description(stream_label: str) -> str:
     return {
-        "PED VKT per capita": "PED finalist exactly replays the stored HPO/static-solver component prediction; inner HPO/static-solver rebuild remains a future audit layer.",
+        "PED VKT per capita": "PED is exact at stored component-prediction level; inner HPO/static-solver rebuild remains a future audit layer.",
         "Light RUC volume": "Two-stage OLS base plus GBM residual correction, exactly replayed against evidence predictions.",
         "Heavy RUC volume": "Four-component weighted ensemble exactly replayed against evidence predictions.",
     }.get(stream_label, "Replay-pack prediction reconstruction.")
@@ -2253,7 +2449,7 @@ def stream_repro_description(stream_label: str) -> str:
 
 def stream_repro_caveat(stream_label: str) -> str:
     return {
-        "PED VKT per capita": "Inner HPO/static-solver rebuild remains future audit",
+        "PED VKT per capita": "Inner HPO/static-solver audit: partial",
         "Light RUC volume": "-",
         "Heavy RUC volume": "-",
     }.get(stream_label, "-")
@@ -2295,7 +2491,7 @@ def page5_build_flow_steps(stream_label: str) -> list[tuple[str, str]]:
             ("Transform", "Stored parent component predictions are replayed; no refit is claimed."),
             ("Window", "Inherited from the HPO/static-solver parent component."),
             ("Base model", "HPO/static-solver component C1."),
-            ("Residual / Ensemble", "Single component at 100% weight."),
+            ("Residual / Ensemble", "Single outer component at 100%; inner HPO audit is partial."),
             ("Final prediction", "The stored component prediction C1 equals the final prediction within tolerance."),
             ("Score basis", "Paper-style horizon MAPE and operational pooled scorecards."),
         ]

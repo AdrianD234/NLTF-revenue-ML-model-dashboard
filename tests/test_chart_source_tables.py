@@ -21,6 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 CHART_SOURCE_DIR = ROOT / "artifacts" / "chart_sources"
 EXPECTED_STREAMS = {"PED VKT per capita", "Light RUC volume", "Heavy RUC volume"}
 EXPECTED_BALANCED_FRONTIER_COUNTS = {"PED VKT per capita": 132, "Light RUC volume": 136, "Heavy RUC volume": 132}
+MULTI_SCORE_BASIS_SOURCE_FILES = {"diagnostics_r2_summary.csv", "reproducibility_component_r2.csv"}
 
 
 @pytest.fixture(scope="session")
@@ -46,7 +47,11 @@ def test_every_main_chart_exports_a_source_table(parquet_dashboard: LoadedRun) -
         assert table["chart_title"].dropna().astype(str).str.len().gt(0).all(), filename
         assert table["metric_name"].dropna().astype(str).str.len().gt(0).all(), filename
         assert "score_basis" in table.columns, filename
-        assert set(table["score_basis"].dropna().astype(str)) == {"schiff_paper_horizon_mean"}, filename
+        score_basis_values = set(table["score_basis"].dropna().astype(str))
+        if filename in MULTI_SCORE_BASIS_SOURCE_FILES:
+            assert {"schiff_paper_horizon_mean", "current_grid_operational_pooled"}.issubset(score_basis_values), filename
+        else:
+            assert score_basis_values == {"schiff_paper_horizon_mean"}, filename
         assert table["calculation_basis"].dropna().astype(str).str.len().gt(0).all(), filename
 
 

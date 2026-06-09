@@ -20,9 +20,12 @@ from model_dashboard.light_ruc_reproducibility import (  # noqa: E402
     LIGHT_RUC_REPRO_DESCRIPTION,
     LIGHT_RUC_REPRO_MODEL,
     LIGHT_RUC_REPRO_ROOT,
+    PED_INNER_HPO_AUDIT_STATUS,
+    PED_INNER_HPO_REPRO_ROOT,
     PED_REPRO_DESCRIPTION,
     PED_REPRO_MODEL,
     PED_REPRO_ROOT,
+    REQUIRED_PED_INNER_HPO_AUDIT_FILES,
     REQUIRED_HEAVY_RUC_REPRO_FILES,
     REQUIRED_LIGHT_RUC_REPRO_FILES,
     REQUIRED_PED_REPRO_FILES,
@@ -33,8 +36,14 @@ from model_dashboard.light_ruc_reproducibility import (  # noqa: E402
     light_ruc_replay_summary,
     light_ruc_sensitivity_view,
     light_ruc_training_window_view,
+    load_ped_inner_hpo_audit_pack,
     load_reproducibility_pack,
     load_light_ruc_reproducibility_pack,
+    ped_inner_hpo_audit_summary,
+    ped_inner_hpo_gap_register_view,
+    ped_inner_hpo_nested_trace_view,
+    ped_inner_hpo_weight_detail_view,
+    ped_inner_hpo_weight_source_view,
     reproducibility_coefficients_view,
     reproducibility_component_trace_view,
     reproducibility_ensemble_equation,
@@ -63,6 +72,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--repro-root", default=str(LIGHT_RUC_REPRO_ROOT))
     parser.add_argument("--heavy-repro-root", default=str(HEAVY_RUC_REPRO_ROOT))
     parser.add_argument("--ped-repro-root", default=str(PED_REPRO_ROOT))
+    parser.add_argument("--ped-inner-hpo-root", default=str(PED_INNER_HPO_REPRO_ROOT))
     return parser.parse_args()
 
 
@@ -71,10 +81,12 @@ def validate(
     repro_root: str | Path,
     heavy_repro_root: str | Path | None = None,
     ped_repro_root: str | Path | None = None,
+    ped_inner_hpo_root: str | Path | None = None,
 ) -> list[dict[str, str]]:
     pack = load_light_ruc_reproducibility_pack(repro_root)
     heavy_pack = load_reproducibility_pack("Heavy RUC volume", heavy_repro_root or HEAVY_RUC_REPRO_ROOT)
     ped_pack = load_reproducibility_pack("PED VKT per capita", ped_repro_root or PED_REPRO_ROOT)
+    ped_inner_hpo_pack = load_ped_inner_hpo_audit_pack(ped_inner_hpo_root or PED_INNER_HPO_REPRO_ROOT)
     findings: list[dict[str, str]] = []
 
     def record(name: str, passed: bool, evidence: str) -> None:
@@ -235,6 +247,7 @@ def validate(
 
     _validate_heavy_pack(heavy_pack, record)
     _validate_ped_pack(ped_pack, record)
+    _validate_ped_inner_hpo_pack(ped_inner_hpo_pack, record)
 
     dashboard = load_evidence_pack(data_root, ROOT)
     recommended = dashboard.data["recommended"].set_index("stream_label")
@@ -276,6 +289,10 @@ def validate(
     _ = reproducibility_ensemble_equation(ped_pack)
     _ = reproducibility_scorecard_view(ped_pack)
     _ = reproducibility_stress_view(ped_pack)
+    _ = ped_inner_hpo_weight_source_view(ped_inner_hpo_pack)
+    _ = ped_inner_hpo_weight_detail_view(ped_inner_hpo_pack)
+    _ = ped_inner_hpo_nested_trace_view(ped_inner_hpo_pack)
+    _ = ped_inner_hpo_gap_register_view(ped_inner_hpo_pack)
     after_hashes = _chart_source_hashes()
     record(
         "Auxiliary reproducibility views do not alter main chart-source tables",
@@ -290,6 +307,83 @@ def validate(
     )
 
     return findings
+
+
+def _validate_ped_inner_hpo_pack(ped_inner_hpo_pack: object, record: object) -> None:
+    root = Path(ped_inner_hpo_pack.root)
+    record(
+        "PED inner HPO audit required files exist",
+        not ped_inner_hpo_pack.missing_files,
+        "missing=" + ", ".join(ped_inner_hpo_pack.missing_files)
+        if ped_inner_hpo_pack.missing_files
+        else f"files={len(REQUIRED_PED_INNER_HPO_AUDIT_FILES)}",
+    )
+    disallowed = sorted(path.name for path in root.glob("*") if path.suffix.lower() in {".csv", ".xlsx", ".xls"})
+    record(
+        "PED inner HPO audit copy excludes CSV/XLSX mirrors",
+        not disallowed,
+        "disallowed=" + ", ".join(disallowed) if disallowed else "No CSV/XLSX mirrors found in PED inner audit pack.",
+    )
+    registry = ped_inner_hpo_pack.table("model_registry")
+    record(
+        "PED inner HPO model registry exists",
+        root.joinpath("model_registry.parquet").exists() and not registry.empty,
+        f"path={root / 'model_registry.parquet'}; rows={len(registry)}",
+    )
+    summary = ped_inner_hpo_audit_summary(ped_inner_hpo_pack) if ped_inner_hpo_pack.available else {}
+    record(
+        "PED outer component replay remains exact in inner audit pack",
+        summary.get("outer_status") == "Exact component-prediction replay"
+        and pd.notna(summary.get("outer_max_abs_delta"))
+        and float(summary["outer_max_abs_delta"]) <= 1e-8,
+        str(summary),
+    )
+    prediction_comparison = ped_inner_hpo_pack.table("evidence_prediction_comparison")
+    pred_delta = pd.to_numeric(
+        prediction_comparison.get("abs_delta_rebuilt_vs_evidence", pd.Series(dtype=float)),
+        errors="coerce",
+    ).max()
+    record(
+        "PED inner audit evidence prediction comparison max delta is below 1e-8",
+        pd.notna(pred_delta) and float(pred_delta) <= 1e-8,
+        f"max_abs_pred_delta={pred_delta}",
+    )
+    nested_delta = summary.get("inner_max_abs_delta", pd.NA)
+    record(
+        "PED inner HPO audit is labelled partial when nested replay delta is non-zero",
+        summary.get("inner_status") == PED_INNER_HPO_AUDIT_STATUS
+        and pd.notna(nested_delta)
+        and float(nested_delta) > 1e-5,
+        str(summary),
+    )
+    source_view = ped_inner_hpo_weight_source_view(ped_inner_hpo_pack)
+    grouped_ok = False
+    if not source_view.empty and {"Source role", "Per-source weight sum"}.issubset(source_view.columns):
+        source_sums = source_view.set_index("Source role")["Per-source weight sum"]
+        roles = set(source_view["Source role"].astype(str))
+        if {"HPO refinement source", "Arbitration lineage/context"}.issubset(roles):
+            grouped_ok = (
+                abs(float(source_sums.loc["HPO refinement source"]) - 1.0) <= 1e-8
+                and abs(float(source_sums.loc["Arbitration lineage/context"]) - 0.4292679798198642) <= 1e-8
+            )
+    record(
+        "PED inner HPO weights are grouped by source_file before summing",
+        grouped_ok,
+        source_view.to_dict(orient="records") if not source_view.empty else "missing grouped weight source table",
+    )
+    gaps = ped_inner_hpo_gap_register_view(ped_inner_hpo_pack)
+    gap_text = gaps.fillna("").astype(str).agg(" ".join, axis=1).str.cat(sep=" | ") if not gaps.empty else ""
+    record(
+        "PED inner HPO gap register includes refit and mismatch caveats",
+        "feature_level_refit_not_attempted" in gap_text and "inner_weighted_replay_mismatch" in gap_text,
+        gap_text,
+    )
+    app_text = (ROOT / "app.py").read_text(encoding="utf-8")
+    record(
+        "PED UI does not label partial inner HPO audit exact",
+        PED_INNER_HPO_AUDIT_STATUS in app_text and "Inner HPO/static-solver audit: exact" not in app_text,
+        "Inner partial wording inspected in app.py.",
+    )
 
 
 def _validate_ped_pack(ped_pack: object, record: object) -> None:
@@ -513,8 +607,11 @@ def _chart_source_auxiliary_references() -> list[str]:
     source_dir = ROOT / "artifacts" / "chart_sources"
     if not source_dir.exists():
         return []
+    allowed_auxiliary_sources = {"reproducibility_component_r2.csv"}
     references: list[str] = []
     for path in sorted(source_dir.glob("*.csv")):
+        if path.name in allowed_auxiliary_sources:
+            continue
         text = path.read_text(encoding="utf-8", errors="ignore")
         if "dashboard_evidence_pack_reproducibility" in text or "light_ruc_exact_reproducibility" in text:
             references.append(path.name)
@@ -525,7 +622,7 @@ def main() -> int:
     args = parse_args()
     artifacts = ROOT / "artifacts"
     artifacts.mkdir(exist_ok=True)
-    findings = validate(args.data_root, args.repro_root, args.heavy_repro_root, args.ped_repro_root)
+    findings = validate(args.data_root, args.repro_root, args.heavy_repro_root, args.ped_repro_root, args.ped_inner_hpo_root)
     failed = [row for row in findings if row["status"] != "PASS"]
     status = "passed" if not failed else "failed"
     lines = [
