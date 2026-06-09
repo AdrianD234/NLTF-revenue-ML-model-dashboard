@@ -16,6 +16,11 @@ from ..labels import (
     humanize_label,
 )
 from ..metrics import best_by_stream
+from ..r2_ladder import (
+    R2_LADDER_NOTE,
+    R2_LADDER_TITLE,
+    r2_ladder_frames,
+)
 from ..reproducibility_imports import diagnostics_r2_summary_frame, format_r2, reproducibility_component_r2_frame
 from ..score_basis import PAPER_SCORE_BASIS, score_basis_label
 from .diagnostics import DEFAULT_ACF_RESIDUAL_SCOPE, select_diagnostic_acf_scope
@@ -73,8 +78,10 @@ EXTRA_COLUMNS = [
     "paired_win_rate_pct",
     "recommendation",
     "r2_type",
+    "data_scope",
     "forecast_r2",
     "calibration_r2",
+    "training_fit_r2",
     "component_r2",
     "n_rows",
     "sse",
@@ -82,7 +89,16 @@ EXTRA_COLUMNS = [
     "bias_pct",
     "mape",
     "interpretation",
+    "availability_status",
+    "training_fit_r2_status",
+    "gap_id",
+    "gap_status",
+    "gap_severity",
+    "gap_detail",
+    "inner_hpo_weights_status",
+    "nested_replay_status",
     "source_prediction_column",
+    "source_actual_column",
     "calibration_r2_source_column",
 ]
 
@@ -96,6 +112,9 @@ CHART_SOURCE_FILES = {
     "diagnostics_pass_matrix.csv": ("Diagnostics", "diagnostics_pass_matrix"),
     "diagnostics_error_distribution_by_horizon.csv": ("Diagnostics", "diagnostics_error_distribution_by_horizon"),
     "diagnostics_r2_summary.csv": ("Diagnostics", "diagnostics_r2_summary"),
+    "r2_ladder_summary.csv": ("Diagnostics", "r2_ladder_summary"),
+    "r2_training_fit_detail.csv": ("Diagnostics", "r2_training_fit_detail"),
+    "r2_reproducibility_gap_register.csv": ("Governance & Reproducibility", "r2_reproducibility_gap_register"),
     "scenario_stream_comparison.csv": ("Scenario Comparison", "scenario_stream_comparison"),
     "scenario_improvement_vs_benchmark.csv": ("Scenario Comparison", "scenario_improvement_vs_benchmark"),
     "scenario_horizon_comparison.csv": ("Scenario Comparison", "scenario_horizon_comparison"),
@@ -157,7 +176,7 @@ def build_chart_source_tables(data: dict[str, pd.DataFrame], repo_root: Path | N
     error_window = error_distribution if error_distribution is not None and not error_distribution.empty else diagnostic_window
     matrix_source = pass_matrix if pass_matrix is not None and not pass_matrix.empty else diagnostics
 
-    return {
+    tables = {
         "overview_kpi_cards.csv": _overview_kpi_cards_source(
             recommended,
             schiff,
@@ -206,6 +225,8 @@ def build_chart_source_tables(data: dict[str, pd.DataFrame], repo_root: Path | N
         "schiff_benchmark_summary.csv": _schiff_summary_source(comparison, source_files["schiff_benchmark_summary"]),
         "reproducibility_component_r2.csv": _reproducibility_component_r2(repo_root, source_files["reproducibility_component_r2"]),
     }
+    tables.update(_r2_ladder_source_tables(data, repo_root))
+    return tables
 
 
 def _chart_contract_source_files(data: dict[str, pd.DataFrame], default: str) -> dict[str, str]:
@@ -219,6 +240,9 @@ def _chart_contract_source_files(data: dict[str, pd.DataFrame], default: str) ->
         "diagnostics_pass_matrix": "diagnostic_pass_matrix",
         "diagnostics_error_distribution_by_horizon": "error_distribution_by_horizon",
         "diagnostics_r2_summary": "scorecard_predictions",
+        "r2_ladder_summary": "scorecard_predictions;diagnostic_tests;reproducibility_component_predictions;training_window_trace",
+        "r2_training_fit_detail": "reproducibility_training_fit_or_component_prediction_rows",
+        "r2_reproducibility_gap_register": "reproducibility_gap_register;training_window_trace;model_registry",
         "scenario_stream_comparison": "stream_comparison",
         "scenario_improvement_vs_benchmark": "improvement_vs_benchmark",
         "scenario_horizon_comparison": "horizon_comparison",
@@ -913,6 +937,8 @@ def _diagnostics_r2_summary(scorecard_predictions: pd.DataFrame, diagnostics: pd
                 "scorecard_predictions.parquet",
                 "Forecast R2 is unavailable because scorecard prediction rows are missing.",
                 "Calibration R2 is actual-on-forecast validation R2, not in-sample training fit.",
+                r2_type="forecast",
+                data_scope="out_of_sample_scorecard_final_prediction_rows",
                 value_available=False,
                 calibration_r2_source_column=pd.NA,
             )
@@ -937,6 +963,7 @@ def _diagnostics_r2_summary(scorecard_predictions: pd.DataFrame, diagnostics: pd
                 "Forecast R2 computed as 1 - SSE/SST from final scorecard predictions in native stream units.",
                 "Calibration R2 is actual-on-forecast validation R2 and is reported separately from net forecast R2.",
                 r2_type="forecast",
+                data_scope="out_of_sample_scorecard_final_prediction_rows",
                 forecast_r2=forecast_value,
                 calibration_r2=calibration_value,
                 n_rows=row.get("n_rows"),
@@ -970,6 +997,8 @@ def _reproducibility_component_r2(repo_root: Path | None, source_file: str) -> p
                 "data/dashboard_evidence_pack_reproducibility/*/component_predictions.parquet",
                 "Reproducibility component R2 is unavailable because component prediction rows are missing.",
                 "If actual variance is zero or rows are insufficient, R2 is unavailable rather than coerced to zero.",
+                r2_type="forecast",
+                data_scope="out_of_sample_final_prediction_rows",
                 value_available=False,
             )
         )
@@ -997,6 +1026,10 @@ def _reproducibility_component_r2(repo_root: Path | None, source_file: str) -> p
                 str(row.get("calculation_basis", "Forecast R2 computed as 1 - SSE/SST from stored prediction rows.")),
                 "Negative R2 is valid but indicates poorer fit than the stream mean on these rows.",
                 r2_type=row.get("r2_type"),
+                data_scope=row.get(
+                    "data_scope",
+                    "out_of_sample_component_prediction_rows" if row.get("r2_type") == "component" else "out_of_sample_final_prediction_rows",
+                ),
                 forecast_r2=forecast_value,
                 calibration_r2=row.get("calibration_r2"),
                 component_r2=component_value,
@@ -1010,6 +1043,182 @@ def _reproducibility_component_r2(repo_root: Path | None, source_file: str) -> p
                 component_rank=row.get("component_rank"),
                 source_prediction_column=row.get("source_prediction_column"),
                 value_available=pd.notna(pd.to_numeric(metric_value, errors="coerce")),
+            )
+        )
+    return _standardize(rows)
+
+
+def _r2_ladder_source_tables(data: dict[str, pd.DataFrame], repo_root: Path | None) -> dict[str, pd.DataFrame]:
+    frames = r2_ladder_frames(data, repo_root=repo_root)
+    return {
+        "r2_ladder_summary.csv": _r2_ladder_summary_source(frames.get("summary", pd.DataFrame())),
+        "r2_training_fit_detail.csv": _r2_training_fit_detail_source(frames.get("training_fit_detail", pd.DataFrame())),
+        "r2_reproducibility_gap_register.csv": _r2_gap_register_source(frames.get("gap_register", pd.DataFrame())),
+    }
+
+
+def _r2_ladder_summary_source(summary: pd.DataFrame) -> pd.DataFrame:
+    rows: list[dict[str, Any]] = []
+    if summary is None or summary.empty:
+        rows.append(
+            _base_row(
+                "Diagnostics",
+                "r2_ladder_summary",
+                R2_LADDER_TITLE,
+                {},
+                "R2 ladder summary",
+                pd.NA,
+                "-",
+                "training_fit_r2;calibration_r2;forecast_r2",
+                "scorecard_predictions.parquet;diagnostic_tests.parquet;data/dashboard_evidence_pack_reproducibility/*/component_predictions.parquet",
+                "R2 ladder is unavailable because its source rows are missing.",
+                R2_LADDER_NOTE,
+                r2_type="r2_ladder",
+                data_scope="mixed_training_calibration_forecast_governance_ladder",
+                value_available=False,
+            )
+        )
+        return _standardize(rows)
+    for _, row in summary.iterrows():
+        rows.append(
+            _base_row(
+                "Diagnostics",
+                "r2_ladder_summary",
+                R2_LADDER_TITLE,
+                row,
+                "R2 ladder summary",
+                row.get("forecast_r2"),
+                format_r2(row.get("forecast_r2")),
+                "training_fit_r2;calibration_r2;forecast_r2",
+                str(row.get("source_file", "scorecard_predictions.parquet;diagnostic_tests.parquet;reproducibility component_predictions.parquet")),
+                str(row.get("calculation_basis", "Training-fit, calibration and forecast R2 are separate governance ladder measures.")),
+                str(row.get("notes", R2_LADDER_NOTE)),
+                r2_type=row.get("r2_type"),
+                data_scope=row.get("data_scope"),
+                forecast_r2=row.get("forecast_r2"),
+                calibration_r2=row.get("calibration_r2"),
+                training_fit_r2=row.get("training_fit_r2"),
+                n_rows=row.get("n_rows"),
+                interpretation=row.get("interpretation"),
+                source_prediction_column=row.get("source_prediction_column"),
+                calibration_r2_source_column=row.get("calibration_r2_source_column"),
+                availability_status=row.get("availability_status"),
+                training_fit_r2_status=row.get("training_fit_r2_status"),
+                inner_hpo_weights_status=row.get("inner_hpo_weights_status"),
+                nested_replay_status=row.get("nested_replay_status"),
+                value_available=row.get("value_available"),
+            )
+        )
+    return _standardize(rows)
+
+
+def _r2_training_fit_detail_source(detail: pd.DataFrame) -> pd.DataFrame:
+    rows: list[dict[str, Any]] = []
+    if detail is None or detail.empty:
+        rows.append(
+            _base_row(
+                "Diagnostics",
+                "r2_training_fit_detail",
+                "R2 ladder training-fit and component validation detail",
+                {},
+                "Training-fit R2 unavailable",
+                pd.NA,
+                "-",
+                "missing_fitted_training_rows",
+                "data/dashboard_evidence_pack_reproducibility/*/training_window_trace.parquet",
+                "No fitted training-row detail is available.",
+                "Unavailable training-fit R2 is blank, not zero.",
+                r2_type="training_fit",
+                data_scope="training_window_fitted_rows_missing",
+                value_available=False,
+            )
+        )
+        return _standardize(rows)
+    for _, row in detail.iterrows():
+        rows.append(
+            _base_row(
+                "Diagnostics",
+                "r2_training_fit_detail",
+                "R2 ladder training-fit and component validation detail",
+                row,
+                str(row.get("metric_name", "Training-fit R2")),
+                row.get("metric_value"),
+                str(row.get("metric_display", format_r2(row.get("metric_value")))),
+                str(row.get("source_column", row.get("source_prediction_column", ""))),
+                str(row.get("source_file", "")),
+                str(row.get("calculation_basis", "R2 detail row for the governance ladder.")),
+                str(row.get("notes", "")),
+                r2_type=row.get("r2_type"),
+                data_scope=row.get("data_scope"),
+                training_fit_r2=row.get("training_fit_r2"),
+                component_r2=row.get("component_r2"),
+                n_rows=row.get("n_rows"),
+                sse=row.get("sse"),
+                sst=row.get("sst"),
+                bias_pct=row.get("bias_pct"),
+                mape=row.get("mape"),
+                interpretation=row.get("interpretation"),
+                component_model=row.get("component_model"),
+                component_rank=row.get("component_rank"),
+                source_prediction_column=row.get("source_prediction_column"),
+                source_actual_column=row.get("source_actual_column"),
+                availability_status=row.get("availability_status"),
+                training_fit_r2_status=row.get("training_fit_r2_status"),
+                value_available=row.get("value_available"),
+            )
+        )
+    return _standardize(rows)
+
+
+def _r2_gap_register_source(gaps: pd.DataFrame) -> pd.DataFrame:
+    rows: list[dict[str, Any]] = []
+    if gaps is None or gaps.empty:
+        rows.append(
+            _base_row(
+                "Governance & Reproducibility",
+                "r2_reproducibility_gap_register",
+                "R2 reproducibility gap register",
+                {},
+                "R2 reproducibility gap",
+                pd.NA,
+                "-",
+                "missing_fitted_training_rows",
+                "data/dashboard_evidence_pack_reproducibility/*/training_window_trace.parquet",
+                "No R2 reproducibility gaps were registered.",
+                "If training-fit rows are unavailable they must be blank rather than zero.",
+                r2_type="training_fit",
+                data_scope="training_window_fitted_rows_missing",
+                value_available=False,
+            )
+        )
+        return _standardize(rows)
+    for _, row in gaps.iterrows():
+        rows.append(
+            _base_row(
+                "Governance & Reproducibility",
+                "r2_reproducibility_gap_register",
+                "R2 reproducibility gap register",
+                row,
+                str(row.get("metric_name", "R2 reproducibility gap")),
+                row.get("metric_value"),
+                str(row.get("metric_display", "-")),
+                str(row.get("source_column", "missing_fitted_training_rows")),
+                str(row.get("source_file", "")),
+                str(row.get("calculation_basis", "R2 training-fit gap register row.")),
+                str(row.get("notes", "")),
+                r2_type=row.get("r2_type"),
+                data_scope=row.get("data_scope"),
+                training_fit_r2=row.get("training_fit_r2"),
+                gap_id=row.get("gap_id"),
+                gap_status=row.get("gap_status"),
+                gap_severity=row.get("gap_severity"),
+                gap_detail=row.get("gap_detail"),
+                availability_status=row.get("availability_status"),
+                training_fit_r2_status=row.get("training_fit_r2_status"),
+                inner_hpo_weights_status=row.get("inner_hpo_weights_status"),
+                nested_replay_status=row.get("nested_replay_status"),
+                component_model=row.get("component_model"),
+                value_available=row.get("value_available"),
             )
         )
     return _standardize(rows)

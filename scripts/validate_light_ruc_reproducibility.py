@@ -607,7 +607,12 @@ def _chart_source_auxiliary_references() -> list[str]:
     source_dir = ROOT / "artifacts" / "chart_sources"
     if not source_dir.exists():
         return []
-    allowed_auxiliary_sources = {"reproducibility_component_r2.csv"}
+    allowed_auxiliary_sources = {
+        "reproducibility_component_r2.csv",
+        "r2_ladder_summary.csv",
+        "r2_training_fit_detail.csv",
+        "r2_reproducibility_gap_register.csv",
+    }
     references: list[str] = []
     for path in sorted(source_dir.glob("*.csv")):
         if path.name in allowed_auxiliary_sources:

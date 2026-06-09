@@ -46,6 +46,7 @@ from model_dashboard.labels import (
     model_alias,
     shorten_model_name,
 )
+from model_dashboard.r2_ladder import R2_LADDER_NOTE, R2_LADDER_TITLE, r2_ladder_summary_frame
 from model_dashboard.reproducibility_imports import (
     PED_INNER_HPO_AUDIT_STATUS,
     R2_GOVERNANCE_INFO_TEXT,
@@ -1225,10 +1226,56 @@ def render_diagnostics_r2_panel(loaded: LoadedRun) -> None:
         display_table(diagnostics_r2_detail_table(loaded), height=230, max_rows=12)
 
 
+def r2_ladder_display_table(loaded: LoadedRun, selected_stream: str = "All streams") -> pd.DataFrame:
+    summary = r2_ladder_summary_frame(loaded.data, Path(__file__).resolve().parent)
+    if selected_stream != "All streams" and not summary.empty:
+        summary = summary[summary["stream_label"].astype(str).eq(selected_stream)].copy()
+    if summary.empty:
+        return pd.DataFrame(
+            [
+                {
+                    "stream": selected_stream,
+                    "model": "-",
+                    "training_fit_r2": "-",
+                    "calibration_r2": "-",
+                    "forecast_r2": "-",
+                    "n_rows": 0,
+                    "score_basis": "-",
+                    "availability_status": "unavailable",
+                    "interpretation": "R2 ladder source rows are unavailable.",
+                }
+            ]
+        )
+    table = summary[
+        [
+            "stream",
+            "model",
+            "training_fit_r2",
+            "calibration_r2",
+            "forecast_r2",
+            "n_rows",
+            "score_basis",
+            "availability_status",
+            "interpretation",
+        ]
+    ].copy()
+    for column in ["training_fit_r2", "calibration_r2", "forecast_r2"]:
+        table[column] = table[column].map(format_r2)
+    table["n_rows"] = pd.to_numeric(table["n_rows"], errors="coerce").fillna(0).astype(int)
+    return table
+
+
+def render_r2_ladder_panel(loaded: LoadedRun, selected_stream: str = "All streams", *, expanded: bool = False) -> None:
+    with st.expander(R2_LADDER_TITLE, expanded=expanded):
+        info_panel(R2_LADDER_NOTE)
+        display_table(r2_ladder_display_table(loaded, selected_stream), height=260, max_rows=12)
+
+
 def render_diagnostics(loaded: LoadedRun, controls: dict[str, Any]) -> None:
     diagnostic_df = loaded.data.get("diagnostic_df", pd.DataFrame())
     gov_kpi_grid(diagnostic_kpi_cards(diagnostic_df))
     render_diagnostics_r2_panel(loaded)
+    render_r2_ladder_panel(loaded)
 
     qpred = common_filter(loaded.data.get("quarterly_predictions", pd.DataFrame()), controls, include_source_variant=False)
     diagnostic_qpred = central_error_window(qpred)
@@ -1417,6 +1464,7 @@ def render_governance_reproducibility_page(loaded: LoadedRun, controls: dict[str
         analytics_stream,
         analytics_pack,
         selected_stream,
+        loaded,
         loaded_packs,
         workbook_manifest,
         panel_contract,
@@ -2082,6 +2130,7 @@ def render_page5_lower_panels(
     analytics_stream: str,
     analytics_pack: Any | None,
     selected_stream: str,
+    loaded: LoadedRun,
     loaded_packs: dict[str, Any | None],
     workbook_manifest: dict[str, Any],
     panel_contract: pd.DataFrame,
@@ -2089,7 +2138,7 @@ def render_page5_lower_panels(
     if analytics_pack is None:
         warning_panel("No reproducibility pack is available for the lower audit panels.")
         return
-    render_page5_r2_panel(selected_stream)
+    render_page5_r2_panel(selected_stream, loaded)
     lower_cols = st.columns([1.0, 1.0, 1.0, 1.05, 1.05])
     with lower_cols[0]:
         render_page5_importance_or_component_panel(analytics_stream, analytics_pack, panel_contract)
@@ -2115,7 +2164,7 @@ def render_page5_lower_panels(
         render_page5_download_buttons(selected_stream, loaded_packs, workbook_manifest, key_prefix="lower")
 
 
-def render_page5_r2_panel(selected_stream: str) -> None:
+def render_page5_r2_panel(selected_stream: str, loaded: LoadedRun | None = None) -> None:
     summary = reproducibility_component_r2_frame(Path(__file__).resolve().parent)
     if selected_stream != "All streams" and not summary.empty:
         summary = summary[summary["stream_label"].astype(str).eq(selected_stream)].copy()
@@ -2158,6 +2207,13 @@ def render_page5_r2_panel(selected_stream: str) -> None:
         unsafe_allow_html=True,
     )
     display_table(table[[column for column in display_cols if column in table.columns]], height=250, max_rows=24)
+    if loaded is not None:
+        st.markdown(
+            f"<div class='page5-panel-title'>{html.escape(R2_LADDER_TITLE)}</div>"
+            f"<div class='page5-panel-sub'>{html.escape(R2_LADDER_NOTE)}</div>",
+            unsafe_allow_html=True,
+        )
+        display_table(r2_ladder_display_table(loaded, selected_stream), height=250, max_rows=12)
 
 
 def render_page5_importance_or_component_panel(stream_label: str, pack: Any, panel_contract: pd.DataFrame) -> None:

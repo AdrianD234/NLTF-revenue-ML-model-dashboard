@@ -95,6 +95,10 @@ def test_r2_source_tables_exist_and_label_metric_types() -> None:
 
     assert not diagnostics.empty
     assert not reproducibility.empty
+    assert diagnostics["r2_type"].dropna().astype(str).str.len().gt(0).all()
+    assert diagnostics["data_scope"].dropna().astype(str).str.len().gt(0).all()
+    assert reproducibility["r2_type"].dropna().astype(str).str.len().gt(0).all()
+    assert reproducibility["data_scope"].dropna().astype(str).str.len().gt(0).all()
     assert set(diagnostics["metric_name"]) == {"Forecast R2"}
     assert {"Forecast R2", "Component R2"}.issubset(set(reproducibility["metric_name"]))
     assert "calibration_r2_source_column" in diagnostics.columns

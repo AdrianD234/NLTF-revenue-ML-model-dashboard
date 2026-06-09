@@ -21,7 +21,13 @@ from model_dashboard.score_basis import OPERATIONAL_SCORE_BASIS, PAPER_SCORE_BAS
 EXPECTED_STREAMS = {"PED VKT per capita", "Light RUC volume", "Heavy RUC volume"}
 EXPECTED_FRONTIER_COUNTS = {"PED VKT per capita": 132, "Light RUC volume": 136, "Heavy RUC volume": 132}
 CHART_SOURCE_DIR = ROOT / "artifacts" / "chart_sources"
-MULTI_SCORE_BASIS_SOURCE_FILES = {"diagnostics_r2_summary.csv", "reproducibility_component_r2.csv"}
+MULTI_SCORE_BASIS_SOURCE_FILES = {
+    "diagnostics_r2_summary.csv",
+    "reproducibility_component_r2.csv",
+    "r2_ladder_summary.csv",
+    "r2_training_fit_detail.csv",
+    "r2_reproducibility_gap_register.csv",
+}
 
 
 def parse_args() -> argparse.Namespace:

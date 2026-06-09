@@ -34,7 +34,8 @@ def validate() -> list[tuple[str, str, str]]:
 
     app_text = read_text(repo_root / "app.py")
     reproducibility_imports_text = read_text(repo_root / "model_dashboard" / "reproducibility_imports.py")
-    r2_text = app_text + reproducibility_imports_text
+    r2_ladder_text = read_text(repo_root / "model_dashboard" / "r2_ladder.py")
+    r2_text = app_text + reproducibility_imports_text + r2_ladder_text
     plot_text = read_text(repo_root / "model_dashboard" / "plots.py")
     chart_spec = read_text(repo_root / "DASHBOARD_PAGE_CHART_SPEC.lock.md")
     screenshot_review = read_text(repo_root / "artifacts" / "screenshot_review.md")
@@ -82,6 +83,14 @@ def validate() -> list[tuple[str, str, str]]:
         and "Calibration R2 is actual-on-forecast validation R2. Neither is in-sample OLS R2." in r2_text
         and "High in-sample OLS R2 means" not in r2_text,
         "Diagnostics and Governance labels distinguish net forecast R2 from calibration R2.",
+    )
+    record(
+        "R2 ladder distinguishes training fit from forecast R2",
+        "R2 ladder: training fit vs calibration vs forecast R2" in r2_text
+        and "Training-fit R2 is not comparable to forecast R2" in r2_text
+        and "High paper-style R2 usually measures in-sample fit" in r2_text
+        and "forecast R2 measures out-of-sample explanatory power" in r2_text,
+        "R2 ladder note inspected in app.py and model_dashboard/r2_ladder.py.",
     )
     record(
         "Full-sample gain chart is not labelled paired",

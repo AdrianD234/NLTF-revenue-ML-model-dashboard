@@ -21,7 +21,13 @@ ROOT = Path(__file__).resolve().parents[1]
 CHART_SOURCE_DIR = ROOT / "artifacts" / "chart_sources"
 EXPECTED_STREAMS = {"PED VKT per capita", "Light RUC volume", "Heavy RUC volume"}
 EXPECTED_BALANCED_FRONTIER_COUNTS = {"PED VKT per capita": 132, "Light RUC volume": 136, "Heavy RUC volume": 132}
-MULTI_SCORE_BASIS_SOURCE_FILES = {"diagnostics_r2_summary.csv", "reproducibility_component_r2.csv"}
+MULTI_SCORE_BASIS_SOURCE_FILES = {
+    "diagnostics_r2_summary.csv",
+    "reproducibility_component_r2.csv",
+    "r2_ladder_summary.csv",
+    "r2_training_fit_detail.csv",
+    "r2_reproducibility_gap_register.csv",
+}
 
 
 @pytest.fixture(scope="session")

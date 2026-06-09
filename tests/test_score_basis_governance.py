@@ -73,7 +73,13 @@ def test_chart_sources_include_score_basis_and_no_old_light_default_values(evide
     chart_dir = ROOT / "artifacts" / "chart_sources"
     source_files = list(chart_dir.glob("*.csv"))
     assert source_files
-    multi_basis = {"diagnostics_r2_summary.csv", "reproducibility_component_r2.csv"}
+    multi_basis = {
+        "diagnostics_r2_summary.csv",
+        "reproducibility_component_r2.csv",
+        "r2_ladder_summary.csv",
+        "r2_training_fit_detail.csv",
+        "r2_reproducibility_gap_register.csv",
+    }
     for path in source_files:
         frame = pd.read_csv(path)
         assert "score_basis" in frame.columns, path.name
