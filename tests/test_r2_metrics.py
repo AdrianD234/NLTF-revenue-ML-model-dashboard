@@ -103,4 +103,7 @@ def test_r2_source_tables_exist_and_label_metric_types() -> None:
         "Valid but poor fit",
         regex=False,
     ).all()
-    assert "in-sample OLS R2" not in (ROOT / "app.py").read_text(encoding="utf-8")
+    r2_text = (ROOT / "model_dashboard" / "reproducibility_imports.py").read_text(encoding="utf-8")
+    assert "Forecast R2 is calculated from final delivered predictions after residual correction or ensemble weighting." in r2_text
+    assert "Calibration R2 is actual-on-forecast validation R2. Neither is in-sample OLS R2." in r2_text
+    assert "High in-sample OLS R2 means" not in r2_text

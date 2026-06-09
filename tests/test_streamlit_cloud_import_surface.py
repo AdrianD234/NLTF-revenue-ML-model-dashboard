@@ -1,15 +1,63 @@
 from __future__ import annotations
 
 import importlib
+import sys
 
-from scripts.check_streamlit_deploy_readiness import REQUIRED_UI_EXPORTS, assert_import_surface
+import pandas as pd
+
+from scripts.check_streamlit_deploy_readiness import (
+    REQUIRED_REPRODUCIBILITY_IMPORT_EXPORTS,
+    REQUIRED_UI_EXPORTS,
+    assert_import_surface,
+    assert_startup_import_subprocess,
+)
 
 
 def test_app_imports_cloud_ui_surface() -> None:
     assert_import_surface()
 
 
+def test_streamlit_cloud_style_subprocess_imports_app() -> None:
+    assert_startup_import_subprocess(force_optional_fallback=False)
+
+
+def test_app_imports_when_optional_reproducibility_imports_fallback() -> None:
+    assert_startup_import_subprocess(force_optional_fallback=True)
+
+
 def test_model_dashboard_ui_exports_app_helpers() -> None:
     ui = importlib.import_module("model_dashboard.ui")
     missing = sorted(name for name in REQUIRED_UI_EXPORTS if not hasattr(ui, name))
     assert missing == []
+
+
+def test_reproducibility_import_wrapper_exports_all_app_symbols() -> None:
+    wrapper = importlib.import_module("model_dashboard.reproducibility_imports")
+    missing = sorted(name for name in REQUIRED_REPRODUCIBILITY_IMPORT_EXPORTS if not hasattr(wrapper, name))
+    assert missing == []
+
+
+def test_reproducibility_import_wrapper_fallbacks_return_missing_data(monkeypatch) -> None:
+    monkeypatch.setenv("NLTF_FORCE_REPRODUCIBILITY_IMPORT_FALLBACK", "1")
+    sys.modules.pop("model_dashboard.reproducibility_imports", None)
+    wrapper = importlib.import_module("model_dashboard.reproducibility_imports")
+
+    try:
+        assert wrapper.REPRODUCIBILITY_IMPORT_ERROR
+        assert wrapper.R2_IMPORT_ERROR
+        assert wrapper.reproducibility_stream_labels() == [
+            "PED VKT per capita",
+            "Light RUC volume",
+            "Heavy RUC volume",
+        ]
+        pack = wrapper.load_reproducibility_pack("Light RUC volume")
+        assert pack.available is False
+        assert pack.missing_files
+        assert wrapper.reproducibility_registry_view(pack).empty
+        assert wrapper.diagnostics_r2_summary_frame(pd.DataFrame()).empty
+        assert wrapper.reproducibility_component_r2_frame().empty
+        assert wrapper.format_r2(0.1234) == "0.123"
+    finally:
+        monkeypatch.delenv("NLTF_FORCE_REPRODUCIBILITY_IMPORT_FALLBACK", raising=False)
+        sys.modules.pop("model_dashboard.reproducibility_imports", None)
+        importlib.import_module("model_dashboard.reproducibility_imports")

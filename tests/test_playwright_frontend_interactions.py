@@ -344,6 +344,8 @@ def test_governance_reproducibility_page_stream_selector_and_downloads(page: Pag
     open_dashboard(page)
     click_page(page, "Governance & Reproducibility")
     body = page.locator("body")
+    r2_forecast_text = "Forecast R2 is calculated from final delivered predictions after residual correction or ensemble weighting."
+    r2_calibration_text = "Calibration R2 is actual-on-forecast validation R2. Neither is in-sample OLS R2."
     expect(body).to_contain_text("Page 5 of 5 - Governance & Reproducibility", timeout=90000)
     expect(body).to_contain_text("Governance & Reproducibility Filters", timeout=60000)
     expect(body).to_contain_text("PED VKT per capita", timeout=60000)
@@ -355,6 +357,8 @@ def test_governance_reproducibility_page_stream_selector_and_downloads(page: Pag
     expect(body).to_contain_text("Exact weighted-ensemble replay", timeout=90000)
     expect(body).to_contain_text("Component trace", timeout=90000)
     expect(body).to_contain_text("Net forecast R2 after final model composition", timeout=90000)
+    expect(body).to_contain_text(r2_forecast_text, timeout=90000)
+    expect(body).to_contain_text(r2_calibration_text, timeout=90000)
     expect(body).to_contain_text("Forecast R2", timeout=90000)
     expect(body).to_contain_text("Component R2", timeout=90000)
     expect(body).to_contain_text("final_pred", timeout=90000)
@@ -388,6 +392,8 @@ def test_governance_reproducibility_page_stream_selector_and_downloads(page: Pag
 def test_diagnostic_pass_matrix_tooltips_hover_and_focus(page: Page) -> None:
     open_dashboard(page)
     click_page(page, "Diagnostics")
+    r2_forecast_text = "Forecast R2 is calculated from final delivered predictions after residual correction or ensemble weighting."
+    r2_calibration_text = "Calibration R2 is actual-on-forecast validation R2. Neither is in-sample OLS R2."
 
     calibration_kpi = page.locator(".kpi-title").filter(has_text="Mean calibration R2").first
     expect(calibration_kpi).to_be_visible(timeout=90000)
@@ -397,6 +403,8 @@ def test_diagnostic_pass_matrix_tooltips_hover_and_focus(page: Page) -> None:
     assert "Forecast R2 is reported in the detail panel" in tooltip_text
     calibration_kpi.hover()
     page.get_by_text("Forecast R2 versus calibration R2", exact=True).first.click()
+    expect(page.locator("body")).to_contain_text(r2_forecast_text, timeout=60000)
+    expect(page.locator("body")).to_contain_text(r2_calibration_text, timeout=60000)
     expect(page.locator("body")).to_contain_text("forecast_r2", timeout=60000)
     expect(page.locator("body")).to_contain_text("calibration_r2", timeout=60000)
     expect(page.locator("body")).to_contain_text("Paper-style horizon MAPE", timeout=60000)

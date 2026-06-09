@@ -33,6 +33,8 @@ def validate() -> list[tuple[str, str, str]]:
     load_evidence_pack(args.data_root, repo_root)
 
     app_text = read_text(repo_root / "app.py")
+    reproducibility_imports_text = read_text(repo_root / "model_dashboard" / "reproducibility_imports.py")
+    r2_text = app_text + reproducibility_imports_text
     plot_text = read_text(repo_root / "model_dashboard" / "plots.py")
     chart_spec = read_text(repo_root / "DASHBOARD_PAGE_CHART_SPEC.lock.md")
     screenshot_review = read_text(repo_root / "artifacts" / "screenshot_review.md")
@@ -76,8 +78,9 @@ def validate() -> list[tuple[str, str, str]]:
         "Forecast R2 and calibration R2 are distinguished",
         "Forecast R2 versus calibration R2" in app_text
         and "Net forecast R2 after final model composition" in app_text
-        and "actual-on-forecast validation regression" in app_text
-        and "in-sample OLS R2" not in app_text,
+        and "Forecast R2 is calculated from final delivered predictions after residual correction or ensemble weighting." in r2_text
+        and "Calibration R2 is actual-on-forecast validation R2. Neither is in-sample OLS R2." in r2_text
+        and "High in-sample OLS R2 means" not in r2_text,
         "Diagnostics and Governance labels distinguish net forecast R2 from calibration R2.",
     )
     record(

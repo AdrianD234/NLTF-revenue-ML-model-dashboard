@@ -46,8 +46,11 @@ from model_dashboard.labels import (
     model_alias,
     shorten_model_name,
 )
-from model_dashboard.light_ruc_reproducibility import (
+from model_dashboard.reproducibility_imports import (
     PED_INNER_HPO_AUDIT_STATUS,
+    R2_GOVERNANCE_INFO_TEXT,
+    diagnostics_r2_summary_frame,
+    format_r2,
     load_ped_inner_hpo_audit_pack,
     ped_inner_hpo_audit_signature,
     ped_inner_hpo_audit_summary,
@@ -73,6 +76,7 @@ from model_dashboard.light_ruc_reproducibility import (
     load_reproducibility_pack,
     plot_reproducibility_feature_importance,
     plot_reproducibility_sensitivities,
+    reproducibility_component_r2_frame,
 )
 from model_dashboard.metrics import (
     best_by_stream,
@@ -88,7 +92,6 @@ from model_dashboard.metrics import (
     schiff_result_label,
     stress_readout,
 )
-from model_dashboard.r2_metrics import diagnostics_r2_summary_frame, format_r2, reproducibility_component_r2_frame
 from model_dashboard.plots import (
     empty_figure,
     plot_actual_vs_predicted,
@@ -1215,9 +1218,9 @@ def diagnostics_r2_detail_table(loaded: LoadedRun) -> pd.DataFrame:
 def render_diagnostics_r2_panel(loaded: LoadedRun) -> None:
     with st.expander("Forecast R2 versus calibration R2", expanded=False):
         info_panel(
-            "Forecast R2 is net R2 from final predictions after model composition. "
-            "Calibration R2 is the actual-on-forecast validation regression R2. "
-            "Negative Forecast R2 is valid but indicates poorer fit than the stream mean; zero actual variance is shown as unavailable."
+            f"{R2_GOVERNANCE_INFO_TEXT} "
+            "Negative Forecast R2 is valid but indicates poorer fit than the stream mean; "
+            "zero actual variance is shown as unavailable."
         )
         display_table(diagnostics_r2_detail_table(loaded), height=230, max_rows=12)
 
@@ -2151,7 +2154,7 @@ def render_page5_r2_panel(selected_stream: str) -> None:
     ]
     st.markdown(
         "<div class='page5-panel-title'>Net forecast R2 after final model composition</div>"
-        "<div class='page5-panel-sub'>Forecast R2 uses final predictions after corrections or ensemble weights; component R2 is shown where component predictions are in target units.</div>",
+        f"<div class='page5-panel-sub'>{html.escape(R2_GOVERNANCE_INFO_TEXT)} Component R2 is shown where component predictions are in target units.</div>",
         unsafe_allow_html=True,
     )
     display_table(table[[column for column in display_cols if column in table.columns]], height=250, max_rows=24)

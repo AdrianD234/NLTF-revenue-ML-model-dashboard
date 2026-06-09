@@ -48,6 +48,38 @@ REQUIRED_UI_EXPORTS = {
     "gov_kpi_grid",
     "governance_cards",
 }
+REQUIRED_REPRODUCIBILITY_IMPORT_EXPORTS = {
+    "PED_INNER_HPO_AUDIT_STATUS",
+    "R2_GOVERNANCE_INFO_TEXT",
+    "load_ped_inner_hpo_audit_pack",
+    "ped_inner_hpo_audit_signature",
+    "ped_inner_hpo_audit_summary",
+    "ped_inner_hpo_gap_register_view",
+    "ped_inner_hpo_nested_trace_view",
+    "ped_inner_hpo_weight_detail_view",
+    "ped_inner_hpo_weight_source_view",
+    "reproducibility_coefficients_view",
+    "reproducibility_component_trace_view",
+    "reproducibility_feature_importance_view",
+    "reproducibility_ensemble_equation",
+    "reproducibility_ensemble_weight_view",
+    "reproducibility_annual_view",
+    "reproducibility_horizon_view",
+    "reproducibility_pack_signature",
+    "reproducibility_registry_view",
+    "reproducibility_replay_summary",
+    "reproducibility_sensitivity_view",
+    "reproducibility_scorecard_view",
+    "reproducibility_stress_view",
+    "reproducibility_stream_labels",
+    "reproducibility_training_window_view",
+    "load_reproducibility_pack",
+    "plot_reproducibility_feature_importance",
+    "plot_reproducibility_sensitivities",
+    "diagnostics_r2_summary_frame",
+    "reproducibility_component_r2_frame",
+    "format_r2",
+}
 
 
 def normalise_requirement(line: str) -> str | None:
@@ -162,6 +194,7 @@ def assert_import_surface() -> None:
         sys.path.insert(0, str(ROOT))
 
     import app
+    import model_dashboard.reproducibility_imports as reproducibility_imports
     import model_dashboard.ui as ui
 
     if not hasattr(app, "main"):
@@ -169,6 +202,50 @@ def assert_import_surface() -> None:
     missing = sorted(name for name in REQUIRED_UI_EXPORTS if not hasattr(ui, name))
     if missing:
         raise AssertionError("model_dashboard.ui is missing exports imported by app.py: " + ", ".join(missing))
+    missing_repro = sorted(name for name in REQUIRED_REPRODUCIBILITY_IMPORT_EXPORTS if not hasattr(reproducibility_imports, name))
+    if missing_repro:
+        raise AssertionError("model_dashboard.reproducibility_imports is missing app.py exports: " + ", ".join(missing_repro))
+
+
+def assert_startup_import_subprocess(*, force_optional_fallback: bool = False) -> None:
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(ROOT) + os.pathsep + env.get("PYTHONPATH", "")
+    env.pop("STAGE1_REQUIRE_FRONTEND_INTERACTIONS", None)
+    if force_optional_fallback:
+        env["NLTF_FORCE_REPRODUCIBILITY_IMPORT_FALLBACK"] = "1"
+    else:
+        env.pop("NLTF_FORCE_REPRODUCIBILITY_IMPORT_FALLBACK", None)
+    code = """
+import app
+from model_dashboard import reproducibility_imports as ri
+required = [
+    'render_overview',
+    'render_diagnostics',
+    'render_scenario_comparison',
+    'render_schiff_benchmark_page',
+    'render_governance_reproducibility_page',
+]
+missing = [name for name in required if not hasattr(app, name)]
+if missing:
+    raise SystemExit('missing app startup symbols: ' + ', '.join(missing))
+if not hasattr(ri, 'load_reproducibility_pack') or not hasattr(ri, 'diagnostics_r2_summary_frame'):
+    raise SystemExit('missing reproducibility/R2 compatibility exports')
+print('cloud import ok')
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+    )
+    if result.returncode != 0:
+        mode = "fallback" if force_optional_fallback else "normal"
+        raise AssertionError(
+            f"Streamlit Cloud-style startup import failed in {mode} mode.\n"
+            f"stdout:\n{result.stdout}\n"
+            f"stderr:\n{result.stderr}"
+        )
 
 
 def assert_tracked_files() -> None:
@@ -203,6 +280,8 @@ def validate() -> None:
         raise AssertionError("Missing app.py.")
     assert_requirements()
     assert_import_surface()
+    assert_startup_import_subprocess(force_optional_fallback=False)
+    assert_startup_import_subprocess(force_optional_fallback=True)
     assert_pack_shape()
     assert_streamlit_config()
     assert_default_load_resolves_repo_pack()

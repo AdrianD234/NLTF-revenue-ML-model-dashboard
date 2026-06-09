@@ -16,7 +16,7 @@ from ..labels import (
     humanize_label,
 )
 from ..metrics import best_by_stream
-from ..r2_metrics import diagnostics_r2_summary_frame, format_r2, reproducibility_component_r2_frame
+from ..reproducibility_imports import diagnostics_r2_summary_frame, format_r2, reproducibility_component_r2_frame
 from ..score_basis import PAPER_SCORE_BASIS, score_basis_label
 from .diagnostics import DEFAULT_ACF_RESIDUAL_SCOPE, select_diagnostic_acf_scope
 
