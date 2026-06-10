@@ -182,8 +182,8 @@ SOURCE_WORKBOOK_ENV_VAR = "REPRODUCIBILITY_SOURCE_WORKBOOK_PATH"
 SOURCE_WORKBOOK_MANIFEST_PATH = Path("artifacts") / "source_workbook_manifest.json"
 PAGE5_UI_CONTRACT_ROOT = Path("data") / "dashboard_evidence_pack_reproducibility" / "_ui_contract"
 HEAVY_RUC_FORECAST_GAP_REASON = (
-    "Heavy RUC: exact stored prediction replay is available; training-fit R2/provenance is available from "
-    "source-refit state; new-row scoring is unavailable until parent-state parity passes."
+    "Heavy RUC: stored historical weighted replay and training-fit R2 are available. New-row Heavy forecasts require "
+    "exact C3/C4 parent-state parity; current status: governed gap."
 )
 GENERIC_FORECAST_GAP_REASON = "Repo-local forward scorer is unavailable for this stream. This is not a model failure."
 PAGE5_PANEL_CONTRACT_FILES = (
@@ -3157,7 +3157,7 @@ def _stream_has_governed_gap(future_rows: pd.DataFrame | None, stream_label: str
 
 def _forecast_builder_governed_gap_annotation(stream_label: str) -> str:
     if str(stream_label) == "Heavy RUC volume":
-        return "Governed gap: Heavy new-row scoring unavailable until parent-state parity passes"
+        return "Governed gap: Heavy requires exact C3/C4 parent-state parity"
     return "Governed gap: repo-local forward scorer unavailable"
 
 

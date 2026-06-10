@@ -1,9 +1,10 @@
 # Heavy RUC Forward Capability Decision
 
-Original parent C3/C4 fitted estimator or feature matrix not retained. Heavy RUC cannot safely score new assumption rows from repo-local artifacts.
+Triage pack inspected: no original C3/C4 parent fitted estimator or exact parent feature matrix was found. Heavy RUC remains a governed gap; stored historical weighted replay and training-fit R2 are available, but new-row Heavy forecasts require exact C3/C4 parent-state parity.
 
-- Stored prediction replay: available from stored parent component predictions.
-- Training-fit R2/provenance: available from source-refit state, not original parent fitted state.
-- New-row forward scoring: unavailable until parent state parity passes.
+- Source zip: `heavy_ruc_parent_state_triage_pack_20260610_225153.zip`.
+- Stored historical weighted replay: available.
+- Training-fit R2: available from source-refit state.
+- New-row Heavy forecasts: require exact C3/C4 parent-state parity.
+- Current status: `governed gap`.
 - Capability decision: `keep_parity_failed`.
-- Parity rerun status: `not_run_no_parent_state_or_exact_matrix_recovered`.

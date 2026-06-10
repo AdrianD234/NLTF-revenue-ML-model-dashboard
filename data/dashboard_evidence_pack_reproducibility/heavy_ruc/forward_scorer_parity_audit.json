@@ -1,9 +1,9 @@
 {
-  "audit_name": "heavy_ruc_final_parent_state_recovery",
-  "audit_version": "heavy-ruc-final-parent-state-search-v1",
+  "audit_name": "heavy_ruc_triage_parent_state_inspection",
+  "audit_version": "heavy-ruc-parent-state-triage-v1",
   "capability_decision": "keep_parity_failed",
   "capability_status": "parity_failed",
-  "data_scope": "canonical_source_script_history_component_replay_with_source_refit_state_export_final_parent_state_search",
+  "data_scope": "canonical_source_script_history_component_replay_with_source_refit_state_export_triage_pack_inspection",
   "diagnosis": {
     "c3_c4_fitted_state_audit": "artifacts/heavy_ruc_forward_parity_debug/c3_c4_fitted_state_audit.csv",
     "candidate_config_status": "matched_locked_spec",
@@ -602,7 +602,7 @@
       "stored_component_predictions_from_different_run": "possible_but_not_proven",
       "window_origin_mismatch": "not_supported_by_current_evidence"
     },
-    "new_row_forward_scoring_status": "unavailable_until_parent_state_parity_passes",
+    "new_row_forward_scoring_status": "unavailable_until_exact_c3_c4_parent_state_parity_passes",
     "origin_target_coverage_status": "stored_keys_matched_replay_rows",
     "parent_run_source_data_status": "missing_from_repo",
     "parent_state_candidates": "artifacts/heavy_ruc_forward_parity_debug/parent_state_candidates.csv",
@@ -638,13 +638,29 @@
     "stored_prediction_replay_status": "available_from_stored_parent_component_predictions",
     "target_lag_policy": "recursive_predicted_lags",
     "target_lag_recursion_audit": "artifacts/heavy_ruc_forward_parity_debug/target_lag_recursion_audit.csv",
-    "training_fit_source_refit_status": "available_from_source_refit_state_not_parent_fitted_state"
+    "training_fit_source_refit_status": "available_from_source_refit_state_not_parent_fitted_state",
+    "triage_classification_counts": {
+      "irrelevant": 37,
+      "original_parent_estimator": 0,
+      "parent_component_predictions": 22,
+      "parent_feature_matrix": 0,
+      "repo_debug_artifact": 182,
+      "source_refit_state": 169,
+      "too_large/skipped": 3
+    },
+    "triage_file_classification": "artifacts/heavy_ruc_forward_parity_debug/triage_file_classification.csv",
+    "triage_pack_basename": "heavy_ruc_parent_state_triage_pack_20260610_225153.zip",
+    "triage_parent_state_findings": "artifacts/heavy_ruc_forward_parity_debug/triage_parent_state_findings.md",
+    "triage_parity_passed": false,
+    "triage_parity_rerun_summary": "artifacts/heavy_ruc_forward_parity_debug/triage_parity_rerun_summary.csv",
+    "triage_recoverable_parent_feature_matrix_found": false,
+    "triage_recoverable_parent_state_found": false
   },
   "failing_component": "HEAVY_RUC__dynamic_no_leads__GBR_learning_rate0_08_max_depth1_n_estimators150__ylag__w40",
   "finalist_model": "HEAVY_RUC__RECON_STATIC_REBUILT",
   "max_abs_delta": 12911117.047347665,
-  "missing_feature_or_artifact": "Original parent C3/C4 fitted estimator or feature matrix not retained. Heavy RUC cannot safely score new assumption rows from repo-local artifacts. Source-script Stage 1 workbook history was recovered and deterministic source-refit state was exported, but the target-lagged GBM components C3/C4 still exceed parity tolerance; parent fitted component estimators or parent feature matrices were not found in the final sanitized search.",
-  "notes": "Exact stored prediction replay is available from parent component predictions; Heavy training-fit R2/provenance is available from source-refit state; new-row forward scoring remains unavailable until original parent state or exact parent feature matrices pass parity.",
+  "missing_feature_or_artifact": "Triage pack inspected: no original C3/C4 parent fitted estimator or exact parent feature matrix was found. Source-script Stage 1 workbook history was recovered and deterministic source-refit state was exported, but the target-lagged GBM components C3/C4 still exceed parity tolerance; parent fitted component estimators or parent feature matrices remain unavailable.",
+  "notes": "Stored historical weighted replay and training-fit R2 are available. New-row Heavy forecasts require exact C3/C4 parent-state parity; current status: governed gap.",
   "parity_status": "failed",
   "parity_tolerance": 1e-06,
   "repo_artifacts": [
