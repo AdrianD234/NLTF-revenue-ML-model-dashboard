@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -9,6 +10,7 @@ from .forward_scorer_governance import (
     ForwardScorerAudit,
     INSUFFICIENT_ARTIFACTS,
     NUMERIC_FORECAST_AVAILABLE,
+    PARITY_FAILED,
     artifact_hashes,
     existing_basis,
     missing_paths,
@@ -22,6 +24,11 @@ STREAM_LABEL = "Heavy RUC volume"
 FINALIST_MODEL = "HEAVY_RUC__RECON_STATIC_REBUILT"
 GAP_CODE = "heavy_ruc_component_forward_scorers_missing"
 PARITY_TOLERANCE = 1e-6
+SOURCE_SCRIPT_RELATIVE = (
+    "data/dashboard_evidence_pack_reproducibility/heavy_ruc/"
+    "source_artifacts/scripts/heavy_ruc_fullgrid_rescue_closure.py"
+)
+PARITY_AUDIT_RELATIVE = "data/dashboard_evidence_pack_reproducibility/heavy_ruc/forward_scorer_parity_audit.json"
 
 HEAVY_RUC_COMPONENTS: tuple[dict[str, Any], ...] = (
     {
@@ -54,6 +61,8 @@ HEAVY_RUC_COMPONENTS: tuple[dict[str, Any], ...] = (
 def evaluate_heavy_ruc_forward_scorer(repo_root: Path | str | None = None) -> ForwardScorerAudit:
     root = Path(repo_root) if repo_root is not None else Path(__file__).resolve().parents[1]
     repro = root / "data" / "dashboard_evidence_pack_reproducibility" / "heavy_ruc"
+    source_script = root / SOURCE_SCRIPT_RELATIVE
+    parity_audit_path = root / PARITY_AUDIT_RELATIVE
     required = [
         root / "data" / "model_input_history" / "heavy_ruc_inputs.parquet",
         root / "data" / "model_input_history" / "manifest.json",
@@ -61,6 +70,8 @@ def evaluate_heavy_ruc_forward_scorer(repo_root: Path | str | None = None) -> Fo
         repro / "component_predictions.parquet",
         repro / "model_coefficients.parquet",
         repro / "training_fit_predictions.parquet",
+        source_script,
+        parity_audit_path,
     ]
     hashes = artifact_hashes(root, required)
     missing = list(missing_paths(root, required))
@@ -94,35 +105,30 @@ def evaluate_heavy_ruc_forward_scorer(repo_root: Path | str | None = None) -> Fo
 
     component_predictions = pd.read_parquet(repro / "component_predictions.parquet")
     stored_replay_delta = _stored_weighted_replay_delta(component_predictions)
-    coefficients = pd.read_parquet(repro / "model_coefficients.parquet")
-    coefficients_available = _coefficients_available(coefficients)
-    source_artifacts = repro / "source_artifacts"
-    source_artifacts_present = source_artifacts.exists() and any(source_artifacts.iterdir())
-
-    if not coefficients_available or not source_artifacts_present:
-        blockers: list[str] = []
-        if not coefficients_available:
-            blockers.append("fitted component coefficients or serialized estimators are unavailable")
-        if not source_artifacts_present:
-            blockers.append(f"{repo_relative(root, source_artifacts)} is absent")
-        reason = (
-            "Heavy RUC remains a governed gap for forward scoring. Stored C1-C4 component predictions prove the "
-            f"weighted replay (max stored replay delta {stored_replay_delta:.12g}), but the repo does not contain "
-            "a parity-tested executable scorer for new assumption rows: "
-            + "; ".join(blockers)
-            + ". Required forward scorers: C1 ElasticNet dynamic no-leads ylag w64; C2 Schiff GBR no ylag w64; "
-            "C3 GBM dynamic no-leads ylag w52; C4 GBM dynamic no-leads ylag w40"
-            + "."
+    parity_audit = _load_parity_audit(parity_audit_path)
+    parity_status = str(parity_audit.get("parity_status", "not_run_missing_parity_audit"))
+    max_parity_delta = _optional_float(parity_audit.get("max_abs_delta"))
+    failing_component = _optional_str(parity_audit.get("failing_component"))
+    if parity_status != "passed" or max_parity_delta is None or max_parity_delta > PARITY_TOLERANCE:
+        blockers = tuple(
+            item
+            for item in [
+                _optional_str(parity_audit.get("missing_feature_or_artifact")),
+            ]
+            if item
         )
+        reason = _parity_failed_reason(stored_replay_delta, max_parity_delta, failing_component, blockers)
         return _audit(
             root,
             required,
             hashes,
-            tuple(blockers),
-            "not_run_insufficient_artifacts",
-            None,
+            blockers,
+            "failed_repo_history_component_replay",
+            max_parity_delta,
             stored_replay_delta,
             reason,
+            capability_status=PARITY_FAILED,
+            failing_component=failing_component,
         )
 
     return ForwardScorerAudit(
@@ -139,6 +145,7 @@ def evaluate_heavy_ruc_forward_scorer(repo_root: Path | str | None = None) -> Fo
         stored_replay_max_delta=stored_replay_delta,
         source_artifact_hashes=hashes,
         required_components=tuple(component["component_model"] for component in HEAVY_RUC_COMPONENTS),
+        failing_component=None,
         forecast_capability_available=True,
     )
 
@@ -200,6 +207,57 @@ def _coefficients_available(coefficients: pd.DataFrame) -> bool:
     return values.notna().any()
 
 
+def _load_parity_audit(path: Path) -> dict[str, Any]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {
+            "parity_status": "not_run_missing_parity_audit",
+            "max_abs_delta": None,
+            "failing_component": None,
+            "missing_feature_or_artifact": f"{path.name} is unavailable: {type(exc).__name__}",
+        }
+    return payload if isinstance(payload, dict) else {}
+
+
+def _optional_float(value: Any) -> float | None:
+    numeric = pd.to_numeric(value, errors="coerce")
+    if pd.isna(numeric):
+        return None
+    return float(numeric)
+
+
+def _optional_str(value: Any) -> str | None:
+    if value is None or pd.isna(value):
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _parity_failed_reason(
+    stored_replay_delta: float | None,
+    max_parity_delta: float | None,
+    failing_component: str | None,
+    blockers: tuple[str, ...],
+) -> str:
+    delta_text = "unavailable" if max_parity_delta is None else f"{max_parity_delta:.12g}"
+    stored_text = "unavailable" if stored_replay_delta is None else f"{stored_replay_delta:.12g}"
+    component_text = failing_component or "unknown component"
+    blocker_text = (
+        "; ".join(item.rstrip(".") for item in blockers)
+        if blockers
+        else "repo-local replay does not meet component parity tolerance"
+    )
+    return (
+        "Heavy RUC remains a governed gap for forward scoring. Stored C1-C4 component predictions prove the "
+        f"weighted replay (max stored replay delta {stored_text}), but the repo-local executable replay does not "
+        f"meet the {PARITY_TOLERANCE:g} parity tolerance for new-row scoring. "
+        f"Failing component: {component_text}; max parity delta: {delta_text}. "
+        f"Missing feature/artifact: {blocker_text}. Required forward scorers: C1 ElasticNet dynamic no-leads ylag w64; "
+        "C2 Schiff GBR no ylag w64; C3 GBM dynamic no-leads ylag w52; C4 GBM dynamic no-leads ylag w40."
+    )
+
+
 def _audit(
     root: Path,
     required: list[Path],
@@ -209,12 +267,15 @@ def _audit(
     max_parity_delta: float | None,
     stored_replay_delta: float | None,
     reason: str,
+    *,
+    capability_status: str = INSUFFICIENT_ARTIFACTS,
+    failing_component: str | None = None,
 ) -> ForwardScorerAudit:
     return ForwardScorerAudit(
         stream=STREAM,
         stream_label=STREAM_LABEL,
         model=FINALIST_MODEL,
-        capability_status=INSUFFICIENT_ARTIFACTS,
+        capability_status=capability_status,
         gap_code=GAP_CODE,
         gap_reason=reason,
         repo_artifact_basis=existing_basis(root, required),
@@ -225,5 +286,6 @@ def _audit(
         source_artifact_hashes=hashes,
         missing_artifacts=missing_or_blockers,
         required_components=tuple(component["component_model"] for component in HEAVY_RUC_COMPONENTS),
+        failing_component=failing_component,
         forecast_capability_available=False,
     )

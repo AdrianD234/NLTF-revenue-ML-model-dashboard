@@ -16,17 +16,45 @@ def test_heavy_ruc_forward_scorer_audit_preserves_governed_gap() -> None:
     audit = evaluate_heavy_ruc_forward_scorer(ROOT)
     assert audit.stream == "HEAVY_RUC"
     assert audit.forecast_capability_available is False
-    assert audit.capability_status == "insufficient_artifacts"
+    assert audit.capability_status == "parity_failed"
     assert audit.gap_code == "heavy_ruc_component_forward_scorers_missing"
-    assert audit.parity_status == "not_run_insufficient_artifacts"
+    assert audit.parity_status == "failed_repo_history_component_replay"
     assert audit.stored_replay_max_delta is not None
     assert 0 <= audit.stored_replay_max_delta <= 1e-6
-    assert audit.max_parity_delta is None
+    assert audit.max_parity_delta is not None
+    assert audit.max_parity_delta > 1
+    assert audit.failing_component == "HEAVY_RUC__schiff__GBR_learning_rate0_06_max_depth1_n_estimators650__noylag__w64"
     assert len(audit.required_components) == 4
     assert audit.required_components == tuple(component["component_model"] for component in HEAVY_RUC_COMPONENTS)
-    assert "fitted component coefficients or serialized estimators are unavailable" in audit.gap_reason
-    assert "data/dashboard_evidence_pack_reproducibility/heavy_ruc/source_artifacts is absent" in audit.gap_reason
+    assert "model_input_history/heavy_ruc_inputs.parquet does not reproduce" in audit.gap_reason
+    assert "fitted component estimators were not serialized" in audit.gap_reason
     assert audit.source_artifact_hashes
+
+
+def test_heavy_ruc_component_configs_and_weights_match_locked_spec() -> None:
+    expected = {
+        "C1": (
+            "HEAVY_RUC__dynamic_no_leads__Elastic_alpha0_005_l1_ratio0_2__ylag__w64",
+            0.469332,
+        ),
+        "C2": (
+            "HEAVY_RUC__schiff__GBR_learning_rate0_06_max_depth1_n_estimators650__noylag__w64",
+            0.281844,
+        ),
+        "C3": (
+            "HEAVY_RUC__dynamic_no_leads__GBR_learning_rate0_08_max_depth1_n_estimators400__ylag__w52",
+            0.144373,
+        ),
+        "C4": (
+            "HEAVY_RUC__dynamic_no_leads__GBR_learning_rate0_08_max_depth1_n_estimators150__ylag__w40",
+            0.104451,
+        ),
+    }
+    observed = {
+        component["label"]: (component["component_model"], component["component_weight"])
+        for component in HEAVY_RUC_COMPONENTS
+    }
+    assert observed == expected
 
 
 def test_ped_forward_scorer_audit_preserves_parity_failed_gap() -> None:

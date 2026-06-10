@@ -2836,13 +2836,18 @@ def _forecast_builder_gap_detail_table(frame: pd.DataFrame) -> pd.DataFrame:
     gaps = frame[~frame["forecast_available"].fillna(False).astype(bool)].copy()
     if gaps.empty:
         return pd.DataFrame()
-    columns = [column for column in ["scenario_name", "stream_label", "gap_code", "gap_reason"] if column in gaps.columns]
+    columns = [
+        column
+        for column in ["scenario_name", "stream_label", "gap_code", "failing_component", "gap_reason"]
+        if column in gaps.columns
+    ]
     detail = gaps[columns].drop_duplicates().copy()
     return detail.rename(
         columns={
             "scenario_name": "Scenario",
             "stream_label": "Stream",
             "gap_code": "Gap code",
+            "failing_component": "Failing component",
             "gap_reason": "Full rationale",
         }
     )
@@ -2898,6 +2903,7 @@ def _forecast_builder_capability_table(frame: pd.DataFrame) -> pd.DataFrame:
         "parity_status",
         "max_parity_delta",
         "stored_replay_max_delta",
+        "failing_component",
         "gap_code",
         "gap_reason",
     ]
@@ -2916,6 +2922,7 @@ def _forecast_builder_capability_table(frame: pd.DataFrame) -> pd.DataFrame:
             "parity_status": "Parity status",
             "max_parity_delta": "Max parity delta",
             "stored_replay_max_delta": "Stored replay delta",
+            "failing_component": "Failing component",
             "gap_code": "Gap code",
             "gap_reason": "Gap reason",
         }

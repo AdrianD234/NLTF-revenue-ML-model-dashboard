@@ -21,7 +21,7 @@ The runner may score future assumption rows only when a stream has a repo-local,
 |---|---|---|---|
 | PED | `PED__RESCUE_static_annual_weighted_top12_capnone` -> `PED__HPOREFINE_solver_static_convex_top18` | `parity_failed` | Inner HPO chain must reproduce stored replay within tolerance and close the feature-level refit gap. |
 | Light RUC | `dynamic_RESID_GBR_n150_d1_lr0.05_w36` | `numeric_forecast_available` | Repo-local model-input history, Light RUC registry and scikit-learn runtime. |
-| Heavy RUC | `HEAVY_RUC__RECON_STATIC_REBUILT` | `insufficient_artifacts` | C1-C4 executable component scorers or fitted states, plus parity for new-row scoring. |
+| Heavy RUC | `HEAVY_RUC__RECON_STATIC_REBUILT` | `parity_failed` | C1-C4 executable component scorers or fitted states, plus parity for new-row scoring. |
 
 ## Heavy RUC Contract
 
@@ -32,7 +32,7 @@ The only Heavy RUC components that may be reconstructed are:
 - C3 `HEAVY_RUC__dynamic_no_leads__GBR_learning_rate0_08_max_depth1_n_estimators400__ylag__w52`, weight `0.144373`;
 - C4 `HEAVY_RUC__dynamic_no_leads__GBR_learning_rate0_08_max_depth1_n_estimators150__ylag__w40`, weight `0.104451`.
 
-Current repo-local evidence proves stored weighted replay from `component_predictions.parquet` within tolerance, but `model_coefficients.parquet` records that fitted component coefficients or serialized estimators are unavailable and `data/dashboard_evidence_pack_reproducibility/heavy_ruc/source_artifacts/` is absent. Heavy RUC therefore remains non-numeric with `capability_status=insufficient_artifacts`.
+Current repo-local evidence includes the vendored Heavy RUC source script and `forward_scorer_parity_audit.json`. Stored weighted replay from `component_predictions.parquet` still closes within tolerance, but the repo-local replay from `data/model_input_history/heavy_ruc_inputs.parquet` does not reproduce the archived C1-C4 component predictions within `1e-6`. The failing component is C2 `HEAVY_RUC__schiff__GBR_learning_rate0_06_max_depth1_n_estimators650__noylag__w64`, with `max_parity_delta=126618189.79961014`. Heavy RUC therefore remains non-numeric with `capability_status=parity_failed`.
 
 ## PED Contract
 
@@ -53,6 +53,7 @@ Every scenario output must carry scorer governance metadata in `future_forecasts
 - `parity_status`;
 - `max_parity_delta`;
 - `stored_replay_max_delta`;
+- `failing_component`;
 - `capability_status`.
 
 Unavailable forecast values must be missing values. They must not be zero, mean forecasts, validation predictions, training-fit predictions or weights-only calculations.

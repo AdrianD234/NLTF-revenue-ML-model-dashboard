@@ -41,6 +41,12 @@ data/**
 !data/dashboard_evidence_pack_reproducibility/ped_inner_hpo/*.parquet
 !data/dashboard_evidence_pack_reproducibility/ped_inner_hpo/source_artifacts/
 !data/dashboard_evidence_pack_reproducibility/ped_inner_hpo/source_artifacts/**
+!data/dashboard_evidence_pack_reproducibility/heavy_ruc/
+!data/dashboard_evidence_pack_reproducibility/heavy_ruc/forward_scorer_parity_audit.json
+!data/dashboard_evidence_pack_reproducibility/heavy_ruc/source_artifacts/
+!data/dashboard_evidence_pack_reproducibility/heavy_ruc/source_artifacts/**
+data/dashboard_evidence_pack_reproducibility/heavy_ruc/source_artifacts/**/__pycache__/
+data/dashboard_evidence_pack_reproducibility/heavy_ruc/source_artifacts/**/*.pyc
 !data/model_input_history/
 !data/model_input_history/*.parquet
 !data/model_input_history/*.json

@@ -38,6 +38,7 @@ class ForwardScorerAudit:
     source_artifact_hashes: dict[str, str] = field(default_factory=dict)
     missing_artifacts: tuple[str, ...] = ()
     required_components: tuple[str, ...] = ()
+    failing_component: str | None = None
     forecast_capability_available: bool = False
 
     def to_capability_record(self) -> dict[str, Any]:
@@ -57,6 +58,7 @@ class ForwardScorerAudit:
             "source_artifact_hashes": json.dumps(self.source_artifact_hashes, sort_keys=True),
             "missing_artifacts": "; ".join(self.missing_artifacts),
             "required_components": "; ".join(self.required_components),
+            "failing_component": self.failing_component,
             "required_for_forward_forecast": True,
         }
 
@@ -99,4 +101,5 @@ def json_record(audit: ForwardScorerAudit) -> dict[str, Any]:
     record["source_artifact_hashes"] = audit.source_artifact_hashes
     record["missing_artifacts"] = list(audit.missing_artifacts)
     record["required_components"] = list(audit.required_components)
+    record["failing_component"] = audit.failing_component
     return record

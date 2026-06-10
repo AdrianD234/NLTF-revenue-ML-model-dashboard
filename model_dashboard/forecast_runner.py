@@ -90,6 +90,7 @@ CAPABILITY_METADATA_COLUMNS = [
     "stored_replay_max_delta",
     "required_components",
     "missing_artifacts",
+    "failing_component",
 ]
 MODEL_INPUT_HISTORY_DIR = Path("data") / "model_input_history"
 MODEL_INPUT_HISTORY_FILES = {
@@ -877,6 +878,7 @@ def _future_forecast_chart_rows(future_forecasts: pd.DataFrame) -> pd.DataFrame:
                 "parity_status": row.get("parity_status"),
                 "max_parity_delta": row.get("max_parity_delta"),
                 "stored_replay_max_delta": row.get("stored_replay_max_delta"),
+                "failing_component": row.get("failing_component"),
                 "source": "future_forecasts",
             }
         )
@@ -1746,6 +1748,7 @@ def _forecast_capability_report(
                 "stored_replay_max_delta": cap.get("stored_replay_max_delta"),
                 "required_components": cap.get("required_components"),
                 "missing_artifacts": cap.get("missing_artifacts"),
+                "failing_component": cap.get("failing_component"),
                 "fixed_finalists_only": True,
                 "broad_search_run": False,
             }
@@ -1784,6 +1787,7 @@ def _forecast_validation_report(validation: ForecastValidationResult, capabiliti
                 f"- Scorer version: `{row.get('scorer_version')}`",
                 f"- Parity status: `{row.get('parity_status')}`",
                 f"- Max parity delta: `{row.get('max_parity_delta')}`",
+                f"- Failing component: `{row.get('failing_component')}`",
                 f"- Gap code: `{row['gap_code']}`",
                 f"- Reason: {row['gap_reason'] or 'Repo-local fixed-finalist scorer is available.'}",
                 f"- Artifact basis: `{row['repo_artifact_basis']}`",

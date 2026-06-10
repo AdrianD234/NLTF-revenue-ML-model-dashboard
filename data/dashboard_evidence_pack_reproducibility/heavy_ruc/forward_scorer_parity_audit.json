@@ -1,0 +1,46 @@
+{
+  "audit_name": "heavy_ruc_forward_scorer_repo_history_component_replay",
+  "audit_version": "2026-06-10-heavy-ruc-forward-parity-v1",
+  "stream": "HEAVY_RUC",
+  "stream_label": "Heavy RUC volume",
+  "finalist_model": "HEAVY_RUC__RECON_STATIC_REBUILT",
+  "parity_status": "failed",
+  "parity_tolerance": 0.000001,
+  "data_scope": "repo_local_model_input_history_validation_replay",
+  "score_basis": "current_grid_operational_pooled",
+  "max_abs_delta": 126618189.79961014,
+  "failing_component": "HEAVY_RUC__schiff__GBR_learning_rate0_06_max_depth1_n_estimators650__noylag__w64",
+  "missing_feature_or_artifact": "repo-local model_input_history/heavy_ruc_inputs.parquet does not reproduce the archived Heavy RUC C1-C4 component feature matrix within tolerance; fitted component estimators were not serialized.",
+  "notes": "C1-C4 were replayed from the vendored source script against data/model_input_history/heavy_ruc_inputs.parquet and compared with data/dashboard_evidence_pack_reproducibility/heavy_ruc/component_predictions.parquet. The replay produced every stored component key, but C2 exceeded tolerance, so Heavy RUC remains disabled for numeric forward forecasts.",
+  "worst_row": {
+    "component_model": "HEAVY_RUC__schiff__GBR_learning_rate0_06_max_depth1_n_estimators650__noylag__w64",
+    "eval_grid": "current_evidence_grid",
+    "feature_column_count": 18,
+    "horizon": 11,
+    "origin": "2022Q1",
+    "replayed_component_pred": 946541242.6115623,
+    "replayed_rows": 450,
+    "score_basis": "current_grid_operational_pooled",
+    "stored_component_pred": 1073159432.4111724,
+    "stored_rows": 564,
+    "target_period": "2024Q4"
+  },
+  "repo_artifacts": [
+    {
+      "repo_relative_path": "data/dashboard_evidence_pack_reproducibility/heavy_ruc/source_artifacts/scripts/heavy_ruc_fullgrid_rescue_closure.py",
+      "sha256": "c85f629bdcf98ba8194b81564496d87848d44ad97198f9740c6db8e49faf91e9"
+    },
+    {
+      "repo_relative_path": "data/model_input_history/heavy_ruc_inputs.parquet",
+      "sha256": "751d6f71ac0941c2c606b4bd87980c249b798df4ddd93d1e7c372b51394dc5bb"
+    },
+    {
+      "repo_relative_path": "data/dashboard_evidence_pack_reproducibility/heavy_ruc/component_predictions.parquet",
+      "sha256": "4ba756fa2061b55c50a5dcaf9cd20aa59caa28285abd848f5986584b699109bf"
+    },
+    {
+      "repo_relative_path": "data/dashboard_evidence_pack_reproducibility/heavy_ruc/model_registry.parquet",
+      "sha256": "9fd89f1ef58e1d12fe530ee91042a36d5af0a49a580fc0f1ecb5d53ac992b906"
+    }
+  ]
+}
