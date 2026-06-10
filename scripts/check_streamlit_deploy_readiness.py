@@ -212,6 +212,14 @@ def assert_import_surface() -> None:
         raise AssertionError("model_dashboard.reproducibility_imports is missing app.py exports: " + ", ".join(missing_repro))
 
 
+def assert_app_uses_cloud_safe_reproducibility_wrapper() -> None:
+    app_source = (ROOT / "app.py").read_text(encoding="utf-8")
+    if "from model_dashboard.r2_ladder import" in app_source:
+        raise AssertionError("app.py must import R2 ladder symbols through model_dashboard.reproducibility_imports for Streamlit Cloud.")
+    if "from model_dashboard.reproducibility_imports import" not in app_source:
+        raise AssertionError("app.py is missing the Streamlit Cloud-safe reproducibility import wrapper.")
+
+
 def assert_startup_import_subprocess(*, force_optional_fallback: bool = False) -> None:
     env = os.environ.copy()
     env["PYTHONPATH"] = str(ROOT) + os.pathsep + env.get("PYTHONPATH", "")
@@ -286,6 +294,7 @@ def validate() -> None:
     if not (ROOT / "app.py").exists():
         raise AssertionError("Missing app.py.")
     assert_requirements()
+    assert_app_uses_cloud_safe_reproducibility_wrapper()
     assert_import_surface()
     assert_startup_import_subprocess(force_optional_fallback=False)
     assert_startup_import_subprocess(force_optional_fallback=True)

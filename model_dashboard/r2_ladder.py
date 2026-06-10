@@ -926,3 +926,14 @@ def _ordered(frame: pd.DataFrame) -> pd.DataFrame:
         [column for column in ["stream_label", "score_basis", "r2_type", "component_model"] if column in frame.columns],
         kind="stable",
     ).reset_index(drop=True)
+
+
+__all__ = [
+    "R2_LADDER_NOTE",
+    "R2_LADDER_TITLE",
+    "R2_TRAINING_FIT_NOTE",
+    "r2_ladder_frames",
+    "r2_ladder_summary_frame",
+    "r2_reproducibility_gap_register_frame",
+    "r2_training_fit_detail_frame",
+]

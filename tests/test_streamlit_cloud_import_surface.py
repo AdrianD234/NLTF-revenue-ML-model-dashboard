@@ -8,6 +8,7 @@ import pandas as pd
 from scripts.check_streamlit_deploy_readiness import (
     REQUIRED_REPRODUCIBILITY_IMPORT_EXPORTS,
     REQUIRED_UI_EXPORTS,
+    assert_app_uses_cloud_safe_reproducibility_wrapper,
     assert_import_surface,
     assert_startup_import_subprocess,
 )
@@ -15,6 +16,25 @@ from scripts.check_streamlit_deploy_readiness import (
 
 def test_app_imports_cloud_ui_surface() -> None:
     assert_import_surface()
+
+
+def test_app_uses_cloud_safe_reproducibility_wrapper() -> None:
+    assert_app_uses_cloud_safe_reproducibility_wrapper()
+
+
+def test_r2_ladder_exports_cloud_reported_import_surface() -> None:
+    ladder = importlib.import_module("model_dashboard.r2_ladder")
+    missing = [
+        name
+        for name in [
+            "R2_LADDER_NOTE",
+            "R2_LADDER_TITLE",
+            "R2_TRAINING_FIT_NOTE",
+            "r2_ladder_summary_frame",
+        ]
+        if not hasattr(ladder, name)
+    ]
+    assert missing == []
 
 
 def test_streamlit_cloud_style_subprocess_imports_app() -> None:
