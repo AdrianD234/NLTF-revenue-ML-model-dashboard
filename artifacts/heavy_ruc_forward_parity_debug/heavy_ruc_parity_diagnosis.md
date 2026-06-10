@@ -70,3 +70,34 @@ The canonical-history recovery audit found the source-script workbook path and `
 - `data/model_input_history/heavy_ruc_inputs.parquet` was not overwritten because source-script replay still fails the fixed `1e-6` component/final parity tolerance.
 - C2 Schiff replay passes from the recovered source-script history, but target-lagged GBM components C3/C4 remain outside tolerance.
 - The remaining governed gap is missing parent fitted component estimators or parent feature matrices for the target-lagged GBM components.
+
+## Target-lag recursion and fitted-state audit
+
+The source-code replay for C3/C4 uses recursive predicted target lags: `y_hist` starts with actual log targets through the origin, then each finite horizon `pred_log` is written back before later horizons are scored.
+
+### Recursion policy results
+
+- C3 `stored_component_after_each_step`: `failed`, max abs delta `3381558.31391`, horizon-1 max `156839.382913`.
+- C3 `recursive_predicted`: `failed`, max abs delta `4113063.82227`, horizon-1 max `156839.382913`.
+- C3 `no_update`: `failed`, max abs delta `40182739.9627`, horizon-1 max `156839.382913`.
+- C3 `actual_after_each_step`: `failed`, max abs delta `42889952.605`, horizon-1 max `156839.382913`.
+- C3 `actual_all_available`: `failed`, max abs delta `42889952.605`, horizon-1 max `156839.382913`.
+- C4 `recursive_predicted`: `failed`, max abs delta `12911117.0473`, horizon-1 max `1592599.56152`.
+- C4 `stored_component_after_each_step`: `failed`, max abs delta `12911117.0473`, horizon-1 max `1592599.56152`.
+- C4 `actual_after_each_step`: `failed`, max abs delta `42914818.8044`, horizon-1 max `1592599.56152`.
+- C4 `actual_all_available`: `failed`, max abs delta `42914818.8044`, horizon-1 max `1592599.56152`.
+- C4 `no_update`: `failed`, max abs delta `43952893.4277`, horizon-1 max `1592599.56152`.
+
+### Fitted-state conclusion
+
+- C3: source-refit state exported, but replay remains `failed` with max abs delta `4113063.82227` and horizon-1 max `156839.382913`.
+- C4: source-refit state exported, but replay remains `failed` with max abs delta `12911117.0473` and horizon-1 max `1592599.56152`.
+- Final weighted C1-C4 replay remains `failed` with max abs delta `1348579.08671`.
+
+### Governance decision
+
+- Forward-state manifest: `data/dashboard_evidence_pack_reproducibility/heavy_ruc/forward_state_manifest.json`.
+- Prediction and training feature matrices are exported under `data/dashboard_evidence_pack_reproducibility/heavy_ruc/forward_feature_matrices/`.
+- Serialized `.joblib` files are source-refit estimator states. They are not labelled as parent fitted estimators because parent run fitted state was not retained.
+- Heavy capability decision remains `keep_parity_failed`.
+- Heavy numeric forecasts must stay disabled unless all C1-C4 component rows and the final weighted replay pass `<=1e-6`.

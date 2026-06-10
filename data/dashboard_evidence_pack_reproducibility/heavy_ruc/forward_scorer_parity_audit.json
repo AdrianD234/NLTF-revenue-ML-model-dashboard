@@ -1,17 +1,17 @@
 {
-  "audit_name": "heavy_ruc_forward_scorer_canonical_history_recovery",
-  "audit_version": "2026-06-10-heavy-ruc-canonical-history-v1",
+  "audit_name": "heavy_ruc_forward_parent_fitted_state_recovery",
+  "audit_version": "2026-06-10-heavy-ruc-parent-fitted-state-v1",
   "stream": "HEAVY_RUC",
   "stream_label": "Heavy RUC volume",
   "finalist_model": "HEAVY_RUC__RECON_STATIC_REBUILT",
   "parity_status": "failed",
   "parity_tolerance": 1e-06,
-  "data_scope": "canonical_source_script_history_component_replay",
+  "data_scope": "canonical_source_script_history_component_replay_with_source_refit_state_export",
   "score_basis": "current_grid_operational_pooled",
   "max_abs_delta": 12911117.047347665,
   "failing_component": "HEAVY_RUC__dynamic_no_leads__GBR_learning_rate0_08_max_depth1_n_estimators150__ylag__w40",
-  "missing_feature_or_artifact": "Source-script Stage 1 workbook history was recovered and narrows the Heavy RUC replay gap, but target-lagged GBM components C3/C4 still exceed parity tolerance; parent fitted component estimators and parent feature matrices were not retained.",
-  "notes": "The committed data/model_input_history/heavy_ruc_inputs.parquet remains unchanged because the source-script workbook candidate does not pass all component and final weighted replay checks at the fixed 1e-6 tolerance. Heavy RUC remains disabled for numeric forward forecasts.",
+  "missing_feature_or_artifact": "Source-script Stage 1 workbook history was recovered and deterministic source-refit state was exported. The target-lagged GBM components C3/C4 still exceed parity tolerance; parent fitted component estimators or parent feature matrices were not retained, and horizon-1 deltas show the residual gap is not only recursive target-lag handling.",
+  "notes": "Heavy RUC remains disabled for numeric forward forecasts until C1-C4 component replay and final weighted replay all pass the fixed 1e-6 tolerance. The exported state is source-refit provenance, not proven parent-run fitted state.",
   "worst_row": {
     "component_model": "HEAVY_RUC__dynamic_no_leads__GBR_learning_rate0_08_max_depth1_n_estimators150__ylag__w40",
     "component_label": "C4",
@@ -61,6 +61,18 @@
     {
       "repo_relative_path": "artifacts/heavy_ruc_forward_parity_debug/canonical_history_manifest.json",
       "sha256": "8f3bd375c49d1b051e059eddcebf0499550e9b03560756ac6868e06ae10ee3e1"
+    },
+    {
+      "repo_relative_path": "data/dashboard_evidence_pack_reproducibility/heavy_ruc/forward_state_manifest.json",
+      "sha256": "eb450b4baa3eb2e56a096690b6cbb00442b667839a239dc957370c35e76a12ca"
+    },
+    {
+      "repo_relative_path": "artifacts/heavy_ruc_forward_parity_debug/target_lag_recursion_audit.csv",
+      "sha256": "fb77b12068f7dd8def5d7e28936b00937b47fddea6a61a63d77ec99c6dca3e1c"
+    },
+    {
+      "repo_relative_path": "artifacts/heavy_ruc_forward_parity_debug/c3_c4_fitted_state_audit.csv",
+      "sha256": "304969996cbb92ae68a273f27f31ac06e9d3f4a9f4d40d24ef7b5e6d74848baa"
     }
   ],
   "diagnosis": {
@@ -524,6 +536,156 @@
       "worst_target_period": "2022Q3",
       "worst_horizon": 10
     },
-    "capability_decision": "keep_parity_failed"
+    "capability_decision": "keep_parity_failed",
+    "forward_state_manifest": "data/dashboard_evidence_pack_reproducibility/heavy_ruc/forward_state_manifest.json",
+    "target_lag_recursion_audit": "artifacts/heavy_ruc_forward_parity_debug/target_lag_recursion_audit.csv",
+    "c3_c4_fitted_state_audit": "artifacts/heavy_ruc_forward_parity_debug/c3_c4_fitted_state_audit.csv",
+    "target_lag_policy": "recursive_predicted_lags",
+    "source_refit_state_status": "exported_parent_fitted_state_missing",
+    "fitted_state_audit_summary": [
+      {
+        "row_type": "component",
+        "component_label": "C3",
+        "component_model": "HEAVY_RUC__dynamic_no_leads__GBR_learning_rate0_08_max_depth1_n_estimators400__ylag__w52",
+        "source_refit_rows": 564,
+        "source_refit_max_abs_delta": 4113063.8222726583,
+        "source_refit_mean_abs_delta": 66363.82066498876,
+        "source_refit_horizon_1_max_abs_delta": 156839.38291335106,
+        "worst_origin": "2017Q2",
+        "worst_target_period": "2018Q3",
+        "worst_horizon": 5,
+        "best_recursion_policy": "stored_component_after_each_step",
+        "best_recursion_policy_max_abs_delta": 3381558.313911915,
+        "parity_tolerance": 1e-06,
+        "parity_status": "failed",
+        "fitted_state_status": "source_refit_exported_parent_fitted_state_missing",
+        "target_lag_policy": "recursive_predicted_lags",
+        "interpretation": "The source code uses recursive predicted target lags. Horizon-1 deltas remain non-zero, so the residual gap cannot be solved by lag recursion choice alone; parent fitted estimators or parent feature matrices are still missing."
+      },
+      {
+        "row_type": "component",
+        "component_label": "C4",
+        "component_model": "HEAVY_RUC__dynamic_no_leads__GBR_learning_rate0_08_max_depth1_n_estimators150__ylag__w40",
+        "source_refit_rows": 564,
+        "source_refit_max_abs_delta": 12911117.047347665,
+        "source_refit_mean_abs_delta": 238408.6331860347,
+        "source_refit_horizon_1_max_abs_delta": 1592599.5615245104,
+        "worst_origin": "2020Q1",
+        "worst_target_period": "2022Q3",
+        "worst_horizon": 10,
+        "best_recursion_policy": "recursive_predicted",
+        "best_recursion_policy_max_abs_delta": 12911117.047347665,
+        "parity_tolerance": 1e-06,
+        "parity_status": "failed",
+        "fitted_state_status": "source_refit_exported_parent_fitted_state_missing",
+        "target_lag_policy": "recursive_predicted_lags",
+        "interpretation": "The source code uses recursive predicted target lags. Horizon-1 deltas remain non-zero, so the residual gap cannot be solved by lag recursion choice alone; parent fitted estimators or parent feature matrices are still missing."
+      },
+      {
+        "row_type": "final_weighted",
+        "component_label": "C1_C4_weighted",
+        "component_model": "HEAVY_RUC__RECON_STATIC_REBUILT",
+        "source_refit_rows": 564,
+        "source_refit_max_abs_delta": 1348579.0867124796,
+        "source_refit_mean_abs_delta": 32667.154243233777,
+        "source_refit_horizon_1_max_abs_delta": 166348.61679935455,
+        "worst_origin": "2020Q1",
+        "worst_target_period": "2022Q3",
+        "worst_horizon": 10,
+        "best_recursion_policy": "recursive_predicted",
+        "best_recursion_policy_max_abs_delta": null,
+        "parity_tolerance": 1e-06,
+        "parity_status": "failed",
+        "fitted_state_status": "source_refit_exported_parent_fitted_state_missing",
+        "target_lag_policy": "mixed_recursive_predicted_lags",
+        "interpretation": "Final weighted replay remains disabled unless all C1-C4 component replays and the weighted final replay pass."
+      }
+    ],
+    "forward_state_manifest_summary": {
+      "audit_version": "2026-06-10-heavy-ruc-parent-fitted-state-v1",
+      "state_file_count": 168,
+      "parity": {
+        "overall_status": "failed",
+        "component_and_final_summary": [
+          {
+            "row_type": "component",
+            "component_label": "C1",
+            "component_model": "HEAVY_RUC__dynamic_no_leads__Elastic_alpha0_005_l1_ratio0_2__ylag__w64",
+            "matched_rows": 564,
+            "stored_rows": 564,
+            "missing_rows": 0,
+            "max_abs_delta": 4.5299530029296875e-06,
+            "mean_abs_delta": 3.9630747855977807e-07,
+            "worst_origin": "2019Q4",
+            "worst_target_period": "2022Q2",
+            "worst_horizon": 10,
+            "parity_status": "failed"
+          },
+          {
+            "row_type": "component",
+            "component_label": "C2",
+            "component_model": "HEAVY_RUC__schiff__GBR_learning_rate0_06_max_depth1_n_estimators650__noylag__w64",
+            "matched_rows": 564,
+            "stored_rows": 564,
+            "missing_rows": 0,
+            "max_abs_delta": 2.384185791015625e-07,
+            "mean_abs_delta": 5.3686453095564604e-08,
+            "worst_origin": "2022Q1",
+            "worst_target_period": "2023Q1",
+            "worst_horizon": 4,
+            "parity_status": "passed"
+          },
+          {
+            "row_type": "component",
+            "component_label": "C3",
+            "component_model": "HEAVY_RUC__dynamic_no_leads__GBR_learning_rate0_08_max_depth1_n_estimators400__ylag__w52",
+            "matched_rows": 564,
+            "stored_rows": 564,
+            "missing_rows": 0,
+            "max_abs_delta": 4113063.8222726583,
+            "mean_abs_delta": 66363.82066498876,
+            "worst_origin": "2017Q2",
+            "worst_target_period": "2018Q3",
+            "worst_horizon": 5,
+            "parity_status": "failed"
+          },
+          {
+            "row_type": "component",
+            "component_label": "C4",
+            "component_model": "HEAVY_RUC__dynamic_no_leads__GBR_learning_rate0_08_max_depth1_n_estimators150__ylag__w40",
+            "matched_rows": 564,
+            "stored_rows": 564,
+            "missing_rows": 0,
+            "max_abs_delta": 12911117.047347665,
+            "mean_abs_delta": 238408.6331860347,
+            "worst_origin": "2020Q1",
+            "worst_target_period": "2022Q3",
+            "worst_horizon": 10,
+            "parity_status": "failed"
+          },
+          {
+            "row_type": "final_weighted",
+            "component_label": "C1_C4_weighted",
+            "component_model": "HEAVY_RUC__RECON_STATIC_REBUILT",
+            "matched_rows": 564,
+            "stored_rows": 564,
+            "missing_rows": 0,
+            "max_abs_delta": 1348579.0867124796,
+            "mean_abs_delta": 32667.154243233777,
+            "worst_origin": "2020Q1",
+            "worst_target_period": "2022Q3",
+            "worst_horizon": 10,
+            "parity_status": "failed"
+          }
+        ],
+        "max_abs_delta": 12911117.047347665,
+        "failing_component": "HEAVY_RUC__dynamic_no_leads__GBR_learning_rate0_08_max_depth1_n_estimators150__ylag__w40",
+        "failing_component_label": "C4",
+        "worst_origin": "2020Q1",
+        "worst_target_period": "2022Q3",
+        "worst_horizon": 10
+      },
+      "capability_decision": "keep_parity_failed"
+    }
   }
 }
