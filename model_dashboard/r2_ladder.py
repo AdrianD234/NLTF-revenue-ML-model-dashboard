@@ -1,12 +1,87 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 import pandas as pd
 
-from .r2_metrics import calibration_r2, forecast_r2, format_r2, reproducibility_component_r2_frame
-from .score_basis import OPERATIONAL_SCORE_BASIS, PAPER_SCORE_BASIS, score_basis_label
+R2_LADDER_DEP_FALLBACK_ENV = "NLTF_FORCE_R2_LADDER_DEP_FALLBACK"
+
+
+def _force_dependency_fallback() -> bool:
+    return os.environ.get(R2_LADDER_DEP_FALLBACK_ENV, "").strip().lower() in {"1", "true", "yes"}
+
+
+try:
+    if _force_dependency_fallback():
+        raise ImportError(f"forced fallback via {R2_LADDER_DEP_FALLBACK_ENV}")
+    from .r2_metrics import calibration_r2, forecast_r2, format_r2, reproducibility_component_r2_frame
+except Exception as exc:
+    R2_METRICS_IMPORT_ERROR = f"{type(exc).__name__}: {exc}"
+
+    def _numeric_pair(actual: Iterable[Any], forecast: Iterable[Any]) -> pd.DataFrame:
+        pair = pd.DataFrame(
+            {
+                "actual": pd.to_numeric(pd.Series(actual), errors="coerce"),
+                "forecast": pd.to_numeric(pd.Series(forecast), errors="coerce"),
+            }
+        )
+        return pair.dropna()
+
+    def forecast_r2(actual: Iterable[Any], forecast: Iterable[Any]) -> float | pd.NA:
+        pair = _numeric_pair(actual, forecast)
+        if len(pair) < 2:
+            return pd.NA
+        sst = float(((pair["actual"] - pair["actual"].mean()) ** 2).sum())
+        if sst <= 0:
+            return pd.NA
+        sse = float(((pair["actual"] - pair["forecast"]) ** 2).sum())
+        return float(1 - (sse / sst))
+
+    def calibration_r2(actual: Iterable[Any], forecast: Iterable[Any]) -> float | pd.NA:
+        pair = _numeric_pair(actual, forecast)
+        if len(pair) < 2:
+            return pd.NA
+        sst = float(((pair["actual"] - pair["actual"].mean()) ** 2).sum())
+        forecast_sst = float(((pair["forecast"] - pair["forecast"].mean()) ** 2).sum())
+        if sst <= 0 or forecast_sst <= 0:
+            return pd.NA
+        x = pair["forecast"]
+        y = pair["actual"]
+        slope = float(((x - x.mean()) * (y - y.mean())).sum() / forecast_sst)
+        intercept = float(y.mean() - slope * x.mean())
+        fitted = intercept + slope * x
+        sse = float(((y - fitted) ** 2).sum())
+        return float(1 - (sse / sst))
+
+    def format_r2(value: Any) -> str:
+        number = pd.to_numeric(value, errors="coerce")
+        return "-" if pd.isna(number) else f"{float(number):.3f}"
+
+    def reproducibility_component_r2_frame(repo_root: Path | str | None = None) -> pd.DataFrame:
+        del repo_root
+        return pd.DataFrame()
+else:
+    R2_METRICS_IMPORT_ERROR = None
+
+try:
+    if _force_dependency_fallback():
+        raise ImportError(f"forced fallback via {R2_LADDER_DEP_FALLBACK_ENV}")
+    from .score_basis import OPERATIONAL_SCORE_BASIS, PAPER_SCORE_BASIS, score_basis_label
+except Exception as exc:
+    R2_SCORE_BASIS_IMPORT_ERROR = f"{type(exc).__name__}: {exc}"
+    PAPER_SCORE_BASIS = "schiff_paper_horizon_mean"
+    OPERATIONAL_SCORE_BASIS = "current_grid_operational_pooled"
+    _FALLBACK_SCORE_BASIS_LABELS = {
+        PAPER_SCORE_BASIS: "Paper-style horizon MAPE",
+        OPERATIONAL_SCORE_BASIS: "Operational pooled MAPE",
+    }
+
+    def score_basis_label(value: Any) -> str:
+        return _FALLBACK_SCORE_BASIS_LABELS.get(str(value), _FALLBACK_SCORE_BASIS_LABELS[PAPER_SCORE_BASIS])
+else:
+    R2_SCORE_BASIS_IMPORT_ERROR = None
 
 
 R2_LADDER_TITLE = "R2 ladder: training fit vs calibration vs forecast R2"

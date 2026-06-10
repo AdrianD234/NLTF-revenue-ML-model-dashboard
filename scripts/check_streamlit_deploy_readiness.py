@@ -85,6 +85,7 @@ REQUIRED_REPRODUCIBILITY_IMPORT_EXPORTS = {
     "r2_ladder_frames",
     "format_r2",
 }
+R2_LADDER_DEP_FALLBACK_ENV = "NLTF_FORCE_R2_LADDER_DEP_FALLBACK"
 
 
 def normalise_requirement(line: str) -> str | None:
@@ -263,6 +264,39 @@ print('cloud import ok')
         )
 
 
+def assert_r2_ladder_direct_import_subprocess(*, force_dependency_fallback: bool = False) -> None:
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(ROOT) + os.pathsep + env.get("PYTHONPATH", "")
+    if force_dependency_fallback:
+        env[R2_LADDER_DEP_FALLBACK_ENV] = "1"
+    else:
+        env.pop(R2_LADDER_DEP_FALLBACK_ENV, None)
+    code = """
+from model_dashboard.r2_ladder import R2_LADDER_NOTE, R2_LADDER_TITLE, R2_TRAINING_FIT_NOTE, r2_ladder_summary_frame
+import pandas as pd
+frame = r2_ladder_summary_frame({'scorecard_predictions': pd.DataFrame()})
+if not R2_LADDER_NOTE or not R2_LADDER_TITLE or not R2_TRAINING_FIT_NOTE:
+    raise SystemExit('missing R2 ladder text export')
+if frame is None:
+    raise SystemExit('R2 ladder summary returned None')
+print('r2 ladder direct import ok')
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+    )
+    if result.returncode != 0:
+        mode = "dependency fallback" if force_dependency_fallback else "normal"
+        raise AssertionError(
+            f"Streamlit Cloud-style direct R2 ladder import failed in {mode} mode.\n"
+            f"stdout:\n{result.stdout}\n"
+            f"stderr:\n{result.stderr}"
+        )
+
+
 def assert_tracked_files() -> None:
     tracked = git_tracked_files()
     if not tracked:
@@ -298,6 +332,8 @@ def validate() -> None:
     assert_import_surface()
     assert_startup_import_subprocess(force_optional_fallback=False)
     assert_startup_import_subprocess(force_optional_fallback=True)
+    assert_r2_ladder_direct_import_subprocess(force_dependency_fallback=False)
+    assert_r2_ladder_direct_import_subprocess(force_dependency_fallback=True)
     assert_pack_shape()
     assert_streamlit_config()
     assert_default_load_resolves_repo_pack()

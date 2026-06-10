@@ -10,6 +10,7 @@ from scripts.check_streamlit_deploy_readiness import (
     REQUIRED_UI_EXPORTS,
     assert_app_uses_cloud_safe_reproducibility_wrapper,
     assert_import_surface,
+    assert_r2_ladder_direct_import_subprocess,
     assert_startup_import_subprocess,
 )
 
@@ -35,6 +36,10 @@ def test_r2_ladder_exports_cloud_reported_import_surface() -> None:
         if not hasattr(ladder, name)
     ]
     assert missing == []
+
+
+def test_r2_ladder_direct_import_survives_dependency_fallback() -> None:
+    assert_r2_ladder_direct_import_subprocess(force_dependency_fallback=True)
 
 
 def test_streamlit_cloud_style_subprocess_imports_app() -> None:
