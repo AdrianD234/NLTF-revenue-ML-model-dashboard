@@ -1,0 +1,54 @@
+{
+  "created_at": "2026-06-10T07:00:43.694760+00:00",
+  "current_repo_history_replay": {
+    "component_max_abs_delta": 95524161.96877861,
+    "feature_matrix_rows_dumped": 12,
+    "parity_status": "failed"
+  },
+  "finalist_model": "HEAVY_RUC__RECON_STATIC_REBUILT",
+  "likely_root_cause": {
+    "feature_engineering_mismatch": "cannot_rule_out_without_parent_feature_matrix",
+    "input_data_mismatch": "likely",
+    "missing_parent_run_fitted_estimators": "confirmed",
+    "model_hyperparameter_mismatch": "not_supported_by_current_evidence",
+    "stored_component_predictions_from_different_run": "possible_but_not_proven",
+    "window_origin_mismatch": "not_supported_by_current_evidence"
+  },
+  "parent_run_source_data": {
+    "notes": "No parent-run input workbook, serialized feature matrix, or fitted C1-C4 estimators are vendored under data/dashboard_evidence_pack_reproducibility/heavy_ruc/source_artifacts. The repo contains parent component predictions and derived training-fit rows only.",
+    "status": "missing_from_repo"
+  },
+  "parity_tolerance": 1e-06,
+  "prior_workbook_replay_evidence": {
+    "source_replay_max_abs_delta": 2.384185791015625e-07,
+    "status": "prior_source_replay_closed",
+    "training_fit_predictions_path": "data/dashboard_evidence_pack_reproducibility/heavy_ruc/training_fit_predictions.parquet"
+  },
+  "repo_input_history": {
+    "columns": 38,
+    "period_max": "2026Q1",
+    "period_min": "2002Q1",
+    "repo_relative_path": "data/model_input_history/heavy_ruc_inputs.parquet",
+    "rows": 97,
+    "sha256": "751d6f71ac0941c2c606b4bd87980c249b798df4ddd93d1e7c372b51394dc5bb",
+    "target_non_null_rows": 97,
+    "target_positive_rows": 66
+  },
+  "source_detection": {
+    "engineered_feature_count": 356,
+    "log_target_non_null_rows": 66,
+    "log_target_period_max": "2025Q4",
+    "log_target_period_min": "2009Q3",
+    "source_column_count": 18,
+    "source_period_max": "2026Q1",
+    "source_period_min": "2002Q1",
+    "target_column": "Heavy RUC net km",
+    "target_is_log": false
+  },
+  "source_script": {
+    "repo_relative_path": "data/dashboard_evidence_pack_reproducibility/heavy_ruc/source_artifacts/scripts/heavy_ruc_fullgrid_rescue_closure.py",
+    "sha256": "c85f629bdcf98ba8194b81564496d87848d44ad97198f9740c6db8e49faf91e9"
+  },
+  "stream": "HEAVY_RUC",
+  "stream_label": "Heavy RUC volume"
+}

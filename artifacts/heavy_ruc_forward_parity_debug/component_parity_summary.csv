@@ -1,0 +1,5 @@
+component_label,component_model,stored_rows,stored_unique_keys,replay_rows,replay_unique_keys,matched_rows,missing_rows,missing_unique_keys,replay_only_unique_keys,max_abs_delta,mean_abs_delta,max_abs_pct_delta,mean_abs_pct_delta,worst_origin,worst_target_period,worst_horizon,parity_status
+C1,HEAVY_RUC__dynamic_no_leads__Elastic_alpha0_005_l1_ratio0_2__ylag__w64,564,438,450,450,564,0,0,12,36062398.01385033,4343715.182200846,3.2993823647117537,0.4167749219394974,2017Q3,2020Q2,11,failed
+C2,HEAVY_RUC__schiff__GBR_learning_rate0_06_max_depth1_n_estimators650__noylag__w64,564,438,450,450,564,0,0,12,95524161.96877861,12242299.980216105,10.167157341522381,1.2397164302320982,2020Q4,2021Q3,3,failed
+C3,HEAVY_RUC__dynamic_no_leads__GBR_learning_rate0_08_max_depth1_n_estimators400__ylag__w52,564,438,450,450,564,0,0,12,66229698.84736872,10337292.169254247,6.693739682050605,1.044941979738187,2022Q3,2024Q2,7,failed
+C4,HEAVY_RUC__dynamic_no_leads__GBR_learning_rate0_08_max_depth1_n_estimators150__ylag__w40,564,438,450,450,564,0,0,12,58697769.14767802,10593332.496424409,5.659336283046898,1.067499125791341,2020Q4,2023Q4,12,failed
