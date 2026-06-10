@@ -6,6 +6,7 @@ from io import BytesIO
 import hashlib
 import json
 from pathlib import Path
+import re
 from typing import Any, BinaryIO
 import zipfile
 
@@ -17,13 +18,16 @@ from openpyxl.styles import Font, PatternFill, Protection
 from openpyxl.utils import get_column_letter
 
 
-FORECAST_HORIZON_QUARTERS = 12
-TEMPLATE_FILENAME = "NLTF_forecast_input_template_12q.xlsx"
-FORECAST_RUNNER_VERSION = "forecast-runner-v2-fixed-finalist-light-ruc"
+DEFAULT_FORECAST_HORIZON_QUARTERS = 20
+MIN_FORECAST_HORIZON_QUARTERS = 1
+FORECAST_HORIZON_QUARTERS = DEFAULT_FORECAST_HORIZON_QUARTERS
+TEMPLATE_FILENAME_PREFIX = "NLTF_forecast_input_template"
+TEMPLATE_FILENAME = f"{TEMPLATE_FILENAME_PREFIX}_{DEFAULT_FORECAST_HORIZON_QUARTERS}q.xlsx"
+FORECAST_RUNNER_VERSION = "forecast-runner-v3-variable-horizon-scenario-comparison"
 FORECAST_BUILDER_TITLE = "Forecast Builder"
 FORECAST_BUILDER_NOTE = (
     "This workflow creates forward forecasts or governed missing-capability gaps from a user-supplied "
-    "12-quarter assumption workbook. It writes separate forecast-run artifacts and does not alter governance "
+    "variable-horizon assumption workbook. It writes separate forecast-run artifacts and does not alter governance "
     "evidence, KPIs, MAPE/R2, chart sources, finalists, scenarios, stress tests or diagnostics."
 )
 
@@ -206,6 +210,18 @@ class ForecastValidationResult:
     latest_actual_period: str
     forecast_periods: list[str]
 
+    @property
+    def forecast_horizon_quarters(self) -> int:
+        return len(self.forecast_periods)
+
+    @property
+    def forecast_start_period(self) -> str | None:
+        return self.forecast_periods[0] if self.forecast_periods else None
+
+    @property
+    def forecast_end_period(self) -> str | None:
+        return self.forecast_periods[-1] if self.forecast_periods else None
+
     def report_frame(self) -> pd.DataFrame:
         rows = [
             {"severity": "error", "message": message}
@@ -235,6 +251,15 @@ class ForecastRunResult:
         if self.future_forecasts.empty or "forecast" not in self.future_forecasts.columns:
             return False
         return pd.to_numeric(self.future_forecasts["forecast"], errors="coerce").notna().any()
+
+
+@dataclass
+class ForecastScenarioComparisonResult:
+    output_dir: Path
+    manifest: dict[str, Any]
+    scenario_results: list[ForecastRunResult]
+    future_forecasts: pd.DataFrame
+    capability_report: pd.DataFrame
 
 
 def repo_root_from_here() -> Path:
@@ -286,16 +311,79 @@ def add_quarters(period: str, quarters: int) -> str:
 
 
 def future_quarters_after(period: str, horizon: int = FORECAST_HORIZON_QUARTERS) -> list[str]:
+    if horizon < MIN_FORECAST_HORIZON_QUARTERS:
+        raise ValueError(f"Forecast horizon must be at least {MIN_FORECAST_HORIZON_QUARTERS} quarter.")
     return [add_quarters(period, offset) for offset in range(1, horizon + 1)]
+
+
+def forecast_periods_after(
+    period: str,
+    *,
+    quarters: int | None = None,
+    end_period: str | None = None,
+) -> list[str]:
+    if quarters is not None and end_period is not None:
+        raise ValueError("Use either quarters or end_period, not both.")
+    if end_period is not None:
+        end = str(end_period).strip().upper()
+        parse_period(end)
+        count = quarter_sort_key(end) - quarter_sort_key(period)
+        if count < MIN_FORECAST_HORIZON_QUARTERS:
+            raise ValueError(f"End period {end} must be after latest actual quarter {period}.")
+        return future_quarters_after(period, count)
+    horizon = DEFAULT_FORECAST_HORIZON_QUARTERS if quarters is None else quarters
+    return future_quarters_after(period, horizon)
+
+
+def forecast_template_filename(*, quarters: int | None = None, end_period: str | None = None) -> str:
+    if quarters is not None and end_period is not None:
+        raise ValueError("Use either quarters or end_period, not both.")
+    if end_period is not None:
+        return f"{TEMPLATE_FILENAME_PREFIX}_to_{str(end_period).strip().upper()}.xlsx"
+    horizon = DEFAULT_FORECAST_HORIZON_QUARTERS if quarters is None else quarters
+    if horizon < MIN_FORECAST_HORIZON_QUARTERS:
+        raise ValueError(f"Forecast horizon must be at least {MIN_FORECAST_HORIZON_QUARTERS} quarter.")
+    return f"{TEMPLATE_FILENAME_PREFIX}_{horizon}q.xlsx"
+
+
+def scenario_name_from_filename(filename: str | Path | None) -> str:
+    name = Path(str(filename or "")).stem
+    text = name.strip()
+    prefixes = [
+        TEMPLATE_FILENAME_PREFIX + "_",
+        "NLTF_forecast_input_template_",
+        "NLTF_forecast_input_",
+        "forecast_input_template_",
+        "forecast_input_",
+        "completed_forecast_input_",
+        "forecast_builder_",
+    ]
+    for prefix in prefixes:
+        if text.lower().startswith(prefix.lower()):
+            text = text[len(prefix) :]
+            break
+    text = re.sub(r"^completed[_ -]+", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"[_ -]+completed$", "", text, flags=re.IGNORECASE)
+    return sanitize_scenario_name(text or "scenario")
+
+
+def sanitize_scenario_name(value: str | None) -> str:
+    text = str(value or "scenario").strip().lower()
+    text = re.sub(r"[^a-z0-9]+", "_", text)
+    text = re.sub(r"_+", "_", text).strip("_")
+    return text or "scenario"
 
 
 def build_forecast_input_template(
     output_path: Path | str,
     repo_root: Path | str | None = None,
+    *,
+    quarters: int | None = None,
+    end_period: str | None = None,
 ) -> Path:
     root = Path(repo_root) if repo_root is not None else repo_root_from_here()
     latest = latest_known_actual_period(root)
-    periods = future_quarters_after(latest)
+    periods = forecast_periods_after(latest, quarters=quarters, end_period=end_period)
     output = Path(output_path)
     output.parent.mkdir(parents=True, exist_ok=True)
 
@@ -311,10 +399,19 @@ def build_forecast_input_template(
 
 
 def build_forecast_input_template_bytes(repo_root: Path | str | None = None) -> bytes:
+    return build_forecast_input_template_bytes_for_horizon(repo_root=repo_root)
+
+
+def build_forecast_input_template_bytes_for_horizon(
+    repo_root: Path | str | None = None,
+    *,
+    quarters: int | None = None,
+    end_period: str | None = None,
+) -> bytes:
     stream = BytesIO()
     root = Path(repo_root) if repo_root is not None else repo_root_from_here()
     latest = latest_known_actual_period(root)
-    periods = future_quarters_after(latest)
+    periods = forecast_periods_after(latest, quarters=quarters, end_period=end_period)
     wb = Workbook()
     readme = wb.active
     readme.title = "README"
@@ -327,12 +424,14 @@ def build_forecast_input_template_bytes(repo_root: Path | str | None = None) -> 
 
 
 def _write_readme_sheet(ws: Any, latest_period: str, periods: list[str]) -> None:
-    ws["A1"] = "NLTF 12-quarter forecast input template"
+    ws["A1"] = "NLTF forecast input template"
     ws["A1"].font = Font(bold=True, size=14, color="002B5C")
     rows = [
         ("Latest known actual quarter", latest_period),
-        ("Forecast horizon", f"{periods[0]} to {periods[-1]}"),
+        ("Forecast horizon", f"{len(periods)} quarters: {periods[0]} to {periods[-1]}"),
         ("What to fill", "Only fill the user-entry columns in PED Inputs, Light RUC Inputs and Heavy RUC Inputs."),
+        ("Variable horizon", "You may fill 1 quarter, the default 20 quarters, or any continuous horizon to a chosen end period."),
+        ("Runner rule", "The runner scores only the continuous valid rows present across all three stream sheets."),
         ("What not to edit", "Do not edit period, year, quarter, horizon or protected formula columns."),
         ("Data rule", "Use real price/GDP assumptions in the units named in each header."),
         ("Governance rule", "The runner does not run a broad candidate search and never overwrites dashboard evidence packs."),
@@ -441,17 +540,26 @@ def _excel_formula(formula_key: str, row: int, col_map: dict[str, int]) -> str:
 def validate_forecast_workbook(
     workbook: Path | str | bytes | BinaryIO,
     repo_root: Path | str | None = None,
+    *,
+    expected_quarters: int | None = None,
+    expected_end_period: str | None = None,
 ) -> ForecastValidationResult:
     root = Path(repo_root) if repo_root is not None else repo_root_from_here()
     latest = latest_known_actual_period(root)
-    periods = future_quarters_after(latest)
+    expected_periods = (
+        forecast_periods_after(latest, quarters=expected_quarters, end_period=expected_end_period)
+        if expected_quarters is not None or expected_end_period is not None
+        else None
+    )
+    fallback_periods = expected_periods or forecast_periods_after(latest)
     errors: list[str] = []
     warnings: list[str] = []
-    frames: list[pd.DataFrame] = []
+    frames_by_stream: dict[str, pd.DataFrame] = {}
+    periods_by_stream: dict[str, list[str]] = {}
     try:
         wb = _load_workbook_from_input(workbook)
     except Exception as exc:
-        return ForecastValidationResult(False, [f"Workbook could not be opened: {exc}"], [], pd.DataFrame(), latest, periods)
+        return ForecastValidationResult(False, [f"Workbook could not be opened: {exc}"], [], pd.DataFrame(), latest, fallback_periods)
 
     for stream in STREAM_ORDER:
         sheet = SHEET_BY_STREAM[stream]
@@ -459,12 +567,29 @@ def validate_forecast_workbook(
             errors.append(f"Missing required sheet: {sheet}")
             continue
         frame = _worksheet_to_frame(wb[sheet])
-        sheet_errors, sheet_warnings = _validate_sheet_frame(frame, stream, periods)
+        valid_frame, sheet_periods, sheet_errors, sheet_warnings = _validate_sheet_frame(
+            frame,
+            stream,
+            latest,
+            expected_periods=expected_periods,
+        )
         errors.extend(sheet_errors)
         warnings.extend(sheet_warnings)
-        if not frame.empty:
-            frames.append(_build_stream_assumptions(frame, stream, periods))
+        if not valid_frame.empty:
+            frames_by_stream[stream] = valid_frame
+            periods_by_stream[stream] = sheet_periods
 
+    inferred_periods = _common_forecast_periods(periods_by_stream)
+    if periods_by_stream and inferred_periods is None:
+        details = "; ".join(f"{SHEET_BY_STREAM[stream]}={periods}" for stream, periods in periods_by_stream.items())
+        errors.append(f"Input sheets must contain the same continuous forecast periods across all streams. {details}")
+    periods = inferred_periods or next(iter(periods_by_stream.values()), fallback_periods)
+    frames: list[pd.DataFrame] = []
+    if not errors and periods:
+        for stream in STREAM_ORDER:
+            frame = frames_by_stream.get(stream)
+            if frame is not None:
+                frames.append(_build_stream_assumptions(frame, stream, periods))
     assumptions = pd.concat(frames, ignore_index=True, sort=False) if frames else pd.DataFrame()
     return ForecastValidationResult(not errors, errors, warnings, assumptions, latest, periods)
 
@@ -475,29 +600,47 @@ def run_forecast_workbook(
     repo_root: Path | str | None = None,
     workbook_filename: str | None = None,
     run_timestamp: str | None = None,
+    scenario_name: str | None = None,
+    expected_quarters: int | None = None,
+    expected_end_period: str | None = None,
 ) -> ForecastRunResult:
     root = Path(repo_root) if repo_root is not None else repo_root_from_here()
-    validation = validate_forecast_workbook(workbook, root)
+    workbook_name = workbook_filename or _workbook_name(workbook)
+    scenario = sanitize_scenario_name(scenario_name) if scenario_name else scenario_name_from_filename(workbook_name)
+    validation = validate_forecast_workbook(
+        workbook,
+        root,
+        expected_quarters=expected_quarters,
+        expected_end_period=expected_end_period,
+    )
     timestamp = run_timestamp or datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    run_dir = Path(output_dir) if output_dir is not None else root / "artifacts" / "forecast_runs" / timestamp
+    run_id = f"{timestamp}_{scenario}"
+    run_dir = Path(output_dir) if output_dir is not None else root / "artifacts" / "forecast_runs" / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
     workbook_bytes = _workbook_bytes(workbook)
     workbook_hash = hashlib.sha256(workbook_bytes).hexdigest() if workbook_bytes else None
 
     capabilities = model_capability_gap_register(root)
     future, components = _forecast_output_rows(validation, capabilities, root)
-    capability_report = _forecast_capability_report(capabilities, future, components, validation)
     assumptions = validation.assumptions.copy()
+    _add_scenario_columns(future, scenario)
+    _add_scenario_columns(components, scenario)
+    _add_scenario_columns(assumptions, scenario)
+    capability_report = _forecast_capability_report(capabilities, future, components, validation, scenario_name=scenario)
     report = _forecast_validation_report(validation, capabilities)
     forecast_status = _forecast_status(validation, future)
     manifest = {
-        "run_id": timestamp,
+        "run_id": run_id,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "forecast_runner_version": FORECAST_RUNNER_VERSION,
-        "workbook_filename": workbook_filename or _workbook_name(workbook),
+        "scenario_name": scenario,
+        "workbook_filename": workbook_name,
         "workbook_sha256": workbook_hash,
         "latest_actual_period": validation.latest_actual_period,
         "forecast_periods": validation.forecast_periods,
+        "forecast_horizon_quarters": validation.forecast_horizon_quarters,
+        "forecast_start_period": validation.forecast_start_period,
+        "forecast_end_period": validation.forecast_end_period,
         "validation_status": "passed" if validation.valid else "failed",
         "validation_errors": validation.errors,
         "validation_warnings": validation.warnings,
@@ -560,11 +703,84 @@ def forecast_pack_zip_bytes(output_dir: Path | str) -> bytes:
     return stream.getvalue()
 
 
+def write_forecast_scenario_comparison(
+    scenario_results: list[ForecastRunResult],
+    output_dir: Path | str | None = None,
+    repo_root: Path | str | None = None,
+    run_timestamp: str | None = None,
+) -> ForecastScenarioComparisonResult:
+    root = Path(repo_root) if repo_root is not None else repo_root_from_here()
+    timestamp = run_timestamp or datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    comparison_id = f"{timestamp}_scenario_comparison"
+    comparison_dir = Path(output_dir) if output_dir is not None else root / "artifacts" / "forecast_runs" / comparison_id
+    comparison_dir.mkdir(parents=True, exist_ok=True)
+    future = (
+        pd.concat([result.future_forecasts for result in scenario_results], ignore_index=True, sort=False)
+        if scenario_results
+        else pd.DataFrame()
+    )
+    capability = (
+        pd.concat([result.capability_report for result in scenario_results], ignore_index=True, sort=False)
+        if scenario_results
+        else pd.DataFrame()
+    )
+    manifest = {
+        "comparison_id": comparison_id,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "forecast_runner_version": FORECAST_RUNNER_VERSION,
+        "scenario_count": len(scenario_results),
+        "scenarios": [
+            {
+                "scenario_name": result.manifest.get("scenario_name"),
+                "run_id": result.manifest.get("run_id"),
+                "output_dir": _repo_relative(root, result.output_dir),
+                "workbook_filename": result.manifest.get("workbook_filename"),
+                "workbook_sha256": result.manifest.get("workbook_sha256"),
+                "forecast_horizon_quarters": result.manifest.get("forecast_horizon_quarters"),
+                "forecast_start_period": result.manifest.get("forecast_start_period"),
+                "forecast_end_period": result.manifest.get("forecast_end_period"),
+                "forecast_status": result.manifest.get("forecast_status"),
+            }
+            for result in scenario_results
+        ],
+        "fixed_finalists_only": True,
+        "broad_search_run": False,
+        "evidence_pack_modified": False,
+        "chart_sources_modified": False,
+        "output_files": [
+            "forecast_scenario_comparison.parquet",
+            "forecast_scenario_comparison.csv",
+            "forecast_scenario_capability_report.parquet",
+            "forecast_scenario_capability_report.csv",
+            "forecast_scenario_comparison_manifest.json",
+        ],
+    }
+    future.to_parquet(comparison_dir / "forecast_scenario_comparison.parquet", index=False)
+    future.to_csv(comparison_dir / "forecast_scenario_comparison.csv", index=False)
+    capability.to_parquet(comparison_dir / "forecast_scenario_capability_report.parquet", index=False)
+    capability.to_csv(comparison_dir / "forecast_scenario_capability_report.csv", index=False)
+    (comparison_dir / "forecast_scenario_comparison_manifest.json").write_text(
+        json.dumps(manifest, indent=2, allow_nan=False),
+        encoding="utf-8",
+    )
+    return ForecastScenarioComparisonResult(
+        output_dir=comparison_dir,
+        manifest=manifest,
+        scenario_results=scenario_results,
+        future_forecasts=future,
+        capability_report=capability,
+    )
+
+
 def create_completed_sample_workbook(
     output_path: Path | str,
     repo_root: Path | str | None = None,
+    *,
+    quarters: int | None = None,
+    end_period: str | None = None,
+    value_multiplier: float = 1.0,
 ) -> Path:
-    path = build_forecast_input_template(output_path, repo_root=repo_root)
+    path = build_forecast_input_template(output_path, repo_root=repo_root, quarters=quarters, end_period=end_period)
     wb = load_workbook(path)
     sample_values = {
         "real_gdp_per_capita_nzd": 72000.0,
@@ -584,11 +800,11 @@ def create_completed_sample_workbook(
         ws = wb[SHEET_BY_STREAM[stream]]
         headers = {cell.value: cell.column for cell in ws[1] if cell.value}
         ws.protection.sheet = False
-        for row in range(2, 2 + FORECAST_HORIZON_QUARTERS):
+        for row in range(2, ws.max_row + 1):
             for name, value in sample_values.items():
                 if name in headers:
                     multiplier = 1.0 + ((row - 2) * 0.004)
-                    ws.cell(row=row, column=headers[name], value=value * multiplier)
+                    ws.cell(row=row, column=headers[name], value=value * multiplier * value_multiplier)
         ws.protection.sheet = True
     wb.save(path)
     return path
@@ -709,7 +925,13 @@ def _worksheet_to_frame(ws: Any) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def _validate_sheet_frame(frame: pd.DataFrame, stream: str, periods: list[str]) -> tuple[list[str], list[str]]:
+def _validate_sheet_frame(
+    frame: pd.DataFrame,
+    stream: str,
+    latest_actual_period: str,
+    *,
+    expected_periods: list[str] | None = None,
+) -> tuple[pd.DataFrame, list[str], list[str], list[str]]:
     errors: list[str] = []
     warnings: list[str] = []
     sheet = SHEET_BY_STREAM[stream]
@@ -717,27 +939,66 @@ def _validate_sheet_frame(frame: pd.DataFrame, stream: str, periods: list[str]) 
     missing_headers = [name for name in expected_headers if name not in frame.columns]
     if missing_headers:
         errors.append(f"{sheet}: missing required headers: {', '.join(missing_headers)}")
-        return errors, warnings
-    if len(frame) != FORECAST_HORIZON_QUARTERS:
-        errors.append(f"{sheet}: expected {FORECAST_HORIZON_QUARTERS} forecast rows, found {len(frame)}")
-    observed_periods = frame["period"].dropna().astype(str).str.upper().tolist()
-    if observed_periods[:FORECAST_HORIZON_QUARTERS] != periods:
-        errors.append(f"{sheet}: period rows must be {periods[0]} through {periods[-1]} with no gaps")
-    for column in [col for col in STREAM_COLUMNS[stream] if col.role == "user" and col.required]:
-        values = pd.to_numeric(frame[column.name], errors="coerce") if column.name in frame.columns else pd.Series(dtype=float)
-        if values.isna().any():
-            errors.append(f"{sheet}: required user-entry column {column.name} has missing or non-numeric values")
-        elif (values <= 0).any():
-            errors.append(f"{sheet}: required user-entry column {column.name} must be positive for log/lag transforms")
+        return pd.DataFrame(), [], errors, warnings
+    if frame.empty:
+        errors.append(f"{sheet}: no forecast rows were found")
+        return pd.DataFrame(), [], errors, warnings
+    required_user_columns = [col.name for col in STREAM_COLUMNS[stream] if col.role == "user" and col.required]
+    valid_indices: list[int] = []
+    blank_indices: set[int] = set()
+    partial_periods: list[str] = []
+    for idx, row in frame.iterrows():
+        values = pd.to_numeric(row[required_user_columns], errors="coerce")
+        filled = values.notna()
+        positive = values.gt(0)
+        period = str(row.get("period", "")).upper()
+        if positive.all():
+            valid_indices.append(idx)
+        elif not filled.any():
+            blank_indices.add(idx)
+        else:
+            partial_periods.append(period or f"row {idx + 2}")
+    if partial_periods:
+        errors.append(
+            f"{sheet}: rows with partial or non-positive required user entries are not valid forecast rows: "
+            + ", ".join(partial_periods[:8])
+        )
+    if not valid_indices:
+        errors.append(f"{sheet}: no valid forecast rows were found; fill at least one continuous quarter.")
+        return pd.DataFrame(), [], errors, warnings
+    first_valid = min(valid_indices)
+    if any(idx < first_valid for idx in blank_indices):
+        errors.append(f"{sheet}: valid forecast rows must start at the first generated forecast quarter.")
+    observed_periods = frame.loc[valid_indices, "period"].dropna().astype(str).str.upper().tolist()
+    expected_continuous = future_quarters_after(latest_actual_period, len(observed_periods))
+    if observed_periods != expected_continuous:
+        errors.append(
+            f"{sheet}: valid forecast rows must be continuous from {expected_continuous[0]} through {expected_continuous[-1]} with no gaps."
+        )
+    if expected_periods is not None and observed_periods != expected_periods:
+        errors.append(
+            f"{sheet}: workbook valid rows are {observed_periods[0]} through {observed_periods[-1]}, "
+            f"but the requested horizon is {expected_periods[0]} through {expected_periods[-1]}."
+        )
     formula_headers = [col.name for col in STREAM_COLUMNS[stream] if col.role == "formula"]
     if not formula_headers:
         warnings.append(f"{sheet}: no formula columns were found")
-    return errors, warnings
+    return frame.loc[valid_indices].copy(), observed_periods, errors, warnings
+
+
+def _common_forecast_periods(periods_by_stream: dict[str, list[str]]) -> list[str] | None:
+    if not periods_by_stream:
+        return None
+    values = list(periods_by_stream.values())
+    first = values[0]
+    if all(periods == first for periods in values[1:]):
+        return first
+    return None
 
 
 def _build_stream_assumptions(frame: pd.DataFrame, stream: str, periods: list[str]) -> pd.DataFrame:
     out = frame.copy()
-    out = out.head(FORECAST_HORIZON_QUARTERS).copy()
+    out = out.head(len(periods)).copy()
     out["stream"] = stream
     out["stream_label"] = STREAM_LABELS[stream]
     out["model"] = FINALIST_BY_STREAM[stream]
@@ -1183,11 +1444,23 @@ def _forecast_status(validation: ForecastValidationResult, future: pd.DataFrame)
     return "mixed_numeric_and_governed_gap"
 
 
+def _add_scenario_columns(frame: pd.DataFrame, scenario_name: str) -> None:
+    if frame.empty:
+        frame["scenario_name"] = pd.Series(dtype=str)
+        return
+    if "scenario_name" in frame.columns:
+        frame["scenario_name"] = scenario_name
+    else:
+        frame.insert(0, "scenario_name", scenario_name)
+
+
 def _forecast_capability_report(
     capabilities: pd.DataFrame,
     future: pd.DataFrame,
     components: pd.DataFrame,
     validation: ForecastValidationResult,
+    *,
+    scenario_name: str,
 ) -> pd.DataFrame:
     rows: list[dict[str, Any]] = []
     future_group = future.groupby("stream", dropna=False) if not future.empty and "stream" in future.columns else {}
@@ -1207,6 +1480,7 @@ def _forecast_capability_report(
             gap_reason = str(first_non_null(stream_future.get("gap_reason")) or "")
         rows.append(
             {
+                "scenario_name": scenario_name,
                 "stream": stream,
                 "stream_label": cap.get("stream_label"),
                 "model": cap.get("model"),

@@ -123,10 +123,11 @@ Backlog state for the Stage 1 Model Governance Dashboard Parquet refresh and vis
 
 ## Closed Forecast Runner Governance Items
 
-- [x] Added a governed 12-quarter forecast input template specification.
+- [x] Added a governed variable-horizon forecast input template specification with a default 20-quarter committed template.
 - [x] Added a forecast runner specification that keeps forecast-run artifacts separate from the historical evidence pack.
-- [x] Added runtime manifest fields for fixed-finalist-only execution, no broad search, and no evidence/chart-source mutation.
-- [x] Documented that current forward forecasting is a governed missing-capability gap unless repo-local fitted finalist states are vendored.
-- [x] Kept runtime model-state gaps in `forecast_run_manifest.json` and `forecast_validation_report.md` rather than adding unchecked dashboard backlog defects.
+- [x] Added runtime manifest fields for fixed-finalist-only execution, no broad search, workbook hash, scenario name, horizon metadata, and no evidence/chart-source mutation.
+- [x] Documented current forward status: Light RUC numeric fixed-finalist forecasts, PED governed gap, and Heavy RUC governed gap.
+- [x] Added a forecast scenario comparison specification for multi-upload combined tables, charts, capability rows, and downloads.
+- [x] Kept runtime model-state gaps in `forecast_run_manifest.json`, `forecast_capability_report.*`, and `forecast_validation_report.md` rather than adding unchecked dashboard backlog defects.
 
 No unchecked backlog items remain.

@@ -16,6 +16,7 @@ output/
 *.parquet
 !templates/
 !templates/NLTF_forecast_input_template_12q.xlsx
+!templates/NLTF_forecast_input_template_20q.xlsx
 artifacts/forecast_runs/
 artifacts/forecast_uploads/
 *_completed_forecast_input*.xlsx

@@ -9,7 +9,7 @@ import pandas as pd
 import pytest
 from playwright.sync_api import Page, expect
 
-from model_dashboard.forecast_runner import create_completed_sample_workbook
+from model_dashboard.forecast_runner import TEMPLATE_FILENAME, create_completed_sample_workbook
 
 
 SCREENSHOT_DIR = Path("artifacts/screenshots")
@@ -410,27 +410,36 @@ def test_forecast_builder_upload_validate_calculate_and_download(page: Page) -> 
     click_page(page, "Governance & Reproducibility")
     body = page.locator("body")
     page.get_by_text("Forecast Builder", exact=True).first.click()
-    expect(body).to_contain_text("Download blank 12-quarter template", timeout=60000)
-    expect(body).to_contain_text("Upload completed 12-quarter forecast workbook", timeout=60000)
+    expect(body).to_contain_text("Download blank 20-quarter template", timeout=60000)
+    expect(body).to_contain_text("Upload completed forecast workbooks", timeout=60000)
     with page.expect_download() as download_info:
-        page.get_by_role("button", name="Download blank 12-quarter template").click()
-    assert download_info.value.suggested_filename == "NLTF_forecast_input_template_12q.xlsx"
+        page.get_by_role("button", name="Download blank 20-quarter template").click()
+    assert download_info.value.suggested_filename == TEMPLATE_FILENAME
 
-    sample_path = Path("test-output") / "forecast_builder_playwright_completed.xlsx"
-    sample_path.parent.mkdir(parents=True, exist_ok=True)
-    create_completed_sample_workbook(sample_path)
-    page.locator("input[type='file']").set_input_files(str(sample_path.resolve()))
+    sample_dir = Path("test-output")
+    sample_dir.mkdir(parents=True, exist_ok=True)
+    basecase_path = sample_dir / "NLTF_forecast_input_template_basecase.xlsx"
+    upside_path = sample_dir / "NLTF_forecast_input_template_upside.xlsx"
+    create_completed_sample_workbook(basecase_path, quarters=1)
+    create_completed_sample_workbook(upside_path, quarters=2, value_multiplier=1.02)
+    page.locator("input[type='file']").set_input_files([str(basecase_path.resolve()), str(upside_path.resolve())])
+    expect(body).to_contain_text("Scenario name for NLTF_forecast_input_template_basecase.xlsx", timeout=60000)
+    expect(body).to_contain_text("Scenario name for NLTF_forecast_input_template_upside.xlsx", timeout=60000)
     validate_button = page.get_by_role("button", name="Validate inputs")
-    calculate_button = page.get_by_role("button", name="Calculate forecasts or governed gaps")
+    calculate_button = page.get_by_role("button", name="Calculate forecasts")
     expect(validate_button).to_be_enabled(timeout=60000)
     expect(calculate_button).to_be_enabled(timeout=60000)
     validate_button.click()
     expect(body).to_contain_text("Forecast workbook validation", timeout=60000)
     expect(body).to_contain_text("Workbook inputs passed structural and required-value validation", timeout=60000)
+    expect(body).to_contain_text("basecase", timeout=60000)
+    expect(body).to_contain_text("upside", timeout=60000)
 
     calculate_button.click()
     expect(body).to_contain_text("Forecast status", timeout=90000)
     expect(body).to_contain_text("mixed_numeric_and_governed_gap", timeout=90000)
+    expect(body).to_contain_text("Scenarios", timeout=90000)
+    expect(body).to_contain_text("Forecast chart by scenario, stream and quarter", timeout=90000)
     expect(body).to_contain_text("Forecast table by stream and quarter", timeout=90000)
     expect(body).to_contain_text("numeric_forecast_available", timeout=90000)
     expect(body).to_contain_text("Numeric fixed-finalist forecasts were produced where repo-reproducible", timeout=90000)
@@ -442,9 +451,17 @@ def test_forecast_builder_upload_validate_calculate_and_download(page: Page) -> 
     expect(body).to_contain_text("base_schiff_ols", timeout=90000)
     expect(body).to_contain_text("residual_gbr", timeout=90000)
     expect(body).to_contain_text("PED component trace", timeout=90000)
-    with page.expect_download() as pack_download:
-        page.get_by_role("button", name="Download forecast-run pack").click()
-    assert pack_download.value.suggested_filename.endswith("_forecast_run_pack.zip")
+    expect(body).to_contain_text("Download combined comparison pack", timeout=90000)
+    expect(body).to_contain_text("Download basecase scenario pack", timeout=90000)
+    expect(body).to_contain_text("Download upside scenario pack", timeout=90000)
+    with page.expect_download() as comparison_download:
+        page.get_by_role("button", name="Download combined comparison pack").click()
+    assert comparison_download.value.suggested_filename.endswith("_forecast_run_pack.zip")
+    assert "scenario_comparison" in comparison_download.value.suggested_filename
+    with page.expect_download() as scenario_download:
+        page.get_by_role("button", name="Download basecase scenario pack").click()
+    assert scenario_download.value.suggested_filename.endswith("_forecast_run_pack.zip")
+    assert "basecase" in scenario_download.value.suggested_filename
     assert_no_streamlit_exception(page)
 
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import hashlib
 import html
 import io
@@ -39,7 +40,10 @@ from model_dashboard.forecast_runner import (
     build_forecast_input_template_bytes,
     forecast_pack_zip_bytes,
     run_forecast_workbook,
+    sanitize_scenario_name,
+    scenario_name_from_filename,
     validate_forecast_workbook,
+    write_forecast_scenario_comparison,
 )
 from model_dashboard.labels import (
     DEFAULT_INPUT_PARENT,
@@ -2506,7 +2510,7 @@ def render_forecast_builder_section() -> None:
         control_cols = st.columns([0.72, 1.28, 0.7, 0.9])
         with control_cols[0]:
             st.download_button(
-                "Download blank 12-quarter template",
+                "Download blank 20-quarter template",
                 data=template_bytes,
                 file_name=TEMPLATE_FILENAME,
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -2514,79 +2518,140 @@ def render_forecast_builder_section() -> None:
                 use_container_width=True,
             )
         with control_cols[1]:
-            uploaded = st.file_uploader(
-                "Upload completed 12-quarter forecast workbook",
+            uploaded_files = st.file_uploader(
+                "Upload completed forecast workbooks",
                 type=["xlsx"],
                 key="forecast_builder_upload",
-                help="Upload a completed copy of the template. Uploaded workbooks are not committed and do not alter evidence packs.",
+                accept_multiple_files=True,
+                help="Upload one or more completed templates. Uploaded workbooks are not committed and do not alter evidence packs.",
             )
+        uploaded_files = uploaded_files or []
 
-        current_hash = None
-        workbook_bytes: bytes | None = None
-        if uploaded is not None:
+        upload_signature = "|".join(
+            f"{getattr(uploaded, 'name', 'uploaded.xlsx')}:{hashlib.sha256(uploaded.getvalue()).hexdigest()}"
+            for uploaded in uploaded_files
+        )
+        if st.session_state.get("forecast_builder_upload_hash") != upload_signature:
+            st.session_state["forecast_builder_upload_hash"] = upload_signature
+            st.session_state.pop("forecast_builder_validations", None)
+            st.session_state.pop("forecast_builder_results", None)
+            st.session_state.pop("forecast_builder_comparison", None)
+
+        upload_rows: list[dict[str, Any]] = []
+        for index, uploaded in enumerate(uploaded_files):
             workbook_bytes = uploaded.getvalue()
-            current_hash = hashlib.sha256(workbook_bytes).hexdigest()
-            if st.session_state.get("forecast_builder_upload_hash") != current_hash:
-                st.session_state["forecast_builder_upload_hash"] = current_hash
-                st.session_state.pop("forecast_builder_validation", None)
-                st.session_state.pop("forecast_builder_result", None)
+            digest = hashlib.sha256(workbook_bytes).hexdigest()
+            scenario_default = scenario_name_from_filename(getattr(uploaded, "name", f"scenario_{index + 1}.xlsx"))
+            scenario_value = st.text_input(
+                f"Scenario name for {getattr(uploaded, 'name', f'uploaded {index + 1}')}",
+                value=scenario_default,
+                key=f"forecast_builder_scenario_{index}_{digest[:10]}",
+            )
+            upload_rows.append(
+                {
+                    "index": index,
+                    "uploaded": uploaded,
+                    "workbook_bytes": workbook_bytes,
+                    "workbook_filename": getattr(uploaded, "name", f"uploaded_{index + 1}.xlsx"),
+                    "scenario_name": sanitize_scenario_name(scenario_value),
+                }
+            )
 
         with control_cols[2]:
             validate_clicked = st.button(
                 "Validate inputs",
                 key="forecast_builder_validate",
                 use_container_width=True,
-                disabled=workbook_bytes is None,
+                disabled=not upload_rows,
             )
         with control_cols[3]:
             run_clicked = st.button(
-                "Calculate forecasts or governed gaps",
+                "Calculate forecasts",
                 key="forecast_builder_calculate",
                 use_container_width=True,
-                disabled=workbook_bytes is None,
+                disabled=not upload_rows,
             )
 
-        if workbook_bytes is not None and validate_clicked:
-            st.session_state["forecast_builder_validation"] = validate_forecast_workbook(workbook_bytes, repo_root=repo_root)
-        if workbook_bytes is not None and run_clicked:
-            st.session_state["forecast_builder_result"] = run_forecast_workbook(
-                workbook_bytes,
-                repo_root=repo_root,
-                workbook_filename=getattr(uploaded, "name", "uploaded_forecast_workbook.xlsx"),
-            )
-            st.session_state["forecast_builder_validation"] = st.session_state["forecast_builder_result"].validation
+        scenario_names = _unique_scenario_names([row["scenario_name"] for row in upload_rows])
+        for row, scenario_name in zip(upload_rows, scenario_names, strict=False):
+            row["scenario_name"] = scenario_name
 
-        validation = st.session_state.get("forecast_builder_validation")
-        if validation is not None:
+        if validate_clicked:
+            st.session_state["forecast_builder_validations"] = [
+                {
+                    **row,
+                    "validation": validate_forecast_workbook(row["workbook_bytes"], repo_root=repo_root),
+                }
+                for row in upload_rows
+            ]
+        if run_clicked:
+            run_timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+            results = [
+                run_forecast_workbook(
+                    row["workbook_bytes"],
+                    repo_root=repo_root,
+                    workbook_filename=row["workbook_filename"],
+                    scenario_name=row["scenario_name"],
+                    run_timestamp=run_timestamp,
+                )
+                for row in upload_rows
+            ]
+            comparison = write_forecast_scenario_comparison(results, repo_root=repo_root, run_timestamp=run_timestamp)
+            st.session_state["forecast_builder_results"] = results
+            st.session_state["forecast_builder_comparison"] = comparison
+            st.session_state["forecast_builder_validations"] = [
+                {**row, "validation": result.validation}
+                for row, result in zip(upload_rows, results, strict=False)
+            ]
+
+        validations = st.session_state.get("forecast_builder_validations")
+        if validations:
             st.markdown("<div class='page5-panel-title'>Forecast workbook validation</div>", unsafe_allow_html=True)
-            display_table(validation.report_frame(), height=165, max_rows=30)
+            display_table(_forecast_builder_validation_table(validations), height=190, max_rows=60)
 
-        result = st.session_state.get("forecast_builder_result")
-        if result is not None:
-            render_forecast_builder_result(result)
-        elif workbook_bytes is None:
-            st.caption("Download the blank template, complete the user-entry columns, then upload the workbook here.")
+        results = st.session_state.get("forecast_builder_results")
+        comparison = st.session_state.get("forecast_builder_comparison")
+        if results:
+            render_forecast_builder_results(results, comparison)
+        elif not upload_rows:
+            st.caption("Download the blank template, complete the user-entry columns for one or more scenarios, then upload the workbooks here.")
 
 
 def render_forecast_builder_result(result: Any) -> None:
-    status = result.manifest.get("forecast_status", "unknown")
-    validation_status = result.manifest.get("validation_status", "unknown")
+    render_forecast_builder_results([result], None)
+
+
+def render_forecast_builder_results(results: list[Any], comparison: Any | None) -> None:
+    future_combined = (
+        comparison.future_forecasts.copy()
+        if comparison is not None and isinstance(getattr(comparison, "future_forecasts", None), pd.DataFrame)
+        else pd.concat([result.future_forecasts for result in results], ignore_index=True, sort=False)
+    )
+    capability_combined = (
+        comparison.capability_report.copy()
+        if comparison is not None and isinstance(getattr(comparison, "capability_report", None), pd.DataFrame)
+        else pd.concat([result.capability_report for result in results], ignore_index=True, sort=False)
+    )
+    component_combined = pd.concat([result.component_forecasts for result in results], ignore_index=True, sort=False)
+    statuses = {str(result.manifest.get("forecast_status", "unknown")) for result in results}
+    status = statuses.pop() if len(statuses) == 1 else "scenario_comparison"
+    validation_status = "passed" if all(result.manifest.get("validation_status") == "passed" for result in results) else "failed"
     kpi_grid(
         [
             ("Validation", validation_status, "completed workbook check"),
             ("Forecast status", status, "available forecast or governed gaps"),
+            ("Scenarios", str(len(results)), "uploaded workbook count"),
             ("Broad search", "not run", "fixed finalists only"),
             ("Evidence pack", "unchanged", "forecast run is isolated"),
         ]
     )
-    capability_report = getattr(result, "capability_report", pd.DataFrame())
-    if isinstance(capability_report, pd.DataFrame) and not capability_report.empty:
+    if not capability_combined.empty:
         st.markdown("<div class='page5-panel-title'>Forecast capability by stream</div>", unsafe_allow_html=True)
-        display_table(_forecast_builder_capability_table(capability_report), height=140, max_rows=6)
-    stream_options = ["All streams"] + sorted(result.future_forecasts["stream_label"].dropna().astype(str).unique().tolist())
+        display_table(_forecast_builder_capability_table(capability_combined), height=160, max_rows=60)
+    stream_options = ["All streams"] + sorted(future_combined["stream_label"].dropna().astype(str).unique().tolist())
     selected_stream = st.selectbox("Forecast stream", stream_options, key="forecast_builder_stream")
-    future = result.future_forecasts.copy()
-    components = result.component_forecasts.copy()
+    future = future_combined.copy()
+    components = component_combined.copy()
     if selected_stream != "All streams":
         future = future[future["stream_label"].astype(str).eq(selected_stream)].copy()
         components = components[components["stream_label"].astype(str).eq(selected_stream)].copy()
@@ -2594,13 +2659,14 @@ def render_forecast_builder_result(result: Any) -> None:
     st.markdown("<div class='page5-panel-title'>Forecast table by stream and quarter</div>", unsafe_allow_html=True)
     display_table(_forecast_builder_table(future), height=240, max_rows=60)
     chart_card(
-        "Forecast chart by stream and quarter",
-        "Numeric forecasts are plotted when fitted finalist state is available; governed gaps are shown as an annotated empty chart.",
+        "Forecast chart by scenario, stream and quarter",
+        "Numeric forecasts are plotted together for uploaded scenarios; governed gaps stay visible in the tables.",
         forecast_builder_figure(future),
         notes_as_tooltip=False,
     )
     has_gap_rows = "forecast_available" in future.columns and (~future["forecast_available"].fillna(False).astype(bool)).any()
-    if not result.has_numeric_forecasts:
+    has_numeric_forecasts = pd.to_numeric(future_combined.get("forecast"), errors="coerce").notna().any()
+    if not has_numeric_forecasts:
         warning_panel("Governed missing-capability gaps were written instead of fake forecasts because fitted finalist states are not repo-local.")
     elif has_gap_rows:
         warning_panel(
@@ -2619,19 +2685,65 @@ def render_forecast_builder_result(result: Any) -> None:
             display_table(_forecast_builder_component_table(trace), height=240, max_rows=80)
 
     st.download_button(
-        "Download forecast-run pack",
-        data=forecast_pack_zip_bytes(result.output_dir),
-        file_name=f"{Path(result.output_dir).name}_forecast_run_pack.zip",
+        "Download combined comparison pack",
+        data=forecast_pack_zip_bytes(comparison.output_dir if comparison is not None else results[0].output_dir),
+        file_name=f"{Path(comparison.output_dir if comparison is not None else results[0].output_dir).name}_forecast_run_pack.zip",
         mime="application/zip",
-        key="forecast_builder_pack_download",
+        key="forecast_builder_comparison_pack_download",
         use_container_width=False,
     )
+    for result in results:
+        scenario = str(result.manifest.get("scenario_name", "scenario"))
+        st.download_button(
+            f"Download {scenario} scenario pack",
+            data=forecast_pack_zip_bytes(result.output_dir),
+            file_name=f"{Path(result.output_dir).name}_forecast_run_pack.zip",
+            mime="application/zip",
+            key=f"forecast_builder_pack_download_{scenario}",
+            use_container_width=False,
+        )
+
+
+def _unique_scenario_names(names: list[str]) -> list[str]:
+    seen: dict[str, int] = {}
+    output: list[str] = []
+    for name in names:
+        base = sanitize_scenario_name(name)
+        count = seen.get(base, 0) + 1
+        seen[base] = count
+        output.append(base if count == 1 else f"{base}_{count}")
+    return output
+
+
+def _forecast_builder_validation_table(rows: list[dict[str, Any]]) -> pd.DataFrame:
+    output: list[dict[str, Any]] = []
+    for row in rows:
+        validation = row.get("validation")
+        scenario_name = row.get("scenario_name", "scenario")
+        workbook_filename = row.get("workbook_filename", "")
+        if validation is None:
+            continue
+        report = validation.report_frame()
+        for _, message_row in report.iterrows():
+            output.append(
+                {
+                    "Scenario": scenario_name,
+                    "Workbook": workbook_filename,
+                    "Horizon": getattr(validation, "forecast_horizon_quarters", len(getattr(validation, "forecast_periods", []))),
+                    "Start": getattr(validation, "forecast_start_period", None),
+                    "End": getattr(validation, "forecast_end_period", None),
+                    "Severity": message_row.get("severity"),
+                    "Message": message_row.get("message"),
+                }
+            )
+    return pd.DataFrame(output)
 
 
 def _forecast_builder_table(frame: pd.DataFrame) -> pd.DataFrame:
     if frame is None or frame.empty:
         return pd.DataFrame()
     columns = [
+        "scenario_name",
         "stream_label",
         "model",
         "target_period",
@@ -2645,6 +2757,7 @@ def _forecast_builder_table(frame: pd.DataFrame) -> pd.DataFrame:
     table = frame[[column for column in columns if column in frame.columns]].copy()
     return table.rename(
         columns={
+            "scenario_name": "Scenario",
             "stream_label": "Stream",
             "model": "Model",
             "target_period": "Quarter",
@@ -2662,6 +2775,7 @@ def _forecast_builder_capability_table(frame: pd.DataFrame) -> pd.DataFrame:
     if frame is None or frame.empty:
         return pd.DataFrame()
     columns = [
+        "scenario_name",
         "stream_label",
         "capability_status",
         "forecast_available",
@@ -2673,6 +2787,7 @@ def _forecast_builder_capability_table(frame: pd.DataFrame) -> pd.DataFrame:
     table = frame[[column for column in columns if column in frame.columns]].copy()
     return table.rename(
         columns={
+            "scenario_name": "Scenario",
             "stream_label": "Stream",
             "capability_status": "Capability",
             "forecast_available": "Forecast available",
@@ -2688,6 +2803,7 @@ def _forecast_builder_component_table(frame: pd.DataFrame) -> pd.DataFrame:
     if frame is None or frame.empty:
         return pd.DataFrame()
     columns = [
+        "scenario_name",
         "stream_label",
         "component_model",
         "component_role",
@@ -2704,6 +2820,7 @@ def _forecast_builder_component_table(frame: pd.DataFrame) -> pd.DataFrame:
     table = frame[[column for column in columns if column in frame.columns]].copy()
     return table.rename(
         columns={
+            "scenario_name": "Scenario",
             "stream_label": "Stream",
             "component_model": "Component",
             "component_role": "Role",
@@ -2729,14 +2846,26 @@ def forecast_builder_figure(frame: pd.DataFrame) -> go.Figure:
     if data.empty:
         return empty_figure("Governed gaps only: fitted finalist state is not available for forward scoring.")
     fig = go.Figure()
-    for stream_label, group in data.groupby("stream_label", dropna=False):
+    if "scenario_name" not in data.columns:
+        data["scenario_name"] = "scenario"
+    scenario_values = sorted(data["scenario_name"].dropna().astype(str).unique().tolist())
+    palette = ["#002B5C", "#008C82", "#7C3AED", "#B45309", "#BE123C", "#475569"]
+    dashes = ["solid", "dash", "dot", "dashdot", "longdash", "longdashdot"]
+    scenario_style = {
+        scenario: {"color": palette[index % len(palette)], "dash": dashes[index % len(dashes)]}
+        for index, scenario in enumerate(scenario_values)
+    }
+    for (scenario, stream_label), group in data.groupby(["scenario_name", "stream_label"], dropna=False):
+        style = scenario_style.get(str(scenario), scenario_style[scenario_values[0]])
         fig.add_trace(
             go.Scatter(
                 x=group["target_period"],
                 y=group["forecast_numeric"],
                 mode="lines+markers",
-                name=str(stream_label),
-                hovertemplate="Quarter: %{x}<br>Forecast: %{y:,.2f}<extra></extra>",
+                name=f"{scenario} - {stream_label}",
+                line=dict(color=style["color"], dash=style["dash"]),
+                hovertemplate="Scenario: %{meta}<br>Quarter: %{x}<br>Forecast: %{y:,.2f}<extra></extra>",
+                meta=str(scenario),
             )
         )
     fig.update_layout(
@@ -2744,7 +2873,7 @@ def forecast_builder_figure(frame: pd.DataFrame) -> go.Figure:
         margin=dict(l=8, r=8, t=10, b=34),
         xaxis_title="Forecast quarter",
         yaxis_title="Forecast",
-        legend_title="Stream",
+        legend_title="Scenario / stream",
     )
     return fig
 
