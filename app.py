@@ -35,9 +35,10 @@ from model_dashboard.data.diagnostics import (
     select_diagnostic_acf_scope,
 )
 from model_dashboard.diagnostic_matrix import diagnostic_pass_matrix_html
-from model_dashboard.forecast_runner import (
+from model_dashboard.forecast_imports import (
     FORECAST_BUILDER_NOTE,
     FORECAST_BUILDER_TITLE,
+    FORECAST_RUNNER_IMPORT_ERROR,
     TEMPLATE_FILENAME,
     build_forecast_input_template_bytes,
     forecast_pack_zip_bytes,
@@ -173,7 +174,7 @@ from model_dashboard.ui import (
 
 
 LOADER_SCHEMA_VERSION = "stage1-governance-loader-v9-parquet-contract-schiff-class"
-STREAMLIT_IMPORT_SURFACE_REVISION = "2026-06-10-r2-ladder-wrapper-v2"
+STREAMLIT_IMPORT_SURFACE_REVISION = "2026-06-11-forecast-runner-wrapper-v1"
 CURATED_DATA_DIR = Path("artifacts") / "curated_data"
 REPRODUCIBILITY_PAGE = "Governance & Reproducibility"
 SOURCE_WORKBOOK_NAME = "Master Copy revenue modelling workbook.xlsx"
@@ -2515,6 +2516,14 @@ def render_forecast_builder_section() -> None:
     repo_root = Path(__file__).resolve().parent
     with st.expander(FORECAST_BUILDER_TITLE, expanded=False):
         info_panel(FORECAST_BUILDER_NOTE)
+        if FORECAST_RUNNER_IMPORT_ERROR:
+            warning_panel(
+                "Forecast Builder is unavailable in this runtime because optional workbook/forward-scorer imports "
+                "did not load. The dashboard evidence pack, KPIs, MAPE/R2, chart sources, finalists, scenarios, "
+                "stress tests and diagnostics still render from repo-local artifacts."
+            )
+            st.caption("Forecast Builder status: optional forecast-runner import unavailable.")
+            return
         template_bytes = build_forecast_input_template_bytes(repo_root)
         control_cols = st.columns([0.72, 1.28, 0.7, 0.9])
         with control_cols[0]:

@@ -85,8 +85,22 @@ REQUIRED_REPRODUCIBILITY_IMPORT_EXPORTS = {
     "r2_ladder_frames",
     "format_r2",
 }
+REQUIRED_FORECAST_IMPORT_EXPORTS = {
+    "FORECAST_BUILDER_NOTE",
+    "FORECAST_BUILDER_TITLE",
+    "FORECAST_RUNNER_IMPORT_ERROR",
+    "TEMPLATE_FILENAME",
+    "build_forecast_input_template_bytes",
+    "forecast_pack_zip_bytes",
+    "quarter_sort_key",
+    "run_forecast_workbook",
+    "sanitize_scenario_name",
+    "scenario_name_from_filename",
+    "validate_forecast_workbook",
+    "write_forecast_scenario_comparison",
+}
 R2_LADDER_DEP_FALLBACK_ENV = "NLTF_FORCE_R2_LADDER_DEP_FALLBACK"
-EXPECTED_IMPORT_SURFACE_REVISION = "2026-06-10-r2-ladder-wrapper-v2"
+EXPECTED_IMPORT_SURFACE_REVISION = "2026-06-11-forecast-runner-wrapper-v1"
 
 
 def normalise_requirement(line: str) -> str | None:
@@ -201,6 +215,7 @@ def assert_import_surface() -> None:
         sys.path.insert(0, str(ROOT))
 
     import app
+    import model_dashboard.forecast_imports as forecast_imports
     import model_dashboard.reproducibility_imports as reproducibility_imports
     import model_dashboard.ui as ui
 
@@ -217,6 +232,9 @@ def assert_import_surface() -> None:
     missing_repro = sorted(name for name in REQUIRED_REPRODUCIBILITY_IMPORT_EXPORTS if not hasattr(reproducibility_imports, name))
     if missing_repro:
         raise AssertionError("model_dashboard.reproducibility_imports is missing app.py exports: " + ", ".join(missing_repro))
+    missing_forecast = sorted(name for name in REQUIRED_FORECAST_IMPORT_EXPORTS if not hasattr(forecast_imports, name))
+    if missing_forecast:
+        raise AssertionError("model_dashboard.forecast_imports is missing app.py exports: " + ", ".join(missing_forecast))
 
 
 def assert_app_uses_cloud_safe_reproducibility_wrapper() -> None:
@@ -227,7 +245,19 @@ def assert_app_uses_cloud_safe_reproducibility_wrapper() -> None:
         raise AssertionError("app.py is missing the Streamlit Cloud-safe reproducibility import wrapper.")
 
 
-def assert_startup_import_subprocess(*, force_optional_fallback: bool = False) -> None:
+def assert_app_uses_cloud_safe_forecast_wrapper() -> None:
+    app_source = (ROOT / "app.py").read_text(encoding="utf-8")
+    if "from model_dashboard.forecast_runner import" in app_source:
+        raise AssertionError("app.py must import Forecast Builder symbols through model_dashboard.forecast_imports for Streamlit Cloud.")
+    if "from model_dashboard.forecast_imports import" not in app_source:
+        raise AssertionError("app.py is missing the Streamlit Cloud-safe Forecast Builder import wrapper.")
+
+
+def assert_startup_import_subprocess(
+    *,
+    force_optional_fallback: bool = False,
+    force_forecast_fallback: bool = False,
+) -> None:
     env = os.environ.copy()
     env["PYTHONPATH"] = str(ROOT) + os.pathsep + env.get("PYTHONPATH", "")
     env.pop("STAGE1_REQUIRE_FRONTEND_INTERACTIONS", None)
@@ -235,8 +265,13 @@ def assert_startup_import_subprocess(*, force_optional_fallback: bool = False) -
         env["NLTF_FORCE_REPRODUCIBILITY_IMPORT_FALLBACK"] = "1"
     else:
         env.pop("NLTF_FORCE_REPRODUCIBILITY_IMPORT_FALLBACK", None)
+    if force_forecast_fallback:
+        env["NLTF_FORCE_FORECAST_RUNNER_IMPORT_FALLBACK"] = "1"
+    else:
+        env.pop("NLTF_FORCE_FORECAST_RUNNER_IMPORT_FALLBACK", None)
     code = """
 import app
+from model_dashboard import forecast_imports as fi
 from model_dashboard import reproducibility_imports as ri
 from scripts.check_streamlit_deploy_readiness import EXPECTED_IMPORT_SURFACE_REVISION
 required = [
@@ -253,6 +288,8 @@ if not hasattr(ri, 'load_reproducibility_pack') or not hasattr(ri, 'diagnostics_
     raise SystemExit('missing reproducibility/R2 compatibility exports')
 if not hasattr(ri, 'r2_ladder_summary_frame') or not hasattr(ri, 'R2_LADDER_TITLE'):
     raise SystemExit('missing R2 ladder compatibility exports')
+if not hasattr(fi, 'build_forecast_input_template_bytes') or not hasattr(fi, 'FORECAST_RUNNER_IMPORT_ERROR'):
+    raise SystemExit('missing Forecast Builder compatibility exports')
 if getattr(app, 'STREAMLIT_IMPORT_SURFACE_REVISION', None) != EXPECTED_IMPORT_SURFACE_REVISION:
     raise SystemExit('stale app import surface revision')
 print('cloud import ok')
@@ -265,7 +302,12 @@ print('cloud import ok')
         capture_output=True,
     )
     if result.returncode != 0:
-        mode = "fallback" if force_optional_fallback else "normal"
+        modes = []
+        if force_optional_fallback:
+            modes.append("reproducibility fallback")
+        if force_forecast_fallback:
+            modes.append("forecast fallback")
+        mode = " + ".join(modes) if modes else "normal"
         raise AssertionError(
             f"Streamlit Cloud-style startup import failed in {mode} mode.\n"
             f"stdout:\n{result.stdout}\n"
@@ -338,9 +380,11 @@ def validate() -> None:
         raise AssertionError("Missing app.py.")
     assert_requirements()
     assert_app_uses_cloud_safe_reproducibility_wrapper()
+    assert_app_uses_cloud_safe_forecast_wrapper()
     assert_import_surface()
     assert_startup_import_subprocess(force_optional_fallback=False)
     assert_startup_import_subprocess(force_optional_fallback=True)
+    assert_startup_import_subprocess(force_forecast_fallback=True)
     assert_r2_ladder_direct_import_subprocess(force_dependency_fallback=False)
     assert_r2_ladder_direct_import_subprocess(force_dependency_fallback=True)
     assert_pack_shape()
