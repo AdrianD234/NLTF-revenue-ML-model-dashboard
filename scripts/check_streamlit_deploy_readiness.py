@@ -86,7 +86,7 @@ REQUIRED_REPRODUCIBILITY_IMPORT_EXPORTS = {
     "format_r2",
 }
 R2_LADDER_DEP_FALLBACK_ENV = "NLTF_FORCE_R2_LADDER_DEP_FALLBACK"
-EXPECTED_IMPORT_SURFACE_REVISION = "2026-06-10-r2-ladder-wrapper"
+EXPECTED_IMPORT_SURFACE_REVISION = "2026-06-10-r2-ladder-wrapper-v2"
 
 
 def normalise_requirement(line: str) -> str | None:
@@ -238,6 +238,7 @@ def assert_startup_import_subprocess(*, force_optional_fallback: bool = False) -
     code = """
 import app
 from model_dashboard import reproducibility_imports as ri
+from scripts.check_streamlit_deploy_readiness import EXPECTED_IMPORT_SURFACE_REVISION
 required = [
     'render_overview',
     'render_diagnostics',
@@ -252,6 +253,8 @@ if not hasattr(ri, 'load_reproducibility_pack') or not hasattr(ri, 'diagnostics_
     raise SystemExit('missing reproducibility/R2 compatibility exports')
 if not hasattr(ri, 'r2_ladder_summary_frame') or not hasattr(ri, 'R2_LADDER_TITLE'):
     raise SystemExit('missing R2 ladder compatibility exports')
+if getattr(app, 'STREAMLIT_IMPORT_SURFACE_REVISION', None) != EXPECTED_IMPORT_SURFACE_REVISION:
+    raise SystemExit('stale app import surface revision')
 print('cloud import ok')
 """
     result = subprocess.run(
