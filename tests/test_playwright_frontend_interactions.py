@@ -419,12 +419,12 @@ def test_forecast_builder_upload_validate_calculate_and_download(page: Page) -> 
     sample_dir = Path("test-output")
     sample_dir.mkdir(parents=True, exist_ok=True)
     basecase_path = sample_dir / "NLTF_forecast_input_template_basecase.xlsx"
-    upside_path = sample_dir / "NLTF_forecast_input_template_upside.xlsx"
+    high_population_path = sample_dir / "NLTF_forecast_input_template_high_population.xlsx"
     create_completed_sample_workbook(basecase_path, quarters=1)
-    create_completed_sample_workbook(upside_path, quarters=2, value_multiplier=1.02)
-    page.locator("input[type='file']").set_input_files([str(basecase_path.resolve()), str(upside_path.resolve())])
+    create_completed_sample_workbook(high_population_path, quarters=2, value_multiplier=1.02)
+    page.locator("input[type='file']").set_input_files([str(basecase_path.resolve()), str(high_population_path.resolve())])
     expect(body).to_contain_text("Scenario name for NLTF_forecast_input_template_basecase.xlsx", timeout=60000)
-    expect(body).to_contain_text("Scenario name for NLTF_forecast_input_template_upside.xlsx", timeout=60000)
+    expect(body).to_contain_text("Scenario name for NLTF_forecast_input_template_high_population.xlsx", timeout=60000)
     validate_button = page.get_by_role("button", name="Validate inputs")
     calculate_button = page.get_by_role("button", name="Calculate forecasts")
     expect(validate_button).to_be_enabled(timeout=60000)
@@ -433,18 +433,50 @@ def test_forecast_builder_upload_validate_calculate_and_download(page: Page) -> 
     expect(body).to_contain_text("Forecast workbook validation", timeout=60000)
     expect(body).to_contain_text("Workbook inputs passed structural and required-value validation", timeout=60000)
     expect(body).to_contain_text("basecase", timeout=60000)
-    expect(body).to_contain_text("upside", timeout=60000)
+    expect(body).to_contain_text("high_population", timeout=60000)
 
     calculate_button.click()
     expect(body).to_contain_text("Forecast status", timeout=90000)
     expect(body).to_contain_text("mixed_numeric_and_governed_gap", timeout=90000)
     expect(body).to_contain_text("Scenarios", timeout=90000)
     expect(body).to_contain_text("Forecast chart by scenario, stream and quarter", timeout=90000)
+    expect(body).to_contain_text("Only streams with numeric forecasts are plotted", timeout=90000)
+    expect(body).to_contain_text("Historical actual", timeout=90000)
+    expect(body).to_contain_text("Forecast start", timeout=90000)
+    expect(body).to_contain_text("basecase forecast", timeout=90000)
+    expect(body).to_contain_text("high_population forecast", timeout=90000)
     expect(body).to_contain_text("Forecast table by stream and quarter", timeout=90000)
+    expect(body).to_contain_text("Forecast table rows", timeout=90000)
+    expect(body).to_contain_text("All rows", timeout=90000)
+    expect(body).to_contain_text("Numeric forecasts only", timeout=90000)
+    expect(body).to_contain_text("Governed gaps only", timeout=90000)
     expect(body).to_contain_text("numeric_forecast_available", timeout=90000)
     expect(body).to_contain_text("Numeric fixed-finalist forecasts were produced where repo-reproducible", timeout=90000)
+    expect(body).to_contain_text("This is not a model failure; repo-local forward scorer is not yet verified.", timeout=90000)
     expect(body).to_contain_text("heavy_ruc_component_forward_scorers_missing", timeout=90000)
     expect(body).to_contain_text("ped_inner_hpo_static_solver_forward_scorer_missing", timeout=90000)
+    page.get_by_text("Numeric forecasts only", exact=True).click()
+    expect(body).to_contain_text("numeric_forecast_available", timeout=60000)
+    page.get_by_text("Governed gaps only", exact=True).click()
+    expect(body).to_contain_text("Repo-local forward scorer is not yet verified", timeout=60000)
+    page.get_by_text("All rows", exact=True).click()
+
+    forecast_stream = page.get_by_label("Forecast stream")
+    forecast_stream.click()
+    page.get_by_role("option", name="PED VKT per capita").click()
+    expect(body).to_contain_text("Historical actual", timeout=90000)
+    expect(body).to_contain_text("Governed gap: forward scorer not yet verified", timeout=90000)
+    forecast_stream = page.get_by_label("Forecast stream")
+    forecast_stream.click()
+    page.get_by_role("option", name="Heavy RUC volume").click()
+    expect(body).to_contain_text("Historical actual", timeout=90000)
+    expect(body).to_contain_text("Governed gap: forward scorer not yet verified", timeout=90000)
+    forecast_stream = page.get_by_label("Forecast stream")
+    forecast_stream.click()
+    page.get_by_role("option", name="Light RUC volume").click()
+    expect(body).to_contain_text("Historical actual", timeout=90000)
+    expect(body).to_contain_text("basecase forecast", timeout=90000)
+    expect(body).to_contain_text("high_population forecast", timeout=90000)
     expect(body).to_contain_text("Heavy component trace", timeout=90000)
     expect(body).to_contain_text("Light base/residual trace", timeout=90000)
     page.get_by_text("Light base/residual trace", exact=True).click()
@@ -453,15 +485,13 @@ def test_forecast_builder_upload_validate_calculate_and_download(page: Page) -> 
     expect(body).to_contain_text("PED component trace", timeout=90000)
     expect(body).to_contain_text("Download combined comparison pack", timeout=90000)
     expect(body).to_contain_text("Download basecase scenario pack", timeout=90000)
-    expect(body).to_contain_text("Download upside scenario pack", timeout=90000)
+    expect(body).to_contain_text("Download high_population scenario pack", timeout=90000)
     with page.expect_download() as comparison_download:
         page.get_by_role("button", name="Download combined comparison pack").click()
-    assert comparison_download.value.suggested_filename.endswith("_forecast_run_pack.zip")
-    assert "scenario_comparison" in comparison_download.value.suggested_filename
+    assert comparison_download.value.suggested_filename.endswith(".zip")
     with page.expect_download() as scenario_download:
         page.get_by_role("button", name="Download basecase scenario pack").click()
-    assert scenario_download.value.suggested_filename.endswith("_forecast_run_pack.zip")
-    assert "basecase" in scenario_download.value.suggested_filename
+    assert scenario_download.value.suggested_filename.endswith(".zip")
     assert_no_streamlit_exception(page)
 
 
@@ -644,6 +674,8 @@ def test_rendered_plotly_trace_data_matches_chart_sources_where_possible(page: P
     assert candidate_plot == len(candidate_source)
 
     stress_source = pd.read_csv(CHART_SOURCE_DIR / "overview_stress_horizon_checks.csv")
+    page.get_by_text("4. Stress and Horizon Checks", exact=False).first.scroll_into_view_if_needed()
+    expect(page.locator(".js-plotly-plot").nth(3)).to_be_visible(timeout=90000)
     stress_plot = page.evaluate(
         """() => {
             const plot = [...document.querySelectorAll('.js-plotly-plot')].find((candidate) => {

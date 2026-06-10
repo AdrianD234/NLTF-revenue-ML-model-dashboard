@@ -45,10 +45,14 @@ Every scenario run writes:
 - `forecast_assumptions.csv`
 - `forecast_capability_report.parquet`
 - `forecast_capability_report.csv`
+- `forecast_chart_rows.parquet`
+- `forecast_chart_rows.csv`
 - `forecast_run_manifest.json`
 - `forecast_validation_report.md`
 
 CSV mirrors are generated artifacts for user download only. They must not feed dashboard evidence calculations.
+
+`forecast_chart_rows.*` is a display/export artifact. It may include `historical_actual` rows sourced from `data/model_input_history` or governed evidence-pack actuals, plus `future_forecast` rows copied from the isolated future forecast output. Historical rows must never be written into `future_forecasts.*` and must not change forecast horizon metadata.
 
 ## Manifest Contract
 
@@ -67,6 +71,7 @@ CSV mirrors are generated artifacts for user download only. They must not feed d
 - `chart_sources_modified: false`;
 - numeric and governed-gap stream lists;
 - stream-level model capability status and gap code.
+- output-file entries for generated display artifacts such as `forecast_chart_rows.*`.
 
 ## Scenario Comparison Contract
 
@@ -80,9 +85,13 @@ with:
 - `forecast_scenario_comparison.csv`
 - `forecast_scenario_capability_report.parquet`
 - `forecast_scenario_capability_report.csv`
+- `forecast_scenario_chart_rows.parquet`
+- `forecast_scenario_chart_rows.csv`
 - `forecast_scenario_comparison_manifest.json`
 
 The combined pack must preserve each scenario's `scenario_name`, workbook metadata, horizon metadata and capability status. It is a generated comparison artifact and does not alter governed evidence-pack or chart-source calculations.
+
+Combined chart rows must de-duplicate `historical_actual` rows by stream and period while preserving every scenario's `future_forecast` rows.
 
 ## Capability Rules
 

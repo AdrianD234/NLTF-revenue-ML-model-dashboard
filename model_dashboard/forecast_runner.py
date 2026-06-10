@@ -23,7 +23,7 @@ MIN_FORECAST_HORIZON_QUARTERS = 1
 FORECAST_HORIZON_QUARTERS = DEFAULT_FORECAST_HORIZON_QUARTERS
 TEMPLATE_FILENAME_PREFIX = "NLTF_forecast_input_template"
 TEMPLATE_FILENAME = f"{TEMPLATE_FILENAME_PREFIX}_{DEFAULT_FORECAST_HORIZON_QUARTERS}q.xlsx"
-FORECAST_RUNNER_VERSION = "forecast-runner-v3-variable-horizon-scenario-comparison"
+FORECAST_RUNNER_VERSION = "forecast-runner-v4-forecast-display-history"
 FORECAST_BUILDER_TITLE = "Forecast Builder"
 FORECAST_BUILDER_NOTE = (
     "This workflow creates forward forecasts or governed missing-capability gaps from a user-supplied "
@@ -243,6 +243,7 @@ class ForecastRunResult:
     future_forecasts: pd.DataFrame
     component_forecasts: pd.DataFrame
     capability_report: pd.DataFrame
+    forecast_chart_rows: pd.DataFrame
     assumptions: pd.DataFrame
     report_markdown: str
 
@@ -260,6 +261,7 @@ class ForecastScenarioComparisonResult:
     scenario_results: list[ForecastRunResult]
     future_forecasts: pd.DataFrame
     capability_report: pd.DataFrame
+    forecast_chart_rows: pd.DataFrame
 
 
 def repo_root_from_here() -> Path:
@@ -627,6 +629,7 @@ def run_forecast_workbook(
     _add_scenario_columns(components, scenario)
     _add_scenario_columns(assumptions, scenario)
     capability_report = _forecast_capability_report(capabilities, future, components, validation, scenario_name=scenario)
+    chart_rows = forecast_chart_rows_for_display(future, repo_root=root, latest_actual_period=validation.latest_actual_period)
     report = _forecast_validation_report(validation, capabilities)
     forecast_status = _forecast_status(validation, future)
     manifest = {
@@ -661,12 +664,14 @@ def run_forecast_workbook(
             "component_forecasts.parquet",
             "forecast_assumptions.parquet",
             "forecast_capability_report.parquet",
+            "forecast_chart_rows.parquet",
             "forecast_run_manifest.json",
             "forecast_validation_report.md",
             "future_forecasts.csv",
             "component_forecasts.csv",
             "forecast_assumptions.csv",
             "forecast_capability_report.csv",
+            "forecast_chart_rows.csv",
         ],
     }
 
@@ -674,10 +679,12 @@ def run_forecast_workbook(
     components.to_parquet(run_dir / "component_forecasts.parquet", index=False)
     assumptions.to_parquet(run_dir / "forecast_assumptions.parquet", index=False)
     capability_report.to_parquet(run_dir / "forecast_capability_report.parquet", index=False)
+    chart_rows.to_parquet(run_dir / "forecast_chart_rows.parquet", index=False)
     future.to_csv(run_dir / "future_forecasts.csv", index=False)
     components.to_csv(run_dir / "component_forecasts.csv", index=False)
     assumptions.to_csv(run_dir / "forecast_assumptions.csv", index=False)
     capability_report.to_csv(run_dir / "forecast_capability_report.csv", index=False)
+    chart_rows.to_csv(run_dir / "forecast_chart_rows.csv", index=False)
     (run_dir / "forecast_run_manifest.json").write_text(json.dumps(manifest, indent=2, allow_nan=False), encoding="utf-8")
     (run_dir / "forecast_validation_report.md").write_text(report, encoding="utf-8")
 
@@ -688,6 +695,7 @@ def run_forecast_workbook(
         future_forecasts=future,
         component_forecasts=components,
         capability_report=capability_report,
+        forecast_chart_rows=chart_rows,
         assumptions=assumptions,
         report_markdown=report,
     )
@@ -701,6 +709,167 @@ def forecast_pack_zip_bytes(output_dir: Path | str) -> bytes:
             if path.is_file():
                 zf.write(path, arcname=path.name)
     return stream.getvalue()
+
+
+def forecast_chart_rows_for_display(
+    future_forecasts: pd.DataFrame,
+    *,
+    repo_root: Path | str | None = None,
+    latest_actual_period: str | None = None,
+) -> pd.DataFrame:
+    root = Path(repo_root) if repo_root is not None else repo_root_from_here()
+    latest = latest_actual_period or latest_known_actual_period(root)
+    streams = (
+        future_forecasts["stream"].dropna().astype(str).unique().tolist()
+        if future_forecasts is not None and not future_forecasts.empty and "stream" in future_forecasts.columns
+        else STREAM_ORDER
+    )
+    historical = historical_actual_rows(root, latest_actual_period=latest, streams=streams)
+    future = _future_forecast_chart_rows(future_forecasts)
+    chart_rows = pd.concat([historical, future], ignore_index=True, sort=False)
+    if chart_rows.empty:
+        return chart_rows
+    chart_rows["period_key"] = chart_rows["period"].map(lambda value: quarter_sort_key(str(value)))
+    chart_rows = chart_rows.sort_values(["stream", "row_type", "scenario_name", "period_key"], kind="stable").drop(columns=["period_key"])
+    return chart_rows.reset_index(drop=True)
+
+
+def historical_actual_rows(
+    repo_root: Path | str | None = None,
+    *,
+    latest_actual_period: str | None = None,
+    streams: list[str] | tuple[str, ...] | None = None,
+) -> pd.DataFrame:
+    root = Path(repo_root) if repo_root is not None else repo_root_from_here()
+    latest = latest_actual_period or latest_known_actual_period(root)
+    selected_streams = list(streams) if streams is not None else list(STREAM_ORDER)
+    rows: list[dict[str, Any]] = []
+    for stream in selected_streams:
+        rows.extend(_model_input_history_rows(root, stream, latest))
+    if rows:
+        return pd.DataFrame(rows)
+    return _evidence_pack_actual_rows(root, selected_streams, latest)
+
+
+def _model_input_history_rows(root: Path, stream: str, latest_actual_period: str) -> list[dict[str, Any]]:
+    path = root / MODEL_INPUT_HISTORY_DIR / MODEL_INPUT_HISTORY_FILES.get(stream, "")
+    if not path.exists():
+        return []
+    try:
+        frame = pd.read_parquet(path, columns=["period", "target"])
+    except Exception:
+        frame = pd.read_parquet(path)
+    if {"period", "target"}.difference(frame.columns):
+        return []
+    source = frame[["period", "target"]].copy()
+    source["period"] = source["period"].astype(str).str.upper()
+    source["value"] = pd.to_numeric(source["target"], errors="coerce")
+    source = source[source["period"].map(lambda value: quarter_sort_key(str(value)) <= quarter_sort_key(latest_actual_period))]
+    source = source[source["value"].gt(0)].copy()
+    source = source.sort_values("period", key=lambda series: series.map(quarter_sort_key))
+    return [
+        {
+            "row_type": "historical_actual",
+            "scenario_name": "historical_actual",
+            "stream": stream,
+            "stream_label": STREAM_LABELS.get(stream, stream),
+            "period": str(row["period"]),
+            "target_period": str(row["period"]),
+            "value": float(row["value"]),
+            "availability_status": "historical_actual",
+            "forecast_available": pd.NA,
+            "gap_code": None,
+            "gap_reason": "",
+            "source": _repo_relative(root, path),
+        }
+        for _, row in source.iterrows()
+    ]
+
+
+def _evidence_pack_actual_rows(root: Path, streams: list[str], latest_actual_period: str) -> pd.DataFrame:
+    path = root / "data" / "dashboard_evidence_pack" / "data" / "scorecard_predictions.parquet"
+    if not path.exists():
+        return pd.DataFrame()
+    try:
+        frame = pd.read_parquet(path, columns=["stream", "stream_label", "target_period", "actual", "scenario"])
+    except Exception:
+        frame = pd.read_parquet(path)
+    required = {"stream", "target_period", "actual"}
+    if required.difference(frame.columns):
+        return pd.DataFrame()
+    source = frame.copy()
+    if "scenario" in source.columns:
+        source = source[source["scenario"].astype(str).str.casefold().eq("finalist")].copy()
+    source = source[source["stream"].astype(str).isin(streams)].copy()
+    source["period"] = source["target_period"].astype(str).str.upper()
+    source["value"] = pd.to_numeric(source["actual"], errors="coerce")
+    source = source[source["period"].map(lambda value: quarter_sort_key(str(value)) <= quarter_sort_key(latest_actual_period))]
+    source = source[source["value"].notna()].copy()
+    source = source.drop_duplicates(subset=["stream", "period"]).sort_values(["stream", "period"])
+    rows = [
+        {
+            "row_type": "historical_actual",
+            "scenario_name": "historical_actual",
+            "stream": str(row["stream"]),
+            "stream_label": row.get("stream_label", STREAM_LABELS.get(str(row["stream"]), str(row["stream"]))),
+            "period": str(row["period"]),
+            "target_period": str(row["period"]),
+            "value": float(row["value"]),
+            "availability_status": "historical_actual",
+            "forecast_available": pd.NA,
+            "gap_code": None,
+            "gap_reason": "",
+            "source": _repo_relative(root, path),
+        }
+        for _, row in source.iterrows()
+    ]
+    return pd.DataFrame(rows)
+
+
+def _future_forecast_chart_rows(future_forecasts: pd.DataFrame) -> pd.DataFrame:
+    if future_forecasts is None or future_forecasts.empty:
+        return pd.DataFrame()
+    source = future_forecasts.copy()
+    if "scenario_name" not in source.columns:
+        source["scenario_name"] = "scenario"
+    rows: list[dict[str, Any]] = []
+    for _, row in source.iterrows():
+        period = str(row.get("target_period", row.get("period", ""))).upper()
+        value = pd.to_numeric(row.get("forecast"), errors="coerce")
+        rows.append(
+            {
+                "row_type": "future_forecast",
+                "scenario_name": str(row.get("scenario_name", "scenario")),
+                "stream": str(row.get("stream", "")),
+                "stream_label": row.get("stream_label"),
+                "period": period,
+                "target_period": period,
+                "value": float(value) if pd.notna(value) else pd.NA,
+                "availability_status": row.get("availability_status"),
+                "forecast_available": row.get("forecast_available"),
+                "gap_code": row.get("gap_code"),
+                "gap_reason": row.get("gap_reason"),
+                "source": "future_forecasts",
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def _combine_forecast_chart_rows(scenario_results: list[ForecastRunResult]) -> pd.DataFrame:
+    if not scenario_results:
+        return pd.DataFrame()
+    rows = pd.concat([result.forecast_chart_rows for result in scenario_results], ignore_index=True, sort=False)
+    if rows.empty:
+        return rows
+    historical = rows[rows["row_type"].astype(str).eq("historical_actual")].drop_duplicates(
+        subset=["row_type", "stream", "period"],
+        keep="first",
+    )
+    future = rows[~rows["row_type"].astype(str).eq("historical_actual")]
+    combined = pd.concat([historical, future], ignore_index=True, sort=False)
+    combined["period_key"] = combined["period"].map(lambda value: quarter_sort_key(str(value)))
+    combined = combined.sort_values(["stream", "row_type", "scenario_name", "period_key"], kind="stable").drop(columns=["period_key"])
+    return combined.reset_index(drop=True)
 
 
 def write_forecast_scenario_comparison(
@@ -724,6 +893,7 @@ def write_forecast_scenario_comparison(
         if scenario_results
         else pd.DataFrame()
     )
+    chart_rows = _combine_forecast_chart_rows(scenario_results)
     manifest = {
         "comparison_id": comparison_id,
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -752,6 +922,8 @@ def write_forecast_scenario_comparison(
             "forecast_scenario_comparison.csv",
             "forecast_scenario_capability_report.parquet",
             "forecast_scenario_capability_report.csv",
+            "forecast_scenario_chart_rows.parquet",
+            "forecast_scenario_chart_rows.csv",
             "forecast_scenario_comparison_manifest.json",
         ],
     }
@@ -759,6 +931,8 @@ def write_forecast_scenario_comparison(
     future.to_csv(comparison_dir / "forecast_scenario_comparison.csv", index=False)
     capability.to_parquet(comparison_dir / "forecast_scenario_capability_report.parquet", index=False)
     capability.to_csv(comparison_dir / "forecast_scenario_capability_report.csv", index=False)
+    chart_rows.to_parquet(comparison_dir / "forecast_scenario_chart_rows.parquet", index=False)
+    chart_rows.to_csv(comparison_dir / "forecast_scenario_chart_rows.csv", index=False)
     (comparison_dir / "forecast_scenario_comparison_manifest.json").write_text(
         json.dumps(manifest, indent=2, allow_nan=False),
         encoding="utf-8",
@@ -769,6 +943,7 @@ def write_forecast_scenario_comparison(
         scenario_results=scenario_results,
         future_forecasts=future,
         capability_report=capability,
+        forecast_chart_rows=chart_rows,
     )
 
 

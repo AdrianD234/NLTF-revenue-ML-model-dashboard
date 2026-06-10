@@ -10,8 +10,10 @@ from pathlib import Path
 from typing import Any
 import zipfile
 
+import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import streamlit as st
 
 from model_dashboard.data_loader import (
@@ -39,6 +41,7 @@ from model_dashboard.forecast_runner import (
     TEMPLATE_FILENAME,
     build_forecast_input_template_bytes,
     forecast_pack_zip_bytes,
+    quarter_sort_key,
     run_forecast_workbook,
     sanitize_scenario_name,
     scenario_name_from_filename,
@@ -2632,6 +2635,11 @@ def render_forecast_builder_results(results: list[Any], comparison: Any | None) 
         if comparison is not None and isinstance(getattr(comparison, "capability_report", None), pd.DataFrame)
         else pd.concat([result.capability_report for result in results], ignore_index=True, sort=False)
     )
+    chart_rows_combined = (
+        comparison.forecast_chart_rows.copy()
+        if comparison is not None and isinstance(getattr(comparison, "forecast_chart_rows", None), pd.DataFrame)
+        else _combine_forecast_builder_chart_rows(results)
+    )
     component_combined = pd.concat([result.component_forecasts for result in results], ignore_index=True, sort=False)
     statuses = {str(result.manifest.get("forecast_status", "unknown")) for result in results}
     status = statuses.pop() if len(statuses) == 1 else "scenario_comparison"
@@ -2649,29 +2657,50 @@ def render_forecast_builder_results(results: list[Any], comparison: Any | None) 
         st.markdown("<div class='page5-panel-title'>Forecast capability by stream</div>", unsafe_allow_html=True)
         display_table(_forecast_builder_capability_table(capability_combined), height=160, max_rows=60)
     stream_options = ["All streams"] + sorted(future_combined["stream_label"].dropna().astype(str).unique().tolist())
-    selected_stream = st.selectbox("Forecast stream", stream_options, key="forecast_builder_stream")
+    filter_cols = st.columns([0.42, 0.58])
+    with filter_cols[0]:
+        selected_stream = st.selectbox("Forecast stream", stream_options, key="forecast_builder_stream")
+    with filter_cols[1]:
+        row_filter = st.radio(
+            "Forecast table rows",
+            ["All rows", "Numeric forecasts only", "Governed gaps only"],
+            horizontal=True,
+            key="forecast_builder_row_filter",
+        )
     future = future_combined.copy()
     components = component_combined.copy()
+    chart_rows = chart_rows_combined.copy()
     if selected_stream != "All streams":
         future = future[future["stream_label"].astype(str).eq(selected_stream)].copy()
         components = components[components["stream_label"].astype(str).eq(selected_stream)].copy()
+        chart_rows = chart_rows[chart_rows["stream_label"].astype(str).eq(selected_stream)].copy()
 
+    future_for_table = _filter_forecast_builder_rows(future, row_filter)
     st.markdown("<div class='page5-panel-title'>Forecast table by stream and quarter</div>", unsafe_allow_html=True)
-    display_table(_forecast_builder_table(future), height=240, max_rows=60)
+    display_table(_forecast_builder_table(future_for_table), height=240, max_rows=60)
     chart_card(
         "Forecast chart by scenario, stream and quarter",
-        "Numeric forecasts are plotted together for uploaded scenarios; governed gaps stay visible in the tables.",
-        forecast_builder_figure(future),
+        "Only streams with numeric forecasts are plotted; governed-gap streams remain visible in the table/capability report.",
+        forecast_builder_figure(chart_rows, future),
         notes_as_tooltip=False,
     )
+    st.caption("Forecast start marker indicates the first forecast quarter after the latest historical actual.")
     has_gap_rows = "forecast_available" in future.columns and (~future["forecast_available"].fillna(False).astype(bool)).any()
     has_numeric_forecasts = pd.to_numeric(future_combined.get("forecast"), errors="coerce").notna().any()
     if not has_numeric_forecasts:
-        warning_panel("Governed missing-capability gaps were written instead of fake forecasts because fitted finalist states are not repo-local.")
+        warning_panel(
+            "Governed missing-capability gaps were written instead of fake forecasts. "
+            "This is not a model failure; repo-local forward scorer is not yet verified."
+        )
     elif has_gap_rows:
         warning_panel(
-            "Numeric fixed-finalist forecasts were produced where repo-reproducible; unsupported streams were kept as governed gaps."
+            "Numeric fixed-finalist forecasts were produced where repo-reproducible; unsupported streams were kept as governed gaps. "
+            "This is not a model failure; repo-local forward scorer is not yet verified."
         )
+    gap_detail = _forecast_builder_gap_detail_table(future)
+    if not gap_detail.empty:
+        with st.expander("Full governed-gap rationale", expanded=False):
+            display_table(gap_detail, height=240, max_rows=80)
 
     tabs = st.tabs(["Heavy component trace", "Light base/residual trace", "PED component trace"])
     trace_filters = [
@@ -2739,9 +2768,89 @@ def _forecast_builder_validation_table(rows: list[dict[str, Any]]) -> pd.DataFra
     return pd.DataFrame(output)
 
 
+def _combine_forecast_builder_chart_rows(results: list[Any]) -> pd.DataFrame:
+    frames = [
+        result.forecast_chart_rows
+        for result in results
+        if isinstance(getattr(result, "forecast_chart_rows", None), pd.DataFrame)
+    ]
+    if not frames:
+        return pd.DataFrame()
+    rows = pd.concat(frames, ignore_index=True, sort=False)
+    if rows.empty or "row_type" not in rows.columns:
+        return rows
+    historical = rows[rows["row_type"].astype(str).eq("historical_actual")].drop_duplicates(
+        subset=[column for column in ["row_type", "stream", "period"] if column in rows.columns],
+        keep="first",
+    )
+    future = rows[~rows["row_type"].astype(str).eq("historical_actual")]
+    return pd.concat([historical, future], ignore_index=True, sort=False)
+
+
+def _filter_forecast_builder_rows(frame: pd.DataFrame, row_filter: str) -> pd.DataFrame:
+    if frame is None or frame.empty or "forecast_available" not in frame.columns:
+        return frame
+    available = frame["forecast_available"].fillna(False).astype(bool)
+    if row_filter == "Numeric forecasts only":
+        return frame[available].copy()
+    if row_filter == "Governed gaps only":
+        return frame[~available].copy()
+    return frame.copy()
+
+
+def _sort_forecast_builder_rows(frame: pd.DataFrame) -> pd.DataFrame:
+    if frame is None or frame.empty:
+        return frame
+    output = frame.copy()
+    available = output.get("forecast_available", pd.Series(False, index=output.index)).fillna(False).astype(bool)
+    output["_availability_rank"] = np.where(available, 0, 1)
+    if "target_period" in output.columns:
+        output["_period_key"] = output["target_period"].astype(str).map(_forecast_builder_period_key)
+    else:
+        output["_period_key"] = range(len(output))
+    sort_columns = [column for column in ["_availability_rank", "stream_label", "scenario_name", "_period_key"] if column in output.columns]
+    return output.sort_values(sort_columns, kind="stable").drop(columns=["_availability_rank", "_period_key"], errors="ignore")
+
+
+def _forecast_builder_period_key(value: Any) -> int:
+    try:
+        return quarter_sort_key(str(value))
+    except Exception:
+        return 0
+
+
+def _short_forecast_gap_reason(row: pd.Series) -> str:
+    status = str(row.get("availability_status", ""))
+    gap_code = str(row.get("gap_code", ""))
+    if status == "validation_failed" or gap_code == "input_validation_failed":
+        return "Input validation failed."
+    if gap_code and gap_code not in {"None", "<NA>", "nan"}:
+        return "Repo-local forward scorer is not yet verified. This is not a model failure."
+    return ""
+
+
+def _forecast_builder_gap_detail_table(frame: pd.DataFrame) -> pd.DataFrame:
+    if frame is None or frame.empty or "forecast_available" not in frame.columns:
+        return pd.DataFrame()
+    gaps = frame[~frame["forecast_available"].fillna(False).astype(bool)].copy()
+    if gaps.empty:
+        return pd.DataFrame()
+    columns = [column for column in ["scenario_name", "stream_label", "gap_code", "gap_reason"] if column in gaps.columns]
+    detail = gaps[columns].drop_duplicates().copy()
+    return detail.rename(
+        columns={
+            "scenario_name": "Scenario",
+            "stream_label": "Stream",
+            "gap_code": "Gap code",
+            "gap_reason": "Full rationale",
+        }
+    )
+
+
 def _forecast_builder_table(frame: pd.DataFrame) -> pd.DataFrame:
     if frame is None or frame.empty:
         return pd.DataFrame()
+    frame = _sort_forecast_builder_rows(frame)
     columns = [
         "scenario_name",
         "stream_label",
@@ -2755,6 +2864,8 @@ def _forecast_builder_table(frame: pd.DataFrame) -> pd.DataFrame:
         "gap_reason",
     ]
     table = frame[[column for column in columns if column in frame.columns]].copy()
+    if "gap_reason" in table.columns:
+        table["gap_reason"] = frame.apply(_short_forecast_gap_reason, axis=1)
     return table.rename(
         columns={
             "scenario_name": "Scenario",
@@ -2774,6 +2885,7 @@ def _forecast_builder_table(frame: pd.DataFrame) -> pd.DataFrame:
 def _forecast_builder_capability_table(frame: pd.DataFrame) -> pd.DataFrame:
     if frame is None or frame.empty:
         return pd.DataFrame()
+    frame = _sort_forecast_builder_rows(frame)
     columns = [
         "scenario_name",
         "stream_label",
@@ -2785,6 +2897,8 @@ def _forecast_builder_capability_table(frame: pd.DataFrame) -> pd.DataFrame:
         "gap_reason",
     ]
     table = frame[[column for column in columns if column in frame.columns]].copy()
+    if "gap_reason" in table.columns:
+        table["gap_reason"] = frame.apply(_short_forecast_gap_reason, axis=1)
     return table.rename(
         columns={
             "scenario_name": "Scenario",
@@ -2802,6 +2916,7 @@ def _forecast_builder_capability_table(frame: pd.DataFrame) -> pd.DataFrame:
 def _forecast_builder_component_table(frame: pd.DataFrame) -> pd.DataFrame:
     if frame is None or frame.empty:
         return pd.DataFrame()
+    frame = _sort_forecast_builder_rows(frame.rename(columns={"target_period": "target_period"}))
     columns = [
         "scenario_name",
         "stream_label",
@@ -2818,6 +2933,8 @@ def _forecast_builder_component_table(frame: pd.DataFrame) -> pd.DataFrame:
         "gap_reason",
     ]
     table = frame[[column for column in columns if column in frame.columns]].copy()
+    if "gap_reason" in table.columns:
+        table["gap_reason"] = frame.apply(_short_forecast_gap_reason, axis=1)
     return table.rename(
         columns={
             "scenario_name": "Scenario",
@@ -2837,45 +2954,163 @@ def _forecast_builder_component_table(frame: pd.DataFrame) -> pd.DataFrame:
     )
 
 
-def forecast_builder_figure(frame: pd.DataFrame) -> go.Figure:
-    if frame is None or frame.empty:
-        return empty_figure("No forecast-run rows are available.")
-    data = frame.copy()
-    data["forecast_numeric"] = pd.to_numeric(data.get("forecast"), errors="coerce")
-    data = data.dropna(subset=["forecast_numeric"])
-    if data.empty:
-        return empty_figure("Governed gaps only: fitted finalist state is not available for forward scoring.")
-    fig = go.Figure()
-    if "scenario_name" not in data.columns:
-        data["scenario_name"] = "scenario"
-    scenario_values = sorted(data["scenario_name"].dropna().astype(str).unique().tolist())
+def forecast_builder_figure(chart_rows: pd.DataFrame, future_rows: pd.DataFrame | None = None) -> go.Figure:
+    if chart_rows is None or chart_rows.empty:
+        return empty_figure("No forecast chart rows are available.")
+    data = chart_rows.copy()
+    data["value_numeric"] = pd.to_numeric(data.get("value"), errors="coerce")
+    data["period_key"] = data["period"].astype(str).map(_forecast_builder_period_key)
+    data = data.sort_values(["stream_label", "row_type", "scenario_name", "period_key"], kind="stable")
+    stream_labels = data["stream_label"].dropna().astype(str).unique().tolist()
+    if not stream_labels:
+        return empty_figure("No stream rows are available for forecast display.")
+
+    rows = len(stream_labels)
+    fig = make_subplots(
+        rows=rows,
+        cols=1,
+        shared_xaxes=False,
+        vertical_spacing=0.075 if rows > 1 else 0.04,
+        subplot_titles=stream_labels if rows > 1 else None,
+    )
     palette = ["#002B5C", "#008C82", "#7C3AED", "#B45309", "#BE123C", "#475569"]
     dashes = ["solid", "dash", "dot", "dashdot", "longdash", "longdashdot"]
+    scenario_values = sorted(
+        data.loc[data["row_type"].astype(str).eq("future_forecast"), "scenario_name"].dropna().astype(str).unique().tolist()
+    )
     scenario_style = {
         scenario: {"color": palette[index % len(palette)], "dash": dashes[index % len(dashes)]}
         for index, scenario in enumerate(scenario_values)
     }
-    for (scenario, stream_label), group in data.groupby(["scenario_name", "stream_label"], dropna=False):
-        style = scenario_style.get(str(scenario), scenario_style[scenario_values[0]])
-        fig.add_trace(
-            go.Scatter(
-                x=group["target_period"],
-                y=group["forecast_numeric"],
-                mode="lines+markers",
-                name=f"{scenario} - {stream_label}",
-                line=dict(color=style["color"], dash=style["dash"]),
-                hovertemplate="Scenario: %{meta}<br>Quarter: %{x}<br>Forecast: %{y:,.2f}<extra></extra>",
-                meta=str(scenario),
+    shown_legend: set[str] = set()
+    forecast_start = _forecast_builder_start_period(data)
+
+    for row_index, stream_label in enumerate(stream_labels, start=1):
+        stream_data = data[data["stream_label"].astype(str).eq(stream_label)].copy()
+        historical = stream_data[stream_data["row_type"].astype(str).eq("historical_actual")].dropna(subset=["value_numeric"])
+        if not historical.empty:
+            showlegend = "historical_actual" not in shown_legend
+            shown_legend.add("historical_actual")
+            fig.add_trace(
+                go.Scatter(
+                    x=historical["period"],
+                    y=historical["value_numeric"],
+                    mode="lines",
+                    name="Historical actual",
+                    legendgroup="historical_actual",
+                    showlegend=showlegend,
+                    line=dict(color="#475569", width=2.2),
+                    hovertemplate="Historical actual<br>Quarter: %{x}<br>Value: %{y:,.2f}<extra></extra>",
+                ),
+                row=row_index,
+                col=1,
             )
-        )
+        future = stream_data[stream_data["row_type"].astype(str).eq("future_forecast")].dropna(subset=["value_numeric"])
+        for scenario, group in future.groupby("scenario_name", dropna=False):
+            scenario_text = str(scenario)
+            style = scenario_style.get(scenario_text, {"color": "#002B5C", "dash": "solid"})
+            legend_key = f"forecast_{scenario_text}"
+            showlegend = legend_key not in shown_legend
+            shown_legend.add(legend_key)
+            fig.add_trace(
+                go.Scatter(
+                    x=group["period"],
+                    y=group["value_numeric"],
+                    mode="lines+markers",
+                    name=f"{scenario_text} forecast",
+                    legendgroup=legend_key,
+                    showlegend=showlegend,
+                    line=dict(color=style["color"], dash=style["dash"], width=2.4),
+                    marker=dict(size=6),
+                    hovertemplate=(
+                        f"Scenario: {html.escape(scenario_text)}<br>"
+                        "Quarter: %{x}<br>Forecast: %{y:,.2f}<extra></extra>"
+                    ),
+                ),
+                row=row_index,
+                col=1,
+            )
+        if forecast_start:
+            fig.add_vline(
+                x=forecast_start,
+                line_color="#64748B",
+                line_dash="dot",
+                line_width=1.4,
+                row=row_index,
+                col=1,
+            )
+            y_anchor = _forecast_builder_annotation_y(historical, future)
+            fig.add_annotation(
+                x=forecast_start,
+                y=y_anchor,
+                text="Forecast start",
+                showarrow=True,
+                arrowhead=2,
+                ax=18,
+                ay=-24,
+                font=dict(size=10, color="#334155"),
+                bgcolor="rgba(255,255,255,0.88)",
+                bordercolor="#CBD5E1",
+                borderwidth=1,
+                row=row_index,
+                col=1,
+            )
+        if future.empty and _stream_has_governed_gap(future_rows, stream_label):
+            y_anchor = _forecast_builder_annotation_y(historical, future)
+            x_anchor = historical["period"].iloc[-1] if not historical.empty else forecast_start
+            fig.add_annotation(
+                x=x_anchor,
+                y=y_anchor,
+                text="Governed gap: forward scorer not yet verified",
+                showarrow=False,
+                font=dict(size=11, color="#92400E"),
+                bgcolor="rgba(255,247,237,0.94)",
+                bordercolor="#FDBA74",
+                borderwidth=1,
+                row=row_index,
+                col=1,
+            )
+        fig.update_yaxes(title_text="Value", row=row_index, col=1)
+        fig.update_xaxes(title_text="Quarter" if row_index == rows else "", row=row_index, col=1)
+
     fig.update_layout(
-        height=320,
-        margin=dict(l=8, r=8, t=10, b=34),
-        xaxis_title="Forecast quarter",
-        yaxis_title="Forecast",
-        legend_title="Scenario / stream",
+        height=max(360, 235 * rows),
+        margin=dict(l=8, r=8, t=34 if rows > 1 else 10, b=34),
+        legend_title="Forecast display",
+        hovermode="x unified" if rows == 1 else "closest",
     )
     return fig
+
+
+def _forecast_builder_start_period(chart_rows: pd.DataFrame) -> str | None:
+    future = chart_rows[chart_rows["row_type"].astype(str).eq("future_forecast")].copy()
+    if future.empty:
+        return None
+    future["period_key"] = future["period"].astype(str).map(_forecast_builder_period_key)
+    future = future.sort_values("period_key")
+    return str(future.iloc[0]["period"])
+
+
+def _forecast_builder_annotation_y(historical: pd.DataFrame, future: pd.DataFrame) -> float:
+    values = pd.concat(
+        [
+            pd.to_numeric(historical.get("value_numeric", pd.Series(dtype=float)), errors="coerce"),
+            pd.to_numeric(future.get("value_numeric", pd.Series(dtype=float)), errors="coerce"),
+        ],
+        ignore_index=True,
+    ).dropna()
+    if values.empty:
+        return 1.0
+    return float(values.max())
+
+
+def _stream_has_governed_gap(future_rows: pd.DataFrame | None, stream_label: str) -> bool:
+    if future_rows is None or future_rows.empty or "stream_label" not in future_rows.columns:
+        return False
+    stream = future_rows[future_rows["stream_label"].astype(str).eq(str(stream_label))]
+    if stream.empty or "forecast_available" not in stream.columns:
+        return False
+    return not stream["forecast_available"].fillna(False).astype(bool).any()
 
 
 def page5_workbook_card_html(manifest: dict[str, Any]) -> str:

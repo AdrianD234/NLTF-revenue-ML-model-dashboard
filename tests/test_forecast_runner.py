@@ -107,11 +107,15 @@ def test_runner_handles_missing_inputs_cleanly(tmp_path: Path) -> None:
         "component_forecasts.parquet",
         "forecast_assumptions.parquet",
         "forecast_capability_report.parquet",
+        "forecast_chart_rows.parquet",
         "forecast_run_manifest.json",
         "forecast_validation_report.md",
         "forecast_capability_report.csv",
+        "forecast_chart_rows.csv",
     ]:
         assert (result.output_dir / name).exists(), name
+    assert result.forecast_chart_rows["row_type"].isin(["historical_actual", "future_forecast"]).all()
+    assert result.forecast_chart_rows[result.forecast_chart_rows["row_type"].eq("historical_actual")]["value"].notna().any()
 
 
 def test_model_input_history_pack_is_committed_and_hash_backed() -> None:
@@ -160,6 +164,7 @@ def test_completed_workbook_builds_transforms_and_numeric_light_outputs(tmp_path
     assert result.manifest["evidence_pack_modified"] is False
     assert result.manifest["chart_sources_modified"] is False
     assert len(result.future_forecasts) == DEFAULT_FORECAST_HORIZON_QUARTERS * len(STREAM_ORDER)
+    assert "row_type" not in result.future_forecasts.columns
     assert result.future_forecasts["scenario_name"].eq("basecase").all()
     assert result.capability_report["scenario_name"].eq("basecase").all()
     assert result.assumptions["scenario_name"].eq("basecase").all()
@@ -207,7 +212,27 @@ def test_completed_workbook_builds_transforms_and_numeric_light_outputs(tmp_path
     manifest = json.loads((result.output_dir / "forecast_run_manifest.json").read_text(encoding="utf-8"))
     assert manifest["broad_search_run"] is False
     assert manifest["output_files"]
+    assert "forecast_chart_rows.parquet" in manifest["output_files"]
     assert (result.output_dir / "forecast_capability_report.csv").exists()
+    assert (result.output_dir / "forecast_chart_rows.parquet").exists()
+    assert (result.output_dir / "forecast_chart_rows.csv").exists()
+    chart_rows = result.forecast_chart_rows
+    assert {"row_type", "scenario_name", "stream", "period", "value", "availability_status"}.issubset(chart_rows.columns)
+    assert {"historical_actual", "future_forecast"} == set(chart_rows["row_type"].dropna().astype(str).unique())
+    historical = chart_rows[chart_rows["row_type"].eq("historical_actual")]
+    assert set(historical["stream"]) == set(STREAM_ORDER)
+    assert historical["scenario_name"].eq("historical_actual").all()
+    assert historical["period"].map(lambda value: int(str(value)[:4])).max() == 2025
+    future_chart = chart_rows[chart_rows["row_type"].eq("future_forecast")]
+    assert len(future_chart) == len(result.future_forecasts)
+    light_chart = future_chart[future_chart["stream"].eq("LIGHT_RUC")].sort_values("period")
+    pd.testing.assert_series_equal(
+        light_chart["value"].reset_index(drop=True).astype(float),
+        light.sort_values("target_period")["forecast"].reset_index(drop=True).astype(float),
+        check_names=False,
+    )
+    gap_chart = future_chart[~future_chart["stream"].eq("LIGHT_RUC")]
+    assert gap_chart["value"].isna().all()
 
 
 def _clear_required_user_values(path: Path, stream: str, excel_row: int) -> None:
@@ -295,8 +320,8 @@ def test_cli_runs_variable_horizon_with_scenario_name(tmp_path: Path) -> None:
 
 def test_scenario_comparison_artifacts(tmp_path: Path) -> None:
     base = create_completed_sample_workbook(tmp_path / "NLTF_forecast_input_template_basecase.xlsx", repo_root=ROOT, quarters=1)
-    upside = create_completed_sample_workbook(
-        tmp_path / "NLTF_forecast_input_template_upside.xlsx",
+    high_population = create_completed_sample_workbook(
+        tmp_path / "NLTF_forecast_input_template_high_population.xlsx",
         repo_root=ROOT,
         quarters=2,
         value_multiplier=1.02,
@@ -310,11 +335,11 @@ def test_scenario_comparison_artifacts(tmp_path: Path) -> None:
             scenario_name="basecase",
         ),
         run_forecast_workbook(
-            upside,
-            output_dir=tmp_path / "upside_run",
+            high_population,
+            output_dir=tmp_path / "high_population_run",
             repo_root=ROOT,
             run_timestamp="comparison-smoke",
-            scenario_name="upside",
+            scenario_name="high_population",
         ),
     ]
     comparison = write_forecast_scenario_comparison(
@@ -324,14 +349,19 @@ def test_scenario_comparison_artifacts(tmp_path: Path) -> None:
         run_timestamp="comparison-smoke",
     )
     assert comparison.manifest["scenario_count"] == 2
-    assert {row["scenario_name"] for row in comparison.manifest["scenarios"]} == {"basecase", "upside"}
+    assert {row["scenario_name"] for row in comparison.manifest["scenarios"]} == {"basecase", "high_population"}
     assert len(comparison.future_forecasts) == sum(len(result.future_forecasts) for result in results)
-    assert set(comparison.future_forecasts["scenario_name"]) == {"basecase", "upside"}
+    assert set(comparison.future_forecasts["scenario_name"]) == {"basecase", "high_population"}
+    assert set(comparison.forecast_chart_rows["scenario_name"]) >= {"historical_actual", "basecase", "high_population"}
+    historical = comparison.forecast_chart_rows[comparison.forecast_chart_rows["row_type"].eq("historical_actual")]
+    assert historical.duplicated(subset=["stream", "period"]).sum() == 0
     for name in [
         "forecast_scenario_comparison.parquet",
         "forecast_scenario_comparison.csv",
         "forecast_scenario_capability_report.parquet",
         "forecast_scenario_capability_report.csv",
+        "forecast_scenario_chart_rows.parquet",
+        "forecast_scenario_chart_rows.csv",
         "forecast_scenario_comparison_manifest.json",
     ]:
         assert (comparison.output_dir / name).exists(), name

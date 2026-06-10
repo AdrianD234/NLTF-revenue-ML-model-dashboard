@@ -36,6 +36,8 @@ or a caller-provided output directory.
 - `forecast_scenario_comparison.csv`
 - `forecast_scenario_capability_report.parquet`
 - `forecast_scenario_capability_report.csv`
+- `forecast_scenario_chart_rows.parquet`
+- `forecast_scenario_chart_rows.csv`
 - `forecast_scenario_comparison_manifest.json`
 
 ## Data Contract
@@ -59,6 +61,18 @@ Required comparison columns include:
 - `broad_search_run`.
 
 `forecast_scenario_capability_report.parquet` and `.csv` contain the row-wise union of scenario capability reports and must include `scenario_name`, stream identifiers, capability status, numeric row counts and gap codes.
+
+`forecast_scenario_chart_rows.parquet` and `.csv` contain display rows with:
+
+- `row_type` equal to `historical_actual` or `future_forecast`;
+- `scenario_name`;
+- `stream`;
+- `stream_label`;
+- `period`;
+- `value`;
+- `availability_status`.
+
+Historical actual rows are de-duplicated by stream and period. Future forecast display rows keep missing `value` for governed gaps so the table/export can show the gap without plotting a fake forecast.
 
 ## Manifest Contract
 
@@ -88,6 +102,11 @@ The Forecast Builder UI must:
 - use `scenario_name` to distinguish line color/style;
 - allow stream filtering across the combined table and chart;
 - show capability status by scenario and stream;
+- plot historical actuals as a distinct grey line;
+- plot future numeric forecasts in scenario styles after the forecast-start marker;
+- keep governed-gap streams visible in the table/capability report;
+- show a governed-gap annotation when a selected stream has historical actuals but no numeric future forecast;
+- provide an All/Numeric/Governed-gap row filter for the forecast table;
 - offer each scenario pack and the combined comparison pack for download.
 
 ## Governance Invariants

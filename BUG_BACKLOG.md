@@ -128,6 +128,7 @@ Backlog state for the Stage 1 Model Governance Dashboard Parquet refresh and vis
 - [x] Added runtime manifest fields for fixed-finalist-only execution, no broad search, workbook hash, scenario name, horizon metadata, and no evidence/chart-source mutation.
 - [x] Documented current forward status: Light RUC numeric fixed-finalist forecasts, PED governed gap, and Heavy RUC governed gap.
 - [x] Added a forecast scenario comparison specification for multi-upload combined tables, charts, capability rows, and downloads.
+- [x] Added display-only forecast chart rows with historical actuals, forecast-start markers, numeric scenario lines, table row filters, and explicit governed-gap annotations.
 - [x] Kept runtime model-state gaps in `forecast_run_manifest.json`, `forecast_capability_report.*`, and `forecast_validation_report.md` rather than adding unchecked dashboard backlog defects.
 
 No unchecked backlog items remain.

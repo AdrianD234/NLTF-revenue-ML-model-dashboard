@@ -64,8 +64,11 @@ with:
 - `component_forecasts.parquet` and `.csv`
 - `forecast_assumptions.parquet` and `.csv`
 - `forecast_capability_report.parquet` and `.csv`
+- `forecast_chart_rows.parquet` and `.csv`
 - `forecast_run_manifest.json`
 - `forecast_validation_report.md`
+
+`forecast_chart_rows.*` is for display and export only. It combines historical actual rows with future forecast rows so charts can show the historical path and forecast start. Historical actuals are not written to `future_forecasts.*`.
 
 ## Streamlit Use
 
@@ -79,7 +82,9 @@ The section supports:
 - validating all uploaded workbooks;
 - calculating forecasts;
 - viewing a combined scenario table and chart;
+- seeing historical actuals, a forecast-start marker, and future scenario lines on the chart;
 - filtering output by stream;
+- filtering table rows by `All rows`, `Numeric forecasts only`, or `Governed gaps only`;
 - viewing future forecast rows and component traces;
 - viewing capability status by scenario and stream;
 - downloading each scenario pack and a combined comparison pack.
@@ -96,6 +101,8 @@ with:
 - `forecast_scenario_comparison.csv`
 - `forecast_scenario_capability_report.parquet`
 - `forecast_scenario_capability_report.csv`
+- `forecast_scenario_chart_rows.parquet`
+- `forecast_scenario_chart_rows.csv`
 - `forecast_scenario_comparison_manifest.json`
 
 The comparison pack is generated for user review only. It does not alter evidence packs or chart-source calculations.
@@ -111,6 +118,8 @@ Current forward status:
 - Heavy RUC: governed gap, `heavy_ruc_component_forward_scorers_missing`.
 
 Governed gaps are expected governance output, not zero forecasts and not hidden failures.
+
+The Forecast Builder chart plots only numeric forecast lines. Governed-gap streams remain visible in the table and capability report, and selected PED/Heavy views show historical actuals plus a governed-gap annotation. This is not a model failure; the repo-local forward scorer is not yet verified.
 
 ## Safety Checks
 
