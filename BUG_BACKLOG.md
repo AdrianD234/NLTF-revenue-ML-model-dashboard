@@ -121,4 +121,12 @@ Backlog state for the Stage 1 Model Governance Dashboard Parquet refresh and vis
 - Fresh after-screenshots exist for Overview, Diagnostics, Scenario Comparison, and Schiff Benchmark from the latest active external-pack verifier path.
 - Performance benchmark measured warm cached Parquet load at under 0.01 seconds.
 
+## Closed Forecast Runner Governance Items
+
+- [x] Added a governed 12-quarter forecast input template specification.
+- [x] Added a forecast runner specification that keeps forecast-run artifacts separate from the historical evidence pack.
+- [x] Added runtime manifest fields for fixed-finalist-only execution, no broad search, and no evidence/chart-source mutation.
+- [x] Documented that current forward forecasting is a governed missing-capability gap unless repo-local fitted finalist states are vendored.
+- [x] Kept runtime model-state gaps in `forecast_run_manifest.json` and `forecast_validation_report.md` rather than adding unchecked dashboard backlog defects.
+
 No unchecked backlog items remain.

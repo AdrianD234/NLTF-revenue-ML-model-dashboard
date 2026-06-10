@@ -32,6 +32,15 @@ from model_dashboard.data.diagnostics import (
     select_diagnostic_acf_scope,
 )
 from model_dashboard.diagnostic_matrix import diagnostic_pass_matrix_html
+from model_dashboard.forecast_runner import (
+    FORECAST_BUILDER_NOTE,
+    FORECAST_BUILDER_TITLE,
+    TEMPLATE_FILENAME,
+    build_forecast_input_template_bytes,
+    forecast_pack_zip_bytes,
+    run_forecast_workbook,
+    validate_forecast_workbook,
+)
 from model_dashboard.labels import (
     DEFAULT_INPUT_PARENT,
     IGNORED_RUN_FOLDER_NAMES,
@@ -1590,6 +1599,7 @@ def render_governance_reproducibility_page(loaded: LoadedRun, controls: dict[str
         panel_contract,
     )
     render_page5_shap_note()
+    render_forecast_builder_section()
 
 
 def _load_reproducibility_pack_safely(stream_label: str) -> Any | None:
@@ -2486,6 +2496,216 @@ def render_page5_shap_note() -> None:
         "<span>SHAP explainability artifacts are not available in this pack.</span></div>",
         unsafe_allow_html=True,
     )
+
+
+def render_forecast_builder_section() -> None:
+    repo_root = Path(__file__).resolve().parent
+    with st.expander(FORECAST_BUILDER_TITLE, expanded=False):
+        info_panel(FORECAST_BUILDER_NOTE)
+        template_bytes = build_forecast_input_template_bytes(repo_root)
+        control_cols = st.columns([0.72, 1.28, 0.7, 0.9])
+        with control_cols[0]:
+            st.download_button(
+                "Download blank 12-quarter template",
+                data=template_bytes,
+                file_name=TEMPLATE_FILENAME,
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="forecast_builder_template_download",
+                use_container_width=True,
+            )
+        with control_cols[1]:
+            uploaded = st.file_uploader(
+                "Upload completed 12-quarter forecast workbook",
+                type=["xlsx"],
+                key="forecast_builder_upload",
+                help="Upload a completed copy of the template. Uploaded workbooks are not committed and do not alter evidence packs.",
+            )
+
+        current_hash = None
+        workbook_bytes: bytes | None = None
+        if uploaded is not None:
+            workbook_bytes = uploaded.getvalue()
+            current_hash = hashlib.sha256(workbook_bytes).hexdigest()
+            if st.session_state.get("forecast_builder_upload_hash") != current_hash:
+                st.session_state["forecast_builder_upload_hash"] = current_hash
+                st.session_state.pop("forecast_builder_validation", None)
+                st.session_state.pop("forecast_builder_result", None)
+
+        with control_cols[2]:
+            validate_clicked = st.button(
+                "Validate inputs",
+                key="forecast_builder_validate",
+                use_container_width=True,
+                disabled=workbook_bytes is None,
+            )
+        with control_cols[3]:
+            run_clicked = st.button(
+                "Calculate forecasts or governed gaps",
+                key="forecast_builder_calculate",
+                use_container_width=True,
+                disabled=workbook_bytes is None,
+            )
+
+        if workbook_bytes is not None and validate_clicked:
+            st.session_state["forecast_builder_validation"] = validate_forecast_workbook(workbook_bytes, repo_root=repo_root)
+        if workbook_bytes is not None and run_clicked:
+            st.session_state["forecast_builder_result"] = run_forecast_workbook(
+                workbook_bytes,
+                repo_root=repo_root,
+                workbook_filename=getattr(uploaded, "name", "uploaded_forecast_workbook.xlsx"),
+            )
+            st.session_state["forecast_builder_validation"] = st.session_state["forecast_builder_result"].validation
+
+        validation = st.session_state.get("forecast_builder_validation")
+        if validation is not None:
+            st.markdown("<div class='page5-panel-title'>Forecast workbook validation</div>", unsafe_allow_html=True)
+            display_table(validation.report_frame(), height=165, max_rows=30)
+
+        result = st.session_state.get("forecast_builder_result")
+        if result is not None:
+            render_forecast_builder_result(result)
+        elif workbook_bytes is None:
+            st.caption("Download the blank template, complete the user-entry columns, then upload the workbook here.")
+
+
+def render_forecast_builder_result(result: Any) -> None:
+    status = result.manifest.get("forecast_status", "unknown")
+    validation_status = result.manifest.get("validation_status", "unknown")
+    kpi_grid(
+        [
+            ("Validation", validation_status, "completed workbook check"),
+            ("Forecast status", status, "available forecast or governed gaps"),
+            ("Broad search", "not run", "fixed finalists only"),
+            ("Evidence pack", "unchanged", "forecast run is isolated"),
+        ]
+    )
+    stream_options = ["All streams"] + sorted(result.future_forecasts["stream_label"].dropna().astype(str).unique().tolist())
+    selected_stream = st.selectbox("Forecast stream", stream_options, key="forecast_builder_stream")
+    future = result.future_forecasts.copy()
+    components = result.component_forecasts.copy()
+    if selected_stream != "All streams":
+        future = future[future["stream_label"].astype(str).eq(selected_stream)].copy()
+        components = components[components["stream_label"].astype(str).eq(selected_stream)].copy()
+
+    st.markdown("<div class='page5-panel-title'>Forecast table by stream and quarter</div>", unsafe_allow_html=True)
+    display_table(_forecast_builder_table(future), height=240, max_rows=60)
+    chart_card(
+        "Forecast chart by stream and quarter",
+        "Numeric forecasts are plotted when fitted finalist state is available; governed gaps are shown as an annotated empty chart.",
+        forecast_builder_figure(future),
+        notes_as_tooltip=False,
+    )
+    if not result.has_numeric_forecasts:
+        warning_panel("Governed missing-capability gaps were written instead of fake forecasts because fitted finalist states are not repo-local.")
+
+    tabs = st.tabs(["Heavy component trace", "Light base/residual trace", "PED component trace"])
+    trace_filters = [
+        ("HEAVY_RUC", tabs[0]),
+        ("LIGHT_RUC", tabs[1]),
+        ("PED", tabs[2]),
+    ]
+    for stream, tab in trace_filters:
+        with tab:
+            trace = components[components["stream"].astype(str).eq(stream)].copy()
+            display_table(_forecast_builder_component_table(trace), height=240, max_rows=80)
+
+    st.download_button(
+        "Download forecast-run pack",
+        data=forecast_pack_zip_bytes(result.output_dir),
+        file_name=f"{Path(result.output_dir).name}_forecast_run_pack.zip",
+        mime="application/zip",
+        key="forecast_builder_pack_download",
+        use_container_width=False,
+    )
+
+
+def _forecast_builder_table(frame: pd.DataFrame) -> pd.DataFrame:
+    if frame is None or frame.empty:
+        return pd.DataFrame()
+    columns = [
+        "stream_label",
+        "model",
+        "target_period",
+        "horizon",
+        "forecast",
+        "forecast_available",
+        "availability_status",
+        "gap_code",
+        "gap_reason",
+    ]
+    table = frame[[column for column in columns if column in frame.columns]].copy()
+    return table.rename(
+        columns={
+            "stream_label": "Stream",
+            "model": "Model",
+            "target_period": "Quarter",
+            "horizon": "Horizon",
+            "forecast": "Forecast",
+            "forecast_available": "Forecast available",
+            "availability_status": "Availability",
+            "gap_code": "Gap code",
+            "gap_reason": "Gap reason",
+        }
+    )
+
+
+def _forecast_builder_component_table(frame: pd.DataFrame) -> pd.DataFrame:
+    if frame is None or frame.empty:
+        return pd.DataFrame()
+    columns = [
+        "stream_label",
+        "component_model",
+        "component_role",
+        "component_weight",
+        "target_period",
+        "horizon",
+        "component_forecast",
+        "availability_status",
+        "gap_code",
+    ]
+    table = frame[[column for column in columns if column in frame.columns]].copy()
+    return table.rename(
+        columns={
+            "stream_label": "Stream",
+            "component_model": "Component",
+            "component_role": "Role",
+            "component_weight": "Weight",
+            "target_period": "Quarter",
+            "horizon": "Horizon",
+            "component_forecast": "Component forecast",
+            "availability_status": "Availability",
+            "gap_code": "Gap code",
+        }
+    )
+
+
+def forecast_builder_figure(frame: pd.DataFrame) -> go.Figure:
+    if frame is None or frame.empty:
+        return empty_figure("No forecast-run rows are available.")
+    data = frame.copy()
+    data["forecast_numeric"] = pd.to_numeric(data.get("forecast"), errors="coerce")
+    data = data.dropna(subset=["forecast_numeric"])
+    if data.empty:
+        return empty_figure("Governed gaps only: fitted finalist state is not available for forward scoring.")
+    fig = go.Figure()
+    for stream_label, group in data.groupby("stream_label", dropna=False):
+        fig.add_trace(
+            go.Scatter(
+                x=group["target_period"],
+                y=group["forecast_numeric"],
+                mode="lines+markers",
+                name=str(stream_label),
+                hovertemplate="Quarter: %{x}<br>Forecast: %{y:,.2f}<extra></extra>",
+            )
+        )
+    fig.update_layout(
+        height=320,
+        margin=dict(l=8, r=8, t=10, b=34),
+        xaxis_title="Forecast quarter",
+        yaxis_title="Forecast",
+        legend_title="Stream",
+    )
+    return fig
 
 
 def page5_workbook_card_html(manifest: dict[str, Any]) -> str:

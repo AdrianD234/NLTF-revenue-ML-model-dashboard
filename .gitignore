@@ -14,6 +14,12 @@ output/
 *.xlsx
 *.xls
 *.parquet
+!templates/
+!templates/NLTF_forecast_input_template_12q.xlsx
+artifacts/forecast_runs/
+artifacts/forecast_uploads/
+*_completed_forecast_input*.xlsx
+*_filled_forecast_input*.xlsx
 !tests/fixtures/**/*.parquet
 artifacts/**
 !artifacts/.gitkeep

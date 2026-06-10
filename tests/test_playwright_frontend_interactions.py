@@ -9,6 +9,8 @@ import pandas as pd
 import pytest
 from playwright.sync_api import Page, expect
 
+from model_dashboard.forecast_runner import create_completed_sample_workbook
+
 
 SCREENSHOT_DIR = Path("artifacts/screenshots")
 SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
@@ -64,6 +66,7 @@ PAGE_PANELS = {
         "Component trace",
         "Net forecast R2 after final model composition",
         "SHAP not yet generated",
+        "Forecast Builder",
     ],
 }
 
@@ -399,6 +402,43 @@ def test_governance_reproducibility_page_stream_selector_and_downloads(page: Pag
     assert "Downloads" not in page_text
     assert "OneDrive" not in page_text
     assert "AppData" not in page_text
+    assert_no_streamlit_exception(page)
+
+
+def test_forecast_builder_upload_validate_calculate_and_download(page: Page) -> None:
+    open_dashboard(page)
+    click_page(page, "Governance & Reproducibility")
+    body = page.locator("body")
+    page.get_by_text("Forecast Builder", exact=True).first.click()
+    expect(body).to_contain_text("Download blank 12-quarter template", timeout=60000)
+    expect(body).to_contain_text("Upload completed 12-quarter forecast workbook", timeout=60000)
+    with page.expect_download() as download_info:
+        page.get_by_role("button", name="Download blank 12-quarter template").click()
+    assert download_info.value.suggested_filename == "NLTF_forecast_input_template_12q.xlsx"
+
+    sample_path = Path("test-output") / "forecast_builder_playwright_completed.xlsx"
+    sample_path.parent.mkdir(parents=True, exist_ok=True)
+    create_completed_sample_workbook(sample_path)
+    page.locator("input[type='file']").set_input_files(str(sample_path.resolve()))
+    validate_button = page.get_by_role("button", name="Validate inputs")
+    calculate_button = page.get_by_role("button", name="Calculate forecasts or governed gaps")
+    expect(validate_button).to_be_enabled(timeout=60000)
+    expect(calculate_button).to_be_enabled(timeout=60000)
+    validate_button.click()
+    expect(body).to_contain_text("Forecast workbook validation", timeout=60000)
+    expect(body).to_contain_text("Workbook inputs passed structural and required-value validation", timeout=60000)
+
+    calculate_button.click()
+    expect(body).to_contain_text("Forecast status", timeout=90000)
+    expect(body).to_contain_text("governed_gap", timeout=90000)
+    expect(body).to_contain_text("Forecast table by stream and quarter", timeout=90000)
+    expect(body).to_contain_text("Governed missing-capability gaps were written instead of fake forecasts", timeout=90000)
+    expect(body).to_contain_text("Heavy component trace", timeout=90000)
+    expect(body).to_contain_text("Light base/residual trace", timeout=90000)
+    expect(body).to_contain_text("PED component trace", timeout=90000)
+    with page.expect_download() as pack_download:
+        page.get_by_role("button", name="Download forecast-run pack").click()
+    assert pack_download.value.suggested_filename.endswith("_forecast_run_pack.zip")
     assert_no_streamlit_exception(page)
 
 
