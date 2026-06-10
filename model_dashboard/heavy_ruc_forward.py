@@ -107,6 +107,7 @@ def evaluate_heavy_ruc_forward_scorer(repo_root: Path | str | None = None) -> Fo
     stored_replay_delta = _stored_weighted_replay_delta(component_predictions)
     parity_audit = _load_parity_audit(parity_audit_path)
     parity_status = str(parity_audit.get("parity_status", "not_run_missing_parity_audit"))
+    failed_status = _failed_parity_status(parity_audit)
     max_parity_delta = _optional_float(parity_audit.get("max_abs_delta"))
     failing_component = _optional_str(parity_audit.get("failing_component"))
     if parity_status != "passed" or max_parity_delta is None or max_parity_delta > PARITY_TOLERANCE:
@@ -123,7 +124,7 @@ def evaluate_heavy_ruc_forward_scorer(repo_root: Path | str | None = None) -> Fo
             required,
             hashes,
             blockers,
-            "failed_repo_history_component_replay",
+            failed_status,
             max_parity_delta,
             stored_replay_delta,
             reason,
@@ -218,6 +219,13 @@ def _load_parity_audit(path: Path) -> dict[str, Any]:
             "missing_feature_or_artifact": f"{path.name} is unavailable: {type(exc).__name__}",
         }
     return payload if isinstance(payload, dict) else {}
+
+
+def _failed_parity_status(parity_audit: dict[str, Any]) -> str:
+    data_scope = str(parity_audit.get("data_scope", ""))
+    if "canonical_source_script_history" in data_scope:
+        return "failed_canonical_history_component_replay"
+    return "failed_repo_history_component_replay"
 
 
 def _optional_float(value: Any) -> float | None:

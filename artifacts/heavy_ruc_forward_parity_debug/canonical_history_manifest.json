@@ -1,0 +1,86 @@
+{
+  "created_at": "2026-06-10T07:54:05.682748+00:00",
+  "current_repo_history": {
+    "engineered_feature_count": 356,
+    "history_source": "data/model_input_history/heavy_ruc_inputs.parquet",
+    "input_sheet": "model_input_history",
+    "log_target_non_null_rows": 66,
+    "period_max": "2026Q1",
+    "period_min": "2002Q1",
+    "raw_columns": 38,
+    "raw_rows": 97,
+    "repo_relative_path": "data/model_input_history/heavy_ruc_inputs.parquet",
+    "sha256": "751d6f71ac0941c2c606b4bd87980c249b798df4ddd93d1e7c372b51394dc5bb",
+    "source_feature_count": 18,
+    "target_column": "Heavy RUC net km",
+    "target_is_log": false,
+    "target_non_null_rows": 97,
+    "target_positive_rows": 66
+  },
+  "current_repo_history_replay": {
+    "component_or_final_max_abs_delta": 95524161.96877861,
+    "parity_status": "failed"
+  },
+  "exported_files": [
+    "canonical_history_comparison.csv",
+    "canonical_feature_matrix_comparison.csv",
+    "canonical_replay_summary.csv",
+    "canonical_history_manifest.json"
+  ],
+  "feature_matrix_comparison_rows": 2522,
+  "finalist_model": "HEAVY_RUC__RECON_STATIC_REBUILT",
+  "history_comparison_rows": 61,
+  "history_recovery_status": "canonical_source_script_history_recovered_but_component_parity_failed",
+  "parity_tolerance": 1e-06,
+  "post_canonical_history_replay": {
+    "component_max_abs_delta": 12911117.047347665,
+    "component_or_final_max_abs_delta": 12911117.047347665,
+    "failing_component": "HEAVY_RUC__dynamic_no_leads__GBR_learning_rate0_08_max_depth1_n_estimators150__ylag__w40",
+    "failing_component_label": "C4",
+    "final_weighted_max_abs_delta": 1348579.0867124796,
+    "parity_status": "failed",
+    "worst_horizon": 10,
+    "worst_origin": "2020Q1",
+    "worst_target_period": "2022Q3"
+  },
+  "registry_source": {
+    "source_parent_run_basename": "heavy_ruc_fullgrid_rescue_closure_run_20260521_171358_20260521_175036.zip",
+    "source_sheet": "Heavy RUC Inputs",
+    "source_workbook_basename": "Master Copy revenue modelling workbook.xlsx"
+  },
+  "root_cause_assessment": {
+    "current_repo_history_engineered_feature_count": 356,
+    "current_repo_history_schema_mismatch": "confirmed",
+    "fitted_component_estimators": "missing_from_parent_run",
+    "heavy_target_mismatch": "not_supported_parent_actuals_match",
+    "likely_residual_blocker": "target_lagged_gbm_fitted_state_or_runtime_replay_drift",
+    "schiff_c2_input_path": "exact_replay_passed",
+    "source_script_engineered_feature_count": 473,
+    "target_lagged_gbm_components": "failed_replay_for_c3_c4"
+  },
+  "source_script": {
+    "repo_relative_path": "data/dashboard_evidence_pack_reproducibility/heavy_ruc/source_artifacts/scripts/heavy_ruc_fullgrid_rescue_closure.py",
+    "sha256": "c85f629bdcf98ba8194b81564496d87848d44ad97198f9740c6db8e49faf91e9"
+  },
+  "source_script_workbook_history": {
+    "engineered_feature_count": 473,
+    "history_source": "source_script_load_input_sheet",
+    "input_sheet": "Stage 1 Inputs",
+    "log_target_non_null_rows": 66,
+    "period_max": "2026Q1",
+    "period_min": "2002Q1",
+    "raw_columns": 52,
+    "raw_rows": 97,
+    "source_feature_count": 26,
+    "target_column": "Heavy RUC net km",
+    "target_is_log": false,
+    "target_non_null_rows": 97,
+    "target_positive_rows": 66,
+    "workbook_basename": "Master Copy revenue modelling workbook.xlsx",
+    "workbook_sha256": "0c0ea8d3f95be6ba4a92316c7b2d5b7ec765cab6062cf7918844cbcb17bb6a5d",
+    "workbook_size_bytes": 209441
+  },
+  "stream": "HEAVY_RUC",
+  "stream_label": "Heavy RUC volume",
+  "write_history_status": "not_written_component_or_final_parity_failed"
+}

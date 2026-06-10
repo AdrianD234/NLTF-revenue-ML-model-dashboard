@@ -1,28 +1,25 @@
 {
-  "audit_name": "heavy_ruc_forward_scorer_repo_history_component_replay",
-  "audit_version": "2026-06-10-heavy-ruc-forward-parity-debug-v2",
+  "audit_name": "heavy_ruc_forward_scorer_canonical_history_recovery",
+  "audit_version": "2026-06-10-heavy-ruc-canonical-history-v1",
   "stream": "HEAVY_RUC",
   "stream_label": "Heavy RUC volume",
   "finalist_model": "HEAVY_RUC__RECON_STATIC_REBUILT",
   "parity_status": "failed",
   "parity_tolerance": 1e-06,
-  "data_scope": "repo_local_model_input_history_validation_replay",
+  "data_scope": "canonical_source_script_history_component_replay",
   "score_basis": "current_grid_operational_pooled",
-  "max_abs_delta": 95524161.96877861,
-  "failing_component": "HEAVY_RUC__schiff__GBR_learning_rate0_06_max_depth1_n_estimators650__noylag__w64",
-  "missing_feature_or_artifact": "Parent-run Heavy RUC feature matrix is not vendored and fitted component estimators were not serialized; repo-local model_input_history/heavy_ruc_inputs.parquet does not reproduce archived component predictions.",
-  "notes": "The Heavy RUC parity-debug pack compares archived component_predictions.parquet with a repo-local replay from data/model_input_history/heavy_ruc_inputs.parquet. Candidate configs and stored keys are aligned, but component deltas exceed tolerance. Heavy RUC remains disabled for numeric forward forecasts.",
+  "max_abs_delta": 12911117.047347665,
+  "failing_component": "HEAVY_RUC__dynamic_no_leads__GBR_learning_rate0_08_max_depth1_n_estimators150__ylag__w40",
+  "missing_feature_or_artifact": "Source-script Stage 1 workbook history was recovered and narrows the Heavy RUC replay gap, but target-lagged GBM components C3/C4 still exceed parity tolerance; parent fitted component estimators and parent feature matrices were not retained.",
+  "notes": "The committed data/model_input_history/heavy_ruc_inputs.parquet remains unchanged because the source-script workbook candidate does not pass all component and final weighted replay checks at the fixed 1e-6 tolerance. Heavy RUC remains disabled for numeric forward forecasts.",
   "worst_row": {
-    "component_model": "HEAVY_RUC__schiff__GBR_learning_rate0_06_max_depth1_n_estimators650__noylag__w64",
-    "eval_grid": "current_evidence_grid",
-    "horizon": 3,
-    "origin": "2020Q4",
-    "replayed_component_pred": 1035060738.0249064,
-    "score_basis": "current_grid_operational_pooled",
-    "stored_component_pred": 939536576.0561278,
-    "target_period": "2021Q3",
-    "abs_delta": 95524161.96877861,
-    "abs_pct_delta": 10.167157341522381
+    "component_model": "HEAVY_RUC__dynamic_no_leads__GBR_learning_rate0_08_max_depth1_n_estimators150__ylag__w40",
+    "component_label": "C4",
+    "origin": "2020Q1",
+    "target_period": "2022Q3",
+    "horizon": 10,
+    "abs_delta": 12911117.047347665,
+    "history_candidate": "source_script_stage1_workbook_history"
   },
   "repo_artifacts": [
     {
@@ -34,6 +31,10 @@
       "sha256": "751d6f71ac0941c2c606b4bd87980c249b798df4ddd93d1e7c372b51394dc5bb"
     },
     {
+      "repo_relative_path": "data/model_input_history/manifest.json",
+      "sha256": "e29ca9b22146e6b8c742ddaed48cd88f437e46e087772df2dbe3916cbd91ceac"
+    },
+    {
       "repo_relative_path": "data/dashboard_evidence_pack_reproducibility/heavy_ruc/component_predictions.parquet",
       "sha256": "4ba756fa2061b55c50a5dcaf9cd20aa59caa28285abd848f5986584b699109bf"
     },
@@ -42,40 +43,24 @@
       "sha256": "9fd89f1ef58e1d12fe530ee91042a36d5af0a49a580fc0f1ecb5d53ac992b906"
     },
     {
-      "repo_relative_path": "artifacts/heavy_ruc_forward_parity_debug/component_parity_summary.csv",
-      "sha256": "900fbc17dd39e53ebe62957456c5f6adf5ae5a366bf37220636fd87760b1225c"
-    },
-    {
-      "repo_relative_path": "artifacts/heavy_ruc_forward_parity_debug/component_parity_rows.csv",
-      "sha256": "2200cbf53d1b601133cd785041606cfbf523cec56d5bc806bdb48f26ec9c3d9a"
-    },
-    {
-      "repo_relative_path": "artifacts/heavy_ruc_forward_parity_debug/worst_rows.csv",
-      "sha256": "fee2b3844db5473f5d67a96daa6f815a3a7d4a0e8d307b26443c3a0df8e88152"
-    },
-    {
-      "repo_relative_path": "artifacts/heavy_ruc_forward_parity_debug/feature_matrix_comparison.csv",
-      "sha256": "0aba5c449656223d9e31d4f0489fadd6d247b601464bf69eb5f217c525ec1ee2"
-    },
-    {
-      "repo_relative_path": "artifacts/heavy_ruc_forward_parity_debug/training_window_comparison.csv",
-      "sha256": "63f9e18309fcce53703212394a4e2b2aa2092713889fb0df0a8cacfe8a32729f"
-    },
-    {
-      "repo_relative_path": "artifacts/heavy_ruc_forward_parity_debug/origin_target_coverage_comparison.csv",
-      "sha256": "289f8877c6dbd90b3098171db797ac58777d8bea1ac4a59334b439291300c37b"
-    },
-    {
-      "repo_relative_path": "artifacts/heavy_ruc_forward_parity_debug/candidate_config_comparison.csv",
-      "sha256": "f61cde00137278b355f9fdbdc9898785645c60c26def46d6931b3f14a9564470"
-    },
-    {
-      "repo_relative_path": "artifacts/heavy_ruc_forward_parity_debug/input_history_manifest.json",
-      "sha256": "353480dc1ee91f0d0f6ba653ebe40513f7b93990ecbbd2734b73712f804c6f5e"
-    },
-    {
       "repo_relative_path": "artifacts/heavy_ruc_forward_parity_debug/heavy_ruc_parity_diagnosis.md",
-      "sha256": "c82cf4f05881a29b69135c1defd81716d807444e94c0f31c7983209666e7bcbf"
+      "sha256": "b64f76d6995e65b2535a3db544aca18b70e971f1a315f44ac4703d6766f44725"
+    },
+    {
+      "repo_relative_path": "artifacts/heavy_ruc_forward_parity_debug/canonical_history_comparison.csv",
+      "sha256": "de2cefe65c9b8c2294b128f09a16748e4dadd2e22549008e316e5262e0f37632"
+    },
+    {
+      "repo_relative_path": "artifacts/heavy_ruc_forward_parity_debug/canonical_feature_matrix_comparison.csv",
+      "sha256": "7a51675f9cbdc1abe7dc6a4f87fcfbd1d0ecbe627c946f283c78ee0bf683a9b5"
+    },
+    {
+      "repo_relative_path": "artifacts/heavy_ruc_forward_parity_debug/canonical_replay_summary.csv",
+      "sha256": "87f8da933c004b7df980378ad5b713c3ae18a8117d940d4982aa9096c9bc4597"
+    },
+    {
+      "repo_relative_path": "artifacts/heavy_ruc_forward_parity_debug/canonical_history_manifest.json",
+      "sha256": "8f3bd375c49d1b051e059eddcebf0499550e9b03560756ac6868e06ae10ee3e1"
     }
   ],
   "diagnosis": {
@@ -228,19 +213,18 @@
       }
     },
     "previous_recorded_audit": {
-      "max_abs_delta": 95524161.96877861,
-      "failing_component": "HEAVY_RUC__schiff__GBR_learning_rate0_06_max_depth1_n_estimators650__noylag__w64",
+      "audit_version": "2026-06-10-heavy-ruc-canonical-history-v1",
+      "parity_status": "failed",
+      "max_abs_delta": 12911117.047347665,
+      "failing_component": "HEAVY_RUC__dynamic_no_leads__GBR_learning_rate0_08_max_depth1_n_estimators150__ylag__w40",
       "worst_row": {
-        "component_model": "HEAVY_RUC__schiff__GBR_learning_rate0_06_max_depth1_n_estimators650__noylag__w64",
-        "eval_grid": "current_evidence_grid",
-        "horizon": 3,
-        "origin": "2020Q4",
-        "replayed_component_pred": 1035060738.0249064,
-        "score_basis": "current_grid_operational_pooled",
-        "stored_component_pred": 939536576.0561278,
-        "target_period": "2021Q3",
-        "abs_delta": 95524161.96877861,
-        "abs_pct_delta": 10.167157341522381
+        "component_model": "HEAVY_RUC__dynamic_no_leads__GBR_learning_rate0_08_max_depth1_n_estimators150__ylag__w40",
+        "component_label": "C4",
+        "origin": "2020Q1",
+        "target_period": "2022Q3",
+        "horizon": 10,
+        "abs_delta": 12911117.047347665,
+        "history_candidate": "source_script_stage1_workbook_history"
       }
     },
     "known_prior_audit_reference": {
@@ -261,7 +245,7 @@
     "candidate_config_status": "matched_locked_spec",
     "origin_target_coverage_status": "stored_keys_matched_replay_rows",
     "parent_run_source_data_status": "missing_from_repo",
-    "fitted_estimators_status": "missing_from_repo",
+    "fitted_estimators_status": "missing_from_parent_run",
     "likely_root_cause": {
       "input_data_mismatch": "likely",
       "feature_engineering_mismatch": "cannot_rule_out_without_parent_feature_matrix",
@@ -269,6 +253,277 @@
       "model_hyperparameter_mismatch": "not_supported_by_current_evidence",
       "missing_parent_run_fitted_estimators": "confirmed",
       "stored_component_predictions_from_different_run": "possible_but_not_proven"
-    }
+    },
+    "canonical_history_files": [
+      "canonical_history_comparison.csv",
+      "canonical_feature_matrix_comparison.csv",
+      "canonical_replay_summary.csv",
+      "canonical_history_manifest.json"
+    ],
+    "canonical_history_manifest": {
+      "created_at": "2026-06-10T07:54:05.682748+00:00",
+      "stream": "HEAVY_RUC",
+      "stream_label": "Heavy RUC volume",
+      "finalist_model": "HEAVY_RUC__RECON_STATIC_REBUILT",
+      "parity_tolerance": 1e-06,
+      "source_script": {
+        "repo_relative_path": "data/dashboard_evidence_pack_reproducibility/heavy_ruc/source_artifacts/scripts/heavy_ruc_fullgrid_rescue_closure.py",
+        "sha256": "c85f629bdcf98ba8194b81564496d87848d44ad97198f9740c6db8e49faf91e9"
+      },
+      "current_repo_history": {
+        "repo_relative_path": "data/model_input_history/heavy_ruc_inputs.parquet",
+        "sha256": "751d6f71ac0941c2c606b4bd87980c249b798df4ddd93d1e7c372b51394dc5bb",
+        "target_column": "Heavy RUC net km",
+        "target_is_log": false,
+        "source_feature_count": 18,
+        "engineered_feature_count": 356,
+        "period_min": "2002Q1",
+        "period_max": "2026Q1",
+        "target_non_null_rows": 97,
+        "target_positive_rows": 66,
+        "log_target_non_null_rows": 66,
+        "history_source": "data/model_input_history/heavy_ruc_inputs.parquet",
+        "input_sheet": "model_input_history",
+        "raw_rows": 97,
+        "raw_columns": 38
+      },
+      "source_script_workbook_history": {
+        "workbook_basename": "Master Copy revenue modelling workbook.xlsx",
+        "workbook_size_bytes": 209441,
+        "workbook_sha256": "0c0ea8d3f95be6ba4a92316c7b2d5b7ec765cab6062cf7918844cbcb17bb6a5d",
+        "target_column": "Heavy RUC net km",
+        "target_is_log": false,
+        "source_feature_count": 26,
+        "engineered_feature_count": 473,
+        "period_min": "2002Q1",
+        "period_max": "2026Q1",
+        "target_non_null_rows": 97,
+        "target_positive_rows": 66,
+        "log_target_non_null_rows": 66,
+        "history_source": "source_script_load_input_sheet",
+        "input_sheet": "Stage 1 Inputs",
+        "raw_rows": 97,
+        "raw_columns": 52
+      },
+      "registry_source": {
+        "source_parent_run_basename": "heavy_ruc_fullgrid_rescue_closure_run_20260521_171358_20260521_175036.zip",
+        "source_workbook_basename": "Master Copy revenue modelling workbook.xlsx",
+        "source_sheet": "Heavy RUC Inputs"
+      },
+      "current_repo_history_replay": {
+        "component_or_final_max_abs_delta": 95524161.96877861,
+        "parity_status": "failed"
+      },
+      "post_canonical_history_replay": {
+        "component_or_final_max_abs_delta": 12911117.047347665,
+        "component_max_abs_delta": 12911117.047347665,
+        "final_weighted_max_abs_delta": 1348579.0867124796,
+        "parity_status": "failed",
+        "failing_component": "HEAVY_RUC__dynamic_no_leads__GBR_learning_rate0_08_max_depth1_n_estimators150__ylag__w40",
+        "failing_component_label": "C4",
+        "worst_origin": "2020Q1",
+        "worst_target_period": "2022Q3",
+        "worst_horizon": 10
+      },
+      "history_recovery_status": "canonical_source_script_history_recovered_but_component_parity_failed",
+      "root_cause_assessment": {
+        "current_repo_history_schema_mismatch": "confirmed",
+        "current_repo_history_engineered_feature_count": 356,
+        "source_script_engineered_feature_count": 473,
+        "heavy_target_mismatch": "not_supported_parent_actuals_match",
+        "schiff_c2_input_path": "exact_replay_passed",
+        "target_lagged_gbm_components": "failed_replay_for_c3_c4",
+        "fitted_component_estimators": "missing_from_parent_run",
+        "likely_residual_blocker": "target_lagged_gbm_fitted_state_or_runtime_replay_drift"
+      },
+      "exported_files": [
+        "canonical_history_comparison.csv",
+        "canonical_feature_matrix_comparison.csv",
+        "canonical_replay_summary.csv",
+        "canonical_history_manifest.json"
+      ],
+      "history_comparison_rows": 61,
+      "feature_matrix_comparison_rows": 2522,
+      "write_history_status": "not_written_component_or_final_parity_failed"
+    },
+    "canonical_replay_summary": [
+      {
+        "history_candidate": "current_repo_model_input_history",
+        "row_type": "component",
+        "component_label": "C1",
+        "component_model": "HEAVY_RUC__dynamic_no_leads__Elastic_alpha0_005_l1_ratio0_2__ylag__w64",
+        "stored_rows": 564,
+        "matched_rows": 564,
+        "missing_rows": 0,
+        "max_abs_delta": 36062398.01385033,
+        "mean_abs_delta": 4343715.182200846,
+        "worst_origin": "2017Q3",
+        "worst_target_period": "2020Q2",
+        "worst_horizon": 11,
+        "parity_tolerance": 1e-06,
+        "parity_status": "failed"
+      },
+      {
+        "history_candidate": "current_repo_model_input_history",
+        "row_type": "component",
+        "component_label": "C2",
+        "component_model": "HEAVY_RUC__schiff__GBR_learning_rate0_06_max_depth1_n_estimators650__noylag__w64",
+        "stored_rows": 564,
+        "matched_rows": 564,
+        "missing_rows": 0,
+        "max_abs_delta": 95524161.96877861,
+        "mean_abs_delta": 12242299.980216103,
+        "worst_origin": "2020Q4",
+        "worst_target_period": "2021Q3",
+        "worst_horizon": 3,
+        "parity_tolerance": 1e-06,
+        "parity_status": "failed"
+      },
+      {
+        "history_candidate": "current_repo_model_input_history",
+        "row_type": "component",
+        "component_label": "C3",
+        "component_model": "HEAVY_RUC__dynamic_no_leads__GBR_learning_rate0_08_max_depth1_n_estimators400__ylag__w52",
+        "stored_rows": 564,
+        "matched_rows": 564,
+        "missing_rows": 0,
+        "max_abs_delta": 66229698.84736872,
+        "mean_abs_delta": 10337292.169254247,
+        "worst_origin": "2022Q3",
+        "worst_target_period": "2024Q2",
+        "worst_horizon": 7,
+        "parity_tolerance": 1e-06,
+        "parity_status": "failed"
+      },
+      {
+        "history_candidate": "current_repo_model_input_history",
+        "row_type": "component",
+        "component_label": "C4",
+        "component_model": "HEAVY_RUC__dynamic_no_leads__GBR_learning_rate0_08_max_depth1_n_estimators150__ylag__w40",
+        "stored_rows": 564,
+        "matched_rows": 564,
+        "missing_rows": 0,
+        "max_abs_delta": 58697769.14767802,
+        "mean_abs_delta": 10593332.496424409,
+        "worst_origin": "2020Q4",
+        "worst_target_period": "2023Q4",
+        "worst_horizon": 12,
+        "parity_tolerance": 1e-06,
+        "parity_status": "failed"
+      },
+      {
+        "history_candidate": "current_repo_model_input_history",
+        "row_type": "final_weighted",
+        "component_label": "C1_C4_weighted",
+        "component_model": "HEAVY_RUC__RECON_STATIC_REBUILT",
+        "stored_rows": 564,
+        "matched_rows": 564,
+        "missing_rows": 0,
+        "max_abs_delta": 24455024.767646432,
+        "mean_abs_delta": 4366957.320190632,
+        "worst_origin": "2020Q2",
+        "worst_target_period": "2023Q1",
+        "worst_horizon": 11,
+        "parity_tolerance": 1e-06,
+        "parity_status": "failed"
+      },
+      {
+        "history_candidate": "source_script_stage1_workbook_history",
+        "row_type": "component",
+        "component_label": "C1",
+        "component_model": "HEAVY_RUC__dynamic_no_leads__Elastic_alpha0_005_l1_ratio0_2__ylag__w64",
+        "stored_rows": 564,
+        "matched_rows": 564,
+        "missing_rows": 0,
+        "max_abs_delta": 4.5299530029296875e-06,
+        "mean_abs_delta": 3.9630747855977807e-07,
+        "worst_origin": "2019Q4",
+        "worst_target_period": "2022Q2",
+        "worst_horizon": 10,
+        "parity_tolerance": 1e-06,
+        "parity_status": "failed"
+      },
+      {
+        "history_candidate": "source_script_stage1_workbook_history",
+        "row_type": "component",
+        "component_label": "C2",
+        "component_model": "HEAVY_RUC__schiff__GBR_learning_rate0_06_max_depth1_n_estimators650__noylag__w64",
+        "stored_rows": 564,
+        "matched_rows": 564,
+        "missing_rows": 0,
+        "max_abs_delta": 2.384185791015625e-07,
+        "mean_abs_delta": 5.3686453095564604e-08,
+        "worst_origin": "2022Q1",
+        "worst_target_period": "2023Q1",
+        "worst_horizon": 4,
+        "parity_tolerance": 1e-06,
+        "parity_status": "passed"
+      },
+      {
+        "history_candidate": "source_script_stage1_workbook_history",
+        "row_type": "component",
+        "component_label": "C3",
+        "component_model": "HEAVY_RUC__dynamic_no_leads__GBR_learning_rate0_08_max_depth1_n_estimators400__ylag__w52",
+        "stored_rows": 564,
+        "matched_rows": 564,
+        "missing_rows": 0,
+        "max_abs_delta": 4113063.8222726583,
+        "mean_abs_delta": 66363.82066498876,
+        "worst_origin": "2017Q2",
+        "worst_target_period": "2018Q3",
+        "worst_horizon": 5,
+        "parity_tolerance": 1e-06,
+        "parity_status": "failed"
+      },
+      {
+        "history_candidate": "source_script_stage1_workbook_history",
+        "row_type": "component",
+        "component_label": "C4",
+        "component_model": "HEAVY_RUC__dynamic_no_leads__GBR_learning_rate0_08_max_depth1_n_estimators150__ylag__w40",
+        "stored_rows": 564,
+        "matched_rows": 564,
+        "missing_rows": 0,
+        "max_abs_delta": 12911117.047347665,
+        "mean_abs_delta": 238408.6331860347,
+        "worst_origin": "2020Q1",
+        "worst_target_period": "2022Q3",
+        "worst_horizon": 10,
+        "parity_tolerance": 1e-06,
+        "parity_status": "failed"
+      },
+      {
+        "history_candidate": "source_script_stage1_workbook_history",
+        "row_type": "final_weighted",
+        "component_label": "C1_C4_weighted",
+        "component_model": "HEAVY_RUC__RECON_STATIC_REBUILT",
+        "stored_rows": 564,
+        "matched_rows": 564,
+        "missing_rows": 0,
+        "max_abs_delta": 1348579.0867124796,
+        "mean_abs_delta": 32667.154243233777,
+        "worst_origin": "2020Q1",
+        "worst_target_period": "2022Q3",
+        "worst_horizon": 10,
+        "parity_tolerance": 1e-06,
+        "parity_status": "failed"
+      }
+    ],
+    "canonical_feature_matrix_status": "parent_feature_matrix_missing",
+    "current_repo_history_replay": {
+      "component_or_final_max_abs_delta": 95524161.96877861,
+      "parity_status": "failed"
+    },
+    "post_canonical_history_replay": {
+      "component_or_final_max_abs_delta": 12911117.047347665,
+      "component_max_abs_delta": 12911117.047347665,
+      "final_weighted_max_abs_delta": 1348579.0867124796,
+      "parity_status": "failed",
+      "failing_component": "HEAVY_RUC__dynamic_no_leads__GBR_learning_rate0_08_max_depth1_n_estimators150__ylag__w40",
+      "failing_component_label": "C4",
+      "worst_origin": "2020Q1",
+      "worst_target_period": "2022Q3",
+      "worst_horizon": 10
+    },
+    "capability_decision": "keep_parity_failed"
   }
 }

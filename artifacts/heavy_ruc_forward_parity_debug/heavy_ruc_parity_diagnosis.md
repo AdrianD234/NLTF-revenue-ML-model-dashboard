@@ -44,3 +44,29 @@ A prior audit reference recorded max abs delta `126618189.8` at `2022Q1` -> `202
 - `candidate_config_comparison.csv`
 - `input_history_manifest.json`
 - `heavy_ruc_parity_diagnosis.md`
+
+## Canonical history recovery update
+
+The canonical-history recovery audit found the source-script workbook path and `Stage 1 Inputs` sheet, but Heavy RUC remains `parity_failed`.
+
+### Current vs source-script history
+
+- Current repo history max component/final delta: `95524161.9688`.
+- Source-script workbook history max component/final delta: `12911117.0473`.
+- Source-script workbook sheet: `Stage 1 Inputs`.
+- Current repo engineered feature count: `356`.
+- Source-script engineered feature count: `473`.
+
+### Post-canonical replay
+
+- C1: `failed`, max abs delta `4.52995300293e-06`.
+- C2: `passed`, max abs delta `2.38418579102e-07`.
+- C3: `failed`, max abs delta `4113063.82227`.
+- C4: `failed`, max abs delta `12911117.0473`.
+- Final weighted C1-C4 replay: `failed`, max abs delta `1348579.08671`.
+
+### Governance decision
+
+- `data/model_input_history/heavy_ruc_inputs.parquet` was not overwritten because source-script replay still fails the fixed `1e-6` component/final parity tolerance.
+- C2 Schiff replay passes from the recovered source-script history, but target-lagged GBM components C3/C4 remain outside tolerance.
+- The remaining governed gap is missing parent fitted component estimators or parent feature matrices for the target-lagged GBM components.

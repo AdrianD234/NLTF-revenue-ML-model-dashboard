@@ -28,6 +28,7 @@ from model_dashboard.forecast_runner import (
 
 
 ROOT = Path(__file__).resolve().parents[1]
+C4 = "HEAVY_RUC__dynamic_no_leads__GBR_learning_rate0_08_max_depth1_n_estimators150__ylag__w40"
 
 
 def _expected_periods(horizon: int) -> list[str]:
@@ -150,14 +151,12 @@ def test_model_capability_register_is_parity_gated_and_hash_backed() -> None:
     assert capabilities.loc["HEAVY_RUC", "capability_status"] == "parity_failed"
     assert capabilities.loc["HEAVY_RUC", "forecast_capability_available"] == False
     assert capabilities.loc["HEAVY_RUC", "gap_code"] == "heavy_ruc_component_forward_scorers_missing"
-    assert capabilities.loc["HEAVY_RUC", "parity_status"] == "failed_repo_history_component_replay"
+    assert capabilities.loc["HEAVY_RUC", "parity_status"] == "failed_canonical_history_component_replay"
     assert 0 <= capabilities.loc["HEAVY_RUC", "stored_replay_max_delta"] <= 1e-6
     assert capabilities.loc["HEAVY_RUC", "max_parity_delta"] > 1
-    assert (
-        capabilities.loc["HEAVY_RUC", "failing_component"]
-        == "HEAVY_RUC__schiff__GBR_learning_rate0_06_max_depth1_n_estimators650__noylag__w64"
-    )
-    assert "model_input_history/heavy_ruc_inputs.parquet does not reproduce" in capabilities.loc["HEAVY_RUC", "gap_reason"]
+    assert capabilities.loc["HEAVY_RUC", "failing_component"] == C4
+    assert "Source-script Stage 1 workbook history was recovered" in capabilities.loc["HEAVY_RUC", "gap_reason"]
+    assert "target-lagged GBM components C3/C4 still exceed parity tolerance" in capabilities.loc["HEAVY_RUC", "gap_reason"]
 
     assert capabilities.loc["PED", "capability_status"] == "parity_failed"
     assert capabilities.loc["PED", "forecast_capability_available"] == False
@@ -253,11 +252,9 @@ def test_completed_workbook_builds_transforms_and_numeric_light_outputs(tmp_path
     assert gap_status == {"PED": "parity_failed", "HEAVY_RUC": "parity_failed"}
     gap_parity = gaps.drop_duplicates("stream").set_index("stream")["parity_status"].to_dict()
     assert gap_parity["PED"] == "failed_inner_hpo_replay_delta"
-    assert gap_parity["HEAVY_RUC"] == "failed_repo_history_component_replay"
+    assert gap_parity["HEAVY_RUC"] == "failed_canonical_history_component_replay"
     gap_failing_component = gaps.drop_duplicates("stream").set_index("stream")["failing_component"].to_dict()
-    assert gap_failing_component["HEAVY_RUC"] == (
-        "HEAVY_RUC__schiff__GBR_learning_rate0_06_max_depth1_n_estimators650__noylag__w64"
-    )
+    assert gap_failing_component["HEAVY_RUC"] == C4
     heavy_reason = " ".join(gaps[gaps["stream"].eq("HEAVY_RUC")]["gap_reason"].dropna().astype(str).unique())
     ped_reason = " ".join(gaps[gaps["stream"].eq("PED")]["gap_reason"].dropna().astype(str).unique())
     assert "C1 ElasticNet dynamic no-leads ylag w64" in heavy_reason
@@ -303,9 +300,7 @@ def test_completed_workbook_builds_transforms_and_numeric_light_outputs(tmp_path
     assert capabilities_by_stream["HEAVY_RUC"]["capability_status"] == "parity_failed"
     assert capabilities_by_stream["PED"]["source_artifact_hashes"]
     assert capabilities_by_stream["HEAVY_RUC"]["source_artifact_hashes"]
-    assert capabilities_by_stream["HEAVY_RUC"]["failing_component"] == (
-        "HEAVY_RUC__schiff__GBR_learning_rate0_06_max_depth1_n_estimators650__noylag__w64"
-    )
+    assert capabilities_by_stream["HEAVY_RUC"]["failing_component"] == C4
     assert "forecast_chart_rows.parquet" in manifest["output_files"]
     assert (result.output_dir / "forecast_capability_report.csv").exists()
     assert (result.output_dir / "forecast_chart_rows.parquet").exists()

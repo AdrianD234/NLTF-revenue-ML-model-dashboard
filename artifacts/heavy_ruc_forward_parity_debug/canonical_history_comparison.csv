@@ -1,0 +1,62 @@
+comparison_section,history_candidate,metric,repo_value,canonical_candidate_value,status,notes
+history_summary,current_repo_model_input_history,rows,97,,observed,
+history_summary,current_repo_model_input_history,source_feature_count,18,,observed,
+history_summary,current_repo_model_input_history,engineered_feature_count,356,,observed,
+history_summary,source_script_stage1_workbook_history,rows,,97,observed,
+history_summary,source_script_stage1_workbook_history,source_feature_count,,26,observed,
+history_summary,source_script_stage1_workbook_history,engineered_feature_count,,473,observed,
+source_artifact,source_script_stage1_workbook_history,workbook,,Master Copy revenue modelling workbook.xlsx,found,sha256=0c0ea8d3f95be6ba4a92316c7b2d5b7ec765cab6062cf7918844cbcb17bb6a5d
+source_artifact,current_repo_model_input_history,input_history,data/model_input_history/heavy_ruc_inputs.parquet,,found,sha256=751d6f71ac0941c2c606b4bd87980c249b798df4ddd93d1e7c372b51394dc5bb
+source_feature_inventory,source_script_stage1_workbook_history,cpi index,,CPI index,canonical_source_only,
+source_feature_inventory,source_script_stage1_workbook_history,cpi rebasing factor,,CPI rebasing factor,canonical_source_only,
+source_feature_inventory,source_script_stage1_workbook_history,diesel price nominal cents litre,,"Diesel price (nominal, cents/litre)",canonical_source_only,
+source_feature_inventory,source_script_stage1_workbook_history,diesel price real cents litre,,"Diesel price (real, cents/litre)",canonical_source_only,
+source_feature_inventory,source_script_stage1_workbook_history,gdp deflator sa,gdp_deflator_sa,,repo_history_only,
+source_feature_inventory,source_script_stage1_workbook_history,gdp deflator seasonally adjusted,,GDP deflator (seasonally adjusted),canonical_source_only,
+source_feature_inventory,source_script_stage1_workbook_history,gdp rebasing factor,gdp_rebasing_factor,GDP rebasing factor,shared_source_feature,
+source_feature_inventory,source_script_stage1_workbook_history,heavy ruc price nominal nzd 1 000 km,,"Heavy RUC price (nominal, NZD/1,000 km)",canonical_source_only,
+source_feature_inventory,source_script_stage1_workbook_history,heavy ruc price nominal nzd per 1000km,heavy_ruc_price_nominal_nzd_per_1000km,,repo_history_only,
+source_feature_inventory,source_script_stage1_workbook_history,heavy ruc price real nzd 1 000 km,,"Heavy RUC price (real, NZD/1,000 km)",canonical_source_only,
+source_feature_inventory,source_script_stage1_workbook_history,lagged light ruc price real nzd 1 000 km,,"Lagged light RUC price (real, NZD/1,000 km)",canonical_source_only,
+source_feature_inventory,source_script_stage1_workbook_history,lagged real light ruc price nzd per 1000km,lagged_real_light_ruc_price_nzd_per_1000km,,repo_history_only,
+source_feature_inventory,source_script_stage1_workbook_history,lead heavy ruc price real nzd 1 000 km,,"Lead heavy RUC price (real, NZD/1,000 km)",canonical_source_only,
+source_feature_inventory,source_script_stage1_workbook_history,lead real heavy ruc price nzd per 1000km,lead_real_heavy_ruc_price_nzd_per_1000km,,repo_history_only,
+source_feature_inventory,source_script_stage1_workbook_history,light ruc price nominal nzd 1 000 km,,"Light RUC price (nominal, NZD/1,000 km)",canonical_source_only,
+source_feature_inventory,source_script_stage1_workbook_history,light ruc price real nzd 1 000 km,,"Light RUC price (real, NZD/1,000 km)",canonical_source_only,
+source_feature_inventory,source_script_stage1_workbook_history,log lagged light ruc price,,Log lagged light RUC price,canonical_source_only,
+source_feature_inventory,source_script_stage1_workbook_history,log lagged real light ruc price,log_lagged_real_light_ruc_price,,repo_history_only,
+source_feature_inventory,source_script_stage1_workbook_history,log lead heavy ruc price,,Log lead heavy RUC price,canonical_source_only,
+source_feature_inventory,source_script_stage1_workbook_history,log lead real heavy ruc price,log_lead_real_heavy_ruc_price,,repo_history_only,
+source_feature_inventory,source_script_stage1_workbook_history,log real diesel price,log_real_diesel_price,Log real diesel price,shared_source_feature,
+source_feature_inventory,source_script_stage1_workbook_history,log real gdp,log_real_gdp,Log real GDP,shared_source_feature,
+source_feature_inventory,source_script_stage1_workbook_history,log real gdp per capita,,Log real GDP per capita,canonical_source_only,
+source_feature_inventory,source_script_stage1_workbook_history,log real heavy ruc price,log_real_heavy_ruc_price,Log real heavy RUC price,shared_source_feature,
+source_feature_inventory,source_script_stage1_workbook_history,log real light ruc price,log_real_light_ruc_price,Log real light RUC price,shared_source_feature,
+source_feature_inventory,source_script_stage1_workbook_history,log unemployment rate,log_unemployment_rate,Log unemployment rate,shared_source_feature,
+source_feature_inventory,source_script_stage1_workbook_history,nominal gdp per capita nzd,,Nominal GDP per capita (NZD),canonical_source_only,
+source_feature_inventory,source_script_stage1_workbook_history,nominal gdp sa nzd,nominal_gdp_sa_nzd,"Nominal GDP (SA, NZD)",shared_source_feature,
+source_feature_inventory,source_script_stage1_workbook_history,real diesel price cents per litre,real_diesel_price_cents_per_litre,,repo_history_only,
+source_feature_inventory,source_script_stage1_workbook_history,real gdp per capita nzd,,Real GDP per capita (NZD),canonical_source_only,
+source_feature_inventory,source_script_stage1_workbook_history,real gdp sa nzd,real_gdp_sa_nzd,"Real GDP (SA, NZD)",shared_source_feature,
+source_feature_inventory,source_script_stage1_workbook_history,real heavy ruc price nzd per 1000km,real_heavy_ruc_price_nzd_per_1000km,,repo_history_only,
+source_feature_inventory,source_script_stage1_workbook_history,real light ruc price nzd per 1000km,real_light_ruc_price_nzd_per_1000km,,repo_history_only,
+source_feature_inventory,source_script_stage1_workbook_history,unemployment,,Unemployment (%),canonical_source_only,
+source_feature_inventory,source_script_stage1_workbook_history,unemployment rate,unemployment_rate,Unemployment rate,shared_source_feature,
+period_value_delta,target,parent_actual_vs_current_target,0.0,0.0,matched,repo_value=max_abs_delta; canonical_candidate_value=mean_abs_delta
+period_value_delta,target,parent_actual_vs_candidate_target,0.0,0.0,matched,repo_value=max_abs_delta; canonical_candidate_value=mean_abs_delta
+period_value_delta,target,current_target_vs_candidate_target,0.0,0.0,matched,repo_value=max_abs_delta; canonical_candidate_value=mean_abs_delta
+raw_column_delta,shared_period_columns,gdp rebasing factor,0.0,0.0,matched,repo_column=gdp_rebasing_factor; source_column=GDP rebasing factor; repo_value=max_abs_delta; canonical_candidate_value=mean_abs_delta
+raw_column_delta,shared_period_columns,heavy ruc revenue nzd,0.0,0.0,matched,repo_column=heavy_ruc_revenue_nzd; source_column=Heavy RUC revenue (NZD); repo_value=max_abs_delta; canonical_candidate_value=mean_abs_delta
+transformed_log_column_delta,shared_period_columns,log real diesel price,0.0,0.0,matched,repo_column=log_real_diesel_price; source_column=Log real diesel price; repo_value=max_abs_delta; canonical_candidate_value=mean_abs_delta
+transformed_log_column_delta,shared_period_columns,log real gdp,0.0,0.0,matched,repo_column=log_real_gdp; source_column=Log real GDP; repo_value=max_abs_delta; canonical_candidate_value=mean_abs_delta
+transformed_log_column_delta,shared_period_columns,log real heavy ruc price,0.0,0.0,matched,repo_column=log_real_heavy_ruc_price; source_column=Log real heavy RUC price; repo_value=max_abs_delta; canonical_candidate_value=mean_abs_delta
+transformed_log_column_delta,shared_period_columns,log real light ruc price,0.0,0.0,matched,repo_column=log_real_light_ruc_price; source_column=Log real light RUC price; repo_value=max_abs_delta; canonical_candidate_value=mean_abs_delta
+transformed_log_column_delta,shared_period_columns,log unemployment rate,0.0,0.0,matched,repo_column=log_unemployment_rate; source_column=Log unemployment rate; repo_value=max_abs_delta; canonical_candidate_value=mean_abs_delta
+raw_column_delta,shared_period_columns,nominal gdp sa nzd,0.0,0.0,matched,"repo_column=nominal_gdp_sa_nzd; source_column=Nominal GDP (SA, NZD); repo_value=max_abs_delta; canonical_candidate_value=mean_abs_delta"
+raw_column_delta,shared_period_columns,q2 dummy,0.0,0.0,matched,repo_column=q2_dummy; source_column=Q2 dummy; repo_value=max_abs_delta; canonical_candidate_value=mean_abs_delta
+raw_column_delta,shared_period_columns,q3 dummy,0.0,0.0,matched,repo_column=q3_dummy; source_column=Q3 dummy; repo_value=max_abs_delta; canonical_candidate_value=mean_abs_delta
+raw_column_delta,shared_period_columns,q4 dummy,0.0,0.0,matched,repo_column=q4_dummy; source_column=Q4 dummy; repo_value=max_abs_delta; canonical_candidate_value=mean_abs_delta
+raw_column_delta,shared_period_columns,quarter,,,matched,repo_column=quarter; source_column=Quarter; repo_value=max_abs_delta; canonical_candidate_value=mean_abs_delta
+raw_column_delta,shared_period_columns,real gdp sa nzd,0.0,0.0,matched,"repo_column=real_gdp_sa_nzd; source_column=Real GDP (SA, NZD); repo_value=max_abs_delta; canonical_candidate_value=mean_abs_delta"
+raw_column_delta,shared_period_columns,trend index,0.0,0.0,matched,repo_column=trend_index; source_column=Trend index; repo_value=max_abs_delta; canonical_candidate_value=mean_abs_delta
+raw_column_delta,shared_period_columns,unemployment rate,0.0,0.0,matched,repo_column=unemployment_rate; source_column=Unemployment rate; repo_value=max_abs_delta; canonical_candidate_value=mean_abs_delta

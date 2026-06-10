@@ -10,6 +10,7 @@ from model_dashboard.ped_forward import PED_REQUIRED_COMPONENTS, evaluate_ped_fo
 
 
 ROOT = Path(__file__).resolve().parents[1]
+C4 = "HEAVY_RUC__dynamic_no_leads__GBR_learning_rate0_08_max_depth1_n_estimators150__ylag__w40"
 
 
 def test_heavy_ruc_forward_scorer_audit_preserves_governed_gap() -> None:
@@ -18,16 +19,17 @@ def test_heavy_ruc_forward_scorer_audit_preserves_governed_gap() -> None:
     assert audit.forecast_capability_available is False
     assert audit.capability_status == "parity_failed"
     assert audit.gap_code == "heavy_ruc_component_forward_scorers_missing"
-    assert audit.parity_status == "failed_repo_history_component_replay"
+    assert audit.parity_status == "failed_canonical_history_component_replay"
     assert audit.stored_replay_max_delta is not None
     assert 0 <= audit.stored_replay_max_delta <= 1e-6
     assert audit.max_parity_delta is not None
     assert audit.max_parity_delta > 1
-    assert audit.failing_component == "HEAVY_RUC__schiff__GBR_learning_rate0_06_max_depth1_n_estimators650__noylag__w64"
+    assert audit.failing_component == C4
     assert len(audit.required_components) == 4
     assert audit.required_components == tuple(component["component_model"] for component in HEAVY_RUC_COMPONENTS)
-    assert "model_input_history/heavy_ruc_inputs.parquet does not reproduce" in audit.gap_reason
-    assert "fitted component estimators were not serialized" in audit.gap_reason
+    assert "Source-script Stage 1 workbook history was recovered" in audit.gap_reason
+    assert "target-lagged GBM components C3/C4 still exceed parity tolerance" in audit.gap_reason
+    assert "parent fitted component estimators" in audit.gap_reason
     assert audit.source_artifact_hashes
 
 
