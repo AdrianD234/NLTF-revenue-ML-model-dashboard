@@ -1,0 +1,180 @@
+{
+  "artifact_outputs": [
+    "artifacts/heavy_ruc_forward_parity_debug/parent_state_search_manifest.json",
+    "artifacts/heavy_ruc_forward_parity_debug/parent_state_search_report.md",
+    "artifacts/heavy_ruc_forward_parity_debug/parent_state_candidates.csv",
+    "artifacts/heavy_ruc_forward_parity_debug/final_heavy_forward_capability_decision.md"
+  ],
+  "audit_name": "heavy_ruc_final_parent_state_recovery",
+  "audit_version": "heavy-ruc-final-parent-state-search-v1",
+  "candidate_count": 218,
+  "candidate_role_counts": {
+    "parity_debug_evidence": 3,
+    "raw_parent_component_forecast_source": 30,
+    "source_code_reference": 12,
+    "source_refit_feature_matrix_not_parent": 4,
+    "source_refit_state_not_parent": 168,
+    "state_lineage_reference": 1
+  },
+  "candidate_status_counts": {
+    "diagnostic_evidence_not_parent_state": 3,
+    "not_exact_parent_feature_matrix": 4,
+    "not_original_parent_state": 169,
+    "source_code_only": 12,
+    "stored_predictions_not_forward_state": 30
+  },
+  "capability_decision": "keep_parity_failed",
+  "created_at": "2026-06-10T09:45:06+00:00",
+  "existing_forward_state_manifest_summary": {
+    "audit_name": "heavy_ruc_forward_parent_fitted_state_recovery",
+    "capability_decision": "keep_parity_failed",
+    "state_export_status": null,
+    "state_file_count": 168
+  },
+  "existing_parity_audit": {
+    "repo_relative_path": "data/dashboard_evidence_pack_reproducibility/heavy_ruc/forward_scorer_parity_audit.json",
+    "sha256": "3d563d7bb1e391d94d3ce8398249eaf8faf1a497b8ed2b7283099e8b36e1a2cc",
+    "size_bytes": 32952,
+    "status": "present"
+  },
+  "existing_parity_summary": {
+    "audit_name": "heavy_ruc_final_parent_state_recovery",
+    "data_scope": "canonical_source_script_history_component_replay_with_source_refit_state_export_final_parent_state_search",
+    "failing_component": "HEAVY_RUC__dynamic_no_leads__GBR_learning_rate0_08_max_depth1_n_estimators150__ylag__w40",
+    "max_abs_delta": 12911117.047347665,
+    "parity_status": "failed"
+  },
+  "existing_source_refit_state": {
+    "repo_relative_path": "data/dashboard_evidence_pack_reproducibility/heavy_ruc/forward_state_manifest.json",
+    "sha256": "eb450b4baa3eb2e56a096690b6cbb00442b667839a239dc957370c35e76a12ca",
+    "size_bytes": 196272,
+    "status": "present"
+  },
+  "final_governed_gap_conclusion": "Original parent C3/C4 fitted estimator or feature matrix not retained. Heavy RUC cannot safely score new assumption rows from repo-local artifacts.",
+  "finalist_model": "HEAVY_RUC__RECON_STATIC_REBUILT",
+  "max_vendor_bytes": 52428800,
+  "new_row_forward_scoring_status": "unavailable_until_parent_state_parity_passes",
+  "parent_feature_matrices": {
+    "artifact_records": [],
+    "status": "not_found"
+  },
+  "parent_forward_state": {
+    "artifact_records": [],
+    "status": "not_found"
+  },
+  "parity_rerun_status": "not_run_no_parent_state_or_exact_matrix_recovered",
+  "parity_tolerance": 1e-06,
+  "public_path_sanitization": "repo-relative paths or source classes only; no user-local absolute paths emitted",
+  "recoverable_parent_feature_matrix_found": false,
+  "recoverable_parent_state_found": false,
+  "search_patterns": [
+    "heavy_ruc_fullgrid_rescue_closure*",
+    "heavy_ruc_reconciliation*",
+    "heavy_ruc_reproducibility_audit*",
+    "heavy_ruc_finalist_exact_reproducibility_audit*"
+  ],
+  "search_scope": [
+    {
+      "path_public": true,
+      "repo_relative_path": "data/dashboard_evidence_pack_reproducibility/heavy_ruc/source_artifacts",
+      "source_location_class": "repo_source_artifacts",
+      "source_scope": "heavy_ruc_source_artifacts"
+    },
+    {
+      "path_public": true,
+      "repo_relative_path": "data/dashboard_evidence_pack_reproducibility/heavy_ruc/forward_state",
+      "source_location_class": "repo_source_refit_state",
+      "source_scope": "heavy_ruc_forward_state"
+    },
+    {
+      "path_public": true,
+      "repo_relative_path": "data/dashboard_evidence_pack_reproducibility/heavy_ruc/forward_feature_matrices",
+      "source_location_class": "repo_source_refit_feature_matrices",
+      "source_scope": "heavy_ruc_forward_feature_matrices"
+    },
+    {
+      "path_public": true,
+      "repo_relative_path": "artifacts/heavy_ruc_forward_parity_debug",
+      "source_location_class": "repo_parity_debug",
+      "source_scope": "heavy_ruc_forward_parity_debug"
+    },
+    {
+      "path_public": true,
+      "repo_relative_path": "data/model_input_history",
+      "source_location_class": "repo_model_input_history",
+      "source_scope": "model_input_history"
+    },
+    {
+      "path_public": true,
+      "repo_relative_path": "scripts",
+      "source_location_class": "repo_scripts",
+      "source_scope": "repo_scripts_heavy_ruc"
+    },
+    {
+      "path_public": false,
+      "repo_relative_path": "",
+      "source_location_class": "external_user_candidate_drop",
+      "source_scope": "local_heavy_ruc_named_candidates"
+    },
+    {
+      "path_public": false,
+      "repo_relative_path": "",
+      "source_location_class": "external_model_input_candidate_drop",
+      "source_scope": "local_model_inputs_named_candidates"
+    }
+  ],
+  "searched_sources": [
+    {
+      "candidate_file_count": 2,
+      "source_location_class": "repo_source_artifacts",
+      "source_scope": "heavy_ruc_source_artifacts",
+      "status": "searched"
+    },
+    {
+      "candidate_file_count": 168,
+      "source_location_class": "repo_source_refit_state",
+      "source_scope": "heavy_ruc_forward_state",
+      "status": "searched"
+    },
+    {
+      "candidate_file_count": 4,
+      "source_location_class": "repo_source_refit_feature_matrices",
+      "source_scope": "heavy_ruc_forward_feature_matrices",
+      "status": "searched"
+    },
+    {
+      "candidate_file_count": 19,
+      "source_location_class": "repo_parity_debug",
+      "source_scope": "heavy_ruc_forward_parity_debug",
+      "status": "searched"
+    },
+    {
+      "candidate_file_count": 5,
+      "source_location_class": "repo_model_input_history",
+      "source_scope": "model_input_history",
+      "status": "searched"
+    },
+    {
+      "candidate_file_count": 6,
+      "source_location_class": "repo_scripts",
+      "source_scope": "repo_scripts_heavy_ruc",
+      "status": "searched"
+    },
+    {
+      "candidate_file_count": 41,
+      "source_location_class": "external_user_candidate_drop",
+      "source_scope": "local_heavy_ruc_named_candidates",
+      "status": "searched"
+    },
+    {
+      "candidate_file_count": 109,
+      "source_location_class": "external_model_input_candidate_drop",
+      "source_scope": "local_model_inputs_named_candidates",
+      "status": "searched"
+    }
+  ],
+  "stored_prediction_replay_status": "available_from_stored_parent_component_predictions",
+  "stream": "HEAVY_RUC",
+  "stream_label": "Heavy RUC volume",
+  "training_fit_source_refit_status": "available_from_source_refit_state_not_parent_fitted_state"
+}

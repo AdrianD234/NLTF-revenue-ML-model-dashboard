@@ -181,6 +181,11 @@ SOURCE_WORKBOOK_REPO_PATH = Path("data") / "source_workbooks" / SOURCE_WORKBOOK_
 SOURCE_WORKBOOK_ENV_VAR = "REPRODUCIBILITY_SOURCE_WORKBOOK_PATH"
 SOURCE_WORKBOOK_MANIFEST_PATH = Path("artifacts") / "source_workbook_manifest.json"
 PAGE5_UI_CONTRACT_ROOT = Path("data") / "dashboard_evidence_pack_reproducibility" / "_ui_contract"
+HEAVY_RUC_FORECAST_GAP_REASON = (
+    "Heavy RUC: exact stored prediction replay is available; training-fit R2/provenance is available from "
+    "source-refit state; new-row scoring is unavailable until parent-state parity passes."
+)
+GENERIC_FORECAST_GAP_REASON = "Repo-local forward scorer is unavailable for this stream. This is not a model failure."
 PAGE5_PANEL_CONTRACT_FILES = (
     "reproducibility_panel_contract.parquet",
     "reproducibility_panel_contract.csv",
@@ -2689,14 +2694,11 @@ def render_forecast_builder_results(results: list[Any], comparison: Any | None) 
     has_gap_rows = "forecast_available" in future.columns and (~future["forecast_available"].fillna(False).astype(bool)).any()
     has_numeric_forecasts = pd.to_numeric(future_combined.get("forecast"), errors="coerce").notna().any()
     if not has_numeric_forecasts:
-        warning_panel(
-            "Governed missing-capability gaps were written instead of fake forecasts. "
-            "This is not a model failure; repo-local forward scorer is not yet verified."
-        )
+        warning_panel("Governed missing-capability gaps were written instead of fake forecasts. " + _forecast_builder_gap_warning(future))
     elif has_gap_rows:
         warning_panel(
             "Numeric fixed-finalist forecasts were produced where repo-reproducible; unsupported streams were kept as governed gaps. "
-            "This is not a model failure; repo-local forward scorer is not yet verified."
+            + _forecast_builder_gap_warning(future)
         )
     gap_detail = _forecast_builder_gap_detail_table(future)
     if not gap_detail.empty:
@@ -2826,8 +2828,32 @@ def _short_forecast_gap_reason(row: pd.Series) -> str:
     if status == "validation_failed" or gap_code == "input_validation_failed":
         return "Input validation failed."
     if gap_code and gap_code not in {"None", "<NA>", "nan"}:
-        return "Repo-local forward scorer is not yet verified. This is not a model failure."
+        stream = str(row.get("stream", ""))
+        stream_label = str(row.get("stream_label", ""))
+        if gap_code == "heavy_ruc_component_forward_scorers_missing" or stream == "HEAVY_RUC" or stream_label == "Heavy RUC volume":
+            return HEAVY_RUC_FORECAST_GAP_REASON
+        return GENERIC_FORECAST_GAP_REASON
     return ""
+
+
+def _forecast_builder_gap_warning(frame: pd.DataFrame) -> str:
+    if frame is None or frame.empty:
+        return GENERIC_FORECAST_GAP_REASON
+    gaps = frame[~frame.get("forecast_available", pd.Series(dtype=bool)).fillna(False).astype(bool)].copy()
+    if gaps.empty:
+        return GENERIC_FORECAST_GAP_REASON
+    stream_codes = set(gaps.get("stream", pd.Series(dtype=str)).dropna().astype(str))
+    stream_labels = set(gaps.get("stream_label", pd.Series(dtype=str)).dropna().astype(str))
+    messages: list[str] = []
+    if "HEAVY_RUC" in stream_codes or "Heavy RUC volume" in stream_labels:
+        messages.append(HEAVY_RUC_FORECAST_GAP_REASON)
+    other_gaps = gaps[
+        ~gaps.get("stream", pd.Series(dtype=str)).astype(str).eq("HEAVY_RUC")
+        & ~gaps.get("stream_label", pd.Series(dtype=str)).astype(str).eq("Heavy RUC volume")
+    ]
+    if not other_gaps.empty:
+        messages.append(GENERIC_FORECAST_GAP_REASON)
+    return " ".join(messages)
 
 
 def _forecast_builder_gap_detail_table(frame: pd.DataFrame) -> pd.DataFrame:
@@ -3077,7 +3103,7 @@ def forecast_builder_figure(chart_rows: pd.DataFrame, future_rows: pd.DataFrame 
             fig.add_annotation(
                 x=x_anchor,
                 y=y_anchor,
-                text="Governed gap: forward scorer not yet verified",
+                text=_forecast_builder_governed_gap_annotation(stream_label),
                 showarrow=False,
                 font=dict(size=11, color="#92400E"),
                 bgcolor="rgba(255,247,237,0.94)",
@@ -3127,6 +3153,12 @@ def _stream_has_governed_gap(future_rows: pd.DataFrame | None, stream_label: str
     if stream.empty or "forecast_available" not in stream.columns:
         return False
     return not stream["forecast_available"].fillna(False).astype(bool).any()
+
+
+def _forecast_builder_governed_gap_annotation(stream_label: str) -> str:
+    if str(stream_label) == "Heavy RUC volume":
+        return "Governed gap: Heavy new-row scoring unavailable until parent-state parity passes"
+    return "Governed gap: repo-local forward scorer unavailable"
 
 
 def page5_workbook_card_html(manifest: dict[str, Any]) -> str:

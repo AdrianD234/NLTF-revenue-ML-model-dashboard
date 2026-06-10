@@ -74,10 +74,10 @@ MISSING_CAPABILITY_NOTES = {
         "Light RUC requires repo-local model_input_history and the fixed dynamic_RESID_GBR_n150_d1_lr0.05_w36 recipe."
     ),
     "HEAVY_RUC": (
-        "Heavy RUC remains a governed gap for forward scoring: repo-local packs prove the final weighted replay from "
-        "stored component predictions, but the executable new-row scorers are not yet parity-tested. Missing forward "
-        "scorers: C1 ElasticNet dynamic no-leads ylag w64, C2 Schiff GBR no ylag w64, C3 GBM dynamic no-leads ylag w52, "
-        "and C4 GBM dynamic no-leads ylag w40."
+        "Heavy RUC remains a governed gap for forward scoring: exact stored prediction replay is available from "
+        "parent component predictions, and training-fit R2/provenance is available from source-refit state, but the "
+        "original parent C3/C4 fitted estimators or exact parent feature matrices were not retained. New-row forward "
+        "scoring is unavailable until parent-state parity passes."
     ),
 }
 LIGHT_RUC_FORWARD_SCORER_VERSION = "light-ruc-forward-scorer-v1"
