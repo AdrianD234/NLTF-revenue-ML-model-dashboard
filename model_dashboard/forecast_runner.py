@@ -17,13 +17,24 @@ from openpyxl.comments import Comment
 from openpyxl.styles import Font, PatternFill, Protection
 from openpyxl.utils import get_column_letter
 
+from .forward_scorer_governance import (
+    ForwardScorerAudit,
+    GOVERNED_GAP,
+    NUMERIC_FORECAST_AVAILABLE,
+    artifact_hashes,
+    existing_basis,
+    missing_paths,
+)
+from .heavy_ruc_forward import evaluate_heavy_ruc_forward_scorer
+from .ped_forward import evaluate_ped_forward_scorer
+
 
 DEFAULT_FORECAST_HORIZON_QUARTERS = 20
 MIN_FORECAST_HORIZON_QUARTERS = 1
 FORECAST_HORIZON_QUARTERS = DEFAULT_FORECAST_HORIZON_QUARTERS
 TEMPLATE_FILENAME_PREFIX = "NLTF_forecast_input_template"
 TEMPLATE_FILENAME = f"{TEMPLATE_FILENAME_PREFIX}_{DEFAULT_FORECAST_HORIZON_QUARTERS}q.xlsx"
-FORECAST_RUNNER_VERSION = "forecast-runner-v4-forecast-display-history"
+FORECAST_RUNNER_VERSION = "forecast-runner-v5-forward-scorer-governance"
 FORECAST_BUILDER_TITLE = "Forecast Builder"
 FORECAST_BUILDER_NOTE = (
     "This workflow creates forward forecasts or governed missing-capability gaps from a user-supplied "
@@ -69,6 +80,17 @@ MISSING_CAPABILITY_NOTES = {
         "and C4 GBM dynamic no-leads ylag w40."
     ),
 }
+LIGHT_RUC_FORWARD_SCORER_VERSION = "light-ruc-forward-scorer-v1"
+CAPABILITY_METADATA_COLUMNS = [
+    "capability_status",
+    "scorer_version",
+    "source_artifact_hashes",
+    "parity_status",
+    "max_parity_delta",
+    "stored_replay_max_delta",
+    "required_components",
+    "missing_artifacts",
+]
 MODEL_INPUT_HISTORY_DIR = Path("data") / "model_input_history"
 MODEL_INPUT_HISTORY_FILES = {
     "PED": "ped_inputs.parquet",
@@ -849,6 +871,12 @@ def _future_forecast_chart_rows(future_forecasts: pd.DataFrame) -> pd.DataFrame:
                 "forecast_available": row.get("forecast_available"),
                 "gap_code": row.get("gap_code"),
                 "gap_reason": row.get("gap_reason"),
+                "capability_status": row.get("capability_status"),
+                "scorer_version": row.get("scorer_version"),
+                "source_artifact_hashes": row.get("source_artifact_hashes"),
+                "parity_status": row.get("parity_status"),
+                "max_parity_delta": row.get("max_parity_delta"),
+                "stored_replay_max_delta": row.get("stored_replay_max_delta"),
                 "source": "future_forecasts",
             }
         )
@@ -989,52 +1017,74 @@ def model_capability_gap_register(repo_root: Path | str | None = None) -> pd.Dat
     root = Path(repo_root) if repo_root is not None else repo_root_from_here()
     rows: list[dict[str, Any]] = []
     for stream in STREAM_ORDER:
-        available, gap_code, gap_reason, artifact_basis = _stream_forward_capability(root, stream)
-        rows.append(
-            {
-                "stream": stream,
-                "stream_label": STREAM_LABELS[stream],
-                "model": FINALIST_BY_STREAM[stream],
-                "forecast_capability_available": available,
-                "capability_status": "numeric_forecast_available" if available else "governed_gap",
-                "gap_code": gap_code,
-                "gap_reason": gap_reason,
-                "repo_artifact_basis": artifact_basis,
-                "required_for_forward_forecast": True,
-            }
-        )
+        rows.append(_stream_forward_capability(root, stream))
     return pd.DataFrame(rows)
 
 
-def _stream_forward_capability(root: Path, stream: str) -> tuple[bool, str | None, str, str]:
+def _stream_forward_capability(root: Path, stream: str) -> dict[str, Any]:
+    if stream == "PED":
+        return evaluate_ped_forward_scorer(root).to_capability_record()
+    if stream == "HEAVY_RUC":
+        return evaluate_heavy_ruc_forward_scorer(root).to_capability_record()
+
     history = root / MODEL_INPUT_HISTORY_DIR / MODEL_INPUT_HISTORY_FILES[stream]
     manifest = root / MODEL_INPUT_HISTORY_DIR / "manifest.json"
     if stream == "LIGHT_RUC":
         registry = root / "data" / "dashboard_evidence_pack_reproducibility" / "light_ruc" / "model_registry.parquet"
-        missing = [path for path in [history, manifest, registry] if not path.exists()]
+        requirements = root / "requirements.txt"
+        required = [history, manifest, registry, requirements]
+        missing = missing_paths(root, required)
+        hashes = artifact_hashes(root, required)
         sklearn_error = _sklearn_import_error()
         if not missing and sklearn_error is None:
-            basis = "; ".join(
-                [
-                    _repo_relative(root, history),
-                    _repo_relative(root, manifest),
-                    _repo_relative(root, registry),
-                    "requirements.txt::scikit-learn",
-                ]
-            )
-            return True, None, "", basis
+            return ForwardScorerAudit(
+                stream=stream,
+                stream_label=STREAM_LABELS[stream],
+                model=FINALIST_BY_STREAM[stream],
+                capability_status=NUMERIC_FORECAST_AVAILABLE,
+                gap_code=None,
+                gap_reason="",
+                repo_artifact_basis=existing_basis(root, required) + "; requirements.txt::scikit-learn",
+                scorer_version=LIGHT_RUC_FORWARD_SCORER_VERSION,
+                parity_status="passed_repo_local_recipe",
+                max_parity_delta=None,
+                stored_replay_max_delta=None,
+                source_artifact_hashes=hashes,
+                required_components=("base_schiff_ols", "residual_gbr", FINALIST_BY_STREAM[stream]),
+                forecast_capability_available=True,
+            ).to_capability_record()
         reason_parts: list[str] = []
         if missing:
-            reason_parts.append("missing repo-local artifacts: " + ", ".join(_repo_relative(root, path) for path in missing))
+            reason_parts.append("missing repo-local artifacts: " + ", ".join(missing))
         if sklearn_error is not None:
             reason_parts.append(f"scikit-learn runtime unavailable: {sklearn_error}")
-        return (
-            False,
-            MISSING_CAPABILITY_BY_STREAM[stream],
-            MISSING_CAPABILITY_NOTES[stream] + " " + "; ".join(reason_parts),
-            _capability_basis(root, stream),
-        )
-    return False, MISSING_CAPABILITY_BY_STREAM[stream], MISSING_CAPABILITY_NOTES[stream], _capability_basis(root, stream)
+        return ForwardScorerAudit(
+            stream=stream,
+            stream_label=STREAM_LABELS[stream],
+            model=FINALIST_BY_STREAM[stream],
+            capability_status=GOVERNED_GAP,
+            gap_code=MISSING_CAPABILITY_BY_STREAM[stream],
+            gap_reason=MISSING_CAPABILITY_NOTES[stream] + " " + "; ".join(reason_parts),
+            repo_artifact_basis=_capability_basis(root, stream),
+            scorer_version=LIGHT_RUC_FORWARD_SCORER_VERSION,
+            parity_status="not_run_missing_runtime_or_artifacts",
+            source_artifact_hashes=hashes,
+            missing_artifacts=tuple(missing),
+            required_components=("base_schiff_ols", "residual_gbr", FINALIST_BY_STREAM[stream]),
+            forecast_capability_available=False,
+        ).to_capability_record()
+    return ForwardScorerAudit(
+        stream=stream,
+        stream_label=STREAM_LABELS[stream],
+        model=FINALIST_BY_STREAM[stream],
+        capability_status=GOVERNED_GAP,
+        gap_code=MISSING_CAPABILITY_BY_STREAM[stream],
+        gap_reason=MISSING_CAPABILITY_NOTES[stream],
+        repo_artifact_basis=_capability_basis(root, stream),
+        scorer_version="not_implemented",
+        parity_status="not_run",
+        forecast_capability_available=False,
+    ).to_capability_record()
 
 
 def _sklearn_import_error() -> str | None:
@@ -1264,6 +1314,8 @@ def _forecast_output_rows(
         component_rows.append(_gap_component_forecast_rows(validation, capabilities, repo_root, stream, error_suffix=error_suffix))
     future = pd.concat(future_rows, ignore_index=True, sort=False) if future_rows else pd.DataFrame()
     components = pd.concat(component_rows, ignore_index=True, sort=False) if component_rows else pd.DataFrame()
+    future = _attach_capability_metadata(future, capabilities)
+    components = _attach_capability_metadata(components, capabilities)
     return future, components
 
 
@@ -1277,9 +1329,11 @@ def _gap_future_forecast_rows(
     rows: list[dict[str, Any]] = []
     cap_lookup = capabilities.set_index("stream").to_dict(orient="index")
     cap = cap_lookup[stream]
+    metadata = _capability_metadata_fields(cap)
     for horizon, period in enumerate(validation.forecast_periods, start=1):
         rows.append(
             {
+                **metadata,
                 "stream": stream,
                 "stream_label": STREAM_LABELS[stream],
                 "model": FINALIST_BY_STREAM[stream],
@@ -1310,11 +1364,13 @@ def _gap_component_forecast_rows(
     cap_lookup = capabilities.set_index("stream").to_dict(orient="index")
     components = _component_registry(repo_root)
     cap = cap_lookup[stream]
+    metadata = _capability_metadata_fields(cap)
     stream_components = components.get(stream, [])
     for horizon, period in enumerate(validation.forecast_periods, start=1):
         for component in stream_components:
             rows.append(
                 {
+                    **metadata,
                     "stream": stream,
                     "stream_label": STREAM_LABELS[stream],
                     "model": FINALIST_BY_STREAM[stream],
@@ -1335,6 +1391,20 @@ def _gap_component_forecast_rows(
                 }
             )
     return pd.DataFrame(rows)
+
+
+def _capability_metadata_fields(cap: dict[str, Any] | pd.Series) -> dict[str, Any]:
+    return {column: cap.get(column, pd.NA) for column in CAPABILITY_METADATA_COLUMNS}
+
+
+def _attach_capability_metadata(frame: pd.DataFrame, capabilities: pd.DataFrame) -> pd.DataFrame:
+    if frame is None or frame.empty or "stream" not in frame.columns or capabilities is None or capabilities.empty:
+        return pd.DataFrame() if frame is None else frame
+    cap_lookup = capabilities.set_index("stream").to_dict(orient="index")
+    out = frame.copy()
+    for column in CAPABILITY_METADATA_COLUMNS:
+        out[column] = out["stream"].map(lambda stream: cap_lookup.get(str(stream), {}).get(column, pd.NA))
+    return out
 
 
 def _light_ruc_forward_forecast(validation: ForecastValidationResult, repo_root: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -1653,6 +1723,7 @@ def _forecast_capability_report(
         if not forecast_available and not stream_future.empty:
             gap_code = first_non_null(stream_future.get("gap_code"))
             gap_reason = str(first_non_null(stream_future.get("gap_reason")) or "")
+        capability_status = NUMERIC_FORECAST_AVAILABLE if forecast_available else cap.get("capability_status")
         rows.append(
             {
                 "scenario_name": scenario_name,
@@ -1664,10 +1735,17 @@ def _forecast_capability_report(
                 "numeric_forecast_rows": numeric_count,
                 "governed_gap_rows": int(len(stream_future) - numeric_count),
                 "component_trace_rows": int(len(stream_components)),
-                "capability_status": "numeric_forecast_available" if forecast_available else "governed_gap",
+                "capability_status": capability_status,
                 "gap_code": gap_code if gap_code is not None else cap.get("gap_code"),
                 "gap_reason": gap_reason if gap_reason else cap.get("gap_reason"),
                 "repo_artifact_basis": cap.get("repo_artifact_basis"),
+                "scorer_version": cap.get("scorer_version"),
+                "source_artifact_hashes": cap.get("source_artifact_hashes"),
+                "parity_status": cap.get("parity_status"),
+                "max_parity_delta": cap.get("max_parity_delta"),
+                "stored_replay_max_delta": cap.get("stored_replay_max_delta"),
+                "required_components": cap.get("required_components"),
+                "missing_artifacts": cap.get("missing_artifacts"),
                 "fixed_finalists_only": True,
                 "broad_search_run": False,
             }
@@ -1703,6 +1781,9 @@ def _forecast_validation_report(validation: ForecastValidationResult, capabiliti
                 "",
                 f"- Fixed finalist: `{row['model']}`",
                 f"- Status: `{row['capability_status']}`",
+                f"- Scorer version: `{row.get('scorer_version')}`",
+                f"- Parity status: `{row.get('parity_status')}`",
+                f"- Max parity delta: `{row.get('max_parity_delta')}`",
                 f"- Gap code: `{row['gap_code']}`",
                 f"- Reason: {row['gap_reason'] or 'Repo-local fixed-finalist scorer is available.'}",
                 f"- Artifact basis: `{row['repo_artifact_basis']}`",

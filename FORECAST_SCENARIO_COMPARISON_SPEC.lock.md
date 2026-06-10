@@ -57,10 +57,16 @@ Required comparison columns include:
 - `availability_status`;
 - `gap_code`;
 - `gap_reason`;
+- `capability_status`;
+- `scorer_version`;
+- `source_artifact_hashes`;
+- `parity_status`;
+- `max_parity_delta`;
+- `stored_replay_max_delta`;
 - `fixed_finalist_only`;
 - `broad_search_run`.
 
-`forecast_scenario_capability_report.parquet` and `.csv` contain the row-wise union of scenario capability reports and must include `scenario_name`, stream identifiers, capability status, numeric row counts and gap codes.
+`forecast_scenario_capability_report.parquet` and `.csv` contain the row-wise union of scenario capability reports and must include `scenario_name`, stream identifiers, capability status, scorer version, parity status, artifact hashes, numeric row counts and gap codes.
 
 `forecast_scenario_chart_rows.parquet` and `.csv` contain display rows with:
 
@@ -71,6 +77,9 @@ Required comparison columns include:
 - `period`;
 - `value`;
 - `availability_status`.
+- `capability_status`;
+- `scorer_version`;
+- `parity_status`.
 
 Historical actual rows are de-duplicated by stream and period. Future forecast display rows keep missing `value` for governed gaps so the table/export can show the gap without plotting a fake forecast.
 
@@ -115,4 +124,4 @@ The Forecast Builder UI must:
 - Scenario comparison must not modify `artifacts/chart_sources`.
 - Scenario comparison must not recalculate historical finalists, MAPE/R2, diagnostics, scenario, stress or benchmark values.
 - Light RUC numeric forecasts must come from the fixed finalist forward scorer.
-- PED and Heavy RUC governed gaps must remain explicit until executable forward scorers are available.
+- PED and Heavy RUC governed gaps must remain explicit until executable forward scorers are available and parity-tested; current statuses are `parity_failed` for PED and `insufficient_artifacts` for Heavy RUC.

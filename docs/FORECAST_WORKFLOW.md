@@ -113,9 +113,11 @@ The current repo contains replay predictions, training-fit rows, component trace
 
 Current forward status:
 
-- PED: governed gap, `ped_inner_hpo_static_solver_forward_scorer_missing`;
+- PED: governed gap with `capability_status=parity_failed`, `ped_inner_hpo_static_solver_forward_scorer_missing`, because the repo-vendored inner HPO replay delta is above tolerance and the feature-level refit gap remains open;
 - Light RUC: numeric fixed-finalist forecast available from repo-local model-input history and the OLS-base plus GBM-residual recipe;
-- Heavy RUC: governed gap, `heavy_ruc_component_forward_scorers_missing`.
+- Heavy RUC: governed gap with `capability_status=insufficient_artifacts`, `heavy_ruc_component_forward_scorers_missing`, because stored C1-C4 weighted replay is proven but fitted component scorers or serialized estimators are unavailable.
+
+Every forecast run and scenario comparison carries scorer governance fields including `scorer_version`, `source_artifact_hashes`, `parity_status`, `max_parity_delta` and `stored_replay_max_delta`.
 
 Governed gaps are expected governance output, not zero forecasts and not hidden failures.
 

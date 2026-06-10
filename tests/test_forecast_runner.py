@@ -19,6 +19,7 @@ from model_dashboard.forecast_runner import (
     forecast_template_filename,
     future_quarters_after,
     latest_known_actual_period,
+    model_capability_gap_register,
     run_forecast_workbook,
     scenario_name_from_filename,
     validate_forecast_workbook,
@@ -140,6 +141,52 @@ def test_model_input_history_pack_is_committed_and_hash_backed() -> None:
         assert pd.to_numeric(frame["target"], errors="coerce").gt(0).any()
 
 
+def test_model_capability_register_is_parity_gated_and_hash_backed() -> None:
+    capabilities = model_capability_gap_register(ROOT).set_index("stream")
+    assert capabilities.loc["LIGHT_RUC", "capability_status"] == "numeric_forecast_available"
+    assert capabilities.loc["LIGHT_RUC", "forecast_capability_available"] == True
+    assert capabilities.loc["LIGHT_RUC", "parity_status"] == "passed_repo_local_recipe"
+
+    assert capabilities.loc["HEAVY_RUC", "capability_status"] == "insufficient_artifacts"
+    assert capabilities.loc["HEAVY_RUC", "forecast_capability_available"] == False
+    assert capabilities.loc["HEAVY_RUC", "gap_code"] == "heavy_ruc_component_forward_scorers_missing"
+    assert capabilities.loc["HEAVY_RUC", "parity_status"] == "not_run_insufficient_artifacts"
+    assert 0 <= capabilities.loc["HEAVY_RUC", "stored_replay_max_delta"] <= 1e-6
+    assert "source_artifacts is absent" in capabilities.loc["HEAVY_RUC", "gap_reason"]
+
+    assert capabilities.loc["PED", "capability_status"] == "parity_failed"
+    assert capabilities.loc["PED", "forecast_capability_available"] == False
+    assert capabilities.loc["PED", "gap_code"] == "ped_inner_hpo_static_solver_forward_scorer_missing"
+    assert capabilities.loc["PED", "parity_status"] == "failed_inner_hpo_replay_delta"
+    assert capabilities.loc["PED", "max_parity_delta"] > 1
+    assert "feature_level_refit_not_attempted" in capabilities.loc["PED", "gap_reason"]
+
+    for stream in STREAM_ORDER:
+        assert capabilities.loc[stream, "scorer_version"]
+        assert capabilities.loc[stream, "source_artifact_hashes"]
+
+
+def test_completed_basecase_and_high_population_validate_to_2050q4(tmp_path: Path) -> None:
+    basecase = create_completed_sample_workbook(
+        tmp_path / "NLTF_forecast_input_template_basecase.xlsx",
+        repo_root=ROOT,
+        end_period="2050Q4",
+    )
+    high_population = create_completed_sample_workbook(
+        tmp_path / "NLTF_forecast_input_template_high_population.xlsx",
+        repo_root=ROOT,
+        end_period="2050Q4",
+        value_multiplier=1.02,
+    )
+    for workbook in [basecase, high_population]:
+        validation = validate_forecast_workbook(workbook, repo_root=ROOT, expected_end_period="2050Q4")
+        assert validation.valid
+        assert validation.forecast_start_period == "2026Q1"
+        assert validation.forecast_end_period == "2050Q4"
+        assert len(validation.forecast_periods) == 100
+        assert len(validation.assumptions) == 100 * len(STREAM_ORDER)
+
+
 def test_completed_workbook_builds_transforms_and_numeric_light_outputs(tmp_path: Path) -> None:
     workbook = create_completed_sample_workbook(tmp_path / "completed.xlsx", repo_root=ROOT)
     result = run_forecast_workbook(
@@ -168,6 +215,18 @@ def test_completed_workbook_builds_transforms_and_numeric_light_outputs(tmp_path
     assert result.future_forecasts["scenario_name"].eq("basecase").all()
     assert result.capability_report["scenario_name"].eq("basecase").all()
     assert result.assumptions["scenario_name"].eq("basecase").all()
+    metadata_columns = {
+        "scorer_version",
+        "source_artifact_hashes",
+        "parity_status",
+        "max_parity_delta",
+        "stored_replay_max_delta",
+        "capability_status",
+    }
+    assert metadata_columns.issubset(result.future_forecasts.columns)
+    assert metadata_columns.issubset(result.component_forecasts.columns)
+    assert metadata_columns.issubset(result.capability_report.columns)
+    assert metadata_columns.issubset(result.forecast_chart_rows.columns)
     light = result.future_forecasts[result.future_forecasts["stream"].eq("LIGHT_RUC")]
     gaps = result.future_forecasts[~result.future_forecasts["stream"].eq("LIGHT_RUC")]
     assert len(light) == DEFAULT_FORECAST_HORIZON_QUARTERS
@@ -175,12 +234,20 @@ def test_completed_workbook_builds_transforms_and_numeric_light_outputs(tmp_path
     assert pd.to_numeric(light["forecast"], errors="coerce").notna().all()
     assert (pd.to_numeric(light["forecast"], errors="coerce") > 0).all()
     assert light["availability_status"].eq("numeric_forecast_available").all()
+    assert light["capability_status"].eq("numeric_forecast_available").all()
+    assert light["parity_status"].eq("passed_repo_local_recipe").all()
     assert gaps["forecast_available"].eq(False).all()
     assert gaps["forecast"].isna().all()
+    assert gaps["availability_status"].eq("governed_gap").all()
     assert set(gaps["gap_code"]) == {
         "ped_inner_hpo_static_solver_forward_scorer_missing",
         "heavy_ruc_component_forward_scorers_missing",
     }
+    gap_status = gaps.drop_duplicates("stream").set_index("stream")["capability_status"].to_dict()
+    assert gap_status == {"PED": "parity_failed", "HEAVY_RUC": "insufficient_artifacts"}
+    gap_parity = gaps.drop_duplicates("stream").set_index("stream")["parity_status"].to_dict()
+    assert gap_parity["PED"] == "failed_inner_hpo_replay_delta"
+    assert gap_parity["HEAVY_RUC"] == "not_run_insufficient_artifacts"
     heavy_reason = " ".join(gaps[gaps["stream"].eq("HEAVY_RUC")]["gap_reason"].dropna().astype(str).unique())
     ped_reason = " ".join(gaps[gaps["stream"].eq("PED")]["gap_reason"].dropna().astype(str).unique())
     assert "C1 ElasticNet dynamic no-leads ylag w64" in heavy_reason
@@ -192,8 +259,14 @@ def test_completed_workbook_builds_transforms_and_numeric_light_outputs(tmp_path
     )
     assert pd.to_numeric(light_components["component_forecast"], errors="coerce").notna().all()
     assert (result.future_forecasts["forecast_available"] == result.future_forecasts["stream"].eq("LIGHT_RUC")).all()
-    assert result.capability_report.set_index("stream").loc["LIGHT_RUC", "forecast_available"] == True
-    assert result.capability_report.set_index("stream").loc["LIGHT_RUC", "numeric_forecast_rows"] == DEFAULT_FORECAST_HORIZON_QUARTERS
+    capability = result.capability_report.set_index("stream")
+    assert capability.loc["LIGHT_RUC", "forecast_available"] == True
+    assert capability.loc["LIGHT_RUC", "numeric_forecast_rows"] == DEFAULT_FORECAST_HORIZON_QUARTERS
+    assert capability.loc["LIGHT_RUC", "capability_status"] == "numeric_forecast_available"
+    assert capability.loc["PED", "capability_status"] == "parity_failed"
+    assert capability.loc["HEAVY_RUC", "capability_status"] == "insufficient_artifacts"
+    assert capability.loc["PED", "max_parity_delta"] > 1
+    assert 0 <= capability.loc["HEAVY_RUC", "stored_replay_max_delta"] <= 1e-6
     assumptions = result.assumptions
     for column in [
         "q2_dummy",
@@ -212,6 +285,13 @@ def test_completed_workbook_builds_transforms_and_numeric_light_outputs(tmp_path
     manifest = json.loads((result.output_dir / "forecast_run_manifest.json").read_text(encoding="utf-8"))
     assert manifest["broad_search_run"] is False
     assert manifest["output_files"]
+    assert all(metadata_columns.issubset(record.keys()) for record in manifest["model_capabilities"])
+    capabilities_by_stream = {record["stream"]: record for record in manifest["model_capabilities"]}
+    assert capabilities_by_stream["LIGHT_RUC"]["capability_status"] == "numeric_forecast_available"
+    assert capabilities_by_stream["PED"]["capability_status"] == "parity_failed"
+    assert capabilities_by_stream["HEAVY_RUC"]["capability_status"] == "insufficient_artifacts"
+    assert capabilities_by_stream["PED"]["source_artifact_hashes"]
+    assert capabilities_by_stream["HEAVY_RUC"]["source_artifact_hashes"]
     assert "forecast_chart_rows.parquet" in manifest["output_files"]
     assert (result.output_dir / "forecast_capability_report.csv").exists()
     assert (result.output_dir / "forecast_chart_rows.parquet").exists()
@@ -233,6 +313,10 @@ def test_completed_workbook_builds_transforms_and_numeric_light_outputs(tmp_path
     )
     gap_chart = future_chart[~future_chart["stream"].eq("LIGHT_RUC")]
     assert gap_chart["value"].isna().all()
+    assert gap_chart.drop_duplicates("stream").set_index("stream")["capability_status"].to_dict() == {
+        "PED": "parity_failed",
+        "HEAVY_RUC": "insufficient_artifacts",
+    }
 
 
 def _clear_required_user_values(path: Path, stream: str, excel_row: int) -> None:

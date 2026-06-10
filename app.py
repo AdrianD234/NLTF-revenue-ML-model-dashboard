@@ -2893,6 +2893,10 @@ def _forecast_builder_capability_table(frame: pd.DataFrame) -> pd.DataFrame:
         "forecast_available",
         "numeric_forecast_rows",
         "governed_gap_rows",
+        "scorer_version",
+        "parity_status",
+        "max_parity_delta",
+        "stored_replay_max_delta",
         "gap_code",
         "gap_reason",
     ]
@@ -2907,6 +2911,10 @@ def _forecast_builder_capability_table(frame: pd.DataFrame) -> pd.DataFrame:
             "forecast_available": "Forecast available",
             "numeric_forecast_rows": "Numeric rows",
             "governed_gap_rows": "Gap rows",
+            "scorer_version": "Scorer version",
+            "parity_status": "Parity status",
+            "max_parity_delta": "Max parity delta",
+            "stored_replay_max_delta": "Stored replay delta",
             "gap_code": "Gap code",
             "gap_reason": "Gap reason",
         }

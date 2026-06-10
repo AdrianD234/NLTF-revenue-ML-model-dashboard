@@ -12,17 +12,17 @@ It must never overwrite or recalculate the historical dashboard evidence pack.
 - Forecast-run outputs live under `artifacts/forecast_runs/` and are ignored by git.
 - Existing finalists, KPI values, MAPE/R2 values, scenario outputs, stress outputs, diagnostics and chart-source calculations are unchanged.
 - The runner uses fixed finalist names only and must not run a broad candidate search.
-- If repo-local fitted model state is unavailable, the runner writes a governed missing-capability gap instead of a fake forecast.
+- If repo-local fitted model state is unavailable or parity fails, the runner writes a governed missing-capability gap instead of a fake forecast.
 - Light RUC may produce numeric fixed-finalist forecasts only from the repo-local model-input history and fixed OLS-base plus GBM-residual recipe.
-- PED and Heavy RUC remain governed forward-scoring gaps until executable new-row scorers are repo-local and parity-tested.
+- PED and Heavy RUC remain non-numeric forward-scoring gaps until executable new-row scorers are repo-local and parity-tested.
 
 ## Fixed Finalists
 
 | Stream | Fixed finalist | Forward-run status |
 |---|---|---|
-| PED | `PED__RESCUE_static_annual_weighted_top12_capnone` | Governed gap: `ped_inner_hpo_static_solver_forward_scorer_missing` |
+| PED | `PED__RESCUE_static_annual_weighted_top12_capnone` | `parity_failed`: `ped_inner_hpo_static_solver_forward_scorer_missing` |
 | Light RUC | `dynamic_RESID_GBR_n150_d1_lr0.05_w36` | Numeric fixed-finalist forecast when repo-local Light RUC history, registry and `scikit-learn` are available |
-| Heavy RUC | `HEAVY_RUC__RECON_STATIC_REBUILT` | Governed gap: `heavy_ruc_component_forward_scorers_missing` |
+| Heavy RUC | `HEAVY_RUC__RECON_STATIC_REBUILT` | `insufficient_artifacts`: `heavy_ruc_component_forward_scorers_missing` |
 
 ## Horizon And Validation Contract
 
@@ -71,6 +71,7 @@ CSV mirrors are generated artifacts for user download only. They must not feed d
 - `chart_sources_modified: false`;
 - numeric and governed-gap stream lists;
 - stream-level model capability status and gap code.
+- stream-level scorer metadata: `scorer_version`, `source_artifact_hashes`, `parity_status`, `max_parity_delta` and `stored_replay_max_delta`;
 - output-file entries for generated display artifacts such as `forecast_chart_rows.*`.
 
 ## Scenario Comparison Contract
@@ -97,4 +98,4 @@ Combined chart rows must de-duplicate `historical_actual` rows by stream and per
 
 Forward forecasts are available only when repo-local artifacts include enough fitted model state or a parity-tested scoring recipe to score new feature rows. Stored backtest predictions, scorecard rows, component replay rows, training-fit rows, weights alone or MAPE/R2 tables are not enough to forecast new quarters.
 
-Current repo-local evidence supports Light RUC fixed-finalist forward scoring from the vendored model-input history. Current repo-local PED and Heavy RUC evidence proves replay and governance diagnostics, not full new-row fitted scoring, so those streams emit governed gaps for every requested forecast row.
+Current repo-local evidence supports Light RUC fixed-finalist forward scoring from the vendored model-input history. Current repo-local Heavy RUC evidence proves stored C1-C4 weighted replay but lacks fitted component state, so Heavy RUC reports `insufficient_artifacts`. Current repo-local PED evidence includes vendored HPO artifacts but fails inner HPO parity, so PED reports `parity_failed`. Both streams emit missing governed-gap forecast values for every requested forecast row.
