@@ -86,6 +86,7 @@ REQUIRED_REPRODUCIBILITY_IMPORT_EXPORTS = {
     "format_r2",
 }
 R2_LADDER_DEP_FALLBACK_ENV = "NLTF_FORCE_R2_LADDER_DEP_FALLBACK"
+EXPECTED_IMPORT_SURFACE_REVISION = "2026-06-10-r2-ladder-wrapper"
 
 
 def normalise_requirement(line: str) -> str | None:
@@ -205,6 +206,11 @@ def assert_import_surface() -> None:
 
     if not hasattr(app, "main"):
         raise AssertionError("app.py imported, but main() is missing.")
+    revision = getattr(app, "STREAMLIT_IMPORT_SURFACE_REVISION", None)
+    if revision != EXPECTED_IMPORT_SURFACE_REVISION:
+        raise AssertionError(
+            f"app.py import surface revision is {revision!r}, expected {EXPECTED_IMPORT_SURFACE_REVISION!r}."
+        )
     missing = sorted(name for name in REQUIRED_UI_EXPORTS if not hasattr(ui, name))
     if missing:
         raise AssertionError("model_dashboard.ui is missing exports imported by app.py: " + ", ".join(missing))
@@ -351,6 +357,7 @@ def main() -> int:
     print("Streamlit deploy readiness: PASS")
     print(f"Repo: {ROOT}")
     print(f"Main file path: {ROOT / 'app.py'}")
+    print(f"Import surface revision: {EXPECTED_IMPORT_SURFACE_REVISION}")
     print(f"Bundled evidence pack: {PACK_ROOT}")
     return 0
 

@@ -173,6 +173,7 @@ from model_dashboard.ui import (
 
 
 LOADER_SCHEMA_VERSION = "stage1-governance-loader-v9-parquet-contract-schiff-class"
+STREAMLIT_IMPORT_SURFACE_REVISION = "2026-06-10-r2-ladder-wrapper"
 CURATED_DATA_DIR = Path("artifacts") / "curated_data"
 REPRODUCIBILITY_PAGE = "Governance & Reproducibility"
 SOURCE_WORKBOOK_NAME = "Master Copy revenue modelling workbook.xlsx"
