@@ -40,3 +40,7 @@ data/**
 !data/dashboard_evidence_pack_reproducibility/ped_inner_hpo/*.parquet
 !data/dashboard_evidence_pack_reproducibility/ped_inner_hpo/source_artifacts/
 !data/dashboard_evidence_pack_reproducibility/ped_inner_hpo/source_artifacts/**
+!data/model_input_history/
+!data/model_input_history/*.parquet
+!data/model_input_history/*.json
+!data/model_input_history/*.md

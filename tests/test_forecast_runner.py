@@ -65,7 +65,7 @@ def test_runner_handles_missing_inputs_cleanly(tmp_path: Path) -> None:
     build_forecast_input_template(template, repo_root=ROOT)
     result = run_forecast_workbook(template, output_dir=tmp_path / "blank_run", repo_root=ROOT, run_timestamp="blank-run")
     assert result.manifest["validation_status"] == "failed"
-    assert result.manifest["forecast_status"] == "governed_gap"
+    assert result.manifest["forecast_status"] == "validation_failed"
     assert result.manifest["broad_search_run"] is False
     assert result.future_forecasts["forecast_available"].eq(False).all()
     assert result.future_forecasts["forecast"].isna().all()
@@ -74,28 +74,74 @@ def test_runner_handles_missing_inputs_cleanly(tmp_path: Path) -> None:
         "future_forecasts.parquet",
         "component_forecasts.parquet",
         "forecast_assumptions.parquet",
+        "forecast_capability_report.parquet",
         "forecast_run_manifest.json",
         "forecast_validation_report.md",
+        "forecast_capability_report.csv",
     ]:
         assert (result.output_dir / name).exists(), name
 
 
-def test_completed_workbook_builds_transforms_and_governed_gap_outputs(tmp_path: Path) -> None:
+def test_model_input_history_pack_is_committed_and_hash_backed() -> None:
+    history_dir = ROOT / "data" / "model_input_history"
+    manifest_path = history_dir / "manifest.json"
+    assert manifest_path.exists()
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest["source_basename"] == "Master Copy revenue modelling workbook.xlsx"
+    assert manifest["source_sha256"]
+    assert manifest["workbook_full_path_public"] is False
+    paths = {
+        "PED": history_dir / "ped_inputs.parquet",
+        "LIGHT_RUC": history_dir / "light_ruc_inputs.parquet",
+        "HEAVY_RUC": history_dir / "heavy_ruc_inputs.parquet",
+    }
+    for stream, path in paths.items():
+        assert path.exists(), stream
+        assert path.stat().st_size < 1_000_000
+        frame = pd.read_parquet(path)
+        assert len(frame) >= 90
+        assert {"period", "target", "year", "quarter"}.issubset(frame.columns)
+        assert pd.to_numeric(frame["target"], errors="coerce").gt(0).any()
+
+
+def test_completed_workbook_builds_transforms_and_numeric_light_outputs(tmp_path: Path) -> None:
     workbook = create_completed_sample_workbook(tmp_path / "completed.xlsx", repo_root=ROOT)
     result = run_forecast_workbook(workbook, output_dir=tmp_path / "sample_run", repo_root=ROOT, run_timestamp="sample-run")
     assert result.manifest["validation_status"] == "passed"
-    assert result.manifest["forecast_status"] == "governed_gap"
+    assert result.manifest["forecast_status"] == "mixed_numeric_and_governed_gap"
+    assert result.manifest["numeric_forecast_streams"] == ["LIGHT_RUC"]
+    assert result.manifest["governed_gap_streams"] == ["HEAVY_RUC", "PED"]
     assert result.manifest["fixed_finalists_only"] is True
     assert result.manifest["broad_search_run"] is False
     assert result.manifest["evidence_pack_modified"] is False
     assert result.manifest["chart_sources_modified"] is False
     assert len(result.future_forecasts) == 36
-    assert len(result.component_forecasts) >= 72
-    assert set(result.future_forecasts["gap_code"]) == {
-        "ped_inner_hpo_static_solver_fitted_state_missing",
-        "light_ruc_ols_gbm_fitted_state_missing",
-        "heavy_ruc_component_fitted_state_missing",
+    light = result.future_forecasts[result.future_forecasts["stream"].eq("LIGHT_RUC")]
+    gaps = result.future_forecasts[~result.future_forecasts["stream"].eq("LIGHT_RUC")]
+    assert len(light) == FORECAST_HORIZON_QUARTERS
+    assert light["forecast_available"].eq(True).all()
+    assert pd.to_numeric(light["forecast"], errors="coerce").notna().all()
+    assert (pd.to_numeric(light["forecast"], errors="coerce") > 0).all()
+    assert light["availability_status"].eq("numeric_forecast_available").all()
+    assert gaps["forecast_available"].eq(False).all()
+    assert gaps["forecast"].isna().all()
+    assert set(gaps["gap_code"]) == {
+        "ped_inner_hpo_static_solver_forward_scorer_missing",
+        "heavy_ruc_component_forward_scorers_missing",
     }
+    heavy_reason = " ".join(gaps[gaps["stream"].eq("HEAVY_RUC")]["gap_reason"].dropna().astype(str).unique())
+    ped_reason = " ".join(gaps[gaps["stream"].eq("PED")]["gap_reason"].dropna().astype(str).unique())
+    assert "C1 ElasticNet dynamic no-leads ylag w64" in heavy_reason
+    assert "C4 GBM dynamic no-leads ylag w40" in heavy_reason
+    assert "inner HPO/static-solver forward scorer" in ped_reason
+    light_components = result.component_forecasts[result.component_forecasts["stream"].eq("LIGHT_RUC")]
+    assert {"base_schiff_ols", "residual_gbr", "dynamic_RESID_GBR_n150_d1_lr0.05_w36"}.issubset(
+        set(light_components["component_model"].astype(str))
+    )
+    assert pd.to_numeric(light_components["component_forecast"], errors="coerce").notna().all()
+    assert (result.future_forecasts["forecast_available"] == result.future_forecasts["stream"].eq("LIGHT_RUC")).all()
+    assert result.capability_report.set_index("stream").loc["LIGHT_RUC", "forecast_available"] == True
+    assert result.capability_report.set_index("stream").loc["LIGHT_RUC", "numeric_forecast_rows"] == FORECAST_HORIZON_QUARTERS
     assumptions = result.assumptions
     for column in [
         "q2_dummy",
@@ -114,6 +160,24 @@ def test_completed_workbook_builds_transforms_and_governed_gap_outputs(tmp_path:
     manifest = json.loads((result.output_dir / "forecast_run_manifest.json").read_text(encoding="utf-8"))
     assert manifest["broad_search_run"] is False
     assert manifest["output_files"]
+    assert (result.output_dir / "forecast_capability_report.csv").exists()
+
+
+def test_forecast_runner_does_not_touch_evidence_pack(tmp_path: Path) -> None:
+    evidence_dir = ROOT / "data" / "dashboard_evidence_pack"
+    before = {
+        path.relative_to(evidence_dir).as_posix(): path.read_bytes()
+        for path in evidence_dir.rglob("*")
+        if path.is_file()
+    }
+    workbook = create_completed_sample_workbook(tmp_path / "completed.xlsx", repo_root=ROOT)
+    run_forecast_workbook(workbook, output_dir=tmp_path / "sample_run", repo_root=ROOT, run_timestamp="evidence-isolation")
+    after = {
+        path.relative_to(evidence_dir).as_posix(): path.read_bytes()
+        for path in evidence_dir.rglob("*")
+        if path.is_file()
+    }
+    assert after == before
 
 
 def test_forecast_runner_does_not_touch_chart_sources(tmp_path: Path) -> None:

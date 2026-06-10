@@ -5,3 +5,4 @@ plotly
 pyarrow
 openpyxl
 pillow
+scikit-learn

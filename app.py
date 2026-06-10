@@ -2579,6 +2579,10 @@ def render_forecast_builder_result(result: Any) -> None:
             ("Evidence pack", "unchanged", "forecast run is isolated"),
         ]
     )
+    capability_report = getattr(result, "capability_report", pd.DataFrame())
+    if isinstance(capability_report, pd.DataFrame) and not capability_report.empty:
+        st.markdown("<div class='page5-panel-title'>Forecast capability by stream</div>", unsafe_allow_html=True)
+        display_table(_forecast_builder_capability_table(capability_report), height=140, max_rows=6)
     stream_options = ["All streams"] + sorted(result.future_forecasts["stream_label"].dropna().astype(str).unique().tolist())
     selected_stream = st.selectbox("Forecast stream", stream_options, key="forecast_builder_stream")
     future = result.future_forecasts.copy()
@@ -2595,8 +2599,13 @@ def render_forecast_builder_result(result: Any) -> None:
         forecast_builder_figure(future),
         notes_as_tooltip=False,
     )
+    has_gap_rows = "forecast_available" in future.columns and (~future["forecast_available"].fillna(False).astype(bool)).any()
     if not result.has_numeric_forecasts:
         warning_panel("Governed missing-capability gaps were written instead of fake forecasts because fitted finalist states are not repo-local.")
+    elif has_gap_rows:
+        warning_panel(
+            "Numeric fixed-finalist forecasts were produced where repo-reproducible; unsupported streams were kept as governed gaps."
+        )
 
     tabs = st.tabs(["Heavy component trace", "Light base/residual trace", "PED component trace"])
     trace_filters = [
@@ -2649,6 +2658,32 @@ def _forecast_builder_table(frame: pd.DataFrame) -> pd.DataFrame:
     )
 
 
+def _forecast_builder_capability_table(frame: pd.DataFrame) -> pd.DataFrame:
+    if frame is None or frame.empty:
+        return pd.DataFrame()
+    columns = [
+        "stream_label",
+        "capability_status",
+        "forecast_available",
+        "numeric_forecast_rows",
+        "governed_gap_rows",
+        "gap_code",
+        "gap_reason",
+    ]
+    table = frame[[column for column in columns if column in frame.columns]].copy()
+    return table.rename(
+        columns={
+            "stream_label": "Stream",
+            "capability_status": "Capability",
+            "forecast_available": "Forecast available",
+            "numeric_forecast_rows": "Numeric rows",
+            "governed_gap_rows": "Gap rows",
+            "gap_code": "Gap code",
+            "gap_reason": "Gap reason",
+        }
+    )
+
+
 def _forecast_builder_component_table(frame: pd.DataFrame) -> pd.DataFrame:
     if frame is None or frame.empty:
         return pd.DataFrame()
@@ -2660,8 +2695,11 @@ def _forecast_builder_component_table(frame: pd.DataFrame) -> pd.DataFrame:
         "target_period",
         "horizon",
         "component_forecast",
+        "component_log_value",
+        "weighted_component_forecast",
         "availability_status",
         "gap_code",
+        "gap_reason",
     ]
     table = frame[[column for column in columns if column in frame.columns]].copy()
     return table.rename(
@@ -2673,8 +2711,11 @@ def _forecast_builder_component_table(frame: pd.DataFrame) -> pd.DataFrame:
             "target_period": "Quarter",
             "horizon": "Horizon",
             "component_forecast": "Component forecast",
+            "component_log_value": "Component log value",
+            "weighted_component_forecast": "Weighted component forecast",
             "availability_status": "Availability",
             "gap_code": "Gap code",
+            "gap_reason": "Gap reason",
         }
     )
 

@@ -19,7 +19,7 @@ from openpyxl.utils import get_column_letter
 
 FORECAST_HORIZON_QUARTERS = 12
 TEMPLATE_FILENAME = "NLTF_forecast_input_template_12q.xlsx"
-FORECAST_RUNNER_VERSION = "forecast-runner-v1-governed-gap-aware"
+FORECAST_RUNNER_VERSION = "forecast-runner-v2-fixed-finalist-light-ruc"
 FORECAST_BUILDER_TITLE = "Forecast Builder"
 FORECAST_BUILDER_NOTE = (
     "This workflow creates forward forecasts or governed missing-capability gaps from a user-supplied "
@@ -44,24 +44,62 @@ FINALIST_BY_STREAM = {
     "HEAVY_RUC": "HEAVY_RUC__RECON_STATIC_REBUILT",
 }
 MISSING_CAPABILITY_BY_STREAM = {
-    "PED": "ped_inner_hpo_static_solver_fitted_state_missing",
-    "LIGHT_RUC": "light_ruc_ols_gbm_fitted_state_missing",
-    "HEAVY_RUC": "heavy_ruc_component_fitted_state_missing",
+    "PED": "ped_inner_hpo_static_solver_forward_scorer_missing",
+    "LIGHT_RUC": "light_ruc_fixed_finalist_forward_scorer_missing",
+    "HEAVY_RUC": "heavy_ruc_component_forward_scorers_missing",
 }
 MISSING_CAPABILITY_NOTES = {
     "PED": (
-        "Repo-local PED packs prove stored component-prediction replay and training-fit R2, but do not include "
-        "the fitted inner HPO/static-solver objects required to score new assumption rows."
+        "PED remains a governed gap for forward scoring: repo-vendored HPO/static-solver artifacts prove stored "
+        "component replay and training-fit provenance, but do not provide a verified executable inner HPO/static-solver "
+        "forward scorer for new assumption rows. Missing forward state: nested top-member refit registry, feature matrix "
+        "builder parity tests, and inner weighted replay parity for new rows."
     ),
     "LIGHT_RUC": (
-        "Repo-local Light RUC packs prove backtest replay and training-fit R2, but do not include the fitted "
-        "OLS base coefficients plus GBM residual model state required for new forward rows."
+        "Light RUC requires repo-local model_input_history and the fixed dynamic_RESID_GBR_n150_d1_lr0.05_w36 recipe."
     ),
     "HEAVY_RUC": (
-        "Repo-local Heavy RUC packs prove weighted replay from stored component predictions, but do not include "
-        "the four fitted component model states required to generate new component predictions."
+        "Heavy RUC remains a governed gap for forward scoring: repo-local packs prove the final weighted replay from "
+        "stored component predictions, but the executable new-row scorers are not yet parity-tested. Missing forward "
+        "scorers: C1 ElasticNet dynamic no-leads ylag w64, C2 Schiff GBR no ylag w64, C3 GBM dynamic no-leads ylag w52, "
+        "and C4 GBM dynamic no-leads ylag w40."
     ),
 }
+MODEL_INPUT_HISTORY_DIR = Path("data") / "model_input_history"
+MODEL_INPUT_HISTORY_FILES = {
+    "PED": "ped_inputs.parquet",
+    "LIGHT_RUC": "light_ruc_inputs.parquet",
+    "HEAVY_RUC": "heavy_ruc_inputs.parquet",
+}
+LIGHT_RUC_WINDOW = 36
+LIGHT_RUC_BASE_FEATURES = [
+    "log_real_diesel_price",
+    "log_real_light_ruc_price",
+    "log_lagged_real_light_ruc_price",
+    "log_real_gdp",
+    "post_2020_dummy",
+    "q2_dummy",
+    "q3_dummy",
+    "q4_dummy",
+]
+LIGHT_RUC_RESIDUAL_FEATURES = [
+    *LIGHT_RUC_BASE_FEATURES,
+    "diesel_x_ruc_price",
+    "gdp_x_post2020",
+    "ruc_x_post2020",
+    "diesel_x_post2020",
+    "time_trend",
+    "log_trend",
+    "log_real_diesel_price_diff1",
+    "log_real_diesel_price_lag1",
+    "log_real_diesel_price_lag4",
+    "log_real_light_ruc_price_diff1",
+    "log_real_light_ruc_price_lag1",
+    "log_real_light_ruc_price_lag4",
+    "log_real_gdp_diff1",
+    "log_real_gdp_lag1",
+    "log_real_gdp_lag4",
+]
 
 
 @dataclass(frozen=True)
@@ -188,6 +226,7 @@ class ForecastRunResult:
     validation: ForecastValidationResult
     future_forecasts: pd.DataFrame
     component_forecasts: pd.DataFrame
+    capability_report: pd.DataFrame
     assumptions: pd.DataFrame
     report_markdown: str
 
@@ -446,10 +485,11 @@ def run_forecast_workbook(
     workbook_hash = hashlib.sha256(workbook_bytes).hexdigest() if workbook_bytes else None
 
     capabilities = model_capability_gap_register(root)
-    future = _future_forecast_rows(validation, capabilities)
-    components = _component_forecast_rows(validation, capabilities, root)
+    future, components = _forecast_output_rows(validation, capabilities, root)
+    capability_report = _forecast_capability_report(capabilities, future, components, validation)
     assumptions = validation.assumptions.copy()
     report = _forecast_validation_report(validation, capabilities)
+    forecast_status = _forecast_status(validation, future)
     manifest = {
         "run_id": timestamp,
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -465,26 +505,37 @@ def run_forecast_workbook(
         "broad_search_run": False,
         "evidence_pack_modified": False,
         "chart_sources_modified": False,
-        "forecast_status": "governed_gap" if not _any_forecast_available(capabilities) else "available",
-        "model_capabilities": capabilities.to_dict(orient="records"),
+        "forecast_status": forecast_status,
+        "numeric_forecast_streams": sorted(
+            future.loc[future["forecast_available"].fillna(False).astype(bool), "stream"].dropna().astype(str).unique().tolist()
+        ),
+        "governed_gap_streams": sorted(
+            future.loc[~future["forecast_available"].fillna(False).astype(bool), "stream"].dropna().astype(str).unique().tolist()
+        ),
+        "model_capabilities": _json_safe_records(capabilities),
         "output_files": [
             "future_forecasts.parquet",
             "component_forecasts.parquet",
             "forecast_assumptions.parquet",
+            "forecast_capability_report.parquet",
             "forecast_run_manifest.json",
             "forecast_validation_report.md",
             "future_forecasts.csv",
             "component_forecasts.csv",
+            "forecast_assumptions.csv",
+            "forecast_capability_report.csv",
         ],
     }
 
     future.to_parquet(run_dir / "future_forecasts.parquet", index=False)
     components.to_parquet(run_dir / "component_forecasts.parquet", index=False)
     assumptions.to_parquet(run_dir / "forecast_assumptions.parquet", index=False)
+    capability_report.to_parquet(run_dir / "forecast_capability_report.parquet", index=False)
     future.to_csv(run_dir / "future_forecasts.csv", index=False)
     components.to_csv(run_dir / "component_forecasts.csv", index=False)
     assumptions.to_csv(run_dir / "forecast_assumptions.csv", index=False)
-    (run_dir / "forecast_run_manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    capability_report.to_csv(run_dir / "forecast_capability_report.csv", index=False)
+    (run_dir / "forecast_run_manifest.json").write_text(json.dumps(manifest, indent=2, allow_nan=False), encoding="utf-8")
     (run_dir / "forecast_validation_report.md").write_text(report, encoding="utf-8")
 
     return ForecastRunResult(
@@ -493,6 +544,7 @@ def run_forecast_workbook(
         validation=validation,
         future_forecasts=future,
         component_forecasts=components,
+        capability_report=capability_report,
         assumptions=assumptions,
         report_markdown=report,
     )
@@ -544,43 +596,70 @@ def create_completed_sample_workbook(
 
 def model_capability_gap_register(repo_root: Path | str | None = None) -> pd.DataFrame:
     root = Path(repo_root) if repo_root is not None else repo_root_from_here()
-    model_artifact_glob = ["*.pkl", "*.pickle", "*.joblib"]
     rows: list[dict[str, Any]] = []
     for stream in STREAM_ORDER:
-        stream_root = root / "data" / "dashboard_evidence_pack_reproducibility" / stream.lower()
-        if stream == "LIGHT_RUC":
-            stream_root = root / "data" / "dashboard_evidence_pack_reproducibility" / "light_ruc"
-        if stream == "HEAVY_RUC":
-            stream_root = root / "data" / "dashboard_evidence_pack_reproducibility" / "heavy_ruc"
-        if stream == "PED":
-            stream_root = root / "data" / "dashboard_evidence_pack_reproducibility" / "ped_inner_hpo"
-        model_artifacts = [
-            path
-            for pattern in model_artifact_glob
-            for path in stream_root.rglob(pattern)
-            if path.is_file()
-        ] if stream_root.exists() else []
-        available = bool(model_artifacts)
+        available, gap_code, gap_reason, artifact_basis = _stream_forward_capability(root, stream)
         rows.append(
             {
                 "stream": stream,
                 "stream_label": STREAM_LABELS[stream],
                 "model": FINALIST_BY_STREAM[stream],
                 "forecast_capability_available": available,
-                "capability_status": "available" if available else "governed_gap",
-                "gap_code": None if available else MISSING_CAPABILITY_BY_STREAM[stream],
-                "gap_reason": "" if available else MISSING_CAPABILITY_NOTES[stream],
-                "repo_artifact_basis": "; ".join(_repo_relative(root, path) for path in model_artifacts) if available else _capability_basis(root, stream),
+                "capability_status": "numeric_forecast_available" if available else "governed_gap",
+                "gap_code": gap_code,
+                "gap_reason": gap_reason,
+                "repo_artifact_basis": artifact_basis,
                 "required_for_forward_forecast": True,
             }
         )
     return pd.DataFrame(rows)
 
 
+def _stream_forward_capability(root: Path, stream: str) -> tuple[bool, str | None, str, str]:
+    history = root / MODEL_INPUT_HISTORY_DIR / MODEL_INPUT_HISTORY_FILES[stream]
+    manifest = root / MODEL_INPUT_HISTORY_DIR / "manifest.json"
+    if stream == "LIGHT_RUC":
+        registry = root / "data" / "dashboard_evidence_pack_reproducibility" / "light_ruc" / "model_registry.parquet"
+        missing = [path for path in [history, manifest, registry] if not path.exists()]
+        sklearn_error = _sklearn_import_error()
+        if not missing and sklearn_error is None:
+            basis = "; ".join(
+                [
+                    _repo_relative(root, history),
+                    _repo_relative(root, manifest),
+                    _repo_relative(root, registry),
+                    "requirements.txt::scikit-learn",
+                ]
+            )
+            return True, None, "", basis
+        reason_parts: list[str] = []
+        if missing:
+            reason_parts.append("missing repo-local artifacts: " + ", ".join(_repo_relative(root, path) for path in missing))
+        if sklearn_error is not None:
+            reason_parts.append(f"scikit-learn runtime unavailable: {sklearn_error}")
+        return (
+            False,
+            MISSING_CAPABILITY_BY_STREAM[stream],
+            MISSING_CAPABILITY_NOTES[stream] + " " + "; ".join(reason_parts),
+            _capability_basis(root, stream),
+        )
+    return False, MISSING_CAPABILITY_BY_STREAM[stream], MISSING_CAPABILITY_NOTES[stream], _capability_basis(root, stream)
+
+
+def _sklearn_import_error() -> str | None:
+    try:
+        import sklearn  # noqa: F401
+    except Exception as exc:
+        return f"{type(exc).__name__}: {exc}"
+    return None
+
+
 def _capability_basis(root: Path, stream: str) -> str:
     paths = [
         root / "data" / "dashboard_evidence_pack" / "data" / "model_registry.parquet",
         root / "data" / "dashboard_evidence_pack" / "data" / "model_coefficients.parquet",
+        root / MODEL_INPUT_HISTORY_DIR / MODEL_INPUT_HISTORY_FILES[stream],
+        root / MODEL_INPUT_HISTORY_DIR / "manifest.json",
     ]
     if stream == "PED":
         paths.append(root / "data" / "dashboard_evidence_pack_reproducibility" / "ped_inner_hpo" / "model_coefficients.parquet")
@@ -722,25 +801,99 @@ def _build_stream_assumptions(frame: pd.DataFrame, stream: str, periods: list[st
     return out
 
 
-def _future_forecast_rows(validation: ForecastValidationResult, capabilities: pd.DataFrame) -> pd.DataFrame:
+def _forecast_output_rows(
+    validation: ForecastValidationResult,
+    capabilities: pd.DataFrame,
+    repo_root: Path,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    light_future: pd.DataFrame | None = None
+    light_components: pd.DataFrame | None = None
+    light_error: str | None = None
+    cap_lookup = capabilities.set_index("stream").to_dict(orient="index")
+    if validation.valid and cap_lookup.get("LIGHT_RUC", {}).get("forecast_capability_available"):
+        try:
+            light_future, light_components = _light_ruc_forward_forecast(validation, repo_root)
+        except Exception as exc:
+            light_error = f"{type(exc).__name__}: {exc}"
+
+    future_rows: list[pd.DataFrame] = []
+    component_rows: list[pd.DataFrame] = []
+    for stream in STREAM_ORDER:
+        if stream == "LIGHT_RUC" and light_future is not None and light_components is not None:
+            future_rows.append(light_future)
+            component_rows.append(light_components)
+            continue
+        error_suffix = f" Scorer error: {light_error}" if stream == "LIGHT_RUC" and light_error else ""
+        future_rows.append(_gap_future_forecast_rows(validation, capabilities, stream, error_suffix=error_suffix))
+        component_rows.append(_gap_component_forecast_rows(validation, capabilities, repo_root, stream, error_suffix=error_suffix))
+    future = pd.concat(future_rows, ignore_index=True, sort=False) if future_rows else pd.DataFrame()
+    components = pd.concat(component_rows, ignore_index=True, sort=False) if component_rows else pd.DataFrame()
+    return future, components
+
+
+def _gap_future_forecast_rows(
+    validation: ForecastValidationResult,
+    capabilities: pd.DataFrame,
+    stream: str,
+    *,
+    error_suffix: str = "",
+) -> pd.DataFrame:
     rows: list[dict[str, Any]] = []
     cap_lookup = capabilities.set_index("stream").to_dict(orient="index")
-    for stream in STREAM_ORDER:
-        cap = cap_lookup[stream]
-        for horizon, period in enumerate(validation.forecast_periods, start=1):
+    cap = cap_lookup[stream]
+    for horizon, period in enumerate(validation.forecast_periods, start=1):
+        rows.append(
+            {
+                "stream": stream,
+                "stream_label": STREAM_LABELS[stream],
+                "model": FINALIST_BY_STREAM[stream],
+                "target_period": period,
+                "horizon": horizon,
+                "forecast": pd.NA,
+                "prediction": pd.NA,
+                "forecast_available": False,
+                "availability_status": "validation_failed" if not validation.valid else "governed_gap",
+                "gap_code": "input_validation_failed" if not validation.valid else cap["gap_code"],
+                "gap_reason": "; ".join(validation.errors) if not validation.valid else str(cap["gap_reason"]) + error_suffix,
+                "fixed_finalist_only": True,
+                "broad_search_run": False,
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def _gap_component_forecast_rows(
+    validation: ForecastValidationResult,
+    capabilities: pd.DataFrame,
+    repo_root: Path,
+    stream: str,
+    *,
+    error_suffix: str = "",
+) -> pd.DataFrame:
+    rows: list[dict[str, Any]] = []
+    cap_lookup = capabilities.set_index("stream").to_dict(orient="index")
+    components = _component_registry(repo_root)
+    cap = cap_lookup[stream]
+    stream_components = components.get(stream, [])
+    for horizon, period in enumerate(validation.forecast_periods, start=1):
+        for component in stream_components:
             rows.append(
                 {
                     "stream": stream,
                     "stream_label": STREAM_LABELS[stream],
                     "model": FINALIST_BY_STREAM[stream],
+                    "component_model": component.get("component_model"),
+                    "component_role": component.get("component_role"),
+                    "component_weight": component.get("component_weight"),
                     "target_period": period,
                     "horizon": horizon,
-                    "forecast": pd.NA,
-                    "prediction": pd.NA,
+                    "component_forecast": pd.NA,
+                    "component_log_value": pd.NA,
+                    "weighted_component_forecast": pd.NA,
                     "forecast_available": False,
-                    "availability_status": "validation_failed" if not validation.valid else cap["capability_status"],
+                    "availability_status": "validation_failed" if not validation.valid else "governed_gap",
                     "gap_code": "input_validation_failed" if not validation.valid else cap["gap_code"],
-                    "gap_reason": "; ".join(validation.errors) if not validation.valid else cap["gap_reason"],
+                    "gap_reason": "; ".join(validation.errors) if not validation.valid else str(cap["gap_reason"]) + error_suffix,
                     "fixed_finalist_only": True,
                     "broad_search_run": False,
                 }
@@ -748,40 +901,221 @@ def _future_forecast_rows(validation: ForecastValidationResult, capabilities: pd
     return pd.DataFrame(rows)
 
 
-def _component_forecast_rows(
-    validation: ForecastValidationResult,
-    capabilities: pd.DataFrame,
-    repo_root: Path,
-) -> pd.DataFrame:
-    rows: list[dict[str, Any]] = []
-    cap_lookup = capabilities.set_index("stream").to_dict(orient="index")
-    components = _component_registry(repo_root)
-    for stream in STREAM_ORDER:
-        cap = cap_lookup[stream]
-        stream_components = components.get(stream, [])
-        for horizon, period in enumerate(validation.forecast_periods, start=1):
-            for component in stream_components:
-                rows.append(
-                    {
-                        "stream": stream,
-                        "stream_label": STREAM_LABELS[stream],
-                        "model": FINALIST_BY_STREAM[stream],
-                        "component_model": component.get("component_model"),
-                        "component_role": component.get("component_role"),
-                        "component_weight": component.get("component_weight"),
-                        "target_period": period,
-                        "horizon": horizon,
-                        "component_forecast": pd.NA,
-                        "weighted_component_forecast": pd.NA,
-                        "forecast_available": False,
-                        "availability_status": "validation_failed" if not validation.valid else cap["capability_status"],
-                        "gap_code": "input_validation_failed" if not validation.valid else cap["gap_code"],
-                        "gap_reason": "; ".join(validation.errors) if not validation.valid else cap["gap_reason"],
-                        "fixed_finalist_only": True,
-                        "broad_search_run": False,
-                    }
-                )
-    return pd.DataFrame(rows)
+def _light_ruc_forward_forecast(validation: ForecastValidationResult, repo_root: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
+    from sklearn.ensemble import GradientBoostingRegressor
+
+    history_path = repo_root / MODEL_INPUT_HISTORY_DIR / MODEL_INPUT_HISTORY_FILES["LIGHT_RUC"]
+    history = pd.read_parquet(history_path)
+    future = validation.assumptions[validation.assumptions["stream"].astype(str).eq("LIGHT_RUC")].copy()
+    if future.empty:
+        raise ValueError("Light RUC future assumption rows are missing from the validated workbook.")
+
+    feature_frame = _light_ruc_feature_frame(history, future, validation.latest_actual_period)
+    train = feature_frame[feature_frame["sample_scope"].eq("history")].copy()
+    train = train[train["period_key"].le(quarter_sort_key(validation.latest_actual_period))].copy()
+    train["target"] = pd.to_numeric(train["target"], errors="coerce")
+    required = ["target", *LIGHT_RUC_BASE_FEATURES, *LIGHT_RUC_RESIDUAL_FEATURES]
+    train = train.replace([np.inf, -np.inf], np.nan).dropna(subset=required)
+    train = train[train["target"].gt(0)].sort_values("period_key").tail(LIGHT_RUC_WINDOW).copy()
+    if len(train) < LIGHT_RUC_WINDOW:
+        raise ValueError(f"Light RUC scorer requires {LIGHT_RUC_WINDOW} usable training rows; found {len(train)}.")
+
+    future_features = feature_frame[feature_frame["sample_scope"].eq("future")].copy()
+    future_features = future_features.replace([np.inf, -np.inf], np.nan)
+    missing_future = _missing_feature_columns(future_features, LIGHT_RUC_RESIDUAL_FEATURES)
+    if missing_future:
+        raise ValueError("Light RUC future rows are missing required residual features: " + ", ".join(missing_future))
+
+    y = np.log(train["target"].to_numpy(dtype=float))
+    base_x = train[LIGHT_RUC_BASE_FEATURES].to_numpy(dtype=float)
+    beta = _ols_fit(base_x, y)
+    train_base_log = _ols_predict(base_x, beta)
+    residual_target = y - train_base_log
+    residual_model = GradientBoostingRegressor(
+        n_estimators=150,
+        max_depth=1,
+        learning_rate=0.05,
+        subsample=0.85,
+        random_state=42,
+        loss="squared_error",
+    )
+    residual_model.fit(train[LIGHT_RUC_RESIDUAL_FEATURES].to_numpy(dtype=float), residual_target)
+
+    future_base_log = _ols_predict(future_features[LIGHT_RUC_BASE_FEATURES].to_numpy(dtype=float), beta)
+    future_residual_log = residual_model.predict(future_features[LIGHT_RUC_RESIDUAL_FEATURES].to_numpy(dtype=float))
+    final_log = future_base_log + future_residual_log
+    forecast = np.exp(final_log)
+
+    future_rows: list[dict[str, Any]] = []
+    component_rows: list[dict[str, Any]] = []
+    train_start = str(train.iloc[0]["period"])
+    train_end = str(train.iloc[-1]["period"])
+    for idx, (_, row) in enumerate(future_features.sort_values("horizon").iterrows()):
+        horizon = int(row["horizon"])
+        period = str(row["period"])
+        base_log = float(future_base_log[idx])
+        residual_log = float(future_residual_log[idx])
+        final_log_value = float(final_log[idx])
+        final_prediction = float(forecast[idx])
+        base_prediction = float(np.exp(base_log))
+        residual_multiplier = float(np.exp(residual_log))
+        common = {
+            "stream": "LIGHT_RUC",
+            "stream_label": STREAM_LABELS["LIGHT_RUC"],
+            "model": FINALIST_BY_STREAM["LIGHT_RUC"],
+            "target_period": period,
+            "horizon": horizon,
+            "availability_status": "numeric_forecast_available",
+            "gap_code": None,
+            "gap_reason": "",
+            "fixed_finalist_only": True,
+            "broad_search_run": False,
+            "source_recipe": "Schiff-style OLS base plus GradientBoostingRegressor residual correction",
+            "training_window_start": train_start,
+            "training_window_end": train_end,
+            "training_window_rows": len(train),
+            "score_basis": "forward_assumption_workbook",
+        }
+        future_rows.append(
+            {
+                **common,
+                "forecast": final_prediction,
+                "prediction": final_prediction,
+                "forecast_available": True,
+                "base_forecast": base_prediction,
+                "residual_log_correction": residual_log,
+                "residual_multiplier": residual_multiplier,
+                "final_log_forecast": final_log_value,
+            }
+        )
+        component_rows.extend(
+            [
+                {
+                    **common,
+                    "component_model": "base_schiff_ols",
+                    "component_role": "OLS base level prediction",
+                    "component_weight": pd.NA,
+                    "component_forecast": base_prediction,
+                    "component_log_value": base_log,
+                    "weighted_component_forecast": pd.NA,
+                    "forecast_available": True,
+                },
+                {
+                    **common,
+                    "component_model": "residual_gbr",
+                    "component_role": "GBM residual log-correction multiplier",
+                    "component_weight": pd.NA,
+                    "component_forecast": residual_multiplier,
+                    "component_log_value": residual_log,
+                    "weighted_component_forecast": pd.NA,
+                    "forecast_available": True,
+                },
+                {
+                    **common,
+                    "component_model": FINALIST_BY_STREAM["LIGHT_RUC"],
+                    "component_role": "final level prediction",
+                    "component_weight": 1.0,
+                    "component_forecast": final_prediction,
+                    "component_log_value": final_log_value,
+                    "weighted_component_forecast": final_prediction,
+                    "forecast_available": True,
+                },
+            ]
+        )
+    return pd.DataFrame(future_rows), pd.DataFrame(component_rows)
+
+
+def _light_ruc_feature_frame(history: pd.DataFrame, future: pd.DataFrame, latest_actual_period: str) -> pd.DataFrame:
+    history_cols = [
+        "period",
+        "year",
+        "quarter",
+        "target",
+        "real_gdp_sa_nzd",
+        "real_diesel_price_cents_per_litre",
+        "real_light_ruc_price_nzd_per_1000km",
+        "lagged_real_light_ruc_price_nzd_per_1000km",
+        "log_real_gdp",
+        "log_real_diesel_price",
+        "log_real_light_ruc_price",
+        "log_lagged_real_light_ruc_price",
+        "q2_dummy",
+        "q3_dummy",
+        "q4_dummy",
+        "post_2020_dummy",
+    ]
+    hist = history[[column for column in history_cols if column in history.columns]].copy()
+    hist["sample_scope"] = "history"
+    hist["horizon"] = pd.NA
+    fut = future.copy()
+    fut["sample_scope"] = "future"
+    fut["target"] = pd.NA
+    combined = pd.concat([hist, fut], ignore_index=True, sort=False)
+    combined["period"] = combined["period"].astype(str).str.upper()
+    combined["period_key"] = combined["period"].map(quarter_sort_key)
+    combined = combined.sort_values("period_key").reset_index(drop=True)
+    first_history_key = combined.loc[combined["sample_scope"].eq("history"), "period_key"].min()
+    combined["period_index"] = combined["period_key"] - int(first_history_key) + 1
+    combined["time_trend"] = combined["period_index"]
+    combined["log_trend"] = np.where(combined["time_trend"] > 0, np.log(combined["time_trend"]), np.nan)
+    combined["year"] = combined["period"].map(lambda value: parse_period(value)[0])
+    combined["quarter"] = combined["period"].map(lambda value: parse_period(value)[1])
+    q = pd.to_numeric(combined["quarter"], errors="coerce")
+    combined["q2_dummy"] = q.eq(2).astype(int)
+    combined["q3_dummy"] = q.eq(3).astype(int)
+    combined["q4_dummy"] = q.eq(4).astype(int)
+    combined["post_2020_dummy"] = pd.to_numeric(combined["year"], errors="coerce").ge(2021).astype(int)
+    _ensure_log_column(combined, "real_gdp_sa_nzd", "log_real_gdp")
+    _ensure_log_column(combined, "real_diesel_price_cents_per_litre", "log_real_diesel_price")
+    _ensure_log_column(combined, "real_light_ruc_price_nzd_per_1000km", "log_real_light_ruc_price")
+    _ensure_log_column(combined, "lagged_real_light_ruc_price_nzd_per_1000km", "log_lagged_real_light_ruc_price")
+    log_diesel = pd.to_numeric(combined["log_real_diesel_price"], errors="coerce")
+    log_ruc = pd.to_numeric(combined["log_real_light_ruc_price"], errors="coerce")
+    log_gdp = pd.to_numeric(combined["log_real_gdp"], errors="coerce")
+    post = pd.to_numeric(combined["post_2020_dummy"], errors="coerce").fillna(0)
+    combined["diesel_x_ruc_price"] = log_diesel * log_ruc
+    combined["gdp_x_post2020"] = log_gdp * post
+    combined["ruc_x_post2020"] = log_ruc * post
+    combined["diesel_x_post2020"] = log_diesel * post
+    combined["log_real_diesel_price_diff1"] = log_diesel.diff()
+    combined["log_real_diesel_price_lag1"] = log_diesel.shift(1)
+    combined["log_real_diesel_price_lag4"] = log_diesel.shift(4)
+    combined["log_real_light_ruc_price_diff1"] = log_ruc.diff()
+    combined["log_real_light_ruc_price_lag1"] = log_ruc.shift(1)
+    combined["log_real_light_ruc_price_lag4"] = log_ruc.shift(4)
+    combined["log_real_gdp_diff1"] = log_gdp.diff()
+    combined["log_real_gdp_lag1"] = log_gdp.shift(1)
+    combined["log_real_gdp_lag4"] = log_gdp.shift(4)
+    combined.loc[combined["period_key"].gt(quarter_sort_key(latest_actual_period)) & combined["sample_scope"].eq("history"), "sample_scope"] = (
+        "future_placeholder"
+    )
+    return combined
+
+
+def _ensure_log_column(frame: pd.DataFrame, source: str, target: str) -> None:
+    if target in frame.columns and pd.to_numeric(frame[target], errors="coerce").notna().any():
+        frame[target] = pd.to_numeric(frame[target], errors="coerce")
+        return
+    numeric = pd.to_numeric(frame.get(source), errors="coerce")
+    frame[target] = np.where(numeric > 0, np.log(numeric), np.nan)
+
+
+def _missing_feature_columns(frame: pd.DataFrame, columns: list[str]) -> list[str]:
+    missing: list[str] = []
+    for column in columns:
+        if column not in frame.columns or pd.to_numeric(frame[column], errors="coerce").isna().any():
+            missing.append(column)
+    return missing
+
+
+def _ols_fit(features: np.ndarray, target: np.ndarray) -> np.ndarray:
+    design = np.column_stack([np.ones(len(features)), features])
+    return np.linalg.lstsq(design, target, rcond=None)[0]
+
+
+def _ols_predict(features: np.ndarray, beta: np.ndarray) -> np.ndarray:
+    design = np.column_stack([np.ones(len(features)), features])
+    return design @ beta
 
 
 def _component_registry(repo_root: Path) -> dict[str, list[dict[str, Any]]]:
@@ -835,6 +1169,63 @@ def _any_forecast_available(capabilities: pd.DataFrame) -> bool:
     return capabilities["forecast_capability_available"].fillna(False).astype(bool).any()
 
 
+def _forecast_status(validation: ForecastValidationResult, future: pd.DataFrame) -> str:
+    if not validation.valid:
+        return "validation_failed"
+    if future.empty or "forecast_available" not in future.columns:
+        return "governed_gap"
+    by_stream = future.groupby("stream")["forecast_available"].any()
+    available_count = int(by_stream.fillna(False).astype(bool).sum())
+    if available_count == 0:
+        return "governed_gap"
+    if available_count == len(STREAM_ORDER):
+        return "numeric_forecast_available"
+    return "mixed_numeric_and_governed_gap"
+
+
+def _forecast_capability_report(
+    capabilities: pd.DataFrame,
+    future: pd.DataFrame,
+    components: pd.DataFrame,
+    validation: ForecastValidationResult,
+) -> pd.DataFrame:
+    rows: list[dict[str, Any]] = []
+    future_group = future.groupby("stream", dropna=False) if not future.empty and "stream" in future.columns else {}
+    component_group = components.groupby("stream", dropna=False) if not components.empty and "stream" in components.columns else {}
+    for _, cap in capabilities.iterrows():
+        stream = str(cap["stream"])
+        stream_future = future_group.get_group(stream) if hasattr(future_group, "groups") and stream in future_group.groups else pd.DataFrame()
+        stream_components = (
+            component_group.get_group(stream) if hasattr(component_group, "groups") and stream in component_group.groups else pd.DataFrame()
+        )
+        forecast_available = bool(stream_future.get("forecast_available", pd.Series(dtype=bool)).fillna(False).astype(bool).any())
+        numeric_count = int(pd.to_numeric(stream_future.get("forecast"), errors="coerce").notna().sum()) if not stream_future.empty else 0
+        gap_reason = ""
+        gap_code = None
+        if not forecast_available and not stream_future.empty:
+            gap_code = first_non_null(stream_future.get("gap_code"))
+            gap_reason = str(first_non_null(stream_future.get("gap_reason")) or "")
+        rows.append(
+            {
+                "stream": stream,
+                "stream_label": cap.get("stream_label"),
+                "model": cap.get("model"),
+                "validation_status": "passed" if validation.valid else "failed",
+                "forecast_available": forecast_available,
+                "numeric_forecast_rows": numeric_count,
+                "governed_gap_rows": int(len(stream_future) - numeric_count),
+                "component_trace_rows": int(len(stream_components)),
+                "capability_status": "numeric_forecast_available" if forecast_available else "governed_gap",
+                "gap_code": gap_code if gap_code is not None else cap.get("gap_code"),
+                "gap_reason": gap_reason if gap_reason else cap.get("gap_reason"),
+                "repo_artifact_basis": cap.get("repo_artifact_basis"),
+                "fixed_finalists_only": True,
+                "broad_search_run": False,
+            }
+        )
+    return pd.DataFrame(rows)
+
+
 def _forecast_validation_report(validation: ForecastValidationResult, capabilities: pd.DataFrame) -> str:
     lines = [
         "# Forecast validation report",
@@ -864,7 +1255,8 @@ def _forecast_validation_report(validation: ForecastValidationResult, capabiliti
                 f"- Fixed finalist: `{row['model']}`",
                 f"- Status: `{row['capability_status']}`",
                 f"- Gap code: `{row['gap_code']}`",
-                f"- Reason: {row['gap_reason']}",
+                f"- Reason: {row['gap_reason'] or 'Repo-local fixed-finalist scorer is available.'}",
+                f"- Artifact basis: `{row['repo_artifact_basis']}`",
                 "",
             ]
         )
@@ -876,3 +1268,25 @@ def _repo_relative(root: Path, path: Path) -> str:
         return path.relative_to(root).as_posix()
     except ValueError:
         return path.name
+
+
+def first_non_null(series: pd.Series | None) -> Any:
+    if series is None:
+        return None
+    values = series.dropna()
+    return values.iloc[0] if not values.empty else None
+
+
+def _json_safe_records(frame: pd.DataFrame) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    for raw in frame.to_dict(orient="records"):
+        record: dict[str, Any] = {}
+        for key, value in raw.items():
+            if pd.isna(value):
+                record[key] = None
+            elif isinstance(value, np.generic):
+                record[key] = value.item()
+            else:
+                record[key] = value
+        records.append(record)
+    return records
