@@ -177,6 +177,8 @@ LOADER_SCHEMA_VERSION = "stage1-governance-loader-v9-parquet-contract-schiff-cla
 STREAMLIT_IMPORT_SURFACE_REVISION = "2026-06-11-forecast-runner-wrapper-v1"
 CURATED_DATA_DIR = Path("artifacts") / "curated_data"
 REPRODUCIBILITY_PAGE = "Governance & Reproducibility"
+SHOW_GOVERNANCE_PAGE_ENV_VAR = "NLTF_SHOW_GOVERNANCE_PAGE"
+STREAMLIT_CLOUD_ENV_MARKERS = ("STREAMLIT_CLOUD", "STREAMLIT_SHARING_MODE", "IS_STREAMLIT_CLOUD")
 SOURCE_WORKBOOK_NAME = "Master Copy revenue modelling workbook.xlsx"
 SOURCE_WORKBOOK_REPO_PATH = Path("data") / "source_workbooks" / SOURCE_WORKBOOK_NAME
 SOURCE_WORKBOOK_ENV_VAR = "REPRODUCIBILITY_SOURCE_WORKBOOK_PATH"
@@ -329,10 +331,46 @@ def directory_signature(path: Path) -> tuple[bool, int, int]:
     return (path.exists(), int(stat.st_mtime_ns), int(stat.st_size))
 
 
+def env_flag(name: str) -> bool | None:
+    value = os.environ.get(name)
+    if value is None:
+        return None
+    normalised = value.strip().lower()
+    if normalised in {"1", "true", "yes", "on", "show"}:
+        return True
+    if normalised in {"0", "false", "no", "off", "hide"}:
+        return False
+    return None
+
+
+def is_streamlit_cloud_runtime() -> bool:
+    for name in STREAMLIT_CLOUD_ENV_MARKERS:
+        marker = env_flag(name)
+        if marker is not None:
+            return marker
+        if os.environ.get(name, "").strip():
+            return True
+    return Path(__file__).resolve().as_posix().startswith("/mount/src/")
+
+
+def should_show_governance_page() -> bool:
+    override = env_flag(SHOW_GOVERNANCE_PAGE_ENV_VAR)
+    if override is not None:
+        return override
+    return not is_streamlit_cloud_runtime()
+
+
+def dashboard_pages() -> list[str]:
+    pages = ["Overview", "Diagnostics", "Scenario Comparison", "Schiff Benchmark"]
+    if should_show_governance_page():
+        pages.append(REPRODUCIBILITY_PAGE)
+    return pages
+
+
 def main() -> None:
     st.set_page_config(page_title="NTLF Revenue Modelling", layout="wide", initial_sidebar_state="collapsed")
     inject_theme()
-    pages = ["Overview", "Diagnostics", "Scenario Comparison", "Schiff Benchmark", REPRODUCIBILITY_PAGE]
+    pages = dashboard_pages()
     st.session_state.setdefault("gov_page", "Overview")
     if st.session_state["gov_page"] not in pages:
         st.session_state["gov_page"] = "Overview"
