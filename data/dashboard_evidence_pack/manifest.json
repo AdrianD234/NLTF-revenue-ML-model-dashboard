@@ -49,10 +49,22 @@
       "size_bytes": 9092
     },
     {
+      "file": "diagnostic_evidence_series.parquet",
+      "rows": 136,
+      "columns": 11,
+      "size_bytes": 13690
+    },
+    {
       "file": "diagnostic_pass_matrix.parquet",
       "rows": 27,
       "columns": 9,
       "size_bytes": 6388
+    },
+    {
+      "file": "diagnostic_test_detail.parquet",
+      "rows": 27,
+      "columns": 21,
+      "size_bytes": 19564
     },
     {
       "file": "diagnostic_tests.parquet",
@@ -235,7 +247,7 @@
   },
   "annual_metric_note": "Annual MAPE fields use the model-summary annual scorecard values; row-level annual_predictions are retained for audit but may use a broader aggregation basis.",
   "reproducibility_audit_created_at": "2026-05-27",
-  "updated_at": "2026-06-10T23:42:11.716073+00:00",
+  "updated_at": "2026-06-11T23:02:10Z",
   "vnext_promotion": {
     "promoted_at": "2026-06-10T23:42:11.716091+00:00",
     "finalists": {

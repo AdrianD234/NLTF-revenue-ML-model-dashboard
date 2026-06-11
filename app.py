@@ -1489,6 +1489,11 @@ def render_diagnostics(loaded: LoadedRun, controls: dict[str, Any]) -> None:
             diagnostic_pass_matrix_html(pass_matrix),
             "Green = pass, amber = watch, red = fail, grey = unavailable.",
         )
+        # Glass-box drilldown: click any diagnostic for the full statistical
+        # detail (statistic, p-value, F-variant, evidence chart, audit trace).
+        from model_dashboard.diagnostic_drilldown import render_diagnostic_drilldown_section
+
+        render_diagnostic_drilldown_section()
     with bottom[1]:
         chart_card(
             "4. Error Distribution by Horizon",
