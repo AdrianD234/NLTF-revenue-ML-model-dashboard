@@ -94,7 +94,13 @@ def test_final_parent_state_candidates_are_hash_backed_and_classified() -> None:
     assert hashed["sha256"].str.fullmatch(r"[0-9a-f]{64}").all()
 
 
-def test_heavy_ruc_final_search_keeps_numeric_disabled_until_parity_passes() -> None:
+def test_heavy_ruc_final_search_keeps_numeric_disabled_until_parity_passes(monkeypatch) -> None:
+    # Pin to the legacy governance path: this test documents that the
+    # ARCHIVED legacy finalist remains non-forward-scoreable. The vNext
+    # finalist capability is covered by test_forward_scorer_governance.
+    import model_dashboard.vnext_forward_integration as vfi
+
+    monkeypatch.setattr(vfi, "evaluate_vnext_forward_scorer", lambda root, stream: None)
     payload = json.loads(PARITY_AUDIT_PATH.read_text(encoding="utf-8"))
     assert payload["capability_status"] == "parity_failed"
     assert payload["capability_decision"] == "keep_parity_failed"

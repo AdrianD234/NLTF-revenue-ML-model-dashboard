@@ -1295,13 +1295,23 @@ def _forecast_output_rows(
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     light_future: pd.DataFrame | None = None
     light_components: pd.DataFrame | None = None
-    light_error: str | None = None
+    scorer_errors: dict[str, str] = {}
     cap_lookup = capabilities.set_index("stream").to_dict(orient="index")
     if validation.valid and cap_lookup.get("LIGHT_RUC", {}).get("forecast_capability_available"):
         try:
             light_future, light_components = _light_ruc_forward_forecast(validation, repo_root)
         except Exception as exc:
-            light_error = f"{type(exc).__name__}: {exc}"
+            scorer_errors["LIGHT_RUC"] = f"{type(exc).__name__}: {exc}"
+
+    vnext_outputs: dict[str, tuple[pd.DataFrame, pd.DataFrame]] = {}
+    for stream in ("PED", "HEAVY_RUC"):
+        if validation.valid and cap_lookup.get(stream, {}).get("forecast_capability_available"):
+            try:
+                from .vnext_forward_integration import vnext_forward_forecast
+
+                vnext_outputs[stream] = vnext_forward_forecast(validation, repo_root, stream)
+            except Exception as exc:
+                scorer_errors[stream] = f"{type(exc).__name__}: {exc}"
 
     future_rows: list[pd.DataFrame] = []
     component_rows: list[pd.DataFrame] = []
@@ -1310,7 +1320,11 @@ def _forecast_output_rows(
             future_rows.append(light_future)
             component_rows.append(light_components)
             continue
-        error_suffix = f" Scorer error: {light_error}" if stream == "LIGHT_RUC" and light_error else ""
+        if stream in vnext_outputs:
+            future_rows.append(vnext_outputs[stream][0])
+            component_rows.append(vnext_outputs[stream][1])
+            continue
+        error_suffix = f" Scorer error: {scorer_errors[stream]}" if stream in scorer_errors else ""
         future_rows.append(_gap_future_forecast_rows(validation, capabilities, stream, error_suffix=error_suffix))
         component_rows.append(_gap_component_forecast_rows(validation, capabilities, repo_root, stream, error_suffix=error_suffix))
     future = pd.concat(future_rows, ignore_index=True, sort=False) if future_rows else pd.DataFrame()

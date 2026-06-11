@@ -37,6 +37,17 @@ PED_REQUIRED_COMPONENTS = (
 
 def evaluate_ped_forward_scorer(repo_root: Path | str | None = None) -> ForwardScorerAudit:
     root = Path(repo_root) if repo_root is not None else Path(__file__).resolve().parents[1]
+    # The vNext fixed-finalist scorer takes precedence when its governed pack
+    # is present; the legacy HPO/static-solver finalist remains archived as
+    # historically reproducible (outer replay exact) but not forward-scoreable.
+    try:
+        from .vnext_forward_integration import evaluate_vnext_forward_scorer
+
+        vnext_audit = evaluate_vnext_forward_scorer(root, STREAM)
+    except Exception:
+        vnext_audit = None
+    if vnext_audit is not None:
+        return vnext_audit
     repro = root / "data" / "dashboard_evidence_pack_reproducibility" / "ped_inner_hpo"
     source = repro / "source_artifacts"
     required = [

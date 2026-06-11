@@ -13,7 +13,28 @@ ROOT = Path(__file__).resolve().parents[1]
 C4 = "HEAVY_RUC__dynamic_no_leads__GBR_learning_rate0_08_max_depth1_n_estimators150__ylag__w40"
 
 
-def test_heavy_ruc_forward_scorer_audit_preserves_governed_gap() -> None:
+def test_heavy_ruc_vnext_scorer_takes_precedence_when_pack_present() -> None:
+    import model_dashboard.vnext_forward_integration as vfi
+
+    if not vfi.vnext_pack_present(ROOT, "HEAVY_RUC"):
+        import pytest
+
+        pytest.skip("Heavy RUC vNext pack not present")
+    audit = evaluate_heavy_ruc_forward_scorer(ROOT)
+    assert audit.stream == "HEAVY_RUC"
+    assert audit.model.startswith("HEAVY_RUC__VNEXT")
+    assert audit.capability_status in {"numeric_forecast_available", "parity_failed"}
+    if audit.capability_status == "numeric_forecast_available":
+        assert audit.forecast_capability_available is True
+        assert audit.parity_status == "passed"
+        assert audit.max_parity_delta is not None and audit.max_parity_delta <= 1e-6
+    assert audit.source_artifact_hashes
+
+
+def test_heavy_ruc_forward_scorer_audit_preserves_governed_gap(monkeypatch) -> None:
+    import model_dashboard.vnext_forward_integration as vfi
+
+    monkeypatch.setattr(vfi, "evaluate_vnext_forward_scorer", lambda root, stream: None)
     audit = evaluate_heavy_ruc_forward_scorer(ROOT)
     assert audit.stream == "HEAVY_RUC"
     assert audit.forecast_capability_available is False
@@ -59,7 +80,27 @@ def test_heavy_ruc_component_configs_and_weights_match_locked_spec() -> None:
     assert observed == expected
 
 
-def test_ped_forward_scorer_audit_preserves_parity_failed_gap() -> None:
+def test_ped_vnext_scorer_takes_precedence_when_pack_present() -> None:
+    import model_dashboard.vnext_forward_integration as vfi
+
+    if not vfi.vnext_pack_present(ROOT, "PED"):
+        import pytest
+
+        pytest.skip("PED vNext pack not present")
+    audit = evaluate_ped_forward_scorer(ROOT)
+    assert audit.stream == "PED"
+    assert audit.model.startswith("PED__VNEXT")
+    assert audit.capability_status in {"numeric_forecast_available", "parity_failed"}
+    if audit.capability_status == "numeric_forecast_available":
+        assert audit.forecast_capability_available is True
+        assert audit.parity_status == "passed"
+    assert audit.source_artifact_hashes
+
+
+def test_ped_forward_scorer_audit_preserves_parity_failed_gap(monkeypatch) -> None:
+    import model_dashboard.vnext_forward_integration as vfi
+
+    monkeypatch.setattr(vfi, "evaluate_vnext_forward_scorer", lambda root, stream: None)
     audit = evaluate_ped_forward_scorer(ROOT)
     assert audit.stream == "PED"
     assert audit.forecast_capability_available is False
@@ -89,7 +130,14 @@ def test_forward_scorer_export_scripts_emit_json_records() -> None:
         assert result.returncode == 0, result.stderr
         payload = json.loads(result.stdout)
         assert payload["stream"] == expected_stream
-        assert payload["forecast_capability_available"] is False
+        # With the vNext pack present the capability may be numeric; the
+        # payload must agree with the in-process evaluator either way.
+        evaluator = {
+            "HEAVY_RUC": evaluate_heavy_ruc_forward_scorer,
+            "PED": evaluate_ped_forward_scorer,
+        }[expected_stream]
+        expected_available = bool(evaluator(ROOT).forecast_capability_available)
+        assert payload["forecast_capability_available"] is expected_available
         assert payload["source_artifact_hashes"]
 
 

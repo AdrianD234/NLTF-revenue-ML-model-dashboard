@@ -286,6 +286,8 @@ def model_hover_title(value: Any) -> str:
     if not text:
         return "Model"
     lower = text.lower()
+    if "vnext_solved_convex" in lower or "vnext_locked_refit" in lower:
+        return "vNext solved convex ensemble"
     if "dynamic_no_leads" in lower and "elastic" in lower:
         return "Dynamic ElasticNet model"
     if "resid_gbr" in lower or ("resid" in lower and "gbr" in lower):
@@ -318,6 +320,19 @@ def model_hover_description(value: Any, *, weight: Any = None) -> str:
         return "-"
     lower = text.lower()
     parts: list[str] = []
+
+    if "vnext_solved_convex" in lower or "vnext_locked_refit" in lower:
+        top_k = re.search(r"top[-_]?(\d+)", lower)
+        parts.append(
+            "Production vNext finalist: a convex-weighted ensemble of governed component models "
+            "with saved fitted state and exact replay parity (production forward-scoreable)."
+        )
+        if top_k:
+            parts.append(f"Weights solved over the top {top_k.group(1)} diverse candidates on the paper-style scorecard.")
+        weight_text = _format_hover_weight(weight)
+        if weight_text:
+            parts.append(f"Ensemble weight: {weight_text}.")
+        return " ".join(parts)
 
     if "dynamic_no_leads" in lower and "elastic" in lower:
         lag_phrase = "includes target lags" if "ylag" in lower and "noylag" not in lower else "does not include target lags"
@@ -373,6 +388,19 @@ def model_hover_description(value: Any, *, weight: Any = None) -> str:
             hp.append(f"L1 ratio = {_format_param(l1_ratio)}")
         if hp:
             parts.append("Hyperparameters: " + ", ".join(hp) + ".")
+    elif "ridge" in lower:
+        lag_phrase = ("includes target lags" if "ylag" in lower and "noylag" not in lower
+                      else "does not include target lags")
+        window = _extract_window(lower)
+        parts.append(
+            "Ridge-regularised linear model"
+            + (" on the dynamic no-leads feature set" if "dynamic_no_leads" in lower else "")
+            + f"; {lag_phrase}"
+            + (f", trained on a {window}-quarter rolling window." if window else ".")
+        )
+        alpha = _extract_decimal_token(lower, "alpha")
+        if alpha is not None:
+            parts.append(f"Hyperparameters: alpha = {_format_param(alpha)}.")
     else:
         parts.append("Curated finalist or benchmark model from the governed evidence pack.")
 
@@ -389,10 +417,10 @@ def _extract_window(text: str) -> int | None:
 
 
 def _extract_decimal_token(text: str, name: str) -> float | None:
-    match = re.search(rf"{re.escape(name)}([0-9]+(?:[_.][0-9]+)?)", text)
+    match = re.search(rf"{re.escape(name)}([0-9]+(?:[_.p][0-9]+)?)", text)
     if not match:
         return None
-    raw = match.group(1).replace("_", ".")
+    raw = match.group(1).replace("_", ".").replace("p", ".")
     try:
         return float(raw)
     except ValueError:

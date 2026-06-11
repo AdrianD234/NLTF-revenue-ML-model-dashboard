@@ -109,7 +109,13 @@ def test_heavy_ruc_canonical_history_audit_narrows_but_does_not_close_gap() -> N
     assert features["comparison_status"].eq("parent_feature_matrix_missing").all()
 
 
-def test_heavy_ruc_audit_keeps_numeric_disabled_while_parity_failed() -> None:
+def test_heavy_ruc_audit_keeps_numeric_disabled_while_parity_failed(monkeypatch) -> None:
+    # Pin to the legacy governance path: this test documents that the
+    # ARCHIVED legacy finalist remains non-forward-scoreable. The vNext
+    # finalist capability is covered by test_forward_scorer_governance.
+    import model_dashboard.vnext_forward_integration as vfi
+
+    monkeypatch.setattr(vfi, "evaluate_vnext_forward_scorer", lambda root, stream: None)
     payload = json.loads(PARITY_AUDIT.read_text(encoding="utf-8"))
     assert payload["parity_status"] != "passed"
     assert payload["max_abs_delta"] > 1e-6

@@ -108,7 +108,13 @@ def test_heavy_ruc_target_lag_recursion_and_fitted_state_gap_are_explicit() -> N
     assert "not labelled as parent fitted estimators" in diagnosis
 
 
-def test_heavy_ruc_numeric_remains_disabled_until_all_parity_rows_pass() -> None:
+def test_heavy_ruc_numeric_remains_disabled_until_all_parity_rows_pass(monkeypatch) -> None:
+    # Pin to the legacy governance path: this test documents that the
+    # ARCHIVED legacy finalist remains non-forward-scoreable. The vNext
+    # finalist capability is covered by test_forward_scorer_governance.
+    import model_dashboard.vnext_forward_integration as vfi
+
+    monkeypatch.setattr(vfi, "evaluate_vnext_forward_scorer", lambda root, stream: None)
     manifest = _read_json(MANIFEST_PATH)
     parity_rows = pd.DataFrame(manifest["parity"]["component_and_final_summary"])
     assert (pd.to_numeric(parity_rows["max_abs_delta"], errors="coerce") > 1e-6).any()

@@ -82,7 +82,7 @@ def test_ensemble_composition_uses_parquet_components(parquet_dashboard: LoadedR
         assert rounded != stale, f"{stream} still uses stale/demo ensemble weights"
 
     ped = table[table["stream_label"].eq("PED VKT per capita")].iloc[0]
-    assert ped["component_short"] == "hpo::PED | HPO-refine Static solver top-18"
+    assert "resid_gbr" in str(ped["component_model"]) or "PED__VNEXT" in str(ped["component_model"])
 
 
 def test_scenario_comparison_source_table_values(parquet_dashboard: LoadedRun) -> None:

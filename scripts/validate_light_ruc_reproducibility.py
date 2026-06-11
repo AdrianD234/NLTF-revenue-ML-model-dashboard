@@ -59,9 +59,10 @@ from model_dashboard.light_ruc_reproducibility import (  # noqa: E402
 
 
 EXPECTED_MAIN_FINALISTS = {
-    "PED VKT per capita": {"quarterly_mape": 3.237143790424483, "annual_mape": 2.033293734597686},
+    # vNext finalists promoted 2026-06 (pack v7): pinned main-pack KPI snapshot.
+    "PED VKT per capita": {"quarterly_mape": 3.131663200284857, "annual_mape": 1.9468458329074037},
     "Light RUC volume": {"quarterly_mape": 5.363206773795227, "annual_mape": 1.2737736398959618},
-    "Heavy RUC volume": {"quarterly_mape": 2.8094728159657563, "annual_mape": 2.061102375292297},
+    "Heavy RUC volume": {"quarterly_mape": 2.2887157985529626, "annual_mape": 1.6827207898744102},
 }
 
 

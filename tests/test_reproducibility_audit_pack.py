@@ -29,17 +29,28 @@ def test_model_registry_covers_finalists_benchmarks_and_components() -> None:
     assert {"PED Inputs", "Light RUC Inputs", "Heavy RUC Inputs"}.issubset(set(registry["source_sheet"].astype(str)))
 
 
-def test_heavy_component_registry_uses_closure_config_inventory() -> None:
+def test_heavy_component_registry_matches_vnext_manifest() -> None:
+    import json
+
     registry = pd.read_parquet(DATA_DIR / "model_registry.parquet")
     heavy_components = registry[
         registry["stream"].astype(str).eq("HEAVY_RUC")
         & registry["model_role"].astype(str).eq("ensemble_component")
     ]
+    manifest = json.loads(
+        (DATA_DIR.parents[1] / "dashboard_evidence_pack_reproducibility" / "heavy_ruc_vnext"
+         / "fitted_model_manifest.json").read_text(encoding="utf-8")
+    )
+    expected = {m["component_model"]: m for m in manifest["members"]}
 
-    assert len(heavy_components) == 4
-    assert heavy_components["source_file"].astype(str).str.contains("candidate_config_inventory.csv", regex=False).all()
+    assert len(heavy_components) == len(expected)
+    assert set(heavy_components["component_model"].astype(str)) == set(expected)
+    assert heavy_components["source_file"].astype(str).str.contains("fitted_model_manifest.json", regex=False).all()
     assert heavy_components["random_state"].astype(str).eq("42").all()
-    assert heavy_components["hyperparameters_json"].astype(str).str.contains("random_state").all()
+    for _, row in heavy_components.iterrows():
+        member = expected[str(row["component_model"])]
+        assert str(row["hyperparameters_json"]) == str(member["params_json"])
+        assert float(row["component_weight"]) == member["component_weight"]
 
 
 def test_single_component_predictions_equal_final_predictions() -> None:
@@ -73,11 +84,11 @@ def test_heavy_ruc_ensemble_component_forecasts_reconcile_to_weighted_sum() -> N
     )
     delta = (weighted["weighted_sum"] - pd.to_numeric(weighted["final_pred"], errors="coerce")).abs()
 
-    assert heavy["component_model"].nunique() == 4
+    assert heavy["component_model"].nunique() == 3
     assert pd.to_numeric(heavy["component_pred"], errors="coerce").notna().all()
-    assert weighted["component_count"].eq(4).all()
+    assert weighted["component_count"].eq(3).all()
     assert delta.max() <= 1e-5
-    assert heavy["component_traceability_status"].eq("component_forecast_loaded_weighted_sum_verified").all()
+    assert heavy["component_traceability_status"].eq("vnext_saved_state_parity_verified").all()
 
 
 def test_reproducibility_report_does_not_claim_full_rebuild() -> None:

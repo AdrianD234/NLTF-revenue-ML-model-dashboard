@@ -376,7 +376,7 @@ def weighted_sum_reconciliation(heavy: pd.DataFrame) -> dict[str, Any]:
         "grouped_rows": int(len(grouped)),
         "max_delta": float(delta.max()) if not delta.empty else np.inf,
         "missing_component_rows": missing_component_rows,
-        "bad_component_count_rows": int(grouped["component_count"].ne(4).sum()),
+        "bad_component_count_rows": int(grouped["component_count"].ne(heavy["component_model"].nunique()).sum()),
     }
 
 

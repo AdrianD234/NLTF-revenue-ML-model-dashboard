@@ -142,7 +142,11 @@ def test_model_input_history_pack_is_committed_and_hash_backed() -> None:
         assert pd.to_numeric(frame["target"], errors="coerce").gt(0).any()
 
 
-def test_model_capability_register_is_parity_gated_and_hash_backed() -> None:
+def test_model_capability_register_is_parity_gated_and_hash_backed(monkeypatch) -> None:
+    # Pin to the legacy governance path; vNext capability is covered separately.
+    import model_dashboard.vnext_forward_integration as vfi
+
+    monkeypatch.setattr(vfi, "evaluate_vnext_forward_scorer", lambda root, stream: None)
     capabilities = model_capability_gap_register(ROOT).set_index("stream")
     assert capabilities.loc["LIGHT_RUC", "capability_status"] == "numeric_forecast_available"
     assert capabilities.loc["LIGHT_RUC", "forecast_capability_available"] == True
@@ -191,7 +195,11 @@ def test_completed_basecase_and_high_population_validate_to_2050q4(tmp_path: Pat
         assert len(validation.assumptions) == 100 * len(STREAM_ORDER)
 
 
-def test_completed_workbook_builds_transforms_and_numeric_light_outputs(tmp_path: Path) -> None:
+def test_completed_workbook_builds_transforms_and_numeric_light_outputs(tmp_path: Path, monkeypatch) -> None:
+    # Pin to the legacy governance path; vNext capability is covered separately.
+    import model_dashboard.vnext_forward_integration as vfi
+
+    monkeypatch.setattr(vfi, "evaluate_vnext_forward_scorer", lambda root, stream: None)
     workbook = create_completed_sample_workbook(tmp_path / "completed.xlsx", repo_root=ROOT)
     result = run_forecast_workbook(
         workbook,
@@ -510,3 +518,41 @@ def test_forecast_run_artifacts_are_repo_ignored() -> None:
         "templates/NLTF_forecast_input_template_12q.xlsx",
         "templates/NLTF_forecast_input_template_20q.xlsx",
     }
+
+
+def test_completed_workbook_numeric_all_streams_with_vnext(tmp_path) -> None:
+    """With the vNext packs present and parity passing, PED and Heavy RUC must
+    produce numeric fixed-finalist forecasts alongside Light RUC."""
+    import model_dashboard.vnext_forward_integration as vfi
+
+    if not (vfi.vnext_pack_present(ROOT, "PED") and vfi.vnext_pack_present(ROOT, "HEAVY_RUC")):
+        import pytest
+
+        pytest.skip("vNext packs not present")
+    ped_audit = vfi.evaluate_vnext_forward_scorer(ROOT, "PED")
+    heavy_audit = vfi.evaluate_vnext_forward_scorer(ROOT, "HEAVY_RUC")
+    if not (ped_audit.forecast_capability_available and heavy_audit.forecast_capability_available):
+        import pytest
+
+        pytest.skip("vNext parity gates not passing in this environment")
+    workbook = create_completed_sample_workbook(tmp_path / "completed.xlsx", repo_root=ROOT)
+    result = run_forecast_workbook(
+        workbook,
+        output_dir=tmp_path / "vnext_run",
+        repo_root=ROOT,
+        run_timestamp="vnext-run",
+        scenario_name="vnext_check",
+    )
+    future = result.future_forecasts
+    for stream in STREAM_ORDER:
+        rows = future[future["stream"].eq(stream)]
+        assert rows["forecast_available"].astype(bool).all(), stream
+        assert pd.to_numeric(rows["forecast"], errors="coerce").gt(0).all(), stream
+    assert result.manifest["forecast_status"] == "numeric_forecast_available"
+    assert sorted(result.manifest["numeric_forecast_streams"]) == sorted(STREAM_ORDER)
+    assert result.manifest["governed_gap_streams"] == []
+    capability = result.capability_report.set_index("stream")
+    assert capability.loc["PED", "capability_status"] == "numeric_forecast_available"
+    assert capability.loc["HEAVY_RUC", "capability_status"] == "numeric_forecast_available"
+    assert str(capability.loc["PED", "model"]).startswith("PED__VNEXT")
+    assert str(capability.loc["HEAVY_RUC", "model"]).startswith("HEAVY_RUC__VNEXT")

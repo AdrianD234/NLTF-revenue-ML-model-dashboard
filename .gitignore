@@ -58,3 +58,11 @@ data/dashboard_evidence_pack_reproducibility/heavy_ruc/source_artifacts/**/*.pyc
 !data/model_input_history/*.parquet
 !data/model_input_history/*.json
 !data/model_input_history/*.md
+
+# vNext production reproducibility packs (governed fitted state + evidence)
+!data/dashboard_evidence_pack_reproducibility/heavy_ruc_vnext/
+!data/dashboard_evidence_pack_reproducibility/heavy_ruc_vnext/**
+!data/dashboard_evidence_pack_reproducibility/ped_vnext/
+!data/dashboard_evidence_pack_reproducibility/ped_vnext/**
+!data/dashboard_evidence_pack_reproducibility/light_ruc_vnext/
+!data/dashboard_evidence_pack_reproducibility/light_ruc_vnext/**

@@ -1,0 +1,17 @@
+{
+  "created_at": "2026-06-10T23:11:22.550579+00:00",
+  "pipeline_version": "vnext-pipeline-v1.0",
+  "stream": "LIGHT_RUC",
+  "finalist_model": "dynamic_RESID_GBR_n150_d1_lr0.05_w36",
+  "note": "State export of the incumbent Light RUC fixed recipe. The Forecast Builder refits this exact recipe at score time from the canonical history; this saved state is the audit artifact proving what that refit produces.",
+  "production_states": {
+    "LIGHT": {
+      "file": "fitted_state/light_ruc_production.joblib",
+      "sha256": "41669526945c546fc66a1e6d327bde3c9077b4fe6f6f4ca24fda3709654a1294",
+      "train_window_start": "2017Q1",
+      "train_window_end": "2025Q4",
+      "train_rows": 36
+    }
+  },
+  "parity_status": "passed_fixed_recipe_identity"
+}

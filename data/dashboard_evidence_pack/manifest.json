@@ -1,5 +1,5 @@
 {
-  "schema_version": "dashboard_evidence_pack_v6_balanced_frontier",
+  "schema_version": "dashboard_evidence_pack_v7_vnext_finalists",
   "created_at": "2026-05-26",
   "description": "Dual scorecard evidence pack with balanced all-stream candidate frontier visualization samples.",
   "default_score_basis": "schiff_paper_horizon_mean",
@@ -22,13 +22,13 @@
       "file": "annual_predictions.parquet",
       "rows": 130,
       "columns": 17,
-      "size_bytes": 14956
+      "size_bytes": 14951
     },
     {
       "file": "candidate_cone.parquet",
       "rows": 400,
       "columns": 54,
-      "size_bytes": 69336
+      "size_bytes": 69560
     },
     {
       "file": "chart_contract.parquet",
@@ -38,57 +38,57 @@
     },
     {
       "file": "component_predictions.parquet",
-      "rows": 3504,
+      "rows": 3672,
       "columns": 18,
-      "size_bytes": 139605
+      "size_bytes": 145995
     },
     {
       "file": "diagnostic_acf.parquet",
       "rows": 39,
       "columns": 12,
-      "size_bytes": 9137
+      "size_bytes": 9092
     },
     {
       "file": "diagnostic_pass_matrix.parquet",
       "rows": 27,
       "columns": 9,
-      "size_bytes": 6406
+      "size_bytes": 6388
     },
     {
       "file": "diagnostic_tests.parquet",
       "rows": 6,
       "columns": 38,
-      "size_bytes": 23770
+      "size_bytes": 23759
     },
     {
       "file": "ensemble_components.parquet",
       "rows": 6,
       "columns": 15,
-      "size_bytes": 11241
+      "size_bytes": 11469
     },
     {
       "file": "error_distribution.parquet",
       "rows": 756,
       "columns": 23,
-      "size_bytes": 38554
+      "size_bytes": 40841
     },
     {
       "file": "feature_importance.parquet",
-      "rows": 4,
+      "rows": 159,
       "columns": 11,
-      "size_bytes": 8006
+      "size_bytes": 10942
     },
     {
       "file": "finalists.parquet",
       "rows": 3,
       "columns": 33,
-      "size_bytes": 25604
+      "size_bytes": 25151
     },
     {
       "file": "horizon_profiles.parquet",
       "rows": 72,
       "columns": 16,
-      "size_bytes": 12424
+      "size_bytes": 12382
     },
     {
       "file": "invalid_predictions_zero_actual.parquet",
@@ -104,39 +104,39 @@
     },
     {
       "file": "model_coefficients.parquet",
-      "rows": 4,
+      "rows": 92,
       "columns": 14,
-      "size_bytes": 9491
+      "size_bytes": 11943
     },
     {
       "file": "model_registry.parquet",
       "rows": 12,
       "columns": 27,
-      "size_bytes": 27072
+      "size_bytes": 26317
     },
     {
       "file": "paired_vs_schiff.parquet",
       "rows": 3,
       "columns": 22,
-      "size_bytes": 15805
+      "size_bytes": 15814
     },
     {
       "file": "residual_predictions.parquet",
       "rows": 756,
       "columns": 22,
-      "size_bytes": 36896
+      "size_bytes": 36845
     },
     {
       "file": "scenario_comparison.parquet",
       "rows": 3,
       "columns": 19,
-      "size_bytes": 14102
+      "size_bytes": 14111
     },
     {
       "file": "scenario_sensitivities.parquet",
-      "rows": 15,
+      "rows": 437,
       "columns": 13,
-      "size_bytes": 9254
+      "size_bytes": 21697
     },
     {
       "file": "schiff_benchmark.parquet",
@@ -154,43 +154,43 @@
       "file": "scorecard_annual_predictions.parquet",
       "rows": 662,
       "columns": 17,
-      "size_bytes": 28632
+      "size_bytes": 28647
     },
     {
       "file": "scorecard_horizon_profiles.parquet",
       "rows": 144,
       "columns": 16,
-      "size_bytes": 14003
+      "size_bytes": 13970
     },
     {
       "file": "scorecard_model_summary.parquet",
       "rows": 12,
       "columns": 33,
-      "size_bytes": 22973
+      "size_bytes": 22925
     },
     {
       "file": "scorecard_predictions.parquet",
       "rows": 3648,
       "columns": 22,
-      "size_bytes": 107000
+      "size_bytes": 106995
     },
     {
       "file": "scorecard_stress_horizon.parquet",
       "rows": 72,
       "columns": 15,
-      "size_bytes": 11860
+      "size_bytes": 11846
     },
     {
       "file": "shap_summary.parquet",
-      "rows": 4,
+      "rows": 6,
       "columns": 11,
-      "size_bytes": 7750
+      "size_bytes": 8107
     },
     {
       "file": "stress_horizon.parquet",
       "rows": 36,
       "columns": 15,
-      "size_bytes": 10915
+      "size_bytes": 10870
     }
   ],
   "canonical_finalists": {
@@ -234,5 +234,18 @@
     }
   },
   "annual_metric_note": "Annual MAPE fields use the model-summary annual scorecard values; row-level annual_predictions are retained for audit but may use a broader aggregation basis.",
-  "reproducibility_audit_created_at": "2026-05-27"
+  "reproducibility_audit_created_at": "2026-05-27",
+  "updated_at": "2026-06-10T23:42:11.716073+00:00",
+  "vnext_promotion": {
+    "promoted_at": "2026-06-10T23:42:11.716091+00:00",
+    "finalists": {
+      "PED": "PED__VNEXT_SOLVED_CONVEX_TOP2",
+      "HEAVY_RUC": "HEAVY_RUC__VNEXT_SOLVED_CONVEX_TOP4"
+    },
+    "legacy_finalists_archived": {
+      "PED": "PED__RESCUE_static_annual_weighted_top12_capnone",
+      "HEAVY_RUC": "HEAVY_RUC__RECON_STATIC_REBUILT"
+    },
+    "note": "PED and Heavy RUC finalists replaced by parity-gated vNext production scorers (saved fitted state; exact replay). Metrics recomputed on the identical stored evidence keysets. Schiff benchmark and Light RUC rows are unchanged. Backup of the previous pack: data/dashboard_evidence_pack_v6_backup."
+  }
 }

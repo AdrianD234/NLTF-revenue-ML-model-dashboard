@@ -30,19 +30,20 @@ def evidence_pack():
 def test_v6_default_score_basis_is_paper_style(evidence_pack) -> None:
     finalists = evidence_pack.data["recommended"].set_index("stream_label")
     assert set(finalists["score_basis"]) == {PAPER_SCORE_BASIS}
-    assert float(finalists.loc["PED VKT per capita", "quarterly_mape"]) == pytest.approx(3.237144, abs=0.001)
+    # vNext finalists promoted 2026-06: paper-style horizon-mean MAPE values.
+    assert float(finalists.loc["PED VKT per capita", "quarterly_mape"]) == pytest.approx(3.131663, abs=0.001)
     assert float(finalists.loc["Light RUC volume", "quarterly_mape"]) == pytest.approx(5.363207, abs=0.001)
-    assert float(finalists.loc["Heavy RUC volume", "quarterly_mape"]) == pytest.approx(2.809473, abs=0.001)
+    assert float(finalists.loc["Heavy RUC volume", "quarterly_mape"]) == pytest.approx(2.288749, abs=0.001)
     assert str(finalists.loc["Light RUC volume", "model"]) == "dynamic_RESID_GBR_n150_d1_lr0.05_w36"
 
 
 def test_operational_score_basis_projection_uses_operational_fields(evidence_pack) -> None:
     projected = project_score_basis_frame(evidence_pack.data["recommended"], OPERATIONAL_SCORE_BASIS).set_index("stream_label")
     assert set(projected["score_basis"]) == {OPERATIONAL_SCORE_BASIS}
-    assert float(projected.loc["PED VKT per capita", "quarterly_mape"]) == pytest.approx(2.473245, abs=0.001)
+    assert float(projected.loc["PED VKT per capita", "quarterly_mape"]) == pytest.approx(2.664135, abs=0.001)
     assert float(projected.loc["Light RUC volume", "quarterly_mape"]) == pytest.approx(8.272972, abs=0.001)
     assert float(projected.loc["Light RUC volume", "annual_mape"]) == pytest.approx(6.774906, abs=0.001)
-    assert float(projected.loc["Heavy RUC volume", "quarterly_mape"]) == pytest.approx(3.484368, abs=0.001)
+    assert float(projected.loc["Heavy RUC volume", "quarterly_mape"]) == pytest.approx(3.011938, abs=0.001)
     assert projected.loc["Light RUC volume", "quarterly_mape_source_column"] == "operational_pooled_mape"
 
 

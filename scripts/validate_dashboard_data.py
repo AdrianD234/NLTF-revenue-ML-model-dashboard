@@ -16,13 +16,16 @@ from model_dashboard.labels import OVERVIEW_STRESS_BUCKET_ORDER, SCHIFF_SPEC_BEN
 
 
 EXPECTED_STREAMS = {"PED VKT per capita", "Light RUC volume", "Heavy RUC volume"}
+# vNext finalists promoted 2026-06 (paper-style horizon-mean / paper annual MAPE).
 EXPECTED_FINALISTS = {
-    "PED VKT per capita": (3.237144, 2.033294),
+    "PED VKT per capita": (3.131663, 1.946846),
     "Light RUC volume": (5.363207, 1.273774),
-    "Heavy RUC volume": (2.809473, 2.061102),
+    "Heavy RUC volume": (2.288716, 1.682721),
 }
 EXPECTED_FINALIST_MODELS = {
+    "PED VKT per capita": "PED__VNEXT_SOLVED_CONVEX_TOP2",
     "Light RUC volume": "dynamic_RESID_GBR_n150_d1_lr0.05_w36",
+    "Heavy RUC volume": "HEAVY_RUC__VNEXT_SOLVED_CONVEX_TOP4",
 }
 EXPECTED_SCHIFF_SPEC = {
     "PED VKT per capita": (4.674917, 3.585729),

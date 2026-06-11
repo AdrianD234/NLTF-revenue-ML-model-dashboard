@@ -1,0 +1,45 @@
+{
+  "created_at": "2026-06-10T23:10:18.167017+00:00",
+  "pipeline_version": "vnext-pipeline-v1.0",
+  "scorer_version": "vnext-forward-scorer-v1",
+  "contract": "New forecasts are produced only by the fixed-finalist scorers below. No model search is run at score time. Streams whose parity/state gates fail emit governed missing-value gaps, never zero-filled forecasts.",
+  "scoring_command": "python -m pipeline.vnext_run forecast --workbook <completed_template.xlsx>",
+  "revalidation_command": "python -m pipeline.vnext_run finalize scorecards",
+  "input_template_generator": "scripts/create_forecast_input_template.py",
+  "history_basis": "data/model_input_history (schema-equal to the forecast input template)",
+  "streams": {
+    "PED": {
+      "stream_label": "PED VKT per capita",
+      "finalist_model": "PED__VNEXT_SOLVED_CONVEX_TOP2",
+      "parity_status": "passed",
+      "state_dir": "data/dashboard_evidence_pack_reproducibility/ped_vnext",
+      "production_state_hashes": {
+        "M1": "69ec46d0085546e82bbd06109b520f5d6f0db0d1b153a31fd245d99b26f380b9",
+        "M2": "f50d538f21f67cf50f6608c98ba909903f7bcfa99e7428c27cfc660317d2f4f6"
+      }
+    },
+    "LIGHT_RUC": {
+      "stream_label": "Light RUC volume",
+      "finalist_model": "dynamic_RESID_GBR_n150_d1_lr0.05_w36",
+      "parity_status": "passed_fixed_recipe_identity",
+      "state_dir": "data/dashboard_evidence_pack_reproducibility/light_ruc_vnext",
+      "production_state_hashes": {
+        "LIGHT": "41669526945c546fc66a1e6d327bde3c9077b4fe6f6f4ca24fda3709654a1294"
+      }
+    },
+    "HEAVY_RUC": {
+      "stream_label": "Heavy RUC volume",
+      "finalist_model": "HEAVY_RUC__VNEXT_SOLVED_CONVEX_TOP4",
+      "parity_status": "passed",
+      "state_dir": "data/dashboard_evidence_pack_reproducibility/heavy_ruc_vnext",
+      "production_state_hashes": {
+        "M1": "68f4bb94b9fad2a01fa320b437fc6a8ed9e9e9d4b8534ba1fcd73b171aca91bb",
+        "M2": "063d0ff45fe5327cc5c115c828ac8f4ea048b32f8df5690b955a2bacd0610c63",
+        "M3": "f64fa1c616e8d88479f5e5edf0ad21026750160be398a33c2e785dcff7b85759"
+      }
+    }
+  },
+  "fixed_finalists_only": true,
+  "broad_search_run": false,
+  "evidence_pack_modified": false
+}
