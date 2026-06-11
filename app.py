@@ -370,6 +370,7 @@ def dashboard_pages() -> list[str]:
 def main() -> None:
     st.set_page_config(page_title="NTLF Revenue Modelling", layout="wide", initial_sidebar_state="collapsed")
     inject_theme()
+    inject_global_theme()
     pages = dashboard_pages()
     st.session_state.setdefault("gov_page", "Overview")
     if st.session_state["gov_page"] not in pages:
@@ -532,11 +533,8 @@ def render_top_filter_bar(loaded: LoadedRun, controls: dict[str, Any]) -> dict[s
         "top_stream": "All",
         "top_family": "All",
         "top_stage": "all",
-        "top_baseline": "Finalist",
         "top_horizon": "1-12 qtrs",
         "top_score_basis": PAPER_SCORE_LABEL,
-        "top_vintage": "Latest",
-        "top_date_window": "All",
         "advanced_top_n": 50,
         "advanced_show_schiff": True,
         "advanced_show_finalists": True,
@@ -552,11 +550,8 @@ def render_top_filter_bar(loaded: LoadedRun, controls: dict[str, Any]) -> dict[s
         "top_stream": ["All"] + stream_options,
         "top_family": ["All"] + family_options,
         "top_stage": ["all"] + stage_options,
-        "top_baseline": baseline_options,
         "top_horizon": horizon_options,
         "top_score_basis": SCORE_BASIS_OPTIONS,
-        "top_vintage": ["Latest"],
-        "top_date_window": date_options,
     }
     for key, options in valid_defaults.items():
         if st.session_state.get(key) not in options:
@@ -580,7 +575,7 @@ def render_top_filter_bar(loaded: LoadedRun, controls: dict[str, Any]) -> dict[s
 
     with st.container(border=True):
         st.markdown("<div class='filter-title'>Governance filters</div>", unsafe_allow_html=True)
-        filter_cols = st.columns([1.0, 1.12, 0.72, 1.0, 1.15, 0.86, 0.9, 0.94, 0.68, 0.46])
+        filter_cols = st.columns([1.05, 1.18, 0.78, 1.05, 1.25, 0.72, 0.48])
         with filter_cols[0]:
             st.selectbox(
                 "Stream",
@@ -604,40 +599,20 @@ def render_top_filter_bar(loaded: LoadedRun, controls: dict[str, Any]) -> dict[s
             )
         with filter_cols[3]:
             st.selectbox(
-                "Baseline",
-                baseline_options,
-                key="top_baseline",
-                format_func=lambda value: {"Finalist": "Refined Finalist", "Schiff": SCHIFF_SPEC_BENCHMARK_LABEL}.get(str(value), str(value)),
-            )
-        with filter_cols[4]:
-            st.selectbox(
                 "Horizon",
                 horizon_options,
                 key="top_horizon",
+                help="Filters the horizon-profile and stress charts to the selected forecast-horizon window.",
                 format_func=lambda value: "1-12 Quarters" if value == "1-12 qtrs" else str(value).replace("qtrs", "quarters"),
             )
-        with filter_cols[5]:
-            st.selectbox(
-                "Forecast Vintage",
-                ["Latest"],
-                key="top_vintage",
-                help="Stage 1 actual-driver runs use the latest realised-driver evidence; vintage input forecasts are tested later.",
-            )
-        with filter_cols[6]:
-            st.selectbox(
-                "Date Window",
-                date_options,
-                key="top_date_window",
-                format_func=lambda value: "All target periods" if value == "All" else str(value),
-            )
-        with filter_cols[7]:
+        with filter_cols[4]:
             st.selectbox(
                 "Score Basis",
                 SCORE_BASIS_OPTIONS,
                 key="top_score_basis",
                 help="Default governance reporting uses paper-style horizon MAPE. Operational pooled MAPE is available explicitly for operational scorecard checks.",
             )
-        with filter_cols[8]:
+        with filter_cols[5]:
             st.button(
                 "Reset Filters",
                 type="primary",
@@ -645,33 +620,22 @@ def render_top_filter_bar(loaded: LoadedRun, controls: dict[str, Any]) -> dict[s
                 on_click=reset_top_filter_state,
                 args=(defaults,),
             )
-        with filter_cols[9]:
+        with filter_cols[6]:
             with st.popover("More", use_container_width=True):
                 controls = render_advanced_controls(loaded, controls)
 
         stream_choice = st.session_state["top_stream"]
         family_choice = st.session_state["top_family"]
         stage_choice = st.session_state["top_stage"]
-        baseline_choice = st.session_state["top_baseline"]
         score_basis_choice = st.session_state["top_score_basis"]
         horizon_choice = st.session_state["top_horizon"]
-        vintage_choice = st.session_state["top_vintage"]
-        date_choice = st.session_state["top_date_window"]
-        baseline_label = {
-            "Finalist": "Refined Finalist",
-            "Schiff": SCHIFF_SPEC_BENCHMARK_LABEL,
-        }.get(str(baseline_choice), str(baseline_choice))
         horizon_label = "1-12 Quarters" if horizon_choice == "1-12 qtrs" else str(horizon_choice).replace("qtrs", "quarters")
-        date_label = "All target periods" if date_choice == "All" else str(date_choice)
         filter_items = [
             ("Stream", "All Streams" if stream_choice == "All" else stream_choice),
             ("Model Family", "All Families" if family_choice == "All" else str(family_choice).replace("_", " ")),
             ("Stage", "All stages" if stage_choice == "all" else str(stage_choice).replace("_", " ").title()),
-            ("Baseline", baseline_label),
             ("Score Basis", score_basis_choice),
             ("Horizon", horizon_label),
-            ("Forecast Vintage", vintage_choice),
-            ("Date Window", date_label),
         ]
         active_filter_line = " | ".join(f"{label}: {value}" for label, value in filter_items)
 
@@ -681,11 +645,8 @@ def render_top_filter_bar(loaded: LoadedRun, controls: dict[str, Any]) -> dict[s
             "stream": "All Streams" if stream_choice == "All" else stream_choice,
             "model_family": "All Families" if family_choice == "All" else family_choice,
             "stage": stage_choice,
-            "baseline": baseline_label,
             "score_basis": score_basis_choice,
             "horizon": horizon_label,
-            "forecast_vintage": vintage_choice,
-            "date_window": date_label,
             "top_n": controls.get("top_n"),
             "show_schiff": controls.get("show_schiff"),
             "show_finalists": controls.get("show_finalists"),
@@ -696,12 +657,9 @@ def render_top_filter_bar(loaded: LoadedRun, controls: dict[str, Any]) -> dict[s
     updated["stage"] = stage_choice
     updated["streams"] = stream_options if stream_choice == "All" else [stream_choice]
     updated["source_families"] = family_options if family_choice == "All" else [family_choice]
-    updated["baseline"] = baseline_label
     updated["score_basis"] = score_basis_key(score_basis_choice)
     updated["score_basis_label"] = score_basis_label(score_basis_choice)
     updated["horizon_bucket_filter"] = [] if horizon_choice == "1-12 qtrs" else [horizon_choice]
-    updated["date_window"] = "All target periods" if date_choice == "All" else date_choice
-    updated["forecast_vintage"] = vintage_choice
     return updated
 
 
@@ -861,18 +819,38 @@ def score_basis_projected(frame: pd.DataFrame, controls: dict[str, Any]) -> pd.D
     return project_score_basis_frame(frame, controls.get("score_basis", PAPER_SCORE_BASIS))
 
 
+HORIZON_BUCKET_RANGES = {"1-4 qtrs": (1, 4), "5-8 qtrs": (5, 8), "9-12 qtrs": (9, 12)}
+
+
+def _apply_horizon_bucket_filter(frame: pd.DataFrame, controls: dict[str, Any]) -> pd.DataFrame:
+    """Apply the global Horizon filter. Default (1-12 qtrs) leaves frames untouched."""
+    buckets = [b for b in controls.get("horizon_bucket_filter") or [] if b in HORIZON_BUCKET_RANGES]
+    if not buckets or frame is None or frame.empty:
+        return frame
+    if "horizon" in frame.columns:
+        lo, hi = HORIZON_BUCKET_RANGES[buckets[0]]
+        horizons = pd.to_numeric(frame["horizon"], errors="coerce")
+        return frame[horizons.between(lo, hi)].copy()
+    if "stress_bucket" in frame.columns:
+        keep = set(buckets) | {"Annual"}
+        return frame[frame["stress_bucket"].astype(str).isin(keep)].copy()
+    return frame
+
+
 def selected_horizon_frame(loaded: LoadedRun, controls: dict[str, Any]) -> pd.DataFrame:
     source = loaded.data.get("scorecard_horizon_df", pd.DataFrame())
     if source is None or source.empty:
         source = loaded.data.get("horizon_df", pd.DataFrame())
-    return filter_score_basis_rows(source, controls.get("score_basis", PAPER_SCORE_BASIS))
+    out = filter_score_basis_rows(source, controls.get("score_basis", PAPER_SCORE_BASIS))
+    return _apply_horizon_bucket_filter(out, controls)
 
 
 def selected_stress_frame(loaded: LoadedRun, controls: dict[str, Any]) -> pd.DataFrame:
     source = loaded.data.get("scorecard_stress_df", pd.DataFrame())
     if source is None or source.empty:
         source = loaded.data.get("stress", pd.DataFrame())
-    return filter_score_basis_rows(source, controls.get("score_basis", PAPER_SCORE_BASIS))
+    out = filter_score_basis_rows(source, controls.get("score_basis", PAPER_SCORE_BASIS))
+    return _apply_horizon_bucket_filter(out, controls)
 
 
 def render_overview(loaded: LoadedRun, controls: dict[str, Any]) -> None:
@@ -947,17 +925,24 @@ def compact_figure(fig: Any, height: int, showlegend: bool | None = None) -> Any
     if hasattr(fig, "update_layout"):
         has_subplot_titles = bool(getattr(fig.layout, "annotations", None))
         top_margin = 42 if has_subplot_titles else 18
-        fig.update_layout(title_text="", height=height, margin={"l": 30, "r": 14, "t": top_margin, "b": 30})
-        fig.update_layout(
-            legend={
-                "orientation": "h",
-                "yanchor": "bottom",
-                "y": 1.12 if has_subplot_titles else 1.0,
-                "xanchor": "center" if has_subplot_titles else "left",
-                "x": 0.5 if has_subplot_titles else 0.0,
-                "font": {"size": 10},
-            }
-        )
+        # Figures that deliberately place their legend below the plot (e.g. the
+        # candidate frontier, to keep the Plotly modebar clear) keep that
+        # placement and their bottom margin.
+        legend_y = getattr(getattr(fig.layout, "legend", None), "y", None)
+        keeps_bottom_legend = legend_y is not None and legend_y < 0
+        bottom_margin = 72 if keeps_bottom_legend else 30
+        fig.update_layout(title_text="", height=height, margin={"l": 30, "r": 14, "t": top_margin, "b": bottom_margin})
+        if not keeps_bottom_legend:
+            fig.update_layout(
+                legend={
+                    "orientation": "h",
+                    "yanchor": "bottom",
+                    "y": 1.12 if has_subplot_titles else 1.0,
+                    "xanchor": "center" if has_subplot_titles else "left",
+                    "x": 0.5 if has_subplot_titles else 0.0,
+                    "font": {"size": 10},
+                }
+            )
         if showlegend is not None:
             fig.update_layout(showlegend=showlegend)
         if showlegend is False:
@@ -1668,6 +1653,26 @@ def _load_ped_inner_hpo_pack_safely() -> Any | None:
     except Exception as exc:
         warning_panel(f"PED inner HPO/static-solver audit pack could not be loaded: {exc}")
         return None
+
+
+def inject_global_theme() -> None:
+    """App-wide layout robustness: filter rows wrap instead of crushing on
+    narrow screens, navigation wraps cleanly, and cards keep their borders."""
+    st.markdown(
+        """
+        <style>
+        .block-container { padding-top: 1.1rem; }
+        div[data-testid="stHorizontalBlock"] { flex-wrap: wrap; row-gap: 0.45rem; }
+        div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {
+            min-width: 150px;
+            flex: 1 1 150px;
+        }
+        div[role="radiogroup"] { flex-wrap: wrap; row-gap: 0.3rem; }
+        div[data-testid="stPlotlyChart"] { overflow: hidden; border-radius: 8px; }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def inject_page5_theme() -> None:

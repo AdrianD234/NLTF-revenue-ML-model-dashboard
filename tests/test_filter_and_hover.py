@@ -11,14 +11,14 @@ from playwright.sync_api import Page, expect
 pytestmark = pytest.mark.e2e
 
 
+# Slimmed 2026-06: dead controls (Baseline, Forecast Vintage, Date Window)
+# were removed from the strip; every remaining filter drives chart state.
 PRIMARY_FILTERS = [
     ("Stream", 0),
     ("Model Family", 1),
     ("Stage", 2),
-    ("Baseline", 3),
-    ("Horizon", 4),
-    ("Forecast Vintage", 5),
-    ("Date Window", 6),
+    ("Horizon", 3),
+    ("Score Basis", 4),
 ]
 
 

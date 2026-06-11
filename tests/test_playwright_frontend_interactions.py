@@ -74,10 +74,8 @@ FILTER_LABELS = [
     "Stream",
     "Model Family",
     "Stage",
-    "Baseline",
     "Horizon",
-    "Forecast Vintage",
-    "Date Window",
+    "Score Basis",
 ]
 
 RAW_HOVER_TERMS = [

@@ -42,6 +42,13 @@ def apply_layout(fig: go.Figure, title: str | None = None, height: int | None = 
         template="plotly_white",
         title={"text": title, "x": 0.02, "xanchor": "left"} if title else None,
         font={"family": "Segoe UI, Inter, Arial, sans-serif", "color": "#334155", "size": 13},
+        hoverlabel={
+            "bgcolor": "rgba(255,255,255,0.98)",
+            "bordercolor": "rgba(15,23,42,0.25)",
+            "font": {"family": "Segoe UI, Inter, Arial, sans-serif", "size": 11.5, "color": "#0f172a"},
+            "align": "left",
+            "namelength": 0,
+        },
         margin={"l": 40, "r": 24, "t": 56 if title else 28, "b": 44},
         legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "left", "x": 0.0},
         hovermode="closest",
@@ -81,11 +88,15 @@ def _model_hover_detail_series(data: pd.DataFrame, column: str = "model", weight
     models = _safe_series(data, column)
     if weight_column and weight_column in data.columns:
         weights = data[weight_column]
-        return pd.Series(
+        detail = pd.Series(
             [model_hover_description(model, weight=weight) for model, weight in zip(models, weights, strict=False)],
             index=data.index,
         )
-    return models.map(model_hover_description)
+    else:
+        detail = models.map(model_hover_description)
+    # Wrap long management descriptions so Plotly hover panels stay compact
+    # instead of stretching across the full chart width.
+    return detail.map(lambda text: _wrap_hover_text(text, width=58, max_lines=5))
 
 
 def plot_finalist_accuracy(recommended: pd.DataFrame) -> go.Figure:
@@ -157,6 +168,52 @@ def _annual_basis_metric_label(data: pd.DataFrame) -> str:
     return label.replace("MAPE", "annual MAPE")
 
 
+def _wrap_hover_text(text: str, width: int = 58, max_lines: int = 4) -> str:
+    words = str(text).split()
+    lines: list[str] = []
+    current = ""
+    for word in words:
+        candidate = f"{current} {word}".strip()
+        if len(candidate) > width and current:
+            lines.append(current)
+            current = word
+            if len(lines) >= max_lines:
+                break
+        else:
+            current = candidate
+    if current and len(lines) < max_lines:
+        lines.append(current)
+    if len(lines) >= max_lines and len(" ".join(words)) > sum(len(l) for l in lines) + len(lines):
+        lines[-1] = lines[-1].rstrip(".") + "..."
+    return "<br>".join(lines)
+
+
+def _compose_frontier_hover(row: pd.Series, basis_label: str, annual_label: str) -> str:
+    def value(key: str) -> str:
+        raw = row.get(key, "")
+        text = "" if raw is None else str(raw).strip()
+        return "" if text in {"-", "nan", "None"} else text
+
+    lines = [f"<b>{value('model_short') or 'Model'}</b>"]
+    pairs = [
+        ("Stream", value("stream_label")),
+        ("Candidate role", value("_hover_role")),
+        (basis_label, f"{float(row['quarterly_mape']):.2f}%" if pd.notna(row.get("quarterly_mape")) else ""),
+        (annual_label, f"{float(row['annual_mape']):.2f}%" if pd.notna(row.get("annual_mape")) else ""),
+        ("Bias", value("_hover_bias")),
+        ("Source", value("_hover_source")),
+        ("Feature set", value("_hover_feature")),
+        ("Governance score", value("_hover_score")),
+        ("Schiff class", value("_hover_schiff_class")),
+    ]
+    lines += [f"{label}: {text}" for label, text in pairs if text]
+    detail = value("_hover_model_detail")
+    if detail:
+        # Already wrapped by _model_hover_detail_series; never wrap twice.
+        lines.append("Model detail: " + detail)
+    return "<br>".join(lines)
+
+
 def plot_candidate_landscape(summary: pd.DataFrame) -> go.Figure:
     required = {"quarterly_mape", "annual_mape", "stream_label"}
     if summary.empty or not required.issubset(summary.columns):
@@ -213,35 +270,12 @@ def plot_candidate_landscape(summary: pd.DataFrame) -> go.Figure:
         "Selected finalist": 17,
     }
     fig = go.Figure()
-    hover_columns = [
-        "stream_label",
-        "model_short",
-        "_hover_model_detail",
-        "_hover_stage",
-        "_hover_variant",
-        "_hover_source",
-        "_hover_feature",
-        "_hover_role",
-        "_hover_bias",
-        "_hover_score",
-        "_hover_schiff_class",
-    ]
-    hover_template = (
-        "<b>%{customdata[1]}</b><br>"
-        "Stream: %{customdata[0]}<br>"
-        "Model: %{customdata[1]}<br>"
-        "Candidate role: %{customdata[7]}<br>"
-        "Quarterly MAPE: %{x:.2f}%<br>"
-        "Annual MAPE: %{y:.2f}%<br>"
-        "Bias: %{customdata[8]}<br>"
-        "Stage: %{customdata[3]}<br>"
-        "Variant: %{customdata[4]}<br>"
-        "Source: %{customdata[5]}<br>"
-        "Feature set: %{customdata[6]}<br>"
-        "Governance score: %{customdata[9]}<br>"
-        "Schiff class: %{customdata[10]}<br>"
-        "Model detail: %{customdata[2]}<extra></extra>"
+    annual_label = _annual_basis_metric_label(data)
+    data["_hover_html"] = data.apply(
+        lambda row: _compose_frontier_hover(row, basis_label, annual_label), axis=1
     )
+    hover_columns = ["_hover_html"]
+    hover_template = "%{customdata[0]}<extra></extra>"
     base = data[data["point_type"].isin(["Distribution sample", "Candidate", "Frontier candidate"])].copy()
     base["_stream_order"] = base["stream_label"].map(_stream_order_value)
     for stream, stream_df in base.sort_values(["_stream_order", "quarterly_mape"]).groupby("stream_label", sort=False, dropna=False):
@@ -295,26 +329,22 @@ def plot_candidate_landscape(summary: pd.DataFrame) -> go.Figure:
                 hovertemplate=hover_template,
             )
         )
-    annotation_rows = []
-    for point_type in ["Selected finalist", SCHIFF_SPEC_BENCHMARK_LABEL]:
-        subset = data[data["point_type"] == point_type].sort_values(["stream_label", "quarterly_mape", "annual_mape"])
-        if subset.empty:
-            continue
-        annotation_rows.append(subset.groupby("stream_label", as_index=False).head(1))
-    annotated = pd.concat(annotation_rows, ignore_index=True) if annotation_rows else pd.DataFrame()
-    for _, row in annotated.head(8).iterrows():
+    # Finalist callouts only: borderless text labels so they never read as a
+    # second tooltip box; alternating offsets avoid label-on-label collisions.
+    finalists = data[data["point_type"] == "Selected finalist"].sort_values(
+        ["quarterly_mape", "annual_mape"]
+    ).groupby("stream_label", as_index=False).head(1)
+    finalists = finalists.sort_values("quarterly_mape").reset_index(drop=True)
+    for idx, row in finalists.head(4).iterrows():
         stream_short = str(row.get("stream_label", "")).replace(" VKT per capita", "").replace(" volume", "")
+        above = idx % 2 == 0
         fig.add_annotation(
             x=row["quarterly_mape"],
             y=row["annual_mape"],
-            text=f"{stream_short} finalist" if row["point_type"] == "Selected finalist" else f"{stream_short} Schiff specification",
-            showarrow=True,
-            arrowhead=2,
-            ax=18,
-            ay=-16,
-            font={"size": 10, "color": "#0f172a"},
-            bgcolor="rgba(255,255,255,0.82)",
-            bordercolor="rgba(15,23,42,0.18)",
+            text=f"<b>{stream_short}</b> finalist",
+            showarrow=False,
+            yshift=18 if above else -18,
+            font={"size": 10, "color": "#334155"},
         )
     fig.update_layout(xaxis_title=f"{basis_label} (%)", yaxis_title=f"{_annual_basis_metric_label(data)} (%)")
     fig = apply_layout(fig, "Candidate Search Frontier", height=580)
@@ -328,13 +358,13 @@ def plot_candidate_landscape(summary: pd.DataFrame) -> go.Figure:
     fig.update_layout(
         legend={
             "orientation": "h",
-            "yanchor": "bottom",
-            "y": 1.02,
+            "yanchor": "top",
+            "y": -0.14,
             "xanchor": "left",
             "x": 0.0,
             "font": {"size": 10},
         },
-        margin={"l": 40, "r": 20, "t": 58, "b": 48},
+        margin={"l": 40, "r": 20, "t": 48, "b": 86},
     )
     return fig
 
@@ -1190,7 +1220,7 @@ def plot_stress_checks(stress: pd.DataFrame) -> go.Figure:
         y1=high_risk_top,
         line_width=0,
         fillcolor="rgba(220, 38, 38, 0.06)",
-        annotation_text="High-risk zone",
+        annotation_text="",
         annotation_position="top left",
     )
     fig.update_xaxes(type="category", categoryorder="array", categoryarray=present_order)

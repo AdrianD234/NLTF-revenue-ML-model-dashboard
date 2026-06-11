@@ -57,13 +57,16 @@ def test_candidate_frontier_hover_uses_model_detail_not_raw_identifier() -> None
     )
 
     fig = plot_candidate_landscape(data)
-    customdata = fig.data[0].customdata[0]
+    # The frontier hover is a single composed HTML string (compact tooltip).
+    hover_html = str(fig.data[0].customdata[0][0])
 
-    assert "Dynamic ElasticNet model" in customdata
-    assert any("Uses no lead variables" in str(value) for value in customdata)
-    assert not any(HEAVY_ELASTIC in str(value) for value in customdata)
+    assert "Dynamic ElasticNet model" in hover_html
+    assert "Uses no lead variables" in hover_html
+    assert "Model detail:" in hover_html
+    assert HEAVY_ELASTIC not in hover_html
     assert "Full model" not in str(fig.data[0].hovertemplate)
-    assert "Model detail" in str(fig.data[0].hovertemplate)
+    hover_payload = str(fig.data[0].hovertemplate) + str(fig.data[0].customdata[0][0])
+    assert "Model detail" in hover_payload
 
 
 def test_ensemble_hover_includes_component_detail_and_weight() -> None:

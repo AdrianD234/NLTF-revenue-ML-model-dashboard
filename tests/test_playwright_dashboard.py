@@ -31,9 +31,8 @@ def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
     assert_visible_text_absent(page, "Deploy")
     expect_filter_value(page, "Stream", 0, "All Streams")
     expect_filter_value(page, "Model Family", 1, "All Families")
-    expect_filter_value(page, "Horizon", 4, "1-12 Quarters")
-    expect_filter_value(page, "Forecast Vintage", 5, "Latest")
-    expect_filter_value(page, "Date Window", 6, "All target periods")
+    expect_filter_value(page, "Horizon", 3, "1-12 Quarters")
+    expect_filter_value(page, "Score Basis", 4, "Paper-style horizon MAPE")
     assert page.get_by_role("radio").count() >= 5
 
     for text in [
@@ -293,7 +292,7 @@ def test_filter_values_are_readable(page: Page) -> None:
     wait_dashboard_ready(page)
     expect_filter_value(page, "Stream", 0, "All Streams")
     expect_filter_value(page, "Model Family", 1, "All Families")
-    expect_filter_value(page, "Horizon", 4, "1-12 Quarters")
+    expect_filter_value(page, "Horizon", 3, "1-12 Quarters")
 
 
 def test_filter_band_is_reference_compact(page: Page) -> None:
@@ -351,7 +350,7 @@ def test_governance_shell_is_readable_in_narrow_browser(page: Page) -> None:
     assert "Page 1 of 5 - Overview" in body
     expect_filter_value(page, "Stream", 0, "All Streams")
     expect_filter_value(page, "Model Family", 1, "All Families")
-    expect_filter_value(page, "Date Window", 6, "All target periods")
+    expect_filter_value(page, "Score Basis", 4, "Paper-style horizon MAPE")
 
     first_chart = page.get_by_text("1. Finalist Forecast Accuracy", exact=False).first
     second_chart = page.get_by_text("2. Candidate Search Frontier", exact=False).first
@@ -492,7 +491,7 @@ def test_ensemble_composition_has_three_stream_panels_under_both_score_bases(pag
     assert_ensemble_plot_has_all_streams(page)
 
     select_combobox_option(page, 7, "Operational pooled MAPE")
-    expect_filter_value(page, "Score Basis", 7, "Operational pooled MAPE")
+    expect_filter_value(page, "Score Basis", 4, "Operational pooled MAPE")
     wait_dashboard_ready(page)
     assert_ensemble_plot_has_all_streams(page)
 

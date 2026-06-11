@@ -700,7 +700,7 @@ def main() -> int:
         if not page_evidence("Overview")[0]:
             return fail("Browser screenshot evidence is unavailable.")
         text = safe_read(ROOT / "artifacts" / "filter_interaction_review.md") + safe_read(ROOT / "artifacts" / "reviews" / "interaction_filter.md")
-        required = ("Reset Filters", "Stream", "Model Family", "Forecast Vintage", "direct")
+        required = ("Reset Filters", "Stream", "Model Family", "direct")
         missing = [item for item in required if item not in text]
         return fail("Filter interaction evidence missing: " + ", ".join(missing)) if missing else ok("Filter review records direct clickable primary filters.")
 
