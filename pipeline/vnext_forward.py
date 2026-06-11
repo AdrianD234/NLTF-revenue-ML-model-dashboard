@@ -132,9 +132,13 @@ def _runtime_production_state_gate(stream: str, sdir: Path, manifest: Dict[str, 
     tf = pd.read_parquet(tf_path)
     mats = pd.read_parquet(mat_path)
     max_delta = 0.0
+    members = {label: entry["component_model"] if isinstance(entry, dict) and "component_model" in entry else None
+               for label, entry in manifest["production_states"].items()}
+    member_models = {m["component_label"]: m["component_model"] for m in manifest["members"]}
     for label, bundle in bundles.items():
         g = mats[(mats["component_label"] == label) & (mats["origin"] == "production")]
-        archived = tf[(tf["component_label"] == label) & (tf["training_fit_stage"] == "production_window")]
+        component_model = member_models.get(label)
+        archived = tf[tf["component_model"] == component_model].drop_duplicates("training_period")
         if g.empty or archived.empty:
             return float("inf")
         X = g[bundle["feature_cols"]].astype(float).fillna(0.0)

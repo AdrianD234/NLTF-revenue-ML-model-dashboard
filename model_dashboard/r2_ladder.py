@@ -96,9 +96,9 @@ R2_TRAINING_FIT_NOTE = (
 
 STREAM_ORDER = ["PED VKT per capita", "Light RUC volume", "Heavy RUC volume"]
 STREAM_TO_KEY = {
-    "PED VKT per capita": "ped",
+    "PED VKT per capita": "ped_vnext",
     "Light RUC volume": "light_ruc",
-    "Heavy RUC volume": "heavy_ruc",
+    "Heavy RUC volume": "heavy_ruc_vnext",
 }
 STREAM_TO_CODE = {
     "PED VKT per capita": "PED",
@@ -152,6 +152,8 @@ def r2_ladder_frames(data: dict[str, pd.DataFrame], repo_root: Path | str | None
     missing_training = _missing_training_rows(root, diagnostics, reproducibility, training_observed)
     training_detail = pd.concat([training_observed, missing_training, component_detail], ignore_index=True, sort=False)
     gap_register = _gap_register_rows(root, training_observed, training_detail)
+    if gap_register is None or gap_register.empty or "gap_id" not in gap_register.columns or gap_register["gap_id"].dropna().empty:
+        gap_register = _no_open_gap_rows()
     summary = _summary_rows(diagnostics, reproducibility, training_detail, gap_register)
     return {
         "summary": _ordered(summary),
@@ -207,7 +209,10 @@ def _training_fit_rows_from_artifacts(repo_root: Path) -> pd.DataFrame:
     base = repo_root / "data" / "dashboard_evidence_pack_reproducibility"
     if not base.exists():
         return pd.DataFrame()
-    for stream_key in ["light_ruc", "heavy_ruc", "ped", "ped_inner_hpo"]:
+    # Current-finalist packs only: the vNext packs carry the promoted PED and
+    # Heavy RUC finalists; legacy packs (heavy_ruc, ped, ped_inner_hpo) are
+    # archived lineage and must not feed current training-fit R2 rows.
+    for stream_key in ["light_ruc", "heavy_ruc_vnext", "ped_vnext"]:
         stream_root = base / stream_key
         for filename in TRAINING_FIT_CANDIDATE_FILENAMES:
             path = stream_root / filename
@@ -455,6 +460,38 @@ def _summary_rows(
     return pd.DataFrame(rows)
 
 
+def _no_open_gap_rows() -> pd.DataFrame:
+    """Explicit closure evidence: every stream has verified fitted training rows."""
+    rows = []
+    for basis in SCORE_BASIS_ORDER:
+        rows.append(
+            {
+                "gap_id": "no_open_training_fit_gaps",
+                "stream": "ALL",
+                "stream_label": "All streams",
+                "model": "vNext finalists + Light RUC fixed recipe",
+                "component_model": "all_components",
+                "training_fit_stage": "weighted_ensemble_final",
+                "score_basis": basis,
+                "score_basis_label": score_basis_label(basis),
+                "r2_type": "training_fit",
+                "data_scope": TRAINING_SCOPE,
+                "training_fit_r2_status": "available",
+                "availability_status": "available",
+                "gap_status": "closed",
+                "gap_severity": "none",
+                "gap_detail": "All current finalists carry verified fitted training rows with saved state.",
+                "metric_name": "Training-fit gap register",
+                "metric_value": pd.NA,
+                "metric_display": "-",
+                "value_available": False,
+                "calculation_basis": "Closure row; training-fit R2 values are reported in the summary and detail tables.",
+                "notes": "No open training-fit reproducibility gaps.",
+            }
+        )
+    return pd.DataFrame(rows)
+
+
 def _gap_register_rows(repo_root: Path, observed: pd.DataFrame, detail: pd.DataFrame) -> pd.DataFrame:
     observed_stage_keys = set()
     observed_stages_by_stream_basis: dict[tuple[str, str], set[str]] = {}
@@ -532,7 +569,9 @@ def _gap_register_rows(repo_root: Path, observed: pd.DataFrame, detail: pd.DataF
                     "notes": R2_LADDER_NOTE,
                 }
             )
-    rows.extend(_ped_inner_hpo_gap_rows(repo_root, score_bases, observed_stages_by_stream_basis))
+    # The PED inner-HPO chain is archived legacy lineage; the vNext PED
+    # finalist carries verified fitted training rows directly, so the legacy
+    # inner-HPO gap rows no longer belong in the current ladder.
     return pd.DataFrame(rows)
 
 
@@ -540,7 +579,7 @@ def _heavy_training_gap(repo_root: Path, observed_stages_by_stream_basis: dict[t
     stages = observed_stages_by_stream_basis.get(("Heavy RUC volume", str(basis)), set())
     if "weighted_ensemble_final" in stages:
         return None
-    components = set(_model_registry_components(repo_root, "heavy_ruc"))
+    components = set(_model_registry_components(repo_root, "heavy_ruc_vnext"))
     if components and components.issubset(stages):
         gap_id = "heavy_ruc_final_ensemble_training_fit_rows_missing"
         component = "weighted_ensemble_final"
@@ -561,7 +600,7 @@ def _heavy_training_gap(repo_root: Path, observed_stages_by_stream_basis: dict[t
         "gap_id": gap_id,
         "stream": "HEAVY_RUC",
         "stream_label": "Heavy RUC volume",
-        "model": _first_non_missing(_finalist_model_for_stream(repo_root, "heavy_ruc", "Heavy RUC volume"), "Heavy RUC volume"),
+        "model": _first_non_missing(_finalist_model_for_stream(repo_root, "heavy_ruc_vnext", "Heavy RUC volume"), "Heavy RUC volume"),
         "component_model": component,
         "training_fit_stage": component,
         "score_basis": basis,
@@ -576,7 +615,7 @@ def _heavy_training_gap(repo_root: Path, observed_stages_by_stream_basis: dict[t
         "metric_name": "Training-fit R2 reproducibility gap",
         "metric_value": pd.NA,
         "metric_display": "-",
-        "source_file": _training_source_file(repo_root, "heavy_ruc"),
+        "source_file": _training_source_file(repo_root, "heavy_ruc_vnext"),
         "source_column": "missing_fitted_training_rows",
         "value_available": False,
         "calculation_basis": "Gap register row; no final ensemble training-fit R2 is calculated without fitted training-row predictions.",
@@ -608,7 +647,7 @@ def _ped_inner_hpo_gap_rows(
                     "gap_id": gap.get("gap", "ped_inner_hpo_gap"),
                     "stream": "PED",
                     "stream_label": "PED VKT per capita",
-                    "model": _finalist_model_for_stream(repo_root, "ped", "PED VKT per capita"),
+                    "model": _finalist_model_for_stream(repo_root, "ped_vnext", "PED VKT per capita"),
                     "component_model": "PED__HPOREFINE_solver_static_convex_top18",
                     "score_basis": basis,
                     "score_basis_label": score_basis_label(basis),
@@ -648,7 +687,7 @@ def _ped_inner_hpo_gap_rows(
 
 
 def _expected_training_components(repo_root: Path) -> dict[str, list[tuple[str, str, str]]]:
-    heavy_components = _model_registry_components(repo_root, "heavy_ruc")
+    heavy_components = _model_registry_components(repo_root, "heavy_ruc_vnext")
     ped_components = _ped_inner_components(repo_root)
     return {
         "Light RUC volume": [
@@ -747,7 +786,9 @@ def _training_summary_value(detail: pd.DataFrame, stream_label: str, score_basis
                     "training_fit_stage": "weighted_ensemble_final",
                 }
         if stream_label == "PED VKT per capita" and "training_fit_stage" in preferred.columns:
-            for stage in ["hpo_refine_final_fitted", "outer_component_fitted"]:
+            # vNext PED emits a weighted-ensemble final stage; legacy packs
+            # used the HPO stage names.
+            for stage in ["weighted_ensemble_final", "hpo_refine_final_fitted", "outer_component_fitted"]:
                 stage_rows = preferred[preferred["training_fit_stage"].astype(str).eq(stage)]
                 if not stage_rows.empty:
                     preferred = stage_rows
@@ -817,14 +858,22 @@ def _stream_missing_status(stream_label: str) -> str:
 
 
 def _ped_final_training_stage_available(stages: set[str]) -> bool:
-    return bool({"hpo_refine_final_fitted", "outer_component_fitted"}.intersection(stages))
+    # Legacy PED packs used HPO stage names; the vNext pack emits the
+    # weighted-ensemble final stage like Heavy RUC.
+    return bool({"hpo_refine_final_fitted", "outer_component_fitted", "weighted_ensemble_final"}.intersection(stages))
 
 
 def _ped_inner_hpo_status(gap_register: pd.DataFrame) -> dict[str, str]:
     ped = gap_register[gap_register["stream_label"].astype(str).eq("PED VKT per capita")] if gap_register is not None and not gap_register.empty else pd.DataFrame()
+
+    def _first(column: str) -> str:
+        if ped.empty or column not in ped.columns or not ped[column].notna().any():
+            return "not_available"
+        return str(ped[column].dropna().iloc[0])
+
     return {
-        "inner_hpo_weights_status": ped["inner_hpo_weights_status"].dropna().iloc[0] if not ped.empty and ped["inner_hpo_weights_status"].notna().any() else "not_available",
-        "nested_replay_status": ped["nested_replay_status"].dropna().iloc[0] if not ped.empty and ped["nested_replay_status"].notna().any() else "not_available",
+        "inner_hpo_weights_status": _first("inner_hpo_weights_status"),
+        "nested_replay_status": _first("nested_replay_status"),
     }
 
 

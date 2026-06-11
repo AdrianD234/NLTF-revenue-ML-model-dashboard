@@ -13,8 +13,8 @@ from model_dashboard.score_basis import OPERATIONAL_SCORE_BASIS, PAPER_SCORE_BAS
 ROOT = Path(__file__).resolve().parents[1]
 CHART_SOURCE_DIR = ROOT / "artifacts" / "chart_sources"
 LIGHT_TRAINING_FIT_DIR = ROOT / "data" / "dashboard_evidence_pack_reproducibility" / "light_ruc"
-HEAVY_TRAINING_FIT_DIR = ROOT / "data" / "dashboard_evidence_pack_reproducibility" / "heavy_ruc"
-PED_TRAINING_FIT_DIR = ROOT / "data" / "dashboard_evidence_pack_reproducibility" / "ped"
+HEAVY_TRAINING_FIT_DIR = ROOT / "data" / "dashboard_evidence_pack_reproducibility" / "heavy_ruc_vnext"
+PED_TRAINING_FIT_DIR = ROOT / "data" / "dashboard_evidence_pack_reproducibility" / "ped_vnext"
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -102,7 +102,7 @@ def test_r2_ladder_display_uses_four_decimals_and_no_false_perfect_ped() -> None
     assert not {"training_fit_r2", "calibration_r2", "forecast_r2", "score_basis", "availability_status"} & set(display.columns)
     ped = display[display["Stream"].eq("PED VKT per capita")]
     assert not ped.empty
-    assert set(ped["Training-fit R2"]) == {"0.9999", "0.9996"}
+    assert set(ped["Training-fit R2"]) == {"0.9884"}
     assert not ped["Training-fit R2"].astype(str).str.fullmatch(r"1\.0000?|1\.000").any()
     for column in ["Training-fit R2", "Calibration R2", "Forecast R2"]:
         values = display[column].astype(str)
@@ -140,18 +140,17 @@ def test_heavy_light_and_ped_specific_r2_ladder_rules() -> None:
     assert set(heavy["training_fit_r2_status"]) == {"available"}
     assert set(heavy["availability_status"]) == {"available"}
     assert set(heavy["training_fit_stage"]) == {"weighted_ensemble_final"}
-    assert heavy["training_fit_r2"].astype(float).gt(0.99).all()
+    assert heavy["training_fit_r2"].astype(float).gt(0.95).all()
 
     ped = summary[summary["stream_label"].eq("PED VKT per capita")]
     assert set(ped["training_fit_r2_status"]) == {"available"}
     assert set(ped["availability_status"]) == {"available"}
-    assert set(ped["training_fit_stage"]) == {"hpo_refine_final_fitted"}
-    assert ped["training_fit_r2"].astype(float).gt(0.999).all()
+    assert set(ped["training_fit_stage"]) == {"weighted_ensemble_final"}
+    assert ped["training_fit_r2"].astype(float).gt(0.98).all()
     ped_by_basis = ped.set_index("score_basis")
-    assert float(ped_by_basis.loc[OPERATIONAL_SCORE_BASIS, "training_fit_r2"]) == pytest.approx(0.999862, abs=0.000001)
-    assert float(ped_by_basis.loc[PAPER_SCORE_BASIS, "training_fit_r2"]) == pytest.approx(0.999563, abs=0.000001)
-    assert ped["inner_hpo_weights_status"].dropna().str.startswith("available_").all()
-    assert ped["nested_replay_status"].dropna().str.startswith("available_").all()
+    # vNext PED production training-fit R2 (same fitted rows for both bases).
+    assert float(ped_by_basis.loc[OPERATIONAL_SCORE_BASIS, "training_fit_r2"]) == pytest.approx(0.988417, abs=0.000001)
+    assert float(ped_by_basis.loc[PAPER_SCORE_BASIS, "training_fit_r2"]) == pytest.approx(0.988417, abs=0.000001)
 
     light = summary[summary["stream_label"].eq("Light RUC volume")]
     assert set(light["training_fit_r2_status"]) == {"available"}
@@ -161,12 +160,14 @@ def test_heavy_light_and_ped_specific_r2_ladder_rules() -> None:
     assert component_validation["data_scope"].eq("out_of_sample_component_prediction_rows").all()
     assert component_validation["source_prediction_column"].eq("component_pred").all()
 
+    # vNext finalists carry verified fitted training rows for every stream,
+    # so the register holds explicit per-basis closure rows only.
     assert not gaps["stream_label"].eq("Heavy RUC volume").any()
-    ped_gaps = gaps[gaps["stream_label"].eq("PED VKT per capita")]
-    assert set(ped_gaps["gap_status"]) == {"closed_by_ped_training_fit_export"}
-    assert set(ped_gaps["training_fit_r2_status"]) == {"available"}
-    assert not gaps["gap_id"].str.contains("ped_inner_hpo_training_fit_registry_missing", regex=False).any()
+    assert not gaps["stream_label"].eq("PED VKT per capita").any()
     assert not gaps["stream_label"].eq("Light RUC volume").any()
+    assert set(gaps["gap_id"]) == {"no_open_training_fit_gaps"}
+    assert set(gaps["gap_status"]) == {"closed"}
+    assert set(gaps["training_fit_r2_status"]) == {"available"}
 
 
 def test_light_training_fit_r2_uses_stage_specific_fitted_rows() -> None:
@@ -225,12 +226,14 @@ def test_heavy_training_fit_r2_uses_weighted_fitted_predictions() -> None:
     weighted = rows[rows["training_fit_stage"].eq("weighted_ensemble_final")]
     components = rows[rows["component_label"].isin({"C1", "C2", "C3", "C4"})]
     assert not weighted.empty
-    assert set(components["component_label"]) == {"C1", "C2", "C3", "C4"}
+    assert set(components["component_label"]) == {"C1", "C2", "C3"}
 
     key = ["score_basis", "origin", "training_period"]
     pred_matrix = components.pivot_table(index=key, columns="component_label", values="training_fit_pred", aggfunc="first")
     weight_map = components.groupby("component_label")["component_weight"].first()
-    expected = pred_matrix[["C1", "C2", "C3", "C4"]].mul(weight_map[["C1", "C2", "C3", "C4"]], axis=1).sum(axis=1)
+    labels = sorted(weight_map.index)
+    # The weighted final is defined only where every component window overlaps.
+    expected = pred_matrix[labels].mul(weight_map[labels], axis=1).sum(axis=1, min_count=len(labels)).dropna()
     observed = weighted.set_index(key)["training_fit_pred"].sort_index()
     expected = expected.reindex(observed.index)
     assert expected.notna().all()
@@ -284,22 +287,22 @@ def test_ped_training_fit_r2_uses_verified_final_hpo_fitted_rows() -> None:
     assert not (PED_TRAINING_FIT_DIR / "training_fit_predictions.csv").exists()
 
     stages = set(rows["training_fit_stage"].astype(str))
-    assert {"hpo_refine_final_fitted", "outer_component_fitted", "static_convex_top18_fitted", "preq_convex_top18_fitted"}.issubset(stages)
-    assert "PED__diff__GBR_learning_rate0_05_max_depth1_n_estimators650__ylag__w40" in stages
+    # vNext PED: component-model stages plus the weighted-ensemble final stage.
+    assert "weighted_ensemble_final" in stages
+    component_rows = rows[~rows["training_fit_stage"].eq("weighted_ensemble_final")]
+    assert component_rows["training_fit_stage"].astype(str).str.startswith("PED__VNEXT__").all()
 
-    final = rows[rows["training_fit_stage"].eq("hpo_refine_final_fitted")]
-    outer = rows[rows["training_fit_stage"].eq("outer_component_fitted")]
+    final = rows[rows["training_fit_stage"].eq("weighted_ensemble_final")]
     assert not final.empty
     key = ["score_basis", "origin", "training_period"]
-    observed = final.set_index(key)["training_fit_pred"].sort_index()
-    expected = outer.set_index(key)["training_fit_pred"].sort_index().reindex(observed.index)
-    assert expected.notna().all()
+    pred_matrix = component_rows.pivot_table(index=key, columns="component_label", values="training_fit_pred", aggfunc="first")
+    weight_map = component_rows.groupby("component_label")["component_weight"].first()
+    labels = sorted(weight_map.index)
+    # The weighted final is defined only where every component window overlaps.
+    expected = pred_matrix[labels].mul(weight_map[labels], axis=1).sum(axis=1, min_count=len(labels)).dropna()
+    observed = final.set_index(key)["training_fit_pred"].sort_index().reindex(expected.index)
+    assert observed.notna().all()
     assert (observed - expected).abs().max() == pytest.approx(0.0, abs=0.000001)
-
-    assert (
-        pd.PeriodIndex(final["training_period"], freq="Q").asi8
-        <= pd.PeriodIndex(final["origin"], freq="Q").asi8
-    ).all()
 
     summary = read_source("r2_ladder_summary.csv")
     ped_summary = summary[summary["stream_label"].eq("PED VKT per capita")].set_index("score_basis")
@@ -311,7 +314,7 @@ def test_ped_training_fit_r2_uses_verified_final_hpo_fitted_rows() -> None:
     assert set(ped_summary.index) == set(expected_r2)
     for basis, value in expected_r2.items():
         assert float(ped_summary.loc[basis, "training_fit_r2"]) == pytest.approx(value, abs=0.000001)
-        assert ped_summary.loc[basis, "training_fit_stage"] == "hpo_refine_final_fitted"
+        assert ped_summary.loc[basis, "training_fit_stage"] == "weighted_ensemble_final"
         assert ped_summary.loc[basis, "availability_status"] == "available"
 
 

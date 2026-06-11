@@ -52,7 +52,7 @@ def test_diagnostics_r2_source_reconciles_to_scorecard_final_predictions() -> No
 
 
 def test_heavy_final_r2_uses_weighted_final_predictions_not_component_weights() -> None:
-    heavy = pd.read_parquet(ROOT / "data/dashboard_evidence_pack_reproducibility/heavy_ruc/component_predictions.parquet")
+    heavy = pd.read_parquet(ROOT / "data/dashboard_evidence_pack_reproducibility/heavy_ruc_vnext/component_predictions.parquet")
     keys = ["score_basis", "eval_grid", "origin", "target_period", "horizon"]
     final_rows = heavy[heavy["score_basis"].eq(OPERATIONAL_SCORE_BASIS)].drop_duplicates(subset=keys, keep="last")
     source = pd.read_csv(CHART_SOURCE_DIR / "reproducibility_component_r2.csv")

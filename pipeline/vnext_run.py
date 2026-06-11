@@ -259,6 +259,10 @@ def stage_select(streams: Sequence[str]) -> None:
         out = vnext_dir(stream)
         preds = pd.read_parquet(out / "search_predictions.parquet")
         keysets = load_eval_keysets(repo_root(), stream, INCUMBENT_FINALISTS[stream])
+        if not keysets:
+            current = pd.read_parquet(repo_root() / "data" / "dashboard_evidence_pack" / "data" / "finalists.parquet")
+            current_model = str(current[current["stream"] == stream]["model"].iloc[0])
+            keysets = load_eval_keysets(repo_root(), stream, current_model)
         schiff = load_schiff_predictions(repo_root(), stream)
         scores = candidate_scores(preds, keysets, schiff)
         scores = scores.sort_values(["paper_horizon_mean_mape", "operational_pooled_mape", "model"]).reset_index(drop=True)
@@ -630,7 +634,11 @@ def stage_scorecards(streams: Sequence[str]) -> None:
         selection = json.loads((out / "selection.json").read_text(encoding="utf-8"))
         finalist = selection["finalist_model"]
         final_preds = pd.read_parquet(sdir / "validation_predictions.parquet")
-        keysets = load_eval_keysets(repo_root(), stream, INCUMBENT_FINALISTS[stream])
+        # Before promotion the stored keysets live under the legacy finalist;
+        # after promotion they live under the vNext finalist. Use whichever
+        # the governed evidence pack currently carries.
+        keysets = (load_eval_keysets(repo_root(), stream, finalist)
+                   or load_eval_keysets(repo_root(), stream, INCUMBENT_FINALISTS[stream]))
         schiff = load_schiff_predictions(repo_root(), stream)
 
         summary_rows, stress_rows, horizon_rows = [], [], []
@@ -692,13 +700,25 @@ def _training_fit_frames(stream: str, sdir: Path):
         actual_level = np.exp(g["y_log"].to_numpy(float))
         fits_by_label[label] = {}
         for tp, al, fl, fg in zip(g["training_period"], actual_level, fit_level, fit_log):
-            pred_rows.append({"stream": stream, "stream_label": STREAM_LABELS[stream],
-                              "model": manifest["finalist_model"], "component_label": label,
-                              "component_model": m["component_model"],
-                              "component_weight": weights[label],
-                              "training_period": tp, "training_fit_stage": "production_window",
-                              "actual": float(al), "training_fit_pred": float(fl),
-                              "training_fit_pred_log": float(fg)})
+            # Ladder convention: one row per score basis; component stage is the
+            # component model name (matches the governed R2 ladder contract).
+            window = manifest["production_states"][label]
+            for basis in (PAPER_SCORE_BASIS, OPERATIONAL_SCORE_BASIS):
+                pred_rows.append({"stream": stream, "stream_label": STREAM_LABELS[stream],
+                                  "model": manifest["finalist_model"], "component_label": label.replace("M", "C"),
+                                  "component_model": m["component_model"],
+                                  "component_weight": weights[label],
+                                  "score_basis": basis,
+                                  "origin": "production",
+                                  "training_period": tp,
+                                  "window_start": window["train_window_start"],
+                                  "window_end": window["train_window_end"],
+                                  "training_fit_stage": m["component_model"],
+                                  "data_scope": "training_window_fitted_rows",
+                                  "sample_role": "training",
+                                  "source_file": "training_feature_matrices.parquet (production origin)",
+                                  "actual": float(al), "training_fit_pred": float(fl),
+                                  "training_fit_pred_log": float(fg)})
             fits_by_label[label][tp] = float(fl)
             actual_by_p[tp] = float(al)
         summary.append({"stream": stream, "stream_label": STREAM_LABELS[stream],
@@ -714,12 +734,20 @@ def _training_fit_frames(stream: str, sdir: Path):
     a = np.array([actual_by_p[p] for p in periods])
     f = np.array([sum(weights[lbl] * fits_by_label[lbl][p] for lbl in fits_by_label) for p in periods])
     for p, al, fl in zip(periods, a, f):
-        pred_rows.append({"stream": stream, "stream_label": STREAM_LABELS[stream],
-                          "model": manifest["finalist_model"], "component_label": "FINAL",
-                          "component_model": manifest["finalist_model"], "component_weight": 1.0,
-                          "training_period": p, "training_fit_stage": "production_window",
-                          "actual": float(al), "training_fit_pred": float(fl),
-                          "training_fit_pred_log": float(np.log(fl)) if fl > 0 else np.nan})
+        for basis in (PAPER_SCORE_BASIS, OPERATIONAL_SCORE_BASIS):
+            pred_rows.append({"stream": stream, "stream_label": STREAM_LABELS[stream],
+                              "model": manifest["finalist_model"], "component_label": "weighted_ensemble_final",
+                              "component_model": manifest["finalist_model"], "component_weight": 1.0,
+                              "score_basis": basis,
+                              "origin": "production",
+                              "training_period": p,
+                              "window_start": min(periods), "window_end": max(periods),
+                              "training_fit_stage": "weighted_ensemble_final",
+                              "data_scope": "training_window_fitted_rows",
+                              "sample_role": "training",
+                              "source_file": "training_feature_matrices.parquet (production origin)",
+                              "actual": float(al), "training_fit_pred": float(fl),
+                              "training_fit_pred_log": float(np.log(fl)) if fl > 0 else np.nan})
     summary.append({"stream": stream, "stream_label": STREAM_LABELS[stream],
                     "model": manifest["finalist_model"], "component_model": manifest["finalist_model"],
                     "training_fit_stage": "production_window", "n_rows": int(len(periods)),

@@ -122,8 +122,12 @@ def reproducibility_component_r2_frame(repo_root: Path | str | None = None) -> p
     if not base.exists():
         return pd.DataFrame()
     rows: list[dict[str, Any]] = []
+    # Current-finalist packs only (legacy packs are archived lineage).
+    current_packs = ("light_ruc", "ped_vnext", "heavy_ruc_vnext")
     for path in sorted(base.glob("*/component_predictions.parquet")):
         stream_key = path.parent.name
+        if stream_key not in current_packs:
+            continue
         try:
             component_predictions = pd.read_parquet(path)
         except Exception:
