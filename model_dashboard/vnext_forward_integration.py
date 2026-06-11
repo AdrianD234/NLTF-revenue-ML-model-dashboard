@@ -23,14 +23,13 @@ from .forward_scorer_governance import (
 
 VNEXT_INTEGRATION_VERSION = "vnext-forward-integration-v1"
 
-_STREAM_LABELS = {
-    "PED": "PED VKT per capita",
-    "HEAVY_RUC": "Heavy RUC volume",
-}
+from .governance_constants import CURRENT_REPRO_PACK_DIRS, STREAM_LABELS as _ALL_STREAM_LABELS
+
+_STREAM_LABELS = {stream: _ALL_STREAM_LABELS[stream] for stream in ("PED", "HEAVY_RUC")}
 
 
 def _state_dir(root: Path, stream: str) -> Path:
-    return root / "data" / "dashboard_evidence_pack_reproducibility" / f"{stream.lower()}_vnext"
+    return root / "data" / "dashboard_evidence_pack_reproducibility" / CURRENT_REPRO_PACK_DIRS[stream]
 
 
 def vnext_pack_present(root: Path, stream: str) -> bool:

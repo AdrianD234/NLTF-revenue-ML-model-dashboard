@@ -23,7 +23,9 @@ LIGHT_RUC_REPRO_MODEL = "dynamic_RESID_GBR_n150_d1_lr0.05_w36"
 LIGHT_RUC_REPRO_DESCRIPTION = (
     "Two-stage OLS base plus GBM residual correction, exactly replayed against evidence predictions."
 )
-PED_REPRO_MODEL = "PED__VNEXT_SOLVED_CONVEX_TOP2"
+from .governance_constants import CURRENT_REPRO_PACK_DIRS as _CURRENT_PACKS, current_finalist as _current_finalist
+
+PED_REPRO_MODEL = _current_finalist("PED")
 PED_REPRO_DESCRIPTION = (
     "Two-component convex vNext ensemble with saved fitted state, "
     "exactly replayed against evidence predictions (production forward-scoreable)."
@@ -110,7 +112,7 @@ REPRODUCIBILITY_STREAM_CONFIGS: dict[str, ReproducibilityStreamConfig] = {
     "PED VKT per capita": ReproducibilityStreamConfig(
         stream_label="PED VKT per capita",
         stream_key="ped",
-        root=REPRODUCIBILITY_BASE_ROOT / "ped_vnext",
+        root=REPRODUCIBILITY_BASE_ROOT / _CURRENT_PACKS["PED"],
         model=PED_REPRO_MODEL,
         description=PED_REPRO_DESCRIPTION,
         report_file="ped_reproducibility_report.md",
@@ -119,8 +121,8 @@ REPRODUCIBILITY_STREAM_CONFIGS: dict[str, ReproducibilityStreamConfig] = {
     "Heavy RUC volume": ReproducibilityStreamConfig(
         stream_label="Heavy RUC volume",
         stream_key="heavy_ruc",
-        root=REPRODUCIBILITY_BASE_ROOT / "heavy_ruc_vnext",
-        model="HEAVY_RUC__VNEXT_SOLVED_CONVEX_TOP4",
+        root=REPRODUCIBILITY_BASE_ROOT / _CURRENT_PACKS["HEAVY_RUC"],
+        model=_current_finalist("HEAVY_RUC"),
         description=(
             "Three-component convex vNext ensemble with saved fitted state, "
             "exactly replayed against evidence predictions (production forward-scoreable)."

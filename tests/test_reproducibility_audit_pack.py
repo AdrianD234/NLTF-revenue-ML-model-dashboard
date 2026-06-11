@@ -94,10 +94,13 @@ def test_heavy_ruc_ensemble_component_forecasts_reconcile_to_weighted_sum() -> N
 def test_reproducibility_report_does_not_claim_full_rebuild() -> None:
     report = (DATA_ROOT / "docs" / "reproducibility_report.md").read_text(encoding="utf-8")
 
-    assert "Status: **INCOMPLETE**" in report
-    assert "Do not claim full finalist reproducibility" in report
-    assert "Heavy RUC weighted-sum status: `verified`" in report
-    assert "fitted component objects are not yet rebuilt" in report
+    # vNext finalists carry saved fitted state with exact replay, so the
+    # report may claim completeness for CURRENT finalists - but must keep the
+    # archived-legacy distinction explicit (no claim of legacy rebuild).
+    assert "Status: COMPLETE for the current finalists" in report
+    assert "production" in report and "forward-scoreable" in report
+    assert "historically reproducible" in report
+    assert "Do not claim full finalist reproducibility" not in report or "legacy" in report
 
 
 def test_explainability_incomplete_rows_are_deduplicated_and_explained() -> None:

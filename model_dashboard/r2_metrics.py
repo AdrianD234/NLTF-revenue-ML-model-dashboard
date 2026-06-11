@@ -123,7 +123,9 @@ def reproducibility_component_r2_frame(repo_root: Path | str | None = None) -> p
         return pd.DataFrame()
     rows: list[dict[str, Any]] = []
     # Current-finalist packs only (legacy packs are archived lineage).
-    current_packs = ("light_ruc", "ped_vnext", "heavy_ruc_vnext")
+    from .governance_constants import CURRENT_REPRO_PACK_DIRS
+
+    current_packs = tuple(CURRENT_REPRO_PACK_DIRS.values())
     for path in sorted(base.glob("*/component_predictions.parquet")):
         stream_key = path.parent.name
         if stream_key not in current_packs:

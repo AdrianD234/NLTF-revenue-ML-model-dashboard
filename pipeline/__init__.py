@@ -12,3 +12,8 @@ Modules:
 """
 
 PIPELINE_VERSION = "vnext-pipeline-v1.0"
+
+# Generation suffix for the reproducibility packs this pipeline writes.
+# model_dashboard/governance_constants.py maps streams to their CURRENT
+# pack; promote a new generation by updating both in one commit.
+GENERATION = "vnext"

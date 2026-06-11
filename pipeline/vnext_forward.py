@@ -18,7 +18,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 import numpy as np
 import pandas as pd
 
-from . import PIPELINE_VERSION
+from . import GENERATION, PIPELINE_VERSION
 from .vnext_core import (
     BASE_SERIES,
     LEVEL_SERIES,
@@ -79,7 +79,7 @@ def repo_root() -> Path:
 
 
 def state_dir(stream: str) -> Path:
-    return repo_root() / "data" / "dashboard_evidence_pack_reproducibility" / f"{stream.lower()}_vnext"
+    return repo_root() / "data" / "dashboard_evidence_pack_reproducibility" / f"{stream.lower()}_{GENERATION}"
 
 
 @dataclass

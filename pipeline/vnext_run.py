@@ -30,7 +30,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 import numpy as np
 import pandas as pd
 
-from . import PIPELINE_VERSION
+from . import GENERATION, PIPELINE_VERSION
 from .vnext_candidates import HEAVY_LOCKED_WEIGHTS, candidate_grid, heavy_locked_refit_components
 from .vnext_core import (
     LAG_RECURSION_POLICY,
@@ -80,7 +80,7 @@ def vnext_dir(stream: str) -> Path:
 
 
 def state_dir(stream: str) -> Path:
-    d = repo_root() / "data" / "dashboard_evidence_pack_reproducibility" / f"{stream.lower()}_vnext"
+    d = repo_root() / "data" / "dashboard_evidence_pack_reproducibility" / f"{stream.lower()}_{GENERATION}"
     d.mkdir(parents=True, exist_ok=True)
     return d
 

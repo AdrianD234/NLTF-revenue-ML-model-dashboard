@@ -95,10 +95,13 @@ R2_TRAINING_FIT_NOTE = (
 )
 
 STREAM_ORDER = ["PED VKT per capita", "Light RUC volume", "Heavy RUC volume"]
+from .governance_constants import CURRENT_REPRO_PACK_DIRS as _CURRENT_PACKS
+
 STREAM_TO_KEY = {
-    "PED VKT per capita": "ped_vnext",
-    "Light RUC volume": "light_ruc",
-    "Heavy RUC volume": "heavy_ruc_vnext",
+    label: _CURRENT_PACKS[stream]
+    for stream, label in (("PED", "PED VKT per capita"),
+                          ("LIGHT_RUC", "Light RUC volume"),
+                          ("HEAVY_RUC", "Heavy RUC volume"))
 }
 STREAM_TO_CODE = {
     "PED VKT per capita": "PED",
@@ -212,7 +215,7 @@ def _training_fit_rows_from_artifacts(repo_root: Path) -> pd.DataFrame:
     # Current-finalist packs only: the vNext packs carry the promoted PED and
     # Heavy RUC finalists; legacy packs (heavy_ruc, ped, ped_inner_hpo) are
     # archived lineage and must not feed current training-fit R2 rows.
-    for stream_key in ["light_ruc", "heavy_ruc_vnext", "ped_vnext"]:
+    for stream_key in _CURRENT_PACKS.values():
         stream_root = base / stream_key
         for filename in TRAINING_FIT_CANDIDATE_FILENAMES:
             path = stream_root / filename
@@ -579,7 +582,7 @@ def _heavy_training_gap(repo_root: Path, observed_stages_by_stream_basis: dict[t
     stages = observed_stages_by_stream_basis.get(("Heavy RUC volume", str(basis)), set())
     if "weighted_ensemble_final" in stages:
         return None
-    components = set(_model_registry_components(repo_root, "heavy_ruc_vnext"))
+    components = set(_model_registry_components(repo_root, _CURRENT_PACKS["HEAVY_RUC"]))
     if components and components.issubset(stages):
         gap_id = "heavy_ruc_final_ensemble_training_fit_rows_missing"
         component = "weighted_ensemble_final"
@@ -600,7 +603,7 @@ def _heavy_training_gap(repo_root: Path, observed_stages_by_stream_basis: dict[t
         "gap_id": gap_id,
         "stream": "HEAVY_RUC",
         "stream_label": "Heavy RUC volume",
-        "model": _first_non_missing(_finalist_model_for_stream(repo_root, "heavy_ruc_vnext", "Heavy RUC volume"), "Heavy RUC volume"),
+        "model": _first_non_missing(_finalist_model_for_stream(repo_root, _CURRENT_PACKS["HEAVY_RUC"], "Heavy RUC volume"), "Heavy RUC volume"),
         "component_model": component,
         "training_fit_stage": component,
         "score_basis": basis,
@@ -615,7 +618,7 @@ def _heavy_training_gap(repo_root: Path, observed_stages_by_stream_basis: dict[t
         "metric_name": "Training-fit R2 reproducibility gap",
         "metric_value": pd.NA,
         "metric_display": "-",
-        "source_file": _training_source_file(repo_root, "heavy_ruc_vnext"),
+        "source_file": _training_source_file(repo_root, _CURRENT_PACKS["HEAVY_RUC"]),
         "source_column": "missing_fitted_training_rows",
         "value_available": False,
         "calculation_basis": "Gap register row; no final ensemble training-fit R2 is calculated without fitted training-row predictions.",
@@ -647,7 +650,7 @@ def _ped_inner_hpo_gap_rows(
                     "gap_id": gap.get("gap", "ped_inner_hpo_gap"),
                     "stream": "PED",
                     "stream_label": "PED VKT per capita",
-                    "model": _finalist_model_for_stream(repo_root, "ped_vnext", "PED VKT per capita"),
+                    "model": _finalist_model_for_stream(repo_root, _CURRENT_PACKS["PED"], "PED VKT per capita"),
                     "component_model": "PED__HPOREFINE_solver_static_convex_top18",
                     "score_basis": basis,
                     "score_basis_label": score_basis_label(basis),
@@ -687,7 +690,7 @@ def _ped_inner_hpo_gap_rows(
 
 
 def _expected_training_components(repo_root: Path) -> dict[str, list[tuple[str, str, str]]]:
-    heavy_components = _model_registry_components(repo_root, "heavy_ruc_vnext")
+    heavy_components = _model_registry_components(repo_root, _CURRENT_PACKS["HEAVY_RUC"])
     ped_components = _ped_inner_components(repo_root)
     return {
         "Light RUC volume": [
