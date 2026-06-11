@@ -1,36 +1,36 @@
 # Schiff Specification Benchmark
 
-The default Stage 1 dashboard benchmark is the Schiff specification benchmark loaded from `data/dashboard_evidence_pack`.
+The default Stage 1 dashboard benchmark is the Schiff specification benchmark loaded from `data/dashboard_evidence_pack` (v7, vNext finalists).
 
 Legacy Schiff-style benchmark rows can remain in review utilities, but they are not default dashboard evidence and must not be used in the executive pages or chart source tables.
 
-## Current Finalists
+## Current Finalists (paper-style horizon / annual MAPE)
 
 | Stream | Finalist Quarterly MAPE | Finalist Annual MAPE |
 | --- | ---: | ---: |
-| PED VKT per capita | 2.47% | 2.39% |
-| Light RUC volume | 9.15% | 6.00% |
-| Heavy RUC volume | 3.48% | 3.02% |
+| PED VKT per capita | 3.13% | 1.95% |
+| Light RUC volume | 5.36% | 1.27% |
+| Heavy RUC volume | 2.29% | 1.68% |
 
-## Schiff Specification Benchmark
+## Schiff Specification Benchmark (paper-style)
 
 | Stream | Schiff Specification Quarterly MAPE | Schiff Specification Annual MAPE |
 | --- | ---: | ---: |
-| PED VKT per capita | 4.09% | 4.13% |
-| Light RUC volume | 8.41% | 5.00% |
-| Heavy RUC volume | 7.80% | 8.11% |
+| PED VKT per capita | 4.67% | 3.59% |
+| Light RUC volume | 8.52% | 2.70% |
+| Heavy RUC volume | 8.76% | 8.88% |
 
-Heavy RUC horizon 12 should reconcile near 10.11% in the governed benchmark evidence. The old Heavy RUC 20.50% H12 Schiff-style value is legacy evidence and must not appear in default charts.
+The old Heavy RUC 20.50% H12 Schiff-style value is legacy evidence and must not appear in default charts.
 
 ## Scenario Comparison
 
 | Stream | Full-sample Qtr Gain | Full-sample Annual Gain | Paired Win Rate | Recommendation |
 | --- | ---: | ---: | ---: | --- |
-| PED VKT per capita | +1.62 pp | +1.75 pp | 76.73% | Promote |
-| Light RUC volume | -0.73 pp | -1.00 pp | 46.71% | Needs Stage 2 |
-| Heavy RUC volume | +4.32 pp | +5.09 pp | 65.49% | Promote |
+| PED VKT per capita | +1.54 pp | +1.64 pp | 69.84% | Promote |
+| Light RUC volume | +3.16 pp | +1.43 pp | 62.70% | Promote |
+| Heavy RUC volume | +6.47 pp | +7.20 pp | 65.08% | Promote |
 
-The benchmark pass state remains 2/3 because Light RUC loses to the Schiff specification benchmark.
+The benchmark pass state is 3/3: every stream beats the Schiff specification benchmark on the default paper-style basis with the vNext finalists.
 
 ## Caveat
 

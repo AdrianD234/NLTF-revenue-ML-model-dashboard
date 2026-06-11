@@ -1,48 +1,28 @@
-# Stage 1 Dashboard Evidence Pack v6 — balanced frontier and reproducibility audit
+# Stage 1 Dashboard Evidence Pack v7 — vNext finalists
 
 This is a Parquet-first evidence pack for the NLTF Stage 1 Governance Dashboard.
 
-## Current finalists
+## Current finalists (vNext, production forward-scoreable)
 
-- PED: `PED__RESCUE_static_annual_weighted_top12_capnone`
-- Light RUC: `dynamic_RESID_GBR_n150_d1_lr0.05_w36`
-- Heavy RUC: `HEAVY_RUC__RECON_STATIC_REBUILT`
+- PED: `PED__VNEXT_SOLVED_CONVEX_TOP2` (two-component convex ensemble, saved fitted state)
+- Light RUC: `dynamic_RESID_GBR_n150_d1_lr0.05_w36` (fixed two-stage recipe, unchanged)
+- Heavy RUC: `HEAVY_RUC__VNEXT_SOLVED_CONVEX_TOP4` (three-component convex ensemble, saved fitted state)
 
 Default score basis is `schiff_paper_horizon_mean`. Operational metrics are retained in `operational_*` columns and scorecard tables.
 
-## Key governance caveat
+## Headline metrics (paper-style horizon MAPE / paper annual MAPE)
 
-The Light RUC finalist is a dynamic residual GBM accuracy challenger. It improves the default paper-style horizon MAPE and operational quarterly MAPE, but operational annual MAPE remains a watch item.
+- PED: 3.132% / 1.947%
+- Light RUC: 5.363% / 1.274%
+- Heavy RUC: 2.289% / 1.683%
 
-## Default paper-style Light RUC metrics
+All three streams beat the Schiff specification benchmark on the default basis. Do not mix paper-style and operational MAPE without labels.
 
-- Paper horizon mean MAPE: 5.363%
-- Paper pooled MAPE: 4.795%
-- Paper annual MAPE: 1.274%
-- Operational pooled MAPE: 8.273%
-- Operational annual MAPE: 6.775%
+## Key governance facts
 
-Do not mix paper-style and operational MAPE without labels.
+- The PED and Heavy RUC finalists are vNext models selected by `pipeline/vnext_run.py` on the exact stored evidence keysets, with saved per-origin and production fitted state (parity replay delta 0.0; see `data/dashboard_evidence_pack_reproducibility/<stream>_vnext/forward_scorer_parity_audit.json`).
+- The archived legacy finalists (`HEAVY_RUC__RECON_STATIC_REBUILT`, `PED__RESCUE_static_annual_weighted_top12_capnone`) remain historically reproducible only; the prior pack is preserved at `data/dashboard_evidence_pack_v6_backup`.
+- The Light RUC finalist is a dynamic residual GBM accuracy challenger; operational annual MAPE remains a watch item.
+- Diagnostics (DW, ADF, KPSS, Breusch-Pagan, White, ARCH, Jarque-Bera, cointegration, Mincer-Zarnowitz calibration) are computed on the vNext finalists' horizon-1 residuals with the same statsmodels battery and Pass/Watch/Fail rules as v6.
 
-
-## v5 frontier note
-
-The default Candidate Search Frontier now includes all three streams. Light RUC points are real challenger-search rows. PED and Heavy RUC include transparent visual frontier sample rows anchored to the current finalist and Schiff specification benchmark so the management chart shows a consistent all-stream frontier shape. These visual frontier sample rows are not used for finalist selection, KPI values, diagnostics, stress tests, scenario comparisons, or benchmark scoring.
-
-
-## v6 frontier note
-
-The default Candidate Search Frontier uses balanced all-stream frontier visualization samples anchored to true current finalist and Schiff specification benchmark points. These rows are for chart context only and must not feed finalist selection, KPIs, diagnostics, scenario comparisons or stress metrics.
-
-## Reproducibility audit note
-
-The pack now includes finalist reproducibility audit tables:
-
-- `data/model_registry.parquet`
-- `data/component_predictions.parquet`
-- `data/model_coefficients.parquet`
-- `data/feature_importance.parquet`
-- `data/scenario_sensitivities.parquet`
-- `data/shap_summary.parquet`
-
-The audit report is `docs/reproducibility_report.md`. The artifact search evidence is `docs/reproducibility_artifact_search.md`. Heavy RUC component forecasts are loaded from the closure output and reconcile to the final weighted ensemble prediction. The report remains intentionally incomplete where source scripts, fitted model objects, origin-level coefficients, feature importances, SHAP values or executable scenario sensitivities are not present in the current evidence pack.
+See `manifest.json` (`vnext_promotion`) for the promotion record and `docs/validation_report.md` for the canonical metric table.

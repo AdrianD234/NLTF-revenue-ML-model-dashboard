@@ -1,3 +1,9 @@
+> **SUPERSEDED NOTE (2026-06):** The metric values in this historical acceptance
+> record describe the legacy v6 finalists. The governed pack is now v7 with the
+> vNext finalists; see `docs/SCHIFF_SPECIFICATION_BENCHMARK.md` and
+> `artifacts/vnext/audit_report.md` for current values. Retained unchanged below
+> as the original acceptance record.
+
 # Baseline Acceptance
 
 Status: SCHIFF_SPECIFICATION_BASELINE_ACCEPTED
