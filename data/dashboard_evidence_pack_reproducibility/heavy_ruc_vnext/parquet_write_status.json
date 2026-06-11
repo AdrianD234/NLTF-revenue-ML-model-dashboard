@@ -1,0 +1,6 @@
+{
+  "created_by": "pipeline/vnext_page5_compat.py",
+  "created_at": "2026-06-11T03:43:38.125356+00:00",
+  "note": "Page-5 compatible audit tables derived from the vNext saved-state pack.",
+  "status": "complete"
+}

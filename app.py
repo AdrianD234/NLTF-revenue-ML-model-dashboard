@@ -2191,8 +2191,8 @@ def page5_ped_inner_status_rows(ped_inner_hpo_pack: Any | None) -> list[tuple[st
     inner_delta = pd.to_numeric(pd.Series([summary.get("inner_max_abs_delta")]), errors="coerce").iloc[0]
     inner_delta_text = f"{inner_delta:.2e}" if pd.notna(inner_delta) else "-"
     return [
-        ("Inner audit status", str(summary.get("inner_status", PED_INNER_HPO_AUDIT_STATUS))),
-        ("Inner max replay delta", inner_delta_text),
+        ("Legacy inner audit (archived)", str(summary.get("inner_status", PED_INNER_HPO_AUDIT_STATUS))),
+        ("Legacy inner replay delta", inner_delta_text),
     ]
 
 

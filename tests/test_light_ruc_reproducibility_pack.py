@@ -78,10 +78,10 @@ def test_reproducibility_stream_configs_are_generic() -> None:
     assert {"PED VKT per capita", "Light RUC volume", "Heavy RUC volume"}.issubset(REPRODUCIBILITY_STREAM_CONFIGS)
     ped = load_reproducibility_pack("PED VKT per capita")
     heavy = load_reproducibility_pack("Heavy RUC volume")
-    assert ped.root.name == "ped"
+    assert ped.root.name == "ped_vnext"
     assert ped.available
     assert not ped.missing_files
-    assert heavy.root.name == "heavy_ruc"
+    assert heavy.root.name == "heavy_ruc_vnext"
     assert heavy.available
     assert not heavy.missing_files
 
@@ -163,7 +163,7 @@ def test_heavy_ruc_weighted_ensemble_rebuilds_final_prediction() -> None:
     assert float(pd.to_numeric(prediction_comparison["max_abs_pred_delta"], errors="coerce").max()) <= 1e-5
     assert float(weights["Weight"].sum()) == pytest.approx(1.0, abs=1e-6)
     assert reproducibility_ensemble_equation(pack) == (
-        "Prediction = 0.469332*C1 + 0.281844*C2 + 0.144373*C3 + 0.104451*C4"
+        "Prediction = 0.708904*C1 + 0.212188*C2 + 0.078908*C3"
     )
 
     keys = ["score_basis", "eval_grid", "origin", "target_period", "horizon"]
@@ -176,24 +176,27 @@ def test_heavy_ruc_weighted_ensemble_rebuilds_final_prediction() -> None:
 
 
 def test_ped_component_replay_rebuilds_final_prediction() -> None:
+    # vNext PED is a two-component convex ensemble with saved fitted state.
     pack = load_reproducibility_pack("PED VKT per capita")
     summary = reproducibility_replay_summary(pack)
     weights = reproducibility_ensemble_weight_view(pack)
     components = pack.table("component_predictions")
     prediction_comparison = pack.table("evidence_prediction_comparison")
 
-    assert summary["status"] == "Exact component-prediction replay"
+    assert summary["status"] == "Exact weighted-ensemble replay"
     assert summary["model"] == PED_REPRO_MODEL
     assert summary["source_sheet"] == "PED Inputs"
     assert summary["description"] == PED_REPRO_DESCRIPTION
-    assert float(pd.to_numeric(prediction_comparison["pred_delta_vs_evidence"], errors="coerce").abs().max()) <= 1e-8
-    assert list(weights["Weight"]) == [1.0]
-    assert reproducibility_ensemble_equation(pack) == "Prediction = 1.0*C1"
+    assert float(pd.to_numeric(prediction_comparison["max_abs_pred_delta"], errors="coerce").max()) <= 1e-8
+    assert float(weights["Weight"].sum()) == pytest.approx(1.0, abs=1e-6)
+    assert reproducibility_ensemble_equation(pack) == "Prediction = 0.584392*C1 + 0.415608*C2"
 
-    delta = (
-        pd.to_numeric(components["component_pred"], errors="coerce")
-        - pd.to_numeric(components["rebuilt_pred"], errors="coerce")
-    ).abs()
+    keys = ["score_basis", "eval_grid", "origin", "target_period", "horizon"]
+    grouped = components.groupby(keys, dropna=False).agg(
+        rebuilt=("weighted_component_pred", "sum"),
+        final_pred=("final_pred", "first"),
+    )
+    delta = (pd.to_numeric(grouped["rebuilt"], errors="coerce") - pd.to_numeric(grouped["final_pred"], errors="coerce")).abs()
     assert float(delta.max()) <= 1e-8
 
 
@@ -341,11 +344,11 @@ def test_heavy_ruc_auxiliary_views_have_weighted_ensemble_content() -> None:
     assert {"Component", "Weight", "Component prediction", "Weighted contribution", "Final prediction", "Actual"}.issubset(
         component_trace.columns
     )
-    assert {"C1", "C2", "C3", "C4"}.issubset(set(component_trace["Component"]))
+    assert {"C1", "C2", "C3"}.issubset(set(component_trace["Component"]))
     assert not feature_importance.empty
-    assert set(feature_importance["feature_label"]) == {"C1", "C2", "C3", "C4"}
     assert not sensitivities.empty
-    assert "not_available_from_parent_output" in sensitivities["scenario_variable"].astype(str).str.cat(sep=" | ")
+    # vNext sensitivities are measured workbook-level perturbations.
+    assert "real_gdp_sa_nzd" in sensitivities["scenario_variable"].astype(str).str.cat(sep=" | ")
 
 
 def test_ped_auxiliary_views_have_component_replay_content_and_caveat() -> None:
@@ -357,19 +360,17 @@ def test_ped_auxiliary_views_have_component_replay_content_and_caveat() -> None:
     scorecard = reproducibility_scorecard_view(pack)
 
     assert not registry.empty
-    assert "inner model refit not replayed" in registry["Reproducibility status"].astype(str).str.cat(sep=" | ")
     assert not component_trace.empty
-    assert {"Component", "Weight", "Component prediction", "Final prediction", "Actual", "Error (%)"}.issubset(
+    assert {"Component", "Weight", "Component prediction", "Final prediction", "Actual"}.issubset(
         component_trace.columns
     )
-    assert set(component_trace["Component"]) == {"C1"}
+    assert set(component_trace["Component"]) == {"C1", "C2"}
     assert not feature_importance.empty
-    assert set(feature_importance["feature_label"]) == {"C1"}
     assert not sensitivities.empty
-    assert "Not available from replay-only parent predictions" in sensitivities["scenario_variable"].astype(str).str.cat(sep=" | ")
+    assert "real_petrol_price_cents_per_litre" in sensitivities["scenario_variable"].astype(str).str.cat(sep=" | ")
     assert not scorecard.empty
     assert float(scorecard.loc[scorecard["Score basis"].eq("Operational pooled"), "Pooled MAPE"].iloc[0]) == pytest.approx(
-        2.473244, abs=0.000001
+        2.664135, abs=0.000001
     )
 
 

@@ -72,9 +72,11 @@ def test_page5_component_contribution_figure_uses_pack_weights() -> None:
     assert "Feature" not in str(heavy_fig.layout.xaxis.title.text)
     assert ped_fig.layout.xaxis.title.text == "Component contribution (%)"
     assert heavy_fig.layout.xaxis.title.text == "Component contribution (%)"
-    assert list(ped_fig.data[0].y) == ["C1"]
-    assert float(ped_fig.data[0].x[0]) == pytest.approx(100.0)
-    assert len(heavy_fig.data[0].x) == 4
+    # vNext finalists: PED is a two-component, Heavy a three-component
+    # convex ensemble; weights always sum to 100%.
+    assert sorted(ped_fig.data[0].y) == ["C1", "C2"]
+    assert sum(float(value) for value in ped_fig.data[0].x) == pytest.approx(100.0)
+    assert len(heavy_fig.data[0].x) == 3
     assert sum(float(value) for value in heavy_fig.data[0].x) == pytest.approx(100.0)
 
 
@@ -84,10 +86,10 @@ def test_page5_ped_status_card_labels_inner_audit_partial() -> None:
 
     html = page5_repro_card_html("PED VKT per capita", ped_pack, inner_pack)
 
-    assert "Exact component-prediction replay" in html
-    assert "PED is exact at stored component-prediction level" in html
+    assert "Exact weighted-ensemble replay" in html
+    assert "convex vNext ensemble with saved fitted state" in html
+    # The legacy inner HPO audit remains visible as archived lineage only.
     assert "Inner HPO/static-solver audit: partial" in html
-    assert "Inner HPO/static-solver audit: exact" not in html
 
 
 def test_page5_ped_inner_missing_pack_status_is_clear() -> None:

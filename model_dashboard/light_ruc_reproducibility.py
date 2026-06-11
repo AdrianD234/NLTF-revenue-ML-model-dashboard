@@ -23,10 +23,10 @@ LIGHT_RUC_REPRO_MODEL = "dynamic_RESID_GBR_n150_d1_lr0.05_w36"
 LIGHT_RUC_REPRO_DESCRIPTION = (
     "Two-stage OLS base plus GBM residual correction, exactly replayed against evidence predictions."
 )
-PED_REPRO_MODEL = "PED__RESCUE_static_annual_weighted_top12_capnone"
+PED_REPRO_MODEL = "PED__VNEXT_SOLVED_CONVEX_TOP2"
 PED_REPRO_DESCRIPTION = (
-    "PED is exact at stored component-prediction level; "
-    "inner HPO/static-solver rebuild remains a future audit layer."
+    "Two-component convex vNext ensemble with saved fitted state, "
+    "exactly replayed against evidence predictions (production forward-scoreable)."
 )
 PED_INNER_HPO_AUDIT_STATUS = "Inner HPO/static-solver audit: partial"
 PED_INNER_HPO_AUDIT_DESCRIPTION = (
@@ -110,7 +110,7 @@ REPRODUCIBILITY_STREAM_CONFIGS: dict[str, ReproducibilityStreamConfig] = {
     "PED VKT per capita": ReproducibilityStreamConfig(
         stream_label="PED VKT per capita",
         stream_key="ped",
-        root=REPRODUCIBILITY_BASE_ROOT / "ped",
+        root=REPRODUCIBILITY_BASE_ROOT / "ped_vnext",
         model=PED_REPRO_MODEL,
         description=PED_REPRO_DESCRIPTION,
         report_file="ped_reproducibility_report.md",
@@ -119,9 +119,12 @@ REPRODUCIBILITY_STREAM_CONFIGS: dict[str, ReproducibilityStreamConfig] = {
     "Heavy RUC volume": ReproducibilityStreamConfig(
         stream_label="Heavy RUC volume",
         stream_key="heavy_ruc",
-        root=REPRODUCIBILITY_BASE_ROOT / "heavy_ruc",
-        model="HEAVY_RUC__RECON_STATIC_REBUILT",
-        description="Four-component weighted ensemble exactly replayed against evidence predictions.",
+        root=REPRODUCIBILITY_BASE_ROOT / "heavy_ruc_vnext",
+        model="HEAVY_RUC__VNEXT_SOLVED_CONVEX_TOP4",
+        description=(
+            "Three-component convex vNext ensemble with saved fitted state, "
+            "exactly replayed against evidence predictions (production forward-scoreable)."
+        ),
         report_file="heavy_ruc_reproducibility_report.md",
     ),
 }
@@ -1164,7 +1167,10 @@ def _score_basis_label(value: Any) -> str:
 
 
 def _is_ped_component_pack(pack: ReproducibilityPack) -> bool:
-    return pack.config.stream_key == "ped"
+    # Historic PED packs replayed a single stored component (100% weight).
+    # The vNext PED pack is a genuine weighted ensemble, so it takes the
+    # weighted-ensemble rendering path like Heavy RUC.
+    return pack.config.stream_key == "ped" and not _is_weighted_ensemble_pack(pack)
 
 
 def _is_weighted_ensemble_pack(pack: ReproducibilityPack) -> bool:
