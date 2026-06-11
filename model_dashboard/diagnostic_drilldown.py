@@ -105,7 +105,16 @@ def _layout(fig: go.Figure, height: int = 300) -> go.Figure:
 
 def _evidence_chart(test: str, s: pd.DataFrame, acf: pd.DataFrame, row: pd.Series) -> go.Figure | None:
     periods = s["target_period"].tolist()
-    resid = s["residual"].to_numpy(float)
+    # Plot the residuals in the units the governed battery actually tests
+    # (native units for PED/Heavy, percentage errors for Light RUC). Older
+    # cached packs without the column fall back to native residuals.
+    if "test_residual" in s.columns:
+        resid = s["test_residual"].to_numpy(float)
+        resid_units = str(s["test_residual_units"].iloc[0]) if "test_residual_units" in s.columns else "native units"
+    else:
+        resid = s["residual"].to_numpy(float)
+        resid_units = "native units"
+    resid_axis = f"Residual, {resid_units}"
     if test == "Calibration R2":
         fig = go.Figure()
         lo = float(min(s["pred"].min(), s["actual"].min()))
@@ -123,11 +132,11 @@ def _evidence_chart(test: str, s: pd.DataFrame, acf: pd.DataFrame, row: pd.Serie
         return _layout(fig, 320)
     if test == "Durbin-Watson":
         fig = go.Figure()
-        fig.add_trace(go.Bar(x=periods, y=resid, name="Residual (actual - forecast)",
+        fig.add_trace(go.Bar(x=periods, y=resid, name="Residual (governed test units)",
                              marker_color=["#0f4c81" if v >= 0 else "#b91c1c" for v in resid]))
         fig.add_hline(y=0, line_color="#64748b", line_width=1)
         fig.update_xaxes(title_text="Target quarter", tickangle=-45, nticks=12)
-        fig.update_yaxes(title_text="Residual, native units")
+        fig.update_yaxes(title_text=resid_axis)
         return _layout(fig, 280)
     if test in ("ADF", "KPSS"):
         fig = go.Figure()
@@ -138,7 +147,7 @@ def _evidence_chart(test: str, s: pd.DataFrame, acf: pd.DataFrame, row: pd.Serie
                                  line={"color": "#b45309", "dash": "dot", "width": 1.6}))
         fig.add_hline(y=0, line_color="#64748b", line_width=1)
         fig.update_xaxes(title_text="Target quarter", tickangle=-45, nticks=12)
-        fig.update_yaxes(title_text="Residual, native units")
+        fig.update_yaxes(title_text=resid_axis)
         return _layout(fig, 280)
     if test in ("Breusch-Pagan", "White"):
         fig = go.Figure()
@@ -148,7 +157,7 @@ def _evidence_chart(test: str, s: pd.DataFrame, acf: pd.DataFrame, row: pd.Serie
                                  hovertemplate="<b>%{customdata}</b><br>Fitted: %{x:,.4s}<br>Residual: %{y:,.4s}<extra></extra>"))
         fig.add_hline(y=0, line_color="#64748b", line_width=1)
         fig.update_xaxes(title_text="Fitted value (h=1 forecast)")
-        fig.update_yaxes(title_text="Residual, native units")
+        fig.update_yaxes(title_text=resid_axis)
         return _layout(fig, 300)
     if test == "Jarque-Bera":
         from plotly.subplots import make_subplots

@@ -66,3 +66,5 @@ data/dashboard_evidence_pack_reproducibility/heavy_ruc/source_artifacts/**/*.pyc
 !data/dashboard_evidence_pack_reproducibility/ped_vnext/**
 !data/dashboard_evidence_pack_reproducibility/light_ruc_vnext/
 !data/dashboard_evidence_pack_reproducibility/light_ruc_vnext/**
+!artifacts/diagnostic_drilldown/
+!artifacts/diagnostic_drilldown/**

@@ -41,6 +41,43 @@ from model_dashboard.governance_constants import STREAM_LABELS, STREAMS  # noqa:
 DATA = REPO / "data" / "dashboard_evidence_pack" / "data"
 OPERATIONAL = "current_grid_operational_pooled"
 
+# Per-stream governed battery convention. PED and Heavy RUC batteries were
+# rebuilt by the v7 promotion using native-unit residuals; the Light RUC row
+# is the archived parent-run battery, which the provenance audit
+# (scripts/audit_light_ruc_diagnostic_provenance.py) reconciled exactly to
+# percentage-error residuals with heteroscedasticity regressors
+# [constant, fitted value] and Ljung-Box at raw lags. Both recipes are
+# asserted below to reproduce the governed diagnostic_tests values to 1e-9.
+BATTERY_CONVENTIONS = {
+    "PED": "vnext_native",
+    "LIGHT_RUC": "parent_pct",
+    "HEAVY_RUC": "vnext_native",
+}
+
+CONVENTION_TEXT = {
+    "vnext_native": {
+        "residual_scope": "horizon-1 residuals (actual - forecast, native units), operational backtest grid",
+        "residual_units": "native units",
+        "bp_regressors": "fitted value + time index",
+        "white_regressors": "fitted value + time index, squares and cross-terms",
+        "provenance_note": ("Statistics recomputed from the live replayed predictions and "
+                            "asserted equal to the governed diagnostic battery."),
+    },
+    "parent_pct": {
+        "residual_scope": ("horizon-1 percentage-error residuals "
+                           "(100 x (forecast - actual) / actual), operational backtest grid"),
+        "residual_units": "% of actual (forecast - actual)",
+        "bp_regressors": "fitted value (native units)",
+        "white_regressors": "fitted value, squares",
+        "provenance_note": ("Statistics recomputed from the live replayed predictions under the "
+                            "archived parent battery convention (percentage-error residuals; "
+                            "heteroscedasticity regressors: constant + fitted value; Ljung-Box at "
+                            "raw lags) and asserted equal to the governed diagnostic battery. "
+                            "Recipe documented in artifacts/diagnostic_drilldown/"
+                            "light_ruc_diagnostic_provenance_audit.md."),
+    },
+}
+
 TESTS = [
     "Calibration R2", "Durbin-Watson", "ADF", "KPSS", "Breusch-Pagan",
     "White", "Jarque-Bera", "Cointegration", "Overall",
@@ -83,31 +120,53 @@ BLOCKS_APPROVAL = {
 }
 
 
-def battery_with_statistics(actual: np.ndarray, pred: np.ndarray) -> dict:
+def battery_with_statistics(actual: np.ndarray, pred: np.ndarray,
+                            convention: str = "vnext_native") -> dict:
     """The exact statsmodels battery used by the promotion script, extended to
-    keep the raw statistics and F-variants alongside the p-values."""
+    keep the raw statistics and F-variants alongside the p-values.
+
+    ``convention`` selects the governed residual recipe per stream:
+
+    - ``vnext_native``: residual = actual - pred (native units); BP/White
+      regressors [const, pred, time index]; Ljung-Box lags min(L, n // 4).
+      This is the v7 promotion convention (PED, Heavy RUC).
+    - ``parent_pct``: residual = 100 * (pred - actual) / actual; BP/White
+      regressors [const, pred]; Ljung-Box at raw lags (4, 8, 12). This is the
+      archived parent-run convention reconciled for Light RUC by the
+      provenance audit.
+
+    Mincer-Zarnowitz and Engle-Granger cointegration always use native-unit
+    actual/pred pairs (identical under both conventions).
+    """
     import statsmodels.api as sm
-    from scipy import stats as sps
     from statsmodels.stats.diagnostic import acorr_ljungbox, het_arch, het_breuschpagan, het_white
     from statsmodels.stats.stattools import durbin_watson, jarque_bera
     from statsmodels.tsa.stattools import adfuller, coint, kpss
 
-    resid = actual - pred
-    n = len(resid)
+    n = len(actual)
+    if convention == "parent_pct":
+        resid = 100.0 * (pred - actual) / actual
+        exog_cols = [pred]
+        lb_lags = [4, 8, 12]
+    else:
+        resid = actual - pred
+        exog_cols = [pred, np.arange(n, dtype=float)]
+        lb_lags = [min(lag, n // 4) for lag in (4, 8, 12)]
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         adf_stat, adf_p, adf_lags, adf_nobs, *_ = adfuller(resid, autolag="AIC")
         kpss_stat, kpss_p, kpss_lags, _ = kpss(resid, regression="c", nlags="auto")
         jb_stat, jb_p, jb_skew, jb_kurt = jarque_bera(resid)
-        exog = sm.add_constant(np.column_stack([pred, np.arange(n, dtype=float)]))
+        exog = sm.add_constant(np.column_stack(exog_cols))
         bp_lm, bp_lm_p, bp_f, bp_f_p = het_breuschpagan(resid, exog)
         wh_lm, wh_lm_p, wh_f, wh_f_p = het_white(resid, exog)
         arch_lm, arch_lm_p, arch_f, arch_f_p = het_arch(resid, nlags=4)
         coint_t, coint_p, coint_crit = coint(actual, pred)
         mz = sm.OLS(actual, sm.add_constant(pred)).fit()
-        lb = acorr_ljungbox(resid, lags=[min(lag, n // 4) for lag in (4, 8, 12)], return_df=True)
+        lb = acorr_ljungbox(resid, lags=lb_lags, return_df=True)
     return {
         "n": n,
+        "test_residual": np.asarray(resid, dtype=float),
         "dw_stat": float(durbin_watson(resid)),
         "adf_stat": float(adf_stat), "adf_p": float(adf_p), "adf_lags": int(adf_lags),
         "kpss_stat": float(kpss_stat), "kpss_p": float(kpss_p), "kpss_lags": int(kpss_lags),
@@ -140,39 +199,33 @@ def main() -> None:
                & (sp["score_basis"] == OPERATIONAL) & (sp["horizon"] == 1)].sort_values("origin")
         actual = g["actual"].to_numpy(float)
         pred = g["pred"].to_numpy(float)
-        b = battery_with_statistics(actual, pred)
+        convention = BATTERY_CONVENTIONS[stream]
+        ctext = CONVENTION_TEXT[convention]
+        b = battery_with_statistics(actual, pred, convention=convention)
         stored = tests_table.loc[model]
 
-        # --- consistency gates ------------------------------------------------
-        # vNext streams must match the governed battery exactly. The Light RUC
-        # row predates the v7 promotion (archived parent run) and is known to
-        # diverge for the order/series-sensitive tests; it keeps the governed
-        # values as authoritative and flags the recomputation as supplementary.
+        # --- consistency gate ---------------------------------------------
+        # Every stream must reproduce the governed battery exactly under its
+        # documented convention. A failure here means the drilldown would
+        # show numbers that disagree with the governed scorecard - that is a
+        # build error, never something to paper over.
         checks = [(b["dw_stat"], stored["durbin_watson"]),
                   (b["adf_p"], stored["adf_p_resid"]),
                   (b["kpss_p"], stored["kpss_p_resid"]),
                   (b["bp_lm_p"], stored["breusch_pagan_p"]),
                   (b["white_lm_p"], stored["white_p"]),
                   (b["jb_p"], stored["jarque_bera_p"]),
+                  (b["arch_lm_p"], stored["arch_lm_p"]),
+                  (b["lb8_p"], stored["ljungbox_p_lag8"]),
+                  (b["skew"], stored["skew_resid"]),
                   (b["coint_p"], stored["coint_p_actual_pred"]),
                   (b["mz_r2"], stored["mz_r2"])]
         max_rel = max(abs(float(o) - float(t)) / max(1.0, abs(float(t))) for o, t in checks)
-        exact_match = max_rel <= 1e-9
-        if stream != "LIGHT_RUC":
-            assert exact_match, (
-                f"{stream}: drilldown battery diverged from governed diagnostic_tests "
-                f"(max rel delta {max_rel:.2e})")
-        if exact_match:
-            provenance = "verified_exact_match_to_governed_battery"
-            provenance_note = ("Statistics recomputed from the live replayed predictions and "
-                               "asserted equal to the governed diagnostic battery.")
-        else:
-            provenance = "archived_parent_values_governed"
-            provenance_note = ("Governed statuses and p-values come from the archived parent-run "
-                               "battery. Statistics shown here are recomputed from the live "
-                               "replayed predictions and may differ slightly; the governed values "
-                               f"remain authoritative (max relative divergence {max_rel:.2e}). "
-                               "Mincer-Zarnowitz and cointegration values match exactly.")
+        assert max_rel <= 1e-9, (
+            f"{stream}: drilldown battery ({convention}) diverged from governed "
+            f"diagnostic_tests (max rel delta {max_rel:.2e})")
+        provenance = "verified_exact_match_to_governed_battery"
+        provenance_note = ctext["provenance_note"]
 
         status = matrix[matrix["model"] == model].set_index("diagnostic_test")["pass_status"].to_dict()
 
@@ -196,11 +249,11 @@ def main() -> None:
             "Breusch-Pagan": dict(statistic=b["bp_lm"], statistic_name="LM statistic",
                                   p_value=b["bp_lm_p"], p_value_name="LM p-value",
                                   f_statistic=b["bp_f"], f_p_value=b["bp_f_p"],
-                                  extra=json.dumps({"regressors": "fitted value + time index"})),
+                                  extra=json.dumps({"regressors": ctext["bp_regressors"]})),
             "White": dict(statistic=b["white_lm"], statistic_name="LM statistic",
                           p_value=b["white_lm_p"], p_value_name="LM p-value",
                           f_statistic=b["white_f"], f_p_value=b["white_f_p"],
-                          extra=json.dumps({"regressors": "fitted value + time index, squares and cross-terms"})),
+                          extra=json.dumps({"regressors": ctext["white_regressors"]})),
             "Jarque-Bera": dict(statistic=b["jb_stat"], statistic_name="Jarque-Bera statistic",
                                 p_value=b["jb_p"], p_value_name="Chi-squared p-value",
                                 f_statistic=np.nan, f_p_value=np.nan,
@@ -232,18 +285,22 @@ def main() -> None:
                 "blocks_approval": BLOCKS_APPROVAL[test],
                 "n_rows": b["n"],
                 "score_basis": OPERATIONAL,
-                "residual_scope": "horizon-1 residuals, operational backtest grid",
+                "residual_scope": ctext["residual_scope"],
                 "source_dataset": "scorecard_predictions.parquet (finalist, operational grid, h=1)",
                 "provenance": provenance,
                 "provenance_note": provenance_note,
                 "extra_json": spec["extra"],
             })
-        for period, a, p_, mzf, eq in zip(g["target_period"], actual, pred, b["mz_fitted"], b["equilibrium_error"]):
+        for period, a, p_, tr, mzf, eq in zip(g["target_period"], actual, pred,
+                                              b["test_residual"], b["mz_fitted"],
+                                              b["equilibrium_error"]):
             series_rows.append({
                 "stream": stream, "stream_label": label, "model": model,
                 "target_period": str(period),
                 "actual": float(a), "pred": float(p_),
                 "residual": float(a - p_),
+                "test_residual": float(tr),
+                "test_residual_units": ctext["residual_units"],
                 "mz_fitted": float(mzf),
                 "equilibrium_error": float(eq),
                 "score_basis": OPERATIONAL, "horizon": 1,
