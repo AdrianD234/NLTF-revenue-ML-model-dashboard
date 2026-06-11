@@ -129,6 +129,7 @@ def plot_finalist_accuracy(recommended: pd.DataFrame) -> go.Figure:
             marker_color=METRIC_COLORS[metric],
             text=[f"{value:.2f}%" if pd.notna(value) else "" for value in values],
             textposition="outside",
+                    cliponaxis=False,
             customdata=finalists[
                 [
                     "_hover_stream",
@@ -359,12 +360,12 @@ def plot_candidate_landscape(summary: pd.DataFrame) -> go.Figure:
         legend={
             "orientation": "h",
             "yanchor": "top",
-            "y": -0.14,
+            "y": -0.26,
             "xanchor": "left",
             "x": 0.0,
             "font": {"size": 10},
         },
-        margin={"l": 40, "r": 20, "t": 48, "b": 86},
+        margin={"l": 40, "r": 20, "t": 48, "b": 96},
     )
     return fig
 
@@ -467,6 +468,7 @@ def plot_schiff_benchmark(summary: pd.DataFrame) -> go.Figure:
                 marker_color=METRIC_COLORS[metric],
                 text=[f"{value:.2f}%" if pd.notna(value) else "" for value in schiff[column]],
                 textposition="outside",
+                    cliponaxis=False,
                 customdata=schiff[["_hover_model", "_hover_model_detail", "_hover_source"]].fillna("-").to_numpy(),
                 hovertemplate=(
                     "<b>%{x}</b><br>"
@@ -656,7 +658,7 @@ def plot_ensemble_composition(weights: pd.DataFrame) -> tuple[go.Figure, pd.Data
                 marker_color=STREAM_COLORS.get(str(stream), "#64748B"),
                 text=stream_data["weight_pct"].map(lambda value: f"{value:.1f}%"),
                 textposition="outside",
-                cliponaxis=False,
+                    cliponaxis=False,
                 customdata=stream_data[
                     ["stream_label", "_hover_ensemble", "_hover_component", "_hover_component_detail", "_hover_weight", "_hover_ensemble_detail"]
                 ].fillna("-").to_numpy(),
@@ -1325,6 +1327,7 @@ def plot_improvement_vs_benchmark(comparison: pd.DataFrame) -> go.Figure:
             marker_color=color,
             text=data[column].map(lambda value: format_pp(value)),
             textposition="outside",
+                    cliponaxis=False,
             customdata=data[["stream_label"]].to_numpy(),
             hovertemplate="<b>%{customdata[0]}</b><br>" + label + ": %{x:.2f} pp<extra></extra>",
         )
@@ -1434,6 +1437,7 @@ def plot_schiff_finalist_mape(comparison: pd.DataFrame) -> go.Figure:
                     marker={"color": color, "size": 12, "line": {"width": 1, "color": "#0f172a"}},
                 text=comparison[column].map(lambda value: format_percent(value)),
                     textposition="top center",
+                    cliponaxis=False,
                     customdata=comparison[["stream_label"]].to_numpy(),
                     hovertemplate="<b>%{customdata[0]}</b><br>" + label + ": %{x:.2f}%<extra></extra>",
                 showlegend=col == 1,

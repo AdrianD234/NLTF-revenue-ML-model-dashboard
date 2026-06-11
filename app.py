@@ -728,9 +728,6 @@ def reset_top_filter_state(defaults: dict[str, Any]) -> None:
     for key, value in defaults.items():
         st.session_state[key] = value
     for key in [
-        "scenario_a_choice",
-        "scenario_b_choice",
-        "scenario_baseline_choice",
         "lazy_diagnostics_inventory",
         "lazy_diagnostics_audit",
         "lazy_scenario_forecast_stress",
@@ -924,20 +921,25 @@ def render_overview(loaded: LoadedRun, controls: dict[str, Any]) -> None:
 def compact_figure(fig: Any, height: int, showlegend: bool | None = None) -> Any:
     if hasattr(fig, "update_layout"):
         has_subplot_titles = bool(getattr(fig.layout, "annotations", None))
-        top_margin = 42 if has_subplot_titles else 18
+        top_margin = 58 if has_subplot_titles else 18
         # Figures that deliberately place their legend below the plot (e.g. the
         # candidate frontier, to keep the Plotly modebar clear) keep that
         # placement and their bottom margin.
         legend_y = getattr(getattr(fig.layout, "legend", None), "y", None)
         keeps_bottom_legend = legend_y is not None and legend_y < 0
-        bottom_margin = 72 if keeps_bottom_legend else 30
+        if keeps_bottom_legend and height <= 340:
+            # Too short for a below-axis legend: the chart's own annotations
+            # carry the stream identification, so drop the legend cleanly.
+            fig.update_layout(showlegend=False)
+            keeps_bottom_legend = False
+        bottom_margin = 92 if keeps_bottom_legend else 30
         fig.update_layout(title_text="", height=height, margin={"l": 30, "r": 14, "t": top_margin, "b": bottom_margin})
         if not keeps_bottom_legend:
             fig.update_layout(
                 legend={
                     "orientation": "h",
                     "yanchor": "bottom",
-                    "y": 1.12 if has_subplot_titles else 1.0,
+                    "y": 1.22 if has_subplot_titles else 1.0,
                     "xanchor": "center" if has_subplot_titles else "left",
                     "x": 0.5 if has_subplot_titles else 0.0,
                     "font": {"size": 10},
@@ -3836,28 +3838,26 @@ def render_scenario_comparison(loaded: LoadedRun, controls: dict[str, Any]) -> N
     paired = common_filter(loaded.data.get("paired_vs_schiff", pd.DataFrame()), controls, include_source_variant=False)
     qpred = common_filter(loaded.data.get("quarterly_predictions", pd.DataFrame()), controls, include_source_variant=False)
 
-    st.session_state.setdefault("scenario_a_choice", "Refined Finalist Ensemble")
-    st.session_state.setdefault("scenario_b_choice", SCHIFF_SPEC_BENCHMARK_LABEL)
-    st.session_state.setdefault("scenario_baseline_choice", "Baseline FY25")
-    scenario_a = str(st.session_state["scenario_a_choice"])
-    scenario_b = str(st.session_state["scenario_b_choice"])
-    baseline = str(st.session_state["scenario_baseline_choice"])
+    # The governed evidence pack carries exactly one comparison: refined
+    # finalists versus the Schiff specification benchmark on the FY25 baseline.
+    # These are fixed facts of the pack, so they render as a read-only summary
+    # (the former "Edit" selectboxes only changed labels, never the data).
+    scenario_a = "Refined Finalist Ensemble"
+    scenario_b = SCHIFF_SPEC_BENCHMARK_LABEL
+    baseline = "Baseline FY25"
 
     with st.container(border=True):
-        scenario_cols = st.columns([1, 0.08])
-        with scenario_cols[0]:
-            filter_summary_grid(
-                [
-                    ("Scenario A", scenario_a),
-                    ("Scenario B", scenario_b),
-                    ("Baseline", baseline),
-                ]
-            )
-        with scenario_cols[1]:
-            with st.popover("Edit", use_container_width=True):
-                scenario_a = st.selectbox("Scenario A", ["Refined Finalist Ensemble", "Best finalist by stream"], key="scenario_a_choice")
-                scenario_b = st.selectbox("Scenario B", [SCHIFF_SPEC_BENCHMARK_LABEL, "Best Schiff specification by stream"], key="scenario_b_choice")
-                baseline = st.selectbox("Scenario baseline", ["Baseline FY25", "Latest loaded run"], key="scenario_baseline_choice")
+        filter_summary_grid(
+            [
+                ("Scenario A", scenario_a),
+                ("Scenario B", scenario_b),
+                ("Baseline", baseline),
+            ]
+        )
+        st.caption(
+            "Fixed governed comparison from the evidence pack. Use the global Score Basis "
+            "filter to switch between paper-style and operational scorecards."
+        )
 
     comparison = evidence_scenario_comparison_frame(loaded, controls)
     if comparison.empty:

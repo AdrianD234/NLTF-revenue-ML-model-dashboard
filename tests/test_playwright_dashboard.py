@@ -178,7 +178,8 @@ def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
             page.evaluate("window.scrollTo(0, 0)")
             expect(page.locator("body")).to_contain_text("Scenario A: Refined Finalist Ensemble", timeout=60000)
             expect(page.locator("body")).to_contain_text("Scenario B: Schiff specification benchmark", timeout=60000)
-            expect(page.get_by_role("button", name="Edit")).to_be_visible(timeout=60000)
+            # The scenario header is a read-only governed summary (the former
+            # "Edit" popover only changed labels, never data, and was removed).
             assert "Scenario settings" not in page.locator("body").inner_text(timeout=60000)
             for title in [
                 "1. Stream Comparison: Scenario A vs Scenario B",
