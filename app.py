@@ -914,25 +914,24 @@ def render_overview(loaded: LoadedRun, controls: dict[str, Any]) -> None:
                 compact_figure(plot_stress_checks(stress_frame), 260),
                 overview_stress_watch_note(stress_frame),
             )
-        with st.expander("Technical detail: candidate search frontier and ensemble composition"):
-            tech_cols = st.columns([1.0, 1.0])
-            with tech_cols[0]:
-                landscape = overview_candidate_landscape_frame(loaded, controls)
-                candidate_context = candidate_frontier_count_context(loaded, controls, landscape)
-                chart_card(
-                    "Candidate Search Frontier",
-                    CANDIDATE_FRONTIER_CAPTION,
-                    compact_figure(plot_candidate_landscape(landscape), 240),
-                    overview_frontier_note(landscape, candidate_context),
-                )
-            with tech_cols[1]:
-                ensemble_weights = loaded.data.get("weights", pd.DataFrame()).copy()
-                fig, mapping = plot_ensemble_composition(ensemble_weights)
-                chart_card(
-                    "Finalist Ensemble Composition",
-                    "Positive solver weights for each finalist ensemble.",
-                    compact_figure(fig, 240),
-                )
+        tech_cols = st.columns([1.0, 1.0])
+        with tech_cols[0]:
+            landscape = overview_candidate_landscape_frame(loaded, controls)
+            candidate_context = candidate_frontier_count_context(loaded, controls, landscape)
+            chart_card(
+                "Candidate Search Frontier",
+                CANDIDATE_FRONTIER_CAPTION,
+                compact_figure(plot_candidate_landscape(landscape), 240),
+                overview_frontier_note(landscape, candidate_context),
+            )
+        with tech_cols[1]:
+            ensemble_weights = loaded.data.get("weights", pd.DataFrame()).copy()
+            fig, mapping = plot_ensemble_composition(ensemble_weights)
+            chart_card(
+                "Finalist Ensemble Composition",
+                "Positive solver weights for each finalist ensemble.",
+                compact_figure(fig, 240),
+            )
         return
 
     upper = st.columns([1.0, 1.0])
