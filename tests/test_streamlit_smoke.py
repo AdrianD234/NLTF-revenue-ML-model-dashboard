@@ -14,7 +14,10 @@ def _clear_governance_visibility_env(monkeypatch) -> None:
 
 
 def test_app_smoke_loads_without_exception(monkeypatch) -> None:
+    """Executive mode is the default presentation profile: same pages,
+    plain-English navigation titles."""
     monkeypatch.setenv(app.SHOW_GOVERNANCE_PAGE_ENV_VAR, "1")
+    monkeypatch.delenv("NLTF_DASHBOARD_MODE", raising=False)
     app_path = Path(__file__).resolve().parents[1] / "app.py"
 
     at = AppTest.from_file(str(app_path), default_timeout=60)
@@ -22,6 +25,24 @@ def test_app_smoke_loads_without_exception(monkeypatch) -> None:
 
     assert not at.exception
     assert len(at.radio) >= 1
+    assert at.radio[0].options == [
+        "Executive Summary",
+        "Model Confidence",
+        "Scenario Forecasts",
+        "Benchmark Comparison",
+        "Governance & Reproducibility",
+    ]
+
+
+def test_app_smoke_analyst_mode_keeps_technical_titles(monkeypatch) -> None:
+    monkeypatch.setenv(app.SHOW_GOVERNANCE_PAGE_ENV_VAR, "1")
+    monkeypatch.setenv("NLTF_DASHBOARD_MODE", "analyst")
+    app_path = Path(__file__).resolve().parents[1] / "app.py"
+
+    at = AppTest.from_file(str(app_path), default_timeout=60)
+    at.run()
+
+    assert not at.exception
     assert at.radio[0].options == [
         "Overview",
         "Diagnostics",

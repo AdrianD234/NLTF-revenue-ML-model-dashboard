@@ -189,13 +189,13 @@ def inject_theme() -> None:
                 margin: 0.04rem 0 0.16rem;
                 padding: 0.22rem 0.42rem 0.12rem;
             }}
-            div[data-testid="stRadio"] {{
+            .st-key-gov_page div[data-testid="stRadio"] {{
                 margin: -2.58rem 0 0.42rem;
             }}
-            div[data-testid="stRadio"] > label {{
+            .st-key-gov_page div[data-testid="stRadio"] > label {{
                 display: none;
             }}
-            div[data-testid="stRadio"] div[role="radiogroup"] {{
+            .st-key-gov_page div[data-testid="stRadio"] div[role="radiogroup"] {{
                 align-items: stretch;
                 border-bottom: 1px solid var(--gov-border);
                 display: flex;
@@ -205,7 +205,7 @@ def inject_theme() -> None:
                 padding-left: clamp(430px, 36vw, 650px);
                 padding-right: 170px;
             }}
-            div[data-testid="stRadio"] div[role="radiogroup"] label {{
+            .st-key-gov_page div[data-testid="stRadio"] div[role="radiogroup"] label {{
                 border-bottom: 3px solid transparent;
                 border-radius: 7px 7px 0 0;
                 color: var(--gov-navy);
@@ -216,7 +216,7 @@ def inject_theme() -> None:
                 padding: 0.22rem 0.5rem 0.34rem;
                 white-space: nowrap;
             }}
-            div[data-testid="stRadio"] div[role="radiogroup"] label > div:first-child {{
+            .st-key-gov_page div[data-testid="stRadio"] div[role="radiogroup"] label > div:first-child {{
                 height: 1px !important;
                 margin: 0 !important;
                 min-height: 1px !important;
@@ -226,15 +226,15 @@ def inject_theme() -> None:
                 position: absolute !important;
                 width: 1px !important;
             }}
-            div[data-testid="stRadio"] div[role="radiogroup"] label:has(input:checked) {{
+            .st-key-gov_page div[data-testid="stRadio"] div[role="radiogroup"] label:has(input:checked) {{
                 background: var(--gov-navy);
                 border-bottom-color: var(--gov-lime);
                 color: #FFFFFF;
             }}
-            div[data-testid="stRadio"] div[role="radiogroup"] label:has(input:checked) div[data-testid="stMarkdownContainer"] p {{
+            .st-key-gov_page div[data-testid="stRadio"] div[role="radiogroup"] label:has(input:checked) div[data-testid="stMarkdownContainer"] p {{
                 color: #FFFFFF !important;
             }}
-            div[data-testid="stRadio"] div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] p {{
+            .st-key-gov_page div[data-testid="stRadio"] div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] p {{
                 font-size: 0.8rem;
                 font-weight: 700;
                 white-space: nowrap;
@@ -364,22 +364,22 @@ def inject_theme() -> None:
                     max-width: 120px;
                     padding-left: 0.48rem;
                 }}
-                div[data-testid="stRadio"] {{
+                .st-key-gov_page div[data-testid="stRadio"] {{
                     margin: 0 0 0.08rem;
                 }}
-                div[data-testid="stRadio"] div[role="radiogroup"] {{
+                .st-key-gov_page div[data-testid="stRadio"] div[role="radiogroup"] {{
                     gap: 0.18rem;
                     justify-content: space-between;
                     padding-left: 0;
                     padding-right: 0;
                 }}
-                div[data-testid="stRadio"] div[role="radiogroup"] label {{
+                .st-key-gov_page div[data-testid="stRadio"] div[role="radiogroup"] label {{
                     font-size: 0.72rem;
                     justify-content: center;
                     min-width: 0;
                     padding: 0.18rem 0.24rem 0.3rem;
                 }}
-                div[data-testid="stRadio"] div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] p {{
+                .st-key-gov_page div[data-testid="stRadio"] div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] p {{
                     font-size: 0.72rem;
                     line-height: 1.08;
                     text-align: center;

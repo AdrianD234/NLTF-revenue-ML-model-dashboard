@@ -101,6 +101,14 @@ from model_dashboard.reproducibility_imports import (
     plot_reproducibility_sensitivities,
     reproducibility_component_r2_frame,
 )
+from model_dashboard.presentation import (
+    display_capability,
+    display_model,
+    header_subtitle,
+    is_executive,
+    page_display_title,
+    render_mode_toggle,
+)
 from model_dashboard.metrics import (
     best_by_stream,
     classify_error_rows,
@@ -381,8 +389,8 @@ def main() -> None:
     with header_slot.container():
         header(
             "NTLF Revenue Modelling",
-            "Transport Revenue Model Testbench | Refined finalist models | actual-driver Stage 1 evidence.",
-            page_chip=f"Page {initial_index} of {len(pages)} - {initial_page}",
+            header_subtitle(),
+            page_chip=f"Page {initial_index} of {len(pages)} - {page_display_title(initial_page)}",
         )
 
     active_path = render_run_sidebar()
@@ -398,8 +406,8 @@ def main() -> None:
     with header_slot.container():
         header(
             "NTLF Revenue Modelling",
-            "Transport Revenue Model Testbench | Refined finalist models | actual-driver Stage 1 evidence.",
-            page_chip=f"Page {current_index} of {len(pages)} - {current_page}",
+            header_subtitle(),
+            page_chip=f"Page {current_index} of {len(pages)} - {page_display_title(current_page)}",
         )
     controls = render_filter_sidebar(loaded)
     if current_page != REPRODUCIBILITY_PAGE:
@@ -417,12 +425,16 @@ def main() -> None:
         render_governance_reproducibility_page(loaded, controls)
 
 def render_primary_navigation(pages: list[str]) -> str:
+    # The analyst-mode toggle lives in the filter strip's More popover; the
+    # page radio keeps the full content width (its CSS pulls it into the
+    # header band, so nothing else may share this block).
     return st.radio(
         "Governance pages",
         pages,
         horizontal=True,
         key="gov_page",
         label_visibility="collapsed",
+        format_func=page_display_title,
     )
 
 
@@ -622,6 +634,7 @@ def render_top_filter_bar(loaded: LoadedRun, controls: dict[str, Any]) -> dict[s
             )
         with filter_cols[6]:
             with st.popover("More", use_container_width=True):
+                render_mode_toggle()
                 controls = render_advanced_controls(loaded, controls)
 
         stream_choice = st.session_state["top_stream"]
@@ -871,6 +884,8 @@ def render_overview(loaded: LoadedRun, controls: dict[str, Any]) -> None:
     candidate_landscape = build_candidate_landscape_frame(loaded, controls, DEFAULT_CANDIDATE_FRONTIER_MODE)
     candidate_context = candidate_frontier_count_context(loaded, controls, candidate_landscape)
     gov_kpi_grid(overview_kpi_cards(summary, recommended, story, errors, candidate_context, schiff_rows=schiff_rows))
+    if is_executive():
+        render_executive_stream_cards()
     basis_metric = score_basis_metric_label(controls.get("score_basis", PAPER_SCORE_BASIS))
     accuracy_subtitle = f"{basis_metric} by stream. Lower is better."
     if not best.empty and {"stream_label", "quarterly_mape", "annual_mape"}.issubset(best.columns):
@@ -882,6 +897,42 @@ def render_overview(loaded: LoadedRun, controls: dict[str, Any]) -> None:
         )
         if finalist_read:
             accuracy_subtitle = f"Current Parquet finalists using {basis_metric}: {finalist_read}. Lower is better."
+
+    if is_executive():
+        exec_cols = st.columns([1.0, 1.0])
+        with exec_cols[0]:
+            chart_card(
+                "Finalist Forecast Accuracy",
+                accuracy_subtitle,
+                compact_figure(plot_finalist_accuracy(recommended), 260),
+            )
+        with exec_cols[1]:
+            chart_card(
+                "Stress and Horizon Checks",
+                overview_stress_subtitle(controls),
+                compact_figure(plot_stress_checks(stress_frame), 260),
+                overview_stress_watch_note(stress_frame),
+            )
+        with st.expander("Technical detail: candidate search frontier and ensemble composition"):
+            tech_cols = st.columns([1.0, 1.0])
+            with tech_cols[0]:
+                landscape = overview_candidate_landscape_frame(loaded, controls)
+                candidate_context = candidate_frontier_count_context(loaded, controls, landscape)
+                chart_card(
+                    "Candidate Search Frontier",
+                    CANDIDATE_FRONTIER_CAPTION,
+                    compact_figure(plot_candidate_landscape(landscape), 240),
+                    overview_frontier_note(landscape, candidate_context),
+                )
+            with tech_cols[1]:
+                ensemble_weights = loaded.data.get("weights", pd.DataFrame()).copy()
+                fig, mapping = plot_ensemble_composition(ensemble_weights)
+                chart_card(
+                    "Finalist Ensemble Composition",
+                    "Positive solver weights for each finalist ensemble.",
+                    compact_figure(fig, 240),
+                )
+        return
 
     upper = st.columns([1.0, 1.0])
     with upper[0]:
@@ -916,6 +967,114 @@ def render_overview(loaded: LoadedRun, controls: dict[str, Any]) -> None:
             compact_figure(plot_stress_checks(stress_frame), 260),
             overview_stress_watch_note(stress_frame),
         )
+
+
+@st.cache_data(show_spinner=False)
+def _executive_card_inputs(signature: float) -> list[dict[str, str]]:
+    """Stream recommendation cards built directly from the governed packs.
+
+    Presentation only: every number is read from finalists.parquet,
+    schiff_benchmark.parquet, diagnostic_pass_matrix.parquet and the
+    reproducibility parity audits - nothing is recomputed.
+    """
+    del signature
+    from model_dashboard.governance_constants import (
+        CURRENT_REPRO_PACK_DIRS,
+        EVIDENCE_PACK_DATA,
+        REPRODUCIBILITY_BASE,
+    )
+
+    pack = EVIDENCE_PACK_DATA
+    fin = pd.read_parquet(pack / "finalists.parquet").set_index("stream")
+    schiff = pd.read_parquet(pack / "schiff_benchmark.parquet").set_index("stream")
+    matrix = pd.read_parquet(pack / "diagnostic_pass_matrix.parquet")
+    repro_root = REPRODUCIBILITY_BASE
+
+    cards: list[dict[str, str]] = []
+    for stream in ("PED", "LIGHT_RUC", "HEAVY_RUC"):
+        if stream not in fin.index:
+            continue
+        row = fin.loc[stream]
+        label = str(row["stream_label"])
+        q_mape = float(row["quarterly_mape"])
+        gain = ""
+        if stream in schiff.index:
+            gain_pp = float(schiff.loc[stream, "quarterly_mape"]) - q_mape
+            gain = f"{gain_pp:+.2f} pp vs Schiff benchmark"
+        m_rows = matrix[(matrix["stream_label"] == label)]
+        overall = str(m_rows[m_rows["diagnostic_test"] == "Overall"]["pass_status"].iloc[0]) if len(m_rows) else "Pass"
+        badge = {"Pass": "Promote", "Watch": "Watch", "Fail": "Monitor"}.get(overall, "Watch")
+        open_items = m_rows[(m_rows["diagnostic_test"] != "Overall") & (m_rows["pass_status"] != "Pass")]
+        if open_items.empty:
+            caveat = "No open diagnostic watch items."
+        else:
+            caveat = "Standing monitoring: " + ", ".join(
+                f"{t} ({s})" for t, s in zip(open_items["diagnostic_test"], open_items["pass_status"], strict=False))
+        readiness = "Historically reproducible"
+        sdir = repro_root / CURRENT_REPRO_PACK_DIRS.get(stream, "")
+        audit_path = sdir / "forward_scorer_parity_audit.json"
+        try:
+            if audit_path.exists():
+                audit = json.loads(audit_path.read_text(encoding="utf-8"))
+                readiness = ("Forecast-ready (parity verified)"
+                             if str(audit.get("parity_status")) == "passed"
+                             else "Forward scorer not verified")
+            elif (sdir / "future_forecasts.parquet").exists():
+                readiness = "Forecast-ready"
+        except Exception:
+            pass
+        cards.append({
+            "stream": label,
+            "badge": badge,
+            "model": display_model(str(row["model"])),
+            "mape": f"{q_mape:.2f}%",
+            "annual": f"{float(row['annual_mape']):.2f}%",
+            "gain": gain,
+            "readiness": readiness,
+            "caveat": caveat,
+        })
+    return cards
+
+
+def render_executive_stream_cards() -> None:
+    """Three plain-English recommendation cards under the KPI band."""
+    from model_dashboard.presentation import BADGE_COLORS
+
+    from model_dashboard.governance_constants import EVIDENCE_PACK_DATA
+
+    try:
+        signature = (EVIDENCE_PACK_DATA / "finalists.parquet").stat().st_mtime
+        cards = _executive_card_inputs(signature)
+    except Exception:
+        return
+    if not cards:
+        return
+    blocks = []
+    for card in cards:
+        color = BADGE_COLORS.get(card["badge"], "#334155")
+        gain_html = (f"<div style='color:#15803d;font-weight:600;font-size:0.8rem;margin-top:2px'>"
+                     f"{card['gain']}</div>") if card["gain"] else ""
+        blocks.append(
+            f"<div style='flex:1 1 260px;background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;"
+            f"padding:14px 16px;min-width:240px'>"
+            f"<div style='display:flex;justify-content:space-between;align-items:center;gap:8px'>"
+            f"<span style='font-weight:700;color:#0f172a'>{card['stream']}</span>"
+            f"<span style='background:{color};color:#fff;border-radius:999px;padding:1px 12px;"
+            f"font-size:0.75rem;font-weight:700'>{card['badge']}</span></div>"
+            f"<div style='color:#475569;font-size:0.8rem;margin-top:4px'>{card['model']}</div>"
+            f"<div style='margin-top:8px;font-size:1.25rem;font-weight:700;color:#0f4c81'>{card['mape']}"
+            f"<span style='font-size:0.75rem;color:#64748b;font-weight:500'> quarterly MAPE | "
+            f"{card['annual']} annual</span></div>"
+            f"{gain_html}"
+            f"<div style='color:#334155;font-size:0.8rem;margin-top:6px'>{card['readiness']}</div>"
+            f"<div style='color:#64748b;font-size:0.76rem;margin-top:4px'>{card['caveat']}</div>"
+            f"</div>"
+        )
+    st.markdown(
+        "<div style='display:flex;gap:12px;flex-wrap:wrap;margin:0.35rem 0 0.6rem'>"
+        + "".join(blocks) + "</div>",
+        unsafe_allow_html=True,
+    )
 
 
 def compact_figure(fig: Any, height: int, showlegend: bool | None = None) -> Any:

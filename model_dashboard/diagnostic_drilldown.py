@@ -189,7 +189,14 @@ def _evidence_chart(test: str, s: pd.DataFrame, acf: pd.DataFrame, row: pd.Serie
             fig.add_trace(go.Histogram(x=z, nbinsx=14, name="Standardised residuals",
                                        marker_color="#0f4c81", opacity=0.85))
             fig.update_xaxes(title_text="Standardised residual")
-        return _layout(fig, 300)
+        fig = _layout(fig, 320)
+        if theo is not None:
+            # Keep the horizontal legend clear of the subplot titles: titles
+            # render as annotations at the top of the plot area, so the
+            # legend moves above them and the top margin grows to fit both.
+            fig.update_layout(margin={"l": 40, "r": 16, "t": 66, "b": 36},
+                              legend={"y": 1.26})
+        return fig
     if test == "Cointegration":
         eq = s["equilibrium_error"].to_numpy(float)
         fig = go.Figure()
@@ -226,7 +233,10 @@ def render_dialog_body(row: pd.Series, detail: pd.DataFrame, series: pd.DataFram
         f"<span style='color:#64748b'>| {row['stream_label']}</span></div>",
         unsafe_allow_html=True,
     )
-    st.caption(f"Model: `{row['model']}` | {row['residual_scope']} | n = {int(row['n_rows'])}")
+    from .presentation import display_model, is_executive
+
+    model_text = display_model(row["model"]) if is_executive() else f"`{row['model']}`"
+    st.caption(f"Model: {model_text} | {row['residual_scope']} | n = {int(row['n_rows'])}")
 
     left, right = st.columns([1.0, 1.25])
     with left:
@@ -267,7 +277,7 @@ def render_dialog_body(row: pd.Series, detail: pd.DataFrame, series: pd.DataFram
     st.divider()
     st.markdown("**Audit trace**")
     st.caption(f"Source: {row['source_dataset']} | Score basis: {row['score_basis']} | "
-               f"Provenance: {row['provenance']}")
+               f"Provenance: {row['provenance']} | Model ID: {row['model']}")
     st.caption(str(row["provenance_note"]))
 
 
