@@ -118,3 +118,48 @@ def test_presentation_layer_is_read_only() -> None:
     src = (ROOT / "model_dashboard" / "presentation.py").read_text(encoding="utf-8")
     assert "to_parquet" not in src
     assert "read_parquet" not in src, "presentation layer must not load data itself"
+
+
+def test_confidence_badges_read_governed_statuses() -> None:
+    import app
+
+    cards = app._executive_card_inputs.__wrapped__(0.0)
+    for card in cards:
+        badges = dict((dim, (label, color)) for dim, label, color in app._confidence_badges_for(card))
+        assert set(badges) == {"Accuracy", "Diagnostics", "Forecast", "Reproducibility"}
+        # Diagnostics dimension must mirror the governed Overall verdict
+        expected = {"Promote": "Pass", "Watch": "Watch", "Monitor": "Fail items"}[card["badge"]]
+        assert badges["Diagnostics"][0] == expected
+        # all three streams beat the benchmark, so Accuracy is never Watch here
+        assert badges["Accuracy"][0] in {"Strong", "Moderate"}
+        for label, _ in badges.values():
+            assert "__" not in label and "_" not in label
+
+
+def test_action_card_copy_is_display_language() -> None:
+    """Action-card inputs compose only from display-language card fields."""
+    import app
+
+    cards = app._executive_card_inputs.__wrapped__(0.0)
+    assert cards
+    for card in cards:
+        for key in ("stream", "badge", "gain", "readiness", "caveat", "model"):
+            assert "__" not in str(card[key])
+    # numeric companions exist for the badge rules
+    assert all(isinstance(card["mape_value"], float) for card in cards)
+
+
+def test_forecast_figure_shades_future_region_and_marks_start() -> None:
+    import app
+
+    rows = []
+    for idx, period in enumerate(["2025Q1", "2025Q2", "2025Q3", "2025Q4"]):
+        rows.append({"stream_label": "Light RUC volume", "row_type": "historical_actual",
+                     "scenario_name": None, "period": period, "value": 100.0 + idx})
+    for idx, period in enumerate(["2026Q1", "2026Q2"]):
+        rows.append({"stream_label": "Light RUC volume", "row_type": "future_forecast",
+                     "scenario_name": "Base", "period": period, "value": 110.0 + idx})
+    fig = app.forecast_builder_figure(pd.DataFrame(rows))
+    shapes = list(fig.layout.shapes or [])
+    assert any(s.type == "rect" for s in shapes), "future region must be shaded"
+    assert any(s.type == "line" for s in shapes), "forecast start marker must be drawn"

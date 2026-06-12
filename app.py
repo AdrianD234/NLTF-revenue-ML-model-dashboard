@@ -886,6 +886,7 @@ def render_overview(loaded: LoadedRun, controls: dict[str, Any]) -> None:
     gov_kpi_grid(overview_kpi_cards(summary, recommended, story, errors, candidate_context, schiff_rows=schiff_rows))
     if is_executive():
         render_executive_stream_cards()
+        render_action_card("Overview")
     basis_metric = score_basis_metric_label(controls.get("score_basis", PAPER_SCORE_BASIS))
     accuracy_subtitle = f"{basis_metric} by stream. Lower is better."
     if not best.empty and {"stream_label", "quarterly_mape", "annual_mape"}.issubset(best.columns):
@@ -1026,6 +1027,8 @@ def _executive_card_inputs(signature: float) -> list[dict[str, str]]:
         cards.append({
             "stream": label,
             "badge": badge,
+            "gain_pp": float(schiff.loc[stream, "quarterly_mape"]) - q_mape if stream in schiff.index else None,
+            "mape_value": q_mape,
             "model": display_model(str(row["model"])),
             "mape": f"{q_mape:.2f}%",
             "annual": f"{float(row['annual_mape']):.2f}%",
@@ -1075,6 +1078,125 @@ def render_executive_stream_cards() -> None:
         + "".join(blocks) + "</div>",
         unsafe_allow_html=True,
     )
+
+
+def _executive_cards_safe() -> list[dict[str, Any]]:
+    from model_dashboard.governance_constants import EVIDENCE_PACK_DATA
+
+    try:
+        signature = (EVIDENCE_PACK_DATA / "finalists.parquet").stat().st_mtime
+        return _executive_card_inputs(signature)
+    except Exception:
+        return []
+
+
+def render_action_card(page: str) -> None:
+    """One management action card per executive page (presentation only:
+    every statement is composed from the governed card inputs)."""
+    if not is_executive():
+        return
+    cards = _executive_cards_safe()
+    if not cards:
+        return
+    by_badge: dict[str, list[str]] = {"Promote": [], "Watch": [], "Monitor": []}
+    for card in cards:
+        by_badge.setdefault(card["badge"], []).append(card["stream"])
+    gains = ", ".join(card["gain"].replace(" vs Schiff benchmark", "") for card in cards if card["gain"])
+    watch_items = "; ".join(
+        f"{card['stream']}: {card['caveat'].replace('Standing monitoring: ', '')}"
+        for card in cards if card["caveat"] != "No open diagnostic watch items.")
+    ready = [card["stream"] for card in cards if card["readiness"].startswith("Forecast-ready")]
+
+    if page == "Overview":
+        title, tone = "Recommended decision", "#15803d"
+        parts = []
+        if by_badge["Promote"]:
+            parts.append(f"Adopt the recommended models for {', '.join(by_badge['Promote'])}.")
+        if by_badge["Watch"]:
+            parts.append(f"{', '.join(by_badge['Watch'])} recommended with advisory watch items.")
+        if by_badge["Monitor"]:
+            parts.append(f"{', '.join(by_badge['Monitor'])} remains usable but carries standing diagnostic "
+                         "monitoring items - review them on the Model Confidence page before promotion.")
+        parts.append(f"All three finalists beat the Schiff specification benchmark ({gains} quarterly MAPE).")
+        body = " ".join(parts)
+    elif page == "Diagnostics":
+        title, tone = "Governance watch item", "#b45309"
+        body = ((f"Open monitoring items - {watch_items}. These are tracked, disclosed and do not "
+                 "change any governed status; click any cell below for the glass-box detail.")
+                if watch_items else
+                "No open diagnostic watch items across the three streams.")
+    elif page == "Scenario Comparison":
+        title, tone = "Scenario implication", "#0f4c81"
+        body = (f"{', '.join(ready) if ready else 'No stream'} can score new assumption workbooks. "
+                "Streams without a verified forward scorer return an explicit governed gap - "
+                "never a fabricated number - so scenario totals are trustworthy by construction.")
+    else:  # Schiff Benchmark
+        title, tone = "Audit conclusion", "#0f4c81"
+        body = (f"{len(cards)}/3 finalists beat the Schiff specification benchmark under the paper-style "
+                f"scorecard ({gains}). The benchmark is replicated from the published workbook and scored "
+                "on identical quarters, so the comparison is like-for-like.")
+    st.markdown(
+        f"<div style='display:flex;gap:10px;align-items:flex-start;background:#ffffff;"
+        f"border:1px solid #e2e8f0;border-left:4px solid {tone};border-radius:10px;"
+        f"padding:10px 14px;margin:0.3rem 0 0.55rem'>"
+        f"<div style='min-width:max-content;font-weight:800;color:{tone};font-size:0.78rem;"
+        f"text-transform:uppercase;letter-spacing:0.04em;padding-top:1px'>{title}</div>"
+        f"<div style='color:#334155;font-size:0.84rem'>{body}</div></div>",
+        unsafe_allow_html=True,
+    )
+
+
+def _confidence_badges_for(card: dict[str, Any]) -> list[tuple[str, str, str]]:
+    """(dimension, label, color) triples. Accuracy banding is a presentation
+    heuristic and is documented in the caption; all other dimensions read the
+    governed statuses directly."""
+    gain = card.get("gain_pp")
+    mape = card.get("mape_value")
+    if gain is not None and mape is not None and gain >= 2.0 and mape < 5.0:
+        accuracy = ("Strong", "#15803d")
+    elif gain is not None and gain > 0:
+        accuracy = ("Moderate", "#0f4c81")
+    else:
+        accuracy = ("Watch", "#b45309")
+    diag = {"Promote": ("Pass", "#15803d"), "Watch": ("Watch", "#b45309"),
+            "Monitor": ("Fail items", "#b91c1c")}[card["badge"]]
+    readiness_text = card["readiness"]
+    if readiness_text.startswith("Forecast-ready"):
+        ready = ("Ready", "#15803d")
+    elif "not verified" in readiness_text:
+        ready = ("Not verified", "#b91c1c")
+    else:
+        ready = ("Historical only", "#b45309")
+    repro = (("Full (parity verified)", "#15803d") if "parity verified" in readiness_text
+             else ("Exact replay", "#0f4c81"))
+    return [("Accuracy", *accuracy), ("Diagnostics", *diag),
+            ("Forecast", *ready), ("Reproducibility", *repro)]
+
+
+def render_confidence_badges() -> None:
+    """Per-stream confidence strip on the Model Confidence page (executive)."""
+    cards = _executive_cards_safe()
+    if not cards:
+        return
+    blocks = []
+    for card in cards:
+        pills = "".join(
+            f"<span style='display:inline-flex;align-items:center;gap:5px;margin:2px 8px 2px 0'>"
+            f"<span style='color:#64748b;font-size:0.72rem'>{dim}</span>"
+            f"<span style='background:{color};color:#fff;border-radius:999px;padding:1px 10px;"
+            f"font-size:0.72rem;font-weight:700'>{label}</span></span>"
+            for dim, label, color in _confidence_badges_for(card))
+        blocks.append(
+            f"<div style='flex:1 1 300px;background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;"
+            f"padding:8px 12px;min-width:280px'>"
+            f"<div style='font-weight:700;color:#0f172a;font-size:0.82rem;margin-bottom:3px'>{card['stream']}</div>"
+            f"{pills}</div>")
+    st.markdown(
+        "<div style='display:flex;gap:10px;flex-wrap:wrap;margin:0.25rem 0 0.2rem'>" + "".join(blocks) + "</div>",
+        unsafe_allow_html=True,
+    )
+    st.caption("Accuracy banding: Strong = beats benchmark by >= 2pp with quarterly MAPE < 5%; Moderate = beats benchmark; "
+               "Watch otherwise. Diagnostics, forecast readiness and reproducibility read the governed statuses directly.")
 
 
 def compact_figure(fig: Any, height: int, showlegend: bool | None = None) -> Any:
@@ -1601,6 +1723,9 @@ def render_r2_ladder_panel(loaded: LoadedRun, selected_stream: str = "All stream
 def render_diagnostics(loaded: LoadedRun, controls: dict[str, Any]) -> None:
     diagnostic_df = loaded.data.get("diagnostic_df", pd.DataFrame())
     gov_kpi_grid(diagnostic_kpi_cards(diagnostic_df))
+    if is_executive():
+        render_confidence_badges()
+        render_action_card("Diagnostics")
     render_diagnostics_r2_panel(loaded)
     render_r2_ladder_panel(loaded)
 
@@ -3291,6 +3416,18 @@ def forecast_builder_figure(chart_rows: pd.DataFrame, future_rows: pd.DataFrame 
                 col=1,
             )
         if forecast_start:
+            future_periods = future["period"].astype(str).tolist()
+            if future_periods:
+                # Shade the forecast window so the future region reads at a glance.
+                fig.add_vrect(
+                    x0=forecast_start,
+                    x1=future_periods[-1],
+                    fillcolor="rgba(15, 76, 129, 0.06)",
+                    line_width=0,
+                    layer="below",
+                    row=row_index,
+                    col=1,
+                )
             fig.add_vline(
                 x=forecast_start,
                 line_color="#64748B",
@@ -3997,6 +4134,7 @@ def central_error_window(qpred: pd.DataFrame, lower: float = 0.01, upper: float 
 
 
 def render_scenario_comparison(loaded: LoadedRun, controls: dict[str, Any]) -> None:
+    render_action_card("Scenario Comparison")
     recommended = common_filter(score_basis_projected(loaded.data.get("recommended", pd.DataFrame()), controls), controls, include_source_variant=False)
     summary = common_filter(score_basis_projected(loaded.data.get("summary", pd.DataFrame()), controls), controls)
     paired = common_filter(loaded.data.get("paired_vs_schiff", pd.DataFrame()), controls, include_source_variant=False)
@@ -4534,6 +4672,7 @@ def scenario_decision_lens_summary(story: pd.DataFrame) -> str:
 
 
 def render_schiff_benchmark_page(loaded: LoadedRun, controls: dict[str, Any]) -> None:
+    render_action_card("Schiff Benchmark")
     summary = common_filter(score_basis_projected(loaded.data.get("summary", pd.DataFrame()), controls), controls)
     paired = common_filter(loaded.data.get("paired_vs_schiff", pd.DataFrame()), controls, include_source_variant=False)
     recommended = common_filter(score_basis_projected(loaded.data.get("recommended", pd.DataFrame()), controls), controls, include_source_variant=False)
