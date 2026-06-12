@@ -103,6 +103,7 @@ from model_dashboard.reproducibility_imports import (
 )
 from model_dashboard.presentation import (
     display_capability,
+    render_cloud_preview_toggle,
     display_model,
     header_subtitle,
     is_executive,
@@ -352,6 +353,10 @@ def env_flag(name: str) -> bool | None:
 
 
 def is_streamlit_cloud_runtime() -> bool:
+    from model_dashboard.presentation import cloud_preview_enabled
+
+    if cloud_preview_enabled():
+        return True
     for name in STREAMLIT_CLOUD_ENV_MARKERS:
         marker = env_flag(name)
         if marker is not None:
@@ -635,6 +640,7 @@ def render_top_filter_bar(loaded: LoadedRun, controls: dict[str, Any]) -> dict[s
         with filter_cols[6]:
             with st.popover("More", use_container_width=True):
                 render_mode_toggle()
+                render_cloud_preview_toggle()
                 controls = render_advanced_controls(loaded, controls)
 
         stream_choice = st.session_state["top_stream"]

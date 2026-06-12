@@ -163,3 +163,18 @@ def test_forecast_figure_shades_future_region_and_marks_start() -> None:
     shapes = list(fig.layout.shapes or [])
     assert any(s.type == "rect" for s in shapes), "future region must be shaded"
     assert any(s.type == "line" for s in shapes), "forecast start marker must be drawn"
+
+
+def test_cloud_runtime_preview_simulates_cloud_page_set(monkeypatch) -> None:
+    """The Cloud runtime preview toggle must make the local page set match
+    the deployed app (Governance page hidden), without any env markers."""
+    import app
+    from model_dashboard import presentation
+
+    monkeypatch.delenv(app.SHOW_GOVERNANCE_PAGE_ENV_VAR, raising=False)
+    for name in app.STREAMLIT_CLOUD_ENV_MARKERS:
+        monkeypatch.delenv(name, raising=False)
+    assert app.REPRODUCIBILITY_PAGE in app.dashboard_pages()
+    monkeypatch.setattr(presentation, "cloud_preview_enabled", lambda: True)
+    assert app.is_streamlit_cloud_runtime()
+    assert app.REPRODUCIBILITY_PAGE not in app.dashboard_pages()

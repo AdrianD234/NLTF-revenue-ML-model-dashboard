@@ -68,3 +68,6 @@ data/dashboard_evidence_pack_reproducibility/heavy_ruc/source_artifacts/**/*.pyc
 !data/dashboard_evidence_pack_reproducibility/light_ruc_vnext/**
 !artifacts/diagnostic_drilldown/
 !artifacts/diagnostic_drilldown/**
+
+# deployed-commit preview worktree (scripts/run_deployed_preview.ps1)
+.deploy_preview/

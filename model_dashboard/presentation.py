@@ -117,6 +117,36 @@ def render_mode_toggle() -> None:
     )
 
 
+CLOUD_PREVIEW_KEY = "cloud_runtime_preview_toggle"
+
+
+def cloud_preview_enabled() -> bool:
+    """Session flag that makes a local run behave like Streamlit Cloud
+    (same page set and runtime gating), so deploy behaviour can be tested
+    before pushing. Code version is unaffected - use
+    scripts/run_deployed_preview.ps1 to run the actually-deployed commit."""
+    try:
+        import streamlit as st
+
+        return bool(st.session_state.get(CLOUD_PREVIEW_KEY, False))
+    except Exception:
+        return False
+
+
+def render_cloud_preview_toggle() -> None:
+    import streamlit as st
+
+    st.toggle(
+        "Cloud runtime preview",
+        key=CLOUD_PREVIEW_KEY,
+        help=("Render this local session with Streamlit Cloud runtime rules "
+              "(e.g. the Governance & Reproducibility page is hidden, exactly as "
+              "on the deployed app). This previews runtime behaviour only - the "
+              "deployed code version may still differ until you push; use "
+              "scripts/run_deployed_preview.ps1 to run the deployed commit side by side."),
+    )
+
+
 def page_display_title(page: str) -> str:
     if is_executive():
         return EXECUTIVE_PAGE_TITLES.get(page, page)
