@@ -1867,7 +1867,7 @@ def render_reproducibility_detail(stream_label: str) -> None:
         section_title("Feature importance")
         st.plotly_chart(
             plot_reproducibility_feature_importance(reproducibility_feature_importance_view(pack), stream_label),
-            width="stretch",
+            use_container_width=True,
             key=f"{_widget_key(stream_label)}_repro_feature_importance",
         )
     with chart_cols[1]:
@@ -1875,7 +1875,7 @@ def render_reproducibility_detail(stream_label: str) -> None:
         info_panel("Scenario sensitivities cover GDP, diesel price, RUC price and other perturbations.")
         st.plotly_chart(
             plot_reproducibility_sensitivities(reproducibility_sensitivity_view(pack), stream_label),
-            width="stretch",
+            use_container_width=True,
             key=f"{_widget_key(stream_label)}_repro_scenario_sensitivities",
         )
 
@@ -2334,7 +2334,6 @@ def render_page5_filter_strip(
                 default="All streams",
                 key="page5_stream_segment",
                 required=True,
-                width="stretch",
             )
         with cols[1]:
             st.selectbox(
@@ -4841,7 +4840,7 @@ def render_executive_summary(loaded: LoadedRun, controls: dict[str, Any]) -> Non
         mime="text/markdown",
     )
 
-    st.plotly_chart(plot_finalist_accuracy(recommended), width="stretch")
+    st.plotly_chart(plot_finalist_accuracy(recommended), use_container_width=True)
 
     with st.expander("Plain-language model-selection terms", expanded=False):
         for term, explanation in TERM_HELP.items():
@@ -4985,7 +4984,7 @@ def render_candidate_landscape(loaded: LoadedRun, controls: dict[str, Any]) -> N
         summary = pd.concat([top, finalists, schiff], ignore_index=True).drop_duplicates()
     if controls.get("hide_outliers") and {"quarterly_mape", "annual_mape"}.issubset(summary.columns):
         summary = hide_candidate_outliers(summary)
-    st.plotly_chart(plot_candidate_landscape(summary), width="stretch")
+    st.plotly_chart(plot_candidate_landscape(summary), use_container_width=True)
     st.caption(
         "Frontier read: finalists and Schiff specification benchmark markers should sit near the lower-left area where both quarterly and "
         "annual MAPE are low. Out-of-range candidates remain available in the table below."
@@ -5094,15 +5093,15 @@ def render_schiff_comparison(loaded: LoadedRun, controls: dict[str, Any]) -> Non
         with st.expander("Paired comparison detail rows", expanded=False):
             st.caption("Paired model comparisons using common forecast pairs. Table includes Gain, Win rate, and Common pairs.")
             display_table(table, height=420)
-        st.plotly_chart(plot_paired_improvement(paired, top_n=controls["top_n"]), width="stretch")
-        st.plotly_chart(plot_paired_scatter(paired), width="stretch")
+        st.plotly_chart(plot_paired_improvement(paired, top_n=controls["top_n"]), use_container_width=True)
+        st.plotly_chart(plot_paired_scatter(paired), use_container_width=True)
 
         best = paired.sort_values("mape_improvement_pct_points", ascending=False).groupby("stream_label", as_index=False).head(1)
         if not best.empty:
             section_title("Stream-Level Best Challenger")
-            st.plotly_chart(plot_paired_improvement(best, top_n=len(best)), width="stretch")
+            st.plotly_chart(plot_paired_improvement(best, top_n=len(best)), use_container_width=True)
 
-    st.plotly_chart(plot_schiff_benchmark(summary), width="stretch")
+    st.plotly_chart(plot_schiff_benchmark(summary), use_container_width=True)
 
 
 def schiff_interpretation(row: pd.Series) -> str:
@@ -5161,12 +5160,12 @@ def render_ensemble_composition(loaded: LoadedRun, controls: dict[str, Any]) -> 
     if insight:
         info_panel(insight)
     info_panel(ensemble_method_readout(plot_data, recommended))
-    st.plotly_chart(fig, width="stretch")
+    st.plotly_chart(fig, use_container_width=True)
     if not mapping.empty:
         with st.expander("Component label mapping", expanded=False):
             display_table(mapping, height=360)
         if has_origin_weight_history(plot_data):
-            st.plotly_chart(plot_weight_over_time(plot_data, mapping), width="stretch")
+            st.plotly_chart(plot_weight_over_time(plot_data, mapping), use_container_width=True)
         else:
             st.caption("No origin-level weight history is available for the selected ensemble view.")
 
@@ -5361,15 +5360,15 @@ def render_forecasts_and_errors(loaded: LoadedRun, controls: dict[str, Any]) -> 
         "Error percentage is calculated as 100 x (predicted minus actual) divided by actual. "
         "The box plot below uses the recommended finalist rows where they can be matched."
     )
-    st.plotly_chart(plot_actual_vs_predicted(detail), width="stretch")
-    st.plotly_chart(plot_percent_error_over_time(detail), width="stretch")
+    st.plotly_chart(plot_actual_vs_predicted(detail), use_container_width=True)
+    st.plotly_chart(plot_percent_error_over_time(detail), use_container_width=True)
 
     best_keys = model_key_set(best_by_stream(recommended)) if not recommended.empty else set()
     box_data = qpred
     if best_keys:
         box_data = filter_to_model_keys(box_data, best_keys)
-    st.plotly_chart(plot_error_distribution(box_data), width="stretch")
-    st.plotly_chart(plot_horizon_mape(box_data), width="stretch")
+    st.plotly_chart(plot_error_distribution(box_data), use_container_width=True)
+    st.plotly_chart(plot_horizon_mape(box_data), use_container_width=True)
 
 
 def default_model_index(model_options: list[str], recommended: pd.DataFrame, stream_choice: str) -> int:
@@ -5394,7 +5393,7 @@ def render_stress_checks(loaded: LoadedRun, controls: dict[str, Any]) -> None:
         stress_frame = stress_frame[stress_frame["stream_label"].isin(controls["streams"])]
     if controls["stage"] != "all" and "stage" in stress_frame.columns:
         stress_frame = stress_frame[stress_frame["stage"].astype(str).str.lower() == controls["stage"].lower()]
-    st.plotly_chart(plot_stress_checks(stress_frame), width="stretch")
+    st.plotly_chart(plot_stress_checks(stress_frame), use_container_width=True)
     info_panel(stress_readout(stress_frame))
     info_panel(
         "Light RUC remains a weak-stream watch point. The 2022-23 RUC discount and purchase-timing period is "
@@ -5433,9 +5432,9 @@ def render_model_inventory(loaded: LoadedRun, controls: dict[str, Any]) -> None:
 
     chart_cols = st.columns(2)
     with chart_cols[0]:
-        st.plotly_chart(plot_inventory_family_performance(summary, sort_metric), width="stretch")
+        st.plotly_chart(plot_inventory_family_performance(summary, sort_metric), use_container_width=True)
     with chart_cols[1]:
-        st.plotly_chart(plot_schiff_class_mix(summary), width="stretch")
+        st.plotly_chart(plot_schiff_class_mix(summary), use_container_width=True)
 
     columns = [col for col in INVENTORY_COLUMNS if col in summary.columns]
     inventory = summary[columns].copy()
@@ -5601,7 +5600,7 @@ def render_run_audit(loaded: LoadedRun) -> None:
     features = loaded.data.get("features", pd.DataFrame())
 
     section_title("Feature and Run Audit")
-    st.plotly_chart(plot_feature_counts(variant_features), width="stretch")
+    st.plotly_chart(plot_feature_counts(variant_features), use_container_width=True)
 
     if not variant_features.empty:
         with st.expander("Variant feature counts", expanded=True):
@@ -5618,7 +5617,7 @@ def render_run_audit(loaded: LoadedRun) -> None:
             "errors.csv is non-empty. Some model-search scripts are designed to log and skip failed candidates rather "
             "than stop the run, so review the flags before treating this as a failed run."
         )
-        st.plotly_chart(plot_error_types(classify_error_rows(errors)), width="stretch")
+        st.plotly_chart(plot_error_types(classify_error_rows(errors)), use_container_width=True)
         display_table(error_flags(errors), height=220)
         with st.expander("Errors table", expanded=True):
             display_table(errors, height=420)

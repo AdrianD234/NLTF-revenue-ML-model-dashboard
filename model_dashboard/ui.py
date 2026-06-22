@@ -1222,7 +1222,7 @@ def chart_card(
             "</div>",
             unsafe_allow_html=True,
         )
-        st.plotly_chart(figure, width="stretch", key=key)
+        st.plotly_chart(figure, use_container_width=True, key=key)
         if caption and not notes_as_tooltip:
             st.caption(caption)
         else:
@@ -1400,7 +1400,7 @@ def display_table(
         st.caption(f"Showing first {max_rows:,} of {len(df):,} rows. Use the download control where available for the full filtered dataset.")
     st.dataframe(
         view,
-        width="stretch",
+        use_container_width=True,
         height=height,
         hide_index=True,
         column_config=column_config,

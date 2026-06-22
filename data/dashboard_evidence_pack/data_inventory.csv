@@ -1,6 +1,6 @@
 file,rows,columns,size_bytes
 annual_predictions.parquet,130,17,14951
-candidate_cone.parquet,400,54,69560
+candidate_cone.parquet,400,54,112225
 chart_contract.parquet,16,5,5520
 component_predictions.parquet,3672,18,145995
 diagnostic_acf.parquet,39,12,9092
@@ -13,7 +13,7 @@ error_distribution.parquet,756,23,40841
 feature_importance.parquet,159,11,10942
 finalists.parquet,3,33,25151
 horizon_profiles.parquet,72,16,12382
-invalid_predictions_zero_actual.parquet,24,31,20791
+invalid_predictions_zero_actual.parquet,24,31,19895
 light_ruc_candidate_scorecard.parquet,887,14,98060
 model_coefficients.parquet,92,14,11943
 model_registry.parquet,12,27,26317

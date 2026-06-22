@@ -73,7 +73,20 @@ def test_overview_source_tables_reconcile_to_current_parquet(parquet_dashboard: 
     assert {"Selected finalist", SCHIFF_SPEC_BENCHMARK_LABEL}.issubset(set(candidate["point_type"]))
     assert candidate["calculation_basis"].str.contains("Default all-stream frontier rows", regex=False).all()
     assert {"frontier_sample_class", "frontier_sample_note"}.issubset(candidate.columns)
-    assert set(candidate["frontier_sample_class"].dropna()) == {"balanced_visual_frontier_sample", "anchor"}
+    assert set(candidate["frontier_sample_class"].dropna()) == {
+        "anchor",
+        "balanced_visual_frontier_sample",
+        "measured_candidate",
+    }
+    assert candidate.groupby(["stream_label", "frontier_sample_class"]).size().to_dict() == {
+        ("Heavy RUC volume", "anchor"): 2,
+        ("Heavy RUC volume", "balanced_visual_frontier_sample"): 130,
+        ("Light RUC volume", "anchor"): 2,
+        ("Light RUC volume", "balanced_visual_frontier_sample"): 66,
+        ("Light RUC volume", "measured_candidate"): 68,
+        ("PED VKT per capita", "anchor"): 2,
+        ("PED VKT per capita", "balanced_visual_frontier_sample"): 130,
+    }
     assert candidate["frontier_sample_note"].dropna().astype(str).str.len().gt(0).all()
     row_text = candidate.fillna("").astype(str).agg(lambda row: " ".join(row.to_list()), axis=1)
     assert not row_text.str.contains(r"20\.50|20\.499", regex=True).any()

@@ -34,6 +34,7 @@ import pandas as pd
 
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
+from scripts.regenerate_candidate_cone import build_candidate_cone
 
 PACK = REPO / "data" / "dashboard_evidence_pack"
 DATA = PACK / "data"
@@ -928,52 +929,14 @@ def rebuild_diagnostics(new_preds: dict[str, pd.DataFrame]) -> tuple[pd.DataFram
     return tests, matrix, acf
 
 
-def rebuild_candidate_cone(new_preds: dict[str, pd.DataFrame]) -> pd.DataFrame:
-    df = pd.read_parquet(DATA / "candidate_cone.parquet")
-    out = df.copy()
-    for stream in VNEXT_STREAMS:
-        legacy = LEGACY_FINALISTS[stream]
-        mask = out["model"] == legacy
-        if not mask.any():
-            raise AssertionError(f"candidate_cone: no anchor row for {legacy}")
-        paper = summary_metrics(new_preds[stream][new_preds[stream]["score_basis"] == PAPER])
-        oper = summary_metrics(new_preds[stream][new_preds[stream]["score_basis"] == OPERATIONAL])
-        model = new_finalist(stream)
-        idx = out[mask].index
-        updates = {
-            "model": model,
-            "model_short": shorten(model),
-            "candidate_uid": candidate_uid(model),
-            "run_source": "vnext_pipeline",
-            "source_file": state_dir(stream).relative_to(REPO).as_posix() + "/fitted_model_manifest.json",
-            "source_family": "vnext_pipeline",
-            "model_kind": "convex_ensemble",
-            "feature_set": "ensemble",
-            "n_quarterly_pairs": paper["n_quarterly_pairs"],
-            "n_origins": paper["n_origins"],
-            "quarterly_mape": paper["horizon_mean_mape"],
-            "annual_mape": paper["annual_mape"],
-            "quarterly_bias_pct": paper["quarterly_bias_pct"],
-            "annual_bias_pct": paper["annual_bias_pct"],
-            "quarterly_p90_ape": paper["quarterly_p90_ape"],
-            "annual_p90_ape": paper["annual_p90_ape"],
-            "mape_h01_04": paper["mape_h01_04"],
-            "mape_h05_08": paper["mape_h05_08"],
-            "mape_h09_12": paper["mape_h09_12"],
-            "operational_pooled_mape": oper["quarterly_pooled_mape"],
-            "operational_horizon_mean_mape": oper["horizon_mean_mape"],
-            "operational_bias_pct": oper["quarterly_bias_pct"],
-            "operational_annual_mape": oper["annual_mape"],
-            "paper_horizon_mean_mape": paper["horizon_mean_mape"],
-            "paper_pooled_mape": paper["quarterly_pooled_mape"],
-            "paper_bias_pct": paper["quarterly_bias_pct"],
-            "paper_annual_mape": paper["annual_mape"],
-            "paper_h09_12_mape": paper["mape_h09_12"],
-        }
-        for col, val in updates.items():
-            if col in out.columns:
-                out.loc[idx, col] = val
-    return out
+def rebuild_candidate_cone(finalists: pd.DataFrame) -> pd.DataFrame:
+    result = build_candidate_cone(
+        existing_cone=pd.read_parquet(DATA / "candidate_cone.parquet"),
+        finalists=finalists,
+        schiff=pd.read_parquet(DATA / "schiff_benchmark.parquet"),
+        light_scorecard=pd.read_parquet(DATA / "light_ruc_candidate_scorecard.parquet"),
+    )
+    return result.frame
 
 
 def refresh_manifest_and_inventory() -> None:
@@ -1061,7 +1024,7 @@ def main() -> None:
     outputs["diagnostic_tests.parquet"] = tests
     outputs["diagnostic_pass_matrix.parquet"] = matrix
     outputs["diagnostic_acf.parquet"] = acf
-    outputs["candidate_cone.parquet"] = rebuild_candidate_cone(new_preds)
+    outputs["candidate_cone.parquet"] = rebuild_candidate_cone(outputs["finalists.parquet"])
 
     # Row-count invariants that downstream validators rely on.
     assert len(outputs["scorecard_predictions.parquet"]) == 3648
