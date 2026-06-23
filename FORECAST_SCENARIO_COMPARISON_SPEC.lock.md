@@ -38,6 +38,8 @@ or a caller-provided output directory.
 - `forecast_scenario_capability_report.csv`
 - `forecast_scenario_chart_rows.parquet`
 - `forecast_scenario_chart_rows.csv`
+- `scenario_input_delta_audit.parquet`
+- `scenario_input_delta_audit.csv`
 - `forecast_scenario_comparison_manifest.json`
 
 ## Data Contract
@@ -52,6 +54,9 @@ Required comparison columns include:
 - `model`;
 - `target_period`;
 - `horizon`;
+- `horizon_support_status`;
+- `horizon_support_label`;
+- `horizon_support_note`;
 - `forecast`;
 - `forecast_available`;
 - `availability_status`;
@@ -75,6 +80,9 @@ Required comparison columns include:
 - `stream`;
 - `stream_label`;
 - `period`;
+- `horizon`;
+- `horizon_support_status`;
+- `horizon_support_label`;
 - `value`;
 - `availability_status`.
 - `capability_status`;
@@ -82,6 +90,8 @@ Required comparison columns include:
 - `parity_status`.
 
 Historical actual rows are de-duplicated by stream and period. Future forecast display rows keep missing `value` for governed gaps so the table/export can show the gap without plotting a fake forecast.
+
+`scenario_input_delta_audit.parquet` and `.csv` compare required user-entry inputs between scenarios. For the `high_population` smoke fixture, every required user input must be recorded as 2% above `basecase`, including unemployment, prices and starting target lags, with `decision_grade_status=not_decision_grade_smoke_fixture`.
 
 ## Manifest Contract
 
@@ -91,6 +101,8 @@ Historical actual rows are de-duplicated by stream and period. Future forecast d
 - created timestamp;
 - forecast runner version;
 - scenario count;
+- H1-H12 backtest-supported horizon metadata and H13 long-range-extrapolation note;
+- high-population smoke fixture caveat;
 - scenario records with name, run id, output directory, workbook metadata, horizon metadata and status;
 - `fixed_finalists_only: true`;
 - `broad_search_run: false`;
@@ -113,6 +125,8 @@ The Forecast Builder UI must:
 - show capability status by scenario and stream;
 - plot historical actuals as a distinct grey line;
 - plot future numeric forecasts in scenario styles after the forecast-start marker;
+- show the H13 long-range-extrapolation boundary and not imply validated 2050 accuracy;
+- show the high-population fixture caveat when that scenario is present;
 - keep governed-gap streams visible in the table/capability report;
 - show a governed-gap annotation when a selected stream has historical actuals but no numeric future forecast;
 - provide an All/Numeric/Governed-gap row filter for the forecast table;
@@ -124,4 +138,6 @@ The Forecast Builder UI must:
 - Scenario comparison must not modify `artifacts/chart_sources`.
 - Scenario comparison must not recalculate historical finalists, MAPE/R2, diagnostics, scenario, stress or benchmark values.
 - Light RUC numeric forecasts must come from the fixed finalist forward scorer.
-- PED and Heavy RUC governed gaps must remain explicit until executable forward scorers are available and parity-tested; current statuses are `parity_failed` for PED and `insufficient_artifacts` for Heavy RUC.
+- PED and Heavy RUC numeric forecasts must come from parity-gated vNext saved states with manifest SHA256 checks before loading/scoring.
+- PED and Heavy RUC governed gaps must remain explicit if a required artifact, manifest hash check, parity audit or runtime state gate fails.
+- H1-H12 is the validated backtest-supported horizon. H13 onward is long-range extrapolation, including 2050Q4 projections.

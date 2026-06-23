@@ -36,9 +36,12 @@ from model_dashboard.data.diagnostics import (
 )
 from model_dashboard.diagnostic_matrix import diagnostic_pass_matrix_html
 from model_dashboard.forecast_imports import (
+    BACKTEST_SUPPORTED_MAX_HORIZON,
     FORECAST_BUILDER_NOTE,
     FORECAST_BUILDER_TITLE,
     FORECAST_RUNNER_IMPORT_ERROR,
+    HIGH_POPULATION_SMOKE_FIXTURE_NOTE,
+    HORIZON_SUPPORT_NOTE,
     TEMPLATE_FILENAME,
     build_forecast_input_template_bytes,
     forecast_pack_zip_bytes,
@@ -3037,7 +3040,10 @@ def render_forecast_builder_results(results: list[Any], comparison: Any | None) 
         forecast_builder_figure(chart_rows, future),
         notes_as_tooltip=False,
     )
-    st.caption("Forecast start marker indicates the first forecast quarter after the latest historical actual.")
+    st.caption("Forecast start marker indicates the first forecast quarter after the latest historical actual. " + HORIZON_SUPPORT_NOTE)
+    scenarios = set(future_combined.get("scenario_name", pd.Series(dtype=str)).dropna().astype(str))
+    if "high_population" in scenarios:
+        st.caption(HIGH_POPULATION_SMOKE_FIXTURE_NOTE)
     has_gap_rows = "forecast_available" in future.columns and (~future["forecast_available"].fillna(False).astype(bool)).any()
     has_numeric_forecasts = pd.to_numeric(future_combined.get("forecast"), errors="coerce").notna().any()
     if not has_numeric_forecasts:
@@ -3236,6 +3242,7 @@ def _forecast_builder_table(frame: pd.DataFrame) -> pd.DataFrame:
         "model",
         "target_period",
         "horizon",
+        "horizon_support_label",
         "forecast",
         "forecast_available",
         "availability_status",
@@ -3252,6 +3259,7 @@ def _forecast_builder_table(frame: pd.DataFrame) -> pd.DataFrame:
             "model": "Model",
             "target_period": "Quarter",
             "horizon": "Horizon",
+            "horizon_support_label": "Horizon scope",
             "forecast": "Forecast",
             "forecast_available": "Forecast available",
             "availability_status": "Availability",
@@ -3401,6 +3409,8 @@ def forecast_builder_figure(chart_rows: pd.DataFrame, future_rows: pd.DataFrame 
             legend_key = f"forecast_{scenario_text}"
             showlegend = legend_key not in shown_legend
             shown_legend.add(legend_key)
+            hover_horizon = group.get("horizon", pd.Series("", index=group.index)).map(_forecast_builder_hover_horizon)
+            hover_scope = group.get("horizon_support_label", pd.Series("", index=group.index)).fillna("").astype(str)
             fig.add_trace(
                 go.Scatter(
                     x=group["period"],
@@ -3411,9 +3421,11 @@ def forecast_builder_figure(chart_rows: pd.DataFrame, future_rows: pd.DataFrame 
                     showlegend=showlegend,
                     line=dict(color=style["color"], dash=style["dash"], width=2.4),
                     marker=dict(size=6),
+                    customdata=pd.DataFrame({"horizon": hover_horizon, "scope": hover_scope}),
                     hovertemplate=(
                         f"Scenario: {html.escape(scenario_text)}<br>"
-                        "Quarter: %{x}<br>Forecast: %{y:,.2f}<extra></extra>"
+                        "Quarter: %{x}<br>Horizon: %{customdata[0]}<br>"
+                        "Scope: %{customdata[1]}<br>Forecast: %{y:,.2f}<extra></extra>"
                     ),
                 ),
                 row=row_index,
@@ -3456,6 +3468,32 @@ def forecast_builder_figure(chart_rows: pd.DataFrame, future_rows: pd.DataFrame 
                 row=row_index,
                 col=1,
             )
+        h13_start = _forecast_builder_long_range_start_period(future)
+        if h13_start:
+            fig.add_vline(
+                x=h13_start,
+                line_color="#B45309",
+                line_dash="dash",
+                line_width=1.3,
+                row=row_index,
+                col=1,
+            )
+            y_anchor = _forecast_builder_annotation_y(historical, future)
+            fig.add_annotation(
+                x=h13_start,
+                y=y_anchor,
+                text=f"H{BACKTEST_SUPPORTED_MAX_HORIZON + 1} long-range starts",
+                showarrow=True,
+                arrowhead=2,
+                ax=18,
+                ay=20,
+                font=dict(size=10, color="#92400E"),
+                bgcolor="rgba(255,251,235,0.90)",
+                bordercolor="#FBBF24",
+                borderwidth=1,
+                row=row_index,
+                col=1,
+            )
         if future.empty and _stream_has_governed_gap(future_rows, stream_label):
             y_anchor = _forecast_builder_annotation_y(historical, future)
             x_anchor = historical["period"].iloc[-1] if not historical.empty else forecast_start
@@ -3481,6 +3519,26 @@ def forecast_builder_figure(chart_rows: pd.DataFrame, future_rows: pd.DataFrame 
         hovermode="x unified" if rows == 1 else "closest",
     )
     return fig
+
+
+def _forecast_builder_hover_horizon(value: Any) -> str:
+    try:
+        return f"H{int(float(value))}"
+    except Exception:
+        return ""
+
+
+def _forecast_builder_long_range_start_period(future_rows: pd.DataFrame) -> str | None:
+    if future_rows is None or future_rows.empty or "horizon" not in future_rows.columns:
+        return None
+    future = future_rows.copy()
+    future["horizon_numeric"] = pd.to_numeric(future["horizon"], errors="coerce")
+    future = future[future["horizon_numeric"].gt(BACKTEST_SUPPORTED_MAX_HORIZON)].copy()
+    if future.empty:
+        return None
+    future["period_key"] = future["period"].astype(str).map(_forecast_builder_period_key)
+    future = future.sort_values("period_key", kind="stable")
+    return str(future.iloc[0]["period"])
 
 
 def _forecast_builder_start_period(chart_rows: pd.DataFrame) -> str | None:

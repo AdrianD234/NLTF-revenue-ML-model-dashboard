@@ -25,6 +25,7 @@ from .forward_scorer_governance import (
     existing_basis,
     missing_paths,
 )
+from .governance_constants import current_finalist
 from .heavy_ruc_forward import evaluate_heavy_ruc_forward_scorer
 from .ped_forward import evaluate_ped_forward_scorer
 
@@ -41,6 +42,15 @@ FORECAST_BUILDER_NOTE = (
     "variable-horizon assumption workbook. It writes separate forecast-run artifacts and does not alter governance "
     "evidence, KPIs, MAPE/R2, chart sources, finalists, scenarios, stress tests or diagnostics."
 )
+BACKTEST_SUPPORTED_MAX_HORIZON = 12
+HORIZON_SUPPORT_NOTE = (
+    "H1-H12 are the validated backtest-supported horizon; H13-H100 are long-range extrapolation, "
+    "not validated 2050 accuracy."
+)
+HIGH_POPULATION_SMOKE_FIXTURE_NOTE = (
+    "The high_population workbook is a technical smoke-test fixture: every user input is 2% above base, "
+    "including unemployment, prices and starting target lags. It is not a decision-grade population-only scenario."
+)
 
 STREAM_ORDER = ["PED", "LIGHT_RUC", "HEAVY_RUC"]
 STREAM_LABELS = {
@@ -53,11 +63,23 @@ SHEET_BY_STREAM = {
     "LIGHT_RUC": "Light RUC Inputs",
     "HEAVY_RUC": "Heavy RUC Inputs",
 }
-FINALIST_BY_STREAM = {
-    "PED": "PED__RESCUE_static_annual_weighted_top12_capnone",
-    "LIGHT_RUC": "dynamic_RESID_GBR_n150_d1_lr0.05_w36",
-    "HEAVY_RUC": "HEAVY_RUC__RECON_STATIC_REBUILT",
-}
+
+def governed_finalist(stream: str) -> str:
+    return current_finalist(str(stream))
+
+
+class _GovernedFinalistMap(dict[str, str]):
+    def __getitem__(self, stream: str) -> str:
+        return governed_finalist(stream)
+
+    def get(self, stream: str, default: Any = None) -> Any:
+        try:
+            return governed_finalist(stream)
+        except Exception:
+            return default
+
+
+FINALIST_BY_STREAM = _GovernedFinalistMap()
 MISSING_CAPABILITY_BY_STREAM = {
     "PED": "ped_inner_hpo_static_solver_forward_scorer_missing",
     "LIGHT_RUC": "light_ruc_fixed_finalist_forward_scorer_missing",
@@ -284,6 +306,7 @@ class ForecastScenarioComparisonResult:
     future_forecasts: pd.DataFrame
     capability_report: pd.DataFrame
     forecast_chart_rows: pd.DataFrame
+    scenario_input_delta_audit: pd.DataFrame
 
 
 def repo_root_from_here() -> Path:
@@ -338,6 +361,42 @@ def future_quarters_after(period: str, horizon: int = FORECAST_HORIZON_QUARTERS)
     if horizon < MIN_FORECAST_HORIZON_QUARTERS:
         raise ValueError(f"Forecast horizon must be at least {MIN_FORECAST_HORIZON_QUARTERS} quarter.")
     return [add_quarters(period, offset) for offset in range(1, horizon + 1)]
+
+
+def horizon_support_status(horizon: Any) -> str:
+    try:
+        value = int(float(horizon))
+    except Exception:
+        return "unknown_horizon_scope"
+    if 1 <= value <= BACKTEST_SUPPORTED_MAX_HORIZON:
+        return "backtest_supported_h1_12"
+    return "long_range_extrapolation_h13_plus"
+
+
+def horizon_support_label(horizon: Any) -> str:
+    status = horizon_support_status(horizon)
+    if status == "backtest_supported_h1_12":
+        return "H1-H12 backtest-supported horizon"
+    if status == "long_range_extrapolation_h13_plus":
+        return "H13-H100 long-range extrapolation"
+    return "Unknown horizon scope"
+
+
+def horizon_support_note(horizon: Any) -> str:
+    return HORIZON_SUPPORT_NOTE
+
+
+def _add_horizon_support_columns(frame: pd.DataFrame) -> pd.DataFrame:
+    if frame is None:
+        return pd.DataFrame()
+    if frame.empty or "horizon" not in frame.columns:
+        return frame
+    out = frame.copy()
+    out["horizon_support_status"] = out["horizon"].map(horizon_support_status)
+    out["horizon_support_label"] = out["horizon"].map(horizon_support_label)
+    out["horizon_support_note"] = out["horizon"].map(horizon_support_note)
+    out["backtest_supported_max_horizon"] = BACKTEST_SUPPORTED_MAX_HORIZON
+    return out
 
 
 def forecast_periods_after(
@@ -664,6 +723,9 @@ def run_forecast_workbook(
         "latest_actual_period": validation.latest_actual_period,
         "forecast_periods": validation.forecast_periods,
         "forecast_horizon_quarters": validation.forecast_horizon_quarters,
+        "backtest_supported_max_horizon": BACKTEST_SUPPORTED_MAX_HORIZON,
+        "long_range_extrapolation_start_horizon": BACKTEST_SUPPORTED_MAX_HORIZON + 1,
+        "horizon_support_note": HORIZON_SUPPORT_NOTE,
         "forecast_start_period": validation.forecast_start_period,
         "forecast_end_period": validation.forecast_end_period,
         "validation_status": "passed" if validation.valid else "failed",
@@ -866,6 +928,11 @@ def _future_forecast_chart_rows(future_forecasts: pd.DataFrame) -> pd.DataFrame:
                 "stream_label": row.get("stream_label"),
                 "period": period,
                 "target_period": period,
+                "horizon": row.get("horizon"),
+                "horizon_support_status": row.get("horizon_support_status"),
+                "horizon_support_label": row.get("horizon_support_label"),
+                "horizon_support_note": row.get("horizon_support_note"),
+                "backtest_supported_max_horizon": row.get("backtest_supported_max_horizon"),
                 "value": float(value) if pd.notna(value) else pd.NA,
                 "availability_status": row.get("availability_status"),
                 "forecast_available": row.get("forecast_available"),
@@ -901,6 +968,95 @@ def _combine_forecast_chart_rows(scenario_results: list[ForecastRunResult]) -> p
     return combined.reset_index(drop=True)
 
 
+def _scenario_input_delta_audit(scenario_results: list[ForecastRunResult]) -> pd.DataFrame:
+    columns = [
+        "base_scenario",
+        "comparison_scenario",
+        "stream",
+        "stream_label",
+        "target_period",
+        "input_column",
+        "base_value",
+        "comparison_value",
+        "pct_delta",
+        "expected_pct_delta",
+        "matches_expected_delta",
+        "decision_grade_status",
+        "assumption_scope_note",
+    ]
+    if not scenario_results:
+        return pd.DataFrame(columns=columns)
+    frames = [
+        result.assumptions
+        for result in scenario_results
+        if isinstance(getattr(result, "assumptions", None), pd.DataFrame) and not result.assumptions.empty
+    ]
+    if not frames:
+        return pd.DataFrame(columns=columns)
+    assumptions = pd.concat(frames, ignore_index=True, sort=False)
+    if "scenario_name" not in assumptions.columns:
+        return pd.DataFrame(columns=columns)
+    scenarios = assumptions["scenario_name"].dropna().astype(str).unique().tolist()
+    if not scenarios:
+        return pd.DataFrame(columns=columns)
+    base_scenario = "basecase" if "basecase" in scenarios else scenarios[0]
+    base = assumptions[assumptions["scenario_name"].astype(str).eq(base_scenario)].copy()
+    rows: list[dict[str, Any]] = []
+    for comparison_scenario in [scenario for scenario in scenarios if scenario != base_scenario]:
+        comparison = assumptions[assumptions["scenario_name"].astype(str).eq(comparison_scenario)].copy()
+        decision_status = (
+            "not_decision_grade_smoke_fixture"
+            if comparison_scenario == "high_population"
+            else "scenario_delta_audit_only"
+        )
+        expected_delta: float | None = 0.02 if comparison_scenario == "high_population" else None
+        note = HIGH_POPULATION_SMOKE_FIXTURE_NOTE if comparison_scenario == "high_population" else ""
+        for stream in STREAM_ORDER:
+            user_columns = [column.name for column in STREAM_COLUMNS[stream] if column.role == "user" and column.required]
+            stream_base = base[base["stream"].astype(str).eq(stream)].copy()
+            stream_comparison = comparison[comparison["stream"].astype(str).eq(stream)].copy()
+            if stream_base.empty or stream_comparison.empty:
+                continue
+            join_keys = ["stream", "period"]
+            merged = stream_base[join_keys + user_columns].merge(
+                stream_comparison[join_keys + user_columns],
+                on=join_keys,
+                how="inner",
+                suffixes=("_base", "_comparison"),
+            )
+            for _, record in merged.iterrows():
+                for input_column in user_columns:
+                    base_value = pd.to_numeric(record.get(f"{input_column}_base"), errors="coerce")
+                    comparison_value = pd.to_numeric(record.get(f"{input_column}_comparison"), errors="coerce")
+                    pct_delta = (
+                        float(comparison_value) / float(base_value) - 1.0
+                        if pd.notna(base_value) and pd.notna(comparison_value) and float(base_value) != 0.0
+                        else np.nan
+                    )
+                    rows.append(
+                        {
+                            "base_scenario": base_scenario,
+                            "comparison_scenario": comparison_scenario,
+                            "stream": stream,
+                            "stream_label": STREAM_LABELS[stream],
+                            "target_period": str(record.get("period")),
+                            "input_column": input_column,
+                            "base_value": float(base_value) if pd.notna(base_value) else pd.NA,
+                            "comparison_value": float(comparison_value) if pd.notna(comparison_value) else pd.NA,
+                            "pct_delta": pct_delta,
+                            "expected_pct_delta": expected_delta,
+                            "matches_expected_delta": (
+                                bool(np.isfinite(pct_delta) and abs(pct_delta - expected_delta) <= 1e-9)
+                                if expected_delta is not None
+                                else pd.NA
+                            ),
+                            "decision_grade_status": decision_status,
+                            "assumption_scope_note": note,
+                        }
+                    )
+    return pd.DataFrame(rows, columns=columns)
+
+
 def write_forecast_scenario_comparison(
     scenario_results: list[ForecastRunResult],
     output_dir: Path | str | None = None,
@@ -923,11 +1079,16 @@ def write_forecast_scenario_comparison(
         else pd.DataFrame()
     )
     chart_rows = _combine_forecast_chart_rows(scenario_results)
+    scenario_input_delta_audit = _scenario_input_delta_audit(scenario_results)
     manifest = {
         "comparison_id": comparison_id,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "forecast_runner_version": FORECAST_RUNNER_VERSION,
         "scenario_count": len(scenario_results),
+        "backtest_supported_max_horizon": BACKTEST_SUPPORTED_MAX_HORIZON,
+        "long_range_extrapolation_start_horizon": BACKTEST_SUPPORTED_MAX_HORIZON + 1,
+        "horizon_support_note": HORIZON_SUPPORT_NOTE,
+        "high_population_fixture_note": HIGH_POPULATION_SMOKE_FIXTURE_NOTE,
         "scenarios": [
             {
                 "scenario_name": result.manifest.get("scenario_name"),
@@ -953,6 +1114,8 @@ def write_forecast_scenario_comparison(
             "forecast_scenario_capability_report.csv",
             "forecast_scenario_chart_rows.parquet",
             "forecast_scenario_chart_rows.csv",
+            "scenario_input_delta_audit.parquet",
+            "scenario_input_delta_audit.csv",
             "forecast_scenario_comparison_manifest.json",
         ],
     }
@@ -962,6 +1125,8 @@ def write_forecast_scenario_comparison(
     capability.to_csv(comparison_dir / "forecast_scenario_capability_report.csv", index=False)
     chart_rows.to_parquet(comparison_dir / "forecast_scenario_chart_rows.parquet", index=False)
     chart_rows.to_csv(comparison_dir / "forecast_scenario_chart_rows.csv", index=False)
+    scenario_input_delta_audit.to_parquet(comparison_dir / "scenario_input_delta_audit.parquet", index=False)
+    scenario_input_delta_audit.to_csv(comparison_dir / "scenario_input_delta_audit.csv", index=False)
     (comparison_dir / "forecast_scenario_comparison_manifest.json").write_text(
         json.dumps(manifest, indent=2, allow_nan=False),
         encoding="utf-8",
@@ -973,6 +1138,7 @@ def write_forecast_scenario_comparison(
         future_forecasts=future,
         capability_report=capability,
         forecast_chart_rows=chart_rows,
+        scenario_input_delta_audit=scenario_input_delta_audit,
     )
 
 
@@ -1038,10 +1204,11 @@ def _stream_forward_capability(root: Path, stream: str) -> dict[str, Any]:
         hashes = artifact_hashes(root, required)
         sklearn_error = _sklearn_import_error()
         if not missing and sklearn_error is None:
+            finalist = governed_finalist(stream)
             return ForwardScorerAudit(
                 stream=stream,
                 stream_label=STREAM_LABELS[stream],
-                model=FINALIST_BY_STREAM[stream],
+                model=finalist,
                 capability_status=NUMERIC_FORECAST_AVAILABLE,
                 gap_code=None,
                 gap_reason="",
@@ -1051,7 +1218,7 @@ def _stream_forward_capability(root: Path, stream: str) -> dict[str, Any]:
                 max_parity_delta=None,
                 stored_replay_max_delta=None,
                 source_artifact_hashes=hashes,
-                required_components=("base_schiff_ols", "residual_gbr", FINALIST_BY_STREAM[stream]),
+                required_components=("base_schiff_ols", "residual_gbr", finalist),
                 forecast_capability_available=True,
             ).to_capability_record()
         reason_parts: list[str] = []
@@ -1059,10 +1226,11 @@ def _stream_forward_capability(root: Path, stream: str) -> dict[str, Any]:
             reason_parts.append("missing repo-local artifacts: " + ", ".join(missing))
         if sklearn_error is not None:
             reason_parts.append(f"scikit-learn runtime unavailable: {sklearn_error}")
+        finalist = governed_finalist(stream)
         return ForwardScorerAudit(
             stream=stream,
             stream_label=STREAM_LABELS[stream],
-            model=FINALIST_BY_STREAM[stream],
+            model=finalist,
             capability_status=GOVERNED_GAP,
             gap_code=MISSING_CAPABILITY_BY_STREAM[stream],
             gap_reason=MISSING_CAPABILITY_NOTES[stream] + " " + "; ".join(reason_parts),
@@ -1071,13 +1239,13 @@ def _stream_forward_capability(root: Path, stream: str) -> dict[str, Any]:
             parity_status="not_run_missing_runtime_or_artifacts",
             source_artifact_hashes=hashes,
             missing_artifacts=tuple(missing),
-            required_components=("base_schiff_ols", "residual_gbr", FINALIST_BY_STREAM[stream]),
+            required_components=("base_schiff_ols", "residual_gbr", finalist),
             forecast_capability_available=False,
         ).to_capability_record()
     return ForwardScorerAudit(
         stream=stream,
         stream_label=STREAM_LABELS[stream],
-        model=FINALIST_BY_STREAM[stream],
+        model=governed_finalist(stream),
         capability_status=GOVERNED_GAP,
         gap_code=MISSING_CAPABILITY_BY_STREAM[stream],
         gap_reason=MISSING_CAPABILITY_NOTES[stream],
@@ -1132,7 +1300,12 @@ def _workbook_bytes(workbook: Path | str | bytes | BinaryIO) -> bytes:
             workbook.seek(0)
         return content
     path = Path(workbook)
-    return path.read_bytes() if path.exists() else b""
+    if not path.exists():
+        return b""
+    try:
+        return path.read_bytes()
+    except OSError:
+        return b""
 
 
 def _workbook_name(workbook: Path | str | bytes | BinaryIO) -> str:
@@ -1227,7 +1400,7 @@ def _build_stream_assumptions(frame: pd.DataFrame, stream: str, periods: list[st
     out = out.head(len(periods)).copy()
     out["stream"] = stream
     out["stream_label"] = STREAM_LABELS[stream]
-    out["model"] = FINALIST_BY_STREAM[stream]
+    out["model"] = governed_finalist(stream)
     out["period"] = periods[: len(out)]
     out["year"] = out["period"].map(lambda value: parse_period(value)[0])
     out["quarter"] = out["period"].map(lambda value: parse_period(value)[1])
@@ -1331,6 +1504,8 @@ def _forecast_output_rows(
     components = pd.concat(component_rows, ignore_index=True, sort=False) if component_rows else pd.DataFrame()
     future = _attach_capability_metadata(future, capabilities)
     components = _attach_capability_metadata(components, capabilities)
+    future = _add_horizon_support_columns(future)
+    components = _add_horizon_support_columns(components)
     return future, components
 
 
@@ -1351,7 +1526,7 @@ def _gap_future_forecast_rows(
                 **metadata,
                 "stream": stream,
                 "stream_label": STREAM_LABELS[stream],
-                "model": FINALIST_BY_STREAM[stream],
+                "model": governed_finalist(stream),
                 "target_period": period,
                 "horizon": horizon,
                 "forecast": pd.NA,
@@ -1388,7 +1563,7 @@ def _gap_component_forecast_rows(
                     **metadata,
                     "stream": stream,
                     "stream_label": STREAM_LABELS[stream],
-                    "model": FINALIST_BY_STREAM[stream],
+                    "model": governed_finalist(stream),
                     "component_model": component.get("component_model"),
                     "component_role": component.get("component_role"),
                     "component_weight": component.get("component_weight"),
@@ -1483,7 +1658,7 @@ def _light_ruc_forward_forecast(validation: ForecastValidationResult, repo_root:
         common = {
             "stream": "LIGHT_RUC",
             "stream_label": STREAM_LABELS["LIGHT_RUC"],
-            "model": FINALIST_BY_STREAM["LIGHT_RUC"],
+            "model": governed_finalist("LIGHT_RUC"),
             "target_period": period,
             "horizon": horizon,
             "availability_status": "numeric_forecast_available",
@@ -1533,7 +1708,7 @@ def _light_ruc_forward_forecast(validation: ForecastValidationResult, repo_root:
                 },
                 {
                     **common,
-                    "component_model": FINALIST_BY_STREAM["LIGHT_RUC"],
+                    "component_model": governed_finalist("LIGHT_RUC"),
                     "component_role": "final level prediction",
                     "component_weight": 1.0,
                     "component_forecast": final_prediction,
@@ -1776,6 +1951,7 @@ def _forecast_validation_report(validation: ForecastValidationResult, capabiliti
         f"- Runner version: `{FORECAST_RUNNER_VERSION}`",
         f"- Latest known actual quarter: `{validation.latest_actual_period}`",
         f"- Forecast horizon: `{validation.forecast_periods[0]}` to `{validation.forecast_periods[-1]}`",
+        f"- Horizon support: {HORIZON_SUPPORT_NOTE}",
         f"- Input validation: `{'passed' if validation.valid else 'failed'}`",
         "- Broad candidate search run: `false`",
         "- Existing dashboard evidence/KPI/chart-source files modified: `false`",

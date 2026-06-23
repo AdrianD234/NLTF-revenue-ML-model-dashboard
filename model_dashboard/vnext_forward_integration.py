@@ -47,10 +47,12 @@ def evaluate_vnext_forward_scorer(root: Path, stream: str) -> ForwardScorerAudit
         from pipeline.vnext_forward import VNEXT_SCORER_VERSION, load_scorer
     except Exception:
         return None
+    scorer_error = ""
     try:
         scorer = load_scorer(stream)
-    except Exception:
+    except Exception as exc:
         scorer = None
+        scorer_error = f"{type(exc).__name__}: {exc}"
     sdir = _state_dir(root, stream)
     manifest = json.loads((sdir / "fitted_model_manifest.json").read_text(encoding="utf-8"))
     parity = json.loads((sdir / "forward_scorer_parity_audit.json").read_text(encoding="utf-8"))
@@ -80,14 +82,19 @@ def evaluate_vnext_forward_scorer(root: Path, stream: str) -> ForwardScorerAudit
             required_components=tuple(m["component_model"] for m in manifest["members"]),
             forecast_capability_available=True,
         )
+    gap_reason = (
+        "vNext fitted state is present but the parity or runtime state gate failed; "
+        "numeric forecasts are withheld. Rerun 'python -m pipeline.vnext_run finalize'."
+    )
+    if scorer_error:
+        gap_reason += f" Load gate error: {scorer_error}"
     return ForwardScorerAudit(
         stream=stream,
         stream_label=_STREAM_LABELS[stream],
         model=manifest["finalist_model"],
         capability_status=PARITY_FAILED,
         gap_code=f"{stream.lower()}_vnext_parity_failed",
-        gap_reason=("vNext fitted state is present but the parity or runtime state gate failed; "
-                    "numeric forecasts are withheld. Rerun 'python -m pipeline.vnext_run finalize'."),
+        gap_reason=gap_reason,
         repo_artifact_basis=basis,
         scorer_version=VNEXT_SCORER_VERSION,
         parity_status=str(parity.get("parity_status")),

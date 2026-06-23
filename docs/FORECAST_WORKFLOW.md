@@ -27,6 +27,8 @@ Other horizons:
 
 Generated filenames include the requested horizon, for example `NLTF_forecast_input_template_1q.xlsx` or `NLTF_forecast_input_template_to_2050Q4.xlsx`.
 
+The historical backtest support window remains H1-H12. Longer templates, including a 2050Q4 template, are allowed for technical projection, but H13 onward is labelled as long-range extrapolation and must not be described as validated 2050 accuracy.
+
 ## Fill The Workbook
 
 Open the workbook and fill only the user-entry columns on:
@@ -103,25 +105,27 @@ with:
 - `forecast_scenario_capability_report.csv`
 - `forecast_scenario_chart_rows.parquet`
 - `forecast_scenario_chart_rows.csv`
+- `scenario_input_delta_audit.parquet`
+- `scenario_input_delta_audit.csv`
 - `forecast_scenario_comparison_manifest.json`
 
 The comparison pack is generated for user review only. It does not alter evidence packs or chart-source calculations.
 
-## Governed Gaps
+If a workbook named `high_population` is used as the smoke fixture, the comparison pack writes `scenario_input_delta_audit.csv` showing that every required user input is 2% above base, including unemployment, prices and starting target lags. That fixture is not decision-grade and not population-only.
 
-The current repo contains replay predictions, training-fit rows, component traces and governance metrics. It does not contain all executable finalist scorers needed to score new assumption rows for every stream.
+## Forward Scorer Governance
 
 Current forward status:
 
-- PED: governed gap with `capability_status=parity_failed`, `ped_inner_hpo_static_solver_forward_scorer_missing`, because the repo-vendored inner HPO replay delta is above tolerance and the feature-level refit gap remains open;
-- Light RUC: numeric fixed-finalist forecast available from repo-local model-input history and the OLS-base plus GBM-residual recipe;
-- Heavy RUC: governed gap with `capability_status=insufficient_artifacts`, `heavy_ruc_component_forward_scorers_missing`, because stored C1-C4 weighted replay is proven but fitted component scorers or serialized estimators are unavailable.
+- PED: numeric fixed-finalist forecast available from the parity-gated `PED__VNEXT_SOLVED_CONVEX_TOP2` saved production states when manifest SHA256 checks, parity audit and runtime state replay pass;
+- Light RUC: numeric fixed-finalist forecast available from repo-local model-input history and the fixed OLS-base plus GBM-residual recipe;
+- Heavy RUC: numeric fixed-finalist forecast available from the parity-gated `HEAVY_RUC__VNEXT_SOLVED_CONVEX_TOP4` saved production states when manifest SHA256 checks, parity audit and runtime state replay pass.
 
-Every forecast run and scenario comparison carries scorer governance fields including `scorer_version`, `source_artifact_hashes`, `parity_status`, `max_parity_delta` and `stored_replay_max_delta`.
+Every forecast run and scenario comparison carries scorer governance fields including `scorer_version`, `source_artifact_hashes`, `parity_status`, `max_parity_delta`, `stored_replay_max_delta`, `horizon_support_status` and `horizon_support_note`.
 
-Governed gaps are expected governance output, not zero forecasts and not hidden failures.
+If a required artifact, manifest hash check, parity audit or runtime state gate fails, the runner writes governed gaps instead of numbers. Governed gaps are expected governance output, not zero forecasts and not hidden failures.
 
-The Forecast Builder chart plots only numeric forecast lines. Governed-gap streams remain visible in the table and capability report, and selected PED/Heavy views show historical actuals plus a governed-gap annotation. This is not a model failure; the repo-local forward scorer is not yet verified.
+The Forecast Builder chart plots numeric forecast lines, keeps governed-gap streams visible in the table and capability report if any gate fails, shows the forecast-start marker, and marks the H13 long-range-extrapolation boundary.
 
 ## Safety Checks
 

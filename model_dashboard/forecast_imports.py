@@ -14,11 +14,23 @@ FORECAST_BUILDER_NOTE = (
     "variable-horizon assumption workbook. It writes separate forecast-run artifacts and does not alter governance "
     "evidence, KPIs, MAPE/R2, chart sources, finalists, scenarios, stress tests or diagnostics."
 )
+BACKTEST_SUPPORTED_MAX_HORIZON = 12
+HORIZON_SUPPORT_NOTE = (
+    "H1-H12 are the validated backtest-supported horizon; H13-H100 are long-range extrapolation, "
+    "not validated 2050 accuracy."
+)
+HIGH_POPULATION_SMOKE_FIXTURE_NOTE = (
+    "The high_population workbook is a technical smoke-test fixture: every user input is 2% above base, "
+    "including unemployment, prices and starting target lags. It is not a decision-grade population-only scenario."
+)
 TEMPLATE_FILENAME = "NLTF_forecast_input_template_20q.xlsx"
 
 _FORECAST_SYMBOLS = {
     "FORECAST_BUILDER_NOTE",
     "FORECAST_BUILDER_TITLE",
+    "BACKTEST_SUPPORTED_MAX_HORIZON",
+    "HIGH_POPULATION_SMOKE_FIXTURE_NOTE",
+    "HORIZON_SUPPORT_NOTE",
     "TEMPLATE_FILENAME",
     "build_forecast_input_template_bytes",
     "forecast_pack_zip_bytes",

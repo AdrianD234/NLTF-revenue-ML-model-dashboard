@@ -5,11 +5,15 @@ from pathlib import Path
 import subprocess
 import sys
 
+import numpy as np
 import pandas as pd
 from openpyxl import load_workbook
 
 from model_dashboard.forecast_runner import (
+    BACKTEST_SUPPORTED_MAX_HORIZON,
     DEFAULT_FORECAST_HORIZON_QUARTERS,
+    HIGH_POPULATION_SMOKE_FIXTURE_NOTE,
+    HORIZON_SUPPORT_NOTE,
     SHEET_BY_STREAM,
     STREAM_COLUMNS,
     STREAM_ORDER,
@@ -29,6 +33,9 @@ from model_dashboard.forecast_runner import (
 
 ROOT = Path(__file__).resolve().parents[1]
 C4 = "HEAVY_RUC__dynamic_no_leads__GBR_learning_rate0_08_max_depth1_n_estimators150__ylag__w40"
+CURRENT_PED_FINALIST = "PED__VNEXT_SOLVED_CONVEX_TOP2"
+CURRENT_HEAVY_FINALIST = "HEAVY_RUC__VNEXT_SOLVED_CONVEX_TOP4"
+CURRENT_LIGHT_FINALIST = "dynamic_RESID_GBR_n150_d1_lr0.05_w36"
 
 
 def _expected_periods(horizon: int) -> list[str]:
@@ -58,6 +65,41 @@ def _assert_template_contract(path: Path, horizon: int) -> None:
             assert isinstance(value, str) and value.startswith("="), header
             last_value = ws.cell(row=horizon + 1, column=headers.index(header) + 1).value
             assert isinstance(last_value, str) and last_value.startswith("="), header
+
+
+def _sorted_forecast_values(frame: pd.DataFrame) -> pd.DataFrame:
+    columns = ["stream", "model", "target_period", "horizon", "forecast", "forecast_available"]
+    out = frame[columns].copy()
+    out["forecast"] = pd.to_numeric(out["forecast"], errors="coerce")
+    return out.sort_values(["stream", "target_period"], kind="stable").reset_index(drop=True)
+
+
+def _set_required_user_values(path: Path, stream: str, excel_row: int, value: float) -> None:
+    wb = load_workbook(path)
+    ws = wb[SHEET_BY_STREAM[stream]]
+    headers = {cell.value: cell.column for cell in ws[1] if cell.value}
+    ws.protection.sheet = False
+    for column in STREAM_COLUMNS[stream]:
+        if column.role == "user" and column.required:
+            ws.cell(row=excel_row, column=headers[column.name]).value = value
+    ws.protection.sheet = True
+    wb.save(path)
+
+
+def _multiply_target_lag_columns(path: Path, streams: tuple[str, ...], multiplier: float) -> None:
+    wb = load_workbook(path)
+    for stream in streams:
+        ws = wb[SHEET_BY_STREAM[stream]]
+        headers = {cell.value: cell.column for cell in ws[1] if cell.value}
+        ws.protection.sheet = False
+        for column_name in ("target_lag_1", "target_lag_4"):
+            col = headers[column_name]
+            for row in range(2, ws.max_row + 1):
+                value = ws.cell(row=row, column=col).value
+                if value is not None:
+                    ws.cell(row=row, column=col).value = float(value) * multiplier
+        ws.protection.sheet = True
+    wb.save(path)
 
 
 def test_forecast_template_workbook_contract_for_variable_horizons(tmp_path: Path) -> None:
@@ -375,6 +417,15 @@ def test_validation_accepts_variable_horizons_and_rejects_gaps_or_unequal_period
     assert any("same continuous forecast periods across all streams" in message for message in unequal_validation.errors)
 
 
+def test_validation_rejects_nonpositive_required_inputs(tmp_path: Path) -> None:
+    workbook = create_completed_sample_workbook(tmp_path / "nonpositive.xlsx", repo_root=ROOT, quarters=2)
+    for stream in STREAM_ORDER:
+        _set_required_user_values(workbook, stream, excel_row=2, value=0.0)
+    validation = validate_forecast_workbook(workbook, repo_root=ROOT, expected_quarters=2)
+    assert not validation.valid
+    assert any("partial or non-positive required user entries" in message for message in validation.errors)
+
+
 def test_filename_suffix_creates_expected_scenario_name() -> None:
     assert scenario_name_from_filename("NLTF_forecast_input_template_basecase.xlsx") == "basecase"
     assert scenario_name_from_filename("NLTF_forecast_input_template_high_fuel.xlsx") == "high_fuel"
@@ -463,9 +514,15 @@ def test_scenario_comparison_artifacts(tmp_path: Path) -> None:
         "forecast_scenario_capability_report.csv",
         "forecast_scenario_chart_rows.parquet",
         "forecast_scenario_chart_rows.csv",
+        "scenario_input_delta_audit.parquet",
+        "scenario_input_delta_audit.csv",
         "forecast_scenario_comparison_manifest.json",
     ]:
         assert (comparison.output_dir / name).exists(), name
+    assert comparison.manifest["horizon_support_note"] == HORIZON_SUPPORT_NOTE
+    assert comparison.manifest["high_population_fixture_note"] == HIGH_POPULATION_SMOKE_FIXTURE_NOTE
+    assert not comparison.scenario_input_delta_audit.empty
+    assert comparison.scenario_input_delta_audit["decision_grade_status"].eq("not_decision_grade_smoke_fixture").all()
 
 
 def test_forecast_runner_does_not_touch_evidence_pack(tmp_path: Path) -> None:
@@ -556,3 +613,165 @@ def test_completed_workbook_numeric_all_streams_with_vnext(tmp_path) -> None:
     assert capability.loc["HEAVY_RUC", "capability_status"] == "numeric_forecast_available"
     assert str(capability.loc["PED", "model"]).startswith("PED__VNEXT")
     assert str(capability.loc["HEAVY_RUC", "model"]).startswith("HEAVY_RUC__VNEXT")
+
+
+def test_100q_forecast_builder_current_finalists_all_streams_numeric_and_deterministic(tmp_path: Path) -> None:
+    capabilities = model_capability_gap_register(ROOT).set_index("stream")
+    assert capabilities["forecast_capability_available"].astype(bool).all()
+    assert capabilities.loc["PED", "parity_status"] == "passed"
+    assert capabilities.loc["HEAVY_RUC", "parity_status"] == "passed"
+    assert float(capabilities.loc["PED", "stored_replay_max_delta"]) <= 1e-6
+    assert float(capabilities.loc["HEAVY_RUC", "stored_replay_max_delta"]) <= 1e-6
+
+    workbooks = {
+        "basecase": create_completed_sample_workbook(
+            tmp_path / "NLTF_forecast_input_template_basecase.xlsx",
+            repo_root=ROOT,
+            end_period="2050Q4",
+        ),
+        "high_population": create_completed_sample_workbook(
+            tmp_path / "NLTF_forecast_input_template_high_population.xlsx",
+            repo_root=ROOT,
+            end_period="2050Q4",
+            value_multiplier=1.02,
+        ),
+    }
+    first_results = []
+    for scenario, workbook in workbooks.items():
+        first = run_forecast_workbook(
+            workbook,
+            output_dir=tmp_path / f"{scenario}_run_1",
+            repo_root=ROOT,
+            run_timestamp="determinism-1",
+            scenario_name=scenario,
+            expected_end_period="2050Q4",
+        )
+        second = run_forecast_workbook(
+            workbook,
+            output_dir=tmp_path / f"{scenario}_run_2",
+            repo_root=ROOT,
+            run_timestamp="determinism-2",
+            scenario_name=scenario,
+            expected_end_period="2050Q4",
+        )
+        first_results.append(first)
+        pd.testing.assert_frame_equal(
+            _sorted_forecast_values(first.future_forecasts),
+            _sorted_forecast_values(second.future_forecasts),
+            check_exact=True,
+        )
+        assert first.manifest["validation_status"] == "passed"
+        assert first.manifest["forecast_status"] == "numeric_forecast_available"
+        assert first.manifest["forecast_horizon_quarters"] == 100
+        assert first.manifest["forecast_start_period"] == "2026Q1"
+        assert first.manifest["forecast_end_period"] == "2050Q4"
+        assert first.manifest["numeric_forecast_streams"] == sorted(STREAM_ORDER)
+        assert first.manifest["governed_gap_streams"] == []
+        assert first.manifest["fixed_finalists_only"] is True
+        assert first.manifest["broad_search_run"] is False
+        assert first.manifest["horizon_support_note"] == HORIZON_SUPPORT_NOTE
+        assert len(first.future_forecasts) == 300
+        model_by_stream = first.future_forecasts.drop_duplicates("stream").set_index("stream")["model"].to_dict()
+        assert model_by_stream == {
+            "PED": CURRENT_PED_FINALIST,
+            "LIGHT_RUC": CURRENT_LIGHT_FINALIST,
+            "HEAVY_RUC": CURRENT_HEAVY_FINALIST,
+        }
+        for stream in STREAM_ORDER:
+            rows = first.future_forecasts[first.future_forecasts["stream"].eq(stream)].sort_values("target_period")
+            values = pd.to_numeric(rows["forecast"], errors="coerce")
+            assert len(rows) == 100
+            assert rows["forecast_available"].astype(bool).all()
+            assert values.notna().all() and np.isfinite(values).all()
+            assert values.gt(0).all()
+            pct_change = values.pct_change().dropna().abs()
+            assert pct_change.lt(2.0).all(), stream
+            assert set(rows["horizon_support_status"]) == {
+                "backtest_supported_h1_12",
+                "long_range_extrapolation_h13_plus",
+            }
+
+        vnext_components = first.component_forecasts[
+            first.component_forecasts["stream"].isin(["PED", "HEAVY_RUC"])
+            & ~first.component_forecasts["component_label"].astype(str).eq("FINAL")
+        ].copy()
+        reconciled = (
+            vnext_components.groupby(["stream", "target_period"], dropna=False)["weighted_component_forecast"]
+            .sum()
+            .reset_index(name="component_weighted_sum")
+            .merge(
+                first.future_forecasts[["stream", "target_period", "forecast"]],
+                on=["stream", "target_period"],
+                how="inner",
+            )
+        )
+        assert not reconciled.empty
+        delta = (
+            pd.to_numeric(reconciled["component_weighted_sum"], errors="coerce")
+            - pd.to_numeric(reconciled["forecast"], errors="coerce")
+        ).abs()
+        assert float(delta.max()) <= 1e-6
+
+    comparison = write_forecast_scenario_comparison(
+        first_results,
+        output_dir=tmp_path / "comparison",
+        repo_root=ROOT,
+        run_timestamp="determinism-comparison",
+    )
+    assert len(comparison.future_forecasts) == 600
+    assert comparison.manifest["fixed_finalists_only"] is True
+    assert comparison.manifest["broad_search_run"] is False
+    assert comparison.manifest["horizon_support_note"] == HORIZON_SUPPORT_NOTE
+    assert "scenario_input_delta_audit.csv" in comparison.manifest["output_files"]
+    for scenario in ["basecase", "high_population"]:
+        rows = comparison.future_forecasts[comparison.future_forecasts["scenario_name"].eq(scenario)]
+        assert len(rows) == 300
+        assert set(rows["stream"]) == set(STREAM_ORDER)
+        for stream in STREAM_ORDER:
+            stream_rows = rows[rows["stream"].eq(stream)].sort_values("target_period")
+            assert stream_rows["target_period"].tolist() == _expected_periods(100)
+    audit = comparison.scenario_input_delta_audit
+    assert len(audit) == 100 * sum(
+        len([column for column in STREAM_COLUMNS[stream] if column.role == "user" and column.required])
+        for stream in STREAM_ORDER
+    )
+    assert audit["decision_grade_status"].eq("not_decision_grade_smoke_fixture").all()
+    assert audit["matches_expected_delta"].astype(bool).all()
+    assert set(audit["input_column"]).issuperset(
+        {"unemployment_rate", "real_petrol_price_cents_per_litre", "real_diesel_price_cents_per_litre", "target_lag_1", "target_lag_4"}
+    )
+    assert audit["assumption_scope_note"].str.contains("not a decision-grade population-only scenario", regex=False).all()
+
+
+def test_vnext_y_lag_members_ignore_future_workbook_target_lag_leakage(tmp_path: Path) -> None:
+    base = create_completed_sample_workbook(
+        tmp_path / "base_target_lags.xlsx",
+        repo_root=ROOT,
+        end_period="2050Q4",
+    )
+    mutated = create_completed_sample_workbook(
+        tmp_path / "mutated_target_lags.xlsx",
+        repo_root=ROOT,
+        end_period="2050Q4",
+    )
+    _multiply_target_lag_columns(mutated, ("PED", "HEAVY_RUC"), multiplier=10_000.0)
+    base_result = run_forecast_workbook(
+        base,
+        output_dir=tmp_path / "base_run",
+        repo_root=ROOT,
+        run_timestamp="lag-base",
+        scenario_name="base_lags",
+        expected_end_period="2050Q4",
+    )
+    mutated_result = run_forecast_workbook(
+        mutated,
+        output_dir=tmp_path / "mutated_run",
+        repo_root=ROOT,
+        run_timestamp="lag-mutated",
+        scenario_name="mutated_lags",
+        expected_end_period="2050Q4",
+    )
+    for stream in ["PED", "HEAVY_RUC"]:
+        base_rows = _sorted_forecast_values(base_result.future_forecasts[base_result.future_forecasts["stream"].eq(stream)])
+        mutated_rows = _sorted_forecast_values(mutated_result.future_forecasts[mutated_result.future_forecasts["stream"].eq(stream)])
+        pd.testing.assert_frame_equal(base_rows, mutated_rows, check_exact=True)

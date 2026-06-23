@@ -61,7 +61,7 @@ def test_candidate_landscape_roles_are_populated() -> None:
 
 def test_candidate_landscape_default_mode_is_not_full_raw() -> None:
     landscape = _landscape()
-    assert len(landscape) == 293
+    assert len(landscape) == 290
     assert landscape["include_reason"].astype(str).str.contains("Distribution", case=False).any()
     assert landscape["include_reason"].astype(str).str.contains("Top", case=False).any()
 

@@ -9,6 +9,7 @@ gap rows (missing values) are emitted.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -33,6 +34,10 @@ from .vnext_core import (
 )
 
 VNEXT_SCORER_VERSION = "vnext-forward-scorer-v1"
+
+
+class FittedStateHashMismatch(RuntimeError):
+    """Raised when a fitted production state differs from its manifest hash."""
 
 SHEET_BY_STREAM = {
     "PED": "PED Inputs",
@@ -82,6 +87,35 @@ def state_dir(stream: str) -> Path:
     return repo_root() / "data" / "dashboard_evidence_pack_reproducibility" / f"{stream.lower()}_{GENERATION}"
 
 
+def sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def fitted_state_hash_errors(sdir: Path, manifest: Dict[str, Any]) -> List[str]:
+    errors: List[str] = []
+    for label, entry in manifest.get("production_states", {}).items():
+        state_file = str(entry.get("file", "")).strip()
+        expected = str(entry.get("sha256", "")).strip().lower()
+        if not state_file:
+            errors.append(f"{label}: manifest production state has no file")
+            continue
+        if not expected:
+            errors.append(f"{label}: manifest production state has no sha256")
+            continue
+        path = sdir / state_file
+        if not path.exists():
+            errors.append(f"{label}: fitted state is missing at {state_file}")
+            continue
+        actual = sha256_file(path)
+        if actual.lower() != expected:
+            errors.append(f"{label}: fitted state SHA256 mismatch for {state_file}; expected {expected}, got {actual}")
+    return errors
+
+
 @dataclass
 class VNextScorer:
     stream: str
@@ -110,6 +144,9 @@ def load_scorer(stream: str) -> Optional[VNextScorer]:
         return None
     manifest = json.loads(mpath.read_text(encoding="utf-8"))
     parity = json.loads(ppath.read_text(encoding="utf-8"))
+    hash_errors = fitted_state_hash_errors(sdir, manifest)
+    if hash_errors:
+        raise FittedStateHashMismatch("; ".join(hash_errors))
     bundles = {}
     for label, entry in manifest["production_states"].items():
         path = sdir / entry["file"]

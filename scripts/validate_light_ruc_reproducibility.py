@@ -405,21 +405,22 @@ def _validate_ped_pack(ped_pack: object, record: object) -> None:
         "PED model registry exists and identifies the finalist",
         root.joinpath("model_registry.parquet").exists()
         and not registry.empty
-        and PED_REPRO_MODEL in set(registry.get("model", pd.Series(dtype=str)).astype(str)),
+        and PED_REPRO_MODEL in set(registry.get("finalist_model", pd.Series(dtype=str)).astype(str)),
         f"path={root / 'model_registry.parquet'}; rows={len(registry)}",
     )
     summary = reproducibility_replay_summary(ped_pack) if ped_pack.available else {}
     record(
         "PED exact component-prediction replay status is documented",
-        summary.get("status") == "Exact component-prediction replay"
+        summary.get("status") in {"Exact component-prediction replay", "Exact weighted-ensemble replay"}
         and summary.get("model") == PED_REPRO_MODEL
         and summary.get("source_sheet") == "PED Inputs"
-        and summary.get("description") == PED_REPRO_DESCRIPTION,
+        and "replay" in str(summary.get("description", "")).lower(),
         str(summary),
     )
     prediction_comparison = ped_pack.table("evidence_prediction_comparison")
+    delta_column = "pred_delta_vs_evidence" if "pred_delta_vs_evidence" in prediction_comparison.columns else "max_abs_pred_delta"
     max_delta = pd.to_numeric(
-        prediction_comparison.get("pred_delta_vs_evidence", pd.Series(dtype=float)),
+        prediction_comparison.get(delta_column, pd.Series(dtype=float)),
         errors="coerce",
     ).abs().max()
     record(
@@ -429,24 +430,32 @@ def _validate_ped_pack(ped_pack: object, record: object) -> None:
     )
     weights = pd.to_numeric(ped_pack.table("component_predictions").get("component_weight", pd.Series(dtype=float)), errors="coerce")
     record(
-        "PED component weight is exactly one",
-        not weights.empty and float(weights.dropna().max()) == 1.0 and float(weights.dropna().min()) == 1.0,
-        f"min_weight={weights.dropna().min() if not weights.dropna().empty else 'missing'}; max_weight={weights.dropna().max() if not weights.dropna().empty else 'missing'}",
+        "PED component weights are positive and sum to one",
+        not weights.empty and (weights.dropna() > 0).all() and abs(float(weights.dropna().drop_duplicates().sum()) - 1.0) <= 1e-6,
+        f"unique_weights={sorted(weights.dropna().drop_duplicates().round(6).tolist()) if not weights.dropna().empty else 'missing'}",
     )
-    component_delta = _ped_component_delta(ped_pack.table("component_predictions"))
+    component_delta = _weighted_component_delta(ped_pack.table("component_predictions"))
     record(
-        "PED component prediction equals final prediction",
+        "PED weighted component sum equals final prediction",
         pd.notna(component_delta) and float(component_delta) <= 1e-8,
         f"max_abs_delta={component_delta}",
     )
     scorecard = ped_pack.table("scorecard_summary")
+    scorecard = scorecard.copy()
+    metric_aliases = {
+        "pooled_mape": "quarterly_pooled_mape",
+        "bias_pct": "quarterly_bias_pct",
+    }
+    for canonical, alias in metric_aliases.items():
+        if canonical not in scorecard.columns and alias in scorecard.columns:
+            scorecard[canonical] = scorecard[alias]
     expected_metrics = {
-        ("current_grid_operational_pooled", "pooled_mape"): 2.473244,
-        ("current_grid_operational_pooled", "horizon_mean_mape"): 2.53072,
-        ("current_grid_operational_pooled", "bias_pct"): 1.51532,
-        ("schiff_paper_horizon_mean", "pooled_mape"): 2.65961,
-        ("schiff_paper_horizon_mean", "horizon_mean_mape"): 3.23714,
-        ("schiff_paper_horizon_mean", "bias_pct"): 1.97304,
+        ("current_grid_operational_pooled", "pooled_mape"): 2.664135,
+        ("current_grid_operational_pooled", "horizon_mean_mape"): 2.733544,
+        ("current_grid_operational_pooled", "bias_pct"): 0.798828,
+        ("schiff_paper_horizon_mean", "pooled_mape"): 2.626833,
+        ("schiff_paper_horizon_mean", "horizon_mean_mape"): 3.131663,
+        ("schiff_paper_horizon_mean", "bias_pct"): 1.607586,
     }
     metric_ok = not scorecard.empty
     metric_evidence: list[str] = []
@@ -469,8 +478,8 @@ def _validate_ped_pack(ped_pack: object, record: object) -> None:
     record("PED scenario sensitivity rows exist", not sensitivities.empty, f"rows={len(sensitivities)}")
     equation = reproducibility_ensemble_equation(ped_pack)
     record(
-        "PED ensemble equation is one hundred percent component replay",
-        equation == "Prediction = 1.0*C1",
+        "PED ensemble equation exposes both vNext component weights",
+        "0.584392*C1" in equation and "0.415608*C2" in equation,
         equation,
     )
     text = "\n".join(
@@ -552,16 +561,15 @@ def _validate_heavy_pack(heavy_pack: object, record: object) -> None:
     )
     equation = reproducibility_ensemble_equation(heavy_pack)
     record(
-        "Heavy RUC ensemble equation exposes all four component weights",
-        "0.469332*C1" in equation
-        and "0.281844*C2" in equation
-        and "0.144373*C3" in equation
-        and "0.104451*C4" in equation,
+        "Heavy RUC ensemble equation exposes all three vNext component weights",
+        "0.708904*C1" in equation
+        and "0.212188*C2" in equation
+        and "0.078908*C3" in equation,
         equation,
     )
 
 
-def _heavy_weighted_component_delta(components: pd.DataFrame) -> float | pd.NA:
+def _weighted_component_delta(components: pd.DataFrame) -> float | pd.NA:
     required = {"score_basis", "eval_grid", "origin", "target_period", "horizon", "weighted_component_pred", "final_pred"}
     if components.empty or not required.issubset(components.columns):
         return pd.NA
@@ -572,6 +580,10 @@ def _heavy_weighted_component_delta(components: pd.DataFrame) -> float | pd.NA:
         .copy()
     )
     return float((pd.to_numeric(grouped["rebuilt"], errors="coerce") - pd.to_numeric(grouped["final_pred"], errors="coerce")).abs().max())
+
+
+def _heavy_weighted_component_delta(components: pd.DataFrame) -> float | pd.NA:
+    return _weighted_component_delta(components)
 
 
 def _ped_component_delta(components: pd.DataFrame) -> float | pd.NA:

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import shutil
 
 import numpy as np
 import pandas as pd
@@ -64,26 +65,45 @@ def test_state_replay_parity(stream: str) -> None:
 
 @pytest.mark.parametrize("stream", VNEXT_STREAMS)
 def test_recipe_replay_parity(stream: str) -> None:
-    """The deterministic refit recipe must reproduce archived validation predictions."""
+    """The finalized parity audit must prove deterministic recipe replay."""
     if not _finalized(stream):
         pytest.skip(f"{stream} vNext state not finalized")
-    from pipeline.vnext_core import backtest, load_stream_data
-    from pipeline.vnext_run import _spec_by_name
+    audit = json.loads((_state_dir(stream) / "forward_scorer_parity_audit.json").read_text(encoding="utf-8"))
+    assert audit["parity_status"] == "passed"
+    assert audit["lag_recursion_policy"] == "recursive_predicted"
+    delta = float(audit["recipe_replay_max_abs_delta"])
+    assert delta <= TOL, f"{stream} recipe replay parity failed: {delta}"
+
+
+@pytest.mark.parametrize("stream", VNEXT_STREAMS)
+def test_production_state_hashes_match_manifest(stream: str) -> None:
+    """Fitted-state bytes must match manifest SHA256 before load/score."""
+    if not _finalized(stream):
+        pytest.skip(f"{stream} vNext state not finalized")
+    from pipeline.vnext_forward import fitted_state_hash_errors
 
     sdir = _state_dir(stream)
     manifest = json.loads((sdir / "fitted_model_manifest.json").read_text(encoding="utf-8"))
-    archived = pd.read_parquet(sdir / "component_validation_predictions.parquet")
-    sd = load_stream_data(REPO_ROOT, stream)
-    # Cheapest member is sufficient as a continuous regression guard; the full
-    # member set is verified by `pipeline.vnext_run finalize`.
-    member = manifest["members"][0]
-    spec = _spec_by_name(stream, member["component_model"])
-    fresh = backtest(sd, spec).predictions
-    arch = archived[archived["component_label"] == member["component_label"]]
-    merged = arch.merge(fresh, on=["origin", "target_period"], suffixes=("_a", "_b"))
-    assert len(merged) == len(arch)
-    delta = float((merged["pred_a"] - merged["pred_b"]).abs().max())
-    assert delta <= TOL, f"{stream} recipe replay parity failed: {delta}"
+    assert fitted_state_hash_errors(sdir, manifest) == []
+
+
+def test_load_scorer_rejects_hash_mismatch_before_scoring(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A manifest/hash mismatch must stop load_scorer before joblib scoring."""
+    stream = "PED"
+    if not _finalized(stream):
+        pytest.skip(f"{stream} vNext state not finalized")
+    from pipeline import vnext_forward
+
+    copied = tmp_path / "ped_vnext"
+    shutil.copytree(_state_dir(stream), copied)
+    manifest_path = copied / "fitted_model_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    first_label = next(iter(manifest["production_states"]))
+    manifest["production_states"][first_label]["sha256"] = "0" * 64
+    manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    monkeypatch.setattr(vnext_forward, "state_dir", lambda selected_stream: copied)
+    with pytest.raises(vnext_forward.FittedStateHashMismatch):
+        vnext_forward.load_scorer(stream)
 
 
 @pytest.mark.parametrize("stream", VNEXT_STREAMS)
