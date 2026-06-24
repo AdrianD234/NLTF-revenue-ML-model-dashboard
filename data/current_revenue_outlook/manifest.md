@@ -18,3 +18,9 @@
 - Heavy RUC volume: nominal_rate_missing
 - Light RUC volume: nominal_rate_missing
 - PED VKT per capita: ped_bridge_source_history_missing
+
+## Revenue Source Pack
+- Version: `2026_05_19`
+- Raw workbook SHA256: `00c6070694818d27d7c402749354d8175de999894846dce45a4abdd7f5eb3e6b`
+- Manifest SHA256: `00f5547b4c54f5fc9bfa4fc2a3f3b470cab89be56d87265a3491b7b003b72fd6`
+- Status: `source_pack_vendored`

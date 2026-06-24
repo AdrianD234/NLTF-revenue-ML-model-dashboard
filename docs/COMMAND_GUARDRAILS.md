@@ -48,6 +48,12 @@ throws with a clear failure reason.
 per-command default is 900 seconds and can be changed with
 `-CommandTimeoutSeconds` when a longer run is intentional.
 
+When a known dashboard is already healthy and should not be restarted, reuse it:
+
+```powershell
+& .\scripts\invoke_bounded.ps1 -Label verify-dashboard-reuse -TimeoutSeconds 900 -FilePath pwsh -Arguments @("-NoProfile", "-File", "scripts\verify_dashboard.ps1", "-Port", "8501", "-ReuseExistingServer")
+```
+
 ## Triage Rules
 
 - Use focused tests before a broad Playwright or dashboard verification run.

@@ -156,5 +156,54 @@
     "manifest.json",
     "manifest.md"
   ],
-  "repo_relative_output_dir": "data/current_revenue_outlook"
+  "repo_relative_output_dir": "data/current_revenue_outlook",
+  "revenue_source_pack": {
+    "status": "source_pack_vendored",
+    "repo_relative_path": "data/revenue_model_source_pack/2026_05_19",
+    "source_pack_version": "2026_05_19",
+    "schema_version": "nltf-revenue-source-pack-v1",
+    "raw_workbook_basename": "19 05 2026 Latest NLTF revenue forecast model.xlsx",
+    "raw_workbook_sha256": "00c6070694818d27d7c402749354d8175de999894846dce45a4abdd7f5eb3e6b",
+    "distilled_workbook_basename": "NLTF_revenue_model_distilled.xlsx",
+    "distilled_workbook_sha256": "c7b9c80011a01cc86cc374b1a1ffbf0eb69e14dccc6690e1c54ffc6d6f9ed716",
+    "source_pack_manifest_sha256": "00f5547b4c54f5fc9bfa4fc2a3f3b470cab89be56d87265a3491b7b003b72fd6",
+    "selections": {
+      "crown_top_up": "Exclude",
+      "fed_path_scenario": "Current planned path",
+      "model_basis": "In-house model",
+      "release_round": "BEFU25",
+      "revenue_path": "Net of admin fees & refunds",
+      "scenario": "Medium",
+      "selected_fy": "FY2031",
+      "series": "Total RUC+PED revenue",
+      "uncertainty_source": "MOT release round",
+      "view": "Annual"
+    }
+  },
+  "output_hashes": {
+    "future_revenue_forecasts.parquet": {
+      "sha256": "73eb1fc8681c9b75f6fd6f4309bb9a18aad8ee1c46902fcff85f67d5479d3b8d",
+      "size_bytes": 25243
+    },
+    "future_revenue_forecasts.csv": {
+      "sha256": "670472f9018cac9c1f71d58ff81b53b8e46d89c0997cbb30509bd87c90cba0c3",
+      "size_bytes": 388032
+    },
+    "revenue_bridge_components.parquet": {
+      "sha256": "710ed356a4f0f9fa98b75b420ea1cacf711ac730d7749772c3b0e7549adfa393",
+      "size_bytes": 22905
+    },
+    "revenue_bridge_components.csv": {
+      "sha256": "6dd043f714c6561f61e4293e61f937a376e04e22416f33f2d50f0a04d4b21848",
+      "size_bytes": 328447
+    },
+    "revenue_chart_rows.parquet": {
+      "sha256": "598b6a746ba47a572ac45f045c81902052217fde2cf4de75f866b64babb65508",
+      "size_bytes": 33706
+    },
+    "revenue_chart_rows.csv": {
+      "sha256": "1bcdc5b175124642116b393a7a4e126afa2fbf69f9cc7f14826b290720cefcfb",
+      "size_bytes": 586350
+    }
+  }
 }

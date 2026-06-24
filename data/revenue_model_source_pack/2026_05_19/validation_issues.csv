@@ -1,0 +1,4 @@
+severity,check,message
+warning,revenue_basis_alias,Revenue basis is derived from normalized revenue_path controls; no separate workbook control is exposed.
+warning,series_registry_gap,"Unregistered source series preserved: Gross MVR revenue, Gross RUC revenue, Heavy BEV RUC net km, Light BEV RUC net km, MVR revenues net of admin fees & COO, PHEV RUC net km, RUC revenues net of admin fees, TUC GTK, Total NLTF revenue error %, Total admin fees, Total gross revenues, Total refunds, Total revenues net of admin fees"
+warning,unresolved_critical_decisions,3 critical revenue decisions remain explicit gaps.

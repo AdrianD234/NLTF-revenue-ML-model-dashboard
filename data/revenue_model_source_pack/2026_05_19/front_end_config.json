@@ -1,0 +1,231 @@
+{
+  "controls": [
+    {
+      "control_id": "release_round",
+      "legacy_cell": "Dashboard!B5",
+      "option_count": 32,
+      "options": [
+        "BEFU25",
+        "HYEFU24",
+        "BEFU24",
+        "OBU24",
+        "HYEFU23",
+        "BEFU23",
+        "PREFU23",
+        "OBU23",
+        "HYEFU22",
+        "BEFU22",
+        "OBU22",
+        "HYEFU21",
+        "BEFU21",
+        "OBU21",
+        "HYEFU20",
+        "BEFU20",
+        "PREFU20",
+        "OBU20",
+        "HYEFU19",
+        "BEFU19",
+        "OBU19",
+        "HYEFU18",
+        "BEFU18",
+        "OBU18",
+        "HYEFU17",
+        "BEFU17",
+        "PREFU17",
+        "OBU17",
+        "BEFU16",
+        "HYEFU16",
+        "BEFU15",
+        "OBU14"
+      ],
+      "source_list": "Release list"
+    },
+    {
+      "control_id": "series",
+      "legacy_cell": "Dashboard!E5",
+      "option_count": 25,
+      "options": [
+        "Total RUC+PED revenue",
+        "Total NLTF revenue",
+        "Total RUC forecast incl EV/PHEV",
+        "PED revenue",
+        "Net FED revenue",
+        "PED volume",
+        "PED VKT per capita",
+        "Light RUC revenue",
+        "Heavy RUC revenue",
+        "Light conventional RUC revenue",
+        "Heavy conventional RUC revenue",
+        "Light BEV RUC net revenue",
+        "Heavy BEV RUC net revenue",
+        "PHEV RUC net revenue",
+        "Light RUC net km",
+        "Heavy RUC net km",
+        "Light BEV RUC net km",
+        "Heavy BEV RUC net km",
+        "PHEV RUC net km",
+        "RUC revenues net of admin fees",
+        "RUC revenues net of admin fees & refunds",
+        "RUC admin revenue",
+        "RUC refunds",
+        "Net MVR revenue",
+        "TUC net revenue"
+      ],
+      "source_list": "Series clean list"
+    },
+    {
+      "control_id": "revenue_path",
+      "legacy_cell": "Dashboard!H5",
+      "option_count": 2,
+      "options": [
+        "Net of admin fees & refunds",
+        "Gross / benchmark actual"
+      ],
+      "source_list": "Revenue path clean list"
+    },
+    {
+      "control_id": "scenario",
+      "legacy_cell": "Dashboard!K5",
+      "option_count": 1,
+      "options": [
+        "Medium"
+      ],
+      "source_list": "Scenario clean list"
+    },
+    {
+      "control_id": "fed_path_scenario",
+      "legacy_cell": "Dashboard!N5",
+      "option_count": 2,
+      "options": [
+        "Current planned path",
+        "No 2027 12c uplift"
+      ],
+      "source_list": "FED path clean list"
+    },
+    {
+      "control_id": "view",
+      "legacy_cell": "Dashboard!Q5",
+      "option_count": 2,
+      "options": [
+        "Annual",
+        "Quarterly"
+      ],
+      "source_list": "View clean list"
+    },
+    {
+      "control_id": "uncertainty_source",
+      "legacy_cell": "Dashboard!S6",
+      "option_count": 3,
+      "options": [
+        "MOT release round",
+        "In-house model",
+        "Aaron Schiff model"
+      ],
+      "source_list": "Uncertainty source list"
+    },
+    {
+      "control_id": "crown_top_up",
+      "legacy_cell": "Dashboard!U5",
+      "option_count": 2,
+      "options": [
+        "Exclude",
+        "Include"
+      ],
+      "source_list": "Crown top-up list"
+    },
+    {
+      "control_id": "selected_fy",
+      "legacy_cell": "Dashboard!A10",
+      "option_count": 18,
+      "options": [
+        "FY2014",
+        "FY2015",
+        "FY2016",
+        "FY2017",
+        "FY2018",
+        "FY2019",
+        "FY2020",
+        "FY2021",
+        "FY2022",
+        "FY2023",
+        "FY2024",
+        "FY2025",
+        "FY2026",
+        "FY2027",
+        "FY2028",
+        "FY2029",
+        "FY2030",
+        "FY2031"
+      ],
+      "source_list": "FY selector list"
+    },
+    {
+      "control_id": "component_selector",
+      "legacy_cell": "Dashboard component",
+      "option_count": 17,
+      "options": [
+        "None",
+        "Net FED revenue",
+        "PED revenue",
+        "Light RUC revenue",
+        "Heavy RUC revenue",
+        "Light conventional RUC revenue",
+        "Heavy conventional RUC revenue",
+        "Light BEV RUC net revenue",
+        "Heavy BEV RUC net revenue",
+        "PHEV RUC net revenue",
+        "Total RUC forecast incl EV/PHEV",
+        "Net MVR revenue",
+        "TUC net revenue",
+        "RUC revenues net of admin fees",
+        "RUC revenues net of admin fees & refunds",
+        "RUC admin revenue",
+        "RUC refunds"
+      ],
+      "source_list": "Component selector list"
+    }
+  ],
+  "current_selections": {
+    "crown_top_up": {
+      "current_value": "Exclude",
+      "workbook_cell": "U5"
+    },
+    "fed_path_scenario": {
+      "current_value": "Current planned path",
+      "workbook_cell": "N5"
+    },
+    "model_basis": {
+      "current_value": "In-house model",
+      "workbook_cell": "S5"
+    },
+    "release_round": {
+      "current_value": "BEFU25",
+      "workbook_cell": "B5"
+    },
+    "revenue_path": {
+      "current_value": "Net of admin fees & refunds",
+      "workbook_cell": "H5"
+    },
+    "scenario": {
+      "current_value": "Medium",
+      "workbook_cell": "K5"
+    },
+    "selected_fy": {
+      "current_value": "FY2031",
+      "workbook_cell": "A10"
+    },
+    "series": {
+      "current_value": "Total RUC+PED revenue",
+      "workbook_cell": "E5"
+    },
+    "uncertainty_source": {
+      "current_value": "MOT release round",
+      "workbook_cell": "S6"
+    },
+    "view": {
+      "current_value": "Annual",
+      "workbook_cell": "Q5"
+    }
+  },
+  "source": "Dashboard Controls and Current Selections sheets"
+}

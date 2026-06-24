@@ -67,6 +67,8 @@ data/dashboard_evidence_pack_reproducibility/ped_inner_hpo/source_artifacts/**/*
 !data/current_revenue_outlook/*.csv
 !data/current_revenue_outlook/*.json
 !data/current_revenue_outlook/*.md
+!data/revenue_model_source_pack/
+!data/revenue_model_source_pack/**
 
 # vNext production reproducibility packs (governed fitted state + evidence)
 !data/dashboard_evidence_pack_reproducibility/heavy_ruc_vnext/

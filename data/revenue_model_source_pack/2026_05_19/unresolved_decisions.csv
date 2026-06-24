@@ -1,0 +1,8 @@
+Priority,Item,Why needed,Recommended resolution
+critical,Future nominal PED/FED rates by scenario,Converts PED litres to nominal revenue and affects retail petrol-price scenarios.,Add explicit nominal rate paths to reviewed scenario workbooks or a governed rate table; keep Crown top-up separate.
+critical,Future nominal effective Light/Heavy RUC rates,Converts net km into revenue; Heavy RUC is class-mix weighted.,Provide scenario/year effective average rate paths with source and class-mix assumptions.
+critical,PED bridge source history and re-estimation,The current app pack reports ped_bridge_source_history_missing.,Use accrual PED revenue/base-rate history from 2008Q3 onward; replay Table 3.3 and re-estimate on current data with rolling validation.
+high,"Pass-through policy for LPG, CNG, FED refunds, MVR and TUC",Only PED/Light/Heavy RUC are directly modeled; Total NLTF requires the other lines.,Use an explicit MOT release path where available; otherwise use a governed assumption with status and source.
+high,RUC gross/net/admin/refund basis,The workbook scales modeled RUC components to the official net-of-admin/refunds basis.,"Store gross, admin, refunds and net as separate canonical series and calculate the selected basis explicitly."
+high,Crown top-up policy,Temporary relief changes benchmark actuals and total comparisons.,Keep an Include/Exclude control and persist the choice in the run manifest.
+medium,H13+ treatment,Econometric performance is validated to 12 quarters while the workbook projects to 2050.,Label H1–H12 backtest-supported and H13+ long-range extrapolation/assumption.

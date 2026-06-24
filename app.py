@@ -116,6 +116,15 @@ from model_dashboard.revenue_outlook import (
     revenue_outlook_signature,
     validate_promotable_comparison,
 )
+from model_dashboard.revenue_source_pack import (
+    REVENUE_SOURCE_PACK_DIR,
+    REVENUE_SOURCE_PACK_SCHEMA_VERSION,
+    RevenueSourcePack,
+    control_options,
+    current_selection,
+    load_revenue_source_pack,
+    revenue_source_pack_signature,
+)
 from model_dashboard.presentation import (
     display_capability,
     render_cloud_preview_toggle,
@@ -198,7 +207,7 @@ from model_dashboard.ui import (
 
 
 LOADER_SCHEMA_VERSION = "stage1-governance-loader-v9-parquet-contract-schiff-class"
-STREAMLIT_IMPORT_SURFACE_REVISION = "2026-06-24-revenue-outlook-v1"
+STREAMLIT_IMPORT_SURFACE_REVISION = "2026-06-24-revenue-source-pack-v1"
 CURATED_DATA_DIR = Path("artifacts") / "curated_data"
 REPRODUCIBILITY_PAGE = "Governance & Reproducibility"
 REVENUE_OUTLOOK_PAGE = "Revenue Outlook"
@@ -358,6 +367,18 @@ def cached_load_revenue_outlook_pack(
     del signature
     del schema_version
     return load_revenue_outlook_pack(pack_dir, repo_root=repo_root)
+
+
+@st.cache_data(show_spinner=False)
+def cached_load_revenue_source_pack(
+    pack_dir: str,
+    repo_root: str,
+    signature: tuple[tuple[str, int, int], ...],
+    schema_version: str,
+) -> RevenueSourcePack | None:
+    del signature
+    del schema_version
+    return load_revenue_source_pack(pack_dir, repo_root=repo_root)
 
 
 def directory_signature(path: Path) -> tuple[bool, int, int]:
@@ -1929,6 +1950,12 @@ def render_reproducibility_detail(stream_label: str) -> None:
 def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     del loaded
     repo_root = Path(__file__).resolve().parent
+    source_pack = cached_load_revenue_source_pack(
+        str(repo_root / REVENUE_SOURCE_PACK_DIR),
+        str(repo_root),
+        revenue_source_pack_signature(repo_root / REVENUE_SOURCE_PACK_DIR, repo_root),
+        REVENUE_SOURCE_PACK_SCHEMA_VERSION,
+    )
     pack = st.session_state.get("revenue_outlook_pack")
     if not isinstance(pack, RevenueOutlookPack):
         pack = cached_load_revenue_outlook_pack(
@@ -1938,7 +1965,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             REVENUE_OUTLOOK_SCHEMA_VERSION,
         )
 
-    if pack is None:
+    if pack is None and source_pack is None:
         section_title(REVENUE_OUTLOOK_TITLE)
         warning_panel(
             "No explicitly promoted Revenue Outlook pack is available. Use Forecast Builder on the local "
@@ -1951,18 +1978,31 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         )
         return
 
-    manifest = pack.manifest or {}
-    chart_rows = pack.revenue_chart_rows.copy() if isinstance(pack.revenue_chart_rows, pd.DataFrame) else pd.DataFrame()
-    bridge = pack.revenue_bridge_components.copy() if isinstance(pack.revenue_bridge_components, pd.DataFrame) else pd.DataFrame()
-    future_revenue = pack.future_revenue_forecasts.copy() if isinstance(pack.future_revenue_forecasts, pd.DataFrame) else pd.DataFrame()
+    manifest = pack.manifest if pack is not None and isinstance(pack.manifest, dict) else {}
+    chart_rows = pack.revenue_chart_rows.copy() if pack is not None and isinstance(pack.revenue_chart_rows, pd.DataFrame) else pd.DataFrame()
+    bridge = pack.revenue_bridge_components.copy() if pack is not None and isinstance(pack.revenue_bridge_components, pd.DataFrame) else pd.DataFrame()
+    future_revenue = pack.future_revenue_forecasts.copy() if pack is not None and isinstance(pack.future_revenue_forecasts, pd.DataFrame) else pd.DataFrame()
 
     section_title(REVENUE_OUTLOOK_TITLE)
     st.caption(
-        "Governed current outlook from an explicit promoted comparison. Forecast Builder controls remain on "
-        "the local Governance page; this page renders the reviewed pack only."
+        "Governed NLTF revenue architecture from the repo-local distilled source pack, with reviewed "
+        "Forecast Builder volume packs joined only after explicit promotion."
     )
     st.caption("Source policy: explicit promoted pack or in-session reviewed comparison only; no latest-folder scan; no test-fixture publication.")
-    kpi_grid(_revenue_outlook_summary_cards(manifest, chart_rows, future_revenue))
+    kpi_grid(_revenue_source_kpi_cards(source_pack) + _revenue_outlook_summary_cards(manifest, chart_rows, future_revenue))
+
+    source_controls = _render_revenue_source_controls(source_pack)
+    if source_pack is None:
+        warning_panel("The repo-local NLTF revenue source pack is missing; Total NLTF architecture controls are unavailable.")
+    else:
+        _render_revenue_source_architecture(source_pack, source_controls)
+
+    if pack is None:
+        warning_panel(
+            "No explicitly promoted Forecast Builder revenue pack is available yet. The Total NLTF source-pack "
+            "architecture remains visible, but future PED/Light/Heavy reviewed scenario bridges require promotion."
+        )
+        return
 
     if chart_rows.empty:
         warning_panel("The promoted Revenue Outlook pack has no chart rows.")
@@ -2038,6 +2078,516 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             dataframe_download(chart_rows, "Download revenue chart rows", "revenue_chart_rows.csv")
 
 
+def _revenue_source_kpi_cards(source_pack: RevenueSourcePack | None) -> list[tuple[str, str, str | None]]:
+    if source_pack is None or source_pack.canonical_long.empty:
+        return [("Source pack", "Missing", "data/revenue_model_source_pack/2026_05_19")]
+    frame = source_pack.canonical_long
+    selected_fy = current_selection(source_pack, "selected_fy", "FY2031")
+    cards = [
+        ("Source pack", str(source_pack.manifest.get("source_pack_version", "unknown")), source_pack.validation_status),
+        ("Total NLTF", _source_value_label(frame, "total_nltf_net_revenue", selected_fy), selected_fy),
+        ("PED", _source_value_label(frame, "gross_ped_revenue", selected_fy), "revenue bridge"),
+        ("Light RUC", _source_value_label(frame, "light_ruc_net_revenue", selected_fy), "direct model output bridged to revenue"),
+        ("Heavy RUC", _source_value_label(frame, "heavy_ruc_net_revenue", selected_fy), "direct model output bridged to revenue"),
+        ("Uncertainty / MAPE", _source_error_label(frame, selected_fy), "source-pack diagnostic where available"),
+    ]
+    return cards
+
+
+def _render_revenue_source_controls(source_pack: RevenueSourcePack | None) -> dict[str, Any]:
+    if source_pack is None:
+        return {}
+    with st.container(border=True):
+        st.markdown("<div class='page5-panel-title'>NLTF revenue source controls</div>", unsafe_allow_html=True)
+        row1 = st.columns([0.18, 0.26, 0.20, 0.18, 0.18])
+        release_options = control_options(source_pack, "release_round", ["BEFU25"])
+        series_options = control_options(source_pack, "series", ["Total NLTF revenue"])
+        revenue_path_options = control_options(source_pack, "revenue_path", ["Net of admin fees & refunds", "Gross / benchmark actual"])
+        scenario_options = control_options(source_pack, "scenario", ["Medium"])
+        fed_path_options = control_options(source_pack, "fed_path_scenario", ["Current planned path", "No 2027 12c uplift"])
+        with row1[0]:
+            release_round = st.selectbox(
+                "Release round",
+                release_options,
+                index=_option_index(release_options, current_selection(source_pack, "release_round", release_options[0])),
+                key="revenue_source_release_round",
+            )
+        with row1[1]:
+            series = st.selectbox(
+                "Series",
+                series_options,
+                index=_option_index(series_options, "Total NLTF revenue", fallback=current_selection(source_pack, "series", series_options[0])),
+                key="revenue_source_series",
+            )
+        with row1[2]:
+            revenue_path = st.selectbox(
+                "Revenue path",
+                revenue_path_options,
+                index=_option_index(revenue_path_options, current_selection(source_pack, "revenue_path", revenue_path_options[0])),
+                key="revenue_source_revenue_path",
+            )
+        with row1[3]:
+            scenario = st.selectbox(
+                "Scenario",
+                scenario_options,
+                index=_option_index(scenario_options, current_selection(source_pack, "scenario", scenario_options[0])),
+                key="revenue_source_scenario",
+            )
+        with row1[4]:
+            fed_path = st.selectbox(
+                "FED path",
+                fed_path_options,
+                index=_option_index(fed_path_options, current_selection(source_pack, "fed_path_scenario", fed_path_options[0])),
+                key="revenue_source_fed_path",
+            )
+
+        row2 = st.columns([0.16, 0.18, 0.18, 0.22, 0.14, 0.12])
+        view_options = ["June-year", "Quarterly"]
+        model_basis_options = ["In-house model", "Aaron Schiff model", "Selected dashboard basis"]
+        revenue_basis_options = control_options(source_pack, "revenue_basis", ["Net", "Gross", "Benchmark actual"])
+        uncertainty_options = control_options(source_pack, "uncertainty_source", ["MOT release round", "In-house model", "Aaron Schiff model"])
+        fy_options = control_options(source_pack, "selected_fy", ["FY2031"])
+        top_up_options = control_options(source_pack, "crown_top_up", ["Exclude", "Include"])
+        with row2[0]:
+            time_grain = st.radio("Time grain", view_options, horizontal=True, key="revenue_source_time_grain")
+        with row2[1]:
+            model_basis = st.selectbox(
+                "Model basis",
+                model_basis_options,
+                index=_option_index(model_basis_options, current_selection(source_pack, "model_basis", "In-house model")),
+                key="revenue_source_model_basis",
+            )
+        with row2[2]:
+            revenue_basis = st.selectbox(
+                "Revenue basis",
+                revenue_basis_options,
+                index=_option_index(revenue_basis_options, revenue_basis_options[0]),
+                key="revenue_source_revenue_basis",
+            )
+        with row2[3]:
+            uncertainty = st.selectbox(
+                "Uncertainty source",
+                uncertainty_options,
+                index=_option_index(uncertainty_options, current_selection(source_pack, "uncertainty_source", uncertainty_options[0])),
+                key="revenue_source_uncertainty",
+            )
+        with row2[4]:
+            selected_fy = st.selectbox(
+                "Selected FY",
+                fy_options,
+                index=_option_index(fy_options, current_selection(source_pack, "selected_fy", fy_options[-1])),
+                key="revenue_source_selected_fy",
+            )
+        with row2[5]:
+            crown_top_up = st.selectbox(
+                "Crown top-up",
+                top_up_options,
+                index=_option_index(top_up_options, current_selection(source_pack, "crown_top_up", top_up_options[0])),
+                key="revenue_source_crown_top_up",
+            )
+    return {
+        "release_round": release_round,
+        "series": series,
+        "revenue_path": revenue_path,
+        "scenario": scenario,
+        "fed_path": fed_path,
+        "time_grain": time_grain,
+        "model_basis": model_basis,
+        "revenue_basis": revenue_basis,
+        "uncertainty": uncertainty,
+        "selected_fy": selected_fy,
+        "crown_top_up": crown_top_up,
+    }
+
+
+def _render_revenue_source_architecture(source_pack: RevenueSourcePack, controls: dict[str, Any]) -> None:
+    if controls.get("time_grain") == "Quarterly":
+        warning_panel("The distilled revenue source pack is annual only. Quarterly display remains available for the promoted Forecast Builder volume pack below.")
+    source_status = (
+        f"Source pack version {source_pack.manifest.get('source_pack_version', 'unknown')}; "
+        f"raw workbook SHA256 {source_pack.manifest.get('raw_workbook', {}).get('sha256', 'missing')[:12]}...; "
+        f"validation status {source_pack.validation_status}."
+    )
+    info_panel(source_status)
+    chart_cols = st.columns(2)
+    with chart_cols[0]:
+        chart_card(
+            "Total path chart",
+            "Actual/benchmark, selected basis, Aaron Schiff and in-house paths from the normalized annual model-path table.",
+            _source_total_path_figure(source_pack, controls),
+            caption="MOT/BEFU release registry is loaded, but the distilled pack does not expose the full release-value table; unresolved differences are reported instead of forced.",
+            notes_as_tooltip=False,
+        )
+    with chart_cols[1]:
+        chart_card(
+            "Uncertainty fan",
+            "Displayed only from available governed model paths; no probabilistic residual fan is fabricated.",
+            _source_uncertainty_figure(source_pack, controls),
+            caption="Where only model-spread evidence is available, the band is labelled as model spread rather than probabilistic uncertainty.",
+            notes_as_tooltip=False,
+        )
+
+    drill_cols = st.columns(2)
+    with drill_cols[0]:
+        chart_card(
+            "Component drill-down",
+            "Positive lines and deductions for the selected FY preserve their source signs.",
+            _source_component_figure(source_pack, controls),
+            caption="Gross, net, deduction and overlay lines are preserved from the normalized source pack.",
+            notes_as_tooltip=False,
+        )
+    with drill_cols[1]:
+        chart_card(
+            "Selected-FY revenue split",
+            "Net FED, total RUC, net MVR and TUC share of selected FY revenue where available.",
+            _source_split_figure(source_pack, controls),
+            caption="Total RUC+PED is treated as the legacy Net FED + Net RUC subtotal, not the root total.",
+            notes_as_tooltip=False,
+        )
+
+    source_tables = st.columns(2)
+    with source_tables[0]:
+        st.markdown("<div class='page5-panel-title'>Hierarchy reconciliation</div>", unsafe_allow_html=True)
+        display_table(_source_reconciliation_view(source_pack, controls), height=280, max_rows=120)
+    with source_tables[1]:
+        st.markdown("<div class='page5-panel-title'>Unresolved revenue decisions</div>", unsafe_allow_html=True)
+        display_table(source_pack.unresolved_decisions, height=280, max_rows=80)
+
+    with st.expander("Source-pack validation and manifest", expanded=False):
+        display_table(source_pack.validation_issues, height=180, max_rows=80)
+        display_table(_source_manifest_view(source_pack), height=220, max_rows=80)
+        dataframe_download(source_pack.canonical_long, "Download canonical revenue long table", "canonical_revenue_long.csv")
+
+
+def _option_index(options: list[str], preferred: str, *, fallback: str | None = None) -> int:
+    if preferred in options:
+        return options.index(preferred)
+    if fallback in options:
+        return options.index(str(fallback))
+    return 0
+
+
+def _source_value_label(frame: pd.DataFrame, series_id: str, selected_fy: str) -> str:
+    rows = _source_series_rows(frame, series_id)
+    if rows.empty:
+        return "-"
+    selected = rows[rows["period"].eq(selected_fy)]
+    model_rows = selected[selected["line"].eq("Model path")]
+    actual_rows = selected[selected["line"].isin(["Actual", "Actual / benchmark"])]
+    row = (model_rows if not model_rows.empty else actual_rows if not actual_rows.empty else selected).tail(1)
+    if row.empty:
+        row = rows.sort_values("FY").tail(1)
+    value = row.iloc[0].get("value")
+    unit = str(row.iloc[0].get("unit", ""))
+    return _source_format_value(value, unit)
+
+
+def _source_error_label(frame: pd.DataFrame, selected_fy: str) -> str:
+    rows = frame[
+        frame["source_series_label"].astype(str).str.contains("error", case=False, na=False)
+        & frame["period"].eq(selected_fy)
+    ].copy()
+    if rows.empty:
+        rows = frame[frame["source_series_label"].astype(str).str.contains("error", case=False, na=False)].sort_values("FY").tail(1)
+    if rows.empty:
+        return "gap"
+    value = rows.iloc[0].get("value")
+    try:
+        return f"{float(value):+.1%}"
+    except (TypeError, ValueError):
+        return "gap"
+
+
+def _source_total_path_figure(source_pack: RevenueSourcePack, controls: dict[str, Any]) -> go.Figure:
+    frame = _selected_source_series_frame(source_pack, controls)
+    if frame.empty:
+        return empty_figure("Selected revenue series is unavailable in the normalized source pack.")
+    fig = go.Figure()
+    trace_specs = [
+        ("Actual / benchmark", frame[frame["line"].isin(["Actual", "Actual / benchmark"])], "#7A869A", "solid"),
+        ("Selected dashboard basis", _source_model_rows(frame, "selected_dashboard_basis"), "#002B5C", "solid"),
+        ("In-house prediction / forecast", _source_model_rows(frame, "in_house_model"), "#00843D", "solid"),
+        ("Aaron Schiff", _source_model_rows(frame, "aaron_schiff_model"), "#F37021", "dash"),
+    ]
+    for name, rows, color, dash in trace_specs:
+        rows = _dedupe_path_rows(rows)
+        if rows.empty:
+            continue
+        fig.add_trace(
+            go.Scatter(
+                x=rows["FY"],
+                y=rows["value"],
+                mode="lines+markers",
+                name=name,
+                line={"color": color, "dash": dash, "width": 2.6},
+                marker={"size": 6},
+                hovertemplate="FY%{x}<br>%{y:,.1f}<extra>" + name + "</extra>",
+            )
+        )
+    fy = _selected_fy_number(controls)
+    if fy is not None:
+        fig.add_vline(x=fy, line_dash="dot", line_color="#102A43", annotation_text=f"Selected FY{fy}", annotation_position="top")
+    fig.add_annotation(
+        text="Full MOT/BEFU release-value table is not present in the distilled pack; registry-only release selection is shown as a governance gap.",
+        xref="paper",
+        yref="paper",
+        x=0,
+        y=1.12,
+        showarrow=False,
+        align="left",
+        font={"size": 11, "color": "#52616B"},
+    )
+    fig.update_layout(
+        margin={"l": 52, "r": 18, "t": 42, "b": 48},
+        height=360,
+        legend={"orientation": "h", "y": -0.18},
+        yaxis_title=_source_axis_title(frame),
+        xaxis_title="June year",
+        hovermode="x unified",
+    )
+    return fig
+
+
+def _source_uncertainty_figure(source_pack: RevenueSourcePack, controls: dict[str, Any]) -> go.Figure:
+    frame = _selected_source_series_frame(source_pack, controls)
+    model = frame[frame["line"].eq("Model path")].copy()
+    if model.empty or not {"in_house_model", "aaron_schiff_model"}.issubset(set(model["model_basis"])):
+        return empty_figure("Probabilistic uncertainty fan is not available in the normalized source pack.")
+    pivot = model.pivot_table(index="FY", columns="model_basis", values="value", aggfunc="first").dropna(how="any")
+    if pivot.empty:
+        return empty_figure("Model-spread uncertainty cannot be drawn for this series.")
+    lower = pivot[["in_house_model", "aaron_schiff_model"]].min(axis=1)
+    upper = pivot[["in_house_model", "aaron_schiff_model"]].max(axis=1)
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=pivot.index,
+            y=upper,
+            mode="lines",
+            line={"width": 0},
+            showlegend=False,
+            hoverinfo="skip",
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=pivot.index,
+            y=lower,
+            mode="lines",
+            fill="tonexty",
+            fillcolor="rgba(0, 132, 61, 0.18)",
+            line={"width": 0},
+            name="In-house vs Schiff model spread",
+            hovertemplate="FY%{x}<br>%{y:,.1f}<extra>Lower spread bound</extra>",
+        )
+    )
+    selected = _source_model_rows(frame, _model_basis_key(controls.get("model_basis")))
+    selected = _dedupe_path_rows(selected)
+    if not selected.empty:
+        fig.add_trace(
+            go.Scatter(
+                x=selected["FY"],
+                y=selected["value"],
+                mode="lines+markers",
+                name=str(controls.get("model_basis", "Selected model")),
+                line={"color": "#002B5C", "width": 2.8},
+            )
+        )
+    fig.update_layout(
+        margin={"l": 52, "r": 18, "t": 28, "b": 48},
+        height=360,
+        yaxis_title=_source_axis_title(frame),
+        xaxis_title="June year",
+        hovermode="x unified",
+    )
+    return fig
+
+
+def _source_component_figure(source_pack: RevenueSourcePack, controls: dict[str, Any]) -> go.Figure:
+    rows = _source_selected_fy_rows(source_pack, controls)
+    if rows.empty:
+        return empty_figure("Selected FY component rows are unavailable.")
+    component_ids = [
+        "net_fed_revenue",
+        "gross_ped_revenue",
+        "total_ruc_net_revenue",
+        "light_ruc_net_revenue",
+        "heavy_ruc_net_revenue",
+        "net_mvr_revenue",
+        "tuc_net_revenue",
+        "fed_refunds",
+        "ruc_refunds",
+        "mvr_refunds",
+        "crown_top_up",
+    ]
+    plot = rows[rows["series_id"].isin(component_ids)].copy()
+    if plot.empty:
+        return empty_figure("No selected FY component rows match the governed series registry.")
+    plot["signed_value"] = pd.to_numeric(plot["value"], errors="coerce") * pd.to_numeric(plot["aggregation_sign"], errors="coerce").fillna(1)
+    plot = plot.dropna(subset=["signed_value"])
+    plot = plot.drop_duplicates("series_id", keep="last")
+    fig = go.Figure(
+        go.Bar(
+            x=plot["display_name"],
+            y=plot["signed_value"],
+            marker_color=["#B7791F" if value < 0 else "#00843D" for value in plot["signed_value"]],
+            hovertemplate="%{x}<br>%{y:,.1f}<extra></extra>",
+        )
+    )
+    fig.update_layout(
+        margin={"l": 52, "r": 18, "t": 28, "b": 96},
+        height=360,
+        yaxis_title="$m nominal ex GST",
+        xaxis_tickangle=-30,
+    )
+    return fig
+
+
+def _source_split_figure(source_pack: RevenueSourcePack, controls: dict[str, Any]) -> go.Figure:
+    rows = _source_selected_fy_rows(source_pack, controls)
+    component_ids = ["net_fed_revenue", "total_ruc_net_revenue", "net_mvr_revenue", "tuc_net_revenue"]
+    plot = rows[rows["series_id"].isin(component_ids)].copy()
+    plot["value"] = pd.to_numeric(plot["value"], errors="coerce")
+    plot = plot.dropna(subset=["value"]).drop_duplicates("series_id", keep="last")
+    if plot.empty:
+        return empty_figure("Selected FY split is unavailable for this model basis.")
+    fig = go.Figure(
+        go.Pie(
+            labels=plot["display_name"],
+            values=plot["value"].clip(lower=0),
+            hole=0.45,
+            marker={"colors": ["#002B5C", "#00843D", "#008C7E", "#F37021"][: len(plot)]},
+            hovertemplate="%{label}<br>%{value:,.1f}<br>%{percent}<extra></extra>",
+        )
+    )
+    fig.update_layout(margin={"l": 16, "r": 16, "t": 28, "b": 16}, height=360, showlegend=True)
+    return fig
+
+
+def _source_reconciliation_view(source_pack: RevenueSourcePack, controls: dict[str, Any]) -> pd.DataFrame:
+    report = source_pack.reconciliation_report.copy()
+    fy = _selected_fy_number(controls)
+    if fy is not None and "FY" in report.columns:
+        report = report[report["FY"].eq(fy)]
+    if report.empty:
+        return pd.DataFrame([{"status": "gap", "message": "No reconciliation rows are available for the selected FY."}])
+    cols = [
+        "scope",
+        "FY",
+        "output_series_id",
+        "component_status",
+        "calculated_value",
+        "official_value",
+        "difference",
+        "missing_inputs",
+    ]
+    return report[[col for col in cols if col in report.columns]].reset_index(drop=True)
+
+
+def _source_manifest_view(source_pack: RevenueSourcePack) -> pd.DataFrame:
+    manifest = source_pack.manifest
+    rows = [
+        {"field": "schema_version", "value": manifest.get("schema_version", "")},
+        {"field": "source_pack_version", "value": manifest.get("source_pack_version", "")},
+        {"field": "raw_workbook_basename", "value": manifest.get("raw_workbook", {}).get("basename", "")},
+        {"field": "raw_workbook_sha256", "value": manifest.get("raw_workbook", {}).get("sha256", "")},
+        {"field": "distilled_workbook_sha256", "value": manifest.get("distilled_workbook", {}).get("sha256", "")},
+        {"field": "source_policy", "value": manifest.get("source_policy", "")},
+        {"field": "canonical_rows", "value": str(len(source_pack.canonical_long))},
+    ]
+    return pd.DataFrame(rows)
+
+
+def _selected_source_series_frame(source_pack: RevenueSourcePack, controls: dict[str, Any]) -> pd.DataFrame:
+    selected = str(controls.get("series", "Total NLTF revenue"))
+    frame = source_pack.canonical_long.copy()
+    rows = frame[
+        frame["display_name"].eq(selected)
+        | frame["source_series_label"].eq(selected)
+        | frame["series_id"].eq(_selected_series_id(source_pack, selected))
+    ].copy()
+    if rows.empty and selected == "Total RUC+PED revenue":
+        rows = frame[frame["series_id"].eq("total_fed_ruc_net_revenue")].copy()
+    return rows[pd.to_numeric(rows["value"], errors="coerce").notna()].copy()
+
+
+def _source_series_rows(frame: pd.DataFrame, series_id: str) -> pd.DataFrame:
+    return frame[frame["series_id"].eq(series_id) & pd.to_numeric(frame["value"], errors="coerce").notna()].copy()
+
+
+def _source_selected_fy_rows(source_pack: RevenueSourcePack, controls: dict[str, Any]) -> pd.DataFrame:
+    fy = _selected_fy_number(controls)
+    frame = source_pack.canonical_long.copy()
+    if fy is None:
+        return pd.DataFrame()
+    frame = frame[frame["FY"].eq(fy)].copy()
+    model_key = _model_basis_key(controls.get("model_basis"))
+    preferred = frame[(frame["source_file"].eq("annual_model_paths.csv")) & (frame["model_basis"].eq(model_key)) & (frame["line"].eq("Model path"))]
+    if preferred.empty:
+        preferred = frame[(frame["source_file"].eq("annual_model_paths.csv")) & (frame["line"].isin(["Actual", "Actual / benchmark"]))]
+    if preferred.empty:
+        preferred = frame[frame["source_file"].eq("annual_actuals.csv")]
+    return preferred.copy()
+
+
+def _source_model_rows(frame: pd.DataFrame, model_basis: str) -> pd.DataFrame:
+    return frame[(frame["line"].eq("Model path")) & (frame["model_basis"].eq(model_basis))].copy()
+
+
+def _dedupe_path_rows(rows: pd.DataFrame) -> pd.DataFrame:
+    if rows.empty:
+        return rows
+    return rows.sort_values(["FY", "source_file", "source_cell"], kind="stable").drop_duplicates("FY", keep="last")
+
+
+def _selected_series_id(source_pack: RevenueSourcePack, selected: str) -> str:
+    rows = source_pack.series_master[
+        source_pack.series_master["Display name"].astype(str).eq(selected)
+        | source_pack.series_master["Series ID"].astype(str).eq(selected)
+    ]
+    if not rows.empty:
+        return str(rows.iloc[0]["Series ID"])
+    if selected == "Total RUC+PED revenue":
+        return "total_fed_ruc_net_revenue"
+    if selected == "Total RUC forecast incl EV/PHEV":
+        return "total_ruc_net_revenue"
+    return selected.lower().replace(" ", "_")
+
+
+def _model_basis_key(value: Any) -> str:
+    text = str(value or "").strip().lower()
+    if "aaron" in text or "schiff" in text:
+        return "aaron_schiff_model"
+    if "selected" in text:
+        return "selected_dashboard_basis"
+    return "in_house_model"
+
+
+def _selected_fy_number(controls: dict[str, Any]) -> int | None:
+    text = str(controls.get("selected_fy", "")).upper().replace("FY", "")
+    try:
+        return int(text)
+    except ValueError:
+        return None
+
+
+def _source_axis_title(frame: pd.DataFrame) -> str:
+    units = [str(unit) for unit in frame["unit"].dropna().unique() if str(unit)]
+    return units[0] if len(units) == 1 else "Value"
+
+
+def _source_format_value(value: Any, unit: str) -> str:
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return "-"
+    if "$m" in unit:
+        return f"${numeric:,.0f}m"
+    if "percent" in unit.lower():
+        return f"{numeric:.1%}"
+    return f"{numeric:,.1f}"
+
+
 def _revenue_outlook_summary_cards(
     manifest: dict[str, Any],
     chart_rows: pd.DataFrame,
@@ -2052,13 +2602,27 @@ def _revenue_outlook_summary_cards(
     delta_value, delta_period = _comparison_delta_value(chart_rows)
     gap_count = _future_gap_count(future_revenue)
     return [
-        ("Pack status", str(manifest.get("pack_status", "unavailable")), _short_timestamp(manifest.get("promotion_time"))),
+        (
+            "Pack status",
+            _pack_status_label(manifest.get("pack_status", "unavailable")),
+            _short_timestamp(manifest.get("promotion_time")),
+        ),
         ("Scenarios", str(scenario_count), str(source.get("comparison_id", "reviewed comparison"))),
         ("Latest actual", latest_actual or "-", "latest source historical quarter"),
         ("First forecast", first_forecast or "-", "first reviewed scenario quarter"),
         ("FY5 revenue", _format_compact_value(fy5_value, "nominal NZD"), fy5_period or "no revenue bridge value"),
         ("Comparison delta", _format_signed_compact(delta_value), delta_period or f"{gap_count} governed revenue gaps"),
     ]
+
+
+def _pack_status_label(status: Any) -> str:
+    value = str(status or "unavailable")
+    labels = {
+        "explicitly_promoted_current_outlook": "Promoted",
+        "missing": "Missing",
+        "unavailable": "Unavailable",
+    }
+    return labels.get(value, value.replace("_", " ").title())
 
 
 def _revenue_outlook_stream_options(chart_rows: pd.DataFrame) -> list[str]:

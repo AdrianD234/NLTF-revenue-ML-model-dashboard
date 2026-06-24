@@ -1,0 +1,25 @@
+{
+  "created_at": "2026-06-24T08:56:51.084816+00:00",
+  "exports": {
+    "canonical_revenue_long.csv": {
+      "role": "Canonical long schema across actuals and model paths.",
+      "row_count": 1932,
+      "sha256": "64dec2423cb9c6040f5ee2f3ce2b6bfd5ba0d2ffcd950043b3e2a1121b605954"
+    },
+    "reconciliation_report.csv": {
+      "role": "Hierarchy roll-up reconciliation and explicit gap report.",
+      "row_count": 192,
+      "sha256": "83a250790506d54e09eaa9d1421d9e3c08c4104d5088fd81d18ecb09303690b6"
+    },
+    "validation_issues.csv": {
+      "role": "Loader validation warnings/errors for the source pack.",
+      "row_count": 3,
+      "sha256": "f32c273a7fd46881da2c8c296f9cac20632100b5a6629ddf39e4d9f9a35ffb2b"
+    }
+  },
+  "repo_relative_output_dir": "data/revenue_model_source_pack/2026_05_19",
+  "schema_version": "nltf-revenue-source-pack-loader-exports-v1",
+  "source_pack_raw_sha256": "00c6070694818d27d7c402749354d8175de999894846dce45a4abdd7f5eb3e6b",
+  "source_pack_version": "2026_05_19",
+  "validation_status": "warning"
+}

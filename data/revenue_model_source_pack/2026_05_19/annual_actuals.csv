@@ -1,0 +1,379 @@
+Group,Series,Unit,FY June,Value,Source sheet,Source cell
+Volumes,Light RUC net km,million km,2013,8150.161816,NLTF core annual,E6
+Volumes,Light RUC net km,million km,2014,8809.590297,NLTF core annual,F6
+Volumes,Light RUC net km,million km,2015,9167.483044,NLTF core annual,G6
+Volumes,Light RUC net km,million km,2016,9669.475028,NLTF core annual,H6
+Volumes,Light RUC net km,million km,2017,10425.610839,NLTF core annual,I6
+Volumes,Light RUC net km,million km,2018,11112.22716,NLTF core annual,J6
+Volumes,Light RUC net km,million km,2019,11898.225208,NLTF core annual,K6
+Volumes,Light RUC net km,million km,2020,11385.93681,NLTF core annual,L6
+Volumes,Light RUC net km,million km,2021,11998.163013,NLTF core annual,M6
+Volumes,Light RUC net km,million km,2022,12644.208208,NLTF core annual,N6
+Volumes,Light RUC net km,million km,2023,13553.287615,NLTF core annual,O6
+Volumes,Light RUC net km,million km,2024,10355.550659,NLTF core annual,P6
+Volumes,Light RUC net km,million km,2025,12273.983872,NLTF core annual,Q6
+Volumes,Light RUC net km,million km,2026,6430.924246,NLTF core annual,R6
+Volumes,Heavy RUC net km,million km,2013,3552.310017,NLTF core annual,E7
+Volumes,Heavy RUC net km,million km,2014,3646.506756,NLTF core annual,F7
+Volumes,Heavy RUC net km,million km,2015,3698.793648,NLTF core annual,G7
+Volumes,Heavy RUC net km,million km,2016,3716.710068,NLTF core annual,H7
+Volumes,Heavy RUC net km,million km,2017,3842.683587,NLTF core annual,I7
+Volumes,Heavy RUC net km,million km,2018,4022.092402,NLTF core annual,J7
+Volumes,Heavy RUC net km,million km,2019,4071.164816,NLTF core annual,K7
+Volumes,Heavy RUC net km,million km,2020,3867.517432,NLTF core annual,L7
+Volumes,Heavy RUC net km,million km,2021,4141.235503,NLTF core annual,M7
+Volumes,Heavy RUC net km,million km,2022,4170.928916,NLTF core annual,N7
+Volumes,Heavy RUC net km,million km,2023,4152.746925,NLTF core annual,O7
+Volumes,Heavy RUC net km,million km,2024,3903.861766,NLTF core annual,P7
+Volumes,Heavy RUC net km,million km,2025,3981.873439,NLTF core annual,Q7
+Volumes,Heavy RUC net km,million km,2026,2043.382626,NLTF core annual,R7
+Volumes,Light BEV RUC net km,million km,2024,413.518791,NLTF core annual,P8
+Volumes,Light BEV RUC net km,million km,2025,820.641429,NLTF core annual,Q8
+Volumes,Light BEV RUC net km,million km,2026,544.953474,NLTF core annual,R8
+Volumes,Heavy BEV RUC net km,million km,2024,0,NLTF core annual,P9
+Volumes,Heavy BEV RUC net km,million km,2025,0,NLTF core annual,Q9
+Volumes,Heavy BEV RUC net km,million km,2026,0,NLTF core annual,R9
+Volumes,PHEV RUC net km,million km,2024,194.94237,NLTF core annual,P10
+Volumes,PHEV RUC net km,million km,2025,435.117435,NLTF core annual,Q10
+Volumes,PHEV RUC net km,million km,2026,279.621995,NLTF core annual,R10
+Volumes,TUC GTK,tonne-km,2022,6130861644,NLTF core annual,N14
+Volumes,TUC GTK,tonne-km,2023,9070318124,NLTF core annual,O14
+Volumes,TUC GTK,tonne-km,2024,8349651775,NLTF core annual,P14
+Volumes,TUC GTK,tonne-km,2025,8016352797,NLTF core annual,Q14
+Volumes,TUC GTK,tonne-km,2026,4134685544.66,NLTF core annual,R14
+RUC revenue,Light RUC net revenue,$m ex GST,2013,329.8508367652173,NLTF core annual,E15
+RUC revenue,Light RUC net revenue,$m ex GST,2014,415.1234353565218,NLTF core annual,F15
+RUC revenue,Light RUC net revenue,$m ex GST,2015,469.8084842086959,NLTF core annual,G15
+RUC revenue,Light RUC net revenue,$m ex GST,2016,524.5291478869565,NLTF core annual,H15
+RUC revenue,Light RUC net revenue,$m ex GST,2017,490.8589926434784,NLTF core annual,I15
+RUC revenue,Light RUC net revenue,$m ex GST,2018,522.8235887043478,NLTF core annual,J15
+RUC revenue,Light RUC net revenue,$m ex GST,2019,688.6312373043479,NLTF core annual,K15
+RUC revenue,Light RUC net revenue,$m ex GST,2020,698.5758703652175,NLTF core annual,L15
+RUC revenue,Light RUC net revenue,$m ex GST,2021,790.3223137391305,NLTF core annual,M15
+RUC revenue,Light RUC net revenue,$m ex GST,2022,761.6106490782606,NLTF core annual,N15
+RUC revenue,Light RUC net revenue,$m ex GST,2023,600.6886672521739,NLTF core annual,O15
+RUC revenue,Light RUC net revenue,$m ex GST,2024,689.7409352260869,NLTF core annual,P15
+RUC revenue,Light RUC net revenue,$m ex GST,2025,772.7835326347827,NLTF core annual,Q15
+RUC revenue,Light RUC net revenue,$m ex GST,2026,404.1757696086956,NLTF core annual,R15
+RUC revenue,Heavy RUC net revenue,$m ex GST,2013,776.3294544200002,NLTF core annual,E16
+RUC revenue,Heavy RUC net revenue,$m ex GST,2014,813.5597911500001,NLTF core annual,F16
+RUC revenue,Heavy RUC net revenue,$m ex GST,2015,833.8183096399999,NLTF core annual,G16
+RUC revenue,Heavy RUC net revenue,$m ex GST,2016,878.6670045299998,NLTF core annual,H16
+RUC revenue,Heavy RUC net revenue,$m ex GST,2017,982.1650531600001,NLTF core annual,I16
+RUC revenue,Heavy RUC net revenue,$m ex GST,2018,1033.60319676,NLTF core annual,J16
+RUC revenue,Heavy RUC net revenue,$m ex GST,2019,990.4322618000001,NLTF core annual,K16
+RUC revenue,Heavy RUC net revenue,$m ex GST,2020,1021.66038778,NLTF core annual,L16
+RUC revenue,Heavy RUC net revenue,$m ex GST,2021,1136.73230031,NLTF core annual,M16
+RUC revenue,Heavy RUC net revenue,$m ex GST,2022,1075.30883881,NLTF core annual,N16
+RUC revenue,Heavy RUC net revenue,$m ex GST,2023,779.3147737900001,NLTF core annual,O16
+RUC revenue,Heavy RUC net revenue,$m ex GST,2024,1089.56171388,NLTF core annual,P16
+RUC revenue,Heavy RUC net revenue,$m ex GST,2025,1146.29680501,NLTF core annual,Q16
+RUC revenue,Heavy RUC net revenue,$m ex GST,2026,592.6234532899999,NLTF core annual,R16
+RUC revenue,Light BEV RUC net revenue,$m ex GST,2024,27.17009431304352,NLTF core annual,P17
+RUC revenue,Light BEV RUC net revenue,$m ex GST,2025,51.47360806956523,NLTF core annual,Q17
+RUC revenue,Light BEV RUC net revenue,$m ex GST,2026,34.01967200869566,NLTF core annual,R17
+RUC revenue,Heavy BEV RUC net revenue,$m ex GST,2025,0,NLTF core annual,Q18
+RUC revenue,Heavy BEV RUC net revenue,$m ex GST,2026,0,NLTF core annual,R18
+RUC revenue,PHEV RUC net revenue,$m ex GST,2019,0,NLTF core annual,K19
+RUC revenue,PHEV RUC net revenue,$m ex GST,2024,6.460867695652169,NLTF core annual,P19
+RUC revenue,PHEV RUC net revenue,$m ex GST,2025,13.28056079999999,NLTF core annual,Q19
+RUC revenue,PHEV RUC net revenue,$m ex GST,2026,8.687195252173908,NLTF core annual,R19
+RUC revenue,RUC refunds,$m ex GST,2013,53.19034252000001,NLTF core annual,E20
+RUC revenue,RUC refunds,$m ex GST,2014,42.49246883,NLTF core annual,F20
+RUC revenue,RUC refunds,$m ex GST,2015,52.32499065,NLTF core annual,G20
+RUC revenue,RUC refunds,$m ex GST,2016,51.76397021,NLTF core annual,H20
+RUC revenue,RUC refunds,$m ex GST,2017,38.9584592,NLTF core annual,I20
+RUC revenue,RUC refunds,$m ex GST,2018,43.0361253,NLTF core annual,J20
+RUC revenue,RUC refunds,$m ex GST,2019,54.33328386,NLTF core annual,K20
+RUC revenue,RUC refunds,$m ex GST,2020,57.11888813,NLTF core annual,L20
+RUC revenue,RUC refunds,$m ex GST,2021,62.8001345,NLTF core annual,M20
+RUC revenue,RUC refunds,$m ex GST,2022,71.64409653,NLTF core annual,N20
+RUC revenue,RUC refunds,$m ex GST,2023,43.57967467,NLTF core annual,O20
+RUC revenue,RUC refunds,$m ex GST,2024,66.70266696,NLTF core annual,P20
+RUC revenue,RUC refunds,$m ex GST,2025,62.55622679000001,NLTF core annual,Q20
+RUC revenue,RUC refunds,$m ex GST,2026,34.60004829,NLTF core annual,R20
+RUC revenue,Gross RUC revenue,$m ex GST,2013,1159.370633705217,NLTF core annual,E21
+RUC revenue,Gross RUC revenue,$m ex GST,2014,1271.175695336522,NLTF core annual,F21
+RUC revenue,Gross RUC revenue,$m ex GST,2015,1355.951784498696,NLTF core annual,G21
+RUC revenue,Gross RUC revenue,$m ex GST,2016,1454.960122626956,NLTF core annual,H21
+RUC revenue,Gross RUC revenue,$m ex GST,2017,1511.982505003479,NLTF core annual,I21
+RUC revenue,Gross RUC revenue,$m ex GST,2018,1599.462910764348,NLTF core annual,J21
+RUC revenue,Gross RUC revenue,$m ex GST,2019,1733.396782964348,NLTF core annual,K21
+RUC revenue,Gross RUC revenue,$m ex GST,2020,1777.355146275218,NLTF core annual,L21
+RUC revenue,Gross RUC revenue,$m ex GST,2021,1989.854748549131,NLTF core annual,M21
+RUC revenue,Gross RUC revenue,$m ex GST,2022,1908.563584418261,NLTF core annual,N21
+RUC revenue,Gross RUC revenue,$m ex GST,2023,1423.583115712174,NLTF core annual,O21
+RUC revenue,Gross RUC revenue,$m ex GST,2024,1879.636278074782,NLTF core annual,P21
+RUC revenue,Gross RUC revenue,$m ex GST,2025,2046.390733304348,NLTF core annual,Q21
+RUC revenue,Gross RUC revenue,$m ex GST,2026,1074.106138449565,NLTF core annual,R21
+RUC revenue,RUC admin revenue,$m ex GST,2013,11.00874266,NLTF core annual,E22
+RUC revenue,RUC admin revenue,$m ex GST,2014,11.08004691,NLTF core annual,F22
+RUC revenue,RUC admin revenue,$m ex GST,2015,11.65209955304348,NLTF core annual,G22
+RUC revenue,RUC admin revenue,$m ex GST,2016,12.1292957047826,NLTF core annual,H22
+RUC revenue,RUC admin revenue,$m ex GST,2017,12.62837238391304,NLTF core annual,I22
+RUC revenue,RUC admin revenue,$m ex GST,2018,13.02647099347825,NLTF core annual,J22
+RUC revenue,RUC admin revenue,$m ex GST,2019,13.43615195869565,NLTF core annual,K22
+RUC revenue,RUC admin revenue,$m ex GST,2020,12.68684726173913,NLTF core annual,L22
+RUC revenue,RUC admin revenue,$m ex GST,2021,13.3971655004348,NLTF core annual,M22
+RUC revenue,RUC admin revenue,$m ex GST,2022,13.20106673130434,NLTF core annual,N22
+RUC revenue,RUC admin revenue,$m ex GST,2023,12.47290874304348,NLTF core annual,O22
+RUC revenue,RUC admin revenue,$m ex GST,2024,24.25519492608696,NLTF core annual,P22
+RUC revenue,RUC admin revenue,$m ex GST,2025,32.26586805217392,NLTF core annual,Q22
+RUC revenue,RUC admin revenue,$m ex GST,2026,17.15183260173912,NLTF core annual,R22
+RUC revenue,RUC revenues net of admin fees,$m ex GST,2013,1148.361891045217,NLTF core annual,E23
+RUC revenue,RUC revenues net of admin fees,$m ex GST,2014,1260.095648426522,NLTF core annual,F23
+RUC revenue,RUC revenues net of admin fees,$m ex GST,2015,1344.299684945652,NLTF core annual,G23
+RUC revenue,RUC revenues net of admin fees,$m ex GST,2016,1442.830826922174,NLTF core annual,H23
+RUC revenue,RUC revenues net of admin fees,$m ex GST,2017,1499.354132619565,NLTF core annual,I23
+RUC revenue,RUC revenues net of admin fees,$m ex GST,2018,1586.43643977087,NLTF core annual,J23
+RUC revenue,RUC revenues net of admin fees,$m ex GST,2019,1719.960631005652,NLTF core annual,K23
+RUC revenue,RUC revenues net of admin fees,$m ex GST,2020,1764.668299013478,NLTF core annual,L23
+RUC revenue,RUC revenues net of admin fees,$m ex GST,2021,1976.457583048696,NLTF core annual,M23
+RUC revenue,RUC revenues net of admin fees,$m ex GST,2022,1895.362517686956,NLTF core annual,N23
+RUC revenue,RUC revenues net of admin fees,$m ex GST,2023,1411.110206969131,NLTF core annual,O23
+RUC revenue,RUC revenues net of admin fees,$m ex GST,2024,1855.381083148696,NLTF core annual,P23
+RUC revenue,RUC revenues net of admin fees,$m ex GST,2025,2014.124865252174,NLTF core annual,Q23
+RUC revenue,RUC revenues net of admin fees,$m ex GST,2026,1056.954305847826,NLTF core annual,R23
+RUC revenue,RUC revenues net of admin fees & refunds,$m ex GST,2013,1106.180291185217,NLTF core annual,E24
+RUC revenue,RUC revenues net of admin fees & refunds,$m ex GST,2014,1228.683226506522,NLTF core annual,F24
+RUC revenue,RUC revenues net of admin fees & refunds,$m ex GST,2015,1303.626793848696,NLTF core annual,G24
+RUC revenue,RUC revenues net of admin fees & refunds,$m ex GST,2016,1403.196152416956,NLTF core annual,H24
+RUC revenue,RUC revenues net of admin fees & refunds,$m ex GST,2017,1473.024045803478,NLTF core annual,I24
+RUC revenue,RUC revenues net of admin fees & refunds,$m ex GST,2018,1556.426785464348,NLTF core annual,J24
+RUC revenue,RUC revenues net of admin fees & refunds,$m ex GST,2019,1679.063499104348,NLTF core annual,K24
+RUC revenue,RUC revenues net of admin fees & refunds,$m ex GST,2020,1720.236258145218,NLTF core annual,L24
+RUC revenue,RUC revenues net of admin fees & refunds,$m ex GST,2021,1927.054614049131,NLTF core annual,M24
+RUC revenue,RUC revenues net of admin fees & refunds,$m ex GST,2022,1836.919487888261,NLTF core annual,N24
+RUC revenue,RUC revenues net of admin fees & refunds,$m ex GST,2023,1380.003441042174,NLTF core annual,O24
+RUC revenue,RUC revenues net of admin fees & refunds,$m ex GST,2024,1812.933611114782,NLTF core annual,P24
+RUC revenue,RUC revenues net of admin fees & refunds,$m ex GST,2025,1983.834506514348,NLTF core annual,Q24
+RUC revenue,RUC revenues net of admin fees & refunds,$m ex GST,2026,1039.506090159565,NLTF core annual,R24
+FED revenue,Gross PED revenue,$m ex GST,2013,1537.78117519,NLTF core annual,E25
+FED revenue,Gross PED revenue,$m ex GST,2014,1626.00155652,NLTF core annual,F25
+FED revenue,Gross PED revenue,$m ex GST,2015,1761.92669309,NLTF core annual,G25
+FED revenue,Gross PED revenue,$m ex GST,2016,1906.0248969,NLTF core annual,H25
+FED revenue,Gross PED revenue,$m ex GST,2017,1933.77670022,NLTF core annual,I25
+FED revenue,Gross PED revenue,$m ex GST,2018,1933.90465553,NLTF core annual,J25
+FED revenue,Gross PED revenue,$m ex GST,2019,2016.01858683,NLTF core annual,K25
+FED revenue,Gross PED revenue,$m ex GST,2020,1914.67028566,NLTF core annual,L25
+FED revenue,Gross PED revenue,$m ex GST,2021,2176.23857515,NLTF core annual,M25
+FED revenue,Gross PED revenue,$m ex GST,2022,1766.4787651,NLTF core annual,N25
+FED revenue,Gross PED revenue,$m ex GST,2023,1349.04504259,NLTF core annual,O25
+FED revenue,Gross PED revenue,$m ex GST,2024,2033.76913415,NLTF core annual,P25
+FED revenue,Gross PED revenue,$m ex GST,2025,2026.68630478,NLTF core annual,Q25
+FED revenue,Gross PED revenue,$m ex GST,2026,1051.08623476,NLTF core annual,R25
+FED revenue,Gross LPG revenue,$m ex GST,2013,32.43573362,NLTF core annual,E26
+FED revenue,Gross LPG revenue,$m ex GST,2014,31.64969001,NLTF core annual,F26
+FED revenue,Gross LPG revenue,$m ex GST,2015,36.42896451000001,NLTF core annual,G26
+FED revenue,Gross LPG revenue,$m ex GST,2016,35.33328707,NLTF core annual,H26
+FED revenue,Gross LPG revenue,$m ex GST,2017,35.08583452999999,NLTF core annual,I26
+FED revenue,Gross LPG revenue,$m ex GST,2018,35.06419135,NLTF core annual,J26
+FED revenue,Gross LPG revenue,$m ex GST,2019,37.18468972999999,NLTF core annual,K26
+FED revenue,Gross LPG revenue,$m ex GST,2020,35.74170434000001,NLTF core annual,L26
+FED revenue,Gross LPG revenue,$m ex GST,2021,39.87002343,NLTF core annual,M26
+FED revenue,Gross LPG revenue,$m ex GST,2022,46.36007741,NLTF core annual,N26
+FED revenue,Gross LPG revenue,$m ex GST,2023,48.43202956,NLTF core annual,O26
+FED revenue,Gross LPG revenue,$m ex GST,2024,40.16342351000001,NLTF core annual,P26
+FED revenue,Gross LPG revenue,$m ex GST,2025,40.94161913000001,NLTF core annual,Q26
+FED revenue,Gross LPG revenue,$m ex GST,2026,23.01288828,NLTF core annual,R26
+FED revenue,Gross CNG revenue,$m ex GST,2013,0.15598234,NLTF core annual,E27
+FED revenue,Gross CNG revenue,$m ex GST,2014,0.08325372000000002,NLTF core annual,F27
+FED revenue,Gross CNG revenue,$m ex GST,2015,0.07415424000000001,NLTF core annual,G27
+FED revenue,Gross CNG revenue,$m ex GST,2016,0.06420263,NLTF core annual,H27
+FED revenue,Gross CNG revenue,$m ex GST,2017,0.05061531,NLTF core annual,I27
+FED revenue,Gross CNG revenue,$m ex GST,2018,0.01576777,NLTF core annual,J27
+FED revenue,Gross CNG revenue,$m ex GST,2019,0,NLTF core annual,K27
+FED revenue,Gross CNG revenue,$m ex GST,2020,0,NLTF core annual,L27
+FED revenue,Gross CNG revenue,$m ex GST,2021,0,NLTF core annual,M27
+FED revenue,Gross CNG revenue,$m ex GST,2022,0,NLTF core annual,N27
+FED revenue,Gross CNG revenue,$m ex GST,2023,0,NLTF core annual,O27
+FED revenue,Gross CNG revenue,$m ex GST,2024,0,NLTF core annual,P27
+FED revenue,Gross CNG revenue,$m ex GST,2025,0,NLTF core annual,Q27
+FED revenue,Gross CNG revenue,$m ex GST,2026,0,NLTF core annual,R27
+FED revenue,Gross FED revenue,$m ex GST,2013,1570.37289115,NLTF core annual,E28
+FED revenue,Gross FED revenue,$m ex GST,2014,1657.73450025,NLTF core annual,F28
+FED revenue,Gross FED revenue,$m ex GST,2015,1798.42981184,NLTF core annual,G28
+FED revenue,Gross FED revenue,$m ex GST,2016,1941.4223866,NLTF core annual,H28
+FED revenue,Gross FED revenue,$m ex GST,2017,1968.91315006,NLTF core annual,I28
+FED revenue,Gross FED revenue,$m ex GST,2018,1968.98461465,NLTF core annual,J28
+FED revenue,Gross FED revenue,$m ex GST,2019,2053.20327656,NLTF core annual,K28
+FED revenue,Gross FED revenue,$m ex GST,2020,1950.41199,NLTF core annual,L28
+FED revenue,Gross FED revenue,$m ex GST,2021,2216.10859858,NLTF core annual,M28
+FED revenue,Gross FED revenue,$m ex GST,2022,1812.83884251,NLTF core annual,N28
+FED revenue,Gross FED revenue,$m ex GST,2023,1397.47707215,NLTF core annual,O28
+FED revenue,Gross FED revenue,$m ex GST,2024,2073.93255766,NLTF core annual,P28
+FED revenue,Gross FED revenue,$m ex GST,2025,2067.62792391,NLTF core annual,Q28
+FED revenue,Gross FED revenue,$m ex GST,2026,1074.09912304,NLTF core annual,R28
+FED revenue,FED refunds,$m ex GST,2013,36.25090689,NLTF core annual,E29
+FED revenue,FED refunds,$m ex GST,2014,42.32392003,NLTF core annual,F29
+FED revenue,FED refunds,$m ex GST,2015,50.75234515,NLTF core annual,G29
+FED revenue,FED refunds,$m ex GST,2016,58.67643186999999,NLTF core annual,H29
+FED revenue,FED refunds,$m ex GST,2017,56.24315484,NLTF core annual,I29
+FED revenue,FED refunds,$m ex GST,2018,65.16975787,NLTF core annual,J29
+FED revenue,FED refunds,$m ex GST,2019,66.08742835000001,NLTF core annual,K29
+FED revenue,FED refunds,$m ex GST,2020,67.88041850999998,NLTF core annual,L29
+FED revenue,FED refunds,$m ex GST,2021,67.59249122,NLTF core annual,M29
+FED revenue,FED refunds,$m ex GST,2022,59.9764789,NLTF core annual,N29
+FED revenue,FED refunds,$m ex GST,2023,68.05107856000001,NLTF core annual,O29
+FED revenue,FED refunds,$m ex GST,2024,67.00276261,NLTF core annual,P29
+FED revenue,FED refunds,$m ex GST,2025,69.90077731000001,NLTF core annual,Q29
+FED revenue,FED refunds,$m ex GST,2026,37.11699416,NLTF core annual,R29
+FED revenue,Net FED revenue,$m ex GST,2013,1534.12198426,NLTF core annual,E30
+FED revenue,Net FED revenue,$m ex GST,2014,1615.41058022,NLTF core annual,F30
+FED revenue,Net FED revenue,$m ex GST,2015,1747.67746669,NLTF core annual,G30
+FED revenue,Net FED revenue,$m ex GST,2016,1882.74595473,NLTF core annual,H30
+FED revenue,Net FED revenue,$m ex GST,2017,1912.66999522,NLTF core annual,I30
+FED revenue,Net FED revenue,$m ex GST,2018,1903.81485678,NLTF core annual,J30
+FED revenue,Net FED revenue,$m ex GST,2019,1987.11584821,NLTF core annual,K30
+FED revenue,Net FED revenue,$m ex GST,2020,1882.53157149,NLTF core annual,L30
+FED revenue,Net FED revenue,$m ex GST,2021,2148.51610736,NLTF core annual,M30
+FED revenue,Net FED revenue,$m ex GST,2022,1752.86236361,NLTF core annual,N30
+FED revenue,Net FED revenue,$m ex GST,2023,1329.42599359,NLTF core annual,O30
+FED revenue,Net FED revenue,$m ex GST,2024,2006.92979505,NLTF core annual,P30
+FED revenue,Net FED revenue,$m ex GST,2025,1997.7271466,NLTF core annual,Q30
+FED revenue,Net FED revenue,$m ex GST,2026,1036.98212888,NLTF core annual,R30
+MVR/TUC revenue,Gross MVR revenue,$m ex GST,2013,271.5565145617391,NLTF core annual,E31
+MVR/TUC revenue,Gross MVR revenue,$m ex GST,2014,287.3290612078261,NLTF core annual,F31
+MVR/TUC revenue,Gross MVR revenue,$m ex GST,2015,288.7846689039131,NLTF core annual,G31
+MVR/TUC revenue,Gross MVR revenue,$m ex GST,2016,322.5835391621739,NLTF core annual,H31
+MVR/TUC revenue,Gross MVR revenue,$m ex GST,2017,324.1239951434783,NLTF core annual,I31
+MVR/TUC revenue,Gross MVR revenue,$m ex GST,2018,325.4163800330435,NLTF core annual,J31
+MVR/TUC revenue,Gross MVR revenue,$m ex GST,2019,321.900255963913,NLTF core annual,K31
+MVR/TUC revenue,Gross MVR revenue,$m ex GST,2020,316.9017783656521,NLTF core annual,L31
+MVR/TUC revenue,Gross MVR revenue,$m ex GST,2021,324.1874254830435,NLTF core annual,M31
+MVR/TUC revenue,Gross MVR revenue,$m ex GST,2022,322.6686632265217,NLTF core annual,N31
+MVR/TUC revenue,Gross MVR revenue,$m ex GST,2023,329.0999977608695,NLTF core annual,O31
+MVR/TUC revenue,Gross MVR revenue,$m ex GST,2024,361.8070675126086,NLTF core annual,P31
+MVR/TUC revenue,Gross MVR revenue,$m ex GST,2025,431.3572420082609,NLTF core annual,Q31
+MVR/TUC revenue,Gross MVR revenue,$m ex GST,2026,255.8951428669565,NLTF core annual,R31
+MVR/TUC revenue,MVR admin revenue,$m ex GST,2013,45.20602402608695,NLTF core annual,E32
+MVR/TUC revenue,MVR admin revenue,$m ex GST,2014,46.39537042608695,NLTF core annual,F32
+MVR/TUC revenue,MVR admin revenue,$m ex GST,2015,50.03730606086958,NLTF core annual,G32
+MVR/TUC revenue,MVR admin revenue,$m ex GST,2016,50.04163347826086,NLTF core annual,H32
+MVR/TUC revenue,MVR admin revenue,$m ex GST,2017,46.36904719130436,NLTF core annual,I32
+MVR/TUC revenue,MVR admin revenue,$m ex GST,2018,44.60026396521737,NLTF core annual,J32
+MVR/TUC revenue,MVR admin revenue,$m ex GST,2019,43.15816284347824,NLTF core annual,K32
+MVR/TUC revenue,MVR admin revenue,$m ex GST,2020,41.42691239130433,NLTF core annual,L32
+MVR/TUC revenue,MVR admin revenue,$m ex GST,2021,41.75362429565217,NLTF core annual,M32
+MVR/TUC revenue,MVR admin revenue,$m ex GST,2022,40.0483052173913,NLTF core annual,N32
+MVR/TUC revenue,MVR admin revenue,$m ex GST,2023,42.17176638260869,NLTF core annual,O32
+MVR/TUC revenue,MVR admin revenue,$m ex GST,2024,63.3054770173913,NLTF core annual,P32
+MVR/TUC revenue,MVR admin revenue,$m ex GST,2025,71.76413736521741,NLTF core annual,Q32
+MVR/TUC revenue,MVR admin revenue,$m ex GST,2026,37.13791544347826,NLTF core annual,R32
+MVR/TUC revenue,MVR revenues net of admin fees & COO,$m ex GST,2013,219.4796804660869,NLTF core annual,E33
+MVR/TUC revenue,MVR revenues net of admin fees & COO,$m ex GST,2014,234.0150306860869,NLTF core annual,F33
+MVR/TUC revenue,MVR revenues net of admin fees & COO,$m ex GST,2015,231.5771007908696,NLTF core annual,G33
+MVR/TUC revenue,MVR revenues net of admin fees & COO,$m ex GST,2016,264.9885961882609,NLTF core annual,H33
+MVR/TUC revenue,MVR revenues net of admin fees & COO,$m ex GST,2017,270.0915762913044,NLTF core annual,I33
+MVR/TUC revenue,MVR revenues net of admin fees & COO,$m ex GST,2018,273.0300188852174,NLTF core annual,J33
+MVR/TUC revenue,MVR revenues net of admin fees & COO,$m ex GST,2019,270.8788536334782,NLTF core annual,K33
+MVR/TUC revenue,MVR revenues net of admin fees & COO,$m ex GST,2020,267.9766366613043,NLTF core annual,L33
+MVR/TUC revenue,MVR revenues net of admin fees & COO,$m ex GST,2021,274.1329012656522,NLTF core annual,M33
+MVR/TUC revenue,MVR revenues net of admin fees & COO,$m ex GST,2022,275.1745196873913,NLTF core annual,N33
+MVR/TUC revenue,MVR revenues net of admin fees & COO,$m ex GST,2023,279.2944288826087,NLTF core annual,O33
+MVR/TUC revenue,MVR revenues net of admin fees & COO,$m ex GST,2024,296.5418137473913,NLTF core annual,P33
+MVR/TUC revenue,MVR revenues net of admin fees & COO,$m ex GST,2025,359.5932010952174,NLTF core annual,Q33
+MVR/TUC revenue,MVR revenues net of admin fees & COO,$m ex GST,2026,218.7572274234783,NLTF core annual,R33
+MVR/TUC revenue,MVR refunds,$m ex GST,2013,0.43050114,NLTF core annual,E34
+MVR/TUC revenue,MVR refunds,$m ex GST,2014,0.50827399,NLTF core annual,F34
+MVR/TUC revenue,MVR refunds,$m ex GST,2015,0.5660215200000001,NLTF core annual,G34
+MVR/TUC revenue,MVR refunds,$m ex GST,2016,0.81911607,NLTF core annual,H34
+MVR/TUC revenue,MVR refunds,$m ex GST,2017,0.7957954400000001,NLTF core annual,I34
+MVR/TUC revenue,MVR refunds,$m ex GST,2018,0.9834056399999999,NLTF core annual,J34
+MVR/TUC revenue,MVR refunds,$m ex GST,2019,0.9531394100000001,NLTF core annual,K34
+MVR/TUC revenue,MVR refunds,$m ex GST,2020,0.91561874,NLTF core annual,L34
+MVR/TUC revenue,MVR refunds,$m ex GST,2021,0.97320013,NLTF core annual,M34
+MVR/TUC revenue,MVR refunds,$m ex GST,2022,0.90534219,NLTF core annual,N34
+MVR/TUC revenue,MVR refunds,$m ex GST,2023,1.06713379,NLTF core annual,O34
+MVR/TUC revenue,MVR refunds,$m ex GST,2024,0.9581695,NLTF core annual,P34
+MVR/TUC revenue,MVR refunds,$m ex GST,2025,1.03557262,NLTF core annual,Q34
+MVR/TUC revenue,MVR refunds,$m ex GST,2026,0.7727786799999999,NLTF core annual,R34
+MVR/TUC revenue,"MVR revenues net of admin fees, refunds & COO",$m ex GST,2013,219.0491793260869,NLTF core annual,E35
+MVR/TUC revenue,"MVR revenues net of admin fees, refunds & COO",$m ex GST,2014,233.5067566960869,NLTF core annual,F35
+MVR/TUC revenue,"MVR revenues net of admin fees, refunds & COO",$m ex GST,2015,231.0110792708696,NLTF core annual,G35
+MVR/TUC revenue,"MVR revenues net of admin fees, refunds & COO",$m ex GST,2016,264.1694801182609,NLTF core annual,H35
+MVR/TUC revenue,"MVR revenues net of admin fees, refunds & COO",$m ex GST,2017,269.2957808513044,NLTF core annual,I35
+MVR/TUC revenue,"MVR revenues net of admin fees, refunds & COO",$m ex GST,2018,272.0466132452174,NLTF core annual,J35
+MVR/TUC revenue,"MVR revenues net of admin fees, refunds & COO",$m ex GST,2019,269.9257142234782,NLTF core annual,K35
+MVR/TUC revenue,"MVR revenues net of admin fees, refunds & COO",$m ex GST,2020,267.0610179213043,NLTF core annual,L35
+MVR/TUC revenue,"MVR revenues net of admin fees, refunds & COO",$m ex GST,2021,273.1597011356521,NLTF core annual,M35
+MVR/TUC revenue,"MVR revenues net of admin fees, refunds & COO",$m ex GST,2022,274.2691774973913,NLTF core annual,N35
+MVR/TUC revenue,"MVR revenues net of admin fees, refunds & COO",$m ex GST,2023,278.2272950926086,NLTF core annual,O35
+MVR/TUC revenue,"MVR revenues net of admin fees, refunds & COO",$m ex GST,2024,295.5836442473913,NLTF core annual,P35
+MVR/TUC revenue,"MVR revenues net of admin fees, refunds & COO",$m ex GST,2025,358.5576284752174,NLTF core annual,Q35
+MVR/TUC revenue,"MVR revenues net of admin fees, refunds & COO",$m ex GST,2026,217.9844487434783,NLTF core annual,R35
+MVR/TUC revenue,TUC net revenue,$m ex GST,2022,7.23441674,NLTF core annual,N36
+MVR/TUC revenue,TUC net revenue,$m ex GST,2023,14.97376563,NLTF core annual,O36
+MVR/TUC revenue,TUC net revenue,$m ex GST,2024,17.6100245,NLTF core annual,P36
+MVR/TUC revenue,TUC net revenue,$m ex GST,2025,17.09481038,NLTF core annual,Q36
+MVR/TUC revenue,TUC net revenue,$m ex GST,2026,8.627127640000001,NLTF core annual,R36
+Total revenue,Total gross revenues,$m ex GST,2013,3001.300039416957,NLTF core annual,E37
+Total revenue,Total gross revenues,$m ex GST,2014,3216.239256794348,NLTF core annual,F37
+Total revenue,Total gross revenues,$m ex GST,2015,3443.166265242609,NLTF core annual,G37
+Total revenue,Total gross revenues,$m ex GST,2016,3718.96604838913,NLTF core annual,H37
+Total revenue,Total gross revenues,$m ex GST,2017,3805.019650206957,NLTF core annual,I37
+Total revenue,Total gross revenues,$m ex GST,2018,3893.863905447392,NLTF core annual,J37
+Total revenue,Total gross revenues,$m ex GST,2019,4108.500315488262,NLTF core annual,K37
+Total revenue,Total gross revenues,$m ex GST,2020,4044.66891464087,NLTF core annual,L37
+Total revenue,Total gross revenues,$m ex GST,2021,4530.150772612174,NLTF core annual,M37
+Total revenue,Total gross revenues,$m ex GST,2022,4051.305506894782,NLTF core annual,N37
+Total revenue,Total gross revenues,$m ex GST,2023,3165.133951253043,NLTF core annual,O37
+Total revenue,Total gross revenues,$m ex GST,2024,4332.985927747391,NLTF core annual,P37
+Total revenue,Total gross revenues,$m ex GST,2025,4562.470709602609,NLTF core annual,Q37
+Total revenue,Total gross revenues,$m ex GST,2026,2412.727531996522,NLTF core annual,R37
+Total revenue,Total admin fees,$m ex GST,2013,56.21476668608695,NLTF core annual,E38
+Total revenue,Total admin fees,$m ex GST,2014,57.47541733608695,NLTF core annual,F38
+Total revenue,Total admin fees,$m ex GST,2015,61.68940561391306,NLTF core annual,G38
+Total revenue,Total admin fees,$m ex GST,2016,62.17092918304346,NLTF core annual,H38
+Total revenue,Total admin fees,$m ex GST,2017,58.9974195752174,NLTF core annual,I38
+Total revenue,Total admin fees,$m ex GST,2018,57.62673495869562,NLTF core annual,J38
+Total revenue,Total admin fees,$m ex GST,2019,56.5943148021739,NLTF core annual,K38
+Total revenue,Total admin fees,$m ex GST,2020,54.11375965304346,NLTF core annual,L38
+Total revenue,Total admin fees,$m ex GST,2021,55.15078979608698,NLTF core annual,M38
+Total revenue,Total admin fees,$m ex GST,2022,53.24937194869564,NLTF core annual,N38
+Total revenue,Total admin fees,$m ex GST,2023,54.64467512565217,NLTF core annual,O38
+Total revenue,Total admin fees,$m ex GST,2024,87.56067194347827,NLTF core annual,P38
+Total revenue,Total admin fees,$m ex GST,2025,104.0300054173913,NLTF core annual,Q38
+Total revenue,Total admin fees,$m ex GST,2026,54.28974804521738,NLTF core annual,R38
+Total revenue,Total revenues net of admin fees,$m ex GST,2013,2945.08527273087,NLTF core annual,E39
+Total revenue,Total revenues net of admin fees,$m ex GST,2014,3158.763839458261,NLTF core annual,F39
+Total revenue,Total revenues net of admin fees,$m ex GST,2015,3381.476859628696,NLTF core annual,G39
+Total revenue,Total revenues net of admin fees,$m ex GST,2016,3656.795119206087,NLTF core annual,H39
+Total revenue,Total revenues net of admin fees,$m ex GST,2017,3746.02223063174,NLTF core annual,I39
+Total revenue,Total revenues net of admin fees,$m ex GST,2018,3836.237170488696,NLTF core annual,J39
+Total revenue,Total revenues net of admin fees,$m ex GST,2019,4051.906000686088,NLTF core annual,K39
+Total revenue,Total revenues net of admin fees,$m ex GST,2020,3990.555154987826,NLTF core annual,L39
+Total revenue,Total revenues net of admin fees,$m ex GST,2021,4474.999982816087,NLTF core annual,M39
+Total revenue,Total revenues net of admin fees,$m ex GST,2022,3998.056134946086,NLTF core annual,N39
+Total revenue,Total revenues net of admin fees,$m ex GST,2023,3110.489276127391,NLTF core annual,O39
+Total revenue,Total revenues net of admin fees,$m ex GST,2024,4245.425255803912,NLTF core annual,P39
+Total revenue,Total revenues net of admin fees,$m ex GST,2025,4458.440704185217,NLTF core annual,Q39
+Total revenue,Total revenues net of admin fees,$m ex GST,2026,2358.437783951304,NLTF core annual,R39
+Total revenue,Total refunds,$m ex GST,2013,89.87175055000002,NLTF core annual,E40
+Total revenue,Total refunds,$m ex GST,2014,85.32466285,NLTF core annual,F40
+Total revenue,Total refunds,$m ex GST,2015,103.64335732,NLTF core annual,G40
+Total revenue,Total refunds,$m ex GST,2016,111.25951815,NLTF core annual,H40
+Total revenue,Total refunds,$m ex GST,2017,95.99740948,NLTF core annual,I40
+Total revenue,Total refunds,$m ex GST,2018,109.18928881,NLTF core annual,J40
+Total revenue,Total refunds,$m ex GST,2019,121.37385162,NLTF core annual,K40
+Total revenue,Total refunds,$m ex GST,2020,125.91492538,NLTF core annual,L40
+Total revenue,Total refunds,$m ex GST,2021,131.36582585,NLTF core annual,M40
+Total revenue,Total refunds,$m ex GST,2022,132.52591762,NLTF core annual,N40
+Total revenue,Total refunds,$m ex GST,2023,112.69788702,NLTF core annual,O40
+Total revenue,Total refunds,$m ex GST,2024,134.66359907,NLTF core annual,P40
+Total revenue,Total refunds,$m ex GST,2025,133.49257672,NLTF core annual,Q40
+Total revenue,Total refunds,$m ex GST,2026,72.48982113,NLTF core annual,R40
+Total revenue,Total net revenues,$m ex GST,2013,2859.351454771305,NLTF core annual,E41
+Total revenue,Total net revenues,$m ex GST,2014,3077.600563422609,NLTF core annual,F41
+Total revenue,Total net revenues,$m ex GST,2015,3282.315339809566,NLTF core annual,G41
+Total revenue,Total net revenues,$m ex GST,2016,3550.111587265217,NLTF core annual,H41
+Total revenue,Total net revenues,$m ex GST,2017,3654.989821874783,NLTF core annual,I41
+Total revenue,Total net revenues,$m ex GST,2018,3732.288255489565,NLTF core annual,J41
+Total revenue,Total net revenues,$m ex GST,2019,3936.105061537826,NLTF core annual,K41
+Total revenue,Total net revenues,$m ex GST,2020,3869.828847556522,NLTF core annual,L41
+Total revenue,Total net revenues,$m ex GST,2021,4348.730422544783,NLTF core annual,M41
+Total revenue,Total net revenues,$m ex GST,2022,3871.285445735652,NLTF core annual,N41
+Total revenue,Total net revenues,$m ex GST,2023,3002.630495354782,NLTF core annual,O41
+Total revenue,Total net revenues,$m ex GST,2024,4133.057074912173,NLTF core annual,P41
+Total revenue,Total net revenues,$m ex GST,2025,4357.214091969565,NLTF core annual,Q41
+Total revenue,Total net revenues,$m ex GST,2026,2303.099795423043,NLTF core annual,R41

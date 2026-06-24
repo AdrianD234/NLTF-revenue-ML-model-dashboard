@@ -1,0 +1,11 @@
+Control ID,Workbook cell,Current value
+release_round,B5,BEFU25
+series,E5,Total RUC+PED revenue
+revenue_path,H5,Net of admin fees & refunds
+scenario,K5,Medium
+fed_path_scenario,N5,Current planned path
+view,Q5,Annual
+model_basis,S5,In-house model
+uncertainty_source,S6,MOT release round
+crown_top_up,U5,Exclude
+selected_fy,A10,FY2031

@@ -1,0 +1,89 @@
+{
+  "config_files": {
+    "MODEL_WORKFLOW.md": {
+      "sha256": "0963bf09c0f1405ba9389775f0826c0f54ffc7d6e006918f47f1069ca270d15f"
+    },
+    "README.md": {
+      "sha256": "e6cbc067ded2d9e7d7235c23688a432a895f41fc209ebebd3636f4f5b3fe67d0"
+    },
+    "front_end_config.json": {
+      "sha256": "6291877f05b1aadca44e16fd4db979272d5627fbbe8ae1703c227adfcad2ffed"
+    }
+  },
+  "created_at": "2026-06-24T08:35:55.187949+00:00",
+  "distilled_workbook": {
+    "basename": "NLTF_revenue_model_distilled.xlsx",
+    "sha256": "c7b9c80011a01cc86cc374b1a1ffbf0eb69e14dccc6690e1c54ffc6d6f9ed716",
+    "status": "normalized_contract_source"
+  },
+  "normalized_files": {
+    "aggregation_rules.csv": {
+      "row_count": 12,
+      "sha256": "41aa56360f8ebf7d8b2a37103a5cd3397bbd4d8b15c3c43d2709a597374bf508",
+      "source_sheet": "Aggregation Rules"
+    },
+    "annual_actuals.csv": {
+      "row_count": 378,
+      "sha256": "f37d30359832cb7099de8c021ed7d60d7d509935c902ce298f44e8fded81a711",
+      "source_sheet": "Annual Actuals"
+    },
+    "annual_model_paths.csv": {
+      "row_count": 1554,
+      "sha256": "fbab6f3e3de41a5eacc0f49136c654464e0f426a8913b4cff12424c7577f1e83",
+      "source_sheet": "Annual Model Paths"
+    },
+    "current_selections.csv": {
+      "row_count": 10,
+      "sha256": "29181e7a7a5ff6e924353e05d9dd415d182d67dee4ef49ed6252d064f0cc2dc7",
+      "source_sheet": "Current Selections"
+    },
+    "formula_errors.csv": {
+      "row_count": 396,
+      "sha256": "4c87bcd9cc6e47dcf467d2f4fa275874d22078edce22b73eb8237b56004b85b4",
+      "source_sheet": "Formula Errors"
+    },
+    "model_coefficients.csv": {
+      "row_count": 31,
+      "sha256": "44bff04962928ccff0e6387d7fb318233e147cb6a7049e4462c8a50fcd7cc24d",
+      "source_sheet": "Model Coefficients"
+    },
+    "release_registry.csv": {
+      "row_count": 53,
+      "sha256": "f704ff3bdf953b5f7c97afdac1b53c74a642d129f118c29962bb3d2f0c95fb99",
+      "source_sheet": "Release Registry"
+    },
+    "series_master.csv": {
+      "row_count": 29,
+      "sha256": "adc79ded4d5c48e7bd537643ebcca3ebac8c21fcab04dbaab69e5ab2bdf72b02",
+      "source_sheet": "Series Master"
+    },
+    "unresolved_decisions.csv": {
+      "row_count": 7,
+      "sha256": "630982edb60d17136a77b156bc85d81252268bcb32d6d892e8df44c564e9967a",
+      "source_sheet": "Open Decisions"
+    }
+  },
+  "raw_workbook": {
+    "basename": "19 05 2026 Latest NLTF revenue forecast model.xlsx",
+    "sha256": "00c6070694818d27d7c402749354d8175de999894846dce45a4abdd7f5eb3e6b",
+    "status": "verified_lineage_only_not_committed"
+  },
+  "repo_relative_output_dir": "data/revenue_model_source_pack/2026_05_19",
+  "schema_version": "nltf-revenue-source-pack-v1",
+  "source_pack_version": "2026_05_19",
+  "source_policy": "runtime uses repo-local normalized files only; raw workbook is lineage-only and never loaded by Streamlit",
+  "workbook_sheets": [
+    "Read Me",
+    "Overview",
+    "Series Master",
+    "Aggregation Rules",
+    "Dashboard Controls",
+    "Current Selections",
+    "Model Coefficients",
+    "Annual Actuals",
+    "Annual Model Paths",
+    "Release Registry",
+    "Open Decisions",
+    "Formula Errors"
+  ]
+}

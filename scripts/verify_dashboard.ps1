@@ -3,7 +3,8 @@ param(
     [string]$DataRoot = "",
     [int]$Port = 8501,
     [int]$StartupTimeoutSeconds = 90,
-    [int]$CommandTimeoutSeconds = 900
+    [int]$CommandTimeoutSeconds = 900,
+    [switch]$ReuseExistingServer
 )
 
 $ErrorActionPreference = "Stop"
@@ -92,6 +93,7 @@ Invoke-Checked -FilePath $Python -Arguments @("-m", "pytest", "-q", "tests") -La
 $healthUrl = "http://localhost:$Port/_stcore/health"
 $appUrl = "http://localhost:$Port"
 $serverProcess = $null
+$usingExistingServer = $false
 $serverLog = Join-Path $Root "streamlit.test.out.log"
 $serverErr = Join-Path $Root "streamlit.test.err.log"
 
@@ -133,27 +135,33 @@ function Stop-PortListeners {
         }
 }
 
-Stop-PortListeners -Port $Port
+if ($ReuseExistingServer -and ((Test-StreamlitHealth -Url $healthUrl) -or (Test-StreamlitHealth -Url $appUrl))) {
+    Write-Host "STREAMLIT_REUSE $appUrl"
+    $usingExistingServer = $true
+}
+else {
+    Stop-PortListeners -Port $Port
 
-$serverProcess = Start-Process -FilePath $Python -ArgumentList @(
-    "-m",
-    "streamlit",
-    "run",
-    "app.py",
-    "--server.port",
-    "$Port",
-    "--server.headless",
-    "true",
-    "--browser.gatherUsageStats",
-    "false"
-) -WorkingDirectory $Root -WindowStyle Hidden -RedirectStandardOutput $serverLog -RedirectStandardError $serverErr -PassThru
+    $serverProcess = Start-Process -FilePath $Python -ArgumentList @(
+        "-m",
+        "streamlit",
+        "run",
+        "app.py",
+        "--server.port",
+        "$Port",
+        "--server.headless",
+        "true",
+        "--browser.gatherUsageStats",
+        "false"
+    ) -WorkingDirectory $Root -WindowStyle Hidden -RedirectStandardOutput $serverLog -RedirectStandardError $serverErr -PassThru
 
-$deadline = (Get-Date).AddSeconds($StartupTimeoutSeconds)
-while ((Get-Date) -lt $deadline) {
-    if ((Test-StreamlitHealth -Url $healthUrl) -or (Test-StreamlitHealth -Url $appUrl)) {
-        break
+    $deadline = (Get-Date).AddSeconds($StartupTimeoutSeconds)
+    while ((Get-Date) -lt $deadline) {
+        if ((Test-StreamlitHealth -Url $healthUrl) -or (Test-StreamlitHealth -Url $appUrl)) {
+            break
+        }
+        Start-Sleep -Seconds 2
     }
-    Start-Sleep -Seconds 2
 }
 
 try {
@@ -237,8 +245,10 @@ try {
     Write-Host "Parquet-backed dashboard verification passed with the 120-gate visual conformance suite."
 }
 finally {
-    Stop-PortListeners -Port $Port
-    if ($serverProcess -ne $null) {
+    if (-not $usingExistingServer) {
+        Stop-PortListeners -Port $Port
+    }
+    if ((-not $usingExistingServer) -and $serverProcess -ne $null) {
         Stop-Process -Id $serverProcess.Id -Force -ErrorAction SilentlyContinue
     }
 }

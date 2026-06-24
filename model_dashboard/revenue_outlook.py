@@ -23,6 +23,7 @@ from .forecast_imports import (
     SCENARIO_ROLE_COMPARISON,
     quarter_sort_key,
 )
+from .revenue_source_pack import REVENUE_SOURCE_PACK_DIR
 
 if TYPE_CHECKING:
     from .forecast_runner import ForecastScenarioComparisonResult
@@ -675,6 +676,7 @@ def _manifest(
             "future_light_heavy": "reviewed workbook nominal effective average RUC rate columns",
             "future_ped": "reviewed workbook PED base-rate column plus source-backed PED litres bridge; currently a governed gap when source litres/history are missing",
         },
+        "revenue_source_pack": _revenue_source_pack_metadata(repo_root),
         "bridge_status_by_stream": bridge_status,
         "row_counts": {
             "future_revenue_forecasts": int(len(future_revenue)),
@@ -709,6 +711,21 @@ def _write_pack_files(
     future_revenue.to_csv(output_dir / "future_revenue_forecasts.csv", index=False)
     bridge_components.to_csv(output_dir / "revenue_bridge_components.csv", index=False)
     chart_rows.to_csv(output_dir / "revenue_chart_rows.csv", index=False)
+    output_hashes: dict[str, Any] = {}
+    for filename in [
+        "future_revenue_forecasts.parquet",
+        "future_revenue_forecasts.csv",
+        "revenue_bridge_components.parquet",
+        "revenue_bridge_components.csv",
+        "revenue_chart_rows.parquet",
+        "revenue_chart_rows.csv",
+    ]:
+        path = output_dir / filename
+        output_hashes[filename] = {
+            "sha256": _sha256(path),
+            "size_bytes": path.stat().st_size,
+        }
+    manifest["output_hashes"] = output_hashes
     (output_dir / "manifest.json").write_text(json.dumps(manifest, indent=2, allow_nan=False), encoding="utf-8")
     (output_dir / "manifest.md").write_text(_manifest_markdown(manifest), encoding="utf-8")
 
@@ -736,6 +753,18 @@ def _manifest_markdown(manifest: dict[str, Any]) -> str:
     rows.extend(["", "## Bridge Status"])
     for stream, statuses in (manifest.get("bridge_status_by_stream") or {}).items():
         rows.append(f"- {STREAM_LABELS.get(stream, stream)}: {', '.join(statuses)}")
+    source_pack = manifest.get("revenue_source_pack") or {}
+    if source_pack:
+        rows.extend(
+            [
+                "",
+                "## Revenue Source Pack",
+                f"- Version: `{source_pack.get('source_pack_version')}`",
+                f"- Raw workbook SHA256: `{source_pack.get('raw_workbook_sha256')}`",
+                f"- Manifest SHA256: `{source_pack.get('source_pack_manifest_sha256')}`",
+                f"- Status: `{source_pack.get('status')}`",
+            ]
+        )
     return "\n".join(rows) + "\n"
 
 
@@ -760,6 +789,48 @@ def _source_hashes(repo_root: Path, scenarios: Any) -> dict[str, Any]:
         if isinstance(scenario, dict)
     ]
     return hashes
+
+
+def _revenue_source_pack_metadata(repo_root: Path) -> dict[str, Any]:
+    pack_dir = repo_root / REVENUE_SOURCE_PACK_DIR
+    manifest_path = pack_dir / "manifest.json"
+    front_end_config_path = pack_dir / "front_end_config.json"
+    if not manifest_path.exists():
+        return {
+            "status": "source_pack_missing",
+            "repo_relative_path": _repo_relative(repo_root, pack_dir),
+        }
+    try:
+        source_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {
+            "status": "source_pack_manifest_unreadable",
+            "repo_relative_path": _repo_relative(repo_root, pack_dir),
+            "error": str(exc),
+        }
+    selections: dict[str, Any] = {}
+    if front_end_config_path.exists():
+        try:
+            config = json.loads(front_end_config_path.read_text(encoding="utf-8"))
+            selections = {
+                key: value.get("current_value")
+                for key, value in (config.get("current_selections") or {}).items()
+                if isinstance(value, dict)
+            }
+        except Exception:
+            selections = {}
+    return {
+        "status": "source_pack_vendored",
+        "repo_relative_path": _repo_relative(repo_root, pack_dir),
+        "source_pack_version": source_manifest.get("source_pack_version"),
+        "schema_version": source_manifest.get("schema_version"),
+        "raw_workbook_basename": source_manifest.get("raw_workbook", {}).get("basename"),
+        "raw_workbook_sha256": source_manifest.get("raw_workbook", {}).get("sha256"),
+        "distilled_workbook_basename": source_manifest.get("distilled_workbook", {}).get("basename"),
+        "distilled_workbook_sha256": source_manifest.get("distilled_workbook", {}).get("sha256"),
+        "source_pack_manifest_sha256": _sha256(manifest_path),
+        "selections": selections,
+    }
 
 
 def _gap_component(stream: str, code: str, reason: str) -> dict[str, Any]:

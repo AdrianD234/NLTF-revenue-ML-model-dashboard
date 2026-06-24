@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 from pathlib import Path
 
 import pandas as pd
@@ -24,6 +25,14 @@ from model_dashboard.revenue_outlook import (
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _comparison(tmp_path: Path, *, blank_rates: bool = False, fixture: bool = False):
@@ -148,6 +157,21 @@ def test_committed_current_revenue_outlook_pack_is_repo_local_and_hash_backed() 
     assert manifest["repo_relative_output_dir"] == "data/current_revenue_outlook"
     assert manifest["source_hashes"]["model_input_history"]
     assert all(item.get("workbook_sha256") for item in manifest["source_hashes"]["workbooks"])
+    assert manifest["revenue_source_pack"]["status"] == "source_pack_vendored"
+    assert manifest["revenue_source_pack"]["source_pack_version"] == "2026_05_19"
+    assert manifest["revenue_source_pack"]["raw_workbook_sha256"] == "00c6070694818d27d7c402749354d8175de999894846dce45a4abdd7f5eb3e6b"
+    assert manifest["revenue_source_pack"]["selections"]["release_round"] == "BEFU25"
+    assert manifest["revenue_source_pack"]["selections"]["series"] == "Total RUC+PED revenue"
+    assert sorted(manifest["output_hashes"]) == [
+        "future_revenue_forecasts.csv",
+        "future_revenue_forecasts.parquet",
+        "revenue_bridge_components.csv",
+        "revenue_bridge_components.parquet",
+        "revenue_chart_rows.csv",
+        "revenue_chart_rows.parquet",
+    ]
+    for filename, metadata in manifest["output_hashes"].items():
+        assert metadata["sha256"] == _sha256(pack_dir / filename)
     for path in pack_dir.iterdir():
         if path.is_file():
             assert path.stat().st_size < 50 * 1024 * 1024

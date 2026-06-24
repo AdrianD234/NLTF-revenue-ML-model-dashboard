@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -100,7 +101,24 @@ REQUIRED_FORECAST_IMPORT_EXPORTS = {
     "write_forecast_scenario_comparison",
 }
 R2_LADDER_DEP_FALLBACK_ENV = "NLTF_FORCE_R2_LADDER_DEP_FALLBACK"
-EXPECTED_IMPORT_SURFACE_REVISION = "2026-06-24-revenue-outlook-v1"
+EXPECTED_IMPORT_SURFACE_REVISION = "2026-06-24-revenue-source-pack-v1"
+REVENUE_SOURCE_PACK_ROOT = ROOT / "data" / "revenue_model_source_pack" / "2026_05_19"
+REQUIRED_REVENUE_SOURCE_PACK_FILES = {
+    "README.md",
+    "MODEL_WORKFLOW.md",
+    "manifest.json",
+    "series_master.csv",
+    "aggregation_rules.csv",
+    "front_end_config.json",
+    "unresolved_decisions.csv",
+    "annual_actuals.csv",
+    "annual_model_paths.csv",
+    "release_registry.csv",
+    "canonical_revenue_long.csv",
+    "reconciliation_report.csv",
+    "validation_issues.csv",
+    "loader_exports_manifest.json",
+}
 
 
 def normalise_requirement(line: str) -> str | None:
@@ -168,6 +186,28 @@ def assert_pack_shape() -> None:
         raise AssertionError("Evidence pack contains forbidden files: " + ", ".join(forbidden_files))
 
 
+def assert_revenue_source_pack_shape() -> None:
+    if not REVENUE_SOURCE_PACK_ROOT.exists():
+        raise AssertionError(f"Missing revenue source pack folder: {REVENUE_SOURCE_PACK_ROOT}")
+    missing = sorted(name for name in REQUIRED_REVENUE_SOURCE_PACK_FILES if not (REVENUE_SOURCE_PACK_ROOT / name).exists())
+    if missing:
+        raise AssertionError("Revenue source pack is missing files: " + ", ".join(missing))
+    for path in REVENUE_SOURCE_PACK_ROOT.rglob("*"):
+        if path.is_file() and path.stat().st_size > MAX_FILE_BYTES:
+            raise AssertionError(f"Revenue source pack file exceeds 50 MB: {path}")
+    manifest_text = (REVENUE_SOURCE_PACK_ROOT / "manifest.json").read_text(encoding="utf-8")
+    loader_text = (REVENUE_SOURCE_PACK_ROOT / "loader_exports_manifest.json").read_text(encoding="utf-8")
+    for token in ["C:\\Users", "Downloads", "OneDrive"]:
+        if token in manifest_text or token in loader_text:
+            raise AssertionError(f"Revenue source pack exposes local path token: {token}")
+    manifest = json.loads(manifest_text)
+    if manifest.get("raw_workbook", {}).get("sha256") != "00c6070694818d27d7c402749354d8175de999894846dce45a4abdd7f5eb3e6b":
+        raise AssertionError("Revenue source pack raw workbook SHA256 is not the governed value.")
+    loader_manifest = json.loads(loader_text)
+    if loader_manifest.get("validation_status") not in {"passed", "warning"}:
+        raise AssertionError("Revenue source pack loader exports are not validation-ready.")
+
+
 def assert_requirements() -> None:
     runtime = read_requirements(ROOT / "requirements.txt")
     missing = REQUIRED_RUNTIME_DEPS - runtime
@@ -217,6 +257,7 @@ def assert_import_surface() -> None:
     import app
     import model_dashboard.forecast_imports as forecast_imports
     import model_dashboard.reproducibility_imports as reproducibility_imports
+    import model_dashboard.revenue_source_pack as revenue_source_pack
     import model_dashboard.ui as ui
 
     if not hasattr(app, "main"):
@@ -235,6 +276,8 @@ def assert_import_surface() -> None:
     missing_forecast = sorted(name for name in REQUIRED_FORECAST_IMPORT_EXPORTS if not hasattr(forecast_imports, name))
     if missing_forecast:
         raise AssertionError("model_dashboard.forecast_imports is missing app.py exports: " + ", ".join(missing_forecast))
+    if not hasattr(revenue_source_pack, "load_revenue_source_pack"):
+        raise AssertionError("model_dashboard.revenue_source_pack is missing load_revenue_source_pack.")
 
 
 def assert_app_uses_cloud_safe_reproducibility_wrapper() -> None:
@@ -273,6 +316,7 @@ def assert_startup_import_subprocess(
 import app
 from model_dashboard import forecast_imports as fi
 from model_dashboard import reproducibility_imports as ri
+from model_dashboard import revenue_source_pack as rsp
 from scripts.check_streamlit_deploy_readiness import EXPECTED_IMPORT_SURFACE_REVISION
 required = [
     'render_overview',
@@ -291,6 +335,8 @@ if not hasattr(ri, 'r2_ladder_summary_frame') or not hasattr(ri, 'R2_LADDER_TITL
     raise SystemExit('missing R2 ladder compatibility exports')
 if not hasattr(fi, 'build_forecast_input_template_bytes') or not hasattr(fi, 'FORECAST_RUNNER_IMPORT_ERROR'):
     raise SystemExit('missing Forecast Builder compatibility exports')
+if not hasattr(rsp, 'load_revenue_source_pack') or not hasattr(rsp, 'REVENUE_SOURCE_PACK_DIR'):
+    raise SystemExit('missing revenue source pack exports')
 if getattr(app, 'STREAMLIT_IMPORT_SURFACE_REVISION', None) != EXPECTED_IMPORT_SURFACE_REVISION:
     raise SystemExit('stale app import surface revision')
 print('cloud import ok')
@@ -389,6 +435,7 @@ def validate() -> None:
     assert_r2_ladder_direct_import_subprocess(force_dependency_fallback=False)
     assert_r2_ladder_direct_import_subprocess(force_dependency_fallback=True)
     assert_pack_shape()
+    assert_revenue_source_pack_shape()
     assert_streamlit_config()
     assert_default_load_resolves_repo_pack()
     assert_tracked_files()

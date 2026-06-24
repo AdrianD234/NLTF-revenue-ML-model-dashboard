@@ -1,0 +1,54 @@
+Source sheet,Release family,Release year,Standard release,Treatment
+BEFU 2015,BEFU,2015,BEFU15,Direct mapping
+BEFU 2016,BEFU,2016,BEFU16,Direct mapping
+BEFU 2017,BEFU,2017,BEFU17,Direct mapping
+BEFU 2018,BEFU,2018,BEFU18,Direct mapping
+BEFU 2019,BEFU,2019,BEFU19,Direct mapping
+BEFU 2020,BEFU,2020,BEFU20,Direct mapping
+BEFU2012,BEFU,2012,BEFU12,Direct mapping
+BEFU21 NLTP,BEFU NLTP,2021,BEFU NLTP21,Direct mapping
+BEFU22,BEFU,2022,BEFU22,Direct mapping
+BEFU24,BEFU,2024,BEFU24,Direct mapping
+BEFU25,BEFU,2025,BEFU25,Direct mapping
+HYEFU 2016,HYEFU,2016,HYEFU16,Direct mapping
+HYEFU 2017,HYEFU,2017,HYEFU17,Direct mapping
+HYEFU 2018,HYEFU,2018,HYEFU18,Direct mapping
+HYEFU 2019,HYEFU,2019,HYEFU19,Direct mapping
+HYEFU 2020,HYEFU,2020,HYEFU20,Direct mapping
+HYEFU2012,HYEFU,2012,HYEFU12,Direct mapping
+HYEFU24,HYEFU,2024,HYEFU24,Direct mapping
+"MBU 2014, BEFU2014",MBU,2014,MBU14,Split shared source sheet into separate releases
+"MBU 2014, BEFU2014",BEFU,2014,BEFU14,Split shared source sheet into separate releases
+MBU 2015,MBU,2015,MBU15,Direct mapping
+MBU 2016,MBU,2016,MBU16,Direct mapping
+MBU 2017,MBU,2017,MBU17,Direct mapping
+MBU 2018,MBU,2018,MBU18,Direct mapping
+MBU 2019,MBU,2019,MBU19,Direct mapping
+MBU 2020,MBU,2020,MBU20,Direct mapping
+MBU 2021,MBU,2021,MBU21,Direct mapping
+MBU2012,MBU,2012,MBU12,Direct mapping
+MBU2013,MBU,2013,MBU13,Direct mapping
+MBU22,MBU,2022,MBU22,Direct mapping
+"MBU23, BEFU23",MBU,2023,MBU23,Split shared source sheet into separate releases
+"MBU23, BEFU23",BEFU,2023,BEFU23,Split shared source sheet into separate releases
+MBU24,MBU,2024,MBU24,Direct mapping
+MBU25,MBU,2025,MBU25,Direct mapping
+MBU26,MBU,2026,MBU26,Direct mapping
+OBU 2014,OBU,2014,OBU14,Direct mapping
+OBU 2015,OBU,2015,OBU15,Direct mapping
+OBU 2016,OBU,2016,OBU16,Direct mapping
+OBU 2017,OBU,2017,OBU17,Direct mapping
+OBU 2018,OBU,2018,OBU18,Direct mapping
+OBU 2019,OBU,2019,OBU19,Direct mapping
+OBU 2020,OBU,2020,OBU20,Direct mapping
+OBU2013,OBU,2013,OBU13,Direct mapping
+"OBU21, HYEFU21",OBU,2021,OBU21,Split shared source sheet into separate releases
+"OBU21, HYEFU21",HYEFU,2021,HYEFU21,Split shared source sheet into separate releases
+"OBU22, HYEFU22",OBU,2022,OBU22,Split shared source sheet into separate releases
+"OBU22, HYEFU22",HYEFU,2022,HYEFU22,Split shared source sheet into separate releases
+"OBU23, HYEFU23",OBU,2023,OBU23,Split shared source sheet into separate releases
+"OBU23, HYEFU23",HYEFU,2023,HYEFU23,Split shared source sheet into separate releases
+OBU24,OBU,2024,OBU24,Direct mapping
+PREFU 2017,PREFU,2017,PREFU17,Direct mapping
+PREFU 2020,PREFU,2020,PREFU20,Direct mapping
+PREFU23,PREFU,2023,PREFU23,Direct mapping
