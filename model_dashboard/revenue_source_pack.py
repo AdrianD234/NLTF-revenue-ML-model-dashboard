@@ -121,6 +121,7 @@ class RevenueSourcePack:
     path_trace_status: pd.DataFrame
     intake_status: pd.DataFrame
     remaining_decisions_handoff: pd.DataFrame
+    series_role_audit: pd.DataFrame
 
     @property
     def validation_status(self) -> str:
@@ -205,6 +206,10 @@ def load_revenue_source_pack(
         unresolved_decisions=unresolved_decisions,
         gap_register=gap_register,
     )
+    role_audit = revenue_series_role_audit(
+        series_master=series_master,
+        canonical_long=canonical,
+    )
     return RevenueSourcePack(
         pack_dir=base,
         manifest=manifest,
@@ -222,6 +227,7 @@ def load_revenue_source_pack(
         path_trace_status=path_trace_status,
         intake_status=intake_status,
         remaining_decisions_handoff=remaining_decisions,
+        series_role_audit=role_audit,
     )
 
 
@@ -757,6 +763,78 @@ def revenue_remaining_decisions_handoff(
     )
 
 
+def revenue_series_role_audit(
+    *,
+    series_master: pd.DataFrame,
+    canonical_long: pd.DataFrame,
+) -> pd.DataFrame:
+    rows: list[dict[str, Any]] = []
+    canonical_groups = {
+        str(series_id): group.copy()
+        for series_id, group in canonical_long.groupby("series_id", dropna=False)
+        if str(series_id).strip()
+    }
+    registered_ids: set[str] = set()
+    for record in series_master.to_dict("records"):
+        series_id = str(record.get("Series ID", "")).strip()
+        if not series_id:
+            continue
+        registered_ids.add(series_id)
+        role = str(record.get("Forecast role", "")).strip()
+        group = canonical_groups.get(series_id, pd.DataFrame())
+        rows.append(
+            _series_role_audit_row(
+                series_id=series_id,
+                display_name=str(record.get("Display name", "")).strip(),
+                parent_series_id="" if pd.isna(record.get("Parent series ID")) else str(record.get("Parent series ID", "")).strip(),
+                unit=str(record.get("Unit", "")).strip(),
+                aggregation_sign=_as_sign(record.get("Sign")),
+                forecast_role=role,
+                dashboard_visible=bool(record.get("Dashboard visible", False)),
+                notes=str(record.get("Notes", "")).strip(),
+                canonical_rows=group,
+            )
+        )
+
+    for series_id, group in canonical_groups.items():
+        if series_id in registered_ids:
+            continue
+        display = _first_text(group, "display_name") or _first_text(group, "source_series_label") or series_id
+        rows.append(
+            _series_role_audit_row(
+                series_id=series_id,
+                display_name=display,
+                parent_series_id=_first_text(group, "parent_series_id"),
+                unit=_first_text(group, "unit"),
+                aggregation_sign=_first_int(group, "aggregation_sign", default=1),
+                forecast_role="unregistered_source_line",
+                dashboard_visible=False,
+                notes="Preserved source line not registered in series_master.csv; retained as a governance gap.",
+                canonical_rows=group,
+            )
+        )
+
+    return pd.DataFrame(
+        rows,
+        columns=[
+            "series_id",
+            "display_name",
+            "role_category",
+            "forecast_role",
+            "runtime_treatment",
+            "parent_series_id",
+            "unit",
+            "aggregation_sign",
+            "dashboard_visible",
+            "canonical_row_count",
+            "source_statuses",
+            "bridge_statuses",
+            "revenue_bases",
+            "notes",
+        ],
+    ).sort_values(["role_category", "series_id"], kind="stable").reset_index(drop=True)
+
+
 def control_options(pack: RevenueSourcePack | None, control_id: str, default: list[str]) -> list[str]:
     if pack is None:
         return default
@@ -935,6 +1013,93 @@ def _decision_handoff_link(item: str, gap_status: dict[str, str]) -> dict[str, A
 def _decision_id(item: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "_", item.lower()).strip("_")
     return slug or "unresolved_decision"
+
+
+def _series_role_audit_row(
+    *,
+    series_id: str,
+    display_name: str,
+    parent_series_id: str,
+    unit: str,
+    aggregation_sign: int,
+    forecast_role: str,
+    dashboard_visible: bool,
+    notes: str,
+    canonical_rows: pd.DataFrame,
+) -> dict[str, Any]:
+    return {
+        "series_id": series_id,
+        "display_name": display_name,
+        "role_category": _role_category(forecast_role),
+        "forecast_role": forecast_role,
+        "runtime_treatment": _role_runtime_treatment(forecast_role),
+        "parent_series_id": parent_series_id,
+        "unit": unit,
+        "aggregation_sign": aggregation_sign,
+        "dashboard_visible": bool(dashboard_visible),
+        "canonical_row_count": int(len(canonical_rows)) if isinstance(canonical_rows, pd.DataFrame) else 0,
+        "source_statuses": _joined_unique(canonical_rows, "source_status"),
+        "bridge_statuses": _joined_unique(canonical_rows, "bridge_status"),
+        "revenue_bases": _joined_unique(canonical_rows, "revenue_basis"),
+        "notes": notes,
+    }
+
+
+def _role_category(forecast_role: str) -> str:
+    if forecast_role == "econometric_model":
+        return "direct_model_output"
+    if forecast_role in {"econometric_bridge", "derived_bridge"}:
+        return "revenue_bridge"
+    if forecast_role == "aggregation":
+        return "aggregation"
+    if forecast_role == "deduction":
+        return "deduction"
+    if forecast_role == "optional_overlay":
+        return "policy_overlay"
+    if forecast_role in {"official_pass_through", "derived_scenario_split"}:
+        return "pass_through_or_governed_assumption"
+    if forecast_role == "unregistered_source_line":
+        return "source_registry_gap"
+    return "manual_review"
+
+
+def _role_runtime_treatment(forecast_role: str) -> str:
+    if forecast_role == "econometric_model":
+        return "modeled_activity_stream"
+    if forecast_role in {"econometric_bridge", "derived_bridge"}:
+        return "requires_governed_bridge_inputs"
+    if forecast_role == "aggregation":
+        return "calculated_from_child_series_when_inputs_exist"
+    if forecast_role == "deduction":
+        return "preserve_sign_and_subtract_in_rollup"
+    if forecast_role == "optional_overlay":
+        return "apply_only_with_explicit_policy_selection_and_values"
+    if forecast_role in {"official_pass_through", "derived_scenario_split"}:
+        return "source_or_assumption_backed_pass_through"
+    if forecast_role == "unregistered_source_line":
+        return "preserve_as_source_registry_gap"
+    return "manual_review_required"
+
+
+def _joined_unique(frame: pd.DataFrame, column: str) -> str:
+    if not isinstance(frame, pd.DataFrame) or frame.empty or column not in frame.columns:
+        return ""
+    values = sorted({str(value).strip() for value in frame[column].dropna() if str(value).strip()})
+    return "; ".join(values)
+
+
+def _first_text(frame: pd.DataFrame, column: str) -> str:
+    if not isinstance(frame, pd.DataFrame) or frame.empty or column not in frame.columns:
+        return ""
+    values = [str(value).strip() for value in frame[column].dropna() if str(value).strip()]
+    return values[0] if values else ""
+
+
+def _first_int(frame: pd.DataFrame, column: str, *, default: int) -> int:
+    if not isinstance(frame, pd.DataFrame) or frame.empty or column not in frame.columns:
+        return default
+    value = pd.to_numeric(frame[column], errors="coerce").dropna()
+    return int(value.iloc[0]) if not value.empty else default
 
 
 def _nullable_int(value: Any) -> int | None:

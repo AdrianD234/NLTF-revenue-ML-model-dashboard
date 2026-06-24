@@ -190,6 +190,50 @@ def test_revenue_remaining_decisions_handoff_links_runtime_gaps_and_is_sanitized
     assert critical["runtime_status"].astype(str).str.len().gt(0).all()
 
 
+def test_revenue_series_role_audit_makes_model_bridge_and_passthrough_roles_explicit() -> None:
+    pack = load_revenue_source_pack(repo_root=ROOT)
+    assert pack is not None
+    roles = pack.series_role_audit
+    assert not roles.empty
+    assert {
+        "series_id",
+        "display_name",
+        "role_category",
+        "forecast_role",
+        "runtime_treatment",
+        "canonical_row_count",
+        "source_statuses",
+        "bridge_statuses",
+        "revenue_bases",
+    }.issubset(roles.columns)
+    roles_text = roles.to_csv(index=False)
+    assert "C:\\Users" not in roles_text
+    assert "Downloads" not in roles_text
+    assert "OneDrive" not in roles_text
+
+    by_id = roles.set_index("series_id")
+    for series_id in ["ped_vkt_per_capita", "light_ruc_net_km", "heavy_ruc_net_km"]:
+        assert by_id.loc[series_id, "role_category"] == "direct_model_output"
+        assert by_id.loc[series_id, "runtime_treatment"] == "modeled_activity_stream"
+        assert by_id.loc[series_id, "revenue_bases"] == "activity"
+
+    for series_id in ["gross_ped_revenue", "light_ruc_net_revenue", "heavy_ruc_net_revenue"]:
+        assert by_id.loc[series_id, "role_category"] == "revenue_bridge"
+        assert by_id.loc[series_id, "runtime_treatment"] == "requires_governed_bridge_inputs"
+        assert "bridge_required" in str(by_id.loc[series_id, "bridge_statuses"])
+
+    assert by_id.loc["gross_lpg_revenue", "role_category"] == "pass_through_or_governed_assumption"
+    assert by_id.loc["gross_cng_revenue", "role_category"] == "pass_through_or_governed_assumption"
+    assert by_id.loc["tuc_net_revenue", "role_category"] == "pass_through_or_governed_assumption"
+    assert by_id.loc["fed_refunds", "role_category"] == "deduction"
+    assert by_id.loc["crown_top_up", "role_category"] == "policy_overlay"
+
+    gaps = roles[roles["role_category"].eq("source_registry_gap")]
+    assert not gaps.empty
+    assert gaps["source_statuses"].astype(str).str.contains("unregistered_source_series").all()
+    assert gaps["runtime_treatment"].eq("preserve_as_source_registry_gap").all()
+
+
 def test_revenue_path_trace_status_marks_missing_release_traces_without_fabrication() -> None:
     pack = load_revenue_source_pack(repo_root=ROOT)
     assert pack is not None
@@ -283,6 +327,7 @@ def test_revenue_source_pack_loader_exports_are_hash_backed() -> None:
         "reconciliation_report.csv": len(pack.reconciliation_report),
         "source_gap_register.csv": len(pack.source_gap_register),
         "remaining_decisions_handoff.csv": len(pack.remaining_decisions_handoff),
+        "series_role_audit.csv": len(pack.series_role_audit),
         "validation_issues.csv": len(pack.validation_issues),
     }
     for filename, meta in manifest["exports"].items():

@@ -120,6 +120,7 @@ REQUIRED_REVENUE_SOURCE_PACK_FILES = {
     "reconciliation_report.csv",
     "source_gap_register.csv",
     "remaining_decisions_handoff.csv",
+    "series_role_audit.csv",
     "validation_issues.csv",
     "loader_exports_manifest.json",
 }

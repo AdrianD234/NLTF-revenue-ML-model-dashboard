@@ -1,5 +1,5 @@
 {
-  "created_at": "2026-06-24T10:03:54.345883+00:00",
+  "created_at": "2026-06-24T10:18:58.380735+00:00",
   "exports": {
     "canonical_revenue_long.csv": {
       "role": "Canonical long schema across actuals and model paths.",
@@ -20,6 +20,11 @@
       "role": "Unresolved revenue decisions linked to runtime gaps and dashboard treatment.",
       "row_count": 7,
       "sha256": "8c3bac0e0c52adcb8bddc6546c719d6a1b9bd6bec3b07c75ef3b4e9ff0c38a2b"
+    },
+    "series_role_audit.csv": {
+      "role": "Explicit role contract for modeled activity, revenue bridges, pass-through lines, deductions, overlays, and source gaps.",
+      "row_count": 42,
+      "sha256": "d261cce84673aac46a6488932ba3999b6700bf6aab46af2163b27bff6846358b"
     },
     "source_gap_register.csv": {
       "role": "Structured source-pack gaps for release values, Crown top-up, quarterly rows, and bridge replay.",

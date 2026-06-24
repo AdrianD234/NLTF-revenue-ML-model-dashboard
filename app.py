@@ -2268,6 +2268,8 @@ def _render_revenue_source_architecture(source_pack: RevenueSourcePack, controls
         display_table(_source_path_trace_status(source_pack), height=180, max_rows=80)
         st.caption("Source gap register")
         display_table(_source_gap_register(source_pack), height=180, max_rows=80)
+        st.caption("Series role audit")
+        display_table(_source_series_role_audit(source_pack), height=180, max_rows=100)
         st.caption("Loader export manifest")
         display_table(_source_manifest_view(source_pack), height=220, max_rows=80)
         dataframe_download(source_pack.canonical_long, "Download canonical revenue long table", "canonical_revenue_long.csv")
@@ -2439,6 +2441,25 @@ def _source_remaining_decisions_handoff(source_pack: RevenueSourcePack) -> pd.Da
     frame["runtime_status"] = "manual_review_required"
     frame["dashboard_treatment"] = "Carry as explicit unresolved governance decision until source evidence is vendored."
     return frame
+
+
+def _source_series_role_audit(source_pack: RevenueSourcePack) -> pd.DataFrame:
+    audit = getattr(source_pack, "series_role_audit", None)
+    if isinstance(audit, pd.DataFrame):
+        return audit
+    frame = getattr(source_pack, "canonical_long", pd.DataFrame())
+    if not isinstance(frame, pd.DataFrame) or frame.empty:
+        return pd.DataFrame()
+    columns = [
+        "series_id",
+        "display_name",
+        "forecast_role",
+        "bridge_status",
+        "revenue_basis",
+        "source_status",
+    ]
+    existing = [column for column in columns if column in frame.columns]
+    return frame[existing].drop_duplicates().sort_values(existing, kind="stable").reset_index(drop=True)
 
 
 def _source_path_trace_status(source_pack: RevenueSourcePack) -> pd.DataFrame:

@@ -72,6 +72,7 @@ exist; it must not apply a fabricated zero.
 - `reconciliation_report.csv`
 - `source_gap_register.csv`
 - `remaining_decisions_handoff.csv`
+- `series_role_audit.csv`
 - `validation_issues.csv`
 - `loader_exports_manifest.json`
 
@@ -101,3 +102,10 @@ The remaining-decisions handoff links each unresolved workbook decision to the
 runtime gap IDs, repo-local artifacts, and dashboard treatment that currently
 govern it. It is a decision register, not a model refit, and it does not change
 forecast values.
+
+The series role audit records the runtime treatment for every registered series
+and every preserved unregistered source line. PED VKT per capita, Light RUC net
+km, and Heavy RUC net km are classified as direct modeled activity streams;
+their revenue lines are classified as revenue bridges that require governed
+bridge inputs. LPG, CNG, refunds, MVR, TUC, EV/PHEV splits, and Crown top-up
+remain pass-through, deduction, policy-overlay, or source-registry gap rows.

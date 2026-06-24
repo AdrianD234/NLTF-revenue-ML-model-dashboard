@@ -12,7 +12,11 @@ from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path
+import sys
 
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 from model_dashboard.revenue_source_pack import REVENUE_SOURCE_PACK_DIR, load_revenue_source_pack
 
 
@@ -23,6 +27,7 @@ EXPORT_FILES = {
     "reconciliation_report.csv": "Hierarchy roll-up reconciliation and explicit gap report.",
     "source_gap_register.csv": "Structured source-pack gaps for release values, Crown top-up, quarterly rows, and bridge replay.",
     "remaining_decisions_handoff.csv": "Unresolved revenue decisions linked to runtime gaps and dashboard treatment.",
+    "series_role_audit.csv": "Explicit role contract for modeled activity, revenue bridges, pass-through lines, deductions, overlays, and source gaps.",
     "validation_issues.csv": "Loader validation warnings/errors for the source pack.",
 }
 
@@ -46,6 +51,7 @@ def export_tables(pack_dir: Path) -> dict[str, object]:
         "reconciliation_report.csv": pack.reconciliation_report,
         "source_gap_register.csv": pack.source_gap_register,
         "remaining_decisions_handoff.csv": pack.remaining_decisions_handoff,
+        "series_role_audit.csv": pack.series_role_audit,
         "validation_issues.csv": pack.validation_issues,
     }
     manifest: dict[str, object] = {
