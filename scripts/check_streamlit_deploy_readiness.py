@@ -115,6 +115,7 @@ REQUIRED_REVENUE_SOURCE_PACK_FILES = {
     "annual_model_paths.csv",
     "release_registry.csv",
     "canonical_revenue_long.csv",
+    "path_trace_status.csv",
     "reconciliation_report.csv",
     "source_gap_register.csv",
     "validation_issues.csv",

@@ -1,10 +1,15 @@
 {
-  "created_at": "2026-06-24T09:12:06.714857+00:00",
+  "created_at": "2026-06-24T09:27:38.415164+00:00",
   "exports": {
     "canonical_revenue_long.csv": {
       "role": "Canonical long schema across actuals and model paths.",
       "row_count": 1932,
       "sha256": "64dec2423cb9c6040f5ee2f3ce2b6bfd5ba0d2ffcd950043b3e2a1121b605954"
+    },
+    "path_trace_status.csv": {
+      "role": "Availability and plotting status for required Revenue Outlook total-path traces.",
+      "row_count": 6,
+      "sha256": "844b847f2a3793b8eaacbb07178410629b0911638b756cc3ec587432a9c90f18"
     },
     "reconciliation_report.csv": {
       "role": "Hierarchy roll-up reconciliation and explicit gap report.",

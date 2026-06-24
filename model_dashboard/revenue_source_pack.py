@@ -117,6 +117,7 @@ class RevenueSourcePack:
     validation_issues: pd.DataFrame
     reconciliation_report: pd.DataFrame
     source_gap_register: pd.DataFrame
+    path_trace_status: pd.DataFrame
 
     @property
     def validation_status(self) -> str:
@@ -189,6 +190,10 @@ def load_revenue_source_pack(
         front_end_config=front_end_config,
         canonical_long=canonical,
     )
+    path_trace_status = revenue_path_trace_status(
+        canonical_long=canonical,
+        gap_register=gap_register,
+    )
     return RevenueSourcePack(
         pack_dir=base,
         manifest=manifest,
@@ -203,6 +208,7 @@ def load_revenue_source_pack(
         validation_issues=validation,
         reconciliation_report=reconciliation,
         source_gap_register=gap_register,
+        path_trace_status=path_trace_status,
     )
 
 
@@ -482,6 +488,81 @@ def revenue_source_gap_register(
     )
 
 
+def revenue_path_trace_status(
+    *,
+    canonical_long: pd.DataFrame,
+    gap_register: pd.DataFrame,
+) -> pd.DataFrame:
+    release_gap = _gap_status(gap_register, "release_value_table_missing")
+    has_actual = _has_trace_rows(canonical_long, line_values={"Actual", "Actual / benchmark"})
+    has_selected_workbook = _has_trace_rows(canonical_long, model_basis="selected_dashboard_basis", line_values={"Model path"})
+    has_in_house = _has_trace_rows(canonical_long, model_basis="in_house_model", line_values={"Model path"})
+    has_schiff = _has_trace_rows(canonical_long, model_basis="aaron_schiff_model", line_values={"Model path"})
+    release_available = release_gap.get("availability_status") == "available"
+    rows = [
+        _trace_status_row(
+            "actual_benchmark",
+            "Actual / benchmark",
+            has_actual,
+            "annual actual and benchmark rows",
+            "",
+            "Source actual/benchmark rows are plotted where present.",
+        ),
+        _trace_status_row(
+            "selected_workbook_basis",
+            "Selected workbook basis",
+            has_selected_workbook,
+            "annual model path rows",
+            "",
+            "Current workbook-selected annual model path is plotted.",
+        ),
+        _trace_status_row(
+            "selected_mot_befu_release",
+            "Selected MOT/BEFU release path",
+            release_available,
+            "release-value table",
+            "" if release_available else "release_value_table_missing",
+            "Selected MOT/BEFU release path requires release-value rows; registry-only release metadata is not plotted as values.",
+        ),
+        _trace_status_row(
+            "rolling_befu_1y",
+            "Rolling BEFU 1Y",
+            release_available,
+            "release-value table",
+            "" if release_available else "release_value_table_missing",
+            "Rolling BEFU 1Y requires historical release-value rows; it is not fabricated from model paths.",
+        ),
+        _trace_status_row(
+            "aaron_schiff_model",
+            "Aaron Schiff prediction / forecast",
+            has_schiff,
+            "annual model path rows",
+            "",
+            "Aaron Schiff annual model path is plotted where source rows exist.",
+        ),
+        _trace_status_row(
+            "in_house_model",
+            "In-house prediction / forecast",
+            has_in_house,
+            "annual model path rows",
+            "",
+            "In-house annual model path is plotted where source rows exist.",
+        ),
+    ]
+    return pd.DataFrame(
+        rows,
+        columns=[
+            "trace_id",
+            "trace_label",
+            "availability_status",
+            "plotted",
+            "data_scope",
+            "blocking_gap_id",
+            "user_visible_message",
+        ],
+    )
+
+
 def control_options(pack: RevenueSourcePack | None, control_id: str, default: list[str]) -> list[str]:
     if pack is None:
         return default
@@ -505,6 +586,50 @@ def current_selection(pack: RevenueSourcePack | None, control_id: str, default: 
 def _selection_value(selections: dict[str, Any], control_id: str, default: str = "") -> str:
     value = selections.get(control_id, {}).get("current_value") if isinstance(selections.get(control_id, {}), dict) else None
     return str(value) if value else default
+
+
+def _gap_status(gap_register: pd.DataFrame, gap_id: str) -> dict[str, Any]:
+    if gap_register.empty or "gap_id" not in gap_register.columns:
+        return {}
+    rows = gap_register[gap_register["gap_id"].eq(gap_id)]
+    return rows.iloc[0].to_dict() if not rows.empty else {}
+
+
+def _has_trace_rows(
+    canonical_long: pd.DataFrame,
+    *,
+    model_basis: str | None = None,
+    line_values: set[str] | None = None,
+) -> bool:
+    if canonical_long.empty:
+        return False
+    rows = canonical_long.copy()
+    if model_basis is not None and "model_basis" in rows.columns:
+        rows = rows[rows["model_basis"].astype(str).eq(model_basis)]
+    if line_values is not None and "line" in rows.columns:
+        rows = rows[rows["line"].astype(str).isin(line_values)]
+    if "value" not in rows.columns:
+        return False
+    return pd.to_numeric(rows["value"], errors="coerce").notna().any()
+
+
+def _trace_status_row(
+    trace_id: str,
+    trace_label: str,
+    available: bool,
+    data_scope: str,
+    blocking_gap_id: str,
+    message: str,
+) -> dict[str, Any]:
+    return {
+        "trace_id": trace_id,
+        "trace_label": trace_label,
+        "availability_status": "available" if available else "missing",
+        "plotted": bool(available),
+        "data_scope": data_scope,
+        "blocking_gap_id": blocking_gap_id,
+        "user_visible_message": message,
+    }
 
 
 def _registry(series_master: pd.DataFrame) -> dict[str, dict[str, Any]]:

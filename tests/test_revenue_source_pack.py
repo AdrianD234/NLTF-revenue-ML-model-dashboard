@@ -155,6 +155,43 @@ def test_revenue_source_gap_register_exposes_missing_release_and_top_up_inputs()
     assert by_id["user_visible_message"].astype(str).str.len().gt(20).all()
 
 
+def test_revenue_path_trace_status_marks_missing_release_traces_without_fabrication() -> None:
+    pack = load_revenue_source_pack(repo_root=ROOT)
+    assert pack is not None
+    status = pack.path_trace_status
+    assert not status.empty
+    assert {
+        "trace_id",
+        "trace_label",
+        "availability_status",
+        "plotted",
+        "data_scope",
+        "blocking_gap_id",
+        "user_visible_message",
+    }.issubset(status.columns)
+
+    by_id = status.set_index("trace_id")
+    required_traces = {
+        "actual_benchmark",
+        "selected_workbook_basis",
+        "selected_mot_befu_release",
+        "rolling_befu_1y",
+        "aaron_schiff_model",
+        "in_house_model",
+    }
+    assert required_traces.issubset(set(by_id.index))
+
+    available = by_id.loc[["actual_benchmark", "selected_workbook_basis", "aaron_schiff_model", "in_house_model"]]
+    assert set(available["availability_status"]) == {"available"}
+    assert available["plotted"].astype(bool).all()
+
+    missing_release = by_id.loc[["selected_mot_befu_release", "rolling_befu_1y"]]
+    assert set(missing_release["availability_status"]) == {"missing"}
+    assert not missing_release["plotted"].astype(bool).any()
+    assert set(missing_release["blocking_gap_id"]) == {"release_value_table_missing"}
+    assert missing_release["user_visible_message"].astype(str).str.contains("release-value rows", case=False).all()
+
+
 def test_revenue_source_pack_loader_exports_are_hash_backed() -> None:
     manifest_path = PACK_DIR / "loader_exports_manifest.json"
     assert manifest_path.exists()
@@ -169,6 +206,7 @@ def test_revenue_source_pack_loader_exports_are_hash_backed() -> None:
     assert pack is not None
     expected_counts = {
         "canonical_revenue_long.csv": len(pack.canonical_long),
+        "path_trace_status.csv": len(pack.path_trace_status),
         "reconciliation_report.csv": len(pack.reconciliation_report),
         "source_gap_register.csv": len(pack.source_gap_register),
         "validation_issues.csv": len(pack.validation_issues),

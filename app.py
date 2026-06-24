@@ -2257,8 +2257,13 @@ def _render_revenue_source_architecture(source_pack: RevenueSourcePack, controls
         display_table(source_pack.unresolved_decisions, height=280, max_rows=80)
 
     with st.expander("Source-pack validation and manifest", expanded=False):
+        st.caption("Validation issues")
         display_table(source_pack.validation_issues, height=180, max_rows=80)
+        st.caption("Required path trace status")
+        display_table(_source_path_trace_status(source_pack), height=180, max_rows=80)
+        st.caption("Source gap register")
         display_table(_source_gap_register(source_pack), height=180, max_rows=80)
+        st.caption("Loader export manifest")
         display_table(_source_manifest_view(source_pack), height=220, max_rows=80)
         dataframe_download(source_pack.canonical_long, "Download canonical revenue long table", "canonical_revenue_long.csv")
 
@@ -2340,6 +2345,57 @@ def _source_gap_register(source_pack: RevenueSourcePack) -> pd.DataFrame:
             "user_visible_message",
         ],
     )
+
+
+def _source_path_trace_status(source_pack: RevenueSourcePack) -> pd.DataFrame:
+    status = getattr(source_pack, "path_trace_status", None)
+    if isinstance(status, pd.DataFrame):
+        return status
+    frame = getattr(source_pack, "canonical_long", pd.DataFrame())
+    gaps = _source_gap_register(source_pack)
+    release_gap = gaps[gaps["gap_id"].eq("release_value_table_missing")] if "gap_id" in gaps.columns else pd.DataFrame()
+    release_available = not release_gap.empty and release_gap.iloc[0].get("availability_status") == "available"
+    rows = [
+        _path_trace_row("actual_benchmark", "Actual / benchmark", _has_source_trace(frame, line_values={"Actual", "Actual / benchmark"}), "annual actual and benchmark rows", ""),
+        _path_trace_row("selected_workbook_basis", "Selected workbook basis", _has_source_trace(frame, model_basis="selected_dashboard_basis", line_values={"Model path"}), "annual model path rows", ""),
+        _path_trace_row("selected_mot_befu_release", "Selected MOT/BEFU release path", release_available, "release-value table", "" if release_available else "release_value_table_missing"),
+        _path_trace_row("rolling_befu_1y", "Rolling BEFU 1Y", release_available, "release-value table", "" if release_available else "release_value_table_missing"),
+        _path_trace_row("aaron_schiff_model", "Aaron Schiff prediction / forecast", _has_source_trace(frame, model_basis="aaron_schiff_model", line_values={"Model path"}), "annual model path rows", ""),
+        _path_trace_row("in_house_model", "In-house prediction / forecast", _has_source_trace(frame, model_basis="in_house_model", line_values={"Model path"}), "annual model path rows", ""),
+    ]
+    return pd.DataFrame(rows)
+
+
+def _path_trace_row(trace_id: str, trace_label: str, available: bool, data_scope: str, blocking_gap_id: str) -> dict[str, Any]:
+    return {
+        "trace_id": trace_id,
+        "trace_label": trace_label,
+        "availability_status": "available" if available else "missing",
+        "plotted": bool(available),
+        "data_scope": data_scope,
+        "blocking_gap_id": blocking_gap_id,
+        "user_visible_message": (
+            f"{trace_label} is backed by {data_scope}."
+            if available
+            else f"{trace_label} is unavailable because {blocking_gap_id or 'required source rows are missing'}."
+        ),
+    }
+
+
+def _has_source_trace(
+    frame: pd.DataFrame,
+    *,
+    model_basis: str | None = None,
+    line_values: set[str] | None = None,
+) -> bool:
+    if not isinstance(frame, pd.DataFrame) or frame.empty:
+        return False
+    rows = frame
+    if model_basis is not None and "model_basis" in rows.columns:
+        rows = rows[rows["model_basis"].astype(str).eq(model_basis)]
+    if line_values is not None and "line" in rows.columns:
+        rows = rows[rows["line"].astype(str).isin(line_values)]
+    return "value" in rows.columns and pd.to_numeric(rows["value"], errors="coerce").notna().any()
 
 
 def _selection_value(selections: dict[str, Any], control_id: str, default: str = "") -> str:
