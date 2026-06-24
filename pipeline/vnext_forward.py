@@ -288,10 +288,26 @@ def forward_forecast(stream: str, assumptions: pd.DataFrame,
             row: Dict[str, float] = exog_full.loc[p].to_dict() if p in exog_full.index else {}
             if include_ylags:
                 row.update(target_lag_row(p, y_hist))
-            x = pd.DataFrame([{c: row.get(c, np.nan) for c in bundle["feature_cols"]}]).astype(float).fillna(0.0)
+            x, feature_gap = _feature_contract_frame(row, bundle["feature_cols"], bundle, stream, label, p)
+            if feature_gap is not None:
+                gap_capability = _feature_contract_gap_capability(capability, [feature_gap])
+                gap_future, _ = _gap_rows(stream, periods, gap_capability)
+                return (
+                    gap_future,
+                    _feature_contract_gap_component_rows(stream, periods, gap_capability, [feature_gap]),
+                    gap_capability,
+                )
             model = bundle["model"]
             if isinstance(model, dict) and model.get("kind") == "residual":
-                xb = pd.DataFrame([{c: row.get(c, np.nan) for c in bundle["base_cols"]}]).astype(float).fillna(0.0)
+                xb, base_gap = _feature_contract_frame(row, bundle["base_cols"], bundle, stream, label, p)
+                if base_gap is not None:
+                    gap_capability = _feature_contract_gap_capability(capability, [base_gap])
+                    gap_future, _ = _gap_rows(stream, periods, gap_capability)
+                    return (
+                        gap_future,
+                        _feature_contract_gap_component_rows(stream, periods, gap_capability, [base_gap]),
+                        gap_capability,
+                    )
                 pred_log = float(model["base"].predict(xb.to_numpy(float))[0]
                                  + model["resid"].predict(x.to_numpy(float))[0])
             else:
@@ -338,6 +354,74 @@ def forward_forecast(stream: str, assumptions: pd.DataFrame,
                                "weighted_component_forecast": final_level,
                                "forecast_available": True})
     return pd.DataFrame(future_rows), pd.DataFrame(component_rows), capability
+
+
+def _zero_imputed_feature_set(bundle: Dict[str, Any]) -> set[str]:
+    contract = bundle.get("feature_contract", {}) if isinstance(bundle, dict) else {}
+    values = []
+    for key in ("zero_imputed_features", "zero_fill_features"):
+        raw = bundle.get(key) if isinstance(bundle, dict) else None
+        if raw is None and isinstance(contract, dict):
+            raw = contract.get(key)
+        if isinstance(raw, str):
+            values.extend([item.strip() for item in raw.split(",")])
+        elif isinstance(raw, (list, tuple, set)):
+            values.extend([str(item).strip() for item in raw])
+    return {value for value in values if value}
+
+
+def _feature_contract_frame(
+    row: Dict[str, Any],
+    columns: Sequence[str],
+    bundle: Dict[str, Any],
+    stream: str,
+    member: str,
+    period: pd.Period,
+) -> Tuple[pd.DataFrame, Dict[str, Any] | None]:
+    frame = pd.DataFrame([{column: row.get(column, np.nan) for column in columns}]).astype(float)
+    allowed_zero = _zero_imputed_feature_set(bundle)
+    missing = [
+        column
+        for column in columns
+        if column in frame.columns and not np.isfinite(pd.to_numeric(frame.at[0, column], errors="coerce"))
+    ]
+    zero_fill = [column for column in missing if column in allowed_zero]
+    if zero_fill:
+        frame.loc[0, zero_fill] = 0.0
+    review_required = [column for column in missing if column not in allowed_zero]
+    if review_required:
+        return frame, {
+            "stream": stream,
+            "member": member,
+            "period": period_str(period),
+            "missing_or_nonfinite_features": review_required,
+        }
+    return frame, None
+
+
+def _feature_contract_gap_capability(capability: Dict[str, Any], gaps: list[Dict[str, Any]]) -> Dict[str, Any]:
+    out = dict(capability)
+    stream = str(out.get("stream", "stream")).lower()
+    out["capability_status"] = "feature_contract_review_required"
+    out["gap_code"] = f"{stream}_vnext_feature_contract_gap"
+    out["gap_reason"] = "Missing/nonfinite future features require governed review before scoring: " + json.dumps(gaps, sort_keys=True)
+    out["forecast_capability_available"] = False
+    out["feature_contract_gaps"] = json.dumps(gaps, sort_keys=True)
+    return out
+
+
+def _feature_contract_gap_component_rows(
+    stream: str,
+    periods: Sequence[pd.Period],
+    capability: Dict[str, Any],
+    gaps: list[Dict[str, Any]],
+) -> pd.DataFrame:
+    _, component_rows = _gap_rows(stream, periods, capability)
+    if component_rows.empty:
+        return component_rows
+    component_rows["component_role"] = "feature contract governed gap"
+    component_rows["feature_contract_gaps"] = json.dumps(gaps, sort_keys=True)
+    return component_rows
 
 
 def _scorer_metadata(capability: Dict[str, Any]) -> Dict[str, Any]:

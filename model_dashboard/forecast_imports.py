@@ -23,6 +23,9 @@ HIGH_POPULATION_SMOKE_FIXTURE_NOTE = (
     "The high_population workbook is a technical smoke-test fixture: every user input is 2% above base, "
     "including unemployment, prices and starting target lags. It is not a decision-grade population-only scenario."
 )
+SCENARIO_ROLE_BASECASE = "basecase"
+SCENARIO_ROLE_COMPARISON = "comparison"
+SCENARIO_ROLE_OPTIONS = (SCENARIO_ROLE_BASECASE, SCENARIO_ROLE_COMPARISON)
 TEMPLATE_FILENAME = "NLTF_forecast_input_template_20q.xlsx"
 
 _FORECAST_SYMBOLS = {
@@ -31,10 +34,14 @@ _FORECAST_SYMBOLS = {
     "BACKTEST_SUPPORTED_MAX_HORIZON",
     "HIGH_POPULATION_SMOKE_FIXTURE_NOTE",
     "HORIZON_SUPPORT_NOTE",
+    "SCENARIO_ROLE_BASECASE",
+    "SCENARIO_ROLE_COMPARISON",
+    "SCENARIO_ROLE_OPTIONS",
     "TEMPLATE_FILENAME",
     "build_forecast_input_template_bytes",
     "forecast_pack_zip_bytes",
     "quarter_sort_key",
+    "resolve_scenario_role",
     "run_forecast_workbook",
     "sanitize_scenario_name",
     "scenario_name_from_filename",
@@ -96,6 +103,30 @@ def scenario_name_from_filename(filename: str | Path | None) -> str:
             stem = stem[len(prefix) :]
             break
     return sanitize_scenario_name(stem or "scenario")
+
+
+def resolve_scenario_role(
+    *,
+    scenario_role: str | None = None,
+    scenario_name: str | None = None,
+    workbook_filename: str | Path | None = None,
+) -> tuple[str | None, str]:
+    if scenario_role is None or not str(scenario_role).strip():
+        text = ""
+    else:
+        text = sanitize_scenario_name(scenario_role)
+    if text in {"base", "basecase", "base_case", "baseline", "reference"}:
+        return SCENARIO_ROLE_BASECASE, "explicit"
+    if text in {"comparison", "compare", "alternative", "alternate", "high_population", "upside", "downside"}:
+        return SCENARIO_ROLE_COMPARISON, "explicit"
+    combined = sanitize_scenario_name(f"{scenario_name or ''} {workbook_filename or ''}")
+    has_base = "basecase" in combined or "base_case" in combined or re.search(r"(?:^|_)base(?:_|$)", combined)
+    has_comparison = "high_population" in combined or any(
+        token in combined.split("_") for token in ["comparison", "compare", "alternative", "alternate", "upside", "downside"]
+    )
+    if has_base == has_comparison:
+        return None, "ambiguous"
+    return (SCENARIO_ROLE_BASECASE if has_base else SCENARIO_ROLE_COMPARISON), "inferred_from_name"
 
 
 _forecast, FORECAST_RUNNER_IMPORT_ERROR = _load_forecast_runner()

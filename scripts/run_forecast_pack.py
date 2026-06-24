@@ -15,6 +15,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Run a governed variable-horizon NLTF forecast pack from a completed workbook.")
     parser.add_argument("workbook", type=Path, help="Completed forecast input workbook.")
     parser.add_argument("--scenario-name", default=None, help="Scenario name to write into outputs.")
+    parser.add_argument("--scenario-role", choices=["basecase", "comparison"], default=None, help="Scenario comparison role.")
+    parser.add_argument("--is-test-fixture", action="store_true", help="Mark this workbook as an explicitly generated test fixture.")
     parser.add_argument("--quarters", type=int, default=None, help="Expected forecast horizon in quarters.")
     parser.add_argument("--end-period", default=None, help="Expected final forecast quarter, for example 2050Q4.")
     parser.add_argument("--output-dir", type=Path, default=None, help="Forecast-run output directory.")
@@ -30,11 +32,14 @@ def main() -> int:
         repo_root=ROOT,
         workbook_filename=args.workbook.name,
         scenario_name=scenario_name,
+        scenario_role=args.scenario_role,
+        is_test_fixture=args.is_test_fixture,
         expected_quarters=args.quarters,
         expected_end_period=args.end_period,
     )
     print(f"Forecast run: {result.output_dir}")
     print(f"Scenario: {result.manifest['scenario_name']}")
+    print(f"Scenario role: {result.manifest['scenario_role'] or 'ambiguous'}")
     print(f"Horizon: {result.manifest['forecast_horizon_quarters']} quarters")
     print(f"Validation: {result.manifest['validation_status']}")
     print(f"Forecast status: {result.manifest['forecast_status']}")

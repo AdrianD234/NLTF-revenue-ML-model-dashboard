@@ -24,6 +24,7 @@ from model_dashboard.forecast_runner import (
     future_quarters_after,
     latest_known_actual_period,
     model_capability_gap_register,
+    resolve_scenario_role,
     run_forecast_workbook,
     scenario_name_from_filename,
     validate_forecast_workbook,
@@ -434,6 +435,23 @@ def test_filename_suffix_creates_expected_scenario_name() -> None:
     assert scenario_name_from_filename("completed.xlsx") == "completed"
 
 
+def test_scenario_role_inference_handles_horizon_copy_filename_variants() -> None:
+    cases = [
+        ("NLTF forecast input template to 2050Q4 Basecase (2) Copy.xlsx", "basecase"),
+        ("to_2050q4_basecase_2_copy.xlsx", "basecase"),
+        ("NLTF_forecast_input_template_to_2050Q4_high population Copy.xlsx", "comparison"),
+        ("to_2050q4_high_population_2_copy.xlsx", "comparison"),
+    ]
+    for filename, expected_role in cases:
+        scenario = scenario_name_from_filename(filename)
+        role, source = resolve_scenario_role(scenario_name=scenario, workbook_filename=filename)
+        assert role == expected_role
+        assert source == "inferred_from_name"
+    role, source = resolve_scenario_role(scenario_name="to_2050q4_2_copy", workbook_filename="to_2050q4_2_copy.xlsx")
+    assert role is None
+    assert source == "ambiguous"
+
+
 def test_cli_runs_variable_horizon_with_scenario_name(tmp_path: Path) -> None:
     workbook = create_completed_sample_workbook(
         tmp_path / "NLTF_forecast_input_template_high_fuel.xlsx",
@@ -460,8 +478,10 @@ def test_cli_runs_variable_horizon_with_scenario_name(tmp_path: Path) -> None:
     )
     assert result.returncode == 0, result.stderr
     assert "Scenario: high_fuel" in result.stdout
+    assert "Scenario role: ambiguous" in result.stdout
     manifest = json.loads((output_dir / "forecast_run_manifest.json").read_text(encoding="utf-8"))
     assert manifest["scenario_name"] == "high_fuel"
+    assert manifest["scenario_role"] is None
     assert manifest["forecast_horizon_quarters"] == 1
     future = pd.read_parquet(output_dir / "future_forecasts.parquet")
     assert len(future) == len(STREAM_ORDER)
@@ -471,9 +491,13 @@ def test_cli_runs_variable_horizon_with_scenario_name(tmp_path: Path) -> None:
 
 
 def test_scenario_comparison_artifacts(tmp_path: Path) -> None:
-    base = create_completed_sample_workbook(tmp_path / "NLTF_forecast_input_template_basecase.xlsx", repo_root=ROOT, quarters=1)
+    base = create_completed_sample_workbook(
+        tmp_path / "NLTF forecast input template to 2050Q4 Basecase (2) Copy.xlsx",
+        repo_root=ROOT,
+        quarters=1,
+    )
     high_population = create_completed_sample_workbook(
-        tmp_path / "NLTF_forecast_input_template_high_population.xlsx",
+        tmp_path / "NLTF_forecast_input_template_to_2050Q4_high population Copy.xlsx",
         repo_root=ROOT,
         quarters=2,
         value_multiplier=1.02,
@@ -484,14 +508,12 @@ def test_scenario_comparison_artifacts(tmp_path: Path) -> None:
             output_dir=tmp_path / "basecase_run",
             repo_root=ROOT,
             run_timestamp="comparison-smoke",
-            scenario_name="basecase",
         ),
         run_forecast_workbook(
             high_population,
             output_dir=tmp_path / "high_population_run",
             repo_root=ROOT,
             run_timestamp="comparison-smoke",
-            scenario_name="high_population",
         ),
     ]
     comparison = write_forecast_scenario_comparison(
@@ -501,10 +523,11 @@ def test_scenario_comparison_artifacts(tmp_path: Path) -> None:
         run_timestamp="comparison-smoke",
     )
     assert comparison.manifest["scenario_count"] == 2
-    assert {row["scenario_name"] for row in comparison.manifest["scenarios"]} == {"basecase", "high_population"}
+    assert comparison.manifest["scenario_role_validation"]["base_scenario"] == results[0].manifest["scenario_name"]
+    assert {row["scenario_role"] for row in comparison.manifest["scenarios"]} == {"basecase", "comparison"}
     assert len(comparison.future_forecasts) == sum(len(result.future_forecasts) for result in results)
-    assert set(comparison.future_forecasts["scenario_name"]) == {"basecase", "high_population"}
-    assert set(comparison.forecast_chart_rows["scenario_name"]) >= {"historical_actual", "basecase", "high_population"}
+    assert set(comparison.future_forecasts["scenario_name"]) == {result.manifest["scenario_name"] for result in results}
+    assert set(comparison.forecast_chart_rows["scenario_name"]) >= {"historical_actual", *[result.manifest["scenario_name"] for result in results]}
     historical = comparison.forecast_chart_rows[comparison.forecast_chart_rows["row_type"].eq("historical_actual")]
     assert historical.duplicated(subset=["stream", "period"]).sum() == 0
     for name in [
@@ -520,9 +543,68 @@ def test_scenario_comparison_artifacts(tmp_path: Path) -> None:
     ]:
         assert (comparison.output_dir / name).exists(), name
     assert comparison.manifest["horizon_support_note"] == HORIZON_SUPPORT_NOTE
-    assert comparison.manifest["high_population_fixture_note"] == HIGH_POPULATION_SMOKE_FIXTURE_NOTE
+    assert "high_population_fixture_note" not in comparison.manifest
     assert not comparison.scenario_input_delta_audit.empty
-    assert comparison.scenario_input_delta_audit["decision_grade_status"].eq("not_decision_grade_smoke_fixture").all()
+    audit = comparison.scenario_input_delta_audit
+    assert audit["base_scenario_role"].eq("basecase").all()
+    assert audit["comparison_scenario_role"].eq("comparison").all()
+    assert audit["base_original_filename"].str.contains("Basecase", regex=False).all()
+    assert audit["comparison_original_filename"].str.contains("high population", regex=False).all()
+    assert audit["base_workbook_sha256"].str.fullmatch(r"[0-9a-f]{64}").all()
+    assert audit["comparison_workbook_sha256"].str.fullmatch(r"[0-9a-f]{64}").all()
+    assert audit["decision_grade_status"].eq("scenario_delta_audit_only").all()
+    assert not audit["all_required_inputs_plus_2pct"].fillna(False).astype(bool).any()
+    assert audit["assumption_scope_note"].str.contains("not labelled as an all-inputs +2% smoke fixture", regex=False).all()
+    assert pd.to_numeric(audit["pct_delta"], errors="coerce").dropna().between(0.019999999, 0.020000001).all()
+
+
+def test_scenario_comparison_refuses_ambiguous_roles(tmp_path: Path) -> None:
+    first = create_completed_sample_workbook(tmp_path / "to_2050q4_first_copy.xlsx", repo_root=ROOT, quarters=1)
+    second = create_completed_sample_workbook(tmp_path / "to_2050q4_second_copy.xlsx", repo_root=ROOT, quarters=1)
+    results = [
+        run_forecast_workbook(first, output_dir=tmp_path / "first", repo_root=ROOT, run_timestamp="ambiguous"),
+        run_forecast_workbook(second, output_dir=tmp_path / "second", repo_root=ROOT, run_timestamp="ambiguous"),
+    ]
+    try:
+        write_forecast_scenario_comparison(results, output_dir=tmp_path / "comparison", repo_root=ROOT)
+    except ValueError as exc:
+        message = str(exc)
+        assert "scenario role is ambiguous" in message
+        assert "upload order is not used" in message
+    else:
+        raise AssertionError("Ambiguous scenario roles should fail comparison packaging.")
+
+
+def test_all_inputs_plus_two_smoke_note_requires_fixture_flag(tmp_path: Path) -> None:
+    base = create_completed_sample_workbook(tmp_path / "basecase.xlsx", repo_root=ROOT, quarters=1)
+    fixture = create_completed_sample_workbook(tmp_path / "high_population.xlsx", repo_root=ROOT, quarters=1, value_multiplier=1.02)
+    results = [
+        run_forecast_workbook(
+            base,
+            output_dir=tmp_path / "basecase_run",
+            repo_root=ROOT,
+            run_timestamp="fixture",
+            scenario_name="basecase",
+            scenario_role="basecase",
+        ),
+        run_forecast_workbook(
+            fixture,
+            output_dir=tmp_path / "fixture_run",
+            repo_root=ROOT,
+            run_timestamp="fixture",
+            scenario_name="high_population",
+            scenario_role="comparison",
+            is_test_fixture=True,
+        ),
+    ]
+    comparison = write_forecast_scenario_comparison(results, output_dir=tmp_path / "comparison", repo_root=ROOT)
+    audit = comparison.scenario_input_delta_audit
+    assert audit["decision_grade_status"].eq("not_decision_grade_smoke_fixture").all()
+    assert audit["all_required_inputs_plus_2pct"].astype(bool).all()
+    assert audit["assumption_scope_note"].eq(HIGH_POPULATION_SMOKE_FIXTURE_NOTE).all()
+    summary = comparison.manifest["scenario_assumption_delta_summary"][0]
+    assert summary["all_required_inputs_plus_2pct"] is True
+    assert summary["comparison_is_test_fixture"] is True
 
 
 def test_forecast_runner_does_not_touch_evidence_pack(tmp_path: Path) -> None:
@@ -644,6 +726,7 @@ def test_100q_forecast_builder_current_finalists_all_streams_numeric_and_determi
             repo_root=ROOT,
             run_timestamp="determinism-1",
             scenario_name=scenario,
+            scenario_role="basecase" if scenario == "basecase" else "comparison",
             expected_end_period="2050Q4",
         )
         second = run_forecast_workbook(
@@ -652,6 +735,7 @@ def test_100q_forecast_builder_current_finalists_all_streams_numeric_and_determi
             repo_root=ROOT,
             run_timestamp="determinism-2",
             scenario_name=scenario,
+            scenario_role="basecase" if scenario == "basecase" else "comparison",
             expected_end_period="2050Q4",
         )
         first_results.append(first)
@@ -661,6 +745,7 @@ def test_100q_forecast_builder_current_finalists_all_streams_numeric_and_determi
             check_exact=True,
         )
         assert first.manifest["validation_status"] == "passed"
+        assert first.manifest["scenario_role"] == ("basecase" if scenario == "basecase" else "comparison")
         assert first.manifest["forecast_status"] == "numeric_forecast_available"
         assert first.manifest["forecast_horizon_quarters"] == 100
         assert first.manifest["forecast_start_period"] == "2026Q1"
@@ -722,6 +807,9 @@ def test_100q_forecast_builder_current_finalists_all_streams_numeric_and_determi
     assert comparison.manifest["fixed_finalists_only"] is True
     assert comparison.manifest["broad_search_run"] is False
     assert comparison.manifest["horizon_support_note"] == HORIZON_SUPPORT_NOTE
+    assert comparison.manifest["scenario_role_validation"]["base_scenario"] == "basecase"
+    assert comparison.manifest["scenario_role_validation"]["comparison_scenarios"] == ["high_population"]
+    assert "high_population_fixture_note" not in comparison.manifest
     assert "scenario_input_delta_audit.csv" in comparison.manifest["output_files"]
     for scenario in ["basecase", "high_population"]:
         rows = comparison.future_forecasts[comparison.future_forecasts["scenario_name"].eq(scenario)]
@@ -735,12 +823,20 @@ def test_100q_forecast_builder_current_finalists_all_streams_numeric_and_determi
         len([column for column in STREAM_COLUMNS[stream] if column.role == "user" and column.required])
         for stream in STREAM_ORDER
     )
-    assert audit["decision_grade_status"].eq("not_decision_grade_smoke_fixture").all()
-    assert audit["matches_expected_delta"].astype(bool).all()
+    assert audit["base_scenario"].eq("basecase").all()
+    assert audit["comparison_scenario"].eq("high_population").all()
+    assert audit["base_scenario_role"].eq("basecase").all()
+    assert audit["comparison_scenario_role"].eq("comparison").all()
+    assert audit["decision_grade_status"].eq("scenario_delta_audit_only").all()
+    assert not audit["all_required_inputs_plus_2pct"].fillna(False).astype(bool).any()
     assert set(audit["input_column"]).issuperset(
         {"unemployment_rate", "real_petrol_price_cents_per_litre", "real_diesel_price_cents_per_litre", "target_lag_1", "target_lag_4"}
     )
-    assert audit["assumption_scope_note"].str.contains("not a decision-grade population-only scenario", regex=False).all()
+    assert audit["assumption_scope_note"].str.contains("not labelled as an all-inputs +2% smoke fixture", regex=False).all()
+    summary = comparison.manifest["scenario_assumption_delta_summary"][0]
+    assert summary["comparison_scenario"] == "high_population"
+    assert summary["comparison_is_test_fixture"] is False
+    assert summary["all_required_inputs_plus_2pct"] is False
 
 
 def test_vnext_y_lag_members_ignore_future_workbook_target_lag_leakage(tmp_path: Path) -> None:

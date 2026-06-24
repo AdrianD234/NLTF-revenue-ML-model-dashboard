@@ -40,12 +40,14 @@ from model_dashboard.forecast_imports import (
     FORECAST_BUILDER_NOTE,
     FORECAST_BUILDER_TITLE,
     FORECAST_RUNNER_IMPORT_ERROR,
-    HIGH_POPULATION_SMOKE_FIXTURE_NOTE,
     HORIZON_SUPPORT_NOTE,
+    SCENARIO_ROLE_BASECASE,
+    SCENARIO_ROLE_COMPARISON,
     TEMPLATE_FILENAME,
     build_forecast_input_template_bytes,
     forecast_pack_zip_bytes,
     quarter_sort_key,
+    resolve_scenario_role,
     run_forecast_workbook,
     sanitize_scenario_name,
     scenario_name_from_filename,
@@ -2899,35 +2901,68 @@ def render_forecast_builder_section() -> None:
         for index, uploaded in enumerate(uploaded_files):
             workbook_bytes = uploaded.getvalue()
             digest = hashlib.sha256(workbook_bytes).hexdigest()
-            scenario_default = scenario_name_from_filename(getattr(uploaded, "name", f"scenario_{index + 1}.xlsx"))
-            scenario_value = st.text_input(
-                f"Scenario name for {getattr(uploaded, 'name', f'uploaded {index + 1}')}",
-                value=scenario_default,
-                key=f"forecast_builder_scenario_{index}_{digest[:10]}",
+            workbook_filename = getattr(uploaded, "name", f"uploaded_{index + 1}.xlsx")
+            scenario_default = scenario_name_from_filename(workbook_filename)
+            inferred_role, inferred_role_source = resolve_scenario_role(
+                scenario_name=scenario_default,
+                workbook_filename=workbook_filename,
             )
+            role_options = ["Select role", "Basecase", "Comparison"]
+            role_index = (
+                1
+                if inferred_role == SCENARIO_ROLE_BASECASE
+                else 2
+                if inferred_role == SCENARIO_ROLE_COMPARISON
+                else 0
+            )
+            scenario_cols = st.columns([0.58, 0.42])
+            with scenario_cols[0]:
+                scenario_value = st.text_input(
+                    f"Scenario name for {workbook_filename}",
+                    value=scenario_default,
+                    key=f"forecast_builder_scenario_{index}_{digest[:10]}",
+                )
+            with scenario_cols[1]:
+                selected_role_label = st.selectbox(
+                    f"Scenario role for {workbook_filename}",
+                    role_options,
+                    index=role_index,
+                    key=f"forecast_builder_scenario_role_{index}_{digest[:10]}",
+                    help="Required for scenario comparisons. Upload order is never used to infer base/comparison direction.",
+                )
+            selected_role = {
+                "Basecase": SCENARIO_ROLE_BASECASE,
+                "Comparison": SCENARIO_ROLE_COMPARISON,
+            }.get(selected_role_label)
             upload_rows.append(
                 {
                     "index": index,
                     "uploaded": uploaded,
                     "workbook_bytes": workbook_bytes,
-                    "workbook_filename": getattr(uploaded, "name", f"uploaded_{index + 1}.xlsx"),
+                    "workbook_filename": workbook_filename,
                     "scenario_name": sanitize_scenario_name(scenario_value),
+                    "scenario_role": selected_role,
+                    "scenario_role_source": "explicit" if selected_role else inferred_role_source,
+                    "workbook_sha256": digest,
                 }
             )
+        role_errors = _forecast_builder_role_errors(upload_rows)
+        if role_errors:
+            warning_panel("Scenario role validation failed: " + " ".join(role_errors))
 
         with control_cols[2]:
             validate_clicked = st.button(
                 "Validate inputs",
                 key="forecast_builder_validate",
                 use_container_width=True,
-                disabled=not upload_rows,
+                disabled=not upload_rows or bool(role_errors),
             )
         with control_cols[3]:
             run_clicked = st.button(
                 "Calculate forecasts",
                 key="forecast_builder_calculate",
                 use_container_width=True,
-                disabled=not upload_rows,
+                disabled=not upload_rows or bool(role_errors),
             )
 
         scenario_names = _unique_scenario_names([row["scenario_name"] for row in upload_rows])
@@ -2950,6 +2985,7 @@ def render_forecast_builder_section() -> None:
                     repo_root=repo_root,
                     workbook_filename=row["workbook_filename"],
                     scenario_name=row["scenario_name"],
+                    scenario_role=row["scenario_role"],
                     run_timestamp=run_timestamp,
                 )
                 for row in upload_rows
@@ -3040,9 +3076,8 @@ def render_forecast_builder_results(results: list[Any], comparison: Any | None) 
         notes_as_tooltip=False,
     )
     st.caption("Forecast start marker indicates the first forecast quarter after the latest historical actual. " + HORIZON_SUPPORT_NOTE)
-    scenarios = set(future_combined.get("scenario_name", pd.Series(dtype=str)).dropna().astype(str))
-    if "high_population" in scenarios:
-        st.caption(HIGH_POPULATION_SMOKE_FIXTURE_NOTE)
+    for note in _forecast_builder_assumption_notes(comparison):
+        st.caption(note)
     has_gap_rows = "forecast_available" in future.columns and (~future["forecast_available"].fillna(False).astype(bool)).any()
     has_numeric_forecasts = pd.to_numeric(future_combined.get("forecast"), errors="coerce").notna().any()
     if not has_numeric_forecasts:
@@ -3099,6 +3134,40 @@ def _unique_scenario_names(names: list[str]) -> list[str]:
     return output
 
 
+def _forecast_builder_role_errors(rows: list[dict[str, Any]]) -> list[str]:
+    if not rows:
+        return []
+    errors: list[str] = []
+    missing = [str(row.get("workbook_filename", row.get("scenario_name", "uploaded workbook"))) for row in rows if not row.get("scenario_role")]
+    if missing:
+        errors.append("Choose Basecase or Comparison for: " + ", ".join(missing) + ".")
+    base_count = sum(1 for row in rows if row.get("scenario_role") == SCENARIO_ROLE_BASECASE)
+    comparison_count = sum(1 for row in rows if row.get("scenario_role") == SCENARIO_ROLE_COMPARISON)
+    if base_count != 1:
+        errors.append(f"Exactly one uploaded workbook must be marked Basecase; found {base_count}.")
+    if comparison_count < 1:
+        errors.append("At least one uploaded workbook must be marked Comparison.")
+    return errors
+
+
+def _forecast_builder_assumption_notes(comparison: Any | None) -> list[str]:
+    if comparison is None:
+        return []
+    manifest = getattr(comparison, "manifest", {}) or {}
+    summary = manifest.get("scenario_assumption_delta_summary", [])
+    if not isinstance(summary, list):
+        return []
+    notes: list[str] = []
+    for record in summary:
+        if not isinstance(record, dict):
+            continue
+        comparison_name = record.get("comparison_scenario", "comparison")
+        note = str(record.get("assumption_scope_note") or "").strip()
+        if note:
+            notes.append(f"{comparison_name}: {note}")
+    return notes
+
+
 def _forecast_builder_validation_table(rows: list[dict[str, Any]]) -> pd.DataFrame:
     output: list[dict[str, Any]] = []
     for row in rows:
@@ -3112,7 +3181,9 @@ def _forecast_builder_validation_table(rows: list[dict[str, Any]]) -> pd.DataFra
             output.append(
                 {
                     "Scenario": scenario_name,
+                    "Role": row.get("scenario_role") or "unresolved",
                     "Workbook": workbook_filename,
+                    "Workbook SHA256": row.get("workbook_sha256"),
                     "Horizon": getattr(validation, "forecast_horizon_quarters", len(getattr(validation, "forecast_periods", []))),
                     "Start": getattr(validation, "forecast_start_period", None),
                     "End": getattr(validation, "forecast_end_period", None),
@@ -3509,7 +3580,15 @@ def forecast_builder_figure(chart_rows: pd.DataFrame, future_rows: pd.DataFrame 
                 col=1,
             )
         fig.update_yaxes(title_text="Value", row=row_index, col=1)
-        fig.update_xaxes(title_text="Quarter" if row_index == rows else "", row=row_index, col=1)
+        tickvals, ticktext = _forecast_builder_xaxis_ticks(stream_data, forecast_start, h13_start)
+        fig.update_xaxes(
+            title_text="Quarter" if row_index == rows else "",
+            tickmode="array",
+            tickvals=tickvals,
+            ticktext=ticktext,
+            row=row_index,
+            col=1,
+        )
 
     fig.update_layout(
         height=max(360, 235 * rows),
@@ -3538,6 +3617,54 @@ def _forecast_builder_long_range_start_period(future_rows: pd.DataFrame) -> str 
     future["period_key"] = future["period"].astype(str).map(_forecast_builder_period_key)
     future = future.sort_values("period_key", kind="stable")
     return str(future.iloc[0]["period"])
+
+
+def _forecast_builder_xaxis_ticks(
+    stream_rows: pd.DataFrame,
+    forecast_start: str | None,
+    h13_start: str | None,
+) -> tuple[list[str], list[str]]:
+    if stream_rows is None or stream_rows.empty or "period" not in stream_rows.columns:
+        return [], []
+    periods = (
+        stream_rows[["period", "period_key"]]
+        .dropna(subset=["period"])
+        .drop_duplicates(subset=["period"])
+        .sort_values("period_key", kind="stable")["period"]
+        .astype(str)
+        .tolist()
+    )
+    if not periods:
+        return [], []
+    forecast_start_key = _forecast_builder_period_key(forecast_start) if forecast_start else None
+    h13_key = _forecast_builder_period_key(h13_start) if h13_start else None
+    tickvals: list[str] = []
+    ticktext: list[str] = []
+    for period in periods:
+        key = _forecast_builder_period_key(period)
+        year, quarter = _forecast_builder_period_parts(period)
+        label: str | None = None
+        if period == forecast_start or period == h13_start:
+            label = period
+        elif forecast_start_key is not None and key >= forecast_start_key and (h13_key is None or key < h13_key):
+            label = period
+        elif quarter == 4 and year:
+            label = year
+        if label:
+            tickvals.append(period)
+            ticktext.append(label)
+    return tickvals, ticktext
+
+
+def _forecast_builder_period_parts(value: Any) -> tuple[str | None, int | None]:
+    text = str(value or "").strip()
+    if len(text) < 6 or text[-2] != "Q":
+        return None, None
+    year = text[:4]
+    quarter_text = text[-1]
+    if not year.isdigit() or quarter_text not in {"1", "2", "3", "4"}:
+        return None, None
+    return year, int(quarter_text)
 
 
 def _forecast_builder_start_period(chart_rows: pd.DataFrame) -> str | None:

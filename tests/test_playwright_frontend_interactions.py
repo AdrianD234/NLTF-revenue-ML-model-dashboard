@@ -432,7 +432,7 @@ def test_governance_reproducibility_page_stream_selector_and_downloads(page: Pag
     assert_no_streamlit_exception(page)
 
 
-def test_forecast_builder_upload_validate_calculate_and_download(page: Page) -> None:
+def test_forecast_builder_upload_validate_calculate_and_download(page: Page, tmp_path: Path) -> None:
     open_dashboard(page)
     click_page(page, "Governance & Reproducibility")
     body = page.locator("body")
@@ -443,15 +443,21 @@ def test_forecast_builder_upload_validate_calculate_and_download(page: Page) -> 
         page.get_by_role("button", name="Download blank 20-quarter template").click()
     assert download_info.value.suggested_filename == TEMPLATE_FILENAME
 
-    sample_dir = Path("test-output")
+    sample_dir = tmp_path / "forecast_builder_smoke_inputs"
     sample_dir.mkdir(parents=True, exist_ok=True)
-    basecase_path = sample_dir / "NLTF_forecast_input_template_basecase.xlsx"
-    high_population_path = sample_dir / "NLTF_forecast_input_template_high_population.xlsx"
-    create_completed_sample_workbook(basecase_path, quarters=1)
-    create_completed_sample_workbook(high_population_path, quarters=2, value_multiplier=1.02)
-    page.locator("input[type='file']").set_input_files([str(basecase_path.resolve()), str(high_population_path.resolve())])
-    expect(body).to_contain_text("Scenario name for NLTF_forecast_input_template_basecase.xlsx", timeout=60000)
-    expect(body).to_contain_text("Scenario name for NLTF_forecast_input_template_high_population.xlsx", timeout=60000)
+    smoke_base_1q_path = sample_dir / "smoke_base_1q.xlsx"
+    smoke_all_inputs_plus_2pct_2q_path = sample_dir / "smoke_all_inputs_plus_2pct_2q.xlsx"
+    create_completed_sample_workbook(smoke_base_1q_path, quarters=1)
+    create_completed_sample_workbook(smoke_all_inputs_plus_2pct_2q_path, quarters=2, value_multiplier=1.02)
+    page.locator("input[type='file']").set_input_files([str(smoke_base_1q_path.resolve()), str(smoke_all_inputs_plus_2pct_2q_path.resolve())])
+    expect(body).to_contain_text("Scenario name for smoke_base_1q.xlsx", timeout=60000)
+    expect(body).to_contain_text("Scenario name for smoke_all_inputs_plus_2pct_2q.xlsx", timeout=60000)
+    expect(body).to_contain_text("Scenario role validation failed", timeout=60000)
+    page.get_by_role(
+        "combobox",
+        name=re.compile(r"Scenario role for smoke_all_inputs_plus_2pct_2q\.xlsx"),
+    ).click()
+    page.get_by_role("option", name="Comparison").click()
     validate_button = page.get_by_role("button", name="Validate inputs")
     calculate_button = page.get_by_role("button", name="Calculate forecasts")
     expect(validate_button).to_be_enabled(timeout=60000)
@@ -459,8 +465,8 @@ def test_forecast_builder_upload_validate_calculate_and_download(page: Page) -> 
     validate_button.click()
     expect(body).to_contain_text("Forecast workbook validation", timeout=60000)
     expect(body).to_contain_text("Workbook inputs passed structural and required-value validation", timeout=60000)
-    expect(body).to_contain_text("basecase", timeout=60000)
-    expect(body).to_contain_text("high_population", timeout=60000)
+    expect(body).to_contain_text("smoke_base_1q", timeout=60000)
+    expect(body).to_contain_text("smoke_all_inputs_plus_2pct_2q", timeout=60000)
 
     calculate_button.click()
     expect(body).to_contain_text("Forecast status", timeout=90000)
@@ -470,8 +476,9 @@ def test_forecast_builder_upload_validate_calculate_and_download(page: Page) -> 
     expect(body).to_contain_text("Only streams with numeric forecasts are plotted", timeout=90000)
     expect(body).to_contain_text("Historical actual", timeout=90000)
     expect(body).to_contain_text("Forecast start", timeout=90000)
-    expect(body).to_contain_text("basecase forecast", timeout=90000)
-    expect(body).to_contain_text("high_population forecast", timeout=90000)
+    expect(body).to_contain_text("smoke_base_1q forecast", timeout=90000)
+    expect(body).to_contain_text("smoke_all_inputs_plus_2pct_2q forecast", timeout=90000)
+    expect(body).to_contain_text("not labelled as an all-inputs +2% smoke fixture", timeout=90000)
     expect(body).to_contain_text("Forecast table by stream and quarter", timeout=90000)
     expect(body).to_contain_text("Forecast table rows", timeout=90000)
     expect(body).to_contain_text("All rows", timeout=90000)
@@ -490,20 +497,20 @@ def test_forecast_builder_upload_validate_calculate_and_download(page: Page) -> 
     forecast_stream.click()
     page.get_by_role("option", name="PED VKT per capita").click()
     expect(body).to_contain_text("Historical actual", timeout=90000)
-    expect(body).to_contain_text("basecase forecast", timeout=90000)
-    expect(body).to_contain_text("high_population forecast", timeout=90000)
+    expect(body).to_contain_text("smoke_base_1q forecast", timeout=90000)
+    expect(body).to_contain_text("smoke_all_inputs_plus_2pct_2q forecast", timeout=90000)
     forecast_stream = page.get_by_label("Forecast stream")
     forecast_stream.click()
     page.get_by_role("option", name="Heavy RUC volume").click()
     expect(body).to_contain_text("Historical actual", timeout=90000)
-    expect(body).to_contain_text("basecase forecast", timeout=90000)
-    expect(body).to_contain_text("high_population forecast", timeout=90000)
+    expect(body).to_contain_text("smoke_base_1q forecast", timeout=90000)
+    expect(body).to_contain_text("smoke_all_inputs_plus_2pct_2q forecast", timeout=90000)
     forecast_stream = page.get_by_label("Forecast stream")
     forecast_stream.click()
     page.get_by_role("option", name="Light RUC volume").click()
     expect(body).to_contain_text("Historical actual", timeout=90000)
-    expect(body).to_contain_text("basecase forecast", timeout=90000)
-    expect(body).to_contain_text("high_population forecast", timeout=90000)
+    expect(body).to_contain_text("smoke_base_1q forecast", timeout=90000)
+    expect(body).to_contain_text("smoke_all_inputs_plus_2pct_2q forecast", timeout=90000)
     expect(body).to_contain_text("Heavy component trace", timeout=90000)
     expect(body).to_contain_text("Light base/residual trace", timeout=90000)
     page.get_by_text("Light base/residual trace", exact=True).click()
@@ -511,13 +518,13 @@ def test_forecast_builder_upload_validate_calculate_and_download(page: Page) -> 
     expect(body).to_contain_text("residual_gbr", timeout=90000)
     expect(body).to_contain_text("PED component trace", timeout=90000)
     expect(body).to_contain_text("Download combined comparison pack", timeout=90000)
-    expect(body).to_contain_text("Download basecase scenario pack", timeout=90000)
-    expect(body).to_contain_text("Download high_population scenario pack", timeout=90000)
+    expect(body).to_contain_text("Download smoke_base_1q scenario pack", timeout=90000)
+    expect(body).to_contain_text("Download smoke_all_inputs_plus_2pct_2q scenario pack", timeout=90000)
     with page.expect_download() as comparison_download:
         page.get_by_role("button", name="Download combined comparison pack").click()
     assert comparison_download.value.suggested_filename.endswith(".zip")
     with page.expect_download() as scenario_download:
-        page.get_by_role("button", name="Download basecase scenario pack").click()
+        page.get_by_role("button", name="Download smoke_base_1q scenario pack").click()
     assert scenario_download.value.suggested_filename.endswith(".zip")
     assert_no_streamlit_exception(page)
 

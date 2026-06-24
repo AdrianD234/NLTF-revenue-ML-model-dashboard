@@ -51,6 +51,11 @@ HIGH_POPULATION_SMOKE_FIXTURE_NOTE = (
     "The high_population workbook is a technical smoke-test fixture: every user input is 2% above base, "
     "including unemployment, prices and starting target lags. It is not a decision-grade population-only scenario."
 )
+SCENARIO_ROLE_BASECASE = "basecase"
+SCENARIO_ROLE_COMPARISON = "comparison"
+SCENARIO_ROLE_OPTIONS = (SCENARIO_ROLE_BASECASE, SCENARIO_ROLE_COMPARISON)
+SMOKE_FIXTURE_EXPECTED_DELTA = 0.02
+SMOKE_FIXTURE_DELTA_TOLERANCE = 1e-9
 
 STREAM_ORDER = ["PED", "LIGHT_RUC", "HEAVY_RUC"]
 STREAM_LABELS = {
@@ -457,6 +462,50 @@ def sanitize_scenario_name(value: str | None) -> str:
     return text or "scenario"
 
 
+def normalize_scenario_role(value: str | None) -> str | None:
+    if value is None or not str(value).strip():
+        return None
+    text = sanitize_scenario_name(value)
+    if text in {"base", "basecase", "base_case", "baseline", "reference"}:
+        return SCENARIO_ROLE_BASECASE
+    if text in {"comparison", "compare", "alternative", "alternate", "high_population", "upside", "downside"}:
+        return SCENARIO_ROLE_COMPARISON
+    return None
+
+
+def infer_scenario_role(*values: str | Path | None) -> str | None:
+    text = " ".join(str(value or "") for value in values)
+    normalized = sanitize_scenario_name(text)
+    tokens = {token for token in normalized.split("_") if token}
+    has_base = bool(
+        {"basecase", "baseline", "reference"}.intersection(tokens)
+        or re.search(r"(?:^|_)base(?:_|$)", normalized)
+        or "base_case" in normalized
+    )
+    has_comparison = bool(
+        "high_population" in normalized
+        or {"comparison", "compare", "alternative", "alternate", "upside", "downside"}.intersection(tokens)
+    )
+    if has_base == has_comparison:
+        return None
+    return SCENARIO_ROLE_BASECASE if has_base else SCENARIO_ROLE_COMPARISON
+
+
+def resolve_scenario_role(
+    *,
+    scenario_role: str | None = None,
+    scenario_name: str | None = None,
+    workbook_filename: str | Path | None = None,
+) -> tuple[str | None, str]:
+    explicit = normalize_scenario_role(scenario_role)
+    if explicit is not None:
+        return explicit, "explicit"
+    inferred = infer_scenario_role(scenario_name, workbook_filename)
+    if inferred is not None:
+        return inferred, "inferred_from_name"
+    return None, "ambiguous"
+
+
 def build_forecast_input_template(
     output_path: Path | str,
     repo_root: Path | str | None = None,
@@ -684,12 +733,19 @@ def run_forecast_workbook(
     workbook_filename: str | None = None,
     run_timestamp: str | None = None,
     scenario_name: str | None = None,
+    scenario_role: str | None = None,
+    is_test_fixture: bool = False,
     expected_quarters: int | None = None,
     expected_end_period: str | None = None,
 ) -> ForecastRunResult:
     root = Path(repo_root) if repo_root is not None else repo_root_from_here()
     workbook_name = workbook_filename or _workbook_name(workbook)
     scenario = sanitize_scenario_name(scenario_name) if scenario_name else scenario_name_from_filename(workbook_name)
+    resolved_role, role_source = resolve_scenario_role(
+        scenario_role=scenario_role,
+        scenario_name=scenario,
+        workbook_filename=workbook_name,
+    )
     validation = validate_forecast_workbook(
         workbook,
         root,
@@ -706,10 +762,17 @@ def run_forecast_workbook(
     capabilities = model_capability_gap_register(root)
     future, components = _forecast_output_rows(validation, capabilities, root)
     assumptions = validation.assumptions.copy()
-    _add_scenario_columns(future, scenario)
-    _add_scenario_columns(components, scenario)
-    _add_scenario_columns(assumptions, scenario)
-    capability_report = _forecast_capability_report(capabilities, future, components, validation, scenario_name=scenario)
+    _add_scenario_columns(future, scenario, resolved_role)
+    _add_scenario_columns(components, scenario, resolved_role)
+    _add_scenario_columns(assumptions, scenario, resolved_role)
+    capability_report = _forecast_capability_report(
+        capabilities,
+        future,
+        components,
+        validation,
+        scenario_name=scenario,
+        scenario_role=resolved_role,
+    )
     chart_rows = forecast_chart_rows_for_display(future, repo_root=root, latest_actual_period=validation.latest_actual_period)
     report = _forecast_validation_report(validation, capabilities)
     forecast_status = _forecast_status(validation, future)
@@ -718,8 +781,13 @@ def run_forecast_workbook(
         "created_at": datetime.now(timezone.utc).isoformat(),
         "forecast_runner_version": FORECAST_RUNNER_VERSION,
         "scenario_name": scenario,
+        "scenario_role": resolved_role,
+        "scenario_role_source": role_source,
+        "scenario_role_required_for_comparison": True,
+        "scenario_display_name": scenario,
         "workbook_filename": workbook_name,
         "workbook_sha256": workbook_hash,
+        "is_test_fixture": bool(is_test_fixture),
         "latest_actual_period": validation.latest_actual_period,
         "forecast_periods": validation.forecast_periods,
         "forecast_horizon_quarters": validation.forecast_horizon_quarters,
@@ -968,10 +1036,68 @@ def _combine_forecast_chart_rows(scenario_results: list[ForecastRunResult]) -> p
     return combined.reset_index(drop=True)
 
 
-def _scenario_input_delta_audit(scenario_results: list[ForecastRunResult]) -> pd.DataFrame:
+def _scenario_role_records(scenario_results: list[ForecastRunResult]) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    errors: list[str] = []
+    for index, result in enumerate(scenario_results):
+        manifest = result.manifest
+        scenario_name = sanitize_scenario_name(str(manifest.get("scenario_name", f"scenario_{index + 1}")))
+        workbook_filename = str(manifest.get("workbook_filename") or "")
+        explicit_role = manifest.get("scenario_role")
+        role = normalize_scenario_role(str(explicit_role)) if explicit_role else None
+        role_source = str(manifest.get("scenario_role_source") or "")
+        if role is None:
+            role, role_source = resolve_scenario_role(
+                scenario_role=None,
+                scenario_name=scenario_name,
+                workbook_filename=workbook_filename,
+            )
+        if role is None:
+            errors.append(
+                f"{workbook_filename or scenario_name}: scenario role is ambiguous. "
+                "Choose Basecase or Comparison explicitly; upload order is not used."
+            )
+        records.append(
+            {
+                "result_index": index,
+                "scenario_name": scenario_name,
+                "scenario_role": role,
+                "scenario_role_source": role_source,
+                "scenario_display_name": str(manifest.get("scenario_display_name") or scenario_name),
+                "workbook_filename": workbook_filename,
+                "workbook_sha256": manifest.get("workbook_sha256"),
+                "run_id": manifest.get("run_id"),
+                "output_dir": _repo_relative(repo_root_from_here(), result.output_dir),
+                "is_test_fixture": bool(manifest.get("is_test_fixture", False)),
+            }
+        )
+    base_count = sum(1 for record in records if record["scenario_role"] == SCENARIO_ROLE_BASECASE)
+    comparison_count = sum(1 for record in records if record["scenario_role"] == SCENARIO_ROLE_COMPARISON)
+    if base_count != 1:
+        errors.append(f"Scenario comparison requires exactly one Basecase role; found {base_count}.")
+    if comparison_count < 1:
+        errors.append("Scenario comparison requires at least one Comparison role; found 0.")
+    if errors:
+        raise ValueError("Scenario role validation failed: " + " ".join(errors))
+    return records
+
+
+def _scenario_input_delta_audit(
+    scenario_results: list[ForecastRunResult],
+    role_records: list[dict[str, Any]] | None = None,
+) -> pd.DataFrame:
     columns = [
         "base_scenario",
+        "base_scenario_role",
+        "base_original_filename",
+        "base_sanitized_display_name",
+        "base_workbook_sha256",
         "comparison_scenario",
+        "comparison_scenario_role",
+        "comparison_original_filename",
+        "comparison_sanitized_display_name",
+        "comparison_workbook_sha256",
+        "comparison_is_test_fixture",
         "stream",
         "stream_label",
         "target_period",
@@ -981,6 +1107,7 @@ def _scenario_input_delta_audit(scenario_results: list[ForecastRunResult]) -> pd
         "pct_delta",
         "expected_pct_delta",
         "matches_expected_delta",
+        "all_required_inputs_plus_2pct",
         "decision_grade_status",
         "assumption_scope_note",
     ]
@@ -996,21 +1123,21 @@ def _scenario_input_delta_audit(scenario_results: list[ForecastRunResult]) -> pd
     assumptions = pd.concat(frames, ignore_index=True, sort=False)
     if "scenario_name" not in assumptions.columns:
         return pd.DataFrame(columns=columns)
-    scenarios = assumptions["scenario_name"].dropna().astype(str).unique().tolist()
-    if not scenarios:
+    if role_records is None:
+        role_records = _scenario_role_records(scenario_results)
+    role_by_scenario = {str(record["scenario_name"]): record for record in role_records}
+    base_records = [record for record in role_records if record["scenario_role"] == SCENARIO_ROLE_BASECASE]
+    comparison_records = [record for record in role_records if record["scenario_role"] == SCENARIO_ROLE_COMPARISON]
+    if len(base_records) != 1 or not comparison_records:
         return pd.DataFrame(columns=columns)
-    base_scenario = "basecase" if "basecase" in scenarios else scenarios[0]
+    base_record = base_records[0]
+    base_scenario = str(base_record["scenario_name"])
     base = assumptions[assumptions["scenario_name"].astype(str).eq(base_scenario)].copy()
     rows: list[dict[str, Any]] = []
-    for comparison_scenario in [scenario for scenario in scenarios if scenario != base_scenario]:
+    for comparison_record in comparison_records:
+        comparison_scenario = str(comparison_record["scenario_name"])
         comparison = assumptions[assumptions["scenario_name"].astype(str).eq(comparison_scenario)].copy()
-        decision_status = (
-            "not_decision_grade_smoke_fixture"
-            if comparison_scenario == "high_population"
-            else "scenario_delta_audit_only"
-        )
-        expected_delta: float | None = 0.02 if comparison_scenario == "high_population" else None
-        note = HIGH_POPULATION_SMOKE_FIXTURE_NOTE if comparison_scenario == "high_population" else ""
+        expected_delta: float | None = SMOKE_FIXTURE_EXPECTED_DELTA if comparison_record["is_test_fixture"] else None
         for stream in STREAM_ORDER:
             user_columns = [column.name for column in STREAM_COLUMNS[stream] if column.role == "user" and column.required]
             stream_base = base[base["stream"].astype(str).eq(stream)].copy()
@@ -1036,7 +1163,16 @@ def _scenario_input_delta_audit(scenario_results: list[ForecastRunResult]) -> pd
                     rows.append(
                         {
                             "base_scenario": base_scenario,
+                            "base_scenario_role": base_record["scenario_role"],
+                            "base_original_filename": base_record["workbook_filename"],
+                            "base_sanitized_display_name": base_record["scenario_display_name"],
+                            "base_workbook_sha256": base_record["workbook_sha256"],
                             "comparison_scenario": comparison_scenario,
+                            "comparison_scenario_role": comparison_record["scenario_role"],
+                            "comparison_original_filename": comparison_record["workbook_filename"],
+                            "comparison_sanitized_display_name": comparison_record["scenario_display_name"],
+                            "comparison_workbook_sha256": comparison_record["workbook_sha256"],
+                            "comparison_is_test_fixture": bool(comparison_record["is_test_fixture"]),
                             "stream": stream,
                             "stream_label": STREAM_LABELS[stream],
                             "target_period": str(record.get("period")),
@@ -1046,15 +1182,71 @@ def _scenario_input_delta_audit(scenario_results: list[ForecastRunResult]) -> pd
                             "pct_delta": pct_delta,
                             "expected_pct_delta": expected_delta,
                             "matches_expected_delta": (
-                                bool(np.isfinite(pct_delta) and abs(pct_delta - expected_delta) <= 1e-9)
+                                bool(np.isfinite(pct_delta) and abs(pct_delta - expected_delta) <= SMOKE_FIXTURE_DELTA_TOLERANCE)
                                 if expected_delta is not None
                                 else pd.NA
                             ),
-                            "decision_grade_status": decision_status,
-                            "assumption_scope_note": note,
+                            "all_required_inputs_plus_2pct": pd.NA,
+                            "decision_grade_status": "pending_delta_summary",
+                            "assumption_scope_note": "",
                         }
                     )
-    return pd.DataFrame(rows, columns=columns)
+    return _finalize_scenario_input_delta_audit(pd.DataFrame(rows, columns=columns))
+
+
+def _finalize_scenario_input_delta_audit(audit: pd.DataFrame) -> pd.DataFrame:
+    if audit.empty:
+        return audit
+    out = audit.copy()
+    for comparison_scenario, group in out.groupby("comparison_scenario", dropna=False):
+        idx = group.index
+        deltas = pd.to_numeric(group["pct_delta"], errors="coerce")
+        finite = deltas[np.isfinite(deltas)]
+        is_fixture = bool(group["comparison_is_test_fixture"].fillna(False).astype(bool).all())
+        matches = group["matches_expected_delta"]
+        all_plus2 = bool(is_fixture and not matches.empty and matches.fillna(False).astype(bool).all())
+        out.loc[idx, "all_required_inputs_plus_2pct"] = all_plus2
+        if all_plus2:
+            status = "not_decision_grade_smoke_fixture"
+            note = HIGH_POPULATION_SMOKE_FIXTURE_NOTE
+        elif is_fixture:
+            status = "test_fixture_delta_mismatch_review_required"
+            note = "Workbook is flagged as a test fixture, but not every required user input is +2% versus basecase."
+        elif finite.empty:
+            status = "scenario_delta_audit_only"
+            note = "No finite base/comparison input deltas could be calculated for this scenario."
+        else:
+            status = "scenario_delta_audit_only"
+            note = (
+                f"Required user-input deltas range from {float(finite.min()):.3%} to {float(finite.max()):.3%} "
+                "versus the resolved basecase; this is not labelled as an all-inputs +2% smoke fixture."
+            )
+        out.loc[idx, "decision_grade_status"] = status
+        out.loc[idx, "assumption_scope_note"] = note
+    return out
+
+
+def _scenario_assumption_delta_summary(audit: pd.DataFrame) -> list[dict[str, Any]]:
+    if audit is None or audit.empty:
+        return []
+    rows: list[dict[str, Any]] = []
+    for comparison_scenario, group in audit.groupby("comparison_scenario", dropna=False):
+        deltas = pd.to_numeric(group["pct_delta"], errors="coerce")
+        finite = deltas[np.isfinite(deltas)]
+        rows.append(
+            {
+                "base_scenario": first_non_null(group["base_scenario"]),
+                "comparison_scenario": str(comparison_scenario),
+                "comparison_is_test_fixture": bool(group["comparison_is_test_fixture"].fillna(False).astype(bool).all()),
+                "all_required_inputs_plus_2pct": bool(group["all_required_inputs_plus_2pct"].fillna(False).astype(bool).all()),
+                "decision_grade_status": first_non_null(group["decision_grade_status"]),
+                "min_pct_delta": float(finite.min()) if not finite.empty else None,
+                "max_pct_delta": float(finite.max()) if not finite.empty else None,
+                "assumption_scope_note": first_non_null(group["assumption_scope_note"]),
+                "row_count": int(len(group)),
+            }
+        )
+    return rows
 
 
 def write_forecast_scenario_comparison(
@@ -1064,6 +1256,7 @@ def write_forecast_scenario_comparison(
     run_timestamp: str | None = None,
 ) -> ForecastScenarioComparisonResult:
     root = Path(repo_root) if repo_root is not None else repo_root_from_here()
+    role_records = _scenario_role_records(scenario_results)
     timestamp = run_timestamp or datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     comparison_id = f"{timestamp}_scenario_comparison"
     comparison_dir = Path(output_dir) if output_dir is not None else root / "artifacts" / "forecast_runs" / comparison_id
@@ -1079,19 +1272,35 @@ def write_forecast_scenario_comparison(
         else pd.DataFrame()
     )
     chart_rows = _combine_forecast_chart_rows(scenario_results)
-    scenario_input_delta_audit = _scenario_input_delta_audit(scenario_results)
+    scenario_input_delta_audit = _scenario_input_delta_audit(scenario_results, role_records)
+    role_by_scenario = {record["scenario_name"]: record for record in role_records}
+    base_scenario = next(record["scenario_name"] for record in role_records if record["scenario_role"] == SCENARIO_ROLE_BASECASE)
+    comparison_scenarios = [
+        record["scenario_name"] for record in role_records if record["scenario_role"] == SCENARIO_ROLE_COMPARISON
+    ]
+    scenario_delta_summary = _scenario_assumption_delta_summary(scenario_input_delta_audit)
     manifest = {
         "comparison_id": comparison_id,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "forecast_runner_version": FORECAST_RUNNER_VERSION,
         "scenario_count": len(scenario_results),
+        "scenario_role_validation": {
+            "status": "passed",
+            "base_scenario": base_scenario,
+            "comparison_scenarios": comparison_scenarios,
+            "rule": "exactly one basecase role and at least one comparison role; upload order is never used",
+        },
         "backtest_supported_max_horizon": BACKTEST_SUPPORTED_MAX_HORIZON,
         "long_range_extrapolation_start_horizon": BACKTEST_SUPPORTED_MAX_HORIZON + 1,
         "horizon_support_note": HORIZON_SUPPORT_NOTE,
-        "high_population_fixture_note": HIGH_POPULATION_SMOKE_FIXTURE_NOTE,
+        "scenario_assumption_delta_summary": scenario_delta_summary,
         "scenarios": [
             {
                 "scenario_name": result.manifest.get("scenario_name"),
+                "scenario_role": role_by_scenario.get(result.manifest.get("scenario_name"), {}).get("scenario_role"),
+                "scenario_role_source": role_by_scenario.get(result.manifest.get("scenario_name"), {}).get("scenario_role_source"),
+                "scenario_display_name": role_by_scenario.get(result.manifest.get("scenario_name"), {}).get("scenario_display_name"),
+                "is_test_fixture": role_by_scenario.get(result.manifest.get("scenario_name"), {}).get("is_test_fixture"),
                 "run_id": result.manifest.get("run_id"),
                 "output_dir": _repo_relative(root, result.output_dir),
                 "workbook_filename": result.manifest.get("workbook_filename"),
@@ -1879,14 +2088,19 @@ def _forecast_status(validation: ForecastValidationResult, future: pd.DataFrame)
     return "mixed_numeric_and_governed_gap"
 
 
-def _add_scenario_columns(frame: pd.DataFrame, scenario_name: str) -> None:
+def _add_scenario_columns(frame: pd.DataFrame, scenario_name: str, scenario_role: str | None = None) -> None:
     if frame.empty:
         frame["scenario_name"] = pd.Series(dtype=str)
+        frame["scenario_role"] = pd.Series(dtype=str)
         return
     if "scenario_name" in frame.columns:
         frame["scenario_name"] = scenario_name
     else:
         frame.insert(0, "scenario_name", scenario_name)
+    if "scenario_role" in frame.columns:
+        frame["scenario_role"] = scenario_role
+    else:
+        frame.insert(1, "scenario_role", scenario_role)
 
 
 def _forecast_capability_report(
@@ -1896,6 +2110,7 @@ def _forecast_capability_report(
     validation: ForecastValidationResult,
     *,
     scenario_name: str,
+    scenario_role: str | None = None,
 ) -> pd.DataFrame:
     rows: list[dict[str, Any]] = []
     future_group = future.groupby("stream", dropna=False) if not future.empty and "stream" in future.columns else {}
@@ -1917,6 +2132,7 @@ def _forecast_capability_report(
         rows.append(
             {
                 "scenario_name": scenario_name,
+                "scenario_role": scenario_role,
                 "stream": stream,
                 "stream_label": cap.get("stream_label"),
                 "model": cap.get("model"),
