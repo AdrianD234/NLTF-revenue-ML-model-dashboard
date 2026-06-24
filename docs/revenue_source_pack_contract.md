@@ -105,6 +105,12 @@ series, the dashboard appends a `revenue_basis_selection_unavailable` gap to the
 runtime source gap register and shows a warning. It keeps the source-backed rows
 unchanged and does not relabel Net rows as Gross, Admin or Deductions.
 
+When the selected basis is value-backed for the selected series, the Revenue
+Outlook source frame filters to rows with that exact `revenue_basis`. For
+example, `PED revenue` can show workbook rows labelled `Gross PED revenue` for
+the Gross basis or `PED revenue` for the Nominal ex GST basis, without mixing
+or relabelling either source row family.
+
 ## Derived Audit Artifacts
 
 `scripts/export_revenue_source_pack_tables.py` exports:

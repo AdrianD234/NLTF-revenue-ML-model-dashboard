@@ -11,6 +11,7 @@ from app import (
     _source_gap_register_for_controls,
     _source_path_trace_status_for_controls,
     _source_reconciliation_view,
+    _selected_source_series_frame,
     _source_split_figure,
     _source_total_path_figure,
     _source_uncertainty_figure,
@@ -73,6 +74,24 @@ def test_source_gap_register_reports_unsupported_revenue_basis_selection() -> No
     ).set_index("gap_id")
     assert available.loc["revenue_basis_selection_unavailable", "availability_status"] == "available"
     assert available.loc["revenue_basis_selection_unavailable", "runtime_treatment"] == "basis_filter_available"
+
+
+def test_selected_source_series_applies_value_backed_revenue_basis_without_relabeling() -> None:
+    pack = load_revenue_source_pack(repo_root=ROOT)
+    assert pack is not None
+
+    gross = _selected_source_series_frame(pack, {"series": "PED revenue", "revenue_basis": "Gross"})
+    assert set(gross["revenue_basis"]) == {"gross"}
+    assert set(gross["source_series_label"]) == {"Gross PED revenue"}
+
+    nominal = _selected_source_series_frame(pack, {"series": "PED revenue", "revenue_basis": "Nominal ex GST"})
+    assert set(nominal["revenue_basis"]) == {"nominal_ex_gst"}
+    assert set(nominal["source_series_label"]) == {"PED revenue"}
+
+    unavailable = _selected_source_series_frame(pack, {"series": "PED revenue", "revenue_basis": "Net"})
+    assert set(unavailable["revenue_basis"]) == {"gross", "nominal_ex_gst"}
+    messages = _source_control_gap_messages(pack, {"series": "PED revenue", "revenue_basis": "Net"})
+    assert any("not value-backed" in message for message in messages)
 
 
 def test_reconciliation_view_exposes_optional_rollup_inputs() -> None:

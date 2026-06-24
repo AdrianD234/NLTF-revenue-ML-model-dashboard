@@ -2905,7 +2905,23 @@ def _selected_source_series_frame(source_pack: RevenueSourcePack, controls: dict
     ].copy()
     if rows.empty and selected == "Total RUC+PED revenue":
         rows = frame[frame["series_id"].eq("total_fed_ruc_net_revenue")].copy()
-    return rows[pd.to_numeric(rows["value"], errors="coerce").notna()].copy()
+    rows = rows[pd.to_numeric(rows["value"], errors="coerce").notna()].copy()
+    return _filter_source_rows_by_revenue_basis(rows, controls)
+
+
+def _filter_source_rows_by_revenue_basis(rows: pd.DataFrame, controls: dict[str, Any]) -> pd.DataFrame:
+    if rows.empty or "revenue_basis" not in rows.columns:
+        return rows
+    selected_basis = controls.get("revenue_basis") or _source_revenue_path_basis_label(controls.get("revenue_path"))
+    basis_key = _source_revenue_basis_key(selected_basis)
+    if not basis_key:
+        return rows
+    basis = rows["revenue_basis"].astype(str)
+    revenue_mask = basis.str.lower().ne("activity")
+    if not revenue_mask.any():
+        return rows
+    filtered = rows[revenue_mask & basis.eq(basis_key)].copy()
+    return filtered if not filtered.empty else rows
 
 
 def _source_series_rows(frame: pd.DataFrame, series_id: str) -> pd.DataFrame:
@@ -2971,6 +2987,15 @@ def _source_revenue_basis_key(value: Any) -> str:
         "nominal ex gst": "nominal_ex_gst",
     }
     return labels.get(text, "")
+
+
+def _source_revenue_path_basis_label(value: Any) -> str:
+    text = str(value or "").strip().lower()
+    if "gross" in text:
+        return "Gross"
+    if "net" in text:
+        return "Net"
+    return ""
 
 
 def _source_revenue_basis_label(value: Any) -> str:
