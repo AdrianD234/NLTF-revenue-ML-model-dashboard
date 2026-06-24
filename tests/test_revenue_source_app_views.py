@@ -5,6 +5,7 @@ from pathlib import Path
 import pandas as pd
 
 from app import (
+    REVENUE_SOURCE_PACK_CACHE_REVISION,
     _source_axis_title,
     _source_component_figure,
     _source_control_gap_messages,
@@ -19,10 +20,14 @@ from app import (
     _source_uncertainty_figure,
     revenue_outlook_figure,
 )
-from model_dashboard.revenue_source_pack import load_revenue_source_pack
+from model_dashboard.revenue_source_pack import REVENUE_SOURCE_PACK_RUNTIME_REVISION, load_revenue_source_pack
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_revenue_source_pack_cache_revision_tracks_loader_runtime_revision() -> None:
+    assert REVENUE_SOURCE_PACK_CACHE_REVISION == REVENUE_SOURCE_PACK_RUNTIME_REVISION
 
 
 def test_source_gap_register_view_reflects_active_crown_top_up_control() -> None:

@@ -120,6 +120,7 @@ from model_dashboard.revenue_outlook import (
 from model_dashboard.revenue_source_pack import (
     REQUIRED_SOURCE_PACK_FILES,
     REVENUE_SOURCE_PACK_DIR,
+    REVENUE_SOURCE_PACK_RUNTIME_REVISION,
     REVENUE_SOURCE_PACK_SCHEMA_VERSION,
     RevenueSourcePack,
     control_options,
@@ -210,7 +211,7 @@ from model_dashboard.ui import (
 
 LOADER_SCHEMA_VERSION = "stage1-governance-loader-v9-parquet-contract-schiff-class"
 STREAMLIT_IMPORT_SURFACE_REVISION = "2026-06-24-revenue-source-pack-v1"
-REVENUE_SOURCE_PACK_CACHE_REVISION = "2026-06-24-source-gap-register-v1"
+REVENUE_SOURCE_PACK_CACHE_REVISION = REVENUE_SOURCE_PACK_RUNTIME_REVISION
 CURATED_DATA_DIR = Path("artifacts") / "curated_data"
 REPRODUCIBILITY_PAGE = "Governance & Reproducibility"
 REVENUE_OUTLOOK_PAGE = "Revenue Outlook"

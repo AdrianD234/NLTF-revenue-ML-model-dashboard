@@ -17,6 +17,10 @@ files, and `load_revenue_source_pack()` reports a validation error if a
 declared repo-local file is missing, has no manifest SHA256, or no longer
 matches the declared SHA256.
 
+The Streamlit Revenue Outlook cache key must use the source-pack loader runtime
+revision, so governance-only loader changes invalidate cached source-pack views
+even when normalized file timestamps are unchanged.
+
 ## Canonical Schema
 
 `model_dashboard.revenue_source_pack.load_revenue_source_pack()` builds a
