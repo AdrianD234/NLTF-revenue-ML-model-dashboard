@@ -102,6 +102,10 @@ REQUIRED_ROLLUP_INPUTS = {
     "total_nltf_net_revenue": ["net_fed_revenue", "total_ruc_net_revenue", "net_mvr_revenue", "tuc_net_revenue"],
 }
 
+OPTIONAL_ROLLUP_INPUTS = {
+    "net_fed_revenue": ["crown_top_up"],
+}
+
 
 @dataclass
 class RevenueSourcePack:
@@ -440,6 +444,7 @@ def revenue_reconciliation_report(canonical_long: pd.DataFrame) -> pd.DataFrame:
                 "difference",
                 "abs_difference",
                 "missing_inputs",
+                "optional_inputs_applied",
             ]
         )
     report["abs_difference"] = pd.to_numeric(report["difference"], errors="coerce").abs()
@@ -1214,6 +1219,7 @@ def _rollup_rows(scope: str, fy: int, values: dict[str, Any]) -> list[dict[str, 
     rows = []
     for output, inputs in REQUIRED_ROLLUP_INPUTS.items():
         missing = [series_id for series_id in inputs if series_id not in values or pd.isna(values.get(series_id))]
+        optional_applied = [series_id for series_id in OPTIONAL_ROLLUP_INPUTS.get(output, []) if series_id in values and not pd.isna(values.get(series_id))]
         official = values.get(output)
         if missing:
             status = "partial_missing"
@@ -1237,6 +1243,7 @@ def _rollup_rows(scope: str, fy: int, values: dict[str, Any]) -> list[dict[str, 
                 "official_value": official if official is not None else pd.NA,
                 "difference": difference,
                 "missing_inputs": "; ".join(missing),
+                "optional_inputs_applied": "; ".join(optional_applied),
             }
         )
     return rows
@@ -1246,7 +1253,8 @@ def _calculate_rollup(output: str, values: dict[str, Any]) -> float:
     if output == "gross_fed_revenue":
         return float(values["gross_ped_revenue"]) + float(values["gross_lpg_revenue"]) + float(values["gross_cng_revenue"])
     if output == "net_fed_revenue":
-        return float(values["gross_fed_revenue"]) - float(values["fed_refunds"])
+        top_up = 0.0 if "crown_top_up" not in values or pd.isna(values.get("crown_top_up")) else float(values["crown_top_up"])
+        return float(values["gross_fed_revenue"]) - float(values["fed_refunds"]) + top_up
     if output == "total_ruc_net_revenue":
         return (
             float(values["light_ruc_net_revenue"])

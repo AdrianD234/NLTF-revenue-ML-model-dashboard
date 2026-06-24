@@ -11,6 +11,7 @@ from model_dashboard.revenue_source_pack import (
     REQUIRED_SOURCE_PACK_FILES,
     REVENUE_SOURCE_PACK_SCHEMA_VERSION,
     load_revenue_source_pack,
+    revenue_reconciliation_report,
 )
 
 
@@ -24,6 +25,19 @@ def _sha256(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _rollup_source_row(fy: int, series_id: str, value: float) -> dict[str, object]:
+    return {
+        "scope": "official_actuals",
+        "FY": fy,
+        "series_id": series_id,
+        "value": value,
+        "unit": "$m nominal ex GST",
+        "source_file": "annual_actuals.csv",
+        "model_basis": "official_actuals",
+        "line": "Actual",
+    }
 
 
 def test_revenue_source_pack_required_files_are_repo_local_and_hash_backed() -> None:
@@ -126,6 +140,30 @@ def test_revenue_source_pack_rollups_reconcile_where_inputs_exist_and_report_gap
     assert set(net_mvr["component_status"]) == {"partial_missing"}
     assert net_mvr["missing_inputs"].astype(str).str.contains("mr1_cvl_revenue").all()
     assert net_mvr["calculated_value"].isna().all()
+
+
+def test_revenue_rollup_applies_crown_top_up_only_when_value_exists() -> None:
+    frame = pd.DataFrame(
+        [
+            _rollup_source_row(2024, "gross_fed_revenue", 100.0),
+            _rollup_source_row(2024, "fed_refunds", 10.0),
+            _rollup_source_row(2024, "net_fed_revenue", 90.0),
+            _rollup_source_row(2025, "gross_fed_revenue", 100.0),
+            _rollup_source_row(2025, "fed_refunds", 10.0),
+            _rollup_source_row(2025, "crown_top_up", 5.0),
+            _rollup_source_row(2025, "net_fed_revenue", 95.0),
+        ]
+    )
+
+    report = revenue_reconciliation_report(frame)
+    net_fed = report[report["output_series_id"].eq("net_fed_revenue")].set_index("FY")
+
+    assert net_fed.loc[2024, "component_status"] == "reconciled"
+    assert net_fed.loc[2024, "calculated_value"] == 90.0
+    assert net_fed.loc[2024, "optional_inputs_applied"] == ""
+    assert net_fed.loc[2025, "component_status"] == "reconciled"
+    assert net_fed.loc[2025, "calculated_value"] == 95.0
+    assert net_fed.loc[2025, "optional_inputs_applied"] == "crown_top_up"
 
 
 def test_revenue_source_pack_validation_is_warning_not_error_for_known_source_gaps() -> None:
