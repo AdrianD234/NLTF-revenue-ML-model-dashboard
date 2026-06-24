@@ -2,7 +2,8 @@ param(
     [string]$Python = "",
     [string]$DataRoot = "",
     [int]$Port = 8501,
-    [int]$StartupTimeoutSeconds = 90
+    [int]$StartupTimeoutSeconds = 90,
+    [int]$CommandTimeoutSeconds = 900
 )
 
 $ErrorActionPreference = "Stop"
@@ -42,8 +43,31 @@ if ([string]::IsNullOrWhiteSpace($DataRoot)) {
 function Invoke-Checked {
     param(
         [string]$FilePath,
-        [string[]]$Arguments
+        [string[]]$Arguments,
+        [int]$TimeoutSeconds = $CommandTimeoutSeconds,
+        [string]$Label = ""
     )
+
+    $boundedScript = Join-Path $ScriptDir "invoke_bounded.ps1"
+    if (Test-Path -LiteralPath $boundedScript) {
+        if ([string]::IsNullOrWhiteSpace($Label)) {
+            $commandName = Split-Path -Leaf $FilePath
+            if ([string]::IsNullOrWhiteSpace($commandName)) {
+                $commandName = $FilePath
+            }
+            $argLabel = ($Arguments | Select-Object -First 4) -join "_"
+            $Label = "verify-$commandName-$argLabel"
+        }
+
+        & $boundedScript `
+            -FilePath $FilePath `
+            -Arguments $Arguments `
+            -TimeoutSeconds $TimeoutSeconds `
+            -WorkingDirectory $Root `
+            -Label $Label
+        return
+    }
+
     & $FilePath @Arguments
     if ($LASTEXITCODE -ne 0) {
         throw "Command failed with exit code ${LASTEXITCODE}: $FilePath $($Arguments -join ' ')"
@@ -52,18 +76,18 @@ function Invoke-Checked {
 
 $env:DASHBOARD_EVIDENCE_PACK_ROOT = $DataRoot
 
-Invoke-Checked -FilePath $Python -Arguments @("-m", "compileall", "app.py", "model_dashboard", "scripts")
-Invoke-Checked -FilePath $Python -Arguments @("-m", "pytest", "-q")
-Invoke-Checked -FilePath $Python -Arguments @("scripts\inspect_parquet_schema.py", "--data-root", $DataRoot)
-Invoke-Checked -FilePath $Python -Arguments @("scripts\validate_dashboard_data.py", "--data-root", $DataRoot)
-Invoke-Checked -FilePath $Python -Arguments @("scripts\validate_chart_sources.py", "--data-root", $DataRoot)
-Invoke-Checked -FilePath $Python -Arguments @("scripts\validate_semantic_labels.py", "--data-root", $DataRoot)
-Invoke-Checked -FilePath $Python -Arguments @("scripts\validate_reproducibility_audit_pack.py", "--data-root", $DataRoot)
-Invoke-Checked -FilePath $Python -Arguments @("scripts\validate_light_ruc_reproducibility.py", "--data-root", $DataRoot)
-Invoke-Checked -FilePath $Python -Arguments @("scripts\check_streamlit_deploy_readiness.py")
-Invoke-Checked -FilePath $Python -Arguments @("-m", "pytest", "-q", "tests/test_chart_data_reconciliation.py")
-Invoke-Checked -FilePath $Python -Arguments @("-m", "pytest", "-q", "tests/test_chart_source_tables.py")
-Invoke-Checked -FilePath $Python -Arguments @("-m", "pytest", "-q", "tests")
+Invoke-Checked -FilePath $Python -Arguments @("-m", "compileall", "app.py", "model_dashboard", "scripts") -Label "verify-compileall"
+Invoke-Checked -FilePath $Python -Arguments @("-m", "pytest", "-q") -Label "verify-pytest-all"
+Invoke-Checked -FilePath $Python -Arguments @("scripts\inspect_parquet_schema.py", "--data-root", $DataRoot) -Label "verify-parquet-schema"
+Invoke-Checked -FilePath $Python -Arguments @("scripts\validate_dashboard_data.py", "--data-root", $DataRoot) -Label "verify-dashboard-data"
+Invoke-Checked -FilePath $Python -Arguments @("scripts\validate_chart_sources.py", "--data-root", $DataRoot) -Label "verify-chart-sources"
+Invoke-Checked -FilePath $Python -Arguments @("scripts\validate_semantic_labels.py", "--data-root", $DataRoot) -Label "verify-semantic-labels"
+Invoke-Checked -FilePath $Python -Arguments @("scripts\validate_reproducibility_audit_pack.py", "--data-root", $DataRoot) -Label "verify-reproducibility-pack"
+Invoke-Checked -FilePath $Python -Arguments @("scripts\validate_light_ruc_reproducibility.py", "--data-root", $DataRoot) -Label "verify-light-ruc-reproducibility"
+Invoke-Checked -FilePath $Python -Arguments @("scripts\check_streamlit_deploy_readiness.py") -Label "verify-streamlit-deploy-readiness"
+Invoke-Checked -FilePath $Python -Arguments @("-m", "pytest", "-q", "tests/test_chart_data_reconciliation.py") -Label "verify-chart-data-reconciliation"
+Invoke-Checked -FilePath $Python -Arguments @("-m", "pytest", "-q", "tests/test_chart_source_tables.py") -Label "verify-chart-source-tables"
+Invoke-Checked -FilePath $Python -Arguments @("-m", "pytest", "-q", "tests") -Label "verify-pytest-tests"
 
 $healthUrl = "http://localhost:$Port/_stcore/health"
 $appUrl = "http://localhost:$Port"
@@ -153,15 +177,11 @@ try {
         "tests/test_hovers_are_readable.py",
         "-m",
         "e2e"
-    )
+    ) -Label "verify-playwright-e2e"
 
     Write-Host "Running Playwright/browser frontend interaction tests..."
     $env:STAGE1_REQUIRE_FRONTEND_INTERACTIONS = "1"
-    & $Python -m pytest -q tests/test_playwright_frontend_interactions.py
-
-    if ($LASTEXITCODE -ne 0) {
-        throw "Playwright frontend interaction tests failed."
-    }
+    Invoke-Checked -FilePath $Python -Arguments @("-m", "pytest", "-q", "tests/test_playwright_frontend_interactions.py") -Label "verify-playwright-frontend-interactions"
 
     $requiredFrontendScreenshots = @(
         "artifacts/screenshots/final-overview.png",
@@ -187,8 +207,9 @@ try {
 
     Write-Host "Playwright frontend interaction tests passed."
 
-    Invoke-Checked -FilePath $Python -Arguments @("scripts/visual_reference_check.py")
-    Invoke-Checked -FilePath $Python -Arguments @("scripts\validate_visual_conformance.py")
+    Invoke-Checked -FilePath $Python -Arguments @("scripts/visual_reference_check.py") -Label "verify-visual-reference"
+    Invoke-Checked -FilePath $Python -Arguments @("scripts\write_visual_review_evidence.py") -Label "verify-write-visual-review-evidence"
+    Invoke-Checked -FilePath $Python -Arguments @("scripts\validate_visual_conformance.py") -Label "verify-visual-conformance"
 
     $requiredScreenshots = @(
         "artifacts/screenshots/final-01-overview.png",
@@ -203,8 +224,8 @@ try {
         }
     }
 
-    Invoke-Checked -FilePath $Python -Arguments @("scripts\validate_80_gates.py", "--data-root", $DataRoot)
-    Invoke-Checked -FilePath $Python -Arguments @("scripts\validate_120_gates.py", "--data-root", $DataRoot)
+    Invoke-Checked -FilePath $Python -Arguments @("scripts\validate_80_gates.py", "--data-root", $DataRoot) -Label "verify-80-gates"
+    Invoke-Checked -FilePath $Python -Arguments @("scripts\validate_120_gates.py", "--data-root", $DataRoot) -Label "verify-120-gates"
 
     $backlog = Get-Content -LiteralPath (Join-Path $Root "BUG_BACKLOG.md") -Raw
     if ($backlog -match "- \[ \]") {

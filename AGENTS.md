@@ -149,6 +149,32 @@ python -m pytest -q
 pwsh -File scripts\verify_dashboard.ps1
 ```
 
+## Bounded command policy
+
+Do not run risky shell commands without a hard timeout.
+
+Use checked-in wrappers instead of pasted multi-line PowerShell loops:
+
+```powershell
+pwsh -NoProfile -File scripts\start_streamlit_bounded.ps1 -Port 8501 -StartupTimeoutSeconds 90
+& .\scripts\invoke_bounded.ps1 -Label verify-dashboard -TimeoutSeconds 900 -FilePath pwsh -Arguments @("-NoProfile", "-File", "scripts\verify_dashboard.ps1")
+```
+
+Timeout defaults:
+
+- Streamlit startup/health checks: 90 seconds.
+- Focused Playwright tests: 180 to 300 seconds.
+- Full e2e or full pytest runs: 900 seconds.
+- Dependency or network commands: 300 to 600 seconds.
+
+When a broad Playwright run prints repeated `F` output or appears to hang, split
+it first with `-vv -s --maxfail=1` so the first failure is visible immediately.
+The bounded wrapper should still be used for the split command.
+
+On timeout, inspect the wrapper log tails and exact child process command line,
+then stop only the process tree launched by the wrapper. Do not kill unrelated
+user Chrome, Excel, Python or Streamlit processes blindly.
+
 ## Performance hardening rule
 
 For Streamlit dashboard performance tasks, passing functional tests is not sufficient.

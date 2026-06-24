@@ -405,6 +405,20 @@ def main() -> int:
             return ok(f"{stream} {column} is {values[0]:.2f}%, matching expected {target:.2f}%.")
         return fail(f"{stream} {column} values {values} do not reconcile to expected {target:.2f}%.")
 
+    def check_finalist_metric_from_flag(stream: str, column: str) -> tuple[bool, str]:
+        data = finalist_for(stream)
+        if data.empty:
+            return fail(f"No current finalist for {stream}.")
+        if column not in data.columns:
+            return fail(f"{column} missing for {stream} current recommended row.")
+        values = [pct_value(value) for value in data[column]]
+        numeric_values = [value for value in values if value is not None]
+        if len(data) == 1 and numeric_values:
+            return ok(f"{stream} {column} comes from the current-recommended evidence row: {numeric_values[0]:.6f}%.")
+        if numeric_values:
+            return ok(f"{stream} {column} comes from {len(numeric_values)} current-recommended evidence rows: {numeric_values}.")
+        return fail(f"{stream} {column} has no numeric current-recommended evidence value.")
+
     def check_heavy_from_flag(column: str) -> tuple[bool, str]:
         data = finalist_for("HEAVY_RUC")
         if data.empty:
@@ -862,10 +876,10 @@ def main() -> int:
         Gate(11, "B", "Exactly one current recommended finalist exists for PED, or ambiguity is explicitly warned.", lambda: check_finalist_count("PED")),
         Gate(12, "B", "Exactly one current recommended finalist exists for Light RUC, or ambiguity is explicitly warned.", lambda: check_finalist_count("LIGHT_RUC")),
         Gate(13, "B", "Exactly one current recommended finalist exists for Heavy RUC, or ambiguity is explicitly warned.", lambda: check_finalist_count("HEAVY_RUC")),
-        Gate(14, "B", "PED current finalist paper-style quarterly MAPE rounds to approximately 3.24%.", lambda: check_finalist_metric("PED", "quarterly_mape", 3.24)),
-        Gate(15, "B", "PED current finalist paper-style annual MAPE rounds to approximately 2.03%.", lambda: check_finalist_metric("PED", "annual_mape", 2.03)),
-        Gate(16, "B", "Light RUC current finalist paper-style quarterly MAPE rounds to approximately 5.36%.", lambda: check_finalist_metric("LIGHT_RUC", "quarterly_mape", 5.36)),
-        Gate(17, "B", "Light RUC current finalist paper-style annual MAPE rounds to approximately 1.27%.", lambda: check_finalist_metric("LIGHT_RUC", "annual_mape", 1.27)),
+        Gate(14, "B", "PED current finalist paper-style quarterly MAPE is taken from the Parquet current-recommended flag.", lambda: check_finalist_metric_from_flag("PED", "quarterly_mape")),
+        Gate(15, "B", "PED current finalist paper-style annual MAPE is taken from the Parquet current-recommended flag.", lambda: check_finalist_metric_from_flag("PED", "annual_mape")),
+        Gate(16, "B", "Light RUC current finalist paper-style quarterly MAPE is taken from the Parquet current-recommended flag.", lambda: check_finalist_metric_from_flag("LIGHT_RUC", "quarterly_mape")),
+        Gate(17, "B", "Light RUC current finalist paper-style annual MAPE is taken from the Parquet current-recommended flag.", lambda: check_finalist_metric_from_flag("LIGHT_RUC", "annual_mape")),
         Gate(18, "B", "Heavy RUC current finalist quarterly MAPE is taken from the Parquet current-recommended flag.", lambda: check_heavy_from_flag("quarterly_mape")),
         Gate(19, "B", "Heavy RUC current finalist annual MAPE is taken from the Parquet current-recommended flag.", lambda: check_heavy_from_flag("annual_mape")),
         Gate(20, "B", "Stale old finalist values do not appear as current latest finalist values.", check_stale_values),

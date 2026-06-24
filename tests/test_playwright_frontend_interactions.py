@@ -31,12 +31,29 @@ PAGES = [
     ("Governance & Reproducibility", "final-governance-reproducibility.png"),
 ]
 
+PAGE_DISPLAY_TITLES = {
+    "Overview": "Executive Summary",
+    "Diagnostics": "Model Confidence",
+    "Scenario Comparison": "Scenario Forecasts",
+    "Schiff Benchmark": "Benchmark Comparison",
+    "Governance & Reproducibility": "Governance & Reproducibility",
+}
+PAGE_ORDER = list(PAGE_DISPLAY_TITLES)
+
+
+def page_display_label(page_name: str) -> str:
+    return PAGE_DISPLAY_TITLES.get(page_name, page_name)
+
+
+def expected_page_chip(page_name: str) -> str:
+    return f"Page {PAGE_ORDER.index(page_name) + 1} of {len(PAGE_ORDER)} - {page_display_label(page_name)}"
+
 PAGE_PANELS = {
     "Overview": [
-        "1. Finalist Forecast Accuracy",
-        "2. Candidate Search Frontier",
-        "3. Finalist Ensemble Composition",
-        "4. Stress and Horizon Checks",
+        "Finalist Forecast Accuracy",
+        "Candidate Search Frontier",
+        "Finalist Ensemble Composition",
+        "Stress and Horizon Checks",
     ],
     "Diagnostics": [
         "Forecast R2 versus calibration R2",
@@ -162,12 +179,19 @@ def open_dashboard(page: Page) -> None:
     expect(page.get_by_text("NTLF Revenue Modelling").first).to_be_visible(timeout=90000)
     expect(page.get_by_text("GOVERNANCE FILTERS")).to_be_visible(timeout=90000)
     expect(page.locator(".js-plotly-plot").first).to_be_visible(timeout=90000)
+    expect(page.locator("body")).to_contain_text(expected_page_chip("Overview"), timeout=90000)
     assert_no_streamlit_exception(page)
 
 
 def click_page(page: Page, page_name: str) -> None:
-    page.locator("div[data-testid='stRadio'] label").filter(has_text=page_name).first.click()
-    expect(page.locator("body")).to_contain_text(page_name, timeout=90000)
+    labels = page.locator("div[data-testid='stRadio'] label")
+    display_label = page_display_label(page_name)
+    target = labels.filter(has_text=display_label)
+    if target.count() == 0:
+        target = labels.filter(has_text=page_name)
+    expect(target.first).to_be_visible(timeout=60000)
+    target.first.click()
+    expect(page.locator("body")).to_contain_text(expected_page_chip(page_name), timeout=90000)
     for panel in PAGE_PANELS[page_name]:
         expect(page.locator("body")).to_contain_text(panel, timeout=90000)
     assert_no_streamlit_exception(page)
@@ -223,6 +247,7 @@ def hover_text(page: Page) -> str:
 def hover_plotly_chart(page: Page, plot_index: int) -> str:
     plot = page.locator(".js-plotly-plot").nth(plot_index)
     expect(plot).to_be_visible(timeout=60000)
+    plot.scroll_into_view_if_needed()
     for selector in [".scatterlayer .trace .points path", ".barlayer .point", ".barlayer path"]:
         points = plot.locator(selector)
         for point_index in range(min(points.count(), 12)):
@@ -301,7 +326,7 @@ def test_all_pages_click_render_screenshot_and_console_clean(page: Page) -> None
 def test_primary_filters_click_change_and_reset(page: Page) -> None:
     open_dashboard(page)
     dropdowns = page.get_by_role("combobox")
-    assert dropdowns.count() >= 7, "Expected seven real primary dropdown controls."
+    assert dropdowns.count() >= len(FILTER_LABELS), "Expected all primary dropdown controls."
     for index, label in enumerate(FILTER_LABELS):
         aria_label = primary_combobox(page, index).get_attribute("aria-label") or ""
         assert label in aria_label, f"Expected filter {index} to be {label}; aria-label was {aria_label!r}"
@@ -316,22 +341,22 @@ def test_primary_filters_click_change_and_reset(page: Page) -> None:
     after_stream = page.locator("body").inner_text(timeout=60000)
     assert before != after_stream
 
-    horizon_value = select_first_non_default_option(page, 4, ("1-12 Quarters",))
-    expect_combobox_value(page, 4, horizon_value)
+    horizon_value = select_first_non_default_option(page, 3, ("1-12 Quarters",))
+    expect_combobox_value(page, 3, horizon_value)
     after_horizon = page.locator("body").inner_text(timeout=60000)
     assert after_stream != after_horizon
 
     page.get_by_role("button", name="Reset Filters").click()
     expect_combobox_value(page, 0, "All Streams")
     expect_combobox_value(page, 1, "All Families")
-    expect_combobox_value(page, 4, "1-12 Quarters")
+    expect_combobox_value(page, 3, "1-12 Quarters")
     assert_no_streamlit_exception(page)
 
 
 def test_plotly_hovers_are_human_readable_on_all_pages(page: Page) -> None:
     open_dashboard(page)
     hover_targets = [
-        ("Overview", 1),
+        ("Overview", 2),
         ("Diagnostics", 0),
         ("Scenario Comparison", 1),
         ("Schiff Benchmark", 0),
@@ -347,7 +372,7 @@ def test_governance_reproducibility_page_stream_selector_and_downloads(page: Pag
     body = page.locator("body")
     r2_forecast_text = "Forecast R2 is calculated from final delivered predictions after residual correction or ensemble weighting."
     r2_calibration_text = "Calibration R2 is actual-on-forecast validation R2. Neither is in-sample OLS R2."
-    expect(body).to_contain_text("Page 5 of 5 - Governance & Reproducibility", timeout=90000)
+    expect(body).to_contain_text(expected_page_chip("Governance & Reproducibility"), timeout=90000)
     expect(body).to_contain_text("Governance & Reproducibility Filters", timeout=60000)
     expect(body).to_contain_text("PED VKT per capita", timeout=60000)
     expect(body).to_contain_text("Light RUC volume", timeout=60000)
@@ -389,9 +414,13 @@ def test_governance_reproducibility_page_stream_selector_and_downloads(page: Pag
     expect(body).to_contain_text("data/dashboard_evidence_pack_reproducibility/ped_inner_hpo/source_artifacts/", timeout=90000)
     expect(body).to_contain_text("Nested trace", timeout=90000)
     expect(body).to_contain_text("Gap register", timeout=90000)
-    expect(body).to_contain_text("Training-fit R2 is available; forecast R2 0.465", timeout=90000)
-    expect(body).to_contain_text("0.9999", timeout=90000)
-    expect(body).to_contain_text("0.9996", timeout=90000)
+    expect(body).to_contain_text("Training-fit R2 is available; forecast R2", timeout=90000)
+    ped_ladder = pd.read_csv(CHART_SOURCE_DIR / "r2_ladder_summary.csv")
+    ped_ladder = ped_ladder[ped_ladder["stream_label"].eq("PED VKT per capita")]
+    for value in ped_ladder["forecast_r2"].dropna().astype(float).unique():
+        expect(body).to_contain_text(f"{value:.3f}", timeout=90000)
+    for value in ped_ladder["training_fit_r2"].dropna().astype(float).unique():
+        expect(body).to_contain_text(f"{value:.4f}", timeout=90000)
     assert page.get_by_text("Feature importance (PED)", exact=True).count() == 0
     expect(body).to_contain_text("SHAP not yet generated", timeout=60000)
     page_text = body.inner_text(timeout=60000)
@@ -435,7 +464,7 @@ def test_forecast_builder_upload_validate_calculate_and_download(page: Page) -> 
 
     calculate_button.click()
     expect(body).to_contain_text("Forecast status", timeout=90000)
-    expect(body).to_contain_text("mixed_numeric_and_governed_gap", timeout=90000)
+    expect(body).to_contain_text("numeric_forecast_available", timeout=90000)
     expect(body).to_contain_text("Scenarios", timeout=90000)
     expect(body).to_contain_text("Forecast chart by scenario, stream and quarter", timeout=90000)
     expect(body).to_contain_text("Only streams with numeric forecasts are plotted", timeout=90000)
@@ -449,33 +478,26 @@ def test_forecast_builder_upload_validate_calculate_and_download(page: Page) -> 
     expect(body).to_contain_text("Numeric forecasts only", timeout=90000)
     expect(body).to_contain_text("Governed gaps only", timeout=90000)
     expect(body).to_contain_text("numeric_forecast_available", timeout=90000)
-    expect(body).to_contain_text("parity_failed", timeout=90000)
-    expect(body).to_contain_text("failed_inner_hpo_replay_delta", timeout=90000)
-    expect(body).to_contain_text("failed_canonical_history_component_replay", timeout=90000)
-    expect(body).to_contain_text("HEAVY_RUC__dynamic_no_leads__GBR_learning_rate0_08_max_depth1_n_estimators150__ylag__w40", timeout=90000)
-    expect(body).to_contain_text("ped-forward-scorer-audit-v1", timeout=90000)
-    expect(body).to_contain_text("heavy-ruc-forward-scorer-audit-v1", timeout=90000)
-    expect(body).to_contain_text("Numeric fixed-finalist forecasts were produced where repo-reproducible", timeout=90000)
-    expect(body).to_contain_text("Heavy RUC: stored historical weighted replay and training-fit R2 are available", timeout=90000)
-    expect(body).to_contain_text("New-row Heavy forecasts require exact C3/C4 parent-state parity", timeout=90000)
-    expect(body).to_contain_text("heavy_ruc_component_forward_scorers_missing", timeout=90000)
-    expect(body).to_contain_text("ped_inner_hpo_static_solver_forward_scorer_missing", timeout=90000)
+    expect(body).to_contain_text("vnext-forward-scorer-v1", timeout=90000)
+    expect(body).to_contain_text("light-ruc-forward-scorer-v1", timeout=90000)
+    expect(body).to_contain_text("fixed finalists only", timeout=90000)
+    expect(body).to_contain_text("forecast run is isolated", timeout=90000)
     page.get_by_text("Numeric forecasts only", exact=True).click()
     expect(body).to_contain_text("numeric_forecast_available", timeout=60000)
-    page.get_by_text("Governed gaps only", exact=True).click()
-    expect(body).to_contain_text("current status: governed gap", timeout=60000)
     page.get_by_text("All rows", exact=True).click()
 
     forecast_stream = page.get_by_label("Forecast stream")
     forecast_stream.click()
     page.get_by_role("option", name="PED VKT per capita").click()
     expect(body).to_contain_text("Historical actual", timeout=90000)
-    expect(body).to_contain_text("Governed gap: repo-local forward scorer unavailable", timeout=90000)
+    expect(body).to_contain_text("basecase forecast", timeout=90000)
+    expect(body).to_contain_text("high_population forecast", timeout=90000)
     forecast_stream = page.get_by_label("Forecast stream")
     forecast_stream.click()
     page.get_by_role("option", name="Heavy RUC volume").click()
     expect(body).to_contain_text("Historical actual", timeout=90000)
-    expect(body).to_contain_text("Governed gap: Heavy requires exact C3/C4 parent-state parity", timeout=90000)
+    expect(body).to_contain_text("basecase forecast", timeout=90000)
+    expect(body).to_contain_text("high_population forecast", timeout=90000)
     forecast_stream = page.get_by_label("Forecast stream")
     forecast_stream.click()
     page.get_by_role("option", name="Light RUC volume").click()
@@ -534,7 +556,9 @@ def test_diagnostic_pass_matrix_tooltips_hover_and_focus(page: Page) -> None:
     expect(ladder).to_contain_text("Forecast R2", timeout=60000)
     expect(ladder).to_contain_text("Score basis", timeout=60000)
     expect(ladder).to_contain_text("Availability", timeout=60000)
-    expect(ladder).to_contain_text("0.9999", timeout=60000)
+    ladder_source = pd.read_csv(CHART_SOURCE_DIR / "r2_ladder_summary.csv")
+    for value in ladder_source["training_fit_r2"].dropna().astype(float).unique():
+        expect(ladder).to_contain_text(f"{value:.4f}", timeout=60000)
     ladder_text = ladder.inner_text(timeout=60000)
     assert "training_fit_r2" not in ladder_text
     assert "availability_status" not in ladder_text
@@ -646,10 +670,10 @@ def test_rendered_plotly_trace_data_matches_chart_sources_where_possible(page: P
 
     candidate_source = pd.read_csv(CHART_SOURCE_DIR / "overview_candidate_search_frontier.csv")
     click_page(page, "Overview")
-    page.get_by_text("2. Candidate Search Frontier", exact=False).first.scroll_into_view_if_needed()
+    page.get_by_text("Candidate Search Frontier", exact=False).first.scroll_into_view_if_needed()
     expect(page.locator(".js-plotly-plot").nth(1)).to_be_visible(timeout=90000)
     body_text = page.locator("body").inner_text(timeout=60000)
-    frontier_info = chart_info_text(page, "2. Candidate Search Frontier")
+    frontier_info = chart_info_text(page, "Candidate Search Frontier")
     assert "400 plotted candidates from 400 curated rows" in frontier_info
     assert "Balanced all-stream frontier view" in frontier_info
     assert "excluded from governance scoring" in frontier_info
@@ -679,7 +703,7 @@ def test_rendered_plotly_trace_data_matches_chart_sources_where_possible(page: P
     assert candidate_plot == len(candidate_source)
 
     stress_source = pd.read_csv(CHART_SOURCE_DIR / "overview_stress_horizon_checks.csv")
-    page.get_by_text("4. Stress and Horizon Checks", exact=False).first.scroll_into_view_if_needed()
+    page.get_by_text("Stress and Horizon Checks", exact=False).first.scroll_into_view_if_needed()
     expect(page.locator(".js-plotly-plot").nth(3)).to_be_visible(timeout=90000)
     stress_plot = page.evaluate(
         """() => {

@@ -2336,7 +2336,6 @@ def render_page5_filter_strip(
                 list(stream_map),
                 default="All streams",
                 key="page5_stream_segment",
-                required=True,
             )
         with cols[1]:
             st.selectbox(

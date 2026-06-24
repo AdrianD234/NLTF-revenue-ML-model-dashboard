@@ -65,22 +65,22 @@ def test_reset_filters_restores_defaults(page: Page) -> None:
     primary_combobox(page, "Stream", 0).click()
     stream_value = click_option_if_present(page, ["Light RUC volume", "PED VKT per capita", "Heavy RUC volume"])
     assert stream_value is not None
-    primary_combobox(page, "Horizon", 4).click()
+    primary_combobox(page, "Horizon", 3).click()
     horizon_value = click_option_if_present(page, ["1-4 quarters", "5-8 quarters", "9-12 quarters"])
     assert horizon_value is not None
     expect_filter_value(page, "Stream", 0, stream_value)
     page.get_by_role("button", name="Reset Filters").click()
     expect_filter_value(page, "Stream", 0, "All Streams")
-    expect_filter_value(page, "Horizon", 4, "1-12 Quarters")
+    expect_filter_value(page, "Horizon", 3, "1-12 Quarters")
 
 
 def test_candidate_landscape_hover_is_human_readable(page: Page) -> None:
     open_dashboard(page)
-    tooltip = hover_plotly_element(page, plot_index=1, selectors=[".scatterlayer .trace .points path"])
+    tooltip = hover_plotly_element(page, plot_index=2, selectors=[".scatterlayer .trace .points path"])
     save_hover_screenshot(page, "hover-candidate-landscape.png")
     assert_human_hover(
         tooltip,
-        required=["Stream", "Quarterly MAPE", "Annual MAPE", "Model", "Model detail"],
+        required=["Stream", "Paper-style horizon MAPE", "Paper-style horizon annual MAPE", "Model detail"],
         forbidden=["quarterly_mape", "annual_mape", "source_family", "model_kind", "HEAVY_RUC__"],
     )
 
@@ -98,7 +98,7 @@ def test_finalist_accuracy_hover_is_human_readable(page: Page) -> None:
 
 def test_ensemble_hover_is_human_readable(page: Page) -> None:
     open_dashboard(page)
-    tooltip = hover_plotly_element(page, plot_index=2, selectors=[".barlayer .point", ".barlayer path"])
+    tooltip = hover_plotly_element(page, plot_index=3, selectors=[".barlayer .point", ".barlayer path"])
     save_hover_screenshot(page, "hover-ensemble-composition.png")
     assert_human_hover(
         tooltip,
@@ -111,7 +111,7 @@ def test_ensemble_hover_is_human_readable(page: Page) -> None:
 
 def test_stress_hover_is_human_readable(page: Page) -> None:
     open_dashboard(page)
-    tooltip = hover_plotly_element(page, plot_index=3, selectors=[".scatterlayer .trace .points path"])
+    tooltip = hover_plotly_element(page, plot_index=1, selectors=[".scatterlayer .trace .points path"])
     save_hover_screenshot(page, "hover-stress-checks.png")
     assert_human_hover(
         tooltip,
@@ -139,7 +139,10 @@ def open_dashboard(page: Page) -> None:
     expect(page.get_by_text("NTLF Revenue Modelling").first).to_be_visible(timeout=90000)
     expect(page.get_by_text("GOVERNANCE FILTERS")).to_be_visible(timeout=90000)
     expect(page.locator(".js-plotly-plot").first).to_be_visible(timeout=90000)
-    expect(page.locator("body")).to_contain_text("Page 1 of 5 - Overview", timeout=90000)
+    page.wait_for_function(
+        """() => /Page 1 of \\d+ - Executive Summary/.test(document.body.innerText || '')""",
+        timeout=90000,
+    )
 
 
 def primary_combobox(page: Page, label: str, index: int):

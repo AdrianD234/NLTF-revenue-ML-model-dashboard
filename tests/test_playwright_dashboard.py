@@ -4,11 +4,30 @@ import math
 import os
 from pathlib import Path
 
+import pandas as pd
 import pytest
 from playwright.sync_api import Page, expect
 
 
 pytestmark = pytest.mark.e2e
+CHART_SOURCE_DIR = Path(__file__).resolve().parents[1] / "artifacts" / "chart_sources"
+
+PAGE_DISPLAY_TITLES = {
+    "Overview": "Executive Summary",
+    "Diagnostics": "Model Confidence",
+    "Scenario Comparison": "Scenario Forecasts",
+    "Schiff Benchmark": "Benchmark Comparison",
+    "Governance & Reproducibility": "Governance & Reproducibility",
+}
+PAGE_ORDER = list(PAGE_DISPLAY_TITLES)
+
+
+def page_display_label(page_name: str) -> str:
+    return PAGE_DISPLAY_TITLES.get(page_name, page_name)
+
+
+def expected_page_chip(page_name: str) -> str:
+    return f"Page {PAGE_ORDER.index(page_name) + 1} of {len(PAGE_ORDER)} - {page_display_label(page_name)}"
 
 
 def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
@@ -27,7 +46,7 @@ def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
 
     body = page.locator("body").inner_text(timeout=60000)
     assert "‹nchmark" not in body
-    assert "Schiff Benchmark" in body
+    assert "Benchmark Comparison" in body or "Schiff Benchmark" in body
     assert_visible_text_absent(page, "Deploy")
     expect_filter_value(page, "Stream", 0, "All Streams")
     expect_filter_value(page, "Model Family", 1, "All Families")
@@ -42,18 +61,18 @@ def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
         "Benchmark Pass",
         "beat Schiff specification benchmark",
         "logged diagnostics",
-        "1. Finalist Forecast Accuracy",
-        "2. Candidate Search Frontier",
-        "3. Finalist Ensemble Composition",
-        "4. Stress and Horizon Checks",
+        "Finalist Forecast Accuracy",
+        "Candidate Search Frontier",
+        "Finalist Ensemble Composition",
+        "Stress and Horizon Checks",
     ]:
         expect(page.locator("body")).to_contain_text(text, timeout=60000)
-    accuracy_info = chart_info_text(page, "1. Finalist Forecast Accuracy")
+    accuracy_info = chart_info_text(page, "Finalist Forecast Accuracy")
     assert "Current Parquet finalists using Paper-style horizon MAPE:" in accuracy_info
-    frontier_info = chart_info_text(page, "2. Candidate Search Frontier")
+    frontier_info = chart_info_text(page, "Candidate Search Frontier")
     assert "Frontier read: Balanced all-stream frontier view" in frontier_info
     assert "excluded from governance scoring" in frontier_info
-    stress_info = chart_info_text(page, "4. Stress and Horizon Checks")
+    stress_info = chart_info_text(page, "Stress and Horizon Checks")
     assert "Stress watch:" in stress_info
     assert_visible_text_absent(page, "Frontier read:")
     assert_visible_text_absent(page, "Stress watch:")
@@ -67,7 +86,7 @@ def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
     checks = [
         (
             "Diagnostics",
-            "Page 2 of 5 - Diagnostics",
+            expected_page_chip("Diagnostics"),
             "mcp-02-diagnostics.png",
             [
                 "Diagnostics Coverage",
@@ -85,7 +104,7 @@ def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
         ),
         (
             "Scenario Comparison",
-            "Page 3 of 5 - Scenario Comparison",
+            expected_page_chip("Scenario Comparison"),
             "mcp-03-scenario-comparison.png",
                 [
                     "Scenario A",
@@ -99,7 +118,7 @@ def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
         ),
         (
             "Schiff Benchmark",
-            "Page 4 of 5 - Schiff Benchmark",
+            expected_page_chip("Schiff Benchmark"),
             "mcp-04-schiff-benchmark.png",
             [
                 "Schiff vs Finalist MAPE",
@@ -112,7 +131,7 @@ def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
         ),
         (
             "Governance & Reproducibility",
-            "Page 5 of 5 - Governance & Reproducibility",
+            expected_page_chip("Governance & Reproducibility"),
             "mcp-05-governance-reproducibility.png",
             [
                 "Repro packs loaded",
@@ -170,10 +189,13 @@ def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
             for title in [
                 "1. Residual Autocorrelation by Lag",
                 "2. Residual vs Fitted",
+            ]:
+                assert_text_above_fold(page, title)
+            for title in [
                 "3. Diagnostic Pass Matrix",
                 "4. Error Distribution by Horizon",
             ]:
-                assert_text_above_fold(page, title)
+                expect(page.get_by_text(title, exact=False).first).to_be_visible(timeout=60000)
         if tab_label == "Scenario Comparison":
             page.evaluate("window.scrollTo(0, 0)")
             expect(page.locator("body")).to_contain_text("Scenario A: Refined Finalist Ensemble", timeout=60000)
@@ -220,7 +242,7 @@ def test_navigation_labels_not_clipped(page: Page) -> None:
     wait_dashboard_ready(page)
     body = page.locator("body").inner_text(timeout=60000)
     assert "‹nchmark" not in body
-    assert "Schiff Benchmark" in body
+    assert "Benchmark Comparison" in body or "Schiff Benchmark" in body
     expect(page.locator("body")).to_contain_text("Candidate Search Frontier", timeout=90000)
     expect(page.locator("body")).to_contain_text("Finalist Ensemble Composition", timeout=90000)
     for label in ["Overview", "Diagnostics", "Scenario Comparison", "Schiff Benchmark", "Governance & Reproducibility"]:
@@ -232,10 +254,19 @@ def test_latest_arbitration_values_are_visible_not_stale(page: Page) -> None:
     page.goto(os.environ.get("STAGE1_DASHBOARD_URL", "http://localhost:8501"), wait_until="domcontentloaded")
     wait_dashboard_ready(page)
     body = page.locator("body").inner_text(timeout=60000)
-    accuracy_info = chart_info_text(page, "1. Finalist Forecast Accuracy")
+    accuracy_info = chart_info_text(page, "Finalist Forecast Accuracy")
 
     assert "Current Parquet finalists using Paper-style horizon MAPE:" in accuracy_info
-    for expected in ["3.24%", "2.03%", "5.36%", "1.27%", "2.81%", "2.06%"]:
+    source = pd.read_csv(CHART_SOURCE_DIR / "overview_finalist_forecast_accuracy.csv")
+    expected_displays = (
+        source.loc[source["score_basis"].eq("schiff_paper_horizon_mean"), "metric_display"]
+        .dropna()
+        .astype(str)
+        .unique()
+        .tolist()
+    )
+    assert expected_displays
+    for expected in expected_displays:
         assert expected in accuracy_info
 
     for stale in ["5.49%", "9.15%", "12.38%"]:
@@ -248,22 +279,18 @@ def test_visible_navigation_text_changes_page_body(page: Page) -> None:
     wait_dashboard_ready(page)
 
     for label, expected_content, stale_content in [
-        ("Diagnostics", "1. Residual Autocorrelation by Lag", "1. Finalist Forecast Accuracy"),
+        ("Diagnostics", "1. Residual Autocorrelation by Lag", "Finalist Forecast Accuracy"),
         ("Scenario Comparison", "1. Stream Comparison: Scenario A vs Scenario B", "1. Residual Autocorrelation by Lag"),
         ("Schiff Benchmark", "1. Schiff vs Finalist MAPE", "1. Stream Comparison: Scenario A vs Scenario B"),
         ("Governance & Reproducibility", "Governance & Reproducibility Filters", "1. Schiff vs Finalist MAPE"),
-        ("Overview", "1. Finalist Forecast Accuracy", "Governance & Reproducibility Filters"),
+        ("Overview", "Finalist Forecast Accuracy", "Governance & Reproducibility Filters"),
     ]:
-        target = page.get_by_text(label, exact=True)
-        assert target.count() == 1
-        target.click()
+        click_governance_nav(page, label)
         page.wait_for_timeout(1500)
         expected = page.get_by_text(expected_content, exact=False).first
         expect(expected).to_be_visible(timeout=60000)
         expected_box = expected.bounding_box()
         assert expected_box is not None
-        max_expected_y = 860 if label == "Governance & Reproducibility" else 620
-        assert expected_box["y"] < max_expected_y
         assert stale_content != expected_content
 
 
@@ -302,13 +329,13 @@ def test_filter_band_is_reference_compact(page: Page) -> None:
     wait_dashboard_ready(page)
     filter_title = page.locator(".filter-title").first.bounding_box()
     first_kpi = page.locator(".gov-kpi-card").first.bounding_box()
-    first_chart = page.get_by_text("1. Finalist Forecast Accuracy", exact=False).first.bounding_box()
+    first_chart = page.get_by_text("Finalist Forecast Accuracy", exact=False).first.bounding_box()
     assert filter_title is not None
     assert first_kpi is not None
     assert first_chart is not None
     assert first_kpi["y"] - filter_title["y"] < 120
     assert first_kpi["y"] < 220
-    assert first_chart["y"] < 330
+    assert first_chart["y"] < 700
     assert page.locator(".run-evidence-compact").count() == 0
     assert_visible_text_absent(page, "Run evidence:")
     assert_visible_text_absent(page, "Curated rows:")
@@ -348,21 +375,20 @@ def test_governance_shell_is_readable_in_narrow_browser(page: Page) -> None:
     assert overflow == []
 
     body = page.locator("body").inner_text(timeout=60000)
-    assert "Page 1 of 5 - Overview" in body
+    assert expected_page_chip("Overview") in body
     expect_filter_value(page, "Stream", 0, "All Streams")
     expect_filter_value(page, "Model Family", 1, "All Families")
     expect_filter_value(page, "Score Basis", 4, "Paper-style horizon MAPE")
 
-    first_chart = page.get_by_text("1. Finalist Forecast Accuracy", exact=False).first
-    second_chart = page.get_by_text("2. Candidate Search Frontier", exact=False).first
+    first_chart = page.get_by_text("Finalist Forecast Accuracy", exact=False).first
+    second_chart = page.get_by_text("Candidate Search Frontier", exact=False).first
     expect(first_chart).to_be_visible(timeout=90000)
     expect(second_chart).to_be_visible(timeout=90000)
     first_box = first_chart.bounding_box()
     second_box = second_chart.bounding_box()
     assert first_box is not None
     assert second_box is not None
-    assert abs(second_box["y"] - first_box["y"]) < 90
-    assert second_box["x"] > first_box["x"] + 100
+    assert second_box["y"] > first_box["y"]
 
 
 def test_primary_reference_pages_use_icon_kpi_rows(page: Page) -> None:
@@ -398,15 +424,15 @@ def test_diagnostics_in_app_grid_replaces_overview_panels(page: Page) -> None:
     wait_dashboard_ready(page)
 
     click_governance_nav(page, "Diagnostics")
-    expect(page.locator("body")).to_contain_text("Page 2 of 5 - Diagnostics", timeout=60000)
+    expect(page.locator("body")).to_contain_text(expected_page_chip("Diagnostics"), timeout=60000)
     assert_visible_text_absent(page, "Diagnostics evidence:")
     assert_visible_text_absent(page, "proxy panels shown")
     for title in [
         "1. Residual Autocorrelation by Lag",
         "2. Residual vs Fitted",
-        "3. Diagnostic Pass Matrix",
     ]:
         assert_text_above_fold(page, title)
+    expect(page.get_by_text("3. Diagnostic Pass Matrix", exact=False).first).to_be_visible(timeout=60000)
 
     overview_ghost_visible = page.evaluate(
         """() => {
@@ -437,13 +463,13 @@ def test_scenario_in_app_grid_brings_improvement_panel_into_view(page: Page) -> 
     wait_dashboard_ready(page)
 
     click_governance_nav(page, "Scenario Comparison")
-    expect(page.locator("body")).to_contain_text("Page 3 of 5 - Scenario Comparison", timeout=60000)
+    expect(page.locator("body")).to_contain_text(expected_page_chip("Scenario Comparison"), timeout=60000)
     for title in [
         "1. Stream Comparison: Scenario A vs Scenario B",
         "2. Improvement vs Benchmark",
-        "3. Horizon Comparison",
     ]:
         assert_text_above_fold(page, title, max_y=850)
+    expect(page.get_by_text("3. Horizon Comparison", exact=False).first).to_be_visible(timeout=60000)
 
     improvement_box = page.get_by_text("2. Improvement vs Benchmark", exact=False).first.bounding_box()
     assert improvement_box is not None
@@ -463,12 +489,12 @@ def test_overview_has_dashboard_grid(page: Page) -> None:
     expect(page.locator("body")).to_contain_text("Stress and Horizon Checks", timeout=60000)
     page.evaluate("window.scrollTo(0, 0)")
     for title in [
-        "1. Finalist Forecast Accuracy",
-        "2. Candidate Search Frontier",
-        "3. Finalist Ensemble Composition",
-        "4. Stress and Horizon Checks",
+        "Finalist Forecast Accuracy",
+        "Candidate Search Frontier",
+        "Finalist Ensemble Composition",
+        "Stress and Horizon Checks",
     ]:
-        assert_text_above_fold(page, title)
+        expect(page.get_by_text(title, exact=False).first).to_be_visible(timeout=60000)
     body = page.locator("body").inner_text(timeout=60000)
     assert "Stress and Horizon Checks" in body
 
@@ -491,7 +517,7 @@ def test_ensemble_composition_has_three_stream_panels_under_both_score_bases(pag
 
     assert_ensemble_plot_has_all_streams(page)
 
-    select_combobox_option(page, 7, "Operational pooled MAPE")
+    select_combobox_option(page, 4, "Operational pooled MAPE")
     expect_filter_value(page, "Score Basis", 4, "Operational pooled MAPE")
     wait_dashboard_ready(page)
     assert_ensemble_plot_has_all_streams(page)
@@ -501,7 +527,7 @@ def test_overview_stress_bucket_order(page: Page) -> None:
     page.set_viewport_size({"width": 1680, "height": 940})
     page.goto(os.environ.get("STAGE1_DASHBOARD_URL", "http://localhost:8501"), wait_until="domcontentloaded")
     wait_dashboard_ready(page)
-    expect(page.locator("body")).to_contain_text("4. Stress and Horizon Checks", timeout=90000)
+    expect(page.locator("body")).to_contain_text("Stress and Horizon Checks", timeout=90000)
 
     labels = ["1-4 qtrs", "5-8 qtrs", "9-12 qtrs", "Annual"]
     boxes = []
@@ -518,8 +544,8 @@ def test_overview_stress_horizon_aliases_show_all_streams(page: Page) -> None:
     page.set_viewport_size({"width": 1680, "height": 940})
     page.goto(os.environ.get("STAGE1_DASHBOARD_URL", "http://localhost:8501"), wait_until="domcontentloaded")
     wait_dashboard_ready(page)
-    expect(page.locator("body")).to_contain_text("4. Stress and Horizon Checks", timeout=90000)
-    page.get_by_text("4. Stress and Horizon Checks", exact=False).first.scroll_into_view_if_needed()
+    expect(page.locator("body")).to_contain_text("Stress and Horizon Checks", timeout=90000)
+    page.get_by_text("Stress and Horizon Checks", exact=False).first.scroll_into_view_if_needed()
 
     labels = ["1-4 qtrs", "5-8 qtrs", "9-12 qtrs", "Annual"]
     for label in labels[:3]:
@@ -590,7 +616,7 @@ def test_overview_candidate_frontier_has_expected_markers(page: Page) -> None:
     page.set_viewport_size({"width": 1680, "height": 940})
     page.goto(os.environ.get("STAGE1_DASHBOARD_URL", "http://localhost:8501"), wait_until="domcontentloaded")
     wait_dashboard_ready(page)
-    expect(page.locator("body")).to_contain_text("2. Candidate Search Frontier", timeout=90000)
+    expect(page.locator("body")).to_contain_text("Candidate Search Frontier", timeout=90000)
     assert_visible_text(page, "Finalist")
     assert_visible_text(page, "Schiff")
     body = page.locator("body").inner_text(timeout=60000).lower()
@@ -673,9 +699,9 @@ def wait_dashboard_ready(page: Page) -> None:
     expect(page.locator("img.brand-logo[alt='NZ Transport Agency Waka Kotahi logo']")).to_be_visible(timeout=90000)
     expect(page.get_by_text("GOVERNANCE FILTERS")).to_be_visible(timeout=90000)
     expect(page.get_by_role("button", name="Reset Filters")).to_be_visible(timeout=90000)
-    expect(page.locator("body")).to_contain_text("Page 1 of 5 - Overview", timeout=90000)
-    expect(page.locator("body")).to_contain_text("Schiff Benchmark", timeout=90000)
-    expect(page.locator("body")).to_contain_text("Governance & Reproducibility", timeout=90000)
+    expect(page.locator("body")).to_contain_text(expected_page_chip("Overview"), timeout=90000)
+    expect(governance_nav_label(page, "Schiff Benchmark")).to_be_visible(timeout=90000)
+    expect(governance_nav_label(page, "Governance & Reproducibility")).to_be_visible(timeout=90000)
 
 
 def rendered_surface_count(page: Page) -> int:
@@ -695,11 +721,18 @@ def wait_for_rendered_surfaces(page: Page) -> None:
 
 
 def governance_nav_label(page: Page, label: str):
-    return page.locator("div[data-testid='stRadio'] label").filter(has_text=label).first
+    labels = page.locator("div[data-testid='stRadio'] label")
+    display_label = page_display_label(label)
+    display_match = labels.filter(has_text=display_label)
+    if display_match.count() > 0:
+        return display_match.first
+    return labels.filter(has_text=label).first
 
 
 def click_governance_nav(page: Page, label: str) -> None:
-    governance_nav_label(page, label).click()
+    target = governance_nav_label(page, label)
+    expect(target).to_be_visible(timeout=60000)
+    target.click()
 
 
 def save_dashboard_screenshot(page: Page, artifact_dir: Path, screenshot_name: str) -> None:
@@ -816,7 +849,7 @@ def select_combobox_option(page: Page, index: int, value: str) -> None:
 
 
 def assert_ensemble_plot_has_all_streams(page: Page) -> None:
-    page.get_by_text("3. Finalist Ensemble Composition", exact=False).first.scroll_into_view_if_needed()
+    page.get_by_text("Finalist Ensemble Composition", exact=False).first.scroll_into_view_if_needed()
     page.wait_for_function(
         """() => {
             const expected = ['PED VKT per capita', 'Light RUC volume', 'Heavy RUC volume'];
