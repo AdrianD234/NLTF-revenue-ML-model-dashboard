@@ -1,5 +1,5 @@
 {
-  "created_at": "2026-06-24T08:56:51.084816+00:00",
+  "created_at": "2026-06-24T09:12:06.714857+00:00",
   "exports": {
     "canonical_revenue_long.csv": {
       "role": "Canonical long schema across actuals and model paths.",
@@ -10,6 +10,11 @@
       "role": "Hierarchy roll-up reconciliation and explicit gap report.",
       "row_count": 192,
       "sha256": "83a250790506d54e09eaa9d1421d9e3c08c4104d5088fd81d18ecb09303690b6"
+    },
+    "source_gap_register.csv": {
+      "role": "Structured source-pack gaps for release values, Crown top-up, quarterly rows, and bridge replay.",
+      "row_count": 4,
+      "sha256": "3457ef14a81423e44ce629360eb3fd7425c845dfda41f9aacdef51a642f62ab7"
     },
     "validation_issues.csv": {
       "role": "Loader validation warnings/errors for the source pack.",

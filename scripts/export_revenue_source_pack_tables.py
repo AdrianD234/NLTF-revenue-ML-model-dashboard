@@ -19,6 +19,7 @@ from model_dashboard.revenue_source_pack import REVENUE_SOURCE_PACK_DIR, load_re
 EXPORT_FILES = {
     "canonical_revenue_long.csv": "Canonical long schema across actuals and model paths.",
     "reconciliation_report.csv": "Hierarchy roll-up reconciliation and explicit gap report.",
+    "source_gap_register.csv": "Structured source-pack gaps for release values, Crown top-up, quarterly rows, and bridge replay.",
     "validation_issues.csv": "Loader validation warnings/errors for the source pack.",
 }
 
@@ -38,6 +39,7 @@ def export_tables(pack_dir: Path) -> dict[str, object]:
     outputs = {
         "canonical_revenue_long.csv": pack.canonical_long,
         "reconciliation_report.csv": pack.reconciliation_report,
+        "source_gap_register.csv": pack.source_gap_register,
         "validation_issues.csv": pack.validation_issues,
     }
     manifest: dict[str, object] = {

@@ -17,10 +17,10 @@ test fixtures, or silently convert unavailable bridge rows to zero.
 canonical long table with:
 
 `period`, `FY`, `time_grain`, `series_id`, `parent_series_id`, `value`, `unit`,
-`aggregation_sign`, `release_vintage`, `forecast_path`, `scenario_name`,
-`scenario_role`, `model_basis`, `revenue_basis`, `source_status`,
-`bridge_status`, `source_file`, `source_cell`, `source_hash_sha256`, and
-`distilled_hash_sha256`.
+`aggregation_sign`, `release_vintage`, `forecast_path`, `path_status`,
+`scenario_name`, `scenario_role`, `model_basis`, `revenue_basis`,
+`source_status`, `bridge_status`, `source_file`, `source_cell`,
+`source_hash_sha256`, and `distilled_hash_sha256`.
 
 Rows whose source labels are not registered in `series_master.csv` are retained
 with `source_status=unregistered_source_series` and
@@ -52,15 +52,26 @@ Future revenue remains unavailable until explicit nominal rates and PED bridge
 history pass governance. The current distilled pack records these as unresolved
 decisions rather than filled values.
 
+Crown top-up is an explicit policy overlay. When the current selection excludes
+it, Net FED reconciliation remains Gross FED less refunds. When a user selects
+Include, the dashboard must show a visible gap unless governed top-up value rows
+exist; it must not apply a fabricated zero.
+
 ## Derived Audit Artifacts
 
 `scripts/export_revenue_source_pack_tables.py` exports:
 
 - `canonical_revenue_long.csv`
 - `reconciliation_report.csv`
+- `source_gap_register.csv`
 - `validation_issues.csv`
 - `loader_exports_manifest.json`
 
 The reconciliation report compares calculable hierarchy totals to official
 rows within rounding and reports `partial_missing`, `official_row_missing`, or
 `difference_reported` where the source pack does not support a forced balance.
+
+The source gap register is a machine-readable list of runtime limitations such
+as missing release-value tables, missing Crown top-up rows, annual-only source
+pack scope, and unavailable PED total-VKT bridge rows. It backs the Revenue
+Outlook warnings and is hash-recorded in `loader_exports_manifest.json`.

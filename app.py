@@ -208,6 +208,7 @@ from model_dashboard.ui import (
 
 LOADER_SCHEMA_VERSION = "stage1-governance-loader-v9-parquet-contract-schiff-class"
 STREAMLIT_IMPORT_SURFACE_REVISION = "2026-06-24-revenue-source-pack-v1"
+REVENUE_SOURCE_PACK_CACHE_REVISION = "2026-06-24-source-gap-register-v1"
 CURATED_DATA_DIR = Path("artifacts") / "curated_data"
 REPRODUCIBILITY_PAGE = "Governance & Reproducibility"
 REVENUE_OUTLOOK_PAGE = "Revenue Outlook"
@@ -1954,7 +1955,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         str(repo_root / REVENUE_SOURCE_PACK_DIR),
         str(repo_root),
         revenue_source_pack_signature(repo_root / REVENUE_SOURCE_PACK_DIR, repo_root),
-        REVENUE_SOURCE_PACK_SCHEMA_VERSION,
+        REVENUE_SOURCE_PACK_CACHE_REVISION,
     )
     pack = st.session_state.get("revenue_outlook_pack")
     if not isinstance(pack, RevenueOutlookPack):
@@ -2203,6 +2204,8 @@ def _render_revenue_source_controls(source_pack: RevenueSourcePack | None) -> di
 def _render_revenue_source_architecture(source_pack: RevenueSourcePack, controls: dict[str, Any]) -> None:
     if controls.get("time_grain") == "Quarterly":
         warning_panel("The distilled revenue source pack is annual only. Quarterly display remains available for the promoted Forecast Builder volume pack below.")
+    for message in _source_control_gap_messages(source_pack, controls):
+        warning_panel(message)
     source_status = (
         f"Source pack version {source_pack.manifest.get('source_pack_version', 'unknown')}; "
         f"raw workbook SHA256 {source_pack.manifest.get('raw_workbook', {}).get('sha256', 'missing')[:12]}...; "
@@ -2255,8 +2258,93 @@ def _render_revenue_source_architecture(source_pack: RevenueSourcePack, controls
 
     with st.expander("Source-pack validation and manifest", expanded=False):
         display_table(source_pack.validation_issues, height=180, max_rows=80)
+        display_table(_source_gap_register(source_pack), height=180, max_rows=80)
         display_table(_source_manifest_view(source_pack), height=220, max_rows=80)
         dataframe_download(source_pack.canonical_long, "Download canonical revenue long table", "canonical_revenue_long.csv")
+
+
+def _source_control_gap_messages(source_pack: RevenueSourcePack, controls: dict[str, Any]) -> list[str]:
+    gaps = _source_gap_register(source_pack)
+    if gaps.empty:
+        return []
+    messages: list[str] = []
+    if str(controls.get("crown_top_up", "")).lower() == "include":
+        crown = gaps[gaps["gap_id"].eq("crown_top_up_values_missing")]
+        if not crown.empty and crown.iloc[0].get("availability_status") == "missing":
+            messages.append(str(crown.iloc[0].get("user_visible_message")))
+    if str(controls.get("release_round", "")).strip():
+        release = gaps[gaps["gap_id"].eq("release_value_table_missing")]
+        if not release.empty and release.iloc[0].get("availability_status") == "missing":
+            messages.append(str(release.iloc[0].get("user_visible_message")))
+    return messages
+
+
+def _source_gap_register(source_pack: RevenueSourcePack) -> pd.DataFrame:
+    gaps = getattr(source_pack, "source_gap_register", None)
+    if isinstance(gaps, pd.DataFrame):
+        return gaps
+    manifest = getattr(source_pack, "manifest", {})
+    config = getattr(source_pack, "front_end_config", {})
+    frame = getattr(source_pack, "canonical_long", pd.DataFrame())
+    selections = config.get("current_selections", {}) if isinstance(config, dict) else {}
+    crown_top_up_selection = _selection_value(selections, "crown_top_up", "Exclude")
+    has_crown_top_up_rows = bool(frame["series_id"].eq("crown_top_up").any()) if isinstance(frame, pd.DataFrame) and "series_id" in frame.columns else False
+    has_release_values = bool(manifest.get("normalized_files", {}).get("release_values.csv")) if isinstance(manifest, dict) else False
+    has_quarterly_values = (
+        bool(frame["time_grain"].astype(str).str.lower().eq("quarterly").any())
+        if isinstance(frame, pd.DataFrame) and "time_grain" in frame.columns
+        else False
+    )
+    has_ped_total_vkt = bool(frame["series_id"].eq("ped_total_vkt").any()) if isinstance(frame, pd.DataFrame) and "series_id" in frame.columns else False
+    return pd.DataFrame(
+        [
+            {
+                "gap_id": "release_value_table_missing",
+                "required_for": "selected MOT/BEFU and rolling BEFU 1Y release paths",
+                "availability_status": "available" if has_release_values else "missing",
+                "current_selection": _selection_value(selections, "release_round", "BEFU25"),
+                "runtime_treatment": "release_values_available" if has_release_values else "registry_only",
+                "user_visible_message": "Full MOT/BEFU release-value table is unavailable; release selection is registry-only and unresolved differences are reported.",
+            },
+            {
+                "gap_id": "crown_top_up_values_missing",
+                "required_for": "Include Crown top-up roll-up treatment",
+                "availability_status": "available" if has_crown_top_up_rows else "missing",
+                "current_selection": crown_top_up_selection,
+                "runtime_treatment": "excluded_by_selection" if crown_top_up_selection.lower() == "exclude" else "not_applied_missing_source",
+                "user_visible_message": "Crown top-up Include is not applied because no governed top-up value rows are present in the source pack.",
+            },
+            {
+                "gap_id": "quarterly_source_pack_missing",
+                "required_for": "Quarterly Revenue Outlook from source pack",
+                "availability_status": "available" if has_quarterly_values else "missing",
+                "current_selection": _selection_value(selections, "view", "Annual"),
+                "runtime_treatment": "quarterly_available" if has_quarterly_values else "annual_only_source_pack",
+                "user_visible_message": "The distilled source pack is annual only; quarterly views use promoted Forecast Builder volume packs where available.",
+            },
+            {
+                "gap_id": "ped_total_vkt_bridge_missing",
+                "required_for": "PED VKT per capita to total VKT bridge replay",
+                "availability_status": "available" if has_ped_total_vkt else "missing",
+                "current_selection": _selection_value(selections, "series", "Total NLTF revenue"),
+                "runtime_treatment": "bridge_rows_available" if has_ped_total_vkt else "reported_gap",
+                "user_visible_message": "PED total VKT bridge rows are absent; PED revenue paths are preserved from workbook source rows rather than recomputed.",
+            },
+        ],
+        columns=[
+            "gap_id",
+            "required_for",
+            "availability_status",
+            "current_selection",
+            "runtime_treatment",
+            "user_visible_message",
+        ],
+    )
+
+
+def _selection_value(selections: dict[str, Any], control_id: str, default: str = "") -> str:
+    value = selections.get(control_id, {}).get("current_value") if isinstance(selections.get(control_id, {}), dict) else None
+    return str(value) if value else default
 
 
 def _option_index(options: list[str], preferred: str, *, fallback: str | None = None) -> int:

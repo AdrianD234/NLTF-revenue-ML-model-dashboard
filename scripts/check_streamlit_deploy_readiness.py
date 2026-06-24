@@ -116,6 +116,7 @@ REQUIRED_REVENUE_SOURCE_PACK_FILES = {
     "release_registry.csv",
     "canonical_revenue_long.csv",
     "reconciliation_report.csv",
+    "source_gap_register.csv",
     "validation_issues.csv",
     "loader_exports_manifest.json",
 }

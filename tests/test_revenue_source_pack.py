@@ -139,6 +139,22 @@ def test_revenue_source_pack_validation_is_warning_not_error_for_known_source_ga
     assert "front_end_config" not in set(issues["check"])
 
 
+def test_revenue_source_gap_register_exposes_missing_release_and_top_up_inputs() -> None:
+    pack = load_revenue_source_pack(repo_root=ROOT)
+    assert pack is not None
+    gaps = pack.source_gap_register
+    assert not gaps.empty
+    assert {"gap_id", "availability_status", "runtime_treatment", "user_visible_message"}.issubset(gaps.columns)
+
+    by_id = gaps.set_index("gap_id")
+    assert by_id.loc["release_value_table_missing", "availability_status"] == "missing"
+    assert by_id.loc["release_value_table_missing", "runtime_treatment"] == "registry_only"
+    assert by_id.loc["crown_top_up_values_missing", "availability_status"] == "missing"
+    assert by_id.loc["crown_top_up_values_missing", "runtime_treatment"] == "excluded_by_selection"
+    assert by_id.loc["quarterly_source_pack_missing", "runtime_treatment"] == "annual_only_source_pack"
+    assert by_id["user_visible_message"].astype(str).str.len().gt(20).all()
+
+
 def test_revenue_source_pack_loader_exports_are_hash_backed() -> None:
     manifest_path = PACK_DIR / "loader_exports_manifest.json"
     assert manifest_path.exists()
@@ -154,6 +170,7 @@ def test_revenue_source_pack_loader_exports_are_hash_backed() -> None:
     expected_counts = {
         "canonical_revenue_long.csv": len(pack.canonical_long),
         "reconciliation_report.csv": len(pack.reconciliation_report),
+        "source_gap_register.csv": len(pack.source_gap_register),
         "validation_issues.csv": len(pack.validation_issues),
     }
     for filename, meta in manifest["exports"].items():
