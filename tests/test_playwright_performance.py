@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import time
 from pathlib import Path
 
@@ -26,30 +27,30 @@ def test_dashboard_interaction_performance(page: Page) -> None:
 
     t0 = time.perf_counter()
     page.goto(base_url, wait_until="domcontentloaded")
-    expect(page.get_by_text("Page 1 of 5 - Overview").first).to_be_visible(timeout=90000)
+    expect(page.get_by_text("Page 1 of 5 - Executive Summary").first).to_be_visible(timeout=90000)
     timings["cold_load_sec"] = time.perf_counter() - t0
     overview_t0 = time.perf_counter()
-    expect(page.get_by_text("1. Finalist Forecast Accuracy").first).to_be_visible(timeout=90000)
+    expect(page.get_by_text("Finalist Forecast Accuracy").first).to_be_visible(timeout=90000)
     overview_chart_sec = time.perf_counter() - overview_t0
 
     warm_samples: list[float] = []
     for _ in range(2):
         t0 = time.perf_counter()
         page.reload(wait_until="domcontentloaded")
-        expect(page.get_by_text("Page 1 of 5 - Overview").first).to_be_visible(timeout=90000)
+        expect(page.get_by_text("Page 1 of 5 - Executive Summary").first).to_be_visible(timeout=90000)
         warm_samples.append(time.perf_counter() - t0)
-        expect(page.get_by_text("1. Finalist Forecast Accuracy").first).to_be_visible(timeout=90000)
+        expect(page.get_by_text("Finalist Forecast Accuracy").first).to_be_visible(timeout=90000)
     timings["warm_load_samples_sec"] = warm_samples
     timings["warm_load_sec"] = min(warm_samples)
 
     page_render_timings: dict[str, float] = {"Overview": overview_chart_sec}
     tab_timings: dict[str, float] = {}
     for label, expected in [
-        ("Diagnostics", "Page 2 of 5 - Diagnostics"),
-        ("Scenario Comparison", "Page 3 of 5 - Scenario Comparison"),
-        ("Schiff Benchmark", "Page 4 of 5 - Schiff Benchmark"),
+        ("Model Confidence", "Page 2 of 5 - Model Confidence"),
+        ("Scenario Forecasts", "Page 3 of 5 - Scenario Forecasts"),
+        ("Benchmark Comparison", "Page 4 of 5 - Benchmark Comparison"),
         ("Governance & Reproducibility", "Page 5 of 5 - Governance & Reproducibility"),
-        ("Overview", "Page 1 of 5 - Overview"),
+        ("Executive Summary", "Page 1 of 5 - Executive Summary"),
     ]:
         t0 = time.perf_counter()
         page.get_by_text(label, exact=True).click()
@@ -62,7 +63,7 @@ def test_dashboard_interaction_performance(page: Page) -> None:
     timings["page_render_sec"] = page_render_timings
 
     t0 = time.perf_counter()
-    stream_combo = page.get_by_role("combobox").nth(0)
+    stream_combo = page.get_by_role("combobox", name=re.compile(r"Stream")).first
     stream_combo.click()
     for option_name in ["Light RUC volume", "PED VKT per capita", "Heavy RUC volume"]:
         option = page.get_by_role("option", name=option_name)
@@ -71,18 +72,19 @@ def test_dashboard_interaction_performance(page: Page) -> None:
             break
     page.wait_for_function(
         """() => {
-            const combo = document.querySelectorAll('[role="combobox"]')[0];
+            const combos = Array.from(document.querySelectorAll('[role="combobox"]'));
+            const combo = combos.find((element) => (element.getAttribute('aria-label') || '').includes('Stream'));
             const label = combo ? combo.getAttribute('aria-label') || '' : '';
             return label.startsWith('Selected ') && !label.includes('Selected All Streams.');
         }""",
         timeout=60000,
     )
-    expect(page.get_by_text("1. Finalist Forecast Accuracy").first).to_be_visible(timeout=90000)
+    expect(page.get_by_text("Finalist Forecast Accuracy").first).to_be_visible(timeout=90000)
     timings["primary_filter_select_sec"] = time.perf_counter() - t0
 
     t0 = time.perf_counter()
     page.get_by_role("button", name="Reset Filters").click()
-    expect(page.get_by_text("1. Finalist Forecast Accuracy").first).to_be_visible(timeout=90000)
+    expect(page.get_by_text("Finalist Forecast Accuracy").first).to_be_visible(timeout=90000)
     timings["primary_filter_reset_sec"] = time.perf_counter() - t0
 
     hover_t0 = time.perf_counter()

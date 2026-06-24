@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
 
 import numpy as np
 import pandas as pd
+import pytest
 from openpyxl import load_workbook
 
 from model_dashboard.forecast_runner import (
@@ -73,6 +76,57 @@ def _sorted_forecast_values(frame: pd.DataFrame) -> pd.DataFrame:
     out = frame[columns].copy()
     out["forecast"] = pd.to_numeric(out["forecast"], errors="coerce")
     return out.sort_values(["stream", "target_period"], kind="stable").reset_index(drop=True)
+
+
+def _tracked_data_hashes() -> dict[str, str]:
+    result = subprocess.run(
+        ["git", "ls-files", "data/dashboard_evidence_pack", "artifacts/chart_sources"],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    hashes: dict[str, str] = {}
+    for rel_path in result.stdout.splitlines():
+        path = ROOT / rel_path
+        if path.is_file():
+            hashes[rel_path] = hashlib.sha256(path.read_bytes()).hexdigest()
+    return hashes
+
+
+def _forecast_values_by_role(frame: pd.DataFrame) -> pd.DataFrame:
+    out = frame.copy()
+    if "scenario_role" not in out.columns or out["scenario_role"].isna().all():
+        scenario = out.get("scenario_name", pd.Series("", index=out.index)).astype(str)
+        out["scenario_role"] = scenario.map({"basecase": "basecase", "high_population": "comparison"}).fillna(scenario)
+    out["forecast"] = pd.to_numeric(out["forecast"], errors="coerce")
+    columns = ["scenario_role", "stream", "model", "target_period", "horizon", "forecast", "forecast_available"]
+    return out[columns].sort_values(["scenario_role", "stream", "target_period"], kind="stable").reset_index(drop=True)
+
+
+def _assert_source_derived_continuity(result) -> None:
+    for stream in STREAM_ORDER:
+        historical = result.forecast_chart_rows[
+            result.forecast_chart_rows["row_type"].astype(str).eq("historical_actual")
+            & result.forecast_chart_rows["stream"].astype(str).eq(stream)
+        ].copy()
+        historical["period_key"] = historical["period"].astype(str).map(lambda value: int(value[:4]) * 4 + int(value[-1]))
+        historical = historical.sort_values("period_key", kind="stable")
+        history_values = pd.to_numeric(historical["value"], errors="coerce").dropna()
+        recent_qoq = history_values.pct_change().dropna().abs().tail(20)
+        assert not recent_qoq.empty, stream
+        tolerance = max(float(recent_qoq.quantile(0.95)) * 3.0, float(recent_qoq.max()) * 2.0)
+
+        future = result.future_forecasts[result.future_forecasts["stream"].eq(stream)].sort_values("target_period")
+        future_values = pd.to_numeric(future["forecast"], errors="coerce")
+        actual_to_h1 = abs(float(future_values.iloc[0]) / float(history_values.iloc[-1]) - 1.0)
+        h1_h12_qoq = future_values.head(BACKTEST_SUPPORTED_MAX_HORIZON).pct_change().dropna().abs()
+
+        assert actual_to_h1 <= tolerance, f"{stream} latest actual-to-H1 {actual_to_h1:.6f} exceeds source tolerance {tolerance:.6f}"
+        assert float(h1_h12_qoq.max()) <= tolerance, (
+            f"{stream} H1-H{BACKTEST_SUPPORTED_MAX_HORIZON} QoQ {float(h1_h12_qoq.max()):.6f} "
+            f"exceeds source tolerance {tolerance:.6f}"
+        )
 
 
 def _set_required_user_values(path: Path, stream: str, excel_row: int, value: float) -> None:
@@ -837,6 +891,85 @@ def test_100q_forecast_builder_current_finalists_all_streams_numeric_and_determi
     assert summary["comparison_scenario"] == "high_population"
     assert summary["comparison_is_test_fixture"] is False
     assert summary["all_required_inputs_plus_2pct"] is False
+
+
+def test_exact_2050q4_workbooks_preserve_forecasts_and_source_continuity(tmp_path: Path) -> None:
+    base_path = os.environ.get("NLTF_EXACT_BASECASE_WORKBOOK")
+    comparison_path = os.environ.get("NLTF_EXACT_COMPARISON_WORKBOOK")
+    if not base_path or not comparison_path:
+        pytest.skip("Set NLTF_EXACT_BASECASE_WORKBOOK and NLTF_EXACT_COMPARISON_WORKBOOK to run exact workbook regression.")
+    base_workbook = Path(base_path)
+    comparison_workbook = Path(comparison_path)
+    if not base_workbook.exists() or not comparison_workbook.exists():
+        pytest.skip("Exact workbook paths are not available in this environment.")
+
+    before_hashes = _tracked_data_hashes()
+    results = [
+        run_forecast_workbook(
+            base_workbook,
+            output_dir=tmp_path / "exact_basecase_run",
+            repo_root=ROOT,
+            workbook_filename=base_workbook.name,
+            run_timestamp="exact-env",
+            expected_end_period="2050Q4",
+        ),
+        run_forecast_workbook(
+            comparison_workbook,
+            output_dir=tmp_path / "exact_comparison_run",
+            repo_root=ROOT,
+            workbook_filename=comparison_workbook.name,
+            run_timestamp="exact-env",
+            expected_end_period="2050Q4",
+        ),
+    ]
+
+    for result in results:
+        assert result.manifest["forecast_status"] == "numeric_forecast_available"
+        assert result.manifest["forecast_horizon_quarters"] == 100
+        assert result.manifest["forecast_start_period"] == "2026Q1"
+        assert result.manifest["forecast_end_period"] == "2050Q4"
+        assert len(result.future_forecasts) == 300
+        assert set(result.future_forecasts["model"]) == {CURRENT_PED_FINALIST, CURRENT_LIGHT_FINALIST, CURRENT_HEAVY_FINALIST}
+        _assert_source_derived_continuity(result)
+
+    comparison = write_forecast_scenario_comparison(
+        results,
+        output_dir=tmp_path / "exact_comparison",
+        repo_root=ROOT,
+        run_timestamp="exact-env-comparison",
+    )
+    assert len(comparison.future_forecasts) == 600
+    assert comparison.manifest["scenario_role_validation"]["base_scenario"] == results[0].manifest["scenario_name"]
+    assert comparison.manifest["scenario_role_validation"]["comparison_scenarios"] == [results[1].manifest["scenario_name"]]
+    assert "high_population_fixture_note" not in comparison.manifest
+    assert comparison.manifest["evidence_pack_modified"] is False
+    assert comparison.manifest["chart_sources_modified"] is False
+
+    audit = comparison.scenario_input_delta_audit
+    assert audit["base_scenario_role"].eq("basecase").all()
+    assert audit["comparison_scenario_role"].eq("comparison").all()
+    assert audit["base_original_filename"].eq(base_workbook.name).all()
+    assert audit["comparison_original_filename"].eq(comparison_workbook.name).all()
+    assert audit["base_workbook_sha256"].eq(hashlib.sha256(base_workbook.read_bytes()).hexdigest()).all()
+    assert audit["comparison_workbook_sha256"].eq(hashlib.sha256(comparison_workbook.read_bytes()).hexdigest()).all()
+    assert audit["decision_grade_status"].eq("scenario_delta_audit_only").all()
+    assert not audit["all_required_inputs_plus_2pct"].fillna(False).astype(bool).any()
+    sample = audit[pd.to_numeric(audit["pct_delta"], errors="coerce").notna()].iloc[0]
+    expected_delta = float(sample["comparison_value"]) / float(sample["base_value"]) - 1.0
+    assert abs(float(sample["pct_delta"]) - expected_delta) <= 1e-12
+
+    baseline_dir = os.environ.get("NLTF_EXACT_BASELINE_COMPARISON_DIR")
+    if baseline_dir:
+        baseline_path = Path(baseline_dir) / "forecast_scenario_comparison.parquet"
+        assert baseline_path.exists(), f"Requested exact baseline comparison does not exist: {baseline_path}"
+        baseline = pd.read_parquet(baseline_path)
+        pd.testing.assert_frame_equal(
+            _forecast_values_by_role(comparison.future_forecasts),
+            _forecast_values_by_role(baseline),
+            check_exact=True,
+        )
+
+    assert _tracked_data_hashes() == before_hashes
 
 
 def test_vnext_y_lag_members_ignore_future_workbook_target_lag_leakage(tmp_path: Path) -> None:
