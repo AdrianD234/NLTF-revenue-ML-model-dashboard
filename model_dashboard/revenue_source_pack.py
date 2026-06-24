@@ -106,6 +106,18 @@ OPTIONAL_ROLLUP_INPUTS = {
     "net_fed_revenue": ["crown_top_up"],
 }
 
+REVENUE_BASIS_LABELS = {
+    "net": "Net",
+    "gross": "Gross",
+    "admin": "Admin",
+    "deduction": "Deductions",
+    "nominal_ex_gst": "Nominal ex GST",
+}
+REVENUE_PATH_TO_BASIS = {
+    "net of admin fees & refunds": "Net",
+    "gross / benchmark actual": "Gross",
+}
+
 
 @dataclass
 class RevenueSourcePack:
@@ -843,6 +855,8 @@ def revenue_series_role_audit(
 def control_options(pack: RevenueSourcePack | None, control_id: str, default: list[str]) -> list[str]:
     if pack is None:
         return default
+    if control_id == "revenue_basis":
+        return _derived_revenue_basis_options(pack.canonical_long, default)
     controls = pack.front_end_config.get("controls", []) if isinstance(pack.front_end_config, dict) else []
     for control in controls:
         if isinstance(control, dict) and control.get("control_id") == control_id:
@@ -857,7 +871,20 @@ def current_selection(pack: RevenueSourcePack | None, control_id: str, default: 
     if pack is None:
         return default
     selections = pack.front_end_config.get("current_selections", {}) if isinstance(pack.front_end_config, dict) else {}
+    if control_id == "revenue_basis":
+        revenue_path = _selection_value(selections, "revenue_path", "")
+        return REVENUE_PATH_TO_BASIS.get(revenue_path.strip().lower(), default)
     return _selection_value(selections, control_id, default)
+
+
+def _derived_revenue_basis_options(canonical_long: pd.DataFrame, default: list[str]) -> list[str]:
+    if canonical_long is None or canonical_long.empty or "revenue_basis" not in canonical_long.columns:
+        return default
+    values = canonical_long["revenue_basis"].dropna().astype(str).str.strip().unique().tolist()
+    labels = [REVENUE_BASIS_LABELS[value] for value in values if value in REVENUE_BASIS_LABELS]
+    preferred = ["Net", "Gross", "Admin", "Deductions", "Nominal ex GST"]
+    ordered = [label for label in preferred if label in labels]
+    return ordered or default
 
 
 def _selection_value(selections: dict[str, Any], control_id: str, default: str = "") -> str:

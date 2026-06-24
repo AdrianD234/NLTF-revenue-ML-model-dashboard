@@ -78,6 +78,16 @@ columns are join metadata only; they do not alter activity forecasts, revenue
 forecasts, bridge statuses, chart values, or output provenance hashes except for
 the expected file hash changes caused by adding the columns.
 
+## Revenue Basis Control
+
+The workbook does not expose `revenue_basis` as a separate native dashboard
+control. Revenue Outlook therefore derives that control from normalized
+`canonical_long.revenue_basis` values and uses the workbook `revenue_path`
+selection to choose the default. The derived control is still source-backed:
+it is limited to observed normalized bases such as Net, Gross, Admin,
+Deductions, and Nominal ex GST. Activity rows are excluded from the revenue
+basis selector.
+
 ## Derived Audit Artifacts
 
 `scripts/export_revenue_source_pack_tables.py` exports:

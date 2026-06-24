@@ -2163,7 +2163,10 @@ def _render_revenue_source_controls(source_pack: RevenueSourcePack | None) -> di
             revenue_basis = st.selectbox(
                 "Revenue basis",
                 revenue_basis_options,
-                index=_option_index(revenue_basis_options, revenue_basis_options[0]),
+                index=_option_index(
+                    revenue_basis_options,
+                    current_selection(source_pack, "revenue_basis", revenue_basis_options[0]),
+                ),
                 key="revenue_source_revenue_basis",
             )
         with row2[3]:

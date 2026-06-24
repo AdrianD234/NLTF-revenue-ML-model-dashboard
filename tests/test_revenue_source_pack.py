@@ -10,6 +10,8 @@ from model_dashboard.revenue_source_pack import (
     CANONICAL_REVENUE_SCHEMA_VERSION,
     REQUIRED_SOURCE_PACK_FILES,
     REVENUE_SOURCE_PACK_SCHEMA_VERSION,
+    control_options,
+    current_selection,
     load_revenue_source_pack,
     revenue_reconciliation_report,
 )
@@ -175,6 +177,24 @@ def test_revenue_source_pack_validation_is_warning_not_error_for_known_source_ga
     assert "error" not in set(issues["severity"])
     assert {"revenue_basis_alias", "series_registry_gap", "unresolved_critical_decisions"}.issubset(set(issues["check"]))
     assert "front_end_config" not in set(issues["check"])
+
+
+def test_revenue_basis_control_is_derived_from_normalized_contract_rows() -> None:
+    pack = load_revenue_source_pack(repo_root=ROOT)
+    assert pack is not None
+
+    options = control_options(pack, "revenue_basis", ["Net", "Gross"])
+
+    assert options[:2] == ["Net", "Gross"]
+    assert {"Admin", "Deductions", "Nominal ex GST"}.issubset(set(options))
+    assert "activity" not in options
+    assert current_selection(pack, "revenue_basis", "Gross") == "Net"
+    control_ids = {
+        str(item.get("control_id", ""))
+        for item in pack.front_end_config.get("controls", [])
+        if isinstance(item, dict)
+    }
+    assert "revenue_basis" not in control_ids
 
 
 def test_revenue_source_gap_register_exposes_missing_release_and_top_up_inputs() -> None:
