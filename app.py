@@ -117,6 +117,7 @@ from model_dashboard.revenue_outlook import (
     validate_promotable_comparison,
 )
 from model_dashboard.revenue_source_pack import (
+    REQUIRED_SOURCE_PACK_FILES,
     REVENUE_SOURCE_PACK_DIR,
     REVENUE_SOURCE_PACK_SCHEMA_VERSION,
     RevenueSourcePack,
@@ -2257,6 +2258,8 @@ def _render_revenue_source_architecture(source_pack: RevenueSourcePack, controls
         display_table(source_pack.unresolved_decisions, height=280, max_rows=80)
 
     with st.expander("Source-pack validation and manifest", expanded=False):
+        st.caption("Source-pack intake status")
+        display_table(_source_intake_status(source_pack), height=180, max_rows=80)
         st.caption("Validation issues")
         display_table(source_pack.validation_issues, height=180, max_rows=80)
         st.caption("Required path trace status")
@@ -2345,6 +2348,74 @@ def _source_gap_register(source_pack: RevenueSourcePack) -> pd.DataFrame:
             "user_visible_message",
         ],
     )
+
+
+def _source_intake_status(source_pack: RevenueSourcePack) -> pd.DataFrame:
+    status = getattr(source_pack, "intake_status", None)
+    if isinstance(status, pd.DataFrame):
+        return status
+    manifest = getattr(source_pack, "manifest", {})
+    root = f"data/revenue_model_source_pack/{manifest.get('source_pack_version', '2026_05_19')}"
+    rows: list[dict[str, Any]] = []
+    declared: set[str] = {"manifest.json"}
+    rows.append(
+        {
+            "artifact_name": "manifest.json",
+            "artifact_role": "source_pack_manifest",
+            "repo_relative_path": f"{root}/manifest.json",
+            "status": "repo_local_manifest_declared",
+            "required_for_runtime": True,
+            "required_for_replay": True,
+            "size_bytes": "",
+            "row_count": "",
+            "sha256": "",
+            "notes": "Manifest-declared source-pack artifact.",
+        }
+    )
+    for bucket in ("normalized_files", "config_files"):
+        payload = manifest.get(bucket, {}) if isinstance(manifest, dict) else {}
+        if not isinstance(payload, dict):
+            continue
+        for filename, meta in payload.items():
+            declared.add(str(filename))
+            metadata = meta if isinstance(meta, dict) else {}
+            rows.append(
+                {
+                    "artifact_name": str(filename),
+                    "artifact_role": str(metadata.get("source_sheet", "config_or_document")),
+                    "repo_relative_path": f"{root}/{filename}",
+                    "status": "repo_local_manifest_declared",
+                    "required_for_runtime": str(filename) in REQUIRED_SOURCE_PACK_FILES,
+                    "required_for_replay": True,
+                    "size_bytes": "",
+                    "row_count": metadata.get("row_count", ""),
+                    "sha256": metadata.get("sha256", ""),
+                    "notes": "Manifest-declared source-pack artifact.",
+                }
+            )
+    for filename, role in {
+        "release_values.csv": "selected MOT/BEFU and rolling BEFU 1Y release-value paths",
+        "forecast_archive.csv": "full workbook forecast archive replay",
+        "formula_lineage.csv": "full formula lineage replay",
+        "quarterly_actuals.csv": "source-pack quarterly Revenue Outlook",
+    }.items():
+        if filename in declared:
+            continue
+        rows.append(
+            {
+                "artifact_name": filename,
+                "artifact_role": role,
+                "repo_relative_path": f"{root}/{filename}",
+                "status": "not_vendored",
+                "required_for_runtime": False,
+                "required_for_replay": True,
+                "size_bytes": "",
+                "row_count": "",
+                "sha256": "",
+                "notes": "Not present in the repo-local normalized pack; dependent dashboard traces remain governed gaps.",
+            }
+        )
+    return pd.DataFrame(rows)
 
 
 def _source_path_trace_status(source_pack: RevenueSourcePack) -> pd.DataFrame:

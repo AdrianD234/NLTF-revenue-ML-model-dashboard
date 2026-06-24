@@ -8,6 +8,7 @@ runtime logic; source cells are lineage metadata only.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -118,6 +119,7 @@ class RevenueSourcePack:
     reconciliation_report: pd.DataFrame
     source_gap_register: pd.DataFrame
     path_trace_status: pd.DataFrame
+    intake_status: pd.DataFrame
 
     @property
     def validation_status(self) -> str:
@@ -194,6 +196,10 @@ def load_revenue_source_pack(
         canonical_long=canonical,
         gap_register=gap_register,
     )
+    intake_status = revenue_source_pack_intake_status(
+        pack_dir=base,
+        manifest=manifest,
+    )
     return RevenueSourcePack(
         pack_dir=base,
         manifest=manifest,
@@ -209,6 +215,7 @@ def load_revenue_source_pack(
         reconciliation_report=reconciliation,
         source_gap_register=gap_register,
         path_trace_status=path_trace_status,
+        intake_status=intake_status,
     )
 
 
@@ -563,6 +570,134 @@ def revenue_path_trace_status(
     )
 
 
+def revenue_source_pack_intake_status(
+    *,
+    pack_dir: Path,
+    manifest: dict[str, Any],
+) -> pd.DataFrame:
+    rows: list[dict[str, Any]] = []
+    source_pack_root = Path("data") / "revenue_model_source_pack" / str(manifest.get("source_pack_version", "2026_05_19"))
+
+    raw_hash = str(manifest.get("raw_workbook", {}).get("sha256", ""))
+    rows.append(
+        _intake_status_row(
+            artifact_name="raw_workbook_lineage",
+            artifact_role="lineage_only_not_runtime_loaded",
+            repo_relative_path="",
+            status="verified_sha256_in_manifest" if raw_hash else "missing_hash",
+            required_for_runtime=False,
+            required_for_replay=True,
+            sha256=raw_hash,
+            size_bytes=None,
+            row_count=None,
+            notes="Raw workbook remains outside Git; Streamlit uses normalized repo-local files only.",
+        )
+    )
+
+    distilled_hash = str(manifest.get("distilled_workbook", {}).get("sha256", ""))
+    rows.append(
+        _intake_status_row(
+            artifact_name="distilled_workbook_lineage",
+            artifact_role="normalized_contract_source",
+            repo_relative_path="",
+            status="verified_sha256_in_manifest" if distilled_hash else "missing_hash",
+            required_for_runtime=False,
+            required_for_replay=True,
+            sha256=distilled_hash,
+            size_bytes=None,
+            row_count=None,
+            notes="Distilled workbook is lineage only after normalized files are vendored.",
+        )
+    )
+
+    file_metadata: dict[str, dict[str, Any]] = {}
+    for bucket in ("normalized_files", "config_files"):
+        payload = manifest.get(bucket, {})
+        if isinstance(payload, dict):
+            for filename, meta in payload.items():
+                file_metadata[str(filename)] = meta if isinstance(meta, dict) else {}
+
+    manifest_path = pack_dir / "manifest.json"
+    rows.append(
+        _intake_status_row(
+            artifact_name="manifest.json",
+            artifact_role="source_pack_manifest",
+            repo_relative_path=(source_pack_root / "manifest.json").as_posix(),
+            status="repo_local_hash_verified" if manifest_path.exists() else "missing_or_hash_mismatch",
+            required_for_runtime=True,
+            required_for_replay=True,
+            sha256=_sha256(manifest_path) if manifest_path.exists() else "",
+            size_bytes=manifest_path.stat().st_size if manifest_path.exists() else None,
+            row_count=None,
+            notes="Source-pack manifest for repo-local normalized files.",
+        )
+    )
+
+    for filename in sorted(file_metadata):
+        path = pack_dir / filename
+        meta = file_metadata[filename]
+        repo_path = (source_pack_root / filename).as_posix()
+        exists = path.exists()
+        size = path.stat().st_size if exists else None
+        actual_hash = _sha256(path) if exists else ""
+        expected_hash = str(meta.get("sha256", ""))
+        rows.append(
+            _intake_status_row(
+                artifact_name=filename,
+                artifact_role=str(meta.get("source_sheet", "config_or_document")),
+                repo_relative_path=repo_path,
+                status="repo_local_hash_verified" if exists and actual_hash == expected_hash else "missing_or_hash_mismatch",
+                required_for_runtime=filename in REQUIRED_SOURCE_PACK_FILES,
+                required_for_replay=True,
+                sha256=actual_hash or expected_hash,
+                size_bytes=size,
+                row_count=_nullable_int(meta.get("row_count")),
+                notes="Normalized source-pack contract file.",
+            )
+        )
+
+    declared = set(file_metadata)
+    large_artifact_roles = {
+        "release_values.csv": "selected MOT/BEFU and rolling BEFU 1Y release-value paths",
+        "forecast_archive.csv": "full workbook forecast archive replay",
+        "formula_lineage.csv": "full formula lineage replay",
+        "quarterly_actuals.csv": "source-pack quarterly Revenue Outlook",
+    }
+    for filename, role in large_artifact_roles.items():
+        if filename in declared:
+            continue
+        rows.append(
+            _intake_status_row(
+                artifact_name=filename,
+                artifact_role=role,
+                repo_relative_path=(source_pack_root / filename).as_posix(),
+                status="not_vendored",
+                required_for_runtime=False,
+                required_for_replay=True,
+                sha256="",
+                size_bytes=None,
+                row_count=None,
+                notes="Not present in the repo-local normalized pack; dependent dashboard traces remain governed gaps.",
+            )
+        )
+
+    return pd.DataFrame(
+        rows,
+        columns=[
+            "artifact_name",
+            "artifact_role",
+            "repo_relative_path",
+            "status",
+            "required_for_runtime",
+            "required_for_replay",
+            "size_bytes",
+            "row_count",
+            "sha256",
+            "notes",
+        ],
+    )
+
+
 def control_options(pack: RevenueSourcePack | None, control_id: str, default: list[str]) -> list[str]:
     if pack is None:
         return default
@@ -630,6 +765,46 @@ def _trace_status_row(
         "blocking_gap_id": blocking_gap_id,
         "user_visible_message": message,
     }
+
+
+def _intake_status_row(
+    *,
+    artifact_name: str,
+    artifact_role: str,
+    repo_relative_path: str,
+    status: str,
+    required_for_runtime: bool,
+    required_for_replay: bool,
+    size_bytes: int | None,
+    row_count: int | None,
+    sha256: str,
+    notes: str,
+) -> dict[str, Any]:
+    return {
+        "artifact_name": artifact_name,
+        "artifact_role": artifact_role,
+        "repo_relative_path": repo_relative_path,
+        "status": status,
+        "required_for_runtime": bool(required_for_runtime),
+        "required_for_replay": bool(required_for_replay),
+        "size_bytes": size_bytes,
+        "row_count": row_count,
+        "sha256": sha256,
+        "notes": notes,
+    }
+
+
+def _nullable_int(value: Any) -> int | None:
+    numeric = pd.to_numeric(pd.Series([value]), errors="coerce").iloc[0]
+    return None if pd.isna(numeric) else int(numeric)
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _registry(series_master: pd.DataFrame) -> dict[str, dict[str, Any]]:

@@ -62,6 +62,7 @@ exist; it must not apply a fabricated zero.
 `scripts/export_revenue_source_pack_tables.py` exports:
 
 - `canonical_revenue_long.csv`
+- `source_pack_intake_status.csv`
 - `path_trace_status.csv`
 - `reconciliation_report.csv`
 - `source_gap_register.csv`
@@ -71,6 +72,12 @@ exist; it must not apply a fabricated zero.
 The reconciliation report compares calculable hierarchy totals to official
 rows within rounding and reports `partial_missing`, `official_row_missing`, or
 `difference_reported` where the source pack does not support a forced balance.
+
+The source-pack intake status table records repo-local contract files, size,
+SHA256, row counts, and replay-only artifacts that are not currently vendored.
+It uses relative repository paths only. Missing release-value, forecast archive,
+formula-lineage, and quarterly actual files are carried as explicit
+`not_vendored` replay gaps, not inferred from local user folders.
 
 The path trace status table records whether each required Revenue Outlook
 total-path trace is value-backed and plotted. Actual/benchmark, selected

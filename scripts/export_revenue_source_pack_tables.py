@@ -18,6 +18,7 @@ from model_dashboard.revenue_source_pack import REVENUE_SOURCE_PACK_DIR, load_re
 
 EXPORT_FILES = {
     "canonical_revenue_long.csv": "Canonical long schema across actuals and model paths.",
+    "source_pack_intake_status.csv": "Repo-local source-pack intake status, hashes, and replay gaps.",
     "path_trace_status.csv": "Availability and plotting status for required Revenue Outlook total-path traces.",
     "reconciliation_report.csv": "Hierarchy roll-up reconciliation and explicit gap report.",
     "source_gap_register.csv": "Structured source-pack gaps for release values, Crown top-up, quarterly rows, and bridge replay.",
@@ -39,6 +40,7 @@ def export_tables(pack_dir: Path) -> dict[str, object]:
         raise FileNotFoundError(f"Revenue source pack not found: {pack_dir}")
     outputs = {
         "canonical_revenue_long.csv": pack.canonical_long,
+        "source_pack_intake_status.csv": pack.intake_status,
         "path_trace_status.csv": pack.path_trace_status,
         "reconciliation_report.csv": pack.reconciliation_report,
         "source_gap_register.csv": pack.source_gap_register,

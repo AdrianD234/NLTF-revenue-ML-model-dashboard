@@ -1,5 +1,5 @@
 {
-  "created_at": "2026-06-24T09:27:38.415164+00:00",
+  "created_at": "2026-06-24T09:41:38.826726+00:00",
   "exports": {
     "canonical_revenue_long.csv": {
       "role": "Canonical long schema across actuals and model paths.",
@@ -20,6 +20,11 @@
       "role": "Structured source-pack gaps for release values, Crown top-up, quarterly rows, and bridge replay.",
       "row_count": 4,
       "sha256": "3457ef14a81423e44ce629360eb3fd7425c845dfda41f9aacdef51a642f62ab7"
+    },
+    "source_pack_intake_status.csv": {
+      "role": "Repo-local source-pack intake status, hashes, and replay gaps.",
+      "row_count": 19,
+      "sha256": "05e19bb4c58dff59a53cafd0b678c8ab264be64bb8d6bba91a7cc5392cf8de54"
     },
     "validation_issues.csv": {
       "role": "Loader validation warnings/errors for the source pack.",

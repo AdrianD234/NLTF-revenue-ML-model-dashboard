@@ -192,6 +192,43 @@ def test_revenue_path_trace_status_marks_missing_release_traces_without_fabricat
     assert missing_release["user_visible_message"].astype(str).str.contains("release-value rows", case=False).all()
 
 
+def test_revenue_source_pack_intake_status_is_hash_backed_and_sanitized() -> None:
+    pack = load_revenue_source_pack(repo_root=ROOT)
+    assert pack is not None
+    intake = pack.intake_status
+    assert not intake.empty
+    assert {
+        "artifact_name",
+        "artifact_role",
+        "repo_relative_path",
+        "status",
+        "required_for_runtime",
+        "required_for_replay",
+        "size_bytes",
+        "row_count",
+        "sha256",
+        "notes",
+    }.issubset(intake.columns)
+    intake_text = intake.to_csv(index=False)
+    assert "C:\\Users" not in intake_text
+    assert "Downloads" not in intake_text
+    assert "OneDrive" not in intake_text
+
+    by_name = intake.set_index("artifact_name")
+    for filename in REQUIRED_SOURCE_PACK_FILES:
+        assert by_name.loc[filename, "status"] == "repo_local_hash_verified"
+        assert str(by_name.loc[filename, "repo_relative_path"]).startswith("data/revenue_model_source_pack/2026_05_19/")
+        assert len(str(by_name.loc[filename, "sha256"])) == 64
+        assert int(by_name.loc[filename, "size_bytes"]) < 50 * 1024 * 1024
+
+    assert by_name.loc["raw_workbook_lineage", "status"] == "verified_sha256_in_manifest"
+    assert by_name.loc["raw_workbook_lineage", "sha256"] == "00c6070694818d27d7c402749354d8175de999894846dce45a4abdd7f5eb3e6b"
+    for filename in ["release_values.csv", "forecast_archive.csv", "formula_lineage.csv", "quarterly_actuals.csv"]:
+        assert by_name.loc[filename, "status"] == "not_vendored"
+        assert not bool(by_name.loc[filename, "required_for_runtime"])
+        assert bool(by_name.loc[filename, "required_for_replay"])
+
+
 def test_revenue_source_pack_loader_exports_are_hash_backed() -> None:
     manifest_path = PACK_DIR / "loader_exports_manifest.json"
     assert manifest_path.exists()
@@ -206,6 +243,7 @@ def test_revenue_source_pack_loader_exports_are_hash_backed() -> None:
     assert pack is not None
     expected_counts = {
         "canonical_revenue_long.csv": len(pack.canonical_long),
+        "source_pack_intake_status.csv": len(pack.intake_status),
         "path_trace_status.csv": len(pack.path_trace_status),
         "reconciliation_report.csv": len(pack.reconciliation_report),
         "source_gap_register.csv": len(pack.source_gap_register),
