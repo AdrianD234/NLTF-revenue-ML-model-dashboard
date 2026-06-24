@@ -27,7 +27,7 @@ def test_dashboard_interaction_performance(page: Page) -> None:
 
     t0 = time.perf_counter()
     page.goto(base_url, wait_until="domcontentloaded")
-    expect(page.get_by_text("Page 1 of 5 - Executive Summary").first).to_be_visible(timeout=90000)
+    expect(page.get_by_text("Page 1 of 6 - Executive Summary").first).to_be_visible(timeout=90000)
     timings["cold_load_sec"] = time.perf_counter() - t0
     overview_t0 = time.perf_counter()
     expect(page.get_by_text("Finalist Forecast Accuracy").first).to_be_visible(timeout=90000)
@@ -37,7 +37,7 @@ def test_dashboard_interaction_performance(page: Page) -> None:
     for _ in range(2):
         t0 = time.perf_counter()
         page.reload(wait_until="domcontentloaded")
-        expect(page.get_by_text("Page 1 of 5 - Executive Summary").first).to_be_visible(timeout=90000)
+        expect(page.get_by_text("Page 1 of 6 - Executive Summary").first).to_be_visible(timeout=90000)
         warm_samples.append(time.perf_counter() - t0)
         expect(page.get_by_text("Finalist Forecast Accuracy").first).to_be_visible(timeout=90000)
     timings["warm_load_samples_sec"] = warm_samples
@@ -46,11 +46,12 @@ def test_dashboard_interaction_performance(page: Page) -> None:
     page_render_timings: dict[str, float] = {"Overview": overview_chart_sec}
     tab_timings: dict[str, float] = {}
     for label, expected in [
-        ("Model Confidence", "Page 2 of 5 - Model Confidence"),
-        ("Scenario Forecasts", "Page 3 of 5 - Scenario Forecasts"),
-        ("Benchmark Comparison", "Page 4 of 5 - Benchmark Comparison"),
-        ("Governance & Reproducibility", "Page 5 of 5 - Governance & Reproducibility"),
-        ("Executive Summary", "Page 1 of 5 - Executive Summary"),
+        ("Model Confidence", "Page 2 of 6 - Model Confidence"),
+        ("Scenario Forecasts", "Page 3 of 6 - Scenario Forecasts"),
+        ("Benchmark Comparison", "Page 4 of 6 - Benchmark Comparison"),
+        ("Revenue Outlook", "Page 5 of 6 - Revenue Outlook"),
+        ("Governance & Reproducibility", "Page 6 of 6 - Governance & Reproducibility"),
+        ("Executive Summary", "Page 1 of 6 - Executive Summary"),
     ]:
         t0 = time.perf_counter()
         page.get_by_text(label, exact=True).click()

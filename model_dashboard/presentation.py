@@ -28,6 +28,7 @@ EXECUTIVE_PAGE_TITLES = {
     "Diagnostics": "Model Confidence",
     "Scenario Comparison": "Scenario Forecasts",
     "Schiff Benchmark": "Benchmark Comparison",
+    "Revenue Outlook": "Revenue Outlook",
     "Governance & Reproducibility": "Governance & Reproducibility",
 }
 

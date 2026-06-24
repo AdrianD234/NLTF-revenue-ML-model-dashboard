@@ -267,11 +267,13 @@ def main() -> int:
             "final-02-diagnostics.png",
             "final-03-scenario-comparison.png",
             "final-04-schiff-benchmark.png",
-            "final-05-governance-reproducibility.png",
+            "final-05-revenue-outlook.png",
+            "final-06-governance-reproducibility.png",
             "final-overview.png",
             "final-diagnostics.png",
             "final-scenario-comparison.png",
             "final-schiff-benchmark.png",
+            "final-revenue-outlook.png",
             "final-governance-reproducibility.png",
         ]
         missing = [name for name in required if not (repo_root / "artifacts" / "screenshots" / name).exists()]
@@ -281,13 +283,13 @@ def main() -> int:
 
     def check_visual_matrix() -> str:
         matrix = read_text("artifacts/target_vs_current_screenshot_matrix.md")
-        pages = ["Overview", "Diagnostics", "Scenario Comparison", "Schiff Benchmark", "Governance & Reproducibility"]
-        if not all(page in matrix for page in pages) or matrix.count("PASS") < 5:
-            raise AssertionError("Target-vs-current matrix does not mark all five pages PASS.")
+        pages = ["Overview", "Diagnostics", "Scenario Comparison", "Schiff Benchmark", "Revenue Outlook", "Governance & Reproducibility"]
+        if not all(page in matrix for page in pages) or matrix.count("PASS") < 6:
+            raise AssertionError("Target-vs-current matrix does not mark all six pages PASS.")
         page5_matrix = read_text("artifacts/page5_target_vs_current_matrix.md")
         if "Status: PASS" not in page5_matrix:
             raise AssertionError("Page 5 target-vs-current matrix is missing or not PASS.")
-        return "Target-vs-current matrix marks all five pages PASS."
+        return "Target-vs-current matrix marks all six pages PASS."
 
     def check_hover_terms() -> str:
         report = read_text("artifacts/hover_review.md") + read_text("artifacts/filter_interaction_review.md")

@@ -1,0 +1,160 @@
+{
+  "schema_version": "revenue-outlook-pack-v1",
+  "created_at": "2026-06-24T04:01:43.691071+00:00",
+  "promotion_time": "2026-06-24T04:01:43.691078+00:00",
+  "pack_status": "explicitly_promoted_current_outlook",
+  "promoted_by": "codex_reviewed_workbook_promotion",
+  "source_policy": "explicit_promoted_pack_or_in_session_reviewed_result_only; no latest-folder scan; no test-fixture publication",
+  "source_comparison": {
+    "comparison_id": "current_revenue_outlook_scenario_comparison",
+    "scenario_role_validation": {
+      "status": "passed",
+      "base_scenario": "current_basecase",
+      "comparison_scenarios": [
+        "current_comparison_1"
+      ],
+      "rule": "exactly one basecase role and at least one comparison role; upload order is never used"
+    },
+    "scenarios": [
+      {
+        "scenario_name": "current_basecase",
+        "scenario_role": "basecase",
+        "scenario_role_source": "explicit",
+        "scenario_display_name": "current_basecase",
+        "is_test_fixture": false,
+        "run_id": "current_revenue_outlook_current_basecase",
+        "output_dir": "test-output/tmp/revenue_outlook_promotion/basecase",
+        "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_basecase (2) - Copy.xlsx",
+        "workbook_sha256": "d0644d353ee5a073602186cf7ac5c16e707d5350e16fd037b73a65528067cc6a",
+        "forecast_horizon_quarters": 100,
+        "forecast_start_period": "2026Q1",
+        "forecast_end_period": "2050Q4",
+        "forecast_status": "numeric_forecast_available"
+      },
+      {
+        "scenario_name": "current_comparison_1",
+        "scenario_role": "comparison",
+        "scenario_role_source": "explicit",
+        "scenario_display_name": "current_comparison_1",
+        "is_test_fixture": false,
+        "run_id": "current_revenue_outlook_current_comparison_1",
+        "output_dir": "test-output/tmp/revenue_outlook_promotion/comparison_1",
+        "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_high_population (2) - Copy.xlsx",
+        "workbook_sha256": "6213ce565cf1f4a058a3ea9f1af4d5476a8b0423a4d8747905c3cba128380ce1",
+        "forecast_horizon_quarters": 100,
+        "forecast_start_period": "2026Q1",
+        "forecast_end_period": "2050Q4",
+        "forecast_status": "numeric_forecast_available"
+      }
+    ],
+    "output_dir": "test-output/tmp/revenue_outlook_promotion/scenario_comparison"
+  },
+  "scenario_roles": [
+    {
+      "scenario_name": "current_basecase",
+      "scenario_role": "basecase",
+      "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_basecase (2) - Copy.xlsx",
+      "workbook_sha256": "d0644d353ee5a073602186cf7ac5c16e707d5350e16fd037b73a65528067cc6a"
+    },
+    {
+      "scenario_name": "current_comparison_1",
+      "scenario_role": "comparison",
+      "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_high_population (2) - Copy.xlsx",
+      "workbook_sha256": "6213ce565cf1f4a058a3ea9f1af4d5476a8b0423a4d8747905c3cba128380ce1"
+    }
+  ],
+  "model_ids": {
+    "HEAVY_RUC": [
+      "HEAVY_RUC__VNEXT_SOLVED_CONVEX_TOP4"
+    ],
+    "LIGHT_RUC": [
+      "dynamic_RESID_GBR_n150_d1_lr0.05_w36"
+    ],
+    "PED": [
+      "PED__VNEXT_SOLVED_CONVEX_TOP2"
+    ]
+  },
+  "units": {
+    "activity": {
+      "PED": "VKT per capita",
+      "LIGHT_RUC": "net km",
+      "HEAVY_RUC": "net km"
+    },
+    "revenue": "nominal NZD",
+    "rates": {
+      "PED": "cents/litre",
+      "LIGHT_RUC": "NZD/1,000km",
+      "HEAVY_RUC": "NZD/1,000km"
+    }
+  },
+  "equations": {
+    "LIGHT_RUC": "Light RUC revenue = net km / 1,000 * nominal effective average Light RUC rate.",
+    "HEAVY_RUC": "Heavy RUC revenue = net km / 1,000 * nominal effective average Heavy RUC rate.",
+    "PED": "PED revenue = litres * nominal PED base rate / 100. Litres must come from a source-backed PED litres bridge, not from the VKT/capita activity model alone."
+  },
+  "rate_provenance": {
+    "historical_light_heavy": "data/model_input_history source net revenue; effective average rate = revenue * 1,000 / net km",
+    "future_light_heavy": "reviewed workbook nominal effective average RUC rate columns",
+    "future_ped": "reviewed workbook PED base-rate column plus source-backed PED litres bridge; currently a governed gap when source litres/history are missing"
+  },
+  "bridge_status_by_stream": {
+    "HEAVY_RUC": [
+      "nominal_rate_missing"
+    ],
+    "LIGHT_RUC": [
+      "nominal_rate_missing"
+    ],
+    "PED": [
+      "ped_bridge_source_history_missing"
+    ]
+  },
+  "row_counts": {
+    "future_revenue_forecasts": 600,
+    "revenue_bridge_components": 603,
+    "revenue_chart_rows": 1809
+  },
+  "source_hashes": {
+    "model_input_history": {
+      "PED": {
+        "repo_relative_path": "data/model_input_history/ped_inputs.parquet",
+        "sha256": "d1955e01e07c74ad5aff08736cc822cd914cfa2df201e1f7dd8872116219a1f9",
+        "size_bytes": 46549
+      },
+      "LIGHT_RUC": {
+        "repo_relative_path": "data/model_input_history/light_ruc_inputs.parquet",
+        "sha256": "ab0a7ccc4b9c7f2a92c596fe3c25c2a21f973a8643733c50da08c4db0ceea76d",
+        "size_bytes": 59138
+      },
+      "HEAVY_RUC": {
+        "repo_relative_path": "data/model_input_history/heavy_ruc_inputs.parquet",
+        "sha256": "751d6f71ac0941c2c606b4bd87980c249b798df4ddd93d1e7c372b51394dc5bb",
+        "size_bytes": 44847
+      }
+    },
+    "workbooks": [
+      {
+        "scenario_name": "current_basecase",
+        "scenario_role": "basecase",
+        "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_basecase (2) - Copy.xlsx",
+        "workbook_sha256": "d0644d353ee5a073602186cf7ac5c16e707d5350e16fd037b73a65528067cc6a"
+      },
+      {
+        "scenario_name": "current_comparison_1",
+        "scenario_role": "comparison",
+        "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_high_population (2) - Copy.xlsx",
+        "workbook_sha256": "6213ce565cf1f4a058a3ea9f1af4d5476a8b0423a4d8747905c3cba128380ce1"
+      }
+    ]
+  },
+  "output_files": [
+    "future_revenue_forecasts.parquet",
+    "future_revenue_forecasts.csv",
+    "revenue_bridge_components.parquet",
+    "revenue_bridge_components.csv",
+    "revenue_chart_rows.parquet",
+    "revenue_chart_rows.csv",
+    "manifest.json",
+    "manifest.md"
+  ],
+  "repo_relative_output_dir": "data/current_revenue_outlook"
+}

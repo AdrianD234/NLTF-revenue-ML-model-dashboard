@@ -185,6 +185,9 @@ PED_COLUMNS = [
     TemplateColumn("population", "user", True, "User-entered population assumption."),
     TemplateColumn("unemployment_rate", "user", True, "User-entered unemployment rate assumption in percentage points."),
     TemplateColumn("real_petrol_price_cents_per_litre", "user", True, "User-entered real petrol price assumption."),
+    TemplateColumn("ped_base_rate_cents_per_litre", "user", False, "Optional nominal PED base rate for governed revenue outlooks."),
+    TemplateColumn("ped_rate_source", "user", False, "Optional source/provenance note for the nominal PED base rate."),
+    TemplateColumn("ped_rate_cpi_basis", "user", False, "Optional CPI or nominal-rate basis note. Revenue uses this only as provenance."),
     TemplateColumn("target_lag_1", "user", True, "Most recent PED VKT per capita value available before this forecast quarter."),
     TemplateColumn("target_lag_4", "user", True, "PED VKT per capita value four quarters before this forecast quarter."),
     *COMMON_FORMULA_COLUMNS,
@@ -204,6 +207,9 @@ LIGHT_RUC_COLUMNS = [
     TemplateColumn("real_gdp_sa_nzd", "user", True, "User-entered real GDP assumption."),
     TemplateColumn("real_diesel_price_cents_per_litre", "user", True, "User-entered real diesel price assumption."),
     TemplateColumn("real_light_ruc_price_nzd_per_1000km", "user", True, "User-entered real Light RUC price assumption."),
+    TemplateColumn("light_ruc_nominal_rate_nzd_per_1000km", "user", False, "Optional nominal effective average Light RUC rate for governed revenue outlooks."),
+    TemplateColumn("light_ruc_rate_source", "user", False, "Optional source/provenance note for the nominal Light RUC rate."),
+    TemplateColumn("light_ruc_rate_cpi_basis", "user", False, "Optional CPI or nominal-rate basis note. Revenue uses this only as provenance."),
     TemplateColumn("lagged_real_light_ruc_price_nzd_per_1000km", "user", True, "Real Light RUC price lag available before this forecast quarter."),
     TemplateColumn("target_lag_1", "user", True, "Most recent Light RUC volume available before this forecast quarter."),
     TemplateColumn("target_lag_4", "user", True, "Light RUC volume four quarters before this forecast quarter."),
@@ -226,6 +232,9 @@ HEAVY_RUC_COLUMNS = [
     TemplateColumn("real_light_ruc_price_nzd_per_1000km", "user", True, "User-entered real Light RUC price assumption used by Heavy components."),
     TemplateColumn("lagged_real_light_ruc_price_nzd_per_1000km", "user", True, "Real Light RUC price lag used by Heavy components."),
     TemplateColumn("real_heavy_ruc_price_nzd_per_1000km", "user", True, "User-entered real Heavy RUC price assumption."),
+    TemplateColumn("heavy_ruc_nominal_rate_nzd_per_1000km", "user", False, "Optional nominal effective average Heavy RUC rate for governed revenue outlooks."),
+    TemplateColumn("heavy_ruc_rate_source", "user", False, "Optional source/provenance note for the nominal Heavy RUC rate."),
+    TemplateColumn("heavy_ruc_rate_cpi_basis", "user", False, "Optional CPI or nominal-rate basis note. Revenue uses this only as provenance."),
     TemplateColumn("lead_real_heavy_ruc_price_nzd_per_1000km", "user", True, "Expected next-quarter real Heavy RUC price assumption."),
     TemplateColumn("target_lag_1", "user", True, "Most recent Heavy RUC volume available before this forecast quarter."),
     TemplateColumn("target_lag_4", "user", True, "Heavy RUC volume four quarters before this forecast quarter."),
@@ -562,6 +571,10 @@ def _write_readme_sheet(ws: Any, latest_period: str, periods: list[str]) -> None
         ("Latest known actual quarter", latest_period),
         ("Forecast horizon", f"{len(periods)} quarters: {periods[0]} to {periods[-1]}"),
         ("What to fill", "Only fill the user-entry columns in PED Inputs, Light RUC Inputs and Heavy RUC Inputs."),
+        (
+            "Revenue Outlook inputs",
+            "Nominal PED/RUC rate columns are optional for volume forecasts, but required before future nominal revenue can be published.",
+        ),
         ("Variable horizon", "You may fill 1 quarter, the default 20 quarters, or any continuous horizon to a chosen end period."),
         ("Runner rule", "The runner scores only the continuous valid rows present across all three stream sheets."),
         ("What not to edit", "Do not edit period, year, quarter, horizon or protected formula columns."),
@@ -1366,11 +1379,14 @@ def create_completed_sample_workbook(
         "population": 5300000.0,
         "unemployment_rate": 4.2,
         "real_petrol_price_cents_per_litre": 265.0,
+        "ped_base_rate_cents_per_litre": 70.024,
         "real_gdp_sa_nzd": 320000000000.0,
         "real_diesel_price_cents_per_litre": 232.0,
         "real_light_ruc_price_nzd_per_1000km": 84.0,
+        "light_ruc_nominal_rate_nzd_per_1000km": 78.0,
         "lagged_real_light_ruc_price_nzd_per_1000km": 82.0,
         "real_heavy_ruc_price_nzd_per_1000km": 188.0,
+        "heavy_ruc_nominal_rate_nzd_per_1000km": 320.0,
         "lead_real_heavy_ruc_price_nzd_per_1000km": 190.0,
         "target_lag_1": 1000.0,
         "target_lag_4": 980.0,
@@ -1544,10 +1560,19 @@ def _validate_sheet_frame(
     warnings: list[str] = []
     sheet = SHEET_BY_STREAM[stream]
     expected_headers = [column.name for column in STREAM_COLUMNS[stream]]
-    missing_headers = [name for name in expected_headers if name not in frame.columns]
+    required_headers = [column.name for column in STREAM_COLUMNS[stream] if column.required]
+    missing_headers = [name for name in required_headers if name not in frame.columns]
     if missing_headers:
         errors.append(f"{sheet}: missing required headers: {', '.join(missing_headers)}")
         return pd.DataFrame(), [], errors, warnings
+    optional_missing = [name for name in expected_headers if name not in frame.columns and name not in required_headers]
+    for name in optional_missing:
+        frame[name] = pd.NA
+    if optional_missing:
+        warnings.append(
+            f"{sheet}: optional revenue-outlook headers missing: {', '.join(optional_missing)}. "
+            "Volume forecasts can run; revenue forecasts will show governed rate gaps."
+        )
     if frame.empty:
         errors.append(f"{sheet}: no forecast rows were found")
         return pd.DataFrame(), [], errors, warnings
@@ -1627,10 +1652,13 @@ def _build_stream_assumptions(frame: pd.DataFrame, stream: str, periods: list[st
         "population",
         "unemployment_rate",
         "real_petrol_price_cents_per_litre",
+        "ped_base_rate_cents_per_litre",
         "real_diesel_price_cents_per_litre",
         "real_light_ruc_price_nzd_per_1000km",
+        "light_ruc_nominal_rate_nzd_per_1000km",
         "lagged_real_light_ruc_price_nzd_per_1000km",
         "real_heavy_ruc_price_nzd_per_1000km",
+        "heavy_ruc_nominal_rate_nzd_per_1000km",
         "lead_real_heavy_ruc_price_nzd_per_1000km",
         "target_lag_1",
         "target_lag_4",

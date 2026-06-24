@@ -100,7 +100,7 @@ REQUIRED_FORECAST_IMPORT_EXPORTS = {
     "write_forecast_scenario_comparison",
 }
 R2_LADDER_DEP_FALLBACK_ENV = "NLTF_FORCE_R2_LADDER_DEP_FALLBACK"
-EXPECTED_IMPORT_SURFACE_REVISION = "2026-06-11-forecast-runner-wrapper-v1"
+EXPECTED_IMPORT_SURFACE_REVISION = "2026-06-24-revenue-outlook-v1"
 
 
 def normalise_requirement(line: str) -> str | None:
@@ -279,6 +279,7 @@ required = [
     'render_diagnostics',
     'render_scenario_comparison',
     'render_schiff_benchmark_page',
+    'render_revenue_outlook_page',
     'render_governance_reproducibility_page',
 ]
 missing = [name for name in required if not hasattr(app, name)]

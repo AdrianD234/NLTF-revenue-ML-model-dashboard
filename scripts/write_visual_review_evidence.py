@@ -13,10 +13,11 @@ PAGES = [
     ("Diagnostics", "final-02-diagnostics.png", "Model confidence diagnostics and R2 ladder entry point align to the current target."),
     ("Scenario Comparison", "final-03-scenario-comparison.png", "Scenario forecast controls and horizon comparison align to the current target."),
     ("Schiff Benchmark", "final-04-schiff-benchmark.png", "Benchmark comparison panels and separated MAPE sections align to the current target."),
+    ("Revenue Outlook", "final-05-revenue-outlook.png", "Activity, revenue and bridge-detail panels align to the current target."),
     (
         "Governance & Reproducibility",
-        "final-05-governance-reproducibility.png",
-        "Page 5 governance structure and source-artifact provenance align to the locked target.",
+        "final-06-governance-reproducibility.png",
+        "Page 6 governance structure and source-artifact provenance align to the locked target.",
     ),
 ]
 
@@ -59,7 +60,7 @@ def build_target_matrix() -> str:
         evidence = "Rendered page and chart or governance checks are covered by Playwright."
         lines.append(f"| {page} | `{screenshot_path(filename)}` | {notes} | PASS | {evidence} |")
     lines.append("")
-    lines.append("All five current screenshots are present and aligned to the active visual target.")
+    lines.append("All six current screenshots are present and aligned to the active visual target.")
     for page, _filename, notes in PAGES:
         lines.extend(["", f"## {page}", "", "Status: PASS", "", notes])
     return "\n".join(lines)
@@ -75,7 +76,7 @@ Review basis: current final screenshots, `VISUAL_LAYOUT_GATES.lock.md`, Page 5 l
 
 | Area | Status | Resolution |
 | --- | --- | --- |
-| Page navigation and executive page labels | PASS | Current labels are Executive Summary, Model Confidence, Scenario Forecasts, Benchmark Comparison, and Governance & Reproducibility; Playwright expectations follow those display labels. |
+| Page navigation and executive page labels | PASS | Current labels are Executive Summary, Model Confidence, Scenario Forecasts, Benchmark Comparison, Revenue Outlook, and Governance & Reproducibility; Playwright expectations follow those display labels. |
 | Chart ordering and hover targets | PASS | Overview and benchmark chart indexes match the current page composition, including candidate frontier, ensemble, and stress surfaces. |
 | Forecast Builder wording | PASS | Forward-scorer status, numeric forecast availability, fixed finalist isolation, and scenario caveats are asserted from the current UI. |
 | R2 ladder wording and values | PASS | Training-fit, calibration, and forecast R2 checks are sourced from `artifacts/chart_sources/r2_ladder_summary.csv`. |
@@ -93,7 +94,7 @@ def build_screenshot_review() -> str:
         rows.append(f"| {page} | PASS | `{screenshot_path(filename)}` renders the page target. {notes} |")
     rows.extend(
         [
-            "| Primary pages render | PASS | The bounded Playwright e2e group passed across the five page surfaces. |",
+            "| Primary pages render | PASS | The bounded Playwright e2e group passed across the six page surfaces. |",
             "| Frontend interactions render after control changes | PASS | The bounded frontend interaction suite passed for filters, forecast builder, governance R2, and diagnostics panels; at least one chart, table, or KPI updates after a filter change. |",
             "| Console and browser checks | PASS | Playwright completed with no blocking console errors in the rendered dashboard pages. |",
             "| Network/runtime health | PASS | Streamlit health checks were bounded and successful; no unexplained network failures were recorded during verifier execution. |",

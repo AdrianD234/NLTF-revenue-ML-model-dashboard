@@ -106,6 +106,16 @@ from model_dashboard.reproducibility_imports import (
     plot_reproducibility_sensitivities,
     reproducibility_component_r2_frame,
 )
+from model_dashboard.revenue_outlook import (
+    CURRENT_REVENUE_OUTLOOK_DIR,
+    REVENUE_OUTLOOK_SCHEMA_VERSION,
+    REVENUE_OUTLOOK_TITLE,
+    RevenueOutlookPack,
+    load_revenue_outlook_pack,
+    promote_revenue_outlook_pack,
+    revenue_outlook_signature,
+    validate_promotable_comparison,
+)
 from model_dashboard.presentation import (
     display_capability,
     render_cloud_preview_toggle,
@@ -188,9 +198,10 @@ from model_dashboard.ui import (
 
 
 LOADER_SCHEMA_VERSION = "stage1-governance-loader-v9-parquet-contract-schiff-class"
-STREAMLIT_IMPORT_SURFACE_REVISION = "2026-06-11-forecast-runner-wrapper-v1"
+STREAMLIT_IMPORT_SURFACE_REVISION = "2026-06-24-revenue-outlook-v1"
 CURATED_DATA_DIR = Path("artifacts") / "curated_data"
 REPRODUCIBILITY_PAGE = "Governance & Reproducibility"
+REVENUE_OUTLOOK_PAGE = "Revenue Outlook"
 SHOW_GOVERNANCE_PAGE_ENV_VAR = "NLTF_SHOW_GOVERNANCE_PAGE"
 STREAMLIT_CLOUD_ENV_MARKERS = ("STREAMLIT_CLOUD", "STREAMLIT_SHARING_MODE", "IS_STREAMLIT_CLOUD")
 SOURCE_WORKBOOK_NAME = "Master Copy revenue modelling workbook.xlsx"
@@ -337,6 +348,18 @@ def cached_load_ped_inner_hpo_audit_pack(signature: tuple[tuple[str, int, int], 
     return load_ped_inner_hpo_audit_pack()
 
 
+@st.cache_data(show_spinner=False)
+def cached_load_revenue_outlook_pack(
+    pack_dir: str,
+    repo_root: str,
+    signature: tuple[tuple[str, int, int], ...],
+    schema_version: str,
+) -> RevenueOutlookPack | None:
+    del signature
+    del schema_version
+    return load_revenue_outlook_pack(pack_dir, repo_root=repo_root)
+
+
 def directory_signature(path: Path) -> tuple[bool, int, int]:
     try:
         stat = path.stat()
@@ -379,7 +402,7 @@ def should_show_governance_page() -> bool:
 
 
 def dashboard_pages() -> list[str]:
-    pages = ["Overview", "Diagnostics", "Scenario Comparison", "Schiff Benchmark"]
+    pages = ["Overview", "Diagnostics", "Scenario Comparison", "Schiff Benchmark", REVENUE_OUTLOOK_PAGE]
     if should_show_governance_page():
         pages.append(REPRODUCIBILITY_PAGE)
     return pages
@@ -420,7 +443,7 @@ def main() -> None:
             page_chip=f"Page {current_index} of {len(pages)} - {page_display_title(current_page)}",
         )
     controls = render_filter_sidebar(loaded)
-    if current_page != REPRODUCIBILITY_PAGE:
+    if current_page not in {REPRODUCIBILITY_PAGE, REVENUE_OUTLOOK_PAGE}:
         controls = render_top_filter_bar(loaded, controls)
 
     if current_page == "Overview":
@@ -431,6 +454,8 @@ def main() -> None:
         render_scenario_comparison(loaded, controls)
     elif current_page == "Schiff Benchmark":
         render_schiff_benchmark_page(loaded, controls)
+    elif current_page == REVENUE_OUTLOOK_PAGE:
+        render_revenue_outlook_page(loaded)
     else:
         render_governance_reproducibility_page(loaded, controls)
 
@@ -1901,6 +1926,493 @@ def render_reproducibility_detail(stream_label: str) -> None:
         display_table(reproducibility_training_window_view(pack), height=320, max_rows=200)
 
 
+def render_revenue_outlook_page(loaded: LoadedRun) -> None:
+    del loaded
+    repo_root = Path(__file__).resolve().parent
+    pack = st.session_state.get("revenue_outlook_pack")
+    if not isinstance(pack, RevenueOutlookPack):
+        pack = cached_load_revenue_outlook_pack(
+            str(repo_root / CURRENT_REVENUE_OUTLOOK_DIR),
+            str(repo_root),
+            revenue_outlook_signature(repo_root / CURRENT_REVENUE_OUTLOOK_DIR, repo_root),
+            REVENUE_OUTLOOK_SCHEMA_VERSION,
+        )
+
+    if pack is None:
+        section_title(REVENUE_OUTLOOK_TITLE)
+        warning_panel(
+            "No explicitly promoted Revenue Outlook pack is available. Use Forecast Builder on the local "
+            "Governance & Reproducibility page, review the scenario roles, then promote the comparison. "
+            "This page does not scan latest run folders or publish test fixtures automatically."
+        )
+        info_panel(
+            "Source policy: explicit promoted pack or in-session reviewed comparison only. Forecast Builder "
+            "uploads remain on the local Governance page; Streamlit Cloud can display only a committed promoted pack."
+        )
+        return
+
+    manifest = pack.manifest or {}
+    chart_rows = pack.revenue_chart_rows.copy() if isinstance(pack.revenue_chart_rows, pd.DataFrame) else pd.DataFrame()
+    bridge = pack.revenue_bridge_components.copy() if isinstance(pack.revenue_bridge_components, pd.DataFrame) else pd.DataFrame()
+    future_revenue = pack.future_revenue_forecasts.copy() if isinstance(pack.future_revenue_forecasts, pd.DataFrame) else pd.DataFrame()
+
+    section_title(REVENUE_OUTLOOK_TITLE)
+    st.caption(
+        "Governed current outlook from an explicit promoted comparison. Forecast Builder controls remain on "
+        "the local Governance page; this page renders the reviewed pack only."
+    )
+    st.caption("Source policy: explicit promoted pack or in-session reviewed comparison only; no latest-folder scan; no test-fixture publication.")
+    kpi_grid(_revenue_outlook_summary_cards(manifest, chart_rows, future_revenue))
+
+    if chart_rows.empty:
+        warning_panel("The promoted Revenue Outlook pack has no chart rows.")
+        return
+
+    with st.container(border=True):
+        st.markdown("<div class='page5-panel-title'>Revenue Outlook controls</div>", unsafe_allow_html=True)
+        control_cols = st.columns([0.22, 0.38, 0.40])
+        with control_cols[0]:
+            grain_label = st.radio(
+                "Time grain",
+                ["Quarterly", "June-year"],
+                horizontal=True,
+                key="revenue_outlook_time_grain",
+            )
+        stream_options = _revenue_outlook_stream_options(chart_rows)
+        with control_cols[1]:
+            selected_streams = st.multiselect(
+                "Streams",
+                stream_options,
+                default=stream_options,
+                key="revenue_outlook_streams",
+            )
+        scenario_options = _revenue_outlook_scenario_options(chart_rows)
+        with control_cols[2]:
+            selected_scenarios = st.multiselect(
+                "Forecast scenarios",
+                scenario_options,
+                default=scenario_options,
+                key="revenue_outlook_scenarios",
+            )
+
+    filtered_rows = _filter_revenue_outlook_rows(
+        chart_rows,
+        time_grain="june_year" if grain_label == "June-year" else "quarterly",
+        stream_labels=selected_streams,
+        scenario_names=selected_scenarios,
+    )
+    filtered_bridge = _filter_revenue_bridge_rows(bridge, selected_streams, selected_scenarios)
+    gap_summary = _revenue_outlook_gap_summary(filtered_bridge)
+    if gap_summary:
+        warning_panel(gap_summary)
+
+    chart_cols = st.columns(2)
+    with chart_cols[0]:
+        chart_card(
+            "Activity and volume outlook",
+            "PED uses VKT per capita; Light and Heavy RUC use net kilometres. Grey lines are source historical actuals.",
+            revenue_outlook_figure(filtered_rows, metric_type="activity"),
+            caption="Forecast start and H13 markers are shown where numeric reviewed forecasts exist. Units are kept separate by stream.",
+            notes_as_tooltip=False,
+        )
+    with chart_cols[1]:
+        chart_card(
+            "Revenue outlook",
+            "Nominal revenue is plotted only where the governed revenue bridge is available; unavailable revenue remains a visible gap.",
+            revenue_outlook_figure(filtered_rows, metric_type="revenue"),
+            caption="RUC revenue uses net km / 1,000 * reviewed nominal effective average rate. PED revenue requires a source-backed litres bridge.",
+            notes_as_tooltip=False,
+        )
+
+    st.markdown("<div class='page5-panel-title'>Revenue bridge detail</div>", unsafe_allow_html=True)
+    display_table(_revenue_bridge_display_table(filtered_bridge), height=320, max_rows=240)
+
+    with st.expander("Manifest, source policy and downloads", expanded=False):
+        display_table(_revenue_outlook_manifest_table(manifest), height=220, max_rows=80)
+        download_cols = st.columns(3)
+        with download_cols[0]:
+            dataframe_download(future_revenue, "Download future revenue forecasts", "future_revenue_forecasts.csv")
+        with download_cols[1]:
+            dataframe_download(bridge, "Download revenue bridge components", "revenue_bridge_components.csv")
+        with download_cols[2]:
+            dataframe_download(chart_rows, "Download revenue chart rows", "revenue_chart_rows.csv")
+
+
+def _revenue_outlook_summary_cards(
+    manifest: dict[str, Any],
+    chart_rows: pd.DataFrame,
+    future_revenue: pd.DataFrame,
+) -> list[tuple[str, str, str | None]]:
+    source = manifest.get("source_comparison", {}) if isinstance(manifest, dict) else {}
+    scenario_rows = manifest.get("scenario_roles", []) if isinstance(manifest, dict) else []
+    scenario_count = len(scenario_rows) if isinstance(scenario_rows, list) else 0
+    latest_actual = _latest_period(chart_rows, row_type="historical_actual")
+    first_forecast = _first_period(chart_rows, row_type="future_forecast")
+    fy5_value, fy5_period = _fy5_revenue_value(chart_rows)
+    delta_value, delta_period = _comparison_delta_value(chart_rows)
+    gap_count = _future_gap_count(future_revenue)
+    return [
+        ("Pack status", str(manifest.get("pack_status", "unavailable")), _short_timestamp(manifest.get("promotion_time"))),
+        ("Scenarios", str(scenario_count), str(source.get("comparison_id", "reviewed comparison"))),
+        ("Latest actual", latest_actual or "-", "latest source historical quarter"),
+        ("First forecast", first_forecast or "-", "first reviewed scenario quarter"),
+        ("FY5 revenue", _format_compact_value(fy5_value, "nominal NZD"), fy5_period or "no revenue bridge value"),
+        ("Comparison delta", _format_signed_compact(delta_value), delta_period or f"{gap_count} governed revenue gaps"),
+    ]
+
+
+def _revenue_outlook_stream_options(chart_rows: pd.DataFrame) -> list[str]:
+    if chart_rows is None or chart_rows.empty or "stream_label" not in chart_rows.columns:
+        return []
+    preferred = ["PED VKT per capita", "Light RUC volume", "Heavy RUC volume"]
+    available = set(chart_rows["stream_label"].dropna().astype(str))
+    ordered = [label for label in preferred if label in available]
+    ordered.extend(sorted(available.difference(ordered)))
+    return ordered
+
+
+def _revenue_outlook_scenario_options(chart_rows: pd.DataFrame) -> list[str]:
+    if chart_rows is None or chart_rows.empty or "scenario_name" not in chart_rows.columns:
+        return []
+    data = chart_rows[chart_rows["row_type"].astype(str).eq("future_forecast")].copy()
+    return sorted(data["scenario_name"].dropna().astype(str).unique().tolist())
+
+
+def _filter_revenue_outlook_rows(
+    chart_rows: pd.DataFrame,
+    *,
+    time_grain: str,
+    stream_labels: list[str],
+    scenario_names: list[str],
+) -> pd.DataFrame:
+    if chart_rows is None or chart_rows.empty:
+        return pd.DataFrame()
+    data = chart_rows.copy()
+    data = data[data["time_grain"].astype(str).eq(time_grain)].copy()
+    if stream_labels:
+        data = data[data["stream_label"].astype(str).isin(stream_labels)].copy()
+    if scenario_names:
+        is_actual = data["row_type"].astype(str).eq("historical_actual")
+        data = data[is_actual | data["scenario_name"].astype(str).isin(scenario_names)].copy()
+    data["_period_order"] = data["period"].map(_revenue_period_order)
+    return data.sort_values(["stream", "metric_type", "_period_order", "scenario_name"], kind="stable").drop(columns=["_period_order"], errors="ignore")
+
+
+def _filter_revenue_bridge_rows(bridge: pd.DataFrame, stream_labels: list[str], scenario_names: list[str]) -> pd.DataFrame:
+    if bridge is None or bridge.empty:
+        return pd.DataFrame()
+    data = bridge.copy()
+    if stream_labels and "stream_label" in data.columns:
+        data = data[data["stream_label"].astype(str).isin(stream_labels)].copy()
+    if scenario_names and "scenario_name" in data.columns:
+        scenario_text = data["scenario_name"].fillna("").astype(str)
+        data = data[scenario_text.eq("") | scenario_text.isin(scenario_names)].copy()
+    return data
+
+
+def revenue_outlook_figure(rows: pd.DataFrame, *, metric_type: str) -> go.Figure:
+    data = pd.DataFrame() if rows is None else rows.copy()
+    data = data[data.get("metric_type", pd.Series(dtype=str)).astype(str).eq(metric_type)].copy()
+    streams = _revenue_outlook_stream_options(data)
+    if not streams:
+        streams = ["PED VKT per capita", "Light RUC volume", "Heavy RUC volume"]
+    fig = make_subplots(rows=1, cols=len(streams), subplot_titles=streams, shared_yaxes=False, horizontal_spacing=0.06)
+    scenario_colors = _scenario_color_map(data)
+    for col, stream_label in enumerate(streams, start=1):
+        stream_rows = data[data.get("stream_label", pd.Series(dtype=str)).astype(str).eq(stream_label)].copy()
+        stream_rows["_period_order"] = stream_rows.get("period", pd.Series(dtype=str)).map(_revenue_period_order)
+        stream_rows["value_numeric"] = pd.to_numeric(stream_rows.get("value"), errors="coerce")
+        stream_rows = stream_rows.sort_values("_period_order", kind="stable")
+        unit = _first_non_empty(stream_rows.get("value_unit", pd.Series(dtype=str))) or ""
+        historical = stream_rows[stream_rows["row_type"].astype(str).eq("historical_actual") & stream_rows["value_numeric"].notna()].copy()
+        if not historical.empty:
+            fig.add_trace(
+                go.Scatter(
+                    x=historical["period"],
+                    y=historical["value_numeric"],
+                    mode="lines",
+                    name="Historical actual",
+                    legendgroup="historical",
+                    showlegend=col == 1,
+                    line={"color": "#737373", "width": 2},
+                    hovertemplate="%{x}<br>%{y:,.2f}<extra>Historical actual</extra>",
+                ),
+                row=1,
+                col=col,
+            )
+        future = stream_rows[stream_rows["row_type"].astype(str).eq("future_forecast") & stream_rows["value_numeric"].notna()].copy()
+        last_actual = historical.tail(1)[["period", "value_numeric"]] if not historical.empty else pd.DataFrame()
+        for scenario, group in future.groupby("scenario_name", dropna=False):
+            scenario_name = str(scenario)
+            color = scenario_colors.get(scenario_name, "#006FAD")
+            plot_group = group[["period", "value_numeric", "horizon"]].copy()
+            if not last_actual.empty:
+                join_row = last_actual.copy()
+                join_row["horizon"] = pd.NA
+                plot_group = pd.concat([join_row, plot_group], ignore_index=True, sort=False)
+            label = _scenario_label(scenario_name, group)
+            fig.add_trace(
+                go.Scatter(
+                    x=plot_group["period"],
+                    y=plot_group["value_numeric"],
+                    mode="lines+markers",
+                    name=label,
+                    legendgroup=f"scenario-{scenario_name}",
+                    showlegend=col == 1,
+                    line={"color": color, "width": 2},
+                    marker={"size": 6},
+                    hovertemplate="%{x}<br>%{y:,.2f}<extra>" + html.escape(label) + "</extra>",
+                ),
+                row=1,
+                col=col,
+            )
+            marker_rows = group[group["horizon"].map(_is_forecast_start_or_h13)].copy()
+            if not marker_rows.empty:
+                fig.add_trace(
+                    go.Scatter(
+                        x=marker_rows["period"],
+                        y=marker_rows["value_numeric"],
+                        mode="markers",
+                        name=f"{label} markers",
+                        legendgroup=f"scenario-{scenario_name}",
+                        showlegend=False,
+                        marker={"color": color, "size": 11, "symbol": "triangle-up-open", "line": {"width": 2}},
+                        hovertemplate="%{x}<br>%{y:,.2f}<br>Forecast start or H13<extra></extra>",
+                    ),
+                    row=1,
+                    col=col,
+                )
+        periods = stream_rows["period"].dropna().astype(str).drop_duplicates().tolist()
+        fig.update_xaxes(categoryorder="array", categoryarray=periods, tickangle=-35, row=1, col=col)
+        fig.update_yaxes(title_text=unit, row=1, col=col, separatethousands=True)
+        if stream_rows.empty:
+            fig.add_annotation(text="No rows", x=0.5, y=0.5, showarrow=False, row=1, col=col)
+    fig.update_layout(
+        height=390,
+        margin={"l": 40, "r": 18, "t": 46, "b": 64},
+        hovermode="x unified",
+        legend={"orientation": "h", "y": -0.22, "x": 0.0},
+    )
+    return fig
+
+
+def _scenario_color_map(rows: pd.DataFrame) -> dict[str, str]:
+    palette = ["#006FAD", "#E56B2B", "#00843D", "#6B4E71", "#C2410C", "#0F766E"]
+    output: dict[str, str] = {}
+    if rows is None or rows.empty:
+        return output
+    scenarios = rows[rows["row_type"].astype(str).eq("future_forecast")].copy()
+    scenarios["_role_order"] = scenarios.get("scenario_role", pd.Series(dtype=str)).map(lambda value: 0 if str(value) == SCENARIO_ROLE_BASECASE else 1)
+    names = scenarios.sort_values(["_role_order", "scenario_name"], kind="stable")["scenario_name"].dropna().astype(str).drop_duplicates().tolist()
+    for index, name in enumerate(names):
+        output[name] = palette[index % len(palette)]
+    return output
+
+
+def _scenario_label(scenario_name: str, rows: pd.DataFrame) -> str:
+    role = _first_non_empty(rows.get("scenario_role", pd.Series(dtype=str)))
+    suffix = f" ({role})" if role else ""
+    return f"{scenario_name}{suffix}"
+
+
+def _is_forecast_start_or_h13(horizon: Any) -> bool:
+    try:
+        value = int(float(horizon))
+    except Exception:
+        return False
+    return value in {1, BACKTEST_SUPPORTED_MAX_HORIZON + 1}
+
+
+def _revenue_bridge_display_table(bridge: pd.DataFrame) -> pd.DataFrame:
+    if bridge is None or bridge.empty:
+        return pd.DataFrame()
+    view = bridge.copy()
+    rename = {
+        "scenario_name": "Scenario",
+        "scenario_role": "Role",
+        "stream_label": "Stream",
+        "component_type": "Component",
+        "period": "Period",
+        "horizon": "Horizon",
+        "activity_value": "Activity",
+        "activity_unit": "Activity unit",
+        "rate_value": "Rate",
+        "rate_unit": "Rate unit",
+        "revenue_nzd": "Revenue NZD",
+        "bridge_status": "Bridge status",
+        "bridge_method": "Bridge method",
+        "gap_reason": "Gap reason",
+        "source": "Source",
+    }
+    cols = [col for col in rename if col in view.columns]
+    view = view[cols].rename(columns=rename)
+    for col in ["Activity", "Rate", "Revenue NZD"]:
+        if col in view.columns:
+            view[col] = pd.to_numeric(view[col], errors="coerce").map(lambda value: _format_compact_value(value, "nominal NZD" if col == "Revenue NZD" else ""))
+    return view
+
+
+def _revenue_outlook_manifest_table(manifest: dict[str, Any]) -> pd.DataFrame:
+    if not isinstance(manifest, dict) or not manifest:
+        return pd.DataFrame()
+    rows = [
+        ("Schema", manifest.get("schema_version")),
+        ("Pack status", manifest.get("pack_status")),
+        ("Promotion time", manifest.get("promotion_time")),
+        ("Source policy", manifest.get("source_policy")),
+        ("Output folder", manifest.get("repo_relative_output_dir")),
+    ]
+    source = manifest.get("source_comparison", {}) if isinstance(manifest.get("source_comparison"), dict) else {}
+    rows.append(("Comparison ID", source.get("comparison_id")))
+    role_validation = source.get("scenario_role_validation", {})
+    if isinstance(role_validation, dict):
+        rows.append(("Scenario role validation", role_validation.get("status")))
+    return pd.DataFrame([{"Field": label, "Value": value} for label, value in rows])
+
+
+def _revenue_outlook_gap_summary(bridge: pd.DataFrame) -> str:
+    if bridge is None or bridge.empty or "bridge_status" not in bridge.columns:
+        return ""
+    statuses = bridge["bridge_status"].fillna("").astype(str)
+    gap_rows = bridge[~statuses.isin(["available", ""])].copy()
+    if gap_rows.empty:
+        return ""
+    summary = (
+        gap_rows.groupby(["stream_label", "bridge_status"], dropna=False)
+        .size()
+        .reset_index(name="rows")
+        .sort_values(["stream_label", "bridge_status"], kind="stable")
+    )
+    parts = [f"{row['stream_label']}: {row['bridge_status']} ({int(row['rows'])} rows)" for _, row in summary.iterrows()]
+    return "Revenue bridge governed gaps remain visible: " + "; ".join(parts[:6]) + ("." if len(parts) <= 6 else "; ...")
+
+
+def _latest_period(rows: pd.DataFrame, *, row_type: str) -> str:
+    if rows is None or rows.empty:
+        return ""
+    data = rows[rows["row_type"].astype(str).eq(row_type)].copy()
+    if data.empty:
+        return ""
+    data["_period_order"] = data["period"].map(_revenue_period_order)
+    return str(data.sort_values("_period_order").iloc[-1]["period"])
+
+
+def _first_period(rows: pd.DataFrame, *, row_type: str) -> str:
+    if rows is None or rows.empty:
+        return ""
+    data = rows[rows["row_type"].astype(str).eq(row_type)].copy()
+    if data.empty:
+        return ""
+    data["_period_order"] = data["period"].map(_revenue_period_order)
+    return str(data.sort_values("_period_order").iloc[0]["period"])
+
+
+def _fy5_revenue_value(rows: pd.DataFrame) -> tuple[Any, str]:
+    if rows is None or rows.empty:
+        return pd.NA, ""
+    data = rows[
+        rows["metric_type"].astype(str).eq("revenue")
+        & rows["time_grain"].astype(str).eq("june_year")
+        & rows["row_type"].astype(str).eq("future_forecast")
+    ].copy()
+    data["value_numeric"] = pd.to_numeric(data.get("value"), errors="coerce")
+    data = data[data["value_numeric"].notna()].copy()
+    if data.empty:
+        return pd.NA, ""
+    periods = sorted(data["period"].dropna().astype(str).unique().tolist(), key=_revenue_period_order)
+    target_period = periods[min(4, len(periods) - 1)]
+    base = data[data.get("scenario_role", pd.Series(dtype=str)).astype(str).eq(SCENARIO_ROLE_BASECASE)]
+    chosen = base[base["period"].astype(str).eq(target_period)] if not base.empty else data[data["period"].astype(str).eq(target_period)]
+    value = float(chosen["value_numeric"].sum()) if not chosen.empty else pd.NA
+    return value, target_period
+
+
+def _comparison_delta_value(rows: pd.DataFrame) -> tuple[Any, str]:
+    if rows is None or rows.empty:
+        return pd.NA, ""
+    data = rows[
+        rows["metric_type"].astype(str).eq("revenue")
+        & rows["time_grain"].astype(str).eq("june_year")
+        & rows["row_type"].astype(str).eq("future_forecast")
+    ].copy()
+    data["value_numeric"] = pd.to_numeric(data.get("value"), errors="coerce")
+    data = data[data["value_numeric"].notna()].copy()
+    if data.empty or "scenario_role" not in data.columns:
+        return pd.NA, ""
+    pivot = (
+        data.groupby(["period", "scenario_role"], dropna=False)["value_numeric"]
+        .sum()
+        .unstack("scenario_role")
+        .reset_index()
+    )
+    if SCENARIO_ROLE_BASECASE not in pivot.columns or SCENARIO_ROLE_COMPARISON not in pivot.columns:
+        return pd.NA, ""
+    pivot["_period_order"] = pivot["period"].map(_revenue_period_order)
+    pivot = pivot[pivot[SCENARIO_ROLE_BASECASE].notna() & pivot[SCENARIO_ROLE_COMPARISON].notna()].sort_values("_period_order")
+    if pivot.empty:
+        return pd.NA, ""
+    row = pivot.iloc[-1]
+    return float(row[SCENARIO_ROLE_COMPARISON] - row[SCENARIO_ROLE_BASECASE]), str(row["period"])
+
+
+def _future_gap_count(future_revenue: pd.DataFrame) -> int:
+    if future_revenue is None or future_revenue.empty or "bridge_status" not in future_revenue.columns:
+        return 0
+    statuses = future_revenue["bridge_status"].fillna("").astype(str)
+    return int((~statuses.isin(["available", ""])).sum())
+
+
+def _revenue_period_order(period: Any) -> int:
+    text = str(period).strip().upper()
+    if text.startswith("FY"):
+        digits = "".join(ch for ch in text if ch.isdigit())
+        return int(digits) * 4 + 2 if digits else 999999
+    return quarter_sort_key(text)
+
+
+def _format_compact_value(value: Any, unit: str) -> str:
+    number = pd.to_numeric(value, errors="coerce")
+    if pd.isna(number):
+        return "-"
+    number = float(number)
+    prefix = "$" if unit == "nominal NZD" else ""
+    abs_value = abs(number)
+    if abs_value >= 1_000_000_000:
+        return f"{prefix}{number / 1_000_000_000:.2f}b"
+    if abs_value >= 1_000_000:
+        return f"{prefix}{number / 1_000_000:.1f}m"
+    if abs_value >= 1_000:
+        return f"{prefix}{number / 1_000:.1f}k"
+    return f"{prefix}{number:,.2f}"
+
+
+def _format_signed_compact(value: Any) -> str:
+    number = pd.to_numeric(value, errors="coerce")
+    if pd.isna(number):
+        return "-"
+    sign = "+" if float(number) >= 0 else ""
+    return sign + _format_compact_value(number, "nominal NZD")
+
+
+def _first_non_empty(values: Any) -> str:
+    try:
+        iterator = values.dropna().astype(str).tolist()
+    except Exception:
+        iterator = [str(values)] if values is not None else []
+    for value in iterator:
+        text = str(value).strip()
+        if text and text.lower() not in {"nan", "<na>"}:
+            return text
+    return ""
+
+
+def _short_timestamp(value: Any) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    return text.replace("T", " ").replace("+00:00", " UTC")[:22]
+
+
 def render_governance_reproducibility_page(loaded: LoadedRun, controls: dict[str, Any]) -> None:
     del controls
     inject_page5_theme()
@@ -3102,6 +3614,25 @@ def render_forecast_builder_results(results: list[Any], comparison: Any | None) 
         with tab:
             trace = components[components["stream"].astype(str).eq(stream)].copy()
             display_table(_forecast_builder_component_table(trace), height=240, max_rows=80)
+
+    if comparison is not None:
+        promotion_errors = validate_promotable_comparison(comparison)
+        if promotion_errors:
+            warning_panel("Revenue Outlook promotion is disabled: " + " ".join(promotion_errors))
+        if st.button(
+            "Promote reviewed comparison to Revenue Outlook",
+            key="forecast_builder_promote_revenue_outlook",
+            use_container_width=False,
+            disabled=bool(promotion_errors),
+            help="Writes the governed current-outlook pack used by the Revenue Outlook page. Test fixtures are blocked.",
+        ):
+            pack = promote_revenue_outlook_pack(
+                comparison,
+                repo_root=Path(__file__).resolve().parent,
+                output_dir=Path(__file__).resolve().parent / CURRENT_REVENUE_OUTLOOK_DIR,
+            )
+            st.session_state["revenue_outlook_pack"] = pack
+            st.success("Revenue Outlook promoted from this reviewed comparison. Open the Revenue Outlook page to inspect activity and revenue.")
 
     st.download_button(
         "Download combined comparison pack",

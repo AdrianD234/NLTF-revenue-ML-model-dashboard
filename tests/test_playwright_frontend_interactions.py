@@ -28,6 +28,7 @@ PAGES = [
     ("Diagnostics", "final-diagnostics.png"),
     ("Scenario Comparison", "final-scenario-comparison.png"),
     ("Schiff Benchmark", "final-schiff-benchmark.png"),
+    ("Revenue Outlook", "final-revenue-outlook.png"),
     ("Governance & Reproducibility", "final-governance-reproducibility.png"),
 ]
 
@@ -36,6 +37,7 @@ PAGE_DISPLAY_TITLES = {
     "Diagnostics": "Model Confidence",
     "Scenario Comparison": "Scenario Forecasts",
     "Schiff Benchmark": "Benchmark Comparison",
+    "Revenue Outlook": "Revenue Outlook",
     "Governance & Reproducibility": "Governance & Reproducibility",
 }
 PAGE_ORDER = list(PAGE_DISPLAY_TITLES)
@@ -73,6 +75,12 @@ PAGE_PANELS = {
         "2. Benchmark Horizon Profiles",
         "3. Full-sample Gain vs Schiff specification benchmark",
         "4. Benchmark Summary",
+    ],
+    "Revenue Outlook": [
+        "Revenue Outlook controls",
+        "Activity and volume outlook",
+        "Revenue outlook",
+        "Revenue bridge detail",
     ],
     "Governance & Reproducibility": [
         "Governance & Reproducibility Filters",
@@ -360,6 +368,7 @@ def test_plotly_hovers_are_human_readable_on_all_pages(page: Page) -> None:
         ("Diagnostics", 0),
         ("Scenario Comparison", 1),
         ("Schiff Benchmark", 0),
+        ("Revenue Outlook", 0),
     ]
     for page_name, plot_index in hover_targets:
         click_page(page, page_name)

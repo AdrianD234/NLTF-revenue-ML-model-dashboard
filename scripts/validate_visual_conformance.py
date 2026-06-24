@@ -13,11 +13,13 @@ REQUIRED_SCREENSHOTS = [
     "artifacts/screenshots/final-02-diagnostics.png",
     "artifacts/screenshots/final-03-scenario-comparison.png",
     "artifacts/screenshots/final-04-schiff-benchmark.png",
-    "artifacts/screenshots/final-05-governance-reproducibility.png",
+    "artifacts/screenshots/final-05-revenue-outlook.png",
+    "artifacts/screenshots/final-06-governance-reproducibility.png",
     "artifacts/screenshots/final-overview.png",
     "artifacts/screenshots/final-diagnostics.png",
     "artifacts/screenshots/final-scenario-comparison.png",
     "artifacts/screenshots/final-schiff-benchmark.png",
+    "artifacts/screenshots/final-revenue-outlook.png",
     "artifacts/screenshots/final-governance-reproducibility.png",
 ]
 
@@ -48,7 +50,7 @@ def validate() -> list[tuple[str, str, str]]:
         findings.append((name, "PASS" if passed else "FAIL", evidence))
 
     missing = [path for path in REQUIRED_SCREENSHOTS if not (ROOT / path).exists()]
-    record("Final browser screenshots exist for all five pages", not missing, "missing=" + ", ".join(missing) if missing else "All required screenshots present.")
+    record("Final browser screenshots exist for all six pages", not missing, "missing=" + ", ".join(missing) if missing else "All required screenshots present.")
 
     backlog = read_text("BUG_BACKLOG.md")
     open_backlog = re.findall(r"- \[ \].*", backlog)
@@ -65,9 +67,9 @@ def validate() -> list[tuple[str, str, str]]:
     record("Visual reviewer artifacts are resolved", not unresolved, "unresolved=" + ", ".join(unresolved) if unresolved else "All reviewer artifacts are resolved.")
 
     matrix = read_text("artifacts/target_vs_current_screenshot_matrix.md")
-    required_pages = ["Overview", "Diagnostics", "Scenario Comparison", "Schiff Benchmark", "Governance & Reproducibility"]
-    matrix_ok = all(page in matrix for page in required_pages) and matrix.count("PASS") >= 5
-    record("Target-vs-current screenshot matrix marks all pages PASS", matrix_ok, "Matrix inspected for all five page PASS statuses.")
+    required_pages = ["Overview", "Diagnostics", "Scenario Comparison", "Schiff Benchmark", "Revenue Outlook", "Governance & Reproducibility"]
+    matrix_ok = all(page in matrix for page in required_pages) and matrix.count("PASS") >= 6
+    record("Target-vs-current screenshot matrix marks all pages PASS", matrix_ok, "Matrix inspected for all six page PASS statuses.")
 
     page5_backlog = read_text("PAGE5_VISUAL_DELTA_BACKLOG.md")
     page5_open = re.findall(r"- \[ \].*", page5_backlog)
@@ -102,7 +104,7 @@ def validate() -> list[tuple[str, str, str]]:
     app_text = read_text("app.py")
     record(
         "Primary pages and panel counts remain aligned to target",
-        all(term in app_text for term in ["Overview", "Diagnostics", "Scenario Comparison", "Schiff Benchmark", "Governance & Reproducibility"]),
+        all(term in app_text for term in ["Overview", "Diagnostics", "Scenario Comparison", "Schiff Benchmark", "Revenue Outlook", "Governance & Reproducibility"]),
         "Top-level page labels inspected.",
     )
 

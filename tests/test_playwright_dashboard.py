@@ -17,6 +17,7 @@ PAGE_DISPLAY_TITLES = {
     "Diagnostics": "Model Confidence",
     "Scenario Comparison": "Scenario Forecasts",
     "Schiff Benchmark": "Benchmark Comparison",
+    "Revenue Outlook": "Revenue Outlook",
     "Governance & Reproducibility": "Governance & Reproducibility",
 }
 PAGE_ORDER = list(PAGE_DISPLAY_TITLES)
@@ -130,9 +131,21 @@ def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
             ],
         ),
         (
+            "Revenue Outlook",
+            expected_page_chip("Revenue Outlook"),
+            "mcp-05-revenue-outlook.png",
+            [
+                "Revenue Outlook controls",
+                "Activity and volume outlook",
+                "Revenue outlook",
+                "Revenue bridge detail",
+                "Source policy",
+            ],
+        ),
+        (
             "Governance & Reproducibility",
             expected_page_chip("Governance & Reproducibility"),
-            "mcp-05-governance-reproducibility.png",
+            "mcp-06-governance-reproducibility.png",
             [
                 "Repro packs loaded",
                 "Workbook provenance",
@@ -171,6 +184,10 @@ def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
         "Schiff Benchmark": [
             "Candidate and ensemble evidence drilldown",
             "Transport Revenue Model Testbench | Refined Finalist Models",
+        ],
+        "Revenue Outlook": [
+            "Forecast Builder",
+            "Governance & Reproducibility Filters",
         ],
         "Governance & Reproducibility": [
             "This Governance & Reproducibility page is read-only",
@@ -219,6 +236,14 @@ def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
                 "4. Benchmark Summary",
             ]:
                 assert_text_above_fold(page, title)
+        if tab_label == "Revenue Outlook":
+            page.evaluate("window.scrollTo(0, 0)")
+            for title in [
+                "Revenue Outlook controls",
+                "Activity and volume outlook",
+                "Revenue outlook",
+            ]:
+                assert_text_above_fold(page, title)
         if tab_label == "Governance & Reproducibility":
             page.evaluate("window.scrollTo(0, 0)")
             for title in [
@@ -245,7 +270,7 @@ def test_navigation_labels_not_clipped(page: Page) -> None:
     assert "Benchmark Comparison" in body or "Schiff Benchmark" in body
     expect(page.locator("body")).to_contain_text("Candidate Search Frontier", timeout=90000)
     expect(page.locator("body")).to_contain_text("Finalist Ensemble Composition", timeout=90000)
-    for label in ["Overview", "Diagnostics", "Scenario Comparison", "Schiff Benchmark", "Governance & Reproducibility"]:
+    for label in ["Overview", "Diagnostics", "Scenario Comparison", "Schiff Benchmark", "Revenue Outlook", "Governance & Reproducibility"]:
         expect(governance_nav_label(page, label)).to_be_visible(timeout=60000)
 
 
@@ -282,7 +307,8 @@ def test_visible_navigation_text_changes_page_body(page: Page) -> None:
         ("Diagnostics", "1. Residual Autocorrelation by Lag", "Finalist Forecast Accuracy"),
         ("Scenario Comparison", "1. Stream Comparison: Scenario A vs Scenario B", "1. Residual Autocorrelation by Lag"),
         ("Schiff Benchmark", "1. Schiff vs Finalist MAPE", "1. Stream Comparison: Scenario A vs Scenario B"),
-        ("Governance & Reproducibility", "Governance & Reproducibility Filters", "1. Schiff vs Finalist MAPE"),
+        ("Revenue Outlook", "Activity and volume outlook", "1. Schiff vs Finalist MAPE"),
+        ("Governance & Reproducibility", "Governance & Reproducibility Filters", "Activity and volume outlook"),
         ("Overview", "Finalist Forecast Accuracy", "Governance & Reproducibility Filters"),
     ]:
         click_governance_nav(page, label)
@@ -346,7 +372,7 @@ def test_governance_shell_is_readable_in_narrow_browser(page: Page) -> None:
     page.goto(os.environ.get("STAGE1_DASHBOARD_URL", "http://localhost:8501"), wait_until="domcontentloaded")
     wait_dashboard_ready(page)
 
-    for label in ["Overview", "Diagnostics", "Scenario Comparison", "Schiff Benchmark", "Governance & Reproducibility"]:
+    for label in ["Overview", "Diagnostics", "Scenario Comparison", "Schiff Benchmark", "Revenue Outlook", "Governance & Reproducibility"]:
         expect(governance_nav_label(page, label)).to_be_visible(timeout=60000)
 
     title_box = page.get_by_text("NTLF Revenue Modelling", exact=True).first.bounding_box()
@@ -687,7 +713,8 @@ def test_visual_screenshots_are_regenerated() -> None:
         "final-02-diagnostics.png",
         "final-03-scenario-comparison.png",
         "final-04-schiff-benchmark.png",
-        "final-05-governance-reproducibility.png",
+        "final-05-revenue-outlook.png",
+        "final-06-governance-reproducibility.png",
     ]:
         path = screenshot_dir / name
         assert path.exists(), f"Missing screenshot {path}"
@@ -701,6 +728,7 @@ def wait_dashboard_ready(page: Page) -> None:
     expect(page.get_by_role("button", name="Reset Filters")).to_be_visible(timeout=90000)
     expect(page.locator("body")).to_contain_text(expected_page_chip("Overview"), timeout=90000)
     expect(governance_nav_label(page, "Schiff Benchmark")).to_be_visible(timeout=90000)
+    expect(governance_nav_label(page, "Revenue Outlook")).to_be_visible(timeout=90000)
     expect(governance_nav_label(page, "Governance & Reproducibility")).to_be_visible(timeout=90000)
 
 
