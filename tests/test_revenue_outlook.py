@@ -14,6 +14,7 @@ from model_dashboard.forecast_runner import (
     write_forecast_scenario_comparison,
 )
 from model_dashboard.revenue_outlook import (
+    CANONICAL_JOIN_KEY_COLUMNS,
     CURRENT_REVENUE_OUTLOOK_DIR,
     FUTURE_RATE_COLUMNS,
     REVENUE_OUTLOOK_SCHEMA_VERSION,
@@ -99,9 +100,14 @@ def test_revenue_outlook_pack_computes_ruc_formula_and_honest_ped_gap(tmp_path: 
     assert pack.manifest["schema_version"] == REVENUE_OUTLOOK_SCHEMA_VERSION
     assert pack.manifest["pack_status"] == "explicitly_promoted_current_outlook"
     assert pack.manifest["source_policy"].startswith("explicit_promoted_pack_or_in_session_reviewed_result_only")
+    assert pack.manifest["join_key_contract"]["columns"] == CANONICAL_JOIN_KEY_COLUMNS
     assert (pack.output_dir / "manifest.json").exists()
     assert (pack.output_dir / "future_revenue_forecasts.parquet").exists()
     assert load_revenue_outlook_pack(pack.output_dir, repo_root=ROOT) is not None
+    for frame in [pack.future_revenue_forecasts, pack.revenue_bridge_components, pack.revenue_chart_rows]:
+        assert set(CANONICAL_JOIN_KEY_COLUMNS).issubset(frame.columns)
+        assert frame["canonical_join_key"].astype(str).str.count(r"\|").eq(2).all()
+        assert not frame["canonical_join_key"].astype(str).str.contains(r"\|\||^\||\|$").any()
 
     light = pack.future_revenue_forecasts[
         pack.future_revenue_forecasts["stream"].eq("LIGHT_RUC")
@@ -154,6 +160,8 @@ def test_committed_current_revenue_outlook_pack_is_repo_local_and_hash_backed() 
     assert "Downloads" not in manifest_text
     manifest = json.loads(manifest_text)
     assert manifest["schema_version"] == REVENUE_OUTLOOK_SCHEMA_VERSION
+    assert manifest["join_key_contract"]["columns"] == CANONICAL_JOIN_KEY_COLUMNS
+    assert "canonical stream, period and scenario keys" in manifest["join_key_contract"]["rule"]
     assert manifest["repo_relative_output_dir"] == "data/current_revenue_outlook"
     assert manifest["source_hashes"]["model_input_history"]
     assert all(item.get("workbook_sha256") for item in manifest["source_hashes"]["workbooks"])
@@ -175,6 +183,10 @@ def test_committed_current_revenue_outlook_pack_is_repo_local_and_hash_backed() 
     ]
     for filename, metadata in manifest["output_hashes"].items():
         assert metadata["sha256"] == _sha256(pack_dir / filename)
+    for filename in ["future_revenue_forecasts.parquet", "revenue_bridge_components.parquet", "revenue_chart_rows.parquet"]:
+        frame = pd.read_parquet(pack_dir / filename)
+        assert set(CANONICAL_JOIN_KEY_COLUMNS).issubset(frame.columns)
+        assert frame["canonical_join_key"].astype(str).str.count(r"\|").eq(2).all()
     for path in pack_dir.iterdir():
         if path.is_file():
             assert path.stat().st_size < 50 * 1024 * 1024

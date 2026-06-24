@@ -19,6 +19,10 @@
 - Light RUC volume: nominal_rate_missing
 - PED VKT per capita: ped_bridge_source_history_missing
 
+## Canonical Join Keys
+- Columns: `canonical_stream_key, canonical_period_key, canonical_scenario_key, canonical_join_key`
+- Rule: Forecast Builder volume packs join to Revenue Outlook rows by canonical stream, period and scenario keys; historical rows use historical_actual.
+
 ## Revenue Source Pack
 - Version: `2026_05_19`
 - Raw workbook SHA256: `00c6070694818d27d7c402749354d8175de999894846dce45a4abdd7f5eb3e6b`

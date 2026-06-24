@@ -62,6 +62,22 @@ it, Net FED reconciliation remains Gross FED less refunds. When a user selects
 Include, the dashboard must show a visible gap unless governed top-up value rows
 exist; it must not apply a fabricated zero.
 
+## Forecast Builder Join Keys
+
+Promoted Revenue Outlook packs expose deterministic canonical join keys on
+`future_revenue_forecasts`, `revenue_bridge_components`, and
+`revenue_chart_rows`:
+
+`canonical_stream_key`, `canonical_period_key`, `canonical_scenario_key`, and
+`canonical_join_key`.
+
+The keys are derived from the reviewed Forecast Builder stream, target period
+or period, and scenario name. Historical rows use `historical_actual` as the
+scenario key, and non-scenario aggregate audit rows use `all_scenarios`. These
+columns are join metadata only; they do not alter activity forecasts, revenue
+forecasts, bridge statuses, chart values, or output provenance hashes except for
+the expected file hash changes caused by adding the columns.
+
 ## Derived Audit Artifacts
 
 `scripts/export_revenue_source_pack_tables.py` exports:

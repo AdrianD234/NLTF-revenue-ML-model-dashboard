@@ -76,6 +76,21 @@ REVENUE_EQUATIONS = {
         "PED litres bridge, not from the VKT/capita activity model alone."
     ),
 }
+CANONICAL_JOIN_KEY_COLUMNS = [
+    "canonical_stream_key",
+    "canonical_period_key",
+    "canonical_scenario_key",
+    "canonical_join_key",
+]
+CANONICAL_JOIN_KEY_CONTRACT = {
+    "columns": CANONICAL_JOIN_KEY_COLUMNS,
+    "source_columns": {
+        "canonical_stream_key": ["stream"],
+        "canonical_period_key": ["target_period", "period"],
+        "canonical_scenario_key": ["scenario_name", "row_type"],
+    },
+    "rule": "Forecast Builder volume packs join to Revenue Outlook rows by canonical stream, period and scenario keys; historical rows use historical_actual.",
+}
 
 
 @dataclass
@@ -209,6 +224,9 @@ def build_revenue_outlook_pack(
         ["metric_type", "stream", "time_grain", "period_key", "scenario_name"],
         kind="stable",
     ).drop(columns=["period_key"], errors="ignore")
+    future_revenue = _add_canonical_join_keys(future_revenue)
+    bridge_components = _add_canonical_join_keys(bridge_components)
+    chart_rows = _add_canonical_join_keys(chart_rows)
 
     manifest = _manifest(
         comparison,
@@ -620,6 +638,55 @@ def _add_june_year_rows(chart_rows: pd.DataFrame) -> pd.DataFrame:
     return pd.concat(rows, ignore_index=True, sort=False)
 
 
+def _add_canonical_join_keys(frame: pd.DataFrame) -> pd.DataFrame:
+    if frame is None or frame.empty:
+        return pd.DataFrame() if frame is None else frame
+    out = frame.copy()
+    out["canonical_stream_key"] = out.apply(_canonical_stream_key, axis=1)
+    out["canonical_period_key"] = out.apply(_canonical_period_key, axis=1)
+    out["canonical_scenario_key"] = out.apply(_canonical_scenario_key, axis=1)
+    out["canonical_join_key"] = (
+        out["canonical_stream_key"].astype(str)
+        + "|"
+        + out["canonical_period_key"].astype(str)
+        + "|"
+        + out["canonical_scenario_key"].astype(str)
+    )
+    return out
+
+
+def _canonical_stream_key(row: pd.Series) -> str:
+    stream = str(row.get("stream") or "").strip().upper()
+    if stream:
+        return stream
+    label = str(row.get("stream_label") or "").strip()
+    for key, stream_label in STREAM_LABELS.items():
+        if label == stream_label:
+            return key
+    return "UNKNOWN_STREAM"
+
+
+def _canonical_period_key(row: pd.Series) -> str:
+    for column in ("target_period", "period"):
+        value = row.get(column)
+        if pd.notna(value) and str(value).strip():
+            return str(value).strip().upper()
+    return "ALL_PERIODS"
+
+
+def _canonical_scenario_key(row: pd.Series) -> str:
+    scenario = row.get("scenario_name")
+    if pd.notna(scenario) and str(scenario).strip():
+        return str(scenario).strip()
+    row_type = str(row.get("row_type") or "").strip()
+    if row_type == "historical_actual":
+        return "historical_actual"
+    component_type = str(row.get("component_type") or "").strip()
+    if component_type == "historical_revenue_reconciliation":
+        return "historical_actual"
+    return "all_scenarios"
+
+
 def _manifest(
     comparison: ForecastScenarioComparisonResult,
     repo_root: Path,
@@ -676,6 +743,7 @@ def _manifest(
             "future_light_heavy": "reviewed workbook nominal effective average RUC rate columns",
             "future_ped": "reviewed workbook PED base-rate column plus source-backed PED litres bridge; currently a governed gap when source litres/history are missing",
         },
+        "join_key_contract": CANONICAL_JOIN_KEY_CONTRACT,
         "revenue_source_pack": _revenue_source_pack_metadata(repo_root),
         "bridge_status_by_stream": bridge_status,
         "row_counts": {
@@ -726,7 +794,7 @@ def _write_pack_files(
             "size_bytes": path.stat().st_size,
         }
     manifest["output_hashes"] = output_hashes
-    (output_dir / "manifest.json").write_text(json.dumps(manifest, indent=2, allow_nan=False), encoding="utf-8")
+    (output_dir / "manifest.json").write_text(json.dumps(manifest, indent=2, allow_nan=False) + "\n", encoding="utf-8")
     (output_dir / "manifest.md").write_text(_manifest_markdown(manifest), encoding="utf-8")
 
 
@@ -753,6 +821,16 @@ def _manifest_markdown(manifest: dict[str, Any]) -> str:
     rows.extend(["", "## Bridge Status"])
     for stream, statuses in (manifest.get("bridge_status_by_stream") or {}).items():
         rows.append(f"- {STREAM_LABELS.get(stream, stream)}: {', '.join(statuses)}")
+    join_contract = manifest.get("join_key_contract") or {}
+    if join_contract:
+        rows.extend(
+            [
+                "",
+                "## Canonical Join Keys",
+                f"- Columns: `{', '.join(join_contract.get('columns', []))}`",
+                f"- Rule: {join_contract.get('rule')}",
+            ]
+        )
     source_pack = manifest.get("revenue_source_pack") or {}
     if source_pack:
         dashboard_defaults = source_pack.get("dashboard_default_selections") or source_pack.get("selections") or {}
