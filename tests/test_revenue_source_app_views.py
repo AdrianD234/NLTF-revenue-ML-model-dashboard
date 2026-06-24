@@ -11,6 +11,7 @@ from app import (
     _source_gap_register_for_controls,
     _source_path_trace_status_for_controls,
     _source_reconciliation_view,
+    _revenue_outlook_manifest_table,
     _selected_source_series_frame,
     _source_split_figure,
     _source_total_path_figure,
@@ -325,3 +326,46 @@ def test_revenue_outlook_hover_preserves_horizon_scope_labels() -> None:
     assert any("H13+ long-range extrapolation" in label for label in forecast_hover)
     assert "Forecast start (H1)" in marker_hover
     assert "Long-range extrapolation begins (H13)" in marker_hover
+
+
+def test_revenue_outlook_manifest_table_exposes_source_pack_and_bridge_provenance() -> None:
+    manifest = {
+        "schema_version": "revenue-outlook-pack-v1",
+        "pack_status": "explicitly_promoted_current_outlook",
+        "promotion_time": "2026-06-24T09:50:46+00:00",
+        "source_policy": "explicit promoted pack only",
+        "repo_relative_output_dir": "data/current_revenue_outlook",
+        "source_comparison": {
+            "comparison_id": "current_revenue_outlook_scenario_comparison",
+            "scenario_role_validation": {"status": "passed"},
+        },
+        "revenue_source_pack": {
+            "status": "source_pack_vendored",
+            "repo_relative_path": "data/revenue_model_source_pack/2026_05_19",
+            "source_pack_version": "2026_05_19",
+            "raw_workbook_sha256": "00c6070694818d27d7c402749354d8175de999894846dce45a4abdd7f5eb3e6b",
+            "source_pack_manifest_sha256": "abc123",
+            "dashboard_default_selections": {"series": "Total NLTF revenue"},
+            "source_workbook_selections": {"series": "Total RUC+PED revenue"},
+            "default_selection_policy": "Revenue Outlook defaults to Total NLTF revenue.",
+        },
+        "bridge_status_by_stream": {
+            "PED": ["ped_bridge_source_history_missing"],
+            "LIGHT_RUC": ["nominal_rate_missing"],
+        },
+        "output_hashes": {
+            "future_revenue_forecasts.parquet": {"sha256": "f" * 64},
+        },
+    }
+
+    view = _revenue_outlook_manifest_table(manifest).set_index("Field")
+
+    assert view.loc["Revenue source pack", "Value"] == "2026_05_19"
+    assert view.loc["Raw workbook SHA256", "Value"] == "00c6070694818d27d7c402749354d8175de999894846dce45a4abdd7f5eb3e6b"
+    assert view.loc["Dashboard default series", "Value"] == "Total NLTF revenue"
+    assert view.loc["Workbook current series", "Value"] == "Total RUC+PED revenue"
+    assert view.loc["Bridge status: PED VKT per capita", "Value"] == "ped_bridge_source_history_missing"
+    assert view.loc["Bridge status: Light RUC volume", "Value"] == "nominal_rate_missing"
+    assert view.loc["Output SHA256: future_revenue_forecasts.parquet", "Value"] == "f" * 64
+    assert "C:\\Users" not in view.to_csv()
+    assert "Downloads" not in view.to_csv()

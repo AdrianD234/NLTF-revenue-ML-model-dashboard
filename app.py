@@ -110,6 +110,7 @@ from model_dashboard.revenue_outlook import (
     CURRENT_REVENUE_OUTLOOK_DIR,
     REVENUE_OUTLOOK_SCHEMA_VERSION,
     REVENUE_OUTLOOK_TITLE,
+    STREAM_LABELS,
     RevenueOutlookPack,
     load_revenue_outlook_pack,
     promote_revenue_outlook_pack,
@@ -3400,6 +3401,36 @@ def _revenue_outlook_manifest_table(manifest: dict[str, Any]) -> pd.DataFrame:
     role_validation = source.get("scenario_role_validation", {})
     if isinstance(role_validation, dict):
         rows.append(("Scenario role validation", role_validation.get("status")))
+    source_pack = manifest.get("revenue_source_pack", {})
+    if isinstance(source_pack, dict) and source_pack:
+        dashboard_defaults = source_pack.get("dashboard_default_selections") or source_pack.get("selections") or {}
+        workbook_selections = source_pack.get("source_workbook_selections") or {}
+        rows.extend(
+            [
+                ("Revenue source pack", source_pack.get("source_pack_version")),
+                ("Revenue source status", source_pack.get("status")),
+                ("Revenue source path", source_pack.get("repo_relative_path")),
+                ("Raw workbook SHA256", source_pack.get("raw_workbook_sha256")),
+                ("Source pack manifest SHA256", source_pack.get("source_pack_manifest_sha256")),
+                ("Dashboard default series", dashboard_defaults.get("series") if isinstance(dashboard_defaults, dict) else ""),
+                ("Workbook current series", workbook_selections.get("series") if isinstance(workbook_selections, dict) else ""),
+                ("Default selection policy", source_pack.get("default_selection_policy")),
+            ]
+        )
+    bridge_statuses = manifest.get("bridge_status_by_stream", {})
+    if isinstance(bridge_statuses, dict):
+        for stream, statuses in sorted(bridge_statuses.items()):
+            if isinstance(statuses, list):
+                status_text = ", ".join(str(status) for status in statuses)
+            else:
+                status_text = str(statuses)
+            rows.append((f"Bridge status: {STREAM_LABELS.get(str(stream), str(stream))}", status_text))
+    output_hashes = manifest.get("output_hashes", {})
+    if isinstance(output_hashes, dict):
+        for filename, metadata in sorted(output_hashes.items()):
+            sha = str(metadata.get("sha256", "")) if isinstance(metadata, dict) else ""
+            if sha:
+                rows.append((f"Output SHA256: {filename}", sha))
     return pd.DataFrame([{"Field": label, "Value": value} for label, value in rows])
 
 

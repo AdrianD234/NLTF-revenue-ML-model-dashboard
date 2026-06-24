@@ -90,6 +90,11 @@ hashes, and requires the three runtime parquet files to be declared, before
 reading the promoted pack. A missing or hash-mismatched output is treated as a
 governance failure rather than a partially loaded dashboard source.
 
+The Revenue Outlook manifest table must surface the repo-local source-pack
+version/path, raw-workbook and source-pack manifest SHA256s, dashboard-default
+versus source-workbook series selections, bridge statuses by stream, and output
+file hashes. It must not expose user-local workbook paths.
+
 ## Revenue Basis Control
 
 The workbook does not expose `revenue_basis` as a separate native dashboard
