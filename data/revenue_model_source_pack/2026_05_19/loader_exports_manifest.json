@@ -1,5 +1,7 @@
 {
-  "created_at": "2026-06-24T11:09:26.120863+00:00",
+  "created_at": "2026-06-24T08:35:55.187949+00:00",
+  "created_at_source": "source_pack_manifest_created_at",
+  "determinism_policy": "No wall-clock timestamp is used; identical source-pack inputs produce identical export manifests.",
   "exports": {
     "canonical_revenue_long.csv": {
       "role": "Canonical long schema across actuals and model paths.",

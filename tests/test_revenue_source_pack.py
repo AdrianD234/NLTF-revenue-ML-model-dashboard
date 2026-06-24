@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+import shutil
 
 import pandas as pd
 
@@ -15,6 +16,7 @@ from model_dashboard.revenue_source_pack import (
     load_revenue_source_pack,
     revenue_reconciliation_report,
 )
+from scripts.export_revenue_source_pack_tables import export_tables
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -376,6 +378,9 @@ def test_revenue_source_pack_loader_exports_are_hash_backed() -> None:
     assert "Downloads" not in manifest_text
     manifest = json.loads(manifest_text)
     assert manifest["schema_version"] == "nltf-revenue-source-pack-loader-exports-v1"
+    assert manifest["created_at"] == json.loads((PACK_DIR / "manifest.json").read_text(encoding="utf-8"))["created_at"]
+    assert manifest["created_at_source"] == "source_pack_manifest_created_at"
+    assert manifest["determinism_policy"].startswith("No wall-clock timestamp")
     assert manifest["source_pack_raw_sha256"] == "00c6070694818d27d7c402749354d8175de999894846dce45a4abdd7f5eb3e6b"
 
     pack = load_revenue_source_pack(repo_root=ROOT)
@@ -395,3 +400,27 @@ def test_revenue_source_pack_loader_exports_are_hash_backed() -> None:
         assert path.exists()
         assert meta["sha256"] == _sha256(path)
         assert meta["row_count"] == expected_counts[filename]
+
+
+def test_revenue_source_pack_loader_exports_are_deterministic(tmp_path: Path) -> None:
+    pack_copy = tmp_path / "source_pack"
+    shutil.copytree(PACK_DIR, pack_copy)
+
+    first = export_tables(pack_copy)
+    first_manifest_text = (pack_copy / "loader_exports_manifest.json").read_text(encoding="utf-8")
+    first_hashes = {
+        filename: _sha256(pack_copy / filename)
+        for filename in first["exports"]
+    }
+
+    second = export_tables(pack_copy)
+    second_manifest_text = (pack_copy / "loader_exports_manifest.json").read_text(encoding="utf-8")
+    second_hashes = {
+        filename: _sha256(pack_copy / filename)
+        for filename in second["exports"]
+    }
+
+    assert first_manifest_text == second_manifest_text
+    assert first_hashes == second_hashes
+    assert first["created_at"] == second["created_at"]
+    assert first["determinism_policy"] == second["determinism_policy"]

@@ -102,6 +102,12 @@ basis selector.
 - `validation_issues.csv`
 - `loader_exports_manifest.json`
 
+The export manifest is deterministic for a fixed source pack: it records the
+source-pack manifest `created_at` value and an explicit determinism policy
+rather than the wall-clock time of the export command. Re-running the exporter
+against unchanged normalized files must reproduce identical loader-export
+hashes and manifest text.
+
 The reconciliation report compares calculable hierarchy totals to official
 rows within rounding and reports `partial_missing`, `official_row_missing`, or
 `difference_reported` where the source pack does not support a forced balance.

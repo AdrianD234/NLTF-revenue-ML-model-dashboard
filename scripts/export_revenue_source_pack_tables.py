@@ -8,7 +8,6 @@ downloads without loading the raw workbook at runtime.
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path
@@ -56,7 +55,9 @@ def export_tables(pack_dir: Path) -> dict[str, object]:
     }
     manifest: dict[str, object] = {
         "schema_version": "nltf-revenue-source-pack-loader-exports-v1",
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": pack.manifest.get("created_at", ""),
+        "created_at_source": "source_pack_manifest_created_at",
+        "determinism_policy": "No wall-clock timestamp is used; identical source-pack inputs produce identical export manifests.",
         "repo_relative_output_dir": pack_dir.as_posix(),
         "source_pack_version": pack.manifest.get("source_pack_version"),
         "source_pack_raw_sha256": pack.manifest.get("raw_workbook", {}).get("sha256"),
