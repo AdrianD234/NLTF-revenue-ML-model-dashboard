@@ -2609,10 +2609,13 @@ def _source_total_path_figure(source_pack: RevenueSourcePack, controls: dict[str
         ("In-house prediction / forecast", _source_model_rows(frame, "in_house_model"), "#00843D", "solid"),
         ("Aaron Schiff", _source_model_rows(frame, "aaron_schiff_model"), "#F37021", "dash"),
     ]
+    axis_title = _source_axis_title(frame)
     for name, rows, color, dash in trace_specs:
         rows = _dedupe_path_rows(rows)
         if rows.empty:
             continue
+        rows = rows.copy()
+        rows["hover_unit"] = axis_title
         fig.add_trace(
             go.Scatter(
                 x=rows["FY"],
@@ -2621,7 +2624,8 @@ def _source_total_path_figure(source_pack: RevenueSourcePack, controls: dict[str
                 name=name,
                 line={"color": color, "dash": dash, "width": 2.6},
                 marker={"size": 6},
-                hovertemplate="FY%{x}<br>%{y:,.1f}<extra>" + name + "</extra>",
+                customdata=rows[["hover_unit"]].to_numpy(),
+                hovertemplate="FY%{x}<br>%{y:,.1f} %{customdata[0]}<extra>" + name + "</extra>",
             )
         )
     _add_missing_source_path_gap_traces(fig, source_pack, controls)
@@ -2642,8 +2646,9 @@ def _source_total_path_figure(source_pack: RevenueSourcePack, controls: dict[str
         margin={"l": 52, "r": 18, "t": 42, "b": 48},
         height=360,
         legend={"orientation": "h", "y": -0.18},
-        yaxis_title=_source_axis_title(frame),
+        yaxis_title=axis_title,
         xaxis_title="June year",
+        xaxis={"tickmode": "linear", "dtick": 1},
         hovermode="x unified",
     )
     return fig
@@ -2682,6 +2687,7 @@ def _source_uncertainty_figure(source_pack: RevenueSourcePack, controls: dict[st
     model = frame[frame["line"].eq("Model path")].copy()
     if model.empty or not {"in_house_model", "aaron_schiff_model"}.issubset(set(model["model_basis"])):
         return empty_figure("Probabilistic uncertainty fan is not available in the normalized source pack.")
+    axis_title = _source_axis_title(frame)
     pivot = model.pivot_table(index="FY", columns="model_basis", values="value", aggfunc="first").dropna(how="any")
     if pivot.empty:
         return empty_figure("Model-spread uncertainty cannot be drawn for this series.")
@@ -2707,12 +2713,15 @@ def _source_uncertainty_figure(source_pack: RevenueSourcePack, controls: dict[st
             fillcolor="rgba(0, 132, 61, 0.18)",
             line={"width": 0},
             name="In-house vs Schiff model spread",
-            hovertemplate="FY%{x}<br>%{y:,.1f}<extra>Lower spread bound</extra>",
+            customdata=[[axis_title] for _ in range(len(lower))],
+            hovertemplate="FY%{x}<br>%{y:,.1f} %{customdata[0]}<extra>Lower spread bound</extra>",
         )
     )
     selected = _source_model_rows(frame, _model_basis_key(controls.get("model_basis")))
     selected = _dedupe_path_rows(selected)
     if not selected.empty:
+        selected = selected.copy()
+        selected["hover_unit"] = axis_title
         fig.add_trace(
             go.Scatter(
                 x=selected["FY"],
@@ -2720,13 +2729,16 @@ def _source_uncertainty_figure(source_pack: RevenueSourcePack, controls: dict[st
                 mode="lines+markers",
                 name=str(controls.get("model_basis", "Selected model")),
                 line={"color": "#002B5C", "width": 2.8},
+                customdata=selected[["hover_unit"]].to_numpy(),
+                hovertemplate="FY%{x}<br>%{y:,.1f} %{customdata[0]}<extra>%{fullData.name}</extra>",
             )
         )
     fig.update_layout(
         margin={"l": 52, "r": 18, "t": 28, "b": 48},
         height=360,
-        yaxis_title=_source_axis_title(frame),
+        yaxis_title=axis_title,
         xaxis_title="June year",
+        xaxis={"tickmode": "linear", "dtick": 1},
         hovermode="x unified",
     )
     return fig
@@ -2903,7 +2915,18 @@ def _selected_fy_number(controls: dict[str, Any]) -> int | None:
 
 def _source_axis_title(frame: pd.DataFrame) -> str:
     units = [str(unit) for unit in frame["unit"].dropna().unique() if str(unit)]
+    normalized = {_normalized_source_unit_label(unit) for unit in units}
+    normalized = {unit for unit in normalized if unit}
+    if len(normalized) == 1:
+        return next(iter(normalized))
     return units[0] if len(units) == 1 else "Value"
+
+
+def _normalized_source_unit_label(unit: str) -> str:
+    text = str(unit or "").strip()
+    if text in {"$m ex GST", "$m nominal ex GST"}:
+        return "$m nominal ex GST"
+    return text
 
 
 def _source_format_value(value: Any, unit: str) -> str:

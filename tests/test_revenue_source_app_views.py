@@ -5,10 +5,12 @@ from pathlib import Path
 import pandas as pd
 
 from app import (
+    _source_axis_title,
     _source_gap_register_for_controls,
     _source_path_trace_status_for_controls,
     _source_reconciliation_view,
     _source_total_path_figure,
+    _source_uncertainty_figure,
     revenue_outlook_figure,
 )
 from model_dashboard.revenue_source_pack import load_revenue_source_pack
@@ -89,6 +91,36 @@ def test_total_path_chart_exposes_missing_release_paths_without_values() -> None
         assert list(trace.x) == [None]
         assert list(trace.y) == [None]
         assert trace.meta["governance_gap"] == "release_value_table_missing"
+
+
+def test_revenue_source_charts_use_explicit_units_and_annual_ticks() -> None:
+    pack = load_revenue_source_pack(repo_root=ROOT)
+    assert pack is not None
+    controls = {
+        "series": "Total NLTF revenue",
+        "release_round": "BEFU25",
+        "model_basis": "In-house model",
+        "selected_fy": "FY2031",
+    }
+    frame = pack.canonical_long[pack.canonical_long["series_id"].eq("total_nltf_net_revenue")]
+
+    assert _source_axis_title(frame) == "$m nominal ex GST"
+
+    total_fig = _source_total_path_figure(pack, controls)
+    uncertainty_fig = _source_uncertainty_figure(pack, controls)
+    for fig in [total_fig, uncertainty_fig]:
+        assert fig.layout.yaxis.title.text == "$m nominal ex GST"
+        assert fig.layout.xaxis.title.text == "June year"
+        assert fig.layout.xaxis.tickmode == "linear"
+        assert fig.layout.xaxis.dtick == 1
+
+    value_traces = [
+        trace
+        for trace in total_fig.data
+        if getattr(trace, "y", None) is not None and list(trace.y) != [None]
+    ]
+    assert value_traces
+    assert all("$m nominal ex GST" in {row[0] for row in trace.customdata} for trace in value_traces)
 
 
 def test_revenue_outlook_hover_preserves_horizon_scope_labels() -> None:
