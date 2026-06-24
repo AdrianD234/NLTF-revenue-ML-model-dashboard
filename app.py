@@ -2993,11 +2993,20 @@ def revenue_outlook_figure(rows: pd.DataFrame, *, metric_type: str) -> go.Figure
         for scenario, group in future.groupby("scenario_name", dropna=False):
             scenario_name = str(scenario)
             color = scenario_colors.get(scenario_name, "#006FAD")
-            plot_group = group[["period", "value_numeric", "horizon"]].copy()
+            plot_cols = [col for col in ["period", "value_numeric", "horizon", "horizon_scope", "bridge_status", "gap_reason"] if col in group.columns]
+            plot_group = group[plot_cols].copy()
+            for column in ["horizon", "horizon_scope", "bridge_status", "gap_reason"]:
+                if column not in plot_group.columns:
+                    plot_group[column] = ""
             if not last_actual.empty:
                 join_row = last_actual.copy()
                 join_row["horizon"] = pd.NA
+                join_row["horizon_scope"] = ""
+                join_row["bridge_status"] = "historical_actual"
+                join_row["gap_reason"] = ""
                 plot_group = pd.concat([join_row, plot_group], ignore_index=True, sort=False)
+            plot_group["horizon_hover"] = plot_group.apply(_revenue_horizon_hover_label, axis=1)
+            plot_group["bridge_hover"] = plot_group.apply(_revenue_bridge_hover_label, axis=1)
             label = _scenario_label(scenario_name, group)
             fig.add_trace(
                 go.Scatter(
@@ -3009,13 +3018,16 @@ def revenue_outlook_figure(rows: pd.DataFrame, *, metric_type: str) -> go.Figure
                     showlegend=col == 1,
                     line={"color": color, "width": 2},
                     marker={"size": 6},
-                    hovertemplate="%{x}<br>%{y:,.2f}<extra>" + html.escape(label) + "</extra>",
+                    customdata=plot_group[["horizon_hover", "bridge_hover"]].to_numpy(),
+                    hovertemplate="%{x}<br>%{y:,.2f}<br>%{customdata[0]}%{customdata[1]}<extra>" + html.escape(label) + "</extra>",
                 ),
                 row=1,
                 col=col,
             )
             marker_rows = group[group["horizon"].map(_is_forecast_start_or_h13)].copy()
             if not marker_rows.empty:
+                marker_rows["marker_hover"] = marker_rows.apply(_revenue_marker_hover_label, axis=1)
+                marker_rows["horizon_hover"] = marker_rows.apply(_revenue_horizon_hover_label, axis=1)
                 fig.add_trace(
                     go.Scatter(
                         x=marker_rows["period"],
@@ -3025,7 +3037,8 @@ def revenue_outlook_figure(rows: pd.DataFrame, *, metric_type: str) -> go.Figure
                         legendgroup=f"scenario-{scenario_name}",
                         showlegend=False,
                         marker={"color": color, "size": 11, "symbol": "triangle-up-open", "line": {"width": 2}},
-                        hovertemplate="%{x}<br>%{y:,.2f}<br>Forecast start or H13<extra></extra>",
+                        customdata=marker_rows[["marker_hover", "horizon_hover"]].to_numpy(),
+                        hovertemplate="%{x}<br>%{y:,.2f}<br>%{customdata[0]}<br>%{customdata[1]}<extra></extra>",
                     ),
                     row=1,
                     col=col,
@@ -3069,6 +3082,39 @@ def _is_forecast_start_or_h13(horizon: Any) -> bool:
     except Exception:
         return False
     return value in {1, BACKTEST_SUPPORTED_MAX_HORIZON + 1}
+
+
+def _revenue_horizon_hover_label(row: pd.Series) -> str:
+    try:
+        horizon = int(float(row.get("horizon")))
+    except Exception:
+        return "Latest actual join point"
+    scope = str(row.get("horizon_scope") or "").strip()
+    if scope == "H1-H12" or 1 <= horizon <= BACKTEST_SUPPORTED_MAX_HORIZON:
+        return f"H{horizon}: H1-H12 backtest-supported horizon"
+    return f"H{horizon}: H13+ long-range extrapolation"
+
+
+def _revenue_bridge_hover_label(row: pd.Series) -> str:
+    status = str(row.get("bridge_status") or "").strip()
+    reason = str(row.get("gap_reason") or "").strip()
+    if reason:
+        return f"<br>Bridge status: {html.escape(status)} - {html.escape(reason)}"
+    if status:
+        return f"<br>Bridge status: {html.escape(status)}"
+    return ""
+
+
+def _revenue_marker_hover_label(row: pd.Series) -> str:
+    try:
+        horizon = int(float(row.get("horizon")))
+    except Exception:
+        return "Forecast marker"
+    if horizon == 1:
+        return "Forecast start (H1)"
+    if horizon == BACKTEST_SUPPORTED_MAX_HORIZON + 1:
+        return f"Long-range extrapolation begins (H{horizon})"
+    return f"Forecast marker (H{horizon})"
 
 
 def _revenue_bridge_display_table(bridge: pd.DataFrame) -> pd.DataFrame:

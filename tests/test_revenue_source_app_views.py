@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from app import _source_gap_register_for_controls, _source_reconciliation_view
+import pandas as pd
+
+from app import _source_gap_register_for_controls, _source_reconciliation_view, revenue_outlook_figure
 from model_dashboard.revenue_source_pack import load_revenue_source_pack
 
 
@@ -41,3 +43,69 @@ def test_reconciliation_view_exposes_optional_rollup_inputs() -> None:
 
     assert not view.empty
     assert "optional_inputs_applied" in view.columns
+
+
+def test_revenue_outlook_hover_preserves_horizon_scope_labels() -> None:
+    rows = pd.DataFrame(
+        [
+            {
+                "metric_type": "revenue",
+                "time_grain": "quarterly",
+                "row_type": "historical_actual",
+                "scenario_name": "historical_actual",
+                "scenario_role": "",
+                "stream": "LIGHT_RUC",
+                "stream_label": "Light RUC volume",
+                "period": "2025Q4",
+                "horizon": pd.NA,
+                "horizon_scope": "",
+                "value": 100.0,
+                "value_unit": "nominal NZD",
+                "bridge_status": "available",
+                "gap_reason": "",
+            },
+            {
+                "metric_type": "revenue",
+                "time_grain": "quarterly",
+                "row_type": "future_forecast",
+                "scenario_name": "basecase",
+                "scenario_role": "basecase",
+                "stream": "LIGHT_RUC",
+                "stream_label": "Light RUC volume",
+                "period": "2026Q1",
+                "horizon": 1,
+                "horizon_scope": "H1-H12",
+                "value": 101.0,
+                "value_unit": "nominal NZD",
+                "bridge_status": "available",
+                "gap_reason": "",
+            },
+            {
+                "metric_type": "revenue",
+                "time_grain": "quarterly",
+                "row_type": "future_forecast",
+                "scenario_name": "basecase",
+                "scenario_role": "basecase",
+                "stream": "LIGHT_RUC",
+                "stream_label": "Light RUC volume",
+                "period": "2029Q1",
+                "horizon": 13,
+                "horizon_scope": "H13+",
+                "value": 113.0,
+                "value_unit": "nominal NZD",
+                "bridge_status": "available",
+                "gap_reason": "",
+            },
+        ]
+    )
+
+    fig = revenue_outlook_figure(rows, metric_type="revenue")
+    forecast_trace = next(trace for trace in fig.data if trace.name == "basecase (basecase)")
+    marker_trace = next(trace for trace in fig.data if trace.name == "basecase (basecase) markers")
+    forecast_hover = [custom[0] for custom in forecast_trace.customdata]
+    marker_hover = [custom[0] for custom in marker_trace.customdata]
+
+    assert any("H1-H12 backtest-supported horizon" in label for label in forecast_hover)
+    assert any("H13+ long-range extrapolation" in label for label in forecast_hover)
+    assert "Forecast start (H1)" in marker_hover
+    assert "Long-range extrapolation begins (H13)" in marker_hover
