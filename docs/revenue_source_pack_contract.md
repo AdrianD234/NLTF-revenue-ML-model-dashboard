@@ -119,7 +119,9 @@ Selected MOT/BEFU release paths and rolling BEFU 1Y are marked missing when the
 release-value table is unavailable; registry metadata alone is not plotted as
 values. The dashboard view overlays the active release-round control in the
 `current_selection` column so missing release traces are tied to the selection
-being inspected.
+being inspected. The total-path chart mirrors those unavailable traces as
+legend-only governed gaps, with no numeric x/y values, so selected MOT/BEFU and
+rolling BEFU 1Y remain visible without fabricating release-value paths.
 
 The source gap register is a machine-readable list of runtime limitations such
 as missing release-value tables, missing Crown top-up rows, annual-only source

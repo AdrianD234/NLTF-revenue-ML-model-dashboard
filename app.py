@@ -2624,6 +2624,7 @@ def _source_total_path_figure(source_pack: RevenueSourcePack, controls: dict[str
                 hovertemplate="FY%{x}<br>%{y:,.1f}<extra>" + name + "</extra>",
             )
         )
+    _add_missing_source_path_gap_traces(fig, source_pack, controls)
     fy = _selected_fy_number(controls)
     if fy is not None:
         fig.add_vline(x=fy, line_dash="dot", line_color="#102A43", annotation_text=f"Selected FY{fy}", annotation_position="top")
@@ -2646,6 +2647,34 @@ def _source_total_path_figure(source_pack: RevenueSourcePack, controls: dict[str
         hovermode="x unified",
     )
     return fig
+
+
+def _add_missing_source_path_gap_traces(fig: go.Figure, source_pack: RevenueSourcePack, controls: dict[str, Any]) -> None:
+    status = _source_path_trace_status_for_controls(source_pack, controls)
+    if status.empty or "trace_id" not in status.columns:
+        return
+    gap_styles = {
+        "selected_mot_befu_release": ("Selected MOT/BEFU release path", "#5B677A", "dashdot"),
+        "rolling_befu_1y": ("Rolling BEFU 1Y", "#6B7F2A", "dot"),
+    }
+    for trace_id, (label, color, dash) in gap_styles.items():
+        rows = status[status["trace_id"].eq(trace_id)]
+        if rows.empty or rows.iloc[0].get("availability_status") != "missing":
+            continue
+        selection = str(rows.iloc[0].get("current_selection") or "").strip()
+        suffix = f" ({selection} gap)" if selection else " (gap)"
+        fig.add_trace(
+            go.Scatter(
+                x=[None],
+                y=[None],
+                mode="lines",
+                name=f"{label}{suffix}",
+                line={"color": color, "dash": dash, "width": 2.2},
+                hoverinfo="skip",
+                showlegend=True,
+                meta={"governance_gap": str(rows.iloc[0].get("blocking_gap_id") or "")},
+            )
+        )
 
 
 def _source_uncertainty_figure(source_pack: RevenueSourcePack, controls: dict[str, Any]) -> go.Figure:

@@ -8,6 +8,7 @@ from app import (
     _source_gap_register_for_controls,
     _source_path_trace_status_for_controls,
     _source_reconciliation_view,
+    _source_total_path_figure,
     revenue_outlook_figure,
 )
 from model_dashboard.revenue_source_pack import load_revenue_source_pack
@@ -61,6 +62,33 @@ def test_path_trace_status_view_reflects_active_release_selection() -> None:
     assert set(release_traces["current_selection"]) == {"HYEFU24"}
     assert set(release_traces["availability_status"]) == {"missing"}
     assert set(release_traces["blocking_gap_id"]) == {"release_value_table_missing"}
+
+
+def test_total_path_chart_exposes_missing_release_paths_without_values() -> None:
+    pack = load_revenue_source_pack(repo_root=ROOT)
+    assert pack is not None
+
+    fig = _source_total_path_figure(
+        pack,
+        {
+            "series": "Total NLTF revenue",
+            "release_round": "BEFU25",
+            "model_basis": "In-house model",
+            "selected_fy": "FY2031",
+        },
+    )
+
+    by_name = {trace.name: trace for trace in fig.data}
+    expected_gap_traces = {
+        "Selected MOT/BEFU release path (BEFU25 gap)",
+        "Rolling BEFU 1Y (BEFU25 gap)",
+    }
+    assert expected_gap_traces.issubset(set(by_name))
+    for name in expected_gap_traces:
+        trace = by_name[name]
+        assert list(trace.x) == [None]
+        assert list(trace.y) == [None]
+        assert trace.meta["governance_gap"] == "release_value_table_missing"
 
 
 def test_revenue_outlook_hover_preserves_horizon_scope_labels() -> None:
