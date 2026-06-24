@@ -2291,6 +2291,9 @@ def _source_control_gap_messages(source_pack: RevenueSourcePack, controls: dict[
         release = gaps[gaps["gap_id"].eq("release_value_table_missing")]
         if not release.empty and release.iloc[0].get("availability_status") == "missing":
             messages.append(str(release.iloc[0].get("user_visible_message")))
+    basis = gaps[gaps["gap_id"].eq("revenue_basis_selection_unavailable")]
+    if not basis.empty and basis.iloc[0].get("availability_status") == "missing":
+        messages.append(str(basis.iloc[0].get("user_visible_message")))
     return messages
 
 
@@ -2315,6 +2318,9 @@ def _source_gap_register_for_controls(source_pack: RevenueSourcePack, controls: 
         gaps.loc[missing_crown, "runtime_treatment"] = (
             "excluded_by_selection" if selection.lower() == "exclude" else "not_applied_missing_source"
         )
+    basis_gap = _source_revenue_basis_gap_row(source_pack, controls)
+    if basis_gap is not None:
+        gaps = pd.concat([gaps, pd.DataFrame([basis_gap])], ignore_index=True, sort=False)
     return gaps
 
 
@@ -2379,6 +2385,42 @@ def _source_gap_register(source_pack: RevenueSourcePack) -> pd.DataFrame:
             "user_visible_message",
         ],
     )
+
+
+def _source_revenue_basis_gap_row(source_pack: RevenueSourcePack, controls: dict[str, Any]) -> dict[str, Any] | None:
+    selected_basis = str(controls.get("revenue_basis") or "").strip()
+    if not selected_basis:
+        return None
+    selected_series = str(controls.get("series") or "Total NLTF revenue").strip()
+    basis_key = _source_revenue_basis_key(selected_basis)
+    if not basis_key:
+        return None
+    rows = _selected_source_series_frame(source_pack, {"series": selected_series})
+    if rows.empty or "revenue_basis" not in rows.columns:
+        return None
+    revenue_rows = rows[rows["revenue_basis"].astype(str).str.lower().ne("activity")].copy()
+    if revenue_rows.empty:
+        return None
+    available = bool(revenue_rows["revenue_basis"].astype(str).eq(basis_key).any())
+    available_labels = sorted(
+        {
+            _source_revenue_basis_label(value)
+            for value in revenue_rows["revenue_basis"].dropna().astype(str)
+            if _source_revenue_basis_label(value)
+        }
+    )
+    return {
+        "gap_id": "revenue_basis_selection_unavailable",
+        "required_for": "Revenue basis control for selected source-pack series",
+        "availability_status": "available" if available else "missing",
+        "current_selection": f"{selected_series}: {selected_basis}",
+        "runtime_treatment": "basis_filter_available" if available else "basis_selection_not_applied_missing_source",
+        "user_visible_message": (
+            f"Revenue basis '{selected_basis}' is not value-backed for '{selected_series}'. "
+            f"Available source-backed bases: {', '.join(available_labels) or 'none'}; "
+            "dashboard keeps source-backed rows and reports this gap rather than relabelling values."
+        ),
+    }
 
 
 def _source_intake_status(source_pack: RevenueSourcePack) -> pd.DataFrame:
@@ -2916,6 +2958,31 @@ def _model_basis_key(value: Any) -> str:
     if "selected" in text:
         return "selected_dashboard_basis"
     return "in_house_model"
+
+
+def _source_revenue_basis_key(value: Any) -> str:
+    text = str(value or "").strip().lower()
+    labels = {
+        "net": "net",
+        "gross": "gross",
+        "admin": "admin",
+        "deductions": "deduction",
+        "deduction": "deduction",
+        "nominal ex gst": "nominal_ex_gst",
+    }
+    return labels.get(text, "")
+
+
+def _source_revenue_basis_label(value: Any) -> str:
+    text = str(value or "").strip()
+    labels = {
+        "net": "Net",
+        "gross": "Gross",
+        "admin": "Admin",
+        "deduction": "Deductions",
+        "nominal_ex_gst": "Nominal ex GST",
+    }
+    return labels.get(text, text)
 
 
 def _uncertainty_source_key(controls: dict[str, Any]) -> str:

@@ -7,6 +7,7 @@ import pandas as pd
 from app import (
     _source_axis_title,
     _source_component_figure,
+    _source_control_gap_messages,
     _source_gap_register_for_controls,
     _source_path_trace_status_for_controls,
     _source_reconciliation_view,
@@ -43,6 +44,35 @@ def test_source_gap_register_view_reflects_active_crown_top_up_control() -> None
 
     pack_by_id = pack.source_gap_register.set_index("gap_id")
     assert pack_by_id.loc["crown_top_up_values_missing", "runtime_treatment"] == "excluded_by_selection"
+
+
+def test_source_gap_register_reports_unsupported_revenue_basis_selection() -> None:
+    pack = load_revenue_source_pack(repo_root=ROOT)
+    assert pack is not None
+
+    unavailable = _source_gap_register_for_controls(
+        pack,
+        {
+            "series": "Total NLTF revenue",
+            "revenue_basis": "Gross",
+        },
+    ).set_index("gap_id")
+
+    assert unavailable.loc["revenue_basis_selection_unavailable", "availability_status"] == "missing"
+    assert unavailable.loc["revenue_basis_selection_unavailable", "current_selection"] == "Total NLTF revenue: Gross"
+    assert unavailable.loc["revenue_basis_selection_unavailable", "runtime_treatment"] == "basis_selection_not_applied_missing_source"
+    assert "Available source-backed bases: Net" in unavailable.loc["revenue_basis_selection_unavailable", "user_visible_message"]
+    assert any("not value-backed" in message for message in _source_control_gap_messages(pack, {"series": "Total NLTF revenue", "revenue_basis": "Gross"}))
+
+    available = _source_gap_register_for_controls(
+        pack,
+        {
+            "series": "Total NLTF revenue",
+            "revenue_basis": "Net",
+        },
+    ).set_index("gap_id")
+    assert available.loc["revenue_basis_selection_unavailable", "availability_status"] == "available"
+    assert available.loc["revenue_basis_selection_unavailable", "runtime_treatment"] == "basis_filter_available"
 
 
 def test_reconciliation_view_exposes_optional_rollup_inputs() -> None:
