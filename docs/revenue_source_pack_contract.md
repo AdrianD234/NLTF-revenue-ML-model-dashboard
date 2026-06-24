@@ -116,6 +116,12 @@ a `revenue_path_basis_conflict` row to the runtime source gap register and shows
 a warning. The explicit `revenue_basis` control takes precedence for filtering,
 and the conflict is reported rather than resolved by relabelling source values.
 
+The FED path scenario control is registry-backed until source FED rate/path
+values are vendored. The runtime source gap register reports
+`fed_path_scenario_values_missing` for the active selection, including the
+`No 2027 12c uplift` option, and the dashboard preserves workbook source rows
+instead of recalculating the 2027 uplift effect from missing rate paths.
+
 ## Derived Audit Artifacts
 
 `scripts/export_revenue_source_pack_tables.py` exports:

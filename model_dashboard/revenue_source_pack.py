@@ -20,7 +20,7 @@ import pandas as pd
 REVENUE_SOURCE_PACK_DIR = Path("data") / "revenue_model_source_pack" / "2026_05_19"
 REVENUE_SOURCE_PACK_SCHEMA_VERSION = "nltf-revenue-source-pack-v1"
 CANONICAL_REVENUE_SCHEMA_VERSION = "nltf-revenue-canonical-long-v1"
-REVENUE_SOURCE_PACK_RUNTIME_REVISION = "2026-06-24-source-gap-register-v1"
+REVENUE_SOURCE_PACK_RUNTIME_REVISION = "2026-06-24-source-gap-register-v2"
 
 REQUIRED_SOURCE_PACK_FILES = (
     "README.md",
@@ -485,6 +485,11 @@ def revenue_source_gap_register(
     crown_top_up_selection = _selection_value(selections, "crown_top_up", "Exclude")
     has_crown_top_up_rows = bool(canonical_long["series_id"].eq("crown_top_up").any()) if "series_id" in canonical_long.columns else False
     has_release_values = bool(manifest.get("normalized_files", {}).get("release_values.csv"))
+    normalized_files = manifest.get("normalized_files", {}) if isinstance(manifest, dict) else {}
+    has_fed_path_values = any(
+        str(filename) in normalized_files
+        for filename in ["fed_path_values.csv", "fed_rate_paths.csv", "nominal_ped_fed_rate_paths.csv"]
+    )
     has_quarterly_values = bool(canonical_long["time_grain"].astype(str).str.lower().eq("quarterly").any()) if "time_grain" in canonical_long.columns else False
     has_ped_total_vkt = bool(canonical_long["series_id"].eq("ped_total_vkt").any()) if "series_id" in canonical_long.columns else False
     rows = [
@@ -495,6 +500,14 @@ def revenue_source_gap_register(
             "current_selection": _selection_value(selections, "release_round", "BEFU25"),
             "runtime_treatment": "release_values_available" if has_release_values else "registry_only",
             "user_visible_message": "Full MOT/BEFU release-value table is unavailable; release selection is registry-only and unresolved differences are reported.",
+        },
+        {
+            "gap_id": "fed_path_scenario_values_missing",
+            "required_for": "FED path scenario control and 2027 12c uplift treatment",
+            "availability_status": "available" if has_fed_path_values else "missing",
+            "current_selection": _selection_value(selections, "fed_path_scenario", "Current planned path"),
+            "runtime_treatment": "fed_path_values_available" if has_fed_path_values else "registry_only",
+            "user_visible_message": "FED path scenario values are not separately vendored; the FED path control is registry-only and revenue rows are preserved from source paths rather than recalculated.",
         },
         {
             "gap_id": "crown_top_up_values_missing",
@@ -989,7 +1002,7 @@ def _decision_handoff_link(item: str, gap_status: dict[str, str]) -> dict[str, A
     text = item.lower()
     if "ped/fed" in text or ("ped" in text and "rates" in text):
         return {
-            "linked_gap_ids": ["ped_total_vkt_bridge_missing"],
+            "linked_gap_ids": ["fed_path_scenario_values_missing", "ped_total_vkt_bridge_missing"],
             "linked_artifacts": "annual_model_paths.csv; source_gap_register.csv; nominal PED/FED rate table not vendored",
             "runtime_status": "nominal_rate_path_missing",
             "dashboard_treatment": (

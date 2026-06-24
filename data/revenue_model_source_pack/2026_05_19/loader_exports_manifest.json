@@ -21,7 +21,7 @@
     "remaining_decisions_handoff.csv": {
       "role": "Unresolved revenue decisions linked to runtime gaps and dashboard treatment.",
       "row_count": 7,
-      "sha256": "8c3bac0e0c52adcb8bddc6546c719d6a1b9bd6bec3b07c75ef3b4e9ff0c38a2b"
+      "sha256": "156b78d116c7470c7115c7823b4dca1afb340ccdb85d7c9cb1c5415c3710f6f3"
     },
     "series_role_audit.csv": {
       "role": "Explicit role contract for modeled activity, revenue bridges, pass-through lines, deductions, overlays, and source gaps.",
@@ -29,9 +29,9 @@
       "sha256": "d261cce84673aac46a6488932ba3999b6700bf6aab46af2163b27bff6846358b"
     },
     "source_gap_register.csv": {
-      "role": "Structured source-pack gaps for release values, Crown top-up, quarterly rows, and bridge replay.",
-      "row_count": 4,
-      "sha256": "3457ef14a81423e44ce629360eb3fd7425c845dfda41f9aacdef51a642f62ab7"
+      "role": "Structured source-pack gaps for release values, FED path scenarios, Crown top-up, quarterly rows, and bridge replay.",
+      "row_count": 5,
+      "sha256": "5a7ad55eebb5ff499021fc406cb58ffcd5151e6596be8ff0e50ba48b8b80b4c5"
     },
     "source_pack_intake_status.csv": {
       "role": "Repo-local source-pack intake status, hashes, and replay gaps.",

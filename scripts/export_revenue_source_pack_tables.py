@@ -24,7 +24,7 @@ EXPORT_FILES = {
     "source_pack_intake_status.csv": "Repo-local source-pack intake status, hashes, and replay gaps.",
     "path_trace_status.csv": "Availability and plotting status for required Revenue Outlook total-path traces.",
     "reconciliation_report.csv": "Hierarchy roll-up reconciliation and explicit gap report.",
-    "source_gap_register.csv": "Structured source-pack gaps for release values, Crown top-up, quarterly rows, and bridge replay.",
+    "source_gap_register.csv": "Structured source-pack gaps for release values, FED path scenarios, Crown top-up, quarterly rows, and bridge replay.",
     "remaining_decisions_handoff.csv": "Unresolved revenue decisions linked to runtime gaps and dashboard treatment.",
     "series_role_audit.csv": "Explicit role contract for modeled activity, revenue bridges, pass-through lines, deductions, overlays, and source gaps.",
     "validation_issues.csv": "Loader validation warnings/errors for the source pack.",

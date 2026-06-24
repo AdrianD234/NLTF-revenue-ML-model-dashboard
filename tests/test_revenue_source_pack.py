@@ -232,6 +232,8 @@ def test_revenue_source_gap_register_exposes_missing_release_and_top_up_inputs()
     by_id = gaps.set_index("gap_id")
     assert by_id.loc["release_value_table_missing", "availability_status"] == "missing"
     assert by_id.loc["release_value_table_missing", "runtime_treatment"] == "registry_only"
+    assert by_id.loc["fed_path_scenario_values_missing", "availability_status"] == "missing"
+    assert by_id.loc["fed_path_scenario_values_missing", "runtime_treatment"] == "registry_only"
     assert by_id.loc["crown_top_up_values_missing", "availability_status"] == "missing"
     assert by_id.loc["crown_top_up_values_missing", "runtime_treatment"] == "excluded_by_selection"
     assert by_id.loc["quarterly_source_pack_missing", "runtime_treatment"] == "annual_only_source_pack"
@@ -264,6 +266,7 @@ def test_revenue_remaining_decisions_handoff_links_runtime_gaps_and_is_sanitized
     by_id = handoff.set_index("decision_id")
     assert by_id.loc["crown_top_up_policy", "linked_gap_ids"] == "crown_top_up_values_missing"
     assert by_id.loc["crown_top_up_policy", "runtime_status"] == "policy_overlay_missing_values"
+    assert by_id.loc["future_nominal_ped_fed_rates_by_scenario", "linked_gap_ids"] == "fed_path_scenario_values_missing; ped_total_vkt_bridge_missing"
     assert by_id.loc["ped_bridge_source_history_and_re_estimation", "linked_gap_ids"] == "ped_total_vkt_bridge_missing"
     assert by_id.loc["h13_treatment", "availability_status"] == "governance_label_required"
     assert by_id.loc["h13_treatment", "linked_gap_ids"] == ""

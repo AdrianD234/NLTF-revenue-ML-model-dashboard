@@ -76,6 +76,23 @@ def test_source_gap_register_reports_unsupported_revenue_basis_selection() -> No
     assert available.loc["revenue_basis_selection_unavailable", "runtime_treatment"] == "basis_filter_available"
 
 
+def test_source_gap_register_view_reflects_active_fed_path_control() -> None:
+    pack = load_revenue_source_pack(repo_root=ROOT)
+    assert pack is not None
+
+    view = _source_gap_register_for_controls(pack, {"fed_path": "No 2027 12c uplift"})
+
+    by_id = view.set_index("gap_id")
+    assert by_id.loc["fed_path_scenario_values_missing", "availability_status"] == "missing"
+    assert by_id.loc["fed_path_scenario_values_missing", "current_selection"] == "No 2027 12c uplift"
+    assert by_id.loc["fed_path_scenario_values_missing", "runtime_treatment"] == "registry_only"
+    assert "registry-only" in by_id.loc["fed_path_scenario_values_missing", "user_visible_message"]
+    assert any(
+        "FED path scenario values are not separately vendored" in message
+        for message in _source_control_gap_messages(pack, {"fed_path": "No 2027 12c uplift"})
+    )
+
+
 def test_selected_source_series_applies_value_backed_revenue_basis_without_relabeling() -> None:
     pack = load_revenue_source_pack(repo_root=ROOT)
     assert pack is not None

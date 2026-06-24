@@ -2291,6 +2291,10 @@ def _source_control_gap_messages(source_pack: RevenueSourcePack, controls: dict[
         release = gaps[gaps["gap_id"].eq("release_value_table_missing")]
         if not release.empty and release.iloc[0].get("availability_status") == "missing":
             messages.append(str(release.iloc[0].get("user_visible_message")))
+    if str(controls.get("fed_path_scenario") or controls.get("fed_path") or "").strip():
+        fed_path = gaps[gaps["gap_id"].eq("fed_path_scenario_values_missing")]
+        if not fed_path.empty and fed_path.iloc[0].get("availability_status") == "missing":
+            messages.append(str(fed_path.iloc[0].get("user_visible_message")))
     basis = gaps[gaps["gap_id"].eq("revenue_basis_selection_unavailable")]
     if not basis.empty and basis.iloc[0].get("availability_status") == "missing":
         messages.append(str(basis.iloc[0].get("user_visible_message")))
@@ -2307,6 +2311,10 @@ def _source_gap_register_for_controls(source_pack: RevenueSourcePack, controls: 
     if "release_round" in controls:
         release_mask = gaps["gap_id"].eq("release_value_table_missing")
         gaps.loc[release_mask, "current_selection"] = str(controls.get("release_round") or "")
+    if "fed_path" in controls or "fed_path_scenario" in controls:
+        fed_path_selection = str(controls.get("fed_path_scenario") or controls.get("fed_path") or "")
+        fed_path_mask = gaps["gap_id"].eq("fed_path_scenario_values_missing")
+        gaps.loc[fed_path_mask, "current_selection"] = fed_path_selection
     if "time_grain" in controls:
         quarterly_mask = gaps["gap_id"].eq("quarterly_source_pack_missing")
         gaps.loc[quarterly_mask, "current_selection"] = str(controls.get("time_grain") or "")
@@ -2340,7 +2348,16 @@ def _source_gap_register(source_pack: RevenueSourcePack) -> pd.DataFrame:
     selections = config.get("current_selections", {}) if isinstance(config, dict) else {}
     crown_top_up_selection = _selection_value(selections, "crown_top_up", "Exclude")
     has_crown_top_up_rows = bool(frame["series_id"].eq("crown_top_up").any()) if isinstance(frame, pd.DataFrame) and "series_id" in frame.columns else False
-    has_release_values = bool(manifest.get("normalized_files", {}).get("release_values.csv")) if isinstance(manifest, dict) else False
+    normalized_files = manifest.get("normalized_files", {}) if isinstance(manifest, dict) else {}
+    has_release_values = bool(normalized_files.get("release_values.csv")) if isinstance(normalized_files, dict) else False
+    has_fed_path_values = (
+        any(
+            filename in normalized_files
+            for filename in ["fed_path_values.csv", "fed_rate_paths.csv", "nominal_ped_fed_rate_paths.csv"]
+        )
+        if isinstance(normalized_files, dict)
+        else False
+    )
     has_quarterly_values = (
         bool(frame["time_grain"].astype(str).str.lower().eq("quarterly").any())
         if isinstance(frame, pd.DataFrame) and "time_grain" in frame.columns
@@ -2356,6 +2373,14 @@ def _source_gap_register(source_pack: RevenueSourcePack) -> pd.DataFrame:
                 "current_selection": _selection_value(selections, "release_round", "BEFU25"),
                 "runtime_treatment": "release_values_available" if has_release_values else "registry_only",
                 "user_visible_message": "Full MOT/BEFU release-value table is unavailable; release selection is registry-only and unresolved differences are reported.",
+            },
+            {
+                "gap_id": "fed_path_scenario_values_missing",
+                "required_for": "FED path scenario control and 2027 12c uplift treatment",
+                "availability_status": "available" if has_fed_path_values else "missing",
+                "current_selection": _selection_value(selections, "fed_path_scenario", "Current planned path"),
+                "runtime_treatment": "fed_path_values_available" if has_fed_path_values else "registry_only",
+                "user_visible_message": "FED path scenario values are not separately vendored; the FED path control is registry-only and revenue rows are preserved from source paths rather than recalculated.",
             },
             {
                 "gap_id": "crown_top_up_values_missing",
