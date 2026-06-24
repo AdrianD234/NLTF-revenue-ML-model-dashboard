@@ -20,6 +20,7 @@ from model_dashboard.revenue_outlook import (
     CURRENT_REVENUE_OUTLOOK_DIR,
     FUTURE_RATE_COLUMNS,
     REVENUE_OUTLOOK_SCHEMA_VERSION,
+    SOURCE_COMPARISON_OUTPUT_DIR_POLICY,
     build_revenue_outlook_pack,
     load_revenue_outlook_pack,
     promote_revenue_outlook_pack,
@@ -102,6 +103,9 @@ def test_revenue_outlook_pack_computes_ruc_formula_and_honest_ped_gap(tmp_path: 
     assert pack.manifest["schema_version"] == REVENUE_OUTLOOK_SCHEMA_VERSION
     assert pack.manifest["pack_status"] == "explicitly_promoted_current_outlook"
     assert pack.manifest["source_policy"].startswith("explicit_promoted_pack_or_in_session_reviewed_result_only")
+    assert pack.manifest["source_comparison"]["output_dir_policy"] == SOURCE_COMPARISON_OUTPUT_DIR_POLICY
+    assert "output_dir" not in pack.manifest["source_comparison"]
+    assert all("output_dir" not in scenario for scenario in pack.manifest["source_comparison"]["scenarios"])
     assert pack.manifest["join_key_contract"]["columns"] == CANONICAL_JOIN_KEY_COLUMNS
     assert (pack.output_dir / "manifest.json").exists()
     assert (pack.output_dir / "future_revenue_forecasts.parquet").exists()
@@ -160,8 +164,13 @@ def test_committed_current_revenue_outlook_pack_is_repo_local_and_hash_backed() 
     manifest_text = manifest_path.read_text(encoding="utf-8")
     assert "C:\\Users" not in manifest_text
     assert "Downloads" not in manifest_text
+    assert "test-output" not in manifest_text
+    assert "revenue_outlook_promotion" not in manifest_text
     manifest = json.loads(manifest_text)
     assert manifest["schema_version"] == REVENUE_OUTLOOK_SCHEMA_VERSION
+    assert manifest["source_comparison"]["output_dir_policy"] == SOURCE_COMPARISON_OUTPUT_DIR_POLICY
+    assert "output_dir" not in manifest["source_comparison"]
+    assert all("output_dir" not in scenario for scenario in manifest["source_comparison"]["scenarios"])
     assert manifest["join_key_contract"]["columns"] == CANONICAL_JOIN_KEY_COLUMNS
     assert "canonical stream, period and scenario keys" in manifest["join_key_contract"]["rule"]
     assert manifest["repo_relative_output_dir"] == "data/current_revenue_outlook"

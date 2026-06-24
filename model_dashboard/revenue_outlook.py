@@ -96,6 +96,24 @@ CANONICAL_JOIN_KEY_CONTRACT = {
     },
     "rule": "Forecast Builder volume packs join to Revenue Outlook rows by canonical stream, period and scenario keys; historical rows use historical_actual.",
 }
+PROMOTED_SCENARIO_MANIFEST_FIELDS = (
+    "scenario_name",
+    "scenario_role",
+    "scenario_role_source",
+    "scenario_display_name",
+    "is_test_fixture",
+    "run_id",
+    "workbook_filename",
+    "workbook_sha256",
+    "forecast_horizon_quarters",
+    "forecast_start_period",
+    "forecast_end_period",
+    "forecast_status",
+)
+SOURCE_COMPARISON_OUTPUT_DIR_POLICY = (
+    "Source run output folders are not published in the promoted runtime manifest; "
+    "scenario roles, workbook hashes, and governed output hashes are retained."
+)
 
 
 @dataclass
@@ -721,6 +739,17 @@ def _canonical_scenario_key(row: pd.Series) -> str:
     return "all_scenarios"
 
 
+def _promoted_scenario_manifest_records(scenarios: Any) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    for scenario in scenarios if isinstance(scenarios, list) else []:
+        if not isinstance(scenario, dict):
+            continue
+        records.append(
+            {field: scenario.get(field) for field in PROMOTED_SCENARIO_MANIFEST_FIELDS if field in scenario}
+        )
+    return records
+
+
 def _manifest(
     comparison: ForecastScenarioComparisonResult,
     repo_root: Path,
@@ -732,7 +761,8 @@ def _manifest(
     pack_status: str,
     promoted_by: str,
 ) -> dict[str, Any]:
-    scenarios = comparison.manifest.get("scenarios", [])
+    source_scenarios = comparison.manifest.get("scenarios", [])
+    scenarios = _promoted_scenario_manifest_records(source_scenarios)
     model_ids = {}
     future = comparison.future_forecasts
     if future is not None and not future.empty:
@@ -753,7 +783,7 @@ def _manifest(
             "comparison_id": comparison.manifest.get("comparison_id"),
             "scenario_role_validation": comparison.manifest.get("scenario_role_validation"),
             "scenarios": scenarios,
-            "output_dir": _repo_relative(repo_root, comparison.output_dir),
+            "output_dir_policy": SOURCE_COMPARISON_OUTPUT_DIR_POLICY,
         },
         "scenario_roles": [
             {
@@ -785,7 +815,7 @@ def _manifest(
             "revenue_bridge_components": int(len(bridge_components)),
             "revenue_chart_rows": int(len(chart_rows)),
         },
-        "source_hashes": _source_hashes(repo_root, scenarios),
+        "source_hashes": _source_hashes(repo_root, source_scenarios),
         "output_files": [
             "future_revenue_forecasts.parquet",
             "future_revenue_forecasts.csv",

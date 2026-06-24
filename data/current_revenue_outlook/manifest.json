@@ -23,7 +23,6 @@
         "scenario_display_name": "current_basecase",
         "is_test_fixture": false,
         "run_id": "current_revenue_outlook_current_basecase",
-        "output_dir": "test-output/tmp/revenue_outlook_promotion/basecase",
         "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_basecase (2) - Copy.xlsx",
         "workbook_sha256": "d0644d353ee5a073602186cf7ac5c16e707d5350e16fd037b73a65528067cc6a",
         "forecast_horizon_quarters": 100,
@@ -38,7 +37,6 @@
         "scenario_display_name": "current_comparison_1",
         "is_test_fixture": false,
         "run_id": "current_revenue_outlook_current_comparison_1",
-        "output_dir": "test-output/tmp/revenue_outlook_promotion/comparison_1",
         "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_high_population (2) - Copy.xlsx",
         "workbook_sha256": "6213ce565cf1f4a058a3ea9f1af4d5476a8b0423a4d8747905c3cba128380ce1",
         "forecast_horizon_quarters": 100,
@@ -47,7 +45,7 @@
         "forecast_status": "numeric_forecast_available"
       }
     ],
-    "output_dir": "test-output/tmp/revenue_outlook_promotion/scenario_comparison"
+    "output_dir_policy": "Source run output folders are not published in the promoted runtime manifest; scenario roles, workbook hashes, and governed output hashes are retained."
   },
   "scenario_roles": [
     {

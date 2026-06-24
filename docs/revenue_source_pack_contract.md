@@ -99,6 +99,10 @@ version/path, raw-workbook and source-pack manifest SHA256s, dashboard-default
 versus source-workbook series selections, bridge statuses by stream, and output
 file hashes. It must not expose user-local workbook paths.
 
+Promoted manifests retain workbook hashes, scenario roles, bridge statuses, and
+output hashes, but do not publish transient Forecast Builder run-output
+folders.
+
 Revenue Outlook scenario colours are role-stable under filtering: the basecase
 path keeps the basecase colour, and comparison paths keep deterministic
 comparison colours rather than being re-indexed from the visible subset.
