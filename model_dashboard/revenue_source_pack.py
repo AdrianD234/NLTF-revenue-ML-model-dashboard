@@ -157,9 +157,18 @@ def revenue_source_pack_signature(
 ) -> tuple[tuple[str, int, int], ...]:
     root = Path(repo_root) if repo_root is not None else repo_root_from_here()
     base = Path(pack_dir) if pack_dir is not None else root / REVENUE_SOURCE_PACK_DIR
+    signature_paths = [base / filename for filename in REQUIRED_SOURCE_PACK_FILES]
+    manifest_path = base / "manifest.json"
+    if manifest_path.exists():
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except Exception:
+            manifest = {}
+        declared_files = _manifest_declared_files(manifest)
+        existing = {path.name for path in signature_paths}
+        signature_paths.extend(base / filename for filename in declared_files if filename not in existing)
     signature = []
-    for filename in REQUIRED_SOURCE_PACK_FILES:
-        path = base / filename
+    for path in signature_paths:
         try:
             stat = path.stat()
         except OSError:
@@ -198,6 +207,7 @@ def load_revenue_source_pack(
     )
     validation = validate_revenue_source_pack(
         manifest=manifest,
+        pack_dir=base,
         series_master=series_master,
         aggregation_rules=aggregation_rules,
         front_end_config=front_end_config,
@@ -335,6 +345,7 @@ def canonical_revenue_long_frame(
 def validate_revenue_source_pack(
     *,
     manifest: dict[str, Any],
+    pack_dir: Path | None = None,
     series_master: pd.DataFrame,
     aggregation_rules: pd.DataFrame,
     front_end_config: dict[str, Any],
@@ -346,6 +357,7 @@ def validate_revenue_source_pack(
         issues.append(_issue("error", "manifest_schema", "Unexpected revenue source pack schema version."))
     if manifest.get("raw_workbook", {}).get("sha256") != "00c6070694818d27d7c402749354d8175de999894846dce45a4abdd7f5eb3e6b":
         issues.append(_issue("error", "raw_sha256", "Raw workbook SHA256 does not match the governed lineage hash."))
+    issues.extend(_manifest_file_hash_issues(manifest, pack_dir))
 
     required_columns = {
         "period",
@@ -1317,6 +1329,48 @@ def _calculate_rollup(output: str, values: dict[str, Any]) -> float:
 
 def _issue(severity: str, check: str, message: str) -> dict[str, str]:
     return {"severity": severity, "check": check, "message": message}
+
+
+def _manifest_declared_files(manifest: dict[str, Any]) -> list[str]:
+    filenames: set[str] = set()
+    for bucket in ("normalized_files", "config_files"):
+        payload = manifest.get(bucket, {})
+        if isinstance(payload, dict):
+            filenames.update(str(filename) for filename in payload if str(filename).strip())
+    return sorted(filenames)
+
+
+def _manifest_file_hash_issues(manifest: dict[str, Any], pack_dir: Path | None) -> list[dict[str, str]]:
+    if pack_dir is None:
+        return []
+    issues: list[dict[str, str]] = []
+    for bucket in ("normalized_files", "config_files"):
+        payload = manifest.get(bucket, {})
+        if not isinstance(payload, dict):
+            issues.append(_issue("error", "source_pack_manifest_files", f"Manifest {bucket} must be an object of file metadata."))
+            continue
+        for filename, metadata in sorted(payload.items()):
+            name = str(filename).strip()
+            if not name:
+                continue
+            expected = str(metadata.get("sha256", "")).strip() if isinstance(metadata, dict) else ""
+            path = pack_dir / name
+            if not path.exists():
+                issues.append(_issue("error", "source_pack_file_missing", f"Manifest-declared source-pack file is missing: {name}."))
+                continue
+            if not expected:
+                issues.append(_issue("error", "source_pack_file_hash", f"Manifest-declared source-pack file has no SHA256: {name}."))
+                continue
+            actual = _sha256(path)
+            if actual != expected:
+                issues.append(
+                    _issue(
+                        "error",
+                        "source_pack_file_hash",
+                        f"Manifest-declared source-pack file hash mismatch: {name}.",
+                    )
+                )
+    return issues
 
 
 def _as_int(value: Any) -> int | None:

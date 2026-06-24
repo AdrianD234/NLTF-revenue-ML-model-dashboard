@@ -15,6 +15,7 @@ from model_dashboard.revenue_source_pack import (
     current_selection,
     load_revenue_source_pack,
     revenue_reconciliation_report,
+    revenue_source_pack_signature,
 )
 from scripts.export_revenue_source_pack_tables import export_tables
 
@@ -64,6 +65,28 @@ def test_revenue_source_pack_required_files_are_repo_local_and_hash_backed() -> 
     for filename, meta in manifest["config_files"].items():
         assert (PACK_DIR / filename).stat().st_size < 50 * 1024 * 1024
         assert meta["sha256"] == _sha256(PACK_DIR / filename)
+
+
+def test_revenue_source_pack_signature_tracks_manifest_declared_files() -> None:
+    signature_names = {Path(path).name for path, _, _ in revenue_source_pack_signature(PACK_DIR, ROOT)}
+
+    assert {"current_selections.csv", "formula_errors.csv", "model_coefficients.csv"}.issubset(signature_names)
+
+
+def test_revenue_source_pack_validation_fails_on_declared_file_hash_mismatch(tmp_path: Path) -> None:
+    pack_copy = tmp_path / "source_pack"
+    shutil.copytree(PACK_DIR, pack_copy)
+    readme = pack_copy / "README.md"
+    readme.write_text(readme.read_text(encoding="utf-8") + "\nTampered for validation test.\n", encoding="utf-8")
+
+    pack = load_revenue_source_pack(pack_dir=pack_copy, repo_root=ROOT)
+
+    assert pack is not None
+    assert pack.validation_status == "failed"
+    issues = pack.validation_issues
+    hash_issues = issues[issues["check"].eq("source_pack_file_hash")]
+    assert not hash_issues.empty
+    assert hash_issues["message"].astype(str).str.contains("README.md").any()
 
 
 def test_revenue_source_pack_canonical_long_schema_preserves_source_rows() -> None:

@@ -11,6 +11,12 @@ model.xlsx` is lineage-only. Its governed SHA256 is
 The runtime must not scan a latest folder, load raw Excel workbooks, publish
 test fixtures, or silently convert unavailable bridge rows to zero.
 
+Every normalized or config file declared in `manifest.json` is part of the
+loader validation surface. The loader cache signature tracks those declared
+files, and `load_revenue_source_pack()` reports a validation error if a
+declared repo-local file is missing, has no manifest SHA256, or no longer
+matches the declared SHA256.
+
 ## Canonical Schema
 
 `model_dashboard.revenue_source_pack.load_revenue_source_pack()` builds a
