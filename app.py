@@ -2267,7 +2267,7 @@ def _render_revenue_source_architecture(source_pack: RevenueSourcePack, controls
         st.caption("Required path trace status")
         display_table(_source_path_trace_status(source_pack), height=180, max_rows=80)
         st.caption("Source gap register")
-        display_table(_source_gap_register(source_pack), height=180, max_rows=80)
+        display_table(_source_gap_register_for_controls(source_pack, controls), height=180, max_rows=80)
         st.caption("Series role audit")
         display_table(_source_series_role_audit(source_pack), height=180, max_rows=100)
         st.caption("Loader export manifest")
@@ -2276,7 +2276,7 @@ def _render_revenue_source_architecture(source_pack: RevenueSourcePack, controls
 
 
 def _source_control_gap_messages(source_pack: RevenueSourcePack, controls: dict[str, Any]) -> list[str]:
-    gaps = _source_gap_register(source_pack)
+    gaps = _source_gap_register_for_controls(source_pack, controls)
     if gaps.empty:
         return []
     messages: list[str] = []
@@ -2289,6 +2289,30 @@ def _source_control_gap_messages(source_pack: RevenueSourcePack, controls: dict[
         if not release.empty and release.iloc[0].get("availability_status") == "missing":
             messages.append(str(release.iloc[0].get("user_visible_message")))
     return messages
+
+
+def _source_gap_register_for_controls(source_pack: RevenueSourcePack, controls: dict[str, Any]) -> pd.DataFrame:
+    gaps = _source_gap_register(source_pack).copy()
+    if gaps.empty or "gap_id" not in gaps.columns:
+        return gaps
+    if "release_round" in controls:
+        release_mask = gaps["gap_id"].eq("release_value_table_missing")
+        gaps.loc[release_mask, "current_selection"] = str(controls.get("release_round") or "")
+    if "time_grain" in controls:
+        quarterly_mask = gaps["gap_id"].eq("quarterly_source_pack_missing")
+        gaps.loc[quarterly_mask, "current_selection"] = str(controls.get("time_grain") or "")
+    if "series" in controls:
+        ped_mask = gaps["gap_id"].eq("ped_total_vkt_bridge_missing")
+        gaps.loc[ped_mask, "current_selection"] = str(controls.get("series") or "")
+    if "crown_top_up" in controls:
+        selection = str(controls.get("crown_top_up") or "").strip() or "Exclude"
+        crown_mask = gaps["gap_id"].eq("crown_top_up_values_missing")
+        gaps.loc[crown_mask, "current_selection"] = selection
+        missing_crown = crown_mask & gaps["availability_status"].astype(str).str.lower().eq("missing")
+        gaps.loc[missing_crown, "runtime_treatment"] = (
+            "excluded_by_selection" if selection.lower() == "exclude" else "not_applied_missing_source"
+        )
+    return gaps
 
 
 def _source_gap_register(source_pack: RevenueSourcePack) -> pd.DataFrame:
@@ -2739,6 +2763,7 @@ def _source_reconciliation_view(source_pack: RevenueSourcePack, controls: dict[s
         "official_value",
         "difference",
         "missing_inputs",
+        "optional_inputs_applied",
     ]
     return report[[col for col in cols if col in report.columns]].reset_index(drop=True)
 
