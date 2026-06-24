@@ -535,6 +535,7 @@ def revenue_path_trace_status(
     has_in_house = _has_trace_rows(canonical_long, model_basis="in_house_model", line_values={"Model path"})
     has_schiff = _has_trace_rows(canonical_long, model_basis="aaron_schiff_model", line_values={"Model path"})
     release_available = release_gap.get("availability_status") == "available"
+    release_selection = str(release_gap.get("current_selection") or "")
     rows = [
         _trace_status_row(
             "actual_benchmark",
@@ -542,6 +543,7 @@ def revenue_path_trace_status(
             has_actual,
             "annual actual and benchmark rows",
             "",
+            "official actual or benchmark",
             "Source actual/benchmark rows are plotted where present.",
         ),
         _trace_status_row(
@@ -550,6 +552,7 @@ def revenue_path_trace_status(
             has_selected_workbook,
             "annual model path rows",
             "",
+            "source workbook current selection",
             "Current workbook-selected annual model path is plotted.",
         ),
         _trace_status_row(
@@ -558,6 +561,7 @@ def revenue_path_trace_status(
             release_available,
             "release-value table",
             "" if release_available else "release_value_table_missing",
+            release_selection,
             "Selected MOT/BEFU release path requires release-value rows; registry-only release metadata is not plotted as values.",
         ),
         _trace_status_row(
@@ -566,6 +570,7 @@ def revenue_path_trace_status(
             release_available,
             "release-value table",
             "" if release_available else "release_value_table_missing",
+            release_selection,
             "Rolling BEFU 1Y requires historical release-value rows; it is not fabricated from model paths.",
         ),
         _trace_status_row(
@@ -574,6 +579,7 @@ def revenue_path_trace_status(
             has_schiff,
             "annual model path rows",
             "",
+            "Aaron Schiff model",
             "Aaron Schiff annual model path is plotted where source rows exist.",
         ),
         _trace_status_row(
@@ -582,6 +588,7 @@ def revenue_path_trace_status(
             has_in_house,
             "annual model path rows",
             "",
+            "In-house model",
             "In-house annual model path is plotted where source rows exist.",
         ),
     ]
@@ -594,6 +601,7 @@ def revenue_path_trace_status(
             "plotted",
             "data_scope",
             "blocking_gap_id",
+            "current_selection",
             "user_visible_message",
         ],
     )
@@ -923,6 +931,7 @@ def _trace_status_row(
     available: bool,
     data_scope: str,
     blocking_gap_id: str,
+    current_selection: str,
     message: str,
 ) -> dict[str, Any]:
     return {
@@ -932,6 +941,7 @@ def _trace_status_row(
         "plotted": bool(available),
         "data_scope": data_scope,
         "blocking_gap_id": blocking_gap_id,
+        "current_selection": current_selection,
         "user_visible_message": message,
     }
 

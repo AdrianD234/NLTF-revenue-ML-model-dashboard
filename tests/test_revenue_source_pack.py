@@ -304,6 +304,7 @@ def test_revenue_path_trace_status_marks_missing_release_traces_without_fabricat
         "plotted",
         "data_scope",
         "blocking_gap_id",
+        "current_selection",
         "user_visible_message",
     }.issubset(status.columns)
 
@@ -326,6 +327,7 @@ def test_revenue_path_trace_status_marks_missing_release_traces_without_fabricat
     assert set(missing_release["availability_status"]) == {"missing"}
     assert not missing_release["plotted"].astype(bool).any()
     assert set(missing_release["blocking_gap_id"]) == {"release_value_table_missing"}
+    assert set(missing_release["current_selection"]) == {"BEFU25"}
     assert missing_release["user_visible_message"].astype(str).str.contains("release-value rows", case=False).all()
 
 

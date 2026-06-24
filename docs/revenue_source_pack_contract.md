@@ -117,7 +117,9 @@ total-path trace is value-backed and plotted. Actual/benchmark, selected
 workbook basis, Aaron Schiff, and in-house paths are plotted from source rows.
 Selected MOT/BEFU release paths and rolling BEFU 1Y are marked missing when the
 release-value table is unavailable; registry metadata alone is not plotted as
-values.
+values. The dashboard view overlays the active release-round control in the
+`current_selection` column so missing release traces are tied to the selection
+being inspected.
 
 The source gap register is a machine-readable list of runtime limitations such
 as missing release-value tables, missing Crown top-up rows, annual-only source

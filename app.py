@@ -2268,7 +2268,7 @@ def _render_revenue_source_architecture(source_pack: RevenueSourcePack, controls
         st.caption("Validation issues")
         display_table(source_pack.validation_issues, height=180, max_rows=80)
         st.caption("Required path trace status")
-        display_table(_source_path_trace_status(source_pack), height=180, max_rows=80)
+        display_table(_source_path_trace_status_for_controls(source_pack, controls), height=180, max_rows=80)
         st.caption("Source gap register")
         display_table(_source_gap_register_for_controls(source_pack, controls), height=180, max_rows=80)
         st.caption("Series role audit")
@@ -2508,6 +2508,19 @@ def _source_path_trace_status(source_pack: RevenueSourcePack) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def _source_path_trace_status_for_controls(source_pack: RevenueSourcePack, controls: dict[str, Any]) -> pd.DataFrame:
+    status = _source_path_trace_status(source_pack).copy()
+    if status.empty:
+        return status
+    if "current_selection" not in status.columns:
+        status["current_selection"] = ""
+    if "trace_id" in status.columns and "release_round" in controls:
+        release_selection = str(controls.get("release_round") or "")
+        release_trace_mask = status["trace_id"].isin(["selected_mot_befu_release", "rolling_befu_1y"])
+        status.loc[release_trace_mask, "current_selection"] = release_selection
+    return status
+
+
 def _path_trace_row(trace_id: str, trace_label: str, available: bool, data_scope: str, blocking_gap_id: str) -> dict[str, Any]:
     return {
         "trace_id": trace_id,
@@ -2516,6 +2529,7 @@ def _path_trace_row(trace_id: str, trace_label: str, available: bool, data_scope
         "plotted": bool(available),
         "data_scope": data_scope,
         "blocking_gap_id": blocking_gap_id,
+        "current_selection": "",
         "user_visible_message": (
             f"{trace_label} is backed by {data_scope}."
             if available

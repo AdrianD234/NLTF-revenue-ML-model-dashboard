@@ -4,7 +4,12 @@ from pathlib import Path
 
 import pandas as pd
 
-from app import _source_gap_register_for_controls, _source_reconciliation_view, revenue_outlook_figure
+from app import (
+    _source_gap_register_for_controls,
+    _source_path_trace_status_for_controls,
+    _source_reconciliation_view,
+    revenue_outlook_figure,
+)
 from model_dashboard.revenue_source_pack import load_revenue_source_pack
 
 
@@ -43,6 +48,19 @@ def test_reconciliation_view_exposes_optional_rollup_inputs() -> None:
 
     assert not view.empty
     assert "optional_inputs_applied" in view.columns
+
+
+def test_path_trace_status_view_reflects_active_release_selection() -> None:
+    pack = load_revenue_source_pack(repo_root=ROOT)
+    assert pack is not None
+
+    view = _source_path_trace_status_for_controls(pack, {"release_round": "HYEFU24"})
+
+    by_id = view.set_index("trace_id")
+    release_traces = by_id.loc[["selected_mot_befu_release", "rolling_befu_1y"]]
+    assert set(release_traces["current_selection"]) == {"HYEFU24"}
+    assert set(release_traces["availability_status"]) == {"missing"}
+    assert set(release_traces["blocking_gap_id"]) == {"release_value_table_missing"}
 
 
 def test_revenue_outlook_hover_preserves_horizon_scope_labels() -> None:
