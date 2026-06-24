@@ -71,6 +71,7 @@ exist; it must not apply a fabricated zero.
 - `path_trace_status.csv`
 - `reconciliation_report.csv`
 - `source_gap_register.csv`
+- `remaining_decisions_handoff.csv`
 - `validation_issues.csv`
 - `loader_exports_manifest.json`
 
@@ -95,3 +96,8 @@ The source gap register is a machine-readable list of runtime limitations such
 as missing release-value tables, missing Crown top-up rows, annual-only source
 pack scope, and unavailable PED total-VKT bridge rows. It backs the Revenue
 Outlook warnings and is hash-recorded in `loader_exports_manifest.json`.
+
+The remaining-decisions handoff links each unresolved workbook decision to the
+runtime gap IDs, repo-local artifacts, and dashboard treatment that currently
+govern it. It is a decision register, not a model refit, and it does not change
+forecast values.

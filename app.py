@@ -2254,12 +2254,14 @@ def _render_revenue_source_architecture(source_pack: RevenueSourcePack, controls
         st.markdown("<div class='page5-panel-title'>Hierarchy reconciliation</div>", unsafe_allow_html=True)
         display_table(_source_reconciliation_view(source_pack, controls), height=280, max_rows=120)
     with source_tables[1]:
-        st.markdown("<div class='page5-panel-title'>Unresolved revenue decisions</div>", unsafe_allow_html=True)
-        display_table(source_pack.unresolved_decisions, height=280, max_rows=80)
+        st.markdown("<div class='page5-panel-title'>Remaining decisions handoff</div>", unsafe_allow_html=True)
+        display_table(_source_remaining_decisions_handoff(source_pack), height=280, max_rows=80)
 
     with st.expander("Source-pack validation and manifest", expanded=False):
         st.caption("Source-pack intake status")
         display_table(_source_intake_status(source_pack), height=180, max_rows=80)
+        st.caption("Unresolved revenue decisions")
+        display_table(source_pack.unresolved_decisions, height=180, max_rows=80)
         st.caption("Validation issues")
         display_table(source_pack.validation_issues, height=180, max_rows=80)
         st.caption("Required path trace status")
@@ -2416,6 +2418,27 @@ def _source_intake_status(source_pack: RevenueSourcePack) -> pd.DataFrame:
             }
         )
     return pd.DataFrame(rows)
+
+
+def _source_remaining_decisions_handoff(source_pack: RevenueSourcePack) -> pd.DataFrame:
+    handoff = getattr(source_pack, "remaining_decisions_handoff", None)
+    if isinstance(handoff, pd.DataFrame):
+        return handoff
+    decisions = getattr(source_pack, "unresolved_decisions", pd.DataFrame())
+    if not isinstance(decisions, pd.DataFrame) or decisions.empty:
+        return pd.DataFrame()
+    frame = decisions.rename(
+        columns={
+            "Priority": "priority",
+            "Item": "decision_item",
+            "Why needed": "why_needed",
+            "Recommended resolution": "recommended_resolution",
+        }
+    ).copy()
+    frame["availability_status"] = "open_decision"
+    frame["runtime_status"] = "manual_review_required"
+    frame["dashboard_treatment"] = "Carry as explicit unresolved governance decision until source evidence is vendored."
+    return frame
 
 
 def _source_path_trace_status(source_pack: RevenueSourcePack) -> pd.DataFrame:

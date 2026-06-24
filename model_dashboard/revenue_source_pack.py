@@ -120,6 +120,7 @@ class RevenueSourcePack:
     source_gap_register: pd.DataFrame
     path_trace_status: pd.DataFrame
     intake_status: pd.DataFrame
+    remaining_decisions_handoff: pd.DataFrame
 
     @property
     def validation_status(self) -> str:
@@ -200,6 +201,10 @@ def load_revenue_source_pack(
         pack_dir=base,
         manifest=manifest,
     )
+    remaining_decisions = revenue_remaining_decisions_handoff(
+        unresolved_decisions=unresolved_decisions,
+        gap_register=gap_register,
+    )
     return RevenueSourcePack(
         pack_dir=base,
         manifest=manifest,
@@ -216,6 +221,7 @@ def load_revenue_source_pack(
         source_gap_register=gap_register,
         path_trace_status=path_trace_status,
         intake_status=intake_status,
+        remaining_decisions_handoff=remaining_decisions,
     )
 
 
@@ -698,6 +704,59 @@ def revenue_source_pack_intake_status(
     )
 
 
+def revenue_remaining_decisions_handoff(
+    *,
+    unresolved_decisions: pd.DataFrame,
+    gap_register: pd.DataFrame,
+) -> pd.DataFrame:
+    gap_status = {
+        str(record.get("gap_id", "")): str(record.get("availability_status", ""))
+        for record in gap_register.to_dict("records")
+        if str(record.get("gap_id", "")).strip()
+    }
+    rows: list[dict[str, Any]] = []
+    for record in unresolved_decisions.to_dict("records"):
+        item = str(record.get("Item", "")).strip()
+        link = _decision_handoff_link(item, gap_status)
+        linked_gap_ids = link["linked_gap_ids"]
+        linked_statuses = [gap_status.get(gap_id, "not_applicable") for gap_id in linked_gap_ids]
+        if linked_statuses and any(status == "missing" for status in linked_statuses):
+            availability_status = "open_gap"
+        elif linked_statuses:
+            availability_status = "source_backed"
+        else:
+            availability_status = link["availability_status"]
+        rows.append(
+            {
+                "decision_id": _decision_id(item),
+                "priority": str(record.get("Priority", "")).strip(),
+                "decision_item": item,
+                "availability_status": availability_status,
+                "linked_gap_ids": "; ".join(linked_gap_ids),
+                "linked_artifacts": link["linked_artifacts"],
+                "runtime_status": link["runtime_status"],
+                "dashboard_treatment": link["dashboard_treatment"],
+                "why_needed": str(record.get("Why needed", "")).strip(),
+                "recommended_resolution": str(record.get("Recommended resolution", "")).strip(),
+            }
+        )
+    return pd.DataFrame(
+        rows,
+        columns=[
+            "decision_id",
+            "priority",
+            "decision_item",
+            "availability_status",
+            "linked_gap_ids",
+            "linked_artifacts",
+            "runtime_status",
+            "dashboard_treatment",
+            "why_needed",
+            "recommended_resolution",
+        ],
+    )
+
+
 def control_options(pack: RevenueSourcePack | None, control_id: str, default: list[str]) -> list[str]:
     if pack is None:
         return default
@@ -792,6 +851,90 @@ def _intake_status_row(
         "sha256": sha256,
         "notes": notes,
     }
+
+
+def _decision_handoff_link(item: str, gap_status: dict[str, str]) -> dict[str, Any]:
+    text = item.lower()
+    if "ped/fed" in text or ("ped" in text and "rates" in text):
+        return {
+            "linked_gap_ids": ["ped_total_vkt_bridge_missing"],
+            "linked_artifacts": "annual_model_paths.csv; source_gap_register.csv; nominal PED/FED rate table not vendored",
+            "runtime_status": "nominal_rate_path_missing",
+            "dashboard_treatment": (
+                "Preserve workbook-sourced PED/FED paths; do not refit or bridge future revenue "
+                "without governed nominal rate paths."
+            ),
+            "availability_status": "open_gap",
+        }
+    if "light/heavy ruc" in text or "ruc rates" in text:
+        return {
+            "linked_gap_ids": ["release_value_table_missing"],
+            "linked_artifacts": "annual_model_paths.csv; source_gap_register.csv; nominal Light/Heavy RUC rate table not vendored",
+            "runtime_status": "nominal_rate_path_missing",
+            "dashboard_treatment": (
+                "Preserve modeled RUC revenue rows; do not recompute from net-km forecasts "
+                "without governed effective rate paths."
+            ),
+            "availability_status": "open_gap",
+        }
+    if "ped bridge" in text:
+        return {
+            "linked_gap_ids": ["ped_total_vkt_bridge_missing"],
+            "linked_artifacts": "source_gap_register.csv; PED bridge history not vendored",
+            "runtime_status": "bridge_replay_missing",
+            "dashboard_treatment": (
+                "Report PED bridge as a governance gap; do not infer total VKT or training-history "
+                "rows from validation forecasts."
+            ),
+            "availability_status": "open_gap",
+        }
+    if "pass-through" in text:
+        return {
+            "linked_gap_ids": ["release_value_table_missing", "quarterly_source_pack_missing"],
+            "linked_artifacts": "release_registry.csv; source_gap_register.csv; pass-through value table not vendored",
+            "runtime_status": "official_release_path_missing",
+            "dashboard_treatment": (
+                "Use explicit source rows where present and show missing release-value paths "
+                "instead of fabricating pass-through totals."
+            ),
+            "availability_status": "open_gap",
+        }
+    if "gross/net/admin/refund" in text:
+        return {
+            "linked_gap_ids": ["release_value_table_missing"],
+            "linked_artifacts": "aggregation_rules.csv; canonical_revenue_long.csv; source_gap_register.csv",
+            "runtime_status": "basis_components_partial",
+            "dashboard_treatment": "Keep gross, admin, refunds and net basis as separate governed series where source rows exist.",
+            "availability_status": "open_gap" if gap_status.get("release_value_table_missing") == "missing" else "source_backed",
+        }
+    if "crown top-up" in text:
+        return {
+            "linked_gap_ids": ["crown_top_up_values_missing"],
+            "linked_artifacts": "front_end_config.json; source_gap_register.csv",
+            "runtime_status": "policy_overlay_missing_values",
+            "dashboard_treatment": "Persist Include/Exclude selection and warn when Include is requested without governed top-up value rows.",
+            "availability_status": "open_gap",
+        }
+    if "h13" in text:
+        return {
+            "linked_gap_ids": [],
+            "linked_artifacts": "forecast horizon labels; current_revenue_outlook manifest",
+            "runtime_status": "label_required",
+            "dashboard_treatment": "Label H1-H12 as backtest-supported and H13+ as long-range extrapolation or assumption; no value changes.",
+            "availability_status": "governance_label_required",
+        }
+    return {
+        "linked_gap_ids": [],
+        "linked_artifacts": "unresolved_decisions.csv",
+        "runtime_status": "manual_review_required",
+        "dashboard_treatment": "Carry as explicit unresolved governance decision until source evidence is vendored.",
+        "availability_status": "open_decision",
+    }
+
+
+def _decision_id(item: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "_", item.lower()).strip("_")
+    return slug or "unresolved_decision"
 
 
 def _nullable_int(value: Any) -> int | None:

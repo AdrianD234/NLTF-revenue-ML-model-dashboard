@@ -155,6 +155,41 @@ def test_revenue_source_gap_register_exposes_missing_release_and_top_up_inputs()
     assert by_id["user_visible_message"].astype(str).str.len().gt(20).all()
 
 
+def test_revenue_remaining_decisions_handoff_links_runtime_gaps_and_is_sanitized() -> None:
+    pack = load_revenue_source_pack(repo_root=ROOT)
+    assert pack is not None
+    handoff = pack.remaining_decisions_handoff
+    assert len(handoff) == len(pack.unresolved_decisions) == 7
+    assert {
+        "decision_id",
+        "priority",
+        "decision_item",
+        "availability_status",
+        "linked_gap_ids",
+        "linked_artifacts",
+        "runtime_status",
+        "dashboard_treatment",
+        "why_needed",
+        "recommended_resolution",
+    }.issubset(handoff.columns)
+
+    handoff_text = handoff.to_csv(index=False)
+    assert "C:\\Users" not in handoff_text
+    assert "Downloads" not in handoff_text
+    assert "OneDrive" not in handoff_text
+
+    by_id = handoff.set_index("decision_id")
+    assert by_id.loc["crown_top_up_policy", "linked_gap_ids"] == "crown_top_up_values_missing"
+    assert by_id.loc["crown_top_up_policy", "runtime_status"] == "policy_overlay_missing_values"
+    assert by_id.loc["ped_bridge_source_history_and_re_estimation", "linked_gap_ids"] == "ped_total_vkt_bridge_missing"
+    assert by_id.loc["h13_treatment", "availability_status"] == "governance_label_required"
+    assert by_id.loc["h13_treatment", "linked_gap_ids"] == ""
+    assert by_id.loc["h13_treatment", "dashboard_treatment"].lower().find("no value changes") >= 0
+    critical = handoff[handoff["priority"].astype(str).str.lower().eq("critical")]
+    assert critical["linked_gap_ids"].astype(str).str.len().gt(0).all()
+    assert critical["runtime_status"].astype(str).str.len().gt(0).all()
+
+
 def test_revenue_path_trace_status_marks_missing_release_traces_without_fabrication() -> None:
     pack = load_revenue_source_pack(repo_root=ROOT)
     assert pack is not None
@@ -247,6 +282,7 @@ def test_revenue_source_pack_loader_exports_are_hash_backed() -> None:
         "path_trace_status.csv": len(pack.path_trace_status),
         "reconciliation_report.csv": len(pack.reconciliation_report),
         "source_gap_register.csv": len(pack.source_gap_register),
+        "remaining_decisions_handoff.csv": len(pack.remaining_decisions_handoff),
         "validation_issues.csv": len(pack.validation_issues),
     }
     for filename, meta in manifest["exports"].items():

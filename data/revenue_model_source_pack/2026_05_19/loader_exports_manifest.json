@@ -1,5 +1,5 @@
 {
-  "created_at": "2026-06-24T09:41:38.826726+00:00",
+  "created_at": "2026-06-24T10:03:54.345883+00:00",
   "exports": {
     "canonical_revenue_long.csv": {
       "role": "Canonical long schema across actuals and model paths.",
@@ -15,6 +15,11 @@
       "role": "Hierarchy roll-up reconciliation and explicit gap report.",
       "row_count": 192,
       "sha256": "83a250790506d54e09eaa9d1421d9e3c08c4104d5088fd81d18ecb09303690b6"
+    },
+    "remaining_decisions_handoff.csv": {
+      "role": "Unresolved revenue decisions linked to runtime gaps and dashboard treatment.",
+      "row_count": 7,
+      "sha256": "8c3bac0e0c52adcb8bddc6546c719d6a1b9bd6bec3b07c75ef3b4e9ff0c38a2b"
     },
     "source_gap_register.csv": {
       "role": "Structured source-pack gaps for release values, Crown top-up, quarterly rows, and bridge replay.",

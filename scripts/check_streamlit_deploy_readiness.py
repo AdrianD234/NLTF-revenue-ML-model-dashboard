@@ -119,6 +119,7 @@ REQUIRED_REVENUE_SOURCE_PACK_FILES = {
     "path_trace_status.csv",
     "reconciliation_report.csv",
     "source_gap_register.csv",
+    "remaining_decisions_handoff.csv",
     "validation_issues.csv",
     "loader_exports_manifest.json",
 }
