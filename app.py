@@ -3303,11 +3303,44 @@ def _scenario_color_map(rows: pd.DataFrame) -> dict[str, str]:
     if rows is None or rows.empty:
         return output
     scenarios = rows[rows["row_type"].astype(str).eq("future_forecast")].copy()
-    scenarios["_role_order"] = scenarios.get("scenario_role", pd.Series(dtype=str)).map(lambda value: 0 if str(value) == SCENARIO_ROLE_BASECASE else 1)
-    names = scenarios.sort_values(["_role_order", "scenario_name"], kind="stable")["scenario_name"].dropna().astype(str).drop_duplicates().tolist()
-    for index, name in enumerate(names):
-        output[name] = palette[index % len(palette)]
+    scenario_records = (
+        scenarios[["scenario_name", "scenario_role"]]
+        .dropna(subset=["scenario_name"])
+        .astype(str)
+        .drop_duplicates()
+        .sort_values(["scenario_role", "scenario_name"], kind="stable")
+        .to_dict("records")
+    )
+    for record in scenario_records:
+        name = str(record.get("scenario_name") or "").strip()
+        if not name:
+            continue
+        role = str(record.get("scenario_role") or "").strip()
+        if role == SCENARIO_ROLE_BASECASE:
+            output[name] = palette[0]
+        elif role == SCENARIO_ROLE_COMPARISON:
+            output[name] = palette[1 + (_scenario_comparison_color_index(name) % (len(palette) - 1))]
+        else:
+            output[name] = palette[_stable_palette_index(name, len(palette))]
     return output
+
+
+def _scenario_comparison_color_index(name: str) -> int:
+    digits = ""
+    for character in reversed(str(name).strip()):
+        if character.isdigit():
+            digits = character + digits
+            continue
+        break
+    if digits:
+        return max(int(digits) - 1, 0)
+    return 0
+
+
+def _stable_palette_index(name: str, palette_size: int) -> int:
+    if palette_size <= 0:
+        return 0
+    return sum(ord(character) for character in str(name)) % palette_size
 
 
 def _scenario_label(scenario_name: str, rows: pd.DataFrame) -> str:

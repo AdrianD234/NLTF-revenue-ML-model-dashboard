@@ -12,6 +12,7 @@ from app import (
     _source_path_trace_status_for_controls,
     _source_reconciliation_view,
     _revenue_outlook_manifest_table,
+    _scenario_color_map,
     _selected_source_series_frame,
     _source_split_figure,
     _source_total_path_figure,
@@ -326,6 +327,38 @@ def test_revenue_outlook_hover_preserves_horizon_scope_labels() -> None:
     assert any("H13+ long-range extrapolation" in label for label in forecast_hover)
     assert "Forecast start (H1)" in marker_hover
     assert "Long-range extrapolation begins (H13)" in marker_hover
+
+
+def test_revenue_outlook_scenario_colors_are_stable_under_filters() -> None:
+    rows = pd.DataFrame(
+        [
+            {
+                "row_type": "future_forecast",
+                "scenario_name": "current_basecase",
+                "scenario_role": "basecase",
+            },
+            {
+                "row_type": "future_forecast",
+                "scenario_name": "current_comparison_1",
+                "scenario_role": "comparison",
+            },
+            {
+                "row_type": "future_forecast",
+                "scenario_name": "current_comparison_2",
+                "scenario_role": "comparison",
+            },
+        ]
+    )
+
+    full_map = _scenario_color_map(rows)
+    comparison_only = _scenario_color_map(rows[rows["scenario_name"].eq("current_comparison_1")])
+    second_comparison_only = _scenario_color_map(rows[rows["scenario_name"].eq("current_comparison_2")])
+
+    assert full_map["current_basecase"] == "#006FAD"
+    assert full_map["current_comparison_1"] == "#E56B2B"
+    assert full_map["current_comparison_2"] == "#00843D"
+    assert comparison_only["current_comparison_1"] == full_map["current_comparison_1"]
+    assert second_comparison_only["current_comparison_2"] == full_map["current_comparison_2"]
 
 
 def test_revenue_outlook_manifest_table_exposes_source_pack_and_bridge_provenance() -> None:
