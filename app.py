@@ -2294,6 +2294,9 @@ def _source_control_gap_messages(source_pack: RevenueSourcePack, controls: dict[
     basis = gaps[gaps["gap_id"].eq("revenue_basis_selection_unavailable")]
     if not basis.empty and basis.iloc[0].get("availability_status") == "missing":
         messages.append(str(basis.iloc[0].get("user_visible_message")))
+    conflict = gaps[gaps["gap_id"].eq("revenue_path_basis_conflict")]
+    if not conflict.empty and conflict.iloc[0].get("availability_status") == "selection_conflict":
+        messages.append(str(conflict.iloc[0].get("user_visible_message")))
     return messages
 
 
@@ -2321,6 +2324,9 @@ def _source_gap_register_for_controls(source_pack: RevenueSourcePack, controls: 
     basis_gap = _source_revenue_basis_gap_row(source_pack, controls)
     if basis_gap is not None:
         gaps = pd.concat([gaps, pd.DataFrame([basis_gap])], ignore_index=True, sort=False)
+    conflict_gap = _source_revenue_path_basis_conflict_row(controls)
+    if conflict_gap is not None:
+        gaps = pd.concat([gaps, pd.DataFrame([conflict_gap])], ignore_index=True, sort=False)
     return gaps
 
 
@@ -2419,6 +2425,31 @@ def _source_revenue_basis_gap_row(source_pack: RevenueSourcePack, controls: dict
             f"Revenue basis '{selected_basis}' is not value-backed for '{selected_series}'. "
             f"Available source-backed bases: {', '.join(available_labels) or 'none'}; "
             "dashboard keeps source-backed rows and reports this gap rather than relabelling values."
+        ),
+    }
+
+
+def _source_revenue_path_basis_conflict_row(controls: dict[str, Any]) -> dict[str, Any] | None:
+    revenue_path = str(controls.get("revenue_path") or "").strip()
+    selected_basis = str(controls.get("revenue_basis") or "").strip()
+    if not revenue_path or not selected_basis:
+        return None
+    path_basis_label = _source_revenue_path_basis_label(revenue_path)
+    path_basis_key = _source_revenue_basis_key(path_basis_label)
+    selected_basis_key = _source_revenue_basis_key(selected_basis)
+    if not path_basis_key or not selected_basis_key or path_basis_key == selected_basis_key:
+        return None
+    path_basis = _source_revenue_basis_label(path_basis_key)
+    basis_label = _source_revenue_basis_label(selected_basis_key)
+    return {
+        "gap_id": "revenue_path_basis_conflict",
+        "required_for": "Consistent Revenue Outlook revenue path and revenue basis controls",
+        "availability_status": "selection_conflict",
+        "current_selection": f"{revenue_path}: {selected_basis}",
+        "runtime_treatment": "explicit_revenue_basis_takes_precedence",
+        "user_visible_message": (
+            f"Revenue path '{revenue_path}' implies {path_basis}, but revenue basis is '{basis_label}'. "
+            "Dashboard filters by the explicit revenue basis and reports this conflict rather than silently relabelling values."
         ),
     }
 

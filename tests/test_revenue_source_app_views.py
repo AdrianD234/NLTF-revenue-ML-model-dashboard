@@ -80,6 +80,10 @@ def test_selected_source_series_applies_value_backed_revenue_basis_without_relab
     pack = load_revenue_source_pack(repo_root=ROOT)
     assert pack is not None
 
+    path_gross = _selected_source_series_frame(pack, {"series": "PED revenue", "revenue_path": "Gross / benchmark actual"})
+    assert set(path_gross["revenue_basis"]) == {"gross"}
+    assert set(path_gross["source_series_label"]) == {"Gross PED revenue"}
+
     gross = _selected_source_series_frame(pack, {"series": "PED revenue", "revenue_basis": "Gross"})
     assert set(gross["revenue_basis"]) == {"gross"}
     assert set(gross["source_series_label"]) == {"Gross PED revenue"}
@@ -92,6 +96,45 @@ def test_selected_source_series_applies_value_backed_revenue_basis_without_relab
     assert set(unavailable["revenue_basis"]) == {"gross", "nominal_ex_gst"}
     messages = _source_control_gap_messages(pack, {"series": "PED revenue", "revenue_basis": "Net"})
     assert any("not value-backed" in message for message in messages)
+
+
+def test_source_gap_register_reports_revenue_path_basis_conflicts() -> None:
+    pack = load_revenue_source_pack(repo_root=ROOT)
+    assert pack is not None
+
+    conflict = _source_gap_register_for_controls(
+        pack,
+        {
+            "series": "Total NLTF revenue",
+            "revenue_path": "Gross / benchmark actual",
+            "revenue_basis": "Net",
+        },
+    ).set_index("gap_id")
+
+    assert conflict.loc["revenue_path_basis_conflict", "availability_status"] == "selection_conflict"
+    assert conflict.loc["revenue_path_basis_conflict", "runtime_treatment"] == "explicit_revenue_basis_takes_precedence"
+    assert "implies Gross" in conflict.loc["revenue_path_basis_conflict", "user_visible_message"]
+    assert any(
+        "explicit revenue basis" in message
+        for message in _source_control_gap_messages(
+            pack,
+            {
+                "series": "Total NLTF revenue",
+                "revenue_path": "Gross / benchmark actual",
+                "revenue_basis": "Net",
+            },
+        )
+    )
+
+    aligned = _source_gap_register_for_controls(
+        pack,
+        {
+            "series": "Total NLTF revenue",
+            "revenue_path": "Net of admin fees & refunds",
+            "revenue_basis": "Net",
+        },
+    )
+    assert "revenue_path_basis_conflict" not in set(aligned["gap_id"])
 
 
 def test_reconciliation_view_exposes_optional_rollup_inputs() -> None:

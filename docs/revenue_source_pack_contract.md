@@ -111,6 +111,11 @@ example, `PED revenue` can show workbook rows labelled `Gross PED revenue` for
 the Gross basis or `PED revenue` for the Nominal ex GST basis, without mixing
 or relabelling either source row family.
 
+If `revenue_path` and `revenue_basis` imply different bases, the dashboard adds
+a `revenue_path_basis_conflict` row to the runtime source gap register and shows
+a warning. The explicit `revenue_basis` control takes precedence for filtering,
+and the conflict is reported rather than resolved by relabelling source values.
+
 ## Derived Audit Artifacts
 
 `scripts/export_revenue_source_pack_tables.py` exports:
