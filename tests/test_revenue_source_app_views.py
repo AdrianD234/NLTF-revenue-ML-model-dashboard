@@ -6,9 +6,11 @@ import pandas as pd
 
 from app import (
     _source_axis_title,
+    _source_component_figure,
     _source_gap_register_for_controls,
     _source_path_trace_status_for_controls,
     _source_reconciliation_view,
+    _source_split_figure,
     _source_total_path_figure,
     _source_uncertainty_figure,
     revenue_outlook_figure,
@@ -108,11 +110,14 @@ def test_revenue_source_charts_use_explicit_units_and_annual_ticks() -> None:
 
     total_fig = _source_total_path_figure(pack, controls)
     uncertainty_fig = _source_uncertainty_figure(pack, controls)
+    component_fig = _source_component_figure(pack, controls)
+    split_fig = _source_split_figure(pack, controls)
     for fig in [total_fig, uncertainty_fig]:
         assert fig.layout.yaxis.title.text == "$m nominal ex GST"
         assert fig.layout.xaxis.title.text == "June year"
         assert fig.layout.xaxis.tickmode == "linear"
         assert fig.layout.xaxis.dtick == 1
+    assert component_fig.layout.yaxis.title.text == "$m nominal ex GST"
 
     value_traces = [
         trace
@@ -121,6 +126,8 @@ def test_revenue_source_charts_use_explicit_units_and_annual_ticks() -> None:
     ]
     assert value_traces
     assert all("$m nominal ex GST" in {row[0] for row in trace.customdata} for trace in value_traces)
+    assert "$m nominal ex GST" in {row[0] for row in component_fig.data[0].customdata}
+    assert "$m nominal ex GST" in {row[0] for row in split_fig.data[0].customdata}
 
 
 def test_revenue_outlook_hover_preserves_horizon_scope_labels() -> None:

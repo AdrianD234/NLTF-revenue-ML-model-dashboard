@@ -125,9 +125,10 @@ rolling BEFU 1Y remain visible without fabricating release-value paths.
 
 Revenue charts normalize equivalent monetary source-unit labels (`$m ex GST`
 and `$m nominal ex GST`) to a single displayed axis and hover unit:
-`$m nominal ex GST`. This is a display label harmonization only; it does not
-rescale values or mix revenue units with activity units. Annual source-pack
-charts use one tick per June year.
+`$m nominal ex GST`. This applies to path, fan, component, and selected-FY
+split hovers. It is a display label harmonization only; it does not rescale
+values or mix revenue units with activity units. Annual source-pack charts use
+one tick per June year.
 
 The source gap register is a machine-readable list of runtime limitations such
 as missing release-value tables, missing Crown top-up rows, annual-only source

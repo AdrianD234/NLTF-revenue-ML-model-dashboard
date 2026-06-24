@@ -2767,18 +2767,21 @@ def _source_component_figure(source_pack: RevenueSourcePack, controls: dict[str,
     plot["signed_value"] = pd.to_numeric(plot["value"], errors="coerce") * pd.to_numeric(plot["aggregation_sign"], errors="coerce").fillna(1)
     plot = plot.dropna(subset=["signed_value"])
     plot = plot.drop_duplicates("series_id", keep="last")
+    axis_title = _source_axis_title(plot)
+    plot["hover_unit"] = axis_title
     fig = go.Figure(
         go.Bar(
             x=plot["display_name"],
             y=plot["signed_value"],
             marker_color=["#B7791F" if value < 0 else "#00843D" for value in plot["signed_value"]],
-            hovertemplate="%{x}<br>%{y:,.1f}<extra></extra>",
+            customdata=plot[["hover_unit"]].to_numpy(),
+            hovertemplate="%{x}<br>%{y:,.1f} %{customdata[0]}<extra></extra>",
         )
     )
     fig.update_layout(
         margin={"l": 52, "r": 18, "t": 28, "b": 96},
         height=360,
-        yaxis_title="$m nominal ex GST",
+        yaxis_title=axis_title,
         xaxis_tickangle=-30,
     )
     return fig
@@ -2792,13 +2795,15 @@ def _source_split_figure(source_pack: RevenueSourcePack, controls: dict[str, Any
     plot = plot.dropna(subset=["value"]).drop_duplicates("series_id", keep="last")
     if plot.empty:
         return empty_figure("Selected FY split is unavailable for this model basis.")
+    axis_title = _source_axis_title(plot)
     fig = go.Figure(
         go.Pie(
             labels=plot["display_name"],
             values=plot["value"].clip(lower=0),
             hole=0.45,
             marker={"colors": ["#002B5C", "#00843D", "#008C7E", "#F37021"][: len(plot)]},
-            hovertemplate="%{label}<br>%{value:,.1f}<br>%{percent}<extra></extra>",
+            customdata=[[axis_title] for _ in range(len(plot))],
+            hovertemplate="%{label}<br>%{value:,.1f} %{customdata[0]}<br>%{percent}<extra></extra>",
         )
     )
     fig.update_layout(margin={"l": 16, "r": 16, "t": 28, "b": 16}, height=360, showlegend=True)
