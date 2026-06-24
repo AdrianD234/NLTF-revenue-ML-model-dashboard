@@ -161,7 +161,10 @@ def test_committed_current_revenue_outlook_pack_is_repo_local_and_hash_backed() 
     assert manifest["revenue_source_pack"]["source_pack_version"] == "2026_05_19"
     assert manifest["revenue_source_pack"]["raw_workbook_sha256"] == "00c6070694818d27d7c402749354d8175de999894846dce45a4abdd7f5eb3e6b"
     assert manifest["revenue_source_pack"]["selections"]["release_round"] == "BEFU25"
-    assert manifest["revenue_source_pack"]["selections"]["series"] == "Total RUC+PED revenue"
+    assert manifest["revenue_source_pack"]["selections"]["series"] == "Total NLTF revenue"
+    assert manifest["revenue_source_pack"]["dashboard_default_selections"]["series"] == "Total NLTF revenue"
+    assert manifest["revenue_source_pack"]["source_workbook_selections"]["series"] == "Total RUC+PED revenue"
+    assert "legacy Total RUC+PED subtotal" in manifest["revenue_source_pack"]["default_selection_policy"]
     assert sorted(manifest["output_hashes"]) == [
         "future_revenue_forecasts.csv",
         "future_revenue_forecasts.parquet",

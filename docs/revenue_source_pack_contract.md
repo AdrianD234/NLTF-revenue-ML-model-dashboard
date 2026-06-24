@@ -41,6 +41,11 @@ The governed hierarchy uses the normalized `aggregation_rules.csv` contract:
 `Total RUC+PED revenue` is the legacy Net FED + Net RUC subtotal. It is never
 treated as the root Total NLTF revenue series.
 
+The source workbook current selection may still reference that legacy subtotal.
+Revenue Outlook defaults and promoted-pack manifests use `Total NLTF revenue`
+as the effective dashboard selection, while preserving the workbook current
+selection separately as provenance.
+
 ## Model And Bridge Roles
 
 PED VKT per capita, Light RUC net km, and Heavy RUC net km remain direct model

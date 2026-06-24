@@ -2,7 +2,7 @@
 
 - Schema: `revenue-outlook-pack-v1`
 - Status: `explicitly_promoted_current_outlook`
-- Promoted: `2026-06-24T04:01:43.691078+00:00`
+- Promoted: `2026-06-24T09:50:46.982869+00:00`
 - Output: `data/current_revenue_outlook`
 
 ## Equations
@@ -24,3 +24,5 @@
 - Raw workbook SHA256: `00c6070694818d27d7c402749354d8175de999894846dce45a4abdd7f5eb3e6b`
 - Manifest SHA256: `00f5547b4c54f5fc9bfa4fc2a3f3b470cab89be56d87265a3491b7b003b72fd6`
 - Status: `source_pack_vendored`
+- Dashboard default series: `Total NLTF revenue`
+- Source workbook current series: `Total RUC+PED revenue`

@@ -755,6 +755,8 @@ def _manifest_markdown(manifest: dict[str, Any]) -> str:
         rows.append(f"- {STREAM_LABELS.get(stream, stream)}: {', '.join(statuses)}")
     source_pack = manifest.get("revenue_source_pack") or {}
     if source_pack:
+        dashboard_defaults = source_pack.get("dashboard_default_selections") or source_pack.get("selections") or {}
+        source_workbook_selections = source_pack.get("source_workbook_selections") or {}
         rows.extend(
             [
                 "",
@@ -763,6 +765,8 @@ def _manifest_markdown(manifest: dict[str, Any]) -> str:
                 f"- Raw workbook SHA256: `{source_pack.get('raw_workbook_sha256')}`",
                 f"- Manifest SHA256: `{source_pack.get('source_pack_manifest_sha256')}`",
                 f"- Status: `{source_pack.get('status')}`",
+                f"- Dashboard default series: `{dashboard_defaults.get('series')}`",
+                f"- Source workbook current series: `{source_workbook_selections.get('series')}`",
             ]
         )
     return "\n".join(rows) + "\n"
@@ -808,17 +812,18 @@ def _revenue_source_pack_metadata(repo_root: Path) -> dict[str, Any]:
             "repo_relative_path": _repo_relative(repo_root, pack_dir),
             "error": str(exc),
         }
-    selections: dict[str, Any] = {}
+    source_workbook_selections: dict[str, Any] = {}
     if front_end_config_path.exists():
         try:
             config = json.loads(front_end_config_path.read_text(encoding="utf-8"))
-            selections = {
+            source_workbook_selections = {
                 key: value.get("current_value")
                 for key, value in (config.get("current_selections") or {}).items()
                 if isinstance(value, dict)
             }
         except Exception:
-            selections = {}
+            source_workbook_selections = {}
+    dashboard_default_selections = _dashboard_default_revenue_selections(source_workbook_selections)
     return {
         "status": "source_pack_vendored",
         "repo_relative_path": _repo_relative(repo_root, pack_dir),
@@ -829,8 +834,29 @@ def _revenue_source_pack_metadata(repo_root: Path) -> dict[str, Any]:
         "distilled_workbook_basename": source_manifest.get("distilled_workbook", {}).get("basename"),
         "distilled_workbook_sha256": source_manifest.get("distilled_workbook", {}).get("sha256"),
         "source_pack_manifest_sha256": _sha256(manifest_path),
-        "selections": selections,
+        "selections": dashboard_default_selections,
+        "dashboard_default_selections": dashboard_default_selections,
+        "source_workbook_selections": source_workbook_selections,
+        "default_selection_policy": (
+            "Revenue Outlook defaults to Total NLTF revenue even when the source workbook current selection "
+            "uses the legacy Total RUC+PED subtotal."
+        ),
     }
+
+
+def _dashboard_default_revenue_selections(source_workbook_selections: dict[str, Any]) -> dict[str, Any]:
+    defaults = dict(source_workbook_selections)
+    defaults["series"] = "Total NLTF revenue"
+    defaults.setdefault("release_round", "BEFU25")
+    defaults.setdefault("revenue_path", "Net of admin fees & refunds")
+    defaults.setdefault("scenario", "Medium")
+    defaults.setdefault("fed_path_scenario", "Current planned path")
+    defaults.setdefault("view", "Annual")
+    defaults.setdefault("model_basis", "In-house model")
+    defaults.setdefault("uncertainty_source", "MOT release round")
+    defaults.setdefault("selected_fy", "FY2031")
+    defaults.setdefault("crown_top_up", "Exclude")
+    return defaults
 
 
 def _gap_component(stream: str, code: str, reason: str) -> dict[str, Any]:
