@@ -19,8 +19,8 @@ import pandas as pd
 
 REVENUE_SOURCE_PACK_DIR = Path("data") / "revenue_model_source_pack" / "2026_05_19"
 REVENUE_SOURCE_PACK_SCHEMA_VERSION = "nltf-revenue-source-pack-v1"
-CANONICAL_REVENUE_SCHEMA_VERSION = "nltf-revenue-canonical-long-v1"
-REVENUE_SOURCE_PACK_RUNTIME_REVISION = "2026-06-24-source-gap-register-v2"
+CANONICAL_REVENUE_SCHEMA_VERSION = "nltf-revenue-canonical-long-v2"
+REVENUE_SOURCE_PACK_RUNTIME_REVISION = "2026-06-25-normalized-source-row-hashes-v1"
 
 REQUIRED_SOURCE_PACK_FILES = (
     "README.md",
@@ -268,6 +268,7 @@ def canonical_revenue_long_frame(
     rows = []
     source_hash = str(manifest.get("raw_workbook", {}).get("sha256", ""))
     distilled_hash = str(manifest.get("distilled_workbook", {}).get("sha256", ""))
+    normalized_hashes = _normalized_file_hashes(manifest)
 
     for record in annual_actuals.to_dict("records"):
         label = str(record.get("Series", "")).strip()
@@ -290,6 +291,7 @@ def canonical_revenue_long_frame(
                 source_file="annual_actuals.csv",
                 source_sheet=record.get("Source sheet", ""),
                 source_cell=record.get("Source cell", ""),
+                normalized_source_sha256=normalized_hashes.get("annual_actuals.csv", ""),
                 source_hash_sha256=source_hash,
                 distilled_hash_sha256=distilled_hash,
             )
@@ -318,6 +320,7 @@ def canonical_revenue_long_frame(
                 source_file="annual_model_paths.csv",
                 source_sheet=record.get("Source sheet", ""),
                 source_cell=record.get("Source cell", ""),
+                normalized_source_sha256=normalized_hashes.get("annual_model_paths.csv", ""),
                 source_hash_sha256=source_hash,
                 distilled_hash_sha256=distilled_hash,
             )
@@ -379,6 +382,7 @@ def validate_revenue_source_pack(
         "bridge_status",
         "source_file",
         "source_cell",
+        "normalized_source_sha256",
         "source_hash_sha256",
         "distilled_hash_sha256",
     }
@@ -1255,6 +1259,7 @@ def _canonical_row(registry: dict[str, dict[str, Any]], **kwargs: Any) -> dict[s
         "source_file": kwargs.get("source_file", ""),
         "source_sheet": kwargs.get("source_sheet", ""),
         "source_cell": kwargs.get("source_cell", ""),
+        "normalized_source_sha256": kwargs.get("normalized_source_sha256", ""),
         "source_hash_sha256": kwargs.get("source_hash_sha256", ""),
         "distilled_hash_sha256": kwargs.get("distilled_hash_sha256", ""),
     }
@@ -1351,6 +1356,20 @@ def _manifest_declared_files(manifest: dict[str, Any]) -> list[str]:
         if isinstance(payload, dict):
             filenames.update(str(filename) for filename in payload if str(filename).strip())
     return sorted(filenames)
+
+
+def _normalized_file_hashes(manifest: dict[str, Any]) -> dict[str, str]:
+    payload = manifest.get("normalized_files", {}) if isinstance(manifest, dict) else {}
+    if not isinstance(payload, dict):
+        return {}
+    hashes: dict[str, str] = {}
+    for filename, metadata in payload.items():
+        if not isinstance(metadata, dict):
+            continue
+        expected = str(metadata.get("sha256", "")).strip()
+        if expected:
+            hashes[str(filename)] = expected
+    return hashes
 
 
 def _manifest_file_hash_issues(manifest: dict[str, Any], pack_dir: Path | None) -> list[dict[str, str]]:

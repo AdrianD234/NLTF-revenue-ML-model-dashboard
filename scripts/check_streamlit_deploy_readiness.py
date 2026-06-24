@@ -101,7 +101,7 @@ REQUIRED_FORECAST_IMPORT_EXPORTS = {
     "write_forecast_scenario_comparison",
 }
 R2_LADDER_DEP_FALLBACK_ENV = "NLTF_FORCE_R2_LADDER_DEP_FALLBACK"
-EXPECTED_IMPORT_SURFACE_REVISION = "2026-06-24-revenue-source-pack-v1"
+EXPECTED_IMPORT_SURFACE_REVISION = "2026-06-25-revenue-source-pack-normalized-source-hashes-v1"
 REVENUE_SOURCE_PACK_ROOT = ROOT / "data" / "revenue_model_source_pack" / "2026_05_19"
 REQUIRED_REVENUE_SOURCE_PACK_FILES = {
     "README.md",

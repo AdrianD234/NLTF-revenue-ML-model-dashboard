@@ -30,7 +30,8 @@ canonical long table with:
 `aggregation_sign`, `release_vintage`, `forecast_path`, `path_status`,
 `scenario_name`, `scenario_role`, `model_basis`, `revenue_basis`,
 `source_status`, `bridge_status`, `source_file`, `source_cell`,
-`source_hash_sha256`, and `distilled_hash_sha256`.
+`normalized_source_sha256`, `source_hash_sha256`, and
+`distilled_hash_sha256`.
 
 Rows whose source labels are not registered in `series_master.csv` are retained
 with `source_status=unregistered_source_series` and

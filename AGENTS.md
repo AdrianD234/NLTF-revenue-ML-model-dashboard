@@ -157,6 +157,7 @@ Use checked-in wrappers instead of pasted multi-line PowerShell loops:
 
 ```powershell
 pwsh -NoProfile -File scripts\start_streamlit_bounded.ps1 -Port 8501 -StartupTimeoutSeconds 90
+pwsh -NoProfile -File scripts\restart_streamlit_bounded.ps1 -Port 8501 -StartupTimeoutSeconds 90 -StopTimeoutSeconds 20
 & .\scripts\invoke_bounded.ps1 -Label verify-dashboard -TimeoutSeconds 900 -FilePath pwsh -Arguments @("-NoProfile", "-File", "scripts\verify_dashboard.ps1")
 ```
 
@@ -174,6 +175,10 @@ The bounded wrapper should still be used for the split command.
 On timeout, inspect the wrapper log tails and exact child process command line,
 then stop only the process tree launched by the wrapper. Do not kill unrelated
 user Chrome, Excel, Python or Streamlit processes blindly.
+
+Do not hand-roll Streamlit restart loops with `Get-NetTCPConnection` polling.
+Use `scripts\restart_streamlit_bounded.ps1`; use `-ReuseHealthy` when an
+existing healthy server should be kept.
 
 ## Performance hardening rule
 

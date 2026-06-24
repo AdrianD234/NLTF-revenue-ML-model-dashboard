@@ -92,14 +92,14 @@ function Stop-ProcessTree {
     Stop-Process -Id $RootProcessId -Force -ErrorAction SilentlyContinue
 }
 
-$existing = @(Get-NetTCPConnection -LocalPort $Port -ErrorAction SilentlyContinue | Where-Object { $_.State -in @("Listen", "Bound") })
-if ($existing.Count -gt 0) {
-    if ($ReuseHealthy -and (Test-StreamlitHealth -Url $healthUrl)) {
+$alreadyHealthy = Test-StreamlitHealth -Url $healthUrl
+if ($alreadyHealthy) {
+    if ($ReuseHealthy) {
         Write-Output "STREAMLIT_READY $appUrl existing_listener=true"
         exit 0
     }
 
-    throw "Port $Port is already in use. Use -ReuseHealthy only when the existing listener is the dashboard you want."
+    throw "Port $Port already serves a healthy Streamlit endpoint. Use -ReuseHealthy or scripts\restart_streamlit_bounded.ps1 for an intentional restart."
 }
 
 $env:PYTHONPATH = $Root

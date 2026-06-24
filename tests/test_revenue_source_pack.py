@@ -117,6 +117,7 @@ def test_revenue_source_pack_canonical_long_schema_preserves_source_rows() -> No
         "bridge_status",
         "source_file",
         "source_cell",
+        "normalized_source_sha256",
         "source_hash_sha256",
         "distilled_hash_sha256",
     }
@@ -124,6 +125,18 @@ def test_revenue_source_pack_canonical_long_schema_preserves_source_rows() -> No
     assert not frame["unit"].astype(str).str.strip().eq("").any()
     assert frame["period"].astype(str).str.match(r"^FY\d{4}$").all()
     assert set(frame["aggregation_sign"].dropna().unique()).issubset({-1, 0, 1})
+    expected_source_hashes = {
+        filename: meta["sha256"]
+        for filename, meta in pack.manifest["normalized_files"].items()
+        if filename in {"annual_actuals.csv", "annual_model_paths.csv"}
+    }
+    actual_source_hashes = (
+        frame.groupby("source_file", dropna=False)["normalized_source_sha256"]
+        .agg(lambda values: set(values.dropna().astype(str)))
+        .to_dict()
+    )
+    assert actual_source_hashes["annual_actuals.csv"] == {expected_source_hashes["annual_actuals.csv"]}
+    assert actual_source_hashes["annual_model_paths.csv"] == {expected_source_hashes["annual_model_paths.csv"]}
     assert set(frame["path_status"].dropna().unique()).issubset(
         {"actual_or_benchmark", "selected_workbook_basis", "in_house_prediction_forecast", "aaron_schiff_prediction_forecast", "other_model_path"}
     )
@@ -411,6 +424,22 @@ def test_revenue_source_pack_loader_exports_are_hash_backed() -> None:
 
     pack = load_revenue_source_pack(repo_root=ROOT)
     assert pack is not None
+    canonical_export = pd.read_csv(PACK_DIR / "canonical_revenue_long.csv")
+    assert "normalized_source_sha256" in canonical_export.columns
+    for source_file, expected_hash in {
+        filename: meta["sha256"]
+        for filename, meta in pack.manifest["normalized_files"].items()
+        if filename in {"annual_actuals.csv", "annual_model_paths.csv"}
+    }.items():
+        hashes = set(
+            canonical_export.loc[
+                canonical_export["source_file"].eq(source_file),
+                "normalized_source_sha256",
+            ]
+            .dropna()
+            .astype(str)
+        )
+        assert hashes == {expected_hash}
     expected_counts = {
         "canonical_revenue_long.csv": len(pack.canonical_long),
         "source_pack_intake_status.csv": len(pack.intake_status),

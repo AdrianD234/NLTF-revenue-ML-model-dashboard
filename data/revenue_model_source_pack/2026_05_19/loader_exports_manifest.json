@@ -6,7 +6,7 @@
     "canonical_revenue_long.csv": {
       "role": "Canonical long schema across actuals and model paths.",
       "row_count": 1932,
-      "sha256": "64dec2423cb9c6040f5ee2f3ce2b6bfd5ba0d2ffcd950043b3e2a1121b605954"
+      "sha256": "ab7f237b0a67d2b381a0bbad6666b00e72a022d28e09b064099cb1351e4e7762"
     },
     "path_trace_status.csv": {
       "role": "Availability and plotting status for required Revenue Outlook total-path traces.",
