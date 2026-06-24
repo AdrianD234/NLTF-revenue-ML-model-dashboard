@@ -84,6 +84,12 @@ columns are join metadata only; they do not alter activity forecasts, revenue
 forecasts, bridge statuses, chart values, or output provenance hashes except for
 the expected file hash changes caused by adding the columns.
 
+The promoted-pack manifest must also declare SHA256 hashes for every generated
+Revenue Outlook output file. `load_revenue_outlook_pack()` validates those
+hashes, and requires the three runtime parquet files to be declared, before
+reading the promoted pack. A missing or hash-mismatched output is treated as a
+governance failure rather than a partially loaded dashboard source.
+
 ## Revenue Basis Control
 
 The workbook does not expose `revenue_basis` as a separate native dashboard

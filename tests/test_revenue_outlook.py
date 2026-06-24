@@ -3,9 +3,11 @@ from __future__ import annotations
 import json
 import hashlib
 from pathlib import Path
+import shutil
 
 import pandas as pd
 from openpyxl import load_workbook
+import pytest
 
 from model_dashboard.forecast_runner import (
     SHEET_BY_STREAM,
@@ -190,3 +192,13 @@ def test_committed_current_revenue_outlook_pack_is_repo_local_and_hash_backed() 
     for path in pack_dir.iterdir():
         if path.is_file():
             assert path.stat().st_size < 50 * 1024 * 1024
+
+
+def test_revenue_outlook_loader_rejects_hash_mismatched_promoted_pack(tmp_path: Path) -> None:
+    pack_copy = tmp_path / "current_revenue_outlook"
+    shutil.copytree(ROOT / CURRENT_REVENUE_OUTLOOK_DIR, pack_copy)
+    chart_csv = pack_copy / "revenue_chart_rows.csv"
+    chart_csv.write_text(chart_csv.read_text(encoding="utf-8") + "\n# tampered\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="revenue_chart_rows.csv hash mismatch"):
+        load_revenue_outlook_pack(pack_copy, repo_root=ROOT)

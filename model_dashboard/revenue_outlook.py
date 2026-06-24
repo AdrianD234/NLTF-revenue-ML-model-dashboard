@@ -38,6 +38,11 @@ MODEL_INPUT_HISTORY_FILES = {
     "LIGHT_RUC": "light_ruc_inputs.parquet",
     "HEAVY_RUC": "heavy_ruc_inputs.parquet",
 }
+RUNTIME_REVENUE_OUTLOOK_FILES = (
+    "future_revenue_forecasts.parquet",
+    "revenue_bridge_components.parquet",
+    "revenue_chart_rows.parquet",
+)
 STREAM_ORDER = ["PED", "LIGHT_RUC", "HEAVY_RUC"]
 STREAM_LABELS = {
     "PED": "PED VKT per capita",
@@ -136,6 +141,9 @@ def load_revenue_outlook_pack(
     if not manifest_path.exists():
         return None
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    hash_errors = _validate_output_hashes(base, manifest)
+    if hash_errors:
+        raise ValueError("Revenue Outlook promoted pack failed hash validation: " + " ".join(hash_errors))
     return RevenueOutlookPack(
         output_dir=base,
         manifest=manifest,
@@ -246,6 +254,32 @@ def _read_optional_parquet(path: Path) -> pd.DataFrame:
     if not path.exists():
         return pd.DataFrame()
     return pd.read_parquet(path)
+
+
+def _validate_output_hashes(pack_dir: Path, manifest: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
+    output_hashes = manifest.get("output_hashes")
+    if not isinstance(output_hashes, dict):
+        return ["manifest output_hashes is missing or invalid."]
+    for filename in RUNTIME_REVENUE_OUTLOOK_FILES:
+        if filename not in output_hashes:
+            errors.append(f"{filename} is missing from output_hashes.")
+    for filename, metadata in sorted(output_hashes.items()):
+        name = str(filename).strip()
+        if not name:
+            continue
+        expected = str(metadata.get("sha256", "")).strip() if isinstance(metadata, dict) else ""
+        path = pack_dir / name
+        if not path.exists():
+            errors.append(f"{name} is missing.")
+            continue
+        if not expected:
+            errors.append(f"{name} has no SHA256 in output_hashes.")
+            continue
+        actual = _sha256(path)
+        if actual != expected:
+            errors.append(f"{name} hash mismatch.")
+    return errors
 
 
 def _comparison_assumptions(comparison: ForecastScenarioComparisonResult) -> pd.DataFrame:
