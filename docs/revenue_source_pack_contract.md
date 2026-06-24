@@ -129,6 +129,13 @@ being inspected. The total-path chart mirrors those unavailable traces as
 legend-only governed gaps, with no numeric x/y values, so selected MOT/BEFU and
 rolling BEFU 1Y remain visible without fabricating release-value paths.
 
+The uncertainty source control is evidence-bound. When the user selects
+`MOT release round`, the dashboard requires release-value rows from the
+source pack. If those rows are not vendored, the uncertainty panel renders an
+explicit `release_value_table_missing` gap instead of substituting the
+in-house-vs-Schiff model spread. Model-spread uncertainty remains available
+only when the uncertainty source control selects a model-based source.
+
 Revenue charts normalize equivalent monetary source-unit labels (`$m ex GST`
 and `$m nominal ex GST`) to a single displayed axis and hover unit:
 `$m nominal ex GST`. This applies to path, fan, component, and selected-FY

@@ -2684,6 +2684,14 @@ def _add_missing_source_path_gap_traces(fig: go.Figure, source_pack: RevenueSour
 
 def _source_uncertainty_figure(source_pack: RevenueSourcePack, controls: dict[str, Any]) -> go.Figure:
     frame = _selected_source_series_frame(source_pack, controls)
+    uncertainty_source = _uncertainty_source_key(controls)
+    if uncertainty_source == "mot_release_round":
+        release_gap = _source_gap_register_for_controls(source_pack, controls)
+        release_gap = release_gap[release_gap["gap_id"].eq("release_value_table_missing")] if "gap_id" in release_gap.columns else pd.DataFrame()
+        if release_gap.empty or release_gap.iloc[0].get("availability_status") == "missing":
+            return empty_figure(
+                "MOT release-round uncertainty requires release-value rows; the distilled source pack carries this as release_value_table_missing."
+            )
     model = frame[frame["line"].eq("Model path")].copy()
     if model.empty or not {"in_house_model", "aaron_schiff_model"}.issubset(set(model["model_basis"])):
         return empty_figure("Probabilistic uncertainty fan is not available in the normalized source pack.")
@@ -2907,6 +2915,15 @@ def _model_basis_key(value: Any) -> str:
         return "aaron_schiff_model"
     if "selected" in text:
         return "selected_dashboard_basis"
+    return "in_house_model"
+
+
+def _uncertainty_source_key(controls: dict[str, Any]) -> str:
+    text = str(controls.get("uncertainty") or controls.get("uncertainty_source") or "").strip().lower()
+    if "mot" in text or "release" in text:
+        return "mot_release_round"
+    if "aaron" in text or "schiff" in text:
+        return "aaron_schiff_model"
     return "in_house_model"
 
 

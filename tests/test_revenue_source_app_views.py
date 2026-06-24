@@ -130,6 +130,28 @@ def test_revenue_source_charts_use_explicit_units_and_annual_ticks() -> None:
     assert "$m nominal ex GST" in {row[0] for row in split_fig.data[0].customdata}
 
 
+def test_uncertainty_source_control_does_not_fabricate_mot_release_fan() -> None:
+    pack = load_revenue_source_pack(repo_root=ROOT)
+    assert pack is not None
+    controls = {
+        "series": "Total NLTF revenue",
+        "release_round": "BEFU25",
+        "model_basis": "In-house model",
+        "selected_fy": "FY2031",
+        "uncertainty": "MOT release round",
+    }
+
+    mot_fig = _source_uncertainty_figure(pack, controls)
+
+    assert not mot_fig.data
+    assert "release-value rows" in mot_fig.layout.annotations[0].text
+    assert "release_value_table_missing" in mot_fig.layout.annotations[0].text
+
+    model_fig = _source_uncertainty_figure(pack, {**controls, "uncertainty": "In-house model"})
+    assert model_fig.data
+    assert model_fig.layout.yaxis.title.text == "$m nominal ex GST"
+
+
 def test_revenue_outlook_hover_preserves_horizon_scope_labels() -> None:
     rows = pd.DataFrame(
         [
