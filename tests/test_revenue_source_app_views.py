@@ -18,6 +18,7 @@ from app import (
     _source_path_trace_status_for_controls,
     _source_reconciliation_view,
     _revenue_outlook_manifest_table,
+    _resolve_revenue_source_control_applicability,
     _scenario_color_map,
     _selected_source_series_frame,
     _source_split_figure,
@@ -186,9 +187,15 @@ def test_hybrid_annual_view_exposes_replacement_audit_for_selected_fy() -> None:
     assert set(replacements["series_id"]) == {"gross_ped_revenue", "light_ruc_net_revenue", "heavy_ruc_net_revenue"}
     assert set(replacements["fed_path"]) == {"Current planned path"}
     replacement_sources = replacements.groupby("series_id")["source_file"].agg(lambda values: set(values))
-    assert replacement_sources.loc["gross_ped_revenue"] == {"annual_model_paths.csv; fed_rate_paths.csv; ped_bridge_inputs.csv"}
-    assert replacement_sources.loc["light_ruc_net_revenue"] == {"annual_model_paths.csv"}
-    assert replacement_sources.loc["heavy_ruc_net_revenue"] == {"annual_model_paths.csv"}
+    assert replacement_sources.loc["gross_ped_revenue"] == {
+        "data/current_revenue_outlook/revenue_chart_rows.csv; ped_bridge_inputs.csv; fed_rate_paths.csv"
+    }
+    assert replacement_sources.loc["light_ruc_net_revenue"] == {
+        "data/current_revenue_outlook/revenue_chart_rows.csv; official_befu25_annual.csv"
+    }
+    assert replacement_sources.loc["heavy_ruc_net_revenue"] == {
+        "data/current_revenue_outlook/revenue_chart_rows.csv; official_befu25_annual.csv"
+    }
     assert {"population_count", "ped_total_vkt", "ped_litres_per_100km"}.issubset(set(view["series_id"]))
     assert view[view["row_role"].eq("calculated_rollup")]["residual_vs_official"].notna().any()
 
@@ -205,17 +212,18 @@ def test_hybrid_annual_view_applies_crown_top_up_only_when_selected() -> None:
     pack = load_revenue_source_pack(repo_root=ROOT)
     assert pack is not None
 
-    exclude = _source_hybrid_annual_view(pack, {"selected_fy": "FY2023", "crown_top_up": "Exclude"})
-    include = _source_hybrid_annual_view(pack, {"selected_fy": "FY2023", "crown_top_up": "Include"})
+    exclude = _source_hybrid_annual_view(pack, {"selected_fy": "FY2026", "crown_top_up": "Exclude"})
+    include = _source_hybrid_annual_view(pack, {"selected_fy": "FY2026", "crown_top_up": "Include"})
 
     excluded_top_up = float(exclude[exclude["series_id"].eq("crown_top_up")]["value"].iloc[0])
-    included_top_up = float(include[include["series_id"].eq("crown_top_up")]["value"].iloc[0])
+    included_top_up = include[include["series_id"].eq("crown_top_up")]["value"].iloc[0]
     excluded_total = float(exclude[exclude["series_id"].eq("total_nltf_net_revenue")]["value"].iloc[0])
     included_total = float(include[include["series_id"].eq("total_nltf_net_revenue")]["value"].iloc[0])
 
     assert excluded_top_up == 0.0
-    assert included_top_up > 0.0
-    assert included_total == excluded_total + included_top_up
+    assert pd.isna(included_top_up)
+    assert included_total == excluded_total
+    assert set(include[include["series_id"].eq("crown_top_up")]["availability_status"]) == {"missing"}
 
 
 def test_revenue_source_horizon_control_limits_path_chart_without_selected_fy_coupling() -> None:
@@ -295,7 +303,7 @@ def test_component_deduction_long_form_is_selectable_signed_and_download_ready()
         pack,
         {**controls, "component_filter": ["FED refunds", "Gross PED revenue"]},
     )
-    assert set(selected["display_name"]) == {"FED refunds", "Gross PED revenue"}
+    assert set(selected["series_id"]) == {"fed_refunds", "gross_ped_revenue"}
 
 
 def test_full_common_horizon_stops_at_last_fixed_or_replacement_row() -> None:
@@ -311,11 +319,11 @@ def test_full_common_horizon_stops_at_last_fixed_or_replacement_row() -> None:
     lower, upper = _source_horizon_bounds(pack, controls)
     fig = _source_total_path_figure(pack, controls)
 
-    assert (lower, upper) == (2014, 2031)
+    assert (lower, upper) == (2026, 2031)
     for trace in fig.data:
         xs = [int(x) for x in getattr(trace, "x", []) if x is not None]
         if xs:
-            assert min(xs) >= 2014
+            assert min(xs) >= 2026
             assert max(xs) <= 2031
 
 
@@ -393,16 +401,62 @@ def test_total_path_chart_splits_fy2026_partial_actual_from_forecast_paths() -> 
 
     for trace_name in [
         "Selected MOT/BEFU release path",
-        "Selected dashboard basis",
         "In-house prediction / forecast",
-        "Aaron Schiff",
+        "Legacy workbook selected basis",
+        "Legacy workbook model",
+        "Legacy workbook Schiff model",
         "Hybrid replacement-only outlook",
     ]:
         assert min(int(value) for value in by_name[trace_name].x) == 2026
 
+    current = pack.current_forecast_annual[
+        pack.current_forecast_annual["series_id"].eq("total_nltf_net_revenue")
+        & pack.current_forecast_annual["scenario_name"].eq("current_basecase")
+        & pack.current_forecast_annual["fed_path"].eq("Current planned path")
+        & pack.current_forecast_annual["FY"].eq(2026)
+    ]
+    assert not current.empty
+    in_house = by_name["In-house prediction / forecast"]
+    first_idx = list(map(int, in_house.x)).index(2026)
+    assert abs(float(in_house.y[first_idx]) - float(current.iloc[0]["value"])) <= 1e-9
+
     marker_shapes = {(int(shape.x0), shape.line.dash) for shape in fig.layout.shapes}
     assert (2026, "dash") in marker_shapes
     assert (2031, "dot") in marker_shapes
+
+
+def test_revenue_source_control_applicability_resolves_invalid_series_controls() -> None:
+    pack = load_revenue_source_pack(repo_root=ROOT)
+    assert pack is not None
+
+    activity_controls, activity_messages = _resolve_revenue_source_control_applicability(
+        pack,
+        {
+            "series": "Light RUC net km",
+            "revenue_path": "Net of admin fees & refunds",
+            "revenue_basis": "Net",
+            "fed_path": "No 2027 12c uplift",
+            "crown_top_up": "Include",
+        },
+    )
+    assert activity_controls["revenue_basis"] == "Not applicable"
+    assert activity_controls["fed_path"] == "Not applicable"
+    assert activity_controls["crown_top_up"] == "Exclude"
+    assert any("activity/volume series" in message for message in activity_messages)
+
+    ped_controls, ped_messages = _resolve_revenue_source_control_applicability(
+        pack,
+        {
+            "series": "PED revenue",
+            "revenue_path": "Net of admin fees & refunds",
+            "revenue_basis": "Net",
+            "fed_path": "Current planned path",
+            "crown_top_up": "Exclude",
+        },
+    )
+    assert ped_controls["revenue_basis"] == "Gross"
+    assert ped_controls["revenue_path"] == "Gross / benchmark actual"
+    assert any("does not support revenue basis" in message for message in ped_messages)
 
 
 def test_revenue_source_charts_use_explicit_units_and_annual_ticks() -> None:

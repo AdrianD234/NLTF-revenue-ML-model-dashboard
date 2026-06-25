@@ -1,0 +1,90 @@
+{
+  "annual_completeness_rows": 54,
+  "current_outlook_chart_rows": 1809,
+  "current_outlook_model_ids": {
+    "HEAVY_RUC": [
+      "HEAVY_RUC__VNEXT_SOLVED_CONVEX_TOP4"
+    ],
+    "LIGHT_RUC": [
+      "dynamic_RESID_GBR_n150_d1_lr0.05_w36"
+    ],
+    "PED": [
+      "PED__VNEXT_SOLVED_CONVEX_TOP2"
+    ]
+  },
+  "current_outlook_output_hashes": {
+    "future_revenue_forecasts.csv": {
+      "sha256": "433c56f87c259ef76afbb8a8f5a4f54a666175b9c9741d1a3ef8224b33c30086",
+      "size_bytes": 428916
+    },
+    "future_revenue_forecasts.parquet": {
+      "sha256": "cfd0f72abf96d0999834d5e72bd91299d85cfcc3ede52a5752a4d136ff65c333",
+      "size_bytes": 32463
+    },
+    "revenue_bridge_components.csv": {
+      "sha256": "a9ee38ad4d2a056ea1a5a05e88821a50aae2b20565bad7874b168e7749a90e50",
+      "size_bytes": 369551
+    },
+    "revenue_bridge_components.parquet": {
+      "sha256": "52aa0a07dfa79bc046731563a2bbdb589705b4fda6477e4673e0e60213613c7a",
+      "size_bytes": 30260
+    },
+    "revenue_chart_rows.csv": {
+      "sha256": "be9de3f1722b42755b52810dbd7e61500519454bb45f63e80baf80843681b9ca",
+      "size_bytes": 708900
+    },
+    "revenue_chart_rows.parquet": {
+      "sha256": "f6939fba667ac756d66862f45fdbee805e8593bebdda7d7f6716ba8dcf3944de",
+      "size_bytes": 46156
+    }
+  },
+  "current_outlook_pack_status": "explicitly_promoted_current_outlook",
+  "current_outlook_promotion_time": "2026-06-24T09:50:46.982869+00:00",
+  "current_outlook_scenarios": [
+    {
+      "forecast_end_period": "2050Q4",
+      "forecast_horizon_quarters": 100,
+      "forecast_start_period": "2026Q1",
+      "scenario_name": "current_basecase",
+      "scenario_role": "basecase"
+    },
+    {
+      "forecast_end_period": "2050Q4",
+      "forecast_horizon_quarters": 100,
+      "forecast_start_period": "2026Q1",
+      "scenario_name": "current_comparison_1",
+      "scenario_role": "comparison"
+    }
+  ],
+  "first_model_forecast_fy": "FY2026",
+  "first_model_forecast_quarter": "2026Q1",
+  "last_complete_actual_fy": 2025,
+  "missing_partial_actual_quarters": "2026Q2",
+  "model_refit_cutoff": "2025Q4",
+  "model_training_cutoff": "2025Q4",
+  "partial_actual_fy": 2026,
+  "partial_actual_quarters": "2025Q3; 2025Q4; 2026Q1",
+  "policy_note": "Models are trained/refitted through 2025Q4. 2026Q1 is an observation/source actual, not a model-training row. FY2026 is partial actual-to-date unless explicitly shown as actual-plus-forecast-to-go nowcast.",
+  "repo_relative_current_revenue_outlook_dir": "data/current_revenue_outlook",
+  "repo_relative_source_pack_dir": "data/revenue_model_source_pack/2026_05_19",
+  "revenue_source_actual_cutoff": "2026Q1",
+  "schema_version": "nltf-revenue-data-vintage-v1",
+  "source_pack_normalized_hashes": {
+    "aggregation_rules.csv": "41aa56360f8ebf7d8b2a37103a5cd3397bbd4d8b15c3c43d2709a597374bf508",
+    "annual_actuals.csv": "f37d30359832cb7099de8c021ed7d60d7d509935c902ce298f44e8fded81a711",
+    "annual_model_paths.csv": "fbab6f3e3de41a5eacc0f49136c654464e0f426a8913b4cff12424c7577f1e83",
+    "current_selections.csv": "29181e7a7a5ff6e924353e05d9dd415d182d67dee4ef49ed6252d064f0cc2dc7",
+    "fed_rate_paths.csv": "fc1bdac362bc565cb2fa785f19f9fb0b57eb68f47654717810090dc994c2059a",
+    "forecast_archive.csv": "f80ce6ddd2187c4567fab368b0c67ec4bccbceaf6691198076ab73ac8beaa4d5",
+    "formula_errors.csv": "4c87bcd9cc6e47dcf467d2f4fa275874d22078edce22b73eb8237b56004b85b4",
+    "model_coefficients.csv": "44bff04962928ccff0e6387d7fb318233e147cb6a7049e4462c8a50fcd7cc24d",
+    "mot_error_bands.csv": "ea802d34d92de0fa7dce4accfdaa23383b0edb09d0d73bc8d4f22313f9b5e806",
+    "official_befu25_annual.csv": "8d875c4693e2eede86c3a690a9e51e1477d3ffb404b2d76694c2d927b4a7e2f2",
+    "ped_bridge_inputs.csv": "427918975779d9be6400ae448bfc0900e83e6ab709b7799a8840c1320eaf5249",
+    "quarterly_actuals.csv": "06d7da1b0b361fff2f1e8ce010886c07ec4dfe9decc54fafda4eb81af11625bb",
+    "release_registry.csv": "f704ff3bdf953b5f7c97afdac1b53c74a642d129f118c29962bb3d2f0c95fb99",
+    "release_values.csv": "afb8aae4f5a82c9f32ec041398479b96171e3226c418487ebc6b3fbd5deee858",
+    "series_master.csv": "adc79ded4d5c48e7bd537643ebcca3ebac8c21fcab04dbaab69e5ab2bdf72b02",
+    "unresolved_decisions.csv": "630982edb60d17136a77b156bc85d81252268bcb32d6d892e8df44c564e9967a"
+  }
+}

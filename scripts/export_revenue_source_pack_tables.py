@@ -29,6 +29,9 @@ EXPORT_FILES = {
     "series_role_audit.csv": "Explicit role contract for modeled activity, revenue bridges, pass-through lines, deductions, overlays, and source gaps.",
     "hybrid_annual_revenue.csv": "Replacement-only annual NLTF hybrid roll-up audit using source-backed PED/FED, Light RUC and Heavy RUC bridge inputs plus MOT fixed components.",
     "annual_completeness_audit.csv": "June-year annual actual completeness audit and chart-treatment contract.",
+    "series_trace_contract.csv": "Per-series trace contract for valid controls, actual source, primary current forecast source, legacy benchmark source, bridge and cutoffs.",
+    "series_junction_audit.csv": "FY2024-FY2027 actual/current/legacy junction audit with quarter coverage, cutoffs, nowcast components and discontinuity flags.",
+    "data_vintage_manifest.json": "Model/source observation cutoffs and repo-local current Revenue Outlook/source-pack hashes.",
     "validation_issues.csv": "Loader validation warnings/errors for the source pack.",
 }
 
@@ -55,6 +58,8 @@ def export_tables(pack_dir: Path) -> dict[str, object]:
         "series_role_audit.csv": pack.series_role_audit,
         "hybrid_annual_revenue.csv": pack.hybrid_annual_revenue,
         "annual_completeness_audit.csv": pack.annual_completeness_audit,
+        "series_trace_contract.csv": pack.series_trace_contract,
+        "series_junction_audit.csv": pack.series_junction_audit,
         "validation_issues.csv": pack.validation_issues,
     }
     manifest: dict[str, object] = {
@@ -76,6 +81,13 @@ def export_tables(pack_dir: Path) -> dict[str, object]:
             "row_count": int(len(frame)),
             "role": EXPORT_FILES[filename],
         }
+    data_vintage_path = pack_dir / "data_vintage_manifest.json"
+    data_vintage_path.write_text(json.dumps(pack.data_vintage_manifest, indent=2, sort_keys=True, default=str) + "\n", encoding="utf-8")
+    manifest["exports"]["data_vintage_manifest.json"] = {
+        "sha256": sha256(data_vintage_path),
+        "row_count": None,
+        "role": EXPORT_FILES["data_vintage_manifest.json"],
+    }
     loader_manifest = pack_dir / "loader_exports_manifest.json"
     loader_manifest.write_text(json.dumps(manifest, indent=2, sort_keys=True, default=str) + "\n", encoding="utf-8")
     return manifest

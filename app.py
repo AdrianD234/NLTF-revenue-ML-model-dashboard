@@ -2233,8 +2233,11 @@ def _render_revenue_source_controls(source_pack: RevenueSourcePack | None) -> di
 
 
 def _render_revenue_source_architecture(source_pack: RevenueSourcePack, controls: dict[str, Any]) -> None:
+    controls, applicability_messages = _resolve_revenue_source_control_applicability(source_pack, controls)
     if controls.get("time_grain") == "Quarterly":
         warning_panel("The distilled revenue source pack is annual only. Quarterly display remains available for the promoted Forecast Builder volume pack below.")
+    for message in applicability_messages:
+        info_panel(message)
     for message in _source_control_gap_messages(source_pack, controls):
         warning_panel(message)
     source_status = (
@@ -2317,11 +2320,98 @@ def _render_revenue_source_architecture(source_pack: RevenueSourcePack, controls
         display_table(_source_gap_register_for_controls(source_pack, controls), height=180, max_rows=80)
         st.caption("Series role audit")
         display_table(_source_series_role_audit(source_pack), height=180, max_rows=100)
+        st.caption("Series trace contract")
+        display_table(getattr(source_pack, "series_trace_contract", pd.DataFrame()), height=220, max_rows=120)
+        st.caption("FY2025/FY2026 junction audit")
+        display_table(getattr(source_pack, "series_junction_audit", pd.DataFrame()), height=220, max_rows=160)
         st.caption("Loader export manifest")
         display_table(_source_manifest_view(source_pack), height=220, max_rows=80)
         dataframe_download(source_pack.canonical_long, "Download canonical revenue long table", "canonical_revenue_long.csv")
         dataframe_download(annual_completeness, "Download annual completeness audit", "annual_completeness_audit.csv")
         dataframe_download(_source_hybrid_annual_view(source_pack, controls), "Download hybrid annual replacement audit", "hybrid_annual_revenue.csv")
+
+
+def _resolve_revenue_source_control_applicability(
+    source_pack: RevenueSourcePack,
+    controls: dict[str, Any],
+) -> tuple[dict[str, Any], list[str]]:
+    resolved = dict(controls)
+    selected_label = str(resolved.get("series") or "Total NLTF revenue").strip()
+    contract = _source_trace_contract_for_selection(source_pack, selected_label)
+    series_id = str(contract.get("canonical_id") or _selected_series_id(source_pack, selected_label))
+    metric_type = str(contract.get("metric_type") or "").strip().lower()
+    valid_bases = _source_contract_list(contract.get("valid_bases"))
+    valid_controls = set(_source_contract_list(contract.get("valid_controls")))
+    messages: list[str] = []
+
+    if metric_type == "activity":
+        if str(resolved.get("revenue_path") or "").strip().lower() != "not applicable":
+            messages.append(
+                f"Control applicability: '{selected_label}' is an activity/volume series, so revenue path, revenue basis, FED path and Crown top-up are ignored for this trace."
+            )
+        resolved["revenue_path"] = "Not applicable"
+        resolved["revenue_basis"] = "Not applicable"
+        resolved["fed_path"] = "Not applicable"
+        resolved["crown_top_up"] = "Exclude"
+        return resolved, messages
+
+    selected_basis = str(resolved.get("revenue_basis") or "").strip()
+    selected_basis_key = _source_revenue_basis_key(selected_basis)
+    valid_basis_keys = {_source_revenue_basis_key(value) for value in valid_bases}
+    valid_basis_keys.discard("")
+    if valid_basis_keys and selected_basis_key not in valid_basis_keys:
+        preferred = _preferred_source_basis(valid_bases)
+        resolved["revenue_basis"] = preferred
+        if _source_revenue_basis_key(preferred) == "gross":
+            resolved["revenue_path"] = "Gross / benchmark actual"
+        elif _source_revenue_basis_key(preferred) == "net":
+            resolved["revenue_path"] = "Net of admin fees & refunds"
+        messages.append(
+            f"Control applicability: '{selected_label}' does not support revenue basis '{selected_basis or 'blank'}'; using '{preferred}' for the source-backed trace."
+        )
+
+    if "fed_path" not in valid_controls and str(resolved.get("fed_path") or "").strip() not in {"", "Not applicable"}:
+        resolved["fed_path"] = "Not applicable"
+        messages.append(f"Control applicability: FED path is not value-changing for '{selected_label}' and is ignored.")
+    if "crown_top_up" not in valid_controls and str(resolved.get("crown_top_up") or "").strip().lower() == "include":
+        resolved["crown_top_up"] = "Exclude"
+        messages.append(f"Control applicability: Crown top-up is not an applicable overlay for '{selected_label}' and has been excluded.")
+
+    if series_id == "gross_ped_revenue" and _source_revenue_basis_key(str(resolved.get("revenue_basis") or "")) == "net":
+        resolved["revenue_basis"] = "Gross"
+        resolved["revenue_path"] = "Gross / benchmark actual"
+        messages.append("Control applicability: PED revenue is gross/nominal ex GST only; Net is not shown as a PED-only basis.")
+    return resolved, messages
+
+
+def _source_trace_contract_for_selection(source_pack: RevenueSourcePack, selected_label: str) -> dict[str, Any]:
+    contract = getattr(source_pack, "series_trace_contract", pd.DataFrame())
+    if not isinstance(contract, pd.DataFrame) or contract.empty:
+        return {}
+    series_id = _selected_series_id(source_pack, selected_label)
+    rows = contract[
+        contract.get("series_option", pd.Series("", index=contract.index)).astype(str).eq(selected_label)
+        | contract.get("canonical_id", pd.Series("", index=contract.index)).astype(str).eq(series_id)
+        | contract.get("display_name", pd.Series("", index=contract.index)).astype(str).eq(selected_label)
+    ].copy()
+    if rows.empty:
+        return {}
+    return rows.iloc[0].to_dict()
+
+
+def _source_contract_list(value: Any) -> list[str]:
+    if isinstance(value, list):
+        raw = value
+    else:
+        raw = str(value or "").split(";")
+    return [str(item).strip() for item in raw if str(item).strip()]
+
+
+def _preferred_source_basis(valid_bases: list[str]) -> str:
+    for candidate in ["Net", "Gross", "Nominal ex GST"]:
+        if candidate in valid_bases:
+            return candidate
+    return valid_bases[0] if valid_bases else "Net"
 
 
 def _source_control_gap_messages(source_pack: RevenueSourcePack, controls: dict[str, Any]) -> list[str]:
@@ -2788,9 +2878,10 @@ def _source_total_path_figure(source_pack: RevenueSourcePack, controls: dict[str
         ("Selected MOT/BEFU release path", _source_forecast_path_rows(source_pack, _source_selected_release_rows(frame, controls)), "#5B677A", "dashdot"),
         ("Rolling BEFU 1Y", _source_rolling_befu_1y_rows(frame), "#6B7F2A", "dot"),
         ("Hybrid replacement-only outlook", _source_forecast_path_rows(source_pack, _source_hybrid_path_rows(source_pack, controls)), "#D1495B", "solid"),
-        ("Selected dashboard basis", _source_forecast_path_rows(source_pack, _source_model_rows(frame, "selected_dashboard_basis")), "#002B5C", "solid"),
-        ("In-house prediction / forecast", _source_forecast_path_rows(source_pack, _source_model_rows(frame, "in_house_model")), "#00843D", "solid"),
-        ("Aaron Schiff", _source_forecast_path_rows(source_pack, _source_model_rows(frame, "aaron_schiff_model")), "#F37021", "dash"),
+        ("In-house prediction / forecast", _source_forecast_path_rows(source_pack, _source_current_forecast_path_rows(source_pack, frame, controls)), "#00843D", "solid"),
+        ("Legacy workbook selected basis", _source_forecast_path_rows(source_pack, _source_model_rows(frame, "selected_dashboard_basis")), "#002B5C", "solid"),
+        ("Legacy workbook model", _source_forecast_path_rows(source_pack, _source_model_rows(frame, "in_house_model")), "#2F855A", "dot"),
+        ("Legacy workbook Schiff model", _source_forecast_path_rows(source_pack, _source_model_rows(frame, "aaron_schiff_model")), "#F37021", "dash"),
     ]
     axis_title = _source_axis_title(frame)
     for name, rows, color, dash in trace_specs:
@@ -3327,7 +3418,12 @@ def _source_component_long_form_view(source_pack: RevenueSourcePack, controls: d
     out = rows.copy()
     component_filter = [str(value) for value in controls.get("component_filter", []) or [] if str(value).strip()]
     if component_filter:
-        out = out[out["display_name"].astype(str).isin(component_filter) | out["series_id"].astype(str).isin(component_filter)].copy()
+        component_ids = set(component_filter)
+        component_ids.update(_selected_series_id(source_pack, value) for value in component_filter)
+        out = out[
+            out["display_name"].astype(str).isin(component_filter)
+            | out["series_id"].astype(str).isin(component_ids)
+        ].copy()
     if out.empty:
         return pd.DataFrame([{"status": "gap", "message": "No selected components or deductions match the current controls."}])
     out["sign"] = out["series_id"].map(_hybrid_component_sign).fillna(1).astype(int)
@@ -3443,6 +3539,41 @@ def _source_hybrid_path_rows(source_pack: RevenueSourcePack, controls: dict[str,
     rows["line"] = "Model path"
     rows["model_basis"] = "hybrid_replacement_only"
     rows["value"] = pd.to_numeric(rows["value"], errors="coerce")
+    return rows.rename(columns={"display_name": "source_series_label"})
+
+
+def _source_current_forecast_path_rows(source_pack: RevenueSourcePack, frame: pd.DataFrame, controls: dict[str, Any]) -> pd.DataFrame:
+    current = getattr(source_pack, "current_forecast_annual", pd.DataFrame())
+    if not isinstance(current, pd.DataFrame) or current.empty or frame.empty:
+        return pd.DataFrame()
+    series_ids = set(frame.get("series_id", pd.Series(dtype=str)).dropna().astype(str))
+    if not series_ids:
+        return pd.DataFrame()
+    rows = current[current.get("series_id", pd.Series(dtype=str)).astype(str).isin(series_ids)].copy()
+    if rows.empty:
+        return pd.DataFrame()
+    if "scenario_name" in rows.columns:
+        rows = rows[rows["scenario_name"].astype(str).eq("current_basecase")].copy()
+    selected_path = _selected_fed_path(controls)
+    if "fed_path" in rows.columns and selected_path:
+        path_rows = rows[rows["fed_path"].astype(str).eq(selected_path)].copy()
+        if not path_rows.empty:
+            rows = path_rows
+    rows["value"] = pd.to_numeric(rows.get("value"), errors="coerce")
+    rows = rows[rows["value"].notna()].copy()
+    if rows.empty:
+        return pd.DataFrame()
+    defaults = {
+        "source_file": "data/current_revenue_outlook/revenue_chart_rows.csv",
+        "line": "Model path",
+        "model_basis": "current_finalist_model",
+        "forecast_path": "current_finalist_model",
+        "path_status": "current_model_forecast",
+        "source_status": "source_backed",
+    }
+    for column, value in defaults.items():
+        if column not in rows.columns:
+            rows[column] = value
     return rows.rename(columns={"display_name": "source_series_label"})
 
 

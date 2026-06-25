@@ -13,15 +13,20 @@
       "row_count": 39967,
       "sha256": "f7a7fc2e9f14f32c4606e1fb98d2bcfa283d6f80098a77ea2a35eb96c92d0ee5"
     },
+    "data_vintage_manifest.json": {
+      "role": "Model/source observation cutoffs and repo-local current Revenue Outlook/source-pack hashes.",
+      "row_count": null,
+      "sha256": "7ef5f5cf2e6aa84bca6b3b2a8ff528c80b6aa0ed7fb75575cd92d6d7e7054a37"
+    },
     "hybrid_annual_revenue.csv": {
       "role": "Replacement-only annual NLTF hybrid roll-up audit using source-backed PED/FED, Light RUC and Heavy RUC bridge inputs plus MOT fixed components.",
-      "row_count": 1296,
-      "sha256": "36398b7dff7550906bcb9b8bfc3baed621f136ddba00629266ba5b5b50ed3241"
+      "row_count": 450,
+      "sha256": "91585aa27b23ab48784cea38f25bfcd0d07097fb0ffbba6eb24db82d5cb70a78"
     },
     "path_trace_status.csv": {
       "role": "Availability and plotting status for required Revenue Outlook total-path traces.",
-      "row_count": 7,
-      "sha256": "76ebfdddfdd762cf1ba3c8f02449b558c51b561b4831aa05ed563c9c10a5b9e1"
+      "row_count": 8,
+      "sha256": "b5780e1d9362236acb675e31bbab1e22d143ad36aca234c9281ee5e753c01a60"
     },
     "reconciliation_report.csv": {
       "role": "Hierarchy roll-up reconciliation and explicit gap report.",
@@ -33,10 +38,20 @@
       "row_count": 7,
       "sha256": "542ca27d21fcdeaaed5c1d89f42e50bdabb73b1a84dc1e400a3bef463c8dca0a"
     },
+    "series_junction_audit.csv": {
+      "role": "FY2024-FY2027 actual/current/legacy junction audit with quarter coverage, cutoffs, nowcast components and discontinuity flags.",
+      "row_count": 264,
+      "sha256": "e3b1da79e6c11b77d84c71960608e010a3f0be7262a3e306475d4413fecb355d"
+    },
     "series_role_audit.csv": {
       "role": "Explicit role contract for modeled activity, revenue bridges, pass-through lines, deductions, overlays, and source gaps.",
       "row_count": 79,
       "sha256": "364e16ba6e4916b35f20bb980e12124d835f1233f3e383b9ca16fe3c945009b6"
+    },
+    "series_trace_contract.csv": {
+      "role": "Per-series trace contract for valid controls, actual source, primary current forecast source, legacy benchmark source, bridge and cutoffs.",
+      "row_count": 25,
+      "sha256": "c65a2b2e79471fdd51d1441fff19aac3125a9924fe352305eb1ccdce3328a587"
     },
     "source_gap_register.csv": {
       "role": "Structured source-pack gaps for release values, FED path scenarios, Crown top-up, quarterly rows, and bridge replay.",

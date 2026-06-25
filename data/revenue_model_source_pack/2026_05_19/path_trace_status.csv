@@ -1,8 +1,9 @@
 trace_id,trace_label,availability_status,plotted,data_scope,blocking_gap_id,current_selection,user_visible_message
 actual_benchmark,Complete annual actuals,available,True,annual actual rows after completeness audit,,official actual or benchmark,Only complete annual actual years are connected as the grey actual line.
 actual_to_date_marker,Actual to date marker,available,True,partial current-FY annual actual row,,FY2026 actual-to-date,Partial current-FY actuals are plotted as distinct markers and are not joined to the complete actual line.
-selected_workbook_basis,Selected workbook basis,available,True,annual model path rows,,source workbook current selection,Current workbook-selected annual model path is plotted.
+selected_workbook_basis,Legacy workbook selected basis,available,True,annual model path rows,,source workbook current selection,Workbook-selected annual model path is retained as a legacy benchmark.
 selected_mot_befu_release,Selected MOT/BEFU release path,available,True,release-value table,,BEFU25,Selected MOT/BEFU release path is plotted from repo-local release_values.csv rows.
 rolling_befu_1y,Rolling BEFU 1Y,available,True,release-value table,,BEFU25,Rolling BEFU 1Y is plotted from true one-year-ahead rows in release_values.csv.
-aaron_schiff_model,Aaron Schiff prediction / forecast,available,True,annual model path rows,,Aaron Schiff model,Aaron Schiff annual model path is plotted where source rows exist.
-in_house_model,In-house prediction / forecast,available,True,annual model path rows,,In-house model,In-house annual model path is plotted where source rows exist.
+aaron_schiff_model,Legacy workbook Schiff model,available,True,annual model path rows,,Aaron Schiff model,Aaron Schiff annual model path is retained as a legacy benchmark.
+in_house_model,In-house prediction / forecast,available,True,promoted current finalist quarterly outputs annualized to June years,,current finalist model,"Primary in-house trace is plotted from data/current_revenue_outlook current finalist outputs, not annual_model_paths.csv."
+legacy_in_house_model,Legacy workbook model,available,True,annual model path rows,,legacy workbook in-house model,Workbook in-house annual model path is retained only as an optional legacy benchmark.

@@ -268,9 +268,15 @@ def test_hybrid_annual_revenue_replaces_only_three_lines_and_preserves_mot_fixed
     non_replacements = hybrid[~hybrid["replacement_only"].astype(bool)]
     assert not set(non_replacements["series_id"]).intersection({"gross_ped_revenue", "light_ruc_net_revenue", "heavy_ruc_net_revenue"})
     replacement_sources = replacements.groupby("series_id")["source_file"].agg(lambda values: set(values))
-    assert replacement_sources.loc["gross_ped_revenue"] == {"annual_model_paths.csv; fed_rate_paths.csv; ped_bridge_inputs.csv"}
-    assert replacement_sources.loc["light_ruc_net_revenue"] == {"annual_model_paths.csv"}
-    assert replacement_sources.loc["heavy_ruc_net_revenue"] == {"annual_model_paths.csv"}
+    assert replacement_sources.loc["gross_ped_revenue"] == {
+        "data/current_revenue_outlook/revenue_chart_rows.csv; ped_bridge_inputs.csv; fed_rate_paths.csv"
+    }
+    assert replacement_sources.loc["light_ruc_net_revenue"] == {
+        "data/current_revenue_outlook/revenue_chart_rows.csv; official_befu25_annual.csv"
+    }
+    assert replacement_sources.loc["heavy_ruc_net_revenue"] == {
+        "data/current_revenue_outlook/revenue_chart_rows.csv; official_befu25_annual.csv"
+    }
     assert {"Current planned path", "No 2027 12c uplift"}.issubset(set(replacements["fed_path"]))
     assert replacements["formula"].astype(str).str.len().gt(0).all()
 
@@ -517,12 +523,23 @@ def test_revenue_path_trace_status_marks_vendored_release_traces_available_witho
         "rolling_befu_1y",
         "aaron_schiff_model",
         "in_house_model",
+        "legacy_in_house_model",
     }
     assert required_traces.issubset(set(by_id.index))
 
-    available = by_id.loc[["actual_benchmark", "selected_workbook_basis", "aaron_schiff_model", "in_house_model"]]
+    available = by_id.loc[
+        [
+            "actual_benchmark",
+            "selected_workbook_basis",
+            "aaron_schiff_model",
+            "in_house_model",
+            "legacy_in_house_model",
+        ]
+    ]
     assert set(available["availability_status"]) == {"available"}
     assert available["plotted"].astype(bool).all()
+    assert "promoted current finalist" in by_id.loc["in_house_model", "data_scope"]
+    assert by_id.loc["legacy_in_house_model", "trace_label"] == "Legacy workbook model"
 
     release = by_id.loc[["selected_mot_befu_release", "rolling_befu_1y"]]
     assert set(release["availability_status"]) == {"available"}
@@ -616,6 +633,9 @@ def test_revenue_source_pack_loader_exports_are_hash_backed() -> None:
         "source_gap_register.csv": len(pack.source_gap_register),
         "remaining_decisions_handoff.csv": len(pack.remaining_decisions_handoff),
         "series_role_audit.csv": len(pack.series_role_audit),
+        "series_trace_contract.csv": len(pack.series_trace_contract),
+        "series_junction_audit.csv": len(pack.series_junction_audit),
+        "data_vintage_manifest.json": None,
         "hybrid_annual_revenue.csv": len(pack.hybrid_annual_revenue),
         "annual_completeness_audit.csv": len(pack.annual_completeness_audit),
         "validation_issues.csv": len(pack.validation_issues),
