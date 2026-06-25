@@ -1182,8 +1182,28 @@ def revenue_formula_residual_frame(line_reconciliation: pd.DataFrame) -> pd.Data
 
 def _line_display_label(series_id: Any, fallback: Any = "") -> str:
     text = str(series_id or "")
-    if text == "coo_revenue":
-        return "MR13"
+    requested_labels = {
+        "light_ruc_net_revenue": "Light RUC net revenue",
+        "heavy_ruc_net_revenue": "Heavy RUC net revenue",
+        "gross_ruc_revenue": "Gross RUC",
+        "ruc_admin_revenue": "RUC admin",
+        "ruc_revenue_net_admin": "RUC net admin",
+        "total_ruc_net_revenue": "RUC net admin/refunds",
+        "gross_ped_revenue": "Gross PED",
+        "gross_lpg_revenue": "LPG",
+        "gross_cng_revenue": "CNG",
+        "gross_fed_revenue": "Gross FED",
+        "net_fed_revenue": "Net FED",
+        "mr1_revenue": "MR1",
+        "mr2_revenue": "MR2",
+        "coo_revenue": "MR13",
+        "gross_mvr_revenue": "Gross MVR",
+        "mvr_admin_revenue": "MVR admin",
+        "mvr_revenue_net_admin_coo": "MVR net admin & COO",
+        "net_mvr_revenue": "MVR net admin/refunds/COO",
+    }
+    if text in requested_labels:
+        return requested_labels[text]
     for row in ROW_DEFINITIONS:
         if str(row["series_id"]) == text:
             return str(row["display_name"])

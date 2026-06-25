@@ -93,13 +93,13 @@ def main() -> None:
             }
         )
 
-    reconciliation_path = _write_reconciliation_table_screenshot()
+    reconciliation_path, reconciliation_rows = _write_reconciliation_table_screenshot()
     manifest.append(
         {
             "series_id": "revenue_line_reconciliation",
             "title": "Revenue Outlook - revenue line reconciliation",
             "repo_relative_path": reconciliation_path.relative_to(ROOT).as_posix(),
-            "rows": 0,
+            "rows": reconciliation_rows,
         }
     )
 
@@ -109,13 +109,13 @@ def main() -> None:
         print(f"WROTE {item['repo_relative_path']} rows={item['rows']}")
 
 
-def _write_reconciliation_table_screenshot() -> Path:
+def _write_reconciliation_table_screenshot() -> tuple[Path, int]:
     line = pd.read_csv(PACK_DIR / "revenue_line_reconciliation.csv")
     keep_lines = [
-        "Total RUC all classes",
-        "PED revenue",
-        "Gross FED revenue",
-        "Net FED revenue",
+        "RUC net admin/refunds",
+        "Gross PED",
+        "Gross FED",
+        "Net FED",
         "Total NLTF revenue",
     ]
     view = line[
@@ -157,7 +157,7 @@ def _write_reconciliation_table_screenshot() -> Path:
     path = SCREENSHOT_DIR / "revenue-outlook-reconciliation-table.png"
     fig.savefig(path)
     plt.close(fig)
-    return path
+    return path, int(len(view))
 
 
 if __name__ == "__main__":
