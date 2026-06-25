@@ -138,6 +138,8 @@ Use browser tooling to:
 - WinError 5 during sync_playwright/startup means sandbox named-pipe denial, not missing dependencies or dashboard failure.
 - Do not retry inside the sandbox or reinstall Playwright.
 - Reuse the healthy Streamlit server and run the browser phase outside the sandbox.
+- From Codex on Windows, call `scripts\verify_dashboard.ps1 -SkipBrowser` for the sandbox phase and `scripts\verify_browser_host.ps1 -Python python -Port <port>` only from an approved host/outside-sandbox shell.
+- Do not call raw `scripts\verify_dashboard.ps1` expecting it to run browser tests on Windows; the browser phase is intentionally split to avoid sandbox named-pipe hangs.
 
 ## Do-not rules
 

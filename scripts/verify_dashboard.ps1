@@ -96,6 +96,14 @@ if ($SkipBrowser) {
     exit 0
 }
 
+$isWindowsHost = ($env:OS -eq "Windows_NT") -or ([System.Environment]::OSVersion.Platform -eq [System.PlatformID]::Win32NT)
+if ($isWindowsHost) {
+    Write-Host "BROWSER_PHASE_SPLIT Windows pytest-playwright verification is intentionally excluded from scripts\verify_dashboard.ps1."
+    Write-Host "HOST_BROWSER_REQUIRED Run the browser phase from an approved host/outside-sandbox PowerShell:"
+    Write-Host "pwsh -NoProfile -File scripts\verify_browser_host.ps1 -Python $Python -Port $Port"
+    exit 0
+}
+
 $healthUrl = "http://localhost:$Port/_stcore/health"
 $appUrl = "http://localhost:$Port"
 $serverProcess = $null
