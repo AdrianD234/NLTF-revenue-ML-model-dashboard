@@ -249,6 +249,7 @@ def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
                 "Selected-FY revenue split",
             ]:
                 assert_text_above_fold(page, title)
+            assert_revenue_outlook_primary_runtime_contract(page)
         if tab_label == "Governance & Reproducibility":
             page.evaluate("window.scrollTo(0, 0)")
             for title in [
@@ -264,6 +265,53 @@ def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
     assert not page.locator("[data-testid='stException']").count()
     assert page_errors == []
     assert console_errors == []
+
+
+def test_revenue_outlook_activity_selection_hides_revenue_only_controls(page: Page) -> None:
+    page.set_viewport_size({"width": 1680, "height": 940})
+    page.goto(os.environ.get("STAGE1_DASHBOARD_URL", "http://localhost:8501"), wait_until="domcontentloaded")
+    wait_dashboard_ready(page)
+
+    click_governance_nav(page, "Revenue Outlook")
+    expect(page.get_by_text("Revenue Outlook controls", exact=False).first).to_be_visible(timeout=90000)
+    select_revenue_outlook_series(page, "PED VKT per capita")
+    expect(page.get_by_text("Not applicable to activity series.", exact=False).first).to_be_visible(timeout=90000)
+    expect(page.get_by_text("Revenue component drill-down and selected-FY revenue split are not applicable", exact=False).first).to_be_visible(timeout=90000)
+    assert_visible_text_absent(page, "Component drill-down")
+    assert_visible_text_absent(page, "Selected-FY revenue split")
+    assert_revenue_outlook_primary_runtime_contract(page, selected_series="PED VKT per capita")
+
+
+def test_revenue_outlook_is_responsive_without_horizontal_overflow(page: Page) -> None:
+    page.set_viewport_size({"width": 820, "height": 940})
+    page.goto(os.environ.get("STAGE1_DASHBOARD_URL", "http://localhost:8501"), wait_until="domcontentloaded")
+    wait_dashboard_ready(page)
+
+    click_governance_nav(page, "Revenue Outlook")
+    expect(page.get_by_text("Total path chart", exact=False).first).to_be_visible(timeout=90000)
+    expect(page.get_by_text("Uncertainty fan", exact=False).first).to_be_visible(timeout=90000)
+    overflow = page.evaluate(
+        """() => {
+            const bad = [];
+            const nodes = [
+                ...document.querySelectorAll('.chart-card-header'),
+                ...document.querySelectorAll('.page5-panel-title'),
+                ...document.querySelectorAll('[role="combobox"]'),
+                ...document.querySelectorAll('.js-plotly-plot')
+            ];
+            for (const node of nodes) {
+                const rect = node.getBoundingClientRect();
+                const style = window.getComputedStyle(node);
+                if (style.display === 'none' || style.visibility === 'hidden' || rect.width < 2 || rect.height < 2) continue;
+                if (rect.right > window.innerWidth + 2 || rect.left < -2) {
+                    bad.push((node.innerText || node.getAttribute('aria-label') || node.className || node.tagName).toString().trim().slice(0, 80));
+                }
+            }
+            return bad;
+        }"""
+    )
+    assert overflow == []
+    assert_revenue_outlook_primary_runtime_contract(page)
 
 
 def test_navigation_labels_not_clipped(page: Page) -> None:
@@ -792,6 +840,86 @@ def assert_text_above_fold(page: Page, text: str, max_y: int = 930) -> None:
     box = locator.bounding_box()
     assert box is not None, f"{text!r} has no visible bounding box"
     assert box["y"] < max_y, f"{text!r} should be visible above the first viewport fold; y={box['y']}"
+
+
+def assert_revenue_outlook_primary_runtime_contract(page: Page, selected_series: str = "Total NLTF revenue") -> None:
+    page.wait_for_function(
+        """() => [...document.querySelectorAll('.js-plotly-plot')].some((plot) =>
+            (plot.data || []).some((trace) => trace.name === 'Current finalist Base case')
+        )""",
+        timeout=90000,
+    )
+    contract = page.evaluate(
+        """() => {
+            const plot = [...document.querySelectorAll('.js-plotly-plot')].find((candidate) =>
+                (candidate.data || []).some((trace) => trace.name === 'Current finalist Base case')
+            );
+            if (!plot) return null;
+            const traces = (plot.data || []).map((trace) => ({
+                name: String(trace.name || ''),
+                x: Array.from(trace.x || []).map(String),
+                dash: String((trace.line || {}).dash || 'solid'),
+                color: String((trace.line || {}).color || ''),
+                hovertemplate: String(trace.hovertemplate || ''),
+            }));
+            const legend = (plot.layout || {}).legend || {};
+            const annotations = ((plot.layout || {}).annotations || []).map((annotation) => String(annotation.text || ''));
+            const layoutKeys = Object.keys(plot.layout || {});
+            return {
+                traces,
+                legend,
+                annotations,
+                hasSmallMultipleAxes: layoutKeys.some((key) => /^xaxis[2-9]/.test(key) || /^yaxis[2-9]/.test(key)),
+                yTitle: String((((plot.layout || {}).yaxis || {}).title || {}).text || ''),
+            };
+        }"""
+    )
+    assert contract is not None
+    trace_names = {trace["name"] for trace in contract["traces"] if trace["name"]}
+    allowed = {
+        "Actual",
+        "Current finalist Base case",
+        "Current finalist High population/comparison",
+        "Official comparator: selected MOT/BEFU",
+        "Official comparator: rolling BEFU 1Y",
+    }
+    assert trace_names.issubset(allowed), trace_names
+    assert "Current finalist Base case" in trace_names
+    assert "Current finalist High population/comparison" in trace_names
+    for forbidden in ["Schiff", "selected_dashboard", "legacy workbook", "Current finalist forecast"]:
+        assert all(forbidden.lower() not in trace["name"].lower() for trace in contract["traces"])
+    assert contract["hasSmallMultipleAxes"] is False
+    assert contract["legend"].get("orientation") == "h"
+    assert float(contract["legend"].get("y", 0)) <= 0
+    assert contract["yTitle"], "Revenue Outlook primary chart should expose explicit units on the y-axis."
+    assert any("Forecast start FY2026" in text for text in contract["annotations"])
+
+    by_name = {trace["name"]: trace for trace in contract["traces"]}
+    actual = by_name.get("Actual")
+    if actual is not None and actual["x"]:
+        assert max(actual["x"]) <= "FY2025"
+        assert actual["color"] == "#737373"
+    for name in ["Current finalist Base case", "Current finalist High population/comparison"]:
+        trace = by_name[name]
+        assert "FY2025" in trace["x"], f"{name} should include the FY2025 actual anchor"
+        assert "FY2026" in trace["x"], f"{name} should join to the FY2026 nowcast/forecast"
+        assert "customdata" in trace["hovertemplate"] or "%{customdata" in trace["hovertemplate"]
+    if "Official comparator: selected MOT/BEFU" in by_name:
+        assert by_name["Official comparator: selected MOT/BEFU"]["dash"] in {"dash", "dashdot"}
+    if "Official comparator: rolling BEFU 1Y" in by_name:
+        assert by_name["Official comparator: rolling BEFU 1Y"]["dash"] == "dot"
+    page_text = page.locator("body").inner_text(timeout=60000)
+    assert selected_series in page_text
+    assert "MOT archived-error fan bands are not materialized in data/current_revenue_outlook" in page_text
+
+
+def select_revenue_outlook_series(page: Page, value: str) -> None:
+    combo = page.locator('[role="combobox"][aria-label*="Series"]').first
+    expect(combo).to_be_visible(timeout=30000)
+    combo.click()
+    option = page.get_by_role("option", name=value)
+    expect(option.first).to_be_visible(timeout=30000)
+    option.first.click()
 
 
 def assert_visible_text(page: Page, text: str) -> None:

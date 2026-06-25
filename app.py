@@ -2028,13 +2028,19 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 index=default_stream_index,
                 key="revenue_outlook_stream",
             )
+        selected_metric_type = _revenue_outlook_series_metric_type(chart_rows, selected_stream)
         with control_cols[2]:
-            selected_fed_path = st.selectbox(
-                "FED path",
-                fed_path_options,
-                index=default_fed_index,
-                key="revenue_outlook_fed_path",
-            )
+            if selected_metric_type == "activity":
+                selected_fed_path = fed_path_options[default_fed_index] if fed_path_options else ""
+                st.markdown("<div class='control-label'>FED path</div>", unsafe_allow_html=True)
+                st.caption("Not applicable to activity series.")
+            else:
+                selected_fed_path = st.selectbox(
+                    "FED path",
+                    fed_path_options,
+                    index=default_fed_index,
+                    key="revenue_outlook_fed_path",
+                )
         with control_cols[3]:
             selected_fy = st.selectbox(
                 "Selected FY",
@@ -2081,23 +2087,26 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         )
 
     selected_fy_number = _selected_fy_to_number(selected_fy)
-    detail_cols = st.columns([0.58, 0.42])
-    with detail_cols[0]:
-        chart_card(
-            "Component drill-down",
-            "Selected-FY bridge components behind the current finalist revenue composition.",
-            revenue_outlook_component_figure(bridge, selected_fy=selected_fy, selected_fed_path=selected_fed_path),
-            caption="Component rows come from revenue_bridge_components in the committed runtime pack.",
-            notes_as_tooltip=False,
-        )
-    with detail_cols[1]:
-        chart_card(
-            "Selected-FY revenue split",
-            "Net FED, total RUC and MVR share of selected-FY revenue where available.",
-            revenue_outlook_split_figure(bridge, selected_fy=selected_fy, selected_fed_path=selected_fed_path),
-            caption=f"Selected FY: {selected_fy_number or selected_fy}.",
-            notes_as_tooltip=False,
-        )
+    if selected_metric_type == "activity":
+        st.caption("Revenue component drill-down and selected-FY revenue split are not applicable to activity-volume series.")
+    else:
+        detail_cols = st.columns([0.58, 0.42])
+        with detail_cols[0]:
+            chart_card(
+                "Component drill-down",
+                "Selected-FY bridge components behind the current finalist revenue composition.",
+                revenue_outlook_component_figure(bridge, selected_fy=selected_fy, selected_fed_path=selected_fed_path),
+                caption="Component rows come from revenue_bridge_components in the committed runtime pack.",
+                notes_as_tooltip=False,
+            )
+        with detail_cols[1]:
+            chart_card(
+                "Selected-FY revenue split",
+                "Net FED, total RUC and MVR share of selected-FY revenue where available.",
+                revenue_outlook_split_figure(bridge, selected_fy=selected_fy, selected_fed_path=selected_fed_path),
+                caption=f"Selected FY: {selected_fy_number or selected_fy}.",
+                notes_as_tooltip=False,
+            )
 
     with st.expander("Activity and volume outlook", expanded=False):
         activity_rows = _filter_revenue_outlook_rows(
@@ -3909,6 +3918,16 @@ def _revenue_outlook_stream_options(chart_rows: pd.DataFrame) -> list[str]:
     return ordered
 
 
+def _revenue_outlook_series_metric_type(chart_rows: pd.DataFrame, selected_series: str) -> str:
+    if chart_rows is None or chart_rows.empty:
+        return ""
+    label_column = "series_label" if "series_label" in chart_rows.columns else "stream_label"
+    if label_column not in chart_rows.columns or "metric_type" not in chart_rows.columns:
+        return ""
+    rows = chart_rows[chart_rows[label_column].astype(str).eq(str(selected_series))].copy()
+    return _first_non_empty(rows.get("metric_type", pd.Series(dtype=str)))
+
+
 def _revenue_outlook_scenario_options(chart_rows: pd.DataFrame) -> list[str]:
     if chart_rows is None or chart_rows.empty or "scenario_name" not in chart_rows.columns:
         return []
@@ -4072,7 +4091,7 @@ def revenue_outlook_total_path_figure(rows: pd.DataFrame, *, selected_series: st
         )
 
     periods = data["period"].dropna().astype(str).drop_duplicates().tolist()
-    forecast_period = _first_period(data, row_type="future_forecast")
+    forecast_period = _revenue_outlook_forecast_start_period(data)
     if forecast_period and forecast_period in periods:
         fig.add_vline(x=forecast_period, line_dash="dash", line_color="#B45309")
         fig.add_annotation(x=forecast_period, y=1.0, yref="paper", text=f"Forecast start {forecast_period}", showarrow=False, yanchor="bottom")
@@ -4132,6 +4151,25 @@ def _revenue_outlook_gap_figure(message: str, *, height: int) -> go.Figure:
     fig = empty_figure(message)
     fig.update_layout(height=height, margin={"l": 20, "r": 20, "t": 18, "b": 24})
     return fig
+
+
+def _revenue_outlook_forecast_start_period(rows: pd.DataFrame) -> str:
+    if rows is None or rows.empty:
+        return ""
+    data = rows.copy()
+    data["_period_order"] = data.get("period", pd.Series(dtype=str)).map(_revenue_period_order)
+    actual_rows = data[data.get("row_type", pd.Series(dtype=str)).astype(str).eq("historical_actual")].copy()
+    latest_actual_order = pd.to_numeric(actual_rows.get("_period_order"), errors="coerce").max() if not actual_rows.empty else pd.NA
+    current = data[
+        data.get("trace_role", pd.Series("", index=data.index)).astype(str).eq("in_house_current_finalist")
+        & data.get("row_type", pd.Series("", index=data.index)).astype(str).eq("future_forecast")
+        & ~data.get("data_scope", pd.Series("", index=data.index)).astype(str).eq("actual_anchor")
+    ].copy()
+    if pd.notna(latest_actual_order):
+        current = current[pd.to_numeric(current["_period_order"], errors="coerce").gt(float(latest_actual_order))].copy()
+    if current.empty:
+        return ""
+    return str(current.sort_values("_period_order", kind="stable").iloc[0]["period"])
 
 
 def revenue_outlook_component_figure(bridge: pd.DataFrame, *, selected_fy: str, selected_fed_path: str) -> go.Figure:
