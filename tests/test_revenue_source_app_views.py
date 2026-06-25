@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from itertools import product
 from pathlib import Path
 
 import pandas as pd
@@ -457,6 +458,85 @@ def test_revenue_source_control_applicability_resolves_invalid_series_controls()
     assert ped_controls["revenue_basis"] == "Gross"
     assert ped_controls["revenue_path"] == "Gross / benchmark actual"
     assert any("does not support revenue basis" in message for message in ped_messages)
+
+
+def test_revenue_source_every_series_valid_control_permutation_has_governed_traces() -> None:
+    pack = load_revenue_source_pack(repo_root=ROOT)
+    assert pack is not None
+    contract = pack.series_trace_contract
+    assert not contract.empty
+
+    series_control = [
+        control
+        for control in pack.front_end_config.get("controls", [])
+        if isinstance(control, dict) and control.get("control_id") == "series"
+    ][0]
+    assert len(contract) == len(series_control["options"])
+
+    for row in contract.to_dict("records"):
+        series = str(row["series_option"])
+        valid_bases = [value.strip() for value in str(row["valid_bases"]).split(";") if value.strip()]
+        valid_controls = {value.strip() for value in str(row["valid_controls"]).split(";") if value.strip()}
+        fed_paths = ["Current planned path", "No 2027 12c uplift"] if "fed_path" in valid_controls else ["Current planned path"]
+        crown_top_ups = ["Exclude", "Include"] if "crown_top_up" in valid_controls else ["Exclude"]
+
+        for basis, fed_path, crown_top_up, time_grain in product(
+            valid_bases,
+            fed_paths,
+            crown_top_ups,
+            ["June-year", "Quarterly"],
+        ):
+            controls = {
+                "series": series,
+                "release_round": "BEFU25",
+                "model_basis": "In-house model",
+                "selected_fy": "FY2031",
+                "horizon": "To FY2031",
+                "revenue_basis": basis,
+                "revenue_path": (
+                    "Gross / benchmark actual"
+                    if basis == "Gross"
+                    else "Net of admin fees & refunds"
+                    if basis == "Net"
+                    else "Not applicable"
+                ),
+                "fed_path": fed_path,
+                "crown_top_up": crown_top_up,
+                "time_grain": time_grain,
+            }
+            resolved, _messages = _resolve_revenue_source_control_applicability(pack, controls)
+            frame = _selected_source_series_frame(pack, resolved)
+            assert not frame.empty, (series, basis, fed_path, crown_top_up, time_grain)
+
+            fig = _source_total_path_figure(pack, resolved)
+            assert fig.data, (series, basis, fed_path, crown_top_up, time_grain)
+            names = {trace.name for trace in fig.data}
+            assert "Selected dashboard basis" not in names
+            assert "Aaron Schiff" not in names
+
+            if "Actual" in names:
+                actual = next(trace for trace in fig.data if trace.name == "Actual")
+                assert max(int(value) for value in actual.x if value is not None) <= 2025
+            if "Actual to date (3 of 4 quarters)" in names:
+                partial = next(trace for trace in fig.data if trace.name == "Actual to date (3 of 4 quarters)")
+                assert set(int(value) for value in partial.x if value is not None) == {2026}
+                assert partial.mode == "markers"
+
+            if "In-house prediction / forecast" in names:
+                current = next(trace for trace in fig.data if trace.name == "In-house prediction / forecast")
+                assert min(int(value) for value in current.x if value is not None) >= 2026
+                source_cells = [
+                    str(customdata[5])
+                    for customdata in current.customdata
+                    if customdata is not None and len(customdata) > 5
+                ]
+                assert source_cells
+                assert all("current_revenue_outlook" in cell for cell in source_cells)
+
+            for trace in fig.data:
+                if not getattr(trace, "customdata", None) is None:
+                    for customdata in trace.customdata:
+                        assert str(customdata[0]).strip()
 
 
 def test_revenue_source_charts_use_explicit_units_and_annual_ticks() -> None:
