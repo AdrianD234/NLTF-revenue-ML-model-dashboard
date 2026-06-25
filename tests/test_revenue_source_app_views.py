@@ -18,6 +18,7 @@ from app import (
     _source_horizon_bounds,
     _source_path_trace_status_for_controls,
     _source_reconciliation_view,
+    _filter_revenue_outlook_rows,
     _revenue_outlook_manifest_table,
     _resolve_revenue_source_control_applicability,
     _scenario_color_map,
@@ -26,6 +27,10 @@ from app import (
     _source_total_path_figure,
     _source_uncertainty_figure,
     revenue_outlook_figure,
+    revenue_outlook_component_figure,
+    revenue_outlook_split_figure,
+    revenue_outlook_total_path_figure,
+    revenue_outlook_uncertainty_fan_figure,
 )
 from model_dashboard.revenue_source_pack import REVENUE_SOURCE_PACK_RUNTIME_REVISION, load_revenue_source_pack
 
@@ -725,6 +730,46 @@ def test_revenue_outlook_scenario_colors_are_stable_under_filters() -> None:
     assert full_map["current_comparison_2"] == "#00843D"
     assert comparison_only["current_comparison_1"] == full_map["current_comparison_1"]
     assert second_comparison_only["current_comparison_2"] == full_map["current_comparison_2"]
+
+
+def test_revenue_outlook_primary_figures_use_runtime_pack_selected_series_only() -> None:
+    chart = pd.read_csv(ROOT / "data" / "current_revenue_outlook" / "revenue_chart_rows.csv")
+    bridge = pd.read_csv(ROOT / "data" / "current_revenue_outlook" / "revenue_bridge_components.csv")
+    traces = [
+        "Actual",
+        "Current finalist Base case",
+        "Current finalist High population/comparison",
+        "Official comparator: selected MOT/BEFU",
+        "Official comparator: rolling BEFU 1Y",
+    ]
+
+    rows = _filter_revenue_outlook_rows(
+        chart,
+        time_grain="june_year",
+        stream_labels=["Total NLTF revenue"],
+        fed_paths=["Current planned path"],
+        trace_names=traces,
+    )
+    total_fig = revenue_outlook_total_path_figure(rows, selected_series="Total NLTF revenue", selected_fy="FY2031")
+    trace_names = {str(trace.name) for trace in total_fig.data if trace.name}
+
+    assert set(traces).issubset(trace_names)
+    assert "Current finalist forecast" not in trace_names
+    assert not any("Schiff" in name or "selected_dashboard" in name for name in trace_names)
+    assert all(
+        getattr(trace, "x", None) is None or "FY2031" in list(trace.x)
+        for trace in total_fig.data
+        if trace.name == "Current finalist Base case"
+    )
+
+    fan_fig = revenue_outlook_uncertainty_fan_figure(rows, selected_series="Total NLTF revenue")
+    fan_text = " ".join(str(annotation.text) for annotation in fan_fig.layout.annotations or [])
+    assert "not materialized in data/current_revenue_outlook" in fan_text
+
+    component_fig = revenue_outlook_component_figure(bridge, selected_fy="FY2031", selected_fed_path="Current planned path")
+    split_fig = revenue_outlook_split_figure(bridge, selected_fy="FY2031", selected_fed_path="Current planned path")
+    assert component_fig.data
+    assert split_fig.data
 
 
 def test_revenue_outlook_manifest_table_exposes_source_pack_and_bridge_provenance() -> None:

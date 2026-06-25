@@ -2003,9 +2003,17 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         warning_panel("The promoted Revenue Outlook pack has no chart rows.")
         return
 
+    stream_options = _revenue_outlook_stream_options(chart_rows)
+    default_stream_index = stream_options.index("Total NLTF revenue") if "Total NLTF revenue" in stream_options else 0
+    fed_path_options = _revenue_outlook_fed_path_options(chart_rows)
+    default_fed_index = fed_path_options.index("Current planned path") if "Current planned path" in fed_path_options else 0
+    trace_options = _revenue_outlook_trace_options(chart_rows)
+    fy_options = _revenue_outlook_fy_options(chart_rows)
+    default_fy_index = fy_options.index("FY2031") if "FY2031" in fy_options else max(len(fy_options) - 1, 0)
+
     with st.container(border=True):
         st.markdown("<div class='page5-panel-title'>Revenue Outlook controls</div>", unsafe_allow_html=True)
-        control_cols = st.columns([0.16, 0.34, 0.22, 0.28])
+        control_cols = st.columns([0.16, 0.30, 0.22, 0.14, 0.18])
         with control_cols[0]:
             grain_label = st.radio(
                 "Time grain",
@@ -2013,59 +2021,97 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 horizontal=True,
                 key="revenue_outlook_time_grain",
             )
-        stream_options = _revenue_outlook_stream_options(chart_rows)
         with control_cols[1]:
-            selected_streams = st.multiselect(
+            selected_stream = st.selectbox(
                 "Series",
                 stream_options,
-                default=stream_options,
-                key="revenue_outlook_streams",
+                index=default_stream_index,
+                key="revenue_outlook_stream",
             )
-        fed_path_options = _revenue_outlook_fed_path_options(chart_rows)
-        fed_path_default = ["Current planned path"] if "Current planned path" in fed_path_options else fed_path_options[:1]
         with control_cols[2]:
-            selected_fed_paths = st.multiselect(
+            selected_fed_path = st.selectbox(
                 "FED path",
                 fed_path_options,
-                default=fed_path_default,
-                key="revenue_outlook_fed_paths",
+                index=default_fed_index,
+                key="revenue_outlook_fed_path",
             )
-        scenario_options = _revenue_outlook_scenario_options(chart_rows)
         with control_cols[3]:
-            selected_scenarios = st.multiselect(
+            selected_fy = st.selectbox(
+                "Selected FY",
+                fy_options,
+                index=default_fy_index,
+                key="revenue_outlook_selected_fy",
+            )
+        with control_cols[4]:
+            selected_traces = st.multiselect(
                 "Traces",
-                scenario_options,
-                default=scenario_options,
-                key="revenue_outlook_scenarios",
+                trace_options,
+                default=trace_options,
+                key="revenue_outlook_traces",
             )
 
     filtered_rows = _filter_revenue_outlook_rows(
         chart_rows,
         time_grain="june_year" if grain_label == "June-year" else "quarterly",
-        stream_labels=selected_streams,
-        fed_paths=selected_fed_paths,
-        scenario_names=selected_scenarios,
+        stream_labels=[selected_stream],
+        fed_paths=[selected_fed_path],
+        trace_names=selected_traces,
     )
-    filtered_bridge = _filter_revenue_bridge_rows(bridge, selected_streams, selected_scenarios, selected_fed_paths)
+    filtered_bridge = _filter_revenue_bridge_rows(bridge, [selected_stream], _scenario_names_for_traces(chart_rows, selected_traces), [selected_fed_path])
     gap_summary = _revenue_outlook_gap_summary(filtered_bridge)
     if gap_summary:
         warning_panel(gap_summary)
 
-    chart_cols = st.columns(2)
-    with chart_cols[0]:
+    primary_cols = st.columns([0.64, 0.36])
+    with primary_cols[0]:
+        chart_card(
+            "Total path chart",
+            "Single selected series from the committed current runtime pack.",
+            revenue_outlook_total_path_figure(filtered_rows, selected_series=selected_stream, selected_fy=selected_fy),
+            caption="Actuals, current finalist base/comparison and official comparator traces are shown only where the runtime pack carries governed rows.",
+            notes_as_tooltip=False,
+        )
+    with primary_cols[1]:
+        chart_card(
+            "Uncertainty fan",
+            "MOT archived-error fan if materialized; otherwise an explicit runtime-pack governance gap.",
+            revenue_outlook_uncertainty_fan_figure(filtered_rows, selected_series=selected_stream),
+            caption="No fallback source-pack chart engine is used on this page.",
+            notes_as_tooltip=False,
+        )
+
+    selected_fy_number = _selected_fy_to_number(selected_fy)
+    detail_cols = st.columns([0.58, 0.42])
+    with detail_cols[0]:
+        chart_card(
+            "Component drill-down",
+            "Selected-FY bridge components behind the current finalist revenue composition.",
+            revenue_outlook_component_figure(bridge, selected_fy=selected_fy, selected_fed_path=selected_fed_path),
+            caption="Component rows come from revenue_bridge_components in the committed runtime pack.",
+            notes_as_tooltip=False,
+        )
+    with detail_cols[1]:
+        chart_card(
+            "Selected-FY revenue split",
+            "Net FED, total RUC and MVR share of selected-FY revenue where available.",
+            revenue_outlook_split_figure(bridge, selected_fy=selected_fy, selected_fed_path=selected_fed_path),
+            caption=f"Selected FY: {selected_fy_number or selected_fy}.",
+            notes_as_tooltip=False,
+        )
+
+    with st.expander("Activity and volume outlook", expanded=False):
+        activity_rows = _filter_revenue_outlook_rows(
+            chart_rows,
+            time_grain="june_year" if grain_label == "June-year" else "quarterly",
+            stream_labels=["PED VKT per capita", "Light RUC net km", "Heavy RUC net km"],
+            fed_paths=[selected_fed_path],
+            trace_names=selected_traces,
+        )
         chart_card(
             "Activity and volume outlook",
             "PED uses VKT per capita; Light and Heavy RUC use net kilometres. Actuals end at FY2025.",
-            revenue_outlook_figure(filtered_rows, metric_type="activity"),
+            revenue_outlook_figure(activity_rows, metric_type="activity"),
             caption="Forecast start and H13 markers are shown where numeric reviewed forecasts exist. Units are kept separate by stream.",
-            notes_as_tooltip=False,
-        )
-    with chart_cols[1]:
-        chart_card(
-            "Revenue outlook",
-            "Current finalist revenue replaces only PED, Light RUC and Heavy RUC; fixed components remain official MOT rows.",
-            revenue_outlook_figure(filtered_rows, metric_type="revenue"),
-            caption="PED uses source-backed population, litres intensity and FED rate. RUC uses current net km and governed effective rates.",
             notes_as_tooltip=False,
         )
 
@@ -3872,6 +3918,25 @@ def _revenue_outlook_scenario_options(chart_rows: pd.DataFrame) -> list[str]:
     return sorted(data["scenario_name"].dropna().astype(str).unique().tolist())
 
 
+def _revenue_outlook_trace_options(chart_rows: pd.DataFrame) -> list[str]:
+    if chart_rows is None or chart_rows.empty or "trace_name" not in chart_rows.columns:
+        return []
+    data = chart_rows.copy()
+    if "plot_allowed" in data.columns:
+        data = data[data["plot_allowed"].fillna(True).astype(bool)].copy()
+    available = set(data["trace_name"].dropna().astype(str))
+    preferred = [
+        "Actual",
+        "Current finalist Base case",
+        "Current finalist High population/comparison",
+        "Official comparator: selected MOT/BEFU",
+        "Official comparator: rolling BEFU 1Y",
+    ]
+    ordered = [trace for trace in preferred if trace in available]
+    ordered.extend(sorted(available.difference(ordered)))
+    return ordered
+
+
 def _revenue_outlook_fed_path_options(chart_rows: pd.DataFrame) -> list[str]:
     if chart_rows is None or chart_rows.empty or "fed_path" not in chart_rows.columns:
         return []
@@ -3885,13 +3950,32 @@ def _revenue_outlook_fed_path_options(chart_rows: pd.DataFrame) -> list[str]:
     return ordered
 
 
+def _revenue_outlook_fy_options(chart_rows: pd.DataFrame) -> list[str]:
+    if chart_rows is None or chart_rows.empty or "june_year" not in chart_rows.columns:
+        return []
+    years = pd.to_numeric(chart_rows["june_year"], errors="coerce").dropna().astype(int)
+    if years.empty:
+        return []
+    return [f"FY{year}" for year in sorted(years.unique().tolist()) if year >= 2025]
+
+
+def _scenario_names_for_traces(chart_rows: pd.DataFrame, trace_names: list[str]) -> list[str]:
+    if chart_rows is None or chart_rows.empty or not trace_names or "trace_name" not in chart_rows.columns:
+        return []
+    rows = chart_rows[chart_rows["trace_name"].astype(str).isin(trace_names)].copy()
+    if "scenario_name" not in rows.columns:
+        return []
+    return sorted(rows["scenario_name"].dropna().astype(str).unique().tolist())
+
+
 def _filter_revenue_outlook_rows(
     chart_rows: pd.DataFrame,
     *,
     time_grain: str,
     stream_labels: list[str],
     fed_paths: list[str],
-    scenario_names: list[str],
+    scenario_names: list[str] | None = None,
+    trace_names: list[str] | None = None,
 ) -> pd.DataFrame:
     if chart_rows is None or chart_rows.empty:
         return pd.DataFrame()
@@ -3906,6 +3990,8 @@ def _filter_revenue_outlook_rows(
         fed_text = data["fed_path"].fillna("").astype(str)
         is_path_sensitive = data.get("trace_role", pd.Series("", index=data.index)).astype(str).eq("in_house_current_finalist")
         data = data[(~is_path_sensitive) | fed_text.isin(fed_paths)].copy()
+    if trace_names and "trace_name" in data.columns:
+        data = data[data["trace_name"].astype(str).isin(trace_names)].copy()
     if scenario_names:
         is_actual = data["row_type"].astype(str).eq("historical_actual")
         data = data[is_actual | data["scenario_name"].astype(str).isin(scenario_names)].copy()
@@ -3931,6 +4017,235 @@ def _filter_revenue_bridge_rows(
         fed_text = data["fed_path"].fillna("").astype(str)
         data = data[fed_text.eq("") | fed_text.isin(fed_paths)].copy()
     return data
+
+
+def revenue_outlook_total_path_figure(rows: pd.DataFrame, *, selected_series: str, selected_fy: str) -> go.Figure:
+    data = _selected_revenue_outlook_series_rows(rows, selected_series)
+    if data.empty:
+        return empty_figure("Selected revenue series is unavailable in the committed runtime pack.")
+    data["value_numeric"] = pd.to_numeric(data.get("value"), errors="coerce")
+    data = data[data["value_numeric"].notna()].copy()
+    if data.empty:
+        return empty_figure("Selected revenue series has no numeric runtime-pack values.")
+
+    data["_period_order"] = data.get("period", pd.Series(dtype=str)).map(_revenue_period_order)
+    data = data.sort_values("_period_order", kind="stable")
+    axis_title = _revenue_axis_title(data)
+    scenario_colors = _scenario_color_map(data)
+    fig = go.Figure()
+    trace_styles = {
+        "Actual": ("#737373", "solid", 2.4),
+        "Current finalist Base case": ("#006FAD", "solid", 2.8),
+        "Current finalist High population/comparison": ("#E56B2B", "solid", 2.4),
+        "Official comparator: selected MOT/BEFU": ("#00843D", "dash", 2.2),
+        "Official comparator: rolling BEFU 1Y": ("#6B4E71", "dot", 2.2),
+    }
+    trace_names = _ordered_runtime_trace_names(data)
+    for trace_name in trace_names:
+        group = data[data["trace_name"].astype(str).eq(trace_name)].copy()
+        if group.empty:
+            continue
+        group = group.drop_duplicates(["period", "trace_name", "scenario_name", "fed_path"], keep="last")
+        group = group.sort_values("_period_order", kind="stable")
+        for column in ["horizon", "horizon_scope", "bridge_status", "gap_reason", "data_scope", "value_status", "actual_quarters", "forecast_quarters"]:
+            if column not in group.columns:
+                group[column] = ""
+        group["horizon_hover"] = group.apply(_revenue_horizon_hover_label, axis=1)
+        group["bridge_hover"] = group.apply(_revenue_bridge_hover_label, axis=1)
+        group["scope_hover"] = group.apply(_revenue_scope_hover_label, axis=1)
+        color, dash, width = trace_styles.get(trace_name, (scenario_colors.get(trace_name, "#006FAD"), "solid", 2.2))
+        fig.add_trace(
+            go.Scatter(
+                x=group["period"],
+                y=group["value_numeric"],
+                mode="lines+markers",
+                name=trace_name,
+                line={"color": color, "dash": dash, "width": width},
+                marker={"size": 6},
+                customdata=group[["horizon_hover", "bridge_hover", "scope_hover"]].to_numpy(),
+                hovertemplate=(
+                    "%{x}<br>%{y:,.2f}"
+                    "<br>%{customdata[0]}%{customdata[1]}%{customdata[2]}"
+                    "<extra>" + html.escape(trace_name) + "</extra>"
+                ),
+            )
+        )
+
+    periods = data["period"].dropna().astype(str).drop_duplicates().tolist()
+    forecast_period = _first_period(data, row_type="future_forecast")
+    if forecast_period and forecast_period in periods:
+        fig.add_vline(x=forecast_period, line_dash="dash", line_color="#B45309")
+        fig.add_annotation(x=forecast_period, y=1.0, yref="paper", text=f"Forecast start {forecast_period}", showarrow=False, yanchor="bottom")
+    if selected_fy in periods:
+        fig.add_vline(x=selected_fy, line_dash="dot", line_color="#102A43")
+    fig.update_xaxes(categoryorder="array", categoryarray=periods, tickangle=-30)
+    fig.update_layout(
+        height=250,
+        margin={"l": 52, "r": 18, "t": 16, "b": 46},
+        yaxis_title=axis_title,
+        hovermode="x unified",
+        legend={"orientation": "h", "y": -0.20, "x": 0.0},
+    )
+    return fig
+
+
+def revenue_outlook_uncertainty_fan_figure(rows: pd.DataFrame, *, selected_series: str) -> go.Figure:
+    data = _selected_revenue_outlook_series_rows(rows, selected_series)
+    band_columns = {"lower50", "upper50", "lower80", "upper80"}
+    if data.empty:
+        return _revenue_outlook_gap_figure("Selected series has no runtime-pack rows for uncertainty review.", height=250)
+    if not band_columns.issubset(data.columns):
+        return _revenue_outlook_gap_figure(
+            "MOT archived-error fan bands are not materialized in data/current_revenue_outlook for this selected series.",
+            height=250,
+        )
+    data["value_numeric"] = pd.to_numeric(data.get("value"), errors="coerce")
+    for column in band_columns:
+        data[column] = pd.to_numeric(data[column], errors="coerce")
+    data = data.dropna(subset=["value_numeric", "lower50", "upper50", "lower80", "upper80"]).copy()
+    if data.empty:
+        return _revenue_outlook_gap_figure("Runtime-pack uncertainty columns are present but have no numeric selected-series rows.", height=250)
+    data["_period_order"] = data.get("period", pd.Series(dtype=str)).map(_revenue_period_order)
+    data = data.sort_values("_period_order", kind="stable")
+    fig = go.Figure()
+    for upper, lower, name, color in [
+        ("upper80", "lower80", "MOT archived error 80% band", "rgba(0, 43, 92, 0.14)"),
+        ("upper50", "lower50", "MOT archived error 50% band", "rgba(0, 132, 61, 0.18)"),
+    ]:
+        fig.add_trace(go.Scatter(x=data["period"], y=data[upper], mode="lines", line={"width": 0}, showlegend=False, hoverinfo="skip"))
+        fig.add_trace(go.Scatter(x=data["period"], y=data[lower], mode="lines", fill="tonexty", fillcolor=color, line={"width": 0}, name=name))
+    fig.add_trace(
+        go.Scatter(
+            x=data["period"],
+            y=data["value_numeric"],
+            mode="lines+markers",
+            name="Selected series",
+            line={"color": "#006FAD", "width": 2.4},
+            marker={"size": 6},
+        )
+    )
+    fig.update_layout(height=250, margin={"l": 40, "r": 12, "t": 16, "b": 40}, hovermode="x unified")
+    return fig
+
+
+def _revenue_outlook_gap_figure(message: str, *, height: int) -> go.Figure:
+    fig = empty_figure(message)
+    fig.update_layout(height=height, margin={"l": 20, "r": 20, "t": 18, "b": 24})
+    return fig
+
+
+def revenue_outlook_component_figure(bridge: pd.DataFrame, *, selected_fy: str, selected_fed_path: str) -> go.Figure:
+    plot = _selected_revenue_bridge_snapshot(bridge, selected_fy=selected_fy, selected_fed_path=selected_fed_path)
+    if plot.empty:
+        return empty_figure("Selected FY component rows are unavailable in revenue_bridge_components.")
+    component_order = [
+        "gross_ped_revenue",
+        "light_ruc_net_revenue",
+        "heavy_ruc_net_revenue",
+        "net_fed_revenue",
+        "total_ruc_net_revenue",
+        "net_mvr_revenue",
+        "total_fed_ruc_net_revenue",
+        "total_nltf_net_revenue",
+    ]
+    plot = plot[plot["stream"].astype(str).isin(component_order)].copy()
+    if plot.empty:
+        return empty_figure("No selected-FY component rows match the governed runtime component registry.")
+    plot["_order"] = plot["stream"].astype(str).map({name: index for index, name in enumerate(component_order)})
+    plot["component_numeric"] = pd.to_numeric(plot["component_value"], errors="coerce")
+    plot = plot.dropna(subset=["component_numeric"]).sort_values("_order", kind="stable")
+    fig = go.Figure(
+        go.Bar(
+            x=plot["stream_label"],
+            y=plot["component_numeric"],
+            marker_color=["#006FAD" if value >= 0 else "#B45309" for value in plot["component_numeric"]],
+            customdata=plot[["component_unit", "component_type", "bridge_status"]].to_numpy(),
+            hovertemplate="%{x}<br>%{y:,.1f} %{customdata[0]}<br>%{customdata[1]} - %{customdata[2]}<extra></extra>",
+        )
+    )
+    fig.update_layout(height=360, margin={"l": 52, "r": 18, "t": 28, "b": 104}, yaxis_title=_bridge_axis_title(plot), xaxis_tickangle=-30)
+    return fig
+
+
+def revenue_outlook_split_figure(bridge: pd.DataFrame, *, selected_fy: str, selected_fed_path: str) -> go.Figure:
+    plot = _selected_revenue_bridge_snapshot(bridge, selected_fy=selected_fy, selected_fed_path=selected_fed_path)
+    split_ids = ["net_fed_revenue", "total_ruc_net_revenue", "net_mvr_revenue"]
+    plot = plot[plot["stream"].astype(str).isin(split_ids)].copy() if not plot.empty else pd.DataFrame()
+    if plot.empty:
+        return empty_figure("Selected-FY split is unavailable in revenue_bridge_components.")
+    plot["component_numeric"] = pd.to_numeric(plot["component_value"], errors="coerce")
+    plot = plot.dropna(subset=["component_numeric"])
+    plot = plot[plot["component_numeric"] > 0].copy()
+    if plot.empty:
+        return empty_figure("Selected-FY split has no positive numeric component values.")
+    plot["_order"] = plot["stream"].astype(str).map({name: index for index, name in enumerate(split_ids)})
+    plot = plot.sort_values("_order", kind="stable")
+    fig = go.Figure(
+        go.Pie(
+            labels=plot["stream_label"],
+            values=plot["component_numeric"],
+            hole=0.45,
+            marker={"colors": ["#006FAD", "#00843D", "#6B4E71"][: len(plot)]},
+            customdata=plot[["component_unit", "bridge_status"]].to_numpy(),
+            hovertemplate="%{label}<br>%{value:,.1f} %{customdata[0]}<br>%{percent}<br>%{customdata[1]}<extra></extra>",
+        )
+    )
+    fig.update_layout(height=360, margin={"l": 12, "r": 12, "t": 28, "b": 16}, showlegend=True)
+    return fig
+
+
+def _selected_revenue_outlook_series_rows(rows: pd.DataFrame, selected_series: str) -> pd.DataFrame:
+    if rows is None or rows.empty:
+        return pd.DataFrame()
+    label_column = "series_label" if "series_label" in rows.columns else "stream_label"
+    if label_column not in rows.columns:
+        return pd.DataFrame()
+    return rows[rows[label_column].astype(str).eq(str(selected_series))].copy()
+
+
+def _ordered_runtime_trace_names(rows: pd.DataFrame) -> list[str]:
+    if rows is None or rows.empty or "trace_name" not in rows.columns:
+        return []
+    available = set(rows["trace_name"].dropna().astype(str))
+    preferred = [
+        "Actual",
+        "Current finalist Base case",
+        "Current finalist High population/comparison",
+        "Official comparator: selected MOT/BEFU",
+        "Official comparator: rolling BEFU 1Y",
+    ]
+    ordered = [trace for trace in preferred if trace in available]
+    ordered.extend(sorted(available.difference(ordered)))
+    return ordered
+
+
+def _selected_fy_to_number(selected_fy: Any) -> int | None:
+    match = re.search(r"(\d{4})", str(selected_fy or ""))
+    if not match:
+        return None
+    return int(match.group(1))
+
+
+def _selected_revenue_bridge_snapshot(bridge: pd.DataFrame, *, selected_fy: str, selected_fed_path: str) -> pd.DataFrame:
+    if bridge is None or bridge.empty:
+        return pd.DataFrame()
+    data = bridge.copy()
+    data = data[data["period"].astype(str).eq(str(selected_fy))].copy()
+    if "scenario_name" in data.columns:
+        data = data[data["scenario_name"].astype(str).eq("current_basecase")].copy()
+    if selected_fed_path and "fed_path" in data.columns:
+        data = data[data["fed_path"].astype(str).eq(str(selected_fed_path))].copy()
+    return data
+
+
+def _revenue_axis_title(rows: pd.DataFrame) -> str:
+    unit = _first_non_empty(rows.get("value_unit", pd.Series(dtype=str)))
+    return unit or "Value"
+
+
+def _bridge_axis_title(rows: pd.DataFrame) -> str:
+    unit = _first_non_empty(rows.get("component_unit", pd.Series(dtype=str)))
+    return unit or "Value"
 
 
 def revenue_outlook_figure(rows: pd.DataFrame, *, metric_type: str) -> go.Figure:

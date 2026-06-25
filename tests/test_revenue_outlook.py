@@ -294,6 +294,29 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     }.issubset(audit.columns)
 
 
+def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
+    pack_dir = ROOT / CURRENT_REVENUE_OUTLOOK_DIR
+    expected_hashes = {
+        "future_revenue_forecasts.csv": "f9addbed5a596d18c2c51f0a58cb2098ffca9b861d6654f54c28c0da00d938d8",
+        "future_revenue_forecasts.parquet": "7f6955ff3147ce03e85a4166ad773dd94356c226a700e42245de6ddda823463b",
+        "manifest.json": "f21fbf248814d83ae43b78c7c4945ccb0cb766390c8000b687d8b0d151d21a00",
+        "manifest.md": "298acdfe34495afbf0620266cc4c5f0f27bc5fdf89d6050e4e8ad600b84947dd",
+        "path_trace_status.csv": "b0b2b2f01c6977e869a21f620485e686c119b1895d29e1c67d12ce7afb9adfe3",
+        "path_trace_status.parquet": "65e91a936ae5033d050469d57fbd09bf049edf62e47baa8b2ea670be7f84d97c",
+        "revenue_bridge_components.csv": "132a9a0ff3e302ea73194b14b60cc2b2969e519ae74876db2e3878ac6c8bb2e1",
+        "revenue_bridge_components.parquet": "b274052e704dae5da0f141c8f4b1dd11131d5165ee75e1d31a776e0c6729a4b5",
+        "revenue_chart_rows.csv": "4d52e18fb2e7414419cb4f53b69e9b4fd09eb5b43c51725ec6f972373d8a57e0",
+        "revenue_chart_rows.parquet": "4084a32cae2dd43f663415c24aa460b95f8a8a17010f64e7c2e05194663dcfbc",
+        "runtime_trace_audit.csv": "405b142d5da3d2a373b96392c98a19c11003db599799b3c0f0fd64c798ce8016",
+        "runtime_trace_audit.parquet": "935a752438f027b97c9b34a12205a67d16d270cab9d8c3aedb146a73b3464a87",
+        "series_trace_contract.csv": "bbfe7a0fb06569540ee6ad94f5d6f1b8924af0c0490eeebd053eaee30cdd0d16",
+        "series_trace_contract.parquet": "6a1ae2a1abf43a68185f1e61e287ef316367ac32da9e70d8f081d1e49e35c311",
+        "trace_source_contract.csv": "3a8b3b66da395cad28c74622c12bb43af1a6e035eb5917e9d9e61e52539a50d5",
+        "trace_source_contract.parquet": "282d61fc1487883ed6daa126f0fac4bb7da9ddc88d79cbf1fde1dd15b3c7d34c",
+    }
+    assert {path.name: _sha256(path) for path in sorted(pack_dir.iterdir()) if path.is_file()} == expected_hashes
+
+
 def test_revenue_outlook_loader_rejects_hash_mismatched_promoted_pack(tmp_path: Path) -> None:
     pack_copy = tmp_path / "current_revenue_outlook"
     shutil.copytree(ROOT / CURRENT_REVENUE_OUTLOOK_DIR, pack_copy)

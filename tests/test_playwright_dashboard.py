@@ -136,8 +136,11 @@ def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
             "mcp-05-revenue-outlook.png",
             [
                 "Revenue Outlook controls",
+                "Total path chart",
+                "Uncertainty fan",
+                "Component drill-down",
+                "Selected-FY revenue split",
                 "Activity and volume outlook",
-                "Revenue outlook",
                 "Revenue bridge detail",
                 "Source policy",
             ],
@@ -240,8 +243,10 @@ def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
             page.evaluate("window.scrollTo(0, 0)")
             for title in [
                 "Revenue Outlook controls",
-                "Activity and volume outlook",
-                "Revenue outlook",
+                "Total path chart",
+                "Uncertainty fan",
+                "Component drill-down",
+                "Selected-FY revenue split",
             ]:
                 assert_text_above_fold(page, title)
         if tab_label == "Governance & Reproducibility":
@@ -319,8 +324,8 @@ def test_visible_navigation_text_changes_page_body(page: Page) -> None:
         ("Diagnostics", "1. Residual Autocorrelation by Lag", "Finalist Forecast Accuracy"),
         ("Scenario Comparison", "1. Stream Comparison: Scenario A vs Scenario B", "1. Residual Autocorrelation by Lag"),
         ("Schiff Benchmark", "1. Schiff vs Finalist MAPE", "1. Stream Comparison: Scenario A vs Scenario B"),
-        ("Revenue Outlook", "Activity and volume outlook", "1. Schiff vs Finalist MAPE"),
-        ("Governance & Reproducibility", "Governance & Reproducibility Filters", "Activity and volume outlook"),
+        ("Revenue Outlook", "Total path chart", "1. Schiff vs Finalist MAPE"),
+        ("Governance & Reproducibility", "Governance & Reproducibility Filters", "Total path chart"),
         ("Overview", "Finalist Forecast Accuracy", "Governance & Reproducibility Filters"),
     ]:
         click_governance_nav(page, label)
