@@ -169,10 +169,11 @@ def test_reconciliation_view_exposes_optional_rollup_inputs() -> None:
     pack = load_revenue_source_pack(repo_root=ROOT)
     assert pack is not None
 
-    view = _source_reconciliation_view(pack, {"selected_fy": "FY2031"})
+    view = _source_reconciliation_view(pack, {"selected_fy": "FY2025"})
 
     assert not view.empty
     assert "optional_inputs_applied" in view.columns
+    assert set(view["scope"]) == {"official_actuals"}
 
 
 def test_hybrid_annual_view_exposes_replacement_audit_for_selected_fy() -> None:
@@ -234,7 +235,7 @@ def test_revenue_source_horizon_control_limits_path_chart_without_selected_fy_co
     controls = {
         "series": "Total NLTF revenue",
         "release_round": "BEFU25",
-        "model_basis": "In-house model",
+        "model_basis": "Current finalist ensemble",
         "selected_fy": "FY2031",
         "horizon": "Next 5 FY",
     }
@@ -314,17 +315,17 @@ def test_full_common_horizon_stops_at_last_fixed_or_replacement_row() -> None:
     controls = {
         "series": "Total NLTF revenue",
         "release_round": "BEFU25",
-        "model_basis": "In-house model",
+        "model_basis": "Current finalist ensemble",
         "horizon": "Full common horizon",
     }
     lower, upper = _source_horizon_bounds(pack, controls)
     fig = _source_total_path_figure(pack, controls)
 
-    assert (lower, upper) == (2026, 2031)
+    assert (lower, upper) == (2025, 2031)
     for trace in fig.data:
         xs = [int(x) for x in getattr(trace, "x", []) if x is not None]
         if xs:
-            assert min(xs) >= 2026
+            assert min(xs) >= 2025
             assert max(xs) <= 2031
 
 
@@ -351,27 +352,36 @@ def test_total_path_chart_plots_vendored_release_paths_from_source_rows() -> Non
         {
             "series": "Total NLTF revenue",
             "release_round": "BEFU25",
-            "model_basis": "In-house model",
+            "model_basis": "Current finalist ensemble",
             "selected_fy": "FY2031",
         },
     )
 
     by_name = {trace.name: trace for trace in fig.data}
     expected_release_traces = {
-        "Selected MOT/BEFU release path",
-        "Rolling BEFU 1Y",
+        "Official comparator: selected MOT/BEFU",
+        "Official comparator: rolling BEFU 1Y",
     }
     assert expected_release_traces.issubset(set(by_name))
     for name in expected_release_traces:
         trace = by_name[name]
         assert len([value for value in trace.y if value is not None]) > 0
         assert list(trace.x) != [None]
-    assert "Hybrid replacement-only outlook" in by_name
-    assert len([value for value in by_name["Hybrid replacement-only outlook"].y if value is not None]) > 0
+    assert "Current finalist forecast" in by_name
+    assert len([value for value in by_name["Current finalist forecast"].y if value is not None]) > 0
+    forbidden = {
+        "Hybrid replacement-only outlook",
+        "In-house prediction / forecast",
+        "Legacy workbook selected basis",
+        "Legacy workbook model",
+        "Legacy workbook Schiff model",
+        "Actual to date (3 of 4 quarters)",
+    }
+    assert not forbidden.intersection(by_name)
     assert not any(str(name).endswith("(BEFU25 gap)") for name in by_name)
 
 
-def test_total_path_chart_splits_fy2026_partial_actual_from_forecast_paths() -> None:
+def test_total_path_chart_uses_source_actual_anchor_and_current_finalist_nowcast() -> None:
     pack = load_revenue_source_pack(repo_root=ROOT)
     assert pack is not None
 
@@ -380,7 +390,7 @@ def test_total_path_chart_splits_fy2026_partial_actual_from_forecast_paths() -> 
         {
             "series": "Total NLTF revenue",
             "release_round": "BEFU25",
-            "model_basis": "In-house model",
+            "model_basis": "Current finalist ensemble",
             "selected_fy": "FY2031",
         },
     )
@@ -390,25 +400,10 @@ def test_total_path_chart_splits_fy2026_partial_actual_from_forecast_paths() -> 
     assert 2026 not in [int(value) for value in actual.x]
     assert max(int(value) for value in actual.x) == 2025
 
-    partial = by_name["Actual to date (3 of 4 quarters)"]
-    assert list(map(int, partial.x)) == [2026]
-    assert abs(float(partial.y[0]) - 3528.410251053044) <= 1e-9
-    assert partial.mode == "markers"
-    partial_hover = partial.customdata[0]
-    assert partial_hover[1] == "partial_actual_to_date"
-    assert partial_hover[2] == "2025Q3; 2025Q4; 2026Q1"
-    assert "AZ16" in partial_hover[5] and "BB52" in partial_hover[5]
-    assert partial_hover[6] == "False"
-
-    for trace_name in [
-        "Selected MOT/BEFU release path",
-        "In-house prediction / forecast",
-        "Legacy workbook selected basis",
-        "Legacy workbook model",
-        "Legacy workbook Schiff model",
-        "Hybrid replacement-only outlook",
-    ]:
-        assert min(int(value) for value in by_name[trace_name].x) == 2026
+    assert "Actual to date (3 of 4 quarters)" not in by_name
+    assert "In-house prediction / forecast" not in by_name
+    assert "Legacy workbook selected basis" not in by_name
+    assert min(int(value) for value in by_name["Official comparator: selected MOT/BEFU"].x) == 2026
 
     current = pack.current_forecast_annual[
         pack.current_forecast_annual["series_id"].eq("total_nltf_net_revenue")
@@ -417,9 +412,21 @@ def test_total_path_chart_splits_fy2026_partial_actual_from_forecast_paths() -> 
         & pack.current_forecast_annual["FY"].eq(2026)
     ]
     assert not current.empty
-    in_house = by_name["In-house prediction / forecast"]
-    first_idx = list(map(int, in_house.x)).index(2026)
-    assert abs(float(in_house.y[first_idx]) - float(current.iloc[0]["value"])) <= 1e-9
+    finalist = by_name["Current finalist forecast"]
+    finalist_x = list(map(int, finalist.x))
+    assert finalist_x[0] == 2025
+    assert finalist_x[1] == 2026
+    assert abs(float(finalist.y[0]) - float(actual.y[-1])) <= 1e-9
+    first_forecast_idx = finalist_x.index(2026)
+    assert abs(float(finalist.y[first_forecast_idx]) - float(current.iloc[0]["value"])) <= 1e-9
+    anchor_hover = finalist.customdata[0]
+    nowcast_hover = finalist.customdata[first_forecast_idx]
+    assert anchor_hover[1] == "Actual anchor"
+    assert anchor_hover[5] == "Q41"
+    assert nowcast_hover[1] == "Current-finalist FY nowcast (2 actual + 2 forecast)"
+    assert nowcast_hover[2] == "actual: 2025Q3; 2025Q4; forecast: 2026Q1; 2026Q2"
+    assert nowcast_hover[3] == "source_backed"
+    assert nowcast_hover[6] == "True"
 
     marker_shapes = {(int(shape.x0), shape.line.dash) for shape in fig.layout.shapes}
     assert (2026, "dash") in marker_shapes
@@ -489,7 +496,7 @@ def test_revenue_source_every_series_valid_control_permutation_has_governed_trac
             controls = {
                 "series": series,
                 "release_round": "BEFU25",
-                "model_basis": "In-house model",
+                "model_basis": "Current finalist ensemble",
                 "selected_fy": "FY2031",
                 "horizon": "To FY2031",
                 "revenue_basis": basis,
@@ -513,25 +520,25 @@ def test_revenue_source_every_series_valid_control_permutation_has_governed_trac
             names = {trace.name for trace in fig.data}
             assert "Selected dashboard basis" not in names
             assert "Aaron Schiff" not in names
+            assert "Actual to date (3 of 4 quarters)" not in names
+            assert "Legacy workbook selected basis" not in names
+            assert "Legacy workbook model" not in names
+            assert "Legacy workbook Schiff model" not in names
 
             if "Actual" in names:
                 actual = next(trace for trace in fig.data if trace.name == "Actual")
                 assert max(int(value) for value in actual.x if value is not None) <= 2025
-            if "Actual to date (3 of 4 quarters)" in names:
-                partial = next(trace for trace in fig.data if trace.name == "Actual to date (3 of 4 quarters)")
-                assert set(int(value) for value in partial.x if value is not None) == {2026}
-                assert partial.mode == "markers"
-
-            if "In-house prediction / forecast" in names:
-                current = next(trace for trace in fig.data if trace.name == "In-house prediction / forecast")
-                assert min(int(value) for value in current.x if value is not None) >= 2026
+            if "Current finalist forecast" in names:
+                current = next(trace for trace in fig.data if trace.name == "Current finalist forecast")
+                assert min(int(value) for value in current.x if value is not None) >= 2025
                 source_cells = [
                     str(customdata[5])
                     for customdata in current.customdata
                     if customdata is not None and len(customdata) > 5
                 ]
                 assert source_cells
-                assert all("current_revenue_outlook" in cell for cell in source_cells)
+                assert "annual_model_paths.csv" not in "; ".join(source_cells)
+                assert any("current_revenue_outlook" in cell for cell in source_cells if cell != "Q41")
 
             for trace in fig.data:
                 if not getattr(trace, "customdata", None) is None:
@@ -545,7 +552,7 @@ def test_revenue_source_charts_use_explicit_units_and_annual_ticks() -> None:
     controls = {
         "series": "Total NLTF revenue",
         "release_round": "BEFU25",
-        "model_basis": "In-house model",
+        "model_basis": "Current finalist ensemble",
         "selected_fy": "FY2031",
     }
     frame = pack.canonical_long[pack.canonical_long["series_id"].eq("total_nltf_net_revenue")]
@@ -556,11 +563,17 @@ def test_revenue_source_charts_use_explicit_units_and_annual_ticks() -> None:
     uncertainty_fig = _source_uncertainty_figure(pack, controls)
     component_fig = _source_component_figure(pack, controls)
     split_fig = _source_split_figure(pack, controls)
-    for fig in [total_fig, uncertainty_fig]:
-        assert fig.layout.yaxis.title.text == "$m nominal ex GST"
-        assert fig.layout.xaxis.title.text == "June year"
-        assert fig.layout.xaxis.tickmode == "linear"
-        assert fig.layout.xaxis.dtick == 1
+    assert total_fig.layout.yaxis.title.text == "$m nominal ex GST"
+    assert total_fig.layout.xaxis.title.text == "June year"
+    assert total_fig.layout.xaxis.tickmode == "linear"
+    assert total_fig.layout.xaxis.dtick == 1
+    if uncertainty_fig.data:
+        assert uncertainty_fig.layout.yaxis.title.text == "$m nominal ex GST"
+        assert uncertainty_fig.layout.xaxis.title.text == "June year"
+        assert uncertainty_fig.layout.xaxis.tickmode == "linear"
+        assert uncertainty_fig.layout.xaxis.dtick == 1
+    else:
+        assert uncertainty_fig.layout.annotations
     assert component_fig.layout.yaxis.title.text == "$m nominal ex GST"
 
     value_traces = [
@@ -580,7 +593,7 @@ def test_uncertainty_source_control_does_not_fabricate_mot_release_fan() -> None
     controls = {
         "series": "Total NLTF revenue",
         "release_round": "BEFU25",
-        "model_basis": "In-house model",
+        "model_basis": "Current finalist ensemble",
         "selected_fy": "FY2031",
         "uncertainty": "MOT release round",
     }
@@ -590,9 +603,9 @@ def test_uncertainty_source_control_does_not_fabricate_mot_release_fan() -> None
     assert not mot_fig.data
     assert "archived horizon-specific error bands" in mot_fig.layout.annotations[0].text
 
-    model_fig = _source_uncertainty_figure(pack, {**controls, "uncertainty": "In-house model"})
-    assert model_fig.data
-    assert model_fig.layout.yaxis.title.text == "$m nominal ex GST"
+    removed_fallback = _source_uncertainty_figure(pack, {**controls, "uncertainty": "Removed workbook model spread"})
+    assert not removed_fallback.data
+    assert "governed gap" in removed_fallback.layout.annotations[0].text or "unavailable" in removed_fallback.layout.annotations[0].text
 
 
 def test_uncertainty_source_control_uses_mot_archived_error_bands_when_available() -> None:
@@ -601,7 +614,7 @@ def test_uncertainty_source_control_uses_mot_archived_error_bands_when_available
     controls = {
         "series": "Total RUC+PED revenue",
         "release_round": "BEFU25",
-        "model_basis": "In-house model",
+        "model_basis": "Current finalist ensemble",
         "selected_fy": "FY2031",
         "uncertainty": "MOT release round",
     }
@@ -609,8 +622,8 @@ def test_uncertainty_source_control_uses_mot_archived_error_bands_when_available
     mot_fig = _source_uncertainty_figure(pack, controls)
 
     by_name = {trace.name: trace for trace in mot_fig.data}
-    assert {"MOT archived error 80% band", "MOT archived error 50% band", "Selected MOT/BEFU release path"}.issubset(by_name)
-    selected = by_name["Selected MOT/BEFU release path"]
+    assert {"MOT archived error 80% band", "MOT archived error 50% band", "Official comparator: selected MOT/BEFU"}.issubset(by_name)
+    selected = by_name["Official comparator: selected MOT/BEFU"]
     assert len(selected.y) > 0
     assert min(row[2] for row in selected.customdata) >= 10
 

@@ -124,11 +124,13 @@ from model_dashboard.revenue_outlook import (
     validate_promotable_comparison,
 )
 from model_dashboard.revenue_source_pack import (
+    CURRENT_FINALIST_COMPOSITE_MODEL_ID,
     OPTIONAL_SOURCE_PACK_FILES,
     REQUIRED_SOURCE_PACK_FILES,
     REVENUE_SOURCE_PACK_DIR,
     REVENUE_SOURCE_PACK_RUNTIME_REVISION,
     REVENUE_SOURCE_PACK_SCHEMA_VERSION,
+    SOURCE_SERIES_ALIASES,
     RevenueSourcePack,
     control_options,
     current_selection,
@@ -2105,10 +2107,10 @@ def _revenue_source_kpi_cards(source_pack: RevenueSourcePack | None) -> list[tup
     selected_fy = current_selection(source_pack, "selected_fy", "FY2031")
     cards = [
         ("Source pack", str(source_pack.manifest.get("source_pack_version", "unknown")), source_pack.validation_status),
-        ("Total NLTF", _source_value_label(frame, "total_nltf_net_revenue", selected_fy), selected_fy),
-        ("PED", _source_value_label(frame, "gross_ped_revenue", selected_fy), "revenue bridge"),
-        ("Light RUC", _source_value_label(frame, "light_ruc_net_revenue", selected_fy), "direct model output bridged to revenue"),
-        ("Heavy RUC", _source_value_label(frame, "heavy_ruc_net_revenue", selected_fy), "direct model output bridged to revenue"),
+        ("Total NLTF", _source_value_label(source_pack, "total_nltf_net_revenue", selected_fy), selected_fy),
+        ("PED", _source_value_label(source_pack, "gross_ped_revenue", selected_fy), "revenue bridge"),
+        ("Light RUC", _source_value_label(source_pack, "light_ruc_net_revenue", selected_fy), "direct model output bridged to revenue"),
+        ("Heavy RUC", _source_value_label(source_pack, "heavy_ruc_net_revenue", selected_fy), "direct model output bridged to revenue"),
         ("Uncertainty / MAPE", _source_error_label(frame, selected_fy), "source-pack diagnostic where available"),
     ]
     return cards
@@ -2163,21 +2165,17 @@ def _render_revenue_source_controls(source_pack: RevenueSourcePack | None) -> di
 
         row2 = st.columns([0.13, 0.16, 0.16, 0.18, 0.14, 0.12, 0.11])
         view_options = ["June-year", "Quarterly"]
-        model_basis_options = ["In-house model", "Aaron Schiff model", "Selected dashboard basis"]
         revenue_basis_options = control_options(source_pack, "revenue_basis", ["Net", "Gross", "Benchmark actual"])
-        uncertainty_options = control_options(source_pack, "uncertainty_source", ["MOT release round", "In-house model", "Aaron Schiff model"])
+        uncertainty_options = ["MOT release round"]
         fy_options = control_options(source_pack, "selected_fy", ["FY2031"])
         horizon_options = control_options(source_pack, "horizon", REVENUE_SOURCE_HORIZON_OPTIONS)
         top_up_options = control_options(source_pack, "crown_top_up", ["Exclude", "Include"])
         with row2[0]:
             time_grain = st.radio("Time grain", view_options, horizontal=True, key="revenue_source_time_grain")
         with row2[1]:
-            model_basis = st.selectbox(
-                "Model basis",
-                model_basis_options,
-                index=_option_index(model_basis_options, current_selection(source_pack, "model_basis", "In-house model")),
-                key="revenue_source_model_basis",
-            )
+            st.markdown("<div class='page5-panel-title'>Model basis</div>", unsafe_allow_html=True)
+            st.caption("Current finalist ensemble")
+            model_basis = "Current finalist ensemble"
         with row2[2]:
             revenue_basis = st.selectbox(
                 "Revenue basis",
@@ -2250,9 +2248,9 @@ def _render_revenue_source_architecture(source_pack: RevenueSourcePack, controls
     with chart_cols[0]:
         chart_card(
             "Total path chart",
-            "Actual/benchmark, selected basis, Aaron Schiff and in-house paths from the normalized annual model-path table.",
+            "Source actuals, current finalist forecast and official MOT/BEFU comparators from repo-local governed sources.",
             _source_total_path_figure(source_pack, controls),
-            caption="MOT/BEFU release registry is loaded, but the distilled pack does not expose the full release-value table; unresolved differences are reported instead of forced.",
+            caption="Current finalist forecast is the only in-house forecast source. Workbook model paths are offline lineage only and are not plotted.",
             notes_as_tooltip=False,
         )
     with chart_cols[1]:
@@ -2260,7 +2258,7 @@ def _render_revenue_source_architecture(source_pack: RevenueSourcePack, controls
             "Uncertainty fan",
             "Displayed only from available governed model paths; no probabilistic residual fan is fabricated.",
             _source_uncertainty_figure(source_pack, controls),
-            caption="Where only model-spread evidence is available, the band is labelled as model spread rather than probabilistic uncertainty.",
+            caption="No workbook model-spread fallback is used; unavailable uncertainty evidence is shown as a governed gap.",
             notes_as_tooltip=False,
         )
 
@@ -2311,6 +2309,8 @@ def _render_revenue_source_architecture(source_pack: RevenueSourcePack, controls
         display_table(source_pack.validation_issues, height=180, max_rows=80)
         st.caption("Required path trace status")
         display_table(_source_path_trace_status_for_controls(source_pack, controls), height=180, max_rows=80)
+        st.caption("Displayed trace source contract")
+        display_table(getattr(source_pack, "trace_source_contract", pd.DataFrame()), height=180, max_rows=80)
         st.caption("Annual completeness audit")
         annual_completeness = _source_annual_completeness_audit(source_pack)
         display_table(annual_completeness, height=180, max_rows=80)
@@ -2566,7 +2566,7 @@ def _source_gap_register(source_pack: RevenueSourcePack) -> pd.DataFrame:
                 "availability_status": "available" if has_ped_total_vkt else "missing",
                 "current_selection": _selection_value(selections, "series", "Total NLTF revenue"),
                 "runtime_treatment": "bridge_rows_available" if has_ped_total_vkt else "reported_gap",
-                "user_visible_message": "PED total VKT bridge rows are absent; PED revenue paths are preserved from workbook source rows rather than recomputed.",
+                "user_visible_message": "PED total VKT bridge rows are absent; PED replacement revenue is reported as a governed gap rather than falling back to workbook model paths.",
             },
         ],
         columns=[
@@ -2755,20 +2755,14 @@ def _source_path_trace_status(source_pack: RevenueSourcePack) -> pd.DataFrame:
     status = getattr(source_pack, "path_trace_status", None)
     if isinstance(status, pd.DataFrame):
         return status
-    frame = getattr(source_pack, "canonical_long", pd.DataFrame())
     gaps = _source_gap_register(source_pack)
     release_gap = gaps[gaps["gap_id"].eq("release_value_table_missing")] if "gap_id" in gaps.columns else pd.DataFrame()
     release_available = not release_gap.empty and release_gap.iloc[0].get("availability_status") == "available"
-    actual_rows = frame[frame["line"].astype(str).isin(["Actual", "Actual / benchmark"])].copy() if "line" in frame.columns else pd.DataFrame()
-    has_partial_actual = bool(pd.to_numeric(actual_rows.get("FY"), errors="coerce").eq(2026).any()) if not actual_rows.empty else False
     rows = [
-        _path_trace_row("actual_benchmark", "Complete annual actuals", _has_source_trace(frame, line_values={"Actual", "Actual / benchmark"}), "annual actual rows after completeness audit", ""),
-        _path_trace_row("actual_to_date_marker", "Actual to date marker", has_partial_actual, "partial current-FY annual actual row", ""),
-        _path_trace_row("selected_workbook_basis", "Selected workbook basis", _has_source_trace(frame, model_basis="selected_dashboard_basis", line_values={"Model path"}), "annual model path rows", ""),
-        _path_trace_row("selected_mot_befu_release", "Selected MOT/BEFU release path", release_available, "release-value table", "" if release_available else "release_value_table_missing"),
-        _path_trace_row("rolling_befu_1y", "Rolling BEFU 1Y", release_available, "release-value table", "" if release_available else "release_value_table_missing"),
-        _path_trace_row("aaron_schiff_model", "Aaron Schiff prediction / forecast", _has_source_trace(frame, model_basis="aaron_schiff_model", line_values={"Model path"}), "annual model path rows", ""),
-        _path_trace_row("in_house_model", "In-house prediction / forecast", _has_source_trace(frame, model_basis="in_house_model", line_values={"Model path"}), "annual model path rows", ""),
+        _path_trace_row("actual_benchmark", "Complete annual actuals", True, "source actual rows after completeness audit", ""),
+        _path_trace_row("selected_mot_befu_release", "Official comparator: selected MOT/BEFU", release_available, "release-value table", "" if release_available else "release_value_table_missing"),
+        _path_trace_row("rolling_befu_1y", "Official comparator: rolling BEFU 1Y", release_available, "release-value table", "" if release_available else "release_value_table_missing"),
+        _path_trace_row("current_finalist_forecast", "Current finalist forecast", True, "promoted current finalist quarterly outputs annualized to June years with FY2025 actual anchor", ""),
     ]
     return pd.DataFrame(rows)
 
@@ -2803,22 +2797,6 @@ def _path_trace_row(trace_id: str, trace_label: str, available: bool, data_scope
     }
 
 
-def _has_source_trace(
-    frame: pd.DataFrame,
-    *,
-    model_basis: str | None = None,
-    line_values: set[str] | None = None,
-) -> bool:
-    if not isinstance(frame, pd.DataFrame) or frame.empty:
-        return False
-    rows = frame
-    if model_basis is not None and "model_basis" in rows.columns:
-        rows = rows[rows["model_basis"].astype(str).eq(model_basis)]
-    if line_values is not None and "line" in rows.columns:
-        rows = rows[rows["line"].astype(str).isin(line_values)]
-    return "value" in rows.columns and pd.to_numeric(rows["value"], errors="coerce").notna().any()
-
-
 def _selection_value(selections: dict[str, Any], control_id: str, default: str = "") -> str:
     value = selections.get(control_id, {}).get("current_value") if isinstance(selections.get(control_id, {}), dict) else None
     return str(value) if value else default
@@ -2832,14 +2810,17 @@ def _option_index(options: list[str], preferred: str, *, fallback: str | None = 
     return 0
 
 
-def _source_value_label(frame: pd.DataFrame, series_id: str, selected_fy: str) -> str:
+def _source_value_label(source_pack: RevenueSourcePack, series_id: str, selected_fy: str) -> str:
+    frame = getattr(source_pack, "hybrid_annual_revenue", pd.DataFrame())
     rows = _source_series_rows(frame, series_id)
     if rows.empty:
         return "-"
-    selected = rows[rows["period"].eq(selected_fy)]
-    model_rows = selected[selected["line"].eq("Model path")]
-    actual_rows = selected[selected["line"].isin(["Actual", "Actual / benchmark"])]
-    row = (model_rows if not model_rows.empty else actual_rows if not actual_rows.empty else selected).tail(1)
+    if "period" in rows.columns:
+        selected = rows[rows["period"].eq(selected_fy)]
+    else:
+        fy = _fy_from_label(selected_fy)
+        selected = rows[pd.to_numeric(rows.get("FY"), errors="coerce").eq(fy)] if fy is not None else pd.DataFrame()
+    row = selected.tail(1)
     if row.empty:
         row = rows.sort_values("FY").tail(1)
     value = row.iloc[0].get("value")
@@ -2869,19 +2850,12 @@ def _source_total_path_figure(source_pack: RevenueSourcePack, controls: dict[str
         return empty_figure("Selected revenue series is unavailable in the normalized source pack.")
     fig = go.Figure()
     actual_rows = _source_complete_actual_rows(source_pack, frame)
-    partial_actual_rows = _source_partial_actual_rows(source_pack, frame)
     forecast_start = _source_forecast_start_fy_from_audit(source_pack)
-    if forecast_start is not None and not partial_actual_rows.empty:
-        partial_actual_rows = partial_actual_rows[pd.to_numeric(partial_actual_rows["FY"], errors="coerce").ge(forecast_start)].copy()
     trace_specs = [
         ("Actual", actual_rows, "#7A869A", "solid"),
-        ("Selected MOT/BEFU release path", _source_forecast_path_rows(source_pack, _source_selected_release_rows(frame, controls)), "#5B677A", "dashdot"),
-        ("Rolling BEFU 1Y", _source_rolling_befu_1y_rows(frame), "#6B7F2A", "dot"),
-        ("Hybrid replacement-only outlook", _source_forecast_path_rows(source_pack, _source_hybrid_path_rows(source_pack, controls)), "#D1495B", "solid"),
-        ("In-house prediction / forecast", _source_forecast_path_rows(source_pack, _source_current_forecast_path_rows(source_pack, frame, controls)), "#00843D", "solid"),
-        ("Legacy workbook selected basis", _source_forecast_path_rows(source_pack, _source_model_rows(frame, "selected_dashboard_basis")), "#002B5C", "solid"),
-        ("Legacy workbook model", _source_forecast_path_rows(source_pack, _source_model_rows(frame, "in_house_model")), "#2F855A", "dot"),
-        ("Legacy workbook Schiff model", _source_forecast_path_rows(source_pack, _source_model_rows(frame, "aaron_schiff_model")), "#F37021", "dash"),
+        ("Official comparator: selected MOT/BEFU", _source_forecast_path_rows(source_pack, _source_selected_release_rows(frame, controls)), "#5B677A", "dashdot"),
+        ("Official comparator: rolling BEFU 1Y", _source_rolling_befu_1y_rows(frame), "#6B7F2A", "dot"),
+        ("Current finalist forecast", _source_current_forecast_path_rows(source_pack, frame, controls), "#00843D", "solid"),
     ]
     axis_title = _source_axis_title(frame)
     for name, rows, color, dash in trace_specs:
@@ -2919,40 +2893,6 @@ def _source_total_path_figure(source_pack: RevenueSourcePack, controls: dict[str
                     "<br>Source cells: %{customdata[5]}"
                     "<br>Nowcast: %{customdata[6]}"
                     "<extra>" + name + "</extra>"
-                ),
-            )
-        )
-    partial_actual_rows = _filter_source_horizon_rows(partial_actual_rows, source_pack, controls)
-    partial_actual_rows = _dedupe_path_rows(partial_actual_rows)
-    if not partial_actual_rows.empty:
-        partial_actual_rows = _source_chart_hover_rows(source_pack, partial_actual_rows, axis_title=axis_title)
-        fig.add_trace(
-            go.Scatter(
-                x=partial_actual_rows["FY"],
-                y=partial_actual_rows["value"],
-                mode="markers",
-                name="Actual to date (3 of 4 quarters)",
-                marker={"color": "#7A869A", "size": 11, "symbol": "diamond-open", "line": {"width": 2}},
-                customdata=partial_actual_rows[
-                    [
-                        "hover_unit",
-                        "period_status",
-                        "quarters_present_hover",
-                        "source_status_hover",
-                        "release_hover",
-                        "source_cells_hover",
-                        "nowcast_flag_hover",
-                    ]
-                ].to_numpy(),
-                hovertemplate=(
-                    "FY%{x}<br>%{y:,.1f} %{customdata[0]}"
-                    "<br>Status: %{customdata[1]}"
-                    "<br>Quarters: %{customdata[2]}"
-                    "<br>Source status: %{customdata[3]}"
-                    "<br>Release/path: %{customdata[4]}"
-                    "<br>Source cells: %{customdata[5]}"
-                    "<br>Nowcast: %{customdata[6]}"
-                    "<extra>Actual to date</extra>"
                 ),
             )
         )
@@ -3008,8 +2948,9 @@ def _source_actual_base_rows(frame: pd.DataFrame) -> pd.DataFrame:
     if frame.empty or "line" not in frame.columns:
         return pd.DataFrame()
     rows = frame[frame["line"].astype(str).isin(["Actual", "Actual / benchmark"])].copy()
-    preferred = rows[rows.get("source_file", pd.Series("", index=rows.index)).astype(str).eq("annual_model_paths.csv")]
-    return preferred if not preferred.empty else rows
+    allowed_sources = {"annual_actuals.csv", "quarterly_actuals.csv"}
+    preferred = rows[rows.get("source_file", pd.Series("", index=rows.index)).astype(str).isin(allowed_sources)]
+    return preferred
 
 
 def _source_complete_actual_rows(source_pack: RevenueSourcePack, frame: pd.DataFrame) -> pd.DataFrame:
@@ -3092,6 +3033,14 @@ def _source_chart_hover_rows(source_pack: RevenueSourcePack, rows: pd.DataFrame,
             }
         )
         out = out.merge(audit_view, on="FY", how="left")
+        for column in ["quarters_present", "actual_quarters", "forecast_quarters"]:
+            if column not in out.columns:
+                preferred = f"{column}_x"
+                audit_column = f"{column}_y"
+                if preferred in out.columns:
+                    out[column] = out[preferred]
+                elif audit_column in out.columns:
+                    out[column] = out[audit_column]
     for column in [
         "completeness_status",
         "quarters_present",
@@ -3107,14 +3056,27 @@ def _source_chart_hover_rows(source_pack: RevenueSourcePack, rows: pd.DataFrame,
     row_source_status = out.get("source_status", pd.Series("", index=out.index)).fillna("").astype(str)
     row_value_status = out.get("value_status", pd.Series("", index=out.index)).fillna("").astype(str)
     row_line = out.get("line", pd.Series("", index=out.index)).fillna("").astype(str)
+    row_nowcast_flag = out.get("nowcast_flag", pd.Series(False, index=out.index)).fillna(False).astype(bool)
     out["period_status"] = out["completeness_status"].fillna("").astype(str)
     out.loc[out["period_status"].eq(""), "period_status"] = row_value_status.where(row_value_status.ne(""), row_line)
+    current_status_mask = row_value_status.isin(["Actual anchor", "Current-finalist FY nowcast (2 actual + 2 forecast)", "current_finalist_forecast"])
+    out.loc[current_status_mask, "period_status"] = row_value_status[current_status_mask]
     out["quarters_present_hover"] = out["actual_quarters"].fillna("").astype(str)
     out.loc[out["quarters_present_hover"].eq(""), "quarters_present_hover"] = out["quarters_present"].fillna("").astype(str)
     out.loc[out["quarters_present_hover"].eq(""), "quarters_present_hover"] = out["forecast_quarters"].fillna("").astype(str)
+    nowcast_status_mask = row_value_status.eq("Current-finalist FY nowcast (2 actual + 2 forecast)")
+    nowcast_actuals = out["actual_quarters"].fillna("").astype(str)
+    nowcast_forecasts = out["forecast_quarters"].fillna("").astype(str)
+    out.loc[nowcast_status_mask, "quarters_present_hover"] = (
+        "actual: "
+        + nowcast_actuals.where(nowcast_actuals.ne(""), "none")
+        + "; forecast: "
+        + nowcast_forecasts.where(nowcast_forecasts.ne(""), "none")
+    )[nowcast_status_mask]
     out.loc[out["quarters_present_hover"].eq(""), "quarters_present_hover"] = "n/a"
     out["source_status_hover"] = out["audit_source_status"].fillna("").astype(str)
     out.loc[out["source_status_hover"].eq(""), "source_status_hover"] = row_source_status.where(row_source_status.ne(""), row_value_status)
+    out.loc[current_status_mask & row_source_status.ne(""), "source_status_hover"] = row_source_status[current_status_mask & row_source_status.ne("")]
     out.loc[out["source_status_hover"].eq(""), "source_status_hover"] = "n/a"
     out["release_hover"] = out.get("release_vintage", pd.Series("", index=out.index)).fillna("").astype(str)
     out.loc[out["release_hover"].eq(""), "release_hover"] = out.get("scenario_name", pd.Series("", index=out.index)).fillna("").astype(str)
@@ -3128,6 +3090,7 @@ def _source_chart_hover_rows(source_pack: RevenueSourcePack, rows: pd.DataFrame,
     ].astype(str)
     out.loc[out["source_cells_hover"].eq(""), "source_cells_hover"] = "n/a"
     out["nowcast_flag_hover"] = out["audit_nowcast_flag"].fillna(False).astype(str)
+    out.loc[current_status_mask, "nowcast_flag_hover"] = row_nowcast_flag[current_status_mask].astype(str)
     return out
 
 
@@ -3136,8 +3099,8 @@ def _add_missing_source_path_gap_traces(fig: go.Figure, source_pack: RevenueSour
     if status.empty or "trace_id" not in status.columns:
         return
     gap_styles = {
-        "selected_mot_befu_release": ("Selected MOT/BEFU release path", "#5B677A", "dashdot"),
-        "rolling_befu_1y": ("Rolling BEFU 1Y", "#6B7F2A", "dot"),
+        "selected_mot_befu_release": ("Official comparator: selected MOT/BEFU", "#5B677A", "dashdot"),
+        "rolling_befu_1y": ("Official comparator: rolling BEFU 1Y", "#6B7F2A", "dot"),
     }
     for trace_id, (label, color, dash) in gap_styles.items():
         rows = status[status["trace_id"].eq(trace_id)]
@@ -3211,7 +3174,7 @@ def _source_uncertainty_figure(source_pack: RevenueSourcePack, controls: dict[st
                 x=mot["FY"],
                 y=mot["value"],
                 mode="lines+markers",
-                name="Selected MOT/BEFU release path",
+                name="Official comparator: selected MOT/BEFU",
                 line={"color": "#002B5C", "width": 2.8},
                 marker={"size": 6},
                 customdata=mot[["hover_unit", "horizon_label", "sample_size"]].to_numpy(),
@@ -3230,64 +3193,7 @@ def _source_uncertainty_figure(source_pack: RevenueSourcePack, controls: dict[st
             hovermode="x unified",
         )
         return fig
-    model = frame[frame["line"].eq("Model path")].copy()
-    if model.empty or not {"in_house_model", "aaron_schiff_model"}.issubset(set(model["model_basis"])):
-        return empty_figure("Probabilistic uncertainty fan is not available in the normalized source pack.")
-    axis_title = _source_axis_title(frame)
-    pivot = model.pivot_table(index="FY", columns="model_basis", values="value", aggfunc="first").dropna(how="any")
-    if pivot.empty:
-        return empty_figure("Model-spread uncertainty cannot be drawn for this series.")
-    lower = pivot[["in_house_model", "aaron_schiff_model"]].min(axis=1)
-    upper = pivot[["in_house_model", "aaron_schiff_model"]].max(axis=1)
-    fig = go.Figure()
-    fig.add_trace(
-        go.Scatter(
-            x=pivot.index,
-            y=upper,
-            mode="lines",
-            line={"width": 0},
-            showlegend=False,
-            hoverinfo="skip",
-        )
-    )
-    fig.add_trace(
-        go.Scatter(
-            x=pivot.index,
-            y=lower,
-            mode="lines",
-            fill="tonexty",
-            fillcolor="rgba(0, 132, 61, 0.18)",
-            line={"width": 0},
-            name="In-house vs Schiff model spread",
-            customdata=[[axis_title] for _ in range(len(lower))],
-            hovertemplate="FY%{x}<br>%{y:,.1f} %{customdata[0]}<extra>Lower spread bound</extra>",
-        )
-    )
-    selected = _source_model_rows(frame, _model_basis_key(controls.get("model_basis")))
-    selected = _dedupe_path_rows(selected)
-    if not selected.empty:
-        selected = selected.copy()
-        selected["hover_unit"] = axis_title
-        fig.add_trace(
-            go.Scatter(
-                x=selected["FY"],
-                y=selected["value"],
-                mode="lines+markers",
-                name=str(controls.get("model_basis", "Selected model")),
-                line={"color": "#002B5C", "width": 2.8},
-                customdata=selected[["hover_unit"]].to_numpy(),
-                hovertemplate="FY%{x}<br>%{y:,.1f} %{customdata[0]}<extra>%{fullData.name}</extra>",
-            )
-        )
-    fig.update_layout(
-        margin={"l": 52, "r": 18, "t": 28, "b": 48},
-        height=360,
-        yaxis_title=axis_title,
-        xaxis_title="June year",
-        xaxis={"tickmode": "linear", "dtick": 1},
-        hovermode="x unified",
-    )
-    return fig
+    return empty_figure("Only MOT release-round uncertainty is available on Revenue Outlook; workbook model-spread fallback has been removed.")
 
 
 def _source_component_figure(source_pack: RevenueSourcePack, controls: dict[str, Any]) -> go.Figure:
@@ -3512,17 +3418,8 @@ def _source_selected_fy_rows(source_pack: RevenueSourcePack, controls: dict[str,
     if fy is None:
         return pd.DataFrame()
     frame = frame[frame["FY"].eq(fy)].copy()
-    model_key = _model_basis_key(controls.get("model_basis"))
-    preferred = frame[(frame["source_file"].eq("annual_model_paths.csv")) & (frame["model_basis"].eq(model_key)) & (frame["line"].eq("Model path"))]
-    if preferred.empty:
-        preferred = frame[(frame["source_file"].eq("annual_model_paths.csv")) & (frame["line"].isin(["Actual", "Actual / benchmark"]))]
-    if preferred.empty:
-        preferred = frame[frame["source_file"].eq("annual_actuals.csv")]
+    preferred = frame[frame["source_file"].isin(["annual_actuals.csv", "quarterly_actuals.csv", "official_befu25_annual.csv", "release_values.csv"])]
     return preferred.copy()
-
-
-def _source_model_rows(frame: pd.DataFrame, model_basis: str) -> pd.DataFrame:
-    return frame[(frame["line"].eq("Model path")) & (frame["model_basis"].eq(model_basis))].copy()
 
 
 def _source_hybrid_path_rows(source_pack: RevenueSourcePack, controls: dict[str, Any]) -> pd.DataFrame:
@@ -3817,6 +3714,9 @@ def _dedupe_path_rows(rows: pd.DataFrame) -> pd.DataFrame:
 
 
 def _selected_series_id(source_pack: RevenueSourcePack, selected: str) -> str:
+    alias = SOURCE_SERIES_ALIASES.get(str(selected or "").strip())
+    if alias:
+        return alias
     rows = source_pack.series_master[
         source_pack.series_master["Display name"].astype(str).eq(selected)
         | source_pack.series_master["Series ID"].astype(str).eq(selected)
@@ -3828,15 +3728,6 @@ def _selected_series_id(source_pack: RevenueSourcePack, selected: str) -> str:
     if selected == "Total RUC forecast incl EV/PHEV":
         return "total_ruc_net_revenue"
     return selected.lower().replace(" ", "_")
-
-
-def _model_basis_key(value: Any) -> str:
-    text = str(value or "").strip().lower()
-    if "aaron" in text or "schiff" in text:
-        return "aaron_schiff_model"
-    if "selected" in text:
-        return "selected_dashboard_basis"
-    return "in_house_model"
 
 
 def _source_revenue_basis_key(value: Any) -> str:
@@ -3875,15 +3766,15 @@ def _source_revenue_basis_label(value: Any) -> str:
 
 def _uncertainty_source_key(controls: dict[str, Any]) -> str:
     text = str(controls.get("uncertainty") or controls.get("uncertainty_source") or "").strip().lower()
-    if "mot" in text or "release" in text:
-        return "mot_release_round"
-    if "aaron" in text or "schiff" in text:
-        return "aaron_schiff_model"
-    return "in_house_model"
+    return "mot_release_round" if "mot" in text or "release" in text else "mot_release_round"
 
 
 def _selected_fy_number(controls: dict[str, Any]) -> int | None:
-    text = str(controls.get("selected_fy", "")).upper().replace("FY", "")
+    return _fy_from_label(controls.get("selected_fy", ""))
+
+
+def _fy_from_label(value: Any) -> int | None:
+    text = str(value or "").upper().replace("FY", "")
     try:
         return int(text)
     except ValueError:

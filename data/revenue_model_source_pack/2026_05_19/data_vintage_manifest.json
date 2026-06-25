@@ -1,5 +1,9 @@
 {
   "annual_completeness_rows": 54,
+  "current_finalist_anchor_fy": "FY2025",
+  "current_finalist_nowcast_actual_quarters": "2025Q3; 2025Q4",
+  "current_finalist_nowcast_forecast_quarters": "2026Q1; 2026Q2",
+  "current_finalist_nowcast_fy": "FY2026",
   "current_outlook_chart_rows": 1809,
   "current_outlook_model_ids": {
     "HEAVY_RUC": [
@@ -64,7 +68,7 @@
   "model_training_cutoff": "2025Q4",
   "partial_actual_fy": 2026,
   "partial_actual_quarters": "2025Q3; 2025Q4; 2026Q1",
-  "policy_note": "Models are trained/refitted through 2025Q4. 2026Q1 is an observation/source actual, not a model-training row. FY2026 is partial actual-to-date unless explicitly shown as actual-plus-forecast-to-go nowcast.",
+  "policy_note": "Models are trained/refitted through 2025Q4. 2026Q1 is an observation/source actual, not a model-training row. Revenue Outlook current-finalist FY2026 uses the production-vintage forecast for 2026Q1 and 2026Q2, with 2025Q3 and 2025Q4 as actual anchors inside the June-year nowcast; it does not use observed 2026Q1 revenue as model training data.",
   "repo_relative_current_revenue_outlook_dir": "data/current_revenue_outlook",
   "repo_relative_source_pack_dir": "data/revenue_model_source_pack/2026_05_19",
   "revenue_source_actual_cutoff": "2026Q1",

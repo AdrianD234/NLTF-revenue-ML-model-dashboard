@@ -9,6 +9,8 @@ import pandas as pd
 
 from model_dashboard.revenue_source_pack import (
     CANONICAL_REVENUE_SCHEMA_VERSION,
+    CURRENT_FINALIST_COMPOSITE_MODEL_ID,
+    CURRENT_FINALIST_MODEL_IDS,
     OPTIONAL_SOURCE_PACK_FILES,
     REQUIRED_SOURCE_PACK_FILES,
     REVENUE_SOURCE_PACK_SCHEMA_VERSION,
@@ -166,9 +168,6 @@ def test_revenue_source_pack_canonical_long_schema_preserves_source_rows() -> No
     assert set(frame["path_status"].dropna().unique()).issubset(
         {
             "actual_or_benchmark",
-            "selected_workbook_basis",
-            "in_house_prediction_forecast",
-            "aaron_schiff_prediction_forecast",
             "selected_mot_release_forecast",
             "fed_path_rate",
             "other_model_path",
@@ -267,7 +266,8 @@ def test_hybrid_annual_revenue_replaces_only_three_lines_and_preserves_mot_fixed
     assert replacement_matrix.map(lambda values: values == {"gross_ped_revenue", "light_ruc_net_revenue", "heavy_ruc_net_revenue"}).all()
     non_replacements = hybrid[~hybrid["replacement_only"].astype(bool)]
     assert not set(non_replacements["series_id"]).intersection({"gross_ped_revenue", "light_ruc_net_revenue", "heavy_ruc_net_revenue"})
-    replacement_sources = replacements.groupby("series_id")["source_file"].agg(lambda values: set(values))
+    forecast_replacements = replacements[pd.to_numeric(replacements["FY"], errors="coerce").ge(2026)].copy()
+    replacement_sources = forecast_replacements.groupby("series_id")["source_file"].agg(lambda values: set(values))
     assert replacement_sources.loc["gross_ped_revenue"] == {
         "data/current_revenue_outlook/revenue_chart_rows.csv; ped_bridge_inputs.csv; fed_rate_paths.csv"
     }
@@ -280,12 +280,15 @@ def test_hybrid_annual_revenue_replaces_only_three_lines_and_preserves_mot_fixed
     assert {"Current planned path", "No 2027 12c uplift"}.issubset(set(replacements["fed_path"]))
     assert replacements["formula"].astype(str).str.len().gt(0).all()
 
-    fixed = hybrid[hybrid["row_role"].astype(str).str.startswith("fixed_mot")]
+    fixed = hybrid[
+        hybrid["row_role"].astype(str).str.startswith("fixed_mot")
+        & pd.to_numeric(hybrid["FY"], errors="coerce").ge(2026)
+    ]
     assert not fixed.empty
     assert set(fixed["source_file"]) == {"official_befu25_annual.csv"}
     assert not set(fixed["series_id"]).intersection({"gross_ped_revenue", "light_ruc_net_revenue", "heavy_ruc_net_revenue"})
 
-    fy = int(hybrid["FY"].min())
+    fy = 2026
     rows = hybrid[hybrid["FY"].eq(fy) & hybrid["fed_path"].eq("Current planned path")].set_index("series_id")
     assert {"population_count", "ped_total_vkt", "ped_litres_per_100km", "ped_fed_rate_path"}.issubset(rows.index)
     ped_expected = rows.loc["ped_total_vkt", "value"] * rows.loc["ped_litres_per_100km", "value"] / 100.0 * rows.loc["ped_fed_rate_path", "value"]
@@ -518,28 +521,22 @@ def test_revenue_path_trace_status_marks_vendored_release_traces_available_witho
     by_id = status.set_index("trace_id")
     required_traces = {
         "actual_benchmark",
-        "selected_workbook_basis",
         "selected_mot_befu_release",
         "rolling_befu_1y",
-        "aaron_schiff_model",
-        "in_house_model",
-        "legacy_in_house_model",
+        "current_finalist_forecast",
     }
-    assert required_traces.issubset(set(by_id.index))
+    assert set(by_id.index) == required_traces
 
     available = by_id.loc[
         [
             "actual_benchmark",
-            "selected_workbook_basis",
-            "aaron_schiff_model",
-            "in_house_model",
-            "legacy_in_house_model",
+            "current_finalist_forecast",
         ]
     ]
     assert set(available["availability_status"]) == {"available"}
     assert available["plotted"].astype(bool).all()
-    assert "promoted current finalist" in by_id.loc["in_house_model", "data_scope"]
-    assert by_id.loc["legacy_in_house_model", "trace_label"] == "Legacy workbook model"
+    assert "promoted current finalist" in by_id.loc["current_finalist_forecast", "data_scope"]
+    assert by_id.loc["current_finalist_forecast", "trace_label"] == "Current finalist forecast"
 
     release = by_id.loc[["selected_mot_befu_release", "rolling_befu_1y"]]
     assert set(release["availability_status"]) == {"available"}
@@ -547,6 +544,70 @@ def test_revenue_path_trace_status_marks_vendored_release_traces_available_witho
     assert set(release["blocking_gap_id"]) == {""}
     assert set(release["current_selection"]) == {"BEFU25"}
     assert release["user_visible_message"].astype(str).str.contains("release_values.csv|one-year-ahead", case=False, regex=True).all()
+
+
+def test_revenue_trace_source_contract_excludes_workbook_runtime_forecasts() -> None:
+    pack = load_revenue_source_pack(repo_root=ROOT)
+    assert pack is not None
+    contract = pack.trace_source_contract
+    assert not contract.empty
+
+    required = {
+        "trace_name",
+        "trace_role",
+        "source_file",
+        "model_id",
+        "cutoff",
+        "scenario",
+        "period_status",
+        "anchor_forecast_flag",
+        "runtime_forecast_source",
+        "displayed",
+    }
+    assert required.issubset(contract.columns)
+    by_name = contract.set_index("trace_name")
+    assert set(by_name.index) == {
+        "Actual",
+        "Current finalist forecast",
+        "Official comparator: selected MOT/BEFU",
+        "Official comparator: rolling BEFU 1Y",
+    }
+    current = by_name.loc["Current finalist forecast"]
+    assert bool(current["runtime_forecast_source"])
+    assert bool(current["displayed"])
+    assert current["model_id"] == CURRENT_FINALIST_COMPOSITE_MODEL_ID
+    assert "annual_model_paths.csv" not in str(current["source_file"])
+    runtime_fields = contract.loc[
+        contract["runtime_forecast_source"].astype(bool),
+        ["trace_name", "source_file", "model_id", "scenario", "anchor_forecast_flag"],
+    ]
+    assert "workbook" not in runtime_fields.to_csv(index=False).lower()
+
+
+def test_current_finalist_forecast_rows_use_promoted_models_and_no_workbook_source() -> None:
+    pack = load_revenue_source_pack(repo_root=ROOT)
+    assert pack is not None
+    current = pack.current_forecast_annual[
+        pack.current_forecast_annual["scenario_name"].eq("current_basecase")
+        & pack.current_forecast_annual["fed_path"].eq("Current planned path")
+    ].copy()
+    assert not current.empty
+    assert not current["source_file"].astype(str).str.contains("annual_model_paths.csv|legacy", case=False, regex=True).any()
+    assert not current["model_basis"].astype(str).str.contains("selected_dashboard_basis|in_house_model|aaron_schiff", case=False, regex=True).any()
+
+    fy2026 = current[current["FY"].eq(2026)].set_index("series_id")
+    assert fy2026.loc["gross_ped_revenue", "model_id"] == CURRENT_FINALIST_MODEL_IDS["PED"]
+    assert fy2026.loc["light_ruc_net_revenue", "model_id"] == CURRENT_FINALIST_MODEL_IDS["LIGHT_RUC"]
+    assert fy2026.loc["heavy_ruc_net_revenue", "model_id"] == CURRENT_FINALIST_MODEL_IDS["HEAVY_RUC"]
+    assert fy2026.loc["total_nltf_net_revenue", "model_id"] == CURRENT_FINALIST_COMPOSITE_MODEL_ID
+    assert fy2026.loc["total_nltf_net_revenue", "value_status"] == "Current-finalist FY nowcast (2 actual + 2 forecast)"
+    assert fy2026.loc["total_nltf_net_revenue", "actual_quarters"] == "2025Q3; 2025Q4"
+    assert fy2026.loc["total_nltf_net_revenue", "forecast_quarters"] == "2026Q1; 2026Q2"
+
+    anchor = current[current["FY"].eq(2025)].set_index("series_id")
+    assert anchor.loc["total_nltf_net_revenue", "value_status"] == "Actual anchor"
+    assert anchor.loc["total_nltf_net_revenue", "source_file"] == "annual_actuals.csv"
+    assert abs(float(anchor.loc["total_nltf_net_revenue", "value"]) - 4357.214091969565) <= 1e-9
 
 
 def test_revenue_source_pack_intake_status_is_hash_backed_and_sanitized() -> None:
@@ -629,6 +690,7 @@ def test_revenue_source_pack_loader_exports_are_hash_backed() -> None:
         "canonical_revenue_long.csv": len(pack.canonical_long),
         "source_pack_intake_status.csv": len(pack.intake_status),
         "path_trace_status.csv": len(pack.path_trace_status),
+        "trace_source_contract.csv": len(pack.trace_source_contract),
         "reconciliation_report.csv": len(pack.reconciliation_report),
         "source_gap_register.csv": len(pack.source_gap_register),
         "remaining_decisions_handoff.csv": len(pack.remaining_decisions_handoff),

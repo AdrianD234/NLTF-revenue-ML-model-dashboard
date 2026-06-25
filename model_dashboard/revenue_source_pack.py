@@ -27,6 +27,12 @@ REVENUE_FIRST_FORECAST_QUARTER = "2026Q1"
 REVENUE_SOURCE_ACTUAL_CUTOFF = "2026Q1"
 REVENUE_LAST_COMPLETE_ACTUAL_FY = 2025
 REVENUE_PARTIAL_ACTUAL_FY = 2026
+CURRENT_FINALIST_MODEL_IDS = {
+    "PED": "PED__VNEXT_SOLVED_CONVEX_TOP2",
+    "LIGHT_RUC": "dynamic_RESID_GBR_n150_d1_lr0.05_w36",
+    "HEAVY_RUC": "HEAVY_RUC__VNEXT_SOLVED_CONVEX_TOP4",
+}
+CURRENT_FINALIST_COMPOSITE_MODEL_ID = "; ".join(CURRENT_FINALIST_MODEL_IDS[key] for key in ["PED", "LIGHT_RUC", "HEAVY_RUC"])
 
 REQUIRED_SOURCE_PACK_FILES = (
     "README.md",
@@ -212,6 +218,7 @@ class RevenueSourcePack:
     data_vintage_manifest: dict[str, Any]
     series_trace_contract: pd.DataFrame
     series_junction_audit: pd.DataFrame
+    trace_source_contract: pd.DataFrame
 
     @property
     def validation_status(self) -> str:
@@ -361,6 +368,10 @@ def load_revenue_source_pack(
         annual_completeness=annual_completeness,
         data_vintage_manifest=data_vintage,
     )
+    trace_source_contract = trace_source_contract_frame(
+        path_trace_status=path_trace_status,
+        data_vintage_manifest=data_vintage,
+    )
     return RevenueSourcePack(
         pack_dir=base,
         manifest=manifest,
@@ -392,6 +403,7 @@ def load_revenue_source_pack(
         data_vintage_manifest=data_vintage,
         series_trace_contract=series_trace_contract,
         series_junction_audit=series_junction_audit,
+        trace_source_contract=trace_source_contract,
     )
 
 
@@ -456,6 +468,10 @@ def data_vintage_manifest_payload(
         "partial_actual_fy": REVENUE_PARTIAL_ACTUAL_FY,
         "partial_actual_quarters": "2025Q3; 2025Q4; 2026Q1",
         "missing_partial_actual_quarters": "2026Q2",
+        "current_finalist_anchor_fy": f"FY{REVENUE_LAST_COMPLETE_ACTUAL_FY}",
+        "current_finalist_nowcast_fy": f"FY{REVENUE_PARTIAL_ACTUAL_FY}",
+        "current_finalist_nowcast_actual_quarters": "2025Q3; 2025Q4",
+        "current_finalist_nowcast_forecast_quarters": "2026Q1; 2026Q2",
         "current_outlook_pack_status": current_outlook_manifest.get("pack_status", ""),
         "current_outlook_promotion_time": current_outlook_manifest.get("promotion_time", ""),
         "current_outlook_model_ids": current_outlook_manifest.get("model_ids", {}),
@@ -470,8 +486,9 @@ def data_vintage_manifest_payload(
         "current_outlook_chart_rows": int(len(current_outlook_chart_rows)) if isinstance(current_outlook_chart_rows, pd.DataFrame) else 0,
         "policy_note": (
             "Models are trained/refitted through 2025Q4. 2026Q1 is an observation/source actual, "
-            "not a model-training row. FY2026 is partial actual-to-date unless explicitly shown as "
-            "actual-plus-forecast-to-go nowcast."
+            "not a model-training row. Revenue Outlook current-finalist FY2026 uses the production-vintage "
+            "forecast for 2026Q1 and 2026Q2, with 2025Q3 and 2025Q4 as actual anchors inside the June-year "
+            "nowcast; it does not use observed 2026Q1 revenue as model training data."
         ),
     }
 
@@ -1036,6 +1053,7 @@ def current_forecast_annual_frame(
         "source_file",
         "source_cell",
         "source_status",
+        "model_id",
         "formula",
         "replacement_only",
         "official_value",
@@ -1097,7 +1115,12 @@ def current_forecast_annual_frame(
         light_activity = activity_values["light_ruc_net_km"]
         heavy_activity = activity_values["heavy_ruc_net_km"]
         scenario_role = str(getattr(ped_activity, "scenario_role", "") or "")
-        status = "actual_plus_forecast_to_go_nowcast" if bool(getattr(ped_activity, "nowcast_flag", False)) else "current_model_forecast"
+        if int(fy) == REVENUE_LAST_COMPLETE_ACTUAL_FY:
+            status = "Actual anchor"
+        elif bool(getattr(ped_activity, "nowcast_flag", False)):
+            status = "Current-finalist FY nowcast (2 actual + 2 forecast)"
+        else:
+            status = "current_finalist_forecast"
         actual_quarters = str(getattr(ped_activity, "actual_quarters", "") or "")
         forecast_quarters = str(getattr(ped_activity, "forecast_quarters", "") or "")
         quarters_present = str(getattr(ped_activity, "quarters_present", "") or "")
@@ -1170,6 +1193,30 @@ def current_forecast_annual_frame(
     if not rows:
         return pd.DataFrame(columns=columns)
     out = pd.DataFrame(rows)
+    anchor_lookup = _source_actual_anchor_lookup(canonical_long)
+    anchor_mask = (
+        pd.to_numeric(out.get("FY"), errors="coerce").eq(REVENUE_LAST_COMPLETE_ACTUAL_FY)
+        & out.get("series_id", pd.Series("", index=out.index)).astype(str).isin(anchor_lookup)
+    )
+    for idx, row in out.loc[anchor_mask].iterrows():
+        actual = anchor_lookup.get(str(row.get("series_id", "")), {})
+        actual_value = pd.to_numeric(pd.Series([actual.get("value")]), errors="coerce").iloc[0]
+        if pd.isna(actual_value):
+            continue
+        out.at[idx, "value"] = actual_value
+        out.at[idx, "unit"] = actual.get("unit") or out.at[idx, "unit"]
+        out.at[idx, "source_basis"] = "source_actual_anchor"
+        out.at[idx, "source_file"] = actual.get("source_file", "annual_actuals.csv")
+        out.at[idx, "source_status"] = actual.get("source_status", "source_backed")
+        out.at[idx, "source_cell"] = actual.get("source_cell", out.at[idx, "source_cell"])
+        out.at[idx, "formula"] = "source-backed complete annual actual anchor"
+        out.at[idx, "value_status"] = "Actual anchor"
+        out.at[idx, "quarters_present"] = "; ".join(_expected_june_year_quarters(REVENUE_LAST_COMPLETE_ACTUAL_FY))
+        out.at[idx, "actual_quarters"] = "; ".join(_expected_june_year_quarters(REVENUE_LAST_COMPLETE_ACTUAL_FY))
+        out.at[idx, "forecast_quarters"] = ""
+        out.at[idx, "nowcast_flag"] = False
+        out.at[idx, "official_value"] = actual_value
+        out.at[idx, "residual_vs_official"] = 0.0
     for column in columns:
         if column not in out.columns:
             out[column] = pd.NA if column in {"official_value", "residual_vs_official"} else ""
@@ -1204,188 +1251,7 @@ def revenue_hybrid_annual_frame(canonical_long: pd.DataFrame, current_forecast_a
         out["residual_vs_official"] = pd.to_numeric(out["residual_vs_official"], errors="coerce")
         return out[columns].sort_values(["FY", "row_role", "series_id"], kind="stable").reset_index(drop=True)
 
-    columns = [
-        "FY",
-        "fed_path",
-        "series_id",
-        "display_name",
-        "value",
-        "unit",
-        "row_role",
-        "source_basis",
-        "source_file",
-        "source_status",
-        "formula",
-        "replacement_only",
-        "official_value",
-        "residual_vs_official",
-        "availability_status",
-    ]
-    if canonical_long is None or canonical_long.empty:
-        return pd.DataFrame(columns=columns)
-
-    frame = canonical_long.copy()
-    frame["value_numeric"] = pd.to_numeric(frame["value"], errors="coerce")
-    official = frame[
-        frame["source_file"].eq("official_befu25_annual.csv")
-        & frame["time_grain"].eq("june_year")
-        & frame["value_numeric"].notna()
-    ].copy()
-    in_house = frame[
-        frame["source_file"].eq("annual_model_paths.csv")
-        & frame["model_basis"].eq("in_house_model")
-        & frame["line"].eq("Model path")
-        & frame["value_numeric"].notna()
-    ].copy()
-    fed_rates = frame[
-        frame["source_file"].eq("fed_rate_paths.csv")
-        & frame["value_numeric"].notna()
-        & frame["FY"].notna()
-    ].copy()
-    ped_bridge = frame[
-        frame["source_file"].eq("ped_bridge_inputs.csv")
-        & frame["value_numeric"].notna()
-        & frame["FY"].notna()
-        & frame["time_grain"].eq("june_year")
-    ].copy()
-    crown_top_up = frame[
-        frame["series_id"].eq("crown_top_up")
-        & frame["value_numeric"].notna()
-        & frame["FY"].notna()
-    ].copy()
-    required_official = {
-        "gross_lpg_revenue",
-        "gross_cng_revenue",
-        "fed_refunds",
-        "total_ruc_net_revenue",
-        "light_ruc_net_revenue",
-        "heavy_ruc_net_revenue",
-        "gross_ped_revenue",
-        "net_mvr_revenue",
-        "tuc_net_revenue",
-        "gross_fed_revenue",
-        "net_fed_revenue",
-        "total_nltf_net_revenue",
-    }
-    required_replacements = {
-        "ped_volume",
-        "light_ruc_net_km",
-        "light_ruc_net_revenue",
-        "heavy_ruc_net_km",
-        "heavy_ruc_net_revenue",
-    }
-    required_ped_bridge = {
-        "population_count",
-        "ped_total_vkt",
-        "ped_litres_per_100km",
-    }
-    official_fys = _fys_with_series(official, required_official)
-    replacement_fys = _fys_with_series(in_house, required_replacements)
-    ped_bridge_fys = _fys_with_series(ped_bridge, required_ped_bridge)
-    if fed_rates.empty:
-        fed_rate_lookup: dict[tuple[str, int], float] = {}
-    else:
-        fed_rate_lookup = {
-            (str(path), int(fy)): float(rate)
-            for (path, fy), rate in fed_rates.groupby(["scenario_name", "FY"], dropna=True)["value_numeric"].mean().items()
-            if str(path).strip()
-        }
-    fed_paths = sorted({path for path, _fy in fed_rate_lookup}) or ["Selected rate"]
-    fed_rate_fys = {fy for _path, fy in fed_rate_lookup}
-    common_fys = sorted(official_fys & replacement_fys & fed_rate_fys & ped_bridge_fys)
-    if crown_top_up.empty:
-        top_up_lookup: dict[int, float] = {}
-    else:
-        crown_top_up = crown_top_up.copy()
-        crown_unit = crown_top_up["unit"].astype(str).str.lower()
-        dollar_not_million = crown_unit.str.contains(r"\$", regex=True, na=False) & ~crown_unit.str.contains(r"\$m", regex=True, na=False)
-        crown_top_up["annual_value_m"] = crown_top_up["value_numeric"].where(~dollar_not_million, crown_top_up["value_numeric"] / 1_000_000.0)
-        top_up_lookup = crown_top_up.groupby("FY")["annual_value_m"].sum().to_dict()
-    rows: list[dict[str, Any]] = []
-    for fy in common_fys:
-        off = _value_lookup(official[official["FY"].eq(fy)])
-        rep = _value_lookup(in_house[in_house["FY"].eq(fy)])
-        bridge = _value_lookup(ped_bridge[ped_bridge["FY"].eq(fy)])
-        population_count = bridge["population_count"]
-        ped_total_vkt = bridge["ped_total_vkt"]
-        ped_litres_per_100km = bridge["ped_litres_per_100km"]
-        ped_volume = rep["ped_volume"]
-        light_km = rep["light_ruc_net_km"]
-        heavy_km = rep["heavy_ruc_net_km"]
-        light_rate = rep["light_ruc_net_revenue"] * 1000.0 / light_km
-        heavy_rate = rep["heavy_ruc_net_revenue"] * 1000.0 / heavy_km
-        light_revenue = light_km / 1000.0 * light_rate
-        heavy_revenue = heavy_km / 1000.0 * heavy_rate
-        official_total_ruc = off["total_ruc_net_revenue"]
-        official_light = off["light_ruc_net_revenue"]
-        official_heavy = off["heavy_ruc_net_revenue"]
-        ruc_fixed_residual = official_total_ruc - official_light - official_heavy
-
-        for fed_path in fed_paths:
-            ped_rate = fed_rate_lookup.get((fed_path, fy))
-            if ped_rate is None:
-                continue
-            ped_revenue = ped_total_vkt * ped_litres_per_100km / 100.0 * ped_rate
-            gross_fed = ped_revenue + off["gross_lpg_revenue"] + off["gross_cng_revenue"]
-            net_fed = gross_fed - off["fed_refunds"]
-            total_ruc = light_revenue + heavy_revenue + ruc_fixed_residual
-            total_fed_ruc = net_fed + total_ruc
-            total_nltf = total_fed_ruc + off["net_mvr_revenue"] + off["tuc_net_revenue"]
-            top_up = top_up_lookup.get(fy, pd.NA)
-
-            rows.extend(
-                [
-                    _hybrid_row(fy, "ped_volume", ped_volume, "bridge_input", "in_house_model", "annual_model_paths.csv", fed_path=fed_path, unit="million L"),
-                    _hybrid_row(fy, "population_count", population_count, "bridge_input", "ped_bridge", "ped_bridge_inputs.csv", fed_path=fed_path, unit="persons"),
-                    _hybrid_row(fy, "ped_total_vkt", ped_total_vkt, "bridge_input", "ped_bridge", "ped_bridge_inputs.csv", fed_path=fed_path, unit="million km", formula="PED VKT per capita * population / 1,000,000"),
-                    _hybrid_row(fy, "ped_litres_per_100km", ped_litres_per_100km, "bridge_input", "ped_bridge", "ped_bridge_inputs.csv", fed_path=fed_path, unit="L/100km", formula="source-backed PED litres / PED total VKT * 100"),
-                    _hybrid_row(fy, "ped_fed_rate_path", ped_rate, "bridge_input", fed_path, "fed_rate_paths.csv", fed_path=fed_path, unit="NZD/L"),
-                    _hybrid_row(fy, "light_ruc_net_km", light_km, "bridge_input", "in_house_model", "annual_model_paths.csv", fed_path=fed_path, unit="million km"),
-                    _hybrid_row(fy, "light_ruc_effective_rate", light_rate, "bridge_input", "source_derived_effective_rate", "annual_model_paths.csv", fed_path=fed_path, unit="NZD/1,000 km", formula="source Light RUC revenue / source Light RUC net km * 1,000"),
-                    _hybrid_row(fy, "heavy_ruc_net_km", heavy_km, "bridge_input", "in_house_model", "annual_model_paths.csv", fed_path=fed_path, unit="million km"),
-                    _hybrid_row(fy, "heavy_ruc_effective_rate", heavy_rate, "bridge_input", "source_derived_effective_rate", "annual_model_paths.csv", fed_path=fed_path, unit="NZD/1,000 km", formula="source Heavy RUC revenue / source Heavy RUC net km * 1,000"),
-                    _hybrid_row(
-                        fy,
-                        "gross_ped_revenue",
-                        ped_revenue,
-                        "replacement_line",
-                        "ped_bridge + fed_rate_path",
-                        "annual_model_paths.csv; fed_rate_paths.csv; ped_bridge_inputs.csv",
-                        fed_path=fed_path,
-                        formula="PED VKT per capita * population -> total VKT; source-backed litres intensity -> litres; litres * annual-average FED rate path",
-                        replacement_only=True,
-                        official_value=off["gross_ped_revenue"],
-                    ),
-                    _hybrid_row(fy, "light_ruc_net_revenue", light_revenue, "replacement_line", "in_house_model", "annual_model_paths.csv", fed_path=fed_path, formula="Light RUC net km / 1,000 * source-derived nominal effective rate", replacement_only=True, official_value=off["light_ruc_net_revenue"]),
-                    _hybrid_row(fy, "heavy_ruc_net_revenue", heavy_revenue, "replacement_line", "in_house_model", "annual_model_paths.csv", fed_path=fed_path, formula="Heavy RUC net km / 1,000 * source-derived nominal effective rate", replacement_only=True, official_value=off["heavy_ruc_net_revenue"]),
-                    _hybrid_row(fy, "gross_lpg_revenue", off["gross_lpg_revenue"], "fixed_mot_component", "official_befu25_annual", "official_befu25_annual.csv", fed_path=fed_path),
-                    _hybrid_row(fy, "gross_cng_revenue", off["gross_cng_revenue"], "fixed_mot_component", "official_befu25_annual", "official_befu25_annual.csv", fed_path=fed_path),
-                    _hybrid_row(fy, "fed_refunds", off["fed_refunds"], "fixed_mot_deduction", "official_befu25_annual", "official_befu25_annual.csv", fed_path=fed_path),
-                    _hybrid_row(
-                        fy,
-                        "ruc_fixed_residual_net_revenue",
-                        ruc_fixed_residual,
-                        "fixed_mot_component",
-                        "official_befu25_annual",
-                        "official_befu25_annual.csv",
-                        fed_path=fed_path,
-                        formula="official_total_ruc_net_revenue - official_light_ruc_net_revenue - official_heavy_ruc_net_revenue",
-                    ),
-                    _hybrid_row(fy, "net_mvr_revenue", off["net_mvr_revenue"], "fixed_mot_component", "official_befu25_annual", "official_befu25_annual.csv", fed_path=fed_path),
-                    _hybrid_row(fy, "tuc_net_revenue", off["tuc_net_revenue"], "fixed_mot_component", "official_befu25_annual", "official_befu25_annual.csv", fed_path=fed_path),
-                    _hybrid_row(fy, "crown_top_up", top_up, "optional_overlay", "quarterly_actuals_annual_sum", "quarterly_actuals.csv", fed_path=fed_path, formula="sum quarterly Crown top-up rows by June year", unit="$m nominal ex GST", availability_status="available" if pd.notna(top_up) else "missing"),
-                    _hybrid_row(fy, "gross_fed_revenue", gross_fed, "calculated_rollup", "hybrid_formula", "hybrid_formula", fed_path=fed_path, formula="gross_ped_revenue + MOT gross_lpg_revenue + MOT gross_cng_revenue", official_value=off["gross_fed_revenue"]),
-                    _hybrid_row(fy, "net_fed_revenue", net_fed, "calculated_rollup", "hybrid_formula", "hybrid_formula", fed_path=fed_path, formula="gross_fed_revenue - MOT fed_refunds", official_value=off["net_fed_revenue"]),
-                    _hybrid_row(fy, "total_ruc_net_revenue", total_ruc, "calculated_rollup", "hybrid_formula", "hybrid_formula", fed_path=fed_path, formula="light_ruc_net_revenue + heavy_ruc_net_revenue + MOT fixed RUC residual", official_value=off["total_ruc_net_revenue"]),
-                    _hybrid_row(fy, "total_fed_ruc_net_revenue", total_fed_ruc, "calculated_rollup", "hybrid_formula", "hybrid_formula", fed_path=fed_path, formula="net_fed_revenue + total_ruc_net_revenue"),
-                    _hybrid_row(fy, "total_nltf_net_revenue", total_nltf, "calculated_rollup", "hybrid_formula", "hybrid_formula", fed_path=fed_path, formula="net_fed_revenue + total_ruc_net_revenue + MOT net_mvr_revenue + MOT tuc_net_revenue", official_value=off["total_nltf_net_revenue"]),
-                ]
-            )
-    if not rows:
-        return pd.DataFrame(columns=columns)
-    out = pd.DataFrame(rows, columns=columns)
-    out["residual_vs_official"] = pd.to_numeric(out["residual_vs_official"], errors="coerce")
-    return out.sort_values(["FY", "row_role", "series_id"], kind="stable").reset_index(drop=True)
+    return pd.DataFrame(columns=columns)
 
 
 def _current_activity_annual_values(chart_rows: pd.DataFrame) -> pd.DataFrame:
@@ -1396,6 +1262,7 @@ def _current_activity_annual_values(chart_rows: pd.DataFrame) -> pd.DataFrame:
         "series_id",
         "value",
         "unit",
+        "model_id",
         "quarters_present",
         "actual_quarters",
         "forecast_quarters",
@@ -1432,6 +1299,8 @@ def _current_activity_annual_values(chart_rows: pd.DataFrame) -> pd.DataFrame:
     for (scenario_name, series_id), group in future.groupby(["scenario_name", "series_id"], dropna=False):
         scenario_role = _first_text(group, "scenario_role")
         future_lookup = {str(row.period): row for row in group.itertuples()}
+        stream = _current_stream_for_series(str(series_id))
+        model_id = CURRENT_FINALIST_MODEL_IDS.get(stream, "")
         fys = sorted(
             {
                 _june_year_from_quarter(str(period))
@@ -1473,15 +1342,57 @@ def _current_activity_annual_values(chart_rows: pd.DataFrame) -> pd.DataFrame:
                     "series_id": str(series_id),
                     "value": annual_value,
                     "unit": unit,
+                    "model_id": model_id,
                     "quarters_present": "; ".join(expected),
                     "actual_quarters": "; ".join(actual_quarters),
                     "forecast_quarters": "; ".join(forecast_quarters),
                     "nowcast_flag": bool(actual_quarters and forecast_quarters),
                 }
             )
+        anchor_expected = _expected_june_year_quarters(REVENUE_LAST_COMPLETE_ACTUAL_FY)
+        anchor_values = []
+        for quarter in anchor_expected:
+            hist_row = hist_lookup.get((str(series_id), quarter))
+            if hist_row is not None:
+                anchor_values.append(float(hist_row.value_numeric))
+        if len(anchor_values) == 4:
+            if str(series_id) == "ped_vkt_per_capita":
+                anchor_value = sum(anchor_values) / 4.0
+                anchor_unit = "km/person"
+            else:
+                anchor_value = sum(anchor_values)
+                unit_text = _first_text(group, "value_unit")
+                anchor_unit = "million km"
+                if str(unit_text).lower() == "net km" or abs(anchor_value) > 10_000_000:
+                    anchor_value = anchor_value / 1_000_000.0
+            rows.append(
+                {
+                    "FY": REVENUE_LAST_COMPLETE_ACTUAL_FY,
+                    "scenario_name": str(scenario_name),
+                    "scenario_role": scenario_role,
+                    "series_id": str(series_id),
+                    "value": anchor_value,
+                    "unit": anchor_unit,
+                    "model_id": model_id,
+                    "quarters_present": "; ".join(anchor_expected),
+                    "actual_quarters": "; ".join(anchor_expected),
+                    "forecast_quarters": "",
+                    "nowcast_flag": False,
+                }
+            )
     if not rows:
         return pd.DataFrame(columns=columns)
     return pd.DataFrame(rows, columns=columns).sort_values(["FY", "scenario_name", "series_id"], kind="stable").reset_index(drop=True)
+
+
+def _current_stream_for_series(series_id: str) -> str:
+    if str(series_id).startswith("ped_") or str(series_id) in {"gross_ped_revenue", "gross_fed_revenue", "net_fed_revenue"}:
+        return "PED"
+    if str(series_id).startswith("light_"):
+        return "LIGHT_RUC"
+    if str(series_id).startswith("heavy_"):
+        return "HEAVY_RUC"
+    return ""
 
 
 def _june_year_from_quarter(period: str) -> int | None:
@@ -1556,6 +1467,40 @@ def _crown_top_up_lookup(canonical_long: pd.DataFrame) -> dict[int, float]:
     return rows.groupby("FY_int")["value_numeric"].sum().to_dict()
 
 
+def _source_actual_anchor_lookup(canonical_long: pd.DataFrame) -> dict[str, dict[str, Any]]:
+    if canonical_long is None or canonical_long.empty:
+        return {}
+    rows = canonical_long[
+        canonical_long.get("source_file", pd.Series("", index=canonical_long.index)).astype(str).eq("annual_actuals.csv")
+        & canonical_long.get("line", pd.Series("", index=canonical_long.index)).astype(str).isin(["Actual", "Actual / benchmark"])
+        & pd.to_numeric(canonical_long.get("FY"), errors="coerce").eq(REVENUE_LAST_COMPLETE_ACTUAL_FY)
+    ].copy()
+    if rows.empty:
+        return {}
+    rows["value_numeric"] = pd.to_numeric(rows.get("value"), errors="coerce")
+    rows = rows[rows["value_numeric"].notna()].copy()
+    output: dict[str, dict[str, Any]] = {}
+    for series_id, group in rows.groupby(rows.get("series_id", pd.Series("", index=rows.index)).astype(str), dropna=False):
+        if not str(series_id).strip():
+            continue
+        row = group.iloc[0]
+        output[str(series_id)] = {
+            "value": row.get("value_numeric"),
+            "unit": _normalized_source_unit(row.get("unit")),
+            "source_file": row.get("source_file"),
+            "source_cell": row.get("source_cell"),
+            "source_status": row.get("source_status"),
+        }
+    return output
+
+
+def _normalized_source_unit(unit: Any) -> str:
+    text = str(unit or "").strip()
+    if text in {"$m ex GST", "$m nominal ex GST"}:
+        return "$m nominal ex GST"
+    return text
+
+
 def _current_annual_row(
     *,
     FY: int,
@@ -1580,6 +1525,7 @@ def _current_annual_row(
     replacement_only: bool = False,
     official_value: Any = pd.NA,
     availability_status: str = "available",
+    model_id: str = "",
 ) -> dict[str, Any]:
     numeric_value = pd.to_numeric(pd.Series([value]), errors="coerce").iloc[0]
     numeric_official = pd.to_numeric(pd.Series([official_value]), errors="coerce").iloc[0]
@@ -1598,6 +1544,7 @@ def _current_annual_row(
         "source_basis": source_basis,
         "source_file": source_file,
         "source_status": "source_backed",
+        "model_id": model_id or _current_model_id_for_series(series_id),
         "formula": formula,
         "replacement_only": bool(replacement_only),
         "official_value": numeric_official if pd.notna(numeric_official) else pd.NA,
@@ -1614,6 +1561,26 @@ def _current_annual_row(
         "forecast_quarters": forecast_quarters,
         "nowcast_flag": bool(nowcast_flag),
     }
+
+
+def _current_model_id_for_series(series_id: str) -> str:
+    text = str(series_id)
+    if text in {
+        "ped_vkt_per_capita",
+        "ped_total_vkt",
+        "ped_source_backed_litres",
+        "gross_ped_revenue",
+        "gross_fed_revenue",
+        "net_fed_revenue",
+    }:
+        return CURRENT_FINALIST_MODEL_IDS["PED"]
+    if text in {"light_ruc_net_km", "light_ruc_net_revenue", "light_ruc_effective_rate"}:
+        return CURRENT_FINALIST_MODEL_IDS["LIGHT_RUC"]
+    if text in {"heavy_ruc_net_km", "heavy_ruc_net_revenue", "heavy_ruc_effective_rate"}:
+        return CURRENT_FINALIST_MODEL_IDS["HEAVY_RUC"]
+    if text in {"total_ruc_net_revenue", "total_fed_ruc_net_revenue", "total_nltf_net_revenue"}:
+        return CURRENT_FINALIST_COMPOSITE_MODEL_ID
+    return ""
 
 
 def revenue_source_gap_register(
@@ -1723,15 +1690,12 @@ def revenue_path_trace_status(
     current_forecast_annual: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     release_gap = _gap_status(gap_register, "release_value_table_missing")
-    has_actual = _has_trace_rows(canonical_long, line_values={"Actual", "Actual / benchmark"})
-    has_partial_actual = False
-    if has_actual and "FY" in canonical_long.columns:
-        actual_rows = canonical_long[canonical_long["line"].astype(str).isin(["Actual", "Actual / benchmark"])].copy()
-        has_partial_actual = bool(pd.to_numeric(actual_rows.get("FY"), errors="coerce").eq(2026).any())
-    has_selected_workbook = _has_trace_rows(canonical_long, model_basis="selected_dashboard_basis", line_values={"Model path"})
+    has_actual = _has_trace_rows(
+        canonical_long,
+        line_values={"Actual", "Actual / benchmark"},
+        source_files={"annual_actuals.csv", "quarterly_actuals.csv"},
+    )
     has_current_model = bool(isinstance(current_forecast_annual, pd.DataFrame) and not current_forecast_annual.empty)
-    has_legacy_in_house = _has_trace_rows(canonical_long, model_basis="in_house_model", line_values={"Model path"})
-    has_schiff = _has_trace_rows(canonical_long, model_basis="aaron_schiff_model", line_values={"Model path"})
     release_available = release_gap.get("availability_status") == "available"
     release_selection = str(release_gap.get("current_selection") or "")
     rows = [
@@ -1745,75 +1709,39 @@ def revenue_path_trace_status(
             "Only complete annual actual years are connected as the grey actual line.",
         ),
         _trace_status_row(
-            "actual_to_date_marker",
-            "Actual to date marker",
-            has_partial_actual,
-            "partial current-FY annual actual row",
-            "",
-            "FY2026 actual-to-date",
-            "Partial current-FY actuals are plotted as distinct markers and are not joined to the complete actual line.",
-        ),
-        _trace_status_row(
-            "selected_workbook_basis",
-            "Legacy workbook selected basis",
-            has_selected_workbook,
-            "annual model path rows",
-            "",
-            "source workbook current selection",
-            "Workbook-selected annual model path is retained as a legacy benchmark.",
-        ),
-        _trace_status_row(
             "selected_mot_befu_release",
-            "Selected MOT/BEFU release path",
+            "Official comparator: selected MOT/BEFU",
             release_available,
             "release-value table",
             "" if release_available else "release_value_table_missing",
             release_selection,
             (
-                "Selected MOT/BEFU release path is plotted from repo-local release_values.csv rows."
+                "Official selected MOT/BEFU comparator is plotted from repo-local release_values.csv rows."
                 if release_available
-                else "Selected MOT/BEFU release path requires release-value rows; registry-only release metadata is not plotted as values."
+                else "Official selected MOT/BEFU comparator requires release-value rows; registry-only release metadata is not plotted as values."
             ),
         ),
         _trace_status_row(
             "rolling_befu_1y",
-            "Rolling BEFU 1Y",
+            "Official comparator: rolling BEFU 1Y",
             release_available,
             "release-value table",
             "" if release_available else "release_value_table_missing",
             release_selection,
             (
-                "Rolling BEFU 1Y is plotted from true one-year-ahead rows in release_values.csv."
+                "Official rolling BEFU 1Y comparator is plotted from true one-year-ahead rows in release_values.csv."
                 if release_available
-                else "Rolling BEFU 1Y requires historical release-value rows; it is not fabricated from model paths."
+                else "Official rolling BEFU 1Y comparator requires historical release-value rows; it is not fabricated from model paths."
             ),
         ),
         _trace_status_row(
-            "aaron_schiff_model",
-            "Legacy workbook Schiff model",
-            has_schiff,
-            "annual model path rows",
-            "",
-            "Aaron Schiff model",
-            "Aaron Schiff annual model path is retained as a legacy benchmark.",
-        ),
-        _trace_status_row(
-            "in_house_model",
-            "In-house prediction / forecast",
+            "current_finalist_forecast",
+            "Current finalist forecast",
             has_current_model,
-            "promoted current finalist quarterly outputs annualized to June years",
+            "promoted current finalist quarterly outputs annualized to June years with FY2025 actual anchor",
             "" if has_current_model else "current_revenue_outlook_missing",
-            "current finalist model",
-            "Primary in-house trace is plotted from data/current_revenue_outlook current finalist outputs, not annual_model_paths.csv.",
-        ),
-        _trace_status_row(
-            "legacy_in_house_model",
-            "Legacy workbook model",
-            has_legacy_in_house,
-            "annual model path rows",
-            "",
-            "legacy workbook in-house model",
-            "Workbook in-house annual model path is retained only as an optional legacy benchmark.",
+            "current finalist ensemble",
+            "Current finalist forecast is plotted from data/current_revenue_outlook outputs only; FY2025 is an Actual anchor and FY2026 is the production-vintage nowcast.",
         ),
     ]
     return pd.DataFrame(
@@ -1829,6 +1757,69 @@ def revenue_path_trace_status(
             "user_visible_message",
         ],
     )
+
+
+def trace_source_contract_frame(
+    *,
+    path_trace_status: pd.DataFrame,
+    data_vintage_manifest: dict[str, Any],
+) -> pd.DataFrame:
+    trace_ids = set(path_trace_status.get("trace_id", pd.Series(dtype=str)).astype(str)) if isinstance(path_trace_status, pd.DataFrame) else set()
+    rows = [
+        {
+            "trace_name": "Actual",
+            "trace_role": "source_actual",
+            "source_file": "annual_actuals.csv; quarterly_actuals.csv",
+            "model_id": "",
+            "cutoff": f"last complete FY{REVENUE_LAST_COMPLETE_ACTUAL_FY}",
+            "scenario": "actual",
+            "period_status": "complete_actual_line",
+            "anchor_forecast_flag": "actual",
+            "runtime_forecast_source": False,
+            "displayed": "actual_benchmark" in trace_ids,
+            "notes": "Connected grey actual line ends at FY2025; FY2026 partial actual is not plotted as a path point.",
+        },
+        {
+            "trace_name": "Current finalist forecast",
+            "trace_role": "in_house_current_finalist",
+            "source_file": "data/current_revenue_outlook/revenue_chart_rows.csv; forecast_scenario_comparison.parquet; ped_bridge_inputs.csv; fed_rate_paths.csv; official_befu25_annual.csv",
+            "model_id": CURRENT_FINALIST_COMPOSITE_MODEL_ID,
+            "cutoff": data_vintage_manifest.get("model_training_cutoff", REVENUE_MODEL_TRAINING_CUTOFF),
+            "scenario": "current_basecase",
+            "period_status": "FY2025 Actual anchor; FY2026 Current-finalist FY nowcast (2 actual + 2 forecast); FY2027+ current finalist forecast",
+            "anchor_forecast_flag": "actual_anchor_then_forecast",
+            "runtime_forecast_source": True,
+            "displayed": "current_finalist_forecast" in trace_ids,
+            "notes": "No annual_model_paths.csv or workbook model_basis is permitted in this runtime trace.",
+        },
+        {
+            "trace_name": "Official comparator: selected MOT/BEFU",
+            "trace_role": "official_external_comparator",
+            "source_file": "release_values.csv",
+            "model_id": "",
+            "cutoff": "BEFU25 selected release rows",
+            "scenario": "selected release",
+            "period_status": "official_comparator",
+            "anchor_forecast_flag": "external_comparator",
+            "runtime_forecast_source": False,
+            "displayed": "selected_mot_befu_release" in trace_ids,
+            "notes": "Official comparator only; never labelled as in-house.",
+        },
+        {
+            "trace_name": "Official comparator: rolling BEFU 1Y",
+            "trace_role": "official_external_comparator",
+            "source_file": "release_values.csv",
+            "model_id": "",
+            "cutoff": "true one-year-ahead release rows",
+            "scenario": "rolling BEFU 1Y",
+            "period_status": "official_comparator",
+            "anchor_forecast_flag": "external_comparator",
+            "runtime_forecast_source": False,
+            "displayed": "rolling_befu_1y" in trace_ids,
+            "notes": "Official comparator only; never labelled as in-house.",
+        },
+    ]
+    return pd.DataFrame(rows)
 
 
 def revenue_source_pack_intake_status(
@@ -2125,11 +2116,6 @@ def series_trace_contract_frame(
             if series_id in current_series
             else _primary_source_for_non_current_series(series_id, group)
         )
-        legacy_available = bool(
-            not group.empty
-            and group.get("source_file", pd.Series("", index=group.index)).astype(str).eq("annual_model_paths.csv").any()
-            and group.get("line", pd.Series("", index=group.index)).astype(str).eq("Model path").any()
-        )
         rows.append(
             {
                 "series_option": option,
@@ -2139,9 +2125,9 @@ def series_trace_contract_frame(
                 "unit": unit,
                 "valid_bases": "; ".join(valid_bases),
                 "valid_controls": "; ".join(applicable_controls),
-                "actual_source": "quarterly_actuals.csv actual-status rows; annual_model_paths.csv actual line only after completeness audit",
+                "actual_source": "annual_actuals.csv and quarterly_actuals.csv actual-status rows after completeness audit",
                 "primary_forecast_source": primary_source,
-                "optional_legacy_source": "annual_model_paths.csv workbook model paths" if legacy_available else "",
+                "excluded_lineage_source": "annual_model_paths.csv is offline lineage only and is excluded from Revenue Outlook runtime forecasts",
                 "bridge": _bridge_contract_for_series(series_id, forecast_role),
                 "last_complete_actual_fy": data_vintage_manifest.get("last_complete_actual_fy", REVENUE_LAST_COMPLETE_ACTUAL_FY),
                 "first_forecast_fy": data_vintage_manifest.get("first_model_forecast_fy", f"FY{REVENUE_PARTIAL_ACTUAL_FY}"),
@@ -2174,7 +2160,6 @@ def series_junction_audit_frame(
     for series_id in series_ids:
         actual_values = _junction_actual_values(canonical_long, series_id)
         current_values = _junction_current_values(current_forecast_annual, series_id)
-        legacy_values = _junction_legacy_values(canonical_long, series_id)
         ratio = _last_actual_first_forecast_ratio(actual_values, current_values)
         tolerance = _source_derived_ratio_tolerance(actual_values)
         for fy in range(2024, 2028):
@@ -2197,18 +2182,6 @@ def series_junction_audit_frame(
                     path="current_finalist_model",
                     fy=fy,
                     payload=current_values.get(fy, {}),
-                    audit_row=audit_row,
-                    data_vintage_manifest=data_vintage_manifest,
-                    ratio=ratio,
-                    tolerance=tolerance,
-                )
-            )
-            rows.append(
-                _junction_row(
-                    series_id=series_id,
-                    path="legacy_workbook_in_house_model",
-                    fy=fy,
-                    payload=legacy_values.get(fy, {}),
                     audit_row=audit_row,
                     data_vintage_manifest=data_vintage_manifest,
                     ratio=ratio,
@@ -2359,7 +2332,7 @@ def _series_contract_interpretation(series_id: str, metric_type: str) -> str:
         return "PED revenue is gross/nominal ex GST only; Net is not a valid PED-only basis."
     if series_id in {"total_nltf_net_revenue", "net_fed_revenue"}:
         return "Total/net rollups expose only controls that affect their governed components."
-    return "Revenue trace must state whether it is current finalist, selected MOT, or legacy workbook benchmark."
+    return "Revenue trace must state whether it is current finalist or an official external comparator."
 
 
 def _junction_actual_values(canonical_long: pd.DataFrame, series_id: str) -> dict[int, dict[str, Any]]:
@@ -2374,9 +2347,9 @@ def _junction_actual_values(canonical_long: pd.DataFrame, series_id: str) -> dic
     for fy, group in rows.groupby("FY_int", dropna=True):
         if int(fy) > REVENUE_PARTIAL_ACTUAL_FY:
             continue
-        selected = group[group.get("source_file", pd.Series("", index=group.index)).astype(str).eq("annual_model_paths.csv")]
+        selected = group[group.get("source_file", pd.Series("", index=group.index)).astype(str).isin(["annual_actuals.csv", "quarterly_actuals.csv"])]
         if selected.empty:
-            selected = group
+            continue
         row = selected.iloc[0]
         output[int(fy)] = {
             "value": row.get("value"),
@@ -2395,22 +2368,6 @@ def _junction_current_values(current_forecast_annual: pd.DataFrame, series_id: s
         & current_forecast_annual.get("fed_path", pd.Series(dtype=str)).astype(str).eq("Current planned path")
     ].copy()
     rows["FY_int"] = pd.to_numeric(rows.get("FY"), errors="coerce").astype("Int64")
-    output: dict[int, dict[str, Any]] = {}
-    for fy, group in rows.groupby("FY_int", dropna=True):
-        row = group.iloc[0]
-        output[int(fy)] = row.to_dict()
-    return output
-
-
-def _junction_legacy_values(canonical_long: pd.DataFrame, series_id: str) -> dict[int, dict[str, Any]]:
-    rows = canonical_long[
-        canonical_long.get("series_id", pd.Series("", index=canonical_long.index)).astype(str).eq(series_id)
-        & canonical_long.get("line", pd.Series("", index=canonical_long.index)).astype(str).eq("Model path")
-        & canonical_long.get("model_basis", pd.Series("", index=canonical_long.index)).astype(str).eq("in_house_model")
-    ].copy()
-    rows["FY_int"] = pd.to_numeric(rows.get("FY"), errors="coerce").astype("Int64")
-    rows["value_numeric"] = pd.to_numeric(rows.get("value"), errors="coerce")
-    rows = rows[rows["FY_int"].notna() & rows["value_numeric"].notna()].copy()
     output: dict[int, dict[str, Any]] = {}
     for fy, group in rows.groupby("FY_int", dropna=True):
         row = group.iloc[0]
@@ -2515,6 +2472,7 @@ def _has_trace_rows(
     *,
     model_basis: str | None = None,
     line_values: set[str] | None = None,
+    source_files: set[str] | None = None,
 ) -> bool:
     if canonical_long.empty:
         return False
@@ -2523,6 +2481,8 @@ def _has_trace_rows(
         rows = rows[rows["model_basis"].astype(str).eq(model_basis)]
     if line_values is not None and "line" in rows.columns:
         rows = rows[rows["line"].astype(str).isin(line_values)]
+    if source_files is not None and "source_file" in rows.columns:
+        rows = rows[rows["source_file"].astype(str).isin(source_files)]
     if "value" not in rows.columns:
         return False
     return pd.to_numeric(rows["value"], errors="coerce").notna().any()
@@ -2634,8 +2594,8 @@ def _decision_handoff_link(item: str, gap_status: dict[str, str]) -> dict[str, A
         return {
             "linked_gap_ids": ["fed_path_scenario_values_missing", "ped_total_vkt_bridge_missing"],
             "linked_artifacts": (
-                "annual_model_paths.csv; fed_rate_paths.csv; ped_bridge_inputs.csv; "
-                "hybrid_annual_revenue.csv; source_gap_register.csv"
+                "data/current_revenue_outlook/revenue_chart_rows.csv; fed_rate_paths.csv; ped_bridge_inputs.csv; "
+                "official_befu25_annual.csv; hybrid_annual_revenue.csv; source_gap_register.csv"
             ),
             "runtime_status": "fed_rate_path_and_total_vkt_source_backed" if bridge_available else "fed_rate_path_source_backed_total_vkt_gap",
             "dashboard_treatment": (
@@ -2650,7 +2610,10 @@ def _decision_handoff_link(item: str, gap_status: dict[str, str]) -> dict[str, A
     if "light/heavy ruc" in text or "ruc rates" in text:
         return {
             "linked_gap_ids": ["release_value_table_missing"],
-            "linked_artifacts": "annual_model_paths.csv; hybrid_annual_revenue.csv; source_gap_register.csv",
+            "linked_artifacts": (
+                "data/current_revenue_outlook/revenue_chart_rows.csv; official_befu25_annual.csv; "
+                "hybrid_annual_revenue.csv; source_gap_register.csv"
+            ),
             "runtime_status": "source_derived_effective_rate_replay",
             "dashboard_treatment": (
                 "Recompute Light/Heavy RUC revenue from repo-vendored net-km rows and source-derived effective "
@@ -2926,13 +2889,6 @@ def _reconciliation_scopes(canonical_long: pd.DataFrame) -> list[tuple[str, pd.D
         & canonical_long["unit"].astype(str).str.contains(r"\$m", regex=True, na=False)
     ].copy()
     scopes.append(("official_actuals", actual))
-    selected = canonical_long[
-        canonical_long["source_file"].eq("annual_model_paths.csv")
-        & canonical_long["model_basis"].eq("selected_dashboard_basis")
-        & canonical_long["line"].isin(["Actual", "Actual / benchmark", "Model path"])
-        & canonical_long["unit"].astype(str).str.contains(r"\$m", regex=True, na=False)
-    ].copy()
-    scopes.append(("selected_dashboard_basis", selected))
     return scopes
 
 
@@ -3202,12 +3158,8 @@ def _path_status(forecast_path: str, line: str) -> str:
         return "selected_mot_release_forecast"
     if forecast_path.startswith("fed_path:") or forecast_path == "fed_path":
         return "fed_path_rate"
-    if forecast_path == "selected_dashboard_basis":
-        return "selected_workbook_basis"
-    if forecast_path == "in_house_prediction":
-        return "in_house_prediction_forecast"
-    if forecast_path == "aaron_schiff_prediction":
-        return "aaron_schiff_prediction_forecast"
+    if forecast_path == "current_finalist_model":
+        return "current_model_forecast"
     return "other_model_path"
 
 

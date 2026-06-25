@@ -20,17 +20,18 @@ from model_dashboard.revenue_source_pack import REVENUE_SOURCE_PACK_DIR, load_re
 
 
 EXPORT_FILES = {
-    "canonical_revenue_long.csv": "Canonical long schema across actuals and model paths.",
+    "canonical_revenue_long.csv": "Canonical long schema across repo-local source rows and offline lineage rows.",
     "source_pack_intake_status.csv": "Repo-local source-pack intake status, hashes, and replay gaps.",
     "path_trace_status.csv": "Availability and plotting status for required Revenue Outlook total-path traces.",
+    "trace_source_contract.csv": "Displayed Revenue Outlook trace source contract with role, source files, model IDs, cutoffs, scenario and anchor/forecast flags.",
     "reconciliation_report.csv": "Hierarchy roll-up reconciliation and explicit gap report.",
     "source_gap_register.csv": "Structured source-pack gaps for release values, FED path scenarios, Crown top-up, quarterly rows, and bridge replay.",
     "remaining_decisions_handoff.csv": "Unresolved revenue decisions linked to runtime gaps and dashboard treatment.",
     "series_role_audit.csv": "Explicit role contract for modeled activity, revenue bridges, pass-through lines, deductions, overlays, and source gaps.",
     "hybrid_annual_revenue.csv": "Replacement-only annual NLTF hybrid roll-up audit using source-backed PED/FED, Light RUC and Heavy RUC bridge inputs plus MOT fixed components.",
     "annual_completeness_audit.csv": "June-year annual actual completeness audit and chart-treatment contract.",
-    "series_trace_contract.csv": "Per-series trace contract for valid controls, actual source, primary current forecast source, legacy benchmark source, bridge and cutoffs.",
-    "series_junction_audit.csv": "FY2024-FY2027 actual/current/legacy junction audit with quarter coverage, cutoffs, nowcast components and discontinuity flags.",
+    "series_trace_contract.csv": "Per-series trace contract for valid controls, source actuals, primary current-finalist forecast source, bridge and cutoffs.",
+    "series_junction_audit.csv": "FY2024-FY2027 source-actual/current-finalist junction audit with quarter coverage, cutoffs, nowcast components and discontinuity flags.",
     "data_vintage_manifest.json": "Model/source observation cutoffs and repo-local current Revenue Outlook/source-pack hashes.",
     "validation_issues.csv": "Loader validation warnings/errors for the source pack.",
 }
@@ -52,6 +53,7 @@ def export_tables(pack_dir: Path) -> dict[str, object]:
         "canonical_revenue_long.csv": pack.canonical_long,
         "source_pack_intake_status.csv": pack.intake_status,
         "path_trace_status.csv": pack.path_trace_status,
+        "trace_source_contract.csv": pack.trace_source_contract,
         "reconciliation_report.csv": pack.reconciliation_report,
         "source_gap_register.csv": pack.source_gap_register,
         "remaining_decisions_handoff.csv": pack.remaining_decisions_handoff,

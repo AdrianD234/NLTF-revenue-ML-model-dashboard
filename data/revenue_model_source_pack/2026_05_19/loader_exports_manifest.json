@@ -9,39 +9,39 @@
       "sha256": "43280775c23535c2985d35aaf8002e0d9d1242692976b0a42503d1b3e0fe7c8a"
     },
     "canonical_revenue_long.csv": {
-      "role": "Canonical long schema across actuals and model paths.",
+      "role": "Canonical long schema across repo-local source rows and offline lineage rows.",
       "row_count": 39967,
-      "sha256": "f7a7fc2e9f14f32c4606e1fb98d2bcfa283d6f80098a77ea2a35eb96c92d0ee5"
+      "sha256": "b418aa2f571f00bb99046ade5f3cfaa6cfe58990ad3ad7dfb6915880c1c6cd29"
     },
     "data_vintage_manifest.json": {
       "role": "Model/source observation cutoffs and repo-local current Revenue Outlook/source-pack hashes.",
       "row_count": null,
-      "sha256": "7ef5f5cf2e6aa84bca6b3b2a8ff528c80b6aa0ed7fb75575cd92d6d7e7054a37"
+      "sha256": "b869666ce6ddb6444ee7e0ae8b34b4d73761f5e8e7bd4383bf13724630792d1e"
     },
     "hybrid_annual_revenue.csv": {
       "role": "Replacement-only annual NLTF hybrid roll-up audit using source-backed PED/FED, Light RUC and Heavy RUC bridge inputs plus MOT fixed components.",
-      "row_count": 450,
-      "sha256": "91585aa27b23ab48784cea38f25bfcd0d07097fb0ffbba6eb24db82d5cb70a78"
+      "row_count": 525,
+      "sha256": "30b2ec2b1540c51e5d60d95984bc26d8e5ea3331a98d04a57633800874dd0d3d"
     },
     "path_trace_status.csv": {
       "role": "Availability and plotting status for required Revenue Outlook total-path traces.",
-      "row_count": 8,
-      "sha256": "b5780e1d9362236acb675e31bbab1e22d143ad36aca234c9281ee5e753c01a60"
+      "row_count": 4,
+      "sha256": "b0b2b2f01c6977e869a21f620485e686c119b1895d29e1c67d12ce7afb9adfe3"
     },
     "reconciliation_report.csv": {
       "role": "Hierarchy roll-up reconciliation and explicit gap report.",
-      "row_count": 192,
-      "sha256": "e6e9608e0b2650e0eafbaf42e9ca26a4f4e364f639ed656f661a578281c98a18"
+      "row_count": 84,
+      "sha256": "cda23c2e6d2a08515b8d026f832e84c718373d64e099bcc2cb4690d4b9374aa8"
     },
     "remaining_decisions_handoff.csv": {
       "role": "Unresolved revenue decisions linked to runtime gaps and dashboard treatment.",
       "row_count": 7,
-      "sha256": "542ca27d21fcdeaaed5c1d89f42e50bdabb73b1a84dc1e400a3bef463c8dca0a"
+      "sha256": "14258034dba5eb6cbdc0ae6f5ce9598d1668fafd58cae0a04e3755a613106519"
     },
     "series_junction_audit.csv": {
-      "role": "FY2024-FY2027 actual/current/legacy junction audit with quarter coverage, cutoffs, nowcast components and discontinuity flags.",
-      "row_count": 264,
-      "sha256": "e3b1da79e6c11b77d84c71960608e010a3f0be7262a3e306475d4413fecb355d"
+      "role": "FY2024-FY2027 source-actual/current-finalist junction audit with quarter coverage, cutoffs, nowcast components and discontinuity flags.",
+      "row_count": 176,
+      "sha256": "8b2a7f16d03167ed3fed92cf4bde61c52b9afb5270e78717f8f234b19271b8d4"
     },
     "series_role_audit.csv": {
       "role": "Explicit role contract for modeled activity, revenue bridges, pass-through lines, deductions, overlays, and source gaps.",
@@ -49,9 +49,9 @@
       "sha256": "364e16ba6e4916b35f20bb980e12124d835f1233f3e383b9ca16fe3c945009b6"
     },
     "series_trace_contract.csv": {
-      "role": "Per-series trace contract for valid controls, actual source, primary current forecast source, legacy benchmark source, bridge and cutoffs.",
+      "role": "Per-series trace contract for valid controls, source actuals, primary current-finalist forecast source, bridge and cutoffs.",
       "row_count": 25,
-      "sha256": "c65a2b2e79471fdd51d1441fff19aac3125a9924fe352305eb1ccdce3328a587"
+      "sha256": "bbfe7a0fb06569540ee6ad94f5d6f1b8924af0c0490eeebd053eaee30cdd0d16"
     },
     "source_gap_register.csv": {
       "role": "Structured source-pack gaps for release values, FED path scenarios, Crown top-up, quarterly rows, and bridge replay.",
@@ -62,6 +62,11 @@
       "role": "Repo-local source-pack intake status, hashes, and replay gaps.",
       "row_count": 23,
       "sha256": "7a3117749e2fb1bc860027c3e8eb975082a804083c92134322f1dfeafc453f82"
+    },
+    "trace_source_contract.csv": {
+      "role": "Displayed Revenue Outlook trace source contract with role, source files, model IDs, cutoffs, scenario and anchor/forecast flags.",
+      "row_count": 4,
+      "sha256": "3a8b3b66da395cad28c74622c12bb43af1a6e035eb5917e9d9e61e52539a50d5"
     },
     "validation_issues.csv": {
       "role": "Loader validation warnings/errors for the source pack.",
