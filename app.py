@@ -2308,6 +2308,9 @@ def _render_revenue_source_architecture(source_pack: RevenueSourcePack, controls
         display_table(source_pack.validation_issues, height=180, max_rows=80)
         st.caption("Required path trace status")
         display_table(_source_path_trace_status_for_controls(source_pack, controls), height=180, max_rows=80)
+        st.caption("Annual completeness audit")
+        annual_completeness = _source_annual_completeness_audit(source_pack)
+        display_table(annual_completeness, height=180, max_rows=80)
         st.caption("Hybrid annual replacement-only audit")
         display_table(_source_hybrid_annual_view(source_pack, controls), height=220, max_rows=120)
         st.caption("Source gap register")
@@ -2317,6 +2320,7 @@ def _render_revenue_source_architecture(source_pack: RevenueSourcePack, controls
         st.caption("Loader export manifest")
         display_table(_source_manifest_view(source_pack), height=220, max_rows=80)
         dataframe_download(source_pack.canonical_long, "Download canonical revenue long table", "canonical_revenue_long.csv")
+        dataframe_download(annual_completeness, "Download annual completeness audit", "annual_completeness_audit.csv")
         dataframe_download(_source_hybrid_annual_view(source_pack, controls), "Download hybrid annual replacement audit", "hybrid_annual_revenue.csv")
 
 
@@ -2665,8 +2669,11 @@ def _source_path_trace_status(source_pack: RevenueSourcePack) -> pd.DataFrame:
     gaps = _source_gap_register(source_pack)
     release_gap = gaps[gaps["gap_id"].eq("release_value_table_missing")] if "gap_id" in gaps.columns else pd.DataFrame()
     release_available = not release_gap.empty and release_gap.iloc[0].get("availability_status") == "available"
+    actual_rows = frame[frame["line"].astype(str).isin(["Actual", "Actual / benchmark"])].copy() if "line" in frame.columns else pd.DataFrame()
+    has_partial_actual = bool(pd.to_numeric(actual_rows.get("FY"), errors="coerce").eq(2026).any()) if not actual_rows.empty else False
     rows = [
-        _path_trace_row("actual_benchmark", "Actual / benchmark", _has_source_trace(frame, line_values={"Actual", "Actual / benchmark"}), "annual actual and benchmark rows", ""),
+        _path_trace_row("actual_benchmark", "Complete annual actuals", _has_source_trace(frame, line_values={"Actual", "Actual / benchmark"}), "annual actual rows after completeness audit", ""),
+        _path_trace_row("actual_to_date_marker", "Actual to date marker", has_partial_actual, "partial current-FY annual actual row", ""),
         _path_trace_row("selected_workbook_basis", "Selected workbook basis", _has_source_trace(frame, model_basis="selected_dashboard_basis", line_values={"Model path"}), "annual model path rows", ""),
         _path_trace_row("selected_mot_befu_release", "Selected MOT/BEFU release path", release_available, "release-value table", "" if release_available else "release_value_table_missing"),
         _path_trace_row("rolling_befu_1y", "Rolling BEFU 1Y", release_available, "release-value table", "" if release_available else "release_value_table_missing"),
@@ -2771,14 +2778,19 @@ def _source_total_path_figure(source_pack: RevenueSourcePack, controls: dict[str
     if frame.empty:
         return empty_figure("Selected revenue series is unavailable in the normalized source pack.")
     fig = go.Figure()
+    actual_rows = _source_complete_actual_rows(source_pack, frame)
+    partial_actual_rows = _source_partial_actual_rows(source_pack, frame)
+    forecast_start = _source_forecast_start_fy_from_audit(source_pack)
+    if forecast_start is not None and not partial_actual_rows.empty:
+        partial_actual_rows = partial_actual_rows[pd.to_numeric(partial_actual_rows["FY"], errors="coerce").ge(forecast_start)].copy()
     trace_specs = [
-        ("Actual / benchmark", frame[frame["line"].isin(["Actual", "Actual / benchmark"])], "#7A869A", "solid"),
-        ("Selected MOT/BEFU release path", _source_selected_release_rows(frame, controls), "#5B677A", "dashdot"),
+        ("Actual", actual_rows, "#7A869A", "solid"),
+        ("Selected MOT/BEFU release path", _source_forecast_path_rows(source_pack, _source_selected_release_rows(frame, controls)), "#5B677A", "dashdot"),
         ("Rolling BEFU 1Y", _source_rolling_befu_1y_rows(frame), "#6B7F2A", "dot"),
-        ("Hybrid replacement-only outlook", _source_hybrid_path_rows(source_pack, controls), "#D1495B", "solid"),
-        ("Selected dashboard basis", _source_model_rows(frame, "selected_dashboard_basis"), "#002B5C", "solid"),
-        ("In-house prediction / forecast", _source_model_rows(frame, "in_house_model"), "#00843D", "solid"),
-        ("Aaron Schiff", _source_model_rows(frame, "aaron_schiff_model"), "#F37021", "dash"),
+        ("Hybrid replacement-only outlook", _source_forecast_path_rows(source_pack, _source_hybrid_path_rows(source_pack, controls)), "#D1495B", "solid"),
+        ("Selected dashboard basis", _source_forecast_path_rows(source_pack, _source_model_rows(frame, "selected_dashboard_basis")), "#002B5C", "solid"),
+        ("In-house prediction / forecast", _source_forecast_path_rows(source_pack, _source_model_rows(frame, "in_house_model")), "#00843D", "solid"),
+        ("Aaron Schiff", _source_forecast_path_rows(source_pack, _source_model_rows(frame, "aaron_schiff_model")), "#F37021", "dash"),
     ]
     axis_title = _source_axis_title(frame)
     for name, rows, color, dash in trace_specs:
@@ -2787,7 +2799,7 @@ def _source_total_path_figure(source_pack: RevenueSourcePack, controls: dict[str
         if rows.empty:
             continue
         rows = rows.copy()
-        rows["hover_unit"] = axis_title
+        rows = _source_chart_hover_rows(source_pack, rows, axis_title=axis_title)
         fig.add_trace(
             go.Scatter(
                 x=rows["FY"],
@@ -2796,13 +2808,74 @@ def _source_total_path_figure(source_pack: RevenueSourcePack, controls: dict[str
                 name=name,
                 line={"color": color, "dash": dash, "width": 2.6},
                 marker={"size": 6},
-                customdata=rows[["hover_unit"]].to_numpy(),
-                hovertemplate="FY%{x}<br>%{y:,.1f} %{customdata[0]}<extra>" + name + "</extra>",
+                customdata=rows[
+                    [
+                        "hover_unit",
+                        "period_status",
+                        "quarters_present_hover",
+                        "source_status_hover",
+                        "release_hover",
+                        "source_cells_hover",
+                        "nowcast_flag_hover",
+                    ]
+                ].to_numpy(),
+                hovertemplate=(
+                    "FY%{x}<br>%{y:,.1f} %{customdata[0]}"
+                    "<br>Status: %{customdata[1]}"
+                    "<br>Quarters: %{customdata[2]}"
+                    "<br>Source status: %{customdata[3]}"
+                    "<br>Release/path: %{customdata[4]}"
+                    "<br>Source cells: %{customdata[5]}"
+                    "<br>Nowcast: %{customdata[6]}"
+                    "<extra>" + name + "</extra>"
+                ),
+            )
+        )
+    partial_actual_rows = _filter_source_horizon_rows(partial_actual_rows, source_pack, controls)
+    partial_actual_rows = _dedupe_path_rows(partial_actual_rows)
+    if not partial_actual_rows.empty:
+        partial_actual_rows = _source_chart_hover_rows(source_pack, partial_actual_rows, axis_title=axis_title)
+        fig.add_trace(
+            go.Scatter(
+                x=partial_actual_rows["FY"],
+                y=partial_actual_rows["value"],
+                mode="markers",
+                name="Actual to date (3 of 4 quarters)",
+                marker={"color": "#7A869A", "size": 11, "symbol": "diamond-open", "line": {"width": 2}},
+                customdata=partial_actual_rows[
+                    [
+                        "hover_unit",
+                        "period_status",
+                        "quarters_present_hover",
+                        "source_status_hover",
+                        "release_hover",
+                        "source_cells_hover",
+                        "nowcast_flag_hover",
+                    ]
+                ].to_numpy(),
+                hovertemplate=(
+                    "FY%{x}<br>%{y:,.1f} %{customdata[0]}"
+                    "<br>Status: %{customdata[1]}"
+                    "<br>Quarters: %{customdata[2]}"
+                    "<br>Source status: %{customdata[3]}"
+                    "<br>Release/path: %{customdata[4]}"
+                    "<br>Source cells: %{customdata[5]}"
+                    "<br>Nowcast: %{customdata[6]}"
+                    "<extra>Actual to date</extra>"
+                ),
             )
         )
     _add_missing_source_path_gap_traces(fig, source_pack, controls)
     fy = _selected_fy_number(controls)
     bounds = _source_horizon_bounds(source_pack, controls)
+    if forecast_start is not None and _fy_within_bounds(forecast_start, bounds):
+        fig.add_vline(
+            x=forecast_start,
+            line_dash="dash",
+            line_color="#B45309",
+            annotation_text=f"Forecast start FY{forecast_start}",
+            annotation_position="bottom right",
+        )
     if fy is not None and _fy_within_bounds(fy, bounds):
         fig.add_vline(x=fy, line_dash="dot", line_color="#102A43", annotation_text=f"Selected FY{fy}", annotation_position="top")
     release_gap = _source_gap_register_for_controls(source_pack, controls)
@@ -2833,6 +2906,138 @@ def _source_total_path_figure(source_pack: RevenueSourcePack, controls: dict[str
         hovermode="x unified",
     )
     return fig
+
+
+def _source_annual_completeness_audit(source_pack: RevenueSourcePack) -> pd.DataFrame:
+    audit = getattr(source_pack, "annual_completeness_audit", None)
+    return audit.copy() if isinstance(audit, pd.DataFrame) else pd.DataFrame()
+
+
+def _source_actual_base_rows(frame: pd.DataFrame) -> pd.DataFrame:
+    if frame.empty or "line" not in frame.columns:
+        return pd.DataFrame()
+    rows = frame[frame["line"].astype(str).isin(["Actual", "Actual / benchmark"])].copy()
+    preferred = rows[rows.get("source_file", pd.Series("", index=rows.index)).astype(str).eq("annual_model_paths.csv")]
+    return preferred if not preferred.empty else rows
+
+
+def _source_complete_actual_rows(source_pack: RevenueSourcePack, frame: pd.DataFrame) -> pd.DataFrame:
+    rows = _source_actual_base_rows(frame)
+    audit = _source_annual_completeness_audit(source_pack)
+    if rows.empty or audit.empty or "chart_treatment" not in audit.columns:
+        return rows
+    complete_fys = set(pd.to_numeric(audit.loc[audit["chart_treatment"].eq("complete_actual_line"), "FY"], errors="coerce").dropna().astype(int))
+    return rows[pd.to_numeric(rows["FY"], errors="coerce").isin(complete_fys)].copy()
+
+
+def _source_partial_actual_rows(source_pack: RevenueSourcePack, frame: pd.DataFrame) -> pd.DataFrame:
+    rows = _source_actual_base_rows(frame)
+    audit = _source_annual_completeness_audit(source_pack)
+    if rows.empty or audit.empty or "chart_treatment" not in audit.columns:
+        return pd.DataFrame()
+    partial_fys = set(
+        pd.to_numeric(audit.loc[audit["chart_treatment"].eq("partial_actual_marker_not_connected"), "FY"], errors="coerce")
+        .dropna()
+        .astype(int)
+    )
+    return rows[pd.to_numeric(rows["FY"], errors="coerce").isin(partial_fys)].copy()
+
+
+def _source_forecast_start_fy_from_audit(source_pack: RevenueSourcePack) -> int | None:
+    audit = _source_annual_completeness_audit(source_pack)
+    if not audit.empty and {"FY", "chart_treatment"}.issubset(audit.columns):
+        audit = audit.copy()
+        audit["FY"] = pd.to_numeric(audit["FY"], errors="coerce")
+        audit = audit.dropna(subset=["FY"])
+        complete = audit[audit["chart_treatment"].astype(str).eq("complete_actual_line")]
+        last_complete = int(complete["FY"].max()) if not complete.empty else None
+        partial = audit[audit["chart_treatment"].astype(str).eq("partial_actual_marker_not_connected")]
+        if last_complete is not None:
+            partial_after_complete = partial[partial["FY"].gt(last_complete)]
+            if not partial_after_complete.empty:
+                return int(partial_after_complete["FY"].min())
+            forecast_after_complete = audit[
+                audit["chart_treatment"].astype(str).eq("forecast_path_only")
+                & audit["FY"].gt(last_complete)
+            ]
+            if not forecast_after_complete.empty:
+                return int(forecast_after_complete["FY"].min())
+        if not partial.empty:
+            return int(partial["FY"].min())
+    return _source_forecast_start_fy(source_pack)
+
+
+def _source_forecast_path_rows(source_pack: RevenueSourcePack, rows: pd.DataFrame) -> pd.DataFrame:
+    if rows.empty or "FY" not in rows.columns:
+        return rows
+    forecast_start = _source_forecast_start_fy_from_audit(source_pack)
+    if forecast_start is None:
+        return rows
+    return rows[pd.to_numeric(rows["FY"], errors="coerce").ge(forecast_start)].copy()
+
+
+def _source_chart_hover_rows(source_pack: RevenueSourcePack, rows: pd.DataFrame, *, axis_title: str) -> pd.DataFrame:
+    out = rows.copy()
+    out["hover_unit"] = axis_title
+    audit = _source_annual_completeness_audit(source_pack)
+    if not audit.empty and "FY" in audit.columns:
+        audit_cols = [
+            "FY",
+            "completeness_status",
+            "quarters_present",
+            "actual_quarters",
+            "forecast_quarters",
+            "source_status",
+            "source_cells",
+            "source_cutoff",
+            "nowcast_flag",
+        ]
+        existing = [column for column in audit_cols if column in audit.columns]
+        audit_view = audit[existing].rename(
+            columns={
+                "source_status": "audit_source_status",
+                "source_cells": "audit_source_cells",
+                "nowcast_flag": "audit_nowcast_flag",
+            }
+        )
+        out = out.merge(audit_view, on="FY", how="left")
+    for column in [
+        "completeness_status",
+        "quarters_present",
+        "actual_quarters",
+        "forecast_quarters",
+        "audit_source_status",
+        "audit_source_cells",
+        "source_cutoff",
+        "audit_nowcast_flag",
+    ]:
+        if column not in out.columns:
+            out[column] = ""
+    row_source_status = out.get("source_status", pd.Series("", index=out.index)).fillna("").astype(str)
+    row_value_status = out.get("value_status", pd.Series("", index=out.index)).fillna("").astype(str)
+    row_line = out.get("line", pd.Series("", index=out.index)).fillna("").astype(str)
+    out["period_status"] = out["completeness_status"].fillna("").astype(str)
+    out.loc[out["period_status"].eq(""), "period_status"] = row_value_status.where(row_value_status.ne(""), row_line)
+    out["quarters_present_hover"] = out["actual_quarters"].fillna("").astype(str)
+    out.loc[out["quarters_present_hover"].eq(""), "quarters_present_hover"] = out["quarters_present"].fillna("").astype(str)
+    out.loc[out["quarters_present_hover"].eq(""), "quarters_present_hover"] = out["forecast_quarters"].fillna("").astype(str)
+    out.loc[out["quarters_present_hover"].eq(""), "quarters_present_hover"] = "n/a"
+    out["source_status_hover"] = out["audit_source_status"].fillna("").astype(str)
+    out.loc[out["source_status_hover"].eq(""), "source_status_hover"] = row_source_status.where(row_source_status.ne(""), row_value_status)
+    out.loc[out["source_status_hover"].eq(""), "source_status_hover"] = "n/a"
+    out["release_hover"] = out.get("release_vintage", pd.Series("", index=out.index)).fillna("").astype(str)
+    out.loc[out["release_hover"].eq(""), "release_hover"] = out.get("scenario_name", pd.Series("", index=out.index)).fillna("").astype(str)
+    out.loc[out["release_hover"].eq(""), "release_hover"] = out.get("forecast_path", pd.Series("", index=out.index)).fillna("").astype(str)
+    out.loc[out["release_hover"].eq(""), "release_hover"] = "n/a"
+    row_source_cells = out.get("source_cell", pd.Series("", index=out.index)).fillna("").astype(str)
+    actual_period = row_line.isin(["Actual", "Actual / benchmark"])
+    out["source_cells_hover"] = row_source_cells
+    out.loc[actual_period & out["audit_source_cells"].fillna("").astype(str).ne(""), "source_cells_hover"] = out.loc[
+        actual_period & out["audit_source_cells"].fillna("").astype(str).ne(""), "audit_source_cells"
+    ].astype(str)
+    out.loc[out["source_cells_hover"].eq(""), "source_cells_hover"] = "n/a"
+    out["nowcast_flag_hover"] = out["audit_nowcast_flag"].fillna(False).astype(str)
+    return out
 
 
 def _add_missing_source_path_gap_traces(fig: go.Figure, source_pack: RevenueSourcePack, controls: dict[str, Any]) -> None:

@@ -210,6 +210,33 @@ def test_quarterly_actuals_use_june_year_mapping_without_partial_year_inference(
     assert sorted(canonical_fy2025["period"].astype(str).tolist()) == fy2025
 
 
+def test_annual_completeness_audit_keeps_fy2026_actual_to_date_separate_from_forecast() -> None:
+    pack = load_revenue_source_pack(repo_root=ROOT)
+    assert pack is not None
+    audit = pack.annual_completeness_audit.set_index("FY")
+
+    assert audit.loc[2026, "expected_quarter_set"] == "2025Q3; 2025Q4; 2026Q1; 2026Q2"
+    assert audit.loc[2026, "actual_quarters"] == "2025Q3; 2025Q4; 2026Q1"
+    assert audit.loc[2026, "coverage_count"] == 3
+    assert audit.loc[2026, "completeness_status"] == "partial_actual_to_date"
+    assert audit.loc[2026, "source_cutoff"] == "2026Q1"
+    assert audit.loc[2026, "chart_treatment"] == "partial_actual_marker_not_connected"
+    assert audit.loc[2026, "workbook_formula_cells"] == "AZ163; BA163; BB163"
+    assert audit.loc[2026, "missing_formula_cells"] == "BC163"
+    assert abs(float(audit.loc[2026, "annual_actual_value"]) - 3528.410251053044) <= 1e-9
+    assert audit.loc[2026, "annual_actual_source_cell"] == "R27"
+    assert abs(float(audit.loc[2026, "selected_model_value"]) - 4709.942174904469) <= 1e-9
+    assert audit.loc[2026, "selected_model_source_cell"] == "R26"
+    assert abs(float(audit.loc[2026, "official_befu25_value"]) - 4569.88166803382) <= 1e-9
+    assert audit.loc[2026, "official_befu25_status"] == "ST_FORECAST"
+
+    assert audit.loc[2024, "expected_quarter_set"] == "2023Q3; 2023Q4; 2024Q1; 2024Q2"
+    assert audit.loc[2025, "expected_quarter_set"] == "2024Q3; 2024Q4; 2025Q1; 2025Q2"
+    assert audit.loc[2024, "chart_treatment"] == "complete_actual_line"
+    assert audit.loc[2025, "chart_treatment"] == "complete_actual_line"
+    assert audit.loc[2027, "chart_treatment"] == "forecast_path_only"
+
+
 def test_rolling_befu_1y_rows_are_true_release_horizon_one_rows() -> None:
     pack = load_revenue_source_pack(repo_root=ROOT)
     assert pack is not None
@@ -590,6 +617,7 @@ def test_revenue_source_pack_loader_exports_are_hash_backed() -> None:
         "remaining_decisions_handoff.csv": len(pack.remaining_decisions_handoff),
         "series_role_audit.csv": len(pack.series_role_audit),
         "hybrid_annual_revenue.csv": len(pack.hybrid_annual_revenue),
+        "annual_completeness_audit.csv": len(pack.annual_completeness_audit),
         "validation_issues.csv": len(pack.validation_issues),
     }
     for filename, meta in manifest["exports"].items():

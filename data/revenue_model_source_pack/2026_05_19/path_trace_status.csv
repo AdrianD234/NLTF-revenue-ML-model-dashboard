@@ -1,5 +1,6 @@
 trace_id,trace_label,availability_status,plotted,data_scope,blocking_gap_id,current_selection,user_visible_message
-actual_benchmark,Actual / benchmark,available,True,annual actual and benchmark rows,,official actual or benchmark,Source actual/benchmark rows are plotted where present.
+actual_benchmark,Complete annual actuals,available,True,annual actual rows after completeness audit,,official actual or benchmark,Only complete annual actual years are connected as the grey actual line.
+actual_to_date_marker,Actual to date marker,available,True,partial current-FY annual actual row,,FY2026 actual-to-date,Partial current-FY actuals are plotted as distinct markers and are not joined to the complete actual line.
 selected_workbook_basis,Selected workbook basis,available,True,annual model path rows,,source workbook current selection,Current workbook-selected annual model path is plotted.
 selected_mot_befu_release,Selected MOT/BEFU release path,available,True,release-value table,,BEFU25,Selected MOT/BEFU release path is plotted from repo-local release_values.csv rows.
 rolling_befu_1y,Rolling BEFU 1Y,available,True,release-value table,,BEFU25,Rolling BEFU 1Y is plotted from true one-year-ahead rows in release_values.csv.

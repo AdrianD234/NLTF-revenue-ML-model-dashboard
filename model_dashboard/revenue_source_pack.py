@@ -44,6 +44,16 @@ OPTIONAL_SOURCE_PACK_FILES = (
     "official_befu25_annual.csv",
 )
 
+TOTAL_NLTF_COMPLETENESS_SERIES = (
+    "Gross PED exGST",
+    "Gross LPG exGST",
+    "Gross CNG exGST",
+    "FED refunds total exGST",
+    "Total RUC all classes exGST",
+    "Net MVR revenue exGST",
+    "TUC revenue exGST",
+)
+
 CORE_ROLLUP_SERIES = {
     "gross_fed_revenue",
     "net_fed_revenue",
@@ -191,6 +201,7 @@ class RevenueSourcePack:
     remaining_decisions_handoff: pd.DataFrame
     series_role_audit: pd.DataFrame
     hybrid_annual_revenue: pd.DataFrame
+    annual_completeness_audit: pd.DataFrame
 
     @property
     def validation_status(self) -> str:
@@ -258,6 +269,11 @@ def load_revenue_source_pack(
     ped_bridge_inputs = _read_optional_csv(base / "ped_bridge_inputs.csv")
     mot_error_bands = _read_optional_csv(base / "mot_error_bands.csv")
     official_befu25_annual = _read_optional_csv(base / "official_befu25_annual.csv")
+    annual_completeness = annual_completeness_audit_frame(
+        quarterly_actuals=quarterly_actuals,
+        annual_model_paths=annual_model_paths,
+        official_befu25_annual=official_befu25_annual,
+    )
 
     canonical = canonical_revenue_long_frame(
         series_master=series_master,
@@ -329,6 +345,7 @@ def load_revenue_source_pack(
         remaining_decisions_handoff=remaining_decisions,
         series_role_audit=role_audit,
         hybrid_annual_revenue=hybrid_annual,
+        annual_completeness_audit=annual_completeness,
     )
 
 
@@ -592,6 +609,137 @@ def canonical_revenue_long_frame(
         ],
         kind="stable",
     ).reset_index(drop=True)
+
+
+def annual_completeness_audit_frame(
+    *,
+    quarterly_actuals: pd.DataFrame,
+    annual_model_paths: pd.DataFrame,
+    official_befu25_annual: pd.DataFrame | None = None,
+) -> pd.DataFrame:
+    columns = [
+        "FY",
+        "expected_quarter_set",
+        "quarters_present",
+        "actual_quarters",
+        "forecast_quarters",
+        "coverage_count",
+        "completeness_status",
+        "source_cutoff",
+        "source_cells",
+        "source_status",
+        "annual_actual_value",
+        "annual_actual_source_cell",
+        "selected_model_value",
+        "selected_model_source_cell",
+        "official_befu25_value",
+        "official_befu25_status",
+        "workbook_formula_cells",
+        "missing_formula_cells",
+        "chart_treatment",
+        "nowcast_flag",
+        "notes",
+    ]
+    fy_values: set[int] = set()
+    if isinstance(quarterly_actuals, pd.DataFrame) and not quarterly_actuals.empty and "FY" in quarterly_actuals.columns:
+        fy_values.update(int(value) for value in pd.to_numeric(quarterly_actuals["FY"], errors="coerce").dropna().unique())
+    if isinstance(annual_model_paths, pd.DataFrame) and not annual_model_paths.empty and "FY June" in annual_model_paths.columns:
+        fy_values.update(int(value) for value in pd.to_numeric(annual_model_paths["FY June"], errors="coerce").dropna().unique())
+    if isinstance(official_befu25_annual, pd.DataFrame) and not official_befu25_annual.empty and "FY" in official_befu25_annual.columns:
+        fy_values.update(int(value) for value in pd.to_numeric(official_befu25_annual["FY"], errors="coerce").dropna().unique())
+    rows: list[dict[str, Any]] = []
+    quarterly = quarterly_actuals.copy() if isinstance(quarterly_actuals, pd.DataFrame) else pd.DataFrame()
+    if not quarterly.empty:
+        quarterly["FY_int"] = pd.to_numeric(quarterly.get("FY"), errors="coerce").astype("Int64")
+        quarterly["quarter_text"] = quarterly.get("quarter", pd.Series("", index=quarterly.index)).fillna("").astype(str).str.upper()
+        quarterly["status_text"] = quarterly.get("value_status", pd.Series("", index=quarterly.index)).fillna("").astype(str).str.lower()
+        quarterly = quarterly[quarterly["series"].astype(str).isin(TOTAL_NLTF_COMPLETENESS_SERIES)].copy()
+    annual = annual_model_paths.copy() if isinstance(annual_model_paths, pd.DataFrame) else pd.DataFrame()
+    official = official_befu25_annual.copy() if isinstance(official_befu25_annual, pd.DataFrame) else pd.DataFrame()
+    for fy in sorted(fy_values):
+        expected_quarters = _expected_june_year_quarters(fy)
+        expected_set = set(expected_quarters)
+        fy_quarters = quarterly[quarterly["FY_int"].eq(fy)].copy() if not quarterly.empty else pd.DataFrame()
+        quarters_present = sorted(set(fy_quarters["quarter_text"].dropna().astype(str)) & expected_set, key=_quarter_sort_key)
+        actual_rows = fy_quarters[fy_quarters["status_text"].str.contains("actual", na=False)].copy() if not fy_quarters.empty else pd.DataFrame()
+        forecast_rows = fy_quarters[fy_quarters["status_text"].str.contains("forecast", na=False)].copy() if not fy_quarters.empty else pd.DataFrame()
+        actual_sets: list[set[str]] = []
+        for series in TOTAL_NLTF_COMPLETENESS_SERIES:
+            if actual_rows.empty:
+                actual_sets.append(set())
+                continue
+            series_rows = actual_rows[actual_rows["series"].astype(str).eq(series)]
+            actual_sets.append(set(series_rows["quarter_text"].dropna().astype(str)) & expected_set)
+        actual_quarters = sorted(set.intersection(*actual_sets) if actual_sets else set(), key=_quarter_sort_key)
+        forecast_quarters = (
+            sorted(set(forecast_rows["quarter_text"].dropna().astype(str)) & expected_set, key=_quarter_sort_key)
+            if not forecast_rows.empty
+            else []
+        )
+        coverage_count = len(actual_quarters)
+        selected_actual = _annual_model_total_row(annual, fy, line="Actual")
+        selected_model = _annual_model_total_row(annual, fy, line="Model path")
+        official_row = _official_befu25_total_row(official, fy)
+        official_status = str(official_row.get("status", "") if official_row is not None else "").upper()
+        if selected_actual is not None and coverage_count == 4:
+            completeness_status = "complete_actual"
+            chart_treatment = "complete_actual_line"
+        elif selected_actual is not None and coverage_count > 0:
+            completeness_status = "partial_actual_to_date"
+            chart_treatment = "partial_actual_marker_not_connected"
+        elif official_row is not None and "FORECAST" in official_status:
+            completeness_status = "forecast_only"
+            chart_treatment = "forecast_path_only"
+        elif official_row is not None:
+            completeness_status = "official_status_actual_without_quarterly_coverage"
+            chart_treatment = "not_plotted_as_actual"
+        else:
+            completeness_status = "no_actual_coverage"
+            chart_treatment = "not_plotted_as_actual"
+        source_cells = []
+        if not actual_rows.empty and actual_quarters:
+            source_cells = sorted(
+                {
+                    str(value).strip()
+                    for value in actual_rows[actual_rows["quarter_text"].isin(actual_quarters)]["source_cell"].dropna()
+                    if str(value).strip()
+                },
+                key=_cell_sort_key,
+            )
+        status_values = sorted({str(value).strip() for value in fy_quarters.get("value_status", pd.Series(dtype=str)).dropna() if str(value).strip()})
+        formula_cells = ""
+        missing_formula_cells = ""
+        notes = ""
+        if fy == 2026:
+            formula_cells = "AZ163; BA163; BB163"
+            missing_formula_cells = "BC163"
+            notes = "Workbook FY2026 Actual formula is actual-to-date: AZ163+BA163+BB163; BC163 is the missing fourth quarter."
+        rows.append(
+            {
+                "FY": fy,
+                "expected_quarter_set": "; ".join(expected_quarters),
+                "quarters_present": "; ".join(quarters_present),
+                "actual_quarters": "; ".join(actual_quarters),
+                "forecast_quarters": "; ".join(forecast_quarters),
+                "coverage_count": coverage_count,
+                "completeness_status": completeness_status,
+                "source_cutoff": actual_quarters[-1] if actual_quarters else "",
+                "source_cells": "; ".join(source_cells),
+                "source_status": "; ".join(status_values),
+                "annual_actual_value": selected_actual.get("Value") if selected_actual is not None else pd.NA,
+                "annual_actual_source_cell": selected_actual.get("Source cell") if selected_actual is not None else "",
+                "selected_model_value": selected_model.get("Value") if selected_model is not None else pd.NA,
+                "selected_model_source_cell": selected_model.get("Source cell") if selected_model is not None else "",
+                "official_befu25_value": official_row.get("value") if official_row is not None else pd.NA,
+                "official_befu25_status": official_status,
+                "workbook_formula_cells": formula_cells,
+                "missing_formula_cells": missing_formula_cells,
+                "chart_treatment": chart_treatment,
+                "nowcast_flag": False,
+                "notes": notes,
+            }
+        )
+    return pd.DataFrame(rows, columns=columns)
 
 
 def validate_revenue_source_pack(
@@ -1029,6 +1177,10 @@ def revenue_path_trace_status(
 ) -> pd.DataFrame:
     release_gap = _gap_status(gap_register, "release_value_table_missing")
     has_actual = _has_trace_rows(canonical_long, line_values={"Actual", "Actual / benchmark"})
+    has_partial_actual = False
+    if has_actual and "FY" in canonical_long.columns:
+        actual_rows = canonical_long[canonical_long["line"].astype(str).isin(["Actual", "Actual / benchmark"])].copy()
+        has_partial_actual = bool(pd.to_numeric(actual_rows.get("FY"), errors="coerce").eq(2026).any())
     has_selected_workbook = _has_trace_rows(canonical_long, model_basis="selected_dashboard_basis", line_values={"Model path"})
     has_in_house = _has_trace_rows(canonical_long, model_basis="in_house_model", line_values={"Model path"})
     has_schiff = _has_trace_rows(canonical_long, model_basis="aaron_schiff_model", line_values={"Model path"})
@@ -1037,12 +1189,21 @@ def revenue_path_trace_status(
     rows = [
         _trace_status_row(
             "actual_benchmark",
-            "Actual / benchmark",
+            "Complete annual actuals",
             has_actual,
-            "annual actual and benchmark rows",
+            "annual actual rows after completeness audit",
             "",
             "official actual or benchmark",
-            "Source actual/benchmark rows are plotted where present.",
+            "Only complete annual actual years are connected as the grey actual line.",
+        ),
+        _trace_status_row(
+            "actual_to_date_marker",
+            "Actual to date marker",
+            has_partial_actual,
+            "partial current-FY annual actual row",
+            "",
+            "FY2026 actual-to-date",
+            "Partial current-FY actuals are plotted as distinct markers and are not joined to the complete actual line.",
         ),
         _trace_status_row(
             "selected_workbook_basis",
@@ -1458,6 +1619,57 @@ def _trace_status_row(
         "current_selection": current_selection,
         "user_visible_message": message,
     }
+
+
+def _expected_june_year_quarters(fy: int) -> list[str]:
+    return [f"{fy - 1}Q3", f"{fy - 1}Q4", f"{fy}Q1", f"{fy}Q2"]
+
+
+def _quarter_sort_key(value: Any) -> tuple[int, int]:
+    text = str(value or "").upper().strip()
+    match = re.match(r"^(\d{4})Q([1-4])$", text)
+    if not match:
+        return (9999, 9)
+    return (int(match.group(1)), int(match.group(2)))
+
+
+def _cell_sort_key(value: Any) -> tuple[int, int, str]:
+    text = str(value or "").upper().strip()
+    match = re.match(r"^([A-Z]+)(\d+)$", text)
+    if not match:
+        return (999999, 999999, text)
+    column = 0
+    for char in match.group(1):
+        column = column * 26 + (ord(char) - ord("A") + 1)
+    return (column, int(match.group(2)), text)
+
+
+def _annual_model_total_row(frame: pd.DataFrame, fy: int, *, line: str) -> dict[str, Any] | None:
+    if not isinstance(frame, pd.DataFrame) or frame.empty:
+        return None
+    rows = frame[
+        frame.get("Series", pd.Series("", index=frame.index)).astype(str).eq("Total NLTF revenue")
+        & frame.get("Line", pd.Series("", index=frame.index)).astype(str).eq(line)
+        & pd.to_numeric(frame.get("FY June"), errors="coerce").eq(fy)
+    ].copy()
+    if rows.empty:
+        return None
+    selected = rows[rows.get("Model basis", pd.Series("", index=rows.index)).astype(str).eq("selected_dashboard_basis")]
+    if selected.empty:
+        selected = rows
+    return selected.iloc[0].to_dict()
+
+
+def _official_befu25_total_row(frame: pd.DataFrame, fy: int) -> dict[str, Any] | None:
+    if not isinstance(frame, pd.DataFrame) or frame.empty:
+        return None
+    rows = frame[
+        frame.get("series", pd.Series("", index=frame.index)).astype(str).eq("Total net revenues")
+        & pd.to_numeric(frame.get("FY"), errors="coerce").eq(fy)
+    ].copy()
+    if rows.empty:
+        return None
+    return rows.iloc[0].to_dict()
 
 
 def _intake_status_row(

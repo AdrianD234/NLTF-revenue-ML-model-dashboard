@@ -1,10 +1,11 @@
 # Revenue Outlook Requirement Audit
 
-Status: VERIFIED IN WORKTREE, NOT YET COMMITTED
+Status: DELIVERED TO REMOTE AT `22d6d31`; FY2026 JUNCTION UPDATE IN PROGRESS
 
 This audit maps the active Revenue Outlook hybrid NLTF forecast objective to
-current repository evidence. It is not a substitute for committing and pushing
-the new source-pack files.
+current repository evidence. The source-pack delivery covered by this audit was
+committed and pushed to `origin/main` at `22d6d31`. The current FY2026 junction
+update is tracked separately until its scoped changes are validated and pushed.
 
 ## Objective Invariants
 
@@ -70,7 +71,7 @@ Decision handoff statuses:
 
 ## Remaining Delivery Caveat
 
-The objective is functionally verified in the working tree, but the source-pack
-CSV additions and script/test changes are still uncommitted. Treat completion as
-not delivered to the remote application until these files are committed and
-pushed.
+Resolved for the original Revenue Outlook hybrid source-pack delivery: the
+source-pack CSV additions and script/test changes were committed and pushed at
+`22d6d31`. New FY2026 junction edits must still complete their own validation,
+commit, push and clean-status check before they are treated as delivered.

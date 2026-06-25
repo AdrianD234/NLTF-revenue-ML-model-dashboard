@@ -3,6 +3,11 @@
   "created_at_source": "source_pack_manifest_created_at",
   "determinism_policy": "No wall-clock timestamp is used; identical source-pack inputs produce identical export manifests.",
   "exports": {
+    "annual_completeness_audit.csv": {
+      "role": "June-year annual actual completeness audit and chart-treatment contract.",
+      "row_count": 54,
+      "sha256": "43280775c23535c2985d35aaf8002e0d9d1242692976b0a42503d1b3e0fe7c8a"
+    },
     "canonical_revenue_long.csv": {
       "role": "Canonical long schema across actuals and model paths.",
       "row_count": 39967,
@@ -15,8 +20,8 @@
     },
     "path_trace_status.csv": {
       "role": "Availability and plotting status for required Revenue Outlook total-path traces.",
-      "row_count": 6,
-      "sha256": "19b1b138e95d22bf801fe66ac8dbbf6bee427584168eda939b7c29de0acc1556"
+      "row_count": 7,
+      "sha256": "76ebfdddfdd762cf1ba3c8f02449b558c51b561b4831aa05ed563c9c10a5b9e1"
     },
     "reconciliation_report.csv": {
       "role": "Hierarchy roll-up reconciliation and explicit gap report.",

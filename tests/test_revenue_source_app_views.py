@@ -362,6 +362,49 @@ def test_total_path_chart_plots_vendored_release_paths_from_source_rows() -> Non
     assert not any(str(name).endswith("(BEFU25 gap)") for name in by_name)
 
 
+def test_total_path_chart_splits_fy2026_partial_actual_from_forecast_paths() -> None:
+    pack = load_revenue_source_pack(repo_root=ROOT)
+    assert pack is not None
+
+    fig = _source_total_path_figure(
+        pack,
+        {
+            "series": "Total NLTF revenue",
+            "release_round": "BEFU25",
+            "model_basis": "In-house model",
+            "selected_fy": "FY2031",
+        },
+    )
+    by_name = {trace.name: trace for trace in fig.data}
+
+    actual = by_name["Actual"]
+    assert 2026 not in [int(value) for value in actual.x]
+    assert max(int(value) for value in actual.x) == 2025
+
+    partial = by_name["Actual to date (3 of 4 quarters)"]
+    assert list(map(int, partial.x)) == [2026]
+    assert abs(float(partial.y[0]) - 3528.410251053044) <= 1e-9
+    assert partial.mode == "markers"
+    partial_hover = partial.customdata[0]
+    assert partial_hover[1] == "partial_actual_to_date"
+    assert partial_hover[2] == "2025Q3; 2025Q4; 2026Q1"
+    assert "AZ16" in partial_hover[5] and "BB52" in partial_hover[5]
+    assert partial_hover[6] == "False"
+
+    for trace_name in [
+        "Selected MOT/BEFU release path",
+        "Selected dashboard basis",
+        "In-house prediction / forecast",
+        "Aaron Schiff",
+        "Hybrid replacement-only outlook",
+    ]:
+        assert min(int(value) for value in by_name[trace_name].x) == 2026
+
+    marker_shapes = {(int(shape.x0), shape.line.dash) for shape in fig.layout.shapes}
+    assert (2026, "dash") in marker_shapes
+    assert (2031, "dot") in marker_shapes
+
+
 def test_revenue_source_charts_use_explicit_units_and_annual_ticks() -> None:
     pack = load_revenue_source_pack(repo_root=ROOT)
     assert pack is not None
