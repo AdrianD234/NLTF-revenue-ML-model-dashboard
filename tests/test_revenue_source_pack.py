@@ -9,6 +9,7 @@ import pandas as pd
 
 from model_dashboard.revenue_source_pack import (
     CANONICAL_REVENUE_SCHEMA_VERSION,
+    OPTIONAL_SOURCE_PACK_FILES,
     REQUIRED_SOURCE_PACK_FILES,
     REVENUE_SOURCE_PACK_SCHEMA_VERSION,
     control_options,
@@ -93,7 +94,15 @@ def test_revenue_source_pack_canonical_long_schema_preserves_source_rows() -> No
     pack = load_revenue_source_pack(repo_root=ROOT)
     assert pack is not None
     frame = pack.canonical_long
-    expected_rows = len(pack.annual_actuals) + len(pack.annual_model_paths)
+    expected_rows = (
+        len(pack.annual_actuals)
+        + len(pack.annual_model_paths)
+        + len(pack.release_values)
+        + len(pack.quarterly_actuals)
+        + len(pack.fed_rate_paths)
+        + len(pack.ped_bridge_inputs)
+        + len(pack.official_befu25_annual)
+    )
     assert len(frame) == expected_rows
     assert set(frame["schema_version"]) == {CANONICAL_REVENUE_SCHEMA_VERSION}
 
@@ -107,12 +116,16 @@ def test_revenue_source_pack_canonical_long_schema_preserves_source_rows() -> No
         "unit",
         "aggregation_sign",
         "release_vintage",
+        "release_family",
+        "release_year",
+        "horizon",
         "forecast_path",
         "path_status",
         "scenario_name",
         "scenario_role",
         "model_basis",
         "revenue_basis",
+        "value_status",
         "source_status",
         "bridge_status",
         "source_file",
@@ -123,12 +136,20 @@ def test_revenue_source_pack_canonical_long_schema_preserves_source_rows() -> No
     }
     assert required.issubset(frame.columns)
     assert not frame["unit"].astype(str).str.strip().eq("").any()
-    assert frame["period"].astype(str).str.match(r"^FY\d{4}$").all()
+    assert (frame["period"].astype(str).str.match(r"^FY\d{4}$") | frame["period"].astype(str).str.match(r"^\d{4}Q[1-4]$")).all()
     assert set(frame["aggregation_sign"].dropna().unique()).issubset({-1, 0, 1})
     expected_source_hashes = {
         filename: meta["sha256"]
         for filename, meta in pack.manifest["normalized_files"].items()
-        if filename in {"annual_actuals.csv", "annual_model_paths.csv"}
+        if filename in {
+            "annual_actuals.csv",
+            "annual_model_paths.csv",
+            "release_values.csv",
+            "quarterly_actuals.csv",
+            "fed_rate_paths.csv",
+            "ped_bridge_inputs.csv",
+            "official_befu25_annual.csv",
+        }
     }
     actual_source_hashes = (
         frame.groupby("source_file", dropna=False)["normalized_source_sha256"]
@@ -137,8 +158,21 @@ def test_revenue_source_pack_canonical_long_schema_preserves_source_rows() -> No
     )
     assert actual_source_hashes["annual_actuals.csv"] == {expected_source_hashes["annual_actuals.csv"]}
     assert actual_source_hashes["annual_model_paths.csv"] == {expected_source_hashes["annual_model_paths.csv"]}
+    assert actual_source_hashes["release_values.csv"] == {expected_source_hashes["release_values.csv"]}
+    assert actual_source_hashes["quarterly_actuals.csv"] == {expected_source_hashes["quarterly_actuals.csv"]}
+    assert actual_source_hashes["fed_rate_paths.csv"] == {expected_source_hashes["fed_rate_paths.csv"]}
+    assert actual_source_hashes["ped_bridge_inputs.csv"] == {expected_source_hashes["ped_bridge_inputs.csv"]}
+    assert actual_source_hashes["official_befu25_annual.csv"] == {expected_source_hashes["official_befu25_annual.csv"]}
     assert set(frame["path_status"].dropna().unique()).issubset(
-        {"actual_or_benchmark", "selected_workbook_basis", "in_house_prediction_forecast", "aaron_schiff_prediction_forecast", "other_model_path"}
+        {
+            "actual_or_benchmark",
+            "selected_workbook_basis",
+            "in_house_prediction_forecast",
+            "aaron_schiff_prediction_forecast",
+            "selected_mot_release_forecast",
+            "fed_path_rate",
+            "other_model_path",
+        }
     )
     assert frame.duplicated(["source_file", "source_cell", "period", "series_id", "forecast_path", "model_basis", "line"]).sum() == 0
 
@@ -154,6 +188,92 @@ def test_revenue_source_pack_legacy_total_ruc_ped_is_not_root_total() -> None:
     root = frame[frame["series_id"].eq("total_nltf_net_revenue")]
     assert not root.empty
     assert not root["source_series_label"].eq("Total RUC+PED revenue").any()
+
+
+def test_quarterly_actuals_use_june_year_mapping_without_partial_year_inference() -> None:
+    pack = load_revenue_source_pack(repo_root=ROOT)
+    assert pack is not None
+    quarters = pack.quarterly_actuals
+    gross_ped = quarters[quarters["series"].eq("Gross PED exGST")].copy()
+    assert not gross_ped.empty
+
+    fy2025 = sorted(gross_ped.loc[gross_ped["FY"].eq(2025), "quarter"].dropna().astype(str).tolist())
+    assert fy2025 == ["2024Q3", "2024Q4", "2025Q1", "2025Q2"]
+    fy2026 = sorted(gross_ped.loc[gross_ped["FY"].eq(2026), "quarter"].dropna().astype(str).tolist())
+    assert fy2026 == ["2025Q3", "2025Q4", "2026Q1"]
+
+    canonical_fy2025 = pack.canonical_long[
+        pack.canonical_long["source_file"].eq("quarterly_actuals.csv")
+        & pack.canonical_long["source_series_label"].eq("Gross PED exGST")
+        & pack.canonical_long["FY"].eq(2025)
+    ]
+    assert sorted(canonical_fy2025["period"].astype(str).tolist()) == fy2025
+
+
+def test_rolling_befu_1y_rows_are_true_release_horizon_one_rows() -> None:
+    pack = load_revenue_source_pack(repo_root=ROOT)
+    assert pack is not None
+    release_rows = pack.canonical_long[
+        pack.canonical_long["source_file"].eq("release_values.csv")
+        & pack.canonical_long["release_family"].astype(str).str.upper().eq("BEFU")
+        & pd.to_numeric(pack.canonical_long["horizon"], errors="coerce").eq(1)
+    ].copy()
+
+    assert not release_rows.empty
+    assert set(pd.to_numeric(release_rows["horizon"], errors="coerce").dropna().astype(int).unique()) == {1}
+    assert release_rows["source_file"].eq("release_values.csv").all()
+
+
+def test_hybrid_annual_revenue_replaces_only_three_lines_and_preserves_mot_fixed_rows() -> None:
+    pack = load_revenue_source_pack(repo_root=ROOT)
+    assert pack is not None
+    hybrid = pack.hybrid_annual_revenue
+    assert not hybrid.empty
+    assert {"FY", "series_id", "row_role", "source_file", "replacement_only", "value", "residual_vs_official"}.issubset(hybrid.columns)
+
+    replacements = hybrid[hybrid["replacement_only"].astype(bool)]
+    assert set(replacements["series_id"]) == {"gross_ped_revenue", "light_ruc_net_revenue", "heavy_ruc_net_revenue"}
+    assert set(replacements["row_role"]) == {"replacement_line"}
+    replacement_counts = replacements.groupby(["FY", "fed_path", "series_id"], dropna=False).size()
+    assert set(replacement_counts.unique()) == {1}
+    replacement_matrix = replacements.groupby(["FY", "fed_path"], dropna=False)["series_id"].agg(lambda values: set(values))
+    assert replacement_matrix.map(lambda values: values == {"gross_ped_revenue", "light_ruc_net_revenue", "heavy_ruc_net_revenue"}).all()
+    non_replacements = hybrid[~hybrid["replacement_only"].astype(bool)]
+    assert not set(non_replacements["series_id"]).intersection({"gross_ped_revenue", "light_ruc_net_revenue", "heavy_ruc_net_revenue"})
+    replacement_sources = replacements.groupby("series_id")["source_file"].agg(lambda values: set(values))
+    assert replacement_sources.loc["gross_ped_revenue"] == {"annual_model_paths.csv; fed_rate_paths.csv; ped_bridge_inputs.csv"}
+    assert replacement_sources.loc["light_ruc_net_revenue"] == {"annual_model_paths.csv"}
+    assert replacement_sources.loc["heavy_ruc_net_revenue"] == {"annual_model_paths.csv"}
+    assert {"Current planned path", "No 2027 12c uplift"}.issubset(set(replacements["fed_path"]))
+    assert replacements["formula"].astype(str).str.len().gt(0).all()
+
+    fixed = hybrid[hybrid["row_role"].astype(str).str.startswith("fixed_mot")]
+    assert not fixed.empty
+    assert set(fixed["source_file"]) == {"official_befu25_annual.csv"}
+    assert not set(fixed["series_id"]).intersection({"gross_ped_revenue", "light_ruc_net_revenue", "heavy_ruc_net_revenue"})
+
+    fy = int(hybrid["FY"].min())
+    rows = hybrid[hybrid["FY"].eq(fy) & hybrid["fed_path"].eq("Current planned path")].set_index("series_id")
+    assert {"population_count", "ped_total_vkt", "ped_litres_per_100km", "ped_fed_rate_path"}.issubset(rows.index)
+    ped_expected = rows.loc["ped_total_vkt", "value"] * rows.loc["ped_litres_per_100km", "value"] / 100.0 * rows.loc["ped_fed_rate_path", "value"]
+    assert abs(rows.loc["gross_ped_revenue", "value"] - ped_expected) <= 1e-9
+    gross_fed_expected = rows.loc["gross_ped_revenue", "value"] + rows.loc["gross_lpg_revenue", "value"] + rows.loc["gross_cng_revenue", "value"]
+    net_fed_expected = gross_fed_expected - rows.loc["fed_refunds", "value"]
+    ruc_expected = rows.loc["light_ruc_net_revenue", "value"] + rows.loc["heavy_ruc_net_revenue", "value"] + rows.loc["ruc_fixed_residual_net_revenue", "value"]
+    total_expected = net_fed_expected + ruc_expected + rows.loc["net_mvr_revenue", "value"] + rows.loc["tuc_net_revenue", "value"]
+
+    assert abs(rows.loc["gross_fed_revenue", "value"] - gross_fed_expected) <= 1e-9
+    assert abs(rows.loc["net_fed_revenue", "value"] - net_fed_expected) <= 1e-9
+    assert abs(rows.loc["total_ruc_net_revenue", "value"] - ruc_expected) <= 1e-9
+    assert abs(rows.loc["total_nltf_net_revenue", "value"] - total_expected) <= 1e-9
+    assert pd.notna(rows.loc["total_nltf_net_revenue", "official_value"])
+    assert abs(
+        rows.loc["total_nltf_net_revenue", "residual_vs_official"]
+        - (rows.loc["total_nltf_net_revenue", "value"] - rows.loc["total_nltf_net_revenue", "official_value"])
+    ) <= 1e-9
+
+    fy2031 = hybrid[hybrid["FY"].eq(2031) & hybrid["series_id"].eq("gross_ped_revenue")].set_index("fed_path")
+    assert fy2031.loc["Current planned path", "value"] > fy2031.loc["No 2027 12c uplift", "value"]
 
 
 def test_revenue_source_pack_rollups_reconcile_where_inputs_exist_and_report_gaps() -> None:
@@ -213,7 +333,8 @@ def test_revenue_source_pack_validation_is_warning_not_error_for_known_source_ga
     issues = pack.validation_issues
     assert not issues.empty
     assert "error" not in set(issues["severity"])
-    assert {"revenue_basis_alias", "series_registry_gap", "unresolved_critical_decisions"}.issubset(set(issues["check"]))
+    assert {"revenue_basis_alias", "series_registry_gap"}.issubset(set(issues["check"]))
+    assert "unresolved_critical_decisions" not in set(issues["check"])
     assert "front_end_config" not in set(issues["check"])
 
 
@@ -243,13 +364,17 @@ def test_revenue_source_gap_register_exposes_missing_release_and_top_up_inputs()
     assert {"gap_id", "availability_status", "runtime_treatment", "user_visible_message"}.issubset(gaps.columns)
 
     by_id = gaps.set_index("gap_id")
-    assert by_id.loc["release_value_table_missing", "availability_status"] == "missing"
-    assert by_id.loc["release_value_table_missing", "runtime_treatment"] == "registry_only"
-    assert by_id.loc["fed_path_scenario_values_missing", "availability_status"] == "missing"
-    assert by_id.loc["fed_path_scenario_values_missing", "runtime_treatment"] == "registry_only"
-    assert by_id.loc["crown_top_up_values_missing", "availability_status"] == "missing"
+    assert by_id.loc["release_value_table_missing", "availability_status"] == "available"
+    assert by_id.loc["release_value_table_missing", "runtime_treatment"] == "release_values_available"
+    assert by_id.loc["fed_path_scenario_values_missing", "availability_status"] == "available"
+    assert by_id.loc["fed_path_scenario_values_missing", "runtime_treatment"] == "fed_path_values_available"
+    assert by_id.loc["crown_top_up_values_missing", "availability_status"] == "available"
     assert by_id.loc["crown_top_up_values_missing", "runtime_treatment"] == "excluded_by_selection"
-    assert by_id.loc["quarterly_source_pack_missing", "runtime_treatment"] == "annual_only_source_pack"
+    assert by_id.loc["quarterly_source_pack_missing", "availability_status"] == "available"
+    assert by_id.loc["quarterly_source_pack_missing", "runtime_treatment"] == "quarterly_available"
+    assert by_id.loc["ped_total_vkt_bridge_missing", "availability_status"] == "available"
+    assert by_id.loc["ped_total_vkt_bridge_missing", "runtime_treatment"] == "bridge_rows_available"
+    assert "ped_bridge_inputs.csv" in by_id.loc["ped_total_vkt_bridge_missing", "user_visible_message"]
     assert by_id["user_visible_message"].astype(str).str.len().gt(20).all()
 
 
@@ -280,8 +405,13 @@ def test_revenue_remaining_decisions_handoff_links_runtime_gaps_and_is_sanitized
     assert by_id.loc["crown_top_up_policy", "linked_gap_ids"] == "crown_top_up_values_missing"
     assert by_id.loc["crown_top_up_policy", "runtime_status"] == "policy_overlay_missing_values"
     assert by_id.loc["future_nominal_ped_fed_rates_by_scenario", "linked_gap_ids"] == "fed_path_scenario_values_missing; ped_total_vkt_bridge_missing"
+    assert by_id.loc["future_nominal_ped_fed_rates_by_scenario", "runtime_status"] == "fed_rate_path_and_total_vkt_source_backed"
+    assert "fed_rate_paths.csv" in by_id.loc["future_nominal_ped_fed_rates_by_scenario", "linked_artifacts"]
+    assert "ped_bridge_inputs.csv" in by_id.loc["future_nominal_ped_fed_rates_by_scenario", "linked_artifacts"]
     assert by_id.loc["ped_bridge_source_history_and_re_estimation", "linked_gap_ids"] == "ped_total_vkt_bridge_missing"
-    assert by_id.loc["h13_treatment", "availability_status"] == "governance_label_required"
+    assert by_id.loc["ped_bridge_source_history_and_re_estimation", "runtime_status"] == "bridge_rows_available"
+    assert by_id.loc["h13_treatment", "availability_status"] == "label_applied"
+    assert by_id.loc["h13_treatment", "runtime_status"] == "label_applied"
     assert by_id.loc["h13_treatment", "linked_gap_ids"] == ""
     assert by_id.loc["h13_treatment", "dashboard_treatment"].lower().find("no value changes") >= 0
     critical = handoff[handoff["priority"].astype(str).str.lower().eq("critical")]
@@ -326,14 +456,17 @@ def test_revenue_series_role_audit_makes_model_bridge_and_passthrough_roles_expl
     assert by_id.loc["tuc_net_revenue", "role_category"] == "pass_through_or_governed_assumption"
     assert by_id.loc["fed_refunds", "role_category"] == "deduction"
     assert by_id.loc["crown_top_up", "role_category"] == "policy_overlay"
+    for series_id in ["population_count", "ped_total_vkt", "ped_litres_per_100km", "ped_source_backed_litres"]:
+        assert by_id.loc[series_id, "role_category"] == "revenue_bridge"
+        assert by_id.loc[series_id, "runtime_treatment"] == "requires_governed_bridge_inputs"
 
     gaps = roles[roles["role_category"].eq("source_registry_gap")]
     assert not gaps.empty
-    assert gaps["source_statuses"].astype(str).str.contains("unregistered_source_series").all()
+    assert gaps["source_statuses"].astype(str).str.contains("unregistered_source_series|registered_alias", regex=True).all()
     assert gaps["runtime_treatment"].eq("preserve_as_source_registry_gap").all()
 
 
-def test_revenue_path_trace_status_marks_missing_release_traces_without_fabrication() -> None:
+def test_revenue_path_trace_status_marks_vendored_release_traces_available_without_fabrication() -> None:
     pack = load_revenue_source_pack(repo_root=ROOT)
     assert pack is not None
     status = pack.path_trace_status
@@ -364,12 +497,12 @@ def test_revenue_path_trace_status_marks_missing_release_traces_without_fabricat
     assert set(available["availability_status"]) == {"available"}
     assert available["plotted"].astype(bool).all()
 
-    missing_release = by_id.loc[["selected_mot_befu_release", "rolling_befu_1y"]]
-    assert set(missing_release["availability_status"]) == {"missing"}
-    assert not missing_release["plotted"].astype(bool).any()
-    assert set(missing_release["blocking_gap_id"]) == {"release_value_table_missing"}
-    assert set(missing_release["current_selection"]) == {"BEFU25"}
-    assert missing_release["user_visible_message"].astype(str).str.contains("release-value rows", case=False).all()
+    release = by_id.loc[["selected_mot_befu_release", "rolling_befu_1y"]]
+    assert set(release["availability_status"]) == {"available"}
+    assert release["plotted"].astype(bool).all()
+    assert set(release["blocking_gap_id"]) == {""}
+    assert set(release["current_selection"]) == {"BEFU25"}
+    assert release["user_visible_message"].astype(str).str.contains("release_values.csv|one-year-ahead", case=False, regex=True).all()
 
 
 def test_revenue_source_pack_intake_status_is_hash_backed_and_sanitized() -> None:
@@ -395,18 +528,18 @@ def test_revenue_source_pack_intake_status_is_hash_backed_and_sanitized() -> Non
     assert "OneDrive" not in intake_text
 
     by_name = intake.set_index("artifact_name")
-    for filename in REQUIRED_SOURCE_PACK_FILES:
+    for filename in REQUIRED_SOURCE_PACK_FILES + OPTIONAL_SOURCE_PACK_FILES:
         assert by_name.loc[filename, "status"] == "repo_local_hash_verified"
         assert str(by_name.loc[filename, "repo_relative_path"]).startswith("data/revenue_model_source_pack/2026_05_19/")
         assert len(str(by_name.loc[filename, "sha256"])) == 64
         assert int(by_name.loc[filename, "size_bytes"]) < 50 * 1024 * 1024
+        assert bool(by_name.loc[filename, "required_for_runtime"])
 
     assert by_name.loc["raw_workbook_lineage", "status"] == "verified_sha256_in_manifest"
     assert by_name.loc["raw_workbook_lineage", "sha256"] == "00c6070694818d27d7c402749354d8175de999894846dce45a4abdd7f5eb3e6b"
-    for filename in ["release_values.csv", "forecast_archive.csv", "formula_lineage.csv", "quarterly_actuals.csv"]:
-        assert by_name.loc[filename, "status"] == "not_vendored"
-        assert not bool(by_name.loc[filename, "required_for_runtime"])
-        assert bool(by_name.loc[filename, "required_for_replay"])
+    assert by_name.loc["formula_lineage.csv", "status"] == "not_vendored"
+    assert not bool(by_name.loc["formula_lineage.csv", "required_for_runtime"])
+    assert bool(by_name.loc["formula_lineage.csv", "required_for_replay"])
 
 
 def test_revenue_source_pack_loader_exports_are_hash_backed() -> None:
@@ -429,7 +562,15 @@ def test_revenue_source_pack_loader_exports_are_hash_backed() -> None:
     for source_file, expected_hash in {
         filename: meta["sha256"]
         for filename, meta in pack.manifest["normalized_files"].items()
-        if filename in {"annual_actuals.csv", "annual_model_paths.csv"}
+        if filename in {
+            "annual_actuals.csv",
+            "annual_model_paths.csv",
+            "release_values.csv",
+            "quarterly_actuals.csv",
+            "fed_rate_paths.csv",
+            "ped_bridge_inputs.csv",
+            "official_befu25_annual.csv",
+        }
     }.items():
         hashes = set(
             canonical_export.loc[
@@ -448,6 +589,7 @@ def test_revenue_source_pack_loader_exports_are_hash_backed() -> None:
         "source_gap_register.csv": len(pack.source_gap_register),
         "remaining_decisions_handoff.csv": len(pack.remaining_decisions_handoff),
         "series_role_audit.csv": len(pack.series_role_audit),
+        "hybrid_annual_revenue.csv": len(pack.hybrid_annual_revenue),
         "validation_issues.csv": len(pack.validation_issues),
     }
     for filename, meta in manifest["exports"].items():

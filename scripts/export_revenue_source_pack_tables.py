@@ -27,6 +27,7 @@ EXPORT_FILES = {
     "source_gap_register.csv": "Structured source-pack gaps for release values, FED path scenarios, Crown top-up, quarterly rows, and bridge replay.",
     "remaining_decisions_handoff.csv": "Unresolved revenue decisions linked to runtime gaps and dashboard treatment.",
     "series_role_audit.csv": "Explicit role contract for modeled activity, revenue bridges, pass-through lines, deductions, overlays, and source gaps.",
+    "hybrid_annual_revenue.csv": "Replacement-only annual NLTF hybrid roll-up audit using source-backed PED/FED, Light RUC and Heavy RUC bridge inputs plus MOT fixed components.",
     "validation_issues.csv": "Loader validation warnings/errors for the source pack.",
 }
 
@@ -51,6 +52,7 @@ def export_tables(pack_dir: Path) -> dict[str, object]:
         "source_gap_register.csv": pack.source_gap_register,
         "remaining_decisions_handoff.csv": pack.remaining_decisions_handoff,
         "series_role_audit.csv": pack.series_role_audit,
+        "hybrid_annual_revenue.csv": pack.hybrid_annual_revenue,
         "validation_issues.csv": pack.validation_issues,
     }
     manifest: dict[str, object] = {

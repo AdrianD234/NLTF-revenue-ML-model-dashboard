@@ -270,8 +270,20 @@ def test_navigation_labels_not_clipped(page: Page) -> None:
     assert "Benchmark Comparison" in body or "Schiff Benchmark" in body
     expect(page.locator("body")).to_contain_text("Candidate Search Frontier", timeout=90000)
     expect(page.locator("body")).to_contain_text("Finalist Ensemble Composition", timeout=90000)
+    page_chip_box = page.locator(".page-chip").first.bounding_box()
+    assert page_chip_box is not None, "Page chip should have a visible bounding box"
     for label in ["Overview", "Diagnostics", "Scenario Comparison", "Schiff Benchmark", "Revenue Outlook", "Governance & Reproducibility"]:
-        expect(governance_nav_label(page, label)).to_be_visible(timeout=60000)
+        nav_label = governance_nav_label(page, label)
+        expect(nav_label).to_be_visible(timeout=60000)
+        label_box = nav_label.bounding_box()
+        assert label_box is not None, f"{label} nav label should have a visible bounding box"
+        horizontal_gap = label_box["x"] + label_box["width"] <= page_chip_box["x"] - 4 or (
+            page_chip_box["x"] + page_chip_box["width"] <= label_box["x"] - 4
+        )
+        vertical_gap = label_box["y"] + label_box["height"] <= page_chip_box["y"] - 2 or (
+            page_chip_box["y"] + page_chip_box["height"] <= label_box["y"] - 2
+        )
+        assert horizontal_gap or vertical_gap, f"{label} nav label overlaps the page chip"
 
 
 def test_latest_arbitration_values_are_visible_not_stale(page: Page) -> None:
@@ -837,6 +849,7 @@ def assert_visible_text_absent(page: Page, text: str) -> None:
 
 
 def chart_info_text(page: Page, title: str) -> str:
+    expect(page.locator(".chart-card-header").filter(has_text=title).first).to_be_visible(timeout=60000)
     info = page.evaluate(
         """(title) => {
             const headers = Array.from(document.querySelectorAll('.chart-card-header'));

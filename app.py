@@ -7,8 +7,14 @@ import io
 import json
 import os
 from pathlib import Path
+import re
+import sys
 from typing import Any
 import zipfile
+
+_RUNTIME_PYARROW24 = Path(__file__).resolve().parent / ".runtime_pyarrow24"
+if _RUNTIME_PYARROW24.exists() and str(_RUNTIME_PYARROW24) not in sys.path:
+    sys.path.insert(0, str(_RUNTIME_PYARROW24))
 
 import numpy as np
 import pandas as pd
@@ -118,6 +124,7 @@ from model_dashboard.revenue_outlook import (
     validate_promotable_comparison,
 )
 from model_dashboard.revenue_source_pack import (
+    OPTIONAL_SOURCE_PACK_FILES,
     REQUIRED_SOURCE_PACK_FILES,
     REVENUE_SOURCE_PACK_DIR,
     REVENUE_SOURCE_PACK_RUNTIME_REVISION,
@@ -212,6 +219,7 @@ from model_dashboard.ui import (
 LOADER_SCHEMA_VERSION = "stage1-governance-loader-v9-parquet-contract-schiff-class"
 STREAMLIT_IMPORT_SURFACE_REVISION = "2026-06-25-revenue-source-pack-normalized-source-hashes-v1"
 REVENUE_SOURCE_PACK_CACHE_REVISION = REVENUE_SOURCE_PACK_RUNTIME_REVISION
+REVENUE_SOURCE_HORIZON_OPTIONS = ["Next 5 FY", "To FY2031", "Full common horizon"]
 CURATED_DATA_DIR = Path("artifacts") / "curated_data"
 REPRODUCIBILITY_PAGE = "Governance & Reproducibility"
 REVENUE_OUTLOOK_PAGE = "Revenue Outlook"
@@ -1993,15 +2001,15 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         "Forecast Builder volume packs joined only after explicit promotion."
     )
     st.caption("Source policy: explicit promoted pack or in-session reviewed comparison only; no latest-folder scan; no test-fixture publication.")
-    kpi_grid(_revenue_source_kpi_cards(source_pack) + _revenue_outlook_summary_cards(manifest, chart_rows, future_revenue))
-
-    source_controls = _render_revenue_source_controls(source_pack)
-    if source_pack is None:
-        warning_panel("The repo-local NLTF revenue source pack is missing; Total NLTF architecture controls are unavailable.")
-    else:
-        _render_revenue_source_architecture(source_pack, source_controls)
+    revenue_kpis = _revenue_source_kpi_cards(source_pack) + _revenue_outlook_summary_cards(manifest, chart_rows, future_revenue)
 
     if pack is None:
+        kpi_grid(revenue_kpis)
+        if source_pack is None:
+            warning_panel("The repo-local NLTF revenue source pack is missing; Total NLTF architecture controls are unavailable.")
+        else:
+            source_controls = _render_revenue_source_controls(source_pack)
+            _render_revenue_source_architecture(source_pack, source_controls)
         warning_panel(
             "No explicitly promoted Forecast Builder revenue pack is available yet. The Total NLTF source-pack "
             "architecture remains visible, but future PED/Light/Heavy reviewed scenario bridges require promotion."
@@ -2068,6 +2076,8 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             notes_as_tooltip=False,
         )
 
+    kpi_grid(revenue_kpis)
+
     st.markdown("<div class='page5-panel-title'>Revenue bridge detail</div>", unsafe_allow_html=True)
     display_table(_revenue_bridge_display_table(filtered_bridge), height=320, max_rows=240)
 
@@ -2080,6 +2090,12 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             dataframe_download(bridge, "Download revenue bridge components", "revenue_bridge_components.csv")
         with download_cols[2]:
             dataframe_download(chart_rows, "Download revenue chart rows", "revenue_chart_rows.csv")
+
+    if source_pack is None:
+        warning_panel("The repo-local NLTF revenue source pack is missing; Total NLTF architecture controls are unavailable.")
+    else:
+        source_controls = _render_revenue_source_controls(source_pack)
+        _render_revenue_source_architecture(source_pack, source_controls)
 
 
 def _revenue_source_kpi_cards(source_pack: RevenueSourcePack | None) -> list[tuple[str, str, str | None]]:
@@ -2145,12 +2161,13 @@ def _render_revenue_source_controls(source_pack: RevenueSourcePack | None) -> di
                 key="revenue_source_fed_path",
             )
 
-        row2 = st.columns([0.16, 0.18, 0.18, 0.22, 0.14, 0.12])
+        row2 = st.columns([0.13, 0.16, 0.16, 0.18, 0.14, 0.12, 0.11])
         view_options = ["June-year", "Quarterly"]
         model_basis_options = ["In-house model", "Aaron Schiff model", "Selected dashboard basis"]
         revenue_basis_options = control_options(source_pack, "revenue_basis", ["Net", "Gross", "Benchmark actual"])
         uncertainty_options = control_options(source_pack, "uncertainty_source", ["MOT release round", "In-house model", "Aaron Schiff model"])
         fy_options = control_options(source_pack, "selected_fy", ["FY2031"])
+        horizon_options = control_options(source_pack, "horizon", REVENUE_SOURCE_HORIZON_OPTIONS)
         top_up_options = control_options(source_pack, "crown_top_up", ["Exclude", "Include"])
         with row2[0]:
             time_grain = st.radio("Time grain", view_options, horizontal=True, key="revenue_source_time_grain")
@@ -2186,6 +2203,13 @@ def _render_revenue_source_controls(source_pack: RevenueSourcePack | None) -> di
                 key="revenue_source_selected_fy",
             )
         with row2[5]:
+            horizon = st.selectbox(
+                "Horizon",
+                horizon_options,
+                index=_option_index(horizon_options, "To FY2031", fallback=horizon_options[0]),
+                key="revenue_source_horizon",
+            )
+        with row2[6]:
             crown_top_up = st.selectbox(
                 "Crown top-up",
                 top_up_options,
@@ -2203,6 +2227,7 @@ def _render_revenue_source_controls(source_pack: RevenueSourcePack | None) -> di
         "revenue_basis": revenue_basis,
         "uncertainty": uncertainty,
         "selected_fy": selected_fy,
+        "horizon": horizon,
         "crown_top_up": crown_top_up,
     }
 
@@ -2263,6 +2288,18 @@ def _render_revenue_source_architecture(source_pack: RevenueSourcePack, controls
         display_table(_source_remaining_decisions_handoff(source_pack), height=280, max_rows=80)
 
     with st.expander("Source-pack validation and manifest", expanded=False):
+        component_long = _source_component_long_form_view(source_pack, controls)
+        component_options = _source_component_long_form_options(component_long)
+        selected_components = st.multiselect(
+            "Components and deductions",
+            component_options,
+            default=component_options,
+            key="revenue_source_component_filter",
+        )
+        component_long = _source_component_long_form_view(source_pack, {**controls, "component_filter": selected_components})
+        st.caption("Selected component/deduction long form")
+        display_table(component_long, height=220, max_rows=160)
+        dataframe_download(component_long, "Download selected component/deduction long form", "revenue_component_deduction_long.csv")
         st.caption("Source-pack intake status")
         display_table(_source_intake_status(source_pack), height=180, max_rows=80)
         st.caption("Unresolved revenue decisions")
@@ -2271,6 +2308,8 @@ def _render_revenue_source_architecture(source_pack: RevenueSourcePack, controls
         display_table(source_pack.validation_issues, height=180, max_rows=80)
         st.caption("Required path trace status")
         display_table(_source_path_trace_status_for_controls(source_pack, controls), height=180, max_rows=80)
+        st.caption("Hybrid annual replacement-only audit")
+        display_table(_source_hybrid_annual_view(source_pack, controls), height=220, max_rows=120)
         st.caption("Source gap register")
         display_table(_source_gap_register_for_controls(source_pack, controls), height=180, max_rows=80)
         st.caption("Series role audit")
@@ -2278,6 +2317,7 @@ def _render_revenue_source_architecture(source_pack: RevenueSourcePack, controls
         st.caption("Loader export manifest")
         display_table(_source_manifest_view(source_pack), height=220, max_rows=80)
         dataframe_download(source_pack.canonical_long, "Download canonical revenue long table", "canonical_revenue_long.csv")
+        dataframe_download(_source_hybrid_annual_view(source_pack, controls), "Download hybrid annual replacement audit", "hybrid_annual_revenue.csv")
 
 
 def _source_control_gap_messages(source_pack: RevenueSourcePack, controls: dict[str, Any]) -> list[str]:
@@ -2331,6 +2371,10 @@ def _source_gap_register_for_controls(source_pack: RevenueSourcePack, controls: 
         gaps.loc[missing_crown, "runtime_treatment"] = (
             "excluded_by_selection" if selection.lower() == "exclude" else "not_applied_missing_source"
         )
+        available_crown = crown_mask & gaps["availability_status"].astype(str).str.lower().eq("available")
+        gaps.loc[available_crown, "runtime_treatment"] = (
+            "excluded_by_selection" if selection.lower() == "exclude" else "top_up_rows_available"
+        )
     basis_gap = _source_revenue_basis_gap_row(source_pack, controls)
     if basis_gap is not None:
         gaps = pd.concat([gaps, pd.DataFrame([basis_gap])], ignore_index=True, sort=False)
@@ -2374,7 +2418,11 @@ def _source_gap_register(source_pack: RevenueSourcePack) -> pd.DataFrame:
                 "availability_status": "available" if has_release_values else "missing",
                 "current_selection": _selection_value(selections, "release_round", "BEFU25"),
                 "runtime_treatment": "release_values_available" if has_release_values else "registry_only",
-                "user_visible_message": "Full MOT/BEFU release-value table is unavailable; release selection is registry-only and unresolved differences are reported.",
+                "user_visible_message": (
+                    "Selected MOT/BEFU release values are repo-vendored and plotted from release_values.csv."
+                    if has_release_values
+                    else "Full MOT/BEFU release-value table is unavailable; release selection is registry-only and unresolved differences are reported."
+                ),
             },
             {
                 "gap_id": "fed_path_scenario_values_missing",
@@ -2382,15 +2430,29 @@ def _source_gap_register(source_pack: RevenueSourcePack) -> pd.DataFrame:
                 "availability_status": "available" if has_fed_path_values else "missing",
                 "current_selection": _selection_value(selections, "fed_path_scenario", "Current planned path"),
                 "runtime_treatment": "fed_path_values_available" if has_fed_path_values else "registry_only",
-                "user_visible_message": "FED path scenario values are not separately vendored; the FED path control is registry-only and revenue rows are preserved from source paths rather than recalculated.",
+                "user_visible_message": (
+                    "FED path scenario values are repo-vendored from fed_rate_paths.csv."
+                    if has_fed_path_values
+                    else "FED path scenario values are not separately vendored; the FED path control is registry-only and revenue rows are preserved from source paths rather than recalculated."
+                ),
             },
             {
                 "gap_id": "crown_top_up_values_missing",
                 "required_for": "Include Crown top-up roll-up treatment",
                 "availability_status": "available" if has_crown_top_up_rows else "missing",
                 "current_selection": crown_top_up_selection,
-                "runtime_treatment": "excluded_by_selection" if crown_top_up_selection.lower() == "exclude" else "not_applied_missing_source",
-                "user_visible_message": "Crown top-up Include is not applied because no governed top-up value rows are present in the source pack.",
+                "runtime_treatment": (
+                    "excluded_by_selection"
+                    if crown_top_up_selection.lower() == "exclude"
+                    else "top_up_rows_available"
+                    if has_crown_top_up_rows
+                    else "not_applied_missing_source"
+                ),
+                "user_visible_message": (
+                    "Crown top-up rows are repo-vendored; Include/Exclude selection can be applied by the roll-up view."
+                    if has_crown_top_up_rows
+                    else "Crown top-up Include is not applied because no governed top-up value rows are present in the source pack."
+                ),
             },
             {
                 "gap_id": "quarterly_source_pack_missing",
@@ -2398,7 +2460,11 @@ def _source_gap_register(source_pack: RevenueSourcePack) -> pd.DataFrame:
                 "availability_status": "available" if has_quarterly_values else "missing",
                 "current_selection": _selection_value(selections, "view", "Annual"),
                 "runtime_treatment": "quarterly_available" if has_quarterly_values else "annual_only_source_pack",
-                "user_visible_message": "The distilled source pack is annual only; quarterly views use promoted Forecast Builder volume packs where available.",
+                "user_visible_message": (
+                    "Quarterly source rows are repo-vendored from quarterly_actuals.csv with June-year mapping."
+                    if has_quarterly_values
+                    else "The distilled source pack is annual only; quarterly views use promoted Forecast Builder volume packs where available."
+                ),
             },
             {
                 "gap_id": "ped_total_vkt_bridge_missing",
@@ -2516,7 +2582,7 @@ def _source_intake_status(source_pack: RevenueSourcePack) -> pd.DataFrame:
                     "artifact_role": str(metadata.get("source_sheet", "config_or_document")),
                     "repo_relative_path": f"{root}/{filename}",
                     "status": "repo_local_manifest_declared",
-                    "required_for_runtime": str(filename) in REQUIRED_SOURCE_PACK_FILES,
+                    "required_for_runtime": str(filename) in REQUIRED_SOURCE_PACK_FILES or str(filename) in OPTIONAL_SOURCE_PACK_FILES,
                     "required_for_replay": True,
                     "size_bytes": "",
                     "row_count": metadata.get("row_count", ""),
@@ -2529,6 +2595,8 @@ def _source_intake_status(source_pack: RevenueSourcePack) -> pd.DataFrame:
         "forecast_archive.csv": "full workbook forecast archive replay",
         "formula_lineage.csv": "full formula lineage replay",
         "quarterly_actuals.csv": "source-pack quarterly Revenue Outlook",
+        "fed_rate_paths.csv": "FED path scenario rate values",
+        "mot_error_bands.csv": "MOT archived-error uncertainty bands",
     }.items():
         if filename in declared:
             continue
@@ -2705,12 +2773,16 @@ def _source_total_path_figure(source_pack: RevenueSourcePack, controls: dict[str
     fig = go.Figure()
     trace_specs = [
         ("Actual / benchmark", frame[frame["line"].isin(["Actual", "Actual / benchmark"])], "#7A869A", "solid"),
+        ("Selected MOT/BEFU release path", _source_selected_release_rows(frame, controls), "#5B677A", "dashdot"),
+        ("Rolling BEFU 1Y", _source_rolling_befu_1y_rows(frame), "#6B7F2A", "dot"),
+        ("Hybrid replacement-only outlook", _source_hybrid_path_rows(source_pack, controls), "#D1495B", "solid"),
         ("Selected dashboard basis", _source_model_rows(frame, "selected_dashboard_basis"), "#002B5C", "solid"),
         ("In-house prediction / forecast", _source_model_rows(frame, "in_house_model"), "#00843D", "solid"),
         ("Aaron Schiff", _source_model_rows(frame, "aaron_schiff_model"), "#F37021", "dash"),
     ]
     axis_title = _source_axis_title(frame)
     for name, rows, color, dash in trace_specs:
+        rows = _filter_source_horizon_rows(rows, source_pack, controls)
         rows = _dedupe_path_rows(rows)
         if rows.empty:
             continue
@@ -2730,10 +2802,19 @@ def _source_total_path_figure(source_pack: RevenueSourcePack, controls: dict[str
         )
     _add_missing_source_path_gap_traces(fig, source_pack, controls)
     fy = _selected_fy_number(controls)
-    if fy is not None:
+    bounds = _source_horizon_bounds(source_pack, controls)
+    if fy is not None and _fy_within_bounds(fy, bounds):
         fig.add_vline(x=fy, line_dash="dot", line_color="#102A43", annotation_text=f"Selected FY{fy}", annotation_position="top")
+    release_gap = _source_gap_register_for_controls(source_pack, controls)
+    release_gap = release_gap[release_gap["gap_id"].eq("release_value_table_missing")] if "gap_id" in release_gap.columns else pd.DataFrame()
+    release_available = not release_gap.empty and release_gap.iloc[0].get("availability_status") == "available"
+    annotation_text = (
+        "Selected MOT/BEFU and rolling BEFU 1Y traces are plotted from repo-vendored release_values.csv where matching source rows exist."
+        if release_available
+        else "Full MOT/BEFU release-value table is not present in the distilled pack; registry-only release selection is shown as a governance gap."
+    )
     fig.add_annotation(
-        text="Full MOT/BEFU release-value table is not present in the distilled pack; registry-only release selection is shown as a governance gap.",
+        text=annotation_text,
         xref="paper",
         yref="paper",
         x=0,
@@ -2783,7 +2864,7 @@ def _add_missing_source_path_gap_traces(fig: go.Figure, source_pack: RevenueSour
 
 
 def _source_uncertainty_figure(source_pack: RevenueSourcePack, controls: dict[str, Any]) -> go.Figure:
-    frame = _selected_source_series_frame(source_pack, controls)
+    frame = _filter_source_horizon_rows(_selected_source_series_frame(source_pack, controls), source_pack, controls)
     uncertainty_source = _uncertainty_source_key(controls)
     if uncertainty_source == "mot_release_round":
         release_gap = _source_gap_register_for_controls(source_pack, controls)
@@ -2792,6 +2873,67 @@ def _source_uncertainty_figure(source_pack: RevenueSourcePack, controls: dict[st
             return empty_figure(
                 "MOT release-round uncertainty requires release-value rows; the distilled source pack carries this as release_value_table_missing."
             )
+        mot = _source_mot_uncertainty_rows(source_pack, frame, controls)
+        if mot.empty:
+            return empty_figure(
+                "MOT release-round uncertainty is a governed gap for this selected series: archived horizon-specific error bands are unavailable or below the sample threshold."
+            )
+        axis_title = _source_axis_title(frame)
+        fig = go.Figure()
+        for upper, lower, name, color in [
+            ("upper80", "lower80", "MOT archived error 80% band", "rgba(0, 43, 92, 0.14)"),
+            ("upper50", "lower50", "MOT archived error 50% band", "rgba(0, 132, 61, 0.18)"),
+        ]:
+            fig.add_trace(
+                go.Scatter(
+                    x=mot["FY"],
+                    y=mot[upper],
+                    mode="lines",
+                    line={"width": 0},
+                    showlegend=False,
+                    hoverinfo="skip",
+                )
+            )
+            fig.add_trace(
+                go.Scatter(
+                    x=mot["FY"],
+                    y=mot[lower],
+                    mode="lines",
+                    fill="tonexty",
+                    fillcolor=color,
+                    line={"width": 0},
+                    name=name,
+                    customdata=mot[["hover_unit", "horizon_label", "sample_size"]].to_numpy(),
+                    hovertemplate=(
+                        "FY%{x}<br>%{y:,.1f} %{customdata[0]}<br>"
+                        "%{customdata[1]}<br>n=%{customdata[2]}<extra>%{fullData.name}</extra>"
+                    ),
+                )
+            )
+        fig.add_trace(
+            go.Scatter(
+                x=mot["FY"],
+                y=mot["value"],
+                mode="lines+markers",
+                name="Selected MOT/BEFU release path",
+                line={"color": "#002B5C", "width": 2.8},
+                marker={"size": 6},
+                customdata=mot[["hover_unit", "horizon_label", "sample_size"]].to_numpy(),
+                hovertemplate=(
+                    "FY%{x}<br>%{y:,.1f} %{customdata[0]}<br>"
+                    "%{customdata[1]}<br>n=%{customdata[2]}<extra>%{fullData.name}</extra>"
+                ),
+            )
+        )
+        fig.update_layout(
+            margin={"l": 52, "r": 18, "t": 28, "b": 48},
+            height=360,
+            yaxis_title=axis_title,
+            xaxis_title="June year",
+            xaxis={"tickmode": "linear", "dtick": 1},
+            hovermode="x unified",
+        )
+        return fig
     model = frame[frame["line"].eq("Model path")].copy()
     if model.empty or not {"in_house_model", "aaron_schiff_model"}.issubset(set(model["model_basis"])):
         return empty_figure("Probabilistic uncertainty fan is not available in the normalized source pack.")
@@ -2853,7 +2995,9 @@ def _source_uncertainty_figure(source_pack: RevenueSourcePack, controls: dict[st
 
 
 def _source_component_figure(source_pack: RevenueSourcePack, controls: dict[str, Any]) -> go.Figure:
-    rows = _source_selected_fy_rows(source_pack, controls)
+    rows = _source_hybrid_rows_for_controls(source_pack, controls)
+    if rows.empty:
+        rows = _source_selected_fy_rows(source_pack, controls)
     if rows.empty:
         return empty_figure("Selected FY component rows are unavailable.")
     component_ids = [
@@ -2872,6 +3016,8 @@ def _source_component_figure(source_pack: RevenueSourcePack, controls: dict[str,
     plot = rows[rows["series_id"].isin(component_ids)].copy()
     if plot.empty:
         return empty_figure("No selected FY component rows match the governed series registry.")
+    if "aggregation_sign" not in plot.columns:
+        plot["aggregation_sign"] = plot["series_id"].map(_hybrid_component_sign).fillna(1)
     plot["signed_value"] = pd.to_numeric(plot["value"], errors="coerce") * pd.to_numeric(plot["aggregation_sign"], errors="coerce").fillna(1)
     plot = plot.dropna(subset=["signed_value"])
     plot = plot.drop_duplicates("series_id", keep="last")
@@ -2896,7 +3042,9 @@ def _source_component_figure(source_pack: RevenueSourcePack, controls: dict[str,
 
 
 def _source_split_figure(source_pack: RevenueSourcePack, controls: dict[str, Any]) -> go.Figure:
-    rows = _source_selected_fy_rows(source_pack, controls)
+    rows = _source_hybrid_rows_for_controls(source_pack, controls)
+    if rows.empty:
+        rows = _source_selected_fy_rows(source_pack, controls)
     component_ids = ["net_fed_revenue", "total_ruc_net_revenue", "net_mvr_revenue", "tuc_net_revenue"]
     plot = rows[rows["series_id"].isin(component_ids)].copy()
     plot["value"] = pd.to_numeric(plot["value"], errors="coerce")
@@ -2937,6 +3085,77 @@ def _source_reconciliation_view(source_pack: RevenueSourcePack, controls: dict[s
         "optional_inputs_applied",
     ]
     return report[[col for col in cols if col in report.columns]].reset_index(drop=True)
+
+
+def _source_hybrid_annual_view(source_pack: RevenueSourcePack, controls: dict[str, Any]) -> pd.DataFrame:
+    out = _source_hybrid_rows_for_controls(source_pack, controls, include_bridge_inputs=True)
+    if out.empty:
+        return pd.DataFrame([{"status": "gap", "message": "Hybrid annual replacement audit is unavailable."}])
+    cols = [
+        "FY",
+        "fed_path",
+        "series_id",
+        "display_name",
+        "row_role",
+        "value",
+        "official_value",
+        "residual_vs_official",
+        "source_basis",
+        "source_file",
+        "formula",
+        "replacement_only",
+        "availability_status",
+    ]
+    return out[[col for col in cols if col in out.columns]].reset_index(drop=True)
+
+
+def _source_component_long_form_options(frame: pd.DataFrame) -> list[str]:
+    if not isinstance(frame, pd.DataFrame) or frame.empty or "display_name" not in frame.columns:
+        return []
+    return sorted(str(value) for value in frame["display_name"].dropna().unique() if str(value).strip())
+
+
+def _source_component_long_form_view(source_pack: RevenueSourcePack, controls: dict[str, Any]) -> pd.DataFrame:
+    rows = _source_hybrid_rows_for_controls(source_pack, controls, include_bridge_inputs=True)
+    if rows.empty:
+        return pd.DataFrame([{"status": "gap", "message": "Component/deduction long form is unavailable."}])
+    out = rows.copy()
+    component_filter = [str(value) for value in controls.get("component_filter", []) or [] if str(value).strip()]
+    if component_filter:
+        out = out[out["display_name"].astype(str).isin(component_filter) | out["series_id"].astype(str).isin(component_filter)].copy()
+    if out.empty:
+        return pd.DataFrame([{"status": "gap", "message": "No selected components or deductions match the current controls."}])
+    out["sign"] = out["series_id"].map(_hybrid_component_sign).fillna(1).astype(int)
+    out["value"] = pd.to_numeric(out["value"], errors="coerce")
+    out["signed_value"] = out["value"] * out["sign"]
+    out["replacement_flag"] = out["replacement_only"].astype(bool) if "replacement_only" in out.columns else False
+    out["component_class"] = out["row_role"].map(_component_class_label).fillna("Component")
+    out["release_path_provenance"] = out.apply(_component_provenance_label, axis=1)
+    cols = [
+        "FY",
+        "fed_path",
+        "series_id",
+        "display_name",
+        "component_class",
+        "row_role",
+        "value",
+        "sign",
+        "signed_value",
+        "unit",
+        "release_path_provenance",
+        "source_basis",
+        "source_file",
+        "source_status",
+        "formula",
+        "replacement_flag",
+        "availability_status",
+        "official_value",
+        "residual_vs_official",
+    ]
+    return out[[col for col in cols if col in out.columns]].sort_values(
+        ["FY", "component_class", "display_name"],
+        kind="stable",
+    ).reset_index(drop=True)
 
 
 def _source_manifest_view(source_pack: RevenueSourcePack) -> pd.DataFrame:
@@ -3003,6 +3222,256 @@ def _source_selected_fy_rows(source_pack: RevenueSourcePack, controls: dict[str,
 
 def _source_model_rows(frame: pd.DataFrame, model_basis: str) -> pd.DataFrame:
     return frame[(frame["line"].eq("Model path")) & (frame["model_basis"].eq(model_basis))].copy()
+
+
+def _source_hybrid_path_rows(source_pack: RevenueSourcePack, controls: dict[str, Any]) -> pd.DataFrame:
+    hybrid = _source_hybrid_rows_for_controls(source_pack, controls, selected_fy_only=False, apply_horizon=True)
+    if hybrid.empty:
+        return pd.DataFrame()
+    selected = str(controls.get("series", "Total NLTF revenue"))
+    series_id = _selected_series_id(source_pack, selected)
+    rows = hybrid[hybrid["series_id"].astype(str).eq(series_id)].copy()
+    if rows.empty:
+        return pd.DataFrame()
+    rows["source_file"] = "hybrid_annual_revenue.csv"
+    rows["source_cell"] = rows["FY"].astype(str)
+    rows["line"] = "Model path"
+    rows["model_basis"] = "hybrid_replacement_only"
+    rows["value"] = pd.to_numeric(rows["value"], errors="coerce")
+    return rows.rename(columns={"display_name": "source_series_label"})
+
+
+def _source_hybrid_rows_for_controls(
+    source_pack: RevenueSourcePack,
+    controls: dict[str, Any],
+    *,
+    include_bridge_inputs: bool = False,
+    selected_fy_only: bool = True,
+    apply_horizon: bool = False,
+) -> pd.DataFrame:
+    frame = getattr(source_pack, "hybrid_annual_revenue", pd.DataFrame())
+    if not isinstance(frame, pd.DataFrame) or frame.empty:
+        return pd.DataFrame()
+    out = frame.copy()
+    selected_path = _selected_fed_path(controls)
+    if selected_path and "fed_path" in out.columns:
+        path_rows = out[out["fed_path"].astype(str).eq(selected_path)].copy()
+        if path_rows.empty and selected_path != "Selected rate":
+            path_rows = out[out["fed_path"].astype(str).eq("Selected rate")].copy()
+        if not path_rows.empty:
+            out = path_rows
+    fy = _selected_fy_number(controls)
+    if selected_fy_only and fy is not None and "FY" in out.columns:
+        selected = out[out["FY"].eq(fy)].copy()
+        if not selected.empty:
+            out = selected
+    if apply_horizon:
+        out = _filter_source_horizon_rows(out, source_pack, controls)
+    if not include_bridge_inputs and "row_role" in out.columns:
+        out = out[~out["row_role"].astype(str).eq("bridge_input")].copy()
+    return _apply_crown_top_up_selection(out, controls)
+
+
+def _selected_fed_path(controls: dict[str, Any]) -> str:
+    return str(controls.get("fed_path_scenario") or controls.get("fed_path") or "Current planned path").strip()
+
+
+def _apply_crown_top_up_selection(rows: pd.DataFrame, controls: dict[str, Any]) -> pd.DataFrame:
+    if rows.empty or "series_id" not in rows.columns:
+        return rows
+    out = rows.copy()
+    include = str(controls.get("crown_top_up") or "Exclude").strip().lower() == "include"
+    crown_mask = out["series_id"].astype(str).eq("crown_top_up")
+    if crown_mask.any() and not include:
+        out.loc[crown_mask, "value"] = 0.0
+        out.loc[crown_mask, "availability_status"] = "excluded_by_selection"
+    if include and crown_mask.any():
+        for fy, crown_rows in out[crown_mask].groupby("FY", dropna=True):
+            top_up = pd.to_numeric(crown_rows["value"], errors="coerce").fillna(0.0).sum()
+            total_mask = out["series_id"].astype(str).eq("total_nltf_net_revenue") & out["FY"].eq(fy)
+            if not total_mask.any() or top_up == 0:
+                continue
+            out.loc[total_mask, "value"] = pd.to_numeric(out.loc[total_mask, "value"], errors="coerce") + top_up
+            if "formula" in out.columns:
+                out.loc[total_mask, "formula"] = out.loc[total_mask, "formula"].astype(str) + " + selected Crown top-up"
+            if {"official_value", "residual_vs_official"}.issubset(out.columns):
+                official = pd.to_numeric(out.loc[total_mask, "official_value"], errors="coerce")
+                value = pd.to_numeric(out.loc[total_mask, "value"], errors="coerce")
+                out.loc[total_mask, "residual_vs_official"] = value.to_numpy() - official.to_numpy()
+    return out
+
+
+def _hybrid_component_sign(series_id: Any) -> int:
+    return -1 if str(series_id) in {"fed_refunds", "ruc_refunds", "mvr_refunds"} else 1
+
+
+def _component_class_label(row_role: Any) -> str:
+    role = str(row_role or "")
+    labels = {
+        "bridge_input": "Bridge input",
+        "replacement_line": "Replacement line",
+        "fixed_mot_component": "Fixed MOT component",
+        "fixed_mot_deduction": "Deduction",
+        "optional_overlay": "Optional overlay",
+        "calculated_rollup": "Calculated roll-up",
+    }
+    return labels.get(role, "Component")
+
+
+def _component_provenance_label(row: pd.Series) -> str:
+    parts = []
+    fed_path = str(row.get("fed_path") or "").strip()
+    source_file = str(row.get("source_file") or "").strip()
+    source_basis = str(row.get("source_basis") or "").strip()
+    if fed_path:
+        parts.append(f"FED path: {fed_path}")
+    if source_basis:
+        parts.append(f"Basis: {source_basis}")
+    if source_file:
+        parts.append(f"Source: {source_file}")
+    return " | ".join(parts)
+
+
+def _filter_source_horizon_rows(rows: pd.DataFrame, source_pack: RevenueSourcePack, controls: dict[str, Any]) -> pd.DataFrame:
+    if rows.empty or "FY" not in rows.columns:
+        return rows
+    lower, upper = _source_horizon_bounds(source_pack, controls)
+    fy = pd.to_numeric(rows["FY"], errors="coerce")
+    mask = fy.notna()
+    if lower is not None:
+        mask &= fy.ge(lower)
+    if upper is not None:
+        mask &= fy.le(upper)
+    return rows[mask].copy()
+
+
+def _source_horizon_bounds(source_pack: RevenueSourcePack, controls: dict[str, Any]) -> tuple[int | None, int | None]:
+    selection = str(controls.get("horizon") or "To FY2031").strip()
+    common_start, common_end = _source_common_horizon_bounds(source_pack, controls)
+    if selection == "Next 5 FY":
+        forecast_start = _source_forecast_start_fy(source_pack)
+        if forecast_start is None:
+            forecast_start = common_start
+        if forecast_start is None:
+            return common_start, common_end
+        upper = forecast_start + 4
+        if common_end is not None:
+            upper = min(upper, common_end)
+        return forecast_start, upper
+    if selection == "Full common horizon":
+        return common_start, common_end
+    upper = 2031
+    if common_end is not None:
+        upper = min(upper, common_end)
+    return None, upper
+
+
+def _source_common_horizon_bounds(source_pack: RevenueSourcePack, controls: dict[str, Any]) -> tuple[int | None, int | None]:
+    frame = getattr(source_pack, "hybrid_annual_revenue", pd.DataFrame())
+    if not isinstance(frame, pd.DataFrame) or frame.empty or "FY" not in frame.columns:
+        return None, None
+    rows = frame.copy()
+    selected_path = _selected_fed_path(controls)
+    if selected_path and "fed_path" in rows.columns:
+        path_rows = rows[rows["fed_path"].astype(str).eq(selected_path)].copy()
+        if path_rows.empty and selected_path != "Selected rate":
+            path_rows = rows[rows["fed_path"].astype(str).eq("Selected rate")].copy()
+        if not path_rows.empty:
+            rows = path_rows
+    required_roles = {"replacement_line", "fixed_mot_component", "fixed_mot_deduction"}
+    rows = rows[rows["row_role"].astype(str).isin(required_roles)].copy() if "row_role" in rows.columns else rows
+    rows["FY"] = pd.to_numeric(rows["FY"], errors="coerce")
+    rows["value"] = pd.to_numeric(rows.get("value"), errors="coerce")
+    rows = rows.dropna(subset=["FY", "value"])
+    if rows.empty:
+        return None, None
+    by_series = rows.groupby("series_id")["FY"].agg(["min", "max"])
+    return int(by_series["min"].max()), int(by_series["max"].min())
+
+
+def _source_forecast_start_fy(source_pack: RevenueSourcePack) -> int | None:
+    frame = getattr(source_pack, "canonical_long", pd.DataFrame())
+    if not isinstance(frame, pd.DataFrame) or frame.empty or "FY" not in frame.columns:
+        return None
+    rows = frame[frame.get("source_file", pd.Series("", index=frame.index)).astype(str).eq("official_befu25_annual.csv")].copy()
+    if rows.empty:
+        return None
+    status = rows.get("value_status", pd.Series("", index=rows.index)).astype(str).str.lower()
+    rows = rows[status.str.contains("forecast", na=False)].copy()
+    rows["FY"] = pd.to_numeric(rows["FY"], errors="coerce")
+    rows = rows.dropna(subset=["FY"])
+    if rows.empty:
+        return None
+    return int(rows["FY"].min())
+
+
+def _fy_within_bounds(fy: int, bounds: tuple[int | None, int | None]) -> bool:
+    lower, upper = bounds
+    if lower is not None and fy < lower:
+        return False
+    if upper is not None and fy > upper:
+        return False
+    return True
+
+
+def _source_selected_release_rows(frame: pd.DataFrame, controls: dict[str, Any]) -> pd.DataFrame:
+    if frame.empty or "source_file" not in frame.columns:
+        return pd.DataFrame()
+    release_round = str(controls.get("release_round") or "").strip()
+    rows = frame[frame["source_file"].eq("release_values.csv")].copy()
+    if release_round and "release_vintage" in rows.columns:
+        rows = rows[rows["release_vintage"].astype(str).eq(release_round)]
+    return rows
+
+
+def _source_rolling_befu_1y_rows(frame: pd.DataFrame) -> pd.DataFrame:
+    if frame.empty or "source_file" not in frame.columns:
+        return pd.DataFrame()
+    rows = frame[frame["source_file"].eq("release_values.csv")].copy()
+    if rows.empty:
+        return rows
+    family = rows["release_family"].astype(str).str.upper() if "release_family" in rows.columns else pd.Series("", index=rows.index)
+    horizon = pd.to_numeric(rows["horizon"], errors="coerce") if "horizon" in rows.columns else pd.Series(pd.NA, index=rows.index)
+    return rows[family.eq("BEFU") & horizon.eq(1)].copy()
+
+
+def _source_mot_uncertainty_rows(source_pack: RevenueSourcePack, frame: pd.DataFrame, controls: dict[str, Any]) -> pd.DataFrame:
+    release = _source_selected_release_rows(frame, controls)
+    bands = getattr(source_pack, "mot_error_bands", pd.DataFrame())
+    if release.empty or not isinstance(bands, pd.DataFrame) or bands.empty:
+        return pd.DataFrame()
+    labels = {
+        str(value).strip()
+        for column in ["source_series_label", "display_name"]
+        if column in frame.columns
+        for value in frame[column].dropna().unique()
+        if str(value).strip()
+    }
+    band_rows = bands[bands["series"].astype(str).isin(labels)].copy() if "series" in bands.columns else pd.DataFrame()
+    if band_rows.empty:
+        return pd.DataFrame()
+    band_rows["horizon_int"] = pd.to_numeric(band_rows.get("horizon_june_years"), errors="coerce")
+    band_rows["sample_size"] = pd.to_numeric(band_rows.get("n"), errors="coerce")
+    band_rows = band_rows[band_rows["sample_size"].ge(10)]
+    release = release.copy()
+    release["horizon_int"] = pd.to_numeric(release.get("horizon"), errors="coerce")
+    release["value"] = pd.to_numeric(release["value"], errors="coerce")
+    release = release.dropna(subset=["FY", "value", "horizon_int"])
+    merged = release.merge(band_rows, how="inner", on="horizon_int", suffixes=("", "_band"))
+    if merged.empty:
+        return pd.DataFrame()
+    for column in ["p10", "p25", "p75", "p90"]:
+        merged[column] = pd.to_numeric(merged[column], errors="coerce")
+    merged = merged.dropna(subset=["p10", "p25", "p75", "p90"])
+    if merged.empty:
+        return pd.DataFrame()
+    merged["lower80"] = merged["value"] * (1.0 + merged["p10"])
+    merged["upper80"] = merged["value"] * (1.0 + merged["p90"])
+    merged["lower50"] = merged["value"] * (1.0 + merged["p25"])
+    merged["upper50"] = merged["value"] * (1.0 + merged["p75"])
+    merged["hover_unit"] = _source_axis_title(frame)
+    merged["horizon_label"] = "Horizon " + merged["horizon_int"].astype("Int64").astype(str) + " June-year(s)"
+    return _dedupe_path_rows(merged.sort_values(["FY", "horizon_int"], kind="stable"))
 
 
 def _dedupe_path_rows(rows: pd.DataFrame) -> pd.DataFrame:
@@ -3205,7 +3674,13 @@ def revenue_outlook_figure(rows: pd.DataFrame, *, metric_type: str) -> go.Figure
     streams = _revenue_outlook_stream_options(data)
     if not streams:
         streams = ["PED VKT per capita", "Light RUC volume", "Heavy RUC volume"]
-    fig = make_subplots(rows=1, cols=len(streams), subplot_titles=streams, shared_yaxes=False, horizontal_spacing=0.06)
+    fig = make_subplots(
+        rows=1,
+        cols=len(streams),
+        subplot_titles=[short_stream_label(label) for label in streams],
+        shared_yaxes=False,
+        horizontal_spacing=0.06,
+    )
     scenario_colors = _scenario_color_map(data)
     for col, stream_label in enumerate(streams, start=1):
         stream_rows = data[data.get("stream_label", pd.Series(dtype=str)).astype(str).eq(stream_label)].copy()
@@ -3345,9 +3820,33 @@ def _stable_palette_index(name: str, palette_size: int) -> int:
 
 
 def _scenario_label(scenario_name: str, rows: pd.DataFrame) -> str:
+    display_name = _first_non_empty(rows.get("scenario_display_name", pd.Series(dtype=str)))
+    label = _human_revenue_code_label(display_name or scenario_name)
     role = _first_non_empty(rows.get("scenario_role", pd.Series(dtype=str)))
-    suffix = f" ({role})" if role else ""
-    return f"{scenario_name}{suffix}"
+    role_label = _human_revenue_code_label(role)
+    suffix = f" ({role_label})" if role_label and role_label.lower() != label.lower() else ""
+    return f"{label}{suffix}"
+
+
+def _human_revenue_code_label(value: Any) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    lookup = {
+        "basecase": "Base case",
+        "comparison": "Comparison",
+        "current_basecase": "Current base case",
+        "current_comparison_1": "Current comparison 1",
+        "historical_actual": "Historical actual",
+        "historical_activity_available": "Historical activity available",
+        "forecast_available": "Forecast available",
+        "governed_gap": "Governed gap",
+        "available": "Available",
+    }
+    normalized = text.lower()
+    if normalized in lookup:
+        return lookup[normalized]
+    return re.sub(r"\s+", " ", text.replace("_", " ").replace("-", " ")).strip()
 
 
 def _is_forecast_start_or_h13(horizon: Any) -> bool:
@@ -3372,10 +3871,12 @@ def _revenue_horizon_hover_label(row: pd.Series) -> str:
 def _revenue_bridge_hover_label(row: pd.Series) -> str:
     status = str(row.get("bridge_status") or "").strip()
     reason = str(row.get("gap_reason") or "").strip()
+    status_label = _human_revenue_code_label(status)
+    reason_label = _human_revenue_code_label(reason)
     if reason:
-        return f"<br>Bridge status: {html.escape(status)} - {html.escape(reason)}"
+        return f"<br>Bridge status: {html.escape(status_label)} - {html.escape(reason_label)}"
     if status:
-        return f"<br>Bridge status: {html.escape(status)}"
+        return f"<br>Bridge status: {html.escape(status_label)}"
     return ""
 
 

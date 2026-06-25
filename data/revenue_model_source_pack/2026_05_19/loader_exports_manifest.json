@@ -1,47 +1,52 @@
 {
-  "created_at": "2026-06-24T08:35:55.187949+00:00",
+  "created_at": "2026-05-19T00:00:00+00:00",
   "created_at_source": "source_pack_manifest_created_at",
   "determinism_policy": "No wall-clock timestamp is used; identical source-pack inputs produce identical export manifests.",
   "exports": {
     "canonical_revenue_long.csv": {
       "role": "Canonical long schema across actuals and model paths.",
-      "row_count": 1932,
-      "sha256": "ab7f237b0a67d2b381a0bbad6666b00e72a022d28e09b064099cb1351e4e7762"
+      "row_count": 39967,
+      "sha256": "f7a7fc2e9f14f32c4606e1fb98d2bcfa283d6f80098a77ea2a35eb96c92d0ee5"
+    },
+    "hybrid_annual_revenue.csv": {
+      "role": "Replacement-only annual NLTF hybrid roll-up audit using source-backed PED/FED, Light RUC and Heavy RUC bridge inputs plus MOT fixed components.",
+      "row_count": 1296,
+      "sha256": "36398b7dff7550906bcb9b8bfc3baed621f136ddba00629266ba5b5b50ed3241"
     },
     "path_trace_status.csv": {
       "role": "Availability and plotting status for required Revenue Outlook total-path traces.",
       "row_count": 6,
-      "sha256": "35d0c96327ab403c4b558908734008c121720c25c578ca459c6a728d76745f05"
+      "sha256": "19b1b138e95d22bf801fe66ac8dbbf6bee427584168eda939b7c29de0acc1556"
     },
     "reconciliation_report.csv": {
       "role": "Hierarchy roll-up reconciliation and explicit gap report.",
       "row_count": 192,
-      "sha256": "dcf2e323ebbeb49a652ffb8bdcc00b66362ff32f2c73e1d8752c3aa3a37636f0"
+      "sha256": "e6e9608e0b2650e0eafbaf42e9ca26a4f4e364f639ed656f661a578281c98a18"
     },
     "remaining_decisions_handoff.csv": {
       "role": "Unresolved revenue decisions linked to runtime gaps and dashboard treatment.",
       "row_count": 7,
-      "sha256": "156b78d116c7470c7115c7823b4dca1afb340ccdb85d7c9cb1c5415c3710f6f3"
+      "sha256": "542ca27d21fcdeaaed5c1d89f42e50bdabb73b1a84dc1e400a3bef463c8dca0a"
     },
     "series_role_audit.csv": {
       "role": "Explicit role contract for modeled activity, revenue bridges, pass-through lines, deductions, overlays, and source gaps.",
-      "row_count": 42,
-      "sha256": "d261cce84673aac46a6488932ba3999b6700bf6aab46af2163b27bff6846358b"
+      "row_count": 79,
+      "sha256": "364e16ba6e4916b35f20bb980e12124d835f1233f3e383b9ca16fe3c945009b6"
     },
     "source_gap_register.csv": {
       "role": "Structured source-pack gaps for release values, FED path scenarios, Crown top-up, quarterly rows, and bridge replay.",
       "row_count": 5,
-      "sha256": "5a7ad55eebb5ff499021fc406cb58ffcd5151e6596be8ff0e50ba48b8b80b4c5"
+      "sha256": "51d115a2b73e73db0d2a81c7acbc1aac5f46b54ef4b39adda97053c4093ec308"
     },
     "source_pack_intake_status.csv": {
       "role": "Repo-local source-pack intake status, hashes, and replay gaps.",
-      "row_count": 19,
-      "sha256": "05e19bb4c58dff59a53cafd0b678c8ab264be64bb8d6bba91a7cc5392cf8de54"
+      "row_count": 23,
+      "sha256": "7a3117749e2fb1bc860027c3e8eb975082a804083c92134322f1dfeafc453f82"
     },
     "validation_issues.csv": {
       "role": "Loader validation warnings/errors for the source pack.",
-      "row_count": 3,
-      "sha256": "f32c273a7fd46881da2c8c296f9cac20632100b5a6629ddf39e4d9f9a35ffb2b"
+      "row_count": 2,
+      "sha256": "eeaba04ea7bce437e72f3b13fc32606b4cab7a48dbcdb4a1eb243d43f59eb2bd"
     }
   },
   "repo_relative_output_dir": "data/revenue_model_source_pack/2026_05_19",

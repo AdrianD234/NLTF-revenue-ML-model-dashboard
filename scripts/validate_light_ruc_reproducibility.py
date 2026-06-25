@@ -5,12 +5,15 @@ import hashlib
 from pathlib import Path
 import sys
 
-import numpy as np
-import pandas as pd
-
 ROOT = Path(__file__).resolve().parents[1]
+RUNTIME_PYARROW24 = ROOT / ".runtime_pyarrow24"
+if RUNTIME_PYARROW24.exists() and str(RUNTIME_PYARROW24) not in sys.path:
+    sys.path.insert(0, str(RUNTIME_PYARROW24))
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+
+import numpy as np
+import pandas as pd
 
 from model_dashboard.data.config import DEFAULT_EVIDENCE_PACK_ROOT  # noqa: E402
 from model_dashboard.evidence_pack import load_evidence_pack  # noqa: E402

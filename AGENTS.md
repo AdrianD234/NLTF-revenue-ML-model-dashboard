@@ -131,6 +131,14 @@ Use browser tooling to:
 - check console/network errors;
 - verify no Streamlit exception blocks are present.
 
+## Windows Playwright policy
+
+- Run non-browser verification through the normal bounded sandbox.
+- Run pytest-playwright only through an explicitly approved host/outside-sandbox shell.
+- WinError 5 during sync_playwright/startup means sandbox named-pipe denial, not missing dependencies or dashboard failure.
+- Do not retry inside the sandbox or reinstall Playwright.
+- Reuse the healthy Streamlit server and run the browser phase outside the sandbox.
+
 ## Do-not rules
 
 - Do not hard-code demo data as if it were real.
@@ -146,7 +154,8 @@ Use browser tooling to:
 ```powershell
 python -m compileall .
 python -m pytest -q
-pwsh -File scripts\verify_dashboard.ps1
+pwsh -File scripts\verify_dashboard.ps1 -SkipBrowser
+pwsh -File scripts\verify_browser_host.ps1 -Python python -Port 8501
 ```
 
 ## Bounded command policy
@@ -159,6 +168,7 @@ Use checked-in wrappers instead of pasted multi-line PowerShell loops:
 pwsh -NoProfile -File scripts\start_streamlit_bounded.ps1 -Port 8501 -StartupTimeoutSeconds 90
 pwsh -NoProfile -File scripts\restart_streamlit_bounded.ps1 -Port 8501 -StartupTimeoutSeconds 90 -StopTimeoutSeconds 20
 & .\scripts\invoke_bounded.ps1 -Label verify-dashboard -TimeoutSeconds 900 -FilePath pwsh -Arguments @("-NoProfile", "-File", "scripts\verify_dashboard.ps1")
+& .\scripts\invoke_bounded.ps1 -Label verify-dashboard-non-browser -TimeoutSeconds 900 -FilePath pwsh -Arguments @("-NoProfile", "-File", "scripts\verify_dashboard.ps1", "-SkipBrowser")
 ```
 
 Timeout defaults:

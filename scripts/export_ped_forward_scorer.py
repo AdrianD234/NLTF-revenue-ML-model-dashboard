@@ -7,6 +7,9 @@ import sys
 
 
 ROOT = Path(__file__).resolve().parents[1]
+RUNTIME_PYARROW24 = ROOT / ".runtime_pyarrow24"
+if RUNTIME_PYARROW24.exists() and str(RUNTIME_PYARROW24) not in sys.path:
+    sys.path.insert(0, str(RUNTIME_PYARROW24))
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 

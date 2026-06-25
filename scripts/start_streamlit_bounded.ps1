@@ -51,13 +51,52 @@ $serverErr = Join-Path $logDir "streamlit.$Port.err.log"
 $pidPath = Join-Path $Root ".streamlit_$Port.pid"
 
 function Test-StreamlitHealth {
-    param([string]$Url)
+    param(
+        [int]$Port,
+        [int]$TimeoutMilliseconds = 1500
+    )
+
+    $client = $null
+    $waitHandle = $null
     try {
-        $response = Invoke-WebRequest -UseBasicParsing -Uri $Url -TimeoutSec 5
-        return $response.StatusCode -eq 200
+        $client = [System.Net.Sockets.TcpClient]::new()
+        $asyncResult = $client.BeginConnect("127.0.0.1", $Port, $null, $null)
+        $waitHandle = $asyncResult.AsyncWaitHandle
+        if (-not $waitHandle.WaitOne($TimeoutMilliseconds)) {
+            return $false
+        }
+
+        $client.EndConnect($asyncResult)
+        $stream = $client.GetStream()
+        $stream.ReadTimeout = $TimeoutMilliseconds
+        $stream.WriteTimeout = $TimeoutMilliseconds
+
+        # Avoid Invoke-WebRequest here; on this Windows host it has previously
+        # ignored its timeout and left startup commands stuck for hours.
+        $request = "GET /_stcore/health HTTP/1.1`r`nHost: localhost:$Port`r`nConnection: close`r`n`r`n"
+        $requestBytes = [System.Text.Encoding]::ASCII.GetBytes($request)
+        $stream.Write($requestBytes, 0, $requestBytes.Length)
+
+        $buffer = New-Object byte[] 128
+        $read = $stream.Read($buffer, 0, $buffer.Length)
+        if ($read -le 0) {
+            return $false
+        }
+
+        $status = [System.Text.Encoding]::ASCII.GetString($buffer, 0, $read)
+        return $status.StartsWith("HTTP/1.1 200") -or $status.StartsWith("HTTP/1.0 200")
     }
     catch {
         return $false
+    }
+    finally {
+        if ($waitHandle) {
+            $waitHandle.Dispose()
+        }
+        if ($client) {
+            $client.Close()
+            $client.Dispose()
+        }
     }
 }
 
@@ -92,7 +131,7 @@ function Stop-ProcessTree {
     Stop-Process -Id $RootProcessId -Force -ErrorAction SilentlyContinue
 }
 
-$alreadyHealthy = Test-StreamlitHealth -Url $healthUrl
+$alreadyHealthy = Test-StreamlitHealth -Port $Port
 if ($alreadyHealthy) {
     if ($ReuseHealthy) {
         Write-Output "STREAMLIT_READY $appUrl existing_listener=true"
@@ -130,7 +169,7 @@ $process.Id | Set-Content -LiteralPath $pidPath
 $deadline = (Get-Date).AddSeconds($StartupTimeoutSeconds)
 $ok = $false
 while ((Get-Date) -lt $deadline) {
-    if (Test-StreamlitHealth -Url $healthUrl) {
+    if (Test-StreamlitHealth -Port $Port) {
         $ok = $true
         break
     }

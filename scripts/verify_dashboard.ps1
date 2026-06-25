@@ -4,7 +4,8 @@ param(
     [int]$Port = 8501,
     [int]$StartupTimeoutSeconds = 90,
     [int]$CommandTimeoutSeconds = 900,
-    [switch]$ReuseExistingServer
+    [switch]$ReuseExistingServer,
+    [switch]$SkipBrowser
 )
 
 $ErrorActionPreference = "Stop"
@@ -89,6 +90,11 @@ Invoke-Checked -FilePath $Python -Arguments @("scripts\check_streamlit_deploy_re
 Invoke-Checked -FilePath $Python -Arguments @("-m", "pytest", "-q", "tests/test_chart_data_reconciliation.py") -Label "verify-chart-data-reconciliation"
 Invoke-Checked -FilePath $Python -Arguments @("-m", "pytest", "-q", "tests/test_chart_source_tables.py") -Label "verify-chart-source-tables"
 Invoke-Checked -FilePath $Python -Arguments @("-m", "pytest", "-q", "tests") -Label "verify-pytest-tests"
+
+if ($SkipBrowser) {
+    Write-Host "BROWSER_PHASE_SKIPPED Run scripts\verify_browser_host.ps1 from an approved host/outside-sandbox PowerShell to execute pytest-playwright checks."
+    exit 0
+}
 
 $healthUrl = "http://localhost:$Port/_stcore/health"
 $appUrl = "http://localhost:$Port"

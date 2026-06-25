@@ -1,87 +1,87 @@
 scope,FY,output_series_id,component_status,calculated_value,official_value,difference,missing_inputs,optional_inputs_applied,abs_difference
 official_actuals,2013,gross_fed_revenue,reconciled,1570.3728911500002,1570.37289115,2.2737367544323206e-13,,,2.2737367544323206e-13
 official_actuals,2013,net_fed_revenue,reconciled,1534.12198426,1534.12198426,0.0,,,0.0
-official_actuals,2013,net_mvr_revenue,partial_missing,,219.0491793260869,,mr1_cvl_revenue; mr2_revenue; coo_revenue,,
+official_actuals,2013,net_mvr_revenue,partial_missing,,219.4796804660869,,mr1_cvl_revenue; mr2_revenue; coo_revenue,,
 official_actuals,2013,total_fed_ruc_net_revenue,official_row_missing,2640.3022754452168,,,,,
 official_actuals,2013,total_nltf_net_revenue,partial_missing,,2859.351454771305,,tuc_net_revenue,,
 official_actuals,2013,total_ruc_net_revenue,partial_missing,,1106.180291185217,,light_bev_ruc_net_revenue; heavy_bev_ruc_net_revenue; phev_ruc_net_revenue,,
 official_actuals,2014,gross_fed_revenue,reconciled,1657.7345002499999,1657.73450025,-2.2737367544323206e-13,,,2.2737367544323206e-13
 official_actuals,2014,net_fed_revenue,reconciled,1615.4105802200002,1615.41058022,2.2737367544323206e-13,,,2.2737367544323206e-13
-official_actuals,2014,net_mvr_revenue,partial_missing,,233.5067566960869,,mr1_cvl_revenue; mr2_revenue; coo_revenue,,
+official_actuals,2014,net_mvr_revenue,partial_missing,,234.0150306860869,,mr1_cvl_revenue; mr2_revenue; coo_revenue,,
 official_actuals,2014,total_fed_ruc_net_revenue,official_row_missing,2844.093806726522,,,,,
 official_actuals,2014,total_nltf_net_revenue,partial_missing,,3077.600563422609,,tuc_net_revenue,,
 official_actuals,2014,total_ruc_net_revenue,partial_missing,,1228.683226506522,,light_bev_ruc_net_revenue; heavy_bev_ruc_net_revenue; phev_ruc_net_revenue,,
 official_actuals,2015,gross_fed_revenue,reconciled,1798.4298118400002,1798.42981184,2.2737367544323206e-13,,,2.2737367544323206e-13
 official_actuals,2015,net_fed_revenue,reconciled,1747.67746669,1747.67746669,0.0,,,0.0
-official_actuals,2015,net_mvr_revenue,partial_missing,,231.0110792708696,,mr1_cvl_revenue; mr2_revenue; coo_revenue,,
+official_actuals,2015,net_mvr_revenue,partial_missing,,231.5771007908696,,mr1_cvl_revenue; mr2_revenue; coo_revenue,,
 official_actuals,2015,total_fed_ruc_net_revenue,official_row_missing,3051.3042605386963,,,,,
 official_actuals,2015,total_nltf_net_revenue,partial_missing,,3282.315339809566,,tuc_net_revenue,,
 official_actuals,2015,total_ruc_net_revenue,partial_missing,,1303.626793848696,,light_bev_ruc_net_revenue; heavy_bev_ruc_net_revenue; phev_ruc_net_revenue,,
 official_actuals,2016,gross_fed_revenue,reconciled,1941.4223866,1941.4223866,0.0,,,0.0
 official_actuals,2016,net_fed_revenue,reconciled,1882.74595473,1882.74595473,0.0,,,0.0
-official_actuals,2016,net_mvr_revenue,partial_missing,,264.1694801182609,,mr1_cvl_revenue; mr2_revenue; coo_revenue,,
+official_actuals,2016,net_mvr_revenue,partial_missing,,264.9885961882609,,mr1_cvl_revenue; mr2_revenue; coo_revenue,,
 official_actuals,2016,total_fed_ruc_net_revenue,official_row_missing,3285.942107146956,,,,,
 official_actuals,2016,total_nltf_net_revenue,partial_missing,,3550.111587265217,,tuc_net_revenue,,
 official_actuals,2016,total_ruc_net_revenue,partial_missing,,1403.196152416956,,light_bev_ruc_net_revenue; heavy_bev_ruc_net_revenue; phev_ruc_net_revenue,,
 official_actuals,2017,gross_fed_revenue,reconciled,1968.9131500600001,1968.91315006,2.2737367544323206e-13,,,2.2737367544323206e-13
 official_actuals,2017,net_fed_revenue,reconciled,1912.66999522,1912.66999522,0.0,,,0.0
-official_actuals,2017,net_mvr_revenue,partial_missing,,269.2957808513044,,mr1_cvl_revenue; mr2_revenue; coo_revenue,,
+official_actuals,2017,net_mvr_revenue,partial_missing,,270.0915762913044,,mr1_cvl_revenue; mr2_revenue; coo_revenue,,
 official_actuals,2017,total_fed_ruc_net_revenue,official_row_missing,3385.694041023478,,,,,
 official_actuals,2017,total_nltf_net_revenue,partial_missing,,3654.989821874783,,tuc_net_revenue,,
 official_actuals,2017,total_ruc_net_revenue,partial_missing,,1473.024045803478,,light_bev_ruc_net_revenue; heavy_bev_ruc_net_revenue; phev_ruc_net_revenue,,
 official_actuals,2018,gross_fed_revenue,reconciled,1968.98461465,1968.98461465,0.0,,,0.0
 official_actuals,2018,net_fed_revenue,reconciled,1903.81485678,1903.81485678,0.0,,,0.0
-official_actuals,2018,net_mvr_revenue,partial_missing,,272.0466132452174,,mr1_cvl_revenue; mr2_revenue; coo_revenue,,
+official_actuals,2018,net_mvr_revenue,partial_missing,,273.0300188852174,,mr1_cvl_revenue; mr2_revenue; coo_revenue,,
 official_actuals,2018,total_fed_ruc_net_revenue,official_row_missing,3460.241642244348,,,,,
 official_actuals,2018,total_nltf_net_revenue,partial_missing,,3732.288255489565,,tuc_net_revenue,,
 official_actuals,2018,total_ruc_net_revenue,partial_missing,,1556.426785464348,,light_bev_ruc_net_revenue; heavy_bev_ruc_net_revenue; phev_ruc_net_revenue,,
 official_actuals,2019,gross_fed_revenue,reconciled,2053.20327656,2053.20327656,0.0,,,0.0
 official_actuals,2019,net_fed_revenue,reconciled,1987.1158482100002,1987.11584821,2.2737367544323206e-13,,,2.2737367544323206e-13
-official_actuals,2019,net_mvr_revenue,partial_missing,,269.9257142234782,,mr1_cvl_revenue; mr2_revenue; coo_revenue,,
+official_actuals,2019,net_mvr_revenue,partial_missing,,270.8788536334782,,mr1_cvl_revenue; mr2_revenue; coo_revenue,,
 official_actuals,2019,total_fed_ruc_net_revenue,official_row_missing,3666.179347314348,,,,,
 official_actuals,2019,total_nltf_net_revenue,partial_missing,,3936.105061537826,,tuc_net_revenue,,
 official_actuals,2019,total_ruc_net_revenue,partial_missing,,1679.063499104348,,light_bev_ruc_net_revenue; heavy_bev_ruc_net_revenue,,
 official_actuals,2020,gross_fed_revenue,reconciled,1950.41199,1950.41199,0.0,,,0.0
 official_actuals,2020,net_fed_revenue,reconciled,1882.53157149,1882.53157149,0.0,,,0.0
-official_actuals,2020,net_mvr_revenue,partial_missing,,267.0610179213043,,mr1_cvl_revenue; mr2_revenue; coo_revenue,,
+official_actuals,2020,net_mvr_revenue,partial_missing,,267.9766366613043,,mr1_cvl_revenue; mr2_revenue; coo_revenue,,
 official_actuals,2020,total_fed_ruc_net_revenue,official_row_missing,3602.767829635218,,,,,
 official_actuals,2020,total_nltf_net_revenue,partial_missing,,3869.828847556522,,tuc_net_revenue,,
 official_actuals,2020,total_ruc_net_revenue,partial_missing,,1720.236258145218,,light_bev_ruc_net_revenue; heavy_bev_ruc_net_revenue; phev_ruc_net_revenue,,
 official_actuals,2021,gross_fed_revenue,reconciled,2216.10859858,2216.10859858,0.0,,,0.0
 official_actuals,2021,net_fed_revenue,reconciled,2148.51610736,2148.51610736,0.0,,,0.0
-official_actuals,2021,net_mvr_revenue,partial_missing,,273.1597011356521,,mr1_cvl_revenue; mr2_revenue; coo_revenue,,
+official_actuals,2021,net_mvr_revenue,partial_missing,,274.1329012656522,,mr1_cvl_revenue; mr2_revenue; coo_revenue,,
 official_actuals,2021,total_fed_ruc_net_revenue,official_row_missing,4075.5707214091312,,,,,
 official_actuals,2021,total_nltf_net_revenue,partial_missing,,4348.730422544783,,tuc_net_revenue,,
 official_actuals,2021,total_ruc_net_revenue,partial_missing,,1927.054614049131,,light_bev_ruc_net_revenue; heavy_bev_ruc_net_revenue; phev_ruc_net_revenue,,
 official_actuals,2022,gross_fed_revenue,reconciled,1812.83884251,1812.83884251,0.0,,,0.0
 official_actuals,2022,net_fed_revenue,reconciled,1752.8623636099999,1752.86236361,-2.2737367544323206e-13,,,2.2737367544323206e-13
-official_actuals,2022,net_mvr_revenue,partial_missing,,274.2691774973913,,mr1_cvl_revenue; mr2_revenue; coo_revenue,,
+official_actuals,2022,net_mvr_revenue,partial_missing,,275.1745196873913,,mr1_cvl_revenue; mr2_revenue; coo_revenue,,
 official_actuals,2022,total_fed_ruc_net_revenue,official_row_missing,3589.781851498261,,,,,
-official_actuals,2022,total_nltf_net_revenue,reconciled,3871.2854457356525,3871.285445735652,4.547473508864641e-13,,,4.547473508864641e-13
+official_actuals,2022,total_nltf_net_revenue,difference_reported,3872.1907879256523,3871.285445735652,0.9053421900002832,,,0.9053421900002832
 official_actuals,2022,total_ruc_net_revenue,partial_missing,,1836.919487888261,,light_bev_ruc_net_revenue; heavy_bev_ruc_net_revenue; phev_ruc_net_revenue,,
 official_actuals,2023,gross_fed_revenue,reconciled,1397.4770721500001,1397.47707215,2.2737367544323206e-13,,,2.2737367544323206e-13
 official_actuals,2023,net_fed_revenue,reconciled,1329.42599359,1329.42599359,0.0,,,0.0
-official_actuals,2023,net_mvr_revenue,partial_missing,,278.2272950926086,,mr1_cvl_revenue; mr2_revenue; coo_revenue,,
+official_actuals,2023,net_mvr_revenue,partial_missing,,279.2944288826087,,mr1_cvl_revenue; mr2_revenue; coo_revenue,,
 official_actuals,2023,total_fed_ruc_net_revenue,official_row_missing,2709.429434632174,,,,,
-official_actuals,2023,total_nltf_net_revenue,reconciled,3002.6304953547824,3002.630495354782,4.547473508864641e-13,,,4.547473508864641e-13
+official_actuals,2023,total_nltf_net_revenue,difference_reported,3003.6976291447827,3002.630495354782,1.067133790000753,,,1.067133790000753
 official_actuals,2023,total_ruc_net_revenue,partial_missing,,1380.003441042174,,light_bev_ruc_net_revenue; heavy_bev_ruc_net_revenue; phev_ruc_net_revenue,,
 official_actuals,2024,gross_fed_revenue,reconciled,2073.93255766,2073.93255766,0.0,,,0.0
 official_actuals,2024,net_fed_revenue,reconciled,2006.92979505,2006.92979505,0.0,,,0.0
-official_actuals,2024,net_mvr_revenue,partial_missing,,295.5836442473913,,mr1_cvl_revenue; mr2_revenue; coo_revenue,,
+official_actuals,2024,net_mvr_revenue,partial_missing,,296.5418137473913,,mr1_cvl_revenue; mr2_revenue; coo_revenue,,
 official_actuals,2024,total_fed_ruc_net_revenue,official_row_missing,3819.8634061647817,,,,,
-official_actuals,2024,total_nltf_net_revenue,reconciled,4133.0570749121725,4133.057074912173,-9.094947017729282e-13,,,9.094947017729282e-13
+official_actuals,2024,total_nltf_net_revenue,difference_reported,4134.015244412173,4133.057074912173,0.9581694999997126,,,0.9581694999997126
 official_actuals,2024,total_ruc_net_revenue,partial_missing,,1812.933611114782,,heavy_bev_ruc_net_revenue,,
 official_actuals,2025,gross_fed_revenue,reconciled,2067.62792391,2067.62792391,0.0,,,0.0
 official_actuals,2025,net_fed_revenue,reconciled,1997.7271466,1997.7271466,0.0,,,0.0
-official_actuals,2025,net_mvr_revenue,partial_missing,,358.5576284752174,,mr1_cvl_revenue; mr2_revenue; coo_revenue,,
+official_actuals,2025,net_mvr_revenue,partial_missing,,359.5932010952174,,mr1_cvl_revenue; mr2_revenue; coo_revenue,,
 official_actuals,2025,total_fed_ruc_net_revenue,official_row_missing,3981.561653114348,,,,,
-official_actuals,2025,total_nltf_net_revenue,reconciled,4357.214091969566,4357.214091969565,9.094947017729282e-13,,,9.094947017729282e-13
+official_actuals,2025,total_nltf_net_revenue,difference_reported,4358.249664589565,4357.214091969565,1.0355726200004938,,,1.0355726200004938
 official_actuals,2025,total_ruc_net_revenue,reconciled,1983.834506514348,1983.834506514348,0.0,,,0.0
 official_actuals,2026,gross_fed_revenue,reconciled,1074.09912304,1074.09912304,0.0,,,0.0
 official_actuals,2026,net_fed_revenue,reconciled,1036.98212888,1036.98212888,0.0,,,0.0
-official_actuals,2026,net_mvr_revenue,partial_missing,,217.9844487434783,,mr1_cvl_revenue; mr2_revenue; coo_revenue,,
+official_actuals,2026,net_mvr_revenue,partial_missing,,218.7572274234783,,mr1_cvl_revenue; mr2_revenue; coo_revenue,,
 official_actuals,2026,total_fed_ruc_net_revenue,official_row_missing,2076.4882190395647,,,,,
-official_actuals,2026,total_nltf_net_revenue,reconciled,2303.099795423043,2303.099795423043,0.0,,,0.0
+official_actuals,2026,total_nltf_net_revenue,difference_reported,2303.8725741030426,2303.099795423043,0.7727786799996466,,,0.7727786799996466
 official_actuals,2026,total_ruc_net_revenue,reconciled,1039.506090159565,1039.506090159565,0.0,,,0.0
 selected_dashboard_basis,2014,gross_fed_revenue,partial_missing,,,,gross_lpg_revenue; gross_cng_revenue,,
 selected_dashboard_basis,2014,net_fed_revenue,partial_missing,,1615.4105802199997,,gross_fed_revenue; fed_refunds,,

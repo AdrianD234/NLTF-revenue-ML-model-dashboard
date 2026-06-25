@@ -7,8 +7,13 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import sys
 from typing import Any, BinaryIO
 import zipfile
+
+_RUNTIME_PYARROW24 = Path(__file__).resolve().parents[1] / ".runtime_pyarrow24"
+if _RUNTIME_PYARROW24.exists() and str(_RUNTIME_PYARROW24) not in sys.path:
+    sys.path.insert(0, str(_RUNTIME_PYARROW24))
 
 import numpy as np
 import pandas as pd

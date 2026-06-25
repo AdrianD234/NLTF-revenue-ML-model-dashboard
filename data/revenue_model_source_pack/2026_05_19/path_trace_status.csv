@@ -1,7 +1,7 @@
 trace_id,trace_label,availability_status,plotted,data_scope,blocking_gap_id,current_selection,user_visible_message
 actual_benchmark,Actual / benchmark,available,True,annual actual and benchmark rows,,official actual or benchmark,Source actual/benchmark rows are plotted where present.
 selected_workbook_basis,Selected workbook basis,available,True,annual model path rows,,source workbook current selection,Current workbook-selected annual model path is plotted.
-selected_mot_befu_release,Selected MOT/BEFU release path,missing,False,release-value table,release_value_table_missing,BEFU25,Selected MOT/BEFU release path requires release-value rows; registry-only release metadata is not plotted as values.
-rolling_befu_1y,Rolling BEFU 1Y,missing,False,release-value table,release_value_table_missing,BEFU25,Rolling BEFU 1Y requires historical release-value rows; it is not fabricated from model paths.
+selected_mot_befu_release,Selected MOT/BEFU release path,available,True,release-value table,,BEFU25,Selected MOT/BEFU release path is plotted from repo-local release_values.csv rows.
+rolling_befu_1y,Rolling BEFU 1Y,available,True,release-value table,,BEFU25,Rolling BEFU 1Y is plotted from true one-year-ahead rows in release_values.csv.
 aaron_schiff_model,Aaron Schiff prediction / forecast,available,True,annual model path rows,,Aaron Schiff model,Aaron Schiff annual model path is plotted where source rows exist.
 in_house_model,In-house prediction / forecast,available,True,annual model path rows,,In-house model,In-house annual model path is plotted where source rows exist.

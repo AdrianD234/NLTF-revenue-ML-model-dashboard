@@ -34,6 +34,15 @@ REQUIRED_SOURCE_PACK_FILES = (
     "annual_model_paths.csv",
     "release_registry.csv",
 )
+OPTIONAL_SOURCE_PACK_FILES = (
+    "release_values.csv",
+    "forecast_archive.csv",
+    "quarterly_actuals.csv",
+    "fed_rate_paths.csv",
+    "ped_bridge_inputs.csv",
+    "mot_error_bands.csv",
+    "official_befu25_annual.csv",
+)
 
 CORE_ROLLUP_SERIES = {
     "gross_fed_revenue",
@@ -43,6 +52,11 @@ CORE_ROLLUP_SERIES = {
     "total_fed_ruc_net_revenue",
     "total_nltf_net_revenue",
 }
+HYBRID_REPLACEMENT_SERIES = {
+    "gross_ped_revenue",
+    "light_ruc_net_revenue",
+    "heavy_ruc_net_revenue",
+}
 
 # Explicit, reviewed label bindings from the distilled pack. Labels not covered
 # here are still preserved with generated IDs and a source_registry_gap status.
@@ -50,6 +64,7 @@ SOURCE_SERIES_ALIASES = {
     "Total NLTF revenue": "total_nltf_net_revenue",
     "Total net revenues": "total_nltf_net_revenue",
     "Total RUC+PED revenue": "total_fed_ruc_net_revenue",
+    "Total FED+RUC net revenue": "total_fed_ruc_net_revenue",
     "Total RUC forecast incl EV/PHEV": "total_ruc_net_revenue",
     "RUC revenues net of admin fees & refunds": "total_ruc_net_revenue",
     "Net FED revenue": "net_fed_revenue",
@@ -72,16 +87,46 @@ SOURCE_SERIES_ALIASES = {
     "RUC refunds": "ruc_refunds",
     "Net MVR revenue": "net_mvr_revenue",
     "MVR revenues net of admin fees, refunds & COO": "net_mvr_revenue",
+    "MVR revenues net of admin fees & COO": "net_mvr_revenue",
     "MVR admin revenue": "mvr_admin_revenue",
     "MVR refunds": "mvr_refunds",
     "TUC net revenue": "tuc_net_revenue",
+    "Crown top-up": "crown_top_up",
+    "FED / PED Crown top-up": "crown_top_up",
+    "Total top-up": "crown_top_up",
+    "Gross PED exGST": "gross_ped_revenue",
+    "PED raw actual exGST": "gross_ped_revenue",
+    "Gross LPG exGST": "gross_lpg_revenue",
+    "Gross CNG exGST": "gross_cng_revenue",
+    "FED refunds total exGST": "fed_refunds",
+    "RUC refunds exGST": "ruc_refunds",
+    "MVR refunds exGST": "mvr_refunds",
+    "MR1 & CVL revenue exGST": "mr1_cvl_revenue",
+    "MR2 revenue exGST": "mr2_revenue",
+    "COO revenue exGST": "coo_revenue",
+    "MVR admin revenue exGST": "mvr_admin_revenue",
+    "Net MVR revenue exGST": "net_mvr_revenue",
     "PED VKT per capita": "ped_vkt_per_capita",
     "PED volume": "ped_volume",
+    "PED/FED rate path": "ped_fed_rate_path",
+    "Population count": "population_count",
+    "Forecast input population count": "forecast_input_population_count",
+    "PED total VKT": "ped_total_vkt",
+    "PED source-backed litres": "ped_source_backed_litres",
+    "PED litres per 100km": "ped_litres_per_100km",
     "Light RUC net km": "light_ruc_net_km",
     "Heavy RUC net km": "heavy_ruc_net_km",
     "Light BEV RUC net km": "light_bev_ruc_net_km",
     "Heavy BEV RUC net km": "heavy_bev_ruc_net_km",
     "PHEV RUC net km": "phev_ruc_net_km",
+}
+
+RUNTIME_DERIVED_BRIDGE_SERIES = {
+    "forecast_input_population_count",
+    "population_count",
+    "ped_fed_rate_path",
+    "ped_litres_per_100km",
+    "ped_source_backed_litres",
 }
 
 REQUIRED_ROLLUP_INPUTS = {
@@ -130,6 +175,13 @@ class RevenueSourcePack:
     annual_actuals: pd.DataFrame
     annual_model_paths: pd.DataFrame
     release_registry: pd.DataFrame
+    release_values: pd.DataFrame
+    forecast_archive: pd.DataFrame
+    quarterly_actuals: pd.DataFrame
+    fed_rate_paths: pd.DataFrame
+    ped_bridge_inputs: pd.DataFrame
+    mot_error_bands: pd.DataFrame
+    official_befu25_annual: pd.DataFrame
     canonical_long: pd.DataFrame
     validation_issues: pd.DataFrame
     reconciliation_report: pd.DataFrame
@@ -138,6 +190,7 @@ class RevenueSourcePack:
     intake_status: pd.DataFrame
     remaining_decisions_handoff: pd.DataFrame
     series_role_audit: pd.DataFrame
+    hybrid_annual_revenue: pd.DataFrame
 
     @property
     def validation_status(self) -> str:
@@ -198,21 +251,24 @@ def load_revenue_source_pack(
     annual_actuals = pd.read_csv(base / "annual_actuals.csv")
     annual_model_paths = pd.read_csv(base / "annual_model_paths.csv")
     release_registry = pd.read_csv(base / "release_registry.csv")
+    release_values = _read_optional_csv(base / "release_values.csv")
+    forecast_archive = _read_optional_csv(base / "forecast_archive.csv")
+    quarterly_actuals = _read_optional_csv(base / "quarterly_actuals.csv")
+    fed_rate_paths = _read_optional_csv(base / "fed_rate_paths.csv")
+    ped_bridge_inputs = _read_optional_csv(base / "ped_bridge_inputs.csv")
+    mot_error_bands = _read_optional_csv(base / "mot_error_bands.csv")
+    official_befu25_annual = _read_optional_csv(base / "official_befu25_annual.csv")
 
     canonical = canonical_revenue_long_frame(
         series_master=series_master,
         annual_actuals=annual_actuals,
         annual_model_paths=annual_model_paths,
+        release_values=release_values,
+        quarterly_actuals=quarterly_actuals,
+        fed_rate_paths=fed_rate_paths,
+        ped_bridge_inputs=ped_bridge_inputs,
+        official_befu25_annual=official_befu25_annual,
         manifest=manifest,
-    )
-    validation = validate_revenue_source_pack(
-        manifest=manifest,
-        pack_dir=base,
-        series_master=series_master,
-        aggregation_rules=aggregation_rules,
-        front_end_config=front_end_config,
-        unresolved_decisions=unresolved_decisions,
-        canonical_long=canonical,
     )
     reconciliation = revenue_reconciliation_report(canonical)
     gap_register = revenue_source_gap_register(
@@ -232,10 +288,21 @@ def load_revenue_source_pack(
         unresolved_decisions=unresolved_decisions,
         gap_register=gap_register,
     )
+    validation = validate_revenue_source_pack(
+        manifest=manifest,
+        pack_dir=base,
+        series_master=series_master,
+        aggregation_rules=aggregation_rules,
+        front_end_config=front_end_config,
+        unresolved_decisions=unresolved_decisions,
+        remaining_decisions_handoff=remaining_decisions,
+        canonical_long=canonical,
+    )
     role_audit = revenue_series_role_audit(
         series_master=series_master,
         canonical_long=canonical,
     )
+    hybrid_annual = revenue_hybrid_annual_frame(canonical)
     return RevenueSourcePack(
         pack_dir=base,
         manifest=manifest,
@@ -246,6 +313,13 @@ def load_revenue_source_pack(
         annual_actuals=annual_actuals,
         annual_model_paths=annual_model_paths,
         release_registry=release_registry,
+        release_values=release_values,
+        forecast_archive=forecast_archive,
+        quarterly_actuals=quarterly_actuals,
+        fed_rate_paths=fed_rate_paths,
+        ped_bridge_inputs=ped_bridge_inputs,
+        mot_error_bands=mot_error_bands,
+        official_befu25_annual=official_befu25_annual,
         canonical_long=canonical,
         validation_issues=validation,
         reconciliation_report=reconciliation,
@@ -254,7 +328,14 @@ def load_revenue_source_pack(
         intake_status=intake_status,
         remaining_decisions_handoff=remaining_decisions,
         series_role_audit=role_audit,
+        hybrid_annual_revenue=hybrid_annual,
     )
+
+
+def _read_optional_csv(path: Path) -> pd.DataFrame:
+    if not path.exists():
+        return pd.DataFrame()
+    return pd.read_csv(path)
 
 
 def canonical_revenue_long_frame(
@@ -262,6 +343,11 @@ def canonical_revenue_long_frame(
     series_master: pd.DataFrame,
     annual_actuals: pd.DataFrame,
     annual_model_paths: pd.DataFrame,
+    release_values: pd.DataFrame | None = None,
+    quarterly_actuals: pd.DataFrame | None = None,
+    fed_rate_paths: pd.DataFrame | None = None,
+    ped_bridge_inputs: pd.DataFrame | None = None,
+    official_befu25_annual: pd.DataFrame | None = None,
     manifest: dict[str, Any],
 ) -> pd.DataFrame:
     registry = _registry(series_master)
@@ -326,6 +412,169 @@ def canonical_revenue_long_frame(
             )
         )
 
+    if isinstance(release_values, pd.DataFrame) and not release_values.empty:
+        for record in release_values.to_dict("records"):
+            label = str(record.get("series", "")).strip()
+            fy = _as_int(record.get("FY"))
+            release_round = str(record.get("release_round", "")).strip()
+            rows.append(
+                _canonical_row(
+                    registry,
+                    source_label=label,
+                    period=f"FY{fy}" if fy is not None else "",
+                    fy=fy,
+                    time_grain="june_year",
+                    group="MOT release",
+                    value=record.get("value"),
+                    unit=record.get("unit", ""),
+                    line=str(record.get("value_status", "forecast")).strip() or "forecast",
+                    release_vintage=release_round,
+                    release_family=record.get("release_family", ""),
+                    release_year=record.get("release_year", ""),
+                    horizon=record.get("horizon", ""),
+                    forecast_path=f"mot_release:{release_round}" if release_round else "mot_release",
+                    scenario_name=release_round or "MOT release",
+                    scenario_role="mot_release",
+                    model_basis="mot_release",
+                    value_status=record.get("value_status", ""),
+                    source_file="release_values.csv",
+                    source_sheet=record.get("source_sheet", ""),
+                    source_cell=record.get("source_cell", ""),
+                    normalized_source_sha256=normalized_hashes.get("release_values.csv", ""),
+                    source_hash_sha256=source_hash,
+                    distilled_hash_sha256=distilled_hash,
+                )
+            )
+
+    if isinstance(quarterly_actuals, pd.DataFrame) and not quarterly_actuals.empty:
+        for record in quarterly_actuals.to_dict("records"):
+            label = str(record.get("series", "")).strip()
+            quarter = str(record.get("quarter", "")).strip().upper()
+            fy = _as_int(record.get("FY"))
+            rows.append(
+                _canonical_row(
+                    registry,
+                    source_label=label,
+                    period=quarter,
+                    fy=fy,
+                    time_grain="quarterly",
+                    group="Quarterly actuals",
+                    value=record.get("value"),
+                    unit=record.get("unit", ""),
+                    line=str(record.get("value_status", "actual")).strip() or "actual",
+                    release_vintage="actual",
+                    forecast_path="official_actual",
+                    scenario_name="actual",
+                    scenario_role="actual",
+                    model_basis="official_actuals",
+                    value_status=record.get("value_status", ""),
+                    source_file="quarterly_actuals.csv",
+                    source_sheet=record.get("source_sheet", ""),
+                    source_cell=record.get("source_cell", ""),
+                    normalized_source_sha256=normalized_hashes.get("quarterly_actuals.csv", ""),
+                    source_hash_sha256=source_hash,
+                    distilled_hash_sha256=distilled_hash,
+                )
+            )
+
+    if isinstance(fed_rate_paths, pd.DataFrame) and not fed_rate_paths.empty:
+        for record in fed_rate_paths.to_dict("records"):
+            quarter = str(record.get("quarter", "")).strip().upper()
+            fy = _as_int(record.get("FY"))
+            fed_path = str(record.get("fed_path", "")).strip()
+            rows.append(
+                _canonical_row(
+                    registry,
+                    source_label="PED/FED rate path",
+                    period=quarter,
+                    fy=fy,
+                    time_grain="quarterly",
+                    group="FED rates",
+                    value=record.get("rate_nzd_per_litre"),
+                    unit=record.get("unit", "NZD/L"),
+                    line="rate_path",
+                    release_vintage="rate_path",
+                    forecast_path=f"fed_path:{fed_path}" if fed_path else "fed_path",
+                    scenario_name=fed_path,
+                    scenario_role="fed_path",
+                    model_basis="fed_rate_path",
+                    value_status=record.get("value_status", ""),
+                    source_file="fed_rate_paths.csv",
+                    source_sheet=record.get("source_sheet", ""),
+                    source_cell=record.get("source_cell", ""),
+                    normalized_source_sha256=normalized_hashes.get("fed_rate_paths.csv", ""),
+                    source_hash_sha256=source_hash,
+                    distilled_hash_sha256=distilled_hash,
+                )
+            )
+
+    if isinstance(ped_bridge_inputs, pd.DataFrame) and not ped_bridge_inputs.empty:
+        for record in ped_bridge_inputs.to_dict("records"):
+            label = str(record.get("series", "")).strip()
+            period = str(record.get("period", "")).strip()
+            fy = _as_int(record.get("FY"))
+            time_grain = str(record.get("time_grain", "")).strip() or ("quarterly" if "Q" in period else "june_year")
+            rows.append(
+                _canonical_row(
+                    registry,
+                    source_label=label,
+                    period=period,
+                    fy=fy,
+                    time_grain=time_grain,
+                    group="PED bridge",
+                    value=record.get("value"),
+                    unit=record.get("unit", ""),
+                    line=str(record.get("value_status", "ped_bridge")).strip() or "ped_bridge",
+                    release_vintage="ped_bridge",
+                    forecast_path="ped_bridge",
+                    scenario_name=record.get("source_basis", "PED bridge"),
+                    scenario_role="ped_bridge",
+                    model_basis="ped_bridge",
+                    value_status=record.get("value_status", ""),
+                    source_file="ped_bridge_inputs.csv",
+                    source_sheet=record.get("source_sheet", ""),
+                    source_cell=record.get("source_cell", ""),
+                    normalized_source_sha256=normalized_hashes.get("ped_bridge_inputs.csv", ""),
+                    source_hash_sha256=source_hash,
+                    distilled_hash_sha256=distilled_hash,
+                )
+            )
+
+    if isinstance(official_befu25_annual, pd.DataFrame) and not official_befu25_annual.empty:
+        for record in official_befu25_annual.to_dict("records"):
+            label = str(record.get("series", "")).strip()
+            fy = _as_int(record.get("FY"))
+            status = str(record.get("status", "")).strip().upper()
+            line = "Actual" if status == "ACTUAL" else "Model path"
+            rows.append(
+                _canonical_row(
+                    registry,
+                    source_label=label,
+                    period=f"FY{fy}" if fy is not None else "",
+                    fy=fy,
+                    time_grain="june_year",
+                    group=record.get("group", "Official BEFU25 annual"),
+                    value=record.get("value"),
+                    unit=record.get("unit", ""),
+                    line=line,
+                    release_vintage=record.get("release_round", "BEFU25"),
+                    release_family=record.get("release_family", "BEFU"),
+                    release_year=record.get("release_year", 2025),
+                    horizon=record.get("horizon", ""),
+                    forecast_path="mot_release:BEFU25",
+                    scenario_name="BEFU25",
+                    scenario_role="mot_release",
+                    model_basis="selected_mot_release",
+                    value_status=record.get("value_status", ""),
+                    source_file="official_befu25_annual.csv",
+                    source_sheet=record.get("source_sheet", ""),
+                    source_cell=record.get("source_cell", ""),
+                    normalized_source_sha256=normalized_hashes.get("official_befu25_annual.csv", ""),
+                    source_hash_sha256=source_hash,
+                    distilled_hash_sha256=distilled_hash,
+                )
+            )
+
     frame = pd.DataFrame(rows)
     frame["schema_version"] = CANONICAL_REVENUE_SCHEMA_VERSION
     frame["value"] = pd.to_numeric(frame["value"], errors="coerce")
@@ -353,6 +602,7 @@ def validate_revenue_source_pack(
     aggregation_rules: pd.DataFrame,
     front_end_config: dict[str, Any],
     unresolved_decisions: pd.DataFrame,
+    remaining_decisions_handoff: pd.DataFrame | None = None,
     canonical_long: pd.DataFrame,
 ) -> pd.DataFrame:
     issues: list[dict[str, Any]] = []
@@ -405,8 +655,10 @@ def validate_revenue_source_pack(
 
     if canonical_long["unit"].fillna("").astype(str).str.strip().eq("").any():
         issues.append(_issue("error", "unit", "One or more canonical rows has no unit."))
-    if canonical_long["period"].fillna("").astype(str).str.match(r"^FY\d{4}$").eq(False).any():
-        issues.append(_issue("error", "period", "One or more canonical rows has an invalid FY period label."))
+    period_text = canonical_long["period"].fillna("").astype(str)
+    valid_period = period_text.str.match(r"^FY\d{4}$") | period_text.str.match(r"^\d{4}Q[1-4]$")
+    if valid_period.eq(False).any():
+        issues.append(_issue("error", "period", "One or more canonical rows has an invalid FY or quarterly period label."))
     if canonical_long["aggregation_sign"].isin([-1, 0, 1]).eq(False).any():
         issues.append(_issue("error", "aggregation_sign", "Aggregation sign must be -1, 0, or +1."))
 
@@ -440,13 +692,19 @@ def validate_revenue_source_pack(
     if len(gaps):
         issues.append(_issue("warning", "series_registry_gap", f"Unregistered source series preserved: {', '.join(sorted(map(str, gaps)))}"))
 
-    critical_decisions = unresolved_decisions[unresolved_decisions["Priority"].astype(str).str.lower().eq("critical")]
+    if remaining_decisions_handoff is not None and not remaining_decisions_handoff.empty:
+        critical_decisions = remaining_decisions_handoff[
+            remaining_decisions_handoff["priority"].astype(str).str.lower().eq("critical")
+            & ~remaining_decisions_handoff["availability_status"].astype(str).str.lower().isin(["source_backed"])
+        ]
+    else:
+        critical_decisions = unresolved_decisions[unresolved_decisions["Priority"].astype(str).str.lower().eq("critical")]
     if not critical_decisions.empty:
         issues.append(
             _issue(
                 "warning",
                 "unresolved_critical_decisions",
-                f"{len(critical_decisions)} critical revenue decisions remain explicit gaps.",
+                f"{len(critical_decisions)} critical revenue decisions remain explicit open gaps.",
             )
         )
 
@@ -479,6 +737,191 @@ def revenue_reconciliation_report(canonical_long: pd.DataFrame) -> pd.DataFrame:
     return report.sort_values(["scope", "FY", "output_series_id"], kind="stable").reset_index(drop=True)
 
 
+def revenue_hybrid_annual_frame(canonical_long: pd.DataFrame) -> pd.DataFrame:
+    columns = [
+        "FY",
+        "fed_path",
+        "series_id",
+        "display_name",
+        "value",
+        "unit",
+        "row_role",
+        "source_basis",
+        "source_file",
+        "source_status",
+        "formula",
+        "replacement_only",
+        "official_value",
+        "residual_vs_official",
+        "availability_status",
+    ]
+    if canonical_long is None or canonical_long.empty:
+        return pd.DataFrame(columns=columns)
+
+    frame = canonical_long.copy()
+    frame["value_numeric"] = pd.to_numeric(frame["value"], errors="coerce")
+    official = frame[
+        frame["source_file"].eq("official_befu25_annual.csv")
+        & frame["time_grain"].eq("june_year")
+        & frame["value_numeric"].notna()
+    ].copy()
+    in_house = frame[
+        frame["source_file"].eq("annual_model_paths.csv")
+        & frame["model_basis"].eq("in_house_model")
+        & frame["line"].eq("Model path")
+        & frame["value_numeric"].notna()
+    ].copy()
+    fed_rates = frame[
+        frame["source_file"].eq("fed_rate_paths.csv")
+        & frame["value_numeric"].notna()
+        & frame["FY"].notna()
+    ].copy()
+    ped_bridge = frame[
+        frame["source_file"].eq("ped_bridge_inputs.csv")
+        & frame["value_numeric"].notna()
+        & frame["FY"].notna()
+        & frame["time_grain"].eq("june_year")
+    ].copy()
+    crown_top_up = frame[
+        frame["series_id"].eq("crown_top_up")
+        & frame["value_numeric"].notna()
+        & frame["FY"].notna()
+    ].copy()
+    required_official = {
+        "gross_lpg_revenue",
+        "gross_cng_revenue",
+        "fed_refunds",
+        "total_ruc_net_revenue",
+        "light_ruc_net_revenue",
+        "heavy_ruc_net_revenue",
+        "gross_ped_revenue",
+        "net_mvr_revenue",
+        "tuc_net_revenue",
+        "gross_fed_revenue",
+        "net_fed_revenue",
+        "total_nltf_net_revenue",
+    }
+    required_replacements = {
+        "ped_volume",
+        "light_ruc_net_km",
+        "light_ruc_net_revenue",
+        "heavy_ruc_net_km",
+        "heavy_ruc_net_revenue",
+    }
+    required_ped_bridge = {
+        "population_count",
+        "ped_total_vkt",
+        "ped_litres_per_100km",
+    }
+    official_fys = _fys_with_series(official, required_official)
+    replacement_fys = _fys_with_series(in_house, required_replacements)
+    ped_bridge_fys = _fys_with_series(ped_bridge, required_ped_bridge)
+    if fed_rates.empty:
+        fed_rate_lookup: dict[tuple[str, int], float] = {}
+    else:
+        fed_rate_lookup = {
+            (str(path), int(fy)): float(rate)
+            for (path, fy), rate in fed_rates.groupby(["scenario_name", "FY"], dropna=True)["value_numeric"].mean().items()
+            if str(path).strip()
+        }
+    fed_paths = sorted({path for path, _fy in fed_rate_lookup}) or ["Selected rate"]
+    fed_rate_fys = {fy for _path, fy in fed_rate_lookup}
+    common_fys = sorted(official_fys & replacement_fys & fed_rate_fys & ped_bridge_fys)
+    if crown_top_up.empty:
+        top_up_lookup: dict[int, float] = {}
+    else:
+        crown_top_up = crown_top_up.copy()
+        crown_unit = crown_top_up["unit"].astype(str).str.lower()
+        dollar_not_million = crown_unit.str.contains(r"\$", regex=True, na=False) & ~crown_unit.str.contains(r"\$m", regex=True, na=False)
+        crown_top_up["annual_value_m"] = crown_top_up["value_numeric"].where(~dollar_not_million, crown_top_up["value_numeric"] / 1_000_000.0)
+        top_up_lookup = crown_top_up.groupby("FY")["annual_value_m"].sum().to_dict()
+    rows: list[dict[str, Any]] = []
+    for fy in common_fys:
+        off = _value_lookup(official[official["FY"].eq(fy)])
+        rep = _value_lookup(in_house[in_house["FY"].eq(fy)])
+        bridge = _value_lookup(ped_bridge[ped_bridge["FY"].eq(fy)])
+        population_count = bridge["population_count"]
+        ped_total_vkt = bridge["ped_total_vkt"]
+        ped_litres_per_100km = bridge["ped_litres_per_100km"]
+        ped_volume = rep["ped_volume"]
+        light_km = rep["light_ruc_net_km"]
+        heavy_km = rep["heavy_ruc_net_km"]
+        light_rate = rep["light_ruc_net_revenue"] * 1000.0 / light_km
+        heavy_rate = rep["heavy_ruc_net_revenue"] * 1000.0 / heavy_km
+        light_revenue = light_km / 1000.0 * light_rate
+        heavy_revenue = heavy_km / 1000.0 * heavy_rate
+        official_total_ruc = off["total_ruc_net_revenue"]
+        official_light = off["light_ruc_net_revenue"]
+        official_heavy = off["heavy_ruc_net_revenue"]
+        ruc_fixed_residual = official_total_ruc - official_light - official_heavy
+
+        for fed_path in fed_paths:
+            ped_rate = fed_rate_lookup.get((fed_path, fy))
+            if ped_rate is None:
+                continue
+            ped_revenue = ped_total_vkt * ped_litres_per_100km / 100.0 * ped_rate
+            gross_fed = ped_revenue + off["gross_lpg_revenue"] + off["gross_cng_revenue"]
+            net_fed = gross_fed - off["fed_refunds"]
+            total_ruc = light_revenue + heavy_revenue + ruc_fixed_residual
+            total_fed_ruc = net_fed + total_ruc
+            total_nltf = total_fed_ruc + off["net_mvr_revenue"] + off["tuc_net_revenue"]
+            top_up = top_up_lookup.get(fy, pd.NA)
+
+            rows.extend(
+                [
+                    _hybrid_row(fy, "ped_volume", ped_volume, "bridge_input", "in_house_model", "annual_model_paths.csv", fed_path=fed_path, unit="million L"),
+                    _hybrid_row(fy, "population_count", population_count, "bridge_input", "ped_bridge", "ped_bridge_inputs.csv", fed_path=fed_path, unit="persons"),
+                    _hybrid_row(fy, "ped_total_vkt", ped_total_vkt, "bridge_input", "ped_bridge", "ped_bridge_inputs.csv", fed_path=fed_path, unit="million km", formula="PED VKT per capita * population / 1,000,000"),
+                    _hybrid_row(fy, "ped_litres_per_100km", ped_litres_per_100km, "bridge_input", "ped_bridge", "ped_bridge_inputs.csv", fed_path=fed_path, unit="L/100km", formula="source-backed PED litres / PED total VKT * 100"),
+                    _hybrid_row(fy, "ped_fed_rate_path", ped_rate, "bridge_input", fed_path, "fed_rate_paths.csv", fed_path=fed_path, unit="NZD/L"),
+                    _hybrid_row(fy, "light_ruc_net_km", light_km, "bridge_input", "in_house_model", "annual_model_paths.csv", fed_path=fed_path, unit="million km"),
+                    _hybrid_row(fy, "light_ruc_effective_rate", light_rate, "bridge_input", "source_derived_effective_rate", "annual_model_paths.csv", fed_path=fed_path, unit="NZD/1,000 km", formula="source Light RUC revenue / source Light RUC net km * 1,000"),
+                    _hybrid_row(fy, "heavy_ruc_net_km", heavy_km, "bridge_input", "in_house_model", "annual_model_paths.csv", fed_path=fed_path, unit="million km"),
+                    _hybrid_row(fy, "heavy_ruc_effective_rate", heavy_rate, "bridge_input", "source_derived_effective_rate", "annual_model_paths.csv", fed_path=fed_path, unit="NZD/1,000 km", formula="source Heavy RUC revenue / source Heavy RUC net km * 1,000"),
+                    _hybrid_row(
+                        fy,
+                        "gross_ped_revenue",
+                        ped_revenue,
+                        "replacement_line",
+                        "ped_bridge + fed_rate_path",
+                        "annual_model_paths.csv; fed_rate_paths.csv; ped_bridge_inputs.csv",
+                        fed_path=fed_path,
+                        formula="PED VKT per capita * population -> total VKT; source-backed litres intensity -> litres; litres * annual-average FED rate path",
+                        replacement_only=True,
+                        official_value=off["gross_ped_revenue"],
+                    ),
+                    _hybrid_row(fy, "light_ruc_net_revenue", light_revenue, "replacement_line", "in_house_model", "annual_model_paths.csv", fed_path=fed_path, formula="Light RUC net km / 1,000 * source-derived nominal effective rate", replacement_only=True, official_value=off["light_ruc_net_revenue"]),
+                    _hybrid_row(fy, "heavy_ruc_net_revenue", heavy_revenue, "replacement_line", "in_house_model", "annual_model_paths.csv", fed_path=fed_path, formula="Heavy RUC net km / 1,000 * source-derived nominal effective rate", replacement_only=True, official_value=off["heavy_ruc_net_revenue"]),
+                    _hybrid_row(fy, "gross_lpg_revenue", off["gross_lpg_revenue"], "fixed_mot_component", "official_befu25_annual", "official_befu25_annual.csv", fed_path=fed_path),
+                    _hybrid_row(fy, "gross_cng_revenue", off["gross_cng_revenue"], "fixed_mot_component", "official_befu25_annual", "official_befu25_annual.csv", fed_path=fed_path),
+                    _hybrid_row(fy, "fed_refunds", off["fed_refunds"], "fixed_mot_deduction", "official_befu25_annual", "official_befu25_annual.csv", fed_path=fed_path),
+                    _hybrid_row(
+                        fy,
+                        "ruc_fixed_residual_net_revenue",
+                        ruc_fixed_residual,
+                        "fixed_mot_component",
+                        "official_befu25_annual",
+                        "official_befu25_annual.csv",
+                        fed_path=fed_path,
+                        formula="official_total_ruc_net_revenue - official_light_ruc_net_revenue - official_heavy_ruc_net_revenue",
+                    ),
+                    _hybrid_row(fy, "net_mvr_revenue", off["net_mvr_revenue"], "fixed_mot_component", "official_befu25_annual", "official_befu25_annual.csv", fed_path=fed_path),
+                    _hybrid_row(fy, "tuc_net_revenue", off["tuc_net_revenue"], "fixed_mot_component", "official_befu25_annual", "official_befu25_annual.csv", fed_path=fed_path),
+                    _hybrid_row(fy, "crown_top_up", top_up, "optional_overlay", "quarterly_actuals_annual_sum", "quarterly_actuals.csv", fed_path=fed_path, formula="sum quarterly Crown top-up rows by June year", unit="$m nominal ex GST", availability_status="available" if pd.notna(top_up) else "missing"),
+                    _hybrid_row(fy, "gross_fed_revenue", gross_fed, "calculated_rollup", "hybrid_formula", "hybrid_formula", fed_path=fed_path, formula="gross_ped_revenue + MOT gross_lpg_revenue + MOT gross_cng_revenue", official_value=off["gross_fed_revenue"]),
+                    _hybrid_row(fy, "net_fed_revenue", net_fed, "calculated_rollup", "hybrid_formula", "hybrid_formula", fed_path=fed_path, formula="gross_fed_revenue - MOT fed_refunds", official_value=off["net_fed_revenue"]),
+                    _hybrid_row(fy, "total_ruc_net_revenue", total_ruc, "calculated_rollup", "hybrid_formula", "hybrid_formula", fed_path=fed_path, formula="light_ruc_net_revenue + heavy_ruc_net_revenue + MOT fixed RUC residual", official_value=off["total_ruc_net_revenue"]),
+                    _hybrid_row(fy, "total_fed_ruc_net_revenue", total_fed_ruc, "calculated_rollup", "hybrid_formula", "hybrid_formula", fed_path=fed_path, formula="net_fed_revenue + total_ruc_net_revenue"),
+                    _hybrid_row(fy, "total_nltf_net_revenue", total_nltf, "calculated_rollup", "hybrid_formula", "hybrid_formula", fed_path=fed_path, formula="net_fed_revenue + total_ruc_net_revenue + MOT net_mvr_revenue + MOT tuc_net_revenue", official_value=off["total_nltf_net_revenue"]),
+                ]
+            )
+    if not rows:
+        return pd.DataFrame(columns=columns)
+    out = pd.DataFrame(rows, columns=columns)
+    out["residual_vs_official"] = pd.to_numeric(out["residual_vs_official"], errors="coerce")
+    return out.sort_values(["FY", "row_role", "series_id"], kind="stable").reset_index(drop=True)
+
+
 def revenue_source_gap_register(
     *,
     manifest: dict[str, Any],
@@ -503,7 +946,11 @@ def revenue_source_gap_register(
             "availability_status": "available" if has_release_values else "missing",
             "current_selection": _selection_value(selections, "release_round", "BEFU25"),
             "runtime_treatment": "release_values_available" if has_release_values else "registry_only",
-            "user_visible_message": "Full MOT/BEFU release-value table is unavailable; release selection is registry-only and unresolved differences are reported.",
+            "user_visible_message": (
+                "Selected MOT/BEFU release values are repo-vendored and plotted from release_values.csv."
+                if has_release_values
+                else "Full MOT/BEFU release-value table is unavailable; release selection is registry-only and unresolved differences are reported."
+            ),
         },
         {
             "gap_id": "fed_path_scenario_values_missing",
@@ -511,17 +958,29 @@ def revenue_source_gap_register(
             "availability_status": "available" if has_fed_path_values else "missing",
             "current_selection": _selection_value(selections, "fed_path_scenario", "Current planned path"),
             "runtime_treatment": "fed_path_values_available" if has_fed_path_values else "registry_only",
-            "user_visible_message": "FED path scenario values are not separately vendored; the FED path control is registry-only and revenue rows are preserved from source paths rather than recalculated.",
+            "user_visible_message": (
+                "FED path scenario values are repo-vendored from fed_rate_paths.csv."
+                if has_fed_path_values
+                else "FED path scenario values are not separately vendored; the FED path control is registry-only and revenue rows are preserved from source paths rather than recalculated."
+            ),
         },
         {
             "gap_id": "crown_top_up_values_missing",
             "required_for": "Include Crown top-up roll-up treatment",
             "availability_status": "available" if has_crown_top_up_rows else "missing",
             "current_selection": crown_top_up_selection,
-            "runtime_treatment": "excluded_by_selection"
-            if crown_top_up_selection.lower() == "exclude"
-            else "not_applied_missing_source",
-            "user_visible_message": "Crown top-up Include is not applied because no governed top-up value rows are present in the source pack.",
+            "runtime_treatment": (
+                "excluded_by_selection"
+                if crown_top_up_selection.lower() == "exclude"
+                else "top_up_rows_available"
+                if has_crown_top_up_rows
+                else "not_applied_missing_source"
+            ),
+            "user_visible_message": (
+                "Crown top-up rows are repo-vendored; Include/Exclude selection can be applied by the roll-up view."
+                if has_crown_top_up_rows
+                else "Crown top-up Include is not applied because no governed top-up value rows are present in the source pack."
+            ),
         },
         {
             "gap_id": "quarterly_source_pack_missing",
@@ -529,7 +988,11 @@ def revenue_source_gap_register(
             "availability_status": "available" if has_quarterly_values else "missing",
             "current_selection": _selection_value(selections, "view", "Annual"),
             "runtime_treatment": "quarterly_available" if has_quarterly_values else "annual_only_source_pack",
-            "user_visible_message": "The distilled source pack is annual only; quarterly views use promoted Forecast Builder volume packs where available.",
+            "user_visible_message": (
+                "Quarterly source rows are repo-vendored from quarterly_actuals.csv with June-year mapping."
+                if has_quarterly_values
+                else "The distilled source pack is annual only; quarterly views use promoted Forecast Builder volume packs where available."
+            ),
         },
         {
             "gap_id": "ped_total_vkt_bridge_missing",
@@ -537,7 +1000,13 @@ def revenue_source_gap_register(
             "availability_status": "available" if has_ped_total_vkt else "missing",
             "current_selection": _selection_value(selections, "series", "Total NLTF revenue"),
             "runtime_treatment": "bridge_rows_available" if has_ped_total_vkt else "reported_gap",
-            "user_visible_message": "PED total VKT bridge rows are absent; PED revenue paths are preserved from workbook source rows rather than recomputed.",
+            "user_visible_message": (
+                "PED total VKT bridge rows are repo-vendored in ped_bridge_inputs.csv; PED revenue is replayed from "
+                "VKT per capita, population, source-backed litres intensity and FED rate path."
+                if has_ped_total_vkt
+                else "PED total VKT bridge rows are absent; PED revenue is recomputed from source-backed PED volume "
+                "and FED rate paths, while the population-to-total-VKT replay remains a governed gap."
+            ),
         },
     ]
     return pd.DataFrame(
@@ -591,7 +1060,11 @@ def revenue_path_trace_status(
             "release-value table",
             "" if release_available else "release_value_table_missing",
             release_selection,
-            "Selected MOT/BEFU release path requires release-value rows; registry-only release metadata is not plotted as values.",
+            (
+                "Selected MOT/BEFU release path is plotted from repo-local release_values.csv rows."
+                if release_available
+                else "Selected MOT/BEFU release path requires release-value rows; registry-only release metadata is not plotted as values."
+            ),
         ),
         _trace_status_row(
             "rolling_befu_1y",
@@ -600,7 +1073,11 @@ def revenue_path_trace_status(
             "release-value table",
             "" if release_available else "release_value_table_missing",
             release_selection,
-            "Rolling BEFU 1Y requires historical release-value rows; it is not fabricated from model paths.",
+            (
+                "Rolling BEFU 1Y is plotted from true one-year-ahead rows in release_values.csv."
+                if release_available
+                else "Rolling BEFU 1Y requires historical release-value rows; it is not fabricated from model paths."
+            ),
         ),
         _trace_status_row(
             "aaron_schiff_model",
@@ -713,7 +1190,7 @@ def revenue_source_pack_intake_status(
                 artifact_role=str(meta.get("source_sheet", "config_or_document")),
                 repo_relative_path=repo_path,
                 status="repo_local_hash_verified" if exists and actual_hash == expected_hash else "missing_or_hash_mismatch",
-                required_for_runtime=filename in REQUIRED_SOURCE_PACK_FILES,
+                required_for_runtime=filename in REQUIRED_SOURCE_PACK_FILES or filename in OPTIONAL_SOURCE_PACK_FILES,
                 required_for_replay=True,
                 sha256=actual_hash or expected_hash,
                 size_bytes=size,
@@ -728,6 +1205,9 @@ def revenue_source_pack_intake_status(
         "forecast_archive.csv": "full workbook forecast archive replay",
         "formula_lineage.csv": "full formula lineage replay",
         "quarterly_actuals.csv": "source-pack quarterly Revenue Outlook",
+        "fed_rate_paths.csv": "FED path scenario rate values",
+        "mot_error_bands.csv": "MOT archived-error uncertainty bands",
+        "official_befu25_annual.csv": "Official BEFU25 fixed annual components",
     }
     for filename, role in large_artifact_roles.items():
         if filename in declared:
@@ -854,6 +1334,7 @@ def revenue_series_role_audit(
         if series_id in registered_ids:
             continue
         display = _first_text(group, "display_name") or _first_text(group, "source_series_label") or series_id
+        is_runtime_bridge = series_id in RUNTIME_DERIVED_BRIDGE_SERIES
         rows.append(
             _series_role_audit_row(
                 series_id=series_id,
@@ -861,9 +1342,13 @@ def revenue_series_role_audit(
                 parent_series_id=_first_text(group, "parent_series_id"),
                 unit=_first_text(group, "unit"),
                 aggregation_sign=_first_int(group, "aggregation_sign", default=1),
-                forecast_role="unregistered_source_line",
+                forecast_role="derived_bridge" if is_runtime_bridge else "unregistered_source_line",
                 dashboard_visible=False,
-                notes="Preserved source line not registered in series_master.csv; retained as a governance gap.",
+                notes=(
+                    "Runtime-derived PED bridge input bound by source-pack alias; retained outside the workbook series master."
+                    if is_runtime_bridge
+                    else "Preserved source line not registered in series_master.csv; retained as a governance gap."
+                ),
                 canonical_rows=group,
             )
         )
@@ -1005,34 +1490,45 @@ def _intake_status_row(
 def _decision_handoff_link(item: str, gap_status: dict[str, str]) -> dict[str, Any]:
     text = item.lower()
     if "ped/fed" in text or ("ped" in text and "rates" in text):
+        bridge_available = gap_status.get("ped_total_vkt_bridge_missing") == "available"
         return {
             "linked_gap_ids": ["fed_path_scenario_values_missing", "ped_total_vkt_bridge_missing"],
-            "linked_artifacts": "annual_model_paths.csv; source_gap_register.csv; nominal PED/FED rate table not vendored",
-            "runtime_status": "nominal_rate_path_missing",
+            "linked_artifacts": (
+                "annual_model_paths.csv; fed_rate_paths.csv; ped_bridge_inputs.csv; "
+                "hybrid_annual_revenue.csv; source_gap_register.csv"
+            ),
+            "runtime_status": "fed_rate_path_and_total_vkt_source_backed" if bridge_available else "fed_rate_path_source_backed_total_vkt_gap",
             "dashboard_treatment": (
-                "Preserve workbook-sourced PED/FED paths; do not refit or bridge future revenue "
-                "without governed nominal rate paths."
+                "Recompute PED revenue from repo-vendored VKT per capita, population, source-backed litres "
+                "intensity and FED rate paths."
+                if bridge_available
+                else "Recompute PED revenue from repo-vendored PED volume and FED rate paths; keep the missing "
+                "population-to-total-VKT replay as an explicit governance gap."
             ),
             "availability_status": "open_gap",
         }
     if "light/heavy ruc" in text or "ruc rates" in text:
         return {
             "linked_gap_ids": ["release_value_table_missing"],
-            "linked_artifacts": "annual_model_paths.csv; source_gap_register.csv; nominal Light/Heavy RUC rate table not vendored",
-            "runtime_status": "nominal_rate_path_missing",
+            "linked_artifacts": "annual_model_paths.csv; hybrid_annual_revenue.csv; source_gap_register.csv",
+            "runtime_status": "source_derived_effective_rate_replay",
             "dashboard_treatment": (
-                "Preserve modeled RUC revenue rows; do not recompute from net-km forecasts "
-                "without governed effective rate paths."
+                "Recompute Light/Heavy RUC revenue from repo-vendored net-km rows and source-derived effective "
+                "rates; keep independent nominal rate tables as a provenance limitation."
             ),
             "availability_status": "open_gap",
         }
     if "ped bridge" in text:
+        bridge_available = gap_status.get("ped_total_vkt_bridge_missing") == "available"
         return {
             "linked_gap_ids": ["ped_total_vkt_bridge_missing"],
-            "linked_artifacts": "source_gap_register.csv; PED bridge history not vendored",
-            "runtime_status": "bridge_replay_missing",
+            "linked_artifacts": "ped_bridge_inputs.csv; source_gap_register.csv; hybrid_annual_revenue.csv",
+            "runtime_status": "bridge_rows_available" if bridge_available else "bridge_replay_missing",
             "dashboard_treatment": (
-                "Report PED bridge as a governance gap; do not infer total VKT or training-history "
+                "Use the repo-vendored PED bridge rows for population, total VKT and source-backed litres "
+                "intensity; do not infer missing training-history rows from validation forecasts."
+                if bridge_available
+                else "Report PED bridge as a governance gap; do not infer total VKT or training-history "
                 "rows from validation forecasts."
             ),
             "availability_status": "open_gap",
@@ -1068,9 +1564,9 @@ def _decision_handoff_link(item: str, gap_status: dict[str, str]) -> dict[str, A
         return {
             "linked_gap_ids": [],
             "linked_artifacts": "forecast horizon labels; current_revenue_outlook manifest",
-            "runtime_status": "label_required",
+            "runtime_status": "label_applied",
             "dashboard_treatment": "Label H1-H12 as backtest-supported and H13+ as long-range extrapolation or assumption; no value changes.",
-            "availability_status": "governance_label_required",
+            "availability_status": "label_applied",
         }
     return {
         "linked_gap_ids": [],
@@ -1209,7 +1705,8 @@ def _registry(series_master: pd.DataFrame) -> dict[str, dict[str, Any]]:
 
 
 def _canonical_row(registry: dict[str, dict[str, Any]], **kwargs: Any) -> dict[str, Any]:
-    label = str(kwargs["source_label"]).strip()
+    raw_label = kwargs["source_label"]
+    label = "" if pd.isna(raw_label) else str(raw_label).strip()
     direct = registry.get(label)
     alias_id = SOURCE_SERIES_ALIASES.get(label)
     alias = registry.get(alias_id or "") if alias_id else None
@@ -1218,6 +1715,17 @@ def _canonical_row(registry: dict[str, dict[str, Any]], **kwargs: Any) -> dict[s
         source_status = "registered"
     elif alias is not None:
         reg = alias
+        source_status = "registered_alias"
+    elif alias_id:
+        reg = {
+            "series_id": alias_id,
+            "display_name": label,
+            "parent_series_id": "",
+            "unit": kwargs.get("unit", ""),
+            "aggregation_sign": 1,
+            "forecast_role": "derived_bridge",
+            "group": kwargs.get("group", ""),
+        }
         source_status = "registered_alias"
     else:
         generated_id = _slug(label)
@@ -1232,12 +1740,14 @@ def _canonical_row(registry: dict[str, dict[str, Any]], **kwargs: Any) -> dict[s
         }
         source_status = "unregistered_source_series"
 
-    unit = str(kwargs.get("unit", "")).strip()
-    line = str(kwargs.get("line", "")).strip()
+    raw_unit = kwargs.get("unit", "")
+    unit = "" if pd.isna(raw_unit) else str(raw_unit).strip()
+    raw_line = kwargs.get("line", "")
+    line = "" if pd.isna(raw_line) else str(raw_line).strip()
     return {
         "period": kwargs.get("period", ""),
         "FY": kwargs.get("fy"),
-        "time_grain": "june_year",
+        "time_grain": kwargs.get("time_grain", "june_year"),
         "series_id": reg["series_id"],
         "source_series_label": label,
         "display_name": reg.get("display_name") or label,
@@ -1246,12 +1756,16 @@ def _canonical_row(registry: dict[str, dict[str, Any]], **kwargs: Any) -> dict[s
         "unit": unit,
         "aggregation_sign": reg.get("aggregation_sign", 1),
         "release_vintage": kwargs.get("release_vintage", ""),
+        "release_family": kwargs.get("release_family", ""),
+        "release_year": kwargs.get("release_year", ""),
+        "horizon": kwargs.get("horizon", ""),
         "forecast_path": kwargs.get("forecast_path", ""),
         "path_status": _path_status(str(kwargs.get("forecast_path", "")), str(kwargs.get("line", ""))),
         "scenario_name": kwargs.get("scenario_name", ""),
         "scenario_role": kwargs.get("scenario_role", ""),
         "model_basis": kwargs.get("model_basis", ""),
         "revenue_basis": _revenue_basis(label, unit),
+        "value_status": kwargs.get("value_status", ""),
         "forecast_role": reg.get("forecast_role", ""),
         "line": line,
         "source_status": source_status,
@@ -1343,6 +1857,90 @@ def _calculate_rollup(output: str, values: dict[str, Any]) -> float:
     if output == "total_nltf_net_revenue":
         return float(values["net_fed_revenue"]) + float(values["total_ruc_net_revenue"]) + float(values["net_mvr_revenue"]) + float(values["tuc_net_revenue"])
     raise KeyError(output)
+
+
+def _fys_with_series(frame: pd.DataFrame, series_ids: set[str]) -> set[int]:
+    if frame.empty:
+        return set()
+    present = frame[frame["series_id"].isin(series_ids) & frame["value_numeric"].notna()].copy()
+    if present.empty:
+        return set()
+    counts = present.groupby("FY")["series_id"].agg(lambda values: set(values.dropna().astype(str)))
+    return {int(fy) for fy, available in counts.items() if series_ids.issubset(available)}
+
+
+def _value_lookup(frame: pd.DataFrame) -> dict[str, float]:
+    values: dict[str, float] = {}
+    if frame.empty:
+        return values
+    ordered = frame.sort_values(["series_id", "source_file", "source_cell"], kind="stable")
+    for series_id, group in ordered.groupby("series_id", dropna=False):
+        value = pd.to_numeric(group["value_numeric"], errors="coerce").dropna()
+        if not value.empty:
+            values[str(series_id)] = float(value.iloc[-1])
+    return values
+
+
+def _hybrid_row(
+    fy: int,
+    series_id: str,
+    value: float,
+    row_role: str,
+    source_basis: str,
+    source_file: str,
+    *,
+    formula: str = "",
+    replacement_only: bool = False,
+    official_value: float | None = None,
+    fed_path: str = "",
+    unit: str = "$m nominal ex GST",
+    availability_status: str = "available",
+) -> dict[str, Any]:
+    display_names = {
+        "population_count": "Population count",
+        "ped_total_vkt": "PED total VKT",
+        "ped_litres_per_100km": "PED litres per 100km",
+        "ped_volume": "PED volume",
+        "ped_fed_rate_path": "PED/FED rate path",
+        "light_ruc_net_km": "Light RUC net km",
+        "light_ruc_effective_rate": "Light RUC effective rate",
+        "heavy_ruc_net_km": "Heavy RUC net km",
+        "heavy_ruc_effective_rate": "Heavy RUC effective rate",
+        "gross_ped_revenue": "Gross PED revenue",
+        "light_ruc_net_revenue": "Light RUC net revenue",
+        "heavy_ruc_net_revenue": "Heavy RUC net revenue",
+        "gross_lpg_revenue": "Gross LPG revenue",
+        "gross_cng_revenue": "Gross CNG revenue",
+        "fed_refunds": "FED refunds",
+        "ruc_fixed_residual_net_revenue": "MOT fixed RUC rows net residual",
+        "net_mvr_revenue": "Net MVR revenue",
+        "tuc_net_revenue": "TUC net revenue",
+        "gross_fed_revenue": "Gross FED revenue",
+        "net_fed_revenue": "Net FED revenue",
+        "total_ruc_net_revenue": "Total RUC net revenue",
+        "total_fed_ruc_net_revenue": "Total FED+RUC net revenue",
+        "total_nltf_net_revenue": "Total NLTF revenue",
+    }
+    residual = pd.NA
+    if official_value is not None and pd.notna(official_value):
+        residual = float(value) - float(official_value)
+    return {
+        "FY": fy,
+        "fed_path": fed_path,
+        "series_id": series_id,
+        "display_name": display_names.get(series_id, series_id),
+        "value": value,
+        "unit": unit,
+        "row_role": row_role,
+        "source_basis": source_basis,
+        "source_file": source_file,
+        "source_status": "source_backed",
+        "formula": formula,
+        "replacement_only": bool(replacement_only),
+        "official_value": official_value if official_value is not None else pd.NA,
+        "residual_vs_official": residual,
+        "availability_status": availability_status,
+    }
 
 
 def _issue(severity: str, check: str, message: str) -> dict[str, str]:
@@ -1458,8 +2056,12 @@ def _scenario_role(line: str) -> str:
 
 
 def _path_status(forecast_path: str, line: str) -> str:
-    if line in {"Actual", "Actual / benchmark"} or forecast_path in {"actual", "actual_benchmark", "official_actual"}:
+    if line in {"Actual", "Actual / benchmark", "actual", "benchmark_or_release_value", "policy_overlay_actual"} or forecast_path in {"actual", "actual_benchmark", "official_actual"}:
         return "actual_or_benchmark"
+    if forecast_path.startswith("mot_release:") or forecast_path == "mot_release":
+        return "selected_mot_release_forecast"
+    if forecast_path.startswith("fed_path:") or forecast_path == "fed_path":
+        return "fed_path_rate"
     if forecast_path == "selected_dashboard_basis":
         return "selected_workbook_basis"
     if forecast_path == "in_house_prediction":
@@ -1487,8 +2089,10 @@ def _revenue_basis(label: str, unit: str) -> str:
 def _bridge_status(forecast_role: str, source_status: str, line: str) -> str:
     if source_status == "unregistered_source_series":
         return "source_registry_gap"
-    if line in {"Actual", "Actual / benchmark"}:
+    if line in {"Actual", "Actual / benchmark", "actual", "benchmark_or_release_value", "policy_overlay_actual"}:
         return "source_actual_or_benchmark"
+    if line == "rate_path":
+        return "rate_path_source"
     if forecast_role in {"econometric_bridge", "derived_bridge"}:
         return "bridge_required"
     if forecast_role in {"official_pass_through", "deduction", "optional_overlay", "derived_scenario_split"}:

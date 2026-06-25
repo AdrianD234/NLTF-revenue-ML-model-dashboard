@@ -3,13 +3,20 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import sys
 from typing import Any
+
+ROOT = Path(__file__).resolve().parents[1]
+RUNTIME_PYARROW24 = ROOT / ".runtime_pyarrow24"
+if RUNTIME_PYARROW24.exists() and str(RUNTIME_PYARROW24) not in sys.path:
+    sys.path.insert(0, str(RUNTIME_PYARROW24))
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 import numpy as np
 import pandas as pd
 
 
-ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DATA_ROOT = ROOT / "data" / "dashboard_evidence_pack"
 
 REQUIRED_TABLE_COLUMNS = {

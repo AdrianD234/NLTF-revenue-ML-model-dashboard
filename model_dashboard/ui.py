@@ -199,21 +199,22 @@ def inject_theme() -> None:
                 align-items: stretch;
                 border-bottom: 1px solid var(--gov-border);
                 display: flex;
-                gap: 0.48rem;
+                flex-wrap: wrap;
+                gap: 0.2rem;
                 justify-content: flex-end;
-                min-height: 28px;
-                padding-left: clamp(430px, 36vw, 650px);
-                padding-right: 170px;
+                min-height: 24px;
+                padding-left: clamp(380px, 32vw, 560px);
+                padding-right: clamp(165px, 13vw, 220px);
             }}
             .st-key-gov_page div[data-testid="stRadio"] div[role="radiogroup"] label {{
                 border-bottom: 3px solid transparent;
                 border-radius: 7px 7px 0 0;
                 color: var(--gov-navy);
                 display: flex;
-                font-size: 0.8rem;
+                font-size: 0.69rem;
                 font-weight: 700;
                 min-width: max-content;
-                padding: 0.22rem 0.5rem 0.34rem;
+                padding: 0.14rem 0.26rem 0.22rem;
                 white-space: nowrap;
             }}
             .st-key-gov_page div[data-testid="stRadio"] div[role="radiogroup"] label > div:first-child {{
@@ -235,7 +236,7 @@ def inject_theme() -> None:
                 color: #FFFFFF !important;
             }}
             .st-key-gov_page div[data-testid="stRadio"] div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] p {{
-                font-size: 0.8rem;
+                font-size: 0.69rem;
                 font-weight: 700;
                 white-space: nowrap;
             }}
