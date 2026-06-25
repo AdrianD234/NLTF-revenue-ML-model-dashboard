@@ -737,10 +737,9 @@ def test_revenue_outlook_primary_figures_use_runtime_pack_selected_series_only()
     bridge = pd.read_csv(ROOT / "data" / "current_revenue_outlook" / "revenue_bridge_components.csv")
     traces = [
         "Actual",
+        "MBU26 official",
         "Current finalist Base case",
         "Current finalist High population/comparison",
-        "Official comparator: selected MOT/BEFU",
-        "Official comparator: rolling BEFU 1Y",
     ]
 
     rows = _filter_revenue_outlook_rows(

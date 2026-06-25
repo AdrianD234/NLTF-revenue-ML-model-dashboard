@@ -1995,9 +1995,9 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     section_title(REVENUE_OUTLOOK_TITLE)
     st.caption(
         "Governed NLTF revenue architecture from the committed runtime pack: source actuals, current finalist "
-        "forecasts and official MOT/BEFU comparators."
+        "forecasts and the MBU26 official comparator."
     )
-    st.caption("Source policy: committed runtime pack only; no latest-folder scan; no runtime source-pack chart join.")
+    st.caption("Source policy: committed runtime pack only; no latest-folder scan; no runtime source-pack chart join; no Excel workbook model forecasts.")
 
     if chart_rows.empty:
         warning_panel("The promoted Revenue Outlook pack has no chart rows.")
@@ -2080,7 +2080,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     with primary_cols[1]:
         chart_card(
             "Uncertainty fan",
-            "MOT archived-error fan if materialized; otherwise an explicit runtime-pack governance gap.",
+            "Archived-error fan if materialized; otherwise an explicit runtime-pack governance gap.",
             revenue_outlook_uncertainty_fan_figure(filtered_rows, selected_series=selected_stream),
             caption="No fallback source-pack chart engine is used on this page.",
             notes_as_tooltip=False,
@@ -3904,7 +3904,7 @@ def _revenue_outlook_stream_options(chart_rows: pd.DataFrame) -> list[str]:
         "Net FED revenue",
         "Total RUC all classes",
         "Net MVR revenue",
-        "Total FED+RUC net revenue",
+        "Total RUC+PED revenue",
         "Total NLTF revenue",
         "Light RUC volume",
         "Heavy RUC volume",
@@ -3946,10 +3946,9 @@ def _revenue_outlook_trace_options(chart_rows: pd.DataFrame) -> list[str]:
     available = set(data["trace_name"].dropna().astype(str))
     preferred = [
         "Actual",
+        "MBU26 official",
         "Current finalist Base case",
         "Current finalist High population/comparison",
-        "Official comparator: selected MOT/BEFU",
-        "Official comparator: rolling BEFU 1Y",
     ]
     ordered = [trace for trace in preferred if trace in available]
     ordered.extend(sorted(available.difference(ordered)))
@@ -4054,10 +4053,9 @@ def revenue_outlook_total_path_figure(rows: pd.DataFrame, *, selected_series: st
     fig = go.Figure()
     trace_styles = {
         "Actual": ("#737373", "solid", 2.4),
+        "MBU26 official": ("#00843D", "dash", 2.2),
         "Current finalist Base case": ("#006FAD", "solid", 2.8),
         "Current finalist High population/comparison": ("#E56B2B", "solid", 2.4),
-        "Official comparator: selected MOT/BEFU": ("#00843D", "dash", 2.2),
-        "Official comparator: rolling BEFU 1Y": ("#6B4E71", "dot", 2.2),
     }
     trace_names = _ordered_runtime_trace_names(data)
     for trace_name in trace_names:
@@ -4115,7 +4113,7 @@ def revenue_outlook_uncertainty_fan_figure(rows: pd.DataFrame, *, selected_serie
         return _revenue_outlook_gap_figure("Selected series has no runtime-pack rows for uncertainty review.", height=250)
     if not band_columns.issubset(data.columns):
         return _revenue_outlook_gap_figure(
-            "MOT archived-error fan bands are not materialized in data/current_revenue_outlook for this selected series.",
+            "Runtime fan bands are not materialized in data/current_revenue_outlook for this selected series.",
             height=250,
         )
     data["value_numeric"] = pd.to_numeric(data.get("value"), errors="coerce")
@@ -4247,10 +4245,9 @@ def _ordered_runtime_trace_names(rows: pd.DataFrame) -> list[str]:
     available = set(rows["trace_name"].dropna().astype(str))
     preferred = [
         "Actual",
+        "MBU26 official",
         "Current finalist Base case",
         "Current finalist High population/comparison",
-        "Official comparator: selected MOT/BEFU",
-        "Official comparator: rolling BEFU 1Y",
     ]
     ordered = [trace for trace in preferred if trace in available]
     ordered.extend(sorted(available.difference(ordered)))
@@ -4421,10 +4418,9 @@ def _scenario_color_map(rows: pd.DataFrame) -> dict[str, str]:
     palette = ["#006FAD", "#E56B2B", "#00843D", "#6B4E71", "#C2410C", "#0F766E"]
     trace_palette = {
         "Actual": "#737373",
+        "MBU26 official": "#00843D",
         "Current finalist Base case": "#006FAD",
         "Current finalist High population/comparison": "#E56B2B",
-        "Official comparator: selected MOT/BEFU": "#00843D",
-        "Official comparator: rolling BEFU 1Y": "#6B4E71",
     }
     output: dict[str, str] = {}
     if rows is None or rows.empty:

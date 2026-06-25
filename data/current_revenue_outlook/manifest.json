@@ -1,19 +1,24 @@
 {
   "schema_version": "revenue-outlook-pack-v1",
   "pack_status": "explicitly_promoted_current_outlook",
-  "runtime_pack_type": "source_actual_current_finalist_official_comparator",
-  "promotion_time": "2026-06-25T05:34:15.787329+00:00",
-  "promoted_by": "repo_source_runtime_rebuild",
+  "runtime_pack_type": "mbu26_actual_current_finalist_official_comparator",
+  "promotion_time": "2026-06-25T21:42:25.800323+00:00",
+  "promoted_by": "codex_mbu26_runtime_rebuild",
   "repo_relative_output_dir": "data/current_revenue_outlook",
-  "source_policy": "committed_current_runtime_pack_only; no Streamlit runtime source-pack join; no annual_model_paths.csv legacy in-house forecasts",
-  "runtime_policy": "Revenue Outlook runtime rows are materialized from repo-local source actuals, current finalist forecasts and official MOT/BEFU comparators. Source-pack tables are retained as audit lineage and are not a second Streamlit chart engine.",
+  "source_policy": "committed_current_runtime_pack_only; MBU26 annual source spine is repo-local; Streamlit does not load the offline workbook or legacy Excel forecast paths",
+  "runtime_policy": "Revenue Outlook runtime rows are materialized from repo-local source actuals, current finalist forecasts and the MBU26 official comparator. Source-pack tables are retained as audit lineage and are not a second Streamlit chart engine.",
   "allowed_traces": [
     "Actual",
+    "MBU26 official",
     "Current finalist Base case",
-    "Current finalist High population/comparison",
-    "Official comparator: selected MOT/BEFU",
-    "Official comparator: rolling BEFU 1Y"
+    "Current finalist High population/comparison"
   ],
+  "runtime_source_layers": {
+    "A_actuals": "MBU26 annual source rows through last complete FY2025",
+    "B_official_comparator": "MBU26 official forecast rows for FY2026+",
+    "C_current_finalist_activity": "Promoted quarterly finalist outputs annualized by June year",
+    "D_hybrid_current_revenue": "Only PED, Light RUC and Heavy RUC revenue are replaced; all other rows use MBU26 official components."
+  },
   "period_rule": {
     "last_complete_actual_fy": 2025,
     "first_forecast_quarter": "2026Q1",
@@ -146,55 +151,132 @@
         "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_high_population (2) - Copy.xlsx",
         "workbook_sha256": "6213ce565cf1f4a058a3ea9f1af4d5476a8b0423a4d8747905c3cba128380ce1"
       }
-    ]
+    ],
+    "mbu26_annual_spine": {
+      "repo_relative_path": "data/revenue_model_source_pack/mbu26_annual_spine",
+      "manifest_sha256": "fee4c2bde49bc381266aaec41c0e1762c5e529a5c948a59f592f8224fa91f836",
+      "source_release": "MBU26",
+      "schema_version": "nltf-revenue-mbu26-annual-spine-v1",
+      "workbook_basename": "Revenue forecast error, annual view from BEFU 2013-25.xlsx",
+      "workbook_sha256": "9aaff21f72c0a10cfa972a29d3c4f716495c79cbd72fc28e8008a65558454e12",
+      "normalized_files": {
+        "mbu26_annual_spine.csv": {
+          "sha256": "521cad24224ef2f109b82bcd2a6581e0cb47dd2b5379da2bdd7e9662b8667b0d",
+          "size_bytes": 772130
+        },
+        "mbu26_annual_spine.parquet": {
+          "sha256": "a7fade5db952d8e87d3684990854b84fb0aa261f9dd088bc2f4bd1e12482882e",
+          "size_bytes": 59280
+        },
+        "mbu26_formula_audit.csv": {
+          "sha256": "ee3ed9dfd8133324fdfba849804a87d38a874a7f5bae660fc02dfbe006a7139a",
+          "size_bytes": 204959
+        },
+        "mbu26_formula_audit.parquet": {
+          "sha256": "b35f383252ea464c5ce18eb685138f6decae5678b306cf226cff5464718ecdf5",
+          "size_bytes": 38224
+        },
+        "mbu26_official_annual.csv": {
+          "sha256": "e5631204c4dc096b86ba3b81266a92b18d0004fca0174da2fa82bb631ee402d0",
+          "size_bytes": 889282
+        },
+        "mbu26_official_annual.parquet": {
+          "sha256": "c0c134adf022cab15bc59f9c7d3462b76a37996a48ad288141df881e115cd16a",
+          "size_bytes": 62699
+        },
+        "row_reconciliation.csv": {
+          "sha256": "ee3ed9dfd8133324fdfba849804a87d38a874a7f5bae660fc02dfbe006a7139a",
+          "size_bytes": 204959
+        },
+        "row_reconciliation.parquet": {
+          "sha256": "b35f383252ea464c5ce18eb685138f6decae5678b306cf226cff5464718ecdf5",
+          "size_bytes": 38224
+        },
+        "series_trace_contract.csv": {
+          "sha256": "2eaf18c4c54fc18a21dd68415c0aea041bd174e8d75285409a4bb83034b60e09",
+          "size_bytes": 8081
+        },
+        "series_trace_contract.parquet": {
+          "sha256": "5706036ec8e179dbc31003e6ab6dcd966d0d02216f8c30d5e4f4c48ba36e9d3f",
+          "size_bytes": 13586
+        },
+        "trace_source_contract.csv": {
+          "sha256": "396a97e28c43adc892c438ce92fe16a847d87b0ad91c6f8ec1334416c85a070a",
+          "size_bytes": 1979
+        },
+        "trace_source_contract.parquet": {
+          "sha256": "17fda181174f117be894a0f638c992b988a418a3dba9c08ee77bdfe78b7c8bd9",
+          "size_bytes": 10321
+        },
+        "path_trace_status.csv": {
+          "sha256": "9aee7a4e7003ec6541476ca3e4afef6d8586b6c358e41db1c8e06623e5ffcaa3",
+          "size_bytes": 842
+        },
+        "path_trace_status.parquet": {
+          "sha256": "e79340ac5be2b4847c7b0670ec1e04e9509e00f8e3d43c852e4ed844c891e5cf",
+          "size_bytes": 5974
+        }
+      }
+    }
+  },
+  "mbu26_annual_spine": {
+    "status": "mbu26_annual_spine_vendored",
+    "source_release": "MBU26",
+    "schema_version": "nltf-revenue-mbu26-annual-spine-v1",
+    "repo_relative_path": "data/revenue_model_source_pack/mbu26_annual_spine",
+    "manifest_sha256": "fee4c2bde49bc381266aaec41c0e1762c5e529a5c948a59f592f8224fa91f836",
+    "workbook_basename": "Revenue forecast error, annual view from BEFU 2013-25.xlsx",
+    "workbook_sha256": "9aaff21f72c0a10cfa972a29d3c4f716495c79cbd72fc28e8008a65558454e12",
+    "sheet": "MBU26",
+    "source_policy": "MBU26 worksheet only; workbook is offline lineage and is never loaded at Streamlit runtime.",
+    "row_count": {
+      "mbu26_annual_spine": 2145,
+      "mbu26_formula_audit": 770,
+      "mbu26_official_annual": 2200,
+      "row_reconciliation": 770,
+      "series_trace_contract": 14,
+      "trace_source_contract": 4,
+      "path_trace_status": 4
+    },
+    "formula_policy": "MBU26 annual value cells are stored without Excel formulas in the grid; aggregate formula contracts are asserted from MBU26 row identities and residuals are reported without force-balancing."
   },
   "revenue_source_pack": {
-    "status": "source_pack_vendored",
-    "repo_relative_path": "data/revenue_model_source_pack/2026_05_19",
-    "source_pack_version": "2026_05_19",
-    "schema_version": "nltf-revenue-source-pack-v1",
-    "raw_workbook_basename": "19 05 2026 Latest NLTF revenue forecast model.xlsx",
-    "raw_workbook_sha256": "00c6070694818d27d7c402749354d8175de999894846dce45a4abdd7f5eb3e6b",
-    "distilled_workbook_basename": "NLTF_revenue_model_distilled.xlsx",
-    "distilled_workbook_sha256": "c7b9c80011a01cc86cc374b1a1ffbf0eb69e14dccc6690e1c54ffc6d6f9ed716",
-    "source_pack_manifest_sha256": "ab3cb81048625b2beb199d177af9616338877c1631fa96185e601997c537f456",
+    "status": "mbu26_annual_spine_vendored",
+    "repo_relative_path": "data/revenue_model_source_pack/mbu26_annual_spine",
+    "source_pack_version": "MBU26",
+    "schema_version": "nltf-revenue-mbu26-annual-spine-v1",
+    "raw_workbook_basename": "Revenue forecast error, annual view from BEFU 2013-25.xlsx",
+    "raw_workbook_sha256": "9aaff21f72c0a10cfa972a29d3c4f716495c79cbd72fc28e8008a65558454e12",
+    "source_pack_manifest_sha256": "fee4c2bde49bc381266aaec41c0e1762c5e529a5c948a59f592f8224fa91f836",
     "selections": {
-      "crown_top_up": "Exclude",
-      "fed_path_scenario": "Current planned path",
-      "model_basis": "Current finalist ensemble",
-      "release_round": "BEFU25",
-      "revenue_path": "Net of admin fees & refunds",
-      "scenario": "Medium",
-      "selected_fy": "FY2031",
       "series": "Total NLTF revenue",
-      "uncertainty_source": "MOT release round",
-      "view": "Annual"
+      "release_round": "MBU26",
+      "revenue_path": "Net of admin fees & refunds",
+      "scenario": "MBU26 official + current finalist base/comparison",
+      "fed_path_scenario": "Current planned path",
+      "view": "Annual",
+      "model_basis": "Current finalist ensemble",
+      "uncertainty_source": "not materialized",
+      "selected_fy": "FY2031",
+      "crown_top_up": "Exclude"
     },
     "dashboard_default_selections": {
-      "crown_top_up": "Exclude",
-      "fed_path_scenario": "Current planned path",
-      "model_basis": "Current finalist ensemble",
-      "release_round": "BEFU25",
-      "revenue_path": "Net of admin fees & refunds",
-      "scenario": "Medium",
-      "selected_fy": "FY2031",
       "series": "Total NLTF revenue",
-      "uncertainty_source": "MOT release round",
-      "view": "Annual"
+      "release_round": "MBU26",
+      "revenue_path": "Net of admin fees & refunds",
+      "scenario": "MBU26 official + current finalist base/comparison",
+      "fed_path_scenario": "Current planned path",
+      "view": "Annual",
+      "model_basis": "Current finalist ensemble",
+      "uncertainty_source": "not materialized",
+      "selected_fy": "FY2031",
+      "crown_top_up": "Exclude"
     },
     "source_workbook_selections": {
-      "crown_top_up": "Exclude",
-      "fed_path_scenario": "Current planned path",
-      "model_basis": "In-house model",
-      "release_round": "BEFU25",
-      "revenue_path": "Net of admin fees & refunds",
-      "scenario": "Medium",
-      "selected_fy": "FY2031",
-      "series": "Total RUC+PED revenue",
-      "uncertainty_source": "MOT release round",
-      "view": "Annual"
+      "release_round": "MBU26",
+      "sheet": "MBU26"
     },
-    "default_selection_policy": "Revenue Outlook defaults to Total NLTF revenue even when the source workbook current selection uses the legacy Total RUC+PED subtotal."
+    "default_selection_policy": "Revenue Outlook defaults to Total NLTF revenue from the MBU26 source spine."
   },
   "bridge_status_by_stream": {
     "PED": [
@@ -208,15 +290,15 @@
     ]
   },
   "equations": {
-    "PED": "PED revenue = VKT/capita * scenario population -> total VKT * governed litres/100km * nominal PED/FED rate.",
-    "LIGHT_RUC": "Light RUC revenue = current finalist net km / 1,000 * governed effective Light RUC rate.",
-    "HEAVY_RUC": "Heavy RUC revenue = current finalist net km / 1,000 * governed class-mix Heavy RUC rate.",
-    "ROLLUPS": "Gross FED, Net FED, Total RUC, Total RUC+PED and Total NLTF recalculate exactly three replacement lines plus MOT fixed components."
+    "PED": "PED revenue = current finalist VKT/capita * MBU26 population -> total VKT * MBU26 litres/100km * MBU26 gross PED rate.",
+    "LIGHT_RUC": "Light RUC revenue = current finalist net km * MBU26 effective Light RUC rate.",
+    "HEAVY_RUC": "Heavy RUC revenue = current finalist net km * MBU26 effective Heavy RUC rate.",
+    "ROLLUPS": "Gross FED, Net FED, Total RUC, Total RUC+PED and Total NLTF recalculate three replacement lines plus MBU26 fixed components."
   },
   "rate_provenance": {
-    "future_light_heavy": "official_befu25_annual.csv effective rates joined to current finalist net-km outputs",
-    "future_ped": "ped_bridge_inputs.csv population/intensity plus fed_rate_paths.csv nominal rate joined to current finalist PED VKT/capita",
-    "fixed_components": "official_befu25_annual.csv selected-MOT rows"
+    "future_light_heavy": "mbu26_official_annual.csv effective rates joined to current finalist net-km outputs",
+    "future_ped": "MBU26 population/intensity/rate joined to current finalist PED VKT/capita",
+    "fixed_components": "mbu26_official_annual.csv official rows"
   },
   "trace_audit": {
     "repo_relative_path": "data/current_revenue_outlook/runtime_trace_audit.csv",
@@ -225,60 +307,68 @@
   "validation_status": "runtime_rebuilt",
   "output_hashes": {
     "future_revenue_forecasts.csv": {
-      "sha256": "f9addbed5a596d18c2c51f0a58cb2098ffca9b861d6654f54c28c0da00d938d8",
-      "size_bytes": 157500
+      "sha256": "82135a315d90563e0750a3598dd8b24ce9f1bc9a0fc36faf9bc0a820e45c8443",
+      "size_bytes": 213270
     },
     "future_revenue_forecasts.parquet": {
-      "sha256": "7f6955ff3147ce03e85a4166ad773dd94356c226a700e42245de6ddda823463b",
-      "size_bytes": 18953
+      "sha256": "b9027e7604157d0e5eface39ebed2b49d849ce24a5868d5d534f89c248d07872",
+      "size_bytes": 24759
     },
     "path_trace_status.csv": {
-      "sha256": "b0b2b2f01c6977e869a21f620485e686c119b1895d29e1c67d12ce7afb9adfe3",
-      "size_bytes": 1064
+      "sha256": "9aee7a4e7003ec6541476ca3e4afef6d8586b6c358e41db1c8e06623e5ffcaa3",
+      "size_bytes": 842
     },
     "path_trace_status.parquet": {
-      "sha256": "65e91a936ae5033d050469d57fbd09bf049edf62e47baa8b2ea670be7f84d97c",
-      "size_bytes": 6581
+      "sha256": "e66d860fb7532ee4b92285c1ba023c9f8d9469cfdaaaef819415f7cd87c73757",
+      "size_bytes": 5960
     },
     "revenue_bridge_components.csv": {
-      "sha256": "132a9a0ff3e302ea73194b14b60cc2b2969e519ae74876db2e3878ac6c8bb2e1",
-      "size_bytes": 274698
+      "sha256": "f1227fd260deb40bd621d124b0a64e623a3c9842472320ecb198ab858f20fee2",
+      "size_bytes": 334758
     },
     "revenue_bridge_components.parquet": {
-      "sha256": "b274052e704dae5da0f141c8f4b1dd11131d5165ee75e1d31a776e0c6729a4b5",
-      "size_bytes": 25503
+      "sha256": "d722843c704056e3801a8842509ecc27b5c404083a23452291c8fbbab26839ca",
+      "size_bytes": 41179
     },
     "revenue_chart_rows.csv": {
-      "sha256": "4d52e18fb2e7414419cb4f53b69e9b4fd09eb5b43c51725ec6f972373d8a57e0",
-      "size_bytes": 1048616
+      "sha256": "84618e9ce0ea8994744140e46a06a9b465ca578cfa84281467a5807fef81a8d8",
+      "size_bytes": 1538068
     },
     "revenue_chart_rows.parquet": {
-      "sha256": "4084a32cae2dd43f663415c24aa460b95f8a8a17010f64e7c2e05194663dcfbc",
-      "size_bytes": 67172
+      "sha256": "79b079abfa4589b0a249b12d3fa656a4401fbed238758051ef03f21339e98a43",
+      "size_bytes": 104163
+    },
+    "row_reconciliation.csv": {
+      "sha256": "d484f5d75cce88e30ce7bcf5dd70058505cc02e5dff93f457a579f119c2fc7ce",
+      "size_bytes": 204693
+    },
+    "row_reconciliation.parquet": {
+      "sha256": "bf2b638920e4b9b00ca4ac00d4263083258ce0d94625943c4e7b3cdf90493dd7",
+      "size_bytes": 38215
     },
     "runtime_trace_audit.csv": {
-      "sha256": "405b142d5da3d2a373b96392c98a19c11003db599799b3c0f0fd64c798ce8016",
-      "size_bytes": 118824
+      "sha256": "26071ca6944cb2e4070b128ae8305d9d262708d87125b2d464567ea7c1414fbd",
+      "size_bytes": 54240
     },
     "runtime_trace_audit.parquet": {
-      "sha256": "935a752438f027b97c9b34a12205a67d16d270cab9d8c3aedb146a73b3464a87",
-      "size_bytes": 17382
+      "sha256": "095bdee6de33ce2a0c017cf20082ede1074fbfdf5898353a461f28bd2f117348",
+      "size_bytes": 19587
     },
     "series_trace_contract.csv": {
-      "sha256": "bbfe7a0fb06569540ee6ad94f5d6f1b8924af0c0490eeebd053eaee30cdd0d16",
-      "size_bytes": 16105
+      "sha256": "2eaf18c4c54fc18a21dd68415c0aea041bd174e8d75285409a4bb83034b60e09",
+      "size_bytes": 8081
     },
     "series_trace_contract.parquet": {
-      "sha256": "6a1ae2a1abf43a68185f1e61e287ef316367ac32da9e70d8f081d1e49e35c311",
-      "size_bytes": 15895
+      "sha256": "5706036ec8e179dbc31003e6ab6dcd966d0d02216f8c30d5e4f4c48ba36e9d3f",
+      "size_bytes": 13586
     },
     "trace_source_contract.csv": {
-      "sha256": "3a8b3b66da395cad28c74622c12bb43af1a6e035eb5917e9d9e61e52539a50d5",
-      "size_bytes": 1428
+      "sha256": "396a97e28c43adc892c438ce92fe16a847d87b0ad91c6f8ec1334416c85a070a",
+      "size_bytes": 1979
     },
     "trace_source_contract.parquet": {
-      "sha256": "282d61fc1487883ed6daa126f0fac4bb7da9ddc88d79cbf1fde1dd15b3c7d34c",
-      "size_bytes": 8555
+      "sha256": "17fda181174f117be894a0f638c992b988a418a3dba9c08ee77bdfe78b7c8bd9",
+      "size_bytes": 10321
     }
   }
 }

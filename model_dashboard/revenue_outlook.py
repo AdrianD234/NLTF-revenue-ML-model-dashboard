@@ -28,6 +28,13 @@ from .forecast_imports import (
     SCENARIO_ROLE_COMPARISON,
     quarter_sort_key,
 )
+from .mbu26_source_spine import (
+    MBU26_RELEASE_ROUND,
+    MBU26_SCHEMA_VERSION,
+    MBU26_SOURCE_PACK_DIR,
+    current_forecast_annual_from_mbu26,
+    load_mbu26_annual_spine,
+)
 from .revenue_source_pack import (
     CURRENT_FINALIST_COMPOSITE_MODEL_ID,
     CURRENT_FINALIST_MODEL_IDS,
@@ -134,7 +141,7 @@ SOURCE_COMPARISON_OUTPUT_DIR_POLICY = (
 )
 CURRENT_RUNTIME_POLICY = (
     "Revenue Outlook runtime rows are materialized from repo-local source actuals, "
-    "current finalist forecasts and official MOT/BEFU comparators. Source-pack "
+    "current finalist forecasts and the MBU26 official comparator. Source-pack "
     "tables are retained as audit lineage and are not a second Streamlit chart engine."
 )
 REVENUE_FIRST_FORECAST_FY = 2026
@@ -265,9 +272,10 @@ def build_current_revenue_outlook_runtime_pack(
 ) -> RevenueOutlookPack:
     """Materialize the committed Revenue Outlook pack from repo-local sources.
 
-    This is the deployment/runtime path. It uses the normalized source pack as
-    an offline input and writes chart-ready rows into data/current_revenue_outlook
-    so Streamlit does not need to join source-pack tables at render time.
+    This is the deployment/runtime path. It uses the repo-local MBU26 annual
+    source spine plus current-finalist quarterly outputs already promoted into
+    ``data/current_revenue_outlook``. The offline workbook is never loaded by
+    Streamlit.
     """
 
     root = Path(repo_root) if repo_root is not None else repo_root_from_here()
@@ -275,32 +283,27 @@ def build_current_revenue_outlook_runtime_pack(
     base.mkdir(parents=True, exist_ok=True)
 
     existing_manifest = _read_existing_manifest(base)
-    source_pack = load_revenue_source_pack(repo_root=root)
-    current = source_pack.current_forecast_annual.copy()
+    mbu26_pack = load_mbu26_annual_spine(repo_root=root)
+    if mbu26_pack is None:
+        raise ValueError(
+            "Cannot rebuild current Revenue Outlook runtime pack: "
+            f"{MBU26_SOURCE_PACK_DIR.as_posix()} is missing."
+        )
+    existing_chart_rows = _read_optional_csv(base / "revenue_chart_rows.csv")
+    current = current_forecast_annual_from_mbu26(
+        current_outlook_chart_rows=existing_chart_rows,
+        mbu26_official_annual=mbu26_pack.official_annual,
+    )
     if current.empty:
         raise ValueError("Cannot rebuild current Revenue Outlook runtime pack: current finalist annual rows are missing.")
 
-    existing_chart_rows = _read_optional_csv(base / "revenue_chart_rows.csv")
-    series_meta = _runtime_series_metadata(source_pack.series_trace_contract)
+    series_meta = _runtime_series_metadata(mbu26_pack.series_trace_contract)
     quarterly_inputs = _runtime_quarterly_activity_inputs(existing_chart_rows, series_meta)
-    actual_rows = _runtime_actual_rows(source_pack.series_junction_audit, series_meta)
+    actual_rows = _runtime_mbu26_actual_rows(mbu26_pack.official_annual, series_meta)
     current_rows = _runtime_current_rows(current, series_meta)
-    selected_release_rows = _runtime_release_rows(
-        source_pack.release_values,
-        series_meta,
-        trace_name="Official comparator: selected MOT/BEFU",
-        scenario_name="official_selected_mot_befu",
-        trace_source="selected_mot_befu_release",
-    )
-    rolling_release_rows = _runtime_release_rows(
-        source_pack.release_values,
-        series_meta,
-        trace_name="Official comparator: rolling BEFU 1Y",
-        scenario_name="official_rolling_befu_1y",
-        trace_source="rolling_befu_1y",
-    )
+    mbu26_official_rows = _runtime_mbu26_official_rows(mbu26_pack.official_annual, series_meta)
     chart_rows = pd.concat(
-        [quarterly_inputs, actual_rows, current_rows, selected_release_rows, rolling_release_rows],
+        [quarterly_inputs, actual_rows, current_rows, mbu26_official_rows],
         ignore_index=True,
         sort=False,
     )
@@ -312,25 +315,33 @@ def build_current_revenue_outlook_runtime_pack(
     trace_audit = _runtime_trace_audit(chart_rows)
 
     scenarios = _runtime_scenario_records(existing_manifest, current)
+    promotion_time = existing_manifest.get("promotion_time") if isinstance(existing_manifest, dict) else ""
+    if not str(promotion_time or "").strip():
+        promotion_time = datetime.now(timezone.utc).isoformat()
     manifest = {
         "schema_version": REVENUE_OUTLOOK_SCHEMA_VERSION,
         "pack_status": "explicitly_promoted_current_outlook",
-        "runtime_pack_type": "source_actual_current_finalist_official_comparator",
-        "promotion_time": datetime.now(timezone.utc).isoformat(),
+        "runtime_pack_type": "mbu26_actual_current_finalist_official_comparator",
+        "promotion_time": promotion_time,
         "promoted_by": promoted_by,
         "repo_relative_output_dir": _repo_relative(root, base),
         "source_policy": (
-            "committed_current_runtime_pack_only; no Streamlit runtime source-pack join; "
-            "no annual_model_paths.csv legacy in-house forecasts"
+            "committed_current_runtime_pack_only; MBU26 annual source spine is repo-local; "
+            "Streamlit does not load the offline workbook or legacy Excel forecast paths"
         ),
         "runtime_policy": CURRENT_RUNTIME_POLICY,
         "allowed_traces": [
             "Actual",
+            "MBU26 official",
             "Current finalist Base case",
             "Current finalist High population/comparison",
-            "Official comparator: selected MOT/BEFU",
-            "Official comparator: rolling BEFU 1Y",
         ],
+        "runtime_source_layers": {
+            "A_actuals": "MBU26 annual source rows through last complete FY2025",
+            "B_official_comparator": "MBU26 official forecast rows for FY2026+",
+            "C_current_finalist_activity": "Promoted quarterly finalist outputs annualized by June year",
+            "D_hybrid_current_revenue": "Only PED, Light RUC and Heavy RUC revenue are replaced; all other rows use MBU26 official components.",
+        },
         "period_rule": {
             "last_complete_actual_fy": REVENUE_LAST_COMPLETE_ACTUAL_FY,
             "first_forecast_quarter": REVENUE_FIRST_FORECAST_QUARTER,
@@ -349,23 +360,24 @@ def build_current_revenue_outlook_runtime_pack(
         },
         "scenario_roles": scenarios,
         "join_key_contract": CANONICAL_JOIN_KEY_CONTRACT,
-        "source_hashes": existing_manifest.get("source_hashes") or _source_hashes(root, scenarios),
-        "revenue_source_pack": _revenue_source_pack_metadata(root),
+        "source_hashes": _runtime_source_hashes(root, scenarios, mbu26_pack),
+        "mbu26_annual_spine": _mbu26_annual_spine_metadata(root, mbu26_pack),
+        "revenue_source_pack": _mbu26_runtime_source_metadata(root, mbu26_pack),
         "bridge_status_by_stream": {
             "PED": ["available"],
             "LIGHT_RUC": ["available"],
             "HEAVY_RUC": ["available"],
         },
         "equations": {
-            "PED": "PED revenue = VKT/capita * scenario population -> total VKT * governed litres/100km * nominal PED/FED rate.",
-            "LIGHT_RUC": "Light RUC revenue = current finalist net km / 1,000 * governed effective Light RUC rate.",
-            "HEAVY_RUC": "Heavy RUC revenue = current finalist net km / 1,000 * governed class-mix Heavy RUC rate.",
-            "ROLLUPS": "Gross FED, Net FED, Total RUC, Total RUC+PED and Total NLTF recalculate exactly three replacement lines plus MOT fixed components.",
+            "PED": "PED revenue = current finalist VKT/capita * MBU26 population -> total VKT * MBU26 litres/100km * MBU26 gross PED rate.",
+            "LIGHT_RUC": "Light RUC revenue = current finalist net km * MBU26 effective Light RUC rate.",
+            "HEAVY_RUC": "Heavy RUC revenue = current finalist net km * MBU26 effective Heavy RUC rate.",
+            "ROLLUPS": "Gross FED, Net FED, Total RUC, Total RUC+PED and Total NLTF recalculate three replacement lines plus MBU26 fixed components.",
         },
         "rate_provenance": {
-            "future_light_heavy": "official_befu25_annual.csv effective rates joined to current finalist net-km outputs",
-            "future_ped": "ped_bridge_inputs.csv population/intensity plus fed_rate_paths.csv nominal rate joined to current finalist PED VKT/capita",
-            "fixed_components": "official_befu25_annual.csv selected-MOT rows",
+            "future_light_heavy": "mbu26_official_annual.csv effective rates joined to current finalist net-km outputs",
+            "future_ped": "MBU26 population/intensity/rate joined to current finalist PED VKT/capita",
+            "fixed_components": "mbu26_official_annual.csv official rows",
         },
         "trace_audit": {
             "repo_relative_path": _repo_relative(root, base / "runtime_trace_audit.csv"),
@@ -373,8 +385,6 @@ def build_current_revenue_outlook_runtime_pack(
         },
         "validation_status": "runtime_rebuilt",
     }
-    manifest["revenue_source_pack"]["dashboard_default_selections"]["model_basis"] = "Current finalist ensemble"
-    manifest["revenue_source_pack"]["selections"]["model_basis"] = "Current finalist ensemble"
 
     _write_pack_files(
         base,
@@ -384,9 +394,10 @@ def build_current_revenue_outlook_runtime_pack(
         chart_rows,
         extra_frames={
             "runtime_trace_audit": trace_audit,
-            "trace_source_contract": source_pack.trace_source_contract,
-            "series_trace_contract": source_pack.series_trace_contract,
-            "path_trace_status": source_pack.path_trace_status,
+            "trace_source_contract": mbu26_pack.trace_source_contract,
+            "series_trace_contract": mbu26_pack.series_trace_contract,
+            "path_trace_status": mbu26_pack.path_trace_status,
+            "row_reconciliation": mbu26_pack.row_reconciliation,
         },
     )
     return load_revenue_outlook_pack(base, repo_root=root)  # type: ignore[return-value]
@@ -482,7 +493,7 @@ def _runtime_series_metadata(series_trace_contract: pd.DataFrame) -> dict[str, d
     fallback_labels = {
         "gross_fed_revenue": "Gross FED revenue",
         "total_ruc_net_revenue": "Total RUC all classes",
-        "total_fed_ruc_net_revenue": "Total FED+RUC net revenue",
+        "total_fed_ruc_net_revenue": "Total RUC+PED revenue",
         "total_nltf_net_revenue": "Total NLTF revenue",
         "ped_vkt_per_capita": "PED VKT per capita",
         "light_ruc_net_km": "Light RUC net km",
@@ -549,6 +560,7 @@ def _runtime_quarterly_activity_inputs(chart_rows: pd.DataFrame, series_meta: di
         lambda row: "Actual" if str(row.get("row_type", "")) == "historical_actual" else _runtime_current_trace_name(row.get("scenario_name"), row.get("scenario_role")),
         axis=1,
     )
+    data["trace_type"] = data["trace_name"].map(_runtime_trace_type)
     data["trace_role"] = data.apply(
         lambda row: "source_actual" if str(row.get("row_type", "")) == "historical_actual" else "in_house_current_finalist",
         axis=1,
@@ -573,7 +585,128 @@ def _runtime_quarterly_activity_inputs(chart_rows: pd.DataFrame, series_meta: di
     data["anchor_flag"] = False
     data["nowcast_flag"] = False
     data["source_file"] = data.get("source", "")
+    data["source_cell"] = data.apply(
+        lambda row: f"data/current_revenue_outlook/revenue_chart_rows.csv:{row.get('scenario_name', '')}:{row.get('period', '')}",
+        axis=1,
+    )
+    data["replacement_only"] = False
     return data
+
+
+def _runtime_mbu26_actual_rows(official_annual: pd.DataFrame, series_meta: dict[str, dict[str, Any]]) -> pd.DataFrame:
+    columns = _runtime_chart_columns()
+    if official_annual is None or official_annual.empty:
+        return pd.DataFrame(columns=columns)
+    data = official_annual[
+        official_annual.get("series_id", pd.Series(dtype=str)).astype(str).isin(DISPLAY_SERIES_ORDER)
+    ].copy()
+    data["FY_numeric"] = pd.to_numeric(data.get("FY"), errors="coerce")
+    data["value_numeric"] = pd.to_numeric(data.get("value"), errors="coerce")
+    data = data[
+        data["FY_numeric"].le(REVENUE_LAST_COMPLETE_ACTUAL_FY)
+        & data["value_numeric"].notna()
+        & data.get("period_status", pd.Series("", index=data.index)).astype(str).str.upper().eq("ACTUAL")
+    ].copy()
+    records: list[dict[str, Any]] = []
+    for row in data.itertuples(index=False):
+        series_id = str(getattr(row, "series_id", "") or "")
+        fy = int(getattr(row, "FY_numeric"))
+        quarters = "; ".join(_expected_june_year_quarters(fy))
+        records.append(
+            _runtime_chart_record(
+                series_id=series_id,
+                series_meta=series_meta,
+                metric_type=_runtime_metric_type(series_meta.get(series_id, {}).get("metric_type"), getattr(row, "unit", "")),
+                time_grain="june_year",
+                row_type="historical_actual",
+                trace_name="Actual",
+                trace_type="Actual",
+                trace_role="source_actual",
+                trace_source="actual_benchmark",
+                scenario_name="actual",
+                scenario_role="actual",
+                period=f"FY{fy}",
+                june_year=fy,
+                value=getattr(row, "value_numeric"),
+                value_unit=getattr(row, "unit", ""),
+                source=getattr(row, "source_file", "mbu26_official_annual.csv"),
+                source_file=getattr(row, "source_file", "mbu26_official_annual.csv"),
+                source_cell=getattr(row, "source_cell", ""),
+                source_status=getattr(row, "period_status", "ACTUAL"),
+                value_status=getattr(row, "value_status", "actual"),
+                data_scope="mbu26_complete_actual_line",
+                model_id="",
+                actual_quarters=quarters,
+                forecast_quarters="",
+                quarters_present=quarters,
+                anchor_flag=fy == REVENUE_LAST_COMPLETE_ACTUAL_FY,
+                nowcast_flag=False,
+                formula=getattr(row, "formula", ""),
+                source_basis="MBU26 annual source spine",
+                row_role=getattr(row, "row_role", ""),
+                official_value=getattr(row, "value_numeric"),
+                residual_vs_official=0.0,
+            )
+        )
+    return pd.DataFrame.from_records(records, columns=columns)
+
+
+def _runtime_mbu26_official_rows(official_annual: pd.DataFrame, series_meta: dict[str, dict[str, Any]]) -> pd.DataFrame:
+    columns = _runtime_chart_columns()
+    if official_annual is None or official_annual.empty:
+        return pd.DataFrame(columns=columns)
+    data = official_annual[
+        official_annual.get("series_id", pd.Series(dtype=str)).astype(str).isin(DISPLAY_SERIES_ORDER)
+    ].copy()
+    data["FY_numeric"] = pd.to_numeric(data.get("FY"), errors="coerce")
+    data["value_numeric"] = pd.to_numeric(data.get("value"), errors="coerce")
+    data = data[data["FY_numeric"].ge(REVENUE_LAST_COMPLETE_ACTUAL_FY + 1) & data["value_numeric"].notna()].copy()
+    data = data[
+        ~data.get("period_status", pd.Series("", index=data.index)).astype(str).str.upper().eq("ACTUAL")
+    ].copy()
+    records: list[dict[str, Any]] = []
+    for row in data.itertuples(index=False):
+        series_id = str(getattr(row, "series_id", "") or "")
+        fy = int(getattr(row, "FY_numeric"))
+        records.append(
+            _runtime_chart_record(
+                series_id=series_id,
+                series_meta=series_meta,
+                metric_type=_runtime_metric_type(series_meta.get(series_id, {}).get("metric_type"), getattr(row, "unit", "")),
+                time_grain="june_year",
+                row_type="official_comparator",
+                trace_name="MBU26 official",
+                trace_type="MBU26 official",
+                trace_role="official_external_comparator",
+                trace_source="mbu26_official",
+                scenario_name="mbu26_official",
+                scenario_role="official_comparator",
+                period=f"FY{fy}",
+                june_year=fy,
+                value=getattr(row, "value_numeric"),
+                value_unit=getattr(row, "unit", ""),
+                source=getattr(row, "source_file", "mbu26_official_annual.csv"),
+                source_file=getattr(row, "source_file", "mbu26_official_annual.csv"),
+                source_cell=getattr(row, "source_cell", ""),
+                source_status=getattr(row, "period_status", ""),
+                value_status=getattr(row, "value_status", "official_forecast"),
+                data_scope="mbu26_official_forecast",
+                model_id="",
+                fed_path=MBU26_RELEASE_ROUND,
+                revenue_basis=getattr(row, "unit", ""),
+                bridge_status="available",
+                bridge_method="MBU26 official annual row",
+                release_round=MBU26_RELEASE_ROUND,
+                anchor_flag=False,
+                nowcast_flag=False,
+                formula=getattr(row, "formula", ""),
+                source_basis="MBU26 official annual",
+                row_role=getattr(row, "row_role", ""),
+                official_value=getattr(row, "value_numeric"),
+                residual_vs_official=0.0,
+            )
+        )
+    return pd.DataFrame.from_records(records, columns=columns)
 
 
 def _runtime_actual_rows(series_junction_audit: pd.DataFrame, series_meta: dict[str, dict[str, Any]]) -> pd.DataFrame:
@@ -599,6 +732,7 @@ def _runtime_actual_rows(series_junction_audit: pd.DataFrame, series_meta: dict[
                 time_grain="june_year",
                 row_type="historical_actual",
                 trace_name="Actual",
+                trace_type="Actual",
                 trace_role="source_actual",
                 trace_source="actual_benchmark",
                 scenario_name="actual",
@@ -609,6 +743,7 @@ def _runtime_actual_rows(series_junction_audit: pd.DataFrame, series_meta: dict[
                 value_unit=getattr(row, "unit", ""),
                 source=getattr(row, "source_file", "annual_actuals.csv"),
                 source_file=getattr(row, "source_file", "annual_actuals.csv"),
+                source_cell=getattr(row, "source_cell", ""),
                 source_status=getattr(row, "source_status", ""),
                 value_status=getattr(row, "value_status", "Actual"),
                 data_scope="complete_actual_line",
@@ -645,6 +780,7 @@ def _runtime_current_rows(current: pd.DataFrame, series_meta: dict[str, dict[str
                 time_grain="june_year",
                 row_type="future_forecast",
                 trace_name=_runtime_current_trace_name(scenario_name, scenario_role),
+                trace_type=_runtime_trace_type(_runtime_current_trace_name(scenario_name, scenario_role)),
                 trace_role="in_house_current_finalist",
                 trace_source="current_finalist_forecast",
                 scenario_name=scenario_name,
@@ -655,6 +791,7 @@ def _runtime_current_rows(current: pd.DataFrame, series_meta: dict[str, dict[str
                 value_unit=getattr(row, "unit", ""),
                 source=getattr(row, "source_file", ""),
                 source_file=getattr(row, "source_file", ""),
+                source_cell=getattr(row, "source_cell", ""),
                 source_status=getattr(row, "source_status", ""),
                 value_status=getattr(row, "value_status", ""),
                 data_scope="actual_anchor" if fy == REVENUE_LAST_COMPLETE_ACTUAL_FY else ("current_nowcast" if bool(getattr(row, "nowcast_flag", False)) else "current_forecast"),
@@ -671,6 +808,7 @@ def _runtime_current_rows(current: pd.DataFrame, series_meta: dict[str, dict[str
                 formula=getattr(row, "formula", ""),
                 source_basis=getattr(row, "source_basis", ""),
                 row_role=getattr(row, "row_role", ""),
+                replacement_only=bool(getattr(row, "replacement_only", False)),
                 official_value=getattr(row, "official_value", pd.NA),
                 residual_vs_official=getattr(row, "residual_vs_official", pd.NA),
             )
@@ -723,6 +861,7 @@ def _runtime_release_rows(
                 time_grain="june_year",
                 row_type="official_comparator",
                 trace_name=trace_name,
+                trace_type=_runtime_trace_type(trace_name),
                 trace_role="official_external_comparator",
                 trace_source=trace_source,
                 scenario_name=scenario_name,
@@ -733,6 +872,7 @@ def _runtime_release_rows(
                 value_unit=getattr(row, "unit", ""),
                 source="release_values.csv",
                 source_file="release_values.csv",
+                source_cell=getattr(row, "source_cell", ""),
                 source_status=getattr(row, "value_status", ""),
                 value_status=getattr(row, "value_status", ""),
                 data_scope="official_comparator",
@@ -759,6 +899,12 @@ def _normalize_runtime_chart_rows(chart_rows: pd.DataFrame) -> pd.DataFrame:
     if "plot_allowed" not in chart_rows.columns:
         chart_rows["plot_allowed"] = True
     chart_rows["plot_allowed"] = chart_rows["plot_allowed"].fillna(True).astype(bool)
+    chart_rows["trace_type"] = chart_rows["trace_type"].where(
+        chart_rows["trace_type"].astype(str).str.strip().ne(""),
+        chart_rows["trace_name"].map(_runtime_trace_type),
+    )
+    chart_rows["source_cell"] = chart_rows["source_cell"].fillna("").astype(str)
+    chart_rows["replacement_only"] = chart_rows["replacement_only"].fillna(False).astype(bool)
     chart_rows = chart_rows[chart_rows["value"].notna()].copy()
     chart_rows["_series_order"] = chart_rows["series_id"].map(lambda value: DISPLAY_SERIES_ORDER.index(value) if value in DISPLAY_SERIES_ORDER else len(DISPLAY_SERIES_ORDER))
     chart_rows["_period_order"] = chart_rows["period"].map(_period_sort_value)
@@ -859,7 +1005,9 @@ def _runtime_trace_audit(chart_rows: pd.DataFrame) -> pd.DataFrame:
         "series_id",
         "series_label",
         "trace_name",
+        "trace_type",
         "trace_role",
+        "trace_source",
         "scenario_name",
         "fed_path",
         "period",
@@ -869,8 +1017,11 @@ def _runtime_trace_audit(chart_rows: pd.DataFrame) -> pd.DataFrame:
         "row_type",
         "data_scope",
         "source_file",
+        "source_cell",
         "source_status",
+        "formula",
         "model_id",
+        "replacement_only",
         "value_status",
         "actual_quarters",
         "forecast_quarters",
@@ -891,6 +1042,7 @@ def _runtime_chart_columns() -> list[str]:
         "time_grain",
         "row_type",
         "trace_name",
+        "trace_type",
         "trace_role",
         "trace_source",
         "scenario_name",
@@ -915,6 +1067,7 @@ def _runtime_chart_columns() -> list[str]:
         "gap_reason",
         "source",
         "source_file",
+        "source_cell",
         "source_status",
         "source_basis",
         "formula",
@@ -932,6 +1085,7 @@ def _runtime_chart_columns() -> list[str]:
         "nowcast_flag",
         "plot_allowed",
         "row_role",
+        "replacement_only",
         "official_value",
         "residual_vs_official",
     ] + CANONICAL_JOIN_KEY_COLUMNS
@@ -945,6 +1099,7 @@ def _runtime_chart_record(
     time_grain: str,
     row_type: str,
     trace_name: str,
+    trace_type: str,
     trace_role: str,
     trace_source: str,
     scenario_name: str,
@@ -955,6 +1110,7 @@ def _runtime_chart_record(
     value_unit: Any,
     source: Any,
     source_file: Any,
+    source_cell: Any,
     source_status: Any,
     value_status: Any,
     data_scope: str,
@@ -977,6 +1133,7 @@ def _runtime_chart_record(
     formula: Any = "",
     source_basis: Any = "",
     row_role: Any = "",
+    replacement_only: bool = False,
     official_value: Any = pd.NA,
     residual_vs_official: Any = pd.NA,
 ) -> dict[str, Any]:
@@ -986,6 +1143,7 @@ def _runtime_chart_record(
         "time_grain": time_grain,
         "row_type": row_type,
         "trace_name": trace_name,
+        "trace_type": trace_type or _runtime_trace_type(trace_name),
         "trace_role": trace_role,
         "trace_source": trace_source,
         "scenario_name": scenario_name,
@@ -1010,6 +1168,7 @@ def _runtime_chart_record(
         "gap_reason": gap_reason,
         "source": source,
         "source_file": source_file,
+        "source_cell": source_cell,
         "source_status": source_status,
         "source_basis": source_basis,
         "formula": formula,
@@ -1027,6 +1186,7 @@ def _runtime_chart_record(
         "nowcast_flag": nowcast_flag,
         "plot_allowed": plot_allowed,
         "row_role": row_role,
+        "replacement_only": bool(replacement_only),
         "official_value": official_value,
         "residual_vs_official": residual_vs_official,
     }
@@ -1040,9 +1200,22 @@ def _runtime_current_trace_name(scenario_name: Any, scenario_role: Any) -> str:
     return "Current finalist High population/comparison"
 
 
+def _runtime_trace_type(trace_name: Any) -> str:
+    name = str(trace_name or "").strip()
+    if name == "Actual":
+        return "Actual"
+    if name == "MBU26 official":
+        return "MBU26 official"
+    if name == "Current finalist Base case":
+        return "current finalist base"
+    if name == "Current finalist High population/comparison":
+        return "current finalist comparison"
+    return name
+
+
 def _runtime_model_id(series_id: Any) -> str:
     series = str(series_id or "")
-    if series in {"ped_vkt_per_capita", "gross_ped_revenue", "gross_fed_revenue", "net_fed_revenue"}:
+    if series in {"ped_vkt_per_capita", "ped_volume", "gross_ped_revenue", "gross_fed_revenue", "net_fed_revenue"}:
         return CURRENT_FINALIST_MODEL_IDS["PED"]
     if series in {"light_ruc_net_km", "light_ruc_net_revenue"}:
         return CURRENT_FINALIST_MODEL_IDS["LIGHT_RUC"]
@@ -1091,12 +1264,17 @@ def _period_sort_value(period: Any) -> int:
 def _trace_sort_value(trace_name: Any) -> int:
     order = {
         "Actual": 0,
-        "Current finalist Base case": 1,
-        "Current finalist High population/comparison": 2,
-        "Official comparator: selected MOT/BEFU": 3,
-        "Official comparator: rolling BEFU 1Y": 4,
+        "MBU26 official": 1,
+        "Current finalist Base case": 2,
+        "Current finalist High population/comparison": 3,
+        "Official comparator: selected MOT/BEFU": 4,
+        "Official comparator: rolling BEFU 1Y": 5,
     }
     return order.get(str(trace_name or ""), 99)
+
+
+def _expected_june_year_quarters(fy: int) -> list[str]:
+    return [f"{fy - 1}Q3", f"{fy - 1}Q4", f"{fy}Q1", f"{fy}Q2"]
 
 
 def _coerce_int(value: Any) -> int:
@@ -1720,8 +1898,9 @@ def _manifest_markdown(manifest: dict[str, Any]) -> str:
         "",
         "## Equations",
     ]
-    for stream, equation in REVENUE_EQUATIONS.items():
-        rows.append(f"- {STREAM_LABELS[stream]}: {equation}")
+    equations = manifest.get("equations") if isinstance(manifest.get("equations"), dict) else REVENUE_EQUATIONS
+    for stream, equation in equations.items():
+        rows.append(f"- {STREAM_LABELS.get(stream, stream)}: {equation}")
     rows.extend(["", "## Scenario Roles"])
     for scenario in scenarios if isinstance(scenarios, list) else []:
         rows.append(
@@ -1781,6 +1960,75 @@ def _source_hashes(repo_root: Path, scenarios: Any) -> dict[str, Any]:
         if isinstance(scenario, dict)
     ]
     return hashes
+
+
+def _runtime_source_hashes(repo_root: Path, scenarios: Any, mbu26_pack: Any) -> dict[str, Any]:
+    hashes = _source_hashes(repo_root, scenarios)
+    hashes["mbu26_annual_spine"] = {
+        "repo_relative_path": _repo_relative(repo_root, mbu26_pack.pack_dir),
+        "manifest_sha256": _sha256(mbu26_pack.pack_dir / "manifest.json"),
+        "source_release": MBU26_RELEASE_ROUND,
+        "schema_version": (mbu26_pack.manifest or {}).get("schema_version", MBU26_SCHEMA_VERSION),
+        "workbook_basename": ((mbu26_pack.manifest or {}).get("workbook") or {}).get("basename", ""),
+        "workbook_sha256": ((mbu26_pack.manifest or {}).get("workbook") or {}).get("sha256", ""),
+        "normalized_files": {
+            filename: metadata
+            for filename, metadata in ((mbu26_pack.manifest or {}).get("normalized_files") or {}).items()
+            if isinstance(metadata, dict)
+        },
+    }
+    return hashes
+
+
+def _mbu26_annual_spine_metadata(repo_root: Path, mbu26_pack: Any) -> dict[str, Any]:
+    manifest = mbu26_pack.manifest or {}
+    workbook = manifest.get("workbook") or {}
+    return {
+        "status": "mbu26_annual_spine_vendored",
+        "source_release": MBU26_RELEASE_ROUND,
+        "schema_version": manifest.get("schema_version", MBU26_SCHEMA_VERSION),
+        "repo_relative_path": _repo_relative(repo_root, mbu26_pack.pack_dir),
+        "manifest_sha256": _sha256(mbu26_pack.pack_dir / "manifest.json"),
+        "workbook_basename": workbook.get("basename", ""),
+        "workbook_sha256": workbook.get("sha256", ""),
+        "sheet": workbook.get("sheet", "MBU26"),
+        "source_policy": manifest.get(
+            "source_policy",
+            "MBU26 worksheet only; workbook is offline lineage and is never loaded at Streamlit runtime.",
+        ),
+        "row_count": manifest.get("row_count") or {},
+        "formula_policy": manifest.get("formula_policy", ""),
+    }
+
+
+def _mbu26_runtime_source_metadata(repo_root: Path, mbu26_pack: Any) -> dict[str, Any]:
+    manifest = mbu26_pack.manifest or {}
+    workbook = manifest.get("workbook") or {}
+    defaults = {
+        "series": "Total NLTF revenue",
+        "release_round": MBU26_RELEASE_ROUND,
+        "revenue_path": "Net of admin fees & refunds",
+        "scenario": "MBU26 official + current finalist base/comparison",
+        "fed_path_scenario": "Current planned path",
+        "view": "Annual",
+        "model_basis": "Current finalist ensemble",
+        "uncertainty_source": "not materialized",
+        "selected_fy": "FY2031",
+        "crown_top_up": "Exclude",
+    }
+    return {
+        "status": "mbu26_annual_spine_vendored",
+        "repo_relative_path": _repo_relative(repo_root, mbu26_pack.pack_dir),
+        "source_pack_version": MBU26_RELEASE_ROUND,
+        "schema_version": manifest.get("schema_version", MBU26_SCHEMA_VERSION),
+        "raw_workbook_basename": workbook.get("basename", ""),
+        "raw_workbook_sha256": workbook.get("sha256", ""),
+        "source_pack_manifest_sha256": _sha256(mbu26_pack.pack_dir / "manifest.json"),
+        "selections": defaults,
+        "dashboard_default_selections": defaults,
+        "source_workbook_selections": {"release_round": MBU26_RELEASE_ROUND, "sheet": workbook.get("sheet", "MBU26")},
+        "default_selection_policy": "Revenue Outlook defaults to Total NLTF revenue from the MBU26 source spine.",
+    }
 
 
 def _revenue_source_pack_metadata(repo_root: Path) -> dict[str, Any]:

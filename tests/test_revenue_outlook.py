@@ -176,14 +176,19 @@ def test_committed_current_revenue_outlook_pack_is_repo_local_and_hash_backed() 
     assert manifest["repo_relative_output_dir"] == "data/current_revenue_outlook"
     assert manifest["source_hashes"]["model_input_history"]
     assert all(item.get("workbook_sha256") for item in manifest["source_hashes"]["workbooks"])
-    assert manifest["revenue_source_pack"]["status"] == "source_pack_vendored"
-    assert manifest["revenue_source_pack"]["source_pack_version"] == "2026_05_19"
-    assert manifest["revenue_source_pack"]["raw_workbook_sha256"] == "00c6070694818d27d7c402749354d8175de999894846dce45a4abdd7f5eb3e6b"
-    assert manifest["revenue_source_pack"]["selections"]["release_round"] == "BEFU25"
+    assert manifest["mbu26_annual_spine"]["status"] == "mbu26_annual_spine_vendored"
+    assert manifest["mbu26_annual_spine"]["source_release"] == "MBU26"
+    assert manifest["mbu26_annual_spine"]["workbook_sha256"] == "9aaff21f72c0a10cfa972a29d3c4f716495c79cbd72fc28e8008a65558454e12"
+    assert manifest["mbu26_annual_spine"]["sheet"] == "MBU26"
+    assert manifest["source_hashes"]["mbu26_annual_spine"]["repo_relative_path"] == "data/revenue_model_source_pack/mbu26_annual_spine"
+    assert manifest["revenue_source_pack"]["status"] == "mbu26_annual_spine_vendored"
+    assert manifest["revenue_source_pack"]["source_pack_version"] == "MBU26"
+    assert manifest["revenue_source_pack"]["raw_workbook_sha256"] == "9aaff21f72c0a10cfa972a29d3c4f716495c79cbd72fc28e8008a65558454e12"
+    assert manifest["revenue_source_pack"]["selections"]["release_round"] == "MBU26"
     assert manifest["revenue_source_pack"]["selections"]["series"] == "Total NLTF revenue"
     assert manifest["revenue_source_pack"]["dashboard_default_selections"]["series"] == "Total NLTF revenue"
-    assert manifest["revenue_source_pack"]["source_workbook_selections"]["series"] == "Total RUC+PED revenue"
-    assert "legacy Total RUC+PED subtotal" in manifest["revenue_source_pack"]["default_selection_policy"]
+    assert manifest["revenue_source_pack"]["source_workbook_selections"]["sheet"] == "MBU26"
+    assert "MBU26 source spine" in manifest["revenue_source_pack"]["default_selection_policy"]
     assert sorted(manifest["output_hashes"]) == [
         "future_revenue_forecasts.csv",
         "future_revenue_forecasts.parquet",
@@ -193,6 +198,8 @@ def test_committed_current_revenue_outlook_pack_is_repo_local_and_hash_backed() 
         "revenue_bridge_components.parquet",
         "revenue_chart_rows.csv",
         "revenue_chart_rows.parquet",
+        "row_reconciliation.csv",
+        "row_reconciliation.parquet",
         "runtime_trace_audit.csv",
         "runtime_trace_audit.parquet",
         "series_trace_contract.csv",
@@ -219,22 +226,22 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     future = pd.read_parquet(pack_dir / "future_revenue_forecasts.parquet")
     audit = pd.read_parquet(pack_dir / "runtime_trace_audit.parquet")
 
-    assert manifest["runtime_pack_type"] == "source_actual_current_finalist_official_comparator"
+    assert manifest["runtime_pack_type"] == "mbu26_actual_current_finalist_official_comparator"
     assert manifest["bridge_status_by_stream"] == {
         "PED": ["available"],
         "LIGHT_RUC": ["available"],
         "HEAVY_RUC": ["available"],
     }
     assert "workbook model" not in json.dumps(manifest).lower()
+    assert "annual_model_paths" not in json.dumps(manifest).lower()
     assert "nominal_rate_missing" not in json.dumps(manifest)
     assert "ped_bridge_source_history_missing" not in json.dumps(manifest)
 
     allowed_traces = {
         "Actual",
+        "MBU26 official",
         "Current finalist Base case",
         "Current finalist High population/comparison",
-        "Official comparator: selected MOT/BEFU",
-        "Official comparator: rolling BEFU 1Y",
     }
     displayed = chart[chart["time_grain"].astype(str).eq("june_year") & chart["plot_allowed"].astype(str).str.lower().isin(["true", "1"])]
     assert set(displayed["trace_name"].dropna().unique()) == allowed_traces
@@ -254,6 +261,8 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     assert "annual_model_paths.csv" not in runtime_text
     assert "selected_dashboard" not in runtime_text.lower()
     assert "schiff" not in runtime_text.lower()
+    assert "Official comparator: selected MOT/BEFU" not in runtime_text
+    assert "Official comparator: rolling BEFU 1Y" not in runtime_text
 
     current = chart[
         chart["time_grain"].astype(str).eq("june_year")
@@ -271,7 +280,7 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
 
     anchor = current[current["period"].astype(str).eq("FY2025")].set_index(["series_id", "scenario_name"])
     assert anchor.loc[("total_nltf_net_revenue", "current_basecase"), "data_scope"] == "actual_anchor"
-    assert anchor.loc[("total_nltf_net_revenue", "current_basecase"), "source_file"] == "annual_actuals.csv"
+    assert anchor.loc[("total_nltf_net_revenue", "current_basecase"), "source_file"] == "mbu26_annual_spine.csv"
 
     assert set(bridge["bridge_status"].dropna().astype(str).unique()) == {"available"}
     replacements = bridge[bridge["component_type"].astype(str).eq("replacement_line")]
@@ -284,9 +293,14 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     assert {
         "series_id",
         "trace_name",
+        "trace_type",
         "trace_role",
+        "trace_source",
         "source_file",
+        "source_cell",
+        "formula",
         "model_id",
+        "replacement_only",
         "actual_quarters",
         "forecast_quarters",
         "anchor_flag",
@@ -297,22 +311,24 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
 def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
     pack_dir = ROOT / CURRENT_REVENUE_OUTLOOK_DIR
     expected_hashes = {
-        "future_revenue_forecasts.csv": "f9addbed5a596d18c2c51f0a58cb2098ffca9b861d6654f54c28c0da00d938d8",
-        "future_revenue_forecasts.parquet": "7f6955ff3147ce03e85a4166ad773dd94356c226a700e42245de6ddda823463b",
-        "manifest.json": "f21fbf248814d83ae43b78c7c4945ccb0cb766390c8000b687d8b0d151d21a00",
-        "manifest.md": "298acdfe34495afbf0620266cc4c5f0f27bc5fdf89d6050e4e8ad600b84947dd",
-        "path_trace_status.csv": "b0b2b2f01c6977e869a21f620485e686c119b1895d29e1c67d12ce7afb9adfe3",
-        "path_trace_status.parquet": "65e91a936ae5033d050469d57fbd09bf049edf62e47baa8b2ea670be7f84d97c",
-        "revenue_bridge_components.csv": "132a9a0ff3e302ea73194b14b60cc2b2969e519ae74876db2e3878ac6c8bb2e1",
-        "revenue_bridge_components.parquet": "b274052e704dae5da0f141c8f4b1dd11131d5165ee75e1d31a776e0c6729a4b5",
-        "revenue_chart_rows.csv": "4d52e18fb2e7414419cb4f53b69e9b4fd09eb5b43c51725ec6f972373d8a57e0",
-        "revenue_chart_rows.parquet": "4084a32cae2dd43f663415c24aa460b95f8a8a17010f64e7c2e05194663dcfbc",
-        "runtime_trace_audit.csv": "405b142d5da3d2a373b96392c98a19c11003db599799b3c0f0fd64c798ce8016",
-        "runtime_trace_audit.parquet": "935a752438f027b97c9b34a12205a67d16d270cab9d8c3aedb146a73b3464a87",
-        "series_trace_contract.csv": "bbfe7a0fb06569540ee6ad94f5d6f1b8924af0c0490eeebd053eaee30cdd0d16",
-        "series_trace_contract.parquet": "6a1ae2a1abf43a68185f1e61e287ef316367ac32da9e70d8f081d1e49e35c311",
-        "trace_source_contract.csv": "3a8b3b66da395cad28c74622c12bb43af1a6e035eb5917e9d9e61e52539a50d5",
-        "trace_source_contract.parquet": "282d61fc1487883ed6daa126f0fac4bb7da9ddc88d79cbf1fde1dd15b3c7d34c",
+        "future_revenue_forecasts.csv": "82135a315d90563e0750a3598dd8b24ce9f1bc9a0fc36faf9bc0a820e45c8443",
+        "future_revenue_forecasts.parquet": "b9027e7604157d0e5eface39ebed2b49d849ce24a5868d5d534f89c248d07872",
+        "manifest.json": "336baa3d19176aed86b625e821cb022b2223f20ab9ccb8e552899eb73afa8e9b",
+        "manifest.md": "cadedd0c392baa81ec71fb0aa79effabbf5faf5adfc5193fe71090edec310742",
+        "path_trace_status.csv": "9aee7a4e7003ec6541476ca3e4afef6d8586b6c358e41db1c8e06623e5ffcaa3",
+        "path_trace_status.parquet": "e66d860fb7532ee4b92285c1ba023c9f8d9469cfdaaaef819415f7cd87c73757",
+        "revenue_bridge_components.csv": "f1227fd260deb40bd621d124b0a64e623a3c9842472320ecb198ab858f20fee2",
+        "revenue_bridge_components.parquet": "d722843c704056e3801a8842509ecc27b5c404083a23452291c8fbbab26839ca",
+        "revenue_chart_rows.csv": "84618e9ce0ea8994744140e46a06a9b465ca578cfa84281467a5807fef81a8d8",
+        "revenue_chart_rows.parquet": "79b079abfa4589b0a249b12d3fa656a4401fbed238758051ef03f21339e98a43",
+        "row_reconciliation.csv": "d484f5d75cce88e30ce7bcf5dd70058505cc02e5dff93f457a579f119c2fc7ce",
+        "row_reconciliation.parquet": "bf2b638920e4b9b00ca4ac00d4263083258ce0d94625943c4e7b3cdf90493dd7",
+        "runtime_trace_audit.csv": "26071ca6944cb2e4070b128ae8305d9d262708d87125b2d464567ea7c1414fbd",
+        "runtime_trace_audit.parquet": "095bdee6de33ce2a0c017cf20082ede1074fbfdf5898353a461f28bd2f117348",
+        "series_trace_contract.csv": "2eaf18c4c54fc18a21dd68415c0aea041bd174e8d75285409a4bb83034b60e09",
+        "series_trace_contract.parquet": "5706036ec8e179dbc31003e6ab6dcd966d0d02216f8c30d5e4f4c48ba36e9d3f",
+        "trace_source_contract.csv": "396a97e28c43adc892c438ce92fe16a847d87b0ad91c6f8ec1334416c85a070a",
+        "trace_source_contract.parquet": "17fda181174f117be894a0f638c992b988a418a3dba9c08ee77bdfe78b7c8bd9",
     }
     assert {path.name: _sha256(path) for path in sorted(pack_dir.iterdir()) if path.is_file()} == expected_hashes
 

@@ -94,7 +94,7 @@ ROW_DEFINITIONS: tuple[dict[str, Any], ...] = (
 
 
 FORMULA_DEFINITIONS: tuple[dict[str, Any], ...] = (
-    {"output_series_id": "gross_ruc_revenue", "expression": "light_ruc_net_revenue + heavy_ruc_net_revenue + light_bev_ruc_net_revenue + heavy_bev_ruc_net_revenue + phev_ruc_net_revenue", "terms": (("light_ruc_net_revenue", 1), ("heavy_ruc_net_revenue", 1), ("light_bev_ruc_net_revenue", 1), ("heavy_bev_ruc_net_revenue", 1), ("phev_ruc_net_revenue", 1))},
+    {"output_series_id": "gross_ruc_revenue", "expression": "light_ruc_net_revenue + heavy_ruc_net_revenue + light_bev_ruc_net_revenue + heavy_bev_ruc_net_revenue + phev_ruc_net_revenue + ruc_refunds", "terms": (("light_ruc_net_revenue", 1), ("heavy_ruc_net_revenue", 1), ("light_bev_ruc_net_revenue", 1), ("heavy_bev_ruc_net_revenue", 1), ("phev_ruc_net_revenue", 1), ("ruc_refunds", 1))},
     {"output_series_id": "ruc_revenue_net_admin", "expression": "gross_ruc_revenue - ruc_admin_revenue", "terms": (("gross_ruc_revenue", 1), ("ruc_admin_revenue", -1))},
     {"output_series_id": "total_ruc_net_revenue", "expression": "ruc_revenue_net_admin - ruc_refunds", "terms": (("ruc_revenue_net_admin", 1), ("ruc_refunds", -1))},
     {"output_series_id": "gross_fed_revenue", "expression": "gross_ped_revenue + gross_lpg_revenue + gross_cng_revenue", "terms": (("gross_ped_revenue", 1), ("gross_lpg_revenue", 1), ("gross_cng_revenue", 1))},
@@ -169,6 +169,7 @@ def materialize_mbu26_annual_spine(
     root = Path(repo_root) if repo_root is not None else repo_root_from_here()
     output = Path(output_dir) if output_dir is not None else root / MBU26_SOURCE_PACK_DIR
     output.mkdir(parents=True, exist_ok=True)
+    existing_manifest = _read_existing_manifest(output)
     workbook = Path(workbook_path)
     workbook_hash = sha256(workbook)
     values_wb = openpyxl.load_workbook(workbook, read_only=False, data_only=True)
@@ -198,12 +199,21 @@ def materialize_mbu26_annual_spine(
     }
     file_hashes: dict[str, dict[str, Any]] = {}
     for stem, frame in frames.items():
-        frame.to_csv(output / f"{stem}.csv", index=False)
-        frame.to_parquet(output / f"{stem}.parquet", index=False)
+        output_frame = _prepare_frame_for_output(frame)
+        output_frame.to_csv(output / f"{stem}.csv", index=False)
+        output_frame.to_parquet(output / f"{stem}.parquet", index=False)
         for suffix in ("csv", "parquet"):
             path = output / f"{stem}.{suffix}"
             file_hashes[path.name] = {"sha256": sha256(path), "size_bytes": path.stat().st_size}
 
+    existing_workbook = existing_manifest.get("workbook") if isinstance(existing_manifest, dict) else {}
+    extracted_at = (
+        existing_manifest.get("extracted_at")
+        if isinstance(existing_workbook, dict)
+        and existing_workbook.get("sha256") == workbook_hash
+        and existing_manifest.get("schema_version") == MBU26_SCHEMA_VERSION
+        else datetime.now(timezone.utc).isoformat()
+    )
     manifest = {
         "schema_version": MBU26_SCHEMA_VERSION,
         "source_release": MBU26_RELEASE_ROUND,
@@ -215,7 +225,7 @@ def materialize_mbu26_annual_spine(
             "size_bytes": workbook.stat().st_size,
             "sheet": MBU26_SHEET_NAME,
         },
-        "extracted_at": datetime.now(timezone.utc).isoformat(),
+        "extracted_at": extracted_at,
         "extracted_by": extracted_by,
         "row_count": {
             name: int(len(frame))
@@ -230,6 +240,24 @@ def materialize_mbu26_annual_spine(
     (output / "manifest.json").write_text(json.dumps(manifest, indent=2, allow_nan=False) + "\n", encoding="utf-8")
     (output / "manifest.md").write_text(_manifest_markdown(manifest), encoding="utf-8")
     return manifest
+
+
+def _prepare_frame_for_output(frame: pd.DataFrame) -> pd.DataFrame:
+    output = frame.copy()
+    for column in output.columns:
+        if output[column].dtype == object:
+            output[column] = output[column].where(output[column].notna(), "").astype(str)
+    return output
+
+
+def _read_existing_manifest(output: Path) -> dict[str, Any]:
+    manifest_path = output / "manifest.json"
+    if not manifest_path.exists():
+        return {}
+    try:
+        return json.loads(manifest_path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
 
 
 def current_forecast_annual_from_mbu26(
@@ -535,7 +563,7 @@ def _official_annual_frame(spine: pd.DataFrame, formula_audit: pd.DataFrame) -> 
                 "workbook_sha256": base["workbook_sha256"].iloc[0] if not base.empty else "",
                 "sheet": MBU26_SHEET_NAME,
                 "source_row": "",
-                "source_cell": "",
+                "source_cell": subtotal["source_cells"],
                 "source_year_cell": "",
                 "source_status_cell": "",
                 "source_formula": "",
@@ -772,7 +800,7 @@ def _series_trace_contract_frame() -> pd.DataFrame:
                 "valid_controls": controls,
                 "actual_source": "data/revenue_model_source_pack/mbu26_annual_spine/mbu26_annual_spine.csv",
                 "primary_forecast_source": "MBU26 official annual rows plus current-finalist model forecast replacements where applicable",
-                "excluded_lineage_source": "annual_model_paths.csv and Excel workbook model forecasts are excluded from runtime traces",
+                "excluded_lineage_source": "Legacy Excel forecast paths are excluded from runtime traces",
                 "bridge": _series_bridge_text(item["canonical_id"]),
                 "last_complete_actual_fy": REVENUE_LAST_COMPLETE_ACTUAL_FY,
                 "first_forecast_fy": f"FY{REVENUE_PARTIAL_ACTUAL_FY}",

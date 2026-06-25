@@ -2,13 +2,14 @@
 
 - Schema: `revenue-outlook-pack-v1`
 - Status: `explicitly_promoted_current_outlook`
-- Promoted: `2026-06-25T05:34:15.787329+00:00`
+- Promoted: `2026-06-25T21:42:25.800323+00:00`
 - Output: `data/current_revenue_outlook`
 
 ## Equations
-- Light RUC volume: Light RUC revenue = net km / 1,000 * nominal effective average Light RUC rate.
-- Heavy RUC volume: Heavy RUC revenue = net km / 1,000 * nominal effective average Heavy RUC rate.
-- PED VKT per capita: PED revenue = litres * nominal PED base rate / 100. Litres must come from a source-backed PED litres bridge, not from the VKT/capita activity model alone.
+- PED VKT per capita: PED revenue = current finalist VKT/capita * MBU26 population -> total VKT * MBU26 litres/100km * MBU26 gross PED rate.
+- Light RUC volume: Light RUC revenue = current finalist net km * MBU26 effective Light RUC rate.
+- Heavy RUC volume: Heavy RUC revenue = current finalist net km * MBU26 effective Heavy RUC rate.
+- ROLLUPS: Gross FED, Net FED, Total RUC, Total RUC+PED and Total NLTF recalculate three replacement lines plus MBU26 fixed components.
 
 ## Scenario Roles
 - `current_basecase`: `basecase`, workbook `NLTF_forecast_input_template_to_2050Q4_basecase (2) - Copy.xlsx`, SHA256 `d0644d353ee5a073602186cf7ac5c16e707d5350e16fd037b73a65528067cc6a`
@@ -24,9 +25,9 @@
 - Rule: Forecast Builder volume packs join to Revenue Outlook rows by canonical stream, period and scenario keys; historical rows use historical_actual.
 
 ## Revenue Source Pack
-- Version: `2026_05_19`
-- Raw workbook SHA256: `00c6070694818d27d7c402749354d8175de999894846dce45a4abdd7f5eb3e6b`
-- Manifest SHA256: `ab3cb81048625b2beb199d177af9616338877c1631fa96185e601997c537f456`
-- Status: `source_pack_vendored`
+- Version: `MBU26`
+- Raw workbook SHA256: `9aaff21f72c0a10cfa972a29d3c4f716495c79cbd72fc28e8008a65558454e12`
+- Manifest SHA256: `fee4c2bde49bc381266aaec41c0e1762c5e529a5c948a59f592f8224fa91f836`
+- Status: `mbu26_annual_spine_vendored`
 - Dashboard default series: `Total NLTF revenue`
-- Source workbook current series: `Total RUC+PED revenue`
+- Source workbook current series: `None`

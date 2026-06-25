@@ -878,10 +878,9 @@ def assert_revenue_outlook_primary_runtime_contract(page: Page, selected_series:
     trace_names = {trace["name"] for trace in contract["traces"] if trace["name"]}
     allowed = {
         "Actual",
+        "MBU26 official",
         "Current finalist Base case",
         "Current finalist High population/comparison",
-        "Official comparator: selected MOT/BEFU",
-        "Official comparator: rolling BEFU 1Y",
     }
     assert trace_names.issubset(allowed), trace_names
     assert "Current finalist Base case" in trace_names
@@ -904,13 +903,11 @@ def assert_revenue_outlook_primary_runtime_contract(page: Page, selected_series:
         assert "FY2025" in trace["x"], f"{name} should include the FY2025 actual anchor"
         assert "FY2026" in trace["x"], f"{name} should join to the FY2026 nowcast/forecast"
         assert "customdata" in trace["hovertemplate"] or "%{customdata" in trace["hovertemplate"]
-    if "Official comparator: selected MOT/BEFU" in by_name:
-        assert by_name["Official comparator: selected MOT/BEFU"]["dash"] in {"dash", "dashdot"}
-    if "Official comparator: rolling BEFU 1Y" in by_name:
-        assert by_name["Official comparator: rolling BEFU 1Y"]["dash"] == "dot"
+    if "MBU26 official" in by_name:
+        assert by_name["MBU26 official"]["dash"] in {"dash", "dashdot"}
     page_text = page.locator("body").inner_text(timeout=60000)
     assert selected_series in page_text
-    assert "MOT archived-error fan bands are not materialized in data/current_revenue_outlook" in page_text
+    assert "Runtime fan bands are not materialized in data/current_revenue_outlook" in page_text
 
 
 def select_revenue_outlook_series(page: Page, value: str) -> None:

@@ -23,17 +23,15 @@ SERIES = {
 
 TRACE_ORDER = [
     "Actual",
+    "MBU26 official",
     "Current finalist Base case",
     "Current finalist High population/comparison",
-    "Official comparator: selected MOT/BEFU",
-    "Official comparator: rolling BEFU 1Y",
 ]
 TRACE_STYLE = {
     "Actual": {"color": "#737373", "linestyle": "-", "marker": "o"},
+    "MBU26 official": {"color": "#00843D", "linestyle": "--", "marker": "s"},
     "Current finalist Base case": {"color": "#006FAD", "linestyle": "-", "marker": "o"},
     "Current finalist High population/comparison": {"color": "#E56B2B", "linestyle": "-", "marker": "o"},
-    "Official comparator: selected MOT/BEFU": {"color": "#00843D", "linestyle": "--", "marker": "s"},
-    "Official comparator: rolling BEFU 1Y": {"color": "#6B4E71", "linestyle": ":", "marker": "^"},
 }
 
 
