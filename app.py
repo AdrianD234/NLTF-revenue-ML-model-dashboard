@@ -1964,12 +1964,6 @@ def render_reproducibility_detail(stream_label: str) -> None:
 def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     del loaded
     repo_root = Path(__file__).resolve().parent
-    source_pack = cached_load_revenue_source_pack(
-        str(repo_root / REVENUE_SOURCE_PACK_DIR),
-        str(repo_root),
-        revenue_source_pack_signature(repo_root / REVENUE_SOURCE_PACK_DIR, repo_root),
-        REVENUE_SOURCE_PACK_CACHE_REVISION,
-    )
     pack = st.session_state.get("revenue_outlook_pack")
     if not isinstance(pack, RevenueOutlookPack):
         pack = cached_load_revenue_outlook_pack(
@@ -1979,16 +1973,17 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             REVENUE_OUTLOOK_SCHEMA_VERSION,
         )
 
-    if pack is None and source_pack is None:
+    if pack is None:
         section_title(REVENUE_OUTLOOK_TITLE)
         warning_panel(
             "No explicitly promoted Revenue Outlook pack is available. Use Forecast Builder on the local "
             "Governance & Reproducibility page, review the scenario roles, then promote the comparison. "
-            "This page does not scan latest run folders or publish test fixtures automatically."
+            "This page reads only the committed current_revenue_outlook runtime pack and does not scan "
+            "latest run folders or publish test fixtures automatically."
         )
         info_panel(
-            "Source policy: explicit promoted pack or in-session reviewed comparison only. Forecast Builder "
-            "uploads remain on the local Governance page; Streamlit Cloud can display only a committed promoted pack."
+            "Source policy: committed current runtime pack only. Source-pack tables are retained as audit lineage, "
+            "not as a second Streamlit chart engine."
         )
         return
 
@@ -1999,24 +1994,10 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
 
     section_title(REVENUE_OUTLOOK_TITLE)
     st.caption(
-        "Governed NLTF revenue architecture from the repo-local distilled source pack, with reviewed "
-        "Forecast Builder volume packs joined only after explicit promotion."
+        "Governed NLTF revenue architecture from the committed runtime pack: source actuals, current finalist "
+        "forecasts and official MOT/BEFU comparators."
     )
-    st.caption("Source policy: explicit promoted pack or in-session reviewed comparison only; no latest-folder scan; no test-fixture publication.")
-    revenue_kpis = _revenue_source_kpi_cards(source_pack) + _revenue_outlook_summary_cards(manifest, chart_rows, future_revenue)
-
-    if pack is None:
-        kpi_grid(revenue_kpis)
-        if source_pack is None:
-            warning_panel("The repo-local NLTF revenue source pack is missing; Total NLTF architecture controls are unavailable.")
-        else:
-            source_controls = _render_revenue_source_controls(source_pack)
-            _render_revenue_source_architecture(source_pack, source_controls)
-        warning_panel(
-            "No explicitly promoted Forecast Builder revenue pack is available yet. The Total NLTF source-pack "
-            "architecture remains visible, but future PED/Light/Heavy reviewed scenario bridges require promotion."
-        )
-        return
+    st.caption("Source policy: committed runtime pack only; no latest-folder scan; no runtime source-pack chart join.")
 
     if chart_rows.empty:
         warning_panel("The promoted Revenue Outlook pack has no chart rows.")
@@ -2024,26 +2005,35 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
 
     with st.container(border=True):
         st.markdown("<div class='page5-panel-title'>Revenue Outlook controls</div>", unsafe_allow_html=True)
-        control_cols = st.columns([0.22, 0.38, 0.40])
+        control_cols = st.columns([0.16, 0.34, 0.22, 0.28])
         with control_cols[0]:
             grain_label = st.radio(
                 "Time grain",
-                ["Quarterly", "June-year"],
+                ["June-year", "Quarterly"],
                 horizontal=True,
                 key="revenue_outlook_time_grain",
             )
         stream_options = _revenue_outlook_stream_options(chart_rows)
         with control_cols[1]:
             selected_streams = st.multiselect(
-                "Streams",
+                "Series",
                 stream_options,
                 default=stream_options,
                 key="revenue_outlook_streams",
             )
-        scenario_options = _revenue_outlook_scenario_options(chart_rows)
+        fed_path_options = _revenue_outlook_fed_path_options(chart_rows)
+        fed_path_default = ["Current planned path"] if "Current planned path" in fed_path_options else fed_path_options[:1]
         with control_cols[2]:
+            selected_fed_paths = st.multiselect(
+                "FED path",
+                fed_path_options,
+                default=fed_path_default,
+                key="revenue_outlook_fed_paths",
+            )
+        scenario_options = _revenue_outlook_scenario_options(chart_rows)
+        with control_cols[3]:
             selected_scenarios = st.multiselect(
-                "Forecast scenarios",
+                "Traces",
                 scenario_options,
                 default=scenario_options,
                 key="revenue_outlook_scenarios",
@@ -2053,9 +2043,10 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         chart_rows,
         time_grain="june_year" if grain_label == "June-year" else "quarterly",
         stream_labels=selected_streams,
+        fed_paths=selected_fed_paths,
         scenario_names=selected_scenarios,
     )
-    filtered_bridge = _filter_revenue_bridge_rows(bridge, selected_streams, selected_scenarios)
+    filtered_bridge = _filter_revenue_bridge_rows(bridge, selected_streams, selected_scenarios, selected_fed_paths)
     gap_summary = _revenue_outlook_gap_summary(filtered_bridge)
     if gap_summary:
         warning_panel(gap_summary)
@@ -2064,7 +2055,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     with chart_cols[0]:
         chart_card(
             "Activity and volume outlook",
-            "PED uses VKT per capita; Light and Heavy RUC use net kilometres. Grey lines are source historical actuals.",
+            "PED uses VKT per capita; Light and Heavy RUC use net kilometres. Actuals end at FY2025.",
             revenue_outlook_figure(filtered_rows, metric_type="activity"),
             caption="Forecast start and H13 markers are shown where numeric reviewed forecasts exist. Units are kept separate by stream.",
             notes_as_tooltip=False,
@@ -2072,12 +2063,13 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     with chart_cols[1]:
         chart_card(
             "Revenue outlook",
-            "Nominal revenue is plotted only where the governed revenue bridge is available; unavailable revenue remains a visible gap.",
+            "Current finalist revenue replaces only PED, Light RUC and Heavy RUC; fixed components remain official MOT rows.",
             revenue_outlook_figure(filtered_rows, metric_type="revenue"),
-            caption="RUC revenue uses net km / 1,000 * reviewed nominal effective average rate. PED revenue requires a source-backed litres bridge.",
+            caption="PED uses source-backed population, litres intensity and FED rate. RUC uses current net km and governed effective rates.",
             notes_as_tooltip=False,
         )
 
+    revenue_kpis = _revenue_outlook_summary_cards(manifest, filtered_rows, future_revenue)
     kpi_grid(revenue_kpis)
 
     st.markdown("<div class='page5-panel-title'>Revenue bridge detail</div>", unsafe_allow_html=True)
@@ -2092,12 +2084,6 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             dataframe_download(bridge, "Download revenue bridge components", "revenue_bridge_components.csv")
         with download_cols[2]:
             dataframe_download(chart_rows, "Download revenue chart rows", "revenue_chart_rows.csv")
-
-    if source_pack is None:
-        warning_panel("The repo-local NLTF revenue source pack is missing; Total NLTF architecture controls are unavailable.")
-    else:
-        source_controls = _render_revenue_source_controls(source_pack)
-        _render_revenue_source_architecture(source_pack, source_controls)
 
 
 def _revenue_source_kpi_cards(source_pack: RevenueSourcePack | None) -> list[tuple[str, str, str | None]]:
@@ -3847,10 +3833,31 @@ def _pack_status_label(status: Any) -> str:
 
 
 def _revenue_outlook_stream_options(chart_rows: pd.DataFrame) -> list[str]:
-    if chart_rows is None or chart_rows.empty or "stream_label" not in chart_rows.columns:
+    if chart_rows is None or chart_rows.empty:
         return []
-    preferred = ["PED VKT per capita", "Light RUC volume", "Heavy RUC volume"]
-    available = set(chart_rows["stream_label"].dropna().astype(str))
+    label_column = "series_label" if "series_label" in chart_rows.columns else "stream_label"
+    if label_column not in chart_rows.columns:
+        return []
+    preferred = [
+        "PED VKT per capita",
+        "Light RUC net km",
+        "Heavy RUC net km",
+        "PED revenue",
+        "Light RUC revenue",
+        "Heavy RUC revenue",
+        "Gross FED revenue",
+        "Net FED revenue",
+        "Total RUC all classes",
+        "Net MVR revenue",
+        "Total FED+RUC net revenue",
+        "Total NLTF revenue",
+        "Light RUC volume",
+        "Heavy RUC volume",
+    ]
+    data = chart_rows.copy()
+    if "plot_allowed" in data.columns:
+        data = data[data["plot_allowed"].fillna(True).astype(bool)].copy()
+    available = set(data[label_column].dropna().astype(str))
     ordered = [label for label in preferred if label in available]
     ordered.extend(sorted(available.difference(ordered)))
     return ordered
@@ -3859,8 +3866,23 @@ def _revenue_outlook_stream_options(chart_rows: pd.DataFrame) -> list[str]:
 def _revenue_outlook_scenario_options(chart_rows: pd.DataFrame) -> list[str]:
     if chart_rows is None or chart_rows.empty or "scenario_name" not in chart_rows.columns:
         return []
-    data = chart_rows[chart_rows["row_type"].astype(str).eq("future_forecast")].copy()
+    data = chart_rows[~chart_rows["row_type"].astype(str).eq("historical_actual")].copy()
+    if "plot_allowed" in data.columns:
+        data = data[data["plot_allowed"].fillna(True).astype(bool)].copy()
     return sorted(data["scenario_name"].dropna().astype(str).unique().tolist())
+
+
+def _revenue_outlook_fed_path_options(chart_rows: pd.DataFrame) -> list[str]:
+    if chart_rows is None or chart_rows.empty or "fed_path" not in chart_rows.columns:
+        return []
+    data = chart_rows.copy()
+    if "plot_allowed" in data.columns:
+        data = data[data["plot_allowed"].fillna(True).astype(bool)].copy()
+    values = [value for value in data["fed_path"].dropna().astype(str).unique().tolist() if value and value.lower() not in {"nan", "befu25"}]
+    preferred = ["Current planned path", "No 2027 12c uplift", "Selected rate"]
+    ordered = [value for value in preferred if value in values]
+    ordered.extend(sorted(set(values).difference(ordered)))
+    return ordered
 
 
 def _filter_revenue_outlook_rows(
@@ -3868,14 +3890,22 @@ def _filter_revenue_outlook_rows(
     *,
     time_grain: str,
     stream_labels: list[str],
+    fed_paths: list[str],
     scenario_names: list[str],
 ) -> pd.DataFrame:
     if chart_rows is None or chart_rows.empty:
         return pd.DataFrame()
     data = chart_rows.copy()
     data = data[data["time_grain"].astype(str).eq(time_grain)].copy()
+    if "plot_allowed" in data.columns:
+        data = data[data["plot_allowed"].fillna(True).astype(bool)].copy()
+    label_column = "series_label" if "series_label" in data.columns else "stream_label"
     if stream_labels:
-        data = data[data["stream_label"].astype(str).isin(stream_labels)].copy()
+        data = data[data[label_column].astype(str).isin(stream_labels)].copy()
+    if fed_paths and "fed_path" in data.columns:
+        fed_text = data["fed_path"].fillna("").astype(str)
+        is_path_sensitive = data.get("trace_role", pd.Series("", index=data.index)).astype(str).eq("in_house_current_finalist")
+        data = data[(~is_path_sensitive) | fed_text.isin(fed_paths)].copy()
     if scenario_names:
         is_actual = data["row_type"].astype(str).eq("historical_actual")
         data = data[is_actual | data["scenario_name"].astype(str).isin(scenario_names)].copy()
@@ -3883,7 +3913,12 @@ def _filter_revenue_outlook_rows(
     return data.sort_values(["stream", "metric_type", "_period_order", "scenario_name"], kind="stable").drop(columns=["_period_order"], errors="ignore")
 
 
-def _filter_revenue_bridge_rows(bridge: pd.DataFrame, stream_labels: list[str], scenario_names: list[str]) -> pd.DataFrame:
+def _filter_revenue_bridge_rows(
+    bridge: pd.DataFrame,
+    stream_labels: list[str],
+    scenario_names: list[str],
+    fed_paths: list[str] | None = None,
+) -> pd.DataFrame:
     if bridge is None or bridge.empty:
         return pd.DataFrame()
     data = bridge.copy()
@@ -3892,6 +3927,9 @@ def _filter_revenue_bridge_rows(bridge: pd.DataFrame, stream_labels: list[str], 
     if scenario_names and "scenario_name" in data.columns:
         scenario_text = data["scenario_name"].fillna("").astype(str)
         data = data[scenario_text.eq("") | scenario_text.isin(scenario_names)].copy()
+    if fed_paths and "fed_path" in data.columns:
+        fed_text = data["fed_path"].fillna("").astype(str)
+        data = data[fed_text.eq("") | fed_text.isin(fed_paths)].copy()
     return data
 
 
@@ -3910,7 +3948,8 @@ def revenue_outlook_figure(rows: pd.DataFrame, *, metric_type: str) -> go.Figure
     )
     scenario_colors = _scenario_color_map(data)
     for col, stream_label in enumerate(streams, start=1):
-        stream_rows = data[data.get("stream_label", pd.Series(dtype=str)).astype(str).eq(stream_label)].copy()
+        label_column = "series_label" if "series_label" in data.columns else "stream_label"
+        stream_rows = data[data.get(label_column, pd.Series(dtype=str)).astype(str).eq(stream_label)].copy()
         stream_rows["_period_order"] = stream_rows.get("period", pd.Series(dtype=str)).map(_revenue_period_order)
         stream_rows["value_numeric"] = pd.to_numeric(stream_rows.get("value"), errors="coerce")
         stream_rows = stream_rows.sort_values("_period_order", kind="stable")
@@ -3931,25 +3970,50 @@ def revenue_outlook_figure(rows: pd.DataFrame, *, metric_type: str) -> go.Figure
                 row=1,
                 col=col,
             )
-        future = stream_rows[stream_rows["row_type"].astype(str).eq("future_forecast") & stream_rows["value_numeric"].notna()].copy()
+        future = stream_rows[
+            stream_rows["row_type"].astype(str).isin(["future_forecast", "official_comparator"])
+            & stream_rows["value_numeric"].notna()
+        ].copy()
         last_actual = historical.tail(1)[["period", "value_numeric"]] if not historical.empty else pd.DataFrame()
-        for scenario, group in future.groupby("scenario_name", dropna=False):
+        group_column = "trace_name" if "trace_name" in future.columns else "scenario_name"
+        for scenario, group in future.groupby(group_column, dropna=False):
             scenario_name = str(scenario)
             color = scenario_colors.get(scenario_name, "#006FAD")
-            plot_cols = [col for col in ["period", "value_numeric", "horizon", "horizon_scope", "bridge_status", "gap_reason"] if col in group.columns]
+            plot_cols = [
+                col
+                for col in [
+                    "period",
+                    "value_numeric",
+                    "horizon",
+                    "horizon_scope",
+                    "bridge_status",
+                    "gap_reason",
+                    "data_scope",
+                    "value_status",
+                    "actual_quarters",
+                    "forecast_quarters",
+                ]
+                if col in group.columns
+            ]
             plot_group = group[plot_cols].copy()
-            for column in ["horizon", "horizon_scope", "bridge_status", "gap_reason"]:
+            for column in ["horizon", "horizon_scope", "bridge_status", "gap_reason", "data_scope", "value_status", "actual_quarters", "forecast_quarters"]:
                 if column not in plot_group.columns:
                     plot_group[column] = ""
-            if not last_actual.empty:
+            trace_role = _first_non_empty(group.get("trace_role", pd.Series(dtype=str)))
+            if not last_actual.empty and trace_role != "official_external_comparator":
                 join_row = last_actual.copy()
                 join_row["horizon"] = pd.NA
                 join_row["horizon_scope"] = ""
                 join_row["bridge_status"] = "historical_actual"
                 join_row["gap_reason"] = ""
+                join_row["data_scope"] = "latest_actual_join"
+                join_row["value_status"] = "Actual join"
+                join_row["actual_quarters"] = ""
+                join_row["forecast_quarters"] = ""
                 plot_group = pd.concat([join_row, plot_group], ignore_index=True, sort=False)
             plot_group["horizon_hover"] = plot_group.apply(_revenue_horizon_hover_label, axis=1)
             plot_group["bridge_hover"] = plot_group.apply(_revenue_bridge_hover_label, axis=1)
+            plot_group["scope_hover"] = plot_group.apply(_revenue_scope_hover_label, axis=1)
             label = _scenario_label(scenario_name, group)
             fig.add_trace(
                 go.Scatter(
@@ -3961,8 +4025,8 @@ def revenue_outlook_figure(rows: pd.DataFrame, *, metric_type: str) -> go.Figure
                     showlegend=col == 1,
                     line={"color": color, "width": 2},
                     marker={"size": 6},
-                    customdata=plot_group[["horizon_hover", "bridge_hover"]].to_numpy(),
-                    hovertemplate="%{x}<br>%{y:,.2f}<br>%{customdata[0]}%{customdata[1]}<extra>" + html.escape(label) + "</extra>",
+                    customdata=plot_group[["horizon_hover", "bridge_hover", "scope_hover"]].to_numpy(),
+                    hovertemplate="%{x}<br>%{y:,.2f}<br>%{customdata[0]}%{customdata[1]}%{customdata[2]}<extra>" + html.escape(label) + "</extra>",
                 ),
                 row=1,
                 col=col,
@@ -4002,10 +4066,21 @@ def revenue_outlook_figure(rows: pd.DataFrame, *, metric_type: str) -> go.Figure
 
 def _scenario_color_map(rows: pd.DataFrame) -> dict[str, str]:
     palette = ["#006FAD", "#E56B2B", "#00843D", "#6B4E71", "#C2410C", "#0F766E"]
+    trace_palette = {
+        "Actual": "#737373",
+        "Current finalist Base case": "#006FAD",
+        "Current finalist High population/comparison": "#E56B2B",
+        "Official comparator: selected MOT/BEFU": "#00843D",
+        "Official comparator: rolling BEFU 1Y": "#6B4E71",
+    }
     output: dict[str, str] = {}
     if rows is None or rows.empty:
         return output
-    scenarios = rows[rows["row_type"].astype(str).eq("future_forecast")].copy()
+    if "trace_name" in rows.columns:
+        for trace_name in rows["trace_name"].dropna().astype(str).unique().tolist():
+            if trace_name in trace_palette:
+                output[trace_name] = trace_palette[trace_name]
+    scenarios = rows[~rows["row_type"].astype(str).eq("historical_actual")].copy()
     scenario_records = (
         scenarios[["scenario_name", "scenario_role"]]
         .dropna(subset=["scenario_name"])
@@ -4047,6 +4122,9 @@ def _stable_palette_index(name: str, palette_size: int) -> int:
 
 
 def _scenario_label(scenario_name: str, rows: pd.DataFrame) -> str:
+    trace_name = _first_non_empty(rows.get("trace_name", pd.Series(dtype=str)))
+    if trace_name:
+        return str(trace_name)
     display_name = _first_non_empty(rows.get("scenario_display_name", pd.Series(dtype=str)))
     label = _human_revenue_code_label(display_name or scenario_name)
     role = _first_non_empty(rows.get("scenario_role", pd.Series(dtype=str)))
@@ -4064,6 +4142,8 @@ def _human_revenue_code_label(value: Any) -> str:
         "comparison": "Comparison",
         "current_basecase": "Current base case",
         "current_comparison_1": "Current comparison 1",
+        "official_selected_mot_befu": "Official selected MOT/BEFU",
+        "official_rolling_befu_1y": "Official rolling BEFU 1Y",
         "historical_actual": "Historical actual",
         "historical_activity_available": "Historical activity available",
         "forecast_available": "Forecast available",
@@ -4085,6 +4165,9 @@ def _is_forecast_start_or_h13(horizon: Any) -> bool:
 
 
 def _revenue_horizon_hover_label(row: pd.Series) -> str:
+    data_scope = str(row.get("data_scope") or "").strip()
+    if data_scope in {"actual_anchor", "current_nowcast", "current_forecast", "official_comparator"}:
+        return _human_revenue_code_label(str(row.get("value_status") or data_scope))
     try:
         horizon = int(float(row.get("horizon")))
     except Exception:
@@ -4105,6 +4188,19 @@ def _revenue_bridge_hover_label(row: pd.Series) -> str:
     if status:
         return f"<br>Bridge status: {html.escape(status_label)}"
     return ""
+
+
+def _revenue_scope_hover_label(row: pd.Series) -> str:
+    parts = []
+    actual_quarters = str(row.get("actual_quarters") or "").strip()
+    forecast_quarters = str(row.get("forecast_quarters") or "").strip()
+    if actual_quarters:
+        parts.append(f"actual: {html.escape(actual_quarters)}")
+    if forecast_quarters:
+        parts.append(f"forecast: {html.escape(forecast_quarters)}")
+    if not parts:
+        return ""
+    return "<br>" + "; ".join(parts)
 
 
 def _revenue_marker_hover_label(row: pd.Series) -> str:
@@ -4132,6 +4228,8 @@ def _revenue_bridge_display_table(bridge: pd.DataFrame) -> pd.DataFrame:
         "horizon": "Horizon",
         "activity_value": "Activity",
         "activity_unit": "Activity unit",
+        "component_value": "Component value",
+        "component_unit": "Component unit",
         "rate_value": "Rate",
         "rate_unit": "Rate unit",
         "revenue_nzd": "Revenue NZD",
@@ -4142,7 +4240,7 @@ def _revenue_bridge_display_table(bridge: pd.DataFrame) -> pd.DataFrame:
     }
     cols = [col for col in rename if col in view.columns]
     view = view[cols].rename(columns=rename)
-    for col in ["Activity", "Rate", "Revenue NZD"]:
+    for col in ["Activity", "Component value", "Rate", "Revenue NZD"]:
         if col in view.columns:
             view[col] = pd.to_numeric(view[col], errors="coerce").map(lambda value: _format_compact_value(value, "nominal NZD" if col == "Revenue NZD" else ""))
     return view
@@ -4241,6 +4339,10 @@ def _fy5_revenue_value(rows: pd.DataFrame) -> tuple[Any, str]:
         & rows["time_grain"].astype(str).eq("june_year")
         & rows["row_type"].astype(str).eq("future_forecast")
     ].copy()
+    if "series_id" in data.columns and data["series_id"].astype(str).eq("total_nltf_net_revenue").any():
+        data = data[data["series_id"].astype(str).eq("total_nltf_net_revenue")].copy()
+    if "fed_path" in data.columns and data["fed_path"].astype(str).eq("Current planned path").any():
+        data = data[data["fed_path"].astype(str).eq("Current planned path")].copy()
     data["value_numeric"] = pd.to_numeric(data.get("value"), errors="coerce")
     data = data[data["value_numeric"].notna()].copy()
     if data.empty:
@@ -4249,7 +4351,7 @@ def _fy5_revenue_value(rows: pd.DataFrame) -> tuple[Any, str]:
     target_period = periods[min(4, len(periods) - 1)]
     base = data[data.get("scenario_role", pd.Series(dtype=str)).astype(str).eq(SCENARIO_ROLE_BASECASE)]
     chosen = base[base["period"].astype(str).eq(target_period)] if not base.empty else data[data["period"].astype(str).eq(target_period)]
-    value = float(chosen["value_numeric"].sum()) if not chosen.empty else pd.NA
+    value = float(chosen["value_numeric"].iloc[0]) if len(chosen) == 1 else (float(chosen["value_numeric"].sum()) if not chosen.empty else pd.NA)
     return value, target_period
 
 
@@ -4261,6 +4363,10 @@ def _comparison_delta_value(rows: pd.DataFrame) -> tuple[Any, str]:
         & rows["time_grain"].astype(str).eq("june_year")
         & rows["row_type"].astype(str).eq("future_forecast")
     ].copy()
+    if "series_id" in data.columns and data["series_id"].astype(str).eq("total_nltf_net_revenue").any():
+        data = data[data["series_id"].astype(str).eq("total_nltf_net_revenue")].copy()
+    if "fed_path" in data.columns and data["fed_path"].astype(str).eq("Current planned path").any():
+        data = data[data["fed_path"].astype(str).eq("Current planned path")].copy()
     data["value_numeric"] = pd.to_numeric(data.get("value"), errors="coerce")
     data = data[data["value_numeric"].notna()].copy()
     if data.empty or "scenario_role" not in data.columns:

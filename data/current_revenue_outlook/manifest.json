@@ -1,12 +1,29 @@
 {
   "schema_version": "revenue-outlook-pack-v1",
-  "created_at": "2026-06-24T09:50:46.982860+00:00",
-  "promotion_time": "2026-06-24T09:50:46.982869+00:00",
   "pack_status": "explicitly_promoted_current_outlook",
-  "promoted_by": "codex_reviewed_workbook_promotion",
-  "source_policy": "explicit_promoted_pack_or_in_session_reviewed_result_only; no latest-folder scan; no test-fixture publication",
+  "runtime_pack_type": "source_actual_current_finalist_official_comparator",
+  "promotion_time": "2026-06-25T05:34:15.787329+00:00",
+  "promoted_by": "repo_source_runtime_rebuild",
+  "repo_relative_output_dir": "data/current_revenue_outlook",
+  "source_policy": "committed_current_runtime_pack_only; no Streamlit runtime source-pack join; no annual_model_paths.csv legacy in-house forecasts",
+  "runtime_policy": "Revenue Outlook runtime rows are materialized from repo-local source actuals, current finalist forecasts and official MOT/BEFU comparators. Source-pack tables are retained as audit lineage and are not a second Streamlit chart engine.",
+  "allowed_traces": [
+    "Actual",
+    "Current finalist Base case",
+    "Current finalist High population/comparison",
+    "Official comparator: selected MOT/BEFU",
+    "Official comparator: rolling BEFU 1Y"
+  ],
+  "period_rule": {
+    "last_complete_actual_fy": 2025,
+    "first_forecast_quarter": "2026Q1",
+    "model_training_cutoff": "2025Q4",
+    "fy2026_nowcast": "2025Q3+2025Q4 source actuals plus 2026Q1+2026Q2 current finalist forecasts",
+    "rule": "Actual line ends FY2025; FY2026 actual-to-date rows are nowcast inputs only and are not plotted as actuals."
+  },
   "source_comparison": {
     "comparison_id": "current_revenue_outlook_scenario_comparison",
+    "output_dir_policy": "Source run output folders are not published in the promoted runtime manifest; scenario roles, workbook hashes, and governed output hashes are retained.",
     "scenario_role_validation": {
       "status": "passed",
       "base_scenario": "current_basecase",
@@ -44,120 +61,59 @@
         "forecast_end_period": "2050Q4",
         "forecast_status": "numeric_forecast_available"
       }
-    ],
-    "output_dir_policy": "Source run output folders are not published in the promoted runtime manifest; scenario roles, workbook hashes, and governed output hashes are retained."
+    ]
   },
   "scenario_roles": [
     {
       "scenario_name": "current_basecase",
       "scenario_role": "basecase",
+      "scenario_role_source": "explicit",
+      "scenario_display_name": "current_basecase",
+      "is_test_fixture": false,
+      "run_id": "current_revenue_outlook_current_basecase",
       "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_basecase (2) - Copy.xlsx",
-      "workbook_sha256": "d0644d353ee5a073602186cf7ac5c16e707d5350e16fd037b73a65528067cc6a"
+      "workbook_sha256": "d0644d353ee5a073602186cf7ac5c16e707d5350e16fd037b73a65528067cc6a",
+      "forecast_horizon_quarters": 100,
+      "forecast_start_period": "2026Q1",
+      "forecast_end_period": "2050Q4",
+      "forecast_status": "numeric_forecast_available"
     },
     {
       "scenario_name": "current_comparison_1",
       "scenario_role": "comparison",
+      "scenario_role_source": "explicit",
+      "scenario_display_name": "current_comparison_1",
+      "is_test_fixture": false,
+      "run_id": "current_revenue_outlook_current_comparison_1",
       "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_high_population (2) - Copy.xlsx",
-      "workbook_sha256": "6213ce565cf1f4a058a3ea9f1af4d5476a8b0423a4d8747905c3cba128380ce1"
+      "workbook_sha256": "6213ce565cf1f4a058a3ea9f1af4d5476a8b0423a4d8747905c3cba128380ce1",
+      "forecast_horizon_quarters": 100,
+      "forecast_start_period": "2026Q1",
+      "forecast_end_period": "2050Q4",
+      "forecast_status": "numeric_forecast_available"
     }
   ],
-  "model_ids": {
-    "HEAVY_RUC": [
-      "HEAVY_RUC__VNEXT_SOLVED_CONVEX_TOP4"
+  "join_key_contract": {
+    "columns": [
+      "canonical_stream_key",
+      "canonical_period_key",
+      "canonical_scenario_key",
+      "canonical_join_key"
     ],
-    "LIGHT_RUC": [
-      "dynamic_RESID_GBR_n150_d1_lr0.05_w36"
-    ],
-    "PED": [
-      "PED__VNEXT_SOLVED_CONVEX_TOP2"
-    ]
-  },
-  "units": {
-    "activity": {
-      "PED": "VKT per capita",
-      "LIGHT_RUC": "net km",
-      "HEAVY_RUC": "net km"
+    "source_columns": {
+      "canonical_stream_key": [
+        "stream"
+      ],
+      "canonical_period_key": [
+        "target_period",
+        "period"
+      ],
+      "canonical_scenario_key": [
+        "scenario_name",
+        "row_type"
+      ]
     },
-    "revenue": "nominal NZD",
-    "rates": {
-      "PED": "cents/litre",
-      "LIGHT_RUC": "NZD/1,000km",
-      "HEAVY_RUC": "NZD/1,000km"
-    }
-  },
-  "equations": {
-    "LIGHT_RUC": "Light RUC revenue = net km / 1,000 * nominal effective average Light RUC rate.",
-    "HEAVY_RUC": "Heavy RUC revenue = net km / 1,000 * nominal effective average Heavy RUC rate.",
-    "PED": "PED revenue = litres * nominal PED base rate / 100. Litres must come from a source-backed PED litres bridge, not from the VKT/capita activity model alone."
-  },
-  "rate_provenance": {
-    "historical_light_heavy": "data/model_input_history source net revenue; effective average rate = revenue * 1,000 / net km",
-    "future_light_heavy": "reviewed workbook nominal effective average RUC rate columns",
-    "future_ped": "reviewed workbook PED base-rate column plus source-backed PED litres bridge; currently a governed gap when source litres/history are missing"
-  },
-  "revenue_source_pack": {
-    "status": "source_pack_vendored",
-    "repo_relative_path": "data/revenue_model_source_pack/2026_05_19",
-    "source_pack_version": "2026_05_19",
-    "schema_version": "nltf-revenue-source-pack-v1",
-    "raw_workbook_basename": "19 05 2026 Latest NLTF revenue forecast model.xlsx",
-    "raw_workbook_sha256": "00c6070694818d27d7c402749354d8175de999894846dce45a4abdd7f5eb3e6b",
-    "distilled_workbook_basename": "NLTF_revenue_model_distilled.xlsx",
-    "distilled_workbook_sha256": "c7b9c80011a01cc86cc374b1a1ffbf0eb69e14dccc6690e1c54ffc6d6f9ed716",
-    "source_pack_manifest_sha256": "00f5547b4c54f5fc9bfa4fc2a3f3b470cab89be56d87265a3491b7b003b72fd6",
-    "selections": {
-      "crown_top_up": "Exclude",
-      "fed_path_scenario": "Current planned path",
-      "model_basis": "In-house model",
-      "release_round": "BEFU25",
-      "revenue_path": "Net of admin fees & refunds",
-      "scenario": "Medium",
-      "selected_fy": "FY2031",
-      "series": "Total NLTF revenue",
-      "uncertainty_source": "MOT release round",
-      "view": "Annual"
-    },
-    "dashboard_default_selections": {
-      "crown_top_up": "Exclude",
-      "fed_path_scenario": "Current planned path",
-      "model_basis": "In-house model",
-      "release_round": "BEFU25",
-      "revenue_path": "Net of admin fees & refunds",
-      "scenario": "Medium",
-      "selected_fy": "FY2031",
-      "series": "Total NLTF revenue",
-      "uncertainty_source": "MOT release round",
-      "view": "Annual"
-    },
-    "source_workbook_selections": {
-      "crown_top_up": "Exclude",
-      "fed_path_scenario": "Current planned path",
-      "model_basis": "In-house model",
-      "release_round": "BEFU25",
-      "revenue_path": "Net of admin fees & refunds",
-      "scenario": "Medium",
-      "selected_fy": "FY2031",
-      "series": "Total RUC+PED revenue",
-      "uncertainty_source": "MOT release round",
-      "view": "Annual"
-    },
-    "default_selection_policy": "Revenue Outlook defaults to Total NLTF revenue even when the source workbook current selection uses the legacy Total RUC+PED subtotal."
-  },
-  "bridge_status_by_stream": {
-    "HEAVY_RUC": [
-      "nominal_rate_missing"
-    ],
-    "LIGHT_RUC": [
-      "nominal_rate_missing"
-    ],
-    "PED": [
-      "ped_bridge_source_history_missing"
-    ]
-  },
-  "row_counts": {
-    "future_revenue_forecasts": 600,
-    "revenue_bridge_components": 603,
-    "revenue_chart_rows": 1809
+    "rule": "Forecast Builder volume packs join to Revenue Outlook rows by canonical stream, period and scenario keys; historical rows use historical_actual."
   },
   "source_hashes": {
     "model_input_history": {
@@ -192,63 +148,137 @@
       }
     ]
   },
-  "output_files": [
-    "future_revenue_forecasts.parquet",
-    "future_revenue_forecasts.csv",
-    "revenue_bridge_components.parquet",
-    "revenue_bridge_components.csv",
-    "revenue_chart_rows.parquet",
-    "revenue_chart_rows.csv",
-    "manifest.json",
-    "manifest.md"
-  ],
-  "repo_relative_output_dir": "data/current_revenue_outlook",
+  "revenue_source_pack": {
+    "status": "source_pack_vendored",
+    "repo_relative_path": "data/revenue_model_source_pack/2026_05_19",
+    "source_pack_version": "2026_05_19",
+    "schema_version": "nltf-revenue-source-pack-v1",
+    "raw_workbook_basename": "19 05 2026 Latest NLTF revenue forecast model.xlsx",
+    "raw_workbook_sha256": "00c6070694818d27d7c402749354d8175de999894846dce45a4abdd7f5eb3e6b",
+    "distilled_workbook_basename": "NLTF_revenue_model_distilled.xlsx",
+    "distilled_workbook_sha256": "c7b9c80011a01cc86cc374b1a1ffbf0eb69e14dccc6690e1c54ffc6d6f9ed716",
+    "source_pack_manifest_sha256": "ab3cb81048625b2beb199d177af9616338877c1631fa96185e601997c537f456",
+    "selections": {
+      "crown_top_up": "Exclude",
+      "fed_path_scenario": "Current planned path",
+      "model_basis": "Current finalist ensemble",
+      "release_round": "BEFU25",
+      "revenue_path": "Net of admin fees & refunds",
+      "scenario": "Medium",
+      "selected_fy": "FY2031",
+      "series": "Total NLTF revenue",
+      "uncertainty_source": "MOT release round",
+      "view": "Annual"
+    },
+    "dashboard_default_selections": {
+      "crown_top_up": "Exclude",
+      "fed_path_scenario": "Current planned path",
+      "model_basis": "Current finalist ensemble",
+      "release_round": "BEFU25",
+      "revenue_path": "Net of admin fees & refunds",
+      "scenario": "Medium",
+      "selected_fy": "FY2031",
+      "series": "Total NLTF revenue",
+      "uncertainty_source": "MOT release round",
+      "view": "Annual"
+    },
+    "source_workbook_selections": {
+      "crown_top_up": "Exclude",
+      "fed_path_scenario": "Current planned path",
+      "model_basis": "In-house model",
+      "release_round": "BEFU25",
+      "revenue_path": "Net of admin fees & refunds",
+      "scenario": "Medium",
+      "selected_fy": "FY2031",
+      "series": "Total RUC+PED revenue",
+      "uncertainty_source": "MOT release round",
+      "view": "Annual"
+    },
+    "default_selection_policy": "Revenue Outlook defaults to Total NLTF revenue even when the source workbook current selection uses the legacy Total RUC+PED subtotal."
+  },
+  "bridge_status_by_stream": {
+    "PED": [
+      "available"
+    ],
+    "LIGHT_RUC": [
+      "available"
+    ],
+    "HEAVY_RUC": [
+      "available"
+    ]
+  },
+  "equations": {
+    "PED": "PED revenue = VKT/capita * scenario population -> total VKT * governed litres/100km * nominal PED/FED rate.",
+    "LIGHT_RUC": "Light RUC revenue = current finalist net km / 1,000 * governed effective Light RUC rate.",
+    "HEAVY_RUC": "Heavy RUC revenue = current finalist net km / 1,000 * governed class-mix Heavy RUC rate.",
+    "ROLLUPS": "Gross FED, Net FED, Total RUC, Total RUC+PED and Total NLTF recalculate exactly three replacement lines plus MOT fixed components."
+  },
+  "rate_provenance": {
+    "future_light_heavy": "official_befu25_annual.csv effective rates joined to current finalist net-km outputs",
+    "future_ped": "ped_bridge_inputs.csv population/intensity plus fed_rate_paths.csv nominal rate joined to current finalist PED VKT/capita",
+    "fixed_components": "official_befu25_annual.csv selected-MOT rows"
+  },
+  "trace_audit": {
+    "repo_relative_path": "data/current_revenue_outlook/runtime_trace_audit.csv",
+    "scope": "Per-series FY2024-FY2027 trace audit with source, role, model ID, scenario, quarter composition and anchor flags."
+  },
+  "validation_status": "runtime_rebuilt",
   "output_hashes": {
-    "future_revenue_forecasts.parquet": {
-      "sha256": "cfd0f72abf96d0999834d5e72bd91299d85cfcc3ede52a5752a4d136ff65c333",
-      "size_bytes": 32463
-    },
     "future_revenue_forecasts.csv": {
-      "sha256": "433c56f87c259ef76afbb8a8f5a4f54a666175b9c9741d1a3ef8224b33c30086",
-      "size_bytes": 428916
+      "sha256": "f9addbed5a596d18c2c51f0a58cb2098ffca9b861d6654f54c28c0da00d938d8",
+      "size_bytes": 157500
     },
-    "revenue_bridge_components.parquet": {
-      "sha256": "52aa0a07dfa79bc046731563a2bbdb589705b4fda6477e4673e0e60213613c7a",
-      "size_bytes": 30260
+    "future_revenue_forecasts.parquet": {
+      "sha256": "7f6955ff3147ce03e85a4166ad773dd94356c226a700e42245de6ddda823463b",
+      "size_bytes": 18953
+    },
+    "path_trace_status.csv": {
+      "sha256": "b0b2b2f01c6977e869a21f620485e686c119b1895d29e1c67d12ce7afb9adfe3",
+      "size_bytes": 1064
+    },
+    "path_trace_status.parquet": {
+      "sha256": "65e91a936ae5033d050469d57fbd09bf049edf62e47baa8b2ea670be7f84d97c",
+      "size_bytes": 6581
     },
     "revenue_bridge_components.csv": {
-      "sha256": "a9ee38ad4d2a056ea1a5a05e88821a50aae2b20565bad7874b168e7749a90e50",
-      "size_bytes": 369551
+      "sha256": "132a9a0ff3e302ea73194b14b60cc2b2969e519ae74876db2e3878ac6c8bb2e1",
+      "size_bytes": 274698
     },
-    "revenue_chart_rows.parquet": {
-      "sha256": "f6939fba667ac756d66862f45fdbee805e8593bebdda7d7f6716ba8dcf3944de",
-      "size_bytes": 46156
+    "revenue_bridge_components.parquet": {
+      "sha256": "b274052e704dae5da0f141c8f4b1dd11131d5165ee75e1d31a776e0c6729a4b5",
+      "size_bytes": 25503
     },
     "revenue_chart_rows.csv": {
-      "sha256": "be9de3f1722b42755b52810dbd7e61500519454bb45f63e80baf80843681b9ca",
-      "size_bytes": 708900
-    }
-  },
-  "join_key_contract": {
-    "columns": [
-      "canonical_stream_key",
-      "canonical_period_key",
-      "canonical_scenario_key",
-      "canonical_join_key"
-    ],
-    "source_columns": {
-      "canonical_stream_key": [
-        "stream"
-      ],
-      "canonical_period_key": [
-        "target_period",
-        "period"
-      ],
-      "canonical_scenario_key": [
-        "scenario_name",
-        "row_type"
-      ]
+      "sha256": "4d52e18fb2e7414419cb4f53b69e9b4fd09eb5b43c51725ec6f972373d8a57e0",
+      "size_bytes": 1048616
     },
-    "rule": "Forecast Builder volume packs join to Revenue Outlook rows by canonical stream, period and scenario keys; historical rows use historical_actual."
+    "revenue_chart_rows.parquet": {
+      "sha256": "4084a32cae2dd43f663415c24aa460b95f8a8a17010f64e7c2e05194663dcfbc",
+      "size_bytes": 67172
+    },
+    "runtime_trace_audit.csv": {
+      "sha256": "405b142d5da3d2a373b96392c98a19c11003db599799b3c0f0fd64c798ce8016",
+      "size_bytes": 118824
+    },
+    "runtime_trace_audit.parquet": {
+      "sha256": "935a752438f027b97c9b34a12205a67d16d270cab9d8c3aedb146a73b3464a87",
+      "size_bytes": 17382
+    },
+    "series_trace_contract.csv": {
+      "sha256": "bbfe7a0fb06569540ee6ad94f5d6f1b8924af0c0490eeebd053eaee30cdd0d16",
+      "size_bytes": 16105
+    },
+    "series_trace_contract.parquet": {
+      "sha256": "6a1ae2a1abf43a68185f1e61e287ef316367ac32da9e70d8f081d1e49e35c311",
+      "size_bytes": 15895
+    },
+    "trace_source_contract.csv": {
+      "sha256": "3a8b3b66da395cad28c74622c12bb43af1a6e035eb5917e9d9e61e52539a50d5",
+      "size_bytes": 1428
+    },
+    "trace_source_contract.parquet": {
+      "sha256": "282d61fc1487883ed6daa126f0fac4bb7da9ddc88d79cbf1fde1dd15b3c7d34c",
+      "size_bytes": 8555
+    }
   }
 }

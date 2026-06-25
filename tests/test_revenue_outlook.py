@@ -187,10 +187,18 @@ def test_committed_current_revenue_outlook_pack_is_repo_local_and_hash_backed() 
     assert sorted(manifest["output_hashes"]) == [
         "future_revenue_forecasts.csv",
         "future_revenue_forecasts.parquet",
+        "path_trace_status.csv",
+        "path_trace_status.parquet",
         "revenue_bridge_components.csv",
         "revenue_bridge_components.parquet",
         "revenue_chart_rows.csv",
         "revenue_chart_rows.parquet",
+        "runtime_trace_audit.csv",
+        "runtime_trace_audit.parquet",
+        "series_trace_contract.csv",
+        "series_trace_contract.parquet",
+        "trace_source_contract.csv",
+        "trace_source_contract.parquet",
     ]
     for filename, metadata in manifest["output_hashes"].items():
         assert metadata["sha256"] == _sha256(pack_dir / filename)
@@ -201,6 +209,89 @@ def test_committed_current_revenue_outlook_pack_is_repo_local_and_hash_backed() 
     for path in pack_dir.iterdir():
         if path.is_file():
             assert path.stat().st_size < 50 * 1024 * 1024
+
+
+def test_committed_current_revenue_outlook_runtime_contract() -> None:
+    pack_dir = ROOT / CURRENT_REVENUE_OUTLOOK_DIR
+    manifest = json.loads((pack_dir / "manifest.json").read_text(encoding="utf-8"))
+    chart = pd.read_parquet(pack_dir / "revenue_chart_rows.parquet")
+    bridge = pd.read_parquet(pack_dir / "revenue_bridge_components.parquet")
+    future = pd.read_parquet(pack_dir / "future_revenue_forecasts.parquet")
+    audit = pd.read_parquet(pack_dir / "runtime_trace_audit.parquet")
+
+    assert manifest["runtime_pack_type"] == "source_actual_current_finalist_official_comparator"
+    assert manifest["bridge_status_by_stream"] == {
+        "PED": ["available"],
+        "LIGHT_RUC": ["available"],
+        "HEAVY_RUC": ["available"],
+    }
+    assert "workbook model" not in json.dumps(manifest).lower()
+    assert "nominal_rate_missing" not in json.dumps(manifest)
+    assert "ped_bridge_source_history_missing" not in json.dumps(manifest)
+
+    allowed_traces = {
+        "Actual",
+        "Current finalist Base case",
+        "Current finalist High population/comparison",
+        "Official comparator: selected MOT/BEFU",
+        "Official comparator: rolling BEFU 1Y",
+    }
+    displayed = chart[chart["time_grain"].astype(str).eq("june_year") & chart["plot_allowed"].astype(str).str.lower().isin(["true", "1"])]
+    assert set(displayed["trace_name"].dropna().unique()) == allowed_traces
+    assert displayed[
+        displayed["row_type"].astype(str).eq("historical_actual")
+        & pd.to_numeric(displayed["june_year"], errors="coerce").gt(2025)
+    ].empty
+
+    runtime_text = pd.concat(
+        [
+            chart[["source_file", "source", "model_basis"]].astype(str).stack(),
+            bridge[["source", "source_basis", "model_id"]].astype(str).stack(),
+            future[["source", "model_id"]].astype(str).stack(),
+        ],
+        ignore_index=True,
+    ).str.cat(sep="\n")
+    assert "annual_model_paths.csv" not in runtime_text
+    assert "selected_dashboard" not in runtime_text.lower()
+    assert "schiff" not in runtime_text.lower()
+
+    current = chart[
+        chart["time_grain"].astype(str).eq("june_year")
+        & chart["trace_role"].astype(str).eq("in_house_current_finalist")
+        & chart["fed_path"].astype(str).eq("Current planned path")
+    ].copy()
+    fy2026 = current[current["period"].astype(str).eq("FY2026")].set_index(["series_id", "scenario_name"])
+    assert fy2026.loc[("gross_ped_revenue", "current_basecase"), "model_id"] == "PED__VNEXT_SOLVED_CONVEX_TOP2"
+    assert fy2026.loc[("light_ruc_net_revenue", "current_basecase"), "model_id"] == "dynamic_RESID_GBR_n150_d1_lr0.05_w36"
+    assert fy2026.loc[("heavy_ruc_net_revenue", "current_basecase"), "model_id"] == "HEAVY_RUC__VNEXT_SOLVED_CONVEX_TOP4"
+    assert "PED__VNEXT_SOLVED_CONVEX_TOP2" in fy2026.loc[("total_nltf_net_revenue", "current_basecase"), "model_id"]
+    assert fy2026.loc[("total_nltf_net_revenue", "current_basecase"), "data_scope"] == "current_nowcast"
+    assert fy2026.loc[("total_nltf_net_revenue", "current_basecase"), "actual_quarters"] == "2025Q3; 2025Q4"
+    assert fy2026.loc[("total_nltf_net_revenue", "current_basecase"), "forecast_quarters"] == "2026Q1; 2026Q2"
+
+    anchor = current[current["period"].astype(str).eq("FY2025")].set_index(["series_id", "scenario_name"])
+    assert anchor.loc[("total_nltf_net_revenue", "current_basecase"), "data_scope"] == "actual_anchor"
+    assert anchor.loc[("total_nltf_net_revenue", "current_basecase"), "source_file"] == "annual_actuals.csv"
+
+    assert set(bridge["bridge_status"].dropna().astype(str).unique()) == {"available"}
+    replacements = bridge[bridge["component_type"].astype(str).eq("replacement_line")]
+    assert set(replacements["stream"].unique()) == {"gross_ped_revenue", "light_ruc_net_revenue", "heavy_ruc_net_revenue"}
+    replacement_counts = replacements.groupby(["period", "scenario_name", "fed_path"])["stream"].agg(lambda values: set(values))
+    assert replacement_counts.map(lambda values: values == {"gross_ped_revenue", "light_ruc_net_revenue", "heavy_ruc_net_revenue"}).all()
+
+    assert not audit.empty
+    assert {2024, 2025, 2026, 2027}.issubset(set(pd.to_numeric(audit["june_year"], errors="coerce").dropna().astype(int)))
+    assert {
+        "series_id",
+        "trace_name",
+        "trace_role",
+        "source_file",
+        "model_id",
+        "actual_quarters",
+        "forecast_quarters",
+        "anchor_flag",
+        "nowcast_flag",
+    }.issubset(audit.columns)
 
 
 def test_revenue_outlook_loader_rejects_hash_mismatched_promoted_pack(tmp_path: Path) -> None:

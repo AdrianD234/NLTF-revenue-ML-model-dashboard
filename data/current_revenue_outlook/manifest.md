@@ -2,7 +2,7 @@
 
 - Schema: `revenue-outlook-pack-v1`
 - Status: `explicitly_promoted_current_outlook`
-- Promoted: `2026-06-24T09:50:46.982869+00:00`
+- Promoted: `2026-06-25T05:34:15.787329+00:00`
 - Output: `data/current_revenue_outlook`
 
 ## Equations
@@ -15,9 +15,9 @@
 - `current_comparison_1`: `comparison`, workbook `NLTF_forecast_input_template_to_2050Q4_high_population (2) - Copy.xlsx`, SHA256 `6213ce565cf1f4a058a3ea9f1af4d5476a8b0423a4d8747905c3cba128380ce1`
 
 ## Bridge Status
-- Heavy RUC volume: nominal_rate_missing
-- Light RUC volume: nominal_rate_missing
-- PED VKT per capita: ped_bridge_source_history_missing
+- PED VKT per capita: available
+- Light RUC volume: available
+- Heavy RUC volume: available
 
 ## Canonical Join Keys
 - Columns: `canonical_stream_key, canonical_period_key, canonical_scenario_key, canonical_join_key`
@@ -26,7 +26,7 @@
 ## Revenue Source Pack
 - Version: `2026_05_19`
 - Raw workbook SHA256: `00c6070694818d27d7c402749354d8175de999894846dce45a4abdd7f5eb3e6b`
-- Manifest SHA256: `00f5547b4c54f5fc9bfa4fc2a3f3b470cab89be56d87265a3491b7b003b72fd6`
+- Manifest SHA256: `ab3cb81048625b2beb199d177af9616338877c1631fa96185e601997c537f456`
 - Status: `source_pack_vendored`
 - Dashboard default series: `Total NLTF revenue`
 - Source workbook current series: `Total RUC+PED revenue`

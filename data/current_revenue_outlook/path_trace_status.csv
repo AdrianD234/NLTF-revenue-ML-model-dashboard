@@ -1,0 +1,5 @@
+trace_id,trace_label,availability_status,plotted,data_scope,blocking_gap_id,current_selection,user_visible_message
+actual_benchmark,Complete annual actuals,available,True,annual actual rows after completeness audit,,official actual or benchmark,Only complete annual actual years are connected as the grey actual line.
+selected_mot_befu_release,Official comparator: selected MOT/BEFU,available,True,release-value table,,BEFU25,Official selected MOT/BEFU comparator is plotted from repo-local release_values.csv rows.
+rolling_befu_1y,Official comparator: rolling BEFU 1Y,available,True,release-value table,,BEFU25,Official rolling BEFU 1Y comparator is plotted from true one-year-ahead rows in release_values.csv.
+current_finalist_forecast,Current finalist forecast,available,True,promoted current finalist quarterly outputs annualized to June years with FY2025 actual anchor,,current finalist ensemble,Current finalist forecast is plotted from data/current_revenue_outlook outputs only; FY2025 is an Actual anchor and FY2026 is the production-vintage nowcast.

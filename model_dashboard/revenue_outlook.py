@@ -28,7 +28,16 @@ from .forecast_imports import (
     SCENARIO_ROLE_COMPARISON,
     quarter_sort_key,
 )
-from .revenue_source_pack import REVENUE_SOURCE_PACK_DIR
+from .revenue_source_pack import (
+    CURRENT_FINALIST_COMPOSITE_MODEL_ID,
+    CURRENT_FINALIST_MODEL_IDS,
+    REVENUE_FIRST_FORECAST_QUARTER,
+    REVENUE_LAST_COMPLETE_ACTUAL_FY,
+    REVENUE_MODEL_TRAINING_CUTOFF,
+    REVENUE_SOURCE_PACK_DIR,
+    SOURCE_SERIES_ALIASES,
+    load_revenue_source_pack,
+)
 
 if TYPE_CHECKING:
     from .forecast_runner import ForecastScenarioComparisonResult
@@ -47,6 +56,10 @@ RUNTIME_REVENUE_OUTLOOK_FILES = (
     "future_revenue_forecasts.parquet",
     "revenue_bridge_components.parquet",
     "revenue_chart_rows.parquet",
+    "runtime_trace_audit.parquet",
+    "trace_source_contract.parquet",
+    "series_trace_contract.parquet",
+    "path_trace_status.parquet",
 )
 STREAM_ORDER = ["PED", "LIGHT_RUC", "HEAVY_RUC"]
 STREAM_LABELS = {
@@ -119,6 +132,12 @@ SOURCE_COMPARISON_OUTPUT_DIR_POLICY = (
     "Source run output folders are not published in the promoted runtime manifest; "
     "scenario roles, workbook hashes, and governed output hashes are retained."
 )
+CURRENT_RUNTIME_POLICY = (
+    "Revenue Outlook runtime rows are materialized from repo-local source actuals, "
+    "current finalist forecasts and official MOT/BEFU comparators. Source-pack "
+    "tables are retained as audit lineage and are not a second Streamlit chart engine."
+)
+REVENUE_FIRST_FORECAST_FY = 2026
 
 
 @dataclass
@@ -222,6 +241,157 @@ def promote_revenue_outlook_pack(
     )
 
 
+DISPLAY_SERIES_ORDER = [
+    "ped_vkt_per_capita",
+    "light_ruc_net_km",
+    "heavy_ruc_net_km",
+    "gross_ped_revenue",
+    "light_ruc_net_revenue",
+    "heavy_ruc_net_revenue",
+    "gross_fed_revenue",
+    "net_fed_revenue",
+    "total_ruc_net_revenue",
+    "net_mvr_revenue",
+    "total_fed_ruc_net_revenue",
+    "total_nltf_net_revenue",
+]
+
+
+def build_current_revenue_outlook_runtime_pack(
+    *,
+    repo_root: Path | str | None = None,
+    output_dir: Path | str | None = None,
+    promoted_by: str = "repo_source_runtime_rebuild",
+) -> RevenueOutlookPack:
+    """Materialize the committed Revenue Outlook pack from repo-local sources.
+
+    This is the deployment/runtime path. It uses the normalized source pack as
+    an offline input and writes chart-ready rows into data/current_revenue_outlook
+    so Streamlit does not need to join source-pack tables at render time.
+    """
+
+    root = Path(repo_root) if repo_root is not None else repo_root_from_here()
+    base = Path(output_dir) if output_dir is not None else root / CURRENT_REVENUE_OUTLOOK_DIR
+    base.mkdir(parents=True, exist_ok=True)
+
+    existing_manifest = _read_existing_manifest(base)
+    source_pack = load_revenue_source_pack(repo_root=root)
+    current = source_pack.current_forecast_annual.copy()
+    if current.empty:
+        raise ValueError("Cannot rebuild current Revenue Outlook runtime pack: current finalist annual rows are missing.")
+
+    existing_chart_rows = _read_optional_csv(base / "revenue_chart_rows.csv")
+    series_meta = _runtime_series_metadata(source_pack.series_trace_contract)
+    quarterly_inputs = _runtime_quarterly_activity_inputs(existing_chart_rows, series_meta)
+    actual_rows = _runtime_actual_rows(source_pack.series_junction_audit, series_meta)
+    current_rows = _runtime_current_rows(current, series_meta)
+    selected_release_rows = _runtime_release_rows(
+        source_pack.release_values,
+        series_meta,
+        trace_name="Official comparator: selected MOT/BEFU",
+        scenario_name="official_selected_mot_befu",
+        trace_source="selected_mot_befu_release",
+    )
+    rolling_release_rows = _runtime_release_rows(
+        source_pack.release_values,
+        series_meta,
+        trace_name="Official comparator: rolling BEFU 1Y",
+        scenario_name="official_rolling_befu_1y",
+        trace_source="rolling_befu_1y",
+    )
+    chart_rows = pd.concat(
+        [quarterly_inputs, actual_rows, current_rows, selected_release_rows, rolling_release_rows],
+        ignore_index=True,
+        sort=False,
+    )
+    if chart_rows.empty:
+        raise ValueError("Cannot rebuild current Revenue Outlook runtime pack: no chart rows were produced.")
+    chart_rows = _normalize_runtime_chart_rows(chart_rows)
+    future_revenue = _runtime_future_revenue_forecasts(current, series_meta)
+    bridge_components = _runtime_bridge_components(current, series_meta)
+    trace_audit = _runtime_trace_audit(chart_rows)
+
+    scenarios = _runtime_scenario_records(existing_manifest, current)
+    manifest = {
+        "schema_version": REVENUE_OUTLOOK_SCHEMA_VERSION,
+        "pack_status": "explicitly_promoted_current_outlook",
+        "runtime_pack_type": "source_actual_current_finalist_official_comparator",
+        "promotion_time": datetime.now(timezone.utc).isoformat(),
+        "promoted_by": promoted_by,
+        "repo_relative_output_dir": _repo_relative(root, base),
+        "source_policy": (
+            "committed_current_runtime_pack_only; no Streamlit runtime source-pack join; "
+            "no annual_model_paths.csv legacy in-house forecasts"
+        ),
+        "runtime_policy": CURRENT_RUNTIME_POLICY,
+        "allowed_traces": [
+            "Actual",
+            "Current finalist Base case",
+            "Current finalist High population/comparison",
+            "Official comparator: selected MOT/BEFU",
+            "Official comparator: rolling BEFU 1Y",
+        ],
+        "period_rule": {
+            "last_complete_actual_fy": REVENUE_LAST_COMPLETE_ACTUAL_FY,
+            "first_forecast_quarter": REVENUE_FIRST_FORECAST_QUARTER,
+            "model_training_cutoff": REVENUE_MODEL_TRAINING_CUTOFF,
+            "fy2026_nowcast": "2025Q3+2025Q4 source actuals plus 2026Q1+2026Q2 current finalist forecasts",
+            "rule": "Actual line ends FY2025; FY2026 actual-to-date rows are nowcast inputs only and are not plotted as actuals.",
+        },
+        "source_comparison": {
+            "comparison_id": (existing_manifest.get("source_comparison") or {}).get("comparison_id", "current_finalist_runtime_rebuild"),
+            "output_dir_policy": SOURCE_COMPARISON_OUTPUT_DIR_POLICY,
+            "scenario_role_validation": (existing_manifest.get("source_comparison") or {}).get(
+                "scenario_role_validation",
+                {"status": "passed", "source": "committed runtime rebuild"},
+            ),
+            "scenarios": scenarios,
+        },
+        "scenario_roles": scenarios,
+        "join_key_contract": CANONICAL_JOIN_KEY_CONTRACT,
+        "source_hashes": existing_manifest.get("source_hashes") or _source_hashes(root, scenarios),
+        "revenue_source_pack": _revenue_source_pack_metadata(root),
+        "bridge_status_by_stream": {
+            "PED": ["available"],
+            "LIGHT_RUC": ["available"],
+            "HEAVY_RUC": ["available"],
+        },
+        "equations": {
+            "PED": "PED revenue = VKT/capita * scenario population -> total VKT * governed litres/100km * nominal PED/FED rate.",
+            "LIGHT_RUC": "Light RUC revenue = current finalist net km / 1,000 * governed effective Light RUC rate.",
+            "HEAVY_RUC": "Heavy RUC revenue = current finalist net km / 1,000 * governed class-mix Heavy RUC rate.",
+            "ROLLUPS": "Gross FED, Net FED, Total RUC, Total RUC+PED and Total NLTF recalculate exactly three replacement lines plus MOT fixed components.",
+        },
+        "rate_provenance": {
+            "future_light_heavy": "official_befu25_annual.csv effective rates joined to current finalist net-km outputs",
+            "future_ped": "ped_bridge_inputs.csv population/intensity plus fed_rate_paths.csv nominal rate joined to current finalist PED VKT/capita",
+            "fixed_components": "official_befu25_annual.csv selected-MOT rows",
+        },
+        "trace_audit": {
+            "repo_relative_path": _repo_relative(root, base / "runtime_trace_audit.csv"),
+            "scope": "Per-series FY2024-FY2027 trace audit with source, role, model ID, scenario, quarter composition and anchor flags.",
+        },
+        "validation_status": "runtime_rebuilt",
+    }
+    manifest["revenue_source_pack"]["dashboard_default_selections"]["model_basis"] = "Current finalist ensemble"
+    manifest["revenue_source_pack"]["selections"]["model_basis"] = "Current finalist ensemble"
+
+    _write_pack_files(
+        base,
+        manifest,
+        future_revenue,
+        bridge_components,
+        chart_rows,
+        extra_frames={
+            "runtime_trace_audit": trace_audit,
+            "trace_source_contract": source_pack.trace_source_contract,
+            "series_trace_contract": source_pack.series_trace_contract,
+            "path_trace_status": source_pack.path_trace_status,
+        },
+    )
+    return load_revenue_outlook_pack(base, repo_root=root)  # type: ignore[return-value]
+
+
 def build_revenue_outlook_pack(
     comparison: ForecastScenarioComparisonResult,
     *,
@@ -277,6 +447,665 @@ def _read_optional_parquet(path: Path) -> pd.DataFrame:
     if not path.exists():
         return pd.DataFrame()
     return pd.read_parquet(path)
+
+
+def _read_optional_csv(path: Path) -> pd.DataFrame:
+    if not path.exists():
+        return pd.DataFrame()
+    return pd.read_csv(path)
+
+
+def _read_existing_manifest(pack_dir: Path) -> dict[str, Any]:
+    path = pack_dir / "manifest.json"
+    if not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _runtime_series_metadata(series_trace_contract: pd.DataFrame) -> dict[str, dict[str, Any]]:
+    metadata: dict[str, dict[str, Any]] = {}
+    if isinstance(series_trace_contract, pd.DataFrame) and not series_trace_contract.empty:
+        for record in series_trace_contract.to_dict("records"):
+            series_id = str(record.get("canonical_id") or "").strip()
+            if not series_id or series_id in metadata:
+                continue
+            metadata[series_id] = {
+                "display_name": str(record.get("display_name") or record.get("series_option") or series_id).strip(),
+                "metric_type": _runtime_metric_type(record.get("metric_type"), record.get("unit")),
+                "unit": record.get("unit") or "",
+                "availability_status": record.get("availability_status") or "",
+                "valid_controls": record.get("valid_controls") or "",
+            }
+    fallback_labels = {
+        "gross_fed_revenue": "Gross FED revenue",
+        "total_ruc_net_revenue": "Total RUC all classes",
+        "total_fed_ruc_net_revenue": "Total FED+RUC net revenue",
+        "total_nltf_net_revenue": "Total NLTF revenue",
+        "ped_vkt_per_capita": "PED VKT per capita",
+        "light_ruc_net_km": "Light RUC net km",
+        "heavy_ruc_net_km": "Heavy RUC net km",
+    }
+    for series_id in DISPLAY_SERIES_ORDER:
+        metadata.setdefault(
+            series_id,
+            {
+                "display_name": fallback_labels.get(series_id, series_id.replace("_", " ").title()),
+                "metric_type": "activity" if series_id.endswith("_km") or series_id == "ped_vkt_per_capita" else "revenue",
+                "unit": "",
+                "availability_status": "",
+                "valid_controls": "",
+            },
+        )
+    return metadata
+
+
+def _runtime_metric_type(metric_type: Any, unit: Any = "") -> str:
+    text = str(metric_type or "").strip().lower()
+    if text in {"activity", "revenue"}:
+        return text
+    unit_text = str(unit or "").lower()
+    if "km" in unit_text or "person" in unit_text:
+        return "activity"
+    return "revenue"
+
+
+def _runtime_display_name(series_id: str, series_meta: dict[str, dict[str, Any]], fallback: Any = "") -> str:
+    meta = series_meta.get(str(series_id), {})
+    label = str(meta.get("display_name") or "").strip()
+    if label:
+        return label
+    text = str(fallback or "").strip()
+    return text or str(series_id).replace("_", " ").title()
+
+
+def _runtime_series_id_from_release_label(label: Any) -> str:
+    text = str(label or "").strip()
+    return str(SOURCE_SERIES_ALIASES.get(text, "") or "").strip()
+
+
+def _runtime_quarterly_activity_inputs(chart_rows: pd.DataFrame, series_meta: dict[str, dict[str, Any]]) -> pd.DataFrame:
+    if chart_rows is None or chart_rows.empty:
+        return pd.DataFrame()
+    data = chart_rows[
+        chart_rows.get("time_grain", pd.Series(dtype=str)).astype(str).eq("quarterly")
+        & chart_rows.get("metric_type", pd.Series(dtype=str)).astype(str).eq("activity")
+    ].copy()
+    if data.empty:
+        return pd.DataFrame()
+    stream_to_series = {
+        "PED": "ped_vkt_per_capita",
+        "LIGHT_RUC": "light_ruc_net_km",
+        "HEAVY_RUC": "heavy_ruc_net_km",
+    }
+    data["series_id"] = data.get("stream", pd.Series("", index=data.index)).astype(str).map(stream_to_series).fillna("")
+    data = data[data["series_id"].isin(DISPLAY_SERIES_ORDER)].copy()
+    if data.empty:
+        return data
+    data["series_label"] = data["series_id"].map(lambda value: _runtime_display_name(value, series_meta))
+    data["trace_name"] = data.apply(
+        lambda row: "Actual" if str(row.get("row_type", "")) == "historical_actual" else _runtime_current_trace_name(row.get("scenario_name"), row.get("scenario_role")),
+        axis=1,
+    )
+    data["trace_role"] = data.apply(
+        lambda row: "source_actual" if str(row.get("row_type", "")) == "historical_actual" else "in_house_current_finalist",
+        axis=1,
+    )
+    data["trace_source"] = data.apply(
+        lambda row: "actual_benchmark" if str(row.get("row_type", "")) == "historical_actual" else "current_finalist_forecast",
+        axis=1,
+    )
+    data["data_scope"] = data.apply(
+        lambda row: "nowcast_input_actual_not_plotted"
+        if str(row.get("row_type", "")) == "historical_actual" and _coerce_int(row.get("june_year")) > REVENUE_LAST_COMPLETE_ACTUAL_FY
+        else "quarterly_current_finalist_input",
+        axis=1,
+    )
+    data["plot_allowed"] = ~(
+        data.get("row_type", pd.Series("", index=data.index)).astype(str).eq("historical_actual")
+        & pd.to_numeric(data.get("june_year"), errors="coerce").gt(REVENUE_LAST_COMPLETE_ACTUAL_FY)
+    )
+    data["model_id"] = data["series_id"].map(_runtime_model_id)
+    data["fed_path"] = "Current planned path"
+    data["revenue_basis"] = "not_applicable"
+    data["anchor_flag"] = False
+    data["nowcast_flag"] = False
+    data["source_file"] = data.get("source", "")
+    return data
+
+
+def _runtime_actual_rows(series_junction_audit: pd.DataFrame, series_meta: dict[str, dict[str, Any]]) -> pd.DataFrame:
+    columns = _runtime_chart_columns()
+    if series_junction_audit is None or series_junction_audit.empty:
+        return pd.DataFrame(columns=columns)
+    data = series_junction_audit[
+        series_junction_audit.get("path", pd.Series(dtype=str)).astype(str).eq("actual_or_actual_to_date")
+        & series_junction_audit.get("series_id", pd.Series(dtype=str)).astype(str).isin(DISPLAY_SERIES_ORDER)
+    ].copy()
+    data["FY_numeric"] = pd.to_numeric(data.get("FY"), errors="coerce")
+    data["value_numeric"] = pd.to_numeric(data.get("value"), errors="coerce")
+    data = data[data["FY_numeric"].le(REVENUE_LAST_COMPLETE_ACTUAL_FY) & data["value_numeric"].notna()].copy()
+    records: list[dict[str, Any]] = []
+    for row in data.itertuples(index=False):
+        series_id = str(getattr(row, "series_id", "") or "")
+        fy = int(getattr(row, "FY_numeric"))
+        records.append(
+            _runtime_chart_record(
+                series_id=series_id,
+                series_meta=series_meta,
+                metric_type=_runtime_metric_type(series_meta.get(series_id, {}).get("metric_type"), getattr(row, "unit", "")),
+                time_grain="june_year",
+                row_type="historical_actual",
+                trace_name="Actual",
+                trace_role="source_actual",
+                trace_source="actual_benchmark",
+                scenario_name="actual",
+                scenario_role="actual",
+                period=f"FY{fy}",
+                june_year=fy,
+                value=getattr(row, "value_numeric"),
+                value_unit=getattr(row, "unit", ""),
+                source=getattr(row, "source_file", "annual_actuals.csv"),
+                source_file=getattr(row, "source_file", "annual_actuals.csv"),
+                source_status=getattr(row, "source_status", ""),
+                value_status=getattr(row, "value_status", "Actual"),
+                data_scope="complete_actual_line",
+                model_id="",
+                actual_quarters=getattr(row, "actual_quarters", ""),
+                forecast_quarters="",
+                quarters_present=getattr(row, "quarters_present", ""),
+                anchor_flag=fy == REVENUE_LAST_COMPLETE_ACTUAL_FY,
+                nowcast_flag=False,
+            )
+        )
+    return pd.DataFrame.from_records(records, columns=columns)
+
+
+def _runtime_current_rows(current: pd.DataFrame, series_meta: dict[str, dict[str, Any]]) -> pd.DataFrame:
+    columns = _runtime_chart_columns()
+    if current is None or current.empty:
+        return pd.DataFrame(columns=columns)
+    data = current[current.get("series_id", pd.Series(dtype=str)).astype(str).isin(DISPLAY_SERIES_ORDER)].copy()
+    data["FY_numeric"] = pd.to_numeric(data.get("FY"), errors="coerce")
+    data["value_numeric"] = pd.to_numeric(data.get("value"), errors="coerce")
+    data = data[data["FY_numeric"].ge(REVENUE_LAST_COMPLETE_ACTUAL_FY) & data["value_numeric"].notna()].copy()
+    records: list[dict[str, Any]] = []
+    for row in data.itertuples(index=False):
+        series_id = str(getattr(row, "series_id", "") or "")
+        fy = int(getattr(row, "FY_numeric"))
+        scenario_name = str(getattr(row, "scenario_name", "") or "")
+        scenario_role = str(getattr(row, "scenario_role", "") or "")
+        records.append(
+            _runtime_chart_record(
+                series_id=series_id,
+                series_meta=series_meta,
+                metric_type=_runtime_metric_type(series_meta.get(series_id, {}).get("metric_type"), getattr(row, "unit", "")),
+                time_grain="june_year",
+                row_type="future_forecast",
+                trace_name=_runtime_current_trace_name(scenario_name, scenario_role),
+                trace_role="in_house_current_finalist",
+                trace_source="current_finalist_forecast",
+                scenario_name=scenario_name,
+                scenario_role=scenario_role,
+                period=f"FY{fy}",
+                june_year=fy,
+                value=getattr(row, "value_numeric"),
+                value_unit=getattr(row, "unit", ""),
+                source=getattr(row, "source_file", ""),
+                source_file=getattr(row, "source_file", ""),
+                source_status=getattr(row, "source_status", ""),
+                value_status=getattr(row, "value_status", ""),
+                data_scope="actual_anchor" if fy == REVENUE_LAST_COMPLETE_ACTUAL_FY else ("current_nowcast" if bool(getattr(row, "nowcast_flag", False)) else "current_forecast"),
+                model_id=getattr(row, "model_id", "") or _runtime_model_id(series_id),
+                fed_path=getattr(row, "fed_path", ""),
+                revenue_basis="not_applicable" if series_meta.get(series_id, {}).get("metric_type") == "activity" else "Net",
+                bridge_status="available",
+                bridge_method=getattr(row, "formula", "") or getattr(row, "source_basis", ""),
+                actual_quarters=getattr(row, "actual_quarters", ""),
+                forecast_quarters=getattr(row, "forecast_quarters", ""),
+                quarters_present=getattr(row, "quarters_present", ""),
+                anchor_flag=fy == REVENUE_LAST_COMPLETE_ACTUAL_FY,
+                nowcast_flag=bool(getattr(row, "nowcast_flag", False)),
+                formula=getattr(row, "formula", ""),
+                source_basis=getattr(row, "source_basis", ""),
+                row_role=getattr(row, "row_role", ""),
+                official_value=getattr(row, "official_value", pd.NA),
+                residual_vs_official=getattr(row, "residual_vs_official", pd.NA),
+            )
+        )
+    return pd.DataFrame.from_records(records, columns=columns)
+
+
+def _runtime_release_rows(
+    release_values: pd.DataFrame,
+    series_meta: dict[str, dict[str, Any]],
+    *,
+    trace_name: str,
+    scenario_name: str,
+    trace_source: str,
+) -> pd.DataFrame:
+    columns = _runtime_chart_columns()
+    if release_values is None or release_values.empty:
+        return pd.DataFrame(columns=columns)
+    data = release_values.copy()
+    if trace_source == "selected_mot_befu_release":
+        data = data[data.get("release_round", pd.Series(dtype=str)).astype(str).eq("BEFU25")].copy()
+        data["FY_numeric"] = pd.to_numeric(data.get("FY"), errors="coerce")
+        data = data[data["FY_numeric"].between(REVENUE_LAST_COMPLETE_ACTUAL_FY - 1, 2031, inclusive="both")].copy()
+    else:
+        data = data[
+            data.get("release_family", pd.Series(dtype=str)).astype(str).eq("BEFU")
+            & pd.to_numeric(data.get("horizon"), errors="coerce").eq(1)
+        ].copy()
+        data["FY_numeric"] = pd.to_numeric(data.get("FY"), errors="coerce")
+        data = data[data["FY_numeric"].between(REVENUE_LAST_COMPLETE_ACTUAL_FY - 6, 2031, inclusive="both")].copy()
+    if data.empty:
+        return pd.DataFrame(columns=columns)
+    data["series_id"] = data.get("series", pd.Series(dtype=str)).map(_runtime_series_id_from_release_label)
+    data = data[data["series_id"].isin(DISPLAY_SERIES_ORDER)].copy()
+    data["value_numeric"] = pd.to_numeric(data.get("value"), errors="coerce")
+    data = data[data["value_numeric"].notna()].copy()
+    if data.empty:
+        return pd.DataFrame(columns=columns)
+    sort_cols = [col for col in ["series_id", "FY_numeric", "release_year", "release_round"] if col in data.columns]
+    data = data.sort_values(sort_cols, kind="stable").drop_duplicates(["series_id", "FY_numeric"], keep="last")
+    records: list[dict[str, Any]] = []
+    for row in data.itertuples(index=False):
+        series_id = str(getattr(row, "series_id", "") or "")
+        fy = int(getattr(row, "FY_numeric"))
+        records.append(
+            _runtime_chart_record(
+                series_id=series_id,
+                series_meta=series_meta,
+                metric_type=_runtime_metric_type(series_meta.get(series_id, {}).get("metric_type"), getattr(row, "unit", "")),
+                time_grain="june_year",
+                row_type="official_comparator",
+                trace_name=trace_name,
+                trace_role="official_external_comparator",
+                trace_source=trace_source,
+                scenario_name=scenario_name,
+                scenario_role="official_comparator",
+                period=f"FY{fy}",
+                june_year=fy,
+                value=getattr(row, "value_numeric"),
+                value_unit=getattr(row, "unit", ""),
+                source="release_values.csv",
+                source_file="release_values.csv",
+                source_status=getattr(row, "value_status", ""),
+                value_status=getattr(row, "value_status", ""),
+                data_scope="official_comparator",
+                model_id="",
+                fed_path=getattr(row, "fed_path", "") or "BEFU25",
+                revenue_basis=getattr(row, "revenue_basis", ""),
+                bridge_status="available",
+                bridge_method="official MOT/BEFU release value",
+                release_round=getattr(row, "release_round", ""),
+                anchor_flag=False,
+                nowcast_flag=False,
+            )
+        )
+    return pd.DataFrame.from_records(records, columns=columns)
+
+
+def _normalize_runtime_chart_rows(chart_rows: pd.DataFrame) -> pd.DataFrame:
+    for column in _runtime_chart_columns():
+        if column not in chart_rows.columns:
+            chart_rows[column] = pd.NA
+    chart_rows["june_year"] = pd.to_numeric(chart_rows["june_year"], errors="coerce").astype("Int64")
+    chart_rows["value"] = pd.to_numeric(chart_rows["value"], errors="coerce")
+    chart_rows["forecast_available"] = chart_rows["value"].notna()
+    if "plot_allowed" not in chart_rows.columns:
+        chart_rows["plot_allowed"] = True
+    chart_rows["plot_allowed"] = chart_rows["plot_allowed"].fillna(True).astype(bool)
+    chart_rows = chart_rows[chart_rows["value"].notna()].copy()
+    chart_rows["_series_order"] = chart_rows["series_id"].map(lambda value: DISPLAY_SERIES_ORDER.index(value) if value in DISPLAY_SERIES_ORDER else len(DISPLAY_SERIES_ORDER))
+    chart_rows["_period_order"] = chart_rows["period"].map(_period_sort_value)
+    chart_rows["_trace_order"] = chart_rows["trace_name"].map(_trace_sort_value)
+    chart_rows = chart_rows.sort_values(["metric_type", "_series_order", "time_grain", "_period_order", "_trace_order", "scenario_name"], kind="stable")
+    chart_rows = chart_rows.drop(columns=["_series_order", "_period_order", "_trace_order"], errors="ignore")
+    return _add_canonical_join_keys(chart_rows[_runtime_chart_columns()])
+
+
+def _runtime_future_revenue_forecasts(current: pd.DataFrame, series_meta: dict[str, dict[str, Any]]) -> pd.DataFrame:
+    revenue_ids = {
+        "gross_ped_revenue",
+        "light_ruc_net_revenue",
+        "heavy_ruc_net_revenue",
+        "gross_fed_revenue",
+        "net_fed_revenue",
+        "total_ruc_net_revenue",
+        "net_mvr_revenue",
+        "total_fed_ruc_net_revenue",
+        "total_nltf_net_revenue",
+    }
+    data = current[current.get("series_id", pd.Series(dtype=str)).astype(str).isin(revenue_ids)].copy()
+    data["FY_numeric"] = pd.to_numeric(data.get("FY"), errors="coerce")
+    data["value_numeric"] = pd.to_numeric(data.get("value"), errors="coerce")
+    data = data[data["FY_numeric"].ge(REVENUE_FIRST_FORECAST_FY) & data["value_numeric"].notna()].copy()
+    if data.empty:
+        return _add_canonical_join_keys(pd.DataFrame())
+    out = pd.DataFrame(
+        {
+            "stream": data["series_id"].astype(str),
+            "stream_label": data["series_id"].astype(str).map(lambda value: _runtime_display_name(value, series_meta)),
+            "component_type": data.get("row_role", ""),
+            "period": data["FY_numeric"].map(lambda value: f"FY{int(value)}"),
+            "target_period": data["FY_numeric"].map(lambda value: f"FY{int(value)}"),
+            "scenario_name": data.get("scenario_name", ""),
+            "scenario_role": data.get("scenario_role", ""),
+            "fed_path": data.get("fed_path", ""),
+            "revenue_forecast_nzd": data["value_numeric"],
+            "revenue_unit": data.get("unit", "$m nominal ex GST"),
+            "forecast_available": True,
+            "bridge_status": "available",
+            "bridge_method": data.get("formula", ""),
+            "source": data.get("source_file", ""),
+            "model_id": data.get("model_id", ""),
+            "value_status": data.get("value_status", ""),
+            "actual_quarters": data.get("actual_quarters", ""),
+            "forecast_quarters": data.get("forecast_quarters", ""),
+            "nowcast_flag": data.get("nowcast_flag", False),
+        }
+    )
+    return _add_canonical_join_keys(out)
+
+
+def _runtime_bridge_components(current: pd.DataFrame, series_meta: dict[str, dict[str, Any]]) -> pd.DataFrame:
+    data = current[current.get("series_id", pd.Series(dtype=str)).astype(str).isin(DISPLAY_SERIES_ORDER)].copy()
+    data["FY_numeric"] = pd.to_numeric(data.get("FY"), errors="coerce")
+    data["value_numeric"] = pd.to_numeric(data.get("value"), errors="coerce")
+    data = data[data["value_numeric"].notna()].copy()
+    if data.empty:
+        return _add_canonical_join_keys(pd.DataFrame())
+    out = pd.DataFrame(
+        {
+            "stream": data["series_id"].astype(str),
+            "stream_label": data["series_id"].astype(str).map(lambda value: _runtime_display_name(value, series_meta)),
+            "component_type": data.get("row_role", ""),
+            "period": data["FY_numeric"].map(lambda value: f"FY{int(value)}"),
+            "target_period": data["FY_numeric"].map(lambda value: f"FY{int(value)}"),
+            "scenario_name": data.get("scenario_name", ""),
+            "scenario_role": data.get("scenario_role", ""),
+            "fed_path": data.get("fed_path", ""),
+            "component_value": data["value_numeric"],
+            "component_unit": data.get("unit", ""),
+            "bridge_status": "available",
+            "bridge_method": data.get("formula", ""),
+            "equation": data.get("formula", ""),
+            "source": data.get("source_file", ""),
+            "source_basis": data.get("source_basis", ""),
+            "model_id": data.get("model_id", ""),
+            "official_value": data.get("official_value", pd.NA),
+            "residual_vs_official": data.get("residual_vs_official", pd.NA),
+            "value_status": data.get("value_status", ""),
+            "actual_quarters": data.get("actual_quarters", ""),
+            "forecast_quarters": data.get("forecast_quarters", ""),
+            "nowcast_flag": data.get("nowcast_flag", False),
+        }
+    )
+    return _add_canonical_join_keys(out)
+
+
+def _runtime_trace_audit(chart_rows: pd.DataFrame) -> pd.DataFrame:
+    if chart_rows is None or chart_rows.empty:
+        return pd.DataFrame()
+    data = chart_rows.copy()
+    data = data[data.get("time_grain", pd.Series(dtype=str)).astype(str).eq("june_year")].copy()
+    data["FY_numeric"] = pd.to_numeric(data.get("june_year"), errors="coerce")
+    data = data[data["FY_numeric"].between(2024, 2027, inclusive="both")].copy()
+    columns = [
+        "series_id",
+        "series_label",
+        "trace_name",
+        "trace_role",
+        "scenario_name",
+        "fed_path",
+        "period",
+        "june_year",
+        "value",
+        "value_unit",
+        "row_type",
+        "data_scope",
+        "source_file",
+        "source_status",
+        "model_id",
+        "value_status",
+        "actual_quarters",
+        "forecast_quarters",
+        "quarters_present",
+        "anchor_flag",
+        "nowcast_flag",
+        "plot_allowed",
+    ]
+    for column in columns:
+        if column not in data.columns:
+            data[column] = pd.NA
+    return data[columns].sort_values(["series_id", "june_year", "trace_name", "scenario_name"], kind="stable").reset_index(drop=True)
+
+
+def _runtime_chart_columns() -> list[str]:
+    return [
+        "metric_type",
+        "time_grain",
+        "row_type",
+        "trace_name",
+        "trace_role",
+        "trace_source",
+        "scenario_name",
+        "scenario_role",
+        "stream",
+        "stream_label",
+        "series_id",
+        "series_label",
+        "period",
+        "target_period",
+        "june_year",
+        "horizon",
+        "horizon_scope",
+        "value",
+        "value_unit",
+        "forecast_available",
+        "bridge_status",
+        "bridge_method",
+        "rate_value",
+        "rate_unit",
+        "gap_code",
+        "gap_reason",
+        "source",
+        "source_file",
+        "source_status",
+        "source_basis",
+        "formula",
+        "model_id",
+        "model_basis",
+        "data_scope",
+        "value_status",
+        "fed_path",
+        "revenue_basis",
+        "release_round",
+        "actual_quarters",
+        "forecast_quarters",
+        "quarters_present",
+        "anchor_flag",
+        "nowcast_flag",
+        "plot_allowed",
+        "row_role",
+        "official_value",
+        "residual_vs_official",
+    ] + CANONICAL_JOIN_KEY_COLUMNS
+
+
+def _runtime_chart_record(
+    *,
+    series_id: str,
+    series_meta: dict[str, dict[str, Any]],
+    metric_type: str,
+    time_grain: str,
+    row_type: str,
+    trace_name: str,
+    trace_role: str,
+    trace_source: str,
+    scenario_name: str,
+    scenario_role: str,
+    period: str,
+    june_year: int,
+    value: Any,
+    value_unit: Any,
+    source: Any,
+    source_file: Any,
+    source_status: Any,
+    value_status: Any,
+    data_scope: str,
+    model_id: Any = "",
+    fed_path: Any = "",
+    revenue_basis: Any = "",
+    bridge_status: Any = "available",
+    bridge_method: Any = "",
+    rate_value: Any = pd.NA,
+    rate_unit: Any = "",
+    gap_code: Any = "",
+    gap_reason: Any = "",
+    release_round: Any = "",
+    actual_quarters: Any = "",
+    forecast_quarters: Any = "",
+    quarters_present: Any = "",
+    anchor_flag: bool = False,
+    nowcast_flag: bool = False,
+    plot_allowed: bool = True,
+    formula: Any = "",
+    source_basis: Any = "",
+    row_role: Any = "",
+    official_value: Any = pd.NA,
+    residual_vs_official: Any = pd.NA,
+) -> dict[str, Any]:
+    label = _runtime_display_name(series_id, series_meta)
+    return {
+        "metric_type": metric_type,
+        "time_grain": time_grain,
+        "row_type": row_type,
+        "trace_name": trace_name,
+        "trace_role": trace_role,
+        "trace_source": trace_source,
+        "scenario_name": scenario_name,
+        "scenario_role": scenario_role,
+        "stream": series_id,
+        "stream_label": label,
+        "series_id": series_id,
+        "series_label": label,
+        "period": period,
+        "target_period": period,
+        "june_year": june_year,
+        "horizon": "",
+        "horizon_scope": "",
+        "value": value,
+        "value_unit": value_unit,
+        "forecast_available": pd.notna(value),
+        "bridge_status": bridge_status,
+        "bridge_method": bridge_method,
+        "rate_value": rate_value,
+        "rate_unit": rate_unit,
+        "gap_code": gap_code,
+        "gap_reason": gap_reason,
+        "source": source,
+        "source_file": source_file,
+        "source_status": source_status,
+        "source_basis": source_basis,
+        "formula": formula,
+        "model_id": model_id,
+        "model_basis": "Current finalist ensemble" if trace_role == "in_house_current_finalist" else "",
+        "data_scope": data_scope,
+        "value_status": value_status,
+        "fed_path": fed_path,
+        "revenue_basis": revenue_basis,
+        "release_round": release_round,
+        "actual_quarters": actual_quarters,
+        "forecast_quarters": forecast_quarters,
+        "quarters_present": quarters_present,
+        "anchor_flag": anchor_flag,
+        "nowcast_flag": nowcast_flag,
+        "plot_allowed": plot_allowed,
+        "row_role": row_role,
+        "official_value": official_value,
+        "residual_vs_official": residual_vs_official,
+    }
+
+
+def _runtime_current_trace_name(scenario_name: Any, scenario_role: Any) -> str:
+    role = str(scenario_role or "").strip().lower()
+    name = str(scenario_name or "").strip().lower()
+    if role == SCENARIO_ROLE_BASECASE or name == "current_basecase":
+        return "Current finalist Base case"
+    return "Current finalist High population/comparison"
+
+
+def _runtime_model_id(series_id: Any) -> str:
+    series = str(series_id or "")
+    if series in {"ped_vkt_per_capita", "gross_ped_revenue", "gross_fed_revenue", "net_fed_revenue"}:
+        return CURRENT_FINALIST_MODEL_IDS["PED"]
+    if series in {"light_ruc_net_km", "light_ruc_net_revenue"}:
+        return CURRENT_FINALIST_MODEL_IDS["LIGHT_RUC"]
+    if series in {"heavy_ruc_net_km", "heavy_ruc_net_revenue"}:
+        return CURRENT_FINALIST_MODEL_IDS["HEAVY_RUC"]
+    if series in {"total_ruc_net_revenue", "total_fed_ruc_net_revenue", "total_nltf_net_revenue"}:
+        return CURRENT_FINALIST_COMPOSITE_MODEL_ID
+    return ""
+
+
+def _runtime_scenario_records(existing_manifest: dict[str, Any], current: pd.DataFrame) -> list[dict[str, Any]]:
+    source = existing_manifest.get("source_comparison") if isinstance(existing_manifest, dict) else {}
+    scenarios = source.get("scenarios") if isinstance(source, dict) else None
+    if isinstance(scenarios, list) and scenarios:
+        return [dict(item) for item in scenarios if isinstance(item, dict)]
+    records = []
+    for scenario_name, group in current.groupby("scenario_name", dropna=False):
+        name = str(scenario_name or "")
+        role = first_non_null(group.get("scenario_role", pd.Series(dtype=str))) or ""
+        records.append(
+            {
+                "scenario_name": name,
+                "scenario_role": role,
+                "scenario_display_name": _runtime_current_trace_name(name, role),
+                "is_test_fixture": False,
+                "forecast_status": "current finalist runtime rows",
+            }
+        )
+    return records
+
+
+def _period_sort_value(period: Any) -> int:
+    text = str(period or "").upper().replace("FY", "")
+    if "Q" in text:
+        try:
+            year, quarter = text.split("Q", 1)
+            return int(year) * 10 + int(quarter)
+        except Exception:
+            return 0
+    try:
+        return int(text) * 10
+    except Exception:
+        return 0
+
+
+def _trace_sort_value(trace_name: Any) -> int:
+    order = {
+        "Actual": 0,
+        "Current finalist Base case": 1,
+        "Current finalist High population/comparison": 2,
+        "Official comparator: selected MOT/BEFU": 3,
+        "Official comparator: rolling BEFU 1Y": 4,
+    }
+    return order.get(str(trace_name or ""), 99)
+
+
+def _coerce_int(value: Any) -> int:
+    try:
+        if pd.isna(value):
+            return 0
+        return int(float(value))
+    except Exception:
+        return 0
 
 
 def _validate_output_hashes(pack_dir: Path, manifest: dict[str, Any]) -> list[str]:
@@ -841,30 +1670,42 @@ def _write_pack_files(
     future_revenue: pd.DataFrame,
     bridge_components: pd.DataFrame,
     chart_rows: pd.DataFrame,
+    *,
+    extra_frames: dict[str, pd.DataFrame] | None = None,
 ) -> None:
-    future_revenue.to_parquet(output_dir / "future_revenue_forecasts.parquet", index=False)
-    bridge_components.to_parquet(output_dir / "revenue_bridge_components.parquet", index=False)
-    chart_rows.to_parquet(output_dir / "revenue_chart_rows.parquet", index=False)
-    future_revenue.to_csv(output_dir / "future_revenue_forecasts.csv", index=False)
-    bridge_components.to_csv(output_dir / "revenue_bridge_components.csv", index=False)
-    chart_rows.to_csv(output_dir / "revenue_chart_rows.csv", index=False)
+    frames = {
+        "future_revenue_forecasts": future_revenue,
+        "revenue_bridge_components": bridge_components,
+        "revenue_chart_rows": chart_rows,
+    }
+    if extra_frames:
+        frames.update(extra_frames)
+    for required_stem in ["runtime_trace_audit", "trace_source_contract", "series_trace_contract", "path_trace_status"]:
+        frames.setdefault(required_stem, pd.DataFrame())
+    for stem, frame in frames.items():
+        output_frame = _prepare_frame_for_output(frame)
+        output_frame.to_parquet(output_dir / f"{stem}.parquet", index=False)
+        output_frame.to_csv(output_dir / f"{stem}.csv", index=False)
     output_hashes: dict[str, Any] = {}
-    for filename in [
-        "future_revenue_forecasts.parquet",
-        "future_revenue_forecasts.csv",
-        "revenue_bridge_components.parquet",
-        "revenue_bridge_components.csv",
-        "revenue_chart_rows.parquet",
-        "revenue_chart_rows.csv",
-    ]:
-        path = output_dir / filename
-        output_hashes[filename] = {
-            "sha256": _sha256(path),
-            "size_bytes": path.stat().st_size,
-        }
+    for stem in sorted(frames):
+        for suffix in ("csv", "parquet"):
+            filename = f"{stem}.{suffix}"
+            path = output_dir / filename
+            output_hashes[filename] = {
+                "sha256": _sha256(path),
+                "size_bytes": path.stat().st_size,
+            }
     manifest["output_hashes"] = output_hashes
     (output_dir / "manifest.json").write_text(json.dumps(manifest, indent=2, allow_nan=False) + "\n", encoding="utf-8")
     (output_dir / "manifest.md").write_text(_manifest_markdown(manifest), encoding="utf-8")
+
+
+def _prepare_frame_for_output(frame: pd.DataFrame) -> pd.DataFrame:
+    output = frame.copy()
+    for column in output.columns:
+        if output[column].dtype == object:
+            output[column] = output[column].where(output[column].notna(), "").astype(str)
+    return output
 
 
 def _manifest_markdown(manifest: dict[str, Any]) -> str:
