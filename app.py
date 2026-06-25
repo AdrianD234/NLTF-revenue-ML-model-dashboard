@@ -1991,6 +1991,8 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     chart_rows = pack.revenue_chart_rows.copy() if pack is not None and isinstance(pack.revenue_chart_rows, pd.DataFrame) else pd.DataFrame()
     bridge = pack.revenue_bridge_components.copy() if pack is not None and isinstance(pack.revenue_bridge_components, pd.DataFrame) else pd.DataFrame()
     future_revenue = pack.future_revenue_forecasts.copy() if pack is not None and isinstance(pack.future_revenue_forecasts, pd.DataFrame) else pd.DataFrame()
+    line_reconciliation = pack.revenue_line_reconciliation.copy() if pack is not None and isinstance(getattr(pack, "revenue_line_reconciliation", None), pd.DataFrame) else pd.DataFrame()
+    formula_residuals = pack.revenue_formula_residuals.copy() if pack is not None and isinstance(getattr(pack, "revenue_formula_residuals", None), pd.DataFrame) else pd.DataFrame()
 
     section_title(REVENUE_OUTLOOK_TITLE)
     st.caption(
@@ -2107,6 +2109,47 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 caption=f"Selected FY: {selected_fy_number or selected_fy}.",
                 notes_as_tooltip=False,
             )
+
+    with st.container(border=True):
+        st.markdown("<div class='page5-panel-title'>Revenue line reconciliation</div>", unsafe_allow_html=True)
+        rec_cols = st.columns([0.35, 0.25, 0.25, 0.15])
+        source_options = _revenue_line_source_options(line_reconciliation)
+        section_options = _revenue_line_section_options(line_reconciliation)
+        fy_min, fy_max = _revenue_line_fy_bounds(line_reconciliation)
+        with rec_cols[0]:
+            selected_source_paths = st.multiselect(
+                "Source path",
+                source_options,
+                default=source_options,
+                key="revenue_line_reconciliation_source_paths",
+            )
+        with rec_cols[1]:
+            selected_sections = st.multiselect(
+                "Section",
+                section_options,
+                default=section_options,
+                key="revenue_line_reconciliation_sections",
+            )
+        with rec_cols[2]:
+            selected_fy_range = st.slider(
+                "FY range",
+                min_value=fy_min,
+                max_value=fy_max,
+                value=(max(fy_min, 2024), min(fy_max, 2027)) if fy_min <= 2024 <= fy_max else (fy_min, min(fy_max, fy_min + 3)),
+                key="revenue_line_reconciliation_fy_range",
+            )
+        filtered_reconciliation = _filter_revenue_line_reconciliation(
+            line_reconciliation,
+            source_paths=selected_source_paths,
+            sections=selected_sections,
+            fy_range=selected_fy_range,
+        )
+        with rec_cols[3]:
+            dataframe_download(filtered_reconciliation, "Download CSV", "revenue_line_reconciliation.csv")
+        gap_banner = _revenue_formula_gap_banner(formula_residuals, selected_source_paths, selected_fy_range)
+        if gap_banner:
+            warning_panel(gap_banner)
+        display_table(_revenue_line_reconciliation_display_table(filtered_reconciliation), height=360, max_rows=520)
 
     with st.expander("Activity and volume outlook", expanded=False):
         activity_rows = _filter_revenue_outlook_rows(
@@ -4593,6 +4636,117 @@ def _revenue_bridge_display_table(bridge: pd.DataFrame) -> pd.DataFrame:
         if col in view.columns:
             view[col] = pd.to_numeric(view[col], errors="coerce").map(lambda value: _format_compact_value(value, "nominal NZD" if col == "Revenue NZD" else ""))
     return view
+
+
+def _revenue_line_source_options(line_reconciliation: pd.DataFrame) -> list[str]:
+    if line_reconciliation is None or line_reconciliation.empty or "source_path" not in line_reconciliation.columns:
+        return ["MBU26 official", "Current finalist Base case", "Current finalist High population/comparison"]
+    values = [value for value in line_reconciliation["source_path"].dropna().astype(str).unique().tolist() if value]
+    preferred = ["MBU26 official", "Current finalist Base case", "Current finalist High population/comparison"]
+    ordered = [value for value in preferred if value in values]
+    ordered.extend(sorted(set(values).difference(ordered)))
+    return ordered or preferred
+
+
+def _revenue_line_section_options(line_reconciliation: pd.DataFrame) -> list[str]:
+    if line_reconciliation is None or line_reconciliation.empty or "section" not in line_reconciliation.columns:
+        return ["Key volumes", "RUC", "FED", "MVR", "TUC", "Totals"]
+    values = [value for value in line_reconciliation["section"].dropna().astype(str).unique().tolist() if value]
+    preferred = ["Key volumes", "RUC", "FED", "MVR", "TUC", "Totals"]
+    ordered = [value for value in preferred if value in values]
+    ordered.extend(sorted(set(values).difference(ordered)))
+    return ordered or preferred
+
+
+def _revenue_line_fy_bounds(line_reconciliation: pd.DataFrame) -> tuple[int, int]:
+    if line_reconciliation is None or line_reconciliation.empty or "FY" not in line_reconciliation.columns:
+        return 2024, 2027
+    years = pd.to_numeric(line_reconciliation["FY"], errors="coerce").dropna().astype(int)
+    if years.empty:
+        return 2024, 2027
+    return int(years.min()), int(years.max())
+
+
+def _filter_revenue_line_reconciliation(
+    line_reconciliation: pd.DataFrame,
+    *,
+    source_paths: list[str],
+    sections: list[str],
+    fy_range: tuple[int, int] | list[int],
+) -> pd.DataFrame:
+    if line_reconciliation is None or line_reconciliation.empty:
+        return pd.DataFrame()
+    data = line_reconciliation.copy()
+    data["FY_numeric"] = pd.to_numeric(data.get("FY"), errors="coerce").astype("Int64")
+    if source_paths and "source_path" in data.columns:
+        data = data[data["source_path"].astype(str).isin(source_paths)].copy()
+    if sections and "section" in data.columns:
+        data = data[data["section"].astype(str).isin(sections)].copy()
+    try:
+        low, high = int(fy_range[0]), int(fy_range[1])
+    except Exception:
+        low, high = _revenue_line_fy_bounds(data)
+    data = data[data["FY_numeric"].between(low, high, inclusive="both")].copy()
+    return data.drop(columns=["FY_numeric"], errors="ignore")
+
+
+def _revenue_line_reconciliation_display_table(line_reconciliation: pd.DataFrame) -> pd.DataFrame:
+    if line_reconciliation is None or line_reconciliation.empty:
+        return pd.DataFrame()
+    view = line_reconciliation.copy()
+    rename = {
+        "source_path": "Source path",
+        "period": "FY",
+        "section": "Section",
+        "line_label": "Line",
+        "value": "Value",
+        "unit": "Unit",
+        "row_role": "Row role",
+        "source_file": "Source file",
+        "source_cell": "Source cell/formula",
+        "formula": "Formula",
+        "model_id": "Model ID",
+        "quarter_composition": "Quarter composition",
+        "replacement_flag": "Replacement",
+        "residual_vs_official": "Residual vs official",
+        "availability_status": "Status",
+    }
+    cols = [col for col in rename if col in view.columns]
+    view = view[cols].rename(columns=rename)
+    if "Value" in view.columns:
+        view["Value"] = pd.to_numeric(view["Value"], errors="coerce").map(lambda value: _format_compact_value(value, ""))
+    if "Residual vs official" in view.columns:
+        view["Residual vs official"] = pd.to_numeric(view["Residual vs official"], errors="coerce").map(lambda value: _format_compact_value(value, ""))
+    return view
+
+
+def _revenue_formula_gap_banner(
+    formula_residuals: pd.DataFrame,
+    source_paths: list[str],
+    fy_range: tuple[int, int] | list[int],
+) -> str:
+    if formula_residuals is None or formula_residuals.empty:
+        return ""
+    data = formula_residuals.copy()
+    data["FY_numeric"] = pd.to_numeric(data.get("FY"), errors="coerce").astype("Int64")
+    if source_paths and "source_path" in data.columns:
+        data = data[data["source_path"].astype(str).isin(source_paths)].copy()
+    if "source_path" in data.columns:
+        data = data[data["source_path"].astype(str).str.startswith("Current finalist")].copy()
+    try:
+        low, high = int(fy_range[0]), int(fy_range[1])
+    except Exception:
+        low, high = _revenue_line_fy_bounds(data)
+    data = data[data["FY_numeric"].between(low, high, inclusive="both")].copy()
+    gaps = data[~data.get("status", pd.Series("", index=data.index)).astype(str).eq("reconciled")].copy()
+    if gaps.empty:
+        return ""
+    first = gaps.iloc[0]
+    return (
+        "Governed gap: one or more selected revenue aggregates fail formula reconciliation. "
+        f"First gap: {first.get('source_path')} {first.get('period')} {first.get('output_label')} "
+        f"status={first.get('status')}."
+    )
 
 
 def _revenue_outlook_manifest_table(manifest: dict[str, Any]) -> pd.DataFrame:

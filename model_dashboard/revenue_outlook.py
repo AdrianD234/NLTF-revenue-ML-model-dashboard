@@ -7,7 +7,7 @@ folders, and it never promotes smoke-test fixtures.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -34,6 +34,8 @@ from .mbu26_source_spine import (
     MBU26_SOURCE_PACK_DIR,
     current_forecast_annual_from_mbu26,
     load_mbu26_annual_spine,
+    revenue_formula_residual_frame,
+    revenue_line_reconciliation_frame,
 )
 from .revenue_source_pack import (
     CURRENT_FINALIST_COMPOSITE_MODEL_ID,
@@ -64,6 +66,8 @@ RUNTIME_REVENUE_OUTLOOK_FILES = (
     "revenue_bridge_components.parquet",
     "revenue_chart_rows.parquet",
     "runtime_trace_audit.parquet",
+    "revenue_line_reconciliation.parquet",
+    "revenue_formula_residuals.parquet",
     "trace_source_contract.parquet",
     "series_trace_contract.parquet",
     "path_trace_status.parquet",
@@ -154,6 +158,8 @@ class RevenueOutlookPack:
     future_revenue_forecasts: pd.DataFrame
     revenue_bridge_components: pd.DataFrame
     revenue_chart_rows: pd.DataFrame
+    revenue_line_reconciliation: pd.DataFrame = field(default_factory=pd.DataFrame)
+    revenue_formula_residuals: pd.DataFrame = field(default_factory=pd.DataFrame)
 
 
 def repo_root_from_here() -> Path:
@@ -168,6 +174,8 @@ def revenue_outlook_signature(pack_dir: Path | str | None = None, repo_root: Pat
         base / "future_revenue_forecasts.parquet",
         base / "revenue_bridge_components.parquet",
         base / "revenue_chart_rows.parquet",
+        base / "revenue_line_reconciliation.parquet",
+        base / "revenue_formula_residuals.parquet",
     ]
     signature: list[tuple[str, int, int]] = []
     for path in paths:
@@ -199,6 +207,8 @@ def load_revenue_outlook_pack(
         future_revenue_forecasts=_read_optional_parquet(base / "future_revenue_forecasts.parquet"),
         revenue_bridge_components=_read_optional_parquet(base / "revenue_bridge_components.parquet"),
         revenue_chart_rows=_read_optional_parquet(base / "revenue_chart_rows.parquet"),
+        revenue_line_reconciliation=_read_optional_parquet(base / "revenue_line_reconciliation.parquet"),
+        revenue_formula_residuals=_read_optional_parquet(base / "revenue_formula_residuals.parquet"),
     )
 
 
@@ -296,6 +306,11 @@ def build_current_revenue_outlook_runtime_pack(
     )
     if current.empty:
         raise ValueError("Cannot rebuild current Revenue Outlook runtime pack: current finalist annual rows are missing.")
+    line_reconciliation = revenue_line_reconciliation_frame(
+        mbu26_official_annual=mbu26_pack.official_annual,
+        current_forecast_annual=current,
+    )
+    formula_residuals = revenue_formula_residual_frame(line_reconciliation)
 
     series_meta = _runtime_series_metadata(mbu26_pack.series_trace_contract)
     quarterly_inputs = _runtime_quarterly_activity_inputs(existing_chart_rows, series_meta)
@@ -310,6 +325,7 @@ def build_current_revenue_outlook_runtime_pack(
     if chart_rows.empty:
         raise ValueError("Cannot rebuild current Revenue Outlook runtime pack: no chart rows were produced.")
     chart_rows = _normalize_runtime_chart_rows(chart_rows)
+    chart_rows = _suppress_unreconciled_current_chart_rows(chart_rows, formula_residuals)
     future_revenue = _runtime_future_revenue_forecasts(current, series_meta)
     bridge_components = _runtime_bridge_components(current, series_meta)
     trace_audit = _runtime_trace_audit(chart_rows)
@@ -383,6 +399,19 @@ def build_current_revenue_outlook_runtime_pack(
             "repo_relative_path": _repo_relative(root, base / "runtime_trace_audit.csv"),
             "scope": "Per-series FY2024-FY2027 trace audit with source, role, model ID, scenario, quarter composition and anchor flags.",
         },
+        "revenue_line_reconciliation": {
+            "repo_relative_path": _repo_relative(root, base / "revenue_line_reconciliation.csv"),
+            "scope": "Live table source for MBU26 official and current finalist line-item decomposition.",
+            "source_paths": [
+                "MBU26 official",
+                "Current finalist Base case",
+                "Current finalist High population/comparison",
+            ],
+        },
+        "revenue_formula_residuals": {
+            "repo_relative_path": _repo_relative(root, base / "revenue_formula_residuals.csv"),
+            "scope": "Formula residual checks for RUC, FED, MVR and total rows by source path and FY.",
+        },
         "validation_status": "runtime_rebuilt",
     }
 
@@ -398,6 +427,8 @@ def build_current_revenue_outlook_runtime_pack(
             "series_trace_contract": mbu26_pack.series_trace_contract,
             "path_trace_status": mbu26_pack.path_trace_status,
             "row_reconciliation": mbu26_pack.row_reconciliation,
+            "revenue_line_reconciliation": line_reconciliation,
+            "revenue_formula_residuals": formula_residuals,
         },
     )
     return load_revenue_outlook_pack(base, repo_root=root)  # type: ignore[return-value]
@@ -912,6 +943,38 @@ def _normalize_runtime_chart_rows(chart_rows: pd.DataFrame) -> pd.DataFrame:
     chart_rows = chart_rows.sort_values(["metric_type", "_series_order", "time_grain", "_period_order", "_trace_order", "scenario_name"], kind="stable")
     chart_rows = chart_rows.drop(columns=["_series_order", "_period_order", "_trace_order"], errors="ignore")
     return _add_canonical_join_keys(chart_rows[_runtime_chart_columns()])
+
+
+def _suppress_unreconciled_current_chart_rows(chart_rows: pd.DataFrame, formula_residuals: pd.DataFrame) -> pd.DataFrame:
+    if chart_rows is None or chart_rows.empty or formula_residuals is None or formula_residuals.empty:
+        return chart_rows
+    residuals = formula_residuals.copy()
+    residuals = residuals[
+        residuals.get("source_path", pd.Series(dtype=str)).astype(str).str.startswith("Current finalist")
+        & ~residuals.get("status", pd.Series(dtype=str)).astype(str).eq("reconciled")
+    ].copy()
+    if residuals.empty:
+        return chart_rows
+    blocked = {
+        (str(row.source_path), int(row.FY), str(row.output_series_id)): str(row.status)
+        for row in residuals.itertuples()
+        if pd.notna(row.FY)
+    }
+    if not blocked:
+        return chart_rows
+    out = chart_rows.copy()
+    for idx, row in out.iterrows():
+        if str(row.get("trace_role", "")) != "in_house_current_finalist":
+            continue
+        key = (str(row.get("trace_name", "")), _coerce_int(row.get("june_year")), str(row.get("series_id", "")))
+        status = blocked.get(key)
+        if not status:
+            continue
+        out.at[idx, "plot_allowed"] = False
+        out.at[idx, "bridge_status"] = "governed_gap"
+        out.at[idx, "gap_code"] = "formula_reconciliation_failed"
+        out.at[idx, "gap_reason"] = f"Current-finalist aggregate suppressed because formula residual status is {status}."
+    return out
 
 
 def _runtime_future_revenue_forecasts(current: pd.DataFrame, series_meta: dict[str, dict[str, Any]]) -> pd.DataFrame:
@@ -1858,7 +1921,14 @@ def _write_pack_files(
     }
     if extra_frames:
         frames.update(extra_frames)
-    for required_stem in ["runtime_trace_audit", "trace_source_contract", "series_trace_contract", "path_trace_status"]:
+    for required_stem in [
+        "runtime_trace_audit",
+        "revenue_line_reconciliation",
+        "revenue_formula_residuals",
+        "trace_source_contract",
+        "series_trace_contract",
+        "path_trace_status",
+    ]:
         frames.setdefault(required_stem, pd.DataFrame())
     for stem, frame in frames.items():
         output_frame = _prepare_frame_for_output(frame)

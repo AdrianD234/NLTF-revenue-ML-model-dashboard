@@ -93,10 +93,71 @@ def main() -> None:
             }
         )
 
+    reconciliation_path = _write_reconciliation_table_screenshot()
+    manifest.append(
+        {
+            "series_id": "revenue_line_reconciliation",
+            "title": "Revenue Outlook - revenue line reconciliation",
+            "repo_relative_path": reconciliation_path.relative_to(ROOT).as_posix(),
+            "rows": 0,
+        }
+    )
+
     manifest_path = ROOT / "artifacts" / "revenue_outlook_series_screenshot_manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     for item in manifest:
         print(f"WROTE {item['repo_relative_path']} rows={item['rows']}")
+
+
+def _write_reconciliation_table_screenshot() -> Path:
+    line = pd.read_csv(PACK_DIR / "revenue_line_reconciliation.csv")
+    keep_lines = [
+        "Total RUC all classes",
+        "PED revenue",
+        "Gross FED revenue",
+        "Net FED revenue",
+        "Total NLTF revenue",
+    ]
+    view = line[
+        line["FY"].eq(2026)
+        & line["source_path"].isin(["MBU26 official", "Current finalist Base case"])
+        & line["line_label"].isin(keep_lines)
+    ].copy()
+    view["value"] = pd.to_numeric(view["value"], errors="coerce").map(lambda value: f"{value:,.2f}")
+    view = view[["source_path", "section", "line_label", "value", "unit", "quarter_composition"]].rename(
+        columns={
+            "source_path": "Source path",
+            "section": "Section",
+            "line_label": "Line",
+            "value": "Value",
+            "unit": "Unit",
+            "quarter_composition": "Quarter composition",
+        }
+    )
+    fig, ax = plt.subplots(figsize=(13.5, 4.8), dpi=150)
+    ax.axis("off")
+    ax.set_title("Revenue Outlook - FY2026 revenue line reconciliation", loc="left", fontsize=14, weight="bold")
+    table = ax.table(
+        cellText=view.values,
+        colLabels=view.columns,
+        loc="center",
+        cellLoc="left",
+        colLoc="left",
+    )
+    table.auto_set_font_size(False)
+    table.set_fontsize(8)
+    table.scale(1, 1.35)
+    for (row, _col), cell in table.get_celld().items():
+        if row == 0:
+            cell.set_text_props(weight="bold", color="#0F172A")
+            cell.set_facecolor("#E2E8F0")
+        else:
+            cell.set_facecolor("#FFFFFF" if row % 2 else "#F8FAFC")
+    fig.tight_layout()
+    path = SCREENSHOT_DIR / "revenue-outlook-reconciliation-table.png"
+    fig.savefig(path)
+    plt.close(fig)
+    return path
 
 
 if __name__ == "__main__":

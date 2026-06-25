@@ -92,6 +92,13 @@ ROW_DEFINITIONS: tuple[dict[str, Any], ...] = (
     {"row": 70, "series_id": "total_nltf_net_revenue", "display_name": "Total NLTF revenue", "section": "Totals", "unit": "$m nominal ex GST", "metric_type": "revenue", "row_role": "aggregate"},
 )
 
+REVENUE_LINE_TABLE_SERIES_IDS: tuple[str, ...] = tuple(str(row["series_id"]) for row in ROW_DEFINITIONS)
+REVENUE_LINE_SOURCE_PATHS: tuple[str, ...] = (
+    "MBU26 official",
+    "Current finalist Base case",
+    "Current finalist High population/comparison",
+)
+
 
 FORMULA_DEFINITIONS: tuple[dict[str, Any], ...] = (
     {"output_series_id": "gross_ruc_revenue", "expression": "light_ruc_net_revenue + heavy_ruc_net_revenue + light_bev_ruc_net_revenue + heavy_bev_ruc_net_revenue + phev_ruc_net_revenue + ruc_refunds", "terms": (("light_ruc_net_revenue", 1), ("heavy_ruc_net_revenue", 1), ("light_bev_ruc_net_revenue", 1), ("heavy_bev_ruc_net_revenue", 1), ("phev_ruc_net_revenue", 1), ("ruc_refunds", 1))},
@@ -268,11 +275,13 @@ def current_forecast_annual_from_mbu26(
     columns = [
         "FY",
         "period",
+        "source_path",
         "fed_path",
         "scenario_name",
         "scenario_role",
         "series_id",
         "display_name",
+        "section",
         "value",
         "unit",
         "row_role",
@@ -299,7 +308,9 @@ def current_forecast_annual_from_mbu26(
     activity = _current_activity_annual_values(current_outlook_chart_rows)
     if activity.empty:
         return pd.DataFrame(columns=columns)
+    quarter_lookup = _current_activity_quarter_lookup(current_outlook_chart_rows)
     official = _official_lookup(mbu26_official_annual)
+    official_records = _official_record_lookup(mbu26_official_annual)
     rows: list[dict[str, Any]] = []
     keys = sorted({(str(row.scenario_name), int(row.FY)) for row in activity.itertuples()})
     for scenario_name, fy in keys:
@@ -320,22 +331,51 @@ def current_forecast_annual_from_mbu26(
             "light_ruc_net_km",
             "heavy_ruc_net_revenue",
             "heavy_ruc_net_km",
+            "light_bev_ruc_net_km",
+            "heavy_bev_ruc_net_km",
+            "phev_ruc_net_km",
+            "light_bev_ruc_net_revenue",
+            "heavy_bev_ruc_net_revenue",
+            "phev_ruc_net_revenue",
+            "ruc_refunds",
+            "gross_ruc_revenue",
+            "ruc_admin_revenue",
+            "ruc_revenue_net_admin",
             "gross_lpg_revenue",
             "gross_cng_revenue",
             "fed_refunds",
             "total_ruc_net_revenue",
+            "mr1_revenue",
+            "mr2_revenue",
+            "coo_revenue",
+            "gross_mvr_revenue",
+            "mvr_admin_revenue",
+            "mvr_revenue_net_admin_coo",
+            "mvr_refunds",
             "net_mvr_revenue",
             "tuc_net_revenue",
+            "tuc_gtk",
             "gross_fed_revenue",
             "net_fed_revenue",
+            "total_gross_revenue",
+            "total_admin_fees",
+            "total_revenue_net_admin",
+            "total_refunds",
             "total_nltf_net_revenue",
         }
         if not required_official.issubset(off):
             continue
+        official_row = official_records.get(fy, {})
         ped_activity = activity_values["ped_vkt_per_capita"]
         light_activity = activity_values["light_ruc_net_km"]
         heavy_activity = activity_values["heavy_ruc_net_km"]
+        ped_quarters = quarter_lookup.get((scenario_name, fy, "ped_vkt_per_capita"), {})
+        light_quarters = quarter_lookup.get((scenario_name, fy, "light_ruc_net_km"), {})
+        heavy_quarters = quarter_lookup.get((scenario_name, fy, "heavy_ruc_net_km"), {})
+        if not ped_quarters or not light_quarters or not heavy_quarters:
+            continue
         scenario_role = str(getattr(ped_activity, "scenario_role", "") or "")
+        source_path = _current_source_path_label(scenario_name, scenario_role)
         value_status = (
             "Actual anchor"
             if fy == REVENUE_LAST_COMPLETE_ACTUAL_FY
@@ -346,29 +386,55 @@ def current_forecast_annual_from_mbu26(
         actual_quarters = str(getattr(ped_activity, "actual_quarters", "") or "")
         forecast_quarters = str(getattr(ped_activity, "forecast_quarters", "") or "")
         quarters_present = str(getattr(ped_activity, "quarters_present", "") or "")
-        source_cell = f"current_revenue_outlook:{scenario_name}:FY{fy}"
-        ped_vkt_per_capita = float(getattr(ped_activity, "value"))
-        light_km_million = float(getattr(light_activity, "value"))
-        heavy_km_million = float(getattr(heavy_activity, "value"))
+        ped_source_cell = str(ped_quarters.get("source_cells") or f"current_revenue_outlook:{scenario_name}:FY{fy}:PED")
+        light_source_cell = str(light_quarters.get("source_cells") or f"current_revenue_outlook:{scenario_name}:FY{fy}:LIGHT_RUC")
+        heavy_source_cell = str(heavy_quarters.get("source_cells") or f"current_revenue_outlook:{scenario_name}:FY{fy}:HEAVY_RUC")
+        current_source_cell = f"current_revenue_outlook:{scenario_name}:FY{fy}"
+        ped_values = [float(value) for value in ped_quarters.get("values", [])]
+        light_values = [float(value) for value in light_quarters.get("values", [])]
+        heavy_values = [float(value) for value in heavy_quarters.get("values", [])]
+        ped_vkt_per_capita = sum(ped_values) / 4.0
+        light_km_million = sum(light_values)
+        heavy_km_million = sum(heavy_values)
+        if abs(light_km_million) > 10_000_000:
+            light_km_million /= 1_000_000.0
+        if abs(heavy_km_million) > 10_000_000:
+            heavy_km_million /= 1_000_000.0
         population_count = float(off["light_petrol_vkt"]) * 1_000_000.0 / float(off["light_petrol_vkt_per_capita"])
         ped_litres_per_100km = float(off["ped_volume"]) / float(off["light_petrol_vkt"]) * 100.0
         ped_rate = float(off["gross_ped_revenue"]) / float(off["ped_volume"])
-        ped_total_vkt = ped_vkt_per_capita * population_count / 1_000_000.0
-        ped_volume = ped_total_vkt * ped_litres_per_100km / 100.0
-        ped_revenue = ped_volume * ped_rate
+        ped_total_vkt = sum(value * population_count / 1_000_000.0 for value in ped_values)
+        ped_volume = sum(value * population_count / 1_000_000.0 * ped_litres_per_100km / 100.0 for value in ped_values)
+        ped_revenue = sum(value * population_count / 1_000_000.0 * ped_litres_per_100km / 100.0 * ped_rate for value in ped_values)
         light_rate = float(off["light_ruc_net_revenue"]) / float(off["light_ruc_net_km"])
         heavy_rate = float(off["heavy_ruc_net_revenue"]) / float(off["heavy_ruc_net_km"])
         light_revenue = light_km_million * light_rate
         heavy_revenue = heavy_km_million * heavy_rate
-        ruc_fixed_residual = float(off["total_ruc_net_revenue"]) - float(off["light_ruc_net_revenue"]) - float(off["heavy_ruc_net_revenue"])
+        gross_ruc = (
+            light_revenue
+            + heavy_revenue
+            + float(off["light_bev_ruc_net_revenue"])
+            + float(off["heavy_bev_ruc_net_revenue"])
+            + float(off["phev_ruc_net_revenue"])
+            + float(off["ruc_refunds"])
+        )
+        ruc_net_admin = gross_ruc - float(off["ruc_admin_revenue"])
+        total_ruc = ruc_net_admin - float(off["ruc_refunds"])
         gross_fed = ped_revenue + float(off["gross_lpg_revenue"]) + float(off["gross_cng_revenue"])
         net_fed = gross_fed - float(off["fed_refunds"])
-        total_ruc = light_revenue + heavy_revenue + ruc_fixed_residual
+        gross_mvr = float(off["mr1_revenue"]) + float(off["mr2_revenue"]) + float(off["coo_revenue"])
+        mvr_net_admin_coo = float(off["mr1_revenue"]) + float(off["mr2_revenue"]) - float(off["mvr_admin_revenue"])
+        net_mvr = mvr_net_admin_coo - float(off["mvr_refunds"])
+        total_gross = gross_ruc + gross_fed + gross_mvr + float(off["tuc_net_revenue"])
+        total_admin = float(off["ruc_admin_revenue"]) + float(off["mvr_admin_revenue"]) + float(off["coo_revenue"])
+        total_net_admin = total_gross - total_admin
+        total_refunds = float(off["ruc_refunds"]) + float(off["fed_refunds"]) + float(off["mvr_refunds"])
         total_fed_ruc = net_fed + total_ruc
-        total_nltf = total_fed_ruc + float(off["net_mvr_revenue"]) + float(off["tuc_net_revenue"])
+        total_nltf = total_net_admin - total_refunds
         common = {
             "FY": fy,
             "period": f"FY{fy}",
+            "source_path": source_path,
             "fed_path": "Current planned path",
             "scenario_name": scenario_name,
             "scenario_role": scenario_role,
@@ -377,34 +443,56 @@ def current_forecast_annual_from_mbu26(
             "forecast_quarters": forecast_quarters,
             "nowcast_flag": bool(getattr(ped_activity, "nowcast_flag", False)),
             "value_status": value_status,
-            "source_cell": source_cell,
         }
+        fixed = lambda series_id, **overrides: _current_fixed_row(
+            common=common,
+            official_row=official_row,
+            series_id=series_id,
+            **overrides,
+        )
         rows.extend(
             [
-                _current_annual_row(**common, series_id="ped_vkt_per_capita", display_name="PED VKT per capita", value=ped_vkt_per_capita, unit="km/person", row_role="bridge_input", source_basis="current_finalist_model", source_file="forecast_scenario_comparison.parquet"),
-                _current_annual_row(**common, series_id="population_count", display_name="Population count", value=population_count, unit="persons", row_role="bridge_input", source_basis="MBU26 light_petrol_vkt / light_petrol_vkt_per_capita", source_file="mbu26_official_annual.csv", formula="light_petrol_vkt / light_petrol_vkt_per_capita * 1,000,000"),
-                _current_annual_row(**common, series_id="ped_total_vkt", display_name="Total light petrol VKT", value=ped_total_vkt, unit="million km", row_role="bridge_input", source_basis="current_finalist_model + MBU26 population", source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", formula="current PED VKT/capita * MBU26 population / 1,000,000"),
-                _current_annual_row(**common, series_id="ped_litres_per_100km", display_name="PED litres per 100km", value=ped_litres_per_100km, unit="L/100km", row_role="bridge_input", source_basis="MBU26 PED volume / light petrol VKT", source_file="mbu26_official_annual.csv", formula="MBU26 PED volume / MBU26 light petrol VKT * 100"),
-                _current_annual_row(**common, series_id="ped_volume", display_name="PED volume", value=ped_volume, unit="million litres", row_role="bridge_input", source_basis="current finalist PED VKT/capita + MBU26 intensity", source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", formula="current PED total VKT * MBU26 litres intensity / 100"),
-                _current_annual_row(**common, series_id="ped_fed_rate_path", display_name="PED/FED rate path", value=ped_rate, unit="NZD/L", row_role="bridge_input", source_basis="MBU26 gross PED revenue / PED volume", source_file="mbu26_official_annual.csv", formula="MBU26 gross_ped_revenue / MBU26 ped_volume"),
-                _current_annual_row(**common, series_id="light_ruc_net_km", display_name="Light RUC net km", value=light_km_million, unit="million km", row_role="bridge_input", source_basis="current_finalist_model", source_file="forecast_scenario_comparison.parquet"),
-                _current_annual_row(**common, series_id="light_ruc_effective_rate", display_name="Light RUC effective rate", value=light_rate, unit="$m per million km", row_role="bridge_input", source_basis="MBU26 effective rate", source_file="mbu26_official_annual.csv", formula="MBU26 light_ruc_net_revenue / MBU26 light_ruc_net_km"),
-                _current_annual_row(**common, series_id="heavy_ruc_net_km", display_name="Heavy RUC net km", value=heavy_km_million, unit="million km", row_role="bridge_input", source_basis="current_finalist_model", source_file="forecast_scenario_comparison.parquet"),
-                _current_annual_row(**common, series_id="heavy_ruc_effective_rate", display_name="Heavy RUC effective rate", value=heavy_rate, unit="$m per million km", row_role="bridge_input", source_basis="MBU26 effective rate", source_file="mbu26_official_annual.csv", formula="MBU26 heavy_ruc_net_revenue / MBU26 heavy_ruc_net_km"),
-                _current_annual_row(**common, series_id="gross_ped_revenue", display_name="PED revenue", value=ped_revenue, unit="$m nominal ex GST", row_role="replacement_line", source_basis="current_finalist_model + MBU26 bridge", source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", formula="current PED VKT/capita -> MBU26 population/intensity/rate", replacement_only=True, official_value=off["gross_ped_revenue"]),
-                _current_annual_row(**common, series_id="light_ruc_net_revenue", display_name="Light RUC revenue", value=light_revenue, unit="$m nominal ex GST", row_role="replacement_line", source_basis="current_finalist_model + MBU26 effective rate", source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", formula="current Light RUC net km * MBU26 effective rate", replacement_only=True, official_value=off["light_ruc_net_revenue"]),
-                _current_annual_row(**common, series_id="heavy_ruc_net_revenue", display_name="Heavy RUC revenue", value=heavy_revenue, unit="$m nominal ex GST", row_role="replacement_line", source_basis="current_finalist_model + MBU26 effective rate", source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", formula="current Heavy RUC net km * MBU26 effective rate", replacement_only=True, official_value=off["heavy_ruc_net_revenue"]),
-                _current_annual_row(**common, series_id="gross_lpg_revenue", display_name="Gross LPG revenue", value=off["gross_lpg_revenue"], unit="$m nominal ex GST", row_role="fixed_mbu26_component", source_basis="MBU26 official", source_file="mbu26_official_annual.csv"),
-                _current_annual_row(**common, series_id="gross_cng_revenue", display_name="Gross CNG revenue", value=off["gross_cng_revenue"], unit="$m nominal ex GST", row_role="fixed_mbu26_component", source_basis="MBU26 official", source_file="mbu26_official_annual.csv"),
-                _current_annual_row(**common, series_id="fed_refunds", display_name="FED refunds", value=off["fed_refunds"], unit="$m nominal ex GST", row_role="fixed_mbu26_deduction", source_basis="MBU26 official", source_file="mbu26_official_annual.csv"),
-                _current_annual_row(**common, series_id="ruc_fixed_residual_net_revenue", display_name="RUC fixed residual", value=ruc_fixed_residual, unit="$m nominal ex GST", row_role="fixed_mbu26_component", source_basis="MBU26 official", source_file="mbu26_official_annual.csv", formula="MBU26 total_ruc_net_revenue - MBU26 Light RUC - MBU26 Heavy RUC"),
-                _current_annual_row(**common, series_id="net_mvr_revenue", display_name="Net MVR revenue", value=off["net_mvr_revenue"], unit="$m nominal ex GST", row_role="fixed_mbu26_component", source_basis="MBU26 official", source_file="mbu26_official_annual.csv", official_value=off["net_mvr_revenue"]),
-                _current_annual_row(**common, series_id="tuc_net_revenue", display_name="TUC net revenue", value=off["tuc_net_revenue"], unit="$m nominal ex GST", row_role="fixed_mbu26_component", source_basis="MBU26 official", source_file="mbu26_official_annual.csv", official_value=off["tuc_net_revenue"]),
-                _current_annual_row(**common, series_id="gross_fed_revenue", display_name="Gross FED revenue", value=gross_fed, unit="$m nominal ex GST", row_role="calculated_rollup", source_basis="current_hybrid_formula", source_file="current_hybrid_formula", formula="gross_ped_revenue + MBU26 gross_lpg_revenue + MBU26 gross_cng_revenue", official_value=off["gross_fed_revenue"]),
-                _current_annual_row(**common, series_id="net_fed_revenue", display_name="Net FED revenue", value=net_fed, unit="$m nominal ex GST", row_role="calculated_rollup", source_basis="current_hybrid_formula", source_file="current_hybrid_formula", formula="gross_fed_revenue - MBU26 fed_refunds", official_value=off["net_fed_revenue"]),
-                _current_annual_row(**common, series_id="total_ruc_net_revenue", display_name="Total RUC all classes", value=total_ruc, unit="$m nominal ex GST", row_role="calculated_rollup", source_basis="current_hybrid_formula", source_file="current_hybrid_formula", formula="current light_ruc_net_revenue + current heavy_ruc_net_revenue + MBU26 fixed residual", official_value=off["total_ruc_net_revenue"]),
-                _current_annual_row(**common, series_id="total_fed_ruc_net_revenue", display_name="Total RUC+PED revenue", value=total_fed_ruc, unit="$m nominal ex GST", row_role="calculated_rollup", source_basis="current_hybrid_formula", source_file="current_hybrid_formula", formula="net_fed_revenue + total_ruc_net_revenue", official_value=off.get("total_fed_ruc_net_revenue")),
-                _current_annual_row(**common, series_id="total_nltf_net_revenue", display_name="Total NLTF revenue", value=total_nltf, unit="$m nominal ex GST", row_role="calculated_rollup", source_basis="current_hybrid_formula", source_file="current_hybrid_formula", formula="net_fed_revenue + total_ruc_net_revenue + MBU26 net_mvr_revenue + MBU26 tuc_net_revenue", official_value=off["total_nltf_net_revenue"]),
+                _current_annual_row(**common, series_id="ped_vkt_per_capita", display_name="PED VKT per capita", section="Key volumes", value=ped_vkt_per_capita, unit="km/person", row_role="bridge_input", source_basis="current_finalist_model", source_file="forecast_scenario_comparison.parquet", source_cell=ped_source_cell, formula="average of quarterly current finalist PED VKT/capita inputs"),
+                _current_annual_row(**common, series_id="ped_volume", display_name="PED volume", section="Key volumes", value=ped_volume, unit="million litres", row_role="bridge_input", source_basis="current finalist PED VKT/capita + MBU26 intensity", source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=ped_source_cell, formula="sum(quarterly PED VKT/capita * MBU26 population / 1,000,000 * MBU26 litres intensity / 100)", official_value=off["ped_volume"]),
+                _current_annual_row(**common, series_id="light_petrol_vkt", display_name="Light petrol VKT", section="Key volumes", value=ped_total_vkt, unit="million km", row_role="bridge_input", source_basis="current_finalist_model + MBU26 population", source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=ped_source_cell, formula="sum(quarterly PED VKT/capita * MBU26 population / 1,000,000)", official_value=off["light_petrol_vkt"]),
+                _current_annual_row(**common, series_id="light_petrol_vkt_per_capita", display_name="Light petrol VKT per capita", section="Key volumes", value=ped_vkt_per_capita * 4.0, unit="km/person", row_role="bridge_input", source_basis="current_finalist_model", source_file="forecast_scenario_comparison.parquet", source_cell=ped_source_cell, formula="sum quarterly current finalist PED VKT/capita", official_value=off["light_petrol_vkt_per_capita"]),
+                _current_annual_row(**common, series_id="light_ruc_net_km", display_name="Light RUC net km", section="Key volumes", value=light_km_million, unit="million km", row_role="bridge_input", source_basis="current_finalist_model", source_file="forecast_scenario_comparison.parquet", source_cell=light_source_cell, formula="sum quarterly current finalist Light RUC net km", official_value=off["light_ruc_net_km"]),
+                _current_annual_row(**common, series_id="heavy_ruc_net_km", display_name="Heavy RUC net km", section="Key volumes", value=heavy_km_million, unit="million km", row_role="bridge_input", source_basis="current_finalist_model", source_file="forecast_scenario_comparison.parquet", source_cell=heavy_source_cell, formula="sum quarterly current finalist Heavy RUC net km", official_value=off["heavy_ruc_net_km"]),
+                fixed("light_bev_ruc_net_km"),
+                fixed("heavy_bev_ruc_net_km"),
+                fixed("phev_ruc_net_km"),
+                fixed("tuc_gtk"),
+                _current_annual_row(**common, series_id="gross_ped_revenue", display_name="PED revenue", section="FED", value=ped_revenue, unit="$m nominal ex GST", row_role="replacement_line", source_basis="current_finalist_model + MBU26 bridge", source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=ped_source_cell, formula="sum(quarterly PED VKT/capita * MBU26 population / 1,000,000 * MBU26 litres intensity / 100 * MBU26 PED rate)", replacement_only=True, official_value=off["gross_ped_revenue"]),
+                _current_annual_row(**common, series_id="light_ruc_net_revenue", display_name="Light RUC revenue", section="RUC", value=light_revenue, unit="$m nominal ex GST", row_role="replacement_line", source_basis="current_finalist_model + MBU26 effective rate", source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=light_source_cell, formula="sum quarterly current Light RUC net km * MBU26 effective rate", replacement_only=True, official_value=off["light_ruc_net_revenue"]),
+                _current_annual_row(**common, series_id="heavy_ruc_net_revenue", display_name="Heavy RUC revenue", section="RUC", value=heavy_revenue, unit="$m nominal ex GST", row_role="replacement_line", source_basis="current_finalist_model + MBU26 effective rate", source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=heavy_source_cell, formula="sum quarterly current Heavy RUC net km * MBU26 effective rate", replacement_only=True, official_value=off["heavy_ruc_net_revenue"]),
+                fixed("light_bev_ruc_net_revenue"),
+                fixed("heavy_bev_ruc_net_revenue"),
+                fixed("phev_ruc_net_revenue"),
+                fixed("ruc_refunds"),
+                _current_annual_row(**common, series_id="gross_ruc_revenue", display_name="Gross RUC revenue", section="RUC", value=gross_ruc, unit="$m nominal ex GST", row_role="calculated_rollup", source_basis="current_hybrid_formula", source_file="current_hybrid_formula", source_cell=current_source_cell, formula="light_ruc_net_revenue + heavy_ruc_net_revenue + MBU26 EV/PHEV RUC revenues + MBU26 ruc_refunds", official_value=off["gross_ruc_revenue"]),
+                fixed("ruc_admin_revenue"),
+                _current_annual_row(**common, series_id="ruc_revenue_net_admin", display_name="RUC revenues net of admin fees", section="RUC", value=ruc_net_admin, unit="$m nominal ex GST", row_role="calculated_rollup", source_basis="current_hybrid_formula", source_file="current_hybrid_formula", source_cell=current_source_cell, formula="gross_ruc_revenue - MBU26 ruc_admin_revenue", official_value=off["ruc_revenue_net_admin"]),
+                _current_annual_row(**common, series_id="total_ruc_net_revenue", display_name="Total RUC all classes", section="RUC", value=total_ruc, unit="$m nominal ex GST", row_role="calculated_rollup", source_basis="current_hybrid_formula", source_file="current_hybrid_formula", source_cell=current_source_cell, formula="ruc_revenue_net_admin - MBU26 ruc_refunds", official_value=off["total_ruc_net_revenue"]),
+                fixed("gross_lpg_revenue"),
+                fixed("gross_cng_revenue"),
+                _current_annual_row(**common, series_id="gross_fed_revenue", display_name="Gross FED revenue", section="FED", value=gross_fed, unit="$m nominal ex GST", row_role="calculated_rollup", source_basis="current_hybrid_formula", source_file="current_hybrid_formula", source_cell=current_source_cell, formula="gross_ped_revenue + MBU26 gross_lpg_revenue + MBU26 gross_cng_revenue", official_value=off["gross_fed_revenue"]),
+                fixed("fed_refunds"),
+                _current_annual_row(**common, series_id="net_fed_revenue", display_name="Net FED revenue", section="FED", value=net_fed, unit="$m nominal ex GST", row_role="calculated_rollup", source_basis="current_hybrid_formula", source_file="current_hybrid_formula", source_cell=current_source_cell, formula="gross_fed_revenue - MBU26 fed_refunds", official_value=off["net_fed_revenue"]),
+                fixed("mr1_revenue"),
+                fixed("mr2_revenue"),
+                fixed("coo_revenue", display_name="MR13"),
+                _current_annual_row(**common, series_id="gross_mvr_revenue", display_name="Gross MVR revenue", section="MVR", value=gross_mvr, unit="$m nominal ex GST", row_role="calculated_rollup", source_basis="MBU26 official formula", source_file="mbu26_official_annual.csv", source_cell=_source_cell_for_series(official_row, "gross_mvr_revenue"), formula="mr1_revenue + mr2_revenue + coo_revenue", official_value=off["gross_mvr_revenue"]),
+                fixed("mvr_admin_revenue"),
+                _current_annual_row(**common, series_id="mvr_revenue_net_admin_coo", display_name="MVR revenues net of admin fees and COO", section="MVR", value=mvr_net_admin_coo, unit="$m nominal ex GST", row_role="calculated_rollup", source_basis="MBU26 official formula", source_file="mbu26_official_annual.csv", source_cell=_source_cell_for_series(official_row, "mvr_revenue_net_admin_coo"), formula="mr1_revenue + mr2_revenue - mvr_admin_revenue", official_value=off["mvr_revenue_net_admin_coo"]),
+                fixed("mvr_refunds"),
+                _current_annual_row(**common, series_id="net_mvr_revenue", display_name="Net MVR revenue", section="MVR", value=net_mvr, unit="$m nominal ex GST", row_role="calculated_rollup", source_basis="MBU26 official formula", source_file="mbu26_official_annual.csv", source_cell=_source_cell_for_series(official_row, "net_mvr_revenue"), formula="mvr_revenue_net_admin_coo - mvr_refunds", official_value=off["net_mvr_revenue"]),
+                fixed("tuc_net_revenue"),
+                _current_annual_row(**common, series_id="total_gross_revenue", display_name="Total gross revenues", section="Totals", value=total_gross, unit="$m nominal ex GST", row_role="calculated_rollup", source_basis="current_hybrid_formula", source_file="current_hybrid_formula", source_cell=current_source_cell, formula="gross_ruc_revenue + gross_fed_revenue + gross_mvr_revenue + tuc_net_revenue", official_value=off["total_gross_revenue"]),
+                _current_annual_row(**common, series_id="total_admin_fees", display_name="Total admin fees", section="Totals", value=total_admin, unit="$m nominal ex GST", row_role="calculated_rollup", source_basis="current_hybrid_formula", source_file="current_hybrid_formula", source_cell=current_source_cell, formula="ruc_admin_revenue + mvr_admin_revenue + coo_revenue", official_value=off["total_admin_fees"]),
+                _current_annual_row(**common, series_id="total_revenue_net_admin", display_name="Total revenues net of admin fees", section="Totals", value=total_net_admin, unit="$m nominal ex GST", row_role="calculated_rollup", source_basis="current_hybrid_formula", source_file="current_hybrid_formula", source_cell=current_source_cell, formula="total_gross_revenue - total_admin_fees", official_value=off["total_revenue_net_admin"]),
+                _current_annual_row(**common, series_id="total_refunds", display_name="Total refunds", section="Totals", value=total_refunds, unit="$m nominal ex GST", row_role="calculated_rollup", source_basis="current_hybrid_formula", source_file="current_hybrid_formula", source_cell=current_source_cell, formula="ruc_refunds + fed_refunds + mvr_refunds", official_value=off["total_refunds"]),
+                _current_annual_row(**common, series_id="total_nltf_net_revenue", display_name="Total NLTF revenue", section="Totals", value=total_nltf, unit="$m nominal ex GST", row_role="calculated_rollup", source_basis="current_hybrid_formula", source_file="current_hybrid_formula", source_cell=current_source_cell, formula="total_revenue_net_admin - total_refunds", official_value=off["total_nltf_net_revenue"]),
+                _current_annual_row(**common, series_id="total_fed_ruc_net_revenue", display_name="Total RUC+PED revenue", section="Derived totals", value=total_fed_ruc, unit="$m nominal ex GST", row_role="calculated_rollup", source_basis="current_hybrid_formula", source_file="current_hybrid_formula", source_cell=current_source_cell, formula="net_fed_revenue + total_ruc_net_revenue", official_value=off.get("total_fed_ruc_net_revenue")),
             ]
         )
     if not rows:
@@ -437,7 +525,9 @@ def current_forecast_annual_from_mbu26(
     for column in columns:
         if column not in out.columns:
             out[column] = pd.NA if column in {"official_value", "residual_vs_official"} else ""
-    return out[columns].sort_values(["FY", "scenario_name", "fed_path", "row_role", "series_id"], kind="stable").reset_index(drop=True)
+    out["_line_order"] = out["series_id"].map(_line_order)
+    out = out.sort_values(["FY", "scenario_name", "fed_path", "_line_order", "series_id"], kind="stable")
+    return out[columns].reset_index(drop=True)
 
 
 def _extract_annual_spine(values_sheet: Any, formulas_sheet: Any, workbook_name: str, workbook_hash: str) -> pd.DataFrame:
@@ -688,6 +778,60 @@ def _current_activity_annual_values(chart_rows: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=columns).sort_values(["FY", "scenario_name", "series_id"], kind="stable").reset_index(drop=True)
 
 
+def _current_activity_quarter_lookup(chart_rows: pd.DataFrame) -> dict[tuple[str, int, str], dict[str, Any]]:
+    if chart_rows is None or chart_rows.empty:
+        return {}
+    data = chart_rows.copy()
+    data = data[
+        data.get("time_grain", pd.Series(dtype=str)).astype(str).eq("quarterly")
+        & data.get("metric_type", pd.Series(dtype=str)).astype(str).eq("activity")
+        & data.get("period", pd.Series(dtype=str)).astype(str).str.match(r"^\d{4}Q[1-4]$", na=False)
+    ].copy()
+    data["value_numeric"] = pd.to_numeric(data.get("value"), errors="coerce")
+    data = data[data["value_numeric"].notna()].copy()
+    if data.empty:
+        return {}
+    stream_to_series = {"PED": "ped_vkt_per_capita", "LIGHT_RUC": "light_ruc_net_km", "HEAVY_RUC": "heavy_ruc_net_km"}
+    data["series_id"] = data.get("stream", pd.Series("", index=data.index)).astype(str).map(stream_to_series)
+    data = data[data["series_id"].notna()].copy()
+    future = data[data["row_type"].astype(str).eq("future_forecast")].copy()
+    historical = data[data["row_type"].astype(str).eq("historical_actual")].copy()
+    hist_lookup = {(str(row.series_id), str(row.period)): row for row in historical.itertuples()}
+    output: dict[tuple[str, int, str], dict[str, Any]] = {}
+    for (scenario_name, series_id), group in future.groupby(["scenario_name", "series_id"], dropna=False):
+        future_lookup = {str(row.period): row for row in group.itertuples()}
+        fys = sorted({_june_year_from_quarter(str(period)) for period in list(future_lookup) if _june_year_from_quarter(str(period)) is not None})
+        fys.append(REVENUE_LAST_COMPLETE_ACTUAL_FY)
+        for fy in sorted(set(int(value) for value in fys if value is not None)):
+            expected = _expected_june_year_quarters(fy)
+            values: list[float] = []
+            actual_quarters: list[str] = []
+            forecast_quarters: list[str] = []
+            source_cells: list[str] = []
+            for quarter in expected:
+                row = future_lookup.get(quarter)
+                if row is not None:
+                    values.append(float(row.value_numeric))
+                    forecast_quarters.append(quarter)
+                    source_cells.append(str(getattr(row, "source_cell", "") or f"data/current_revenue_outlook/revenue_chart_rows.csv:{scenario_name}:{quarter}"))
+                    continue
+                hist_row = hist_lookup.get((str(series_id), quarter))
+                if hist_row is not None:
+                    values.append(float(hist_row.value_numeric))
+                    actual_quarters.append(quarter)
+                    source_cells.append(str(getattr(hist_row, "source_cell", "") or f"data/current_revenue_outlook/revenue_chart_rows.csv:historical_actual:{quarter}"))
+            if len(values) != 4:
+                continue
+            output[(str(scenario_name), fy, str(series_id))] = {
+                "values": values,
+                "quarters_present": "; ".join(expected),
+                "actual_quarters": "; ".join(actual_quarters),
+                "forecast_quarters": "; ".join(forecast_quarters),
+                "source_cells": "; ".join(source_cells),
+            }
+    return output
+
+
 def _official_lookup(official: pd.DataFrame) -> dict[int, dict[str, Any]]:
     if official is None or official.empty:
         return {}
@@ -698,6 +842,24 @@ def _official_lookup(official: pd.DataFrame) -> dict[int, dict[str, Any]]:
     output: dict[int, dict[str, Any]] = {}
     for fy, group in data.groupby("FY_int", dropna=True):
         output[int(fy)] = group.groupby("series_id")["value_numeric"].first().to_dict()
+    return output
+
+
+def _official_record_lookup(official: pd.DataFrame) -> dict[int, dict[str, dict[str, Any]]]:
+    if official is None or official.empty:
+        return {}
+    data = official.copy()
+    data["FY_int"] = pd.to_numeric(data.get("FY"), errors="coerce").astype("Int64")
+    data["value_numeric"] = pd.to_numeric(data.get("value"), errors="coerce")
+    data = data[data["FY_int"].notna()].copy()
+    output: dict[int, dict[str, dict[str, Any]]] = {}
+    for fy, group in data.groupby("FY_int", dropna=True):
+        fy_records: dict[str, dict[str, Any]] = {}
+        for row in group.to_dict("records"):
+            series_id = str(row.get("series_id") or "")
+            if series_id and series_id not in fy_records:
+                fy_records[series_id] = row
+        output[int(fy)] = fy_records
     return output
 
 
@@ -726,11 +888,13 @@ def _current_annual_row(
     *,
     FY: int,
     period: str,
+    source_path: str,
     fed_path: str,
     scenario_name: str,
     scenario_role: str,
     series_id: str,
     display_name: str,
+    section: str,
     value: Any,
     unit: str,
     row_role: str,
@@ -754,11 +918,13 @@ def _current_annual_row(
     return {
         "FY": int(FY),
         "period": period,
+        "source_path": source_path,
         "fed_path": fed_path,
         "scenario_name": scenario_name,
         "scenario_role": scenario_role,
         "series_id": series_id,
         "display_name": display_name,
+        "section": section,
         "value": numeric_value,
         "unit": unit,
         "row_role": row_role,
@@ -782,6 +948,246 @@ def _current_annual_row(
         "forecast_quarters": forecast_quarters,
         "nowcast_flag": bool(nowcast_flag),
     }
+
+
+def _current_fixed_row(
+    *,
+    common: dict[str, Any],
+    official_row: dict[str, dict[str, Any]],
+    series_id: str,
+    display_name: str | None = None,
+    row_role: str | None = None,
+) -> dict[str, Any]:
+    record = official_row.get(series_id, {})
+    return _current_annual_row(
+        **common,
+        series_id=series_id,
+        display_name=str(display_name or record.get("display_name") or record.get("label") or series_id),
+        section=str(record.get("section") or ""),
+        value=record.get("value_numeric", record.get("value")),
+        unit=str(record.get("unit") or ""),
+        row_role=str(row_role or record.get("row_role") or "fixed_mbu26_component"),
+        source_basis="MBU26 official fixed component",
+        source_file=str(record.get("source_file") or "mbu26_official_annual.csv"),
+        source_cell=str(record.get("source_cell") or ""),
+        formula=str(record.get("formula") or ""),
+        official_value=record.get("value_numeric", record.get("value")),
+    )
+
+
+def _source_cell_for_series(official_row: dict[str, dict[str, Any]], series_id: str) -> str:
+    return str(official_row.get(series_id, {}).get("source_cell") or "")
+
+
+def _line_order(series_id: Any) -> int:
+    text = str(series_id or "")
+    try:
+        return REVENUE_LINE_TABLE_SERIES_IDS.index(text)
+    except ValueError:
+        if text == "total_fed_ruc_net_revenue":
+            return len(REVENUE_LINE_TABLE_SERIES_IDS)
+        return len(REVENUE_LINE_TABLE_SERIES_IDS) + 1
+
+
+def _current_source_path_label(scenario_name: str, scenario_role: str = "") -> str:
+    if str(scenario_name) == "current_basecase" or str(scenario_role).lower() == "basecase":
+        return "Current finalist Base case"
+    return "Current finalist High population/comparison"
+
+
+def revenue_line_reconciliation_frame(
+    *,
+    mbu26_official_annual: pd.DataFrame,
+    current_forecast_annual: pd.DataFrame,
+) -> pd.DataFrame:
+    columns = [
+        "source_path",
+        "FY",
+        "period",
+        "section",
+        "line_label",
+        "series_id",
+        "value",
+        "unit",
+        "row_role",
+        "source_file",
+        "source_cell",
+        "formula",
+        "source_status",
+        "source_basis",
+        "model_id",
+        "quarter_composition",
+        "actual_quarters",
+        "forecast_quarters",
+        "replacement_flag",
+        "value_status",
+        "residual_vs_official",
+        "scenario_name",
+        "scenario_role",
+        "fed_path",
+        "availability_status",
+    ]
+    rows: list[dict[str, Any]] = []
+    if isinstance(mbu26_official_annual, pd.DataFrame) and not mbu26_official_annual.empty:
+        official = mbu26_official_annual[
+            mbu26_official_annual.get("series_id", pd.Series(dtype=str)).astype(str).isin(REVENUE_LINE_TABLE_SERIES_IDS)
+        ].copy()
+        official["FY_numeric"] = pd.to_numeric(official.get("FY"), errors="coerce").astype("Int64")
+        official["value_numeric"] = pd.to_numeric(official.get("value"), errors="coerce")
+        official = official[official["FY_numeric"].notna() & official["value_numeric"].notna()].copy()
+        for row in official.to_dict("records"):
+            fy = int(row.get("FY_numeric"))
+            quarters = "; ".join(_expected_june_year_quarters(fy))
+            rows.append(
+                {
+                    "source_path": "MBU26 official",
+                    "FY": fy,
+                    "period": f"FY{fy}",
+                    "section": row.get("section", ""),
+                    "line_label": _line_display_label(row.get("series_id"), row.get("display_name") or row.get("label")),
+                    "series_id": row.get("series_id", ""),
+                    "value": row.get("value_numeric"),
+                    "unit": row.get("unit", ""),
+                    "row_role": row.get("row_role", ""),
+                    "source_file": row.get("source_file", "mbu26_official_annual.csv"),
+                    "source_cell": row.get("source_cell", ""),
+                    "formula": row.get("formula", ""),
+                    "source_status": row.get("period_status", ""),
+                    "source_basis": "MBU26 official source row",
+                    "model_id": "",
+                    "quarter_composition": quarters,
+                    "actual_quarters": quarters if str(row.get("period_status", "")).upper() == "ACTUAL" else "",
+                    "forecast_quarters": "" if str(row.get("period_status", "")).upper() == "ACTUAL" else quarters,
+                    "replacement_flag": False,
+                    "value_status": row.get("value_status", ""),
+                    "residual_vs_official": 0.0,
+                    "scenario_name": "mbu26_official",
+                    "scenario_role": "official_comparator",
+                    "fed_path": MBU26_RELEASE_ROUND,
+                    "availability_status": "available",
+                }
+            )
+    if isinstance(current_forecast_annual, pd.DataFrame) and not current_forecast_annual.empty:
+        current = current_forecast_annual[
+            current_forecast_annual.get("series_id", pd.Series(dtype=str)).astype(str).isin(REVENUE_LINE_TABLE_SERIES_IDS)
+        ].copy()
+        current["FY_numeric"] = pd.to_numeric(current.get("FY"), errors="coerce").astype("Int64")
+        current["value_numeric"] = pd.to_numeric(current.get("value"), errors="coerce")
+        current = current[current["FY_numeric"].notna() & current["value_numeric"].notna()].copy()
+        for row in current.to_dict("records"):
+            fy = int(row.get("FY_numeric"))
+            rows.append(
+                {
+                    "source_path": row.get("source_path") or _current_source_path_label(str(row.get("scenario_name", "")), str(row.get("scenario_role", ""))),
+                    "FY": fy,
+                    "period": f"FY{fy}",
+                    "section": row.get("section", ""),
+                    "line_label": _line_display_label(row.get("series_id"), row.get("display_name")),
+                    "series_id": row.get("series_id", ""),
+                    "value": row.get("value_numeric"),
+                    "unit": row.get("unit", ""),
+                    "row_role": row.get("row_role", ""),
+                    "source_file": row.get("source_file", ""),
+                    "source_cell": row.get("source_cell", ""),
+                    "formula": row.get("formula", ""),
+                    "source_status": row.get("source_status", ""),
+                    "source_basis": row.get("source_basis", ""),
+                    "model_id": row.get("model_id", ""),
+                    "quarter_composition": row.get("quarters_present", ""),
+                    "actual_quarters": row.get("actual_quarters", ""),
+                    "forecast_quarters": row.get("forecast_quarters", ""),
+                    "replacement_flag": bool(row.get("replacement_only", False)),
+                    "value_status": row.get("value_status", ""),
+                    "residual_vs_official": row.get("residual_vs_official", pd.NA),
+                    "scenario_name": row.get("scenario_name", ""),
+                    "scenario_role": row.get("scenario_role", ""),
+                    "fed_path": row.get("fed_path", ""),
+                    "availability_status": row.get("availability_status", "available"),
+                }
+            )
+    if not rows:
+        return pd.DataFrame(columns=columns)
+    out = pd.DataFrame(rows)
+    out["_source_order"] = out["source_path"].map(lambda value: REVENUE_LINE_SOURCE_PATHS.index(value) if value in REVENUE_LINE_SOURCE_PATHS else len(REVENUE_LINE_SOURCE_PATHS))
+    out["_line_order"] = out["series_id"].map(_line_order)
+    return out[columns + ["_source_order", "_line_order"]].sort_values(["_source_order", "FY", "_line_order", "scenario_name"], kind="stable").drop(columns=["_source_order", "_line_order"]).reset_index(drop=True)
+
+
+def revenue_formula_residual_frame(line_reconciliation: pd.DataFrame) -> pd.DataFrame:
+    columns = [
+        "source_path",
+        "FY",
+        "period",
+        "scenario_name",
+        "output_series_id",
+        "output_label",
+        "formula",
+        "observed_value",
+        "calculated_value",
+        "residual",
+        "residual_abs",
+        "status",
+        "missing_inputs",
+    ]
+    if line_reconciliation is None or line_reconciliation.empty:
+        return pd.DataFrame(columns=columns)
+    data = line_reconciliation.copy()
+    data["FY_numeric"] = pd.to_numeric(data.get("FY"), errors="coerce").astype("Int64")
+    data["value_numeric"] = pd.to_numeric(data.get("value"), errors="coerce")
+    data = data[data["FY_numeric"].notna()].copy()
+    rows: list[dict[str, Any]] = []
+    for (source_path, scenario_name, fy), group in data.groupby(["source_path", "scenario_name", "FY_numeric"], dropna=False):
+        values = {
+            str(row.series_id): float(row.value_numeric)
+            for row in group.itertuples()
+            if pd.notna(row.value_numeric)
+        }
+        labels = {
+            str(row["series_id"]): str(row["line_label"])
+            for row in group[["series_id", "line_label"]].drop_duplicates().to_dict("records")
+        }
+        for formula in FORMULA_DEFINITIONS:
+            output = str(formula["output_series_id"])
+            if output == "total_fed_ruc_net_revenue":
+                continue
+            terms = tuple(formula["terms"])
+            missing = [series_id for series_id, _sign in terms if series_id not in values]
+            observed = values.get(output, pd.NA)
+            calculated = pd.NA if missing else sum(values[series_id] * sign for series_id, sign in terms)
+            residual = pd.NA
+            if pd.notna(observed) and pd.notna(calculated):
+                residual = float(observed) - float(calculated)
+            status = "missing_inputs" if missing else "reconciled" if pd.notna(residual) and abs(float(residual)) <= 0.05 else "residual_reported"
+            rows.append(
+                {
+                    "source_path": source_path,
+                    "FY": int(fy),
+                    "period": f"FY{int(fy)}",
+                    "scenario_name": scenario_name,
+                    "output_series_id": output,
+                    "output_label": labels.get(output, str(formula.get("output_label") or output)),
+                    "formula": str(formula["expression"]),
+                    "observed_value": observed,
+                    "calculated_value": calculated,
+                    "residual": residual,
+                    "residual_abs": abs(float(residual)) if pd.notna(residual) else pd.NA,
+                    "status": status,
+                    "missing_inputs": "; ".join(missing),
+                }
+            )
+    if not rows:
+        return pd.DataFrame(columns=columns)
+    return pd.DataFrame(rows, columns=columns).sort_values(["source_path", "FY", "output_series_id", "scenario_name"], kind="stable").reset_index(drop=True)
+
+
+def _line_display_label(series_id: Any, fallback: Any = "") -> str:
+    text = str(series_id or "")
+    if text == "coo_revenue":
+        return "MR13"
+    for row in ROW_DEFINITIONS:
+        if str(row["series_id"]) == text:
+            return str(row["display_name"])
+    return str(fallback or text)
 
 
 def _series_trace_contract_frame() -> pd.DataFrame:

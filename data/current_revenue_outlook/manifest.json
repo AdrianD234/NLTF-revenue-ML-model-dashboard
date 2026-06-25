@@ -3,7 +3,7 @@
   "pack_status": "explicitly_promoted_current_outlook",
   "runtime_pack_type": "mbu26_actual_current_finalist_official_comparator",
   "promotion_time": "2026-06-25T21:42:25.800323+00:00",
-  "promoted_by": "codex_mbu26_runtime_rebuild",
+  "promoted_by": "repo_source_runtime_rebuild",
   "repo_relative_output_dir": "data/current_revenue_outlook",
   "source_policy": "committed_current_runtime_pack_only; MBU26 annual source spine is repo-local; Streamlit does not load the offline workbook or legacy Excel forecast paths",
   "runtime_policy": "Revenue Outlook runtime rows are materialized from repo-local source actuals, current finalist forecasts and the MBU26 official comparator. Source-pack tables are retained as audit lineage and are not a second Streamlit chart engine.",
@@ -304,15 +304,28 @@
     "repo_relative_path": "data/current_revenue_outlook/runtime_trace_audit.csv",
     "scope": "Per-series FY2024-FY2027 trace audit with source, role, model ID, scenario, quarter composition and anchor flags."
   },
+  "revenue_line_reconciliation": {
+    "repo_relative_path": "data/current_revenue_outlook/revenue_line_reconciliation.csv",
+    "scope": "Live table source for MBU26 official and current finalist line-item decomposition.",
+    "source_paths": [
+      "MBU26 official",
+      "Current finalist Base case",
+      "Current finalist High population/comparison"
+    ]
+  },
+  "revenue_formula_residuals": {
+    "repo_relative_path": "data/current_revenue_outlook/revenue_formula_residuals.csv",
+    "scope": "Formula residual checks for RUC, FED, MVR and total rows by source path and FY."
+  },
   "validation_status": "runtime_rebuilt",
   "output_hashes": {
     "future_revenue_forecasts.csv": {
-      "sha256": "82135a315d90563e0750a3598dd8b24ce9f1bc9a0fc36faf9bc0a820e45c8443",
-      "size_bytes": 213270
+      "sha256": "5a8e4024e960a08308654b862acf00c278d79b9a60c899af9b710dbca9f7a0a7",
+      "size_bytes": 214642
     },
     "future_revenue_forecasts.parquet": {
-      "sha256": "b9027e7604157d0e5eface39ebed2b49d849ce24a5868d5d534f89c248d07872",
-      "size_bytes": 24759
+      "sha256": "674ba0173044702cf0e78ab2e79791baca1879709650b2f2a840871e2d497b21",
+      "size_bytes": 24590
     },
     "path_trace_status.csv": {
       "sha256": "9aee7a4e7003ec6541476ca3e4afef6d8586b6c358e41db1c8e06623e5ffcaa3",
@@ -323,20 +336,36 @@
       "size_bytes": 5960
     },
     "revenue_bridge_components.csv": {
-      "sha256": "f1227fd260deb40bd621d124b0a64e623a3c9842472320ecb198ab858f20fee2",
-      "size_bytes": 334758
+      "sha256": "32c1ff9bb842a4ee92e5672f6b77cf64ed63b1f4d17aae8a42be64d0a4681282",
+      "size_bytes": 357517
     },
     "revenue_bridge_components.parquet": {
-      "sha256": "d722843c704056e3801a8842509ecc27b5c404083a23452291c8fbbab26839ca",
-      "size_bytes": 41179
+      "sha256": "9e6b24981e0d8bcd2be2c3601d79a23df5f60df85407558be438ac3c7eddf32e",
+      "size_bytes": 44224
     },
     "revenue_chart_rows.csv": {
-      "sha256": "84618e9ce0ea8994744140e46a06a9b465ca578cfa84281467a5807fef81a8d8",
-      "size_bytes": 1538068
+      "sha256": "f62ed55927106e497ab26908bdb39b57d86e047ffe816911091ecc6f94b6f56d",
+      "size_bytes": 1634531
     },
     "revenue_chart_rows.parquet": {
-      "sha256": "79b079abfa4589b0a249b12d3fa656a4401fbed238758051ef03f21339e98a43",
-      "size_bytes": 104163
+      "sha256": "bc59f384182f5564e262972cbe94d0ffd7385a3d1a1bc86f990485df35e5fad7",
+      "size_bytes": 108062
+    },
+    "revenue_formula_residuals.csv": {
+      "sha256": "ee167159210cf498ea7f8cd369018f8a4fe699f61b012a43362f6c246205f058",
+      "size_bytes": 305088
+    },
+    "revenue_formula_residuals.parquet": {
+      "sha256": "b7c0e1bcd65847dbde6ff929d64678ca05fc19c6223017b199e89cf3053cc3ea",
+      "size_bytes": 35724
+    },
+    "revenue_line_reconciliation.csv": {
+      "sha256": "919182cd3274ab5932f05bbf2969e11a1bd3a4d78b284220fde8b25222e37bc1",
+      "size_bytes": 1717263
+    },
+    "revenue_line_reconciliation.parquet": {
+      "sha256": "a7f8978a8d9536ff0f6f620d2735bf0f568ed135fb0565e69fb8dfc7f015dc80",
+      "size_bytes": 75927
     },
     "row_reconciliation.csv": {
       "sha256": "d484f5d75cce88e30ce7bcf5dd70058505cc02e5dff93f457a579f119c2fc7ce",
@@ -347,12 +376,12 @@
       "size_bytes": 38215
     },
     "runtime_trace_audit.csv": {
-      "sha256": "26071ca6944cb2e4070b128ae8305d9d262708d87125b2d464567ea7c1414fbd",
-      "size_bytes": 54240
+      "sha256": "74247f10efdbab7d8fe961080d3eb301aba312d41c60aec536443a70ecddcad4",
+      "size_bytes": 61772
     },
     "runtime_trace_audit.parquet": {
-      "sha256": "095bdee6de33ce2a0c017cf20082ede1074fbfdf5898353a461f28bd2f117348",
-      "size_bytes": 19587
+      "sha256": "5c505ce661eec24602055859aae8d70d88165a5a8b42c0e61ea96d2f7784a384",
+      "size_bytes": 20395
     },
     "series_trace_contract.csv": {
       "sha256": "2eaf18c4c54fc18a21dd68415c0aea041bd174e8d75285409a4bb83034b60e09",
