@@ -67,6 +67,7 @@ RUNTIME_REVENUE_OUTLOOK_FILES = (
     "revenue_chart_rows.parquet",
     "runtime_trace_audit.parquet",
     "revenue_line_reconciliation.parquet",
+    "revenue_stack_components.parquet",
     "revenue_formula_residuals.parquet",
     "series_alias_audit.parquet",
     "fan_availability.parquet",
@@ -206,6 +207,69 @@ CURRENT_RUNTIME_POLICY = (
     "tables are retained as audit lineage and are not a second Streamlit chart engine."
 )
 REVENUE_FIRST_FORECAST_FY = 2026
+REVENUE_STACK_SECTION_ORDER = {
+    "Key volumes": 0,
+    "RUC": 1,
+    "FED": 2,
+    "MVR": 3,
+    "TUC": 4,
+    "Totals": 5,
+}
+REVENUE_STACK_SERIES_ORDER = {
+    series_id: index
+    for index, series_id in enumerate(
+        [
+            "light_ruc_net_km",
+            "heavy_ruc_net_km",
+            "light_bev_ruc_net_km",
+            "heavy_bev_ruc_net_km",
+            "phev_ruc_net_km",
+            "ped_volume",
+            "light_petrol_vkt",
+            "ped_vkt_per_capita",
+            "tuc_gtk",
+            "light_ruc_net_revenue",
+            "heavy_ruc_net_revenue",
+            "light_bev_ruc_net_revenue",
+            "heavy_bev_ruc_net_revenue",
+            "phev_ruc_net_revenue",
+            "ruc_refunds",
+            "gross_ruc_revenue",
+            "ruc_admin_revenue",
+            "ruc_revenue_net_admin",
+            "total_ruc_net_revenue",
+            "total_fed_ruc_net_revenue",
+            "gross_ped_revenue",
+            "gross_lpg_revenue",
+            "gross_cng_revenue",
+            "gross_fed_revenue",
+            "fed_refunds",
+            "net_fed_revenue",
+            "mr1_revenue",
+            "mr2_revenue",
+            "coo_revenue",
+            "gross_mvr_revenue",
+            "mvr_admin_revenue",
+            "mvr_revenue_net_admin_coo",
+            "mvr_refunds",
+            "net_mvr_revenue",
+            "tuc_net_revenue",
+            "total_gross_revenue",
+            "total_admin_fees",
+            "total_revenue_net_admin",
+            "total_refunds",
+            "total_nltf_net_revenue",
+        ]
+    )
+}
+REVENUE_STACK_DEDUCTION_SERIES = {
+    "ruc_refunds",
+    "ruc_admin_revenue",
+    "fed_refunds",
+    "mvr_admin_revenue",
+    "mvr_refunds",
+}
+REVENUE_STACK_OFFSET_SERIES = {"coo_revenue", "ruc_refunds"}
 
 
 @dataclass
@@ -216,6 +280,7 @@ class RevenueOutlookPack:
     revenue_bridge_components: pd.DataFrame
     revenue_chart_rows: pd.DataFrame
     revenue_line_reconciliation: pd.DataFrame = field(default_factory=pd.DataFrame)
+    revenue_stack_components: pd.DataFrame = field(default_factory=pd.DataFrame)
     revenue_formula_residuals: pd.DataFrame = field(default_factory=pd.DataFrame)
     series_alias_audit: pd.DataFrame = field(default_factory=pd.DataFrame)
     fan_availability: pd.DataFrame = field(default_factory=pd.DataFrame)
@@ -235,6 +300,7 @@ def revenue_outlook_signature(pack_dir: Path | str | None = None, repo_root: Pat
         base / "revenue_bridge_components.parquet",
         base / "revenue_chart_rows.parquet",
         base / "revenue_line_reconciliation.parquet",
+        base / "revenue_stack_components.parquet",
         base / "revenue_formula_residuals.parquet",
         base / "series_alias_audit.parquet",
         base / "fan_availability.parquet",
@@ -271,6 +337,7 @@ def load_revenue_outlook_pack(
         revenue_bridge_components=_read_optional_parquet(base / "revenue_bridge_components.parquet"),
         revenue_chart_rows=_read_optional_parquet(base / "revenue_chart_rows.parquet"),
         revenue_line_reconciliation=_read_optional_parquet(base / "revenue_line_reconciliation.parquet"),
+        revenue_stack_components=_read_optional_parquet(base / "revenue_stack_components.parquet"),
         revenue_formula_residuals=_read_optional_parquet(base / "revenue_formula_residuals.parquet"),
         series_alias_audit=_read_optional_parquet(base / "series_alias_audit.parquet"),
         fan_availability=_read_optional_parquet(base / "fan_availability.parquet"),
@@ -377,6 +444,7 @@ def build_current_revenue_outlook_runtime_pack(
         current_forecast_annual=current,
     )
     formula_residuals = revenue_formula_residual_frame(line_reconciliation)
+    stack_components = revenue_stack_components_frame(line_reconciliation, formula_residuals)
 
     series_meta = _runtime_series_metadata(mbu26_pack.series_trace_contract)
     quarterly_inputs = _runtime_quarterly_activity_inputs(existing_chart_rows, series_meta)
@@ -479,6 +547,12 @@ def build_current_revenue_outlook_runtime_pack(
             "repo_relative_path": _repo_relative(root, base / "revenue_formula_residuals.csv"),
             "scope": "Formula residual checks for RUC, FED, MVR and total rows by source path and FY.",
         },
+        "revenue_stack_components": {
+            "repo_relative_path": _repo_relative(root, base / "revenue_stack_components.csv"),
+            "scope": "Composition-over-time stack rows classified from revenue_line_reconciliation; aggregates are overlays only and are never stacked.",
+            "source": "data/current_revenue_outlook/revenue_line_reconciliation.csv",
+            "balance_rule": "component_positive + component_negative + zero-net offsets reconciles to Total NLTF revenue; residuals are reported and never forced.",
+        },
         "series_alias_audit": {
             "repo_relative_path": _repo_relative(root, base / "series_alias_audit.csv"),
             "scope": "Canonical Revenue Outlook series aliases from source labels/series IDs to dashboard selector IDs.",
@@ -508,6 +582,7 @@ def build_current_revenue_outlook_runtime_pack(
             "path_trace_status": mbu26_pack.path_trace_status,
             "row_reconciliation": mbu26_pack.row_reconciliation,
             "revenue_line_reconciliation": line_reconciliation,
+            "revenue_stack_components": stack_components,
             "revenue_formula_residuals": formula_residuals,
             "fan_availability": fan_availability,
             "fan_band_rows": fan_band_rows,
@@ -587,6 +662,199 @@ def _read_existing_manifest(pack_dir: Path) -> dict[str, Any]:
         return json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return {}
+
+
+def revenue_stack_components_frame(
+    line_reconciliation: pd.DataFrame,
+    formula_residuals: pd.DataFrame | None = None,
+) -> pd.DataFrame:
+    """Classify committed line-reconciliation rows for composition plotting."""
+
+    base_columns = list(line_reconciliation.columns) if isinstance(line_reconciliation, pd.DataFrame) else []
+    audit_columns = [
+        "stack_role",
+        "signed_contribution",
+        "stack_value",
+        "stack_unit",
+        "section_order",
+        "line_order",
+        "source_path_order",
+        "stack_balance_value",
+        "stack_balance_residual",
+        "stack_balance_status",
+        "stack_note",
+        "formula_residual",
+        "formula_residual_abs",
+        "formula_residual_status",
+    ]
+    if line_reconciliation is None or line_reconciliation.empty:
+        return pd.DataFrame(columns=base_columns + audit_columns)
+
+    out = line_reconciliation.copy()
+    for column in ["source_path", "FY", "series_id", "section", "row_role", "unit", "value"]:
+        if column not in out.columns:
+            out[column] = pd.NA
+    out = _append_total_fed_ruc_overlay_rows(out)
+
+    out["FY_numeric"] = pd.to_numeric(out["FY"], errors="coerce")
+    out["section_order"] = out["section"].astype(str).map(REVENUE_STACK_SECTION_ORDER).fillna(99).astype(int)
+    out["line_order"] = out["series_id"].astype(str).map(REVENUE_STACK_SERIES_ORDER).fillna(999).astype(int)
+    source_order = {
+        "MBU26 official": 0,
+        "Current finalist Base case": 1,
+        "Current finalist High population/comparison": 2,
+    }
+    out["source_path_order"] = out["source_path"].astype(str).map(source_order).fillna(99).astype(int)
+    out["value_numeric"] = pd.to_numeric(out["value"], errors="coerce")
+
+    series = out["series_id"].astype(str)
+    row_role = out["row_role"].astype(str)
+    section = out["section"].astype(str)
+    unit = out["unit"].astype(str)
+    revenue_unit = unit.eq("$m nominal ex GST")
+
+    out["stack_role"] = "audit_context"
+    out.loc[row_role.eq("bridge_input") | section.eq("Key volumes"), "stack_role"] = "activity_context"
+    out.loc[row_role.isin(["aggregate", "calculated_rollup"]), "stack_role"] = "aggregate_overlay"
+    out.loc[
+        row_role.isin(["leaf", "replacement_line"]) & revenue_unit,
+        "stack_role",
+    ] = "component_positive"
+    out.loc[
+        (row_role.eq("deduction") | series.isin(REVENUE_STACK_DEDUCTION_SERIES)) & revenue_unit,
+        "stack_role",
+    ] = "component_negative"
+    out.loc[series.isin(REVENUE_STACK_OFFSET_SERIES), "stack_role"] = "offset_not_stacked"
+
+    out["signed_contribution"] = pd.NA
+    positive = out["stack_role"].eq("component_positive")
+    negative = out["stack_role"].isin(["component_negative", "offset_not_stacked"])
+    out.loc[positive, "signed_contribution"] = out.loc[positive, "value_numeric"]
+    out.loc[negative, "signed_contribution"] = -out.loc[negative, "value_numeric"].abs()
+    out["signed_contribution"] = pd.to_numeric(out["signed_contribution"], errors="coerce")
+
+    out["stack_value"] = pd.NA
+    out.loc[positive | out["stack_role"].eq("component_negative"), "stack_value"] = out.loc[
+        positive | out["stack_role"].eq("component_negative"),
+        "signed_contribution",
+    ]
+    out.loc[out["stack_role"].eq("offset_not_stacked"), "stack_value"] = 0.0
+    out["stack_value"] = pd.to_numeric(out["stack_value"], errors="coerce")
+    out["stack_unit"] = out["unit"].where(out["stack_role"].isin(["component_positive", "component_negative", "offset_not_stacked"]), "")
+    out["stack_note"] = ""
+    out.loc[series.eq("coo_revenue"), "stack_note"] = (
+        "MR13/COO is present in both gross MVR and total admin-fee formulas; it is shown as a deduction audit row "
+        "with zero net stack value to avoid double-counting."
+    )
+    out.loc[series.eq("ruc_refunds"), "stack_note"] = (
+        "RUC refunds are included in the MBU26 Gross RUC row and deducted again in Total refunds; they are shown as "
+        "a refund audit row with zero net stack value to avoid double-counting."
+    )
+
+    component_mask = out["stack_role"].isin(["component_positive", "component_negative", "offset_not_stacked"])
+    stack_balance = (
+        out.loc[component_mask]
+        .groupby(["source_path", "FY_numeric"], dropna=False)["stack_value"]
+        .sum(min_count=1)
+        .rename("stack_balance_value")
+        .reset_index()
+    )
+    total_rows = out[series.eq("total_nltf_net_revenue")][["source_path", "FY_numeric", "value_numeric"]].rename(
+        columns={"value_numeric": "stack_balance_total_nltf"}
+    )
+    stack_balance = stack_balance.merge(total_rows, on=["source_path", "FY_numeric"], how="left")
+    stack_balance["stack_balance_residual"] = (
+        pd.to_numeric(stack_balance["stack_balance_value"], errors="coerce")
+        - pd.to_numeric(stack_balance["stack_balance_total_nltf"], errors="coerce")
+    )
+    stack_balance["stack_balance_status"] = np.where(
+        pd.to_numeric(stack_balance["stack_balance_residual"], errors="coerce").abs().le(1e-6),
+        "balanced",
+        "residual_reported",
+    )
+    out = out.merge(
+        stack_balance[
+            ["source_path", "FY_numeric", "stack_balance_value", "stack_balance_residual", "stack_balance_status"]
+        ],
+        on=["source_path", "FY_numeric"],
+        how="left",
+    )
+
+    if isinstance(formula_residuals, pd.DataFrame) and not formula_residuals.empty:
+        residual_cols = [
+            "source_path",
+            "FY",
+            "output_series_id",
+            "residual",
+            "residual_abs",
+            "status",
+        ]
+        available = [col for col in residual_cols if col in formula_residuals.columns]
+        if {"source_path", "FY", "output_series_id"}.issubset(available):
+            residual_view = formula_residuals[available].copy()
+            residual_view["FY_numeric"] = pd.to_numeric(residual_view["FY"], errors="coerce")
+            residual_view = residual_view.rename(
+                columns={
+                    "output_series_id": "series_id",
+                    "residual": "formula_residual",
+                    "residual_abs": "formula_residual_abs",
+                    "status": "formula_residual_status",
+                }
+            ).drop(columns=["FY"], errors="ignore")
+            out = out.merge(residual_view, on=["source_path", "FY_numeric", "series_id"], how="left")
+
+    for column in ["formula_residual", "formula_residual_abs", "formula_residual_status"]:
+        if column not in out.columns:
+            out[column] = pd.NA
+
+    out = out.sort_values(
+        ["source_path_order", "FY_numeric", "section_order", "line_order", "series_id"],
+        kind="stable",
+    )
+    return out.drop(columns=["FY_numeric", "value_numeric"], errors="ignore").reset_index(drop=True)
+
+
+def _append_total_fed_ruc_overlay_rows(line_reconciliation: pd.DataFrame) -> pd.DataFrame:
+    if line_reconciliation is None or line_reconciliation.empty:
+        return pd.DataFrame() if line_reconciliation is None else line_reconciliation
+    required = {"source_path", "FY", "series_id", "value"}
+    if required.difference(line_reconciliation.columns):
+        return line_reconciliation
+
+    rows: list[dict[str, Any]] = []
+    for _, group in line_reconciliation.groupby(["source_path", "FY"], dropna=False, sort=False):
+        by_series = group.drop_duplicates("series_id", keep="last").set_index("series_id", drop=False)
+        if "net_fed_revenue" not in by_series.index or "total_ruc_net_revenue" not in by_series.index:
+            continue
+        if "total_fed_ruc_net_revenue" in by_series.index:
+            continue
+        net_fed = pd.to_numeric(pd.Series([by_series.loc["net_fed_revenue", "value"]]), errors="coerce").iloc[0]
+        total_ruc = pd.to_numeric(pd.Series([by_series.loc["total_ruc_net_revenue", "value"]]), errors="coerce").iloc[0]
+        if pd.isna(net_fed) or pd.isna(total_ruc):
+            continue
+        template_key = "total_nltf_net_revenue" if "total_nltf_net_revenue" in by_series.index else "net_fed_revenue"
+        record = by_series.loc[template_key].to_dict()
+        record.update(
+            {
+                "section": "Totals",
+                "line_label": "Total RUC+PED",
+                "series_id": "total_fed_ruc_net_revenue",
+                "value": float(net_fed) + float(total_ruc),
+                "unit": "$m nominal ex GST",
+                "row_role": "calculated_rollup",
+                "source_file": "revenue_line_reconciliation.csv",
+                "source_cell": "net_fed_revenue + total_ruc_net_revenue",
+                "formula": "net_fed_revenue + total_ruc_net_revenue",
+                "source_status": "derived_dashboard_subtotal",
+                "source_basis": "runtime_formula_overlay",
+                "residual_vs_official": pd.NA,
+                "availability_status": "available",
+            }
+        )
+        rows.append(record)
+    if not rows:
+        return line_reconciliation
+    return pd.concat([line_reconciliation, pd.DataFrame(rows)], ignore_index=True, sort=False)
 
 
 def revenue_outlook_fan_tables(
@@ -2507,6 +2775,7 @@ def _write_pack_files(
     for required_stem in [
         "runtime_trace_audit",
         "revenue_line_reconciliation",
+        "revenue_stack_components",
         "revenue_formula_residuals",
         "series_alias_audit",
         "fan_availability",

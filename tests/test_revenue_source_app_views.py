@@ -27,6 +27,7 @@ from app import (
     _source_total_path_figure,
     _source_uncertainty_figure,
     revenue_outlook_figure,
+    revenue_outlook_composition_figure,
     revenue_outlook_component_figure,
     revenue_outlook_split_figure,
     revenue_outlook_total_path_figure,
@@ -823,6 +824,34 @@ def test_revenue_outlook_primary_figures_use_runtime_pack_selected_series_only()
     split_fig = revenue_outlook_split_figure(bridge, selected_fy="FY2031", selected_fed_path="Current planned path")
     assert component_fig.data
     assert split_fig.data
+
+
+def test_revenue_outlook_composition_figure_stacks_components_and_overlays_aggregates() -> None:
+    stack = pd.read_csv(ROOT / "data/current_revenue_outlook/revenue_stack_components.csv")
+    source = "Current finalist Base case"
+    view = stack[
+        stack["source_path"].astype(str).eq(source)
+        & pd.to_numeric(stack["FY"], errors="coerce").between(2026, 2031)
+        & stack["section"].astype(str).isin(["RUC", "FED", "MVR", "TUC", "Totals"])
+    ].copy()
+
+    fig = revenue_outlook_composition_figure(
+        view,
+        source_path=source,
+        overlays=["Total NLTF revenue", "Total RUC+PED"],
+    )
+
+    assert fig.data
+    bar_names = {str(trace.name) for trace in fig.data if trace.type == "bar"}
+    scatter_names = {str(trace.name) for trace in fig.data if trace.type == "scatter"}
+    assert "Gross FED" not in bar_names
+    assert "Total NLTF revenue" not in bar_names
+    assert "Total NLTF revenue overlay" in scatter_names
+    assert "Total RUC+PED overlay" in scatter_names
+    assert fig.layout.barmode == "relative"
+    assert fig.layout.yaxis.title.text == "$m nominal ex GST"
+    assert any(min(float(value) for value in trace.y) < 0 for trace in fig.data if trace.type == "bar")
+    assert not any("Schiff" in str(trace.name) or "selected_dashboard" in str(trace.name) for trace in fig.data)
 
 
 def test_revenue_outlook_manifest_table_exposes_source_pack_and_bridge_provenance() -> None:

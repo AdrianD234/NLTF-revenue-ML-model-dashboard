@@ -138,6 +138,7 @@ def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
                 "Revenue Outlook controls",
                 "Total path chart",
                 "Uncertainty fan",
+                "Revenue composition over time",
                 "Component drill-down",
                 "Selected-FY revenue split",
                 "Activity and volume outlook",
@@ -245,11 +246,16 @@ def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
                 "Revenue Outlook controls",
                 "Total path chart",
                 "Uncertainty fan",
+            ]:
+                assert_text_above_fold(page, title)
+            for title in [
+                "Revenue composition over time",
                 "Component drill-down",
                 "Selected-FY revenue split",
             ]:
-                assert_text_above_fold(page, title)
+                expect(page.get_by_text(title, exact=False).first).to_be_visible(timeout=60000)
             assert_revenue_outlook_primary_runtime_contract(page)
+            assert_revenue_outlook_composition_below_primary(page)
         if tab_label == "Governance & Reproducibility":
             page.evaluate("window.scrollTo(0, 0)")
             for title in [
@@ -842,6 +848,13 @@ def assert_text_above_fold(page: Page, text: str, max_y: int = 930) -> None:
     assert box["y"] < max_y, f"{text!r} should be visible above the first viewport fold; y={box['y']}"
 
 
+def document_y_for_text(page: Page, text: str) -> float:
+    locator = page.get_by_text(text, exact=False).first
+    locator.wait_for(state="visible", timeout=60000)
+    y_value = locator.evaluate("element => element.getBoundingClientRect().top + window.scrollY")
+    return float(y_value)
+
+
 def assert_revenue_outlook_primary_runtime_contract(page: Page, selected_series: str = "Total NLTF revenue") -> None:
     page.wait_for_function(
         """() => [...document.querySelectorAll('.js-plotly-plot')].some((plot) =>
@@ -909,6 +922,25 @@ def assert_revenue_outlook_primary_runtime_contract(page: Page, selected_series:
     assert selected_series in page_text
     assert "Fan source" in page_text
     assert "Scenario spread" in page_text or "Current finalist backtest error" in page_text
+
+
+def assert_revenue_outlook_composition_below_primary(page: Page) -> None:
+    for text in [
+        "Revenue composition over time",
+        "FY range / horizon",
+        "Section filter",
+        "Aggregate overlays",
+        "Positive revenue components stack above zero",
+    ]:
+        expect(page.locator("body")).to_contain_text(text, timeout=60000)
+
+    total_y = document_y_for_text(page, "Total path chart")
+    fan_y = document_y_for_text(page, "Uncertainty fan")
+    composition_y = document_y_for_text(page, "Revenue composition over time")
+    assert composition_y > max(total_y, fan_y), (
+        "Revenue composition card should render below the primary Total path chart/fan row; "
+        f"total_y={total_y}, fan_y={fan_y}, composition_y={composition_y}"
+    )
 
 
 def select_revenue_outlook_series(page: Page, value: str) -> None:

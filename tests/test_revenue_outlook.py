@@ -193,6 +193,8 @@ def test_committed_current_revenue_outlook_pack_is_repo_local_and_hash_backed() 
     assert manifest["revenue_source_pack"]["source_workbook_selections"]["sheet"] == "MBU26"
     assert "MBU26 source spine" in manifest["revenue_source_pack"]["default_selection_policy"]
     assert manifest["revenue_line_reconciliation"]["repo_relative_path"] == "data/current_revenue_outlook/revenue_line_reconciliation.csv"
+    assert manifest["revenue_stack_components"]["repo_relative_path"] == "data/current_revenue_outlook/revenue_stack_components.csv"
+    assert "aggregates are overlays only" in manifest["revenue_stack_components"]["scope"]
     assert manifest["revenue_formula_residuals"]["repo_relative_path"] == "data/current_revenue_outlook/revenue_formula_residuals.csv"
     assert manifest["series_alias_audit"]["repo_relative_path"] == "data/current_revenue_outlook/series_alias_audit.csv"
     assert manifest["fan_availability"]["repo_relative_path"] == "data/current_revenue_outlook/fan_availability.csv"
@@ -214,6 +216,8 @@ def test_committed_current_revenue_outlook_pack_is_repo_local_and_hash_backed() 
         "revenue_formula_residuals.parquet",
         "revenue_line_reconciliation.csv",
         "revenue_line_reconciliation.parquet",
+        "revenue_stack_components.csv",
+        "revenue_stack_components.parquet",
         "row_reconciliation.csv",
         "row_reconciliation.parquet",
         "runtime_trace_audit.csv",
@@ -244,6 +248,7 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     future = pd.read_parquet(pack_dir / "future_revenue_forecasts.parquet")
     audit = pd.read_parquet(pack_dir / "runtime_trace_audit.parquet")
     line_reconciliation = pd.read_parquet(pack_dir / "revenue_line_reconciliation.parquet")
+    stack_components = pd.read_parquet(pack_dir / "revenue_stack_components.parquet")
     residuals = pd.read_parquet(pack_dir / "revenue_formula_residuals.parquet")
     alias_audit = pd.read_parquet(pack_dir / "series_alias_audit.parquet")
     fan_availability = pd.read_parquet(pack_dir / "fan_availability.parquet")
@@ -334,6 +339,7 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
             chart[["source_file", "source", "model_basis"]].astype(str).stack(),
             bridge[["source", "source_basis", "model_id"]].astype(str).stack(),
             future[["source", "model_id"]].astype(str).stack(),
+            stack_components[["source_file", "source_basis", "model_id"]].astype(str).stack(),
         ],
         ignore_index=True,
     ).str.cat(sep="\n")
@@ -441,6 +447,91 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
         path_rows = line_reconciliation[line_reconciliation["source_path"].astype(str).eq(source_path)]
         assert required_lines.issubset(set(path_rows["line_label"].astype(str)))
     assert "light_petrol_vkt_per_capita" not in set(line_reconciliation["series_id"].dropna().astype(str))
+
+    required_stack_cols = {
+        "source_path",
+        "FY",
+        "section",
+        "line_label",
+        "series_id",
+        "value",
+        "signed_contribution",
+        "stack_value",
+        "unit",
+        "row_role",
+        "stack_role",
+        "source_file",
+        "source_cell",
+        "formula",
+        "replacement_flag",
+        "model_id",
+        "quarter_composition",
+        "residual_vs_official",
+        "stack_balance_residual",
+        "formula_residual_status",
+    }
+    assert required_stack_cols.issubset(stack_components.columns)
+    assert set(stack_components["source_path"].dropna().unique()) == {
+        "MBU26 official",
+        "Current finalist Base case",
+        "Current finalist High population/comparison",
+    }
+    for source_path in ["MBU26 official", "Current finalist Base case", "Current finalist High population/comparison"]:
+        path_rows = stack_components[stack_components["source_path"].astype(str).eq(source_path)]
+        assert required_lines.issubset(set(path_rows["line_label"].astype(str)))
+        assert "Total RUC+PED" in set(path_rows["line_label"].astype(str))
+    assert "light_petrol_vkt_per_capita" not in set(stack_components["series_id"].dropna().astype(str))
+    assert set(
+        stack_components.loc[
+            stack_components["stack_role"].astype(str).eq("aggregate_overlay"),
+            "series_id",
+        ].astype(str)
+    ).issuperset(
+        {
+            "gross_ruc_revenue",
+            "gross_fed_revenue",
+            "net_fed_revenue",
+            "total_ruc_net_revenue",
+            "total_fed_ruc_net_revenue",
+            "total_nltf_net_revenue",
+        }
+    )
+    assert stack_components.loc[
+        stack_components["stack_role"].astype(str).eq("aggregate_overlay"),
+        "stack_value",
+    ].isna().all()
+    negative_rows = stack_components[stack_components["stack_role"].astype(str).eq("component_negative")]
+    assert not negative_rows.empty
+    assert pd.to_numeric(negative_rows["signed_contribution"], errors="coerce").le(0).all()
+    assert pd.to_numeric(negative_rows["stack_value"], errors="coerce").le(0).all()
+    offset_rows = stack_components[stack_components["stack_role"].astype(str).eq("offset_not_stacked")]
+    assert set(offset_rows["series_id"].dropna().astype(str)) == {"coo_revenue", "ruc_refunds"}
+    assert pd.to_numeric(offset_rows["signed_contribution"], errors="coerce").le(0).all()
+    assert pd.to_numeric(offset_rows["stack_value"], errors="coerce").eq(0).all()
+    stack_residuals = stack_components[["source_path", "FY", "stack_balance_residual"]].drop_duplicates()
+    assert pd.to_numeric(stack_residuals["stack_balance_residual"], errors="coerce").abs().max() <= 1.0
+    component_sums = (
+        stack_components[stack_components["stack_role"].isin(["component_positive", "component_negative", "offset_not_stacked"])]
+        .groupby(["source_path", "FY"])["stack_value"]
+        .sum()
+    )
+    totals = stack_components[stack_components["series_id"].eq("total_nltf_net_revenue")].set_index(["source_path", "FY"])["value"]
+    diff = pd.to_numeric(component_sums, errors="coerce") - pd.to_numeric(totals, errors="coerce")
+    assert diff.abs().max() <= 1.0
+    current_stack = stack_components[stack_components["source_path"].astype(str).str.startswith("Current finalist")]
+    current_replacements = set(
+        current_stack.loc[
+            current_stack["replacement_flag"].astype(str).str.lower().isin(["true", "1"]),
+            "series_id",
+        ].astype(str)
+    )
+    assert current_replacements == {"gross_ped_revenue", "light_ruc_net_revenue", "heavy_ruc_net_revenue"}
+    stack_text = stack_components.astype(str).to_csv(index=False)
+    assert "C:\\Users" not in stack_text
+    assert "Downloads" not in stack_text
+    assert "OneDrive" not in stack_text
+    assert ".xlsx" not in stack_text
+
     assert {
         "source_label",
         "source_series_id",
@@ -570,7 +661,7 @@ def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
         "fan_band_rows.parquet": "0da58f6bd9f132d9cd5224a29cadb80afc617ee9bd7f9f0971df885865a2a60c",
         "future_revenue_forecasts.csv": "5a8e4024e960a08308654b862acf00c278d79b9a60c899af9b710dbca9f7a0a7",
         "future_revenue_forecasts.parquet": "674ba0173044702cf0e78ab2e79791baca1879709650b2f2a840871e2d497b21",
-        "manifest.json": "af714ce553c738347054f189821f169e9aca3b60699084d21f0c042dcfb4d431",
+        "manifest.json": "aec17a91ac51a4929a8c0581a5462e2632f80ce8d0ad64347f4f70efaef190cb",
         "manifest.md": "2842343704e8ba363af30cacefec80b9b5471fbaf25932f37afdd24c046252fc",
         "path_trace_status.csv": "9aee7a4e7003ec6541476ca3e4afef6d8586b6c358e41db1c8e06623e5ffcaa3",
         "path_trace_status.parquet": "e66d860fb7532ee4b92285c1ba023c9f8d9469cfdaaaef819415f7cd87c73757",
@@ -582,6 +673,8 @@ def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
         "revenue_formula_residuals.parquet": "bae3a888bda46a32876e9bfa20d6c197e008cc56b9025eb713a728ae63eade49",
         "revenue_line_reconciliation.csv": "a491632452529408c40987e651abfa8ec8b3d429590b1e2188fc95bf38f0a9aa",
         "revenue_line_reconciliation.parquet": "55fa0fbbe4a06da65f1295e9c9614a697b5dd569108dbbdc8bfa6842b170681b",
+        "revenue_stack_components.csv": "77e8b064eabd10205835cf33a96c11ca7ab36da4e6c5a1ed276195ab73350abc",
+        "revenue_stack_components.parquet": "35329e462976e9d8b53b04ebdbb842e3e91d8d723a0937973225e9b9d5535acc",
         "row_reconciliation.csv": "d484f5d75cce88e30ce7bcf5dd70058505cc02e5dff93f457a579f119c2fc7ce",
         "row_reconciliation.parquet": "bf2b638920e4b9b00ca4ac00d4263083258ce0d94625943c4e7b3cdf90493dd7",
         "runtime_trace_audit.csv": "a72f0dc6e03506ca85596accdc105587c6629c9d7bef65ee1a441a344c4c5a9b",

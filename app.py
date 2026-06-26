@@ -1997,6 +1997,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     bridge = pack.revenue_bridge_components.copy() if pack is not None and isinstance(pack.revenue_bridge_components, pd.DataFrame) else pd.DataFrame()
     future_revenue = pack.future_revenue_forecasts.copy() if pack is not None and isinstance(pack.future_revenue_forecasts, pd.DataFrame) else pd.DataFrame()
     line_reconciliation = pack.revenue_line_reconciliation.copy() if pack is not None and isinstance(getattr(pack, "revenue_line_reconciliation", None), pd.DataFrame) else pd.DataFrame()
+    stack_components = pack.revenue_stack_components.copy() if pack is not None and isinstance(getattr(pack, "revenue_stack_components", None), pd.DataFrame) else pd.DataFrame()
     formula_residuals = pack.revenue_formula_residuals.copy() if pack is not None and isinstance(getattr(pack, "revenue_formula_residuals", None), pd.DataFrame) else pd.DataFrame()
     alias_audit = pack.series_alias_audit.copy() if pack is not None and isinstance(getattr(pack, "series_alias_audit", None), pd.DataFrame) else pd.DataFrame()
     fan_availability = pack.fan_availability.copy() if pack is not None and isinstance(getattr(pack, "fan_availability", None), pd.DataFrame) else pd.DataFrame()
@@ -2094,6 +2095,83 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             selected_series=selected_stream,
             selected_fed_path=selected_fed_path,
         )
+
+    with st.container(border=True):
+        st.markdown("<div class='page5-panel-title'>Revenue composition over time</div>", unsafe_allow_html=True)
+        comp_cols = st.columns([0.30, 0.22, 0.25, 0.23])
+        stack_source_options = _revenue_line_source_options(stack_components)
+        stack_section_options = _revenue_line_section_options(stack_components)
+        stack_fy_min, stack_fy_max = _revenue_line_fy_bounds(stack_components)
+        with comp_cols[0]:
+            selected_stack_source = st.selectbox(
+                "Source path",
+                stack_source_options,
+                index=0,
+                key="revenue_stack_source_path",
+            )
+        with comp_cols[1]:
+            selected_stack_fy_range = st.slider(
+                "FY range / horizon",
+                min_value=stack_fy_min,
+                max_value=stack_fy_max,
+                value=(max(stack_fy_min, 2025), min(stack_fy_max, 2035)) if stack_fy_min <= 2025 <= stack_fy_max else (stack_fy_min, min(stack_fy_max, stack_fy_min + 10)),
+                key="revenue_stack_fy_range",
+            )
+        default_stack_sections = [section for section in ["RUC", "FED", "MVR", "TUC"] if section in stack_section_options]
+        with comp_cols[2]:
+            selected_stack_sections = st.multiselect(
+                "Section filter",
+                stack_section_options,
+                default=default_stack_sections or stack_section_options,
+                key="revenue_stack_sections",
+            )
+        stack_overlay_options = _revenue_stack_overlay_options(stack_components)
+        with comp_cols[3]:
+            selected_stack_overlays = st.multiselect(
+                "Aggregate overlays",
+                stack_overlay_options,
+                default=[value for value in ["Total NLTF revenue"] if value in stack_overlay_options],
+                key="revenue_stack_overlays",
+            )
+
+        filtered_stack = _filter_revenue_stack_components(
+            stack_components,
+            source_path=selected_stack_source,
+            sections=selected_stack_sections,
+            fy_range=selected_stack_fy_range,
+        )
+        chart_stack = filtered_stack
+        if selected_stack_overlays:
+            overlay_stack = _filter_revenue_stack_components(
+                stack_components,
+                source_path=selected_stack_source,
+                sections=stack_section_options,
+                fy_range=selected_stack_fy_range,
+            )
+            overlay_stack = overlay_stack[
+                overlay_stack.get("stack_role", pd.Series("", index=overlay_stack.index)).astype(str).eq("aggregate_overlay")
+                & overlay_stack.get("line_label", pd.Series("", index=overlay_stack.index)).astype(str).isin(selected_stack_overlays)
+            ].copy()
+            if not overlay_stack.empty:
+                chart_stack = pd.concat([filtered_stack, overlay_stack], ignore_index=True, sort=False)
+        chart_card(
+            "Revenue composition over time",
+            "Line-item contributions from revenue_stack_components; aggregate rows are overlays only.",
+            revenue_outlook_composition_figure(
+                chart_stack,
+                source_path=selected_stack_source,
+                overlays=selected_stack_overlays,
+            ),
+            caption="Positive revenue components stack above zero; deductions/admin/refunds stack below zero. Aggregates are not stacked.",
+            notes_as_tooltip=False,
+        )
+        stack_gap_banner = _revenue_stack_gap_banner(filtered_stack)
+        if stack_gap_banner:
+            warning_panel(stack_gap_banner)
+        table_cols = st.columns([0.82, 0.18])
+        with table_cols[1]:
+            dataframe_download(filtered_stack, "Download CSV", "revenue_stack_components.csv")
+        display_table(_revenue_stack_components_display_table(filtered_stack), height=360, max_rows=720)
 
     selected_fy_number = _selected_fy_to_number(selected_fy)
     if selected_metric_type == "activity":
@@ -4448,6 +4526,141 @@ def revenue_outlook_split_figure(bridge: pd.DataFrame, *, selected_fy: str, sele
     return fig
 
 
+def revenue_outlook_composition_figure(
+    stack_components: pd.DataFrame,
+    *,
+    source_path: str,
+    overlays: list[str],
+) -> go.Figure:
+    if stack_components is None or stack_components.empty:
+        return empty_figure("Revenue composition rows are unavailable in revenue_stack_components.")
+    data = stack_components.copy()
+    if "source_path" in data.columns and source_path:
+        data = data[data["source_path"].astype(str).eq(str(source_path))].copy()
+    if data.empty:
+        return empty_figure("No Revenue composition rows match the selected source path.")
+
+    component_roles = {"component_positive", "component_negative"}
+    plot = data[data.get("stack_role", pd.Series("", index=data.index)).astype(str).isin(component_roles)].copy()
+    plot["stack_value_numeric"] = pd.to_numeric(plot.get("stack_value"), errors="coerce")
+    plot["FY_numeric"] = pd.to_numeric(plot.get("FY"), errors="coerce")
+    plot = plot.dropna(subset=["stack_value_numeric", "FY_numeric"])
+    if plot.empty:
+        return empty_figure("No stackable contribution rows match the selected controls.")
+
+    fig = go.Figure()
+    colors = [
+        "#006FAD",
+        "#00843D",
+        "#6B4E71",
+        "#E56B2B",
+        "#3B7080",
+        "#7A7D00",
+        "#6A5ACD",
+        "#C44900",
+        "#287D8E",
+        "#5B6770",
+        "#B7791F",
+        "#C2410C",
+        "#9A3412",
+        "#92400E",
+    ]
+    labels = (
+        plot[["line_label", "section_order", "line_order"]]
+        .drop_duplicates()
+        .sort_values(["section_order", "line_order", "line_label"], kind="stable")
+    )
+    for index, label_row in labels.reset_index(drop=True).iterrows():
+        label = str(label_row["line_label"])
+        trace_rows = plot[plot["line_label"].astype(str).eq(label)].sort_values("FY_numeric", kind="stable")
+        custom_cols = [
+            "unit",
+            "section",
+            "row_role",
+            "source_file",
+            "source_cell",
+            "formula",
+            "model_id",
+            "quarter_composition",
+            "replacement_flag",
+            "residual_vs_official",
+            "stack_note",
+        ]
+        for column in custom_cols:
+            if column not in trace_rows.columns:
+                trace_rows[column] = ""
+        values = trace_rows["stack_value_numeric"].tolist()
+        fig.add_trace(
+            go.Bar(
+                name=label,
+                x=trace_rows["FY_numeric"].astype(int),
+                y=values,
+                marker_color=colors[index % len(colors)],
+                customdata=trace_rows[custom_cols].astype(str).to_numpy(),
+                hovertemplate=(
+                    "%{fullData.name}<br>FY%{x}<br>%{y:,.1f} %{customdata[0]}"
+                    "<br>Section: %{customdata[1]}"
+                    "<br>Role: %{customdata[2]}"
+                    "<br>Source: %{customdata[3]} %{customdata[4]}"
+                    "<br>Formula: %{customdata[5]}"
+                    "<br>Model: %{customdata[6]}"
+                    "<br>Quarter composition: %{customdata[7]}"
+                    "<br>Replacement: %{customdata[8]}"
+                    "<br>Residual vs official: %{customdata[9]}"
+                    "<br>%{customdata[10]}<extra></extra>"
+                ),
+            )
+        )
+
+    overlay_labels = [str(value) for value in overlays or [] if str(value).strip()]
+    overlay_rows = data[
+        data.get("stack_role", pd.Series("", index=data.index)).astype(str).eq("aggregate_overlay")
+        & data.get("line_label", pd.Series("", index=data.index)).astype(str).isin(overlay_labels)
+    ].copy()
+    if not overlay_rows.empty:
+        overlay_rows["FY_numeric"] = pd.to_numeric(overlay_rows.get("FY"), errors="coerce")
+        overlay_rows["value_numeric"] = pd.to_numeric(overlay_rows.get("value"), errors="coerce")
+        overlay_rows = overlay_rows.dropna(subset=["FY_numeric", "value_numeric"])
+        for label, group in overlay_rows.groupby("line_label", sort=False):
+            group = group.sort_values("FY_numeric", kind="stable")
+            custom_cols = ["unit", "formula", "source_file", "source_cell", "formula_residual_status", "formula_residual"]
+            for column in custom_cols:
+                if column not in group.columns:
+                    group[column] = ""
+            fig.add_trace(
+                go.Scatter(
+                    name=f"{label} overlay",
+                    x=group["FY_numeric"].astype(int),
+                    y=group["value_numeric"],
+                    mode="lines+markers",
+                    line={"width": 2.5, "dash": "dot"},
+                    marker={"size": 7, "symbol": "diamond"},
+                    customdata=group[custom_cols].astype(str).to_numpy(),
+                    hovertemplate=(
+                        "%{fullData.name}<br>FY%{x}<br>%{y:,.1f} %{customdata[0]}"
+                        "<br>Formula: %{customdata[1]}"
+                        "<br>Source: %{customdata[2]} %{customdata[3]}"
+                        "<br>Formula status: %{customdata[4]}"
+                        "<br>Formula residual: %{customdata[5]}<extra></extra>"
+                    ),
+                )
+            )
+
+    axis_title = _revenue_stack_axis_title(plot)
+    fig.update_layout(
+        barmode="relative",
+        height=460,
+        margin={"l": 58, "r": 20, "t": 28, "b": 58},
+        yaxis_title=axis_title,
+        xaxis_title="June year",
+        xaxis={"tickmode": "linear", "dtick": 1},
+        yaxis={"zeroline": True, "zerolinewidth": 1.5, "zerolinecolor": "#52616B"},
+        legend={"orientation": "h", "y": -0.20, "x": 0, "font": {"size": 10}},
+        hovermode="x unified",
+    )
+    return fig
+
+
 def _selected_revenue_outlook_series_rows(rows: pd.DataFrame, selected_series: str) -> pd.DataFrame:
     if rows is None or rows.empty:
         return pd.DataFrame()
@@ -4821,6 +5034,121 @@ def _revenue_line_source_options(line_reconciliation: pd.DataFrame) -> list[str]
     ordered = [value for value in preferred if value in values]
     ordered.extend(sorted(set(values).difference(ordered)))
     return ordered or preferred
+
+
+def _revenue_stack_axis_title(stack_components: pd.DataFrame) -> str:
+    if stack_components is None or stack_components.empty or "unit" not in stack_components.columns:
+        return "$m nominal ex GST"
+    units = [str(value) for value in stack_components["unit"].dropna().unique().tolist() if str(value).strip()]
+    if "$m nominal ex GST" in units:
+        return "$m nominal ex GST"
+    return units[0] if units else "$m nominal ex GST"
+
+
+def _revenue_stack_overlay_options(stack_components: pd.DataFrame) -> list[str]:
+    preferred = [
+        "Gross RUC",
+        "RUC net admin",
+        "RUC net admin/refunds",
+        "Gross FED",
+        "Net FED",
+        "Gross MVR",
+        "MVR net admin & COO",
+        "MVR net admin/refunds/COO",
+        "Total RUC+PED",
+        "Total gross revenues",
+        "Total admin fees",
+        "Total revenues net of admin fees",
+        "Total refunds",
+        "Total NLTF revenue",
+    ]
+    if stack_components is None or stack_components.empty or "stack_role" not in stack_components.columns:
+        return preferred
+    overlay = stack_components[stack_components["stack_role"].astype(str).eq("aggregate_overlay")].copy()
+    if overlay.empty or "line_label" not in overlay.columns:
+        return preferred
+    values = [str(value) for value in overlay["line_label"].dropna().unique().tolist() if str(value).strip()]
+    ordered = [value for value in preferred if value in values]
+    ordered.extend(sorted(set(values).difference(ordered)))
+    return ordered or preferred
+
+
+def _filter_revenue_stack_components(
+    stack_components: pd.DataFrame,
+    *,
+    source_path: str,
+    sections: list[str],
+    fy_range: tuple[int, int] | list[int],
+) -> pd.DataFrame:
+    if stack_components is None or stack_components.empty:
+        return pd.DataFrame()
+    data = stack_components.copy()
+    data["FY_numeric"] = pd.to_numeric(data.get("FY"), errors="coerce").astype("Int64")
+    if source_path and "source_path" in data.columns:
+        data = data[data["source_path"].astype(str).eq(str(source_path))].copy()
+    if sections and "section" in data.columns:
+        data = data[data["section"].astype(str).isin(sections)].copy()
+    try:
+        low, high = int(fy_range[0]), int(fy_range[1])
+    except Exception:
+        low, high = _revenue_line_fy_bounds(data)
+    data = data[data["FY_numeric"].between(low, high, inclusive="both")].copy()
+    sort_cols = [col for col in ["source_path_order", "FY_numeric", "section_order", "line_order", "series_id"] if col in data.columns]
+    if sort_cols:
+        data = data.sort_values(sort_cols, kind="stable")
+    return data.drop(columns=["FY_numeric"], errors="ignore")
+
+
+def _revenue_stack_gap_banner(stack_components: pd.DataFrame) -> str:
+    if stack_components is None or stack_components.empty or "stack_balance_status" not in stack_components.columns:
+        return ""
+    status = stack_components[["source_path", "FY", "stack_balance_status", "stack_balance_residual"]].drop_duplicates()
+    gaps = status[~status["stack_balance_status"].astype(str).eq("balanced")].copy()
+    if gaps.empty:
+        return ""
+    gaps["stack_balance_residual"] = pd.to_numeric(gaps["stack_balance_residual"], errors="coerce")
+    worst = gaps.loc[gaps["stack_balance_residual"].abs().idxmax()] if gaps["stack_balance_residual"].notna().any() else gaps.iloc[0]
+    return (
+        "Composition stack residuals are reported rather than forced. "
+        f"Largest visible residual: {worst.get('source_path', '')} FY{worst.get('FY', '')} "
+        f"{_format_compact_value(worst.get('stack_balance_residual'), '$m nominal ex GST')}."
+    )
+
+
+def _revenue_stack_components_display_table(stack_components: pd.DataFrame) -> pd.DataFrame:
+    if stack_components is None or stack_components.empty:
+        return pd.DataFrame()
+    view = stack_components.copy()
+    rename = {
+        "section": "Section",
+        "line_label": "Line",
+        "value": "Value",
+        "signed_contribution": "Signed contribution",
+        "stack_value": "Stack value",
+        "unit": "Unit",
+        "source_path": "Source path",
+        "period": "FY",
+        "row_role": "Row role",
+        "stack_role": "Stack role",
+        "source_file": "Source file",
+        "source_cell": "Source cell/formula",
+        "formula": "Formula",
+        "replacement_flag": "Replacement",
+        "model_id": "Model ID",
+        "quarter_composition": "Quarter composition",
+        "residual_vs_official": "Residual vs official",
+        "stack_balance_residual": "Stack residual",
+        "formula_residual_status": "Formula status",
+        "formula_residual": "Formula residual",
+        "stack_note": "Stack note",
+        "availability_status": "Status",
+    }
+    cols = [col for col in rename if col in view.columns]
+    view = view[cols].rename(columns=rename)
+    for col in ["Value", "Signed contribution", "Stack value", "Residual vs official", "Stack residual", "Formula residual"]:
+        if col in view.columns:
+            view[col] = pd.to_numeric(view[col], errors="coerce").map(lambda value: _format_compact_value(value, ""))
+    return view
 
 
 def _revenue_line_section_options(line_reconciliation: pd.DataFrame) -> list[str]:

@@ -326,6 +326,12 @@
     "repo_relative_path": "data/current_revenue_outlook/revenue_formula_residuals.csv",
     "scope": "Formula residual checks for RUC, FED, MVR and total rows by source path and FY."
   },
+  "revenue_stack_components": {
+    "repo_relative_path": "data/current_revenue_outlook/revenue_stack_components.csv",
+    "scope": "Composition-over-time stack rows classified from revenue_line_reconciliation; aggregates are overlays only and are never stacked.",
+    "source": "data/current_revenue_outlook/revenue_line_reconciliation.csv",
+    "balance_rule": "component_positive + component_negative + zero-net offsets reconciles to Total NLTF revenue; residuals are reported and never forced."
+  },
   "series_alias_audit": {
     "repo_relative_path": "data/current_revenue_outlook/series_alias_audit.csv",
     "scope": "Canonical Revenue Outlook series aliases from source labels/series IDs to dashboard selector IDs."
@@ -403,6 +409,14 @@
     "revenue_line_reconciliation.parquet": {
       "sha256": "55fa0fbbe4a06da65f1295e9c9614a697b5dd569108dbbdc8bfa6842b170681b",
       "size_bytes": 75896
+    },
+    "revenue_stack_components.csv": {
+      "sha256": "77e8b064eabd10205835cf33a96c11ca7ab36da4e6c5a1ed276195ab73350abc",
+      "size_bytes": 2248923
+    },
+    "revenue_stack_components.parquet": {
+      "sha256": "35329e462976e9d8b53b04ebdbb842e3e91d8d723a0937973225e9b9d5535acc",
+      "size_bytes": 109398
     },
     "row_reconciliation.csv": {
       "sha256": "d484f5d75cce88e30ce7bcf5dd70058505cc02e5dff93f457a579f119c2fc7ce",

@@ -29,6 +29,12 @@ FAN_SERIES = {
     "light_ruc_net_km": "Light RUC net km",
 }
 
+COMPOSITION_SOURCE_PATHS = {
+    "MBU26 official": "mbu26-official",
+    "Current finalist Base case": "current-finalist-base-case",
+    "Current finalist High population/comparison": "current-finalist-high-population-comparison",
+}
+
 FAN_SOURCE_AUTO = "Auto / best available"
 FAN_SOURCE_MBU26_ARCHIVED = "MBU26 archived forecast error"
 FAN_SOURCE_CURRENT_BACKTEST = "Current finalist backtest error"
@@ -132,6 +138,7 @@ def main() -> None:
         )
 
     manifest.extend(_write_fan_screenshots())
+    manifest.extend(_write_composition_screenshots())
 
     reconciliation_path, reconciliation_rows = _write_reconciliation_table_screenshot()
     manifest.append(
@@ -269,6 +276,106 @@ def _write_fan_screenshot(frame: pd.DataFrame, title: str, filename: str) -> Pat
     ax.grid(True, axis="y", color="#E2E8F0", linewidth=0.8)
     ax.spines[["top", "right"]].set_visible(False)
     ax.legend(loc="upper left", frameon=False, fontsize=8)
+    fig.tight_layout()
+    path = SCREENSHOT_DIR / filename
+    fig.savefig(path)
+    plt.close(fig)
+    return path
+
+
+def _write_composition_screenshots() -> list[dict[str, object]]:
+    stack_path = PACK_DIR / "revenue_stack_components.csv"
+    if not stack_path.exists():
+        return []
+    stack = pd.read_csv(stack_path)
+    manifest: list[dict[str, object]] = []
+    for source_path, slug in COMPOSITION_SOURCE_PATHS.items():
+        frame = stack[
+            stack["source_path"].astype(str).eq(source_path)
+            & (
+                (
+                    stack["stack_role"].astype(str).isin(["component_positive", "component_negative"])
+                    & stack["section"].astype(str).isin(["RUC", "FED", "MVR", "TUC"])
+                )
+                | stack["series_id"].astype(str).eq("total_nltf_net_revenue")
+            )
+        ].copy()
+        if frame.empty:
+            continue
+        frame["FY_numeric"] = pd.to_numeric(frame["FY"], errors="coerce")
+        frame["stack_value_numeric"] = pd.to_numeric(frame["stack_value"], errors="coerce")
+        frame = frame[
+            frame["FY_numeric"].between(2025, 2035, inclusive="both")
+            & frame["stack_value_numeric"].notna()
+        ].copy()
+        if frame.empty:
+            continue
+        title = f"Revenue Outlook composition - {source_path}"
+        filename = f"revenue-outlook-composition-{slug}.png"
+        path = _write_composition_screenshot(frame, title, filename)
+        manifest.append(
+            {
+                "series_id": "revenue_stack_components",
+                "title": title,
+                "source_path": source_path,
+                "repo_relative_path": path.relative_to(ROOT).as_posix(),
+                "rows": int(len(frame)),
+            }
+        )
+    return manifest
+
+
+def _write_composition_screenshot(frame: pd.DataFrame, title: str, filename: str) -> Path:
+    years = sorted(int(value) for value in frame["FY_numeric"].dropna().unique())
+    stack_frame = frame[frame["stack_role"].astype(str).isin(["component_positive", "component_negative"])].copy()
+    labels = (
+        stack_frame[["line_label", "section_order", "line_order"]]
+        .drop_duplicates()
+        .sort_values(["section_order", "line_order", "line_label"], kind="stable")
+    )
+    fig, ax = plt.subplots(figsize=(12.5, 6.4), dpi=150)
+    positive_bottom = pd.Series(0.0, index=years)
+    negative_bottom = pd.Series(0.0, index=years)
+    colors = [
+        "#006FAD",
+        "#00843D",
+        "#6B4E71",
+        "#E56B2B",
+        "#3B7080",
+        "#7A7D00",
+        "#6A5ACD",
+        "#C44900",
+        "#287D8E",
+        "#5B6770",
+        "#B7791F",
+        "#C2410C",
+        "#9A3412",
+        "#92400E",
+    ]
+    for index, row in labels.reset_index(drop=True).iterrows():
+        label = str(row["line_label"])
+        values = (
+            stack_frame[stack_frame["line_label"].astype(str).eq(label)]
+            .set_index("FY_numeric")["stack_value_numeric"]
+            .reindex(years)
+            .fillna(0.0)
+        )
+        bottom = positive_bottom.where(values >= 0, negative_bottom)
+        ax.bar(years, values, bottom=bottom, label=label, color=colors[index % len(colors)], width=0.72)
+        positive_bottom = positive_bottom + values.clip(lower=0)
+        negative_bottom = negative_bottom + values.clip(upper=0)
+
+    overlays = frame[frame["series_id"].astype(str).eq("total_nltf_net_revenue")] if "series_id" in frame.columns else pd.DataFrame()
+    if not overlays.empty:
+        overlay = overlays.drop_duplicates("FY_numeric", keep="last").sort_values("FY_numeric")
+        ax.plot(overlay["FY_numeric"], overlay["value"], color="#0F172A", linewidth=2.2, marker="D", label="Total NLTF overlay")
+    ax.axhline(0, color="#52616B", linewidth=1.0)
+    ax.set_title(title, loc="left", fontsize=14, weight="bold")
+    ax.set_xlabel("June year")
+    ax.set_ylabel("$m nominal ex GST")
+    ax.grid(True, axis="y", color="#E2E8F0", linewidth=0.8)
+    ax.spines[["top", "right"]].set_visible(False)
+    ax.legend(loc="upper left", bbox_to_anchor=(1.01, 1), frameon=False, fontsize=7)
     fig.tight_layout()
     path = SCREENSHOT_DIR / filename
     fig.savefig(path)
