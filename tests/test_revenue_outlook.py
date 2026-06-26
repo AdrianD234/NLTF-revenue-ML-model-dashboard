@@ -18,6 +18,9 @@ from model_dashboard.forecast_runner import (
 from model_dashboard.revenue_outlook import (
     CANONICAL_JOIN_KEY_COLUMNS,
     CURRENT_REVENUE_OUTLOOK_DIR,
+    FAN_SOURCE_CURRENT_BACKTEST,
+    FAN_SOURCE_MBU26_ARCHIVED,
+    FAN_SOURCE_SCENARIO_SPREAD,
     FUTURE_RATE_COLUMNS,
     REVENUE_OUTLOOK_SCHEMA_VERSION,
     SOURCE_COMPARISON_OUTPUT_DIR_POLICY,
@@ -192,7 +195,13 @@ def test_committed_current_revenue_outlook_pack_is_repo_local_and_hash_backed() 
     assert manifest["revenue_line_reconciliation"]["repo_relative_path"] == "data/current_revenue_outlook/revenue_line_reconciliation.csv"
     assert manifest["revenue_formula_residuals"]["repo_relative_path"] == "data/current_revenue_outlook/revenue_formula_residuals.csv"
     assert manifest["series_alias_audit"]["repo_relative_path"] == "data/current_revenue_outlook/series_alias_audit.csv"
+    assert manifest["fan_availability"]["repo_relative_path"] == "data/current_revenue_outlook/fan_availability.csv"
+    assert manifest["fan_band_rows"]["repo_relative_path"] == "data/current_revenue_outlook/fan_band_rows.csv"
     assert sorted(manifest["output_hashes"]) == [
+        "fan_availability.csv",
+        "fan_availability.parquet",
+        "fan_band_rows.csv",
+        "fan_band_rows.parquet",
         "future_revenue_forecasts.csv",
         "future_revenue_forecasts.parquet",
         "path_trace_status.csv",
@@ -237,6 +246,8 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     line_reconciliation = pd.read_parquet(pack_dir / "revenue_line_reconciliation.parquet")
     residuals = pd.read_parquet(pack_dir / "revenue_formula_residuals.parquet")
     alias_audit = pd.read_parquet(pack_dir / "series_alias_audit.parquet")
+    fan_availability = pd.read_parquet(pack_dir / "fan_availability.parquet")
+    fan_bands = pd.read_parquet(pack_dir / "fan_band_rows.parquet")
 
     assert manifest["runtime_pack_type"] == "mbu26_actual_current_finalist_official_comparator"
     assert manifest["bridge_status_by_stream"] == {
@@ -446,6 +457,80 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     assert ped_alias["dashboard_label"] == "PED VKT per capita"
     assert ped_alias["status"] == "canonical_mapping"
 
+    required_fan_availability_cols = {
+        "series_id",
+        "series_label",
+        "fan_source",
+        "available",
+        "reason",
+        "source_file",
+        "model_id",
+        "horizon_scope",
+        "interpretation",
+    }
+    required_fan_band_cols = {
+        "series_id",
+        "fan_source",
+        "scenario_name",
+        "FY",
+        "period",
+        "central",
+        "lower50",
+        "upper50",
+        "lower80",
+        "upper80",
+        "unit",
+        "method",
+        "source_file",
+        "model_id",
+    }
+    assert required_fan_availability_cols.issubset(fan_availability.columns)
+    assert required_fan_band_cols.issubset(fan_bands.columns)
+    assert set(fan_availability["series_id"].dropna().astype(str)) == dashboard_series
+    for series_id in ["ped_vkt_per_capita", "light_ruc_net_km", "heavy_ruc_net_km"]:
+        rows = fan_availability[fan_availability["series_id"].astype(str).eq(series_id)]
+        current_row = rows[rows["fan_source"].astype(str).eq(FAN_SOURCE_CURRENT_BACKTEST)].iloc[0]
+        assert str(current_row["available"]).lower() in {"true", "1"}
+        assert "annual_predictions.parquet" in current_row["source_file"]
+        band_rows = fan_bands[
+            fan_bands["series_id"].astype(str).eq(series_id)
+            & fan_bands["fan_source"].astype(str).eq(FAN_SOURCE_CURRENT_BACKTEST)
+        ]
+        assert not band_rows.empty
+        assert band_rows["method"].astype(str).eq("empirical_current_finalist_annual_backtest_error").all()
+    for series_id in ["gross_ped_revenue", "light_ruc_net_revenue", "heavy_ruc_net_revenue"]:
+        current_row = fan_availability[
+            fan_availability["series_id"].astype(str).eq(series_id)
+            & fan_availability["fan_source"].astype(str).eq(FAN_SOURCE_CURRENT_BACKTEST)
+        ].iloc[0]
+        assert str(current_row["available"]).lower() in {"true", "1"}
+        assert "deterministic" in current_row["interpretation"].lower()
+        assert "excludes" in current_row["interpretation"].lower()
+    total_nltf_current = fan_availability[
+        fan_availability["series_id"].astype(str).eq("total_nltf_net_revenue")
+        & fan_availability["fan_source"].astype(str).eq(FAN_SOURCE_CURRENT_BACKTEST)
+    ].iloc[0]
+    assert str(total_nltf_current["available"]).lower() in {"false", "0"}
+    assert "not been propagated" in total_nltf_current["reason"]
+    assert fan_bands[
+        fan_bands["series_id"].astype(str).eq("total_nltf_net_revenue")
+        & fan_bands["fan_source"].astype(str).eq(FAN_SOURCE_CURRENT_BACKTEST)
+    ].empty
+    assert not fan_bands[fan_bands["fan_source"].astype(str).eq(FAN_SOURCE_SCENARIO_SPREAD)].empty
+    assert fan_bands.loc[fan_bands["fan_source"].astype(str).eq(FAN_SOURCE_SCENARIO_SPREAD), "method"].astype(str).eq(
+        "scenario_spread_not_probabilistic"
+    ).all()
+    assert not fan_bands.loc[fan_bands["fan_source"].astype(str).eq(FAN_SOURCE_SCENARIO_SPREAD), "method"].astype(str).str.contains(
+        "probability|confidence", case=False
+    ).any()
+    assert not fan_bands[fan_bands["fan_source"].astype(str).eq(FAN_SOURCE_MBU26_ARCHIVED)].empty
+    ped_mbu26 = fan_availability[
+        fan_availability["series_id"].astype(str).eq("ped_vkt_per_capita")
+        & fan_availability["fan_source"].astype(str).eq(FAN_SOURCE_MBU26_ARCHIVED)
+    ].iloc[0]
+    assert str(ped_mbu26["available"]).lower() in {"false", "0"}
+    assert "not PED VKT per capita" in ped_mbu26["reason"]
+
     base_lines = line_reconciliation[
         line_reconciliation["source_path"].astype(str).eq("Current finalist Base case")
         & pd.to_numeric(line_reconciliation["FY"], errors="coerce").eq(2026)
@@ -479,9 +564,13 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
 def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
     pack_dir = ROOT / CURRENT_REVENUE_OUTLOOK_DIR
     expected_hashes = {
+        "fan_availability.csv": "3e248fadf746e62affad42d0ca87a3dd232aaed5ee031e6072e7b2f5bd586248",
+        "fan_availability.parquet": "05ca6cd3485e6725e571bb8f0b9a04dbc4396a2c52b15b32320b1b43266afc79",
+        "fan_band_rows.csv": "891f79fae6e5e1ec7821e4a7b88d6746da5f24fe48ba3eab260ffdac9429799b",
+        "fan_band_rows.parquet": "0da58f6bd9f132d9cd5224a29cadb80afc617ee9bd7f9f0971df885865a2a60c",
         "future_revenue_forecasts.csv": "5a8e4024e960a08308654b862acf00c278d79b9a60c899af9b710dbca9f7a0a7",
         "future_revenue_forecasts.parquet": "674ba0173044702cf0e78ab2e79791baca1879709650b2f2a840871e2d497b21",
-        "manifest.json": "5f48c0c5260eab41dc4345d4c1674bb7ffc772ccf693139449b76d2ab4e6a346",
+        "manifest.json": "af714ce553c738347054f189821f169e9aca3b60699084d21f0c042dcfb4d431",
         "manifest.md": "2842343704e8ba363af30cacefec80b9b5471fbaf25932f37afdd24c046252fc",
         "path_trace_status.csv": "9aee7a4e7003ec6541476ca3e4afef6d8586b6c358e41db1c8e06623e5ffcaa3",
         "path_trace_status.parquet": "e66d860fb7532ee4b92285c1ba023c9f8d9469cfdaaaef819415f7cd87c73757",

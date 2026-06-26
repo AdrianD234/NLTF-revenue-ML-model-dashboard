@@ -907,7 +907,8 @@ def assert_revenue_outlook_primary_runtime_contract(page: Page, selected_series:
         assert by_name["MBU26 official"]["dash"] in {"dash", "dashdot"}
     page_text = page.locator("body").inner_text(timeout=60000)
     assert selected_series in page_text
-    assert "Runtime fan bands are not materialized in data/current_revenue_outlook" in page_text
+    assert "Fan source" in page_text
+    assert "Scenario spread" in page_text or "Current finalist backtest error" in page_text
 
 
 def select_revenue_outlook_series(page: Page, value: str) -> None:

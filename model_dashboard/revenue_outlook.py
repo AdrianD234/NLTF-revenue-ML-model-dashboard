@@ -69,6 +69,8 @@ RUNTIME_REVENUE_OUTLOOK_FILES = (
     "revenue_line_reconciliation.parquet",
     "revenue_formula_residuals.parquet",
     "series_alias_audit.parquet",
+    "fan_availability.parquet",
+    "fan_band_rows.parquet",
     "trace_source_contract.parquet",
     "series_trace_contract.parquet",
     "path_trace_status.parquet",
@@ -81,6 +83,60 @@ STREAM_LABELS = {
 }
 REVENUE_OUTLOOK_SCHEMA_VERSION = "revenue-outlook-pack-v1"
 REVENUE_OUTLOOK_TITLE = "Revenue Outlook"
+FAN_SOURCE_AUTO = "Auto / best available"
+FAN_SOURCE_MBU26_ARCHIVED = "MBU26 archived forecast error"
+FAN_SOURCE_CURRENT_BACKTEST = "Current finalist backtest error"
+FAN_SOURCE_SCENARIO_SPREAD = "Scenario spread"
+FAN_SOURCE_NONE = "None / governed gap"
+FAN_SOURCE_OPTIONS = (
+    FAN_SOURCE_AUTO,
+    FAN_SOURCE_MBU26_ARCHIVED,
+    FAN_SOURCE_CURRENT_BACKTEST,
+    FAN_SOURCE_SCENARIO_SPREAD,
+    FAN_SOURCE_NONE,
+)
+FAN_SOURCE_PRIORITY = (
+    FAN_SOURCE_CURRENT_BACKTEST,
+    FAN_SOURCE_MBU26_ARCHIVED,
+    FAN_SOURCE_SCENARIO_SPREAD,
+)
+
+ARCHIVED_ERROR_BAND_LABELS = {
+    "gross_ped_revenue": "PED revenue",
+    "light_ruc_net_km": "Light RUC net km",
+    "light_ruc_net_revenue": "Light RUC revenue",
+    "heavy_ruc_net_km": "Heavy RUC net km",
+    "heavy_ruc_net_revenue": "Heavy RUC revenue",
+    "total_fed_ruc_net_revenue": "Total RUC+PED revenue",
+}
+CURRENT_BACKTEST_STREAM_MAP = {
+    "ped_vkt_per_capita": ("PED", "modelled_activity", "PED finalist backtest residuals mapped directly to PED VKT per capita."),
+    "light_ruc_net_km": ("LIGHT_RUC", "modelled_activity", "Light RUC finalist backtest residuals mapped directly to Light RUC net km."),
+    "heavy_ruc_net_km": ("HEAVY_RUC", "modelled_activity", "Heavy RUC finalist backtest residuals mapped directly to Heavy RUC net km."),
+    "gross_ped_revenue": (
+        "PED",
+        "partial_model_stream_only",
+        "PED model uncertainty applied through the deterministic MBU26 population, intensity and rate bridge; excludes uncertainty in those bridge inputs.",
+    ),
+    "light_ruc_net_revenue": (
+        "LIGHT_RUC",
+        "partial_model_stream_only",
+        "Light RUC model uncertainty applied through the deterministic MBU26 effective-rate bridge; excludes rate uncertainty.",
+    ),
+    "heavy_ruc_net_revenue": (
+        "HEAVY_RUC",
+        "partial_model_stream_only",
+        "Heavy RUC model uncertainty applied through the deterministic MBU26 effective-rate bridge; excludes rate uncertainty.",
+    ),
+}
+AGGREGATE_PROPAGATION_GAP_SERIES = {
+    "gross_fed_revenue",
+    "net_fed_revenue",
+    "net_mvr_revenue",
+    "total_ruc_net_revenue",
+    "total_fed_ruc_net_revenue",
+    "total_nltf_net_revenue",
+}
 
 ACTIVITY_UNITS = {
     "PED": "VKT per capita",
@@ -162,6 +218,8 @@ class RevenueOutlookPack:
     revenue_line_reconciliation: pd.DataFrame = field(default_factory=pd.DataFrame)
     revenue_formula_residuals: pd.DataFrame = field(default_factory=pd.DataFrame)
     series_alias_audit: pd.DataFrame = field(default_factory=pd.DataFrame)
+    fan_availability: pd.DataFrame = field(default_factory=pd.DataFrame)
+    fan_band_rows: pd.DataFrame = field(default_factory=pd.DataFrame)
 
 
 def repo_root_from_here() -> Path:
@@ -179,6 +237,8 @@ def revenue_outlook_signature(pack_dir: Path | str | None = None, repo_root: Pat
         base / "revenue_line_reconciliation.parquet",
         base / "revenue_formula_residuals.parquet",
         base / "series_alias_audit.parquet",
+        base / "fan_availability.parquet",
+        base / "fan_band_rows.parquet",
     ]
     signature: list[tuple[str, int, int]] = []
     for path in paths:
@@ -213,6 +273,8 @@ def load_revenue_outlook_pack(
         revenue_line_reconciliation=_read_optional_parquet(base / "revenue_line_reconciliation.parquet"),
         revenue_formula_residuals=_read_optional_parquet(base / "revenue_formula_residuals.parquet"),
         series_alias_audit=_read_optional_parquet(base / "series_alias_audit.parquet"),
+        fan_availability=_read_optional_parquet(base / "fan_availability.parquet"),
+        fan_band_rows=_read_optional_parquet(base / "fan_band_rows.parquet"),
     )
 
 
@@ -333,6 +395,7 @@ def build_current_revenue_outlook_runtime_pack(
     future_revenue = _runtime_future_revenue_forecasts(current, series_meta)
     bridge_components = _runtime_bridge_components(current, series_meta)
     trace_audit = _runtime_trace_audit(chart_rows)
+    fan_availability, fan_band_rows = revenue_outlook_fan_tables(chart_rows, repo_root=root)
 
     scenarios = _runtime_scenario_records(existing_manifest, current)
     promotion_time = existing_manifest.get("promotion_time") if isinstance(existing_manifest, dict) else ""
@@ -420,6 +483,14 @@ def build_current_revenue_outlook_runtime_pack(
             "repo_relative_path": _repo_relative(root, base / "series_alias_audit.csv"),
             "scope": "Canonical Revenue Outlook series aliases from source labels/series IDs to dashboard selector IDs.",
         },
+        "fan_availability": {
+            "repo_relative_path": _repo_relative(root, base / "fan_availability.csv"),
+            "scope": "Per-series availability contract for Revenue Outlook fan sources, missing artifacts and interpretation.",
+        },
+        "fan_band_rows": {
+            "repo_relative_path": _repo_relative(root, base / "fan_band_rows.csv"),
+            "scope": "Hash-backed fan band rows only where archived-error, current-finalist backtest or scenario-spread evidence exists.",
+        },
         "validation_status": "runtime_rebuilt",
     }
 
@@ -438,6 +509,8 @@ def build_current_revenue_outlook_runtime_pack(
             "row_reconciliation": mbu26_pack.row_reconciliation,
             "revenue_line_reconciliation": line_reconciliation,
             "revenue_formula_residuals": formula_residuals,
+            "fan_availability": fan_availability,
+            "fan_band_rows": fan_band_rows,
         },
     )
     return load_revenue_outlook_pack(base, repo_root=root)  # type: ignore[return-value]
@@ -514,6 +587,507 @@ def _read_existing_manifest(pack_dir: Path) -> dict[str, Any]:
         return json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return {}
+
+
+def revenue_outlook_fan_tables(
+    chart_rows: pd.DataFrame,
+    *,
+    repo_root: Path | str | None = None,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Build source-explicit Revenue Outlook fan availability and band rows."""
+
+    root = Path(repo_root) if repo_root is not None else repo_root_from_here()
+    series = _fan_display_series_frame(chart_rows)
+    band_frames = [
+        _mbu26_archived_fan_band_rows(chart_rows, root),
+        _current_finalist_backtest_fan_band_rows(chart_rows, root),
+        _scenario_spread_fan_band_rows(chart_rows),
+    ]
+    non_empty_band_frames = [frame for frame in band_frames if frame is not None and not frame.empty]
+    if not non_empty_band_frames:
+        bands = pd.DataFrame(columns=_fan_band_columns())
+    else:
+        bands = pd.concat(non_empty_band_frames, ignore_index=True, sort=False)
+        bands = bands.reindex(columns=_fan_band_columns())
+        bands["_series_order"] = bands["series_id"].map(_series_order_index)
+        bands["_source_order"] = bands["fan_source"].map(_fan_source_order_index)
+        bands["_fy_order"] = pd.to_numeric(bands["FY"], errors="coerce")
+        bands = bands.sort_values(["_series_order", "_source_order", "_fy_order", "period", "scenario_name"], kind="stable").drop(
+            columns=["_series_order", "_source_order", "_fy_order"]
+        )
+    availability = _fan_availability_frame(series, bands)
+    return availability, bands
+
+
+def _fan_band_columns() -> list[str]:
+    return [
+        "series_id",
+        "series_label",
+        "fan_source",
+        "scenario_name",
+        "FY",
+        "period",
+        "central",
+        "p10",
+        "p25",
+        "p75",
+        "p90",
+        "lower50",
+        "upper50",
+        "lower80",
+        "upper80",
+        "unit",
+        "method",
+        "source_file",
+        "model_id",
+        "horizon_scope",
+        "interpretation",
+        "fed_path",
+    ]
+
+
+def _fan_availability_columns() -> list[str]:
+    return [
+        "series_id",
+        "series_label",
+        "fan_source",
+        "available",
+        "reason",
+        "source_file",
+        "model_id",
+        "horizon_scope",
+        "interpretation",
+    ]
+
+
+def _fan_display_series_frame(chart_rows: pd.DataFrame) -> pd.DataFrame:
+    columns = ["series_id", "series_label", "unit", "metric_type"]
+    if chart_rows is None or chart_rows.empty:
+        return pd.DataFrame(columns=columns)
+    data = chart_rows.copy()
+    data = data[
+        data.get("time_grain", pd.Series("", index=data.index)).astype(str).eq("june_year")
+        & data.get("plot_allowed", pd.Series(False, index=data.index)).astype(str).str.lower().isin(["true", "1"])
+    ].copy()
+    if data.empty:
+        return pd.DataFrame(columns=columns)
+    rows = []
+    for series_id, group in data.groupby("series_id", dropna=False):
+        if pd.isna(series_id) or not str(series_id).strip():
+            continue
+        rows.append(
+            {
+                "series_id": str(series_id),
+                "series_label": _first_group_value(group, "series_label") or str(series_id),
+                "unit": _first_group_value(group, "value_unit"),
+                "metric_type": _first_group_value(group, "metric_type"),
+            }
+        )
+    out = pd.DataFrame(rows, columns=columns)
+    if out.empty:
+        return out
+    out["_series_order"] = out["series_id"].map(_series_order_index)
+    return out.sort_values(["_series_order", "series_label"], kind="stable").drop(columns=["_series_order"]).reset_index(drop=True)
+
+
+def _mbu26_archived_fan_band_rows(chart_rows: pd.DataFrame, root: Path) -> pd.DataFrame:
+    bands_path = root / REVENUE_SOURCE_PACK_DIR / "mot_error_bands.csv"
+    archived_bands = _read_optional_csv(bands_path)
+    if chart_rows is None or chart_rows.empty or archived_bands.empty:
+        return pd.DataFrame(columns=_fan_band_columns())
+    central_rows = _fan_central_rows(chart_rows, scenario_name="mbu26_official")
+    if central_rows.empty:
+        return pd.DataFrame(columns=_fan_band_columns())
+    archived_bands = archived_bands.copy()
+    archived_bands["horizon_june_years"] = pd.to_numeric(archived_bands.get("horizon_june_years"), errors="coerce")
+    archived_bands["sample_size"] = pd.to_numeric(archived_bands.get("n"), errors="coerce")
+    for column in ["p10", "p25", "p75", "p90"]:
+        archived_bands[column] = pd.to_numeric(archived_bands.get(column), errors="coerce")
+    archived_bands = archived_bands.dropna(subset=["horizon_june_years", "sample_size", "p10", "p25", "p75", "p90"])
+    archived_bands = archived_bands[archived_bands["sample_size"].ge(10)].copy()
+    rows: list[dict[str, Any]] = []
+    for series_id, source_label in ARCHIVED_ERROR_BAND_LABELS.items():
+        selected = central_rows[central_rows["series_id"].astype(str).eq(series_id)].copy()
+        source = archived_bands[archived_bands.get("series", pd.Series(dtype=str)).astype(str).eq(source_label)].copy()
+        if selected.empty or source.empty:
+            continue
+        selected["fan_horizon"] = pd.to_numeric(selected["june_year"], errors="coerce") - REVENUE_LAST_COMPLETE_ACTUAL_FY
+        merged = selected.merge(source, how="inner", left_on="fan_horizon", right_on="horizon_june_years", suffixes=("", "_band"))
+        for _, row in merged.iterrows():
+            central = _as_float(row.get("value"))
+            if central is None:
+                continue
+            p10, p25, p75, p90 = (float(row["p10"]), float(row["p25"]), float(row["p75"]), float(row["p90"]))
+            rows.append(
+                _fan_band_row(
+                    row,
+                    series_id=series_id,
+                    fan_source=FAN_SOURCE_MBU26_ARCHIVED,
+                    scenario_name="mbu26_official",
+                    central=central,
+                    p10=p10,
+                    p25=p25,
+                    p75=p75,
+                    p90=p90,
+                    method="mbu26_archived_forecast_error_bands",
+                    source_file=f"{_repo_relative(root, bands_path)}; data/current_revenue_outlook/revenue_chart_rows.csv",
+                    model_id="MBU26 official comparator",
+                    horizon_scope="june_year_horizon_from_fy2025_actual",
+                    interpretation="Archived MBU26/MOT forecast-error quantiles by matching source series and June-year horizon.",
+                )
+            )
+    return pd.DataFrame(rows, columns=_fan_band_columns())
+
+
+def _current_finalist_backtest_fan_band_rows(chart_rows: pd.DataFrame, root: Path) -> pd.DataFrame:
+    evidence_path = root / "data" / "dashboard_evidence_pack" / "data" / "annual_predictions.parquet"
+    evidence = _read_optional_parquet(evidence_path)
+    if chart_rows is None or chart_rows.empty or evidence.empty:
+        return pd.DataFrame(columns=_fan_band_columns())
+    quantiles = _current_finalist_backtest_quantiles(evidence)
+    if quantiles.empty:
+        return pd.DataFrame(columns=_fan_band_columns())
+    central_rows = _fan_central_rows(chart_rows, scenario_name="current_basecase")
+    central_rows = central_rows[pd.to_numeric(central_rows.get("june_year"), errors="coerce").ge(REVENUE_FIRST_FORECAST_FY)].copy()
+    rows: list[dict[str, Any]] = []
+    for series_id, (stream, _scope, interpretation) in CURRENT_BACKTEST_STREAM_MAP.items():
+        stream_q = quantiles[quantiles["stream"].astype(str).eq(stream)]
+        selected = central_rows[central_rows["series_id"].astype(str).eq(series_id)].copy()
+        if stream_q.empty or selected.empty:
+            continue
+        q = stream_q.iloc[0]
+        for _, row in selected.iterrows():
+            central = _as_float(row.get("value"))
+            if central is None:
+                continue
+            p10, p25, p75, p90 = (float(q["p10"]), float(q["p25"]), float(q["p75"]), float(q["p90"]))
+            rows.append(
+                _fan_band_row(
+                    row,
+                    series_id=series_id,
+                    fan_source=FAN_SOURCE_CURRENT_BACKTEST,
+                    scenario_name="current_basecase",
+                    central=central,
+                    p10=p10,
+                    p25=p25,
+                    p75=p75,
+                    p90=p90,
+                    method="empirical_current_finalist_annual_backtest_error",
+                    source_file=f"{_repo_relative(root, evidence_path)}; data/current_revenue_outlook/revenue_chart_rows.csv",
+                    model_id=str(q.get("model_id") or row.get("model_id") or ""),
+                    horizon_scope="annual_backtest_residuals_all_available_origins",
+                    interpretation=f"{interpretation} Empirical bands use actual/predicted annual finalist residual ratios; n={int(q['n'])}.",
+                )
+            )
+    return pd.DataFrame(rows, columns=_fan_band_columns())
+
+
+def _scenario_spread_fan_band_rows(chart_rows: pd.DataFrame) -> pd.DataFrame:
+    if chart_rows is None or chart_rows.empty:
+        return pd.DataFrame(columns=_fan_band_columns())
+    base = _fan_central_rows(chart_rows, scenario_name="current_basecase")
+    comparison = _fan_central_rows(chart_rows, scenario_name="current_comparison_1")
+    base = base[pd.to_numeric(base.get("june_year"), errors="coerce").ge(REVENUE_FIRST_FORECAST_FY)].copy()
+    comparison = comparison[pd.to_numeric(comparison.get("june_year"), errors="coerce").ge(REVENUE_FIRST_FORECAST_FY)].copy()
+    if base.empty or comparison.empty:
+        return pd.DataFrame(columns=_fan_band_columns())
+    join_cols = ["series_id", "period", "june_year", "value_unit", "fed_path"]
+    left = base[join_cols + ["series_label", "value", "source_file", "model_id"]].copy()
+    right = comparison[join_cols + ["value", "source_file", "model_id"]].copy()
+    merged = left.merge(right, how="inner", on=join_cols, suffixes=("_base", "_comparison"))
+    rows: list[dict[str, Any]] = []
+    for _, row in merged.iterrows():
+        central = _as_float(row.get("value_base"))
+        comparison_value = _as_float(row.get("value_comparison"))
+        if central is None or comparison_value is None:
+            continue
+        lower = min(central, comparison_value)
+        upper = max(central, comparison_value)
+        rows.append(
+            {
+                "series_id": str(row["series_id"]),
+                "series_label": str(row.get("series_label") or row["series_id"]),
+                "fan_source": FAN_SOURCE_SCENARIO_SPREAD,
+                "scenario_name": "current_basecase_vs_current_comparison_1",
+                "FY": _coerce_int(row.get("june_year")),
+                "period": str(row.get("period") or f"FY{_coerce_int(row.get('june_year'))}"),
+                "central": central,
+                "p10": pd.NA,
+                "p25": pd.NA,
+                "p75": pd.NA,
+                "p90": pd.NA,
+                "lower50": lower,
+                "upper50": upper,
+                "lower80": lower,
+                "upper80": upper,
+                "unit": str(row.get("value_unit") or ""),
+                "method": "scenario_spread_not_probabilistic",
+                "source_file": _combine_unique_text([row.get("source_file_base"), row.get("source_file_comparison")]),
+                "model_id": _combine_unique_text([row.get("model_id_base"), row.get("model_id_comparison")]),
+                "horizon_scope": "future_june_year_base_vs_comparison",
+                "interpretation": "Base and comparison current-finalist values define a scenario spread; this is not probabilistic uncertainty.",
+                "fed_path": str(row.get("fed_path") or ""),
+            }
+        )
+    return pd.DataFrame(rows, columns=_fan_band_columns())
+
+
+def _fan_availability_frame(series: pd.DataFrame, bands: pd.DataFrame) -> pd.DataFrame:
+    rows: list[dict[str, Any]] = []
+    for _, series_row in series.iterrows():
+        series_id = str(series_row["series_id"])
+        series_label = str(series_row.get("series_label") or series_id)
+        available_sources = {
+            str(value)
+            for value in bands.loc[bands["series_id"].astype(str).eq(series_id), "fan_source"].dropna().unique()
+        } if not bands.empty else set()
+        for fan_source in FAN_SOURCE_OPTIONS:
+            rows.append(_fan_availability_row(series_id, series_label, fan_source, available_sources, bands))
+    out = pd.DataFrame(rows, columns=_fan_availability_columns())
+    if out.empty:
+        return out
+    out["_series_order"] = out["series_id"].map(_series_order_index)
+    out["_source_order"] = out["fan_source"].map(_fan_source_order_index)
+    return out.sort_values(["_series_order", "_source_order"], kind="stable").drop(columns=["_series_order", "_source_order"]).reset_index(drop=True)
+
+
+def _fan_availability_row(
+    series_id: str,
+    series_label: str,
+    fan_source: str,
+    available_sources: set[str],
+    bands: pd.DataFrame,
+) -> dict[str, Any]:
+    if fan_source == FAN_SOURCE_AUTO:
+        chosen = next((source for source in FAN_SOURCE_PRIORITY if source in available_sources), "")
+        if chosen:
+            meta = _fan_band_metadata(series_id, chosen, bands)
+            return {
+                "series_id": series_id,
+                "series_label": series_label,
+                "fan_source": fan_source,
+                "available": True,
+                "reason": f"Auto selects {chosen}, the highest-priority materialized fan source for this series.",
+                **meta,
+            }
+        return _fan_gap_row(series_id, series_label, fan_source, "No fan source has materialized bands for this series; governed gap only.")
+    if fan_source == FAN_SOURCE_NONE:
+        return _fan_gap_row(series_id, series_label, fan_source, "Fan intentionally disabled; governed gap displayed.", horizon_scope="not_applicable")
+    if fan_source in available_sources:
+        reason = {
+            FAN_SOURCE_MBU26_ARCHIVED: "Archived forecast-error bands and MBU26 official central rows are materialized for this series.",
+            FAN_SOURCE_CURRENT_BACKTEST: "Current finalist annual backtest residual evidence is materialized for the mapped model stream.",
+            FAN_SOURCE_SCENARIO_SPREAD: "Current finalist base and comparison rows are materialized for this series; scenario spread is not probabilistic uncertainty.",
+        }.get(fan_source, "Fan source is materialized for this series.")
+        meta = _fan_band_metadata(series_id, fan_source, bands)
+        return {
+            "series_id": series_id,
+            "series_label": series_label,
+            "fan_source": fan_source,
+            "available": True,
+            "reason": reason,
+            **meta,
+        }
+    return _fan_gap_row(series_id, series_label, fan_source, _fan_missing_reason(series_id, series_label, fan_source), horizon_scope=_fan_missing_horizon_scope(fan_source))
+
+
+def _fan_band_metadata(series_id: str, fan_source: str, bands: pd.DataFrame) -> dict[str, Any]:
+    selected = bands[bands["series_id"].astype(str).eq(series_id) & bands["fan_source"].astype(str).eq(fan_source)] if not bands.empty else pd.DataFrame()
+    return {
+        "source_file": _combine_unique_text(selected.get("source_file", pd.Series(dtype=str)).dropna().unique().tolist()) if not selected.empty else "",
+        "model_id": _combine_unique_text(selected.get("model_id", pd.Series(dtype=str)).dropna().unique().tolist()) if not selected.empty else "",
+        "horizon_scope": _combine_unique_text(selected.get("horizon_scope", pd.Series(dtype=str)).dropna().unique().tolist()) if not selected.empty else "",
+        "interpretation": _combine_unique_text(selected.get("interpretation", pd.Series(dtype=str)).dropna().unique().tolist()) if not selected.empty else "",
+    }
+
+
+def _fan_gap_row(
+    series_id: str,
+    series_label: str,
+    fan_source: str,
+    reason: str,
+    *,
+    horizon_scope: str = "missing_runtime_artifact",
+) -> dict[str, Any]:
+    return {
+        "series_id": series_id,
+        "series_label": series_label,
+        "fan_source": fan_source,
+        "available": False,
+        "reason": reason,
+        "source_file": "",
+        "model_id": "",
+        "horizon_scope": horizon_scope,
+        "interpretation": reason,
+    }
+
+
+def _fan_missing_reason(series_id: str, series_label: str, fan_source: str) -> str:
+    if fan_source == FAN_SOURCE_MBU26_ARCHIVED:
+        if series_id == "ped_vkt_per_capita":
+            return "MBU26 archived error bands are materialized for PED volume/revenue, not PED VKT per capita; no VKT-per-capita archived band is available."
+        if series_id in ARCHIVED_ERROR_BAND_LABELS:
+            return f"Archived error-band source exists for {ARCHIVED_ERROR_BAND_LABELS[series_id]}, but no matching horizon/central rows survived materialization."
+        return f"No MBU26 archived forecast-error band is materialized for {series_label}."
+    if fan_source == FAN_SOURCE_CURRENT_BACKTEST:
+        if series_id in AGGREGATE_PROPAGATION_GAP_SERIES:
+            return "Current finalist component uncertainty has not been propagated through this aggregate revenue formula, so no aggregate backtest-error fan is shown."
+        return f"No mapped current-finalist model-stream residual evidence is available for {series_label}."
+    if fan_source == FAN_SOURCE_SCENARIO_SPREAD:
+        return "Current finalist base and comparison rows are missing for the selected series/FY horizon, so scenario spread cannot be drawn."
+    return "Fan source is unavailable."
+
+
+def _fan_missing_horizon_scope(fan_source: str) -> str:
+    return {
+        FAN_SOURCE_MBU26_ARCHIVED: "missing_archived_error_band_by_series_horizon",
+        FAN_SOURCE_CURRENT_BACKTEST: "missing_model_stream_or_component_propagation",
+        FAN_SOURCE_SCENARIO_SPREAD: "missing_base_comparison_rows",
+    }.get(fan_source, "missing_runtime_artifact")
+
+
+def _fan_central_rows(chart_rows: pd.DataFrame, *, scenario_name: str) -> pd.DataFrame:
+    if chart_rows is None or chart_rows.empty:
+        return pd.DataFrame()
+    data = chart_rows.copy()
+    required = {"series_id", "scenario_name", "time_grain", "value", "june_year", "period"}
+    if not required.issubset(data.columns):
+        return pd.DataFrame()
+    data = data[
+        data["time_grain"].astype(str).eq("june_year")
+        & data["scenario_name"].astype(str).eq(scenario_name)
+        & data.get("plot_allowed", pd.Series(True, index=data.index)).astype(str).str.lower().isin(["true", "1"])
+    ].copy()
+    if "fed_path" not in data.columns:
+        data["fed_path"] = ""
+    data["fed_path"] = data["fed_path"].fillna("").astype(str)
+    data = data[data["fed_path"].isin(["", "Current planned path", "MBU26"])].copy()
+    data["value"] = pd.to_numeric(data["value"], errors="coerce")
+    return data.dropna(subset=["value", "june_year"]).copy()
+
+
+def _current_finalist_backtest_quantiles(evidence: pd.DataFrame) -> pd.DataFrame:
+    if evidence is None or evidence.empty:
+        return pd.DataFrame(columns=["stream", "n", "p10", "p25", "p75", "p90", "model_id"])
+    data = evidence.copy()
+    data = data[
+        data.get("scenario", pd.Series("", index=data.index)).astype(str).eq("Finalist")
+        & data.get("model_class", pd.Series("", index=data.index)).astype(str).eq("Current finalist")
+    ].copy()
+    if data.empty:
+        return pd.DataFrame(columns=["stream", "n", "p10", "p25", "p75", "p90", "model_id"])
+    data["actual_numeric"] = pd.to_numeric(data.get("actual"), errors="coerce")
+    data["pred_numeric"] = pd.to_numeric(data.get("pred"), errors="coerce")
+    data = data[data["actual_numeric"].notna() & data["pred_numeric"].notna() & data["pred_numeric"].ne(0)].copy()
+    data["actual_vs_pred_ratio"] = data["actual_numeric"] / data["pred_numeric"] - 1.0
+    rows = []
+    for stream, group in data.groupby("stream", dropna=False):
+        clean = group["actual_vs_pred_ratio"].dropna()
+        if len(clean) < 10:
+            continue
+        rows.append(
+            {
+                "stream": str(stream),
+                "n": int(len(clean)),
+                "p10": float(clean.quantile(0.10)),
+                "p25": float(clean.quantile(0.25)),
+                "p75": float(clean.quantile(0.75)),
+                "p90": float(clean.quantile(0.90)),
+                "model_id": _combine_unique_text(group.get("model", pd.Series(dtype=str)).dropna().astype(str).unique().tolist()),
+            }
+        )
+    return pd.DataFrame(rows, columns=["stream", "n", "p10", "p25", "p75", "p90", "model_id"])
+
+
+def _fan_band_row(
+    central_row: pd.Series,
+    *,
+    series_id: str,
+    fan_source: str,
+    scenario_name: str,
+    central: float,
+    p10: float,
+    p25: float,
+    p75: float,
+    p90: float,
+    method: str,
+    source_file: str,
+    model_id: str,
+    horizon_scope: str,
+    interpretation: str,
+) -> dict[str, Any]:
+    lower80, upper80 = sorted([central * (1.0 + p10), central * (1.0 + p90)])
+    lower50, upper50 = sorted([central * (1.0 + p25), central * (1.0 + p75)])
+    return {
+        "series_id": series_id,
+        "series_label": str(central_row.get("series_label") or series_id),
+        "fan_source": fan_source,
+        "scenario_name": scenario_name,
+        "FY": _coerce_int(central_row.get("june_year")),
+        "period": str(central_row.get("period") or f"FY{_coerce_int(central_row.get('june_year'))}"),
+        "central": central,
+        "p10": p10,
+        "p25": p25,
+        "p75": p75,
+        "p90": p90,
+        "lower50": lower50,
+        "upper50": upper50,
+        "lower80": lower80,
+        "upper80": upper80,
+        "unit": str(central_row.get("value_unit") or ""),
+        "method": method,
+        "source_file": source_file,
+        "model_id": model_id,
+        "horizon_scope": horizon_scope,
+        "interpretation": interpretation,
+        "fed_path": str(central_row.get("fed_path") or ""),
+    }
+
+
+def _series_order_index(series_id: Any) -> int:
+    try:
+        return DISPLAY_SERIES_ORDER.index(str(series_id))
+    except ValueError:
+        return len(DISPLAY_SERIES_ORDER) + 1
+
+
+def _fan_source_order_index(fan_source: Any) -> int:
+    try:
+        return FAN_SOURCE_OPTIONS.index(str(fan_source))
+    except ValueError:
+        return len(FAN_SOURCE_OPTIONS) + 1
+
+
+def _first_group_value(frame: pd.DataFrame, column: str) -> str:
+    if column not in frame.columns:
+        return ""
+    values = [str(value).strip() for value in frame[column].dropna().tolist() if str(value).strip()]
+    return values[0] if values else ""
+
+
+def _combine_unique_text(values: Any) -> str:
+    try:
+        iterator = list(values)
+    except TypeError:
+        iterator = [values]
+    out: list[str] = []
+    for value in iterator:
+        if value is None or pd.isna(value):
+            continue
+        text = str(value).strip()
+        if text and text not in out:
+            out.append(text)
+    return "; ".join(out)
+
+
+def _as_float(value: Any) -> float | None:
+    try:
+        number = float(value)
+    except Exception:
+        return None
+    if not np.isfinite(number):
+        return None
+    return number
 
 
 def _runtime_series_metadata(series_trace_contract: pd.DataFrame) -> dict[str, dict[str, Any]]:
@@ -1935,6 +2509,8 @@ def _write_pack_files(
         "revenue_line_reconciliation",
         "revenue_formula_residuals",
         "series_alias_audit",
+        "fan_availability",
+        "fan_band_rows",
         "trace_source_contract",
         "series_trace_contract",
         "path_trace_status",

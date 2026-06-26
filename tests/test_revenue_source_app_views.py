@@ -32,6 +32,11 @@ from app import (
     revenue_outlook_total_path_figure,
     revenue_outlook_uncertainty_fan_figure,
 )
+from model_dashboard.revenue_outlook import (
+    FAN_SOURCE_CURRENT_BACKTEST,
+    FAN_SOURCE_NONE,
+    FAN_SOURCE_SCENARIO_SPREAD,
+)
 from model_dashboard.revenue_source_pack import REVENUE_SOURCE_PACK_RUNTIME_REVISION, load_revenue_source_pack
 
 
@@ -763,9 +768,56 @@ def test_revenue_outlook_primary_figures_use_runtime_pack_selected_series_only()
         if trace.name == "Current finalist Base case"
     )
 
-    fan_fig = revenue_outlook_uncertainty_fan_figure(rows, selected_series="Total NLTF revenue")
+    fan_availability = pd.read_csv(ROOT / "data/current_revenue_outlook/fan_availability.csv")
+    fan_bands = pd.read_csv(ROOT / "data/current_revenue_outlook/fan_band_rows.csv")
+    fan_fig = revenue_outlook_uncertainty_fan_figure(
+        fan_bands,
+        fan_availability=fan_availability,
+        selected_series="Total NLTF revenue",
+        fan_source=FAN_SOURCE_CURRENT_BACKTEST,
+        selected_fed_path="Current planned path",
+    )
     fan_text = " ".join(str(annotation.text) for annotation in fan_fig.layout.annotations or [])
-    assert "not materialized in data/current_revenue_outlook" in fan_text
+    assert "not been propagated" in fan_text
+
+    spread_fig = revenue_outlook_uncertainty_fan_figure(
+        fan_bands,
+        fan_availability=fan_availability,
+        selected_series="Total NLTF revenue",
+        fan_source=FAN_SOURCE_SCENARIO_SPREAD,
+        selected_fed_path="Current planned path",
+    )
+    assert spread_fig.data
+    assert not any("confidence" in str(trace.name).lower() or "probability" in str(trace.name).lower() for trace in spread_fig.data)
+
+    none_fig = revenue_outlook_uncertainty_fan_figure(
+        fan_bands,
+        fan_availability=fan_availability,
+        selected_series="Total NLTF revenue",
+        fan_source=FAN_SOURCE_NONE,
+        selected_fed_path="Current planned path",
+    )
+    none_text = " ".join(str(annotation.text) for annotation in none_fig.layout.annotations or [])
+    assert "Fan intentionally disabled" in none_text
+
+    # The fan uses its own source selector and runtime fan tables; narrowing main path traces
+    # changes the path chart rows but does not remove the fan bands.
+    actual_only_rows = _filter_revenue_outlook_rows(
+        chart,
+        time_grain="june_year",
+        stream_labels=["Total NLTF revenue"],
+        fed_paths=["Current planned path"],
+        trace_names=["Actual"],
+    )
+    assert set(actual_only_rows["trace_name"].dropna().astype(str)) == {"Actual"}
+    independent_fan = revenue_outlook_uncertainty_fan_figure(
+        fan_bands,
+        fan_availability=fan_availability,
+        selected_series="Total NLTF revenue",
+        fan_source=FAN_SOURCE_SCENARIO_SPREAD,
+        selected_fed_path="Current planned path",
+    )
+    assert independent_fan.data
 
     component_fig = revenue_outlook_component_figure(bridge, selected_fy="FY2031", selected_fed_path="Current planned path")
     split_fig = revenue_outlook_split_figure(bridge, selected_fy="FY2031", selected_fed_path="Current planned path")

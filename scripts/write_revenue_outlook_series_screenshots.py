@@ -22,6 +22,43 @@ SERIES = {
     "total_nltf_net_revenue": ("Revenue Outlook - Total NLTF revenue", "revenue-outlook-total-nltf.png"),
 }
 
+FAN_SERIES = {
+    "total_nltf_net_revenue": "Total NLTF revenue",
+    "ped_vkt_per_capita": "PED VKT per capita",
+    "gross_ped_revenue": "PED revenue",
+    "light_ruc_net_km": "Light RUC net km",
+}
+
+FAN_SOURCE_AUTO = "Auto / best available"
+FAN_SOURCE_MBU26_ARCHIVED = "MBU26 archived forecast error"
+FAN_SOURCE_CURRENT_BACKTEST = "Current finalist backtest error"
+FAN_SOURCE_SCENARIO_SPREAD = "Scenario spread"
+FAN_SOURCE_NONE = "None / governed gap"
+FAN_SOURCE_ORDER = [
+    FAN_SOURCE_AUTO,
+    FAN_SOURCE_MBU26_ARCHIVED,
+    FAN_SOURCE_CURRENT_BACKTEST,
+    FAN_SOURCE_SCENARIO_SPREAD,
+]
+FAN_SOURCE_AUTO_PRIORITY = [
+    FAN_SOURCE_CURRENT_BACKTEST,
+    FAN_SOURCE_MBU26_ARCHIVED,
+    FAN_SOURCE_SCENARIO_SPREAD,
+]
+FAN_SOURCE_SLUGS = {
+    FAN_SOURCE_AUTO: "auto-best-available",
+    FAN_SOURCE_MBU26_ARCHIVED: "mbu26-archived-forecast-error",
+    FAN_SOURCE_CURRENT_BACKTEST: "current-finalist-backtest-error",
+    FAN_SOURCE_SCENARIO_SPREAD: "scenario-spread",
+    FAN_SOURCE_NONE: "none-governed-gap",
+}
+SERIES_SLUGS = {
+    "total_nltf_net_revenue": "total-nltf",
+    "ped_vkt_per_capita": "ped-vkt-per-capita",
+    "gross_ped_revenue": "ped-revenue",
+    "light_ruc_net_km": "light-ruc-net-km",
+}
+
 TRACE_ORDER = [
     "Actual",
     "MBU26 official",
@@ -94,6 +131,8 @@ def main() -> None:
             }
         )
 
+    manifest.extend(_write_fan_screenshots())
+
     reconciliation_path, reconciliation_rows = _write_reconciliation_table_screenshot()
     manifest.append(
         {
@@ -117,6 +156,124 @@ def main() -> None:
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     for item in manifest:
         print(f"WROTE {item['repo_relative_path']} rows={item['rows']}")
+
+
+def _write_fan_screenshots() -> list[dict[str, object]]:
+    availability_path = PACK_DIR / "fan_availability.csv"
+    bands_path = PACK_DIR / "fan_band_rows.csv"
+    if not availability_path.exists() or not bands_path.exists():
+        return []
+
+    availability = pd.read_csv(availability_path)
+    bands = pd.read_csv(bands_path)
+    manifest: list[dict[str, object]] = []
+    for series_id, series_label in FAN_SERIES.items():
+        for selected_source in FAN_SOURCE_ORDER:
+            if not _fan_source_available(availability, series_id, selected_source):
+                continue
+            resolved_source = _resolve_fan_source(availability, series_id, selected_source)
+            frame = bands[
+                bands["series_id"].astype(str).eq(series_id)
+                & bands["fan_source"].astype(str).eq(resolved_source)
+            ].copy()
+            if frame.empty:
+                continue
+            title = f"Revenue Outlook fan - {series_label}"
+            if selected_source == FAN_SOURCE_AUTO and resolved_source != selected_source:
+                title = f"{title} - Auto ({resolved_source})"
+            else:
+                title = f"{title} - {selected_source}"
+            filename = (
+                f"revenue-outlook-fan-{SERIES_SLUGS[series_id]}-"
+                f"{FAN_SOURCE_SLUGS[selected_source]}.png"
+            )
+            path = _write_fan_screenshot(frame, title, filename)
+            manifest.append(
+                {
+                    "series_id": series_id,
+                    "title": title,
+                    "fan_source": selected_source,
+                    "resolved_fan_source": resolved_source,
+                    "repo_relative_path": path.relative_to(ROOT).as_posix(),
+                    "rows": int(len(frame)),
+                }
+            )
+    return manifest
+
+
+def _fan_source_available(availability: pd.DataFrame, series_id: str, fan_source: str) -> bool:
+    rows = availability[
+        availability["series_id"].astype(str).eq(series_id)
+        & availability["fan_source"].astype(str).eq(fan_source)
+    ]
+    if rows.empty:
+        return False
+    return str(rows.iloc[0]["available"]).lower() in {"true", "1"}
+
+
+def _resolve_fan_source(availability: pd.DataFrame, series_id: str, fan_source: str) -> str:
+    if fan_source != FAN_SOURCE_AUTO:
+        return fan_source
+    for candidate in FAN_SOURCE_AUTO_PRIORITY:
+        if _fan_source_available(availability, series_id, candidate):
+            return candidate
+    return FAN_SOURCE_NONE
+
+
+def _write_fan_screenshot(frame: pd.DataFrame, title: str, filename: str) -> Path:
+    frame = frame.copy()
+    frame["year"] = pd.to_numeric(frame["FY"], errors="coerce")
+    frame["central"] = pd.to_numeric(frame["central"], errors="coerce")
+    for column in ["lower50", "upper50", "lower80", "upper80"]:
+        frame[column] = pd.to_numeric(frame[column], errors="coerce")
+    frame = frame.dropna(subset=["year", "central", "lower50", "upper50", "lower80", "upper80"])
+    frame = frame.sort_values(["year", "scenario_name"], kind="stable").drop_duplicates(["year"], keep="last")
+
+    fig, ax = plt.subplots(figsize=(11.5, 6.2), dpi=150)
+    x = frame["year"].to_numpy(dtype=float)
+    ax.fill_between(
+        x,
+        frame["lower80"].to_numpy(dtype=float),
+        frame["upper80"].to_numpy(dtype=float),
+        color="#BFDBFE",
+        alpha=0.55,
+        label="80% band" if "scenario_spread" not in str(frame["method"].iloc[0]) else "Outer scenario range",
+    )
+    ax.fill_between(
+        x,
+        frame["lower50"].to_numpy(dtype=float),
+        frame["upper50"].to_numpy(dtype=float),
+        color="#60A5FA",
+        alpha=0.45,
+        label="50% band" if "scenario_spread" not in str(frame["method"].iloc[0]) else "Inner scenario range",
+    )
+    ax.plot(x, frame["central"].to_numpy(dtype=float), color="#0F172A", linewidth=2.1, label="Central path")
+    ax.axvline(2025, color="#94A3B8", linewidth=1.0)
+    ax.set_title(title, loc="left", fontsize=14, weight="bold")
+    ax.set_xlabel("June year")
+    unit = frame["unit"].dropna().astype(str).iloc[0] if not frame.empty else "$m nominal ex GST"
+    ax.set_ylabel(unit)
+    interpretation = frame["interpretation"].dropna().astype(str).iloc[0] if not frame.empty else ""
+    if interpretation:
+        ax.text(
+            0,
+            -0.16,
+            interpretation[:165],
+            transform=ax.transAxes,
+            fontsize=8,
+            color="#475569",
+            va="top",
+            ha="left",
+            wrap=True,
+        )
+    ax.grid(True, axis="y", color="#E2E8F0", linewidth=0.8)
+    ax.spines[["top", "right"]].set_visible(False)
+    ax.legend(loc="upper left", frameon=False, fontsize=8)
+    fig.tight_layout()
+    path = SCREENSHOT_DIR / filename
+    fig.savefig(path)
+    plt.close(fig)
+    return path
 
 
 def _write_reconciliation_table_screenshot() -> tuple[Path, int]:

@@ -114,6 +114,11 @@ from model_dashboard.reproducibility_imports import (
 )
 from model_dashboard.revenue_outlook import (
     CURRENT_REVENUE_OUTLOOK_DIR,
+    FAN_SOURCE_AUTO,
+    FAN_SOURCE_NONE,
+    FAN_SOURCE_OPTIONS,
+    FAN_SOURCE_PRIORITY,
+    FAN_SOURCE_SCENARIO_SPREAD,
     REVENUE_OUTLOOK_SCHEMA_VERSION,
     REVENUE_OUTLOOK_TITLE,
     STREAM_LABELS,
@@ -1994,6 +1999,8 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     line_reconciliation = pack.revenue_line_reconciliation.copy() if pack is not None and isinstance(getattr(pack, "revenue_line_reconciliation", None), pd.DataFrame) else pd.DataFrame()
     formula_residuals = pack.revenue_formula_residuals.copy() if pack is not None and isinstance(getattr(pack, "revenue_formula_residuals", None), pd.DataFrame) else pd.DataFrame()
     alias_audit = pack.series_alias_audit.copy() if pack is not None and isinstance(getattr(pack, "series_alias_audit", None), pd.DataFrame) else pd.DataFrame()
+    fan_availability = pack.fan_availability.copy() if pack is not None and isinstance(getattr(pack, "fan_availability", None), pd.DataFrame) else pd.DataFrame()
+    fan_band_rows = pack.fan_band_rows.copy() if pack is not None and isinstance(getattr(pack, "fan_band_rows", None), pd.DataFrame) else pd.DataFrame()
 
     section_title(REVENUE_OUTLOOK_TITLE)
     st.caption(
@@ -2081,12 +2088,11 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             notes_as_tooltip=False,
         )
     with primary_cols[1]:
-        chart_card(
-            "Uncertainty fan",
-            "Archived-error fan if materialized; otherwise an explicit runtime-pack governance gap.",
-            revenue_outlook_uncertainty_fan_figure(filtered_rows, selected_series=selected_stream),
-            caption="No fallback source-pack chart engine is used on this page.",
-            notes_as_tooltip=False,
+        _render_revenue_outlook_fan_card(
+            fan_band_rows,
+            fan_availability,
+            selected_series=selected_stream,
+            selected_fed_path=selected_fed_path,
         )
 
     selected_fy_number = _selected_fy_to_number(selected_fy)
@@ -4157,43 +4163,204 @@ def revenue_outlook_total_path_figure(rows: pd.DataFrame, *, selected_series: st
     return fig
 
 
-def revenue_outlook_uncertainty_fan_figure(rows: pd.DataFrame, *, selected_series: str) -> go.Figure:
-    data = _selected_revenue_outlook_series_rows(rows, selected_series)
-    band_columns = {"lower50", "upper50", "lower80", "upper80"}
-    if data.empty:
-        return _revenue_outlook_gap_figure("Selected series has no runtime-pack rows for uncertainty review.", height=250)
-    if not band_columns.issubset(data.columns):
-        return _revenue_outlook_gap_figure(
-            "Runtime fan bands are not materialized in data/current_revenue_outlook for this selected series.",
-            height=250,
+def _render_revenue_outlook_fan_card(
+    fan_band_rows: pd.DataFrame,
+    fan_availability: pd.DataFrame,
+    *,
+    selected_series: str,
+    selected_fed_path: str,
+) -> None:
+    with st.container(border=True):
+        st.markdown(
+            "<div class='gov-chart-card chart-card'>"
+            "<div class='chart-card-title'>Uncertainty fan</div>"
+            "<div class='chart-card-subtitle'>Fan source is controlled independently from the main trace selector.</div>"
+            "</div>",
+            unsafe_allow_html=True,
         )
-    data["value_numeric"] = pd.to_numeric(data.get("value"), errors="coerce")
-    for column in band_columns:
-        data[column] = pd.to_numeric(data[column], errors="coerce")
-    data = data.dropna(subset=["value_numeric", "lower50", "upper50", "lower80", "upper80"]).copy()
+        selected_fan_source = st.selectbox(
+            "Fan source",
+            list(FAN_SOURCE_OPTIONS),
+            index=0,
+            key="revenue_outlook_fan_source",
+        )
+        fig = revenue_outlook_uncertainty_fan_figure(
+            fan_band_rows,
+            fan_availability=fan_availability,
+            selected_series=selected_series,
+            fan_source=selected_fan_source,
+            selected_fed_path=selected_fed_path,
+        )
+        st.plotly_chart(fig, use_container_width=True, key="chart_card_uncertainty_fan")
+        st.caption(_revenue_outlook_fan_caption(fan_availability, selected_series, selected_fan_source)[:220])
+
+
+def revenue_outlook_uncertainty_fan_figure(
+    fan_band_rows: pd.DataFrame,
+    *,
+    fan_availability: pd.DataFrame | None = None,
+    selected_series: str,
+    fan_source: str = FAN_SOURCE_AUTO,
+    selected_fed_path: str | None = None,
+) -> go.Figure:
+    selected_series_id = _revenue_outlook_fan_series_id(fan_availability, selected_series)
+    resolved_source = _resolve_revenue_outlook_fan_source(fan_availability, selected_series_id, fan_source)
+    if not resolved_source or resolved_source == FAN_SOURCE_NONE:
+        return _revenue_outlook_gap_figure(_revenue_outlook_fan_gap_message(fan_availability, selected_series_id, fan_source), height=220)
+    if fan_band_rows is None or fan_band_rows.empty:
+        return _revenue_outlook_gap_figure(_revenue_outlook_fan_gap_message(fan_availability, selected_series_id, fan_source), height=220)
+    data = fan_band_rows[
+        fan_band_rows.get("series_id", pd.Series(dtype=str)).astype(str).eq(str(selected_series_id))
+        & fan_band_rows.get("fan_source", pd.Series(dtype=str)).astype(str).eq(resolved_source)
+    ].copy()
+    if selected_fed_path and "fed_path" in data.columns:
+        allowed_fed_paths = {"", str(selected_fed_path), "MBU26"}
+        data = data[data["fed_path"].fillna("").astype(str).isin(allowed_fed_paths)].copy()
+    for column in ["central", "lower50", "upper50", "lower80", "upper80"]:
+        data[column] = pd.to_numeric(data.get(column), errors="coerce")
+    data = data.dropna(subset=["central", "lower50", "upper50", "lower80", "upper80"]).copy()
     if data.empty:
-        return _revenue_outlook_gap_figure("Runtime-pack uncertainty columns are present but have no numeric selected-series rows.", height=250)
+        return _revenue_outlook_gap_figure(_revenue_outlook_fan_gap_message(fan_availability, selected_series_id, fan_source), height=220)
     data["_period_order"] = data.get("period", pd.Series(dtype=str)).map(_revenue_period_order)
-    data = data.sort_values("_period_order", kind="stable")
+    data = data.sort_values(["_period_order", "scenario_name"], kind="stable")
     fig = go.Figure()
-    for upper, lower, name, color in [
-        ("upper80", "lower80", "MOT archived error 80% band", "rgba(0, 43, 92, 0.14)"),
-        ("upper50", "lower50", "MOT archived error 50% band", "rgba(0, 132, 61, 0.18)"),
-    ]:
+    is_scenario_spread = resolved_source == FAN_SOURCE_SCENARIO_SPREAD
+    band_specs = (
+        [
+            ("upper80", "lower80", "Scenario spread outer range (not probabilistic)", "rgba(0, 43, 92, 0.14)"),
+            ("upper50", "lower50", "Scenario spread inner range (not probabilistic)", "rgba(0, 132, 61, 0.18)"),
+        ]
+        if is_scenario_spread
+        else [
+            ("upper80", "lower80", f"{resolved_source} 80% empirical band", "rgba(0, 43, 92, 0.14)"),
+            ("upper50", "lower50", f"{resolved_source} 50% empirical band", "rgba(0, 132, 61, 0.18)"),
+        ]
+    )
+    for upper, lower, name, color in band_specs:
         fig.add_trace(go.Scatter(x=data["period"], y=data[upper], mode="lines", line={"width": 0}, showlegend=False, hoverinfo="skip"))
-        fig.add_trace(go.Scatter(x=data["period"], y=data[lower], mode="lines", fill="tonexty", fillcolor=color, line={"width": 0}, name=name))
+        fig.add_trace(
+            go.Scatter(
+                x=data["period"],
+                y=data[lower],
+                mode="lines",
+                fill="tonexty",
+                fillcolor=color,
+                line={"width": 0},
+                name=name,
+                customdata=data[["method", "source_file"]].to_numpy(),
+                hovertemplate="%{x}<br>%{y:,.2f}<br>%{customdata[0]}<br>%{customdata[1]}<extra>%{fullData.name}</extra>",
+            )
+        )
+    central_name = "Current finalist base case" if is_scenario_spread else resolved_source
     fig.add_trace(
         go.Scatter(
             x=data["period"],
-            y=data["value_numeric"],
+            y=data["central"],
             mode="lines+markers",
-            name="Selected series",
+            name=central_name,
             line={"color": "#006FAD", "width": 2.4},
             marker={"size": 6},
+            customdata=data[["unit", "interpretation"]].to_numpy(),
+            hovertemplate="%{x}<br>%{y:,.2f} %{customdata[0]}<br>%{customdata[1]}<extra>%{fullData.name}</extra>",
         )
     )
-    fig.update_layout(height=250, margin={"l": 40, "r": 12, "t": 16, "b": 40}, hovermode="x unified")
+    unit = str(data["unit"].dropna().iloc[0]) if "unit" in data.columns and not data["unit"].dropna().empty else ""
+    fig.update_layout(
+        height=220,
+        margin={"l": 40, "r": 12, "t": 16, "b": 40},
+        hovermode="x unified",
+        yaxis_title=unit,
+        legend={"orientation": "h", "y": -0.24, "x": 0.0},
+    )
     return fig
+
+
+def _revenue_outlook_fan_series_id(fan_availability: pd.DataFrame | None, selected_series: str) -> str:
+    selected = str(selected_series or "").strip()
+    if fan_availability is None or fan_availability.empty:
+        return selected
+    series_ids = fan_availability.get("series_id", pd.Series(dtype=str)).dropna().astype(str)
+    if selected in set(series_ids):
+        return selected
+    labels = fan_availability.get("series_label", pd.Series("", index=fan_availability.index)).fillna("").astype(str)
+    matches = fan_availability[labels.eq(selected)]
+    if not matches.empty:
+        return str(matches.iloc[0].get("series_id", selected))
+    return selected
+
+
+def _resolve_revenue_outlook_fan_source(fan_availability: pd.DataFrame | None, selected_series: str, requested_source: str) -> str:
+    selected_series = _revenue_outlook_fan_series_id(fan_availability, selected_series)
+    requested_source = str(requested_source or FAN_SOURCE_AUTO)
+    if requested_source != FAN_SOURCE_AUTO:
+        return requested_source if _revenue_outlook_fan_available(fan_availability, selected_series, requested_source) else ""
+    if fan_availability is None or fan_availability.empty:
+        return ""
+    selected = fan_availability[
+        fan_availability.get("series_id", pd.Series(dtype=str)).astype(str).eq(str(selected_series))
+        & fan_availability.get("available", pd.Series(False, index=fan_availability.index)).astype(str).str.lower().isin(["true", "1"])
+    ]
+    for source in FAN_SOURCE_PRIORITY:
+        if source in set(selected.get("fan_source", pd.Series(dtype=str)).astype(str)):
+            return source
+    return ""
+
+
+def _revenue_outlook_fan_available(fan_availability: pd.DataFrame | None, selected_series: str, fan_source: str) -> bool:
+    if fan_availability is None or fan_availability.empty:
+        return False
+    selected_series = _revenue_outlook_fan_series_id(fan_availability, selected_series)
+    rows = fan_availability[
+        fan_availability.get("series_id", pd.Series(dtype=str)).astype(str).eq(str(selected_series))
+        & fan_availability.get("fan_source", pd.Series(dtype=str)).astype(str).eq(str(fan_source))
+    ]
+    if rows.empty:
+        return False
+    return str(rows.iloc[0].get("available", "")).lower() in {"true", "1"}
+
+
+def _revenue_outlook_fan_gap_message(fan_availability: pd.DataFrame | None, selected_series: str, requested_source: str) -> str:
+    if fan_availability is None or fan_availability.empty:
+        return "Fan availability table is missing from data/current_revenue_outlook; no fan can be drawn."
+    selected_series = _revenue_outlook_fan_series_id(fan_availability, selected_series)
+    requested_source = str(requested_source or FAN_SOURCE_AUTO)
+    selected = fan_availability[fan_availability.get("series_id", pd.Series(dtype=str)).astype(str).eq(str(selected_series))]
+    if selected.empty:
+        return f"Selected series {selected_series} has no fan availability row in data/current_revenue_outlook/fan_availability.csv."
+    if requested_source == FAN_SOURCE_AUTO:
+        base_reason = "Auto / best available found no materialized fan source for this series."
+    else:
+        row = selected[selected.get("fan_source", pd.Series(dtype=str)).astype(str).eq(requested_source)]
+        base_reason = str(row.iloc[0].get("reason", "")) if not row.empty else f"{requested_source} has no availability row."
+    alternatives = _revenue_outlook_fan_alternatives(selected)
+    return f"Fan source: {requested_source}. {base_reason} {alternatives}".strip()
+
+
+def _revenue_outlook_fan_caption(fan_availability: pd.DataFrame | None, selected_series: str, requested_source: str) -> str:
+    if fan_availability is None or fan_availability.empty:
+        return "Fan availability table missing; no uncertainty bands are rendered."
+    selected_series = _revenue_outlook_fan_series_id(fan_availability, selected_series)
+    resolved = _resolve_revenue_outlook_fan_source(fan_availability, selected_series, requested_source)
+    selected = fan_availability[fan_availability.get("series_id", pd.Series(dtype=str)).astype(str).eq(str(selected_series))]
+    if resolved:
+        row = selected[selected.get("fan_source", pd.Series(dtype=str)).astype(str).eq(resolved)]
+        reason = str(row.iloc[0].get("reason", "")) if not row.empty else ""
+        interpretation = str(row.iloc[0].get("interpretation", "")) if not row.empty else ""
+        auto_note = f"Auto resolved to {resolved}. " if str(requested_source) == FAN_SOURCE_AUTO else ""
+        return f"{auto_note}{reason} {interpretation}".strip()
+    return _revenue_outlook_fan_gap_message(fan_availability, selected_series, requested_source)
+
+
+def _revenue_outlook_fan_alternatives(selected_availability: pd.DataFrame) -> str:
+    if selected_availability is None or selected_availability.empty:
+        return "No alternative fan source is listed."
+    alternatives = selected_availability[
+        selected_availability.get("available", pd.Series(False, index=selected_availability.index)).astype(str).str.lower().isin(["true", "1"])
+        & ~selected_availability.get("fan_source", pd.Series(dtype=str)).astype(str).isin([FAN_SOURCE_AUTO])
+    ]["fan_source"].dropna().astype(str).unique().tolist()
+    if not alternatives:
+        return "No alternative fan source is available."
+    return "Available alternative fan source(s): " + ", ".join(alternatives) + "."
 
 
 def _revenue_outlook_gap_figure(message: str, *, height: int) -> go.Figure:

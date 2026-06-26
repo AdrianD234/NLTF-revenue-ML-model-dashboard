@@ -330,8 +330,32 @@
     "repo_relative_path": "data/current_revenue_outlook/series_alias_audit.csv",
     "scope": "Canonical Revenue Outlook series aliases from source labels/series IDs to dashboard selector IDs."
   },
+  "fan_availability": {
+    "repo_relative_path": "data/current_revenue_outlook/fan_availability.csv",
+    "scope": "Per-series availability contract for Revenue Outlook fan sources, missing artifacts and interpretation."
+  },
+  "fan_band_rows": {
+    "repo_relative_path": "data/current_revenue_outlook/fan_band_rows.csv",
+    "scope": "Hash-backed fan band rows only where archived-error, current-finalist backtest or scenario-spread evidence exists."
+  },
   "validation_status": "runtime_rebuilt",
   "output_hashes": {
+    "fan_availability.csv": {
+      "sha256": "3e248fadf746e62affad42d0ca87a3dd232aaed5ee031e6072e7b2f5bd586248",
+      "size_bytes": 23213
+    },
+    "fan_availability.parquet": {
+      "sha256": "05ca6cd3485e6725e571bb8f0b9a04dbc4396a2c52b15b32320b1b43266afc79",
+      "size_bytes": 9596
+    },
+    "fan_band_rows.csv": {
+      "sha256": "891f79fae6e5e1ec7821e4a7b88d6746da5f24fe48ba3eab260ffdac9429799b",
+      "size_bytes": 291096
+    },
+    "fan_band_rows.parquet": {
+      "sha256": "0da58f6bd9f132d9cd5224a29cadb80afc617ee9bd7f9f0971df885865a2a60c",
+      "size_bytes": 40092
+    },
     "future_revenue_forecasts.csv": {
       "sha256": "5a8e4024e960a08308654b862acf00c278d79b9a60c899af9b710dbca9f7a0a7",
       "size_bytes": 214642
