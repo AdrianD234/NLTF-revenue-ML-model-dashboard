@@ -328,13 +328,13 @@
   },
   "revenue_stack_components": {
     "repo_relative_path": "data/current_revenue_outlook/revenue_stack_components.csv",
-    "scope": "Composition-over-time stack rows classified from revenue_line_reconciliation in net-contribution and gross-to-net bridge modes; aggregates are overlays only and are never stacked.",
+    "scope": "Composition-over-time stack rows classified from revenue_line_reconciliation in gross-to-net bridge and gross-contribution modes; aggregates are overlays only and are never stacked.",
     "source": "data/current_revenue_outlook/revenue_line_reconciliation.csv",
     "composition_modes": [
-      "Net contribution stack",
-      "Gross-to-net bridge audit"
+      "Gross-to-net bridge audit",
+      "Gross contribution stack"
     ],
-    "balance_rule": "Each composition mode reconciles stack_value to Total NLTF revenue within source rounding; residuals are reported and never forced."
+    "balance_rule": "Gross-to-net bridge reconciles displayed stack_value to Total NLTF revenue; gross contribution stack reconciles displayed stack_value to Total gross revenues. Residuals are reported and never forced."
   },
   "series_alias_audit": {
     "repo_relative_path": "data/current_revenue_outlook/series_alias_audit.csv",
@@ -415,12 +415,12 @@
       "size_bytes": 75896
     },
     "revenue_stack_components.csv": {
-      "sha256": "f5616156e1d16fd17db3ec1e948aa2a97f429900d6516edbe56bc1155b4ecb8a",
-      "size_bytes": 5057622
+      "sha256": "c51b8c4d38c4c5f60f1ef20396b453ccf028db8656906717f2c5f41dda92392a",
+      "size_bytes": 8314128
     },
     "revenue_stack_components.parquet": {
-      "sha256": "1ec3d1da023ca3210003ac8f2654387e58b3f37adaf0f91cfa42efd205c08b30",
-      "size_bytes": 134186
+      "sha256": "2d391fcba14299b7a874b44364904cc6ed27d41c047fcc675ffad52e6546d067",
+      "size_bytes": 142941
     },
     "row_reconciliation.csv": {
       "sha256": "d484f5d75cce88e30ce7bcf5dd70058505cc02e5dff93f457a579f119c2fc7ce",

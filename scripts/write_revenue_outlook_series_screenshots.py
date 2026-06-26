@@ -35,8 +35,12 @@ COMPOSITION_SOURCE_PATHS = {
     "Current finalist High population/comparison": "current-finalist-high-population-comparison",
 }
 COMPOSITION_MODES = {
-    "Net contribution stack": "net-contribution-stack",
     "Gross-to-net bridge audit": "gross-to-net-bridge-audit",
+    "Gross contribution stack": "gross-contribution-stack",
+}
+COMPOSITION_OVERLAYS = {
+    "Gross-to-net bridge audit": ("total_nltf_net_revenue", "Total NLTF overlay"),
+    "Gross contribution stack": ("total_gross_revenue", "Total gross overlay"),
 }
 
 FAN_SOURCE_AUTO = "Auto / best available"
@@ -295,6 +299,7 @@ def _write_composition_screenshots() -> list[dict[str, object]]:
     manifest: list[dict[str, object]] = []
     for source_path, source_slug in COMPOSITION_SOURCE_PATHS.items():
         for mode, mode_slug in COMPOSITION_MODES.items():
+            overlay_series_id, _overlay_label = COMPOSITION_OVERLAYS.get(mode, ("total_nltf_net_revenue", "Total overlay"))
             mode_mask = (
                 stack["composition_mode"].astype(str).eq(mode)
                 if "composition_mode" in stack.columns
@@ -308,14 +313,14 @@ def _write_composition_screenshots() -> list[dict[str, object]]:
                         stack["stack_role"].astype(str).isin(["component_positive", "component_negative"])
                         & stack["section"].astype(str).isin(["RUC", "FED", "MVR", "TUC"])
                     )
-                    | stack["series_id"].astype(str).eq("total_nltf_net_revenue")
+                    | stack["series_id"].astype(str).eq(overlay_series_id)
                 )
             ].copy()
             if frame.empty:
                 continue
             frame["FY_numeric"] = pd.to_numeric(frame["FY"], errors="coerce")
             frame["stack_value_numeric"] = pd.to_numeric(frame["stack_value"], errors="coerce")
-            overlay_mask = frame["series_id"].astype(str).eq("total_nltf_net_revenue")
+            overlay_mask = frame["series_id"].astype(str).eq(overlay_series_id)
             frame = frame[
                 frame["FY_numeric"].between(2025, 2035, inclusive="both")
                 & (frame["stack_value_numeric"].notna() | overlay_mask)
@@ -324,7 +329,7 @@ def _write_composition_screenshots() -> list[dict[str, object]]:
                 continue
             title = f"Revenue Outlook composition - {source_path} - {mode}"
             filename = f"revenue-outlook-composition-{mode_slug}-{source_slug}.png"
-            path = _write_composition_screenshot(frame, title, filename)
+            path = _write_composition_screenshot(frame, title, filename, mode=mode, overlay_series_id=overlay_series_id)
             manifest.append(
                 {
                     "series_id": "revenue_stack_components",
@@ -338,17 +343,17 @@ def _write_composition_screenshots() -> list[dict[str, object]]:
     return manifest
 
 
-def _write_composition_screenshot(frame: pd.DataFrame, title: str, filename: str) -> Path:
+def _write_composition_screenshot(frame: pd.DataFrame, title: str, filename: str, *, mode: str, overlay_series_id: str) -> Path:
     years = sorted(int(value) for value in frame["FY_numeric"].dropna().unique())
     stack_frame = frame[frame["stack_role"].astype(str).isin(["component_positive", "component_negative"])].copy()
-    labels = (
-        stack_frame[["line_label", "section_order", "line_order"]]
-        .drop_duplicates()
-        .sort_values(["section_order", "line_order", "line_label"], kind="stable")
-    )
+    labels = stack_frame[["line_label", "stack_role", "section_order", "line_order"]].drop_duplicates().copy()
+    labels["bridge_role_order"] = labels["stack_role"].astype(str).map({"component_negative": 0, "component_positive": 1}).fillna(2).astype(int)
+    sort_cols = ["bridge_role_order", "section_order", "line_order", "line_label"] if mode == "Gross-to-net bridge audit" else ["section_order", "line_order", "line_label"]
+    labels = labels.sort_values(sort_cols, kind="stable")
     fig, ax = plt.subplots(figsize=(12.5, 6.4), dpi=150)
     positive_bottom = pd.Series(0.0, index=years)
     negative_bottom = pd.Series(0.0, index=years)
+    bridge_bottom = pd.Series(0.0, index=years)
     colors = [
         "#006FAD",
         "#00843D",
@@ -373,15 +378,20 @@ def _write_composition_screenshot(frame: pd.DataFrame, title: str, filename: str
             .reindex(years)
             .fillna(0.0)
         )
-        bottom = positive_bottom.where(values >= 0, negative_bottom)
+        if mode == "Gross-to-net bridge audit":
+            bottom = bridge_bottom.copy()
+            bridge_bottom = bridge_bottom + values
+        else:
+            bottom = positive_bottom.where(values >= 0, negative_bottom)
+            positive_bottom = positive_bottom + values.clip(lower=0)
+            negative_bottom = negative_bottom + values.clip(upper=0)
         ax.bar(years, values, bottom=bottom, label=label, color=colors[index % len(colors)], width=0.72)
-        positive_bottom = positive_bottom + values.clip(lower=0)
-        negative_bottom = negative_bottom + values.clip(upper=0)
 
-    overlays = frame[frame["series_id"].astype(str).eq("total_nltf_net_revenue")] if "series_id" in frame.columns else pd.DataFrame()
+    overlays = frame[frame["series_id"].astype(str).eq(overlay_series_id)] if "series_id" in frame.columns else pd.DataFrame()
     if not overlays.empty:
         overlay = overlays.drop_duplicates("FY_numeric", keep="last").sort_values("FY_numeric")
-        ax.plot(overlay["FY_numeric"], overlay["value"], color="#0F172A", linewidth=2.2, marker="D", label="Total NLTF overlay")
+        label = COMPOSITION_OVERLAYS.get(mode, (overlay_series_id, "Total overlay"))[1]
+        ax.plot(overlay["FY_numeric"], overlay["value"], color="#0F172A", linewidth=2.2, marker="D", label=label)
     ax.axhline(0, color="#52616B", linewidth=1.0)
     ax.set_title(title, loc="left", fontsize=14, weight="bold")
     ax.set_xlabel("June year")

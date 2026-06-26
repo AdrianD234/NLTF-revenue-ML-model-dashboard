@@ -207,9 +207,9 @@ CURRENT_RUNTIME_POLICY = (
     "tables are retained as audit lineage and are not a second Streamlit chart engine."
 )
 REVENUE_FIRST_FORECAST_FY = 2026
-REVENUE_STACK_MODE_NET = "Net contribution stack"
 REVENUE_STACK_MODE_BRIDGE = "Gross-to-net bridge audit"
-REVENUE_STACK_MODES = (REVENUE_STACK_MODE_NET, REVENUE_STACK_MODE_BRIDGE)
+REVENUE_STACK_MODE_GROSS = "Gross contribution stack"
+REVENUE_STACK_MODES = (REVENUE_STACK_MODE_BRIDGE, REVENUE_STACK_MODE_GROSS)
 REVENUE_STACK_SECTION_ORDER = {
     "Key volumes": 0,
     "RUC": 1,
@@ -271,10 +271,25 @@ REVENUE_STACK_DEDUCTION_SERIES = {
     "ruc_refunds",
     "ruc_admin_revenue",
     "fed_refunds",
+    "coo_revenue",
     "mvr_admin_revenue",
     "mvr_refunds",
 }
-REVENUE_STACK_OFFSET_SERIES = {"coo_revenue", "ruc_refunds"}
+REVENUE_STACK_GROSS_COMPONENT_SERIES = {
+    "light_ruc_net_revenue",
+    "heavy_ruc_net_revenue",
+    "light_bev_ruc_net_revenue",
+    "heavy_bev_ruc_net_revenue",
+    "phev_ruc_net_revenue",
+    "ruc_refunds",
+    "gross_ped_revenue",
+    "gross_lpg_revenue",
+    "gross_cng_revenue",
+    "mr1_revenue",
+    "mr2_revenue",
+    "coo_revenue",
+    "tuc_net_revenue",
+}
 REVENUE_STACK_AGGREGATE_SERIES = {
     "gross_ruc_revenue",
     "ruc_revenue_net_admin",
@@ -290,6 +305,10 @@ REVENUE_STACK_AGGREGATE_SERIES = {
     "total_revenue_net_admin",
     "total_refunds",
     "total_nltf_net_revenue",
+}
+REVENUE_STACK_MODE_TARGET_SERIES = {
+    REVENUE_STACK_MODE_BRIDGE: "total_nltf_net_revenue",
+    REVENUE_STACK_MODE_GROSS: "total_gross_revenue",
 }
 REVENUE_STACK_BRIDGE_ADDBACKS = {
     "ruc_refunds": {
@@ -588,10 +607,10 @@ def build_current_revenue_outlook_runtime_pack(
         },
         "revenue_stack_components": {
             "repo_relative_path": _repo_relative(root, base / "revenue_stack_components.csv"),
-            "scope": "Composition-over-time stack rows classified from revenue_line_reconciliation in net-contribution and gross-to-net bridge modes; aggregates are overlays only and are never stacked.",
+            "scope": "Composition-over-time stack rows classified from revenue_line_reconciliation in gross-to-net bridge and gross-contribution modes; aggregates are overlays only and are never stacked.",
             "source": "data/current_revenue_outlook/revenue_line_reconciliation.csv",
             "composition_modes": list(REVENUE_STACK_MODES),
-            "balance_rule": "Each composition mode reconciles stack_value to Total NLTF revenue within source rounding; residuals are reported and never forced.",
+            "balance_rule": "Gross-to-net bridge reconciles displayed stack_value to Total NLTF revenue; gross contribution stack reconciles displayed stack_value to Total gross revenues. Residuals are reported and never forced.",
         },
         "series_alias_audit": {
             "repo_relative_path": _repo_relative(root, base / "series_alias_audit.csv"),
@@ -711,9 +730,10 @@ def revenue_stack_components_frame(
     """Classify committed line-reconciliation rows for composition plotting.
 
     The returned frame intentionally carries two charting modes over the same
-    source values. Net mode shows only the rows that net to Total NLTF revenue;
-    bridge mode adds explicit gross add-backs so refunds/admin offsets can be
-    shown as deductions without double-counting embedded gross aggregates.
+    source values. The bridge mode reconciles displayed gross components,
+    add-backs and deductions to Total NLTF revenue; the gross mode stacks only
+    leaf rows that reconcile to Total gross revenues. Aggregate rows remain
+    table/overlay rows and are never stacked bars.
     """
 
     base_columns = list(line_reconciliation.columns) if isinstance(line_reconciliation, pd.DataFrame) else []
@@ -731,6 +751,12 @@ def revenue_stack_components_frame(
         "stack_balance_value",
         "stack_balance_residual",
         "stack_balance_status",
+        "stack_total_by_FY",
+        "overlay_total_value",
+        "overlay_series_id",
+        "overlay_label",
+        "stack_overlay_residual",
+        "stack_overlay_status",
         "stack_note",
         "formula_residual",
         "formula_residual_abs",
@@ -744,6 +770,7 @@ def revenue_stack_components_frame(
         if column not in base.columns:
             base[column] = pd.NA
     base = _append_total_fed_ruc_overlay_rows(base)
+    base = _extend_current_stack_actual_history(base)
 
     base["FY_numeric"] = pd.to_numeric(base["FY"], errors="coerce")
     base["section_order"] = base["section"].astype(str).map(REVENUE_STACK_SECTION_ORDER).fillna(99).astype(int)
@@ -796,6 +823,66 @@ def revenue_stack_components_frame(
     return out.drop(columns=["FY_numeric", "value_numeric"], errors="ignore").reset_index(drop=True)
 
 
+def _extend_current_stack_actual_history(base: pd.DataFrame) -> pd.DataFrame:
+    """Copy MBU26 actual line rows into current finalist composition paths.
+
+    Current finalist forecasts only begin in the source reconciliation around
+    the actual anchor. Composition charts need a continuous history; the
+    historical rows are copied from the repo-local MBU26 actual spine and are
+    marked as actual anchors rather than model replacements.
+    """
+
+    if base is None or base.empty or {"source_path", "FY"}.difference(base.columns):
+        return base
+
+    data = base.copy()
+    data["FY_numeric"] = pd.to_numeric(data["FY"], errors="coerce")
+    current_sources = [
+        "Current finalist Base case",
+        "Current finalist High population/comparison",
+    ]
+    available_current_sources = [source for source in current_sources if data["source_path"].astype(str).eq(source).any()]
+    if not available_current_sources:
+        return data.drop(columns=["FY_numeric"], errors="ignore")
+
+    actual_rows = data[
+        data["source_path"].astype(str).eq("MBU26 official")
+        & data["FY_numeric"].le(REVENUE_LAST_COMPLETE_ACTUAL_FY)
+    ].copy()
+    if actual_rows.empty:
+        return data.drop(columns=["FY_numeric"], errors="ignore")
+
+    history_frames: list[pd.DataFrame] = []
+    for source_path in available_current_sources:
+        source_rows = data[data["source_path"].astype(str).eq(source_path)].copy()
+        metadata = source_rows.sort_values("FY_numeric", kind="stable").head(1)
+        scenario_name = str(metadata["scenario_name"].iloc[0]) if "scenario_name" in metadata and not metadata.empty else ""
+        scenario_role = str(metadata["scenario_role"].iloc[0]) if "scenario_role" in metadata and not metadata.empty else ""
+        fed_path = str(metadata["fed_path"].iloc[0]) if "fed_path" in metadata and not metadata.empty else ""
+
+        history = actual_rows.copy()
+        history["source_path"] = source_path
+        history["scenario_name"] = scenario_name
+        history["scenario_role"] = scenario_role
+        history["fed_path"] = fed_path
+        history["source_basis"] = "MBU26 actual anchor"
+        history["model_id"] = ""
+        history["replacement_flag"] = False
+        history["forecast_quarters"] = ""
+        history["value_status"] = "Actual anchor"
+        history["residual_vs_official"] = 0.0
+        history_frames.append(history)
+
+    future_current = data[
+        ~(
+            data["source_path"].astype(str).isin(available_current_sources)
+            & data["FY_numeric"].le(REVENUE_LAST_COMPLETE_ACTUAL_FY)
+        )
+    ].copy()
+    extended = pd.concat([future_current, *history_frames], ignore_index=True, sort=False)
+    return extended.drop(columns=["FY_numeric"], errors="ignore")
+
+
 def _revenue_stack_mode_frame(base: pd.DataFrame, *, mode: str, mode_order: int) -> pd.DataFrame:
     out = base.copy()
     out["composition_mode"] = mode
@@ -807,6 +894,8 @@ def _revenue_stack_mode_frame(base: pd.DataFrame, *, mode: str, mode_order: int)
     unit = out["unit"].astype(str)
     revenue_unit = unit.eq("$m nominal ex GST")
     aggregate = row_role.isin(["aggregate", "calculated_rollup"]) | series.isin(REVENUE_STACK_AGGREGATE_SERIES)
+    gross_component = series.isin(REVENUE_STACK_GROSS_COMPONENT_SERIES) & revenue_unit & ~aggregate
+    deduction_component = series.isin(REVENUE_STACK_DEDUCTION_SERIES) & revenue_unit & ~aggregate
 
     out["stack_role"] = "audit_context"
     out["formula_role"] = "audit_context"
@@ -814,83 +903,92 @@ def _revenue_stack_mode_frame(base: pd.DataFrame, *, mode: str, mode_order: int)
     out.loc[row_role.eq("bridge_input") | section.eq("Key volumes"), "formula_role"] = "activity_context"
     out.loc[aggregate, "stack_role"] = "aggregate_overlay"
     out.loc[aggregate, "formula_role"] = "aggregate_overlay"
-    out.loc[
-        row_role.isin(["leaf", "replacement_line"]) & revenue_unit & ~aggregate,
-        "stack_role",
-    ] = "component_positive"
-    out.loc[
-        row_role.isin(["leaf", "replacement_line"]) & revenue_unit & ~aggregate,
-        "formula_role",
-    ] = "leaf_contribution"
-    out.loc[
-        (row_role.eq("deduction") | series.isin(REVENUE_STACK_DEDUCTION_SERIES)) & revenue_unit & ~aggregate,
-        "stack_role",
-    ] = "component_negative"
-    out.loc[
-        (row_role.eq("deduction") | series.isin(REVENUE_STACK_DEDUCTION_SERIES)) & revenue_unit & ~aggregate,
-        "formula_role",
-    ] = "deduction"
-    if mode == REVENUE_STACK_MODE_NET:
-        out.loc[series.isin(REVENUE_STACK_OFFSET_SERIES) & revenue_unit & ~aggregate, "stack_role"] = "offset_not_stacked"
-        out.loc[series.isin(REVENUE_STACK_OFFSET_SERIES) & revenue_unit & ~aggregate, "formula_role"] = "zero_net_offset"
+
+    if mode == REVENUE_STACK_MODE_GROSS:
+        out.loc[gross_component, "stack_role"] = "component_positive"
+        out.loc[gross_component, "formula_role"] = "gross_component"
+        out.loc[series.eq("ruc_refunds") & revenue_unit & ~aggregate, "formula_role"] = "ruc_gross_refund_component"
+        out.loc[series.eq("coo_revenue") & revenue_unit & ~aggregate, "formula_role"] = "mvr_gross_coo_component"
     elif mode == REVENUE_STACK_MODE_BRIDGE:
+        bridge_gross_component = gross_component & ~series.isin(REVENUE_STACK_BRIDGE_ADDBACKS)
+        out.loc[bridge_gross_component, "stack_role"] = "component_positive"
+        out.loc[bridge_gross_component, "formula_role"] = "gross_component"
+        out.loc[deduction_component, "stack_role"] = "component_negative"
+        out.loc[deduction_component, "formula_role"] = "deduction"
+        out.loc[series.eq("coo_revenue") & deduction_component, "formula_role"] = "admin_coo_deduction"
+        out.loc[series.eq("ruc_refunds") & deduction_component, "formula_role"] = "refund_deduction"
         addback_rows = _revenue_stack_bridge_addback_rows(out)
         if not addback_rows.empty:
             out = pd.concat([out, addback_rows], ignore_index=True, sort=False)
+    else:
+        out["stack_note"] = f"Unsupported composition mode: {mode}"
 
     out["signed_contribution"] = pd.NA
     positive = out["stack_role"].eq("component_positive")
-    negative = out["stack_role"].isin(["component_negative", "offset_not_stacked"])
+    negative = out["stack_role"].eq("component_negative")
     out.loc[positive, "signed_contribution"] = out.loc[positive, "value_numeric"]
-    out.loc[negative, "signed_contribution"] = -out.loc[negative, "value_numeric"].abs()
+    out.loc[negative, "signed_contribution"] = -out.loc[negative, "value_numeric"]
     out["signed_contribution"] = pd.to_numeric(out["signed_contribution"], errors="coerce")
 
     out["stack_value"] = pd.NA
-    out.loc[positive | out["stack_role"].eq("component_negative"), "stack_value"] = out.loc[
-        positive | out["stack_role"].eq("component_negative"),
+    out.loc[positive | negative, "stack_value"] = out.loc[
+        positive | negative,
         "signed_contribution",
     ]
-    out.loc[out["stack_role"].eq("offset_not_stacked"), "stack_value"] = 0.0
     out["stack_value"] = pd.to_numeric(out["stack_value"], errors="coerce")
-    out["stack_unit"] = out["unit"].where(out["stack_role"].isin(["component_positive", "component_negative", "offset_not_stacked"]), "")
-    out["stack_note"] = ""
+    out["stack_unit"] = out["unit"].where(out["stack_role"].isin(["component_positive", "component_negative"]), "")
+    if "stack_note" not in out.columns:
+        out["stack_note"] = ""
+    out["stack_note"] = out["stack_note"].fillna("").astype(str)
     series = out["series_id"].astype(str)
     out.loc[series.eq("coo_revenue"), "line_label"] = "MR13/COO"
-    out.loc[series.eq("coo_revenue"), "stack_note"] = (
-        "MR13/COO is present in both gross MVR and total admin-fee formulas; it is shown as a deduction audit row "
-        "with zero net stack value to avoid double-counting."
-    )
-    out.loc[series.eq("ruc_refunds"), "stack_note"] = (
-        "RUC refunds are included in the MBU26 Gross RUC row and deducted again in Total refunds; they are shown as "
-        "a refund audit row with zero net stack value to avoid double-counting."
-    )
+    if mode == REVENUE_STACK_MODE_GROSS:
+        out.loc[series.eq("coo_revenue"), "stack_note"] = "MR13/COO is part of MBU26 Gross MVR and therefore part of Total gross revenues."
+        out.loc[series.eq("ruc_refunds"), "stack_note"] = "RUC refunds are included in MBU26 Gross RUC and therefore part of Total gross revenues."
+    elif mode == REVENUE_STACK_MODE_BRIDGE:
+        out.loc[series.eq("coo_revenue"), "stack_note"] = (
+            "MR13/COO is present in Gross MVR and Total admin fees; the bridge shows the gross add-back and the signed admin/COO deduction."
+        )
+        out.loc[series.eq("ruc_refunds"), "stack_note"] = (
+            "RUC refunds are present in Gross RUC and Total refunds; the bridge shows the gross add-back and the signed refund deduction."
+        )
     out_series = out["series_id"].astype(str)
     for addback in REVENUE_STACK_BRIDGE_ADDBACKS.values():
         out.loc[out_series.eq(str(addback["series_id"])), "stack_note"] = str(addback["note"])
 
-    component_mask = out["stack_role"].isin(["component_positive", "component_negative", "offset_not_stacked"])
-    stack_balance = (
+    component_mask = out["stack_role"].isin(["component_positive", "component_negative"])
+    stack_totals = (
         out.loc[component_mask]
         .groupby(["source_path", "composition_mode", "FY_numeric"], dropna=False)["stack_value"]
         .sum(min_count=1)
-        .rename("stack_balance_value")
+        .rename("stack_total_by_FY")
         .reset_index()
     )
-    total_rows = out[out["series_id"].astype(str).eq("total_nltf_net_revenue")][
-        ["source_path", "composition_mode", "FY_numeric", "value_numeric"]
-    ].rename(columns={"value_numeric": "stack_balance_total_nltf"})
-    stack_balance = stack_balance.merge(total_rows, on=["source_path", "composition_mode", "FY_numeric"], how="left")
-    stack_balance["stack_balance_residual"] = (
-        pd.to_numeric(stack_balance["stack_balance_value"], errors="coerce")
-        - pd.to_numeric(stack_balance["stack_balance_total_nltf"], errors="coerce")
+    target_series_id = REVENUE_STACK_MODE_TARGET_SERIES.get(mode, "total_nltf_net_revenue")
+    target_rows = out[out["series_id"].astype(str).eq(target_series_id)][
+        ["source_path", "composition_mode", "FY_numeric", "series_id", "line_label", "value_numeric"]
+    ].rename(
+        columns={
+            "series_id": "overlay_series_id",
+            "line_label": "overlay_label",
+            "value_numeric": "overlay_total_value",
+        }
     )
-    stack_balance["stack_balance_status"] = np.where(
-        pd.to_numeric(stack_balance["stack_balance_residual"], errors="coerce").abs().le(1e-6),
+    stack_totals = stack_totals.merge(target_rows, on=["source_path", "composition_mode", "FY_numeric"], how="left")
+    stack_totals["stack_overlay_residual"] = (
+        pd.to_numeric(stack_totals["stack_total_by_FY"], errors="coerce")
+        - pd.to_numeric(stack_totals["overlay_total_value"], errors="coerce")
+    )
+    stack_totals["stack_overlay_status"] = np.where(
+        pd.to_numeric(stack_totals["stack_overlay_residual"], errors="coerce").abs().le(1.0),
         "balanced",
         "residual_reported",
     )
+    stack_totals["stack_balance_value"] = stack_totals["stack_total_by_FY"]
+    stack_totals["stack_balance_residual"] = stack_totals["stack_overlay_residual"]
+    stack_totals["stack_balance_status"] = stack_totals["stack_overlay_status"]
     out = out.merge(
-        stack_balance[
+        stack_totals[
             [
                 "source_path",
                 "composition_mode",
@@ -898,6 +996,12 @@ def _revenue_stack_mode_frame(base: pd.DataFrame, *, mode: str, mode_order: int)
                 "stack_balance_value",
                 "stack_balance_residual",
                 "stack_balance_status",
+                "stack_total_by_FY",
+                "overlay_total_value",
+                "overlay_series_id",
+                "overlay_label",
+                "stack_overlay_residual",
+                "stack_overlay_status",
             ]
         ],
         on=["source_path", "composition_mode", "FY_numeric"],
@@ -930,7 +1034,7 @@ def _revenue_stack_bridge_addback_rows(mode_frame: pd.DataFrame) -> pd.DataFrame
     addbacks["stack_note"] = addbacks["formula"]
     addbacks["replacement_flag"] = False
     addbacks["residual_vs_official"] = pd.NA
-    addbacks["value_numeric"] = pd.to_numeric(addbacks["value_numeric"], errors="coerce").abs()
+    addbacks["value_numeric"] = pd.to_numeric(addbacks["value_numeric"], errors="coerce")
     addbacks["value"] = addbacks["value_numeric"]
     return addbacks.drop(columns=["original_series_id"], errors="ignore")
 

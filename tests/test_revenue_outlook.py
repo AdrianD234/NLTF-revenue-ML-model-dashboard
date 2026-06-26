@@ -458,6 +458,12 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
         "value",
         "signed_contribution",
         "stack_value",
+        "stack_total_by_FY",
+        "overlay_total_value",
+        "overlay_series_id",
+        "overlay_label",
+        "stack_overlay_residual",
+        "stack_overlay_status",
         "unit",
         "row_role",
         "stack_role",
@@ -475,10 +481,10 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
         "formula_residual_status",
     }
     assert required_stack_cols.issubset(stack_components.columns)
-    assert set(stack_components["composition_mode"].dropna().astype(str).unique()) == {
-        "Net contribution stack",
+    assert list(stack_components["composition_mode"].dropna().astype(str).drop_duplicates()) == [
         "Gross-to-net bridge audit",
-    }
+        "Gross contribution stack",
+    ]
     assert set(stack_components["source_path"].dropna().unique()) == {
         "MBU26 official",
         "Current finalist Base case",
@@ -523,47 +529,61 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     ].isna().all()
     fy2026_mbu26 = stack_components[
         stack_components["source_path"].astype(str).eq("MBU26 official")
-        & stack_components["composition_mode"].astype(str).eq("Net contribution stack")
+        & stack_components["composition_mode"].astype(str).eq("Gross contribution stack")
         & pd.to_numeric(stack_components["FY"], errors="coerce").eq(2026)
     ]
     assert fy2026_mbu26.set_index("series_id").loc["gross_fed_revenue", "stack_role"] == "aggregate_overlay"
     assert fy2026_mbu26.set_index("series_id").loc["gross_ped_revenue", "stack_role"] == "component_positive"
     assert fy2026_mbu26.set_index("series_id").loc["gross_lpg_revenue", "stack_role"] == "component_positive"
     assert fy2026_mbu26.set_index("series_id").loc["gross_cng_revenue", "stack_role"] == "component_positive"
-    negative_rows = stack_components[stack_components["stack_role"].astype(str).eq("component_negative")]
+    assert fy2026_mbu26.set_index("series_id").loc["fed_refunds", "stack_role"] == "audit_context"
+    assert fy2026_mbu26.set_index("series_id").loc["ruc_refunds", "stack_role"] == "component_positive"
+    assert fy2026_mbu26.set_index("series_id").loc["coo_revenue", "stack_role"] == "component_positive"
+    assert "offset_not_stacked" not in set(stack_components["stack_role"].dropna().astype(str))
+    negative_rows = stack_components[stack_components["stack_role"].astype(str).eq("component_negative")].copy()
     assert not negative_rows.empty
-    assert pd.to_numeric(negative_rows["signed_contribution"], errors="coerce").le(0).all()
-    assert pd.to_numeric(negative_rows["stack_value"], errors="coerce").le(0).all()
-    offset_rows = stack_components[
-        stack_components["composition_mode"].astype(str).eq("Net contribution stack")
-        & stack_components["stack_role"].astype(str).eq("offset_not_stacked")
-    ]
-    assert set(offset_rows["series_id"].dropna().astype(str)) == {"coo_revenue", "ruc_refunds"}
-    assert pd.to_numeric(offset_rows["signed_contribution"], errors="coerce").le(0).all()
-    assert pd.to_numeric(offset_rows["stack_value"], errors="coerce").eq(0).all()
+    assert pd.to_numeric(negative_rows["signed_contribution"], errors="coerce").to_numpy() == pytest.approx(
+        -pd.to_numeric(negative_rows["value"], errors="coerce").to_numpy()
+    )
     bridge_offsets = stack_components[
         stack_components["composition_mode"].astype(str).eq("Gross-to-net bridge audit")
         & stack_components["series_id"].astype(str).isin(["coo_revenue", "ruc_refunds"])
     ]
     assert set(bridge_offsets["stack_role"].dropna().astype(str)) == {"component_negative"}
-    assert pd.to_numeric(bridge_offsets["stack_value"], errors="coerce").le(0).all()
+    assert pd.to_numeric(bridge_offsets["stack_value"], errors="coerce").to_numpy() == pytest.approx(
+        -pd.to_numeric(bridge_offsets["value"], errors="coerce").to_numpy()
+    )
     bridge_addbacks = stack_components[
         stack_components["composition_mode"].astype(str).eq("Gross-to-net bridge audit")
         & stack_components["series_id"].astype(str).isin(["coo_gross_mvr_addback", "ruc_refunds_gross_addback"])
     ]
     assert set(bridge_addbacks["stack_role"].dropna().astype(str)) == {"component_positive"}
     assert set(bridge_addbacks["formula_role"].dropna().astype(str)) == {"gross_addback"}
-    assert pd.to_numeric(bridge_addbacks["stack_value"], errors="coerce").ge(0).all()
-    stack_residuals = stack_components[["source_path", "composition_mode", "FY", "stack_balance_residual"]].drop_duplicates()
-    assert pd.to_numeric(stack_residuals["stack_balance_residual"], errors="coerce").abs().max() <= 1.0
+    assert pd.to_numeric(bridge_addbacks["stack_value"], errors="coerce").to_numpy() == pytest.approx(
+        pd.to_numeric(bridge_addbacks["value"], errors="coerce").to_numpy()
+    )
+    stack_residuals = stack_components[["source_path", "composition_mode", "FY", "stack_overlay_residual", "stack_overlay_status"]].drop_duplicates()
+    assert set(stack_residuals["stack_overlay_status"].dropna().astype(str)) == {"balanced"}
+    assert pd.to_numeric(stack_residuals["stack_overlay_residual"], errors="coerce").abs().max() <= 1.0
     component_sums = (
-        stack_components[stack_components["stack_role"].isin(["component_positive", "component_negative", "offset_not_stacked"])]
+        stack_components[stack_components["stack_role"].isin(["component_positive", "component_negative"])]
         .groupby(["source_path", "composition_mode", "FY"])["stack_value"]
         .sum()
     )
-    totals = stack_components[stack_components["series_id"].eq("total_nltf_net_revenue")].set_index(["source_path", "composition_mode", "FY"])["value"]
-    diff = pd.to_numeric(component_sums, errors="coerce") - pd.to_numeric(totals, errors="coerce")
+    bridge_totals = stack_components[
+        stack_components["composition_mode"].eq("Gross-to-net bridge audit")
+        & stack_components["series_id"].eq("total_nltf_net_revenue")
+    ].set_index(["source_path", "composition_mode", "FY"])["value"]
+    gross_totals = stack_components[
+        stack_components["composition_mode"].eq("Gross contribution stack")
+        & stack_components["series_id"].eq("total_gross_revenue")
+    ].set_index(["source_path", "composition_mode", "FY"])["value"]
+    target_totals = pd.concat([bridge_totals, gross_totals])
+    diff = pd.to_numeric(component_sums, errors="coerce") - pd.to_numeric(target_totals, errors="coerce")
     assert diff.abs().max() <= 1.0
+    overlay_targets = stack_components[["composition_mode", "overlay_series_id", "overlay_label"]].drop_duplicates()
+    assert set(overlay_targets[overlay_targets["composition_mode"].eq("Gross-to-net bridge audit")]["overlay_series_id"]) == {"total_nltf_net_revenue"}
+    assert set(overlay_targets[overlay_targets["composition_mode"].eq("Gross contribution stack")]["overlay_series_id"]) == {"total_gross_revenue"}
     current_stack = stack_components[stack_components["source_path"].astype(str).str.startswith("Current finalist")]
     current_pre_forecast = current_stack[
         pd.to_numeric(current_stack["FY"], errors="coerce").le(2025)
@@ -721,7 +741,7 @@ def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
         "fan_band_rows.parquet": "0da58f6bd9f132d9cd5224a29cadb80afc617ee9bd7f9f0971df885865a2a60c",
         "future_revenue_forecasts.csv": "5a8e4024e960a08308654b862acf00c278d79b9a60c899af9b710dbca9f7a0a7",
         "future_revenue_forecasts.parquet": "674ba0173044702cf0e78ab2e79791baca1879709650b2f2a840871e2d497b21",
-        "manifest.json": "65e55f3ceed6ebfac5b53c71322c2418b225ea5c425f4b8fd6139a96be31476b",
+        "manifest.json": "e132284d6d9f982d72cac8823f4c8e6b758e5d517ee1e2958bd23900b8e116ea",
         "manifest.md": "2842343704e8ba363af30cacefec80b9b5471fbaf25932f37afdd24c046252fc",
         "path_trace_status.csv": "9aee7a4e7003ec6541476ca3e4afef6d8586b6c358e41db1c8e06623e5ffcaa3",
         "path_trace_status.parquet": "e66d860fb7532ee4b92285c1ba023c9f8d9469cfdaaaef819415f7cd87c73757",
@@ -733,8 +753,8 @@ def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
         "revenue_formula_residuals.parquet": "bae3a888bda46a32876e9bfa20d6c197e008cc56b9025eb713a728ae63eade49",
         "revenue_line_reconciliation.csv": "a491632452529408c40987e651abfa8ec8b3d429590b1e2188fc95bf38f0a9aa",
         "revenue_line_reconciliation.parquet": "55fa0fbbe4a06da65f1295e9c9614a697b5dd569108dbbdc8bfa6842b170681b",
-        "revenue_stack_components.csv": "f5616156e1d16fd17db3ec1e948aa2a97f429900d6516edbe56bc1155b4ecb8a",
-        "revenue_stack_components.parquet": "1ec3d1da023ca3210003ac8f2654387e58b3f37adaf0f91cfa42efd205c08b30",
+        "revenue_stack_components.csv": "c51b8c4d38c4c5f60f1ef20396b453ccf028db8656906717f2c5f41dda92392a",
+        "revenue_stack_components.parquet": "2d391fcba14299b7a874b44364904cc6ed27d41c047fcc675ffad52e6546d067",
         "row_reconciliation.csv": "d484f5d75cce88e30ce7bcf5dd70058505cc02e5dff93f457a579f119c2fc7ce",
         "row_reconciliation.parquet": "bf2b638920e4b9b00ca4ac00d4263083258ce0d94625943c4e7b3cdf90493dd7",
         "runtime_trace_audit.csv": "a72f0dc6e03506ca85596accdc105587c6629c9d7bef65ee1a441a344c4c5a9b",

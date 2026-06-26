@@ -121,7 +121,8 @@ from model_dashboard.revenue_outlook import (
     FAN_SOURCE_SCENARIO_SPREAD,
     REVENUE_OUTLOOK_SCHEMA_VERSION,
     REVENUE_OUTLOOK_TITLE,
-    REVENUE_STACK_MODE_NET,
+    REVENUE_STACK_MODE_BRIDGE,
+    REVENUE_STACK_MODE_GROSS,
     REVENUE_STACK_MODES,
     STREAM_LABELS,
     RevenueOutlookPack,
@@ -2136,12 +2137,13 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 key="revenue_stack_sections",
             )
         stack_overlay_options = _revenue_stack_overlay_options(stack_components)
+        default_stack_overlays = _revenue_stack_default_overlays(selected_stack_mode, stack_overlay_options)
         with comp_cols[4]:
             selected_stack_overlays = st.multiselect(
                 "Aggregate overlays",
                 stack_overlay_options,
-                default=[value for value in ["Total NLTF revenue"] if value in stack_overlay_options],
-                key="revenue_stack_overlays",
+                default=default_stack_overlays,
+                key=f"revenue_stack_overlays_{selected_stack_mode}",
             )
 
         filtered_stack = _filter_revenue_stack_components(
@@ -2175,7 +2177,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 composition_mode=selected_stack_mode,
                 overlays=selected_stack_overlays,
             ),
-            caption="Net mode stacks only rows that net to Total NLTF revenue. Bridge mode shows gross add-backs and explicit deductions. Aggregates are overlays only.",
+            caption="Bridge mode reconciles gross add-backs and explicit deductions to Total NLTF revenue. Gross mode stacks leaf rows to Total gross revenues. Aggregates are overlays only.",
             notes_as_tooltip=False,
         )
         stack_gap_banner = _revenue_stack_gap_banner(filtered_stack)
@@ -4552,8 +4554,10 @@ def revenue_outlook_composition_figure(
     if "source_path" in data.columns and source_path:
         data = data[data["source_path"].astype(str).eq(str(source_path))].copy()
     if "composition_mode" in data.columns:
-        mode = str(composition_mode or REVENUE_STACK_MODE_NET)
+        mode = str(composition_mode or REVENUE_STACK_MODE_BRIDGE)
         data = data[data["composition_mode"].astype(str).eq(mode)].copy()
+    else:
+        mode = str(composition_mode or REVENUE_STACK_MODE_BRIDGE)
     if data.empty:
         return empty_figure("No Revenue composition rows match the selected source path.")
 
@@ -4564,6 +4568,17 @@ def revenue_outlook_composition_figure(
     plot = plot.dropna(subset=["stack_value_numeric", "FY_numeric"])
     if plot.empty:
         return empty_figure("No stackable contribution rows match the selected controls.")
+    visible_stack_totals = (
+        plot.groupby("FY_numeric", dropna=False)["stack_value_numeric"]
+        .sum(min_count=1)
+        .rename("visible_stack_total")
+        .reset_index()
+    )
+    visible_stack_lookup = {
+        int(row.FY_numeric): float(row.visible_stack_total)
+        for row in visible_stack_totals.itertuples(index=False)
+        if pd.notna(row.FY_numeric) and pd.notna(row.visible_stack_total)
+    }
 
     fig = go.Figure()
     colors = [
@@ -4582,20 +4597,33 @@ def revenue_outlook_composition_figure(
         "#9A3412",
         "#92400E",
     ]
-    labels = (
-        plot[["line_label", "section_order", "line_order"]]
-        .drop_duplicates()
-        .sort_values(["section_order", "line_order", "line_label"], kind="stable")
-    )
+    bridge_mode = mode == REVENUE_STACK_MODE_BRIDGE
+    label_cols = ["line_label", "stack_role", "section_order", "line_order"]
+    labels = plot[label_cols].drop_duplicates().copy()
+    labels["bridge_role_order"] = labels["stack_role"].astype(str).map({"component_negative": 0, "component_positive": 1}).fillna(2).astype(int)
+    sort_cols = ["bridge_role_order", "section_order", "line_order", "line_label"] if bridge_mode else ["section_order", "line_order", "line_label"]
+    labels = labels.sort_values(sort_cols, kind="stable")
+    bridge_running = {fy: 0.0 for fy in sorted(visible_stack_lookup)}
     for index, label_row in labels.reset_index(drop=True).iterrows():
         label = str(label_row["line_label"])
         trace_rows = plot[plot["line_label"].astype(str).eq(label)].sort_values("FY_numeric", kind="stable")
-        custom_cols = ["unit", "stack_balance_value"]
+        trace_rows["visible_stack_total"] = trace_rows["FY_numeric"].map(lambda value: visible_stack_lookup.get(int(value), np.nan))
+        custom_cols = ["unit", "visible_stack_total"]
         for column in custom_cols:
             if column not in trace_rows.columns:
                 trace_rows[column] = pd.NA
-        trace_rows["stack_balance_value"] = pd.to_numeric(trace_rows["stack_balance_value"], errors="coerce")
+        trace_rows["visible_stack_total"] = pd.to_numeric(trace_rows["visible_stack_total"], errors="coerce")
         values = trace_rows["stack_value_numeric"].tolist()
+        bar_kwargs = {}
+        if bridge_mode:
+            bases: list[float] = []
+            for row in trace_rows.itertuples(index=False):
+                fy = int(getattr(row, "FY_numeric"))
+                value = float(getattr(row, "stack_value_numeric"))
+                base = float(bridge_running.get(fy, 0.0))
+                bases.append(base)
+                bridge_running[fy] = base + value
+            bar_kwargs["base"] = bases
         fig.add_trace(
             go.Bar(
                 name=label,
@@ -4604,9 +4632,10 @@ def revenue_outlook_composition_figure(
                 marker_color=colors[index % len(colors)],
                 customdata=trace_rows[custom_cols].to_numpy(),
                 hovertemplate=(
-                    "%{fullData.name}: %{y:,.1f} %{customdata[0]}; "
-                    "FY %{x}; total stack: %{customdata[1]:,.1f} %{customdata[0]}<extra></extra>"
+                    "%{fullData.name}: %{y:,.1f}; "
+                    "FY %{x}; stack total: %{customdata[1]:,.1f}<extra></extra>"
                 ),
+                **bar_kwargs,
             )
         )
 
@@ -4621,7 +4650,14 @@ def revenue_outlook_composition_figure(
         overlay_rows = overlay_rows.dropna(subset=["FY_numeric", "value_numeric"])
         for label, group in overlay_rows.groupby("line_label", sort=False):
             group = group.sort_values("FY_numeric", kind="stable")
-            custom_cols = ["unit", "formula_residual_status"]
+            group["visible_stack_total"] = group["FY_numeric"].map(lambda value: visible_stack_lookup.get(int(value), np.nan))
+            group["visible_stack_residual"] = pd.to_numeric(group["visible_stack_total"], errors="coerce") - pd.to_numeric(group["value_numeric"], errors="coerce")
+            if "stack_overlay_status" in group.columns:
+                group = group[group["stack_overlay_status"].astype(str).eq("balanced")].copy()
+            group = group[pd.to_numeric(group["visible_stack_residual"], errors="coerce").abs().le(1.0)].copy()
+            if group.empty:
+                continue
+            custom_cols = ["unit", "visible_stack_total"]
             for column in custom_cols:
                 if column not in group.columns:
                     group[column] = ""
@@ -4633,17 +4669,17 @@ def revenue_outlook_composition_figure(
                     mode="lines+markers",
                     line={"width": 2.5, "dash": "dot"},
                     marker={"size": 7, "symbol": "diamond"},
-                    customdata=group[custom_cols].astype(str).to_numpy(),
+                    customdata=group[custom_cols].to_numpy(),
                     hovertemplate=(
-                        "%{fullData.name}: %{y:,.1f} %{customdata[0]}; "
-                        "FY %{x}; status: %{customdata[1]}<extra></extra>"
+                        "%{fullData.name}: %{y:,.1f}; "
+                        "FY %{x}; stack total: %{customdata[1]:,.1f}<extra></extra>"
                     ),
                 )
             )
 
     axis_title = _revenue_stack_axis_title(plot)
     fig.update_layout(
-        barmode="relative",
+        barmode="overlay" if bridge_mode else "relative",
         height=460,
         margin={"l": 58, "r": 20, "t": 28, "b": 58},
         yaxis_title=axis_title,
@@ -4651,7 +4687,7 @@ def revenue_outlook_composition_figure(
         xaxis={"tickmode": "linear", "dtick": 1},
         yaxis={"zeroline": True, "zerolinewidth": 1.5, "zerolinecolor": "#52616B"},
         legend={"orientation": "h", "y": -0.20, "x": 0, "font": {"size": 10}},
-        hovermode="x unified",
+        hovermode="closest",
     )
     return fig
 
@@ -5078,6 +5114,11 @@ def _revenue_stack_overlay_options(stack_components: pd.DataFrame) -> list[str]:
     return ordered or preferred
 
 
+def _revenue_stack_default_overlays(composition_mode: str, overlay_options: list[str]) -> list[str]:
+    preferred = "Total gross revenues" if composition_mode == REVENUE_STACK_MODE_GROSS else "Total NLTF revenue"
+    return [preferred] if preferred in overlay_options else []
+
+
 def _filter_revenue_stack_components(
     stack_components: pd.DataFrame,
     *,
@@ -5112,18 +5153,24 @@ def _filter_revenue_stack_components(
 
 
 def _revenue_stack_gap_banner(stack_components: pd.DataFrame) -> str:
-    if stack_components is None or stack_components.empty or "stack_balance_status" not in stack_components.columns:
+    if stack_components is None or stack_components.empty:
         return ""
-    status = stack_components[["source_path", "FY", "stack_balance_status", "stack_balance_residual"]].drop_duplicates()
-    gaps = status[~status["stack_balance_status"].astype(str).eq("balanced")].copy()
+    status_col = "stack_overlay_status" if "stack_overlay_status" in stack_components.columns else "stack_balance_status"
+    residual_col = "stack_overlay_residual" if "stack_overlay_residual" in stack_components.columns else "stack_balance_residual"
+    if status_col not in stack_components.columns or residual_col not in stack_components.columns:
+        return ""
+    cols = [col for col in ["source_path", "composition_mode", "FY", "overlay_label", status_col, residual_col] if col in stack_components.columns]
+    status = stack_components[cols].drop_duplicates()
+    gaps = status[~status[status_col].astype(str).eq("balanced")].copy()
     if gaps.empty:
         return ""
-    gaps["stack_balance_residual"] = pd.to_numeric(gaps["stack_balance_residual"], errors="coerce")
-    worst = gaps.loc[gaps["stack_balance_residual"].abs().idxmax()] if gaps["stack_balance_residual"].notna().any() else gaps.iloc[0]
+    gaps[residual_col] = pd.to_numeric(gaps[residual_col], errors="coerce")
+    worst = gaps.loc[gaps[residual_col].abs().idxmax()] if gaps[residual_col].notna().any() else gaps.iloc[0]
     return (
-        "Composition stack residuals are reported rather than forced. "
-        f"Largest visible residual: {worst.get('source_path', '')} FY{worst.get('FY', '')} "
-        f"{_format_compact_value(worst.get('stack_balance_residual'), '$m nominal ex GST')}."
+        "Composition overlay suppressed where the visible stack does not reconcile to its governed target. "
+        f"Largest residual: {worst.get('source_path', '')} {worst.get('composition_mode', '')} FY{worst.get('FY', '')} "
+        f"vs {worst.get('overlay_label', 'target')} "
+        f"{_format_compact_value(worst.get(residual_col), '$m nominal ex GST')}."
     )
 
 
@@ -5138,6 +5185,11 @@ def _revenue_stack_components_display_table(stack_components: pd.DataFrame) -> p
         "value": "Value",
         "signed_contribution": "Signed contribution",
         "stack_value": "Stack value",
+        "stack_total_by_FY": "Stack total by FY",
+        "overlay_total_value": "Overlay total",
+        "overlay_label": "Overlay target",
+        "stack_overlay_residual": "Overlay residual",
+        "stack_overlay_status": "Overlay status",
         "unit": "Unit",
         "source_path": "Source path",
         "FY": "FY",
@@ -5162,7 +5214,17 @@ def _revenue_stack_components_display_table(stack_components: pd.DataFrame) -> p
     }
     cols = [col for col in rename if col in view.columns]
     view = view[cols].rename(columns=rename)
-    for col in ["Value", "Signed contribution", "Stack value", "Residual vs official", "Stack residual", "Formula residual"]:
+    for col in [
+        "Value",
+        "Signed contribution",
+        "Stack value",
+        "Stack total by FY",
+        "Overlay total",
+        "Overlay residual",
+        "Residual vs official",
+        "Stack residual",
+        "Formula residual",
+    ]:
         if col in view.columns:
             view[col] = pd.to_numeric(view[col], errors="coerce").map(lambda value: _format_compact_value(value, ""))
     return view
