@@ -154,19 +154,19 @@
     ],
     "mbu26_annual_spine": {
       "repo_relative_path": "data/revenue_model_source_pack/mbu26_annual_spine",
-      "manifest_sha256": "fee4c2bde49bc381266aaec41c0e1762c5e529a5c948a59f592f8224fa91f836",
+      "manifest_sha256": "c3290964f9b79dbff6bca00a7633a8e5d7fcfa4ce5654bc2a200e8ca824f511c",
       "source_release": "MBU26",
       "schema_version": "nltf-revenue-mbu26-annual-spine-v1",
       "workbook_basename": "Revenue forecast error, annual view from BEFU 2013-25.xlsx",
       "workbook_sha256": "9aaff21f72c0a10cfa972a29d3c4f716495c79cbd72fc28e8008a65558454e12",
       "normalized_files": {
         "mbu26_annual_spine.csv": {
-          "sha256": "521cad24224ef2f109b82bcd2a6581e0cb47dd2b5379da2bdd7e9662b8667b0d",
-          "size_bytes": 772130
+          "sha256": "ec7269d4b9f79c1defb7747fb0d509d96565f14fc2a1ca657f0568df00b39e8a",
+          "size_bytes": 926916
         },
         "mbu26_annual_spine.parquet": {
-          "sha256": "a7fade5db952d8e87d3684990854b84fb0aa261f9dd088bc2f4bd1e12482882e",
-          "size_bytes": 59280
+          "sha256": "593fa60e30972b984c1448ec3a8bc0b7d372e6138188f4711ff08338a1d423ff",
+          "size_bytes": 63749
         },
         "mbu26_formula_audit.csv": {
           "sha256": "ee3ed9dfd8133324fdfba849804a87d38a874a7f5bae660fc02dfbe006a7139a",
@@ -177,12 +177,12 @@
           "size_bytes": 38224
         },
         "mbu26_official_annual.csv": {
-          "sha256": "e5631204c4dc096b86ba3b81266a92b18d0004fca0174da2fa82bb631ee402d0",
-          "size_bytes": 889282
+          "sha256": "fee478beaefeb96c7bebb4b50894a2b2f66c59b63a1bc3ae89a01fee360d76ea",
+          "size_bytes": 1044288
         },
         "mbu26_official_annual.parquet": {
-          "sha256": "c0c134adf022cab15bc59f9c7d3462b76a37996a48ad288141df881e115cd16a",
-          "size_bytes": 62699
+          "sha256": "e51c4e620af41a13c21c1d156f35ff7b3d776a08347a5e351fd8aaccf88d422c",
+          "size_bytes": 67073
         },
         "row_reconciliation.csv": {
           "sha256": "ee3ed9dfd8133324fdfba849804a87d38a874a7f5bae660fc02dfbe006a7139a",
@@ -191,6 +191,14 @@
         "row_reconciliation.parquet": {
           "sha256": "b35f383252ea464c5ce18eb685138f6decae5678b306cf226cff5464718ecdf5",
           "size_bytes": 38224
+        },
+        "series_alias_audit.csv": {
+          "sha256": "c0330c9918d7e2f4f972d15e8465537c16d96aca607ef253353612cadd62c56d",
+          "size_bytes": 2196
+        },
+        "series_alias_audit.parquet": {
+          "sha256": "21bfb15b78175555571f472b1b62cb9ff3372065eb707b1305c51dac97ffd1c5",
+          "size_bytes": 7505
         },
         "series_trace_contract.csv": {
           "sha256": "2eaf18c4c54fc18a21dd68415c0aea041bd174e8d75285409a4bb83034b60e09",
@@ -224,7 +232,7 @@
     "source_release": "MBU26",
     "schema_version": "nltf-revenue-mbu26-annual-spine-v1",
     "repo_relative_path": "data/revenue_model_source_pack/mbu26_annual_spine",
-    "manifest_sha256": "fee4c2bde49bc381266aaec41c0e1762c5e529a5c948a59f592f8224fa91f836",
+    "manifest_sha256": "c3290964f9b79dbff6bca00a7633a8e5d7fcfa4ce5654bc2a200e8ca824f511c",
     "workbook_basename": "Revenue forecast error, annual view from BEFU 2013-25.xlsx",
     "workbook_sha256": "9aaff21f72c0a10cfa972a29d3c4f716495c79cbd72fc28e8008a65558454e12",
     "sheet": "MBU26",
@@ -234,6 +242,7 @@
       "mbu26_formula_audit": 770,
       "mbu26_official_annual": 2200,
       "row_reconciliation": 770,
+      "series_alias_audit": 9,
       "series_trace_contract": 14,
       "trace_source_contract": 4,
       "path_trace_status": 4
@@ -247,7 +256,7 @@
     "schema_version": "nltf-revenue-mbu26-annual-spine-v1",
     "raw_workbook_basename": "Revenue forecast error, annual view from BEFU 2013-25.xlsx",
     "raw_workbook_sha256": "9aaff21f72c0a10cfa972a29d3c4f716495c79cbd72fc28e8008a65558454e12",
-    "source_pack_manifest_sha256": "fee4c2bde49bc381266aaec41c0e1762c5e529a5c948a59f592f8224fa91f836",
+    "source_pack_manifest_sha256": "c3290964f9b79dbff6bca00a7633a8e5d7fcfa4ce5654bc2a200e8ca824f511c",
     "selections": {
       "series": "Total NLTF revenue",
       "release_round": "MBU26",
@@ -317,6 +326,10 @@
     "repo_relative_path": "data/current_revenue_outlook/revenue_formula_residuals.csv",
     "scope": "Formula residual checks for RUC, FED, MVR and total rows by source path and FY."
   },
+  "series_alias_audit": {
+    "repo_relative_path": "data/current_revenue_outlook/series_alias_audit.csv",
+    "scope": "Canonical Revenue Outlook series aliases from source labels/series IDs to dashboard selector IDs."
+  },
   "validation_status": "runtime_rebuilt",
   "output_hashes": {
     "future_revenue_forecasts.csv": {
@@ -336,20 +349,20 @@
       "size_bytes": 5960
     },
     "revenue_bridge_components.csv": {
-      "sha256": "32c1ff9bb842a4ee92e5672f6b77cf64ed63b1f4d17aae8a42be64d0a4681282",
-      "size_bytes": 357517
+      "sha256": "a978206d738eebdf689865e41c56e37e69ebb5600c246b62f92975d959456168",
+      "size_bytes": 357494
     },
     "revenue_bridge_components.parquet": {
-      "sha256": "9e6b24981e0d8bcd2be2c3601d79a23df5f60df85407558be438ac3c7eddf32e",
-      "size_bytes": 44224
+      "sha256": "2c6250ad2c5a1ea65fb9a8deb302c9500cec7e62f120900acef190cfc9299c42",
+      "size_bytes": 38407
     },
     "revenue_chart_rows.csv": {
-      "sha256": "f62ed55927106e497ab26908bdb39b57d86e047ffe816911091ecc6f94b6f56d",
-      "size_bytes": 1634531
+      "sha256": "eda813058e64fdb698b5b6b79ec72e4c86bb50a7e215b9a8416f92efe21e5678",
+      "size_bytes": 1664846
     },
     "revenue_chart_rows.parquet": {
-      "sha256": "bc59f384182f5564e262972cbe94d0ffd7385a3d1a1bc86f990485df35e5fad7",
-      "size_bytes": 108062
+      "sha256": "2d1fa28b5cf1791f3bff0893d7dd4797c9f45762f5f3b5517c0670f8ab9f1415",
+      "size_bytes": 102632
     },
     "revenue_formula_residuals.csv": {
       "sha256": "47c4d5f95aea4071be32e512b10428d1dad323202e7e189e0aa4b106e0873f0e",
@@ -360,11 +373,11 @@
       "size_bytes": 35699
     },
     "revenue_line_reconciliation.csv": {
-      "sha256": "cb7f7b12c4fcacff18db7583f86259697f69dbec85f10b691d0955b59adaab4c",
-      "size_bytes": 1705279
+      "sha256": "a491632452529408c40987e651abfa8ec8b3d429590b1e2188fc95bf38f0a9aa",
+      "size_bytes": 1704897
     },
     "revenue_line_reconciliation.parquet": {
-      "sha256": "a1f3bb6ecc74daebb334f462b21d02d5ddf056c5aabf388e384e88029fa4841a",
+      "sha256": "55fa0fbbe4a06da65f1295e9c9614a697b5dd569108dbbdc8bfa6842b170681b",
       "size_bytes": 75896
     },
     "row_reconciliation.csv": {
@@ -376,12 +389,20 @@
       "size_bytes": 38215
     },
     "runtime_trace_audit.csv": {
-      "sha256": "74247f10efdbab7d8fe961080d3eb301aba312d41c60aec536443a70ecddcad4",
-      "size_bytes": 61772
+      "sha256": "a72f0dc6e03506ca85596accdc105587c6629c9d7bef65ee1a441a344c4c5a9b",
+      "size_bytes": 62151
     },
     "runtime_trace_audit.parquet": {
-      "sha256": "5c505ce661eec24602055859aae8d70d88165a5a8b42c0e61ea96d2f7784a384",
-      "size_bytes": 20395
+      "sha256": "f37e7a5f6893f5bba1df795cecd955e0126c3b5aabff71cb3699a7b291998ef8",
+      "size_bytes": 20199
+    },
+    "series_alias_audit.csv": {
+      "sha256": "c0330c9918d7e2f4f972d15e8465537c16d96aca607ef253353612cadd62c56d",
+      "size_bytes": 2196
+    },
+    "series_alias_audit.parquet": {
+      "sha256": "9b376147c912748d5a2429abf524799e348a3711d6af89a4b9d1ec287f558918",
+      "size_bytes": 7583
     },
     "series_trace_contract.csv": {
       "sha256": "2eaf18c4c54fc18a21dd68415c0aea041bd174e8d75285409a4bb83034b60e09",

@@ -16,18 +16,19 @@
     "mbu26_formula_audit": 770,
     "mbu26_official_annual": 2200,
     "row_reconciliation": 770,
+    "series_alias_audit": 9,
     "series_trace_contract": 14,
     "trace_source_contract": 4,
     "path_trace_status": 4
   },
   "normalized_files": {
     "mbu26_annual_spine.csv": {
-      "sha256": "521cad24224ef2f109b82bcd2a6581e0cb47dd2b5379da2bdd7e9662b8667b0d",
-      "size_bytes": 772130
+      "sha256": "ec7269d4b9f79c1defb7747fb0d509d96565f14fc2a1ca657f0568df00b39e8a",
+      "size_bytes": 926916
     },
     "mbu26_annual_spine.parquet": {
-      "sha256": "a7fade5db952d8e87d3684990854b84fb0aa261f9dd088bc2f4bd1e12482882e",
-      "size_bytes": 59280
+      "sha256": "593fa60e30972b984c1448ec3a8bc0b7d372e6138188f4711ff08338a1d423ff",
+      "size_bytes": 63749
     },
     "mbu26_formula_audit.csv": {
       "sha256": "ee3ed9dfd8133324fdfba849804a87d38a874a7f5bae660fc02dfbe006a7139a",
@@ -38,12 +39,12 @@
       "size_bytes": 38224
     },
     "mbu26_official_annual.csv": {
-      "sha256": "e5631204c4dc096b86ba3b81266a92b18d0004fca0174da2fa82bb631ee402d0",
-      "size_bytes": 889282
+      "sha256": "fee478beaefeb96c7bebb4b50894a2b2f66c59b63a1bc3ae89a01fee360d76ea",
+      "size_bytes": 1044288
     },
     "mbu26_official_annual.parquet": {
-      "sha256": "c0c134adf022cab15bc59f9c7d3462b76a37996a48ad288141df881e115cd16a",
-      "size_bytes": 62699
+      "sha256": "e51c4e620af41a13c21c1d156f35ff7b3d776a08347a5e351fd8aaccf88d422c",
+      "size_bytes": 67073
     },
     "row_reconciliation.csv": {
       "sha256": "ee3ed9dfd8133324fdfba849804a87d38a874a7f5bae660fc02dfbe006a7139a",
@@ -52,6 +53,14 @@
     "row_reconciliation.parquet": {
       "sha256": "b35f383252ea464c5ce18eb685138f6decae5678b306cf226cff5464718ecdf5",
       "size_bytes": 38224
+    },
+    "series_alias_audit.csv": {
+      "sha256": "c0330c9918d7e2f4f972d15e8465537c16d96aca607ef253353612cadd62c56d",
+      "size_bytes": 2196
+    },
+    "series_alias_audit.parquet": {
+      "sha256": "21bfb15b78175555571f472b1b62cb9ff3372065eb707b1305c51dac97ffd1c5",
+      "size_bytes": 7505
     },
     "series_trace_contract.csv": {
       "sha256": "2eaf18c4c54fc18a21dd68415c0aea041bd174e8d75285409a4bb83034b60e09",

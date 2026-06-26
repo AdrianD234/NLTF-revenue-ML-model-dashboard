@@ -191,6 +191,7 @@ def test_committed_current_revenue_outlook_pack_is_repo_local_and_hash_backed() 
     assert "MBU26 source spine" in manifest["revenue_source_pack"]["default_selection_policy"]
     assert manifest["revenue_line_reconciliation"]["repo_relative_path"] == "data/current_revenue_outlook/revenue_line_reconciliation.csv"
     assert manifest["revenue_formula_residuals"]["repo_relative_path"] == "data/current_revenue_outlook/revenue_formula_residuals.csv"
+    assert manifest["series_alias_audit"]["repo_relative_path"] == "data/current_revenue_outlook/series_alias_audit.csv"
     assert sorted(manifest["output_hashes"]) == [
         "future_revenue_forecasts.csv",
         "future_revenue_forecasts.parquet",
@@ -208,6 +209,8 @@ def test_committed_current_revenue_outlook_pack_is_repo_local_and_hash_backed() 
         "row_reconciliation.parquet",
         "runtime_trace_audit.csv",
         "runtime_trace_audit.parquet",
+        "series_alias_audit.csv",
+        "series_alias_audit.parquet",
         "series_trace_contract.csv",
         "series_trace_contract.parquet",
         "trace_source_contract.csv",
@@ -233,6 +236,7 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     audit = pd.read_parquet(pack_dir / "runtime_trace_audit.parquet")
     line_reconciliation = pd.read_parquet(pack_dir / "revenue_line_reconciliation.parquet")
     residuals = pd.read_parquet(pack_dir / "revenue_formula_residuals.parquet")
+    alias_audit = pd.read_parquet(pack_dir / "series_alias_audit.parquet")
 
     assert manifest["runtime_pack_type"] == "mbu26_actual_current_finalist_official_comparator"
     assert manifest["bridge_status_by_stream"] == {
@@ -257,6 +261,62 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
         displayed["row_type"].astype(str).eq("historical_actual")
         & pd.to_numeric(displayed["june_year"], errors="coerce").gt(2025)
     ].empty
+    dashboard_series = {str(value) for value in displayed["series_id"].dropna().unique()}
+    assert dashboard_series == {
+        "gross_fed_revenue",
+        "gross_ped_revenue",
+        "heavy_ruc_net_km",
+        "heavy_ruc_net_revenue",
+        "light_ruc_net_km",
+        "light_ruc_net_revenue",
+        "net_fed_revenue",
+        "net_mvr_revenue",
+        "ped_vkt_per_capita",
+        "total_fed_ruc_net_revenue",
+        "total_nltf_net_revenue",
+        "total_ruc_net_revenue",
+    }
+    for series_id, series_rows in displayed.groupby("series_id"):
+        traces = set(series_rows["trace_name"].dropna().astype(str))
+        assert allowed_traces.issubset(traces), series_id
+        actual_rows = series_rows[series_rows["trace_name"].astype(str).eq("Actual")]
+        official_rows = series_rows[series_rows["trace_name"].astype(str).eq("MBU26 official")]
+        assert not actual_rows.empty, series_id
+        assert not official_rows.empty, series_id
+        assert not actual_rows["source_file"].fillna("").astype(str).str.contains("forecast_scenario|annual_model_paths|selected_dashboard", case=False).any(), series_id
+        assert not official_rows["source_file"].fillna("").astype(str).str.contains("forecast_scenario|annual_model_paths|selected_dashboard", case=False).any(), series_id
+        official_years = set(pd.to_numeric(official_rows["june_year"], errors="coerce").dropna().astype(int))
+        assert {2026, 2027}.issubset(official_years), series_id
+        current_rows = series_rows[
+            series_rows["trace_name"].astype(str).isin(
+                [
+                    "Current finalist Base case",
+                    "Current finalist High population/comparison",
+                ]
+            )
+            & pd.to_numeric(series_rows["june_year"], errors="coerce").ge(2026)
+        ]
+        assert {
+            "Current finalist Base case",
+            "Current finalist High population/comparison",
+        }.issubset(set(current_rows["trace_name"].dropna().astype(str))), series_id
+        assert not current_rows["source_file"].fillna("").astype(str).str.contains("annual_model_paths|selected_dashboard", case=False).any(), series_id
+    assert "light_petrol_vkt_per_capita" not in set(chart["series_id"].dropna().astype(str))
+    ped_displayed = displayed[displayed["series_id"].astype(str).eq("ped_vkt_per_capita")].copy()
+    ped_by_trace = {
+        trace: set(pd.to_numeric(group["june_year"], errors="coerce").dropna().astype(int))
+        for trace, group in ped_displayed.groupby("trace_name")
+    }
+    assert 2025 in ped_by_trace["Actual"]
+    assert {2026, 2027}.issubset(ped_by_trace["MBU26 official"])
+    assert {2026, 2027}.issubset(ped_by_trace["Current finalist Base case"])
+    assert {2026, 2027}.issubset(ped_by_trace["Current finalist High population/comparison"])
+    official_ped_fy2026 = ped_displayed[
+        ped_displayed["trace_name"].astype(str).eq("MBU26 official")
+        & pd.to_numeric(ped_displayed["june_year"], errors="coerce").eq(2026)
+    ].iloc[0]
+    assert float(official_ped_fy2026["value"]) > 5000
+    assert official_ped_fy2026["source_cell"] == "AB17"
 
     runtime_text = pd.concat(
         [
@@ -333,7 +393,7 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
         "PHEV RUC net km",
         "PED volume",
         "Light petrol VKT",
-        "Light petrol VKT per capita",
+        "PED VKT per capita",
         "TUC GTK",
         "Light RUC net revenue",
         "Heavy RUC net revenue",
@@ -369,6 +429,22 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     for source_path in ["MBU26 official", "Current finalist Base case", "Current finalist High population/comparison"]:
         path_rows = line_reconciliation[line_reconciliation["source_path"].astype(str).eq(source_path)]
         assert required_lines.issubset(set(path_rows["line_label"].astype(str)))
+    assert "light_petrol_vkt_per_capita" not in set(line_reconciliation["series_id"].dropna().astype(str))
+    assert {
+        "source_label",
+        "source_series_id",
+        "runtime_series_id",
+        "dashboard_label",
+        "unit",
+        "source_row",
+        "source_cell",
+        "alias_reason",
+        "status",
+    }.issubset(alias_audit.columns)
+    ped_alias = alias_audit[alias_audit["source_series_id"].astype(str).eq("light_petrol_vkt_per_capita")].iloc[0]
+    assert ped_alias["runtime_series_id"] == "ped_vkt_per_capita"
+    assert ped_alias["dashboard_label"] == "PED VKT per capita"
+    assert ped_alias["status"] == "canonical_mapping"
 
     base_lines = line_reconciliation[
         line_reconciliation["source_path"].astype(str).eq("Current finalist Base case")
@@ -405,22 +481,24 @@ def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
     expected_hashes = {
         "future_revenue_forecasts.csv": "5a8e4024e960a08308654b862acf00c278d79b9a60c899af9b710dbca9f7a0a7",
         "future_revenue_forecasts.parquet": "674ba0173044702cf0e78ab2e79791baca1879709650b2f2a840871e2d497b21",
-        "manifest.json": "dac100f9baf7d14a20f2ccfc3cfe96730830c437b9cc310f274e51196a656c48",
-        "manifest.md": "cadedd0c392baa81ec71fb0aa79effabbf5faf5adfc5193fe71090edec310742",
+        "manifest.json": "5f48c0c5260eab41dc4345d4c1674bb7ffc772ccf693139449b76d2ab4e6a346",
+        "manifest.md": "2842343704e8ba363af30cacefec80b9b5471fbaf25932f37afdd24c046252fc",
         "path_trace_status.csv": "9aee7a4e7003ec6541476ca3e4afef6d8586b6c358e41db1c8e06623e5ffcaa3",
         "path_trace_status.parquet": "e66d860fb7532ee4b92285c1ba023c9f8d9469cfdaaaef819415f7cd87c73757",
-        "revenue_bridge_components.csv": "32c1ff9bb842a4ee92e5672f6b77cf64ed63b1f4d17aae8a42be64d0a4681282",
-        "revenue_bridge_components.parquet": "9e6b24981e0d8bcd2be2c3601d79a23df5f60df85407558be438ac3c7eddf32e",
-        "revenue_chart_rows.csv": "f62ed55927106e497ab26908bdb39b57d86e047ffe816911091ecc6f94b6f56d",
-        "revenue_chart_rows.parquet": "bc59f384182f5564e262972cbe94d0ffd7385a3d1a1bc86f990485df35e5fad7",
+        "revenue_bridge_components.csv": "a978206d738eebdf689865e41c56e37e69ebb5600c246b62f92975d959456168",
+        "revenue_bridge_components.parquet": "2c6250ad2c5a1ea65fb9a8deb302c9500cec7e62f120900acef190cfc9299c42",
+        "revenue_chart_rows.csv": "eda813058e64fdb698b5b6b79ec72e4c86bb50a7e215b9a8416f92efe21e5678",
+        "revenue_chart_rows.parquet": "2d1fa28b5cf1791f3bff0893d7dd4797c9f45762f5f3b5517c0670f8ab9f1415",
         "revenue_formula_residuals.csv": "47c4d5f95aea4071be32e512b10428d1dad323202e7e189e0aa4b106e0873f0e",
         "revenue_formula_residuals.parquet": "bae3a888bda46a32876e9bfa20d6c197e008cc56b9025eb713a728ae63eade49",
-        "revenue_line_reconciliation.csv": "cb7f7b12c4fcacff18db7583f86259697f69dbec85f10b691d0955b59adaab4c",
-        "revenue_line_reconciliation.parquet": "a1f3bb6ecc74daebb334f462b21d02d5ddf056c5aabf388e384e88029fa4841a",
+        "revenue_line_reconciliation.csv": "a491632452529408c40987e651abfa8ec8b3d429590b1e2188fc95bf38f0a9aa",
+        "revenue_line_reconciliation.parquet": "55fa0fbbe4a06da65f1295e9c9614a697b5dd569108dbbdc8bfa6842b170681b",
         "row_reconciliation.csv": "d484f5d75cce88e30ce7bcf5dd70058505cc02e5dff93f457a579f119c2fc7ce",
         "row_reconciliation.parquet": "bf2b638920e4b9b00ca4ac00d4263083258ce0d94625943c4e7b3cdf90493dd7",
-        "runtime_trace_audit.csv": "74247f10efdbab7d8fe961080d3eb301aba312d41c60aec536443a70ecddcad4",
-        "runtime_trace_audit.parquet": "5c505ce661eec24602055859aae8d70d88165a5a8b42c0e61ea96d2f7784a384",
+        "runtime_trace_audit.csv": "a72f0dc6e03506ca85596accdc105587c6629c9d7bef65ee1a441a344c4c5a9b",
+        "runtime_trace_audit.parquet": "f37e7a5f6893f5bba1df795cecd955e0126c3b5aabff71cb3699a7b291998ef8",
+        "series_alias_audit.csv": "c0330c9918d7e2f4f972d15e8465537c16d96aca607ef253353612cadd62c56d",
+        "series_alias_audit.parquet": "9b376147c912748d5a2429abf524799e348a3711d6af89a4b9d1ec287f558918",
         "series_trace_contract.csv": "2eaf18c4c54fc18a21dd68415c0aea041bd174e8d75285409a4bb83034b60e09",
         "series_trace_contract.parquet": "5706036ec8e179dbc31003e6ab6dcd966d0d02216f8c30d5e4f4c48ba36e9d3f",
         "trace_source_contract.csv": "396a97e28c43adc892c438ce92fe16a847d87b0ad91c6f8ec1334416c85a070a",

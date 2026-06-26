@@ -45,6 +45,7 @@ class MBU26AnnualSpinePack:
     official_annual: pd.DataFrame
     formula_audit: pd.DataFrame
     row_reconciliation: pd.DataFrame
+    series_alias_audit: pd.DataFrame
     series_trace_contract: pd.DataFrame
     trace_source_contract: pd.DataFrame
     path_trace_status: pd.DataFrame
@@ -58,7 +59,7 @@ ROW_DEFINITIONS: tuple[dict[str, Any], ...] = (
     {"row": 14, "series_id": "phev_ruc_net_km", "display_name": "PHEV RUC net km", "section": "Key volumes", "unit": "million km", "metric_type": "activity", "row_role": "bridge_input"},
     {"row": 15, "series_id": "ped_volume", "display_name": "PED volume", "section": "Key volumes", "unit": "million litres", "metric_type": "activity", "row_role": "bridge_input"},
     {"row": 16, "series_id": "light_petrol_vkt", "display_name": "Light petrol VKT", "section": "Key volumes", "unit": "million km", "metric_type": "activity", "row_role": "bridge_input"},
-    {"row": 17, "series_id": "light_petrol_vkt_per_capita", "display_name": "Light petrol VKT per capita", "section": "Key volumes", "unit": "km/person", "metric_type": "activity", "row_role": "bridge_input"},
+    {"row": 17, "series_id": "ped_vkt_per_capita", "source_series_id": "light_petrol_vkt_per_capita", "display_name": "PED VKT per capita", "source_display_name": "Light petrol VKT per capita", "section": "Key volumes", "unit": "km/person", "metric_type": "activity", "row_role": "bridge_input"},
     {"row": 18, "series_id": "tuc_gtk", "display_name": "TUC GTK", "section": "Key volumes", "unit": "tonne-km", "metric_type": "activity", "row_role": "bridge_input"},
     {"row": 33, "series_id": "light_ruc_net_revenue", "display_name": "Light RUC revenue", "section": "RUC", "unit": "$m nominal ex GST", "metric_type": "revenue", "row_role": "leaf"},
     {"row": 34, "series_id": "heavy_ruc_net_revenue", "display_name": "Heavy RUC revenue", "section": "RUC", "unit": "$m nominal ex GST", "metric_type": "revenue", "row_role": "leaf"},
@@ -97,6 +98,90 @@ REVENUE_LINE_SOURCE_PATHS: tuple[str, ...] = (
     "MBU26 official",
     "Current finalist Base case",
     "Current finalist High population/comparison",
+)
+
+SERIES_ALIAS_AUDIT_ROWS: tuple[dict[str, str], ...] = (
+    {
+        "source_label": "Light petrol VKT per capita (km)",
+        "source_series_id": "light_petrol_vkt_per_capita",
+        "runtime_series_id": "ped_vkt_per_capita",
+        "dashboard_label": "PED VKT per capita",
+        "unit": "km/person",
+        "alias_reason": "MBU26 row 17 uses the worksheet label Light petrol VKT per capita; the dashboard and current finalist model use PED VKT per capita for the same annual activity concept.",
+        "status": "canonical_mapping",
+    },
+    {
+        "source_label": "PED VKT per capita",
+        "source_series_id": "ped_vkt_per_capita",
+        "runtime_series_id": "ped_vkt_per_capita",
+        "dashboard_label": "PED VKT per capita",
+        "unit": "km/person",
+        "alias_reason": "Current finalist source rows already use the dashboard canonical series.",
+        "status": "already_canonical",
+    },
+    {
+        "source_label": "Gross PED revenue",
+        "source_series_id": "gross_ped_revenue",
+        "runtime_series_id": "gross_ped_revenue",
+        "dashboard_label": "PED revenue",
+        "unit": "$m nominal ex GST",
+        "alias_reason": "Gross PED revenue and PED revenue are display aliases for the same MBU26 gross PED row.",
+        "status": "display_alias",
+    },
+    {
+        "source_label": "RUC revenues net of admin fees & refunds",
+        "source_series_id": "total_ruc_net_revenue",
+        "runtime_series_id": "total_ruc_net_revenue",
+        "dashboard_label": "Total RUC all classes",
+        "unit": "$m nominal ex GST",
+        "alias_reason": "The dashboard selector keeps the MBU26 Total RUC all classes label; source-pack wording describes the same net-admin/refunds formula.",
+        "status": "canonical_mapping",
+    },
+    {
+        "source_label": "MR13 revenue",
+        "source_series_id": "coo_revenue",
+        "runtime_series_id": "coo_revenue",
+        "dashboard_label": "MR13",
+        "unit": "$m nominal ex GST",
+        "alias_reason": "MR13 and COO revenue are label variants for the same MBU26 row 55 deduction component.",
+        "status": "display_alias",
+    },
+    {
+        "source_label": "MR13/COO revenue",
+        "source_series_id": "coo_revenue",
+        "runtime_series_id": "coo_revenue",
+        "dashboard_label": "MR13",
+        "unit": "$m nominal ex GST",
+        "alias_reason": "The original MBU26/source label is retained in provenance while the compact dashboard line label is MR13.",
+        "status": "display_alias",
+    },
+    {
+        "source_label": "MVR revenues net of admin fees & COO",
+        "source_series_id": "mvr_revenue_net_admin_coo",
+        "runtime_series_id": "mvr_revenue_net_admin_coo",
+        "dashboard_label": "MVR net admin & COO",
+        "unit": "$m nominal ex GST",
+        "alias_reason": "Long-form MBU26/source label and compact dashboard label describe the same MVR net-admin/COO component.",
+        "status": "display_alias",
+    },
+    {
+        "source_label": "MVR revenues net of admin fees, refunds & COO",
+        "source_series_id": "net_mvr_revenue",
+        "runtime_series_id": "net_mvr_revenue",
+        "dashboard_label": "MVR net admin/refunds/COO",
+        "unit": "$m nominal ex GST",
+        "alias_reason": "This label variant includes refunds and maps to the final Net MVR revenue canonical row.",
+        "status": "canonical_mapping",
+    },
+    {
+        "source_label": "Total net revenues",
+        "source_series_id": "total_nltf_net_revenue",
+        "runtime_series_id": "total_nltf_net_revenue",
+        "dashboard_label": "Total NLTF revenue",
+        "unit": "$m nominal ex GST",
+        "alias_reason": "Total net revenues is the source-pack wording for the final Total NLTF revenue line.",
+        "status": "canonical_mapping",
+    },
 )
 
 
@@ -158,6 +243,7 @@ def load_mbu26_annual_spine(
         official_annual=pd.read_csv(base / "mbu26_official_annual.csv"),
         formula_audit=pd.read_csv(base / "mbu26_formula_audit.csv"),
         row_reconciliation=pd.read_csv(base / "row_reconciliation.csv"),
+        series_alias_audit=pd.read_csv(base / "series_alias_audit.csv"),
         series_trace_contract=pd.read_csv(base / "series_trace_contract.csv"),
         trace_source_contract=pd.read_csv(base / "trace_source_contract.csv"),
         path_trace_status=pd.read_csv(base / "path_trace_status.csv"),
@@ -191,6 +277,7 @@ def materialize_mbu26_annual_spine(
 
     formula_audit = _formula_audit_frame(annual_spine)
     official_annual = _official_annual_frame(annual_spine, formula_audit)
+    alias_audit = revenue_series_alias_audit_frame(annual_spine)
     series_contract = _series_trace_contract_frame()
     trace_contract = _trace_source_contract_frame(workbook.name, workbook_hash)
     path_status = _path_trace_status_frame()
@@ -200,6 +287,7 @@ def materialize_mbu26_annual_spine(
         "mbu26_formula_audit": formula_audit,
         "mbu26_official_annual": official_annual,
         "row_reconciliation": formula_audit.copy(),
+        "series_alias_audit": alias_audit,
         "series_trace_contract": series_contract,
         "trace_source_contract": trace_contract,
         "path_trace_status": path_status,
@@ -267,6 +355,59 @@ def _read_existing_manifest(output: Path) -> dict[str, Any]:
         return {}
 
 
+def revenue_series_alias_audit_frame(annual_spine: pd.DataFrame | None = None) -> pd.DataFrame:
+    columns = [
+        "source_label",
+        "source_series_id",
+        "runtime_series_id",
+        "dashboard_label",
+        "unit",
+        "source_row",
+        "source_cell",
+        "alias_reason",
+        "status",
+    ]
+    row_by_runtime = {str(row["series_id"]): row for row in ROW_DEFINITIONS}
+    row_by_source = {str(row.get("source_series_id") or row["series_id"]): row for row in ROW_DEFINITIONS}
+    source_cells: dict[tuple[str, str], str] = {}
+    source_rows: dict[tuple[str, str], str] = {}
+    source_labels: dict[tuple[str, str], str] = {}
+    if isinstance(annual_spine, pd.DataFrame) and not annual_spine.empty:
+        spine = annual_spine.copy()
+        for key, group in spine.groupby(
+            [
+                spine.get("source_series_id", spine.get("series_id", pd.Series("", index=spine.index))).astype(str),
+                spine.get("series_id", pd.Series("", index=spine.index)).astype(str),
+            ],
+            dropna=False,
+        ):
+            source_series_id, runtime_series_id = str(key[0]), str(key[1])
+            source_cells[(source_series_id, runtime_series_id)] = _source_cell_range(group)
+            source_rows[(source_series_id, runtime_series_id)] = _first_text(group, "source_row")
+            source_labels[(source_series_id, runtime_series_id)] = _first_text(group, "source_label")
+    rows: list[dict[str, Any]] = []
+    for item in SERIES_ALIAS_AUDIT_ROWS:
+        source_series_id = item["source_series_id"]
+        runtime_series_id = item["runtime_series_id"]
+        key = (source_series_id, runtime_series_id)
+        definition = row_by_source.get(source_series_id) or row_by_runtime.get(runtime_series_id, {})
+        source_label = source_labels.get(key) if source_series_id != runtime_series_id else ""
+        rows.append(
+            {
+                "source_label": source_label or item["source_label"],
+                "source_series_id": source_series_id,
+                "runtime_series_id": runtime_series_id,
+                "dashboard_label": item["dashboard_label"],
+                "unit": item["unit"],
+                "source_row": source_rows.get(key) or str(definition.get("row") or ""),
+                "source_cell": source_cells.get(key) or _definition_source_cell_hint(definition),
+                "alias_reason": item["alias_reason"],
+                "status": item["status"],
+            }
+        )
+    return pd.DataFrame(rows, columns=columns).sort_values(["runtime_series_id", "source_label"], kind="stable").reset_index(drop=True)
+
+
 def current_forecast_annual_from_mbu26(
     *,
     current_outlook_chart_rows: pd.DataFrame,
@@ -324,7 +465,7 @@ def current_forecast_annual_from_mbu26(
         off = official.get(fy, {})
         required_official = {
             "light_petrol_vkt",
-            "light_petrol_vkt_per_capita",
+            "ped_vkt_per_capita",
             "ped_volume",
             "gross_ped_revenue",
             "light_ruc_net_revenue",
@@ -393,14 +534,14 @@ def current_forecast_annual_from_mbu26(
         ped_values = [float(value) for value in ped_quarters.get("values", [])]
         light_values = [float(value) for value in light_quarters.get("values", [])]
         heavy_values = [float(value) for value in heavy_quarters.get("values", [])]
-        ped_vkt_per_capita = sum(ped_values) / 4.0
+        ped_vkt_per_capita = sum(ped_values)
         light_km_million = sum(light_values)
         heavy_km_million = sum(heavy_values)
         if abs(light_km_million) > 10_000_000:
             light_km_million /= 1_000_000.0
         if abs(heavy_km_million) > 10_000_000:
             heavy_km_million /= 1_000_000.0
-        population_count = float(off["light_petrol_vkt"]) * 1_000_000.0 / float(off["light_petrol_vkt_per_capita"])
+        population_count = float(off["light_petrol_vkt"]) * 1_000_000.0 / float(off["ped_vkt_per_capita"])
         ped_litres_per_100km = float(off["ped_volume"]) / float(off["light_petrol_vkt"]) * 100.0
         ped_rate = float(off["gross_ped_revenue"]) / float(off["ped_volume"])
         ped_total_vkt = sum(value * population_count / 1_000_000.0 for value in ped_values)
@@ -452,10 +593,9 @@ def current_forecast_annual_from_mbu26(
         )
         rows.extend(
             [
-                _current_annual_row(**common, series_id="ped_vkt_per_capita", display_name="PED VKT per capita", section="Key volumes", value=ped_vkt_per_capita, unit="km/person", row_role="bridge_input", source_basis="current_finalist_model", source_file="forecast_scenario_comparison.parquet", source_cell=ped_source_cell, formula="average of quarterly current finalist PED VKT/capita inputs"),
+                _current_annual_row(**common, series_id="ped_vkt_per_capita", display_name="PED VKT per capita", section="Key volumes", value=ped_vkt_per_capita, unit="km/person", row_role="bridge_input", source_basis="current_finalist_model", source_file="forecast_scenario_comparison.parquet", source_cell=ped_source_cell, formula="sum quarterly current finalist PED VKT/capita", official_value=off["ped_vkt_per_capita"]),
                 _current_annual_row(**common, series_id="ped_volume", display_name="PED volume", section="Key volumes", value=ped_volume, unit="million litres", row_role="bridge_input", source_basis="current finalist PED VKT/capita + MBU26 intensity", source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=ped_source_cell, formula="sum(quarterly PED VKT/capita * MBU26 population / 1,000,000 * MBU26 litres intensity / 100)", official_value=off["ped_volume"]),
                 _current_annual_row(**common, series_id="light_petrol_vkt", display_name="Light petrol VKT", section="Key volumes", value=ped_total_vkt, unit="million km", row_role="bridge_input", source_basis="current_finalist_model + MBU26 population", source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=ped_source_cell, formula="sum(quarterly PED VKT/capita * MBU26 population / 1,000,000)", official_value=off["light_petrol_vkt"]),
-                _current_annual_row(**common, series_id="light_petrol_vkt_per_capita", display_name="Light petrol VKT per capita", section="Key volumes", value=ped_vkt_per_capita * 4.0, unit="km/person", row_role="bridge_input", source_basis="current_finalist_model", source_file="forecast_scenario_comparison.parquet", source_cell=ped_source_cell, formula="sum quarterly current finalist PED VKT/capita", official_value=off["light_petrol_vkt_per_capita"]),
                 _current_annual_row(**common, series_id="light_ruc_net_km", display_name="Light RUC net km", section="Key volumes", value=light_km_million, unit="million km", row_role="bridge_input", source_basis="current_finalist_model", source_file="forecast_scenario_comparison.parquet", source_cell=light_source_cell, formula="sum quarterly current finalist Light RUC net km", official_value=off["light_ruc_net_km"]),
                 _current_annual_row(**common, series_id="heavy_ruc_net_km", display_name="Heavy RUC net km", section="Key volumes", value=heavy_km_million, unit="million km", row_role="bridge_input", source_basis="current_finalist_model", source_file="forecast_scenario_comparison.parquet", source_cell=heavy_source_cell, formula="sum quarterly current finalist Heavy RUC net km", official_value=off["heavy_ruc_net_km"]),
                 fixed("light_bev_ruc_net_km"),
@@ -549,6 +689,10 @@ def _extract_annual_spine(values_sheet: Any, formulas_sheet: Any, workbook_name:
     rows: list[dict[str, Any]] = []
     for definition in ROW_DEFINITIONS:
         source_row = int(definition["row"])
+        runtime_series_id = str(definition["series_id"])
+        source_series_id = str(definition.get("source_series_id") or runtime_series_id)
+        dashboard_label = str(definition["display_name"])
+        source_display_name = str(definition.get("source_display_name") or dashboard_label)
         workbook_label = str(values_sheet.cell(source_row, 2).value or "").strip()
         for year_info in year_columns:
             column = int(year_info["column"])
@@ -567,14 +711,18 @@ def _extract_annual_spine(values_sheet: Any, formulas_sheet: Any, workbook_name:
                     "source_year_cell": year_info["source_year_cell"],
                     "source_status_cell": year_info["source_status_cell"],
                     "source_formula": source_formula,
-                    "asserted_formula": formula_by_output.get(str(definition["series_id"]), ""),
+                    "asserted_formula": formula_by_output.get(runtime_series_id, ""),
                     "FY": int(year_info["fy"]),
                     "period": f"FY{int(year_info['fy'])}",
                     "period_status": year_info["period_status"],
                     "source_label": workbook_label,
-                    "label": definition["display_name"],
-                    "series_id": definition["series_id"],
-                    "display_name": definition["display_name"],
+                    "source_series_id": source_series_id,
+                    "runtime_series_id": runtime_series_id,
+                    "dashboard_label": dashboard_label,
+                    "source_display_name": source_display_name,
+                    "label": dashboard_label,
+                    "series_id": runtime_series_id,
+                    "display_name": dashboard_label,
                     "section": definition["section"],
                     "unit": definition["unit"],
                     "metric_type": definition["metric_type"],
@@ -726,7 +874,7 @@ def _current_activity_annual_values(chart_rows: pd.DataFrame) -> pd.DataFrame:
             if len(values) != 4:
                 continue
             if str(series_id) == "ped_vkt_per_capita":
-                annual_value = sum(values) / 4.0
+                annual_value = sum(values)
                 unit = "km/person"
             else:
                 annual_value = sum(values)
@@ -1381,6 +1529,22 @@ def _first_text(frame: pd.DataFrame, column: str) -> str:
         return ""
     values = [str(value).strip() for value in frame[column].dropna() if str(value).strip()]
     return values[0] if values else ""
+
+
+def _source_cell_range(frame: pd.DataFrame) -> str:
+    if not isinstance(frame, pd.DataFrame) or frame.empty or "source_cell" not in frame.columns:
+        return ""
+    cells = [str(value).strip() for value in frame["source_cell"].dropna() if str(value).strip()]
+    if not cells:
+        return ""
+    return cells[0] if cells[0] == cells[-1] else f"{cells[0]}:{cells[-1]}"
+
+
+def _definition_source_cell_hint(definition: dict[str, Any]) -> str:
+    row = definition.get("row") if isinstance(definition, dict) else ""
+    if row in (None, ""):
+        return ""
+    return f"MBU26 row {row}"
 
 
 def _as_int(value: Any) -> int | None:

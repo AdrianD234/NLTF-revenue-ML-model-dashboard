@@ -15,6 +15,7 @@ PACK_DIR = ROOT / "data" / "current_revenue_outlook"
 SCREENSHOT_DIR = ROOT / "artifacts" / "screenshots"
 
 SERIES = {
+    "ped_vkt_per_capita": ("Revenue Outlook - PED VKT per capita", "revenue-outlook-ped-vkt-per-capita.png"),
     "gross_ped_revenue": ("Revenue Outlook - PED revenue", "revenue-outlook-ped-revenue.png"),
     "net_fed_revenue": ("Revenue Outlook - Net FED revenue", "revenue-outlook-net-fed.png"),
     "total_fed_ruc_net_revenue": ("Revenue Outlook - Total RUC+PED revenue", "revenue-outlook-total-ruc-ped.png"),
@@ -102,6 +103,15 @@ def main() -> None:
             "rows": reconciliation_rows,
         }
     )
+    alias_path, alias_rows = _write_alias_audit_screenshot()
+    manifest.append(
+        {
+            "series_id": "series_alias_audit",
+            "title": "Revenue Outlook - series alias audit",
+            "repo_relative_path": alias_path.relative_to(ROOT).as_posix(),
+            "rows": alias_rows,
+        }
+    )
 
     manifest_path = ROOT / "artifacts" / "revenue_outlook_series_screenshot_manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
@@ -155,6 +165,44 @@ def _write_reconciliation_table_screenshot() -> tuple[Path, int]:
             cell.set_facecolor("#FFFFFF" if row % 2 else "#F8FAFC")
     fig.tight_layout()
     path = SCREENSHOT_DIR / "revenue-outlook-reconciliation-table.png"
+    fig.savefig(path)
+    plt.close(fig)
+    return path, int(len(view))
+
+
+def _write_alias_audit_screenshot() -> tuple[Path, int]:
+    alias = pd.read_csv(PACK_DIR / "series_alias_audit.csv")
+    view = alias[["source_label", "source_series_id", "runtime_series_id", "dashboard_label", "source_cell", "status"]].rename(
+        columns={
+            "source_label": "Source label",
+            "source_series_id": "Source series ID",
+            "runtime_series_id": "Runtime series ID",
+            "dashboard_label": "Dashboard label",
+            "source_cell": "Source cell",
+            "status": "Status",
+        }
+    )
+    fig, ax = plt.subplots(figsize=(14.5, 5.2), dpi=150)
+    ax.axis("off")
+    ax.set_title("Revenue Outlook - series alias audit", loc="left", fontsize=14, weight="bold")
+    table = ax.table(
+        cellText=view.values,
+        colLabels=view.columns,
+        loc="center",
+        cellLoc="left",
+        colLoc="left",
+    )
+    table.auto_set_font_size(False)
+    table.set_fontsize(7.2)
+    table.scale(1, 1.32)
+    for (row, _col), cell in table.get_celld().items():
+        if row == 0:
+            cell.set_text_props(weight="bold", color="#0F172A")
+            cell.set_facecolor("#E2E8F0")
+        else:
+            cell.set_facecolor("#FFFFFF" if row % 2 else "#F8FAFC")
+    fig.tight_layout()
+    path = SCREENSHOT_DIR / "revenue-outlook-series-alias-audit.png"
     fig.savefig(path)
     plt.close(fig)
     return path, int(len(view))

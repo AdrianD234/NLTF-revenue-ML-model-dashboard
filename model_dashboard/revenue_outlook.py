@@ -68,6 +68,7 @@ RUNTIME_REVENUE_OUTLOOK_FILES = (
     "runtime_trace_audit.parquet",
     "revenue_line_reconciliation.parquet",
     "revenue_formula_residuals.parquet",
+    "series_alias_audit.parquet",
     "trace_source_contract.parquet",
     "series_trace_contract.parquet",
     "path_trace_status.parquet",
@@ -160,6 +161,7 @@ class RevenueOutlookPack:
     revenue_chart_rows: pd.DataFrame
     revenue_line_reconciliation: pd.DataFrame = field(default_factory=pd.DataFrame)
     revenue_formula_residuals: pd.DataFrame = field(default_factory=pd.DataFrame)
+    series_alias_audit: pd.DataFrame = field(default_factory=pd.DataFrame)
 
 
 def repo_root_from_here() -> Path:
@@ -176,6 +178,7 @@ def revenue_outlook_signature(pack_dir: Path | str | None = None, repo_root: Pat
         base / "revenue_chart_rows.parquet",
         base / "revenue_line_reconciliation.parquet",
         base / "revenue_formula_residuals.parquet",
+        base / "series_alias_audit.parquet",
     ]
     signature: list[tuple[str, int, int]] = []
     for path in paths:
@@ -209,6 +212,7 @@ def load_revenue_outlook_pack(
         revenue_chart_rows=_read_optional_parquet(base / "revenue_chart_rows.parquet"),
         revenue_line_reconciliation=_read_optional_parquet(base / "revenue_line_reconciliation.parquet"),
         revenue_formula_residuals=_read_optional_parquet(base / "revenue_formula_residuals.parquet"),
+        series_alias_audit=_read_optional_parquet(base / "series_alias_audit.parquet"),
     )
 
 
@@ -412,6 +416,10 @@ def build_current_revenue_outlook_runtime_pack(
             "repo_relative_path": _repo_relative(root, base / "revenue_formula_residuals.csv"),
             "scope": "Formula residual checks for RUC, FED, MVR and total rows by source path and FY.",
         },
+        "series_alias_audit": {
+            "repo_relative_path": _repo_relative(root, base / "series_alias_audit.csv"),
+            "scope": "Canonical Revenue Outlook series aliases from source labels/series IDs to dashboard selector IDs.",
+        },
         "validation_status": "runtime_rebuilt",
     }
 
@@ -425,6 +433,7 @@ def build_current_revenue_outlook_runtime_pack(
             "runtime_trace_audit": trace_audit,
             "trace_source_contract": mbu26_pack.trace_source_contract,
             "series_trace_contract": mbu26_pack.series_trace_contract,
+            "series_alias_audit": mbu26_pack.series_alias_audit,
             "path_trace_status": mbu26_pack.path_trace_status,
             "row_reconciliation": mbu26_pack.row_reconciliation,
             "revenue_line_reconciliation": line_reconciliation,
@@ -1731,8 +1740,8 @@ def _add_june_year_rows(chart_rows: pd.DataFrame) -> pd.DataFrame:
         stream = str(record["stream"])
         metric_type = str(record["metric_type"])
         if metric_type == "activity" and stream == "PED":
-            value = float(group["value_numeric"].mean())
-            aggregation_method = "mean_quarterly_vkt_per_capita"
+            value = float(group["value_numeric"].sum())
+            aggregation_method = "sum_quarterly_vkt_per_capita"
         else:
             value = float(group["value_numeric"].sum())
             aggregation_method = "sum_quarters"
@@ -1925,6 +1934,7 @@ def _write_pack_files(
         "runtime_trace_audit",
         "revenue_line_reconciliation",
         "revenue_formula_residuals",
+        "series_alias_audit",
         "trace_source_contract",
         "series_trace_contract",
         "path_trace_status",

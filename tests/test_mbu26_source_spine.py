@@ -33,6 +33,7 @@ def test_mbu26_source_spine_manifest_is_hash_backed_and_repo_local() -> None:
             "mbu26_formula_audit.csv",
             "mbu26_official_annual.csv",
             "row_reconciliation.csv",
+            "series_alias_audit.csv",
             "series_trace_contract.csv",
             "trace_source_contract.csv",
             "path_trace_status.csv",
@@ -95,8 +96,43 @@ def test_mbu26_spine_extracts_required_rows_statuses_and_roles() -> None:
     assert spine.loc[pd.to_numeric(spine["FY"], errors="coerce").gt(2025), "period_status"].ne("ACTUAL").all()
     assert not spine["source_cell"].fillna("").astype(str).eq("").any()
     missing = spine[spine["value"].isna()]
-    assert set(missing["series_id"].dropna().unique()) <= {"light_petrol_vkt", "light_petrol_vkt_per_capita"}
+    assert set(missing["series_id"].dropna().unique()) <= {"light_petrol_vkt", "ped_vkt_per_capita"}
     assert set(pd.to_numeric(missing["FY"], errors="coerce").dropna().astype(int)) <= {2001, 2002}
+    row17 = spine[pd.to_numeric(spine["source_row"], errors="coerce").eq(17)]
+    assert set(row17["series_id"].dropna().astype(str).unique()) == {"ped_vkt_per_capita"}
+    assert set(row17["source_series_id"].dropna().astype(str).unique()) == {"light_petrol_vkt_per_capita"}
+    assert set(row17["display_name"].dropna().astype(str).unique()) == {"PED VKT per capita"}
+    assert set(row17["source_label"].dropna().astype(str).unique()) == {"Light petrol VKT per capita (km)"}
+
+
+def test_mbu26_series_alias_audit_documents_runtime_canonicalization() -> None:
+    alias = pd.read_csv(SPINE_DIR / "series_alias_audit.csv")
+    required = {
+        "source_label",
+        "source_series_id",
+        "runtime_series_id",
+        "dashboard_label",
+        "unit",
+        "source_row",
+        "source_cell",
+        "alias_reason",
+        "status",
+    }
+    assert required.issubset(alias.columns)
+    ped = alias[alias["source_series_id"].astype(str).eq("light_petrol_vkt_per_capita")].iloc[0]
+    assert ped["runtime_series_id"] == "ped_vkt_per_capita"
+    assert ped["dashboard_label"] == "PED VKT per capita"
+    assert ped["source_row"] == 17
+    assert str(ped["source_cell"]).startswith("C17:")
+    assert ped["status"] == "canonical_mapping"
+    assert {
+        "gross_ped_revenue",
+        "total_ruc_net_revenue",
+        "coo_revenue",
+        "mvr_revenue_net_admin_coo",
+        "net_mvr_revenue",
+        "total_nltf_net_revenue",
+    }.issubset(set(alias["runtime_series_id"].astype(str)))
 
 
 def test_mbu26_formula_audit_and_row_reconciliation_are_explicit() -> None:

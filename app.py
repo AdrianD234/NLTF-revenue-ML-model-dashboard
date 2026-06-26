@@ -1993,6 +1993,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     future_revenue = pack.future_revenue_forecasts.copy() if pack is not None and isinstance(pack.future_revenue_forecasts, pd.DataFrame) else pd.DataFrame()
     line_reconciliation = pack.revenue_line_reconciliation.copy() if pack is not None and isinstance(getattr(pack, "revenue_line_reconciliation", None), pd.DataFrame) else pd.DataFrame()
     formula_residuals = pack.revenue_formula_residuals.copy() if pack is not None and isinstance(getattr(pack, "revenue_formula_residuals", None), pd.DataFrame) else pd.DataFrame()
+    alias_audit = pack.series_alias_audit.copy() if pack is not None and isinstance(getattr(pack, "series_alias_audit", None), pd.DataFrame) else pd.DataFrame()
 
     section_title(REVENUE_OUTLOOK_TITLE)
     st.caption(
@@ -2150,6 +2151,13 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         if gap_banner:
             warning_panel(gap_banner)
         display_table(_revenue_line_reconciliation_display_table(filtered_reconciliation), height=360, max_rows=520)
+
+    with st.container(border=True):
+        st.markdown("<div class='page5-panel-title'>Series alias audit</div>", unsafe_allow_html=True)
+        alias_cols = st.columns([0.82, 0.18])
+        with alias_cols[1]:
+            dataframe_download(alias_audit, "Download CSV", "series_alias_audit.csv")
+        display_table(_revenue_series_alias_audit_display_table(alias_audit), height=260, max_rows=120)
 
     with st.expander("Activity and volume outlook", expanded=False):
         activity_rows = _filter_revenue_outlook_rows(
@@ -4718,6 +4726,25 @@ def _revenue_line_reconciliation_display_table(line_reconciliation: pd.DataFrame
     if "Residual vs official" in view.columns:
         view["Residual vs official"] = pd.to_numeric(view["Residual vs official"], errors="coerce").map(lambda value: _format_compact_value(value, ""))
     return view
+
+
+def _revenue_series_alias_audit_display_table(alias_audit: pd.DataFrame) -> pd.DataFrame:
+    if alias_audit is None or alias_audit.empty:
+        return pd.DataFrame()
+    view = alias_audit.copy()
+    rename = {
+        "source_label": "Source label",
+        "source_series_id": "Source series ID",
+        "runtime_series_id": "Runtime series ID",
+        "dashboard_label": "Dashboard label",
+        "unit": "Unit",
+        "source_row": "Source row",
+        "source_cell": "Source cell",
+        "alias_reason": "Alias reason",
+        "status": "Status",
+    }
+    cols = [col for col in rename if col in view.columns]
+    return view[cols].rename(columns=rename)
 
 
 def _revenue_formula_gap_banner(

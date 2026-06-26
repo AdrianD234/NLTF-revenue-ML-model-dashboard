@@ -27,7 +27,7 @@
 ## Revenue Source Pack
 - Version: `MBU26`
 - Raw workbook SHA256: `9aaff21f72c0a10cfa972a29d3c4f716495c79cbd72fc28e8008a65558454e12`
-- Manifest SHA256: `fee4c2bde49bc381266aaec41c0e1762c5e529a5c948a59f592f8224fa91f836`
+- Manifest SHA256: `c3290964f9b79dbff6bca00a7633a8e5d7fcfa4ce5654bc2a200e8ca824f511c`
 - Status: `mbu26_annual_spine_vendored`
 - Dashboard default series: `Total NLTF revenue`
 - Source workbook current series: `None`

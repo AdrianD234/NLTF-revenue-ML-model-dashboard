@@ -129,6 +129,8 @@ SOURCE_SERIES_ALIASES = {
     "MVR admin revenue exGST": "mvr_admin_revenue",
     "Net MVR revenue exGST": "net_mvr_revenue",
     "PED VKT per capita": "ped_vkt_per_capita",
+    "Light petrol VKT per capita": "ped_vkt_per_capita",
+    "Light petrol VKT per capita (km)": "ped_vkt_per_capita",
     "PED volume": "ped_volume",
     "PED/FED rate path": "ped_fed_rate_path",
     "Population count": "population_count",

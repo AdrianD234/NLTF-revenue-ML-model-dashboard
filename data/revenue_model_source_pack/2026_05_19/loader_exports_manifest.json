@@ -11,12 +11,12 @@
     "canonical_revenue_long.csv": {
       "role": "Canonical long schema across repo-local source rows and offline lineage rows.",
       "row_count": 39967,
-      "sha256": "b418aa2f571f00bb99046ade5f3cfaa6cfe58990ad3ad7dfb6915880c1c6cd29"
+      "sha256": "a7e0be399ce8e909ea4207dc93568cc3c14b1b2f757f2bfb6e2f4bf26caef868"
     },
     "data_vintage_manifest.json": {
       "role": "Model/source observation cutoffs and repo-local current Revenue Outlook/source-pack hashes.",
       "row_count": null,
-      "sha256": "b869666ce6ddb6444ee7e0ae8b34b4d73761f5e8e7bd4383bf13724630792d1e"
+      "sha256": "7273de0ea536cb83201afb31d6fa6279dbaa73a6586115669eecf8b47d52faa4"
     },
     "hybrid_annual_revenue.csv": {
       "role": "Replacement-only annual NLTF hybrid roll-up audit using source-backed PED/FED, Light RUC and Heavy RUC bridge inputs plus MOT fixed components.",
@@ -45,8 +45,8 @@
     },
     "series_role_audit.csv": {
       "role": "Explicit role contract for modeled activity, revenue bridges, pass-through lines, deductions, overlays, and source gaps.",
-      "row_count": 79,
-      "sha256": "364e16ba6e4916b35f20bb980e12124d835f1233f3e383b9ca16fe3c945009b6"
+      "row_count": 78,
+      "sha256": "ac0500f60dab8eab74f98cebe860dc5937e542c46bd6696f5c2d39310ab237e7"
     },
     "series_trace_contract.csv": {
       "role": "Per-series trace contract for valid controls, source actuals, primary current-finalist forecast source, bridge and cutoffs.",
@@ -71,7 +71,7 @@
     "validation_issues.csv": {
       "role": "Loader validation warnings/errors for the source pack.",
       "row_count": 2,
-      "sha256": "eeaba04ea7bce437e72f3b13fc32606b4cab7a48dbcdb4a1eb243d43f59eb2bd"
+      "sha256": "86f670ec0b78d45b5c013f2c26153cb25a74692312b0f34f6cc09dcc04429d5c"
     }
   },
   "repo_relative_output_dir": "data/revenue_model_source_pack/2026_05_19",
