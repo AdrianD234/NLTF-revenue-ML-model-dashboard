@@ -449,6 +449,7 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     assert "light_petrol_vkt_per_capita" not in set(line_reconciliation["series_id"].dropna().astype(str))
 
     required_stack_cols = {
+        "composition_mode",
         "source_path",
         "FY",
         "section",
@@ -460,65 +461,124 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
         "unit",
         "row_role",
         "stack_role",
+        "formula_role",
         "source_file",
         "source_cell",
         "formula",
         "replacement_flag",
         "model_id",
         "quarter_composition",
+        "actual_quarters",
+        "forecast_quarters",
         "residual_vs_official",
         "stack_balance_residual",
         "formula_residual_status",
     }
     assert required_stack_cols.issubset(stack_components.columns)
+    assert set(stack_components["composition_mode"].dropna().astype(str).unique()) == {
+        "Net contribution stack",
+        "Gross-to-net bridge audit",
+    }
     assert set(stack_components["source_path"].dropna().unique()) == {
         "MBU26 official",
         "Current finalist Base case",
         "Current finalist High population/comparison",
     }
+    required_stack_lines = set(required_lines).difference({"MR13"})
+    required_stack_lines.update({"MR13/COO", "RUC refunds gross add-back", "MR13/COO gross add-back"})
     for source_path in ["MBU26 official", "Current finalist Base case", "Current finalist High population/comparison"]:
         path_rows = stack_components[stack_components["source_path"].astype(str).eq(source_path)]
-        assert required_lines.issubset(set(path_rows["line_label"].astype(str)))
+        assert required_stack_lines.issubset(set(path_rows["line_label"].astype(str)))
         assert "Total RUC+PED" in set(path_rows["line_label"].astype(str))
     assert "light_petrol_vkt_per_capita" not in set(stack_components["series_id"].dropna().astype(str))
+    aggregate_series = {
+        "gross_ruc_revenue",
+        "ruc_revenue_net_admin",
+        "total_ruc_net_revenue",
+        "total_fed_ruc_net_revenue",
+        "gross_fed_revenue",
+        "net_fed_revenue",
+        "gross_mvr_revenue",
+        "mvr_revenue_net_admin_coo",
+        "net_mvr_revenue",
+        "total_gross_revenue",
+        "total_admin_fees",
+        "total_revenue_net_admin",
+        "total_refunds",
+        "total_nltf_net_revenue",
+    }
     assert set(
         stack_components.loc[
             stack_components["stack_role"].astype(str).eq("aggregate_overlay"),
             "series_id",
         ].astype(str)
-    ).issuperset(
-        {
-            "gross_ruc_revenue",
-            "gross_fed_revenue",
-            "net_fed_revenue",
-            "total_ruc_net_revenue",
-            "total_fed_ruc_net_revenue",
-            "total_nltf_net_revenue",
-        }
-    )
+    ).issuperset(aggregate_series)
+    assert stack_components[
+        stack_components["series_id"].astype(str).isin(aggregate_series)
+        & stack_components["stack_role"].astype(str).isin(["component_positive", "component_negative", "offset_not_stacked"])
+    ].empty
     assert stack_components.loc[
         stack_components["stack_role"].astype(str).eq("aggregate_overlay"),
         "stack_value",
     ].isna().all()
+    fy2026_mbu26 = stack_components[
+        stack_components["source_path"].astype(str).eq("MBU26 official")
+        & stack_components["composition_mode"].astype(str).eq("Net contribution stack")
+        & pd.to_numeric(stack_components["FY"], errors="coerce").eq(2026)
+    ]
+    assert fy2026_mbu26.set_index("series_id").loc["gross_fed_revenue", "stack_role"] == "aggregate_overlay"
+    assert fy2026_mbu26.set_index("series_id").loc["gross_ped_revenue", "stack_role"] == "component_positive"
+    assert fy2026_mbu26.set_index("series_id").loc["gross_lpg_revenue", "stack_role"] == "component_positive"
+    assert fy2026_mbu26.set_index("series_id").loc["gross_cng_revenue", "stack_role"] == "component_positive"
     negative_rows = stack_components[stack_components["stack_role"].astype(str).eq("component_negative")]
     assert not negative_rows.empty
     assert pd.to_numeric(negative_rows["signed_contribution"], errors="coerce").le(0).all()
     assert pd.to_numeric(negative_rows["stack_value"], errors="coerce").le(0).all()
-    offset_rows = stack_components[stack_components["stack_role"].astype(str).eq("offset_not_stacked")]
+    offset_rows = stack_components[
+        stack_components["composition_mode"].astype(str).eq("Net contribution stack")
+        & stack_components["stack_role"].astype(str).eq("offset_not_stacked")
+    ]
     assert set(offset_rows["series_id"].dropna().astype(str)) == {"coo_revenue", "ruc_refunds"}
     assert pd.to_numeric(offset_rows["signed_contribution"], errors="coerce").le(0).all()
     assert pd.to_numeric(offset_rows["stack_value"], errors="coerce").eq(0).all()
-    stack_residuals = stack_components[["source_path", "FY", "stack_balance_residual"]].drop_duplicates()
+    bridge_offsets = stack_components[
+        stack_components["composition_mode"].astype(str).eq("Gross-to-net bridge audit")
+        & stack_components["series_id"].astype(str).isin(["coo_revenue", "ruc_refunds"])
+    ]
+    assert set(bridge_offsets["stack_role"].dropna().astype(str)) == {"component_negative"}
+    assert pd.to_numeric(bridge_offsets["stack_value"], errors="coerce").le(0).all()
+    bridge_addbacks = stack_components[
+        stack_components["composition_mode"].astype(str).eq("Gross-to-net bridge audit")
+        & stack_components["series_id"].astype(str).isin(["coo_gross_mvr_addback", "ruc_refunds_gross_addback"])
+    ]
+    assert set(bridge_addbacks["stack_role"].dropna().astype(str)) == {"component_positive"}
+    assert set(bridge_addbacks["formula_role"].dropna().astype(str)) == {"gross_addback"}
+    assert pd.to_numeric(bridge_addbacks["stack_value"], errors="coerce").ge(0).all()
+    stack_residuals = stack_components[["source_path", "composition_mode", "FY", "stack_balance_residual"]].drop_duplicates()
     assert pd.to_numeric(stack_residuals["stack_balance_residual"], errors="coerce").abs().max() <= 1.0
     component_sums = (
         stack_components[stack_components["stack_role"].isin(["component_positive", "component_negative", "offset_not_stacked"])]
-        .groupby(["source_path", "FY"])["stack_value"]
+        .groupby(["source_path", "composition_mode", "FY"])["stack_value"]
         .sum()
     )
-    totals = stack_components[stack_components["series_id"].eq("total_nltf_net_revenue")].set_index(["source_path", "FY"])["value"]
+    totals = stack_components[stack_components["series_id"].eq("total_nltf_net_revenue")].set_index(["source_path", "composition_mode", "FY"])["value"]
     diff = pd.to_numeric(component_sums, errors="coerce") - pd.to_numeric(totals, errors="coerce")
     assert diff.abs().max() <= 1.0
     current_stack = stack_components[stack_components["source_path"].astype(str).str.startswith("Current finalist")]
+    current_pre_forecast = current_stack[
+        pd.to_numeric(current_stack["FY"], errors="coerce").le(2025)
+        & current_stack["row_role"].astype(str).isin(["leaf", "deduction", "replacement_line"])
+    ]
+    assert set(current_pre_forecast["source_file"].dropna().astype(str)) == {"mbu26_annual_spine.csv"}
+    assert set(current_pre_forecast["source_basis"].dropna().astype(str)) == {"MBU26 actual anchor"}
+    assert not current_pre_forecast["source_file"].astype(str).str.contains("forecast_scenario", case=False).any()
+    assert current_pre_forecast["forecast_quarters"].fillna("").astype(str).str.strip().eq("").all()
+    current_fy2026_replacements = current_stack[
+        pd.to_numeric(current_stack["FY"], errors="coerce").eq(2026)
+        & current_stack["replacement_flag"].astype(str).str.lower().isin(["true", "1"])
+    ]
+    assert set(current_fy2026_replacements["actual_quarters"].dropna().astype(str)) == {"2025Q3; 2025Q4"}
+    assert set(current_fy2026_replacements["forecast_quarters"].dropna().astype(str)) == {"2026Q1; 2026Q2"}
     current_replacements = set(
         current_stack.loc[
             current_stack["replacement_flag"].astype(str).str.lower().isin(["true", "1"]),
@@ -661,7 +721,7 @@ def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
         "fan_band_rows.parquet": "0da58f6bd9f132d9cd5224a29cadb80afc617ee9bd7f9f0971df885865a2a60c",
         "future_revenue_forecasts.csv": "5a8e4024e960a08308654b862acf00c278d79b9a60c899af9b710dbca9f7a0a7",
         "future_revenue_forecasts.parquet": "674ba0173044702cf0e78ab2e79791baca1879709650b2f2a840871e2d497b21",
-        "manifest.json": "aec17a91ac51a4929a8c0581a5462e2632f80ce8d0ad64347f4f70efaef190cb",
+        "manifest.json": "65e55f3ceed6ebfac5b53c71322c2418b225ea5c425f4b8fd6139a96be31476b",
         "manifest.md": "2842343704e8ba363af30cacefec80b9b5471fbaf25932f37afdd24c046252fc",
         "path_trace_status.csv": "9aee7a4e7003ec6541476ca3e4afef6d8586b6c358e41db1c8e06623e5ffcaa3",
         "path_trace_status.parquet": "e66d860fb7532ee4b92285c1ba023c9f8d9469cfdaaaef819415f7cd87c73757",
@@ -673,8 +733,8 @@ def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
         "revenue_formula_residuals.parquet": "bae3a888bda46a32876e9bfa20d6c197e008cc56b9025eb713a728ae63eade49",
         "revenue_line_reconciliation.csv": "a491632452529408c40987e651abfa8ec8b3d429590b1e2188fc95bf38f0a9aa",
         "revenue_line_reconciliation.parquet": "55fa0fbbe4a06da65f1295e9c9614a697b5dd569108dbbdc8bfa6842b170681b",
-        "revenue_stack_components.csv": "77e8b064eabd10205835cf33a96c11ca7ab36da4e6c5a1ed276195ab73350abc",
-        "revenue_stack_components.parquet": "35329e462976e9d8b53b04ebdbb842e3e91d8d723a0937973225e9b9d5535acc",
+        "revenue_stack_components.csv": "f5616156e1d16fd17db3ec1e948aa2a97f429900d6516edbe56bc1155b4ecb8a",
+        "revenue_stack_components.parquet": "1ec3d1da023ca3210003ac8f2654387e58b3f37adaf0f91cfa42efd205c08b30",
         "row_reconciliation.csv": "d484f5d75cce88e30ce7bcf5dd70058505cc02e5dff93f457a579f119c2fc7ce",
         "row_reconciliation.parquet": "bf2b638920e4b9b00ca4ac00d4263083258ce0d94625943c4e7b3cdf90493dd7",
         "runtime_trace_audit.csv": "a72f0dc6e03506ca85596accdc105587c6629c9d7bef65ee1a441a344c4c5a9b",

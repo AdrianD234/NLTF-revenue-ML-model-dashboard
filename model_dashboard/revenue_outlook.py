@@ -207,6 +207,9 @@ CURRENT_RUNTIME_POLICY = (
     "tables are retained as audit lineage and are not a second Streamlit chart engine."
 )
 REVENUE_FIRST_FORECAST_FY = 2026
+REVENUE_STACK_MODE_NET = "Net contribution stack"
+REVENUE_STACK_MODE_BRIDGE = "Gross-to-net bridge audit"
+REVENUE_STACK_MODES = (REVENUE_STACK_MODE_NET, REVENUE_STACK_MODE_BRIDGE)
 REVENUE_STACK_SECTION_ORDER = {
     "Key volumes": 0,
     "RUC": 1,
@@ -234,6 +237,7 @@ REVENUE_STACK_SERIES_ORDER = {
             "heavy_bev_ruc_net_revenue",
             "phev_ruc_net_revenue",
             "ruc_refunds",
+            "ruc_refunds_gross_addback",
             "gross_ruc_revenue",
             "ruc_admin_revenue",
             "ruc_revenue_net_admin",
@@ -248,6 +252,7 @@ REVENUE_STACK_SERIES_ORDER = {
             "mr1_revenue",
             "mr2_revenue",
             "coo_revenue",
+            "coo_gross_mvr_addback",
             "gross_mvr_revenue",
             "mvr_admin_revenue",
             "mvr_revenue_net_admin_coo",
@@ -270,6 +275,40 @@ REVENUE_STACK_DEDUCTION_SERIES = {
     "mvr_refunds",
 }
 REVENUE_STACK_OFFSET_SERIES = {"coo_revenue", "ruc_refunds"}
+REVENUE_STACK_AGGREGATE_SERIES = {
+    "gross_ruc_revenue",
+    "ruc_revenue_net_admin",
+    "total_ruc_net_revenue",
+    "total_fed_ruc_net_revenue",
+    "gross_fed_revenue",
+    "net_fed_revenue",
+    "gross_mvr_revenue",
+    "mvr_revenue_net_admin_coo",
+    "net_mvr_revenue",
+    "total_gross_revenue",
+    "total_admin_fees",
+    "total_revenue_net_admin",
+    "total_refunds",
+    "total_nltf_net_revenue",
+}
+REVENUE_STACK_BRIDGE_ADDBACKS = {
+    "ruc_refunds": {
+        "series_id": "ruc_refunds_gross_addback",
+        "line_label": "RUC refunds gross add-back",
+        "note": (
+            "Gross-to-net bridge add-back: Gross RUC already includes RUC refunds, so this positive row "
+            "allows the explicit refund deduction to remain visible without changing Total NLTF revenue."
+        ),
+    },
+    "coo_revenue": {
+        "series_id": "coo_gross_mvr_addback",
+        "line_label": "MR13/COO gross add-back",
+        "note": (
+            "Gross-to-net bridge add-back: Gross MVR already includes MR13/COO, so this positive row "
+            "allows the explicit MR13/COO deduction to remain visible without changing Total NLTF revenue."
+        ),
+    },
+}
 
 
 @dataclass
@@ -549,9 +588,10 @@ def build_current_revenue_outlook_runtime_pack(
         },
         "revenue_stack_components": {
             "repo_relative_path": _repo_relative(root, base / "revenue_stack_components.csv"),
-            "scope": "Composition-over-time stack rows classified from revenue_line_reconciliation; aggregates are overlays only and are never stacked.",
+            "scope": "Composition-over-time stack rows classified from revenue_line_reconciliation in net-contribution and gross-to-net bridge modes; aggregates are overlays only and are never stacked.",
             "source": "data/current_revenue_outlook/revenue_line_reconciliation.csv",
-            "balance_rule": "component_positive + component_negative + zero-net offsets reconciles to Total NLTF revenue; residuals are reported and never forced.",
+            "composition_modes": list(REVENUE_STACK_MODES),
+            "balance_rule": "Each composition mode reconciles stack_value to Total NLTF revenue within source rounding; residuals are reported and never forced.",
         },
         "series_alias_audit": {
             "repo_relative_path": _repo_relative(root, base / "series_alias_audit.csv"),
@@ -668,11 +708,20 @@ def revenue_stack_components_frame(
     line_reconciliation: pd.DataFrame,
     formula_residuals: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
-    """Classify committed line-reconciliation rows for composition plotting."""
+    """Classify committed line-reconciliation rows for composition plotting.
+
+    The returned frame intentionally carries two charting modes over the same
+    source values. Net mode shows only the rows that net to Total NLTF revenue;
+    bridge mode adds explicit gross add-backs so refunds/admin offsets can be
+    shown as deductions without double-counting embedded gross aggregates.
+    """
 
     base_columns = list(line_reconciliation.columns) if isinstance(line_reconciliation, pd.DataFrame) else []
     audit_columns = [
+        "composition_mode",
+        "composition_mode_order",
         "stack_role",
+        "formula_role",
         "signed_contribution",
         "stack_value",
         "stack_unit",
@@ -690,95 +739,28 @@ def revenue_stack_components_frame(
     if line_reconciliation is None or line_reconciliation.empty:
         return pd.DataFrame(columns=base_columns + audit_columns)
 
-    out = line_reconciliation.copy()
+    base = line_reconciliation.copy()
     for column in ["source_path", "FY", "series_id", "section", "row_role", "unit", "value"]:
-        if column not in out.columns:
-            out[column] = pd.NA
-    out = _append_total_fed_ruc_overlay_rows(out)
+        if column not in base.columns:
+            base[column] = pd.NA
+    base = _append_total_fed_ruc_overlay_rows(base)
 
-    out["FY_numeric"] = pd.to_numeric(out["FY"], errors="coerce")
-    out["section_order"] = out["section"].astype(str).map(REVENUE_STACK_SECTION_ORDER).fillna(99).astype(int)
-    out["line_order"] = out["series_id"].astype(str).map(REVENUE_STACK_SERIES_ORDER).fillna(999).astype(int)
+    base["FY_numeric"] = pd.to_numeric(base["FY"], errors="coerce")
+    base["section_order"] = base["section"].astype(str).map(REVENUE_STACK_SECTION_ORDER).fillna(99).astype(int)
+    base["line_order"] = base["series_id"].astype(str).map(REVENUE_STACK_SERIES_ORDER).fillna(999).astype(int)
     source_order = {
         "MBU26 official": 0,
         "Current finalist Base case": 1,
         "Current finalist High population/comparison": 2,
     }
-    out["source_path_order"] = out["source_path"].astype(str).map(source_order).fillna(99).astype(int)
-    out["value_numeric"] = pd.to_numeric(out["value"], errors="coerce")
+    base["source_path_order"] = base["source_path"].astype(str).map(source_order).fillna(99).astype(int)
+    base["value_numeric"] = pd.to_numeric(base["value"], errors="coerce")
 
-    series = out["series_id"].astype(str)
-    row_role = out["row_role"].astype(str)
-    section = out["section"].astype(str)
-    unit = out["unit"].astype(str)
-    revenue_unit = unit.eq("$m nominal ex GST")
-
-    out["stack_role"] = "audit_context"
-    out.loc[row_role.eq("bridge_input") | section.eq("Key volumes"), "stack_role"] = "activity_context"
-    out.loc[row_role.isin(["aggregate", "calculated_rollup"]), "stack_role"] = "aggregate_overlay"
-    out.loc[
-        row_role.isin(["leaf", "replacement_line"]) & revenue_unit,
-        "stack_role",
-    ] = "component_positive"
-    out.loc[
-        (row_role.eq("deduction") | series.isin(REVENUE_STACK_DEDUCTION_SERIES)) & revenue_unit,
-        "stack_role",
-    ] = "component_negative"
-    out.loc[series.isin(REVENUE_STACK_OFFSET_SERIES), "stack_role"] = "offset_not_stacked"
-
-    out["signed_contribution"] = pd.NA
-    positive = out["stack_role"].eq("component_positive")
-    negative = out["stack_role"].isin(["component_negative", "offset_not_stacked"])
-    out.loc[positive, "signed_contribution"] = out.loc[positive, "value_numeric"]
-    out.loc[negative, "signed_contribution"] = -out.loc[negative, "value_numeric"].abs()
-    out["signed_contribution"] = pd.to_numeric(out["signed_contribution"], errors="coerce")
-
-    out["stack_value"] = pd.NA
-    out.loc[positive | out["stack_role"].eq("component_negative"), "stack_value"] = out.loc[
-        positive | out["stack_role"].eq("component_negative"),
-        "signed_contribution",
+    frames = [
+        _revenue_stack_mode_frame(base, mode=mode, mode_order=order)
+        for order, mode in enumerate(REVENUE_STACK_MODES)
     ]
-    out.loc[out["stack_role"].eq("offset_not_stacked"), "stack_value"] = 0.0
-    out["stack_value"] = pd.to_numeric(out["stack_value"], errors="coerce")
-    out["stack_unit"] = out["unit"].where(out["stack_role"].isin(["component_positive", "component_negative", "offset_not_stacked"]), "")
-    out["stack_note"] = ""
-    out.loc[series.eq("coo_revenue"), "stack_note"] = (
-        "MR13/COO is present in both gross MVR and total admin-fee formulas; it is shown as a deduction audit row "
-        "with zero net stack value to avoid double-counting."
-    )
-    out.loc[series.eq("ruc_refunds"), "stack_note"] = (
-        "RUC refunds are included in the MBU26 Gross RUC row and deducted again in Total refunds; they are shown as "
-        "a refund audit row with zero net stack value to avoid double-counting."
-    )
-
-    component_mask = out["stack_role"].isin(["component_positive", "component_negative", "offset_not_stacked"])
-    stack_balance = (
-        out.loc[component_mask]
-        .groupby(["source_path", "FY_numeric"], dropna=False)["stack_value"]
-        .sum(min_count=1)
-        .rename("stack_balance_value")
-        .reset_index()
-    )
-    total_rows = out[series.eq("total_nltf_net_revenue")][["source_path", "FY_numeric", "value_numeric"]].rename(
-        columns={"value_numeric": "stack_balance_total_nltf"}
-    )
-    stack_balance = stack_balance.merge(total_rows, on=["source_path", "FY_numeric"], how="left")
-    stack_balance["stack_balance_residual"] = (
-        pd.to_numeric(stack_balance["stack_balance_value"], errors="coerce")
-        - pd.to_numeric(stack_balance["stack_balance_total_nltf"], errors="coerce")
-    )
-    stack_balance["stack_balance_status"] = np.where(
-        pd.to_numeric(stack_balance["stack_balance_residual"], errors="coerce").abs().le(1e-6),
-        "balanced",
-        "residual_reported",
-    )
-    out = out.merge(
-        stack_balance[
-            ["source_path", "FY_numeric", "stack_balance_value", "stack_balance_residual", "stack_balance_status"]
-        ],
-        on=["source_path", "FY_numeric"],
-        how="left",
-    )
+    out = pd.concat(frames, ignore_index=True, sort=False)
 
     if isinstance(formula_residuals, pd.DataFrame) and not formula_residuals.empty:
         residual_cols = [
@@ -808,10 +790,149 @@ def revenue_stack_components_frame(
             out[column] = pd.NA
 
     out = out.sort_values(
-        ["source_path_order", "FY_numeric", "section_order", "line_order", "series_id"],
+        ["source_path_order", "composition_mode_order", "FY_numeric", "section_order", "line_order", "series_id"],
         kind="stable",
     )
     return out.drop(columns=["FY_numeric", "value_numeric"], errors="ignore").reset_index(drop=True)
+
+
+def _revenue_stack_mode_frame(base: pd.DataFrame, *, mode: str, mode_order: int) -> pd.DataFrame:
+    out = base.copy()
+    out["composition_mode"] = mode
+    out["composition_mode_order"] = mode_order
+
+    series = out["series_id"].astype(str)
+    row_role = out["row_role"].astype(str)
+    section = out["section"].astype(str)
+    unit = out["unit"].astype(str)
+    revenue_unit = unit.eq("$m nominal ex GST")
+    aggregate = row_role.isin(["aggregate", "calculated_rollup"]) | series.isin(REVENUE_STACK_AGGREGATE_SERIES)
+
+    out["stack_role"] = "audit_context"
+    out["formula_role"] = "audit_context"
+    out.loc[row_role.eq("bridge_input") | section.eq("Key volumes"), "stack_role"] = "activity_context"
+    out.loc[row_role.eq("bridge_input") | section.eq("Key volumes"), "formula_role"] = "activity_context"
+    out.loc[aggregate, "stack_role"] = "aggregate_overlay"
+    out.loc[aggregate, "formula_role"] = "aggregate_overlay"
+    out.loc[
+        row_role.isin(["leaf", "replacement_line"]) & revenue_unit & ~aggregate,
+        "stack_role",
+    ] = "component_positive"
+    out.loc[
+        row_role.isin(["leaf", "replacement_line"]) & revenue_unit & ~aggregate,
+        "formula_role",
+    ] = "leaf_contribution"
+    out.loc[
+        (row_role.eq("deduction") | series.isin(REVENUE_STACK_DEDUCTION_SERIES)) & revenue_unit & ~aggregate,
+        "stack_role",
+    ] = "component_negative"
+    out.loc[
+        (row_role.eq("deduction") | series.isin(REVENUE_STACK_DEDUCTION_SERIES)) & revenue_unit & ~aggregate,
+        "formula_role",
+    ] = "deduction"
+    if mode == REVENUE_STACK_MODE_NET:
+        out.loc[series.isin(REVENUE_STACK_OFFSET_SERIES) & revenue_unit & ~aggregate, "stack_role"] = "offset_not_stacked"
+        out.loc[series.isin(REVENUE_STACK_OFFSET_SERIES) & revenue_unit & ~aggregate, "formula_role"] = "zero_net_offset"
+    elif mode == REVENUE_STACK_MODE_BRIDGE:
+        addback_rows = _revenue_stack_bridge_addback_rows(out)
+        if not addback_rows.empty:
+            out = pd.concat([out, addback_rows], ignore_index=True, sort=False)
+
+    out["signed_contribution"] = pd.NA
+    positive = out["stack_role"].eq("component_positive")
+    negative = out["stack_role"].isin(["component_negative", "offset_not_stacked"])
+    out.loc[positive, "signed_contribution"] = out.loc[positive, "value_numeric"]
+    out.loc[negative, "signed_contribution"] = -out.loc[negative, "value_numeric"].abs()
+    out["signed_contribution"] = pd.to_numeric(out["signed_contribution"], errors="coerce")
+
+    out["stack_value"] = pd.NA
+    out.loc[positive | out["stack_role"].eq("component_negative"), "stack_value"] = out.loc[
+        positive | out["stack_role"].eq("component_negative"),
+        "signed_contribution",
+    ]
+    out.loc[out["stack_role"].eq("offset_not_stacked"), "stack_value"] = 0.0
+    out["stack_value"] = pd.to_numeric(out["stack_value"], errors="coerce")
+    out["stack_unit"] = out["unit"].where(out["stack_role"].isin(["component_positive", "component_negative", "offset_not_stacked"]), "")
+    out["stack_note"] = ""
+    series = out["series_id"].astype(str)
+    out.loc[series.eq("coo_revenue"), "line_label"] = "MR13/COO"
+    out.loc[series.eq("coo_revenue"), "stack_note"] = (
+        "MR13/COO is present in both gross MVR and total admin-fee formulas; it is shown as a deduction audit row "
+        "with zero net stack value to avoid double-counting."
+    )
+    out.loc[series.eq("ruc_refunds"), "stack_note"] = (
+        "RUC refunds are included in the MBU26 Gross RUC row and deducted again in Total refunds; they are shown as "
+        "a refund audit row with zero net stack value to avoid double-counting."
+    )
+    out_series = out["series_id"].astype(str)
+    for addback in REVENUE_STACK_BRIDGE_ADDBACKS.values():
+        out.loc[out_series.eq(str(addback["series_id"])), "stack_note"] = str(addback["note"])
+
+    component_mask = out["stack_role"].isin(["component_positive", "component_negative", "offset_not_stacked"])
+    stack_balance = (
+        out.loc[component_mask]
+        .groupby(["source_path", "composition_mode", "FY_numeric"], dropna=False)["stack_value"]
+        .sum(min_count=1)
+        .rename("stack_balance_value")
+        .reset_index()
+    )
+    total_rows = out[out["series_id"].astype(str).eq("total_nltf_net_revenue")][
+        ["source_path", "composition_mode", "FY_numeric", "value_numeric"]
+    ].rename(columns={"value_numeric": "stack_balance_total_nltf"})
+    stack_balance = stack_balance.merge(total_rows, on=["source_path", "composition_mode", "FY_numeric"], how="left")
+    stack_balance["stack_balance_residual"] = (
+        pd.to_numeric(stack_balance["stack_balance_value"], errors="coerce")
+        - pd.to_numeric(stack_balance["stack_balance_total_nltf"], errors="coerce")
+    )
+    stack_balance["stack_balance_status"] = np.where(
+        pd.to_numeric(stack_balance["stack_balance_residual"], errors="coerce").abs().le(1e-6),
+        "balanced",
+        "residual_reported",
+    )
+    out = out.merge(
+        stack_balance[
+            [
+                "source_path",
+                "composition_mode",
+                "FY_numeric",
+                "stack_balance_value",
+                "stack_balance_residual",
+                "stack_balance_status",
+            ]
+        ],
+        on=["source_path", "composition_mode", "FY_numeric"],
+        how="left",
+    )
+    return out
+
+
+def _revenue_stack_bridge_addback_rows(mode_frame: pd.DataFrame) -> pd.DataFrame:
+    addbacks = mode_frame[mode_frame["series_id"].astype(str).isin(REVENUE_STACK_BRIDGE_ADDBACKS)].copy()
+    if addbacks.empty:
+        return pd.DataFrame(columns=mode_frame.columns)
+    addbacks["original_series_id"] = addbacks["series_id"].astype(str)
+    addbacks["series_id"] = addbacks["original_series_id"].map(
+        {key: value["series_id"] for key, value in REVENUE_STACK_BRIDGE_ADDBACKS.items()}
+    )
+    addbacks["line_label"] = addbacks["original_series_id"].map(
+        {key: value["line_label"] for key, value in REVENUE_STACK_BRIDGE_ADDBACKS.items()}
+    )
+    addbacks["row_role"] = "bridge_addback"
+    addbacks["stack_role"] = "component_positive"
+    addbacks["formula_role"] = "gross_addback"
+    addbacks["line_order"] = addbacks["series_id"].astype(str).map(REVENUE_STACK_SERIES_ORDER).fillna(998).astype(int)
+    addbacks["source_status"] = "derived_bridge_addback"
+    addbacks["source_basis"] = "runtime_bridge_audit"
+    addbacks["source_cell"] = addbacks["source_cell"].astype(str).where(addbacks["source_cell"].notna(), "")
+    addbacks["formula"] = addbacks["original_series_id"].map(
+        {key: value["note"] for key, value in REVENUE_STACK_BRIDGE_ADDBACKS.items()}
+    )
+    addbacks["stack_note"] = addbacks["formula"]
+    addbacks["replacement_flag"] = False
+    addbacks["residual_vs_official"] = pd.NA
+    addbacks["value_numeric"] = pd.to_numeric(addbacks["value_numeric"], errors="coerce").abs()
+    addbacks["value"] = addbacks["value_numeric"]
+    return addbacks.drop(columns=["original_series_id"], errors="ignore")
 
 
 def _append_total_fed_ruc_overlay_rows(line_reconciliation: pd.DataFrame) -> pd.DataFrame:

@@ -121,6 +121,8 @@ from model_dashboard.revenue_outlook import (
     FAN_SOURCE_SCENARIO_SPREAD,
     REVENUE_OUTLOOK_SCHEMA_VERSION,
     REVENUE_OUTLOOK_TITLE,
+    REVENUE_STACK_MODE_NET,
+    REVENUE_STACK_MODES,
     STREAM_LABELS,
     RevenueOutlookPack,
     load_revenue_outlook_pack,
@@ -2098,8 +2100,9 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
 
     with st.container(border=True):
         st.markdown("<div class='page5-panel-title'>Revenue composition over time</div>", unsafe_allow_html=True)
-        comp_cols = st.columns([0.30, 0.22, 0.25, 0.23])
+        comp_cols = st.columns([0.24, 0.22, 0.18, 0.19, 0.17])
         stack_source_options = _revenue_line_source_options(stack_components)
+        stack_mode_options = _revenue_stack_mode_options(stack_components)
         stack_section_options = _revenue_line_section_options(stack_components)
         stack_fy_min, stack_fy_max = _revenue_line_fy_bounds(stack_components)
         with comp_cols[0]:
@@ -2110,6 +2113,13 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 key="revenue_stack_source_path",
             )
         with comp_cols[1]:
+            selected_stack_mode = st.selectbox(
+                "Mode",
+                stack_mode_options,
+                index=0,
+                key="revenue_stack_composition_mode",
+            )
+        with comp_cols[2]:
             selected_stack_fy_range = st.slider(
                 "FY range / horizon",
                 min_value=stack_fy_min,
@@ -2118,7 +2128,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 key="revenue_stack_fy_range",
             )
         default_stack_sections = [section for section in ["RUC", "FED", "MVR", "TUC"] if section in stack_section_options]
-        with comp_cols[2]:
+        with comp_cols[3]:
             selected_stack_sections = st.multiselect(
                 "Section filter",
                 stack_section_options,
@@ -2126,7 +2136,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 key="revenue_stack_sections",
             )
         stack_overlay_options = _revenue_stack_overlay_options(stack_components)
-        with comp_cols[3]:
+        with comp_cols[4]:
             selected_stack_overlays = st.multiselect(
                 "Aggregate overlays",
                 stack_overlay_options,
@@ -2137,6 +2147,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         filtered_stack = _filter_revenue_stack_components(
             stack_components,
             source_path=selected_stack_source,
+            composition_mode=selected_stack_mode,
             sections=selected_stack_sections,
             fy_range=selected_stack_fy_range,
         )
@@ -2145,6 +2156,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             overlay_stack = _filter_revenue_stack_components(
                 stack_components,
                 source_path=selected_stack_source,
+                composition_mode=selected_stack_mode,
                 sections=stack_section_options,
                 fy_range=selected_stack_fy_range,
             )
@@ -2160,9 +2172,10 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             revenue_outlook_composition_figure(
                 chart_stack,
                 source_path=selected_stack_source,
+                composition_mode=selected_stack_mode,
                 overlays=selected_stack_overlays,
             ),
-            caption="Positive revenue components stack above zero; deductions/admin/refunds stack below zero. Aggregates are not stacked.",
+            caption="Net mode stacks only rows that net to Total NLTF revenue. Bridge mode shows gross add-backs and explicit deductions. Aggregates are overlays only.",
             notes_as_tooltip=False,
         )
         stack_gap_banner = _revenue_stack_gap_banner(filtered_stack)
@@ -4530,13 +4543,17 @@ def revenue_outlook_composition_figure(
     stack_components: pd.DataFrame,
     *,
     source_path: str,
-    overlays: list[str],
+    composition_mode: str | None = None,
+    overlays: list[str] | None = None,
 ) -> go.Figure:
     if stack_components is None or stack_components.empty:
         return empty_figure("Revenue composition rows are unavailable in revenue_stack_components.")
     data = stack_components.copy()
     if "source_path" in data.columns and source_path:
         data = data[data["source_path"].astype(str).eq(str(source_path))].copy()
+    if "composition_mode" in data.columns:
+        mode = str(composition_mode or REVENUE_STACK_MODE_NET)
+        data = data[data["composition_mode"].astype(str).eq(mode)].copy()
     if data.empty:
         return empty_figure("No Revenue composition rows match the selected source path.")
 
@@ -4573,22 +4590,11 @@ def revenue_outlook_composition_figure(
     for index, label_row in labels.reset_index(drop=True).iterrows():
         label = str(label_row["line_label"])
         trace_rows = plot[plot["line_label"].astype(str).eq(label)].sort_values("FY_numeric", kind="stable")
-        custom_cols = [
-            "unit",
-            "section",
-            "row_role",
-            "source_file",
-            "source_cell",
-            "formula",
-            "model_id",
-            "quarter_composition",
-            "replacement_flag",
-            "residual_vs_official",
-            "stack_note",
-        ]
+        custom_cols = ["unit", "stack_balance_value"]
         for column in custom_cols:
             if column not in trace_rows.columns:
-                trace_rows[column] = ""
+                trace_rows[column] = pd.NA
+        trace_rows["stack_balance_value"] = pd.to_numeric(trace_rows["stack_balance_value"], errors="coerce")
         values = trace_rows["stack_value_numeric"].tolist()
         fig.add_trace(
             go.Bar(
@@ -4596,18 +4602,10 @@ def revenue_outlook_composition_figure(
                 x=trace_rows["FY_numeric"].astype(int),
                 y=values,
                 marker_color=colors[index % len(colors)],
-                customdata=trace_rows[custom_cols].astype(str).to_numpy(),
+                customdata=trace_rows[custom_cols].to_numpy(),
                 hovertemplate=(
-                    "%{fullData.name}<br>FY%{x}<br>%{y:,.1f} %{customdata[0]}"
-                    "<br>Section: %{customdata[1]}"
-                    "<br>Role: %{customdata[2]}"
-                    "<br>Source: %{customdata[3]} %{customdata[4]}"
-                    "<br>Formula: %{customdata[5]}"
-                    "<br>Model: %{customdata[6]}"
-                    "<br>Quarter composition: %{customdata[7]}"
-                    "<br>Replacement: %{customdata[8]}"
-                    "<br>Residual vs official: %{customdata[9]}"
-                    "<br>%{customdata[10]}<extra></extra>"
+                    "%{fullData.name}: %{y:,.1f} %{customdata[0]}; "
+                    "FY %{x}; total stack: %{customdata[1]:,.1f} %{customdata[0]}<extra></extra>"
                 ),
             )
         )
@@ -4623,7 +4621,7 @@ def revenue_outlook_composition_figure(
         overlay_rows = overlay_rows.dropna(subset=["FY_numeric", "value_numeric"])
         for label, group in overlay_rows.groupby("line_label", sort=False):
             group = group.sort_values("FY_numeric", kind="stable")
-            custom_cols = ["unit", "formula", "source_file", "source_cell", "formula_residual_status", "formula_residual"]
+            custom_cols = ["unit", "formula_residual_status"]
             for column in custom_cols:
                 if column not in group.columns:
                     group[column] = ""
@@ -4637,11 +4635,8 @@ def revenue_outlook_composition_figure(
                     marker={"size": 7, "symbol": "diamond"},
                     customdata=group[custom_cols].astype(str).to_numpy(),
                     hovertemplate=(
-                        "%{fullData.name}<br>FY%{x}<br>%{y:,.1f} %{customdata[0]}"
-                        "<br>Formula: %{customdata[1]}"
-                        "<br>Source: %{customdata[2]} %{customdata[3]}"
-                        "<br>Formula status: %{customdata[4]}"
-                        "<br>Formula residual: %{customdata[5]}<extra></extra>"
+                        "%{fullData.name}: %{y:,.1f} %{customdata[0]}; "
+                        "FY %{x}; status: %{customdata[1]}<extra></extra>"
                     ),
                 )
             )
@@ -5036,6 +5031,16 @@ def _revenue_line_source_options(line_reconciliation: pd.DataFrame) -> list[str]
     return ordered or preferred
 
 
+def _revenue_stack_mode_options(stack_components: pd.DataFrame) -> list[str]:
+    preferred = list(REVENUE_STACK_MODES)
+    if stack_components is None or stack_components.empty or "composition_mode" not in stack_components.columns:
+        return preferred
+    values = [value for value in stack_components["composition_mode"].dropna().astype(str).unique().tolist() if value]
+    ordered = [value for value in preferred if value in values]
+    ordered.extend(sorted(set(values).difference(ordered)))
+    return ordered or preferred
+
+
 def _revenue_stack_axis_title(stack_components: pd.DataFrame) -> str:
     if stack_components is None or stack_components.empty or "unit" not in stack_components.columns:
         return "$m nominal ex GST"
@@ -5077,6 +5082,7 @@ def _filter_revenue_stack_components(
     stack_components: pd.DataFrame,
     *,
     source_path: str,
+    composition_mode: str | None = None,
     sections: list[str],
     fy_range: tuple[int, int] | list[int],
 ) -> pd.DataFrame:
@@ -5086,6 +5092,8 @@ def _filter_revenue_stack_components(
     data["FY_numeric"] = pd.to_numeric(data.get("FY"), errors="coerce").astype("Int64")
     if source_path and "source_path" in data.columns:
         data = data[data["source_path"].astype(str).eq(str(source_path))].copy()
+    if composition_mode and "composition_mode" in data.columns:
+        data = data[data["composition_mode"].astype(str).eq(str(composition_mode))].copy()
     if sections and "section" in data.columns:
         data = data[data["section"].astype(str).isin(sections)].copy()
     try:
@@ -5093,7 +5101,11 @@ def _filter_revenue_stack_components(
     except Exception:
         low, high = _revenue_line_fy_bounds(data)
     data = data[data["FY_numeric"].between(low, high, inclusive="both")].copy()
-    sort_cols = [col for col in ["source_path_order", "FY_numeric", "section_order", "line_order", "series_id"] if col in data.columns]
+    sort_cols = [
+        col
+        for col in ["source_path_order", "composition_mode_order", "FY_numeric", "section_order", "line_order", "series_id"]
+        if col in data.columns
+    ]
     if sort_cols:
         data = data.sort_values(sort_cols, kind="stable")
     return data.drop(columns=["FY_numeric"], errors="ignore")
@@ -5120,6 +5132,7 @@ def _revenue_stack_components_display_table(stack_components: pd.DataFrame) -> p
         return pd.DataFrame()
     view = stack_components.copy()
     rename = {
+        "composition_mode": "Composition mode",
         "section": "Section",
         "line_label": "Line",
         "value": "Value",
@@ -5127,15 +5140,19 @@ def _revenue_stack_components_display_table(stack_components: pd.DataFrame) -> p
         "stack_value": "Stack value",
         "unit": "Unit",
         "source_path": "Source path",
-        "period": "FY",
+        "FY": "FY",
+        "period": "FY label",
         "row_role": "Row role",
         "stack_role": "Stack role",
+        "formula_role": "Formula role",
         "source_file": "Source file",
         "source_cell": "Source cell/formula",
         "formula": "Formula",
         "replacement_flag": "Replacement",
         "model_id": "Model ID",
         "quarter_composition": "Quarter composition",
+        "actual_quarters": "Actual quarters",
+        "forecast_quarters": "Forecast quarters",
         "residual_vs_official": "Residual vs official",
         "stack_balance_residual": "Stack residual",
         "formula_residual_status": "Formula status",

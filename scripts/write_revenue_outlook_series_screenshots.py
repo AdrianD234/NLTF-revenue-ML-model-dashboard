@@ -34,6 +34,10 @@ COMPOSITION_SOURCE_PATHS = {
     "Current finalist Base case": "current-finalist-base-case",
     "Current finalist High population/comparison": "current-finalist-high-population-comparison",
 }
+COMPOSITION_MODES = {
+    "Net contribution stack": "net-contribution-stack",
+    "Gross-to-net bridge audit": "gross-to-net-bridge-audit",
+}
 
 FAN_SOURCE_AUTO = "Auto / best available"
 FAN_SOURCE_MBU26_ARCHIVED = "MBU26 archived forecast error"
@@ -289,39 +293,48 @@ def _write_composition_screenshots() -> list[dict[str, object]]:
         return []
     stack = pd.read_csv(stack_path)
     manifest: list[dict[str, object]] = []
-    for source_path, slug in COMPOSITION_SOURCE_PATHS.items():
-        frame = stack[
-            stack["source_path"].astype(str).eq(source_path)
-            & (
-                (
-                    stack["stack_role"].astype(str).isin(["component_positive", "component_negative"])
-                    & stack["section"].astype(str).isin(["RUC", "FED", "MVR", "TUC"])
-                )
-                | stack["series_id"].astype(str).eq("total_nltf_net_revenue")
+    for source_path, source_slug in COMPOSITION_SOURCE_PATHS.items():
+        for mode, mode_slug in COMPOSITION_MODES.items():
+            mode_mask = (
+                stack["composition_mode"].astype(str).eq(mode)
+                if "composition_mode" in stack.columns
+                else pd.Series(True, index=stack.index)
             )
-        ].copy()
-        if frame.empty:
-            continue
-        frame["FY_numeric"] = pd.to_numeric(frame["FY"], errors="coerce")
-        frame["stack_value_numeric"] = pd.to_numeric(frame["stack_value"], errors="coerce")
-        frame = frame[
-            frame["FY_numeric"].between(2025, 2035, inclusive="both")
-            & frame["stack_value_numeric"].notna()
-        ].copy()
-        if frame.empty:
-            continue
-        title = f"Revenue Outlook composition - {source_path}"
-        filename = f"revenue-outlook-composition-{slug}.png"
-        path = _write_composition_screenshot(frame, title, filename)
-        manifest.append(
-            {
-                "series_id": "revenue_stack_components",
-                "title": title,
-                "source_path": source_path,
-                "repo_relative_path": path.relative_to(ROOT).as_posix(),
-                "rows": int(len(frame)),
-            }
-        )
+            frame = stack[
+                stack["source_path"].astype(str).eq(source_path)
+                & mode_mask
+                & (
+                    (
+                        stack["stack_role"].astype(str).isin(["component_positive", "component_negative"])
+                        & stack["section"].astype(str).isin(["RUC", "FED", "MVR", "TUC"])
+                    )
+                    | stack["series_id"].astype(str).eq("total_nltf_net_revenue")
+                )
+            ].copy()
+            if frame.empty:
+                continue
+            frame["FY_numeric"] = pd.to_numeric(frame["FY"], errors="coerce")
+            frame["stack_value_numeric"] = pd.to_numeric(frame["stack_value"], errors="coerce")
+            overlay_mask = frame["series_id"].astype(str).eq("total_nltf_net_revenue")
+            frame = frame[
+                frame["FY_numeric"].between(2025, 2035, inclusive="both")
+                & (frame["stack_value_numeric"].notna() | overlay_mask)
+            ].copy()
+            if frame.empty:
+                continue
+            title = f"Revenue Outlook composition - {source_path} - {mode}"
+            filename = f"revenue-outlook-composition-{mode_slug}-{source_slug}.png"
+            path = _write_composition_screenshot(frame, title, filename)
+            manifest.append(
+                {
+                    "series_id": "revenue_stack_components",
+                    "title": title,
+                    "source_path": source_path,
+                    "composition_mode": mode,
+                    "repo_relative_path": path.relative_to(ROOT).as_posix(),
+                    "rows": int(len(frame)),
+                }
+            )
     return manifest
 
 

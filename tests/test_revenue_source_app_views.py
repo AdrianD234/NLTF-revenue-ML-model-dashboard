@@ -838,6 +838,7 @@ def test_revenue_outlook_composition_figure_stacks_components_and_overlays_aggre
     fig = revenue_outlook_composition_figure(
         view,
         source_path=source,
+        composition_mode="Net contribution stack",
         overlays=["Total NLTF revenue", "Total RUC+PED"],
     )
 
@@ -852,6 +853,31 @@ def test_revenue_outlook_composition_figure_stacks_components_and_overlays_aggre
     assert fig.layout.yaxis.title.text == "$m nominal ex GST"
     assert any(min(float(value) for value in trace.y) < 0 for trace in fig.data if trace.type == "bar")
     assert not any("Schiff" in str(trace.name) or "selected_dashboard" in str(trace.name) for trace in fig.data)
+    hover_templates = "\n".join(str(trace.hovertemplate) for trace in fig.data)
+    assert "total stack" in hover_templates
+    assert "<extra></extra>" in hover_templates
+    for raw_identifier in ["source_file", "source_cell", "model_id", "formula", "quarter_composition"]:
+        assert raw_identifier not in hover_templates
+
+    bridge_view = stack[
+        stack["source_path"].astype(str).eq("MBU26 official")
+        & stack["composition_mode"].astype(str).eq("Gross-to-net bridge audit")
+        & pd.to_numeric(stack["FY"], errors="coerce").between(2001, 2005)
+        & stack["section"].astype(str).isin(["RUC", "FED", "MVR", "TUC", "Totals"])
+    ].copy()
+    bridge_fig = revenue_outlook_composition_figure(
+        bridge_view,
+        source_path="MBU26 official",
+        composition_mode="Gross-to-net bridge audit",
+        overlays=["Total NLTF revenue"],
+    )
+    bridge_bar_names = {str(trace.name) for trace in bridge_fig.data if trace.type == "bar"}
+    assert "RUC refunds" in bridge_bar_names
+    assert "MR13/COO" in bridge_bar_names
+    assert "RUC refunds gross add-back" in bridge_bar_names
+    assert "MR13/COO gross add-back" in bridge_bar_names
+    assert "Gross RUC" not in bridge_bar_names
+    assert "Gross FED" not in bridge_bar_names
 
 
 def test_revenue_outlook_manifest_table_exposes_source_pack_and_bridge_provenance() -> None:
