@@ -280,6 +280,7 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
         "Current finalist Base case",
         "Current finalist High population/comparison",
     }
+    assert pd.to_numeric(current_split["current_allocation_residual_km"], errors="coerce").abs().max() == pytest.approx(0.0, abs=1e-6)
     evidence = (
         ev_phev_split[
             pd.to_numeric(ev_phev_split["FY"], errors="coerce").isin([2024, 2025])
@@ -852,15 +853,15 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
 def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
     pack_dir = ROOT / CURRENT_REVENUE_OUTLOOK_DIR
     expected_hashes = {
-        "ev_phev_split_assumptions.csv": "01e8ac125385c656505dc259e51e19a007e05495cdc3943dc1b70a42b650d89b",
-        "ev_phev_split_assumptions.parquet": "600072aac912768ce23a7951b68ebf0905f5c7f06a15d5e3604fd2ee20f6258e",
+        "ev_phev_split_assumptions.csv": "b99604919e9a5c0230778c755ba0084a704fd1486c4eac27ab7842cafa8ebc64",
+        "ev_phev_split_assumptions.parquet": "cc04a903687065c4019b1c9db840f076043e1a5ee19a8d305e9bf1a2e652a380",
         "fan_availability.csv": "af2d246871e877d4d1cd72953e37da31e03bcd4ac91137547043e6fe45a31d10",
         "fan_availability.parquet": "428e7c45da2ab868f99682f7b00f5d65160be4e1069a1c5fb41d19008cfd8d71",
         "fan_band_rows.csv": "7161f74a2374ead1ceb2cffd12f150176d855f1f58d9f692f4c2f694136af765",
         "fan_band_rows.parquet": "834fc4bf60e0216f27c5231e82eabb9850eebe138a5e8a2c7dc760647e9bdee5",
         "future_revenue_forecasts.csv": "5195e33b543e73386dc1dda6585cfd1823a1cb6c6ef5aed0b368518cd808dd00",
         "future_revenue_forecasts.parquet": "aff719a3a420657e24ef22af5da27dacb411a938eb629a29c7650db5378643ac",
-        "manifest.json": "1dec22d8922712934c0330589408c2ce9ee11389cda1c608550e9dc8ba744942",
+        "manifest.json": "33460261847e847743a43dc27433625e705a37a9b944f8d6236e38a8b1af6c80",
         "manifest.md": "589535c61a159247c3795ba498536a56c4ad04f6bd4d8e6ba8ebe02f20c6a27a",
         "path_trace_status.csv": "9aee7a4e7003ec6541476ca3e4afef6d8586b6c358e41db1c8e06623e5ffcaa3",
         "path_trace_status.parquet": "e66d860fb7532ee4b92285c1ba023c9f8d9469cfdaaaef819415f7cd87c73757",
@@ -870,8 +871,8 @@ def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
         "revenue_chart_rows.parquet": "c172026e14dc162516e521e1cae6b086e0cc89a7739b38d9f93ae76f0a71d582",
         "revenue_formula_residuals.csv": "fab6ea5d67422db8e196a48fc5ca2d0c921f88c2ffb69e281901ae219a51804c",
         "revenue_formula_residuals.parquet": "962dd5dce4abfd2c720b1b99570878dd5a03dd5a930891c8d467bc8a995cef46",
-        "revenue_line_reconciliation.csv": "a24e64171e80051eaeb979594a5536af467fd2d53c9b94a0e047107121dad084",
-        "revenue_line_reconciliation.parquet": "13a6230bf0111bca6e786610b67c0af56e52d329688ab844cfe7c8cb8bb83160",
+        "revenue_line_reconciliation.csv": "4f6c1dc5fc6cf31fd04a3a998409ff4de915471e814a0bc4d50171b4b9405618",
+        "revenue_line_reconciliation.parquet": "616bd2d0ee273bc4c8ae3499a80fca8b98864558d20b9c1e04b87073adbc09ee",
         "revenue_stack_components.csv": "d8f73a44c4b32a433fb7c08611f975d91d6e28f002472b769ef59d52a3dacbfc",
         "revenue_stack_components.parquet": "1c0ca9744b98d493021baeb668676fc0a0135d3bbe88ad5c81b409f9dc11096e",
         "row_reconciliation.csv": "d484f5d75cce88e30ce7bcf5dd70058505cc02e5dff93f457a579f119c2fc7ce",

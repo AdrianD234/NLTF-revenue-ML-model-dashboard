@@ -704,6 +704,44 @@ def current_forecast_annual_from_mbu26(
         out.at[idx, "nowcast_flag"] = False
         out.at[idx, "official_value"] = actual_value
         out.at[idx, "residual_vs_official"] = 0.0
+    light_anchor_values = pd.to_numeric(
+        pd.Series(
+            [
+                anchor_lookup.get("light_ruc_net_km", {}).get("value"),
+                anchor_lookup.get("light_bev_ruc_net_km", {}).get("value"),
+                anchor_lookup.get("phev_ruc_net_km", {}).get("value"),
+            ]
+        ),
+        errors="coerce",
+    )
+    if not light_anchor_values.isna().any():
+        light_anchor_total = float(light_anchor_values.sum())
+        light_total_anchor_mask = (
+            pd.to_numeric(out.get("FY"), errors="coerce").eq(REVENUE_LAST_COMPLETE_ACTUAL_FY)
+            & out.get("series_id", pd.Series("", index=out.index)).astype(str).eq(CURRENT_LIGHT_TOTAL_SERIES_ID)
+        )
+        for idx in out.loc[light_total_anchor_mask].index:
+            out.at[idx, "value"] = light_anchor_total
+            out.at[idx, "source_basis"] = "MBU26 actual anchor total light-RUC universe"
+            out.at[idx, "source_file"] = "mbu26_official_annual.csv"
+            out.at[idx, "source_cell"] = "; ".join(
+                cell
+                for cell in [
+                    anchor_lookup.get("light_ruc_net_km", {}).get("source_cell", ""),
+                    anchor_lookup.get("light_bev_ruc_net_km", {}).get("source_cell", ""),
+                    anchor_lookup.get("phev_ruc_net_km", {}).get("source_cell", ""),
+                ]
+                if cell
+            )
+            out.at[idx, "source_status"] = "ACTUAL"
+            out.at[idx, "formula"] = "MBU26 actual light_ruc_net_km + light_bev_ruc_net_km + phev_ruc_net_km"
+            out.at[idx, "value_status"] = "Actual anchor"
+            out.at[idx, "quarters_present"] = "; ".join(_expected_june_year_quarters(REVENUE_LAST_COMPLETE_ACTUAL_FY))
+            out.at[idx, "actual_quarters"] = "; ".join(_expected_june_year_quarters(REVENUE_LAST_COMPLETE_ACTUAL_FY))
+            out.at[idx, "forecast_quarters"] = ""
+            out.at[idx, "nowcast_flag"] = False
+            out.at[idx, "official_value"] = light_anchor_total
+            out.at[idx, "residual_vs_official"] = 0.0
     for column in columns:
         if column not in out.columns:
             out[column] = pd.NA if column in {"official_value", "residual_vs_official"} else ""
