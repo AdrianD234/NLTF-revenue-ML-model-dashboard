@@ -195,11 +195,17 @@ def test_committed_current_revenue_outlook_pack_is_repo_local_and_hash_backed() 
     assert manifest["revenue_line_reconciliation"]["repo_relative_path"] == "data/current_revenue_outlook/revenue_line_reconciliation.csv"
     assert manifest["revenue_stack_components"]["repo_relative_path"] == "data/current_revenue_outlook/revenue_stack_components.csv"
     assert "aggregates are overlays only" in manifest["revenue_stack_components"]["scope"]
+    assert manifest["ev_phev_split_assumptions"]["repo_relative_path"] == "data/current_revenue_outlook/ev_phev_split_assumptions.csv"
+    assert manifest["ev_phev_split_assumptions"]["allocation_status"] == "not_applied_target_semantics_mismatch"
+    assert manifest["target_semantics_audit"]["LIGHT_RUC"]["status"] == "governed_gap_target_matches_conventional_light_not_total_universe"
+    assert "conventional Light target semantics" in manifest["data_vintage_manifest_notes"]["light_ruc_target_semantics"]
     assert manifest["revenue_formula_residuals"]["repo_relative_path"] == "data/current_revenue_outlook/revenue_formula_residuals.csv"
     assert manifest["series_alias_audit"]["repo_relative_path"] == "data/current_revenue_outlook/series_alias_audit.csv"
     assert manifest["fan_availability"]["repo_relative_path"] == "data/current_revenue_outlook/fan_availability.csv"
     assert manifest["fan_band_rows"]["repo_relative_path"] == "data/current_revenue_outlook/fan_band_rows.csv"
     assert sorted(manifest["output_hashes"]) == [
+        "ev_phev_split_assumptions.csv",
+        "ev_phev_split_assumptions.parquet",
         "fan_availability.csv",
         "fan_availability.parquet",
         "fan_band_rows.csv",
@@ -249,6 +255,7 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     audit = pd.read_parquet(pack_dir / "runtime_trace_audit.parquet")
     line_reconciliation = pd.read_parquet(pack_dir / "revenue_line_reconciliation.parquet")
     stack_components = pd.read_parquet(pack_dir / "revenue_stack_components.parquet")
+    ev_phev_split = pd.read_parquet(pack_dir / "ev_phev_split_assumptions.parquet")
     residuals = pd.read_parquet(pack_dir / "revenue_formula_residuals.parquet")
     alias_audit = pd.read_parquet(pack_dir / "series_alias_audit.parquet")
     fan_availability = pd.read_parquet(pack_dir / "fan_availability.parquet")
@@ -264,6 +271,15 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     assert "annual_model_paths" not in json.dumps(manifest).lower()
     assert "nominal_rate_missing" not in json.dumps(manifest)
     assert "ped_bridge_source_history_missing" not in json.dumps(manifest)
+    assert manifest["target_semantics_audit"]["HEAVY_RUC"]["status"] == "not_reclassified"
+    assert not ev_phev_split.empty
+    assert not ev_phev_split["used_by_current_finalist"].astype(bool).any()
+    evidence = ev_phev_split[pd.to_numeric(ev_phev_split["FY"], errors="coerce").isin([2024, 2025])].set_index("FY")
+    assert set(evidence["target_semantics_status"]) == {"matches_conventional_light_not_total_universe"}
+    assert evidence["target_matches_conventional_light"].astype(bool).all()
+    assert not evidence["target_matches_total_light_universe"].astype(bool).any()
+    assert pd.to_numeric(evidence["target_minus_conventional_light_km"], errors="coerce").abs().max() == pytest.approx(0.0, abs=1e-9)
+    assert pd.to_numeric(evidence["target_minus_total_light_universe_km"], errors="coerce").lt(0).all()
 
     allowed_traces = {
         "Actual",
@@ -778,13 +794,15 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
 def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
     pack_dir = ROOT / CURRENT_REVENUE_OUTLOOK_DIR
     expected_hashes = {
+        "ev_phev_split_assumptions.csv": "0c28171411204ced131deb5c65b716963ec94654c0e4a03af132180c9006b259",
+        "ev_phev_split_assumptions.parquet": "955d4382cd4f59b2cc403dac04fae3382fa097e437525a035dc770669ac9d613",
         "fan_availability.csv": "3e248fadf746e62affad42d0ca87a3dd232aaed5ee031e6072e7b2f5bd586248",
         "fan_availability.parquet": "05ca6cd3485e6725e571bb8f0b9a04dbc4396a2c52b15b32320b1b43266afc79",
         "fan_band_rows.csv": "891f79fae6e5e1ec7821e4a7b88d6746da5f24fe48ba3eab260ffdac9429799b",
         "fan_band_rows.parquet": "0da58f6bd9f132d9cd5224a29cadb80afc617ee9bd7f9f0971df885865a2a60c",
         "future_revenue_forecasts.csv": "5a8e4024e960a08308654b862acf00c278d79b9a60c899af9b710dbca9f7a0a7",
         "future_revenue_forecasts.parquet": "674ba0173044702cf0e78ab2e79791baca1879709650b2f2a840871e2d497b21",
-        "manifest.json": "b212e73d260a2b617e13f465914b3827cfef15cc5e2a088437e6cae774a5b6e6",
+        "manifest.json": "7e32321b22eb8ca9116f81fb57978872580c6edacdaf4fb21659d91af3fd73d2",
         "manifest.md": "2842343704e8ba363af30cacefec80b9b5471fbaf25932f37afdd24c046252fc",
         "path_trace_status.csv": "9aee7a4e7003ec6541476ca3e4afef6d8586b6c358e41db1c8e06623e5ffcaa3",
         "path_trace_status.parquet": "e66d860fb7532ee4b92285c1ba023c9f8d9469cfdaaaef819415f7cd87c73757",

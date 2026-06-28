@@ -2004,6 +2004,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     future_revenue = pack.future_revenue_forecasts.copy() if pack is not None and isinstance(pack.future_revenue_forecasts, pd.DataFrame) else pd.DataFrame()
     line_reconciliation = pack.revenue_line_reconciliation.copy() if pack is not None and isinstance(getattr(pack, "revenue_line_reconciliation", None), pd.DataFrame) else pd.DataFrame()
     stack_components = pack.revenue_stack_components.copy() if pack is not None and isinstance(getattr(pack, "revenue_stack_components", None), pd.DataFrame) else pd.DataFrame()
+    ev_phev_split_assumptions = pack.ev_phev_split_assumptions.copy() if pack is not None and isinstance(getattr(pack, "ev_phev_split_assumptions", None), pd.DataFrame) else pd.DataFrame()
     formula_residuals = pack.revenue_formula_residuals.copy() if pack is not None and isinstance(getattr(pack, "revenue_formula_residuals", None), pd.DataFrame) else pd.DataFrame()
     alias_audit = pack.series_alias_audit.copy() if pack is not None and isinstance(getattr(pack, "series_alias_audit", None), pd.DataFrame) else pd.DataFrame()
     fan_availability = pack.fan_availability.copy() if pack is not None and isinstance(getattr(pack, "fan_availability", None), pd.DataFrame) else pd.DataFrame()
@@ -2198,6 +2199,25 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         with table_cols[1]:
             dataframe_download(filtered_stack, "Download CSV", "revenue_stack_components.csv")
         display_table(_revenue_stack_components_display_table(filtered_stack), height=360, max_rows=720)
+
+    if not ev_phev_split_assumptions.empty:
+        with st.expander("EV/PHEV split audit", expanded=False):
+            target_audit = (manifest.get("target_semantics_audit") or {}).get("LIGHT_RUC", {}) if isinstance(manifest, dict) else {}
+            allocation_status = ((manifest.get("ev_phev_split_assumptions") or {}).get("allocation_status") if isinstance(manifest, dict) else "") or ""
+            warning_panel(
+                "Current Light RUC model output is not allocated into BEV/PHEV in this runtime pack. "
+                "Repo-local target history matches conventional Light RUC net km, not the total light-RUC universe."
+            )
+            st.caption(
+                "Current Light RUC model is treated as conventional Light unless repo-local evidence proves a total light-RUC universe. "
+                "MBU26 Light BEV/PHEV rows remain official comparator/fixed-source rows only."
+            )
+            if target_audit:
+                st.caption(f"Target semantics status: {target_audit.get('status', '')}. Allocation status: {allocation_status}.")
+            audit_cols = st.columns([0.82, 0.18])
+            with audit_cols[1]:
+                dataframe_download(ev_phev_split_assumptions, "Download CSV", "ev_phev_split_assumptions.csv")
+            display_table(_ev_phev_split_assumptions_display_table(ev_phev_split_assumptions), height=320, max_rows=220)
 
     selected_fy_number = _selected_fy_to_number(selected_fy)
     if selected_metric_type == "activity":
@@ -5262,6 +5282,61 @@ def _revenue_stack_components_display_table(stack_components: pd.DataFrame) -> p
     ]:
         if col in view.columns:
             view[col] = pd.to_numeric(view[col], errors="coerce").map(lambda value: _format_compact_value(value, ""))
+    return view
+
+
+def _ev_phev_split_assumptions_display_table(split_assumptions: pd.DataFrame) -> pd.DataFrame:
+    if split_assumptions is None or split_assumptions.empty:
+        return pd.DataFrame()
+    view = split_assumptions.copy()
+    rename = {
+        "FY": "FY",
+        "conventional_light_km": "Conventional Light km",
+        "light_bev_km": "Light BEV km",
+        "phev_km": "PHEV km",
+        "total_light_universe_km": "Total light universe km",
+        "conventional_share": "Conventional share",
+        "light_bev_share": "Light BEV share",
+        "phev_share": "PHEV share",
+        "conventional_light_rate_nzd_per_1000km": "Conventional rate NZD/1000km",
+        "light_bev_rate_nzd_per_1000km": "Light BEV rate NZD/1000km",
+        "phev_rate_nzd_per_1000km": "PHEV rate NZD/1000km",
+        "model_input_target_million_km": "Model target million km",
+        "target_minus_conventional_light_km": "Target minus conventional",
+        "target_minus_total_light_universe_km": "Target minus universe",
+        "target_matches_conventional_light": "Target matches conventional",
+        "target_matches_total_light_universe": "Target matches universe",
+        "target_semantics_status": "Target semantics",
+        "allocation_status": "Allocation status",
+        "used_by_current_finalist": "Used by current finalist",
+        "model_input_quarters": "Model input quarters",
+        "source_file": "Source file",
+        "conventional_light_source_cell": "Conventional source cell",
+        "light_bev_source_cell": "Light BEV source cell",
+        "phev_source_cell": "PHEV source cell",
+        "notes": "Notes",
+    }
+    cols = [col for col in rename if col in view.columns]
+    view = view[cols].rename(columns=rename)
+    for col in [
+        "Conventional Light km",
+        "Light BEV km",
+        "PHEV km",
+        "Total light universe km",
+        "Conventional rate NZD/1000km",
+        "Light BEV rate NZD/1000km",
+        "PHEV rate NZD/1000km",
+        "Model target million km",
+        "Target minus conventional",
+        "Target minus universe",
+    ]:
+        if col in view.columns:
+            view[col] = pd.to_numeric(view[col], errors="coerce").map(lambda value: _format_compact_value(value, ""))
+    for col in ["Conventional share", "Light BEV share", "PHEV share"]:
+        if col in view.columns:
+            view[col] = pd.to_numeric(view[col], errors="coerce").map(
+                lambda value: "" if pd.isna(value) else f"{float(value):.4%}"
+            )
     return view
 
 

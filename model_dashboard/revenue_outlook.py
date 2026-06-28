@@ -68,6 +68,7 @@ RUNTIME_REVENUE_OUTLOOK_FILES = (
     "runtime_trace_audit.parquet",
     "revenue_line_reconciliation.parquet",
     "revenue_stack_components.parquet",
+    "ev_phev_split_assumptions.parquet",
     "revenue_formula_residuals.parquet",
     "series_alias_audit.parquet",
     "fan_availability.parquet",
@@ -348,6 +349,7 @@ class RevenueOutlookPack:
     revenue_chart_rows: pd.DataFrame
     revenue_line_reconciliation: pd.DataFrame = field(default_factory=pd.DataFrame)
     revenue_stack_components: pd.DataFrame = field(default_factory=pd.DataFrame)
+    ev_phev_split_assumptions: pd.DataFrame = field(default_factory=pd.DataFrame)
     revenue_formula_residuals: pd.DataFrame = field(default_factory=pd.DataFrame)
     series_alias_audit: pd.DataFrame = field(default_factory=pd.DataFrame)
     fan_availability: pd.DataFrame = field(default_factory=pd.DataFrame)
@@ -368,6 +370,7 @@ def revenue_outlook_signature(pack_dir: Path | str | None = None, repo_root: Pat
         base / "revenue_chart_rows.parquet",
         base / "revenue_line_reconciliation.parquet",
         base / "revenue_stack_components.parquet",
+        base / "ev_phev_split_assumptions.parquet",
         base / "revenue_formula_residuals.parquet",
         base / "series_alias_audit.parquet",
         base / "fan_availability.parquet",
@@ -405,6 +408,7 @@ def load_revenue_outlook_pack(
         revenue_chart_rows=_read_optional_parquet(base / "revenue_chart_rows.parquet"),
         revenue_line_reconciliation=_read_optional_parquet(base / "revenue_line_reconciliation.parquet"),
         revenue_stack_components=_read_optional_parquet(base / "revenue_stack_components.parquet"),
+        ev_phev_split_assumptions=_read_optional_parquet(base / "ev_phev_split_assumptions.parquet"),
         revenue_formula_residuals=_read_optional_parquet(base / "revenue_formula_residuals.parquet"),
         series_alias_audit=_read_optional_parquet(base / "series_alias_audit.parquet"),
         fan_availability=_read_optional_parquet(base / "fan_availability.parquet"),
@@ -512,6 +516,10 @@ def build_current_revenue_outlook_runtime_pack(
     )
     formula_residuals = revenue_formula_residual_frame(line_reconciliation)
     stack_components = revenue_stack_components_frame(line_reconciliation, formula_residuals)
+    ev_phev_split_assumptions = ev_phev_split_assumptions_frame(
+        mbu26_pack.official_annual,
+        repo_root=root,
+    )
 
     series_meta = _runtime_series_metadata(mbu26_pack.series_trace_contract)
     quarterly_inputs = _runtime_quarterly_activity_inputs(existing_chart_rows, series_meta)
@@ -559,6 +567,11 @@ def build_current_revenue_outlook_runtime_pack(
             "B_official_comparator": "MBU26 official forecast rows for FY2026+",
             "C_current_finalist_activity": "Promoted quarterly finalist outputs annualized by June year",
             "D_hybrid_current_revenue": "Only PED, Light RUC and Heavy RUC revenue are replaced; all other rows use MBU26 official components.",
+            "E_ev_phev_split_audit": (
+                "MBU26 BEV/PHEV split shares are materialized for audit, but current-finalist allocation is not applied "
+                "because repo-local Light RUC target history matches MBU26 conventional Light RUC net km rather than "
+                "the conventional+BEV+PHEV light universe."
+            ),
         },
         "period_rule": {
             "last_complete_actual_fy": REVENUE_LAST_COMPLETE_ACTUAL_FY,
@@ -566,6 +579,13 @@ def build_current_revenue_outlook_runtime_pack(
             "model_training_cutoff": REVENUE_MODEL_TRAINING_CUTOFF,
             "fy2026_nowcast": "2025Q3+2025Q4 source actuals plus 2026Q1+2026Q2 current finalist forecasts",
             "rule": "Actual line ends FY2025; FY2026 actual-to-date rows are nowcast inputs only and are not plotted as actuals.",
+        },
+        "data_vintage_manifest_notes": {
+            "light_ruc_target_semantics": (
+                "Repo-local Light RUC model-input history is compared with MBU26 conventional Light, Light BEV and "
+                "PHEV annual rows in ev_phev_split_assumptions. Positive-overlap years currently prove conventional "
+                "Light target semantics, so EV/PHEV allocation is not applied."
+            )
         },
         "source_comparison": {
             "comparison_id": (existing_manifest.get("source_comparison") or {}).get("comparison_id", "current_finalist_runtime_rebuild"),
@@ -591,6 +611,23 @@ def build_current_revenue_outlook_runtime_pack(
             "LIGHT_RUC": "Light RUC revenue = current finalist net km * MBU26 effective Light RUC rate.",
             "HEAVY_RUC": "Heavy RUC revenue = current finalist net km * MBU26 effective Heavy RUC rate.",
             "ROLLUPS": "Gross FED, Net FED, Total RUC, Total RUC+PED and Total NLTF recalculate three replacement lines plus MBU26 fixed components.",
+        },
+        "target_semantics_audit": {
+            "LIGHT_RUC": _light_ruc_target_semantics_manifest(ev_phev_split_assumptions),
+            "HEAVY_RUC": {
+                "status": "not_reclassified",
+                "decision": "Heavy BEV remains an MBU26 fixed component in current-finalist paths.",
+                "rationale": "No repo-local evidence in this audit proves the Heavy RUC target includes Heavy BEV.",
+            },
+        },
+        "ev_phev_split_assumptions": {
+            "repo_relative_path": _repo_relative(root, base / "ev_phev_split_assumptions.csv"),
+            "scope": (
+                "MBU26 conventional Light, Light BEV and PHEV km/revenue shares and rates, plus repo-local "
+                "model-input target comparison. The split is audit-only unless target semantics prove that "
+                "the current Light RUC model output is the total light-RUC universe."
+            ),
+            "allocation_status": _ev_phev_allocation_status(ev_phev_split_assumptions),
         },
         "rate_provenance": {
             "future_light_heavy": "mbu26_official_annual.csv effective rates joined to current finalist net-km outputs",
@@ -651,6 +688,7 @@ def build_current_revenue_outlook_runtime_pack(
             "row_reconciliation": mbu26_pack.row_reconciliation,
             "revenue_line_reconciliation": line_reconciliation,
             "revenue_stack_components": stack_components,
+            "ev_phev_split_assumptions": ev_phev_split_assumptions,
             "revenue_formula_residuals": formula_residuals,
             "fan_availability": fan_availability,
             "fan_band_rows": fan_band_rows,
@@ -730,6 +768,315 @@ def _read_existing_manifest(pack_dir: Path) -> dict[str, Any]:
         return json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return {}
+
+
+def ev_phev_split_assumptions_frame(
+    mbu26_official_annual: pd.DataFrame,
+    *,
+    repo_root: Path | str | None = None,
+) -> pd.DataFrame:
+    """Audit MBU26 Light RUC EV/PHEV split evidence against the Light target.
+
+    The current finalist Light RUC model can only be allocated down into
+    conventional Light, Light BEV and PHEV if the repo-local target history
+    proves that it is a total light-RUC universe. This frame records the split
+    evidence and the target comparison; it is audit-only when the proof fails.
+    """
+
+    columns = [
+        "FY",
+        "period",
+        "conventional_light_km",
+        "light_bev_km",
+        "phev_km",
+        "total_light_universe_km",
+        "conventional_share",
+        "light_bev_share",
+        "phev_share",
+        "conventional_light_revenue",
+        "light_bev_revenue",
+        "phev_revenue",
+        "conventional_light_rate_nzd_per_1000km",
+        "light_bev_rate_nzd_per_1000km",
+        "phev_rate_nzd_per_1000km",
+        "conventional_light_source_cell",
+        "light_bev_source_cell",
+        "phev_source_cell",
+        "conventional_light_revenue_source_cell",
+        "light_bev_revenue_source_cell",
+        "phev_revenue_source_cell",
+        "source_formula",
+        "source_file",
+        "source_status",
+        "model_input_target_million_km",
+        "model_input_quarters",
+        "model_input_full_year",
+        "target_minus_conventional_light_km",
+        "target_minus_total_light_universe_km",
+        "target_matches_conventional_light",
+        "target_matches_total_light_universe",
+        "target_semantics_status",
+        "allocation_status",
+        "used_by_current_finalist",
+        "notes",
+    ]
+    if mbu26_official_annual is None or mbu26_official_annual.empty:
+        return pd.DataFrame(columns=columns)
+
+    root = Path(repo_root) if repo_root is not None else repo_root_from_here()
+    official = mbu26_official_annual.copy()
+    official["FY_numeric"] = pd.to_numeric(official.get("FY"), errors="coerce").astype("Int64")
+    official["value_numeric"] = pd.to_numeric(official.get("value"), errors="coerce")
+    official = official[official["FY_numeric"].notna()].copy()
+    records: dict[tuple[int, str], dict[str, Any]] = {}
+    for row in official.to_dict("records"):
+        series_id = str(row.get("series_id") or "")
+        if not series_id:
+            continue
+        key = (int(row["FY_numeric"]), series_id)
+        if key not in records:
+            records[key] = row
+
+    target_history = _light_ruc_annual_target_history(root)
+    target_lookup = {int(row.FY): row for row in target_history.itertuples()} if not target_history.empty else {}
+    rows: list[dict[str, Any]] = []
+    for fy in sorted({key[0] for key in records}):
+        conv = _record_value(records, fy, "light_ruc_net_km")
+        bev = _record_value(records, fy, "light_bev_ruc_net_km")
+        phev = _record_value(records, fy, "phev_ruc_net_km")
+        conv_rev = _record_value(records, fy, "light_ruc_net_revenue")
+        bev_rev = _record_value(records, fy, "light_bev_ruc_net_revenue")
+        phev_rev = _record_value(records, fy, "phev_ruc_net_revenue")
+        total = _sum_if_all_present(conv, bev, phev)
+        target_row = target_lookup.get(int(fy))
+        target = getattr(target_row, "target_million_km", pd.NA) if target_row is not None else pd.NA
+        target_quarters = getattr(target_row, "quarters_present", "") if target_row is not None else ""
+        full_year = bool(getattr(target_row, "model_input_full_year", False)) if target_row is not None else False
+        diff_conventional = _subtract_if_present(target, conv)
+        diff_universe = _subtract_if_present(target, total)
+        matches_conventional = _values_close(target, conv) if full_year else False
+        matches_universe = _values_close(target, total) if full_year else False
+        target_status = _light_target_row_status(
+            full_year=full_year,
+            light_bev_km=bev,
+            phev_km=phev,
+            matches_conventional=matches_conventional,
+            matches_universe=matches_universe,
+        )
+        allocation_status = (
+            "not_applied_target_semantics_mismatch"
+            if target_status == "matches_conventional_light_not_total_universe"
+            else "audit_only_pending_total_universe_proof"
+        )
+        rows.append(
+            {
+                "FY": int(fy),
+                "period": f"FY{int(fy)}",
+                "conventional_light_km": conv,
+                "light_bev_km": bev,
+                "phev_km": phev,
+                "total_light_universe_km": total,
+                "conventional_share": _divide_if_present(conv, total),
+                "light_bev_share": _divide_if_present(bev, total),
+                "phev_share": _divide_if_present(phev, total),
+                "conventional_light_revenue": conv_rev,
+                "light_bev_revenue": bev_rev,
+                "phev_revenue": phev_rev,
+                "conventional_light_rate_nzd_per_1000km": _rate_per_1000km(conv_rev, conv),
+                "light_bev_rate_nzd_per_1000km": _rate_per_1000km(bev_rev, bev),
+                "phev_rate_nzd_per_1000km": _rate_per_1000km(phev_rev, phev),
+                "conventional_light_source_cell": _record_text(records, fy, "light_ruc_net_km", "source_cell"),
+                "light_bev_source_cell": _record_text(records, fy, "light_bev_ruc_net_km", "source_cell"),
+                "phev_source_cell": _record_text(records, fy, "phev_ruc_net_km", "source_cell"),
+                "conventional_light_revenue_source_cell": _record_text(records, fy, "light_ruc_net_revenue", "source_cell"),
+                "light_bev_revenue_source_cell": _record_text(records, fy, "light_bev_ruc_net_revenue", "source_cell"),
+                "phev_revenue_source_cell": _record_text(records, fy, "phev_ruc_net_revenue", "source_cell"),
+                "source_formula": "; ".join(
+                    item
+                    for item in [
+                        _record_text(records, fy, "light_ruc_net_km", "formula"),
+                        _record_text(records, fy, "light_bev_ruc_net_km", "formula"),
+                        _record_text(records, fy, "phev_ruc_net_km", "formula"),
+                    ]
+                    if item
+                ),
+                "source_file": "data/revenue_model_source_pack/mbu26_annual_spine/mbu26_annual_spine.csv",
+                "source_status": _record_text(records, fy, "light_ruc_net_km", "period_status"),
+                "model_input_target_million_km": target,
+                "model_input_quarters": target_quarters,
+                "model_input_full_year": full_year,
+                "target_minus_conventional_light_km": diff_conventional,
+                "target_minus_total_light_universe_km": diff_universe,
+                "target_matches_conventional_light": bool(matches_conventional),
+                "target_matches_total_light_universe": bool(matches_universe),
+                "target_semantics_status": target_status,
+                "allocation_status": allocation_status,
+                "used_by_current_finalist": False,
+                "notes": (
+                    "Current-finalist Light RUC allocation is blocked unless target history proves a total light-RUC universe. "
+                    "Rows with post-2023 BEV/PHEV evidence match conventional Light RUC, not conventional+BEV+PHEV."
+                ),
+            }
+        )
+    return pd.DataFrame(rows, columns=columns)
+
+
+def _light_ruc_annual_target_history(root: Path) -> pd.DataFrame:
+    columns = ["FY", "target_million_km", "quarters_present", "model_input_full_year"]
+    path = root / MODEL_INPUT_HISTORY_DIR / MODEL_INPUT_HISTORY_FILES["LIGHT_RUC"]
+    if not path.exists():
+        return pd.DataFrame(columns=columns)
+    history = _read_optional_parquet(path)
+    if history.empty:
+        return pd.DataFrame(columns=columns)
+    data = history.copy()
+    data["year_numeric"] = pd.to_numeric(data.get("year"), errors="coerce").astype("Int64")
+    data["quarter_numeric"] = pd.to_numeric(data.get("quarter"), errors="coerce").astype("Int64")
+    data["target_numeric"] = pd.to_numeric(data.get("target"), errors="coerce")
+    data = data[data["year_numeric"].notna() & data["quarter_numeric"].notna()].copy()
+    if data.empty:
+        return pd.DataFrame(columns=columns)
+    data["FY"] = data["year_numeric"].astype(int) + data["quarter_numeric"].isin([3, 4]).astype(int)
+    data["period_text"] = data.get("period", pd.Series("", index=data.index)).astype(str)
+    rows: list[dict[str, Any]] = []
+    for fy, group in data.groupby("FY", dropna=False):
+        targets = pd.to_numeric(group.get("target_numeric"), errors="coerce")
+        positive_targets = targets[targets.gt(0)]
+        periods = sorted(group["period_text"].dropna().astype(str).tolist(), key=quarter_sort_key)
+        full_year = len(group) == 4 and len(positive_targets) == 4
+        rows.append(
+            {
+                "FY": int(fy),
+                "target_million_km": float(positive_targets.sum() / 1_000_000.0) if len(positive_targets) else pd.NA,
+                "quarters_present": "; ".join(periods),
+                "model_input_full_year": bool(full_year),
+            }
+        )
+    return pd.DataFrame(rows, columns=columns)
+
+
+def _light_ruc_target_semantics_manifest(audit: pd.DataFrame) -> dict[str, Any]:
+    if audit is None or audit.empty:
+        return {
+            "status": "governed_gap_missing_evidence",
+            "decision": "Do not allocate current Light RUC into BEV/PHEV.",
+            "rationale": "No ev_phev_split_assumptions audit rows were available.",
+        }
+    evidence = audit[
+        audit.get("model_input_full_year", pd.Series(False, index=audit.index)).astype(bool)
+        & (
+            pd.to_numeric(audit.get("light_bev_km"), errors="coerce").fillna(0).gt(0)
+            | pd.to_numeric(audit.get("phev_km"), errors="coerce").fillna(0).gt(0)
+        )
+    ].copy()
+    if evidence.empty:
+        return {
+            "status": "governed_gap_no_positive_ev_phev_overlap",
+            "decision": "Do not allocate current Light RUC into BEV/PHEV.",
+            "rationale": "The repo-local model-input target history has no full-year overlap with positive MBU26 Light BEV/PHEV rows.",
+        }
+    status_counts = {
+        str(key): int(value)
+        for key, value in evidence["target_semantics_status"].astype(str).value_counts().to_dict().items()
+    }
+    matches_conventional = int(evidence["target_matches_conventional_light"].astype(bool).sum())
+    matches_universe = int(evidence["target_matches_total_light_universe"].astype(bool).sum())
+    years = [int(value) for value in pd.to_numeric(evidence["FY"], errors="coerce").dropna().astype(int).tolist()]
+    max_universe_residual = pd.to_numeric(evidence["target_minus_total_light_universe_km"], errors="coerce").abs().max()
+    return {
+        "status": "governed_gap_target_matches_conventional_light_not_total_universe",
+        "decision": "Do not allocate current Light RUC into BEV/PHEV from the current finalist output.",
+        "evidence_years": years,
+        "matches_conventional_light_rows": matches_conventional,
+        "matches_total_light_universe_rows": matches_universe,
+        "status_counts": status_counts,
+        "max_abs_target_minus_total_light_universe_km": float(max_universe_residual) if pd.notna(max_universe_residual) else None,
+        "repo_evidence": [
+            "data/model_input_history/light_ruc_inputs.parquet",
+            "data/revenue_model_source_pack/mbu26_annual_spine/mbu26_annual_spine.csv",
+        ],
+        "rationale": (
+            "In full-year overlap rows with positive Light BEV/PHEV evidence, the Light RUC model-input target "
+            "equals MBU26 conventional Light RUC net km and is below the conventional+BEV+PHEV universe."
+        ),
+    }
+
+
+def _ev_phev_allocation_status(audit: pd.DataFrame) -> str:
+    if audit is None or audit.empty or "allocation_status" not in audit.columns:
+        return "governed_gap_missing_evidence"
+    statuses = set(audit["allocation_status"].dropna().astype(str))
+    if "not_applied_target_semantics_mismatch" in statuses:
+        return "not_applied_target_semantics_mismatch"
+    if statuses:
+        return sorted(statuses)[0]
+    return "governed_gap_missing_evidence"
+
+
+def _record_value(records: dict[tuple[int, str], dict[str, Any]], fy: int, series_id: str) -> Any:
+    value = records.get((int(fy), series_id), {}).get("value_numeric")
+    numeric = pd.to_numeric(pd.Series([value]), errors="coerce").iloc[0]
+    return float(numeric) if pd.notna(numeric) else pd.NA
+
+
+def _record_text(records: dict[tuple[int, str], dict[str, Any]], fy: int, series_id: str, column: str) -> str:
+    value = records.get((int(fy), series_id), {}).get(column, "")
+    return "" if pd.isna(value) else str(value)
+
+
+def _sum_if_all_present(*values: Any) -> Any:
+    numeric = pd.to_numeric(pd.Series(values), errors="coerce")
+    if numeric.isna().any():
+        return pd.NA
+    return float(numeric.sum())
+
+
+def _subtract_if_present(left: Any, right: Any) -> Any:
+    numeric = pd.to_numeric(pd.Series([left, right]), errors="coerce")
+    if numeric.isna().any():
+        return pd.NA
+    return float(numeric.iloc[0] - numeric.iloc[1])
+
+
+def _divide_if_present(numerator: Any, denominator: Any) -> Any:
+    numeric = pd.to_numeric(pd.Series([numerator, denominator]), errors="coerce")
+    if numeric.isna().any() or abs(float(numeric.iloc[1])) < 1e-12:
+        return pd.NA
+    return float(numeric.iloc[0] / numeric.iloc[1])
+
+
+def _rate_per_1000km(revenue_million: Any, km_million: Any) -> Any:
+    rate = _divide_if_present(revenue_million, km_million)
+    return float(rate * 1000.0) if pd.notna(rate) else pd.NA
+
+
+def _values_close(left: Any, right: Any, *, abs_tol: float = 1e-6, rel_tol: float = 1e-9) -> bool:
+    numeric = pd.to_numeric(pd.Series([left, right]), errors="coerce")
+    if numeric.isna().any():
+        return False
+    a = float(numeric.iloc[0])
+    b = float(numeric.iloc[1])
+    return abs(a - b) <= max(abs_tol, rel_tol * max(abs(a), abs(b), 1.0))
+
+
+def _light_target_row_status(
+    *,
+    full_year: bool,
+    light_bev_km: Any,
+    phev_km: Any,
+    matches_conventional: bool,
+    matches_universe: bool,
+) -> str:
+    if not full_year:
+        return "model_input_full_year_missing"
+    ev_total = pd.to_numeric(pd.Series([light_bev_km, phev_km]), errors="coerce").fillna(0).sum()
+    if float(ev_total) <= 0:
+        return "pre_ev_phev_or_zero_split_overlap"
+    if matches_conventional and not matches_universe:
+        return "matches_conventional_light_not_total_universe"
+    if matches_universe:
+        return "matches_total_light_universe"
+    return "target_semantics_mismatch_unresolved"
 
 
 def revenue_stack_components_frame(
@@ -3074,6 +3421,7 @@ def _write_pack_files(
         "runtime_trace_audit",
         "revenue_line_reconciliation",
         "revenue_stack_components",
+        "ev_phev_split_assumptions",
         "revenue_formula_residuals",
         "series_alias_audit",
         "fan_availability",

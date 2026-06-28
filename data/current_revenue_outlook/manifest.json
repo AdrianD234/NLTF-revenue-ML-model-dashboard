@@ -17,7 +17,8 @@
     "A_actuals": "MBU26 annual source rows through last complete FY2025",
     "B_official_comparator": "MBU26 official forecast rows for FY2026+",
     "C_current_finalist_activity": "Promoted quarterly finalist outputs annualized by June year",
-    "D_hybrid_current_revenue": "Only PED, Light RUC and Heavy RUC revenue are replaced; all other rows use MBU26 official components."
+    "D_hybrid_current_revenue": "Only PED, Light RUC and Heavy RUC revenue are replaced; all other rows use MBU26 official components.",
+    "E_ev_phev_split_audit": "MBU26 BEV/PHEV split shares are materialized for audit, but current-finalist allocation is not applied because repo-local Light RUC target history matches MBU26 conventional Light RUC net km rather than the conventional+BEV+PHEV light universe."
   },
   "period_rule": {
     "last_complete_actual_fy": 2025,
@@ -25,6 +26,9 @@
     "model_training_cutoff": "2025Q4",
     "fy2026_nowcast": "2025Q3+2025Q4 source actuals plus 2026Q1+2026Q2 current finalist forecasts",
     "rule": "Actual line ends FY2025; FY2026 actual-to-date rows are nowcast inputs only and are not plotted as actuals."
+  },
+  "data_vintage_manifest_notes": {
+    "light_ruc_target_semantics": "Repo-local Light RUC model-input history is compared with MBU26 conventional Light, Light BEV and PHEV annual rows in ev_phev_split_assumptions. Positive-overlap years currently prove conventional Light target semantics, so EV/PHEV allocation is not applied."
   },
   "source_comparison": {
     "comparison_id": "current_revenue_outlook_scenario_comparison",
@@ -304,6 +308,37 @@
     "HEAVY_RUC": "Heavy RUC revenue = current finalist net km * MBU26 effective Heavy RUC rate.",
     "ROLLUPS": "Gross FED, Net FED, Total RUC, Total RUC+PED and Total NLTF recalculate three replacement lines plus MBU26 fixed components."
   },
+  "target_semantics_audit": {
+    "LIGHT_RUC": {
+      "status": "governed_gap_target_matches_conventional_light_not_total_universe",
+      "decision": "Do not allocate current Light RUC into BEV/PHEV from the current finalist output.",
+      "evidence_years": [
+        2024,
+        2025
+      ],
+      "matches_conventional_light_rows": 2,
+      "matches_total_light_universe_rows": 0,
+      "status_counts": {
+        "matches_conventional_light_not_total_universe": 2
+      },
+      "max_abs_target_minus_total_light_universe_km": 1255.7588639999994,
+      "repo_evidence": [
+        "data/model_input_history/light_ruc_inputs.parquet",
+        "data/revenue_model_source_pack/mbu26_annual_spine/mbu26_annual_spine.csv"
+      ],
+      "rationale": "In full-year overlap rows with positive Light BEV/PHEV evidence, the Light RUC model-input target equals MBU26 conventional Light RUC net km and is below the conventional+BEV+PHEV universe."
+    },
+    "HEAVY_RUC": {
+      "status": "not_reclassified",
+      "decision": "Heavy BEV remains an MBU26 fixed component in current-finalist paths.",
+      "rationale": "No repo-local evidence in this audit proves the Heavy RUC target includes Heavy BEV."
+    }
+  },
+  "ev_phev_split_assumptions": {
+    "repo_relative_path": "data/current_revenue_outlook/ev_phev_split_assumptions.csv",
+    "scope": "MBU26 conventional Light, Light BEV and PHEV km/revenue shares and rates, plus repo-local model-input target comparison. The split is audit-only unless target semantics prove that the current Light RUC model output is the total light-RUC universe.",
+    "allocation_status": "not_applied_target_semantics_mismatch"
+  },
   "rate_provenance": {
     "future_light_heavy": "mbu26_official_annual.csv effective rates joined to current finalist net-km outputs",
     "future_ped": "MBU26 population/intensity/rate joined to current finalist PED VKT/capita",
@@ -350,6 +385,14 @@
   },
   "validation_status": "runtime_rebuilt",
   "output_hashes": {
+    "ev_phev_split_assumptions.csv": {
+      "sha256": "0c28171411204ced131deb5c65b716963ec94654c0e4a03af132180c9006b259",
+      "size_bytes": 34691
+    },
+    "ev_phev_split_assumptions.parquet": {
+      "sha256": "955d4382cd4f59b2cc403dac04fae3382fa097e437525a035dc770669ac9d613",
+      "size_bytes": 32195
+    },
     "fan_availability.csv": {
       "sha256": "3e248fadf746e62affad42d0ca87a3dd232aaed5ee031e6072e7b2f5bd586248",
       "size_bytes": 23213
