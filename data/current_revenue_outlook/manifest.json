@@ -415,12 +415,12 @@
       "size_bytes": 75896
     },
     "revenue_stack_components.csv": {
-      "sha256": "c51b8c4d38c4c5f60f1ef20396b453ccf028db8656906717f2c5f41dda92392a",
-      "size_bytes": 8314128
+      "sha256": "f1d15a9bf2584a583a2ea41066e154d9be0bf715f02e159c331a3caaed13ea4e",
+      "size_bytes": 9821388
     },
     "revenue_stack_components.parquet": {
-      "sha256": "2d391fcba14299b7a874b44364904cc6ed27d41c047fcc675ffad52e6546d067",
-      "size_bytes": 142941
+      "sha256": "a650648fb578a39d88cc2436db54d8c137fc7c5e159bfd96b759eb8210c4e901",
+      "size_bytes": 210774
     },
     "row_reconciliation.csv": {
       "sha256": "d484f5d75cce88e30ce7bcf5dd70058505cc02e5dff93f457a579f119c2fc7ce",

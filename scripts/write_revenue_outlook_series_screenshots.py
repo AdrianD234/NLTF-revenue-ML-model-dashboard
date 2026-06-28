@@ -38,6 +38,10 @@ COMPOSITION_MODES = {
     "Gross-to-net bridge audit": "gross-to-net-bridge-audit",
     "Gross contribution stack": "gross-contribution-stack",
 }
+COMPOSITION_DETAIL_LEVELS = {
+    "Clean components": "clean-components",
+    "Full formula audit": "full-formula-audit",
+}
 COMPOSITION_OVERLAYS = {
     "Gross-to-net bridge audit": ("total_nltf_net_revenue", "Total NLTF overlay"),
     "Gross contribution stack": ("total_gross_revenue", "Total gross overlay"),
@@ -299,47 +303,58 @@ def _write_composition_screenshots() -> list[dict[str, object]]:
     manifest: list[dict[str, object]] = []
     for source_path, source_slug in COMPOSITION_SOURCE_PATHS.items():
         for mode, mode_slug in COMPOSITION_MODES.items():
+            detail_levels = ["Clean components", "Full formula audit"] if mode == "Gross-to-net bridge audit" else ["Clean components"]
             overlay_series_id, _overlay_label = COMPOSITION_OVERLAYS.get(mode, ("total_nltf_net_revenue", "Total overlay"))
-            mode_mask = (
-                stack["composition_mode"].astype(str).eq(mode)
-                if "composition_mode" in stack.columns
-                else pd.Series(True, index=stack.index)
-            )
-            frame = stack[
-                stack["source_path"].astype(str).eq(source_path)
-                & mode_mask
-                & (
-                    (
-                        stack["stack_role"].astype(str).isin(["component_positive", "component_negative"])
-                        & stack["section"].astype(str).isin(["RUC", "FED", "MVR", "TUC"])
-                    )
-                    | stack["series_id"].astype(str).eq(overlay_series_id)
+            for detail_level in detail_levels:
+                mode_mask = (
+                    stack["composition_mode"].astype(str).eq(mode)
+                    if "composition_mode" in stack.columns
+                    else pd.Series(True, index=stack.index)
                 )
-            ].copy()
-            if frame.empty:
-                continue
-            frame["FY_numeric"] = pd.to_numeric(frame["FY"], errors="coerce")
-            frame["stack_value_numeric"] = pd.to_numeric(frame["stack_value"], errors="coerce")
-            overlay_mask = frame["series_id"].astype(str).eq(overlay_series_id)
-            frame = frame[
-                frame["FY_numeric"].between(2025, 2035, inclusive="both")
-                & (frame["stack_value_numeric"].notna() | overlay_mask)
-            ].copy()
-            if frame.empty:
-                continue
-            title = f"Revenue Outlook composition - {source_path} - {mode}"
-            filename = f"revenue-outlook-composition-{mode_slug}-{source_slug}.png"
-            path = _write_composition_screenshot(frame, title, filename, mode=mode, overlay_series_id=overlay_series_id)
-            manifest.append(
-                {
-                    "series_id": "revenue_stack_components",
-                    "title": title,
-                    "source_path": source_path,
-                    "composition_mode": mode,
-                    "repo_relative_path": path.relative_to(ROOT).as_posix(),
-                    "rows": int(len(frame)),
-                }
-            )
+                frame = stack[
+                    stack["source_path"].astype(str).eq(source_path)
+                    & mode_mask
+                    & (
+                        (
+                            stack["stack_role"].astype(str).isin(["component_positive", "component_negative"])
+                            & stack["section"].astype(str).isin(["RUC", "FED", "MVR", "TUC"])
+                        )
+                        | stack["series_id"].astype(str).eq(overlay_series_id)
+                    )
+                ].copy()
+                if frame.empty:
+                    continue
+                frame["FY_numeric"] = pd.to_numeric(frame["FY"], errors="coerce")
+                value_column = "stack_value" if detail_level == "Full formula audit" else "clean_stack_value"
+                if value_column not in frame.columns:
+                    value_column = "stack_value"
+                frame["stack_value_numeric"] = pd.to_numeric(frame[value_column], errors="coerce")
+                overlay_mask = frame["series_id"].astype(str).eq(overlay_series_id)
+                if detail_level != "Full formula audit" and "chart_visible" in frame.columns:
+                    visible_mask = frame["chart_visible"].astype(str).str.lower().isin(["true", "1"])
+                    frame = frame[visible_mask | overlay_mask].copy()
+                    overlay_mask = frame["series_id"].astype(str).eq(overlay_series_id)
+                frame = frame[
+                    frame["FY_numeric"].between(2025, 2035, inclusive="both")
+                    & (frame["stack_value_numeric"].notna() | overlay_mask)
+                ].copy()
+                if frame.empty:
+                    continue
+                detail_slug = COMPOSITION_DETAIL_LEVELS[detail_level]
+                title = f"Revenue Outlook composition - {source_path} - {mode} - {detail_level}"
+                filename = f"revenue-outlook-composition-{mode_slug}-{detail_slug}-{source_slug}.png"
+                path = _write_composition_screenshot(frame, title, filename, mode=mode, overlay_series_id=overlay_series_id)
+                manifest.append(
+                    {
+                        "series_id": "revenue_stack_components",
+                        "title": title,
+                        "source_path": source_path,
+                        "composition_mode": mode,
+                        "detail_level": detail_level,
+                        "repo_relative_path": path.relative_to(ROOT).as_posix(),
+                        "rows": int(len(frame)),
+                    }
+                )
     return manifest
 
 

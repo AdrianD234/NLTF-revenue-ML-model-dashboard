@@ -121,6 +121,9 @@ from model_dashboard.revenue_outlook import (
     FAN_SOURCE_SCENARIO_SPREAD,
     REVENUE_OUTLOOK_SCHEMA_VERSION,
     REVENUE_OUTLOOK_TITLE,
+    REVENUE_STACK_DETAIL_CLEAN,
+    REVENUE_STACK_DETAIL_FULL_FORMULA,
+    REVENUE_STACK_DETAIL_LEVELS,
     REVENUE_STACK_MODE_BRIDGE,
     REVENUE_STACK_MODE_GROSS,
     REVENUE_STACK_MODES,
@@ -2101,7 +2104,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
 
     with st.container(border=True):
         st.markdown("<div class='page5-panel-title'>Revenue composition over time</div>", unsafe_allow_html=True)
-        comp_cols = st.columns([0.24, 0.22, 0.18, 0.19, 0.17])
+        comp_cols = st.columns([0.20, 0.18, 0.17, 0.16, 0.15, 0.14])
         stack_source_options = _revenue_line_source_options(stack_components)
         stack_mode_options = _revenue_stack_mode_options(stack_components)
         stack_section_options = _revenue_line_section_options(stack_components)
@@ -2121,6 +2124,13 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 key="revenue_stack_composition_mode",
             )
         with comp_cols[2]:
+            selected_stack_detail_level = st.selectbox(
+                "Detail level",
+                list(REVENUE_STACK_DETAIL_LEVELS),
+                index=0,
+                key="revenue_stack_detail_level",
+            )
+        with comp_cols[3]:
             selected_stack_fy_range = st.slider(
                 "FY range / horizon",
                 min_value=stack_fy_min,
@@ -2129,7 +2139,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 key="revenue_stack_fy_range",
             )
         default_stack_sections = [section for section in ["RUC", "FED", "MVR", "TUC"] if section in stack_section_options]
-        with comp_cols[3]:
+        with comp_cols[4]:
             selected_stack_sections = st.multiselect(
                 "Section filter",
                 stack_section_options,
@@ -2138,12 +2148,12 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             )
         stack_overlay_options = _revenue_stack_overlay_options(stack_components)
         default_stack_overlays = _revenue_stack_default_overlays(selected_stack_mode, stack_overlay_options)
-        with comp_cols[4]:
+        with comp_cols[5]:
             selected_stack_overlays = st.multiselect(
                 "Aggregate overlays",
                 stack_overlay_options,
                 default=default_stack_overlays,
-                key=f"revenue_stack_overlays_{selected_stack_mode}",
+                key=f"revenue_stack_overlays_{selected_stack_mode}_{selected_stack_detail_level}",
             )
 
         filtered_stack = _filter_revenue_stack_components(
@@ -2175,9 +2185,10 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 chart_stack,
                 source_path=selected_stack_source,
                 composition_mode=selected_stack_mode,
+                detail_level=selected_stack_detail_level,
                 overlays=selected_stack_overlays,
             ),
-            caption="Bridge mode reconciles gross add-backs and explicit deductions to Total NLTF revenue. Gross mode stacks leaf rows to Total gross revenues. Aggregates are overlays only.",
+            caption="Clean bridge mode hides internal add-back rows while preserving reconciliation to Total NLTF revenue. Positive revenue components stack above zero; deductions stack below zero. Full formula audit shows internal rows. Gross mode reconciles leaf rows to Total gross revenues. Aggregates are overlays only.",
             notes_as_tooltip=False,
         )
         stack_gap_banner = _revenue_stack_gap_banner(filtered_stack)
@@ -4546,6 +4557,7 @@ def revenue_outlook_composition_figure(
     *,
     source_path: str,
     composition_mode: str | None = None,
+    detail_level: str = REVENUE_STACK_DETAIL_CLEAN,
     overlays: list[str] | None = None,
 ) -> go.Figure:
     if stack_components is None or stack_components.empty:
@@ -4562,8 +4574,20 @@ def revenue_outlook_composition_figure(
         return empty_figure("No Revenue composition rows match the selected source path.")
 
     component_roles = {"component_positive", "component_negative"}
-    plot = data[data.get("stack_role", pd.Series("", index=data.index)).astype(str).isin(component_roles)].copy()
-    plot["stack_value_numeric"] = pd.to_numeric(plot.get("stack_value"), errors="coerce")
+    full_formula_audit = str(detail_level) == REVENUE_STACK_DETAIL_FULL_FORMULA
+    component_mask = data.get("stack_role", pd.Series("", index=data.index)).astype(str).isin(component_roles)
+    if full_formula_audit:
+        plot = data[component_mask].copy()
+        stack_value_column = "stack_value"
+        status_column = "stack_overlay_status"
+    else:
+        visibility = data.get("chart_visible", pd.Series(True, index=data.index)).fillna(False).astype(bool)
+        plot = data[component_mask & visibility].copy()
+        stack_value_column = "clean_stack_value" if "clean_stack_value" in plot.columns else "stack_value_clean"
+        if stack_value_column not in plot.columns:
+            stack_value_column = "stack_value"
+        status_column = "clean_overlay_status"
+    plot["stack_value_numeric"] = pd.to_numeric(plot.get(stack_value_column), errors="coerce")
     plot["FY_numeric"] = pd.to_numeric(plot.get("FY"), errors="coerce")
     plot = plot.dropna(subset=["stack_value_numeric", "FY_numeric"])
     if plot.empty:
@@ -4652,8 +4676,8 @@ def revenue_outlook_composition_figure(
             group = group.sort_values("FY_numeric", kind="stable")
             group["visible_stack_total"] = group["FY_numeric"].map(lambda value: visible_stack_lookup.get(int(value), np.nan))
             group["visible_stack_residual"] = pd.to_numeric(group["visible_stack_total"], errors="coerce") - pd.to_numeric(group["value_numeric"], errors="coerce")
-            if "stack_overlay_status" in group.columns:
-                group = group[group["stack_overlay_status"].astype(str).eq("balanced")].copy()
+            if status_column in group.columns:
+                group = group[group[status_column].astype(str).eq("balanced")].copy()
             group = group[pd.to_numeric(group["visible_stack_residual"], errors="coerce").abs().le(1.0)].copy()
             if group.empty:
                 continue
@@ -4687,7 +4711,7 @@ def revenue_outlook_composition_figure(
         xaxis={"tickmode": "linear", "dtick": 1},
         yaxis={"zeroline": True, "zerolinewidth": 1.5, "zerolinecolor": "#52616B"},
         legend={"orientation": "h", "y": -0.20, "x": 0, "font": {"size": 10}},
-        hovermode="closest",
+        hovermode="x unified",
     )
     return fig
 
@@ -5183,13 +5207,23 @@ def _revenue_stack_components_display_table(stack_components: pd.DataFrame) -> p
         "section": "Section",
         "line_label": "Line",
         "value": "Value",
+        "raw_value": "Raw value",
         "signed_contribution": "Signed contribution",
         "stack_value": "Stack value",
+        "stack_value_clean": "Stack value clean",
+        "clean_stack_value": "Clean stack value",
+        "chart_visible": "Clean chart visible",
+        "legend_visible": "Clean legend visible",
+        "net_effect_group": "Net effect group",
         "stack_total_by_FY": "Stack total by FY",
         "overlay_total_value": "Overlay total",
         "overlay_label": "Overlay target",
         "stack_overlay_residual": "Overlay residual",
         "stack_overlay_status": "Overlay status",
+        "clean_stack_total_by_FY": "Clean stack total by FY",
+        "clean_overlay_total_value": "Clean overlay total",
+        "clean_overlay_residual": "Clean overlay residual",
+        "clean_overlay_status": "Clean overlay status",
         "unit": "Unit",
         "source_path": "Source path",
         "FY": "FY",

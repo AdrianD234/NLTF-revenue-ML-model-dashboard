@@ -4,6 +4,7 @@ from itertools import product
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from app import (
     REVENUE_SOURCE_HORIZON_OPTIONS,
@@ -37,6 +38,7 @@ from model_dashboard.revenue_outlook import (
     FAN_SOURCE_CURRENT_BACKTEST,
     FAN_SOURCE_NONE,
     FAN_SOURCE_SCENARIO_SPREAD,
+    REVENUE_STACK_DETAIL_FULL_FORMULA,
 )
 from model_dashboard.revenue_source_pack import REVENUE_SOURCE_PACK_RUNTIME_REVISION, load_revenue_source_pack
 
@@ -852,10 +854,12 @@ def test_revenue_outlook_composition_figure_stacks_components_and_overlays_aggre
     assert "MR13/COO" in bar_names
     assert "Total gross revenues overlay" in scatter_names
     assert fig.layout.barmode == "relative"
+    assert fig.layout.hovermode == "x unified"
     assert fig.layout.yaxis.title.text == "$m nominal ex GST"
     assert not any("Schiff" in str(trace.name) or "selected_dashboard" in str(trace.name) for trace in fig.data)
     hover_templates = "\n".join(str(trace.hovertemplate) for trace in fig.data)
     assert "stack total" in hover_templates
+    assert "%{fullData.name}: %{y:,.1f}" in hover_templates
     assert "source_file" not in hover_templates
     assert "<extra></extra>" in hover_templates
     for raw_identifier in ["source_file", "source_cell", "model_id", "formula", "quarter_composition"]:
@@ -875,16 +879,40 @@ def test_revenue_outlook_composition_figure_stacks_components_and_overlays_aggre
     )
     bridge_bar_names = {str(trace.name) for trace in bridge_fig.data if trace.type == "bar"}
     bridge_scatter_names = {str(trace.name) for trace in bridge_fig.data if trace.type == "scatter"}
-    assert "RUC refunds" in bridge_bar_names
-    assert "MR13/COO" in bridge_bar_names
-    assert "RUC refunds gross add-back" in bridge_bar_names
-    assert "MR13/COO gross add-back" in bridge_bar_names
+    assert "RUC refunds" not in bridge_bar_names
+    assert "MR13/COO" not in bridge_bar_names
+    assert "RUC refunds gross add-back" not in bridge_bar_names
+    assert "MR13/COO gross add-back" not in bridge_bar_names
     assert "Gross RUC" not in bridge_bar_names
     assert "Gross FED" not in bridge_bar_names
     assert "Total NLTF revenue overlay" in bridge_scatter_names
     assert bridge_fig.layout.barmode == "overlay"
     assert any(getattr(trace, "base", None) is not None for trace in bridge_fig.data if trace.type == "bar")
     assert any(min(float(value) for value in trace.y) < 0 for trace in bridge_fig.data if trace.type == "bar")
+    visible_total = sum(
+        float(trace.y[0])
+        for trace in bridge_fig.data
+        if trace.type == "bar" and len(trace.y) and str(trace.x[0]) == "2001"
+    )
+    overlay_value = next(
+        float(trace.y[0])
+        for trace in bridge_fig.data
+        if trace.type == "scatter" and str(trace.name) == "Total NLTF revenue overlay"
+    )
+    assert visible_total == pytest.approx(overlay_value, abs=1.0)
+
+    full_bridge_fig = revenue_outlook_composition_figure(
+        bridge_view,
+        source_path="MBU26 official",
+        composition_mode="Gross-to-net bridge audit",
+        detail_level=REVENUE_STACK_DETAIL_FULL_FORMULA,
+        overlays=["Total NLTF revenue"],
+    )
+    full_bridge_bar_names = {str(trace.name) for trace in full_bridge_fig.data if trace.type == "bar"}
+    assert "RUC refunds" in full_bridge_bar_names
+    assert "MR13/COO" in full_bridge_bar_names
+    assert "RUC refunds gross add-back" in full_bridge_bar_names
+    assert "MR13/COO gross add-back" in full_bridge_bar_names
 
 
 def test_revenue_outlook_manifest_table_exposes_source_pack_and_bridge_provenance() -> None:

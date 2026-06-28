@@ -210,6 +210,9 @@ REVENUE_FIRST_FORECAST_FY = 2026
 REVENUE_STACK_MODE_BRIDGE = "Gross-to-net bridge audit"
 REVENUE_STACK_MODE_GROSS = "Gross contribution stack"
 REVENUE_STACK_MODES = (REVENUE_STACK_MODE_BRIDGE, REVENUE_STACK_MODE_GROSS)
+REVENUE_STACK_DETAIL_CLEAN = "Clean components"
+REVENUE_STACK_DETAIL_FULL_FORMULA = "Full formula audit"
+REVENUE_STACK_DETAIL_LEVELS = (REVENUE_STACK_DETAIL_CLEAN, REVENUE_STACK_DETAIL_FULL_FORMULA)
 REVENUE_STACK_SECTION_ORDER = {
     "Key volumes": 0,
     "RUC": 1,
@@ -327,6 +330,12 @@ REVENUE_STACK_BRIDGE_ADDBACKS = {
             "allows the explicit MR13/COO deduction to remain visible without changing Total NLTF revenue."
         ),
     },
+}
+REVENUE_STACK_BRIDGE_INTERNAL_NET_ZERO_SERIES = {
+    "ruc_refunds",
+    "ruc_refunds_gross_addback",
+    "coo_revenue",
+    "coo_gross_mvr_addback",
 }
 
 
@@ -742,8 +751,14 @@ def revenue_stack_components_frame(
         "composition_mode_order",
         "stack_role",
         "formula_role",
+        "raw_value",
         "signed_contribution",
         "stack_value",
+        "stack_value_clean",
+        "clean_stack_value",
+        "chart_visible",
+        "legend_visible",
+        "net_effect_group",
         "stack_unit",
         "section_order",
         "line_order",
@@ -757,6 +772,10 @@ def revenue_stack_components_frame(
         "overlay_label",
         "stack_overlay_residual",
         "stack_overlay_status",
+        "clean_stack_total_by_FY",
+        "clean_overlay_total_value",
+        "clean_overlay_residual",
+        "clean_overlay_status",
         "stack_note",
         "formula_residual",
         "formula_residual_abs",
@@ -936,6 +955,21 @@ def _revenue_stack_mode_frame(base: pd.DataFrame, *, mode: str, mode_order: int)
         "signed_contribution",
     ]
     out["stack_value"] = pd.to_numeric(out["stack_value"], errors="coerce")
+    out["raw_value"] = out["value_numeric"]
+    out["stack_value_clean"] = out["stack_value"]
+    out["chart_visible"] = out["stack_role"].isin(["component_positive", "component_negative"])
+    out["legend_visible"] = out["chart_visible"]
+    out["net_effect_group"] = out["series_id"].astype(str)
+    if mode == REVENUE_STACK_MODE_BRIDGE:
+        internal_net_zero = out["series_id"].astype(str).isin(REVENUE_STACK_BRIDGE_INTERNAL_NET_ZERO_SERIES)
+        out.loc[internal_net_zero, "stack_value_clean"] = 0.0
+        out.loc[internal_net_zero, "chart_visible"] = False
+        out.loc[internal_net_zero, "legend_visible"] = False
+        out.loc[out["series_id"].astype(str).isin(["ruc_refunds", "ruc_refunds_gross_addback"]), "net_effect_group"] = "ruc_refunds_internal_zero_net_pair"
+        out.loc[out["series_id"].astype(str).isin(["coo_revenue", "coo_gross_mvr_addback"]), "net_effect_group"] = "mvr_mr13_coo_internal_zero_net_pair"
+    out["clean_stack_value"] = pd.to_numeric(out["stack_value_clean"], errors="coerce")
+    out["chart_visible"] = out["chart_visible"].fillna(False).astype(bool)
+    out["legend_visible"] = out["legend_visible"].fillna(False).astype(bool)
     out["stack_unit"] = out["unit"].where(out["stack_role"].isin(["component_positive", "component_negative"]), "")
     if "stack_note" not in out.columns:
         out["stack_note"] = ""
@@ -987,6 +1021,30 @@ def _revenue_stack_mode_frame(base: pd.DataFrame, *, mode: str, mode_order: int)
     stack_totals["stack_balance_value"] = stack_totals["stack_total_by_FY"]
     stack_totals["stack_balance_residual"] = stack_totals["stack_overlay_residual"]
     stack_totals["stack_balance_status"] = stack_totals["stack_overlay_status"]
+    clean_component_mask = component_mask & out["chart_visible"].fillna(False)
+    clean_totals = (
+        out.loc[clean_component_mask]
+        .groupby(["source_path", "composition_mode", "FY_numeric"], dropna=False)["clean_stack_value"]
+        .sum(min_count=1)
+        .rename("clean_stack_total_by_FY")
+        .reset_index()
+    )
+    clean_totals = clean_totals.merge(
+        target_rows.rename(columns={"overlay_total_value": "clean_overlay_total_value"})[
+            ["source_path", "composition_mode", "FY_numeric", "clean_overlay_total_value"]
+        ],
+        on=["source_path", "composition_mode", "FY_numeric"],
+        how="left",
+    )
+    clean_totals["clean_overlay_residual"] = (
+        pd.to_numeric(clean_totals["clean_stack_total_by_FY"], errors="coerce")
+        - pd.to_numeric(clean_totals["clean_overlay_total_value"], errors="coerce")
+    )
+    clean_totals["clean_overlay_status"] = np.where(
+        pd.to_numeric(clean_totals["clean_overlay_residual"], errors="coerce").abs().le(1.0),
+        "balanced",
+        "residual_reported",
+    )
     out = out.merge(
         stack_totals[
             [
@@ -1002,6 +1060,21 @@ def _revenue_stack_mode_frame(base: pd.DataFrame, *, mode: str, mode_order: int)
                 "overlay_label",
                 "stack_overlay_residual",
                 "stack_overlay_status",
+            ]
+        ],
+        on=["source_path", "composition_mode", "FY_numeric"],
+        how="left",
+    )
+    out = out.merge(
+        clean_totals[
+            [
+                "source_path",
+                "composition_mode",
+                "FY_numeric",
+                "clean_stack_total_by_FY",
+                "clean_overlay_total_value",
+                "clean_overlay_residual",
+                "clean_overlay_status",
             ]
         ],
         on=["source_path", "composition_mode", "FY_numeric"],
