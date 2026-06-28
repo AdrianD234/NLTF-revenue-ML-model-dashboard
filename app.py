@@ -2204,13 +2204,13 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         with st.expander("EV/PHEV split audit", expanded=False):
             target_audit = (manifest.get("target_semantics_audit") or {}).get("LIGHT_RUC", {}) if isinstance(manifest, dict) else {}
             allocation_status = ((manifest.get("ev_phev_split_assumptions") or {}).get("allocation_status") if isinstance(manifest, dict) else "") or ""
-            warning_panel(
-                "Current Light RUC model output is not allocated into BEV/PHEV in this runtime pack. "
-                "Repo-local target history matches conventional Light RUC net km, not the total light-RUC universe."
+            info_panel(
+                "Current Light RUC model output is governed as total light-RUC net km. "
+                "It is allocated down into conventional Light, Light BEV and PHEV using MBU26 annual shares."
             )
             st.caption(
-                "Current Light RUC model is treated as conventional Light unless repo-local evidence proves a total light-RUC universe. "
-                "MBU26 Light BEV/PHEV rows remain official comparator/fixed-source rows only."
+                "BEV/PHEV are not added on top of the current finalist Light RUC output; they replace shares of that total. "
+                "The audit table keeps old fixed-add-on comparator fields for governance review."
             )
             if target_audit:
                 st.caption(f"Target semantics status: {target_audit.get('status', '')}. Allocation status: {allocation_status}.")
@@ -5291,6 +5291,9 @@ def _ev_phev_split_assumptions_display_table(split_assumptions: pd.DataFrame) ->
     view = split_assumptions.copy()
     rename = {
         "FY": "FY",
+        "source_path": "Source path",
+        "scenario_name": "Scenario",
+        "scenario_role": "Scenario role",
         "conventional_light_km": "Conventional Light km",
         "light_bev_km": "Light BEV km",
         "phev_km": "PHEV km",
@@ -5298,6 +5301,19 @@ def _ev_phev_split_assumptions_display_table(split_assumptions: pd.DataFrame) ->
         "conventional_share": "Conventional share",
         "light_bev_share": "Light BEV share",
         "phev_share": "PHEV share",
+        "share_sum": "Share sum",
+        "current_light_total_modelled_km": "Current Light total km",
+        "current_conventional_light_km": "Allocated conventional km",
+        "current_light_bev_km": "Allocated Light BEV km",
+        "current_phev_km": "Allocated PHEV km",
+        "current_allocation_sum_km": "Allocation sum km",
+        "current_allocation_residual_km": "Allocation residual km",
+        "current_light_ruc_net_revenue": "Current Light revenue",
+        "current_light_bev_ruc_net_revenue": "Current Light BEV revenue",
+        "current_phev_ruc_net_revenue": "Current PHEV revenue",
+        "old_light_ruc_net_revenue_no_allocation": "Old no-allocation Light revenue",
+        "old_light_bev_ruc_net_revenue_fixed_mbu": "Old fixed Light BEV revenue",
+        "old_phev_ruc_net_revenue_fixed_mbu": "Old fixed PHEV revenue",
         "conventional_light_rate_nzd_per_1000km": "Conventional rate NZD/1000km",
         "light_bev_rate_nzd_per_1000km": "Light BEV rate NZD/1000km",
         "phev_rate_nzd_per_1000km": "PHEV rate NZD/1000km",
@@ -5307,7 +5323,9 @@ def _ev_phev_split_assumptions_display_table(split_assumptions: pd.DataFrame) ->
         "target_matches_conventional_light": "Target matches conventional",
         "target_matches_total_light_universe": "Target matches universe",
         "target_semantics_status": "Target semantics",
+        "business_rule": "Business rule",
         "allocation_status": "Allocation status",
+        "extrapolated_model_extension": "Model extension",
         "used_by_current_finalist": "Used by current finalist",
         "model_input_quarters": "Model input quarters",
         "source_file": "Source file",
@@ -5323,6 +5341,18 @@ def _ev_phev_split_assumptions_display_table(split_assumptions: pd.DataFrame) ->
         "Light BEV km",
         "PHEV km",
         "Total light universe km",
+        "Current Light total km",
+        "Allocated conventional km",
+        "Allocated Light BEV km",
+        "Allocated PHEV km",
+        "Allocation sum km",
+        "Allocation residual km",
+        "Current Light revenue",
+        "Current Light BEV revenue",
+        "Current PHEV revenue",
+        "Old no-allocation Light revenue",
+        "Old fixed Light BEV revenue",
+        "Old fixed PHEV revenue",
         "Conventional rate NZD/1000km",
         "Light BEV rate NZD/1000km",
         "PHEV rate NZD/1000km",

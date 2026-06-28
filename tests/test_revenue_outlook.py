@@ -196,9 +196,9 @@ def test_committed_current_revenue_outlook_pack_is_repo_local_and_hash_backed() 
     assert manifest["revenue_stack_components"]["repo_relative_path"] == "data/current_revenue_outlook/revenue_stack_components.csv"
     assert "aggregates are overlays only" in manifest["revenue_stack_components"]["scope"]
     assert manifest["ev_phev_split_assumptions"]["repo_relative_path"] == "data/current_revenue_outlook/ev_phev_split_assumptions.csv"
-    assert manifest["ev_phev_split_assumptions"]["allocation_status"] == "not_applied_target_semantics_mismatch"
-    assert manifest["target_semantics_audit"]["LIGHT_RUC"]["status"] == "governed_gap_target_matches_conventional_light_not_total_universe"
-    assert "conventional Light target semantics" in manifest["data_vintage_manifest_notes"]["light_ruc_target_semantics"]
+    assert manifest["ev_phev_split_assumptions"]["allocation_status"] == "business_rule_applied_total_light_universe"
+    assert manifest["target_semantics_audit"]["LIGHT_RUC"]["status"] == "business_rule_applied_total_light_universe"
+    assert "total light-RUC net km" in manifest["data_vintage_manifest_notes"]["light_ruc_target_semantics"]
     assert manifest["revenue_formula_residuals"]["repo_relative_path"] == "data/current_revenue_outlook/revenue_formula_residuals.csv"
     assert manifest["series_alias_audit"]["repo_relative_path"] == "data/current_revenue_outlook/series_alias_audit.csv"
     assert manifest["fan_availability"]["repo_relative_path"] == "data/current_revenue_outlook/fan_availability.csv"
@@ -273,8 +273,21 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     assert "ped_bridge_source_history_missing" not in json.dumps(manifest)
     assert manifest["target_semantics_audit"]["HEAVY_RUC"]["status"] == "not_reclassified"
     assert not ev_phev_split.empty
-    assert not ev_phev_split["used_by_current_finalist"].astype(bool).any()
-    evidence = ev_phev_split[pd.to_numeric(ev_phev_split["FY"], errors="coerce").isin([2024, 2025])].set_index("FY")
+    assert ev_phev_split["used_by_current_finalist"].astype(bool).any()
+    current_split = ev_phev_split[ev_phev_split["used_by_current_finalist"].astype(bool)].copy()
+    assert set(current_split["allocation_status"].dropna().astype(str)) == {"business_rule_applied_total_light_universe"}
+    assert set(current_split["source_path"].dropna().astype(str)) == {
+        "Current finalist Base case",
+        "Current finalist High population/comparison",
+    }
+    evidence = (
+        ev_phev_split[
+            pd.to_numeric(ev_phev_split["FY"], errors="coerce").isin([2024, 2025])
+            & ev_phev_split["model_input_full_year"].astype(bool)
+        ]
+        .drop_duplicates("FY")
+        .set_index("FY")
+    )
     assert set(evidence["target_semantics_status"]) == {"matches_conventional_light_not_total_universe"}
     assert evidence["target_matches_conventional_light"].astype(bool).all()
     assert not evidence["target_matches_total_light_universe"].astype(bool).any()
@@ -299,15 +312,20 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
         "gross_ped_revenue",
         "heavy_ruc_net_km",
         "heavy_ruc_net_revenue",
+        "light_bev_ruc_net_km",
+        "light_bev_ruc_net_revenue",
         "light_ruc_net_km",
         "light_ruc_net_revenue",
         "net_fed_revenue",
         "net_mvr_revenue",
         "ped_vkt_per_capita",
+        "phev_ruc_net_km",
+        "phev_ruc_net_revenue",
         "total_fed_ruc_net_revenue",
         "total_nltf_net_revenue",
         "total_ruc_net_revenue",
     }
+    assert "current_light_ruc_total_modelled_km" not in dashboard_series
     for series_id, series_rows in displayed.groupby("series_id"):
         traces = set(series_rows["trace_name"].dropna().astype(str))
         assert allowed_traces.issubset(traces), series_id
@@ -373,6 +391,8 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     fy2026 = current[current["period"].astype(str).eq("FY2026")].set_index(["series_id", "scenario_name"])
     assert fy2026.loc[("gross_ped_revenue", "current_basecase"), "model_id"] == "PED__VNEXT_SOLVED_CONVEX_TOP2"
     assert fy2026.loc[("light_ruc_net_revenue", "current_basecase"), "model_id"] == "dynamic_RESID_GBR_n150_d1_lr0.05_w36"
+    assert fy2026.loc[("light_bev_ruc_net_revenue", "current_basecase"), "model_id"] == "dynamic_RESID_GBR_n150_d1_lr0.05_w36"
+    assert fy2026.loc[("phev_ruc_net_revenue", "current_basecase"), "model_id"] == "dynamic_RESID_GBR_n150_d1_lr0.05_w36"
     assert fy2026.loc[("heavy_ruc_net_revenue", "current_basecase"), "model_id"] == "HEAVY_RUC__VNEXT_SOLVED_CONVEX_TOP4"
     assert "PED__VNEXT_SOLVED_CONVEX_TOP2" in fy2026.loc[("total_nltf_net_revenue", "current_basecase"), "model_id"]
     assert fy2026.loc[("total_nltf_net_revenue", "current_basecase"), "data_scope"] == "current_nowcast"
@@ -381,8 +401,10 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     assert float(fy2026.loc[("gross_ped_revenue", "current_basecase"), "value"]) == pytest.approx(2143.976348, abs=1e-6)
     assert float(fy2026.loc[("gross_fed_revenue", "current_basecase"), "value"]) == pytest.approx(2186.021511, abs=1e-6)
     assert float(fy2026.loc[("net_fed_revenue", "current_basecase"), "value"]) == pytest.approx(2112.753986, abs=1e-6)
-    assert float(fy2026.loc[("total_ruc_net_revenue", "current_basecase"), "value"]) == pytest.approx(2075.883320, abs=1e-6)
-    assert float(fy2026.loc[("total_nltf_net_revenue", "current_basecase"), "value"]) == pytest.approx(4631.172578, abs=1e-6)
+    assert float(fy2026.loc[("light_bev_ruc_net_revenue", "current_basecase"), "value"]) == pytest.approx(71.608650, abs=1e-6)
+    assert float(fy2026.loc[("phev_ruc_net_revenue", "current_basecase"), "value"]) == pytest.approx(19.197933, abs=1e-6)
+    assert float(fy2026.loc[("total_ruc_net_revenue", "current_basecase"), "value"]) == pytest.approx(1953.654345, abs=1e-6)
+    assert float(fy2026.loc[("total_nltf_net_revenue", "current_basecase"), "value"]) == pytest.approx(4508.943602, abs=1e-6)
 
     anchor = current[current["period"].astype(str).eq("FY2025")].set_index(["series_id", "scenario_name"])
     assert anchor.loc[("total_nltf_net_revenue", "current_basecase"), "data_scope"] == "actual_anchor"
@@ -390,9 +412,16 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
 
     assert set(bridge["bridge_status"].dropna().astype(str).unique()) == {"available"}
     replacements = bridge[bridge["component_type"].astype(str).eq("replacement_line")]
-    assert set(replacements["stream"].unique()) == {"gross_ped_revenue", "light_ruc_net_revenue", "heavy_ruc_net_revenue"}
+    replacement_streams = {
+        "gross_ped_revenue",
+        "light_ruc_net_revenue",
+        "light_bev_ruc_net_revenue",
+        "phev_ruc_net_revenue",
+        "heavy_ruc_net_revenue",
+    }
+    assert set(replacements["stream"].unique()) == replacement_streams
     replacement_counts = replacements.groupby(["period", "scenario_name", "fed_path"])["stream"].agg(lambda values: set(values))
-    assert replacement_counts.map(lambda values: values == {"gross_ped_revenue", "light_ruc_net_revenue", "heavy_ruc_net_revenue"}).all()
+    assert replacement_counts.map(lambda values: values == replacement_streams).all()
 
     assert not audit.empty
     assert {2024, 2025, 2026, 2027}.issubset(set(pd.to_numeric(audit["june_year"], errors="coerce").dropna().astype(int)))
@@ -462,6 +491,9 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     for source_path in ["MBU26 official", "Current finalist Base case", "Current finalist High population/comparison"]:
         path_rows = line_reconciliation[line_reconciliation["source_path"].astype(str).eq(source_path)]
         assert required_lines.issubset(set(path_rows["line_label"].astype(str)))
+    for source_path in ["Current finalist Base case", "Current finalist High population/comparison"]:
+        path_rows = line_reconciliation[line_reconciliation["source_path"].astype(str).eq(source_path)]
+        assert "Current finalist Light RUC total modelled km" in set(path_rows["line_label"].astype(str))
     assert "light_petrol_vkt_per_capita" not in set(line_reconciliation["series_id"].dropna().astype(str))
 
     required_stack_cols = {
@@ -664,7 +696,7 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
             "series_id",
         ].astype(str)
     )
-    assert current_replacements == {"gross_ped_revenue", "light_ruc_net_revenue", "heavy_ruc_net_revenue"}
+    assert current_replacements == replacement_streams
     stack_text = stack_components.astype(str).to_csv(index=False)
     assert "C:\\Users" not in stack_text
     assert "Downloads" not in stack_text
@@ -766,6 +798,10 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
         & pd.to_numeric(line_reconciliation["FY"], errors="coerce").eq(2026)
     ].set_index("series_id")
     value = lambda series_id: float(base_lines.loc[series_id, "value"])
+    assert value("current_light_ruc_total_modelled_km") == pytest.approx(
+        value("light_ruc_net_km") + value("light_bev_ruc_net_km") + value("phev_ruc_net_km"),
+        abs=1e-9,
+    )
     assert value("gross_fed_revenue") == pytest.approx(value("gross_ped_revenue") + value("gross_lpg_revenue") + value("gross_cng_revenue"), abs=1e-9)
     assert value("net_fed_revenue") == pytest.approx(value("gross_fed_revenue") - value("fed_refunds"), abs=1e-9)
     assert value("gross_ruc_revenue") == pytest.approx(
@@ -784,6 +820,28 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     for series_id in ["gross_ped_revenue", "gross_fed_revenue", "net_fed_revenue", "total_ruc_net_revenue", "total_nltf_net_revenue"]:
         assert float(fy2026.loc[(series_id, "current_basecase"), "value"]) == pytest.approx(value(series_id), abs=1e-9)
 
+    split_base_2026 = current_split[
+        current_split["source_path"].astype(str).eq("Current finalist Base case")
+        & pd.to_numeric(current_split["FY"], errors="coerce").eq(2026)
+    ].iloc[0]
+    assert float(split_base_2026["current_light_total_modelled_km"]) == pytest.approx(value("current_light_ruc_total_modelled_km"), abs=1e-9)
+    assert float(split_base_2026["current_allocation_residual_km"]) == pytest.approx(0.0, abs=1e-6)
+    assert float(split_base_2026["old_light_ruc_net_revenue_no_allocation"]) != pytest.approx(value("light_ruc_net_revenue"), abs=1e-6)
+    assert float(split_base_2026["old_light_bev_ruc_net_revenue_fixed_mbu"]) != pytest.approx(value("light_bev_ruc_net_revenue"), abs=1e-6)
+    assert float(split_base_2026["old_phev_ruc_net_revenue_fixed_mbu"]) != pytest.approx(value("phev_ruc_net_revenue"), abs=1e-6)
+
+    base_extension = line_reconciliation[
+        line_reconciliation["source_path"].astype(str).eq("Current finalist Base case")
+        & line_reconciliation["series_id"].astype(str).eq("current_light_ruc_total_modelled_km")
+        & pd.to_numeric(line_reconciliation["FY"], errors="coerce").between(2046, 2055, inclusive="both")
+    ].copy()
+    base_extension["FY_numeric"] = pd.to_numeric(base_extension["FY"], errors="coerce").astype(int)
+    base_extension = base_extension.set_index("FY_numeric")
+    extension_slope = (float(base_extension.loc[2050, "value"]) - float(base_extension.loc[2046, "value"])) / 4.0
+    for fy in range(2051, 2056):
+        assert str(base_extension.loc[fy, "value_status"]) == "extrapolated_model_extension"
+        assert float(base_extension.loc[fy, "value"]) == pytest.approx(float(base_extension.loc[2050, "value"]) + extension_slope * (fy - 2050), abs=1e-9)
+
     current_residuals = residuals[
         residuals["source_path"].astype(str).str.startswith("Current finalist")
         & residuals["output_series_id"].isin(["gross_fed_revenue", "net_fed_revenue", "total_ruc_net_revenue", "total_nltf_net_revenue"])
@@ -794,32 +852,32 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
 def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
     pack_dir = ROOT / CURRENT_REVENUE_OUTLOOK_DIR
     expected_hashes = {
-        "ev_phev_split_assumptions.csv": "0c28171411204ced131deb5c65b716963ec94654c0e4a03af132180c9006b259",
-        "ev_phev_split_assumptions.parquet": "955d4382cd4f59b2cc403dac04fae3382fa097e437525a035dc770669ac9d613",
-        "fan_availability.csv": "3e248fadf746e62affad42d0ca87a3dd232aaed5ee031e6072e7b2f5bd586248",
-        "fan_availability.parquet": "05ca6cd3485e6725e571bb8f0b9a04dbc4396a2c52b15b32320b1b43266afc79",
-        "fan_band_rows.csv": "891f79fae6e5e1ec7821e4a7b88d6746da5f24fe48ba3eab260ffdac9429799b",
-        "fan_band_rows.parquet": "0da58f6bd9f132d9cd5224a29cadb80afc617ee9bd7f9f0971df885865a2a60c",
-        "future_revenue_forecasts.csv": "5a8e4024e960a08308654b862acf00c278d79b9a60c899af9b710dbca9f7a0a7",
-        "future_revenue_forecasts.parquet": "674ba0173044702cf0e78ab2e79791baca1879709650b2f2a840871e2d497b21",
-        "manifest.json": "7e32321b22eb8ca9116f81fb57978872580c6edacdaf4fb21659d91af3fd73d2",
-        "manifest.md": "2842343704e8ba363af30cacefec80b9b5471fbaf25932f37afdd24c046252fc",
+        "ev_phev_split_assumptions.csv": "01e8ac125385c656505dc259e51e19a007e05495cdc3943dc1b70a42b650d89b",
+        "ev_phev_split_assumptions.parquet": "600072aac912768ce23a7951b68ebf0905f5c7f06a15d5e3604fd2ee20f6258e",
+        "fan_availability.csv": "af2d246871e877d4d1cd72953e37da31e03bcd4ac91137547043e6fe45a31d10",
+        "fan_availability.parquet": "428e7c45da2ab868f99682f7b00f5d65160be4e1069a1c5fb41d19008cfd8d71",
+        "fan_band_rows.csv": "7161f74a2374ead1ceb2cffd12f150176d855f1f58d9f692f4c2f694136af765",
+        "fan_band_rows.parquet": "834fc4bf60e0216f27c5231e82eabb9850eebe138a5e8a2c7dc760647e9bdee5",
+        "future_revenue_forecasts.csv": "5195e33b543e73386dc1dda6585cfd1823a1cb6c6ef5aed0b368518cd808dd00",
+        "future_revenue_forecasts.parquet": "aff719a3a420657e24ef22af5da27dacb411a938eb629a29c7650db5378643ac",
+        "manifest.json": "1dec22d8922712934c0330589408c2ce9ee11389cda1c608550e9dc8ba744942",
+        "manifest.md": "589535c61a159247c3795ba498536a56c4ad04f6bd4d8e6ba8ebe02f20c6a27a",
         "path_trace_status.csv": "9aee7a4e7003ec6541476ca3e4afef6d8586b6c358e41db1c8e06623e5ffcaa3",
         "path_trace_status.parquet": "e66d860fb7532ee4b92285c1ba023c9f8d9469cfdaaaef819415f7cd87c73757",
-        "revenue_bridge_components.csv": "a978206d738eebdf689865e41c56e37e69ebb5600c246b62f92975d959456168",
-        "revenue_bridge_components.parquet": "2c6250ad2c5a1ea65fb9a8deb302c9500cec7e62f120900acef190cfc9299c42",
-        "revenue_chart_rows.csv": "eda813058e64fdb698b5b6b79ec72e4c86bb50a7e215b9a8416f92efe21e5678",
-        "revenue_chart_rows.parquet": "2d1fa28b5cf1791f3bff0893d7dd4797c9f45762f5f3b5517c0670f8ab9f1415",
-        "revenue_formula_residuals.csv": "47c4d5f95aea4071be32e512b10428d1dad323202e7e189e0aa4b106e0873f0e",
-        "revenue_formula_residuals.parquet": "bae3a888bda46a32876e9bfa20d6c197e008cc56b9025eb713a728ae63eade49",
-        "revenue_line_reconciliation.csv": "a491632452529408c40987e651abfa8ec8b3d429590b1e2188fc95bf38f0a9aa",
-        "revenue_line_reconciliation.parquet": "55fa0fbbe4a06da65f1295e9c9614a697b5dd569108dbbdc8bfa6842b170681b",
-        "revenue_stack_components.csv": "f1d15a9bf2584a583a2ea41066e154d9be0bf715f02e159c331a3caaed13ea4e",
-        "revenue_stack_components.parquet": "a650648fb578a39d88cc2436db54d8c137fc7c5e159bfd96b759eb8210c4e901",
+        "revenue_bridge_components.csv": "dbd48d851814516a5b15602d6f2054cca22ce529be3dee7ae241ad4c63eefa61",
+        "revenue_bridge_components.parquet": "82999b8d18983dd79ec8bbb061c98ffc84e3f05d5999aa37454a5165a252032c",
+        "revenue_chart_rows.csv": "a1cee695d3c10ede6578feebb2619d7f98ed4a6392acaf231d4dbd5b61e920d3",
+        "revenue_chart_rows.parquet": "c172026e14dc162516e521e1cae6b086e0cc89a7739b38d9f93ae76f0a71d582",
+        "revenue_formula_residuals.csv": "fab6ea5d67422db8e196a48fc5ca2d0c921f88c2ffb69e281901ae219a51804c",
+        "revenue_formula_residuals.parquet": "962dd5dce4abfd2c720b1b99570878dd5a03dd5a930891c8d467bc8a995cef46",
+        "revenue_line_reconciliation.csv": "a24e64171e80051eaeb979594a5536af467fd2d53c9b94a0e047107121dad084",
+        "revenue_line_reconciliation.parquet": "13a6230bf0111bca6e786610b67c0af56e52d329688ab844cfe7c8cb8bb83160",
+        "revenue_stack_components.csv": "d8f73a44c4b32a433fb7c08611f975d91d6e28f002472b769ef59d52a3dacbfc",
+        "revenue_stack_components.parquet": "1c0ca9744b98d493021baeb668676fc0a0135d3bbe88ad5c81b409f9dc11096e",
         "row_reconciliation.csv": "d484f5d75cce88e30ce7bcf5dd70058505cc02e5dff93f457a579f119c2fc7ce",
         "row_reconciliation.parquet": "bf2b638920e4b9b00ca4ac00d4263083258ce0d94625943c4e7b3cdf90493dd7",
-        "runtime_trace_audit.csv": "a72f0dc6e03506ca85596accdc105587c6629c9d7bef65ee1a441a344c4c5a9b",
-        "runtime_trace_audit.parquet": "f37e7a5f6893f5bba1df795cecd955e0126c3b5aabff71cb3699a7b291998ef8",
+        "runtime_trace_audit.csv": "61db3a47b217aece7998b70fe451c48dd85d400cccac2202bf02507fd73757f4",
+        "runtime_trace_audit.parquet": "3a63a2398a06eef87d7f1cafa5a7a2f6fedd7528e3466a9e9022f1a681cacd0a",
         "series_alias_audit.csv": "c0330c9918d7e2f4f972d15e8465537c16d96aca607ef253353612cadd62c56d",
         "series_alias_audit.parquet": "9b376147c912748d5a2429abf524799e348a3711d6af89a4b9d1ec287f558918",
         "series_trace_contract.csv": "2eaf18c4c54fc18a21dd68415c0aea041bd174e8d75285409a4bb83034b60e09",

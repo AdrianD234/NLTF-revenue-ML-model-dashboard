@@ -182,6 +182,8 @@ def test_current_runtime_uses_only_allowed_mbu26_trace_contract() -> None:
     assert set(replacements["stream"].dropna().unique()) == {
         "gross_ped_revenue",
         "light_ruc_net_revenue",
+        "light_bev_ruc_net_revenue",
+        "phev_ruc_net_revenue",
         "heavy_ruc_net_revenue",
     }
     assert {"trace_type", "source_cell", "formula", "replacement_only"}.issubset(audit.columns)
