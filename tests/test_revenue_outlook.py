@@ -831,6 +831,33 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     assert float(split_base_2026["old_light_bev_ruc_net_revenue_fixed_mbu"]) != pytest.approx(value("light_bev_ruc_net_revenue"), abs=1e-6)
     assert float(split_base_2026["old_phev_ruc_net_revenue_fixed_mbu"]) != pytest.approx(value("phev_ruc_net_revenue"), abs=1e-6)
 
+    base_lines_2029 = line_reconciliation[
+        line_reconciliation["source_path"].astype(str).eq("Current finalist Base case")
+        & pd.to_numeric(line_reconciliation["FY"], errors="coerce").eq(2029)
+    ].set_index("series_id")
+    split_base_2029 = current_split[
+        current_split["source_path"].astype(str).eq("Current finalist Base case")
+        & pd.to_numeric(current_split["FY"], errors="coerce").eq(2029)
+    ].iloc[0]
+    old_2029_light_bundle = (
+        float(split_base_2029["old_light_ruc_net_revenue_no_allocation"])
+        + float(split_base_2029["old_light_bev_ruc_net_revenue_fixed_mbu"])
+        + float(split_base_2029["old_phev_ruc_net_revenue_fixed_mbu"])
+    )
+    current_2029_light_bundle = (
+        float(split_base_2029["current_light_ruc_net_revenue"])
+        + float(split_base_2029["current_light_bev_ruc_net_revenue"])
+        + float(split_base_2029["current_phev_ruc_net_revenue"])
+    )
+    current_2029_total_nltf = float(base_lines_2029.loc["total_nltf_net_revenue", "value"])
+    no_allocation_2029_total_nltf = current_2029_total_nltf - current_2029_light_bundle + old_2029_light_bundle
+    assert current_2029_light_bundle != pytest.approx(old_2029_light_bundle, abs=1e-6)
+    assert current_2029_total_nltf != pytest.approx(no_allocation_2029_total_nltf, abs=1e-6)
+    assert current_2029_total_nltf - no_allocation_2029_total_nltf == pytest.approx(
+        current_2029_light_bundle - old_2029_light_bundle,
+        abs=1e-6,
+    )
+
     base_extension = line_reconciliation[
         line_reconciliation["source_path"].astype(str).eq("Current finalist Base case")
         & line_reconciliation["series_id"].astype(str).eq("current_light_ruc_total_modelled_km")
