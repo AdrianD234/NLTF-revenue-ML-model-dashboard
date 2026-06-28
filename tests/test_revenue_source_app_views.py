@@ -858,7 +858,8 @@ def test_revenue_outlook_composition_figure_stacks_components_and_overlays_aggre
     assert fig.layout.yaxis.title.text == "$m nominal ex GST"
     assert not any("Schiff" in str(trace.name) or "selected_dashboard" in str(trace.name) for trace in fig.data)
     hover_templates = "\n".join(str(trace.hovertemplate) for trace in fig.data)
-    assert "stack total" in hover_templates
+    assert "stack total" not in hover_templates
+    assert "%{fullData.name}: %{customdata[2]:,.1f}" in hover_templates
     assert "%{fullData.name}: %{y:,.1f}" in hover_templates
     assert "source_file" not in hover_templates
     assert "<extra></extra>" in hover_templates

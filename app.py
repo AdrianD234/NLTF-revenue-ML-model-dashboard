@@ -4632,7 +4632,8 @@ def revenue_outlook_composition_figure(
         label = str(label_row["line_label"])
         trace_rows = plot[plot["line_label"].astype(str).eq(label)].sort_values("FY_numeric", kind="stable")
         trace_rows["visible_stack_total"] = trace_rows["FY_numeric"].map(lambda value: visible_stack_lookup.get(int(value), np.nan))
-        custom_cols = ["unit", "visible_stack_total"]
+        trace_rows["hover_stack_value"] = trace_rows["stack_value_numeric"]
+        custom_cols = ["unit", "visible_stack_total", "hover_stack_value"]
         for column in custom_cols:
             if column not in trace_rows.columns:
                 trace_rows[column] = pd.NA
@@ -4656,8 +4657,8 @@ def revenue_outlook_composition_figure(
                 marker_color=colors[index % len(colors)],
                 customdata=trace_rows[custom_cols].to_numpy(),
                 hovertemplate=(
-                    "%{fullData.name}: %{y:,.1f}; "
-                    "FY %{x}; stack total: %{customdata[1]:,.1f}<extra></extra>"
+                    "%{fullData.name}: %{customdata[2]:,.1f}; "
+                    "FY %{x}<extra></extra>"
                 ),
                 **bar_kwargs,
             )
@@ -4696,7 +4697,7 @@ def revenue_outlook_composition_figure(
                     customdata=group[custom_cols].to_numpy(),
                     hovertemplate=(
                         "%{fullData.name}: %{y:,.1f}; "
-                        "FY %{x}; stack total: %{customdata[1]:,.1f}<extra></extra>"
+                        "FY %{x}<extra></extra>"
                     ),
                 )
             )
