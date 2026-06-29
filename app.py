@@ -119,8 +119,10 @@ from model_dashboard.revenue_outlook import (
     FAN_SOURCE_OPTIONS,
     FAN_SOURCE_PRIORITY,
     FAN_SOURCE_SCENARIO_SPREAD,
+    PED_COMPARISON_BEHAVIOURAL_TRACE_NAME,
     REVENUE_OUTLOOK_SCHEMA_VERSION,
     REVENUE_OUTLOOK_TITLE,
+    SCENARIO_ROLE_CONTRACT_NOTE,
     REVENUE_STACK_DETAIL_CLEAN,
     REVENUE_STACK_DETAIL_FULL_FORMULA,
     REVENUE_STACK_DETAIL_LEVELS,
@@ -2010,6 +2012,11 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         if pack is not None and isinstance(getattr(pack, "ev_phev_ped_light_drift_assumptions", None), pd.DataFrame)
         else pd.DataFrame()
     )
+    scenario_role_contract = (
+        pack.scenario_role_contract.copy()
+        if pack is not None and isinstance(getattr(pack, "scenario_role_contract", None), pd.DataFrame)
+        else pd.DataFrame()
+    )
     formula_residuals = pack.revenue_formula_residuals.copy() if pack is not None and isinstance(getattr(pack, "revenue_formula_residuals", None), pd.DataFrame) else pd.DataFrame()
     alias_audit = pack.series_alias_audit.copy() if pack is not None and isinstance(getattr(pack, "series_alias_audit", None), pd.DataFrame) else pd.DataFrame()
     fan_availability = pack.fan_availability.copy() if pack is not None and isinstance(getattr(pack, "fan_availability", None), pd.DataFrame) else pd.DataFrame()
@@ -2021,6 +2028,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         "forecasts and the MBU26 official comparator."
     )
     st.caption("Source policy: committed runtime pack only; no latest-folder scan; no runtime source-pack chart join; no Excel workbook model forecasts.")
+    st.caption(SCENARIO_ROLE_CONTRACT_NOTE)
 
     if chart_rows.empty:
         warning_panel("The promoted Revenue Outlook pack has no chart rows.")
@@ -2107,6 +2115,18 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             selected_series=selected_stream,
             selected_fed_path=selected_fed_path,
         )
+
+    if not scenario_role_contract.empty:
+        with st.expander("Scenario role contract", expanded=False):
+            info_panel(SCENARIO_ROLE_CONTRACT_NOTE)
+            st.caption(
+                "PED VKT per capita comparison traces are shown only when the committed runtime carries a value-changing "
+                "behavioural path. Revenue and aggregate traces remain visible where the bridge changes totals."
+            )
+            contract_cols = st.columns([0.82, 0.18])
+            with contract_cols[1]:
+                dataframe_download(scenario_role_contract, "Download CSV", "scenario_role_contract.csv")
+            display_table(_scenario_role_contract_display_table(scenario_role_contract), height=320, max_rows=160)
 
     with st.container(border=True):
         st.markdown("<div class='page5-panel-title'>Revenue composition over time</div>", unsafe_allow_html=True)
@@ -4172,6 +4192,7 @@ def _revenue_outlook_trace_options(chart_rows: pd.DataFrame) -> list[str]:
         "MBU26 official",
         "Current finalist Base case",
         "Current finalist High population/comparison",
+        PED_COMPARISON_BEHAVIOURAL_TRACE_NAME,
     ]
     ordered = [trace for trace in preferred if trace in available]
     ordered.extend(sorted(available.difference(ordered)))
@@ -4279,6 +4300,7 @@ def revenue_outlook_total_path_figure(rows: pd.DataFrame, *, selected_series: st
         "MBU26 official": ("#00843D", "dash", 2.2),
         "Current finalist Base case": ("#006FAD", "solid", 2.8),
         "Current finalist High population/comparison": ("#E56B2B", "solid", 2.4),
+        PED_COMPARISON_BEHAVIOURAL_TRACE_NAME: ("#C2410C", "dot", 2.4),
     }
     trace_names = _ordered_runtime_trace_names(data)
     for trace_name in trace_names:
@@ -4797,6 +4819,7 @@ def _ordered_runtime_trace_names(rows: pd.DataFrame) -> list[str]:
         "MBU26 official",
         "Current finalist Base case",
         "Current finalist High population/comparison",
+        PED_COMPARISON_BEHAVIOURAL_TRACE_NAME,
     ]
     ordered = [trace for trace in preferred if trace in available]
     ordered.extend(sorted(available.difference(ordered)))
@@ -4970,6 +4993,7 @@ def _scenario_color_map(rows: pd.DataFrame) -> dict[str, str]:
         "MBU26 official": "#00843D",
         "Current finalist Base case": "#006FAD",
         "Current finalist High population/comparison": "#E56B2B",
+        PED_COMPARISON_BEHAVIOURAL_TRACE_NAME: "#C2410C",
     }
     output: dict[str, str] = {}
     if rows is None or rows.empty:
@@ -5409,6 +5433,39 @@ def _ev_phev_split_assumptions_display_table(split_assumptions: pd.DataFrame) ->
             view[col] = pd.to_numeric(view[col], errors="coerce").map(
                 lambda value: "" if pd.isna(value) else f"{float(value):.4%}"
             )
+    return view
+
+
+def _scenario_role_contract_display_table(contract: pd.DataFrame) -> pd.DataFrame:
+    if contract is None or contract.empty:
+        return pd.DataFrame()
+    view = contract.copy()
+    rename = {
+        "scenario_name": "Scenario",
+        "scenario_role": "Role",
+        "affected_series": "Affected series",
+        "differing_fields": "Differing fields",
+        "population_only_flag": "Population-only",
+        "behavioural_driver_flag": "Behavioural driver",
+        "display_policy": "Display policy",
+        "interpretation": "Interpretation",
+        "field_classification": "Field classification",
+        "runtime_delta_min": "Runtime delta min",
+        "runtime_delta_max": "Runtime delta max",
+        "ped_population_feature_present": "PED population feature",
+        "ped_population_feature_fields": "PED population fields",
+        "vktpc_path_policy": "VKTpc path policy",
+        "population_path_policy": "Population path policy",
+        "source_basis": "Source basis",
+    }
+    cols = [col for col in rename if col in view.columns]
+    view = view[cols].rename(columns=rename)
+    for col in ["Runtime delta min", "Runtime delta max"]:
+        if col in view.columns:
+            view[col] = pd.to_numeric(view[col], errors="coerce").map(lambda value: "" if pd.isna(value) else f"{float(value):,.3f}")
+    for col in ["Population-only", "Behavioural driver", "PED population feature"]:
+        if col in view.columns:
+            view[col] = view[col].map(lambda value: "Yes" if str(value).strip().lower() in {"true", "1", "yes"} else "No")
     return view
 
 

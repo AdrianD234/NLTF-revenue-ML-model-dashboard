@@ -894,10 +894,20 @@ def assert_revenue_outlook_primary_runtime_contract(page: Page, selected_series:
         "MBU26 official",
         "Current finalist Base case",
         "Current finalist High population/comparison",
+        "Current finalist comparison behavioural path",
     }
     assert trace_names.issubset(allowed), trace_names
     assert "Current finalist Base case" in trace_names
-    assert "Current finalist High population/comparison" in trace_names
+    expected_comparison_trace = (
+        "Current finalist comparison behavioural path"
+        if selected_series == "PED VKT per capita"
+        else "Current finalist High population/comparison"
+    )
+    assert expected_comparison_trace in trace_names
+    if selected_series == "PED VKT per capita":
+        assert "Current finalist High population/comparison" not in trace_names
+    else:
+        assert "Current finalist comparison behavioural path" not in trace_names
     for forbidden in ["Schiff", "selected_dashboard", "legacy workbook", "Current finalist forecast"]:
         assert all(forbidden.lower() not in trace["name"].lower() for trace in contract["traces"])
     assert contract["hasSmallMultipleAxes"] is False
@@ -911,7 +921,7 @@ def assert_revenue_outlook_primary_runtime_contract(page: Page, selected_series:
     if actual is not None and actual["x"]:
         assert max(actual["x"]) <= "FY2025"
         assert actual["color"] == "#737373"
-    for name in ["Current finalist Base case", "Current finalist High population/comparison"]:
+    for name in ["Current finalist Base case", expected_comparison_trace]:
         trace = by_name[name]
         assert "FY2025" in trace["x"], f"{name} should include the FY2025 actual anchor"
         assert "FY2026" in trace["x"], f"{name} should join to the FY2026 nowcast/forecast"

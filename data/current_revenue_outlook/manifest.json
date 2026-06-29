@@ -11,7 +11,8 @@
     "Actual",
     "MBU26 official",
     "Current finalist Base case",
-    "Current finalist High population/comparison"
+    "Current finalist High population/comparison",
+    "Current finalist comparison behavioural path"
   ],
   "runtime_source_layers": {
     "A_actuals": "MBU26 annual source rows through last complete FY2025",
@@ -30,7 +31,8 @@
   },
   "data_vintage_manifest_notes": {
     "light_ruc_target_semantics": "Business rule update: current-finalist Light RUC is treated as total light-RUC net km, while EV/PHEV migration is sourced from both current PED/light-petrol activity and total Light RUC using an optimized deterministic bridge calibrated to MBU26 light-mobility proportions. BEV/PHEV are not fixed add-ons.",
-    "ev_phev_migration_allocation": "Default lambda_mode is optimized; alternatives are recorded for audit only and do not replace the current runtime path unless explicitly selected in governance review."
+    "ev_phev_migration_allocation": "Default lambda_mode is optimized; alternatives are recorded for audit only and do not replace the current runtime path unless explicitly selected in governance review.",
+    "scenario_role_contract": "PED VKT per capita is a behavioural intensity metric. Value-changing comparison PED intensity is labelled as a behavioural comparison path; aggregate and revenue rows keep comparison traces."
   },
   "source_comparison": {
     "comparison_id": "current_revenue_outlook_scenario_comparison",
@@ -383,6 +385,11 @@
     "lambda_smoothness_penalty": 25.0,
     "runtime_mode": "optimized"
   },
+  "scenario_role_contract": {
+    "repo_relative_path": "data/current_revenue_outlook/scenario_role_contract.csv",
+    "scope": "Repo-local audit of scenario role semantics, PED population-feature exposure, display policy and runtime deltas.",
+    "note": "High population affects scale/revenue through population; VKT per capita is a behavioural intensity metric."
+  },
   "rate_provenance": {
     "future_light_heavy": "mbu26_official_annual.csv effective rates joined to current finalist net-km outputs",
     "future_ped": "MBU26 population/intensity/rate joined to optimized PED/light-petrol VKT after EV/PHEV migration",
@@ -486,12 +493,12 @@
       "size_bytes": 63437
     },
     "revenue_chart_rows.csv": {
-      "sha256": "d34730b4320ebd98627fa4d167e2a8d1674b433cbec0a5d7e16149762877d6af",
-      "size_bytes": 2411801
+      "sha256": "02400cd7715ccbf22df576e6af56c7e342066db3eb3dc2bae5f4e08521d0c9ec",
+      "size_bytes": 2413504
     },
     "revenue_chart_rows.parquet": {
-      "sha256": "8364f1d49dd3b4b16ac89b09ce3ad4d92e3a65a1cfbc952aca6b37190b327b5a",
-      "size_bytes": 123738
+      "sha256": "b0241186c1a24c218c6e3fbb5babb0a93a5f7afd93ec3a81f5359a9326ca0623",
+      "size_bytes": 123908
     },
     "revenue_formula_residuals.csv": {
       "sha256": "8e5cfb48896374bdce4ae3b45f62f4c57acde9ef0073d72fdfcaf264a92e9193",
@@ -526,12 +533,20 @@
       "size_bytes": 38215
     },
     "runtime_trace_audit.csv": {
-      "sha256": "f65aeacca0f592b750c4e9216b0f12d1a2cb7b81bf6ab7472ab0046951240247",
-      "size_bytes": 96704
+      "sha256": "0c257dd1e5b02051d99eb044b0946b1d2589f81eab35feb04868a0327211a5aa",
+      "size_bytes": 96743
     },
     "runtime_trace_audit.parquet": {
-      "sha256": "9b8beed60b6bbbd969fafae0e130fb0a28b2ec7c9903302751bd76e445589e56",
-      "size_bytes": 21893
+      "sha256": "5ee622e1c7208d76861937b6f1c85b0590bf402dd3b9a09c4035cc1ffe0f62e2",
+      "size_bytes": 21998
+    },
+    "scenario_role_contract.csv": {
+      "sha256": "19e46e894782d72a8697789e0efa82ec70a923f64663e8d0f58ab2894f51888b",
+      "size_bytes": 11493
+    },
+    "scenario_role_contract.parquet": {
+      "sha256": "d18d3172d9e664b3a31123c43d3bef9bafa61b464b4ae214fe748f2a554719f2",
+      "size_bytes": 14872
     },
     "series_alias_audit.csv": {
       "sha256": "c0330c9918d7e2f4f972d15e8465537c16d96aca607ef253353612cadd62c56d",

@@ -78,6 +78,7 @@ RUNTIME_REVENUE_OUTLOOK_FILES = (
     "revenue_stack_components.parquet",
     "ev_phev_split_assumptions.parquet",
     "ev_phev_ped_light_drift_assumptions.parquet",
+    "scenario_role_contract.parquet",
     "revenue_formula_residuals.parquet",
     "series_alias_audit.parquet",
     "fan_availability.parquet",
@@ -85,6 +86,10 @@ RUNTIME_REVENUE_OUTLOOK_FILES = (
     "trace_source_contract.parquet",
     "series_trace_contract.parquet",
     "path_trace_status.parquet",
+)
+PED_COMPARISON_BEHAVIOURAL_TRACE_NAME = "Current finalist comparison behavioural path"
+SCENARIO_ROLE_CONTRACT_NOTE = (
+    "High population affects scale/revenue through population; VKT per capita is a behavioural intensity metric."
 )
 STREAM_ORDER = ["PED", "LIGHT_RUC", "HEAVY_RUC"]
 STREAM_LABELS = {
@@ -361,6 +366,7 @@ class RevenueOutlookPack:
     revenue_stack_components: pd.DataFrame = field(default_factory=pd.DataFrame)
     ev_phev_split_assumptions: pd.DataFrame = field(default_factory=pd.DataFrame)
     ev_phev_ped_light_drift_assumptions: pd.DataFrame = field(default_factory=pd.DataFrame)
+    scenario_role_contract: pd.DataFrame = field(default_factory=pd.DataFrame)
     revenue_formula_residuals: pd.DataFrame = field(default_factory=pd.DataFrame)
     series_alias_audit: pd.DataFrame = field(default_factory=pd.DataFrame)
     fan_availability: pd.DataFrame = field(default_factory=pd.DataFrame)
@@ -383,6 +389,7 @@ def revenue_outlook_signature(pack_dir: Path | str | None = None, repo_root: Pat
         base / "revenue_stack_components.parquet",
         base / "ev_phev_split_assumptions.parquet",
         base / "ev_phev_ped_light_drift_assumptions.parquet",
+        base / "scenario_role_contract.parquet",
         base / "revenue_formula_residuals.parquet",
         base / "series_alias_audit.parquet",
         base / "fan_availability.parquet",
@@ -422,6 +429,7 @@ def load_revenue_outlook_pack(
         revenue_stack_components=_read_optional_parquet(base / "revenue_stack_components.parquet"),
         ev_phev_split_assumptions=_read_optional_parquet(base / "ev_phev_split_assumptions.parquet"),
         ev_phev_ped_light_drift_assumptions=_read_optional_parquet(base / "ev_phev_ped_light_drift_assumptions.parquet"),
+        scenario_role_contract=_read_optional_parquet(base / "scenario_role_contract.parquet"),
         revenue_formula_residuals=_read_optional_parquet(base / "revenue_formula_residuals.parquet"),
         series_alias_audit=_read_optional_parquet(base / "series_alias_audit.parquet"),
         fan_availability=_read_optional_parquet(base / "fan_availability.parquet"),
@@ -542,11 +550,17 @@ def build_current_revenue_outlook_runtime_pack(
         current_outlook_chart_rows=existing_chart_rows,
         mbu26_official_annual=mbu26_pack.official_annual,
     )
+    scenarios = _runtime_scenario_records(existing_manifest, current)
+    scenario_role_contract = scenario_role_contract_frame(
+        current_forecast_annual=current,
+        scenarios=scenarios,
+        repo_root=root,
+    )
 
     series_meta = _runtime_series_metadata(mbu26_pack.series_trace_contract)
-    quarterly_inputs = _runtime_quarterly_activity_inputs(existing_chart_rows, series_meta)
+    quarterly_inputs = _runtime_quarterly_activity_inputs(existing_chart_rows, series_meta, scenario_role_contract=scenario_role_contract)
     actual_rows = _runtime_mbu26_actual_rows(mbu26_pack.official_annual, series_meta)
-    current_rows = _runtime_current_rows(current, series_meta)
+    current_rows = _runtime_current_rows(current, series_meta, scenario_role_contract=scenario_role_contract)
     mbu26_official_rows = _runtime_mbu26_official_rows(mbu26_pack.official_annual, series_meta)
     chart_rows = pd.concat(
         [quarterly_inputs, actual_rows, current_rows, mbu26_official_rows],
@@ -562,7 +576,6 @@ def build_current_revenue_outlook_runtime_pack(
     trace_audit = _runtime_trace_audit(chart_rows)
     fan_availability, fan_band_rows = revenue_outlook_fan_tables(chart_rows, repo_root=root)
 
-    scenarios = _runtime_scenario_records(existing_manifest, current)
     promotion_time = existing_manifest.get("promotion_time") if isinstance(existing_manifest, dict) else ""
     if not str(promotion_time or "").strip():
         promotion_time = datetime.now(timezone.utc).isoformat()
@@ -583,6 +596,7 @@ def build_current_revenue_outlook_runtime_pack(
             "MBU26 official",
             "Current finalist Base case",
             "Current finalist High population/comparison",
+            PED_COMPARISON_BEHAVIOURAL_TRACE_NAME,
         ],
         "runtime_source_layers": {
             "A_actuals": "MBU26 annual source rows through last complete FY2025",
@@ -614,6 +628,10 @@ def build_current_revenue_outlook_runtime_pack(
             "ev_phev_migration_allocation": (
                 "Default lambda_mode is optimized; alternatives are recorded for audit only and do not replace the current "
                 "runtime path unless explicitly selected in governance review."
+            ),
+            "scenario_role_contract": (
+                "PED VKT per capita is a behavioural intensity metric. Value-changing comparison PED intensity is labelled "
+                "as a behavioural comparison path; aggregate and revenue rows keep comparison traces."
             ),
         },
         "source_comparison": {
@@ -667,6 +685,11 @@ def build_current_revenue_outlook_runtime_pack(
             "default_lambda_mode": EV_PHEV_MIGRATION_DEFAULT_MODE,
             "lambda_smoothness_penalty": EV_PHEV_MIGRATION_SMOOTHNESS_PENALTY,
             "runtime_mode": EV_PHEV_MIGRATION_DEFAULT_MODE,
+        },
+        "scenario_role_contract": {
+            "repo_relative_path": _repo_relative(root, base / "scenario_role_contract.csv"),
+            "scope": "Repo-local audit of scenario role semantics, PED population-feature exposure, display policy and runtime deltas.",
+            "note": SCENARIO_ROLE_CONTRACT_NOTE,
         },
         "rate_provenance": {
             "future_light_heavy": "mbu26_official_annual.csv effective rates joined to current finalist net-km outputs",
@@ -729,6 +752,7 @@ def build_current_revenue_outlook_runtime_pack(
             "revenue_stack_components": stack_components,
             "ev_phev_split_assumptions": ev_phev_split_assumptions,
             "ev_phev_ped_light_drift_assumptions": ev_phev_ped_light_drift_assumptions,
+            "scenario_role_contract": scenario_role_contract,
             "revenue_formula_residuals": formula_residuals,
             "fan_availability": fan_availability,
             "fan_band_rows": fan_band_rows,
@@ -773,6 +797,12 @@ def build_revenue_outlook_pack(
     future_revenue = _add_canonical_join_keys(future_revenue)
     bridge_components = _add_canonical_join_keys(bridge_components)
     chart_rows = _add_canonical_join_keys(chart_rows)
+    comparison_manifest = getattr(comparison, "manifest", {}) or {}
+    scenario_role_contract = scenario_role_contract_frame(
+        current_forecast_annual=pd.DataFrame(),
+        scenarios=comparison_manifest.get("scenarios", []) if isinstance(comparison_manifest, dict) else [],
+        repo_root=root,
+    )
 
     manifest = _manifest(
         comparison,
@@ -784,8 +814,22 @@ def build_revenue_outlook_pack(
         pack_status=pack_status,
         promoted_by=promoted_by,
     )
-    _write_pack_files(base, manifest, future_revenue, bridge_components, chart_rows)
-    return RevenueOutlookPack(base, manifest, future_revenue, bridge_components, chart_rows)
+    _write_pack_files(
+        base,
+        manifest,
+        future_revenue,
+        bridge_components,
+        chart_rows,
+        extra_frames={"scenario_role_contract": scenario_role_contract},
+    )
+    return RevenueOutlookPack(
+        base,
+        manifest,
+        future_revenue,
+        bridge_components,
+        chart_rows,
+        scenario_role_contract=scenario_role_contract,
+    )
 
 
 def _read_optional_parquet(path: Path) -> pd.DataFrame:
@@ -808,6 +852,275 @@ def _read_existing_manifest(pack_dir: Path) -> dict[str, Any]:
         return json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return {}
+
+
+SCENARIO_ROLE_CONTRACT_COLUMNS = [
+    "scenario_name",
+    "scenario_role",
+    "differing_fields",
+    "population_only_flag",
+    "behavioural_driver_flag",
+    "affected_series",
+    "interpretation",
+    "display_policy",
+    "field_classification",
+    "runtime_delta_min",
+    "runtime_delta_max",
+    "ped_population_feature_present",
+    "ped_population_feature_fields",
+    "vktpc_path_policy",
+    "population_path_policy",
+    "source_basis",
+    "notes",
+]
+
+
+def scenario_role_contract_frame(
+    *,
+    current_forecast_annual: pd.DataFrame,
+    scenarios: list[dict[str, Any]],
+    repo_root: Path | str | None = None,
+) -> pd.DataFrame:
+    """Create a repo-local scenario role contract for Revenue Outlook display policy.
+
+    The promoted runtime manifest keeps workbook basenames and hashes, not the
+    source workbook paths. This contract therefore uses committed runtime rows
+    and repo-local feature evidence. It does not load Excel at dashboard runtime.
+    """
+
+    root = Path(repo_root) if repo_root is not None else repo_root_from_here()
+    ped_feature_fields = _ped_population_feature_fields(root)
+    ped_population_feature_present = bool(ped_feature_fields)
+    scenario_records = [dict(item) for item in scenarios if isinstance(item, dict)]
+    if not scenario_records and isinstance(current_forecast_annual, pd.DataFrame) and not current_forecast_annual.empty:
+        scenario_records = _runtime_scenario_records({}, current_forecast_annual)
+
+    base_names = [
+        str(item.get("scenario_name") or "")
+        for item in scenario_records
+        if str(item.get("scenario_role") or "").lower() == SCENARIO_ROLE_BASECASE
+    ]
+    base_name = base_names[0] if base_names else "current_basecase"
+    rows: list[dict[str, Any]] = []
+    affected_series = [
+        "ped_vkt_per_capita",
+        "ped_volume",
+        "gross_ped_revenue",
+        "light_ruc_net_km",
+        "heavy_ruc_net_km",
+        "total_ruc_net_revenue",
+        "total_fed_ruc_net_revenue",
+        "total_nltf_net_revenue",
+    ]
+    for scenario in scenario_records:
+        scenario_name = str(scenario.get("scenario_name") or "")
+        scenario_role = str(scenario.get("scenario_role") or "")
+        role = scenario_role.lower()
+        for series_id in affected_series:
+            delta_min, delta_max = _runtime_series_delta_bounds(
+                current_forecast_annual,
+                base_scenario=base_name,
+                comparison_scenario=scenario_name,
+                series_id=series_id,
+            )
+            value_changes = bool(pd.notna(delta_min) and pd.notna(delta_max) and (abs(float(delta_min)) > 1e-9 or abs(float(delta_max)) > 1e-9))
+            if role == SCENARIO_ROLE_BASECASE:
+                rows.append(
+                    _scenario_contract_row(
+                        scenario_name=scenario_name,
+                        scenario_role=scenario_role,
+                        affected_series=series_id,
+                        differing_fields="none",
+                        population_only_flag=False,
+                        behavioural_driver_flag=False,
+                        display_policy="basecase_reference",
+                        interpretation="Basecase runtime path is the behavioural reference for current finalist Revenue Outlook traces.",
+                        field_classification="basecase_reference",
+                        delta_min=delta_min,
+                        delta_max=delta_max,
+                        ped_population_feature_present=ped_population_feature_present,
+                        ped_feature_fields=ped_feature_fields,
+                        vktpc_path_policy="basecase_reference_path",
+                        population_path_policy="basecase_bridge_population",
+                        source_basis="repo-local current Revenue Outlook runtime and PED feature rows",
+                        notes=SCENARIO_ROLE_CONTRACT_NOTE,
+                    )
+                )
+                continue
+
+            if series_id == "ped_vkt_per_capita":
+                display_policy = "keep_trace_relabel_comparison_behavioural_path" if value_changes else "hide_comparison_intensity_trace"
+                rows.append(
+                    _scenario_contract_row(
+                        scenario_name=scenario_name,
+                        scenario_role=scenario_role,
+                        affected_series=series_id,
+                        differing_fields=_comparison_differing_fields(
+                            scenario,
+                            [
+                                "runtime_PED_VKT_per_capita_forecast_delta",
+                                "PED_feature_population__level_present" if ped_population_feature_present else "PED_population_feature_absent",
+                                "source_workbook_cell_delta_unavailable_in_committed_runtime",
+                            ],
+                        ),
+                        population_only_flag=not value_changes and not ped_population_feature_present,
+                        behavioural_driver_flag=value_changes or ped_population_feature_present,
+                        display_policy=display_policy,
+                        interpretation=(
+                            "Comparison PED VKT per capita is treated as a behavioural comparison path, not a pure high-population scale path, "
+                            "because the committed runtime path changes per-capita values and PED feature evidence includes population exposure."
+                            if value_changes or ped_population_feature_present
+                            else "Comparison does not change the per-capita behavioural path; hide the separate intensity trace and use base VKT per capita."
+                        ),
+                        field_classification="population_and_model_behaviour_mixed_or_unproven",
+                        delta_min=delta_min,
+                        delta_max=delta_max,
+                        ped_population_feature_present=ped_population_feature_present,
+                        ped_feature_fields=ped_feature_fields,
+                        vktpc_path_policy="comparison_behavioural_path" if value_changes else "base_behavioural_path",
+                        population_path_policy="repo_runtime_bridge_population; scenario_workbook_population_path_not_committed",
+                        source_basis="repo-local runtime chart rows and PED prediction feature rows",
+                        notes=SCENARIO_ROLE_CONTRACT_NOTE,
+                    )
+                )
+                continue
+
+            is_ped_bridge = series_id in {"ped_volume", "gross_ped_revenue"}
+            rows.append(
+                _scenario_contract_row(
+                    scenario_name=scenario_name,
+                    scenario_role=scenario_role,
+                    affected_series=series_id,
+                    differing_fields=_comparison_differing_fields(
+                        scenario,
+                        [
+                            f"runtime_{series_id}_delta" if value_changes else f"runtime_{series_id}_no_material_delta",
+                            "source_workbook_cell_delta_unavailable_in_committed_runtime",
+                        ],
+                    ),
+                    population_only_flag=False,
+                    behavioural_driver_flag=bool(is_ped_bridge and (value_changes or ped_population_feature_present)),
+                    display_policy="keep_comparison_trace_scale_or_bridge",
+                    interpretation=(
+                        "Keep the comparison trace for revenue and aggregate series because bridge composition, population-scale assumptions, "
+                        "or modelled activity can change totals even when per-capita intensity is a behavioural metric."
+                    ),
+                    field_classification="aggregate_or_revenue_bridge_delta" if value_changes else "no_material_runtime_delta",
+                    delta_min=delta_min,
+                    delta_max=delta_max,
+                    ped_population_feature_present=ped_population_feature_present,
+                    ped_feature_fields=ped_feature_fields,
+                    vktpc_path_policy="inherits_PED_contract" if is_ped_bridge else "not_applicable",
+                    population_path_policy="repo_runtime_bridge_population; scenario_workbook_population_path_not_committed",
+                    source_basis="repo-local current Revenue Outlook runtime",
+                    notes=SCENARIO_ROLE_CONTRACT_NOTE,
+                )
+            )
+
+    return pd.DataFrame(rows, columns=SCENARIO_ROLE_CONTRACT_COLUMNS)
+
+
+def _scenario_contract_row(
+    *,
+    scenario_name: str,
+    scenario_role: str,
+    affected_series: str,
+    differing_fields: str,
+    population_only_flag: bool,
+    behavioural_driver_flag: bool,
+    display_policy: str,
+    interpretation: str,
+    field_classification: str,
+    delta_min: float | None,
+    delta_max: float | None,
+    ped_population_feature_present: bool,
+    ped_feature_fields: list[str],
+    vktpc_path_policy: str,
+    population_path_policy: str,
+    source_basis: str,
+    notes: str,
+) -> dict[str, Any]:
+    return {
+        "scenario_name": scenario_name,
+        "scenario_role": scenario_role,
+        "differing_fields": differing_fields,
+        "population_only_flag": bool(population_only_flag),
+        "behavioural_driver_flag": bool(behavioural_driver_flag),
+        "affected_series": affected_series,
+        "interpretation": interpretation,
+        "display_policy": display_policy,
+        "field_classification": field_classification,
+        "runtime_delta_min": delta_min if delta_min is not None else pd.NA,
+        "runtime_delta_max": delta_max if delta_max is not None else pd.NA,
+        "ped_population_feature_present": bool(ped_population_feature_present),
+        "ped_population_feature_fields": "; ".join(ped_feature_fields),
+        "vktpc_path_policy": vktpc_path_policy,
+        "population_path_policy": population_path_policy,
+        "source_basis": source_basis,
+        "notes": notes,
+    }
+
+
+def _comparison_differing_fields(scenario: dict[str, Any], fields: list[str]) -> str:
+    workbook = str(scenario.get("workbook_filename") or "").strip()
+    workbook_hash = str(scenario.get("workbook_sha256") or "").strip()
+    values = []
+    if workbook:
+        values.append(f"workbook_filename={workbook}")
+    if workbook_hash:
+        values.append(f"workbook_sha256={workbook_hash}")
+    values.extend(fields)
+    return "; ".join(value for value in values if value)
+
+
+def _runtime_series_delta_bounds(
+    current_forecast_annual: pd.DataFrame,
+    *,
+    base_scenario: str,
+    comparison_scenario: str,
+    series_id: str,
+) -> tuple[float | None, float | None]:
+    if current_forecast_annual is None or current_forecast_annual.empty or base_scenario == comparison_scenario:
+        return (None, None)
+    required = {"scenario_name", "series_id", "FY", "value"}
+    if required.difference(current_forecast_annual.columns):
+        return (None, None)
+    data = current_forecast_annual[
+        current_forecast_annual["series_id"].astype(str).eq(str(series_id))
+        & current_forecast_annual["scenario_name"].astype(str).isin([base_scenario, comparison_scenario])
+    ].copy()
+    if data.empty:
+        return (None, None)
+    data["FY_numeric"] = pd.to_numeric(data["FY"], errors="coerce")
+    data["value_numeric"] = pd.to_numeric(data["value"], errors="coerce")
+    pivot = data.pivot_table(index="FY_numeric", columns="scenario_name", values="value_numeric", aggfunc="first")
+    if base_scenario not in pivot.columns or comparison_scenario not in pivot.columns:
+        return (None, None)
+    delta = (pivot[comparison_scenario] - pivot[base_scenario]).dropna()
+    if delta.empty:
+        return (None, None)
+    return (float(delta.min()), float(delta.max()))
+
+
+def _ped_population_feature_fields(repo_root: Path) -> list[str]:
+    candidates = [
+        repo_root / "data" / "dashboard_evidence_pack_reproducibility" / "ped_vnext" / "prediction_feature_rows.parquet",
+        repo_root / "data" / "dashboard_evidence_pack_reproducibility" / "ped_inner_hpo" / "prediction_feature_rows.parquet",
+        repo_root / "data" / "model_input_history" / "ped_inputs.parquet",
+    ]
+    fields: set[str] = set()
+    for path in candidates:
+        if not path.exists():
+            continue
+        try:
+            frame = pd.read_parquet(path)
+        except Exception:
+            continue
+        for column in frame.columns:
+            text = str(column).lower()
+            if "population" in text or text in {"pop", "log_population"}:
+                fields.add(str(column))
+    return sorted(fields)
 
 
 def ev_phev_split_assumptions_frame(
@@ -2217,7 +2530,12 @@ def _runtime_series_id_from_release_label(label: Any) -> str:
     return str(SOURCE_SERIES_ALIASES.get(text, "") or "").strip()
 
 
-def _runtime_quarterly_activity_inputs(chart_rows: pd.DataFrame, series_meta: dict[str, dict[str, Any]]) -> pd.DataFrame:
+def _runtime_quarterly_activity_inputs(
+    chart_rows: pd.DataFrame,
+    series_meta: dict[str, dict[str, Any]],
+    *,
+    scenario_role_contract: pd.DataFrame | None = None,
+) -> pd.DataFrame:
     if chart_rows is None or chart_rows.empty:
         return pd.DataFrame()
     data = chart_rows[
@@ -2236,8 +2554,16 @@ def _runtime_quarterly_activity_inputs(chart_rows: pd.DataFrame, series_meta: di
     if data.empty:
         return data
     data["series_label"] = data["series_id"].map(lambda value: _runtime_display_name(value, series_meta))
+    policy_lookup = _scenario_display_policy_lookup(scenario_role_contract)
     data["trace_name"] = data.apply(
-        lambda row: "Actual" if str(row.get("row_type", "")) == "historical_actual" else _runtime_current_trace_name(row.get("scenario_name"), row.get("scenario_role")),
+        lambda row: "Actual"
+        if str(row.get("row_type", "")) == "historical_actual"
+        else _runtime_current_trace_name(
+            row.get("scenario_name"),
+            row.get("scenario_role"),
+            series_id=row.get("series_id"),
+            display_policy=policy_lookup.get((str(row.get("scenario_name") or ""), str(row.get("series_id") or ""))),
+        ),
         axis=1,
     )
     data["trace_type"] = data["trace_name"].map(_runtime_trace_type)
@@ -2259,6 +2585,11 @@ def _runtime_quarterly_activity_inputs(chart_rows: pd.DataFrame, series_meta: di
         data.get("row_type", pd.Series("", index=data.index)).astype(str).eq("historical_actual")
         & pd.to_numeric(data.get("june_year"), errors="coerce").gt(REVENUE_LAST_COMPLETE_ACTUAL_FY)
     )
+    hide_policy = data.apply(
+        lambda row: policy_lookup.get((str(row.get("scenario_name") or ""), str(row.get("series_id") or ""))) == "hide_comparison_intensity_trace",
+        axis=1,
+    )
+    data.loc[hide_policy, "plot_allowed"] = False
     data["model_id"] = data["series_id"].map(_runtime_model_id)
     data["fed_path"] = "Current planned path"
     data["revenue_basis"] = "not_applicable"
@@ -2438,7 +2769,12 @@ def _runtime_actual_rows(series_junction_audit: pd.DataFrame, series_meta: dict[
     return pd.DataFrame.from_records(records, columns=columns)
 
 
-def _runtime_current_rows(current: pd.DataFrame, series_meta: dict[str, dict[str, Any]]) -> pd.DataFrame:
+def _runtime_current_rows(
+    current: pd.DataFrame,
+    series_meta: dict[str, dict[str, Any]],
+    *,
+    scenario_role_contract: pd.DataFrame | None = None,
+) -> pd.DataFrame:
     columns = _runtime_chart_columns()
     if current is None or current.empty:
         return pd.DataFrame(columns=columns)
@@ -2446,12 +2782,20 @@ def _runtime_current_rows(current: pd.DataFrame, series_meta: dict[str, dict[str
     data["FY_numeric"] = pd.to_numeric(data.get("FY"), errors="coerce")
     data["value_numeric"] = pd.to_numeric(data.get("value"), errors="coerce")
     data = data[data["FY_numeric"].ge(REVENUE_LAST_COMPLETE_ACTUAL_FY) & data["value_numeric"].notna()].copy()
+    policy_lookup = _scenario_display_policy_lookup(scenario_role_contract)
     records: list[dict[str, Any]] = []
     for row in data.itertuples(index=False):
         series_id = str(getattr(row, "series_id", "") or "")
         fy = int(getattr(row, "FY_numeric"))
         scenario_name = str(getattr(row, "scenario_name", "") or "")
         scenario_role = str(getattr(row, "scenario_role", "") or "")
+        display_policy = policy_lookup.get((scenario_name, series_id))
+        trace_name = _runtime_current_trace_name(
+            scenario_name,
+            scenario_role,
+            series_id=series_id,
+            display_policy=display_policy,
+        )
         value_status = str(getattr(row, "value_status", "") or "")
         data_scope = (
             "actual_anchor"
@@ -2469,8 +2813,8 @@ def _runtime_current_rows(current: pd.DataFrame, series_meta: dict[str, dict[str
                 metric_type=_runtime_metric_type(series_meta.get(series_id, {}).get("metric_type"), getattr(row, "unit", "")),
                 time_grain="june_year",
                 row_type="future_forecast",
-                trace_name=_runtime_current_trace_name(scenario_name, scenario_role),
-                trace_type=_runtime_trace_type(_runtime_current_trace_name(scenario_name, scenario_role)),
+                trace_name=trace_name,
+                trace_type=_runtime_trace_type(trace_name),
                 trace_role="in_house_current_finalist",
                 trace_source="current_finalist_forecast",
                 scenario_name=scenario_name,
@@ -2495,6 +2839,7 @@ def _runtime_current_rows(current: pd.DataFrame, series_meta: dict[str, dict[str
                 quarters_present=getattr(row, "quarters_present", ""),
                 anchor_flag=fy == REVENUE_LAST_COMPLETE_ACTUAL_FY,
                 nowcast_flag=bool(getattr(row, "nowcast_flag", False)),
+                plot_allowed=display_policy != "hide_comparison_intensity_trace",
                 formula=getattr(row, "formula", ""),
                 source_basis=getattr(row, "source_basis", ""),
                 row_role=getattr(row, "row_role", ""),
@@ -2916,11 +3261,38 @@ def _runtime_chart_record(
     }
 
 
-def _runtime_current_trace_name(scenario_name: Any, scenario_role: Any) -> str:
+def _scenario_display_policy_lookup(contract: pd.DataFrame | None) -> dict[tuple[str, str], str]:
+    if contract is None or contract.empty:
+        return {}
+    required = {"scenario_name", "affected_series", "display_policy"}
+    if required.difference(contract.columns):
+        return {}
+    lookup: dict[tuple[str, str], str] = {}
+    for row in contract.itertuples(index=False):
+        scenario_name = str(getattr(row, "scenario_name", "") or "")
+        series_id = str(getattr(row, "affected_series", "") or "")
+        display_policy = str(getattr(row, "display_policy", "") or "")
+        if scenario_name and series_id and display_policy:
+            lookup[(scenario_name, series_id)] = display_policy
+    return lookup
+
+
+def _runtime_current_trace_name(
+    scenario_name: Any,
+    scenario_role: Any,
+    *,
+    series_id: Any = None,
+    display_policy: Any = None,
+) -> str:
     role = str(scenario_role or "").strip().lower()
     name = str(scenario_name or "").strip().lower()
     if role == SCENARIO_ROLE_BASECASE or name == "current_basecase":
         return "Current finalist Base case"
+    if (
+        str(series_id or "") == "ped_vkt_per_capita"
+        and str(display_policy or "") == "keep_trace_relabel_comparison_behavioural_path"
+    ):
+        return PED_COMPARISON_BEHAVIOURAL_TRACE_NAME
     return "Current finalist High population/comparison"
 
 
@@ -2934,6 +3306,8 @@ def _runtime_trace_type(trace_name: Any) -> str:
         return "current finalist base"
     if name == "Current finalist High population/comparison":
         return "current finalist comparison"
+    if name == PED_COMPARISON_BEHAVIOURAL_TRACE_NAME:
+        return "current finalist comparison behavioural"
     return name
 
 
@@ -2991,8 +3365,9 @@ def _trace_sort_value(trace_name: Any) -> int:
         "MBU26 official": 1,
         "Current finalist Base case": 2,
         "Current finalist High population/comparison": 3,
-        "Official comparator: selected MOT/BEFU": 4,
-        "Official comparator: rolling BEFU 1Y": 5,
+        PED_COMPARISON_BEHAVIOURAL_TRACE_NAME: 4,
+        "Official comparator: selected MOT/BEFU": 5,
+        "Official comparator: rolling BEFU 1Y": 6,
     }
     return order.get(str(trace_name or ""), 99)
 
@@ -3588,6 +3963,7 @@ def _write_pack_files(
         "revenue_stack_components",
         "ev_phev_split_assumptions",
         "ev_phev_ped_light_drift_assumptions",
+        "scenario_role_contract",
         "revenue_formula_residuals",
         "series_alias_audit",
         "fan_availability",

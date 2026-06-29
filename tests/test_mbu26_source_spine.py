@@ -158,7 +158,13 @@ def test_current_runtime_uses_only_allowed_mbu26_trace_contract() -> None:
     audit = pd.read_csv(RUNTIME_DIR / "runtime_trace_audit.csv")
     bridge = pd.read_csv(RUNTIME_DIR / "revenue_bridge_components.csv")
 
-    allowed = {"Actual", "MBU26 official", "Current finalist Base case", "Current finalist High population/comparison"}
+    allowed = {
+        "Actual",
+        "MBU26 official",
+        "Current finalist Base case",
+        "Current finalist High population/comparison",
+        "Current finalist comparison behavioural path",
+    }
     displayed = chart[chart["time_grain"].astype(str).eq("june_year")]
     assert set(displayed["trace_name"].dropna().unique()) == allowed
     assert set(displayed["trace_type"].dropna().unique()) == {
@@ -166,7 +172,13 @@ def test_current_runtime_uses_only_allowed_mbu26_trace_contract() -> None:
         "MBU26 official",
         "current finalist base",
         "current finalist comparison",
+        "current finalist comparison behavioural",
     }
+    ped_vktpc = displayed[displayed["series_id"].astype(str).eq("ped_vkt_per_capita")]
+    assert "Current finalist comparison behavioural path" in set(ped_vktpc["trace_name"].dropna().astype(str))
+    assert "Current finalist High population/comparison" not in set(ped_vktpc["trace_name"].dropna().astype(str))
+    non_ped_vktpc = displayed[~displayed["series_id"].astype(str).eq("ped_vkt_per_capita")]
+    assert "Current finalist comparison behavioural path" not in set(non_ped_vktpc["trace_name"].dropna().astype(str))
     assert displayed[
         displayed["row_type"].astype(str).eq("historical_actual")
         & pd.to_numeric(displayed["june_year"], errors="coerce").gt(2025)
