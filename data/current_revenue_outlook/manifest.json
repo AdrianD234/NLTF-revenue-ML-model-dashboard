@@ -390,6 +390,51 @@
     "scope": "Repo-local audit of scenario role semantics, PED population-feature exposure, display policy and runtime deltas.",
     "note": "High population affects scale/revenue through population; VKT per capita is a behavioural intensity metric."
   },
+  "scenario_inputs": {
+    "status": "available",
+    "repo_relative_output_dir": "data/current_revenue_outlook/scenario_inputs",
+    "schema_version": "nltf-scenario-input-materializer-v1",
+    "row_counts": {
+      "scenario_input_cells": 15472,
+      "scenario_input_long": 15200,
+      "scenario_input_wide": 600,
+      "scenario_feature_lineage": 14000
+    },
+    "workbooks": [
+      {
+        "scenario_name": "current_basecase",
+        "role": "basecase",
+        "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_basecase (2) - Copy.xlsx",
+        "workbook_sha256": "d0644d353ee5a073602186cf7ac5c16e707d5350e16fd037b73a65528067cc6a",
+        "size_bytes": 72729,
+        "raw_status": "copied_repo_local_raw_workbook",
+        "raw_repo_relative_path": "data/current_revenue_outlook/scenario_inputs/raw/d0644d353ee5_NLTF_forecast_input_template_to_2050Q4_basecase _2_ - Copy.xlsx",
+        "sheet_count": 5,
+        "non_empty_cell_count": 7736,
+        "long_row_count": 7600,
+        "wide_row_count": 300
+      },
+      {
+        "scenario_name": "current_comparison_1",
+        "role": "comparison",
+        "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_high_population (2) - Copy.xlsx",
+        "workbook_sha256": "6213ce565cf1f4a058a3ea9f1af4d5476a8b0423a4d8747905c3cba128380ce1",
+        "size_bytes": 72716,
+        "raw_status": "copied_repo_local_raw_workbook",
+        "raw_repo_relative_path": "data/current_revenue_outlook/scenario_inputs/raw/6213ce565cf1_NLTF_forecast_input_template_to_2050Q4_high_population _2_ - Copy.xlsx",
+        "sheet_count": 5,
+        "non_empty_cell_count": 7736,
+        "long_row_count": 7600,
+        "wide_row_count": 300
+      }
+    ],
+    "manifest_sha256": "60f7f5fddd3dd6b220eac14793bc2c2a69b6b88813ee052d54088757261b6409"
+  },
+  "scenario_feature_lineage": {
+    "repo_relative_path": "data/current_revenue_outlook/scenario_feature_lineage.csv",
+    "source": "scenario_inputs/scenario_feature_lineage.parquet",
+    "scope": "Feature-level lineage from committed scenario input artifacts to fixed finalist forecast variables."
+  },
   "rate_provenance": {
     "future_light_heavy": "mbu26_official_annual.csv effective rates joined to current finalist net-km outputs",
     "future_ped": "MBU26 population/intensity/rate joined to optimized PED/light-petrol VKT after EV/PHEV migration",
@@ -437,44 +482,44 @@
   "validation_status": "runtime_rebuilt",
   "output_hashes": {
     "ev_phev_ped_light_drift_assumptions.csv": {
-      "sha256": "d9246b99ef5a6b795737eb236d3c1ac819accce976c534b07e9a1337a616b098",
-      "size_bytes": 530739
+      "sha256": "f0a27b5b2e2cf3844ea1c53ed5097a58f8801d8465ee888da39a82e501343bf3",
+      "size_bytes": 580036
     },
     "ev_phev_ped_light_drift_assumptions.parquet": {
-      "sha256": "ce26d938c518e664141fa282e3d07f6918995b37b67fe85f51c9129a978902a2",
-      "size_bytes": 110154
+      "sha256": "b3c1b3cc4c07bdc041b9f6d3a0c9e7a8a0a21742890811d94955d66af964d9a2",
+      "size_bytes": 112020
     },
     "ev_phev_split_assumptions.csv": {
-      "sha256": "361a1b83f9df07a0f315c03e29376c70496a318cf8e24a3204227da56b623c11",
-      "size_bytes": 75756
+      "sha256": "6675ca24b2dc1b57d27e69848b62aa2dbb9cf1db48976e3f54942b6f2c305994",
+      "size_bytes": 75779
     },
     "ev_phev_split_assumptions.parquet": {
-      "sha256": "aa7b9a988afc527a74850791f434468214cdee6619067818ff27404f5804f98e",
-      "size_bytes": 57661
+      "sha256": "e477a4c63d77717c0e7e13d9453057ca50d7a2a8fd76428a37301c0ed1816b00",
+      "size_bytes": 57700
     },
     "fan_availability.csv": {
-      "sha256": "5558e38a5776689e0d104f9bfe95bdab465aa06fc928b933af49047a4ed74291",
-      "size_bytes": 30368
+      "sha256": "7fde72609437ab85136e9e21c8f8b6ba8dfd9cc2024a73f986ddfac299842e3a",
+      "size_bytes": 30413
     },
     "fan_availability.parquet": {
-      "sha256": "99ce74a079f62755584d3af8f2bb437b12f611a16ea63241aac006bcef8f37cb",
-      "size_bytes": 10042
+      "sha256": "65597bfb4c267ee4ffc37907c17df15ec4cd6ade24fc5cd65f0947e4469f0267",
+      "size_bytes": 10070
     },
     "fan_band_rows.csv": {
-      "sha256": "705b076fb08f11742d1deb975aded31c0946e87184809543b1300d45987351f8",
-      "size_bytes": 415154
+      "sha256": "c58a2e9d78d959e193162a61ca7e85607d5ab62ff7380270637de7b8657cc907",
+      "size_bytes": 416497
     },
     "fan_band_rows.parquet": {
-      "sha256": "df71da00f0e5fc3dc04bdd00da4380db5fb8707fbaab80cc98061e2ac06a9e05",
-      "size_bytes": 50184
+      "sha256": "e8828c2997785eed41df3cf090b9fdd29b22e9b5e97dd3aabfae924b7fcd86f9",
+      "size_bytes": 50217
     },
     "future_revenue_forecasts.csv": {
-      "sha256": "b1837c074c79e9eb1dfe4e94ff802e1f713c12a491fffdb9821c89d69cf41eb2",
-      "size_bytes": 331495
+      "sha256": "4e6ed9d9a6bc4a631970247ccba54deb4d66fa4664d04a5ebccf5bfa24d61a72",
+      "size_bytes": 334177
     },
     "future_revenue_forecasts.parquet": {
-      "sha256": "bc65e453ee067160c2558a07d65355dfc1113e599bd951639565b5e78eb0f9da",
-      "size_bytes": 29676
+      "sha256": "ca3cf207b7da7ece6386e975f9faeeb124f3247ef0e9c1c3f4455a5c81a2508d",
+      "size_bytes": 29705
     },
     "path_trace_status.csv": {
       "sha256": "9aee7a4e7003ec6541476ca3e4afef6d8586b6c358e41db1c8e06623e5ffcaa3",
@@ -485,44 +530,44 @@
       "size_bytes": 5960
     },
     "revenue_bridge_components.csv": {
-      "sha256": "2a0c401e2d8fc531711d3323f4c193cdb69c8758c411040df249fab1a3dd5eba",
-      "size_bytes": 629597
+      "sha256": "1d2094bf843ac7408fad130c5b4b7eff516080e18b415b4dc61d06220ff11611",
+      "size_bytes": 650775
     },
     "revenue_bridge_components.parquet": {
-      "sha256": "2dcfb121d8d3b096c2c6e2011f1b0271667c16b9d6ea0f7c1a5ee73129a7276a",
-      "size_bytes": 63437
+      "sha256": "c84ea4ceb6215ce5240cab7cb567d5b7f5dd8a929216be2071114c4ba2e9154f",
+      "size_bytes": 63914
     },
     "revenue_chart_rows.csv": {
-      "sha256": "02400cd7715ccbf22df576e6af56c7e342066db3eb3dc2bae5f4e08521d0c9ec",
-      "size_bytes": 2413504
+      "sha256": "4c824790bf6ea1dcd92bd1ead0e8e62423babcc8bc701e4e9bfc6c070c6951d4",
+      "size_bytes": 2484982
     },
     "revenue_chart_rows.parquet": {
-      "sha256": "b0241186c1a24c218c6e3fbb5babb0a93a5f7afd93ec3a81f5359a9326ca0623",
-      "size_bytes": 123908
+      "sha256": "253d67cd7f8d75867673862c44ceb8cd16d10a268cbb8b1e5bfc32bbef0d2a07",
+      "size_bytes": 125674
     },
     "revenue_formula_residuals.csv": {
-      "sha256": "8e5cfb48896374bdce4ae3b45f62f4c57acde9ef0073d72fdfcaf264a92e9193",
-      "size_bytes": 327176
+      "sha256": "288c1f6227d82debba6a7d5c98f86a4c92f4287576ab2c1a6c95b450127fbe8a",
+      "size_bytes": 327168
     },
     "revenue_formula_residuals.parquet": {
-      "sha256": "4fc96a0c564913121172ac7b69f0f39b190153b0e9c5b759beb8b1be003d921e",
-      "size_bytes": 37707
+      "sha256": "90dd6059bdb07e467a28539ef426267e20e2aace7623d3feb9fca180d9497716",
+      "size_bytes": 37702
     },
     "revenue_line_reconciliation.csv": {
-      "sha256": "be0051da9f2e43352df416e0a082907d76094317134d142909f8316d55c07723",
-      "size_bytes": 2276202
+      "sha256": "3139d0c0414ce39cadafc4457d9ac4d6a9814d6ed838ce968a3d0bbfaf5a7b0b",
+      "size_bytes": 2367942
     },
     "revenue_line_reconciliation.parquet": {
-      "sha256": "3a934b9bfa1e04a1da23fb2723a75d57b59b7cd446d34eb0aaa6433ca79d3ccd",
-      "size_bytes": 89167
+      "sha256": "b9368c4dbc66890a41b7bcc3c4ae0590632504946d01e2e5a5647b00901474b8",
+      "size_bytes": 91538
     },
     "revenue_stack_components.csv": {
-      "sha256": "2aa27cc9d76350dfeca325094a2d758f8766d2112258ed64219c1de65b3cabd8",
-      "size_bytes": 11348001
+      "sha256": "1cfbacf2a0fd598e509edf18ce2339ad875ec2727953f93d5a22689bcf127033",
+      "size_bytes": 11522574
     },
     "revenue_stack_components.parquet": {
-      "sha256": "958b119ec42eb731e04d84373412471bbfab1d29ea39a3922f50edc8dda9f782",
-      "size_bytes": 244059
+      "sha256": "feb44d012cc304a7f6040edf419e19dc85989a8836cf5348b29b9a215eb80c91",
+      "size_bytes": 245797
     },
     "row_reconciliation.csv": {
       "sha256": "d484f5d75cce88e30ce7bcf5dd70058505cc02e5dff93f457a579f119c2fc7ce",
@@ -533,20 +578,28 @@
       "size_bytes": 38215
     },
     "runtime_trace_audit.csv": {
-      "sha256": "0c257dd1e5b02051d99eb044b0946b1d2589f81eab35feb04868a0327211a5aa",
-      "size_bytes": 96743
+      "sha256": "45c9513db0fe5fe5485ec28c560e757d36733d2e900c194d2b4be9fd6b91afe9",
+      "size_bytes": 100148
     },
     "runtime_trace_audit.parquet": {
-      "sha256": "5ee622e1c7208d76861937b6f1c85b0590bf402dd3b9a09c4035cc1ffe0f62e2",
-      "size_bytes": 21998
+      "sha256": "49465b4692e3f0ff60c51ec26c555883ca4e3337ded988e44017464f06720381",
+      "size_bytes": 22451
+    },
+    "scenario_feature_lineage.csv": {
+      "sha256": "fa75ab6a0e4c4c584af3300dd2e887fff579c64877ed2f9adc470fbfdc475243",
+      "size_bytes": 2771070
+    },
+    "scenario_feature_lineage.parquet": {
+      "sha256": "7248e6c3142079b1722fbeb18b57393dd82cd3c127c535e08bee2ce139e1d9ab",
+      "size_bytes": 65301
     },
     "scenario_role_contract.csv": {
-      "sha256": "19e46e894782d72a8697789e0efa82ec70a923f64663e8d0f58ab2894f51888b",
-      "size_bytes": 11493
+      "sha256": "f45d02d7f6667f752a2584b4e71032209faddd3843905f5ef4c8b389cded0620",
+      "size_bytes": 16511
     },
     "scenario_role_contract.parquet": {
-      "sha256": "d18d3172d9e664b3a31123c43d3bef9bafa61b464b4ae214fe748f2a554719f2",
-      "size_bytes": 14872
+      "sha256": "7bfbf555449e5c3e2cfac2ba2821f5958135dc63fdf5acb233d4971d9f06c07d",
+      "size_bytes": 16102
     },
     "series_alias_audit.csv": {
       "sha256": "c0330c9918d7e2f4f972d15e8465537c16d96aca607ef253353612cadd62c56d",

@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path
+import shutil
 import sys
 from typing import Any, TYPE_CHECKING
 
@@ -55,6 +56,15 @@ from .revenue_source_pack import (
     SOURCE_SERIES_ALIASES,
     load_revenue_source_pack,
 )
+from .scenario_inputs import (
+    SCENARIO_FEATURE_LINEAGE_STEM,
+    SCENARIO_INPUT_DIRNAME,
+    SCENARIO_INPUT_MANIFEST,
+    SCENARIO_INPUT_CELLS_STEM,
+    SCENARIO_INPUT_LONG_STEM,
+    SCENARIO_INPUT_WIDE_STEM,
+    combine_scenario_input_dirs,
+)
 
 if TYPE_CHECKING:
     from .forecast_runner import ForecastScenarioComparisonResult
@@ -78,6 +88,7 @@ RUNTIME_REVENUE_OUTLOOK_FILES = (
     "revenue_stack_components.parquet",
     "ev_phev_split_assumptions.parquet",
     "ev_phev_ped_light_drift_assumptions.parquet",
+    "scenario_feature_lineage.parquet",
     "scenario_role_contract.parquet",
     "revenue_formula_residuals.parquet",
     "series_alias_audit.parquet",
@@ -366,6 +377,7 @@ class RevenueOutlookPack:
     revenue_stack_components: pd.DataFrame = field(default_factory=pd.DataFrame)
     ev_phev_split_assumptions: pd.DataFrame = field(default_factory=pd.DataFrame)
     ev_phev_ped_light_drift_assumptions: pd.DataFrame = field(default_factory=pd.DataFrame)
+    scenario_feature_lineage: pd.DataFrame = field(default_factory=pd.DataFrame)
     scenario_role_contract: pd.DataFrame = field(default_factory=pd.DataFrame)
     revenue_formula_residuals: pd.DataFrame = field(default_factory=pd.DataFrame)
     series_alias_audit: pd.DataFrame = field(default_factory=pd.DataFrame)
@@ -389,6 +401,7 @@ def revenue_outlook_signature(pack_dir: Path | str | None = None, repo_root: Pat
         base / "revenue_stack_components.parquet",
         base / "ev_phev_split_assumptions.parquet",
         base / "ev_phev_ped_light_drift_assumptions.parquet",
+        base / "scenario_feature_lineage.parquet",
         base / "scenario_role_contract.parquet",
         base / "revenue_formula_residuals.parquet",
         base / "series_alias_audit.parquet",
@@ -429,6 +442,7 @@ def load_revenue_outlook_pack(
         revenue_stack_components=_read_optional_parquet(base / "revenue_stack_components.parquet"),
         ev_phev_split_assumptions=_read_optional_parquet(base / "ev_phev_split_assumptions.parquet"),
         ev_phev_ped_light_drift_assumptions=_read_optional_parquet(base / "ev_phev_ped_light_drift_assumptions.parquet"),
+        scenario_feature_lineage=_read_optional_parquet(base / "scenario_feature_lineage.parquet"),
         scenario_role_contract=_read_optional_parquet(base / "scenario_role_contract.parquet"),
         revenue_formula_residuals=_read_optional_parquet(base / "revenue_formula_residuals.parquet"),
         series_alias_audit=_read_optional_parquet(base / "series_alias_audit.parquet"),
@@ -522,6 +536,7 @@ def build_current_revenue_outlook_runtime_pack(
     base.mkdir(parents=True, exist_ok=True)
 
     existing_manifest = _read_existing_manifest(base)
+    scenario_input_wide = _read_optional_parquet(base / SCENARIO_INPUT_DIRNAME / f"{SCENARIO_INPUT_WIDE_STEM}.parquet")
     mbu26_pack = load_mbu26_annual_spine(repo_root=root)
     if mbu26_pack is None:
         raise ValueError(
@@ -532,6 +547,7 @@ def build_current_revenue_outlook_runtime_pack(
     current = current_forecast_annual_from_mbu26(
         current_outlook_chart_rows=existing_chart_rows,
         mbu26_official_annual=mbu26_pack.official_annual,
+        scenario_input_wide=scenario_input_wide,
     )
     if current.empty:
         raise ValueError("Cannot rebuild current Revenue Outlook runtime pack: current finalist annual rows are missing.")
@@ -549,6 +565,7 @@ def build_current_revenue_outlook_runtime_pack(
     ev_phev_ped_light_drift_assumptions = ev_phev_ped_light_migration_assumptions_from_mbu26(
         current_outlook_chart_rows=existing_chart_rows,
         mbu26_official_annual=mbu26_pack.official_annual,
+        scenario_input_wide=scenario_input_wide,
     )
     scenarios = _runtime_scenario_records(existing_manifest, current)
     scenario_role_contract = scenario_role_contract_frame(
@@ -556,6 +573,12 @@ def build_current_revenue_outlook_runtime_pack(
         scenarios=scenarios,
         repo_root=root,
     )
+    scenario_input_manifest = _current_scenario_input_manifest(base, root)
+    scenario_feature_lineage = _read_optional_parquet(
+        base / SCENARIO_INPUT_DIRNAME / f"{SCENARIO_FEATURE_LINEAGE_STEM}.parquet"
+    )
+    if scenario_feature_lineage.empty:
+        scenario_feature_lineage = _read_optional_parquet(base / "scenario_feature_lineage.parquet")
 
     series_meta = _runtime_series_metadata(mbu26_pack.series_trace_contract)
     quarterly_inputs = _runtime_quarterly_activity_inputs(existing_chart_rows, series_meta, scenario_role_contract=scenario_role_contract)
@@ -691,6 +714,12 @@ def build_current_revenue_outlook_runtime_pack(
             "scope": "Repo-local audit of scenario role semantics, PED population-feature exposure, display policy and runtime deltas.",
             "note": SCENARIO_ROLE_CONTRACT_NOTE,
         },
+        "scenario_inputs": scenario_input_manifest,
+        "scenario_feature_lineage": {
+            "repo_relative_path": _repo_relative(root, base / "scenario_feature_lineage.csv"),
+            "source": f"{SCENARIO_INPUT_DIRNAME}/{SCENARIO_FEATURE_LINEAGE_STEM}.parquet",
+            "scope": "Feature-level lineage from committed scenario input artifacts to fixed finalist forecast variables.",
+        },
         "rate_provenance": {
             "future_light_heavy": "mbu26_official_annual.csv effective rates joined to current finalist net-km outputs",
             "future_ped": "MBU26 population/intensity/rate joined to optimized PED/light-petrol VKT after EV/PHEV migration",
@@ -752,6 +781,7 @@ def build_current_revenue_outlook_runtime_pack(
             "revenue_stack_components": stack_components,
             "ev_phev_split_assumptions": ev_phev_split_assumptions,
             "ev_phev_ped_light_drift_assumptions": ev_phev_ped_light_drift_assumptions,
+            "scenario_feature_lineage": scenario_feature_lineage,
             "scenario_role_contract": scenario_role_contract,
             "revenue_formula_residuals": formula_residuals,
             "fan_availability": fan_availability,
@@ -798,6 +828,10 @@ def build_revenue_outlook_pack(
     bridge_components = _add_canonical_join_keys(bridge_components)
     chart_rows = _add_canonical_join_keys(chart_rows)
     comparison_manifest = getattr(comparison, "manifest", {}) or {}
+    scenario_input_manifest = _promote_scenario_inputs_from_comparison(comparison, base, root)
+    scenario_feature_lineage = _read_optional_parquet(
+        base / SCENARIO_INPUT_DIRNAME / f"{SCENARIO_FEATURE_LINEAGE_STEM}.parquet"
+    )
     scenario_role_contract = scenario_role_contract_frame(
         current_forecast_annual=pd.DataFrame(),
         scenarios=comparison_manifest.get("scenarios", []) if isinstance(comparison_manifest, dict) else [],
@@ -813,6 +847,7 @@ def build_revenue_outlook_pack(
         bridge_components,
         pack_status=pack_status,
         promoted_by=promoted_by,
+        scenario_input_manifest=scenario_input_manifest,
     )
     _write_pack_files(
         base,
@@ -820,7 +855,10 @@ def build_revenue_outlook_pack(
         future_revenue,
         bridge_components,
         chart_rows,
-        extra_frames={"scenario_role_contract": scenario_role_contract},
+        extra_frames={
+            "scenario_role_contract": scenario_role_contract,
+            "scenario_feature_lineage": scenario_feature_lineage,
+        },
     )
     return RevenueOutlookPack(
         base,
@@ -828,8 +866,48 @@ def build_revenue_outlook_pack(
         future_revenue,
         bridge_components,
         chart_rows,
+        scenario_feature_lineage=scenario_feature_lineage,
         scenario_role_contract=scenario_role_contract,
     )
+
+
+def _promote_scenario_inputs_from_comparison(
+    comparison: ForecastScenarioComparisonResult,
+    output_dir: Path,
+    repo_root: Path,
+) -> dict[str, Any]:
+    target = output_dir / SCENARIO_INPUT_DIRNAME
+    source = Path(getattr(comparison, "output_dir", "")) / SCENARIO_INPUT_DIRNAME
+    if source.exists():
+        if target.exists():
+            shutil.rmtree(target)
+        shutil.copytree(source, target)
+    else:
+        source_dirs = [
+            Path(result.output_dir) / SCENARIO_INPUT_DIRNAME
+            for result in getattr(comparison, "scenario_results", [])
+            if (Path(result.output_dir) / SCENARIO_INPUT_DIRNAME).exists()
+        ]
+        if source_dirs:
+            if target.exists():
+                shutil.rmtree(target)
+            combine_scenario_input_dirs(source_dirs, target, created_by="revenue_outlook_promotion")
+    manifest_path = target / SCENARIO_INPUT_MANIFEST
+    if not manifest_path.exists():
+        return {
+            "status": "missing",
+            "repo_relative_output_dir": _repo_relative(repo_root, target),
+            "reason": "Scenario input artifacts were unavailable in the reviewed comparison pack.",
+        }
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    return {
+        "status": "available",
+        "repo_relative_output_dir": _repo_relative(repo_root, target),
+        "schema_version": manifest.get("schema_version"),
+        "row_counts": manifest.get("row_counts", {}),
+        "workbooks": manifest.get("workbooks", []),
+        "manifest_sha256": _sha256(manifest_path),
+    }
 
 
 def _read_optional_parquet(path: Path) -> pd.DataFrame:
@@ -852,6 +930,26 @@ def _read_existing_manifest(pack_dir: Path) -> dict[str, Any]:
         return json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return {}
+
+
+def _current_scenario_input_manifest(pack_dir: Path, repo_root: Path) -> dict[str, Any]:
+    scenario_dir = pack_dir / SCENARIO_INPUT_DIRNAME
+    manifest_path = scenario_dir / SCENARIO_INPUT_MANIFEST
+    if not manifest_path.exists():
+        return {
+            "status": "missing",
+            "repo_relative_output_dir": _repo_relative(repo_root, scenario_dir),
+            "reason": "Scenario input artifacts have not yet been materialized into the committed runtime pack.",
+        }
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    return {
+        "status": "available",
+        "repo_relative_output_dir": _repo_relative(repo_root, scenario_dir),
+        "schema_version": manifest.get("schema_version"),
+        "row_counts": manifest.get("row_counts", {}),
+        "workbooks": manifest.get("workbooks", []),
+        "manifest_sha256": _sha256(manifest_path),
+    }
 
 
 SCENARIO_ROLE_CONTRACT_COLUMNS = [
@@ -901,6 +999,10 @@ def scenario_role_contract_frame(
         if str(item.get("scenario_role") or "").lower() == SCENARIO_ROLE_BASECASE
     ]
     base_name = base_names[0] if base_names else "current_basecase"
+    scenario_input_wide = _read_optional_parquet(
+        root / CURRENT_REVENUE_OUTLOOK_DIR / SCENARIO_INPUT_DIRNAME / f"{SCENARIO_INPUT_WIDE_STEM}.parquet"
+    )
+    differing_inputs = _scenario_input_differing_fields(scenario_input_wide, base_name)
     rows: list[dict[str, Any]] = []
     affected_series = [
         "ped_vkt_per_capita",
@@ -950,53 +1052,59 @@ def scenario_role_contract_frame(
 
             if series_id == "ped_vkt_per_capita":
                 display_policy = "keep_trace_relabel_comparison_behavioural_path" if value_changes else "hide_comparison_intensity_trace"
+                scenario_differing_fields = differing_inputs.get(scenario_name, [])
+                population_only = bool(scenario_differing_fields) and all(
+                    _classify_scenario_variable(field) == "population/scale" for field in scenario_differing_fields
+                )
+                behavioural_driver = value_changes or ped_population_feature_present or any(
+                    _classify_scenario_variable(field) == "behavioural" for field in scenario_differing_fields
+                )
                 rows.append(
                     _scenario_contract_row(
                         scenario_name=scenario_name,
                         scenario_role=scenario_role,
                         affected_series=series_id,
-                        differing_fields=_comparison_differing_fields(
+                        differing_fields="; ".join(scenario_differing_fields)
+                        or _comparison_differing_fields(
                             scenario,
                             [
                                 "runtime_PED_VKT_per_capita_forecast_delta",
                                 "PED_feature_population__level_present" if ped_population_feature_present else "PED_population_feature_absent",
-                                "source_workbook_cell_delta_unavailable_in_committed_runtime",
                             ],
                         ),
-                        population_only_flag=not value_changes and not ped_population_feature_present,
-                        behavioural_driver_flag=value_changes or ped_population_feature_present,
+                        population_only_flag=population_only and not value_changes and not ped_population_feature_present,
+                        behavioural_driver_flag=behavioural_driver,
                         display_policy=display_policy,
                         interpretation=(
                             "Comparison PED VKT per capita is treated as a behavioural comparison path, not a pure high-population scale path, "
-                            "because the committed runtime path changes per-capita values and PED feature evidence includes population exposure."
-                            if value_changes or ped_population_feature_present
+                            "because the committed runtime path changes per-capita values, the workbook changes behavioural inputs, or PED feature evidence includes population exposure."
+                            if behavioural_driver
                             else "Comparison does not change the per-capita behavioural path; hide the separate intensity trace and use base VKT per capita."
                         ),
-                        field_classification="population_and_model_behaviour_mixed_or_unproven",
+                        field_classification=_scenario_field_classification(scenario_differing_fields),
                         delta_min=delta_min,
                         delta_max=delta_max,
                         ped_population_feature_present=ped_population_feature_present,
                         ped_feature_fields=ped_feature_fields,
                         vktpc_path_policy="comparison_behavioural_path" if value_changes else "base_behavioural_path",
-                        population_path_policy="repo_runtime_bridge_population; scenario_workbook_population_path_not_committed",
-                        source_basis="repo-local runtime chart rows and PED prediction feature rows",
+                        population_path_policy="scenario_input_population_from_committed_workbook_artifacts",
+                        source_basis="repo-local runtime chart rows, scenario_input_wide and PED prediction feature rows",
                         notes=SCENARIO_ROLE_CONTRACT_NOTE,
                     )
                 )
                 continue
 
             is_ped_bridge = series_id in {"ped_volume", "gross_ped_revenue"}
+            scenario_differing_fields = differing_inputs.get(scenario_name, [])
             rows.append(
                 _scenario_contract_row(
                     scenario_name=scenario_name,
                     scenario_role=scenario_role,
                     affected_series=series_id,
-                    differing_fields=_comparison_differing_fields(
+                    differing_fields="; ".join(scenario_differing_fields)
+                    or _comparison_differing_fields(
                         scenario,
-                        [
-                            f"runtime_{series_id}_delta" if value_changes else f"runtime_{series_id}_no_material_delta",
-                            "source_workbook_cell_delta_unavailable_in_committed_runtime",
-                        ],
+                        [f"runtime_{series_id}_delta" if value_changes else f"runtime_{series_id}_no_material_delta"],
                     ),
                     population_only_flag=False,
                     behavioural_driver_flag=bool(is_ped_bridge and (value_changes or ped_population_feature_present)),
@@ -1005,19 +1113,84 @@ def scenario_role_contract_frame(
                         "Keep the comparison trace for revenue and aggregate series because bridge composition, population-scale assumptions, "
                         "or modelled activity can change totals even when per-capita intensity is a behavioural metric."
                     ),
-                    field_classification="aggregate_or_revenue_bridge_delta" if value_changes else "no_material_runtime_delta",
+                    field_classification=_scenario_field_classification(scenario_differing_fields)
+                    or ("aggregate_or_revenue_bridge_delta" if value_changes else "no_material_runtime_delta"),
                     delta_min=delta_min,
                     delta_max=delta_max,
                     ped_population_feature_present=ped_population_feature_present,
                     ped_feature_fields=ped_feature_fields,
                     vktpc_path_policy="inherits_PED_contract" if is_ped_bridge else "not_applicable",
-                    population_path_policy="repo_runtime_bridge_population; scenario_workbook_population_path_not_committed",
-                    source_basis="repo-local current Revenue Outlook runtime",
+                    population_path_policy="scenario_input_population_from_committed_workbook_artifacts" if is_ped_bridge else "not_applicable_or_model_output",
+                    source_basis="repo-local current Revenue Outlook runtime and scenario_input_wide",
                     notes=SCENARIO_ROLE_CONTRACT_NOTE,
                 )
             )
 
     return pd.DataFrame(rows, columns=SCENARIO_ROLE_CONTRACT_COLUMNS)
+
+
+def _scenario_input_differing_fields(scenario_input_wide: pd.DataFrame, base_scenario: str) -> dict[str, list[str]]:
+    if scenario_input_wide is None or scenario_input_wide.empty or "scenario_name" not in scenario_input_wide.columns:
+        return {}
+    source = scenario_input_wide.copy()
+    keys = [column for column in ["stream", "canonical_period"] if column in source.columns]
+    if not keys:
+        return {}
+    metadata = {
+        "scenario_name",
+        "role",
+        "workbook_filename",
+        "workbook_sha256",
+        "stream",
+        "sheet",
+        "period",
+        "canonical_period",
+        "source_artifact",
+    }
+    variable_columns = [column for column in source.columns if column not in metadata]
+    base = source[source["scenario_name"].astype(str).eq(str(base_scenario))].copy()
+    if base.empty:
+        return {}
+    output: dict[str, list[str]] = {}
+    base_subset = base[keys + variable_columns].copy()
+    for scenario_name, group in source[~source["scenario_name"].astype(str).eq(str(base_scenario))].groupby("scenario_name", dropna=False):
+        compare = group[keys + variable_columns].copy()
+        merged = base_subset.merge(compare, on=keys, how="inner", suffixes=("_base", "_comparison"))
+        differing: set[str] = set()
+        for column in variable_columns:
+            base_values = merged.get(f"{column}_base")
+            comparison_values = merged.get(f"{column}_comparison")
+            if base_values is None or comparison_values is None:
+                continue
+            base_numeric = pd.to_numeric(base_values, errors="coerce")
+            comparison_numeric = pd.to_numeric(comparison_values, errors="coerce")
+            numeric_mask = base_numeric.notna() | comparison_numeric.notna()
+            numeric_changed = (base_numeric - comparison_numeric).abs().gt(1e-9) & numeric_mask
+            text_changed = base_values.fillna("").astype(str).ne(comparison_values.fillna("").astype(str)) & ~numeric_mask
+            if bool((numeric_changed | text_changed).any()):
+                differing.add(str(column))
+        output[str(scenario_name)] = sorted(differing)
+    return output
+
+
+def _scenario_field_classification(fields: list[str]) -> str:
+    if not fields:
+        return ""
+    parts = [f"{field}:{_classify_scenario_variable(field)}" for field in fields]
+    return "; ".join(parts)
+
+
+def _classify_scenario_variable(field: str) -> str:
+    text = str(field or "").lower()
+    if "population" in text:
+        return "population/scale"
+    if any(token in text for token in ["price", "rate", "cpi", "ruc"]):
+        return "price/rate/policy"
+    if any(token in text for token in ["gdp", "unemployment", "diesel", "petrol", "target_lag"]):
+        return "behavioural"
+    if any(token in text for token in ["quarter", "year", "horizon", "dummy", "trend"]):
+        return "system/time"
+    return "unknown"
 
 
 def _scenario_contract_row(
@@ -3871,6 +4044,7 @@ def _manifest(
     *,
     pack_status: str,
     promoted_by: str,
+    scenario_input_manifest: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     source_scenarios = comparison.manifest.get("scenarios", [])
     scenarios = _promoted_scenario_manifest_records(source_scenarios)
@@ -3918,6 +4092,15 @@ def _manifest(
             "future_light_heavy": "reviewed workbook nominal effective average RUC rate columns",
             "future_ped": "reviewed workbook PED base-rate column plus source-backed PED litres bridge; currently a governed gap when source litres/history are missing",
         },
+        "scenario_inputs": scenario_input_manifest or {
+            "status": "missing",
+            "repo_relative_output_dir": _repo_relative(repo_root, output_dir / SCENARIO_INPUT_DIRNAME),
+        },
+        "scenario_feature_lineage": {
+            "repo_relative_path": _repo_relative(repo_root, output_dir / "scenario_feature_lineage.csv"),
+            "source": f"{SCENARIO_INPUT_DIRNAME}/{SCENARIO_FEATURE_LINEAGE_STEM}.parquet",
+            "scope": "Feature-level lineage from committed scenario input artifacts to fixed finalist forecast variables.",
+        },
         "join_key_contract": CANONICAL_JOIN_KEY_CONTRACT,
         "revenue_source_pack": _revenue_source_pack_metadata(repo_root),
         "bridge_status_by_stream": bridge_status,
@@ -3934,6 +4117,17 @@ def _manifest(
             "revenue_bridge_components.csv",
             "revenue_chart_rows.parquet",
             "revenue_chart_rows.csv",
+            "scenario_feature_lineage.parquet",
+            "scenario_feature_lineage.csv",
+            f"{SCENARIO_INPUT_DIRNAME}/{SCENARIO_INPUT_CELLS_STEM}.parquet",
+            f"{SCENARIO_INPUT_DIRNAME}/{SCENARIO_INPUT_CELLS_STEM}.csv",
+            f"{SCENARIO_INPUT_DIRNAME}/{SCENARIO_INPUT_LONG_STEM}.parquet",
+            f"{SCENARIO_INPUT_DIRNAME}/{SCENARIO_INPUT_LONG_STEM}.csv",
+            f"{SCENARIO_INPUT_DIRNAME}/{SCENARIO_INPUT_WIDE_STEM}.parquet",
+            f"{SCENARIO_INPUT_DIRNAME}/{SCENARIO_INPUT_WIDE_STEM}.csv",
+            f"{SCENARIO_INPUT_DIRNAME}/{SCENARIO_FEATURE_LINEAGE_STEM}.parquet",
+            f"{SCENARIO_INPUT_DIRNAME}/{SCENARIO_FEATURE_LINEAGE_STEM}.csv",
+            f"{SCENARIO_INPUT_DIRNAME}/{SCENARIO_INPUT_MANIFEST}",
             "manifest.json",
             "manifest.md",
         ],
@@ -3963,6 +4157,7 @@ def _write_pack_files(
         "revenue_stack_components",
         "ev_phev_split_assumptions",
         "ev_phev_ped_light_drift_assumptions",
+        "scenario_feature_lineage",
         "scenario_role_contract",
         "revenue_formula_residuals",
         "series_alias_audit",

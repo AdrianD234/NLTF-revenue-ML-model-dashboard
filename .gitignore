@@ -67,6 +67,8 @@ data/dashboard_evidence_pack_reproducibility/ped_inner_hpo/source_artifacts/**/*
 !data/current_revenue_outlook/*.csv
 !data/current_revenue_outlook/*.json
 !data/current_revenue_outlook/*.md
+!data/current_revenue_outlook/scenario_inputs/
+!data/current_revenue_outlook/scenario_inputs/**
 !data/revenue_model_source_pack/
 !data/revenue_model_source_pack/**
 

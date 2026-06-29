@@ -1,0 +1,84 @@
+{
+  "schema_version": "nltf-scenario-input-materializer-v1",
+  "created_at": "2026-06-29T21:42:01.913721+00:00",
+  "created_by": "materialize_current_scenario_inputs",
+  "repo_relative_output_dir": "data/current_revenue_outlook/scenario_inputs",
+  "source_policy": "committed scenario input artifacts only; Streamlit must not load Excel at runtime",
+  "raw_workbook_size_limit_bytes": 52428800,
+  "workbooks": [
+    {
+      "scenario_name": "current_basecase",
+      "role": "basecase",
+      "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_basecase (2) - Copy.xlsx",
+      "workbook_sha256": "d0644d353ee5a073602186cf7ac5c16e707d5350e16fd037b73a65528067cc6a",
+      "size_bytes": 72729,
+      "raw_status": "copied_repo_local_raw_workbook",
+      "raw_repo_relative_path": "data/current_revenue_outlook/scenario_inputs/raw/d0644d353ee5_NLTF_forecast_input_template_to_2050Q4_basecase _2_ - Copy.xlsx",
+      "sheet_count": 5,
+      "non_empty_cell_count": 7736,
+      "long_row_count": 7600,
+      "wide_row_count": 300
+    },
+    {
+      "scenario_name": "current_comparison_1",
+      "role": "comparison",
+      "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_high_population (2) - Copy.xlsx",
+      "workbook_sha256": "6213ce565cf1f4a058a3ea9f1af4d5476a8b0423a4d8747905c3cba128380ce1",
+      "size_bytes": 72716,
+      "raw_status": "copied_repo_local_raw_workbook",
+      "raw_repo_relative_path": "data/current_revenue_outlook/scenario_inputs/raw/6213ce565cf1_NLTF_forecast_input_template_to_2050Q4_high_population _2_ - Copy.xlsx",
+      "sheet_count": 5,
+      "non_empty_cell_count": 7736,
+      "long_row_count": 7600,
+      "wide_row_count": 300
+    }
+  ],
+  "output_files": {
+    "scenario_input_cells.csv": {
+      "repo_relative_path": "data/current_revenue_outlook/scenario_inputs/scenario_input_cells.csv",
+      "sha256": "66fa77ec48d144dfc7f8d9037ae2f6f5eed36c18d28835939a624b5ba65710e0",
+      "size_bytes": 5173595
+    },
+    "scenario_input_cells.parquet": {
+      "repo_relative_path": "data/current_revenue_outlook/scenario_inputs/scenario_input_cells.parquet",
+      "sha256": "2cfa0969cddb7ba336a695bd3a9e5364594213dced7f0e450f311beebf557cce",
+      "size_bytes": 141268
+    },
+    "scenario_input_long.csv": {
+      "repo_relative_path": "data/current_revenue_outlook/scenario_inputs/scenario_input_long.csv",
+      "sha256": "105c9477ddddc911c68d46ee87221cd6f769e6b24c40e1aef3c812f85cd5e2b7",
+      "size_bytes": 5745360
+    },
+    "scenario_input_long.parquet": {
+      "repo_relative_path": "data/current_revenue_outlook/scenario_inputs/scenario_input_long.parquet",
+      "sha256": "3a70f4d30c8eab61bee6bf248991e76abcb691b9a05a2bf9a68e702a3c75b921",
+      "size_bytes": 152599
+    },
+    "scenario_input_wide.csv": {
+      "repo_relative_path": "data/current_revenue_outlook/scenario_inputs/scenario_input_wide.csv",
+      "sha256": "e8bcb4dde1ed5913cd2124d5396fe61fd7596a51f845a4de597843e915a401c1",
+      "size_bytes": 345595
+    },
+    "scenario_input_wide.parquet": {
+      "repo_relative_path": "data/current_revenue_outlook/scenario_inputs/scenario_input_wide.parquet",
+      "sha256": "2202f8686dc6af57a060b25f7ba6921314cd950a584a23a623dad11c36fc6868",
+      "size_bytes": 130859
+    },
+    "scenario_feature_lineage.csv": {
+      "repo_relative_path": "data/current_revenue_outlook/scenario_inputs/scenario_feature_lineage.csv",
+      "sha256": "fa75ab6a0e4c4c584af3300dd2e887fff579c64877ed2f9adc470fbfdc475243",
+      "size_bytes": 2771070
+    },
+    "scenario_feature_lineage.parquet": {
+      "repo_relative_path": "data/current_revenue_outlook/scenario_inputs/scenario_feature_lineage.parquet",
+      "sha256": "360f5474c85108225333f0882ff274087d11838a266d36c1d3922c5cb23afee9",
+      "size_bytes": 65121
+    }
+  },
+  "row_counts": {
+    "scenario_input_cells": 15472,
+    "scenario_input_long": 15200,
+    "scenario_input_wide": 600,
+    "scenario_feature_lineage": 14000
+  }
+}

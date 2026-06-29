@@ -33,6 +33,12 @@ from .forward_scorer_governance import (
 from .governance_constants import current_finalist
 from .heavy_ruc_forward import evaluate_heavy_ruc_forward_scorer
 from .ped_forward import evaluate_ped_forward_scorer
+from .scenario_inputs import (
+    SCENARIO_INPUT_DIRNAME,
+    combine_scenario_input_dirs,
+    materialize_scenario_inputs,
+    ScenarioWorkbookInput,
+)
 
 
 DEFAULT_FORECAST_HORIZON_QUARTERS = 20
@@ -308,6 +314,7 @@ class ForecastRunResult:
     capability_report: pd.DataFrame
     forecast_chart_rows: pd.DataFrame
     assumptions: pd.DataFrame
+    scenario_input_manifest: dict[str, Any]
     report_markdown: str
 
     @property
@@ -326,6 +333,7 @@ class ForecastScenarioComparisonResult:
     capability_report: pd.DataFrame
     forecast_chart_rows: pd.DataFrame
     scenario_input_delta_audit: pd.DataFrame
+    scenario_input_manifest: dict[str, Any]
 
 
 def repo_root_from_here() -> Path:
@@ -855,6 +863,37 @@ def run_forecast_workbook(
     assumptions.to_csv(run_dir / "forecast_assumptions.csv", index=False)
     capability_report.to_csv(run_dir / "forecast_capability_report.csv", index=False)
     chart_rows.to_csv(run_dir / "forecast_chart_rows.csv", index=False)
+    scenario_input_manifest = materialize_scenario_inputs(
+        [
+            ScenarioWorkbookInput(
+                workbook=workbook_bytes,
+                scenario_name=scenario,
+                scenario_role=resolved_role or "",
+                workbook_filename=workbook_name,
+            )
+        ],
+        run_dir / SCENARIO_INPUT_DIRNAME,
+        created_by="forecast_runner_run",
+    )
+    manifest["scenario_inputs"] = {
+        "repo_relative_output_dir": _repo_relative(root, run_dir / SCENARIO_INPUT_DIRNAME),
+        "schema_version": scenario_input_manifest.get("schema_version"),
+        "row_counts": scenario_input_manifest.get("row_counts", {}),
+        "workbooks": scenario_input_manifest.get("workbooks", []),
+    }
+    manifest["output_files"].extend(
+        [
+            f"{SCENARIO_INPUT_DIRNAME}/scenario_input_cells.parquet",
+            f"{SCENARIO_INPUT_DIRNAME}/scenario_input_cells.csv",
+            f"{SCENARIO_INPUT_DIRNAME}/scenario_input_long.parquet",
+            f"{SCENARIO_INPUT_DIRNAME}/scenario_input_long.csv",
+            f"{SCENARIO_INPUT_DIRNAME}/scenario_input_wide.parquet",
+            f"{SCENARIO_INPUT_DIRNAME}/scenario_input_wide.csv",
+            f"{SCENARIO_INPUT_DIRNAME}/scenario_feature_lineage.parquet",
+            f"{SCENARIO_INPUT_DIRNAME}/scenario_feature_lineage.csv",
+            f"{SCENARIO_INPUT_DIRNAME}/scenario_input_manifest.json",
+        ]
+    )
     (run_dir / "forecast_run_manifest.json").write_text(json.dumps(manifest, indent=2, allow_nan=False), encoding="utf-8")
     (run_dir / "forecast_validation_report.md").write_text(report, encoding="utf-8")
 
@@ -867,6 +906,7 @@ def run_forecast_workbook(
         capability_report=capability_report,
         forecast_chart_rows=chart_rows,
         assumptions=assumptions,
+        scenario_input_manifest=scenario_input_manifest,
         report_markdown=report,
     )
 
@@ -1279,6 +1319,11 @@ def write_forecast_scenario_comparison(
     comparison_id = f"{timestamp}_scenario_comparison"
     comparison_dir = Path(output_dir) if output_dir is not None else root / "artifacts" / "forecast_runs" / comparison_id
     comparison_dir.mkdir(parents=True, exist_ok=True)
+    scenario_input_manifest = combine_scenario_input_dirs(
+        [result.output_dir / SCENARIO_INPUT_DIRNAME for result in scenario_results],
+        comparison_dir / SCENARIO_INPUT_DIRNAME,
+        created_by="forecast_scenario_comparison",
+    )
     future = (
         pd.concat([result.future_forecasts for result in scenario_results], ignore_index=True, sort=False)
         if scenario_results
@@ -1343,8 +1388,23 @@ def write_forecast_scenario_comparison(
             "forecast_scenario_chart_rows.csv",
             "scenario_input_delta_audit.parquet",
             "scenario_input_delta_audit.csv",
+            f"{SCENARIO_INPUT_DIRNAME}/scenario_input_cells.parquet",
+            f"{SCENARIO_INPUT_DIRNAME}/scenario_input_cells.csv",
+            f"{SCENARIO_INPUT_DIRNAME}/scenario_input_long.parquet",
+            f"{SCENARIO_INPUT_DIRNAME}/scenario_input_long.csv",
+            f"{SCENARIO_INPUT_DIRNAME}/scenario_input_wide.parquet",
+            f"{SCENARIO_INPUT_DIRNAME}/scenario_input_wide.csv",
+            f"{SCENARIO_INPUT_DIRNAME}/scenario_feature_lineage.parquet",
+            f"{SCENARIO_INPUT_DIRNAME}/scenario_feature_lineage.csv",
+            f"{SCENARIO_INPUT_DIRNAME}/scenario_input_manifest.json",
             "forecast_scenario_comparison_manifest.json",
         ],
+        "scenario_inputs": {
+            "repo_relative_output_dir": _repo_relative(root, comparison_dir / SCENARIO_INPUT_DIRNAME),
+            "schema_version": scenario_input_manifest.get("schema_version"),
+            "row_counts": scenario_input_manifest.get("row_counts", {}),
+            "workbooks": scenario_input_manifest.get("workbooks", []),
+        },
     }
     future.to_parquet(comparison_dir / "forecast_scenario_comparison.parquet", index=False)
     future.to_csv(comparison_dir / "forecast_scenario_comparison.csv", index=False)
@@ -1366,6 +1426,7 @@ def write_forecast_scenario_comparison(
         capability_report=capability,
         forecast_chart_rows=chart_rows,
         scenario_input_delta_audit=scenario_input_delta_audit,
+        scenario_input_manifest=scenario_input_manifest,
     )
 
 
