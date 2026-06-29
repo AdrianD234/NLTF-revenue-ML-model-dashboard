@@ -608,12 +608,12 @@
       "size_bytes": 49202
     },
     "scenario_role_contract.csv": {
-      "sha256": "d52930b687d18dc5d3f559433bbe84b0c6b2fde4a90a5b1b6daf4b930ff7c39e",
-      "size_bytes": 16127
+      "sha256": "3980fa318b346547286e1f204af1c768b11d4f6ab5ad896584061f2d343b6ecd",
+      "size_bytes": 19960
     },
     "scenario_role_contract.parquet": {
-      "sha256": "35296d1e22ee7eaba708414b167516ede5f31104877c13397ffb9bd709d2e8e2",
-      "size_bytes": 16006
+      "sha256": "f1eac9486d96031ebd0f8fdc2e23654a0a150b661d753baeb79d3f30b6f3c8fc",
+      "size_bytes": 21714
     },
     "series_alias_audit.csv": {
       "sha256": "c0330c9918d7e2f4f972d15e8465537c16d96aca607ef253353612cadd62c56d",

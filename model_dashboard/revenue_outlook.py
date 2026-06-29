@@ -1332,6 +1332,13 @@ SCENARIO_ROLE_CONTRACT_COLUMNS = [
     "interpretation",
     "display_policy",
     "field_classification",
+    "affects_ped_vktpc_directly",
+    "affects_bridge_scaling",
+    "stream_differing_fields",
+    "ped_vktpc_direct_fields",
+    "bridge_scaling_fields",
+    "bridge_only_fields",
+    "unknown_fields",
     "runtime_delta_min",
     "runtime_delta_max",
     "ped_population_feature_present",
@@ -1373,6 +1380,7 @@ def scenario_role_contract_frame(
         root / CURRENT_REVENUE_OUTLOOK_DIR / SCENARIO_INPUT_DIRNAME / f"{SCENARIO_INPUT_WIDE_STEM}.parquet"
     )
     differing_inputs = _scenario_input_differing_fields(scenario_input_wide, base_name)
+    differing_inputs_by_stream = _scenario_input_differing_fields_by_stream(scenario_input_wide, base_name)
     rows: list[dict[str, Any]] = []
     affected_series = [
         "ped_vkt_per_capita",
@@ -1408,6 +1416,13 @@ def scenario_role_contract_frame(
                         display_policy="basecase_reference",
                         interpretation="Basecase runtime path is the behavioural reference for current finalist Revenue Outlook traces.",
                         field_classification="basecase_reference",
+                        affects_ped_vktpc_directly=False,
+                        affects_bridge_scaling=False,
+                        stream_differing_fields="none",
+                        ped_vktpc_direct_fields="",
+                        bridge_scaling_fields="",
+                        bridge_only_fields="",
+                        unknown_fields="",
                         delta_min=delta_min,
                         delta_max=delta_max,
                         ped_population_feature_present=ped_population_feature_present,
@@ -1423,6 +1438,17 @@ def scenario_role_contract_frame(
             if series_id == "ped_vkt_per_capita":
                 display_policy = "keep_trace_relabel_comparison_behavioural_path" if value_changes else "hide_comparison_intensity_trace"
                 scenario_differing_fields = differing_inputs.get(scenario_name, [])
+                stream_fields = _stream_differing_fields_for_series(
+                    series_id,
+                    scenario_name=scenario_name,
+                    differing_inputs_by_stream=differing_inputs_by_stream,
+                )
+                ped_direct_fields = _ped_vktpc_direct_fields(
+                    scenario_name,
+                    differing_inputs_by_stream=differing_inputs_by_stream,
+                )
+                bridge_scaling_fields = _ped_bridge_scaling_fields(ped_direct_fields)
+                bridge_only_fields = [field for field in bridge_scaling_fields if field not in set(ped_direct_fields)]
                 population_only = bool(scenario_differing_fields) and all(
                     _classify_scenario_variable(field) == "population/scale" for field in scenario_differing_fields
                 )
@@ -1452,6 +1478,13 @@ def scenario_role_contract_frame(
                             else "Comparison does not change the per-capita behavioural path; hide the separate intensity trace and use base VKT per capita."
                         ),
                         field_classification=_scenario_field_classification(scenario_differing_fields),
+                        affects_ped_vktpc_directly=bool(ped_direct_fields),
+                        affects_bridge_scaling=bool(bridge_scaling_fields),
+                        stream_differing_fields="; ".join(stream_fields),
+                        ped_vktpc_direct_fields="; ".join(ped_direct_fields),
+                        bridge_scaling_fields="; ".join(bridge_scaling_fields),
+                        bridge_only_fields="; ".join(bridge_only_fields),
+                        unknown_fields="; ".join(_unknown_scenario_fields(scenario_differing_fields)),
                         delta_min=delta_min,
                         delta_max=delta_max,
                         ped_population_feature_present=ped_population_feature_present,
@@ -1464,8 +1497,25 @@ def scenario_role_contract_frame(
                 )
                 continue
 
-            is_ped_bridge = series_id in {"ped_volume", "gross_ped_revenue"}
+            is_ped_bridge = series_id in {
+                "ped_volume",
+                "gross_ped_revenue",
+                "total_fed_ruc_net_revenue",
+                "total_nltf_net_revenue",
+            }
             scenario_differing_fields = differing_inputs.get(scenario_name, [])
+            stream_fields = _stream_differing_fields_for_series(
+                series_id,
+                scenario_name=scenario_name,
+                differing_inputs_by_stream=differing_inputs_by_stream,
+            )
+            ped_direct_fields = (
+                _ped_vktpc_direct_fields(scenario_name, differing_inputs_by_stream=differing_inputs_by_stream)
+                if is_ped_bridge
+                else []
+            )
+            bridge_scaling_fields = _ped_bridge_scaling_fields(ped_direct_fields) if is_ped_bridge else []
+            bridge_only_fields = [field for field in bridge_scaling_fields if field not in set(ped_direct_fields)]
             rows.append(
                 _scenario_contract_row(
                     scenario_name=scenario_name,
@@ -1485,6 +1535,13 @@ def scenario_role_contract_frame(
                     ),
                     field_classification=_scenario_field_classification(scenario_differing_fields)
                     or ("aggregate_or_revenue_bridge_delta" if value_changes else "no_material_runtime_delta"),
+                    affects_ped_vktpc_directly=bool(ped_direct_fields),
+                    affects_bridge_scaling=bool(bridge_scaling_fields),
+                    stream_differing_fields="; ".join(stream_fields),
+                    ped_vktpc_direct_fields="; ".join(ped_direct_fields),
+                    bridge_scaling_fields="; ".join(bridge_scaling_fields),
+                    bridge_only_fields="; ".join(bridge_only_fields),
+                    unknown_fields="; ".join(_unknown_scenario_fields(scenario_differing_fields)),
                     delta_min=delta_min,
                     delta_max=delta_max,
                     ped_population_feature_present=ped_population_feature_present,
@@ -1497,6 +1554,24 @@ def scenario_role_contract_frame(
             )
 
     return pd.DataFrame(rows, columns=SCENARIO_ROLE_CONTRACT_COLUMNS)
+
+
+def _scenario_input_differing_fields_by_stream(
+    scenario_input_wide: pd.DataFrame,
+    base_scenario: str,
+) -> dict[str, dict[str, list[str]]]:
+    if scenario_input_wide is None or scenario_input_wide.empty or "scenario_name" not in scenario_input_wide.columns:
+        return {}
+    source = scenario_input_wide.copy()
+    if "stream" not in source.columns:
+        return {}
+    output: dict[str, dict[str, list[str]]] = {}
+    for stream, group in source.groupby("stream", dropna=False):
+        stream_name = str(stream or "")
+        stream_differences = _scenario_input_differing_fields(group, base_scenario)
+        for scenario_name, fields in stream_differences.items():
+            output.setdefault(scenario_name, {})[stream_name] = fields
+    return output
 
 
 def _scenario_input_differing_fields(scenario_input_wide: pd.DataFrame, base_scenario: str) -> dict[str, list[str]]:
@@ -1543,6 +1618,47 @@ def _scenario_input_differing_fields(scenario_input_wide: pd.DataFrame, base_sce
     return output
 
 
+def _stream_differing_fields_for_series(
+    series_id: str,
+    *,
+    scenario_name: str,
+    differing_inputs_by_stream: dict[str, dict[str, list[str]]],
+) -> list[str]:
+    by_stream = differing_inputs_by_stream.get(scenario_name, {})
+    if not by_stream:
+        return []
+    if str(series_id).startswith("ped_") or str(series_id) == "gross_ped_revenue":
+        return list(by_stream.get("PED", []))
+    if str(series_id).startswith("light_ruc"):
+        return list(by_stream.get("LIGHT_RUC", []))
+    if str(series_id).startswith("heavy_ruc"):
+        return list(by_stream.get("HEAVY_RUC", []))
+    merged: set[str] = set()
+    for fields in by_stream.values():
+        merged.update(fields)
+    return sorted(merged)
+
+
+def _ped_vktpc_direct_fields(
+    scenario_name: str,
+    *,
+    differing_inputs_by_stream: dict[str, dict[str, list[str]]],
+) -> list[str]:
+    return list(differing_inputs_by_stream.get(scenario_name, {}).get("PED", []))
+
+
+def _ped_bridge_scaling_fields(ped_fields: list[str]) -> list[str]:
+    return [
+        field
+        for field in ped_fields
+        if str(field).lower() in {"population", "population_count", "population__level"}
+    ]
+
+
+def _unknown_scenario_fields(fields: list[str]) -> list[str]:
+    return [field for field in fields if _classify_scenario_variable(field) == "unknown"]
+
+
 def _scenario_field_classification(fields: list[str]) -> str:
     if not fields:
         return ""
@@ -1578,6 +1694,13 @@ def _scenario_contract_row(
     display_policy: str,
     interpretation: str,
     field_classification: str,
+    affects_ped_vktpc_directly: bool,
+    affects_bridge_scaling: bool,
+    stream_differing_fields: str,
+    ped_vktpc_direct_fields: str,
+    bridge_scaling_fields: str,
+    bridge_only_fields: str,
+    unknown_fields: str,
     delta_min: float | None,
     delta_max: float | None,
     ped_population_feature_present: bool,
@@ -1597,6 +1720,13 @@ def _scenario_contract_row(
         "interpretation": interpretation,
         "display_policy": display_policy,
         "field_classification": field_classification,
+        "affects_ped_vktpc_directly": bool(affects_ped_vktpc_directly),
+        "affects_bridge_scaling": bool(affects_bridge_scaling),
+        "stream_differing_fields": stream_differing_fields,
+        "ped_vktpc_direct_fields": ped_vktpc_direct_fields,
+        "bridge_scaling_fields": bridge_scaling_fields,
+        "bridge_only_fields": bridge_only_fields,
+        "unknown_fields": unknown_fields,
         "runtime_delta_min": delta_min if delta_min is not None else pd.NA,
         "runtime_delta_max": delta_max if delta_max is not None else pd.NA,
         "ped_population_feature_present": bool(ped_population_feature_present),

@@ -5450,6 +5450,13 @@ def _scenario_role_contract_display_table(contract: pd.DataFrame) -> pd.DataFram
         "display_policy": "Display policy",
         "interpretation": "Interpretation",
         "field_classification": "Field classification",
+        "affects_ped_vktpc_directly": "Affects PED VKTpc",
+        "affects_bridge_scaling": "Affects bridge scaling",
+        "stream_differing_fields": "Stream differing fields",
+        "ped_vktpc_direct_fields": "PED VKTpc direct fields",
+        "bridge_scaling_fields": "Bridge scaling fields",
+        "bridge_only_fields": "Bridge-only fields",
+        "unknown_fields": "Unknown fields",
         "runtime_delta_min": "Runtime delta min",
         "runtime_delta_max": "Runtime delta max",
         "ped_population_feature_present": "PED population feature",
@@ -5463,7 +5470,7 @@ def _scenario_role_contract_display_table(contract: pd.DataFrame) -> pd.DataFram
     for col in ["Runtime delta min", "Runtime delta max"]:
         if col in view.columns:
             view[col] = pd.to_numeric(view[col], errors="coerce").map(lambda value: "" if pd.isna(value) else f"{float(value):,.3f}")
-    for col in ["Population-only", "Behavioural driver", "PED population feature"]:
+    for col in ["Population-only", "Behavioural driver", "Affects PED VKTpc", "Affects bridge scaling", "PED population feature"]:
         if col in view.columns:
             view[col] = view[col].map(lambda value: "Yes" if str(value).strip().lower() in {"true", "1", "yes"} else "No")
     return view

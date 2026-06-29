@@ -361,6 +361,13 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
         "affected_series",
         "interpretation",
         "display_policy",
+        "affects_ped_vktpc_directly",
+        "affects_bridge_scaling",
+        "stream_differing_fields",
+        "ped_vktpc_direct_fields",
+        "bridge_scaling_fields",
+        "bridge_only_fields",
+        "unknown_fields",
     }
     assert required_contract_columns.issubset(scenario_role_contract.columns)
     comparison_ped_contract = scenario_role_contract[
@@ -371,6 +378,13 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     assert bool(comparison_ped_contract["behavioural_driver_flag"])
     assert comparison_ped_contract["display_policy"] == "keep_trace_relabel_comparison_behavioural_path"
     assert "population__level" in str(comparison_ped_contract["ped_population_feature_fields"])
+    assert bool(comparison_ped_contract["affects_ped_vktpc_directly"])
+    assert bool(comparison_ped_contract["affects_bridge_scaling"])
+    assert "gdp_petrol_interaction" in str(comparison_ped_contract["ped_vktpc_direct_fields"])
+    assert "population" in str(comparison_ped_contract["ped_vktpc_direct_fields"])
+    assert str(comparison_ped_contract["bridge_scaling_fields"]) == "population"
+    assert str(comparison_ped_contract["bridge_only_fields"]) == ""
+    assert str(comparison_ped_contract["unknown_fields"]) == ""
     assert pd.to_numeric(comparison_ped_contract["runtime_delta_min"], errors="coerce") < 0
     assert "behavioural intensity metric" in str(comparison_ped_contract["notes"])
     comparison_revenue_contract = scenario_role_contract[
@@ -384,6 +398,20 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     assert "unemployment_rate:macro" in str(comparison_revenue_contract["field_classification"])
     assert "gdp_petrol_interaction:price/rate/policy" in str(comparison_revenue_contract["field_classification"])
     assert "target_lag_1:behavioural" in str(comparison_revenue_contract["field_classification"])
+    assert bool(comparison_revenue_contract["affects_ped_vktpc_directly"])
+    assert bool(comparison_revenue_contract["affects_bridge_scaling"])
+    total_fed_contract = scenario_role_contract[
+        scenario_role_contract["scenario_name"].astype(str).eq("current_comparison_1")
+        & scenario_role_contract["affected_series"].astype(str).eq("total_fed_ruc_net_revenue")
+    ].iloc[0]
+    assert bool(total_fed_contract["affects_ped_vktpc_directly"])
+    assert bool(total_fed_contract["affects_bridge_scaling"])
+    total_ruc_contract = scenario_role_contract[
+        scenario_role_contract["scenario_name"].astype(str).eq("current_comparison_1")
+        & scenario_role_contract["affected_series"].astype(str).eq("total_ruc_net_revenue")
+    ].iloc[0]
+    assert not bool(total_ruc_contract["affects_ped_vktpc_directly"])
+    assert not bool(total_ruc_contract["affects_bridge_scaling"])
     comparison_categories = {
         part.split(":", 1)[1].strip()
         for text in scenario_role_contract["field_classification"].dropna().astype(str)
@@ -1178,7 +1206,7 @@ def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
         "fan_band_rows.parquet": "e8828c2997785eed41df3cf090b9fdd29b22e9b5e97dd3aabfae924b7fcd86f9",
         "future_revenue_forecasts.csv": "4e6ed9d9a6bc4a631970247ccba54deb4d66fa4664d04a5ebccf5bfa24d61a72",
         "future_revenue_forecasts.parquet": "ca3cf207b7da7ece6386e975f9faeeb124f3247ef0e9c1c3f4455a5c81a2508d",
-        "manifest.json": "c55e14ba5b6ea011637fd22b23bca295401d8fa8e3a41b6395396a97847aaa43",
+        "manifest.json": "d5a72a7562e1746ab022f5a78f2d574426cc8931bfbd86de44e87b9954eb8d5e",
         "manifest.md": "0d0ffad81aa2f9ab0e8123a05297aaf2b52d40d1b06f9700f2ca1a53977d0a2d",
         "path_trace_status.csv": "9aee7a4e7003ec6541476ca3e4afef6d8586b6c358e41db1c8e06623e5ffcaa3",
         "path_trace_status.parquet": "e66d860fb7532ee4b92285c1ba023c9f8d9469cfdaaaef819415f7cd87c73757",
@@ -1200,8 +1228,8 @@ def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
         "scenario_feature_lineage.parquet": "7248e6c3142079b1722fbeb18b57393dd82cd3c127c535e08bee2ce139e1d9ab",
         "scenario_input_replay_mismatch_report.csv": "c68bdaa00afceb33fc093d6ef7a69c32d25be0020a7e7a2af95fe64bc84b0008",
         "scenario_input_replay_mismatch_report.parquet": "85f179c019d728114a11990a791ae6c1d31745359f9dfa59ecb807ef316e95da",
-        "scenario_role_contract.csv": "d52930b687d18dc5d3f559433bbe84b0c6b2fde4a90a5b1b6daf4b930ff7c39e",
-        "scenario_role_contract.parquet": "35296d1e22ee7eaba708414b167516ede5f31104877c13397ffb9bd709d2e8e2",
+        "scenario_role_contract.csv": "3980fa318b346547286e1f204af1c768b11d4f6ab5ad896584061f2d343b6ecd",
+        "scenario_role_contract.parquet": "f1eac9486d96031ebd0f8fdc2e23654a0a150b661d753baeb79d3f30b6f3c8fc",
         "series_alias_audit.csv": "c0330c9918d7e2f4f972d15e8465537c16d96aca607ef253353612cadd62c56d",
         "series_alias_audit.parquet": "9b376147c912748d5a2429abf524799e348a3711d6af89a4b9d1ec287f558918",
         "series_trace_contract.csv": "2eaf18c4c54fc18a21dd68415c0aea041bd174e8d75285409a4bb83034b60e09",
