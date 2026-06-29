@@ -223,7 +223,7 @@ def test_committed_current_revenue_outlook_pack_is_repo_local_and_hash_backed() 
         "scenario_input_cells": 15472,
         "scenario_input_long": 15200,
         "scenario_input_wide": 600,
-        "scenario_feature_lineage": 14000,
+        "scenario_feature_lineage": 44800,
     }
     scenario_input_manifest_path = pack_dir / "scenario_inputs" / "scenario_input_manifest.json"
     assert scenario_input_manifest_path.exists()
@@ -469,9 +469,41 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     assert source_split_chart["population_source_file"].astype(str).eq("scenario_inputs/scenario_input_wide.parquet").all()
     assert not scenario_feature_lineage.empty
     assert set(scenario_feature_lineage["stream"].dropna().astype(str)) == {"PED", "LIGHT_RUC", "HEAVY_RUC"}
-    assert set(scenario_feature_lineage["source_status"].dropna().astype(str)) == {"committed_scenario_input"}
-    assert not scenario_feature_lineage["fallback_flag"].astype(bool).any()
-    assert scenario_feature_lineage["source_artifact"].eq("scenario_inputs/scenario_input_long.parquet").all()
+    required_lineage_columns = {
+        "lineage_role",
+        "feature_source_variables",
+        "feature_engineering_basis",
+        "feature_lineage_status",
+    }
+    assert required_lineage_columns.issubset(scenario_feature_lineage.columns)
+    assert {"source_variable", "model_feature"}.issubset(
+        set(scenario_feature_lineage["lineage_role"].dropna().astype(str))
+    )
+    source_variable_lineage = scenario_feature_lineage[
+        scenario_feature_lineage["lineage_role"].astype(str).eq("source_variable")
+    ].copy()
+    model_feature_lineage = scenario_feature_lineage[
+        scenario_feature_lineage["lineage_role"].astype(str).eq("model_feature")
+    ].copy()
+    assert set(source_variable_lineage["source_status"].dropna().astype(str)) == {"committed_scenario_input"}
+    assert not source_variable_lineage["fallback_flag"].astype(bool).any()
+    assert source_variable_lineage["source_artifact"].eq("scenario_inputs/scenario_input_long.parquet").all()
+    assert not model_feature_lineage.empty
+    assert set(model_feature_lineage["stream"].dropna().astype(str)) == {"PED", "LIGHT_RUC", "HEAVY_RUC"}
+    required_model_features = {
+        "LIGHT_RUC": {"diesel_x_ruc_price", "log_real_gdp_lag4"},
+        "PED": {"gdp_pc__log", "policy__petrol_abs_change_1_lag4", "target__roll8_mean"},
+        "HEAVY_RUC": {"heavy_price__log", "policy__diesel_abs_change_1_lag4", "target__roll8_mean"},
+    }
+    for stream, expected_features in required_model_features.items():
+        features = set(
+            model_feature_lineage.loc[model_feature_lineage["stream"].astype(str).eq(stream), "feature_name"].astype(str)
+        )
+        assert expected_features.issubset(features), stream
+    target_lineage = model_feature_lineage[model_feature_lineage["feature_name"].astype(str).str.startswith("target__")]
+    assert not target_lineage.empty
+    assert target_lineage["fallback_flag"].astype(bool).all()
+    assert target_lineage["fallback_reason"].astype(str).str.contains("recursive target-lag", regex=False).all()
     assert scenario_feature_lineage["canonical_variable"].astype(str).str.len().gt(0).all()
     assert set(scenario_input_wide["scenario_name"].dropna().astype(str)) == {
         "current_basecase",
@@ -1253,7 +1285,7 @@ def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
         "fan_band_rows.parquet": "e8828c2997785eed41df3cf090b9fdd29b22e9b5e97dd3aabfae924b7fcd86f9",
         "future_revenue_forecasts.csv": "4e6ed9d9a6bc4a631970247ccba54deb4d66fa4664d04a5ebccf5bfa24d61a72",
         "future_revenue_forecasts.parquet": "ca3cf207b7da7ece6386e975f9faeeb124f3247ef0e9c1c3f4455a5c81a2508d",
-        "manifest.json": "4bd62b972225a9dcb541805b1d857ef090b5be4d130ef62c8aa109b22e56523c",
+        "manifest.json": "19d0d29a7363c77f8a5baf72eb98934b6f7d7f9f5ff6358f15358c84ec480bc7",
         "manifest.md": "0d0ffad81aa2f9ab0e8123a05297aaf2b52d40d1b06f9700f2ca1a53977d0a2d",
         "path_trace_status.csv": "9aee7a4e7003ec6541476ca3e4afef6d8586b6c358e41db1c8e06623e5ffcaa3",
         "path_trace_status.parquet": "e66d860fb7532ee4b92285c1ba023c9f8d9469cfdaaaef819415f7cd87c73757",
@@ -1271,8 +1303,8 @@ def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
         "row_reconciliation.parquet": "bf2b638920e4b9b00ca4ac00d4263083258ce0d94625943c4e7b3cdf90493dd7",
         "runtime_trace_audit.csv": "45c9513db0fe5fe5485ec28c560e757d36733d2e900c194d2b4be9fd6b91afe9",
         "runtime_trace_audit.parquet": "49465b4692e3f0ff60c51ec26c555883ca4e3337ded988e44017464f06720381",
-        "scenario_feature_lineage.csv": "fa75ab6a0e4c4c584af3300dd2e887fff579c64877ed2f9adc470fbfdc475243",
-        "scenario_feature_lineage.parquet": "7248e6c3142079b1722fbeb18b57393dd82cd3c127c535e08bee2ce139e1d9ab",
+        "scenario_feature_lineage.csv": "b123c97090bd282009225a0ac2cfc36226d20017412f820dfeec6af34411b30d",
+        "scenario_feature_lineage.parquet": "488d932eba67a1fdd7db3ce9e1cf5aba4874b72088fb53f3989a68798556a025",
         "scenario_input_replay_mismatch_report.csv": "c68bdaa00afceb33fc093d6ef7a69c32d25be0020a7e7a2af95fe64bc84b0008",
         "scenario_input_replay_mismatch_report.parquet": "85f179c019d728114a11990a791ae6c1d31745359f9dfa59ecb807ef316e95da",
         "scenario_role_contract.csv": "3980fa318b346547286e1f204af1c768b11d4f6ab5ad896584061f2d343b6ecd",

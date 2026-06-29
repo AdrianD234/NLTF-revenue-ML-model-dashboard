@@ -18,6 +18,7 @@ from model_dashboard.forecast_runner import (
     DEFAULT_FORECAST_HORIZON_QUARTERS,
     HIGH_POPULATION_SMOKE_FIXTURE_NOTE,
     HORIZON_SUPPORT_NOTE,
+    LIGHT_RUC_RESIDUAL_FEATURES,
     SHEET_BY_STREAM,
     STREAM_COLUMNS,
     STREAM_ORDER,
@@ -670,6 +671,22 @@ def test_scenario_comparison_artifacts(tmp_path: Path) -> None:
     assert {row["source_status"] for row in comparison.scenario_input_manifest["sheet_inventory"]} == {
         "all_non_empty_cells_materialized"
     }
+    lineage = pd.read_parquet(comparison.output_dir / "scenario_inputs" / "scenario_feature_lineage.parquet")
+    assert {"source_variable", "model_feature"}.issubset(set(lineage["lineage_role"].dropna().astype(str)))
+    model_lineage = lineage[lineage["lineage_role"].astype(str).eq("model_feature")].copy()
+    assert set(model_lineage["stream"].dropna().astype(str)) == {"PED", "LIGHT_RUC", "HEAVY_RUC"}
+    light_features = set(model_lineage.loc[model_lineage["stream"].eq("LIGHT_RUC"), "feature_name"].astype(str))
+    assert set(LIGHT_RUC_RESIDUAL_FEATURES).issubset(light_features)
+    ped_features = set(model_lineage.loc[model_lineage["stream"].eq("PED"), "feature_name"].astype(str))
+    assert {"gdp_pc__log", "policy__petrol_abs_change_1_lag4", "target__roll8_mean"}.issubset(ped_features)
+    heavy_features = set(model_lineage.loc[model_lineage["stream"].eq("HEAVY_RUC"), "feature_name"].astype(str))
+    assert {"heavy_price__log", "policy__diesel_abs_change_1_lag4", "target__roll8_mean"}.issubset(
+        heavy_features
+    )
+    target_lineage = model_lineage[model_lineage["feature_name"].astype(str).str.startswith("target__")]
+    assert not target_lineage.empty
+    assert target_lineage["fallback_flag"].astype(bool).all()
+    assert target_lineage["fallback_reason"].astype(str).str.contains("recursive target-lag", regex=False).all()
     comparison_manifest_text = (comparison.output_dir / "scenario_inputs" / "scenario_input_manifest.json").read_text(
         encoding="utf-8"
     )

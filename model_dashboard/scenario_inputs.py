@@ -33,6 +33,90 @@ TEMPLATE_SHEET_STREAMS = {
 
 SYSTEM_VARIABLES = {"period", "year", "quarter", "horizon"}
 
+LIGHT_RUC_MODEL_FEATURE_SOURCES = {
+    "log_real_diesel_price": ("log_real_diesel_price",),
+    "log_real_light_ruc_price": ("log_real_light_ruc_price",),
+    "log_lagged_real_light_ruc_price": ("log_lagged_real_light_ruc_price",),
+    "log_real_gdp": ("log_real_gdp",),
+    "post_2020_dummy": ("post_2020_dummy",),
+    "q2_dummy": ("q2_dummy",),
+    "q3_dummy": ("q3_dummy",),
+    "q4_dummy": ("q4_dummy",),
+    "diesel_x_ruc_price": ("log_real_diesel_price", "log_real_light_ruc_price"),
+    "gdp_x_post2020": ("log_real_gdp", "post_2020_dummy"),
+    "ruc_x_post2020": ("log_real_light_ruc_price", "post_2020_dummy"),
+    "diesel_x_post2020": ("log_real_diesel_price", "post_2020_dummy"),
+    "time_trend": ("trend_index",),
+    "log_trend": ("trend_index",),
+    "log_real_diesel_price_diff1": ("log_real_diesel_price",),
+    "log_real_diesel_price_lag1": ("log_real_diesel_price",),
+    "log_real_diesel_price_lag4": ("log_real_diesel_price",),
+    "log_real_light_ruc_price_diff1": ("log_real_light_ruc_price",),
+    "log_real_light_ruc_price_lag1": ("log_real_light_ruc_price",),
+    "log_real_light_ruc_price_lag4": ("log_real_light_ruc_price",),
+    "log_real_gdp_diff1": ("log_real_gdp",),
+    "log_real_gdp_lag1": ("log_real_gdp",),
+    "log_real_gdp_lag4": ("log_real_gdp",),
+}
+
+VNEXT_TARGET_LAG_FEATURES = (
+    "target__lag1",
+    "target__lag2",
+    "target__lag4",
+    "target__diff1",
+    "target__diff4",
+    "target__roll4_mean",
+    "target__roll8_mean",
+)
+
+VNEXT_TIME_FEATURES = (
+    "time__trend",
+    "time__trend_sq",
+    "time__post2011",
+    "time__post2011_trend",
+    "time__post2020",
+    "time__covid2020",
+    "time__q2",
+    "time__q3",
+    "time__q4",
+)
+
+VNEXT_LEVEL_SOURCES = {
+    "PED": {
+        "gdp_pc": "real_gdp_per_capita_nzd",
+        "petrol": "real_petrol_price_cents_per_litre",
+        "unemp": "unemployment_rate",
+        "population": "population",
+    },
+    "HEAVY_RUC": {
+        "gdp": "real_gdp_sa_nzd",
+        "diesel": "real_diesel_price_cents_per_litre",
+        "heavy_price": "real_heavy_ruc_price_nzd_per_1000km",
+        "light_price": "real_light_ruc_price_nzd_per_1000km",
+        "unemp": "unemployment_rate",
+    },
+}
+
+VNEXT_LOG_SOURCES = {
+    "PED": {
+        "gdp_pc": "log_real_gdp_per_capita",
+        "petrol": "log_real_petrol_price",
+        "unemp": "log_unemployment_rate",
+    },
+    "HEAVY_RUC": {
+        "gdp": "log_real_gdp",
+        "diesel": "log_real_diesel_price",
+        "heavy_price": "log_real_heavy_ruc_price",
+        "light_price": "log_real_light_ruc_price",
+        "unemp": "log_unemployment_rate",
+    },
+}
+
+VNEXT_POLICY_PRICE_BASES = {
+    "PED": ("petrol",),
+    "HEAVY_RUC": ("heavy_price", "diesel"),
+}
+
 UNIT_HINTS = {
     "population": "persons",
     "real_gdp_per_capita_nzd": "real NZD/person",
@@ -271,6 +355,10 @@ def scenario_feature_lineage_from_wide(wide: pd.DataFrame) -> pd.DataFrame:
         "fallback_flag",
         "fallback_reason",
         "source_status",
+        "lineage_role",
+        "feature_source_variables",
+        "feature_engineering_basis",
+        "feature_lineage_status",
     ]
     if wide is None or wide.empty:
         return pd.DataFrame(columns=columns)
@@ -308,9 +396,155 @@ def scenario_feature_lineage_from_wide(wide: pd.DataFrame) -> pd.DataFrame:
                     "fallback_flag": False,
                     "fallback_reason": "",
                     "source_status": "committed_scenario_input",
+                    "lineage_role": "source_variable",
+                    "feature_source_variables": canonical,
+                    "feature_engineering_basis": "workbook_cell_materialized_to_scenario_input_wide",
+                    "feature_lineage_status": "committed_source_variable",
                 }
             )
+        rows.extend(_model_feature_lineage_rows(record, stream=stream, scenario=scenario, period=period))
     return pd.DataFrame(rows, columns=columns)
+
+
+def _model_feature_lineage_rows(record: dict[str, Any], *, stream: str, scenario: str, period: str) -> list[dict[str, Any]]:
+    model_id = _model_id_for_stream(stream)
+    if not model_id:
+        return []
+    rows: list[dict[str, Any]] = []
+    for feature_name, source_variables in _model_feature_source_map(stream).items():
+        source_variables = tuple(source_variables)
+        missing = [variable for variable in source_variables if variable not in record and variable != "canonical_period"]
+        target_recursive = feature_name.startswith("target__")
+        time_feature = feature_name.startswith("time__")
+        history_context = _feature_requires_history_context(feature_name)
+        fallback_flag = bool(target_recursive or missing)
+        fallback_reason = ""
+        if target_recursive:
+            fallback_reason = (
+                "Governed recursive target-lag feature generated from repo model_input_history and prior fixed-finalist "
+                "forecasts; it is not a direct workbook cell."
+            )
+        elif missing:
+            fallback_reason = "Missing committed scenario source variables: " + "; ".join(missing)
+        source_status = "committed_scenario_input"
+        source_artifact = f"{SCENARIO_INPUT_DIRNAME}/{SCENARIO_INPUT_LONG_STEM}.parquet"
+        if time_feature:
+            source_status = "derived_from_committed_scenario_period"
+            source_artifact = f"{SCENARIO_INPUT_DIRNAME}/{SCENARIO_INPUT_WIDE_STEM}.parquet"
+        elif history_context:
+            source_status = "derived_from_committed_scenario_input_and_repo_history"
+            source_artifact = (
+                f"{SCENARIO_INPUT_DIRNAME}/{SCENARIO_INPUT_LONG_STEM}.parquet; "
+                f"data/model_input_history/{_model_input_history_file(stream)}"
+            )
+        if target_recursive:
+            source_status = "governed_recursive_target_feature"
+            source_artifact = f"data/model_input_history/{_model_input_history_file(stream)}"
+        value = _model_feature_source_value(record, source_variables)
+        rows.append(
+            {
+                "stream": stream,
+                "model_id": model_id,
+                "feature_name": feature_name,
+                "scenario_name": scenario,
+                "period": period,
+                "value": value,
+                "source_artifact": source_artifact,
+                "canonical_variable": "; ".join(source_variables),
+                "fallback_flag": fallback_flag,
+                "fallback_reason": fallback_reason,
+                "source_status": source_status,
+                "lineage_role": "model_feature",
+                "feature_source_variables": "; ".join(source_variables),
+                "feature_engineering_basis": _feature_engineering_basis(feature_name, stream),
+                "feature_lineage_status": "governed_fallback" if fallback_flag else "mapped_to_committed_source",
+            }
+        )
+    return rows
+
+
+def _model_feature_source_map(stream: str) -> dict[str, tuple[str, ...]]:
+    if stream == "LIGHT_RUC":
+        return dict(LIGHT_RUC_MODEL_FEATURE_SOURCES)
+    if stream in {"PED", "HEAVY_RUC"}:
+        return _vnext_feature_source_map(stream)
+    return {}
+
+
+def _vnext_feature_source_map(stream: str) -> dict[str, tuple[str, ...]]:
+    features: dict[str, tuple[str, ...]] = {}
+    for short, variable in VNEXT_LEVEL_SOURCES.get(stream, {}).items():
+        features[f"{short}__level"] = (variable,)
+    for short, variable in VNEXT_LOG_SOURCES.get(stream, {}).items():
+        features[f"{short}__log"] = (variable,)
+        for lag in (1, 2, 4):
+            features[f"{short}__log_lag{lag}"] = (variable,)
+        for diff in (1, 4):
+            features[f"{short}__log_diff{diff}"] = (variable,)
+    for feature_name in VNEXT_TIME_FEATURES:
+        features[feature_name] = ("canonical_period",)
+    for short in VNEXT_POLICY_PRICE_BASES.get(stream, ()):
+        variable = VNEXT_LOG_SOURCES.get(stream, {}).get(short, "")
+        if not variable:
+            continue
+        for feature_name in (
+            f"policy__{short}_log_change_1",
+            f"policy__{short}_log_change_4",
+            f"policy__{short}_jump_up_1",
+            f"policy__{short}_cut_1",
+            f"policy__{short}_abs_change_1",
+        ):
+            features[feature_name] = (variable,)
+        for lag in (1, 2, 4):
+            for source in (
+                f"policy__{short}_jump_up_1",
+                f"policy__{short}_cut_1",
+                f"policy__{short}_abs_change_1",
+            ):
+                features[f"{source}_lag{lag}"] = (variable,)
+    for feature_name in VNEXT_TARGET_LAG_FEATURES:
+        features[feature_name] = ("target_lag_1", "target_lag_4")
+    return features
+
+
+def _feature_requires_history_context(feature_name: str) -> bool:
+    return any(token in feature_name for token in ("_lag", "__log_lag", "_diff", "__log_diff", "_roll", "policy__"))
+
+
+def _model_input_history_file(stream: str) -> str:
+    if stream == "LIGHT_RUC":
+        return "light_ruc_inputs.parquet"
+    if stream == "HEAVY_RUC":
+        return "heavy_ruc_inputs.parquet"
+    if stream == "PED":
+        return "ped_inputs.parquet"
+    return ""
+
+
+def _model_feature_source_value(record: dict[str, Any], source_variables: tuple[str, ...]) -> Any:
+    values: list[str] = []
+    for variable in source_variables:
+        if variable == "canonical_period":
+            value = record.get("canonical_period") or record.get("period")
+        else:
+            value = record.get(variable, "")
+        if pd.notna(value) and str(value) != "":
+            values.append(f"{variable}={value}")
+    return "; ".join(values)
+
+
+def _feature_engineering_basis(feature_name: str, stream: str) -> str:
+    if stream == "LIGHT_RUC":
+        if _feature_requires_history_context(feature_name):
+            return "forecast_runner_light_ruc_feature_frame_with_repo_history_context"
+        return "forecast_runner_light_ruc_direct_feature"
+    if feature_name.startswith("time__"):
+        return "vnext_engineer_features_period_deterministic"
+    if feature_name.startswith("target__"):
+        return "vnext_recursive_target_lag_policy"
+    if feature_name.startswith("policy__") or "__log_lag" in feature_name or "__log_diff" in feature_name:
+        return "vnext_engineer_features_with_repo_history_context"
+    return "vnext_engineer_features_direct_source"
 
 
 def _sheet_inventory_from_cells(cells: pd.DataFrame) -> list[dict[str, Any]]:
