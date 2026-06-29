@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 
@@ -584,6 +585,18 @@ def test_scenario_comparison_artifacts(tmp_path: Path) -> None:
         assert scenario_inputs["row_counts"]["scenario_input_long"] > 0
         assert scenario_inputs["row_counts"]["scenario_input_wide"] > 0
         assert scenario_inputs["row_counts"]["scenario_feature_lineage"] > 0
+        assert len(scenario_inputs["sheet_inventory"]) == scenario_inputs["workbooks"][0]["sheet_count"]
+        assert scenario_inputs["workbooks"][0]["sheet_inventory"] == scenario_inputs["sheet_inventory"]
+        assert {row["source_status"] for row in scenario_inputs["sheet_inventory"]} == {
+            "all_non_empty_cells_materialized"
+        }
+        assert sum(row["materialized_cell_count"] for row in scenario_inputs["sheet_inventory"]) == scenario_inputs[
+            "row_counts"
+        ]["scenario_input_cells"]
+        assert all(
+            re.fullmatch(r"[0-9a-f]{64}", row["materialized_cells_sha256"])
+            for row in scenario_inputs["sheet_inventory"]
+        )
         assert {workbook["raw_status"] for workbook in scenario_inputs["workbooks"]} == {"copied_repo_local_raw_workbook"}
         for workbook in scenario_inputs["workbooks"]:
             raw_path = Path(workbook["raw_repo_relative_path"])
@@ -648,6 +661,15 @@ def test_scenario_comparison_artifacts(tmp_path: Path) -> None:
     assert comparison.scenario_input_manifest["row_counts"]["scenario_feature_lineage"] == sum(
         result.scenario_input_manifest["row_counts"]["scenario_feature_lineage"] for result in results
     )
+    assert len(comparison.scenario_input_manifest["sheet_inventory"]) == sum(
+        len(result.scenario_input_manifest["sheet_inventory"]) for result in results
+    )
+    assert sum(row["materialized_cell_count"] for row in comparison.scenario_input_manifest["sheet_inventory"]) == comparison.scenario_input_manifest[
+        "row_counts"
+    ]["scenario_input_cells"]
+    assert {row["source_status"] for row in comparison.scenario_input_manifest["sheet_inventory"]} == {
+        "all_non_empty_cells_materialized"
+    }
     comparison_manifest_text = (comparison.output_dir / "scenario_inputs" / "scenario_input_manifest.json").read_text(
         encoding="utf-8"
     )

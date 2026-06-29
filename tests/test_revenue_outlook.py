@@ -235,6 +235,21 @@ def test_committed_current_revenue_outlook_pack_is_repo_local_and_hash_backed() 
     assert scenario_input_manifest["source_policy"] == "committed scenario input artifacts only; Streamlit must not load Excel at runtime"
     assert scenario_input_manifest["row_counts"] == manifest["scenario_inputs"]["row_counts"]
     assert len(scenario_input_manifest["workbooks"]) == 2
+    sheet_inventory = scenario_input_manifest["sheet_inventory"]
+    assert len(sheet_inventory) == 10
+    assert {row["sheet"] for row in sheet_inventory} == {
+        "README",
+        "PED Inputs",
+        "Light RUC Inputs",
+        "Heavy RUC Inputs",
+        "Assumptions",
+    }
+    assert {row["source_status"] for row in sheet_inventory} == {"all_non_empty_cells_materialized"}
+    assert sum(row["materialized_cell_count"] for row in sheet_inventory) == manifest["scenario_inputs"]["row_counts"][
+        "scenario_input_cells"
+    ]
+    assert all(row["materialized_cell_count"] == row["non_empty_cell_count"] for row in sheet_inventory)
+    assert all(len(row["materialized_cells_sha256"]) == 64 for row in sheet_inventory)
     assert {workbook["workbook_sha256"] for workbook in scenario_input_manifest["workbooks"]} == {
         "d0644d353ee5a073602186cf7ac5c16e707d5350e16fd037b73a65528067cc6a",
         "6213ce565cf1f4a058a3ea9f1af4d5476a8b0423a4d8747905c3cba128380ce1",
@@ -248,6 +263,10 @@ def test_committed_current_revenue_outlook_pack_is_repo_local_and_hash_backed() 
         assert raw_path.stat().st_size == workbook["size_bytes"]
         assert raw_path.stat().st_size < 50 * 1024 * 1024
         assert _sha256(raw_path) == workbook["workbook_sha256"]
+        assert len(workbook["sheet_inventory"]) == workbook["sheet_count"]
+        assert sum(row["materialized_cell_count"] for row in workbook["sheet_inventory"]) == workbook[
+            "non_empty_cell_count"
+        ]
     for output_file, metadata in scenario_input_manifest["output_files"].items():
         assert metadata["sha256"] == _sha256(ROOT / metadata["repo_relative_path"]), output_file
         assert metadata["repo_relative_path"].startswith("data/current_revenue_outlook/scenario_inputs/")
@@ -1234,7 +1253,7 @@ def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
         "fan_band_rows.parquet": "e8828c2997785eed41df3cf090b9fdd29b22e9b5e97dd3aabfae924b7fcd86f9",
         "future_revenue_forecasts.csv": "4e6ed9d9a6bc4a631970247ccba54deb4d66fa4664d04a5ebccf5bfa24d61a72",
         "future_revenue_forecasts.parquet": "ca3cf207b7da7ece6386e975f9faeeb124f3247ef0e9c1c3f4455a5c81a2508d",
-        "manifest.json": "44c240e8c80e214b27dbf814b140c10fa692c96bbf14353ca2c71481c759b760",
+        "manifest.json": "4bd62b972225a9dcb541805b1d857ef090b5be4d130ef62c8aa109b22e56523c",
         "manifest.md": "0d0ffad81aa2f9ab0e8123a05297aaf2b52d40d1b06f9700f2ca1a53977d0a2d",
         "path_trace_status.csv": "9aee7a4e7003ec6541476ca3e4afef6d8586b6c358e41db1c8e06623e5ffcaa3",
         "path_trace_status.parquet": "e66d860fb7532ee4b92285c1ba023c9f8d9469cfdaaaef819415f7cd87c73757",

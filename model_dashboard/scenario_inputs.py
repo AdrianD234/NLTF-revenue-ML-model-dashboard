@@ -88,6 +88,7 @@ def materialize_scenario_inputs(
     all_long: list[pd.DataFrame] = []
     all_wide: list[pd.DataFrame] = []
     workbook_records: list[dict[str, Any]] = []
+    sheet_inventory_records: list[dict[str, Any]] = []
 
     for item in workbooks:
         workbook_bytes = _workbook_bytes(item.workbook)
@@ -114,9 +115,11 @@ def materialize_scenario_inputs(
         )
         long = _scenario_input_long_from_cells(cells)
         wide = _scenario_input_wide_from_long(long)
+        sheet_inventory = _sheet_inventory_from_cells(cells)
         all_cells.append(cells)
         all_long.append(long)
         all_wide.append(wide)
+        sheet_inventory_records.extend(sheet_inventory)
         workbook_records.append(
             {
                 "scenario_name": item.scenario_name,
@@ -130,6 +133,7 @@ def materialize_scenario_inputs(
                 "non_empty_cell_count": int(len(cells)),
                 "long_row_count": int(len(long)),
                 "wide_row_count": int(len(wide)),
+                "sheet_inventory": sheet_inventory,
             }
         )
 
@@ -151,6 +155,7 @@ def materialize_scenario_inputs(
         "source_policy": "committed scenario input artifacts only; Streamlit must not load Excel at runtime",
         "raw_workbook_size_limit_bytes": int(raw_size_limit_bytes),
         "workbooks": workbook_records,
+        "sheet_inventory": sheet_inventory_records,
         "output_files": output_files,
         "row_counts": {
             "scenario_input_cells": int(len(cells_frame)),
@@ -205,10 +210,12 @@ def combine_scenario_input_dirs(
 
     output_files: dict[str, Any] = {}
     row_counts: dict[str, int] = {}
+    combined_frames: dict[str, pd.DataFrame] = {}
     for stem, frames in frame_map.items():
         frame = pd.concat(frames, ignore_index=True, sort=False) if frames else pd.DataFrame()
         if stem == SCENARIO_FEATURE_LINEAGE_STEM and frame.empty and frame_map[SCENARIO_INPUT_WIDE_STEM]:
             frame = scenario_feature_lineage_from_wide(pd.concat(frame_map[SCENARIO_INPUT_WIDE_STEM], ignore_index=True, sort=False))
+        combined_frames[stem] = frame
         output_files.update(_write_artifact_pair(output, stem, frame, root=root, fallback_base=fallback_base))
         row_counts[stem] = int(len(frame))
 
@@ -226,6 +233,8 @@ def combine_scenario_input_dirs(
                     )
                 workbooks.append(workbook_record)
 
+    sheet_inventory = _sheet_inventory_from_cells(combined_frames.get(SCENARIO_INPUT_CELLS_STEM, pd.DataFrame()))
+
     manifest = {
         "schema_version": SCENARIO_INPUT_SCHEMA_VERSION,
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -241,6 +250,7 @@ def combine_scenario_input_dirs(
             for item in manifests
         ],
         "workbooks": workbooks,
+        "sheet_inventory": sheet_inventory,
         "output_files": output_files,
         "row_counts": row_counts,
     }
@@ -301,6 +311,76 @@ def scenario_feature_lineage_from_wide(wide: pd.DataFrame) -> pd.DataFrame:
                 }
             )
     return pd.DataFrame(rows, columns=columns)
+
+
+def _sheet_inventory_from_cells(cells: pd.DataFrame) -> list[dict[str, Any]]:
+    if cells is None or cells.empty:
+        return []
+    required = {"scenario_name", "role", "workbook_filename", "workbook_sha256", "sheet", "stream", "cell", "row_number", "column_number"}
+    if required.difference(cells.columns):
+        return []
+    hash_columns = [
+        "cell",
+        "row_number",
+        "column_number",
+        "row_label",
+        "column_label",
+        "period",
+        "canonical_period",
+        "variable_name",
+        "canonical_variable",
+        "value",
+        "value_type",
+        "source_status",
+    ]
+    records: list[dict[str, Any]] = []
+    source = cells.copy()
+    source["row_number"] = pd.to_numeric(source["row_number"], errors="coerce")
+    source["column_number"] = pd.to_numeric(source["column_number"], errors="coerce")
+    for keys, group in source.groupby(
+        ["scenario_name", "role", "workbook_filename", "workbook_sha256", "sheet"],
+        dropna=False,
+        sort=True,
+    ):
+        scenario_name, role, workbook_filename, workbook_sha256, sheet = (str(value or "") for value in keys)
+        ordered = group.sort_values(["row_number", "column_number"], kind="stable").copy()
+        hash_frame = ordered.reindex(columns=hash_columns).copy()
+        if "value" in hash_frame.columns:
+            hash_frame["value"] = hash_frame["value"].map(_stringify_excel_value)
+        for column in hash_frame.columns:
+            hash_frame[column] = hash_frame[column].where(hash_frame[column].notna(), "").astype(str)
+        sheet_payload = hash_frame.to_csv(index=False, lineterminator="\n").encode("utf-8")
+        row_numbers = pd.to_numeric(ordered["row_number"], errors="coerce").dropna()
+        column_numbers = pd.to_numeric(ordered["column_number"], errors="coerce").dropna()
+        records.append(
+            {
+                "scenario_name": scenario_name,
+                "role": role,
+                "workbook_filename": workbook_filename,
+                "workbook_sha256": workbook_sha256,
+                "sheet": sheet,
+                "stream": _first_text(ordered.get("stream", pd.Series(dtype=object))),
+                "non_empty_cell_count": int(len(ordered)),
+                "materialized_cell_count": int(len(ordered)),
+                "non_empty_row_count": int(row_numbers.nunique()),
+                "non_empty_column_count": int(column_numbers.nunique()),
+                "first_cell": str(ordered["cell"].iloc[0]) if not ordered.empty else "",
+                "last_cell": str(ordered["cell"].iloc[-1]) if not ordered.empty else "",
+                "materialized_cells_sha256": hashlib.sha256(sheet_payload).hexdigest(),
+                "source_status": "all_non_empty_cells_materialized",
+            }
+        )
+    return records
+
+
+def _first_text(values: Any) -> str:
+    if values is None:
+        return ""
+    for value in values:
+        text = str(value or "").strip()
+        if text:
+            return text
+    return ""
 
 
 def _workbook_bytes(workbook: Path | str | bytes | BinaryIO) -> bytes:
