@@ -420,6 +420,34 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     }
     assert {"population/scale", "macro", "price/rate/policy", "behavioural"}.issubset(comparison_categories)
     assert "scenario_input_wide" in str(comparison_revenue_contract["source_basis"])
+    required_source_split_columns = {
+        "vktpc_source_file",
+        "vktpc_source_cell",
+        "vktpc_source_status",
+        "population_source_file",
+        "population_source_cell",
+        "population_source_status",
+    }
+    assert required_source_split_columns.issubset(line_reconciliation.columns)
+    assert required_source_split_columns.issubset(chart.columns)
+    source_split_lines = line_reconciliation[
+        line_reconciliation["scenario_name"].astype(str).eq("current_comparison_1")
+        & line_reconciliation["series_id"].astype(str).isin(["ped_volume", "gross_ped_revenue"])
+    ].copy()
+    assert not source_split_lines.empty
+    assert source_split_lines["vktpc_source_file"].astype(str).eq("forecast_scenario_comparison.parquet").all()
+    assert source_split_lines["vktpc_source_status"].astype(str).eq("current_finalist_model").all()
+    assert source_split_lines["vktpc_source_cell"].astype(str).str.len().gt(0).all()
+    assert source_split_lines["population_source_file"].astype(str).eq("scenario_inputs/scenario_input_wide.parquet").all()
+    assert source_split_lines["population_source_cell"].astype(str).str.contains("scenario_input_wide.parquet:PED:population").all()
+    assert source_split_lines["population_source_status"].astype(str).str.startswith("scenario_input_population").all()
+    source_split_chart = chart[
+        chart["scenario_name"].astype(str).eq("current_comparison_1")
+        & chart["series_id"].astype(str).eq("gross_ped_revenue")
+    ].copy()
+    assert not source_split_chart.empty
+    assert source_split_chart["vktpc_source_file"].astype(str).eq("forecast_scenario_comparison.parquet").all()
+    assert source_split_chart["population_source_file"].astype(str).eq("scenario_inputs/scenario_input_wide.parquet").all()
     assert not scenario_feature_lineage.empty
     assert set(scenario_feature_lineage["stream"].dropna().astype(str)) == {"PED", "LIGHT_RUC", "HEAVY_RUC"}
     assert set(scenario_feature_lineage["source_status"].dropna().astype(str)) == {"committed_scenario_input"}
@@ -1206,20 +1234,20 @@ def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
         "fan_band_rows.parquet": "e8828c2997785eed41df3cf090b9fdd29b22e9b5e97dd3aabfae924b7fcd86f9",
         "future_revenue_forecasts.csv": "4e6ed9d9a6bc4a631970247ccba54deb4d66fa4664d04a5ebccf5bfa24d61a72",
         "future_revenue_forecasts.parquet": "ca3cf207b7da7ece6386e975f9faeeb124f3247ef0e9c1c3f4455a5c81a2508d",
-        "manifest.json": "d5a72a7562e1746ab022f5a78f2d574426cc8931bfbd86de44e87b9954eb8d5e",
+        "manifest.json": "44c240e8c80e214b27dbf814b140c10fa692c96bbf14353ca2c71481c759b760",
         "manifest.md": "0d0ffad81aa2f9ab0e8123a05297aaf2b52d40d1b06f9700f2ca1a53977d0a2d",
         "path_trace_status.csv": "9aee7a4e7003ec6541476ca3e4afef6d8586b6c358e41db1c8e06623e5ffcaa3",
         "path_trace_status.parquet": "e66d860fb7532ee4b92285c1ba023c9f8d9469cfdaaaef819415f7cd87c73757",
         "revenue_bridge_components.csv": "1d2094bf843ac7408fad130c5b4b7eff516080e18b415b4dc61d06220ff11611",
         "revenue_bridge_components.parquet": "c84ea4ceb6215ce5240cab7cb567d5b7f5dd8a929216be2071114c4ba2e9154f",
-        "revenue_chart_rows.csv": "4c824790bf6ea1dcd92bd1ead0e8e62423babcc8bc701e4e9bfc6c070c6951d4",
-        "revenue_chart_rows.parquet": "253d67cd7f8d75867673862c44ceb8cd16d10a268cbb8b1e5bfc32bbef0d2a07",
+        "revenue_chart_rows.csv": "4aa4157dcd027cf73086b113bd183a1e0f71d9d72aaa5d0e76b803e059b65ab8",
+        "revenue_chart_rows.parquet": "7a614c1cf679c1ede404986802bbe8c05257e08810b049ee27f3e9fdbea13b26",
         "revenue_formula_residuals.csv": "288c1f6227d82debba6a7d5c98f86a4c92f4287576ab2c1a6c95b450127fbe8a",
         "revenue_formula_residuals.parquet": "90dd6059bdb07e467a28539ef426267e20e2aace7623d3feb9fca180d9497716",
-        "revenue_line_reconciliation.csv": "3139d0c0414ce39cadafc4457d9ac4d6a9814d6ed838ce968a3d0bbfaf5a7b0b",
-        "revenue_line_reconciliation.parquet": "b9368c4dbc66890a41b7bcc3c4ae0590632504946d01e2e5a5647b00901474b8",
-        "revenue_stack_components.csv": "1cfbacf2a0fd598e509edf18ce2339ad875ec2727953f93d5a22689bcf127033",
-        "revenue_stack_components.parquet": "feb44d012cc304a7f6040edf419e19dc85989a8836cf5348b29b9a215eb80c91",
+        "revenue_line_reconciliation.csv": "645e5c8040716911b4e411a27db97c5743de901dfb966c9addaeb16707ab5aef",
+        "revenue_line_reconciliation.parquet": "1faaf44b1a91867711ac7d0e9f9fe310225986e01a378e7856f70d3f492dfd15",
+        "revenue_stack_components.csv": "b18a3824f888bbf816f62f8ea816a12e13efcbc087ef74fbce2d166728cee7a8",
+        "revenue_stack_components.parquet": "3d8b501a85d0a347304093e9724797dbe1041033f02c1baed501dc9cc2181fb4",
         "row_reconciliation.csv": "d484f5d75cce88e30ce7bcf5dd70058505cc02e5dff93f457a579f119c2fc7ce",
         "row_reconciliation.parquet": "bf2b638920e4b9b00ca4ac00d4263083258ce0d94625943c4e7b3cdf90493dd7",
         "runtime_trace_audit.csv": "45c9513db0fe5fe5485ec28c560e757d36733d2e900c194d2b4be9fd6b91afe9",

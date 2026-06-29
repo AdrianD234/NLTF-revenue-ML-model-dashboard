@@ -544,12 +544,12 @@
       "size_bytes": 63914
     },
     "revenue_chart_rows.csv": {
-      "sha256": "4c824790bf6ea1dcd92bd1ead0e8e62423babcc8bc701e4e9bfc6c070c6951d4",
-      "size_bytes": 2484982
+      "sha256": "4aa4157dcd027cf73086b113bd183a1e0f71d9d72aaa5d0e76b803e059b65ab8",
+      "size_bytes": 2554419
     },
     "revenue_chart_rows.parquet": {
-      "sha256": "253d67cd7f8d75867673862c44ceb8cd16d10a268cbb8b1e5bfc32bbef0d2a07",
-      "size_bytes": 125674
+      "sha256": "7a614c1cf679c1ede404986802bbe8c05257e08810b049ee27f3e9fdbea13b26",
+      "size_bytes": 133056
     },
     "revenue_formula_residuals.csv": {
       "sha256": "288c1f6227d82debba6a7d5c98f86a4c92f4287576ab2c1a6c95b450127fbe8a",
@@ -560,20 +560,20 @@
       "size_bytes": 37702
     },
     "revenue_line_reconciliation.csv": {
-      "sha256": "3139d0c0414ce39cadafc4457d9ac4d6a9814d6ed838ce968a3d0bbfaf5a7b0b",
-      "size_bytes": 2367942
+      "sha256": "645e5c8040716911b4e411a27db97c5743de901dfb966c9addaeb16707ab5aef",
+      "size_bytes": 2513877
     },
     "revenue_line_reconciliation.parquet": {
-      "sha256": "b9368c4dbc66890a41b7bcc3c4ae0590632504946d01e2e5a5647b00901474b8",
-      "size_bytes": 91538
+      "sha256": "1faaf44b1a91867711ac7d0e9f9fe310225986e01a378e7856f70d3f492dfd15",
+      "size_bytes": 99753
     },
     "revenue_stack_components.csv": {
-      "sha256": "1cfbacf2a0fd598e509edf18ce2339ad875ec2727953f93d5a22689bcf127033",
-      "size_bytes": 11522574
+      "sha256": "b18a3824f888bbf816f62f8ea816a12e13efcbc087ef74fbce2d166728cee7a8",
+      "size_bytes": 11831649
     },
     "revenue_stack_components.parquet": {
-      "sha256": "feb44d012cc304a7f6040edf419e19dc85989a8836cf5348b29b9a215eb80c91",
-      "size_bytes": 245797
+      "sha256": "3d8b501a85d0a347304093e9724797dbe1041033f02c1baed501dc9cc2181fb4",
+      "size_bytes": 254643
     },
     "row_reconciliation.csv": {
       "sha256": "d484f5d75cce88e30ce7bcf5dd70058505cc02e5dff93f457a579f119c2fc7ce",
