@@ -300,6 +300,17 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
         "fixed_ped_only",
         "mbu_ratio",
     }
+    required_drift_columns = {
+        "smoothed_target_PED_light_petrol_km",
+        "smoothed_target_conventional_light_km",
+        "smoothed_target_BEV_km",
+        "smoothed_target_PHEV_km",
+        "smoothed_target_EV_total_km",
+        "current_migration_revenue_total",
+        "old_light_only_migration_revenue_total",
+        "migration_revenue_delta",
+    }
+    assert required_drift_columns.issubset(ev_phev_drift.columns)
     optimized_drift = ev_phev_drift[
         ev_phev_drift["lambda_mode"].astype(str).eq("optimized")
         & ev_phev_drift["source_path"].astype(str).str.startswith("Current finalist")
@@ -326,6 +337,35 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
         "current_PHEV_km",
     ]:
         assert pd.to_numeric(optimized_drift[component], errors="coerce").ge(0).all()
+    for smoothed_col, current_col in {
+        "smoothed_target_PED_light_petrol_km": "current_PED_light_petrol_km",
+        "smoothed_target_conventional_light_km": "current_conventional_light_km",
+        "smoothed_target_BEV_km": "current_BEV_km",
+        "smoothed_target_PHEV_km": "current_PHEV_km",
+    }.items():
+        assert pd.to_numeric(optimized_drift[smoothed_col], errors="coerce").to_numpy() == pytest.approx(
+            pd.to_numeric(optimized_drift[current_col], errors="coerce").to_numpy()
+        )
+    assert pd.to_numeric(optimized_drift["smoothed_target_EV_total_km"], errors="coerce").to_numpy() == pytest.approx(
+        (
+            pd.to_numeric(optimized_drift["smoothed_target_BEV_km"], errors="coerce")
+            + pd.to_numeric(optimized_drift["smoothed_target_PHEV_km"], errors="coerce")
+        ).to_numpy()
+    )
+    assert pd.to_numeric(optimized_drift["current_migration_revenue_total"], errors="coerce").to_numpy() == pytest.approx(
+        (
+            pd.to_numeric(optimized_drift["current_PED_revenue"], errors="coerce")
+            + pd.to_numeric(optimized_drift["current_light_ruc_net_revenue"], errors="coerce")
+            + pd.to_numeric(optimized_drift["current_light_bev_ruc_net_revenue"], errors="coerce")
+            + pd.to_numeric(optimized_drift["current_phev_ruc_net_revenue"], errors="coerce")
+        ).to_numpy()
+    )
+    assert pd.to_numeric(optimized_drift["migration_revenue_delta"], errors="coerce").to_numpy() == pytest.approx(
+        (
+            pd.to_numeric(optimized_drift["current_migration_revenue_total"], errors="coerce")
+            - pd.to_numeric(optimized_drift["old_light_only_migration_revenue_total"], errors="coerce")
+        ).to_numpy()
+    )
     evidence = (
         ev_phev_split[
             pd.to_numeric(ev_phev_split["FY"], errors="coerce").isin([2024, 2025])
@@ -935,8 +975,8 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
 def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
     pack_dir = ROOT / CURRENT_REVENUE_OUTLOOK_DIR
     expected_hashes = {
-        "ev_phev_ped_light_drift_assumptions.csv": "d6dfa327b755cf1a204ba89abaf2fd9f0bb078330d7b1c196947041ed5fee445",
-        "ev_phev_ped_light_drift_assumptions.parquet": "2c70421aee7a77a2f682114dcb26e1e5148c6b0f76c865f619e071ad7f500218",
+        "ev_phev_ped_light_drift_assumptions.csv": "d9246b99ef5a6b795737eb236d3c1ac819accce976c534b07e9a1337a616b098",
+        "ev_phev_ped_light_drift_assumptions.parquet": "ce26d938c518e664141fa282e3d07f6918995b37b67fe85f51c9129a978902a2",
         "ev_phev_split_assumptions.csv": "361a1b83f9df07a0f315c03e29376c70496a318cf8e24a3204227da56b623c11",
         "ev_phev_split_assumptions.parquet": "aa7b9a988afc527a74850791f434468214cdee6619067818ff27404f5804f98e",
         "fan_availability.csv": "5558e38a5776689e0d104f9bfe95bdab465aa06fc928b933af49047a4ed74291",
@@ -945,7 +985,7 @@ def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
         "fan_band_rows.parquet": "df71da00f0e5fc3dc04bdd00da4380db5fb8707fbaab80cc98061e2ac06a9e05",
         "future_revenue_forecasts.csv": "b1837c074c79e9eb1dfe4e94ff802e1f713c12a491fffdb9821c89d69cf41eb2",
         "future_revenue_forecasts.parquet": "bc65e453ee067160c2558a07d65355dfc1113e599bd951639565b5e78eb0f9da",
-        "manifest.json": "5788abef205974dbd63372edce047050a335149e72e06e92e34ad48d55f5c39c",
+        "manifest.json": "6d74bad2e39914d46c81ddb605ce677b31cce3f61fe3c59ebb94b28bf104012e",
         "manifest.md": "0d0ffad81aa2f9ab0e8123a05297aaf2b52d40d1b06f9700f2ca1a53977d0a2d",
         "path_trace_status.csv": "9aee7a4e7003ec6541476ca3e4afef6d8586b6c358e41db1c8e06623e5ffcaa3",
         "path_trace_status.parquet": "e66d860fb7532ee4b92285c1ba023c9f8d9469cfdaaaef819415f7cd87c73757",

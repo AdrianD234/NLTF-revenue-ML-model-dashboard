@@ -1183,6 +1183,11 @@ def ev_phev_ped_light_migration_assumptions_from_mbu26(
         "target_BEV_km",
         "target_PHEV_km",
         "target_EV_total_km",
+        "smoothed_target_PED_light_petrol_km",
+        "smoothed_target_conventional_light_km",
+        "smoothed_target_BEV_km",
+        "smoothed_target_PHEV_km",
+        "smoothed_target_EV_total_km",
         "current_PED_light_petrol_km",
         "current_conventional_light_km",
         "current_BEV_km",
@@ -1212,6 +1217,9 @@ def ev_phev_ped_light_migration_assumptions_from_mbu26(
         "old_light_only_light_ruc_net_revenue",
         "old_light_only_light_bev_ruc_net_revenue",
         "old_light_only_phev_ruc_net_revenue",
+        "current_migration_revenue_total",
+        "old_light_only_migration_revenue_total",
+        "migration_revenue_delta",
         "source_file",
         "source_cells",
         "source_formula",
@@ -1507,6 +1515,13 @@ def _migration_audit_row(item: dict[str, Any], mode: str, lambda_value: float, s
     old_light_only_light_revenue = l_t * float(item["conventional_light_rate"])
     old_light_only_bev_revenue = current_bev * float(item["light_bev_rate"])
     old_light_only_phev_revenue = current_phev * float(item["phev_rate"])
+    current_migration_total = ped_revenue + light_revenue + bev_revenue + phev_revenue
+    old_light_only_migration_total = (
+        old_light_only_ped_revenue
+        + old_light_only_light_revenue
+        + old_light_only_bev_revenue
+        + old_light_only_phev_revenue
+    )
     bindings = []
     if abs(lambda_value - float(item["lambda_lower"])) <= 1e-8:
         bindings.append("lambda_lower_bound")
@@ -1548,6 +1563,11 @@ def _migration_audit_row(item: dict[str, Any], mode: str, lambda_value: float, s
         "target_BEV_km": item["target_BEV"],
         "target_PHEV_km": item["target_PHEV"],
         "target_EV_total_km": ev_total,
+        "smoothed_target_PED_light_petrol_km": current_ped,
+        "smoothed_target_conventional_light_km": current_lconv,
+        "smoothed_target_BEV_km": current_bev,
+        "smoothed_target_PHEV_km": current_phev,
+        "smoothed_target_EV_total_km": current_bev + current_phev,
         "current_PED_light_petrol_km": current_ped,
         "current_conventional_light_km": current_lconv,
         "current_BEV_km": current_bev,
@@ -1577,6 +1597,9 @@ def _migration_audit_row(item: dict[str, Any], mode: str, lambda_value: float, s
         "old_light_only_light_ruc_net_revenue": old_light_only_light_revenue,
         "old_light_only_light_bev_ruc_net_revenue": old_light_only_bev_revenue,
         "old_light_only_phev_ruc_net_revenue": old_light_only_phev_revenue,
+        "current_migration_revenue_total": current_migration_total,
+        "old_light_only_migration_revenue_total": old_light_only_migration_total,
+        "migration_revenue_delta": current_migration_total - old_light_only_migration_total,
         "source_file": "forecast_scenario_comparison.parquet; mbu26_official_annual.csv",
         "source_cells": item["source_cells"],
         "source_formula": item["source_formula"],

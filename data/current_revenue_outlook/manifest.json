@@ -430,12 +430,12 @@
   "validation_status": "runtime_rebuilt",
   "output_hashes": {
     "ev_phev_ped_light_drift_assumptions.csv": {
-      "sha256": "d6dfa327b755cf1a204ba89abaf2fd9f0bb078330d7b1c196947041ed5fee445",
-      "size_bytes": 494478
+      "sha256": "d9246b99ef5a6b795737eb236d3c1ac819accce976c534b07e9a1337a616b098",
+      "size_bytes": 530739
     },
     "ev_phev_ped_light_drift_assumptions.parquet": {
-      "sha256": "2c70421aee7a77a2f682114dcb26e1e5148c6b0f76c865f619e071ad7f500218",
-      "size_bytes": 93058
+      "sha256": "ce26d938c518e664141fa282e3d07f6918995b37b67fe85f51c9129a978902a2",
+      "size_bytes": 110154
     },
     "ev_phev_split_assumptions.csv": {
       "sha256": "361a1b83f9df07a0f315c03e29376c70496a318cf8e24a3204227da56b623c11",
