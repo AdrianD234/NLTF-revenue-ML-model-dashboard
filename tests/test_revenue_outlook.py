@@ -404,10 +404,30 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     assert matched_replay["workbook_sha256"].astype(str).eq(matched_replay["manifest_workbook_sha256"].astype(str)).all()
     assert pd.to_numeric(matched_replay["required_feature_count"], errors="coerce").gt(0).all()
     assert pd.to_numeric(matched_replay["missing_required_feature_count"], errors="coerce").eq(0).all()
+    required_replay_columns = {
+        "replay_forecast_value",
+        "promoted_forecast_value",
+        "replay_abs_delta",
+        "replay_tolerance",
+        "replay_status",
+    }
+    assert required_replay_columns.issubset(scenario_input_replay.columns)
+    assert matched_replay["replay_status"].astype(str).eq("pass").all()
+    replay_values = pd.to_numeric(matched_replay["replay_forecast_value"], errors="coerce")
+    promoted_values = pd.to_numeric(matched_replay["promoted_forecast_value"], errors="coerce")
+    replay_deltas = pd.to_numeric(matched_replay["replay_abs_delta"], errors="coerce")
+    replay_tolerances = pd.to_numeric(matched_replay["replay_tolerance"], errors="coerce")
+    assert replay_values.notna().all()
+    assert promoted_values.notna().all()
+    assert replay_deltas.notna().all()
+    assert replay_tolerances.notna().all()
+    assert replay_tolerances.gt(0).all()
+    assert replay_deltas.le(replay_tolerances).all()
     extension_replay = scenario_input_replay[
         scenario_input_replay["scenario_input_status"].astype(str).eq("governed_model_extension_not_replayed_from_workbook")
     ].copy()
     assert not extension_replay.empty
+    assert extension_replay["replay_status"].astype(str).eq("not_applicable").all()
     assert set(extension_replay["annual_period"].dropna().astype(str)) == {
         "FY2051",
         "FY2052",
@@ -1138,7 +1158,7 @@ def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
         "fan_band_rows.parquet": "e8828c2997785eed41df3cf090b9fdd29b22e9b5e97dd3aabfae924b7fcd86f9",
         "future_revenue_forecasts.csv": "4e6ed9d9a6bc4a631970247ccba54deb4d66fa4664d04a5ebccf5bfa24d61a72",
         "future_revenue_forecasts.parquet": "ca3cf207b7da7ece6386e975f9faeeb124f3247ef0e9c1c3f4455a5c81a2508d",
-        "manifest.json": "3027b1d0e1fd6e793ced1382f5ec0d8fe58f4fbdc893979354f8989952dd8a4e",
+        "manifest.json": "8385439fbd9e2fe44491b356036dfa2990142f84aa2651e5ca8d9fb88c21e17f",
         "manifest.md": "0d0ffad81aa2f9ab0e8123a05297aaf2b52d40d1b06f9700f2ca1a53977d0a2d",
         "path_trace_status.csv": "9aee7a4e7003ec6541476ca3e4afef6d8586b6c358e41db1c8e06623e5ffcaa3",
         "path_trace_status.parquet": "e66d860fb7532ee4b92285c1ba023c9f8d9469cfdaaaef819415f7cd87c73757",
@@ -1158,8 +1178,8 @@ def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
         "runtime_trace_audit.parquet": "49465b4692e3f0ff60c51ec26c555883ca4e3337ded988e44017464f06720381",
         "scenario_feature_lineage.csv": "fa75ab6a0e4c4c584af3300dd2e887fff579c64877ed2f9adc470fbfdc475243",
         "scenario_feature_lineage.parquet": "7248e6c3142079b1722fbeb18b57393dd82cd3c127c535e08bee2ce139e1d9ab",
-        "scenario_input_replay_mismatch_report.csv": "259cef06c0789feb436a3d0ef7d89bc33926b5a7b70d2aacac5c309d5c20b2ea",
-        "scenario_input_replay_mismatch_report.parquet": "e763d51c9161415229c0737cb18190bf91c7fe1c61a0c75e2c49f4557b92d496",
+        "scenario_input_replay_mismatch_report.csv": "c68bdaa00afceb33fc093d6ef7a69c32d25be0020a7e7a2af95fe64bc84b0008",
+        "scenario_input_replay_mismatch_report.parquet": "85f179c019d728114a11990a791ae6c1d31745359f9dfa59ecb807ef316e95da",
         "scenario_role_contract.csv": "f45d02d7f6667f752a2584b4e71032209faddd3843905f5ef4c8b389cded0620",
         "scenario_role_contract.parquet": "7bfbf555449e5c3e2cfac2ba2821f5958135dc63fdf5acb233d4971d9f06c07d",
         "series_alias_audit.csv": "c0330c9918d7e2f4f972d15e8465537c16d96aca607ef253353612cadd62c56d",

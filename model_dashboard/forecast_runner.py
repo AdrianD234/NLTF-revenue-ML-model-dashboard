@@ -336,6 +336,14 @@ class ForecastScenarioComparisonResult:
     scenario_input_manifest: dict[str, Any]
 
 
+@dataclass
+class ScenarioInputForecastReplayResult:
+    future_forecasts: pd.DataFrame
+    component_forecasts: pd.DataFrame
+    assumptions: pd.DataFrame
+    validation_report: pd.DataFrame
+
+
 def repo_root_from_here() -> Path:
     return Path(__file__).resolve().parents[1]
 
@@ -909,6 +917,152 @@ def run_forecast_workbook(
         scenario_input_manifest=scenario_input_manifest,
         report_markdown=report,
     )
+
+
+def replay_forecast_from_scenario_inputs(
+    scenario_input_wide: pd.DataFrame,
+    *,
+    repo_root: Path | str | None = None,
+    latest_actual_period: str | None = None,
+) -> ScenarioInputForecastReplayResult:
+    """Replay fixed-finalist forecasts from committed scenario_input_wide rows.
+
+    This is the repo-local runtime counterpart to ``run_forecast_workbook``:
+    no Excel file is loaded, and every scored row comes from materialized
+    scenario input artifacts.
+    """
+
+    root = Path(repo_root) if repo_root is not None else repo_root_from_here()
+    latest = latest_actual_period or latest_known_actual_period(root)
+    columns = [
+        "scenario_name",
+        "scenario_role",
+        "valid",
+        "errors",
+        "warnings",
+        "forecast_start_period",
+        "forecast_end_period",
+        "forecast_horizon_quarters",
+        "assumption_rows",
+        "numeric_forecast_rows",
+    ]
+    if scenario_input_wide is None or scenario_input_wide.empty:
+        return ScenarioInputForecastReplayResult(
+            future_forecasts=pd.DataFrame(),
+            component_forecasts=pd.DataFrame(),
+            assumptions=pd.DataFrame(),
+            validation_report=pd.DataFrame(columns=columns),
+        )
+
+    required = {"scenario_name", "role", "stream", "canonical_period"}
+    if required.difference(scenario_input_wide.columns):
+        report = pd.DataFrame(
+            [
+                {
+                    "scenario_name": "",
+                    "scenario_role": "",
+                    "valid": False,
+                    "errors": "scenario_input_wide is missing required columns: " + ", ".join(sorted(required.difference(scenario_input_wide.columns))),
+                    "warnings": "",
+                    "forecast_start_period": "",
+                    "forecast_end_period": "",
+                    "forecast_horizon_quarters": 0,
+                    "assumption_rows": 0,
+                    "numeric_forecast_rows": 0,
+                }
+            ],
+            columns=columns,
+        )
+        return ScenarioInputForecastReplayResult(pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), report)
+
+    source = scenario_input_wide.copy()
+    source["canonical_period"] = source["canonical_period"].astype(str)
+    source = source[source["canonical_period"].str.match(r"^\d{4}Q[1-4]$", na=False)].copy()
+    capabilities = model_capability_gap_register(root)
+    future_frames: list[pd.DataFrame] = []
+    component_frames: list[pd.DataFrame] = []
+    assumption_frames: list[pd.DataFrame] = []
+    report_rows: list[dict[str, Any]] = []
+    for scenario_name, scenario_rows in source.groupby("scenario_name", dropna=False):
+        scenario = str(scenario_name)
+        scenario_role = _first_non_empty_text(scenario_rows.get("role", pd.Series("", index=scenario_rows.index)))
+        periods_by_stream: dict[str, list[str]] = {}
+        frames_by_stream: dict[str, pd.DataFrame] = {}
+        for stream in STREAM_ORDER:
+            stream_rows = scenario_rows[scenario_rows["stream"].astype(str).eq(stream)].copy()
+            if stream_rows.empty:
+                continue
+            stream_rows["_period_key"] = stream_rows["canonical_period"].map(lambda value: quarter_sort_key(str(value)))
+            stream_rows = stream_rows.sort_values("_period_key", kind="stable").drop(columns=["_period_key"], errors="ignore")
+            periods = stream_rows["canonical_period"].dropna().astype(str).tolist()
+            periods_by_stream[stream] = periods
+            frames_by_stream[stream] = stream_rows.assign(period=stream_rows["canonical_period"])
+        periods = _common_forecast_periods(periods_by_stream)
+        errors: list[str] = []
+        warnings: list[str] = []
+        if periods is None:
+            details = "; ".join(f"{stream}={periods_by_stream.get(stream, [])}" for stream in STREAM_ORDER)
+            errors.append("Scenario input streams do not share identical forecast periods. " + details)
+            periods = next(iter(periods_by_stream.values()), [])
+        missing_streams = [stream for stream in STREAM_ORDER if stream not in frames_by_stream]
+        if missing_streams:
+            errors.append("Scenario input rows missing streams: " + ", ".join(missing_streams))
+        frames: list[pd.DataFrame] = []
+        if periods and not errors:
+            for stream in STREAM_ORDER:
+                frame = frames_by_stream.get(stream)
+                if frame is not None:
+                    frames.append(_build_stream_assumptions(frame, stream, periods))
+        assumptions = pd.concat(frames, ignore_index=True, sort=False) if frames else pd.DataFrame()
+        _add_scenario_columns(assumptions, scenario, scenario_role)
+        validation = ForecastValidationResult(
+            valid=not errors and not assumptions.empty,
+            errors=errors,
+            warnings=warnings,
+            assumptions=assumptions,
+            latest_actual_period=latest,
+            forecast_periods=periods,
+        )
+        future, components = _forecast_output_rows(validation, capabilities, root)
+        _add_scenario_columns(future, scenario, scenario_role)
+        _add_scenario_columns(components, scenario, scenario_role)
+        future_frames.append(future)
+        component_frames.append(components)
+        assumption_frames.append(assumptions)
+        report_rows.append(
+            {
+                "scenario_name": scenario,
+                "scenario_role": scenario_role,
+                "valid": bool(validation.valid),
+                "errors": "; ".join(errors),
+                "warnings": "; ".join(warnings),
+                "forecast_start_period": validation.forecast_start_period or "",
+                "forecast_end_period": validation.forecast_end_period or "",
+                "forecast_horizon_quarters": validation.forecast_horizon_quarters,
+                "assumption_rows": int(len(assumptions)),
+                "numeric_forecast_rows": int(
+                    pd.to_numeric(future.get("forecast"), errors="coerce").notna().sum()
+                    if not future.empty and "forecast" in future.columns
+                    else 0
+                ),
+            }
+        )
+    return ScenarioInputForecastReplayResult(
+        future_forecasts=pd.concat(future_frames, ignore_index=True, sort=False) if future_frames else pd.DataFrame(),
+        component_forecasts=pd.concat(component_frames, ignore_index=True, sort=False) if component_frames else pd.DataFrame(),
+        assumptions=pd.concat(assumption_frames, ignore_index=True, sort=False) if assumption_frames else pd.DataFrame(),
+        validation_report=pd.DataFrame(report_rows, columns=columns),
+    )
+
+
+def _first_non_empty_text(values: Any) -> str:
+    if values is None:
+        return ""
+    for value in values:
+        text = str(value or "").strip()
+        if text:
+            return text
+    return ""
 
 
 def forecast_pack_zip_bytes(output_dir: Path | str) -> bytes:

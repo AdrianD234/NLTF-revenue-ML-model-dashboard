@@ -600,12 +600,12 @@
       "size_bytes": 65301
     },
     "scenario_input_replay_mismatch_report.csv": {
-      "sha256": "259cef06c0789feb436a3d0ef7d89bc33926b5a7b70d2aacac5c309d5c20b2ea",
-      "size_bytes": 212537
+      "sha256": "c68bdaa00afceb33fc093d6ef7a69c32d25be0020a7e7a2af95fe64bc84b0008",
+      "size_bytes": 257790
     },
     "scenario_input_replay_mismatch_report.parquet": {
-      "sha256": "e763d51c9161415229c0737cb18190bf91c7fe1c61a0c75e2c49f4557b92d496",
-      "size_bytes": 15120
+      "sha256": "85f179c019d728114a11990a791ae6c1d31745359f9dfa59ecb807ef316e95da",
+      "size_bytes": 49202
     },
     "scenario_role_contract.csv": {
       "sha256": "f45d02d7f6667f752a2584b4e71032209faddd3843905f5ef4c8b389cded0620",

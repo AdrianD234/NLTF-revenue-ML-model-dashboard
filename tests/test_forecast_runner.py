@@ -28,6 +28,7 @@ from model_dashboard.forecast_runner import (
     latest_known_actual_period,
     model_capability_gap_register,
     resolve_scenario_role,
+    replay_forecast_from_scenario_inputs,
     run_forecast_workbook,
     scenario_name_from_filename,
     validate_forecast_workbook,
@@ -640,6 +641,35 @@ def test_scenario_comparison_artifacts(tmp_path: Path) -> None:
     }
     assert comparison.manifest["horizon_support_note"] == HORIZON_SUPPORT_NOTE
     assert "high_population_fixture_note" not in comparison.manifest
+    replay = replay_forecast_from_scenario_inputs(
+        pd.read_parquet(comparison.output_dir / "scenario_inputs" / "scenario_input_wide.parquet"),
+        repo_root=ROOT,
+    )
+    assert not replay.future_forecasts.empty
+    assert replay.validation_report["valid"].astype(bool).all()
+    replayed_forecasts = replay.future_forecasts[
+        ["scenario_name", "stream", "target_period", "forecast"]
+    ].rename(columns={"forecast": "replayed_forecast"})
+    promoted_forecasts = comparison.future_forecasts[
+        ["scenario_name", "stream", "target_period", "forecast"]
+    ].rename(columns={"forecast": "promoted_forecast"})
+    parity = replayed_forecasts.merge(
+        promoted_forecasts,
+        on=["scenario_name", "stream", "target_period"],
+        how="inner",
+        validate="one_to_one",
+    )
+    assert len(parity) == len(promoted_forecasts)
+    replay_values = pd.to_numeric(parity["replayed_forecast"], errors="coerce")
+    promoted_values = pd.to_numeric(parity["promoted_forecast"], errors="coerce")
+    replay_delta = (replay_values - promoted_values).abs()
+    replay_tolerance = np.maximum(
+        1e-6,
+        1e-12 * np.maximum(np.maximum(replay_values.abs(), promoted_values.abs()), 1.0),
+    )
+    assert replay_values.notna().all()
+    assert promoted_values.notna().all()
+    assert replay_delta.le(replay_tolerance).all()
     assert not comparison.scenario_input_delta_audit.empty
     audit = comparison.scenario_input_delta_audit
     assert audit["base_scenario_role"].eq("basecase").all()

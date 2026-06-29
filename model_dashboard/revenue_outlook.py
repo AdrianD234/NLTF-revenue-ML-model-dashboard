@@ -587,6 +587,8 @@ def build_current_revenue_outlook_runtime_pack(
         current,
         scenario_input_wide,
         scenario_input_manifest,
+        promoted_chart_rows=existing_chart_rows,
+        repo_root=root,
     )
     replay_mismatches = scenario_input_replay_mismatch_report[
         scenario_input_replay_mismatch_report.get("mismatch_status", pd.Series("", index=scenario_input_replay_mismatch_report.index))
@@ -1000,14 +1002,25 @@ SCENARIO_INPUT_REPLAY_REPORT_COLUMNS = [
     "manifest_workbook_sha256",
     "required_feature_count",
     "missing_required_feature_count",
+    "replay_forecast_value",
+    "promoted_forecast_value",
+    "replay_abs_delta",
+    "replay_tolerance",
+    "replay_status",
+    "replay_reason",
     "source_artifact",
 ]
+SCENARIO_INPUT_REPLAY_ABS_TOLERANCE = 1e-6
+SCENARIO_INPUT_REPLAY_REL_TOLERANCE = 1e-12
 
 
 def _scenario_input_replay_mismatch_report(
     current_forecast_annual: pd.DataFrame,
     scenario_input_wide: pd.DataFrame,
     scenario_input_manifest: dict[str, Any],
+    *,
+    promoted_chart_rows: pd.DataFrame | None = None,
+    repo_root: Path | str | None = None,
 ) -> pd.DataFrame:
     """Verify promoted current-finalist rows are backed by committed scenario inputs.
 
@@ -1073,6 +1086,8 @@ def _scenario_input_replay_mismatch_report(
         for item in scenario_input_manifest.get("workbooks", [])
         if isinstance(item, dict)
     }
+    replay_lookup, replay_validation = _scenario_input_forecast_replay_lookup(scenario_input_wide, repo_root=repo_root)
+    promoted_lookup = _promoted_quarterly_forecast_lookup(promoted_chart_rows)
     rows: list[dict[str, Any]] = []
     source = current_forecast_annual.copy()
     source = source[source.get("series_id", pd.Series("", index=source.index)).astype(str).isin(series_to_stream)].copy()
@@ -1105,6 +1120,12 @@ def _scenario_input_replay_mismatch_report(
                     "workbook_sha256": "",
                     "required_feature_count": 0,
                     "missing_required_feature_count": 0,
+                    "replay_forecast_value": pd.NA,
+                    "promoted_forecast_value": pd.NA,
+                    "replay_abs_delta": pd.NA,
+                    "replay_tolerance": pd.NA,
+                    "replay_status": "not_applicable",
+                    "replay_reason": "Governed extension is not replayed from workbook quarter rows.",
                     "source_artifact": "current_finalist_model_extension",
                 }
             )
@@ -1120,6 +1141,12 @@ def _scenario_input_replay_mismatch_report(
                     "workbook_sha256": "",
                     "required_feature_count": 0,
                     "missing_required_feature_count": 0,
+                    "replay_forecast_value": pd.NA,
+                    "promoted_forecast_value": pd.NA,
+                    "replay_abs_delta": pd.NA,
+                    "replay_tolerance": pd.NA,
+                    "replay_status": "not_applicable",
+                    "replay_reason": "Actual-anchor row is not a promoted future forecast row.",
                     "source_artifact": "mbu26_actual_anchor",
                 }
             )
@@ -1138,12 +1165,43 @@ def _scenario_input_replay_mismatch_report(
                         "workbook_sha256": "",
                         "required_feature_count": len(feature_columns),
                         "missing_required_feature_count": 1,
+                        "replay_forecast_value": pd.NA,
+                        "promoted_forecast_value": pd.NA,
+                        "replay_abs_delta": pd.NA,
+                        "replay_tolerance": pd.NA,
+                        "replay_status": "not_run_missing_input",
+                        "replay_reason": "Replay was skipped because the committed scenario-input quarter row is missing.",
                         "source_artifact": f"{SCENARIO_INPUT_DIRNAME}/{SCENARIO_INPUT_WIDE_STEM}.parquet",
                     }
                 )
                 continue
             workbook_hash = str(input_row.get("workbook_sha256") or "")
             hash_mismatch = bool(manifest_hash and workbook_hash and manifest_hash != workbook_hash)
+            replay = replay_lookup.get((scenario_name, stream, quarter), {})
+            promoted_value = promoted_lookup.get((scenario_name, stream, quarter))
+            replay_value = replay.get("forecast")
+            replay_delta = _abs_delta(replay_value, promoted_value)
+            replay_tolerance = _replay_tolerance(replay_value, promoted_value)
+            replay_available = bool(replay.get("forecast_available")) and pd.notna(replay_value)
+            promoted_available = pd.notna(promoted_value)
+            replay_status = "pass"
+            replay_reason = ""
+            if hash_mismatch:
+                replay_status = "not_run_hash_mismatch"
+                replay_reason = "Scenario input row workbook hash differs from the manifest workbook hash."
+            elif not replay_validation.get(scenario_name, {}).get("valid", False):
+                replay_status = "replay_validation_failed"
+                replay_reason = str(replay_validation.get(scenario_name, {}).get("errors", ""))
+            elif not replay_available:
+                replay_status = "missing_replayed_forecast"
+                replay_reason = "The fixed-finalist replay did not emit a numeric forecast for this scenario/stream/quarter."
+            elif not promoted_available:
+                replay_status = "missing_promoted_forecast"
+                replay_reason = "The promoted runtime chart rows do not contain this scenario/stream/quarter forecast."
+            elif _replay_delta_exceeds_tolerance(replay_delta, replay_tolerance):
+                replay_status = "replay_delta_exceeds_tolerance"
+                replay_reason = "Replayed committed scenario-input forecast differs from promoted forecast_scenario_comparison row."
+            replay_mismatch = replay_status not in {"pass"}
             rows.append(
                 {
                     **base_record,
@@ -1151,13 +1209,19 @@ def _scenario_input_replay_mismatch_report(
                     "scenario_input_status": "matched_committed_scenario_input"
                     if not hash_mismatch
                     else "workbook_hash_mismatch",
-                    "mismatch_status": "mismatch" if hash_mismatch else "pass",
+                    "mismatch_status": "mismatch" if (hash_mismatch or replay_mismatch) else "pass",
                     "mismatch_reason": ""
-                    if not hash_mismatch
-                    else "Scenario input row workbook hash differs from the scenario input manifest workbook hash.",
+                    if not (hash_mismatch or replay_mismatch)
+                    else (replay_reason or "Scenario input row workbook hash differs from the scenario input manifest workbook hash."),
                     "workbook_sha256": workbook_hash,
                     "required_feature_count": int(input_row.get("required_feature_count") or 0),
-                    "missing_required_feature_count": 0 if not hash_mismatch else 1,
+                    "missing_required_feature_count": 0 if not (hash_mismatch or replay_mismatch) else 1,
+                    "replay_forecast_value": replay_value if pd.notna(replay_value) else pd.NA,
+                    "promoted_forecast_value": promoted_value if pd.notna(promoted_value) else pd.NA,
+                    "replay_abs_delta": replay_delta if pd.notna(replay_delta) else pd.NA,
+                    "replay_tolerance": replay_tolerance if pd.notna(replay_tolerance) else pd.NA,
+                    "replay_status": replay_status,
+                    "replay_reason": replay_reason,
                     "source_artifact": input_row.get("source_artifact") or f"{SCENARIO_INPUT_DIRNAME}/{SCENARIO_INPUT_WIDE_STEM}.parquet",
                 }
             )
@@ -1167,6 +1231,86 @@ def _scenario_input_replay_mismatch_report(
         ["scenario_name", "stream", "annual_period", "forecast_quarter"],
         kind="stable",
     )
+
+
+def _scenario_input_forecast_replay_lookup(
+    scenario_input_wide: pd.DataFrame,
+    *,
+    repo_root: Path | str | None,
+) -> tuple[dict[tuple[str, str, str], dict[str, Any]], dict[str, dict[str, Any]]]:
+    if scenario_input_wide is None or scenario_input_wide.empty:
+        return {}, {}
+    from .forecast_runner import replay_forecast_from_scenario_inputs
+
+    replay = replay_forecast_from_scenario_inputs(scenario_input_wide, repo_root=repo_root)
+    validation = {
+        str(row.scenario_name): {
+            "valid": bool(row.valid),
+            "errors": str(row.errors or ""),
+        }
+        for row in replay.validation_report.itertuples(index=False)
+    }
+    lookup: dict[tuple[str, str, str], dict[str, Any]] = {}
+    if replay.future_forecasts.empty:
+        return lookup, validation
+    for row in replay.future_forecasts.itertuples(index=False):
+        key = (
+            str(getattr(row, "scenario_name", "") or ""),
+            str(getattr(row, "stream", "") or ""),
+            str(getattr(row, "target_period", "") or ""),
+        )
+        if not all(key):
+            continue
+        lookup[key] = {
+            "forecast": pd.to_numeric(pd.Series([getattr(row, "forecast", pd.NA)]), errors="coerce").iloc[0],
+            "forecast_available": bool(getattr(row, "forecast_available", False)),
+        }
+    return lookup, validation
+
+
+def _promoted_quarterly_forecast_lookup(chart_rows: pd.DataFrame | None) -> dict[tuple[str, str, str], Any]:
+    if chart_rows is None or chart_rows.empty:
+        return {}
+    required = {"scenario_name", "stream", "period", "value", "time_grain", "metric_type", "row_type"}
+    if required.difference(chart_rows.columns):
+        return {}
+    source = chart_rows[
+        chart_rows["time_grain"].astype(str).eq("quarterly")
+        & chart_rows["metric_type"].astype(str).eq("activity")
+        & chart_rows["row_type"].astype(str).eq("future_forecast")
+    ].copy()
+    lookup: dict[tuple[str, str, str], Any] = {}
+    for row in source.itertuples(index=False):
+        key = (
+            str(getattr(row, "scenario_name", "") or ""),
+            str(getattr(row, "stream", "") or ""),
+            str(getattr(row, "period", "") or ""),
+        )
+        if all(key):
+            lookup[key] = pd.to_numeric(pd.Series([getattr(row, "value", pd.NA)]), errors="coerce").iloc[0]
+    return lookup
+
+
+def _abs_delta(left: Any, right: Any) -> Any:
+    values = pd.to_numeric(pd.Series([left, right]), errors="coerce")
+    if values.isna().any():
+        return pd.NA
+    return abs(float(values.iloc[0]) - float(values.iloc[1]))
+
+
+def _replay_tolerance(left: Any, right: Any) -> Any:
+    values = pd.to_numeric(pd.Series([left, right]), errors="coerce")
+    if values.isna().any():
+        return pd.NA
+    scale = max(abs(float(values.iloc[0])), abs(float(values.iloc[1])), 1.0)
+    return max(SCENARIO_INPUT_REPLAY_ABS_TOLERANCE, SCENARIO_INPUT_REPLAY_REL_TOLERANCE * scale)
+
+
+def _replay_delta_exceeds_tolerance(delta: Any, tolerance: Any) -> bool:
+    values = pd.to_numeric(pd.Series([delta, tolerance]), errors="coerce")
+    if values.isna().any():
+        return False
+    return float(values.iloc[0]) > float(values.iloc[1])
 
 
 def _split_forecast_quarters(value: str) -> list[str]:
