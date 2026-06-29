@@ -370,7 +370,17 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     assert comparison_revenue_contract["display_policy"] == "keep_comparison_trace_scale_or_bridge"
     assert comparison_revenue_contract["population_path_policy"] == "scenario_input_population_from_committed_workbook_artifacts"
     assert "population:population/scale" in str(comparison_revenue_contract["field_classification"])
-    assert "real_gdp_sa_nzd:behavioural" in str(comparison_revenue_contract["field_classification"])
+    assert "real_gdp_sa_nzd:macro" in str(comparison_revenue_contract["field_classification"])
+    assert "unemployment_rate:macro" in str(comparison_revenue_contract["field_classification"])
+    assert "gdp_petrol_interaction:price/rate/policy" in str(comparison_revenue_contract["field_classification"])
+    assert "target_lag_1:behavioural" in str(comparison_revenue_contract["field_classification"])
+    comparison_categories = {
+        part.split(":", 1)[1].strip()
+        for text in scenario_role_contract["field_classification"].dropna().astype(str)
+        for part in text.split(";")
+        if ":" in part
+    }
+    assert {"population/scale", "macro", "price/rate/policy", "behavioural"}.issubset(comparison_categories)
     assert "scenario_input_wide" in str(comparison_revenue_contract["source_basis"])
     assert not scenario_feature_lineage.empty
     assert set(scenario_feature_lineage["stream"].dropna().astype(str)) == {"PED", "LIGHT_RUC", "HEAVY_RUC"}
@@ -1158,7 +1168,7 @@ def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
         "fan_band_rows.parquet": "e8828c2997785eed41df3cf090b9fdd29b22e9b5e97dd3aabfae924b7fcd86f9",
         "future_revenue_forecasts.csv": "4e6ed9d9a6bc4a631970247ccba54deb4d66fa4664d04a5ebccf5bfa24d61a72",
         "future_revenue_forecasts.parquet": "ca3cf207b7da7ece6386e975f9faeeb124f3247ef0e9c1c3f4455a5c81a2508d",
-        "manifest.json": "8385439fbd9e2fe44491b356036dfa2990142f84aa2651e5ca8d9fb88c21e17f",
+        "manifest.json": "c55e14ba5b6ea011637fd22b23bca295401d8fa8e3a41b6395396a97847aaa43",
         "manifest.md": "0d0ffad81aa2f9ab0e8123a05297aaf2b52d40d1b06f9700f2ca1a53977d0a2d",
         "path_trace_status.csv": "9aee7a4e7003ec6541476ca3e4afef6d8586b6c358e41db1c8e06623e5ffcaa3",
         "path_trace_status.parquet": "e66d860fb7532ee4b92285c1ba023c9f8d9469cfdaaaef819415f7cd87c73757",
@@ -1180,8 +1190,8 @@ def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
         "scenario_feature_lineage.parquet": "7248e6c3142079b1722fbeb18b57393dd82cd3c127c535e08bee2ce139e1d9ab",
         "scenario_input_replay_mismatch_report.csv": "c68bdaa00afceb33fc093d6ef7a69c32d25be0020a7e7a2af95fe64bc84b0008",
         "scenario_input_replay_mismatch_report.parquet": "85f179c019d728114a11990a791ae6c1d31745359f9dfa59ecb807ef316e95da",
-        "scenario_role_contract.csv": "f45d02d7f6667f752a2584b4e71032209faddd3843905f5ef4c8b389cded0620",
-        "scenario_role_contract.parquet": "7bfbf555449e5c3e2cfac2ba2821f5958135dc63fdf5acb233d4971d9f06c07d",
+        "scenario_role_contract.csv": "d52930b687d18dc5d3f559433bbe84b0c6b2fde4a90a5b1b6daf4b930ff7c39e",
+        "scenario_role_contract.parquet": "35296d1e22ee7eaba708414b167516ede5f31104877c13397ffb9bd709d2e8e2",
         "series_alias_audit.csv": "c0330c9918d7e2f4f972d15e8465537c16d96aca607ef253353612cadd62c56d",
         "series_alias_audit.parquet": "9b376147c912748d5a2429abf524799e348a3711d6af89a4b9d1ec287f558918",
         "series_trace_contract.csv": "2eaf18c4c54fc18a21dd68415c0aea041bd174e8d75285409a4bb83034b60e09",

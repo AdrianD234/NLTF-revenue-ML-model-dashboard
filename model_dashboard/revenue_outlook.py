@@ -1554,9 +1554,13 @@ def _classify_scenario_variable(field: str) -> str:
     text = str(field or "").lower()
     if "population" in text:
         return "population/scale"
-    if any(token in text for token in ["price", "rate", "cpi", "ruc"]):
+    if "unemployment" in text:
+        return "macro"
+    if any(token in text for token in ["price", "rate", "cpi", "ruc", "diesel", "petrol"]):
         return "price/rate/policy"
-    if any(token in text for token in ["gdp", "unemployment", "diesel", "petrol", "target_lag"]):
+    if "gdp" in text:
+        return "macro"
+    if any(token in text for token in ["target_lag"]):
         return "behavioural"
     if any(token in text for token in ["quarter", "year", "horizon", "dummy", "trend"]):
         return "system/time"
