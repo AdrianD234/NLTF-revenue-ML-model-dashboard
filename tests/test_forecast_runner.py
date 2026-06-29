@@ -575,11 +575,24 @@ def test_scenario_comparison_artifacts(tmp_path: Path) -> None:
         scenario_inputs = result.scenario_input_manifest
         assert scenario_inputs["schema_version"] == "nltf-scenario-input-materializer-v1"
         assert scenario_inputs["source_policy"] == "committed scenario input artifacts only; Streamlit must not load Excel at runtime"
+        scenario_input_manifest_text = (result.output_dir / "scenario_inputs" / "scenario_input_manifest.json").read_text(
+            encoding="utf-8"
+        )
+        assert str(tmp_path) not in scenario_input_manifest_text
+        assert "C:\\Users" not in scenario_input_manifest_text
         assert scenario_inputs["row_counts"]["scenario_input_cells"] > 0
         assert scenario_inputs["row_counts"]["scenario_input_long"] > 0
         assert scenario_inputs["row_counts"]["scenario_input_wide"] > 0
         assert scenario_inputs["row_counts"]["scenario_feature_lineage"] > 0
         assert {workbook["raw_status"] for workbook in scenario_inputs["workbooks"]} == {"copied_repo_local_raw_workbook"}
+        for workbook in scenario_inputs["workbooks"]:
+            raw_path = Path(workbook["raw_repo_relative_path"])
+            assert not raw_path.is_absolute()
+            assert (ROOT / raw_path).exists() or (result.output_dir / raw_path).exists()
+        for metadata in scenario_inputs["output_files"].values():
+            artifact_path = Path(metadata["repo_relative_path"])
+            assert not artifact_path.is_absolute()
+            assert (ROOT / artifact_path).exists() or (result.output_dir / artifact_path).exists()
         for name in [
             "scenario_input_manifest.json",
             "scenario_input_cells.parquet",
@@ -635,10 +648,23 @@ def test_scenario_comparison_artifacts(tmp_path: Path) -> None:
     assert comparison.scenario_input_manifest["row_counts"]["scenario_feature_lineage"] == sum(
         result.scenario_input_manifest["row_counts"]["scenario_feature_lineage"] for result in results
     )
+    comparison_manifest_text = (comparison.output_dir / "scenario_inputs" / "scenario_input_manifest.json").read_text(
+        encoding="utf-8"
+    )
+    assert str(tmp_path) not in comparison_manifest_text
+    assert "C:\\Users" not in comparison_manifest_text
     assert comparison.manifest["scenario_inputs"]["row_counts"] == comparison.scenario_input_manifest["row_counts"]
     assert {workbook["raw_status"] for workbook in comparison.scenario_input_manifest["workbooks"]} == {
         "copied_repo_local_raw_workbook"
     }
+    for workbook in comparison.scenario_input_manifest["workbooks"]:
+        raw_path = Path(workbook["raw_repo_relative_path"])
+        assert not raw_path.is_absolute()
+        assert (ROOT / raw_path).exists() or (comparison.output_dir / raw_path).exists()
+    for metadata in comparison.scenario_input_manifest["output_files"].values():
+        artifact_path = Path(metadata["repo_relative_path"])
+        assert not artifact_path.is_absolute()
+        assert (ROOT / artifact_path).exists() or (comparison.output_dir / artifact_path).exists()
     assert comparison.manifest["horizon_support_note"] == HORIZON_SUPPORT_NOTE
     assert "high_population_fixture_note" not in comparison.manifest
     replay = replay_forecast_from_scenario_inputs(

@@ -67,6 +67,7 @@ def materialize_scenario_inputs(
     copy_raw: bool = True,
     raw_size_limit_bytes: int = RAW_WORKBOOK_SIZE_LIMIT_BYTES,
     created_by: str = "scenario_input_materializer",
+    repo_root: Path | str | None = None,
 ) -> dict[str, Any]:
     """Materialize scenario workbook contents into repo-local audit artifacts.
 
@@ -76,6 +77,8 @@ def materialize_scenario_inputs(
     """
 
     output = Path(output_dir)
+    root = Path(repo_root).resolve() if repo_root is not None else Path.cwd().resolve()
+    fallback_base = output.parent
     output.mkdir(parents=True, exist_ok=True)
     raw_dir = output / "raw"
     if copy_raw:
@@ -96,7 +99,7 @@ def materialize_scenario_inputs(
             raw_name = f"{workbook_sha[:12]}_{_safe_filename(item.workbook_filename)}"
             raw_path = raw_dir / raw_name
             raw_path.write_bytes(workbook_bytes)
-            raw_repo_path = _relative_to_cwd(raw_path)
+            raw_repo_path = _relative_path(raw_path, root, fallback_base=fallback_base)
             raw_status = "copied_repo_local_raw_workbook"
         elif workbook_size > raw_size_limit_bytes:
             raw_status = "too_large_hash_only"
@@ -135,16 +138,16 @@ def materialize_scenario_inputs(
     wide_frame = pd.concat(all_wide, ignore_index=True, sort=False) if all_wide else _empty_wide_frame()
     lineage_frame = scenario_feature_lineage_from_wide(wide_frame)
 
-    output_files = _write_artifact_pair(output, SCENARIO_INPUT_CELLS_STEM, cells_frame)
-    output_files.update(_write_artifact_pair(output, SCENARIO_INPUT_LONG_STEM, long_frame))
-    output_files.update(_write_artifact_pair(output, SCENARIO_INPUT_WIDE_STEM, wide_frame))
-    output_files.update(_write_artifact_pair(output, SCENARIO_FEATURE_LINEAGE_STEM, lineage_frame))
+    output_files = _write_artifact_pair(output, SCENARIO_INPUT_CELLS_STEM, cells_frame, root=root, fallback_base=fallback_base)
+    output_files.update(_write_artifact_pair(output, SCENARIO_INPUT_LONG_STEM, long_frame, root=root, fallback_base=fallback_base))
+    output_files.update(_write_artifact_pair(output, SCENARIO_INPUT_WIDE_STEM, wide_frame, root=root, fallback_base=fallback_base))
+    output_files.update(_write_artifact_pair(output, SCENARIO_FEATURE_LINEAGE_STEM, lineage_frame, root=root, fallback_base=fallback_base))
 
     manifest = {
         "schema_version": SCENARIO_INPUT_SCHEMA_VERSION,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "created_by": created_by,
-        "repo_relative_output_dir": _relative_to_cwd(output),
+        "repo_relative_output_dir": _relative_path(output, root, fallback_base=fallback_base),
         "source_policy": "committed scenario input artifacts only; Streamlit must not load Excel at runtime",
         "raw_workbook_size_limit_bytes": int(raw_size_limit_bytes),
         "workbooks": workbook_records,
@@ -166,8 +169,11 @@ def combine_scenario_input_dirs(
     output_dir: Path | str,
     *,
     created_by: str = "scenario_input_combiner",
+    repo_root: Path | str | None = None,
 ) -> dict[str, Any]:
     output = Path(output_dir)
+    root = Path(repo_root).resolve() if repo_root is not None else Path.cwd().resolve()
+    fallback_base = output.parent
     output.mkdir(parents=True, exist_ok=True)
     raw_dir = output / "raw"
     raw_dir.mkdir(parents=True, exist_ok=True)
@@ -179,6 +185,7 @@ def combine_scenario_input_dirs(
         SCENARIO_INPUT_WIDE_STEM: [],
         SCENARIO_FEATURE_LINEAGE_STEM: [],
     }
+    copied_raw_paths: dict[str, Path] = {}
     for source in input_dirs:
         source_dir = Path(source)
         manifest_path = source_dir / SCENARIO_INPUT_MANIFEST
@@ -194,6 +201,7 @@ def combine_scenario_input_dirs(
                 target = raw_dir / workbook.name
                 if not target.exists():
                     shutil.copy2(workbook, target)
+                copied_raw_paths[workbook.name] = target
 
     output_files: dict[str, Any] = {}
     row_counts: dict[str, int] = {}
@@ -201,20 +209,28 @@ def combine_scenario_input_dirs(
         frame = pd.concat(frames, ignore_index=True, sort=False) if frames else pd.DataFrame()
         if stem == SCENARIO_FEATURE_LINEAGE_STEM and frame.empty and frame_map[SCENARIO_INPUT_WIDE_STEM]:
             frame = scenario_feature_lineage_from_wide(pd.concat(frame_map[SCENARIO_INPUT_WIDE_STEM], ignore_index=True, sort=False))
-        output_files.update(_write_artifact_pair(output, stem, frame))
+        output_files.update(_write_artifact_pair(output, stem, frame, root=root, fallback_base=fallback_base))
         row_counts[stem] = int(len(frame))
 
     workbooks: list[dict[str, Any]] = []
     for manifest in manifests:
         for record in manifest.get("workbooks", []):
             if isinstance(record, dict):
-                workbooks.append(dict(record))
+                workbook_record = dict(record)
+                raw_name = Path(str(workbook_record.get("raw_repo_relative_path") or "")).name
+                if raw_name and raw_name in copied_raw_paths:
+                    workbook_record["raw_repo_relative_path"] = _relative_path(
+                        copied_raw_paths[raw_name],
+                        root,
+                        fallback_base=fallback_base,
+                    )
+                workbooks.append(workbook_record)
 
     manifest = {
         "schema_version": SCENARIO_INPUT_SCHEMA_VERSION,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "created_by": created_by,
-        "repo_relative_output_dir": _relative_to_cwd(output),
+        "repo_relative_output_dir": _relative_path(output, root, fallback_base=fallback_base),
         "source_policy": "combined committed scenario input artifacts; Streamlit must not load Excel at runtime",
         "source_manifests": [
             {
@@ -395,7 +411,14 @@ def _scenario_input_wide_from_long(long: pd.DataFrame) -> pd.DataFrame:
     return wide.reset_index(drop=True)
 
 
-def _write_artifact_pair(output_dir: Path, stem: str, frame: pd.DataFrame) -> dict[str, Any]:
+def _write_artifact_pair(
+    output_dir: Path,
+    stem: str,
+    frame: pd.DataFrame,
+    *,
+    root: Path,
+    fallback_base: Path,
+) -> dict[str, Any]:
     csv_path = output_dir / f"{stem}.csv"
     parquet_path = output_dir / f"{stem}.parquet"
     prepared = frame.copy()
@@ -405,14 +428,14 @@ def _write_artifact_pair(output_dir: Path, stem: str, frame: pd.DataFrame) -> di
     prepared.to_csv(csv_path, index=False)
     prepared.to_parquet(parquet_path, index=False)
     return {
-        f"{stem}.csv": _file_record(csv_path),
-        f"{stem}.parquet": _file_record(parquet_path),
+        f"{stem}.csv": _file_record(csv_path, root=root, fallback_base=fallback_base),
+        f"{stem}.parquet": _file_record(parquet_path, root=root, fallback_base=fallback_base),
     }
 
 
-def _file_record(path: Path) -> dict[str, Any]:
+def _file_record(path: Path, *, root: Path, fallback_base: Path) -> dict[str, Any]:
     return {
-        "repo_relative_path": _relative_to_cwd(path),
+        "repo_relative_path": _relative_path(path, root, fallback_base=fallback_base),
         "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
         "size_bytes": path.stat().st_size,
     }
@@ -545,9 +568,14 @@ def _model_id_for_stream(stream: str) -> str:
     return ""
 
 
-def _relative_to_cwd(path: Path) -> str:
+def _relative_path(path: Path, root: Path, *, fallback_base: Path | None = None) -> str:
     resolved = path.resolve()
     try:
-        return resolved.relative_to(Path.cwd().resolve()).as_posix()
+        return resolved.relative_to(root.resolve()).as_posix()
     except ValueError:
-        return resolved.as_posix()
+        if fallback_base is not None:
+            try:
+                return resolved.relative_to(fallback_base.resolve()).as_posix()
+            except ValueError:
+                pass
+        return path.name

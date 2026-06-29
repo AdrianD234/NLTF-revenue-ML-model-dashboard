@@ -113,6 +113,16 @@ def test_revenue_outlook_pack_computes_ruc_formula_and_honest_ped_gap(tmp_path: 
     assert (pack.output_dir / "manifest.json").exists()
     assert (pack.output_dir / "future_revenue_forecasts.parquet").exists()
     assert load_revenue_outlook_pack(pack.output_dir, repo_root=ROOT) is not None
+    scenario_input_manifest = json.loads(
+        (pack.output_dir / "scenario_inputs" / "scenario_input_manifest.json").read_text(encoding="utf-8")
+    )
+    assert str(tmp_path) not in json.dumps(scenario_input_manifest)
+    assert "C:\\Users" not in json.dumps(scenario_input_manifest)
+    for workbook in scenario_input_manifest["workbooks"]:
+        raw_path = Path(workbook["raw_repo_relative_path"])
+        assert not raw_path.is_absolute()
+        assert (ROOT / raw_path).exists() or (pack.output_dir / raw_path).exists()
+        assert "scenario_inputs/raw" in raw_path.as_posix()
     for frame in [pack.future_revenue_forecasts, pack.revenue_bridge_components, pack.revenue_chart_rows]:
         assert set(CANONICAL_JOIN_KEY_COLUMNS).issubset(frame.columns)
         assert frame["canonical_join_key"].astype(str).str.count(r"\|").eq(2).all()

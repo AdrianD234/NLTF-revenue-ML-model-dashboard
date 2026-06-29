@@ -882,6 +882,7 @@ def run_forecast_workbook(
         ],
         run_dir / SCENARIO_INPUT_DIRNAME,
         created_by="forecast_runner_run",
+        repo_root=root,
     )
     manifest["scenario_inputs"] = {
         "repo_relative_output_dir": _repo_relative(root, run_dir / SCENARIO_INPUT_DIRNAME),
@@ -1477,6 +1478,7 @@ def write_forecast_scenario_comparison(
         [result.output_dir / SCENARIO_INPUT_DIRNAME for result in scenario_results],
         comparison_dir / SCENARIO_INPUT_DIRNAME,
         created_by="forecast_scenario_comparison",
+        repo_root=root,
     )
     future = (
         pd.concat([result.future_forecasts for result in scenario_results], ignore_index=True, sort=False)

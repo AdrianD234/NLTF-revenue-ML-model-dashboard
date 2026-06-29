@@ -72,6 +72,7 @@ def main() -> None:
         workbook_inputs,
         output_dir,
         created_by="materialize_current_scenario_inputs",
+        repo_root=root,
     )
     print(f"SCENARIO_INPUTS_MATERIALIZED {output_dir}")
     print(f"workbooks={len(materialized.get('workbooks', []))}")

@@ -915,7 +915,7 @@ def _promote_scenario_inputs_from_comparison(
     if source.exists():
         if target.exists():
             shutil.rmtree(target)
-        shutil.copytree(source, target)
+        combine_scenario_input_dirs([source], target, created_by="revenue_outlook_promotion", repo_root=repo_root)
     else:
         source_dirs = [
             Path(result.output_dir) / SCENARIO_INPUT_DIRNAME
@@ -925,7 +925,7 @@ def _promote_scenario_inputs_from_comparison(
         if source_dirs:
             if target.exists():
                 shutil.rmtree(target)
-            combine_scenario_input_dirs(source_dirs, target, created_by="revenue_outlook_promotion")
+            combine_scenario_input_dirs(source_dirs, target, created_by="revenue_outlook_promotion", repo_root=repo_root)
     manifest_path = target / SCENARIO_INPUT_MANIFEST
     if not manifest_path.exists():
         return {
