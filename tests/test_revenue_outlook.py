@@ -206,6 +206,52 @@ def test_committed_current_revenue_outlook_pack_is_repo_local_and_hash_backed() 
     assert float(manifest["ev_phev_ped_light_drift_assumptions"]["lambda_smoothness_penalty"]) > 0
     assert manifest["scenario_role_contract"]["repo_relative_path"] == "data/current_revenue_outlook/scenario_role_contract.csv"
     assert "behavioural intensity metric" in manifest["scenario_role_contract"]["note"]
+    assert manifest["scenario_inputs"]["status"] == "available"
+    assert manifest["scenario_inputs"]["repo_relative_output_dir"] == "data/current_revenue_outlook/scenario_inputs"
+    assert manifest["scenario_inputs"]["schema_version"] == "nltf-scenario-input-materializer-v1"
+    assert manifest["scenario_inputs"]["row_counts"] == {
+        "scenario_input_cells": 15472,
+        "scenario_input_long": 15200,
+        "scenario_input_wide": 600,
+        "scenario_feature_lineage": 14000,
+    }
+    scenario_input_manifest_path = pack_dir / "scenario_inputs" / "scenario_input_manifest.json"
+    assert scenario_input_manifest_path.exists()
+    assert manifest["scenario_inputs"]["manifest_sha256"] == _sha256(scenario_input_manifest_path)
+    scenario_input_manifest_text = scenario_input_manifest_path.read_text(encoding="utf-8")
+    assert "C:\\Users" not in scenario_input_manifest_text
+    assert "Downloads" not in scenario_input_manifest_text
+    scenario_input_manifest = json.loads(scenario_input_manifest_text)
+    assert scenario_input_manifest["source_policy"] == "committed scenario input artifacts only; Streamlit must not load Excel at runtime"
+    assert scenario_input_manifest["row_counts"] == manifest["scenario_inputs"]["row_counts"]
+    assert len(scenario_input_manifest["workbooks"]) == 2
+    assert {workbook["workbook_sha256"] for workbook in scenario_input_manifest["workbooks"]} == {
+        "d0644d353ee5a073602186cf7ac5c16e707d5350e16fd037b73a65528067cc6a",
+        "6213ce565cf1f4a058a3ea9f1af4d5476a8b0423a4d8747905c3cba128380ce1",
+    }
+    assert {workbook["raw_status"] for workbook in scenario_input_manifest["workbooks"]} == {
+        "copied_repo_local_raw_workbook"
+    }
+    for workbook in scenario_input_manifest["workbooks"]:
+        raw_path = ROOT / workbook["raw_repo_relative_path"]
+        assert raw_path.exists()
+        assert raw_path.stat().st_size == workbook["size_bytes"]
+        assert raw_path.stat().st_size < 50 * 1024 * 1024
+        assert _sha256(raw_path) == workbook["workbook_sha256"]
+    for output_file, metadata in scenario_input_manifest["output_files"].items():
+        assert metadata["sha256"] == _sha256(ROOT / metadata["repo_relative_path"]), output_file
+        assert metadata["repo_relative_path"].startswith("data/current_revenue_outlook/scenario_inputs/")
+    assert (
+        manifest["scenario_feature_lineage"]["repo_relative_path"]
+        == "data/current_revenue_outlook/scenario_feature_lineage.csv"
+    )
+    assert manifest["scenario_feature_lineage"]["source"] == "scenario_inputs/scenario_feature_lineage.parquet"
+    assert (
+        manifest["scenario_input_replay_mismatch_report"]["repo_relative_path"]
+        == "data/current_revenue_outlook/scenario_input_replay_mismatch_report.csv"
+    )
+    assert manifest["scenario_input_replay_mismatch_report"]["status"] == "passed_no_mismatch"
+    assert "raises" in manifest["scenario_input_replay_mismatch_report"]["fail_policy"]
     assert manifest["target_semantics_audit"]["LIGHT_RUC"]["status"] == "business_rule_applied_ped_light_optimized_migration"
     assert "PED/light-petrol activity and total Light RUC" in manifest["data_vintage_manifest_notes"]["light_ruc_target_semantics"]
     assert manifest["revenue_formula_residuals"]["repo_relative_path"] == "data/current_revenue_outlook/revenue_formula_residuals.csv"
@@ -239,6 +285,10 @@ def test_committed_current_revenue_outlook_pack_is_repo_local_and_hash_backed() 
         "row_reconciliation.parquet",
         "runtime_trace_audit.csv",
         "runtime_trace_audit.parquet",
+        "scenario_feature_lineage.csv",
+        "scenario_feature_lineage.parquet",
+        "scenario_input_replay_mismatch_report.csv",
+        "scenario_input_replay_mismatch_report.parquet",
         "scenario_role_contract.csv",
         "scenario_role_contract.parquet",
         "series_alias_audit.csv",
@@ -275,6 +325,9 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     alias_audit = pd.read_parquet(pack_dir / "series_alias_audit.parquet")
     fan_availability = pd.read_parquet(pack_dir / "fan_availability.parquet")
     fan_bands = pd.read_parquet(pack_dir / "fan_band_rows.parquet")
+    scenario_feature_lineage = pd.read_parquet(pack_dir / "scenario_feature_lineage.parquet")
+    scenario_input_replay = pd.read_parquet(pack_dir / "scenario_input_replay_mismatch_report.parquet")
+    scenario_input_wide = pd.read_parquet(pack_dir / "scenario_inputs" / "scenario_input_wide.parquet")
 
     assert manifest["runtime_pack_type"] == "mbu26_actual_current_finalist_official_comparator"
     assert manifest["bridge_status_by_stream"] == {
@@ -315,6 +368,53 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
         & scenario_role_contract["affected_series"].astype(str).eq("gross_ped_revenue")
     ].iloc[0]
     assert comparison_revenue_contract["display_policy"] == "keep_comparison_trace_scale_or_bridge"
+    assert comparison_revenue_contract["population_path_policy"] == "scenario_input_population_from_committed_workbook_artifacts"
+    assert "population:population/scale" in str(comparison_revenue_contract["field_classification"])
+    assert "real_gdp_sa_nzd:behavioural" in str(comparison_revenue_contract["field_classification"])
+    assert "scenario_input_wide" in str(comparison_revenue_contract["source_basis"])
+    assert not scenario_feature_lineage.empty
+    assert set(scenario_feature_lineage["stream"].dropna().astype(str)) == {"PED", "LIGHT_RUC", "HEAVY_RUC"}
+    assert set(scenario_feature_lineage["source_status"].dropna().astype(str)) == {"committed_scenario_input"}
+    assert not scenario_feature_lineage["fallback_flag"].astype(bool).any()
+    assert scenario_feature_lineage["source_artifact"].eq("scenario_inputs/scenario_input_long.parquet").all()
+    assert scenario_feature_lineage["canonical_variable"].astype(str).str.len().gt(0).all()
+    assert set(scenario_input_wide["scenario_name"].dropna().astype(str)) == {
+        "current_basecase",
+        "current_comparison_1",
+    }
+    ped_population_inputs = scenario_input_wide[
+        scenario_input_wide["stream"].astype(str).eq("PED")
+        & scenario_input_wide["population"].fillna("").astype(str).ne("")
+    ]
+    assert not ped_population_inputs.empty
+    assert set(ped_population_inputs["scenario_name"].dropna().astype(str)) == {
+        "current_basecase",
+        "current_comparison_1",
+    }
+    assert not scenario_input_replay.empty
+    assert set(scenario_input_replay["mismatch_status"].dropna().astype(str)) == {
+        "pass",
+        "not_applicable",
+    }
+    assert "mismatch" not in set(scenario_input_replay["mismatch_status"].dropna().astype(str))
+    matched_replay = scenario_input_replay[
+        scenario_input_replay["scenario_input_status"].astype(str).eq("matched_committed_scenario_input")
+    ].copy()
+    assert not matched_replay.empty
+    assert matched_replay["workbook_sha256"].astype(str).eq(matched_replay["manifest_workbook_sha256"].astype(str)).all()
+    assert pd.to_numeric(matched_replay["required_feature_count"], errors="coerce").gt(0).all()
+    assert pd.to_numeric(matched_replay["missing_required_feature_count"], errors="coerce").eq(0).all()
+    extension_replay = scenario_input_replay[
+        scenario_input_replay["scenario_input_status"].astype(str).eq("governed_model_extension_not_replayed_from_workbook")
+    ].copy()
+    assert not extension_replay.empty
+    assert set(extension_replay["annual_period"].dropna().astype(str)) == {
+        "FY2051",
+        "FY2052",
+        "FY2053",
+        "FY2054",
+        "FY2055",
+    }
     assert not ev_phev_split.empty
     assert ev_phev_split["used_by_current_finalist"].astype(bool).any()
     current_split = ev_phev_split[ev_phev_split["used_by_current_finalist"].astype(bool)].copy()
@@ -507,11 +607,15 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
             future[["source", "model_id"]].astype(str).stack(),
             stack_components[["source_file", "source_basis", "model_id"]].astype(str).stack(),
             scenario_role_contract.astype(str).stack(),
+            scenario_feature_lineage.astype(str).stack(),
+            scenario_input_replay.astype(str).stack(),
         ],
         ignore_index=True,
     ).str.cat(sep="\n")
     assert "annual_model_paths.csv" not in runtime_text
     assert "selected_dashboard" not in runtime_text.lower()
+    assert "scenario_workbook_population_path_not_committed" not in runtime_text
+    assert "source_workbook_cell_delta_unavailable" not in runtime_text
     assert "schiff" not in runtime_text.lower()
     assert "Official comparator: selected MOT/BEFU" not in runtime_text
     assert "Official comparator: rolling BEFU 1Y" not in runtime_text
@@ -533,13 +637,15 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     assert fy2026.loc[("total_nltf_net_revenue", "current_basecase"), "data_scope"] == "current_nowcast"
     assert fy2026.loc[("total_nltf_net_revenue", "current_basecase"), "actual_quarters"] == "2025Q3; 2025Q4"
     assert fy2026.loc[("total_nltf_net_revenue", "current_basecase"), "forecast_quarters"] == "2026Q1; 2026Q2"
-    assert float(fy2026.loc[("gross_ped_revenue", "current_basecase"), "value"]) == pytest.approx(2050.436748, abs=1e-6)
-    assert float(fy2026.loc[("gross_fed_revenue", "current_basecase"), "value"]) == pytest.approx(2092.481910, abs=1e-6)
-    assert float(fy2026.loc[("net_fed_revenue", "current_basecase"), "value"]) == pytest.approx(2019.214386, abs=1e-6)
-    assert float(fy2026.loc[("light_bev_ruc_net_revenue", "current_basecase"), "value"]) == pytest.approx(80.536847, abs=1e-6)
-    assert float(fy2026.loc[("phev_ruc_net_revenue", "current_basecase"), "value"]) == pytest.approx(21.591540, abs=1e-6)
-    assert float(fy2026.loc[("total_ruc_net_revenue", "current_basecase"), "value"]) == pytest.approx(2049.086732, abs=1e-6)
-    assert float(fy2026.loc[("total_nltf_net_revenue", "current_basecase"), "value"]) == pytest.approx(4510.836388, abs=1e-6)
+    assert float(fy2026.loc[("gross_ped_revenue", "current_basecase"), "value"]) == pytest.approx(2052.808602, abs=1e-6)
+    assert float(fy2026.loc[("gross_fed_revenue", "current_basecase"), "value"]) == pytest.approx(2094.853764, abs=1e-6)
+    assert float(fy2026.loc[("net_fed_revenue", "current_basecase"), "value"]) == pytest.approx(2021.586240, abs=1e-6)
+    assert float(fy2026.loc[("light_bev_ruc_net_revenue", "current_basecase"), "value"]) == pytest.approx(80.520128, abs=1e-6)
+    assert float(fy2026.loc[("phev_ruc_net_revenue", "current_basecase"), "value"]) == pytest.approx(21.587058, abs=1e-6)
+    assert float(fy2026.loc[("total_ruc_net_revenue", "current_basecase"), "value"]) == pytest.approx(2045.963932, abs=1e-6)
+    assert float(fy2026.loc[("total_nltf_net_revenue", "current_basecase"), "value"]) == pytest.approx(4510.085443, abs=1e-6)
+    assert float(fy2026.loc[("gross_ped_revenue", "current_comparison_1"), "value"]) == pytest.approx(2054.465215, abs=1e-6)
+    assert float(fy2026.loc[("total_nltf_net_revenue", "current_comparison_1"), "value"]) == pytest.approx(4513.738498, abs=1e-6)
 
     anchor = current[current["period"].astype(str).eq("FY2025")].set_index(["series_id", "scenario_name"])
     assert anchor.loc[("total_nltf_net_revenue", "current_basecase"), "data_scope"] == "actual_anchor"
@@ -1022,36 +1128,40 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
 def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
     pack_dir = ROOT / CURRENT_REVENUE_OUTLOOK_DIR
     expected_hashes = {
-        "ev_phev_ped_light_drift_assumptions.csv": "d9246b99ef5a6b795737eb236d3c1ac819accce976c534b07e9a1337a616b098",
-        "ev_phev_ped_light_drift_assumptions.parquet": "ce26d938c518e664141fa282e3d07f6918995b37b67fe85f51c9129a978902a2",
-        "ev_phev_split_assumptions.csv": "361a1b83f9df07a0f315c03e29376c70496a318cf8e24a3204227da56b623c11",
-        "ev_phev_split_assumptions.parquet": "aa7b9a988afc527a74850791f434468214cdee6619067818ff27404f5804f98e",
-        "fan_availability.csv": "5558e38a5776689e0d104f9bfe95bdab465aa06fc928b933af49047a4ed74291",
-        "fan_availability.parquet": "99ce74a079f62755584d3af8f2bb437b12f611a16ea63241aac006bcef8f37cb",
-        "fan_band_rows.csv": "705b076fb08f11742d1deb975aded31c0946e87184809543b1300d45987351f8",
-        "fan_band_rows.parquet": "df71da00f0e5fc3dc04bdd00da4380db5fb8707fbaab80cc98061e2ac06a9e05",
-        "future_revenue_forecasts.csv": "b1837c074c79e9eb1dfe4e94ff802e1f713c12a491fffdb9821c89d69cf41eb2",
-        "future_revenue_forecasts.parquet": "bc65e453ee067160c2558a07d65355dfc1113e599bd951639565b5e78eb0f9da",
-        "manifest.json": "c1b0c4794a1add51476539830646053038ca74e3c1ec199c09d16077fc839435",
+        "ev_phev_ped_light_drift_assumptions.csv": "f0a27b5b2e2cf3844ea1c53ed5097a58f8801d8465ee888da39a82e501343bf3",
+        "ev_phev_ped_light_drift_assumptions.parquet": "b3c1b3cc4c07bdc041b9f6d3a0c9e7a8a0a21742890811d94955d66af964d9a2",
+        "ev_phev_split_assumptions.csv": "6675ca24b2dc1b57d27e69848b62aa2dbb9cf1db48976e3f54942b6f2c305994",
+        "ev_phev_split_assumptions.parquet": "e477a4c63d77717c0e7e13d9453057ca50d7a2a8fd76428a37301c0ed1816b00",
+        "fan_availability.csv": "7fde72609437ab85136e9e21c8f8b6ba8dfd9cc2024a73f986ddfac299842e3a",
+        "fan_availability.parquet": "65597bfb4c267ee4ffc37907c17df15ec4cd6ade24fc5cd65f0947e4469f0267",
+        "fan_band_rows.csv": "c58a2e9d78d959e193162a61ca7e85607d5ab62ff7380270637de7b8657cc907",
+        "fan_band_rows.parquet": "e8828c2997785eed41df3cf090b9fdd29b22e9b5e97dd3aabfae924b7fcd86f9",
+        "future_revenue_forecasts.csv": "4e6ed9d9a6bc4a631970247ccba54deb4d66fa4664d04a5ebccf5bfa24d61a72",
+        "future_revenue_forecasts.parquet": "ca3cf207b7da7ece6386e975f9faeeb124f3247ef0e9c1c3f4455a5c81a2508d",
+        "manifest.json": "3027b1d0e1fd6e793ced1382f5ec0d8fe58f4fbdc893979354f8989952dd8a4e",
         "manifest.md": "0d0ffad81aa2f9ab0e8123a05297aaf2b52d40d1b06f9700f2ca1a53977d0a2d",
         "path_trace_status.csv": "9aee7a4e7003ec6541476ca3e4afef6d8586b6c358e41db1c8e06623e5ffcaa3",
         "path_trace_status.parquet": "e66d860fb7532ee4b92285c1ba023c9f8d9469cfdaaaef819415f7cd87c73757",
-        "revenue_bridge_components.csv": "2a0c401e2d8fc531711d3323f4c193cdb69c8758c411040df249fab1a3dd5eba",
-        "revenue_bridge_components.parquet": "2dcfb121d8d3b096c2c6e2011f1b0271667c16b9d6ea0f7c1a5ee73129a7276a",
-        "revenue_chart_rows.csv": "02400cd7715ccbf22df576e6af56c7e342066db3eb3dc2bae5f4e08521d0c9ec",
-        "revenue_chart_rows.parquet": "b0241186c1a24c218c6e3fbb5babb0a93a5f7afd93ec3a81f5359a9326ca0623",
-        "revenue_formula_residuals.csv": "8e5cfb48896374bdce4ae3b45f62f4c57acde9ef0073d72fdfcaf264a92e9193",
-        "revenue_formula_residuals.parquet": "4fc96a0c564913121172ac7b69f0f39b190153b0e9c5b759beb8b1be003d921e",
-        "revenue_line_reconciliation.csv": "be0051da9f2e43352df416e0a082907d76094317134d142909f8316d55c07723",
-        "revenue_line_reconciliation.parquet": "3a934b9bfa1e04a1da23fb2723a75d57b59b7cd446d34eb0aaa6433ca79d3ccd",
-        "revenue_stack_components.csv": "2aa27cc9d76350dfeca325094a2d758f8766d2112258ed64219c1de65b3cabd8",
-        "revenue_stack_components.parquet": "958b119ec42eb731e04d84373412471bbfab1d29ea39a3922f50edc8dda9f782",
+        "revenue_bridge_components.csv": "1d2094bf843ac7408fad130c5b4b7eff516080e18b415b4dc61d06220ff11611",
+        "revenue_bridge_components.parquet": "c84ea4ceb6215ce5240cab7cb567d5b7f5dd8a929216be2071114c4ba2e9154f",
+        "revenue_chart_rows.csv": "4c824790bf6ea1dcd92bd1ead0e8e62423babcc8bc701e4e9bfc6c070c6951d4",
+        "revenue_chart_rows.parquet": "253d67cd7f8d75867673862c44ceb8cd16d10a268cbb8b1e5bfc32bbef0d2a07",
+        "revenue_formula_residuals.csv": "288c1f6227d82debba6a7d5c98f86a4c92f4287576ab2c1a6c95b450127fbe8a",
+        "revenue_formula_residuals.parquet": "90dd6059bdb07e467a28539ef426267e20e2aace7623d3feb9fca180d9497716",
+        "revenue_line_reconciliation.csv": "3139d0c0414ce39cadafc4457d9ac4d6a9814d6ed838ce968a3d0bbfaf5a7b0b",
+        "revenue_line_reconciliation.parquet": "b9368c4dbc66890a41b7bcc3c4ae0590632504946d01e2e5a5647b00901474b8",
+        "revenue_stack_components.csv": "1cfbacf2a0fd598e509edf18ce2339ad875ec2727953f93d5a22689bcf127033",
+        "revenue_stack_components.parquet": "feb44d012cc304a7f6040edf419e19dc85989a8836cf5348b29b9a215eb80c91",
         "row_reconciliation.csv": "d484f5d75cce88e30ce7bcf5dd70058505cc02e5dff93f457a579f119c2fc7ce",
         "row_reconciliation.parquet": "bf2b638920e4b9b00ca4ac00d4263083258ce0d94625943c4e7b3cdf90493dd7",
-        "runtime_trace_audit.csv": "0c257dd1e5b02051d99eb044b0946b1d2589f81eab35feb04868a0327211a5aa",
-        "runtime_trace_audit.parquet": "5ee622e1c7208d76861937b6f1c85b0590bf402dd3b9a09c4035cc1ffe0f62e2",
-        "scenario_role_contract.csv": "19e46e894782d72a8697789e0efa82ec70a923f64663e8d0f58ab2894f51888b",
-        "scenario_role_contract.parquet": "d18d3172d9e664b3a31123c43d3bef9bafa61b464b4ae214fe748f2a554719f2",
+        "runtime_trace_audit.csv": "45c9513db0fe5fe5485ec28c560e757d36733d2e900c194d2b4be9fd6b91afe9",
+        "runtime_trace_audit.parquet": "49465b4692e3f0ff60c51ec26c555883ca4e3337ded988e44017464f06720381",
+        "scenario_feature_lineage.csv": "fa75ab6a0e4c4c584af3300dd2e887fff579c64877ed2f9adc470fbfdc475243",
+        "scenario_feature_lineage.parquet": "7248e6c3142079b1722fbeb18b57393dd82cd3c127c535e08bee2ce139e1d9ab",
+        "scenario_input_replay_mismatch_report.csv": "259cef06c0789feb436a3d0ef7d89bc33926b5a7b70d2aacac5c309d5c20b2ea",
+        "scenario_input_replay_mismatch_report.parquet": "e763d51c9161415229c0737cb18190bf91c7fe1c61a0c75e2c49f4557b92d496",
+        "scenario_role_contract.csv": "f45d02d7f6667f752a2584b4e71032209faddd3843905f5ef4c8b389cded0620",
+        "scenario_role_contract.parquet": "7bfbf555449e5c3e2cfac2ba2821f5958135dc63fdf5acb233d4971d9f06c07d",
         "series_alias_audit.csv": "c0330c9918d7e2f4f972d15e8465537c16d96aca607ef253353612cadd62c56d",
         "series_alias_audit.parquet": "9b376147c912748d5a2429abf524799e348a3711d6af89a4b9d1ec287f558918",
         "series_trace_contract.csv": "2eaf18c4c54fc18a21dd68415c0aea041bd174e8d75285409a4bb83034b60e09",

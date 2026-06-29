@@ -88,6 +88,7 @@ RUNTIME_REVENUE_OUTLOOK_FILES = (
     "revenue_stack_components.parquet",
     "ev_phev_split_assumptions.parquet",
     "ev_phev_ped_light_drift_assumptions.parquet",
+    "scenario_input_replay_mismatch_report.parquet",
     "scenario_feature_lineage.parquet",
     "scenario_role_contract.parquet",
     "revenue_formula_residuals.parquet",
@@ -377,6 +378,7 @@ class RevenueOutlookPack:
     revenue_stack_components: pd.DataFrame = field(default_factory=pd.DataFrame)
     ev_phev_split_assumptions: pd.DataFrame = field(default_factory=pd.DataFrame)
     ev_phev_ped_light_drift_assumptions: pd.DataFrame = field(default_factory=pd.DataFrame)
+    scenario_input_replay_mismatch_report: pd.DataFrame = field(default_factory=pd.DataFrame)
     scenario_feature_lineage: pd.DataFrame = field(default_factory=pd.DataFrame)
     scenario_role_contract: pd.DataFrame = field(default_factory=pd.DataFrame)
     revenue_formula_residuals: pd.DataFrame = field(default_factory=pd.DataFrame)
@@ -401,6 +403,7 @@ def revenue_outlook_signature(pack_dir: Path | str | None = None, repo_root: Pat
         base / "revenue_stack_components.parquet",
         base / "ev_phev_split_assumptions.parquet",
         base / "ev_phev_ped_light_drift_assumptions.parquet",
+        base / "scenario_input_replay_mismatch_report.parquet",
         base / "scenario_feature_lineage.parquet",
         base / "scenario_role_contract.parquet",
         base / "revenue_formula_residuals.parquet",
@@ -442,6 +445,7 @@ def load_revenue_outlook_pack(
         revenue_stack_components=_read_optional_parquet(base / "revenue_stack_components.parquet"),
         ev_phev_split_assumptions=_read_optional_parquet(base / "ev_phev_split_assumptions.parquet"),
         ev_phev_ped_light_drift_assumptions=_read_optional_parquet(base / "ev_phev_ped_light_drift_assumptions.parquet"),
+        scenario_input_replay_mismatch_report=_read_optional_parquet(base / "scenario_input_replay_mismatch_report.parquet"),
         scenario_feature_lineage=_read_optional_parquet(base / "scenario_feature_lineage.parquet"),
         scenario_role_contract=_read_optional_parquet(base / "scenario_role_contract.parquet"),
         revenue_formula_residuals=_read_optional_parquet(base / "revenue_formula_residuals.parquet"),
@@ -579,6 +583,24 @@ def build_current_revenue_outlook_runtime_pack(
     )
     if scenario_feature_lineage.empty:
         scenario_feature_lineage = _read_optional_parquet(base / "scenario_feature_lineage.parquet")
+    scenario_input_replay_mismatch_report = _scenario_input_replay_mismatch_report(
+        current,
+        scenario_input_wide,
+        scenario_input_manifest,
+    )
+    replay_mismatches = scenario_input_replay_mismatch_report[
+        scenario_input_replay_mismatch_report.get("mismatch_status", pd.Series("", index=scenario_input_replay_mismatch_report.index))
+        .astype(str)
+        .eq("mismatch")
+    ].copy()
+    if not replay_mismatches.empty:
+        prepared_report = _prepare_frame_for_output(scenario_input_replay_mismatch_report)
+        prepared_report.to_parquet(base / "scenario_input_replay_mismatch_report.parquet", index=False)
+        prepared_report.to_csv(base / "scenario_input_replay_mismatch_report.csv", index=False)
+        raise ValueError(
+            "Committed scenario input replay verification failed; see "
+            f"{_repo_relative(root, base / 'scenario_input_replay_mismatch_report.csv')}"
+        )
 
     series_meta = _runtime_series_metadata(mbu26_pack.series_trace_contract)
     quarterly_inputs = _runtime_quarterly_activity_inputs(existing_chart_rows, series_meta, scenario_role_contract=scenario_role_contract)
@@ -715,6 +737,15 @@ def build_current_revenue_outlook_runtime_pack(
             "note": SCENARIO_ROLE_CONTRACT_NOTE,
         },
         "scenario_inputs": scenario_input_manifest,
+        "scenario_input_replay_mismatch_report": {
+            "repo_relative_path": _repo_relative(root, base / "scenario_input_replay_mismatch_report.csv"),
+            "status": "passed_no_mismatch",
+            "scope": (
+                "Verification that promoted current-finalist activity rows map back to committed scenario-input "
+                "quarters and workbook hashes before annual Revenue Outlook rows are emitted."
+            ),
+            "fail_policy": "If any required scenario-input quarter is missing or hash-mismatched, rebuild writes this report and raises.",
+        },
         "scenario_feature_lineage": {
             "repo_relative_path": _repo_relative(root, base / "scenario_feature_lineage.csv"),
             "source": f"{SCENARIO_INPUT_DIRNAME}/{SCENARIO_FEATURE_LINEAGE_STEM}.parquet",
@@ -722,7 +753,7 @@ def build_current_revenue_outlook_runtime_pack(
         },
         "rate_provenance": {
             "future_light_heavy": "mbu26_official_annual.csv effective rates joined to current finalist net-km outputs",
-            "future_ped": "MBU26 population/intensity/rate joined to optimized PED/light-petrol VKT after EV/PHEV migration",
+            "future_ped": "Scenario-input population where supplied plus MBU26 intensity/rate joined to optimized PED/light-petrol VKT after EV/PHEV migration",
             "fixed_components": "mbu26_official_annual.csv official rows, excluding Light BEV and PHEV in current-finalist paths where they are allocated by the optimized PED+Light migration layer",
         },
         "trace_audit": {
@@ -781,6 +812,7 @@ def build_current_revenue_outlook_runtime_pack(
             "revenue_stack_components": stack_components,
             "ev_phev_split_assumptions": ev_phev_split_assumptions,
             "ev_phev_ped_light_drift_assumptions": ev_phev_ped_light_drift_assumptions,
+            "scenario_input_replay_mismatch_report": scenario_input_replay_mismatch_report,
             "scenario_feature_lineage": scenario_feature_lineage,
             "scenario_role_contract": scenario_role_contract,
             "revenue_formula_residuals": formula_residuals,
@@ -950,6 +982,200 @@ def _current_scenario_input_manifest(pack_dir: Path, repo_root: Path) -> dict[st
         "workbooks": manifest.get("workbooks", []),
         "manifest_sha256": _sha256(manifest_path),
     }
+
+
+SCENARIO_INPUT_REPLAY_REPORT_COLUMNS = [
+    "scenario_name",
+    "scenario_role",
+    "series_id",
+    "stream",
+    "annual_period",
+    "value_status",
+    "forecast_quarter",
+    "committed_forecast_value",
+    "scenario_input_status",
+    "mismatch_status",
+    "mismatch_reason",
+    "workbook_sha256",
+    "manifest_workbook_sha256",
+    "required_feature_count",
+    "missing_required_feature_count",
+    "source_artifact",
+]
+
+
+def _scenario_input_replay_mismatch_report(
+    current_forecast_annual: pd.DataFrame,
+    scenario_input_wide: pd.DataFrame,
+    scenario_input_manifest: dict[str, Any],
+) -> pd.DataFrame:
+    """Verify promoted current-finalist rows are backed by committed scenario inputs.
+
+    This is a source-variable replay guard, not a model refit. It proves that
+    the annualized current-finalist activity rows used by Revenue Outlook can
+    be traced to committed scenario-input quarters and workbook hashes.
+    """
+
+    if current_forecast_annual is None or current_forecast_annual.empty:
+        return pd.DataFrame(columns=SCENARIO_INPUT_REPLAY_REPORT_COLUMNS)
+    series_to_stream = {
+        "ped_vkt_per_capita": "PED",
+        CURRENT_LIGHT_TOTAL_SERIES_ID: "LIGHT_RUC",
+        "heavy_ruc_net_km": "HEAVY_RUC",
+    }
+    required = {
+        "scenario_name",
+        "role",
+        "workbook_sha256",
+        "stream",
+        "canonical_period",
+        "source_artifact",
+    }
+    input_lookup: dict[tuple[str, str, str], dict[str, Any]] = {}
+    feature_columns: list[str] = []
+    if scenario_input_wide is not None and not scenario_input_wide.empty and not required.difference(scenario_input_wide.columns):
+        metadata_columns = {
+            "scenario_name",
+            "role",
+            "workbook_filename",
+            "workbook_sha256",
+            "stream",
+            "sheet",
+            "period",
+            "canonical_period",
+            "source_artifact",
+            "year",
+            "quarter",
+            "horizon",
+        }
+        feature_columns = [column for column in scenario_input_wide.columns if column not in metadata_columns]
+        for row in scenario_input_wide.itertuples(index=False):
+            key = (
+                str(getattr(row, "scenario_name", "") or ""),
+                str(getattr(row, "stream", "") or ""),
+                str(getattr(row, "canonical_period", "") or ""),
+            )
+            if not all(key):
+                continue
+            row_values = row._asdict()
+            feature_count = sum(
+                1
+                for column in feature_columns
+                if column in row_values and pd.notna(row_values[column]) and str(row_values[column]).strip() != ""
+            )
+            input_lookup[key] = {
+                "workbook_sha256": str(row_values.get("workbook_sha256") or ""),
+                "source_artifact": str(row_values.get("source_artifact") or ""),
+                "required_feature_count": int(feature_count),
+            }
+    manifest_hash_by_scenario = {
+        str(item.get("scenario_name") or ""): str(item.get("workbook_sha256") or "")
+        for item in scenario_input_manifest.get("workbooks", [])
+        if isinstance(item, dict)
+    }
+    rows: list[dict[str, Any]] = []
+    source = current_forecast_annual.copy()
+    source = source[source.get("series_id", pd.Series("", index=source.index)).astype(str).isin(series_to_stream)].copy()
+    for row in source.itertuples(index=False):
+        scenario_name = str(getattr(row, "scenario_name", "") or "")
+        series_id = str(getattr(row, "series_id", "") or "")
+        stream = series_to_stream.get(series_id, "")
+        value_status = str(getattr(row, "value_status", "") or "")
+        annual_period = str(getattr(row, "period", "") or f"FY{_coerce_int(getattr(row, 'FY', 0))}")
+        committed_value = getattr(row, "value", pd.NA)
+        forecast_quarters = _split_forecast_quarters(str(getattr(row, "forecast_quarters", "") or ""))
+        base_record = {
+            "scenario_name": scenario_name,
+            "scenario_role": str(getattr(row, "scenario_role", "") or ""),
+            "series_id": series_id,
+            "stream": stream,
+            "annual_period": annual_period,
+            "value_status": value_status,
+            "committed_forecast_value": committed_value,
+            "manifest_workbook_sha256": manifest_hash_by_scenario.get(scenario_name, ""),
+        }
+        if value_status == "extrapolated_model_extension":
+            rows.append(
+                {
+                    **base_record,
+                    "forecast_quarter": "",
+                    "scenario_input_status": "governed_model_extension_not_replayed_from_workbook",
+                    "mismatch_status": "not_applicable",
+                    "mismatch_reason": "FY2051-FY2055 extension uses governed annual gradient rather than workbook quarter rows.",
+                    "workbook_sha256": "",
+                    "required_feature_count": 0,
+                    "missing_required_feature_count": 0,
+                    "source_artifact": "current_finalist_model_extension",
+                }
+            )
+            continue
+        if not forecast_quarters:
+            rows.append(
+                {
+                    **base_record,
+                    "forecast_quarter": "",
+                    "scenario_input_status": "actual_anchor_no_workbook_replay_required",
+                    "mismatch_status": "not_applicable",
+                    "mismatch_reason": "Annual row contains actual-anchor quarters only.",
+                    "workbook_sha256": "",
+                    "required_feature_count": 0,
+                    "missing_required_feature_count": 0,
+                    "source_artifact": "mbu26_actual_anchor",
+                }
+            )
+            continue
+        for quarter in forecast_quarters:
+            input_row = input_lookup.get((scenario_name, stream, quarter))
+            manifest_hash = manifest_hash_by_scenario.get(scenario_name, "")
+            if input_row is None:
+                rows.append(
+                    {
+                        **base_record,
+                        "forecast_quarter": quarter,
+                        "scenario_input_status": "missing_committed_scenario_input",
+                        "mismatch_status": "mismatch",
+                        "mismatch_reason": "Required promoted forecast quarter is absent from scenario_input_wide.",
+                        "workbook_sha256": "",
+                        "required_feature_count": len(feature_columns),
+                        "missing_required_feature_count": 1,
+                        "source_artifact": f"{SCENARIO_INPUT_DIRNAME}/{SCENARIO_INPUT_WIDE_STEM}.parquet",
+                    }
+                )
+                continue
+            workbook_hash = str(input_row.get("workbook_sha256") or "")
+            hash_mismatch = bool(manifest_hash and workbook_hash and manifest_hash != workbook_hash)
+            rows.append(
+                {
+                    **base_record,
+                    "forecast_quarter": quarter,
+                    "scenario_input_status": "matched_committed_scenario_input"
+                    if not hash_mismatch
+                    else "workbook_hash_mismatch",
+                    "mismatch_status": "mismatch" if hash_mismatch else "pass",
+                    "mismatch_reason": ""
+                    if not hash_mismatch
+                    else "Scenario input row workbook hash differs from the scenario input manifest workbook hash.",
+                    "workbook_sha256": workbook_hash,
+                    "required_feature_count": int(input_row.get("required_feature_count") or 0),
+                    "missing_required_feature_count": 0 if not hash_mismatch else 1,
+                    "source_artifact": input_row.get("source_artifact") or f"{SCENARIO_INPUT_DIRNAME}/{SCENARIO_INPUT_WIDE_STEM}.parquet",
+                }
+            )
+    if not rows:
+        return pd.DataFrame(columns=SCENARIO_INPUT_REPLAY_REPORT_COLUMNS)
+    return pd.DataFrame(rows, columns=SCENARIO_INPUT_REPLAY_REPORT_COLUMNS).sort_values(
+        ["scenario_name", "stream", "annual_period", "forecast_quarter"],
+        kind="stable",
+    )
+
+
+def _split_forecast_quarters(value: str) -> list[str]:
+    quarters: list[str] = []
+    for part in str(value or "").replace(",", ";").split(";"):
+        token = part.strip().upper()
+        if len(token) == 6 and token[:4].isdigit() and token[4] == "Q" and token[5] in {"1", "2", "3", "4"}:
+            quarters.append(token)
+    return quarters
 
 
 SCENARIO_ROLE_CONTRACT_COLUMNS = [
@@ -4157,6 +4383,7 @@ def _write_pack_files(
         "revenue_stack_components",
         "ev_phev_split_assumptions",
         "ev_phev_ped_light_drift_assumptions",
+        "scenario_input_replay_mismatch_report",
         "scenario_feature_lineage",
         "scenario_role_contract",
         "revenue_formula_residuals",

@@ -570,6 +570,26 @@ def test_scenario_comparison_artifacts(tmp_path: Path) -> None:
             run_timestamp="comparison-smoke",
         ),
     ]
+    for result in results:
+        scenario_inputs = result.scenario_input_manifest
+        assert scenario_inputs["schema_version"] == "nltf-scenario-input-materializer-v1"
+        assert scenario_inputs["source_policy"] == "committed scenario input artifacts only; Streamlit must not load Excel at runtime"
+        assert scenario_inputs["row_counts"]["scenario_input_cells"] > 0
+        assert scenario_inputs["row_counts"]["scenario_input_long"] > 0
+        assert scenario_inputs["row_counts"]["scenario_input_wide"] > 0
+        assert scenario_inputs["row_counts"]["scenario_feature_lineage"] > 0
+        assert {workbook["raw_status"] for workbook in scenario_inputs["workbooks"]} == {"copied_repo_local_raw_workbook"}
+        for name in [
+            "scenario_input_manifest.json",
+            "scenario_input_cells.parquet",
+            "scenario_input_long.parquet",
+            "scenario_input_wide.parquet",
+            "scenario_feature_lineage.parquet",
+        ]:
+            assert (result.output_dir / "scenario_inputs" / name).exists(), name
+        assert result.manifest["scenario_inputs"]["schema_version"] == "nltf-scenario-input-materializer-v1"
+        assert result.manifest["scenario_inputs"]["row_counts"] == scenario_inputs["row_counts"]
+
     comparison = write_forecast_scenario_comparison(
         results,
         output_dir=tmp_path / "comparison",
@@ -593,9 +613,31 @@ def test_scenario_comparison_artifacts(tmp_path: Path) -> None:
         "forecast_scenario_chart_rows.csv",
         "scenario_input_delta_audit.parquet",
         "scenario_input_delta_audit.csv",
+        "scenario_inputs/scenario_input_manifest.json",
+        "scenario_inputs/scenario_input_cells.parquet",
+        "scenario_inputs/scenario_input_long.parquet",
+        "scenario_inputs/scenario_input_wide.parquet",
+        "scenario_inputs/scenario_feature_lineage.parquet",
         "forecast_scenario_comparison_manifest.json",
     ]:
         assert (comparison.output_dir / name).exists(), name
+    assert comparison.scenario_input_manifest["schema_version"] == "nltf-scenario-input-materializer-v1"
+    assert comparison.scenario_input_manifest["row_counts"]["scenario_input_cells"] == sum(
+        result.scenario_input_manifest["row_counts"]["scenario_input_cells"] for result in results
+    )
+    assert comparison.scenario_input_manifest["row_counts"]["scenario_input_long"] == sum(
+        result.scenario_input_manifest["row_counts"]["scenario_input_long"] for result in results
+    )
+    assert comparison.scenario_input_manifest["row_counts"]["scenario_input_wide"] == sum(
+        result.scenario_input_manifest["row_counts"]["scenario_input_wide"] for result in results
+    )
+    assert comparison.scenario_input_manifest["row_counts"]["scenario_feature_lineage"] == sum(
+        result.scenario_input_manifest["row_counts"]["scenario_feature_lineage"] for result in results
+    )
+    assert comparison.manifest["scenario_inputs"]["row_counts"] == comparison.scenario_input_manifest["row_counts"]
+    assert {workbook["raw_status"] for workbook in comparison.scenario_input_manifest["workbooks"]} == {
+        "copied_repo_local_raw_workbook"
+    }
     assert comparison.manifest["horizon_support_note"] == HORIZON_SUPPORT_NOTE
     assert "high_population_fixture_note" not in comparison.manifest
     assert not comparison.scenario_input_delta_audit.empty
@@ -710,6 +752,8 @@ def test_forecast_run_artifacts_are_repo_ignored() -> None:
     assert tracked_workbooks <= {
         "templates/NLTF_forecast_input_template_12q.xlsx",
         "templates/NLTF_forecast_input_template_20q.xlsx",
+        "data/current_revenue_outlook/scenario_inputs/raw/6213ce565cf1_NLTF_forecast_input_template_to_2050Q4_high_population _2_ - Copy.xlsx",
+        "data/current_revenue_outlook/scenario_inputs/raw/d0644d353ee5_NLTF_forecast_input_template_to_2050Q4_basecase _2_ - Copy.xlsx",
     }
 
 

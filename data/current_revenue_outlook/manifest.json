@@ -430,6 +430,12 @@
     ],
     "manifest_sha256": "60f7f5fddd3dd6b220eac14793bc2c2a69b6b88813ee052d54088757261b6409"
   },
+  "scenario_input_replay_mismatch_report": {
+    "repo_relative_path": "data/current_revenue_outlook/scenario_input_replay_mismatch_report.csv",
+    "status": "passed_no_mismatch",
+    "scope": "Verification that promoted current-finalist activity rows map back to committed scenario-input quarters and workbook hashes before annual Revenue Outlook rows are emitted.",
+    "fail_policy": "If any required scenario-input quarter is missing or hash-mismatched, rebuild writes this report and raises."
+  },
   "scenario_feature_lineage": {
     "repo_relative_path": "data/current_revenue_outlook/scenario_feature_lineage.csv",
     "source": "scenario_inputs/scenario_feature_lineage.parquet",
@@ -437,7 +443,7 @@
   },
   "rate_provenance": {
     "future_light_heavy": "mbu26_official_annual.csv effective rates joined to current finalist net-km outputs",
-    "future_ped": "MBU26 population/intensity/rate joined to optimized PED/light-petrol VKT after EV/PHEV migration",
+    "future_ped": "Scenario-input population where supplied plus MBU26 intensity/rate joined to optimized PED/light-petrol VKT after EV/PHEV migration",
     "fixed_components": "mbu26_official_annual.csv official rows, excluding Light BEV and PHEV in current-finalist paths where they are allocated by the optimized PED+Light migration layer"
   },
   "trace_audit": {
@@ -592,6 +598,14 @@
     "scenario_feature_lineage.parquet": {
       "sha256": "7248e6c3142079b1722fbeb18b57393dd82cd3c127c535e08bee2ce139e1d9ab",
       "size_bytes": 65301
+    },
+    "scenario_input_replay_mismatch_report.csv": {
+      "sha256": "259cef06c0789feb436a3d0ef7d89bc33926b5a7b70d2aacac5c309d5c20b2ea",
+      "size_bytes": 212537
+    },
+    "scenario_input_replay_mismatch_report.parquet": {
+      "sha256": "e763d51c9161415229c0737cb18190bf91c7fe1c61a0c75e2c49f4557b92d496",
+      "size_bytes": 15120
     },
     "scenario_role_contract.csv": {
       "sha256": "f45d02d7f6667f752a2584b4e71032209faddd3843905f5ef4c8b389cded0620",
