@@ -6,10 +6,11 @@
 - Output: `data/current_revenue_outlook`
 
 ## Equations
-- PED VKT per capita: PED revenue = current finalist VKT/capita * MBU26 population -> total VKT * MBU26 litres/100km * MBU26 gross PED rate.
-- Light RUC volume: Light RUC revenue = current finalist total light-RUC net km allocated by MBU26 conventional/Light BEV/PHEV shares, then multiplied by the matching MBU26 effective rates.
+- EV_PHEV_MIGRATION: Optimized lambda allocates EV/PHEV uptake between PED/light-petrol and current finalist total Light RUC to match MBU26 light-mobility proportions with a smoothness penalty.
+- PED VKT per capita: PED revenue = adjusted PED/light-petrol VKT after optimized EV/PHEV migration * MBU26 litres/100km * MBU26 gross PED rate.
+- Light RUC volume: Light RUC revenue = optimized conventional Light RUC km after EV/PHEV migration * MBU26 conventional Light effective rate.
 - Heavy RUC volume: Heavy RUC revenue = current finalist net km * MBU26 effective Heavy RUC rate.
-- ROLLUPS: Gross FED, Net FED, Total RUC, Total RUC+PED and Total NLTF recalculate PED, allocated Light RUC, allocated Light BEV, allocated PHEV and Heavy RUC replacement lines plus MBU26 fixed components.
+- ROLLUPS: Gross FED, Net FED, Total RUC, Total RUC+PED and Total NLTF recalculate optimized PED, conventional Light RUC, Light BEV, PHEV and Heavy RUC replacement lines plus MBU26 fixed components.
 
 ## Scenario Roles
 - `current_basecase`: `basecase`, workbook `NLTF_forecast_input_template_to_2050Q4_basecase (2) - Copy.xlsx`, SHA256 `d0644d353ee5a073602186cf7ac5c16e707d5350e16fd037b73a65528067cc6a`

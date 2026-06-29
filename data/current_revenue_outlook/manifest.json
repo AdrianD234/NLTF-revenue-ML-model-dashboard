@@ -18,7 +18,7 @@
     "B_official_comparator": "MBU26 official forecast rows for FY2026+",
     "C_current_finalist_activity": "Promoted quarterly finalist outputs annualized by June year",
     "D_hybrid_current_revenue": "Only PED, Light RUC and Heavy RUC revenue are replaced; all other rows use MBU26 official components.",
-    "E_ev_phev_split_audit": "Current finalist Light RUC is governed as the total light-RUC net-km universe. MBU26 conventional, Light BEV and PHEV shares allocate that total down before revenue rates are applied.",
+    "E_ev_phev_split_audit": "Current finalist Light RUC is governed as a total light-RUC net-km model input. The optimized migration layer allocates BEV/PHEV uptake between PED/light-petrol and total Light RUC before revenue rates are applied.",
     "F_current_model_extension": "Current-finalist modelled streams extend FY2051-FY2055 using the linear annual gradient from FY2046-FY2050."
   },
   "period_rule": {
@@ -29,7 +29,8 @@
     "rule": "Actual line ends FY2025; FY2026 actual-to-date rows are nowcast inputs only and are not plotted as actuals."
   },
   "data_vintage_manifest_notes": {
-    "light_ruc_target_semantics": "Business rule: current-finalist Light RUC is treated as total light-RUC net km, then allocated into conventional Light, Light BEV and PHEV using MBU26 annual shares. BEV/PHEV are not added on top."
+    "light_ruc_target_semantics": "Business rule update: current-finalist Light RUC is treated as total light-RUC net km, while EV/PHEV migration is sourced from both current PED/light-petrol activity and total Light RUC using an optimized deterministic bridge calibrated to MBU26 light-mobility proportions. BEV/PHEV are not fixed add-ons.",
+    "ev_phev_migration_allocation": "Default lambda_mode is optimized; alternatives are recorded for audit only and do not replace the current runtime path unless explicitly selected in governance review."
   },
   "source_comparison": {
     "comparison_id": "current_revenue_outlook_scenario_comparison",
@@ -304,15 +305,16 @@
     ]
   },
   "equations": {
-    "PED": "PED revenue = current finalist VKT/capita * MBU26 population -> total VKT * MBU26 litres/100km * MBU26 gross PED rate.",
-    "LIGHT_RUC": "Light RUC revenue = current finalist total light-RUC net km allocated by MBU26 conventional/Light BEV/PHEV shares, then multiplied by the matching MBU26 effective rates.",
+    "EV_PHEV_MIGRATION": "Optimized lambda allocates EV/PHEV uptake between PED/light-petrol and current finalist total Light RUC to match MBU26 light-mobility proportions with a smoothness penalty.",
+    "PED": "PED revenue = adjusted PED/light-petrol VKT after optimized EV/PHEV migration * MBU26 litres/100km * MBU26 gross PED rate.",
+    "LIGHT_RUC": "Light RUC revenue = optimized conventional Light RUC km after EV/PHEV migration * MBU26 conventional Light effective rate.",
     "HEAVY_RUC": "Heavy RUC revenue = current finalist net km * MBU26 effective Heavy RUC rate.",
-    "ROLLUPS": "Gross FED, Net FED, Total RUC, Total RUC+PED and Total NLTF recalculate PED, allocated Light RUC, allocated Light BEV, allocated PHEV and Heavy RUC replacement lines plus MBU26 fixed components."
+    "ROLLUPS": "Gross FED, Net FED, Total RUC, Total RUC+PED and Total NLTF recalculate optimized PED, conventional Light RUC, Light BEV, PHEV and Heavy RUC replacement lines plus MBU26 fixed components."
   },
   "target_semantics_audit": {
     "LIGHT_RUC": {
-      "status": "business_rule_applied_total_light_universe",
-      "decision": "Allocate current finalist Light RUC total modelled km into conventional Light, Light BEV and PHEV using MBU26 shares.",
+      "status": "business_rule_applied_ped_light_optimized_migration",
+      "decision": "Allocate EV/PHEV uptake between PED/light-petrol activity and current-finalist total Light RUC using the optimized migration layer; retain the legacy Light-only split as an audit comparator.",
       "evidence_years": [
         2024,
         2025,
@@ -361,7 +363,7 @@
         "data/model_input_history/light_ruc_inputs.parquet",
         "data/revenue_model_source_pack/mbu26_annual_spine/mbu26_annual_spine.csv"
       ],
-      "rationale": "The current governed business rule treats Light RUC finalist output as the total light-RUC universe. The audit preserves prior model-input target evidence and records the allocation rows used by the runtime."
+      "rationale": "The current governed business rule sources EV/PHEV migration from both PED/light-petrol activity and total Light RUC. The legacy split audit preserves prior model-input target evidence and old Light-only comparators for review."
     },
     "HEAVY_RUC": {
       "status": "not_reclassified",
@@ -371,13 +373,20 @@
   },
   "ev_phev_split_assumptions": {
     "repo_relative_path": "data/current_revenue_outlook/ev_phev_split_assumptions.csv",
-    "scope": "MBU26 conventional Light, Light BEV and PHEV km/revenue shares and rates, with current-finalist total Light RUC allocation outputs and old fixed-add-on comparator fields.",
-    "allocation_status": "business_rule_applied_total_light_universe"
+    "scope": "Legacy continuity audit for MBU26 conventional Light, Light BEV and PHEV km/revenue shares and rates, with old fixed-add-on comparator fields. The active current path is the PED+Light migration audit.",
+    "allocation_status": "legacy_light_only_comparator_superseded_by_ped_light_migration"
+  },
+  "ev_phev_ped_light_drift_assumptions": {
+    "repo_relative_path": "data/current_revenue_outlook/ev_phev_ped_light_drift_assumptions.csv",
+    "scope": "Deterministic EV/PHEV migration bridge over current PED/light-petrol activity and current finalist total Light RUC, including optimized, Light-only, PED-only and MBU-ratio lambda modes.",
+    "default_lambda_mode": "optimized",
+    "lambda_smoothness_penalty": 25.0,
+    "runtime_mode": "optimized"
   },
   "rate_provenance": {
     "future_light_heavy": "mbu26_official_annual.csv effective rates joined to current finalist net-km outputs",
-    "future_ped": "MBU26 population/intensity/rate joined to current finalist PED VKT/capita",
-    "fixed_components": "mbu26_official_annual.csv official rows, excluding Light BEV and PHEV in current-finalist paths where they are allocated from current Light RUC total"
+    "future_ped": "MBU26 population/intensity/rate joined to optimized PED/light-petrol VKT after EV/PHEV migration",
+    "fixed_components": "mbu26_official_annual.csv official rows, excluding Light BEV and PHEV in current-finalist paths where they are allocated by the optimized PED+Light migration layer"
   },
   "trace_audit": {
     "repo_relative_path": "data/current_revenue_outlook/runtime_trace_audit.csv",
@@ -420,37 +429,45 @@
   },
   "validation_status": "runtime_rebuilt",
   "output_hashes": {
+    "ev_phev_ped_light_drift_assumptions.csv": {
+      "sha256": "d6dfa327b755cf1a204ba89abaf2fd9f0bb078330d7b1c196947041ed5fee445",
+      "size_bytes": 494478
+    },
+    "ev_phev_ped_light_drift_assumptions.parquet": {
+      "sha256": "2c70421aee7a77a2f682114dcb26e1e5148c6b0f76c865f619e071ad7f500218",
+      "size_bytes": 93058
+    },
     "ev_phev_split_assumptions.csv": {
-      "sha256": "b99604919e9a5c0230778c755ba0084a704fd1486c4eac27ab7842cafa8ebc64",
-      "size_bytes": 76444
+      "sha256": "361a1b83f9df07a0f315c03e29376c70496a318cf8e24a3204227da56b623c11",
+      "size_bytes": 75756
     },
     "ev_phev_split_assumptions.parquet": {
-      "sha256": "cc04a903687065c4019b1c9db840f076043e1a5ee19a8d305e9bf1a2e652a380",
-      "size_bytes": 56690
+      "sha256": "aa7b9a988afc527a74850791f434468214cdee6619067818ff27404f5804f98e",
+      "size_bytes": 57661
     },
     "fan_availability.csv": {
-      "sha256": "af2d246871e877d4d1cd72953e37da31e03bcd4ac91137547043e6fe45a31d10",
-      "size_bytes": 29824
+      "sha256": "5558e38a5776689e0d104f9bfe95bdab465aa06fc928b933af49047a4ed74291",
+      "size_bytes": 30368
     },
     "fan_availability.parquet": {
-      "sha256": "428e7c45da2ab868f99682f7b00f5d65160be4e1069a1c5fb41d19008cfd8d71",
-      "size_bytes": 10047
+      "sha256": "99ce74a079f62755584d3af8f2bb437b12f611a16ea63241aac006bcef8f37cb",
+      "size_bytes": 10042
     },
     "fan_band_rows.csv": {
-      "sha256": "7161f74a2374ead1ceb2cffd12f150176d855f1f58d9f692f4c2f694136af765",
-      "size_bytes": 406746
+      "sha256": "705b076fb08f11742d1deb975aded31c0946e87184809543b1300d45987351f8",
+      "size_bytes": 415154
     },
     "fan_band_rows.parquet": {
-      "sha256": "834fc4bf60e0216f27c5231e82eabb9850eebe138a5e8a2c7dc760647e9bdee5",
-      "size_bytes": 50183
+      "sha256": "df71da00f0e5fc3dc04bdd00da4380db5fb8707fbaab80cc98061e2ac06a9e05",
+      "size_bytes": 50184
     },
     "future_revenue_forecasts.csv": {
-      "sha256": "5195e33b543e73386dc1dda6585cfd1823a1cb6c6ef5aed0b368518cd808dd00",
-      "size_bytes": 322839
+      "sha256": "b1837c074c79e9eb1dfe4e94ff802e1f713c12a491fffdb9821c89d69cf41eb2",
+      "size_bytes": 331495
     },
     "future_revenue_forecasts.parquet": {
-      "sha256": "aff719a3a420657e24ef22af5da27dacb411a938eb629a29c7650db5378643ac",
-      "size_bytes": 29544
+      "sha256": "bc65e453ee067160c2558a07d65355dfc1113e599bd951639565b5e78eb0f9da",
+      "size_bytes": 29676
     },
     "path_trace_status.csv": {
       "sha256": "9aee7a4e7003ec6541476ca3e4afef6d8586b6c358e41db1c8e06623e5ffcaa3",
@@ -461,44 +478,44 @@
       "size_bytes": 5960
     },
     "revenue_bridge_components.csv": {
-      "sha256": "dbd48d851814516a5b15602d6f2054cca22ce529be3dee7ae241ad4c63eefa61",
-      "size_bytes": 599891
+      "sha256": "2a0c401e2d8fc531711d3323f4c193cdb69c8758c411040df249fab1a3dd5eba",
+      "size_bytes": 629597
     },
     "revenue_bridge_components.parquet": {
-      "sha256": "82999b8d18983dd79ec8bbb061c98ffc84e3f05d5999aa37454a5165a252032c",
-      "size_bytes": 63084
+      "sha256": "2dcfb121d8d3b096c2c6e2011f1b0271667c16b9d6ea0f7c1a5ee73129a7276a",
+      "size_bytes": 63437
     },
     "revenue_chart_rows.csv": {
-      "sha256": "a1cee695d3c10ede6578feebb2619d7f98ed4a6392acaf231d4dbd5b61e920d3",
-      "size_bytes": 2262453
+      "sha256": "d34730b4320ebd98627fa4d167e2a8d1674b433cbec0a5d7e16149762877d6af",
+      "size_bytes": 2411801
     },
     "revenue_chart_rows.parquet": {
-      "sha256": "c172026e14dc162516e521e1cae6b086e0cc89a7739b38d9f93ae76f0a71d582",
-      "size_bytes": 121923
+      "sha256": "8364f1d49dd3b4b16ac89b09ce3ad4d92e3a65a1cfbc952aca6b37190b327b5a",
+      "size_bytes": 123738
     },
     "revenue_formula_residuals.csv": {
-      "sha256": "fab6ea5d67422db8e196a48fc5ca2d0c921f88c2ffb69e281901ae219a51804c",
-      "size_bytes": 327033
+      "sha256": "8e5cfb48896374bdce4ae3b45f62f4c57acde9ef0073d72fdfcaf264a92e9193",
+      "size_bytes": 327176
     },
     "revenue_formula_residuals.parquet": {
-      "sha256": "962dd5dce4abfd2c720b1b99570878dd5a03dd5a930891c8d467bc8a995cef46",
-      "size_bytes": 37713
+      "sha256": "4fc96a0c564913121172ac7b69f0f39b190153b0e9c5b759beb8b1be003d921e",
+      "size_bytes": 37707
     },
     "revenue_line_reconciliation.csv": {
-      "sha256": "4f6c1dc5fc6cf31fd04a3a998409ff4de915471e814a0bc4d50171b4b9405618",
-      "size_bytes": 2086875
+      "sha256": "be0051da9f2e43352df416e0a082907d76094317134d142909f8316d55c07723",
+      "size_bytes": 2276202
     },
     "revenue_line_reconciliation.parquet": {
-      "sha256": "616bd2d0ee273bc4c8ae3499a80fca8b98864558d20b9c1e04b87073adbc09ee",
-      "size_bytes": 87331
+      "sha256": "3a934b9bfa1e04a1da23fb2723a75d57b59b7cd446d34eb0aaa6433ca79d3ccd",
+      "size_bytes": 89167
     },
     "revenue_stack_components.csv": {
-      "sha256": "d8f73a44c4b32a433fb7c08611f975d91d6e28f002472b769ef59d52a3dacbfc",
-      "size_bytes": 10969662
+      "sha256": "2aa27cc9d76350dfeca325094a2d758f8766d2112258ed64219c1de65b3cabd8",
+      "size_bytes": 11348001
     },
     "revenue_stack_components.parquet": {
-      "sha256": "1c0ca9744b98d493021baeb668676fc0a0135d3bbe88ad5c81b409f9dc11096e",
-      "size_bytes": 242506
+      "sha256": "958b119ec42eb731e04d84373412471bbfab1d29ea39a3922f50edc8dda9f782",
+      "size_bytes": 244059
     },
     "row_reconciliation.csv": {
       "sha256": "d484f5d75cce88e30ce7bcf5dd70058505cc02e5dff93f457a579f119c2fc7ce",
@@ -509,12 +526,12 @@
       "size_bytes": 38215
     },
     "runtime_trace_audit.csv": {
-      "sha256": "61db3a47b217aece7998b70fe451c48dd85d400cccac2202bf02507fd73757f4",
-      "size_bytes": 85809
+      "sha256": "f65aeacca0f592b750c4e9216b0f12d1a2cb7b81bf6ab7472ab0046951240247",
+      "size_bytes": 96704
     },
     "runtime_trace_audit.parquet": {
-      "sha256": "3a63a2398a06eef87d7f1cafa5a7a2f6fedd7528e3466a9e9022f1a681cacd0a",
-      "size_bytes": 21083
+      "sha256": "9b8beed60b6bbbd969fafae0e130fb0a28b2ec7c9903302751bd76e445589e56",
+      "size_bytes": 21893
     },
     "series_alias_audit.csv": {
       "sha256": "c0330c9918d7e2f4f972d15e8465537c16d96aca607ef253353612cadd62c56d",

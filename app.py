@@ -2005,6 +2005,11 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     line_reconciliation = pack.revenue_line_reconciliation.copy() if pack is not None and isinstance(getattr(pack, "revenue_line_reconciliation", None), pd.DataFrame) else pd.DataFrame()
     stack_components = pack.revenue_stack_components.copy() if pack is not None and isinstance(getattr(pack, "revenue_stack_components", None), pd.DataFrame) else pd.DataFrame()
     ev_phev_split_assumptions = pack.ev_phev_split_assumptions.copy() if pack is not None and isinstance(getattr(pack, "ev_phev_split_assumptions", None), pd.DataFrame) else pd.DataFrame()
+    ev_phev_ped_light_drift_assumptions = (
+        pack.ev_phev_ped_light_drift_assumptions.copy()
+        if pack is not None and isinstance(getattr(pack, "ev_phev_ped_light_drift_assumptions", None), pd.DataFrame)
+        else pd.DataFrame()
+    )
     formula_residuals = pack.revenue_formula_residuals.copy() if pack is not None and isinstance(getattr(pack, "revenue_formula_residuals", None), pd.DataFrame) else pd.DataFrame()
     alias_audit = pack.series_alias_audit.copy() if pack is not None and isinstance(getattr(pack, "series_alias_audit", None), pd.DataFrame) else pd.DataFrame()
     fan_availability = pack.fan_availability.copy() if pack is not None and isinstance(getattr(pack, "fan_availability", None), pd.DataFrame) else pd.DataFrame()
@@ -2200,17 +2205,54 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             dataframe_download(filtered_stack, "Download CSV", "revenue_stack_components.csv")
         display_table(_revenue_stack_components_display_table(filtered_stack), height=360, max_rows=720)
 
+    if not ev_phev_ped_light_drift_assumptions.empty:
+        with st.expander("EV/PHEV PED-Light migration audit", expanded=False):
+            drift_manifest = (manifest.get("ev_phev_ped_light_drift_assumptions") or {}) if isinstance(manifest, dict) else {}
+            mode_values = (
+                ev_phev_ped_light_drift_assumptions.get("lambda_mode", pd.Series(dtype=str))
+                .dropna()
+                .astype(str)
+                .drop_duplicates()
+                .tolist()
+            )
+            mode_labels = {
+                "optimized": "Optimized",
+                "fixed_light_only": "Light-only",
+                "fixed_ped_only": "PED-only",
+                "mbu_ratio": "MBU ratio",
+            }
+            ordered_modes = [mode for mode in ["optimized", "fixed_light_only", "fixed_ped_only", "mbu_ratio"] if mode in mode_values]
+            default_mode = str(drift_manifest.get("default_lambda_mode") or "optimized")
+            selected_mode = st.selectbox(
+                "Migration allocation mode",
+                ordered_modes or mode_values,
+                index=(ordered_modes or mode_values).index(default_mode) if default_mode in (ordered_modes or mode_values) else 0,
+                format_func=lambda value: mode_labels.get(str(value), str(value).replace("_", " ").title()),
+                key="revenue_outlook_migration_allocation_mode",
+            )
+            info_panel(
+                "EV/PHEV uptake is allocated between PED/light-petrol and total Light RUC to match MBU proportions; it is not a new model."
+            )
+            st.caption(
+                "Revenue Outlook current-finalist rows use Optimized by default. Alternative modes are audit comparators for governance review."
+            )
+            drift_view = ev_phev_ped_light_drift_assumptions[
+                ev_phev_ped_light_drift_assumptions.get("lambda_mode", pd.Series("", index=ev_phev_ped_light_drift_assumptions.index)).astype(str).eq(str(selected_mode))
+            ].copy()
+            drift_cols = st.columns([0.82, 0.18])
+            with drift_cols[1]:
+                dataframe_download(drift_view, "Download CSV", "ev_phev_ped_light_drift_assumptions.csv")
+            display_table(_ev_phev_ped_light_drift_display_table(drift_view), height=340, max_rows=260)
+
     if not ev_phev_split_assumptions.empty:
         with st.expander("EV/PHEV split audit", expanded=False):
             target_audit = (manifest.get("target_semantics_audit") or {}).get("LIGHT_RUC", {}) if isinstance(manifest, dict) else {}
             allocation_status = ((manifest.get("ev_phev_split_assumptions") or {}).get("allocation_status") if isinstance(manifest, dict) else "") or ""
             info_panel(
-                "Current Light RUC model output is governed as total light-RUC net km. "
-                "It is allocated down into conventional Light, Light BEV and PHEV using MBU26 annual shares."
+                "Legacy continuity view: MBU26 Light RUC split/rate rows and old fixed-add-on comparators are retained for governance review."
             )
             st.caption(
-                "BEV/PHEV are not added on top of the current finalist Light RUC output; they replace shares of that total. "
-                "The audit table keeps old fixed-add-on comparator fields for governance review."
+                "The active current-finalist path is the PED-Light migration audit above. BEV/PHEV are not fixed add-ons."
             )
             if target_audit:
                 st.caption(f"Target semantics status: {target_audit.get('status', '')}. Allocation status: {allocation_status}.")
@@ -5367,6 +5409,101 @@ def _ev_phev_split_assumptions_display_table(split_assumptions: pd.DataFrame) ->
             view[col] = pd.to_numeric(view[col], errors="coerce").map(
                 lambda value: "" if pd.isna(value) else f"{float(value):.4%}"
             )
+    return view
+
+
+def _ev_phev_ped_light_drift_display_table(drift_assumptions: pd.DataFrame) -> pd.DataFrame:
+    if drift_assumptions is None or drift_assumptions.empty:
+        return pd.DataFrame()
+    view = drift_assumptions.copy()
+    rename = {
+        "FY": "FY",
+        "source_path": "Source path",
+        "scenario_name": "Scenario",
+        "scenario_role": "Scenario role",
+        "lambda_mode": "Lambda mode",
+        "lambda_value": "Lambda",
+        "lambda_raw_unconstrained": "Raw lambda",
+        "lambda_lower_bound": "Lambda lower",
+        "lambda_upper_bound": "Lambda upper",
+        "lambda_binding_constraints": "Binding constraints",
+        "current_P_t_light_petrol_km": "Current P_t petrol km",
+        "current_L_t_total_light_ruc_km": "Current L_t Light RUC km",
+        "current_U_t_light_mobility_km": "Current U_t universe km",
+        "p_PED": "MBU PED prop",
+        "p_Lconv": "MBU conventional prop",
+        "p_BEV": "MBU BEV prop",
+        "p_PHEV": "MBU PHEV prop",
+        "target_PED_light_petrol_km": "Target PED petrol km",
+        "target_conventional_light_km": "Target conventional km",
+        "target_BEV_km": "Target BEV km",
+        "target_PHEV_km": "Target PHEV km",
+        "current_PED_light_petrol_km": "Allocated PED petrol km",
+        "current_conventional_light_km": "Allocated conventional km",
+        "current_BEV_km": "Allocated BEV km",
+        "current_PHEV_km": "Allocated PHEV km",
+        "component_sum_residual_km": "Universe residual km",
+        "ped_prop_residual": "PED prop residual",
+        "lconv_prop_residual": "Light prop residual",
+        "bev_prop_residual": "BEV prop residual",
+        "phev_prop_residual": "PHEV prop residual",
+        "weighted_sse": "Weighted SSE",
+        "current_PED_revenue": "Current PED revenue",
+        "current_light_ruc_net_revenue": "Current Light revenue",
+        "current_light_bev_ruc_net_revenue": "Current BEV revenue",
+        "current_phev_ruc_net_revenue": "Current PHEV revenue",
+        "old_light_only_PED_revenue": "Old light-only PED revenue",
+        "old_light_only_light_ruc_net_revenue": "Old light-only Light revenue",
+        "old_light_only_light_bev_ruc_net_revenue": "Old light-only BEV revenue",
+        "old_light_only_phev_ruc_net_revenue": "Old light-only PHEV revenue",
+        "assumption_status": "Assumption status",
+        "extrapolated_model_extension": "Model extension",
+        "source_cells": "Source cells",
+        "notes": "Notes",
+    }
+    cols = [col for col in rename if col in view.columns]
+    view = view[cols].rename(columns=rename)
+    for col in [
+        "Current P_t petrol km",
+        "Current L_t Light RUC km",
+        "Current U_t universe km",
+        "Target PED petrol km",
+        "Target conventional km",
+        "Target BEV km",
+        "Target PHEV km",
+        "Allocated PED petrol km",
+        "Allocated conventional km",
+        "Allocated BEV km",
+        "Allocated PHEV km",
+        "Universe residual km",
+        "Weighted SSE",
+        "Current PED revenue",
+        "Current Light revenue",
+        "Current BEV revenue",
+        "Current PHEV revenue",
+        "Old light-only PED revenue",
+        "Old light-only Light revenue",
+        "Old light-only BEV revenue",
+        "Old light-only PHEV revenue",
+    ]:
+        if col in view.columns:
+            view[col] = pd.to_numeric(view[col], errors="coerce").map(lambda value: _format_compact_value(value, ""))
+    for col in [
+        "Lambda",
+        "Raw lambda",
+        "Lambda lower",
+        "Lambda upper",
+        "MBU PED prop",
+        "MBU conventional prop",
+        "MBU BEV prop",
+        "MBU PHEV prop",
+        "PED prop residual",
+        "Light prop residual",
+        "BEV prop residual",
+        "PHEV prop residual",
+    ]:
+        if col in view.columns:
+            view[col] = pd.to_numeric(view[col], errors="coerce").map(lambda value: "" if pd.isna(value) else f"{float(value):.4f}")
     return view
 
 

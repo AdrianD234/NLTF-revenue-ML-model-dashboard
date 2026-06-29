@@ -34,10 +34,13 @@ from .mbu26_source_spine import (
     CURRENT_MODEL_EXTENSION_BASE_START_FY,
     CURRENT_MODEL_EXTENSION_END_FY,
     CURRENT_MODEL_EXTENSION_START_FY,
+    EV_PHEV_MIGRATION_DEFAULT_MODE,
+    EV_PHEV_MIGRATION_SMOOTHNESS_PENALTY,
     MBU26_RELEASE_ROUND,
     MBU26_SCHEMA_VERSION,
     MBU26_SOURCE_PACK_DIR,
     current_forecast_annual_from_mbu26,
+    ev_phev_ped_light_migration_assumptions_from_mbu26,
     load_mbu26_annual_spine,
     revenue_formula_residual_frame,
     revenue_line_reconciliation_frame,
@@ -74,6 +77,7 @@ RUNTIME_REVENUE_OUTLOOK_FILES = (
     "revenue_line_reconciliation.parquet",
     "revenue_stack_components.parquet",
     "ev_phev_split_assumptions.parquet",
+    "ev_phev_ped_light_drift_assumptions.parquet",
     "revenue_formula_residuals.parquet",
     "series_alias_audit.parquet",
     "fan_availability.parquet",
@@ -356,6 +360,7 @@ class RevenueOutlookPack:
     revenue_line_reconciliation: pd.DataFrame = field(default_factory=pd.DataFrame)
     revenue_stack_components: pd.DataFrame = field(default_factory=pd.DataFrame)
     ev_phev_split_assumptions: pd.DataFrame = field(default_factory=pd.DataFrame)
+    ev_phev_ped_light_drift_assumptions: pd.DataFrame = field(default_factory=pd.DataFrame)
     revenue_formula_residuals: pd.DataFrame = field(default_factory=pd.DataFrame)
     series_alias_audit: pd.DataFrame = field(default_factory=pd.DataFrame)
     fan_availability: pd.DataFrame = field(default_factory=pd.DataFrame)
@@ -377,6 +382,7 @@ def revenue_outlook_signature(pack_dir: Path | str | None = None, repo_root: Pat
         base / "revenue_line_reconciliation.parquet",
         base / "revenue_stack_components.parquet",
         base / "ev_phev_split_assumptions.parquet",
+        base / "ev_phev_ped_light_drift_assumptions.parquet",
         base / "revenue_formula_residuals.parquet",
         base / "series_alias_audit.parquet",
         base / "fan_availability.parquet",
@@ -415,6 +421,7 @@ def load_revenue_outlook_pack(
         revenue_line_reconciliation=_read_optional_parquet(base / "revenue_line_reconciliation.parquet"),
         revenue_stack_components=_read_optional_parquet(base / "revenue_stack_components.parquet"),
         ev_phev_split_assumptions=_read_optional_parquet(base / "ev_phev_split_assumptions.parquet"),
+        ev_phev_ped_light_drift_assumptions=_read_optional_parquet(base / "ev_phev_ped_light_drift_assumptions.parquet"),
         revenue_formula_residuals=_read_optional_parquet(base / "revenue_formula_residuals.parquet"),
         series_alias_audit=_read_optional_parquet(base / "series_alias_audit.parquet"),
         fan_availability=_read_optional_parquet(base / "fan_availability.parquet"),
@@ -531,6 +538,10 @@ def build_current_revenue_outlook_runtime_pack(
         current_forecast_annual=current,
         repo_root=root,
     )
+    ev_phev_ped_light_drift_assumptions = ev_phev_ped_light_migration_assumptions_from_mbu26(
+        current_outlook_chart_rows=existing_chart_rows,
+        mbu26_official_annual=mbu26_pack.official_annual,
+    )
 
     series_meta = _runtime_series_metadata(mbu26_pack.series_trace_contract)
     quarterly_inputs = _runtime_quarterly_activity_inputs(existing_chart_rows, series_meta)
@@ -579,8 +590,8 @@ def build_current_revenue_outlook_runtime_pack(
             "C_current_finalist_activity": "Promoted quarterly finalist outputs annualized by June year",
             "D_hybrid_current_revenue": "Only PED, Light RUC and Heavy RUC revenue are replaced; all other rows use MBU26 official components.",
             "E_ev_phev_split_audit": (
-                "Current finalist Light RUC is governed as the total light-RUC net-km universe. MBU26 conventional, "
-                "Light BEV and PHEV shares allocate that total down before revenue rates are applied."
+                "Current finalist Light RUC is governed as a total light-RUC net-km model input. The optimized migration "
+                "layer allocates BEV/PHEV uptake between PED/light-petrol and total Light RUC before revenue rates are applied."
             ),
             "F_current_model_extension": (
                 f"Current-finalist modelled streams extend FY{CURRENT_MODEL_EXTENSION_START_FY}-FY{CURRENT_MODEL_EXTENSION_END_FY} "
@@ -596,9 +607,14 @@ def build_current_revenue_outlook_runtime_pack(
         },
         "data_vintage_manifest_notes": {
             "light_ruc_target_semantics": (
-                "Business rule: current-finalist Light RUC is treated as total light-RUC net km, then allocated "
-                "into conventional Light, Light BEV and PHEV using MBU26 annual shares. BEV/PHEV are not added on top."
-            )
+                "Business rule update: current-finalist Light RUC is treated as total light-RUC net km, while EV/PHEV "
+                "migration is sourced from both current PED/light-petrol activity and total Light RUC using an optimized "
+                "deterministic bridge calibrated to MBU26 light-mobility proportions. BEV/PHEV are not fixed add-ons."
+            ),
+            "ev_phev_migration_allocation": (
+                "Default lambda_mode is optimized; alternatives are recorded for audit only and do not replace the current "
+                "runtime path unless explicitly selected in governance review."
+            ),
         },
         "source_comparison": {
             "comparison_id": (existing_manifest.get("source_comparison") or {}).get("comparison_id", "current_finalist_runtime_rebuild"),
@@ -620,10 +636,11 @@ def build_current_revenue_outlook_runtime_pack(
             "HEAVY_RUC": ["available"],
         },
         "equations": {
-            "PED": "PED revenue = current finalist VKT/capita * MBU26 population -> total VKT * MBU26 litres/100km * MBU26 gross PED rate.",
-            "LIGHT_RUC": "Light RUC revenue = current finalist total light-RUC net km allocated by MBU26 conventional/Light BEV/PHEV shares, then multiplied by the matching MBU26 effective rates.",
+            "EV_PHEV_MIGRATION": "Optimized lambda allocates EV/PHEV uptake between PED/light-petrol and current finalist total Light RUC to match MBU26 light-mobility proportions with a smoothness penalty.",
+            "PED": "PED revenue = adjusted PED/light-petrol VKT after optimized EV/PHEV migration * MBU26 litres/100km * MBU26 gross PED rate.",
+            "LIGHT_RUC": "Light RUC revenue = optimized conventional Light RUC km after EV/PHEV migration * MBU26 conventional Light effective rate.",
             "HEAVY_RUC": "Heavy RUC revenue = current finalist net km * MBU26 effective Heavy RUC rate.",
-            "ROLLUPS": "Gross FED, Net FED, Total RUC, Total RUC+PED and Total NLTF recalculate PED, allocated Light RUC, allocated Light BEV, allocated PHEV and Heavy RUC replacement lines plus MBU26 fixed components.",
+            "ROLLUPS": "Gross FED, Net FED, Total RUC, Total RUC+PED and Total NLTF recalculate optimized PED, conventional Light RUC, Light BEV, PHEV and Heavy RUC replacement lines plus MBU26 fixed components.",
         },
         "target_semantics_audit": {
             "LIGHT_RUC": _light_ruc_target_semantics_manifest(ev_phev_split_assumptions),
@@ -636,15 +653,25 @@ def build_current_revenue_outlook_runtime_pack(
         "ev_phev_split_assumptions": {
             "repo_relative_path": _repo_relative(root, base / "ev_phev_split_assumptions.csv"),
             "scope": (
-                "MBU26 conventional Light, Light BEV and PHEV km/revenue shares and rates, with current-finalist "
-                "total Light RUC allocation outputs and old fixed-add-on comparator fields."
+                "Legacy continuity audit for MBU26 conventional Light, Light BEV and PHEV km/revenue shares and rates, "
+                "with old fixed-add-on comparator fields. The active current path is the PED+Light migration audit."
             ),
             "allocation_status": _ev_phev_allocation_status(ev_phev_split_assumptions),
         },
+        "ev_phev_ped_light_drift_assumptions": {
+            "repo_relative_path": _repo_relative(root, base / "ev_phev_ped_light_drift_assumptions.csv"),
+            "scope": (
+                "Deterministic EV/PHEV migration bridge over current PED/light-petrol activity and current finalist total Light RUC, "
+                "including optimized, Light-only, PED-only and MBU-ratio lambda modes."
+            ),
+            "default_lambda_mode": EV_PHEV_MIGRATION_DEFAULT_MODE,
+            "lambda_smoothness_penalty": EV_PHEV_MIGRATION_SMOOTHNESS_PENALTY,
+            "runtime_mode": EV_PHEV_MIGRATION_DEFAULT_MODE,
+        },
         "rate_provenance": {
             "future_light_heavy": "mbu26_official_annual.csv effective rates joined to current finalist net-km outputs",
-            "future_ped": "MBU26 population/intensity/rate joined to current finalist PED VKT/capita",
-            "fixed_components": "mbu26_official_annual.csv official rows, excluding Light BEV and PHEV in current-finalist paths where they are allocated from current Light RUC total",
+            "future_ped": "MBU26 population/intensity/rate joined to optimized PED/light-petrol VKT after EV/PHEV migration",
+            "fixed_components": "mbu26_official_annual.csv official rows, excluding Light BEV and PHEV in current-finalist paths where they are allocated by the optimized PED+Light migration layer",
         },
         "trace_audit": {
             "repo_relative_path": _repo_relative(root, base / "runtime_trace_audit.csv"),
@@ -701,6 +728,7 @@ def build_current_revenue_outlook_runtime_pack(
             "revenue_line_reconciliation": line_reconciliation,
             "revenue_stack_components": stack_components,
             "ev_phev_split_assumptions": ev_phev_split_assumptions,
+            "ev_phev_ped_light_drift_assumptions": ev_phev_ped_light_drift_assumptions,
             "revenue_formula_residuals": formula_residuals,
             "fan_availability": fan_availability,
             "fan_band_rows": fan_band_rows,
@@ -788,7 +816,7 @@ def ev_phev_split_assumptions_frame(
     current_forecast_annual: pd.DataFrame | None = None,
     repo_root: Path | str | None = None,
 ) -> pd.DataFrame:
-    """Audit the governed current-Light allocation into conventional, BEV and PHEV rows."""
+    """Audit legacy current-Light split evidence and fixed-add-on comparators."""
 
     columns = [
         "FY",
@@ -1016,11 +1044,11 @@ def ev_phev_split_assumptions_frame(
                     "old_light_bev_ruc_net_revenue_fixed_mbu": bev_rev,
                     "old_phev_ruc_net_revenue_fixed_mbu": phev_rev,
                     "extrapolated_model_extension": any(value == "extrapolated_model_extension" for value in status_values),
-                    "allocation_status": "business_rule_applied_total_light_universe",
+                    "allocation_status": "legacy_light_only_comparator_superseded_by_ped_light_migration",
                     "used_by_current_finalist": True,
                     "notes": (
-                        "Current finalist Light RUC total modelled km is allocated down by MBU26 conventional, "
-                        "Light BEV and PHEV shares. BEV/PHEV are replacement allocations, not fixed add-ons."
+                        "Legacy Light-only split comparator retained for governance. Active current-finalist "
+                        "rows use the PED-Light optimized migration audit."
                     ),
                 }
             )
@@ -1065,12 +1093,10 @@ def _light_ruc_target_semantics_manifest(audit: pd.DataFrame) -> dict[str, Any]:
     if audit is None or audit.empty:
         return {
             "status": "business_rule_pending_audit_rows",
-            "decision": "Apply the governed total-light allocation when current rows are available.",
+            "decision": "Apply the governed PED-Light optimized migration layer when current rows are available.",
             "rationale": "No ev_phev_split_assumptions audit rows were available.",
         }
-    applied = audit[
-        audit.get("allocation_status", pd.Series("", index=audit.index)).astype(str).eq("business_rule_applied_total_light_universe")
-    ].copy()
+    current_rows = audit[audit.get("used_by_current_finalist", pd.Series(False, index=audit.index)).astype(bool)].copy()
     evidence = audit[
         audit.get("model_input_full_year", pd.Series(False, index=audit.index)).astype(bool)
         & (
@@ -1087,10 +1113,13 @@ def _light_ruc_target_semantics_manifest(audit: pd.DataFrame) -> dict[str, Any]:
     matches_universe = int(evidence["target_matches_total_light_universe"].astype(bool).sum()) if "target_matches_total_light_universe" in evidence.columns else 0
     years = [int(value) for value in pd.to_numeric(evidence.get("FY", pd.Series(dtype=float)), errors="coerce").dropna().astype(int).tolist()]
     max_universe_residual = pd.to_numeric(evidence.get("target_minus_total_light_universe_km", pd.Series(dtype=float)), errors="coerce").abs().max()
-    allocation_years = [int(value) for value in pd.to_numeric(applied.get("FY", pd.Series(dtype=float)), errors="coerce").dropna().astype(int).unique().tolist()]
+    allocation_years = [int(value) for value in pd.to_numeric(current_rows.get("FY", pd.Series(dtype=float)), errors="coerce").dropna().astype(int).unique().tolist()]
     return {
-        "status": "business_rule_applied_total_light_universe",
-        "decision": "Allocate current finalist Light RUC total modelled km into conventional Light, Light BEV and PHEV using MBU26 shares.",
+        "status": "business_rule_applied_ped_light_optimized_migration",
+        "decision": (
+            "Allocate EV/PHEV uptake between PED/light-petrol activity and current-finalist total Light RUC "
+            "using the optimized migration layer; retain the legacy Light-only split as an audit comparator."
+        ),
         "evidence_years": years,
         "allocation_years": allocation_years,
         "matches_conventional_light_rows": matches_conventional,
@@ -1102,8 +1131,9 @@ def _light_ruc_target_semantics_manifest(audit: pd.DataFrame) -> dict[str, Any]:
             "data/revenue_model_source_pack/mbu26_annual_spine/mbu26_annual_spine.csv",
         ],
         "rationale": (
-            "The current governed business rule treats Light RUC finalist output as the total light-RUC universe. "
-            "The audit preserves prior model-input target evidence and records the allocation rows used by the runtime."
+            "The current governed business rule sources EV/PHEV migration from both PED/light-petrol activity "
+            "and total Light RUC. The legacy split audit preserves prior model-input target evidence and old "
+            "Light-only comparators for review."
         ),
     }
 
@@ -1112,8 +1142,8 @@ def _ev_phev_allocation_status(audit: pd.DataFrame) -> str:
     if audit is None or audit.empty or "allocation_status" not in audit.columns:
         return "business_rule_pending_audit_rows"
     statuses = set(audit["allocation_status"].dropna().astype(str))
-    if "business_rule_applied_total_light_universe" in statuses:
-        return "business_rule_applied_total_light_universe"
+    if "legacy_light_only_comparator_superseded_by_ped_light_migration" in statuses:
+        return "legacy_light_only_comparator_superseded_by_ped_light_migration"
     if statuses:
         return sorted(statuses)[0]
     return "business_rule_pending_audit_rows"
@@ -3557,6 +3587,7 @@ def _write_pack_files(
         "revenue_line_reconciliation",
         "revenue_stack_components",
         "ev_phev_split_assumptions",
+        "ev_phev_ped_light_drift_assumptions",
         "revenue_formula_residuals",
         "series_alias_audit",
         "fan_availability",

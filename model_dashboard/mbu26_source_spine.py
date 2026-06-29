@@ -19,6 +19,7 @@ _RUNTIME_PYARROW24 = Path(__file__).resolve().parents[1] / ".runtime_pyarrow24"
 if _RUNTIME_PYARROW24.exists() and str(_RUNTIME_PYARROW24) not in sys.path:
     sys.path.insert(0, str(_RUNTIME_PYARROW24))
 
+import numpy as np
 import pandas as pd
 
 from .revenue_source_pack import (
@@ -40,6 +41,9 @@ CURRENT_MODEL_EXTENSION_END_FY = 2055
 CURRENT_MODEL_EXTENSION_BASE_START_FY = 2046
 CURRENT_MODEL_EXTENSION_BASE_END_FY = 2050
 CURRENT_LIGHT_TOTAL_SERIES_ID = "current_light_ruc_total_modelled_km"
+EV_PHEV_MIGRATION_DEFAULT_MODE = "optimized"
+EV_PHEV_MIGRATION_MODES: tuple[str, ...] = ("optimized", "fixed_light_only", "fixed_ped_only", "mbu_ratio")
+EV_PHEV_MIGRATION_SMOOTHNESS_PENALTY = 25.0
 
 
 @dataclass(frozen=True)
@@ -459,6 +463,16 @@ def current_forecast_annual_from_mbu26(
     quarter_lookup = _current_activity_quarter_lookup(current_outlook_chart_rows)
     official = _official_lookup(mbu26_official_annual)
     official_records = _official_record_lookup(mbu26_official_annual)
+    migration_audit = ev_phev_ped_light_migration_assumptions_from_mbu26(
+        current_outlook_chart_rows=current_outlook_chart_rows,
+        mbu26_official_annual=mbu26_official_annual,
+        modes=(EV_PHEV_MIGRATION_DEFAULT_MODE,),
+    )
+    migration_lookup = {
+        (str(row.scenario_name), int(row.FY)): row
+        for row in migration_audit.itertuples()
+        if str(getattr(row, "lambda_mode", "")) == EV_PHEV_MIGRATION_DEFAULT_MODE
+    }
     rows: list[dict[str, Any]] = []
     keys = sorted({(str(row.scenario_name), int(row.FY)) for row in activity.itertuples()})
     for scenario_name, fy in keys:
@@ -557,24 +571,26 @@ def current_forecast_annual_from_mbu26(
         if abs(heavy_km_million) > 10_000_000:
             heavy_km_million /= 1_000_000.0
         split = _light_ev_phev_split_from_official(off)
-        if split["availability_status"] != "available":
+        migration = migration_lookup.get((scenario_name, fy))
+        if split["availability_status"] != "available" or migration is None:
             continue
         population_count = float(off["light_petrol_vkt"]) * 1_000_000.0 / float(off["ped_vkt_per_capita"])
         ped_litres_per_100km = float(off["ped_volume"]) / float(off["light_petrol_vkt"]) * 100.0
         ped_rate = float(off["gross_ped_revenue"]) / float(off["ped_volume"])
         ped_total_vkt = sum(value * population_count / 1_000_000.0 for value in ped_values)
-        ped_volume = sum(value * population_count / 1_000_000.0 * ped_litres_per_100km / 100.0 for value in ped_values)
-        ped_revenue = sum(value * population_count / 1_000_000.0 * ped_litres_per_100km / 100.0 * ped_rate for value in ped_values)
         light_total_modelled_km = light_km_million
-        conventional_light_km = light_total_modelled_km * float(split["conventional_share"])
-        current_light_bev_km = light_total_modelled_km * float(split["light_bev_share"])
-        current_phev_km = light_total_modelled_km * float(split["phev_share"])
-        allocation_residual = light_total_modelled_km - conventional_light_km - current_light_bev_km - current_phev_km
-        if abs(allocation_residual) > 1e-6:
-            conventional_light_km += allocation_residual
-        light_rate = float(split["conventional_rate"])
-        light_bev_rate = float(split["light_bev_rate"])
-        phev_rate = float(split["phev_rate"])
+        current_ped_light_petrol_vkt = float(getattr(migration, "current_PED_light_petrol_km"))
+        conventional_light_km = float(getattr(migration, "current_conventional_light_km"))
+        current_light_bev_km = float(getattr(migration, "current_BEV_km"))
+        current_phev_km = float(getattr(migration, "current_PHEV_km"))
+        migration_residual = float(getattr(migration, "component_sum_residual_km"))
+        if abs(migration_residual) > 1e-6:
+            conventional_light_km += migration_residual
+        ped_volume = current_ped_light_petrol_vkt * ped_litres_per_100km / 100.0
+        ped_revenue = ped_volume * ped_rate
+        light_rate = float(getattr(migration, "conventional_light_rate"))
+        light_bev_rate = float(getattr(migration, "light_bev_rate"))
+        phev_rate = float(getattr(migration, "phev_rate"))
         heavy_rate = float(off["heavy_ruc_net_revenue"]) / float(off["heavy_ruc_net_km"])
         light_revenue = conventional_light_km * light_rate
         light_bev_revenue = current_light_bev_km * light_bev_rate
@@ -629,29 +645,29 @@ def current_forecast_annual_from_mbu26(
             ]
             if value
         )
-        light_split_source_cell = f"{light_source_cell}; MBU26 split cells {split_cells}".strip("; ")
-        light_split_basis = "current_finalist_light_total + MBU26 EV/PHEV split share"
-        light_split_revenue_basis = "current_finalist_light_total + MBU26 EV/PHEV split share and effective rate"
+        migration_source_cell = f"{ped_source_cell}; {light_source_cell}; MBU26 migration cells {split_cells}".strip("; ")
+        migration_basis = "optimized PED/light-petrol + total Light RUC migration allocation"
+        migration_revenue_basis = "optimized PED/light-petrol + total Light RUC migration allocation and MBU26 effective rate"
         rows.extend(
             [
                 _current_annual_row(**common, series_id="ped_vkt_per_capita", display_name="PED VKT per capita", section="Key volumes", value=ped_vkt_per_capita, unit="km/person", row_role="bridge_input", source_basis="current_finalist_model", source_file="forecast_scenario_comparison.parquet", source_cell=ped_source_cell, formula="sum quarterly current finalist PED VKT/capita", official_value=off["ped_vkt_per_capita"]),
-                _current_annual_row(**common, series_id="ped_volume", display_name="PED volume", section="Key volumes", value=ped_volume, unit="million litres", row_role="bridge_input", source_basis="current finalist PED VKT/capita + MBU26 intensity", source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=ped_source_cell, formula="sum(quarterly PED VKT/capita * MBU26 population / 1,000,000 * MBU26 litres intensity / 100)", official_value=off["ped_volume"]),
-                _current_annual_row(**common, series_id="light_petrol_vkt", display_name="Light petrol VKT", section="Key volumes", value=ped_total_vkt, unit="million km", row_role="bridge_input", source_basis="current_finalist_model + MBU26 population", source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=ped_source_cell, formula="sum(quarterly PED VKT/capita * MBU26 population / 1,000,000)", official_value=off["light_petrol_vkt"]),
+                _current_annual_row(**common, series_id="ped_volume", display_name="PED volume", section="Key volumes", value=ped_volume, unit="million litres", row_role="bridge_input", source_basis="current finalist PED VKT/capita + optimized EV/PHEV migration + MBU26 intensity", source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=migration_source_cell, formula="adjusted PED/light-petrol VKT after optimized EV/PHEV migration * MBU26 litres intensity / 100", official_value=off["ped_volume"]),
+                _current_annual_row(**common, series_id="light_petrol_vkt", display_name="Light petrol VKT", section="Key volumes", value=current_ped_light_petrol_vkt, unit="million km", row_role="bridge_input", source_basis=migration_basis, source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=migration_source_cell, formula="current PED-derived light-petrol VKT - (1 - lambda) * optimized EV/PHEV migration total", official_value=off["light_petrol_vkt"]),
                 _current_annual_row(**common, series_id=CURRENT_LIGHT_TOTAL_SERIES_ID, display_name="Current finalist Light RUC total modelled km", section="Key volumes", value=light_total_modelled_km, unit="million km", row_role="audit_only", source_basis="current_finalist_model_total_light_ruc_universe", source_file="forecast_scenario_comparison.parquet", source_cell=light_source_cell, formula="sum quarterly current finalist Light RUC total net km before EV/PHEV allocation", official_value=pd.NA, model_id=CURRENT_FINALIST_MODEL_IDS["LIGHT_RUC"]),
-                _current_annual_row(**common, series_id="light_ruc_net_km", display_name="Light RUC net km", section="Key volumes", value=conventional_light_km, unit="million km", row_role="bridge_input", source_basis=light_split_basis, source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=light_split_source_cell, formula="current Light RUC total modelled km * MBU26 conventional Light share", official_value=off["light_ruc_net_km"], model_id=CURRENT_FINALIST_MODEL_IDS["LIGHT_RUC"]),
+                _current_annual_row(**common, series_id="light_ruc_net_km", display_name="Light RUC net km", section="Key volumes", value=conventional_light_km, unit="million km", row_role="bridge_input", source_basis=migration_basis, source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=migration_source_cell, formula="current Light RUC total modelled km - lambda * optimized EV/PHEV migration total", official_value=off["light_ruc_net_km"], model_id=CURRENT_FINALIST_MODEL_IDS["LIGHT_RUC"]),
                 _current_annual_row(**common, series_id="heavy_ruc_net_km", display_name="Heavy RUC net km", section="Key volumes", value=heavy_km_million, unit="million km", row_role="bridge_input", source_basis="current_finalist_model", source_file="forecast_scenario_comparison.parquet", source_cell=heavy_source_cell, formula="sum quarterly current finalist Heavy RUC net km", official_value=off["heavy_ruc_net_km"]),
-                _current_annual_row(**common, series_id="light_bev_ruc_net_km", display_name="Light BEV RUC net km", section="Key volumes", value=current_light_bev_km, unit="million km", row_role="bridge_input", source_basis=light_split_basis, source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=light_split_source_cell, formula="current Light RUC total modelled km * MBU26 Light BEV share", official_value=off["light_bev_ruc_net_km"], model_id=CURRENT_FINALIST_MODEL_IDS["LIGHT_RUC"]),
+                _current_annual_row(**common, series_id="light_bev_ruc_net_km", display_name="Light BEV RUC net km", section="Key volumes", value=current_light_bev_km, unit="million km", row_role="bridge_input", source_basis=migration_basis, source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=migration_source_cell, formula="optimized EV/PHEV migration total * MBU26 Light BEV share within EV/PHEV", official_value=off["light_bev_ruc_net_km"], model_id=CURRENT_FINALIST_COMPOSITE_MODEL_ID),
                 fixed("heavy_bev_ruc_net_km"),
-                _current_annual_row(**common, series_id="phev_ruc_net_km", display_name="PHEV RUC net km", section="Key volumes", value=current_phev_km, unit="million km", row_role="bridge_input", source_basis=light_split_basis, source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=light_split_source_cell, formula="current Light RUC total modelled km * MBU26 PHEV share", official_value=off["phev_ruc_net_km"], model_id=CURRENT_FINALIST_MODEL_IDS["LIGHT_RUC"]),
+                _current_annual_row(**common, series_id="phev_ruc_net_km", display_name="PHEV RUC net km", section="Key volumes", value=current_phev_km, unit="million km", row_role="bridge_input", source_basis=migration_basis, source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=migration_source_cell, formula="optimized EV/PHEV migration total * MBU26 PHEV share within EV/PHEV", official_value=off["phev_ruc_net_km"], model_id=CURRENT_FINALIST_COMPOSITE_MODEL_ID),
                 fixed("tuc_gtk"),
-                _current_annual_row(**common, series_id="gross_ped_revenue", display_name="PED revenue", section="FED", value=ped_revenue, unit="$m nominal ex GST", row_role="replacement_line", source_basis="current_finalist_model + MBU26 bridge", source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=ped_source_cell, formula="sum(quarterly PED VKT/capita * MBU26 population / 1,000,000 * MBU26 litres intensity / 100 * MBU26 PED rate)", replacement_only=True, official_value=off["gross_ped_revenue"]),
-                _current_annual_row(**common, series_id="light_ruc_net_revenue", display_name="Light RUC revenue", section="RUC", value=light_revenue, unit="$m nominal ex GST", row_role="replacement_line", source_basis=light_split_revenue_basis, source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=light_split_source_cell, formula="current conventional Light RUC km * MBU26 conventional Light effective rate", replacement_only=True, official_value=off["light_ruc_net_revenue"], model_id=CURRENT_FINALIST_MODEL_IDS["LIGHT_RUC"]),
+                _current_annual_row(**common, series_id="gross_ped_revenue", display_name="PED revenue", section="FED", value=ped_revenue, unit="$m nominal ex GST", row_role="replacement_line", source_basis=migration_revenue_basis, source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=migration_source_cell, formula="adjusted PED/light-petrol VKT after optimized EV/PHEV migration * MBU26 litres intensity / 100 * MBU26 PED rate", replacement_only=True, official_value=off["gross_ped_revenue"]),
+                _current_annual_row(**common, series_id="light_ruc_net_revenue", display_name="Light RUC revenue", section="RUC", value=light_revenue, unit="$m nominal ex GST", row_role="replacement_line", source_basis=migration_revenue_basis, source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=migration_source_cell, formula="optimized conventional Light RUC km * MBU26 conventional Light effective rate", replacement_only=True, official_value=off["light_ruc_net_revenue"], model_id=CURRENT_FINALIST_MODEL_IDS["LIGHT_RUC"]),
                 _current_annual_row(**common, series_id="heavy_ruc_net_revenue", display_name="Heavy RUC revenue", section="RUC", value=heavy_revenue, unit="$m nominal ex GST", row_role="replacement_line", source_basis="current_finalist_model + MBU26 effective rate", source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=heavy_source_cell, formula="sum quarterly current Heavy RUC net km * MBU26 effective rate", replacement_only=True, official_value=off["heavy_ruc_net_revenue"]),
-                _current_annual_row(**common, series_id="light_bev_ruc_net_revenue", display_name="Light BEV RUC net revenue", section="RUC", value=light_bev_revenue, unit="$m nominal ex GST", row_role="replacement_line", source_basis=light_split_revenue_basis, source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=light_split_source_cell, formula="current Light BEV RUC km * MBU26 Light BEV effective rate", replacement_only=True, official_value=off["light_bev_ruc_net_revenue"], model_id=CURRENT_FINALIST_MODEL_IDS["LIGHT_RUC"]),
+                _current_annual_row(**common, series_id="light_bev_ruc_net_revenue", display_name="Light BEV RUC net revenue", section="RUC", value=light_bev_revenue, unit="$m nominal ex GST", row_role="replacement_line", source_basis=migration_revenue_basis, source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=migration_source_cell, formula="optimized Light BEV RUC km * MBU26 Light BEV effective rate", replacement_only=True, official_value=off["light_bev_ruc_net_revenue"], model_id=CURRENT_FINALIST_COMPOSITE_MODEL_ID),
                 fixed("heavy_bev_ruc_net_revenue"),
-                _current_annual_row(**common, series_id="phev_ruc_net_revenue", display_name="PHEV RUC net revenue", section="RUC", value=phev_revenue, unit="$m nominal ex GST", row_role="replacement_line", source_basis=light_split_revenue_basis, source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=light_split_source_cell, formula="current PHEV RUC km * MBU26 PHEV effective rate", replacement_only=True, official_value=off["phev_ruc_net_revenue"], model_id=CURRENT_FINALIST_MODEL_IDS["LIGHT_RUC"]),
+                _current_annual_row(**common, series_id="phev_ruc_net_revenue", display_name="PHEV RUC net revenue", section="RUC", value=phev_revenue, unit="$m nominal ex GST", row_role="replacement_line", source_basis=migration_revenue_basis, source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=migration_source_cell, formula="optimized PHEV RUC km * MBU26 PHEV effective rate", replacement_only=True, official_value=off["phev_ruc_net_revenue"], model_id=CURRENT_FINALIST_COMPOSITE_MODEL_ID),
                 fixed("ruc_refunds"),
-                _current_annual_row(**common, series_id="gross_ruc_revenue", display_name="Gross RUC revenue", section="RUC", value=gross_ruc, unit="$m nominal ex GST", row_role="calculated_rollup", source_basis="current_hybrid_formula", source_file="current_hybrid_formula", source_cell=current_source_cell, formula="allocated light_ruc_net_revenue + heavy_ruc_net_revenue + allocated light_bev_ruc_net_revenue + MBU26 heavy_bev_ruc_net_revenue + allocated phev_ruc_net_revenue + MBU26 ruc_refunds", official_value=off["gross_ruc_revenue"]),
+                _current_annual_row(**common, series_id="gross_ruc_revenue", display_name="Gross RUC revenue", section="RUC", value=gross_ruc, unit="$m nominal ex GST", row_role="calculated_rollup", source_basis="current_hybrid_formula", source_file="current_hybrid_formula", source_cell=current_source_cell, formula="optimized light_ruc_net_revenue + heavy_ruc_net_revenue + optimized light_bev_ruc_net_revenue + MBU26 heavy_bev_ruc_net_revenue + optimized phev_ruc_net_revenue + MBU26 ruc_refunds", official_value=off["gross_ruc_revenue"]),
                 fixed("ruc_admin_revenue"),
                 _current_annual_row(**common, series_id="ruc_revenue_net_admin", display_name="RUC revenues net of admin fees", section="RUC", value=ruc_net_admin, unit="$m nominal ex GST", row_role="calculated_rollup", source_basis="current_hybrid_formula", source_file="current_hybrid_formula", source_cell=current_source_cell, formula="gross_ruc_revenue - MBU26 ruc_admin_revenue", official_value=off["ruc_revenue_net_admin"]),
                 _current_annual_row(**common, series_id="total_ruc_net_revenue", display_name="Total RUC all classes", section="RUC", value=total_ruc, unit="$m nominal ex GST", row_role="calculated_rollup", source_basis="current_hybrid_formula", source_file="current_hybrid_formula", source_cell=current_source_cell, formula="ruc_revenue_net_admin - MBU26 ruc_refunds", official_value=off["total_ruc_net_revenue"]),
@@ -1127,6 +1143,448 @@ def _rate_or_zero(revenue: Any, km: float) -> float | None:
     if pd.isna(numeric):
         return None
     return float(numeric) / float(km)
+
+
+def ev_phev_ped_light_migration_assumptions_from_mbu26(
+    *,
+    current_outlook_chart_rows: pd.DataFrame,
+    mbu26_official_annual: pd.DataFrame,
+    smoothness_penalty: float = EV_PHEV_MIGRATION_SMOOTHNESS_PENALTY,
+    modes: tuple[str, ...] = EV_PHEV_MIGRATION_MODES,
+) -> pd.DataFrame:
+    columns = [
+        "FY",
+        "period",
+        "source_path",
+        "scenario_name",
+        "scenario_role",
+        "lambda_mode",
+        "lambda_value",
+        "lambda_raw_unconstrained",
+        "lambda_lower_bound",
+        "lambda_upper_bound",
+        "lambda_binding_constraints",
+        "lambda_smoothness_penalty",
+        "current_P_t_light_petrol_km",
+        "current_L_t_total_light_ruc_km",
+        "current_U_t_light_mobility_km",
+        "mbu_light_petrol_vkt",
+        "mbu_conventional_light_km",
+        "mbu_light_bev_km",
+        "mbu_phev_km",
+        "mbu_total_light_mobility_km",
+        "p_PED",
+        "p_Lconv",
+        "p_BEV",
+        "p_PHEV",
+        "p_EV",
+        "target_PED_light_petrol_km",
+        "target_conventional_light_km",
+        "target_BEV_km",
+        "target_PHEV_km",
+        "target_EV_total_km",
+        "current_PED_light_petrol_km",
+        "current_conventional_light_km",
+        "current_BEV_km",
+        "current_PHEV_km",
+        "component_sum_km",
+        "component_sum_residual_km",
+        "current_PED_prop",
+        "current_Lconv_prop",
+        "current_BEV_prop",
+        "current_PHEV_prop",
+        "ped_prop_residual",
+        "lconv_prop_residual",
+        "bev_prop_residual",
+        "phev_prop_residual",
+        "weighted_sse",
+        "ped_litres_per_100km",
+        "ped_rate",
+        "conventional_light_rate",
+        "light_bev_rate",
+        "phev_rate",
+        "current_PED_volume",
+        "current_PED_revenue",
+        "current_light_ruc_net_revenue",
+        "current_light_bev_ruc_net_revenue",
+        "current_phev_ruc_net_revenue",
+        "old_light_only_PED_revenue",
+        "old_light_only_light_ruc_net_revenue",
+        "old_light_only_light_bev_ruc_net_revenue",
+        "old_light_only_phev_ruc_net_revenue",
+        "source_file",
+        "source_cells",
+        "source_formula",
+        "availability_status",
+        "assumption_status",
+        "extrapolated_model_extension",
+        "notes",
+    ]
+    if current_outlook_chart_rows is None or current_outlook_chart_rows.empty or mbu26_official_annual is None or mbu26_official_annual.empty:
+        return pd.DataFrame(columns=columns)
+
+    modes = tuple(mode for mode in modes if mode in EV_PHEV_MIGRATION_MODES)
+    if not modes:
+        modes = (EV_PHEV_MIGRATION_DEFAULT_MODE,)
+    activity = _current_activity_annual_values(current_outlook_chart_rows)
+    if activity.empty:
+        return pd.DataFrame(columns=columns)
+    quarter_lookup = _current_activity_quarter_lookup(current_outlook_chart_rows)
+    official = _official_lookup(mbu26_official_annual)
+    official_records = _official_record_lookup(mbu26_official_annual)
+
+    contexts: list[dict[str, Any]] = []
+    keys = sorted({(str(row.scenario_name), int(row.FY)) for row in activity.itertuples()})
+    for scenario_name, fy in keys:
+        activity_values = {
+            str(row.series_id): row
+            for row in activity[activity["scenario_name"].eq(scenario_name) & activity["FY"].eq(fy)].itertuples()
+        }
+        if not {"ped_vkt_per_capita", "light_ruc_net_km"}.issubset(activity_values):
+            continue
+        off = official.get(fy, {})
+        migration_inputs = _ped_light_migration_inputs_from_official(off)
+        if migration_inputs["availability_status"] != "available":
+            continue
+        ped_activity = activity_values["ped_vkt_per_capita"]
+        light_activity = activity_values["light_ruc_net_km"]
+        ped_quarters = quarter_lookup.get((scenario_name, fy, "ped_vkt_per_capita"), {})
+        light_quarters = quarter_lookup.get((scenario_name, fy, "light_ruc_net_km"), {})
+        if _is_extrapolated_activity_row(ped_activity):
+            ped_quarters = _extrapolated_activity_quarter_payload(ped_activity, "ped_vkt_per_capita")
+        if _is_extrapolated_activity_row(light_activity):
+            light_quarters = _extrapolated_activity_quarter_payload(light_activity, "light_ruc_net_km")
+        if not ped_quarters or not light_quarters:
+            continue
+        ped_values = [float(value) for value in ped_quarters.get("values", [])]
+        light_values = [float(value) for value in light_quarters.get("values", [])]
+        if len(ped_values) != 4 or len(light_values) != 4:
+            continue
+        population_count = float(off["light_petrol_vkt"]) * 1_000_000.0 / float(off["ped_vkt_per_capita"])
+        p_t = sum(value * population_count / 1_000_000.0 for value in ped_values)
+        l_t = sum(light_values)
+        if abs(l_t) > 10_000_000:
+            l_t /= 1_000_000.0
+        u_t = p_t + l_t
+        if u_t <= 0:
+            continue
+        p_ev = float(migration_inputs["p_BEV"]) + float(migration_inputs["p_PHEV"])
+        ev_total = u_t * p_ev
+        if ev_total > 0:
+            lambda_raw = (l_t / u_t - float(migration_inputs["p_Lconv"])) / p_ev
+            lambda_lower = max(0.0, 1.0 - p_t / ev_total)
+            lambda_upper = min(1.0, l_t / ev_total)
+        else:
+            lambda_raw = 0.0
+            lambda_lower = 0.0
+            lambda_upper = 1.0
+        lambda_lower = float(np.clip(lambda_lower, 0.0, 1.0))
+        lambda_upper = float(np.clip(lambda_upper, 0.0, 1.0))
+        if lambda_lower > lambda_upper:
+            midpoint = float(np.clip(lambda_raw, 0.0, 1.0))
+            lambda_lower = midpoint
+            lambda_upper = midpoint
+        scenario_role = str(getattr(ped_activity, "scenario_role", "") or "")
+        official_row = official_records.get(fy, {})
+        source_cells = "; ".join(
+            value
+            for value in [
+                str(ped_quarters.get("source_cells") or ""),
+                str(light_quarters.get("source_cells") or ""),
+                _source_cell_for_series(official_row, "light_petrol_vkt"),
+                _source_cell_for_series(official_row, "light_ruc_net_km"),
+                _source_cell_for_series(official_row, "light_bev_ruc_net_km"),
+                _source_cell_for_series(official_row, "phev_ruc_net_km"),
+            ]
+            if value
+        )
+        contexts.append(
+            {
+                **migration_inputs,
+                "FY": int(fy),
+                "period": f"FY{int(fy)}",
+                "source_path": _current_source_path_label(scenario_name, scenario_role),
+                "scenario_name": scenario_name,
+                "scenario_role": scenario_role,
+                "P_t": p_t,
+                "L_t": l_t,
+                "U_t": u_t,
+                "target_PED": u_t * float(migration_inputs["p_PED"]),
+                "target_Lconv": u_t * float(migration_inputs["p_Lconv"]),
+                "target_BEV": u_t * float(migration_inputs["p_BEV"]),
+                "target_PHEV": u_t * float(migration_inputs["p_PHEV"]),
+                "target_EV": ev_total,
+                "lambda_raw": float(lambda_raw),
+                "lambda_lower": lambda_lower,
+                "lambda_upper": lambda_upper,
+                "source_cells": source_cells,
+                "source_formula": (
+                    "U_t=current PED-derived light petrol activity + current finalist total Light RUC; "
+                    "target components=U_t*MBU26 light-mobility proportions; lambda allocates EV/PHEV migration between PED and Light RUC."
+                ),
+                "extrapolated_model_extension": bool(
+                    _is_extrapolated_activity_row(ped_activity) or _is_extrapolated_activity_row(light_activity)
+                ),
+            }
+        )
+    if not contexts:
+        return pd.DataFrame(columns=columns)
+
+    optimized_by_key: dict[tuple[str, int], float] = {}
+    for scenario_name, group_contexts in _group_contexts_by_scenario(contexts).items():
+        ordered = sorted(group_contexts, key=lambda item: int(item["FY"]))
+        fitted = _smooth_bounded_lambdas(
+            raw=[float(item["lambda_raw"]) for item in ordered],
+            lower=[float(item["lambda_lower"]) for item in ordered],
+            upper=[float(item["lambda_upper"]) for item in ordered],
+            weights=[max(float(item["p_EV"]) ** 2 * 2.0, 1e-6) for item in ordered],
+            smoothness_penalty=smoothness_penalty,
+        )
+        for item, lambda_value in zip(ordered, fitted, strict=False):
+            optimized_by_key[(str(scenario_name), int(item["FY"]))] = float(lambda_value)
+
+    rows: list[dict[str, Any]] = []
+    for item in contexts:
+        for mode in modes:
+            lambda_value = _lambda_for_mode(item, mode, optimized_by_key)
+            rows.append(_migration_audit_row(item, mode, lambda_value, smoothness_penalty))
+    return pd.DataFrame(rows, columns=columns)
+
+
+def _ped_light_migration_inputs_from_official(off: dict[str, Any]) -> dict[str, Any]:
+    required = [
+        "light_petrol_vkt",
+        "ped_volume",
+        "gross_ped_revenue",
+        "light_ruc_net_km",
+        "light_bev_ruc_net_km",
+        "phev_ruc_net_km",
+        "light_ruc_net_revenue",
+        "light_bev_ruc_net_revenue",
+        "phev_ruc_net_revenue",
+    ]
+    values = {key: pd.to_numeric(pd.Series([off.get(key)]), errors="coerce").iloc[0] for key in required}
+    if any(pd.isna(value) for value in values.values()):
+        return {"availability_status": "missing_required_mbu26_ped_light_migration_input"}
+    p_mbu = float(values["light_petrol_vkt"])
+    l_mbu = float(values["light_ruc_net_km"])
+    bev_mbu = float(values["light_bev_ruc_net_km"])
+    phev_mbu = float(values["phev_ruc_net_km"])
+    denominator = p_mbu + l_mbu + bev_mbu + phev_mbu
+    if denominator <= 0:
+        return {"availability_status": "invalid_nonpositive_mbu_light_mobility_denominator"}
+    ped_litres_per_100km = float(values["ped_volume"]) / p_mbu * 100.0 if p_mbu > 0 else pd.NA
+    ped_rate = _rate_or_zero(values["gross_ped_revenue"], float(values["ped_volume"]))
+    conventional_rate = _rate_or_zero(values["light_ruc_net_revenue"], l_mbu)
+    light_bev_rate = _rate_or_zero(values["light_bev_ruc_net_revenue"], bev_mbu)
+    phev_rate = _rate_or_zero(values["phev_ruc_net_revenue"], phev_mbu)
+    if any(value is None for value in [ped_rate, conventional_rate, light_bev_rate, phev_rate]):
+        return {"availability_status": "missing_required_mbu26_ped_light_migration_rate"}
+    p_ped = p_mbu / denominator
+    p_lconv = l_mbu / denominator
+    p_bev = bev_mbu / denominator
+    p_phev = phev_mbu / denominator
+    share_sum = p_ped + p_lconv + p_bev + p_phev
+    if abs(share_sum - 1.0) > 1e-9:
+        return {"availability_status": "mbu_light_mobility_proportion_sum_failed"}
+    return {
+        "availability_status": "available",
+        "mbu_light_petrol_vkt": p_mbu,
+        "mbu_conventional_light_km": l_mbu,
+        "mbu_light_bev_km": bev_mbu,
+        "mbu_phev_km": phev_mbu,
+        "mbu_total_light_mobility_km": denominator,
+        "p_PED": p_ped,
+        "p_Lconv": p_lconv,
+        "p_BEV": p_bev,
+        "p_PHEV": p_phev,
+        "p_EV": p_bev + p_phev,
+        "ped_litres_per_100km": float(ped_litres_per_100km),
+        "ped_rate": float(ped_rate or 0.0),
+        "conventional_light_rate": float(conventional_rate or 0.0),
+        "light_bev_rate": float(light_bev_rate or 0.0),
+        "phev_rate": float(phev_rate or 0.0),
+    }
+
+
+def _group_contexts_by_scenario(contexts: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for item in contexts:
+        grouped.setdefault(str(item.get("scenario_name") or ""), []).append(item)
+    return grouped
+
+
+def _smooth_bounded_lambdas(
+    *,
+    raw: list[float],
+    lower: list[float],
+    upper: list[float],
+    weights: list[float],
+    smoothness_penalty: float,
+) -> np.ndarray:
+    raw_arr = np.asarray(raw, dtype=float)
+    lower_arr = np.asarray(lower, dtype=float)
+    upper_arr = np.asarray(upper, dtype=float)
+    weights_arr = np.maximum(np.asarray(weights, dtype=float), 1e-6)
+    n = len(raw_arr)
+    if n == 0:
+        return np.asarray([], dtype=float)
+    hessian = np.diag(weights_arr + 1e-9)
+    rhs = weights_arr * raw_arr
+    if n >= 3 and smoothness_penalty > 0:
+        d2 = np.zeros((n - 2, n), dtype=float)
+        for idx in range(n - 2):
+            d2[idx, idx : idx + 3] = [1.0, -2.0, 1.0]
+        hessian = hessian + float(smoothness_penalty) * (d2.T @ d2)
+    fixed = np.full(n, np.nan, dtype=float)
+    for _ in range(n + 1):
+        free = np.isnan(fixed)
+        x = np.where(free, 0.0, fixed)
+        if free.any():
+            free_idx = np.where(free)[0]
+            fixed_idx = np.where(~free)[0]
+            h_ff = hessian[np.ix_(free_idx, free_idx)]
+            rhs_f = rhs[free_idx].copy()
+            if fixed_idx.size:
+                rhs_f -= hessian[np.ix_(free_idx, fixed_idx)] @ fixed[fixed_idx]
+            try:
+                x[free_idx] = np.linalg.solve(h_ff, rhs_f)
+            except np.linalg.LinAlgError:
+                x[free_idx] = np.linalg.lstsq(h_ff, rhs_f, rcond=None)[0]
+        low_violation = free & (x < lower_arr - 1e-10)
+        high_violation = free & (x > upper_arr + 1e-10)
+        if not (low_violation.any() or high_violation.any()):
+            return np.clip(x, lower_arr, upper_arr)
+        fixed[low_violation] = lower_arr[low_violation]
+        fixed[high_violation] = upper_arr[high_violation]
+    return np.clip(np.where(np.isnan(fixed), raw_arr, fixed), lower_arr, upper_arr)
+
+
+def _lambda_for_mode(item: dict[str, Any], mode: str, optimized_by_key: dict[tuple[str, int], float]) -> float:
+    lower = float(item["lambda_lower"])
+    upper = float(item["lambda_upper"])
+    if mode == "optimized":
+        raw_value = optimized_by_key.get((str(item.get("scenario_name") or ""), int(item["FY"])), float(item["lambda_raw"]))
+    elif mode == "fixed_light_only":
+        raw_value = 1.0
+    elif mode == "fixed_ped_only":
+        raw_value = 0.0
+    elif mode == "mbu_ratio":
+        non_ev = float(item["p_PED"]) + float(item["p_Lconv"])
+        raw_value = float(item["p_Lconv"]) / non_ev if non_ev > 0 else float(item["lambda_raw"])
+    else:
+        raw_value = float(item["lambda_raw"])
+    return float(np.clip(raw_value, lower, upper))
+
+
+def _migration_audit_row(item: dict[str, Any], mode: str, lambda_value: float, smoothness_penalty: float) -> dict[str, Any]:
+    p_t = float(item["P_t"])
+    l_t = float(item["L_t"])
+    u_t = float(item["U_t"])
+    ev_total = float(item["target_EV"])
+    current_ped = p_t - (1.0 - lambda_value) * ev_total
+    current_lconv = l_t - lambda_value * ev_total
+    current_bev = float(item["target_BEV"])
+    current_phev = float(item["target_PHEV"])
+    component_sum = current_ped + current_lconv + current_bev + current_phev
+    component_residual = u_t - component_sum
+    current_ped_prop = current_ped / u_t if u_t else pd.NA
+    current_lconv_prop = current_lconv / u_t if u_t else pd.NA
+    current_bev_prop = current_bev / u_t if u_t else pd.NA
+    current_phev_prop = current_phev / u_t if u_t else pd.NA
+    ped_residual = float(current_ped_prop) - float(item["p_PED"])
+    lconv_residual = float(current_lconv_prop) - float(item["p_Lconv"])
+    bev_residual = float(current_bev_prop) - float(item["p_BEV"])
+    phev_residual = float(current_phev_prop) - float(item["p_PHEV"])
+    weighted_sse = ped_residual**2 + lconv_residual**2 + bev_residual**2 + phev_residual**2
+    ped_volume = current_ped * float(item["ped_litres_per_100km"]) / 100.0
+    ped_revenue = ped_volume * float(item["ped_rate"])
+    light_revenue = current_lconv * float(item["conventional_light_rate"])
+    bev_revenue = current_bev * float(item["light_bev_rate"])
+    phev_revenue = current_phev * float(item["phev_rate"])
+    old_light_only_ped_volume = p_t * float(item["ped_litres_per_100km"]) / 100.0
+    old_light_only_ped_revenue = old_light_only_ped_volume * float(item["ped_rate"])
+    old_light_only_light_revenue = l_t * float(item["conventional_light_rate"])
+    old_light_only_bev_revenue = current_bev * float(item["light_bev_rate"])
+    old_light_only_phev_revenue = current_phev * float(item["phev_rate"])
+    bindings = []
+    if abs(lambda_value - float(item["lambda_lower"])) <= 1e-8:
+        bindings.append("lambda_lower_bound")
+    if abs(lambda_value - float(item["lambda_upper"])) <= 1e-8:
+        bindings.append("lambda_upper_bound")
+    assumption_status = "available"
+    if current_ped < -1e-6 or current_lconv < -1e-6:
+        assumption_status = "invalid_negative_component"
+    elif abs(component_residual) > 1e-6:
+        assumption_status = "invalid_component_sum_residual"
+    return {
+        "FY": int(item["FY"]),
+        "period": item["period"],
+        "source_path": item["source_path"],
+        "scenario_name": item["scenario_name"],
+        "scenario_role": item["scenario_role"],
+        "lambda_mode": mode,
+        "lambda_value": lambda_value,
+        "lambda_raw_unconstrained": float(item["lambda_raw"]),
+        "lambda_lower_bound": float(item["lambda_lower"]),
+        "lambda_upper_bound": float(item["lambda_upper"]),
+        "lambda_binding_constraints": "; ".join(bindings),
+        "lambda_smoothness_penalty": float(smoothness_penalty),
+        "current_P_t_light_petrol_km": p_t,
+        "current_L_t_total_light_ruc_km": l_t,
+        "current_U_t_light_mobility_km": u_t,
+        "mbu_light_petrol_vkt": item["mbu_light_petrol_vkt"],
+        "mbu_conventional_light_km": item["mbu_conventional_light_km"],
+        "mbu_light_bev_km": item["mbu_light_bev_km"],
+        "mbu_phev_km": item["mbu_phev_km"],
+        "mbu_total_light_mobility_km": item["mbu_total_light_mobility_km"],
+        "p_PED": item["p_PED"],
+        "p_Lconv": item["p_Lconv"],
+        "p_BEV": item["p_BEV"],
+        "p_PHEV": item["p_PHEV"],
+        "p_EV": item["p_EV"],
+        "target_PED_light_petrol_km": item["target_PED"],
+        "target_conventional_light_km": item["target_Lconv"],
+        "target_BEV_km": item["target_BEV"],
+        "target_PHEV_km": item["target_PHEV"],
+        "target_EV_total_km": ev_total,
+        "current_PED_light_petrol_km": current_ped,
+        "current_conventional_light_km": current_lconv,
+        "current_BEV_km": current_bev,
+        "current_PHEV_km": current_phev,
+        "component_sum_km": component_sum,
+        "component_sum_residual_km": component_residual,
+        "current_PED_prop": current_ped_prop,
+        "current_Lconv_prop": current_lconv_prop,
+        "current_BEV_prop": current_bev_prop,
+        "current_PHEV_prop": current_phev_prop,
+        "ped_prop_residual": ped_residual,
+        "lconv_prop_residual": lconv_residual,
+        "bev_prop_residual": bev_residual,
+        "phev_prop_residual": phev_residual,
+        "weighted_sse": weighted_sse,
+        "ped_litres_per_100km": item["ped_litres_per_100km"],
+        "ped_rate": item["ped_rate"],
+        "conventional_light_rate": item["conventional_light_rate"],
+        "light_bev_rate": item["light_bev_rate"],
+        "phev_rate": item["phev_rate"],
+        "current_PED_volume": ped_volume,
+        "current_PED_revenue": ped_revenue,
+        "current_light_ruc_net_revenue": light_revenue,
+        "current_light_bev_ruc_net_revenue": bev_revenue,
+        "current_phev_ruc_net_revenue": phev_revenue,
+        "old_light_only_PED_revenue": old_light_only_ped_revenue,
+        "old_light_only_light_ruc_net_revenue": old_light_only_light_revenue,
+        "old_light_only_light_bev_ruc_net_revenue": old_light_only_bev_revenue,
+        "old_light_only_phev_ruc_net_revenue": old_light_only_phev_revenue,
+        "source_file": "forecast_scenario_comparison.parquet; mbu26_official_annual.csv",
+        "source_cells": item["source_cells"],
+        "source_formula": item["source_formula"],
+        "availability_status": item["availability_status"],
+        "assumption_status": assumption_status,
+        "extrapolated_model_extension": item["extrapolated_model_extension"],
+        "notes": "EV/PHEV uptake is allocated between PED/light-petrol and total Light RUC to match MBU proportions; it is not a new model.",
+    }
 
 
 def _current_activity_quarter_lookup(chart_rows: pd.DataFrame) -> dict[tuple[str, int, str], dict[str, Any]]:
