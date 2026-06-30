@@ -6697,10 +6697,24 @@ def _validate_output_hashes(pack_dir: Path, manifest: dict[str, Any]) -> list[st
         if not expected:
             errors.append(f"{name} has no SHA256 in output_hashes.")
             continue
-        actual = _sha256(path)
-        if actual != expected:
+        if not _runtime_output_hash_matches(path, expected):
             errors.append(f"{name} hash mismatch.")
     return errors
+
+
+def _runtime_output_hash_matches(path: Path, expected: str) -> bool:
+    data = path.read_bytes()
+    if hashlib.sha256(data).hexdigest() == expected:
+        return True
+    if path.suffix.lower() != ".csv":
+        return False
+    # Promoted CSV companions may be checked out with LF on Linux even when the
+    # Windows-authored manifest recorded CRLF bytes. Validate the same content
+    # independent of Git line-ending normalization, while keeping binary hashes
+    # exact and still rejecting real CSV content changes.
+    lf_data = data.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    crlf_data = lf_data.replace(b"\n", b"\r\n")
+    return hashlib.sha256(lf_data).hexdigest() == expected or hashlib.sha256(crlf_data).hexdigest() == expected
 
 
 def _comparison_assumptions(comparison: ForecastScenarioComparisonResult) -> pd.DataFrame:

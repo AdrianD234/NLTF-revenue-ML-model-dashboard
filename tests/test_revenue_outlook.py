@@ -1998,6 +1998,21 @@ def test_revenue_outlook_loader_rejects_hash_mismatched_promoted_pack(tmp_path: 
         load_revenue_outlook_pack(pack_copy, repo_root=ROOT)
 
 
+def test_revenue_outlook_loader_accepts_git_normalized_csv_line_endings(tmp_path: Path) -> None:
+    pack_copy = tmp_path / "current_revenue_outlook"
+    shutil.copytree(ROOT / CURRENT_REVENUE_OUTLOOK_DIR, pack_copy)
+    manifest = json.loads((pack_copy / "manifest.json").read_text(encoding="utf-8"))
+    for filename in manifest["output_hashes"]:
+        if str(filename).endswith(".csv"):
+            path = pack_copy / filename
+            path.write_bytes(path.read_bytes().replace(b"\r\n", b"\n"))
+
+    pack = load_revenue_outlook_pack(pack_copy, repo_root=ROOT)
+
+    assert pack is not None
+    assert not pack.revenue_chart_rows.empty
+
+
 def test_revenue_outlook_loader_rejects_missing_required_runtime_file(tmp_path: Path) -> None:
     pack_copy = tmp_path / "current_revenue_outlook"
     shutil.copytree(ROOT / CURRENT_REVENUE_OUTLOOK_DIR, pack_copy)
