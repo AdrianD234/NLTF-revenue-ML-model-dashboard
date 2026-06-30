@@ -856,6 +856,91 @@ def cached_revenue_outlook_fan_figure(
     return figure, caption
 
 
+def revenue_outlook_composition_stack_frame(
+    stack_components: pd.DataFrame,
+    *,
+    source_path: str,
+    composition_mode: str,
+    sections: tuple[str, ...],
+    fy_range: tuple[int, int],
+    overlays: tuple[str, ...],
+    stack_section_options: tuple[str, ...],
+) -> pd.DataFrame:
+    if stack_components is None or stack_components.empty:
+        return pd.DataFrame()
+    scoped_stack = _filter_revenue_stack_components(
+        stack_components,
+        source_path=source_path,
+        composition_mode=composition_mode,
+        sections=list(stack_section_options),
+        fy_range=fy_range,
+    )
+    if scoped_stack.empty:
+        return scoped_stack
+    if sections and "section" in scoped_stack.columns:
+        filtered_stack = scoped_stack[scoped_stack["section"].astype(str).isin(sections)].copy()
+    else:
+        filtered_stack = scoped_stack.copy()
+    overlay_labels = {str(value) for value in overlays if str(value).strip()}
+    if not overlay_labels:
+        return filtered_stack
+    overlay_stack = scoped_stack[
+        scoped_stack.get("stack_role", pd.Series("", index=scoped_stack.index)).astype(str).eq("aggregate_overlay")
+        & scoped_stack.get("line_label", pd.Series("", index=scoped_stack.index)).astype(str).isin(overlay_labels)
+    ].copy()
+    if overlay_stack.empty:
+        return filtered_stack
+    return pd.concat([filtered_stack, overlay_stack], ignore_index=True, sort=False)
+
+
+@st.cache_data(show_spinner=False)
+def cached_revenue_outlook_composition_stack(
+    signature: tuple[tuple[str, int, int], ...],
+    source_path: str,
+    composition_mode: str,
+    sections: tuple[str, ...],
+    fy_range: tuple[int, int],
+    overlays: tuple[str, ...],
+    stack_section_options: tuple[str, ...],
+    sensitivity_key: tuple[str, str, str, str, str, str, str, str, str],
+    bridge_mode: str,
+    _stack_components: pd.DataFrame,
+) -> pd.DataFrame:
+    del signature, sensitivity_key, bridge_mode
+    return revenue_outlook_composition_stack_frame(
+        _stack_components,
+        source_path=source_path,
+        composition_mode=composition_mode,
+        sections=sections,
+        fy_range=fy_range,
+        overlays=overlays,
+        stack_section_options=stack_section_options,
+    )
+
+
+@st.cache_data(show_spinner=False)
+def cached_revenue_outlook_composition_figure(
+    signature: tuple[tuple[str, int, int], ...],
+    source_path: str,
+    composition_mode: str,
+    detail_level: str,
+    sections: tuple[str, ...],
+    fy_range: tuple[int, int],
+    overlays: tuple[str, ...],
+    sensitivity_key: tuple[str, str, str, str, str, str, str, str, str],
+    bridge_mode: str,
+    _chart_stack: pd.DataFrame,
+) -> go.Figure:
+    del signature, sections, fy_range, sensitivity_key, bridge_mode
+    return revenue_outlook_composition_figure(
+        _chart_stack,
+        source_path=source_path,
+        composition_mode=composition_mode,
+        detail_level=detail_level,
+        overlays=list(overlays),
+    )
+
+
 def directory_signature(path: Path) -> tuple[bool, int, int]:
     try:
         stat = path.stat()
@@ -2883,38 +2968,37 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                     key=f"revenue_stack_overlays_{selected_stack_mode}_{selected_stack_detail_level}",
                 )
 
-            filtered_stack = _filter_revenue_stack_components(
+            selected_stack_sections_tuple = tuple(str(value) for value in selected_stack_sections)
+            selected_stack_fy_range_tuple = (int(selected_stack_fy_range[0]), int(selected_stack_fy_range[1]))
+            selected_stack_overlays_tuple = tuple(str(value) for value in selected_stack_overlays)
+            chart_stack = cached_revenue_outlook_composition_stack(
+                pack_signature,
+                selected_stack_source,
+                selected_stack_mode,
+                selected_stack_sections_tuple,
+                selected_stack_fy_range_tuple,
+                selected_stack_overlays_tuple,
+                tuple(str(value) for value in stack_section_options),
+                sensitivity_key,
+                selected_ped_bridge_mode,
                 stack_components,
-                source_path=selected_stack_source,
-                composition_mode=selected_stack_mode,
-                sections=selected_stack_sections,
-                fy_range=selected_stack_fy_range,
             )
-            chart_stack = filtered_stack
-            if selected_stack_overlays:
-                overlay_stack = _filter_revenue_stack_components(
-                    stack_components,
-                    source_path=selected_stack_source,
-                    composition_mode=selected_stack_mode,
-                    sections=stack_section_options,
-                    fy_range=selected_stack_fy_range,
-                )
-                overlay_stack = overlay_stack[
-                    overlay_stack.get("stack_role", pd.Series("", index=overlay_stack.index)).astype(str).eq("aggregate_overlay")
-                    & overlay_stack.get("line_label", pd.Series("", index=overlay_stack.index)).astype(str).isin(selected_stack_overlays)
-                ].copy()
-                if not overlay_stack.empty:
-                    chart_stack = pd.concat([filtered_stack, overlay_stack], ignore_index=True, sort=False)
+            composition_figure = cached_revenue_outlook_composition_figure(
+                pack_signature,
+                selected_stack_source,
+                selected_stack_mode,
+                selected_stack_detail_level,
+                selected_stack_sections_tuple,
+                selected_stack_fy_range_tuple,
+                selected_stack_overlays_tuple,
+                sensitivity_key,
+                selected_ped_bridge_mode,
+                chart_stack,
+            )
             chart_card(
                 "Revenue composition over time",
                 "Line-item contributions from revenue_stack_components; aggregate rows are overlays only.",
-                revenue_outlook_composition_figure(
-                    chart_stack,
-                    source_path=selected_stack_source,
-                    composition_mode=selected_stack_mode,
-                    detail_level=selected_stack_detail_level,
-                    overlays=selected_stack_overlays,
-                ),
+                composition_figure,
                 caption="Clean bridge mode hides internal add-back rows while preserving reconciliation to Total NLTF revenue. Positive revenue components stack above zero; deductions stack below zero. Full formula audit shows internal rows. Gross mode reconciles leaf rows to Total gross revenues. Aggregates are overlays only.",
                 notes_as_tooltip=False,
             )

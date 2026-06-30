@@ -124,7 +124,7 @@ def test_revenue_outlook_heavy_sections_are_lazy_guarded_in_renderer() -> None:
         "revenue_outlook_show_runtime_cutoff_audit": 'runtime_cutoff_audit = _pack_table(pack, "runtime_cutoff_audit")',
         "revenue_outlook_show_sensitivity_impact_audit": "cached_revenue_outlook_sensitivity_audit(",
         "revenue_outlook_show_ped_bridge_diagnostics": 'ped_bridge_shape_fit_metrics = _pack_table(pack, "ped_bridge_shape_fit_metrics")',
-        "revenue_outlook_show_composition": "_filter_revenue_stack_components(",
+        "revenue_outlook_show_composition": "cached_revenue_outlook_composition_stack(",
         "revenue_outlook_show_ev_phev_drift_audit": 'ev_phev_ped_light_drift_assumptions = _pack_table(pack, "ev_phev_ped_light_drift_assumptions")',
         "revenue_outlook_show_ev_phev_split_audit": 'ev_phev_split_assumptions = _pack_table(pack, "ev_phev_split_assumptions")',
         "revenue_outlook_show_line_reconciliation": "_filter_revenue_line_reconciliation(",
@@ -545,6 +545,100 @@ def test_revenue_outlook_visible_figures_materialize_through_cache() -> None:
     assert [trace.name for trace in cached_total.data] == [trace.name for trace in direct_total.data]
     assert [trace.name for trace in cached_fan.data] == [trace.name for trace in direct_fan.data]
     assert cached_caption == app._revenue_outlook_fan_caption(pack.fan_availability, "Total NLTF revenue", app.FAN_SOURCE_AUTO)[:220]
+
+
+def test_revenue_outlook_composition_stack_and_figure_cache_match_direct_builder() -> None:
+    root = Path(__file__).resolve().parents[1]
+    pack_dir = root / CURRENT_REVENUE_OUTLOOK_DIR
+    pack = load_revenue_outlook_pack(pack_dir, repo_root=root)
+    assert pack is not None
+    signature = revenue_outlook_signature(pack_dir, root)
+    sensitivity_key = app.selected_sensitivity_key("Off", "Off", "Off")
+    selectors = app.cached_revenue_outlook_selectors(signature, pack)
+    detail = app.cached_revenue_outlook_detail_frames(signature, sensitivity_key, PED_BRIDGE_DEFAULT_MODE, pack)
+    stack_components = detail["revenue_stack_components"]
+    stack_source = selectors["stack_source_options"][0]
+    stack_mode = selectors["stack_mode_options"][0]
+    stack_section_options = tuple(str(value) for value in selectors["stack_section_options"])
+    stack_sections = tuple(section for section in ("RUC", "FED", "MVR", "TUC") if section in stack_section_options)
+    if not stack_sections:
+        stack_sections = stack_section_options
+    fy_range = (2025, 2035)
+    overlays = tuple(app._revenue_stack_default_overlays(stack_mode, selectors["stack_overlay_options"]))
+
+    direct_filtered = app._filter_revenue_stack_components(
+        stack_components,
+        source_path=stack_source,
+        composition_mode=stack_mode,
+        sections=list(stack_sections),
+        fy_range=fy_range,
+    )
+    direct_chart_stack = direct_filtered
+    if overlays:
+        direct_overlay = app._filter_revenue_stack_components(
+            stack_components,
+            source_path=stack_source,
+            composition_mode=stack_mode,
+            sections=list(stack_section_options),
+            fy_range=fy_range,
+        )
+        direct_overlay = direct_overlay[
+            direct_overlay.get("stack_role", pd.Series("", index=direct_overlay.index)).astype(str).eq("aggregate_overlay")
+            & direct_overlay.get("line_label", pd.Series("", index=direct_overlay.index)).astype(str).isin(overlays)
+        ].copy()
+        if not direct_overlay.empty:
+            direct_chart_stack = pd.concat([direct_filtered, direct_overlay], ignore_index=True, sort=False)
+
+    if hasattr(app.cached_revenue_outlook_composition_stack, "clear"):
+        app.cached_revenue_outlook_composition_stack.clear()
+    if hasattr(app.cached_revenue_outlook_composition_figure, "clear"):
+        app.cached_revenue_outlook_composition_figure.clear()
+    cached_stack = app.cached_revenue_outlook_composition_stack(
+        signature,
+        stack_source,
+        stack_mode,
+        stack_sections,
+        fy_range,
+        overlays,
+        stack_section_options,
+        sensitivity_key,
+        PED_BRIDGE_DEFAULT_MODE,
+        stack_components,
+    )
+    pd.testing.assert_frame_equal(
+        cached_stack.reset_index(drop=True),
+        direct_chart_stack.reset_index(drop=True),
+        check_dtype=False,
+    )
+
+    cached_fig = app.cached_revenue_outlook_composition_figure(
+        signature,
+        stack_source,
+        stack_mode,
+        app.REVENUE_STACK_DETAIL_CLEAN,
+        stack_sections,
+        fy_range,
+        overlays,
+        sensitivity_key,
+        PED_BRIDGE_DEFAULT_MODE,
+        cached_stack,
+    )
+    direct_fig = app.revenue_outlook_composition_figure(
+        direct_chart_stack,
+        source_path=stack_source,
+        composition_mode=stack_mode,
+        detail_level=app.REVENUE_STACK_DETAIL_CLEAN,
+        overlays=list(overlays),
+    )
+
+    assert [trace.name for trace in cached_fig.data] == [trace.name for trace in direct_fig.data]
+    assert [tuple(trace.x) for trace in cached_fig.data] == [tuple(trace.x) for trace in direct_fig.data]
+    for cached_trace, direct_trace in zip(cached_fig.data, direct_fig.data, strict=True):
+        assert pd.to_numeric(pd.Series(cached_trace.y), errors="coerce").to_numpy() == pytest.approx(
+            pd.to_numeric(pd.Series(direct_trace.y), errors="coerce").to_numpy(),
+            abs=0,
+            nan_ok=True,
+        )
 
 
 def test_governance_page_cloud_visibility_can_be_overridden(monkeypatch) -> None:

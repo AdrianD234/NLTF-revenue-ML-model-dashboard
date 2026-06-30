@@ -209,5 +209,27 @@
       "visible_figure_change": "Cached the visible Total path and uncertainty fan figures with runtime signature and control keys, keeping DataFrame values out of the cache hash because the upstream view is already signature-keyed.",
       "validation": "python -m compileall app.py model_dashboard tests passed; Revenue Outlook/cloud test slice passed: 54 passed; bounded verify_dashboard.ps1 -SkipBrowser passed; host verify_browser_host.ps1 on port 8515 passed: 40 passed."
     }
+  },
+  {
+    "timestamp": "2026-07-01T00:20:09+12:00",
+    "scope": "Revenue Outlook composition chart cache",
+    "before_ms": {
+      "direct_composition_filter_inputs_min": 22.17,
+      "direct_composition_filter_inputs_mean": 23.98,
+      "direct_composition_figure_min": 49.7,
+      "direct_composition_figure_mean": 102.95
+    },
+    "after_ms": {
+      "single_pass_composition_stack_min": 12.96,
+      "single_pass_composition_stack_mean": 14.21,
+      "cached_composition_stack_warm_min": 0.87,
+      "cached_composition_stack_warm_mean": 0.94,
+      "cached_composition_figure_warm_min": 5.18,
+      "cached_composition_figure_warm_mean": 5.5
+    },
+    "result": {
+      "composition_change": "Cached the lazy Revenue composition filtered stack and Plotly figure using runtime signature, bridge mode, sensitivity key and visible composition controls, with a single-pass stack filter preserving selected aggregate overlays.",
+      "validation": "python -m compileall app.py model_dashboard tests passed; Revenue Outlook/cloud test slice passed: 55 passed; bounded verify_dashboard.ps1 -SkipBrowser passed; host verify_browser_host.ps1 on port 8515 passed: 40 passed."
+    }
   }
 ]

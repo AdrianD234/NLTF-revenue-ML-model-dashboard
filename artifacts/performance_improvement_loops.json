@@ -191,5 +191,30 @@
       "tests": "python -m compileall app.py model_dashboard tests passed; Revenue Outlook/cloud test slice passed: 54 passed; bounded verify_dashboard.ps1 -SkipBrowser passed; host verify_browser_host.ps1 on port 8515 passed: 40 passed."
     },
     "status": "implemented"
+  },
+  {
+    "loop": 10,
+    "timestamp": "2026-07-01T00:20:09+12:00",
+    "scope": "Revenue Outlook composition chart cache",
+    "finding": "The lazy Revenue composition expander still rebuilt selected stack rows and the Plotly composition figure whenever the expander was open.",
+    "change": "Added a single-pass composition stack helper plus cache_data wrappers for the filtered composition stack and figure, keyed by runtime signature, bridge mode, sensitivity key and visible composition controls.",
+    "evidence": {
+      "before_ms": {
+        "direct_composition_filter_inputs_min": 22.17,
+        "direct_composition_filter_inputs_mean": 23.98,
+        "direct_composition_figure_min": 49.7,
+        "direct_composition_figure_mean": 102.95
+      },
+      "after_ms": {
+        "single_pass_composition_stack_min": 12.96,
+        "single_pass_composition_stack_mean": 14.21,
+        "cached_composition_stack_warm_min": 0.87,
+        "cached_composition_stack_warm_mean": 0.94,
+        "cached_composition_figure_warm_min": 5.18,
+        "cached_composition_figure_warm_mean": 5.5
+      },
+      "tests": "python -m compileall app.py model_dashboard tests passed; Revenue Outlook/cloud test slice passed: 55 passed; bounded verify_dashboard.ps1 -SkipBrowser passed; host verify_browser_host.ps1 on port 8515 passed: 40 passed."
+    },
+    "status": "implemented"
   }
 ]
