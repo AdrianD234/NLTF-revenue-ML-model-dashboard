@@ -101,6 +101,7 @@ def test_revenue_outlook_sensitivity_labels_show_actual_assumptions() -> None:
 
 
 def test_revenue_outlook_lazy_table_uses_explicit_toggle(monkeypatch) -> None:
+    _clear_governance_visibility_env(monkeypatch)
     calls: list[tuple[str, bool, str]] = []
     captions: list[str] = []
 
@@ -117,6 +118,21 @@ def test_revenue_outlook_lazy_table_uses_explicit_toggle(monkeypatch) -> None:
     assert captions == ["not yet"]
 
 
+def test_revenue_outlook_lazy_table_is_hidden_on_streamlit_cloud(monkeypatch) -> None:
+    _clear_governance_visibility_env(monkeypatch)
+    monkeypatch.setenv("STREAMLIT_SHARING_MODE", "streamlit_cloud")
+    calls: list[str] = []
+    captions: list[str] = []
+
+    monkeypatch.setattr(app.st, "toggle", lambda *args, **kwargs: calls.append("toggle"))
+    monkeypatch.setattr(app.st, "caption", lambda text: captions.append(str(text)))
+
+    assert not app.revenue_outlook_lazy_table("Show expensive audit", "cloud_lazy_key", caption="hidden caption")
+    assert app.revenue_outlook_lazy_table("Show default-on audit", "cloud_default_key", default=True, caption="hidden caption")
+    assert calls == []
+    assert captions == []
+
+
 def test_revenue_outlook_heavy_sections_are_lazy_guarded_in_renderer() -> None:
     source = inspect.getsource(app.render_revenue_outlook_page)
     guarded_markers = {
@@ -124,7 +140,6 @@ def test_revenue_outlook_heavy_sections_are_lazy_guarded_in_renderer() -> None:
         "revenue_outlook_show_runtime_cutoff_audit": 'runtime_cutoff_audit = _pack_table(pack, "runtime_cutoff_audit")',
         "revenue_outlook_show_sensitivity_impact_audit": "cached_revenue_outlook_sensitivity_audit(",
         "revenue_outlook_show_ped_bridge_diagnostics": 'ped_bridge_shape_fit_metrics = _pack_table(pack, "ped_bridge_shape_fit_metrics")',
-        "revenue_outlook_show_composition": "cached_revenue_outlook_composition_stack(",
         "revenue_outlook_show_ev_phev_drift_audit": 'ev_phev_ped_light_drift_assumptions = _pack_table(pack, "ev_phev_ped_light_drift_assumptions")',
         "revenue_outlook_show_ev_phev_split_audit": 'ev_phev_split_assumptions = _pack_table(pack, "ev_phev_split_assumptions")',
         "revenue_outlook_show_line_reconciliation": "cached_revenue_line_reconciliation_view(",
@@ -872,13 +887,39 @@ def test_revenue_outlook_activity_branch_uses_cached_figure() -> None:
 
 def test_revenue_outlook_composition_branch_uses_cached_stack_for_table() -> None:
     source = inspect.getsource(app.render_revenue_outlook_page)
-    start = source.index('"Show Revenue composition over time"')
+    start = source.index('st.markdown("<div class=\'page5-panel-title\'>Revenue composition over time</div>"')
     end = source.index('"Show EV/PHEV PED-Light migration audit"')
     composition_branch = source[start:end]
+    assert "Show Revenue composition over time" not in source
+    assert "revenue_outlook_show_composition" not in source
     assert "filtered_stack" not in composition_branch
     assert "dataframe_download(chart_stack" in composition_branch
     assert "cached_revenue_outlook_composition_table_view(" in composition_branch
     assert "_revenue_stack_components_display_table(chart_stack)" not in composition_branch
+    assert "cached_revenue_outlook_composition_stack(" in composition_branch
+    assert "value=(stack_fy_min, stack_fy_max)" in composition_branch
+
+
+def test_revenue_outlook_cloud_hides_debug_toggles_and_shows_full_composition(monkeypatch) -> None:
+    _clear_governance_visibility_env(monkeypatch)
+    monkeypatch.setenv("STREAMLIT_SHARING_MODE", "streamlit_cloud")
+    app_path = Path(__file__).resolve().parents[1] / "app.py"
+    pack_dir = Path(__file__).resolve().parents[1] / CURRENT_REVENUE_OUTLOOK_DIR
+    pack = load_revenue_outlook_pack(pack_dir, repo_root=Path(__file__).resolve().parents[1])
+    assert pack is not None
+    selectors = app.cached_revenue_outlook_selectors(revenue_outlook_signature(pack_dir, Path(__file__).resolve().parents[1]), pack)
+
+    at = AppTest.from_file(str(app_path), default_timeout=90)
+    at.run()
+    at.radio[0].set_value(app.REVENUE_OUTLOOK_PAGE)
+    at.run()
+
+    assert not at.exception
+    assert [(toggle.label, toggle.key) for toggle in at.toggle] == []
+    assert any("Revenue composition over time" in str(markdown.value) for markdown in at.markdown)
+    fy_sliders = [slider for slider in at.slider if slider.label == "FY range / horizon"]
+    assert len(fy_sliders) == 1
+    assert tuple(fy_sliders[0].value) == tuple(selectors["stack_fy_bounds"])
 
 
 def test_governance_page_cloud_visibility_can_be_overridden(monkeypatch) -> None:

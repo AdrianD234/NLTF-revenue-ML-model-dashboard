@@ -534,6 +534,8 @@ def _is_default_sensitivity_key(sensitivity_key: tuple[Any, ...]) -> bool:
 
 
 def revenue_outlook_lazy_table(label: str, key: str, *, default: bool = False, caption: str | None = None) -> bool:
+    if not should_show_local_audit_controls():
+        return bool(default)
     show = st.toggle(label, value=default, key=key)
     if caption and not show:
         st.caption(caption)
@@ -2995,128 +2997,120 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     revenue_kpis = _revenue_outlook_summary_cards(manifest, filtered_rows, future_revenue)
     kpi_grid(revenue_kpis)
 
-    if revenue_outlook_lazy_table(
-        "Show Revenue composition over time",
-        "revenue_outlook_show_composition",
-        caption=(
-            "FY range / horizon, Section filter and Aggregate overlays controls are loaded with the chart. "
-            "Positive revenue components stack above zero."
-        ),
-    ):
-        timer.start("composition figure")
-        detail_frames = cached_revenue_outlook_detail_frames(
+    timer.start("composition figure")
+    detail_frames = cached_revenue_outlook_detail_frames(
+        pack_signature,
+        sensitivity_key,
+        selected_ped_bridge_mode,
+        pack,
+    )
+    stack_components = detail_frames["revenue_stack_components"]
+    with st.container(border=True):
+        st.markdown("<div class='page5-panel-title'>Revenue composition over time</div>", unsafe_allow_html=True)
+        comp_cols = st.columns([0.20, 0.18, 0.17, 0.16, 0.15, 0.14])
+        stack_source_options = selector_options["stack_source_options"]
+        stack_mode_options = selector_options["stack_mode_options"]
+        stack_section_options = selector_options["stack_section_options"]
+        stack_fy_min, stack_fy_max = selector_options["stack_fy_bounds"]
+        with comp_cols[0]:
+            selected_stack_source = st.selectbox(
+                "Source path",
+                stack_source_options,
+                index=0,
+                key="revenue_stack_source_path",
+            )
+        with comp_cols[1]:
+            selected_stack_mode = st.selectbox(
+                "Mode",
+                stack_mode_options,
+                index=0,
+                key="revenue_stack_composition_mode",
+            )
+        with comp_cols[2]:
+            selected_stack_detail_level = st.selectbox(
+                "Detail level",
+                list(REVENUE_STACK_DETAIL_LEVELS),
+                index=0,
+                key="revenue_stack_detail_level",
+            )
+        with comp_cols[3]:
+            selected_stack_fy_range = st.slider(
+                "FY range / horizon",
+                min_value=stack_fy_min,
+                max_value=stack_fy_max,
+                value=(stack_fy_min, stack_fy_max),
+                key="revenue_stack_fy_range",
+            )
+        default_stack_sections = [section for section in ["RUC", "FED", "MVR", "TUC"] if section in stack_section_options]
+        with comp_cols[4]:
+            selected_stack_sections = st.multiselect(
+                "Section filter",
+                stack_section_options,
+                default=default_stack_sections or stack_section_options,
+                key="revenue_stack_sections",
+            )
+        stack_overlay_options = selector_options["stack_overlay_options"]
+        default_stack_overlays = _revenue_stack_default_overlays(selected_stack_mode, stack_overlay_options)
+        with comp_cols[5]:
+            selected_stack_overlays = st.multiselect(
+                "Aggregate overlays",
+                stack_overlay_options,
+                default=default_stack_overlays,
+                key=f"revenue_stack_overlays_{selected_stack_mode}_{selected_stack_detail_level}",
+            )
+
+        selected_stack_sections_tuple = tuple(str(value) for value in selected_stack_sections)
+        selected_stack_fy_range_tuple = (int(selected_stack_fy_range[0]), int(selected_stack_fy_range[1]))
+        selected_stack_overlays_tuple = tuple(str(value) for value in selected_stack_overlays)
+        chart_stack = cached_revenue_outlook_composition_stack(
             pack_signature,
+            selected_stack_source,
+            selected_stack_mode,
+            selected_stack_sections_tuple,
+            selected_stack_fy_range_tuple,
+            selected_stack_overlays_tuple,
+            tuple(str(value) for value in stack_section_options),
             sensitivity_key,
             selected_ped_bridge_mode,
-            pack,
+            stack_components,
         )
-        stack_components = detail_frames["revenue_stack_components"]
-        with st.container(border=True):
-            st.markdown("<div class='page5-panel-title'>Revenue composition over time</div>", unsafe_allow_html=True)
-            comp_cols = st.columns([0.20, 0.18, 0.17, 0.16, 0.15, 0.14])
-            stack_source_options = selector_options["stack_source_options"]
-            stack_mode_options = selector_options["stack_mode_options"]
-            stack_section_options = selector_options["stack_section_options"]
-            stack_fy_min, stack_fy_max = selector_options["stack_fy_bounds"]
-            with comp_cols[0]:
-                selected_stack_source = st.selectbox(
-                    "Source path",
-                    stack_source_options,
-                    index=0,
-                    key="revenue_stack_source_path",
-                )
-            with comp_cols[1]:
-                selected_stack_mode = st.selectbox(
-                    "Mode",
-                    stack_mode_options,
-                    index=0,
-                    key="revenue_stack_composition_mode",
-                )
-            with comp_cols[2]:
-                selected_stack_detail_level = st.selectbox(
-                    "Detail level",
-                    list(REVENUE_STACK_DETAIL_LEVELS),
-                    index=0,
-                    key="revenue_stack_detail_level",
-                )
-            with comp_cols[3]:
-                selected_stack_fy_range = st.slider(
-                    "FY range / horizon",
-                    min_value=stack_fy_min,
-                    max_value=stack_fy_max,
-                    value=(max(stack_fy_min, 2025), min(stack_fy_max, 2035)) if stack_fy_min <= 2025 <= stack_fy_max else (stack_fy_min, min(stack_fy_max, stack_fy_min + 10)),
-                    key="revenue_stack_fy_range",
-                )
-            default_stack_sections = [section for section in ["RUC", "FED", "MVR", "TUC"] if section in stack_section_options]
-            with comp_cols[4]:
-                selected_stack_sections = st.multiselect(
-                    "Section filter",
-                    stack_section_options,
-                    default=default_stack_sections or stack_section_options,
-                    key="revenue_stack_sections",
-                )
-            stack_overlay_options = selector_options["stack_overlay_options"]
-            default_stack_overlays = _revenue_stack_default_overlays(selected_stack_mode, stack_overlay_options)
-            with comp_cols[5]:
-                selected_stack_overlays = st.multiselect(
-                    "Aggregate overlays",
-                    stack_overlay_options,
-                    default=default_stack_overlays,
-                    key=f"revenue_stack_overlays_{selected_stack_mode}_{selected_stack_detail_level}",
-                )
-
-            selected_stack_sections_tuple = tuple(str(value) for value in selected_stack_sections)
-            selected_stack_fy_range_tuple = (int(selected_stack_fy_range[0]), int(selected_stack_fy_range[1]))
-            selected_stack_overlays_tuple = tuple(str(value) for value in selected_stack_overlays)
-            chart_stack = cached_revenue_outlook_composition_stack(
-                pack_signature,
-                selected_stack_source,
-                selected_stack_mode,
-                selected_stack_sections_tuple,
-                selected_stack_fy_range_tuple,
-                selected_stack_overlays_tuple,
-                tuple(str(value) for value in stack_section_options),
-                sensitivity_key,
-                selected_ped_bridge_mode,
-                stack_components,
-            )
-            composition_figure = cached_revenue_outlook_composition_figure(
-                pack_signature,
-                selected_stack_source,
-                selected_stack_mode,
-                selected_stack_detail_level,
-                selected_stack_sections_tuple,
-                selected_stack_fy_range_tuple,
-                selected_stack_overlays_tuple,
-                sensitivity_key,
-                selected_ped_bridge_mode,
-                chart_stack,
-            )
-            stack_gap_banner, stack_display = cached_revenue_outlook_composition_table_view(
-                pack_signature,
-                selected_stack_source,
-                selected_stack_mode,
-                selected_stack_sections_tuple,
-                selected_stack_fy_range_tuple,
-                selected_stack_overlays_tuple,
-                sensitivity_key,
-                selected_ped_bridge_mode,
-                chart_stack,
-            )
-            chart_card(
-                "Revenue composition over time",
-                "Line-item contributions from revenue_stack_components; aggregate rows are overlays only.",
-                composition_figure,
-                caption="Clean bridge mode hides internal add-back rows while preserving reconciliation to Total NLTF revenue. Positive revenue components stack above zero; deductions stack below zero. Full formula audit shows internal rows. Gross mode reconciles leaf rows to Total gross revenues. Aggregates are overlays only.",
-                notes_as_tooltip=False,
-            )
-            if stack_gap_banner:
-                warning_panel(stack_gap_banner)
-            table_cols = st.columns([0.82, 0.18])
-            with table_cols[1]:
-                dataframe_download(chart_stack, "Download CSV", "revenue_stack_components.csv")
-            display_table(stack_display, height=360, max_rows=720)
-        timer.stop("composition figure")
+        composition_figure = cached_revenue_outlook_composition_figure(
+            pack_signature,
+            selected_stack_source,
+            selected_stack_mode,
+            selected_stack_detail_level,
+            selected_stack_sections_tuple,
+            selected_stack_fy_range_tuple,
+            selected_stack_overlays_tuple,
+            sensitivity_key,
+            selected_ped_bridge_mode,
+            chart_stack,
+        )
+        stack_gap_banner, stack_display = cached_revenue_outlook_composition_table_view(
+            pack_signature,
+            selected_stack_source,
+            selected_stack_mode,
+            selected_stack_sections_tuple,
+            selected_stack_fy_range_tuple,
+            selected_stack_overlays_tuple,
+            sensitivity_key,
+            selected_ped_bridge_mode,
+            chart_stack,
+        )
+        chart_card(
+            "Revenue composition over time",
+            "Line-item contributions from revenue_stack_components; aggregate rows are overlays only.",
+            composition_figure,
+            caption="Clean bridge mode hides internal add-back rows while preserving reconciliation to Total NLTF revenue. Positive revenue components stack above zero; deductions stack below zero. Full formula audit shows internal rows. Gross mode reconciles leaf rows to Total gross revenues. Aggregates are overlays only.",
+            notes_as_tooltip=False,
+        )
+        if stack_gap_banner:
+            warning_panel(stack_gap_banner)
+        table_cols = st.columns([0.82, 0.18])
+        with table_cols[1]:
+            dataframe_download(chart_stack, "Download CSV", "revenue_stack_components.csv")
+        display_table(stack_display, height=360, max_rows=720)
+    timer.stop("composition figure")
 
     if revenue_outlook_lazy_table(
         "Show EV/PHEV PED-Light migration audit",
