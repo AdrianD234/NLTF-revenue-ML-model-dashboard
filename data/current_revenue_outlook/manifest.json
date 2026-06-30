@@ -385,9 +385,23 @@
   },
   "ped_revenue_bridge_audit": {
     "repo_relative_path": "data/current_revenue_outlook/ped_revenue_bridge_audit.csv",
-    "scope": "Current-finalist PED bridge audit by FY/source path: VKTpc, population, adjusted light-petrol VKT after EV/PHEV migration, litres intensity, PED volume, PED rate and gross PED revenue.",
+    "scope": "Current-finalist PED bridge decomposition by FY/source path: VKTpc, scenario population, raw VKTpc x population, optimized EV/PHEV migration VKT, PED volume/revenue, Total NLTF, MBU26 comparators and fallback flags.",
     "status": "available",
-    "source": "data/current_revenue_outlook/revenue_line_reconciliation.csv; data/current_revenue_outlook/ev_phev_ped_light_drift_assumptions.csv"
+    "source": "data/current_revenue_outlook/revenue_line_reconciliation.csv; data/current_revenue_outlook/ev_phev_ped_light_drift_assumptions.csv",
+    "default_bridge_mode": "optimized_migration",
+    "population_proxy_warning_rows": 2
+  },
+  "ped_bridge_shape_fit_metrics": {
+    "repo_relative_path": "data/current_revenue_outlook/ped_bridge_shape_fit_metrics.csv",
+    "scope": "FY2026-FY2050 raw-vs-optimized PED bridge shape-fit metrics against MBU26 comparators.",
+    "status": "available"
+  },
+  "ped_bridge_mode_config": {
+    "repo_relative_path": "data/current_revenue_outlook/ped_bridge_mode_config.csv",
+    "scope": "Audit bridge modes for raw, blend and optimized PED bridge overlays. Optimized is the default runtime mode.",
+    "default_bridge_mode": "optimized_migration",
+    "note": "PED bridge modes are audit overlays. The default optimized bridge preserves the committed runtime path; raw and blend modes show how PED volume/revenue would look if the PED VKTpc x scenario population bridge were used more directly.",
+    "status": "available"
   },
   "ped_efficiency_scenarios": {
     "repo_relative_path": "data/current_revenue_outlook/ped_efficiency_scenarios.csv",
@@ -750,6 +764,22 @@
       "sha256": "e66d860fb7532ee4b92285c1ba023c9f8d9469cfdaaaef819415f7cd87c73757",
       "size_bytes": 5960
     },
+    "ped_bridge_mode_config.csv": {
+      "sha256": "a818ddaf9c30efe56b9f11121c39296350dd3db8d7db6d9d9288ccad7f9f521a",
+      "size_bytes": 1098
+    },
+    "ped_bridge_mode_config.parquet": {
+      "sha256": "78047d53c62de45a5536e4b118784dea3e0d7af4493bc62b2102a84a5ab79f1e",
+      "size_bytes": 6117
+    },
+    "ped_bridge_shape_fit_metrics.csv": {
+      "sha256": "bdbe8adc30fc3734d594af6ade207d8f0b5525163630d9fce0c23da03d731eff",
+      "size_bytes": 4849
+    },
+    "ped_bridge_shape_fit_metrics.parquet": {
+      "sha256": "9305e5cc4c3cec76d24246f283145750bc964b15e782e302487cc2e19b6b2693",
+      "size_bytes": 12883
+    },
     "ped_efficiency_scenarios.csv": {
       "sha256": "e23f4ad04f3b7b4e18eee7d185b4d2fa8d3d54c0542695d1c8be59cd395788b8",
       "size_bytes": 1302
@@ -759,12 +789,12 @@
       "size_bytes": 6251
     },
     "ped_revenue_bridge_audit.csv": {
-      "sha256": "5ce46fed554541a6384aab1cf914f626749a87f8a14fbc594827d25d55d469c7",
-      "size_bytes": 94804
+      "sha256": "6d8942c914a0680bd4ff426b6f41b2c9a4dcda8aca42d7c9990d9b569800d3d3",
+      "size_bytes": 127297
     },
     "ped_revenue_bridge_audit.parquet": {
-      "sha256": "3248f12be1fa408dbe655c336dc3305a91d39fcc77de8620b72f36ccb9c03ab7",
-      "size_bytes": 34577
+      "sha256": "fd429e03aa96b3e1a80ef664b732a8a2cadca1395a0736b1fc8d5f7fdff2acd3",
+      "size_bytes": 62035
     },
     "revenue_bridge_components.csv": {
       "sha256": "7e18771e3b6fdea01215a50537a575860ed4de830973c389d0090863f6302126",

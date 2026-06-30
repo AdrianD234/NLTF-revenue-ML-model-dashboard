@@ -85,6 +85,8 @@ RUNTIME_REVENUE_OUTLOOK_FILES = (
     "ev_phev_split_assumptions.parquet",
     "ev_phev_ped_light_drift_assumptions.parquet",
     "ped_revenue_bridge_audit.parquet",
+    "ped_bridge_shape_fit_metrics.parquet",
+    "ped_bridge_mode_config.parquet",
     "ped_efficiency_scenarios.parquet",
     "sensitivity_seed_inputs.parquet",
     "sensitivity_config.parquet",
@@ -290,6 +292,47 @@ SENSITIVITY_ROLLUP_SERIES = {
     "total_fed_ruc_net_revenue",
     "total_nltf_net_revenue",
 }
+PED_BRIDGE_DEFAULT_MODE = "optimized_migration"
+PED_BRIDGE_MODE_SPECS = (
+    (
+        "raw_model",
+        "Raw model bridge",
+        0.0,
+        "PED volume = raw PED VKTpc x scenario population x litres intensity / 100.",
+    ),
+    (
+        "blend_25",
+        "Blend 25%",
+        0.25,
+        "PED bridge uses raw + 25% x (optimized - raw).",
+    ),
+    (
+        "blend_50",
+        "Blend 50%",
+        0.50,
+        "PED bridge uses raw + 50% x (optimized - raw).",
+    ),
+    (
+        "blend_75",
+        "Blend 75%",
+        0.75,
+        "PED bridge uses raw + 75% x (optimized - raw).",
+    ),
+    (
+        PED_BRIDGE_DEFAULT_MODE,
+        "Optimized migration bridge",
+        1.0,
+        "Current runtime default: PED/light-petrol VKT after optimized EV/PHEV migration allocation.",
+    ),
+)
+PED_BRIDGE_MODE_IDS = tuple(spec[0] for spec in PED_BRIDGE_MODE_SPECS)
+PED_BRIDGE_MODE_LABELS = {spec[0]: spec[1] for spec in PED_BRIDGE_MODE_SPECS}
+PED_BRIDGE_MODE_ALPHA = {spec[0]: float(spec[2]) for spec in PED_BRIDGE_MODE_SPECS}
+PED_BRIDGE_NOTE = (
+    "PED bridge modes are audit overlays. The default optimized bridge preserves the committed runtime path; "
+    "raw and blend modes show how PED volume/revenue would look if the PED VKTpc x scenario population bridge "
+    "were used more directly."
+)
 REVENUE_STACK_MODE_BRIDGE = "Gross-to-net bridge audit"
 REVENUE_STACK_MODE_GROSS = "Gross contribution stack"
 REVENUE_STACK_MODES = (REVENUE_STACK_MODE_BRIDGE, REVENUE_STACK_MODE_GROSS)
@@ -435,6 +478,8 @@ class RevenueOutlookPack:
     ev_phev_split_assumptions: pd.DataFrame = field(default_factory=pd.DataFrame)
     ev_phev_ped_light_drift_assumptions: pd.DataFrame = field(default_factory=pd.DataFrame)
     ped_revenue_bridge_audit: pd.DataFrame = field(default_factory=pd.DataFrame)
+    ped_bridge_shape_fit_metrics: pd.DataFrame = field(default_factory=pd.DataFrame)
+    ped_bridge_mode_config: pd.DataFrame = field(default_factory=pd.DataFrame)
     ped_efficiency_scenarios: pd.DataFrame = field(default_factory=pd.DataFrame)
     sensitivity_seed_inputs: pd.DataFrame = field(default_factory=pd.DataFrame)
     sensitivity_config: pd.DataFrame = field(default_factory=pd.DataFrame)
@@ -467,6 +512,8 @@ def revenue_outlook_signature(pack_dir: Path | str | None = None, repo_root: Pat
         base / "ev_phev_split_assumptions.parquet",
         base / "ev_phev_ped_light_drift_assumptions.parquet",
         base / "ped_revenue_bridge_audit.parquet",
+        base / "ped_bridge_shape_fit_metrics.parquet",
+        base / "ped_bridge_mode_config.parquet",
         base / "ped_efficiency_scenarios.parquet",
         base / "sensitivity_seed_inputs.parquet",
         base / "sensitivity_config.parquet",
@@ -516,6 +563,8 @@ def load_revenue_outlook_pack(
         ev_phev_split_assumptions=_read_optional_parquet(base / "ev_phev_split_assumptions.parquet"),
         ev_phev_ped_light_drift_assumptions=_read_optional_parquet(base / "ev_phev_ped_light_drift_assumptions.parquet"),
         ped_revenue_bridge_audit=_read_optional_parquet(base / "ped_revenue_bridge_audit.parquet"),
+        ped_bridge_shape_fit_metrics=_read_optional_parquet(base / "ped_bridge_shape_fit_metrics.parquet"),
+        ped_bridge_mode_config=_read_optional_parquet(base / "ped_bridge_mode_config.parquet"),
         ped_efficiency_scenarios=_read_optional_parquet(base / "ped_efficiency_scenarios.parquet"),
         sensitivity_seed_inputs=_read_optional_parquet(base / "sensitivity_seed_inputs.parquet"),
         sensitivity_config=_read_optional_parquet(base / "sensitivity_config.parquet"),
@@ -812,13 +861,39 @@ def ped_revenue_bridge_audit_frame(
         "fed_path",
         "lambda_mode",
         "ped_vkt_per_capita",
+        "scenario_population",
+        "scenario_population_million",
         "population_million",
+        "population_source",
+        "population_source_status",
+        "population_fallback_flag",
+        "population_warning",
+        "raw_light_petrol_vkt_million_km",
         "adjusted_light_petrol_vkt_million_km",
+        "optimized_light_petrol_vkt_million_km",
+        "optimization_delta_million_km",
         "base_litres_per_100km",
+        "ped_volume_raw_million_litres",
+        "ped_volume_optimized_million_litres",
         "ped_volume_million_litres",
         "ped_rate_nzd_per_litre",
+        "gross_ped_revenue_raw_million_nzd",
+        "gross_ped_revenue_optimized_million_nzd",
         "gross_ped_revenue_million_nzd",
+        "total_nltf_raw_million_nzd",
+        "total_nltf_optimized_million_nzd",
         "total_nltf_net_revenue_million_nzd",
+        "mbu26_ped_vkt_per_capita",
+        "mbu26_population_proxy",
+        "mbu26_light_petrol_vkt_million_km",
+        "mbu26_ped_volume_million_litres",
+        "mbu26_gross_ped_revenue_million_nzd",
+        "mbu26_total_nltf_net_revenue_million_nzd",
+        "raw_light_petrol_vkt_residual",
+        "ped_volume_raw_residual",
+        "ped_volume_optimized_residual",
+        "gross_ped_revenue_raw_residual",
+        "gross_ped_revenue_optimized_residual",
         "vktpc_unit",
         "population_unit",
         "light_petrol_vkt_unit",
@@ -890,10 +965,55 @@ def ped_revenue_bridge_audit_frame(
         scenario_role = str(record.get("scenario_role") or "")
         fed_path = line_text(source_path, fy, scenario_name, "gross_ped_revenue", "fed_path") or "Current planned path"
         ped_vktpc = pd.to_numeric(line_value(source_path, fy, scenario_name, "ped_vkt_per_capita"), errors="coerce")
+        raw_light_petrol_vkt = pd.to_numeric(record.get("current_P_t_light_petrol_km"), errors="coerce")
         light_petrol_vkt = pd.to_numeric(record.get("current_PED_light_petrol_km"), errors="coerce")
-        population_million = pd.NA
-        if pd.notna(ped_vktpc) and float(ped_vktpc) > 0 and pd.notna(light_petrol_vkt):
-            population_million = float(light_petrol_vkt) / float(ped_vktpc)
+        base_litres = pd.to_numeric(record.get("ped_litres_per_100km"), errors="coerce")
+        ped_rate = pd.to_numeric(record.get("ped_rate"), errors="coerce")
+        scenario_population = pd.NA
+        if pd.notna(ped_vktpc) and float(ped_vktpc) > 0 and pd.notna(raw_light_petrol_vkt):
+            scenario_population = float(raw_light_petrol_vkt) * 1_000_000.0 / float(ped_vktpc)
+        population_million = float(scenario_population) / 1_000_000.0 if pd.notna(scenario_population) else pd.NA
+        optimization_delta = (
+            float(light_petrol_vkt) - float(raw_light_petrol_vkt)
+            if pd.notna(light_petrol_vkt) and pd.notna(raw_light_petrol_vkt)
+            else pd.NA
+        )
+        ped_volume_raw = (
+            float(raw_light_petrol_vkt) * float(base_litres) / 100.0
+            if pd.notna(raw_light_petrol_vkt) and pd.notna(base_litres)
+            else pd.NA
+        )
+        ped_volume_optimized = pd.to_numeric(record.get("current_PED_volume"), errors="coerce")
+        gross_ped_raw = (
+            float(ped_volume_raw) * float(ped_rate)
+            if pd.notna(ped_volume_raw) and pd.notna(ped_rate)
+            else pd.NA
+        )
+        gross_ped_optimized = pd.to_numeric(record.get("current_PED_revenue"), errors="coerce")
+        total_nltf_optimized = line_value(source_path, fy, scenario_name, "total_nltf_net_revenue")
+        total_nltf_raw = (
+            float(total_nltf_optimized) + float(gross_ped_raw) - float(gross_ped_optimized)
+            if pd.notna(total_nltf_optimized) and pd.notna(gross_ped_raw) and pd.notna(gross_ped_optimized)
+            else pd.NA
+        )
+        population_source = line_text(source_path, fy, scenario_name, "gross_ped_revenue", "population_source_cell")
+        population_source_status = line_text(source_path, fy, scenario_name, "gross_ped_revenue", "population_source_status")
+        population_fallback_flag = "population_proxy" in f"{population_source} {population_source_status}".lower()
+        population_warning = (
+            "warning_current_finalist_uses_mbu26_population_proxy"
+            if population_fallback_flag and source_path.startswith("Current finalist")
+            else ""
+        )
+        mbu_ped_vktpc = line_value("MBU26 official", fy, "mbu26_official", "ped_vkt_per_capita")
+        mbu_light_petrol_vkt = line_value("MBU26 official", fy, "mbu26_official", "light_petrol_vkt")
+        mbu_ped_volume = line_value("MBU26 official", fy, "mbu26_official", "ped_volume")
+        mbu_gross_ped = line_value("MBU26 official", fy, "mbu26_official", "gross_ped_revenue")
+        mbu_total_nltf = line_value("MBU26 official", fy, "mbu26_official", "total_nltf_net_revenue")
+        mbu_population_proxy = (
+            float(mbu_light_petrol_vkt) * 1_000_000.0 / float(mbu_ped_vktpc)
+            if pd.notna(mbu_light_petrol_vkt) and pd.notna(mbu_ped_vktpc) and float(mbu_ped_vktpc) > 0
+            else pd.NA
+        )
         rows.append(
             {
                 "FY": fy,
@@ -904,13 +1024,59 @@ def ped_revenue_bridge_audit_frame(
                 "fed_path": fed_path,
                 "lambda_mode": str(record.get("lambda_mode") or ""),
                 "ped_vkt_per_capita": ped_vktpc,
+                "scenario_population": scenario_population,
+                "scenario_population_million": population_million,
                 "population_million": population_million,
+                "population_source": population_source,
+                "population_source_status": population_source_status,
+                "population_fallback_flag": population_fallback_flag,
+                "population_warning": population_warning,
+                "raw_light_petrol_vkt_million_km": raw_light_petrol_vkt,
                 "adjusted_light_petrol_vkt_million_km": light_petrol_vkt,
-                "base_litres_per_100km": pd.to_numeric(record.get("ped_litres_per_100km"), errors="coerce"),
-                "ped_volume_million_litres": pd.to_numeric(record.get("current_PED_volume"), errors="coerce"),
-                "ped_rate_nzd_per_litre": pd.to_numeric(record.get("ped_rate"), errors="coerce"),
-                "gross_ped_revenue_million_nzd": pd.to_numeric(record.get("current_PED_revenue"), errors="coerce"),
-                "total_nltf_net_revenue_million_nzd": line_value(source_path, fy, scenario_name, "total_nltf_net_revenue"),
+                "optimized_light_petrol_vkt_million_km": light_petrol_vkt,
+                "optimization_delta_million_km": optimization_delta,
+                "base_litres_per_100km": base_litres,
+                "ped_volume_raw_million_litres": ped_volume_raw,
+                "ped_volume_optimized_million_litres": ped_volume_optimized,
+                "ped_volume_million_litres": ped_volume_optimized,
+                "ped_rate_nzd_per_litre": ped_rate,
+                "gross_ped_revenue_raw_million_nzd": gross_ped_raw,
+                "gross_ped_revenue_optimized_million_nzd": gross_ped_optimized,
+                "gross_ped_revenue_million_nzd": gross_ped_optimized,
+                "total_nltf_raw_million_nzd": total_nltf_raw,
+                "total_nltf_optimized_million_nzd": total_nltf_optimized,
+                "total_nltf_net_revenue_million_nzd": total_nltf_optimized,
+                "mbu26_ped_vkt_per_capita": mbu_ped_vktpc,
+                "mbu26_population_proxy": mbu_population_proxy,
+                "mbu26_light_petrol_vkt_million_km": mbu_light_petrol_vkt,
+                "mbu26_ped_volume_million_litres": mbu_ped_volume,
+                "mbu26_gross_ped_revenue_million_nzd": mbu_gross_ped,
+                "mbu26_total_nltf_net_revenue_million_nzd": mbu_total_nltf,
+                "raw_light_petrol_vkt_residual": (
+                    float(raw_light_petrol_vkt) - float(ped_vktpc) * float(scenario_population) / 1_000_000.0
+                    if pd.notna(raw_light_petrol_vkt) and pd.notna(ped_vktpc) and pd.notna(scenario_population)
+                    else pd.NA
+                ),
+                "ped_volume_raw_residual": (
+                    float(ped_volume_raw) - float(raw_light_petrol_vkt) * float(base_litres) / 100.0
+                    if pd.notna(ped_volume_raw) and pd.notna(raw_light_petrol_vkt) and pd.notna(base_litres)
+                    else pd.NA
+                ),
+                "ped_volume_optimized_residual": (
+                    float(ped_volume_optimized) - float(light_petrol_vkt) * float(base_litres) / 100.0
+                    if pd.notna(ped_volume_optimized) and pd.notna(light_petrol_vkt) and pd.notna(base_litres)
+                    else pd.NA
+                ),
+                "gross_ped_revenue_raw_residual": (
+                    float(gross_ped_raw) - float(ped_volume_raw) * float(ped_rate)
+                    if pd.notna(gross_ped_raw) and pd.notna(ped_volume_raw) and pd.notna(ped_rate)
+                    else pd.NA
+                ),
+                "gross_ped_revenue_optimized_residual": (
+                    float(gross_ped_optimized) - float(ped_volume_optimized) * float(ped_rate)
+                    if pd.notna(gross_ped_optimized) and pd.notna(ped_volume_optimized) and pd.notna(ped_rate)
+                    else pd.NA
+                ),
                 "vktpc_unit": line_text(source_path, fy, scenario_name, "ped_vkt_per_capita", "unit") or "km/person",
                 "population_unit": "million people",
                 "light_petrol_vkt_unit": "million km",
@@ -921,20 +1087,519 @@ def ped_revenue_bridge_audit_frame(
                 "source_file": line_text(source_path, fy, scenario_name, "gross_ped_revenue", "source_file"),
                 "vktpc_source_cell": line_text(source_path, fy, scenario_name, "ped_vkt_per_capita", "vktpc_source_cell")
                 or line_text(source_path, fy, scenario_name, "ped_vkt_per_capita", "source_cell"),
-                "population_source_cell": line_text(source_path, fy, scenario_name, "gross_ped_revenue", "population_source_cell"),
+                "population_source_cell": population_source,
                 "migration_source_cells": str(record.get("source_cells") or ""),
                 "formula": (
-                    "gross_ped_revenue = adjusted_light_petrol_vkt_million_km * "
-                    "base_litres_per_100km / 100 * ped_rate_nzd_per_litre"
+                    "raw_light_petrol_vkt = ped_vkt_per_capita * scenario_population / 1,000,000; "
+                    "optimized_light_petrol_vkt = raw_light_petrol_vkt + optimization_delta; "
+                    "gross_ped_revenue = selected_light_petrol_vkt * base_litres_per_100km / 100 * ped_rate_nzd_per_litre"
                 ),
-                "availability_status": str(record.get("availability_status") or "available"),
+                "availability_status": population_warning or str(record.get("availability_status") or "available"),
                 "notes": (
-                    "Current-finalist PED revenue uses adjusted PED/light-petrol VKT after optimized EV/PHEV "
-                    "migration, then applies MBU26 litres intensity and PED rate."
+                    "Raw bridge uses current-finalist PED VKTpc times scenario population. Optimized bridge then "
+                    "applies the PED+Light EV/PHEV migration allocation before MBU26 litres intensity and PED rate."
                 ),
             }
         )
     return pd.DataFrame(rows, columns=columns).sort_values(["source_path", "FY"], kind="stable").reset_index(drop=True)
+
+
+def ped_bridge_mode_config_frame() -> pd.DataFrame:
+    """Governed PED bridge audit mode registry."""
+
+    return pd.DataFrame(
+        [
+            {
+                "bridge_mode": mode,
+                "display_name": label,
+                "alpha": alpha,
+                "alpha_pct": alpha * 100.0,
+                "default_selected": mode == PED_BRIDGE_DEFAULT_MODE,
+                "formula": "raw_light_petrol_vkt + alpha * (optimized_light_petrol_vkt - raw_light_petrol_vkt)",
+                "runtime_treatment": "default_runtime" if mode == PED_BRIDGE_DEFAULT_MODE else "audit_overlay",
+                "notes": notes,
+            }
+            for mode, label, alpha, notes in PED_BRIDGE_MODE_SPECS
+        ]
+    )
+
+
+def ped_bridge_shape_fit_metrics_frame(ped_revenue_bridge_audit: pd.DataFrame) -> pd.DataFrame:
+    """Quantify whether optimized PED bridge values are closer to MBU26 shapes."""
+
+    columns = [
+        "source_path",
+        "scenario_name",
+        "scenario_role",
+        "series_id",
+        "bridge_variant",
+        "mbu_comparator_series_id",
+        "start_fy",
+        "end_fy",
+        "n_rows",
+        "correlation_vs_mbu",
+        "slope_vs_mbu",
+        "intercept_vs_mbu",
+        "mean_error",
+        "mean_abs_error",
+        "rmse",
+        "mean_abs_pct_error",
+        "shape_anchor_status",
+        "notes",
+    ]
+    if ped_revenue_bridge_audit is None or ped_revenue_bridge_audit.empty:
+        return pd.DataFrame(columns=columns)
+
+    data = ped_revenue_bridge_audit.copy()
+    data["FY_numeric"] = pd.to_numeric(data.get("FY"), errors="coerce")
+    data = data[data["FY_numeric"].between(2026, 2050, inclusive="both")].copy()
+    if data.empty:
+        return pd.DataFrame(columns=columns)
+
+    pairs = [
+        ("raw_light_petrol_vkt_million_km", "raw_light_petrol_vkt", "mbu26_light_petrol_vkt_million_km", "light_petrol_vkt"),
+        (
+            "optimized_light_petrol_vkt_million_km",
+            "optimized_light_petrol_vkt",
+            "mbu26_light_petrol_vkt_million_km",
+            "light_petrol_vkt",
+        ),
+        ("ped_volume_raw_million_litres", "ped_volume_raw", "mbu26_ped_volume_million_litres", "ped_volume"),
+        (
+            "ped_volume_optimized_million_litres",
+            "ped_volume_optimized",
+            "mbu26_ped_volume_million_litres",
+            "ped_volume",
+        ),
+        (
+            "gross_ped_revenue_raw_million_nzd",
+            "gross_ped_revenue_raw",
+            "mbu26_gross_ped_revenue_million_nzd",
+            "gross_ped_revenue",
+        ),
+        (
+            "gross_ped_revenue_optimized_million_nzd",
+            "gross_ped_revenue_optimized",
+            "mbu26_gross_ped_revenue_million_nzd",
+            "gross_ped_revenue",
+        ),
+    ]
+
+    rows: list[dict[str, Any]] = []
+    for (source_path, scenario_name, scenario_role), group in data.groupby(
+        ["source_path", "scenario_name", "scenario_role"], dropna=False, sort=False
+    ):
+        fit_by_comparator: dict[str, dict[str, float]] = {}
+        for value_col, variant, comparator_col, comparator_id in pairs:
+            if value_col not in group.columns or comparator_col not in group.columns:
+                continue
+            value = pd.to_numeric(group[value_col], errors="coerce")
+            mbu = pd.to_numeric(group[comparator_col], errors="coerce")
+            ok = value.notna() & mbu.notna()
+            if not ok.any():
+                continue
+            x = value[ok].astype(float)
+            y = mbu[ok].astype(float)
+            if len(x) >= 2 and float(((y - y.mean()) ** 2).sum()) > 0:
+                slope = float(((x - x.mean()) * (y - y.mean())).sum() / ((y - y.mean()) ** 2).sum())
+                intercept = float(x.mean() - slope * y.mean())
+                corr = float(x.corr(y))
+            else:
+                slope = np.nan
+                intercept = np.nan
+                corr = np.nan
+            error = x - y
+            nonzero = y.abs() > 1e-12
+            mape = float((error[nonzero].abs() / y[nonzero].abs()).mean()) if nonzero.any() else np.nan
+            metrics = {
+                "n_rows": int(ok.sum()),
+                "correlation_vs_mbu": corr,
+                "slope_vs_mbu": slope,
+                "intercept_vs_mbu": intercept,
+                "mean_error": float(error.mean()),
+                "mean_abs_error": float(error.abs().mean()),
+                "rmse": float(np.sqrt((error**2).mean())),
+                "mean_abs_pct_error": mape,
+            }
+            fit_by_comparator[variant] = metrics
+            status = "shape_fit_reported"
+            raw_variant = variant.replace("optimized", "raw")
+            if "optimized" in variant and raw_variant in fit_by_comparator:
+                raw_mae = fit_by_comparator[raw_variant].get("mean_abs_error", np.nan)
+                raw_corr = fit_by_comparator[raw_variant].get("correlation_vs_mbu", np.nan)
+                if np.isfinite(raw_mae) and metrics["mean_abs_error"] < raw_mae and (
+                    not np.isfinite(raw_corr) or (np.isfinite(corr) and abs(corr) >= abs(raw_corr))
+                ):
+                    status = "optimized_closer_to_mbu_than_raw"
+            rows.append(
+                {
+                    "source_path": source_path,
+                    "scenario_name": scenario_name,
+                    "scenario_role": scenario_role,
+                    "series_id": variant,
+                    "bridge_variant": "optimized" if "optimized" in variant else "raw",
+                    "mbu_comparator_series_id": comparator_id,
+                    "start_fy": int(group["FY_numeric"].min()),
+                    "end_fy": int(group["FY_numeric"].max()),
+                    "shape_anchor_status": status,
+                    "notes": "FY2026-FY2050 shape fit. Lower error and higher correlation indicate closer alignment to MBU26 shape.",
+                    **metrics,
+                }
+            )
+    return pd.DataFrame(rows, columns=columns).sort_values(
+        ["source_path", "mbu_comparator_series_id", "bridge_variant", "series_id"],
+        kind="stable",
+    ).reset_index(drop=True)
+
+
+def ped_bridge_mode_impact_audit_frame(
+    line_reconciliation: pd.DataFrame,
+    ped_revenue_bridge_audit: pd.DataFrame,
+    bridge_mode: str = PED_BRIDGE_DEFAULT_MODE,
+) -> pd.DataFrame:
+    """Calculate selected PED bridge-mode deltas for current-finalist rows."""
+
+    columns = [
+        "FY",
+        "period",
+        "source_path",
+        "scenario_name",
+        "scenario_role",
+        "fed_path",
+        "selected_ped_bridge_mode",
+        "selected_ped_bridge_label",
+        "bridge_alpha",
+        "stream",
+        "series_id",
+        "baseline",
+        "adjusted",
+        "delta",
+        "unit",
+        "formula",
+        "source_cells",
+        "population_source_status",
+        "population_fallback_flag",
+        "gap_reason",
+        "status",
+        "notes",
+    ]
+    if line_reconciliation is None or line_reconciliation.empty or ped_revenue_bridge_audit is None or ped_revenue_bridge_audit.empty:
+        return pd.DataFrame(columns=columns)
+
+    mode = _normalize_ped_bridge_mode(bridge_mode)
+    alpha = PED_BRIDGE_MODE_ALPHA.get(mode, 1.0)
+    label = PED_BRIDGE_MODE_LABELS.get(mode, PED_BRIDGE_MODE_LABELS[PED_BRIDGE_DEFAULT_MODE])
+    line = line_reconciliation.copy()
+    line["FY_numeric"] = pd.to_numeric(line.get("FY"), errors="coerce")
+    line["value_numeric"] = pd.to_numeric(line.get("value"), errors="coerce")
+    line["source_path_text"] = line.get("source_path", pd.Series("", index=line.index)).fillna("").astype(str)
+    line["scenario_text"] = line.get("scenario_name", pd.Series("", index=line.index)).fillna("").astype(str)
+    line["series_text"] = line.get("series_id", pd.Series("", index=line.index)).fillna("").astype(str)
+
+    def value(source_path: str, fy: int, scenario_name: str, series_id: str) -> float:
+        rows = line[
+            line["source_path_text"].eq(source_path)
+            & line["FY_numeric"].eq(fy)
+            & line["scenario_text"].eq(scenario_name)
+            & line["series_text"].eq(series_id)
+        ]
+        if rows.empty:
+            return np.nan
+        return _finite_float(rows.iloc[0].get("value_numeric"), np.nan)
+
+    def unit(source_path: str, fy: int, scenario_name: str, series_id: str) -> str:
+        rows = line[
+            line["source_path_text"].eq(source_path)
+            & line["FY_numeric"].eq(fy)
+            & line["scenario_text"].eq(scenario_name)
+            & line["series_text"].eq(series_id)
+        ]
+        if rows.empty:
+            return ""
+        return str(rows.iloc[0].get("unit", "") or "")
+
+    rows: list[dict[str, Any]] = []
+    audit = ped_revenue_bridge_audit.copy()
+    audit["FY_numeric"] = pd.to_numeric(audit.get("FY"), errors="coerce")
+    audit = audit[
+        audit.get("source_path", pd.Series("", index=audit.index)).fillna("").astype(str).str.startswith("Current finalist")
+        & audit["FY_numeric"].ge(REVENUE_FIRST_FORECAST_FY)
+    ].copy()
+    for record in audit.to_dict("records"):
+        if pd.isna(record.get("FY_numeric")):
+            continue
+        fy = int(record["FY_numeric"])
+        source_path = str(record.get("source_path") or "")
+        scenario_name = str(record.get("scenario_name") or "")
+        scenario_role = str(record.get("scenario_role") or "")
+        fed_path = str(record.get("fed_path") or "Current planned path")
+        raw_vkt = _finite_float(record.get("raw_light_petrol_vkt_million_km"), np.nan)
+        opt_vkt = _finite_float(record.get("optimized_light_petrol_vkt_million_km"), np.nan)
+        base_litres = _finite_float(record.get("base_litres_per_100km"), np.nan)
+        ped_rate = _finite_float(record.get("ped_rate_nzd_per_litre"), np.nan)
+        selected_vkt = raw_vkt + alpha * (opt_vkt - raw_vkt) if np.isfinite(raw_vkt) and np.isfinite(opt_vkt) else np.nan
+        selected_volume = selected_vkt * base_litres / 100.0 if np.isfinite(selected_vkt) and np.isfinite(base_litres) else np.nan
+        selected_revenue = selected_volume * ped_rate if np.isfinite(selected_volume) and np.isfinite(ped_rate) else np.nan
+        ped_delta = selected_revenue - value(source_path, fy, scenario_name, "gross_ped_revenue")
+        adjusted = {
+            "light_petrol_vkt": selected_vkt,
+            "ped_volume": selected_volume,
+            "gross_ped_revenue": selected_revenue,
+            "gross_fed_revenue": value(source_path, fy, scenario_name, "gross_fed_revenue") + ped_delta,
+            "net_fed_revenue": value(source_path, fy, scenario_name, "net_fed_revenue") + ped_delta,
+            "total_gross_revenue": value(source_path, fy, scenario_name, "total_gross_revenue") + ped_delta,
+            "total_revenue_net_admin": value(source_path, fy, scenario_name, "total_revenue_net_admin") + ped_delta,
+            "total_fed_ruc_net_revenue": value(source_path, fy, scenario_name, "total_fed_ruc_net_revenue") + ped_delta,
+            "total_nltf_net_revenue": value(source_path, fy, scenario_name, "total_nltf_net_revenue") + ped_delta,
+        }
+        source_cells = "; ".join(
+            part
+            for part in [
+                str(record.get("vktpc_source_cell") or ""),
+                str(record.get("population_source_cell") or ""),
+                str(record.get("migration_source_cells") or ""),
+            ]
+            if part
+        )
+
+        def add_row(series_id: str, stream: str, formula: str) -> None:
+            baseline = value(source_path, fy, scenario_name, series_id)
+            adjusted_value = adjusted.get(series_id, baseline)
+            if not np.isfinite(baseline) or not np.isfinite(adjusted_value):
+                return
+            rows.append(
+                {
+                    "FY": fy,
+                    "period": f"FY{fy}",
+                    "source_path": source_path,
+                    "scenario_name": scenario_name,
+                    "scenario_role": scenario_role,
+                    "fed_path": fed_path,
+                    "selected_ped_bridge_mode": mode,
+                    "selected_ped_bridge_label": label,
+                    "bridge_alpha": alpha,
+                    "stream": stream,
+                    "series_id": series_id,
+                    "baseline": baseline,
+                    "adjusted": adjusted_value,
+                    "delta": adjusted_value - baseline,
+                    "unit": unit(source_path, fy, scenario_name, series_id),
+                    "formula": formula,
+                    "source_cells": source_cells,
+                    "population_source_status": str(record.get("population_source_status") or ""),
+                    "population_fallback_flag": bool(record.get("population_fallback_flag")),
+                    "gap_reason": str(record.get("population_warning") or ""),
+                    "status": "warning_population_proxy" if bool(record.get("population_fallback_flag")) else "adjusted",
+                    "notes": PED_BRIDGE_NOTE,
+                }
+            )
+
+        add_row(
+            "light_petrol_vkt",
+            "PED",
+            "selected_light_petrol_vkt = raw_light_petrol_vkt + alpha * optimization_delta",
+        )
+        add_row("ped_volume", "PED", "selected_light_petrol_vkt * base_litres_per_100km / 100")
+        add_row("gross_ped_revenue", "PED", "selected_ped_volume * ped_rate")
+        for series_id in [
+            "gross_fed_revenue",
+            "net_fed_revenue",
+            "total_gross_revenue",
+            "total_revenue_net_admin",
+            "total_fed_ruc_net_revenue",
+            "total_nltf_net_revenue",
+        ]:
+            add_row(series_id, "ROLLUP", f"{series_id} + selected PED revenue delta")
+    return pd.DataFrame(rows, columns=columns)
+
+
+def apply_ped_bridge_mode_layer(
+    *,
+    chart_rows: pd.DataFrame,
+    line_reconciliation: pd.DataFrame,
+    bridge_components: pd.DataFrame,
+    future_revenue_forecasts: pd.DataFrame,
+    ped_revenue_bridge_audit: pd.DataFrame,
+    bridge_mode: str = PED_BRIDGE_DEFAULT_MODE,
+) -> dict[str, pd.DataFrame]:
+    """Apply a PED bridge audit mode to current-finalist copies."""
+
+    impact = ped_bridge_mode_impact_audit_frame(line_reconciliation, ped_revenue_bridge_audit, bridge_mode)
+    adjusted_line = _apply_ped_bridge_mode_audit_to_frame(
+        line_reconciliation,
+        impact,
+        value_column="value",
+        fy_column="FY",
+        series_column="series_id",
+        source_path_column="source_path",
+        scenario_column="scenario_name",
+        fed_path_column="fed_path",
+    )
+    formula_residuals = revenue_formula_residual_frame(adjusted_line) if adjusted_line is not None and not adjusted_line.empty else pd.DataFrame()
+    adjusted_chart = _apply_ped_bridge_mode_audit_to_frame(
+        chart_rows,
+        impact,
+        value_column="value",
+        fy_column="june_year",
+        series_column="series_id",
+        source_path_column="trace_name",
+        scenario_column="scenario_name",
+        fed_path_column="fed_path",
+        current_mask_column="trace_role",
+    )
+    adjusted_bridge = _apply_ped_bridge_mode_audit_to_frame(
+        bridge_components,
+        impact,
+        value_column="component_value",
+        fy_column="period",
+        series_column="stream",
+        scenario_column="scenario_name",
+        fed_path_column="fed_path",
+    )
+    adjusted_future = _apply_ped_bridge_mode_audit_to_frame(
+        future_revenue_forecasts,
+        impact,
+        value_column="revenue_forecast_nzd",
+        fy_column="period",
+        series_column="stream",
+        scenario_column="scenario_name",
+        fed_path_column="fed_path",
+    )
+    adjusted_ped_audit = _ped_bridge_audit_for_selected_mode(ped_revenue_bridge_audit, bridge_mode)
+    return {
+        "chart_rows": adjusted_chart,
+        "line_reconciliation": adjusted_line,
+        "revenue_formula_residuals": formula_residuals,
+        "revenue_stack_components": revenue_stack_components_frame(adjusted_line, formula_residuals) if adjusted_line is not None and not adjusted_line.empty else pd.DataFrame(),
+        "revenue_bridge_components": adjusted_bridge,
+        "future_revenue_forecasts": adjusted_future,
+        "ped_revenue_bridge_audit": adjusted_ped_audit,
+        "ped_bridge_mode_impact_audit": impact,
+    }
+
+
+def _apply_ped_bridge_mode_audit_to_frame(
+    frame: pd.DataFrame,
+    audit: pd.DataFrame,
+    *,
+    value_column: str,
+    fy_column: str,
+    series_column: str,
+    source_path_column: str | None = None,
+    scenario_column: str | None = None,
+    fed_path_column: str | None = None,
+    current_mask_column: str | None = None,
+) -> pd.DataFrame:
+    if frame is None or frame.empty or audit is None or audit.empty:
+        return pd.DataFrame() if frame is None else frame.copy()
+    out = frame.copy()
+    for column in ["ped_bridge_mode_label", "ped_bridge_value_delta", "ped_bridge_population_warning"]:
+        if column not in out.columns:
+            out[column] = pd.NA
+    audit = audit.copy()
+    audit["FY_numeric"] = pd.to_numeric(audit.get("FY"), errors="coerce")
+    lookup: dict[tuple[str, int, str, str, str], dict[str, Any]] = {}
+    for record in audit.to_dict("records"):
+        if pd.isna(record.get("FY_numeric")):
+            continue
+        lookup[
+            (
+                str(record.get("source_path") or ""),
+                int(record["FY_numeric"]),
+                str(record.get("scenario_name") or ""),
+                str(record.get("fed_path") or ""),
+                str(record.get("series_id") or ""),
+            )
+        ] = record
+    out["_ped_bridge_fy"] = out.get(fy_column, pd.Series("", index=out.index)).map(_extract_fy_number)
+    for idx, row in out.iterrows():
+        if current_mask_column and str(row.get(current_mask_column) or "") not in {"", "in_house_current_finalist"}:
+            continue
+        fy = out.at[idx, "_ped_bridge_fy"]
+        if pd.isna(fy):
+            continue
+        series_id = str(row.get(series_column) or "")
+        source_path = str(row.get(source_path_column) or "") if source_path_column else ""
+        scenario_name = str(row.get(scenario_column) or "") if scenario_column else ""
+        fed_path = str(row.get(fed_path_column) or "") if fed_path_column else ""
+        record = lookup.get((source_path, int(fy), scenario_name, fed_path, series_id))
+        if not record:
+            record = next(
+                (
+                    item
+                    for key, item in lookup.items()
+                    if key[1] == int(fy)
+                    and key[2] == scenario_name
+                    and key[4] == series_id
+                    and (not fed_path or key[3] == fed_path)
+                    and (not source_path or key[0] == source_path)
+                ),
+                None,
+            )
+        if not record:
+            continue
+        adjusted_value = _finite_float(record.get("adjusted"), np.nan)
+        baseline_value = _finite_float(row.get(value_column), np.nan)
+        if not np.isfinite(adjusted_value):
+            continue
+        out.at[idx, value_column] = adjusted_value
+        out.at[idx, "ped_bridge_mode_label"] = _ped_bridge_mode_display_label(record)
+        out.at[idx, "ped_bridge_value_delta"] = adjusted_value - baseline_value if np.isfinite(baseline_value) else pd.NA
+        out.at[idx, "ped_bridge_population_warning"] = record.get("gap_reason")
+    return out.drop(columns=["_ped_bridge_fy"], errors="ignore")
+
+
+def _ped_bridge_audit_for_selected_mode(ped_revenue_bridge_audit: pd.DataFrame, bridge_mode: str) -> pd.DataFrame:
+    if ped_revenue_bridge_audit is None or ped_revenue_bridge_audit.empty:
+        return pd.DataFrame() if ped_revenue_bridge_audit is None else ped_revenue_bridge_audit.copy()
+    mode = _normalize_ped_bridge_mode(bridge_mode)
+    alpha = PED_BRIDGE_MODE_ALPHA.get(mode, 1.0)
+    label = PED_BRIDGE_MODE_LABELS.get(mode, PED_BRIDGE_MODE_LABELS[PED_BRIDGE_DEFAULT_MODE])
+    out = ped_revenue_bridge_audit.copy()
+    raw = pd.to_numeric(out.get("raw_light_petrol_vkt_million_km"), errors="coerce")
+    opt = pd.to_numeric(out.get("optimized_light_petrol_vkt_million_km"), errors="coerce")
+    base_litres = pd.to_numeric(out.get("base_litres_per_100km"), errors="coerce")
+    ped_rate = pd.to_numeric(out.get("ped_rate_nzd_per_litre"), errors="coerce")
+    selected_vkt = raw + float(alpha) * (opt - raw)
+    selected_volume = selected_vkt * base_litres / 100.0
+    selected_revenue = selected_volume * ped_rate
+    optimized_revenue = pd.to_numeric(out.get("gross_ped_revenue_optimized_million_nzd"), errors="coerce")
+    optimized_total = pd.to_numeric(out.get("total_nltf_optimized_million_nzd"), errors="coerce")
+    out["selected_ped_bridge_mode"] = mode
+    out["selected_ped_bridge_label"] = label
+    out["bridge_alpha"] = float(alpha)
+    out["selected_light_petrol_vkt_million_km"] = selected_vkt
+    out["selected_ped_volume_million_litres"] = selected_volume
+    out["selected_gross_ped_revenue_million_nzd"] = selected_revenue
+    out["selected_total_nltf_net_revenue_million_nzd"] = optimized_total + (selected_revenue - optimized_revenue)
+    out["adjusted_light_petrol_vkt_million_km"] = selected_vkt
+    out["ped_volume_million_litres"] = selected_volume
+    out["gross_ped_revenue_million_nzd"] = selected_revenue
+    out["total_nltf_net_revenue_million_nzd"] = out["selected_total_nltf_net_revenue_million_nzd"]
+    return out
+
+
+def _normalize_ped_bridge_mode(value: Any) -> str:
+    text = str(value or PED_BRIDGE_DEFAULT_MODE).strip()
+    for mode in PED_BRIDGE_MODE_IDS:
+        if text.lower() == mode.lower() or text.lower() == PED_BRIDGE_MODE_LABELS.get(mode, "").lower():
+            return mode
+    return PED_BRIDGE_DEFAULT_MODE
+
+
+def _ped_bridge_mode_display_label(record: dict[str, Any]) -> str:
+    label = str(record.get("selected_ped_bridge_label") or PED_BRIDGE_MODE_LABELS[PED_BRIDGE_DEFAULT_MODE])
+    alpha = _finite_float(record.get("bridge_alpha"), np.nan)
+    delta = _finite_float(record.get("delta"), np.nan)
+    parts = [label]
+    if np.isfinite(alpha):
+        parts.append(f"alpha {alpha:.0%}")
+    if np.isfinite(delta) and abs(delta) > 1e-9:
+        parts.append(f"delta {delta:+,.2f}")
+    warning = str(record.get("gap_reason") or "").strip()
+    if warning:
+        parts.append(warning)
+    return "; ".join(parts)
 
 
 def ped_efficiency_adjustment_frame(
@@ -2036,6 +2701,8 @@ def build_current_revenue_outlook_runtime_pack(
         line_reconciliation,
         ev_phev_ped_light_drift_assumptions,
     )
+    ped_bridge_shape_fit_metrics = ped_bridge_shape_fit_metrics_frame(ped_revenue_bridge_audit)
+    ped_bridge_mode_config = ped_bridge_mode_config_frame()
     ped_efficiency_scenarios = ped_efficiency_scenarios_frame(end_fy=runtime_cutoff_fy)
     sensitivity_seed_inputs = sensitivity_seed_inputs_frame()
     sensitivity_config = sensitivity_config_frame(sensitivity_seed_inputs, end_fy=runtime_cutoff_fy)
@@ -2231,11 +2898,29 @@ def build_current_revenue_outlook_runtime_pack(
         "ped_revenue_bridge_audit": {
             "repo_relative_path": _repo_relative(root, base / "ped_revenue_bridge_audit.csv"),
             "scope": (
-                "Current-finalist PED bridge audit by FY/source path: VKTpc, population, adjusted light-petrol VKT "
-                "after EV/PHEV migration, litres intensity, PED volume, PED rate and gross PED revenue."
+                "Current-finalist PED bridge decomposition by FY/source path: VKTpc, scenario population, raw VKTpc x population, "
+                "optimized EV/PHEV migration VKT, PED volume/revenue, Total NLTF, MBU26 comparators and fallback flags."
             ),
             "status": "available" if not ped_revenue_bridge_audit.empty else "missing",
             "source": "data/current_revenue_outlook/revenue_line_reconciliation.csv; data/current_revenue_outlook/ev_phev_ped_light_drift_assumptions.csv",
+            "default_bridge_mode": PED_BRIDGE_DEFAULT_MODE,
+            "population_proxy_warning_rows": int(
+                ped_revenue_bridge_audit.get("population_fallback_flag", pd.Series(dtype=bool)).fillna(False).astype(bool).sum()
+            )
+            if not ped_revenue_bridge_audit.empty
+            else 0,
+        },
+        "ped_bridge_shape_fit_metrics": {
+            "repo_relative_path": _repo_relative(root, base / "ped_bridge_shape_fit_metrics.csv"),
+            "scope": "FY2026-FY2050 raw-vs-optimized PED bridge shape-fit metrics against MBU26 comparators.",
+            "status": "available" if not ped_bridge_shape_fit_metrics.empty else "missing",
+        },
+        "ped_bridge_mode_config": {
+            "repo_relative_path": _repo_relative(root, base / "ped_bridge_mode_config.csv"),
+            "scope": "Audit bridge modes for raw, blend and optimized PED bridge overlays. Optimized is the default runtime mode.",
+            "default_bridge_mode": PED_BRIDGE_DEFAULT_MODE,
+            "note": PED_BRIDGE_NOTE,
+            "status": "available",
         },
         "ped_efficiency_scenarios": {
             "repo_relative_path": _repo_relative(root, base / "ped_efficiency_scenarios.csv"),
@@ -2363,6 +3048,8 @@ def build_current_revenue_outlook_runtime_pack(
             "ev_phev_split_assumptions": ev_phev_split_assumptions,
             "ev_phev_ped_light_drift_assumptions": ev_phev_ped_light_drift_assumptions,
             "ped_revenue_bridge_audit": ped_revenue_bridge_audit,
+            "ped_bridge_shape_fit_metrics": ped_bridge_shape_fit_metrics,
+            "ped_bridge_mode_config": ped_bridge_mode_config,
             "ped_efficiency_scenarios": ped_efficiency_scenarios,
             "sensitivity_seed_inputs": sensitivity_seed_inputs,
             "sensitivity_config": sensitivity_config,
@@ -6496,6 +7183,8 @@ def _write_pack_files(
         "ev_phev_split_assumptions",
         "ev_phev_ped_light_drift_assumptions",
         "ped_revenue_bridge_audit",
+        "ped_bridge_shape_fit_metrics",
+        "ped_bridge_mode_config",
         "ped_efficiency_scenarios",
         "sensitivity_seed_inputs",
         "sensitivity_config",

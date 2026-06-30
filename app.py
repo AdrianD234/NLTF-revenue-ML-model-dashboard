@@ -119,6 +119,9 @@ from model_dashboard.revenue_outlook import (
     FAN_SOURCE_OPTIONS,
     FAN_SOURCE_PRIORITY,
     FAN_SOURCE_SCENARIO_SPREAD,
+    PED_BRIDGE_DEFAULT_MODE,
+    PED_BRIDGE_MODE_LABELS,
+    PED_BRIDGE_NOTE,
     PED_COMPARISON_BEHAVIOURAL_TRACE_NAME,
     PED_EFFICIENCY_BASELINE_SCENARIO_ID,
     PED_EFFICIENCY_DEFAULT_NOTE,
@@ -135,6 +138,7 @@ from model_dashboard.revenue_outlook import (
     SENSITIVITY_LEVELS,
     STREAM_LABELS,
     RevenueOutlookPack,
+    apply_ped_bridge_mode_layer,
     apply_revenue_sensitivity_layer,
     apply_ped_efficiency_sensitivity,
     load_revenue_outlook_pack,
@@ -2025,6 +2029,16 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         if pack is not None and isinstance(getattr(pack, "ped_revenue_bridge_audit", None), pd.DataFrame)
         else pd.DataFrame()
     )
+    ped_bridge_shape_fit_metrics = (
+        pack.ped_bridge_shape_fit_metrics.copy()
+        if pack is not None and isinstance(getattr(pack, "ped_bridge_shape_fit_metrics", None), pd.DataFrame)
+        else pd.DataFrame()
+    )
+    ped_bridge_mode_config = (
+        pack.ped_bridge_mode_config.copy()
+        if pack is not None and isinstance(getattr(pack, "ped_bridge_mode_config", None), pd.DataFrame)
+        else pd.DataFrame()
+    )
     ped_efficiency_scenarios = (
         pack.ped_efficiency_scenarios.copy()
         if pack is not None and isinstance(getattr(pack, "ped_efficiency_scenarios", None), pd.DataFrame)
@@ -2125,6 +2139,23 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 default=trace_options,
                 key="revenue_outlook_traces",
             )
+        bridge_mode_lookup = _ped_bridge_mode_label_lookup(ped_bridge_mode_config)
+        bridge_mode_options = list(bridge_mode_lookup)
+        default_bridge_label = next(
+            (label for label, mode in bridge_mode_lookup.items() if mode == PED_BRIDGE_DEFAULT_MODE),
+            bridge_mode_options[-1] if bridge_mode_options else "Optimized migration bridge",
+        )
+        bridge_cols = st.columns([0.24, 0.76])
+        with bridge_cols[0]:
+            selected_ped_bridge_label = st.selectbox(
+                "PED bridge",
+                bridge_mode_options,
+                index=bridge_mode_options.index(default_bridge_label) if default_bridge_label in bridge_mode_options else 0,
+                key="revenue_outlook_ped_bridge_mode",
+            )
+        with bridge_cols[1]:
+            st.caption(PED_BRIDGE_NOTE)
+        selected_ped_bridge_mode = bridge_mode_lookup.get(selected_ped_bridge_label, PED_BRIDGE_DEFAULT_MODE)
     sensitivity_options = list(SENSITIVITY_LEVELS)
     with st.container(border=True):
         st.markdown("<div class='page5-panel-title'>Sensitivities</div>", unsafe_allow_html=True)
@@ -2178,6 +2209,23 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 st.caption("Custom inputs appear only when selected.")
         st.caption(SENSITIVITY_DEFAULT_NOTE)
 
+    bridge_mode_frames = apply_ped_bridge_mode_layer(
+        chart_rows=chart_rows,
+        line_reconciliation=line_reconciliation,
+        bridge_components=bridge,
+        future_revenue_forecasts=future_revenue,
+        ped_revenue_bridge_audit=ped_revenue_bridge_audit,
+        bridge_mode=selected_ped_bridge_mode,
+    )
+    chart_rows = bridge_mode_frames["chart_rows"]
+    line_reconciliation = bridge_mode_frames["line_reconciliation"]
+    formula_residuals = bridge_mode_frames["revenue_formula_residuals"]
+    stack_components = bridge_mode_frames["revenue_stack_components"]
+    bridge = bridge_mode_frames["revenue_bridge_components"]
+    future_revenue = bridge_mode_frames["future_revenue_forecasts"]
+    ped_revenue_bridge_audit = bridge_mode_frames["ped_revenue_bridge_audit"]
+    ped_bridge_mode_impact_audit = bridge_mode_frames["ped_bridge_mode_impact_audit"]
+
     sensitivity_frames = apply_revenue_sensitivity_layer(
         chart_rows=chart_rows,
         line_reconciliation=line_reconciliation,
@@ -2219,7 +2267,10 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             "Total path chart",
             "Single selected series from the committed current runtime pack.",
             revenue_outlook_total_path_figure(filtered_rows, selected_series=selected_stream, selected_fy=selected_fy),
-            caption="Actuals, current finalist base/comparison and official comparator traces are shown only where the runtime pack carries governed rows.",
+            caption=(
+                "Actuals, current finalist base/comparison and official comparator traces are shown only where the runtime pack carries governed rows. "
+                f"PED bridge mode: {selected_ped_bridge_label}."
+            ),
             notes_as_tooltip=False,
         )
     with primary_cols[1]:
@@ -2273,6 +2324,42 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 if not sensitivity_seed_inputs.empty:
                     dataframe_download(sensitivity_seed_inputs, "Seed CSV", "sensitivity_seed_inputs.csv")
             display_table(_sensitivity_impact_display_table(display_adjustment), height=360, max_rows=300)
+
+    if not ped_revenue_bridge_audit.empty:
+        with st.expander("PED bridge diagnostics", expanded=False):
+            info_panel(
+                "PED VKT per capita is a finalist model output. PED volume and revenue are bridge outputs: raw mode uses "
+                "VKTpc x scenario population, while optimized mode applies the PED+Light EV/PHEV migration allocation first."
+            )
+            st.caption(
+                f"Selected bridge mode: {selected_ped_bridge_label}. Default remains Optimized migration bridge until the audit is reviewed."
+            )
+            fallback_count = int(
+                ped_revenue_bridge_audit.get("population_fallback_flag", pd.Series(dtype=bool)).fillna(False).astype(bool).sum()
+            )
+            if fallback_count:
+                warning_panel(
+                    f"{fallback_count} PED bridge rows use an MBU26 population proxy for at least one quarter. These rows are flagged in the audit table."
+                )
+            diag_cols = st.columns([0.62, 0.13, 0.13, 0.12])
+            fy_bridge = ped_revenue_bridge_audit[
+                pd.to_numeric(ped_revenue_bridge_audit.get("FY"), errors="coerce").between(2026, 2050, inclusive="both")
+            ].copy()
+            with diag_cols[1]:
+                dataframe_download(fy_bridge, "Audit CSV", "ped_revenue_bridge_audit.csv")
+            with diag_cols[2]:
+                if not ped_bridge_shape_fit_metrics.empty:
+                    dataframe_download(ped_bridge_shape_fit_metrics, "Shape CSV", "ped_bridge_shape_fit_metrics.csv")
+            with diag_cols[3]:
+                if not ped_bridge_mode_impact_audit.empty:
+                    dataframe_download(ped_bridge_mode_impact_audit, "Mode CSV", "ped_bridge_mode_impact_audit.csv")
+            display_table(_ped_bridge_diagnostics_display_table(fy_bridge), height=360, max_rows=300)
+            if not ped_bridge_shape_fit_metrics.empty:
+                st.markdown("<div class='page5-panel-title'>Shape-fit metrics</div>", unsafe_allow_html=True)
+                display_table(_ped_bridge_shape_fit_display_table(ped_bridge_shape_fit_metrics), height=260, max_rows=80)
+            if not ped_bridge_mode_impact_audit.empty:
+                st.markdown("<div class='page5-panel-title'>Selected mode impact</div>", unsafe_allow_html=True)
+                display_table(_ped_bridge_mode_impact_display_table(ped_bridge_mode_impact_audit), height=260, max_rows=160)
 
     with st.container(border=True):
         st.markdown("<div class='page5-panel-title'>Revenue composition over time</div>", unsafe_allow_html=True)
@@ -4465,6 +4552,7 @@ def revenue_outlook_total_path_figure(rows: pd.DataFrame, *, selected_series: st
             "value_status",
             "actual_quarters",
             "forecast_quarters",
+            "ped_bridge_mode_label",
             "revenue_sensitivity_label",
         ]:
             if column not in group.columns:
@@ -5072,6 +5160,7 @@ def revenue_outlook_figure(rows: pd.DataFrame, *, metric_type: str) -> go.Figure
                     "value_status",
                     "actual_quarters",
                     "forecast_quarters",
+                    "ped_bridge_mode_label",
                     "revenue_sensitivity_label",
                     "ped_efficiency_label",
                     "adjusted_litres_per_100km",
@@ -5088,6 +5177,7 @@ def revenue_outlook_figure(rows: pd.DataFrame, *, metric_type: str) -> go.Figure
                 "value_status",
                 "actual_quarters",
                 "forecast_quarters",
+                "ped_bridge_mode_label",
                 "revenue_sensitivity_label",
                 "ped_efficiency_label",
                 "adjusted_litres_per_100km",
@@ -5300,16 +5390,19 @@ def _revenue_scope_hover_label(row: pd.Series) -> str:
 
 
 def _revenue_efficiency_hover_label(row: pd.Series) -> str:
+    bridge_value = row.get("ped_bridge_mode_label")
+    bridge = "" if pd.isna(bridge_value) else str(bridge_value).strip()
     sensitivity_value = row.get("revenue_sensitivity_label")
     sensitivity = "" if pd.isna(sensitivity_value) else str(sensitivity_value).strip()
     label_value = row.get("ped_efficiency_label")
     label = "" if pd.isna(label_value) else str(label_value).strip()
     litres = pd.to_numeric(row.get("adjusted_litres_per_100km"), errors="coerce")
+    bridge_text = f"<br>PED bridge: {html.escape(bridge)}" if bridge else ""
     if sensitivity:
-        return f"<br>Sensitivity: {html.escape(sensitivity)}"
+        return f"{bridge_text}<br>Sensitivity: {html.escape(sensitivity)}"
     if not label or pd.isna(litres):
-        return ""
-    return f"<br>PED fleet efficiency: {html.escape(label)}; adjusted litres/100km: {float(litres):,.2f}"
+        return bridge_text
+    return f"{bridge_text}<br>PED fleet efficiency: {html.escape(label)}; adjusted litres/100km: {float(litres):,.2f}"
 
 
 def _revenue_marker_hover_label(row: pd.Series) -> str:
@@ -5352,6 +5445,129 @@ def _revenue_bridge_display_table(bridge: pd.DataFrame) -> pd.DataFrame:
     for col in ["Activity", "Component value", "Rate", "Revenue NZD"]:
         if col in view.columns:
             view[col] = pd.to_numeric(view[col], errors="coerce").map(lambda value: _format_compact_value(value, "nominal NZD" if col == "Revenue NZD" else ""))
+    return view
+
+
+def _ped_bridge_mode_label_lookup(mode_config: pd.DataFrame) -> dict[str, str]:
+    if mode_config is not None and not mode_config.empty and {"bridge_mode", "display_name"}.issubset(mode_config.columns):
+        source = mode_config.copy()
+        if "alpha" in source.columns:
+            source["_alpha"] = pd.to_numeric(source["alpha"], errors="coerce")
+            source = source.sort_values("_alpha", kind="stable")
+        lookup = {
+            str(row.display_name): str(row.bridge_mode)
+            for row in source.itertuples(index=False)
+            if str(getattr(row, "display_name", "")).strip() and str(getattr(row, "bridge_mode", "")).strip()
+        }
+        if lookup:
+            return lookup
+    ordered = ["Raw model bridge", "Blend 25%", "Blend 50%", "Blend 75%", "Optimized migration bridge"]
+    return {label: mode for label, mode in zip(ordered, ["raw_model", "blend_25", "blend_50", "blend_75", PED_BRIDGE_DEFAULT_MODE], strict=False)}
+
+
+def _ped_bridge_diagnostics_display_table(audit: pd.DataFrame) -> pd.DataFrame:
+    if audit is None or audit.empty:
+        return pd.DataFrame()
+    view = audit.copy()
+    rename = {
+        "FY": "FY",
+        "source_path": "Source path",
+        "scenario_name": "Scenario",
+        "ped_vkt_per_capita": "PED VKTpc",
+        "scenario_population": "Scenario population",
+        "population_source_status": "Population status",
+        "population_fallback_flag": "Fallback",
+        "raw_light_petrol_vkt_million_km": "Raw light-petrol VKT",
+        "optimized_light_petrol_vkt_million_km": "Optimized light-petrol VKT",
+        "optimization_delta_million_km": "Optimization delta",
+        "base_litres_per_100km": "L/100km",
+        "ped_volume_raw_million_litres": "Raw PED volume",
+        "ped_volume_optimized_million_litres": "Optimized PED volume",
+        "ped_rate_nzd_per_litre": "PED rate",
+        "gross_ped_revenue_raw_million_nzd": "Raw PED revenue",
+        "gross_ped_revenue_optimized_million_nzd": "Optimized PED revenue",
+        "total_nltf_raw_million_nzd": "Raw Total NLTF",
+        "total_nltf_optimized_million_nzd": "Optimized Total NLTF",
+        "mbu26_light_petrol_vkt_million_km": "MBU light-petrol VKT",
+        "mbu26_ped_volume_million_litres": "MBU PED volume",
+        "mbu26_gross_ped_revenue_million_nzd": "MBU PED revenue",
+        "population_warning": "Warning",
+    }
+    cols = [col for col in rename if col in view.columns]
+    view = view[cols].rename(columns=rename)
+    numeric_cols = [
+        "PED VKTpc",
+        "Scenario population",
+        "Raw light-petrol VKT",
+        "Optimized light-petrol VKT",
+        "Optimization delta",
+        "L/100km",
+        "Raw PED volume",
+        "Optimized PED volume",
+        "PED rate",
+        "Raw PED revenue",
+        "Optimized PED revenue",
+        "Raw Total NLTF",
+        "Optimized Total NLTF",
+        "MBU light-petrol VKT",
+        "MBU PED volume",
+        "MBU PED revenue",
+    ]
+    for col in numeric_cols:
+        if col in view.columns:
+            view[col] = pd.to_numeric(view[col], errors="coerce").map(lambda value: "" if pd.isna(value) else f"{float(value):,.3f}")
+    return view
+
+
+def _ped_bridge_shape_fit_display_table(metrics: pd.DataFrame) -> pd.DataFrame:
+    if metrics is None or metrics.empty:
+        return pd.DataFrame()
+    view = metrics.copy()
+    rename = {
+        "source_path": "Source path",
+        "scenario_name": "Scenario",
+        "series_id": "Series",
+        "bridge_variant": "Variant",
+        "mbu_comparator_series_id": "MBU comparator",
+        "n_rows": "Rows",
+        "correlation_vs_mbu": "Correlation",
+        "slope_vs_mbu": "Slope",
+        "mean_abs_error": "MAE",
+        "rmse": "RMSE",
+        "mean_abs_pct_error": "MAPE",
+        "shape_anchor_status": "Status",
+    }
+    cols = [col for col in rename if col in view.columns]
+    view = view[cols].rename(columns=rename)
+    for col in ["Correlation", "Slope", "MAE", "RMSE", "MAPE"]:
+        if col in view.columns:
+            view[col] = pd.to_numeric(view[col], errors="coerce").map(lambda value: "" if pd.isna(value) else f"{float(value):,.4f}")
+    return view
+
+
+def _ped_bridge_mode_impact_display_table(audit: pd.DataFrame) -> pd.DataFrame:
+    if audit is None or audit.empty:
+        return pd.DataFrame()
+    view = audit.copy()
+    rename = {
+        "FY": "FY",
+        "source_path": "Source path",
+        "selected_ped_bridge_label": "Bridge mode",
+        "bridge_alpha": "Alpha",
+        "series_id": "Series",
+        "baseline": "Baseline",
+        "adjusted": "Adjusted",
+        "delta": "Delta",
+        "unit": "Unit",
+        "population_source_status": "Population status",
+        "gap_reason": "Warning",
+        "formula": "Formula",
+    }
+    cols = [col for col in rename if col in view.columns]
+    view = view[cols].rename(columns=rename)
+    for col in ["Alpha", "Baseline", "Adjusted", "Delta"]:
+        if col in view.columns:
+            view[col] = pd.to_numeric(view[col], errors="coerce").map(lambda value: "" if pd.isna(value) else f"{float(value):,.4f}")
     return view
 
 
