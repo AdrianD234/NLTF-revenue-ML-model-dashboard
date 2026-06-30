@@ -1440,21 +1440,30 @@ def apply_ped_bridge_mode_layer(
     future_revenue_forecasts: pd.DataFrame,
     ped_revenue_bridge_audit: pd.DataFrame,
     bridge_mode: str = PED_BRIDGE_DEFAULT_MODE,
+    include_derived_frames: bool = True,
 ) -> dict[str, pd.DataFrame]:
     """Apply a PED bridge audit mode to current-finalist copies."""
 
     impact = ped_bridge_mode_impact_audit_frame(line_reconciliation, ped_revenue_bridge_audit, bridge_mode)
-    adjusted_line = _apply_ped_bridge_mode_audit_to_frame(
-        line_reconciliation,
-        impact,
-        value_column="value",
-        fy_column="FY",
-        series_column="series_id",
-        source_path_column="source_path",
-        scenario_column="scenario_name",
-        fed_path_column="fed_path",
-    )
-    formula_residuals = revenue_formula_residual_frame(adjusted_line) if adjusted_line is not None and not adjusted_line.empty else pd.DataFrame()
+    if include_derived_frames:
+        adjusted_line = _apply_ped_bridge_mode_audit_to_frame(
+            line_reconciliation,
+            impact,
+            value_column="value",
+            fy_column="FY",
+            series_column="series_id",
+            source_path_column="source_path",
+            scenario_column="scenario_name",
+            fed_path_column="fed_path",
+        )
+        formula_residuals = revenue_formula_residual_frame(adjusted_line) if adjusted_line is not None and not adjusted_line.empty else pd.DataFrame()
+        stack_components = revenue_stack_components_frame(adjusted_line, formula_residuals) if adjusted_line is not None and not adjusted_line.empty else pd.DataFrame()
+        adjusted_ped_audit = _ped_bridge_audit_for_selected_mode(ped_revenue_bridge_audit, bridge_mode)
+    else:
+        adjusted_line = pd.DataFrame()
+        formula_residuals = pd.DataFrame()
+        stack_components = pd.DataFrame()
+        adjusted_ped_audit = pd.DataFrame()
     adjusted_chart = _apply_ped_bridge_mode_audit_to_frame(
         chart_rows,
         impact,
@@ -1484,12 +1493,11 @@ def apply_ped_bridge_mode_layer(
         scenario_column="scenario_name",
         fed_path_column="fed_path",
     )
-    adjusted_ped_audit = _ped_bridge_audit_for_selected_mode(ped_revenue_bridge_audit, bridge_mode)
     return {
         "chart_rows": adjusted_chart,
         "line_reconciliation": adjusted_line,
         "revenue_formula_residuals": formula_residuals,
-        "revenue_stack_components": revenue_stack_components_frame(adjusted_line, formula_residuals) if adjusted_line is not None and not adjusted_line.empty else pd.DataFrame(),
+        "revenue_stack_components": stack_components,
         "revenue_bridge_components": adjusted_bridge,
         "future_revenue_forecasts": adjusted_future,
         "ped_revenue_bridge_audit": adjusted_ped_audit,

@@ -17,5 +17,27 @@
       "tests": "python -m pytest -q tests/test_streamlit_smoke.py tests/test_revenue_outlook.py -> 23 passed"
     },
     "status": "implemented"
+  },
+  {
+    "loop": 2,
+    "timestamp": "2026-06-30T21:45:05+12:00",
+    "scope": "Revenue Outlook lightweight primary bridge path",
+    "finding": "The default cached primary view still materialized line reconciliation, formula residual and stack-component frames before any detail section was opened.",
+    "change": "Added an include_derived_frames switch to the PED bridge layer, used a lightweight bridge path for the default primary cached view, and added a separate cached detail-frame helper for composition, reconciliation and PED diagnostics.",
+    "evidence": {
+      "before_ms": {
+        "bridge_full_derived_min": 1200.36,
+        "cached_view_cold_default": 1398.97,
+        "cached_view_warm_default": 25.42
+      },
+      "after_ms": {
+        "bridge_primary_lightweight_min": 741.81,
+        "cached_view_cold_default_lightweight": 792.25,
+        "cached_view_warm_default_lightweight_mean": 4.11,
+        "detail_frames_cold_when_opened": 1211.43
+      },
+      "tests": "focused primary/detail split tests passed before full validation"
+    },
+    "status": "implemented"
   }
 ]

@@ -593,7 +593,12 @@ def cached_revenue_outlook_selectors(
     }
 
 
-def _bridge_mode_frames_for_pack(pack: RevenueOutlookPack, bridge_mode: str) -> dict[str, pd.DataFrame]:
+def _bridge_mode_frames_for_pack(
+    pack: RevenueOutlookPack,
+    bridge_mode: str,
+    *,
+    include_derived_frames: bool = True,
+) -> dict[str, pd.DataFrame]:
     return apply_ped_bridge_mode_layer(
         chart_rows=_pack_table(pack, "revenue_chart_rows"),
         line_reconciliation=_pack_table(pack, "revenue_line_reconciliation"),
@@ -601,6 +606,7 @@ def _bridge_mode_frames_for_pack(pack: RevenueOutlookPack, bridge_mode: str) -> 
         future_revenue_forecasts=_pack_table(pack, "future_revenue_forecasts"),
         ped_revenue_bridge_audit=_pack_table(pack, "ped_revenue_bridge_audit"),
         bridge_mode=bridge_mode,
+        include_derived_frames=include_derived_frames,
     )
 
 
@@ -647,7 +653,11 @@ def cached_revenue_outlook_view(
     _pack: RevenueOutlookPack,
 ) -> dict[str, Any]:
     del signature
-    bridge_frames = _bridge_mode_frames_for_pack(_pack, bridge_mode)
+    bridge_frames = _bridge_mode_frames_for_pack(
+        _pack,
+        bridge_mode,
+        include_derived_frames=not _is_default_sensitivity_key(sensitivity_key),
+    )
     sensitivity_config = _pack_table(_pack, "sensitivity_config", sensitivity_config_frame())
     if _is_default_sensitivity_key(sensitivity_key):
         sensitivity_frames = {
@@ -690,6 +700,29 @@ def cached_revenue_outlook_view(
 
 
 @st.cache_data(show_spinner=False)
+def cached_revenue_outlook_detail_frames(
+    signature: tuple[tuple[str, int, int], ...],
+    sensitivity_key: tuple[str, str, str, str, str, str, str, str, str],
+    bridge_mode: str,
+    _pack: RevenueOutlookPack,
+) -> dict[str, pd.DataFrame]:
+    del signature
+    bridge_frames = _bridge_mode_frames_for_pack(_pack, bridge_mode, include_derived_frames=True)
+    if _is_default_sensitivity_key(sensitivity_key):
+        return {
+            **bridge_frames,
+            "sensitivity_impact_audit": pd.DataFrame(),
+        }
+    sensitivity_config = _pack_table(_pack, "sensitivity_config", sensitivity_config_frame())
+    sensitivity_frames = _apply_sensitivity_for_key(bridge_frames, sensitivity_config, sensitivity_key)
+    return {
+        **sensitivity_frames,
+        "ped_revenue_bridge_audit": bridge_frames.get("ped_revenue_bridge_audit", pd.DataFrame()),
+        "ped_bridge_mode_impact_audit": bridge_frames.get("ped_bridge_mode_impact_audit", pd.DataFrame()),
+    }
+
+
+@st.cache_data(show_spinner=False)
 def cached_revenue_outlook_sensitivity_audit(
     signature: tuple[tuple[str, int, int], ...],
     sensitivity_key: tuple[str, str, str, str, str, str, str, str, str],
@@ -697,7 +730,7 @@ def cached_revenue_outlook_sensitivity_audit(
     _pack: RevenueOutlookPack,
 ) -> pd.DataFrame:
     del signature
-    bridge_frames = _bridge_mode_frames_for_pack(_pack, bridge_mode)
+    bridge_frames = _bridge_mode_frames_for_pack(_pack, bridge_mode, include_derived_frames=True)
     sensitivity_config = _pack_table(_pack, "sensitivity_config", sensitivity_config_frame())
     return _apply_sensitivity_for_key(bridge_frames, sensitivity_config, sensitivity_key).get("sensitivity_impact_audit", pd.DataFrame())
 
@@ -2597,6 +2630,14 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         caption="PED bridge diagnostics are loaded only when opened.",
     ):
         timer.start("PED bridge diagnostics")
+        detail_frames = cached_revenue_outlook_detail_frames(
+            pack_signature,
+            sensitivity_key,
+            selected_ped_bridge_mode,
+            pack,
+        )
+        ped_revenue_bridge_audit = detail_frames["ped_revenue_bridge_audit"]
+        ped_bridge_mode_impact_audit = detail_frames["ped_bridge_mode_impact_audit"]
         ped_bridge_shape_fit_metrics = _pack_table(pack, "ped_bridge_shape_fit_metrics")
         with st.expander("PED bridge diagnostics", expanded=False):
             info_panel(
@@ -2649,6 +2690,13 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         ),
     ):
         timer.start("composition figure")
+        detail_frames = cached_revenue_outlook_detail_frames(
+            pack_signature,
+            sensitivity_key,
+            selected_ped_bridge_mode,
+            pack,
+        )
+        stack_components = detail_frames["revenue_stack_components"]
         with st.container(border=True):
             st.markdown("<div class='page5-panel-title'>Revenue composition over time</div>", unsafe_allow_html=True)
             comp_cols = st.columns([0.20, 0.18, 0.17, 0.16, 0.15, 0.14])
@@ -2856,6 +2904,14 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         caption="Line reconciliation table is built only when opened.",
     ):
         timer.start("reconciliation table")
+        detail_frames = cached_revenue_outlook_detail_frames(
+            pack_signature,
+            sensitivity_key,
+            selected_ped_bridge_mode,
+            pack,
+        )
+        line_reconciliation = detail_frames["line_reconciliation"]
+        formula_residuals = detail_frames["revenue_formula_residuals"]
         with st.container(border=True):
             st.markdown("<div class='page5-panel-title'>Revenue line reconciliation</div>", unsafe_allow_html=True)
             rec_cols = st.columns([0.35, 0.25, 0.25, 0.15])

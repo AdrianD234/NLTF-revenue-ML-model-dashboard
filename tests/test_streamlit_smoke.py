@@ -8,6 +8,7 @@ import pytest
 from streamlit.testing.v1 import AppTest
 
 import app
+import model_dashboard.revenue_outlook as revenue_outlook_module
 from model_dashboard.revenue_outlook import (
     CURRENT_REVENUE_OUTLOOK_DIR,
     PED_BRIDGE_DEFAULT_MODE,
@@ -183,9 +184,11 @@ def test_revenue_outlook_default_sensitivity_view_uses_fast_path_and_preserves_v
     )
     assert view["sensitivity_fast_path"] is True
     assert view["sensitivity_impact_audit"].empty
+    assert view["line_reconciliation"].empty
+    assert view["revenue_formula_residuals"].empty
+    assert view["revenue_stack_components"].empty
     for key, value_column in [
         ("chart_rows", "value"),
-        ("line_reconciliation", "value"),
         ("revenue_bridge_components", "component_value"),
         ("future_revenue_forecasts", "revenue_forecast_nzd"),
     ]:
@@ -193,6 +196,80 @@ def test_revenue_outlook_default_sensitivity_view_uses_fast_path_and_preserves_v
             pd.to_numeric(expected[key][value_column], errors="coerce").to_numpy(),
             abs=0,
         )
+
+    detail = app.cached_revenue_outlook_detail_frames(
+        signature,
+        sensitivity_key,
+        PED_BRIDGE_DEFAULT_MODE,
+        pack,
+    )
+    for key, value_column in [
+        ("line_reconciliation", "value"),
+        ("revenue_stack_components", "value"),
+    ]:
+        assert not detail[key].empty
+        assert pd.to_numeric(detail[key][value_column], errors="coerce").to_numpy() == pytest.approx(
+            pd.to_numeric(expected[key][value_column], errors="coerce").to_numpy(),
+            abs=0,
+            nan_ok=True,
+        )
+
+
+def test_revenue_outlook_default_primary_view_does_not_build_derived_frames(monkeypatch) -> None:
+    root = Path(__file__).resolve().parents[1]
+    pack_dir = root / CURRENT_REVENUE_OUTLOOK_DIR
+    pack = load_revenue_outlook_pack(pack_dir, repo_root=root)
+    assert pack is not None
+    signature = revenue_outlook_signature(pack_dir, root)
+    traces = tuple(app._revenue_outlook_trace_options(pack.revenue_chart_rows))
+    sensitivity_key = app.selected_sensitivity_key("Off", "Off", "Off")
+
+    def fail_derived_frame(*args, **kwargs):
+        raise AssertionError("default primary Revenue Outlook view should not build derived audit frames")
+
+    monkeypatch.setattr(revenue_outlook_module, "revenue_formula_residual_frame", fail_derived_frame)
+    monkeypatch.setattr(revenue_outlook_module, "revenue_stack_components_frame", fail_derived_frame)
+    if hasattr(app.cached_revenue_outlook_view, "clear"):
+        app.cached_revenue_outlook_view.clear()
+
+    view = app.cached_revenue_outlook_view(
+        signature,
+        "Total NLTF revenue",
+        "june_year",
+        "Current planned path",
+        traces,
+        sensitivity_key,
+        PED_BRIDGE_DEFAULT_MODE,
+        pack,
+    )
+
+    assert view["sensitivity_fast_path"] is True
+    assert view["line_reconciliation"].empty
+    assert view["revenue_formula_residuals"].empty
+    assert view["revenue_stack_components"].empty
+
+
+def test_revenue_outlook_default_sensitivity_audit_materializes_lazily() -> None:
+    root = Path(__file__).resolve().parents[1]
+    pack_dir = root / CURRENT_REVENUE_OUTLOOK_DIR
+    pack = load_revenue_outlook_pack(pack_dir, repo_root=root)
+    assert pack is not None
+    signature = revenue_outlook_signature(pack_dir, root)
+    sensitivity_key = app.selected_sensitivity_key("Off", "Off", "Off")
+
+    if hasattr(app.cached_revenue_outlook_sensitivity_audit, "clear"):
+        app.cached_revenue_outlook_sensitivity_audit.clear()
+    audit = app.cached_revenue_outlook_sensitivity_audit(
+        signature,
+        sensitivity_key,
+        PED_BRIDGE_DEFAULT_MODE,
+        pack,
+    )
+
+    assert not audit.empty
+    assert audit["selected_fleet_efficiency"].astype(str).eq("Off").all()
+    assert audit["selected_pt_mode_shift"].astype(str).eq("Off").all()
+    assert audit["selected_demand_elasticity"].astype(str).eq("Off").all()
 
 
 def test_revenue_outlook_default_figure_matches_uncached_path() -> None:

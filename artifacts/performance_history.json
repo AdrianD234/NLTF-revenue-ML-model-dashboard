@@ -47,5 +47,28 @@
       ],
       "validation": "focused-revenue-outlook-performance-tests: 23 passed"
     }
+  },
+  {
+    "timestamp": "2026-06-30T21:45:05+12:00",
+    "scope": "Revenue Outlook primary bridge render split",
+    "before_ms": {
+      "bridge_full_derived_min": 1200.36,
+      "bridge_full_derived_mean": 1254.18,
+      "prior_cached_view_cold_default": 1398.97,
+      "prior_cached_view_warm_default": 25.42
+    },
+    "after_ms": {
+      "bridge_primary_lightweight_min": 741.81,
+      "bridge_primary_lightweight_mean": 751.93,
+      "cached_view_cold_default_lightweight": 792.25,
+      "cached_view_warm_default_lightweight_mean": 4.11,
+      "detail_frames_cold_when_opened": 1211.43
+    },
+    "result": {
+      "primary_detail_frames": "line reconciliation, formula residuals and stack components are empty on default primary render and materialized only by detail-frame helper when opened",
+      "detail_line_rows_when_opened": 4026,
+      "detail_stack_rows_when_opened": 12376,
+      "validation": "focused primary/detail split tests passed before full validation"
+    }
   }
 ]
