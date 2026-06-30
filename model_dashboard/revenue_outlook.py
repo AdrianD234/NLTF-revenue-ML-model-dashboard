@@ -2444,11 +2444,13 @@ def apply_revenue_sensitivity_layer(
     )
     if _sensitivity_is_off(fleet_efficiency, pt_mode_shift, demand_elasticity):
         adjusted_line = line_reconciliation.copy()
+        formula_residuals = revenue_formula_residual_frame(adjusted_line) if adjusted_line is not None and not adjusted_line.empty else pd.DataFrame()
+        stack_components = revenue_stack_components_frame(adjusted_line, formula_residuals) if adjusted_line is not None and not adjusted_line.empty else pd.DataFrame()
         return {
             "chart_rows": chart_rows.copy(),
             "line_reconciliation": adjusted_line,
-            "revenue_formula_residuals": revenue_formula_residual_frame(adjusted_line) if adjusted_line is not None and not adjusted_line.empty else pd.DataFrame(),
-            "revenue_stack_components": revenue_stack_components_frame(adjusted_line, revenue_formula_residual_frame(adjusted_line)) if adjusted_line is not None and not adjusted_line.empty else pd.DataFrame(),
+            "revenue_formula_residuals": formula_residuals,
+            "revenue_stack_components": stack_components,
             "revenue_bridge_components": bridge_components.copy(),
             "future_revenue_forecasts": future_revenue_forecasts.copy(),
             "sensitivity_impact_audit": audit,

@@ -113,5 +113,21 @@
       "impact_change": "Replaced repeated line-reconciliation DataFrame scans with first-row value/unit lookup dictionaries inside PED bridge impact audit generation.",
       "validation": "python -m compileall app.py model_dashboard passed; Revenue Outlook test slice passed: 31 passed; bounded verify_dashboard.ps1 -SkipBrowser passed; host verify_browser_host.ps1 on port 8515 passed: 40 passed."
     }
+  },
+  {
+    "timestamp": "2026-06-30T22:39:05+12:00",
+    "scope": "Revenue Outlook default sensitivity detail audit",
+    "before_ms": {
+      "sensitivity_off_branch_old_shape_min": 560.99,
+      "sensitivity_off_branch_old_shape_mean": 563.75
+    },
+    "after_ms": {
+      "sensitivity_off_branch_reused_residuals_min": 402.67,
+      "sensitivity_off_branch_reused_residuals_mean": 429.25
+    },
+    "result": {
+      "sensitivity_change": "Reused the single formula-residual frame in the all-Off sensitivity branch instead of rebuilding it for stack components.",
+      "validation": "python -m compileall app.py model_dashboard tests passed; Revenue Outlook test slice passed: 32 passed; bounded verify_dashboard.ps1 -SkipBrowser passed; host verify_browser_host.ps1 on port 8515 passed: 40 passed."
+    }
   }
 ]

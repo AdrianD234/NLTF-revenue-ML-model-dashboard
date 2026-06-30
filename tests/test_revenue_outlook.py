@@ -1803,6 +1803,33 @@ def test_revenue_sensitivity_layer_off_preserves_runtime_values() -> None:
     assert pd.to_numeric(baseline["sensitivity_impact_audit"]["delta"], errors="coerce").abs().max() == pytest.approx(0.0, abs=0)
 
 
+def test_revenue_sensitivity_layer_off_reuses_formula_residuals(monkeypatch) -> None:
+    pack = load_revenue_outlook_pack(ROOT / CURRENT_REVENUE_OUTLOOK_DIR, repo_root=ROOT)
+    assert pack is not None
+
+    calls = 0
+    original = revenue_outlook_module.revenue_formula_residual_frame
+
+    def counted_formula_residuals(line_reconciliation: pd.DataFrame) -> pd.DataFrame:
+        nonlocal calls
+        calls += 1
+        return original(line_reconciliation)
+
+    monkeypatch.setattr(revenue_outlook_module, "revenue_formula_residual_frame", counted_formula_residuals)
+    baseline = revenue_outlook_module.apply_revenue_sensitivity_layer(
+        chart_rows=pack.revenue_chart_rows,
+        line_reconciliation=pack.revenue_line_reconciliation,
+        bridge_components=pack.revenue_bridge_components,
+        future_revenue_forecasts=pack.future_revenue_forecasts,
+        ped_revenue_bridge_audit=pack.ped_revenue_bridge_audit,
+        sensitivity_config=pack.sensitivity_config,
+    )
+
+    assert calls == 1
+    assert len(baseline["revenue_formula_residuals"]) == len(pack.revenue_formula_residuals)
+    assert not baseline["revenue_stack_components"].empty
+
+
 def test_revenue_sensitivity_efficiency_lowers_ped_revenue_holding_vkt_fixed() -> None:
     pack = load_revenue_outlook_pack(ROOT / CURRENT_REVENUE_OUTLOOK_DIR, repo_root=ROOT)
     assert pack is not None

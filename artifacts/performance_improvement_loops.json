@@ -80,5 +80,24 @@
       "tests": "python -m compileall app.py model_dashboard passed; Revenue Outlook test slice passed: 31 passed; bounded verify_dashboard.ps1 -SkipBrowser passed; host verify_browser_host.ps1 on port 8515 passed: 40 passed."
     },
     "status": "implemented"
+  },
+  {
+    "loop": 5,
+    "timestamp": "2026-06-30T22:39:05+12:00",
+    "scope": "Revenue Outlook default sensitivity detail audit",
+    "finding": "The all-Off sensitivity detail path computed formula residuals twice: once for the residual table and again for stack components.",
+    "change": "Computed formula residuals once and passed the same frame into revenue_stack_components_frame.",
+    "evidence": {
+      "before_ms": {
+        "sensitivity_off_branch_old_shape_min": 560.99,
+        "sensitivity_off_branch_old_shape_mean": 563.75
+      },
+      "after_ms": {
+        "sensitivity_off_branch_reused_residuals_min": 402.67,
+        "sensitivity_off_branch_reused_residuals_mean": 429.25
+      },
+      "tests": "python -m compileall app.py model_dashboard tests passed; Revenue Outlook test slice passed: 32 passed; bounded verify_dashboard.ps1 -SkipBrowser passed; host verify_browser_host.ps1 on port 8515 passed: 40 passed."
+    },
+    "status": "implemented"
   }
 ]
