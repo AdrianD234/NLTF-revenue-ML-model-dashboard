@@ -383,6 +383,19 @@
     "lambda_smoothness_penalty": 25.0,
     "runtime_mode": "optimized"
   },
+  "ped_revenue_bridge_audit": {
+    "repo_relative_path": "data/current_revenue_outlook/ped_revenue_bridge_audit.csv",
+    "scope": "Current-finalist PED bridge audit by FY/source path: VKTpc, population, adjusted light-petrol VKT after EV/PHEV migration, litres intensity, PED volume, PED rate and gross PED revenue.",
+    "status": "available",
+    "source": "data/current_revenue_outlook/revenue_line_reconciliation.csv; data/current_revenue_outlook/ev_phev_ped_light_drift_assumptions.csv"
+  },
+  "ped_efficiency_scenarios": {
+    "repo_relative_path": "data/current_revenue_outlook/ped_efficiency_scenarios.csv",
+    "default_scenario_id": "baseline_0pct",
+    "default_runtime_treatment": "0pct_no_change",
+    "scope": "Governed PED fleet-efficiency sensitivity over litres per 100km after EV/PHEV migration.",
+    "note": "Efficiency sensitivity reduces litres per 100km after EV/PHEV migration; it does not change VKTpc forecasts."
+  },
   "scenario_role_contract": {
     "repo_relative_path": "data/current_revenue_outlook/scenario_role_contract.csv",
     "scope": "Repo-local audit of scenario role semantics, PED population-feature exposure, display policy and runtime deltas.",
@@ -678,20 +691,20 @@
       "size_bytes": 54810
     },
     "fan_availability.csv": {
-      "sha256": "7fde72609437ab85136e9e21c8f8b6ba8dfd9cc2024a73f986ddfac299842e3a",
-      "size_bytes": 30413
+      "sha256": "7d8df7d82b99740228350e6aa13f7d09394a693912c9bb4a52e0fbbf13b734d1",
+      "size_bytes": 31995
     },
     "fan_availability.parquet": {
-      "sha256": "65597bfb4c267ee4ffc37907c17df15ec4cd6ade24fc5cd65f0947e4469f0267",
-      "size_bytes": 10070
+      "sha256": "bcb70fc357dc6b59378915fbef840d9d30120291eb9d8207ee48eb12f2deb719",
+      "size_bytes": 10188
     },
     "fan_band_rows.csv": {
-      "sha256": "6d6974a825c07bfaf3d072077554de9d0349386355a14d494a6a69d274ab97bb",
-      "size_bytes": 352110
+      "sha256": "97b20948b568a649d51e425136bb97d7d1e0037c1244655d48a4aa26589c00a6",
+      "size_bytes": 365675
     },
     "fan_band_rows.parquet": {
-      "sha256": "74d5f689c70113b72d0706fa96b805e8e82a726864aae3b134c45d61e131558d",
-      "size_bytes": 45181
+      "sha256": "c77dfc913120f9e8caa6003211ecdb85cc6d3e884512fbf7fbf6e1e12b90be5c",
+      "size_bytes": 46403
     },
     "future_revenue_forecasts.csv": {
       "sha256": "31bc0ab32312cfb37598ca0bcd7db7abbab89d259c6785b3a9787208c9bd2c05",
@@ -709,21 +722,37 @@
       "sha256": "e66d860fb7532ee4b92285c1ba023c9f8d9469cfdaaaef819415f7cd87c73757",
       "size_bytes": 5960
     },
+    "ped_efficiency_scenarios.csv": {
+      "sha256": "e23f4ad04f3b7b4e18eee7d185b4d2fa8d3d54c0542695d1c8be59cd395788b8",
+      "size_bytes": 1302
+    },
+    "ped_efficiency_scenarios.parquet": {
+      "sha256": "6e4c007d3a675a403303b00d117552464e514f7b3c2050bf33dc7c95c2faf325",
+      "size_bytes": 6251
+    },
+    "ped_revenue_bridge_audit.csv": {
+      "sha256": "5ce46fed554541a6384aab1cf914f626749a87f8a14fbc594827d25d55d469c7",
+      "size_bytes": 94804
+    },
+    "ped_revenue_bridge_audit.parquet": {
+      "sha256": "3248f12be1fa408dbe655c336dc3305a91d39fcc77de8620b72f36ccb9c03ab7",
+      "size_bytes": 34577
+    },
     "revenue_bridge_components.csv": {
-      "sha256": "6bfe2a7de0ab19a7c6dd5d5634a59c01a3893375982c51a28fec9aa2fad1bd3d",
-      "size_bytes": 538752
+      "sha256": "7e18771e3b6fdea01215a50537a575860ed4de830973c389d0090863f6302126",
+      "size_bytes": 578749
     },
     "revenue_bridge_components.parquet": {
-      "sha256": "80b316a963d537850d082b971add987479734aae6b729daab57af0afccdb2b1b",
-      "size_bytes": 56680
+      "sha256": "a9da6f103797d788bca0c37a0be4e5010ffb851e697e64428248d10ff865e627",
+      "size_bytes": 60103
     },
     "revenue_chart_rows.csv": {
-      "sha256": "cebe5b1106ebe2e8ad1faa8599f58dd76e44ec38c079e26c0a4509077712172f",
-      "size_bytes": 2283069
+      "sha256": "535f963b843dd17b410d259e39a3ac31a911a3d0d54b9073355c64f9a885c4a3",
+      "size_bytes": 2438379
     },
     "revenue_chart_rows.parquet": {
-      "sha256": "68d26ecf8177da6661a6ccd4671f60f79538fa7decb3a7ac7b68796bfb323bcd",
-      "size_bytes": 123550
+      "sha256": "78904ef79caee77a5daa3df8e990ad9559cac316cb9604f9fc5206b54851f88b",
+      "size_bytes": 126910
     },
     "revenue_formula_residuals.csv": {
       "sha256": "1326a0bf31bf50ade7036c525230be17e13e3876845695339ed7a5c5314c2554",
@@ -766,12 +795,12 @@
       "size_bytes": 6026
     },
     "runtime_trace_audit.csv": {
-      "sha256": "45c9513db0fe5fe5485ec28c560e757d36733d2e900c194d2b4be9fd6b91afe9",
-      "size_bytes": 100148
+      "sha256": "b9dc3802bb27e70db3516fd2455c04e32778190b1d3a952ba78c5ffde7970798",
+      "size_bytes": 107786
     },
     "runtime_trace_audit.parquet": {
-      "sha256": "49465b4692e3f0ff60c51ec26c555883ca4e3337ded988e44017464f06720381",
-      "size_bytes": 22451
+      "sha256": "143083376396702d9f842cee15107fcb969bb0e32acf98ba4517bb51a070b540",
+      "size_bytes": 22666
     },
     "scenario_feature_lineage.csv": {
       "sha256": "b123c97090bd282009225a0ac2cfc36226d20017412f820dfeec6af34411b30d",

@@ -120,6 +120,8 @@ from model_dashboard.revenue_outlook import (
     FAN_SOURCE_PRIORITY,
     FAN_SOURCE_SCENARIO_SPREAD,
     PED_COMPARISON_BEHAVIOURAL_TRACE_NAME,
+    PED_EFFICIENCY_BASELINE_SCENARIO_ID,
+    PED_EFFICIENCY_DEFAULT_NOTE,
     REVENUE_OUTLOOK_SCHEMA_VERSION,
     REVENUE_OUTLOOK_TITLE,
     SCENARIO_ROLE_CONTRACT_NOTE,
@@ -131,7 +133,9 @@ from model_dashboard.revenue_outlook import (
     REVENUE_STACK_MODES,
     STREAM_LABELS,
     RevenueOutlookPack,
+    apply_ped_efficiency_sensitivity,
     load_revenue_outlook_pack,
+    ped_efficiency_scenarios_frame,
     promote_revenue_outlook_pack,
     revenue_outlook_signature,
     validate_promotable_comparison,
@@ -2012,6 +2016,16 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         if pack is not None and isinstance(getattr(pack, "ev_phev_ped_light_drift_assumptions", None), pd.DataFrame)
         else pd.DataFrame()
     )
+    ped_revenue_bridge_audit = (
+        pack.ped_revenue_bridge_audit.copy()
+        if pack is not None and isinstance(getattr(pack, "ped_revenue_bridge_audit", None), pd.DataFrame)
+        else pd.DataFrame()
+    )
+    ped_efficiency_scenarios = (
+        pack.ped_efficiency_scenarios.copy()
+        if pack is not None and isinstance(getattr(pack, "ped_efficiency_scenarios", None), pd.DataFrame)
+        else ped_efficiency_scenarios_frame()
+    )
     scenario_role_contract = (
         pack.scenario_role_contract.copy()
         if pack is not None and isinstance(getattr(pack, "scenario_role_contract", None), pd.DataFrame)
@@ -2055,7 +2069,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
 
     with st.container(border=True):
         st.markdown("<div class='page5-panel-title'>Revenue Outlook controls</div>", unsafe_allow_html=True)
-        control_cols = st.columns([0.16, 0.30, 0.22, 0.14, 0.18])
+        control_cols = st.columns([0.13, 0.25, 0.18, 0.16, 0.11, 0.17])
         with control_cols[0]:
             grain_label = st.radio(
                 "Time grain",
@@ -2083,20 +2097,58 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                     index=default_fed_index,
                     key="revenue_outlook_fed_path",
                 )
+        efficiency_options = (
+            ped_efficiency_scenarios["scenario_id"].dropna().astype(str).tolist()
+            if not ped_efficiency_scenarios.empty and "scenario_id" in ped_efficiency_scenarios.columns
+            else [PED_EFFICIENCY_BASELINE_SCENARIO_ID]
+        )
+        efficiency_labels = (
+            ped_efficiency_scenarios.set_index("scenario_id")["display_name"].astype(str).to_dict()
+            if not ped_efficiency_scenarios.empty and {"scenario_id", "display_name"}.issubset(ped_efficiency_scenarios.columns)
+            else {PED_EFFICIENCY_BASELINE_SCENARIO_ID: "Baseline 0%"}
+        )
         with control_cols[3]:
+            selected_efficiency_id = st.selectbox(
+                "PED fleet efficiency",
+                efficiency_options,
+                index=efficiency_options.index(PED_EFFICIENCY_BASELINE_SCENARIO_ID)
+                if PED_EFFICIENCY_BASELINE_SCENARIO_ID in efficiency_options
+                else 0,
+                format_func=lambda value: efficiency_labels.get(str(value), str(value)),
+                key="revenue_outlook_ped_efficiency",
+            )
+        with control_cols[4]:
             selected_fy = st.selectbox(
                 "Selected FY",
                 fy_options,
                 index=default_fy_index,
                 key="revenue_outlook_selected_fy",
             )
-        with control_cols[4]:
+        with control_cols[5]:
             selected_traces = st.multiselect(
                 "Traces",
                 trace_options,
                 default=trace_options,
                 key="revenue_outlook_traces",
             )
+        st.caption(PED_EFFICIENCY_DEFAULT_NOTE)
+
+    sensitivity_frames = apply_ped_efficiency_sensitivity(
+        chart_rows=chart_rows,
+        line_reconciliation=line_reconciliation,
+        bridge_components=bridge,
+        future_revenue_forecasts=future_revenue,
+        ped_revenue_bridge_audit=ped_revenue_bridge_audit,
+        ped_efficiency_scenarios=ped_efficiency_scenarios,
+        scenario_id=selected_efficiency_id,
+    )
+    chart_rows = sensitivity_frames["chart_rows"]
+    line_reconciliation = sensitivity_frames["line_reconciliation"]
+    formula_residuals = sensitivity_frames["revenue_formula_residuals"]
+    stack_components = sensitivity_frames["revenue_stack_components"]
+    bridge = sensitivity_frames["revenue_bridge_components"]
+    future_revenue = sensitivity_frames["future_revenue_forecasts"]
+    ped_efficiency_adjustment = sensitivity_frames["ped_efficiency_adjustment"]
 
     filtered_rows = _filter_revenue_outlook_rows(
         chart_rows,
@@ -2148,6 +2200,21 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             with cutoff_cols[1]:
                 dataframe_download(runtime_cutoff_audit, "Download CSV", "runtime_cutoff_audit.csv")
             display_table(runtime_cutoff_audit, height=220, max_rows=20)
+
+    if not ped_efficiency_adjustment.empty:
+        with st.expander("PED revenue bridge and fleet-efficiency audit", expanded=False):
+            selected_efficiency_label = efficiency_labels.get(str(selected_efficiency_id), str(selected_efficiency_id))
+            info_panel(PED_EFFICIENCY_DEFAULT_NOTE)
+            st.caption(
+                f"Selected sensitivity: {selected_efficiency_label}. Current-finalist PED volume, PED revenue, Gross FED, Net FED, Total RUC+PED and Total NLTF are recalculated in this view only."
+            )
+            bridge_cols = st.columns([0.82, 0.18])
+            display_adjustment = ped_efficiency_adjustment[
+                pd.to_numeric(ped_efficiency_adjustment.get("FY"), errors="coerce").between(2026, 2050, inclusive="both")
+            ].copy()
+            with bridge_cols[1]:
+                dataframe_download(display_adjustment, "Download CSV", "ped_revenue_bridge_efficiency_audit.csv")
+            display_table(_ped_efficiency_adjustment_display_table(display_adjustment), height=360, max_rows=260)
 
     with st.container(border=True):
         st.markdown("<div class='page5-panel-title'>Revenue composition over time</div>", unsafe_allow_html=True)
@@ -2376,7 +2443,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         activity_rows = _filter_revenue_outlook_rows(
             chart_rows,
             time_grain="june_year" if grain_label == "June-year" else "quarterly",
-            stream_labels=["PED VKT per capita", "Light RUC net km", "Heavy RUC net km"],
+            stream_labels=["PED VKT per capita", "PED volume", "Light RUC net km", "Heavy RUC net km"],
             fed_paths=[selected_fed_path],
             trace_names=selected_traces,
         )
@@ -4159,6 +4226,7 @@ def _revenue_outlook_stream_options(chart_rows: pd.DataFrame) -> list[str]:
         return []
     preferred = [
         "PED VKT per capita",
+        "PED volume",
         "Light RUC net km",
         "Heavy RUC net km",
         "PED revenue",
@@ -4336,6 +4404,7 @@ def revenue_outlook_total_path_figure(rows: pd.DataFrame, *, selected_series: st
         group["horizon_hover"] = group.apply(_revenue_horizon_hover_label, axis=1)
         group["bridge_hover"] = group.apply(_revenue_bridge_hover_label, axis=1)
         group["scope_hover"] = group.apply(_revenue_scope_hover_label, axis=1)
+        group["efficiency_hover"] = group.apply(_revenue_efficiency_hover_label, axis=1)
         color, dash, width = trace_styles.get(trace_name, (scenario_colors.get(trace_name, "#006FAD"), "solid", 2.2))
         fig.add_trace(
             go.Scatter(
@@ -4345,10 +4414,10 @@ def revenue_outlook_total_path_figure(rows: pd.DataFrame, *, selected_series: st
                 name=trace_name,
                 line={"color": color, "dash": dash, "width": width},
                 marker={"size": 6},
-                customdata=group[["horizon_hover", "bridge_hover", "scope_hover"]].to_numpy(),
+                customdata=group[["horizon_hover", "bridge_hover", "scope_hover", "efficiency_hover"]].to_numpy(),
                 hovertemplate=(
                     "%{x}<br>%{y:,.2f}"
-                    "<br>%{customdata[0]}%{customdata[1]}%{customdata[2]}"
+                    "<br>%{customdata[0]}%{customdata[1]}%{customdata[2]}%{customdata[3]}"
                     "<extra>" + html.escape(trace_name) + "</extra>"
                 ),
             )
@@ -4935,11 +5004,24 @@ def revenue_outlook_figure(rows: pd.DataFrame, *, metric_type: str) -> go.Figure
                     "value_status",
                     "actual_quarters",
                     "forecast_quarters",
+                    "ped_efficiency_label",
+                    "adjusted_litres_per_100km",
                 ]
                 if col in group.columns
             ]
             plot_group = group[plot_cols].copy()
-            for column in ["horizon", "horizon_scope", "bridge_status", "gap_reason", "data_scope", "value_status", "actual_quarters", "forecast_quarters"]:
+            for column in [
+                "horizon",
+                "horizon_scope",
+                "bridge_status",
+                "gap_reason",
+                "data_scope",
+                "value_status",
+                "actual_quarters",
+                "forecast_quarters",
+                "ped_efficiency_label",
+                "adjusted_litres_per_100km",
+            ]:
                 if column not in plot_group.columns:
                     plot_group[column] = ""
             trace_role = _first_non_empty(group.get("trace_role", pd.Series(dtype=str)))
@@ -4957,6 +5039,7 @@ def revenue_outlook_figure(rows: pd.DataFrame, *, metric_type: str) -> go.Figure
             plot_group["horizon_hover"] = plot_group.apply(_revenue_horizon_hover_label, axis=1)
             plot_group["bridge_hover"] = plot_group.apply(_revenue_bridge_hover_label, axis=1)
             plot_group["scope_hover"] = plot_group.apply(_revenue_scope_hover_label, axis=1)
+            plot_group["efficiency_hover"] = plot_group.apply(_revenue_efficiency_hover_label, axis=1)
             label = _scenario_label(scenario_name, group)
             fig.add_trace(
                 go.Scatter(
@@ -4968,8 +5051,8 @@ def revenue_outlook_figure(rows: pd.DataFrame, *, metric_type: str) -> go.Figure
                     showlegend=col == 1,
                     line={"color": color, "width": 2},
                     marker={"size": 6},
-                    customdata=plot_group[["horizon_hover", "bridge_hover", "scope_hover"]].to_numpy(),
-                    hovertemplate="%{x}<br>%{y:,.2f}<br>%{customdata[0]}%{customdata[1]}%{customdata[2]}<extra>" + html.escape(label) + "</extra>",
+                    customdata=plot_group[["horizon_hover", "bridge_hover", "scope_hover", "efficiency_hover"]].to_numpy(),
+                    hovertemplate="%{x}<br>%{y:,.2f}<br>%{customdata[0]}%{customdata[1]}%{customdata[2]}%{customdata[3]}<extra>" + html.escape(label) + "</extra>",
                 ),
                 row=1,
                 col=col,
@@ -5146,6 +5229,15 @@ def _revenue_scope_hover_label(row: pd.Series) -> str:
     return "<br>" + "; ".join(parts)
 
 
+def _revenue_efficiency_hover_label(row: pd.Series) -> str:
+    label_value = row.get("ped_efficiency_label")
+    label = "" if pd.isna(label_value) else str(label_value).strip()
+    litres = pd.to_numeric(row.get("adjusted_litres_per_100km"), errors="coerce")
+    if not label or pd.isna(litres):
+        return ""
+    return f"<br>PED fleet efficiency: {html.escape(label)}; adjusted litres/100km: {float(litres):,.2f}"
+
+
 def _revenue_marker_hover_label(row: pd.Series) -> str:
     try:
         horizon = int(float(row.get("horizon")))
@@ -5186,6 +5278,61 @@ def _revenue_bridge_display_table(bridge: pd.DataFrame) -> pd.DataFrame:
     for col in ["Activity", "Component value", "Rate", "Revenue NZD"]:
         if col in view.columns:
             view[col] = pd.to_numeric(view[col], errors="coerce").map(lambda value: _format_compact_value(value, "nominal NZD" if col == "Revenue NZD" else ""))
+    return view
+
+
+def _ped_efficiency_adjustment_display_table(adjustment: pd.DataFrame) -> pd.DataFrame:
+    if adjustment is None or adjustment.empty:
+        return pd.DataFrame()
+    view = adjustment.copy()
+    rename = {
+        "period": "FY",
+        "source_path": "Source path",
+        "efficiency_label": "Efficiency",
+        "ped_vkt_per_capita": "VKTpc",
+        "population_million": "Population (m)",
+        "adjusted_light_petrol_vkt_million_km": "Light-petrol VKT (m km)",
+        "base_litres_per_100km": "Base L/100km",
+        "adjusted_litres_per_100km": "Adjusted L/100km",
+        "baseline_ped_volume_million_litres": "Baseline PED volume (m L)",
+        "adjusted_ped_volume_million_litres": "Adjusted PED volume (m L)",
+        "ped_volume_delta_million_litres": "PED volume delta (m L)",
+        "ped_rate_nzd_per_litre": "PED rate ($/L)",
+        "baseline_gross_ped_revenue_million_nzd": "Baseline PED revenue ($m)",
+        "adjusted_gross_ped_revenue_million_nzd": "Adjusted PED revenue ($m)",
+        "gross_ped_revenue_delta_million_nzd": "PED revenue delta ($m)",
+        "baseline_total_nltf_net_revenue_million_nzd": "Baseline Total NLTF ($m)",
+        "adjusted_total_nltf_net_revenue_million_nzd": "Adjusted Total NLTF ($m)",
+        "total_nltf_net_revenue_delta_million_nzd": "Total NLTF delta ($m)",
+        "reconciliation_status": "Status",
+        "vktpc_source_cell": "VKTpc source",
+        "population_source_cell": "Population source",
+        "formula": "Formula",
+    }
+    cols = [col for col in rename if col in view.columns]
+    view = view[cols].rename(columns=rename)
+    numeric_cols = [
+        "VKTpc",
+        "Population (m)",
+        "Light-petrol VKT (m km)",
+        "Base L/100km",
+        "Adjusted L/100km",
+        "Baseline PED volume (m L)",
+        "Adjusted PED volume (m L)",
+        "PED volume delta (m L)",
+        "PED rate ($/L)",
+        "Baseline PED revenue ($m)",
+        "Adjusted PED revenue ($m)",
+        "PED revenue delta ($m)",
+        "Baseline Total NLTF ($m)",
+        "Adjusted Total NLTF ($m)",
+        "Total NLTF delta ($m)",
+    ]
+    for col in numeric_cols:
+        if col in view.columns:
+            view[col] = pd.to_numeric(view[col], errors="coerce").map(
+                lambda value: "" if pd.isna(value) else f"{float(value):,.3f}"
+            )
     return view
 
 

@@ -84,6 +84,8 @@ RUNTIME_REVENUE_OUTLOOK_FILES = (
     "revenue_stack_components.parquet",
     "ev_phev_split_assumptions.parquet",
     "ev_phev_ped_light_drift_assumptions.parquet",
+    "ped_revenue_bridge_audit.parquet",
+    "ped_efficiency_scenarios.parquet",
     "scenario_input_delta_audit.parquet",
     "scenario_input_replay_mismatch_report.parquet",
     "scenario_feature_lineage.parquet",
@@ -232,6 +234,17 @@ CURRENT_RUNTIME_POLICY = (
     "tables are retained as audit lineage and are not a second Streamlit chart engine."
 )
 REVENUE_FIRST_FORECAST_FY = 2026
+PED_EFFICIENCY_BASELINE_SCENARIO_ID = "baseline_0pct"
+PED_EFFICIENCY_DEFAULT_NOTE = (
+    "Efficiency sensitivity reduces litres per 100km after EV/PHEV migration; it does not change VKTpc forecasts."
+)
+PED_EFFICIENCY_SCENARIO_SPECS = (
+    (PED_EFFICIENCY_BASELINE_SCENARIO_ID, "Baseline 0%", 0.0),
+    ("efficiency_0_5pct_pa", "0.5% p.a.", 0.5),
+    ("efficiency_1_0pct_pa", "1.0% p.a.", 1.0),
+    ("efficiency_1_5pct_pa", "1.5% p.a.", 1.5),
+    ("efficiency_2_0pct_pa", "2.0% p.a.", 2.0),
+)
 REVENUE_STACK_MODE_BRIDGE = "Gross-to-net bridge audit"
 REVENUE_STACK_MODE_GROSS = "Gross contribution stack"
 REVENUE_STACK_MODES = (REVENUE_STACK_MODE_BRIDGE, REVENUE_STACK_MODE_GROSS)
@@ -376,6 +389,8 @@ class RevenueOutlookPack:
     revenue_stack_components: pd.DataFrame = field(default_factory=pd.DataFrame)
     ev_phev_split_assumptions: pd.DataFrame = field(default_factory=pd.DataFrame)
     ev_phev_ped_light_drift_assumptions: pd.DataFrame = field(default_factory=pd.DataFrame)
+    ped_revenue_bridge_audit: pd.DataFrame = field(default_factory=pd.DataFrame)
+    ped_efficiency_scenarios: pd.DataFrame = field(default_factory=pd.DataFrame)
     scenario_input_delta_audit: pd.DataFrame = field(default_factory=pd.DataFrame)
     scenario_input_replay_mismatch_report: pd.DataFrame = field(default_factory=pd.DataFrame)
     scenario_feature_lineage: pd.DataFrame = field(default_factory=pd.DataFrame)
@@ -403,6 +418,8 @@ def revenue_outlook_signature(pack_dir: Path | str | None = None, repo_root: Pat
         base / "revenue_stack_components.parquet",
         base / "ev_phev_split_assumptions.parquet",
         base / "ev_phev_ped_light_drift_assumptions.parquet",
+        base / "ped_revenue_bridge_audit.parquet",
+        base / "ped_efficiency_scenarios.parquet",
         base / "scenario_input_delta_audit.parquet",
         base / "scenario_input_replay_mismatch_report.parquet",
         base / "scenario_feature_lineage.parquet",
@@ -447,6 +464,8 @@ def load_revenue_outlook_pack(
         revenue_stack_components=_read_optional_parquet(base / "revenue_stack_components.parquet"),
         ev_phev_split_assumptions=_read_optional_parquet(base / "ev_phev_split_assumptions.parquet"),
         ev_phev_ped_light_drift_assumptions=_read_optional_parquet(base / "ev_phev_ped_light_drift_assumptions.parquet"),
+        ped_revenue_bridge_audit=_read_optional_parquet(base / "ped_revenue_bridge_audit.parquet"),
+        ped_efficiency_scenarios=_read_optional_parquet(base / "ped_efficiency_scenarios.parquet"),
         scenario_input_delta_audit=_read_optional_parquet(base / "scenario_input_delta_audit.parquet"),
         scenario_input_replay_mismatch_report=_read_optional_parquet(base / "scenario_input_replay_mismatch_report.parquet"),
         scenario_feature_lineage=_read_optional_parquet(base / "scenario_feature_lineage.parquet"),
@@ -507,6 +526,7 @@ def promote_revenue_outlook_pack(
 
 DISPLAY_SERIES_ORDER = [
     "ped_vkt_per_capita",
+    "ped_volume",
     "light_ruc_net_km",
     "light_bev_ruc_net_km",
     "phev_ruc_net_km",
@@ -698,6 +718,397 @@ def _filter_frame_to_runtime_cutoff(frame: pd.DataFrame, runtime_cutoff_fy: int)
     return out
 
 
+def ped_efficiency_scenarios_frame(
+    *,
+    start_fy: int = REVENUE_FIRST_FORECAST_FY,
+    end_fy: int | None = None,
+) -> pd.DataFrame:
+    """Governed PED litres-intensity sensitivity options."""
+
+    end = int(end_fy or start_fy)
+    rows: list[dict[str, Any]] = []
+    for scenario_id, display_name, gain_pct in PED_EFFICIENCY_SCENARIO_SPECS:
+        rows.append(
+            {
+                "scenario_id": scenario_id,
+                "display_name": display_name,
+                "annual_efficiency_gain_pct": float(gain_pct),
+                "start_fy": int(start_fy),
+                "end_fy": end,
+                "compounding_rule": "base_litres_per_100km * (1 - annual_efficiency_gain_pct/100)^(FY-start_fy+1)",
+                "status": "default" if scenario_id == PED_EFFICIENCY_BASELINE_SCENARIO_ID else "available",
+                "notes": PED_EFFICIENCY_DEFAULT_NOTE,
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def ped_revenue_bridge_audit_frame(
+    line_reconciliation: pd.DataFrame,
+    ev_phev_ped_light_drift_assumptions: pd.DataFrame,
+) -> pd.DataFrame:
+    """Expose the current-finalist PED revenue mechanics at FY/source-path grain."""
+
+    columns = [
+        "FY",
+        "period",
+        "source_path",
+        "scenario_name",
+        "scenario_role",
+        "fed_path",
+        "lambda_mode",
+        "ped_vkt_per_capita",
+        "population_million",
+        "adjusted_light_petrol_vkt_million_km",
+        "base_litres_per_100km",
+        "ped_volume_million_litres",
+        "ped_rate_nzd_per_litre",
+        "gross_ped_revenue_million_nzd",
+        "total_nltf_net_revenue_million_nzd",
+        "vktpc_unit",
+        "population_unit",
+        "light_petrol_vkt_unit",
+        "litres_intensity_unit",
+        "ped_volume_unit",
+        "ped_rate_unit",
+        "gross_ped_revenue_unit",
+        "source_file",
+        "vktpc_source_cell",
+        "population_source_cell",
+        "migration_source_cells",
+        "formula",
+        "availability_status",
+        "notes",
+    ]
+    if (
+        line_reconciliation is None
+        or line_reconciliation.empty
+        or ev_phev_ped_light_drift_assumptions is None
+        or ev_phev_ped_light_drift_assumptions.empty
+    ):
+        return pd.DataFrame(columns=columns)
+
+    line = line_reconciliation.copy()
+    line["FY_numeric"] = pd.to_numeric(line.get("FY"), errors="coerce")
+    line["value_numeric"] = pd.to_numeric(line.get("value"), errors="coerce")
+    line["series_text"] = line.get("series_id", pd.Series("", index=line.index)).fillna("").astype(str)
+    line["source_path_text"] = line.get("source_path", pd.Series("", index=line.index)).fillna("").astype(str)
+    line["scenario_text"] = line.get("scenario_name", pd.Series("", index=line.index)).fillna("").astype(str)
+
+    def line_value(source_path: str, fy: int, scenario_name: str, series_id: str, column: str = "value_numeric") -> Any:
+        rows = line[
+            line["source_path_text"].eq(source_path)
+            & line["FY_numeric"].eq(fy)
+            & line["scenario_text"].eq(scenario_name)
+            & line["series_text"].eq(series_id)
+        ]
+        if rows.empty:
+            return pd.NA
+        return rows.iloc[0].get(column, pd.NA)
+
+    def line_text(source_path: str, fy: int, scenario_name: str, series_id: str, column: str) -> str:
+        rows = line[
+            line["source_path_text"].eq(source_path)
+            & line["FY_numeric"].eq(fy)
+            & line["scenario_text"].eq(scenario_name)
+            & line["series_text"].eq(series_id)
+        ]
+        if rows.empty:
+            return ""
+        return str(rows.iloc[0].get(column, "") or "")
+
+    drift = ev_phev_ped_light_drift_assumptions.copy()
+    drift["FY_numeric"] = pd.to_numeric(drift.get("FY"), errors="coerce")
+    drift = drift[
+        drift.get("lambda_mode", pd.Series("", index=drift.index)).fillna("").astype(str).eq(EV_PHEV_MIGRATION_DEFAULT_MODE)
+        & drift.get("source_path", pd.Series("", index=drift.index)).fillna("").astype(str).str.startswith("Current finalist")
+        & drift["FY_numeric"].ge(REVENUE_FIRST_FORECAST_FY)
+        & drift["FY_numeric"].notna()
+    ].copy()
+    if drift.empty:
+        return pd.DataFrame(columns=columns)
+
+    rows: list[dict[str, Any]] = []
+    for record in drift.to_dict("records"):
+        fy = int(record["FY_numeric"])
+        source_path = str(record.get("source_path") or "")
+        scenario_name = str(record.get("scenario_name") or "")
+        scenario_role = str(record.get("scenario_role") or "")
+        fed_path = line_text(source_path, fy, scenario_name, "gross_ped_revenue", "fed_path") or "Current planned path"
+        ped_vktpc = pd.to_numeric(line_value(source_path, fy, scenario_name, "ped_vkt_per_capita"), errors="coerce")
+        light_petrol_vkt = pd.to_numeric(record.get("current_PED_light_petrol_km"), errors="coerce")
+        population_million = pd.NA
+        if pd.notna(ped_vktpc) and float(ped_vktpc) > 0 and pd.notna(light_petrol_vkt):
+            population_million = float(light_petrol_vkt) / float(ped_vktpc)
+        rows.append(
+            {
+                "FY": fy,
+                "period": f"FY{fy}",
+                "source_path": source_path,
+                "scenario_name": scenario_name,
+                "scenario_role": scenario_role,
+                "fed_path": fed_path,
+                "lambda_mode": str(record.get("lambda_mode") or ""),
+                "ped_vkt_per_capita": ped_vktpc,
+                "population_million": population_million,
+                "adjusted_light_petrol_vkt_million_km": light_petrol_vkt,
+                "base_litres_per_100km": pd.to_numeric(record.get("ped_litres_per_100km"), errors="coerce"),
+                "ped_volume_million_litres": pd.to_numeric(record.get("current_PED_volume"), errors="coerce"),
+                "ped_rate_nzd_per_litre": pd.to_numeric(record.get("ped_rate"), errors="coerce"),
+                "gross_ped_revenue_million_nzd": pd.to_numeric(record.get("current_PED_revenue"), errors="coerce"),
+                "total_nltf_net_revenue_million_nzd": line_value(source_path, fy, scenario_name, "total_nltf_net_revenue"),
+                "vktpc_unit": line_text(source_path, fy, scenario_name, "ped_vkt_per_capita", "unit") or "km/person",
+                "population_unit": "million people",
+                "light_petrol_vkt_unit": "million km",
+                "litres_intensity_unit": "litres/100km",
+                "ped_volume_unit": "million litres",
+                "ped_rate_unit": "$/litre",
+                "gross_ped_revenue_unit": "$m nominal ex GST",
+                "source_file": line_text(source_path, fy, scenario_name, "gross_ped_revenue", "source_file"),
+                "vktpc_source_cell": line_text(source_path, fy, scenario_name, "ped_vkt_per_capita", "vktpc_source_cell")
+                or line_text(source_path, fy, scenario_name, "ped_vkt_per_capita", "source_cell"),
+                "population_source_cell": line_text(source_path, fy, scenario_name, "gross_ped_revenue", "population_source_cell"),
+                "migration_source_cells": str(record.get("source_cells") or ""),
+                "formula": (
+                    "gross_ped_revenue = adjusted_light_petrol_vkt_million_km * "
+                    "base_litres_per_100km / 100 * ped_rate_nzd_per_litre"
+                ),
+                "availability_status": str(record.get("availability_status") or "available"),
+                "notes": (
+                    "Current-finalist PED revenue uses adjusted PED/light-petrol VKT after optimized EV/PHEV "
+                    "migration, then applies MBU26 litres intensity and PED rate."
+                ),
+            }
+        )
+    return pd.DataFrame(rows, columns=columns).sort_values(["source_path", "FY"], kind="stable").reset_index(drop=True)
+
+
+def ped_efficiency_adjustment_frame(
+    ped_revenue_bridge_audit: pd.DataFrame,
+    ped_efficiency_scenarios: pd.DataFrame,
+    scenario_id: str = PED_EFFICIENCY_BASELINE_SCENARIO_ID,
+) -> pd.DataFrame:
+    """Calculate before/after PED litres, revenue and rollup deltas for one efficiency option."""
+
+    if ped_revenue_bridge_audit is None or ped_revenue_bridge_audit.empty:
+        return pd.DataFrame()
+    scenarios = ped_efficiency_scenarios_frame() if ped_efficiency_scenarios is None or ped_efficiency_scenarios.empty else ped_efficiency_scenarios.copy()
+    if "scenario_id" not in scenarios.columns:
+        scenarios = ped_efficiency_scenarios_frame()
+    selected = scenarios[scenarios["scenario_id"].astype(str).eq(str(scenario_id))].copy()
+    if selected.empty:
+        selected = scenarios[scenarios["scenario_id"].astype(str).eq(PED_EFFICIENCY_BASELINE_SCENARIO_ID)].copy()
+    scenario = selected.iloc[0]
+    gain_pct = float(pd.to_numeric(scenario.get("annual_efficiency_gain_pct"), errors="coerce") or 0.0)
+    gain = max(gain_pct / 100.0, 0.0)
+    start_fy = int(pd.to_numeric(scenario.get("start_fy"), errors="coerce") or REVENUE_FIRST_FORECAST_FY)
+    end_fy = int(pd.to_numeric(scenario.get("end_fy"), errors="coerce") or start_fy)
+
+    out = ped_revenue_bridge_audit.copy()
+    out["FY_numeric"] = pd.to_numeric(out.get("FY"), errors="coerce")
+    exponent = (out["FY_numeric"] - start_fy + 1).clip(lower=0, upper=max(end_fy - start_fy + 1, 0))
+    multiplier = np.power(max(1.0 - gain, 0.0), exponent.fillna(0))
+    base_litres = pd.to_numeric(out.get("base_litres_per_100km"), errors="coerce")
+    light_vkt = pd.to_numeric(out.get("adjusted_light_petrol_vkt_million_km"), errors="coerce")
+    ped_rate = pd.to_numeric(out.get("ped_rate_nzd_per_litre"), errors="coerce")
+    baseline_volume = pd.to_numeric(out.get("ped_volume_million_litres"), errors="coerce")
+    baseline_revenue = pd.to_numeric(out.get("gross_ped_revenue_million_nzd"), errors="coerce")
+    baseline_total_nltf = pd.to_numeric(out.get("total_nltf_net_revenue_million_nzd"), errors="coerce")
+
+    out["efficiency_scenario_id"] = str(scenario.get("scenario_id") or scenario_id)
+    out["efficiency_label"] = str(scenario.get("display_name") or scenario_id)
+    out["annual_efficiency_gain_pct"] = gain_pct
+    out["efficiency_start_fy"] = start_fy
+    out["efficiency_end_fy"] = end_fy
+    out["efficiency_multiplier"] = multiplier
+    out["adjusted_litres_per_100km"] = (base_litres * multiplier).clip(lower=0)
+    out["baseline_ped_volume_million_litres"] = baseline_volume
+    out["adjusted_ped_volume_million_litres"] = light_vkt * out["adjusted_litres_per_100km"] / 100.0
+    out["ped_volume_delta_million_litres"] = out["adjusted_ped_volume_million_litres"] - baseline_volume
+    out["baseline_gross_ped_revenue_million_nzd"] = baseline_revenue
+    out["adjusted_gross_ped_revenue_million_nzd"] = out["adjusted_ped_volume_million_litres"] * ped_rate
+    out["gross_ped_revenue_delta_million_nzd"] = out["adjusted_gross_ped_revenue_million_nzd"] - baseline_revenue
+    out["gross_fed_revenue_delta_million_nzd"] = out["gross_ped_revenue_delta_million_nzd"]
+    out["net_fed_revenue_delta_million_nzd"] = out["gross_ped_revenue_delta_million_nzd"]
+    out["total_fed_ruc_net_revenue_delta_million_nzd"] = out["gross_ped_revenue_delta_million_nzd"]
+    out["total_nltf_net_revenue_delta_million_nzd"] = out["gross_ped_revenue_delta_million_nzd"]
+    out["baseline_total_nltf_net_revenue_million_nzd"] = baseline_total_nltf
+    out["adjusted_total_nltf_net_revenue_million_nzd"] = baseline_total_nltf + out["total_nltf_net_revenue_delta_million_nzd"]
+    out["reconciliation_status"] = np.where(
+        pd.to_numeric(out["adjusted_ped_volume_million_litres"], errors="coerce").ge(0)
+        & pd.to_numeric(out["adjusted_gross_ped_revenue_million_nzd"], errors="coerce").ge(0),
+        "reconciled",
+        "negative_component_gap",
+    )
+    out["sensitivity_note"] = PED_EFFICIENCY_DEFAULT_NOTE
+    return out.drop(columns=["FY_numeric"], errors="ignore").reset_index(drop=True)
+
+
+def apply_ped_efficiency_sensitivity(
+    *,
+    chart_rows: pd.DataFrame,
+    line_reconciliation: pd.DataFrame,
+    bridge_components: pd.DataFrame,
+    future_revenue_forecasts: pd.DataFrame,
+    ped_revenue_bridge_audit: pd.DataFrame,
+    ped_efficiency_scenarios: pd.DataFrame,
+    scenario_id: str = PED_EFFICIENCY_BASELINE_SCENARIO_ID,
+) -> dict[str, pd.DataFrame]:
+    """Apply a selected PED litres-intensity sensitivity to current-finalist copies."""
+
+    adjustment = ped_efficiency_adjustment_frame(ped_revenue_bridge_audit, ped_efficiency_scenarios, scenario_id)
+    adjusted_line = _apply_ped_efficiency_to_value_frame(
+        line_reconciliation,
+        adjustment,
+        value_column="value",
+        fy_column="FY",
+        series_column="series_id",
+        source_path_column="source_path",
+    )
+    formula_residuals = revenue_formula_residual_frame(adjusted_line) if not adjusted_line.empty else pd.DataFrame()
+    adjusted_stack = revenue_stack_components_frame(adjusted_line, formula_residuals) if not adjusted_line.empty else pd.DataFrame()
+    adjusted_chart = _apply_ped_efficiency_to_value_frame(
+        chart_rows,
+        adjustment,
+        value_column="value",
+        fy_column="june_year",
+        series_column="series_id",
+        scenario_column="scenario_name",
+        fed_path_column="fed_path",
+        current_mask_column="trace_role",
+    )
+    adjusted_bridge = _apply_ped_efficiency_to_value_frame(
+        bridge_components,
+        adjustment,
+        value_column="component_value",
+        fy_column="period",
+        series_column="stream",
+        scenario_column="scenario_name",
+        fed_path_column="fed_path",
+    )
+    adjusted_future = _apply_ped_efficiency_to_value_frame(
+        future_revenue_forecasts,
+        adjustment,
+        value_column="revenue_forecast_nzd",
+        fy_column="period",
+        series_column="stream",
+        scenario_column="scenario_name",
+        fed_path_column="fed_path",
+    )
+    return {
+        "chart_rows": adjusted_chart,
+        "line_reconciliation": adjusted_line,
+        "revenue_formula_residuals": formula_residuals,
+        "revenue_stack_components": adjusted_stack,
+        "revenue_bridge_components": adjusted_bridge,
+        "future_revenue_forecasts": adjusted_future,
+        "ped_efficiency_adjustment": adjustment,
+    }
+
+
+def _apply_ped_efficiency_to_value_frame(
+    frame: pd.DataFrame,
+    adjustment: pd.DataFrame,
+    *,
+    value_column: str,
+    fy_column: str,
+    series_column: str,
+    source_path_column: str | None = None,
+    scenario_column: str | None = None,
+    fed_path_column: str | None = None,
+    current_mask_column: str | None = None,
+) -> pd.DataFrame:
+    if frame is None or frame.empty or adjustment is None or adjustment.empty:
+        return pd.DataFrame() if frame is None else frame.copy()
+    out = frame.copy()
+    for column in [
+        "ped_efficiency_scenario_id",
+        "ped_efficiency_label",
+        "annual_efficiency_gain_pct",
+        "adjusted_litres_per_100km",
+        "ped_efficiency_value_delta",
+    ]:
+        if column not in out.columns:
+            out[column] = pd.NA
+    if value_column not in out.columns or series_column not in out.columns:
+        return out
+
+    adjusted_lookup: dict[tuple[str, int, str, str], dict[str, Any]] = {}
+    adjustment = adjustment.copy()
+    adjustment["FY_numeric"] = pd.to_numeric(adjustment.get("FY"), errors="coerce")
+    for record in adjustment.to_dict("records"):
+        if pd.isna(record.get("FY_numeric")):
+            continue
+        key = (
+            str(record.get("source_path") or ""),
+            int(record["FY_numeric"]),
+            str(record.get("scenario_name") or ""),
+            str(record.get("fed_path") or ""),
+        )
+        adjusted_lookup[key] = record
+
+    out["_eff_fy"] = out.get(fy_column, pd.Series("", index=out.index)).map(_extract_fy_number)
+    for idx, row in out.iterrows():
+        if current_mask_column and str(row.get(current_mask_column) or "") not in {"", "in_house_current_finalist"}:
+            continue
+        series_id = str(row.get(series_column) or "")
+        if series_id not in {
+            "ped_volume",
+            "gross_ped_revenue",
+            "gross_fed_revenue",
+            "net_fed_revenue",
+            "total_gross_revenue",
+            "total_revenue_net_admin",
+            "total_fed_ruc_net_revenue",
+            "total_nltf_net_revenue",
+        }:
+            continue
+        fy = out.at[idx, "_eff_fy"]
+        if pd.isna(fy):
+            continue
+        source_path = str(row.get(source_path_column) or row.get("trace_name") or "") if source_path_column else str(row.get("trace_name") or "")
+        scenario_name = str(row.get(scenario_column) or row.get("scenario_name") or "") if scenario_column else str(row.get("scenario_name") or "")
+        fed_path = str(row.get(fed_path_column) or row.get("fed_path") or "") if fed_path_column else str(row.get("fed_path") or "")
+        record = adjusted_lookup.get((source_path, int(fy), scenario_name, fed_path))
+        if not record:
+            record = next(
+                (
+                    item
+                    for key, item in adjusted_lookup.items()
+                    if key[1] == int(fy) and key[2] == scenario_name and (not fed_path or key[3] == fed_path)
+                ),
+                None,
+            )
+        if not record:
+            continue
+        baseline_value = pd.to_numeric(row.get(value_column), errors="coerce")
+        if series_id == "ped_volume":
+            adjusted_value = record.get("adjusted_ped_volume_million_litres")
+        elif series_id == "gross_ped_revenue":
+            adjusted_value = record.get("adjusted_gross_ped_revenue_million_nzd")
+        else:
+            adjusted_value = baseline_value + pd.to_numeric(record.get("gross_ped_revenue_delta_million_nzd"), errors="coerce")
+        if pd.isna(adjusted_value):
+            continue
+        out.at[idx, value_column] = float(adjusted_value)
+        out.at[idx, "ped_efficiency_scenario_id"] = str(record.get("efficiency_scenario_id") or "")
+        out.at[idx, "ped_efficiency_label"] = str(record.get("efficiency_label") or "")
+        out.at[idx, "annual_efficiency_gain_pct"] = record.get("annual_efficiency_gain_pct")
+        out.at[idx, "adjusted_litres_per_100km"] = record.get("adjusted_litres_per_100km")
+        out.at[idx, "ped_efficiency_value_delta"] = float(adjusted_value) - float(baseline_value) if pd.notna(baseline_value) else pd.NA
+    return out.drop(columns=["_eff_fy"], errors="ignore")
+
+
+def _extract_fy_number(value: Any) -> float:
+    text = str(value or "")
+    if text.startswith("FY"):
+        text = text[2:]
+    try:
+        return float(text)
+    except Exception:
+        return np.nan
+
+
 def build_current_revenue_outlook_runtime_pack(
     *,
     repo_root: Path | str | None = None,
@@ -756,6 +1167,11 @@ def build_current_revenue_outlook_runtime_pack(
         ev_phev_ped_light_drift_assumptions,
         runtime_cutoff_fy,
     )
+    ped_revenue_bridge_audit = ped_revenue_bridge_audit_frame(
+        line_reconciliation,
+        ev_phev_ped_light_drift_assumptions,
+    )
+    ped_efficiency_scenarios = ped_efficiency_scenarios_frame(end_fy=runtime_cutoff_fy)
     scenarios = _runtime_scenario_records(existing_manifest, current)
     scenario_role_contract = scenario_role_contract_frame(
         current_forecast_annual=current,
@@ -937,6 +1353,22 @@ def build_current_revenue_outlook_runtime_pack(
             "lambda_smoothness_penalty": EV_PHEV_MIGRATION_SMOOTHNESS_PENALTY,
             "runtime_mode": EV_PHEV_MIGRATION_DEFAULT_MODE,
         },
+        "ped_revenue_bridge_audit": {
+            "repo_relative_path": _repo_relative(root, base / "ped_revenue_bridge_audit.csv"),
+            "scope": (
+                "Current-finalist PED bridge audit by FY/source path: VKTpc, population, adjusted light-petrol VKT "
+                "after EV/PHEV migration, litres intensity, PED volume, PED rate and gross PED revenue."
+            ),
+            "status": "available" if not ped_revenue_bridge_audit.empty else "missing",
+            "source": "data/current_revenue_outlook/revenue_line_reconciliation.csv; data/current_revenue_outlook/ev_phev_ped_light_drift_assumptions.csv",
+        },
+        "ped_efficiency_scenarios": {
+            "repo_relative_path": _repo_relative(root, base / "ped_efficiency_scenarios.csv"),
+            "default_scenario_id": PED_EFFICIENCY_BASELINE_SCENARIO_ID,
+            "default_runtime_treatment": "0pct_no_change",
+            "scope": "Governed PED fleet-efficiency sensitivity over litres per 100km after EV/PHEV migration.",
+            "note": PED_EFFICIENCY_DEFAULT_NOTE,
+        },
         "scenario_role_contract": {
             "repo_relative_path": _repo_relative(root, base / "scenario_role_contract.csv"),
             "scope": "Repo-local audit of scenario role semantics, PED population-feature exposure, display policy and runtime deltas.",
@@ -1033,6 +1465,8 @@ def build_current_revenue_outlook_runtime_pack(
             "revenue_stack_components": stack_components,
             "ev_phev_split_assumptions": ev_phev_split_assumptions,
             "ev_phev_ped_light_drift_assumptions": ev_phev_ped_light_drift_assumptions,
+            "ped_revenue_bridge_audit": ped_revenue_bridge_audit,
+            "ped_efficiency_scenarios": ped_efficiency_scenarios,
             "scenario_input_delta_audit": scenario_input_delta_audit,
             "scenario_input_replay_mismatch_report": scenario_input_replay_mismatch_report,
             "scenario_feature_lineage": scenario_feature_lineage,
@@ -3627,6 +4061,7 @@ def _runtime_series_metadata(series_trace_contract: pd.DataFrame) -> dict[str, d
         "total_fed_ruc_net_revenue": "Total RUC+PED revenue",
         "total_nltf_net_revenue": "Total NLTF revenue",
         "ped_vkt_per_capita": "PED VKT per capita",
+        "ped_volume": "PED volume",
         "light_ruc_net_km": "Light RUC net km",
         "light_bev_ruc_net_km": "Light BEV RUC net km",
         "phev_ruc_net_km": "PHEV RUC net km",
@@ -3639,7 +4074,7 @@ def _runtime_series_metadata(series_trace_contract: pd.DataFrame) -> dict[str, d
             series_id,
             {
                 "display_name": fallback_labels.get(series_id, series_id.replace("_", " ").title()),
-                "metric_type": "activity" if series_id.endswith("_km") or series_id == "ped_vkt_per_capita" else "revenue",
+                "metric_type": "activity" if series_id.endswith("_km") or series_id in {"ped_vkt_per_capita", "ped_volume"} else "revenue",
                 "unit": "",
                 "availability_status": "",
                 "valid_controls": "",
@@ -5160,6 +5595,8 @@ def _write_pack_files(
         "revenue_stack_components",
         "ev_phev_split_assumptions",
         "ev_phev_ped_light_drift_assumptions",
+        "ped_revenue_bridge_audit",
+        "ped_efficiency_scenarios",
         "scenario_input_delta_audit",
         "scenario_input_replay_mismatch_report",
         "scenario_feature_lineage",

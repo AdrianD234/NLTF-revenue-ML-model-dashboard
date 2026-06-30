@@ -1,0 +1,6 @@
+scenario_id,display_name,annual_efficiency_gain_pct,start_fy,end_fy,compounding_rule,status,notes
+baseline_0pct,Baseline 0%,0.0,2026,2050,base_litres_per_100km * (1 - annual_efficiency_gain_pct/100)^(FY-start_fy+1),default,Efficiency sensitivity reduces litres per 100km after EV/PHEV migration; it does not change VKTpc forecasts.
+efficiency_0_5pct_pa,0.5% p.a.,0.5,2026,2050,base_litres_per_100km * (1 - annual_efficiency_gain_pct/100)^(FY-start_fy+1),available,Efficiency sensitivity reduces litres per 100km after EV/PHEV migration; it does not change VKTpc forecasts.
+efficiency_1_0pct_pa,1.0% p.a.,1.0,2026,2050,base_litres_per_100km * (1 - annual_efficiency_gain_pct/100)^(FY-start_fy+1),available,Efficiency sensitivity reduces litres per 100km after EV/PHEV migration; it does not change VKTpc forecasts.
+efficiency_1_5pct_pa,1.5% p.a.,1.5,2026,2050,base_litres_per_100km * (1 - annual_efficiency_gain_pct/100)^(FY-start_fy+1),available,Efficiency sensitivity reduces litres per 100km after EV/PHEV migration; it does not change VKTpc forecasts.
+efficiency_2_0pct_pa,2.0% p.a.,2.0,2026,2050,base_litres_per_100km * (1 - annual_efficiency_gain_pct/100)^(FY-start_fy+1),available,Efficiency sensitivity reduces litres per 100km after EV/PHEV migration; it does not change VKTpc forecasts.
