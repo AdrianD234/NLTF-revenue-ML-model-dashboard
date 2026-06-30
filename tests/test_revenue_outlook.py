@@ -799,24 +799,36 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     assert int(pd.to_numeric(ped_bridge_audit["FY"], errors="coerce").min()) == 2026
     assert int(pd.to_numeric(ped_bridge_audit["FY"], errors="coerce").max()) == runtime_cutoff_fy
     required_ped_bridge_columns = {
+        "scenario",
+        "ped_vktpc_model",
         "ped_vkt_per_capita",
         "scenario_population",
         "population_million",
         "population_source_status",
         "population_fallback_flag",
+        "raw_light_petrol_vkt",
         "raw_light_petrol_vkt_million_km",
         "adjusted_light_petrol_vkt_million_km",
+        "optimized_light_petrol_vkt",
         "optimized_light_petrol_vkt_million_km",
+        "optimization_delta",
         "optimization_delta_million_km",
         "base_litres_per_100km",
+        "ped_volume_raw",
         "ped_volume_raw_million_litres",
+        "ped_volume_optimized",
         "ped_volume_optimized_million_litres",
         "ped_volume_million_litres",
+        "ped_rate",
         "ped_rate_nzd_per_litre",
+        "gross_ped_revenue_raw",
         "gross_ped_revenue_raw_million_nzd",
+        "gross_ped_revenue_optimized",
         "gross_ped_revenue_optimized_million_nzd",
         "gross_ped_revenue_million_nzd",
+        "total_nltf_raw",
         "total_nltf_raw_million_nzd",
+        "total_nltf_optimized",
         "total_nltf_optimized_million_nzd",
         "total_nltf_net_revenue_million_nzd",
         "mbu26_light_petrol_vkt_million_km",
@@ -832,9 +844,18 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     assert pd.to_numeric(ped_bridge_audit["base_litres_per_100km"], errors="coerce").gt(0).all()
     assert pd.to_numeric(ped_bridge_audit["ped_volume_million_litres"], errors="coerce").gt(0).all()
     assert pd.to_numeric(ped_bridge_audit["gross_ped_revenue_million_nzd"], errors="coerce").gt(0).all()
+    assert pd.to_numeric(ped_bridge_audit["ped_vktpc_model"], errors="coerce").to_numpy() == pytest.approx(
+        pd.to_numeric(ped_bridge_audit["ped_vkt_per_capita"], errors="coerce").to_numpy()
+    )
+    assert pd.to_numeric(ped_bridge_audit["raw_light_petrol_vkt"], errors="coerce").to_numpy() == pytest.approx(
+        pd.to_numeric(ped_bridge_audit["raw_light_petrol_vkt_million_km"], errors="coerce").to_numpy()
+    )
+    assert pd.to_numeric(ped_bridge_audit["ped_volume_raw"], errors="coerce").to_numpy() == pytest.approx(
+        pd.to_numeric(ped_bridge_audit["ped_volume_raw_million_litres"], errors="coerce").to_numpy()
+    )
     assert pd.to_numeric(ped_bridge_audit["raw_light_petrol_vkt_million_km"], errors="coerce").to_numpy() == pytest.approx(
         (
-            pd.to_numeric(ped_bridge_audit["ped_vkt_per_capita"], errors="coerce")
+            pd.to_numeric(ped_bridge_audit["ped_vktpc_model"], errors="coerce")
             * pd.to_numeric(ped_bridge_audit["scenario_population"], errors="coerce")
             / 1_000_000.0
         ).to_numpy()
@@ -1556,12 +1577,20 @@ def test_ped_bridge_modes_materialize_raw_optimized_and_reconcile() -> None:
     audit = pack.ped_revenue_bridge_audit
     assert not audit.empty
     required = {
+        "ped_vktpc_model",
+        "raw_light_petrol_vkt",
         "raw_light_petrol_vkt_million_km",
+        "optimized_light_petrol_vkt",
         "optimized_light_petrol_vkt_million_km",
+        "optimization_delta",
         "optimization_delta_million_km",
+        "ped_volume_raw",
         "ped_volume_raw_million_litres",
+        "ped_volume_optimized",
         "ped_volume_optimized_million_litres",
+        "gross_ped_revenue_raw",
         "gross_ped_revenue_raw_million_nzd",
+        "gross_ped_revenue_optimized",
         "gross_ped_revenue_optimized_million_nzd",
     }
     assert required.issubset(audit.columns)
@@ -1569,7 +1598,7 @@ def test_ped_bridge_modes_materialize_raw_optimized_and_reconcile() -> None:
     assert pd.to_numeric(current_base["optimization_delta_million_km"], errors="coerce").abs().max() > 100
     assert pd.to_numeric(current_base["raw_light_petrol_vkt_million_km"], errors="coerce").to_numpy() == pytest.approx(
         (
-            pd.to_numeric(current_base["ped_vkt_per_capita"], errors="coerce")
+            pd.to_numeric(current_base["ped_vktpc_model"], errors="coerce")
             * pd.to_numeric(current_base["scenario_population"], errors="coerce")
             / 1_000_000.0
         ).to_numpy()
@@ -1845,7 +1874,7 @@ def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
         "fan_band_rows.parquet": "c77dfc913120f9e8caa6003211ecdb85cc6d3e884512fbf7fbf6e1e12b90be5c",
         "future_revenue_forecasts.csv": "31bc0ab32312cfb37598ca0bcd7db7abbab89d259c6785b3a9787208c9bd2c05",
         "future_revenue_forecasts.parquet": "37fd32d0a1e39facca69504b525f1f3c85491f781832b3befbab2ecba700aba0",
-        "manifest.json": "20a5d80da5b2bf54a6fb1449506acbc50cf4d7be17a7559a7861d91802b74033",
+        "manifest.json": "1f78bed4fd8c2862393b1b4a3b31e6d5d9544f9cab2c79e2685c1f1c5682a73f",
         "manifest.md": "0d0ffad81aa2f9ab0e8123a05297aaf2b52d40d1b06f9700f2ca1a53977d0a2d",
         "path_trace_status.csv": "9aee7a4e7003ec6541476ca3e4afef6d8586b6c358e41db1c8e06623e5ffcaa3",
         "path_trace_status.parquet": "e66d860fb7532ee4b92285c1ba023c9f8d9469cfdaaaef819415f7cd87c73757",
@@ -1855,8 +1884,8 @@ def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
         "ped_bridge_shape_fit_metrics.parquet": "9305e5cc4c3cec76d24246f283145750bc964b15e782e302487cc2e19b6b2693",
         "ped_efficiency_scenarios.csv": "e23f4ad04f3b7b4e18eee7d185b4d2fa8d3d54c0542695d1c8be59cd395788b8",
         "ped_efficiency_scenarios.parquet": "6e4c007d3a675a403303b00d117552464e514f7b3c2050bf33dc7c95c2faf325",
-        "ped_revenue_bridge_audit.csv": "6d8942c914a0680bd4ff426b6f41b2c9a4dcda8aca42d7c9990d9b569800d3d3",
-        "ped_revenue_bridge_audit.parquet": "fd429e03aa96b3e1a80ef664b732a8a2cadca1395a0736b1fc8d5f7fdff2acd3",
+        "ped_revenue_bridge_audit.csv": "6c58b4b529ff8a9dd53a491b4450caa6f0a1d6569d4bd7c0fd6a78c3900479f5",
+        "ped_revenue_bridge_audit.parquet": "f5f050069cdf943f3c0c7083a84d0f31cf9c763f902d247b361f416f3823970d",
         "revenue_bridge_components.csv": "7e18771e3b6fdea01215a50537a575860ed4de830973c389d0090863f6302126",
         "revenue_bridge_components.parquet": "a9da6f103797d788bca0c37a0be4e5010ffb851e697e64428248d10ff865e627",
         "revenue_chart_rows.csv": "535f963b843dd17b410d259e39a3ac31a911a3d0d54b9073355c64f9a885c4a3",

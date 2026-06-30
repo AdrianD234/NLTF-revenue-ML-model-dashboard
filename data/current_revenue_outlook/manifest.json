@@ -789,12 +789,12 @@
       "size_bytes": 6251
     },
     "ped_revenue_bridge_audit.csv": {
-      "sha256": "6d8942c914a0680bd4ff426b6f41b2c9a4dcda8aca42d7c9990d9b569800d3d3",
-      "size_bytes": 127297
+      "sha256": "6c58b4b529ff8a9dd53a491b4450caa6f0a1d6569d4bd7c0fd6a78c3900479f5",
+      "size_bytes": 138647
     },
     "ped_revenue_bridge_audit.parquet": {
-      "sha256": "fd429e03aa96b3e1a80ef664b732a8a2cadca1395a0736b1fc8d5f7fdff2acd3",
-      "size_bytes": 62035
+      "sha256": "f5f050069cdf943f3c0c7083a84d0f31cf9c763f902d247b361f416f3823970d",
+      "size_bytes": 74409
     },
     "revenue_bridge_components.csv": {
       "sha256": "7e18771e3b6fdea01215a50537a575860ed4de830973c389d0090863f6302126",
