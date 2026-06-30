@@ -291,5 +291,23 @@
       "ev_phev_audit_change": "Cached the selected EV/PHEV migration audit view and legacy EV/PHEV split display table using runtime signature and visible audit mode; the composition branch now uses the cached stack for its table and download.",
       "validation": "python -m compileall . passed; Revenue Outlook/cloud test slice passed: 59 passed; full pytest passed: 404 passed, 50 skipped, 41 deselected; bounded verify_dashboard.ps1 -SkipBrowser passed; host verify_browser_host.ps1 on port 8515 passed: 40 passed."
     }
+  },
+  {
+    "timestamp": "2026-07-01T01:26:12+12:00",
+    "scope": "Revenue Outlook activity-volume figure cache",
+    "before_ms": {
+      "direct_activity_filter_plus_figure_min": 66.705,
+      "direct_activity_filter_plus_figure_mean": 85.346,
+      "direct_activity_filter_plus_figure_max": 455.258
+    },
+    "after_ms": {
+      "cached_activity_figure_warm_min": 5.093,
+      "cached_activity_figure_warm_mean": 5.627,
+      "cached_activity_figure_warm_max": 7.561
+    },
+    "result": {
+      "activity_figure_change": "Cached the lazy Activity and volume outlook Plotly figure using committed runtime signature, grain, FED path, traces, sensitivity key and PED bridge mode.",
+      "validation": "python -m compileall . passed; Revenue Outlook/cloud test slice passed: 61 passed; full pytest passed: 406 passed, 50 skipped, 41 deselected; bounded verify_dashboard.ps1 -SkipBrowser passed; host verify_browser_host.ps1 on port 8515 passed: 40 passed."
+    }
   }
 ]

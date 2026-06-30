@@ -787,6 +787,69 @@ def test_revenue_outlook_ev_phev_audit_views_cache_match_direct_builders() -> No
     )
 
 
+def test_revenue_outlook_activity_figure_cache_matches_direct_builder() -> None:
+    root = Path(__file__).resolve().parents[1]
+    pack_dir = root / CURRENT_REVENUE_OUTLOOK_DIR
+    pack = load_revenue_outlook_pack(pack_dir, repo_root=root)
+    assert pack is not None
+    signature = revenue_outlook_signature(pack_dir, root)
+    sensitivity_key = app.selected_sensitivity_key("Off", "Off", "Off")
+    selectors = app.cached_revenue_outlook_selectors(signature, pack)
+    traces = tuple(
+        trace
+        for trace in selectors["trace_options"]
+        if trace in ("Actual", "MBU26 official", "Current finalist Base case", "Current finalist High population/comparison")
+    )
+    view = app.cached_revenue_outlook_view(
+        signature,
+        "Total NLTF revenue",
+        "june_year",
+        "Current planned path",
+        traces,
+        sensitivity_key,
+        PED_BRIDGE_DEFAULT_MODE,
+        pack,
+    )
+
+    if hasattr(app.cached_revenue_outlook_activity_figure, "clear"):
+        app.cached_revenue_outlook_activity_figure.clear()
+    cached_fig = app.cached_revenue_outlook_activity_figure(
+        signature,
+        "june_year",
+        "Current planned path",
+        traces,
+        sensitivity_key,
+        PED_BRIDGE_DEFAULT_MODE,
+        view["chart_rows"],
+    )
+    direct_rows = app._filter_revenue_outlook_rows(
+        view["chart_rows"],
+        time_grain="june_year",
+        stream_labels=["PED VKT per capita", "PED volume", "Light RUC net km", "Heavy RUC net km"],
+        fed_paths=["Current planned path"],
+        trace_names=list(traces),
+    )
+    direct_fig = app.revenue_outlook_figure(direct_rows, metric_type="activity")
+
+    assert [trace.name for trace in cached_fig.data] == [trace.name for trace in direct_fig.data]
+    assert [tuple(trace.x) for trace in cached_fig.data] == [tuple(trace.x) for trace in direct_fig.data]
+    for cached_trace, direct_trace in zip(cached_fig.data, direct_fig.data, strict=True):
+        assert pd.to_numeric(pd.Series(cached_trace.y), errors="coerce").to_numpy() == pytest.approx(
+            pd.to_numeric(pd.Series(direct_trace.y), errors="coerce").to_numpy(),
+            abs=0,
+            nan_ok=True,
+        )
+
+
+def test_revenue_outlook_activity_branch_uses_cached_figure() -> None:
+    source = inspect.getsource(app.render_revenue_outlook_page)
+    start = source.index('"Show Activity and volume outlook"')
+    end = source.index('"Show Revenue bridge detail"')
+    activity_branch = source[start:end]
+    assert "cached_revenue_outlook_activity_figure(" in activity_branch
+    assert "revenue_outlook_figure(activity_rows" not in activity_branch
+
+
 def test_revenue_outlook_composition_branch_uses_cached_stack_for_table() -> None:
     source = inspect.getsource(app.render_revenue_outlook_page)
     start = source.index('"Show Revenue composition over time"')

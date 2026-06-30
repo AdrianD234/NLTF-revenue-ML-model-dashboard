@@ -1001,6 +1001,27 @@ def cached_revenue_outlook_ev_phev_split_display(
     return _ev_phev_split_assumptions_display_table(_split_assumptions)
 
 
+@st.cache_data(show_spinner=False)
+def cached_revenue_outlook_activity_figure(
+    signature: tuple[tuple[str, int, int], ...],
+    time_grain: str,
+    selected_fed_path: str,
+    traces: tuple[str, ...],
+    sensitivity_key: tuple[str, str, str, str, str, str, str, str, str],
+    bridge_mode: str,
+    _chart_rows: pd.DataFrame,
+) -> go.Figure:
+    del signature, sensitivity_key, bridge_mode
+    activity_rows = _filter_revenue_outlook_rows(
+        _chart_rows,
+        time_grain=time_grain,
+        stream_labels=["PED VKT per capita", "PED volume", "Light RUC net km", "Heavy RUC net km"],
+        fed_paths=[selected_fed_path],
+        trace_names=list(traces),
+    )
+    return revenue_outlook_figure(activity_rows, metric_type="activity")
+
+
 def directory_signature(path: Path) -> tuple[bool, int, int]:
     try:
         stat = path.stat()
@@ -3272,17 +3293,19 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     ):
         timer.start("activity figure")
         with st.expander("Activity and volume outlook", expanded=False):
-            activity_rows = _filter_revenue_outlook_rows(
+            activity_figure = cached_revenue_outlook_activity_figure(
+                pack_signature,
+                "june_year" if grain_label == "June-year" else "quarterly",
+                selected_fed_path,
+                tuple(str(value) for value in selected_traces),
+                sensitivity_key,
+                selected_ped_bridge_mode,
                 chart_rows,
-                time_grain="june_year" if grain_label == "June-year" else "quarterly",
-                stream_labels=["PED VKT per capita", "PED volume", "Light RUC net km", "Heavy RUC net km"],
-                fed_paths=[selected_fed_path],
-                trace_names=selected_traces,
             )
             chart_card(
                 "Activity and volume outlook",
                 "PED uses VKT per capita; Light and Heavy RUC use net kilometres. Actuals end at FY2025.",
-                revenue_outlook_figure(activity_rows, metric_type="activity"),
+                activity_figure,
                 caption="Forecast start and H13 markers are shown where numeric reviewed forecasts exist. Units are kept separate by stream.",
                 notes_as_tooltip=False,
             )
