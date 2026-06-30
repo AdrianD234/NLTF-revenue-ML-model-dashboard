@@ -2725,9 +2725,11 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             selected_ped_bridge_mode = PED_BRIDGE_DEFAULT_MODE
     sensitivity_options = list(SENSITIVITY_LEVELS)
     sensitivity_labels = selector_options["sensitivity_labels"]
+    selected_demand_elasticity = "Off"
+    cost_per_km_ratio = None
     with st.container(border=True):
         st.markdown("<div class='page5-panel-title'>Sensitivities</div>", unsafe_allow_html=True)
-        sens_cols = st.columns([0.18, 0.18, 0.18, 0.18, 0.28])
+        sens_cols = st.columns([0.22, 0.22, 0.56])
         with sens_cols[0]:
             selected_fleet_efficiency = st.selectbox(
                 "Fleet efficiency",
@@ -2745,28 +2747,6 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 key="revenue_outlook_sensitivity_pt_mode_shift",
             )
         with sens_cols[2]:
-            selected_demand_elasticity = st.selectbox(
-                "Demand elasticity",
-                sensitivity_options,
-                index=sensitivity_options.index("Off"),
-                format_func=lambda level: sensitivity_labels["demand_elasticity"].get(level, str(level)),
-                key="revenue_outlook_sensitivity_demand_elasticity",
-            )
-        with sens_cols[3]:
-            cost_per_km_ratio = None
-            if selected_demand_elasticity != "Off":
-                cost_per_km_ratio = st.number_input(
-                    "Cost/km ratio",
-                    min_value=0.01,
-                    max_value=5.0,
-                    value=1.0,
-                    step=0.01,
-                    key="revenue_outlook_sensitivity_cost_ratio",
-                )
-            else:
-                st.markdown("<div class='control-label'>Cost/km ratio</div>", unsafe_allow_html=True)
-                st.caption("Only used when elasticity is on.")
-        with sens_cols[4]:
             custom_fleet_efficiency_pct = None
             custom_pt_shift_pct = None
             custom_ped_elasticity = None
@@ -2776,11 +2756,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 custom_fleet_efficiency_pct = st.number_input("Custom efficiency % p.a.", min_value=0.0, max_value=10.0, value=1.0, step=0.1)
             if selected_pt_mode_shift == "Custom":
                 custom_pt_shift_pct = st.number_input("Custom PT shift % p.a.", min_value=0.0, max_value=10.0, value=0.5, step=0.1)
-            if selected_demand_elasticity == "Custom":
-                custom_ped_elasticity = st.number_input("Custom PED elasticity", min_value=-2.0, max_value=2.0, value=-0.1, step=0.01)
-                custom_light_elasticity = st.number_input("Custom Light RUC elasticity", min_value=-2.0, max_value=2.0, value=-0.1, step=0.01)
-                custom_heavy_elasticity = st.number_input("Custom Heavy RUC elasticity", min_value=-2.0, max_value=2.0, value=-0.1, step=0.01)
-            if all(value != "Custom" for value in [selected_fleet_efficiency, selected_pt_mode_shift, selected_demand_elasticity]):
+            if all(value != "Custom" for value in [selected_fleet_efficiency, selected_pt_mode_shift]):
                 st.caption("Custom inputs appear only when selected.")
     sensitivity_key = selected_sensitivity_key(
         fleet_efficiency=selected_fleet_efficiency,

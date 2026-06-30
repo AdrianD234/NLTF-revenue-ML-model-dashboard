@@ -921,6 +921,8 @@ def test_revenue_outlook_page_does_not_render_summary_kpi_cards() -> None:
     assert "_revenue_outlook_summary_cards(" not in source
     assert "kpi_grid(revenue_kpis)" not in source
     assert "_render_revenue_outlook_fan_card(" not in source
+    assert "revenue_outlook_sensitivity_demand_elasticity" not in source
+    assert "revenue_outlook_sensitivity_cost_ratio" not in source
 
 
 def test_revenue_outlook_cloud_hides_debug_toggles_and_shows_full_composition(monkeypatch) -> None:
