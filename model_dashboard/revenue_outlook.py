@@ -1443,10 +1443,13 @@ def apply_ped_bridge_mode_layer(
     ped_revenue_bridge_audit: pd.DataFrame,
     bridge_mode: str = PED_BRIDGE_DEFAULT_MODE,
     include_derived_frames: bool = True,
+    derived_frame_scope: str = "all",
+    include_selected_ped_audit: bool | None = None,
 ) -> dict[str, pd.DataFrame]:
     """Apply a PED bridge audit mode to current-finalist copies."""
 
     impact = ped_bridge_mode_impact_audit_frame(line_reconciliation, ped_revenue_bridge_audit, bridge_mode)
+    selected_ped_audit = bool(include_derived_frames) if include_selected_ped_audit is None else bool(include_selected_ped_audit)
     if include_derived_frames:
         adjusted_line = _apply_ped_bridge_mode_audit_to_frame(
             line_reconciliation,
@@ -1458,14 +1461,18 @@ def apply_ped_bridge_mode_layer(
             scenario_column="scenario_name",
             fed_path_column="fed_path",
         )
+        scope = str(derived_frame_scope or "all").strip().lower()
         formula_residuals = revenue_formula_residual_frame(adjusted_line) if adjusted_line is not None and not adjusted_line.empty else pd.DataFrame()
-        stack_components = revenue_stack_components_frame(adjusted_line, formula_residuals) if adjusted_line is not None and not adjusted_line.empty else pd.DataFrame()
-        adjusted_ped_audit = _ped_bridge_audit_for_selected_mode(ped_revenue_bridge_audit, bridge_mode)
+        stack_components = (
+            revenue_stack_components_frame(adjusted_line, formula_residuals)
+            if scope in {"all", "stack", "composition"} and adjusted_line is not None and not adjusted_line.empty
+            else pd.DataFrame()
+        )
     else:
         adjusted_line = pd.DataFrame()
         formula_residuals = pd.DataFrame()
         stack_components = pd.DataFrame()
-        adjusted_ped_audit = pd.DataFrame()
+    adjusted_ped_audit = _ped_bridge_audit_for_selected_mode(ped_revenue_bridge_audit, bridge_mode) if selected_ped_audit else pd.DataFrame()
     adjusted_chart = _apply_ped_bridge_mode_audit_to_frame(
         chart_rows,
         impact,

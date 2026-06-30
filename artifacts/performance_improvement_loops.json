@@ -126,5 +126,25 @@
       "tests": "python -m compileall app.py model_dashboard tests passed; Revenue Outlook test slice passed: 32 passed; bounded verify_dashboard.ps1 -SkipBrowser passed; host verify_browser_host.ps1 on port 8515 passed: 40 passed."
     },
     "status": "implemented"
+  },
+  {
+    "loop": 7,
+    "timestamp": "2026-06-30T23:07:36+12:00",
+    "scope": "Revenue Outlook lazy detail-frame split",
+    "finding": "Opening PED bridge diagnostics or line reconciliation used the full detail-frame helper, which also built stack components needed only by the composition expander.",
+    "change": "Added scoped cached helpers for PED bridge diagnostics and line reconciliation; kept full stack construction isolated to the composition/detail helper.",
+    "evidence": {
+      "before_ms": {
+        "full_detail_frames_cold": 393.26
+      },
+      "after_ms": {
+        "ped_bridge_detail_cold": 41.34,
+        "ped_bridge_detail_warm": 0.64,
+        "line_detail_cold_default": 209.71,
+        "line_detail_warm_default": 2.43
+      },
+      "tests": "python -m compileall app.py model_dashboard tests passed; Revenue Outlook test slice passed: 34 passed; bounded verify_dashboard.ps1 -SkipBrowser passed; host verify_browser_host.ps1 on port 8515 passed: 40 passed."
+    },
+    "status": "implemented"
   }
 ]

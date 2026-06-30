@@ -598,6 +598,8 @@ def _bridge_mode_frames_for_pack(
     bridge_mode: str,
     *,
     include_derived_frames: bool = True,
+    derived_frame_scope: str = "all",
+    include_selected_ped_audit: bool | None = None,
 ) -> dict[str, pd.DataFrame]:
     return apply_ped_bridge_mode_layer(
         chart_rows=_pack_table(pack, "revenue_chart_rows"),
@@ -607,6 +609,8 @@ def _bridge_mode_frames_for_pack(
         ped_revenue_bridge_audit=_pack_table(pack, "ped_revenue_bridge_audit"),
         bridge_mode=bridge_mode,
         include_derived_frames=include_derived_frames,
+        derived_frame_scope=derived_frame_scope,
+        include_selected_ped_audit=include_selected_ped_audit,
     )
 
 
@@ -719,6 +723,53 @@ def cached_revenue_outlook_detail_frames(
         **sensitivity_frames,
         "ped_revenue_bridge_audit": bridge_frames.get("ped_revenue_bridge_audit", pd.DataFrame()),
         "ped_bridge_mode_impact_audit": bridge_frames.get("ped_bridge_mode_impact_audit", pd.DataFrame()),
+    }
+
+
+@st.cache_data(show_spinner=False)
+def cached_revenue_outlook_ped_bridge_detail(
+    signature: tuple[tuple[str, int, int], ...],
+    bridge_mode: str,
+    _pack: RevenueOutlookPack,
+) -> dict[str, pd.DataFrame]:
+    del signature
+    bridge_frames = _bridge_mode_frames_for_pack(
+        _pack,
+        bridge_mode,
+        include_derived_frames=False,
+        include_selected_ped_audit=True,
+    )
+    return {
+        "ped_revenue_bridge_audit": bridge_frames.get("ped_revenue_bridge_audit", pd.DataFrame()),
+        "ped_bridge_mode_impact_audit": bridge_frames.get("ped_bridge_mode_impact_audit", pd.DataFrame()),
+    }
+
+
+@st.cache_data(show_spinner=False)
+def cached_revenue_outlook_line_detail_frames(
+    signature: tuple[tuple[str, int, int], ...],
+    sensitivity_key: tuple[str, str, str, str, str, str, str, str, str],
+    bridge_mode: str,
+    _pack: RevenueOutlookPack,
+) -> dict[str, pd.DataFrame]:
+    del signature
+    bridge_frames = _bridge_mode_frames_for_pack(
+        _pack,
+        bridge_mode,
+        include_derived_frames=True,
+        derived_frame_scope="line",
+        include_selected_ped_audit=False,
+    )
+    if _is_default_sensitivity_key(sensitivity_key):
+        return {
+            "line_reconciliation": bridge_frames.get("line_reconciliation", pd.DataFrame()),
+            "revenue_formula_residuals": bridge_frames.get("revenue_formula_residuals", pd.DataFrame()),
+        }
+    sensitivity_config = _pack_table(_pack, "sensitivity_config", sensitivity_config_frame())
+    sensitivity_frames = _apply_sensitivity_for_key(bridge_frames, sensitivity_config, sensitivity_key)
+    return {
+        "line_reconciliation": sensitivity_frames.get("line_reconciliation", pd.DataFrame()),
+        "revenue_formula_residuals": sensitivity_frames.get("revenue_formula_residuals", pd.DataFrame()),
     }
 
 
@@ -2630,9 +2681,8 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         caption="PED bridge diagnostics are loaded only when opened.",
     ):
         timer.start("PED bridge diagnostics")
-        detail_frames = cached_revenue_outlook_detail_frames(
+        detail_frames = cached_revenue_outlook_ped_bridge_detail(
             pack_signature,
-            sensitivity_key,
             selected_ped_bridge_mode,
             pack,
         )
@@ -2904,7 +2954,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         caption="Line reconciliation table is built only when opened.",
     ):
         timer.start("reconciliation table")
-        detail_frames = cached_revenue_outlook_detail_frames(
+        detail_frames = cached_revenue_outlook_line_detail_frames(
             pack_signature,
             sensitivity_key,
             selected_ped_bridge_mode,

@@ -153,5 +153,22 @@
       "bridge_change": "Replaced per-row iterrows updates in the PED bridge audit application helper with array iteration and batched column assignment while preserving exact/no-source/no-fed fallback order.",
       "validation": "python -m compileall app.py model_dashboard tests passed; Revenue Outlook test slice passed: 32 passed; bounded verify_dashboard.ps1 -SkipBrowser passed; host verify_browser_host.ps1 on port 8515 passed: 40 passed."
     }
+  },
+  {
+    "timestamp": "2026-06-30T23:07:36+12:00",
+    "scope": "Revenue Outlook lazy detail-frame split",
+    "before_ms": {
+      "full_detail_frames_cold": 393.26
+    },
+    "after_ms": {
+      "ped_bridge_detail_cold": 41.34,
+      "ped_bridge_detail_warm": 0.64,
+      "line_detail_cold_default": 209.71,
+      "line_detail_warm_default": 2.43
+    },
+    "result": {
+      "detail_split_change": "Split PED bridge diagnostics and line reconciliation into scoped cached helpers so those expanders do not build stack components unless composition is opened.",
+      "validation": "python -m compileall app.py model_dashboard tests passed; Revenue Outlook test slice passed: 34 passed; bounded verify_dashboard.ps1 -SkipBrowser passed; host verify_browser_host.ps1 on port 8515 passed: 40 passed."
+    }
   }
 ]

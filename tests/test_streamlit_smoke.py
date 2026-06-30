@@ -249,6 +249,58 @@ def test_revenue_outlook_default_primary_view_does_not_build_derived_frames(monk
     assert view["revenue_stack_components"].empty
 
 
+def test_revenue_outlook_ped_bridge_detail_does_not_build_stack_or_formula(monkeypatch) -> None:
+    root = Path(__file__).resolve().parents[1]
+    pack_dir = root / CURRENT_REVENUE_OUTLOOK_DIR
+    pack = load_revenue_outlook_pack(pack_dir, repo_root=root)
+    assert pack is not None
+    signature = revenue_outlook_signature(pack_dir, root)
+
+    def fail_derived_frame(*args, **kwargs):
+        raise AssertionError("PED bridge diagnostics should not build formula or stack detail frames")
+
+    monkeypatch.setattr(revenue_outlook_module, "revenue_formula_residual_frame", fail_derived_frame)
+    monkeypatch.setattr(revenue_outlook_module, "revenue_stack_components_frame", fail_derived_frame)
+    if hasattr(app.cached_revenue_outlook_ped_bridge_detail, "clear"):
+        app.cached_revenue_outlook_ped_bridge_detail.clear()
+
+    detail = app.cached_revenue_outlook_ped_bridge_detail(
+        signature,
+        PED_BRIDGE_DEFAULT_MODE,
+        pack,
+    )
+
+    assert not detail["ped_revenue_bridge_audit"].empty
+    assert not detail["ped_bridge_mode_impact_audit"].empty
+
+
+def test_revenue_outlook_line_detail_default_does_not_build_stack(monkeypatch) -> None:
+    root = Path(__file__).resolve().parents[1]
+    pack_dir = root / CURRENT_REVENUE_OUTLOOK_DIR
+    pack = load_revenue_outlook_pack(pack_dir, repo_root=root)
+    assert pack is not None
+    signature = revenue_outlook_signature(pack_dir, root)
+    sensitivity_key = app.selected_sensitivity_key("Off", "Off", "Off")
+
+    def fail_stack_frame(*args, **kwargs):
+        raise AssertionError("Line reconciliation detail should not build stack components")
+
+    monkeypatch.setattr(revenue_outlook_module, "revenue_stack_components_frame", fail_stack_frame)
+    if hasattr(app.cached_revenue_outlook_line_detail_frames, "clear"):
+        app.cached_revenue_outlook_line_detail_frames.clear()
+
+    detail = app.cached_revenue_outlook_line_detail_frames(
+        signature,
+        sensitivity_key,
+        PED_BRIDGE_DEFAULT_MODE,
+        pack,
+    )
+
+    assert not detail["line_reconciliation"].empty
+    assert not detail["revenue_formula_residuals"].empty
+    assert "revenue_stack_components" not in detail
+
+
 def test_revenue_outlook_default_sensitivity_audit_materializes_lazily() -> None:
     root = Path(__file__).resolve().parents[1]
     pack_dir = root / CURRENT_REVENUE_OUTLOOK_DIR
