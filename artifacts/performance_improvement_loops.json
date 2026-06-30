@@ -39,5 +39,26 @@
       "tests": "focused primary/detail split tests passed before full validation"
     },
     "status": "implemented"
+  },
+  {
+    "loop": 3,
+    "timestamp": "2026-06-30T22:04:00+12:00",
+    "scope": "Revenue Outlook PED bridge audit matching",
+    "finding": "The remaining default primary bridge path still checked unmatched rows by scanning every PED bridge audit key.",
+    "change": "Replaced the row-scan fallback with exact, no-source, no-fed and no-source/no-fed lookup maps that preserve the original matching order.",
+    "evidence": {
+      "before_ms": {
+        "bridge_primary_lightweight_min": 741.81,
+        "cached_view_cold_default_lightweight": 792.25
+      },
+      "after_ms": {
+        "bridge_primary_lightweight_match_maps_min": 667.45,
+        "cached_view_cold_default_match_maps": 774.59,
+        "cached_view_warm_default_match_maps_mean": 4.49
+      },
+      "parity": "Inline parity check matched old row-scan behavior for chart, bridge, future and line frames.",
+      "tests": "Focused fallback semantics and primary-view tests passed before full validation."
+    },
+    "status": "implemented"
   }
 ]

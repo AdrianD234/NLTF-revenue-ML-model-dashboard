@@ -9,6 +9,7 @@ import pandas as pd
 from openpyxl import load_workbook
 import pytest
 
+import model_dashboard.revenue_outlook as revenue_outlook_module
 from model_dashboard.forecast_runner import (
     SHEET_BY_STREAM,
     create_completed_sample_workbook,
@@ -2005,3 +2006,58 @@ def test_revenue_outlook_loader_uses_committed_runtime_pack_without_excel_or_loc
     for name, value in vars(pack).items():
         if isinstance(value, pd.DataFrame) and not value.empty:
             assert not value.astype(str).stack().str.contains(forbidden, regex=True).any(), name
+
+
+def test_ped_bridge_audit_application_preserves_fallback_key_semantics() -> None:
+    audit = pd.DataFrame(
+        [
+            {
+                "FY": 2029,
+                "source_path": "Current finalist Base case",
+                "scenario_name": "current_basecase",
+                "fed_path": "Current planned path",
+                "series_id": "gross_ped_revenue",
+                "adjusted": 15.0,
+                "selected_ped_bridge_label": "Raw model bridge",
+                "bridge_alpha": 0.0,
+                "delta": 5.0,
+                "gap_reason": "",
+            }
+        ]
+    )
+
+    def apply(frame: pd.DataFrame, *, source: bool = True, fed: bool = True, mask: bool = False) -> pd.DataFrame:
+        return revenue_outlook_module._apply_ped_bridge_mode_audit_to_frame(
+            frame,
+            audit,
+            value_column="value",
+            fy_column="period",
+            series_column="series_id",
+            source_path_column="source_path" if source else None,
+            scenario_column="scenario_name",
+            fed_path_column="fed_path" if fed else None,
+            current_mask_column="trace_role" if mask else None,
+        )
+
+    base = {
+        "period": "FY2029",
+        "series_id": "gross_ped_revenue",
+        "scenario_name": "current_basecase",
+        "value": 10.0,
+    }
+    exact = apply(pd.DataFrame([{**base, "source_path": "Current finalist Base case", "fed_path": "Current planned path"}]))
+    no_source = apply(pd.DataFrame([{**base, "fed_path": "Current planned path"}]), source=False)
+    no_fed = apply(pd.DataFrame([{**base, "source_path": "Current finalist Base case"}]), fed=False)
+    no_source_no_fed = apply(pd.DataFrame([base]), source=False, fed=False)
+    masked = apply(
+        pd.DataFrame(
+            [{**base, "source_path": "Current finalist Base case", "fed_path": "Current planned path", "trace_role": "official_comparator"}]
+        ),
+        mask=True,
+    )
+
+    for frame in [exact, no_source, no_fed, no_source_no_fed]:
+        assert frame.loc[0, "value"] == pytest.approx(15.0)
+        assert frame.loc[0, "ped_bridge_value_delta"] == pytest.approx(5.0)
+        assert "Raw model bridge" in str(frame.loc[0, "ped_bridge_mode_label"])
+    assert masked.loc[0, "value"] == pytest.approx(10.0)

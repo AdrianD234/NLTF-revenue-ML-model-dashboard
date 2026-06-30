@@ -70,5 +70,28 @@
       "detail_stack_rows_when_opened": 12376,
       "validation": "focused primary/detail split tests passed before full validation"
     }
+  },
+  {
+    "timestamp": "2026-06-30T22:04:00+12:00",
+    "scope": "Revenue Outlook PED bridge audit matching",
+    "before_ms": {
+      "bridge_primary_lightweight_min": 741.81,
+      "bridge_primary_lightweight_mean": 751.93,
+      "cached_view_cold_default_lightweight": 792.25,
+      "cached_view_warm_default_lightweight_mean": 4.11
+    },
+    "after_ms": {
+      "bridge_primary_lightweight_match_maps_min": 667.45,
+      "bridge_primary_lightweight_match_maps_mean": 699.45,
+      "bridge_full_derived_match_maps_min": 1195.38,
+      "bridge_full_derived_match_maps_mean": 1200.26,
+      "cached_view_cold_default_match_maps": 774.59,
+      "cached_view_warm_default_match_maps_mean": 4.49
+    },
+    "result": {
+      "matching_change": "Replaced per-row fallback scans across all audit keys with exact/no-source/no-fed/no-source-no-fed lookup maps.",
+      "parity": "Inline parity check matched old row-scan behavior for chart, bridge, future and line frames.",
+      "validation": "Focused fallback semantics and primary-view tests passed before full validation."
+    }
   }
 ]

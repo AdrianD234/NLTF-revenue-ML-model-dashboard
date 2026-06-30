@@ -1523,10 +1523,10 @@ def _apply_ped_bridge_mode_audit_to_frame(
     for column in ["ped_bridge_mode_label", "ped_bridge_value_delta", "ped_bridge_population_warning"]:
         if column not in out.columns:
             out[column] = pd.NA
-    audit = audit.copy()
-    audit["FY_numeric"] = pd.to_numeric(audit.get("FY"), errors="coerce")
+    audit_lookup = audit.copy()
+    audit_lookup["FY_numeric"] = pd.to_numeric(audit_lookup.get("FY"), errors="coerce")
     lookup: dict[tuple[str, int, str, str, str], dict[str, Any]] = {}
-    for record in audit.to_dict("records"):
+    for record in audit_lookup.to_dict("records"):
         if pd.isna(record.get("FY_numeric")):
             continue
         lookup[
@@ -1538,11 +1538,25 @@ def _apply_ped_bridge_mode_audit_to_frame(
                 str(record.get("series_id") or ""),
             )
         ] = record
+    no_source_lookup: dict[tuple[int, str, str, str], dict[str, Any]] = {}
+    no_fed_lookup: dict[tuple[str, int, str, str], dict[str, Any]] = {}
+    no_source_no_fed_lookup: dict[tuple[int, str, str], dict[str, Any]] = {}
+    for (source_path, fy, scenario_name, fed_path, series_id), record in lookup.items():
+        no_source_lookup.setdefault((fy, scenario_name, fed_path, series_id), record)
+        no_fed_lookup.setdefault((source_path, fy, scenario_name, series_id), record)
+        no_source_no_fed_lookup.setdefault((fy, scenario_name, series_id), record)
     out["_ped_bridge_fy"] = out.get(fy_column, pd.Series("", index=out.index)).map(_extract_fy_number)
-    for idx, row in out.iterrows():
-        if current_mask_column and str(row.get(current_mask_column) or "") not in {"", "in_house_current_finalist"}:
-            continue
-        fy = out.at[idx, "_ped_bridge_fy"]
+    candidate_mask = out["_ped_bridge_fy"].notna()
+    if current_mask_column:
+        current_role = out.get(current_mask_column, pd.Series("", index=out.index)).fillna("").astype(str)
+        candidate_mask &= current_role.isin(["", "in_house_current_finalist"])
+    candidate_columns = [value_column, "_ped_bridge_fy", series_column]
+    for optional_column in [source_path_column, scenario_column, fed_path_column]:
+        if optional_column:
+            candidate_columns.append(optional_column)
+    candidate_columns = list(dict.fromkeys(column for column in candidate_columns if column in out.columns))
+    for idx, row in out.loc[candidate_mask, candidate_columns].iterrows():
+        fy = row.get("_ped_bridge_fy")
         if pd.isna(fy):
             continue
         series_id = str(row.get(series_column) or "")
@@ -1551,18 +1565,12 @@ def _apply_ped_bridge_mode_audit_to_frame(
         fed_path = str(row.get(fed_path_column) or "") if fed_path_column else ""
         record = lookup.get((source_path, int(fy), scenario_name, fed_path, series_id))
         if not record:
-            record = next(
-                (
-                    item
-                    for key, item in lookup.items()
-                    if key[1] == int(fy)
-                    and key[2] == scenario_name
-                    and key[4] == series_id
-                    and (not fed_path or key[3] == fed_path)
-                    and (not source_path or key[0] == source_path)
-                ),
-                None,
-            )
+            if not source_path and fed_path:
+                record = no_source_lookup.get((int(fy), scenario_name, fed_path, series_id))
+            elif source_path and not fed_path:
+                record = no_fed_lookup.get((source_path, int(fy), scenario_name, series_id))
+            elif not source_path and not fed_path:
+                record = no_source_no_fed_lookup.get((int(fy), scenario_name, series_id))
         if not record:
             continue
         adjusted_value = _finite_float(record.get("adjusted"), np.nan)
