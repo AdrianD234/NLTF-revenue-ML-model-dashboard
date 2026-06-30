@@ -147,6 +147,7 @@ from model_dashboard.revenue_outlook import (
     ped_efficiency_scenarios_frame,
     sensitivity_config_frame,
     promote_revenue_outlook_pack,
+    revenue_sensitivity_impact_audit_frame,
     revenue_outlook_signature,
     validate_promotable_comparison,
 )
@@ -781,9 +782,37 @@ def cached_revenue_outlook_sensitivity_audit(
     _pack: RevenueOutlookPack,
 ) -> pd.DataFrame:
     del signature
-    bridge_frames = _bridge_mode_frames_for_pack(_pack, bridge_mode, include_derived_frames=True)
+    bridge_frames = _bridge_mode_frames_for_pack(
+        _pack,
+        bridge_mode,
+        include_derived_frames=True,
+        derived_frame_scope="line_only",
+        include_selected_ped_audit=True,
+    )
     sensitivity_config = _pack_table(_pack, "sensitivity_config", sensitivity_config_frame())
-    return _apply_sensitivity_for_key(bridge_frames, sensitivity_config, sensitivity_key).get("sensitivity_impact_audit", pd.DataFrame())
+    fleet_efficiency = sensitivity_key[0]
+    pt_mode_shift = sensitivity_key[1]
+    demand_elasticity = sensitivity_key[2]
+    custom_fleet = float(sensitivity_key[3]) if sensitivity_key[3] else None
+    custom_pt = float(sensitivity_key[4]) if sensitivity_key[4] else None
+    custom_ped = float(sensitivity_key[5]) if sensitivity_key[5] else None
+    custom_light = float(sensitivity_key[6]) if sensitivity_key[6] else None
+    custom_heavy = float(sensitivity_key[7]) if sensitivity_key[7] else None
+    cost_ratio = float(sensitivity_key[8]) if sensitivity_key[8] else None
+    return revenue_sensitivity_impact_audit_frame(
+        bridge_frames.get("line_reconciliation", pd.DataFrame()),
+        bridge_frames.get("ped_revenue_bridge_audit", pd.DataFrame()),
+        sensitivity_config,
+        fleet_efficiency=fleet_efficiency,
+        pt_mode_shift=pt_mode_shift,
+        demand_elasticity=demand_elasticity,
+        custom_fleet_efficiency_pct=custom_fleet,
+        custom_pt_shift_pct=custom_pt,
+        custom_ped_elasticity=custom_ped,
+        custom_light_elasticity=custom_light,
+        custom_heavy_elasticity=custom_heavy,
+        cost_per_km_ratio=cost_ratio,
+    )
 
 
 def directory_signature(path: Path) -> tuple[bool, int, int]:

@@ -1462,7 +1462,11 @@ def apply_ped_bridge_mode_layer(
             fed_path_column="fed_path",
         )
         scope = str(derived_frame_scope or "all").strip().lower()
-        formula_residuals = revenue_formula_residual_frame(adjusted_line) if adjusted_line is not None and not adjusted_line.empty else pd.DataFrame()
+        formula_residuals = (
+            revenue_formula_residual_frame(adjusted_line)
+            if scope in {"all", "stack", "composition", "line", "residuals"} and adjusted_line is not None and not adjusted_line.empty
+            else pd.DataFrame()
+        )
         stack_components = (
             revenue_stack_components_frame(adjusted_line, formula_residuals)
             if scope in {"all", "stack", "composition"} and adjusted_line is not None and not adjusted_line.empty

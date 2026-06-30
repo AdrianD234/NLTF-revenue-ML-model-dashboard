@@ -324,6 +324,65 @@ def test_revenue_outlook_default_sensitivity_audit_materializes_lazily() -> None
     assert audit["selected_demand_elasticity"].astype(str).eq("Off").all()
 
 
+def test_revenue_outlook_sensitivity_audit_does_not_build_residual_or_stack(monkeypatch) -> None:
+    root = Path(__file__).resolve().parents[1]
+    pack_dir = root / CURRENT_REVENUE_OUTLOOK_DIR
+    pack = load_revenue_outlook_pack(pack_dir, repo_root=root)
+    assert pack is not None
+    signature = revenue_outlook_signature(pack_dir, root)
+    sensitivity_key = app.selected_sensitivity_key("Med", "Med", "Med")
+
+    def fail_derived_frame(*args, **kwargs):
+        raise AssertionError("Sensitivity audit should not build formula or stack detail frames")
+
+    monkeypatch.setattr(revenue_outlook_module, "revenue_formula_residual_frame", fail_derived_frame)
+    monkeypatch.setattr(revenue_outlook_module, "revenue_stack_components_frame", fail_derived_frame)
+    if hasattr(app.cached_revenue_outlook_sensitivity_audit, "clear"):
+        app.cached_revenue_outlook_sensitivity_audit.clear()
+
+    audit = app.cached_revenue_outlook_sensitivity_audit(
+        signature,
+        sensitivity_key,
+        PED_BRIDGE_DEFAULT_MODE,
+        pack,
+    )
+
+    assert not audit.empty
+    assert audit["selected_fleet_efficiency"].astype(str).eq("Med").all()
+    assert audit["selected_pt_mode_shift"].astype(str).eq("Med").all()
+    assert audit["selected_demand_elasticity"].astype(str).eq("Med").all()
+
+
+def test_revenue_outlook_sensitivity_audit_matches_full_layer() -> None:
+    root = Path(__file__).resolve().parents[1]
+    pack_dir = root / CURRENT_REVENUE_OUTLOOK_DIR
+    pack = load_revenue_outlook_pack(pack_dir, repo_root=root)
+    assert pack is not None
+    signature = revenue_outlook_signature(pack_dir, root)
+    sensitivity_key = app.selected_sensitivity_key("Med", "Med", "Med")
+
+    bridge_frames = app._bridge_mode_frames_for_pack(
+        pack,
+        PED_BRIDGE_DEFAULT_MODE,
+        include_derived_frames=True,
+    )
+    expected = app._apply_sensitivity_for_key(
+        bridge_frames,
+        app._pack_table(pack, "sensitivity_config", revenue_outlook_module.sensitivity_config_frame()),
+        sensitivity_key,
+    )["sensitivity_impact_audit"].reset_index(drop=True)
+    if hasattr(app.cached_revenue_outlook_sensitivity_audit, "clear"):
+        app.cached_revenue_outlook_sensitivity_audit.clear()
+    actual = app.cached_revenue_outlook_sensitivity_audit(
+        signature,
+        sensitivity_key,
+        PED_BRIDGE_DEFAULT_MODE,
+        pack,
+    ).reset_index(drop=True)
+
+    pd.testing.assert_frame_equal(actual, expected, check_dtype=False, atol=1e-9, rtol=1e-12)
+
+
 def test_revenue_outlook_default_figure_matches_uncached_path() -> None:
     root = Path(__file__).resolve().parents[1]
     pack_dir = root / CURRENT_REVENUE_OUTLOOK_DIR
