@@ -855,12 +855,11 @@ def test_revenue_outlook_composition_figure_stacks_components_and_overlays_aggre
     assert "Total gross revenues overlay" in scatter_names
     assert fig.layout.barmode == "relative"
     assert fig.layout.hovermode == "x unified"
-    assert fig.layout.yaxis.title.text == "$m nominal ex GST"
+    assert fig.layout.yaxis.title.text == "$b nominal ex GST"
     assert not any("Schiff" in str(trace.name) or "selected_dashboard" in str(trace.name) for trace in fig.data)
     hover_templates = "\n".join(str(trace.hovertemplate) for trace in fig.data)
     assert "stack total" not in hover_templates
-    assert "%{fullData.name}: %{customdata[2]:,.1f}" in hover_templates
-    assert "%{fullData.name}: %{y:,.1f}" in hover_templates
+    assert "MR13/COO: %{customdata[2]:,.2f} %{customdata[3]}; FY %{x}" in hover_templates
     assert "source_file" not in hover_templates
     assert "<extra></extra>" in hover_templates
     for raw_identifier in ["source_file", "source_cell", "model_id", "formula", "quarter_composition"]:
@@ -887,8 +886,8 @@ def test_revenue_outlook_composition_figure_stacks_components_and_overlays_aggre
     assert "Gross RUC" not in bridge_bar_names
     assert "Gross FED" not in bridge_bar_names
     assert "Total NLTF revenue overlay" in bridge_scatter_names
-    assert bridge_fig.layout.barmode == "overlay"
-    assert any(getattr(trace, "base", None) is not None for trace in bridge_fig.data if trace.type == "bar")
+    assert bridge_fig.layout.barmode == "relative"
+    assert all(getattr(trace, "base", None) is None for trace in bridge_fig.data if trace.type == "bar")
     assert any(min(float(value) for value in trace.y) < 0 for trace in bridge_fig.data if trace.type == "bar")
     visible_total = sum(
         float(trace.y[0])
@@ -914,6 +913,82 @@ def test_revenue_outlook_composition_figure_stacks_components_and_overlays_aggre
     assert "MR13/COO" in full_bridge_bar_names
     assert "RUC refunds gross add-back" in full_bridge_bar_names
     assert "MR13/COO gross add-back" in full_bridge_bar_names
+
+
+def test_revenue_outlook_composition_figure_uses_signed_relative_stack_semantics() -> None:
+    stack = pd.read_csv(ROOT / "data/current_revenue_outlook/revenue_stack_components.csv")
+    positive_labels = {
+        "Light RUC net revenue",
+        "Heavy RUC net revenue",
+        "Light BEV RUC net revenue",
+        "Heavy BEV RUC net revenue",
+        "PHEV RUC net revenue",
+        "Gross PED",
+        "LPG",
+        "CNG",
+        "MR1",
+        "MR2",
+        "TUC net revenue",
+    }
+    negative_labels = {"RUC admin", "FED refunds", "MVR admin", "MVR refunds"}
+    aggregate_labels = {
+        "Gross RUC",
+        "Net FED",
+        "Total RUC",
+        "Total RUC+PED",
+        "Total gross revenues",
+        "Total refunds",
+        "Total NLTF revenue",
+    }
+    sources = ["MBU26 official", "Current finalist Base case", "Current finalist High population/comparison"]
+
+    for source in sources:
+        view = stack[
+            stack["source_path"].astype(str).eq(source)
+            & stack["composition_mode"].astype(str).eq("Gross-to-net bridge audit")
+            & stack["section"].astype(str).isin(["RUC", "FED", "MVR", "TUC", "Totals"])
+            & pd.to_numeric(stack["FY"], errors="coerce").between(2026, 2035)
+        ].copy()
+        fig = revenue_outlook_composition_figure(
+            view,
+            source_path=source,
+            composition_mode="Gross-to-net bridge audit",
+            overlays=["Total NLTF revenue"],
+        )
+
+        assert fig.layout.barmode == "relative"
+        bar_traces = [trace for trace in fig.data if trace.type == "bar"]
+        assert bar_traces
+        assert all(getattr(trace, "base", None) is None for trace in bar_traces)
+        assert aggregate_labels.isdisjoint({str(trace.name) for trace in bar_traces})
+
+        bars_by_name = {str(trace.name): trace for trace in bar_traces}
+        assert "PHEV RUC net revenue" in bars_by_name
+        assert max(float(value) for value in bars_by_name["PHEV RUC net revenue"].y) > 0
+
+        for label in positive_labels.intersection(bars_by_name):
+            values = pd.to_numeric(pd.Series(bars_by_name[label].y), errors="coerce").dropna()
+            assert (values >= 0).all(), f"{source} {label} should stack above zero"
+        for label in negative_labels.intersection(bars_by_name):
+            values = pd.to_numeric(pd.Series(bars_by_name[label].y), errors="coerce").dropna()
+            assert (values <= 0).all(), f"{source} {label} should stack below zero"
+
+        plotted_totals: dict[int, float] = {}
+        for trace in bar_traces:
+            for x_value, y_value in zip(trace.x, trace.y, strict=True):
+                plotted_totals[int(x_value)] = plotted_totals.get(int(x_value), 0.0) + float(y_value)
+
+        overlay_trace = next(
+            trace
+            for trace in fig.data
+            if trace.type == "scatter" and str(trace.name) == "Total NLTF revenue overlay"
+        )
+        for x_value, y_value in zip(overlay_trace.x, overlay_trace.y, strict=True):
+            assert plotted_totals[int(x_value)] == pytest.approx(float(y_value), abs=0.002)
+
+        hover_templates = "\n".join(str(trace.hovertemplate) for trace in fig.data)
+        assert "stack total" not in hover_templates
+        assert "Total NLTF revenue: %{customdata[2]:,.2f} %{customdata[3]}; FY %{x}" in hover_templates
 
 
 def test_revenue_outlook_manifest_table_exposes_source_pack_and_bridge_provenance() -> None:

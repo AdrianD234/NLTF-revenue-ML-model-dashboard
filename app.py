@@ -5753,35 +5753,22 @@ def revenue_outlook_composition_figure(
         "#9A3412",
         "#92400E",
     ]
-    bridge_mode = mode == REVENUE_STACK_MODE_BRIDGE
     label_cols = ["line_label", "stack_role", "section_order", "line_order"]
     labels = plot[label_cols].drop_duplicates().copy()
-    labels["bridge_role_order"] = labels["stack_role"].astype(str).map({"component_negative": 0, "component_positive": 1}).fillna(2).astype(int)
-    sort_cols = ["bridge_role_order", "section_order", "line_order", "line_label"] if bridge_mode else ["section_order", "line_order", "line_label"]
-    labels = labels.sort_values(sort_cols, kind="stable")
-    bridge_running = {fy: 0.0 for fy in sorted(visible_stack_lookup)}
+    labels = labels.sort_values(["section_order", "line_order", "line_label"], kind="stable")
     for index, label_row in labels.reset_index(drop=True).iterrows():
         label = str(label_row["line_label"])
         trace_rows = plot[plot["line_label"].astype(str).eq(label)].sort_values("FY_numeric", kind="stable")
         trace_rows["visible_stack_total"] = trace_rows["FY_numeric"].map(lambda value: visible_stack_lookup.get(int(value), np.nan))
         trace_rows["hover_stack_value"] = trace_rows["stack_value_display"]
         trace_rows["hover_unit"] = hover_unit
-        custom_cols = ["unit", "visible_stack_total", "hover_stack_value", "hover_unit"]
+        trace_rows["hover_label"] = label
+        custom_cols = ["unit", "visible_stack_total", "hover_stack_value", "hover_unit", "hover_label"]
         for column in custom_cols:
             if column not in trace_rows.columns:
                 trace_rows[column] = pd.NA
         trace_rows["visible_stack_total"] = pd.to_numeric(trace_rows["visible_stack_total"], errors="coerce")
         values = trace_rows["stack_value_display"].tolist()
-        bar_kwargs = {}
-        if bridge_mode:
-            bases: list[float] = []
-            for row in trace_rows.itertuples(index=False):
-                fy = int(getattr(row, "FY_numeric"))
-                value = float(getattr(row, "stack_value_display"))
-                base = float(bridge_running.get(fy, 0.0))
-                bases.append(base)
-                bridge_running[fy] = base + value
-            bar_kwargs["base"] = bases
         fig.add_trace(
             go.Bar(
                 name=label,
@@ -5789,12 +5776,7 @@ def revenue_outlook_composition_figure(
                 y=values,
                 marker_color=colors[index % len(colors)],
                 customdata=trace_rows[custom_cols].to_numpy(),
-                hovertemplate=(
-                    "<b>%{fullData.name}</b><br>"
-                    "%{customdata[2]:,.2f} %{customdata[3]}"
-                    "<extra></extra>"
-                ),
-                **bar_kwargs,
+                hovertemplate=f"{label}: %{{customdata[2]:,.2f}} %{{customdata[3]}}; FY %{{x}}<extra></extra>",
             )
         )
 
@@ -5818,7 +5800,8 @@ def revenue_outlook_composition_figure(
             if group.empty:
                 continue
             group["hover_unit"] = hover_unit
-            custom_cols = ["unit", "visible_stack_total", "value_display", "hover_unit"]
+            group["hover_label"] = label
+            custom_cols = ["unit", "visible_stack_total", "value_display", "hover_unit", "hover_label"]
             for column in custom_cols:
                 if column not in group.columns:
                     group[column] = ""
@@ -5831,16 +5814,12 @@ def revenue_outlook_composition_figure(
                     line={"width": 2.5, "dash": "dot"},
                     marker={"size": 7, "symbol": "diamond"},
                     customdata=group[custom_cols].to_numpy(),
-                    hovertemplate=(
-                        "<b>%{fullData.name}</b><br>"
-                        "%{customdata[2]:,.2f} %{customdata[3]}"
-                        "<extra></extra>"
-                    ),
+                    hovertemplate=f"{label}: %{{customdata[2]:,.2f}} %{{customdata[3]}}; FY %{{x}}<extra></extra>",
                 )
             )
 
     fig.update_layout(
-        barmode="overlay" if bridge_mode else "relative",
+        barmode="relative",
         height=460,
         margin={"l": 58, "r": 20, "t": 28, "b": 58},
         yaxis_title=display_axis_title,
