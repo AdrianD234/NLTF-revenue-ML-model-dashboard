@@ -492,7 +492,7 @@ def test_revenue_outlook_default_figure_matches_uncached_path() -> None:
         )
 
 
-def test_revenue_outlook_primary_hover_customdata_matches_row_helpers() -> None:
+def test_revenue_outlook_primary_hover_is_compact_and_billion_scaled() -> None:
     root = Path(__file__).resolve().parents[1]
     pack_dir = root / CURRENT_REVENUE_OUTLOOK_DIR
     pack = load_revenue_outlook_pack(pack_dir, repo_root=root)
@@ -510,40 +510,56 @@ def test_revenue_outlook_primary_hover_customdata_matches_row_helpers() -> None:
         PED_BRIDGE_DEFAULT_MODE,
         pack,
     )
-    rows = app._selected_revenue_outlook_series_rows(view["filtered_rows"], "Total NLTF revenue")
-    for column in [
-        "horizon",
-        "horizon_scope",
-        "bridge_status",
-        "gap_reason",
-        "data_scope",
-        "value_status",
-        "actual_quarters",
-        "forecast_quarters",
-        "ped_bridge_mode_label",
-        "revenue_sensitivity_label",
-    ]:
-        if column not in rows.columns:
-            rows[column] = ""
-
-    actual = pd.DataFrame(
-        app._revenue_path_hover_customdata(rows),
-        columns=["horizon_hover", "bridge_hover", "scope_hover", "efficiency_hover"],
-    )
-    expected = pd.DataFrame(
-        {
-            "horizon_hover": rows.apply(app._revenue_horizon_hover_label, axis=1).to_list(),
-            "bridge_hover": rows.apply(app._revenue_bridge_hover_label, axis=1).to_list(),
-            "scope_hover": rows.apply(app._revenue_scope_hover_label, axis=1).to_list(),
-            "efficiency_hover": rows.apply(app._revenue_efficiency_hover_label, axis=1).to_list(),
-        }
-    )
-
-    pd.testing.assert_frame_equal(actual, expected)
     fig = app.revenue_outlook_total_path_figure(view["filtered_rows"], selected_series="Total NLTF revenue", selected_fy="FY2031")
+    assert fig.layout.yaxis.title.text == "$b nominal ex GST"
+    by_name = {trace.name: trace for trace in fig.data}
+    base_trace = by_name["Current finalist Base case"]
+    assert max(float(value) for value in base_trace.y) < 20
+    assert str(base_trace.customdata[0][0]) == "$b"
+    hovertemplate = str(base_trace.hovertemplate)
+    assert "%{x}" not in hovertemplate
+    for forbidden in ["Bridge status", "forecast:", "actual:", "PED bridge", "forecast_quarters"]:
+        assert forbidden not in hovertemplate
     marker_shapes = {(str(shape.x0), str(shape.line.dash)) for shape in fig.layout.shapes or []}
     assert ("FY2026", "dash") in marker_shapes
     assert ("FY2031", "dot") in marker_shapes
+
+
+def test_revenue_outlook_composition_axis_is_bounded_to_displayed_years() -> None:
+    root = Path(__file__).resolve().parents[1]
+    pack_dir = root / CURRENT_REVENUE_OUTLOOK_DIR
+    pack = load_revenue_outlook_pack(pack_dir, repo_root=root)
+    assert pack is not None
+    signature = revenue_outlook_signature(pack_dir, root)
+    selectors = app.cached_revenue_outlook_selectors(signature, pack)
+    source = selectors["stack_source_options"][0]
+    mode = selectors["stack_mode_options"][0]
+    sections = tuple(section for section in ["RUC", "FED", "MVR", "TUC"] if section in selectors["stack_section_options"])
+    fy_range = tuple(selectors["stack_fy_bounds"])
+    overlays = tuple(app._revenue_stack_default_overlays(mode, selectors["stack_overlay_options"]))
+    chart_stack = app.cached_revenue_outlook_composition_stack(
+        signature,
+        source,
+        mode,
+        sections,
+        fy_range,
+        overlays,
+        tuple(selectors["stack_section_options"]),
+        app.selected_sensitivity_key("Off", "Off", "Off"),
+        PED_BRIDGE_DEFAULT_MODE,
+        pack.revenue_stack_components,
+    )
+    fig = app.revenue_outlook_composition_figure(
+        chart_stack,
+        source_path=source,
+        composition_mode=mode,
+        detail_level=list(app.REVENUE_STACK_DETAIL_LEVELS)[0],
+        overlays=list(overlays),
+    )
+    years = pd.to_numeric(chart_stack["FY"], errors="coerce").dropna()
+    assert fig.layout.xaxis.range == (int(years.min()) - 0.5, int(years.max()) + 0.5)
+    assert fig.layout.xaxis.tick0 == int(years.min())
+    assert fig.layout.yaxis.title.text == "$b nominal ex GST"
 
 
 def test_revenue_outlook_visible_figures_materialize_through_cache() -> None:
@@ -917,6 +933,17 @@ def test_revenue_outlook_cloud_hides_debug_toggles_and_shows_full_composition(mo
     assert not at.exception
     assert [(toggle.label, toggle.key) for toggle in at.toggle] == []
     assert any("Revenue composition over time" in str(markdown.value) for markdown in at.markdown)
+    rendered_text = "\n".join([*(str(markdown.value) for markdown in at.markdown), *(str(caption.value) for caption in at.caption)])
+    for forbidden in [
+        "Single selected series from the committed current runtime pack",
+        "Actuals, current finalist base/comparison and official comparator traces",
+        "PED bridge mode: Raw model bridge",
+        "Post-model overlays; default Off preserves model forecast",
+        "Clean bridge mode hides internal add-back rows",
+        "Line-item contributions from revenue_stack_components",
+        "Showing first",
+    ]:
+        assert forbidden not in rendered_text
     fy_sliders = [slider for slider in at.slider if slider.label == "FY range / horizon"]
     assert len(fy_sliders) == 1
     assert tuple(fy_sliders[0].value) == tuple(selectors["stack_fy_bounds"])

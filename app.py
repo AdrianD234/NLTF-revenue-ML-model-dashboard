@@ -2784,8 +2784,6 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 custom_heavy_elasticity = st.number_input("Custom Heavy RUC elasticity", min_value=-2.0, max_value=2.0, value=-0.1, step=0.01)
             if all(value != "Custom" for value in [selected_fleet_efficiency, selected_pt_mode_shift, selected_demand_elasticity]):
                 st.caption("Custom inputs appear only when selected.")
-        st.caption(SENSITIVITY_DEFAULT_NOTE)
-
     sensitivity_key = selected_sensitivity_key(
         fleet_efficiency=selected_fleet_efficiency,
         pt_mode_shift=selected_pt_mode_shift,
@@ -2842,13 +2840,10 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         timer.stop("main path figure")
         chart_card(
             "Total path chart",
-            "Single selected series from the committed current runtime pack.",
+            "",
             main_path_figure,
-            caption=(
-                "Actuals, current finalist base/comparison and official comparator traces are shown only where the runtime pack carries governed rows. "
-                f"PED bridge mode: {selected_ped_bridge_label}."
-            ),
-            notes_as_tooltip=False,
+            caption=None,
+            notes_as_tooltip=True,
         )
     with primary_cols[1]:
         timer.start("fan figure")
@@ -2917,7 +2912,6 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             )
         sensitivity_seed_inputs = _pack_table(pack, "sensitivity_seed_inputs")
         with st.expander("Sensitivity impact audit", expanded=False):
-            info_panel(SENSITIVITY_DEFAULT_NOTE)
             selected_summary = (
                 f"Fleet efficiency: {sensitivity_option_label('fleet_efficiency', selected_fleet_efficiency)}; "
                 f"PT mode shift: {sensitivity_option_label('pt_mode_shift', selected_pt_mode_shift)}; "
@@ -3099,17 +3093,18 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         )
         chart_card(
             "Revenue composition over time",
-            "Line-item contributions from revenue_stack_components; aggregate rows are overlays only.",
+            "",
             composition_figure,
-            caption="Clean bridge mode hides internal add-back rows while preserving reconciliation to Total NLTF revenue. Positive revenue components stack above zero; deductions stack below zero. Full formula audit shows internal rows. Gross mode reconciles leaf rows to Total gross revenues. Aggregates are overlays only.",
+            caption=None,
             notes_as_tooltip=False,
         )
         if stack_gap_banner:
             warning_panel(stack_gap_banner)
-        table_cols = st.columns([0.82, 0.18])
-        with table_cols[1]:
-            dataframe_download(chart_stack, "Download CSV", "revenue_stack_components.csv")
-        display_table(stack_display, height=360, max_rows=720)
+        if should_show_local_audit_controls():
+            table_cols = st.columns([0.82, 0.18])
+            with table_cols[1]:
+                dataframe_download(chart_stack, "Download CSV", "revenue_stack_components.csv")
+            display_table(stack_display, height=360, max_rows=720)
     timer.stop("composition figure")
 
     if revenue_outlook_lazy_table(
@@ -4194,7 +4189,7 @@ def _source_total_path_figure(source_pack: RevenueSourcePack, controls: dict[str
         legend={"orientation": "h", "y": -0.18},
         yaxis_title=axis_title,
         xaxis_title="June year",
-        xaxis={"tickmode": "linear", "dtick": 1},
+        xaxis=_bounded_year_axis(rows, "FY"),
         hovermode="x unified",
     )
     return fig
@@ -4450,7 +4445,7 @@ def _source_uncertainty_figure(source_pack: RevenueSourcePack, controls: dict[st
             height=360,
             yaxis_title=axis_title,
             xaxis_title="June year",
-            xaxis={"tickmode": "linear", "dtick": 1},
+            xaxis=_bounded_year_axis(mot, "FY"),
             hovermode="x unified",
         )
         return fig
@@ -5271,6 +5266,10 @@ def revenue_outlook_total_path_figure(rows: pd.DataFrame, *, selected_series: st
     data["_period_order"] = data.get("period", pd.Series(dtype=str)).map(_revenue_period_order)
     data = data.sort_values("_period_order", kind="stable")
     axis_title = _revenue_axis_title(data)
+    display_scale = _display_value_scale_for_unit(axis_title)
+    display_axis_title = _display_axis_unit(axis_title)
+    hover_unit = _display_hover_unit(axis_title)
+    data["value_display"] = data["value_numeric"] / display_scale
     scenario_colors = _scenario_color_map(data)
     fig = go.Figure()
     trace_styles = {
@@ -5301,21 +5300,21 @@ def revenue_outlook_total_path_figure(rows: pd.DataFrame, *, selected_series: st
         ]:
             if column not in group.columns:
                 group[column] = ""
-        hover_customdata = _revenue_path_hover_customdata(group)
+        group["hover_unit"] = hover_unit
         color, dash, width = trace_styles.get(trace_name, (scenario_colors.get(trace_name, "#006FAD"), "solid", 2.2))
         fig.add_trace(
             go.Scatter(
                 x=group["period"],
-                y=group["value_numeric"],
+                y=group["value_display"],
                 mode="lines+markers",
                 name=trace_name,
                 line={"color": color, "dash": dash, "width": width},
                 marker={"size": 6},
-                customdata=hover_customdata,
+                customdata=group[["hover_unit"]].to_numpy(),
                 hovertemplate=(
-                    "%{x}<br>%{y:,.2f}"
-                    "<br>%{customdata[0]}%{customdata[1]}%{customdata[2]}%{customdata[3]}"
-                    "<extra>" + html.escape(trace_name) + "</extra>"
+                    "<b>%{fullData.name}</b><br>"
+                    "%{y:,.2f} %{customdata[0]}"
+                    "<extra></extra>"
                 ),
             )
         )
@@ -5365,7 +5364,7 @@ def revenue_outlook_total_path_figure(rows: pd.DataFrame, *, selected_series: st
     layout: dict[str, Any] = {
         "height": 250,
         "margin": {"l": 52, "r": 18, "t": 16, "b": 46},
-        "yaxis_title": axis_title,
+        "yaxis_title": display_axis_title,
         "hovermode": "x unified",
         "legend": {"orientation": "h", "y": -0.20, "x": 0.0},
     }
@@ -5439,6 +5438,14 @@ def revenue_outlook_uncertainty_fan_figure(
         return _revenue_outlook_gap_figure(_revenue_outlook_fan_gap_message(fan_availability, selected_series_id, fan_source), height=220)
     data["_period_order"] = data.get("period", pd.Series(dtype=str)).map(_revenue_period_order)
     data = data.sort_values(["_period_order", "scenario_name"], kind="stable")
+    unit = str(data["unit"].dropna().iloc[0]) if "unit" in data.columns and not data["unit"].dropna().empty else ""
+    display_scale = _display_value_scale_for_unit(unit)
+    display_axis_title = _display_axis_unit(unit)
+    hover_unit = _display_hover_unit(unit)
+    for column in ["upper80", "lower80", "upper50", "lower50", "central"]:
+        if column in data.columns:
+            data[f"{column}_display"] = pd.to_numeric(data[column], errors="coerce") / display_scale
+    data["hover_unit"] = hover_unit
     fig = go.Figure()
     is_scenario_spread = resolved_source == FAN_SOURCE_SCENARIO_SPREAD
     band_specs = (
@@ -5453,39 +5460,38 @@ def revenue_outlook_uncertainty_fan_figure(
         ]
     )
     for upper, lower, name, color in band_specs:
-        fig.add_trace(go.Scatter(x=data["period"], y=data[upper], mode="lines", line={"width": 0}, showlegend=False, hoverinfo="skip"))
+        fig.add_trace(go.Scatter(x=data["period"], y=data[f"{upper}_display"], mode="lines", line={"width": 0}, showlegend=False, hoverinfo="skip"))
         fig.add_trace(
             go.Scatter(
                 x=data["period"],
-                y=data[lower],
+                y=data[f"{lower}_display"],
                 mode="lines",
                 fill="tonexty",
                 fillcolor=color,
                 line={"width": 0},
                 name=name,
-                customdata=data[["method", "source_file"]].to_numpy(),
-                hovertemplate="%{x}<br>%{y:,.2f}<br>%{customdata[0]}<br>%{customdata[1]}<extra>%{fullData.name}</extra>",
+                customdata=data[["hover_unit", "method", "source_file"]].to_numpy(),
+                hovertemplate="%{x}<br>%{y:,.2f} %{customdata[0]}<br>%{customdata[1]}<br>%{customdata[2]}<extra>%{fullData.name}</extra>",
             )
         )
     central_name = "Current finalist base case" if is_scenario_spread else resolved_source
     fig.add_trace(
         go.Scatter(
             x=data["period"],
-            y=data["central"],
+            y=data["central_display"],
             mode="lines+markers",
             name=central_name,
             line={"color": "#006FAD", "width": 2.4},
             marker={"size": 6},
-            customdata=data[["unit", "interpretation"]].to_numpy(),
+            customdata=data[["hover_unit", "interpretation"]].to_numpy(),
             hovertemplate="%{x}<br>%{y:,.2f} %{customdata[0]}<br>%{customdata[1]}<extra>%{fullData.name}</extra>",
         )
     )
-    unit = str(data["unit"].dropna().iloc[0]) if "unit" in data.columns and not data["unit"].dropna().empty else ""
     fig.update_layout(
         height=220,
         margin={"l": 40, "r": 12, "t": 16, "b": 40},
         hovermode="x unified",
-        yaxis_title=unit,
+        yaxis_title=display_axis_title,
         legend={"orientation": "h", "y": -0.24, "x": 0.0},
     )
     return fig
@@ -5624,16 +5630,21 @@ def revenue_outlook_component_figure(bridge: pd.DataFrame, *, selected_fy: str, 
     plot["_order"] = plot["stream"].astype(str).map({name: index for index, name in enumerate(component_order)})
     plot["component_numeric"] = pd.to_numeric(plot["component_value"], errors="coerce")
     plot = plot.dropna(subset=["component_numeric"]).sort_values("_order", kind="stable")
+    axis_title = _bridge_axis_title(plot)
+    display_scale = _display_value_scale_for_unit(axis_title)
+    display_axis_title = _display_axis_unit(axis_title)
+    plot["component_display"] = plot["component_numeric"] / display_scale
+    plot["hover_unit"] = _display_hover_unit(axis_title)
     fig = go.Figure(
         go.Bar(
             x=plot["stream_label"],
-            y=plot["component_numeric"],
+            y=plot["component_display"],
             marker_color=["#006FAD" if value >= 0 else "#B45309" for value in plot["component_numeric"]],
-            customdata=plot[["component_unit", "component_type", "bridge_status"]].to_numpy(),
+            customdata=plot[["hover_unit", "component_type", "bridge_status"]].to_numpy(),
             hovertemplate="%{x}<br>%{y:,.1f} %{customdata[0]}<br>%{customdata[1]} - %{customdata[2]}<extra></extra>",
         )
     )
-    fig.update_layout(height=360, margin={"l": 52, "r": 18, "t": 28, "b": 104}, yaxis_title=_bridge_axis_title(plot), xaxis_tickangle=-30)
+    fig.update_layout(height=360, margin={"l": 52, "r": 18, "t": 28, "b": 104}, yaxis_title=display_axis_title, xaxis_tickangle=-30)
     return fig
 
 
@@ -5650,13 +5661,17 @@ def revenue_outlook_split_figure(bridge: pd.DataFrame, *, selected_fy: str, sele
         return empty_figure("Selected-FY split has no positive numeric component values.")
     plot["_order"] = plot["stream"].astype(str).map({name: index for index, name in enumerate(split_ids)})
     plot = plot.sort_values("_order", kind="stable")
+    unit = _bridge_axis_title(plot)
+    display_scale = _display_value_scale_for_unit(unit)
+    plot["component_display"] = plot["component_numeric"] / display_scale
+    plot["hover_unit"] = _display_hover_unit(unit)
     fig = go.Figure(
         go.Pie(
             labels=plot["stream_label"],
-            values=plot["component_numeric"],
+            values=plot["component_display"],
             hole=0.45,
             marker={"colors": ["#006FAD", "#00843D", "#6B4E71"][: len(plot)]},
-            customdata=plot[["component_unit", "bridge_status"]].to_numpy(),
+            customdata=plot[["hover_unit", "bridge_status"]].to_numpy(),
             hovertemplate="%{label}<br>%{value:,.1f} %{customdata[0]}<br>%{percent}<br>%{customdata[1]}<extra></extra>",
         )
     )
@@ -5704,6 +5719,11 @@ def revenue_outlook_composition_figure(
     plot = plot.dropna(subset=["stack_value_numeric", "FY_numeric"])
     if plot.empty:
         return empty_figure("No stackable contribution rows match the selected controls.")
+    axis_title = _revenue_stack_axis_title(plot)
+    display_scale = _display_value_scale_for_unit(axis_title)
+    display_axis_title = _display_axis_unit(axis_title)
+    hover_unit = _display_hover_unit(axis_title)
+    plot["stack_value_display"] = plot["stack_value_numeric"] / display_scale
     visible_stack_totals = (
         plot.groupby("FY_numeric", dropna=False)["stack_value_numeric"]
         .sum(min_count=1)
@@ -5744,19 +5764,20 @@ def revenue_outlook_composition_figure(
         label = str(label_row["line_label"])
         trace_rows = plot[plot["line_label"].astype(str).eq(label)].sort_values("FY_numeric", kind="stable")
         trace_rows["visible_stack_total"] = trace_rows["FY_numeric"].map(lambda value: visible_stack_lookup.get(int(value), np.nan))
-        trace_rows["hover_stack_value"] = trace_rows["stack_value_numeric"]
-        custom_cols = ["unit", "visible_stack_total", "hover_stack_value"]
+        trace_rows["hover_stack_value"] = trace_rows["stack_value_display"]
+        trace_rows["hover_unit"] = hover_unit
+        custom_cols = ["unit", "visible_stack_total", "hover_stack_value", "hover_unit"]
         for column in custom_cols:
             if column not in trace_rows.columns:
                 trace_rows[column] = pd.NA
         trace_rows["visible_stack_total"] = pd.to_numeric(trace_rows["visible_stack_total"], errors="coerce")
-        values = trace_rows["stack_value_numeric"].tolist()
+        values = trace_rows["stack_value_display"].tolist()
         bar_kwargs = {}
         if bridge_mode:
             bases: list[float] = []
             for row in trace_rows.itertuples(index=False):
                 fy = int(getattr(row, "FY_numeric"))
-                value = float(getattr(row, "stack_value_numeric"))
+                value = float(getattr(row, "stack_value_display"))
                 base = float(bridge_running.get(fy, 0.0))
                 bases.append(base)
                 bridge_running[fy] = base + value
@@ -5769,8 +5790,9 @@ def revenue_outlook_composition_figure(
                 marker_color=colors[index % len(colors)],
                 customdata=trace_rows[custom_cols].to_numpy(),
                 hovertemplate=(
-                    "%{fullData.name}: %{customdata[2]:,.1f}; "
-                    "FY %{x}<extra></extra>"
+                    "<b>%{fullData.name}</b><br>"
+                    "%{customdata[2]:,.2f} %{customdata[3]}"
+                    "<extra></extra>"
                 ),
                 **bar_kwargs,
             )
@@ -5785,6 +5807,7 @@ def revenue_outlook_composition_figure(
         overlay_rows["FY_numeric"] = pd.to_numeric(overlay_rows.get("FY"), errors="coerce")
         overlay_rows["value_numeric"] = pd.to_numeric(overlay_rows.get("value"), errors="coerce")
         overlay_rows = overlay_rows.dropna(subset=["FY_numeric", "value_numeric"])
+        overlay_rows["value_display"] = overlay_rows["value_numeric"] / display_scale
         for label, group in overlay_rows.groupby("line_label", sort=False):
             group = group.sort_values("FY_numeric", kind="stable")
             group["visible_stack_total"] = group["FY_numeric"].map(lambda value: visible_stack_lookup.get(int(value), np.nan))
@@ -5794,7 +5817,8 @@ def revenue_outlook_composition_figure(
             group = group[pd.to_numeric(group["visible_stack_residual"], errors="coerce").abs().le(1.0)].copy()
             if group.empty:
                 continue
-            custom_cols = ["unit", "visible_stack_total"]
+            group["hover_unit"] = hover_unit
+            custom_cols = ["unit", "visible_stack_total", "value_display", "hover_unit"]
             for column in custom_cols:
                 if column not in group.columns:
                     group[column] = ""
@@ -5802,26 +5826,26 @@ def revenue_outlook_composition_figure(
                 go.Scatter(
                     name=f"{label} overlay",
                     x=group["FY_numeric"].astype(int),
-                    y=group["value_numeric"],
+                    y=group["value_display"],
                     mode="lines+markers",
                     line={"width": 2.5, "dash": "dot"},
                     marker={"size": 7, "symbol": "diamond"},
                     customdata=group[custom_cols].to_numpy(),
                     hovertemplate=(
-                        "%{fullData.name}: %{y:,.1f}; "
-                        "FY %{x}<extra></extra>"
+                        "<b>%{fullData.name}</b><br>"
+                        "%{customdata[2]:,.2f} %{customdata[3]}"
+                        "<extra></extra>"
                     ),
                 )
             )
 
-    axis_title = _revenue_stack_axis_title(plot)
     fig.update_layout(
         barmode="overlay" if bridge_mode else "relative",
         height=460,
         margin={"l": 58, "r": 20, "t": 28, "b": 58},
-        yaxis_title=axis_title,
+        yaxis_title=display_axis_title,
         xaxis_title="June year",
-        xaxis={"tickmode": "linear", "dtick": 1},
+        xaxis=_bounded_year_axis(plot, "FY_numeric"),
         yaxis={"zeroline": True, "zerolinewidth": 1.5, "zerolinecolor": "#52616B"},
         legend={"orientation": "h", "y": -0.20, "x": 0, "font": {"size": 10}},
         hovermode="x unified",
@@ -5883,6 +5907,42 @@ def _bridge_axis_title(rows: pd.DataFrame) -> str:
     return unit or "Value"
 
 
+def _is_million_currency_unit(unit: Any) -> bool:
+    text = str(unit or "").strip().lower()
+    return text.startswith("$m") or "million nzd" in text or "million nz$" in text
+
+
+def _display_value_scale_for_unit(unit: Any) -> float:
+    return 1000.0 if _is_million_currency_unit(unit) else 1.0
+
+
+def _display_axis_unit(unit: Any) -> str:
+    text = str(unit or "").strip()
+    if not _is_million_currency_unit(text):
+        return text or "Value"
+    if text.startswith("$m"):
+        return "$b" + text[2:]
+    return "$b nominal"
+
+
+def _display_hover_unit(unit: Any) -> str:
+    return "$b" if _is_million_currency_unit(unit) else str(unit or "").strip()
+
+
+def _bounded_year_axis(rows: pd.DataFrame, column: str) -> dict[str, Any]:
+    years = pd.to_numeric(rows.get(column, pd.Series(dtype=float)), errors="coerce").dropna()
+    if years.empty:
+        return {"tickmode": "linear", "dtick": 1}
+    first_year = int(years.min())
+    last_year = int(years.max())
+    return {
+        "tickmode": "linear",
+        "dtick": 1,
+        "tick0": first_year,
+        "range": [first_year - 0.5, last_year + 0.5],
+    }
+
+
 def revenue_outlook_figure(rows: pd.DataFrame, *, metric_type: str) -> go.Figure:
     data = pd.DataFrame() if rows is None else rows.copy()
     data = data[data.get("metric_type", pd.Series(dtype=str)).astype(str).eq(metric_type)].copy()
@@ -5904,18 +5964,22 @@ def revenue_outlook_figure(rows: pd.DataFrame, *, metric_type: str) -> go.Figure
         stream_rows["value_numeric"] = pd.to_numeric(stream_rows.get("value"), errors="coerce")
         stream_rows = stream_rows.sort_values("_period_order", kind="stable")
         unit = _first_non_empty(stream_rows.get("value_unit", pd.Series(dtype=str))) or ""
+        display_scale = _display_value_scale_for_unit(unit)
+        display_axis_title = _display_axis_unit(unit)
+        hover_unit = _display_hover_unit(unit)
+        stream_rows["value_display"] = stream_rows["value_numeric"] / display_scale
         historical = stream_rows[stream_rows["row_type"].astype(str).eq("historical_actual") & stream_rows["value_numeric"].notna()].copy()
         if not historical.empty:
             fig.add_trace(
                 go.Scatter(
                     x=historical["period"],
-                    y=historical["value_numeric"],
+                    y=historical["value_display"],
                     mode="lines",
                     name="Historical actual",
                     legendgroup="historical",
                     showlegend=col == 1,
                     line={"color": "#737373", "width": 2},
-                    hovertemplate="%{x}<br>%{y:,.2f}<extra>Historical actual</extra>",
+                    hovertemplate=f"%{{x}}<br>%{{y:,.2f}} {html.escape(hover_unit)}<extra>Historical actual</extra>",
                 ),
                 row=1,
                 col=col,
@@ -5924,7 +5988,7 @@ def revenue_outlook_figure(rows: pd.DataFrame, *, metric_type: str) -> go.Figure
             stream_rows["row_type"].astype(str).isin(["future_forecast", "official_comparator"])
             & stream_rows["value_numeric"].notna()
         ].copy()
-        last_actual = historical.tail(1)[["period", "value_numeric"]] if not historical.empty else pd.DataFrame()
+        last_actual = historical.tail(1)[["period", "value_display"]] if not historical.empty else pd.DataFrame()
         group_column = "trace_name" if "trace_name" in future.columns else "scenario_name"
         for scenario, group in future.groupby(group_column, dropna=False):
             scenario_name = str(scenario)
@@ -5933,7 +5997,7 @@ def revenue_outlook_figure(rows: pd.DataFrame, *, metric_type: str) -> go.Figure
                 col
                 for col in [
                     "period",
-                    "value_numeric",
+                    "value_display",
                     "horizon",
                     "horizon_scope",
                     "bridge_status",
@@ -5986,7 +6050,7 @@ def revenue_outlook_figure(rows: pd.DataFrame, *, metric_type: str) -> go.Figure
             fig.add_trace(
                 go.Scatter(
                     x=plot_group["period"],
-                    y=plot_group["value_numeric"],
+                    y=plot_group["value_display"],
                     mode="lines+markers",
                     name=label,
                     legendgroup=f"scenario-{scenario_name}",
@@ -6003,10 +6067,11 @@ def revenue_outlook_figure(rows: pd.DataFrame, *, metric_type: str) -> go.Figure
             if not marker_rows.empty:
                 marker_rows["marker_hover"] = marker_rows.apply(_revenue_marker_hover_label, axis=1)
                 marker_rows["horizon_hover"] = marker_rows.apply(_revenue_horizon_hover_label, axis=1)
+                marker_rows["value_display"] = pd.to_numeric(marker_rows.get("value_numeric"), errors="coerce") / display_scale
                 fig.add_trace(
                     go.Scatter(
                         x=marker_rows["period"],
-                        y=marker_rows["value_numeric"],
+                        y=marker_rows["value_display"],
                         mode="markers",
                         name=f"{label} markers",
                         legendgroup=f"scenario-{scenario_name}",
@@ -6020,7 +6085,7 @@ def revenue_outlook_figure(rows: pd.DataFrame, *, metric_type: str) -> go.Figure
                 )
         periods = stream_rows["period"].dropna().astype(str).drop_duplicates().tolist()
         fig.update_xaxes(categoryorder="array", categoryarray=periods, tickangle=-35, row=1, col=col)
-        fig.update_yaxes(title_text=unit, row=1, col=col, separatethousands=True)
+        fig.update_yaxes(title_text=display_axis_title, row=1, col=col, separatethousands=True)
         if stream_rows.empty:
             fig.add_annotation(text="No rows", x=0.5, y=0.5, showarrow=False, row=1, col=col)
     fig.update_layout(
