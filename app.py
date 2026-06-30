@@ -941,6 +941,26 @@ def cached_revenue_outlook_composition_figure(
     )
 
 
+@st.cache_data(show_spinner=False)
+def cached_revenue_line_reconciliation_view(
+    signature: tuple[tuple[str, int, int], ...],
+    source_paths: tuple[str, ...],
+    sections: tuple[str, ...],
+    fy_range: tuple[int, int],
+    sensitivity_key: tuple[str, str, str, str, str, str, str, str, str],
+    bridge_mode: str,
+    _line_reconciliation: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    del signature, sensitivity_key, bridge_mode
+    filtered = _filter_revenue_line_reconciliation(
+        _line_reconciliation,
+        source_paths=list(source_paths),
+        sections=list(sections),
+        fy_range=fy_range,
+    )
+    return filtered, _revenue_line_reconciliation_display_table(filtered)
+
+
 def directory_signature(path: Path) -> tuple[bool, int, int]:
     try:
         stat = path.stat()
@@ -3156,18 +3176,24 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                     value=(max(fy_min, 2024), min(fy_max, 2027)) if fy_min <= 2024 <= fy_max else (fy_min, min(fy_max, fy_min + 3)),
                     key="revenue_line_reconciliation_fy_range",
                 )
-            filtered_reconciliation = _filter_revenue_line_reconciliation(
+            selected_source_paths_tuple = tuple(str(value) for value in selected_source_paths)
+            selected_sections_tuple = tuple(str(value) for value in selected_sections)
+            selected_reconciliation_fy_range = (int(selected_fy_range[0]), int(selected_fy_range[1]))
+            filtered_reconciliation, reconciliation_display = cached_revenue_line_reconciliation_view(
+                pack_signature,
+                selected_source_paths_tuple,
+                selected_sections_tuple,
+                selected_reconciliation_fy_range,
+                sensitivity_key,
+                selected_ped_bridge_mode,
                 line_reconciliation,
-                source_paths=selected_source_paths,
-                sections=selected_sections,
-                fy_range=selected_fy_range,
             )
             with rec_cols[3]:
                 dataframe_download(filtered_reconciliation, "Download CSV", "revenue_line_reconciliation.csv")
-            gap_banner = _revenue_formula_gap_banner(formula_residuals, selected_source_paths, selected_fy_range)
+            gap_banner = _revenue_formula_gap_banner(formula_residuals, selected_source_paths, selected_reconciliation_fy_range)
             if gap_banner:
                 warning_panel(gap_banner)
-            display_table(_revenue_line_reconciliation_display_table(filtered_reconciliation), height=360, max_rows=520)
+            display_table(reconciliation_display, height=360, max_rows=520)
         timer.stop("reconciliation table")
 
     if revenue_outlook_lazy_table(

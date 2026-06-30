@@ -127,7 +127,7 @@ def test_revenue_outlook_heavy_sections_are_lazy_guarded_in_renderer() -> None:
         "revenue_outlook_show_composition": "cached_revenue_outlook_composition_stack(",
         "revenue_outlook_show_ev_phev_drift_audit": 'ev_phev_ped_light_drift_assumptions = _pack_table(pack, "ev_phev_ped_light_drift_assumptions")',
         "revenue_outlook_show_ev_phev_split_audit": 'ev_phev_split_assumptions = _pack_table(pack, "ev_phev_split_assumptions")',
-        "revenue_outlook_show_line_reconciliation": "_filter_revenue_line_reconciliation(",
+        "revenue_outlook_show_line_reconciliation": "cached_revenue_line_reconciliation_view(",
     }
     for lazy_key, marker in guarded_markers.items():
         marker_index = source.index(marker)
@@ -299,6 +299,48 @@ def test_revenue_outlook_line_detail_default_does_not_build_stack(monkeypatch) -
     assert not detail["line_reconciliation"].empty
     assert not detail["revenue_formula_residuals"].empty
     assert "revenue_stack_components" not in detail
+
+
+def test_revenue_line_reconciliation_view_cache_matches_direct_table() -> None:
+    root = Path(__file__).resolve().parents[1]
+    pack_dir = root / CURRENT_REVENUE_OUTLOOK_DIR
+    pack = load_revenue_outlook_pack(pack_dir, repo_root=root)
+    assert pack is not None
+    signature = revenue_outlook_signature(pack_dir, root)
+    sensitivity_key = app.selected_sensitivity_key("Off", "Off", "Off")
+    selectors = app.cached_revenue_outlook_selectors(signature, pack)
+    detail = app.cached_revenue_outlook_line_detail_frames(
+        signature,
+        sensitivity_key,
+        PED_BRIDGE_DEFAULT_MODE,
+        pack,
+    )
+    source_paths = tuple(str(value) for value in selectors["line_source_options"][:2])
+    sections = tuple(str(value) for value in selectors["line_section_options"])
+    fy_min, fy_max = selectors["line_fy_bounds"]
+    fy_range = (max(fy_min, 2025), min(fy_max, 2035))
+
+    if hasattr(app.cached_revenue_line_reconciliation_view, "clear"):
+        app.cached_revenue_line_reconciliation_view.clear()
+    cached_filtered, cached_display = app.cached_revenue_line_reconciliation_view(
+        signature,
+        source_paths,
+        sections,
+        fy_range,
+        sensitivity_key,
+        PED_BRIDGE_DEFAULT_MODE,
+        detail["line_reconciliation"],
+    )
+    direct_filtered = app._filter_revenue_line_reconciliation(
+        detail["line_reconciliation"],
+        source_paths=list(source_paths),
+        sections=list(sections),
+        fy_range=fy_range,
+    )
+    direct_display = app._revenue_line_reconciliation_display_table(direct_filtered)
+
+    pd.testing.assert_frame_equal(cached_filtered.reset_index(drop=True), direct_filtered.reset_index(drop=True))
+    pd.testing.assert_frame_equal(cached_display.reset_index(drop=True), direct_display.reset_index(drop=True))
 
 
 def test_revenue_outlook_default_sensitivity_audit_materializes_lazily() -> None:

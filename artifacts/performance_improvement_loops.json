@@ -216,5 +216,28 @@
       "tests": "python -m compileall app.py model_dashboard tests passed; Revenue Outlook/cloud test slice passed: 55 passed; bounded verify_dashboard.ps1 -SkipBrowser passed; host verify_browser_host.ps1 on port 8515 passed: 40 passed."
     },
     "status": "implemented"
+  },
+  {
+    "loop": 11,
+    "timestamp": "2026-07-01T00:36:17+12:00",
+    "scope": "Revenue Outlook line reconciliation table cache",
+    "finding": "The lazy line reconciliation expander still rebuilt the filtered reconciliation rows and formatted display table on every open-state rerun.",
+    "change": "Added a cache_data line reconciliation view returning both raw filtered rows for downloads and the formatted display table, keyed by runtime signature, bridge mode, sensitivity key and visible table controls.",
+    "evidence": {
+      "before_ms": {
+        "direct_line_filter_min": 3.98,
+        "direct_line_filter_mean": 4.56,
+        "direct_line_display_min": 2.76,
+        "direct_line_display_mean": 3.28,
+        "direct_filter_plus_display_min": 6.96,
+        "direct_filter_plus_display_mean": 7.71
+      },
+      "after_ms": {
+        "cached_line_view_warm_min": 1.02,
+        "cached_line_view_warm_mean": 1.08
+      },
+      "tests": "python -m compileall app.py model_dashboard tests passed; Revenue Outlook/cloud test slice passed: 56 passed; bounded verify_dashboard.ps1 -SkipBrowser passed; host verify_browser_host.ps1 on port 8515 passed: 40 passed."
+    },
+    "status": "implemented"
   }
 ]
