@@ -68,6 +68,14 @@ def test_governance_page_is_hidden_for_streamlit_cloud_by_default(monkeypatch) -
     assert app.dashboard_pages() == ["Overview", "Diagnostics", "Scenario Comparison", "Schiff Benchmark", "Revenue Outlook"]
 
 
+def test_local_audit_controls_are_hidden_for_streamlit_cloud(monkeypatch) -> None:
+    _clear_governance_visibility_env(monkeypatch)
+    assert app.should_show_local_audit_controls()
+
+    monkeypatch.setenv("STREAMLIT_SHARING_MODE", "streamlit_cloud")
+    assert not app.should_show_local_audit_controls()
+
+
 def test_governance_page_cloud_visibility_can_be_overridden(monkeypatch) -> None:
     _clear_governance_visibility_env(monkeypatch)
     monkeypatch.setenv("STREAMLIT_SHARING_MODE", "streamlit_cloud")

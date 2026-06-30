@@ -121,13 +121,11 @@ from model_dashboard.revenue_outlook import (
     FAN_SOURCE_SCENARIO_SPREAD,
     PED_BRIDGE_DEFAULT_MODE,
     PED_BRIDGE_MODE_LABELS,
-    PED_BRIDGE_NOTE,
     PED_COMPARISON_BEHAVIOURAL_TRACE_NAME,
     PED_EFFICIENCY_BASELINE_SCENARIO_ID,
     PED_EFFICIENCY_DEFAULT_NOTE,
     REVENUE_OUTLOOK_SCHEMA_VERSION,
     REVENUE_OUTLOOK_TITLE,
-    SCENARIO_ROLE_CONTRACT_NOTE,
     REVENUE_STACK_DETAIL_CLEAN,
     REVENUE_STACK_DETAIL_FULL_FORMULA,
     REVENUE_STACK_DETAIL_LEVELS,
@@ -458,6 +456,10 @@ def should_show_governance_page() -> bool:
     override = env_flag(SHOW_GOVERNANCE_PAGE_ENV_VAR)
     if override is not None:
         return override
+    return not is_streamlit_cloud_runtime()
+
+
+def should_show_local_audit_controls() -> bool:
     return not is_streamlit_cloud_runtime()
 
 
@@ -2066,22 +2068,8 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     fan_band_rows = pack.fan_band_rows.copy() if pack is not None and isinstance(getattr(pack, "fan_band_rows", None), pd.DataFrame) else pd.DataFrame()
 
     section_title(REVENUE_OUTLOOK_TITLE)
-    st.caption(
-        "Governed NLTF revenue architecture from the committed runtime pack: source actuals, current finalist "
-        "forecasts and the MBU26 official comparator."
-    )
-    st.caption("Source policy: committed runtime pack only; no latest-folder scan; no runtime source-pack chart join; no Excel workbook model forecasts.")
-    st.caption(SCENARIO_ROLE_CONTRACT_NOTE)
     period_rule = manifest.get("period_rule") if isinstance(manifest, dict) else {}
     runtime_cutoff_fy = (period_rule or {}).get("runtime_cutoff_fy") if isinstance(period_rule, dict) else None
-    if runtime_cutoff_fy:
-        st.caption(
-            f"Runtime horizon: no extrapolated model extension is used; current-finalist comparative charts and calculations stop at FY{runtime_cutoff_fy}."
-        )
-    vintage_notes = manifest.get("data_vintage_manifest_notes") if isinstance(manifest, dict) else {}
-    official_horizon_note = (vintage_notes or {}).get("official_horizon_note") if isinstance(vintage_notes, dict) else ""
-    if official_horizon_note:
-        st.caption(str(official_horizon_note))
 
     if chart_rows.empty:
         warning_panel("The promoted Revenue Outlook pack has no chart rows.")
@@ -2145,17 +2133,17 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             (label for label, mode in bridge_mode_lookup.items() if mode == PED_BRIDGE_DEFAULT_MODE),
             bridge_mode_options[-1] if bridge_mode_options else "Optimized migration bridge",
         )
-        bridge_cols = st.columns([0.24, 0.76])
-        with bridge_cols[0]:
+        if should_show_local_audit_controls() and bridge_mode_options:
             selected_ped_bridge_label = st.selectbox(
                 "PED bridge",
                 bridge_mode_options,
                 index=bridge_mode_options.index(default_bridge_label) if default_bridge_label in bridge_mode_options else 0,
                 key="revenue_outlook_ped_bridge_mode",
             )
-        with bridge_cols[1]:
-            st.caption(PED_BRIDGE_NOTE)
-        selected_ped_bridge_mode = bridge_mode_lookup.get(selected_ped_bridge_label, PED_BRIDGE_DEFAULT_MODE)
+            selected_ped_bridge_mode = bridge_mode_lookup.get(selected_ped_bridge_label, PED_BRIDGE_DEFAULT_MODE)
+        else:
+            selected_ped_bridge_label = default_bridge_label
+            selected_ped_bridge_mode = PED_BRIDGE_DEFAULT_MODE
     sensitivity_options = list(SENSITIVITY_LEVELS)
     with st.container(border=True):
         st.markdown("<div class='page5-panel-title'>Sensitivities</div>", unsafe_allow_html=True)
@@ -2283,7 +2271,6 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
 
     if not scenario_role_contract.empty:
         with st.expander("Scenario role contract", expanded=False):
-            info_panel(SCENARIO_ROLE_CONTRACT_NOTE)
             st.caption(
                 "PED VKT per capita comparison traces are shown only when the committed runtime carries a value-changing "
                 "behavioural path. Revenue and aggregate traces remain visible where the bridge changes totals."
@@ -2485,9 +2472,6 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             )
             info_panel(
                 "EV/PHEV uptake is allocated between PED/light-petrol and total Light RUC to match MBU proportions; it is not a new model."
-            )
-            st.caption(
-                "Revenue Outlook current-finalist rows use Optimized by default. Alternative modes are audit comparators for governance review."
             )
             drift_view = ev_phev_ped_light_drift_assumptions[
                 ev_phev_ped_light_drift_assumptions.get("lambda_mode", pd.Series("", index=ev_phev_ped_light_drift_assumptions.index)).astype(str).eq(str(selected_mode))
@@ -5461,8 +5445,12 @@ def _ped_bridge_mode_label_lookup(mode_config: pd.DataFrame) -> dict[str, str]:
         }
         if lookup:
             return lookup
-    ordered = ["Raw model bridge", "Blend 25%", "Blend 50%", "Blend 75%", "Optimized migration bridge"]
-    return {label: mode for label, mode in zip(ordered, ["raw_model", "blend_25", "blend_50", "blend_75", PED_BRIDGE_DEFAULT_MODE], strict=False)}
+    ordered_modes = ["raw_model", "blend_25", "blend_50", "blend_75", "optimized_migration"]
+    return {
+        PED_BRIDGE_MODE_LABELS.get(mode, mode.replace("_", " ").title()): mode
+        for mode in ordered_modes
+        if mode in PED_BRIDGE_MODE_LABELS or mode == "optimized_migration"
+    }
 
 
 def _ped_bridge_diagnostics_display_table(audit: pd.DataFrame) -> pd.DataFrame:

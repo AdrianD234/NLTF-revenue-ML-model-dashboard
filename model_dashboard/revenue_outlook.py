@@ -105,9 +105,7 @@ RUNTIME_REVENUE_OUTLOOK_FILES = (
     "path_trace_status.parquet",
 )
 PED_COMPARISON_BEHAVIOURAL_TRACE_NAME = "Current finalist comparison behavioural path"
-SCENARIO_ROLE_CONTRACT_NOTE = (
-    "High population affects scale/revenue through population; VKT per capita is a behavioural intensity metric."
-)
+SCENARIO_ROLE_CONTRACT_NOTE = ""
 STREAM_ORDER = ["PED", "LIGHT_RUC", "HEAVY_RUC"]
 STREAM_LABELS = {
     "PED": "PED VKT per capita",
@@ -292,13 +290,14 @@ SENSITIVITY_ROLLUP_SERIES = {
     "total_fed_ruc_net_revenue",
     "total_nltf_net_revenue",
 }
-PED_BRIDGE_DEFAULT_MODE = "optimized_migration"
+PED_BRIDGE_DEFAULT_MODE = "raw_model"
+PED_BRIDGE_OPTIMIZED_MODE = "optimized_migration"
 PED_BRIDGE_MODE_SPECS = (
     (
-        "raw_model",
+        PED_BRIDGE_DEFAULT_MODE,
         "Raw model bridge",
         0.0,
-        "PED volume = raw PED VKTpc x scenario population x litres intensity / 100.",
+        "Default: PED volume = raw PED VKTpc x scenario population x litres intensity / 100.",
     ),
     (
         "blend_25",
@@ -319,20 +318,16 @@ PED_BRIDGE_MODE_SPECS = (
         "PED bridge uses raw + 75% x (optimized - raw).",
     ),
     (
-        PED_BRIDGE_DEFAULT_MODE,
+        PED_BRIDGE_OPTIMIZED_MODE,
         "Optimized migration bridge",
         1.0,
-        "Current runtime default: PED/light-petrol VKT after optimized EV/PHEV migration allocation.",
+        "PED/light-petrol VKT after optimized EV/PHEV migration allocation.",
     ),
 )
 PED_BRIDGE_MODE_IDS = tuple(spec[0] for spec in PED_BRIDGE_MODE_SPECS)
 PED_BRIDGE_MODE_LABELS = {spec[0]: spec[1] for spec in PED_BRIDGE_MODE_SPECS}
 PED_BRIDGE_MODE_ALPHA = {spec[0]: float(spec[2]) for spec in PED_BRIDGE_MODE_SPECS}
-PED_BRIDGE_NOTE = (
-    "PED bridge modes are audit overlays. The default optimized bridge preserves the committed runtime path; "
-    "raw and blend modes show how PED volume/revenue would look if the PED VKTpc x scenario population bridge "
-    "were used more directly."
-)
+PED_BRIDGE_NOTE = ""
 REVENUE_STACK_MODE_BRIDGE = "Gross-to-net bridge audit"
 REVENUE_STACK_MODE_GROSS = "Gross contribution stack"
 REVENUE_STACK_MODES = (REVENUE_STACK_MODE_BRIDGE, REVENUE_STACK_MODE_GROSS)
@@ -753,7 +748,7 @@ def _runtime_cutoff_fy_and_audit(
                 "runtime_cutoff_fy = min(current Base, current comparison, required MBU26 inputs/rates/splits)"
             ),
             "notes": (
-                f"Official source extends beyond the current finalist common horizon; comparative charts stop at FY{cutoff}."
+                f"Comparative charts stop at FY{cutoff}."
                 if official_extends
                 else f"Comparative charts stop at FY{cutoff}."
             ),
@@ -2849,7 +2844,7 @@ def build_current_revenue_outlook_runtime_pack(
                 "Current-finalist paths stop where governed model and source assumptions stop."
             ),
             "official_horizon_note": (
-                f"Official source extends beyond the current finalist common horizon; comparative charts stop at FY{runtime_cutoff_fy}."
+                f"Comparative charts stop at FY{runtime_cutoff_fy}."
                 if _max_numeric_year(mbu26_pack.official_annual, "FY") and int(_max_numeric_year(mbu26_pack.official_annual, "FY") or 0) > runtime_cutoff_fy
                 else f"Comparative charts stop at FY{runtime_cutoff_fy}."
             ),
@@ -2941,7 +2936,7 @@ def build_current_revenue_outlook_runtime_pack(
         },
         "ped_bridge_mode_config": {
             "repo_relative_path": _repo_relative(root, base / "ped_bridge_mode_config.csv"),
-            "scope": "Audit bridge modes for raw, blend and optimized PED bridge overlays. Optimized is the default runtime mode.",
+            "scope": "Audit bridge modes for raw, blend and optimized PED bridge overlays. Raw is the default runtime mode.",
             "default_bridge_mode": PED_BRIDGE_DEFAULT_MODE,
             "note": PED_BRIDGE_NOTE,
             "status": "available",

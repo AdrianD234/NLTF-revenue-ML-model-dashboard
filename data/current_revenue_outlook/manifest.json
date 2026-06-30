@@ -32,7 +32,7 @@
   },
   "data_vintage_manifest_notes": {
     "runtime_cutoff": "No extrapolated model extension is used; last displayed/current calculation FY is FY2050. Current-finalist paths stop where governed model and source assumptions stop.",
-    "official_horizon_note": "Official source extends beyond the current finalist common horizon; comparative charts stop at FY2050.",
+    "official_horizon_note": "Comparative charts stop at FY2050.",
     "light_ruc_target_semantics": "Business rule update: current-finalist Light RUC is treated as total light-RUC net km, while EV/PHEV migration is sourced from both current PED/light-petrol activity and total Light RUC using an optimized deterministic bridge calibrated to MBU26 light-mobility proportions. BEV/PHEV are not fixed add-ons.",
     "ev_phev_migration_allocation": "Default lambda_mode is optimized; alternatives are recorded for audit only and do not replace the current runtime path unless explicitly selected in governance review.",
     "scenario_role_contract": "PED VKT per capita is a behavioural intensity metric. Value-changing comparison PED intensity is labelled as a behavioural comparison path; aggregate and revenue rows keep comparison traces."
@@ -388,7 +388,7 @@
     "scope": "Current-finalist PED bridge decomposition by FY/source path: VKTpc, scenario population, raw VKTpc x population, optimized EV/PHEV migration VKT, PED volume/revenue, Total NLTF, MBU26 comparators and fallback flags.",
     "status": "available",
     "source": "data/current_revenue_outlook/revenue_line_reconciliation.csv; data/current_revenue_outlook/ev_phev_ped_light_drift_assumptions.csv",
-    "default_bridge_mode": "optimized_migration",
+    "default_bridge_mode": "raw_model",
     "population_proxy_warning_rows": 2
   },
   "ped_bridge_shape_fit_metrics": {
@@ -398,9 +398,9 @@
   },
   "ped_bridge_mode_config": {
     "repo_relative_path": "data/current_revenue_outlook/ped_bridge_mode_config.csv",
-    "scope": "Audit bridge modes for raw, blend and optimized PED bridge overlays. Optimized is the default runtime mode.",
-    "default_bridge_mode": "optimized_migration",
-    "note": "PED bridge modes are audit overlays. The default optimized bridge preserves the committed runtime path; raw and blend modes show how PED volume/revenue would look if the PED VKTpc x scenario population bridge were used more directly.",
+    "scope": "Audit bridge modes for raw, blend and optimized PED bridge overlays. Raw is the default runtime mode.",
+    "default_bridge_mode": "raw_model",
+    "note": "",
     "status": "available"
   },
   "ped_efficiency_scenarios": {
@@ -441,7 +441,7 @@
   "scenario_role_contract": {
     "repo_relative_path": "data/current_revenue_outlook/scenario_role_contract.csv",
     "scope": "Repo-local audit of scenario role semantics, PED population-feature exposure, display policy and runtime deltas.",
-    "note": "High population affects scale/revenue through population; VKT per capita is a behavioural intensity metric."
+    "note": ""
   },
   "scenario_inputs": {
     "status": "available",
@@ -765,12 +765,12 @@
       "size_bytes": 5960
     },
     "ped_bridge_mode_config.csv": {
-      "sha256": "a818ddaf9c30efe56b9f11121c39296350dd3db8d7db6d9d9288ccad7f9f521a",
-      "size_bytes": 1098
+      "sha256": "60583741fcd8484df3e4f166a82e49a06fdeb0fd353756fcfdf48a1f9786efc4",
+      "size_bytes": 1082
     },
     "ped_bridge_mode_config.parquet": {
-      "sha256": "78047d53c62de45a5536e4b118784dea3e0d7af4493bc62b2102a84a5ab79f1e",
-      "size_bytes": 6117
+      "sha256": "160beda6e84ec88671ca462acc59c49a1febbe125ccc077a7787929a5df01499",
+      "size_bytes": 6069
     },
     "ped_bridge_shape_fit_metrics.csv": {
       "sha256": "bdbe8adc30fc3734d594af6ade207d8f0b5525163630d9fce0c23da03d731eff",
@@ -845,12 +845,12 @@
       "size_bytes": 38215
     },
     "runtime_cutoff_audit.csv": {
-      "sha256": "39afc7458cba7b1a43063453269659fc6e59a53286774fac3ca77e30efc9813d",
-      "size_bytes": 1343
+      "sha256": "623dae8d47fbe9e5d6a4ff7bba0e3b4d0d8a21a72601a5271db28858360b912d",
+      "size_bytes": 1275
     },
     "runtime_cutoff_audit.parquet": {
-      "sha256": "35ff7136b28f33c4b29a48c5230db6df088775f5a87e868d22b7609e0c3b85a5",
-      "size_bytes": 6026
+      "sha256": "d0ca93757d7bc183039ce4572163cee8bcafe7166662245c01775a7d9b96ea3c",
+      "size_bytes": 5940
     },
     "runtime_trace_audit.csv": {
       "sha256": "b9dc3802bb27e70db3516fd2455c04e32778190b1d3a952ba78c5ffde7970798",
@@ -885,12 +885,12 @@
       "size_bytes": 49056
     },
     "scenario_role_contract.csv": {
-      "sha256": "ba40738ba8f23a44d11fecbf3a1b04e8111efed741462b3c1067cd6a710e2a39",
-      "size_bytes": 19929
+      "sha256": "e8684dbb5f5f2f3ddfcc67036e208227b758ab77d2731c31d9d0dc67d5379cec",
+      "size_bytes": 18217
     },
     "scenario_role_contract.parquet": {
-      "sha256": "8129514d4c43e898625f74b029aad23d583cfae9b36491ee955ab0a99593b30b",
-      "size_bytes": 21676
+      "sha256": "bafecd7bd59d2f27439f174ffb3d40c93258de5338b3edd7760e3c14078f6cf5",
+      "size_bytes": 21145
     },
     "sensitivity_config.csv": {
       "sha256": "2067f75d07b12d61d0b845b03bf637f0e335dc7074c45fea5e72b74fc63eda64",

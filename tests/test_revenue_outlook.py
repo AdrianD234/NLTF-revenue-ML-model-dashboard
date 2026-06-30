@@ -258,7 +258,7 @@ def test_committed_current_revenue_outlook_pack_is_repo_local_and_hash_backed() 
     assert manifest["sensitivity_config"]["default_runtime_treatment"] == "all_off_no_change"
     assert manifest["sensitivity_impact_audit"]["repo_relative_path"] == "data/current_revenue_outlook/sensitivity_impact_audit.csv"
     assert manifest["scenario_role_contract"]["repo_relative_path"] == "data/current_revenue_outlook/scenario_role_contract.csv"
-    assert "behavioural intensity metric" in manifest["scenario_role_contract"]["note"]
+    assert "behavioural intensity metric" not in str(manifest["scenario_role_contract"].get("note", ""))
     assert manifest["scenario_inputs"]["status"] == "available"
     assert manifest["scenario_inputs"]["repo_relative_output_dir"] == "data/current_revenue_outlook/scenario_inputs"
     assert manifest["scenario_inputs"]["schema_version"] == "nltf-scenario-input-materializer-v1"
@@ -516,7 +516,7 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     assert str(comparison_ped_contract["bridge_only_fields"]) == ""
     assert str(comparison_ped_contract["unknown_fields"]) == ""
     assert pd.to_numeric(comparison_ped_contract["runtime_delta_min"], errors="coerce") < 0
-    assert "behavioural intensity metric" in str(comparison_ped_contract["notes"])
+    assert "behavioural intensity metric" not in str(comparison_ped_contract["notes"])
     comparison_revenue_contract = scenario_role_contract[
         scenario_role_contract["scenario_name"].astype(str).eq("current_comparison_1")
         & scenario_role_contract["affected_series"].astype(str).eq("gross_ped_revenue")
@@ -892,6 +892,7 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
         "blend_25",
         "blend_50",
         "blend_75",
+        "optimized_migration",
         PED_BRIDGE_DEFAULT_MODE,
     }
     assert ped_bridge_mode_config.loc[
@@ -1622,18 +1623,51 @@ def test_ped_bridge_modes_materialize_raw_optimized_and_reconcile() -> None:
         ped_revenue_bridge_audit=pack.ped_revenue_bridge_audit,
         bridge_mode=PED_BRIDGE_DEFAULT_MODE,
     )
+    explicit_raw = apply_ped_bridge_mode_layer(
+        chart_rows=pack.revenue_chart_rows,
+        line_reconciliation=pack.revenue_line_reconciliation,
+        bridge_components=pack.revenue_bridge_components,
+        future_revenue_forecasts=pack.future_revenue_forecasts,
+        ped_revenue_bridge_audit=pack.ped_revenue_bridge_audit,
+        bridge_mode="raw_model",
+    )
+    for key, value_column in [
+        ("chart_rows", "value"),
+        ("line_reconciliation", "value"),
+        ("revenue_bridge_components", "component_value"),
+        ("future_revenue_forecasts", "revenue_forecast_nzd"),
+    ]:
+        assert pd.to_numeric(default[key][value_column], errors="coerce").to_numpy() == pytest.approx(
+            pd.to_numeric(explicit_raw[key][value_column], errors="coerce").to_numpy(),
+            abs=0,
+        )
+    assert pd.to_numeric(
+        default["ped_revenue_bridge_audit"]["ped_volume_million_litres"], errors="coerce"
+    ).to_numpy() == pytest.approx(
+        pd.to_numeric(default["ped_revenue_bridge_audit"]["ped_volume_raw_million_litres"], errors="coerce").to_numpy(),
+        abs=0,
+    )
+
+    optimized = apply_ped_bridge_mode_layer(
+        chart_rows=pack.revenue_chart_rows,
+        line_reconciliation=pack.revenue_line_reconciliation,
+        bridge_components=pack.revenue_bridge_components,
+        future_revenue_forecasts=pack.future_revenue_forecasts,
+        ped_revenue_bridge_audit=pack.ped_revenue_bridge_audit,
+        bridge_mode="optimized_migration",
+    )
     for key, value_column, original in [
         ("chart_rows", "value", pack.revenue_chart_rows),
         ("line_reconciliation", "value", pack.revenue_line_reconciliation),
         ("revenue_bridge_components", "component_value", pack.revenue_bridge_components),
         ("future_revenue_forecasts", "revenue_forecast_nzd", pack.future_revenue_forecasts),
     ]:
-        assert pd.to_numeric(default[key][value_column], errors="coerce").to_numpy() == pytest.approx(
+        assert pd.to_numeric(optimized[key][value_column], errors="coerce").to_numpy() == pytest.approx(
             pd.to_numeric(original[value_column], errors="coerce").to_numpy(),
             abs=0,
         )
 
-    for mode in ["raw_model", "blend_25", "blend_50", "blend_75", PED_BRIDGE_DEFAULT_MODE]:
+    for mode in ["raw_model", "blend_25", "blend_50", "blend_75", "optimized_migration", PED_BRIDGE_DEFAULT_MODE]:
         result = apply_ped_bridge_mode_layer(
             chart_rows=pack.revenue_chart_rows,
             line_reconciliation=pack.revenue_line_reconciliation,
@@ -1874,12 +1908,12 @@ def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
         "fan_band_rows.parquet": "c77dfc913120f9e8caa6003211ecdb85cc6d3e884512fbf7fbf6e1e12b90be5c",
         "future_revenue_forecasts.csv": "31bc0ab32312cfb37598ca0bcd7db7abbab89d259c6785b3a9787208c9bd2c05",
         "future_revenue_forecasts.parquet": "37fd32d0a1e39facca69504b525f1f3c85491f781832b3befbab2ecba700aba0",
-        "manifest.json": "1f78bed4fd8c2862393b1b4a3b31e6d5d9544f9cab2c79e2685c1f1c5682a73f",
+        "manifest.json": "886ee239a6869b3096124aff90ea3a5cf5457d29775d9ee9016c427aa8eda1e9",
         "manifest.md": "0d0ffad81aa2f9ab0e8123a05297aaf2b52d40d1b06f9700f2ca1a53977d0a2d",
         "path_trace_status.csv": "9aee7a4e7003ec6541476ca3e4afef6d8586b6c358e41db1c8e06623e5ffcaa3",
         "path_trace_status.parquet": "e66d860fb7532ee4b92285c1ba023c9f8d9469cfdaaaef819415f7cd87c73757",
-        "ped_bridge_mode_config.csv": "a818ddaf9c30efe56b9f11121c39296350dd3db8d7db6d9d9288ccad7f9f521a",
-        "ped_bridge_mode_config.parquet": "78047d53c62de45a5536e4b118784dea3e0d7af4493bc62b2102a84a5ab79f1e",
+        "ped_bridge_mode_config.csv": "60583741fcd8484df3e4f166a82e49a06fdeb0fd353756fcfdf48a1f9786efc4",
+        "ped_bridge_mode_config.parquet": "160beda6e84ec88671ca462acc59c49a1febbe125ccc077a7787929a5df01499",
         "ped_bridge_shape_fit_metrics.csv": "bdbe8adc30fc3734d594af6ade207d8f0b5525163630d9fce0c23da03d731eff",
         "ped_bridge_shape_fit_metrics.parquet": "9305e5cc4c3cec76d24246f283145750bc964b15e782e302487cc2e19b6b2693",
         "ped_efficiency_scenarios.csv": "e23f4ad04f3b7b4e18eee7d185b4d2fa8d3d54c0542695d1c8be59cd395788b8",
@@ -1898,8 +1932,8 @@ def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
         "revenue_stack_components.parquet": "a70f4026d7f016c5ab3a00ce2e0c41d7a5fd2ff6e99b85f87f330415710d45d0",
         "row_reconciliation.csv": "d484f5d75cce88e30ce7bcf5dd70058505cc02e5dff93f457a579f119c2fc7ce",
         "row_reconciliation.parquet": "bf2b638920e4b9b00ca4ac00d4263083258ce0d94625943c4e7b3cdf90493dd7",
-        "runtime_cutoff_audit.csv": "39afc7458cba7b1a43063453269659fc6e59a53286774fac3ca77e30efc9813d",
-        "runtime_cutoff_audit.parquet": "35ff7136b28f33c4b29a48c5230db6df088775f5a87e868d22b7609e0c3b85a5",
+        "runtime_cutoff_audit.csv": "623dae8d47fbe9e5d6a4ff7bba0e3b4d0d8a21a72601a5271db28858360b912d",
+        "runtime_cutoff_audit.parquet": "d0ca93757d7bc183039ce4572163cee8bcafe7166662245c01775a7d9b96ea3c",
         "runtime_trace_audit.csv": "b9dc3802bb27e70db3516fd2455c04e32778190b1d3a952ba78c5ffde7970798",
         "runtime_trace_audit.parquet": "143083376396702d9f842cee15107fcb969bb0e32acf98ba4517bb51a070b540",
         "scenario_feature_lineage.csv": "b123c97090bd282009225a0ac2cfc36226d20017412f820dfeec6af34411b30d",
@@ -1908,8 +1942,8 @@ def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
         "scenario_input_delta_audit.parquet": "21cc6951d017817ad989fa54521cf323113e734dae9ce321e4bfbbf99d01e538",
         "scenario_input_replay_mismatch_report.csv": "e0708fdc23aca483311515a8488cee029d5a959d4f351f6fe168f64431617c6a",
         "scenario_input_replay_mismatch_report.parquet": "80f060bef98147de0ef5e20f65e02e9d6716a1900ca9b85c089e4a36f31e5749",
-        "scenario_role_contract.csv": "ba40738ba8f23a44d11fecbf3a1b04e8111efed741462b3c1067cd6a710e2a39",
-        "scenario_role_contract.parquet": "8129514d4c43e898625f74b029aad23d583cfae9b36491ee955ab0a99593b30b",
+        "scenario_role_contract.csv": "e8684dbb5f5f2f3ddfcc67036e208227b758ab77d2731c31d9d0dc67d5379cec",
+        "scenario_role_contract.parquet": "bafecd7bd59d2f27439f174ffb3d40c93258de5338b3edd7760e3c14078f6cf5",
         "sensitivity_config.csv": "2067f75d07b12d61d0b845b03bf637f0e335dc7074c45fea5e72b74fc63eda64",
         "sensitivity_config.parquet": "2960b8221b4321aafea87db35ac04454a09f5fb421c2c35eb7abe700bf9e0ee6",
         "sensitivity_impact_audit.csv": "2ab42b16e8556f45dfd4fe3f15542b0e13d12bfda3e5221ba632803441fdaae9",

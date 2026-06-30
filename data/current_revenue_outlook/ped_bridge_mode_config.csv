@@ -1,6 +1,6 @@
 bridge_mode,display_name,alpha,alpha_pct,default_selected,formula,runtime_treatment,notes
-raw_model,Raw model bridge,0.0,0.0,False,raw_light_petrol_vkt + alpha * (optimized_light_petrol_vkt - raw_light_petrol_vkt),audit_overlay,PED volume = raw PED VKTpc x scenario population x litres intensity / 100.
+raw_model,Raw model bridge,0.0,0.0,True,raw_light_petrol_vkt + alpha * (optimized_light_petrol_vkt - raw_light_petrol_vkt),default_runtime,Default: PED volume = raw PED VKTpc x scenario population x litres intensity / 100.
 blend_25,Blend 25%,0.25,25.0,False,raw_light_petrol_vkt + alpha * (optimized_light_petrol_vkt - raw_light_petrol_vkt),audit_overlay,PED bridge uses raw + 25% x (optimized - raw).
 blend_50,Blend 50%,0.5,50.0,False,raw_light_petrol_vkt + alpha * (optimized_light_petrol_vkt - raw_light_petrol_vkt),audit_overlay,PED bridge uses raw + 50% x (optimized - raw).
 blend_75,Blend 75%,0.75,75.0,False,raw_light_petrol_vkt + alpha * (optimized_light_petrol_vkt - raw_light_petrol_vkt),audit_overlay,PED bridge uses raw + 75% x (optimized - raw).
-optimized_migration,Optimized migration bridge,1.0,100.0,True,raw_light_petrol_vkt + alpha * (optimized_light_petrol_vkt - raw_light_petrol_vkt),default_runtime,Current runtime default: PED/light-petrol VKT after optimized EV/PHEV migration allocation.
+optimized_migration,Optimized migration bridge,1.0,100.0,False,raw_light_petrol_vkt + alpha * (optimized_light_petrol_vkt - raw_light_petrol_vkt),audit_overlay,PED/light-petrol VKT after optimized EV/PHEV migration allocation.
