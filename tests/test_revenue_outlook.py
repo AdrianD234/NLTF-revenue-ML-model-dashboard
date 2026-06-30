@@ -1970,6 +1970,15 @@ def test_revenue_outlook_loader_rejects_hash_mismatched_promoted_pack(tmp_path: 
         load_revenue_outlook_pack(pack_copy, repo_root=ROOT)
 
 
+def test_revenue_outlook_loader_rejects_missing_required_runtime_file(tmp_path: Path) -> None:
+    pack_copy = tmp_path / "current_revenue_outlook"
+    shutil.copytree(ROOT / CURRENT_REVENUE_OUTLOOK_DIR, pack_copy)
+    (pack_copy / "future_revenue_forecasts.parquet").unlink()
+
+    with pytest.raises(ValueError, match="future_revenue_forecasts.parquet is missing"):
+        load_revenue_outlook_pack(pack_copy, repo_root=ROOT)
+
+
 def test_revenue_outlook_loader_uses_committed_csv_fallback_when_parquet_engine_unavailable(monkeypatch) -> None:
     def fail_read_parquet(*args, **kwargs):
         raise ImportError("simulated missing parquet engine")
@@ -1982,3 +1991,17 @@ def test_revenue_outlook_loader_uses_committed_csv_fallback_when_parquet_engine_
     assert not pack.revenue_bridge_components.empty
     assert not pack.future_revenue_forecasts.empty
     assert not pack.revenue_chart_rows.astype(str).stack().str.contains(r"C:\\Users|Downloads|OneDrive", regex=True).any()
+
+
+def test_revenue_outlook_loader_uses_committed_runtime_pack_without_excel_or_local_paths(monkeypatch) -> None:
+    def fail_read_excel(*args, **kwargs):
+        raise AssertionError("Revenue Outlook runtime loader must not read Excel workbooks")
+
+    monkeypatch.setattr(pd, "read_excel", fail_read_excel)
+    pack = load_revenue_outlook_pack(ROOT / CURRENT_REVENUE_OUTLOOK_DIR, repo_root=ROOT)
+    assert pack is not None
+
+    forbidden = r"C:\\Users|C:/Users|Downloads|OneDrive"
+    for name, value in vars(pack).items():
+        if isinstance(value, pd.DataFrame) and not value.empty:
+            assert not value.astype(str).stack().str.contains(forbidden, regex=True).any(), name
