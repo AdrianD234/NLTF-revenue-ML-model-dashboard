@@ -489,6 +489,64 @@ def test_revenue_outlook_primary_hover_customdata_matches_row_helpers() -> None:
     assert ("FY2031", "dot") in marker_shapes
 
 
+def test_revenue_outlook_visible_figures_materialize_through_cache() -> None:
+    root = Path(__file__).resolve().parents[1]
+    pack_dir = root / CURRENT_REVENUE_OUTLOOK_DIR
+    pack = load_revenue_outlook_pack(pack_dir, repo_root=root)
+    assert pack is not None
+    signature = revenue_outlook_signature(pack_dir, root)
+    traces = tuple(app._revenue_outlook_trace_options(pack.revenue_chart_rows))
+    sensitivity_key = app.selected_sensitivity_key("Off", "Off", "Off")
+    view = app.cached_revenue_outlook_view(
+        signature,
+        "Total NLTF revenue",
+        "june_year",
+        "Current planned path",
+        traces,
+        sensitivity_key,
+        PED_BRIDGE_DEFAULT_MODE,
+        pack,
+    )
+    if hasattr(app.cached_revenue_outlook_total_path_figure, "clear"):
+        app.cached_revenue_outlook_total_path_figure.clear()
+    if hasattr(app.cached_revenue_outlook_fan_figure, "clear"):
+        app.cached_revenue_outlook_fan_figure.clear()
+
+    cached_total = app.cached_revenue_outlook_total_path_figure(
+        signature,
+        "Total NLTF revenue",
+        "FY2031",
+        "june_year",
+        "Current planned path",
+        traces,
+        sensitivity_key,
+        PED_BRIDGE_DEFAULT_MODE,
+        view["filtered_rows"],
+    )
+    direct_total = app.revenue_outlook_total_path_figure(
+        view["filtered_rows"], selected_series="Total NLTF revenue", selected_fy="FY2031"
+    )
+    cached_fan, cached_caption = app.cached_revenue_outlook_fan_figure(
+        signature,
+        "Total NLTF revenue",
+        "Current planned path",
+        app.FAN_SOURCE_AUTO,
+        pack.fan_band_rows,
+        pack.fan_availability,
+    )
+    direct_fan = app.revenue_outlook_uncertainty_fan_figure(
+        pack.fan_band_rows,
+        fan_availability=pack.fan_availability,
+        selected_series="Total NLTF revenue",
+        fan_source=app.FAN_SOURCE_AUTO,
+        selected_fed_path="Current planned path",
+    )
+
+    assert [trace.name for trace in cached_total.data] == [trace.name for trace in direct_total.data]
+    assert [trace.name for trace in cached_fan.data] == [trace.name for trace in direct_fan.data]
+    assert cached_caption == app._revenue_outlook_fan_caption(pack.fan_availability, "Total NLTF revenue", app.FAN_SOURCE_AUTO)[:220]
+
+
 def test_governance_page_cloud_visibility_can_be_overridden(monkeypatch) -> None:
     _clear_governance_visibility_env(monkeypatch)
     monkeypatch.setenv("STREAMLIT_SHARING_MODE", "streamlit_cloud")

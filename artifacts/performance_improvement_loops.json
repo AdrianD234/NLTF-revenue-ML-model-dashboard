@@ -168,5 +168,28 @@
       "tests": "python -m compileall app.py model_dashboard tests passed; Revenue Outlook test slice passed: 37 passed; bounded verify_dashboard.ps1 -SkipBrowser passed; host verify_browser_host.ps1 on port 8515 passed: 40 passed."
     },
     "status": "implemented"
+  },
+  {
+    "loop": 9,
+    "timestamp": "2026-07-01T00:00:54+12:00",
+    "scope": "Revenue Outlook visible figure cache wrappers",
+    "finding": "The cached Revenue Outlook primary view returned filtered rows, but the visible Total path and uncertainty fan Plotly figures were still rebuilt on every rerun.",
+    "change": "Added cache_data wrappers for the Total path and fan figures keyed by the runtime signature and visible controls, while excluding already-derived DataFrames from cache hashing.",
+    "evidence": {
+      "before_ms": {
+        "direct_total_figure_min": 14.63,
+        "direct_total_figure_mean": 16.16,
+        "direct_fan_figure_min": 5.97,
+        "direct_fan_figure_mean": 7.22
+      },
+      "after_ms": {
+        "cached_total_figure_warm_min": 3.88,
+        "cached_total_figure_warm_mean": 4.67,
+        "cached_fan_figure_warm_min": 2.94,
+        "cached_fan_figure_warm_mean": 3.66
+      },
+      "tests": "python -m compileall app.py model_dashboard tests passed; Revenue Outlook/cloud test slice passed: 54 passed; bounded verify_dashboard.ps1 -SkipBrowser passed; host verify_browser_host.ps1 on port 8515 passed: 40 passed."
+    },
+    "status": "implemented"
   }
 ]

@@ -819,6 +819,43 @@ def cached_revenue_outlook_sensitivity_audit(
     )
 
 
+@st.cache_data(show_spinner=False)
+def cached_revenue_outlook_total_path_figure(
+    signature: tuple[tuple[str, int, int], ...],
+    selected_series: str,
+    selected_fy: str,
+    time_grain: str,
+    fed_path: str,
+    traces: tuple[str, ...],
+    sensitivity_key: tuple[str, str, str, str, str, str, str, str, str],
+    bridge_mode: str,
+    _filtered_rows: pd.DataFrame,
+) -> go.Figure:
+    del signature, time_grain, fed_path, traces, sensitivity_key, bridge_mode
+    return revenue_outlook_total_path_figure(_filtered_rows, selected_series=selected_series, selected_fy=selected_fy)
+
+
+@st.cache_data(show_spinner=False)
+def cached_revenue_outlook_fan_figure(
+    signature: tuple[tuple[str, int, int], ...],
+    selected_series: str,
+    selected_fed_path: str,
+    selected_fan_source: str,
+    _fan_band_rows: pd.DataFrame,
+    _fan_availability: pd.DataFrame,
+) -> tuple[go.Figure, str]:
+    del signature
+    figure = revenue_outlook_uncertainty_fan_figure(
+        _fan_band_rows,
+        fan_availability=_fan_availability,
+        selected_series=selected_series,
+        fan_source=selected_fan_source,
+        selected_fed_path=selected_fed_path,
+    )
+    caption = _revenue_outlook_fan_caption(_fan_availability, selected_series, selected_fan_source)[:220]
+    return figure, caption
+
+
 def directory_signature(path: Path) -> tuple[bool, int, int]:
     try:
         stat = path.stat()
@@ -2576,11 +2613,12 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         custom_heavy_elasticity=custom_heavy_elasticity,
         cost_per_km_ratio=cost_per_km_ratio,
     )
+    selected_time_grain = "june_year" if grain_label == "June-year" else "quarterly"
     timer.start("sensitivity overlay")
     view = cached_revenue_outlook_view(
         pack_signature,
         selected_stream,
-        "june_year" if grain_label == "June-year" else "quarterly",
+        selected_time_grain,
         selected_fed_path,
         tuple(selected_traces),
         sensitivity_key,
@@ -2606,7 +2644,17 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     primary_cols = st.columns([0.64, 0.36])
     with primary_cols[0]:
         timer.start("main path figure")
-        main_path_figure = revenue_outlook_total_path_figure(filtered_rows, selected_series=selected_stream, selected_fy=selected_fy)
+        main_path_figure = cached_revenue_outlook_total_path_figure(
+            pack_signature,
+            selected_stream,
+            selected_fy,
+            selected_time_grain,
+            selected_fed_path,
+            tuple(selected_traces),
+            sensitivity_key,
+            selected_ped_bridge_mode,
+            filtered_rows,
+        )
         timer.stop("main path figure")
         chart_card(
             "Total path chart",
@@ -2621,6 +2669,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     with primary_cols[1]:
         timer.start("fan figure")
         _render_revenue_outlook_fan_card(
+            pack_signature,
             fan_band_rows,
             fan_availability,
             selected_series=selected_stream,
@@ -5122,6 +5171,7 @@ def revenue_outlook_total_path_figure(rows: pd.DataFrame, *, selected_series: st
 
 
 def _render_revenue_outlook_fan_card(
+    pack_signature: tuple[tuple[str, int, int], ...],
     fan_band_rows: pd.DataFrame,
     fan_availability: pd.DataFrame,
     *,
@@ -5142,15 +5192,16 @@ def _render_revenue_outlook_fan_card(
             index=0,
             key="revenue_outlook_fan_source",
         )
-        fig = revenue_outlook_uncertainty_fan_figure(
+        fig, caption = cached_revenue_outlook_fan_figure(
+            pack_signature,
+            selected_series,
+            selected_fed_path,
+            selected_fan_source,
             fan_band_rows,
-            fan_availability=fan_availability,
-            selected_series=selected_series,
-            fan_source=selected_fan_source,
-            selected_fed_path=selected_fed_path,
+            fan_availability,
         )
         st.plotly_chart(fig, use_container_width=True, key="chart_card_uncertainty_fan")
-        st.caption(_revenue_outlook_fan_caption(fan_availability, selected_series, selected_fan_source)[:220])
+        st.caption(caption)
 
 
 def revenue_outlook_uncertainty_fan_figure(

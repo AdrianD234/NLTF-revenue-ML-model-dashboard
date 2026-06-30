@@ -189,5 +189,25 @@
       "primary_chart_change": "Replaced row-wise hover DataFrame.apply calls with list-built customdata and replaced Plotly add_vline calls with direct layout shapes/annotations for the forecast and selected-FY markers.",
       "validation": "python -m compileall app.py model_dashboard tests passed; Revenue Outlook test slice passed: 37 passed; bounded verify_dashboard.ps1 -SkipBrowser passed; host verify_browser_host.ps1 on port 8515 passed: 40 passed."
     }
+  },
+  {
+    "timestamp": "2026-07-01T00:00:54+12:00",
+    "scope": "Revenue Outlook visible figure cache wrappers",
+    "before_ms": {
+      "direct_total_figure_min": 14.63,
+      "direct_total_figure_mean": 16.16,
+      "direct_fan_figure_min": 5.97,
+      "direct_fan_figure_mean": 7.22
+    },
+    "after_ms": {
+      "cached_total_figure_warm_min": 3.88,
+      "cached_total_figure_warm_mean": 4.67,
+      "cached_fan_figure_warm_min": 2.94,
+      "cached_fan_figure_warm_mean": 3.66
+    },
+    "result": {
+      "visible_figure_change": "Cached the visible Total path and uncertainty fan figures with runtime signature and control keys, keeping DataFrame values out of the cache hash because the upstream view is already signature-keyed.",
+      "validation": "python -m compileall app.py model_dashboard tests passed; Revenue Outlook/cloud test slice passed: 54 passed; bounded verify_dashboard.ps1 -SkipBrowser passed; host verify_browser_host.ps1 on port 8515 passed: 40 passed."
+    }
   }
 ]
