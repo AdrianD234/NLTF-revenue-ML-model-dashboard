@@ -977,6 +977,30 @@ def cached_revenue_outlook_selected_fy_figures(
     )
 
 
+@st.cache_data(show_spinner=False)
+def cached_revenue_outlook_ev_phev_drift_view(
+    signature: tuple[tuple[str, int, int], ...],
+    selected_mode: str,
+    _drift_assumptions: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    del signature
+    if _drift_assumptions is None or _drift_assumptions.empty:
+        empty = pd.DataFrame()
+        return empty, empty
+    mode_series = _drift_assumptions.get("lambda_mode", pd.Series("", index=_drift_assumptions.index)).astype(str)
+    filtered = _drift_assumptions[mode_series.eq(str(selected_mode))].copy()
+    return filtered, _ev_phev_ped_light_drift_display_table(filtered)
+
+
+@st.cache_data(show_spinner=False)
+def cached_revenue_outlook_ev_phev_split_display(
+    signature: tuple[tuple[str, int, int], ...],
+    _split_assumptions: pd.DataFrame,
+) -> pd.DataFrame:
+    del signature
+    return _ev_phev_split_assumptions_display_table(_split_assumptions)
+
+
 def directory_signature(path: Path) -> tuple[bool, int, int]:
     try:
         stat = path.stat()
@@ -3038,13 +3062,13 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 caption="Clean bridge mode hides internal add-back rows while preserving reconciliation to Total NLTF revenue. Positive revenue components stack above zero; deductions stack below zero. Full formula audit shows internal rows. Gross mode reconciles leaf rows to Total gross revenues. Aggregates are overlays only.",
                 notes_as_tooltip=False,
             )
-            stack_gap_banner = _revenue_stack_gap_banner(filtered_stack)
+            stack_gap_banner = _revenue_stack_gap_banner(chart_stack)
             if stack_gap_banner:
                 warning_panel(stack_gap_banner)
             table_cols = st.columns([0.82, 0.18])
             with table_cols[1]:
-                dataframe_download(filtered_stack, "Download CSV", "revenue_stack_components.csv")
-            display_table(_revenue_stack_components_display_table(filtered_stack), height=360, max_rows=720)
+                dataframe_download(chart_stack, "Download CSV", "revenue_stack_components.csv")
+            display_table(_revenue_stack_components_display_table(chart_stack), height=360, max_rows=720)
         timer.stop("composition figure")
 
     if revenue_outlook_lazy_table(
@@ -3084,13 +3108,15 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 info_panel(
                     "EV/PHEV uptake is allocated between PED/light-petrol and total Light RUC to match MBU proportions; it is not a new model."
                 )
-                drift_view = ev_phev_ped_light_drift_assumptions[
-                    ev_phev_ped_light_drift_assumptions.get("lambda_mode", pd.Series("", index=ev_phev_ped_light_drift_assumptions.index)).astype(str).eq(str(selected_mode))
-                ].copy()
+                drift_view, drift_display = cached_revenue_outlook_ev_phev_drift_view(
+                    pack_signature,
+                    str(selected_mode),
+                    ev_phev_ped_light_drift_assumptions,
+                )
                 drift_cols = st.columns([0.82, 0.18])
                 with drift_cols[1]:
                     dataframe_download(drift_view, "Download CSV", "ev_phev_ped_light_drift_assumptions.csv")
-                display_table(_ev_phev_ped_light_drift_display_table(drift_view), height=340, max_rows=260)
+                display_table(drift_display, height=340, max_rows=260)
         timer.stop("EV/PHEV migration audit")
 
     if revenue_outlook_lazy_table(
@@ -3117,7 +3143,11 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 audit_cols = st.columns([0.82, 0.18])
                 with audit_cols[1]:
                     dataframe_download(ev_phev_split_assumptions, "Download CSV", "ev_phev_split_assumptions.csv")
-                display_table(_ev_phev_split_assumptions_display_table(ev_phev_split_assumptions), height=320, max_rows=220)
+                split_display = cached_revenue_outlook_ev_phev_split_display(
+                    pack_signature,
+                    ev_phev_split_assumptions,
+                )
+                display_table(split_display, height=320, max_rows=220)
         timer.stop("EV/PHEV split audit")
 
     if selected_metric_type == "activity":

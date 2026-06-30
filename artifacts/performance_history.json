@@ -271,5 +271,25 @@
       "selected_fy_change": "Cached the lazy selected-FY component drill-down and revenue split figures as a paired figure result keyed by runtime signature and visible controls.",
       "validation": "python -m compileall app.py model_dashboard tests passed; Revenue Outlook/cloud test slice passed: 57 passed; bounded verify_dashboard.ps1 -SkipBrowser passed; host verify_browser_host.ps1 on port 8515 passed: 40 passed."
     }
+  },
+  {
+    "timestamp": "2026-07-01T01:07:51+12:00",
+    "scope": "Revenue Outlook EV/PHEV audit display cache",
+    "before_ms": {
+      "direct_drift_filter_plus_display_min": 5.433,
+      "direct_drift_filter_plus_display_mean": 5.873,
+      "direct_split_display_min": 4.145,
+      "direct_split_display_mean": 4.603
+    },
+    "after_ms": {
+      "cached_drift_view_warm_min": 0.606,
+      "cached_drift_view_warm_mean": 0.632,
+      "cached_split_display_warm_min": 0.498,
+      "cached_split_display_warm_mean": 0.529
+    },
+    "result": {
+      "ev_phev_audit_change": "Cached the selected EV/PHEV migration audit view and legacy EV/PHEV split display table using runtime signature and visible audit mode; the composition branch now uses the cached stack for its table and download.",
+      "validation": "python -m compileall . passed; Revenue Outlook/cloud test slice passed: 59 passed; full pytest passed: 404 passed, 50 skipped, 41 deselected; bounded verify_dashboard.ps1 -SkipBrowser passed; host verify_browser_host.ps1 on port 8515 passed: 40 passed."
+    }
   }
 ]

@@ -741,6 +741,62 @@ def test_revenue_outlook_composition_stack_and_figure_cache_match_direct_builder
         )
 
 
+def test_revenue_outlook_ev_phev_audit_views_cache_match_direct_builders() -> None:
+    root = Path(__file__).resolve().parents[1]
+    pack_dir = root / CURRENT_REVENUE_OUTLOOK_DIR
+    pack = load_revenue_outlook_pack(pack_dir, repo_root=root)
+    assert pack is not None
+    signature = revenue_outlook_signature(pack_dir, root)
+    manifest = pack.manifest if isinstance(pack.manifest, dict) else {}
+
+    drift = app._pack_table(pack, "ev_phev_ped_light_drift_assumptions")
+    drift_manifest = manifest.get("ev_phev_ped_light_drift_assumptions") or {}
+    mode_values = drift.get("lambda_mode", pd.Series(dtype=str)).dropna().astype(str).drop_duplicates().tolist()
+    ordered_modes = [mode for mode in ["optimized", "fixed_light_only", "fixed_ped_only", "mbu_ratio"] if mode in mode_values]
+    default_mode = str(drift_manifest.get("default_lambda_mode") or "optimized")
+    selected_mode = default_mode if default_mode in (ordered_modes or mode_values) else (ordered_modes or mode_values)[0]
+
+    if hasattr(app.cached_revenue_outlook_ev_phev_drift_view, "clear"):
+        app.cached_revenue_outlook_ev_phev_drift_view.clear()
+    if hasattr(app.cached_revenue_outlook_ev_phev_split_display, "clear"):
+        app.cached_revenue_outlook_ev_phev_split_display.clear()
+
+    cached_drift, cached_drift_display = app.cached_revenue_outlook_ev_phev_drift_view(
+        signature,
+        selected_mode,
+        drift,
+    )
+    direct_drift = drift[
+        drift.get("lambda_mode", pd.Series("", index=drift.index)).astype(str).eq(str(selected_mode))
+    ].copy()
+    direct_drift_display = app._ev_phev_ped_light_drift_display_table(direct_drift)
+    pd.testing.assert_frame_equal(cached_drift.reset_index(drop=True), direct_drift.reset_index(drop=True), check_dtype=False)
+    pd.testing.assert_frame_equal(
+        cached_drift_display.reset_index(drop=True),
+        direct_drift_display.reset_index(drop=True),
+        check_dtype=False,
+    )
+
+    split = app._pack_table(pack, "ev_phev_split_assumptions")
+    cached_split_display = app.cached_revenue_outlook_ev_phev_split_display(signature, split)
+    direct_split_display = app._ev_phev_split_assumptions_display_table(split)
+    pd.testing.assert_frame_equal(
+        cached_split_display.reset_index(drop=True),
+        direct_split_display.reset_index(drop=True),
+        check_dtype=False,
+    )
+
+
+def test_revenue_outlook_composition_branch_uses_cached_stack_for_table() -> None:
+    source = inspect.getsource(app.render_revenue_outlook_page)
+    start = source.index('"Show Revenue composition over time"')
+    end = source.index('"Show EV/PHEV PED-Light migration audit"')
+    composition_branch = source[start:end]
+    assert "filtered_stack" not in composition_branch
+    assert "dataframe_download(chart_stack" in composition_branch
+    assert "_revenue_stack_components_display_table(chart_stack)" in composition_branch
+
+
 def test_governance_page_cloud_visibility_can_be_overridden(monkeypatch) -> None:
     _clear_governance_visibility_env(monkeypatch)
     monkeypatch.setenv("STREAMLIT_SHARING_MODE", "streamlit_cloud")
