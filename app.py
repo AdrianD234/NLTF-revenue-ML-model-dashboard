@@ -456,7 +456,10 @@ def sensitivity_option_label(kind: str, level: str) -> str:
         if level == "Custom":
             return "Custom"
         value = PT_MODE_SHIFT_LEVELS.get(level, 0.0) * 100.0
-        return f"{level} ({value:g}% p.a. from FY2030)"
+        value_text = f"{value:.2f}".rstrip("0").rstrip(".")
+        if "." not in value_text:
+            value_text = f"{value:.1f}"
+        return f"{level} ({value_text}% p.a. from FY2030)"
     if kind == "demand_elasticity":
         if level == "Off":
             return "Off"
@@ -2817,16 +2820,16 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 display_table(_ev_phev_split_assumptions_display_table(ev_phev_split_assumptions), height=320, max_rows=220)
         timer.stop("EV/PHEV split audit")
 
-    if revenue_outlook_lazy_table(
+    if selected_metric_type == "activity":
+        st.caption("Revenue component drill-down and selected-FY revenue split are not applicable to activity-volume series.")
+    elif revenue_outlook_lazy_table(
         "Show Component drill-down and Selected-FY revenue split",
         "revenue_outlook_show_selected_fy_details",
         caption="Selected-FY component and split charts are built only when opened.",
     ):
         timer.start("selected-FY detail figures")
         selected_fy_number = _selected_fy_to_number(selected_fy)
-        if selected_metric_type == "activity":
-            st.caption("Revenue component drill-down and selected-FY revenue split are not applicable to activity-volume series.")
-        else:
+        try:
             detail_cols = st.columns([0.58, 0.42])
             with detail_cols[0]:
                 chart_card(
@@ -2844,7 +2847,8 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                     caption=f"Selected FY: {selected_fy_number or selected_fy}.",
                     notes_as_tooltip=False,
                 )
-        timer.stop("selected-FY detail figures")
+        finally:
+            timer.stop("selected-FY detail figures")
 
     if revenue_outlook_lazy_table(
         "Show revenue line reconciliation",

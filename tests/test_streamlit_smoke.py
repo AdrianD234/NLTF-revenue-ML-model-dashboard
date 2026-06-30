@@ -92,7 +92,7 @@ def test_revenue_outlook_sensitivity_labels_show_actual_assumptions() -> None:
     assert app.sensitivity_option_label("fleet_efficiency", "High") == "High (1.5% p.a.)"
     assert app.sensitivity_option_label("pt_mode_shift", "Low") == "Low (0.25% p.a. from FY2030)"
     assert app.sensitivity_option_label("pt_mode_shift", "Med") == "Med (0.5% p.a. from FY2030)"
-    assert app.sensitivity_option_label("pt_mode_shift", "High") == "High (1% p.a. from FY2030)"
+    assert app.sensitivity_option_label("pt_mode_shift", "High") == "High (1.0% p.a. from FY2030)"
     assert app.sensitivity_option_label("demand_elasticity", "Low") == "Low: PED -0.100 / Light RUC -0.080 / Heavy RUC -0.050"
     assert app.sensitivity_option_label("demand_elasticity", "Med") == "Med: PED -0.144 / Light RUC -0.120 / Heavy RUC -0.100"
     assert app.sensitivity_option_label("demand_elasticity", "High") == "High: PED -0.240 / Light RUC -0.200 / Heavy RUC -0.200"
