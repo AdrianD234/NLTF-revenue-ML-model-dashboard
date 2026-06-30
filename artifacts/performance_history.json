@@ -1,0 +1,51 @@
+[
+  {
+    "timestamp": "2026-06-30T20:44:47+12:00",
+    "scope": "Revenue Outlook app-layer render",
+    "before_ms": {
+      "pack_load": 165.6,
+      "selector_options": 10.36,
+      "ped_bridge_layer": 1373.88,
+      "sensitivity_overlay_default": 647.91,
+      "main_filter": 7.71,
+      "main_path_figure": 388.61,
+      "fan_figure": 9.79,
+      "composition_filter": 10.91,
+      "composition_figure": 64.76,
+      "reconciliation_filter": 4.04,
+      "reconciliation_table": 1.8
+    },
+    "after_ms": {
+      "pack_load": 134.5,
+      "selector_metadata": 18.72,
+      "cached_view_cold_default": 1398.97,
+      "cached_view_warm_default": 25.42,
+      "main_path_figure": 430.95,
+      "fan_figure": 9.61,
+      "composition_filter_when_opened": 11.96,
+      "composition_figure_when_opened": 62.57,
+      "reconciliation_filter_when_opened": 4.95,
+      "reconciliation_table_when_opened": 1.81
+    },
+    "result": {
+      "default_sensitivity_overlay": "skipped on default fast path",
+      "warm_cached_view_ms": 25.42,
+      "lazy_sections": [
+        "scenario role contract",
+        "runtime cutoff audit",
+        "sensitivity impact audit",
+        "PED bridge diagnostics",
+        "revenue composition",
+        "EV/PHEV migration audit",
+        "EV/PHEV split audit",
+        "selected-FY detail charts",
+        "revenue line reconciliation",
+        "series alias audit",
+        "activity and volume outlook",
+        "revenue bridge detail",
+        "manifest and downloads"
+      ],
+      "validation": "focused-revenue-outlook-performance-tests: 23 passed"
+    }
+  }
+]

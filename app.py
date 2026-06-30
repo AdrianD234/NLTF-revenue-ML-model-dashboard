@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import re
 import sys
+from time import perf_counter
 from typing import Any
 import zipfile
 
@@ -119,11 +120,14 @@ from model_dashboard.revenue_outlook import (
     FAN_SOURCE_OPTIONS,
     FAN_SOURCE_PRIORITY,
     FAN_SOURCE_SCENARIO_SPREAD,
+    DEMAND_ELASTICITY_LEVELS,
+    FLEET_EFFICIENCY_LEVELS,
     PED_BRIDGE_DEFAULT_MODE,
     PED_BRIDGE_MODE_LABELS,
     PED_COMPARISON_BEHAVIOURAL_TRACE_NAME,
     PED_EFFICIENCY_BASELINE_SCENARIO_ID,
     PED_EFFICIENCY_DEFAULT_NOTE,
+    PT_MODE_SHIFT_LEVELS,
     REVENUE_OUTLOOK_SCHEMA_VERSION,
     REVENUE_OUTLOOK_TITLE,
     REVENUE_STACK_DETAIL_CLEAN,
@@ -416,6 +420,283 @@ def cached_load_revenue_source_pack(
     del signature
     del schema_version
     return load_revenue_source_pack(pack_dir, repo_root=repo_root)
+
+
+def _pack_table(pack: RevenueOutlookPack | None, name: str, fallback: pd.DataFrame | None = None) -> pd.DataFrame:
+    if pack is None:
+        return pd.DataFrame() if fallback is None else fallback
+    value = getattr(pack, name, None)
+    if isinstance(value, pd.DataFrame):
+        return value
+    return pd.DataFrame() if fallback is None else fallback
+
+
+def _normalize_sensitivity_level(value: Any) -> str:
+    text = str(value or "Off").strip()
+    if text.lower() == "medium":
+        return "Med"
+    for option in SENSITIVITY_LEVELS:
+        if text.lower() == option.lower():
+            return option
+    return "Off"
+
+
+def sensitivity_option_label(kind: str, level: str) -> str:
+    level = _normalize_sensitivity_level(level)
+    if kind == "fleet_efficiency":
+        if level == "Off":
+            return "Off (0.0% p.a.)"
+        if level == "Custom":
+            return "Custom"
+        value = FLEET_EFFICIENCY_LEVELS.get(level, 0.0) * 100.0
+        return f"{level} ({value:.1f}% p.a.)"
+    if kind == "pt_mode_shift":
+        if level == "Off":
+            return "Off (0.0% p.a.)"
+        if level == "Custom":
+            return "Custom"
+        value = PT_MODE_SHIFT_LEVELS.get(level, 0.0) * 100.0
+        return f"{level} ({value:g}% p.a. from FY2030)"
+    if kind == "demand_elasticity":
+        if level == "Off":
+            return "Off"
+        if level == "Custom":
+            return "Custom"
+        ped = DEMAND_ELASTICITY_LEVELS.get("PED", {}).get(level, 0.0)
+        light = DEMAND_ELASTICITY_LEVELS.get("LIGHT_RUC", {}).get(level, 0.0)
+        heavy = DEMAND_ELASTICITY_LEVELS.get("HEAVY_RUC", {}).get(level, 0.0)
+        return f"{level}: PED {ped:.3f} / Light RUC {light:.3f} / Heavy RUC {heavy:.3f}"
+    return level
+
+
+def _key_float(value: float | int | None) -> str:
+    if value is None:
+        return ""
+    try:
+        if pd.isna(value):
+            return ""
+        return f"{float(value):.8g}"
+    except Exception:
+        return ""
+
+
+def selected_sensitivity_key(
+    fleet_efficiency: str,
+    pt_mode_shift: str,
+    demand_elasticity: str,
+    *,
+    custom_fleet_efficiency_pct: float | None = None,
+    custom_pt_shift_pct: float | None = None,
+    custom_ped_elasticity: float | None = None,
+    custom_light_elasticity: float | None = None,
+    custom_heavy_elasticity: float | None = None,
+    cost_per_km_ratio: float | None = None,
+) -> tuple[str, str, str, str, str, str, str, str, str]:
+    return (
+        _normalize_sensitivity_level(fleet_efficiency),
+        _normalize_sensitivity_level(pt_mode_shift),
+        _normalize_sensitivity_level(demand_elasticity),
+        _key_float(custom_fleet_efficiency_pct),
+        _key_float(custom_pt_shift_pct),
+        _key_float(custom_ped_elasticity),
+        _key_float(custom_light_elasticity),
+        _key_float(custom_heavy_elasticity),
+        _key_float(cost_per_km_ratio),
+    )
+
+
+def is_default_sensitivity(
+    fleet_efficiency: str,
+    pt_mode_shift: str,
+    demand_elasticity: str,
+    cost_per_km_ratio: float | None = None,
+) -> bool:
+    return (
+        _normalize_sensitivity_level(fleet_efficiency) == "Off"
+        and _normalize_sensitivity_level(pt_mode_shift) == "Off"
+        and _normalize_sensitivity_level(demand_elasticity) == "Off"
+        and _key_float(cost_per_km_ratio) == ""
+    )
+
+
+def _is_default_sensitivity_key(sensitivity_key: tuple[Any, ...]) -> bool:
+    if len(sensitivity_key) < 9:
+        return False
+    return sensitivity_key[:3] == ("Off", "Off", "Off") and all(str(value or "") == "" for value in sensitivity_key[3:])
+
+
+def revenue_outlook_lazy_table(label: str, key: str, *, default: bool = False, caption: str | None = None) -> bool:
+    show = st.toggle(label, value=default, key=key)
+    if caption and not show:
+        st.caption(caption)
+    return bool(show)
+
+
+class RevenueOutlookRenderTimer:
+    def __init__(self, enabled: bool) -> None:
+        self.enabled = bool(enabled)
+        self.timings_ms: dict[str, float] = {}
+        self._starts: dict[str, float] = {}
+
+    def start(self, label: str) -> None:
+        if self.enabled:
+            self._starts[label] = perf_counter()
+
+    def stop(self, label: str) -> None:
+        if self.enabled and label in self._starts:
+            self.timings_ms[label] = round((perf_counter() - self._starts.pop(label)) * 1000.0, 2)
+
+
+def _revenue_outlook_perf_debug_enabled() -> bool:
+    return env_flag("REVENUE_OUTLOOK_PERF_DEBUG") is True
+
+
+def _render_revenue_outlook_timings(timer: RevenueOutlookRenderTimer) -> None:
+    if not timer.enabled or not timer.timings_ms:
+        return
+    parts = [f"{label}: {value:,.1f} ms" for label, value in timer.timings_ms.items()]
+    st.caption("Revenue Outlook render timings (dev): " + "; ".join(parts))
+
+
+@st.cache_data(show_spinner=False)
+def cached_revenue_outlook_selectors(
+    signature: tuple[tuple[str, int, int], ...],
+    _pack: RevenueOutlookPack,
+) -> dict[str, Any]:
+    del signature
+    chart_rows = _pack_table(_pack, "revenue_chart_rows")
+    line_reconciliation = _pack_table(_pack, "revenue_line_reconciliation")
+    stack_components = _pack_table(_pack, "revenue_stack_components")
+    ped_bridge_mode_config = _pack_table(_pack, "ped_bridge_mode_config")
+    return {
+        "stream_options": _revenue_outlook_stream_options(chart_rows),
+        "fed_path_options": _revenue_outlook_fed_path_options(chart_rows),
+        "trace_options": _revenue_outlook_trace_options(chart_rows),
+        "fy_options": _revenue_outlook_fy_options(chart_rows),
+        "bridge_mode_lookup": _ped_bridge_mode_label_lookup(ped_bridge_mode_config),
+        "line_source_options": _revenue_line_source_options(line_reconciliation),
+        "line_section_options": _revenue_line_section_options(line_reconciliation),
+        "line_fy_bounds": _revenue_line_fy_bounds(line_reconciliation),
+        "stack_source_options": _revenue_line_source_options(stack_components),
+        "stack_mode_options": _revenue_stack_mode_options(stack_components),
+        "stack_section_options": _revenue_line_section_options(stack_components),
+        "stack_fy_bounds": _revenue_line_fy_bounds(stack_components),
+        "stack_overlay_options": _revenue_stack_overlay_options(stack_components),
+        "sensitivity_labels": {
+            "fleet_efficiency": {level: sensitivity_option_label("fleet_efficiency", level) for level in SENSITIVITY_LEVELS},
+            "pt_mode_shift": {level: sensitivity_option_label("pt_mode_shift", level) for level in SENSITIVITY_LEVELS},
+            "demand_elasticity": {level: sensitivity_option_label("demand_elasticity", level) for level in SENSITIVITY_LEVELS},
+        },
+    }
+
+
+def _bridge_mode_frames_for_pack(pack: RevenueOutlookPack, bridge_mode: str) -> dict[str, pd.DataFrame]:
+    return apply_ped_bridge_mode_layer(
+        chart_rows=_pack_table(pack, "revenue_chart_rows"),
+        line_reconciliation=_pack_table(pack, "revenue_line_reconciliation"),
+        bridge_components=_pack_table(pack, "revenue_bridge_components"),
+        future_revenue_forecasts=_pack_table(pack, "future_revenue_forecasts"),
+        ped_revenue_bridge_audit=_pack_table(pack, "ped_revenue_bridge_audit"),
+        bridge_mode=bridge_mode,
+    )
+
+
+def _apply_sensitivity_for_key(
+    bridge_frames: dict[str, pd.DataFrame],
+    sensitivity_config: pd.DataFrame,
+    sensitivity_key: tuple[str, str, str, str, str, str, str, str, str],
+) -> dict[str, pd.DataFrame]:
+    fleet_efficiency, pt_mode_shift, demand_elasticity = sensitivity_key[:3]
+    custom_fleet = float(sensitivity_key[3]) if sensitivity_key[3] else None
+    custom_pt = float(sensitivity_key[4]) if sensitivity_key[4] else None
+    custom_ped = float(sensitivity_key[5]) if sensitivity_key[5] else None
+    custom_light = float(sensitivity_key[6]) if sensitivity_key[6] else None
+    custom_heavy = float(sensitivity_key[7]) if sensitivity_key[7] else None
+    cost_ratio = float(sensitivity_key[8]) if sensitivity_key[8] else None
+    return apply_revenue_sensitivity_layer(
+        chart_rows=bridge_frames["chart_rows"],
+        line_reconciliation=bridge_frames["line_reconciliation"],
+        bridge_components=bridge_frames["revenue_bridge_components"],
+        future_revenue_forecasts=bridge_frames["future_revenue_forecasts"],
+        ped_revenue_bridge_audit=bridge_frames["ped_revenue_bridge_audit"],
+        sensitivity_config=sensitivity_config,
+        fleet_efficiency=fleet_efficiency,
+        pt_mode_shift=pt_mode_shift,
+        demand_elasticity=demand_elasticity,
+        custom_fleet_efficiency_pct=custom_fleet,
+        custom_pt_shift_pct=custom_pt,
+        custom_ped_elasticity=custom_ped,
+        custom_light_elasticity=custom_light,
+        custom_heavy_elasticity=custom_heavy,
+        cost_per_km_ratio=cost_ratio,
+    )
+
+
+@st.cache_data(show_spinner=False)
+def cached_revenue_outlook_view(
+    signature: tuple[tuple[str, int, int], ...],
+    selected_series: str,
+    time_grain: str,
+    fed_path: str,
+    traces: tuple[str, ...],
+    sensitivity_key: tuple[str, str, str, str, str, str, str, str, str],
+    bridge_mode: str,
+    _pack: RevenueOutlookPack,
+) -> dict[str, Any]:
+    del signature
+    bridge_frames = _bridge_mode_frames_for_pack(_pack, bridge_mode)
+    sensitivity_config = _pack_table(_pack, "sensitivity_config", sensitivity_config_frame())
+    if _is_default_sensitivity_key(sensitivity_key):
+        sensitivity_frames = {
+            "chart_rows": bridge_frames["chart_rows"],
+            "line_reconciliation": bridge_frames["line_reconciliation"],
+            "revenue_formula_residuals": bridge_frames["revenue_formula_residuals"],
+            "revenue_stack_components": bridge_frames["revenue_stack_components"],
+            "revenue_bridge_components": bridge_frames["revenue_bridge_components"],
+            "future_revenue_forecasts": bridge_frames["future_revenue_forecasts"],
+            "sensitivity_impact_audit": pd.DataFrame(),
+        }
+        sensitivity_fast_path = True
+    else:
+        sensitivity_frames = _apply_sensitivity_for_key(bridge_frames, sensitivity_config, sensitivity_key)
+        sensitivity_fast_path = False
+
+    chart_rows = sensitivity_frames["chart_rows"]
+    filtered_rows = _filter_revenue_outlook_rows(
+        chart_rows,
+        time_grain=time_grain,
+        stream_labels=[selected_series],
+        fed_paths=[fed_path],
+        trace_names=list(traces),
+    )
+    filtered_bridge = _filter_revenue_bridge_rows(
+        sensitivity_frames["revenue_bridge_components"],
+        [selected_series],
+        _scenario_names_for_traces(chart_rows, list(traces)),
+        [fed_path],
+    )
+    return {
+        **sensitivity_frames,
+        "filtered_rows": filtered_rows,
+        "filtered_bridge": filtered_bridge,
+        "gap_summary": _revenue_outlook_gap_summary(filtered_bridge),
+        "ped_revenue_bridge_audit": bridge_frames["ped_revenue_bridge_audit"],
+        "ped_bridge_mode_impact_audit": bridge_frames["ped_bridge_mode_impact_audit"],
+        "sensitivity_fast_path": sensitivity_fast_path,
+    }
+
+
+@st.cache_data(show_spinner=False)
+def cached_revenue_outlook_sensitivity_audit(
+    signature: tuple[tuple[str, int, int], ...],
+    sensitivity_key: tuple[str, str, str, str, str, str, str, str, str],
+    bridge_mode: str,
+    _pack: RevenueOutlookPack,
+) -> pd.DataFrame:
+    del signature
+    bridge_frames = _bridge_mode_frames_for_pack(_pack, bridge_mode)
+    sensitivity_config = _pack_table(_pack, "sensitivity_config", sensitivity_config_frame())
+    return _apply_sensitivity_for_key(bridge_frames, sensitivity_config, sensitivity_key).get("sensitivity_impact_audit", pd.DataFrame())
 
 
 def directory_signature(path: Path) -> tuple[bool, int, int]:
@@ -1991,14 +2272,18 @@ def render_reproducibility_detail(stream_label: str) -> None:
 def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     del loaded
     repo_root = Path(__file__).resolve().parent
+    timer = RevenueOutlookRenderTimer(_revenue_outlook_perf_debug_enabled())
+    timer.start("pack load")
+    pack_signature = revenue_outlook_signature(repo_root / CURRENT_REVENUE_OUTLOOK_DIR, repo_root)
     pack = st.session_state.get("revenue_outlook_pack")
     if not isinstance(pack, RevenueOutlookPack):
         pack = cached_load_revenue_outlook_pack(
             str(repo_root / CURRENT_REVENUE_OUTLOOK_DIR),
             str(repo_root),
-            revenue_outlook_signature(repo_root / CURRENT_REVENUE_OUTLOOK_DIR, repo_root),
+            pack_signature,
             REVENUE_OUTLOOK_SCHEMA_VERSION,
         )
+    timer.stop("pack load")
 
     if pack is None:
         section_title(REVENUE_OUTLOOK_TITLE)
@@ -2015,57 +2300,9 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         return
 
     manifest = pack.manifest if pack is not None and isinstance(pack.manifest, dict) else {}
-    chart_rows = pack.revenue_chart_rows.copy() if pack is not None and isinstance(pack.revenue_chart_rows, pd.DataFrame) else pd.DataFrame()
-    bridge = pack.revenue_bridge_components.copy() if pack is not None and isinstance(pack.revenue_bridge_components, pd.DataFrame) else pd.DataFrame()
-    future_revenue = pack.future_revenue_forecasts.copy() if pack is not None and isinstance(pack.future_revenue_forecasts, pd.DataFrame) else pd.DataFrame()
-    line_reconciliation = pack.revenue_line_reconciliation.copy() if pack is not None and isinstance(getattr(pack, "revenue_line_reconciliation", None), pd.DataFrame) else pd.DataFrame()
-    stack_components = pack.revenue_stack_components.copy() if pack is not None and isinstance(getattr(pack, "revenue_stack_components", None), pd.DataFrame) else pd.DataFrame()
-    ev_phev_split_assumptions = pack.ev_phev_split_assumptions.copy() if pack is not None and isinstance(getattr(pack, "ev_phev_split_assumptions", None), pd.DataFrame) else pd.DataFrame()
-    ev_phev_ped_light_drift_assumptions = (
-        pack.ev_phev_ped_light_drift_assumptions.copy()
-        if pack is not None and isinstance(getattr(pack, "ev_phev_ped_light_drift_assumptions", None), pd.DataFrame)
-        else pd.DataFrame()
-    )
-    ped_revenue_bridge_audit = (
-        pack.ped_revenue_bridge_audit.copy()
-        if pack is not None and isinstance(getattr(pack, "ped_revenue_bridge_audit", None), pd.DataFrame)
-        else pd.DataFrame()
-    )
-    ped_bridge_shape_fit_metrics = (
-        pack.ped_bridge_shape_fit_metrics.copy()
-        if pack is not None and isinstance(getattr(pack, "ped_bridge_shape_fit_metrics", None), pd.DataFrame)
-        else pd.DataFrame()
-    )
-    ped_bridge_mode_config = (
-        pack.ped_bridge_mode_config.copy()
-        if pack is not None and isinstance(getattr(pack, "ped_bridge_mode_config", None), pd.DataFrame)
-        else pd.DataFrame()
-    )
-    ped_efficiency_scenarios = (
-        pack.ped_efficiency_scenarios.copy()
-        if pack is not None and isinstance(getattr(pack, "ped_efficiency_scenarios", None), pd.DataFrame)
-        else ped_efficiency_scenarios_frame()
-    )
-    sensitivity_config = (
-        pack.sensitivity_config.copy()
-        if pack is not None and isinstance(getattr(pack, "sensitivity_config", None), pd.DataFrame)
-        else sensitivity_config_frame()
-    )
-    sensitivity_seed_inputs = (
-        pack.sensitivity_seed_inputs.copy()
-        if pack is not None and isinstance(getattr(pack, "sensitivity_seed_inputs", None), pd.DataFrame)
-        else pd.DataFrame()
-    )
-    scenario_role_contract = (
-        pack.scenario_role_contract.copy()
-        if pack is not None and isinstance(getattr(pack, "scenario_role_contract", None), pd.DataFrame)
-        else pd.DataFrame()
-    )
-    formula_residuals = pack.revenue_formula_residuals.copy() if pack is not None and isinstance(getattr(pack, "revenue_formula_residuals", None), pd.DataFrame) else pd.DataFrame()
-    alias_audit = pack.series_alias_audit.copy() if pack is not None and isinstance(getattr(pack, "series_alias_audit", None), pd.DataFrame) else pd.DataFrame()
-    runtime_cutoff_audit = pack.runtime_cutoff_audit.copy() if pack is not None and isinstance(getattr(pack, "runtime_cutoff_audit", None), pd.DataFrame) else pd.DataFrame()
-    fan_availability = pack.fan_availability.copy() if pack is not None and isinstance(getattr(pack, "fan_availability", None), pd.DataFrame) else pd.DataFrame()
-    fan_band_rows = pack.fan_band_rows.copy() if pack is not None and isinstance(getattr(pack, "fan_band_rows", None), pd.DataFrame) else pd.DataFrame()
+    chart_rows = _pack_table(pack, "revenue_chart_rows")
+    fan_availability = _pack_table(pack, "fan_availability")
+    fan_band_rows = _pack_table(pack, "fan_band_rows")
 
     section_title(REVENUE_OUTLOOK_TITLE)
     period_rule = manifest.get("period_rule") if isinstance(manifest, dict) else {}
@@ -2075,12 +2312,15 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         warning_panel("The promoted Revenue Outlook pack has no chart rows.")
         return
 
-    stream_options = _revenue_outlook_stream_options(chart_rows)
+    timer.start("selector metadata")
+    selector_options = cached_revenue_outlook_selectors(pack_signature, pack)
+    timer.stop("selector metadata")
+    stream_options = selector_options["stream_options"]
     default_stream_index = stream_options.index("Total NLTF revenue") if "Total NLTF revenue" in stream_options else 0
-    fed_path_options = _revenue_outlook_fed_path_options(chart_rows)
+    fed_path_options = selector_options["fed_path_options"]
     default_fed_index = fed_path_options.index("Current planned path") if "Current planned path" in fed_path_options else 0
-    trace_options = _revenue_outlook_trace_options(chart_rows)
-    fy_options = _revenue_outlook_fy_options(chart_rows)
+    trace_options = selector_options["trace_options"]
+    fy_options = selector_options["fy_options"]
     default_fy_index = fy_options.index("FY2031") if "FY2031" in fy_options else max(len(fy_options) - 1, 0)
 
     with st.container(border=True):
@@ -2127,7 +2367,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 default=trace_options,
                 key="revenue_outlook_traces",
             )
-        bridge_mode_lookup = _ped_bridge_mode_label_lookup(ped_bridge_mode_config)
+        bridge_mode_lookup = selector_options["bridge_mode_lookup"]
         bridge_mode_options = list(bridge_mode_lookup)
         default_bridge_label = next(
             (label for label, mode in bridge_mode_lookup.items() if mode == PED_BRIDGE_DEFAULT_MODE),
@@ -2145,6 +2385,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             selected_ped_bridge_label = default_bridge_label
             selected_ped_bridge_mode = PED_BRIDGE_DEFAULT_MODE
     sensitivity_options = list(SENSITIVITY_LEVELS)
+    sensitivity_labels = selector_options["sensitivity_labels"]
     with st.container(border=True):
         st.markdown("<div class='page5-panel-title'>Sensitivities</div>", unsafe_allow_html=True)
         sens_cols = st.columns([0.18, 0.18, 0.18, 0.18, 0.28])
@@ -2153,6 +2394,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 "Fleet efficiency",
                 sensitivity_options,
                 index=sensitivity_options.index("Off"),
+                format_func=lambda level: sensitivity_labels["fleet_efficiency"].get(level, str(level)),
                 key="revenue_outlook_sensitivity_fleet_efficiency",
             )
         with sens_cols[1]:
@@ -2160,6 +2402,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 "PT mode shift",
                 sensitivity_options,
                 index=sensitivity_options.index("Off"),
+                format_func=lambda level: sensitivity_labels["pt_mode_shift"].get(level, str(level)),
                 key="revenue_outlook_sensitivity_pt_mode_shift",
             )
         with sens_cols[2]:
@@ -2167,6 +2410,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 "Demand elasticity",
                 sensitivity_options,
                 index=sensitivity_options.index("Off"),
+                format_func=lambda level: sensitivity_labels["demand_elasticity"].get(level, str(level)),
                 key="revenue_outlook_sensitivity_demand_elasticity",
             )
         with sens_cols[3]:
@@ -2186,75 +2430,68 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         with sens_cols[4]:
             custom_fleet_efficiency_pct = None
             custom_pt_shift_pct = None
-            custom_elasticity = None
+            custom_ped_elasticity = None
+            custom_light_elasticity = None
+            custom_heavy_elasticity = None
             if selected_fleet_efficiency == "Custom":
                 custom_fleet_efficiency_pct = st.number_input("Custom efficiency % p.a.", min_value=0.0, max_value=10.0, value=1.0, step=0.1)
             if selected_pt_mode_shift == "Custom":
                 custom_pt_shift_pct = st.number_input("Custom PT shift % p.a.", min_value=0.0, max_value=10.0, value=0.5, step=0.1)
             if selected_demand_elasticity == "Custom":
-                custom_elasticity = st.number_input("Custom elasticity", min_value=-2.0, max_value=2.0, value=-0.1, step=0.01)
+                custom_ped_elasticity = st.number_input("Custom PED elasticity", min_value=-2.0, max_value=2.0, value=-0.1, step=0.01)
+                custom_light_elasticity = st.number_input("Custom Light RUC elasticity", min_value=-2.0, max_value=2.0, value=-0.1, step=0.01)
+                custom_heavy_elasticity = st.number_input("Custom Heavy RUC elasticity", min_value=-2.0, max_value=2.0, value=-0.1, step=0.01)
             if all(value != "Custom" for value in [selected_fleet_efficiency, selected_pt_mode_shift, selected_demand_elasticity]):
                 st.caption("Custom inputs appear only when selected.")
         st.caption(SENSITIVITY_DEFAULT_NOTE)
 
-    bridge_mode_frames = apply_ped_bridge_mode_layer(
-        chart_rows=chart_rows,
-        line_reconciliation=line_reconciliation,
-        bridge_components=bridge,
-        future_revenue_forecasts=future_revenue,
-        ped_revenue_bridge_audit=ped_revenue_bridge_audit,
-        bridge_mode=selected_ped_bridge_mode,
-    )
-    chart_rows = bridge_mode_frames["chart_rows"]
-    line_reconciliation = bridge_mode_frames["line_reconciliation"]
-    formula_residuals = bridge_mode_frames["revenue_formula_residuals"]
-    stack_components = bridge_mode_frames["revenue_stack_components"]
-    bridge = bridge_mode_frames["revenue_bridge_components"]
-    future_revenue = bridge_mode_frames["future_revenue_forecasts"]
-    ped_revenue_bridge_audit = bridge_mode_frames["ped_revenue_bridge_audit"]
-    ped_bridge_mode_impact_audit = bridge_mode_frames["ped_bridge_mode_impact_audit"]
-
-    sensitivity_frames = apply_revenue_sensitivity_layer(
-        chart_rows=chart_rows,
-        line_reconciliation=line_reconciliation,
-        bridge_components=bridge,
-        future_revenue_forecasts=future_revenue,
-        ped_revenue_bridge_audit=ped_revenue_bridge_audit,
-        sensitivity_config=sensitivity_config,
+    sensitivity_key = selected_sensitivity_key(
         fleet_efficiency=selected_fleet_efficiency,
         pt_mode_shift=selected_pt_mode_shift,
         demand_elasticity=selected_demand_elasticity,
         custom_fleet_efficiency_pct=custom_fleet_efficiency_pct,
         custom_pt_shift_pct=custom_pt_shift_pct,
-        custom_elasticity=custom_elasticity,
+        custom_ped_elasticity=custom_ped_elasticity,
+        custom_light_elasticity=custom_light_elasticity,
+        custom_heavy_elasticity=custom_heavy_elasticity,
         cost_per_km_ratio=cost_per_km_ratio,
     )
-    chart_rows = sensitivity_frames["chart_rows"]
-    line_reconciliation = sensitivity_frames["line_reconciliation"]
-    formula_residuals = sensitivity_frames["revenue_formula_residuals"]
-    stack_components = sensitivity_frames["revenue_stack_components"]
-    bridge = sensitivity_frames["revenue_bridge_components"]
-    future_revenue = sensitivity_frames["future_revenue_forecasts"]
-    sensitivity_impact_audit = sensitivity_frames["sensitivity_impact_audit"]
-
-    filtered_rows = _filter_revenue_outlook_rows(
-        chart_rows,
-        time_grain="june_year" if grain_label == "June-year" else "quarterly",
-        stream_labels=[selected_stream],
-        fed_paths=[selected_fed_path],
-        trace_names=selected_traces,
+    timer.start("sensitivity overlay")
+    view = cached_revenue_outlook_view(
+        pack_signature,
+        selected_stream,
+        "june_year" if grain_label == "June-year" else "quarterly",
+        selected_fed_path,
+        tuple(selected_traces),
+        sensitivity_key,
+        selected_ped_bridge_mode,
+        pack,
     )
-    filtered_bridge = _filter_revenue_bridge_rows(bridge, [selected_stream], _scenario_names_for_traces(chart_rows, selected_traces), [selected_fed_path])
-    gap_summary = _revenue_outlook_gap_summary(filtered_bridge)
+    timer.stop("sensitivity overlay")
+    chart_rows = view["chart_rows"]
+    line_reconciliation = view["line_reconciliation"]
+    formula_residuals = view["revenue_formula_residuals"]
+    stack_components = view["revenue_stack_components"]
+    bridge = view["revenue_bridge_components"]
+    future_revenue = view["future_revenue_forecasts"]
+    ped_revenue_bridge_audit = view["ped_revenue_bridge_audit"]
+    ped_bridge_mode_impact_audit = view["ped_bridge_mode_impact_audit"]
+    sensitivity_impact_audit = view["sensitivity_impact_audit"]
+    filtered_rows = view["filtered_rows"]
+    filtered_bridge = view["filtered_bridge"]
+    gap_summary = str(view.get("gap_summary") or "")
     if gap_summary:
         warning_panel(gap_summary)
 
     primary_cols = st.columns([0.64, 0.36])
     with primary_cols[0]:
+        timer.start("main path figure")
+        main_path_figure = revenue_outlook_total_path_figure(filtered_rows, selected_series=selected_stream, selected_fy=selected_fy)
+        timer.stop("main path figure")
         chart_card(
             "Total path chart",
             "Single selected series from the committed current runtime pack.",
-            revenue_outlook_total_path_figure(filtered_rows, selected_series=selected_stream, selected_fy=selected_fy),
+            main_path_figure,
             caption=(
                 "Actuals, current finalist base/comparison and official comparator traces are shown only where the runtime pack carries governed rows. "
                 f"PED bridge mode: {selected_ped_bridge_label}."
@@ -2262,343 +2499,467 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             notes_as_tooltip=False,
         )
     with primary_cols[1]:
+        timer.start("fan figure")
         _render_revenue_outlook_fan_card(
             fan_band_rows,
             fan_availability,
             selected_series=selected_stream,
             selected_fed_path=selected_fed_path,
         )
+        timer.stop("fan figure")
 
-    if not scenario_role_contract.empty:
+    if revenue_outlook_lazy_table(
+        "Show scenario role contract",
+        "revenue_outlook_show_scenario_role_contract",
+        caption="Scenario role audit is loaded only when opened.",
+    ):
+        timer.start("scenario role audit")
+        scenario_role_contract = _pack_table(pack, "scenario_role_contract")
         with st.expander("Scenario role contract", expanded=False):
-            st.caption(
-                "PED VKT per capita comparison traces are shown only when the committed runtime carries a value-changing "
-                "behavioural path. Revenue and aggregate traces remain visible where the bridge changes totals."
-            )
-            contract_cols = st.columns([0.82, 0.18])
-            with contract_cols[1]:
-                dataframe_download(scenario_role_contract, "Download CSV", "scenario_role_contract.csv")
-            display_table(_scenario_role_contract_display_table(scenario_role_contract), height=320, max_rows=160)
+            if scenario_role_contract.empty:
+                warning_panel("Scenario role contract is missing from the committed Revenue Outlook pack.")
+            else:
+                st.caption(
+                    "PED VKT per capita comparison traces are shown only when the committed runtime carries a value-changing "
+                    "behavioural path. Revenue and aggregate traces remain visible where the bridge changes totals."
+                )
+                contract_cols = st.columns([0.82, 0.18])
+                with contract_cols[1]:
+                    dataframe_download(scenario_role_contract, "Download CSV", "scenario_role_contract.csv")
+                display_table(_scenario_role_contract_display_table(scenario_role_contract), height=320, max_rows=160)
+        timer.stop("scenario role audit")
 
-    if not runtime_cutoff_audit.empty:
+    if revenue_outlook_lazy_table(
+        "Show runtime cutoff audit",
+        "revenue_outlook_show_runtime_cutoff_audit",
+        caption="Runtime cutoff audit is loaded only when opened.",
+    ):
+        timer.start("runtime cutoff audit")
+        runtime_cutoff_audit = _pack_table(pack, "runtime_cutoff_audit")
         with st.expander("Runtime cutoff audit", expanded=False):
             info_panel(
                 "Revenue Outlook charts and tables stop at the last governed common non-extrapolated horizon across current Base, current comparison and required MBU26 inputs."
             )
-            cutoff_cols = st.columns([0.82, 0.18])
-            with cutoff_cols[1]:
-                dataframe_download(runtime_cutoff_audit, "Download CSV", "runtime_cutoff_audit.csv")
-            display_table(runtime_cutoff_audit, height=220, max_rows=20)
+            if runtime_cutoff_audit.empty:
+                warning_panel("Runtime cutoff audit is missing from the committed Revenue Outlook pack.")
+            else:
+                cutoff_cols = st.columns([0.82, 0.18])
+                with cutoff_cols[1]:
+                    dataframe_download(runtime_cutoff_audit, "Download CSV", "runtime_cutoff_audit.csv")
+                display_table(runtime_cutoff_audit, height=220, max_rows=20)
+        timer.stop("runtime cutoff audit")
 
-    if not sensitivity_impact_audit.empty:
+    if revenue_outlook_lazy_table(
+        "Show sensitivity impact audit",
+        "revenue_outlook_show_sensitivity_impact_audit",
+        caption="Sensitivity audit is skipped on the default fast path until opened.",
+    ):
+        timer.start("sensitivity audit")
+        if sensitivity_impact_audit.empty:
+            sensitivity_impact_audit = cached_revenue_outlook_sensitivity_audit(
+                pack_signature,
+                sensitivity_key,
+                selected_ped_bridge_mode,
+                pack,
+            )
+        sensitivity_seed_inputs = _pack_table(pack, "sensitivity_seed_inputs")
         with st.expander("Sensitivity impact audit", expanded=False):
             info_panel(SENSITIVITY_DEFAULT_NOTE)
             selected_summary = (
-                f"Fleet efficiency: {selected_fleet_efficiency}; "
-                f"PT mode shift: {selected_pt_mode_shift}; "
-                f"Demand elasticity: {selected_demand_elasticity}."
+                f"Fleet efficiency: {sensitivity_option_label('fleet_efficiency', selected_fleet_efficiency)}; "
+                f"PT mode shift: {sensitivity_option_label('pt_mode_shift', selected_pt_mode_shift)}; "
+                f"Demand elasticity: {sensitivity_option_label('demand_elasticity', selected_demand_elasticity)}."
             )
             st.caption(
                 f"{selected_summary} Current-finalist activity/revenue rows and rollups are recalculated in this view only; MBU26 official rows are unchanged."
             )
-            bridge_cols = st.columns([0.74, 0.13, 0.13])
-            display_adjustment = sensitivity_impact_audit[
-                pd.to_numeric(sensitivity_impact_audit.get("FY"), errors="coerce").between(2026, 2050, inclusive="both")
-            ].copy()
-            with bridge_cols[1]:
-                dataframe_download(display_adjustment, "Download CSV", "sensitivity_impact_audit.csv")
-            with bridge_cols[2]:
-                if not sensitivity_seed_inputs.empty:
-                    dataframe_download(sensitivity_seed_inputs, "Seed CSV", "sensitivity_seed_inputs.csv")
-            display_table(_sensitivity_impact_display_table(display_adjustment), height=360, max_rows=300)
+            if sensitivity_impact_audit.empty:
+                warning_panel("Sensitivity impact audit is unavailable for the selected Revenue Outlook view.")
+            else:
+                bridge_cols = st.columns([0.74, 0.13, 0.13])
+                display_adjustment = sensitivity_impact_audit[
+                    pd.to_numeric(sensitivity_impact_audit.get("FY"), errors="coerce").between(2026, 2050, inclusive="both")
+                ].copy()
+                with bridge_cols[1]:
+                    dataframe_download(display_adjustment, "Download CSV", "sensitivity_impact_audit.csv")
+                with bridge_cols[2]:
+                    if not sensitivity_seed_inputs.empty:
+                        dataframe_download(sensitivity_seed_inputs, "Seed CSV", "sensitivity_seed_inputs.csv")
+                display_table(_sensitivity_impact_display_table(display_adjustment), height=360, max_rows=300)
+        timer.stop("sensitivity audit")
 
-    if not ped_revenue_bridge_audit.empty:
+    if revenue_outlook_lazy_table(
+        "Show PED bridge diagnostics",
+        "revenue_outlook_show_ped_bridge_diagnostics",
+        caption="PED bridge diagnostics are loaded only when opened.",
+    ):
+        timer.start("PED bridge diagnostics")
+        ped_bridge_shape_fit_metrics = _pack_table(pack, "ped_bridge_shape_fit_metrics")
         with st.expander("PED bridge diagnostics", expanded=False):
             info_panel(
                 "PED VKT per capita is a finalist model output. PED volume and revenue are bridge outputs: raw mode uses "
                 "VKTpc x scenario population, while optimized mode applies the PED+Light EV/PHEV migration allocation first."
             )
             st.caption(
-                f"Selected bridge mode: {selected_ped_bridge_label}. Default remains Optimized migration bridge until the audit is reviewed."
+                f"Selected bridge mode: {selected_ped_bridge_label}. Default bridge mode is Raw model bridge."
             )
-            fallback_count = int(
-                ped_revenue_bridge_audit.get("population_fallback_flag", pd.Series(dtype=bool)).fillna(False).astype(bool).sum()
-            )
-            if fallback_count:
-                warning_panel(
-                    f"{fallback_count} PED bridge rows use an MBU26 population proxy for at least one quarter. These rows are flagged in the audit table."
+            if ped_revenue_bridge_audit.empty:
+                warning_panel("PED bridge diagnostics are missing from the committed Revenue Outlook pack.")
+            else:
+                fallback_count = int(
+                    ped_revenue_bridge_audit.get("population_fallback_flag", pd.Series(dtype=bool)).fillna(False).astype(bool).sum()
                 )
-            diag_cols = st.columns([0.62, 0.13, 0.13, 0.12])
-            fy_bridge = ped_revenue_bridge_audit[
-                pd.to_numeric(ped_revenue_bridge_audit.get("FY"), errors="coerce").between(2026, 2050, inclusive="both")
-            ].copy()
-            with diag_cols[1]:
-                dataframe_download(fy_bridge, "Audit CSV", "ped_revenue_bridge_audit.csv")
-            with diag_cols[2]:
+                if fallback_count:
+                    warning_panel(
+                        f"{fallback_count} PED bridge rows use an MBU26 population proxy for at least one quarter. These rows are flagged in the audit table."
+                    )
+                diag_cols = st.columns([0.62, 0.13, 0.13, 0.12])
+                fy_bridge = ped_revenue_bridge_audit[
+                    pd.to_numeric(ped_revenue_bridge_audit.get("FY"), errors="coerce").between(2026, 2050, inclusive="both")
+                ].copy()
+                with diag_cols[1]:
+                    dataframe_download(fy_bridge, "Audit CSV", "ped_revenue_bridge_audit.csv")
+                with diag_cols[2]:
+                    if not ped_bridge_shape_fit_metrics.empty:
+                        dataframe_download(ped_bridge_shape_fit_metrics, "Shape CSV", "ped_bridge_shape_fit_metrics.csv")
+                with diag_cols[3]:
+                    if not ped_bridge_mode_impact_audit.empty:
+                        dataframe_download(ped_bridge_mode_impact_audit, "Mode CSV", "ped_bridge_mode_impact_audit.csv")
+                display_table(_ped_bridge_diagnostics_display_table(fy_bridge), height=360, max_rows=300)
                 if not ped_bridge_shape_fit_metrics.empty:
-                    dataframe_download(ped_bridge_shape_fit_metrics, "Shape CSV", "ped_bridge_shape_fit_metrics.csv")
-            with diag_cols[3]:
+                    st.markdown("<div class='page5-panel-title'>Shape-fit metrics</div>", unsafe_allow_html=True)
+                    display_table(_ped_bridge_shape_fit_display_table(ped_bridge_shape_fit_metrics), height=260, max_rows=80)
                 if not ped_bridge_mode_impact_audit.empty:
-                    dataframe_download(ped_bridge_mode_impact_audit, "Mode CSV", "ped_bridge_mode_impact_audit.csv")
-            display_table(_ped_bridge_diagnostics_display_table(fy_bridge), height=360, max_rows=300)
-            if not ped_bridge_shape_fit_metrics.empty:
-                st.markdown("<div class='page5-panel-title'>Shape-fit metrics</div>", unsafe_allow_html=True)
-                display_table(_ped_bridge_shape_fit_display_table(ped_bridge_shape_fit_metrics), height=260, max_rows=80)
-            if not ped_bridge_mode_impact_audit.empty:
-                st.markdown("<div class='page5-panel-title'>Selected mode impact</div>", unsafe_allow_html=True)
-                display_table(_ped_bridge_mode_impact_display_table(ped_bridge_mode_impact_audit), height=260, max_rows=160)
-
-    with st.container(border=True):
-        st.markdown("<div class='page5-panel-title'>Revenue composition over time</div>", unsafe_allow_html=True)
-        comp_cols = st.columns([0.20, 0.18, 0.17, 0.16, 0.15, 0.14])
-        stack_source_options = _revenue_line_source_options(stack_components)
-        stack_mode_options = _revenue_stack_mode_options(stack_components)
-        stack_section_options = _revenue_line_section_options(stack_components)
-        stack_fy_min, stack_fy_max = _revenue_line_fy_bounds(stack_components)
-        with comp_cols[0]:
-            selected_stack_source = st.selectbox(
-                "Source path",
-                stack_source_options,
-                index=0,
-                key="revenue_stack_source_path",
-            )
-        with comp_cols[1]:
-            selected_stack_mode = st.selectbox(
-                "Mode",
-                stack_mode_options,
-                index=0,
-                key="revenue_stack_composition_mode",
-            )
-        with comp_cols[2]:
-            selected_stack_detail_level = st.selectbox(
-                "Detail level",
-                list(REVENUE_STACK_DETAIL_LEVELS),
-                index=0,
-                key="revenue_stack_detail_level",
-            )
-        with comp_cols[3]:
-            selected_stack_fy_range = st.slider(
-                "FY range / horizon",
-                min_value=stack_fy_min,
-                max_value=stack_fy_max,
-                value=(max(stack_fy_min, 2025), min(stack_fy_max, 2035)) if stack_fy_min <= 2025 <= stack_fy_max else (stack_fy_min, min(stack_fy_max, stack_fy_min + 10)),
-                key="revenue_stack_fy_range",
-            )
-        default_stack_sections = [section for section in ["RUC", "FED", "MVR", "TUC"] if section in stack_section_options]
-        with comp_cols[4]:
-            selected_stack_sections = st.multiselect(
-                "Section filter",
-                stack_section_options,
-                default=default_stack_sections or stack_section_options,
-                key="revenue_stack_sections",
-            )
-        stack_overlay_options = _revenue_stack_overlay_options(stack_components)
-        default_stack_overlays = _revenue_stack_default_overlays(selected_stack_mode, stack_overlay_options)
-        with comp_cols[5]:
-            selected_stack_overlays = st.multiselect(
-                "Aggregate overlays",
-                stack_overlay_options,
-                default=default_stack_overlays,
-                key=f"revenue_stack_overlays_{selected_stack_mode}_{selected_stack_detail_level}",
-            )
-
-        filtered_stack = _filter_revenue_stack_components(
-            stack_components,
-            source_path=selected_stack_source,
-            composition_mode=selected_stack_mode,
-            sections=selected_stack_sections,
-            fy_range=selected_stack_fy_range,
-        )
-        chart_stack = filtered_stack
-        if selected_stack_overlays:
-            overlay_stack = _filter_revenue_stack_components(
-                stack_components,
-                source_path=selected_stack_source,
-                composition_mode=selected_stack_mode,
-                sections=stack_section_options,
-                fy_range=selected_stack_fy_range,
-            )
-            overlay_stack = overlay_stack[
-                overlay_stack.get("stack_role", pd.Series("", index=overlay_stack.index)).astype(str).eq("aggregate_overlay")
-                & overlay_stack.get("line_label", pd.Series("", index=overlay_stack.index)).astype(str).isin(selected_stack_overlays)
-            ].copy()
-            if not overlay_stack.empty:
-                chart_stack = pd.concat([filtered_stack, overlay_stack], ignore_index=True, sort=False)
-        chart_card(
-            "Revenue composition over time",
-            "Line-item contributions from revenue_stack_components; aggregate rows are overlays only.",
-            revenue_outlook_composition_figure(
-                chart_stack,
-                source_path=selected_stack_source,
-                composition_mode=selected_stack_mode,
-                detail_level=selected_stack_detail_level,
-                overlays=selected_stack_overlays,
-            ),
-            caption="Clean bridge mode hides internal add-back rows while preserving reconciliation to Total NLTF revenue. Positive revenue components stack above zero; deductions stack below zero. Full formula audit shows internal rows. Gross mode reconciles leaf rows to Total gross revenues. Aggregates are overlays only.",
-            notes_as_tooltip=False,
-        )
-        stack_gap_banner = _revenue_stack_gap_banner(filtered_stack)
-        if stack_gap_banner:
-            warning_panel(stack_gap_banner)
-        table_cols = st.columns([0.82, 0.18])
-        with table_cols[1]:
-            dataframe_download(filtered_stack, "Download CSV", "revenue_stack_components.csv")
-        display_table(_revenue_stack_components_display_table(filtered_stack), height=360, max_rows=720)
-
-    if not ev_phev_ped_light_drift_assumptions.empty:
-        with st.expander("EV/PHEV PED-Light migration audit", expanded=False):
-            drift_manifest = (manifest.get("ev_phev_ped_light_drift_assumptions") or {}) if isinstance(manifest, dict) else {}
-            mode_values = (
-                ev_phev_ped_light_drift_assumptions.get("lambda_mode", pd.Series(dtype=str))
-                .dropna()
-                .astype(str)
-                .drop_duplicates()
-                .tolist()
-            )
-            mode_labels = {
-                "optimized": "Optimized",
-                "fixed_light_only": "Light-only",
-                "fixed_ped_only": "PED-only",
-                "mbu_ratio": "MBU ratio",
-            }
-            ordered_modes = [mode for mode in ["optimized", "fixed_light_only", "fixed_ped_only", "mbu_ratio"] if mode in mode_values]
-            default_mode = str(drift_manifest.get("default_lambda_mode") or "optimized")
-            selected_mode = st.selectbox(
-                "Migration allocation mode",
-                ordered_modes or mode_values,
-                index=(ordered_modes or mode_values).index(default_mode) if default_mode in (ordered_modes or mode_values) else 0,
-                format_func=lambda value: mode_labels.get(str(value), str(value).replace("_", " ").title()),
-                key="revenue_outlook_migration_allocation_mode",
-            )
-            info_panel(
-                "EV/PHEV uptake is allocated between PED/light-petrol and total Light RUC to match MBU proportions; it is not a new model."
-            )
-            drift_view = ev_phev_ped_light_drift_assumptions[
-                ev_phev_ped_light_drift_assumptions.get("lambda_mode", pd.Series("", index=ev_phev_ped_light_drift_assumptions.index)).astype(str).eq(str(selected_mode))
-            ].copy()
-            drift_cols = st.columns([0.82, 0.18])
-            with drift_cols[1]:
-                dataframe_download(drift_view, "Download CSV", "ev_phev_ped_light_drift_assumptions.csv")
-            display_table(_ev_phev_ped_light_drift_display_table(drift_view), height=340, max_rows=260)
-
-    if not ev_phev_split_assumptions.empty:
-        with st.expander("EV/PHEV split audit", expanded=False):
-            target_audit = (manifest.get("target_semantics_audit") or {}).get("LIGHT_RUC", {}) if isinstance(manifest, dict) else {}
-            allocation_status = ((manifest.get("ev_phev_split_assumptions") or {}).get("allocation_status") if isinstance(manifest, dict) else "") or ""
-            info_panel(
-                "Legacy continuity view: MBU26 Light RUC split/rate rows and old fixed-add-on comparators are retained for governance review."
-            )
-            st.caption(
-                "The active current-finalist path is the PED-Light migration audit above. BEV/PHEV are not fixed add-ons."
-            )
-            if target_audit:
-                st.caption(f"Target semantics status: {target_audit.get('status', '')}. Allocation status: {allocation_status}.")
-            audit_cols = st.columns([0.82, 0.18])
-            with audit_cols[1]:
-                dataframe_download(ev_phev_split_assumptions, "Download CSV", "ev_phev_split_assumptions.csv")
-            display_table(_ev_phev_split_assumptions_display_table(ev_phev_split_assumptions), height=320, max_rows=220)
-
-    selected_fy_number = _selected_fy_to_number(selected_fy)
-    if selected_metric_type == "activity":
-        st.caption("Revenue component drill-down and selected-FY revenue split are not applicable to activity-volume series.")
-    else:
-        detail_cols = st.columns([0.58, 0.42])
-        with detail_cols[0]:
-            chart_card(
-                "Component drill-down",
-                "Selected-FY bridge components behind the current finalist revenue composition.",
-                revenue_outlook_component_figure(bridge, selected_fy=selected_fy, selected_fed_path=selected_fed_path),
-                caption="Component rows come from revenue_bridge_components in the committed runtime pack.",
-                notes_as_tooltip=False,
-            )
-        with detail_cols[1]:
-            chart_card(
-                "Selected-FY revenue split",
-                "Net FED, total RUC and MVR share of selected-FY revenue where available.",
-                revenue_outlook_split_figure(bridge, selected_fy=selected_fy, selected_fed_path=selected_fed_path),
-                caption=f"Selected FY: {selected_fy_number or selected_fy}.",
-                notes_as_tooltip=False,
-            )
-
-    with st.container(border=True):
-        st.markdown("<div class='page5-panel-title'>Revenue line reconciliation</div>", unsafe_allow_html=True)
-        rec_cols = st.columns([0.35, 0.25, 0.25, 0.15])
-        source_options = _revenue_line_source_options(line_reconciliation)
-        section_options = _revenue_line_section_options(line_reconciliation)
-        fy_min, fy_max = _revenue_line_fy_bounds(line_reconciliation)
-        with rec_cols[0]:
-            selected_source_paths = st.multiselect(
-                "Source path",
-                source_options,
-                default=source_options,
-                key="revenue_line_reconciliation_source_paths",
-            )
-        with rec_cols[1]:
-            selected_sections = st.multiselect(
-                "Section",
-                section_options,
-                default=section_options,
-                key="revenue_line_reconciliation_sections",
-            )
-        with rec_cols[2]:
-            selected_fy_range = st.slider(
-                "FY range",
-                min_value=fy_min,
-                max_value=fy_max,
-                value=(max(fy_min, 2024), min(fy_max, 2027)) if fy_min <= 2024 <= fy_max else (fy_min, min(fy_max, fy_min + 3)),
-                key="revenue_line_reconciliation_fy_range",
-            )
-        filtered_reconciliation = _filter_revenue_line_reconciliation(
-            line_reconciliation,
-            source_paths=selected_source_paths,
-            sections=selected_sections,
-            fy_range=selected_fy_range,
-        )
-        with rec_cols[3]:
-            dataframe_download(filtered_reconciliation, "Download CSV", "revenue_line_reconciliation.csv")
-        gap_banner = _revenue_formula_gap_banner(formula_residuals, selected_source_paths, selected_fy_range)
-        if gap_banner:
-            warning_panel(gap_banner)
-        display_table(_revenue_line_reconciliation_display_table(filtered_reconciliation), height=360, max_rows=520)
-
-    with st.container(border=True):
-        st.markdown("<div class='page5-panel-title'>Series alias audit</div>", unsafe_allow_html=True)
-        alias_cols = st.columns([0.82, 0.18])
-        with alias_cols[1]:
-            dataframe_download(alias_audit, "Download CSV", "series_alias_audit.csv")
-        display_table(_revenue_series_alias_audit_display_table(alias_audit), height=260, max_rows=120)
-
-    with st.expander("Activity and volume outlook", expanded=False):
-        activity_rows = _filter_revenue_outlook_rows(
-            chart_rows,
-            time_grain="june_year" if grain_label == "June-year" else "quarterly",
-            stream_labels=["PED VKT per capita", "PED volume", "Light RUC net km", "Heavy RUC net km"],
-            fed_paths=[selected_fed_path],
-            trace_names=selected_traces,
-        )
-        chart_card(
-            "Activity and volume outlook",
-            "PED uses VKT per capita; Light and Heavy RUC use net kilometres. Actuals end at FY2025.",
-            revenue_outlook_figure(activity_rows, metric_type="activity"),
-            caption="Forecast start and H13 markers are shown where numeric reviewed forecasts exist. Units are kept separate by stream.",
-            notes_as_tooltip=False,
-        )
+                    st.markdown("<div class='page5-panel-title'>Selected mode impact</div>", unsafe_allow_html=True)
+                    display_table(_ped_bridge_mode_impact_display_table(ped_bridge_mode_impact_audit), height=260, max_rows=160)
+        timer.stop("PED bridge diagnostics")
 
     revenue_kpis = _revenue_outlook_summary_cards(manifest, filtered_rows, future_revenue)
     kpi_grid(revenue_kpis)
 
-    st.markdown("<div class='page5-panel-title'>Revenue bridge detail</div>", unsafe_allow_html=True)
-    display_table(_revenue_bridge_display_table(filtered_bridge), height=320, max_rows=240)
+    if revenue_outlook_lazy_table(
+        "Show Revenue composition over time",
+        "revenue_outlook_show_composition",
+        caption=(
+            "FY range / horizon, Section filter and Aggregate overlays controls are loaded with the chart. "
+            "Positive revenue components stack above zero."
+        ),
+    ):
+        timer.start("composition figure")
+        with st.container(border=True):
+            st.markdown("<div class='page5-panel-title'>Revenue composition over time</div>", unsafe_allow_html=True)
+            comp_cols = st.columns([0.20, 0.18, 0.17, 0.16, 0.15, 0.14])
+            stack_source_options = selector_options["stack_source_options"]
+            stack_mode_options = selector_options["stack_mode_options"]
+            stack_section_options = selector_options["stack_section_options"]
+            stack_fy_min, stack_fy_max = selector_options["stack_fy_bounds"]
+            with comp_cols[0]:
+                selected_stack_source = st.selectbox(
+                    "Source path",
+                    stack_source_options,
+                    index=0,
+                    key="revenue_stack_source_path",
+                )
+            with comp_cols[1]:
+                selected_stack_mode = st.selectbox(
+                    "Mode",
+                    stack_mode_options,
+                    index=0,
+                    key="revenue_stack_composition_mode",
+                )
+            with comp_cols[2]:
+                selected_stack_detail_level = st.selectbox(
+                    "Detail level",
+                    list(REVENUE_STACK_DETAIL_LEVELS),
+                    index=0,
+                    key="revenue_stack_detail_level",
+                )
+            with comp_cols[3]:
+                selected_stack_fy_range = st.slider(
+                    "FY range / horizon",
+                    min_value=stack_fy_min,
+                    max_value=stack_fy_max,
+                    value=(max(stack_fy_min, 2025), min(stack_fy_max, 2035)) if stack_fy_min <= 2025 <= stack_fy_max else (stack_fy_min, min(stack_fy_max, stack_fy_min + 10)),
+                    key="revenue_stack_fy_range",
+                )
+            default_stack_sections = [section for section in ["RUC", "FED", "MVR", "TUC"] if section in stack_section_options]
+            with comp_cols[4]:
+                selected_stack_sections = st.multiselect(
+                    "Section filter",
+                    stack_section_options,
+                    default=default_stack_sections or stack_section_options,
+                    key="revenue_stack_sections",
+                )
+            stack_overlay_options = selector_options["stack_overlay_options"]
+            default_stack_overlays = _revenue_stack_default_overlays(selected_stack_mode, stack_overlay_options)
+            with comp_cols[5]:
+                selected_stack_overlays = st.multiselect(
+                    "Aggregate overlays",
+                    stack_overlay_options,
+                    default=default_stack_overlays,
+                    key=f"revenue_stack_overlays_{selected_stack_mode}_{selected_stack_detail_level}",
+                )
 
-    with st.expander("Manifest, source policy and downloads", expanded=False):
-        display_table(_revenue_outlook_manifest_table(manifest), height=220, max_rows=80)
-        download_cols = st.columns(3)
-        with download_cols[0]:
-            dataframe_download(future_revenue, "Download future revenue forecasts", "future_revenue_forecasts.csv")
-        with download_cols[1]:
-            dataframe_download(bridge, "Download revenue bridge components", "revenue_bridge_components.csv")
-        with download_cols[2]:
-            dataframe_download(chart_rows, "Download revenue chart rows", "revenue_chart_rows.csv")
+            filtered_stack = _filter_revenue_stack_components(
+                stack_components,
+                source_path=selected_stack_source,
+                composition_mode=selected_stack_mode,
+                sections=selected_stack_sections,
+                fy_range=selected_stack_fy_range,
+            )
+            chart_stack = filtered_stack
+            if selected_stack_overlays:
+                overlay_stack = _filter_revenue_stack_components(
+                    stack_components,
+                    source_path=selected_stack_source,
+                    composition_mode=selected_stack_mode,
+                    sections=stack_section_options,
+                    fy_range=selected_stack_fy_range,
+                )
+                overlay_stack = overlay_stack[
+                    overlay_stack.get("stack_role", pd.Series("", index=overlay_stack.index)).astype(str).eq("aggregate_overlay")
+                    & overlay_stack.get("line_label", pd.Series("", index=overlay_stack.index)).astype(str).isin(selected_stack_overlays)
+                ].copy()
+                if not overlay_stack.empty:
+                    chart_stack = pd.concat([filtered_stack, overlay_stack], ignore_index=True, sort=False)
+            chart_card(
+                "Revenue composition over time",
+                "Line-item contributions from revenue_stack_components; aggregate rows are overlays only.",
+                revenue_outlook_composition_figure(
+                    chart_stack,
+                    source_path=selected_stack_source,
+                    composition_mode=selected_stack_mode,
+                    detail_level=selected_stack_detail_level,
+                    overlays=selected_stack_overlays,
+                ),
+                caption="Clean bridge mode hides internal add-back rows while preserving reconciliation to Total NLTF revenue. Positive revenue components stack above zero; deductions stack below zero. Full formula audit shows internal rows. Gross mode reconciles leaf rows to Total gross revenues. Aggregates are overlays only.",
+                notes_as_tooltip=False,
+            )
+            stack_gap_banner = _revenue_stack_gap_banner(filtered_stack)
+            if stack_gap_banner:
+                warning_panel(stack_gap_banner)
+            table_cols = st.columns([0.82, 0.18])
+            with table_cols[1]:
+                dataframe_download(filtered_stack, "Download CSV", "revenue_stack_components.csv")
+            display_table(_revenue_stack_components_display_table(filtered_stack), height=360, max_rows=720)
+        timer.stop("composition figure")
+
+    if revenue_outlook_lazy_table(
+        "Show EV/PHEV PED-Light migration audit",
+        "revenue_outlook_show_ev_phev_drift_audit",
+        caption="EV/PHEV migration audit is loaded only when opened.",
+    ):
+        timer.start("EV/PHEV migration audit")
+        ev_phev_ped_light_drift_assumptions = _pack_table(pack, "ev_phev_ped_light_drift_assumptions")
+        with st.expander("EV/PHEV PED-Light migration audit", expanded=False):
+            if ev_phev_ped_light_drift_assumptions.empty:
+                warning_panel("EV/PHEV migration audit is missing from the committed Revenue Outlook pack.")
+            else:
+                drift_manifest = (manifest.get("ev_phev_ped_light_drift_assumptions") or {}) if isinstance(manifest, dict) else {}
+                mode_values = (
+                    ev_phev_ped_light_drift_assumptions.get("lambda_mode", pd.Series(dtype=str))
+                    .dropna()
+                    .astype(str)
+                    .drop_duplicates()
+                    .tolist()
+                )
+                mode_labels = {
+                    "optimized": "Optimized",
+                    "fixed_light_only": "Light-only",
+                    "fixed_ped_only": "PED-only",
+                    "mbu_ratio": "MBU ratio",
+                }
+                ordered_modes = [mode for mode in ["optimized", "fixed_light_only", "fixed_ped_only", "mbu_ratio"] if mode in mode_values]
+                default_mode = str(drift_manifest.get("default_lambda_mode") or "optimized")
+                selected_mode = st.selectbox(
+                    "Migration allocation mode",
+                    ordered_modes or mode_values,
+                    index=(ordered_modes or mode_values).index(default_mode) if default_mode in (ordered_modes or mode_values) else 0,
+                    format_func=lambda value: mode_labels.get(str(value), str(value).replace("_", " ").title()),
+                    key="revenue_outlook_migration_allocation_mode",
+                )
+                info_panel(
+                    "EV/PHEV uptake is allocated between PED/light-petrol and total Light RUC to match MBU proportions; it is not a new model."
+                )
+                drift_view = ev_phev_ped_light_drift_assumptions[
+                    ev_phev_ped_light_drift_assumptions.get("lambda_mode", pd.Series("", index=ev_phev_ped_light_drift_assumptions.index)).astype(str).eq(str(selected_mode))
+                ].copy()
+                drift_cols = st.columns([0.82, 0.18])
+                with drift_cols[1]:
+                    dataframe_download(drift_view, "Download CSV", "ev_phev_ped_light_drift_assumptions.csv")
+                display_table(_ev_phev_ped_light_drift_display_table(drift_view), height=340, max_rows=260)
+        timer.stop("EV/PHEV migration audit")
+
+    if revenue_outlook_lazy_table(
+        "Show EV/PHEV split audit",
+        "revenue_outlook_show_ev_phev_split_audit",
+        caption="EV/PHEV split audit is loaded only when opened.",
+    ):
+        timer.start("EV/PHEV split audit")
+        ev_phev_split_assumptions = _pack_table(pack, "ev_phev_split_assumptions")
+        with st.expander("EV/PHEV split audit", expanded=False):
+            if ev_phev_split_assumptions.empty:
+                warning_panel("EV/PHEV split audit is missing from the committed Revenue Outlook pack.")
+            else:
+                target_audit = (manifest.get("target_semantics_audit") or {}).get("LIGHT_RUC", {}) if isinstance(manifest, dict) else {}
+                allocation_status = ((manifest.get("ev_phev_split_assumptions") or {}).get("allocation_status") if isinstance(manifest, dict) else "") or ""
+                info_panel(
+                    "Legacy continuity view: MBU26 Light RUC split/rate rows and old fixed-add-on comparators are retained for governance review."
+                )
+                st.caption(
+                    "The active current-finalist path is the PED-Light migration audit above. BEV/PHEV are not fixed add-ons."
+                )
+                if target_audit:
+                    st.caption(f"Target semantics status: {target_audit.get('status', '')}. Allocation status: {allocation_status}.")
+                audit_cols = st.columns([0.82, 0.18])
+                with audit_cols[1]:
+                    dataframe_download(ev_phev_split_assumptions, "Download CSV", "ev_phev_split_assumptions.csv")
+                display_table(_ev_phev_split_assumptions_display_table(ev_phev_split_assumptions), height=320, max_rows=220)
+        timer.stop("EV/PHEV split audit")
+
+    if revenue_outlook_lazy_table(
+        "Show Component drill-down and Selected-FY revenue split",
+        "revenue_outlook_show_selected_fy_details",
+        caption="Selected-FY component and split charts are built only when opened.",
+    ):
+        timer.start("selected-FY detail figures")
+        selected_fy_number = _selected_fy_to_number(selected_fy)
+        if selected_metric_type == "activity":
+            st.caption("Revenue component drill-down and selected-FY revenue split are not applicable to activity-volume series.")
+        else:
+            detail_cols = st.columns([0.58, 0.42])
+            with detail_cols[0]:
+                chart_card(
+                    "Component drill-down",
+                    "Selected-FY bridge components behind the current finalist revenue composition.",
+                    revenue_outlook_component_figure(bridge, selected_fy=selected_fy, selected_fed_path=selected_fed_path),
+                    caption="Component rows come from revenue_bridge_components in the committed runtime pack.",
+                    notes_as_tooltip=False,
+                )
+            with detail_cols[1]:
+                chart_card(
+                    "Selected-FY revenue split",
+                    "Net FED, total RUC and MVR share of selected-FY revenue where available.",
+                    revenue_outlook_split_figure(bridge, selected_fy=selected_fy, selected_fed_path=selected_fed_path),
+                    caption=f"Selected FY: {selected_fy_number or selected_fy}.",
+                    notes_as_tooltip=False,
+                )
+        timer.stop("selected-FY detail figures")
+
+    if revenue_outlook_lazy_table(
+        "Show revenue line reconciliation",
+        "revenue_outlook_show_line_reconciliation",
+        caption="Line reconciliation table is built only when opened.",
+    ):
+        timer.start("reconciliation table")
+        with st.container(border=True):
+            st.markdown("<div class='page5-panel-title'>Revenue line reconciliation</div>", unsafe_allow_html=True)
+            rec_cols = st.columns([0.35, 0.25, 0.25, 0.15])
+            source_options = selector_options["line_source_options"]
+            section_options = selector_options["line_section_options"]
+            fy_min, fy_max = selector_options["line_fy_bounds"]
+            with rec_cols[0]:
+                selected_source_paths = st.multiselect(
+                    "Source path",
+                    source_options,
+                    default=source_options,
+                    key="revenue_line_reconciliation_source_paths",
+                )
+            with rec_cols[1]:
+                selected_sections = st.multiselect(
+                    "Section",
+                    section_options,
+                    default=section_options,
+                    key="revenue_line_reconciliation_sections",
+                )
+            with rec_cols[2]:
+                selected_fy_range = st.slider(
+                    "FY range",
+                    min_value=fy_min,
+                    max_value=fy_max,
+                    value=(max(fy_min, 2024), min(fy_max, 2027)) if fy_min <= 2024 <= fy_max else (fy_min, min(fy_max, fy_min + 3)),
+                    key="revenue_line_reconciliation_fy_range",
+                )
+            filtered_reconciliation = _filter_revenue_line_reconciliation(
+                line_reconciliation,
+                source_paths=selected_source_paths,
+                sections=selected_sections,
+                fy_range=selected_fy_range,
+            )
+            with rec_cols[3]:
+                dataframe_download(filtered_reconciliation, "Download CSV", "revenue_line_reconciliation.csv")
+            gap_banner = _revenue_formula_gap_banner(formula_residuals, selected_source_paths, selected_fy_range)
+            if gap_banner:
+                warning_panel(gap_banner)
+            display_table(_revenue_line_reconciliation_display_table(filtered_reconciliation), height=360, max_rows=520)
+        timer.stop("reconciliation table")
+
+    if revenue_outlook_lazy_table(
+        "Show series alias audit",
+        "revenue_outlook_show_series_alias_audit",
+        caption="Alias audit is loaded only when opened.",
+    ):
+        timer.start("series alias audit")
+        alias_audit = _pack_table(pack, "series_alias_audit")
+        with st.container(border=True):
+            st.markdown("<div class='page5-panel-title'>Series alias audit</div>", unsafe_allow_html=True)
+            alias_cols = st.columns([0.82, 0.18])
+            with alias_cols[1]:
+                dataframe_download(alias_audit, "Download CSV", "series_alias_audit.csv")
+            display_table(_revenue_series_alias_audit_display_table(alias_audit), height=260, max_rows=120)
+        timer.stop("series alias audit")
+
+    if revenue_outlook_lazy_table(
+        "Show Activity and volume outlook",
+        "revenue_outlook_show_activity_volume",
+        caption="Activity-volume chart is built only when opened.",
+    ):
+        timer.start("activity figure")
+        with st.expander("Activity and volume outlook", expanded=False):
+            activity_rows = _filter_revenue_outlook_rows(
+                chart_rows,
+                time_grain="june_year" if grain_label == "June-year" else "quarterly",
+                stream_labels=["PED VKT per capita", "PED volume", "Light RUC net km", "Heavy RUC net km"],
+                fed_paths=[selected_fed_path],
+                trace_names=selected_traces,
+            )
+            chart_card(
+                "Activity and volume outlook",
+                "PED uses VKT per capita; Light and Heavy RUC use net kilometres. Actuals end at FY2025.",
+                revenue_outlook_figure(activity_rows, metric_type="activity"),
+                caption="Forecast start and H13 markers are shown where numeric reviewed forecasts exist. Units are kept separate by stream.",
+                notes_as_tooltip=False,
+            )
+        timer.stop("activity figure")
+
+    if revenue_outlook_lazy_table(
+        "Show Revenue bridge detail",
+        "revenue_outlook_show_bridge_detail",
+        caption="Revenue bridge detail table is built only when opened.",
+    ):
+        timer.start("bridge detail table")
+        st.markdown("<div class='page5-panel-title'>Revenue bridge detail</div>", unsafe_allow_html=True)
+        display_table(_revenue_bridge_display_table(filtered_bridge), height=320, max_rows=240)
+        timer.stop("bridge detail table")
+
+    if revenue_outlook_lazy_table(
+        "Show Manifest, Source policy and downloads",
+        "revenue_outlook_show_manifest_downloads",
+        caption="Manifest table and downloads are prepared only when opened.",
+    ):
+        timer.start("manifest downloads")
+        with st.expander("Manifest, source policy and downloads", expanded=False):
+            display_table(_revenue_outlook_manifest_table(manifest), height=220, max_rows=80)
+            download_cols = st.columns(3)
+            with download_cols[0]:
+                dataframe_download(future_revenue, "Download future revenue forecasts", "future_revenue_forecasts.csv")
+            with download_cols[1]:
+                dataframe_download(bridge, "Download revenue bridge components", "revenue_bridge_components.csv")
+            with download_cols[2]:
+                dataframe_download(chart_rows, "Download revenue chart rows", "revenue_chart_rows.csv")
+        timer.stop("manifest downloads")
+
+    _render_revenue_outlook_timings(timer)
 
 
 def _revenue_source_kpi_cards(source_pack: RevenueSourcePack | None) -> list[tuple[str, str, str | None]]:

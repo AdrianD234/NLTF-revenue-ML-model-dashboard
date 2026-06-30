@@ -2137,6 +2137,9 @@ def revenue_sensitivity_impact_audit_frame(
     custom_fleet_efficiency_pct: float | None = None,
     custom_pt_shift_pct: float | None = None,
     custom_elasticity: float | None = None,
+    custom_ped_elasticity: float | None = None,
+    custom_light_elasticity: float | None = None,
+    custom_heavy_elasticity: float | None = None,
     cost_per_km_ratio: float | None = None,
 ) -> pd.DataFrame:
     """Calculate selected post-model sensitivity impacts at FY/source-path grain."""
@@ -2251,21 +2254,21 @@ def revenue_sensitivity_impact_audit_frame(
             "demand_elasticity",
             demand_selection,
             "PED",
-            custom_value=custom_elasticity,
+            custom_value=custom_ped_elasticity if custom_ped_elasticity is not None else custom_elasticity,
         )
         light_elasticity = _sensitivity_config_value(
             config,
             "demand_elasticity",
             demand_selection,
             "LIGHT_RUC",
-            custom_value=custom_elasticity,
+            custom_value=custom_light_elasticity if custom_light_elasticity is not None else custom_elasticity,
         )
         heavy_elasticity = _sensitivity_config_value(
             config,
             "demand_elasticity",
             demand_selection,
             "HEAVY_RUC",
-            custom_value=custom_elasticity,
+            custom_value=custom_heavy_elasticity if custom_heavy_elasticity is not None else custom_elasticity,
         )
         petrol_demand_factor = float(np.power(ratio, petrol_elasticity)) if demand_ratio_available else 1.0
         light_demand_factor = float(np.power(ratio, light_elasticity)) if demand_ratio_available else 1.0
@@ -2399,6 +2402,9 @@ def apply_revenue_sensitivity_layer(
     custom_fleet_efficiency_pct: float | None = None,
     custom_pt_shift_pct: float | None = None,
     custom_elasticity: float | None = None,
+    custom_ped_elasticity: float | None = None,
+    custom_light_elasticity: float | None = None,
+    custom_heavy_elasticity: float | None = None,
     cost_per_km_ratio: float | None = None,
 ) -> dict[str, pd.DataFrame]:
     """Apply governed post-model Revenue Outlook sensitivities to current-finalist copies."""
@@ -2413,6 +2419,9 @@ def apply_revenue_sensitivity_layer(
         custom_fleet_efficiency_pct=custom_fleet_efficiency_pct,
         custom_pt_shift_pct=custom_pt_shift_pct,
         custom_elasticity=custom_elasticity,
+        custom_ped_elasticity=custom_ped_elasticity,
+        custom_light_elasticity=custom_light_elasticity,
+        custom_heavy_elasticity=custom_heavy_elasticity,
         cost_per_km_ratio=cost_per_km_ratio,
     )
     if _sensitivity_is_off(fleet_efficiency, pt_mode_shift, demand_elasticity):
@@ -3215,9 +3224,21 @@ def _promote_scenario_inputs_from_comparison(
 
 
 def _read_optional_parquet(path: Path) -> pd.DataFrame:
-    if not path.exists():
-        return pd.DataFrame()
-    return pd.read_parquet(path)
+    if path.exists():
+        try:
+            return pd.read_parquet(path)
+        except Exception as exc:
+            csv_path = path.with_suffix(".csv")
+            if csv_path.exists():
+                return pd.read_csv(csv_path)
+            raise RuntimeError(
+                f"Revenue Outlook runtime table {path.name} could not be read as Parquet and CSV fallback "
+                f"{csv_path.name} is missing."
+            ) from exc
+    csv_path = path.with_suffix(".csv")
+    if csv_path.exists():
+        return pd.read_csv(csv_path)
+    return pd.DataFrame()
 
 
 def _read_optional_csv(path: Path) -> pd.DataFrame:

@@ -26,6 +26,8 @@ artifacts/forecast_uploads/
 !tests/fixtures/**/*.parquet
 artifacts/**
 !artifacts/.gitkeep
+!artifacts/performance_history.json
+!artifacts/performance_improvement_loops.json
 !artifacts/heavy_ruc_forward_parity_debug/
 !artifacts/heavy_ruc_forward_parity_debug/**
 data/**

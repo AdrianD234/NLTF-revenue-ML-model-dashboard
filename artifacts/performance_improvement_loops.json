@@ -1,0 +1,21 @@
+[
+  {
+    "loop": 1,
+    "timestamp": "2026-06-30T20:44:47+12:00",
+    "scope": "Revenue Outlook lazy render and default sensitivity fast path",
+    "finding": "Revenue Outlook reruns paid about 647.91 ms for default sensitivity audit/overlay work and rendered multiple audit/table sections eagerly.",
+    "change": "Added cached selector/view helpers keyed by runtime signature and controls, skipped default sensitivity overlay work, and moved heavy audit/detail sections behind explicit lazy toggles.",
+    "evidence": {
+      "before_ms": {
+        "ped_bridge_layer": 1373.88,
+        "sensitivity_overlay_default": 647.91
+      },
+      "after_ms": {
+        "cached_view_cold_default": 1398.97,
+        "cached_view_warm_default": 25.42
+      },
+      "tests": "python -m pytest -q tests/test_streamlit_smoke.py tests/test_revenue_outlook.py -> 23 passed"
+    },
+    "status": "implemented"
+  }
+]

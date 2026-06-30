@@ -1968,3 +1968,17 @@ def test_revenue_outlook_loader_rejects_hash_mismatched_promoted_pack(tmp_path: 
 
     with pytest.raises(ValueError, match="revenue_chart_rows.csv hash mismatch"):
         load_revenue_outlook_pack(pack_copy, repo_root=ROOT)
+
+
+def test_revenue_outlook_loader_uses_committed_csv_fallback_when_parquet_engine_unavailable(monkeypatch) -> None:
+    def fail_read_parquet(*args, **kwargs):
+        raise ImportError("simulated missing parquet engine")
+
+    monkeypatch.setattr(pd, "read_parquet", fail_read_parquet)
+    pack = load_revenue_outlook_pack(ROOT / CURRENT_REVENUE_OUTLOOK_DIR, repo_root=ROOT)
+
+    assert pack is not None
+    assert not pack.revenue_chart_rows.empty
+    assert not pack.revenue_bridge_components.empty
+    assert not pack.future_revenue_forecasts.empty
+    assert not pack.revenue_chart_rows.astype(str).stack().str.contains(r"C:\\Users|Downloads|OneDrive", regex=True).any()
