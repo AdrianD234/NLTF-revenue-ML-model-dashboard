@@ -251,5 +251,25 @@
       "line_reconciliation_change": "Cached the lazy line reconciliation filtered rows and formatted display table using runtime signature, bridge mode, sensitivity key and visible source, section and FY controls.",
       "validation": "python -m compileall app.py model_dashboard tests passed; Revenue Outlook/cloud test slice passed: 56 passed; bounded verify_dashboard.ps1 -SkipBrowser passed; host verify_browser_host.ps1 on port 8515 passed: 40 passed."
     }
+  },
+  {
+    "timestamp": "2026-07-01T00:51:35+12:00",
+    "scope": "Revenue Outlook selected-FY detail figure cache",
+    "before_ms": {
+      "direct_component_figure_min": 3.84,
+      "direct_component_figure_mean": 22.3,
+      "direct_split_figure_min": 3.12,
+      "direct_split_figure_mean": 3.68,
+      "direct_component_plus_split_min": 7.07,
+      "direct_component_plus_split_mean": 7.89
+    },
+    "after_ms": {
+      "cached_selected_fy_figures_warm_min": 4.49,
+      "cached_selected_fy_figures_warm_mean": 4.98
+    },
+    "result": {
+      "selected_fy_change": "Cached the lazy selected-FY component drill-down and revenue split figures as a paired figure result keyed by runtime signature and visible controls.",
+      "validation": "python -m compileall app.py model_dashboard tests passed; Revenue Outlook/cloud test slice passed: 57 passed; bounded verify_dashboard.ps1 -SkipBrowser passed; host verify_browser_host.ps1 on port 8515 passed: 40 passed."
+    }
   }
 ]

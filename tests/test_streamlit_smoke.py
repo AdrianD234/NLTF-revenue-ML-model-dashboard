@@ -589,6 +589,64 @@ def test_revenue_outlook_visible_figures_materialize_through_cache() -> None:
     assert cached_caption == app._revenue_outlook_fan_caption(pack.fan_availability, "Total NLTF revenue", app.FAN_SOURCE_AUTO)[:220]
 
 
+def test_revenue_outlook_selected_fy_figures_materialize_through_cache() -> None:
+    root = Path(__file__).resolve().parents[1]
+    pack_dir = root / CURRENT_REVENUE_OUTLOOK_DIR
+    pack = load_revenue_outlook_pack(pack_dir, repo_root=root)
+    assert pack is not None
+    signature = revenue_outlook_signature(pack_dir, root)
+    traces = tuple(app._revenue_outlook_trace_options(pack.revenue_chart_rows))
+    sensitivity_key = app.selected_sensitivity_key("Off", "Off", "Off")
+    view = app.cached_revenue_outlook_view(
+        signature,
+        "Total NLTF revenue",
+        "june_year",
+        "Current planned path",
+        traces,
+        sensitivity_key,
+        PED_BRIDGE_DEFAULT_MODE,
+        pack,
+    )
+    if hasattr(app.cached_revenue_outlook_selected_fy_figures, "clear"):
+        app.cached_revenue_outlook_selected_fy_figures.clear()
+
+    cached_component, cached_split = app.cached_revenue_outlook_selected_fy_figures(
+        signature,
+        "FY2031",
+        "Current planned path",
+        sensitivity_key,
+        PED_BRIDGE_DEFAULT_MODE,
+        view["revenue_bridge_components"],
+    )
+    direct_component = app.revenue_outlook_component_figure(
+        view["revenue_bridge_components"],
+        selected_fy="FY2031",
+        selected_fed_path="Current planned path",
+    )
+    direct_split = app.revenue_outlook_split_figure(
+        view["revenue_bridge_components"],
+        selected_fy="FY2031",
+        selected_fed_path="Current planned path",
+    )
+
+    assert [trace.type for trace in cached_component.data] == [trace.type for trace in direct_component.data]
+    assert [trace.type for trace in cached_split.data] == [trace.type for trace in direct_split.data]
+    assert [tuple(trace.x) for trace in cached_component.data] == [tuple(trace.x) for trace in direct_component.data]
+    for cached_trace, direct_trace in zip(cached_component.data, direct_component.data, strict=True):
+        assert pd.to_numeric(pd.Series(cached_trace.y), errors="coerce").to_numpy() == pytest.approx(
+            pd.to_numeric(pd.Series(direct_trace.y), errors="coerce").to_numpy(),
+            abs=0,
+            nan_ok=True,
+        )
+    assert [tuple(trace.labels) for trace in cached_split.data] == [tuple(trace.labels) for trace in direct_split.data]
+    for cached_trace, direct_trace in zip(cached_split.data, direct_split.data, strict=True):
+        assert pd.to_numeric(pd.Series(cached_trace.values), errors="coerce").to_numpy() == pytest.approx(
+            pd.to_numeric(pd.Series(direct_trace.values), errors="coerce").to_numpy(),
+            abs=0,
+            nan_ok=True,
+        )
+
+
 def test_revenue_outlook_composition_stack_and_figure_cache_match_direct_builder() -> None:
     root = Path(__file__).resolve().parents[1]
     pack_dir = root / CURRENT_REVENUE_OUTLOOK_DIR

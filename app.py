@@ -961,6 +961,22 @@ def cached_revenue_line_reconciliation_view(
     return filtered, _revenue_line_reconciliation_display_table(filtered)
 
 
+@st.cache_data(show_spinner=False)
+def cached_revenue_outlook_selected_fy_figures(
+    signature: tuple[tuple[str, int, int], ...],
+    selected_fy: str,
+    selected_fed_path: str,
+    sensitivity_key: tuple[str, str, str, str, str, str, str, str, str],
+    bridge_mode: str,
+    _bridge: pd.DataFrame,
+) -> tuple[go.Figure, go.Figure]:
+    del signature, sensitivity_key, bridge_mode
+    return (
+        revenue_outlook_component_figure(_bridge, selected_fy=selected_fy, selected_fed_path=selected_fed_path),
+        revenue_outlook_split_figure(_bridge, selected_fy=selected_fy, selected_fed_path=selected_fed_path),
+    )
+
+
 def directory_signature(path: Path) -> tuple[bool, int, int]:
     try:
         stat = path.stat()
@@ -3114,12 +3130,20 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         timer.start("selected-FY detail figures")
         selected_fy_number = _selected_fy_to_number(selected_fy)
         try:
+            component_figure, split_figure = cached_revenue_outlook_selected_fy_figures(
+                pack_signature,
+                selected_fy,
+                selected_fed_path,
+                sensitivity_key,
+                selected_ped_bridge_mode,
+                bridge,
+            )
             detail_cols = st.columns([0.58, 0.42])
             with detail_cols[0]:
                 chart_card(
                     "Component drill-down",
                     "Selected-FY bridge components behind the current finalist revenue composition.",
-                    revenue_outlook_component_figure(bridge, selected_fy=selected_fy, selected_fed_path=selected_fed_path),
+                    component_figure,
                     caption="Component rows come from revenue_bridge_components in the committed runtime pack.",
                     notes_as_tooltip=False,
                 )
@@ -3127,7 +3151,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 chart_card(
                     "Selected-FY revenue split",
                     "Net FED, total RUC and MVR share of selected-FY revenue where available.",
-                    revenue_outlook_split_figure(bridge, selected_fy=selected_fy, selected_fed_path=selected_fed_path),
+                    split_figure,
                     caption=f"Selected FY: {selected_fy_number or selected_fy}.",
                     notes_as_tooltip=False,
                 )
