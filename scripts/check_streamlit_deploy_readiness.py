@@ -103,6 +103,8 @@ REQUIRED_FORECAST_IMPORT_EXPORTS = {
 R2_LADDER_DEP_FALLBACK_ENV = "NLTF_FORCE_R2_LADDER_DEP_FALLBACK"
 EXPECTED_IMPORT_SURFACE_REVISION = "2026-06-25-revenue-source-pack-normalized-source-hashes-v1"
 REVENUE_SOURCE_PACK_ROOT = ROOT / "data" / "revenue_model_source_pack" / "2026_05_19"
+CURRENT_REVENUE_OUTLOOK_ROOT = ROOT / "data" / "current_revenue_outlook"
+FORBIDDEN_LOCAL_PATH_TOKENS = ("C:\\Users", "C:/Users", "Downloads", "OneDrive")
 REQUIRED_REVENUE_SOURCE_PACK_FILES = {
     "README.md",
     "MODEL_WORKFLOW.md",
@@ -213,6 +215,132 @@ def assert_revenue_source_pack_shape() -> None:
         raise AssertionError("Revenue source pack loader exports are not validation-ready.")
 
 
+def assert_current_revenue_outlook_pack_shape() -> None:
+    if not CURRENT_REVENUE_OUTLOOK_ROOT.exists():
+        raise AssertionError(f"Missing current Revenue Outlook runtime pack folder: {CURRENT_REVENUE_OUTLOOK_ROOT}")
+    manifest_path = CURRENT_REVENUE_OUTLOOK_ROOT / "manifest.json"
+    if not manifest_path.exists():
+        raise AssertionError("Current Revenue Outlook runtime pack manifest.json is missing.")
+    manifest_text = manifest_path.read_text(encoding="utf-8")
+    for token in FORBIDDEN_LOCAL_PATH_TOKENS:
+        if token in manifest_text:
+            raise AssertionError(f"Current Revenue Outlook manifest exposes local path token: {token}")
+    manifest = json.loads(manifest_text)
+    output_hashes = manifest.get("output_hashes")
+    if not isinstance(output_hashes, dict) or not output_hashes:
+        raise AssertionError("Current Revenue Outlook manifest output_hashes is missing or empty.")
+    if str(manifest.get("schema_version") or "") != "revenue-outlook-pack-v1":
+        raise AssertionError("Current Revenue Outlook runtime pack has an unexpected schema_version.")
+    if str(manifest.get("pack_status") or "") != "explicitly_promoted_current_outlook":
+        raise AssertionError("Current Revenue Outlook runtime pack is not explicitly promoted.")
+
+    from model_dashboard.revenue_outlook import RUNTIME_REVENUE_OUTLOOK_FILES, load_revenue_outlook_pack
+
+    missing: list[str] = []
+    hash_gaps: list[str] = []
+    oversized: list[str] = []
+    for parquet_name in RUNTIME_REVENUE_OUTLOOK_FILES:
+        for filename in [parquet_name, str(Path(parquet_name).with_suffix(".csv"))]:
+            path = CURRENT_REVENUE_OUTLOOK_ROOT / filename
+            if not path.exists():
+                missing.append(filename)
+                continue
+            if path.stat().st_size > MAX_FILE_BYTES:
+                oversized.append(filename)
+            metadata = output_hashes.get(filename)
+            if not isinstance(metadata, dict) or not str(metadata.get("sha256") or "").strip():
+                hash_gaps.append(filename)
+    if missing:
+        raise AssertionError("Current Revenue Outlook runtime pack is missing required files: " + ", ".join(sorted(missing)))
+    if hash_gaps:
+        raise AssertionError("Current Revenue Outlook runtime files are missing SHA256 manifest entries: " + ", ".join(sorted(hash_gaps)))
+    if oversized:
+        raise AssertionError("Current Revenue Outlook runtime files exceed 50 MB: " + ", ".join(sorted(oversized)))
+
+    pack = load_revenue_outlook_pack(CURRENT_REVENUE_OUTLOOK_ROOT, repo_root=ROOT)
+    if pack is None:
+        raise AssertionError("Current Revenue Outlook runtime pack did not load.")
+    required_non_empty = {
+        "revenue_chart_rows",
+        "revenue_bridge_components",
+        "future_revenue_forecasts",
+        "ev_phev_ped_light_drift_assumptions",
+        "sensitivity_config",
+        "scenario_role_contract",
+    }
+    empty = [name for name in sorted(required_non_empty) if getattr(pack, name).empty]
+    if empty:
+        raise AssertionError("Current Revenue Outlook required runtime tables are empty: " + ", ".join(empty))
+    forbidden = "|".join(token.replace("\\", "\\\\") for token in FORBIDDEN_LOCAL_PATH_TOKENS)
+    for name, value in vars(pack).items():
+        if hasattr(value, "empty") and not value.empty:
+            if value.astype(str).stack().str.contains(forbidden, regex=True).any():
+                raise AssertionError(f"Current Revenue Outlook runtime table exposes a local path token: {name}")
+
+
+def assert_current_revenue_outlook_cloud_runtime_subprocess() -> None:
+    env = os.environ.copy()
+    runtime_path = str(ROOT / ".runtime_pyarrow24")
+    existing_pythonpath = [
+        path
+        for path in env.get("PYTHONPATH", "").split(os.pathsep)
+        if path and runtime_path not in path and ".runtime_pyarrow24" not in path
+    ]
+    env["PYTHONPATH"] = os.pathsep.join([str(ROOT), *existing_pythonpath])
+    env["NLTF_DISABLE_RUNTIME_PYARROW24"] = "1"
+    code = r"""
+from pathlib import Path
+import sys
+import pandas as pd
+
+root = Path.cwd()
+runtime_path = str(root / ".runtime_pyarrow24")
+sys.path = [path for path in sys.path if runtime_path not in str(path) and ".runtime_pyarrow24" not in str(path)]
+if any(runtime_path in str(path) for path in sys.path):
+    raise SystemExit(".runtime_pyarrow24 was present before Revenue Outlook import")
+
+from model_dashboard.revenue_outlook import CURRENT_REVENUE_OUTLOOK_DIR, load_revenue_outlook_pack
+
+if any(runtime_path in str(path) for path in sys.path):
+    raise SystemExit(".runtime_pyarrow24 was inserted despite NLTF_DISABLE_RUNTIME_PYARROW24=1")
+
+def fail_read_excel(*args, **kwargs):
+    raise AssertionError("Revenue Outlook runtime loader must not read Excel workbooks")
+
+pd.read_excel = fail_read_excel
+pack = load_revenue_outlook_pack(root / CURRENT_REVENUE_OUTLOOK_DIR, repo_root=root)
+if pack is None or pack.revenue_chart_rows.empty:
+    raise SystemExit("Revenue Outlook runtime pack did not load from committed files")
+
+def fail_read_parquet(*args, **kwargs):
+    raise ImportError("simulated missing parquet engine")
+
+pd.read_parquet = fail_read_parquet
+fallback_pack = load_revenue_outlook_pack(root / CURRENT_REVENUE_OUTLOOK_DIR, repo_root=root)
+if fallback_pack is None or fallback_pack.revenue_chart_rows.empty or fallback_pack.future_revenue_forecasts.empty:
+    raise SystemExit("Revenue Outlook CSV fallback failed when Parquet read was unavailable")
+for name, value in vars(fallback_pack).items():
+    if hasattr(value, "empty") and not value.empty:
+        text = value.astype(str).to_csv(index=False)
+        if any(token in text for token in ["C:\\Users", "C:/Users", "Downloads", "OneDrive"]):
+            raise SystemExit(f"local path token leaked from {name}")
+print("revenue outlook cloud runtime ok")
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+    )
+    if result.returncode != 0:
+        raise AssertionError(
+            "Streamlit Cloud-style Revenue Outlook runtime load failed with .runtime_pyarrow24 disabled.\n"
+            f"stdout:\n{result.stdout}\n"
+            f"stderr:\n{result.stderr}"
+        )
+
+
 def assert_requirements() -> None:
     runtime = read_requirements(ROOT / "requirements.txt")
     missing = REQUIRED_RUNTIME_DEPS - runtime
@@ -305,10 +433,20 @@ def assert_startup_import_subprocess(
     *,
     force_optional_fallback: bool = False,
     force_forecast_fallback: bool = False,
+    disable_runtime_pyarrow24: bool = False,
 ) -> None:
     env = os.environ.copy()
-    env["PYTHONPATH"] = str(ROOT) + os.pathsep + env.get("PYTHONPATH", "")
+    existing_pythonpath = [
+        path
+        for path in env.get("PYTHONPATH", "").split(os.pathsep)
+        if path and (not disable_runtime_pyarrow24 or ".runtime_pyarrow24" not in path)
+    ]
+    env["PYTHONPATH"] = os.pathsep.join([str(ROOT), *existing_pythonpath])
     env.pop("STAGE1_REQUIRE_FRONTEND_INTERACTIONS", None)
+    if disable_runtime_pyarrow24:
+        env["NLTF_DISABLE_RUNTIME_PYARROW24"] = "1"
+    else:
+        env.pop("NLTF_DISABLE_RUNTIME_PYARROW24", None)
     if force_optional_fallback:
         env["NLTF_FORCE_REPRODUCIBILITY_IMPORT_FALLBACK"] = "1"
     else:
@@ -318,11 +456,20 @@ def assert_startup_import_subprocess(
     else:
         env.pop("NLTF_FORCE_FORECAST_RUNNER_IMPORT_FALLBACK", None)
     code = """
+import os
+from pathlib import Path
+import sys
+root = Path.cwd()
+runtime_path = str(root / '.runtime_pyarrow24')
+if os.environ.get('NLTF_DISABLE_RUNTIME_PYARROW24'):
+    sys.path = [path for path in sys.path if runtime_path not in str(path) and '.runtime_pyarrow24' not in str(path)]
 import app
 from model_dashboard import forecast_imports as fi
 from model_dashboard import reproducibility_imports as ri
 from model_dashboard import revenue_source_pack as rsp
 from scripts.check_streamlit_deploy_readiness import EXPECTED_IMPORT_SURFACE_REVISION
+if os.environ.get('NLTF_DISABLE_RUNTIME_PYARROW24') and any(runtime_path in str(path) for path in sys.path):
+    raise SystemExit('.runtime_pyarrow24 was inserted despite NLTF_DISABLE_RUNTIME_PYARROW24=1')
 required = [
     'render_overview',
     'render_diagnostics',
@@ -359,6 +506,8 @@ print('cloud import ok')
             modes.append("reproducibility fallback")
         if force_forecast_fallback:
             modes.append("forecast fallback")
+        if disable_runtime_pyarrow24:
+            modes.append("runtime-pyarrow24 disabled")
         mode = " + ".join(modes) if modes else "normal"
         raise AssertionError(
             f"Streamlit Cloud-style startup import failed in {mode} mode.\n"
@@ -435,12 +584,15 @@ def validate() -> None:
     assert_app_uses_cloud_safe_forecast_wrapper()
     assert_import_surface()
     assert_startup_import_subprocess(force_optional_fallback=False)
+    assert_startup_import_subprocess(disable_runtime_pyarrow24=True)
     assert_startup_import_subprocess(force_optional_fallback=True)
     assert_startup_import_subprocess(force_forecast_fallback=True)
     assert_r2_ladder_direct_import_subprocess(force_dependency_fallback=False)
     assert_r2_ladder_direct_import_subprocess(force_dependency_fallback=True)
     assert_pack_shape()
     assert_revenue_source_pack_shape()
+    assert_current_revenue_outlook_pack_shape()
+    assert_current_revenue_outlook_cloud_runtime_subprocess()
     assert_streamlit_config()
     assert_default_load_resolves_repo_pack()
     assert_tracked_files()

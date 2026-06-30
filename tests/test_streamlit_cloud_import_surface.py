@@ -12,6 +12,8 @@ from scripts.check_streamlit_deploy_readiness import (
     REQUIRED_UI_EXPORTS,
     assert_app_uses_cloud_safe_forecast_wrapper,
     assert_app_uses_cloud_safe_reproducibility_wrapper,
+    assert_current_revenue_outlook_cloud_runtime_subprocess,
+    assert_current_revenue_outlook_pack_shape,
     assert_import_surface,
     assert_r2_ladder_direct_import_subprocess,
     assert_startup_import_subprocess,
@@ -51,6 +53,18 @@ def test_r2_ladder_direct_import_survives_dependency_fallback() -> None:
 
 def test_streamlit_cloud_style_subprocess_imports_app() -> None:
     assert_startup_import_subprocess(force_optional_fallback=False)
+
+
+def test_streamlit_cloud_style_subprocess_imports_app_without_local_pyarrow24() -> None:
+    assert_startup_import_subprocess(disable_runtime_pyarrow24=True)
+
+
+def test_revenue_outlook_committed_runtime_pack_is_cloud_ready() -> None:
+    assert_current_revenue_outlook_pack_shape()
+
+
+def test_revenue_outlook_cloud_runtime_load_does_not_require_local_pyarrow24() -> None:
+    assert_current_revenue_outlook_cloud_runtime_subprocess()
 
 
 def test_app_imports_when_optional_reproducibility_imports_fallback() -> None:
