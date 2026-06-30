@@ -2700,12 +2700,24 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 key="revenue_outlook_selected_fy",
             )
         with control_cols[4]:
-            selected_traces = st.multiselect(
-                "Traces",
-                trace_options,
-                default=trace_options,
-                key="revenue_outlook_traces",
-            )
+            selected_trace_defaults = _revenue_outlook_default_traces(trace_options)
+            selected_traces = []
+            st.markdown("<div class='control-label'>Legend items</div>", unsafe_allow_html=True)
+            with st.popover("Select legend items", use_container_width=True):
+                st.caption("Choose which traces appear in the Total path chart legend.")
+                for trace in trace_options:
+                    is_selected = st.checkbox(
+                        trace,
+                        value=trace in selected_trace_defaults,
+                        key=f"revenue_outlook_legend_item_{_widget_key(trace)}",
+                    )
+                    if is_selected:
+                        selected_traces.append(trace)
+            if not selected_traces:
+                selected_traces = selected_trace_defaults or list(trace_options[:1])
+                st.caption("Using default legend items.")
+            else:
+                st.caption(_revenue_outlook_trace_selection_summary(selected_traces, len(trace_options)))
         bridge_mode_lookup = selector_options["bridge_mode_lookup"]
         bridge_mode_options = list(bridge_mode_lookup)
         default_bridge_label = next(
@@ -5119,6 +5131,29 @@ def _revenue_outlook_trace_options(chart_rows: pd.DataFrame) -> list[str]:
     ordered = [trace for trace in preferred if trace in available]
     ordered.extend(sorted(available.difference(ordered)))
     return ordered
+
+
+def _revenue_outlook_default_traces(trace_options: list[str]) -> list[str]:
+    options = list(trace_options or [])
+    preferred = [
+        "Actual",
+        "MBU26 official",
+        "Current finalist Base case",
+        "Current finalist High population/comparison",
+    ]
+    selected = [trace for trace in preferred if trace in options]
+    return selected or options[: min(3, len(options))]
+
+
+def _revenue_outlook_trace_selection_summary(selected_traces: list[str], option_count: int) -> str:
+    selected = [str(trace) for trace in selected_traces if str(trace).strip()]
+    if not selected:
+        return "Using default legend items."
+    if len(selected) == 1:
+        return selected[0]
+    if len(selected) == option_count:
+        return f"All {option_count} selected"
+    return f"{len(selected)} of {option_count} selected"
 
 
 def _revenue_outlook_fed_path_options(chart_rows: pd.DataFrame) -> list[str]:

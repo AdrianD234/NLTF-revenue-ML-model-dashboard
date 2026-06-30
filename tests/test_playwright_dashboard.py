@@ -404,10 +404,12 @@ def test_reference_header_nav_is_integrated_on_desktop(page: Page) -> None:
     assert overview_box is not None
     assert benchmark_box is not None
     assert filter_box is not None
-    assert overview_box["y"] < 65
-    assert benchmark_box["y"] < 65
-    assert benchmark_box["x"] > title_box["x"] + 380
-    assert filter_box["y"] < 120
+    title_bottom = title_box["y"] + title_box["height"]
+    assert overview_box["y"] >= title_bottom - 2
+    assert benchmark_box["y"] >= title_bottom - 2
+    assert benchmark_box["x"] > overview_box["x"] + 240
+    assert filter_box["y"] > overview_box["y"] + overview_box["height"]
+    assert filter_box["y"] < 150
 
 
 def test_filter_values_are_readable(page: Page) -> None:

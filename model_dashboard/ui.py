@@ -190,7 +190,7 @@ def inject_theme() -> None:
                 padding: 0.22rem 0.42rem 0.12rem;
             }}
             .st-key-gov_page div[data-testid="stRadio"] {{
-                margin: -2.58rem 0 0.42rem;
+                margin: 0.16rem 0 0.42rem;
             }}
             .st-key-gov_page div[data-testid="stRadio"] > label {{
                 display: none;
@@ -201,10 +201,10 @@ def inject_theme() -> None:
                 display: flex;
                 flex-wrap: wrap;
                 gap: 0.2rem;
-                justify-content: flex-end;
+                justify-content: flex-start;
                 min-height: 24px;
-                padding-left: clamp(380px, 32vw, 560px);
-                padding-right: clamp(165px, 13vw, 220px);
+                padding-left: 0;
+                padding-right: 0;
             }}
             .st-key-gov_page div[data-testid="stRadio"] div[role="radiogroup"] label {{
                 border-bottom: 3px solid transparent;
