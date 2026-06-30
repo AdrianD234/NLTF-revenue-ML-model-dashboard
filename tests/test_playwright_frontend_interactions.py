@@ -79,7 +79,6 @@ PAGE_PANELS = {
     "Revenue Outlook": [
         "Revenue Outlook controls",
         "Total path chart",
-        "Uncertainty fan",
         "Component drill-down",
         "Selected-FY revenue split",
         "Activity and volume outlook",

@@ -920,6 +920,7 @@ def test_revenue_outlook_page_does_not_render_summary_kpi_cards() -> None:
     source = inspect.getsource(app.render_revenue_outlook_page)
     assert "_revenue_outlook_summary_cards(" not in source
     assert "kpi_grid(revenue_kpis)" not in source
+    assert "_render_revenue_outlook_fan_card(" not in source
 
 
 def test_revenue_outlook_cloud_hides_debug_toggles_and_shows_full_composition(monkeypatch) -> None:
@@ -947,6 +948,7 @@ def test_revenue_outlook_cloud_hides_debug_toggles_and_shows_full_composition(mo
         "Post-model overlays; default Off preserves model forecast",
         "Clean bridge mode hides internal add-back rows",
         "Line-item contributions from revenue_stack_components",
+        "Uncertainty fan",
         "Showing first",
     ]:
         assert forbidden not in rendered_text

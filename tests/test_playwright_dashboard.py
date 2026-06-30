@@ -137,7 +137,6 @@ def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
             [
                 "Revenue Outlook controls",
                 "Total path chart",
-                "Uncertainty fan",
                 "Revenue composition over time",
                 "Component drill-down",
                 "Selected-FY revenue split",
@@ -245,9 +244,9 @@ def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
             for title in [
                 "Revenue Outlook controls",
                 "Total path chart",
-                "Uncertainty fan",
             ]:
                 assert_text_above_fold(page, title)
+            expect(page.get_by_text("Uncertainty fan", exact=False).first).not_to_be_visible(timeout=60000)
             for title in [
                 "Revenue composition over time",
                 "Component drill-down",
@@ -295,7 +294,7 @@ def test_revenue_outlook_is_responsive_without_horizontal_overflow(page: Page) -
 
     click_governance_nav(page, "Revenue Outlook")
     expect(page.get_by_text("Total path chart", exact=False).first).to_be_visible(timeout=90000)
-    expect(page.get_by_text("Uncertainty fan", exact=False).first).to_be_visible(timeout=90000)
+    expect(page.get_by_text("Uncertainty fan", exact=False).first).not_to_be_visible(timeout=90000)
     overflow = page.evaluate(
         """() => {
             const bad = [];
@@ -944,11 +943,10 @@ def assert_revenue_outlook_composition_below_primary(page: Page) -> None:
         expect(page.locator("body")).to_contain_text(text, timeout=60000)
 
     total_y = document_y_for_text(page, "Total path chart")
-    fan_y = document_y_for_text(page, "Uncertainty fan")
     composition_y = document_y_for_text(page, "Revenue composition over time")
-    assert composition_y > max(total_y, fan_y), (
-        "Revenue composition card should render below the primary Total path chart/fan row; "
-        f"total_y={total_y}, fan_y={fan_y}, composition_y={composition_y}"
+    assert composition_y > total_y, (
+        "Revenue composition card should render below the primary Total path chart; "
+        f"total_y={total_y}, composition_y={composition_y}"
     )
 
 

@@ -2642,8 +2642,6 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
 
     manifest = pack.manifest if pack is not None and isinstance(pack.manifest, dict) else {}
     chart_rows = _pack_table(pack, "revenue_chart_rows")
-    fan_availability = _pack_table(pack, "fan_availability")
-    fan_band_rows = _pack_table(pack, "fan_band_rows")
 
     section_title(REVENUE_OUTLOOK_TITLE)
     period_rule = manifest.get("period_rule") if isinstance(manifest, dict) else {}
@@ -2823,38 +2821,26 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     if gap_summary:
         warning_panel(gap_summary)
 
-    primary_cols = st.columns([0.64, 0.36])
-    with primary_cols[0]:
-        timer.start("main path figure")
-        main_path_figure = cached_revenue_outlook_total_path_figure(
-            pack_signature,
-            selected_stream,
-            selected_fy,
-            selected_time_grain,
-            selected_fed_path,
-            tuple(selected_traces),
-            sensitivity_key,
-            selected_ped_bridge_mode,
-            filtered_rows,
-        )
-        timer.stop("main path figure")
-        chart_card(
-            "Total path chart",
-            "",
-            main_path_figure,
-            caption=None,
-            notes_as_tooltip=True,
-        )
-    with primary_cols[1]:
-        timer.start("fan figure")
-        _render_revenue_outlook_fan_card(
-            pack_signature,
-            fan_band_rows,
-            fan_availability,
-            selected_series=selected_stream,
-            selected_fed_path=selected_fed_path,
-        )
-        timer.stop("fan figure")
+    timer.start("main path figure")
+    main_path_figure = cached_revenue_outlook_total_path_figure(
+        pack_signature,
+        selected_stream,
+        selected_fy,
+        selected_time_grain,
+        selected_fed_path,
+        tuple(selected_traces),
+        sensitivity_key,
+        selected_ped_bridge_mode,
+        filtered_rows,
+    )
+    timer.stop("main path figure")
+    chart_card(
+        "Total path chart",
+        "",
+        main_path_figure,
+        caption=None,
+        notes_as_tooltip=True,
+    )
 
     if revenue_outlook_lazy_table(
         "Show scenario role contract",
@@ -3497,23 +3483,13 @@ def _render_revenue_source_architecture(source_pack: RevenueSourcePack, controls
         f"validation status {source_pack.validation_status}."
     )
     info_panel(source_status)
-    chart_cols = st.columns(2)
-    with chart_cols[0]:
-        chart_card(
-            "Total path chart",
-            "Source actuals, current finalist forecast and official MOT/BEFU comparators from repo-local governed sources.",
-            _source_total_path_figure(source_pack, controls),
-            caption="Current finalist forecast is the only in-house forecast source. Workbook model paths are offline lineage only and are not plotted.",
-            notes_as_tooltip=False,
-        )
-    with chart_cols[1]:
-        chart_card(
-            "Uncertainty fan",
-            "Displayed only from available governed model paths; no probabilistic residual fan is fabricated.",
-            _source_uncertainty_figure(source_pack, controls),
-            caption="No workbook model-spread fallback is used; unavailable uncertainty evidence is shown as a governed gap.",
-            notes_as_tooltip=False,
-        )
+    chart_card(
+        "Total path chart",
+        "Source actuals, current finalist forecast and official MOT/BEFU comparators from repo-local governed sources.",
+        _source_total_path_figure(source_pack, controls),
+        caption="Current finalist forecast is the only in-house forecast source. Workbook model paths are offline lineage only and are not plotted.",
+        notes_as_tooltip=False,
+    )
 
     drill_cols = st.columns(2)
     with drill_cols[0]:
