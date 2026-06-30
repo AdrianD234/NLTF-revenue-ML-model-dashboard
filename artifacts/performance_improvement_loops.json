@@ -60,5 +60,25 @@
       "tests": "Focused fallback semantics and primary-view tests passed before full validation."
     },
     "status": "implemented"
+  },
+  {
+    "loop": 4,
+    "timestamp": "2026-06-30T22:22:32+12:00",
+    "scope": "Revenue Outlook PED bridge impact audit generation",
+    "finding": "After fallback matching was optimized, the default Revenue Outlook cold path still spent about 691 ms generating the PED bridge impact audit by repeatedly scanning line-reconciliation rows for each baseline and unit lookup.",
+    "change": "Built first-row value and unit lookup dictionaries once per impact-audit call and reused them for every selected PED bridge audit record.",
+    "evidence": {
+      "before_ms": {
+        "impact_generation_min": 691.41,
+        "bridge_primary_lightweight_min": 760.89
+      },
+      "after_ms": {
+        "impact_generation_lookup_min": 12.45,
+        "bridge_primary_lightweight_lookup_min": 112.9,
+        "bridge_primary_lightweight_lookup_mean": 116.04
+      },
+      "tests": "python -m compileall app.py model_dashboard passed; Revenue Outlook test slice passed: 31 passed; bounded verify_dashboard.ps1 -SkipBrowser passed; host verify_browser_host.ps1 on port 8515 passed: 40 passed."
+    },
+    "status": "implemented"
   }
 ]

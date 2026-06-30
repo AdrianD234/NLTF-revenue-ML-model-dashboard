@@ -1314,28 +1314,30 @@ def ped_bridge_mode_impact_audit_frame(
     line["source_path_text"] = line.get("source_path", pd.Series("", index=line.index)).fillna("").astype(str)
     line["scenario_text"] = line.get("scenario_name", pd.Series("", index=line.index)).fillna("").astype(str)
     line["series_text"] = line.get("series_id", pd.Series("", index=line.index)).fillna("").astype(str)
+    line_units = line.get("unit", pd.Series("", index=line.index))
+    value_lookup: dict[tuple[str, int, str, str], float] = {}
+    unit_lookup: dict[tuple[str, int, str, str], str] = {}
+    for source_path, fy_value, scenario_name, series_id, value_numeric, unit_value in zip(
+        line["source_path_text"],
+        line["FY_numeric"],
+        line["scenario_text"],
+        line["series_text"],
+        line["value_numeric"],
+        line_units,
+        strict=False,
+    ):
+        if pd.isna(fy_value):
+            continue
+        key = (source_path, int(fy_value), scenario_name, series_id)
+        if key not in value_lookup:
+            value_lookup[key] = _finite_float(value_numeric, np.nan)
+            unit_lookup[key] = str(unit_value or "")
 
     def value(source_path: str, fy: int, scenario_name: str, series_id: str) -> float:
-        rows = line[
-            line["source_path_text"].eq(source_path)
-            & line["FY_numeric"].eq(fy)
-            & line["scenario_text"].eq(scenario_name)
-            & line["series_text"].eq(series_id)
-        ]
-        if rows.empty:
-            return np.nan
-        return _finite_float(rows.iloc[0].get("value_numeric"), np.nan)
+        return value_lookup.get((source_path, fy, scenario_name, series_id), np.nan)
 
     def unit(source_path: str, fy: int, scenario_name: str, series_id: str) -> str:
-        rows = line[
-            line["source_path_text"].eq(source_path)
-            & line["FY_numeric"].eq(fy)
-            & line["scenario_text"].eq(scenario_name)
-            & line["series_text"].eq(series_id)
-        ]
-        if rows.empty:
-            return ""
-        return str(rows.iloc[0].get("unit", "") or "")
+        return unit_lookup.get((source_path, fy, scenario_name, series_id), "")
 
     rows: list[dict[str, Any]] = []
     audit = ped_revenue_bridge_audit.copy()

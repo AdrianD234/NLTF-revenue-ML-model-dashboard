@@ -93,5 +93,25 @@
       "parity": "Inline parity check matched old row-scan behavior for chart, bridge, future and line frames.",
       "validation": "Focused fallback semantics and primary-view tests passed before full validation."
     }
+  },
+  {
+    "timestamp": "2026-06-30T22:22:32+12:00",
+    "scope": "Revenue Outlook PED bridge impact audit generation",
+    "before_ms": {
+      "impact_generation_min": 691.41,
+      "impact_generation_mean": 715.91,
+      "bridge_primary_lightweight_min": 760.89,
+      "bridge_primary_lightweight_mean": 774.58
+    },
+    "after_ms": {
+      "impact_generation_lookup_min": 12.45,
+      "impact_generation_lookup_mean": 13.33,
+      "bridge_primary_lightweight_lookup_min": 112.9,
+      "bridge_primary_lightweight_lookup_mean": 116.04
+    },
+    "result": {
+      "impact_change": "Replaced repeated line-reconciliation DataFrame scans with first-row value/unit lookup dictionaries inside PED bridge impact audit generation.",
+      "validation": "python -m compileall app.py model_dashboard passed; Revenue Outlook test slice passed: 31 passed; bounded verify_dashboard.ps1 -SkipBrowser passed; host verify_browser_host.ps1 on port 8515 passed: 40 passed."
+    }
   }
 ]
