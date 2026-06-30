@@ -17,6 +17,9 @@ SCREENSHOT_DIR = ROOT / "artifacts" / "screenshots"
 SERIES = {
     "ped_vkt_per_capita": ("Revenue Outlook - PED VKT per capita", "revenue-outlook-ped-vkt-per-capita.png"),
     "gross_ped_revenue": ("Revenue Outlook - PED revenue", "revenue-outlook-ped-revenue.png"),
+    "light_ruc_net_km": ("Revenue Outlook - Light RUC net km", "revenue-outlook-light-ruc-net-km.png"),
+    "light_ruc_net_revenue": ("Revenue Outlook - Light RUC revenue", "revenue-outlook-light-ruc-revenue.png"),
+    "phev_ruc_net_revenue": ("Revenue Outlook - PHEV revenue", "revenue-outlook-phev-revenue.png"),
     "net_fed_revenue": ("Revenue Outlook - Net FED revenue", "revenue-outlook-net-fed.png"),
     "total_fed_ruc_net_revenue": ("Revenue Outlook - Total RUC+PED revenue", "revenue-outlook-total-ruc-ped.png"),
     "total_nltf_net_revenue": ("Revenue Outlook - Total NLTF revenue", "revenue-outlook-total-nltf.png"),

@@ -2019,6 +2019,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     )
     formula_residuals = pack.revenue_formula_residuals.copy() if pack is not None and isinstance(getattr(pack, "revenue_formula_residuals", None), pd.DataFrame) else pd.DataFrame()
     alias_audit = pack.series_alias_audit.copy() if pack is not None and isinstance(getattr(pack, "series_alias_audit", None), pd.DataFrame) else pd.DataFrame()
+    runtime_cutoff_audit = pack.runtime_cutoff_audit.copy() if pack is not None and isinstance(getattr(pack, "runtime_cutoff_audit", None), pd.DataFrame) else pd.DataFrame()
     fan_availability = pack.fan_availability.copy() if pack is not None and isinstance(getattr(pack, "fan_availability", None), pd.DataFrame) else pd.DataFrame()
     fan_band_rows = pack.fan_band_rows.copy() if pack is not None and isinstance(getattr(pack, "fan_band_rows", None), pd.DataFrame) else pd.DataFrame()
 
@@ -2029,6 +2030,16 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     )
     st.caption("Source policy: committed runtime pack only; no latest-folder scan; no runtime source-pack chart join; no Excel workbook model forecasts.")
     st.caption(SCENARIO_ROLE_CONTRACT_NOTE)
+    period_rule = manifest.get("period_rule") if isinstance(manifest, dict) else {}
+    runtime_cutoff_fy = (period_rule or {}).get("runtime_cutoff_fy") if isinstance(period_rule, dict) else None
+    if runtime_cutoff_fy:
+        st.caption(
+            f"Runtime horizon: no extrapolated model extension is used; current-finalist comparative charts and calculations stop at FY{runtime_cutoff_fy}."
+        )
+    vintage_notes = manifest.get("data_vintage_manifest_notes") if isinstance(manifest, dict) else {}
+    official_horizon_note = (vintage_notes or {}).get("official_horizon_note") if isinstance(vintage_notes, dict) else ""
+    if official_horizon_note:
+        st.caption(str(official_horizon_note))
 
     if chart_rows.empty:
         warning_panel("The promoted Revenue Outlook pack has no chart rows.")
@@ -2127,6 +2138,16 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             with contract_cols[1]:
                 dataframe_download(scenario_role_contract, "Download CSV", "scenario_role_contract.csv")
             display_table(_scenario_role_contract_display_table(scenario_role_contract), height=320, max_rows=160)
+
+    if not runtime_cutoff_audit.empty:
+        with st.expander("Runtime cutoff audit", expanded=False):
+            info_panel(
+                "Revenue Outlook charts and tables stop at the last governed common non-extrapolated horizon across current Base, current comparison and required MBU26 inputs."
+            )
+            cutoff_cols = st.columns([0.82, 0.18])
+            with cutoff_cols[1]:
+                dataframe_download(runtime_cutoff_audit, "Download CSV", "runtime_cutoff_audit.csv")
+            display_table(runtime_cutoff_audit, height=220, max_rows=20)
 
     with st.container(border=True):
         st.markdown("<div class='page5-panel-title'>Revenue composition over time</div>", unsafe_allow_html=True)
@@ -5391,7 +5412,6 @@ def _ev_phev_split_assumptions_display_table(split_assumptions: pd.DataFrame) ->
         "target_semantics_status": "Target semantics",
         "business_rule": "Business rule",
         "allocation_status": "Allocation status",
-        "extrapolated_model_extension": "Model extension",
         "used_by_current_finalist": "Used by current finalist",
         "model_input_quarters": "Model input quarters",
         "source_file": "Source file",
@@ -5529,7 +5549,6 @@ def _ev_phev_ped_light_drift_display_table(drift_assumptions: pd.DataFrame) -> p
         "old_light_only_migration_revenue_total": "Old light-only revenue total",
         "migration_revenue_delta": "Migration revenue delta",
         "assumption_status": "Assumption status",
-        "extrapolated_model_extension": "Model extension",
         "source_cells": "Source cells",
         "notes": "Notes",
     }

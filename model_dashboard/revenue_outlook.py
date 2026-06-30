@@ -31,10 +31,6 @@ from .forecast_imports import (
 )
 from .mbu26_source_spine import (
     CURRENT_LIGHT_TOTAL_SERIES_ID,
-    CURRENT_MODEL_EXTENSION_BASE_END_FY,
-    CURRENT_MODEL_EXTENSION_BASE_START_FY,
-    CURRENT_MODEL_EXTENSION_END_FY,
-    CURRENT_MODEL_EXTENSION_START_FY,
     EV_PHEV_MIGRATION_DEFAULT_MODE,
     EV_PHEV_MIGRATION_SMOOTHNESS_PENALTY,
     MBU26_RELEASE_ROUND,
@@ -94,6 +90,7 @@ RUNTIME_REVENUE_OUTLOOK_FILES = (
     "scenario_role_contract.parquet",
     "revenue_formula_residuals.parquet",
     "series_alias_audit.parquet",
+    "runtime_cutoff_audit.parquet",
     "fan_availability.parquet",
     "fan_band_rows.parquet",
     "trace_source_contract.parquet",
@@ -385,6 +382,7 @@ class RevenueOutlookPack:
     scenario_role_contract: pd.DataFrame = field(default_factory=pd.DataFrame)
     revenue_formula_residuals: pd.DataFrame = field(default_factory=pd.DataFrame)
     series_alias_audit: pd.DataFrame = field(default_factory=pd.DataFrame)
+    runtime_cutoff_audit: pd.DataFrame = field(default_factory=pd.DataFrame)
     fan_availability: pd.DataFrame = field(default_factory=pd.DataFrame)
     fan_band_rows: pd.DataFrame = field(default_factory=pd.DataFrame)
 
@@ -411,6 +409,7 @@ def revenue_outlook_signature(pack_dir: Path | str | None = None, repo_root: Pat
         base / "scenario_role_contract.parquet",
         base / "revenue_formula_residuals.parquet",
         base / "series_alias_audit.parquet",
+        base / "runtime_cutoff_audit.parquet",
         base / "fan_availability.parquet",
         base / "fan_band_rows.parquet",
     ]
@@ -454,6 +453,7 @@ def load_revenue_outlook_pack(
         scenario_role_contract=_read_optional_parquet(base / "scenario_role_contract.parquet"),
         revenue_formula_residuals=_read_optional_parquet(base / "revenue_formula_residuals.parquet"),
         series_alias_audit=_read_optional_parquet(base / "series_alias_audit.parquet"),
+        runtime_cutoff_audit=_read_optional_parquet(base / "runtime_cutoff_audit.parquet"),
         fan_availability=_read_optional_parquet(base / "fan_availability.parquet"),
         fan_band_rows=_read_optional_parquet(base / "fan_band_rows.parquet"),
     )
@@ -524,6 +524,179 @@ DISPLAY_SERIES_ORDER = [
     "total_nltf_net_revenue",
 ]
 
+CURRENT_RUNTIME_CUTOFF_REQUIRED_SERIES = (
+    "ped_vkt_per_capita",
+    "light_ruc_net_km",
+    "heavy_ruc_net_km",
+    "gross_ped_revenue",
+    "light_ruc_net_revenue",
+    "heavy_ruc_net_revenue",
+    "total_nltf_net_revenue",
+)
+MBU26_RUNTIME_CUTOFF_REQUIRED_SERIES = (
+    "light_petrol_vkt",
+    "ped_volume",
+    "gross_ped_revenue",
+    "light_ruc_net_km",
+    "light_bev_ruc_net_km",
+    "phev_ruc_net_km",
+    "light_ruc_net_revenue",
+    "light_bev_ruc_net_revenue",
+    "phev_ruc_net_revenue",
+    "heavy_ruc_net_km",
+    "heavy_ruc_net_revenue",
+    "total_nltf_net_revenue",
+)
+
+
+def _runtime_cutoff_fy_and_audit(
+    current: pd.DataFrame,
+    mbu26_official_annual: pd.DataFrame,
+) -> tuple[int, pd.DataFrame]:
+    current_data = current.copy() if current is not None else pd.DataFrame()
+    source_path = current_data.get("source_path", pd.Series("", index=current_data.index)).fillna("").astype(str)
+    scenario_role = current_data.get("scenario_role", pd.Series("", index=current_data.index)).fillna("").astype(str)
+    base_mask = source_path.eq("Current finalist Base case") | scenario_role.eq(SCENARIO_ROLE_BASECASE)
+    comparison_mask = source_path.eq("Current finalist High population/comparison") | scenario_role.eq(SCENARIO_ROLE_COMPARISON)
+
+    base_last = _last_complete_fy_with_required_series(
+        current_data,
+        CURRENT_RUNTIME_CUTOFF_REQUIRED_SERIES,
+        base_mask,
+        exclude_extrapolated=True,
+    )
+    comparison_last = _last_complete_fy_with_required_series(
+        current_data,
+        CURRENT_RUNTIME_CUTOFF_REQUIRED_SERIES,
+        comparison_mask,
+        exclude_extrapolated=True,
+    )
+    mbu26_last = _last_complete_fy_with_required_series(
+        mbu26_official_annual,
+        MBU26_RUNTIME_CUTOFF_REQUIRED_SERIES,
+        None,
+        exclude_extrapolated=False,
+    )
+
+    components = [
+        (
+            "current_finalist_base",
+            base_last,
+            "last FY with non-extrapolated current-finalist Base case rows",
+            CURRENT_RUNTIME_CUTOFF_REQUIRED_SERIES,
+        ),
+        (
+            "current_finalist_comparison",
+            comparison_last,
+            "last FY with non-extrapolated current-finalist comparison rows",
+            CURRENT_RUNTIME_CUTOFF_REQUIRED_SERIES,
+        ),
+        (
+            "mbu26_required_components_rates_splits",
+            mbu26_last,
+            "last FY with required MBU26 fixed components, rates and split assumptions",
+            MBU26_RUNTIME_CUTOFF_REQUIRED_SERIES,
+        ),
+    ]
+    missing = [component for component, last_fy, _, _ in components if last_fy is None]
+    if missing:
+        raise ValueError(
+            "Cannot determine Revenue Outlook runtime cutoff; missing governed horizon evidence for "
+            + ", ".join(missing)
+        )
+    cutoff = min(int(last_fy) for _, last_fy, _, _ in components if last_fy is not None)
+    official_max = _max_numeric_year(mbu26_official_annual, "FY")
+    official_extends = bool(official_max is not None and int(official_max) > cutoff)
+    rows = [
+        {
+            "audit_component": component,
+            "runtime_cutoff_fy": cutoff,
+            "last_governed_fy": int(last_fy) if last_fy is not None else pd.NA,
+            "required_series": "; ".join(required_series),
+            "status": "available" if last_fy is not None else "missing",
+            "rule": description,
+            "notes": "Excludes disabled post-horizon extension rows." if component.startswith("current_finalist") else "Uses repo-local MBU26 official annual spine.",
+        }
+        for component, last_fy, description, required_series in components
+    ]
+    rows.append(
+        {
+            "audit_component": "runtime_cutoff",
+            "runtime_cutoff_fy": cutoff,
+            "last_governed_fy": cutoff,
+            "required_series": "",
+            "status": "selected",
+            "rule": (
+                "runtime_cutoff_fy = min(current Base, current comparison, required MBU26 inputs/rates/splits)"
+            ),
+            "notes": (
+                f"Official source extends beyond the current finalist common horizon; comparative charts stop at FY{cutoff}."
+                if official_extends
+                else f"Comparative charts stop at FY{cutoff}."
+            ),
+        }
+    )
+    return cutoff, pd.DataFrame(rows)
+
+
+def _last_complete_fy_with_required_series(
+    frame: pd.DataFrame,
+    required_series: tuple[str, ...],
+    mask: pd.Series | None,
+    *,
+    exclude_extrapolated: bool,
+) -> int | None:
+    if frame is None or frame.empty:
+        return None
+    data = frame.copy()
+    data["FY_numeric"] = pd.to_numeric(data.get("FY"), errors="coerce")
+    data["value_numeric"] = pd.to_numeric(data.get("value"), errors="coerce")
+    if mask is not None:
+        data = data[mask.reindex(data.index, fill_value=False)].copy()
+    if exclude_extrapolated:
+        data = data[
+            ~data.get("value_status", pd.Series("", index=data.index)).fillna("").astype(str).eq("extrapolated_model_extension")
+        ].copy()
+    data = data[
+        data["FY_numeric"].notna()
+        & data["value_numeric"].notna()
+        & data.get("series_id", pd.Series("", index=data.index)).astype(str).isin(required_series)
+    ].copy()
+    if data.empty:
+        return None
+    counts = data.groupby("FY_numeric")["series_id"].nunique()
+    complete = counts[counts.ge(len(set(required_series)))]
+    if complete.empty:
+        return None
+    return int(max(complete.index))
+
+
+def _max_numeric_year(frame: pd.DataFrame, column: str) -> int | None:
+    if frame is None or frame.empty or column not in frame.columns:
+        return None
+    values = pd.to_numeric(frame[column], errors="coerce")
+    if values.notna().any():
+        return int(values.max())
+    return None
+
+
+def _filter_frame_to_runtime_cutoff(frame: pd.DataFrame, runtime_cutoff_fy: int) -> pd.DataFrame:
+    if frame is None or frame.empty:
+        return frame
+    out = frame.copy()
+    for column in ("FY", "june_year"):
+        if column in out.columns:
+            years = pd.to_numeric(out[column], errors="coerce")
+            if years.notna().any():
+                return out[years.isna() | years.le(runtime_cutoff_fy)].copy()
+    for column in ("target_period", "annual_period", "period"):
+        if column in out.columns:
+            years = out[column].astype(str).str.extract(r"FY(\d{4})", expand=False)
+            years = pd.to_numeric(years, errors="coerce")
+            if years.notna().any():
+                return out[years.isna() | years.le(runtime_cutoff_fy)].copy()
+    return out
+
 
 def build_current_revenue_outlook_runtime_pack(
     *,
@@ -559,14 +732,17 @@ def build_current_revenue_outlook_runtime_pack(
     )
     if current.empty:
         raise ValueError("Cannot rebuild current Revenue Outlook runtime pack: current finalist annual rows are missing.")
+    runtime_cutoff_fy, runtime_cutoff_audit = _runtime_cutoff_fy_and_audit(current, mbu26_pack.official_annual)
+    current = _filter_frame_to_runtime_cutoff(current, runtime_cutoff_fy)
+    runtime_official_annual = _filter_frame_to_runtime_cutoff(mbu26_pack.official_annual, runtime_cutoff_fy)
     line_reconciliation = revenue_line_reconciliation_frame(
-        mbu26_official_annual=mbu26_pack.official_annual,
+        mbu26_official_annual=runtime_official_annual,
         current_forecast_annual=current,
     )
     formula_residuals = revenue_formula_residual_frame(line_reconciliation)
     stack_components = revenue_stack_components_frame(line_reconciliation, formula_residuals)
     ev_phev_split_assumptions = ev_phev_split_assumptions_frame(
-        mbu26_pack.official_annual,
+        runtime_official_annual,
         current_forecast_annual=current,
         repo_root=root,
     )
@@ -574,6 +750,11 @@ def build_current_revenue_outlook_runtime_pack(
         current_outlook_chart_rows=existing_chart_rows,
         mbu26_official_annual=mbu26_pack.official_annual,
         scenario_input_wide=scenario_input_wide,
+        include_disabled_extension_boundary=True,
+    )
+    ev_phev_ped_light_drift_assumptions = _filter_frame_to_runtime_cutoff(
+        ev_phev_ped_light_drift_assumptions,
+        runtime_cutoff_fy,
     )
     scenarios = _runtime_scenario_records(existing_manifest, current)
     scenario_role_contract = scenario_role_contract_frame(
@@ -614,9 +795,9 @@ def build_current_revenue_outlook_runtime_pack(
 
     series_meta = _runtime_series_metadata(mbu26_pack.series_trace_contract)
     quarterly_inputs = _runtime_quarterly_activity_inputs(existing_chart_rows, series_meta, scenario_role_contract=scenario_role_contract)
-    actual_rows = _runtime_mbu26_actual_rows(mbu26_pack.official_annual, series_meta)
+    actual_rows = _runtime_mbu26_actual_rows(runtime_official_annual, series_meta)
     current_rows = _runtime_current_rows(current, series_meta, scenario_role_contract=scenario_role_contract)
-    mbu26_official_rows = _runtime_mbu26_official_rows(mbu26_pack.official_annual, series_meta)
+    mbu26_official_rows = _runtime_mbu26_official_rows(runtime_official_annual, series_meta)
     chart_rows = pd.concat(
         [quarterly_inputs, actual_rows, current_rows, mbu26_official_rows],
         ignore_index=True,
@@ -626,6 +807,7 @@ def build_current_revenue_outlook_runtime_pack(
         raise ValueError("Cannot rebuild current Revenue Outlook runtime pack: no chart rows were produced.")
     chart_rows = _normalize_runtime_chart_rows(chart_rows)
     chart_rows = _suppress_unreconciled_current_chart_rows(chart_rows, formula_residuals)
+    chart_rows = _filter_frame_to_runtime_cutoff(chart_rows, runtime_cutoff_fy)
     future_revenue = _runtime_future_revenue_forecasts(current, series_meta)
     bridge_components = _runtime_bridge_components(current, series_meta)
     trace_audit = _runtime_trace_audit(chart_rows)
@@ -662,19 +844,33 @@ def build_current_revenue_outlook_runtime_pack(
                 "Current finalist Light RUC is governed as a total light-RUC net-km model input. The optimized migration "
                 "layer allocates BEV/PHEV uptake between PED/light-petrol and total Light RUC before revenue rates are applied."
             ),
-            "F_current_model_extension": (
-                f"Current-finalist modelled streams extend FY{CURRENT_MODEL_EXTENSION_START_FY}-FY{CURRENT_MODEL_EXTENSION_END_FY} "
-                f"using the linear annual gradient from FY{CURRENT_MODEL_EXTENSION_BASE_START_FY}-FY{CURRENT_MODEL_EXTENSION_BASE_END_FY}."
+            "F_runtime_cutoff": (
+                f"No extrapolated model extension is used in the current Revenue Outlook runtime path; "
+                f"current-finalist comparisons stop at FY{runtime_cutoff_fy}."
             ),
         },
         "period_rule": {
             "last_complete_actual_fy": REVENUE_LAST_COMPLETE_ACTUAL_FY,
             "first_forecast_quarter": REVENUE_FIRST_FORECAST_QUARTER,
             "model_training_cutoff": REVENUE_MODEL_TRAINING_CUTOFF,
+            "runtime_cutoff_fy": runtime_cutoff_fy,
             "fy2026_nowcast": "2025Q3+2025Q4 source actuals plus 2026Q1+2026Q2 current finalist forecasts",
-            "rule": "Actual line ends FY2025; FY2026 actual-to-date rows are nowcast inputs only and are not plotted as actuals.",
+            "rule": (
+                "Actual line ends FY2025; FY2026 actual-to-date rows are nowcast inputs only and are not plotted as actuals. "
+                f"Current-finalist comparative charts and runtime calculations stop at FY{runtime_cutoff_fy}, "
+                "the last governed common non-extrapolated horizon."
+            ),
         },
         "data_vintage_manifest_notes": {
+            "runtime_cutoff": (
+                f"No extrapolated model extension is used; last displayed/current calculation FY is FY{runtime_cutoff_fy}. "
+                "Current-finalist paths stop where governed model and source assumptions stop."
+            ),
+            "official_horizon_note": (
+                f"Official source extends beyond the current finalist common horizon; comparative charts stop at FY{runtime_cutoff_fy}."
+                if _max_numeric_year(mbu26_pack.official_annual, "FY") and int(_max_numeric_year(mbu26_pack.official_annual, "FY") or 0) > runtime_cutoff_fy
+                else f"Comparative charts stop at FY{runtime_cutoff_fy}."
+            ),
             "light_ruc_target_semantics": (
                 "Business rule update: current-finalist Light RUC is treated as total light-RUC net km, while EV/PHEV "
                 "migration is sourced from both current PED/light-petrol activity and total Light RUC using an optimized "
@@ -779,6 +975,12 @@ def build_current_revenue_outlook_runtime_pack(
             "repo_relative_path": _repo_relative(root, base / "runtime_trace_audit.csv"),
             "scope": "Per-series FY2024-FY2027 trace audit with source, role, model ID, scenario, quarter composition and anchor flags.",
         },
+        "runtime_cutoff_audit": {
+            "repo_relative_path": _repo_relative(root, base / "runtime_cutoff_audit.csv"),
+            "runtime_cutoff_fy": runtime_cutoff_fy,
+            "scope": "Dynamic Revenue Outlook runtime cutoff audit from current Base, current comparison and required MBU26 input horizons.",
+            "status": "available",
+        },
         "revenue_line_reconciliation": {
             "repo_relative_path": _repo_relative(root, base / "revenue_line_reconciliation.csv"),
             "scope": "Live table source for MBU26 official and current finalist line-item decomposition.",
@@ -836,6 +1038,7 @@ def build_current_revenue_outlook_runtime_pack(
             "scenario_feature_lineage": scenario_feature_lineage,
             "scenario_role_contract": scenario_role_contract,
             "revenue_formula_residuals": formula_residuals,
+            "runtime_cutoff_audit": runtime_cutoff_audit,
             "fan_availability": fan_availability,
             "fan_band_rows": fan_band_rows,
         },
@@ -4963,6 +5166,7 @@ def _write_pack_files(
         "scenario_role_contract",
         "revenue_formula_residuals",
         "series_alias_audit",
+        "runtime_cutoff_audit",
         "fan_availability",
         "fan_band_rows",
         "trace_source_contract",

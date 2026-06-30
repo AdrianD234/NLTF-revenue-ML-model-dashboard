@@ -42,6 +42,23 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _max_fy(frame: pd.DataFrame) -> int | None:
+    if frame is None or frame.empty:
+        return None
+    for column in ("FY", "june_year"):
+        if column in frame.columns:
+            years = pd.to_numeric(frame[column], errors="coerce")
+            if years.notna().any():
+                return int(years.max())
+    for column in ("target_period", "annual_period", "period"):
+        if column in frame.columns:
+            years = frame[column].astype(str).str.extract(r"FY(\d{4})", expand=False)
+            years = pd.to_numeric(years, errors="coerce")
+            if years.notna().any():
+                return int(years.max())
+    return None
+
+
 def _comparison(tmp_path: Path, *, blank_rates: bool = False, fixture: bool = False):
     base = create_completed_sample_workbook(tmp_path / "NLTF_forecast_input_template_basecase.xlsx", repo_root=ROOT, quarters=4)
     comparison = create_completed_sample_workbook(
@@ -318,6 +335,8 @@ def test_committed_current_revenue_outlook_pack_is_repo_local_and_hash_backed() 
         "revenue_stack_components.parquet",
         "row_reconciliation.csv",
         "row_reconciliation.parquet",
+        "runtime_cutoff_audit.csv",
+        "runtime_cutoff_audit.parquet",
         "runtime_trace_audit.csv",
         "runtime_trace_audit.parquet",
         "scenario_feature_lineage.csv",
@@ -360,6 +379,7 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     scenario_role_contract = pd.read_parquet(pack_dir / "scenario_role_contract.parquet")
     residuals = pd.read_parquet(pack_dir / "revenue_formula_residuals.parquet")
     alias_audit = pd.read_parquet(pack_dir / "series_alias_audit.parquet")
+    runtime_cutoff_audit = pd.read_parquet(pack_dir / "runtime_cutoff_audit.parquet")
     fan_availability = pd.read_parquet(pack_dir / "fan_availability.parquet")
     fan_bands = pd.read_parquet(pack_dir / "fan_band_rows.parquet")
     scenario_feature_lineage = pd.read_parquet(pack_dir / "scenario_feature_lineage.parquet")
@@ -377,6 +397,41 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     assert "annual_model_paths" not in json.dumps(manifest).lower()
     assert "nominal_rate_missing" not in json.dumps(manifest)
     assert "ped_bridge_source_history_missing" not in json.dumps(manifest)
+    assert "extrapolated_model_extension" not in json.dumps(manifest)
+    assert "extrapolated from FY2046" not in json.dumps(manifest)
+    runtime_cutoff_fy = int(manifest["period_rule"]["runtime_cutoff_fy"])
+    assert runtime_cutoff_fy == 2050
+    assert manifest["runtime_cutoff_audit"]["repo_relative_path"] == "data/current_revenue_outlook/runtime_cutoff_audit.csv"
+    assert manifest["runtime_cutoff_audit"]["runtime_cutoff_fy"] == runtime_cutoff_fy
+    assert not runtime_cutoff_audit.empty
+    assert set(runtime_cutoff_audit["audit_component"].astype(str)) == {
+        "current_finalist_base",
+        "current_finalist_comparison",
+        "mbu26_required_components_rates_splits",
+        "runtime_cutoff",
+    }
+    assert pd.to_numeric(runtime_cutoff_audit["runtime_cutoff_fy"], errors="coerce").eq(runtime_cutoff_fy).all()
+    assert "no extrapolated model extension is used" in manifest["data_vintage_manifest_notes"]["runtime_cutoff"].lower()
+    assert f"FY{runtime_cutoff_fy}" in manifest["data_vintage_manifest_notes"]["official_horizon_note"]
+    assert _max_fy(chart) == runtime_cutoff_fy
+    assert _max_fy(line_reconciliation) == runtime_cutoff_fy
+    assert _max_fy(stack_components) == runtime_cutoff_fy
+    assert _max_fy(fan_bands) == runtime_cutoff_fy
+    assert _max_fy(future) == runtime_cutoff_fy
+    assert _max_fy(bridge) == runtime_cutoff_fy
+    official_source = pd.read_parquet(ROOT / "data/revenue_model_source_pack/mbu26_annual_spine/mbu26_official_annual.parquet")
+    assert (_max_fy(official_source) or 0) > runtime_cutoff_fy
+    displayed = chart[
+        chart["time_grain"].astype(str).eq("june_year")
+        & chart["plot_allowed"].astype(str).str.lower().isin(["true", "1"])
+    ].copy()
+    assert _max_fy(displayed) == runtime_cutoff_fy
+    current_line = line_reconciliation[line_reconciliation["source_path"].astype(str).str.startswith("Current finalist")].copy()
+    assert _max_fy(current_line) == runtime_cutoff_fy
+    runtime_tables = [chart, line_reconciliation, stack_components, audit, fan_bands]
+    for frame in runtime_tables:
+        assert not frame.astype(str).stack().str.contains("extrapolated_model_extension", regex=False).any()
+        assert not frame.astype(str).stack().str.contains("extrapolated from FY2046", regex=False).any()
     assert manifest["target_semantics_audit"]["HEAVY_RUC"]["status"] == "not_reclassified"
     assert manifest["scenario_role_contract"]["repo_relative_path"] == "data/current_revenue_outlook/scenario_role_contract.csv"
     assert not scenario_role_contract.empty
@@ -599,18 +654,12 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     assert replay_tolerances.notna().all()
     assert replay_tolerances.gt(0).all()
     assert replay_deltas.le(replay_tolerances).all()
-    extension_replay = scenario_input_replay[
-        scenario_input_replay["scenario_input_status"].astype(str).eq("governed_model_extension_not_replayed_from_workbook")
-    ].copy()
-    assert not extension_replay.empty
-    assert extension_replay["replay_status"].astype(str).eq("not_applicable").all()
-    assert set(extension_replay["annual_period"].dropna().astype(str)) == {
-        "FY2051",
-        "FY2052",
-        "FY2053",
-        "FY2054",
-        "FY2055",
-    }
+    assert "governed_model_extension_not_replayed_from_workbook" not in set(
+        scenario_input_replay["scenario_input_status"].dropna().astype(str)
+    )
+    assert not scenario_input_replay["annual_period"].dropna().astype(str).isin(
+        {"FY2051", "FY2052", "FY2053", "FY2054", "FY2055"}
+    ).any()
     assert not ev_phev_split.empty
     assert ev_phev_split["used_by_current_finalist"].astype(bool).any()
     current_split = ev_phev_split[ev_phev_split["used_by_current_finalist"].astype(bool)].copy()
@@ -1302,17 +1351,21 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
         abs=1e-6,
     )
 
-    base_extension = line_reconciliation[
+    base_cutoff_line = line_reconciliation[
         line_reconciliation["source_path"].astype(str).eq("Current finalist Base case")
         & line_reconciliation["series_id"].astype(str).eq("current_light_ruc_total_modelled_km")
-        & pd.to_numeric(line_reconciliation["FY"], errors="coerce").between(2046, 2055, inclusive="both")
+        & pd.to_numeric(line_reconciliation["FY"], errors="coerce").between(2046, runtime_cutoff_fy, inclusive="both")
     ].copy()
-    base_extension["FY_numeric"] = pd.to_numeric(base_extension["FY"], errors="coerce").astype(int)
-    base_extension = base_extension.set_index("FY_numeric")
-    extension_slope = (float(base_extension.loc[2050, "value"]) - float(base_extension.loc[2046, "value"])) / 4.0
-    for fy in range(2051, 2056):
-        assert str(base_extension.loc[fy, "value_status"]) == "extrapolated_model_extension"
-        assert float(base_extension.loc[fy, "value"]) == pytest.approx(float(base_extension.loc[2050, "value"]) + extension_slope * (fy - 2050), abs=1e-9)
+    base_cutoff_line["FY_numeric"] = pd.to_numeric(base_cutoff_line["FY"], errors="coerce").astype(int)
+    assert set(base_cutoff_line["FY_numeric"]) == set(range(2046, runtime_cutoff_fy + 1))
+    assert base_cutoff_line["value_status"].astype(str).ne("extrapolated_model_extension").all()
+    assert pd.to_numeric(
+        line_reconciliation.loc[
+            line_reconciliation["source_path"].astype(str).str.startswith("Current finalist"),
+            "FY",
+        ],
+        errors="coerce",
+    ).max() == runtime_cutoff_fy
 
     current_residuals = residuals[
         residuals["source_path"].astype(str).str.startswith("Current finalist")
@@ -1324,42 +1377,44 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
 def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
     pack_dir = ROOT / CURRENT_REVENUE_OUTLOOK_DIR
     expected_hashes = {
-        "ev_phev_ped_light_drift_assumptions.csv": "f0a27b5b2e2cf3844ea1c53ed5097a58f8801d8465ee888da39a82e501343bf3",
-        "ev_phev_ped_light_drift_assumptions.parquet": "b3c1b3cc4c07bdc041b9f6d3a0c9e7a8a0a21742890811d94955d66af964d9a2",
-        "ev_phev_split_assumptions.csv": "6675ca24b2dc1b57d27e69848b62aa2dbb9cf1db48976e3f54942b6f2c305994",
-        "ev_phev_split_assumptions.parquet": "e477a4c63d77717c0e7e13d9453057ca50d7a2a8fd76428a37301c0ed1816b00",
+        "ev_phev_ped_light_drift_assumptions.csv": "576ae24883099bb2d2c6b8a7f0162598818c23b7b6381e1613a05c64cfbaf672",
+        "ev_phev_ped_light_drift_assumptions.parquet": "764b23da0eef478baf5733ebfd43bd2d1fad55880e51a5416a9ce9907e11561f",
+        "ev_phev_split_assumptions.csv": "f6d678fde5074dd9ec4aa9ed79f10f3f3d02c1a6d72e07f8c050918bfc9f2928",
+        "ev_phev_split_assumptions.parquet": "f1b13a03568eda04ac252d4c303d10918359cbc032405ec959e0616b19c2d4f1",
         "fan_availability.csv": "7fde72609437ab85136e9e21c8f8b6ba8dfd9cc2024a73f986ddfac299842e3a",
         "fan_availability.parquet": "65597bfb4c267ee4ffc37907c17df15ec4cd6ade24fc5cd65f0947e4469f0267",
-        "fan_band_rows.csv": "c58a2e9d78d959e193162a61ca7e85607d5ab62ff7380270637de7b8657cc907",
-        "fan_band_rows.parquet": "e8828c2997785eed41df3cf090b9fdd29b22e9b5e97dd3aabfae924b7fcd86f9",
-        "future_revenue_forecasts.csv": "4e6ed9d9a6bc4a631970247ccba54deb4d66fa4664d04a5ebccf5bfa24d61a72",
-        "future_revenue_forecasts.parquet": "ca3cf207b7da7ece6386e975f9faeeb124f3247ef0e9c1c3f4455a5c81a2508d",
-        "manifest.json": "5693bdd89c794f5cc84a7e8e36223b2fe1db6c7db91da6b8a1d52f90abf0176a",
+        "fan_band_rows.csv": "6d6974a825c07bfaf3d072077554de9d0349386355a14d494a6a69d274ab97bb",
+        "fan_band_rows.parquet": "74d5f689c70113b72d0706fa96b805e8e82a726864aae3b134c45d61e131558d",
+        "future_revenue_forecasts.csv": "31bc0ab32312cfb37598ca0bcd7db7abbab89d259c6785b3a9787208c9bd2c05",
+        "future_revenue_forecasts.parquet": "37fd32d0a1e39facca69504b525f1f3c85491f781832b3befbab2ecba700aba0",
+        "manifest.json": "10c01c3fccb72e8466e86837f6bbdb19477390a824cc8f462d1a12711f74f343",
         "manifest.md": "0d0ffad81aa2f9ab0e8123a05297aaf2b52d40d1b06f9700f2ca1a53977d0a2d",
         "path_trace_status.csv": "9aee7a4e7003ec6541476ca3e4afef6d8586b6c358e41db1c8e06623e5ffcaa3",
         "path_trace_status.parquet": "e66d860fb7532ee4b92285c1ba023c9f8d9469cfdaaaef819415f7cd87c73757",
-        "revenue_bridge_components.csv": "1d2094bf843ac7408fad130c5b4b7eff516080e18b415b4dc61d06220ff11611",
-        "revenue_bridge_components.parquet": "c84ea4ceb6215ce5240cab7cb567d5b7f5dd8a929216be2071114c4ba2e9154f",
-        "revenue_chart_rows.csv": "4aa4157dcd027cf73086b113bd183a1e0f71d9d72aaa5d0e76b803e059b65ab8",
-        "revenue_chart_rows.parquet": "7a614c1cf679c1ede404986802bbe8c05257e08810b049ee27f3e9fdbea13b26",
-        "revenue_formula_residuals.csv": "288c1f6227d82debba6a7d5c98f86a4c92f4287576ab2c1a6c95b450127fbe8a",
-        "revenue_formula_residuals.parquet": "90dd6059bdb07e467a28539ef426267e20e2aace7623d3feb9fca180d9497716",
-        "revenue_line_reconciliation.csv": "645e5c8040716911b4e411a27db97c5743de901dfb966c9addaeb16707ab5aef",
-        "revenue_line_reconciliation.parquet": "1faaf44b1a91867711ac7d0e9f9fe310225986e01a378e7856f70d3f492dfd15",
-        "revenue_stack_components.csv": "b18a3824f888bbf816f62f8ea816a12e13efcbc087ef74fbce2d166728cee7a8",
-        "revenue_stack_components.parquet": "3d8b501a85d0a347304093e9724797dbe1041033f02c1baed501dc9cc2181fb4",
+        "revenue_bridge_components.csv": "6bfe2a7de0ab19a7c6dd5d5634a59c01a3893375982c51a28fec9aa2fad1bd3d",
+        "revenue_bridge_components.parquet": "80b316a963d537850d082b971add987479734aae6b729daab57af0afccdb2b1b",
+        "revenue_chart_rows.csv": "cebe5b1106ebe2e8ad1faa8599f58dd76e44ec38c079e26c0a4509077712172f",
+        "revenue_chart_rows.parquet": "68d26ecf8177da6661a6ccd4671f60f79538fa7decb3a7ac7b68796bfb323bcd",
+        "revenue_formula_residuals.csv": "1326a0bf31bf50ade7036c525230be17e13e3876845695339ed7a5c5314c2554",
+        "revenue_formula_residuals.parquet": "3f82c12a5a6d177a4b327fe3e5ae6efea3d409deb618921bc989a59e185ebf98",
+        "revenue_line_reconciliation.csv": "78805e31eef3213bbab94d3449521db64e0d3fb8b59019c62eeb8915e793aede",
+        "revenue_line_reconciliation.parquet": "bc2e3cc1835bbae62d83b98247426a15a6cbe39dceb3bc4ff871f6b658a6ba53",
+        "revenue_stack_components.csv": "1a3267aac0c600ba8f6d7ac827b9ba405637f1236740faba56f6b325ac266bee",
+        "revenue_stack_components.parquet": "a70f4026d7f016c5ab3a00ce2e0c41d7a5fd2ff6e99b85f87f330415710d45d0",
         "row_reconciliation.csv": "d484f5d75cce88e30ce7bcf5dd70058505cc02e5dff93f457a579f119c2fc7ce",
         "row_reconciliation.parquet": "bf2b638920e4b9b00ca4ac00d4263083258ce0d94625943c4e7b3cdf90493dd7",
+        "runtime_cutoff_audit.csv": "39afc7458cba7b1a43063453269659fc6e59a53286774fac3ca77e30efc9813d",
+        "runtime_cutoff_audit.parquet": "35ff7136b28f33c4b29a48c5230db6df088775f5a87e868d22b7609e0c3b85a5",
         "runtime_trace_audit.csv": "45c9513db0fe5fe5485ec28c560e757d36733d2e900c194d2b4be9fd6b91afe9",
         "runtime_trace_audit.parquet": "49465b4692e3f0ff60c51ec26c555883ca4e3337ded988e44017464f06720381",
         "scenario_feature_lineage.csv": "b123c97090bd282009225a0ac2cfc36226d20017412f820dfeec6af34411b30d",
         "scenario_feature_lineage.parquet": "488d932eba67a1fdd7db3ce9e1cf5aba4874b72088fb53f3989a68798556a025",
         "scenario_input_delta_audit.csv": "c59457c56e9dbfcad284bcdf731d27616f3da766760c9858ec503d3e045e0f13",
         "scenario_input_delta_audit.parquet": "21cc6951d017817ad989fa54521cf323113e734dae9ce321e4bfbbf99d01e538",
-        "scenario_input_replay_mismatch_report.csv": "c68bdaa00afceb33fc093d6ef7a69c32d25be0020a7e7a2af95fe64bc84b0008",
-        "scenario_input_replay_mismatch_report.parquet": "85f179c019d728114a11990a791ae6c1d31745359f9dfa59ecb807ef316e95da",
-        "scenario_role_contract.csv": "3980fa318b346547286e1f204af1c768b11d4f6ab5ad896584061f2d343b6ecd",
-        "scenario_role_contract.parquet": "f1eac9486d96031ebd0f8fdc2e23654a0a150b661d753baeb79d3f30b6f3c8fc",
+        "scenario_input_replay_mismatch_report.csv": "e0708fdc23aca483311515a8488cee029d5a959d4f351f6fe168f64431617c6a",
+        "scenario_input_replay_mismatch_report.parquet": "80f060bef98147de0ef5e20f65e02e9d6716a1900ca9b85c089e4a36f31e5749",
+        "scenario_role_contract.csv": "ba40738ba8f23a44d11fecbf3a1b04e8111efed741462b3c1067cd6a710e2a39",
+        "scenario_role_contract.parquet": "8129514d4c43e898625f74b029aad23d583cfae9b36491ee955ab0a99593b30b",
         "series_alias_audit.csv": "c0330c9918d7e2f4f972d15e8465537c16d96aca607ef253353612cadd62c56d",
         "series_alias_audit.parquet": "9b376147c912748d5a2429abf524799e348a3711d6af89a4b9d1ec287f558918",
         "series_trace_contract.csv": "2eaf18c4c54fc18a21dd68415c0aea041bd174e8d75285409a4bb83034b60e09",

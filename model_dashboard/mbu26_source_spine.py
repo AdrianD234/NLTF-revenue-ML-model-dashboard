@@ -36,6 +36,7 @@ MBU26_SCHEMA_VERSION = "nltf-revenue-mbu26-annual-spine-v1"
 MBU26_SHEET_NAME = "MBU26"
 MBU26_RELEASE_ROUND = "MBU26"
 REVENUE_PARTIAL_ACTUAL_FY = 2026
+CURRENT_MODEL_EXTENSION_ENABLED = False
 CURRENT_MODEL_EXTENSION_START_FY = 2051
 CURRENT_MODEL_EXTENSION_END_FY = 2055
 CURRENT_MODEL_EXTENSION_BASE_START_FY = 2046
@@ -475,6 +476,7 @@ def current_forecast_annual_from_mbu26(
         mbu26_official_annual=mbu26_official_annual,
         scenario_input_wide=scenario_input_wide,
         modes=(EV_PHEV_MIGRATION_DEFAULT_MODE,),
+        include_disabled_extension_boundary=True,
     )
     migration_lookup = {
         (str(row.scenario_name), int(row.FY)): row
@@ -946,7 +948,11 @@ def _official_annual_frame(spine: pd.DataFrame, formula_audit: pd.DataFrame) -> 
     return base.sort_values(["series_id", "FY"], kind="stable").reset_index(drop=True)
 
 
-def _current_activity_annual_values(chart_rows: pd.DataFrame) -> pd.DataFrame:
+def _current_activity_annual_values(
+    chart_rows: pd.DataFrame,
+    *,
+    include_disabled_extension_boundary: bool = False,
+) -> pd.DataFrame:
     columns = ["FY", "scenario_name", "scenario_role", "series_id", "value", "unit", "model_id", "quarters_present", "actual_quarters", "forecast_quarters", "nowcast_flag", "value_status"]
     if chart_rows is None or chart_rows.empty:
         return pd.DataFrame(columns=columns)
@@ -1044,11 +1050,13 @@ def _current_activity_annual_values(chart_rows: pd.DataFrame) -> pd.DataFrame:
     if not rows:
         return pd.DataFrame(columns=columns)
     out = pd.DataFrame(rows, columns=columns)
-    out = _append_extrapolated_activity_extensions(out)
+    if CURRENT_MODEL_EXTENSION_ENABLED or include_disabled_extension_boundary:
+        out = _append_extrapolated_activity_extensions(out)
     return out.sort_values(["FY", "scenario_name", "series_id"], kind="stable").reset_index(drop=True)
 
 
 def _append_extrapolated_activity_extensions(activity: pd.DataFrame) -> pd.DataFrame:
+    """Disabled historical experiment for FY2051-FY2055 annual extensions."""
     if activity is None or activity.empty:
         return activity
     rows: list[dict[str, Any]] = []
@@ -1226,6 +1234,7 @@ def ev_phev_ped_light_migration_assumptions_from_mbu26(
     scenario_input_wide: pd.DataFrame | None = None,
     smoothness_penalty: float = EV_PHEV_MIGRATION_SMOOTHNESS_PENALTY,
     modes: tuple[str, ...] = EV_PHEV_MIGRATION_MODES,
+    include_disabled_extension_boundary: bool = False,
 ) -> pd.DataFrame:
     columns = [
         "FY",
@@ -1309,7 +1318,10 @@ def ev_phev_ped_light_migration_assumptions_from_mbu26(
     modes = tuple(mode for mode in modes if mode in EV_PHEV_MIGRATION_MODES)
     if not modes:
         modes = (EV_PHEV_MIGRATION_DEFAULT_MODE,)
-    activity = _current_activity_annual_values(current_outlook_chart_rows)
+    activity = _current_activity_annual_values(
+        current_outlook_chart_rows,
+        include_disabled_extension_boundary=include_disabled_extension_boundary,
+    )
     if activity.empty:
         return pd.DataFrame(columns=columns)
     quarter_lookup = _current_activity_quarter_lookup(current_outlook_chart_rows)
