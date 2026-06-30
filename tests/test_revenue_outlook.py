@@ -225,6 +225,12 @@ def test_committed_current_revenue_outlook_pack_is_repo_local_and_hash_backed() 
         "scenario_input_wide": 600,
         "scenario_feature_lineage": 44800,
     }
+    assert manifest["scenario_input_delta_audit"]["repo_relative_path"] == (
+        "data/current_revenue_outlook/scenario_input_delta_audit.csv"
+    )
+    assert manifest["scenario_input_delta_audit"]["status"] == "available"
+    assert manifest["scenario_input_delta_audit"]["source"] == "scenario_inputs/scenario_input_long.parquet"
+    assert "workbook-cell base/comparison deltas" in manifest["scenario_input_delta_audit"]["scope"].lower()
     scenario_input_manifest_path = pack_dir / "scenario_inputs" / "scenario_input_manifest.json"
     assert scenario_input_manifest_path.exists()
     assert manifest["scenario_inputs"]["manifest_sha256"] == _sha256(scenario_input_manifest_path)
@@ -316,6 +322,8 @@ def test_committed_current_revenue_outlook_pack_is_repo_local_and_hash_backed() 
         "runtime_trace_audit.parquet",
         "scenario_feature_lineage.csv",
         "scenario_feature_lineage.parquet",
+        "scenario_input_delta_audit.csv",
+        "scenario_input_delta_audit.parquet",
         "scenario_input_replay_mismatch_report.csv",
         "scenario_input_replay_mismatch_report.parquet",
         "scenario_role_contract.csv",
@@ -355,6 +363,7 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     fan_availability = pd.read_parquet(pack_dir / "fan_availability.parquet")
     fan_bands = pd.read_parquet(pack_dir / "fan_band_rows.parquet")
     scenario_feature_lineage = pd.read_parquet(pack_dir / "scenario_feature_lineage.parquet")
+    scenario_input_delta = pd.read_parquet(pack_dir / "scenario_input_delta_audit.parquet")
     scenario_input_replay = pd.read_parquet(pack_dir / "scenario_input_replay_mismatch_report.parquet")
     scenario_input_wide = pd.read_parquet(pack_dir / "scenario_inputs" / "scenario_input_wide.parquet")
 
@@ -439,6 +448,46 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     }
     assert {"population/scale", "macro", "price/rate/policy", "behavioural"}.issubset(comparison_categories)
     assert "scenario_input_wide" in str(comparison_revenue_contract["source_basis"])
+    assert not scenario_input_delta.empty
+    required_delta_columns = {
+        "base_workbook_sha256",
+        "comparison_workbook_sha256",
+        "base_cell",
+        "comparison_cell",
+        "canonical_period",
+        "canonical_variable",
+        "base_value",
+        "comparison_value",
+        "absolute_delta",
+        "pct_delta",
+        "field_classification",
+        "affects_ped_vktpc_directly",
+        "affects_bridge_scaling",
+        "source_status",
+    }
+    assert required_delta_columns.issubset(scenario_input_delta.columns)
+    assert set(scenario_input_delta["source_status"].dropna().astype(str)) == {"committed_scenario_input_delta"}
+    assert scenario_input_delta["base_workbook_sha256"].astype(str).eq(
+        "d0644d353ee5a073602186cf7ac5c16e707d5350e16fd037b73a65528067cc6a"
+    ).all()
+    assert scenario_input_delta["comparison_workbook_sha256"].astype(str).eq(
+        "6213ce565cf1f4a058a3ea9f1af4d5476a8b0423a4d8747905c3cba128380ce1"
+    ).all()
+    assert scenario_input_delta["base_cell"].astype(str).str.len().gt(0).all()
+    assert scenario_input_delta["comparison_cell"].astype(str).str.len().gt(0).all()
+    assert {"PED", "LIGHT_RUC", "HEAVY_RUC"}.issubset(set(scenario_input_delta["stream"].astype(str)))
+    assert {"population/scale", "macro", "price/rate/policy", "behavioural"}.issubset(
+        set(scenario_input_delta["field_classification"].dropna().astype(str))
+    )
+    ped_population_delta = scenario_input_delta[
+        scenario_input_delta["stream"].astype(str).eq("PED")
+        & scenario_input_delta["canonical_variable"].astype(str).eq("population")
+    ].copy()
+    assert not ped_population_delta.empty
+    assert ped_population_delta["field_classification"].astype(str).eq("population/scale").all()
+    assert ped_population_delta["affects_ped_vktpc_directly"].astype(bool).all()
+    assert ped_population_delta["affects_bridge_scaling"].astype(bool).all()
+    assert not scenario_input_delta.astype(str).stack().str.contains(r"C:\\Users|Downloads|OneDrive", regex=True).any()
     required_source_split_columns = {
         "vktpc_source_file",
         "vktpc_source_cell",
@@ -1285,7 +1334,7 @@ def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
         "fan_band_rows.parquet": "e8828c2997785eed41df3cf090b9fdd29b22e9b5e97dd3aabfae924b7fcd86f9",
         "future_revenue_forecasts.csv": "4e6ed9d9a6bc4a631970247ccba54deb4d66fa4664d04a5ebccf5bfa24d61a72",
         "future_revenue_forecasts.parquet": "ca3cf207b7da7ece6386e975f9faeeb124f3247ef0e9c1c3f4455a5c81a2508d",
-        "manifest.json": "19d0d29a7363c77f8a5baf72eb98934b6f7d7f9f5ff6358f15358c84ec480bc7",
+        "manifest.json": "5693bdd89c794f5cc84a7e8e36223b2fe1db6c7db91da6b8a1d52f90abf0176a",
         "manifest.md": "0d0ffad81aa2f9ab0e8123a05297aaf2b52d40d1b06f9700f2ca1a53977d0a2d",
         "path_trace_status.csv": "9aee7a4e7003ec6541476ca3e4afef6d8586b6c358e41db1c8e06623e5ffcaa3",
         "path_trace_status.parquet": "e66d860fb7532ee4b92285c1ba023c9f8d9469cfdaaaef819415f7cd87c73757",
@@ -1305,6 +1354,8 @@ def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
         "runtime_trace_audit.parquet": "49465b4692e3f0ff60c51ec26c555883ca4e3337ded988e44017464f06720381",
         "scenario_feature_lineage.csv": "b123c97090bd282009225a0ac2cfc36226d20017412f820dfeec6af34411b30d",
         "scenario_feature_lineage.parquet": "488d932eba67a1fdd7db3ce9e1cf5aba4874b72088fb53f3989a68798556a025",
+        "scenario_input_delta_audit.csv": "c59457c56e9dbfcad284bcdf731d27616f3da766760c9858ec503d3e045e0f13",
+        "scenario_input_delta_audit.parquet": "21cc6951d017817ad989fa54521cf323113e734dae9ce321e4bfbbf99d01e538",
         "scenario_input_replay_mismatch_report.csv": "c68bdaa00afceb33fc093d6ef7a69c32d25be0020a7e7a2af95fe64bc84b0008",
         "scenario_input_replay_mismatch_report.parquet": "85f179c019d728114a11990a791ae6c1d31745359f9dfa59ecb807ef316e95da",
         "scenario_role_contract.csv": "3980fa318b346547286e1f204af1c768b11d4f6ab5ad896584061f2d343b6ecd",

@@ -88,6 +88,7 @@ RUNTIME_REVENUE_OUTLOOK_FILES = (
     "revenue_stack_components.parquet",
     "ev_phev_split_assumptions.parquet",
     "ev_phev_ped_light_drift_assumptions.parquet",
+    "scenario_input_delta_audit.parquet",
     "scenario_input_replay_mismatch_report.parquet",
     "scenario_feature_lineage.parquet",
     "scenario_role_contract.parquet",
@@ -378,6 +379,7 @@ class RevenueOutlookPack:
     revenue_stack_components: pd.DataFrame = field(default_factory=pd.DataFrame)
     ev_phev_split_assumptions: pd.DataFrame = field(default_factory=pd.DataFrame)
     ev_phev_ped_light_drift_assumptions: pd.DataFrame = field(default_factory=pd.DataFrame)
+    scenario_input_delta_audit: pd.DataFrame = field(default_factory=pd.DataFrame)
     scenario_input_replay_mismatch_report: pd.DataFrame = field(default_factory=pd.DataFrame)
     scenario_feature_lineage: pd.DataFrame = field(default_factory=pd.DataFrame)
     scenario_role_contract: pd.DataFrame = field(default_factory=pd.DataFrame)
@@ -403,6 +405,7 @@ def revenue_outlook_signature(pack_dir: Path | str | None = None, repo_root: Pat
         base / "revenue_stack_components.parquet",
         base / "ev_phev_split_assumptions.parquet",
         base / "ev_phev_ped_light_drift_assumptions.parquet",
+        base / "scenario_input_delta_audit.parquet",
         base / "scenario_input_replay_mismatch_report.parquet",
         base / "scenario_feature_lineage.parquet",
         base / "scenario_role_contract.parquet",
@@ -445,6 +448,7 @@ def load_revenue_outlook_pack(
         revenue_stack_components=_read_optional_parquet(base / "revenue_stack_components.parquet"),
         ev_phev_split_assumptions=_read_optional_parquet(base / "ev_phev_split_assumptions.parquet"),
         ev_phev_ped_light_drift_assumptions=_read_optional_parquet(base / "ev_phev_ped_light_drift_assumptions.parquet"),
+        scenario_input_delta_audit=_read_optional_parquet(base / "scenario_input_delta_audit.parquet"),
         scenario_input_replay_mismatch_report=_read_optional_parquet(base / "scenario_input_replay_mismatch_report.parquet"),
         scenario_feature_lineage=_read_optional_parquet(base / "scenario_feature_lineage.parquet"),
         scenario_role_contract=_read_optional_parquet(base / "scenario_role_contract.parquet"),
@@ -578,6 +582,10 @@ def build_current_revenue_outlook_runtime_pack(
         repo_root=root,
     )
     scenario_input_manifest = _current_scenario_input_manifest(base, root)
+    scenario_input_long = _read_optional_parquet(
+        base / SCENARIO_INPUT_DIRNAME / f"{SCENARIO_INPUT_LONG_STEM}.parquet"
+    )
+    scenario_input_delta_audit = _scenario_input_delta_audit_from_long(scenario_input_long, scenarios)
     scenario_feature_lineage = _read_optional_parquet(
         base / SCENARIO_INPUT_DIRNAME / f"{SCENARIO_FEATURE_LINEAGE_STEM}.parquet"
     )
@@ -739,6 +747,15 @@ def build_current_revenue_outlook_runtime_pack(
             "note": SCENARIO_ROLE_CONTRACT_NOTE,
         },
         "scenario_inputs": scenario_input_manifest,
+        "scenario_input_delta_audit": {
+            "repo_relative_path": _repo_relative(root, base / "scenario_input_delta_audit.csv"),
+            "status": "available" if not scenario_input_delta_audit.empty else "available_no_differences",
+            "source": f"{SCENARIO_INPUT_DIRNAME}/{SCENARIO_INPUT_LONG_STEM}.parquet",
+            "scope": (
+                "Workbook-cell base/comparison deltas derived from committed scenario_input_long artifacts, "
+                "including source cells, workbook hashes, scenario roles and variable classifications."
+            ),
+        },
         "scenario_input_replay_mismatch_report": {
             "repo_relative_path": _repo_relative(root, base / "scenario_input_replay_mismatch_report.csv"),
             "status": "passed_no_mismatch",
@@ -814,6 +831,7 @@ def build_current_revenue_outlook_runtime_pack(
             "revenue_stack_components": stack_components,
             "ev_phev_split_assumptions": ev_phev_split_assumptions,
             "ev_phev_ped_light_drift_assumptions": ev_phev_ped_light_drift_assumptions,
+            "scenario_input_delta_audit": scenario_input_delta_audit,
             "scenario_input_replay_mismatch_report": scenario_input_replay_mismatch_report,
             "scenario_feature_lineage": scenario_feature_lineage,
             "scenario_role_contract": scenario_role_contract,
@@ -863,6 +881,13 @@ def build_revenue_outlook_pack(
     chart_rows = _add_canonical_join_keys(chart_rows)
     comparison_manifest = getattr(comparison, "manifest", {}) or {}
     scenario_input_manifest = _promote_scenario_inputs_from_comparison(comparison, base, root)
+    scenario_input_long = _read_optional_parquet(
+        base / SCENARIO_INPUT_DIRNAME / f"{SCENARIO_INPUT_LONG_STEM}.parquet"
+    )
+    scenario_input_delta_audit = _scenario_input_delta_audit_from_long(
+        scenario_input_long,
+        comparison_manifest.get("scenarios", []) if isinstance(comparison_manifest, dict) else [],
+    )
     scenario_feature_lineage = _read_optional_parquet(
         base / SCENARIO_INPUT_DIRNAME / f"{SCENARIO_FEATURE_LINEAGE_STEM}.parquet"
     )
@@ -890,6 +915,7 @@ def build_revenue_outlook_pack(
         bridge_components,
         chart_rows,
         extra_frames={
+            "scenario_input_delta_audit": scenario_input_delta_audit,
             "scenario_role_contract": scenario_role_contract,
             "scenario_feature_lineage": scenario_feature_lineage,
         },
@@ -900,6 +926,7 @@ def build_revenue_outlook_pack(
         future_revenue,
         bridge_components,
         chart_rows,
+        scenario_input_delta_audit=scenario_input_delta_audit,
         scenario_feature_lineage=scenario_feature_lineage,
         scenario_role_contract=scenario_role_contract,
     )
@@ -984,6 +1011,241 @@ def _current_scenario_input_manifest(pack_dir: Path, repo_root: Path) -> dict[st
         "workbooks": manifest.get("workbooks", []),
         "manifest_sha256": _sha256(manifest_path),
     }
+
+
+SCENARIO_INPUT_DELTA_AUDIT_COLUMNS = [
+    "base_scenario",
+    "base_scenario_role",
+    "base_workbook_filename",
+    "base_workbook_sha256",
+    "base_sheet",
+    "base_cell",
+    "base_range",
+    "base_period",
+    "base_canonical_period",
+    "base_variable_name",
+    "base_canonical_variable",
+    "base_value",
+    "base_unit",
+    "base_value_type",
+    "base_source_artifact",
+    "base_source_status",
+    "comparison_scenario",
+    "comparison_scenario_role",
+    "comparison_workbook_filename",
+    "comparison_workbook_sha256",
+    "comparison_is_test_fixture",
+    "comparison_sheet",
+    "comparison_cell",
+    "comparison_range",
+    "comparison_period",
+    "comparison_canonical_period",
+    "comparison_variable_name",
+    "comparison_canonical_variable",
+    "comparison_value",
+    "comparison_unit",
+    "comparison_value_type",
+    "comparison_source_artifact",
+    "comparison_source_status",
+    "stream",
+    "canonical_variable",
+    "variable_name",
+    "period",
+    "canonical_period",
+    "unit",
+    "value_type",
+    "absolute_delta",
+    "pct_delta",
+    "field_classification",
+    "field_classification_detail",
+    "affects_ped_vktpc_directly",
+    "affects_bridge_scaling",
+    "source_status",
+    "notes",
+]
+
+
+def _scenario_input_delta_audit_from_long(
+    scenario_input_long: pd.DataFrame,
+    scenarios: list[dict[str, Any]],
+) -> pd.DataFrame:
+    """Compare committed base/comparison workbook cells without loading Excel."""
+
+    if scenario_input_long is None or scenario_input_long.empty:
+        return pd.DataFrame(columns=SCENARIO_INPUT_DELTA_AUDIT_COLUMNS)
+    required = {
+        "scenario_name",
+        "role",
+        "workbook_filename",
+        "workbook_sha256",
+        "sheet",
+        "stream",
+        "cell",
+        "range",
+        "period",
+        "canonical_period",
+        "variable_name",
+        "canonical_variable",
+        "value",
+        "unit",
+        "value_type",
+        "source_status",
+        "source_artifact",
+    }
+    if required.difference(scenario_input_long.columns):
+        return pd.DataFrame(columns=SCENARIO_INPUT_DELTA_AUDIT_COLUMNS)
+
+    source = scenario_input_long.copy()
+    source["scenario_name"] = source["scenario_name"].fillna("").astype(str)
+    source["role"] = source["role"].fillna("").astype(str)
+    source["canonical_variable"] = source["canonical_variable"].fillna("").astype(str)
+    source = source[source["canonical_variable"].str.len().gt(0)].copy()
+    if source.empty:
+        return pd.DataFrame(columns=SCENARIO_INPUT_DELTA_AUDIT_COLUMNS)
+
+    scenario_records = [dict(item) for item in scenarios if isinstance(item, dict)]
+    role_by_scenario = {
+        str(record.get("scenario_name") or ""): str(record.get("scenario_role") or record.get("role") or "")
+        for record in scenario_records
+    }
+    fixture_by_scenario = {
+        str(record.get("scenario_name") or ""): bool(record.get("is_test_fixture"))
+        for record in scenario_records
+    }
+    base_names = [
+        str(record.get("scenario_name") or "")
+        for record in scenario_records
+        if str(record.get("scenario_role") or record.get("role") or "").lower() == SCENARIO_ROLE_BASECASE
+    ]
+    if not base_names:
+        base_names = sorted(
+            source.loc[source["role"].str.lower().eq(SCENARIO_ROLE_BASECASE), "scenario_name"]
+            .dropna()
+            .astype(str)
+            .unique()
+            .tolist()
+        )
+    if len(base_names) != 1:
+        return pd.DataFrame(columns=SCENARIO_INPUT_DELTA_AUDIT_COLUMNS)
+    base_scenario = base_names[0]
+
+    comparison_names = [
+        str(record.get("scenario_name") or "")
+        for record in scenario_records
+        if str(record.get("scenario_role") or record.get("role") or "").lower() == SCENARIO_ROLE_COMPARISON
+    ]
+    if not comparison_names:
+        comparison_names = sorted(
+            source.loc[source["role"].str.lower().eq(SCENARIO_ROLE_COMPARISON), "scenario_name"]
+            .dropna()
+            .astype(str)
+            .unique()
+            .tolist()
+        )
+
+    key_columns = ["stream", "canonical_period", "canonical_variable"]
+    ordered = source.sort_values(["scenario_name", *key_columns, "sheet", "cell"], kind="stable")
+    base = ordered[ordered["scenario_name"].eq(base_scenario)].drop_duplicates(key_columns, keep="first").copy()
+    if base.empty:
+        return pd.DataFrame(columns=SCENARIO_INPUT_DELTA_AUDIT_COLUMNS)
+
+    rows: list[dict[str, Any]] = []
+    for comparison_scenario in comparison_names:
+        comparison = (
+            ordered[ordered["scenario_name"].eq(comparison_scenario)]
+            .drop_duplicates(key_columns, keep="first")
+            .copy()
+        )
+        if comparison.empty:
+            continue
+        merged = base.merge(comparison, on=key_columns, how="inner", suffixes=("_base", "_comparison"))
+        for _, record in merged.iterrows():
+            base_value = record.get("value_base")
+            comparison_value = record.get("value_comparison")
+            changed, absolute_delta, pct_delta = _scenario_input_value_delta(base_value, comparison_value)
+            if not changed:
+                continue
+            variable = str(record.get("canonical_variable") or "")
+            classification = _classify_scenario_variable(variable)
+            stream = str(record.get("stream") or "")
+            rows.append(
+                {
+                    "base_scenario": base_scenario,
+                    "base_scenario_role": role_by_scenario.get(base_scenario)
+                    or str(record.get("role_base") or SCENARIO_ROLE_BASECASE),
+                    "base_workbook_filename": record.get("workbook_filename_base"),
+                    "base_workbook_sha256": record.get("workbook_sha256_base"),
+                    "base_sheet": record.get("sheet_base"),
+                    "base_cell": record.get("cell_base"),
+                    "base_range": record.get("range_base"),
+                    "base_period": record.get("period_base"),
+                    "base_canonical_period": record.get("canonical_period"),
+                    "base_variable_name": record.get("variable_name_base"),
+                    "base_canonical_variable": variable,
+                    "base_value": base_value,
+                    "base_unit": record.get("unit_base"),
+                    "base_value_type": record.get("value_type_base"),
+                    "base_source_artifact": record.get("source_artifact_base"),
+                    "base_source_status": record.get("source_status_base"),
+                    "comparison_scenario": comparison_scenario,
+                    "comparison_scenario_role": role_by_scenario.get(comparison_scenario)
+                    or str(record.get("role_comparison") or SCENARIO_ROLE_COMPARISON),
+                    "comparison_workbook_filename": record.get("workbook_filename_comparison"),
+                    "comparison_workbook_sha256": record.get("workbook_sha256_comparison"),
+                    "comparison_is_test_fixture": fixture_by_scenario.get(comparison_scenario, False),
+                    "comparison_sheet": record.get("sheet_comparison"),
+                    "comparison_cell": record.get("cell_comparison"),
+                    "comparison_range": record.get("range_comparison"),
+                    "comparison_period": record.get("period_comparison"),
+                    "comparison_canonical_period": record.get("canonical_period"),
+                    "comparison_variable_name": record.get("variable_name_comparison"),
+                    "comparison_canonical_variable": variable,
+                    "comparison_value": comparison_value,
+                    "comparison_unit": record.get("unit_comparison"),
+                    "comparison_value_type": record.get("value_type_comparison"),
+                    "comparison_source_artifact": record.get("source_artifact_comparison"),
+                    "comparison_source_status": record.get("source_status_comparison"),
+                    "stream": stream,
+                    "canonical_variable": variable,
+                    "variable_name": record.get("variable_name_comparison") or record.get("variable_name_base"),
+                    "period": record.get("period_comparison") or record.get("period_base"),
+                    "canonical_period": record.get("canonical_period"),
+                    "unit": record.get("unit_comparison") or record.get("unit_base"),
+                    "value_type": record.get("value_type_comparison") or record.get("value_type_base"),
+                    "absolute_delta": absolute_delta,
+                    "pct_delta": pct_delta,
+                    "field_classification": classification,
+                    "field_classification_detail": f"{variable}:{classification}",
+                    "affects_ped_vktpc_directly": bool(stream == "PED" and classification != "system/time"),
+                    "affects_bridge_scaling": bool(stream == "PED" and _ped_bridge_scaling_fields([variable])),
+                    "source_status": "committed_scenario_input_delta",
+                    "notes": (
+                        "Base/comparison delta from committed scenario_input_long workbook-cell artifacts; "
+                        "Streamlit does not load Excel at runtime."
+                    ),
+                }
+            )
+    if not rows:
+        return pd.DataFrame(columns=SCENARIO_INPUT_DELTA_AUDIT_COLUMNS)
+    out = pd.DataFrame(rows, columns=SCENARIO_INPUT_DELTA_AUDIT_COLUMNS)
+    return out.sort_values(["comparison_scenario", "stream", "canonical_period", "canonical_variable"], kind="stable").reset_index(drop=True)
+
+
+def _scenario_input_value_delta(base_value: Any, comparison_value: Any) -> tuple[bool, float | None, float | None]:
+    base_numeric = pd.to_numeric(pd.Series([base_value]), errors="coerce").iloc[0]
+    comparison_numeric = pd.to_numeric(pd.Series([comparison_value]), errors="coerce").iloc[0]
+    base_is_numeric = pd.notna(base_numeric)
+    comparison_is_numeric = pd.notna(comparison_numeric)
+    if base_is_numeric or comparison_is_numeric:
+        if base_is_numeric and comparison_is_numeric:
+            absolute_delta = float(comparison_numeric) - float(base_numeric)
+            changed = abs(absolute_delta) > 1e-9
+            pct_delta = absolute_delta / float(base_numeric) if float(base_numeric) != 0.0 else None
+            return changed, absolute_delta if changed else 0.0, pct_delta if changed else 0.0
+        return True, None, None
+    base_text = "" if pd.isna(base_value) else str(base_value)
+    comparison_text = "" if pd.isna(comparison_value) else str(comparison_value)
+    return base_text != comparison_text, None, None
 
 
 SCENARIO_INPUT_REPLAY_REPORT_COLUMNS = [
@@ -4624,6 +4886,14 @@ def _manifest(
             "status": "missing",
             "repo_relative_output_dir": _repo_relative(repo_root, output_dir / SCENARIO_INPUT_DIRNAME),
         },
+        "scenario_input_delta_audit": {
+            "repo_relative_path": _repo_relative(repo_root, output_dir / "scenario_input_delta_audit.csv"),
+            "source": f"{SCENARIO_INPUT_DIRNAME}/{SCENARIO_INPUT_LONG_STEM}.parquet",
+            "scope": (
+                "Workbook-cell base/comparison deltas derived from committed scenario_input_long artifacts, "
+                "including source cells, workbook hashes, scenario roles and variable classifications."
+            ),
+        },
         "scenario_feature_lineage": {
             "repo_relative_path": _repo_relative(repo_root, output_dir / "scenario_feature_lineage.csv"),
             "source": f"{SCENARIO_INPUT_DIRNAME}/{SCENARIO_FEATURE_LINEAGE_STEM}.parquet",
@@ -4645,6 +4915,8 @@ def _manifest(
             "revenue_bridge_components.csv",
             "revenue_chart_rows.parquet",
             "revenue_chart_rows.csv",
+            "scenario_input_delta_audit.parquet",
+            "scenario_input_delta_audit.csv",
             "scenario_feature_lineage.parquet",
             "scenario_feature_lineage.csv",
             f"{SCENARIO_INPUT_DIRNAME}/{SCENARIO_INPUT_CELLS_STEM}.parquet",
@@ -4685,6 +4957,7 @@ def _write_pack_files(
         "revenue_stack_components",
         "ev_phev_split_assumptions",
         "ev_phev_ped_light_drift_assumptions",
+        "scenario_input_delta_audit",
         "scenario_input_replay_mismatch_report",
         "scenario_feature_lineage",
         "scenario_role_contract",

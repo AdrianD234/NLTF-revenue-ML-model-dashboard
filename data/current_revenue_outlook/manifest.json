@@ -3,7 +3,7 @@
   "pack_status": "explicitly_promoted_current_outlook",
   "runtime_pack_type": "mbu26_actual_current_finalist_official_comparator",
   "promotion_time": "2026-06-25T21:42:25.800323+00:00",
-  "promoted_by": "repo_model_feature_lineage_rebuild",
+  "promoted_by": "repo_scenario_delta_audit_rebuild",
   "repo_relative_output_dir": "data/current_revenue_outlook",
   "source_policy": "committed_current_runtime_pack_only; MBU26 annual source spine is repo-local; Streamlit does not load the offline workbook or legacy Excel forecast paths",
   "runtime_policy": "Revenue Outlook runtime rows are materialized from repo-local source actuals, current finalist forecasts and the MBU26 official comparator. Source-pack tables are retained as audit lineage and are not a second Streamlit chart engine.",
@@ -594,6 +594,12 @@
     ],
     "manifest_sha256": "29036194e6745a5eba10beffef3a360732ae1791fd24cea2679f431f8c467f59"
   },
+  "scenario_input_delta_audit": {
+    "repo_relative_path": "data/current_revenue_outlook/scenario_input_delta_audit.csv",
+    "status": "available",
+    "source": "scenario_inputs/scenario_input_long.parquet",
+    "scope": "Workbook-cell base/comparison deltas derived from committed scenario_input_long artifacts, including source cells, workbook hashes, scenario roles and variable classifications."
+  },
   "scenario_input_replay_mismatch_report": {
     "repo_relative_path": "data/current_revenue_outlook/scenario_input_replay_mismatch_report.csv",
     "status": "passed_no_mismatch",
@@ -762,6 +768,14 @@
     "scenario_feature_lineage.parquet": {
       "sha256": "488d932eba67a1fdd7db3ce9e1cf5aba4874b72088fb53f3989a68798556a025",
       "size_bytes": 188442
+    },
+    "scenario_input_delta_audit.csv": {
+      "sha256": "c59457c56e9dbfcad284bcdf731d27616f3da766760c9858ec503d3e045e0f13",
+      "size_bytes": 3049895
+    },
+    "scenario_input_delta_audit.parquet": {
+      "sha256": "21cc6951d017817ad989fa54521cf323113e734dae9ce321e4bfbbf99d01e538",
+      "size_bytes": 185515
     },
     "scenario_input_replay_mismatch_report.csv": {
       "sha256": "c68bdaa00afceb33fc093d6ef7a69c32d25be0020a7e7a2af95fe64bc84b0008",
