@@ -916,6 +916,12 @@ def test_revenue_outlook_composition_branch_uses_cached_stack_for_table() -> Non
     assert "value=(stack_fy_min, stack_fy_max)" in composition_branch
 
 
+def test_revenue_outlook_page_does_not_render_summary_kpi_cards() -> None:
+    source = inspect.getsource(app.render_revenue_outlook_page)
+    assert "_revenue_outlook_summary_cards(" not in source
+    assert "kpi_grid(revenue_kpis)" not in source
+
+
 def test_revenue_outlook_cloud_hides_debug_toggles_and_shows_full_composition(monkeypatch) -> None:
     _clear_governance_visibility_env(monkeypatch)
     monkeypatch.setenv("STREAMLIT_SHARING_MODE", "streamlit_cloud")

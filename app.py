@@ -2988,9 +2988,6 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                     display_table(_ped_bridge_mode_impact_display_table(ped_bridge_mode_impact_audit), height=260, max_rows=160)
         timer.stop("PED bridge diagnostics")
 
-    revenue_kpis = _revenue_outlook_summary_cards(manifest, filtered_rows, future_revenue)
-    kpi_grid(revenue_kpis)
-
     timer.start("composition figure")
     detail_frames = cached_revenue_outlook_detail_frames(
         pack_signature,
