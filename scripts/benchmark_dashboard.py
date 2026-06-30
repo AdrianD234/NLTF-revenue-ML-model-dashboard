@@ -15,6 +15,23 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+
+def prefer_local_pyarrow_runtime() -> None:
+    """Use the repo-local PyArrow runtime for local benchmarks when present.
+
+    The benchmark imports data_loader before app.py. Without this guard, local
+    Windows base Python can import older PyArrow first and fail on committed
+    evidence-pack parquet files that the app itself can read.
+    """
+
+    disabled = os.environ.get("NLTF_DISABLE_RUNTIME_PYARROW24", "").strip().lower() in {"1", "true", "yes"}
+    runtime = ROOT / ".runtime_pyarrow24"
+    if not disabled and runtime.exists() and str(runtime) not in sys.path:
+        sys.path.insert(0, str(runtime))
+
+
+prefer_local_pyarrow_runtime()
+
 DEFAULT_PARQUET_DATA_ROOT = Path(
     os.environ.get("DASHBOARD_EVIDENCE_PACK_ROOT")
     or os.environ.get("STAGE1_DASHBOARD_EVIDENCE_PACK_ROOT")
@@ -301,6 +318,8 @@ def benchmark_parquet_backend(data_root: Path, repo_root: Path, repeats: int) ->
     }
 
     loader = modules.get("model_dashboard.data_loader")
+    metrics = modules.get("model_dashboard.metrics")
+    plots = modules.get("model_dashboard.plots")
     app_module = modules.get("app")
     if isinstance(loader, str):
         results["notes"].append("data_loader import failed; no Parquet benchmarks were run.")
@@ -348,6 +367,94 @@ def benchmark_parquet_backend(data_root: Path, repo_root: Path, repeats: int) ->
 
         results["benchmarks"].append(timed("cached_load_evidence_pack_first_call", cached_call, repeats=1))
         results["benchmarks"].append(timed("cached_load_evidence_pack_warm_call", cached_call, repeats=repeats))
+
+    if not isinstance(metrics, str):
+        recommended = loaded.data.get("recommended")
+        summary = loaded.data.get("summary")
+        paired = loaded.data.get("paired_vs_schiff")
+        stress = loaded.data.get("stress")
+        qpred = loaded.data.get("quarterly_predictions")
+        results["benchmarks"].extend(
+            [
+                timed("summary_generation_prep", lambda: summary_table_prep(summary), repeats=repeats),
+                timed("best_by_stream_recommended", lambda: metrics.best_by_stream(recommended), repeats=repeats),
+                timed(
+                    "governance_story_summary",
+                    lambda: metrics.governance_story_summary(recommended, paired, stress, loaded.data.get("errors")),
+                    repeats=repeats,
+                ),
+                timed(
+                    "filter_summary_common_controls",
+                    lambda: metrics.filter_by_common_controls(
+                        summary,
+                        stage="all",
+                        streams=["All"],
+                        source_families=["All"],
+                        variants=["All"],
+                    ),
+                    repeats=repeats,
+                ),
+                timed(
+                    "filter_qpred_common_controls",
+                    lambda: metrics.filter_by_common_controls(qpred, stage="all", streams=["All"], include_schiff=True),
+                    repeats=repeats,
+                ),
+                timed("stress_summary_prep", lambda: stress_summary_prep(stress), repeats=repeats),
+                timed("model_inventory_prep", lambda: model_inventory_prep(summary), repeats=repeats),
+                timed("run_audit_prep", lambda: run_audit_prep(loaded), repeats=repeats),
+            ]
+        )
+
+    if not isinstance(plots, str):
+        summary = loaded.data.get("summary")
+        recommended = loaded.data.get("recommended")
+        weights = loaded.data.get("weights")
+        qpred = loaded.data.get("quarterly_predictions")
+        stress = loaded.data.get("stress")
+        error_types = metrics.classify_error_rows(loaded.data.get("errors")) if not isinstance(metrics, str) else loaded.data.get("errors")
+        results["benchmarks"].extend(
+            [
+                timed("candidate_landscape_data_prep", lambda: candidate_landscape_prep(summary, plots), repeats=repeats),
+                timed("ensemble_composition_data_prep", lambda: ensemble_composition_prep(weights), repeats=repeats),
+                timed(
+                    "overview_page_render_proxy",
+                    lambda: render_overview_page_proxy(loaded, metrics, plots),
+                    repeats=max(1, min(repeats, 2)),
+                )
+                if not isinstance(metrics, str)
+                else timed("overview_page_render_proxy", lambda: 0, repeats=1),
+                timed(
+                    "forecasts_and_errors_render_proxy",
+                    lambda: render_forecasts_page_proxy(loaded, metrics, plots),
+                    repeats=max(1, min(repeats, 2)),
+                )
+                if not isinstance(metrics, str)
+                else timed("forecasts_and_errors_render_proxy", lambda: 0, repeats=1),
+                timed("plot_finalist_accuracy", lambda: plots.plot_finalist_accuracy(recommended), repeats=repeats),
+                timed("plot_candidate_landscape", lambda: plots.plot_candidate_landscape(summary), repeats=max(1, min(repeats, 2))),
+                timed("plot_ensemble_composition", lambda: plots.plot_ensemble_composition(weights), repeats=max(1, min(repeats, 2))),
+                timed("plot_horizon_mape", lambda: plots.plot_horizon_mape(qpred), repeats=max(1, min(repeats, 2))),
+                timed("plot_stress_checks", lambda: plots.plot_stress_checks(stress), repeats=max(1, min(repeats, 2))),
+                timed("plot_inventory_family_performance", lambda: plots.plot_inventory_family_performance(summary), repeats=max(1, min(repeats, 2))),
+                timed("plot_error_types", lambda: plots.plot_error_types(error_types), repeats=max(1, min(repeats, 2))),
+                timed("plot_error_distribution", lambda: plots.plot_error_distribution(qpred), repeats=max(1, min(repeats, 2))),
+                timed(
+                    "plot_error_distribution_json_bytes",
+                    lambda: figure_json_bytes(plots.plot_error_distribution(qpred)),
+                    repeats=1,
+                ),
+                timed(
+                    "plot_candidate_landscape_json_bytes",
+                    lambda: figure_json_bytes(plots.plot_candidate_landscape(summary)),
+                    repeats=1,
+                ),
+                timed(
+                    "plot_residual_vs_fitted_json_bytes",
+                    lambda: figure_json_bytes(plots.plot_residual_vs_fitted(qpred)),
+                    repeats=1,
+                ),
+            ]
+        )
 
     return results
 

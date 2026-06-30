@@ -325,7 +325,658 @@
     },
     "result": {
       "composition_table_change": "Cached the lazy Revenue composition gap banner and formatted stack display table using runtime signature, composition controls, sensitivity key and PED bridge mode.",
-      "validation": "Focused compile and composition cache parity tests passed; Revenue Outlook/cloud test slice passed: 61 passed; full pytest passed: 406 passed, 50 skipped, 41 deselected; bounded verify_dashboard.ps1 -SkipBrowser passed. Full performance verifier remains blocked by local pyarrow parquet read failure on annual_predictions.parquet."
+      "validation": "Focused compile and composition cache parity tests passed; Revenue Outlook/cloud test slice passed: 61 passed; full pytest passed: 406 passed, 50 skipped, 41 deselected; bounded verify_dashboard.ps1 -SkipBrowser passed; bounded verify_dashboard_performance.ps1 passed after fixing benchmark runtime selection and verifier schema."
+    }
+  },
+  {
+    "timestamp": "2026-07-01T02:05:30",
+    "source_mode": "dashboard_evidence_pack",
+    "data_root": "data\\dashboard_evidence_pack",
+    "repo_root": "C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Revenue Modeling - Strategic Review\\04 Models\\Code\\Stage 1 Model Governance Dashboard",
+    "benchmarks": [
+      {
+        "label": "load_evidence_pack_uncached",
+        "repeats": 1,
+        "min_sec": 0.6515937999356538,
+        "median_sec": 0.6515937999356538,
+        "max_sec": 0.6515937999356538,
+        "result_type": "DashboardEvidencePack"
+      },
+      {
+        "label": "cached_load_evidence_pack_first_call",
+        "repeats": 1,
+        "min_sec": 0.6711401001084596,
+        "median_sec": 0.6711401001084596,
+        "max_sec": 0.6711401001084596,
+        "result_type": "DashboardEvidencePack"
+      },
+      {
+        "label": "cached_load_evidence_pack_warm_call",
+        "repeats": 1,
+        "min_sec": 0.006141899852082133,
+        "median_sec": 0.006141899852082133,
+        "max_sec": 0.006141899852082133,
+        "result_type": "DashboardEvidencePack"
+      }
+    ],
+    "module_status": {
+      "model_dashboard.data_loader": "ok",
+      "model_dashboard.metrics": "ok",
+      "model_dashboard.plots": "ok",
+      "app": "ok"
+    },
+    "notes": [
+      "Evidence-pack Parquet dashboard benchmark path."
+    ],
+    "row_counts": {
+      "candidate_df": 400,
+      "finalists_df": 3,
+      "recommended": 3,
+      "summary": 400,
+      "schiff_df": 3,
+      "schiff_benchmark": 3,
+      "ensemble_df": 6,
+      "weights": 6,
+      "stress_df": 18,
+      "stress": 18,
+      "horizon_df": 72,
+      "scorecard_horizon_df": 144,
+      "scorecard_stress_df": 72,
+      "scorecard_model_summary": 12,
+      "scorecard_predictions": 3648,
+      "light_ruc_candidate_scorecard": 887,
+      "scorecard_annual_metric_summary": 12,
+      "scorecard_annual_predictions": 662,
+      "model_registry": 12,
+      "component_predictions": 3672,
+      "model_coefficients": 92,
+      "feature_importance": 159,
+      "scenario_sensitivities": 437,
+      "shap_summary": 6,
+      "diagnostic_df": 6,
+      "diagnostic_tests": 6,
+      "diagnostic_pass_matrix": 27,
+      "diagnostic_acf": 39,
+      "quarterly_predictions": 756,
+      "residual_predictions": 756,
+      "error_distribution": 756,
+      "annual_predictions": 130,
+      "paired_vs_schiff": 3,
+      "scenario_comparison": 3,
+      "default_score_basis": 1,
+      "chart_contract": 16,
+      "curated_manifest": 1,
+      "errors": 0,
+      "features": 0,
+      "variant_features": 0,
+      "leaderboards": 0,
+      "quarterly_summary": 0,
+      "annual_summary": 0,
+      "audit_tables": 0
+    }
+  },
+  {
+    "timestamp": "2026-07-01T02:06:20",
+    "source_mode": "dashboard_evidence_pack",
+    "data_root": "data\\dashboard_evidence_pack",
+    "repo_root": "C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Revenue Modeling - Strategic Review\\04 Models\\Code\\Stage 1 Model Governance Dashboard",
+    "benchmarks": [
+      {
+        "label": "load_evidence_pack_uncached",
+        "repeats": 1,
+        "min_sec": 0.7405804998707026,
+        "median_sec": 0.7405804998707026,
+        "max_sec": 0.7405804998707026,
+        "result_type": "DashboardEvidencePack"
+      },
+      {
+        "label": "cached_load_evidence_pack_first_call",
+        "repeats": 1,
+        "min_sec": 0.6867589999455959,
+        "median_sec": 0.6867589999455959,
+        "max_sec": 0.6867589999455959,
+        "result_type": "DashboardEvidencePack"
+      },
+      {
+        "label": "cached_load_evidence_pack_warm_call",
+        "repeats": 1,
+        "min_sec": 0.005749800009652972,
+        "median_sec": 0.005749800009652972,
+        "max_sec": 0.005749800009652972,
+        "result_type": "DashboardEvidencePack"
+      },
+      {
+        "label": "summary_generation_prep",
+        "repeats": 1,
+        "min_sec": 0.0012603998184204102,
+        "median_sec": 0.0012603998184204102,
+        "max_sec": 0.0012603998184204102,
+        "result_type": "int",
+        "result_value": 7
+      },
+      {
+        "label": "best_by_stream_recommended",
+        "repeats": 1,
+        "min_sec": 0.0007519999053329229,
+        "median_sec": 0.0007519999053329229,
+        "max_sec": 0.0007519999053329229,
+        "result_type": "DataFrame"
+      },
+      {
+        "label": "governance_story_summary",
+        "repeats": 1,
+        "min_sec": 0.005728600081056356,
+        "median_sec": 0.005728600081056356,
+        "max_sec": 0.005728600081056356,
+        "result_type": "DataFrame"
+      },
+      {
+        "label": "filter_summary_common_controls",
+        "repeats": 1,
+        "min_sec": 0.0009266000706702471,
+        "median_sec": 0.0009266000706702471,
+        "max_sec": 0.0009266000706702471,
+        "result_type": "DataFrame"
+      },
+      {
+        "label": "filter_qpred_common_controls",
+        "repeats": 1,
+        "min_sec": 0.0004911001306027174,
+        "median_sec": 0.0004911001306027174,
+        "max_sec": 0.0004911001306027174,
+        "result_type": "DataFrame"
+      },
+      {
+        "label": "stress_summary_prep",
+        "repeats": 1,
+        "min_sec": 0.0018072999082505703,
+        "median_sec": 0.0018072999082505703,
+        "max_sec": 0.0018072999082505703,
+        "result_type": "int",
+        "result_value": 18
+      },
+      {
+        "label": "model_inventory_prep",
+        "repeats": 1,
+        "min_sec": 0.0004927001427859068,
+        "median_sec": 0.0004927001427859068,
+        "max_sec": 0.0004927001427859068,
+        "result_type": "int",
+        "result_value": 100
+      },
+      {
+        "label": "run_audit_prep",
+        "repeats": 1,
+        "min_sec": 6.200047209858894e-06,
+        "median_sec": 6.200047209858894e-06,
+        "max_sec": 6.200047209858894e-06,
+        "result_type": "int",
+        "result_value": 28
+      },
+      {
+        "label": "candidate_landscape_data_prep",
+        "repeats": 1,
+        "min_sec": 0.000735800014808774,
+        "median_sec": 0.000735800014808774,
+        "max_sec": 0.000735800014808774,
+        "result_type": "int",
+        "result_value": 400
+      },
+      {
+        "label": "ensemble_composition_data_prep",
+        "repeats": 1,
+        "min_sec": 0.0005187001079320908,
+        "median_sec": 0.0005187001079320908,
+        "max_sec": 0.0005187001079320908,
+        "result_type": "int",
+        "result_value": 6
+      },
+      {
+        "label": "overview_page_render_proxy",
+        "repeats": 1,
+        "min_sec": 0.7428852000739425,
+        "median_sec": 0.7428852000739425,
+        "max_sec": 0.7428852000739425,
+        "result_type": "int",
+        "result_value": 292392
+      },
+      {
+        "label": "forecasts_and_errors_render_proxy",
+        "repeats": 1,
+        "min_sec": 0.08275629999116063,
+        "median_sec": 0.08275629999116063,
+        "max_sec": 0.08275629999116063,
+        "result_type": "int",
+        "result_value": 425642
+      },
+      {
+        "label": "plot_finalist_accuracy",
+        "repeats": 1,
+        "min_sec": 0.016261500073596835,
+        "median_sec": 0.016261500073596835,
+        "max_sec": 0.016261500073596835,
+        "result_type": "Figure"
+      },
+      {
+        "label": "plot_candidate_landscape",
+        "repeats": 1,
+        "min_sec": 0.03972609993070364,
+        "median_sec": 0.03972609993070364,
+        "max_sec": 0.03972609993070364,
+        "result_type": "Figure"
+      },
+      {
+        "label": "plot_ensemble_composition",
+        "repeats": 1,
+        "min_sec": 0.031266900012269616,
+        "median_sec": 0.031266900012269616,
+        "max_sec": 0.031266900012269616,
+        "result_type": "tuple"
+      },
+      {
+        "label": "plot_horizon_mape",
+        "repeats": 1,
+        "min_sec": 0.02512490004301071,
+        "median_sec": 0.02512490004301071,
+        "max_sec": 0.02512490004301071,
+        "result_type": "Figure"
+      },
+      {
+        "label": "plot_stress_checks",
+        "repeats": 1,
+        "min_sec": 0.03067540004849434,
+        "median_sec": 0.03067540004849434,
+        "max_sec": 0.03067540004849434,
+        "result_type": "Figure"
+      },
+      {
+        "label": "plot_inventory_family_performance",
+        "repeats": 1,
+        "min_sec": 0.030273200012743473,
+        "median_sec": 0.030273200012743473,
+        "max_sec": 0.030273200012743473,
+        "result_type": "Figure"
+      },
+      {
+        "label": "plot_error_types",
+        "repeats": 1,
+        "min_sec": 0.011749800061807036,
+        "median_sec": 0.011749800061807036,
+        "max_sec": 0.011749800061807036,
+        "result_type": "Figure"
+      },
+      {
+        "label": "plot_error_distribution",
+        "repeats": 1,
+        "min_sec": 0.016265599988400936,
+        "median_sec": 0.016265599988400936,
+        "max_sec": 0.016265599988400936,
+        "result_type": "Figure"
+      },
+      {
+        "label": "plot_error_distribution_json_bytes",
+        "repeats": 1,
+        "min_sec": 0.017909300047904253,
+        "median_sec": 0.017909300047904253,
+        "max_sec": 0.017909300047904253,
+        "result_type": "int",
+        "result_value": 10480
+      },
+      {
+        "label": "plot_candidate_landscape_json_bytes",
+        "repeats": 1,
+        "min_sec": 0.03802160010673106,
+        "median_sec": 0.03802160010673106,
+        "max_sec": 0.03802160010673106,
+        "result_type": "int",
+        "result_value": 239609
+      },
+      {
+        "label": "plot_residual_vs_fitted_json_bytes",
+        "repeats": 1,
+        "min_sec": 0.038488700054585934,
+        "median_sec": 0.038488700054585934,
+        "max_sec": 0.038488700054585934,
+        "result_type": "int",
+        "result_value": 228351
+      }
+    ],
+    "module_status": {
+      "model_dashboard.data_loader": "ok",
+      "model_dashboard.metrics": "ok",
+      "model_dashboard.plots": "ok",
+      "app": "ok"
+    },
+    "notes": [
+      "Evidence-pack Parquet dashboard benchmark path."
+    ],
+    "row_counts": {
+      "candidate_df": 400,
+      "finalists_df": 3,
+      "recommended": 3,
+      "summary": 400,
+      "schiff_df": 3,
+      "schiff_benchmark": 3,
+      "ensemble_df": 6,
+      "weights": 6,
+      "stress_df": 18,
+      "stress": 18,
+      "horizon_df": 72,
+      "scorecard_horizon_df": 144,
+      "scorecard_stress_df": 72,
+      "scorecard_model_summary": 12,
+      "scorecard_predictions": 3648,
+      "light_ruc_candidate_scorecard": 887,
+      "scorecard_annual_metric_summary": 12,
+      "scorecard_annual_predictions": 662,
+      "model_registry": 12,
+      "component_predictions": 3672,
+      "model_coefficients": 92,
+      "feature_importance": 159,
+      "scenario_sensitivities": 437,
+      "shap_summary": 6,
+      "diagnostic_df": 6,
+      "diagnostic_tests": 6,
+      "diagnostic_pass_matrix": 27,
+      "diagnostic_acf": 39,
+      "quarterly_predictions": 756,
+      "residual_predictions": 756,
+      "error_distribution": 756,
+      "annual_predictions": 130,
+      "paired_vs_schiff": 3,
+      "scenario_comparison": 3,
+      "default_score_basis": 1,
+      "chart_contract": 16,
+      "curated_manifest": 1,
+      "errors": 0,
+      "features": 0,
+      "variant_features": 0,
+      "leaderboards": 0,
+      "quarterly_summary": 0,
+      "annual_summary": 0,
+      "audit_tables": 0
+    }
+  },
+  {
+    "timestamp": "2026-07-01T02:06:47",
+    "source_mode": "dashboard_evidence_pack",
+    "data_root": "data\\dashboard_evidence_pack",
+    "repo_root": "C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Revenue Modeling - Strategic Review\\04 Models\\Code\\Stage 1 Model Governance Dashboard",
+    "benchmarks": [
+      {
+        "label": "load_evidence_pack_uncached",
+        "repeats": 2,
+        "min_sec": 0.6539884998928756,
+        "median_sec": 0.6617350998567417,
+        "max_sec": 0.6694816998206079,
+        "result_type": "DashboardEvidencePack"
+      },
+      {
+        "label": "cached_load_evidence_pack_first_call",
+        "repeats": 1,
+        "min_sec": 0.6556955999694765,
+        "median_sec": 0.6556955999694765,
+        "max_sec": 0.6556955999694765,
+        "result_type": "DashboardEvidencePack"
+      },
+      {
+        "label": "cached_load_evidence_pack_warm_call",
+        "repeats": 3,
+        "min_sec": 0.006336400052532554,
+        "median_sec": 0.0067430001217871904,
+        "max_sec": 0.007359399925917387,
+        "result_type": "DashboardEvidencePack"
+      },
+      {
+        "label": "summary_generation_prep",
+        "repeats": 3,
+        "min_sec": 0.0004195999354124069,
+        "median_sec": 0.0005006000865250826,
+        "max_sec": 0.0009956997819244862,
+        "result_type": "int",
+        "result_value": 7
+      },
+      {
+        "label": "best_by_stream_recommended",
+        "repeats": 3,
+        "min_sec": 0.0004648000467568636,
+        "median_sec": 0.0005522998981177807,
+        "max_sec": 0.000620800070464611,
+        "result_type": "DataFrame"
+      },
+      {
+        "label": "governance_story_summary",
+        "repeats": 3,
+        "min_sec": 0.005234099924564362,
+        "median_sec": 0.005246999906376004,
+        "max_sec": 0.00601420016027987,
+        "result_type": "DataFrame"
+      },
+      {
+        "label": "filter_summary_common_controls",
+        "repeats": 3,
+        "min_sec": 0.0006911000236868858,
+        "median_sec": 0.0007863999344408512,
+        "max_sec": 0.0008952999487519264,
+        "result_type": "DataFrame"
+      },
+      {
+        "label": "filter_qpred_common_controls",
+        "repeats": 3,
+        "min_sec": 0.00038439990021288395,
+        "median_sec": 0.0004042000509798527,
+        "max_sec": 0.0006263998802751303,
+        "result_type": "DataFrame"
+      },
+      {
+        "label": "stress_summary_prep",
+        "repeats": 3,
+        "min_sec": 0.0010526999831199646,
+        "median_sec": 0.0011088999453932047,
+        "max_sec": 0.0017081000842154026,
+        "result_type": "int",
+        "result_value": 18
+      },
+      {
+        "label": "model_inventory_prep",
+        "repeats": 3,
+        "min_sec": 0.0004305001348257065,
+        "median_sec": 0.0005038001108914614,
+        "max_sec": 0.0005799999926239252,
+        "result_type": "int",
+        "result_value": 100
+      },
+      {
+        "label": "run_audit_prep",
+        "repeats": 3,
+        "min_sec": 1.2998934835195541e-06,
+        "median_sec": 2.800021320581436e-06,
+        "max_sec": 7.300172001123428e-06,
+        "result_type": "int",
+        "result_value": 28
+      },
+      {
+        "label": "candidate_landscape_data_prep",
+        "repeats": 3,
+        "min_sec": 0.0006429001223295927,
+        "median_sec": 0.0006943000480532646,
+        "max_sec": 0.0008383998647332191,
+        "result_type": "int",
+        "result_value": 400
+      },
+      {
+        "label": "ensemble_composition_data_prep",
+        "repeats": 3,
+        "min_sec": 0.00036079995334148407,
+        "median_sec": 0.0004124001134186983,
+        "max_sec": 0.0006036001723259687,
+        "result_type": "int",
+        "result_value": 6
+      },
+      {
+        "label": "overview_page_render_proxy",
+        "repeats": 2,
+        "min_sec": 0.14364579995162785,
+        "median_sec": 0.4270229999674484,
+        "max_sec": 0.710400199983269,
+        "result_type": "int",
+        "result_value": 292392
+      },
+      {
+        "label": "forecasts_and_errors_render_proxy",
+        "repeats": 2,
+        "min_sec": 0.08294299989938736,
+        "median_sec": 0.08366140001453459,
+        "max_sec": 0.08437980012968183,
+        "result_type": "int",
+        "result_value": 425642
+      },
+      {
+        "label": "plot_finalist_accuracy",
+        "repeats": 3,
+        "min_sec": 0.014532800065353513,
+        "median_sec": 0.01497330004349351,
+        "max_sec": 0.015277900034561753,
+        "result_type": "Figure"
+      },
+      {
+        "label": "plot_candidate_landscape",
+        "repeats": 2,
+        "min_sec": 0.034092299873009324,
+        "median_sec": 0.03505939990282059,
+        "max_sec": 0.03602649993263185,
+        "result_type": "Figure"
+      },
+      {
+        "label": "plot_ensemble_composition",
+        "repeats": 2,
+        "min_sec": 0.027443300001323223,
+        "median_sec": 0.027643400011584163,
+        "max_sec": 0.027843500021845102,
+        "result_type": "tuple"
+      },
+      {
+        "label": "plot_horizon_mape",
+        "repeats": 2,
+        "min_sec": 0.024264399893581867,
+        "median_sec": 0.02441744995303452,
+        "max_sec": 0.024570500012487173,
+        "result_type": "Figure"
+      },
+      {
+        "label": "plot_stress_checks",
+        "repeats": 2,
+        "min_sec": 0.029355800012126565,
+        "median_sec": 0.02939649997279048,
+        "max_sec": 0.029437199933454394,
+        "result_type": "Figure"
+      },
+      {
+        "label": "plot_inventory_family_performance",
+        "repeats": 2,
+        "min_sec": 0.026330700144171715,
+        "median_sec": 0.05200250004418194,
+        "max_sec": 0.07767429994419217,
+        "result_type": "Figure"
+      },
+      {
+        "label": "plot_error_types",
+        "repeats": 2,
+        "min_sec": 0.009781800210475922,
+        "median_sec": 0.010525450110435486,
+        "max_sec": 0.01126910001039505,
+        "result_type": "Figure"
+      },
+      {
+        "label": "plot_error_distribution",
+        "repeats": 2,
+        "min_sec": 0.015673500020056963,
+        "median_sec": 0.0160799000877887,
+        "max_sec": 0.01648630015552044,
+        "result_type": "Figure"
+      },
+      {
+        "label": "plot_error_distribution_json_bytes",
+        "repeats": 1,
+        "min_sec": 0.015899700112640858,
+        "median_sec": 0.015899700112640858,
+        "max_sec": 0.015899700112640858,
+        "result_type": "int",
+        "result_value": 10480
+      },
+      {
+        "label": "plot_candidate_landscape_json_bytes",
+        "repeats": 1,
+        "min_sec": 0.03527710004709661,
+        "median_sec": 0.03527710004709661,
+        "max_sec": 0.03527710004709661,
+        "result_type": "int",
+        "result_value": 239609
+      },
+      {
+        "label": "plot_residual_vs_fitted_json_bytes",
+        "repeats": 1,
+        "min_sec": 0.03817700012587011,
+        "median_sec": 0.03817700012587011,
+        "max_sec": 0.03817700012587011,
+        "result_type": "int",
+        "result_value": 228351
+      }
+    ],
+    "module_status": {
+      "model_dashboard.data_loader": "ok",
+      "model_dashboard.metrics": "ok",
+      "model_dashboard.plots": "ok",
+      "app": "ok"
+    },
+    "notes": [
+      "Evidence-pack Parquet dashboard benchmark path."
+    ],
+    "row_counts": {
+      "candidate_df": 400,
+      "finalists_df": 3,
+      "recommended": 3,
+      "summary": 400,
+      "schiff_df": 3,
+      "schiff_benchmark": 3,
+      "ensemble_df": 6,
+      "weights": 6,
+      "stress_df": 18,
+      "stress": 18,
+      "horizon_df": 72,
+      "scorecard_horizon_df": 144,
+      "scorecard_stress_df": 72,
+      "scorecard_model_summary": 12,
+      "scorecard_predictions": 3648,
+      "light_ruc_candidate_scorecard": 887,
+      "scorecard_annual_metric_summary": 12,
+      "scorecard_annual_predictions": 662,
+      "model_registry": 12,
+      "component_predictions": 3672,
+      "model_coefficients": 92,
+      "feature_importance": 159,
+      "scenario_sensitivities": 437,
+      "shap_summary": 6,
+      "diagnostic_df": 6,
+      "diagnostic_tests": 6,
+      "diagnostic_pass_matrix": 27,
+      "diagnostic_acf": 39,
+      "quarterly_predictions": 756,
+      "residual_predictions": 756,
+      "error_distribution": 756,
+      "annual_predictions": 130,
+      "paired_vs_schiff": 3,
+      "scenario_comparison": 3,
+      "default_score_basis": 1,
+      "chart_contract": 16,
+      "curated_manifest": 1,
+      "errors": 0,
+      "features": 0,
+      "variant_features": 0,
+      "leaderboards": 0,
+      "quarterly_summary": 0,
+      "annual_summary": 0,
+      "audit_tables": 0
     }
   }
 ]

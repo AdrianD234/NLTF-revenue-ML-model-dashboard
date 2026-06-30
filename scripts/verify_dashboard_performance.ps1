@@ -2,7 +2,9 @@ param(
     [string]$Python = "",
     [string]$DataRoot = "",
     [int]$Port = 8502,
-    [int]$StartupTimeoutSeconds = 90
+    [int]$StartupTimeoutSeconds = 90,
+    [int]$CommandTimeoutSeconds = 900,
+    [switch]$ReuseExistingServer
 )
 
 $ErrorActionPreference = "Stop"
@@ -45,8 +47,31 @@ New-Item -ItemType Directory -Force -Path "artifacts/logs" | Out-Null
 function Invoke-Checked {
     param(
         [string]$FilePath,
-        [string[]]$Arguments
+        [string[]]$Arguments,
+        [int]$TimeoutSeconds = $CommandTimeoutSeconds,
+        [string]$Label = ""
     )
+
+    $boundedScript = Join-Path $ScriptDir "invoke_bounded.ps1"
+    if (Test-Path -LiteralPath $boundedScript) {
+        if ([string]::IsNullOrWhiteSpace($Label)) {
+            $commandName = Split-Path -Leaf $FilePath
+            if ([string]::IsNullOrWhiteSpace($commandName)) {
+                $commandName = $FilePath
+            }
+            $argLabel = ($Arguments | Select-Object -First 4) -join "_"
+            $Label = "performance-$commandName-$argLabel"
+        }
+
+        & $boundedScript `
+            -FilePath $FilePath `
+            -Arguments $Arguments `
+            -TimeoutSeconds $TimeoutSeconds `
+            -WorkingDirectory $Root `
+            -Label $Label
+        return
+    }
+
     & $FilePath @Arguments
     if ($LASTEXITCODE -ne 0) {
         throw "Command failed with exit code ${LASTEXITCODE}: $FilePath $($Arguments -join ' ')"
@@ -65,45 +90,38 @@ function Test-StreamlitHealth {
 }
 
 Write-Host "Running backend performance benchmark"
-& $Python scripts\benchmark_dashboard.py --data-root "$DataRoot" --out-dir artifacts --repeats 3 |
-    Tee-Object -FilePath "artifacts/logs/performance_benchmark.log"
-if ($LASTEXITCODE -ne 0) {
-    throw "Backend performance benchmark failed."
-}
+Invoke-Checked -FilePath $Python -Arguments @(
+    "scripts\benchmark_dashboard.py",
+    "--data-root",
+    $DataRoot,
+    "--out-dir",
+    "artifacts",
+    "--repeats",
+    "3"
+) -TimeoutSeconds 300 -Label "performance-backend-benchmark"
 
 $healthUrl = "http://localhost:$Port/_stcore/health"
 $appUrl = "http://localhost:$Port"
-$serverProcess = $null
-$serverLog = Join-Path $Root "streamlit.performance.out.log"
-$serverErr = Join-Path $Root "streamlit.performance.err.log"
+$pidPath = Join-Path $Root ".streamlit_$Port.pid"
+$serverWasHealthy = (Test-StreamlitHealth -Url $healthUrl) -or (Test-StreamlitHealth -Url $appUrl)
+$startedByVerifier = -not $serverWasHealthy
 
-Get-NetTCPConnection -LocalPort $Port -ErrorAction SilentlyContinue |
-    Select-Object -ExpandProperty OwningProcess -Unique |
-    Where-Object { $_ -and $_ -gt 0 } |
-    ForEach-Object {
-        Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue
-    }
-
-$serverProcess = Start-Process -FilePath $Python -ArgumentList @(
-    "-m",
-    "streamlit",
-    "run",
-    "app.py",
-    "--server.port",
+$startArgs = @(
+    "-NoProfile",
+    "-File",
+    "scripts\start_streamlit_bounded.ps1",
+    "-Python",
+    $Python,
+    "-Port",
     "$Port",
-    "--server.headless",
-    "true",
-    "--browser.gatherUsageStats",
-    "false"
-) -WorkingDirectory $Root -WindowStyle Hidden -RedirectStandardOutput $serverLog -RedirectStandardError $serverErr -PassThru
-
-$deadline = (Get-Date).AddSeconds($StartupTimeoutSeconds)
-while ((Get-Date) -lt $deadline) {
-    if ((Test-StreamlitHealth -Url $healthUrl) -or (Test-StreamlitHealth -Url $appUrl)) {
-        break
-    }
-    Start-Sleep -Seconds 2
+    "-StartupTimeoutSeconds",
+    "$StartupTimeoutSeconds"
+)
+if ($ReuseExistingServer -or $serverWasHealthy) {
+    $startArgs += "-ReuseHealthy"
 }
+
+Invoke-Checked -FilePath "pwsh" -Arguments $startArgs -TimeoutSeconds ($StartupTimeoutSeconds + 60) -Label "performance-start-streamlit"
 
 try {
     if (-not ((Test-StreamlitHealth -Url $healthUrl) -or (Test-StreamlitHealth -Url $appUrl))) {
@@ -123,7 +141,7 @@ try {
         "tests/test_playwright_performance.py",
         "-m",
         "e2e"
-    )
+    ) -TimeoutSeconds 300 -Label "performance-playwright"
 
     $required = @(
         "PERFORMANCE_SPEC.lock.md",
@@ -150,9 +168,30 @@ try {
         throw "Fewer than 15 performance improvement loops documented."
     }
     foreach ($loop in $loops) {
-        foreach ($field in @("loop", "bottleneck", "files_changed", "timing_before", "timing_after", "improvement_or_regression", "tests_added_or_updated", "verification", "next_bottleneck")) {
-            if ($null -eq $loop.$field) {
-                throw "Performance loop entry missing field: $field"
+        $fields = @($loop.PSObject.Properties.Name)
+        $legacyFields = @("loop", "bottleneck", "files_changed", "timing_before", "timing_after", "improvement_or_regression", "tests_added_or_updated", "verification", "next_bottleneck")
+        $currentFields = @("loop", "timestamp", "scope", "finding", "change", "evidence", "status")
+        $hasLegacySchema = $true
+        foreach ($field in $legacyFields) {
+            if ($fields -notcontains $field) {
+                $hasLegacySchema = $false
+            }
+        }
+        $hasCurrentSchema = $true
+        foreach ($field in $currentFields) {
+            if ($fields -notcontains $field) {
+                $hasCurrentSchema = $false
+            }
+        }
+        if (-not $hasLegacySchema -and -not $hasCurrentSchema) {
+            throw "Performance loop entry $($loop.loop) does not match the legacy or current performance-loop schema."
+        }
+        if ($hasCurrentSchema) {
+            $evidenceFields = @($loop.evidence.PSObject.Properties.Name)
+            foreach ($field in @("before_ms", "after_ms", "tests")) {
+                if ($evidenceFields -notcontains $field) {
+                    throw "Performance loop entry $($loop.loop) evidence missing field: $field"
+                }
             }
         }
     }
@@ -247,7 +286,13 @@ try {
     Write-Host "Performance verification passed."
 }
 finally {
-    if ($serverProcess -ne $null) {
-        Stop-Process -Id $serverProcess.Id -Force -ErrorAction SilentlyContinue
+    if ($startedByVerifier -and (Test-Path -LiteralPath $pidPath)) {
+        try {
+            $serverPid = [int](Get-Content -LiteralPath $pidPath -ErrorAction Stop)
+            Stop-Process -Id $serverPid -Force -ErrorAction SilentlyContinue
+        }
+        catch {
+            Write-Host "Could not stop Streamlit process recorded in ${pidPath}: $($_.Exception.Message)"
+        }
     }
 }
