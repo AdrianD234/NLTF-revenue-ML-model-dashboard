@@ -435,6 +435,60 @@ def test_revenue_outlook_default_figure_matches_uncached_path() -> None:
         )
 
 
+def test_revenue_outlook_primary_hover_customdata_matches_row_helpers() -> None:
+    root = Path(__file__).resolve().parents[1]
+    pack_dir = root / CURRENT_REVENUE_OUTLOOK_DIR
+    pack = load_revenue_outlook_pack(pack_dir, repo_root=root)
+    assert pack is not None
+    signature = revenue_outlook_signature(pack_dir, root)
+    traces = tuple(app._revenue_outlook_trace_options(pack.revenue_chart_rows))
+    sensitivity_key = app.selected_sensitivity_key("Off", "Off", "Off")
+    view = app.cached_revenue_outlook_view(
+        signature,
+        "Total NLTF revenue",
+        "june_year",
+        "Current planned path",
+        traces,
+        sensitivity_key,
+        PED_BRIDGE_DEFAULT_MODE,
+        pack,
+    )
+    rows = app._selected_revenue_outlook_series_rows(view["filtered_rows"], "Total NLTF revenue")
+    for column in [
+        "horizon",
+        "horizon_scope",
+        "bridge_status",
+        "gap_reason",
+        "data_scope",
+        "value_status",
+        "actual_quarters",
+        "forecast_quarters",
+        "ped_bridge_mode_label",
+        "revenue_sensitivity_label",
+    ]:
+        if column not in rows.columns:
+            rows[column] = ""
+
+    actual = pd.DataFrame(
+        app._revenue_path_hover_customdata(rows),
+        columns=["horizon_hover", "bridge_hover", "scope_hover", "efficiency_hover"],
+    )
+    expected = pd.DataFrame(
+        {
+            "horizon_hover": rows.apply(app._revenue_horizon_hover_label, axis=1).to_list(),
+            "bridge_hover": rows.apply(app._revenue_bridge_hover_label, axis=1).to_list(),
+            "scope_hover": rows.apply(app._revenue_scope_hover_label, axis=1).to_list(),
+            "efficiency_hover": rows.apply(app._revenue_efficiency_hover_label, axis=1).to_list(),
+        }
+    )
+
+    pd.testing.assert_frame_equal(actual, expected)
+    fig = app.revenue_outlook_total_path_figure(view["filtered_rows"], selected_series="Total NLTF revenue", selected_fy="FY2031")
+    marker_shapes = {(str(shape.x0), str(shape.line.dash)) for shape in fig.layout.shapes or []}
+    assert ("FY2026", "dash") in marker_shapes
+    assert ("FY2031", "dot") in marker_shapes
+
+
 def test_governance_page_cloud_visibility_can_be_overridden(monkeypatch) -> None:
     _clear_governance_visibility_env(monkeypatch)
     monkeypatch.setenv("STREAMLIT_SHARING_MODE", "streamlit_cloud")

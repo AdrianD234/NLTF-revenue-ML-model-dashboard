@@ -146,5 +146,27 @@
       "tests": "python -m compileall app.py model_dashboard tests passed; Revenue Outlook test slice passed: 34 passed; bounded verify_dashboard.ps1 -SkipBrowser passed; host verify_browser_host.ps1 on port 8515 passed: 40 passed."
     },
     "status": "implemented"
+  },
+  {
+    "loop": 8,
+    "timestamp": "2026-06-30T23:29:10+12:00",
+    "scope": "Revenue Outlook primary path chart builder",
+    "finding": "The first-viewport Total path chart still spent avoidable time in per-row hover DataFrame.apply calls and Plotly add_vline helpers on every visible render.",
+    "change": "Built primary-chart hover customdata with lightweight list construction and emitted forecast/selected-FY markers as direct layout shapes and annotations.",
+    "evidence": {
+      "before_ms": {
+        "main_chart_cprofile_20_builds": 1262.0,
+        "main_chart_apply_cprofile_20_builds": 354.0,
+        "main_chart_add_vline_cprofile_20_builds": 168.0
+      },
+      "after_ms": {
+        "main_chart_cprofile_20_builds": 786.0,
+        "main_chart_warm_min": 13.62,
+        "main_chart_warm_mean": 16.66,
+        "main_chart_warm_max": 20.42
+      },
+      "tests": "python -m compileall app.py model_dashboard tests passed; Revenue Outlook test slice passed: 37 passed; bounded verify_dashboard.ps1 -SkipBrowser passed; host verify_browser_host.ps1 on port 8515 passed: 40 passed."
+    },
+    "status": "implemented"
   }
 ]

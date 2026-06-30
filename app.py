@@ -5041,10 +5041,7 @@ def revenue_outlook_total_path_figure(rows: pd.DataFrame, *, selected_series: st
         ]:
             if column not in group.columns:
                 group[column] = ""
-        group["horizon_hover"] = group.apply(_revenue_horizon_hover_label, axis=1)
-        group["bridge_hover"] = group.apply(_revenue_bridge_hover_label, axis=1)
-        group["scope_hover"] = group.apply(_revenue_scope_hover_label, axis=1)
-        group["efficiency_hover"] = group.apply(_revenue_efficiency_hover_label, axis=1)
+        hover_customdata = _revenue_path_hover_customdata(group)
         color, dash, width = trace_styles.get(trace_name, (scenario_colors.get(trace_name, "#006FAD"), "solid", 2.2))
         fig.add_trace(
             go.Scatter(
@@ -5054,7 +5051,7 @@ def revenue_outlook_total_path_figure(rows: pd.DataFrame, *, selected_series: st
                 name=trace_name,
                 line={"color": color, "dash": dash, "width": width},
                 marker={"size": 6},
-                customdata=group[["horizon_hover", "bridge_hover", "scope_hover", "efficiency_hover"]].to_numpy(),
+                customdata=hover_customdata,
                 hovertemplate=(
                     "%{x}<br>%{y:,.2f}"
                     "<br>%{customdata[0]}%{customdata[1]}%{customdata[2]}%{customdata[3]}"
@@ -5065,19 +5062,58 @@ def revenue_outlook_total_path_figure(rows: pd.DataFrame, *, selected_series: st
 
     periods = data["period"].dropna().astype(str).drop_duplicates().tolist()
     forecast_period = _revenue_outlook_forecast_start_period(data)
+    shapes: list[dict[str, Any]] = []
+    annotations: list[dict[str, Any]] = []
     if forecast_period and forecast_period in periods:
-        fig.add_vline(x=forecast_period, line_dash="dash", line_color="#B45309")
-        fig.add_annotation(x=forecast_period, y=1.0, yref="paper", text=f"Forecast start {forecast_period}", showarrow=False, yanchor="bottom")
+        shapes.append(
+            {
+                "type": "line",
+                "xref": "x",
+                "yref": "paper",
+                "x0": forecast_period,
+                "x1": forecast_period,
+                "y0": 0,
+                "y1": 1,
+                "line": {"dash": "dash", "color": "#B45309"},
+            }
+        )
+        annotations.append(
+            {
+                "xref": "x",
+                "yref": "paper",
+                "x": forecast_period,
+                "y": 1.0,
+                "text": f"Forecast start {forecast_period}",
+                "showarrow": False,
+                "yanchor": "bottom",
+            }
+        )
     if selected_fy in periods:
-        fig.add_vline(x=selected_fy, line_dash="dot", line_color="#102A43")
+        shapes.append(
+            {
+                "type": "line",
+                "xref": "x",
+                "yref": "paper",
+                "x0": selected_fy,
+                "x1": selected_fy,
+                "y0": 0,
+                "y1": 1,
+                "line": {"dash": "dot", "color": "#102A43"},
+            }
+        )
     fig.update_xaxes(categoryorder="array", categoryarray=periods, tickangle=-30)
-    fig.update_layout(
-        height=250,
-        margin={"l": 52, "r": 18, "t": 16, "b": 46},
-        yaxis_title=axis_title,
-        hovermode="x unified",
-        legend={"orientation": "h", "y": -0.20, "x": 0.0},
-    )
+    layout: dict[str, Any] = {
+        "height": 250,
+        "margin": {"l": 52, "r": 18, "t": 16, "b": 46},
+        "yaxis_title": axis_title,
+        "hovermode": "x unified",
+        "legend": {"orientation": "h", "y": -0.20, "x": 0.0},
+    }
+    if shapes:
+        layout["shapes"] = shapes
+    if annotations:
+        layout["annotations"] = annotations
+    fig.update_layout(**layout)
     return fig
 
 
@@ -5832,6 +5868,108 @@ def _is_forecast_start_or_h13(horizon: Any) -> bool:
     except Exception:
         return False
     return value in {1, BACKTEST_SUPPORTED_MAX_HORIZON + 1}
+
+
+def _revenue_hover_text_values(rows: pd.DataFrame, column: str) -> list[str]:
+    if column not in rows.columns:
+        return [""] * len(rows)
+    output: list[str] = []
+    for value in rows[column].to_numpy():
+        output.append("" if pd.isna(value) else str(value).strip())
+    return output
+
+
+def _revenue_hover_float_values(rows: pd.DataFrame, column: str) -> list[float | None]:
+    if column not in rows.columns:
+        return [None] * len(rows)
+    output: list[float | None] = []
+    for value in rows[column].to_numpy():
+        try:
+            output.append(None if pd.isna(value) else float(value))
+        except Exception:
+            output.append(None)
+    return output
+
+
+def _human_revenue_label_values(values: list[str]) -> list[str]:
+    labels: dict[str, str] = {}
+    output: list[str] = []
+    for value in values:
+        if value not in labels:
+            labels[value] = _human_revenue_code_label(value)
+        output.append(labels[value])
+    return output
+
+
+def _revenue_path_hover_customdata(rows: pd.DataFrame) -> Any:
+    if rows is None or rows.empty:
+        return []
+    data_scope = _revenue_hover_text_values(rows, "data_scope")
+    value_status = _revenue_hover_text_values(rows, "value_status")
+    horizon_scope = _revenue_hover_text_values(rows, "horizon_scope")
+    horizon_values = _revenue_hover_float_values(rows, "horizon")
+    actual_scope = {"actual_anchor", "current_nowcast", "current_forecast", "official_comparator"}
+    value_status_labels = _human_revenue_label_values(value_status)
+    data_scope_labels = _human_revenue_label_values(data_scope)
+    horizon_hover: list[str] = []
+    for scope, status_label, scope_label, horizon, scope_label_raw in zip(
+        data_scope,
+        value_status_labels,
+        data_scope_labels,
+        horizon_values,
+        horizon_scope,
+    ):
+        if scope in actual_scope:
+            horizon_hover.append(status_label or scope_label)
+            continue
+        if horizon is None:
+            horizon_hover.append("Latest actual join point")
+            continue
+        horizon_int = int(float(horizon))
+        if scope_label_raw == "H1-H12" or 1 <= horizon_int <= BACKTEST_SUPPORTED_MAX_HORIZON:
+            horizon_hover.append(f"H{horizon_int}: H1-H12 backtest-supported horizon")
+        else:
+            horizon_hover.append(f"H{horizon_int}: H13+ long-range extrapolation")
+
+    status = _revenue_hover_text_values(rows, "bridge_status")
+    reason = _revenue_hover_text_values(rows, "gap_reason")
+    status_labels = [html.escape(value) for value in _human_revenue_label_values(status)]
+    reason_labels = [html.escape(value) for value in _human_revenue_label_values(reason)]
+    bridge_hover = [
+        f"<br>Bridge status: {status_label} - {reason_label}"
+        if reason_value
+        else (f"<br>Bridge status: {status_label}" if status_value else "")
+        for status_value, reason_value, status_label, reason_label in zip(status, reason, status_labels, reason_labels)
+    ]
+
+    actual_quarters = _revenue_hover_text_values(rows, "actual_quarters")
+    forecast_quarters = _revenue_hover_text_values(rows, "forecast_quarters")
+    scope_hover: list[str] = []
+    for actual_text, forecast_text in zip(actual_quarters, forecast_quarters):
+        parts = []
+        if actual_text:
+            parts.append(f"actual: {html.escape(actual_text)}")
+        if forecast_text:
+            parts.append(f"forecast: {html.escape(forecast_text)}")
+        scope_hover.append("<br>" + "; ".join(parts) if parts else "")
+
+    bridge_label = _revenue_hover_text_values(rows, "ped_bridge_mode_label")
+    sensitivity_label = _revenue_hover_text_values(rows, "revenue_sensitivity_label")
+    efficiency_label = _revenue_hover_text_values(rows, "ped_efficiency_label")
+    litres = _revenue_hover_float_values(rows, "adjusted_litres_per_100km")
+    efficiency_hover: list[str] = []
+    for bridge_text_raw, sensitivity_text, label_text, litre_value in zip(bridge_label, sensitivity_label, efficiency_label, litres):
+        bridge_text = f"<br>PED bridge: {html.escape(bridge_text_raw)}" if bridge_text_raw else ""
+        if sensitivity_text:
+            efficiency_hover.append(f"{bridge_text}<br>Sensitivity: {html.escape(sensitivity_text)}")
+        elif not label_text or litre_value is None:
+            efficiency_hover.append(bridge_text)
+        else:
+            efficiency_hover.append(
+                f"{bridge_text}<br>PED fleet efficiency: {html.escape(label_text)}; adjusted litres/100km: {float(litre_value):,.2f}"
+            )
+
+    return list(zip(horizon_hover, bridge_hover, scope_hover, efficiency_hover))
 
 
 def _revenue_horizon_hover_label(row: pd.Series) -> str:

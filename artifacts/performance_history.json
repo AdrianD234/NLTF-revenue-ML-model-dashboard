@@ -170,5 +170,24 @@
       "detail_split_change": "Split PED bridge diagnostics and line reconciliation into scoped cached helpers so those expanders do not build stack components unless composition is opened.",
       "validation": "python -m compileall app.py model_dashboard tests passed; Revenue Outlook test slice passed: 34 passed; bounded verify_dashboard.ps1 -SkipBrowser passed; host verify_browser_host.ps1 on port 8515 passed: 40 passed."
     }
+  },
+  {
+    "timestamp": "2026-06-30T23:29:10+12:00",
+    "scope": "Revenue Outlook primary path chart builder",
+    "before_ms": {
+      "main_chart_cprofile_20_builds": 1262.0,
+      "main_chart_apply_cprofile_20_builds": 354.0,
+      "main_chart_add_vline_cprofile_20_builds": 168.0
+    },
+    "after_ms": {
+      "main_chart_cprofile_20_builds": 786.0,
+      "main_chart_warm_min": 13.62,
+      "main_chart_warm_mean": 16.66,
+      "main_chart_warm_max": 20.42
+    },
+    "result": {
+      "primary_chart_change": "Replaced row-wise hover DataFrame.apply calls with list-built customdata and replaced Plotly add_vline calls with direct layout shapes/annotations for the forecast and selected-FY markers.",
+      "validation": "python -m compileall app.py model_dashboard tests passed; Revenue Outlook test slice passed: 37 passed; bounded verify_dashboard.ps1 -SkipBrowser passed; host verify_browser_host.ps1 on port 8515 passed: 40 passed."
+    }
   }
 ]
