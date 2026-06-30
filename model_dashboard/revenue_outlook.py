@@ -1552,37 +1552,65 @@ def _apply_ped_bridge_mode_audit_to_frame(
     if current_mask_column:
         current_role = out.get(current_mask_column, pd.Series("", index=out.index)).fillna("").astype(str)
         candidate_mask &= current_role.isin(["", "in_house_current_finalist"])
-    candidate_columns = [value_column, "_ped_bridge_fy", series_column]
-    for optional_column in [source_path_column, scenario_column, fed_path_column]:
-        if optional_column:
-            candidate_columns.append(optional_column)
-    candidate_columns = list(dict.fromkeys(column for column in candidate_columns if column in out.columns))
-    for idx, row in out.loc[candidate_mask, candidate_columns].iterrows():
-        fy = row.get("_ped_bridge_fy")
+    candidate_index = out.index[candidate_mask]
+    candidate_values = out.loc[candidate_index]
+    fy_values = candidate_values["_ped_bridge_fy"].to_numpy()
+    baseline_values = pd.to_numeric(candidate_values.get(value_column, pd.Series(np.nan, index=candidate_index)), errors="coerce").to_numpy()
+    series_values = candidate_values.get(series_column, pd.Series("", index=candidate_index)).fillna("").astype(str).to_numpy()
+    if source_path_column and source_path_column in candidate_values.columns:
+        source_values = candidate_values[source_path_column].fillna("").astype(str).to_numpy()
+    else:
+        source_values = np.full(len(candidate_index), "", dtype=object)
+    if scenario_column and scenario_column in candidate_values.columns:
+        scenario_values = candidate_values[scenario_column].fillna("").astype(str).to_numpy()
+    else:
+        scenario_values = np.full(len(candidate_index), "", dtype=object)
+    if fed_path_column and fed_path_column in candidate_values.columns:
+        fed_values = candidate_values[fed_path_column].fillna("").astype(str).to_numpy()
+    else:
+        fed_values = np.full(len(candidate_index), "", dtype=object)
+
+    update_index: list[Any] = []
+    update_values: list[float] = []
+    update_labels: list[str] = []
+    update_deltas: list[Any] = []
+    update_warnings: list[Any] = []
+    for idx, fy, series_id, source_path, scenario_name, fed_path, baseline_value in zip(
+        candidate_index,
+        fy_values,
+        series_values,
+        source_values,
+        scenario_values,
+        fed_values,
+        baseline_values,
+        strict=False,
+    ):
         if pd.isna(fy):
             continue
-        series_id = str(row.get(series_column) or "")
-        source_path = str(row.get(source_path_column) or "") if source_path_column else ""
-        scenario_name = str(row.get(scenario_column) or "") if scenario_column else ""
-        fed_path = str(row.get(fed_path_column) or "") if fed_path_column else ""
+        fy_int = int(fy)
         record = lookup.get((source_path, int(fy), scenario_name, fed_path, series_id))
         if not record:
             if not source_path and fed_path:
-                record = no_source_lookup.get((int(fy), scenario_name, fed_path, series_id))
+                record = no_source_lookup.get((fy_int, scenario_name, fed_path, series_id))
             elif source_path and not fed_path:
-                record = no_fed_lookup.get((source_path, int(fy), scenario_name, series_id))
+                record = no_fed_lookup.get((source_path, fy_int, scenario_name, series_id))
             elif not source_path and not fed_path:
-                record = no_source_no_fed_lookup.get((int(fy), scenario_name, series_id))
+                record = no_source_no_fed_lookup.get((fy_int, scenario_name, series_id))
         if not record:
             continue
         adjusted_value = _finite_float(record.get("adjusted"), np.nan)
-        baseline_value = _finite_float(row.get(value_column), np.nan)
         if not np.isfinite(adjusted_value):
             continue
-        out.at[idx, value_column] = adjusted_value
-        out.at[idx, "ped_bridge_mode_label"] = _ped_bridge_mode_display_label(record)
-        out.at[idx, "ped_bridge_value_delta"] = adjusted_value - baseline_value if np.isfinite(baseline_value) else pd.NA
-        out.at[idx, "ped_bridge_population_warning"] = record.get("gap_reason")
+        update_index.append(idx)
+        update_values.append(adjusted_value)
+        update_labels.append(_ped_bridge_mode_display_label(record))
+        update_deltas.append(adjusted_value - baseline_value if np.isfinite(baseline_value) else pd.NA)
+        update_warnings.append(record.get("gap_reason"))
+    if update_index:
+        out.loc[update_index, value_column] = update_values
+        out.loc[update_index, "ped_bridge_mode_label"] = update_labels
+        out.loc[update_index, "ped_bridge_value_delta"] = update_deltas
+        out.loc[update_index, "ped_bridge_population_warning"] = update_warnings
     return out.drop(columns=["_ped_bridge_fy"], errors="ignore")
 
 

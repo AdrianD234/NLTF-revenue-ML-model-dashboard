@@ -129,5 +129,29 @@
       "sensitivity_change": "Reused the single formula-residual frame in the all-Off sensitivity branch instead of rebuilding it for stack components.",
       "validation": "python -m compileall app.py model_dashboard tests passed; Revenue Outlook test slice passed: 32 passed; bounded verify_dashboard.ps1 -SkipBrowser passed; host verify_browser_host.ps1 on port 8515 passed: 40 passed."
     }
+  },
+  {
+    "timestamp": "2026-06-30T22:52:51+12:00",
+    "scope": "Revenue Outlook PED bridge audit application",
+    "before_ms": {
+      "apply_chart_min": 35.6,
+      "apply_bridge_min": 27.87,
+      "apply_future_min": 20.22,
+      "apply_line_min": 93.38,
+      "bridge_primary_lightweight_min": 104.87,
+      "bridge_full_derived_min": 498.48
+    },
+    "after_ms": {
+      "apply_chart_batched_min": 10.63,
+      "apply_bridge_batched_min": 6.78,
+      "apply_future_batched_min": 6.55,
+      "apply_line_batched_min": 12.78,
+      "bridge_primary_lightweight_batched_min": 36.99,
+      "bridge_full_derived_batched_min": 376.77
+    },
+    "result": {
+      "bridge_change": "Replaced per-row iterrows updates in the PED bridge audit application helper with array iteration and batched column assignment while preserving exact/no-source/no-fed fallback order.",
+      "validation": "python -m compileall app.py model_dashboard tests passed; Revenue Outlook test slice passed: 32 passed; bounded verify_dashboard.ps1 -SkipBrowser passed; host verify_browser_host.ps1 on port 8515 passed: 40 passed."
+    }
   }
 ]
