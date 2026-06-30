@@ -942,6 +942,22 @@ def cached_revenue_outlook_composition_figure(
 
 
 @st.cache_data(show_spinner=False)
+def cached_revenue_outlook_composition_table_view(
+    signature: tuple[tuple[str, int, int], ...],
+    source_path: str,
+    composition_mode: str,
+    sections: tuple[str, ...],
+    fy_range: tuple[int, int],
+    overlays: tuple[str, ...],
+    sensitivity_key: tuple[str, str, str, str, str, str, str, str, str],
+    bridge_mode: str,
+    _chart_stack: pd.DataFrame,
+) -> tuple[str, pd.DataFrame]:
+    del signature, source_path, composition_mode, sections, fy_range, overlays, sensitivity_key, bridge_mode
+    return _revenue_stack_gap_banner(_chart_stack), _revenue_stack_components_display_table(_chart_stack)
+
+
+@st.cache_data(show_spinner=False)
 def cached_revenue_line_reconciliation_view(
     signature: tuple[tuple[str, int, int], ...],
     source_paths: tuple[str, ...],
@@ -3076,6 +3092,17 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 selected_ped_bridge_mode,
                 chart_stack,
             )
+            stack_gap_banner, stack_display = cached_revenue_outlook_composition_table_view(
+                pack_signature,
+                selected_stack_source,
+                selected_stack_mode,
+                selected_stack_sections_tuple,
+                selected_stack_fy_range_tuple,
+                selected_stack_overlays_tuple,
+                sensitivity_key,
+                selected_ped_bridge_mode,
+                chart_stack,
+            )
             chart_card(
                 "Revenue composition over time",
                 "Line-item contributions from revenue_stack_components; aggregate rows are overlays only.",
@@ -3083,13 +3110,12 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 caption="Clean bridge mode hides internal add-back rows while preserving reconciliation to Total NLTF revenue. Positive revenue components stack above zero; deductions stack below zero. Full formula audit shows internal rows. Gross mode reconciles leaf rows to Total gross revenues. Aggregates are overlays only.",
                 notes_as_tooltip=False,
             )
-            stack_gap_banner = _revenue_stack_gap_banner(chart_stack)
             if stack_gap_banner:
                 warning_panel(stack_gap_banner)
             table_cols = st.columns([0.82, 0.18])
             with table_cols[1]:
                 dataframe_download(chart_stack, "Download CSV", "revenue_stack_components.csv")
-            display_table(_revenue_stack_components_display_table(chart_stack), height=360, max_rows=720)
+            display_table(stack_display, height=360, max_rows=720)
         timer.stop("composition figure")
 
     if revenue_outlook_lazy_table(

@@ -309,5 +309,23 @@
       "activity_figure_change": "Cached the lazy Activity and volume outlook Plotly figure using committed runtime signature, grain, FED path, traces, sensitivity key and PED bridge mode.",
       "validation": "python -m compileall . passed; Revenue Outlook/cloud test slice passed: 61 passed; full pytest passed: 406 passed, 50 skipped, 41 deselected; bounded verify_dashboard.ps1 -SkipBrowser passed; host verify_browser_host.ps1 on port 8515 passed: 40 passed."
     }
+  },
+  {
+    "timestamp": "2026-07-01T01:43:38+12:00",
+    "scope": "Revenue Outlook composition table display cache",
+    "before_ms": {
+      "direct_composition_table_view_min": 5.317,
+      "direct_composition_table_view_mean": 5.505,
+      "direct_composition_table_view_max": 5.705
+    },
+    "after_ms": {
+      "cached_composition_table_view_warm_min": 0.735,
+      "cached_composition_table_view_warm_mean": 0.808,
+      "cached_composition_table_view_warm_max": 1.173
+    },
+    "result": {
+      "composition_table_change": "Cached the lazy Revenue composition gap banner and formatted stack display table using runtime signature, composition controls, sensitivity key and PED bridge mode.",
+      "validation": "Focused compile and composition cache parity tests passed; Revenue Outlook/cloud test slice passed: 61 passed; full pytest passed: 406 passed, 50 skipped, 41 deselected; bounded verify_dashboard.ps1 -SkipBrowser passed. Full performance verifier remains blocked by local pyarrow parquet read failure on annual_predictions.parquet."
+    }
   }
 ]

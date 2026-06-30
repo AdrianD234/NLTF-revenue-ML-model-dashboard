@@ -306,5 +306,26 @@
       "tests": "python -m compileall . passed; Revenue Outlook/cloud test slice passed: 61 passed; full pytest passed: 406 passed, 50 skipped, 41 deselected; bounded verify_dashboard.ps1 -SkipBrowser passed; host verify_browser_host.ps1 on port 8515 passed: 40 passed."
     },
     "status": "implemented"
+  },
+  {
+    "loop": 15,
+    "timestamp": "2026-07-01T01:43:38+12:00",
+    "scope": "Revenue Outlook composition table display cache",
+    "finding": "The lazy Revenue composition branch used cached stack rows and figure output, but still rebuilt the stack gap banner and formatted display table on every open-state rerun.",
+    "change": "Added a cache_data wrapper for the composition gap banner and formatted stack display table, keyed by runtime signature, composition controls, sensitivity key and PED bridge mode.",
+    "evidence": {
+      "before_ms": {
+        "direct_composition_table_view_min": 5.317,
+        "direct_composition_table_view_mean": 5.505,
+        "direct_composition_table_view_max": 5.705
+      },
+      "after_ms": {
+        "cached_composition_table_view_warm_min": 0.735,
+        "cached_composition_table_view_warm_mean": 0.808,
+        "cached_composition_table_view_warm_max": 1.173
+      },
+      "tests": "Focused compile and composition cache parity tests passed; Revenue Outlook/cloud test slice passed: 61 passed; full pytest passed: 406 passed, 50 skipped, 41 deselected; bounded verify_dashboard.ps1 -SkipBrowser passed. Full performance verifier remains blocked by local pyarrow parquet read failure on annual_predictions.parquet."
+    },
+    "status": "implemented"
   }
 ]

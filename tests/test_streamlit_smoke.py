@@ -693,6 +693,8 @@ def test_revenue_outlook_composition_stack_and_figure_cache_match_direct_builder
         app.cached_revenue_outlook_composition_stack.clear()
     if hasattr(app.cached_revenue_outlook_composition_figure, "clear"):
         app.cached_revenue_outlook_composition_figure.clear()
+    if hasattr(app.cached_revenue_outlook_composition_table_view, "clear"):
+        app.cached_revenue_outlook_composition_table_view.clear()
     cached_stack = app.cached_revenue_outlook_composition_stack(
         signature,
         stack_source,
@@ -739,6 +741,24 @@ def test_revenue_outlook_composition_stack_and_figure_cache_match_direct_builder
             abs=0,
             nan_ok=True,
         )
+
+    cached_gap, cached_table = app.cached_revenue_outlook_composition_table_view(
+        signature,
+        stack_source,
+        stack_mode,
+        stack_sections,
+        fy_range,
+        overlays,
+        sensitivity_key,
+        PED_BRIDGE_DEFAULT_MODE,
+        cached_stack,
+    )
+    assert cached_gap == app._revenue_stack_gap_banner(direct_chart_stack)
+    pd.testing.assert_frame_equal(
+        cached_table.reset_index(drop=True),
+        app._revenue_stack_components_display_table(direct_chart_stack).reset_index(drop=True),
+        check_dtype=False,
+    )
 
 
 def test_revenue_outlook_ev_phev_audit_views_cache_match_direct_builders() -> None:
@@ -857,7 +877,8 @@ def test_revenue_outlook_composition_branch_uses_cached_stack_for_table() -> Non
     composition_branch = source[start:end]
     assert "filtered_stack" not in composition_branch
     assert "dataframe_download(chart_stack" in composition_branch
-    assert "_revenue_stack_components_display_table(chart_stack)" in composition_branch
+    assert "cached_revenue_outlook_composition_table_view(" in composition_branch
+    assert "_revenue_stack_components_display_table(chart_stack)" not in composition_branch
 
 
 def test_governance_page_cloud_visibility_can_be_overridden(monkeypatch) -> None:
