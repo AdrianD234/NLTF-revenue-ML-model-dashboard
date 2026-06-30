@@ -86,6 +86,9 @@ RUNTIME_REVENUE_OUTLOOK_FILES = (
     "ev_phev_ped_light_drift_assumptions.parquet",
     "ped_revenue_bridge_audit.parquet",
     "ped_efficiency_scenarios.parquet",
+    "sensitivity_seed_inputs.parquet",
+    "sensitivity_config.parquet",
+    "sensitivity_impact_audit.parquet",
     "scenario_input_delta_audit.parquet",
     "scenario_input_replay_mismatch_report.parquet",
     "scenario_feature_lineage.parquet",
@@ -245,6 +248,48 @@ PED_EFFICIENCY_SCENARIO_SPECS = (
     ("efficiency_1_5pct_pa", "1.5% p.a.", 1.5),
     ("efficiency_2_0pct_pa", "2.0% p.a.", 2.0),
 )
+SENSITIVITY_SEED_WORKBOOK_BASENAME = "Revenue Model2.1 with fuel calcs.xlsx"
+SENSITIVITY_SEED_WORKBOOK_SHA256 = "54ed1cfee4fa533b655575ff41f59ba656f6c53350d52b9b02482bab1d16a3a7"
+SENSITIVITY_SEED_SHEET = "Inputs (TI)"
+SENSITIVITY_DEFAULT_NOTE = (
+    "Post-model overlays; default Off preserves model forecast. Scenario workbook price variables are already "
+    "captured by finalist forecasts where supplied."
+)
+SENSITIVITY_LEVELS = ("Off", "Low", "Med", "High", "Custom")
+FLEET_EFFICIENCY_LEVELS = {"Low": 0.005, "Med": 0.010, "High": 0.015}
+PT_MODE_SHIFT_LEVELS = {"Low": 0.0025, "Med": 0.005, "High": 0.010}
+DEMAND_ELASTICITY_LEVELS = {
+    "PED": {"Low": -0.100, "Med": -0.144116582, "High": -0.240},
+    "LIGHT_RUC": {"Low": -0.080, "Med": -0.120, "High": -0.200},
+    "HEAVY_RUC": {"Low": -0.050, "Med": -0.100, "High": -0.200},
+}
+SENSITIVITY_FLEET_START_FY = REVENUE_FIRST_FORECAST_FY
+SENSITIVITY_PT_START_FY = 2030
+SENSITIVITY_LIGHT_ACTIVITY_SERIES = {
+    "light_petrol_vkt",
+    "light_ruc_net_km",
+    "light_bev_ruc_net_km",
+    "phev_ruc_net_km",
+    "current_light_ruc_total_modelled_km",
+}
+SENSITIVITY_REVENUE_SERIES = {
+    "gross_ped_revenue",
+    "light_ruc_net_revenue",
+    "light_bev_ruc_net_revenue",
+    "phev_ruc_net_revenue",
+    "heavy_ruc_net_revenue",
+}
+SENSITIVITY_ROLLUP_SERIES = {
+    "gross_ruc_revenue",
+    "ruc_revenue_net_admin",
+    "total_ruc_net_revenue",
+    "gross_fed_revenue",
+    "net_fed_revenue",
+    "total_gross_revenue",
+    "total_revenue_net_admin",
+    "total_fed_ruc_net_revenue",
+    "total_nltf_net_revenue",
+}
 REVENUE_STACK_MODE_BRIDGE = "Gross-to-net bridge audit"
 REVENUE_STACK_MODE_GROSS = "Gross contribution stack"
 REVENUE_STACK_MODES = (REVENUE_STACK_MODE_BRIDGE, REVENUE_STACK_MODE_GROSS)
@@ -391,6 +436,9 @@ class RevenueOutlookPack:
     ev_phev_ped_light_drift_assumptions: pd.DataFrame = field(default_factory=pd.DataFrame)
     ped_revenue_bridge_audit: pd.DataFrame = field(default_factory=pd.DataFrame)
     ped_efficiency_scenarios: pd.DataFrame = field(default_factory=pd.DataFrame)
+    sensitivity_seed_inputs: pd.DataFrame = field(default_factory=pd.DataFrame)
+    sensitivity_config: pd.DataFrame = field(default_factory=pd.DataFrame)
+    sensitivity_impact_audit: pd.DataFrame = field(default_factory=pd.DataFrame)
     scenario_input_delta_audit: pd.DataFrame = field(default_factory=pd.DataFrame)
     scenario_input_replay_mismatch_report: pd.DataFrame = field(default_factory=pd.DataFrame)
     scenario_feature_lineage: pd.DataFrame = field(default_factory=pd.DataFrame)
@@ -420,6 +468,9 @@ def revenue_outlook_signature(pack_dir: Path | str | None = None, repo_root: Pat
         base / "ev_phev_ped_light_drift_assumptions.parquet",
         base / "ped_revenue_bridge_audit.parquet",
         base / "ped_efficiency_scenarios.parquet",
+        base / "sensitivity_seed_inputs.parquet",
+        base / "sensitivity_config.parquet",
+        base / "sensitivity_impact_audit.parquet",
         base / "scenario_input_delta_audit.parquet",
         base / "scenario_input_replay_mismatch_report.parquet",
         base / "scenario_feature_lineage.parquet",
@@ -466,6 +517,9 @@ def load_revenue_outlook_pack(
         ev_phev_ped_light_drift_assumptions=_read_optional_parquet(base / "ev_phev_ped_light_drift_assumptions.parquet"),
         ped_revenue_bridge_audit=_read_optional_parquet(base / "ped_revenue_bridge_audit.parquet"),
         ped_efficiency_scenarios=_read_optional_parquet(base / "ped_efficiency_scenarios.parquet"),
+        sensitivity_seed_inputs=_read_optional_parquet(base / "sensitivity_seed_inputs.parquet"),
+        sensitivity_config=_read_optional_parquet(base / "sensitivity_config.parquet"),
+        sensitivity_impact_audit=_read_optional_parquet(base / "sensitivity_impact_audit.parquet"),
         scenario_input_delta_audit=_read_optional_parquet(base / "scenario_input_delta_audit.parquet"),
         scenario_input_replay_mismatch_report=_read_optional_parquet(base / "scenario_input_replay_mismatch_report.parquet"),
         scenario_feature_lineage=_read_optional_parquet(base / "scenario_feature_lineage.parquet"),
@@ -1109,6 +1163,817 @@ def _extract_fy_number(value: Any) -> float:
         return np.nan
 
 
+def sensitivity_seed_inputs_frame() -> pd.DataFrame:
+    """Compact repo-vendored seed evidence from Inputs (TI).
+
+    The source workbook is audit evidence only. Streamlit loads this materialized
+    table from the runtime pack and never opens the workbook at runtime.
+    """
+
+    columns = [
+        "workbook_basename",
+        "workbook_sha256",
+        "sheet",
+        "row",
+        "cell",
+        "label",
+        "family",
+        "stream",
+        "scenario_level",
+        "value",
+        "unit",
+        "note",
+        "source_status",
+    ]
+    rows: list[dict[str, Any]] = []
+
+    def add(row: int, cell: str, label: str, family: str, stream: str, level: str, value: float, unit: str, note: str) -> None:
+        rows.append(
+            {
+                "workbook_basename": SENSITIVITY_SEED_WORKBOOK_BASENAME,
+                "workbook_sha256": SENSITIVITY_SEED_WORKBOOK_SHA256,
+                "sheet": SENSITIVITY_SEED_SHEET,
+                "row": int(row),
+                "cell": cell,
+                "label": label,
+                "family": family,
+                "stream": stream,
+                "scenario_level": level,
+                "value": float(value),
+                "unit": unit,
+                "note": note,
+                "source_status": "repo_vendored_seed_from_inputs_ti",
+            }
+        )
+
+    for level, cell, value in [("Low", "C181", 0.005), ("Med", "D181", 0.010), ("High", "E181", 0.015)]:
+        add(
+            181,
+            cell,
+            "Annual efficiency improvement (Low/Med/High)",
+            "fleet_efficiency",
+            "PED",
+            level,
+            value,
+            "fraction p.a.",
+            "Applied as a post-model litres-intensity overlay after EV/PHEV migration and light-activity overlays.",
+        )
+    for level, cell, value in [("Low", "C206", 0.0025), ("Med", "D206", 0.005), ("High", "E206", 0.010)]:
+        add(
+            206,
+            cell,
+            "Annual shift % to public transport | Petrol (Low/Med/High)",
+            "pt_mode_shift",
+            "PED_LIGHT_PETROL",
+            level,
+            value,
+            "fraction p.a.",
+            "Applied to adjusted PED/light-petrol VKT from FY2030.",
+        )
+    for level, cell, value in [("Low", "C213", 0.0025), ("Med", "D213", 0.005), ("High", "E213", 0.010)]:
+        for stream in ["LIGHT_RUC", "LIGHT_BEV", "PHEV"]:
+            add(
+                213,
+                cell,
+                "Annual shift % to public transport | LRUC (Low/Med/High)",
+                "pt_mode_shift",
+                stream,
+                level,
+                value,
+                "fraction p.a.",
+                "Applied equally to conventional Light RUC, Light BEV and PHEV so EV/PHEV shares do not change.",
+            )
+    for stream, row, cells in [
+        ("PED", 266, [("Low", "C266", -0.100), ("Med", "D266", -0.144116582), ("High", "E266", -0.240)]),
+        ("LIGHT_RUC", 267, [("Low", "C267", -0.080), ("Med", "D267", -0.120), ("High", "E267", -0.200)]),
+        ("HEAVY_RUC", 268, [("Low", "C268", -0.050), ("Med", "D268", -0.100), ("High", "E268", -0.200)]),
+    ]:
+        for level, cell, value in cells:
+            add(
+                row,
+                cell,
+                {
+                    "PED": "Petrol light vehicles | VKT elasticity to retail fuel price",
+                    "LIGHT_RUC": "Light RUC vehicles | km elasticity to retail diesel price",
+                    "HEAVY_RUC": "Heavy RUC vehicles | km elasticity to retail diesel price",
+                }[stream],
+                "demand_elasticity",
+                stream,
+                level,
+                value,
+                "elasticity",
+                "Post-model demand overlay only; no oil/crude or pump-price pass-through is built in this runtime pack.",
+            )
+    return pd.DataFrame(rows, columns=columns)
+
+
+def sensitivity_config_frame(
+    seed_inputs: pd.DataFrame | None = None,
+    *,
+    end_fy: int | None = None,
+) -> pd.DataFrame:
+    """Governed low-complexity Revenue Outlook sensitivity controls."""
+
+    seed = sensitivity_seed_inputs_frame() if seed_inputs is None or seed_inputs.empty else seed_inputs.copy()
+    cutoff = int(end_fy or REVENUE_FIRST_FORECAST_FY)
+    columns = [
+        "family",
+        "selection",
+        "display_name",
+        "stream",
+        "value",
+        "unit",
+        "start_fy",
+        "end_fy",
+        "formula",
+        "default_selected",
+        "custom_allowed",
+        "source_cells",
+        "source_workbook_sha256",
+        "cost_per_km_ratio_status",
+        "notes",
+    ]
+    rows: list[dict[str, Any]] = []
+
+    def source_cells(family: str, stream: str, selection: str) -> str:
+        subset = seed[
+            seed.get("family", pd.Series("", index=seed.index)).astype(str).eq(family)
+            & seed.get("stream", pd.Series("", index=seed.index)).astype(str).eq(stream)
+            & seed.get("scenario_level", pd.Series("", index=seed.index)).astype(str).eq(selection)
+        ]
+        if subset.empty and stream in {"LIGHT_BEV", "PHEV"}:
+            subset = seed[
+                seed.get("family", pd.Series("", index=seed.index)).astype(str).eq(family)
+                & seed.get("stream", pd.Series("", index=seed.index)).astype(str).eq("LIGHT_RUC")
+                & seed.get("scenario_level", pd.Series("", index=seed.index)).astype(str).eq(selection)
+            ]
+        return "; ".join(subset.get("cell", pd.Series(dtype=str)).dropna().astype(str).unique().tolist())
+
+    def add(
+        family: str,
+        selection: str,
+        display_name: str,
+        stream: str,
+        value: float,
+        unit: str,
+        start_fy: int,
+        formula: str,
+        *,
+        default: bool = False,
+        custom_allowed: bool = False,
+        cost_ratio_status: str = "not_applicable",
+        notes: str = "",
+    ) -> None:
+        rows.append(
+            {
+                "family": family,
+                "selection": selection,
+                "display_name": display_name,
+                "stream": stream,
+                "value": float(value),
+                "unit": unit,
+                "start_fy": int(start_fy),
+                "end_fy": cutoff,
+                "formula": formula,
+                "default_selected": bool(default),
+                "custom_allowed": bool(custom_allowed),
+                "source_cells": source_cells(family, stream, selection),
+                "source_workbook_sha256": SENSITIVITY_SEED_WORKBOOK_SHA256,
+                "cost_per_km_ratio_status": cost_ratio_status,
+                "notes": notes or SENSITIVITY_DEFAULT_NOTE,
+            }
+        )
+
+    add("fleet_efficiency", "Off", "Off", "PED", 0.0, "fraction p.a.", SENSITIVITY_FLEET_START_FY, "no overlay", default=True, custom_allowed=True)
+    for selection, value in FLEET_EFFICIENCY_LEVELS.items():
+        add(
+            "fleet_efficiency",
+            selection,
+            {"Low": "Low 0.5% p.a.", "Med": "Med 1.0% p.a.", "High": "High 1.5% p.a."}[selection],
+            "PED",
+            value,
+            "fraction p.a.",
+            SENSITIVITY_FLEET_START_FY,
+            "base_litres_per_100km*(1-eff_gain)^(FY-start_fy+1)",
+            custom_allowed=True,
+        )
+    add(
+        "fleet_efficiency",
+        "Custom",
+        "Custom",
+        "PED",
+        0.0,
+        "fraction p.a.",
+        SENSITIVITY_FLEET_START_FY,
+        "base_litres_per_100km*(1-custom_eff_gain)^(FY-start_fy+1)",
+        custom_allowed=True,
+        notes="Custom value is session-only and is not a new model coefficient.",
+    )
+
+    for stream in ["PED_LIGHT_PETROL", "LIGHT_RUC", "LIGHT_BEV", "PHEV"]:
+        add("pt_mode_shift", "Off", "Off", stream, 0.0, "fraction p.a.", SENSITIVITY_PT_START_FY, "no overlay", default=True, custom_allowed=True)
+        for selection, value in PT_MODE_SHIFT_LEVELS.items():
+            add(
+                "pt_mode_shift",
+                selection,
+                {"Low": "Low 0.25% p.a.", "Med": "Med 0.5% p.a.", "High": "High 1.0% p.a."}[selection],
+                stream,
+                value,
+                "fraction p.a.",
+                SENSITIVITY_PT_START_FY,
+                "(1-pt_shift_pct)^(FY-start_fy+1)",
+                custom_allowed=True,
+                notes="Applied equally across light vehicle components so EV/PHEV shares are unchanged.",
+            )
+        add(
+            "pt_mode_shift",
+            "Custom",
+            "Custom",
+            stream,
+            0.0,
+            "fraction p.a.",
+            SENSITIVITY_PT_START_FY,
+            "(1-custom_pt_shift_pct)^(FY-start_fy+1)",
+            custom_allowed=True,
+            notes="Custom value is session-only and is not a new model coefficient.",
+        )
+
+    for stream in ["PED", "LIGHT_RUC", "HEAVY_RUC"]:
+        add(
+            "demand_elasticity",
+            "Off",
+            "Off",
+            stream,
+            0.0,
+            "elasticity",
+            REVENUE_FIRST_FORECAST_FY,
+            "no overlay",
+            default=True,
+            custom_allowed=True,
+            cost_ratio_status="not_applicable",
+        )
+        for selection, value in DEMAND_ELASTICITY_LEVELS[stream].items():
+            add(
+                "demand_elasticity",
+                selection,
+                f"{selection} {value:g}",
+                stream,
+                value,
+                "elasticity",
+                REVENUE_FIRST_FORECAST_FY,
+                "demand_factor=(cost_per_km_ratio)^elasticity",
+                custom_allowed=True,
+                cost_ratio_status="custom_required",
+                notes="Requires a governed or custom cost/km ratio; no oil/crude pass-through is constructed here.",
+            )
+        add(
+            "demand_elasticity",
+            "Custom",
+            "Custom",
+            stream,
+            0.0,
+            "elasticity",
+            REVENUE_FIRST_FORECAST_FY,
+            "demand_factor=(cost_per_km_ratio)^custom_elasticity",
+            custom_allowed=True,
+            cost_ratio_status="custom_required",
+            notes="Custom elasticity and ratio are session-only; no oil/crude pass-through is constructed here.",
+        )
+    return pd.DataFrame(rows, columns=columns)
+
+
+def revenue_sensitivity_impact_audit_frame(
+    line_reconciliation: pd.DataFrame,
+    ped_revenue_bridge_audit: pd.DataFrame,
+    sensitivity_config: pd.DataFrame | None = None,
+    *,
+    fleet_efficiency: str = "Off",
+    pt_mode_shift: str = "Off",
+    demand_elasticity: str = "Off",
+    custom_fleet_efficiency_pct: float | None = None,
+    custom_pt_shift_pct: float | None = None,
+    custom_elasticity: float | None = None,
+    cost_per_km_ratio: float | None = None,
+) -> pd.DataFrame:
+    """Calculate selected post-model sensitivity impacts at FY/source-path grain."""
+
+    columns = [
+        "FY",
+        "quarter",
+        "period",
+        "source_path",
+        "scenario_name",
+        "scenario_role",
+        "fed_path",
+        "selected_fleet_efficiency",
+        "selected_pt_mode_shift",
+        "selected_demand_elasticity",
+        "stream",
+        "series_id",
+        "baseline",
+        "adjusted",
+        "delta",
+        "unit",
+        "formula",
+        "eff_gain",
+        "pt_factor",
+        "elasticity",
+        "cost_per_km_ratio",
+        "demand_factor",
+        "source_cells",
+        "gap_reason",
+        "status",
+        "notes",
+    ]
+    if line_reconciliation is None or line_reconciliation.empty:
+        return pd.DataFrame(columns=columns)
+
+    config = sensitivity_config_frame(end_fy=REVENUE_FIRST_FORECAST_FY) if sensitivity_config is None or sensitivity_config.empty else sensitivity_config.copy()
+    line = line_reconciliation.copy()
+    line["FY_numeric"] = pd.to_numeric(line.get("FY"), errors="coerce")
+    line = line[
+        line.get("source_path", pd.Series("", index=line.index)).fillna("").astype(str).str.startswith("Current finalist")
+        & line["FY_numeric"].ge(REVENUE_FIRST_FORECAST_FY)
+    ].copy()
+    if line.empty:
+        return pd.DataFrame(columns=columns)
+
+    ped_audit = pd.DataFrame() if ped_revenue_bridge_audit is None else ped_revenue_bridge_audit.copy()
+    if not ped_audit.empty:
+        ped_audit["FY_numeric"] = pd.to_numeric(ped_audit.get("FY"), errors="coerce")
+
+    fleet_selection = _normalize_sensitivity_selection(fleet_efficiency)
+    pt_selection = _normalize_sensitivity_selection(pt_mode_shift)
+    demand_selection = _normalize_sensitivity_selection(demand_elasticity)
+    eff_gain = _sensitivity_config_value(
+        config,
+        "fleet_efficiency",
+        fleet_selection,
+        "PED",
+        custom_value=(custom_fleet_efficiency_pct / 100.0 if custom_fleet_efficiency_pct is not None else None),
+    )
+    pt_shift = _sensitivity_config_value(
+        config,
+        "pt_mode_shift",
+        pt_selection,
+        "LIGHT_RUC",
+        custom_value=(custom_pt_shift_pct / 100.0 if custom_pt_shift_pct is not None else None),
+    )
+    ratio = _finite_float(cost_per_km_ratio, np.nan)
+    demand_ratio_available = demand_selection == "Off" or (np.isfinite(ratio) and ratio > 0)
+    if demand_selection == "Off":
+        ratio = 1.0
+
+    rows: list[dict[str, Any]] = []
+    group_columns = ["source_path", "FY_numeric", "scenario_name", "scenario_role", "fed_path"]
+    for keys, group in line.groupby(group_columns, dropna=False, sort=False):
+        source_path, fy_value, scenario_name, scenario_role, fed_path = keys
+        if pd.isna(fy_value):
+            continue
+        fy = int(fy_value)
+        values = {
+            str(row.get("series_id") or ""): row
+            for row in group.to_dict("records")
+        }
+
+        def value(series_id: str) -> float:
+            return _finite_float(values.get(series_id, {}).get("value"), np.nan)
+
+        def unit(series_id: str) -> str:
+            return str(values.get(series_id, {}).get("unit") or "")
+
+        def source_cell(series_id: str) -> str:
+            return str(values.get(series_id, {}).get("source_cell") or "")
+
+        ped_record = pd.DataFrame()
+        if not ped_audit.empty:
+            ped_record = ped_audit[
+                ped_audit.get("source_path", pd.Series("", index=ped_audit.index)).astype(str).eq(str(source_path))
+                & ped_audit["FY_numeric"].eq(fy)
+                & ped_audit.get("scenario_name", pd.Series("", index=ped_audit.index)).astype(str).eq(str(scenario_name))
+                & ped_audit.get("fed_path", pd.Series("", index=ped_audit.index)).astype(str).eq(str(fed_path))
+            ]
+        ped_bridge = ped_record.iloc[0].to_dict() if not ped_record.empty else {}
+        base_litres = _finite_float(ped_bridge.get("base_litres_per_100km"), np.nan)
+        ped_rate = _finite_float(ped_bridge.get("ped_rate_nzd_per_litre"), np.nan)
+
+        pt_exponent = max(fy - SENSITIVITY_PT_START_FY + 1, 0)
+        pt_factor = float(np.power(max(1.0 - max(pt_shift, 0.0), 0.0), pt_exponent))
+        fleet_exponent = max(fy - SENSITIVITY_FLEET_START_FY + 1, 0)
+        litres_multiplier = float(np.power(max(1.0 - max(eff_gain, 0.0), 0.0), fleet_exponent))
+
+        petrol_elasticity = _sensitivity_config_value(
+            config,
+            "demand_elasticity",
+            demand_selection,
+            "PED",
+            custom_value=custom_elasticity,
+        )
+        light_elasticity = _sensitivity_config_value(
+            config,
+            "demand_elasticity",
+            demand_selection,
+            "LIGHT_RUC",
+            custom_value=custom_elasticity,
+        )
+        heavy_elasticity = _sensitivity_config_value(
+            config,
+            "demand_elasticity",
+            demand_selection,
+            "HEAVY_RUC",
+            custom_value=custom_elasticity,
+        )
+        petrol_demand_factor = float(np.power(ratio, petrol_elasticity)) if demand_ratio_available else 1.0
+        light_demand_factor = float(np.power(ratio, light_elasticity)) if demand_ratio_available else 1.0
+        heavy_demand_factor = float(np.power(ratio, heavy_elasticity)) if demand_ratio_available else 1.0
+        demand_gap = "" if demand_ratio_available else "cost_per_km_ratio_missing_custom_required"
+
+        ped_activity_factor = pt_factor * petrol_demand_factor
+        light_activity_factor = pt_factor * light_demand_factor
+        heavy_activity_factor = heavy_demand_factor
+
+        baseline_light_petrol = value("light_petrol_vkt")
+        adjusted_light_petrol = baseline_light_petrol * ped_activity_factor if np.isfinite(baseline_light_petrol) else np.nan
+        adjusted_litres = base_litres * litres_multiplier if np.isfinite(base_litres) else np.nan
+        adjusted_ped_volume = adjusted_light_petrol * adjusted_litres / 100.0 if np.isfinite(adjusted_light_petrol) and np.isfinite(adjusted_litres) else np.nan
+        adjusted_ped_revenue = adjusted_ped_volume * ped_rate if np.isfinite(adjusted_ped_volume) and np.isfinite(ped_rate) else np.nan
+
+        adjusted: dict[str, float] = {}
+        adjusted["light_petrol_vkt"] = adjusted_light_petrol
+        adjusted["ped_volume"] = adjusted_ped_volume
+        adjusted["gross_ped_revenue"] = adjusted_ped_revenue
+        adjusted["ped_vkt_per_capita"] = value("ped_vkt_per_capita") * ped_activity_factor if np.isfinite(value("ped_vkt_per_capita")) else np.nan
+        for series_id in ["light_ruc_net_km", "light_bev_ruc_net_km", "phev_ruc_net_km", "current_light_ruc_total_modelled_km"]:
+            base_value = value(series_id)
+            adjusted[series_id] = base_value * light_activity_factor if np.isfinite(base_value) else np.nan
+        for km_id, revenue_id in [
+            ("light_ruc_net_km", "light_ruc_net_revenue"),
+            ("light_bev_ruc_net_km", "light_bev_ruc_net_revenue"),
+            ("phev_ruc_net_km", "phev_ruc_net_revenue"),
+        ]:
+            base_km = value(km_id)
+            base_rev = value(revenue_id)
+            rate = base_rev / base_km if np.isfinite(base_rev) and np.isfinite(base_km) and abs(base_km) > 1e-12 else np.nan
+            adjusted[revenue_id] = adjusted.get(km_id, np.nan) * rate if np.isfinite(adjusted.get(km_id, np.nan)) and np.isfinite(rate) else np.nan
+        for series_id in ["heavy_ruc_net_km"]:
+            base_value = value(series_id)
+            adjusted[series_id] = base_value * heavy_activity_factor if np.isfinite(base_value) else np.nan
+        heavy_rate = value("heavy_ruc_net_revenue") / value("heavy_ruc_net_km") if np.isfinite(value("heavy_ruc_net_revenue")) and np.isfinite(value("heavy_ruc_net_km")) and abs(value("heavy_ruc_net_km")) > 1e-12 else np.nan
+        adjusted["heavy_ruc_net_revenue"] = adjusted.get("heavy_ruc_net_km", np.nan) * heavy_rate if np.isfinite(adjusted.get("heavy_ruc_net_km", np.nan)) and np.isfinite(heavy_rate) else np.nan
+
+        ped_delta = _delta(value("gross_ped_revenue"), adjusted.get("gross_ped_revenue"))
+        ruc_delta = sum(
+            _delta(value(series_id), adjusted.get(series_id))
+            for series_id in [
+                "light_ruc_net_revenue",
+                "light_bev_ruc_net_revenue",
+                "phev_ruc_net_revenue",
+                "heavy_ruc_net_revenue",
+            ]
+        )
+        adjusted["gross_ruc_revenue"] = value("gross_ruc_revenue") + ruc_delta
+        adjusted["ruc_revenue_net_admin"] = value("ruc_revenue_net_admin") + ruc_delta
+        adjusted["total_ruc_net_revenue"] = value("total_ruc_net_revenue") + ruc_delta
+        adjusted["gross_fed_revenue"] = value("gross_fed_revenue") + ped_delta
+        adjusted["net_fed_revenue"] = value("net_fed_revenue") + ped_delta
+        adjusted["total_gross_revenue"] = value("total_gross_revenue") + ped_delta + ruc_delta
+        adjusted["total_revenue_net_admin"] = value("total_revenue_net_admin") + ped_delta + ruc_delta
+        adjusted["total_fed_ruc_net_revenue"] = value("total_fed_ruc_net_revenue") + ped_delta + ruc_delta
+        adjusted["total_nltf_net_revenue"] = value("total_nltf_net_revenue") + ped_delta + ruc_delta
+
+        def add_row(series_id: str, stream: str, formula: str, elasticity: float, demand_factor: float, source_cells: str) -> None:
+            baseline = value(series_id)
+            adjusted_value = adjusted.get(series_id, baseline)
+            if not np.isfinite(baseline) or not np.isfinite(adjusted_value):
+                return
+            rows.append(
+                {
+                    "FY": fy,
+                    "quarter": "",
+                    "period": f"FY{fy}",
+                    "source_path": str(source_path),
+                    "scenario_name": str(scenario_name),
+                    "scenario_role": str(scenario_role),
+                    "fed_path": str(fed_path),
+                    "selected_fleet_efficiency": fleet_selection,
+                    "selected_pt_mode_shift": pt_selection,
+                    "selected_demand_elasticity": demand_selection,
+                    "stream": stream,
+                    "series_id": series_id,
+                    "baseline": baseline,
+                    "adjusted": adjusted_value,
+                    "delta": adjusted_value - baseline,
+                    "unit": unit(series_id),
+                    "formula": formula,
+                    "eff_gain": eff_gain,
+                    "pt_factor": pt_factor if stream in {"PED", "LIGHT_RUC", "LIGHT_BEV", "PHEV"} else 1.0,
+                    "elasticity": elasticity,
+                    "cost_per_km_ratio": ratio if demand_selection != "Off" else 1.0,
+                    "demand_factor": demand_factor,
+                    "source_cells": "; ".join(part for part in [source_cell(series_id), source_cells] if str(part).strip()),
+                    "gap_reason": demand_gap,
+                    "status": "gap_no_demand_overlay" if demand_gap else "adjusted",
+                    "notes": SENSITIVITY_DEFAULT_NOTE,
+                }
+            )
+
+        fleet_cells = _sensitivity_source_cells(config, "fleet_efficiency", "PED", fleet_selection)
+        pt_ped_cells = _sensitivity_source_cells(config, "pt_mode_shift", "PED_LIGHT_PETROL", pt_selection)
+        pt_light_cells = _sensitivity_source_cells(config, "pt_mode_shift", "LIGHT_RUC", pt_selection)
+        demand_ped_cells = _sensitivity_source_cells(config, "demand_elasticity", "PED", demand_selection)
+        demand_light_cells = _sensitivity_source_cells(config, "demand_elasticity", "LIGHT_RUC", demand_selection)
+        demand_heavy_cells = _sensitivity_source_cells(config, "demand_elasticity", "HEAVY_RUC", demand_selection)
+        add_row("light_petrol_vkt", "PED", "light_petrol_vkt * pt_factor * petrol_demand_factor", petrol_elasticity, petrol_demand_factor, f"{pt_ped_cells}; {demand_ped_cells}")
+        add_row("ped_vkt_per_capita", "PED", "ped_vkt_per_capita * pt_factor * petrol_demand_factor", petrol_elasticity, petrol_demand_factor, f"{pt_ped_cells}; {demand_ped_cells}")
+        add_row("ped_volume", "PED", "adjusted_light_petrol_vkt * adjusted_litres_per_100km / 100", petrol_elasticity, petrol_demand_factor, f"{pt_ped_cells}; {demand_ped_cells}; {fleet_cells}")
+        add_row("gross_ped_revenue", "PED", "adjusted_ped_volume * ped_rate", petrol_elasticity, petrol_demand_factor, f"{pt_ped_cells}; {demand_ped_cells}; {fleet_cells}")
+        for series_id in ["light_ruc_net_km", "light_bev_ruc_net_km", "phev_ruc_net_km", "current_light_ruc_total_modelled_km"]:
+            stream = "LIGHT_RUC" if series_id in {"light_ruc_net_km", "current_light_ruc_total_modelled_km"} else ("LIGHT_BEV" if "bev" in series_id else "PHEV")
+            add_row(series_id, stream, f"{series_id} * pt_factor * light_demand_factor", light_elasticity, light_demand_factor, f"{pt_light_cells}; {demand_light_cells}")
+        for series_id in ["light_ruc_net_revenue", "light_bev_ruc_net_revenue", "phev_ruc_net_revenue"]:
+            stream = "LIGHT_RUC" if series_id == "light_ruc_net_revenue" else ("LIGHT_BEV" if "bev" in series_id else "PHEV")
+            add_row(series_id, stream, f"{series_id} effective rate applied to adjusted km", light_elasticity, light_demand_factor, f"{pt_light_cells}; {demand_light_cells}")
+        add_row("heavy_ruc_net_km", "HEAVY_RUC", "heavy_ruc_net_km * heavy_demand_factor", heavy_elasticity, heavy_demand_factor, demand_heavy_cells)
+        add_row("heavy_ruc_net_revenue", "HEAVY_RUC", "heavy_ruc_net_revenue effective rate applied to adjusted km", heavy_elasticity, heavy_demand_factor, demand_heavy_cells)
+        for series_id in sorted(SENSITIVITY_ROLLUP_SERIES, key=lambda x: REVENUE_STACK_SERIES_ORDER.get(x, 999)):
+            add_row(series_id, "ROLLUP", f"{series_id} + PED/RUC component deltas", 0.0, 1.0, "")
+
+    return pd.DataFrame(rows, columns=columns)
+
+
+def apply_revenue_sensitivity_layer(
+    *,
+    chart_rows: pd.DataFrame,
+    line_reconciliation: pd.DataFrame,
+    bridge_components: pd.DataFrame,
+    future_revenue_forecasts: pd.DataFrame,
+    ped_revenue_bridge_audit: pd.DataFrame,
+    sensitivity_config: pd.DataFrame,
+    fleet_efficiency: str = "Off",
+    pt_mode_shift: str = "Off",
+    demand_elasticity: str = "Off",
+    custom_fleet_efficiency_pct: float | None = None,
+    custom_pt_shift_pct: float | None = None,
+    custom_elasticity: float | None = None,
+    cost_per_km_ratio: float | None = None,
+) -> dict[str, pd.DataFrame]:
+    """Apply governed post-model Revenue Outlook sensitivities to current-finalist copies."""
+
+    audit = revenue_sensitivity_impact_audit_frame(
+        line_reconciliation,
+        ped_revenue_bridge_audit,
+        sensitivity_config,
+        fleet_efficiency=fleet_efficiency,
+        pt_mode_shift=pt_mode_shift,
+        demand_elasticity=demand_elasticity,
+        custom_fleet_efficiency_pct=custom_fleet_efficiency_pct,
+        custom_pt_shift_pct=custom_pt_shift_pct,
+        custom_elasticity=custom_elasticity,
+        cost_per_km_ratio=cost_per_km_ratio,
+    )
+    if _sensitivity_is_off(fleet_efficiency, pt_mode_shift, demand_elasticity):
+        adjusted_line = line_reconciliation.copy()
+        return {
+            "chart_rows": chart_rows.copy(),
+            "line_reconciliation": adjusted_line,
+            "revenue_formula_residuals": revenue_formula_residual_frame(adjusted_line) if adjusted_line is not None and not adjusted_line.empty else pd.DataFrame(),
+            "revenue_stack_components": revenue_stack_components_frame(adjusted_line, revenue_formula_residual_frame(adjusted_line)) if adjusted_line is not None and not adjusted_line.empty else pd.DataFrame(),
+            "revenue_bridge_components": bridge_components.copy(),
+            "future_revenue_forecasts": future_revenue_forecasts.copy(),
+            "sensitivity_impact_audit": audit,
+        }
+
+    adjusted_line = _apply_sensitivity_audit_to_frame(
+        line_reconciliation,
+        audit,
+        value_column="value",
+        fy_column="FY",
+        series_column="series_id",
+        source_path_column="source_path",
+        scenario_column="scenario_name",
+        fed_path_column="fed_path",
+    )
+    formula_residuals = revenue_formula_residual_frame(adjusted_line) if adjusted_line is not None and not adjusted_line.empty else pd.DataFrame()
+    adjusted_stack = revenue_stack_components_frame(adjusted_line, formula_residuals) if adjusted_line is not None and not adjusted_line.empty else pd.DataFrame()
+    adjusted_chart = _apply_sensitivity_audit_to_frame(
+        chart_rows,
+        audit,
+        value_column="value",
+        fy_column="june_year",
+        series_column="series_id",
+        source_path_column="trace_name",
+        scenario_column="scenario_name",
+        fed_path_column="fed_path",
+        current_mask_column="trace_role",
+    )
+    adjusted_bridge = _apply_sensitivity_audit_to_frame(
+        bridge_components,
+        audit,
+        value_column="component_value",
+        fy_column="period",
+        series_column="stream",
+        scenario_column="scenario_name",
+        fed_path_column="fed_path",
+    )
+    adjusted_future = _apply_sensitivity_audit_to_frame(
+        future_revenue_forecasts,
+        audit,
+        value_column="revenue_forecast_nzd",
+        fy_column="period",
+        series_column="stream",
+        scenario_column="scenario_name",
+        fed_path_column="fed_path",
+    )
+    return {
+        "chart_rows": adjusted_chart,
+        "line_reconciliation": adjusted_line,
+        "revenue_formula_residuals": formula_residuals,
+        "revenue_stack_components": adjusted_stack,
+        "revenue_bridge_components": adjusted_bridge,
+        "future_revenue_forecasts": adjusted_future,
+        "sensitivity_impact_audit": audit,
+    }
+
+
+def _apply_sensitivity_audit_to_frame(
+    frame: pd.DataFrame,
+    audit: pd.DataFrame,
+    *,
+    value_column: str,
+    fy_column: str,
+    series_column: str,
+    source_path_column: str | None = None,
+    scenario_column: str | None = None,
+    fed_path_column: str | None = None,
+    current_mask_column: str | None = None,
+) -> pd.DataFrame:
+    if frame is None or frame.empty or audit is None or audit.empty:
+        return pd.DataFrame() if frame is None else frame.copy()
+    out = frame.copy()
+    for column in [
+        "revenue_sensitivity_label",
+        "revenue_sensitivity_value_delta",
+        "pt_factor",
+        "demand_factor",
+        "adjusted_litres_per_100km",
+        "ped_efficiency_label",
+    ]:
+        if column not in out.columns:
+            out[column] = pd.NA
+    audit = audit.copy()
+    audit["FY_numeric"] = pd.to_numeric(audit.get("FY"), errors="coerce")
+    lookup: dict[tuple[str, int, str, str, str], dict[str, Any]] = {}
+    for record in audit.to_dict("records"):
+        if pd.isna(record.get("FY_numeric")):
+            continue
+        lookup[
+            (
+                str(record.get("source_path") or ""),
+                int(record["FY_numeric"]),
+                str(record.get("scenario_name") or ""),
+                str(record.get("fed_path") or ""),
+                str(record.get("series_id") or ""),
+            )
+        ] = record
+
+    out["_sensitivity_fy"] = out.get(fy_column, pd.Series("", index=out.index)).map(_extract_fy_number)
+    for idx, row in out.iterrows():
+        if current_mask_column and str(row.get(current_mask_column) or "") not in {"", "in_house_current_finalist"}:
+            continue
+        fy = out.at[idx, "_sensitivity_fy"]
+        if pd.isna(fy):
+            continue
+        series_id = str(row.get(series_column) or "")
+        source_path = str(row.get(source_path_column) or "") if source_path_column else ""
+        scenario_name = str(row.get(scenario_column) or "") if scenario_column else ""
+        fed_path = str(row.get(fed_path_column) or "") if fed_path_column else ""
+        record = lookup.get((source_path, int(fy), scenario_name, fed_path, series_id))
+        if not record:
+            record = next(
+                (
+                    item
+                    for key, item in lookup.items()
+                    if key[1] == int(fy)
+                    and key[2] == scenario_name
+                    and key[4] == series_id
+                    and (not fed_path or key[3] == fed_path)
+                    and (not source_path or key[0] == source_path)
+                ),
+                None,
+            )
+        if not record:
+            continue
+        adjusted_value = _finite_float(record.get("adjusted"), np.nan)
+        baseline_value = _finite_float(row.get(value_column), np.nan)
+        if not np.isfinite(adjusted_value):
+            continue
+        out.at[idx, value_column] = adjusted_value
+        out.at[idx, "revenue_sensitivity_label"] = _sensitivity_display_label(record)
+        out.at[idx, "revenue_sensitivity_value_delta"] = adjusted_value - baseline_value if np.isfinite(baseline_value) else pd.NA
+        out.at[idx, "pt_factor"] = record.get("pt_factor")
+        out.at[idx, "demand_factor"] = record.get("demand_factor")
+        if series_id in {"ped_volume", "gross_ped_revenue", "gross_fed_revenue", "net_fed_revenue", "total_fed_ruc_net_revenue", "total_nltf_net_revenue"}:
+            out.at[idx, "ped_efficiency_label"] = str(record.get("selected_fleet_efficiency") or "")
+    return out.drop(columns=["_sensitivity_fy"], errors="ignore")
+
+
+def _normalize_sensitivity_selection(value: Any) -> str:
+    text = str(value or "Off").strip()
+    if text.lower() == "medium":
+        return "Med"
+    for option in SENSITIVITY_LEVELS:
+        if text.lower() == option.lower():
+            return option
+    return "Off"
+
+
+def _sensitivity_is_off(fleet_efficiency: str, pt_mode_shift: str, demand_elasticity: str) -> bool:
+    return (
+        _normalize_sensitivity_selection(fleet_efficiency) == "Off"
+        and _normalize_sensitivity_selection(pt_mode_shift) == "Off"
+        and _normalize_sensitivity_selection(demand_elasticity) == "Off"
+    )
+
+
+def _sensitivity_config_value(
+    config: pd.DataFrame,
+    family: str,
+    selection: str,
+    stream: str,
+    *,
+    custom_value: float | None = None,
+) -> float:
+    normalized = _normalize_sensitivity_selection(selection)
+    if normalized == "Custom":
+        return max(_finite_float(custom_value, 0.0), -10.0)
+    if normalized == "Off":
+        return 0.0
+    if config is None or config.empty:
+        return 0.0
+    rows = config[
+        config.get("family", pd.Series("", index=config.index)).astype(str).eq(family)
+        & config.get("selection", pd.Series("", index=config.index)).astype(str).eq(normalized)
+        & config.get("stream", pd.Series("", index=config.index)).astype(str).eq(stream)
+    ]
+    if rows.empty and stream in {"LIGHT_BEV", "PHEV"}:
+        rows = config[
+            config.get("family", pd.Series("", index=config.index)).astype(str).eq(family)
+            & config.get("selection", pd.Series("", index=config.index)).astype(str).eq(normalized)
+            & config.get("stream", pd.Series("", index=config.index)).astype(str).eq("LIGHT_RUC")
+        ]
+    if rows.empty:
+        return 0.0
+    return _finite_float(rows.iloc[0].get("value"), 0.0)
+
+
+def _sensitivity_source_cells(config: pd.DataFrame, family: str, stream: str, selection: str) -> str:
+    normalized = _normalize_sensitivity_selection(selection)
+    if normalized in {"Off", "Custom"} or config is None or config.empty:
+        return ""
+    rows = config[
+        config.get("family", pd.Series("", index=config.index)).astype(str).eq(family)
+        & config.get("selection", pd.Series("", index=config.index)).astype(str).eq(normalized)
+        & config.get("stream", pd.Series("", index=config.index)).astype(str).eq(stream)
+    ]
+    if rows.empty and stream in {"LIGHT_BEV", "PHEV"}:
+        rows = config[
+            config.get("family", pd.Series("", index=config.index)).astype(str).eq(family)
+            & config.get("selection", pd.Series("", index=config.index)).astype(str).eq(normalized)
+            & config.get("stream", pd.Series("", index=config.index)).astype(str).eq("LIGHT_RUC")
+        ]
+    if rows.empty:
+        return ""
+    return str(rows.iloc[0].get("source_cells") or "")
+
+
+def _finite_float(value: Any, default: float = 0.0) -> float:
+    try:
+        numeric = pd.to_numeric(value, errors="coerce")
+    except Exception:
+        return default
+    if pd.isna(numeric):
+        return default
+    try:
+        return float(numeric)
+    except Exception:
+        return default
+
+
+def _delta(baseline: float, adjusted: float | None) -> float:
+    if adjusted is None or not np.isfinite(baseline) or not np.isfinite(adjusted):
+        return 0.0
+    return float(adjusted) - float(baseline)
+
+
+def _sensitivity_display_label(record: dict[str, Any]) -> str:
+    parts = [
+        f"Fleet {record.get('selected_fleet_efficiency')}",
+        f"PT {record.get('selected_pt_mode_shift')}",
+        f"Elasticity {record.get('selected_demand_elasticity')}",
+    ]
+    return "; ".join(str(part) for part in parts if "Off" not in str(part))
+
+
 def build_current_revenue_outlook_runtime_pack(
     *,
     repo_root: Path | str | None = None,
@@ -1172,6 +2037,16 @@ def build_current_revenue_outlook_runtime_pack(
         ev_phev_ped_light_drift_assumptions,
     )
     ped_efficiency_scenarios = ped_efficiency_scenarios_frame(end_fy=runtime_cutoff_fy)
+    sensitivity_seed_inputs = sensitivity_seed_inputs_frame()
+    sensitivity_config = sensitivity_config_frame(sensitivity_seed_inputs, end_fy=runtime_cutoff_fy)
+    sensitivity_impact_audit = revenue_sensitivity_impact_audit_frame(
+        line_reconciliation,
+        ped_revenue_bridge_audit,
+        sensitivity_config,
+        fleet_efficiency="Off",
+        pt_mode_shift="Off",
+        demand_elasticity="Off",
+    )
     scenarios = _runtime_scenario_records(existing_manifest, current)
     scenario_role_contract = scenario_role_contract_frame(
         current_forecast_annual=current,
@@ -1369,6 +2244,28 @@ def build_current_revenue_outlook_runtime_pack(
             "scope": "Governed PED fleet-efficiency sensitivity over litres per 100km after EV/PHEV migration.",
             "note": PED_EFFICIENCY_DEFAULT_NOTE,
         },
+        "sensitivity_seed_inputs": {
+            "repo_relative_path": _repo_relative(root, base / "sensitivity_seed_inputs.csv"),
+            "source_workbook_basename": SENSITIVITY_SEED_WORKBOOK_BASENAME,
+            "source_workbook_sha256": SENSITIVITY_SEED_WORKBOOK_SHA256,
+            "source_sheet": SENSITIVITY_SEED_SHEET,
+            "status": "available",
+            "scope": "Compact Inputs (TI) seed values for fleet efficiency, PT mode shift and demand elasticity only.",
+            "excluded_scope": "Fleet transition, crude/oil shock, crude-to-pump and ETS/margin/tax pass-through are not runtime sensitivities.",
+        },
+        "sensitivity_config": {
+            "repo_relative_path": _repo_relative(root, base / "sensitivity_config.csv"),
+            "default_runtime_treatment": "all_off_no_change",
+            "selections": list(SENSITIVITY_LEVELS),
+            "scope": "Low-complexity post-model Revenue Outlook overlays: fleet efficiency, PT mode shift and optional demand elasticity.",
+            "note": SENSITIVITY_DEFAULT_NOTE,
+        },
+        "sensitivity_impact_audit": {
+            "repo_relative_path": _repo_relative(root, base / "sensitivity_impact_audit.csv"),
+            "default_runtime_treatment": "all_off_no_change",
+            "status": "available" if not sensitivity_impact_audit.empty else "missing",
+            "scope": "Default-Off sensitivity audit; runtime UI recalculates selected impacts in memory.",
+        },
         "scenario_role_contract": {
             "repo_relative_path": _repo_relative(root, base / "scenario_role_contract.csv"),
             "scope": "Repo-local audit of scenario role semantics, PED population-feature exposure, display policy and runtime deltas.",
@@ -1467,6 +2364,9 @@ def build_current_revenue_outlook_runtime_pack(
             "ev_phev_ped_light_drift_assumptions": ev_phev_ped_light_drift_assumptions,
             "ped_revenue_bridge_audit": ped_revenue_bridge_audit,
             "ped_efficiency_scenarios": ped_efficiency_scenarios,
+            "sensitivity_seed_inputs": sensitivity_seed_inputs,
+            "sensitivity_config": sensitivity_config,
+            "sensitivity_impact_audit": sensitivity_impact_audit,
             "scenario_input_delta_audit": scenario_input_delta_audit,
             "scenario_input_replay_mismatch_report": scenario_input_replay_mismatch_report,
             "scenario_feature_lineage": scenario_feature_lineage,
@@ -5597,6 +6497,9 @@ def _write_pack_files(
         "ev_phev_ped_light_drift_assumptions",
         "ped_revenue_bridge_audit",
         "ped_efficiency_scenarios",
+        "sensitivity_seed_inputs",
+        "sensitivity_config",
+        "sensitivity_impact_audit",
         "scenario_input_delta_audit",
         "scenario_input_replay_mismatch_report",
         "scenario_feature_lineage",

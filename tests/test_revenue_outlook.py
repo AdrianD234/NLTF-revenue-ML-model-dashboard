@@ -24,11 +24,14 @@ from model_dashboard.revenue_outlook import (
     FUTURE_RATE_COLUMNS,
     PED_EFFICIENCY_BASELINE_SCENARIO_ID,
     REVENUE_OUTLOOK_SCHEMA_VERSION,
+    SENSITIVITY_SEED_WORKBOOK_SHA256,
     SOURCE_COMPARISON_OUTPUT_DIR_POLICY,
+    apply_revenue_sensitivity_layer,
     apply_ped_efficiency_sensitivity,
     build_revenue_outlook_pack,
     load_revenue_outlook_pack,
     ped_efficiency_adjustment_frame,
+    revenue_sensitivity_impact_audit_frame,
     promote_revenue_outlook_pack,
     validate_promotable_comparison,
 )
@@ -239,6 +242,13 @@ def test_committed_current_revenue_outlook_pack_is_repo_local_and_hash_backed() 
     assert manifest["ped_efficiency_scenarios"]["repo_relative_path"] == "data/current_revenue_outlook/ped_efficiency_scenarios.csv"
     assert manifest["ped_efficiency_scenarios"]["default_scenario_id"] == PED_EFFICIENCY_BASELINE_SCENARIO_ID
     assert manifest["ped_efficiency_scenarios"]["default_runtime_treatment"] == "0pct_no_change"
+    assert manifest["sensitivity_seed_inputs"]["repo_relative_path"] == "data/current_revenue_outlook/sensitivity_seed_inputs.csv"
+    assert manifest["sensitivity_seed_inputs"]["source_workbook_sha256"] == SENSITIVITY_SEED_WORKBOOK_SHA256
+    assert "fleet transition" in manifest["sensitivity_seed_inputs"]["excluded_scope"].lower()
+    assert "crude/oil shock" in manifest["sensitivity_seed_inputs"]["excluded_scope"]
+    assert manifest["sensitivity_config"]["repo_relative_path"] == "data/current_revenue_outlook/sensitivity_config.csv"
+    assert manifest["sensitivity_config"]["default_runtime_treatment"] == "all_off_no_change"
+    assert manifest["sensitivity_impact_audit"]["repo_relative_path"] == "data/current_revenue_outlook/sensitivity_impact_audit.csv"
     assert manifest["scenario_role_contract"]["repo_relative_path"] == "data/current_revenue_outlook/scenario_role_contract.csv"
     assert "behavioural intensity metric" in manifest["scenario_role_contract"]["note"]
     assert manifest["scenario_inputs"]["status"] == "available"
@@ -359,6 +369,12 @@ def test_committed_current_revenue_outlook_pack_is_repo_local_and_hash_backed() 
         "scenario_input_replay_mismatch_report.parquet",
         "scenario_role_contract.csv",
         "scenario_role_contract.parquet",
+        "sensitivity_config.csv",
+        "sensitivity_config.parquet",
+        "sensitivity_impact_audit.csv",
+        "sensitivity_impact_audit.parquet",
+        "sensitivity_seed_inputs.csv",
+        "sensitivity_seed_inputs.parquet",
         "series_alias_audit.csv",
         "series_alias_audit.parquet",
         "series_trace_contract.csv",
@@ -390,6 +406,9 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     ev_phev_drift = pd.read_parquet(pack_dir / "ev_phev_ped_light_drift_assumptions.parquet")
     ped_bridge_audit = pd.read_parquet(pack_dir / "ped_revenue_bridge_audit.parquet")
     ped_efficiency_scenarios = pd.read_parquet(pack_dir / "ped_efficiency_scenarios.parquet")
+    sensitivity_seed_inputs = pd.read_parquet(pack_dir / "sensitivity_seed_inputs.parquet")
+    sensitivity_config = pd.read_parquet(pack_dir / "sensitivity_config.parquet")
+    sensitivity_impact_audit = pd.read_parquet(pack_dir / "sensitivity_impact_audit.parquet")
     scenario_role_contract = pd.read_parquet(pack_dir / "scenario_role_contract.parquet")
     residuals = pd.read_parquet(pack_dir / "revenue_formula_residuals.parquet")
     alias_audit = pd.read_parquet(pack_dir / "series_alias_audit.parquet")
@@ -795,6 +814,38 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     assert ped_efficiency_scenarios["start_fy"].astype(int).eq(2026).all()
     assert ped_efficiency_scenarios["end_fy"].astype(int).eq(runtime_cutoff_fy).all()
     assert ped_efficiency_scenarios["notes"].astype(str).str.contains("does not change VKTpc forecasts", regex=False).all()
+    assert not sensitivity_seed_inputs.empty
+    assert set(sensitivity_seed_inputs["family"].astype(str)) == {
+        "fleet_efficiency",
+        "pt_mode_shift",
+        "demand_elasticity",
+    }
+    assert set(sensitivity_seed_inputs["scenario_level"].astype(str)) == {"Low", "Med", "High"}
+    assert sensitivity_seed_inputs["workbook_sha256"].astype(str).eq(SENSITIVITY_SEED_WORKBOOK_SHA256).all()
+    assert sensitivity_seed_inputs["sheet"].astype(str).eq("Inputs (TI)").all()
+    assert {"C181", "D181", "E181", "C206", "D206", "E206", "C213", "D213", "E213", "C266", "D266", "E266"}.issubset(
+        set(sensitivity_seed_inputs["cell"].astype(str))
+    )
+    assert not sensitivity_seed_inputs.astype(str).stack().str.contains("C:\\Users", regex=False).any()
+    assert not sensitivity_seed_inputs.astype(str).stack().str.contains("Downloads", regex=False).any()
+    assert not sensitivity_config.empty
+    assert set(sensitivity_config["family"].astype(str)) == {
+        "fleet_efficiency",
+        "pt_mode_shift",
+        "demand_elasticity",
+    }
+    for family in ["fleet_efficiency", "pt_mode_shift", "demand_elasticity"]:
+        assert {"Off", "Low", "Med", "High", "Custom"}.issubset(
+            set(sensitivity_config.loc[sensitivity_config["family"].astype(str).eq(family), "selection"].astype(str))
+        )
+    assert sensitivity_config.loc[sensitivity_config["selection"].astype(str).eq("Off"), "default_selected"].astype(bool).all()
+    assert not sensitivity_config.astype(str).stack().str.contains("crude-to-pump", case=False, regex=False).any()
+    assert not sensitivity_config.astype(str).stack().str.contains("fleet transition target", case=False, regex=False).any()
+    assert not sensitivity_impact_audit.empty
+    assert set(sensitivity_impact_audit["selected_fleet_efficiency"].astype(str)) == {"Off"}
+    assert set(sensitivity_impact_audit["selected_pt_mode_shift"].astype(str)) == {"Off"}
+    assert set(sensitivity_impact_audit["selected_demand_elasticity"].astype(str)) == {"Off"}
+    assert pd.to_numeric(sensitivity_impact_audit["delta"], errors="coerce").abs().max() == pytest.approx(0.0, abs=0)
     evidence = (
         ev_phev_split[
             pd.to_numeric(ev_phev_split["FY"], errors="coerce").isin([2024, 2025])
@@ -1503,6 +1554,124 @@ def test_ped_efficiency_sensitivity_noops_baseline_and_reconciles_rollups() -> N
     )
 
 
+def test_revenue_sensitivity_layer_off_preserves_runtime_values() -> None:
+    pack = load_revenue_outlook_pack(ROOT / CURRENT_REVENUE_OUTLOOK_DIR, repo_root=ROOT)
+    assert pack is not None
+
+    baseline = apply_revenue_sensitivity_layer(
+        chart_rows=pack.revenue_chart_rows,
+        line_reconciliation=pack.revenue_line_reconciliation,
+        bridge_components=pack.revenue_bridge_components,
+        future_revenue_forecasts=pack.future_revenue_forecasts,
+        ped_revenue_bridge_audit=pack.ped_revenue_bridge_audit,
+        sensitivity_config=pack.sensitivity_config,
+    )
+    for key, value_column, original in [
+        ("chart_rows", "value", pack.revenue_chart_rows),
+        ("line_reconciliation", "value", pack.revenue_line_reconciliation),
+        ("revenue_bridge_components", "component_value", pack.revenue_bridge_components),
+        ("future_revenue_forecasts", "revenue_forecast_nzd", pack.future_revenue_forecasts),
+    ]:
+        assert pd.to_numeric(baseline[key][value_column], errors="coerce").to_numpy() == pytest.approx(
+            pd.to_numeric(original[value_column], errors="coerce").to_numpy(),
+            abs=0,
+        )
+    assert pd.to_numeric(baseline["sensitivity_impact_audit"]["delta"], errors="coerce").abs().max() == pytest.approx(0.0, abs=0)
+
+
+def test_revenue_sensitivity_efficiency_lowers_ped_revenue_holding_vkt_fixed() -> None:
+    pack = load_revenue_outlook_pack(ROOT / CURRENT_REVENUE_OUTLOOK_DIR, repo_root=ROOT)
+    assert pack is not None
+
+    sensitivity = apply_revenue_sensitivity_layer(
+        chart_rows=pack.revenue_chart_rows,
+        line_reconciliation=pack.revenue_line_reconciliation,
+        bridge_components=pack.revenue_bridge_components,
+        future_revenue_forecasts=pack.future_revenue_forecasts,
+        ped_revenue_bridge_audit=pack.ped_revenue_bridge_audit,
+        sensitivity_config=pack.sensitivity_config,
+        fleet_efficiency="Med",
+    )
+    audit = sensitivity["sensitivity_impact_audit"]
+    rows = audit[
+        audit["source_path"].astype(str).eq("Current finalist Base case")
+        & pd.to_numeric(audit["FY"], errors="coerce").eq(2029)
+    ].set_index("series_id")
+    assert rows.loc["light_petrol_vkt", "adjusted"] == pytest.approx(rows.loc["light_petrol_vkt", "baseline"], abs=0)
+    assert rows.loc["ped_vkt_per_capita", "adjusted"] == pytest.approx(rows.loc["ped_vkt_per_capita", "baseline"], abs=0)
+    assert rows.loc["ped_volume", "adjusted"] < rows.loc["ped_volume", "baseline"]
+    assert rows.loc["gross_ped_revenue", "adjusted"] < rows.loc["gross_ped_revenue", "baseline"]
+    assert rows.loc["light_ruc_net_km", "adjusted"] == pytest.approx(rows.loc["light_ruc_net_km", "baseline"], abs=0)
+    current_residuals = sensitivity["revenue_formula_residuals"][
+        sensitivity["revenue_formula_residuals"]["source_path"].astype(str).str.startswith("Current finalist")
+    ]
+    assert set(current_residuals["status"].dropna().astype(str)) == {"reconciled"}
+
+
+def test_revenue_sensitivity_pt_shift_preserves_ev_phev_shares() -> None:
+    pack = load_revenue_outlook_pack(ROOT / CURRENT_REVENUE_OUTLOOK_DIR, repo_root=ROOT)
+    assert pack is not None
+
+    sensitivity = apply_revenue_sensitivity_layer(
+        chart_rows=pack.revenue_chart_rows,
+        line_reconciliation=pack.revenue_line_reconciliation,
+        bridge_components=pack.revenue_bridge_components,
+        future_revenue_forecasts=pack.future_revenue_forecasts,
+        ped_revenue_bridge_audit=pack.ped_revenue_bridge_audit,
+        sensitivity_config=pack.sensitivity_config,
+        pt_mode_shift="Med",
+    )
+    audit = sensitivity["sensitivity_impact_audit"]
+    rows = audit[
+        audit["source_path"].astype(str).eq("Current finalist Base case")
+        & pd.to_numeric(audit["FY"], errors="coerce").eq(2031)
+    ].set_index("series_id")
+    expected_factor = (1 - 0.005) ** (2031 - 2030 + 1)
+    for series_id in ["light_petrol_vkt", "light_ruc_net_km", "light_bev_ruc_net_km", "phev_ruc_net_km"]:
+        assert rows.loc[series_id, "adjusted"] == pytest.approx(rows.loc[series_id, "baseline"] * expected_factor)
+    baseline_total = rows.loc["light_ruc_net_km", "baseline"] + rows.loc["light_bev_ruc_net_km", "baseline"] + rows.loc["phev_ruc_net_km", "baseline"]
+    adjusted_total = rows.loc["light_ruc_net_km", "adjusted"] + rows.loc["light_bev_ruc_net_km", "adjusted"] + rows.loc["phev_ruc_net_km", "adjusted"]
+    for series_id in ["light_ruc_net_km", "light_bev_ruc_net_km", "phev_ruc_net_km"]:
+        assert rows.loc[series_id, "adjusted"] / adjusted_total == pytest.approx(rows.loc[series_id, "baseline"] / baseline_total)
+    assert rows.loc["heavy_ruc_net_km", "adjusted"] == pytest.approx(rows.loc["heavy_ruc_net_km", "baseline"], abs=0)
+
+
+def test_revenue_sensitivity_demand_elasticity_responds_to_cost_ratio() -> None:
+    pack = load_revenue_outlook_pack(ROOT / CURRENT_REVENUE_OUTLOOK_DIR, repo_root=ROOT)
+    assert pack is not None
+
+    lower_cost = apply_revenue_sensitivity_layer(
+        chart_rows=pack.revenue_chart_rows,
+        line_reconciliation=pack.revenue_line_reconciliation,
+        bridge_components=pack.revenue_bridge_components,
+        future_revenue_forecasts=pack.future_revenue_forecasts,
+        ped_revenue_bridge_audit=pack.ped_revenue_bridge_audit,
+        sensitivity_config=pack.sensitivity_config,
+        demand_elasticity="Med",
+        cost_per_km_ratio=0.9,
+    )["sensitivity_impact_audit"]
+    higher_cost = apply_revenue_sensitivity_layer(
+        chart_rows=pack.revenue_chart_rows,
+        line_reconciliation=pack.revenue_line_reconciliation,
+        bridge_components=pack.revenue_bridge_components,
+        future_revenue_forecasts=pack.future_revenue_forecasts,
+        ped_revenue_bridge_audit=pack.ped_revenue_bridge_audit,
+        sensitivity_config=pack.sensitivity_config,
+        demand_elasticity="Med",
+        cost_per_km_ratio=1.1,
+    )["sensitivity_impact_audit"]
+    for audit, relation in [(lower_cost, "gt"), (higher_cost, "lt")]:
+        rows = audit[
+            audit["source_path"].astype(str).eq("Current finalist Base case")
+            & pd.to_numeric(audit["FY"], errors="coerce").eq(2029)
+        ].set_index("series_id")
+        for series_id in ["light_petrol_vkt", "light_ruc_net_km", "heavy_ruc_net_km"]:
+            if relation == "gt":
+                assert rows.loc[series_id, "adjusted"] > rows.loc[series_id, "baseline"]
+            else:
+                assert rows.loc[series_id, "adjusted"] < rows.loc[series_id, "baseline"]
+
+
 def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
     pack_dir = ROOT / CURRENT_REVENUE_OUTLOOK_DIR
     expected_hashes = {
@@ -1516,7 +1685,7 @@ def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
         "fan_band_rows.parquet": "c77dfc913120f9e8caa6003211ecdb85cc6d3e884512fbf7fbf6e1e12b90be5c",
         "future_revenue_forecasts.csv": "31bc0ab32312cfb37598ca0bcd7db7abbab89d259c6785b3a9787208c9bd2c05",
         "future_revenue_forecasts.parquet": "37fd32d0a1e39facca69504b525f1f3c85491f781832b3befbab2ecba700aba0",
-        "manifest.json": "29a6a0267f5155e8ec147f3376ed301d0bcf421f915c336a03ad24cdcc4f1489",
+        "manifest.json": "f89e51afc2f023d4ea99e7d9574ceced9e2c2be83022893a4e6366ee35cf0a85",
         "manifest.md": "0d0ffad81aa2f9ab0e8123a05297aaf2b52d40d1b06f9700f2ca1a53977d0a2d",
         "path_trace_status.csv": "9aee7a4e7003ec6541476ca3e4afef6d8586b6c358e41db1c8e06623e5ffcaa3",
         "path_trace_status.parquet": "e66d860fb7532ee4b92285c1ba023c9f8d9469cfdaaaef819415f7cd87c73757",
@@ -1548,6 +1717,12 @@ def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
         "scenario_input_replay_mismatch_report.parquet": "80f060bef98147de0ef5e20f65e02e9d6716a1900ca9b85c089e4a36f31e5749",
         "scenario_role_contract.csv": "ba40738ba8f23a44d11fecbf3a1b04e8111efed741462b3c1067cd6a710e2a39",
         "scenario_role_contract.parquet": "8129514d4c43e898625f74b029aad23d583cfae9b36491ee955ab0a99593b30b",
+        "sensitivity_config.csv": "2067f75d07b12d61d0b845b03bf637f0e335dc7074c45fea5e72b74fc63eda64",
+        "sensitivity_config.parquet": "2960b8221b4321aafea87db35ac04454a09f5fb421c2c35eb7abe700bf9e0ee6",
+        "sensitivity_impact_audit.csv": "2ab42b16e8556f45dfd4fe3f15542b0e13d12bfda3e5221ba632803441fdaae9",
+        "sensitivity_impact_audit.parquet": "eae77be5237c40e7b8a905b32e6eed359bdb99e437856a31e1523776a2cc93b2",
+        "sensitivity_seed_inputs.csv": "dd2b9766cd253d08c6e65ca36d463b5178020c636b7edcc197ed52aa23679861",
+        "sensitivity_seed_inputs.parquet": "eeda21f1cd4ad85044d8bd2a19b8f7e669f78f8ec1d1f63b403744ad852fe3c4",
         "series_alias_audit.csv": "c0330c9918d7e2f4f972d15e8465537c16d96aca607ef253353612cadd62c56d",
         "series_alias_audit.parquet": "9b376147c912748d5a2429abf524799e348a3711d6af89a4b9d1ec287f558918",
         "series_trace_contract.csv": "2eaf18c4c54fc18a21dd68415c0aea041bd174e8d75285409a4bb83034b60e09",

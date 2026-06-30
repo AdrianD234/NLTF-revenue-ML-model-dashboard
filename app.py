@@ -131,11 +131,15 @@ from model_dashboard.revenue_outlook import (
     REVENUE_STACK_MODE_BRIDGE,
     REVENUE_STACK_MODE_GROSS,
     REVENUE_STACK_MODES,
+    SENSITIVITY_DEFAULT_NOTE,
+    SENSITIVITY_LEVELS,
     STREAM_LABELS,
     RevenueOutlookPack,
+    apply_revenue_sensitivity_layer,
     apply_ped_efficiency_sensitivity,
     load_revenue_outlook_pack,
     ped_efficiency_scenarios_frame,
+    sensitivity_config_frame,
     promote_revenue_outlook_pack,
     revenue_outlook_signature,
     validate_promotable_comparison,
@@ -2026,6 +2030,16 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         if pack is not None and isinstance(getattr(pack, "ped_efficiency_scenarios", None), pd.DataFrame)
         else ped_efficiency_scenarios_frame()
     )
+    sensitivity_config = (
+        pack.sensitivity_config.copy()
+        if pack is not None and isinstance(getattr(pack, "sensitivity_config", None), pd.DataFrame)
+        else sensitivity_config_frame()
+    )
+    sensitivity_seed_inputs = (
+        pack.sensitivity_seed_inputs.copy()
+        if pack is not None and isinstance(getattr(pack, "sensitivity_seed_inputs", None), pd.DataFrame)
+        else pd.DataFrame()
+    )
     scenario_role_contract = (
         pack.scenario_role_contract.copy()
         if pack is not None and isinstance(getattr(pack, "scenario_role_contract", None), pd.DataFrame)
@@ -2069,7 +2083,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
 
     with st.container(border=True):
         st.markdown("<div class='page5-panel-title'>Revenue Outlook controls</div>", unsafe_allow_html=True)
-        control_cols = st.columns([0.13, 0.25, 0.18, 0.16, 0.11, 0.17])
+        control_cols = st.columns([0.14, 0.28, 0.18, 0.12, 0.28])
         with control_cols[0]:
             grain_label = st.radio(
                 "Time grain",
@@ -2097,50 +2111,87 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                     index=default_fed_index,
                     key="revenue_outlook_fed_path",
                 )
-        efficiency_options = (
-            ped_efficiency_scenarios["scenario_id"].dropna().astype(str).tolist()
-            if not ped_efficiency_scenarios.empty and "scenario_id" in ped_efficiency_scenarios.columns
-            else [PED_EFFICIENCY_BASELINE_SCENARIO_ID]
-        )
-        efficiency_labels = (
-            ped_efficiency_scenarios.set_index("scenario_id")["display_name"].astype(str).to_dict()
-            if not ped_efficiency_scenarios.empty and {"scenario_id", "display_name"}.issubset(ped_efficiency_scenarios.columns)
-            else {PED_EFFICIENCY_BASELINE_SCENARIO_ID: "Baseline 0%"}
-        )
         with control_cols[3]:
-            selected_efficiency_id = st.selectbox(
-                "PED fleet efficiency",
-                efficiency_options,
-                index=efficiency_options.index(PED_EFFICIENCY_BASELINE_SCENARIO_ID)
-                if PED_EFFICIENCY_BASELINE_SCENARIO_ID in efficiency_options
-                else 0,
-                format_func=lambda value: efficiency_labels.get(str(value), str(value)),
-                key="revenue_outlook_ped_efficiency",
-            )
-        with control_cols[4]:
             selected_fy = st.selectbox(
                 "Selected FY",
                 fy_options,
                 index=default_fy_index,
                 key="revenue_outlook_selected_fy",
             )
-        with control_cols[5]:
+        with control_cols[4]:
             selected_traces = st.multiselect(
                 "Traces",
                 trace_options,
                 default=trace_options,
                 key="revenue_outlook_traces",
             )
-        st.caption(PED_EFFICIENCY_DEFAULT_NOTE)
+    sensitivity_options = list(SENSITIVITY_LEVELS)
+    with st.container(border=True):
+        st.markdown("<div class='page5-panel-title'>Sensitivities</div>", unsafe_allow_html=True)
+        sens_cols = st.columns([0.18, 0.18, 0.18, 0.18, 0.28])
+        with sens_cols[0]:
+            selected_fleet_efficiency = st.selectbox(
+                "Fleet efficiency",
+                sensitivity_options,
+                index=sensitivity_options.index("Off"),
+                key="revenue_outlook_sensitivity_fleet_efficiency",
+            )
+        with sens_cols[1]:
+            selected_pt_mode_shift = st.selectbox(
+                "PT mode shift",
+                sensitivity_options,
+                index=sensitivity_options.index("Off"),
+                key="revenue_outlook_sensitivity_pt_mode_shift",
+            )
+        with sens_cols[2]:
+            selected_demand_elasticity = st.selectbox(
+                "Demand elasticity",
+                sensitivity_options,
+                index=sensitivity_options.index("Off"),
+                key="revenue_outlook_sensitivity_demand_elasticity",
+            )
+        with sens_cols[3]:
+            cost_per_km_ratio = None
+            if selected_demand_elasticity != "Off":
+                cost_per_km_ratio = st.number_input(
+                    "Cost/km ratio",
+                    min_value=0.01,
+                    max_value=5.0,
+                    value=1.0,
+                    step=0.01,
+                    key="revenue_outlook_sensitivity_cost_ratio",
+                )
+            else:
+                st.markdown("<div class='control-label'>Cost/km ratio</div>", unsafe_allow_html=True)
+                st.caption("Only used when elasticity is on.")
+        with sens_cols[4]:
+            custom_fleet_efficiency_pct = None
+            custom_pt_shift_pct = None
+            custom_elasticity = None
+            if selected_fleet_efficiency == "Custom":
+                custom_fleet_efficiency_pct = st.number_input("Custom efficiency % p.a.", min_value=0.0, max_value=10.0, value=1.0, step=0.1)
+            if selected_pt_mode_shift == "Custom":
+                custom_pt_shift_pct = st.number_input("Custom PT shift % p.a.", min_value=0.0, max_value=10.0, value=0.5, step=0.1)
+            if selected_demand_elasticity == "Custom":
+                custom_elasticity = st.number_input("Custom elasticity", min_value=-2.0, max_value=2.0, value=-0.1, step=0.01)
+            if all(value != "Custom" for value in [selected_fleet_efficiency, selected_pt_mode_shift, selected_demand_elasticity]):
+                st.caption("Custom inputs appear only when selected.")
+        st.caption(SENSITIVITY_DEFAULT_NOTE)
 
-    sensitivity_frames = apply_ped_efficiency_sensitivity(
+    sensitivity_frames = apply_revenue_sensitivity_layer(
         chart_rows=chart_rows,
         line_reconciliation=line_reconciliation,
         bridge_components=bridge,
         future_revenue_forecasts=future_revenue,
         ped_revenue_bridge_audit=ped_revenue_bridge_audit,
-        ped_efficiency_scenarios=ped_efficiency_scenarios,
-        scenario_id=selected_efficiency_id,
+        sensitivity_config=sensitivity_config,
+        fleet_efficiency=selected_fleet_efficiency,
+        pt_mode_shift=selected_pt_mode_shift,
+        demand_elasticity=selected_demand_elasticity,
+        custom_fleet_efficiency_pct=custom_fleet_efficiency_pct,
+        custom_pt_shift_pct=custom_pt_shift_pct,
+        custom_elasticity=custom_elasticity,
+        cost_per_km_ratio=cost_per_km_ratio,
     )
     chart_rows = sensitivity_frames["chart_rows"]
     line_reconciliation = sensitivity_frames["line_reconciliation"]
@@ -2148,7 +2199,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     stack_components = sensitivity_frames["revenue_stack_components"]
     bridge = sensitivity_frames["revenue_bridge_components"]
     future_revenue = sensitivity_frames["future_revenue_forecasts"]
-    ped_efficiency_adjustment = sensitivity_frames["ped_efficiency_adjustment"]
+    sensitivity_impact_audit = sensitivity_frames["sensitivity_impact_audit"]
 
     filtered_rows = _filter_revenue_outlook_rows(
         chart_rows,
@@ -2201,20 +2252,27 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 dataframe_download(runtime_cutoff_audit, "Download CSV", "runtime_cutoff_audit.csv")
             display_table(runtime_cutoff_audit, height=220, max_rows=20)
 
-    if not ped_efficiency_adjustment.empty:
-        with st.expander("PED revenue bridge and fleet-efficiency audit", expanded=False):
-            selected_efficiency_label = efficiency_labels.get(str(selected_efficiency_id), str(selected_efficiency_id))
-            info_panel(PED_EFFICIENCY_DEFAULT_NOTE)
-            st.caption(
-                f"Selected sensitivity: {selected_efficiency_label}. Current-finalist PED volume, PED revenue, Gross FED, Net FED, Total RUC+PED and Total NLTF are recalculated in this view only."
+    if not sensitivity_impact_audit.empty:
+        with st.expander("Sensitivity impact audit", expanded=False):
+            info_panel(SENSITIVITY_DEFAULT_NOTE)
+            selected_summary = (
+                f"Fleet efficiency: {selected_fleet_efficiency}; "
+                f"PT mode shift: {selected_pt_mode_shift}; "
+                f"Demand elasticity: {selected_demand_elasticity}."
             )
-            bridge_cols = st.columns([0.82, 0.18])
-            display_adjustment = ped_efficiency_adjustment[
-                pd.to_numeric(ped_efficiency_adjustment.get("FY"), errors="coerce").between(2026, 2050, inclusive="both")
+            st.caption(
+                f"{selected_summary} Current-finalist activity/revenue rows and rollups are recalculated in this view only; MBU26 official rows are unchanged."
+            )
+            bridge_cols = st.columns([0.74, 0.13, 0.13])
+            display_adjustment = sensitivity_impact_audit[
+                pd.to_numeric(sensitivity_impact_audit.get("FY"), errors="coerce").between(2026, 2050, inclusive="both")
             ].copy()
             with bridge_cols[1]:
-                dataframe_download(display_adjustment, "Download CSV", "ped_revenue_bridge_efficiency_audit.csv")
-            display_table(_ped_efficiency_adjustment_display_table(display_adjustment), height=360, max_rows=260)
+                dataframe_download(display_adjustment, "Download CSV", "sensitivity_impact_audit.csv")
+            with bridge_cols[2]:
+                if not sensitivity_seed_inputs.empty:
+                    dataframe_download(sensitivity_seed_inputs, "Seed CSV", "sensitivity_seed_inputs.csv")
+            display_table(_sensitivity_impact_display_table(display_adjustment), height=360, max_rows=300)
 
     with st.container(border=True):
         st.markdown("<div class='page5-panel-title'>Revenue composition over time</div>", unsafe_allow_html=True)
@@ -4398,7 +4456,17 @@ def revenue_outlook_total_path_figure(rows: pd.DataFrame, *, selected_series: st
             continue
         group = group.drop_duplicates(["period", "trace_name", "scenario_name", "fed_path"], keep="last")
         group = group.sort_values("_period_order", kind="stable")
-        for column in ["horizon", "horizon_scope", "bridge_status", "gap_reason", "data_scope", "value_status", "actual_quarters", "forecast_quarters"]:
+        for column in [
+            "horizon",
+            "horizon_scope",
+            "bridge_status",
+            "gap_reason",
+            "data_scope",
+            "value_status",
+            "actual_quarters",
+            "forecast_quarters",
+            "revenue_sensitivity_label",
+        ]:
             if column not in group.columns:
                 group[column] = ""
         group["horizon_hover"] = group.apply(_revenue_horizon_hover_label, axis=1)
@@ -5004,6 +5072,7 @@ def revenue_outlook_figure(rows: pd.DataFrame, *, metric_type: str) -> go.Figure
                     "value_status",
                     "actual_quarters",
                     "forecast_quarters",
+                    "revenue_sensitivity_label",
                     "ped_efficiency_label",
                     "adjusted_litres_per_100km",
                 ]
@@ -5019,6 +5088,7 @@ def revenue_outlook_figure(rows: pd.DataFrame, *, metric_type: str) -> go.Figure
                 "value_status",
                 "actual_quarters",
                 "forecast_quarters",
+                "revenue_sensitivity_label",
                 "ped_efficiency_label",
                 "adjusted_litres_per_100km",
             ]:
@@ -5230,9 +5300,13 @@ def _revenue_scope_hover_label(row: pd.Series) -> str:
 
 
 def _revenue_efficiency_hover_label(row: pd.Series) -> str:
+    sensitivity_value = row.get("revenue_sensitivity_label")
+    sensitivity = "" if pd.isna(sensitivity_value) else str(sensitivity_value).strip()
     label_value = row.get("ped_efficiency_label")
     label = "" if pd.isna(label_value) else str(label_value).strip()
     litres = pd.to_numeric(row.get("adjusted_litres_per_100km"), errors="coerce")
+    if sensitivity:
+        return f"<br>Sensitivity: {html.escape(sensitivity)}"
     if not label or pd.isna(litres):
         return ""
     return f"<br>PED fleet efficiency: {html.escape(label)}; adjusted litres/100km: {float(litres):,.2f}"
@@ -5332,6 +5406,40 @@ def _ped_efficiency_adjustment_display_table(adjustment: pd.DataFrame) -> pd.Dat
         if col in view.columns:
             view[col] = pd.to_numeric(view[col], errors="coerce").map(
                 lambda value: "" if pd.isna(value) else f"{float(value):,.3f}"
+            )
+    return view
+
+
+def _sensitivity_impact_display_table(audit: pd.DataFrame) -> pd.DataFrame:
+    if audit is None or audit.empty:
+        return pd.DataFrame()
+    view = audit.copy()
+    rename = {
+        "FY": "FY",
+        "source_path": "Source path",
+        "scenario_name": "Scenario",
+        "series_id": "Series",
+        "baseline": "Baseline",
+        "adjusted": "Adjusted",
+        "delta": "Delta",
+        "unit": "Unit",
+        "selected_fleet_efficiency": "Fleet efficiency",
+        "selected_pt_mode_shift": "PT mode shift",
+        "selected_demand_elasticity": "Demand elasticity",
+        "eff_gain": "Efficiency gain",
+        "pt_factor": "PT factor",
+        "elasticity": "Elasticity",
+        "cost_per_km_ratio": "Cost/km ratio",
+        "demand_factor": "Demand factor",
+        "gap_reason": "Gap reason",
+        "formula": "Formula",
+    }
+    cols = [col for col in rename if col in view.columns]
+    view = view[cols].rename(columns=rename)
+    for col in ["Baseline", "Adjusted", "Delta", "Efficiency gain", "PT factor", "Elasticity", "Cost/km ratio", "Demand factor"]:
+        if col in view.columns:
+            view[col] = pd.to_numeric(view[col], errors="coerce").map(
+                lambda value: "" if pd.isna(value) else f"{float(value):,.4f}"
             )
     return view
 

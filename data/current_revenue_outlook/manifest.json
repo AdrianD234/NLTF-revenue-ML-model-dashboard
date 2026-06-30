@@ -396,6 +396,34 @@
     "scope": "Governed PED fleet-efficiency sensitivity over litres per 100km after EV/PHEV migration.",
     "note": "Efficiency sensitivity reduces litres per 100km after EV/PHEV migration; it does not change VKTpc forecasts."
   },
+  "sensitivity_seed_inputs": {
+    "repo_relative_path": "data/current_revenue_outlook/sensitivity_seed_inputs.csv",
+    "source_workbook_basename": "Revenue Model2.1 with fuel calcs.xlsx",
+    "source_workbook_sha256": "54ed1cfee4fa533b655575ff41f59ba656f6c53350d52b9b02482bab1d16a3a7",
+    "source_sheet": "Inputs (TI)",
+    "status": "available",
+    "scope": "Compact Inputs (TI) seed values for fleet efficiency, PT mode shift and demand elasticity only.",
+    "excluded_scope": "Fleet transition, crude/oil shock, crude-to-pump and ETS/margin/tax pass-through are not runtime sensitivities."
+  },
+  "sensitivity_config": {
+    "repo_relative_path": "data/current_revenue_outlook/sensitivity_config.csv",
+    "default_runtime_treatment": "all_off_no_change",
+    "selections": [
+      "Off",
+      "Low",
+      "Med",
+      "High",
+      "Custom"
+    ],
+    "scope": "Low-complexity post-model Revenue Outlook overlays: fleet efficiency, PT mode shift and optional demand elasticity.",
+    "note": "Post-model overlays; default Off preserves model forecast. Scenario workbook price variables are already captured by finalist forecasts where supplied."
+  },
+  "sensitivity_impact_audit": {
+    "repo_relative_path": "data/current_revenue_outlook/sensitivity_impact_audit.csv",
+    "default_runtime_treatment": "all_off_no_change",
+    "status": "available",
+    "scope": "Default-Off sensitivity audit; runtime UI recalculates selected impacts in memory."
+  },
   "scenario_role_contract": {
     "repo_relative_path": "data/current_revenue_outlook/scenario_role_contract.csv",
     "scope": "Repo-local audit of scenario role semantics, PED population-feature exposure, display policy and runtime deltas.",
@@ -833,6 +861,30 @@
     "scenario_role_contract.parquet": {
       "sha256": "8129514d4c43e898625f74b029aad23d583cfae9b36491ee955ab0a99593b30b",
       "size_bytes": 21676
+    },
+    "sensitivity_config.csv": {
+      "sha256": "2067f75d07b12d61d0b845b03bf637f0e335dc7074c45fea5e72b74fc63eda64",
+      "size_bytes": 12186
+    },
+    "sensitivity_config.parquet": {
+      "sha256": "2960b8221b4321aafea87db35ac04454a09f5fb421c2c35eb7abe700bf9e0ee6",
+      "size_bytes": 10730
+    },
+    "sensitivity_impact_audit.csv": {
+      "sha256": "2ab42b16e8556f45dfd4fe3f15542b0e13d12bfda3e5221ba632803441fdaae9",
+      "size_bytes": 880632
+    },
+    "sensitivity_impact_audit.parquet": {
+      "sha256": "eae77be5237c40e7b8a905b32e6eed359bdb99e437856a31e1523776a2cc93b2",
+      "size_bytes": 49472
+    },
+    "sensitivity_seed_inputs.csv": {
+      "sha256": "dd2b9766cd253d08c6e65ca36d463b5178020c636b7edcc197ed52aa23679861",
+      "size_bytes": 8702
+    },
+    "sensitivity_seed_inputs.parquet": {
+      "sha256": "eeda21f1cd4ad85044d8bd2a19b8f7e669f78f8ec1d1f63b403744ad852fe3c4",
+      "size_bytes": 9602
     },
     "series_alias_audit.csv": {
       "sha256": "c0330c9918d7e2f4f972d15e8465537c16d96aca607ef253353612cadd62c56d",
