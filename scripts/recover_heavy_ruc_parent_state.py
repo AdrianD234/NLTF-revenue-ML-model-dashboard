@@ -191,14 +191,9 @@ def _search_roots(repo_root: Path) -> list[SearchRoot]:
         ),
         SearchRoot("repo_parity_debug", "heavy_ruc_forward_parity_debug", repo_root / DEBUG_DIR, True),
         SearchRoot("repo_model_input_history", "model_input_history", repo_root / "data" / "model_input_history", True),
+        SearchRoot("repo_source_workbooks", "vendored_source_workbooks", repo_root / "data" / "source_workbooks", True),
         SearchRoot("repo_scripts", "repo_scripts_heavy_ruc", repo_root / "scripts", False),
         SearchRoot("external_user_candidate_drop", "local_heavy_ruc_named_candidates", home / "Downloads", False),
-        SearchRoot(
-            "external_model_input_candidate_drop",
-            "local_model_inputs_named_candidates",
-            home / "OneDrive" / "Documents" / "Playground" / "Revenue Modeling - Strategic Review" / "04 Models" / "Inputs",
-            False,
-        ),
     ]
 
 

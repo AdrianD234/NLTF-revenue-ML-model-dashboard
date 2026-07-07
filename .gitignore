@@ -91,3 +91,7 @@ data/dashboard_evidence_pack_reproducibility/ped_inner_hpo/source_artifacts/**/*
 
 # local Claude Code session config (absolute paths, machine-specific)
 .claude/
+
+# vendored source workbooks (governed inputs; hashes recorded in manifests)
+!data/source_workbooks/
+!data/source_workbooks/*.xlsx

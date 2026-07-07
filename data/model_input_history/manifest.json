@@ -9,7 +9,9 @@
     "heavy_ruc": "Heavy RUC Inputs"
   },
   "workbook_full_path_public": false,
-  "notes": "Compact model-input history built from the master workbook input sheets. The raw workbook is intentionally not vendored.",
+  "raw_workbook_vendored": true,
+  "raw_repo_relative_path": "data/source_workbooks/Master Copy revenue modelling workbook.xlsx",
+  "notes": "Compact model-input history built from the master workbook input sheets. The raw workbook is vendored at data/source_workbooks/ (sha256 verified against source_sha256).",
   "artifacts": [
     {
       "stream": "PED",

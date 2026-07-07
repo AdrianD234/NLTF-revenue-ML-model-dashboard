@@ -24,7 +24,6 @@ STREAM_SHEETS = {
 
 SOURCE_CANDIDATES = [
     ROOT / "data" / "source_workbooks" / WORKBOOK_NAME,
-    ROOT.parent.parent / "Revenue Modeling - Strategic Review" / "04 Models" / "Inputs" / WORKBOOK_NAME,
 ]
 
 
@@ -68,6 +67,10 @@ def main() -> None:
             }
         )
 
+    try:
+        raw_repo_relative = workbook.resolve().relative_to(ROOT).as_posix()
+    except ValueError:
+        raw_repo_relative = None
     manifest = {
         "created_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "source_basename": workbook.name,
@@ -75,9 +78,15 @@ def main() -> None:
         "source_sha256": sha256(workbook),
         "source_sheets": STREAM_SHEETS,
         "workbook_full_path_public": False,
+        "raw_workbook_vendored": raw_repo_relative is not None,
+        "raw_repo_relative_path": raw_repo_relative,
         "notes": (
             "Compact model-input history built from the master workbook input sheets. "
-            "The raw workbook is intentionally not vendored."
+            + (
+                f"The raw workbook is vendored at {raw_repo_relative} (sha256 verified against source_sha256)."
+                if raw_repo_relative
+                else "The raw workbook is not vendored; only its sha256 is recorded."
+            )
         ),
         "artifacts": manifest_rows,
     }
@@ -343,7 +352,11 @@ def write_markdown_manifest(path: Path, manifest: dict[str, Any]) -> None:
         f"- Source workbook: `{manifest['source_basename']}`",
         f"- Source SHA256: `{manifest['source_sha256']}`",
         f"- Created at: `{manifest['created_at']}`",
-        "- Raw workbook vendored: `false`",
+        (
+            f"- Raw workbook vendored: `true` (`{manifest['raw_repo_relative_path']}`)"
+            if manifest.get("raw_workbook_vendored")
+            else "- Raw workbook vendored: `false`"
+        ),
         "",
         "| Stream | Source sheet | Repo path | Rows | First period | Last period | SHA256 |",
         "|---|---|---|---:|---|---|---|",

@@ -12,11 +12,8 @@ EXAMPLE_INFORMATION_PACK_ROOT = (
     r"C:\Users\Adrian Desilvestro\OneDrive\Documents\Playground"
     r"\Revenue Modeling - Strategic Review\04 Models\information pack"
 )
-EXAMPLE_LEGACY_RUN_PARENT = (
-    r"C:\Users\Adrian Desilvestro\OneDrive\Documents\Playground"
-    r"\Revenue Modeling - Strategic Review\04 Models\Inputs"
-)
+# The master workbook is vendored in-repo; external copies are no longer needed.
+EXAMPLE_LEGACY_RUN_PARENT = r"data\source_workbooks"
 EXAMPLE_REPRODUCIBILITY_SOURCE_WORKBOOK_PATH = (
-    r"C:\Users\Adrian Desilvestro\OneDrive\Documents\Playground"
-    r"\Revenue Modeling - Strategic Review\04 Models\Inputs\Master Copy revenue modelling workbook.xlsx"
+    r"data\source_workbooks\Master Copy revenue modelling workbook.xlsx"
 )

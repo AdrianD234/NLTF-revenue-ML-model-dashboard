@@ -3,7 +3,7 @@
 - Source workbook: `Master Copy revenue modelling workbook.xlsx`
 - Source SHA256: `0c0ea8d3f95be6ba4a92316c7b2d5b7ec765cab6062cf7918844cbcb17bb6a5d`
 - Created at: `2026-06-10T01:47:21Z`
-- Raw workbook vendored: `false`
+- Raw workbook vendored: `true` (`data/source_workbooks/Master Copy revenue modelling workbook.xlsx`)
 
 | Stream | Source sheet | Repo path | Rows | First period | Last period | SHA256 |
 |---|---|---|---:|---|---|---|

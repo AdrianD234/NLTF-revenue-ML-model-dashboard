@@ -14,16 +14,7 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DATA_ROOT = ROOT / "data" / "dashboard_evidence_pack"
-DEFAULT_WORKBOOK = (
-    Path.home()
-    / "OneDrive"
-    / "Documents"
-    / "Playground"
-    / "Revenue Modeling - Strategic Review"
-    / "04 Models"
-    / "Inputs"
-    / "Master Copy revenue modelling workbook.xlsx"
-)
+DEFAULT_WORKBOOK = ROOT / "data" / "source_workbooks" / "Master Copy revenue modelling workbook.xlsx"
 DEFAULT_HEAVY_COMPONENT_RUN = (
     Path.home()
     / "OneDrive"

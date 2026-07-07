@@ -159,7 +159,6 @@ def _resolve_workbook(repo_root: Path, override: Path | None, repro_root: Path) 
             basename = str(_read_json(manifest_path).get("source_basename") or "")
             if basename:
                 candidates.append(repo_root / "data" / "source_workbooks" / basename)
-                candidates.append(repo_root.parent.parent / "Revenue Modeling - Strategic Review" / "04 Models" / "Inputs" / basename)
         except Exception:
             pass
 
