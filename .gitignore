@@ -88,3 +88,6 @@ data/dashboard_evidence_pack_reproducibility/ped_inner_hpo/source_artifacts/**/*
 
 # deployed-commit preview worktree (scripts/run_deployed_preview.ps1)
 .deploy_preview/
+
+# local Claude Code session config (absolute paths, machine-specific)
+.claude/

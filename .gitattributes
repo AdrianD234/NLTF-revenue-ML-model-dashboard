@@ -1,0 +1,5 @@
+# Byte-exact checkouts everywhere. The reproducibility packs carry sha256
+# manifests over committed files; any line-ending conversion on checkout
+# breaks those hashes and leaves the working tree in a permanent
+# phantom-modified state under core.autocrlf=true. Disable all conversion.
+* -text
