@@ -693,6 +693,19 @@ def cached_revenue_outlook_view(
         fed_paths=[fed_path],
         trace_names=list(traces),
     )
+    quarterly_disaggregated = False
+    if time_grain == "quarterly" and filtered_rows.empty:
+        annual_rows = _filter_revenue_outlook_rows(
+            chart_rows,
+            time_grain="june_year",
+            stream_labels=[selected_series],
+            fed_paths=[fed_path],
+            trace_names=list(traces),
+        )
+        derived_rows = _disaggregate_annual_rows_to_quarterly(annual_rows, chart_rows)
+        if not derived_rows.empty:
+            filtered_rows = derived_rows
+            quarterly_disaggregated = True
     filtered_bridge = _filter_revenue_bridge_rows(
         sensitivity_frames["revenue_bridge_components"],
         [selected_series],
@@ -707,6 +720,7 @@ def cached_revenue_outlook_view(
         "ped_revenue_bridge_audit": bridge_frames["ped_revenue_bridge_audit"],
         "ped_bridge_mode_impact_audit": bridge_frames["ped_bridge_mode_impact_audit"],
         "sensitivity_fast_path": sensitivity_fast_path,
+        "quarterly_disaggregated": quarterly_disaggregated,
     }
 
 
@@ -2824,7 +2838,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     timer.stop("main path figure")
     chart_card(
         "Total path chart",
-        "",
+        QUARTERLY_DISAGGREGATION_NOTE if view.get("quarterly_disaggregated") else "",
         main_path_figure,
         caption=None,
         notes_as_tooltip=True,
@@ -5193,6 +5207,153 @@ def _scenario_names_for_traces(chart_rows: pd.DataFrame, trace_names: list[str])
     return sorted(rows["scenario_name"].dropna().astype(str).unique().tolist())
 
 
+QUARTERLY_DISAGGREGATION_NOTE = (
+    "This series is only published at June-year grain, so the quarterly view is "
+    "derived by temporal disaggregation: each fiscal year is split across its four "
+    "quarters with a Denton-style benchmarking solve that reproduces the annual "
+    "value exactly (sum for volumes/revenues, average for per-unit series). Where "
+    "the stream has a native quarterly activity path (PED VKT per capita, "
+    "Light/Heavy RUC net km) it supplies the seasonal shape; otherwise the split "
+    "minimises quarter-to-quarter movement. Interpolated quarters are indicative "
+    "display values only - not published quarterly actuals or direct model outputs."
+)
+
+
+def _quarterly_disaggregation_indicator_id(series_id: Any) -> str:
+    sid = str(series_id or "")
+    if sid in {"ped_vkt_per_capita", "light_ruc_net_km", "heavy_ruc_net_km"}:
+        return ""
+    if sid.startswith(("ped", "gross_ped", "gross_fed", "net_fed", "fed")):
+        return "ped_vkt_per_capita"
+    if sid.startswith(("light", "phev")):
+        return "light_ruc_net_km"
+    if sid.startswith("heavy"):
+        return "heavy_ruc_net_km"
+    return ""
+
+
+def _june_year_quarters(june_year: int) -> list[str]:
+    return [f"{june_year - 1}Q3", f"{june_year - 1}Q4", f"{june_year}Q1", f"{june_year}Q2"]
+
+
+def _is_average_preserving_unit(unit: Any) -> bool:
+    text = str(unit or "").lower()
+    return any(token in text for token in ["per capita", "per km", "per litre", "per 1,000"])
+
+
+def _denton_quarterly_split(annual_values: np.ndarray, indicator: np.ndarray, *, average: bool) -> np.ndarray:
+    """Split annual benchmarks into quarters, minimising movement of the quarterly
+    path relative to the indicator (Denton proportional first difference; a flat
+    indicator reduces to the Boot-Feibes-Lisman smooth split). Each year's four
+    quarters reproduce the annual value exactly."""
+    n = int(len(annual_values))
+    m = 4 * n
+    ind = np.asarray(indicator, dtype=float)
+    if ind.shape[0] != m or not np.all(np.isfinite(ind)) or np.any(ind <= 0):
+        ind = np.ones(m, dtype=float)
+    difference = np.diff(np.eye(m), axis=0)
+    weights = ind / 4.0 if average else ind
+    constraint = np.zeros((n, m))
+    for year in range(n):
+        constraint[year, 4 * year : 4 * year + 4] = weights[4 * year : 4 * year + 4]
+    kkt = np.zeros((m + n, m + n))
+    kkt[:m, :m] = 2.0 * difference.T @ difference
+    kkt[:m, m:] = constraint.T
+    kkt[m:, :m] = constraint
+    rhs = np.concatenate([np.zeros(m), np.asarray(annual_values, dtype=float)])
+    solution = np.linalg.lstsq(kkt, rhs, rcond=None)[0]
+    return ind * solution[:m]
+
+
+def _quarterly_indicator_lookup(chart_rows: pd.DataFrame, indicator_series_id: str, trace_name: Any) -> dict[str, float]:
+    if not indicator_series_id or chart_rows is None or chart_rows.empty:
+        return {}
+    if "series_id" not in chart_rows.columns or "time_grain" not in chart_rows.columns:
+        return {}
+    rows = chart_rows[
+        chart_rows["time_grain"].astype(str).eq("quarterly")
+        & chart_rows["series_id"].astype(str).eq(indicator_series_id)
+    ]
+    if rows.empty:
+        return {}
+    frame = pd.DataFrame(
+        {
+            "period": rows["period"].astype(str),
+            "trace": rows.get("trace_name", pd.Series("", index=rows.index)).astype(str),
+            "value": pd.to_numeric(rows["value"], errors="coerce"),
+        }
+    ).dropna(subset=["value"])
+    lookup: dict[str, float] = {}
+    for _, row in frame[frame["trace"].eq("Actual")].iterrows():
+        lookup[row["period"]] = float(row["value"])
+    for _, row in frame[frame["trace"].eq(str(trace_name or ""))].iterrows():
+        lookup[row["period"]] = float(row["value"])
+    return lookup
+
+
+def _disaggregate_annual_rows_to_quarterly(annual_rows: pd.DataFrame, chart_rows: pd.DataFrame) -> pd.DataFrame:
+    """Derive display-only quarterly rows for series published at June-year grain.
+
+    The governed pack is not modified: rows produced here are tagged
+    data_scope=quarterly_disaggregated_from_annual / value_status=interpolated so
+    audits can always separate them from published values."""
+    if annual_rows is None or annual_rows.empty:
+        return pd.DataFrame()
+    data = annual_rows.copy()
+    data["_value_numeric"] = pd.to_numeric(data.get("value"), errors="coerce")
+    data["_june_year_numeric"] = pd.to_numeric(data.get("june_year"), errors="coerce")
+    data = data[data["_value_numeric"].notna() & data["_june_year_numeric"].notna()]
+    if data.empty:
+        return pd.DataFrame()
+    group_cols = [c for c in ["trace_name", "scenario_name", "fed_path"] if c in data.columns]
+    output: list[dict[str, Any]] = []
+    for _, group in data.groupby(group_cols, dropna=False):
+        group = group.sort_values("_june_year_numeric").drop_duplicates("_june_year_numeric", keep="last")
+        years = group["_june_year_numeric"].astype(int).tolist()
+        annual_values = group["_value_numeric"].to_numpy(dtype=float)
+        template = group.iloc[0].to_dict()
+        indicator_id = _quarterly_disaggregation_indicator_id(template.get("series_id"))
+        lookup = _quarterly_indicator_lookup(chart_rows, indicator_id, template.get("trace_name"))
+        quarters = [q for fy in years for q in _june_year_quarters(fy)]
+        seasonal: dict[str, list[float]] = {"Q1": [], "Q2": [], "Q3": [], "Q4": []}
+        for period, value in lookup.items():
+            seasonal[period[-2:]].append(value)
+        seasonal_mean = {q: (sum(v) / len(v) if v else 1.0) for q, v in seasonal.items()}
+        indicator = np.array(
+            [lookup.get(q, seasonal_mean.get(q[-2:], 1.0)) for q in quarters], dtype=float
+        )
+        values = _denton_quarterly_split(
+            annual_values, indicator, average=_is_average_preserving_unit(template.get("value_unit"))
+        )
+        for year_index, fy in enumerate(years):
+            for quarter_index, period in enumerate(_june_year_quarters(fy)):
+                row = dict(template)
+                row.pop("_value_numeric", None)
+                row.pop("_june_year_numeric", None)
+                row.update(
+                    {
+                        "period": period,
+                        "time_grain": "quarterly",
+                        "june_year": fy,
+                        "value": float(values[4 * year_index + quarter_index]),
+                        "value_status": "interpolated",
+                        "data_scope": "quarterly_disaggregated_from_annual",
+                        "plot_allowed": True,
+                        "horizon": "",
+                        "horizon_scope": "",
+                        "actual_quarters": "",
+                        "forecast_quarters": "",
+                        "quarters_present": "",
+                    }
+                )
+                output.append(row)
+    if not output:
+        return pd.DataFrame()
+    result = pd.DataFrame(output)
+    result["_period_order"] = result["period"].map(_revenue_period_order)
+    return result.sort_values(["trace_name", "_period_order"], kind="stable").drop(columns=["_period_order"])
+
+
 def _filter_revenue_outlook_rows(
     chart_rows: pd.DataFrame,
     *,
@@ -5308,6 +5469,33 @@ def revenue_outlook_total_path_figure(rows: pd.DataFrame, *, selected_series: st
                 ),
             )
         )
+
+    # Bridge the visual gap between the last actual and the first point of each
+    # forecast trace with an actual-coloured connector segment so the handover
+    # from history to forecast reads as one continuous path.
+    actual_group = data[data["trace_name"].astype(str).eq("Actual")]
+    if not actual_group.empty:
+        last_actual = actual_group.loc[actual_group["_period_order"].idxmax()]
+        for trace_name in trace_names:
+            if trace_name == "Actual":
+                continue
+            group = data[data["trace_name"].astype(str).eq(trace_name)]
+            if group.empty:
+                continue
+            first_point = group.loc[group["_period_order"].idxmin()]
+            if first_point["_period_order"] <= last_actual["_period_order"]:
+                continue
+            fig.add_trace(
+                go.Scatter(
+                    x=[last_actual["period"], first_point["period"]],
+                    y=[last_actual["value_display"], first_point["value_display"]],
+                    mode="lines",
+                    line={"color": "#737373", "dash": "solid", "width": 2.4},
+                    hoverinfo="skip",
+                    showlegend=False,
+                    name=f"{trace_name} handover",
+                )
+            )
 
     periods = data["period"].dropna().astype(str).drop_duplicates().tolist()
     forecast_period = _revenue_outlook_forecast_start_period(data)
