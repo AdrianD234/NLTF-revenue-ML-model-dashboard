@@ -2230,14 +2230,14 @@
     "artifact_records": [
       {
         "repo_relative_path": "artifacts/heavy_ruc_forward_parity_debug/c3_c4_fitted_state_audit.csv",
-        "size_bytes": 1790,
-        "sha256": "304969996cbb92ae68a273f27f31ac06e9d3f4a9f4d40d24ef7b5e6d74848baa",
+        "size_bytes": 1786,
+        "sha256": "832aabb8e753f6aed3ae95aebaa52fa7bdc6ed31b696d457a07953c806b96b3c",
         "status": "present"
       },
       {
         "repo_relative_path": "artifacts/heavy_ruc_forward_parity_debug/target_lag_recursion_audit.csv",
-        "size_bytes": 4769,
-        "sha256": "fb77b12068f7dd8def5d7e28936b00937b47fddea6a61a63d77ec99c6dca3e1c",
+        "size_bytes": 4758,
+        "sha256": "41cc42d6c2b1ffee894d30516e30ae6df9d457a6e892c3401b60c95302b8950c",
         "status": "present"
       },
       {

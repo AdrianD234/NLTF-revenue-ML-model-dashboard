@@ -1,13 +1,13 @@
 {
   "config_files": {
     "MODEL_WORKFLOW.md": {
-      "sha256": "0963bf09c0f1405ba9389775f0826c0f54ffc7d6e006918f47f1069ca270d15f"
+      "sha256": "0e99005941628c1f973d684e583a91a7adb5d8d4d92e0d39f3571a57c494e00d"
     },
     "README.md": {
-      "sha256": "e6cbc067ded2d9e7d7235c23688a432a895f41fc209ebebd3636f4f5b3fe67d0"
+      "sha256": "dbc1adb7658050dfabd9aa5bfd2d56268e4e2c269ad1343d3ff732007f0da54c"
     },
     "front_end_config.json": {
-      "sha256": "6291877f05b1aadca44e16fd4db979272d5627fbbe8ae1703c227adfcad2ffed"
+      "sha256": "158319fbc0c6e93f6cbd7c34d5be5fb53420e961eb635754e8082170e9ade19f"
     }
   },
   "created_at": "2026-05-19T00:00:00+00:00",
@@ -19,82 +19,82 @@
   "normalized_files": {
     "aggregation_rules.csv": {
       "row_count": 12,
-      "sha256": "41aa56360f8ebf7d8b2a37103a5cd3397bbd4d8b15c3c43d2709a597374bf508",
+      "sha256": "08d026f1adc0efe9e2fd3a26ebeb10e21bc708eecc0127a3c8d72b959f3ef78e",
       "source_sheet": "Aggregation Rules"
     },
     "annual_actuals.csv": {
       "row_count": 378,
-      "sha256": "f37d30359832cb7099de8c021ed7d60d7d509935c902ce298f44e8fded81a711",
+      "sha256": "5179e7a56e22fcb670f5bf9beb6cf4c8b638dd0ea6492248a6fa4989092cb574",
       "source_sheet": "Annual Actuals"
     },
     "annual_model_paths.csv": {
       "row_count": 1554,
-      "sha256": "fbab6f3e3de41a5eacc0f49136c654464e0f426a8913b4cff12424c7577f1e83",
+      "sha256": "03aaca82ad46356efa43bb79264a47b956b71c57cc4b6eb6c32b26bffb4e0b50",
       "source_sheet": "Annual Model Paths"
     },
     "current_selections.csv": {
       "row_count": 10,
-      "sha256": "29181e7a7a5ff6e924353e05d9dd415d182d67dee4ef49ed6252d064f0cc2dc7",
+      "sha256": "abcad19639131dab6dee6e45cb506bdd427a80dcb9dfeedbe30d4f643bac492d",
       "source_sheet": "Current Selections"
     },
     "fed_rate_paths.csv": {
       "row_count": 222,
-      "sha256": "fc1bdac362bc565cb2fa785f19f9fb0b57eb68f47654717810090dc994c2059a",
+      "sha256": "37eaad93d4f3c5373fe2569c62841f5216dc7ff10c8a868debc2c7ed61f25269",
       "source_sheet": "FED rates"
     },
     "forecast_archive.csv": {
       "row_count": 1973,
-      "sha256": "f80ce6ddd2187c4567fab368b0c67ec4bccbceaf6691198076ab73ac8beaa4d5",
+      "sha256": "1b99209b1786628e2868abc2f52d7e19c33007ef8bbace0f573c76d316d8b0ec",
       "source_sheet": "Forecast archive"
     },
     "formula_errors.csv": {
       "row_count": 396,
-      "sha256": "4c87bcd9cc6e47dcf467d2f4fa275874d22078edce22b73eb8237b56004b85b4",
+      "sha256": "317ac26aa8dc7a2141e15f2b31543a8f8c57162b0841572c0b88479c08009f28",
       "source_sheet": "Formula Errors"
     },
     "model_coefficients.csv": {
       "row_count": 31,
-      "sha256": "44bff04962928ccff0e6387d7fb318233e147cb6a7049e4462c8a50fcd7cc24d",
+      "sha256": "4e9827856277e37071675fb99dbddf8eca6863cd4a7aeaeb22e4f1c7a4d54f3d",
       "source_sheet": "Model Coefficients"
     },
     "mot_error_bands.csv": {
       "row_count": 89,
-      "sha256": "ea802d34d92de0fa7dce4accfdaa23383b0edb09d0d73bc8d4f22313f9b5e806",
+      "sha256": "814ff9b8434fdeedc3d5cc5bd3c539ae338993b38048a57d4f0ccb0a18fdfda4",
       "source_sheet": "Error bands"
     },
     "official_befu25_annual.csv": {
       "row_count": 1940,
-      "sha256": "8d875c4693e2eede86c3a690a9e51e1477d3ffb404b2d76694c2d927b4a7e2f2",
+      "sha256": "6bd2c97fa686d5863f04bb5b1e23cb0c95f765c38a1a1ddf43e49e2924eaef90",
       "source_sheet": "Official BEFU25 annual"
     },
     "ped_bridge_inputs.csv": {
       "row_count": 94,
-      "sha256": "427918975779d9be6400ae448bfc0900e83e6ab709b7799a8840c1320eaf5249",
+      "sha256": "bd3723ab9543171a9ccb76b9aa3a9a0d64b9f832bcb026b96edf00730a2295be",
       "source_sheet": "Forecast inputs + Official BEFU25 annual + Model annual"
     },
     "quarterly_actuals.csv": {
       "row_count": 2007,
-      "sha256": "06d7da1b0b361fff2f1e8ce010886c07ec4dfe9decc54fafda4eb81af11625bb",
+      "sha256": "f6d87c670fbbe76ef1667046228fde1e568e492a92bbd30e71a32272a926ca21",
       "source_sheet": "Quarterly actuals + Crown top-up"
     },
     "release_registry.csv": {
       "row_count": 53,
-      "sha256": "f704ff3bdf953b5f7c97afdac1b53c74a642d129f118c29962bb3d2f0c95fb99",
+      "sha256": "7db073bc2e5c789af628ed34a63d1c80615c95342c3ad3cacba773188a024433",
       "source_sheet": "Release Registry"
     },
     "release_values.csv": {
       "row_count": 33772,
-      "sha256": "afb8aae4f5a82c9f32ec041398479b96171e3226c418487ebc6b3fbd5deee858",
+      "sha256": "dd89b45252f2fe24b92681d907198d50c0615601a810e59cc8f2ca465c40e15b",
       "source_sheet": "MOT release series"
     },
     "series_master.csv": {
       "row_count": 29,
-      "sha256": "adc79ded4d5c48e7bd537643ebcca3ebac8c21fcab04dbaab69e5ab2bdf72b02",
+      "sha256": "f1b3f242284fd361efbd498fc6750f505653e2bb036b67baac8c713904b20006",
       "source_sheet": "Series Master"
     },
     "unresolved_decisions.csv": {
       "row_count": 7,
-      "sha256": "630982edb60d17136a77b156bc85d81252268bcb32d6d892e8df44c564e9967a",
+      "sha256": "a3c2ee9ad8d68d79ee06f0ca23acaa893c8d653d4ff107c4a5a32d5bead66c71",
       "source_sheet": "Open Decisions"
     }
   },

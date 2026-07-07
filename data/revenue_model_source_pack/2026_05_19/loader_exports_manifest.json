@@ -11,12 +11,12 @@
     "canonical_revenue_long.csv": {
       "role": "Canonical long schema across repo-local source rows and offline lineage rows.",
       "row_count": 39967,
-      "sha256": "a7e0be399ce8e909ea4207dc93568cc3c14b1b2f757f2bfb6e2f4bf26caef868"
+      "sha256": "334c4255bfe6cea7a3e039f40e3f41a60054ca2587ea9b1303a20b15e9385cd5"
     },
     "data_vintage_manifest.json": {
       "role": "Model/source observation cutoffs and repo-local current Revenue Outlook/source-pack hashes.",
       "row_count": null,
-      "sha256": "7273de0ea536cb83201afb31d6fa6279dbaa73a6586115669eecf8b47d52faa4"
+      "sha256": "01191f4457f1a7d074f0e2a4430a36618aa5bc3894843294101c4b597b8acdff"
     },
     "hybrid_annual_revenue.csv": {
       "role": "Replacement-only annual NLTF hybrid roll-up audit using source-backed PED/FED, Light RUC and Heavy RUC bridge inputs plus MOT fixed components.",
@@ -61,7 +61,7 @@
     "source_pack_intake_status.csv": {
       "role": "Repo-local source-pack intake status, hashes, and replay gaps.",
       "row_count": 23,
-      "sha256": "7a3117749e2fb1bc860027c3e8eb975082a804083c92134322f1dfeafc453f82"
+      "sha256": "a18fe3fee948bec4d8934b7162105454ead741b1092f26444f0f356073425d6c"
     },
     "trace_source_contract.csv": {
       "role": "Displayed Revenue Outlook trace source contract with role, source files, model IDs, cutoffs, scenario and anchor/forecast flags.",
