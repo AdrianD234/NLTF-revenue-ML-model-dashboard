@@ -598,7 +598,6 @@ def current_forecast_annual_from_mbu26(
             quarters=str(ped_quarters.get("quarters_present") or "").split("; "),
             fallback_population=fallback_population_count,
         )
-        ped_total_vkt = sum(value * population / 1_000_000.0 for value, population in zip(ped_values, population_values, strict=False))
         light_total_modelled_km = light_km_million
         current_ped_light_petrol_vkt = float(getattr(migration, "current_PED_light_petrol_km"))
         conventional_light_km = float(getattr(migration, "current_conventional_light_km"))

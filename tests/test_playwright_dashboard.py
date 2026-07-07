@@ -931,8 +931,9 @@ def assert_revenue_outlook_primary_runtime_contract(page: Page, selected_series:
         assert by_name["MBU26 official"]["dash"] in {"dash", "dashdot"}
     page_text = page.locator("body").inner_text(timeout=60000)
     assert selected_series in page_text
-    assert "Fan source" in page_text
-    assert "Scenario spread" in page_text or "Current finalist backtest error" in page_text
+    # The uncertainty fan card is intentionally hidden on Revenue Outlook
+    # (commit 417f34a); its "Fan source" control must not be on the page.
+    assert "Fan source" not in page_text
 
 
 def assert_revenue_outlook_composition_below_primary(page: Page) -> None:
@@ -956,6 +957,10 @@ def select_revenue_outlook_series(page: Page, value: str) -> None:
     combo = page.locator('[role="combobox"][aria-label*="Series"]').first
     expect(combo).to_be_visible(timeout=30000)
     combo.click()
+    # The Series listbox is virtualised, so options outside the scrolled
+    # window are absent from the DOM; typeahead filtering makes the target
+    # option render regardless of list length.
+    combo.type(value, delay=20)
     option = page.get_by_role("option", name=value)
     expect(option.first).to_be_visible(timeout=30000)
     option.first.click()

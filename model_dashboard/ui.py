@@ -79,6 +79,15 @@ def inject_theme() -> None:
             div[data-testid="stAppViewContainer"] > .main {{
                 padding-top: 0 !important;
             }}
+            div[data-testid="stAppViewContainer"] div[data-testid="stVerticalBlock"] {{
+                gap: 0.68rem;
+            }}
+            .control-label {{
+                color: var(--gov-text);
+                font-size: 0.82rem;
+                line-height: 1.25;
+                margin-bottom: 0.3rem;
+            }}
             body, .stMarkdown, .stDataFrame {{
                 color: var(--pbi-text);
                 font-family: "Segoe UI", Inter, Arial, sans-serif;
@@ -108,8 +117,8 @@ def inject_theme() -> None:
             .brand-logo {{
                 display: block;
                 height: auto;
-                max-height: 46px;
-                max-width: 240px;
+                max-height: 40px;
+                max-width: 220px;
                 object-fit: contain;
                 object-position: left center;
                 width: 100%;
@@ -147,7 +156,7 @@ def inject_theme() -> None:
             .pbi-header {{
                 color: var(--pbi-blue);
                 display: inline-block;
-                font-size: 1.96rem;
+                font-size: 1.74rem;
                 font-weight: 780;
                 letter-spacing: 0;
                 line-height: 1.05;
@@ -190,7 +199,7 @@ def inject_theme() -> None:
                 padding: 0.22rem 0.42rem 0.12rem;
             }}
             .st-key-gov_page div[data-testid="stRadio"] {{
-                margin: 0.16rem 0 0.42rem;
+                margin: 0.1rem 0 0.3rem;
             }}
             .st-key-gov_page div[data-testid="stRadio"] > label {{
                 display: none;

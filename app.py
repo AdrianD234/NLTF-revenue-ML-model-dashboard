@@ -2704,7 +2704,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             selected_traces = []
             st.markdown("<div class='control-label'>Legend items</div>", unsafe_allow_html=True)
             with st.popover("Select legend items", use_container_width=True):
-                st.caption("Choose which traces appear in the Total path chart legend.")
+                st.caption("Choose which traces appear in the chart legend.")
                 for trace in trace_options:
                     is_selected = st.checkbox(
                         trace,
@@ -5140,6 +5140,10 @@ def _revenue_outlook_default_traces(trace_options: list[str]) -> list[str]:
         "MBU26 official",
         "Current finalist Base case",
         "Current finalist High population/comparison",
+        # Governed scenario-role policy keeps the PED behavioural comparison
+        # path visible (relabelled); it must be in the default legend or the
+        # PED VKT per capita comparison disappears by default.
+        PED_COMPARISON_BEHAVIOURAL_TRACE_NAME,
     ]
     selected = [trace for trace in preferred if trace in options]
     return selected or options[: min(3, len(options))]
@@ -5162,7 +5166,9 @@ def _revenue_outlook_fed_path_options(chart_rows: pd.DataFrame) -> list[str]:
     data = chart_rows.copy()
     if "plot_allowed" in data.columns:
         data = data[data["plot_allowed"].fillna(True).astype(bool)].copy()
-    values = [value for value in data["fed_path"].dropna().astype(str).unique().tolist() if value and value.lower() not in {"nan", "befu25"}]
+    # BEFU25/MBU26 are official-comparator release labels, not selectable FED
+    # rate paths; only in-house path-sensitive traces respond to this control.
+    values = [value for value in data["fed_path"].dropna().astype(str).unique().tolist() if value and value.lower() not in {"nan", "befu25", "mbu26"}]
     preferred = ["Current planned path", "No 2027 12c uplift", "Selected rate"]
     ordered = [value for value in preferred if value in values]
     ordered.extend(sorted(set(values).difference(ordered)))
@@ -5344,13 +5350,15 @@ def revenue_outlook_total_path_figure(rows: pd.DataFrame, *, selected_series: st
                 "line": {"dash": "dot", "color": "#102A43"},
             }
         )
-    fig.update_xaxes(categoryorder="array", categoryarray=periods, tickangle=-30)
+    fig.update_xaxes(categoryorder="array", categoryarray=periods, tickangle=-30, showgrid=False)
+    fig.update_yaxes(gridcolor="#E6EDF5", zeroline=False)
     layout: dict[str, Any] = {
-        "height": 250,
-        "margin": {"l": 52, "r": 18, "t": 16, "b": 46},
+        "height": 300,
+        "margin": {"l": 52, "r": 18, "t": 20, "b": 46},
         "yaxis_title": display_axis_title,
         "hovermode": "x unified",
-        "legend": {"orientation": "h", "y": -0.20, "x": 0.0},
+        "legend": {"orientation": "h", "y": -0.18, "x": 0.0, "font": {"size": 11}},
+        "plot_bgcolor": "#FFFFFF",
     }
     if shapes:
         layout["shapes"] = shapes
@@ -5721,20 +5729,22 @@ def revenue_outlook_composition_figure(
     }
 
     fig = go.Figure()
+    # NZTA brand-anchored sequence: blues/greens/teals lead for the large
+    # RUC/FED components; warm hues stay for deductions and small lines.
     colors = [
         "#006FAD",
         "#00843D",
-        "#6B4E71",
-        "#E56B2B",
+        "#002B5C",
+        "#008C7E",
         "#3B7080",
-        "#7A7D00",
-        "#6A5ACD",
-        "#C44900",
+        "#A7C800",
         "#287D8E",
+        "#6B4E71",
         "#5B6770",
+        "#E56B2B",
         "#B7791F",
         "#C2410C",
-        "#9A3412",
+        "#6A5ACD",
         "#92400E",
     ]
     label_cols = ["line_label", "stack_role", "section_order", "line_order"]
@@ -5809,9 +5819,10 @@ def revenue_outlook_composition_figure(
         yaxis_title=display_axis_title,
         xaxis_title="June year",
         xaxis=_bounded_year_axis(plot, "FY_numeric"),
-        yaxis={"zeroline": True, "zerolinewidth": 1.5, "zerolinecolor": "#52616B"},
+        yaxis={"zeroline": True, "zerolinewidth": 1.5, "zerolinecolor": "#52616B", "gridcolor": "#E6EDF5"},
         legend={"orientation": "h", "y": -0.20, "x": 0, "font": {"size": 10}},
         hovermode="x unified",
+        plot_bgcolor="#FFFFFF",
     )
     return fig
 
