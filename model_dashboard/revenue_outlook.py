@@ -5843,16 +5843,17 @@ def _runtime_quarterly_activity_inputs(
         lambda row: "actual_benchmark" if str(row.get("row_type", "")) == "historical_actual" else "current_finalist_forecast",
         axis=1,
     )
+    # Quarterly actuals plot through the latest published quarter, including
+    # quarters inside the incomplete June year (the annual grain still
+    # aggregates complete FYs only). The scope tag keeps the partial-FY
+    # quarters identifiable for audits.
     data["data_scope"] = data.apply(
-        lambda row: "nowcast_input_actual_not_plotted"
+        lambda row: "nowcast_input_actual"
         if str(row.get("row_type", "")) == "historical_actual" and _coerce_int(row.get("june_year")) > REVENUE_LAST_COMPLETE_ACTUAL_FY
         else "quarterly_current_finalist_input",
         axis=1,
     )
-    data["plot_allowed"] = ~(
-        data.get("row_type", pd.Series("", index=data.index)).astype(str).eq("historical_actual")
-        & pd.to_numeric(data.get("june_year"), errors="coerce").gt(REVENUE_LAST_COMPLETE_ACTUAL_FY)
-    )
+    data["plot_allowed"] = True
     hide_policy = data.apply(
         lambda row: policy_lookup.get((str(row.get("scenario_name") or ""), str(row.get("series_id") or ""))) == "hide_comparison_intensity_trace",
         axis=1,

@@ -5357,6 +5357,10 @@ def revenue_outlook_total_path_figure(rows: pd.DataFrame, *, selected_series: st
         "margin": {"l": 52, "r": 18, "t": 20, "b": 46},
         "yaxis_title": display_axis_title,
         "hovermode": "x unified",
+        # Only report traces with a point at the hovered period; the default
+        # 20px search pulls neighbouring quarters' values into the tooltip
+        # under the wrong period header.
+        "hoverdistance": 5,
         "legend": {"orientation": "h", "y": -0.18, "x": 0.0, "font": {"size": 11}},
         "plot_bgcolor": "#FFFFFF",
     }
