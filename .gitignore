@@ -95,3 +95,9 @@ data/dashboard_evidence_pack_reproducibility/ped_inner_hpo/source_artifacts/**/*
 # vendored source workbooks (governed inputs; hashes recorded in manifests)
 !data/source_workbooks/
 !data/source_workbooks/*.xlsx
+!data/source_workbooks/*.pdf
+
+# MoT VFM 202405 derived uptake shares (governed lineage for EV lever presets)
+!data/vfm_202405/
+!data/vfm_202405/*.csv
+!data/vfm_202405/manifest.json

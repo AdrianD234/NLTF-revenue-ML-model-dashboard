@@ -186,6 +186,7 @@ def test_revenue_outlook_default_sensitivity_view_uses_fast_path_and_preserves_v
         traces,
         sensitivity_key,
         PED_BRIDGE_DEFAULT_MODE,
+        (app.DEFAULT_EV_UPTAKE_MODE, ()),
         pack,
     )
 
@@ -255,6 +256,7 @@ def test_revenue_outlook_default_primary_view_does_not_build_derived_frames(monk
         traces,
         sensitivity_key,
         PED_BRIDGE_DEFAULT_MODE,
+        (app.DEFAULT_EV_UPTAKE_MODE, ()),
         pack,
     )
 
@@ -457,6 +459,7 @@ def test_revenue_outlook_default_figure_matches_uncached_path() -> None:
         traces,
         sensitivity_key,
         PED_BRIDGE_DEFAULT_MODE,
+        (app.DEFAULT_EV_UPTAKE_MODE, ()),
         pack,
     )
     uncached = apply_ped_bridge_mode_layer(
@@ -508,6 +511,7 @@ def test_revenue_outlook_primary_hover_is_compact_and_billion_scaled() -> None:
         traces,
         sensitivity_key,
         PED_BRIDGE_DEFAULT_MODE,
+        (app.DEFAULT_EV_UPTAKE_MODE, ()),
         pack,
     )
     fig = app.revenue_outlook_total_path_figure(view["filtered_rows"], selected_series="Total NLTF revenue", selected_fy="FY2031")
@@ -578,6 +582,7 @@ def test_revenue_outlook_visible_figures_materialize_through_cache() -> None:
         traces,
         sensitivity_key,
         PED_BRIDGE_DEFAULT_MODE,
+        (app.DEFAULT_EV_UPTAKE_MODE, ()),
         pack,
     )
     if hasattr(app.cached_revenue_outlook_total_path_figure, "clear"):
@@ -594,6 +599,7 @@ def test_revenue_outlook_visible_figures_materialize_through_cache() -> None:
         traces,
         sensitivity_key,
         PED_BRIDGE_DEFAULT_MODE,
+        (app.DEFAULT_EV_UPTAKE_MODE, ()),
         view["filtered_rows"],
     )
     direct_total = app.revenue_outlook_total_path_figure(
@@ -636,6 +642,7 @@ def test_revenue_outlook_selected_fy_figures_materialize_through_cache() -> None
         traces,
         sensitivity_key,
         PED_BRIDGE_DEFAULT_MODE,
+        (app.DEFAULT_EV_UPTAKE_MODE, ()),
         pack,
     )
     if hasattr(app.cached_revenue_outlook_selected_fy_figures, "clear"):
@@ -859,6 +866,7 @@ def test_revenue_outlook_activity_figure_cache_matches_direct_builder() -> None:
         traces,
         sensitivity_key,
         PED_BRIDGE_DEFAULT_MODE,
+        (app.DEFAULT_EV_UPTAKE_MODE, ()),
         pack,
     )
 

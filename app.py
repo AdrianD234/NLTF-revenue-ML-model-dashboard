@@ -117,6 +117,16 @@ from model_dashboard.reproducibility_imports import (
     plot_reproducibility_sensitivities,
     reproducibility_component_r2_frame,
 )
+from model_dashboard.ev_uptake_levers import (
+    CUSTOM_OPTION as EV_UPTAKE_CUSTOM_OPTION,
+    DEFAULT_EV_UPTAKE_MODE,
+    EV_UPTAKE_MODE_OPTIONS,
+    EV_UPTAKE_PRESETS,
+    GOVERNED_PACK_OPTION as EV_UPTAKE_GOVERNED_OPTION,
+    UptakeLevers,
+    VFM_SOURCE_NOTE,
+    apply_uptake_levers_to_chart_rows,
+)
 from model_dashboard.revenue_outlook import (
     CURRENT_REVENUE_OUTLOOK_DIR,
     FAN_SOURCE_AUTO,
@@ -653,6 +663,18 @@ def _apply_sensitivity_for_key(
 
 
 @st.cache_data(show_spinner=False)
+def _resolve_ev_uptake_levers(ev_uptake_key: tuple[Any, ...]) -> UptakeLevers | None:
+    mode = str(ev_uptake_key[0]) if ev_uptake_key else EV_UPTAKE_GOVERNED_OPTION
+    if mode == EV_UPTAKE_GOVERNED_OPTION:
+        return None
+    if mode == EV_UPTAKE_CUSTOM_OPTION:
+        values = ev_uptake_key[1] if len(ev_uptake_key) > 1 else ()
+        if len(values) != 7:
+            return None
+        return UptakeLevers(*[float(v) for v in values])
+    return EV_UPTAKE_PRESETS.get(mode)
+
+
 def cached_revenue_outlook_view(
     signature: tuple[tuple[str, int, int], ...],
     selected_series: str,
@@ -661,6 +683,7 @@ def cached_revenue_outlook_view(
     traces: tuple[str, ...],
     sensitivity_key: tuple[str, str, str, str, str, str, str, str, str],
     bridge_mode: str,
+    ev_uptake_key: tuple[Any, ...],
     _pack: RevenueOutlookPack,
 ) -> dict[str, Any]:
     del signature
@@ -686,6 +709,14 @@ def cached_revenue_outlook_view(
         sensitivity_fast_path = False
 
     chart_rows = sensitivity_frames["chart_rows"]
+    ev_uptake_levers = _resolve_ev_uptake_levers(ev_uptake_key)
+    ev_uptake_audit = pd.DataFrame()
+    if ev_uptake_levers is not None:
+        chart_rows, ev_uptake_audit = apply_uptake_levers_to_chart_rows(
+            chart_rows,
+            _pack_table(_pack, "ev_phev_ped_light_drift_assumptions"),
+            ev_uptake_levers,
+        )
     filtered_rows = _filter_revenue_outlook_rows(
         chart_rows,
         time_grain=time_grain,
@@ -714,6 +745,7 @@ def cached_revenue_outlook_view(
     )
     return {
         **sensitivity_frames,
+        "chart_rows": chart_rows,
         "filtered_rows": filtered_rows,
         "filtered_bridge": filtered_bridge,
         "gap_summary": _revenue_outlook_gap_summary(filtered_bridge),
@@ -721,6 +753,8 @@ def cached_revenue_outlook_view(
         "ped_bridge_mode_impact_audit": bridge_frames["ped_bridge_mode_impact_audit"],
         "sensitivity_fast_path": sensitivity_fast_path,
         "quarterly_disaggregated": quarterly_disaggregated,
+        "ev_uptake_applied": ev_uptake_levers is not None and not ev_uptake_audit.empty,
+        "ev_uptake_audit": ev_uptake_audit,
     }
 
 
@@ -845,9 +879,10 @@ def cached_revenue_outlook_total_path_figure(
     traces: tuple[str, ...],
     sensitivity_key: tuple[str, str, str, str, str, str, str, str, str],
     bridge_mode: str,
+    ev_uptake_key: tuple[Any, ...],
     _filtered_rows: pd.DataFrame,
 ) -> go.Figure:
-    del signature, time_grain, fed_path, traces, sensitivity_key, bridge_mode
+    del signature, time_grain, fed_path, traces, sensitivity_key, bridge_mode, ev_uptake_key
     return revenue_outlook_total_path_figure(_filtered_rows, selected_series=selected_series, selected_fy=selected_fy)
 
 
@@ -2784,6 +2819,56 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 custom_pt_shift_pct = st.number_input("Custom PT shift % p.a.", min_value=0.0, max_value=10.0, value=0.5, step=0.1)
             if all(value != "Custom" for value in [selected_fleet_efficiency, selected_pt_mode_shift]):
                 st.caption("Custom inputs appear only when selected.")
+    with st.container(border=True):
+        st.markdown("<div class='page5-panel-title'>EV/PHEV uptake</div>", unsafe_allow_html=True)
+        uptake_cols = st.columns([0.30, 0.70])
+        with uptake_cols[0]:
+            selected_ev_uptake_mode = st.selectbox(
+                "Uptake basis",
+                list(EV_UPTAKE_MODE_OPTIONS),
+                index=list(EV_UPTAKE_MODE_OPTIONS).index(DEFAULT_EV_UPTAKE_MODE),
+                key="revenue_outlook_ev_uptake_mode",
+                help=VFM_SOURCE_NOTE,
+            )
+        custom_ev_levers: tuple[float, ...] = ()
+        with uptake_cols[1]:
+            if selected_ev_uptake_mode == EV_UPTAKE_CUSTOM_OPTION:
+                defaults = EV_UPTAKE_PRESETS["MBU26 official shape"]
+                lever_cols = st.columns(4)
+                with lever_cols[0]:
+                    bev_speed = st.number_input("BEV peak speed (pp/yr)", min_value=0.5, max_value=10.0, value=defaults.bev_peak_speed_pp * 100, step=0.25, key="ev_lever_bev_speed")
+                    phev_rise = st.number_input("PHEV rise (pp/yr)", min_value=0.1, max_value=5.0, value=defaults.phev_rise_pp * 100, step=0.1, key="ev_lever_phev_rise")
+                with lever_cols[1]:
+                    bev_peak_year = st.number_input("BEV peak year", min_value=2026, max_value=2050, value=int(defaults.bev_peak_year), step=1, key="ev_lever_bev_peak_year")
+                    phev_peak = st.number_input("PHEV peak share (%)", min_value=1.0, max_value=40.0, value=defaults.phev_peak_share * 100, step=0.5, key="ev_lever_phev_peak")
+                with lever_cols[2]:
+                    bev_2050 = st.number_input("BEV share 2050 (%)", min_value=10.0, max_value=99.0, value=defaults.bev_share_2050 * 100, step=1.0, key="ev_lever_bev_2050")
+                    phev_decay = st.number_input("PHEV decay (%/yr)", min_value=0.0, max_value=25.0, value=defaults.phev_decay_rate * 100, step=0.5, key="ev_lever_phev_decay")
+                with lever_cols[3]:
+                    phev_start = st.number_input("PHEV start share (%)", min_value=0.0, max_value=15.0, value=defaults.phev_start_share * 100, step=0.5, key="ev_lever_phev_start")
+                custom_ev_levers = (
+                    bev_speed / 100.0,
+                    float(bev_peak_year),
+                    bev_2050 / 100.0,
+                    phev_start / 100.0,
+                    phev_rise / 100.0,
+                    phev_peak / 100.0,
+                    phev_decay / 100.0,
+                )
+            elif selected_ev_uptake_mode == EV_UPTAKE_GOVERNED_OPTION:
+                st.caption(
+                    "Committed runtime pack allocation (λ-migration to MBU26 universe proportions). "
+                    "Select an MoT VFM preset or custom levers to reshape BEV/PHEV uptake in this view."
+                )
+            else:
+                preset = EV_UPTAKE_PRESETS[selected_ev_uptake_mode]
+                st.caption(
+                    f"BEV: peak {preset.bev_peak_speed_pp * 100:.2f} pp/yr in {preset.bev_peak_year:.0f}, "
+                    f"{preset.bev_share_2050 * 100:.0f}% of the light RUC pool by 2050. "
+                    f"PHEV: +{preset.phev_rise_pp * 100:.1f} pp/yr to a {preset.phev_peak_share * 100:.1f}% peak, "
+                    f"then -{preset.phev_decay_rate * 100:.1f}%/yr. Applied in this view only; the governed pack is unchanged."
+                )
+    ev_uptake_key: tuple[Any, ...] = (selected_ev_uptake_mode, custom_ev_levers)
     sensitivity_key = selected_sensitivity_key(
         fleet_efficiency=selected_fleet_efficiency,
         pt_mode_shift=selected_pt_mode_shift,
@@ -2805,6 +2890,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         tuple(selected_traces),
         sensitivity_key,
         selected_ped_bridge_mode,
+        ev_uptake_key,
         pack,
     )
     timer.stop("sensitivity overlay")
@@ -2833,12 +2919,22 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         tuple(selected_traces),
         sensitivity_key,
         selected_ped_bridge_mode,
+        ev_uptake_key,
         filtered_rows,
     )
     timer.stop("main path figure")
+    total_path_notes = []
+    if view.get("quarterly_disaggregated"):
+        total_path_notes.append(QUARTERLY_DISAGGREGATION_NOTE)
+    if view.get("ev_uptake_applied"):
+        total_path_notes.append(
+            f"EV/PHEV uptake basis: {selected_ev_uptake_mode}. Light RUC conventional/BEV/PHEV km and "
+            "revenue lines (plus dependent rollups) are reallocated in this view with lever share curves; "
+            "the governed pack is unchanged. " + VFM_SOURCE_NOTE
+        )
     chart_card(
         "Total path chart",
-        QUARTERLY_DISAGGREGATION_NOTE if view.get("quarterly_disaggregated") else "",
+        "\n\n".join(total_path_notes),
         main_path_figure,
         caption=None,
         notes_as_tooltip=True,
