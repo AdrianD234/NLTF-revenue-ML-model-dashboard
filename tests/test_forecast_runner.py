@@ -852,6 +852,9 @@ def test_forecast_run_artifacts_are_repo_ignored() -> None:
         # governed training-data workbook, vendored 2026-07-08 (sha256 recorded
         # in data/model_input_history/manifest.json)
         "data/source_workbooks/Master Copy revenue modelling workbook.xlsx",
+        # MoT VFM 202405 outputs, vendored 2026-07-08 (sha256 recorded in
+        # data/vfm_202405/manifest.json; source of EV uptake lever presets)
+        "data/source_workbooks/VFM202405_outputs_summary_V3.xlsx",
     }
 
 

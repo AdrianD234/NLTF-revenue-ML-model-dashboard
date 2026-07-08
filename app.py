@@ -669,7 +669,7 @@ def _resolve_ev_uptake_levers(ev_uptake_key: tuple[Any, ...]) -> UptakeLevers | 
         return None
     if mode == EV_UPTAKE_CUSTOM_OPTION:
         values = ev_uptake_key[1] if len(ev_uptake_key) > 1 else ()
-        if len(values) != 7:
+        if len(values) != 13:
             return None
         return UptakeLevers(*[float(v) for v in values])
     return EV_UPTAKE_PRESETS.get(mode)
@@ -716,6 +716,9 @@ def cached_revenue_outlook_view(
             chart_rows,
             _pack_table(_pack, "ev_phev_ped_light_drift_assumptions"),
             ev_uptake_levers,
+            # The optimized-migration PED bridge already displaces petrol
+            # activity; only the raw bridge needs the displacement lever.
+            adjust_ped=str(bridge_mode) == PED_BRIDGE_DEFAULT_MODE,
         )
     filtered_rows = _filter_revenue_outlook_rows(
         chart_rows,
@@ -2834,18 +2837,26 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         with uptake_cols[1]:
             if selected_ev_uptake_mode == EV_UPTAKE_CUSTOM_OPTION:
                 defaults = EV_UPTAKE_PRESETS["MBU26 official shape"]
-                lever_cols = st.columns(4)
-                with lever_cols[0]:
+                light_col, ped_col, heavy_col = st.columns(3)
+                with light_col:
+                    st.markdown("**Light RUC pool**")
                     bev_speed = st.number_input("BEV peak speed (pp/yr)", min_value=0.5, max_value=10.0, value=defaults.bev_peak_speed_pp * 100, step=0.25, key="ev_lever_bev_speed")
-                    phev_rise = st.number_input("PHEV rise (pp/yr)", min_value=0.1, max_value=5.0, value=defaults.phev_rise_pp * 100, step=0.1, key="ev_lever_phev_rise")
-                with lever_cols[1]:
                     bev_peak_year = st.number_input("BEV peak year", min_value=2026, max_value=2050, value=int(defaults.bev_peak_year), step=1, key="ev_lever_bev_peak_year")
-                    phev_peak = st.number_input("PHEV peak share (%)", min_value=1.0, max_value=40.0, value=defaults.phev_peak_share * 100, step=0.5, key="ev_lever_phev_peak")
-                with lever_cols[2]:
                     bev_2050 = st.number_input("BEV share 2050 (%)", min_value=10.0, max_value=99.0, value=defaults.bev_share_2050 * 100, step=1.0, key="ev_lever_bev_2050")
-                    phev_decay = st.number_input("PHEV decay (%/yr)", min_value=0.0, max_value=25.0, value=defaults.phev_decay_rate * 100, step=0.5, key="ev_lever_phev_decay")
-                with lever_cols[3]:
                     phev_start = st.number_input("PHEV start share (%)", min_value=0.0, max_value=15.0, value=defaults.phev_start_share * 100, step=0.5, key="ev_lever_phev_start")
+                    phev_rise = st.number_input("PHEV rise (pp/yr)", min_value=0.1, max_value=5.0, value=defaults.phev_rise_pp * 100, step=0.1, key="ev_lever_phev_rise")
+                    phev_peak = st.number_input("PHEV peak share (%)", min_value=1.0, max_value=40.0, value=defaults.phev_peak_share * 100, step=0.5, key="ev_lever_phev_peak")
+                    phev_decay = st.number_input("PHEV decay (%/yr)", min_value=0.0, max_value=25.0, value=defaults.phev_decay_rate * 100, step=0.5, key="ev_lever_phev_decay")
+                with ped_col:
+                    st.markdown("**PED petrol displacement**")
+                    ped_speed = st.number_input("Displacement speed (pp/yr)", min_value=0.5, max_value=12.0, value=defaults.ped_disp_speed_pp * 100, step=0.25, key="ev_lever_ped_speed")
+                    ped_mid = st.number_input("Displacement midpoint year", min_value=2028, max_value=2055, value=int(defaults.ped_disp_midpoint), step=1, key="ev_lever_ped_mid")
+                    ped_2050 = st.number_input("Displaced by 2050 (%)", min_value=0.0, max_value=95.0, value=defaults.ped_disp_2050 * 100, step=1.0, key="ev_lever_ped_2050")
+                with heavy_col:
+                    st.markdown("**Heavy RUC pool**")
+                    heavy_speed = st.number_input("Heavy BEV speed (pp/yr)", min_value=0.25, max_value=8.0, value=defaults.heavy_bev_speed_pp * 100, step=0.25, key="ev_lever_heavy_speed")
+                    heavy_mid = st.number_input("Heavy BEV midpoint year", min_value=2035, max_value=2075, value=int(defaults.heavy_bev_midpoint), step=1, key="ev_lever_heavy_mid")
+                    heavy_2050 = st.number_input("Heavy BEV share 2050 (%)", min_value=0.0, max_value=80.0, value=defaults.heavy_bev_share_2050 * 100, step=1.0, key="ev_lever_heavy_2050")
                 custom_ev_levers = (
                     bev_speed / 100.0,
                     float(bev_peak_year),
@@ -2854,6 +2865,12 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                     phev_rise / 100.0,
                     phev_peak / 100.0,
                     phev_decay / 100.0,
+                    ped_speed / 100.0,
+                    float(ped_mid),
+                    ped_2050 / 100.0,
+                    heavy_speed / 100.0,
+                    float(heavy_mid),
+                    heavy_2050 / 100.0,
                 )
             elif selected_ev_uptake_mode == EV_UPTAKE_GOVERNED_OPTION:
                 st.caption(
@@ -2863,10 +2880,12 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             else:
                 preset = EV_UPTAKE_PRESETS[selected_ev_uptake_mode]
                 st.caption(
-                    f"BEV: peak {preset.bev_peak_speed_pp * 100:.2f} pp/yr in {preset.bev_peak_year:.0f}, "
-                    f"{preset.bev_share_2050 * 100:.0f}% of the light RUC pool by 2050. "
-                    f"PHEV: +{preset.phev_rise_pp * 100:.1f} pp/yr to a {preset.phev_peak_share * 100:.1f}% peak, "
-                    f"then -{preset.phev_decay_rate * 100:.1f}%/yr. Applied in this view only; the governed pack is unchanged."
+                    f"Light BEV: peak {preset.bev_peak_speed_pp * 100:.2f} pp/yr in {preset.bev_peak_year:.0f}, "
+                    f"{preset.bev_share_2050 * 100:.0f}% of the light RUC pool by 2050; "
+                    f"PHEV: +{preset.phev_rise_pp * 100:.1f} pp/yr to {preset.phev_peak_share * 100:.1f}%, then -{preset.phev_decay_rate * 100:.1f}%/yr. "
+                    f"PED: {preset.ped_disp_2050 * 100:.0f}% of petrol activity displaced by 2050 (midpoint {preset.ped_disp_midpoint:.0f}, raw bridge only). "
+                    f"Heavy: {preset.heavy_bev_share_2050 * 100:.0f}% BEV by 2050 (rollup-neutral; BEVs pay the same per-km RUC). "
+                    "Applied in this view only; the governed pack is unchanged."
                 )
     ev_uptake_key: tuple[Any, ...] = (selected_ev_uptake_mode, custom_ev_levers)
     sensitivity_key = selected_sensitivity_key(

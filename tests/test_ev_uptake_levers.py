@@ -4,12 +4,15 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from model_dashboard.ev_uptake_levers import (
     EV_UPTAKE_PRESETS,
     UptakeLevers,
     apply_uptake_levers_to_chart_rows,
+    heavy_bev_share_curve,
     lever_share_curves,
+    ped_retention_curve,
     solve_logistic_from_levers,
 )
 
@@ -40,9 +43,13 @@ def test_share_curves_sum_to_one_and_stay_positive() -> None:
 
 
 def test_extreme_levers_never_overflow_the_pool() -> None:
-    aggressive = UptakeLevers(0.09, 2030.0, 0.99, 0.05, 0.03, 0.30, 0.01)
+    aggressive = UptakeLevers(0.09, 2030.0, 0.99, 0.05, 0.03, 0.30, 0.01, 0.10, 2032.0, 0.95, 0.06, 2040.0, 0.75)
     curves = lever_share_curves(range(2025, 2051), aggressive)
     assert (curves["conventional"] >= 0.005 - 1e-9).all()
+    retention = ped_retention_curve(range(2025, 2051), aggressive)
+    assert (retention >= 0).all() and (retention <= 1).all()
+    share = heavy_bev_share_curve(range(2025, 2051), aggressive)
+    assert (share <= 0.995).all()
 
 
 def test_vfm_presets_reproduce_official_scenarios() -> None:
@@ -54,6 +61,36 @@ def test_vfm_presets_reproduce_official_scenarios() -> None:
         phev_err = (curves["phev"] - official["light_ruc_phev_share"]).abs().max()
         assert bev_err < 0.016, f"{preset_name}: BEV share max error {bev_err:.4f}"
         assert phev_err < 0.016, f"{preset_name}: PHEV share max error {phev_err:.4f}"
+
+
+def test_vfm_presets_reproduce_official_ped_retention_and_heavy_share() -> None:
+    shares = pd.read_csv(VFM_SHARES)
+    for preset_name, scenario in PRESET_TO_VFM_SCENARIO.items():
+        official = shares[shares["scenario"].eq(scenario)].set_index("june_year")
+        levers = EV_UPTAKE_PRESETS[preset_name]
+        retention_official = official["light_petrol_share_of_light_vkt"] / official["light_petrol_share_of_light_vkt"].loc[2025]
+        retention = ped_retention_curve(official.index, levers)
+        ped_err = (retention - retention_official).abs().max()
+        assert ped_err < 0.03, f"{preset_name}: PED retention max error {ped_err:.4f}"
+        heavy = heavy_bev_share_curve(official.index, levers)
+        heavy_err = (heavy - official["heavy_bev_vkt_share"]).abs().max()
+        assert heavy_err < 0.02, f"{preset_name}: heavy BEV share max error {heavy_err:.4f}"
+
+
+def test_ped_retention_starts_at_one_and_declines() -> None:
+    for levers in EV_UPTAKE_PRESETS.values():
+        retention = ped_retention_curve(range(2025, 2051), levers)
+        assert abs(retention.loc[2025] - 1.0) < 1e-9
+        assert retention.is_monotonic_decreasing
+        assert retention.loc[2050] < 0.5
+
+
+def test_heavy_share_starts_at_zero_and_rises() -> None:
+    for levers in EV_UPTAKE_PRESETS.values():
+        share = heavy_bev_share_curve(range(2025, 2051), levers)
+        assert abs(share.loc[2025]) < 1e-9
+        assert share.is_monotonic_increasing
+        assert 0.05 < share.loc[2050] < 0.5
 
 
 def _fixture_chart_rows_and_drift() -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -82,6 +119,13 @@ def _fixture_chart_rows_and_drift() -> tuple[pd.DataFrame, pd.DataFrame]:
                 ("light_ruc_net_revenue", pool * 0.12 * 0.09),
                 ("light_bev_ruc_net_revenue", pool * 0.82 * 0.08),
                 ("phev_ruc_net_revenue", pool * 0.06 * 0.05),
+                ("ped_vkt_per_capita", 1500.0),
+                ("ped_volume", 2800.0),
+                ("gross_ped_revenue", 1960.0),
+                ("gross_fed_revenue", 2100.0),
+                ("net_fed_revenue", 2000.0),
+                ("heavy_ruc_net_km", 4700.0),
+                ("heavy_ruc_net_revenue", 3000.0),
                 ("total_nltf_net_revenue", 8000.0),
             ]:
                 rows.append(
@@ -132,14 +176,51 @@ def test_overlay_cascades_revenue_delta_to_aggregates_and_tags_rows() -> None:
     sel_new = adjusted[adjusted["scenario_name"].eq("current_basecase") & adjusted["june_year"].eq(2050)]
     old = {row["series_id"]: row["value"] for _, row in sel_old.iterrows()}
     new = {row["series_id"]: row["value"] for _, row in sel_new.iterrows()}
-    component_delta = sum(
+    light_delta = sum(
         new[s] - old[s]
         for s in ["light_ruc_net_revenue", "light_bev_ruc_net_revenue", "phev_ruc_net_revenue"]
     )
+    ped_delta = new["gross_ped_revenue"] - old["gross_ped_revenue"]
+    # heavy split is rollup-neutral (same per-km rate for heavy BEVs in MBU26)
     aggregate_delta = new["total_nltf_net_revenue"] - old["total_nltf_net_revenue"]
-    assert abs(component_delta - aggregate_delta) < 1e-9
+    assert abs((light_delta + ped_delta) - aggregate_delta) < 1e-9
+    fed_delta = new["gross_fed_revenue"] - old["gross_fed_revenue"]
+    assert abs(fed_delta - ped_delta) < 1e-9
     assert set(sel_new["value_status"]) == {"lever_adjusted"}
     assert set(sel_new["data_scope"]) == {"ev_uptake_lever_overlay"}
+
+
+def test_ped_displacement_scales_family_and_respects_bridge_gate() -> None:
+    chart_rows, drift = _fixture_chart_rows_and_drift()
+    levers = EV_UPTAKE_PRESETS["MoT VFM base"]
+    adjusted, audit = apply_uptake_levers_to_chart_rows(chart_rows, drift, levers, adjust_ped=True)
+    retention_2050 = float(audit[audit["june_year"].eq(2050)]["ped_retention"].iloc[0])
+    assert retention_2050 < 0.35
+    sel = adjusted[adjusted["scenario_name"].eq("current_basecase") & adjusted["june_year"].eq(2050)]
+    values = {row["series_id"]: row["value"] for _, row in sel.iterrows()}
+    assert values["ped_volume"] == pytest.approx(2800.0 * retention_2050)
+    assert values["ped_vkt_per_capita"] == pytest.approx(1500.0 * retention_2050)
+    assert values["gross_ped_revenue"] == pytest.approx(1960.0 * retention_2050)
+    # optimized-migration bridge already displaces petrol: gate must skip PED
+    gated, gated_audit = apply_uptake_levers_to_chart_rows(chart_rows, drift, levers, adjust_ped=False)
+    gsel = gated[gated["scenario_name"].eq("current_basecase") & gated["june_year"].eq(2050)]
+    gvalues = {row["series_id"]: row["value"] for _, row in gsel.iterrows()}
+    assert gvalues["ped_volume"] == pytest.approx(2800.0)
+    assert set(gated_audit["ped_retention"]) == {1.0}
+
+
+def test_heavy_split_moves_km_but_is_rollup_neutral() -> None:
+    chart_rows, drift = _fixture_chart_rows_and_drift()
+    levers = EV_UPTAKE_PRESETS["MoT VFM base"]
+    adjusted, audit = apply_uptake_levers_to_chart_rows(chart_rows, drift, levers, adjust_ped=False)
+    share_2050 = float(audit[audit["june_year"].eq(2050)]["heavy_bev_share"].iloc[0])
+    assert 0.15 < share_2050 < 0.30
+    sel = adjusted[adjusted["scenario_name"].eq("current_basecase") & adjusted["june_year"].eq(2050)]
+    values = {row["series_id"]: row["value"] for _, row in sel.iterrows()}
+    assert values["heavy_ruc_net_km"] == pytest.approx(4700.0 * (1 - share_2050))
+    assert values["heavy_ruc_net_revenue"] == pytest.approx(3000.0 * (1 - share_2050))
+    reallocated = float(audit[audit["june_year"].eq(2050)]["heavy_revenue_reallocated_to_bev"].iloc[0])
+    assert reallocated == pytest.approx(3000.0 * share_2050)
 
 
 def test_historical_and_quarterly_rows_are_untouched() -> None:

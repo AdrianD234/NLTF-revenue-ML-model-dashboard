@@ -46,22 +46,43 @@ LEVER_SERIES_REVENUE = {
     "light_bev_ruc_net_revenue": ("bev", "light_bev_rate"),
     "phev_ruc_net_revenue": ("phev", "phev_rate"),
 }
-# Aggregate june-year revenue series that contain the three light RUC revenue
-# components additively (admin fees and refunds are unaffected by the split).
-LEVER_AGGREGATE_SERIES = (
+# PED family adjusted by the petrol-displacement retention curve.
+PED_ACTIVITY_SERIES = ("ped_vkt_per_capita", "ped_volume")
+PED_REVENUE_SERIES = "gross_ped_revenue"
+# Heavy family: the finalist heavy total splits into conventional + BEV.
+HEAVY_KM_SERIES = "heavy_ruc_net_km"
+HEAVY_REVENUE_SERIES = "heavy_ruc_net_revenue"
+# Aggregate june-year revenue series receiving additive deltas. Light RUC
+# deltas flow through the RUC rollups, PED deltas through the FED rollups,
+# and both meet in the whole-of-NLTF totals. Heavy BEV reallocation is
+# rollup-neutral (BEVs pay the same per-km RUC in MBU26).
+RUC_AGGREGATE_SERIES = (
     "gross_ruc_revenue",
     "ruc_revenue_net_admin",
     "total_ruc_net_revenue",
+)
+FED_AGGREGATE_SERIES = (
+    "gross_fed_revenue",
+    "net_fed_revenue",
+)
+TOTAL_AGGREGATE_SERIES = (
     "total_fed_ruc_net_revenue",
     "total_gross_revenue",
     "total_revenue_net_admin",
     "total_nltf_net_revenue",
 )
+LEVER_AGGREGATE_SERIES = RUC_AGGREGATE_SERIES + FED_AGGREGATE_SERIES + TOTAL_AGGREGATE_SERIES
 
 
 @dataclass(frozen=True)
 class UptakeLevers:
-    """Human levers for the light RUC pool power-type split."""
+    """Human levers for the EV transition across the three streams.
+
+    Light RUC pool split (BEV logistic + PHEV hump), PED petrol displacement
+    (logistic share of the FY2025 petrol activity displaced to EVs), and the
+    heavy BEV share of the heavy RUC pool (logistic; the MoT midpoint sits
+    near or beyond 2050 because heavy electrification lags light by ~15y).
+    """
 
     bev_peak_speed_pp: float  # peak BEV uptake speed, share points per year
     bev_peak_year: float  # year of fastest adoption (logistic midpoint)
@@ -70,18 +91,38 @@ class UptakeLevers:
     phev_rise_pp: float  # PHEV linear rise, share points per year
     phev_peak_share: float  # PHEV peak share
     phev_decay_rate: float  # PHEV post-peak exponential decay per year
+    ped_disp_speed_pp: float  # peak petrol displacement speed, pp per year
+    ped_disp_midpoint: float  # year of fastest petrol displacement
+    ped_disp_2050: float  # share of FY2025 petrol activity displaced by 2050
+    heavy_bev_speed_pp: float  # peak heavy BEV uptake speed, pp per year
+    heavy_bev_midpoint: float  # heavy logistic midpoint year
+    heavy_bev_share_2050: float  # heavy BEV share of the heavy pool in 2050
 
     def key(self) -> tuple[float, ...]:
         return tuple(round(float(v), 6) for v in asdict(self).values())
 
 
 EV_UPTAKE_PRESETS: dict[str, UptakeLevers] = {
-    # Fitted to MBU26 official light-mobility proportions (max error 1.5pp).
-    "MBU26 official shape": UptakeLevers(0.045, 2038.0, 0.82, 0.030, 0.010, 0.140, 0.065),
-    # Fitted to MoT VFM 202405 scenarios (max error <=1.5pp each).
-    "MoT VFM base": UptakeLevers(0.0425, 2038.0, 0.83, 0.036, 0.011, 0.155, 0.060),
-    "MoT VFM fast": UptakeLevers(0.0475, 2036.5, 0.86, 0.039, 0.013, 0.175, 0.065),
-    "MoT VFM slow": UptakeLevers(0.0425, 2039.5, 0.78, 0.034, 0.009, 0.135, 0.055),
+    # Fitted to MBU26 official proportions / paths (light <=1.5pp, PED <=2.5pp,
+    # heavy <=1.1pp over 2025-2050).
+    "MBU26 official shape": UptakeLevers(
+        0.045, 2038.0, 0.82, 0.030, 0.010, 0.140, 0.065,
+        0.060, 2041.0, 0.75, 0.0175, 2048.0, 0.23,
+    ),
+    # Fitted to MoT VFM 202405 scenarios (light <=1.5pp, PED <=1.1pp,
+    # heavy <=0.9pp each).
+    "MoT VFM base": UptakeLevers(
+        0.0425, 2038.0, 0.83, 0.036, 0.011, 0.155, 0.060,
+        0.0425, 2042.0, 0.78, 0.0175, 2051.0, 0.21,
+    ),
+    "MoT VFM fast": UptakeLevers(
+        0.0475, 2036.5, 0.86, 0.039, 0.013, 0.175, 0.065,
+        0.0425, 2040.5, 0.84, 0.025, 2046.0, 0.36,
+    ),
+    "MoT VFM slow": UptakeLevers(
+        0.0425, 2039.5, 0.78, 0.034, 0.009, 0.135, 0.055,
+        0.0425, 2043.5, 0.68, 0.010, 2054.0, 0.10,
+    ),
 }
 GOVERNED_PACK_OPTION = "Governed pack (MBU26 λ-migration)"
 CUSTOM_OPTION = "Custom levers"
@@ -136,6 +177,29 @@ def lever_share_curves(june_years: Any, levers: UptakeLevers) -> pd.DataFrame:
     return pd.DataFrame({"june_year": years.astype(int), "bev": bev, "phev": phev, "conventional": conventional})
 
 
+def ped_retention_curve(june_years: Any, levers: UptakeLevers) -> pd.Series:
+    """Fraction of FY2025 petrol activity retained (1 - displacement).
+
+    Normalised so retention(2025) = 1: the lever displaces activity relative
+    to the first forecast-era year, phasing in from zero.
+    """
+    years = np.asarray(list(june_years), dtype=float)
+    smax, k = solve_logistic_from_levers(levers.ped_disp_speed_pp, levers.ped_disp_midpoint, levers.ped_disp_2050)
+    displacement = smax / (1.0 + np.exp(-k * (years - float(levers.ped_disp_midpoint))))
+    base = smax / (1.0 + np.exp(-k * (2025.0 - float(levers.ped_disp_midpoint))))
+    retention = (1.0 - displacement) / max(1.0 - base, 1e-9)
+    return pd.Series(np.clip(retention, 0.0, 1.0), index=years.astype(int))
+
+
+def heavy_bev_share_curve(june_years: Any, levers: UptakeLevers) -> pd.Series:
+    """Heavy BEV share of the heavy RUC pool, anchored to ~0 at FY2025."""
+    years = np.asarray(list(june_years), dtype=float)
+    smax, k = solve_logistic_from_levers(levers.heavy_bev_speed_pp, levers.heavy_bev_midpoint, levers.heavy_bev_share_2050)
+    share = smax / (1.0 + np.exp(-k * (years - float(levers.heavy_bev_midpoint))))
+    base = smax / (1.0 + np.exp(-k * (2025.0 - float(levers.heavy_bev_midpoint))))
+    return pd.Series(np.clip(share - base, 0.0, 0.995), index=years.astype(int))
+
+
 def _drift_rate_lookup(drift: pd.DataFrame) -> dict[tuple[str, int], dict[str, float]]:
     """Per (scenario, FY): MBU26 per-km revenue rates for the light RUC classes."""
     if drift is None or drift.empty or "lambda_mode" not in drift.columns:
@@ -169,6 +233,8 @@ def apply_uptake_levers_to_chart_rows(
     chart_rows: pd.DataFrame,
     drift_assumptions: pd.DataFrame,
     levers: UptakeLevers,
+    *,
+    adjust_ped: bool = True,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Reallocate the light RUC pool with lever shares (display overlay).
 
@@ -195,8 +261,24 @@ def apply_uptake_levers_to_chart_rows(
     is_june = data.get("time_grain", pd.Series("", index=data.index)).astype(str).eq("june_year")
     is_forecast = ~data.get("row_type", pd.Series("", index=data.index)).astype(str).eq("historical_actual")
 
+    fys_index = shares.index
+    retention = ped_retention_curve(fys_index, levers)
+    heavy_share = heavy_bev_share_curve(fys_index, levers)
+
+    def _scale_series(mask: pd.Series, factor: float) -> float:
+        """Scale matching rows by factor; return the resulting value delta."""
+        delta = 0.0
+        for index in data.index[mask]:
+            old = numeric_value.at[index]
+            if pd.isna(old):
+                continue
+            data.at[index, "value"] = float(old) * factor
+            delta += float(old) * (factor - 1.0)
+        return delta
+
     audit_rows: list[dict[str, Any]] = []
-    delta_by_key: dict[tuple[str, int], float] = {}
+    ruc_delta: dict[tuple[str, int], float] = {}
+    fed_delta: dict[tuple[str, int], float] = {}
     for (scenario, fy), rates in rate_lookup.items():
         share_row = shares.loc[fy] if fy in shares.index else None
         if share_row is None:
@@ -211,23 +293,48 @@ def apply_uptake_levers_to_chart_rows(
         pool_km = _pool_from_chart_rows(data, base_mask, numeric_value)
         if pool_km is None or pool_km <= 0:
             continue
-        revenue_delta = 0.0
+        light_revenue_delta = 0.0
         for series_id, component in LEVER_SERIES_KM.items():
             mask = base_mask & data["series_id"].astype(str).eq(series_id)
             if not mask.any():
                 continue
-            new_km = pool_km * share_values[component]
-            data.loc[mask, "value"] = new_km
+            data.loc[mask, "value"] = pool_km * share_values[component]
         for series_id, (component, rate_key) in LEVER_SERIES_REVENUE.items():
             mask = base_mask & data["series_id"].astype(str).eq(series_id)
             if not mask.any() or not np.isfinite(rates[rate_key]):
                 continue
             new_revenue = pool_km * share_values[component] * rates[rate_key]
             old_revenue = float(numeric_value[mask].iloc[0]) if numeric_value[mask].notna().any() else 0.0
-            revenue_delta += new_revenue - old_revenue
+            light_revenue_delta += new_revenue - old_revenue
             data.loc[mask, "value"] = new_revenue
-        if revenue_delta:
-            delta_by_key[(scenario, fy)] = revenue_delta
+
+        # PED petrol displacement: the finalist raw-bridge petrol path keeps
+        # activity that the VFM says migrates to EVs. Scale the PED family by
+        # the retention curve; the lost excise flows to the FED aggregates.
+        ped_revenue_delta = 0.0
+        ped_factor = float(retention.get(fy, 1.0))
+        if adjust_ped and ped_factor < 1.0:
+            for series_id in PED_ACTIVITY_SERIES:
+                _scale_series(base_mask & data["series_id"].astype(str).eq(series_id), ped_factor)
+            ped_revenue_delta = _scale_series(
+                base_mask & data["series_id"].astype(str).eq(PED_REVENUE_SERIES), ped_factor
+            )
+
+        # Heavy BEV split: MBU26 charges heavy BEVs the same per-km RUC, so
+        # the split moves km/revenue out of the charted conventional heavy
+        # lines without changing any rollup total.
+        heavy_factor = 1.0 - float(heavy_share.get(fy, 0.0))
+        heavy_reallocated = 0.0
+        if heavy_factor < 1.0:
+            _scale_series(base_mask & data["series_id"].astype(str).eq(HEAVY_KM_SERIES), heavy_factor)
+            heavy_reallocated = -_scale_series(
+                base_mask & data["series_id"].astype(str).eq(HEAVY_REVENUE_SERIES), heavy_factor
+            )
+
+        if light_revenue_delta:
+            ruc_delta[(scenario, fy)] = light_revenue_delta
+        if ped_revenue_delta:
+            fed_delta[(scenario, fy)] = ped_revenue_delta
         audit_rows.append(
             {
                 "scenario_name": scenario,
@@ -236,27 +343,42 @@ def apply_uptake_levers_to_chart_rows(
                 "conventional_share": share_values["conventional"],
                 "bev_share": share_values["bev"],
                 "phev_share": share_values["phev"],
-                "light_revenue_delta_vs_pack": revenue_delta,
+                "light_revenue_delta_vs_pack": light_revenue_delta,
+                "ped_retention": ped_factor if adjust_ped else 1.0,
+                "ped_revenue_delta_vs_pack": ped_revenue_delta,
+                "heavy_bev_share": 1.0 - heavy_factor,
+                "heavy_revenue_reallocated_to_bev": heavy_reallocated,
             }
         )
 
-    if delta_by_key:
+    if ruc_delta or fed_delta:
         aggregate_mask = (
             is_june
             & is_forecast
             & data["series_id"].astype(str).isin(LEVER_AGGREGATE_SERIES)
         )
         for index in data.index[aggregate_mask]:
+            if pd.isna(numeric_value.at[index]):
+                continue
             key = (str(data.at[index, "scenario_name"]), int(june_year.at[index]) if pd.notna(june_year.at[index]) else -1)
-            delta = delta_by_key.get(key)
-            if delta and pd.notna(numeric_value.at[index]):
+            series_id = str(data.at[index, "series_id"])
+            delta = 0.0
+            if series_id in RUC_AGGREGATE_SERIES or series_id in TOTAL_AGGREGATE_SERIES:
+                delta += ruc_delta.get(key, 0.0)
+            if series_id in FED_AGGREGATE_SERIES or series_id in TOTAL_AGGREGATE_SERIES:
+                delta += fed_delta.get(key, 0.0)
+            if delta:
                 data.at[index, "value"] = float(numeric_value.at[index]) + delta
 
     touched = (
         is_june
         & is_forecast
         & data["series_id"].astype(str).isin(
-            set(LEVER_SERIES_KM) | set(LEVER_SERIES_REVENUE) | set(LEVER_AGGREGATE_SERIES)
+            set(LEVER_SERIES_KM)
+            | set(LEVER_SERIES_REVENUE)
+            | set(LEVER_AGGREGATE_SERIES)
+            | set(PED_ACTIVITY_SERIES)
+            | {PED_REVENUE_SERIES, HEAVY_KM_SERIES, HEAVY_REVENUE_SERIES}
         )
     )
     if "value_status" in data.columns:

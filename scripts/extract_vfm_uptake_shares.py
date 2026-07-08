@@ -62,12 +62,14 @@ def main() -> None:
         heavy_total = heavy_by_power.sum(axis=1)
         heavy_bev = heavy_by_power.get("Electric", 0) / heavy_total
 
+        light_total = light[light["scenario"].eq(scenario)].groupby("year")["vkt"].sum()
         series = {
             "light_ruc_conventional_share": to_june_year(conventional / pool),
             "light_ruc_bev_share": to_june_year(bev / pool),
             "light_ruc_phev_share": to_june_year(phev / pool),
             "heavy_bev_vkt_share": to_june_year(heavy_bev),
             "light_petrol_vkt_million_km": to_june_year(petrol / 1e6),
+            "light_petrol_share_of_light_vkt": to_june_year(petrol / light_total),
         }
         for fy in FY_RANGE:
             rows.append({"scenario": scenario, "june_year": fy, **{name: values[fy] for name, values in series.items()}})
