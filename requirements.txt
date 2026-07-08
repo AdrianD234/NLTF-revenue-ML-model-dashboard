@@ -1,8 +1,8 @@
-streamlit
-pandas
-numpy
-plotly
-pyarrow
-openpyxl
-pillow
-scikit-learn
+streamlit==1.59.0
+pandas==3.0.3
+numpy==2.4.6
+plotly==6.8.0
+pyarrow==24.0.0
+openpyxl==3.1.5
+pillow==12.3.0
+scikit-learn==1.9.0
