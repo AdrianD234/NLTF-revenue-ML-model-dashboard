@@ -5359,6 +5359,12 @@ def _revenue_outlook_trace_options(chart_rows: pd.DataFrame) -> list[str]:
     return ordered
 
 
+def _display_period_label(period: Any) -> str:
+    """June-year periods display as plain years ('FY2025' -> '2025')."""
+    text = str(period or "")
+    return text[2:] if text.startswith("FY") and text[2:].isdigit() else text
+
+
 def _revenue_outlook_default_traces(trace_options: list[str]) -> list[str]:
     options = list(trace_options or [])
     # The high-population comparison stays available in the legend picker but
@@ -5794,7 +5800,7 @@ def revenue_outlook_total_path_figure(
                 "yref": "paper",
                 "x": boundary_x,
                 "y": 1.0,
-                "text": f"Actuals to {preceding[-1]}" if preceding else f"Forecast start {forecast_period}",
+                "text": f"Actuals to {_display_period_label(preceding[-1])}" if preceding else f"Forecast start {_display_period_label(forecast_period)}",
                 "showarrow": False,
                 "yanchor": "bottom",
                 "font": {"color": "#B45309", "size": 11},
@@ -5813,7 +5819,24 @@ def revenue_outlook_total_path_figure(
                 "line": {"dash": "dot", "color": "#102A43"},
             }
         )
-    fig.update_xaxes(categoryorder="array", categoryarray=periods, tickangle=-30, showgrid=False)
+    # June-year categories are periods that END mid-year, and the boundary
+    # markers sit on the seams between them, so plain year labels ("2025",
+    # "2026") read correctly; the axis title carries the June-year semantics.
+    is_june_axis = bool(periods) and all(str(p).startswith("FY") for p in periods)
+    axis_kwargs: dict[str, Any] = {
+        "categoryorder": "array",
+        "categoryarray": periods,
+        "tickangle": -30,
+        "showgrid": False,
+    }
+    if is_june_axis:
+        axis_kwargs.update(
+            tickvals=periods,
+            ticktext=[_display_period_label(p) for p in periods],
+            title_text="June year ending",
+            title_font={"size": 11, "color": "#5A6B7B"},
+        )
+    fig.update_xaxes(**axis_kwargs)
     fig.update_yaxes(gridcolor="#E6EDF5", zeroline=False)
     layout: dict[str, Any] = {
         "height": 300,
