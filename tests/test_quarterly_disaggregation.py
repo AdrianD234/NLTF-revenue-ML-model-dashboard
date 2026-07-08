@@ -52,6 +52,43 @@ def test_indicator_mapping_uses_stream_activity_paths() -> None:
     assert _quarterly_disaggregation_indicator_id("total_nltf_net_revenue") == ""
 
 
+def test_forecast_traces_are_not_disaggregated_into_the_actuals_era() -> None:
+    """A finalist nowcast anchor row (FY2025) must not become 2024Q3-2025Q2
+    forecast quarters overlapping the actuals; forecast traces start at the
+    first forecast June year (FY2026 -> 2025Q3)."""
+    rows = []
+    for fy, row_type, trace in [
+        (2024, "historical_actual", "Actual"),
+        (2025, "historical_actual", "Actual"),
+        (2025, "future_forecast", "Current finalist Base case"),
+        (2026, "future_forecast", "Current finalist Base case"),
+    ]:
+        rows.append(
+            {
+                "trace_name": trace,
+                "scenario_name": "" if row_type == "historical_actual" else "current_basecase",
+                "fed_path": "Current planned path",
+                "series_id": "gross_ped_revenue",
+                "series_label": "PED revenue",
+                "stream": "gross_ped_revenue",
+                "stream_label": "PED revenue",
+                "row_type": row_type,
+                "time_grain": "june_year",
+                "period": f"FY{fy}",
+                "june_year": fy,
+                "value": 2000.0,
+                "value_unit": "$m nominal ex GST",
+            }
+        )
+    derived = _disaggregate_annual_rows_to_quarterly(pd.DataFrame(rows), pd.DataFrame())
+    forecast = derived[derived["trace_name"].eq("Current finalist Base case")]
+    actual = derived[derived["trace_name"].eq("Actual")]
+    assert list(forecast["period"]) == ["2025Q3", "2025Q4", "2026Q1", "2026Q2"]
+    assert actual["period"].max() == "2025Q2"
+    # no overlap: forecast quarters all come after the last actual quarter
+    assert min(forecast["period"]) > actual["period"].max()
+
+
 def test_disaggregated_rows_are_tagged_and_sum_to_annual() -> None:
     annual_rows = pd.DataFrame(
         [

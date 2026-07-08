@@ -145,6 +145,7 @@ from model_dashboard.revenue_outlook import (
     FREIGHT_RAIL_SHIFT_LEVELS,
     FREIGHT_RAIL_SHIFT_NOTE,
     PT_MODE_SHIFT_LEVELS,
+    REVENUE_FIRST_FORECAST_FY,
     REVENUE_OUTLOOK_SCHEMA_VERSION,
     REVENUE_OUTLOOK_TITLE,
     REVENUE_STACK_DETAIL_CLEAN,
@@ -5467,6 +5468,15 @@ def _disaggregate_annual_rows_to_quarterly(annual_rows: pd.DataFrame, chart_rows
     data["_value_numeric"] = pd.to_numeric(data.get("value"), errors="coerce")
     data["_june_year_numeric"] = pd.to_numeric(data.get("june_year"), errors="coerce")
     data = data[data["_value_numeric"].notna() & data["_june_year_numeric"].notna()]
+    if data.empty:
+        return pd.DataFrame()
+    # Forecast/comparator traces may carry a nowcast anchor row for the last
+    # complete actual year (e.g. FY2025); splitting it would plant forecast
+    # quarters inside the actuals era. Disaggregate non-actual traces only
+    # from the first forecast June year, so their quarterly paths start at
+    # FY{first}Q1 (calendar Q3) and hand over from the actuals cleanly.
+    is_actual_row = data.get("row_type", pd.Series("", index=data.index)).astype(str).eq("historical_actual")
+    data = data[is_actual_row | data["_june_year_numeric"].ge(REVENUE_FIRST_FORECAST_FY)]
     if data.empty:
         return pd.DataFrame()
     group_cols = [c for c in ["trace_name", "scenario_name", "fed_path"] if c in data.columns]
