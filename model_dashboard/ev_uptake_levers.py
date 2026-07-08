@@ -35,6 +35,16 @@ VFM_SOURCE_NOTE = (
     "the official Base/Fast/Slow scenario VKT shares within ~1.5pp over "
     "2025-2050 (see data/vfm_202405/)."
 )
+SENSITIVITY_INTERPLAY_NOTE = (
+    "These levers reshape power-type composition only; they compose "
+    "multiplicatively with the Sensitivities panel, which owns the other two "
+    "axes. Fleet efficiency owns petrol intensity (litres/100km): MBU26 "
+    "embeds ~1.0% p.a. (Med) and VFM fleet turnover implies ~1.5% p.a. "
+    "(High), so pick Med with any preset to reproduce the MBU26 PED volume "
+    "path. PT mode shift owns travel demand: the VFM EV scenarios hold total "
+    "light VKT fixed (<0.2% spread) and exclude rail entirely, so any "
+    "non-Off mode shift is deliberately additional to official assumptions."
+)
 
 LEVER_SERIES_KM = {
     "light_ruc_net_km": "conventional",
@@ -103,11 +113,16 @@ class UptakeLevers:
 
 
 EV_UPTAKE_PRESETS: dict[str, UptakeLevers] = {
-    # Fitted to MBU26 official proportions / paths (light <=1.5pp, PED <=2.5pp,
-    # heavy <=1.1pp over 2025-2050).
+    # Fitted to MBU26 official proportions / paths (light <=1.5pp, PED share
+    # retention <=2.3pp, heavy <=1.1pp over 2025-2050). All PED levers are
+    # activity-only (petrol share of the light universe): the litres/100km
+    # intensity path belongs to the Fleet efficiency sensitivity, so the two
+    # levers compose without double counting (MBU26 embeds ~1.0% p.a.
+    # intensity gain = the sensitivity's Med level; VFM fleet turnover
+    # implies ~1.5% p.a. = High).
     "MBU26 official shape": UptakeLevers(
         0.045, 2038.0, 0.82, 0.030, 0.010, 0.140, 0.065,
-        0.060, 2041.0, 0.75, 0.0175, 2048.0, 0.23,
+        0.0375, 2041.5, 0.77, 0.0175, 2048.0, 0.23,
     ),
     # Fitted to MoT VFM 202405 scenarios (light <=1.5pp, PED <=1.1pp,
     # heavy <=0.9pp each).

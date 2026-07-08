@@ -124,6 +124,7 @@ from model_dashboard.ev_uptake_levers import (
     EV_UPTAKE_PRESETS,
     GOVERNED_PACK_OPTION as EV_UPTAKE_GOVERNED_OPTION,
     UptakeLevers,
+    SENSITIVITY_INTERPLAY_NOTE,
     VFM_SOURCE_NOTE,
     apply_uptake_levers_to_chart_rows,
 )
@@ -2831,7 +2832,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 list(EV_UPTAKE_MODE_OPTIONS),
                 index=list(EV_UPTAKE_MODE_OPTIONS).index(DEFAULT_EV_UPTAKE_MODE),
                 key="revenue_outlook_ev_uptake_mode",
-                help=VFM_SOURCE_NOTE,
+                help=VFM_SOURCE_NOTE + "\n\n" + SENSITIVITY_INTERPLAY_NOTE,
             )
         custom_ev_levers: tuple[float, ...] = ()
         with uptake_cols[1]:

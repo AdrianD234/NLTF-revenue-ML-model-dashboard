@@ -77,6 +77,31 @@ def test_vfm_presets_reproduce_official_ped_retention_and_heavy_share() -> None:
         assert heavy_err < 0.02, f"{preset_name}: heavy BEV share max error {heavy_err:.4f}"
 
 
+def test_mbu26_preset_ped_retention_is_activity_only() -> None:
+    """MBU26 PED levers track the petrol *share* of the light universe.
+
+    Intensity (litres/100km) belongs to the Fleet efficiency sensitivity, so
+    the preset must reproduce the share-retention path, not the volume path.
+    """
+    mbu = pd.read_csv(ROOT / "data" / "revenue_model_source_pack" / "mbu26_annual_spine" / "mbu26_official_annual.csv")
+    piv = (
+        mbu.pivot_table(index="FY", columns="series_id", values="value", aggfunc="first")
+        .loc[2025:2050]
+        .apply(pd.to_numeric, errors="coerce")
+    )
+    universe = (
+        piv["light_petrol_vkt"]
+        + piv["light_ruc_net_km"]
+        + piv["light_bev_ruc_net_km"]
+        + piv["phev_ruc_net_km"]
+    )
+    share = piv["light_petrol_vkt"] / universe
+    target = share / share.loc[2025]
+    retention = ped_retention_curve(target.index, EV_UPTAKE_PRESETS["MBU26 official shape"])
+    err = (retention - target).abs().max()
+    assert err < 0.025, f"MBU26 PED share-retention max error {err:.4f}"
+
+
 def test_ped_retention_starts_at_one_and_declines() -> None:
     for levers in EV_UPTAKE_PRESETS.values():
         retention = ped_retention_curve(range(2025, 2051), levers)
