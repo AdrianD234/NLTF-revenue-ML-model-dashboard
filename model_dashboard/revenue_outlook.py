@@ -263,6 +263,12 @@ SENSITIVITY_DEFAULT_NOTE = (
 SENSITIVITY_LEVELS = ("Off", "Low", "Med", "High", "Custom")
 FLEET_EFFICIENCY_LEVELS = {"Low": 0.005, "Med": 0.010, "High": 0.015}
 PT_MODE_SHIFT_LEVELS = {"Low": 0.0025, "Med": 0.005, "High": 0.010}
+FREIGHT_RAIL_SHIFT_LEVELS = {"Low": 0.0025, "Med": 0.005, "High": 0.010}
+FREIGHT_RAIL_SHIFT_NOTE = (
+    "Preset diversion rates are analyst inferences; no official MoT road-to-rail freight shift scenario exists. "
+    "MoT VFM 202405 section 4.1 drives truck VKT from freight tonne-km projections, so the overlay diverts "
+    "heavy RUC km cumulatively from FY2030."
+)
 DEMAND_ELASTICITY_LEVELS = {
     "PED": {"Low": -0.100, "Med": -0.144116582, "High": -0.240},
     "LIGHT_RUC": {"Low": -0.080, "Med": -0.120, "High": -0.200},
@@ -270,6 +276,7 @@ DEMAND_ELASTICITY_LEVELS = {
 }
 SENSITIVITY_FLEET_START_FY = REVENUE_FIRST_FORECAST_FY
 SENSITIVITY_PT_START_FY = 2030
+SENSITIVITY_FREIGHT_START_FY = 2030
 SENSITIVITY_LIGHT_ACTIVITY_SERIES = {
     "light_petrol_vkt",
     "light_ruc_net_km",
@@ -1989,6 +1996,24 @@ def sensitivity_seed_inputs_frame() -> pd.DataFrame:
                 "fraction p.a.",
                 "Applied equally to conventional Light RUC, Light BEV and PHEV so EV/PHEV shares do not change.",
             )
+    for level, value in [("Low", 0.0025), ("Med", 0.005), ("High", 0.010)]:
+        rows.append(
+            {
+                "workbook_basename": "",
+                "workbook_sha256": "",
+                "sheet": "",
+                "row": 0,
+                "cell": "",
+                "label": "Annual shift % of heavy RUC km to rail freight (Low/Med/High)",
+                "family": "freight_rail_shift",
+                "stream": "HEAVY_RUC",
+                "scenario_level": level,
+                "value": float(value),
+                "unit": "fraction p.a.",
+                "note": FREIGHT_RAIL_SHIFT_NOTE,
+                "source_status": "analyst_inference_no_official_mot_scenario",
+            }
+        )
     for stream, row, cells in [
         ("PED", 266, [("Low", "C266", -0.100), ("Med", "D266", -0.144116582), ("High", "E266", -0.240)]),
         ("LIGHT_RUC", 267, [("Low", "C267", -0.080), ("Med", "D267", -0.120), ("High", "E267", -0.200)]),
@@ -2069,6 +2094,7 @@ def sensitivity_config_frame(
         custom_allowed: bool = False,
         cost_ratio_status: str = "not_applicable",
         notes: str = "",
+        workbook_sha256: str = SENSITIVITY_SEED_WORKBOOK_SHA256,
     ) -> None:
         rows.append(
             {
@@ -2084,7 +2110,7 @@ def sensitivity_config_frame(
                 "default_selected": bool(default),
                 "custom_allowed": bool(custom_allowed),
                 "source_cells": source_cells(family, stream, selection),
-                "source_workbook_sha256": SENSITIVITY_SEED_WORKBOOK_SHA256,
+                "source_workbook_sha256": workbook_sha256,
                 "cost_per_km_ratio_status": cost_ratio_status,
                 "notes": notes or SENSITIVITY_DEFAULT_NOTE,
             }
@@ -2144,6 +2170,48 @@ def sensitivity_config_frame(
             notes="Custom value is session-only and is not a new model coefficient.",
         )
 
+    add(
+        "freight_rail_shift",
+        "Off",
+        "Off",
+        "HEAVY_RUC",
+        0.0,
+        "fraction p.a.",
+        SENSITIVITY_FREIGHT_START_FY,
+        "no overlay",
+        default=True,
+        custom_allowed=True,
+        notes=FREIGHT_RAIL_SHIFT_NOTE,
+        workbook_sha256="",
+    )
+    for selection, value in FREIGHT_RAIL_SHIFT_LEVELS.items():
+        add(
+            "freight_rail_shift",
+            selection,
+            {"Low": "Low 0.25% p.a.", "Med": "Med 0.5% p.a.", "High": "High 1.0% p.a."}[selection],
+            "HEAVY_RUC",
+            value,
+            "fraction p.a.",
+            SENSITIVITY_FREIGHT_START_FY,
+            "(1-rail_shift_pct)^(FY-start_fy+1)",
+            custom_allowed=True,
+            notes=FREIGHT_RAIL_SHIFT_NOTE,
+            workbook_sha256="",
+        )
+    add(
+        "freight_rail_shift",
+        "Custom",
+        "Custom",
+        "HEAVY_RUC",
+        0.0,
+        "fraction p.a.",
+        SENSITIVITY_FREIGHT_START_FY,
+        "(1-custom_rail_shift_pct)^(FY-start_fy+1)",
+        custom_allowed=True,
+        notes="Custom value is session-only and is not a new model coefficient. " + FREIGHT_RAIL_SHIFT_NOTE,
+        workbook_sha256="",
+    )
+
     for stream in ["PED", "LIGHT_RUC", "HEAVY_RUC"]:
         add(
             "demand_elasticity",
@@ -2195,9 +2263,11 @@ def revenue_sensitivity_impact_audit_frame(
     *,
     fleet_efficiency: str = "Off",
     pt_mode_shift: str = "Off",
+    freight_rail_shift: str = "Off",
     demand_elasticity: str = "Off",
     custom_fleet_efficiency_pct: float | None = None,
     custom_pt_shift_pct: float | None = None,
+    custom_freight_shift_pct: float | None = None,
     custom_elasticity: float | None = None,
     custom_ped_elasticity: float | None = None,
     custom_light_elasticity: float | None = None,
@@ -2216,6 +2286,7 @@ def revenue_sensitivity_impact_audit_frame(
         "fed_path",
         "selected_fleet_efficiency",
         "selected_pt_mode_shift",
+        "selected_freight_rail_shift",
         "selected_demand_elasticity",
         "stream",
         "series_id",
@@ -2226,6 +2297,7 @@ def revenue_sensitivity_impact_audit_frame(
         "formula",
         "eff_gain",
         "pt_factor",
+        "freight_factor",
         "elasticity",
         "cost_per_km_ratio",
         "demand_factor",
@@ -2253,6 +2325,7 @@ def revenue_sensitivity_impact_audit_frame(
 
     fleet_selection = _normalize_sensitivity_selection(fleet_efficiency)
     pt_selection = _normalize_sensitivity_selection(pt_mode_shift)
+    freight_selection = _normalize_sensitivity_selection(freight_rail_shift)
     demand_selection = _normalize_sensitivity_selection(demand_elasticity)
     eff_gain = _sensitivity_config_value(
         config,
@@ -2267,6 +2340,13 @@ def revenue_sensitivity_impact_audit_frame(
         pt_selection,
         "LIGHT_RUC",
         custom_value=(custom_pt_shift_pct / 100.0 if custom_pt_shift_pct is not None else None),
+    )
+    freight_shift = _sensitivity_config_value(
+        config,
+        "freight_rail_shift",
+        freight_selection,
+        "HEAVY_RUC",
+        custom_value=(custom_freight_shift_pct / 100.0 if custom_freight_shift_pct is not None else None),
     )
     ratio = _finite_float(cost_per_km_ratio, np.nan)
     demand_ratio_available = demand_selection == "Off" or (np.isfinite(ratio) and ratio > 0)
@@ -2308,6 +2388,8 @@ def revenue_sensitivity_impact_audit_frame(
 
         pt_exponent = max(fy - SENSITIVITY_PT_START_FY + 1, 0)
         pt_factor = float(np.power(max(1.0 - max(pt_shift, 0.0), 0.0), pt_exponent))
+        freight_exponent = max(fy - SENSITIVITY_FREIGHT_START_FY + 1, 0)
+        freight_factor = float(np.power(max(1.0 - max(freight_shift, 0.0), 0.0), freight_exponent))
         fleet_exponent = max(fy - SENSITIVITY_FLEET_START_FY + 1, 0)
         litres_multiplier = float(np.power(max(1.0 - max(eff_gain, 0.0), 0.0), fleet_exponent))
 
@@ -2339,7 +2421,7 @@ def revenue_sensitivity_impact_audit_frame(
 
         ped_activity_factor = pt_factor * petrol_demand_factor
         light_activity_factor = pt_factor * light_demand_factor
-        heavy_activity_factor = heavy_demand_factor
+        heavy_activity_factor = freight_factor * heavy_demand_factor
 
         baseline_light_petrol = value("light_petrol_vkt")
         adjusted_light_petrol = baseline_light_petrol * ped_activity_factor if np.isfinite(baseline_light_petrol) else np.nan
@@ -2406,6 +2488,7 @@ def revenue_sensitivity_impact_audit_frame(
                     "fed_path": str(fed_path),
                     "selected_fleet_efficiency": fleet_selection,
                     "selected_pt_mode_shift": pt_selection,
+                    "selected_freight_rail_shift": freight_selection,
                     "selected_demand_elasticity": demand_selection,
                     "stream": stream,
                     "series_id": series_id,
@@ -2416,6 +2499,7 @@ def revenue_sensitivity_impact_audit_frame(
                     "formula": formula,
                     "eff_gain": eff_gain,
                     "pt_factor": pt_factor if stream in {"PED", "LIGHT_RUC", "LIGHT_BEV", "PHEV"} else 1.0,
+                    "freight_factor": freight_factor if stream == "HEAVY_RUC" else 1.0,
                     "elasticity": elasticity,
                     "cost_per_km_ratio": ratio if demand_selection != "Off" else 1.0,
                     "demand_factor": demand_factor,
@@ -2429,6 +2513,7 @@ def revenue_sensitivity_impact_audit_frame(
         fleet_cells = _sensitivity_source_cells(config, "fleet_efficiency", "PED", fleet_selection)
         pt_ped_cells = _sensitivity_source_cells(config, "pt_mode_shift", "PED_LIGHT_PETROL", pt_selection)
         pt_light_cells = _sensitivity_source_cells(config, "pt_mode_shift", "LIGHT_RUC", pt_selection)
+        freight_heavy_cells = _sensitivity_source_cells(config, "freight_rail_shift", "HEAVY_RUC", freight_selection)
         demand_ped_cells = _sensitivity_source_cells(config, "demand_elasticity", "PED", demand_selection)
         demand_light_cells = _sensitivity_source_cells(config, "demand_elasticity", "LIGHT_RUC", demand_selection)
         demand_heavy_cells = _sensitivity_source_cells(config, "demand_elasticity", "HEAVY_RUC", demand_selection)
@@ -2442,8 +2527,8 @@ def revenue_sensitivity_impact_audit_frame(
         for series_id in ["light_ruc_net_revenue", "light_bev_ruc_net_revenue", "phev_ruc_net_revenue"]:
             stream = "LIGHT_RUC" if series_id == "light_ruc_net_revenue" else ("LIGHT_BEV" if "bev" in series_id else "PHEV")
             add_row(series_id, stream, f"{series_id} effective rate applied to adjusted km", light_elasticity, light_demand_factor, f"{pt_light_cells}; {demand_light_cells}")
-        add_row("heavy_ruc_net_km", "HEAVY_RUC", "heavy_ruc_net_km * heavy_demand_factor", heavy_elasticity, heavy_demand_factor, demand_heavy_cells)
-        add_row("heavy_ruc_net_revenue", "HEAVY_RUC", "heavy_ruc_net_revenue effective rate applied to adjusted km", heavy_elasticity, heavy_demand_factor, demand_heavy_cells)
+        add_row("heavy_ruc_net_km", "HEAVY_RUC", "heavy_ruc_net_km * freight_factor * heavy_demand_factor", heavy_elasticity, heavy_demand_factor, f"{freight_heavy_cells}; {demand_heavy_cells}")
+        add_row("heavy_ruc_net_revenue", "HEAVY_RUC", "heavy_ruc_net_revenue effective rate applied to adjusted km", heavy_elasticity, heavy_demand_factor, f"{freight_heavy_cells}; {demand_heavy_cells}")
         for series_id in sorted(SENSITIVITY_ROLLUP_SERIES, key=lambda x: REVENUE_STACK_SERIES_ORDER.get(x, 999)):
             add_row(series_id, "ROLLUP", f"{series_id} + PED/RUC component deltas", 0.0, 1.0, "")
 
@@ -2460,9 +2545,11 @@ def apply_revenue_sensitivity_layer(
     sensitivity_config: pd.DataFrame,
     fleet_efficiency: str = "Off",
     pt_mode_shift: str = "Off",
+    freight_rail_shift: str = "Off",
     demand_elasticity: str = "Off",
     custom_fleet_efficiency_pct: float | None = None,
     custom_pt_shift_pct: float | None = None,
+    custom_freight_shift_pct: float | None = None,
     custom_elasticity: float | None = None,
     custom_ped_elasticity: float | None = None,
     custom_light_elasticity: float | None = None,
@@ -2477,16 +2564,18 @@ def apply_revenue_sensitivity_layer(
         sensitivity_config,
         fleet_efficiency=fleet_efficiency,
         pt_mode_shift=pt_mode_shift,
+        freight_rail_shift=freight_rail_shift,
         demand_elasticity=demand_elasticity,
         custom_fleet_efficiency_pct=custom_fleet_efficiency_pct,
         custom_pt_shift_pct=custom_pt_shift_pct,
+        custom_freight_shift_pct=custom_freight_shift_pct,
         custom_elasticity=custom_elasticity,
         custom_ped_elasticity=custom_ped_elasticity,
         custom_light_elasticity=custom_light_elasticity,
         custom_heavy_elasticity=custom_heavy_elasticity,
         cost_per_km_ratio=cost_per_km_ratio,
     )
-    if _sensitivity_is_off(fleet_efficiency, pt_mode_shift, demand_elasticity):
+    if _sensitivity_is_off(fleet_efficiency, pt_mode_shift, demand_elasticity, freight_rail_shift):
         adjusted_line = line_reconciliation.copy()
         formula_residuals = revenue_formula_residual_frame(adjusted_line) if adjusted_line is not None and not adjusted_line.empty else pd.DataFrame()
         stack_components = revenue_stack_components_frame(adjusted_line, formula_residuals) if adjusted_line is not None and not adjusted_line.empty else pd.DataFrame()
@@ -2571,6 +2660,7 @@ def _apply_sensitivity_audit_to_frame(
         "revenue_sensitivity_label",
         "revenue_sensitivity_value_delta",
         "pt_factor",
+        "freight_factor",
         "demand_factor",
         "adjusted_litres_per_100km",
         "ped_efficiency_label",
@@ -2628,6 +2718,7 @@ def _apply_sensitivity_audit_to_frame(
         out.at[idx, "revenue_sensitivity_label"] = _sensitivity_display_label(record)
         out.at[idx, "revenue_sensitivity_value_delta"] = adjusted_value - baseline_value if np.isfinite(baseline_value) else pd.NA
         out.at[idx, "pt_factor"] = record.get("pt_factor")
+        out.at[idx, "freight_factor"] = record.get("freight_factor")
         out.at[idx, "demand_factor"] = record.get("demand_factor")
         if series_id in {"ped_volume", "gross_ped_revenue", "gross_fed_revenue", "net_fed_revenue", "total_fed_ruc_net_revenue", "total_nltf_net_revenue"}:
             out.at[idx, "ped_efficiency_label"] = str(record.get("selected_fleet_efficiency") or "")
@@ -2644,11 +2735,12 @@ def _normalize_sensitivity_selection(value: Any) -> str:
     return "Off"
 
 
-def _sensitivity_is_off(fleet_efficiency: str, pt_mode_shift: str, demand_elasticity: str) -> bool:
+def _sensitivity_is_off(fleet_efficiency: str, pt_mode_shift: str, demand_elasticity: str, freight_rail_shift: str = "Off") -> bool:
     return (
         _normalize_sensitivity_selection(fleet_efficiency) == "Off"
         and _normalize_sensitivity_selection(pt_mode_shift) == "Off"
         and _normalize_sensitivity_selection(demand_elasticity) == "Off"
+        and _normalize_sensitivity_selection(freight_rail_shift) == "Off"
     )
 
 
@@ -2726,6 +2818,7 @@ def _sensitivity_display_label(record: dict[str, Any]) -> str:
     parts = [
         f"Fleet {record.get('selected_fleet_efficiency')}",
         f"PT {record.get('selected_pt_mode_shift')}",
+        f"Freight rail {record.get('selected_freight_rail_shift')}",
         f"Elasticity {record.get('selected_demand_elasticity')}",
     ]
     return "; ".join(str(part) for part in parts if "Off" not in str(part))
@@ -2804,6 +2897,7 @@ def build_current_revenue_outlook_runtime_pack(
         sensitivity_config,
         fleet_efficiency="Off",
         pt_mode_shift="Off",
+        freight_rail_shift="Off",
         demand_elasticity="Off",
     )
     scenarios = _runtime_scenario_records(existing_manifest, current)
@@ -3027,14 +3121,20 @@ def build_current_revenue_outlook_runtime_pack(
             "source_workbook_sha256": SENSITIVITY_SEED_WORKBOOK_SHA256,
             "source_sheet": SENSITIVITY_SEED_SHEET,
             "status": "available",
-            "scope": "Compact Inputs (TI) seed values for fleet efficiency, PT mode shift and demand elasticity only.",
+            "scope": (
+                "Compact Inputs (TI) seed values for fleet efficiency, PT mode shift and demand elasticity, "
+                "plus analyst-inferred freight rail shift presets (no official MoT freight-shift scenario exists)."
+            ),
             "excluded_scope": "Fleet transition, crude/oil shock, crude-to-pump and ETS/margin/tax pass-through are not runtime sensitivities.",
         },
         "sensitivity_config": {
             "repo_relative_path": _repo_relative(root, base / "sensitivity_config.csv"),
             "default_runtime_treatment": "all_off_no_change",
             "selections": list(SENSITIVITY_LEVELS),
-            "scope": "Low-complexity post-model Revenue Outlook overlays: fleet efficiency, PT mode shift and optional demand elasticity.",
+            "scope": (
+                "Low-complexity post-model Revenue Outlook overlays: fleet efficiency, PT mode shift, "
+                "freight rail shift (analyst-inferred presets) and optional demand elasticity."
+            ),
             "note": SENSITIVITY_DEFAULT_NOTE,
         },
         "sensitivity_impact_audit": {

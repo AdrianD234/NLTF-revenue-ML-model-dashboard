@@ -416,7 +416,7 @@
     "source_workbook_sha256": "54ed1cfee4fa533b655575ff41f59ba656f6c53350d52b9b02482bab1d16a3a7",
     "source_sheet": "Inputs (TI)",
     "status": "available",
-    "scope": "Compact Inputs (TI) seed values for fleet efficiency, PT mode shift and demand elasticity only.",
+    "scope": "Compact Inputs (TI) seed values for fleet efficiency, PT mode shift and demand elasticity, plus analyst-inferred freight rail shift presets (no official MoT freight-shift scenario exists).",
     "excluded_scope": "Fleet transition, crude/oil shock, crude-to-pump and ETS/margin/tax pass-through are not runtime sensitivities."
   },
   "sensitivity_config": {
@@ -429,7 +429,7 @@
       "High",
       "Custom"
     ],
-    "scope": "Low-complexity post-model Revenue Outlook overlays: fleet efficiency, PT mode shift and optional demand elasticity.",
+    "scope": "Low-complexity post-model Revenue Outlook overlays: fleet efficiency, PT mode shift, freight rail shift (analyst-inferred presets) and optional demand elasticity.",
     "note": "Post-model overlays; default Off preserves model forecast. Scenario workbook price variables are already captured by finalist forecasts where supplied."
   },
   "sensitivity_impact_audit": {
@@ -893,28 +893,28 @@
       "size_bytes": 20973
     },
     "sensitivity_config.csv": {
-      "sha256": "2067f75d07b12d61d0b845b03bf637f0e335dc7074c45fea5e72b74fc63eda64",
-      "size_bytes": 12186
+      "sha256": "07ef357edcf635211f9b32ee3c0fc9a1032898afc196ce85cf01d79c6fe35aa4",
+      "size_bytes": 14173
     },
     "sensitivity_config.parquet": {
-      "sha256": "40ff3c954501af10a29f6d3477b8bff25a976f211ce927af8d1f7e1b810fff50",
-      "size_bytes": 10638
+      "sha256": "7acd005dc2f2cda4659d01ce2cf8bebad4f315db293e1c52eb4bd5c204229a5a",
+      "size_bytes": 10806
     },
     "sensitivity_impact_audit.csv": {
-      "sha256": "2ab42b16e8556f45dfd4fe3f15542b0e13d12bfda3e5221ba632803441fdaae9",
-      "size_bytes": 880632
+      "sha256": "4baaa014c6afd72634745fcef82b2dd403568143e8978237680f3bf9d2e8ae9d",
+      "size_bytes": 890325
     },
     "sensitivity_impact_audit.parquet": {
-      "sha256": "fd007773f54fc45879b03f101fe856adb70f51ac15026f3593cb5fc20b7d5df2",
-      "size_bytes": 49320
+      "sha256": "2ea3e6bbcf60710e2179884670129c1fde36f316aae06280c842dd523520cc87",
+      "size_bytes": 49447
     },
     "sensitivity_seed_inputs.csv": {
-      "sha256": "dd2b9766cd253d08c6e65ca36d463b5178020c636b7edcc197ed52aa23679861",
-      "size_bytes": 8702
+      "sha256": "5181058396fbdb3896ade20b3ea335955fc186af85cccd365c7d86531852f3a6",
+      "size_bytes": 9948
     },
     "sensitivity_seed_inputs.parquet": {
-      "sha256": "550c451da97ce321b9cddcea0657ffabec9260ddcf4041b3513bd7dbdda43cf5",
-      "size_bytes": 9502
+      "sha256": "23a8ba664690235b92fac25912b9c8ab0eefe990f94a58258b901fafa306b310",
+      "size_bytes": 9962
     },
     "series_alias_audit.csv": {
       "sha256": "c0330c9918d7e2f4f972d15e8465537c16d96aca607ef253353612cadd62c56d",
