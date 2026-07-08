@@ -762,7 +762,7 @@ def test_revenue_outlook_primary_figures_use_runtime_pack_selected_series_only()
     annotation_text = " ".join(str(annotation.text) for annotation in total_fig.layout.annotations or [])
 
     assert set(traces).issubset(trace_names)
-    assert "Forecast start FY2026" in annotation_text
+    assert "Actuals to FY2025" in annotation_text
     assert "Current finalist forecast" not in trace_names
     assert not any("Schiff" in name or "selected_dashboard" in name for name in trace_names)
     assert all(

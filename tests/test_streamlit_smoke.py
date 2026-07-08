@@ -562,7 +562,11 @@ def test_revenue_outlook_primary_hover_is_compact_and_billion_scaled() -> None:
     for forbidden in ["Bridge status", "forecast:", "actual:", "PED bridge", "forecast_quarters"]:
         assert forbidden not in hovertemplate
     marker_shapes = {(str(shape.x0), str(shape.line.dash)) for shape in fig.layout.shapes or []}
-    assert ("FY2026", "dash") in marker_shapes
+    # The history/forecast boundary sits on the seam between the last actual
+    # (FY2025) and the first forecast category, expressed as a numeric
+    # category coordinate ending in .5.
+    dash_x = [float(x) for x, dash in marker_shapes if dash == "dash"]
+    assert len(dash_x) == 1 and dash_x[0] % 1 == 0.5
     assert ("FY2031", "dot") in marker_shapes
 
 

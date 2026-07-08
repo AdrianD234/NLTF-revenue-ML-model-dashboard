@@ -735,38 +735,78 @@ def cached_revenue_outlook_view(
         sensitivity_frames = _apply_sensitivity_for_key(bridge_frames, sensitivity_config, sensitivity_key)
         sensitivity_fast_path = False
 
-    chart_rows = sensitivity_frames["chart_rows"]
-    ev_uptake_levers = _resolve_ev_uptake_levers(ev_uptake_key)
-    ev_uptake_audit = pd.DataFrame()
-    if ev_uptake_levers is not None:
-        chart_rows, ev_uptake_audit = apply_uptake_levers_to_chart_rows(
-            chart_rows,
-            _pack_table(_pack, "ev_phev_ped_light_drift_assumptions"),
-            ev_uptake_levers,
-            # The optimized-migration PED bridge already displaces petrol
-            # activity; only the raw bridge needs the displacement lever.
-            adjust_ped=str(bridge_mode) == PED_BRIDGE_DEFAULT_MODE,
-        )
-    filtered_rows = _filter_revenue_outlook_rows(
-        chart_rows,
-        time_grain=time_grain,
-        stream_labels=[selected_series],
-        fed_paths=[fed_path],
-        trace_names=list(traces),
-    )
-    quarterly_disaggregated = False
-    if time_grain == "quarterly" and filtered_rows.empty:
-        annual_rows = _filter_revenue_outlook_rows(
-            chart_rows,
-            time_grain="june_year",
+    sensitivity_chart_rows = sensitivity_frames["chart_rows"]
+    adjust_ped = str(bridge_mode) == PED_BRIDGE_DEFAULT_MODE
+
+    def _lever_adjusted_series_rows(levers: UptakeLevers | None) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, bool]:
+        """chart rows + filtered rows for the selected series under `levers`."""
+        rows = sensitivity_chart_rows
+        audit = pd.DataFrame()
+        if levers is not None:
+            rows, audit = apply_uptake_levers_to_chart_rows(
+                rows,
+                _pack_table(_pack, "ev_phev_ped_light_drift_assumptions"),
+                levers,
+                # The optimized-migration PED bridge already displaces petrol
+                # activity; only the raw bridge needs the displacement lever.
+                adjust_ped=adjust_ped,
+            )
+        filtered = _filter_revenue_outlook_rows(
+            rows,
+            time_grain=time_grain,
             stream_labels=[selected_series],
             fed_paths=[fed_path],
             trace_names=list(traces),
         )
-        derived_rows = _disaggregate_annual_rows_to_quarterly(annual_rows, chart_rows)
-        if not derived_rows.empty:
-            filtered_rows = derived_rows
-            quarterly_disaggregated = True
+        disaggregated = False
+        if time_grain == "quarterly" and filtered.empty:
+            annual = _filter_revenue_outlook_rows(
+                rows,
+                time_grain="june_year",
+                stream_labels=[selected_series],
+                fed_paths=[fed_path],
+                trace_names=list(traces),
+            )
+            derived = _disaggregate_annual_rows_to_quarterly(annual, rows)
+            if not derived.empty:
+                filtered = derived
+                disaggregated = True
+        return rows, filtered, audit, disaggregated
+
+    ev_uptake_levers = _resolve_ev_uptake_levers(ev_uptake_key)
+    chart_rows, filtered_rows, ev_uptake_audit, quarterly_disaggregated = _lever_adjusted_series_rows(ev_uptake_levers)
+
+    # MoT VFM fleet-transition cone: the fast/slow scenario envelope around
+    # the base-case trace. Computed with the same pipeline so the band is
+    # exactly what the chart would show under those presets.
+    cone_band = pd.DataFrame()
+    if ev_uptake_levers is not None:
+        bounds: dict[str, pd.Series] = {}
+        for bound_name, preset_name in (("fast", "MoT VFM fast"), ("slow", "MoT VFM slow")):
+            _, bound_rows, _, _ = _lever_adjusted_series_rows(EV_UPTAKE_PRESETS[preset_name])
+            base_trace = bound_rows[
+                bound_rows.get("trace_name", pd.Series(dtype=str)).astype(str).eq("Current finalist Base case")
+                & ~bound_rows.get("row_type", pd.Series(dtype=str)).astype(str).eq("historical_actual")
+            ]
+            if base_trace.empty:
+                continue
+            bounds[bound_name] = pd.Series(
+                pd.to_numeric(base_trace["value"], errors="coerce").to_numpy(),
+                index=base_trace["period"].astype(str),
+            )
+        if len(bounds) == 2:
+            merged = pd.DataFrame(bounds).dropna()
+            if not merged.empty:
+                spread = (merged["fast"] - merged["slow"]).abs()
+                scale = merged.abs().to_numpy().max()
+                if scale > 0 and float(spread.max()) / scale > 1e-6:
+                    cone_band = pd.DataFrame(
+                        {
+                            "period": merged.index,
+                            "lower": merged.min(axis=1).to_numpy(),
+                            "upper": merged.max(axis=1).to_numpy(),
+                        }
+                    )
     filtered_bridge = _filter_revenue_bridge_rows(
         sensitivity_frames["revenue_bridge_components"],
         [selected_series],
@@ -785,6 +825,7 @@ def cached_revenue_outlook_view(
         "quarterly_disaggregated": quarterly_disaggregated,
         "ev_uptake_applied": ev_uptake_levers is not None and not ev_uptake_audit.empty,
         "ev_uptake_audit": ev_uptake_audit,
+        "cone_band": cone_band,
     }
 
 
@@ -915,9 +956,12 @@ def cached_revenue_outlook_total_path_figure(
     bridge_mode: str,
     ev_uptake_key: tuple[Any, ...],
     _filtered_rows: pd.DataFrame,
+    _cone_band: pd.DataFrame | None = None,
 ) -> go.Figure:
     del signature, time_grain, fed_path, traces, sensitivity_key, bridge_mode, ev_uptake_key
-    return revenue_outlook_total_path_figure(_filtered_rows, selected_series=selected_series, selected_fy=selected_fy)
+    return revenue_outlook_total_path_figure(
+        _filtered_rows, selected_series=selected_series, selected_fy=selected_fy, cone_band=_cone_band
+    )
 
 
 @st.cache_data(show_spinner=False)
@@ -2743,7 +2787,9 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     default_fed_index = fed_path_options.index("Current planned path") if "Current planned path" in fed_path_options else 0
     trace_options = selector_options["trace_options"]
     fy_options = selector_options["fy_options"]
-    default_fy_index = fy_options.index("FY2031") if "FY2031" in fy_options else max(len(fy_options) - 1, 0)
+    # FY2030 is the last MoT-forecast June year in MBU26; beyond it the paths
+    # are extrapolation, so the selected-FY marker defaults to the window end.
+    default_fy_index = fy_options.index("FY2030") if "FY2030" in fy_options else max(len(fy_options) - 1, 0)
 
     with st.container(border=True):
         st.markdown("<div class='page5-panel-title'>Revenue Outlook controls</div>", unsafe_allow_html=True)
@@ -2989,6 +3035,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         selected_ped_bridge_mode,
         ev_uptake_key,
         filtered_rows,
+        view.get("cone_band"),
     )
     timer.stop("main path figure")
     total_path_notes = []
@@ -5314,11 +5361,13 @@ def _revenue_outlook_trace_options(chart_rows: pd.DataFrame) -> list[str]:
 
 def _revenue_outlook_default_traces(trace_options: list[str]) -> list[str]:
     options = list(trace_options or [])
+    # The high-population comparison stays available in the legend picker but
+    # is unticked by default: the default story is base case + the MoT VFM
+    # fast/slow fleet-transition cone.
     preferred = [
         "Actual",
         "MBU26 official",
         "Current finalist Base case",
-        "Current finalist High population/comparison",
         # Governed scenario-role policy keeps the PED behavioural comparison
         # path visible (relabelled); it must be in the default legend or the
         # PED VKT per capita comparison disappears by default.
@@ -5579,7 +5628,13 @@ def _filter_revenue_bridge_rows(
     return data
 
 
-def revenue_outlook_total_path_figure(rows: pd.DataFrame, *, selected_series: str, selected_fy: str) -> go.Figure:
+def revenue_outlook_total_path_figure(
+    rows: pd.DataFrame,
+    *,
+    selected_series: str,
+    selected_fy: str,
+    cone_band: pd.DataFrame | None = None,
+) -> go.Figure:
     data = _selected_revenue_outlook_series_rows(rows, selected_series)
     if data.empty:
         return empty_figure("Selected revenue series is unavailable in the committed runtime pack.")
@@ -5597,6 +5652,44 @@ def revenue_outlook_total_path_figure(rows: pd.DataFrame, *, selected_series: st
     data["value_display"] = data["value_numeric"] / display_scale
     scenario_colors = _scenario_color_map(data)
     fig = go.Figure()
+
+    # MoT VFM fleet-transition cone: fast/slow scenario envelope drawn first
+    # so every line sits above the shading.
+    if cone_band is not None and not cone_band.empty:
+        band = cone_band.copy()
+        band["_order"] = band["period"].astype(str).map(_revenue_period_order)
+        band = band.sort_values("_order", kind="stable")
+        visible_periods = set(data["period"].astype(str))
+        band = band[band["period"].astype(str).isin(visible_periods)]
+        if not band.empty:
+            band_x = band["period"].astype(str).tolist()
+            upper = (pd.to_numeric(band["upper"], errors="coerce") / display_scale).tolist()
+            lower = (pd.to_numeric(band["lower"], errors="coerce") / display_scale).tolist()
+            fig.add_trace(
+                go.Scatter(
+                    x=band_x,
+                    y=upper,
+                    mode="lines",
+                    line={"color": "rgba(0,111,173,0.28)", "width": 0.8, "dash": "dot"},
+                    hoverinfo="skip",
+                    showlegend=False,
+                    name="MoT VFM fast bound",
+                )
+            )
+            fig.add_trace(
+                go.Scatter(
+                    x=band_x,
+                    y=lower,
+                    mode="lines",
+                    line={"color": "rgba(0,111,173,0.28)", "width": 0.8, "dash": "dot"},
+                    fill="tonexty",
+                    fillcolor="rgba(0,111,173,0.10)",
+                    hoverinfo="skip",
+                    showlegend=True,
+                    name="MoT VFM fast–slow range",
+                    legendrank=1100,
+                )
+            )
     trace_styles = {
         "Actual": ("#737373", "solid", 2.4),
         "MBU26 official": ("#00843D", "dash", 2.2),
@@ -5676,27 +5769,35 @@ def revenue_outlook_total_path_figure(rows: pd.DataFrame, *, selected_series: st
     shapes: list[dict[str, Any]] = []
     annotations: list[dict[str, Any]] = []
     if forecast_period and forecast_period in periods:
+        # Draw the history/forecast boundary on the seam where the actuals
+        # end: halfway between the last actual and the first forecast
+        # category (category axes accept numeric index coordinates).
+        boundary_index = float(periods.index(forecast_period))
+        actual_periods = data[data.get("row_type", pd.Series(dtype=str)).astype(str).eq("historical_actual")]["period"].astype(str)
+        preceding = [p for p in actual_periods if p in periods and periods.index(p) < boundary_index]
+        boundary_x = (periods.index(preceding[-1]) + boundary_index) / 2 if preceding else boundary_index - 0.5
         shapes.append(
             {
                 "type": "line",
                 "xref": "x",
                 "yref": "paper",
-                "x0": forecast_period,
-                "x1": forecast_period,
+                "x0": boundary_x,
+                "x1": boundary_x,
                 "y0": 0,
                 "y1": 1,
-                "line": {"dash": "dash", "color": "#B45309"},
+                "line": {"dash": "dash", "color": "#B45309", "width": 1.4},
             }
         )
         annotations.append(
             {
                 "xref": "x",
                 "yref": "paper",
-                "x": forecast_period,
+                "x": boundary_x,
                 "y": 1.0,
-                "text": f"Forecast start {forecast_period}",
+                "text": f"Actuals to {preceding[-1]}" if preceding else f"Forecast start {forecast_period}",
                 "showarrow": False,
                 "yanchor": "bottom",
+                "font": {"color": "#B45309", "size": 11},
             }
         )
     if selected_fy in periods:

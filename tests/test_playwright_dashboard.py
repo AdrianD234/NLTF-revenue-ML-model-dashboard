@@ -915,7 +915,7 @@ def assert_revenue_outlook_primary_runtime_contract(page: Page, selected_series:
     assert contract["legend"].get("orientation") == "h"
     assert float(contract["legend"].get("y", 0)) <= 0
     assert contract["yTitle"], "Revenue Outlook primary chart should expose explicit units on the y-axis."
-    assert any("Forecast start FY2026" in text for text in contract["annotations"])
+    assert any("Actuals to FY2025" in text for text in contract["annotations"])
 
     by_name = {trace["name"]: trace for trace in contract["traces"]}
     actual = by_name.get("Actual")
