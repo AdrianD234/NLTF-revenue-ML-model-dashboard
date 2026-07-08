@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+
+# This CLI rebuilds the INCUMBENT (ML ensemble) pack; keep model-name
+# resolution on the incumbent engine regardless of the dashboard default.
+os.environ.setdefault("DASHBOARD_ENGINE_DEFAULT", "ensemble")
 
 from model_dashboard.revenue_outlook import build_current_revenue_outlook_runtime_pack
 

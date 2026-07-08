@@ -41,6 +41,7 @@ ANALYST_SUBTITLE = ("Transport Revenue Model Testbench | Refined finalist models
 # Every identifier that can surface in charts, hovers, tables or modals.
 # Coverage is enforced by tests/test_executive_mode.py against the packs.
 MODEL_DISPLAY = {
+    "PED__DIAGLAB__B__glsar__ylag1__ar1__wexp": "PED AR(1) model",
     "PED__VNEXT_SOLVED_CONVEX_TOP2": "PED weighted ensemble (vNext)",
     "HEAVY_RUC__VNEXT_SOLVED_CONVEX_TOP4": "Heavy RUC weighted ensemble (vNext)",
     "dynamic_RESID_GBR_n150_d1_lr0.05_w36": "Light RUC residual-correction model",

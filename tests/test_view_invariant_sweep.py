@@ -84,9 +84,16 @@ SENSITIVITY_KEYS = {
 }
 
 
-@pytest.fixture(scope="module")
-def sweep_context():
-    pack_dir = ROOT / CURRENT_REVENUE_OUTLOOK_DIR
+@pytest.fixture(
+    scope="module",
+    params=[
+        pytest.param(Path("data") / "current_revenue_outlook", id="ensemble"),
+        pytest.param(Path("data") / "engine_ar1" / "current_revenue_outlook", id="ar1"),
+    ],
+)
+def sweep_context(request):
+    # Every structural invariant must hold on BOTH engines' runtime packs.
+    pack_dir = ROOT / request.param
     pack = load_revenue_outlook_pack(pack_dir, repo_root=ROOT)
     assert pack is not None
     signature = revenue_outlook_signature(pack_dir, ROOT)

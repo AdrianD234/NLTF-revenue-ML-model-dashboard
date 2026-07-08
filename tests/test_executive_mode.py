@@ -95,10 +95,22 @@ def test_executive_page_titles_cover_all_pages() -> None:
         assert EXECUTIVE_PAGE_TITLES[page]
 
 
-def test_executive_stream_cards_use_display_language_only() -> None:
-    import app
+def _engine_cards(engine: str) -> list[dict[str, str]]:
+    import json
 
-    cards = app._executive_card_inputs.__wrapped__(0.0)
+    import app
+    from model_dashboard.engine import engine_evidence_data, engine_repro_pack_dirs
+
+    return app._executive_card_inputs.__wrapped__(
+        str(engine_evidence_data(engine)), json.dumps(engine_repro_pack_dirs(engine)), 0.0
+    )
+
+
+@pytest.mark.parametrize("engine", ["ensemble", "ar1"])
+def test_executive_stream_cards_use_display_language_only(engine: str) -> None:
+    from model_dashboard.engine import engine_evidence_data
+
+    cards = _engine_cards(engine)
     assert len(cards) == 3
     for card in cards:
         for key, value in card.items():
@@ -107,8 +119,8 @@ def test_executive_stream_cards_use_display_language_only() -> None:
         assert card["mape"].endswith("%")
         assert card["readiness"]
         assert card["caveat"]
-    # governed numbers come straight from the pack
-    fin = pd.read_parquet(DATA / "finalists.parquet").set_index("stream_label")
+    # governed numbers come straight from the engine's own pack
+    fin = pd.read_parquet(engine_evidence_data(engine) / "finalists.parquet").set_index("stream_label")
     for card in cards:
         stored = float(fin.loc[card["stream"], "quarterly_mape"])
         assert card["mape"] == f"{stored:.2f}%"
@@ -120,10 +132,11 @@ def test_presentation_layer_is_read_only() -> None:
     assert "read_parquet" not in src, "presentation layer must not load data itself"
 
 
-def test_confidence_badges_read_governed_statuses() -> None:
+@pytest.mark.parametrize("engine", ["ensemble", "ar1"])
+def test_confidence_badges_read_governed_statuses(engine: str) -> None:
     import app
 
-    cards = app._executive_card_inputs.__wrapped__(0.0)
+    cards = _engine_cards(engine)
     for card in cards:
         badges = dict((dim, (label, color)) for dim, label, color in app._confidence_badges_for(card))
         assert set(badges) == {"Accuracy", "Diagnostics", "Forecast", "Reproducibility"}
@@ -136,11 +149,10 @@ def test_confidence_badges_read_governed_statuses() -> None:
             assert "__" not in label and "_" not in label
 
 
-def test_action_card_copy_is_display_language() -> None:
+@pytest.mark.parametrize("engine", ["ensemble", "ar1"])
+def test_action_card_copy_is_display_language(engine: str) -> None:
     """Action-card inputs compose only from display-language card fields."""
-    import app
-
-    cards = app._executive_card_inputs.__wrapped__(0.0)
+    cards = _engine_cards(engine)
     assert cards
     for card in cards:
         for key in ("stream", "badge", "gain", "readiness", "caveat", "model"):

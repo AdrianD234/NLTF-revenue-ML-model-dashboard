@@ -83,6 +83,12 @@ data/dashboard_evidence_pack_reproducibility/ped_inner_hpo/source_artifacts/**/*
 !data/dashboard_evidence_pack_reproducibility/ped_vnext/**
 !data/dashboard_evidence_pack_reproducibility/light_ruc_vnext/
 !data/dashboard_evidence_pack_reproducibility/light_ruc_vnext/**
+
+# AR(1) engine packs (default engine; fitted state, evidence + runtime packs)
+!data/dashboard_evidence_pack_reproducibility/ped_ar1/
+!data/dashboard_evidence_pack_reproducibility/ped_ar1/**
+!data/engine_ar1/
+!data/engine_ar1/**
 !artifacts/diagnostic_drilldown/
 !artifacts/diagnostic_drilldown/**
 

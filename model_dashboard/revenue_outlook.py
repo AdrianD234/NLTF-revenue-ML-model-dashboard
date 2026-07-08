@@ -48,7 +48,6 @@ from .mbu26_source_spine import (
     revenue_line_reconciliation_frame,
 )
 from .revenue_source_pack import (
-    CURRENT_FINALIST_COMPOSITE_MODEL_ID,
     CURRENT_FINALIST_MODEL_IDS,
     REVENUE_FIRST_FORECAST_QUARTER,
     REVENUE_LAST_COMPLETE_ACTUAL_FY,
@@ -2883,6 +2882,7 @@ def build_current_revenue_outlook_runtime_pack(
     repo_root: Path | str | None = None,
     output_dir: Path | str | None = None,
     promoted_by: str = "repo_source_runtime_rebuild",
+    engine: str = "ensemble",
 ) -> RevenueOutlookPack:
     """Materialize the committed Revenue Outlook pack from repo-local sources.
 
@@ -2976,6 +2976,7 @@ def build_current_revenue_outlook_runtime_pack(
         scenario_input_manifest,
         promoted_chart_rows=existing_chart_rows,
         repo_root=root,
+        engine=engine,
     )
     replay_mismatches = scenario_input_replay_mismatch_report[
         scenario_input_replay_mismatch_report.get("mismatch_status", pd.Series("", index=scenario_input_replay_mismatch_report.index))
@@ -3016,6 +3017,7 @@ def build_current_revenue_outlook_runtime_pack(
         promotion_time = datetime.now(timezone.utc).isoformat()
     manifest = {
         "schema_version": REVENUE_OUTLOOK_SCHEMA_VERSION,
+        "engine": engine,
         "pack_status": "explicitly_promoted_current_outlook",
         "runtime_pack_type": "mbu26_actual_current_finalist_official_comparator",
         "promotion_time": promotion_time,
@@ -3765,6 +3767,7 @@ def _scenario_input_replay_mismatch_report(
     *,
     promoted_chart_rows: pd.DataFrame | None = None,
     repo_root: Path | str | None = None,
+    engine: str = "ensemble",
 ) -> pd.DataFrame:
     """Verify promoted current-finalist rows are backed by committed scenario inputs.
 
@@ -3830,7 +3833,7 @@ def _scenario_input_replay_mismatch_report(
         for item in scenario_input_manifest.get("workbooks", [])
         if isinstance(item, dict)
     }
-    replay_lookup, replay_validation = _scenario_input_forecast_replay_lookup(scenario_input_wide, repo_root=repo_root)
+    replay_lookup, replay_validation = _scenario_input_forecast_replay_lookup(scenario_input_wide, repo_root=repo_root, engine=engine)
     promoted_lookup = _promoted_quarterly_forecast_lookup(promoted_chart_rows)
     rows: list[dict[str, Any]] = []
     source = current_forecast_annual.copy()
@@ -3981,12 +3984,13 @@ def _scenario_input_forecast_replay_lookup(
     scenario_input_wide: pd.DataFrame,
     *,
     repo_root: Path | str | None,
+    engine: str = "ensemble",
 ) -> tuple[dict[tuple[str, str, str], dict[str, Any]], dict[str, dict[str, Any]]]:
     if scenario_input_wide is None or scenario_input_wide.empty:
         return {}, {}
     from .forecast_runner import replay_forecast_from_scenario_inputs
 
-    replay = replay_forecast_from_scenario_inputs(scenario_input_wide, repo_root=repo_root)
+    replay = replay_forecast_from_scenario_inputs(scenario_input_wide, repo_root=repo_root, engine=engine)
     validation = {
         str(row.scenario_name): {
             "valid": bool(row.valid),
@@ -6761,13 +6765,20 @@ def _runtime_trace_type(trace_name: Any) -> str:
 def _runtime_model_id(series_id: Any) -> str:
     series = str(series_id or "")
     if series in {"ped_vkt_per_capita", "ped_volume", "gross_ped_revenue", "gross_fed_revenue", "net_fed_revenue"}:
-        return CURRENT_FINALIST_MODEL_IDS["PED"]
+        # The PED finalist differs per engine (vNext ensemble vs AR(1)); the
+        # engine-aware resolver keeps pack builds stamping the model that
+        # actually produced the values.
+        from .governance_constants import current_finalist
+
+        return current_finalist("PED")
     if series in {"light_ruc_net_km", "light_ruc_net_revenue"}:
         return CURRENT_FINALIST_MODEL_IDS["LIGHT_RUC"]
     if series in {"heavy_ruc_net_km", "heavy_ruc_net_revenue"}:
         return CURRENT_FINALIST_MODEL_IDS["HEAVY_RUC"]
     if series in {"total_ruc_net_revenue", "total_fed_ruc_net_revenue", "total_nltf_net_revenue"}:
-        return CURRENT_FINALIST_COMPOSITE_MODEL_ID
+        from .governance_constants import current_composite_model_id
+
+        return current_composite_model_id()
     return ""
 
 

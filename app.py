@@ -190,7 +190,6 @@ from model_dashboard.revenue_outlook import (
     validate_promotable_comparison,
 )
 from model_dashboard.revenue_source_pack import (
-    CURRENT_FINALIST_COMPOSITE_MODEL_ID,
     OPTIONAL_SOURCE_PACK_FILES,
     REQUIRED_SOURCE_PACK_FILES,
     REVENUE_SOURCE_PACK_DIR,
@@ -1434,11 +1433,14 @@ def _warm_revenue_outlook_caches() -> None:
     hit warm caches instead of paying the 0.5-2s pipeline cost inline.
     """
     try:
+        from model_dashboard.engine import engine_default, engine_revenue_outlook_dir
+
         repo_root = Path(__file__).resolve().parent
-        pack = load_revenue_outlook_pack(repo_root / CURRENT_REVENUE_OUTLOOK_DIR, repo_root=repo_root)
+        pack_dir = repo_root / engine_revenue_outlook_dir(engine_default())
+        pack = load_revenue_outlook_pack(pack_dir, repo_root=repo_root)
         if pack is None:
             return
-        signature = revenue_outlook_signature(repo_root / CURRENT_REVENUE_OUTLOOK_DIR, repo_root)
+        signature = revenue_outlook_signature(pack_dir, repo_root)
         default_sens = selected_sensitivity_key("Off", "Off", "Off", freight_rail_shift="Off")
         default_uptake = (DEFAULT_EV_UPTAKE_MODE, (), (), 0)
         uptake_12c_off = (DEFAULT_EV_UPTAKE_MODE, (), (), 1)
@@ -1498,11 +1500,13 @@ def main() -> None:
     header_slot = st.empty()
     initial_page = st.session_state["gov_page"]
     initial_index = pages.index(initial_page) + 1
+    from model_dashboard.engine import engine_label
+
     with header_slot.container():
         header(
             "NTLF Revenue Modelling",
             header_subtitle(),
-            page_chip=f"Page {initial_index} of {len(pages)} - {page_display_title(initial_page)}",
+            page_chip=f"Page {initial_index} of {len(pages)} - {page_display_title(initial_page)} · {engine_label()}",
         )
 
     active_path = render_run_sidebar()
@@ -1520,7 +1524,7 @@ def main() -> None:
         header(
             "NTLF Revenue Modelling",
             header_subtitle(),
-            page_chip=f"Page {current_index} of {len(pages)} - {page_display_title(current_page)}",
+            page_chip=f"Page {current_index} of {len(pages)} - {page_display_title(current_page)} · {engine_label()}",
         )
     controls = render_filter_sidebar(loaded)
     if current_page not in {REPRODUCIBILITY_PAGE, REVENUE_OUTLOOK_PAGE}:
@@ -1554,10 +1558,12 @@ def render_primary_navigation(pages: list[str]) -> str:
 
 
 def render_run_sidebar() -> str:
+    from model_dashboard.engine import engine_evidence_root
+
     requested_root = Path(
         os.environ.get("DASHBOARD_EVIDENCE_PACK_ROOT")
         or os.environ.get("STAGE1_DASHBOARD_EVIDENCE_PACK_ROOT")
-        or DEFAULT_EVIDENCE_PACK_ROOT
+        or engine_evidence_root()
     ).expanduser()
     data_root = resolve_evidence_pack_root(requested_root)
     st.session_state["active_data_root"] = str(data_root)
@@ -1749,6 +1755,9 @@ def render_top_filter_bar(loaded: LoadedRun, controls: dict[str, Any]) -> dict[s
             )
         with filter_cols[6]:
             with st.popover("More", use_container_width=True):
+                from model_dashboard.engine import render_engine_selector
+
+                render_engine_selector()
                 render_mode_toggle()
                 render_cloud_preview_toggle()
                 controls = render_advanced_controls(loaded, controls)
@@ -2086,21 +2095,19 @@ def render_overview(loaded: LoadedRun, controls: dict[str, Any]) -> None:
 
 
 @st.cache_data(show_spinner=False)
-def _executive_card_inputs(signature: float) -> list[dict[str, str]]:
+def _executive_card_inputs(pack_data: str, repro_dirs_json: str, signature: float) -> list[dict[str, str]]:
     """Stream recommendation cards built directly from the governed packs.
 
     Presentation only: every number is read from finalists.parquet,
     schiff_benchmark.parquet, diagnostic_pass_matrix.parquet and the
-    reproducibility parity audits - nothing is recomputed.
+    reproducibility parity audits - nothing is recomputed. Keyed on the
+    engine-resolved pack path so both engines cache side by side.
     """
     del signature
-    from model_dashboard.governance_constants import (
-        CURRENT_REPRO_PACK_DIRS,
-        EVIDENCE_PACK_DATA,
-        REPRODUCIBILITY_BASE,
-    )
+    from model_dashboard.governance_constants import REPRODUCIBILITY_BASE
 
-    pack = EVIDENCE_PACK_DATA
+    repro_dirs = json.loads(repro_dirs_json)
+    pack = Path(pack_data)
     fin = pd.read_parquet(pack / "finalists.parquet").set_index("stream")
     schiff = pd.read_parquet(pack / "schiff_benchmark.parquet").set_index("stream")
     matrix = pd.read_parquet(pack / "diagnostic_pass_matrix.parquet")
@@ -2127,7 +2134,7 @@ def _executive_card_inputs(signature: float) -> list[dict[str, str]]:
             caveat = "Standing monitoring: " + ", ".join(
                 f"{t} ({s})" for t, s in zip(open_items["diagnostic_test"], open_items["pass_status"], strict=False))
         readiness = "Historically reproducible"
-        sdir = repro_root / CURRENT_REPRO_PACK_DIRS.get(stream, "")
+        sdir = repro_root / repro_dirs.get(stream, "")
         audit_path = sdir / "forward_scorer_parity_audit.json"
         try:
             if audit_path.exists():
@@ -2158,13 +2165,7 @@ def render_executive_stream_cards() -> None:
     """Three plain-English recommendation cards under the KPI band."""
     from model_dashboard.presentation import BADGE_COLORS
 
-    from model_dashboard.governance_constants import EVIDENCE_PACK_DATA
-
-    try:
-        signature = (EVIDENCE_PACK_DATA / "finalists.parquet").stat().st_mtime
-        cards = _executive_card_inputs(signature)
-    except Exception:
-        return
+    cards = _executive_cards_safe()
     if not cards:
         return
     blocks = []
@@ -2196,11 +2197,12 @@ def render_executive_stream_cards() -> None:
 
 
 def _executive_cards_safe() -> list[dict[str, Any]]:
-    from model_dashboard.governance_constants import EVIDENCE_PACK_DATA
+    from model_dashboard.engine import engine_evidence_data, engine_repro_pack_dirs
 
     try:
-        signature = (EVIDENCE_PACK_DATA / "finalists.parquet").stat().st_mtime
-        return _executive_card_inputs(signature)
+        pack_data = engine_evidence_data()
+        signature = (pack_data / "finalists.parquet").stat().st_mtime
+        return _executive_card_inputs(str(pack_data), json.dumps(engine_repro_pack_dirs()), signature)
     except Exception:
         return []
 
@@ -3330,14 +3332,18 @@ def _compare_mode_lever_state(selected_metric_type: str) -> dict[str, Any]:
 def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     del loaded
     _persist_revenue_outlook_view_state()
+    from model_dashboard.engine import active_engine, engine_revenue_outlook_dir
+
     repo_root = Path(__file__).resolve().parent
+    engine = active_engine()
+    pack_dir = repo_root / engine_revenue_outlook_dir(engine)
     timer = RevenueOutlookRenderTimer(_revenue_outlook_perf_debug_enabled())
     timer.start("pack load")
-    pack_signature = revenue_outlook_signature(repo_root / CURRENT_REVENUE_OUTLOOK_DIR, repo_root)
+    pack_signature = revenue_outlook_signature(pack_dir, repo_root)
     pack = st.session_state.get("revenue_outlook_pack")
-    if not isinstance(pack, RevenueOutlookPack):
+    if not isinstance(pack, RevenueOutlookPack) or str(pack.manifest.get("engine", "ensemble")) != engine:
         pack = cached_load_revenue_outlook_pack(
-            str(repo_root / CURRENT_REVENUE_OUTLOOK_DIR),
+            str(pack_dir),
             str(repo_root),
             pack_signature,
             REVENUE_OUTLOOK_SCHEMA_VERSION,
@@ -3407,6 +3413,10 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 index=default_stream_index,
                 key="revenue_outlook_stream",
             )
+        with view_cols[2]:
+            from model_dashboard.engine import render_engine_selector
+
+            render_engine_selector()
         selected_metric_type = _revenue_outlook_series_metric_type(chart_rows, selected_stream)
         # Rows carry the planned path; the 12c counterfactual is a display
         # reprice handled by the policy toggle in the lever accordion.

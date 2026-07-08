@@ -53,18 +53,37 @@ ARCHIVED_FINALISTS = {
 }
 
 
-def current_repro_pack_root(stream: str) -> Path:
-    return REPRODUCIBILITY_BASE / CURRENT_REPRO_PACK_DIRS[stream]
+def current_repro_pack_dirs(engine: str | None = None) -> dict[str, str]:
+    """Engine-aware reproducibility-pack map (PED -> ped_ar1 under 'ar1')."""
+    from model_dashboard.engine import engine_repro_pack_dirs
+
+    return engine_repro_pack_dirs(engine)
+
+
+def evidence_pack_data(engine: str | None = None) -> Path:
+    from model_dashboard.engine import engine_evidence_data
+
+    return engine_evidence_data(engine)
+
+
+def current_repro_pack_root(stream: str, engine: str | None = None) -> Path:
+    return REPRODUCIBILITY_BASE / current_repro_pack_dirs(engine)[stream]
+
+
+def current_finalist(stream: str, engine: str | None = None) -> str:
+    """Resolve the current finalist model name for the active (or given) engine.
+
+    Order of truth: the stream's current reproducibility-pack manifest, then
+    the governed evidence pack, then the archived fallback.
+    """
+    from model_dashboard.engine import active_engine
+
+    return _current_finalist_cached(str(stream), engine or active_engine())
 
 
 @lru_cache(maxsize=None)
-def current_finalist(stream: str) -> str:
-    """Resolve the current finalist model name.
-
-    Order of truth: the stream's current reproducibility-pack manifest, then
-    the governed evidence pack, then the archived fallback. Cached per process.
-    """
-    manifest_path = current_repro_pack_root(stream) / "fitted_model_manifest.json"
+def _current_finalist_cached(stream: str, engine: str) -> str:
+    manifest_path = current_repro_pack_root(stream, engine) / "fitted_model_manifest.json"
     if manifest_path.exists():
         try:
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -73,7 +92,7 @@ def current_finalist(stream: str) -> str:
                 return model
         except Exception:
             pass
-    finalists_path = EVIDENCE_PACK_DATA / "finalists.parquet"
+    finalists_path = evidence_pack_data(engine) / "finalists.parquet"
     if finalists_path.exists():
         try:
             import pandas as pd
@@ -87,5 +106,10 @@ def current_finalist(stream: str) -> str:
     return ARCHIVED_FINALISTS[stream]
 
 
-def current_finalists() -> dict[str, str]:
-    return {stream: current_finalist(stream) for stream in STREAMS}
+def current_finalists(engine: str | None = None) -> dict[str, str]:
+    return {stream: current_finalist(stream, engine) for stream in STREAMS}
+
+
+def current_composite_model_id(engine: str | None = None) -> str:
+    """Joined finalist ids for rollup rows that combine all three streams."""
+    return "; ".join(current_finalist(stream, engine) for stream in STREAMS)

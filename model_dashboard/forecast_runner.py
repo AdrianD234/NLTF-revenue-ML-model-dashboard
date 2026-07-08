@@ -930,6 +930,7 @@ def replay_forecast_from_scenario_inputs(
     *,
     repo_root: Path | str | None = None,
     latest_actual_period: str | None = None,
+    engine: str = "ensemble",
 ) -> ScenarioInputForecastReplayResult:
     """Replay fixed-finalist forecasts from committed scenario_input_wide rows.
 
@@ -984,7 +985,7 @@ def replay_forecast_from_scenario_inputs(
     source = scenario_input_wide.copy()
     source["canonical_period"] = source["canonical_period"].astype(str)
     source = source[source["canonical_period"].str.match(r"^\d{4}Q[1-4]$", na=False)].copy()
-    capabilities = model_capability_gap_register(root)
+    capabilities = model_capability_gap_register(root, engine=engine)
     future_frames: list[pd.DataFrame] = []
     component_frames: list[pd.DataFrame] = []
     assumption_frames: list[pd.DataFrame] = []
@@ -1029,7 +1030,7 @@ def replay_forecast_from_scenario_inputs(
             latest_actual_period=latest,
             forecast_periods=periods,
         )
-        future, components = _forecast_output_rows(validation, capabilities, root)
+        future, components = _forecast_output_rows(validation, capabilities, root, engine=engine)
         _add_scenario_columns(future, scenario, scenario_role)
         _add_scenario_columns(components, scenario, scenario_role)
         future_frames.append(future)
@@ -1632,10 +1633,17 @@ def create_completed_sample_workbook(
     return path
 
 
-def model_capability_gap_register(repo_root: Path | str | None = None) -> pd.DataFrame:
+def model_capability_gap_register(repo_root: Path | str | None = None, engine: str = "ensemble") -> pd.DataFrame:
     root = Path(repo_root) if repo_root is not None else repo_root_from_here()
     rows: list[dict[str, Any]] = []
     for stream in STREAM_ORDER:
+        if stream == "PED" and engine == "ar1":
+            # The AR(1) alternate engine owns PED forward capability; Light and
+            # Heavy keep their incumbent scorers under both engines.
+            from pipeline.ar1_engine import capability_record
+
+            rows.append(capability_record(root))
+            continue
         rows.append(_stream_forward_capability(root, stream))
     return pd.DataFrame(rows)
 
@@ -1929,6 +1937,7 @@ def _forecast_output_rows(
     validation: ForecastValidationResult,
     capabilities: pd.DataFrame,
     repo_root: Path,
+    engine: str = "ensemble",
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     light_future: pd.DataFrame | None = None
     light_components: pd.DataFrame | None = None
@@ -1944,9 +1953,14 @@ def _forecast_output_rows(
     for stream in ("PED", "HEAVY_RUC"):
         if validation.valid and cap_lookup.get(stream, {}).get("forecast_capability_available"):
             try:
-                from .vnext_forward_integration import vnext_forward_forecast
+                if stream == "PED" and engine == "ar1":
+                    from pipeline.ar1_engine import ar1_forward_forecast
 
-                vnext_outputs[stream] = vnext_forward_forecast(validation, repo_root, stream)
+                    vnext_outputs[stream] = ar1_forward_forecast(validation, repo_root)
+                else:
+                    from .vnext_forward_integration import vnext_forward_forecast
+
+                    vnext_outputs[stream] = vnext_forward_forecast(validation, repo_root, stream)
             except Exception as exc:
                 scorer_errors[stream] = f"{type(exc).__name__}: {exc}"
 
