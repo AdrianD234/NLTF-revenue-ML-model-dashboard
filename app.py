@@ -2879,17 +2879,13 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             (label for label, mode in bridge_mode_lookup.items() if mode == PED_BRIDGE_DEFAULT_MODE),
             bridge_mode_options[-1] if bridge_mode_options else "Optimized migration bridge",
         )
-        if should_show_local_audit_controls() and bridge_mode_options:
-            selected_ped_bridge_label = st.selectbox(
-                "PED bridge",
-                bridge_mode_options,
-                index=bridge_mode_options.index(default_bridge_label) if default_bridge_label in bridge_mode_options else 0,
-                key="revenue_outlook_ped_bridge_mode",
-            )
-            selected_ped_bridge_mode = bridge_mode_lookup.get(selected_ped_bridge_label, PED_BRIDGE_DEFAULT_MODE)
-        else:
-            selected_ped_bridge_label = default_bridge_label
-            selected_ped_bridge_mode = PED_BRIDGE_DEFAULT_MODE
+        # The raw model bridge is the sole PED pathway on this page: petrol->EV
+        # displacement is owned by the interpretable VFM-inferred uptake lever
+        # (which reproduces the retired lambda-optimizer within fit tolerance),
+        # so the esoteric raw/optimized bridge selector is gone. The lambda
+        # machinery and its audit tables remain in the pack as lineage.
+        selected_ped_bridge_label = default_bridge_label
+        selected_ped_bridge_mode = PED_BRIDGE_DEFAULT_MODE
     sensitivity_options = list(SENSITIVITY_LEVELS)
     sensitivity_labels = selector_options["sensitivity_labels"]
     selected_demand_elasticity = "Off"
@@ -3262,11 +3258,21 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     stack_components = detail_frames["revenue_stack_components"]
     with st.container(border=True):
         st.markdown("<div class='page5-panel-title'>Revenue composition over time</div>", unsafe_allow_html=True)
-        comp_cols = st.columns([0.20, 0.18, 0.17, 0.16, 0.15, 0.14])
+        st.caption(
+            "Stacked build-up of Total NLTF revenue: gross components net of refunds and admin fees, "
+            "so the stack reconciles to the total path above."
+        )
+        # One composition story for everyone: the net build-up that reconciles
+        # to Total NLTF ('Gross-to-net bridge audit' internally). The gross
+        # stack and the full formula-audit detail were analyst plumbing - the
+        # data and mode machinery remain for audits, but the selectors are
+        # gone; the formula-audit detail stays available on local audit runs.
+        selected_stack_mode = REVENUE_STACK_MODE_BRIDGE
         stack_source_options = selector_options["stack_source_options"]
-        stack_mode_options = selector_options["stack_mode_options"]
         stack_section_options = selector_options["stack_section_options"]
         stack_fy_min, stack_fy_max = selector_options["stack_fy_bounds"]
+        show_detail_selector = should_show_local_audit_controls()
+        comp_cols = st.columns([0.22, 0.20, 0.20, 0.19, 0.19] if not show_detail_selector else [0.19, 0.16, 0.17, 0.16, 0.16, 0.16])
         with comp_cols[0]:
             selected_stack_source = st.selectbox(
                 "Source path",
@@ -3274,21 +3280,19 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 index=0,
                 key="revenue_stack_source_path",
             )
-        with comp_cols[1]:
-            selected_stack_mode = st.selectbox(
-                "Mode",
-                stack_mode_options,
-                index=0,
-                key="revenue_stack_composition_mode",
-            )
-        with comp_cols[2]:
-            selected_stack_detail_level = st.selectbox(
-                "Detail level",
-                list(REVENUE_STACK_DETAIL_LEVELS),
-                index=0,
-                key="revenue_stack_detail_level",
-            )
-        with comp_cols[3]:
+        detail_col_offset = 0
+        if show_detail_selector:
+            with comp_cols[1]:
+                selected_stack_detail_level = st.selectbox(
+                    "Detail level",
+                    list(REVENUE_STACK_DETAIL_LEVELS),
+                    index=0,
+                    key="revenue_stack_detail_level",
+                )
+            detail_col_offset = 1
+        else:
+            selected_stack_detail_level = REVENUE_STACK_DETAIL_CLEAN
+        with comp_cols[1 + detail_col_offset]:
             selected_stack_fy_range = st.slider(
                 "FY range / horizon",
                 min_value=stack_fy_min,
@@ -3297,7 +3301,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 key="revenue_stack_fy_range",
             )
         default_stack_sections = [section for section in ["RUC", "FED", "MVR", "TUC"] if section in stack_section_options]
-        with comp_cols[4]:
+        with comp_cols[2 + detail_col_offset]:
             selected_stack_sections = st.multiselect(
                 "Section filter",
                 stack_section_options,
@@ -3306,7 +3310,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             )
         stack_overlay_options = selector_options["stack_overlay_options"]
         default_stack_overlays = _revenue_stack_default_overlays(selected_stack_mode, stack_overlay_options)
-        with comp_cols[5]:
+        with comp_cols[3 + detail_col_offset]:
             selected_stack_overlays = st.multiselect(
                 "Aggregate overlays",
                 stack_overlay_options,
