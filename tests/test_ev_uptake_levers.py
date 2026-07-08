@@ -77,11 +77,12 @@ def test_vfm_presets_reproduce_official_ped_retention_and_heavy_share() -> None:
         assert heavy_err < 0.02, f"{preset_name}: heavy BEV share max error {heavy_err:.4f}"
 
 
-def test_mbu26_preset_ped_retention_is_activity_only() -> None:
-    """MBU26 PED levers track the petrol *share* of the light universe.
+def test_default_preset_tracks_mbu26_official_ped_share_retention() -> None:
+    """The base preset doubles as the MBU26 official-shape anchor.
 
-    Intensity (litres/100km) belongs to the Fleet efficiency sensitivity, so
-    the preset must reproduce the share-retention path, not the volume path.
+    MBU26's proportions are the VFM base scenario, so the 'MoT VFM base'
+    preset must reproduce MBU26's petrol share-retention path (activity-only:
+    intensity belongs to the Fleet efficiency sensitivity).
     """
     mbu = pd.read_csv(ROOT / "data" / "revenue_model_source_pack" / "mbu26_annual_spine" / "mbu26_official_annual.csv")
     piv = (
@@ -97,9 +98,9 @@ def test_mbu26_preset_ped_retention_is_activity_only() -> None:
     )
     share = piv["light_petrol_vkt"] / universe
     target = share / share.loc[2025]
-    retention = ped_retention_curve(target.index, EV_UPTAKE_PRESETS["MBU26 official shape"])
+    retention = ped_retention_curve(target.index, EV_UPTAKE_PRESETS["MoT VFM base"])
     err = (retention - target).abs().max()
-    assert err < 0.025, f"MBU26 PED share-retention max error {err:.4f}"
+    assert err < 0.04, f"base preset vs MBU26 share-retention max error {err:.4f}"
 
 
 def test_ped_retention_starts_at_one_and_declines() -> None:

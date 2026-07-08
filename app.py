@@ -122,6 +122,13 @@ from model_dashboard.eruc_transition import (
     ErucTransitionLevers,
     apply_eruc_transition_to_chart_rows,
 )
+from model_dashboard.rate_paths import (
+    FED_UPLIFT_NOTE,
+    RATE_CHART_NOTE,
+    apply_fed_uplift_off_to_chart_rows,
+    fed_uplift_off_factors,
+    rate_paths_frame,
+)
 from model_dashboard.ev_uptake_levers import (
     CUSTOM_OPTION as EV_UPTAKE_CUSTOM_OPTION,
     DEFAULT_EV_UPTAKE_MODE,
@@ -752,10 +759,17 @@ def cached_revenue_outlook_view(
     adjust_ped = str(bridge_mode) == PED_BRIDGE_DEFAULT_MODE
     eruc_levers = _resolve_eruc_levers(ev_uptake_key)
     eruc_audit = pd.DataFrame()
+    fed_uplift_off = bool(ev_uptake_key[3]) if len(ev_uptake_key) > 3 else False
+    uplift_factors = (
+        fed_uplift_off_factors(Path(__file__).resolve().parent, _pack.revenue_chart_rows)
+        if fed_uplift_off
+        else {}
+    )
+    fed_uplift_audit = pd.DataFrame()
 
     def _lever_adjusted_series_rows(levers: UptakeLevers | None) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, bool]:
         """chart rows + filtered rows for the selected series under `levers`."""
-        nonlocal eruc_audit
+        nonlocal eruc_audit, fed_uplift_audit
         rows = sensitivity_chart_rows
         audit = pd.DataFrame()
         if levers is not None:
@@ -775,6 +789,10 @@ def cached_revenue_outlook_view(
             )
             if levers is ev_uptake_levers:
                 eruc_audit = transition_audit
+        if uplift_factors:
+            rows, uplift_audit = apply_fed_uplift_off_to_chart_rows(rows, uplift_factors)
+            if levers is ev_uptake_levers:
+                fed_uplift_audit = uplift_audit
         filtered = _filter_revenue_outlook_rows(
             rows,
             time_grain=time_grain,
@@ -852,6 +870,8 @@ def cached_revenue_outlook_view(
         "cone_band": cone_band,
         "eruc_applied": eruc_levers is not None and not eruc_audit.empty,
         "eruc_audit": eruc_audit,
+        "fed_uplift_off": fed_uplift_off and not fed_uplift_audit.empty,
+        "fed_uplift_audit": fed_uplift_audit,
     }
 
 
@@ -2835,17 +2855,20 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 key="revenue_outlook_stream",
             )
         selected_metric_type = _revenue_outlook_series_metric_type(chart_rows, selected_stream)
+        # Rows carry the planned path; the 12c counterfactual is a display
+        # reprice, so the old one-option 'FED path' selector is a toggle now.
+        selected_fed_path = fed_path_options[default_fed_index] if fed_path_options else ""
         with control_cols[2]:
             if selected_metric_type == "activity":
-                selected_fed_path = fed_path_options[default_fed_index] if fed_path_options else ""
-                st.markdown("<div class='control-label'>FED path</div>", unsafe_allow_html=True)
+                fed_uplift_on = True
+                st.markdown("<div class='control-label'>2027 12c FED uplift</div>", unsafe_allow_html=True)
                 st.caption("Not applicable to activity series.")
             else:
-                selected_fed_path = st.selectbox(
-                    "FED path",
-                    fed_path_options,
-                    index=default_fed_index,
-                    key="revenue_outlook_fed_path",
+                fed_uplift_on = st.toggle(
+                    "2027 12c FED uplift",
+                    value=True,
+                    key="revenue_outlook_fed_uplift",
+                    help=FED_UPLIFT_NOTE,
                 )
         with control_cols[3]:
             selected_fy = st.selectbox(
@@ -2950,7 +2973,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 "Uptake basis",
                 list(EV_UPTAKE_MODE_OPTIONS),
                 index=list(EV_UPTAKE_MODE_OPTIONS).index(DEFAULT_EV_UPTAKE_MODE),
-                key="revenue_outlook_ev_uptake_basis",
+                key="revenue_outlook_ev_uptake_basis_v2",
                 help=VFM_SOURCE_NOTE + "\n\n" + SENSITIVITY_INTERPLAY_NOTE,
             )
         custom_ev_levers: tuple[float, ...] = ()
@@ -3038,7 +3061,12 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                     "running-cost change so the tax-free pump price still drives VKT. Petrol demand stays on the "
                     "PED finalist; the Light RUC finalist is not re-estimated."
                 )
-    ev_uptake_key: tuple[Any, ...] = (selected_ev_uptake_mode, custom_ev_levers, eruc_lever_values)
+    ev_uptake_key: tuple[Any, ...] = (
+        selected_ev_uptake_mode,
+        custom_ev_levers,
+        eruc_lever_values,
+        0 if fed_uplift_on else 1,
+    )
     sensitivity_key = selected_sensitivity_key(
         fleet_efficiency=selected_fleet_efficiency,
         pt_mode_shift=selected_pt_mode_shift,
@@ -3107,10 +3135,19 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         )
     if view.get("eruc_applied"):
         total_path_notes.append(ERUC_NOTE)
+    if view.get("fed_uplift_off"):
+        total_path_notes.append(FED_UPLIFT_NOTE)
     chart_card(
         "Total path chart",
         "\n\n".join(total_path_notes),
         main_path_figure,
+        caption=None,
+        notes_as_tooltip=True,
+    )
+    chart_card(
+        "Effective rates per 1,000 km",
+        RATE_CHART_NOTE,
+        cached_revenue_rate_paths_figure(pack_signature, fed_uplift_on, pack.revenue_chart_rows),
         caption=None,
         notes_as_tooltip=True,
     )
@@ -5427,6 +5464,89 @@ def _revenue_outlook_trace_options(chart_rows: pd.DataFrame) -> list[str]:
     return ordered
 
 
+@st.cache_data(show_spinner=False)
+def cached_revenue_rate_paths_figure(
+    signature: tuple[tuple[str, int, int], ...],
+    fed_uplift_on: bool,
+    _chart_rows: pd.DataFrame,
+) -> go.Figure:
+    del signature
+    frame = rate_paths_frame(Path(__file__).resolve().parent, _chart_rows)
+    return revenue_rate_paths_figure(frame, fed_uplift_on=fed_uplift_on)
+
+
+def revenue_rate_paths_figure(frame: pd.DataFrame, *, fed_uplift_on: bool) -> go.Figure:
+    if frame is None or frame.empty:
+        return empty_figure("Rate paths are unavailable in the committed source tables.")
+    fig = go.Figure()
+    selected_segment = "planned" if fed_uplift_on else "no_uplift"
+    alternative_segment = "no_uplift" if fed_uplift_on else "planned"
+    segment_labels = {"planned": "PED incl. 12c uplift", "no_uplift": "PED excl. 12c uplift"}
+    styles = [
+        ("Light RUC", None, "#006FAD", "solid", 2.4, "Light RUC"),
+        ("Heavy RUC", None, "#102A43", "solid", 2.4, "Heavy RUC"),
+        ("PED (petrol excise)", "history", "#00843D", "solid", 2.4, "PED (petrol excise), actual"),
+        ("PED (petrol excise)", selected_segment, "#00843D", "dash", 2.4, segment_labels[selected_segment]),
+        ("PED (petrol excise)", alternative_segment, "#7FBF9E", "dot", 1.6, segment_labels[alternative_segment]),
+    ]
+    for series, segment, color, dash, width, label in styles:
+        group = frame[frame["series"].eq(series)]
+        if segment is not None:
+            group = group[group["segment"].eq(segment)]
+        group = group.dropna(subset=["nzd_per_1000km"]).sort_values("june_year")
+        if group.empty:
+            continue
+        litre_text = [
+            f"<br>${v:,.2f}/litre" if pd.notna(v) else "" for v in group["nzd_per_litre"]
+        ]
+        fig.add_trace(
+            go.Scatter(
+                x=group["june_year"],
+                y=group["nzd_per_1000km"],
+                mode="lines",
+                name=label,
+                line={"color": color, "dash": dash, "width": width},
+                customdata=litre_text,
+                hovertemplate="<b>%{fullData.name}</b><br>$%{y:,.0f} per 1,000 km%{customdata}<extra></extra>",
+            )
+        )
+    fig.update_xaxes(title_text="June year ending", title_font={"size": 11, "color": "#5A6B7B"}, showgrid=False, dtick=5)
+    fig.update_yaxes(title_text="NZD per 1,000 km", gridcolor="#E6EDF5", zeroline=False)
+    fig.update_layout(
+        height=300,
+        margin={"l": 56, "r": 18, "t": 20, "b": 40},
+        hovermode="x unified",
+        hoverdistance=5,
+        legend={"orientation": "h", "y": -0.22, "x": 0.0, "font": {"size": 11}},
+        plot_bgcolor="#FFFFFF",
+        shapes=[
+            {
+                "type": "line",
+                "xref": "x",
+                "yref": "paper",
+                "x0": 2025.5,
+                "x1": 2025.5,
+                "y0": 0,
+                "y1": 1,
+                "line": {"dash": "dash", "color": "#B45309", "width": 1.4},
+            }
+        ],
+        annotations=[
+            {
+                "xref": "x",
+                "yref": "paper",
+                "x": 2025.5,
+                "y": 1.0,
+                "text": "Actuals to 2025",
+                "showarrow": False,
+                "yanchor": "bottom",
+                "font": {"color": "#B45309", "size": 11},
+            }
+        ],
+    )
+    return fig
+
+
 def _display_period_label(period: Any) -> str:
     """June-year periods display as plain years ('FY2025' -> '2025')."""
     text = str(period or "")
@@ -5894,7 +6014,7 @@ def revenue_outlook_total_path_figure(
     axis_kwargs: dict[str, Any] = {
         "categoryorder": "array",
         "categoryarray": periods,
-        "tickangle": -30,
+        "tickangle": -90,
         "showgrid": False,
     }
     if is_june_axis:
