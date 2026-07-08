@@ -178,3 +178,14 @@ def test_cloud_runtime_preview_simulates_cloud_page_set(monkeypatch) -> None:
     monkeypatch.setattr(presentation, "cloud_preview_enabled", lambda: True)
     assert app.is_streamlit_cloud_runtime()
     assert app.REPRODUCIBILITY_PAGE not in app.dashboard_pages()
+
+
+def test_cloud_preview_defaults_on_for_fresh_sessions(monkeypatch) -> None:
+    """Without the suite's env pin, a fresh session previews the cloud
+    runtime by default so local and deployed views match out of the box."""
+    from model_dashboard import presentation
+
+    monkeypatch.delenv(presentation.CLOUD_PREVIEW_DEFAULT_ENV, raising=False)
+    assert presentation.cloud_preview_default() is True
+    monkeypatch.setenv(presentation.CLOUD_PREVIEW_DEFAULT_ENV, "0")
+    assert presentation.cloud_preview_default() is False

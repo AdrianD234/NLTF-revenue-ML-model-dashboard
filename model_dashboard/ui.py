@@ -1122,6 +1122,33 @@ def inject_theme() -> None:
                 overflow: hidden;
                 padding: 0;
             }}
+            /* Shared panel headings (used on Revenue Outlook and the
+               governance page; the page-5 theme adds further detail). */
+            .page5-panel-title {{
+                color: #002B5C;
+                font-size: 0.92rem;
+                font-weight: 800;
+                line-height: 1.2;
+                margin-bottom: 0.1rem;
+            }}
+            .page5-panel-sub {{
+                color: #64748B;
+                font-size: 0.74rem;
+                line-height: 1.25;
+                margin-bottom: 0.5rem;
+            }}
+            /* Scenario comparison (A vs B) column headers. */
+            .ro-cmp-scenario-head {{
+                border-radius: 8px;
+                color: #FFFFFF;
+                font-size: 0.8rem;
+                font-weight: 750;
+                letter-spacing: 0.02em;
+                margin-bottom: 0.55rem;
+                padding: 0.34rem 0.72rem;
+            }}
+            .ro-cmp-a {{ background: #002B5C; }}
+            .ro-cmp-b {{ background: #F37021; }}
         </style>
         """,
         unsafe_allow_html=True,

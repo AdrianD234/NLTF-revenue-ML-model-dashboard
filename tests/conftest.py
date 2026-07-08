@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 import sys
 from uuid import uuid4
@@ -10,6 +11,11 @@ import pytest
 RUNTIME_PYARROW24 = Path(__file__).resolve().parents[1] / ".runtime_pyarrow24"
 if RUNTIME_PYARROW24.exists() and str(RUNTIME_PYARROW24) not in sys.path:
     sys.path.insert(0, str(RUNTIME_PYARROW24))
+
+# The app's cloud-runtime preview defaults ON for humans; the suite exercises
+# local analyst behaviour, so pin the default OFF here. Tests that assert the
+# ON default explicitly monkeypatch this variable away (test_executive_mode).
+os.environ.setdefault("CLOUD_PREVIEW_DEFAULT", "0")
 
 
 @pytest.fixture

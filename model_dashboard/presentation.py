@@ -119,6 +119,19 @@ def render_mode_toggle() -> None:
 
 
 CLOUD_PREVIEW_KEY = "cloud_runtime_preview_toggle"
+CLOUD_PREVIEW_DEFAULT_ENV = "CLOUD_PREVIEW_DEFAULT"
+
+
+def cloud_preview_default() -> bool:
+    """Default for the cloud-preview toggle: ON, so a fresh local session
+    looks like the deployed app. The CLOUD_PREVIEW_DEFAULT env var overrides
+    (0/false -> local analyst view first; used by the test suite)."""
+    value = os.environ.get(CLOUD_PREVIEW_DEFAULT_ENV, "").strip().lower()
+    if value in {"0", "false", "no", "off"}:
+        return False
+    if value in {"1", "true", "yes", "on"}:
+        return True
+    return True
 
 
 def cloud_preview_enabled() -> bool:
@@ -129,7 +142,7 @@ def cloud_preview_enabled() -> bool:
     try:
         import streamlit as st
 
-        return bool(st.session_state.get(CLOUD_PREVIEW_KEY, False))
+        return bool(st.session_state.get(CLOUD_PREVIEW_KEY, cloud_preview_default()))
     except Exception:
         return False
 
@@ -137,12 +150,14 @@ def cloud_preview_enabled() -> bool:
 def render_cloud_preview_toggle() -> None:
     import streamlit as st
 
+    st.session_state.setdefault(CLOUD_PREVIEW_KEY, cloud_preview_default())
     st.toggle(
         "Cloud runtime preview",
         key=CLOUD_PREVIEW_KEY,
-        help=("Render this local session with Streamlit Cloud runtime rules "
-              "(e.g. the Governance & Reproducibility page is hidden, exactly as "
-              "on the deployed app). This previews runtime behaviour only - the "
+        help=("On by default so this local session renders exactly like the "
+              "deployed app (the Governance & Reproducibility page and local "
+              "audit controls are hidden). Switch off to restore the full "
+              "local analyst view. This previews runtime behaviour only - the "
               "deployed code version may still differ until you push; use "
               "scripts/run_deployed_preview.ps1 to run the deployed commit side by side."),
     )

@@ -1000,6 +1000,7 @@ def test_revenue_outlook_cloud_hides_debug_toggles_and_shows_full_composition(mo
         ("2027 12c FED uplift", "revenue_outlook_fed_uplift"),
         ("Freight rail shift", "revenue_outlook_sensitivity_freight_rail_toggle"),
         ("Move petrol fleet to e-RUC", "revenue_outlook_eruc_toggle"),
+        ("Compare scenarios (A vs B)", "revenue_outlook_compare_toggle"),
     ]
     assert any("Revenue composition over time" in str(markdown.value) for markdown in at.markdown)
     rendered_text = "\n".join([*(str(markdown.value) for markdown in at.markdown), *(str(caption.value) for caption in at.caption)])

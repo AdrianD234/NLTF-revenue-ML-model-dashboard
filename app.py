@@ -122,6 +122,13 @@ from model_dashboard.eruc_transition import (
     ErucTransitionLevers,
     apply_eruc_transition_to_chart_rows,
 )
+from model_dashboard.npv import (
+    average_annual,
+    cumulative_total,
+    horizon_label,
+    mbcm_label,
+    npv_to_horizon,
+)
 from model_dashboard.rate_paths import (
     FED_UPLIFT_NOTE,
     RATE_CHART_NOTE,
@@ -872,6 +879,54 @@ def cached_revenue_outlook_view(
         "eruc_audit": eruc_audit,
         "fed_uplift_off": fed_uplift_off and not fed_uplift_audit.empty,
         "fed_uplift_audit": fed_uplift_audit,
+    }
+
+
+@st.cache_data(show_spinner=False)
+def cached_scenario_comparison_paths(
+    signature: tuple[tuple[str, int, int], ...],
+    series: str,
+    fed_path: str,
+    sensitivity_key_a: tuple[str, ...],
+    ev_uptake_key_a: tuple[Any, ...],
+    sensitivity_key_b: tuple[str, ...],
+    ev_uptake_key_b: tuple[Any, ...],
+    bridge_mode: str,
+    _pack: RevenueOutlookPack,
+) -> dict[str, Any]:
+    """A/B scenario paths for one series: two full view computations.
+
+    ``cached_revenue_outlook_view`` itself is uncached; this wrapper provides
+    the caching so a rerun with unchanged scenario keys is free.
+    """
+    traces = ("Current finalist Base case", "Actual")
+
+    def _paths(sensitivity_key, ev_uptake_key) -> tuple[pd.Series, pd.Series, str, str]:
+        view = cached_revenue_outlook_view(
+            signature, series, "june_year", fed_path, traces,
+            sensitivity_key, bridge_mode, ev_uptake_key, _pack,
+        )
+        rows = view["filtered_rows"]
+        if rows is None or rows.empty:
+            return pd.Series(dtype=float), pd.Series(dtype=float), "", ""
+        fy = pd.to_numeric(rows["june_year"], errors="coerce")
+        values = pd.to_numeric(rows["value"], errors="coerce")
+        is_actual = rows["row_type"].astype(str).eq("historical_actual")
+        is_base = rows["trace_name"].astype(str).eq("Current finalist Base case")
+        history = pd.Series(values[is_actual].to_numpy(), index=fy[is_actual].to_numpy()).dropna().sort_index()
+        forecast = pd.Series(values[is_base & ~is_actual].to_numpy(), index=fy[is_base & ~is_actual].to_numpy()).dropna().sort_index()
+        unit = _first_non_empty(rows.get("value_unit", pd.Series(dtype=str)))
+        metric = _revenue_outlook_series_metric_type(view["chart_rows"], series)
+        return forecast, history, str(unit or ""), str(metric or "")
+
+    forecast_a, history, unit, metric = _paths(sensitivity_key_a, ev_uptake_key_a)
+    forecast_b, _, _, _ = _paths(sensitivity_key_b, ev_uptake_key_b)
+    return {
+        "history": history,
+        "a": forecast_a,
+        "b": forecast_b,
+        "value_unit": unit,
+        "metric_type": metric,
     }
 
 
@@ -2838,7 +2893,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     default_fy_index = fy_options.index("FY2030") if "FY2030" in fy_options else max(len(fy_options) - 1, 0)
 
     with st.container(border=True):
-        st.markdown("<div class='page5-panel-title'>Revenue Outlook controls</div>", unsafe_allow_html=True)
+        st.markdown("<div class='page5-panel-title'>Revenue Outlook controls</div><div class='page5-panel-sub'>Series, time grain and comparator selections for every chart below.</div>", unsafe_allow_html=True)
         control_cols = st.columns([0.14, 0.28, 0.18, 0.12, 0.28])
         with control_cols[0]:
             grain_label = st.radio(
@@ -2914,7 +2969,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     selected_demand_elasticity = "Off"
     cost_per_km_ratio = None
     with st.container(border=True):
-        st.markdown("<div class='page5-panel-title'>Sensitivities</div>", unsafe_allow_html=True)
+        st.markdown("<div class='page5-panel-title'>Sensitivities</div><div class='page5-panel-sub'>Demand and intensity levers layered onto the current forecasts.</div>", unsafe_allow_html=True)
         sens_cols = st.columns([0.20, 0.20, 0.20, 0.40])
         with sens_cols[0]:
             selected_fleet_efficiency = st.selectbox(
@@ -2966,7 +3021,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             if all(value != "Custom" for value in [selected_fleet_efficiency, selected_pt_mode_shift, selected_freight_rail_shift]):
                 st.caption("Custom inputs appear only when selected.")
     with st.container(border=True):
-        st.markdown("<div class='page5-panel-title'>EV/PHEV uptake</div>", unsafe_allow_html=True)
+        st.markdown("<div class='page5-panel-title'>EV/PHEV uptake</div><div class='page5-panel-sub'>Fleet-transition share curves inferred from the MoT Vehicle Fleet Model.</div>", unsafe_allow_html=True)
         uptake_cols = st.columns([0.30, 0.70])
         with uptake_cols[0]:
             selected_ev_uptake_mode = st.selectbox(
@@ -3026,7 +3081,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                     "Applied in this view only; the governed pack is unchanged."
                 )
     with st.container(border=True):
-        st.markdown("<div class='page5-panel-title'>e-RUC transition</div>", unsafe_allow_html=True)
+        st.markdown("<div class='page5-panel-title'>e-RUC transition</div><div class='page5-panel-sub'>Move the petrol fleet from fuel excise to per-km road user charges.</div>", unsafe_allow_html=True)
         eruc_cols = st.columns([0.30, 0.70])
         with eruc_cols[0]:
             eruc_enabled = st.toggle(
@@ -3150,6 +3205,14 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         cached_revenue_rate_paths_figure(pack_signature, fed_uplift_on, pack.revenue_chart_rows),
         caption=None,
         notes_as_tooltip=True,
+    )
+
+    _render_scenario_comparison_panel(
+        pack_signature,
+        pack,
+        selector_options,
+        selected_fed_path,
+        sensitivity_labels,
     )
 
     if revenue_outlook_lazy_table(
@@ -5462,6 +5525,359 @@ def _revenue_outlook_trace_options(chart_rows: pd.DataFrame) -> list[str]:
     ordered = [trace for trace in preferred if trace in available]
     ordered.extend(sorted(available.difference(ordered)))
     return ordered
+
+
+_COMPARISON_SENSITIVITY_LEVELS = ("Off", "Low", "Med", "High")
+_COMPARISON_DISCOUNT_MBCM = "NZTA MBCM (2% p.a.; 1.5% beyond yr 30)"
+_COMPARISON_DISCOUNT_CUSTOM = "Custom single rate"
+
+
+def _validated_select_state(key: str, options: list[str], default: str) -> None:
+    """Keep a selectbox session value legal when its option set changes."""
+    if key in st.session_state and st.session_state[key] not in options:
+        st.session_state[key] = default if default in options else options[0]
+
+
+def _comparison_scenario_defaults(prefix: str) -> dict[str, Any]:
+    is_b = prefix == "b"
+    return {
+        "uptake": "MoT VFM fast" if is_b else DEFAULT_EV_UPTAKE_MODE,
+        "fleet": "Off",
+        "pt": "Off",
+        "freight": "Off",
+        "eruc": False,
+        "fed": True,
+    }
+
+
+def _render_comparison_scenario_column(prefix: str, sensitivity_labels: dict[str, dict[str, str]]) -> tuple[tuple, tuple]:
+    defaults = _comparison_scenario_defaults(prefix)
+    uptake_options = [mode for mode in EV_UPTAKE_MODE_OPTIONS if mode != EV_UPTAKE_CUSTOM_OPTION]
+    keys = {name: f"ro_cmp_{prefix}_{name}" for name in ["uptake", "fleet", "pt", "freight", "eruc", "fed"]}
+    _validated_select_state(keys["uptake"], uptake_options, defaults["uptake"])
+    st.session_state.setdefault(keys["uptake"], defaults["uptake"])
+    uptake = st.selectbox("Uptake basis", uptake_options, key=keys["uptake"])
+    levels = list(_COMPARISON_SENSITIVITY_LEVELS)
+    for name, family in [("fleet", "fleet_efficiency"), ("pt", "pt_mode_shift"), ("freight", "freight_rail_shift")]:
+        _validated_select_state(keys[name], levels, defaults[name])
+        st.session_state.setdefault(keys[name], defaults[name])
+    fleet = st.selectbox(
+        "Fleet efficiency", levels, key=keys["fleet"],
+        format_func=lambda level: sensitivity_labels["fleet_efficiency"].get(level, str(level)),
+    )
+    pt_shift = st.selectbox(
+        "PT mode shift", levels, key=keys["pt"],
+        format_func=lambda level: sensitivity_labels["pt_mode_shift"].get(level, str(level)),
+    )
+    freight = st.selectbox(
+        "Freight rail shift", levels, key=keys["freight"],
+        format_func=lambda level: sensitivity_labels["freight_rail_shift"].get(level, str(level)),
+    )
+    st.session_state.setdefault(keys["eruc"], defaults["eruc"])
+    eruc_on = st.toggle("e-RUC transition", key=keys["eruc"], help=ERUC_NOTE)
+    eruc_values: tuple[float, ...] = ()
+    if eruc_on:
+        with st.popover("e-RUC levers", use_container_width=True):
+            start = st.number_input("Start FY", min_value=2026, max_value=2045, value=2027, step=1, key=f"ro_cmp_{prefix}_eruc_start")
+            phase = st.number_input("Phase-in (years)", min_value=1, max_value=10, value=3, step=1, key=f"ro_cmp_{prefix}_eruc_phase")
+            ratio = st.number_input("e-RUC rate vs light RUC (%)", min_value=25.0, max_value=200.0, value=100.0, step=5.0, key=f"ro_cmp_{prefix}_eruc_ratio")
+            elasticity = st.number_input("VKT elasticity", min_value=-1.0, max_value=0.0, value=-0.15, step=0.05, key=f"ro_cmp_{prefix}_eruc_elasticity")
+            pump = st.number_input("Pump price ($/L incl. excise)", min_value=1.0, max_value=6.0, value=2.70, step=0.05, key=f"ro_cmp_{prefix}_eruc_pump")
+        eruc_values = (float(start), float(phase), ratio / 100.0, float(elasticity), float(pump))
+    st.session_state.setdefault(keys["fed"], defaults["fed"])
+    fed_on = st.toggle("2027 12c FED uplift", key=keys["fed"], help=FED_UPLIFT_NOTE)
+    sensitivity_key = selected_sensitivity_key(fleet, pt_shift, "Off", freight_rail_shift=freight)
+    ev_uptake_key = (uptake, (), eruc_values, 0 if fed_on else 1)
+    return sensitivity_key, ev_uptake_key
+
+
+def _copy_page_settings_to_scenario_a() -> None:
+    """Map the main-panel session values into the Scenario A keys."""
+    uptake = str(st.session_state.get("revenue_outlook_ev_uptake_basis_v2", DEFAULT_EV_UPTAKE_MODE))
+    if uptake == EV_UPTAKE_CUSTOM_OPTION:
+        uptake = DEFAULT_EV_UPTAKE_MODE
+    st.session_state["ro_cmp_a_uptake"] = uptake
+    for target, source in [
+        ("ro_cmp_a_fleet", "revenue_outlook_sensitivity_fleet_efficiency"),
+        ("ro_cmp_a_pt", "revenue_outlook_sensitivity_pt_mode_shift"),
+    ]:
+        level = str(st.session_state.get(source, "Off"))
+        st.session_state[target] = level if level in _COMPARISON_SENSITIVITY_LEVELS else "Off"
+    freight_level = "Off"
+    if bool(st.session_state.get("revenue_outlook_sensitivity_freight_rail_toggle", False)):
+        candidate = str(st.session_state.get("revenue_outlook_sensitivity_freight_rail_shift", "Med"))
+        freight_level = candidate if candidate in _COMPARISON_SENSITIVITY_LEVELS else "Med"
+    st.session_state["ro_cmp_a_freight"] = freight_level
+    st.session_state["ro_cmp_a_eruc"] = bool(st.session_state.get("revenue_outlook_eruc_toggle", False))
+    st.session_state["ro_cmp_a_fed"] = bool(st.session_state.get("revenue_outlook_fed_uplift", True))
+
+
+def _scenario_summary_text(sensitivity_key: tuple, ev_uptake_key: tuple) -> str:
+    parts = [str(ev_uptake_key[0])]
+    for label, value in [("Fleet", sensitivity_key[0]), ("PT", sensitivity_key[1]), ("Freight", sensitivity_key[9])]:
+        if value != "Off":
+            parts.append(f"{label} {value}")
+    if len(ev_uptake_key) > 2 and ev_uptake_key[2]:
+        parts.append("e-RUC on")
+    if len(ev_uptake_key) > 3 and ev_uptake_key[3]:
+        parts.append("12c off")
+    return " · ".join(parts)
+
+
+def _render_scenario_comparison_panel(
+    pack_signature: tuple[tuple[str, int, int], ...],
+    pack: RevenueOutlookPack,
+    selector_options: dict[str, Any],
+    fed_path: str,
+    sensitivity_labels: dict[str, dict[str, str]],
+) -> None:
+    with st.container(border=True):
+        st.markdown("<div class='page5-panel-title'>Scenario comparison (A vs B)</div>", unsafe_allow_html=True)
+        compare_on = st.toggle(
+            "Compare scenarios (A vs B)",
+            value=False,
+            key="revenue_outlook_compare_toggle",
+            help=(
+                "Hold two policy configurations side by side: overlaid forecast paths, a horizon NPV for "
+                "revenue series (physical quantities are reported as cumulative and average-annual totals - "
+                "the MBCM discounts monetised streams only), and delta cards in the selected metric's units. "
+                "Uses named presets; custom lever values remain available in the main panels."
+            ),
+        )
+        if not compare_on:
+            st.caption("Switch on to configure Scenario A and Scenario B and compare paths, NPV and deltas.")
+            return
+
+        head_cols = st.columns([0.34, 0.26, 0.16, 0.24])
+        with head_cols[0]:
+            series_options = list(selector_options["stream_options"])
+            _validated_select_state("ro_cmp_series", series_options, "Total NLTF revenue")
+            st.session_state.setdefault("ro_cmp_series", "Total NLTF revenue" if "Total NLTF revenue" in series_options else series_options[0])
+            comparison_series = st.selectbox("Series to compare", series_options, key="ro_cmp_series")
+        with head_cols[1]:
+            discount_mode = st.selectbox(
+                "Discount basis",
+                [_COMPARISON_DISCOUNT_MBCM, _COMPARISON_DISCOUNT_CUSTOM],
+                key="ro_cmp_discount_mode",
+                help="Applied to revenue series only. " + mbcm_label(),
+            )
+        with head_cols[2]:
+            custom_rate = None
+            if discount_mode == _COMPARISON_DISCOUNT_CUSTOM:
+                custom_rate = st.number_input("Rate (% p.a.)", min_value=0.5, max_value=10.0, value=4.0, step=0.5, key="ro_cmp_discount_rate") / 100.0
+        with head_cols[3]:
+            st.button(
+                "Copy current page settings to A",
+                on_click=_copy_page_settings_to_scenario_a,
+                key="ro_cmp_copy_a",
+                help="Maps the main-panel levers into Scenario A (custom selections fall back to defaults).",
+                use_container_width=True,
+            )
+
+        column_a, column_b = st.columns(2)
+        with column_a:
+            st.markdown("<div class='ro-cmp-scenario-head ro-cmp-a'>Scenario A</div>", unsafe_allow_html=True)
+            sens_a, uptake_a = _render_comparison_scenario_column("a", sensitivity_labels)
+        with column_b:
+            st.markdown("<div class='ro-cmp-scenario-head ro-cmp-b'>Scenario B</div>", unsafe_allow_html=True)
+            sens_b, uptake_b = _render_comparison_scenario_column("b", sensitivity_labels)
+
+        result = cached_scenario_comparison_paths(
+            pack_signature,
+            comparison_series,
+            fed_path,
+            sens_a,
+            uptake_a,
+            sens_b,
+            uptake_b,
+            PED_BRIDGE_DEFAULT_MODE,
+            pack,
+        )
+        a_path, b_path = result["a"], result["b"]
+        if a_path.empty or b_path.empty:
+            warning_panel("The selected series has no forecast rows for one of the scenarios.")
+            return
+
+        filter_summary_grid(
+            [
+                ("Scenario A", _scenario_summary_text(sens_a, uptake_a)),
+                ("Scenario B", _scenario_summary_text(sens_b, uptake_b)),
+                ("Series", str(comparison_series)),
+            ]
+        )
+        gov_kpi_grid(
+            _scenario_comparison_cards(
+                comparison_series,
+                result["metric_type"],
+                a_path,
+                b_path,
+                result["value_unit"],
+                None if discount_mode == _COMPARISON_DISCOUNT_MBCM else custom_rate,
+            )
+        )
+        chart_card(
+            "Scenario paths (A vs B)",
+            "Shared history in grey; Scenario A solid navy, Scenario B dashed orange. Same governed pipeline as the total path chart.",
+            _scenario_comparison_figure(result["history"], a_path, b_path, result["value_unit"]),
+            caption=None,
+            notes_as_tooltip=True,
+        )
+        if result["metric_type"] == "revenue":
+            rate_for_npv = None if discount_mode == _COMPARISON_DISCOUNT_MBCM else custom_rate
+            chart_card(
+                "NPV bridge (A to B)",
+                "NPV to FY2050 from an FY2026 base. " + (mbcm_label() if rate_for_npv is None else f"Single rate {rate_for_npv:.1%} p.a."),
+                _scenario_npv_waterfall_figure(
+                    npv_to_horizon(a_path, rate=rate_for_npv),
+                    npv_to_horizon(b_path, rate=rate_for_npv),
+                    result["value_unit"],
+                ),
+                caption=None,
+                notes_as_tooltip=True,
+            )
+
+
+def _format_scenario_amount(value: float, unit: str, *, signed: bool = False) -> str:
+    if pd.isna(value):
+        return "-"
+    unit_text = str(unit or "").strip()
+    if _is_million_currency_unit(unit_text):
+        magnitude = f"${abs(value):,.0f}m"
+    elif "million" in unit_text.lower():
+        magnitude = f"{abs(value):,.0f} {unit_text}"
+    else:
+        magnitude = f"{abs(value):,.0f} {unit_text}".strip()
+    if signed:
+        sign = "+" if value >= 0 else "−"
+        return f"{sign}{magnitude}"
+    return f"-{magnitude}" if value < 0 else magnitude
+
+
+def _scenario_delta_tone(delta: float) -> str:
+    if pd.isna(delta) or abs(delta) < 1e-9:
+        return "mixed"
+    return "good" if delta > 0 else "bad"
+
+
+def _scenario_comparison_cards(
+    series_label: str,
+    metric_type: str,
+    a: pd.Series,
+    b: pd.Series,
+    value_unit: str,
+    discount_rate: float | None,
+) -> list[tuple]:
+    """Adaptive KPI cards: NPV language for revenue, physical totals otherwise.
+
+    The forecast series may carry an FY2025 nowcast anchor for chart
+    continuity; card metrics cover the forecast window proper (FY2026+).
+    """
+    label = str(series_label or "")
+    a = a[a.index >= 2026] if len(a) else a
+    b = b[b.index >= 2026] if len(b) else b
+    horizon = horizon_label(a if len(a) else b)
+    is_intensity = "per capita" in label.lower() or "per capita" in str(value_unit).lower()
+    if metric_type == "revenue":
+        npv_a = npv_to_horizon(a, rate=discount_rate)
+        npv_b = npv_to_horizon(b, rate=discount_rate)
+        delta = npv_b - npv_a
+        cum_delta = cumulative_total(b) - cumulative_total(a)
+        basis = mbcm_label() if discount_rate is None else f"single rate {discount_rate:.1%} p.a."
+        pct = f"{delta / npv_a:+.1%} vs A" if npv_a else "-"
+        return [
+            ("Scenario A - NPV to FY2050", _format_scenario_amount(npv_a, value_unit), f"{basis}; FY2026 base", "-", "neutral", "A"),
+            ("Scenario B - NPV to FY2050", _format_scenario_amount(npv_b, value_unit), f"{basis}; FY2026 base", "-", "neutral", "B"),
+            ("NPV delta (B - A)", _format_scenario_amount(delta, value_unit, signed=True), horizon, pct, _scenario_delta_tone(delta), "Δ"),
+            ("Cumulative nominal delta (B - A)", _format_scenario_amount(cum_delta, value_unit, signed=True), f"{horizon}, undiscounted", "-", _scenario_delta_tone(cum_delta), "Σ"),
+        ]
+    if is_intensity:
+        avg_a, avg_b = average_annual(a), average_annual(b)
+        delta = avg_b - avg_a
+        end_delta = (b.iloc[-1] - a.iloc[-1]) if len(a) and len(b) else float("nan")
+        return [
+            ("Scenario A - average annual level", _format_scenario_amount(avg_a, value_unit), horizon, "-", "neutral", "A"),
+            ("Scenario B - average annual level", _format_scenario_amount(avg_b, value_unit), horizon, "-", "neutral", "B"),
+            ("Average level delta (B - A)", _format_scenario_amount(delta, value_unit, signed=True), horizon, "-", _scenario_delta_tone(delta), "Δ"),
+            ("FY2050 delta (B - A)", _format_scenario_amount(end_delta, value_unit, signed=True), "end of horizon", "-", _scenario_delta_tone(end_delta), "→"),
+        ]
+    cum_a, cum_b = cumulative_total(a), cumulative_total(b)
+    delta = cum_b - cum_a
+    avg_delta = average_annual(b) - average_annual(a)
+    return [
+        ("Scenario A - cumulative", _format_scenario_amount(cum_a, value_unit), horizon, "-", "neutral", "A"),
+        ("Scenario B - cumulative", _format_scenario_amount(cum_b, value_unit), horizon, "-", "neutral", "B"),
+        ("Cumulative delta (B - A)", _format_scenario_amount(delta, value_unit, signed=True), horizon, "-", _scenario_delta_tone(delta), "Δ"),
+        ("Average annual delta (B - A)", _format_scenario_amount(avg_delta, value_unit, signed=True), "per June year", "-", _scenario_delta_tone(avg_delta), "⌀"),
+    ]
+
+
+def _scenario_comparison_figure(history: pd.Series, a: pd.Series, b: pd.Series, value_unit: str) -> go.Figure:
+    if (a is None or a.empty) and (b is None or b.empty):
+        return empty_figure("Selected series has no forecast rows for the chosen scenarios.")
+    scale = _display_value_scale_for_unit(value_unit)
+    axis_title = _display_axis_unit(value_unit)
+    fig = go.Figure()
+    if history is not None and not history.empty:
+        fig.add_trace(
+            go.Scatter(
+                x=history.index.astype(int), y=history.to_numpy(dtype=float) / scale,
+                mode="lines+markers", name="Actual",
+                line={"color": "#64748B", "width": 1.6}, marker={"size": 4},
+                hovertemplate="<b>Actual</b><br>%{y:,.2f}<extra></extra>",
+            )
+        )
+    for series, name, color, dash in [
+        (a, "Scenario A", "#002B5C", "solid"),
+        (b, "Scenario B", "#F37021", "dash"),
+    ]:
+        if series is None or series.empty:
+            continue
+        fig.add_trace(
+            go.Scatter(
+                x=series.index.astype(int), y=series.to_numpy(dtype=float) / scale,
+                mode="lines+markers", name=name,
+                line={"color": color, "width": 3, "dash": dash}, marker={"size": 5},
+                hovertemplate=f"<b>{name}</b><br>%{{y:,.2f}}<extra></extra>",
+            )
+        )
+    fig.update_xaxes(title_text="June year ending", title_font={"size": 11, "color": "#5A6B7B"}, showgrid=False, dtick=5)
+    fig.update_yaxes(title_text=axis_title, gridcolor="#E6EDF5", zeroline=False)
+    fig.update_layout(
+        height=340,
+        margin={"l": 56, "r": 18, "t": 18, "b": 40},
+        hovermode="x unified",
+        hoverdistance=5,
+        legend={"orientation": "h", "y": -0.2, "x": 0.0, "font": {"size": 11}},
+        plot_bgcolor="#FFFFFF",
+    )
+    return fig
+
+
+def _scenario_npv_waterfall_figure(npv_a: float, npv_b: float, value_unit: str) -> go.Figure:
+    scale = _display_value_scale_for_unit(value_unit)
+    axis_title = _display_axis_unit(value_unit)
+    delta = npv_b - npv_a
+    fig = go.Figure(
+        go.Waterfall(
+            orientation="v",
+            measure=["absolute", "relative", "total"],
+            x=["Scenario A NPV", "Δ (B − A)", "Scenario B NPV"],
+            y=[npv_a / scale, delta / scale, npv_b / scale],
+            increasing={"marker": {"color": "#00843D"}},
+            decreasing={"marker": {"color": "#B42318"}},
+            totals={"marker": {"color": "#002B5C"}},
+            connector={"line": {"color": "#CBD5E1", "width": 1}},
+            hovertemplate="<b>%{x}</b><br>%{y:,.2f}<extra></extra>",
+        )
+    )
+    fig.update_yaxes(title_text=axis_title, gridcolor="#E6EDF5", zeroline=False)
+    fig.update_layout(
+        height=300,
+        margin={"l": 56, "r": 18, "t": 18, "b": 36},
+        showlegend=False,
+        plot_bgcolor="#FFFFFF",
+    )
+    return fig
 
 
 @st.cache_data(show_spinner=False)
@@ -8272,6 +8688,17 @@ def inject_page5_theme() -> None:
             line-height:1.2;
             margin-bottom:0.42rem;
         }
+        .ro-cmp-scenario-head {
+            border-radius:8px;
+            color:#FFFFFF;
+            font-size:0.78rem;
+            font-weight:750;
+            letter-spacing:0.02em;
+            margin-bottom:0.5rem;
+            padding:0.32rem 0.7rem;
+        }
+        .ro-cmp-a { background:#002B5C; }
+        .ro-cmp-b { background:#F37021; }
         .page5-diagram-row {
             align-items:center;
             border-bottom:1px solid #E6EDF5;
