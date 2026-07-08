@@ -73,7 +73,7 @@ def inject_theme() -> None:
                 visibility: hidden !important;
             }}
             div.block-container, .main .block-container, section.main > div.block-container {{
-                padding: 0.12rem 1rem 1.35rem !important;
+                padding: 0.85rem 1rem 1.35rem !important;
                 max-width: 1900px;
             }}
             div[data-testid="stAppViewContainer"] > .main {{
@@ -95,7 +95,7 @@ def inject_theme() -> None:
             .gov-header, .governance-shell {{
                 border-bottom: 1px solid #D9E2EC;
                 margin-bottom: 0;
-                padding: 0 0 0.1rem;
+                padding: 0.35rem 0 0.75rem;
             }}
             .governance-masthead {{
                 align-items: center;
@@ -159,9 +159,9 @@ def inject_theme() -> None:
                 font-size: 1.74rem;
                 font-weight: 780;
                 letter-spacing: 0;
-                line-height: 1.05;
-                margin-bottom: 0.02rem;
-                padding-bottom: 0.18rem;
+                line-height: 1.1;
+                margin-bottom: 0.05rem;
+                padding-bottom: 0.26rem;
                 position: relative;
             }}
             .pbi-header::after {{
@@ -199,7 +199,7 @@ def inject_theme() -> None:
                 padding: 0.22rem 0.42rem 0.12rem;
             }}
             .st-key-gov_page div[data-testid="stRadio"] {{
-                margin: 0.1rem 0 0.3rem;
+                margin: 0.6rem 0 0.7rem;
             }}
             .st-key-gov_page div[data-testid="stRadio"] > label {{
                 display: none;
@@ -375,7 +375,7 @@ def inject_theme() -> None:
                     padding-left: 0.48rem;
                 }}
                 .st-key-gov_page div[data-testid="stRadio"] {{
-                    margin: 0 0 0.08rem;
+                    margin: 0.45rem 0 0.4rem;
                 }}
                 .st-key-gov_page div[data-testid="stRadio"] div[role="radiogroup"] {{
                     gap: 0.18rem;
