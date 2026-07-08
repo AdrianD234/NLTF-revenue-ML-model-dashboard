@@ -2838,8 +2838,50 @@ def render_reproducibility_detail(stream_label: str) -> None:
         display_table(reproducibility_training_window_view(pack), height=320, max_rows=200)
 
 
+REVENUE_OUTLOOK_VIEW_SINGLE = "Single scenario"
+REVENUE_OUTLOOK_VIEW_COMPARE = "Compare A vs B"
+# Single-view controls unmount while the comparison view is active;
+# re-assigning their session values each run marks them as programmatically
+# set so Streamlit keeps them alive across the mode switch.
+_REVENUE_OUTLOOK_PERSISTED_KEYS = ("revenue_outlook_time_grain", "revenue_outlook_selected_fy")
+_REVENUE_OUTLOOK_PERSISTED_PREFIXES = ("revenue_outlook_legend_item_",)
+
+
+def _persist_revenue_outlook_view_state() -> None:
+    for key in list(st.session_state.keys()):
+        name = str(key)
+        if name in _REVENUE_OUTLOOK_PERSISTED_KEYS or name.startswith(_REVENUE_OUTLOOK_PERSISTED_PREFIXES):
+            st.session_state[key] = st.session_state[key]
+
+
+def _active_lever_summary(
+    fleet: str,
+    pt_shift: str,
+    freight: str,
+    uptake_mode: str,
+    eruc_on: bool,
+    fed_uplift_on: bool,
+) -> str:
+    """One-line summary of non-default levers, shown while the accordion is closed."""
+    parts: list[str] = []
+    if fleet != "Off":
+        parts.append(f"Fleet efficiency {fleet}")
+    if pt_shift != "Off":
+        parts.append(f"PT shift {pt_shift}")
+    if freight != "Off":
+        parts.append(f"Freight rail {freight}")
+    if uptake_mode != DEFAULT_EV_UPTAKE_MODE:
+        parts.append(f"Uptake {uptake_mode}")
+    if eruc_on:
+        parts.append("e-RUC on")
+    if not fed_uplift_on:
+        parts.append("12c uplift off")
+    return " · ".join(parts)
+
+
 def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     del loaded
+    _persist_revenue_outlook_view_state()
     repo_root = Path(__file__).resolve().parent
     timer = RevenueOutlookRenderTimer(_revenue_outlook_perf_debug_enabled())
     timer.start("pack load")
@@ -2893,16 +2935,24 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     default_fy_index = fy_options.index("FY2030") if "FY2030" in fy_options else max(len(fy_options) - 1, 0)
 
     with st.container(border=True):
-        st.markdown("<div class='page5-panel-title'>Revenue Outlook controls</div><div class='page5-panel-sub'>Series, time grain and comparator selections for every chart below.</div>", unsafe_allow_html=True)
-        control_cols = st.columns([0.14, 0.28, 0.18, 0.12, 0.28])
-        with control_cols[0]:
-            grain_label = st.radio(
-                "Time grain",
-                ["June-year", "Quarterly"],
+        st.markdown("<div class='page5-panel-title'>Revenue Outlook controls</div><div class='page5-panel-sub'>Choose a view, then the series every chart below tracks.</div>", unsafe_allow_html=True)
+        view_cols = st.columns([0.34, 0.30, 0.36])
+        with view_cols[0]:
+            st.markdown("<div class='control-label'>View</div>", unsafe_allow_html=True)
+            view_mode = st.radio(
+                "View",
+                [REVENUE_OUTLOOK_VIEW_SINGLE, REVENUE_OUTLOOK_VIEW_COMPARE],
                 horizontal=True,
-                key="revenue_outlook_time_grain",
+                label_visibility="collapsed",
+                key="revenue_outlook_view_mode",
+                help=(
+                    "Single scenario plots the committed forecast with the advanced levers applied. "
+                    "Compare A vs B replaces the total path chart with two independently configured "
+                    "scenarios: overlaid paths, horizon NPV and adaptive delta cards."
+                ),
             )
-        with control_cols[1]:
+        compare_mode = view_mode == REVENUE_OUTLOOK_VIEW_COMPARE
+        with view_cols[1]:
             selected_stream = st.selectbox(
                 "Series",
                 stream_options,
@@ -2911,46 +2961,63 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             )
         selected_metric_type = _revenue_outlook_series_metric_type(chart_rows, selected_stream)
         # Rows carry the planned path; the 12c counterfactual is a display
-        # reprice, so the old one-option 'FED path' selector is a toggle now.
+        # reprice handled by the policy toggle in the lever accordion.
         selected_fed_path = fed_path_options[default_fed_index] if fed_path_options else ""
-        with control_cols[2]:
-            if selected_metric_type == "activity":
-                fed_uplift_on = True
-                st.markdown("<div class='control-label'>2027 12c FED uplift</div>", unsafe_allow_html=True)
-                st.caption("Not applicable to activity series.")
-            else:
-                fed_uplift_on = st.toggle(
-                    "2027 12c FED uplift",
-                    value=True,
-                    key="revenue_outlook_fed_uplift",
-                    help=FED_UPLIFT_NOTE,
-                )
-        with control_cols[3]:
-            selected_fy = st.selectbox(
-                "Selected FY",
-                fy_options,
-                index=default_fy_index,
-                key="revenue_outlook_selected_fy",
+        selected_trace_defaults = _revenue_outlook_default_traces(trace_options)
+        if compare_mode:
+            st.caption(
+                "Comparison plots June years. Time grain, FY marker and legend selections apply to "
+                "the single-scenario view and are kept while you compare."
             )
-        with control_cols[4]:
-            selected_trace_defaults = _revenue_outlook_default_traces(trace_options)
-            selected_traces = []
-            st.markdown("<div class='control-label'>Legend items</div>", unsafe_allow_html=True)
-            with st.popover("Select legend items", use_container_width=True):
-                st.caption("Choose which traces appear in the chart legend.")
-                for trace in trace_options:
-                    is_selected = st.checkbox(
-                        trace,
-                        value=trace in selected_trace_defaults,
-                        key=f"revenue_outlook_legend_item_{_widget_key(trace)}",
-                    )
-                    if is_selected:
-                        selected_traces.append(trace)
+            grain_label = str(st.session_state.get("revenue_outlook_time_grain", "June-year"))
+            default_fy = fy_options[default_fy_index] if fy_options else ""
+            selected_fy = str(st.session_state.get("revenue_outlook_selected_fy", default_fy))
+            if selected_fy not in fy_options and fy_options:
+                selected_fy = default_fy
+            selected_traces = [
+                trace
+                for trace in trace_options
+                if st.session_state.get(
+                    f"revenue_outlook_legend_item_{_widget_key(trace)}",
+                    trace in selected_trace_defaults,
+                )
+            ]
             if not selected_traces:
                 selected_traces = selected_trace_defaults or list(trace_options[:1])
-                st.caption("Using default legend items.")
-            else:
-                st.caption(_revenue_outlook_trace_selection_summary(selected_traces, len(trace_options)))
+        else:
+            control_cols = st.columns([0.20, 0.16, 0.28, 0.36])
+            with control_cols[0]:
+                grain_label = st.radio(
+                    "Time grain",
+                    ["June-year", "Quarterly"],
+                    horizontal=True,
+                    key="revenue_outlook_time_grain",
+                )
+            with control_cols[1]:
+                selected_fy = st.selectbox(
+                    "Selected FY",
+                    fy_options,
+                    index=default_fy_index,
+                    key="revenue_outlook_selected_fy",
+                )
+            with control_cols[2]:
+                selected_traces = []
+                st.markdown("<div class='control-label'>Legend items</div>", unsafe_allow_html=True)
+                with st.popover("Select legend items", use_container_width=True):
+                    st.caption("Choose which traces appear in the chart legend.")
+                    for trace in trace_options:
+                        is_selected = st.checkbox(
+                            trace,
+                            value=trace in selected_trace_defaults,
+                            key=f"revenue_outlook_legend_item_{_widget_key(trace)}",
+                        )
+                        if is_selected:
+                            selected_traces.append(trace)
+                if not selected_traces:
+                    selected_traces = selected_trace_defaults or list(trace_options[:1])
+                    st.caption("Using default legend items.")
+                else:
+                    st.caption(_revenue_outlook_trace_selection_summary(selected_traces, len(trace_options)))
         bridge_mode_lookup = selector_options["bridge_mode_lookup"]
         bridge_mode_options = list(bridge_mode_lookup)
         default_bridge_label = next(
@@ -2968,7 +3035,10 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     sensitivity_labels = selector_options["sensitivity_labels"]
     selected_demand_elasticity = "Off"
     cost_per_km_ratio = None
-    with st.container(border=True):
+    # One accordion holds every scenario lever; re-entering the same expander
+    # object appends each group without re-indenting their layouts.
+    lever_expander = st.expander("Advanced scenario levers", expanded=False)
+    with lever_expander:
         st.markdown("<div class='page5-panel-title'>Sensitivities</div><div class='page5-panel-sub'>Demand and intensity levers layered onto the current forecasts.</div>", unsafe_allow_html=True)
         sens_cols = st.columns([0.20, 0.20, 0.20, 0.40])
         with sens_cols[0]:
@@ -3020,7 +3090,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 custom_freight_shift_pct = st.number_input("Custom rail shift % p.a.", min_value=0.0, max_value=10.0, value=0.5, step=0.1)
             if all(value != "Custom" for value in [selected_fleet_efficiency, selected_pt_mode_shift, selected_freight_rail_shift]):
                 st.caption("Custom inputs appear only when selected.")
-    with st.container(border=True):
+    with lever_expander:
         st.markdown("<div class='page5-panel-title'>EV/PHEV uptake</div><div class='page5-panel-sub'>Fleet-transition share curves inferred from the MoT Vehicle Fleet Model.</div>", unsafe_allow_html=True)
         uptake_cols = st.columns([0.30, 0.70])
         with uptake_cols[0]:
@@ -3080,10 +3150,21 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                     f"Heavy: {preset.heavy_bev_share_2050 * 100:.0f}% BEV by 2050 (rollup-neutral; BEVs pay the same per-km RUC). "
                     "Applied in this view only; the governed pack is unchanged."
                 )
-    with st.container(border=True):
-        st.markdown("<div class='page5-panel-title'>e-RUC transition</div><div class='page5-panel-sub'>Move the petrol fleet from fuel excise to per-km road user charges.</div>", unsafe_allow_html=True)
+    with lever_expander:
+        st.markdown("<div class='page5-panel-title'>Policy switches</div><div class='page5-panel-sub'>Legislated 12c FED uplift and the petrol-fleet e-RUC transition.</div>", unsafe_allow_html=True)
         eruc_cols = st.columns([0.30, 0.70])
         with eruc_cols[0]:
+            if selected_metric_type == "activity":
+                fed_uplift_on = True
+                st.markdown("<div class='control-label'>2027 12c FED uplift</div>", unsafe_allow_html=True)
+                st.caption("Not applicable to activity series.")
+            else:
+                fed_uplift_on = st.toggle(
+                    "2027 12c FED uplift",
+                    value=True,
+                    key="revenue_outlook_fed_uplift",
+                    help=FED_UPLIFT_NOTE,
+                )
             eruc_enabled = st.toggle(
                 "Move petrol fleet to e-RUC",
                 value=False,
@@ -3116,6 +3197,16 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                     "running-cost change so the tax-free pump price still drives VKT. Petrol demand stays on the "
                     "PED finalist; the Light RUC finalist is not re-estimated."
                 )
+    lever_summary = _active_lever_summary(
+        fleet=selected_fleet_efficiency,
+        pt_shift=selected_pt_mode_shift,
+        freight=selected_freight_rail_shift,
+        uptake_mode=selected_ev_uptake_mode,
+        eruc_on=eruc_enabled,
+        fed_uplift_on=fed_uplift_on,
+    )
+    if lever_summary:
+        st.caption(f"Active levers: {lever_summary}")
     ev_uptake_key: tuple[Any, ...] = (
         selected_ev_uptake_mode,
         custom_ev_levers,
@@ -3164,56 +3255,50 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     if gap_summary:
         warning_panel(gap_summary)
 
-    timer.start("main path figure")
-    main_path_figure = cached_revenue_outlook_total_path_figure(
-        pack_signature,
-        selected_stream,
-        selected_fy,
-        selected_time_grain,
-        selected_fed_path,
-        tuple(selected_traces),
-        sensitivity_key,
-        selected_ped_bridge_mode,
-        ev_uptake_key,
-        filtered_rows,
-        view.get("cone_band"),
-    )
-    timer.stop("main path figure")
-    total_path_notes = []
-    if view.get("quarterly_disaggregated"):
-        total_path_notes.append(QUARTERLY_DISAGGREGATION_NOTE)
-    if view.get("ev_uptake_applied"):
-        total_path_notes.append(
-            f"EV/PHEV uptake basis: {selected_ev_uptake_mode}. Light RUC conventional/BEV/PHEV km and "
-            "revenue lines (plus dependent rollups) are reallocated in this view with lever share curves; "
-            "the governed pack is unchanged. " + VFM_SOURCE_NOTE
+    if compare_mode:
+        _render_scenario_comparison_panel(
+            pack_signature,
+            pack,
+            selected_stream,
+            selected_fed_path,
+            sensitivity_labels,
         )
-    if view.get("eruc_applied"):
-        total_path_notes.append(ERUC_NOTE)
-    if view.get("fed_uplift_off"):
-        total_path_notes.append(FED_UPLIFT_NOTE)
-    chart_card(
-        "Total path chart",
-        "\n\n".join(total_path_notes),
-        main_path_figure,
-        caption=None,
-        notes_as_tooltip=True,
-    )
-    chart_card(
-        "Effective rates per 1,000 km",
-        RATE_CHART_NOTE,
-        cached_revenue_rate_paths_figure(pack_signature, fed_uplift_on, pack.revenue_chart_rows),
-        caption=None,
-        notes_as_tooltip=True,
-    )
-
-    _render_scenario_comparison_panel(
-        pack_signature,
-        pack,
-        selector_options,
-        selected_fed_path,
-        sensitivity_labels,
-    )
+    else:
+        timer.start("main path figure")
+        main_path_figure = cached_revenue_outlook_total_path_figure(
+            pack_signature,
+            selected_stream,
+            selected_fy,
+            selected_time_grain,
+            selected_fed_path,
+            tuple(selected_traces),
+            sensitivity_key,
+            selected_ped_bridge_mode,
+            ev_uptake_key,
+            filtered_rows,
+            view.get("cone_band"),
+        )
+        timer.stop("main path figure")
+        total_path_notes = []
+        if view.get("quarterly_disaggregated"):
+            total_path_notes.append(QUARTERLY_DISAGGREGATION_NOTE)
+        if view.get("ev_uptake_applied"):
+            total_path_notes.append(
+                f"EV/PHEV uptake basis: {selected_ev_uptake_mode}. Light RUC conventional/BEV/PHEV km and "
+                "revenue lines (plus dependent rollups) are reallocated in this view with lever share curves; "
+                "the governed pack is unchanged. " + VFM_SOURCE_NOTE
+            )
+        if view.get("eruc_applied"):
+            total_path_notes.append(ERUC_NOTE)
+        if view.get("fed_uplift_off"):
+            total_path_notes.append(FED_UPLIFT_NOTE)
+        chart_card(
+            "Total path chart",
+            "\n\n".join(total_path_notes),
+            main_path_figure,
+            caption=None,
+            notes_as_tooltip=True,
+        )
 
     if revenue_outlook_lazy_table(
         "Show scenario role contract",
@@ -3700,6 +3785,14 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         st.markdown("<div class='page5-panel-title'>Revenue bridge detail</div>", unsafe_allow_html=True)
         display_table(_revenue_bridge_display_table(filtered_bridge), height=320, max_rows=240)
         timer.stop("bridge detail table")
+
+    chart_card(
+        "Effective rates per 1,000 km",
+        RATE_CHART_NOTE,
+        cached_revenue_rate_paths_figure(pack_signature, fed_uplift_on, pack.revenue_chart_rows),
+        caption=None,
+        notes_as_tooltip=True,
+    )
 
     if revenue_outlook_lazy_table(
         "Show Manifest, Source policy and downloads",
@@ -5627,60 +5720,49 @@ def _scenario_summary_text(sensitivity_key: tuple, ev_uptake_key: tuple) -> str:
 def _render_scenario_comparison_panel(
     pack_signature: tuple[tuple[str, int, int], ...],
     pack: RevenueOutlookPack,
-    selector_options: dict[str, Any],
+    comparison_series: str,
     fed_path: str,
     sensitivity_labels: dict[str, dict[str, str]],
 ) -> None:
     with st.container(border=True):
-        st.markdown("<div class='page5-panel-title'>Scenario comparison (A vs B)</div>", unsafe_allow_html=True)
-        compare_on = st.toggle(
-            "Compare scenarios (A vs B)",
-            value=False,
-            key="revenue_outlook_compare_toggle",
-            help=(
-                "Hold two policy configurations side by side: overlaid forecast paths, a horizon NPV for "
-                "revenue series (physical quantities are reported as cumulative and average-annual totals - "
-                "the MBCM discounts monetised streams only), and delta cards in the selected metric's units. "
-                "Uses named presets; custom lever values remain available in the main panels."
-            ),
+        st.markdown(
+            "<div class='page5-panel-title'>Scenario comparison (A vs B)</div>"
+            "<div class='page5-panel-sub'>Two policy configurations held side by side for the selected "
+            "series: overlaid paths, horizon NPV for revenue (physical quantities report cumulative and "
+            "average-annual totals - the MBCM discounts monetised streams only) and adaptive delta cards. "
+            "Uses named presets; custom lever values live in the advanced levers above.</div>",
+            unsafe_allow_html=True,
         )
-        if not compare_on:
-            st.caption("Switch on to configure Scenario A and Scenario B and compare paths, NPV and deltas.")
-            return
+        with st.expander("Configure scenarios A and B", expanded=True):
+            head_cols = st.columns([0.30, 0.20, 0.14, 0.36])
+            with head_cols[0]:
+                discount_mode = st.selectbox(
+                    "Discount basis",
+                    [_COMPARISON_DISCOUNT_MBCM, _COMPARISON_DISCOUNT_CUSTOM],
+                    key="ro_cmp_discount_mode",
+                    help="Applied to revenue series only. " + mbcm_label(),
+                )
+            with head_cols[1]:
+                custom_rate = None
+                if discount_mode == _COMPARISON_DISCOUNT_CUSTOM:
+                    custom_rate = st.number_input("Rate (% p.a.)", min_value=0.5, max_value=10.0, value=4.0, step=0.5, key="ro_cmp_discount_rate") / 100.0
+            with head_cols[3]:
+                st.markdown("<div class='control-label'>Scenario A seed</div>", unsafe_allow_html=True)
+                st.button(
+                    "Copy current page settings to A",
+                    on_click=_copy_page_settings_to_scenario_a,
+                    key="ro_cmp_copy_a",
+                    help="Maps the advanced-lever selections into Scenario A (custom selections fall back to defaults).",
+                    use_container_width=True,
+                )
 
-        head_cols = st.columns([0.34, 0.26, 0.16, 0.24])
-        with head_cols[0]:
-            series_options = list(selector_options["stream_options"])
-            _validated_select_state("ro_cmp_series", series_options, "Total NLTF revenue")
-            st.session_state.setdefault("ro_cmp_series", "Total NLTF revenue" if "Total NLTF revenue" in series_options else series_options[0])
-            comparison_series = st.selectbox("Series to compare", series_options, key="ro_cmp_series")
-        with head_cols[1]:
-            discount_mode = st.selectbox(
-                "Discount basis",
-                [_COMPARISON_DISCOUNT_MBCM, _COMPARISON_DISCOUNT_CUSTOM],
-                key="ro_cmp_discount_mode",
-                help="Applied to revenue series only. " + mbcm_label(),
-            )
-        with head_cols[2]:
-            custom_rate = None
-            if discount_mode == _COMPARISON_DISCOUNT_CUSTOM:
-                custom_rate = st.number_input("Rate (% p.a.)", min_value=0.5, max_value=10.0, value=4.0, step=0.5, key="ro_cmp_discount_rate") / 100.0
-        with head_cols[3]:
-            st.button(
-                "Copy current page settings to A",
-                on_click=_copy_page_settings_to_scenario_a,
-                key="ro_cmp_copy_a",
-                help="Maps the main-panel levers into Scenario A (custom selections fall back to defaults).",
-                use_container_width=True,
-            )
-
-        column_a, column_b = st.columns(2)
-        with column_a:
-            st.markdown("<div class='ro-cmp-scenario-head ro-cmp-a'>Scenario A</div>", unsafe_allow_html=True)
-            sens_a, uptake_a = _render_comparison_scenario_column("a", sensitivity_labels)
-        with column_b:
-            st.markdown("<div class='ro-cmp-scenario-head ro-cmp-b'>Scenario B</div>", unsafe_allow_html=True)
-            sens_b, uptake_b = _render_comparison_scenario_column("b", sensitivity_labels)
+            column_a, column_b = st.columns(2)
+            with column_a:
+                st.markdown("<div class='ro-cmp-scenario-head ro-cmp-a'>Scenario A</div>", unsafe_allow_html=True)
+                sens_a, uptake_a = _render_comparison_scenario_column("a", sensitivity_labels)
+            with column_b:
+                st.markdown("<div class='ro-cmp-scenario-head ro-cmp-b'>Scenario B</div>", unsafe_allow_html=True)
+                sens_b, uptake_b = _render_comparison_scenario_column("b", sensitivity_labels)
 
         result = cached_scenario_comparison_paths(
             pack_signature,

@@ -1149,6 +1149,51 @@ def inject_theme() -> None:
             }}
             .ro-cmp-a {{ background: #002B5C; }}
             .ro-cmp-b {{ background: #F37021; }}
+            /* Revenue Outlook view-mode switch: a horizontal radio rendered
+               as a segmented pill control (single scenario vs A/B compare). */
+            .st-key-revenue_outlook_view_mode div[data-testid="stRadio"] > label {{
+                display: none;
+            }}
+            .st-key-revenue_outlook_view_mode div[data-testid="stRadio"] div[role="radiogroup"] {{
+                background: #EEF3F8;
+                border: 1px solid #D9E2EC;
+                border-radius: 999px;
+                display: inline-flex;
+                gap: 0.14rem;
+                padding: 0.14rem;
+            }}
+            .st-key-revenue_outlook_view_mode div[data-testid="stRadio"] div[role="radiogroup"] label {{
+                border-radius: 999px;
+                color: #002B5C;
+                cursor: pointer;
+                margin: 0;
+                min-width: max-content;
+                padding: 0.22rem 0.85rem;
+                transition: background 120ms ease, color 120ms ease;
+                white-space: nowrap;
+            }}
+            .st-key-revenue_outlook_view_mode div[data-testid="stRadio"] div[role="radiogroup"] label > div:first-child {{
+                height: 1px !important;
+                margin: 0 !important;
+                min-height: 1px !important;
+                opacity: 0 !important;
+                overflow: hidden !important;
+                padding: 0 !important;
+                position: absolute !important;
+                width: 1px !important;
+            }}
+            .st-key-revenue_outlook_view_mode div[data-testid="stRadio"] div[role="radiogroup"] label:has(input:checked) {{
+                background: #002B5C;
+                box-shadow: 0 2px 6px rgba(0, 43, 92, 0.28);
+            }}
+            .st-key-revenue_outlook_view_mode div[data-testid="stRadio"] div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] p {{
+                font-size: 0.76rem;
+                font-weight: 700;
+                white-space: nowrap;
+            }}
+            .st-key-revenue_outlook_view_mode div[data-testid="stRadio"] div[role="radiogroup"] label:has(input:checked) div[data-testid="stMarkdownContainer"] p {{
+                color: #FFFFFF !important;
+            }}
         </style>
         """,
         unsafe_allow_html=True,

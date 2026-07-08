@@ -993,14 +993,13 @@ def test_revenue_outlook_cloud_hides_debug_toggles_and_shows_full_composition(mo
     at.run()
 
     assert not at.exception
-    # Debug toggles stay hidden on cloud; the 12c uplift, freight rail shift
-    # and e-RUC transition toggles are user-facing scenario controls and
-    # remain visible.
+    # Debug toggles stay hidden on cloud; the freight rail shift, 12c uplift
+    # and e-RUC transition toggles are user-facing scenario controls inside
+    # the advanced levers accordion and remain visible in its render order.
     assert [(toggle.label, toggle.key) for toggle in at.toggle] == [
-        ("2027 12c FED uplift", "revenue_outlook_fed_uplift"),
         ("Freight rail shift", "revenue_outlook_sensitivity_freight_rail_toggle"),
+        ("2027 12c FED uplift", "revenue_outlook_fed_uplift"),
         ("Move petrol fleet to e-RUC", "revenue_outlook_eruc_toggle"),
-        ("Compare scenarios (A vs B)", "revenue_outlook_compare_toggle"),
     ]
     assert any("Revenue composition over time" in str(markdown.value) for markdown in at.markdown)
     rendered_text = "\n".join([*(str(markdown.value) for markdown in at.markdown), *(str(caption.value) for caption in at.caption)])
@@ -1018,6 +1017,53 @@ def test_revenue_outlook_cloud_hides_debug_toggles_and_shows_full_composition(mo
     fy_sliders = [slider for slider in at.slider if slider.label == "FY range / horizon"]
     assert len(fy_sliders) == 1
     assert tuple(fy_sliders[0].value) == tuple(selectors["stack_fy_bounds"])
+
+
+def _run_revenue_outlook_page() -> AppTest:
+    app_path = Path(__file__).resolve().parents[1] / "app.py"
+    at = AppTest.from_file(str(app_path), default_timeout=120)
+    at.run()
+    at.radio[0].set_value(app.REVENUE_OUTLOOK_PAGE)
+    at.run()
+    assert not at.exception
+    return at
+
+
+def _view_mode_radio(at: AppTest):
+    return next(radio for radio in at.radio if radio.key == "revenue_outlook_view_mode")
+
+
+def test_revenue_outlook_defaults_to_single_scenario_view() -> None:
+    at = _run_revenue_outlook_page()
+    assert _view_mode_radio(at).value == app.REVENUE_OUTLOOK_VIEW_SINGLE
+    rendered = "\n".join(str(markdown.value) for markdown in at.markdown)
+    assert "Total path chart" in rendered
+    assert "page5-panel-title'>Scenario comparison (A vs B)" not in rendered
+    # The advanced levers live in one accordion; the old bordered panels are gone.
+    expander_labels = [str(expander.label) for expander in at.expander]
+    assert "Advanced scenario levers" in expander_labels
+
+
+def test_revenue_outlook_compare_mode_swaps_total_path_for_comparison() -> None:
+    at = _run_revenue_outlook_page()
+    _view_mode_radio(at).set_value(app.REVENUE_OUTLOOK_VIEW_COMPARE)
+    at.run()
+    assert not at.exception
+    rendered = "\n".join(str(markdown.value) for markdown in at.markdown)
+    assert "page5-panel-title'>Scenario comparison (A vs B)" in rendered
+    assert "Total path chart" not in rendered
+    expander_labels = [str(expander.label) for expander in at.expander]
+    assert "Configure scenarios A and B" in expander_labels
+    # Default B (MoT VFM fast) differs from A, so NPV cards render immediately.
+    assert "NPV to FY2050" in rendered
+
+
+def test_revenue_outlook_rates_chart_renders_last() -> None:
+    source = inspect.getsource(app.render_revenue_outlook_page)
+    rates_index = source.index("Effective rates per 1,000 km")
+    assert rates_index > source.index("Total path chart")
+    assert rates_index > source.index("Show Revenue bridge detail")
+    assert rates_index < source.index("Show Manifest, Source policy and downloads")
 
 
 def test_governance_page_cloud_visibility_can_be_overridden(monkeypatch) -> None:
