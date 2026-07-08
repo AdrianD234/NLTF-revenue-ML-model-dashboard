@@ -107,3 +107,100 @@ def test_npv_waterfall_bridges_a_to_b() -> None:
     values = list(trace.y)
     assert values[0] + values[1] == pytest.approx(values[2])
     assert list(trace.measure) == ["absolute", "relative", "total"]
+
+
+def _component_breakdown(comparison_context, keys_a, keys_b, rate=None):
+    total = _paths(comparison_context, "Total NLTF revenue", keys_a, keys_b)
+    npv_a = app.npv_to_horizon(total["a"], rate=rate)
+    npv_b = app.npv_to_horizon(total["b"], rate=rate)
+    component_npvs = {
+        series: app._scenario_component_npv(
+            _paths(comparison_context, series, keys_a, keys_b), rate
+        )
+        for series in app._SCENARIO_COMPONENT_FETCH_SERIES
+    }
+    return app._scenario_npv_component_breakdown(component_npvs, npv_a, npv_b), npv_a, npv_b
+
+
+def test_component_breakdown_closes_total_npv_exactly(comparison_context) -> None:
+    components, npv_a, npv_b = _component_breakdown(
+        comparison_context, _keys(), _keys(uptake="MoT VFM fast")
+    )
+    assert sum(a for _, a, _ in components) == pytest.approx(npv_a, abs=1e-6)
+    assert sum(b for _, _, b in components) == pytest.approx(npv_b, abs=1e-6)
+    delta_sum = sum(b - a for _, a, b in components)
+    assert delta_sum == pytest.approx(npv_b - npv_a, abs=1e-6)
+
+
+def test_uptake_delta_stays_out_of_heavy_and_mvr(comparison_context) -> None:
+    # Heavy BEV reallocation is rollup-neutral, so a pure light-uptake change
+    # must leave the heavy block and MVR untouched in the bridge.
+    components, _, _ = _component_breakdown(
+        comparison_context, _keys(), _keys(uptake="MoT VFM fast")
+    )
+    by_label = {label: b - a for label, a, b in components}
+    assert abs(by_label["Heavy & other RUC"]) < 1.0
+    assert by_label["Net MVR"] == pytest.approx(0.0, abs=1e-9)
+    assert by_label["PED / FED (net)"] < 0
+    assert by_label["Light RUC (conventional)"] < 0
+    assert by_label["Light BEV RUC"] > 0
+
+
+def test_freight_shift_lands_in_heavy_component(comparison_context) -> None:
+    components, npv_a, npv_b = _component_breakdown(
+        comparison_context, _keys(), _keys(freight="High")
+    )
+    by_label = {label: b - a for label, a, b in components}
+    assert by_label["Heavy & other RUC"] == pytest.approx(npv_b - npv_a, abs=1e-6)
+    assert by_label["PED / FED (net)"] == pytest.approx(0.0, abs=1e-9)
+    assert by_label["Light RUC (conventional)"] == pytest.approx(0.0, abs=1e-9)
+
+
+def test_component_bridge_figure_accumulates_to_total_delta() -> None:
+    components = [
+        ("PED / FED (net)", 40000.0, 38000.0),
+        ("Light RUC (conventional)", 22000.0, 21000.0),
+        ("Light BEV RUC", 39000.0, 41500.0),
+        ("Net MVR", 9000.0, 9000.0),  # immaterial delta, must be dropped
+    ]
+    npv_a = sum(a for _, a, _ in components)
+    npv_b = sum(b for _, _, b in components)
+    figure = app._scenario_npv_component_bridge_figure(npv_a, npv_b, components, "$m nominal ex GST")
+    trace = figure.data[0]
+    measures = list(trace.measure)
+    assert measures == ["relative", "relative", "relative", "total"]
+    assert "Net MVR" not in list(trace.x)
+    assert sum(list(trace.y)[:-1]) == pytest.approx((npv_b - npv_a) / 1000.0)
+
+
+def test_comparison_hovers_carry_units() -> None:
+    # A bare "-3.61" hover is meaningless; currency charts hover in $b.
+    components = [("PED / FED (net)", 40000.0, 38000.0)]
+    currency = "$m nominal ex GST"
+    bridge = app._scenario_npv_component_bridge_figure(80000.0, 78000.0, components, currency)
+    composition = app._scenario_npv_composition_figure(components, currency)
+    simple = app._scenario_npv_waterfall_figure(1000.0, 900.0, currency)
+    for figure in (bridge, composition, simple):
+        assert "%{y:$,.2f}b" in str(figure.data[0].hovertemplate)
+
+    paths = app._scenario_comparison_figure(
+        pd.Series(dtype=float),
+        pd.Series([100.0], index=[2026]),
+        pd.Series([90.0], index=[2026]),
+        "million km",
+    )
+    assert "million km" in str(paths.data[0].hovertemplate)
+
+
+def test_composition_figure_stacks_sum_to_totals() -> None:
+    components = [
+        ("PED / FED (net)", 40000.0, 38000.0),
+        ("Heavy & other RUC", 39000.0, 39000.0),
+        ("TUC & other", 350.0, 350.0),
+    ]
+    figure = app._scenario_npv_composition_figure(components, "$m nominal ex GST")
+    stack_a = sum(trace.y[0] for trace in figure.data)
+    stack_b = sum(trace.y[1] for trace in figure.data)
+    assert stack_a == pytest.approx(sum(a for _, a, _ in components) / 1000.0)
+    assert stack_b == pytest.approx(sum(b for _, _, b in components) / 1000.0)
+    assert figure.layout.barmode == "stack"

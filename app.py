@@ -5724,17 +5724,50 @@ def _render_scenario_comparison_panel(
         )
         if result["metric_type"] == "revenue":
             rate_for_npv = None if discount_mode == _COMPARISON_DISCOUNT_MBCM else custom_rate
-            chart_card(
-                "NPV bridge (A to B)",
-                "NPV to FY2050 from an FY2026 base. " + (mbcm_label() if rate_for_npv is None else f"Single rate {rate_for_npv:.1%} p.a."),
-                _scenario_npv_waterfall_figure(
-                    npv_to_horizon(a_path, rate=rate_for_npv),
-                    npv_to_horizon(b_path, rate=rate_for_npv),
-                    result["value_unit"],
-                ),
-                caption=None,
-                notes_as_tooltip=True,
-            )
+            basis_note = mbcm_label() if rate_for_npv is None else f"Single rate {rate_for_npv:.1%} p.a."
+            npv_a = npv_to_horizon(a_path, rate=rate_for_npv)
+            npv_b = npv_to_horizon(b_path, rate=rate_for_npv)
+            if comparison_series == _SCENARIO_COMPARISON_TOTAL_SERIES:
+                component_npvs = {
+                    component_series: _scenario_component_npv(
+                        cached_scenario_comparison_paths(
+                            pack_signature, component_series, fed_path,
+                            sens_a, uptake_a, sens_b, uptake_b,
+                            PED_BRIDGE_DEFAULT_MODE, pack,
+                        ),
+                        rate_for_npv,
+                    )
+                    for component_series in _SCENARIO_COMPONENT_FETCH_SERIES
+                }
+                components = _scenario_npv_component_breakdown(component_npvs, npv_a, npv_b)
+                chart_card(
+                    "NPV composition (A vs B)",
+                    "Each scenario's NPV to FY2050 stacked by revenue stream, all streams recomputed "
+                    "through that scenario's levers. Heavy & other RUC is the RUC rollup less the light "
+                    "classes (heavy BEVs pay the same per-km RUC, so heavy electrification reshuffles "
+                    "within this block); TUC & other closes the governed NLTF identity. " + basis_note + ".",
+                    _scenario_npv_composition_figure(components, result["value_unit"]),
+                    caption=None,
+                    notes_as_tooltip=True,
+                )
+                chart_card(
+                    "NPV delta bridge by revenue stream (B − A)",
+                    "How each revenue stream contributes to the NPV gap between the scenarios: "
+                    "component deltas accumulate from zero to the total NPV delta, so gains in one "
+                    "stream (green) and losses in another (red) net out to the headline figure on the "
+                    "delta card. Streams moving less than $1m NPV are omitted. " + basis_note + ".",
+                    _scenario_npv_component_bridge_figure(npv_a, npv_b, components, result["value_unit"]),
+                    caption=None,
+                    notes_as_tooltip=True,
+                )
+            else:
+                chart_card(
+                    "NPV bridge (A to B)",
+                    "NPV to FY2050 from an FY2026 base. " + basis_note,
+                    _scenario_npv_waterfall_figure(npv_a, npv_b, result["value_unit"]),
+                    caption=None,
+                    notes_as_tooltip=True,
+                )
 
 
 def _format_scenario_amount(value: float, unit: str, *, signed: bool = False) -> str:
@@ -5811,11 +5844,25 @@ def _scenario_comparison_cards(
     ]
 
 
+def _scenario_hover_value_format(value_unit: str) -> str:
+    """Plotly y-format with units for the comparison charts.
+
+    Million-currency series are plotted in $b, so hover as "$3.61b" (d3's
+    currency format keeps the minus sign outside: "-$3.61b"); other units
+    trail the number, e.g. "12,345.67 million km".
+    """
+    if _is_million_currency_unit(value_unit):
+        return "%{y:$,.2f}b"
+    unit_text = str(value_unit or "").strip()
+    return "%{y:,.2f}" + (f" {unit_text}" if unit_text else "")
+
+
 def _scenario_comparison_figure(history: pd.Series, a: pd.Series, b: pd.Series, value_unit: str) -> go.Figure:
     if (a is None or a.empty) and (b is None or b.empty):
         return empty_figure("Selected series has no forecast rows for the chosen scenarios.")
     scale = _display_value_scale_for_unit(value_unit)
     axis_title = _display_axis_unit(value_unit)
+    hover_value = _scenario_hover_value_format(value_unit)
     fig = go.Figure()
     if history is not None and not history.empty:
         fig.add_trace(
@@ -5823,7 +5870,7 @@ def _scenario_comparison_figure(history: pd.Series, a: pd.Series, b: pd.Series, 
                 x=history.index.astype(int), y=history.to_numpy(dtype=float) / scale,
                 mode="lines+markers", name="Actual",
                 line={"color": "#64748B", "width": 1.6}, marker={"size": 4},
-                hovertemplate="<b>Actual</b><br>%{y:,.2f}<extra></extra>",
+                hovertemplate=f"<b>Actual</b><br>{hover_value}<extra></extra>",
             )
         )
     for series, name, color, dash in [
@@ -5837,7 +5884,7 @@ def _scenario_comparison_figure(history: pd.Series, a: pd.Series, b: pd.Series, 
                 x=series.index.astype(int), y=series.to_numpy(dtype=float) / scale,
                 mode="lines+markers", name=name,
                 line={"color": color, "width": 3, "dash": dash}, marker={"size": 5},
-                hovertemplate=f"<b>{name}</b><br>%{{y:,.2f}}<extra></extra>",
+                hovertemplate=f"<b>{name}</b><br>{hover_value}<extra></extra>",
             )
         )
     fig.update_xaxes(title_text="June year ending", title_font={"size": 11, "color": "#5A6B7B"}, showgrid=False, dtick=5)
@@ -5867,13 +5914,163 @@ def _scenario_npv_waterfall_figure(npv_a: float, npv_b: float, value_unit: str) 
             decreasing={"marker": {"color": "#B42318"}},
             totals={"marker": {"color": "#002B5C"}},
             connector={"line": {"color": "#CBD5E1", "width": 1}},
-            hovertemplate="<b>%{x}</b><br>%{y:,.2f}<extra></extra>",
+            hovertemplate=f"<b>%{{x}}</b><br>{_scenario_hover_value_format(value_unit)}<extra></extra>",
         )
     )
     fig.update_yaxes(title_text=axis_title, gridcolor="#E6EDF5", zeroline=False)
     fig.update_layout(
         height=300,
         margin={"l": 56, "r": 18, "t": 18, "b": 36},
+        showlegend=False,
+        plot_bgcolor="#FFFFFF",
+    )
+    return fig
+
+
+_SCENARIO_COMPARISON_TOTAL_SERIES = "Total NLTF revenue"
+# Series fetched through the full scenario pipeline to decompose the total.
+# "Total RUC all classes" is fetched as the RUC rollup so the heavy remainder
+# can be derived: heavy BEV reallocation is rollup-neutral (BEVs pay the same
+# per-km RUC), so conventional heavy alone would leave a phantom residual.
+_SCENARIO_COMPONENT_FETCH_SERIES = (
+    "Net FED revenue",
+    "Light RUC revenue",
+    "Light BEV RUC net revenue",
+    "PHEV RUC net revenue",
+    "Total RUC all classes",
+    "Net MVR revenue",
+)
+_SCENARIO_COMPONENT_COLORS = {
+    "PED / FED (net)": "#00843D",
+    "Light RUC (conventional)": "#006FAD",
+    "Light BEV RUC": "#4CA7D8",
+    "PHEV RUC": "#9CCBE8",
+    "Heavy & other RUC": "#102A43",
+    "Net MVR": "#94A3B8",
+    "TUC & other": "#CBD5E1",
+}
+_SCENARIO_COMPONENT_MATERIALITY = 1.0  # $m NPV; bars below this are dropped
+
+
+def _scenario_component_npv(paths: dict[str, Any], rate: float | None) -> tuple[float, float]:
+    npv_a = npv_to_horizon(paths["a"], rate=rate)
+    npv_b = npv_to_horizon(paths["b"], rate=rate)
+    return (0.0 if pd.isna(npv_a) else npv_a, 0.0 if pd.isna(npv_b) else npv_b)
+
+
+def _scenario_npv_component_breakdown(
+    component_npvs: dict[str, tuple[float, float]],
+    npv_a_total: float,
+    npv_b_total: float,
+) -> list[tuple[str, float, float]]:
+    """Decompose Total NLTF NPV into revenue-stream components for A and B.
+
+    Exact by construction: "Heavy & other RUC" is the RUC rollup less the
+    light-class series (absorbing heavy BEV and refund/admin interactions),
+    and "TUC & other" closes the governed NLTF identity
+    (net FED + total RUC + net MVR + TUC) against the total.
+    """
+
+    def pair(series: str) -> tuple[float, float]:
+        return component_npvs.get(series, (0.0, 0.0))
+
+    fed = pair("Net FED revenue")
+    light = pair("Light RUC revenue")
+    bev = pair("Light BEV RUC net revenue")
+    phev = pair("PHEV RUC net revenue")
+    ruc = pair("Total RUC all classes")
+    mvr = pair("Net MVR revenue")
+    heavy = (ruc[0] - light[0] - bev[0] - phev[0], ruc[1] - light[1] - bev[1] - phev[1])
+    residual = (
+        npv_a_total - fed[0] - ruc[0] - mvr[0],
+        npv_b_total - fed[1] - ruc[1] - mvr[1],
+    )
+    return [
+        ("PED / FED (net)", fed[0], fed[1]),
+        ("Light RUC (conventional)", light[0], light[1]),
+        ("Light BEV RUC", bev[0], bev[1]),
+        ("PHEV RUC", phev[0], phev[1]),
+        ("Heavy & other RUC", heavy[0], heavy[1]),
+        ("Net MVR", mvr[0], mvr[1]),
+        ("TUC & other", residual[0], residual[1]),
+    ]
+
+
+def _scenario_npv_composition_figure(
+    components: list[tuple[str, float, float]], value_unit: str
+) -> go.Figure:
+    scale = _display_value_scale_for_unit(value_unit)
+    axis_title = _display_axis_unit(value_unit)
+    fig = go.Figure()
+    total_a = sum(a for _, a, _ in components)
+    total_b = sum(b for _, _, b in components)
+    for label, npv_a, npv_b in components:
+        if abs(npv_a) < _SCENARIO_COMPONENT_MATERIALITY and abs(npv_b) < _SCENARIO_COMPONENT_MATERIALITY:
+            continue
+        share_a = npv_a / total_a if total_a else float("nan")
+        share_b = npv_b / total_b if total_b else float("nan")
+        fig.add_trace(
+            go.Bar(
+                x=["Scenario A", "Scenario B"],
+                y=[npv_a / scale, npv_b / scale],
+                name=label,
+                marker={"color": _SCENARIO_COMPONENT_COLORS.get(label, "#64748B")},
+                customdata=[f"{share_a:.1%} of total", f"{share_b:.1%} of total"],
+                hovertemplate=f"<b>{label}</b><br>{_scenario_hover_value_format(value_unit)}<br>%{{customdata}}<extra></extra>",
+            )
+        )
+    fig.update_yaxes(title_text=axis_title, gridcolor="#E6EDF5", zeroline=False)
+    fig.update_layout(
+        barmode="stack",
+        height=360,
+        margin={"l": 56, "r": 18, "t": 18, "b": 36},
+        legend={"orientation": "h", "y": -0.14, "x": 0.0, "font": {"size": 11}, "traceorder": "normal"},
+        plot_bgcolor="#FFFFFF",
+    )
+    return fig
+
+
+def _scenario_npv_component_bridge_figure(
+    npv_a: float,
+    npv_b: float,
+    components: list[tuple[str, float, float]],
+    value_unit: str,
+) -> go.Figure:
+    """Delta-space bridge: component NPV deltas accumulate from zero to B − A.
+
+    Level anchors (~two orders of magnitude above the deltas) live in the KPI
+    cards and the composition chart; plotting them here would flatten the
+    component bars into invisibility.
+    """
+    deltas = [
+        (label, comp_b - comp_a)
+        for label, comp_a, comp_b in components
+        if abs(comp_b - comp_a) >= _SCENARIO_COMPONENT_MATERIALITY
+    ]
+    if not deltas:
+        return _scenario_npv_waterfall_figure(npv_a, npv_b, value_unit)
+    scale = _display_value_scale_for_unit(value_unit)
+    axis_title = _display_axis_unit(value_unit)
+    labels = [*(label for label, _ in deltas), "NPV delta (B − A)"]
+    values = [*(delta / scale for _, delta in deltas), (npv_b - npv_a) / scale]
+    fig = go.Figure(
+        go.Waterfall(
+            orientation="v",
+            measure=[*(["relative"] * len(deltas)), "total"],
+            x=labels,
+            y=values,
+            increasing={"marker": {"color": "#00843D"}},
+            decreasing={"marker": {"color": "#B42318"}},
+            totals={"marker": {"color": "#002B5C"}},
+            connector={"line": {"color": "#CBD5E1", "width": 1}},
+            hovertemplate=f"<b>%{{x}}</b><br>{_scenario_hover_value_format(value_unit)}<extra></extra>",
+        )
+    )
+    fig.update_xaxes(tickangle=-30, tickfont={"size": 10.5})
+    fig.update_yaxes(title_text=axis_title, gridcolor="#E6EDF5", zeroline=True, zerolinecolor="#CBD5E1")
+    fig.update_layout(
+        height=340,
+        margin={"l": 56, "r": 18, "t": 18, "b": 78},
         showlegend=False,
         plot_bgcolor="#FFFFFF",
     )
