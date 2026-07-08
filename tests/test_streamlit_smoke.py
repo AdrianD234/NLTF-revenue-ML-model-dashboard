@@ -95,6 +95,10 @@ def test_revenue_outlook_sensitivity_labels_show_actual_assumptions() -> None:
     assert app.sensitivity_option_label("pt_mode_shift", "Low") == "Low (0.25% p.a. from FY2030)"
     assert app.sensitivity_option_label("pt_mode_shift", "Med") == "Med (0.5% p.a. from FY2030)"
     assert app.sensitivity_option_label("pt_mode_shift", "High") == "High (1.0% p.a. from FY2030)"
+    assert app.sensitivity_option_label("freight_rail_shift", "Off") == "Off (0.0% p.a.)"
+    assert app.sensitivity_option_label("freight_rail_shift", "Low") == "Low (0.25% p.a. from FY2030)"
+    assert app.sensitivity_option_label("freight_rail_shift", "Med") == "Med (0.5% p.a. from FY2030)"
+    assert app.sensitivity_option_label("freight_rail_shift", "High") == "High (1.0% p.a. from FY2030)"
     assert app.sensitivity_option_label("demand_elasticity", "Low") == "Low: PED -0.100 / Light RUC -0.080 / Heavy RUC -0.050"
     assert app.sensitivity_option_label("demand_elasticity", "Med") == "Med: PED -0.144 / Light RUC -0.120 / Heavy RUC -0.100"
     assert app.sensitivity_option_label("demand_elasticity", "High") == "High: PED -0.240 / Light RUC -0.200 / Heavy RUC -0.200"
@@ -164,6 +168,7 @@ def test_revenue_outlook_selector_metadata_is_precomputed() -> None:
     assert selectors["stack_fy_bounds"][0] <= 2025 <= selectors["stack_fy_bounds"][1]
     assert selectors["sensitivity_labels"]["fleet_efficiency"]["High"] == "High (1.5% p.a.)"
     assert selectors["sensitivity_labels"]["pt_mode_shift"]["High"] == "High (1.0% p.a. from FY2030)"
+    assert selectors["sensitivity_labels"]["freight_rail_shift"]["High"] == "High (1.0% p.a. from FY2030)"
     assert selectors["sensitivity_labels"]["demand_elasticity"]["Med"] == "Med: PED -0.144 / Light RUC -0.120 / Heavy RUC -0.100"
 
 
@@ -380,7 +385,39 @@ def test_revenue_outlook_default_sensitivity_audit_materializes_lazily() -> None
     assert not audit.empty
     assert audit["selected_fleet_efficiency"].astype(str).eq("Off").all()
     assert audit["selected_pt_mode_shift"].astype(str).eq("Off").all()
+    assert audit["selected_freight_rail_shift"].astype(str).eq("Off").all()
     assert audit["selected_demand_elasticity"].astype(str).eq("Off").all()
+
+
+def test_revenue_outlook_freight_rail_shift_key_reaches_sensitivity_layer() -> None:
+    root = Path(__file__).resolve().parents[1]
+    pack_dir = root / CURRENT_REVENUE_OUTLOOK_DIR
+    pack = load_revenue_outlook_pack(pack_dir, repo_root=root)
+    assert pack is not None
+    signature = revenue_outlook_signature(pack_dir, root)
+    sensitivity_key = app.selected_sensitivity_key("Off", "Off", "Off", freight_rail_shift="Med")
+    assert not app._is_default_sensitivity_key(sensitivity_key)
+
+    if hasattr(app.cached_revenue_outlook_sensitivity_audit, "clear"):
+        app.cached_revenue_outlook_sensitivity_audit.clear()
+    audit = app.cached_revenue_outlook_sensitivity_audit(
+        signature,
+        sensitivity_key,
+        PED_BRIDGE_DEFAULT_MODE,
+        pack,
+    )
+
+    assert not audit.empty
+    assert audit["selected_freight_rail_shift"].astype(str).eq("Med").all()
+    assert audit["selected_pt_mode_shift"].astype(str).eq("Off").all()
+    heavy_km = audit[
+        audit["series_id"].astype(str).eq("heavy_ruc_net_km")
+        & pd.to_numeric(audit["FY"], errors="coerce").ge(2030)
+    ]
+    assert not heavy_km.empty
+    assert pd.to_numeric(heavy_km["delta"], errors="coerce").lt(0).all()
+    light_km = audit[audit["series_id"].astype(str).eq("light_ruc_net_km")]
+    assert pd.to_numeric(light_km["delta"], errors="coerce").abs().max() == pytest.approx(0.0, abs=0)
 
 
 def test_revenue_outlook_sensitivity_audit_does_not_build_residual_or_stack(monkeypatch) -> None:

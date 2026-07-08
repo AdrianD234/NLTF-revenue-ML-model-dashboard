@@ -914,11 +914,21 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     assert set(sensitivity_seed_inputs["family"].astype(str)) == {
         "fleet_efficiency",
         "pt_mode_shift",
+        "freight_rail_shift",
         "demand_elasticity",
     }
     assert set(sensitivity_seed_inputs["scenario_level"].astype(str)) == {"Low", "Med", "High"}
-    assert sensitivity_seed_inputs["workbook_sha256"].astype(str).eq(SENSITIVITY_SEED_WORKBOOK_SHA256).all()
-    assert sensitivity_seed_inputs["sheet"].astype(str).eq("Inputs (TI)").all()
+    workbook_seed_rows = sensitivity_seed_inputs[
+        ~sensitivity_seed_inputs["family"].astype(str).eq("freight_rail_shift")
+    ]
+    assert workbook_seed_rows["workbook_sha256"].astype(str).eq(SENSITIVITY_SEED_WORKBOOK_SHA256).all()
+    assert workbook_seed_rows["sheet"].astype(str).eq("Inputs (TI)").all()
+    freight_seed_rows = sensitivity_seed_inputs[sensitivity_seed_inputs["family"].astype(str).eq("freight_rail_shift")]
+    assert len(freight_seed_rows) == 3
+    assert freight_seed_rows["stream"].astype(str).eq("HEAVY_RUC").all()
+    assert freight_seed_rows["workbook_sha256"].astype(str).eq("").all()
+    assert freight_seed_rows["source_status"].astype(str).eq("analyst_inference_no_official_mot_scenario").all()
+    assert freight_seed_rows["note"].astype(str).str.contains("analyst inferences", case=False, regex=False).all()
     assert {"C181", "D181", "E181", "C206", "D206", "E206", "C213", "D213", "E213", "C266", "D266", "E266"}.issubset(
         set(sensitivity_seed_inputs["cell"].astype(str))
     )
@@ -928,18 +938,30 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     assert set(sensitivity_config["family"].astype(str)) == {
         "fleet_efficiency",
         "pt_mode_shift",
+        "freight_rail_shift",
         "demand_elasticity",
     }
-    for family in ["fleet_efficiency", "pt_mode_shift", "demand_elasticity"]:
+    for family in ["fleet_efficiency", "pt_mode_shift", "freight_rail_shift", "demand_elasticity"]:
         assert {"Off", "Low", "Med", "High", "Custom"}.issubset(
             set(sensitivity_config.loc[sensitivity_config["family"].astype(str).eq(family), "selection"].astype(str))
         )
     assert sensitivity_config.loc[sensitivity_config["selection"].astype(str).eq("Off"), "default_selected"].astype(bool).all()
+    freight_config = sensitivity_config[sensitivity_config["family"].astype(str).eq("freight_rail_shift")]
+    assert freight_config["stream"].astype(str).eq("HEAVY_RUC").all()
+    assert freight_config["start_fy"].astype(int).eq(2030).all()
+    assert freight_config["custom_allowed"].astype(bool).all()
+    assert freight_config["source_workbook_sha256"].astype(str).eq("").all()
+    assert freight_config["notes"].astype(str).str.contains("analyst inferences", case=False, regex=False).all()
+    assert (
+        freight_config.set_index("selection")["value"].astype(float).loc[["Low", "Med", "High"]].tolist()
+        == [0.0025, 0.005, 0.010]
+    )
     assert not sensitivity_config.astype(str).stack().str.contains("crude-to-pump", case=False, regex=False).any()
     assert not sensitivity_config.astype(str).stack().str.contains("fleet transition target", case=False, regex=False).any()
     assert not sensitivity_impact_audit.empty
     assert set(sensitivity_impact_audit["selected_fleet_efficiency"].astype(str)) == {"Off"}
     assert set(sensitivity_impact_audit["selected_pt_mode_shift"].astype(str)) == {"Off"}
+    assert set(sensitivity_impact_audit["selected_freight_rail_shift"].astype(str)) == {"Off"}
     assert set(sensitivity_impact_audit["selected_demand_elasticity"].astype(str)) == {"Off"}
     assert pd.to_numeric(sensitivity_impact_audit["delta"], errors="coerce").abs().max() == pytest.approx(0.0, abs=0)
     evidence = (
@@ -1887,6 +1909,45 @@ def test_revenue_sensitivity_pt_shift_preserves_ev_phev_shares() -> None:
     assert rows.loc["heavy_ruc_net_km", "adjusted"] == pytest.approx(rows.loc["heavy_ruc_net_km", "baseline"], abs=0)
 
 
+def test_revenue_sensitivity_freight_rail_shift_scales_heavy_ruc_only() -> None:
+    pack = load_revenue_outlook_pack(ROOT / CURRENT_REVENUE_OUTLOOK_DIR, repo_root=ROOT)
+    assert pack is not None
+
+    sensitivity = apply_revenue_sensitivity_layer(
+        chart_rows=pack.revenue_chart_rows,
+        line_reconciliation=pack.revenue_line_reconciliation,
+        bridge_components=pack.revenue_bridge_components,
+        future_revenue_forecasts=pack.future_revenue_forecasts,
+        ped_revenue_bridge_audit=pack.ped_revenue_bridge_audit,
+        sensitivity_config=pack.sensitivity_config,
+        freight_rail_shift="Med",
+    )
+    audit = sensitivity["sensitivity_impact_audit"]
+    assert set(audit["selected_freight_rail_shift"].astype(str)) == {"Med"}
+    rows = audit[
+        audit["source_path"].astype(str).eq("Current finalist Base case")
+        & pd.to_numeric(audit["FY"], errors="coerce").eq(2031)
+    ].set_index("series_id")
+    expected_factor = (1 - 0.005) ** (2031 - 2030 + 1)
+    for series_id in ["heavy_ruc_net_km", "heavy_ruc_net_revenue"]:
+        assert rows.loc[series_id, "adjusted"] == pytest.approx(rows.loc[series_id, "baseline"] * expected_factor)
+    for series_id in ["light_petrol_vkt", "light_ruc_net_km", "light_bev_ruc_net_km", "phev_ruc_net_km", "ped_volume", "gross_ped_revenue"]:
+        assert rows.loc[series_id, "adjusted"] == pytest.approx(rows.loc[series_id, "baseline"], abs=0)
+    heavy_delta = rows.loc["heavy_ruc_net_revenue", "adjusted"] - rows.loc["heavy_ruc_net_revenue", "baseline"]
+    assert heavy_delta < 0
+    for rollup_id in ["total_ruc_net_revenue", "total_nltf_net_revenue"]:
+        assert rows.loc[rollup_id, "adjusted"] - rows.loc[rollup_id, "baseline"] == pytest.approx(heavy_delta)
+    pre_start = audit[
+        audit["source_path"].astype(str).eq("Current finalist Base case")
+        & pd.to_numeric(audit["FY"], errors="coerce").eq(2029)
+    ].set_index("series_id")
+    assert pre_start.loc["heavy_ruc_net_km", "adjusted"] == pytest.approx(pre_start.loc["heavy_ruc_net_km", "baseline"], abs=0)
+    current_residuals = sensitivity["revenue_formula_residuals"][
+        sensitivity["revenue_formula_residuals"]["source_path"].astype(str).str.startswith("Current finalist")
+    ]
+    assert set(current_residuals["status"].dropna().astype(str)) == {"reconciled"}
+
+
 def test_revenue_sensitivity_demand_elasticity_responds_to_cost_ratio() -> None:
     pack = load_revenue_outlook_pack(ROOT / CURRENT_REVENUE_OUTLOOK_DIR, repo_root=ROOT)
     assert pack is not None
@@ -1936,7 +1997,7 @@ def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
         "fan_band_rows.parquet": "461917e6ca288f866adc9f5e1a96c1db44dc7490b68551286ddde11b925817f9",
         "future_revenue_forecasts.csv": "31bc0ab32312cfb37598ca0bcd7db7abbab89d259c6785b3a9787208c9bd2c05",
         "future_revenue_forecasts.parquet": "d90c4cc70776fe3ba572a9e960f36d6f36d9909b0a721fece9197776d0c8c4c8",
-        "manifest.json": "1b5ce02b86c25a1a1a55662e334f8e1a131afa4185091058b575c05ecf4676fa",
+        "manifest.json": "0c5ea7e8a1cbf6301b48526943511b6b216b77922a1465069fa6893b8f80f1df",
         "manifest.md": "f76666a8af7cc3c4388ecd6c33533708ddd2b4e58d777db179c452bee6a6a523",
         "path_trace_status.csv": "9aee7a4e7003ec6541476ca3e4afef6d8586b6c358e41db1c8e06623e5ffcaa3",
         "path_trace_status.parquet": "e8d295393c0586167da97d2f0c054eb77419e8c9e4acf134198c0a5f53010eaa",
@@ -1972,12 +2033,12 @@ def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
         "scenario_input_replay_mismatch_report.parquet": "4d315a08a213674f1589a4adfc588516b67c5a107a714f43a4b746e00850237b",
         "scenario_role_contract.csv": "e8684dbb5f5f2f3ddfcc67036e208227b758ab77d2731c31d9d0dc67d5379cec",
         "scenario_role_contract.parquet": "e1d24837a40f7e3395625b6d02d4118fdb42f4b4eda005159665f4bbd764ecdb",
-        "sensitivity_config.csv": "2067f75d07b12d61d0b845b03bf637f0e335dc7074c45fea5e72b74fc63eda64",
-        "sensitivity_config.parquet": "40ff3c954501af10a29f6d3477b8bff25a976f211ce927af8d1f7e1b810fff50",
-        "sensitivity_impact_audit.csv": "2ab42b16e8556f45dfd4fe3f15542b0e13d12bfda3e5221ba632803441fdaae9",
-        "sensitivity_impact_audit.parquet": "fd007773f54fc45879b03f101fe856adb70f51ac15026f3593cb5fc20b7d5df2",
-        "sensitivity_seed_inputs.csv": "dd2b9766cd253d08c6e65ca36d463b5178020c636b7edcc197ed52aa23679861",
-        "sensitivity_seed_inputs.parquet": "550c451da97ce321b9cddcea0657ffabec9260ddcf4041b3513bd7dbdda43cf5",
+        "sensitivity_config.csv": "07ef357edcf635211f9b32ee3c0fc9a1032898afc196ce85cf01d79c6fe35aa4",
+        "sensitivity_config.parquet": "7acd005dc2f2cda4659d01ce2cf8bebad4f315db293e1c52eb4bd5c204229a5a",
+        "sensitivity_impact_audit.csv": "4baaa014c6afd72634745fcef82b2dd403568143e8978237680f3bf9d2e8ae9d",
+        "sensitivity_impact_audit.parquet": "2ea3e6bbcf60710e2179884670129c1fde36f316aae06280c842dd523520cc87",
+        "sensitivity_seed_inputs.csv": "5181058396fbdb3896ade20b3ea335955fc186af85cccd365c7d86531852f3a6",
+        "sensitivity_seed_inputs.parquet": "23a8ba664690235b92fac25912b9c8ab0eefe990f94a58258b901fafa306b310",
         "series_alias_audit.csv": "c0330c9918d7e2f4f972d15e8465537c16d96aca607ef253353612cadd62c56d",
         "series_alias_audit.parquet": "2600d218525ecd8916c57b5a1ea503106f51aab1fd105c95f3fc3d67d2dd05f9",
         "series_trace_contract.csv": "2eaf18c4c54fc18a21dd68415c0aea041bd174e8d75285409a4bb83034b60e09",

@@ -142,6 +142,8 @@ from model_dashboard.revenue_outlook import (
     PED_COMPARISON_BEHAVIOURAL_TRACE_NAME,
     PED_EFFICIENCY_BASELINE_SCENARIO_ID,
     PED_EFFICIENCY_DEFAULT_NOTE,
+    FREIGHT_RAIL_SHIFT_LEVELS,
+    FREIGHT_RAIL_SHIFT_NOTE,
     PT_MODE_SHIFT_LEVELS,
     REVENUE_OUTLOOK_SCHEMA_VERSION,
     REVENUE_OUTLOOK_TITLE,
@@ -476,6 +478,16 @@ def sensitivity_option_label(kind: str, level: str) -> str:
         if "." not in value_text:
             value_text = f"{value:.1f}"
         return f"{level} ({value_text}% p.a. from FY2030)"
+    if kind == "freight_rail_shift":
+        if level == "Off":
+            return "Off (0.0% p.a.)"
+        if level == "Custom":
+            return "Custom"
+        value = FREIGHT_RAIL_SHIFT_LEVELS.get(level, 0.0) * 100.0
+        value_text = f"{value:.2f}".rstrip("0").rstrip(".")
+        if "." not in value_text:
+            value_text = f"{value:.1f}"
+        return f"{level} ({value_text}% p.a. from FY2030)"
     if kind == "demand_elasticity":
         if level == "Off":
             return "Off"
@@ -504,13 +516,15 @@ def selected_sensitivity_key(
     pt_mode_shift: str,
     demand_elasticity: str,
     *,
+    freight_rail_shift: str = "Off",
     custom_fleet_efficiency_pct: float | None = None,
     custom_pt_shift_pct: float | None = None,
+    custom_freight_shift_pct: float | None = None,
     custom_ped_elasticity: float | None = None,
     custom_light_elasticity: float | None = None,
     custom_heavy_elasticity: float | None = None,
     cost_per_km_ratio: float | None = None,
-) -> tuple[str, str, str, str, str, str, str, str, str]:
+) -> tuple[str, str, str, str, str, str, str, str, str, str, str]:
     return (
         _normalize_sensitivity_level(fleet_efficiency),
         _normalize_sensitivity_level(pt_mode_shift),
@@ -521,6 +535,8 @@ def selected_sensitivity_key(
         _key_float(custom_light_elasticity),
         _key_float(custom_heavy_elasticity),
         _key_float(cost_per_km_ratio),
+        _normalize_sensitivity_level(freight_rail_shift),
+        _key_float(custom_freight_shift_pct),
     )
 
 
@@ -529,19 +545,23 @@ def is_default_sensitivity(
     pt_mode_shift: str,
     demand_elasticity: str,
     cost_per_km_ratio: float | None = None,
+    freight_rail_shift: str = "Off",
 ) -> bool:
     return (
         _normalize_sensitivity_level(fleet_efficiency) == "Off"
         and _normalize_sensitivity_level(pt_mode_shift) == "Off"
         and _normalize_sensitivity_level(demand_elasticity) == "Off"
+        and _normalize_sensitivity_level(freight_rail_shift) == "Off"
         and _key_float(cost_per_km_ratio) == ""
     )
 
 
 def _is_default_sensitivity_key(sensitivity_key: tuple[Any, ...]) -> bool:
-    if len(sensitivity_key) < 9:
+    if len(sensitivity_key) < 11:
         return False
-    return sensitivity_key[:3] == ("Off", "Off", "Off") and all(str(value or "") == "" for value in sensitivity_key[3:])
+    selections = (sensitivity_key[0], sensitivity_key[1], sensitivity_key[2], sensitivity_key[9])
+    custom_values = [sensitivity_key[i] for i in (3, 4, 5, 6, 7, 8, 10)]
+    return selections == ("Off", "Off", "Off", "Off") and all(str(value or "") == "" for value in custom_values)
 
 
 def revenue_outlook_lazy_table(label: str, key: str, *, default: bool = False, caption: str | None = None) -> bool:
@@ -606,6 +626,7 @@ def cached_revenue_outlook_selectors(
         "sensitivity_labels": {
             "fleet_efficiency": {level: sensitivity_option_label("fleet_efficiency", level) for level in SENSITIVITY_LEVELS},
             "pt_mode_shift": {level: sensitivity_option_label("pt_mode_shift", level) for level in SENSITIVITY_LEVELS},
+            "freight_rail_shift": {level: sensitivity_option_label("freight_rail_shift", level) for level in SENSITIVITY_LEVELS},
             "demand_elasticity": {level: sensitivity_option_label("demand_elasticity", level) for level in SENSITIVITY_LEVELS},
         },
     }
@@ -635,15 +656,17 @@ def _bridge_mode_frames_for_pack(
 def _apply_sensitivity_for_key(
     bridge_frames: dict[str, pd.DataFrame],
     sensitivity_config: pd.DataFrame,
-    sensitivity_key: tuple[str, str, str, str, str, str, str, str, str],
+    sensitivity_key: tuple[str, str, str, str, str, str, str, str, str, str, str],
 ) -> dict[str, pd.DataFrame]:
     fleet_efficiency, pt_mode_shift, demand_elasticity = sensitivity_key[:3]
+    freight_rail_shift = sensitivity_key[9] if len(sensitivity_key) > 9 else "Off"
     custom_fleet = float(sensitivity_key[3]) if sensitivity_key[3] else None
     custom_pt = float(sensitivity_key[4]) if sensitivity_key[4] else None
     custom_ped = float(sensitivity_key[5]) if sensitivity_key[5] else None
     custom_light = float(sensitivity_key[6]) if sensitivity_key[6] else None
     custom_heavy = float(sensitivity_key[7]) if sensitivity_key[7] else None
     cost_ratio = float(sensitivity_key[8]) if sensitivity_key[8] else None
+    custom_freight = float(sensitivity_key[10]) if len(sensitivity_key) > 10 and sensitivity_key[10] else None
     return apply_revenue_sensitivity_layer(
         chart_rows=bridge_frames["chart_rows"],
         line_reconciliation=bridge_frames["line_reconciliation"],
@@ -653,9 +676,11 @@ def _apply_sensitivity_for_key(
         sensitivity_config=sensitivity_config,
         fleet_efficiency=fleet_efficiency,
         pt_mode_shift=pt_mode_shift,
+        freight_rail_shift=freight_rail_shift,
         demand_elasticity=demand_elasticity,
         custom_fleet_efficiency_pct=custom_fleet,
         custom_pt_shift_pct=custom_pt,
+        custom_freight_shift_pct=custom_freight,
         custom_ped_elasticity=custom_ped,
         custom_light_elasticity=custom_light,
         custom_heavy_elasticity=custom_heavy,
@@ -682,7 +707,7 @@ def cached_revenue_outlook_view(
     time_grain: str,
     fed_path: str,
     traces: tuple[str, ...],
-    sensitivity_key: tuple[str, str, str, str, str, str, str, str, str],
+    sensitivity_key: tuple[str, str, str, str, str, str, str, str, str, str, str],
     bridge_mode: str,
     ev_uptake_key: tuple[Any, ...],
     _pack: RevenueOutlookPack,
@@ -765,7 +790,7 @@ def cached_revenue_outlook_view(
 @st.cache_data(show_spinner=False)
 def cached_revenue_outlook_detail_frames(
     signature: tuple[tuple[str, int, int], ...],
-    sensitivity_key: tuple[str, str, str, str, str, str, str, str, str],
+    sensitivity_key: tuple[str, str, str, str, str, str, str, str, str, str, str],
     bridge_mode: str,
     _pack: RevenueOutlookPack,
 ) -> dict[str, pd.DataFrame]:
@@ -807,7 +832,7 @@ def cached_revenue_outlook_ped_bridge_detail(
 @st.cache_data(show_spinner=False)
 def cached_revenue_outlook_line_detail_frames(
     signature: tuple[tuple[str, int, int], ...],
-    sensitivity_key: tuple[str, str, str, str, str, str, str, str, str],
+    sensitivity_key: tuple[str, str, str, str, str, str, str, str, str, str, str],
     bridge_mode: str,
     _pack: RevenueOutlookPack,
 ) -> dict[str, pd.DataFrame]:
@@ -835,7 +860,7 @@ def cached_revenue_outlook_line_detail_frames(
 @st.cache_data(show_spinner=False)
 def cached_revenue_outlook_sensitivity_audit(
     signature: tuple[tuple[str, int, int], ...],
-    sensitivity_key: tuple[str, str, str, str, str, str, str, str, str],
+    sensitivity_key: tuple[str, str, str, str, str, str, str, str, str, str, str],
     bridge_mode: str,
     _pack: RevenueOutlookPack,
 ) -> pd.DataFrame:
@@ -851,21 +876,25 @@ def cached_revenue_outlook_sensitivity_audit(
     fleet_efficiency = sensitivity_key[0]
     pt_mode_shift = sensitivity_key[1]
     demand_elasticity = sensitivity_key[2]
+    freight_rail_shift = sensitivity_key[9] if len(sensitivity_key) > 9 else "Off"
     custom_fleet = float(sensitivity_key[3]) if sensitivity_key[3] else None
     custom_pt = float(sensitivity_key[4]) if sensitivity_key[4] else None
     custom_ped = float(sensitivity_key[5]) if sensitivity_key[5] else None
     custom_light = float(sensitivity_key[6]) if sensitivity_key[6] else None
     custom_heavy = float(sensitivity_key[7]) if sensitivity_key[7] else None
     cost_ratio = float(sensitivity_key[8]) if sensitivity_key[8] else None
+    custom_freight = float(sensitivity_key[10]) if len(sensitivity_key) > 10 and sensitivity_key[10] else None
     return revenue_sensitivity_impact_audit_frame(
         bridge_frames.get("line_reconciliation", pd.DataFrame()),
         bridge_frames.get("ped_revenue_bridge_audit", pd.DataFrame()),
         sensitivity_config,
         fleet_efficiency=fleet_efficiency,
         pt_mode_shift=pt_mode_shift,
+        freight_rail_shift=freight_rail_shift,
         demand_elasticity=demand_elasticity,
         custom_fleet_efficiency_pct=custom_fleet,
         custom_pt_shift_pct=custom_pt,
+        custom_freight_shift_pct=custom_freight,
         custom_ped_elasticity=custom_ped,
         custom_light_elasticity=custom_light,
         custom_heavy_elasticity=custom_heavy,
@@ -881,7 +910,7 @@ def cached_revenue_outlook_total_path_figure(
     time_grain: str,
     fed_path: str,
     traces: tuple[str, ...],
-    sensitivity_key: tuple[str, str, str, str, str, str, str, str, str],
+    sensitivity_key: tuple[str, str, str, str, str, str, str, str, str, str, str],
     bridge_mode: str,
     ev_uptake_key: tuple[Any, ...],
     _filtered_rows: pd.DataFrame,
@@ -957,7 +986,7 @@ def cached_revenue_outlook_composition_stack(
     fy_range: tuple[int, int],
     overlays: tuple[str, ...],
     stack_section_options: tuple[str, ...],
-    sensitivity_key: tuple[str, str, str, str, str, str, str, str, str],
+    sensitivity_key: tuple[str, str, str, str, str, str, str, str, str, str, str],
     bridge_mode: str,
     _stack_components: pd.DataFrame,
 ) -> pd.DataFrame:
@@ -982,7 +1011,7 @@ def cached_revenue_outlook_composition_figure(
     sections: tuple[str, ...],
     fy_range: tuple[int, int],
     overlays: tuple[str, ...],
-    sensitivity_key: tuple[str, str, str, str, str, str, str, str, str],
+    sensitivity_key: tuple[str, str, str, str, str, str, str, str, str, str, str],
     bridge_mode: str,
     _chart_stack: pd.DataFrame,
 ) -> go.Figure:
@@ -1004,7 +1033,7 @@ def cached_revenue_outlook_composition_table_view(
     sections: tuple[str, ...],
     fy_range: tuple[int, int],
     overlays: tuple[str, ...],
-    sensitivity_key: tuple[str, str, str, str, str, str, str, str, str],
+    sensitivity_key: tuple[str, str, str, str, str, str, str, str, str, str, str],
     bridge_mode: str,
     _chart_stack: pd.DataFrame,
 ) -> tuple[str, pd.DataFrame]:
@@ -1018,7 +1047,7 @@ def cached_revenue_line_reconciliation_view(
     source_paths: tuple[str, ...],
     sections: tuple[str, ...],
     fy_range: tuple[int, int],
-    sensitivity_key: tuple[str, str, str, str, str, str, str, str, str],
+    sensitivity_key: tuple[str, str, str, str, str, str, str, str, str, str, str],
     bridge_mode: str,
     _line_reconciliation: pd.DataFrame,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -1037,7 +1066,7 @@ def cached_revenue_outlook_selected_fy_figures(
     signature: tuple[tuple[str, int, int], ...],
     selected_fy: str,
     selected_fed_path: str,
-    sensitivity_key: tuple[str, str, str, str, str, str, str, str, str],
+    sensitivity_key: tuple[str, str, str, str, str, str, str, str, str, str, str],
     bridge_mode: str,
     _bridge: pd.DataFrame,
 ) -> tuple[go.Figure, go.Figure]:
@@ -1078,7 +1107,7 @@ def cached_revenue_outlook_activity_figure(
     time_grain: str,
     selected_fed_path: str,
     traces: tuple[str, ...],
-    sensitivity_key: tuple[str, str, str, str, str, str, str, str, str],
+    sensitivity_key: tuple[str, str, str, str, str, str, str, str, str, str, str],
     bridge_mode: str,
     _chart_rows: pd.DataFrame,
 ) -> go.Figure:
@@ -2794,7 +2823,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     cost_per_km_ratio = None
     with st.container(border=True):
         st.markdown("<div class='page5-panel-title'>Sensitivities</div>", unsafe_allow_html=True)
-        sens_cols = st.columns([0.22, 0.22, 0.56])
+        sens_cols = st.columns([0.20, 0.20, 0.20, 0.40])
         with sens_cols[0]:
             selected_fleet_efficiency = st.selectbox(
                 "Fleet efficiency",
@@ -2812,8 +2841,18 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 key="revenue_outlook_sensitivity_pt_mode_shift",
             )
         with sens_cols[2]:
+            selected_freight_rail_shift = st.selectbox(
+                "Freight rail shift",
+                sensitivity_options,
+                index=sensitivity_options.index("Off"),
+                format_func=lambda level: sensitivity_labels["freight_rail_shift"].get(level, str(level)),
+                key="revenue_outlook_sensitivity_freight_rail_shift",
+                help=FREIGHT_RAIL_SHIFT_NOTE,
+            )
+        with sens_cols[3]:
             custom_fleet_efficiency_pct = None
             custom_pt_shift_pct = None
+            custom_freight_shift_pct = None
             custom_ped_elasticity = None
             custom_light_elasticity = None
             custom_heavy_elasticity = None
@@ -2821,7 +2860,9 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 custom_fleet_efficiency_pct = st.number_input("Custom efficiency % p.a.", min_value=0.0, max_value=10.0, value=1.0, step=0.1)
             if selected_pt_mode_shift == "Custom":
                 custom_pt_shift_pct = st.number_input("Custom PT shift % p.a.", min_value=0.0, max_value=10.0, value=0.5, step=0.1)
-            if all(value != "Custom" for value in [selected_fleet_efficiency, selected_pt_mode_shift]):
+            if selected_freight_rail_shift == "Custom":
+                custom_freight_shift_pct = st.number_input("Custom rail shift % p.a.", min_value=0.0, max_value=10.0, value=0.5, step=0.1)
+            if all(value != "Custom" for value in [selected_fleet_efficiency, selected_pt_mode_shift, selected_freight_rail_shift]):
                 st.caption("Custom inputs appear only when selected.")
     with st.container(border=True):
         st.markdown("<div class='page5-panel-title'>EV/PHEV uptake</div>", unsafe_allow_html=True)
@@ -2893,8 +2934,10 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         fleet_efficiency=selected_fleet_efficiency,
         pt_mode_shift=selected_pt_mode_shift,
         demand_elasticity=selected_demand_elasticity,
+        freight_rail_shift=selected_freight_rail_shift,
         custom_fleet_efficiency_pct=custom_fleet_efficiency_pct,
         custom_pt_shift_pct=custom_pt_shift_pct,
+        custom_freight_shift_pct=custom_freight_shift_pct,
         custom_ped_elasticity=custom_ped_elasticity,
         custom_light_elasticity=custom_light_elasticity,
         custom_heavy_elasticity=custom_heavy_elasticity,
@@ -3019,6 +3062,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             selected_summary = (
                 f"Fleet efficiency: {sensitivity_option_label('fleet_efficiency', selected_fleet_efficiency)}; "
                 f"PT mode shift: {sensitivity_option_label('pt_mode_shift', selected_pt_mode_shift)}; "
+                f"Freight rail shift: {sensitivity_option_label('freight_rail_shift', selected_freight_rail_shift)}; "
                 f"Demand elasticity: {sensitivity_option_label('demand_elasticity', selected_demand_elasticity)}."
             )
             st.caption(
@@ -6876,9 +6920,11 @@ def _sensitivity_impact_display_table(audit: pd.DataFrame) -> pd.DataFrame:
         "unit": "Unit",
         "selected_fleet_efficiency": "Fleet efficiency",
         "selected_pt_mode_shift": "PT mode shift",
+        "selected_freight_rail_shift": "Freight rail shift",
         "selected_demand_elasticity": "Demand elasticity",
         "eff_gain": "Efficiency gain",
         "pt_factor": "PT factor",
+        "freight_factor": "Freight factor",
         "elasticity": "Elasticity",
         "cost_per_km_ratio": "Cost/km ratio",
         "demand_factor": "Demand factor",
@@ -6887,7 +6933,7 @@ def _sensitivity_impact_display_table(audit: pd.DataFrame) -> pd.DataFrame:
     }
     cols = [col for col in rename if col in view.columns]
     view = view[cols].rename(columns=rename)
-    for col in ["Baseline", "Adjusted", "Delta", "Efficiency gain", "PT factor", "Elasticity", "Cost/km ratio", "Demand factor"]:
+    for col in ["Baseline", "Adjusted", "Delta", "Efficiency gain", "PT factor", "Freight factor", "Elasticity", "Cost/km ratio", "Demand factor"]:
         if col in view.columns:
             view[col] = pd.to_numeric(view[col], errors="coerce").map(
                 lambda value: "" if pd.isna(value) else f"{float(value):,.4f}"
