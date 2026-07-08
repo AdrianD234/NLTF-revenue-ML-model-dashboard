@@ -989,7 +989,11 @@ def test_revenue_outlook_cloud_hides_debug_toggles_and_shows_full_composition(mo
     at.run()
 
     assert not at.exception
-    assert [(toggle.label, toggle.key) for toggle in at.toggle] == []
+    # Debug toggles stay hidden on cloud; the freight rail shift toggle is a
+    # user-facing sensitivity control and remains visible.
+    assert [(toggle.label, toggle.key) for toggle in at.toggle] == [
+        ("Freight rail shift", "revenue_outlook_sensitivity_freight_rail_toggle"),
+    ]
     assert any("Revenue composition over time" in str(markdown.value) for markdown in at.markdown)
     rendered_text = "\n".join([*(str(markdown.value) for markdown in at.markdown), *(str(caption.value) for caption in at.caption)])
     for forbidden in [

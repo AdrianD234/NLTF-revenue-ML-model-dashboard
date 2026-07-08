@@ -2841,14 +2841,23 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 key="revenue_outlook_sensitivity_pt_mode_shift",
             )
         with sens_cols[2]:
-            selected_freight_rail_shift = st.selectbox(
+            freight_rail_enabled = st.toggle(
                 "Freight rail shift",
-                sensitivity_options,
-                index=sensitivity_options.index("Off"),
-                format_func=lambda level: sensitivity_labels["freight_rail_shift"].get(level, str(level)),
-                key="revenue_outlook_sensitivity_freight_rail_shift",
+                value=False,
+                key="revenue_outlook_sensitivity_freight_rail_toggle",
                 help=FREIGHT_RAIL_SHIFT_NOTE,
             )
+            if freight_rail_enabled:
+                freight_level_options = [level for level in sensitivity_options if level != "Off"]
+                selected_freight_rail_shift = st.selectbox(
+                    "Rail shift level",
+                    freight_level_options,
+                    index=freight_level_options.index("Med"),
+                    format_func=lambda level: sensitivity_labels["freight_rail_shift"].get(level, str(level)),
+                    key="revenue_outlook_sensitivity_freight_rail_shift",
+                )
+            else:
+                selected_freight_rail_shift = "Off"
         with sens_cols[3]:
             custom_fleet_efficiency_pct = None
             custom_pt_shift_pct = None
