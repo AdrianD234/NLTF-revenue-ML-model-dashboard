@@ -232,14 +232,22 @@ def _drift_rate_lookup(drift: pd.DataFrame) -> dict[tuple[str, int], dict[str, f
     return lookup
 
 
-def _pool_from_chart_rows(data: pd.DataFrame, base_mask: pd.Series, numeric_value: pd.Series) -> float | None:
+def _pool_from_labels(
+    labels_for: Any,
+    numeric_value: pd.Series,
+    scenario: str,
+    fy: int,
+) -> float | None:
     """Full light RUC universe = sum of the three displayed km series."""
     total = 0.0
     for series_id in LEVER_SERIES_KM:
-        mask = base_mask & data["series_id"].astype(str).eq(series_id)
-        if not mask.any() or not numeric_value[mask].notna().any():
+        labels = labels_for(scenario, fy, series_id)
+        if not labels:
             return None
-        total += float(numeric_value[mask].iloc[0])
+        values = numeric_value.loc[labels]
+        if not values.notna().any():
+            return None
+        total += float(values.iloc[0])
     return total
 
 
@@ -279,10 +287,29 @@ def apply_uptake_levers_to_chart_rows(
     retention = ped_retention_curve(fys_index, levers)
     heavy_share = heavy_bev_share_curve(fys_index, levers)
 
-    def _scale_series(mask: pd.Series, factor: float) -> float:
+    # One pass builds (scenario, FY, series) -> row labels for the june-year
+    # forecast rows; the per-(scenario, FY) loop below then never recomputes
+    # full-frame string masks (the previous approach was O(pairs x rows)).
+    series_str = data["series_id"].astype(str)
+    scenario_str = data.get("scenario_name", pd.Series("", index=data.index)).astype(str)
+    eligible = (is_june & is_forecast).to_numpy()
+    fy_values = june_year.to_numpy()
+    rows_by_key: dict[tuple[str, int, str], list[Any]] = {}
+    for position, label in enumerate(data.index):
+        fy_value = fy_values[position]
+        if not eligible[position] or pd.isna(fy_value):
+            continue
+        rows_by_key.setdefault(
+            (scenario_str.iat[position], int(fy_value), series_str.iat[position]), []
+        ).append(label)
+
+    def _labels_for(scenario: str, fy: int, series_id: str) -> list[Any]:
+        return rows_by_key.get((scenario, fy, series_id), [])
+
+    def _scale_series(labels: list[Any], factor: float) -> float:
         """Scale matching rows by factor; return the resulting value delta."""
         delta = 0.0
-        for index in data.index[mask]:
+        for index in labels:
             old = numeric_value.at[index]
             if pd.isna(old):
                 continue
@@ -302,25 +329,24 @@ def apply_uptake_levers_to_chart_rows(
             "bev": float(share_row["bev"]),
             "phev": float(share_row["phev"]),
         }
-        scenario_mask = data.get("scenario_name", pd.Series("", index=data.index)).astype(str).eq(scenario)
-        base_mask = is_june & is_forecast & scenario_mask & june_year.eq(fy)
-        pool_km = _pool_from_chart_rows(data, base_mask, numeric_value)
+        pool_km = _pool_from_labels(_labels_for, numeric_value, scenario, fy)
         if pool_km is None or pool_km <= 0:
             continue
         light_revenue_delta = 0.0
         for series_id, component in LEVER_SERIES_KM.items():
-            mask = base_mask & data["series_id"].astype(str).eq(series_id)
-            if not mask.any():
+            labels = _labels_for(scenario, fy, series_id)
+            if not labels:
                 continue
-            data.loc[mask, "value"] = pool_km * share_values[component]
+            data.loc[labels, "value"] = pool_km * share_values[component]
         for series_id, (component, rate_key) in LEVER_SERIES_REVENUE.items():
-            mask = base_mask & data["series_id"].astype(str).eq(series_id)
-            if not mask.any() or not np.isfinite(rates[rate_key]):
+            labels = _labels_for(scenario, fy, series_id)
+            if not labels or not np.isfinite(rates[rate_key]):
                 continue
+            values = numeric_value.loc[labels]
             new_revenue = pool_km * share_values[component] * rates[rate_key]
-            old_revenue = float(numeric_value[mask].iloc[0]) if numeric_value[mask].notna().any() else 0.0
+            old_revenue = float(values.iloc[0]) if values.notna().any() else 0.0
             light_revenue_delta += new_revenue - old_revenue
-            data.loc[mask, "value"] = new_revenue
+            data.loc[labels, "value"] = new_revenue
 
         # PED petrol displacement: the finalist raw-bridge petrol path keeps
         # activity that the VFM says migrates to EVs. Scale the PED family by
@@ -329,10 +355,8 @@ def apply_uptake_levers_to_chart_rows(
         ped_factor = float(retention.get(fy, 1.0))
         if adjust_ped and ped_factor < 1.0:
             for series_id in PED_ACTIVITY_SERIES:
-                _scale_series(base_mask & data["series_id"].astype(str).eq(series_id), ped_factor)
-            ped_revenue_delta = _scale_series(
-                base_mask & data["series_id"].astype(str).eq(PED_REVENUE_SERIES), ped_factor
-            )
+                _scale_series(_labels_for(scenario, fy, series_id), ped_factor)
+            ped_revenue_delta = _scale_series(_labels_for(scenario, fy, PED_REVENUE_SERIES), ped_factor)
 
         # Heavy BEV split: MBU26 charges heavy BEVs the same per-km RUC, so
         # the split moves km/revenue out of the charted conventional heavy
@@ -340,10 +364,8 @@ def apply_uptake_levers_to_chart_rows(
         heavy_factor = 1.0 - float(heavy_share.get(fy, 0.0))
         heavy_reallocated = 0.0
         if heavy_factor < 1.0:
-            _scale_series(base_mask & data["series_id"].astype(str).eq(HEAVY_KM_SERIES), heavy_factor)
-            heavy_reallocated = -_scale_series(
-                base_mask & data["series_id"].astype(str).eq(HEAVY_REVENUE_SERIES), heavy_factor
-            )
+            _scale_series(_labels_for(scenario, fy, HEAVY_KM_SERIES), heavy_factor)
+            heavy_reallocated = -_scale_series(_labels_for(scenario, fy, HEAVY_REVENUE_SERIES), heavy_factor)
 
         if light_revenue_delta:
             ruc_delta[(scenario, fy)] = light_revenue_delta
@@ -366,11 +388,7 @@ def apply_uptake_levers_to_chart_rows(
         )
 
     if ruc_delta or fed_delta:
-        aggregate_mask = (
-            is_june
-            & is_forecast
-            & data["series_id"].astype(str).isin(LEVER_AGGREGATE_SERIES)
-        )
+        aggregate_mask = is_june & is_forecast & series_str.isin(LEVER_AGGREGATE_SERIES)
         for index in data.index[aggregate_mask]:
             if pd.isna(numeric_value.at[index]):
                 continue
@@ -387,7 +405,7 @@ def apply_uptake_levers_to_chart_rows(
     touched = (
         is_june
         & is_forecast
-        & data["series_id"].astype(str).isin(
+        & series_str.isin(
             set(LEVER_SERIES_KM)
             | set(LEVER_SERIES_REVENUE)
             | set(LEVER_AGGREGATE_SERIES)

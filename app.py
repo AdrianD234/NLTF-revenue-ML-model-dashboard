@@ -6,6 +6,7 @@ import html
 import io
 import json
 import os
+import threading
 from pathlib import Path
 import re
 import sys
@@ -729,17 +730,19 @@ def _resolve_eruc_levers(ev_uptake_key: tuple[Any, ...]) -> ErucTransitionLevers
     return ErucTransitionLevers(*[float(v) for v in values])
 
 
-def cached_revenue_outlook_view(
+@st.cache_data(show_spinner=False)
+def cached_sensitivity_stage_frames(
     signature: tuple[tuple[str, int, int], ...],
-    selected_series: str,
-    time_grain: str,
-    fed_path: str,
-    traces: tuple[str, ...],
-    sensitivity_key: tuple[str, str, str, str, str, str, str, str, str, str, str],
     bridge_mode: str,
-    ev_uptake_key: tuple[Any, ...],
+    sensitivity_key: tuple[str, str, str, str, str, str, str, str, str, str, str],
     _pack: RevenueOutlookPack,
-) -> dict[str, Any]:
+) -> tuple[dict[str, pd.DataFrame], dict[str, pd.DataFrame], bool]:
+    """Bridge + sensitivity stages of the view pipeline: (bridge, sensitivity, fast_path).
+
+    These stages cost ~0.6-2.9s and are shared by every lever overlay run
+    (selected levers, cone bounds, comparison scenarios), so they cache
+    independently of the uptake/e-RUC/12c keys layered on top.
+    """
     del signature
     bridge_frames = _bridge_mode_frames_for_pack(
         _pack,
@@ -757,105 +760,190 @@ def cached_revenue_outlook_view(
             "future_revenue_forecasts": bridge_frames["future_revenue_forecasts"],
             "sensitivity_impact_audit": pd.DataFrame(),
         }
-        sensitivity_fast_path = True
-    else:
-        sensitivity_frames = _apply_sensitivity_for_key(bridge_frames, sensitivity_config, sensitivity_key)
-        sensitivity_fast_path = False
+        return bridge_frames, sensitivity_frames, True
+    return bridge_frames, _apply_sensitivity_for_key(bridge_frames, sensitivity_config, sensitivity_key), False
 
-    sensitivity_chart_rows = sensitivity_frames["chart_rows"]
-    adjust_ped = str(bridge_mode) == PED_BRIDGE_DEFAULT_MODE
-    eruc_levers = _resolve_eruc_levers(ev_uptake_key)
+
+@st.cache_data(show_spinner=False)
+def cached_fed_uplift_factors(
+    signature: tuple[tuple[str, int, int], ...],
+    _pack: RevenueOutlookPack,
+) -> dict[Any, Any]:
+    del signature
+    return fed_uplift_off_factors(Path(__file__).resolve().parent, _pack.revenue_chart_rows)
+
+
+def _apply_scenario_overlays(
+    rows: pd.DataFrame,
+    drift: pd.DataFrame,
+    levers: UptakeLevers | None,
+    eruc_levers: ErucTransitionLevers | None,
+    uplift_factors: dict[Any, Any],
+    *,
+    adjust_ped: bool,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """uptake -> e-RUC -> 12c-off overlay chain shared by view, cone and comparison.
+
+    Returns (rows, uptake_audit, eruc_audit, uplift_audit).
+    """
+    uptake_audit = pd.DataFrame()
     eruc_audit = pd.DataFrame()
-    fed_uplift_off = bool(ev_uptake_key[3]) if len(ev_uptake_key) > 3 else False
-    uplift_factors = (
-        fed_uplift_off_factors(Path(__file__).resolve().parent, _pack.revenue_chart_rows)
-        if fed_uplift_off
-        else {}
-    )
-    fed_uplift_audit = pd.DataFrame()
+    uplift_audit = pd.DataFrame()
+    if levers is not None:
+        # The optimized-migration PED bridge already displaces petrol
+        # activity; only the raw bridge needs the displacement lever.
+        rows, uptake_audit = apply_uptake_levers_to_chart_rows(rows, drift, levers, adjust_ped=adjust_ped)
+    if eruc_levers is not None:
+        rows, eruc_audit = apply_eruc_transition_to_chart_rows(rows, drift, eruc_levers)
+    if uplift_factors:
+        rows, uplift_audit = apply_fed_uplift_off_to_chart_rows(rows, uplift_factors)
+    return rows, uptake_audit, eruc_audit, uplift_audit
 
-    def _lever_adjusted_series_rows(levers: UptakeLevers | None) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, bool]:
-        """chart rows + filtered rows for the selected series under `levers`."""
-        nonlocal eruc_audit, fed_uplift_audit
-        rows = sensitivity_chart_rows
-        audit = pd.DataFrame()
-        if levers is not None:
-            rows, audit = apply_uptake_levers_to_chart_rows(
-                rows,
-                _pack_table(_pack, "ev_phev_ped_light_drift_assumptions"),
-                levers,
-                # The optimized-migration PED bridge already displaces petrol
-                # activity; only the raw bridge needs the displacement lever.
-                adjust_ped=adjust_ped,
-            )
-        if eruc_levers is not None:
-            rows, transition_audit = apply_eruc_transition_to_chart_rows(
-                rows,
-                _pack_table(_pack, "ev_phev_ped_light_drift_assumptions"),
-                eruc_levers,
-            )
-            if levers is ev_uptake_levers:
-                eruc_audit = transition_audit
-        if uplift_factors:
-            rows, uplift_audit = apply_fed_uplift_off_to_chart_rows(rows, uplift_factors)
-            if levers is ev_uptake_levers:
-                fed_uplift_audit = uplift_audit
-        filtered = _filter_revenue_outlook_rows(
+
+@st.cache_data(show_spinner=False)
+def cached_scenario_overlay_rows(
+    signature: tuple[tuple[str, int, int], ...],
+    sensitivity_key: tuple[str, ...],
+    bridge_mode: str,
+    ev_uptake_key: tuple[Any, ...],
+    _pack: RevenueOutlookPack,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """(rows, uptake_audit, eruc_audit, uplift_audit) for one scenario key.
+
+    Series- and grain-agnostic: the view, the VFM cone bounds and the A/B
+    comparison all share this cache and filter from it, so switching series
+    or grain never re-runs the overlay chain.
+    """
+    _, sensitivity_frames, _ = cached_sensitivity_stage_frames(signature, bridge_mode, sensitivity_key, _pack)
+    levers = _resolve_ev_uptake_levers(ev_uptake_key)
+    eruc_levers = _resolve_eruc_levers(ev_uptake_key)
+    fed_uplift_off = bool(ev_uptake_key[3]) if len(ev_uptake_key) > 3 else False
+    uplift_factors = cached_fed_uplift_factors(signature, _pack) if fed_uplift_off else {}
+    return _apply_scenario_overlays(
+        sensitivity_frames["chart_rows"],
+        _pack_table(_pack, "ev_phev_ped_light_drift_assumptions"),
+        levers,
+        eruc_levers,
+        uplift_factors,
+        adjust_ped=str(bridge_mode) == PED_BRIDGE_DEFAULT_MODE,
+    )
+
+
+def _filter_series_rows_with_fallback(
+    rows: pd.DataFrame,
+    selected_series: str,
+    time_grain: str,
+    fed_path: str,
+    traces: tuple[str, ...],
+) -> tuple[pd.DataFrame, bool]:
+    """Selected-series rows at the requested grain, Denton-disaggregated if quarterly rows are absent."""
+    filtered = _filter_revenue_outlook_rows(
+        rows,
+        time_grain=time_grain,
+        stream_labels=[selected_series],
+        fed_paths=[fed_path],
+        trace_names=list(traces),
+    )
+    if time_grain == "quarterly" and filtered.empty:
+        annual = _filter_revenue_outlook_rows(
             rows,
-            time_grain=time_grain,
+            time_grain="june_year",
             stream_labels=[selected_series],
             fed_paths=[fed_path],
             trace_names=list(traces),
         )
-        disaggregated = False
-        if time_grain == "quarterly" and filtered.empty:
-            annual = _filter_revenue_outlook_rows(
-                rows,
-                time_grain="june_year",
-                stream_labels=[selected_series],
-                fed_paths=[fed_path],
-                trace_names=list(traces),
-            )
-            derived = _disaggregate_annual_rows_to_quarterly(annual, rows)
-            if not derived.empty:
-                filtered = derived
-                disaggregated = True
-        return rows, filtered, audit, disaggregated
+        derived = _disaggregate_annual_rows_to_quarterly(annual, rows)
+        if not derived.empty:
+            return derived, True
+    return filtered, False
 
+
+@st.cache_data(show_spinner=False)
+def cached_view_cone_band(
+    signature: tuple[tuple[str, int, int], ...],
+    selected_series: str,
+    time_grain: str,
+    fed_path: str,
+    traces: tuple[str, ...],
+    sensitivity_key: tuple[str, str, str, str, str, str, str, str, str, str, str],
+    bridge_mode: str,
+    eruc_values: tuple[float, ...],
+    fed_uplift_off: bool,
+    _pack: RevenueOutlookPack,
+) -> pd.DataFrame:
+    """MoT VFM fast/slow fleet-transition envelope around the base-case trace.
+
+    Keyed without the selected uptake levers: the cone always uses the fast
+    and slow presets, so switching the uptake basis reuses the cached band.
+    """
+    bounds: dict[str, pd.Series] = {}
+    for bound_name, preset_name in (("fast", "MoT VFM fast"), ("slow", "MoT VFM slow")):
+        preset_key = (preset_name, (), tuple(eruc_values), 1 if fed_uplift_off else 0)
+        rows, _, _, _ = cached_scenario_overlay_rows(signature, sensitivity_key, bridge_mode, preset_key, _pack)
+        bound_rows, _ = _filter_series_rows_with_fallback(rows, selected_series, time_grain, fed_path, traces)
+        base_trace = bound_rows[
+            bound_rows.get("trace_name", pd.Series(dtype=str)).astype(str).eq("Current finalist Base case")
+            & ~bound_rows.get("row_type", pd.Series(dtype=str)).astype(str).eq("historical_actual")
+        ]
+        if base_trace.empty:
+            continue
+        bounds[bound_name] = pd.Series(
+            pd.to_numeric(base_trace["value"], errors="coerce").to_numpy(),
+            index=base_trace["period"].astype(str),
+        )
+    if len(bounds) != 2:
+        return pd.DataFrame()
+    merged = pd.DataFrame(bounds).dropna()
+    if merged.empty:
+        return pd.DataFrame()
+    spread = (merged["fast"] - merged["slow"]).abs()
+    scale = merged.abs().to_numpy().max()
+    if not (scale > 0 and float(spread.max()) / scale > 1e-6):
+        return pd.DataFrame()
+    return pd.DataFrame(
+        {
+            "period": merged.index,
+            "lower": merged.min(axis=1).to_numpy(),
+            "upper": merged.max(axis=1).to_numpy(),
+        }
+    )
+
+
+@st.cache_data(show_spinner=False)
+def cached_revenue_outlook_view(
+    signature: tuple[tuple[str, int, int], ...],
+    selected_series: str,
+    time_grain: str,
+    fed_path: str,
+    traces: tuple[str, ...],
+    sensitivity_key: tuple[str, str, str, str, str, str, str, str, str, str, str],
+    bridge_mode: str,
+    ev_uptake_key: tuple[Any, ...],
+    _pack: RevenueOutlookPack,
+) -> dict[str, Any]:
+    bridge_frames, sensitivity_frames, sensitivity_fast_path = cached_sensitivity_stage_frames(
+        signature, bridge_mode, sensitivity_key, _pack
+    )
+    eruc_levers = _resolve_eruc_levers(ev_uptake_key)
+    fed_uplift_off = bool(ev_uptake_key[3]) if len(ev_uptake_key) > 3 else False
     ev_uptake_levers = _resolve_ev_uptake_levers(ev_uptake_key)
-    chart_rows, filtered_rows, ev_uptake_audit, quarterly_disaggregated = _lever_adjusted_series_rows(ev_uptake_levers)
+    chart_rows, ev_uptake_audit, eruc_audit, fed_uplift_audit = cached_scenario_overlay_rows(
+        signature, sensitivity_key, bridge_mode, ev_uptake_key, _pack
+    )
+    filtered_rows, quarterly_disaggregated = _filter_series_rows_with_fallback(
+        chart_rows, selected_series, time_grain, fed_path, traces
+    )
 
     # MoT VFM fleet-transition cone: the fast/slow scenario envelope around
     # the base-case trace. Computed with the same pipeline so the band is
     # exactly what the chart would show under those presets.
     cone_band = pd.DataFrame()
     if ev_uptake_levers is not None:
-        bounds: dict[str, pd.Series] = {}
-        for bound_name, preset_name in (("fast", "MoT VFM fast"), ("slow", "MoT VFM slow")):
-            _, bound_rows, _, _ = _lever_adjusted_series_rows(EV_UPTAKE_PRESETS[preset_name])
-            base_trace = bound_rows[
-                bound_rows.get("trace_name", pd.Series(dtype=str)).astype(str).eq("Current finalist Base case")
-                & ~bound_rows.get("row_type", pd.Series(dtype=str)).astype(str).eq("historical_actual")
-            ]
-            if base_trace.empty:
-                continue
-            bounds[bound_name] = pd.Series(
-                pd.to_numeric(base_trace["value"], errors="coerce").to_numpy(),
-                index=base_trace["period"].astype(str),
-            )
-        if len(bounds) == 2:
-            merged = pd.DataFrame(bounds).dropna()
-            if not merged.empty:
-                spread = (merged["fast"] - merged["slow"]).abs()
-                scale = merged.abs().to_numpy().max()
-                if scale > 0 and float(spread.max()) / scale > 1e-6:
-                    cone_band = pd.DataFrame(
-                        {
-                            "period": merged.index,
-                            "lower": merged.min(axis=1).to_numpy(),
-                            "upper": merged.max(axis=1).to_numpy(),
-                        }
-                    )
+        eruc_values = tuple(float(v) for v in (ev_uptake_key[2] if len(ev_uptake_key) > 2 else ()) or ())
+        cone_band = cached_view_cone_band(
+            signature, selected_series, time_grain, fed_path, traces,
+            sensitivity_key, bridge_mode, eruc_values, fed_uplift_off, _pack,
+        )
     filtered_bridge = _filter_revenue_bridge_rows(
         sensitivity_frames["revenue_bridge_components"],
         [selected_series],
@@ -894,19 +982,18 @@ def cached_scenario_comparison_paths(
     bridge_mode: str,
     _pack: RevenueOutlookPack,
 ) -> dict[str, Any]:
-    """A/B scenario paths for one series: two full view computations.
-
-    ``cached_revenue_outlook_view`` itself is uncached; this wrapper provides
-    the caching so a rerun with unchanged scenario keys is free.
-    """
+    """A/B paths for one series, filtered from the per-scenario cached rows."""
     traces = ("Current finalist Base case", "Actual")
 
     def _paths(sensitivity_key, ev_uptake_key) -> tuple[pd.Series, pd.Series, str, str]:
-        view = cached_revenue_outlook_view(
-            signature, series, "june_year", fed_path, traces,
-            sensitivity_key, bridge_mode, ev_uptake_key, _pack,
+        scenario_rows, _, _, _ = cached_scenario_overlay_rows(signature, sensitivity_key, bridge_mode, ev_uptake_key, _pack)
+        rows = _filter_revenue_outlook_rows(
+            scenario_rows,
+            time_grain="june_year",
+            stream_labels=[series],
+            fed_paths=[fed_path],
+            trace_names=list(traces),
         )
-        rows = view["filtered_rows"]
         if rows is None or rows.empty:
             return pd.Series(dtype=float), pd.Series(dtype=float), "", ""
         fy = pd.to_numeric(rows["june_year"], errors="coerce")
@@ -916,7 +1003,7 @@ def cached_scenario_comparison_paths(
         history = pd.Series(values[is_actual].to_numpy(), index=fy[is_actual].to_numpy()).dropna().sort_index()
         forecast = pd.Series(values[is_base & ~is_actual].to_numpy(), index=fy[is_base & ~is_actual].to_numpy()).dropna().sort_index()
         unit = _first_non_empty(rows.get("value_unit", pd.Series(dtype=str)))
-        metric = _revenue_outlook_series_metric_type(view["chart_rows"], series)
+        metric = _revenue_outlook_series_metric_type(scenario_rows, series)
         return forecast, history, str(unit or ""), str(metric or "")
 
     forecast_a, history, unit, metric = _paths(sensitivity_key_a, ev_uptake_key_a)
@@ -937,15 +1024,16 @@ def cached_revenue_outlook_detail_frames(
     bridge_mode: str,
     _pack: RevenueOutlookPack,
 ) -> dict[str, pd.DataFrame]:
-    del signature
-    bridge_frames = _bridge_mode_frames_for_pack(_pack, bridge_mode, include_derived_frames=True)
     if _is_default_sensitivity_key(sensitivity_key):
+        bridge_frames = _bridge_mode_frames_for_pack(_pack, bridge_mode, include_derived_frames=True)
         return {
             **bridge_frames,
             "sensitivity_impact_audit": pd.DataFrame(),
         }
-    sensitivity_config = _pack_table(_pack, "sensitivity_config", sensitivity_config_frame())
-    sensitivity_frames = _apply_sensitivity_for_key(bridge_frames, sensitivity_config, sensitivity_key)
+    # Non-default keys reuse the staged pipeline cache (which builds the
+    # bridge with derived frames for exactly these keys) instead of paying a
+    # duplicate ~3s bridge + sensitivity recompute per lever change.
+    bridge_frames, sensitivity_frames, _ = cached_sensitivity_stage_frames(signature, bridge_mode, sensitivity_key, _pack)
     return {
         **sensitivity_frames,
         "ped_revenue_bridge_audit": bridge_frames.get("ped_revenue_bridge_audit", pd.DataFrame()),
@@ -1320,6 +1408,80 @@ def dashboard_pages() -> list[str]:
     return pages
 
 
+_REVENUE_OUTLOOK_WARMER_STARTED = threading.Event()
+
+
+def _revenue_outlook_warm_sensitivity_keys() -> list[tuple[str, ...]]:
+    """Most-likely first sensitivity selections: one family at a time."""
+    keys: list[tuple[str, ...]] = []
+    for level in ("Low", "Med", "High"):
+        keys.append(selected_sensitivity_key(level, "Off", "Off", freight_rail_shift="Off"))
+        keys.append(selected_sensitivity_key("Off", level, "Off", freight_rail_shift="Off"))
+        keys.append(selected_sensitivity_key("Off", "Off", "Off", freight_rail_shift=level))
+    return keys
+
+
+def _warm_revenue_outlook_caches() -> None:
+    """Best-effort pre-compute of the hot Revenue Outlook cache keys.
+
+    ``st.cache_data`` is process-global, so warming here makes the first
+    visit to the page (and the first click on any single sensitivity level)
+    hit warm caches instead of paying the 0.5-2s pipeline cost inline.
+    """
+    try:
+        repo_root = Path(__file__).resolve().parent
+        pack = load_revenue_outlook_pack(repo_root / CURRENT_REVENUE_OUTLOOK_DIR, repo_root=repo_root)
+        if pack is None:
+            return
+        signature = revenue_outlook_signature(repo_root / CURRENT_REVENUE_OUTLOOK_DIR, repo_root)
+        default_sens = selected_sensitivity_key("Off", "Off", "Off", freight_rail_shift="Off")
+        default_uptake = (DEFAULT_EV_UPTAKE_MODE, (), (), 0)
+        uptake_12c_off = (DEFAULT_EV_UPTAKE_MODE, (), (), 1)
+
+        def _warm_view(sensitivity_key: tuple[str, ...], ev_uptake_key: tuple[Any, ...]) -> None:
+            cached_revenue_outlook_view(
+                signature,
+                "Total NLTF revenue",
+                "june_year",
+                "Current planned path",
+                ("Current finalist Base case", "Actual"),
+                sensitivity_key,
+                PED_BRIDGE_DEFAULT_MODE,
+                ev_uptake_key,
+                pack,
+            )
+
+        _warm_view(default_sens, default_uptake)
+        _warm_view(default_sens, uptake_12c_off)
+        cached_revenue_outlook_detail_frames(signature, default_sens, PED_BRIDGE_DEFAULT_MODE, pack)
+        for sensitivity_key in _revenue_outlook_warm_sensitivity_keys():
+            _warm_view(sensitivity_key, default_uptake)
+            cached_revenue_outlook_detail_frames(signature, sensitivity_key, PED_BRIDGE_DEFAULT_MODE, pack)
+    except Exception:
+        # Warming is an optimisation only; the page computes on demand.
+        pass
+
+
+def _start_revenue_outlook_cache_warmer() -> None:
+    if env_flag("REVENUE_OUTLOOK_CACHE_WARMER") is False:
+        return
+    if _REVENUE_OUTLOOK_WARMER_STARTED.is_set():
+        return
+    _REVENUE_OUTLOOK_WARMER_STARTED.set()
+    thread = threading.Thread(
+        target=_warm_revenue_outlook_caches,
+        name="revenue-outlook-cache-warmer",
+        daemon=True,
+    )
+    try:
+        from streamlit.runtime.scriptrunner import add_script_run_ctx
+
+        add_script_run_ctx(thread)
+    except Exception:
+        pass
+    thread.start()
+
+
 def main() -> None:
     st.set_page_config(page_title="NTLF Revenue Modelling", layout="wide", initial_sidebar_state="collapsed")
     inject_theme()
@@ -1346,6 +1508,7 @@ def main() -> None:
     for warning in global_warnings(loaded.warnings):
         warning_panel(warning)
 
+    _start_revenue_outlook_cache_warmer()
     current_page = render_primary_navigation(pages)
     current_index = pages.index(current_page) + 1
     with header_slot.container():
@@ -2840,11 +3003,22 @@ def render_reproducibility_detail(stream_label: str) -> None:
 
 REVENUE_OUTLOOK_VIEW_SINGLE = "Single scenario"
 REVENUE_OUTLOOK_VIEW_COMPARE = "Compare A vs B"
-# Single-view controls unmount while the comparison view is active;
-# re-assigning their session values each run marks them as programmatically
-# set so Streamlit keeps them alive across the mode switch.
-_REVENUE_OUTLOOK_PERSISTED_KEYS = ("revenue_outlook_time_grain", "revenue_outlook_selected_fy")
-_REVENUE_OUTLOOK_PERSISTED_PREFIXES = ("revenue_outlook_legend_item_",)
+COMPARISON_MOT_OFFICIAL_OPTION = "MoT official (MBU26, no levers)"
+# Single-view controls (and the whole lever accordion) unmount while the
+# comparison view is active; re-assigning their session values each run marks
+# them as programmatically set so Streamlit keeps them alive across the switch.
+_REVENUE_OUTLOOK_PERSISTED_KEYS = (
+    "revenue_outlook_time_grain",
+    "revenue_outlook_selected_fy",
+    "revenue_outlook_sensitivity_fleet_efficiency",
+    "revenue_outlook_sensitivity_pt_mode_shift",
+    "revenue_outlook_sensitivity_freight_rail_toggle",
+    "revenue_outlook_sensitivity_freight_rail_shift",
+    "revenue_outlook_ev_uptake_basis_v2",
+    "revenue_outlook_eruc_toggle",
+    "revenue_outlook_fed_uplift",
+)
+_REVENUE_OUTLOOK_PERSISTED_PREFIXES = ("revenue_outlook_legend_item_", "ev_lever_", "eruc_lever_")
 
 
 def _persist_revenue_outlook_view_state() -> None:
@@ -2852,6 +3026,16 @@ def _persist_revenue_outlook_view_state() -> None:
         name = str(key)
         if name in _REVENUE_OUTLOOK_PERSISTED_KEYS or name.startswith(_REVENUE_OUTLOOK_PERSISTED_PREFIXES):
             st.session_state[key] = st.session_state[key]
+
+
+def _widget_default_kwargs(key: str, **defaults: Any) -> dict[str, Any]:
+    """Widget default kwargs only while the key has no session value.
+
+    Persisted keys are re-assigned via the Session State API each run; also
+    passing ``value=``/``index=`` then would log a default-vs-session-state
+    warning on every rerun.
+    """
+    return {} if key in st.session_state else defaults
 
 
 def _active_lever_summary(
@@ -2985,6 +3169,9 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             if not selected_traces:
                 selected_traces = selected_trace_defaults or list(trace_options[:1])
         else:
+            # Widgets whose state survives compare mode via the persistence
+            # idiom must not also pass a default once the key exists, or
+            # Streamlit logs a default-vs-session-state warning per rerun.
             control_cols = st.columns([0.20, 0.16, 0.28, 0.36])
             with control_cols[0]:
                 grain_label = st.radio(
@@ -2994,11 +3181,12 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                     key="revenue_outlook_time_grain",
                 )
             with control_cols[1]:
+                fy_default_kwargs = {} if "revenue_outlook_selected_fy" in st.session_state else {"index": default_fy_index}
                 selected_fy = st.selectbox(
                     "Selected FY",
                     fy_options,
-                    index=default_fy_index,
                     key="revenue_outlook_selected_fy",
+                    **fy_default_kwargs,
                 )
             with control_cols[2]:
                 selected_traces = []
@@ -3006,11 +3194,9 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 with st.popover("Select legend items", use_container_width=True):
                     st.caption("Choose which traces appear in the chart legend.")
                     for trace in trace_options:
-                        is_selected = st.checkbox(
-                            trace,
-                            value=trace in selected_trace_defaults,
-                            key=f"revenue_outlook_legend_item_{_widget_key(trace)}",
-                        )
+                        legend_key = f"revenue_outlook_legend_item_{_widget_key(trace)}"
+                        legend_default_kwargs = {} if legend_key in st.session_state else {"value": trace in selected_trace_defaults}
+                        is_selected = st.checkbox(trace, key=legend_key, **legend_default_kwargs)
                         if is_selected:
                             selected_traces.append(trace)
                 if not selected_traces:

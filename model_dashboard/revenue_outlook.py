@@ -2684,34 +2684,62 @@ def _apply_sensitivity_audit_to_frame(
         ] = record
 
     out["_sensitivity_fy"] = out.get(fy_column, pd.Series("", index=out.index)).map(_extract_fy_number)
-    for idx, row in out.iterrows():
-        if current_mask_column and str(row.get(current_mask_column) or "") not in {"", "in_house_current_finalist"}:
+    # Insertion-order fallback candidates per (FY, scenario, series): the
+    # original linear scan over the whole lookup made this O(rows x audit).
+    fallback_index: dict[tuple[int, str, str], list[tuple[tuple[str, int, str, str, str], dict[str, Any]]]] = {}
+    for key, record in lookup.items():
+        fallback_index.setdefault((key[1], key[2], key[4]), []).append((key, record))
+
+    def _column_values(column: str | None) -> list[Any] | None:
+        if not column or column not in out.columns:
+            return None
+        return out[column].tolist()
+
+    n_rows = len(out)
+    fy_values = out["_sensitivity_fy"].tolist()
+    series_values = _column_values(series_column) or [""] * n_rows
+    source_values = _column_values(source_path_column)
+    scenario_values = _column_values(scenario_column)
+    fed_values = _column_values(fed_path_column)
+    mask_values = _column_values(current_mask_column)
+    baseline_values = _column_values(value_column) or [np.nan] * n_rows
+    grain_values = _column_values("time_grain")
+
+    value_updates: list[tuple[int, float]] = []
+    label_updates: list[Any] = []
+    delta_updates: list[Any] = []
+    pt_updates: list[Any] = []
+    freight_updates: list[Any] = []
+    demand_updates: list[Any] = []
+    ped_positions: list[int] = []
+    ped_labels: list[str] = []
+    ped_label_series = {"ped_volume", "gross_ped_revenue", "gross_fed_revenue", "net_fed_revenue", "total_fed_ruc_net_revenue", "total_nltf_net_revenue"}
+
+    for pos in range(n_rows):
+        if mask_values is not None and str(mask_values[pos] or "") not in {"", "in_house_current_finalist"}:
             continue
-        fy = out.at[idx, "_sensitivity_fy"]
+        fy = fy_values[pos]
         if pd.isna(fy):
             continue
-        series_id = str(row.get(series_column) or "")
-        source_path = str(row.get(source_path_column) or "") if source_path_column else ""
-        scenario_name = str(row.get(scenario_column) or "") if scenario_column else ""
-        fed_path = str(row.get(fed_path_column) or "") if fed_path_column else ""
+        series_id = str(series_values[pos] or "")
+        source_path = str(source_values[pos] or "") if source_values is not None else ""
+        scenario_name = str(scenario_values[pos] or "") if scenario_values is not None else ""
+        fed_path = str(fed_values[pos] or "") if fed_values is not None else ""
         record = lookup.get((source_path, int(fy), scenario_name, fed_path, series_id))
         if not record:
+            candidates = fallback_index.get((int(fy), scenario_name, series_id), ())
             record = next(
                 (
                     item
-                    for key, item in lookup.items()
-                    if key[1] == int(fy)
-                    and key[2] == scenario_name
-                    and key[4] == series_id
-                    and (not fed_path or key[3] == fed_path)
-                    and (not source_path or key[0] == source_path)
+                    for key, item in candidates
+                    if (not fed_path or key[3] == fed_path) and (not source_path or key[0] == source_path)
                 ),
                 None,
             )
         if not record:
             continue
         adjusted_value = _finite_float(record.get("adjusted"), np.nan)
-        baseline_value = _finite_float(row.get(value_column), np.nan)
+        baseline_value = _finite_float(baseline_values[pos], np.nan)
         if not np.isfinite(adjusted_value):
             continue
         audit_baseline = _finite_float(record.get("baseline"), np.nan)
@@ -2719,23 +2747,35 @@ def _apply_sensitivity_audit_to_frame(
             # Pass-through record: the selected sensitivities do not move this
             # series. Skip so untouched rows keep their exact pack values.
             continue
-        row_grain = str(row.get("time_grain") or "") if "time_grain" in out.columns else ""
+        row_grain = str(grain_values[pos] or "") if grain_values is not None else ""
         if row_grain == "quarterly":
             # Audit values are annual; overwriting a quarterly row with the
             # annual level corrupts the series (annual-sized spikes). Apply
             # the annual adjustment ratio to the quarterly value instead.
             if not (np.isfinite(audit_baseline) and audit_baseline != 0.0 and np.isfinite(baseline_value)):
                 continue
-            out.at[idx, value_column] = baseline_value * (adjusted_value / audit_baseline)
+            value_updates.append((pos, baseline_value * (adjusted_value / audit_baseline)))
         else:
-            out.at[idx, value_column] = adjusted_value
-        out.at[idx, "revenue_sensitivity_label"] = _sensitivity_display_label(record)
-        out.at[idx, "revenue_sensitivity_value_delta"] = adjusted_value - baseline_value if np.isfinite(baseline_value) else pd.NA
-        out.at[idx, "pt_factor"] = record.get("pt_factor")
-        out.at[idx, "freight_factor"] = record.get("freight_factor")
-        out.at[idx, "demand_factor"] = record.get("demand_factor")
-        if series_id in {"ped_volume", "gross_ped_revenue", "gross_fed_revenue", "net_fed_revenue", "total_fed_ruc_net_revenue", "total_nltf_net_revenue"}:
-            out.at[idx, "ped_efficiency_label"] = str(record.get("selected_fleet_efficiency") or "")
+            value_updates.append((pos, adjusted_value))
+        label_updates.append(_sensitivity_display_label(record))
+        delta_updates.append(adjusted_value - baseline_value if np.isfinite(baseline_value) else pd.NA)
+        pt_updates.append(record.get("pt_factor"))
+        freight_updates.append(record.get("freight_factor"))
+        demand_updates.append(record.get("demand_factor"))
+        if series_id in ped_label_series:
+            ped_positions.append(pos)
+            ped_labels.append(str(record.get("selected_fleet_efficiency") or ""))
+
+    if value_updates:
+        positions = [pos for pos, _ in value_updates]
+        out.iloc[positions, out.columns.get_loc(value_column)] = [value for _, value in value_updates]
+        out.iloc[positions, out.columns.get_loc("revenue_sensitivity_label")] = label_updates
+        out.iloc[positions, out.columns.get_loc("revenue_sensitivity_value_delta")] = delta_updates
+        out.iloc[positions, out.columns.get_loc("pt_factor")] = pt_updates
+        out.iloc[positions, out.columns.get_loc("freight_factor")] = freight_updates
+        out.iloc[positions, out.columns.get_loc("demand_factor")] = demand_updates
+    if ped_positions:
+        out.iloc[ped_positions, out.columns.get_loc("ped_efficiency_label")] = ped_labels
     return out.drop(columns=["_sensitivity_fy"], errors="ignore")
 
 

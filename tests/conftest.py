@@ -17,6 +17,10 @@ if RUNTIME_PYARROW24.exists() and str(RUNTIME_PYARROW24) not in sys.path:
 # ON default explicitly monkeypatch this variable away (test_executive_mode).
 os.environ.setdefault("CLOUD_PREVIEW_DEFAULT", "0")
 
+# The background cache warmer would burn ~20s of CPU per AppTest process and
+# add nondeterminism; the suite exercises the cold and warm paths explicitly.
+os.environ.setdefault("REVENUE_OUTLOOK_CACHE_WARMER", "0")
+
 
 @pytest.fixture
 def tmp_path() -> Path:
