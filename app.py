@@ -2831,13 +2831,13 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 "Uptake basis",
                 list(EV_UPTAKE_MODE_OPTIONS),
                 index=list(EV_UPTAKE_MODE_OPTIONS).index(DEFAULT_EV_UPTAKE_MODE),
-                key="revenue_outlook_ev_uptake_mode",
+                key="revenue_outlook_ev_uptake_basis",
                 help=VFM_SOURCE_NOTE + "\n\n" + SENSITIVITY_INTERPLAY_NOTE,
             )
         custom_ev_levers: tuple[float, ...] = ()
         with uptake_cols[1]:
             if selected_ev_uptake_mode == EV_UPTAKE_CUSTOM_OPTION:
-                defaults = EV_UPTAKE_PRESETS["MBU26 official shape"]
+                defaults = EV_UPTAKE_PRESETS[DEFAULT_EV_UPTAKE_MODE]
                 light_col, ped_col, heavy_col = st.columns(3)
                 with light_col:
                     st.markdown("**Light RUC pool**")
@@ -2872,11 +2872,6 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                     heavy_speed / 100.0,
                     float(heavy_mid),
                     heavy_2050 / 100.0,
-                )
-            elif selected_ev_uptake_mode == EV_UPTAKE_GOVERNED_OPTION:
-                st.caption(
-                    "Committed runtime pack allocation (λ-migration to MBU26 universe proportions). "
-                    "Select an MoT VFM preset or custom levers to reshape BEV/PHEV uptake in this view."
                 )
             else:
                 preset = EV_UPTAKE_PRESETS[selected_ev_uptake_mode]

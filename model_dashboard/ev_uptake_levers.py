@@ -139,10 +139,13 @@ EV_UPTAKE_PRESETS: dict[str, UptakeLevers] = {
         0.0425, 2043.5, 0.68, 0.010, 2054.0, 0.10,
     ),
 }
+# Engine sentinel for the unmodified governed-pack allocation. Not offered in
+# the UI (the λ-migration split allowed the terminal-year scenario crossing);
+# retained so parity tests and diagnostics can request a no-overlay view.
 GOVERNED_PACK_OPTION = "Governed pack (MBU26 λ-migration)"
 CUSTOM_OPTION = "Custom levers"
-EV_UPTAKE_MODE_OPTIONS = (GOVERNED_PACK_OPTION, *EV_UPTAKE_PRESETS.keys(), CUSTOM_OPTION)
-DEFAULT_EV_UPTAKE_MODE = GOVERNED_PACK_OPTION
+EV_UPTAKE_MODE_OPTIONS = (*EV_UPTAKE_PRESETS.keys(), CUSTOM_OPTION)
+DEFAULT_EV_UPTAKE_MODE = "MoT VFM base"
 
 
 def solve_logistic_from_levers(peak_speed: float, peak_year: float, share_2050: float) -> tuple[float, float]:
