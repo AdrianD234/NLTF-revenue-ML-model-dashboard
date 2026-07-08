@@ -940,8 +940,7 @@ def assert_revenue_outlook_composition_below_primary(page: Page) -> None:
     for text in [
         "Revenue composition over time",
         "FY range / horizon",
-        "Section filter",
-        "Aggregate overlays",
+        "Source path",
     ]:
         expect(page.locator("body")).to_contain_text(text, timeout=60000)
 

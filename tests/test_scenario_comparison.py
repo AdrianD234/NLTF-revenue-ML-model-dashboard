@@ -92,6 +92,33 @@ def test_vkt_per_capita_uses_intensity_card_variant(comparison_context) -> None:
     assert "NPV" not in text
 
 
+def test_mot_official_scenario_plots_the_mbu26_official_trace(comparison_context) -> None:
+    pack, _ = comparison_context
+    governed_keys = _keys(uptake=app.EV_UPTAKE_GOVERNED_OPTION)
+    result = _paths(comparison_context, "Total NLTF revenue", governed_keys, governed_keys)
+    assert not result["a"].empty
+    assert result["metric_type"] == "revenue"
+    pd.testing.assert_series_equal(result["a"], result["b"])
+    # It must be the MBU26 official trace itself - NOT the finalist base case
+    # with lever overlays switched off (the raw petrol bridge keeps all petrol
+    # activity to 2050, which is exactly what the displacement lever corrects).
+    rows = pack.revenue_chart_rows
+    label_col = "series_label" if "series_label" in rows.columns else "stream_label"
+    mbu = rows[
+        rows["time_grain"].astype(str).eq("june_year")
+        & rows[label_col].astype(str).eq("Total NLTF revenue")
+        & rows["trace_name"].astype(str).eq("MBU26 official")
+    ]
+    expected = pd.Series(
+        pd.to_numeric(mbu["value"], errors="coerce").to_numpy(),
+        index=pd.to_numeric(mbu["june_year"], errors="coerce").to_numpy(),
+    ).dropna().sort_index()
+    pd.testing.assert_series_equal(result["a"], expected, check_index_type=False)
+    # And it differs from the VFM base preset overlay path.
+    vs_base = _paths(comparison_context, "Total NLTF revenue", governed_keys, _keys())
+    assert not vs_base["a"].equals(vs_base["b"])
+
+
 def test_delta_tone_flips_with_sign() -> None:
     up = pd.Series([100.0, 100.0], index=[2026, 2027])
     down = pd.Series([90.0, 90.0], index=[2026, 2027])

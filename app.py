@@ -983,23 +983,28 @@ def cached_scenario_comparison_paths(
     _pack: RevenueOutlookPack,
 ) -> dict[str, Any]:
     """A/B paths for one series, filtered from the per-scenario cached rows."""
-    traces = ("Current finalist Base case", "Actual")
 
     def _paths(sensitivity_key, ev_uptake_key) -> tuple[pd.Series, pd.Series, str, str]:
         scenario_rows, _, _, _ = cached_scenario_overlay_rows(signature, sensitivity_key, bridge_mode, ev_uptake_key, _pack)
+        # The MoT official scenario plots the governed MBU26 trace itself, not
+        # the finalist base case with the overlays switched off (the raw
+        # finalist petrol bridge keeps all petrol activity to 2050, which is
+        # the implausible path the displacement lever exists to correct).
+        mode = str(ev_uptake_key[0]) if ev_uptake_key else ""
+        base_trace = "MBU26 official" if mode == EV_UPTAKE_GOVERNED_OPTION else "Current finalist Base case"
         rows = _filter_revenue_outlook_rows(
             scenario_rows,
             time_grain="june_year",
             stream_labels=[series],
             fed_paths=[fed_path],
-            trace_names=list(traces),
+            trace_names=[base_trace, "Actual"],
         )
         if rows is None or rows.empty:
             return pd.Series(dtype=float), pd.Series(dtype=float), "", ""
         fy = pd.to_numeric(rows["june_year"], errors="coerce")
         values = pd.to_numeric(rows["value"], errors="coerce")
         is_actual = rows["row_type"].astype(str).eq("historical_actual")
-        is_base = rows["trace_name"].astype(str).eq("Current finalist Base case")
+        is_base = rows["trace_name"].astype(str).eq(base_trace)
         history = pd.Series(values[is_actual].to_numpy(), index=fy[is_actual].to_numpy()).dropna().sort_index()
         forecast = pd.Series(values[is_base & ~is_actual].to_numpy(), index=fy[is_base & ~is_actual].to_numpy()).dropna().sort_index()
         unit = _first_non_empty(rows.get("value_unit", pd.Series(dtype=str)))
@@ -3063,6 +3068,265 @@ def _active_lever_summary(
     return " · ".join(parts)
 
 
+def _render_lever_accordion(
+    selected_metric_type: str,
+    sensitivity_options: list[str],
+    sensitivity_labels: dict[str, dict[str, str]],
+) -> dict[str, Any]:
+    """Advanced scenario levers accordion (rendered in single-scenario view only).
+
+    One accordion holds every scenario lever; re-entering the same expander
+    object appends each group without re-indenting their layouts. Widget
+    defaults go through ``_widget_default_kwargs`` because these keys are
+    persisted across the compare-mode switch.
+    """
+    lever_expander = st.expander("Advanced scenario levers", expanded=False)
+    with lever_expander:
+        st.markdown("<div class='page5-panel-title'>Sensitivities</div><div class='page5-panel-sub'>Demand and intensity levers layered onto the current forecasts.</div>", unsafe_allow_html=True)
+        sens_cols = st.columns([0.20, 0.20, 0.20, 0.40])
+        with sens_cols[0]:
+            selected_fleet_efficiency = st.selectbox(
+                "Fleet efficiency",
+                sensitivity_options,
+                format_func=lambda level: sensitivity_labels["fleet_efficiency"].get(level, str(level)),
+                key="revenue_outlook_sensitivity_fleet_efficiency",
+                **_widget_default_kwargs("revenue_outlook_sensitivity_fleet_efficiency", index=sensitivity_options.index("Off")),
+            )
+        with sens_cols[1]:
+            selected_pt_mode_shift = st.selectbox(
+                "PT mode shift",
+                sensitivity_options,
+                format_func=lambda level: sensitivity_labels["pt_mode_shift"].get(level, str(level)),
+                key="revenue_outlook_sensitivity_pt_mode_shift",
+                **_widget_default_kwargs("revenue_outlook_sensitivity_pt_mode_shift", index=sensitivity_options.index("Off")),
+            )
+        with sens_cols[2]:
+            freight_rail_enabled = st.toggle(
+                "Freight rail shift",
+                key="revenue_outlook_sensitivity_freight_rail_toggle",
+                help=FREIGHT_RAIL_SHIFT_NOTE,
+                **_widget_default_kwargs("revenue_outlook_sensitivity_freight_rail_toggle", value=False),
+            )
+            if freight_rail_enabled:
+                freight_level_options = [level for level in sensitivity_options if level != "Off"]
+                selected_freight_rail_shift = st.selectbox(
+                    "Rail shift level",
+                    freight_level_options,
+                    format_func=lambda level: sensitivity_labels["freight_rail_shift"].get(level, str(level)),
+                    key="revenue_outlook_sensitivity_freight_rail_shift",
+                    **_widget_default_kwargs("revenue_outlook_sensitivity_freight_rail_shift", index=freight_level_options.index("Med")),
+                )
+            else:
+                selected_freight_rail_shift = "Off"
+        with sens_cols[3]:
+            custom_fleet_efficiency_pct = None
+            custom_pt_shift_pct = None
+            custom_freight_shift_pct = None
+            if selected_fleet_efficiency == "Custom":
+                custom_fleet_efficiency_pct = st.number_input("Custom efficiency % p.a.", min_value=0.0, max_value=10.0, value=1.0, step=0.1)
+            if selected_pt_mode_shift == "Custom":
+                custom_pt_shift_pct = st.number_input("Custom PT shift % p.a.", min_value=0.0, max_value=10.0, value=0.5, step=0.1)
+            if selected_freight_rail_shift == "Custom":
+                custom_freight_shift_pct = st.number_input("Custom rail shift % p.a.", min_value=0.0, max_value=10.0, value=0.5, step=0.1)
+            if all(value != "Custom" for value in [selected_fleet_efficiency, selected_pt_mode_shift, selected_freight_rail_shift]):
+                st.caption("Custom inputs appear only when selected.")
+    with lever_expander:
+        st.markdown("<div class='page5-panel-title'>EV/PHEV uptake</div><div class='page5-panel-sub'>Fleet-transition share curves inferred from the MoT Vehicle Fleet Model.</div>", unsafe_allow_html=True)
+        uptake_cols = st.columns([0.30, 0.70])
+        with uptake_cols[0]:
+            selected_ev_uptake_mode = st.selectbox(
+                "Uptake basis",
+                list(EV_UPTAKE_MODE_OPTIONS),
+                key="revenue_outlook_ev_uptake_basis_v2",
+                help=VFM_SOURCE_NOTE + "\n\n" + SENSITIVITY_INTERPLAY_NOTE,
+                **_widget_default_kwargs("revenue_outlook_ev_uptake_basis_v2", index=list(EV_UPTAKE_MODE_OPTIONS).index(DEFAULT_EV_UPTAKE_MODE)),
+            )
+        custom_ev_levers: tuple[float, ...] = ()
+        with uptake_cols[1]:
+            if selected_ev_uptake_mode == EV_UPTAKE_CUSTOM_OPTION:
+                defaults = EV_UPTAKE_PRESETS[DEFAULT_EV_UPTAKE_MODE]
+
+                def _lever_input(label: str, key: str, **kwargs: Any) -> float:
+                    default_value = kwargs.pop("value")
+                    return st.number_input(label, key=key, **kwargs, **_widget_default_kwargs(key, value=default_value))
+
+                light_col, ped_col, heavy_col = st.columns(3)
+                with light_col:
+                    st.markdown("**Light RUC pool**")
+                    bev_speed = _lever_input("BEV peak speed (pp/yr)", "ev_lever_bev_speed", min_value=0.5, max_value=10.0, value=defaults.bev_peak_speed_pp * 100, step=0.25)
+                    bev_peak_year = _lever_input("BEV peak year", "ev_lever_bev_peak_year", min_value=2026, max_value=2050, value=int(defaults.bev_peak_year), step=1)
+                    bev_2050 = _lever_input("BEV share 2050 (%)", "ev_lever_bev_2050", min_value=10.0, max_value=99.0, value=defaults.bev_share_2050 * 100, step=1.0)
+                    phev_start = _lever_input("PHEV start share (%)", "ev_lever_phev_start", min_value=0.0, max_value=15.0, value=defaults.phev_start_share * 100, step=0.5)
+                    phev_rise = _lever_input("PHEV rise (pp/yr)", "ev_lever_phev_rise", min_value=0.1, max_value=5.0, value=defaults.phev_rise_pp * 100, step=0.1)
+                    phev_peak = _lever_input("PHEV peak share (%)", "ev_lever_phev_peak", min_value=1.0, max_value=40.0, value=defaults.phev_peak_share * 100, step=0.5)
+                    phev_decay = _lever_input("PHEV decay (%/yr)", "ev_lever_phev_decay", min_value=0.0, max_value=25.0, value=defaults.phev_decay_rate * 100, step=0.5)
+                with ped_col:
+                    st.markdown("**PED petrol displacement**")
+                    ped_speed = _lever_input("Displacement speed (pp/yr)", "ev_lever_ped_speed", min_value=0.5, max_value=12.0, value=defaults.ped_disp_speed_pp * 100, step=0.25)
+                    ped_mid = _lever_input("Displacement midpoint year", "ev_lever_ped_mid", min_value=2028, max_value=2055, value=int(defaults.ped_disp_midpoint), step=1)
+                    ped_2050 = _lever_input("Displaced by 2050 (%)", "ev_lever_ped_2050", min_value=0.0, max_value=95.0, value=defaults.ped_disp_2050 * 100, step=1.0)
+                with heavy_col:
+                    st.markdown("**Heavy RUC pool**")
+                    heavy_speed = _lever_input("Heavy BEV speed (pp/yr)", "ev_lever_heavy_speed", min_value=0.25, max_value=8.0, value=defaults.heavy_bev_speed_pp * 100, step=0.25)
+                    heavy_mid = _lever_input("Heavy BEV midpoint year", "ev_lever_heavy_mid", min_value=2035, max_value=2075, value=int(defaults.heavy_bev_midpoint), step=1)
+                    heavy_2050 = _lever_input("Heavy BEV share 2050 (%)", "ev_lever_heavy_2050", min_value=0.0, max_value=80.0, value=defaults.heavy_bev_share_2050 * 100, step=1.0)
+                custom_ev_levers = (
+                    bev_speed / 100.0,
+                    float(bev_peak_year),
+                    bev_2050 / 100.0,
+                    phev_start / 100.0,
+                    phev_rise / 100.0,
+                    phev_peak / 100.0,
+                    phev_decay / 100.0,
+                    ped_speed / 100.0,
+                    float(ped_mid),
+                    ped_2050 / 100.0,
+                    heavy_speed / 100.0,
+                    float(heavy_mid),
+                    heavy_2050 / 100.0,
+                )
+            else:
+                preset = EV_UPTAKE_PRESETS[selected_ev_uptake_mode]
+                st.caption(
+                    f"Light BEV: peak {preset.bev_peak_speed_pp * 100:.2f} pp/yr in {preset.bev_peak_year:.0f}, "
+                    f"{preset.bev_share_2050 * 100:.0f}% of the light RUC pool by 2050; "
+                    f"PHEV: +{preset.phev_rise_pp * 100:.1f} pp/yr to {preset.phev_peak_share * 100:.1f}%, then -{preset.phev_decay_rate * 100:.1f}%/yr. "
+                    f"PED: {preset.ped_disp_2050 * 100:.0f}% of petrol activity displaced by 2050 (midpoint {preset.ped_disp_midpoint:.0f}, raw bridge only). "
+                    f"Heavy: {preset.heavy_bev_share_2050 * 100:.0f}% BEV by 2050 (rollup-neutral; BEVs pay the same per-km RUC). "
+                    "Applied in this view only; the governed pack is unchanged."
+                )
+    with lever_expander:
+        st.markdown("<div class='page5-panel-title'>Policy switches</div><div class='page5-panel-sub'>Legislated 12c FED uplift and the petrol-fleet e-RUC transition.</div>", unsafe_allow_html=True)
+        eruc_cols = st.columns([0.30, 0.70])
+        with eruc_cols[0]:
+            if selected_metric_type == "activity":
+                fed_uplift_on = True
+                st.markdown("<div class='control-label'>2027 12c FED uplift</div>", unsafe_allow_html=True)
+                st.caption("Not applicable to activity series.")
+            else:
+                fed_uplift_on = st.toggle(
+                    "2027 12c FED uplift",
+                    key="revenue_outlook_fed_uplift",
+                    help=FED_UPLIFT_NOTE,
+                    **_widget_default_kwargs("revenue_outlook_fed_uplift", value=True),
+                )
+            eruc_enabled = st.toggle(
+                "Move petrol fleet to e-RUC",
+                key="revenue_outlook_eruc_toggle",
+                help=ERUC_NOTE,
+                **_widget_default_kwargs("revenue_outlook_eruc_toggle", value=False),
+            )
+        eruc_lever_values: tuple[float, ...] = ()
+        with eruc_cols[1]:
+            if eruc_enabled:
+                eruc_input_cols = st.columns(5)
+                with eruc_input_cols[0]:
+                    eruc_start = st.number_input("Start FY", min_value=2026, max_value=2045, step=1, key="eruc_lever_start", **_widget_default_kwargs("eruc_lever_start", value=2027))
+                with eruc_input_cols[1]:
+                    eruc_phase = st.number_input("Phase-in (years)", min_value=1, max_value=10, step=1, key="eruc_lever_phase", **_widget_default_kwargs("eruc_lever_phase", value=3))
+                with eruc_input_cols[2]:
+                    eruc_ratio = st.number_input("e-RUC rate vs light RUC (%)", min_value=25.0, max_value=200.0, step=5.0, key="eruc_lever_ratio", **_widget_default_kwargs("eruc_lever_ratio", value=100.0))
+                with eruc_input_cols[3]:
+                    eruc_elasticity = st.number_input("VKT elasticity", min_value=-1.0, max_value=0.0, step=0.05, key="eruc_lever_elasticity", **_widget_default_kwargs("eruc_lever_elasticity", value=-0.15))
+                with eruc_input_cols[4]:
+                    eruc_pump = st.number_input("Pump price ($/L incl. excise)", min_value=1.0, max_value=6.0, step=0.05, key="eruc_lever_pump", **_widget_default_kwargs("eruc_lever_pump", value=2.70))
+                eruc_lever_values = (
+                    float(eruc_start),
+                    float(eruc_phase),
+                    eruc_ratio / 100.0,
+                    float(eruc_elasticity),
+                    float(eruc_pump),
+                )
+                st.caption(
+                    "Migrated petrol km leave the excise base and pay e-RUC per km; demand responds to the net "
+                    "running-cost change so the tax-free pump price still drives VKT. Petrol demand stays on the "
+                    "PED finalist; the Light RUC finalist is not re-estimated."
+                )
+    return {
+        "fleet": selected_fleet_efficiency,
+        "pt": selected_pt_mode_shift,
+        "freight": selected_freight_rail_shift,
+        "custom_fleet": custom_fleet_efficiency_pct,
+        "custom_pt": custom_pt_shift_pct,
+        "custom_freight": custom_freight_shift_pct,
+        "uptake_mode": selected_ev_uptake_mode,
+        "custom_ev_levers": custom_ev_levers,
+        "eruc_enabled": eruc_enabled,
+        "eruc_levers": eruc_lever_values,
+        "fed_uplift_on": fed_uplift_on,
+    }
+
+
+def _compare_mode_lever_state(selected_metric_type: str) -> dict[str, Any]:
+    """Single-view lever selections read from session state in compare mode.
+
+    The accordion is hidden while comparing (the A/B columns own the levers
+    there), but these persisted selections keep driving the composition and
+    audit sections below. Unkeyed Custom percentage inputs cannot persist,
+    so Custom levels fall back to Off/Med like the Copy-to-A mapping.
+    """
+
+    def _level(key: str) -> str:
+        value = str(st.session_state.get(key, "Off"))
+        return "Off" if value == "Custom" else value
+
+    freight = "Off"
+    if bool(st.session_state.get("revenue_outlook_sensitivity_freight_rail_toggle", False)):
+        freight = str(st.session_state.get("revenue_outlook_sensitivity_freight_rail_shift", "Med"))
+        if freight == "Custom":
+            freight = "Med"
+    uptake_mode = str(st.session_state.get("revenue_outlook_ev_uptake_basis_v2", DEFAULT_EV_UPTAKE_MODE))
+    custom_ev_levers: tuple[float, ...] = ()
+    if uptake_mode == EV_UPTAKE_CUSTOM_OPTION:
+        defaults = EV_UPTAKE_PRESETS[DEFAULT_EV_UPTAKE_MODE]
+
+        def _lever(key: str, fallback: float) -> float:
+            try:
+                return float(st.session_state.get(key, fallback))
+            except (TypeError, ValueError):
+                return float(fallback)
+
+        custom_ev_levers = (
+            _lever("ev_lever_bev_speed", defaults.bev_peak_speed_pp * 100) / 100.0,
+            _lever("ev_lever_bev_peak_year", defaults.bev_peak_year),
+            _lever("ev_lever_bev_2050", defaults.bev_share_2050 * 100) / 100.0,
+            _lever("ev_lever_phev_start", defaults.phev_start_share * 100) / 100.0,
+            _lever("ev_lever_phev_rise", defaults.phev_rise_pp * 100) / 100.0,
+            _lever("ev_lever_phev_peak", defaults.phev_peak_share * 100) / 100.0,
+            _lever("ev_lever_phev_decay", defaults.phev_decay_rate * 100) / 100.0,
+            _lever("ev_lever_ped_speed", defaults.ped_disp_speed_pp * 100) / 100.0,
+            _lever("ev_lever_ped_mid", defaults.ped_disp_midpoint),
+            _lever("ev_lever_ped_2050", defaults.ped_disp_2050 * 100) / 100.0,
+            _lever("ev_lever_heavy_speed", defaults.heavy_bev_speed_pp * 100) / 100.0,
+            _lever("ev_lever_heavy_mid", defaults.heavy_bev_midpoint),
+            _lever("ev_lever_heavy_2050", defaults.heavy_bev_share_2050 * 100) / 100.0,
+        )
+    eruc_enabled = bool(st.session_state.get("revenue_outlook_eruc_toggle", False))
+    eruc_levers: tuple[float, ...] = ()
+    if eruc_enabled:
+        eruc_levers = (
+            float(st.session_state.get("eruc_lever_start", 2027)),
+            float(st.session_state.get("eruc_lever_phase", 3)),
+            float(st.session_state.get("eruc_lever_ratio", 100.0)) / 100.0,
+            float(st.session_state.get("eruc_lever_elasticity", -0.15)),
+            float(st.session_state.get("eruc_lever_pump", 2.70)),
+        )
+    fed_uplift_on = True if selected_metric_type == "activity" else bool(st.session_state.get("revenue_outlook_fed_uplift", True))
+    return {
+        "fleet": _level("revenue_outlook_sensitivity_fleet_efficiency"),
+        "pt": _level("revenue_outlook_sensitivity_pt_mode_shift"),
+        "freight": freight,
+        "custom_fleet": None,
+        "custom_pt": None,
+        "custom_freight": None,
+        "uptake_mode": uptake_mode,
+        "custom_ev_levers": custom_ev_levers,
+        "eruc_enabled": eruc_enabled,
+        "eruc_levers": eruc_levers,
+        "fed_uplift_on": fed_uplift_on,
+    }
+
+
 def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     del loaded
     _persist_revenue_outlook_view_state()
@@ -3221,168 +3485,27 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     sensitivity_labels = selector_options["sensitivity_labels"]
     selected_demand_elasticity = "Off"
     cost_per_km_ratio = None
-    # One accordion holds every scenario lever; re-entering the same expander
-    # object appends each group without re-indenting their layouts.
-    lever_expander = st.expander("Advanced scenario levers", expanded=False)
-    with lever_expander:
-        st.markdown("<div class='page5-panel-title'>Sensitivities</div><div class='page5-panel-sub'>Demand and intensity levers layered onto the current forecasts.</div>", unsafe_allow_html=True)
-        sens_cols = st.columns([0.20, 0.20, 0.20, 0.40])
-        with sens_cols[0]:
-            selected_fleet_efficiency = st.selectbox(
-                "Fleet efficiency",
-                sensitivity_options,
-                index=sensitivity_options.index("Off"),
-                format_func=lambda level: sensitivity_labels["fleet_efficiency"].get(level, str(level)),
-                key="revenue_outlook_sensitivity_fleet_efficiency",
-            )
-        with sens_cols[1]:
-            selected_pt_mode_shift = st.selectbox(
-                "PT mode shift",
-                sensitivity_options,
-                index=sensitivity_options.index("Off"),
-                format_func=lambda level: sensitivity_labels["pt_mode_shift"].get(level, str(level)),
-                key="revenue_outlook_sensitivity_pt_mode_shift",
-            )
-        with sens_cols[2]:
-            freight_rail_enabled = st.toggle(
-                "Freight rail shift",
-                value=False,
-                key="revenue_outlook_sensitivity_freight_rail_toggle",
-                help=FREIGHT_RAIL_SHIFT_NOTE,
-            )
-            if freight_rail_enabled:
-                freight_level_options = [level for level in sensitivity_options if level != "Off"]
-                selected_freight_rail_shift = st.selectbox(
-                    "Rail shift level",
-                    freight_level_options,
-                    index=freight_level_options.index("Med"),
-                    format_func=lambda level: sensitivity_labels["freight_rail_shift"].get(level, str(level)),
-                    key="revenue_outlook_sensitivity_freight_rail_shift",
-                )
-            else:
-                selected_freight_rail_shift = "Off"
-        with sens_cols[3]:
-            custom_fleet_efficiency_pct = None
-            custom_pt_shift_pct = None
-            custom_freight_shift_pct = None
-            custom_ped_elasticity = None
-            custom_light_elasticity = None
-            custom_heavy_elasticity = None
-            if selected_fleet_efficiency == "Custom":
-                custom_fleet_efficiency_pct = st.number_input("Custom efficiency % p.a.", min_value=0.0, max_value=10.0, value=1.0, step=0.1)
-            if selected_pt_mode_shift == "Custom":
-                custom_pt_shift_pct = st.number_input("Custom PT shift % p.a.", min_value=0.0, max_value=10.0, value=0.5, step=0.1)
-            if selected_freight_rail_shift == "Custom":
-                custom_freight_shift_pct = st.number_input("Custom rail shift % p.a.", min_value=0.0, max_value=10.0, value=0.5, step=0.1)
-            if all(value != "Custom" for value in [selected_fleet_efficiency, selected_pt_mode_shift, selected_freight_rail_shift]):
-                st.caption("Custom inputs appear only when selected.")
-    with lever_expander:
-        st.markdown("<div class='page5-panel-title'>EV/PHEV uptake</div><div class='page5-panel-sub'>Fleet-transition share curves inferred from the MoT Vehicle Fleet Model.</div>", unsafe_allow_html=True)
-        uptake_cols = st.columns([0.30, 0.70])
-        with uptake_cols[0]:
-            selected_ev_uptake_mode = st.selectbox(
-                "Uptake basis",
-                list(EV_UPTAKE_MODE_OPTIONS),
-                index=list(EV_UPTAKE_MODE_OPTIONS).index(DEFAULT_EV_UPTAKE_MODE),
-                key="revenue_outlook_ev_uptake_basis_v2",
-                help=VFM_SOURCE_NOTE + "\n\n" + SENSITIVITY_INTERPLAY_NOTE,
-            )
-        custom_ev_levers: tuple[float, ...] = ()
-        with uptake_cols[1]:
-            if selected_ev_uptake_mode == EV_UPTAKE_CUSTOM_OPTION:
-                defaults = EV_UPTAKE_PRESETS[DEFAULT_EV_UPTAKE_MODE]
-                light_col, ped_col, heavy_col = st.columns(3)
-                with light_col:
-                    st.markdown("**Light RUC pool**")
-                    bev_speed = st.number_input("BEV peak speed (pp/yr)", min_value=0.5, max_value=10.0, value=defaults.bev_peak_speed_pp * 100, step=0.25, key="ev_lever_bev_speed")
-                    bev_peak_year = st.number_input("BEV peak year", min_value=2026, max_value=2050, value=int(defaults.bev_peak_year), step=1, key="ev_lever_bev_peak_year")
-                    bev_2050 = st.number_input("BEV share 2050 (%)", min_value=10.0, max_value=99.0, value=defaults.bev_share_2050 * 100, step=1.0, key="ev_lever_bev_2050")
-                    phev_start = st.number_input("PHEV start share (%)", min_value=0.0, max_value=15.0, value=defaults.phev_start_share * 100, step=0.5, key="ev_lever_phev_start")
-                    phev_rise = st.number_input("PHEV rise (pp/yr)", min_value=0.1, max_value=5.0, value=defaults.phev_rise_pp * 100, step=0.1, key="ev_lever_phev_rise")
-                    phev_peak = st.number_input("PHEV peak share (%)", min_value=1.0, max_value=40.0, value=defaults.phev_peak_share * 100, step=0.5, key="ev_lever_phev_peak")
-                    phev_decay = st.number_input("PHEV decay (%/yr)", min_value=0.0, max_value=25.0, value=defaults.phev_decay_rate * 100, step=0.5, key="ev_lever_phev_decay")
-                with ped_col:
-                    st.markdown("**PED petrol displacement**")
-                    ped_speed = st.number_input("Displacement speed (pp/yr)", min_value=0.5, max_value=12.0, value=defaults.ped_disp_speed_pp * 100, step=0.25, key="ev_lever_ped_speed")
-                    ped_mid = st.number_input("Displacement midpoint year", min_value=2028, max_value=2055, value=int(defaults.ped_disp_midpoint), step=1, key="ev_lever_ped_mid")
-                    ped_2050 = st.number_input("Displaced by 2050 (%)", min_value=0.0, max_value=95.0, value=defaults.ped_disp_2050 * 100, step=1.0, key="ev_lever_ped_2050")
-                with heavy_col:
-                    st.markdown("**Heavy RUC pool**")
-                    heavy_speed = st.number_input("Heavy BEV speed (pp/yr)", min_value=0.25, max_value=8.0, value=defaults.heavy_bev_speed_pp * 100, step=0.25, key="ev_lever_heavy_speed")
-                    heavy_mid = st.number_input("Heavy BEV midpoint year", min_value=2035, max_value=2075, value=int(defaults.heavy_bev_midpoint), step=1, key="ev_lever_heavy_mid")
-                    heavy_2050 = st.number_input("Heavy BEV share 2050 (%)", min_value=0.0, max_value=80.0, value=defaults.heavy_bev_share_2050 * 100, step=1.0, key="ev_lever_heavy_2050")
-                custom_ev_levers = (
-                    bev_speed / 100.0,
-                    float(bev_peak_year),
-                    bev_2050 / 100.0,
-                    phev_start / 100.0,
-                    phev_rise / 100.0,
-                    phev_peak / 100.0,
-                    phev_decay / 100.0,
-                    ped_speed / 100.0,
-                    float(ped_mid),
-                    ped_2050 / 100.0,
-                    heavy_speed / 100.0,
-                    float(heavy_mid),
-                    heavy_2050 / 100.0,
-                )
-            else:
-                preset = EV_UPTAKE_PRESETS[selected_ev_uptake_mode]
-                st.caption(
-                    f"Light BEV: peak {preset.bev_peak_speed_pp * 100:.2f} pp/yr in {preset.bev_peak_year:.0f}, "
-                    f"{preset.bev_share_2050 * 100:.0f}% of the light RUC pool by 2050; "
-                    f"PHEV: +{preset.phev_rise_pp * 100:.1f} pp/yr to {preset.phev_peak_share * 100:.1f}%, then -{preset.phev_decay_rate * 100:.1f}%/yr. "
-                    f"PED: {preset.ped_disp_2050 * 100:.0f}% of petrol activity displaced by 2050 (midpoint {preset.ped_disp_midpoint:.0f}, raw bridge only). "
-                    f"Heavy: {preset.heavy_bev_share_2050 * 100:.0f}% BEV by 2050 (rollup-neutral; BEVs pay the same per-km RUC). "
-                    "Applied in this view only; the governed pack is unchanged."
-                )
-    with lever_expander:
-        st.markdown("<div class='page5-panel-title'>Policy switches</div><div class='page5-panel-sub'>Legislated 12c FED uplift and the petrol-fleet e-RUC transition.</div>", unsafe_allow_html=True)
-        eruc_cols = st.columns([0.30, 0.70])
-        with eruc_cols[0]:
-            if selected_metric_type == "activity":
-                fed_uplift_on = True
-                st.markdown("<div class='control-label'>2027 12c FED uplift</div>", unsafe_allow_html=True)
-                st.caption("Not applicable to activity series.")
-            else:
-                fed_uplift_on = st.toggle(
-                    "2027 12c FED uplift",
-                    value=True,
-                    key="revenue_outlook_fed_uplift",
-                    help=FED_UPLIFT_NOTE,
-                )
-            eruc_enabled = st.toggle(
-                "Move petrol fleet to e-RUC",
-                value=False,
-                key="revenue_outlook_eruc_toggle",
-                help=ERUC_NOTE,
-            )
-        eruc_lever_values: tuple[float, ...] = ()
-        with eruc_cols[1]:
-            if eruc_enabled:
-                eruc_input_cols = st.columns(5)
-                with eruc_input_cols[0]:
-                    eruc_start = st.number_input("Start FY", min_value=2026, max_value=2045, value=2027, step=1, key="eruc_lever_start")
-                with eruc_input_cols[1]:
-                    eruc_phase = st.number_input("Phase-in (years)", min_value=1, max_value=10, value=3, step=1, key="eruc_lever_phase")
-                with eruc_input_cols[2]:
-                    eruc_ratio = st.number_input("e-RUC rate vs light RUC (%)", min_value=25.0, max_value=200.0, value=100.0, step=5.0, key="eruc_lever_ratio")
-                with eruc_input_cols[3]:
-                    eruc_elasticity = st.number_input("VKT elasticity", min_value=-1.0, max_value=0.0, value=-0.15, step=0.05, key="eruc_lever_elasticity")
-                with eruc_input_cols[4]:
-                    eruc_pump = st.number_input("Pump price ($/L incl. excise)", min_value=1.0, max_value=6.0, value=2.70, step=0.05, key="eruc_lever_pump")
-                eruc_lever_values = (
-                    float(eruc_start),
-                    float(eruc_phase),
-                    eruc_ratio / 100.0,
-                    float(eruc_elasticity),
-                    float(eruc_pump),
-                )
-                st.caption(
-                    "Migrated petrol km leave the excise base and pay e-RUC per km; demand responds to the net "
-                    "running-cost change so the tax-free pump price still drives VKT. Petrol demand stays on the "
-                    "PED finalist; the Light RUC finalist is not re-estimated."
-                )
+    custom_ped_elasticity = None
+    custom_light_elasticity = None
+    custom_heavy_elasticity = None
+    if compare_mode:
+        # The accordion disappears gracefully in compare mode - the A/B
+        # columns own the levers there - while the persisted single-view
+        # selections keep driving the composition and audit sections below.
+        lever_state = _compare_mode_lever_state(selected_metric_type)
+    else:
+        lever_state = _render_lever_accordion(selected_metric_type, sensitivity_options, sensitivity_labels)
+    selected_fleet_efficiency = lever_state["fleet"]
+    selected_pt_mode_shift = lever_state["pt"]
+    selected_freight_rail_shift = lever_state["freight"]
+    custom_fleet_efficiency_pct = lever_state["custom_fleet"]
+    custom_pt_shift_pct = lever_state["custom_pt"]
+    custom_freight_shift_pct = lever_state["custom_freight"]
+    selected_ev_uptake_mode = lever_state["uptake_mode"]
+    custom_ev_levers = lever_state["custom_ev_levers"]
+    eruc_enabled = lever_state["eruc_enabled"]
+    eruc_lever_values = lever_state["eruc_levers"]
+    fed_uplift_on = lever_state["fed_uplift_on"]
     lever_summary = _active_lever_summary(
         fleet=selected_fleet_efficiency,
         pt_shift=selected_pt_mode_shift,
@@ -3392,7 +3515,10 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         fed_uplift_on=fed_uplift_on,
     )
     if lever_summary:
-        st.caption(f"Active levers: {lever_summary}")
+        if compare_mode:
+            st.caption(f"Single-view levers (still applied to the sections below the comparison): {lever_summary}")
+        else:
+            st.caption(f"Active levers: {lever_summary}")
     ev_uptake_key: tuple[Any, ...] = (
         selected_ev_uptake_mode,
         custom_ev_levers,
@@ -3642,17 +3768,15 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         stack_source_options = selector_options["stack_source_options"]
         stack_section_options = selector_options["stack_section_options"]
         stack_fy_min, stack_fy_max = selector_options["stack_fy_bounds"]
+        stack_overlay_options = selector_options["stack_overlay_options"]
+        default_stack_sections = [section for section in ["RUC", "FED", "MVR", "TUC"] if section in stack_section_options]
+        default_stack_overlays = _revenue_stack_default_overlays(selected_stack_mode, stack_overlay_options)
+        # Two selectors carry the story (source path + FY zoom); the section
+        # and overlay multiselects duplicated the defaults for everyone and
+        # stay available on local audit runs only.
         show_detail_selector = should_show_local_audit_controls()
-        comp_cols = st.columns([0.22, 0.20, 0.20, 0.19, 0.19] if not show_detail_selector else [0.19, 0.16, 0.17, 0.16, 0.16, 0.16])
-        with comp_cols[0]:
-            selected_stack_source = st.selectbox(
-                "Source path",
-                stack_source_options,
-                index=0,
-                key="revenue_stack_source_path",
-            )
-        detail_col_offset = 0
         if show_detail_selector:
+            comp_cols = st.columns([0.19, 0.16, 0.17, 0.16, 0.16, 0.16])
             with comp_cols[1]:
                 selected_stack_detail_level = st.selectbox(
                     "Detail level",
@@ -3660,33 +3784,41 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                     index=0,
                     key="revenue_stack_detail_level",
                 )
-            detail_col_offset = 1
+            with comp_cols[3]:
+                selected_stack_sections = st.multiselect(
+                    "Section filter",
+                    stack_section_options,
+                    default=default_stack_sections or stack_section_options,
+                    key="revenue_stack_sections",
+                )
+            with comp_cols[4]:
+                selected_stack_overlays = st.multiselect(
+                    "Aggregate overlays",
+                    stack_overlay_options,
+                    default=default_stack_overlays,
+                    key=f"revenue_stack_overlays_{selected_stack_mode}_{selected_stack_detail_level}",
+                )
+            slider_col = comp_cols[2]
         else:
+            comp_cols = st.columns([0.26, 0.48, 0.26])
             selected_stack_detail_level = REVENUE_STACK_DETAIL_CLEAN
-        with comp_cols[1 + detail_col_offset]:
+            selected_stack_sections = default_stack_sections or list(stack_section_options)
+            selected_stack_overlays = list(default_stack_overlays)
+            slider_col = comp_cols[1]
+        with comp_cols[0]:
+            selected_stack_source = st.selectbox(
+                "Source path",
+                stack_source_options,
+                index=0,
+                key="revenue_stack_source_path",
+            )
+        with slider_col:
             selected_stack_fy_range = st.slider(
                 "FY range / horizon",
                 min_value=stack_fy_min,
                 max_value=stack_fy_max,
                 value=(stack_fy_min, stack_fy_max),
                 key="revenue_stack_fy_range",
-            )
-        default_stack_sections = [section for section in ["RUC", "FED", "MVR", "TUC"] if section in stack_section_options]
-        with comp_cols[2 + detail_col_offset]:
-            selected_stack_sections = st.multiselect(
-                "Section filter",
-                stack_section_options,
-                default=default_stack_sections or stack_section_options,
-                key="revenue_stack_sections",
-            )
-        stack_overlay_options = selector_options["stack_overlay_options"]
-        default_stack_overlays = _revenue_stack_default_overlays(selected_stack_mode, stack_overlay_options)
-        with comp_cols[3 + detail_col_offset]:
-            selected_stack_overlays = st.multiselect(
-                "Aggregate overlays",
-                stack_overlay_options,
-                default=default_stack_overlays,
-                key=f"revenue_stack_overlays_{selected_stack_mode}_{selected_stack_detail_level}",
             )
 
         selected_stack_sections_tuple = tuple(str(value) for value in selected_stack_sections)
@@ -5832,30 +5964,42 @@ def _comparison_scenario_defaults(prefix: str) -> dict[str, Any]:
 def _render_comparison_scenario_column(prefix: str, sensitivity_labels: dict[str, dict[str, str]]) -> tuple[tuple, tuple]:
     defaults = _comparison_scenario_defaults(prefix)
     uptake_options = [mode for mode in EV_UPTAKE_MODE_OPTIONS if mode != EV_UPTAKE_CUSTOM_OPTION]
+    uptake_options.append(COMPARISON_MOT_OFFICIAL_OPTION)
     keys = {name: f"ro_cmp_{prefix}_{name}" for name in ["uptake", "fleet", "pt", "freight", "eruc", "fed"]}
     _validated_select_state(keys["uptake"], uptake_options, defaults["uptake"])
     st.session_state.setdefault(keys["uptake"], defaults["uptake"])
-    uptake = st.selectbox("Uptake basis", uptake_options, key=keys["uptake"])
+    uptake = st.selectbox(
+        "Uptake basis",
+        uptake_options,
+        key=keys["uptake"],
+        help=(
+            f"'{COMPARISON_MOT_OFFICIAL_OPTION}' plots the governed MBU26 official path exactly as "
+            "committed - every lever is locked off for that scenario."
+        ),
+    )
+    mot_official = uptake == COMPARISON_MOT_OFFICIAL_OPTION
+    if mot_official:
+        st.caption("Pure MBU26 official path - levers locked for this scenario.")
     levels = list(_COMPARISON_SENSITIVITY_LEVELS)
-    for name, family in [("fleet", "fleet_efficiency"), ("pt", "pt_mode_shift"), ("freight", "freight_rail_shift")]:
+    for name in ("fleet", "pt", "freight"):
         _validated_select_state(keys[name], levels, defaults[name])
         st.session_state.setdefault(keys[name], defaults[name])
     fleet = st.selectbox(
-        "Fleet efficiency", levels, key=keys["fleet"],
+        "Fleet efficiency", levels, key=keys["fleet"], disabled=mot_official,
         format_func=lambda level: sensitivity_labels["fleet_efficiency"].get(level, str(level)),
     )
     pt_shift = st.selectbox(
-        "PT mode shift", levels, key=keys["pt"],
+        "PT mode shift", levels, key=keys["pt"], disabled=mot_official,
         format_func=lambda level: sensitivity_labels["pt_mode_shift"].get(level, str(level)),
     )
     freight = st.selectbox(
-        "Freight rail shift", levels, key=keys["freight"],
+        "Freight rail shift", levels, key=keys["freight"], disabled=mot_official,
         format_func=lambda level: sensitivity_labels["freight_rail_shift"].get(level, str(level)),
     )
-    st.session_state.setdefault(keys["eruc"], defaults["eruc"])
-    eruc_on = st.toggle("e-RUC transition", key=keys["eruc"], help=ERUC_NOTE)
     eruc_values: tuple[float, ...] = ()
-    if eruc_on:
+    st.session_state.setdefault(keys["eruc"], defaults["eruc"])
+    eruc_on = st.toggle("e-RUC transition", key=keys["eruc"], help=ERUC_NOTE, disabled=mot_official)
+    if eruc_on and not mot_official:
         with st.popover("e-RUC levers", use_container_width=True):
             start = st.number_input("Start FY", min_value=2026, max_value=2045, value=2027, step=1, key=f"ro_cmp_{prefix}_eruc_start")
             phase = st.number_input("Phase-in (years)", min_value=1, max_value=10, value=3, step=1, key=f"ro_cmp_{prefix}_eruc_phase")
@@ -5864,7 +6008,11 @@ def _render_comparison_scenario_column(prefix: str, sensitivity_labels: dict[str
             pump = st.number_input("Pump price ($/L incl. excise)", min_value=1.0, max_value=6.0, value=2.70, step=0.05, key=f"ro_cmp_{prefix}_eruc_pump")
         eruc_values = (float(start), float(phase), ratio / 100.0, float(elasticity), float(pump))
     st.session_state.setdefault(keys["fed"], defaults["fed"])
-    fed_on = st.toggle("2027 12c FED uplift", key=keys["fed"], help=FED_UPLIFT_NOTE)
+    fed_on = st.toggle("2027 12c FED uplift", key=keys["fed"], help=FED_UPLIFT_NOTE, disabled=mot_official)
+    if mot_official:
+        sensitivity_key = selected_sensitivity_key("Off", "Off", "Off", freight_rail_shift="Off")
+        ev_uptake_key: tuple[Any, ...] = (EV_UPTAKE_GOVERNED_OPTION, (), (), 0)
+        return sensitivity_key, ev_uptake_key
     sensitivity_key = selected_sensitivity_key(fleet, pt_shift, "Off", freight_rail_shift=freight)
     ev_uptake_key = (uptake, (), eruc_values, 0 if fed_on else 1)
     return sensitivity_key, ev_uptake_key
@@ -5892,7 +6040,8 @@ def _copy_page_settings_to_scenario_a() -> None:
 
 
 def _scenario_summary_text(sensitivity_key: tuple, ev_uptake_key: tuple) -> str:
-    parts = [str(ev_uptake_key[0])]
+    mode = str(ev_uptake_key[0])
+    parts = [COMPARISON_MOT_OFFICIAL_OPTION if mode == EV_UPTAKE_GOVERNED_OPTION else mode]
     for label, value in [("Fleet", sensitivity_key[0]), ("PT", sensitivity_key[1]), ("Freight", sensitivity_key[9])]:
         if value != "Off":
             parts.append(f"{label} {value}")
@@ -6868,10 +7017,12 @@ def revenue_outlook_total_path_figure(
                 "xref": "x",
                 "yref": "paper",
                 "x": boundary_x,
-                "y": 1.0,
+                # Just inside the plot's top edge: the band above the chart
+                # belongs to the legend, which would collide with it there.
+                "y": 0.985,
                 "text": f"Actuals to {_display_period_label(preceding[-1])}" if preceding else f"Forecast start {_display_period_label(forecast_period)}",
                 "showarrow": False,
-                "yanchor": "bottom",
+                "yanchor": "top",
                 "font": {"color": "#B45309", "size": 11},
             }
         )
@@ -6908,15 +7059,18 @@ def revenue_outlook_total_path_figure(
     fig.update_xaxes(**axis_kwargs)
     fig.update_yaxes(gridcolor="#E6EDF5", zeroline=False)
     layout: dict[str, Any] = {
-        "height": 300,
-        "margin": {"l": 52, "r": 18, "t": 20, "b": 46},
+        "height": 316,
+        "margin": {"l": 52, "r": 18, "t": 56, "b": 46},
         "yaxis_title": display_axis_title,
         "hovermode": "x unified",
         # Only report traces with a point at the hovered period; the default
         # 20px search pulls neighbouring quarters' values into the tooltip
         # under the wrong period header.
         "hoverdistance": 5,
-        "legend": {"orientation": "h", "y": -0.18, "x": 0.0, "font": {"size": 11}},
+        # Above the plot: the bottom band already carries the vertical year
+        # ticks and the axis title, so a below-axis legend overlaps them
+        # regardless of screen width.
+        "legend": {"orientation": "h", "yanchor": "bottom", "y": 1.02, "x": 0.0, "font": {"size": 11}},
         "plot_bgcolor": "#FFFFFF",
     }
     if shapes:

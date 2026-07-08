@@ -1017,6 +1017,11 @@ def test_revenue_outlook_cloud_hides_debug_toggles_and_shows_full_composition(mo
     fy_sliders = [slider for slider in at.slider if slider.label == "FY range / horizon"]
     assert len(fy_sliders) == 1
     assert tuple(fy_sliders[0].value) == tuple(selectors["stack_fy_bounds"])
+    # The section/overlay multiselects duplicated their defaults for everyone;
+    # they are local-audit-only now.
+    multiselect_labels = {str(widget.label) for widget in at.multiselect}
+    assert "Section filter" not in multiselect_labels
+    assert "Aggregate overlays" not in multiselect_labels
 
 
 def _run_revenue_outlook_page() -> AppTest:
@@ -1054,8 +1059,44 @@ def test_revenue_outlook_compare_mode_swaps_total_path_for_comparison() -> None:
     assert "Total path chart" not in rendered
     expander_labels = [str(expander.label) for expander in at.expander]
     assert "Configure scenarios A and B" in expander_labels
+    # The lever accordion disappears in compare mode (the A/B columns own the
+    # levers); its persisted selections still drive the sections below.
+    assert "Advanced scenario levers" not in expander_labels
     # Default B (MoT VFM fast) differs from A, so NPV cards render immediately.
     assert "NPV to FY2050" in rendered
+
+
+def test_revenue_outlook_compare_mode_keeps_lever_state_for_downstream() -> None:
+    at = _run_revenue_outlook_page()
+    freight = next(t for t in at.toggle if t.key == "revenue_outlook_sensitivity_freight_rail_toggle")
+    freight.set_value(True)
+    at.run()
+    _view_mode_radio(at).set_value(app.REVENUE_OUTLOOK_VIEW_COMPARE)
+    at.run()
+    assert not at.exception
+    captions = "\n".join(str(caption.value) for caption in at.caption)
+    assert "Single-view levers" in captions
+    assert "Freight rail Med" in captions
+    _view_mode_radio(at).set_value(app.REVENUE_OUTLOOK_VIEW_SINGLE)
+    at.run()
+    assert not at.exception
+    freight_after = next(t for t in at.toggle if t.key == "revenue_outlook_sensitivity_freight_rail_toggle")
+    assert freight_after.value is True
+
+
+def test_revenue_outlook_comparison_offers_mot_official_locked_scenario() -> None:
+    at = _run_revenue_outlook_page()
+    _view_mode_radio(at).set_value(app.REVENUE_OUTLOOK_VIEW_COMPARE)
+    at.run()
+    uptake_b = next(s for s in at.selectbox if s.key == "ro_cmp_b_uptake")
+    assert app.COMPARISON_MOT_OFFICIAL_OPTION in uptake_b.options
+    uptake_b.set_value(app.COMPARISON_MOT_OFFICIAL_OPTION)
+    at.run()
+    assert not at.exception
+    rendered = "\n".join(str(markdown.value) for markdown in at.markdown)
+    assert app.COMPARISON_MOT_OFFICIAL_OPTION in rendered
+    captions = "\n".join(str(caption.value) for caption in at.caption)
+    assert "levers locked" in captions
 
 
 def test_revenue_outlook_rates_chart_renders_last() -> None:
