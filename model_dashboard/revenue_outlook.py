@@ -2714,7 +2714,21 @@ def _apply_sensitivity_audit_to_frame(
         baseline_value = _finite_float(row.get(value_column), np.nan)
         if not np.isfinite(adjusted_value):
             continue
-        out.at[idx, value_column] = adjusted_value
+        audit_baseline = _finite_float(record.get("baseline"), np.nan)
+        if np.isfinite(audit_baseline) and adjusted_value == audit_baseline:
+            # Pass-through record: the selected sensitivities do not move this
+            # series. Skip so untouched rows keep their exact pack values.
+            continue
+        row_grain = str(row.get("time_grain") or "") if "time_grain" in out.columns else ""
+        if row_grain == "quarterly":
+            # Audit values are annual; overwriting a quarterly row with the
+            # annual level corrupts the series (annual-sized spikes). Apply
+            # the annual adjustment ratio to the quarterly value instead.
+            if not (np.isfinite(audit_baseline) and audit_baseline != 0.0 and np.isfinite(baseline_value)):
+                continue
+            out.at[idx, value_column] = baseline_value * (adjusted_value / audit_baseline)
+        else:
+            out.at[idx, value_column] = adjusted_value
         out.at[idx, "revenue_sensitivity_label"] = _sensitivity_display_label(record)
         out.at[idx, "revenue_sensitivity_value_delta"] = adjusted_value - baseline_value if np.isfinite(baseline_value) else pd.NA
         out.at[idx, "pt_factor"] = record.get("pt_factor")
