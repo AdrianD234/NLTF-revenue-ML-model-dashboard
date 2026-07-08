@@ -117,6 +117,11 @@ from model_dashboard.reproducibility_imports import (
     plot_reproducibility_sensitivities,
     reproducibility_component_r2_frame,
 )
+from model_dashboard.eruc_transition import (
+    ERUC_NOTE,
+    ErucTransitionLevers,
+    apply_eruc_transition_to_chart_rows,
+)
 from model_dashboard.ev_uptake_levers import (
     CUSTOM_OPTION as EV_UPTAKE_CUSTOM_OPTION,
     DEFAULT_EV_UPTAKE_MODE,
@@ -702,6 +707,14 @@ def _resolve_ev_uptake_levers(ev_uptake_key: tuple[Any, ...]) -> UptakeLevers | 
     return EV_UPTAKE_PRESETS.get(mode)
 
 
+def _resolve_eruc_levers(ev_uptake_key: tuple[Any, ...]) -> ErucTransitionLevers | None:
+    """The e-RUC transition rides in slot 2 of the uptake key (optional)."""
+    values = ev_uptake_key[2] if len(ev_uptake_key) > 2 else ()
+    if not values or len(values) != 5:
+        return None
+    return ErucTransitionLevers(*[float(v) for v in values])
+
+
 def cached_revenue_outlook_view(
     signature: tuple[tuple[str, int, int], ...],
     selected_series: str,
@@ -737,9 +750,12 @@ def cached_revenue_outlook_view(
 
     sensitivity_chart_rows = sensitivity_frames["chart_rows"]
     adjust_ped = str(bridge_mode) == PED_BRIDGE_DEFAULT_MODE
+    eruc_levers = _resolve_eruc_levers(ev_uptake_key)
+    eruc_audit = pd.DataFrame()
 
     def _lever_adjusted_series_rows(levers: UptakeLevers | None) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, bool]:
         """chart rows + filtered rows for the selected series under `levers`."""
+        nonlocal eruc_audit
         rows = sensitivity_chart_rows
         audit = pd.DataFrame()
         if levers is not None:
@@ -751,6 +767,14 @@ def cached_revenue_outlook_view(
                 # activity; only the raw bridge needs the displacement lever.
                 adjust_ped=adjust_ped,
             )
+        if eruc_levers is not None:
+            rows, transition_audit = apply_eruc_transition_to_chart_rows(
+                rows,
+                _pack_table(_pack, "ev_phev_ped_light_drift_assumptions"),
+                eruc_levers,
+            )
+            if levers is ev_uptake_levers:
+                eruc_audit = transition_audit
         filtered = _filter_revenue_outlook_rows(
             rows,
             time_grain=time_grain,
@@ -826,6 +850,8 @@ def cached_revenue_outlook_view(
         "ev_uptake_applied": ev_uptake_levers is not None and not ev_uptake_audit.empty,
         "ev_uptake_audit": ev_uptake_audit,
         "cone_band": cone_band,
+        "eruc_applied": eruc_levers is not None and not eruc_audit.empty,
+        "eruc_audit": eruc_audit,
     }
 
 
@@ -2980,7 +3006,43 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                     f"Heavy: {preset.heavy_bev_share_2050 * 100:.0f}% BEV by 2050 (rollup-neutral; BEVs pay the same per-km RUC). "
                     "Applied in this view only; the governed pack is unchanged."
                 )
-    ev_uptake_key: tuple[Any, ...] = (selected_ev_uptake_mode, custom_ev_levers)
+    with st.container(border=True):
+        st.markdown("<div class='page5-panel-title'>e-RUC transition</div>", unsafe_allow_html=True)
+        eruc_cols = st.columns([0.30, 0.70])
+        with eruc_cols[0]:
+            eruc_enabled = st.toggle(
+                "Move petrol fleet to e-RUC",
+                value=False,
+                key="revenue_outlook_eruc_toggle",
+                help=ERUC_NOTE,
+            )
+        eruc_lever_values: tuple[float, ...] = ()
+        with eruc_cols[1]:
+            if eruc_enabled:
+                eruc_input_cols = st.columns(5)
+                with eruc_input_cols[0]:
+                    eruc_start = st.number_input("Start FY", min_value=2026, max_value=2045, value=2027, step=1, key="eruc_lever_start")
+                with eruc_input_cols[1]:
+                    eruc_phase = st.number_input("Phase-in (years)", min_value=1, max_value=10, value=3, step=1, key="eruc_lever_phase")
+                with eruc_input_cols[2]:
+                    eruc_ratio = st.number_input("e-RUC rate vs light RUC (%)", min_value=25.0, max_value=200.0, value=100.0, step=5.0, key="eruc_lever_ratio")
+                with eruc_input_cols[3]:
+                    eruc_elasticity = st.number_input("VKT elasticity", min_value=-1.0, max_value=0.0, value=-0.15, step=0.05, key="eruc_lever_elasticity")
+                with eruc_input_cols[4]:
+                    eruc_pump = st.number_input("Pump price ($/L incl. excise)", min_value=1.0, max_value=6.0, value=2.70, step=0.05, key="eruc_lever_pump")
+                eruc_lever_values = (
+                    float(eruc_start),
+                    float(eruc_phase),
+                    eruc_ratio / 100.0,
+                    float(eruc_elasticity),
+                    float(eruc_pump),
+                )
+                st.caption(
+                    "Migrated petrol km leave the excise base and pay e-RUC per km; demand responds to the net "
+                    "running-cost change so the tax-free pump price still drives VKT. Petrol demand stays on the "
+                    "PED finalist; the Light RUC finalist is not re-estimated."
+                )
+    ev_uptake_key: tuple[Any, ...] = (selected_ev_uptake_mode, custom_ev_levers, eruc_lever_values)
     sensitivity_key = selected_sensitivity_key(
         fleet_efficiency=selected_fleet_efficiency,
         pt_mode_shift=selected_pt_mode_shift,
@@ -3047,6 +3109,8 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             "revenue lines (plus dependent rollups) are reallocated in this view with lever share curves; "
             "the governed pack is unchanged. " + VFM_SOURCE_NOTE
         )
+    if view.get("eruc_applied"):
+        total_path_notes.append(ERUC_NOTE)
     chart_card(
         "Total path chart",
         "\n\n".join(total_path_notes),
