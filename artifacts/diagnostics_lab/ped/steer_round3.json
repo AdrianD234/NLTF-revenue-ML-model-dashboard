@@ -1,0 +1,6 @@
+{
+  "note": "Round 3 steer (Claude): B/glsar ylag1 ar1 is 6/6 core at +0.09pp - refine it (pulse for the JB Watch, window and lag neighbours). D confirmed 6/6 but LB8 0.042 is borderline; one dylag neighbour only. A and C retired (3/6 vs 6/6 best).",
+  "retire_arms": ["A", "C"],
+  "arm_quotas": {"B": 8, "D": 2},
+  "max_configs": 12
+}

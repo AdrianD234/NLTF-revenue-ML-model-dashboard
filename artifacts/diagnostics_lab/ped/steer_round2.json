@@ -1,0 +1,5 @@
+{
+  "note": "Round 2 steer (Claude): GLSAR dominates round 1 (5/6 core at 2.90%, beating the finalist). Budget concentrates on B; D gets the dylag remedy; A/C token quotas before retirement. DW is the single remaining core failure everywhere that matters.",
+  "arm_quotas": {"B": 10, "D": 4, "A": 2, "C": 2},
+  "max_configs": 24
+}
