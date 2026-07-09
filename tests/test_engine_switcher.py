@@ -23,7 +23,6 @@ PAGES = [
     "Overview",
     "Diagnostics",
     "Scenario Comparison",
-    "Schiff Benchmark",
     app.REVENUE_OUTLOOK_PAGE,
 ]
 
@@ -69,7 +68,6 @@ def test_engine_flip_moves_every_executive_surface_together() -> None:
     rendered_ar1 = "\n".join(str(m.value) for m in at.markdown)
     assert "PED AR(1) model" in rendered_ar1
     assert "3.22%" in rendered_ar1
-    assert "AR(1) model" in rendered_ar1  # masthead chip
 
     at.session_state[ENGINE_KEY] = ENGINE_ENSEMBLE
     at.run()
@@ -78,7 +76,6 @@ def test_engine_flip_moves_every_executive_surface_together() -> None:
     assert "PED weighted ensemble (vNext)" in rendered_ens
     assert "3.13%" in rendered_ens
     assert "PED AR(1) model" not in rendered_ens
-    assert "ML ensemble" in rendered_ens
 
 
 def test_diagnostic_matrix_follows_engine() -> None:

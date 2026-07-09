@@ -40,7 +40,6 @@ def test_app_smoke_loads_without_exception(monkeypatch) -> None:
         "Executive Summary",
         "Model Confidence",
         "Scenario Forecasts",
-        "Benchmark Comparison",
         "Revenue Outlook",
         "Governance & Reproducibility",
     ]
@@ -59,7 +58,6 @@ def test_app_smoke_analyst_mode_keeps_technical_titles(monkeypatch) -> None:
         "Overview",
         "Diagnostics",
         "Scenario Comparison",
-        "Schiff Benchmark",
         "Revenue Outlook",
         "Governance & Reproducibility",
     ]
@@ -76,7 +74,7 @@ def test_governance_page_is_hidden_for_streamlit_cloud_by_default(monkeypatch) -
     monkeypatch.setenv("STREAMLIT_SHARING_MODE", "streamlit_cloud")
 
     assert app.REPRODUCIBILITY_PAGE not in app.dashboard_pages()
-    assert app.dashboard_pages() == ["Overview", "Diagnostics", "Scenario Comparison", "Schiff Benchmark", "Revenue Outlook"]
+    assert app.dashboard_pages() == ["Overview", "Diagnostics", "Scenario Comparison", "Revenue Outlook"]
 
 
 def test_local_audit_controls_are_hidden_for_streamlit_cloud(monkeypatch) -> None:

@@ -16,7 +16,6 @@ PAGE_DISPLAY_TITLES = {
     "Overview": "Executive Summary",
     "Diagnostics": "Model Confidence",
     "Scenario Comparison": "Scenario Forecasts",
-    "Schiff Benchmark": "Benchmark Comparison",
     "Revenue Outlook": "Revenue Outlook",
     "Governance & Reproducibility": "Governance & Reproducibility",
 }
@@ -47,7 +46,6 @@ def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
 
     body = page.locator("body").inner_text(timeout=60000)
     assert "‹nchmark" not in body
-    assert "Benchmark Comparison" in body or "Schiff Benchmark" in body
     assert_visible_text_absent(page, "Deploy")
     expect_filter_value(page, "Stream", 0, "All Streams")
     expect_filter_value(page, "Model Family", 1, "All Families")
@@ -118,19 +116,6 @@ def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
                 ],
         ),
         (
-            "Schiff Benchmark",
-            expected_page_chip("Schiff Benchmark"),
-            "mcp-04-schiff-benchmark.png",
-            [
-                "Schiff vs Finalist MAPE",
-                "Schiff Specification Streams",
-                "Schiff specification benchmark only",
-                "Benchmark Horizon Profiles",
-                "Full-sample Gain vs Schiff specification benchmark",
-                "Benchmark Summary",
-            ],
-        ),
-        (
             "Revenue Outlook",
             expected_page_chip("Revenue Outlook"),
             "mcp-05-revenue-outlook.png",
@@ -184,10 +169,6 @@ def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
             "Forecast and stress drilldown",
             "Transport Revenue Model Testbench | Refined Finalist Models",
         ],
-        "Schiff Benchmark": [
-            "Candidate and ensemble evidence drilldown",
-            "Transport Revenue Model Testbench | Refined Finalist Models",
-        ],
         "Revenue Outlook": [
             "Forecast Builder",
             "Governance & Reproducibility Filters",
@@ -230,15 +211,6 @@ def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
                 "4. Decision Summary",
             ]:
                 assert_text_above_fold(page, title)
-        if tab_label == "Schiff Benchmark":
-            page.evaluate("window.scrollTo(0, 0)")
-            for title in [
-                "1. Schiff vs Finalist MAPE",
-                "2. Benchmark Horizon Profiles",
-                "3. Full-sample Gain vs Schiff specification benchmark",
-                "4. Benchmark Summary",
-            ]:
-                assert_text_above_fold(page, title)
         if tab_label == "Revenue Outlook":
             page.evaluate("window.scrollTo(0, 0)")
             for title in [
@@ -264,8 +236,6 @@ def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
                 assert_text_above_fold(page, title)
         assert rendered_surface_count(page) > 0
         save_dashboard_screenshot(page, artifact_dir, screenshot_name)
-        if screenshot_name == "mcp-04-schiff-benchmark.png":
-            save_dashboard_screenshot(page, artifact_dir, "mcp-03-schiff-comparison.png")
 
     assert not page.locator("[data-testid='stException']").count()
     assert page_errors == []
@@ -325,12 +295,11 @@ def test_navigation_labels_not_clipped(page: Page) -> None:
     wait_dashboard_ready(page)
     body = page.locator("body").inner_text(timeout=60000)
     assert "‹nchmark" not in body
-    assert "Benchmark Comparison" in body or "Schiff Benchmark" in body
     expect(page.locator("body")).to_contain_text("Candidate Search Frontier", timeout=90000)
     expect(page.locator("body")).to_contain_text("Finalist Ensemble Composition", timeout=90000)
     page_chip_box = page.locator(".page-chip").first.bounding_box()
     assert page_chip_box is not None, "Page chip should have a visible bounding box"
-    for label in ["Overview", "Diagnostics", "Scenario Comparison", "Schiff Benchmark", "Revenue Outlook", "Governance & Reproducibility"]:
+    for label in ["Overview", "Diagnostics", "Scenario Comparison", "Revenue Outlook", "Governance & Reproducibility"]:
         nav_label = governance_nav_label(page, label)
         expect(nav_label).to_be_visible(timeout=60000)
         label_box = nav_label.bounding_box()
@@ -376,8 +345,7 @@ def test_visible_navigation_text_changes_page_body(page: Page) -> None:
     for label, expected_content, stale_content in [
         ("Diagnostics", "1. Residual Autocorrelation by Lag", "Finalist Forecast Accuracy"),
         ("Scenario Comparison", "1. Stream Comparison: Scenario A vs Scenario B", "1. Residual Autocorrelation by Lag"),
-        ("Schiff Benchmark", "1. Schiff vs Finalist MAPE", "1. Stream Comparison: Scenario A vs Scenario B"),
-        ("Revenue Outlook", "Total path chart", "1. Schiff vs Finalist MAPE"),
+        ("Revenue Outlook", "Total path chart", "1. Stream Comparison: Scenario A vs Scenario B"),
         ("Governance & Reproducibility", "Governance & Reproducibility Filters", "Total path chart"),
         ("Overview", "Finalist Forecast Accuracy", "Governance & Reproducibility Filters"),
     ]:
@@ -397,17 +365,17 @@ def test_reference_header_nav_is_integrated_on_desktop(page: Page) -> None:
 
     title_box = page.get_by_text("NTLF Revenue Modelling", exact=True).first.bounding_box()
     overview_box = governance_nav_label(page, "Overview").bounding_box()
-    benchmark_box = governance_nav_label(page, "Schiff Benchmark").bounding_box()
+    outlook_box = governance_nav_label(page, "Revenue Outlook").bounding_box()
     filter_box = page.locator(".filter-title").first.bounding_box()
 
     assert title_box is not None
     assert overview_box is not None
-    assert benchmark_box is not None
+    assert outlook_box is not None
     assert filter_box is not None
     title_bottom = title_box["y"] + title_box["height"]
     assert overview_box["y"] >= title_bottom - 2
-    assert benchmark_box["y"] >= title_bottom - 2
-    assert benchmark_box["x"] > overview_box["x"] + 240
+    assert outlook_box["y"] >= title_bottom - 2
+    assert outlook_box["x"] > overview_box["x"] + 240
     assert filter_box["y"] > overview_box["y"] + overview_box["height"]
     assert filter_box["y"] < 150
 
@@ -444,7 +412,7 @@ def test_governance_shell_is_readable_in_narrow_browser(page: Page) -> None:
     page.goto(os.environ.get("STAGE1_DASHBOARD_URL", "http://localhost:8501"), wait_until="domcontentloaded")
     wait_dashboard_ready(page)
 
-    for label in ["Overview", "Diagnostics", "Scenario Comparison", "Schiff Benchmark", "Revenue Outlook", "Governance & Reproducibility"]:
+    for label in ["Overview", "Diagnostics", "Scenario Comparison", "Revenue Outlook", "Governance & Reproducibility"]:
         expect(governance_nav_label(page, label)).to_be_visible(timeout=60000)
 
     title_box = page.get_by_text("NTLF Revenue Modelling", exact=True).first.bounding_box()
@@ -496,7 +464,6 @@ def test_primary_reference_pages_use_icon_kpi_rows(page: Page) -> None:
 
     for tab_label, left_label, right_label in [
         ("Diagnostics", "Diagnostics Coverage", "Heteroscedasticity Pass"),
-        ("Schiff Benchmark", "Schiff Specification Streams", "Paired Comparisons"),
     ]:
         click_governance_nav(page, tab_label)
         expect(page.locator("body")).to_contain_text(left_label, timeout=60000)
@@ -758,33 +725,12 @@ def test_scenario_dumbbell_no_overlap_smoke(page: Page) -> None:
     page.screenshot(path=screenshot_dir / "visual-smoke-scenario-dumbbell.png", full_page=True)
 
 
-def test_schiff_horizon_profiles_show_all_streams(page: Page) -> None:
-    page.set_viewport_size({"width": 1680, "height": 940})
-    page.goto(os.environ.get("STAGE1_DASHBOARD_URL", "http://localhost:8501"), wait_until="domcontentloaded")
-    wait_dashboard_ready(page)
-    click_governance_nav(page, "Schiff Benchmark")
-    expect(page.locator("body")).to_contain_text("2. Benchmark Horizon Profiles", timeout=90000)
-    for stream in ["PED VKT per capita", "Light RUC volume", "Heavy RUC volume"]:
-        expect(page.locator("body")).to_contain_text(stream, timeout=90000)
-
-
-def test_schiff_mape_chart_has_clear_sections(page: Page) -> None:
-    page.set_viewport_size({"width": 1680, "height": 940})
-    page.goto(os.environ.get("STAGE1_DASHBOARD_URL", "http://localhost:8501"), wait_until="domcontentloaded")
-    wait_dashboard_ready(page)
-    click_governance_nav(page, "Schiff Benchmark")
-    expect(page.locator("body")).to_contain_text("1. Schiff vs Finalist MAPE", timeout=90000)
-    expect(page.locator("body")).to_contain_text("Quarterly MAPE", timeout=90000)
-    expect(page.locator("body")).to_contain_text("Annual MAPE", timeout=90000)
-
-
 def test_visual_screenshots_are_regenerated() -> None:
     screenshot_dir = Path(__file__).resolve().parents[1] / "artifacts" / "screenshots"
     for name in [
         "final-01-overview.png",
         "final-02-diagnostics.png",
         "final-03-scenario-comparison.png",
-        "final-04-schiff-benchmark.png",
         "final-05-revenue-outlook.png",
         "final-06-governance-reproducibility.png",
     ]:
@@ -799,7 +745,6 @@ def wait_dashboard_ready(page: Page) -> None:
     expect(page.get_by_text("GOVERNANCE FILTERS")).to_be_visible(timeout=90000)
     expect(page.get_by_role("button", name="Reset Filters")).to_be_visible(timeout=90000)
     expect(page.locator("body")).to_contain_text(expected_page_chip("Overview"), timeout=90000)
-    expect(governance_nav_label(page, "Schiff Benchmark")).to_be_visible(timeout=90000)
     expect(governance_nav_label(page, "Revenue Outlook")).to_be_visible(timeout=90000)
     expect(governance_nav_label(page, "Governance & Reproducibility")).to_be_visible(timeout=90000)
 

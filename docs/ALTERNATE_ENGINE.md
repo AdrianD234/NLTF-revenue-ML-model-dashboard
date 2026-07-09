@@ -1,8 +1,13 @@
 # Alternate engine: "AR(1) model" (default) vs "ML ensemble"
 
-The dashboard can run on either of two model engines. The engine is a per-session
-setting (radio in the filter strip's **More** popover on the executive pages, and in the
-Revenue Outlook controls panel); the masthead page chip always shows the active engine.
+The dashboard can run on either of two model engines. The AR(1) model is the only
+engine served on Streamlit Cloud; the in-app switcher was retired 2026-07 to keep the
+deployed app inside the Community Cloud memory budget (loading a second engine's packs
+costs real RAM). The ML ensemble remains fully minted and locally runnable:
+
+```powershell
+$env:DASHBOARD_ENGINE_DEFAULT = "ensemble"   # then start streamlit as usual
+```
 
 | | AR(1) model (default) | ML ensemble |
 |---|---|---|

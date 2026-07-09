@@ -799,7 +799,7 @@ def _apply_scenario_overlays(
     return rows, uptake_audit, eruc_audit, uplift_audit
 
 
-@st.cache_data(show_spinner=False, max_entries=8)
+@st.cache_data(show_spinner=False, max_entries=12)
 def cached_scenario_overlay_rows(
     signature: tuple[tuple[str, int, int], ...],
     sensitivity_key: tuple[str, ...],
@@ -908,7 +908,7 @@ def cached_view_cone_band(
     )
 
 
-@st.cache_data(show_spinner=False, max_entries=10)
+@st.cache_data(show_spinner=False, max_entries=16)
 def cached_revenue_outlook_view(
     signature: tuple[tuple[str, int, int], ...],
     selected_series: str,
@@ -1414,7 +1414,10 @@ def should_show_local_audit_controls() -> bool:
 
 
 def dashboard_pages() -> list[str]:
-    pages = ["Overview", "Diagnostics", "Scenario Comparison", "Schiff Benchmark", REVENUE_OUTLOOK_PAGE]
+    # "Schiff Benchmark" retired as a page 2026-07: the benchmark numbers stay
+    # on the executive cards and Scenario Forecasts; render_schiff_benchmark_page
+    # remains for local audit revival if ever needed.
+    pages = ["Overview", "Diagnostics", "Scenario Comparison", REVENUE_OUTLOOK_PAGE]
     if should_show_governance_page():
         pages.append(REPRODUCIBILITY_PAGE)
     return pages
@@ -1469,15 +1472,13 @@ def _warm_revenue_outlook_caches() -> None:
         _warm_view(default_sens, default_uptake)
         _warm_view(default_sens, uptake_12c_off)
         cached_revenue_outlook_detail_frames(signature, default_sens, PED_BRIDGE_DEFAULT_MODE, pack)
-        if _real_cloud_runtime():
-            # The Community Cloud container has ~2.7 GB of memory; the full
-            # sensitivity pre-warm costs ~80 MB per lever combination, which
-            # is the difference between a healthy app and an OOM kill there.
-            # Default views stay warm; lever clicks compute on demand.
-            return
+        # Full lever pre-warm everywhere: with the engine switcher retired the
+        # cloud never loads a second engine's packs, which frees enough of the
+        # ~2.7 GB Community Cloud budget to keep first lever clicks instant.
+        # Detail frames are only warmed for the default key - they back the
+        # audit tables, not the headline charts, and cost real memory per key.
         for sensitivity_key in _revenue_outlook_warm_sensitivity_keys():
             _warm_view(sensitivity_key, default_uptake)
-            cached_revenue_outlook_detail_frames(signature, sensitivity_key, PED_BRIDGE_DEFAULT_MODE, pack)
     except Exception:
         # Warming is an optimisation only; the page computes on demand.
         pass
@@ -1514,13 +1515,11 @@ def main() -> None:
     header_slot = st.empty()
     initial_page = st.session_state["gov_page"]
     initial_index = pages.index(initial_page) + 1
-    from model_dashboard.engine import engine_label
-
     with header_slot.container():
         header(
             "NTLF Revenue Modelling",
             header_subtitle(),
-            page_chip=f"Page {initial_index} of {len(pages)} - {page_display_title(initial_page)} · {engine_label()}",
+            page_chip=f"Page {initial_index} of {len(pages)} - {page_display_title(initial_page)}",
         )
 
     active_path = render_run_sidebar()
@@ -1538,7 +1537,7 @@ def main() -> None:
         header(
             "NTLF Revenue Modelling",
             header_subtitle(),
-            page_chip=f"Page {current_index} of {len(pages)} - {page_display_title(current_page)} · {engine_label()}",
+            page_chip=f"Page {current_index} of {len(pages)} - {page_display_title(current_page)}",
         )
     controls = render_filter_sidebar(loaded)
     if current_page not in {REPRODUCIBILITY_PAGE, REVENUE_OUTLOOK_PAGE}:
@@ -1550,8 +1549,6 @@ def main() -> None:
         render_diagnostics(loaded, controls)
     elif current_page == "Scenario Comparison":
         render_scenario_comparison(loaded, controls)
-    elif current_page == "Schiff Benchmark":
-        render_schiff_benchmark_page(loaded, controls)
     elif current_page == REVENUE_OUTLOOK_PAGE:
         render_revenue_outlook_page(loaded)
     else:
@@ -1769,9 +1766,6 @@ def render_top_filter_bar(loaded: LoadedRun, controls: dict[str, Any]) -> dict[s
             )
         with filter_cols[6]:
             with st.popover("More", use_container_width=True):
-                from model_dashboard.engine import render_engine_selector
-
-                render_engine_selector()
                 render_mode_toggle()
                 render_cloud_preview_toggle()
                 controls = render_advanced_controls(loaded, controls)
@@ -3404,7 +3398,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
 
     with st.container(border=True):
         st.markdown("<div class='page5-panel-title'>Revenue Outlook controls</div><div class='page5-panel-sub'>Choose a view, then the series every chart below tracks.</div>", unsafe_allow_html=True)
-        view_cols = st.columns([0.34, 0.30, 0.36])
+        view_cols = st.columns([0.42, 0.58])
         with view_cols[0]:
             st.markdown("<div class='control-label'>View</div>", unsafe_allow_html=True)
             view_mode = st.radio(
@@ -3427,10 +3421,6 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 index=default_stream_index,
                 key="revenue_outlook_stream",
             )
-        with view_cols[2]:
-            from model_dashboard.engine import render_engine_selector
-
-            render_engine_selector()
         selected_metric_type = _revenue_outlook_series_metric_type(chart_rows, selected_stream)
         # Rows carry the planned path; the 12c counterfactual is a display
         # reprice handled by the policy toggle in the lever accordion.

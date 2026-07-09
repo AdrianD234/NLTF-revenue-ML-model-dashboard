@@ -27,7 +27,6 @@ PAGES = [
     ("Overview", "final-overview.png"),
     ("Diagnostics", "final-diagnostics.png"),
     ("Scenario Comparison", "final-scenario-comparison.png"),
-    ("Schiff Benchmark", "final-schiff-benchmark.png"),
     ("Revenue Outlook", "final-revenue-outlook.png"),
     ("Governance & Reproducibility", "final-governance-reproducibility.png"),
 ]
@@ -36,7 +35,6 @@ PAGE_DISPLAY_TITLES = {
     "Overview": "Executive Summary",
     "Diagnostics": "Model Confidence",
     "Scenario Comparison": "Scenario Forecasts",
-    "Schiff Benchmark": "Benchmark Comparison",
     "Revenue Outlook": "Revenue Outlook",
     "Governance & Reproducibility": "Governance & Reproducibility",
 }
@@ -69,12 +67,6 @@ PAGE_PANELS = {
         "2. Improvement vs Benchmark",
         "3. Horizon Comparison",
         "4. Decision Summary",
-    ],
-    "Schiff Benchmark": [
-        "1. Schiff vs Finalist MAPE",
-        "2. Benchmark Horizon Profiles",
-        "3. Full-sample Gain vs Schiff specification benchmark",
-        "4. Benchmark Summary",
     ],
     "Revenue Outlook": [
         "Revenue Outlook controls",
@@ -369,7 +361,6 @@ def test_plotly_hovers_are_human_readable_on_all_pages(page: Page) -> None:
         ("Overview", 2),
         ("Diagnostics", 0),
         ("Scenario Comparison", 1),
-        ("Schiff Benchmark", 0),
         ("Revenue Outlook", 0),
     ]
     for page_name, plot_index in hover_targets:
@@ -634,26 +625,8 @@ def test_diagnostic_pass_matrix_tooltips_hover_and_focus(page: Page) -> None:
     assert_no_streamlit_exception(page)
 
 
-def test_benchmark_and_decision_summary_tooltips_hover_and_focus(page: Page) -> None:
+def test_decision_summary_tooltips_hover_and_focus(page: Page) -> None:
     open_dashboard(page)
-    click_page(page, "Schiff Benchmark")
-
-    benchmark_table = page.locator(".summary-tooltip-table").filter(has_text="Paired Win Rate").first
-    expect(benchmark_table).to_be_visible(timeout=90000)
-    paired_header = benchmark_table.locator("th").filter(has_text="Paired Win Rate").first
-    paired_trigger = paired_header.locator(".summary-tooltip-trigger").first
-    paired_trigger.hover()
-    expect(paired_trigger.locator(".summary-tooltip-text")).to_be_visible(timeout=10000)
-    expect(paired_trigger.locator(".summary-tooltip-text")).to_contain_text(
-        "matched forecast comparisons",
-        timeout=10000,
-    )
-    paired_trigger.focus()
-    expect(paired_trigger.locator(".summary-tooltip-text")).to_contain_text(
-        "same stream, origin, target period and horizon",
-        timeout=10000,
-    )
-
     click_page(page, "Scenario Comparison")
     decision_table = page.locator(".summary-tooltip-table").filter(has_text="Recommendation").first
     expect(decision_table).to_be_visible(timeout=90000)
@@ -788,16 +761,3 @@ def test_rendered_plotly_trace_data_matches_chart_sources_where_possible(page: P
             continue
         assert trace["x"] == source_rows["lag"].astype(int).tolist()
         assert [float(value) for value in trace["y"]] == pytest.approx(source_rows["metric_value"].astype(float).tolist(), abs=0.001)
-
-    click_page(page, "Schiff Benchmark")
-    expect(page.locator("body")).to_contain_text("3. Full-sample Gain vs Schiff specification benchmark", timeout=90000)
-    assert "Paired Gain vs Schiff" not in page.locator("body").inner_text(timeout=60000)
-    schiff_gain = pd.read_csv(CHART_SOURCE_DIR / "schiff_paired_or_fullsample_gain.csv")
-    light = schiff_gain[schiff_gain["stream_label"].eq("Light RUC volume")]
-    assert float(light[light["metric_name"].eq("Full-sample quarterly gain")]["metric_value"].iloc[0]) == pytest.approx(
-        3.158190, abs=0.001
-    )
-    assert float(light[light["metric_name"].eq("Full-sample annual gain")]["metric_value"].iloc[0]) == pytest.approx(
-        1.428227, abs=0.001
-    )
-    assert float(light["paired_gain_pp"].dropna().iloc[0]) == pytest.approx(2.932205, abs=0.001)
