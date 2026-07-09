@@ -23,9 +23,13 @@ LIGHT_RUC_REPRO_MODEL = "dynamic_RESID_GBR_n150_d1_lr0.05_w36"
 LIGHT_RUC_REPRO_DESCRIPTION = (
     "Two-stage OLS base plus GBM residual correction, exactly replayed against evidence predictions."
 )
+from .engine import ENGINE_ENSEMBLE as _ENGINE_ENSEMBLE
 from .governance_constants import CURRENT_REPRO_PACK_DIRS as _CURRENT_PACKS, current_finalist as _current_finalist
 
-PED_REPRO_MODEL = _current_finalist("PED")
+# This module documents the committed vNext exact-replay lineage (the packs in
+# _CURRENT_PACKS), so its finalist names are pinned to the ensemble engine;
+# the AR(1) engine carries its own state pack and parity gate (ped_ar1).
+PED_REPRO_MODEL = _current_finalist("PED", _ENGINE_ENSEMBLE)
 PED_REPRO_DESCRIPTION = (
     "Two-component convex vNext ensemble with saved fitted state, "
     "exactly replayed against evidence predictions (production forward-scoreable)."
@@ -122,7 +126,7 @@ REPRODUCIBILITY_STREAM_CONFIGS: dict[str, ReproducibilityStreamConfig] = {
         stream_label="Heavy RUC volume",
         stream_key="heavy_ruc",
         root=REPRODUCIBILITY_BASE_ROOT / _CURRENT_PACKS["HEAVY_RUC"],
-        model=_current_finalist("HEAVY_RUC"),
+        model=_current_finalist("HEAVY_RUC", _ENGINE_ENSEMBLE),
         description=(
             "Three-component convex vNext ensemble with saved fitted state, "
             "exactly replayed against evidence predictions (production forward-scoreable)."

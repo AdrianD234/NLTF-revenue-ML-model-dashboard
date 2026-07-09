@@ -65,6 +65,12 @@ score 10–13% MAPE. Nothing to do.
 
 ---
 
+## Postscript: promoted
+
+The recommended candidate was subsequently productionised as the **"AR(1) model" engine**
+(dashboard default, switchable back to the "ML ensemble" incumbent). See
+`docs/ALTERNATE_ENGINE.md` for the pack architecture and minting scripts.
+
 ## Alternate-engine readiness (Phase B input)
 
 `artifacts/diagnostics_lab/<stream>/winners/` carries, for each shortlisted spec, the full

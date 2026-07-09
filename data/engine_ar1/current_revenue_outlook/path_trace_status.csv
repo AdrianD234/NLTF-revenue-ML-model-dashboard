@@ -1,0 +1,5 @@
+trace_id,trace_label,availability_status,plotted,data_scope,blocking_gap_id,current_selection,user_visible_message
+actual,Actual,available,True,MBU26 ACTUAL rows through FY2025,,MBU26,Actuals are read from the MBU26 annual source spine.
+mbu26_official,MBU26 official,available,True,MBU26 ST_FORECAST/LT_FORECAST rows,,MBU26,Official comparator is the MBU26 worksheet only.
+current_finalist_base,Current finalist Base case,available,True,Current finalist model output annualized to June years,,current_basecase,"Current finalist base replaces only PED, Light RUC and Heavy RUC revenue."
+current_finalist_comparison,Current finalist High population/comparison,available,True,Current finalist comparison output annualized to June years,,current_comparison_1,"Current finalist comparison replaces only PED, Light RUC and Heavy RUC revenue."
