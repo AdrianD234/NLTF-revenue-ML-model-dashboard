@@ -30,10 +30,14 @@ import numpy as np
 import pandas as pd
 
 VFM_SOURCE_NOTE = (
-    "Share curves are the reduced form of the MoT Vehicle Fleet Model 202405 "
-    "(TCO logit registrations + scrappage fleet turnover); presets reproduce "
-    "the official Base/Fast/Slow scenario VKT shares within ~1.5pp over "
-    "2025-2050 (see data/vfm_202405/)."
+    "Share curves follow the MoT Vehicle Fleet Model 202405. The S-shape is a "
+    "measured property of that model's own series, not a fitted choice: its "
+    "growth rate declines linearly as the fleet fills (R-squared 0.96, the "
+    "saturating-adoption signature), the curve constants are read off that "
+    "line, and the same shape emerges from MoT's registration mix and fleet "
+    "turnover with no formula at all. Presets track the official "
+    "Base/Fast/Slow VKT shares within ~1.5pp over 2025-2050 (evidence: "
+    "sheet 3 of the glass-box workbook; artifacts/uptake_shape_lab/)."
 )
 SENSITIVITY_INTERPLAY_NOTE = (
     "These levers reshape power-type composition only; they compose "
