@@ -39,6 +39,7 @@ PACK = ROOT / "data" / "engine_ar1" / "current_revenue_outlook"
 SPINE = ROOT / "data" / "revenue_model_source_pack" / "mbu26_annual_spine" / "mbu26_official_annual.csv"
 VFM = ROOT / "data" / "vfm_202405" / "vfm_vkt_shares.csv"
 VFM_MANIFEST = ROOT / "data" / "vfm_202405" / "manifest.json"
+SHAPE_LAB = ROOT / "artifacts" / "uptake_shape_lab"
 OUT = ROOT / "deliverables" / "NLTF_revenue_glass_box.xlsx"
 
 FYS = list(range(2026, 2051))
@@ -116,6 +117,17 @@ def load_inputs():
     spine = pd.read_csv(SPINE)
     vfm = pd.read_csv(VFM)
 
+    lab_files = {
+        "tournament": SHAPE_LAB / "tournament_light_bev_Base_EV.csv",
+        "stock_flow": SHAPE_LAB / "stock_flow_Base_EV.csv",
+        "observed": SHAPE_LAB / "observed_vs_vfm.csv",
+    }
+    missing = [str(p) for p in lab_files.values() if not p.exists()]
+    if missing:
+        raise SystemExit(
+            "shape-lab artifacts missing - run scripts/uptake_shape_lab.py first:\n  " + "\n  ".join(missing))
+    lab = {name: pd.read_csv(path) for name, path in lab_files.items()}
+
     quarterly = rows[rows["time_grain"] == "quarterly"]
 
     def q_lookup(series_id: str):
@@ -183,7 +195,7 @@ def load_inputs():
             per[fy] = float(r["value"])
         dash[series] = per
 
-    return dict(detail=detail, off=off, cells=cells, lam=lam, vfm=vfm, dash=dash)
+    return dict(detail=detail, off=off, cells=cells, lam=lam, vfm=vfm, dash=dash, lab=lab)
 
 
 def assert_faithful(d) -> None:
@@ -249,6 +261,24 @@ def assert_faithful(d) -> None:
             assert delta < 5e-5, (fy, series, computed, target)
     print(f"[glass-box] python mirror reproduces the committed pack; worst |delta| = {worst:.2e}")
 
+    # The Test-1 claim on sheet 3 must hold on the June-year series it displays.
+    vfm = d["vfm"]
+    base = vfm[vfm["scenario"] == "Base_EV"].sort_values("june_year")["light_ruc_bev_share"].to_numpy(float)
+    mid = (base[1:] + base[:-1]) / 2
+    growth = np.diff(base) / mid
+    slope, intercept = np.polyfit(mid, growth, 1)
+    r2 = float(np.corrcoef(mid, growth)[0, 1] ** 2)
+    smax_dial, k_dial = solve_logistic_from_levers(
+        EV_UPTAKE_PRESETS["MoT VFM base"].bev_peak_speed_pp,
+        EV_UPTAKE_PRESETS["MoT VFM base"].bev_peak_year,
+        EV_UPTAKE_PRESETS["MoT VFM base"].bev_share_2050)
+    print(f"[glass-box] growth signature (June years): R2={r2:.3f}, "
+          f"measured ceiling={-intercept / slope:.3f} vs dial {smax_dial:.3f}, "
+          f"measured speed={intercept:.3f} vs dial {k_dial:.3f}")
+    assert r2 > 0.9, f"growth-rate signature weakened (R2={r2:.3f}) - revisit sheet 3's claims"
+    assert abs(-intercept / slope - smax_dial) < 0.08, "measured ceiling drifted from the dial"
+    assert abs(intercept - k_dial) < 0.05, "measured speed drifted from the dial"
+
 
 # ------------------------------------------------------------- sheets -------
 def build_readme(wb, d) -> None:
@@ -269,7 +299,10 @@ def build_readme(wb, d) -> None:
         "the MBU26 class mix (how light travel divides into petrol, conventional RUC, battery-electric and plug-in "
         "hybrid), fuel intensity (litres per 100 km), and the effective duty and RUC rates.",
         "The electric-vehicle transition itself comes from MoT's Vehicle Fleet Model (VFM 202405): sheet 2 shows the "
-        "official share curves, and sheet 3 shows how our dashboard reproduces them from a handful of readable levers.",
+        "official share curves, and sheet 3 shows the evidence that the S-shape is a property of the data - a "
+        "no-fitting growth-rate signature, a nine-way form tournament judged on an unseen decade, a fleet-turnover "
+        "reconstruction with no curve at all, and the observed NZ outturns - before presenting the dashboard's dials "
+        "as measurements of that shape.",
         "Sheets 4-7 then walk line by line from the model forecasts to total NLTF revenue. Sheet 8 proves the result: "
         "every line reconciles to the committed dashboard data to well under $0.01m.",
         "No opaque weights are used anywhere: every step is an ordinary spreadsheet formula you can audit.",
@@ -377,17 +410,181 @@ def build_vfm(wb, d) -> int:
     return start_data  # first data row (FY2025) for cross-references
 
 
-def build_presets(wb, d, vfm_start_row: int) -> None:
-    ws = wb.create_sheet("3. Uptake presets")
+DIALS_START = 112  # fixed anchor so the evidence sections can reference dial cells
+
+
+def build_scurve_evidence(wb, d, vfm_start_row: int) -> None:
+    ws = wb.create_sheet("3. Why an S-curve")
     ws.sheet_view.showGridLines = False
     ws.column_dimensions["A"].width = 44
     for c in range(2, 12):
         ws.column_dimensions[get_column_letter(c)].width = 13
-    r = sheet_title(ws, "Our uptake levers - and how closely they reproduce the MoT curves",
-                    "The dashboard's EV levers are five readable dials per curve. This sheet computes the base-preset "
-                    "curves with ordinary formulas and compares them to MoT's official base scenario from sheet 2.")
+    r = sheet_title(ws, "Why an S-curve? Because the data says so - four tests our formula could fail",
+                    "A fitted curve proves nothing by itself: with enough parameters a formula can mimic anything. "
+                    "So this sheet starts from falsifiable tests of the shape, not from our formula.")
 
-    r = section(ws, r, "Lever settings (fitted to the MoT VFM scenarios)", 11)
+    r = section(ws, r, "The four tests", 11)
+    for text in [
+        "1. Growth-rate signature - saturating adoption has a straight-line fingerprint that needs NO curve "
+        "fitting; the line's endpoints ARE the ceiling and speed, measured from MoT's own series.",
+        "2. Form tournament - fit nine candidate shapes on 2001-2040, judge them on the unseen 2041-2050 decade. "
+        "Flexible forms mimic in-sample and fail out-of-sample; only a form whose shape matches the data survives.",
+        "3. Mechanism - rebuild the fleet share from MoT's own registration flows and fleet turnover with no "
+        "functional form at all: the S-curve emerges from the arithmetic.",
+        "4. Observed outturns - New Zealand's actual fleet shares (outside the VFM) sit on the projected toe.",
+    ]:
+        cell = ws.cell(row=r, column=1, value=text)
+        cell.font = F_BODY
+        cell.alignment = Alignment(wrap_text=True, vertical="top")
+        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=10)
+        ws.row_dimensions[r].height = 26
+        r += 1
+    r += 1
+
+    # ---- Test 1: growth-rate signature ------------------------------------
+    r = section(ws, r, "Test 1 - the growth-rate signature (no curve fitting anywhere)", 11)
+    cell = ws.cell(row=r, column=1, value=(
+        "If adoption saturates, the relative growth rate s'/s falls in a straight line as the share s rises: "
+        "s'/s = speed x (1 - s / ceiling). Straight-line behaviour is falsifiable - and the intercept and "
+        "x-intercept of that line ARE the speed and ceiling, read from MoT's series rather than chosen by us."))
+    cell.font = F_SMALL
+    cell.alignment = Alignment(wrap_text=True, vertical="top")
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=10)
+    ws.row_dimensions[r].height = 30
+    r += 1
+    for c, h in enumerate(["June year", "BEV share (sheet 2, base)", "Mid-point share",
+                           "Relative growth = change / mid share"], start=1):
+        head(ws, r, c, h)
+    r += 1
+    sig0 = r
+    for i, fy in enumerate(range(2025, 2051)):
+        put(ws, r, 1, fy, F_BODY, NF_KM)
+        put(ws, r, 2, f"='2. MoT VFM curves'!C{vfm_start_row + i}", F_LINK, NF_PCT)
+        if i > 0:
+            put(ws, r, 3, f"=(B{r}+B{r - 1})/2", F_FORMULA, NF_PCT)
+            put(ws, r, 4, f"=(B{r}-B{r - 1})/C{r}", F_FORMULA, "0.000")
+        r += 1
+    sig1 = r - 1
+    g_rng, x_rng = f"D{sig0 + 1}:D{sig1}", f"C{sig0 + 1}:C{sig1}"
+    dial_ceiling_row = DIALS_START + 17
+    dial_speed_row = DIALS_START + 18
+    summary = [
+        ("Straight-line fit R-squared", f"=RSQ({g_rng},{x_rng})", "0.000", F_FORMULA),
+        ("Speed constant (line intercept)", f"=INTERCEPT({g_rng},{x_rng})", "0.000", F_FORMULA),
+        ("Ceiling (line's x-intercept)", f"=-INTERCEPT({g_rng},{x_rng})/SLOPE({g_rng},{x_rng})", "0.000", F_FORMULA),
+        ("Dashboard dial: speed", f"=B{dial_speed_row}", "0.000", F_LINK),
+        ("Dashboard dial: ceiling", f"=B{dial_ceiling_row}", "0.000", F_LINK),
+    ]
+    for j, (label, formula, nf, font) in enumerate(summary):
+        put(ws, sig0 + 1 + j, 6, label, F_HEAD)
+        cell = put(ws, sig0 + 1 + j, 8, formula, font, nf)
+        cell.fill = FILL_CHECK
+        ws.merge_cells(start_row=sig0 + 1 + j, start_column=6, end_row=sig0 + 1 + j, end_column=7)
+    cell = ws.cell(row=sig0 + 7, column=6, value=(
+        "The measured speed and ceiling match the dashboard's dials - the dials are "
+        "measurements of MoT's series, not free coefficients."))
+    cell.font = F_SMALL
+    cell.alignment = Alignment(wrap_text=True, vertical="top")
+    ws.merge_cells(start_row=sig0 + 7, start_column=6, end_row=sig0 + 9, end_column=10)
+    r += 1
+
+    # ---- Test 2: form tournament -------------------------------------------
+    r = section(ws, r, "Test 2 - the form tournament (fit 2001-2040, judged on the unseen 2041-2050)", 11)
+    for c, h in enumerate(["Functional form", "Parameters", "Fit error 2001-2040 (pp)",
+                           "Error on unseen 2041-2050 (pp)", "Predicted 2050 share (%)"], start=1):
+        head(ws, r, c, h)
+    r += 1
+    tour = d["lab"]["tournament"]
+    for _, row in tour.iterrows():
+        put(ws, r, 1, str(row["form"]), F_BODY)
+        put(ws, r, 2, int(row["params"]), F_INPUT, NF_KM)
+        put(ws, r, 3, float(row["rmse_fit_pp"]), F_INPUT, "0.00")
+        put(ws, r, 4, float(row["rmse_holdout_pp"]), F_INPUT, "0.00")
+        put(ws, r, 5, float(row["pred_2050_pp"]), F_INPUT, "0.0")
+        r += 1
+    for note in [
+        "VFM's actual 2050 base-scenario share: 82.1%. The forms that fit BEST in-sample (cubic, Gompertz, "
+        "Richards, 0.3-0.4pp) miss the unseen decade by 12-27 points - that is exactly what 'a formula can mimic "
+        "anything' looks like. The logistic is the only form that both fits and extrapolates: the shape, not "
+        "parameter flexibility, is doing the work.",
+        "Computed by scripts/uptake_shape_lab.py from the VFM workbook's raw outputs; full results (all three "
+        "scenarios) in artifacts/uptake_shape_lab/.",
+    ]:
+        cell = ws.cell(row=r + 1, column=1, value=note)
+        cell.font = F_SMALL
+        cell.alignment = Alignment(wrap_text=True, vertical="top")
+        ws.merge_cells(start_row=r + 1, start_column=1, end_row=r + 1, end_column=10)
+        ws.row_dimensions[r + 1].height = 30
+        r += 2
+    r += 1
+
+    # ---- Test 3: stock-flow mechanism --------------------------------------
+    r = section(ws, r, "Test 3 - the mechanism: fleet-turnover arithmetic (no curve at all)", 11)
+    cell = ws.cell(row=r, column=1, value=(
+        "VFM is a fleet-turnover model. Take the 2023 fleet share as the only starting value, then apply "
+        "next year = this year + turnover x (new-entry share - this year), using MoT's own registration mix and "
+        "turnover. No functional form appears anywhere - and the S-curve emerges from the arithmetic."))
+    cell.font = F_SMALL
+    cell.alignment = Alignment(wrap_text=True, vertical="top")
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=10)
+    ws.row_dimensions[r].height = 30
+    r += 1
+    for c, h in enumerate(["Calendar year", "BEV share of new light entries", "Fleet turnover (entries/stock)",
+                           "VFM fleet BEV share", "Reconstructed share (formula)", "Gap (pp)"], start=1):
+        head(ws, r, c, h)
+    r += 1
+    flow0 = r
+    sf = d["lab"]["stock_flow"]
+    sf = sf[sf["year"] <= 2050].reset_index(drop=True)
+    for i, row in sf.iterrows():
+        put(ws, r, 1, int(row["year"]), F_BODY, NF_KM)
+        put(ws, r, 2, float(row["new_entry_bev_share"]), F_INPUT, NF_PCT)
+        put(ws, r, 3, float(row["turnover"]), F_INPUT, NF_PCT)
+        put(ws, r, 4, float(row["vfm_fleet_bev_share_stock"]), F_INPUT, NF_PCT)
+        if i == 0:
+            put(ws, r, 5, f"=D{r}", F_FORMULA, NF_PCT)
+        else:
+            put(ws, r, 5, f"=E{r - 1}+C{r - 1}*(B{r - 1}-E{r - 1})", F_FORMULA, NF_PCT)
+        put(ws, r, 6, f"=(E{r}-D{r})*100", F_FORMULA, "0.00")
+        r += 1
+    cell = ws.cell(row=r + 1, column=1, value=(
+        "The reconstruction tracks VFM's fleet share within ~7 points over three decades and sits consistently "
+        "BELOW it - exactly as it should, because real scrappage retires older conventional vehicles first while "
+        "this simple version retires the average mix. A rising sales mix filtered through roughly 8% a year of "
+        "fleet turnover IS the S-curve. Source: 'Registrations' and raw-output sheets of the VFM workbook."))
+    cell.font = F_SMALL
+    cell.alignment = Alignment(wrap_text=True, vertical="top")
+    ws.merge_cells(start_row=r + 1, start_column=1, end_row=r + 1, end_column=10)
+    ws.row_dimensions[r + 1].height = 42
+    r += 3
+
+    # ---- Test 4: observed outturns ------------------------------------------
+    r = section(ws, r, "Test 4 - observed New Zealand outturns (outside the VFM)", 11)
+    for c, h in enumerate(["June year", "Observed light BEV share (MBU26 actuals)",
+                           "VFM base scenario", "Gap (pp)"], start=1):
+        head(ws, r, c, h)
+    r += 1
+    for _, row in d["lab"]["observed"].iterrows():
+        put(ws, r, 1, int(row["FY"]), F_BODY, NF_KM)
+        put(ws, r, 2, float(row["observed_pct"]) / 100, F_INPUT, NF_PCT)
+        put(ws, r, 3, float(row["vfm_base_pct"]) / 100, F_INPUT, NF_PCT)
+        put(ws, r, 4, f"=(B{r}-C{r})*100", F_FORMULA, "0.00")
+        r += 1
+    cell = ws.cell(row=r + 1, column=1, value=(
+        "MBU26 splits the light BEV class out only from FY2024, so two observed points exist so far; both sit on "
+        "the toe of the projected curve with the gap closing. This test grows teeth every year as outturns land. "
+        "The straight-line growth signature above is also the classic technology-substitution result (Fisher & "
+        "Pry, 1971), observed across dozens of adoptions from colour TV to smartphones - and famously completed "
+        "by Norway's electric fleet."))
+    cell.font = F_SMALL
+    cell.alignment = Alignment(wrap_text=True, vertical="top")
+    ws.merge_cells(start_row=r + 1, start_column=1, end_row=r + 1, end_column=10)
+    ws.row_dimensions[r + 1].height = 42
+    r += 3
+
+    assert r <= DIALS_START, f"evidence sections overflow into the dials block ({r} > {DIALS_START})"
+    r = DIALS_START
+    r = section(ws, r, "The dashboard's dials - a readable parameterisation of the measured shape", 11)
     lever_rows = [
         ("Battery-electric: fastest uptake speed (share points per year)", "bev_peak_speed_pp", NF_PCT),
         ("Battery-electric: year of fastest uptake", "bev_peak_year", NF_KM),
@@ -888,7 +1085,7 @@ def main() -> None:
     wb.remove(wb.active)
     build_readme(wb, d)
     vfm_start = build_vfm(wb, d)
-    build_presets(wb, d, vfm_start)
+    build_scurve_evidence(wb, d, vfm_start)
     q = build_quarterly(wb, d)
     split = build_split(wb, d, q)
     rates = build_rates(wb, d, split, q)

@@ -32,6 +32,8 @@ artifacts/**
 !artifacts/reviews/*.md
 !artifacts/heavy_ruc_forward_parity_debug/
 !artifacts/heavy_ruc_forward_parity_debug/**
+!artifacts/uptake_shape_lab/
+!artifacts/uptake_shape_lab/**
 data/**
 !data/.gitkeep
 !data/dashboard_evidence_pack/

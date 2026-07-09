@@ -1,0 +1,4 @@
+scenario,r2_all,r2_proj,n_proj,ceiling_measured,ceiling_preset,speed_measured,speed_preset
+Base_EV,0.662,0.966,31,0.911,0.92,0.189,0.185
+Fast_EV,0.714,0.963,31,0.917,0.912,0.207,0.208
+Slow_EV,0.568,0.904,31,0.918,0.883,0.167,0.192
