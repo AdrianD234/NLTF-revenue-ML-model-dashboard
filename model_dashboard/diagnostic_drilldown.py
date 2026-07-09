@@ -17,7 +17,8 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from .governance_constants import EVIDENCE_PACK_DATA, STREAM_LABELS
+from .governance_constants import STREAM_LABELS
+from .engine import engine_evidence_data
 
 STATUS_DOT = {"Pass": "\U0001F7E2", "Watch": "\U0001F7E1", "Fail": "\U0001F534"}
 STATUS_COLOR = {"Pass": "#15803d", "Watch": "#b45309", "Fail": "#b91c1c"}
@@ -59,23 +60,25 @@ HOW_TO_READ = {
 }
 
 
-@st.cache_data(show_spinner=False)
-def load_drilldown_tables(signature: float) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+@st.cache_data(show_spinner=False, max_entries=4)
+def load_drilldown_tables(pack_data: str, signature: float) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     del signature
-    detail = pd.read_parquet(EVIDENCE_PACK_DATA / "diagnostic_test_detail.parquet")
-    series = pd.read_parquet(EVIDENCE_PACK_DATA / "diagnostic_evidence_series.parquet")
-    acf = pd.read_parquet(EVIDENCE_PACK_DATA / "diagnostic_acf.parquet")
+    root = Path(pack_data)
+    detail = pd.read_parquet(root / "diagnostic_test_detail.parquet")
+    series = pd.read_parquet(root / "diagnostic_evidence_series.parquet")
+    acf = pd.read_parquet(root / "diagnostic_acf.parquet")
     return detail, series, acf
 
 
 def drilldown_signature() -> float:
-    path = EVIDENCE_PACK_DATA / "diagnostic_test_detail.parquet"
+    path = engine_evidence_data() / "diagnostic_test_detail.parquet"
     return path.stat().st_mtime if path.exists() else 0.0
 
 
 def drilldown_available() -> bool:
-    return (EVIDENCE_PACK_DATA / "diagnostic_test_detail.parquet").exists() and (
-        EVIDENCE_PACK_DATA / "diagnostic_evidence_series.parquet").exists()
+    root = engine_evidence_data()
+    return (root / "diagnostic_test_detail.parquet").exists() and (
+        root / "diagnostic_evidence_series.parquet").exists()
 
 
 def _fmt(value, digits=4) -> str:
@@ -286,7 +289,7 @@ def render_diagnostic_drilldown_section() -> None:
     if not drilldown_available():
         st.caption("Diagnostic drilldown pack not built. Run scripts/build_diagnostic_drilldown_pack.py.")
         return
-    detail, series, acf = load_drilldown_tables(drilldown_signature())
+    detail, series, acf = load_drilldown_tables(str(engine_evidence_data()), drilldown_signature())
     st.markdown("<div style='font-weight:700;color:#0f172a;margin:0.4rem 0 0.1rem'>"
                 "Diagnostic drilldown <span style='color:#64748b;font-weight:500'>"
                 "- click any test for the glass-box view</span></div>", unsafe_allow_html=True)

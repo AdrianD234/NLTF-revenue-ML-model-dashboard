@@ -380,14 +380,14 @@ def render_info_tooltip(label: str, tooltip_text: str, *, css_class: str = "summ
     )
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, max_entries=2)
 def cached_load_run(run_path: str, signature: tuple[tuple[str, int, int], ...], schema_version: str) -> LoadedRun:
     del signature
     del schema_version
     return load_run(run_path)
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, max_entries=2)
 def cached_load_curated_run(
     curated_path: str,
     run_path: str,
@@ -401,7 +401,7 @@ def cached_load_curated_run(
     return load_curated_run(curated_path, run_path)
 
 
-@st.cache_data(show_spinner=False, ttl=300)
+@st.cache_data(show_spinner=False, ttl=300, max_entries=4)
 def cached_discover_run_folders(
     parent_path: str,
     ignored_names: tuple[str, ...],
@@ -412,7 +412,7 @@ def cached_discover_run_folders(
     return tuple(str(path) for path in runs)
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, max_entries=2)
 def cached_load_evidence_pack(
     data_root: str,
     repo_root: str,
@@ -424,19 +424,19 @@ def cached_load_evidence_pack(
     return load_evidence_pack(data_root, repo_root)
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, max_entries=6)
 def cached_load_reproducibility_pack(stream_label: str, signature: tuple[tuple[str, int, int], ...]) -> Any:
     del signature
     return load_reproducibility_pack(stream_label)
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, max_entries=1)
 def cached_load_ped_inner_hpo_audit_pack(signature: tuple[tuple[str, int, int], ...]) -> Any:
     del signature
     return load_ped_inner_hpo_audit_pack()
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, max_entries=2)
 def cached_load_revenue_outlook_pack(
     pack_dir: str,
     repo_root: str,
@@ -448,7 +448,7 @@ def cached_load_revenue_outlook_pack(
     return load_revenue_outlook_pack(pack_dir, repo_root=repo_root)
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, max_entries=2)
 def cached_load_revenue_source_pack(
     pack_dir: str,
     repo_root: str,
@@ -619,7 +619,7 @@ def _render_revenue_outlook_timings(timer: RevenueOutlookRenderTimer) -> None:
     st.caption("Revenue Outlook render timings (dev): " + "; ".join(parts))
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, max_entries=2)
 def cached_revenue_outlook_selectors(
     signature: tuple[tuple[str, int, int], ...],
     _pack: RevenueOutlookPack,
@@ -708,7 +708,7 @@ def _apply_sensitivity_for_key(
     )
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, max_entries=32)
 def _resolve_ev_uptake_levers(ev_uptake_key: tuple[Any, ...]) -> UptakeLevers | None:
     mode = str(ev_uptake_key[0]) if ev_uptake_key else EV_UPTAKE_GOVERNED_OPTION
     if mode == EV_UPTAKE_GOVERNED_OPTION:
@@ -729,7 +729,7 @@ def _resolve_eruc_levers(ev_uptake_key: tuple[Any, ...]) -> ErucTransitionLevers
     return ErucTransitionLevers(*[float(v) for v in values])
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, max_entries=4)
 def cached_sensitivity_stage_frames(
     signature: tuple[tuple[str, int, int], ...],
     bridge_mode: str,
@@ -763,7 +763,7 @@ def cached_sensitivity_stage_frames(
     return bridge_frames, _apply_sensitivity_for_key(bridge_frames, sensitivity_config, sensitivity_key), False
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, max_entries=2)
 def cached_fed_uplift_factors(
     signature: tuple[tuple[str, int, int], ...],
     _pack: RevenueOutlookPack,
@@ -799,7 +799,7 @@ def _apply_scenario_overlays(
     return rows, uptake_audit, eruc_audit, uplift_audit
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, max_entries=8)
 def cached_scenario_overlay_rows(
     signature: tuple[tuple[str, int, int], ...],
     sensitivity_key: tuple[str, ...],
@@ -857,7 +857,7 @@ def _filter_series_rows_with_fallback(
     return filtered, False
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, max_entries=6)
 def cached_view_cone_band(
     signature: tuple[tuple[str, int, int], ...],
     selected_series: str,
@@ -908,7 +908,7 @@ def cached_view_cone_band(
     )
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, max_entries=10)
 def cached_revenue_outlook_view(
     signature: tuple[tuple[str, int, int], ...],
     selected_series: str,
@@ -969,7 +969,7 @@ def cached_revenue_outlook_view(
     }
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, max_entries=24)
 def cached_scenario_comparison_paths(
     signature: tuple[tuple[str, int, int], ...],
     series: str,
@@ -1021,7 +1021,7 @@ def cached_scenario_comparison_paths(
     }
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, max_entries=4)
 def cached_revenue_outlook_detail_frames(
     signature: tuple[tuple[str, int, int], ...],
     sensitivity_key: tuple[str, str, str, str, str, str, str, str, str, str, str],
@@ -1045,7 +1045,7 @@ def cached_revenue_outlook_detail_frames(
     }
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, max_entries=4)
 def cached_revenue_outlook_ped_bridge_detail(
     signature: tuple[tuple[str, int, int], ...],
     bridge_mode: str,
@@ -1064,7 +1064,7 @@ def cached_revenue_outlook_ped_bridge_detail(
     }
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, max_entries=4)
 def cached_revenue_outlook_line_detail_frames(
     signature: tuple[tuple[str, int, int], ...],
     sensitivity_key: tuple[str, str, str, str, str, str, str, str, str, str, str],
@@ -1092,7 +1092,7 @@ def cached_revenue_outlook_line_detail_frames(
     }
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, max_entries=4)
 def cached_revenue_outlook_sensitivity_audit(
     signature: tuple[tuple[str, int, int], ...],
     sensitivity_key: tuple[str, str, str, str, str, str, str, str, str, str, str],
@@ -1137,7 +1137,7 @@ def cached_revenue_outlook_sensitivity_audit(
     )
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, max_entries=12)
 def cached_revenue_outlook_total_path_figure(
     signature: tuple[tuple[str, int, int], ...],
     selected_series: str,
@@ -1157,7 +1157,7 @@ def cached_revenue_outlook_total_path_figure(
     )
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, max_entries=12)
 def cached_revenue_outlook_fan_figure(
     signature: tuple[tuple[str, int, int], ...],
     selected_series: str,
@@ -1215,7 +1215,7 @@ def revenue_outlook_composition_stack_frame(
     return pd.concat([filtered_stack, overlay_stack], ignore_index=True, sort=False)
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, max_entries=8)
 def cached_revenue_outlook_composition_stack(
     signature: tuple[tuple[str, int, int], ...],
     source_path: str,
@@ -1240,7 +1240,7 @@ def cached_revenue_outlook_composition_stack(
     )
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, max_entries=8)
 def cached_revenue_outlook_composition_figure(
     signature: tuple[tuple[str, int, int], ...],
     source_path: str,
@@ -1263,7 +1263,7 @@ def cached_revenue_outlook_composition_figure(
     )
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, max_entries=8)
 def cached_revenue_outlook_composition_table_view(
     signature: tuple[tuple[str, int, int], ...],
     source_path: str,
@@ -1279,7 +1279,7 @@ def cached_revenue_outlook_composition_table_view(
     return _revenue_stack_gap_banner(_chart_stack), _revenue_stack_components_display_table(_chart_stack)
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, max_entries=4)
 def cached_revenue_line_reconciliation_view(
     signature: tuple[tuple[str, int, int], ...],
     source_paths: tuple[str, ...],
@@ -1299,7 +1299,7 @@ def cached_revenue_line_reconciliation_view(
     return filtered, _revenue_line_reconciliation_display_table(filtered)
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, max_entries=8)
 def cached_revenue_outlook_selected_fy_figures(
     signature: tuple[tuple[str, int, int], ...],
     selected_fy: str,
@@ -1315,7 +1315,7 @@ def cached_revenue_outlook_selected_fy_figures(
     )
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, max_entries=8)
 def cached_revenue_outlook_ev_phev_drift_view(
     signature: tuple[tuple[str, int, int], ...],
     selected_mode: str,
@@ -1330,7 +1330,7 @@ def cached_revenue_outlook_ev_phev_drift_view(
     return filtered, _ev_phev_ped_light_drift_display_table(filtered)
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, max_entries=4)
 def cached_revenue_outlook_ev_phev_split_display(
     signature: tuple[tuple[str, int, int], ...],
     _split_assumptions: pd.DataFrame,
@@ -1339,7 +1339,7 @@ def cached_revenue_outlook_ev_phev_split_display(
     return _ev_phev_split_assumptions_display_table(_split_assumptions)
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, max_entries=12)
 def cached_revenue_outlook_activity_figure(
     signature: tuple[tuple[str, int, int], ...],
     time_grain: str,
@@ -1385,6 +1385,14 @@ def is_streamlit_cloud_runtime() -> bool:
 
     if cloud_preview_enabled():
         return True
+    return _real_cloud_runtime()
+
+
+def _real_cloud_runtime() -> bool:
+    """True only on actual Streamlit Cloud (env markers / mount path), never
+    for the local cloud-preview toggle. Used for resource decisions - the
+    Community Cloud container has ~2.7 GB of memory, so anything memory-hungry
+    must check the real runtime, not the previewed one."""
     for name in STREAMLIT_CLOUD_ENV_MARKERS:
         marker = env_flag(name)
         if marker is not None:
@@ -1461,6 +1469,12 @@ def _warm_revenue_outlook_caches() -> None:
         _warm_view(default_sens, default_uptake)
         _warm_view(default_sens, uptake_12c_off)
         cached_revenue_outlook_detail_frames(signature, default_sens, PED_BRIDGE_DEFAULT_MODE, pack)
+        if _real_cloud_runtime():
+            # The Community Cloud container has ~2.7 GB of memory; the full
+            # sensitivity pre-warm costs ~80 MB per lever combination, which
+            # is the difference between a healthy app and an OOM kill there.
+            # Default views stay warm; lever clicks compute on demand.
+            return
         for sensitivity_key in _revenue_outlook_warm_sensitivity_keys():
             _warm_view(sensitivity_key, default_uptake)
             cached_revenue_outlook_detail_frames(signature, sensitivity_key, PED_BRIDGE_DEFAULT_MODE, pack)
@@ -2094,7 +2108,7 @@ def render_overview(loaded: LoadedRun, controls: dict[str, Any]) -> None:
         )
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, max_entries=4)
 def _executive_card_inputs(pack_data: str, repro_dirs_json: str, signature: float) -> list[dict[str, str]]:
     """Stream recommendation cards built directly from the governed packs.
 
@@ -6549,7 +6563,7 @@ def _scenario_npv_component_bridge_figure(
     return fig
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, max_entries=6)
 def cached_revenue_rate_paths_figure(
     signature: tuple[tuple[str, int, int], ...],
     fed_uplift_on: bool,
@@ -10974,7 +10988,7 @@ def page5_panel_contract_signature() -> tuple[tuple[str, int, int], ...]:
     return tuple(signature)
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, max_entries=2)
 def cached_page5_panel_contract(signature: tuple[tuple[str, int, int], ...]) -> pd.DataFrame:
     del signature
     root = Path(__file__).resolve().parent / PAGE5_UI_CONTRACT_ROOT

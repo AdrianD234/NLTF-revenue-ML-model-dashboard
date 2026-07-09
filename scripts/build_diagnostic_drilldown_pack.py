@@ -185,11 +185,12 @@ def battery_with_statistics(actual: np.ndarray, pred: np.ndarray,
     }
 
 
-def main() -> None:
-    sp = pd.read_parquet(DATA / "scorecard_predictions.parquet")
-    finalists = pd.read_parquet(DATA / "finalists.parquet").set_index("stream")
-    matrix = pd.read_parquet(DATA / "diagnostic_pass_matrix.parquet")
-    tests_table = pd.read_parquet(DATA / "diagnostic_tests.parquet").set_index("model")
+def main(data_dir: Path | None = None) -> None:
+    data = Path(data_dir) if data_dir is not None else DATA
+    sp = pd.read_parquet(data / "scorecard_predictions.parquet")
+    finalists = pd.read_parquet(data / "finalists.parquet").set_index("stream")
+    matrix = pd.read_parquet(data / "diagnostic_pass_matrix.parquet")
+    tests_table = pd.read_parquet(data / "diagnostic_tests.parquet").set_index("model")
 
     detail_rows, series_rows = [], []
     for stream in STREAMS:
@@ -308,12 +309,18 @@ def main() -> None:
 
     detail = pd.DataFrame(detail_rows)
     series = pd.DataFrame(series_rows)
-    detail.to_parquet(DATA / "diagnostic_test_detail.parquet", index=False)
-    series.to_parquet(DATA / "diagnostic_evidence_series.parquet", index=False)
+    detail.to_parquet(data / "diagnostic_test_detail.parquet", index=False)
+    series.to_parquet(data / "diagnostic_evidence_series.parquet", index=False)
+    print(f"[drilldown] data dir: {data}")
     print(f"[drilldown] detail rows: {len(detail)} | evidence series rows: {len(series)}")
     print("[drilldown] statuses asserted equal to diagnostic_pass_matrix; "
           "p-values asserted equal to diagnostic_tests")
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Build the diagnostic drilldown evidence tables.")
+    parser.add_argument("--data", type=Path, default=None,
+                        help="Evidence-pack data directory (defaults to the incumbent pack).")
+    main(parser.parse_args().data)
