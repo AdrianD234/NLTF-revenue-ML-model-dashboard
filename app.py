@@ -6168,11 +6168,12 @@ def _render_scenario_comparison_panel(
                 }
                 components = _scenario_npv_component_breakdown(component_npvs, npv_a, npv_b)
                 chart_card(
-                    "NPV composition (A vs B)",
-                    "Each scenario's NPV to FY2050 stacked by revenue stream, all streams recomputed "
-                    "through that scenario's levers. Heavy & other RUC is the RUC rollup less the light "
-                    "classes (heavy BEVs pay the same per-km RUC, so heavy electrification reshuffles "
-                    "within this block); TUC & other closes the governed NLTF identity. " + basis_note + ".",
+                    "NPV by revenue stream (A vs B)",
+                    "Each revenue stream's NPV to FY2050 under Scenario A (navy) and Scenario B "
+                    "(orange), largest stream first, all streams recomputed through that scenario's "
+                    "levers. Heavy & other RUC is the RUC rollup less the light classes (heavy BEVs "
+                    "pay the same per-km RUC, so heavy electrification reshuffles within this block); "
+                    "TUC & other closes the governed NLTF identity. " + basis_note + ".",
                     _scenario_npv_composition_figure(components, result["value_unit"]),
                     caption=None,
                     notes_as_tooltip=True,
@@ -6271,17 +6272,28 @@ def _scenario_comparison_cards(
     ]
 
 
-def _scenario_hover_value_format(value_unit: str) -> str:
-    """Plotly y-format with units for the comparison charts.
+def _scenario_hover_value_format(value_unit: str, axis: str = "y") -> str:
+    """Plotly value-format with units for the comparison charts.
 
     Million-currency series are plotted in $b, so hover as "$3.61b" (d3's
     currency format keeps the minus sign outside: "-$3.61b"); other units
-    trail the number, e.g. "12,345.67 million km".
+    trail the number, e.g. "12,345.67 million km". ``axis`` selects the
+    encoded value axis ("x" for horizontal bars).
     """
     if _is_million_currency_unit(value_unit):
-        return "%{y:$,.2f}b"
+        return "%{" + axis + ":$,.2f}b"
     unit_text = str(value_unit or "").strip()
-    return "%{y:,.2f}" + (f" {unit_text}" if unit_text else "")
+    return "%{" + axis + ":,.2f}" + (f" {unit_text}" if unit_text else "")
+
+
+def _scenario_amount_text(value_in_millions: float, value_unit: str) -> str:
+    """Compact on-bar label: "$3.61b" for currency, plain numbers otherwise."""
+    scale = _display_value_scale_for_unit(value_unit)
+    scaled = value_in_millions / scale
+    if _is_million_currency_unit(value_unit):
+        sign = "−" if scaled < 0 else ""
+        return f"{sign}${abs(scaled):,.2f}b"
+    return f"{scaled:,.1f}"
 
 
 def _scenario_comparison_figure(history: pd.Series, a: pd.Series, b: pd.Series, value_unit: str) -> go.Figure:
@@ -6426,32 +6438,54 @@ def _scenario_npv_component_breakdown(
 def _scenario_npv_composition_figure(
     components: list[tuple[str, float, float]], value_unit: str
 ) -> go.Figure:
+    """Per-stream NPV comparison: one row per revenue stream, A vs B paired.
+
+    Grouped horizontal bars read stream-by-stream (largest at the top) in the
+    same scenario colours as the paths chart; the stacked-total view lives in
+    the KPI cards, so each stream's A/B gap stays legible here.
+    """
     scale = _display_value_scale_for_unit(value_unit)
     axis_title = _display_axis_unit(value_unit)
-    fig = go.Figure()
     total_a = sum(a for _, a, _ in components)
     total_b = sum(b for _, _, b in components)
-    for label, npv_a, npv_b in components:
-        if abs(npv_a) < _SCENARIO_COMPONENT_MATERIALITY and abs(npv_b) < _SCENARIO_COMPONENT_MATERIALITY:
-            continue
-        share_a = npv_a / total_a if total_a else float("nan")
-        share_b = npv_b / total_b if total_b else float("nan")
+    material = [
+        (label, npv_a, npv_b)
+        for label, npv_a, npv_b in components
+        if abs(npv_a) >= _SCENARIO_COMPONENT_MATERIALITY or abs(npv_b) >= _SCENARIO_COMPONENT_MATERIALITY
+    ]
+    material.sort(key=lambda row: max(abs(row[1]), abs(row[2])), reverse=True)
+    labels = [label for label, _, _ in material]
+    hover_value = _scenario_hover_value_format(value_unit, axis="x")
+    fig = go.Figure()
+    for name, color, values, total in [
+        ("Scenario A", "#002B5C", [a for _, a, _ in material], total_a),
+        ("Scenario B", "#F37021", [b for _, _, b in material], total_b),
+    ]:
+        shares = [v / total if total else float("nan") for v in values]
         fig.add_trace(
             go.Bar(
-                x=["Scenario A", "Scenario B"],
-                y=[npv_a / scale, npv_b / scale],
-                name=label,
-                marker={"color": _SCENARIO_COMPONENT_COLORS.get(label, "#64748B")},
-                customdata=[f"{share_a:.1%} of total", f"{share_b:.1%} of total"],
-                hovertemplate=f"<b>{label}</b><br>{_scenario_hover_value_format(value_unit)}<br>%{{customdata}}<extra></extra>",
+                y=labels,
+                x=[v / scale for v in values],
+                orientation="h",
+                name=name,
+                marker={"color": color},
+                text=[_scenario_amount_text(v, value_unit) for v in values],
+                textposition="outside",
+                textfont={"size": 10.5},
+                cliponaxis=False,
+                customdata=[f"{share:.1%} of total" for share in shares],
+                hovertemplate=f"<b>{name}</b> — %{{y}}<br>{hover_value}<br>%{{customdata}}<extra></extra>",
             )
         )
-    fig.update_yaxes(title_text=axis_title, gridcolor="#E6EDF5", zeroline=False)
+    fig.update_xaxes(title_text=axis_title, gridcolor="#E6EDF5", zeroline=True, zerolinecolor="#CBD5E1")
+    fig.update_yaxes(autorange="reversed", tickfont={"size": 11.5}, ticksuffix="  ")
     fig.update_layout(
-        barmode="stack",
-        height=360,
-        margin={"l": 56, "r": 18, "t": 18, "b": 36},
-        legend={"orientation": "h", "y": -0.14, "x": 0.0, "font": {"size": 11}, "traceorder": "normal"},
+        barmode="group",
+        bargap=0.28,
+        bargroupgap=0.08,
+        height=max(320, 66 * len(material) + 132),
+        margin={"l": 8, "r": 64, "t": 54, "b": 40},
+        legend={"orientation": "h", "y": 1.0, "yanchor": "bottom", "x": 0.0, "font": {"size": 11}},
         plot_bgcolor="#FFFFFF",
     )
     return fig
@@ -6476,16 +6510,27 @@ def _scenario_npv_component_bridge_figure(
     ]
     if not deltas:
         return _scenario_npv_waterfall_figure(npv_a, npv_b, value_unit)
+    # gains first, largest loss lands right before the total bar
+    deltas.sort(key=lambda row: row[1], reverse=True)
     scale = _display_value_scale_for_unit(value_unit)
     axis_title = _display_axis_unit(value_unit)
+    total_delta = npv_b - npv_a
     labels = [*(label for label, _ in deltas), "NPV delta (B − A)"]
-    values = [*(delta / scale for _, delta in deltas), (npv_b - npv_a) / scale]
+    values = [*(delta / scale for _, delta in deltas), total_delta / scale]
+    bar_text = [
+        *(("+" if delta >= 0 else "") + _scenario_amount_text(delta, value_unit) for _, delta in deltas),
+        ("+" if total_delta >= 0 else "") + _scenario_amount_text(total_delta, value_unit),
+    ]
     fig = go.Figure(
         go.Waterfall(
             orientation="v",
             measure=[*(["relative"] * len(deltas)), "total"],
             x=labels,
             y=values,
+            text=bar_text,
+            textposition="outside",
+            textfont={"size": 10.5},
+            cliponaxis=False,
             increasing={"marker": {"color": "#00843D"}},
             decreasing={"marker": {"color": "#B42318"}},
             totals={"marker": {"color": "#002B5C"}},
@@ -6496,8 +6541,8 @@ def _scenario_npv_component_bridge_figure(
     fig.update_xaxes(tickangle=-30, tickfont={"size": 10.5})
     fig.update_yaxes(title_text=axis_title, gridcolor="#E6EDF5", zeroline=True, zerolinecolor="#CBD5E1")
     fig.update_layout(
-        height=340,
-        margin={"l": 56, "r": 18, "t": 18, "b": 78},
+        height=360,
+        margin={"l": 56, "r": 18, "t": 30, "b": 78},
         showlegend=False,
         plot_bgcolor="#FFFFFF",
     )

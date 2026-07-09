@@ -849,6 +849,10 @@ def test_forecast_run_artifacts_are_repo_ignored() -> None:
         "templates/NLTF_forecast_input_template_20q.xlsx",
         "data/current_revenue_outlook/scenario_inputs/raw/6213ce565cf1_NLTF_forecast_input_template_to_2050Q4_high_population _2_ - Copy.xlsx",
         "data/current_revenue_outlook/scenario_inputs/raw/d0644d353ee5_NLTF_forecast_input_template_to_2050Q4_basecase _2_ - Copy.xlsx",
+        # the AR(1) engine's runtime pack carries its own copy of the governed
+        # scenario-input lineage (hashes in its scenario_input_manifest.json)
+        "data/engine_ar1/current_revenue_outlook/scenario_inputs/raw/6213ce565cf1_NLTF_forecast_input_template_to_2050Q4_high_population _2_ - Copy.xlsx",
+        "data/engine_ar1/current_revenue_outlook/scenario_inputs/raw/d0644d353ee5_NLTF_forecast_input_template_to_2050Q4_basecase _2_ - Copy.xlsx",
         # governed training-data workbook, vendored 2026-07-08 (sha256 recorded
         # in data/model_input_history/manifest.json)
         "data/source_workbooks/Master Copy revenue modelling workbook.xlsx",

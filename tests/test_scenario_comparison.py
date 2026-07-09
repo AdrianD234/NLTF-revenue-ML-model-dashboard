@@ -205,10 +205,12 @@ def test_comparison_hovers_carry_units() -> None:
     components = [("PED / FED (net)", 40000.0, 38000.0)]
     currency = "$m nominal ex GST"
     bridge = app._scenario_npv_component_bridge_figure(80000.0, 78000.0, components, currency)
-    composition = app._scenario_npv_composition_figure(components, currency)
     simple = app._scenario_npv_waterfall_figure(1000.0, 900.0, currency)
-    for figure in (bridge, composition, simple):
+    for figure in (bridge, simple):
         assert "%{y:$,.2f}b" in str(figure.data[0].hovertemplate)
+    # the by-stream chart is horizontal, so the value lives on the x axis
+    composition = app._scenario_npv_composition_figure(components, currency)
+    assert "%{x:$,.2f}b" in str(composition.data[0].hovertemplate)
 
     paths = app._scenario_comparison_figure(
         pd.Series(dtype=float),
@@ -219,15 +221,21 @@ def test_comparison_hovers_carry_units() -> None:
     assert "million km" in str(paths.data[0].hovertemplate)
 
 
-def test_composition_figure_stacks_sum_to_totals() -> None:
+def test_composition_figure_groups_by_stream() -> None:
     components = [
+        ("TUC & other", 350.0, 350.0),
         ("PED / FED (net)", 40000.0, 38000.0),
         ("Heavy & other RUC", 39000.0, 39000.0),
-        ("TUC & other", 350.0, 350.0),
+        ("Net MVR", 0.2, 0.4),  # immaterial in both scenarios -> dropped
     ]
     figure = app._scenario_npv_composition_figure(components, "$m nominal ex GST")
-    stack_a = sum(trace.y[0] for trace in figure.data)
-    stack_b = sum(trace.y[1] for trace in figure.data)
-    assert stack_a == pytest.approx(sum(a for _, a, _ in components) / 1000.0)
-    assert stack_b == pytest.approx(sum(b for _, _, b in components) / 1000.0)
-    assert figure.layout.barmode == "stack"
+    assert figure.layout.barmode == "group"
+    by_name = {trace.name: trace for trace in figure.data}
+    assert set(by_name) == {"Scenario A", "Scenario B"}
+    # per-scenario bars cover every material stream and sum to the totals
+    for trace, key in ((by_name["Scenario A"], 1), (by_name["Scenario B"], 2)):
+        assert sum(trace.x) == pytest.approx(sum(row[key] for row in components[:3]) / 1000.0)
+        assert "Net MVR" not in list(trace.y)
+    # streams read largest first (top of a reversed y axis)
+    assert list(by_name["Scenario A"].y) == ["PED / FED (net)", "Heavy & other RUC", "TUC & other"]
+    assert figure.layout.yaxis.autorange == "reversed"
