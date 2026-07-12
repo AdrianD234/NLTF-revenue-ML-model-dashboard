@@ -4126,6 +4126,8 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         notes_as_tooltip=True,
     )
 
+    _render_fleet_mix_explorer()
+
     if revenue_outlook_lazy_table(
         "Show Manifest, Source policy and downloads",
         "revenue_outlook_show_manifest_downloads",
@@ -6551,6 +6553,127 @@ def _scenario_npv_component_bridge_figure(
         plot_bgcolor="#FFFFFF",
     )
     return fig
+
+
+@st.cache_data(show_spinner=False, max_entries=8)
+def cached_fleet_mix_frame(source: str, signature: tuple[float, ...]) -> pd.DataFrame:
+    del signature
+    from model_dashboard.fleet_mix import load_source_frame
+
+    return load_source_frame(Path(__file__).resolve().parent, source)
+
+
+def _fleet_mix_signature() -> tuple[float, ...]:
+    repo_root = Path(__file__).resolve().parent
+    paths = [
+        repo_root / "data" / "revenue_model_source_pack" / "mbu26_annual_spine" / "mbu26_official_annual.csv",
+        repo_root / "data" / "vfm_202405" / "vfm_vkt_shares.csv",
+        repo_root / "data" / "engine_ar1" / "current_revenue_outlook" / "revenue_chart_rows.csv",
+    ]
+    return tuple(path.stat().st_mtime if path.exists() else 0.0 for path in paths)
+
+
+def _render_fleet_mix_explorer() -> None:
+    """MoT's six volume rows across MBU26 / VFM / the dashboard pack, with an
+    explicit choice of denominator - because the same BEV kilometres are 1.7%
+    of all road travel and 6.1% of the light RUC pool, and mixing those
+    silently is how trust dies."""
+    from model_dashboard.fleet_mix import (
+        DENOMINATORS,
+        MBU26_SOURCE,
+        METRIC_KM,
+        METRIC_OPTIONS,
+        METRIC_SHARE,
+        METRIC_YOY,
+        ROW_COLORS,
+        ROW_KEYS,
+        ROW_LABELS,
+        SOURCE_OPTIONS,
+        definitions_table,
+        denominator_example,
+        share_frame,
+        yoy_frame,
+    )
+
+    repo_root = Path(__file__).resolve().parent
+    with st.expander("Fleet mix explorer - MoT's six volume rows across MBU26, the VFM and this dashboard", expanded=False):
+        st.caption(
+            "Everything the class split does happens on MoT's own six volume rows. Compare the sources "
+            "on those rows directly - in kilometres, as shares of an explicitly chosen total, or as "
+            "year-on-year change. Light RUC net km is conventional (diesel) ONLY; battery-electric and "
+            "plug-in hybrid are their own rows."
+        )
+        control_cols = st.columns([0.40, 0.32, 0.28])
+        with control_cols[0]:
+            source = st.selectbox("Source", SOURCE_OPTIONS, key="fleet_mix_source")
+        with control_cols[1]:
+            metric = st.radio("View", METRIC_OPTIONS, key="fleet_mix_metric",
+                              label_visibility="visible", horizontal=False)
+        denominator = list(DENOMINATORS)[0]
+        with control_cols[2]:
+            if metric == METRIC_SHARE:
+                denominator = st.selectbox("As a share of", list(DENOMINATORS), key="fleet_mix_denominator")
+
+        try:
+            frame = cached_fleet_mix_frame(source, _fleet_mix_signature())
+        except Exception as exc:  # pragma: no cover - defensive surface
+            warning_panel(f"Fleet mix data unavailable: {exc}")
+            return
+
+        fig = go.Figure()
+        if metric == METRIC_KM:
+            for key in ROW_KEYS:
+                fig.add_trace(go.Scatter(
+                    x=frame.index, y=frame[key], name=ROW_LABELS[key], mode="lines",
+                    stackgroup="fleet", line={"width": 0.6, "color": ROW_COLORS[key]},
+                    hovertemplate=f"<b>{ROW_LABELS[key]}</b><br>%{{y:,.0f}} million km<extra></extra>",
+                ))
+            fig.update_yaxes(title_text="million km", gridcolor="#E6EDF5")
+        elif metric == METRIC_SHARE:
+            shares = share_frame(frame, denominator)
+            for key in shares.columns:
+                fig.add_trace(go.Scatter(
+                    x=shares.index, y=shares[key], name=ROW_LABELS[key], mode="lines",
+                    line={"width": 2.4, "color": ROW_COLORS[key]},
+                    hovertemplate=f"<b>{ROW_LABELS[key]}</b><br>%{{y:.1%}} of: {denominator}<extra></extra>",
+                ))
+            fig.update_yaxes(title_text=f"share of {denominator.lower()}", tickformat=".0%", gridcolor="#E6EDF5")
+        else:
+            growth = yoy_frame(frame)
+            for key in ROW_KEYS:
+                fig.add_trace(go.Scatter(
+                    x=growth.index, y=growth[key], name=ROW_LABELS[key], mode="lines",
+                    line={"width": 2.0, "color": ROW_COLORS[key]},
+                    hovertemplate=f"<b>{ROW_LABELS[key]}</b><br>%{{y:+.1f}}% vs prior year<extra></extra>",
+                ))
+            fig.update_yaxes(title_text="% change vs prior year", gridcolor="#E6EDF5", zeroline=True,
+                             zerolinecolor="#CBD5E1")
+        fig.update_xaxes(title_text="June year ending", title_font={"size": 11, "color": "#5A6B7B"},
+                         showgrid=False, dtick=5)
+        fig.update_layout(height=380, margin={"l": 56, "r": 18, "t": 40, "b": 40},
+                          hovermode="x unified", plot_bgcolor="#FFFFFF",
+                          legend={"orientation": "h", "yanchor": "bottom", "y": 1.0, "x": 0.0,
+                                  "font": {"size": 10.5}})
+        st.plotly_chart(fig, use_container_width=True, key="fleet_mix_chart")
+
+        ex = denominator_example(repo_root)
+        st.markdown(
+            f"<div style='background:#F0F7FF;border:1px solid #BFDBFE;border-radius:10px;padding:10px 14px;"
+            f"font-size:0.84rem;color:#1E3A5F'><b>Same kilometres, three denominators (MBU26, FY{ex['fy']}):</b> "
+            f"BEV travel is {ex['light_bev_km']:,.0f}m km. Divided by all six rows "
+            f"({ex['total_km']:,.0f}m km) that is <b>{ex['share_all']:.2%}</b> of all road travel; divided by all "
+            f"light travel including petrol ({ex['light_all_km']:,.0f}m km) it is <b>{ex['share_light']:.2%}</b>; "
+            f"divided by the light RUC pool ({ex['pool_km']:,.0f}m km) it is <b>{ex['share_pool']:.2%}</b> - the "
+            f"number the S-curve analysis and the uptake levers work with, because that pool is what the class "
+            f"split reallocates. None of these is wrong; they answer different questions.</div>",
+            unsafe_allow_html=True,
+        )
+        st.markdown("<div class='page5-panel-title' style='margin-top:0.6rem'>What each row means, source by source</div>",
+                    unsafe_allow_html=True)
+        display_table(definitions_table(), height=260, max_rows=10)
+        if source == MBU26_SOURCE:
+            st.caption("MBU26 covers FY2001-FY2050 (actuals then official forecast). The VFM scenarios and the "
+                       "dashboard pack cover the forecast era, FY2025-FY2050.")
 
 
 @st.cache_data(show_spinner=False, max_entries=6)

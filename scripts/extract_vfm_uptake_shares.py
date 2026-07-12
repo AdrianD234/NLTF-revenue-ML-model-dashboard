@@ -70,6 +70,13 @@ def main() -> None:
             "heavy_bev_vkt_share": to_june_year(heavy_bev),
             "light_petrol_vkt_million_km": to_june_year(petrol / 1e6),
             "light_petrol_share_of_light_vkt": to_june_year(petrol / light_total),
+            # raw class volumes (million km) so downstream views can present
+            # MoT's six-row taxonomy in levels, not just pool shares
+            "light_ruc_conventional_million_km": to_june_year(conventional / 1e6),
+            "light_ruc_bev_million_km": to_june_year(bev / 1e6),
+            "light_ruc_phev_million_km": to_june_year(phev / 1e6),
+            "heavy_total_million_km": to_june_year(heavy_total / 1e6),
+            "heavy_bev_million_km": to_june_year(heavy_by_power.get("Electric", 0) / 1e6),
         }
         for fy in FY_RANGE:
             rows.append({"scenario": scenario, "june_year": fy, **{name: values[fy] for name, values in series.items()}})
@@ -80,7 +87,7 @@ def main() -> None:
     frame.to_csv(output_csv, index=False, lineterminator="\n", float_format="%.6f")
 
     manifest = {
-        "schema_version": "vfm-uptake-shares-v1",
+        "schema_version": "vfm-uptake-shares-v2",
         "created_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "source_workbook": {
             "repo_relative_path": "data/source_workbooks/VFM202405_outputs_summary_V3.xlsx",

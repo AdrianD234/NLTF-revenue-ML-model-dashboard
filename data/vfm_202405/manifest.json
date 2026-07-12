@@ -1,6 +1,6 @@
 {
-  "schema_version": "vfm-uptake-shares-v1",
-  "created_at": "2026-07-08T00:22:55Z",
+  "schema_version": "vfm-uptake-shares-v2",
+  "created_at": "2026-07-12T23:42:27Z",
   "source_workbook": {
     "repo_relative_path": "data/source_workbooks/VFM202405_outputs_summary_V3.xlsx",
     "sha256": "2c49dc3e2fd6b4f083c0d8e8f52b36f34216bc37eac78ed4329347692ac4b4ab"
@@ -12,7 +12,7 @@
   "derivation": "Light RUC pool = diesel + diesel-hybrid (conventional) + battery-electric (BEV) + petrol plug-in (PHEV) VKT for LPV+LCV; shares are of that pool. Heavy BEV share is electric VKT over all M+H truck VKT. June-year FY(t) = mean(calendar t-1, t).",
   "output": {
     "repo_relative_path": "data/vfm_202405/vfm_vkt_shares.csv",
-    "sha256": "4d044b825547f45e0c74ccbbccbd0f690dcf7f4c9bce8c55920fffbc1faea2ef",
+    "sha256": "81da2535b316245182abc416d1e43a418888eb9ff986b8f663b636a6e375abe8",
     "rows": 78
   }
 }
