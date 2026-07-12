@@ -156,6 +156,20 @@ results; the CSVs carry every underlying number.
    currently runs the battery on the primary light-BEV curve; PHEV/heavy are covered by
    the preset-vs-VFM gap table only).
 
+## 7a. A definitional trap, pre-cleared: "BEV share" has three denominators
+
+Every "BEV share" in the S-curve work is the share of the **light RUC pool**
+(conventional diesel + BEV + PHEV — the pool the class split reallocates). The same
+kilometres give very different ratios against other totals: FY2025's 820.6m BEV km are
+6.07% of the pool, 1.81% of all light travel including petrol, and 1.67% of all road
+travel across MBU26's six volume rows. Also note MBU26's "Light RUC net km" row is
+conventional (diesel) ONLY — BEV and PHEV are separate rows. The dashboard's **Fleet mix
+explorer** (bottom of the Revenue Outlook page; commit `5fee9fb`) makes all of this
+explicit: MoT's six rows across MBU26 / VFM / the committed pack, with a mandatory
+"as a share of" denominator picker and a definitions table mapping each MBU26 row to its
+VFM power types and dashboard series. `tests/test_fleet_mix.py` pins the three-denominator
+example as a regression test.
+
 ## 8. Suggested review angles for the consultant
 
 - Re-run everything (commands below) and check the workbook's sheet 8 verdict and the
