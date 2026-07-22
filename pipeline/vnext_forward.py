@@ -10,7 +10,9 @@ gap rows (missing values) are emitted.
 from __future__ import annotations
 
 import hashlib
+import importlib
 import json
+import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -38,6 +40,27 @@ VNEXT_SCORER_VERSION = "vnext-forward-scorer-v1"
 
 class FittedStateHashMismatch(RuntimeError):
     """Raised when a fitted production state differs from its manifest hash."""
+
+
+def _register_legacy_sklearn_loss_module_alias() -> None:
+    """Keep the governed scikit-learn 1.7 fitted states loadable on 1.9.
+
+    The committed GradientBoostingRegressor states contain a Cython loss
+    reference serialized as the historical top-level module ``_loss``.
+    scikit-learn 1.9 still ships the same extension under its package path,
+    but no longer exposes the top-level import during unpickling. Registering
+    the existing extension under its historical name preserves the original
+    fitted-state bytes and lets the runtime parity gate verify the result.
+    """
+
+    if "_loss" in sys.modules:
+        return
+    try:
+        loss_extension = importlib.import_module("sklearn._loss._loss")
+    except ModuleNotFoundError:
+        return
+    sys.modules.setdefault("_loss", loss_extension)
+
 
 SHEET_BY_STREAM = {
     "PED": "PED Inputs",
@@ -137,6 +160,7 @@ class VNextScorer:
 def load_scorer(stream: str) -> Optional[VNextScorer]:
     import joblib
 
+    _register_legacy_sklearn_loss_module_alias()
     sdir = state_dir(stream)
     mpath = sdir / "fitted_model_manifest.json"
     ppath = sdir / "forward_scorer_parity_audit.json"

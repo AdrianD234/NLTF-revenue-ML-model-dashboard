@@ -405,6 +405,77 @@ def _annual_bridge_and_factors(
     return annual.reset_index(drop=True), factors
 
 
+def _validate_complete_numeric_replay(
+    replay: ScenarioInputForecastReplayResult,
+    *,
+    replay_inputs: pd.DataFrame,
+    scenario_names: tuple[str, ...],
+) -> None:
+    """Require every governed scenario/stream/quarter before annual bridging."""
+
+    forecasts = replay.future_forecasts
+    required_forecast_columns = {"scenario_name", "stream", "target_period", "forecast"}
+    if forecasts is None or forecasts.empty or required_forecast_columns.difference(forecasts.columns):
+        raise ValueError("Fixed-finalist Iran-war replay produced no usable forecast rows.")
+
+    problems: list[str] = []
+    for scenario_name in scenario_names:
+        scenario_inputs = replay_inputs[
+            replay_inputs["scenario_name"].astype(str).eq(scenario_name)
+        ].copy()
+        scenario_forecasts = forecasts[
+            forecasts["scenario_name"].astype(str).eq(scenario_name)
+        ].copy()
+        for stream in _STREAM_SERIES_IDS:
+            expected_periods = set(
+                scenario_inputs.loc[
+                    scenario_inputs["stream"].astype(str).eq(stream), "canonical_period"
+                ].dropna().astype(str)
+            )
+            stream_forecasts = scenario_forecasts[
+                scenario_forecasts["stream"].astype(str).eq(stream)
+            ].copy()
+            numeric = pd.to_numeric(stream_forecasts.get("forecast"), errors="coerce")
+            numeric_periods = expected_periods.intersection(
+                stream_forecasts.loc[numeric.notna(), "target_period"].dropna().astype(str)
+            )
+            missing_periods = sorted(expected_periods.difference(numeric_periods))
+            if expected_periods and not missing_periods:
+                continue
+
+            gap_codes = sorted(
+                value
+                for value in stream_forecasts.get("gap_code", pd.Series(dtype=object))
+                .dropna()
+                .astype(str)
+                .unique()
+                .tolist()
+                if value
+            )
+            reason = ""
+            if "gap_reason" in stream_forecasts:
+                reasons = [
+                    value
+                    for value in stream_forecasts["gap_reason"].dropna().astype(str).unique().tolist()
+                    if value
+                ]
+                reason = reasons[0] if reasons else ""
+            detail = (
+                f"{scenario_name}/{stream}: {len(numeric_periods)} of {len(expected_periods)} "
+                "required quarters are numeric"
+            )
+            if gap_codes:
+                detail += f" (gap: {', '.join(gap_codes)})"
+            if reason:
+                detail += f"; {reason}"
+            problems.append(detail)
+
+    if problems:
+        raise ValueError(
+            "Fixed-finalist Iran-war replay lacks complete numeric coverage: " + " | ".join(problems)
+        )
+
+
 def run_fuel_price_scenario_replay(
     base_inputs: pd.DataFrame,
     repo_root: Path | str,
@@ -425,6 +496,11 @@ def run_fuel_price_scenario_replay(
     if validation.empty or not validation["valid"].fillna(False).all():
         details = validation[[column for column in ["scenario_name", "errors"] if column in validation.columns]].to_dict("records")
         raise ValueError(f"Fixed-finalist Iran-war replay failed validation: {details}")
+    _validate_complete_numeric_replay(
+        replay,
+        replay_inputs=replay_inputs,
+        scenario_names=(base_scenario_name, FUEL_PRICE_SCENARIO_NAME),
+    )
     input_audit = _input_change_audit(base_rows, fuel_rows, base_scenario_name)
     quarterly_factors = _quarterly_factor_audit(replay, base_scenario_name=base_scenario_name)
     annual_bridge, annual_factors = _annual_bridge_and_factors(

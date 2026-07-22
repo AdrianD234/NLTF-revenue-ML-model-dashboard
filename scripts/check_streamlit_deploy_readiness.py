@@ -12,7 +12,17 @@ import tomllib
 ROOT = Path(__file__).resolve().parents[1]
 PACK_ROOT = ROOT / "data" / "dashboard_evidence_pack"
 MAX_FILE_BYTES = 50 * 1024 * 1024
-REQUIRED_RUNTIME_DEPS = {"streamlit", "pandas", "numpy", "plotly", "pyarrow", "openpyxl", "pillow", "scikit-learn"}
+REQUIRED_RUNTIME_DEPS = {
+    "streamlit",
+    "pandas",
+    "numpy",
+    "plotly",
+    "pyarrow",
+    "openpyxl",
+    "pillow",
+    "scikit-learn",
+    "statsmodels",
+}
 DEV_ONLY_DEPS = {"pytest", "playwright", "pytest-playwright", "kaleido"}
 REQUIRED_PARQUET = {
     "candidate_cone.parquet",

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+from pathlib import Path
 import sys
 
 import pandas as pd
@@ -22,6 +23,11 @@ from scripts.check_streamlit_deploy_readiness import (
 
 def test_app_imports_cloud_ui_surface() -> None:
     assert_import_surface()
+
+
+def test_streamlit_cloud_runtime_requirements_include_ar1_dependency() -> None:
+    requirements = (Path(__file__).resolve().parents[1] / "requirements.txt").read_text(encoding="utf-8")
+    assert "statsmodels==0.14.6" in requirements.splitlines()
 
 
 def test_app_uses_cloud_safe_reproducibility_wrapper() -> None:

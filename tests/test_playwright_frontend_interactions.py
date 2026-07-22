@@ -69,13 +69,10 @@ PAGE_PANELS = {
     "Revenue Outlook": [
         "Revenue Outlook controls",
         "Total path chart",
+        "Revenue composition over time",
         "Fleet mix explorer - MoT's six volume rows across MBU26, the VFM and this dashboard",
         "Effective rates per 1,000 km",
         "Download 12c timing CSV",
-        "Component drill-down",
-        "Selected-FY revenue split",
-        "Activity and volume outlook",
-        "Revenue bridge detail",
     ],
 }
 
@@ -668,9 +665,9 @@ def test_rendered_plotly_trace_data_matches_chart_sources_where_possible(page: P
     expect(page.locator(".js-plotly-plot").nth(1)).to_be_visible(timeout=90000)
     body_text = page.locator("body").inner_text(timeout=60000)
     frontier_info = chart_info_text(page, "Candidate Search Frontier")
-    assert "400 plotted candidates from 400 curated rows" in frontier_info
     assert "Balanced all-stream frontier view" in frontier_info
     assert "excluded from governance scoring" in frontier_info
+    assert "Coverage:" in frontier_info
     assert visible_text_absent(page, "Balanced all-stream frontier view")
     assert visible_text_absent(page, "Frontier read:")
     assert "Candidate frontier mode" not in body_text

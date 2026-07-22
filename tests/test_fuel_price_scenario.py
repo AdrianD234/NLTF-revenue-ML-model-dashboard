@@ -14,10 +14,12 @@ from model_dashboard.fuel_price_scenario import (
     RUC_PRICE_LAGGED_EFFECT_PERIODS,
     RUC_PRICE_MULTIPLIER,
     RUC_PRICE_SHOCK_PERIODS,
+    _validate_complete_numeric_replay,
     append_fuel_price_scenario_to_chart_rows,
     build_fuel_price_scenario_inputs,
     run_fuel_price_scenario_replay,
 )
+from model_dashboard.forecast_runner import ScenarioInputForecastReplayResult
 from model_dashboard.ev_uptake_levers import EV_UPTAKE_PRESETS, apply_uptake_levers_to_chart_rows
 from model_dashboard.rate_paths import apply_fed_uplift_delay_to_chart_rows, fed_uplift_delayed_factors
 
@@ -59,6 +61,107 @@ def _annual(rows: pd.DataFrame, scenario: str, fy: int) -> pd.DataFrame:
         & pd.to_numeric(rows["june_year"], errors="coerce").eq(fy)
     ].copy()
     return selected.set_index("series_id")
+
+
+def test_iran_replay_rejects_partial_numeric_stream_coverage() -> None:
+    scenarios = ("current_basecase", FUEL_PRICE_SCENARIO_NAME)
+    periods = ("2026Q1", "2026Q2")
+    input_rows = [
+        {"scenario_name": scenario, "stream": stream, "canonical_period": period}
+        for scenario in scenarios
+        for stream in ("PED", "LIGHT_RUC", "HEAVY_RUC")
+        for period in periods
+    ]
+    forecast_rows = [
+        {
+            "scenario_name": scenario,
+            "stream": stream,
+            "target_period": period,
+            "forecast": 1.0 if stream == "LIGHT_RUC" else pd.NA,
+            "gap_code": None if stream == "LIGHT_RUC" else f"{stream.lower()}_vnext_parity_failed",
+            "gap_reason": "Load gate error: ModuleNotFoundError: No module named '_loss'"
+            if stream != "LIGHT_RUC"
+            else "",
+        }
+        for scenario in scenarios
+        for stream in ("PED", "LIGHT_RUC", "HEAVY_RUC")
+        for period in periods
+    ]
+    replay = ScenarioInputForecastReplayResult(
+        future_forecasts=pd.DataFrame(forecast_rows),
+        component_forecasts=pd.DataFrame(),
+        assumptions=pd.DataFrame(),
+        validation_report=pd.DataFrame(),
+    )
+
+    with pytest.raises(ValueError, match="lacks complete numeric coverage") as excinfo:
+        _validate_complete_numeric_replay(
+            replay,
+            replay_inputs=pd.DataFrame(input_rows),
+            scenario_names=scenarios,
+        )
+
+    message = str(excinfo.value)
+    assert "current_basecase/PED: 0 of 2 required quarters are numeric" in message
+    assert "current_basecase/HEAVY_RUC: 0 of 2 required quarters are numeric" in message
+    assert "No module named '_loss'" in message
+
+
+def test_run_rejects_partial_replay_before_annual_bridge(
+    scenario_inputs: pd.DataFrame,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import model_dashboard.fuel_price_scenario as scenario_module
+
+    def incomplete_replay(replay_inputs, **_kwargs):
+        rows = replay_inputs[["scenario_name", "stream", "canonical_period"]].rename(
+            columns={"canonical_period": "target_period"}
+        )
+        rows["forecast"] = np.where(rows["stream"].astype(str).eq("LIGHT_RUC"), 1.0, np.nan)
+        rows["gap_code"] = np.where(
+            rows["stream"].astype(str).eq("PED"),
+            "ped_ar1_parity_failed",
+            np.where(
+                rows["stream"].astype(str).eq("HEAVY_RUC"),
+                "heavy_ruc_vnext_parity_failed",
+                "",
+            ),
+        )
+        rows["gap_reason"] = np.where(
+            rows["stream"].astype(str).eq("LIGHT_RUC"),
+            "",
+            "clean-cloud runtime dependency/load gate failed",
+        )
+        validation = pd.DataFrame(
+            {
+                "scenario_name": rows["scenario_name"].drop_duplicates().tolist(),
+                "valid": True,
+                "errors": "",
+            }
+        )
+        return ScenarioInputForecastReplayResult(
+            future_forecasts=rows,
+            component_forecasts=pd.DataFrame(),
+            assumptions=pd.DataFrame(),
+            validation_report=validation,
+        )
+
+    monkeypatch.setattr(scenario_module, "replay_forecast_from_scenario_inputs", incomplete_replay)
+    monkeypatch.setattr(
+        scenario_module,
+        "_annual_bridge_and_factors",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("annual bridge must not run for an incomplete replay")
+        ),
+    )
+
+    with pytest.raises(ValueError, match="lacks complete numeric coverage") as excinfo:
+        run_fuel_price_scenario_replay(scenario_inputs, repo_root=ROOT, engine="ensemble")
+
+    message = str(excinfo.value)
+    assert "current_basecase/PED: 0 of 100 required quarters are numeric" in message
+    assert "current_basecase/HEAVY_RUC: 0 of 100 required quarters are numeric" in message
+    assert "ped_ar1_parity_failed" in message
 
 
 def test_build_iran_war_scenario_inputs_changes_only_governed_fuel_and_ruc_drivers(scenario_inputs) -> None:

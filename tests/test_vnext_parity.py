@@ -11,8 +11,9 @@ These tests enforce the production-reproducibility contract:
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import shutil
+import sys
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -104,6 +105,18 @@ def test_load_scorer_rejects_hash_mismatch_before_scoring(tmp_path: Path, monkey
     monkeypatch.setattr(vnext_forward, "state_dir", lambda selected_stream: copied)
     with pytest.raises(vnext_forward.FittedStateHashMismatch):
         vnext_forward.load_scorer(stream)
+
+
+def test_load_scorer_registers_the_legacy_sklearn_loss_pickle_alias(monkeypatch: pytest.MonkeyPatch) -> None:
+    """scikit-learn 1.9 can load the governed 1.7 GradientBoosting state."""
+
+    from pipeline import vnext_forward
+
+    monkeypatch.delitem(sys.modules, "_loss", raising=False)
+    scorer = vnext_forward.load_scorer("PED")
+    expected = __import__("sklearn._loss._loss", fromlist=["*"])
+    assert sys.modules.get("_loss") is expected
+    assert scorer is not None and scorer.numeric_enabled
 
 
 @pytest.mark.parametrize("stream", VNEXT_STREAMS)
