@@ -281,3 +281,97 @@ def test_historical_and_quarterly_rows_are_untouched() -> None:
     quarterly_row = adjusted[adjusted["time_grain"].eq("quarterly")]
     assert float(actual_row["value"].iloc[0]) == 12000.0
     assert float(quarterly_row["value"].iloc[0]) == 3100.0
+
+
+def _to_base_units(value: float, unit: str) -> float:
+    text = str(unit).lower()
+    if "million" in text:
+        return float(value) * 1_000_000.0
+    return float(value)
+
+
+def _fy_periods(fy: int) -> set[str]:
+    return {f"{fy - 1}Q3", f"{fy - 1}Q4", f"{fy}Q1", f"{fy}Q2"}
+
+
+def test_default_uptake_reconciles_native_quarters_to_adjusted_annual_activity() -> None:
+    chart = pd.read_parquet(ROOT / "data" / "current_revenue_outlook" / "revenue_chart_rows.parquet")
+    drift = pd.read_parquet(
+        ROOT / "data" / "current_revenue_outlook" / "ev_phev_ped_light_drift_assumptions.parquet"
+    )
+    adjusted, _ = apply_uptake_levers_to_chart_rows(
+        chart,
+        drift,
+        EV_UPTAKE_PRESETS["MoT VFM base"],
+        adjust_ped=True,
+    )
+
+    native_series = ("light_ruc_net_km", "heavy_ruc_net_km", "ped_vkt_per_capita")
+    for scenario in ("current_basecase", "current_comparison_1"):
+        for fy in (2026, 2030, 2050):
+            for series_id in native_series:
+                annual = adjusted[
+                    adjusted["scenario_name"].astype(str).eq(scenario)
+                    & adjusted["series_id"].astype(str).eq(series_id)
+                    & adjusted["time_grain"].astype(str).eq("june_year")
+                    & pd.to_numeric(adjusted["june_year"], errors="coerce").eq(fy)
+                ]
+                forecast_quarters = adjusted[
+                    adjusted["scenario_name"].astype(str).eq(scenario)
+                    & adjusted["series_id"].astype(str).eq(series_id)
+                    & adjusted["time_grain"].astype(str).eq("quarterly")
+                    & pd.to_numeric(adjusted["june_year"], errors="coerce").eq(fy)
+                ]
+                actual_quarters = adjusted[
+                    adjusted["row_type"].astype(str).eq("historical_actual")
+                    & adjusted["series_id"].astype(str).eq(series_id)
+                    & adjusted["time_grain"].astype(str).eq("quarterly")
+                    & pd.to_numeric(adjusted["june_year"], errors="coerce").eq(fy)
+                ]
+                quarters = pd.concat([actual_quarters, forecast_quarters], ignore_index=True)
+                assert len(annual) == 1
+                assert set(quarters["period"].astype(str)) == _fy_periods(fy)
+                assert not quarters["period"].astype(str).duplicated().any()
+
+                annual_total = _to_base_units(float(annual.iloc[0]["value"]), str(annual.iloc[0]["value_unit"]))
+                quarterly_total = sum(
+                    _to_base_units(float(row.value), str(row.value_unit)) for row in quarters.itertuples()
+                )
+                assert quarterly_total == pytest.approx(annual_total, rel=0.0, abs=1e-5)
+                assert set(forecast_quarters["value_status"].astype(str)) == {
+                    "lever_adjusted_quarterly_reconciled"
+                }
+                assert set(forecast_quarters["data_scope"].astype(str)) == {
+                    "ev_uptake_quarterly_annual_reconciliation"
+                }
+                if series_id.endswith("ruc_net_km"):
+                    assert set(quarters["value_unit"].astype(str)) == {"million km"}
+
+    # For a complete forecast FY, the bridge changes only the level: the
+    # original within-year shape remains exactly proportional.
+    original = chart[
+        chart["scenario_name"].astype(str).eq("current_basecase")
+        & chart["series_id"].astype(str).eq("light_ruc_net_km")
+        & chart["time_grain"].astype(str).eq("quarterly")
+        & pd.to_numeric(chart["june_year"], errors="coerce").eq(2030)
+    ].sort_values("period")
+    rebased = adjusted[
+        adjusted["scenario_name"].astype(str).eq("current_basecase")
+        & adjusted["series_id"].astype(str).eq("light_ruc_net_km")
+        & adjusted["time_grain"].astype(str).eq("quarterly")
+        & pd.to_numeric(adjusted["june_year"], errors="coerce").eq(2030)
+    ].sort_values("period")
+    original_share = pd.to_numeric(original["value"], errors="coerce").to_numpy(dtype=float)
+    rebased_share = pd.to_numeric(rebased["value"], errors="coerce").to_numpy(dtype=float)
+    np.testing.assert_allclose(
+        rebased_share / rebased_share.sum(),
+        original_share / original_share.sum(),
+        rtol=1e-12,
+        atol=1e-12,
+    )
+
+    # MBU26 remains a governed annual comparator; the current-scenario bridge
+    # must not mutate any of its source rows.
+    original_mbu = chart[chart["scenario_name"].astype(str).eq("mbu26_official")].reset_index(drop=True)
+    adjusted_mbu = adjusted[adjusted["scenario_name"].astype(str).eq("mbu26_official")].reset_index(drop=True)
+    pd.testing.assert_frame_equal(adjusted_mbu[original_mbu.columns], original_mbu, check_dtype=False)

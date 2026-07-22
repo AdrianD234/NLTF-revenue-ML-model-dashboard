@@ -28,7 +28,6 @@ PAGES = [
     ("Diagnostics", "final-diagnostics.png"),
     ("Scenario Comparison", "final-scenario-comparison.png"),
     ("Revenue Outlook", "final-revenue-outlook.png"),
-    ("Governance & Reproducibility", "final-governance-reproducibility.png"),
 ]
 
 PAGE_DISPLAY_TITLES = {
@@ -36,7 +35,6 @@ PAGE_DISPLAY_TITLES = {
     "Diagnostics": "Model Confidence",
     "Scenario Comparison": "Scenario Forecasts",
     "Revenue Outlook": "Revenue Outlook",
-    "Governance & Reproducibility": "Governance & Reproducibility",
 }
 PAGE_ORDER = list(PAGE_DISPLAY_TITLES)
 
@@ -71,21 +69,13 @@ PAGE_PANELS = {
     "Revenue Outlook": [
         "Revenue Outlook controls",
         "Total path chart",
+        "Fleet mix explorer - MoT's six volume rows across MBU26, the VFM and this dashboard",
+        "Effective rates per 1,000 km",
+        "Download 12c timing CSV",
         "Component drill-down",
         "Selected-FY revenue split",
         "Activity and volume outlook",
         "Revenue bridge detail",
-    ],
-    "Governance & Reproducibility": [
-        "Governance & Reproducibility Filters",
-        "Repro packs loaded",
-        "How the model is built",
-        "Model glossary",
-        "Registry",
-        "Component trace",
-        "Net forecast R2 after final model composition",
-        "SHAP not yet generated",
-        "Forecast Builder",
     ],
 }
 
@@ -196,6 +186,20 @@ def click_page(page: Page, page_name: str) -> None:
     expect(page.locator("body")).to_contain_text(expected_page_chip(page_name), timeout=90000)
     for panel in PAGE_PANELS[page_name]:
         expect(page.locator("body")).to_contain_text(panel, timeout=90000)
+    assert_no_streamlit_exception(page)
+
+
+def open_local_governance_drilldowns(page: Page) -> None:
+    """Open local-only governance tools without making them a fifth governed page."""
+    labels = page.locator("div[data-testid='stRadio'] label")
+    target = labels.filter(has_text="Governance & Reproducibility")
+    if target.count() == 0:
+        pytest.skip("Governance drilldowns are intentionally hidden in the governed four-page runtime.")
+    expect(target.first).to_be_visible(timeout=60000)
+    target.first.click()
+    expect(page.locator("body")).to_contain_text(
+        "Governance & Reproducibility Filters", timeout=90000
+    )
     assert_no_streamlit_exception(page)
 
 
@@ -370,11 +374,10 @@ def test_plotly_hovers_are_human_readable_on_all_pages(page: Page) -> None:
 
 def test_governance_reproducibility_page_stream_selector_and_downloads(page: Page) -> None:
     open_dashboard(page)
-    click_page(page, "Governance & Reproducibility")
+    open_local_governance_drilldowns(page)
     body = page.locator("body")
     r2_forecast_text = "Forecast R2 is calculated from final delivered predictions after residual correction or ensemble weighting."
     r2_calibration_text = "Calibration R2 is actual-on-forecast validation R2. Neither is in-sample OLS R2."
-    expect(body).to_contain_text(expected_page_chip("Governance & Reproducibility"), timeout=90000)
     expect(body).to_contain_text("Governance & Reproducibility Filters", timeout=60000)
     expect(body).to_contain_text("PED VKT per capita", timeout=60000)
     expect(body).to_contain_text("Light RUC volume", timeout=60000)
@@ -436,7 +439,7 @@ def test_governance_reproducibility_page_stream_selector_and_downloads(page: Pag
 
 def test_forecast_builder_upload_validate_calculate_and_download(page: Page, tmp_path: Path) -> None:
     open_dashboard(page)
-    click_page(page, "Governance & Reproducibility")
+    open_local_governance_drilldowns(page)
     body = page.locator("body")
     page.get_by_text("Forecast Builder", exact=True).first.click()
     expect(body).to_contain_text("Download blank 20-quarter template", timeout=60000)

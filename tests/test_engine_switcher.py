@@ -46,6 +46,13 @@ def test_engine_path_resolvers() -> None:
     assert engine_repro_pack_dirs(ENGINE_AR1)["LIGHT_RUC"] == engine_repro_pack_dirs(ENGINE_ENSEMBLE)["LIGHT_RUC"]
 
 
+def test_known_pack_env_root_does_not_pin_the_engine_switch(monkeypatch) -> None:
+    monkeypatch.setenv("DASHBOARD_EVIDENCE_PACK_ROOT", "data/dashboard_evidence_pack")
+    at = _boot(ENGINE_AR1)
+    active_root = Path(str(at.session_state["active_data_root"])).resolve(strict=False)
+    assert active_root == engine_evidence_root(ENGINE_AR1).resolve(strict=False)
+
+
 def _boot(engine: str) -> AppTest:
     at = AppTest.from_file(APP_PATH, default_timeout=180)
     at.session_state[ENGINE_KEY] = engine

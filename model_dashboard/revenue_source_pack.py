@@ -89,6 +89,8 @@ SOURCE_SERIES_ALIASES = {
     "Total FED+RUC net revenue": "total_fed_ruc_net_revenue",
     "Total RUC forecast incl EV/PHEV": "total_ruc_net_revenue",
     "RUC revenues net of admin fees & refunds": "total_ruc_net_revenue",
+    "Net RUC revenue": "total_ruc_net_revenue",
+    "Net RUC revenue (all classes)": "total_ruc_net_revenue",
     "Net FED revenue": "net_fed_revenue",
     "Gross FED revenue": "gross_fed_revenue",
     "PED revenue": "gross_ped_revenue",

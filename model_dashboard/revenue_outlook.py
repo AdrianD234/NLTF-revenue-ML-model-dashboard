@@ -109,6 +109,12 @@ RUNTIME_REVENUE_OUTLOOK_FILES = (
     "path_trace_status.parquet",
 )
 PED_COMPARISON_BEHAVIOURAL_TRACE_NAME = "Current finalist comparison behavioural path"
+# Mirrored from ``model_dashboard.fuel_price_scenario``.  Keeping the trace
+# identity contract here avoids coupling the core pack builder to the optional
+# scenario-construction module while still preventing a second comparison
+# scenario from being collapsed into the High-population trace.
+FUEL_PRICE_SCENARIO_NAME = "current_iran_war_fuel_15pct_ruc_20pct_6q"
+FUEL_PRICE_SCENARIO_TRACE_NAME = "Current finalist Iran war (+15% fuel, +20% RUC; 6 quarters)"
 SCENARIO_ROLE_CONTRACT_NOTE = ""
 STREAM_ORDER = ["PED", "LIGHT_RUC", "HEAVY_RUC"]
 STREAM_LABELS = {
@@ -118,6 +124,24 @@ STREAM_LABELS = {
 }
 REVENUE_OUTLOOK_SCHEMA_VERSION = "revenue-outlook-pack-v1"
 REVENUE_OUTLOOK_TITLE = "Revenue Outlook"
+NET_REVENUE_COMPARISON_UNIT = "$m nominal ex GST"
+NET_REVENUE_COMPARISON_SERIES = (
+    (
+        "net_fed_revenue",
+        "Net FED",
+        "gross_fed_revenue - fed_refunds",
+    ),
+    (
+        "total_ruc_net_revenue",
+        "Net RUC (all classes)",
+        "gross_ruc_revenue - ruc_admin_revenue - ruc_refunds",
+    ),
+    (
+        "net_mvr_revenue",
+        "Net MVR",
+        "mr1_revenue + mr2_revenue - mvr_admin_revenue - mvr_refunds",
+    ),
+)
 FAN_SOURCE_AUTO = "Auto / best available"
 FAN_SOURCE_MBU26_ARCHIVED = "MBU26 archived forecast error"
 FAN_SOURCE_CURRENT_BACKTEST = "Current finalist backtest error"
@@ -527,6 +551,7 @@ def revenue_outlook_signature(pack_dir: Path | str | None = None, repo_root: Pat
         base / "scenario_input_delta_audit.parquet",
         base / "scenario_input_replay_mismatch_report.parquet",
         base / "scenario_feature_lineage.parquet",
+        base / "scenario_inputs" / "scenario_input_wide.parquet",
         base / "scenario_role_contract.parquet",
         base / "revenue_formula_residuals.parquet",
         base / "series_alias_audit.parquet",
@@ -652,6 +677,187 @@ DISPLAY_SERIES_ORDER = [
     "total_fed_ruc_net_revenue",
     "total_nltf_net_revenue",
 ]
+
+
+def net_revenue_timing_comparison_frame(
+    chart_rows: pd.DataFrame,
+    delayed_factors: dict[int, float],
+    *,
+    start_fy: int = 2026,
+    end_fy: int = 2030,
+) -> pd.DataFrame:
+    """Return the governed Base/Iran net-revenue matrix for both 12c timings.
+
+    ``chart_rows`` may currently carry the published, delayed, or no-uplift
+    display state.  FED policy overlays preserve the published value in
+    ``_fed_baseline_value``; using that lineage makes this comparison stable
+    when a user changes the separate on/off control.  The delayed path is
+    then rebuilt from the governed gross-PED factor.  RUC and MVR are not FED
+    rate series and must therefore be identical across the two timing paths.
+
+    The canonical RUC ID deliberately remains ``total_ruc_net_revenue``:
+    "total" means all RUC classes, while the value is net of RUC admin and
+    refunds.
+    """
+
+    columns = [
+        "path_id",
+        "path_order",
+        "scenario_id",
+        "scenario",
+        "timing_id",
+        "12c timing",
+        "FY",
+        "series_id",
+        "series_order",
+        "revenue_line",
+        "value_million_nzd",
+        "value_billion_nzd",
+        "unit",
+        "definition",
+    ]
+    if chart_rows is None or chart_rows.empty:
+        return pd.DataFrame(columns=columns)
+    required = {"time_grain", "scenario_name", "june_year", "series_id", "value", "value_unit"}
+    missing = sorted(required.difference(chart_rows.columns))
+    if missing:
+        raise ValueError(f"Net-revenue timing comparison is missing chart columns: {', '.join(missing)}")
+    if int(end_fy) < int(start_fy):
+        raise ValueError("end_fy must be greater than or equal to start_fy")
+
+    scenario_specs = (
+        ("baseline", "Baseline", "current_basecase"),
+        ("iran", "Iran", FUEL_PRICE_SCENARIO_NAME),
+    )
+    series_specs = {series_id: (label, definition) for series_id, label, definition in NET_REVENUE_COMPARISON_SERIES}
+    required_series = set(series_specs) | {"gross_ped_revenue"}
+    annual = chart_rows[
+        chart_rows["time_grain"].astype(str).eq("june_year")
+        & chart_rows["scenario_name"].astype(str).isin([item[2] for item in scenario_specs])
+        & chart_rows["series_id"].astype(str).isin(required_series)
+    ].copy()
+    annual["_fy"] = pd.to_numeric(annual["june_year"], errors="coerce")
+    annual = annual[annual["_fy"].between(int(start_fy), int(end_fy), inclusive="both")].copy()
+    if "row_type" in annual.columns:
+        annual = annual[~annual["row_type"].astype(str).eq("historical_actual")].copy()
+    if "fed_path" in annual.columns:
+        fed_path = annual["fed_path"].fillna("").astype(str)
+        annual = annual[fed_path.isin({"", "Current planned path"})].copy()
+    annual["_value"] = pd.to_numeric(annual["value"], errors="coerce")
+    if "_fed_baseline_value" in annual.columns:
+        published = pd.to_numeric(annual["_fed_baseline_value"], errors="coerce")
+        annual["_published_value"] = published.where(published.notna(), annual["_value"])
+    else:
+        annual["_published_value"] = annual["_value"]
+
+    duplicate_keys = ["scenario_name", "_fy", "series_id"]
+    duplicates = annual.duplicated(duplicate_keys, keep=False)
+    if duplicates.any():
+        detail = annual.loc[duplicates, duplicate_keys].sort_values(duplicate_keys).head(20)
+        raise ValueError("Duplicate annual net-revenue comparison rows:\n" + detail.to_string(index=False))
+
+    lookup: dict[tuple[str, int, str], tuple[float, str, Any]] = {}
+    for _, row in annual.iterrows():
+        fy = row.get("_fy")
+        value = row.get("_published_value")
+        if pd.isna(fy) or pd.isna(value):
+            continue
+        lookup[(str(row.get("scenario_name")), int(fy), str(row.get("series_id")))] = (
+            float(value),
+            str(row.get("value_unit")),
+            row.to_dict(),
+        )
+
+    result_rows: list[dict[str, Any]] = []
+    for scenario_order, (scenario_id, scenario_label, scenario_name) in enumerate(scenario_specs):
+        for timing_order, (timing_id, timing_label) in enumerate(
+            (
+                ("published", "Original: 12c from 1 Jan 2027"),
+                ("shifted_6m", "Shifted +6 months: 12c from 1 Jul 2027"),
+            )
+        ):
+            path_id = f"{scenario_id}_{timing_id}"
+            path_order = scenario_order * 2 + timing_order
+            for fy in range(int(start_fy), int(end_fy) + 1):
+                gross_ped_key = (scenario_name, fy, "gross_ped_revenue")
+                if gross_ped_key not in lookup:
+                    raise ValueError(f"Missing gross PED row for {scenario_label}, FY{fy}.")
+                published_gross_ped, gross_ped_unit, _ = lookup[gross_ped_key]
+                if gross_ped_unit != NET_REVENUE_COMPARISON_UNIT:
+                    raise ValueError(
+                        f"Gross PED unit for {scenario_label}, FY{fy} is {gross_ped_unit!r}; "
+                        f"expected {NET_REVENUE_COMPARISON_UNIT!r}."
+                    )
+                delay_factor = float(delayed_factors.get(fy, 1.0))
+                for series_order, (series_id, label, definition) in enumerate(NET_REVENUE_COMPARISON_SERIES):
+                    key = (scenario_name, fy, series_id)
+                    if key not in lookup:
+                        raise ValueError(f"Missing {series_id} row for {scenario_label}, FY{fy}.")
+                    published_value, unit, source_row = lookup[key]
+                    if unit != NET_REVENUE_COMPARISON_UNIT:
+                        raise ValueError(
+                            f"{label} unit for {scenario_label}, FY{fy} is {unit!r}; "
+                            f"expected {NET_REVENUE_COMPARISON_UNIT!r}."
+                        )
+                    value = published_value
+                    if timing_id == "shifted_6m" and series_id == "net_fed_revenue":
+                        value += published_gross_ped * (delay_factor - 1.0)
+                        policy = str(source_row.get("_fed_policy", "") or "")
+                        current_value = pd.to_numeric(pd.Series([source_row.get("value")]), errors="coerce").iloc[0]
+                        if policy == "delay_6m" and pd.notna(current_value) and not np.isclose(
+                            float(current_value), value, rtol=0.0, atol=1e-6
+                        ):
+                            raise ValueError(
+                                f"Stored delayed Net FED does not reconcile for {scenario_label}, FY{fy}: "
+                                f"stored={float(current_value):.9f}, rebuilt={value:.9f}."
+                            )
+                    result_rows.append(
+                        {
+                            "path_id": path_id,
+                            "path_order": path_order,
+                            "scenario_id": scenario_id,
+                            "scenario": scenario_label,
+                            "timing_id": timing_id,
+                            "12c timing": timing_label,
+                            "FY": fy,
+                            "series_id": series_id,
+                            "series_order": series_order,
+                            "revenue_line": label,
+                            "value_million_nzd": float(value),
+                            "value_billion_nzd": float(value) / 1000.0,
+                            "unit": unit,
+                            "definition": definition,
+                        }
+                    )
+
+    out = pd.DataFrame(result_rows, columns=columns)
+    expected_rows = 4 * (int(end_fy) - int(start_fy) + 1) * len(NET_REVENUE_COMPARISON_SERIES)
+    if len(out) != expected_rows or out.duplicated(["path_id", "FY", "series_id"]).any():
+        raise ValueError(
+            f"Net-revenue timing matrix is incomplete or duplicated: expected {expected_rows} unique rows, got {len(out)}."
+        )
+    if out["value_million_nzd"].isna().any() or not np.isfinite(out["value_million_nzd"]).all():
+        raise ValueError("Net-revenue timing matrix contains missing or non-finite values.")
+
+    timing = out.pivot(index=["scenario_id", "FY", "series_id"], columns="timing_id", values="value_million_nzd")
+    timing["delta"] = timing["shifted_6m"] - timing["published"]
+    non_fed = timing.index.get_level_values("series_id") != "net_fed_revenue"
+    if not np.allclose(timing.loc[non_fed, "delta"], 0.0, rtol=0.0, atol=1e-9):
+        raise ValueError("FED timing changed Net RUC or Net MVR; only Net FED may move.")
+    unexpected_fed = (
+        (timing.index.get_level_values("series_id") == "net_fed_revenue")
+        & (timing.index.get_level_values("FY") != 2027)
+    )
+    if not np.allclose(timing.loc[unexpected_fed, "delta"], 0.0, rtol=0.0, atol=1e-9):
+        raise ValueError("The six-month 12c shift changed Net FED outside FY2027.")
+    if int(start_fy) <= 2027 <= int(end_fy):
+        fy2027_fed = timing[
+            (timing.index.get_level_values("series_id") == "net_fed_revenue")
+            & (timing.index.get_level_values("FY") == 2027)
+        ]
+        if len(fy2027_fed) != 2 or not fy2027_fed["delta"].lt(0.0).all():
+            raise ValueError("The six-month 12c shift must reduce FY2027 Net FED for Base and Iran.")
+    return out.sort_values(["path_order", "FY", "series_order"], kind="stable").reset_index(drop=True)
 
 CURRENT_RUNTIME_CUTOFF_REQUIRED_SERIES = (
     "ped_vkt_per_capita",
@@ -4639,9 +4845,12 @@ def ev_phev_split_assumptions_frame(
         current = current[current["FY_numeric"].notna()].copy()
         for row in current.to_dict("records"):
             fy = int(row["FY_numeric"])
-            source_path = str(row.get("source_path") or _current_source_path_label(str(row.get("scenario_name") or ""), str(row.get("scenario_role") or "")))
             scenario_name = str(row.get("scenario_name") or "")
             scenario_role = str(row.get("scenario_role") or "")
+            source_path = str(
+                row.get("source_path")
+                or _runtime_current_trace_name(scenario_name, scenario_role)
+            )
             series_id = str(row.get("series_id") or "")
             if not series_id or not source_path.startswith("Current finalist"):
                 continue
@@ -5032,6 +5241,7 @@ def revenue_stack_components_frame(
         "MBU26 official": 0,
         "Current finalist Base case": 1,
         "Current finalist High population/comparison": 2,
+        FUEL_PRICE_SCENARIO_TRACE_NAME: 3,
     }
     base["source_path_order"] = base["source_path"].astype(str).map(source_order).fillna(99).astype(int)
     base["value_numeric"] = pd.to_numeric(base["value"], errors="coerce")
@@ -5093,6 +5303,7 @@ def _extend_current_stack_actual_history(base: pd.DataFrame) -> pd.DataFrame:
     current_sources = [
         "Current finalist Base case",
         "Current finalist High population/comparison",
+        FUEL_PRICE_SCENARIO_TRACE_NAME,
     ]
     available_current_sources = [source for source in current_sources if data["source_path"].astype(str).eq(source).any()]
     if not available_current_sources:
@@ -6739,6 +6950,8 @@ def _runtime_current_trace_name(
     name = str(scenario_name or "").strip().lower()
     if role == SCENARIO_ROLE_BASECASE or name == "current_basecase":
         return "Current finalist Base case"
+    if name == FUEL_PRICE_SCENARIO_NAME:
+        return FUEL_PRICE_SCENARIO_TRACE_NAME
     if (
         str(series_id or "") == "ped_vkt_per_capita"
         and str(display_policy or "") == "keep_trace_relabel_comparison_behavioural_path"
@@ -6757,6 +6970,8 @@ def _runtime_trace_type(trace_name: Any) -> str:
         return "current finalist base"
     if name == "Current finalist High population/comparison":
         return "current finalist comparison"
+    if name == FUEL_PRICE_SCENARIO_TRACE_NAME:
+        return "current finalist Iran war comparison"
     if name == PED_COMPARISON_BEHAVIOURAL_TRACE_NAME:
         return "current finalist comparison behavioural"
     return name
@@ -6823,9 +7038,10 @@ def _trace_sort_value(trace_name: Any) -> int:
         "MBU26 official": 1,
         "Current finalist Base case": 2,
         "Current finalist High population/comparison": 3,
-        PED_COMPARISON_BEHAVIOURAL_TRACE_NAME: 4,
-        "Official comparator: selected MOT/BEFU": 5,
-        "Official comparator: rolling BEFU 1Y": 6,
+        FUEL_PRICE_SCENARIO_TRACE_NAME: 4,
+        PED_COMPARISON_BEHAVIOURAL_TRACE_NAME: 5,
+        "Official comparator: selected MOT/BEFU": 6,
+        "Official comparator: rolling BEFU 1Y": 7,
     }
     return order.get(str(trace_name or ""), 99)
 

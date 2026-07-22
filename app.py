@@ -131,11 +131,21 @@ from model_dashboard.npv import (
     npv_to_horizon,
 )
 from model_dashboard.rate_paths import (
+    FED_UPLIFT_DELAY_NOTE,
     FED_UPLIFT_NOTE,
     RATE_CHART_NOTE,
+    apply_fed_uplift_delay_to_chart_rows,
     apply_fed_uplift_off_to_chart_rows,
+    fed_uplift_delayed_factors,
     fed_uplift_off_factors,
     rate_paths_frame,
+)
+from model_dashboard.fuel_price_scenario import (
+    FUEL_PRICE_SCENARIO_NAME,
+    FUEL_PRICE_SCENARIO_NOTE,
+    FUEL_PRICE_SCENARIO_TRACE_NAME,
+    append_fuel_price_scenario_to_chart_rows,
+    run_fuel_price_scenario_replay,
 )
 from model_dashboard.ev_uptake_levers import (
     CUSTOM_OPTION as EV_UPTAKE_CUSTOM_OPTION,
@@ -148,6 +158,7 @@ from model_dashboard.ev_uptake_levers import (
     VFM_SOURCE_NOTE,
     apply_uptake_levers_to_chart_rows,
 )
+from model_dashboard.mbu26_source_spine import FORMULA_DEFINITIONS
 from model_dashboard.revenue_outlook import (
     CURRENT_REVENUE_OUTLOOK_DIR,
     FAN_SOURCE_AUTO,
@@ -182,11 +193,14 @@ from model_dashboard.revenue_outlook import (
     apply_revenue_sensitivity_layer,
     apply_ped_efficiency_sensitivity,
     load_revenue_outlook_pack,
+    net_revenue_timing_comparison_frame,
     ped_efficiency_scenarios_frame,
     sensitivity_config_frame,
     promote_revenue_outlook_pack,
     revenue_sensitivity_impact_audit_frame,
+    revenue_formula_residual_frame,
     revenue_outlook_signature,
+    revenue_stack_components_frame,
     validate_promotable_comparison,
 )
 from model_dashboard.revenue_source_pack import (
@@ -729,6 +743,45 @@ def _resolve_eruc_levers(ev_uptake_key: tuple[Any, ...]) -> ErucTransitionLevers
     return ErucTransitionLevers(*[float(v) for v in values])
 
 
+_CURRENT_FED_UPLIFT_ROLES = ("basecase", "comparison")
+_MBU26_FED_UPLIFT_ROLES = ("official_comparator",)
+
+
+def _fed_uplift_off_scope(ev_uptake_key: tuple[Any, ...]) -> tuple[bool, bool]:
+    """Return (current scenarios off, MBU26 comparator off).
+
+    Five-slot keys carry independent policy states. Four-slot keys retain the
+    legacy global behaviour for cached/test callers created before the split.
+    """
+    current_off = bool(ev_uptake_key[3]) if len(ev_uptake_key) > 3 else False
+    mbu26_off = bool(ev_uptake_key[4]) if len(ev_uptake_key) > 4 else current_off
+    return current_off, mbu26_off
+
+
+def _fed_uplift_roles_for_key(ev_uptake_key: tuple[Any, ...]) -> tuple[str, ...]:
+    current_off, mbu26_off = _fed_uplift_off_scope(ev_uptake_key)
+    roles: list[str] = []
+    if current_off:
+        roles.extend(_CURRENT_FED_UPLIFT_ROLES)
+    if mbu26_off:
+        roles.extend(_MBU26_FED_UPLIFT_ROLES)
+    return tuple(roles)
+
+
+def _fed_policy_scopes_for_key(ev_uptake_key: tuple[Any, ...]) -> tuple[tuple[str, tuple[str, ...]], ...]:
+    """Policy schedule for Current and MBU26 traces.
+
+    The two existing switches stay independent.  ON now means the governed
+    six-month delay (the 12c step starts in 2027Q3); OFF remains the no-uplift
+    counterfactual.
+    """
+    current_off, mbu26_off = _fed_uplift_off_scope(ev_uptake_key)
+    return (
+        ("off" if current_off else "delayed_6m", _CURRENT_FED_UPLIFT_ROLES),
+        ("off" if mbu26_off else "delayed_6m", _MBU26_FED_UPLIFT_ROLES),
+    )
+
+
 @st.cache_data(show_spinner=False, max_entries=4)
 def cached_sensitivity_stage_frames(
     signature: tuple[tuple[str, int, int], ...],
@@ -767,9 +820,32 @@ def cached_sensitivity_stage_frames(
 def cached_fed_uplift_factors(
     signature: tuple[tuple[str, int, int], ...],
     _pack: RevenueOutlookPack,
-) -> dict[Any, Any]:
+) -> dict[str, dict[Any, Any]]:
     del signature
-    return fed_uplift_off_factors(Path(__file__).resolve().parent, _pack.revenue_chart_rows)
+    root = Path(__file__).resolve().parent
+    return {
+        "delayed_6m": fed_uplift_delayed_factors(root, _pack.revenue_chart_rows),
+        "off": fed_uplift_off_factors(root, _pack.revenue_chart_rows),
+    }
+
+
+@st.cache_data(show_spinner=False, max_entries=2)
+def cached_fuel_price_scenario_replay(
+    signature: tuple[tuple[str, int, int], ...],
+    _pack: RevenueOutlookPack,
+) -> Any:
+    """Run the fixed-finalist Iran-war fuel/RUC scenario once per pack."""
+    del signature
+    input_path = _pack.output_dir / "scenario_inputs" / "scenario_input_wide.parquet"
+    if not input_path.exists():
+        return None
+    scenario_inputs = pd.read_parquet(input_path)
+    engine = "ar1" if "engine_ar1" in {part.lower() for part in _pack.output_dir.parts} else "ensemble"
+    return run_fuel_price_scenario_replay(
+        scenario_inputs,
+        repo_root=Path(__file__).resolve().parent,
+        engine=engine,
+    )
 
 
 def _apply_scenario_overlays(
@@ -777,9 +853,10 @@ def _apply_scenario_overlays(
     drift: pd.DataFrame,
     levers: UptakeLevers | None,
     eruc_levers: ErucTransitionLevers | None,
-    uplift_factors: dict[Any, Any],
+    uplift_factors: dict[str, dict[Any, Any]],
     *,
     adjust_ped: bool,
+    fed_policy_scopes: tuple[tuple[str, tuple[str, ...]], ...] = (),
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """uptake -> e-RUC -> 12c-off overlay chain shared by view, cone and comparison.
 
@@ -794,8 +871,23 @@ def _apply_scenario_overlays(
         rows, uptake_audit = apply_uptake_levers_to_chart_rows(rows, drift, levers, adjust_ped=adjust_ped)
     if eruc_levers is not None:
         rows, eruc_audit = apply_eruc_transition_to_chart_rows(rows, drift, eruc_levers)
-    if uplift_factors:
-        rows, uplift_audit = apply_fed_uplift_off_to_chart_rows(rows, uplift_factors)
+    policy_audits: list[pd.DataFrame] = []
+    for policy, scenario_roles in fed_policy_scopes:
+        factors = uplift_factors.get(policy, {})
+        if not factors or not scenario_roles:
+            continue
+        if policy == "off":
+            rows, policy_audit = apply_fed_uplift_off_to_chart_rows(
+                rows, factors, scenario_roles=set(scenario_roles)
+            )
+        else:
+            rows, policy_audit = apply_fed_uplift_delay_to_chart_rows(
+                rows, factors, scenario_roles=set(scenario_roles)
+            )
+        if policy_audit is not None and not policy_audit.empty:
+            policy_audits.append(policy_audit)
+    if policy_audits:
+        uplift_audit = pd.concat(policy_audits, ignore_index=True, sort=False)
     return rows, uptake_audit, eruc_audit, uplift_audit
 
 
@@ -806,8 +898,8 @@ def cached_scenario_overlay_rows(
     bridge_mode: str,
     ev_uptake_key: tuple[Any, ...],
     _pack: RevenueOutlookPack,
-) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    """(rows, uptake_audit, eruc_audit, uplift_audit) for one scenario key.
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """(rows, uptake, e-RUC, FED-policy, Iran-war audits) for one key.
 
     Series- and grain-agnostic: the view, the VFM cone bounds and the A/B
     comparison all share this cache and filter from it, so switching series
@@ -816,16 +908,22 @@ def cached_scenario_overlay_rows(
     _, sensitivity_frames, _ = cached_sensitivity_stage_frames(signature, bridge_mode, sensitivity_key, _pack)
     levers = _resolve_ev_uptake_levers(ev_uptake_key)
     eruc_levers = _resolve_eruc_levers(ev_uptake_key)
-    fed_uplift_off = bool(ev_uptake_key[3]) if len(ev_uptake_key) > 3 else False
-    uplift_factors = cached_fed_uplift_factors(signature, _pack) if fed_uplift_off else {}
-    return _apply_scenario_overlays(
+    fed_policy_scopes = _fed_policy_scopes_for_key(ev_uptake_key)
+    uplift_factors = cached_fed_uplift_factors(signature, _pack)
+    rows, uptake_audit, eruc_audit, uplift_audit = _apply_scenario_overlays(
         sensitivity_frames["chart_rows"],
         _pack_table(_pack, "ev_phev_ped_light_drift_assumptions"),
         levers,
         eruc_levers,
         uplift_factors,
         adjust_ped=str(bridge_mode) == PED_BRIDGE_DEFAULT_MODE,
+        fed_policy_scopes=fed_policy_scopes,
     )
+    fuel_replay = cached_fuel_price_scenario_replay(signature, _pack)
+    if fuel_replay is None:
+        return rows, uptake_audit, eruc_audit, uplift_audit, pd.DataFrame()
+    rows, fuel_audit = append_fuel_price_scenario_to_chart_rows(rows, fuel_replay)
+    return rows, uptake_audit, eruc_audit, uplift_audit, fuel_audit
 
 
 def _filter_series_rows_with_fallback(
@@ -835,7 +933,12 @@ def _filter_series_rows_with_fallback(
     fed_path: str,
     traces: tuple[str, ...],
 ) -> tuple[pd.DataFrame, bool]:
-    """Selected-series rows at the requested grain, Denton-disaggregated if quarterly rows are absent."""
+    """Selected-series rows, filling any trace missing native quarters.
+
+    Current finalists carry native activity quarters, while MBU26 is governed
+    at June-year grain.  The fallback therefore operates per requested trace,
+    not only when the whole quarterly selection is empty.
+    """
     filtered = _filter_revenue_outlook_rows(
         rows,
         time_grain=time_grain,
@@ -843,18 +946,24 @@ def _filter_series_rows_with_fallback(
         fed_paths=[fed_path],
         trace_names=list(traces),
     )
-    if time_grain == "quarterly" and filtered.empty:
+    used_fallback = False
+    if time_grain == "quarterly":
+        present_traces = set(filtered.get("trace_name", pd.Series(dtype=str)).dropna().astype(str))
+        missing_traces = [trace for trace in traces if str(trace) not in present_traces]
+        if not missing_traces:
+            return filtered, used_fallback
         annual = _filter_revenue_outlook_rows(
             rows,
             time_grain="june_year",
             stream_labels=[selected_series],
             fed_paths=[fed_path],
-            trace_names=list(traces),
+            trace_names=missing_traces,
         )
         derived = _disaggregate_annual_rows_to_quarterly(annual, rows)
         if not derived.empty:
-            return derived, True
-    return filtered, False
+            filtered = pd.concat([filtered, derived], ignore_index=True, sort=False)
+            used_fallback = True
+    return filtered, used_fallback
 
 
 @st.cache_data(show_spinner=False, max_entries=6)
@@ -877,8 +986,8 @@ def cached_view_cone_band(
     """
     bounds: dict[str, pd.Series] = {}
     for bound_name, preset_name in (("fast", "MoT VFM fast"), ("slow", "MoT VFM slow")):
-        preset_key = (preset_name, (), tuple(eruc_values), 1 if fed_uplift_off else 0)
-        rows, _, _, _ = cached_scenario_overlay_rows(signature, sensitivity_key, bridge_mode, preset_key, _pack)
+        preset_key = (preset_name, (), tuple(eruc_values), 1 if fed_uplift_off else 0, 0)
+        rows, _, _, _, _ = cached_scenario_overlay_rows(signature, sensitivity_key, bridge_mode, preset_key, _pack)
         bound_rows, _ = _filter_series_rows_with_fallback(rows, selected_series, time_grain, fed_path, traces)
         base_trace = bound_rows[
             bound_rows.get("trace_name", pd.Series(dtype=str)).astype(str).eq("Current finalist Base case")
@@ -908,6 +1017,266 @@ def cached_view_cone_band(
     )
 
 
+def _annual_chart_value_lookup(chart_rows: pd.DataFrame) -> tuple[dict[tuple[str, int, str], float], dict[str, str]]:
+    """Scenario/FY/series values used to keep all detail frames aligned."""
+    if chart_rows is None or chart_rows.empty:
+        return {}, {}
+    annual = chart_rows[
+        chart_rows.get("time_grain", pd.Series("", index=chart_rows.index)).astype(str).eq("june_year")
+        & ~chart_rows.get("row_type", pd.Series("", index=chart_rows.index)).astype(str).eq("historical_actual")
+    ].copy()
+    annual["_fy"] = pd.to_numeric(annual.get("june_year"), errors="coerce")
+    annual["_value"] = pd.to_numeric(annual.get("value"), errors="coerce")
+    annual = annual.dropna(subset=["_fy", "_value"])
+    values: dict[tuple[str, int, str], float] = {}
+    source_paths: dict[str, str] = {}
+    for _, row in annual.iterrows():
+        scenario = str(row.get("scenario_name", "") or "")
+        series = str(row.get("series_id", "") or "")
+        if not scenario or not series:
+            continue
+        values[(scenario, int(row["_fy"]), series)] = float(row["_value"])
+        trace = str(row.get("trace_name", "") or "")
+        if trace:
+            source_paths[scenario] = trace
+    return values, source_paths
+
+
+def _reconcile_aligned_revenue_formula_rows(
+    frame: pd.DataFrame,
+    chart_values: dict[tuple[str, int, str], float],
+    *,
+    fy_values: pd.Series,
+    source_path_column: str | None,
+) -> pd.DataFrame:
+    """Refresh chart-hidden leaves/rollups after display-time overlays.
+
+    The chart pack intentionally carries a compact series inventory.  In
+    particular, Heavy-BEV revenue and the intermediate gross/net-admin RUC
+    rows are absent.  When Base detail is copied to create the Iran path (or
+    when uptake levers move the heavy split), merely replacing visible chart
+    rows leaves those hidden lines stale.  Solve the one hidden RUC leaf from
+    the canonical Net RUC checkpoint, then replay the governed formulas in
+    dependency order.  Chart-carried aggregates remain authoritative and are
+    asserted against the rebuilt detail rather than overwritten.
+    """
+
+    if frame is None or frame.empty or "scenario_name" not in frame.columns or "series_id" not in frame.columns:
+        return frame
+    out = frame.copy()
+    out["_alignment_fy"] = pd.to_numeric(fy_values, errors="coerce")
+    group_columns = ["scenario_name", "_alignment_fy"]
+    if source_path_column and source_path_column in out.columns:
+        group_columns.insert(0, source_path_column)
+    changed_indices: set[Any] = set()
+
+    for group_key, group in out[out["_alignment_fy"].notna()].groupby(group_columns, dropna=False, sort=False):
+        if not isinstance(group_key, tuple):
+            group_key = (group_key,)
+        scenario_name = str(group["scenario_name"].iloc[0] or "")
+        fy = int(float(group["_alignment_fy"].iloc[0]))
+        direct_series = {
+            series_id
+            for scenario, direct_fy, series_id in chart_values
+            if scenario == scenario_name and int(direct_fy) == fy
+        }
+        if not direct_series:
+            continue
+        duplicate_series = group["series_id"].astype(str).duplicated(keep=False)
+        if duplicate_series.any():
+            duplicate_ids = sorted(group.loc[duplicate_series, "series_id"].astype(str).unique())
+            raise ValueError(
+                f"Duplicate aligned revenue detail rows for {scenario_name}, FY{fy}: {', '.join(duplicate_ids)}"
+            )
+        index_by_series = {
+            str(out.at[index, "series_id"]): index
+            for index in group.index
+        }
+        values = {
+            series_id: float(value)
+            for series_id, index in index_by_series.items()
+            if pd.notna(value := pd.to_numeric(pd.Series([out.at[index, "value"]]), errors="coerce").iloc[0])
+        }
+
+        # Net RUC = sum of the five RUC class revenues - RUC admin.  Four
+        # class rows are chart-carried; Heavy BEV is the rollup-neutral hidden
+        # counterpart and is therefore solved from the canonical net total.
+        visible_ruc_leaves = (
+            "light_ruc_net_revenue",
+            "heavy_ruc_net_revenue",
+            "light_bev_ruc_net_revenue",
+            "phev_ruc_net_revenue",
+        )
+        hidden_ruc_leaf = "heavy_bev_ruc_net_revenue"
+        ruc_inputs = ("total_ruc_net_revenue", "ruc_admin_revenue", *visible_ruc_leaves)
+        if hidden_ruc_leaf in index_by_series and all(series_id in values for series_id in ruc_inputs):
+            hidden_value = (
+                values["total_ruc_net_revenue"]
+                + values["ruc_admin_revenue"]
+                - sum(values[series_id] for series_id in visible_ruc_leaves)
+            )
+            hidden_index = index_by_series[hidden_ruc_leaf]
+            out.at[hidden_index, "value"] = hidden_value
+            values[hidden_ruc_leaf] = hidden_value
+            changed_indices.add(hidden_index)
+
+        for formula in FORMULA_DEFINITIONS:
+            output = str(formula["output_series_id"])
+            output_index = index_by_series.get(output)
+            if output_index is None:
+                continue
+            terms = tuple(formula["terms"])
+            if any(str(series_id) not in values for series_id, _ in terms):
+                continue
+            calculated = sum(values[str(series_id)] * float(sign) for series_id, sign in terms)
+            if output in direct_series:
+                observed = values.get(output)
+                if observed is None or not np.isclose(observed, calculated, rtol=0.0, atol=1e-6):
+                    raise ValueError(
+                        f"Aligned chart/detail formula mismatch for {scenario_name}, FY{fy}, {output}: "
+                        f"chart={observed!r}, rebuilt={calculated:.9f}."
+                    )
+                continue
+            out.at[output_index, "value"] = calculated
+            values[output] = calculated
+            changed_indices.add(output_index)
+
+    if "residual_vs_official" in out.columns:
+        for index in changed_indices:
+            official = pd.to_numeric(pd.Series([out.at[index, "official_value"]]), errors="coerce").iloc[0] if "official_value" in out.columns else np.nan
+            value = pd.to_numeric(pd.Series([out.at[index, "value"]]), errors="coerce").iloc[0]
+            if pd.notna(official) and pd.notna(value):
+                out.at[index, "residual_vs_official"] = float(value) - float(official)
+    return out.drop(columns=["_alignment_fy"], errors="ignore")
+
+
+def _align_detail_frame_to_chart_rows(
+    frame: pd.DataFrame,
+    chart_rows: pd.DataFrame,
+    *,
+    fy_column: str,
+    series_column: str,
+    value_column: str,
+    source_path_column: str | None = None,
+) -> pd.DataFrame:
+    """Update detail rows from the scenario chart and append the fuel case.
+
+    Advanced view overlays are display-time transformations.  This alignment
+    step ensures the composition, bridge and reconciliation tables use the
+    same annual values as the main path instead of silently reverting to the
+    unadjusted pack.
+    """
+    if frame is None or frame.empty:
+        return pd.DataFrame() if frame is None else frame.copy()
+    values, source_paths = _annual_chart_value_lookup(chart_rows)
+    if not values:
+        return frame.copy()
+    out = frame.copy()
+
+    def detail_fy(values: pd.Series | Any) -> pd.Series:
+        series = values if isinstance(values, pd.Series) else pd.Series(values, index=out.index)
+        extracted = series.astype(str).str.extract(r"(\d{4})", expand=False)
+        return pd.to_numeric(extracted, errors="coerce")
+
+    has_fuel = FUEL_PRICE_SCENARIO_NAME in source_paths
+    if has_fuel and "scenario_name" in out.columns and not out["scenario_name"].astype(str).eq(FUEL_PRICE_SCENARIO_NAME).any():
+        base = out[out["scenario_name"].astype(str).eq("current_basecase")].copy()
+        base_fy = detail_fy(base.get(fy_column))
+        base = base[base_fy.ge(REVENUE_FIRST_FORECAST_FY)].copy()
+        if not base.empty:
+            base["scenario_name"] = FUEL_PRICE_SCENARIO_NAME
+            if "scenario_role" in base.columns:
+                base["scenario_role"] = "comparison"
+            if "role" in base.columns:
+                base["role"] = "comparison"
+            if source_path_column and source_path_column in base.columns:
+                base[source_path_column] = FUEL_PRICE_SCENARIO_TRACE_NAME
+            if "source_status" in base.columns:
+                base["source_status"] = "derived_fixed_finalist_reforecast"
+            if "value_status" in base.columns:
+                base["value_status"] = "fuel_price_scenario_reforecast"
+            out = pd.concat([out, base], ignore_index=True, sort=False)
+
+    fy = detail_fy(out.get(fy_column))
+    numeric = pd.to_numeric(out.get(value_column), errors="coerce")
+    if "residual_vs_official" in out.columns:
+        out["residual_vs_official"] = pd.to_numeric(out["residual_vs_official"], errors="coerce")
+    for index in out.index:
+        if pd.isna(fy.at[index]):
+            continue
+        key = (
+            str(out.at[index, "scenario_name"]) if "scenario_name" in out.columns else "",
+            int(fy.at[index]),
+            str(out.at[index, series_column]),
+        )
+        adjusted = values.get(key)
+        if adjusted is None:
+            continue
+        out.at[index, value_column] = adjusted
+        if source_path_column and source_path_column in out.columns:
+            trace = source_paths.get(key[0])
+            if trace:
+                out.at[index, source_path_column] = trace
+        if "residual_vs_official" in out.columns and pd.notna(numeric.at[index]):
+            official = pd.to_numeric(pd.Series([out.at[index, "official_value"]]), errors="coerce").iloc[0] if "official_value" in out.columns else np.nan
+            if pd.notna(official):
+                out.at[index, "residual_vs_official"] = adjusted - float(official)
+    if series_column == "series_id" and value_column == "value":
+        out = _reconcile_aligned_revenue_formula_rows(
+            out,
+            values,
+            fy_values=fy,
+            source_path_column=source_path_column,
+        )
+    return out
+
+
+@st.cache_data(show_spinner=False, max_entries=12)
+def cached_aligned_scenario_detail_frames(
+    signature: tuple[tuple[str, int, int], ...],
+    sensitivity_key: tuple[str, ...],
+    bridge_mode: str,
+    ev_uptake_key: tuple[Any, ...],
+    _pack: RevenueOutlookPack,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Line, residual, stack and bridge frames aligned to one overlay key."""
+    detail_frames = cached_revenue_outlook_detail_frames(
+        signature,
+        sensitivity_key,
+        bridge_mode,
+        _pack,
+    )
+    chart_rows, _, _, _, _ = cached_scenario_overlay_rows(
+        signature, sensitivity_key, bridge_mode, ev_uptake_key, _pack
+    )
+    line_reconciliation = _align_detail_frame_to_chart_rows(
+        detail_frames["line_reconciliation"],
+        chart_rows,
+        fy_column="FY",
+        series_column="series_id",
+        value_column="value",
+        source_path_column="source_path",
+    )
+    formula_residuals = (
+        revenue_formula_residual_frame(line_reconciliation)
+        if line_reconciliation is not None and not line_reconciliation.empty
+        else pd.DataFrame()
+    )
+    stack_components = (
+        revenue_stack_components_frame(line_reconciliation, formula_residuals)
+        if line_reconciliation is not None and not line_reconciliation.empty
+        else pd.DataFrame()
+    )
+    bridge_components = _align_detail_frame_to_chart_rows(
+        detail_frames["revenue_bridge_components"],
+        chart_rows,
+        fy_column="period",
+        series_column="stream",
+        value_column="component_value",
+    )
+    return line_reconciliation, formula_residuals, stack_components, bridge_components
+
+
 @st.cache_data(show_spinner=False, max_entries=16)
 def cached_revenue_outlook_view(
     signature: tuple[tuple[str, int, int], ...],
@@ -924,11 +1293,18 @@ def cached_revenue_outlook_view(
         signature, bridge_mode, sensitivity_key, _pack
     )
     eruc_levers = _resolve_eruc_levers(ev_uptake_key)
-    fed_uplift_off = bool(ev_uptake_key[3]) if len(ev_uptake_key) > 3 else False
+    current_fed_uplift_off, mbu26_fed_uplift_off = _fed_uplift_off_scope(ev_uptake_key)
     ev_uptake_levers = _resolve_ev_uptake_levers(ev_uptake_key)
-    chart_rows, ev_uptake_audit, eruc_audit, fed_uplift_audit = cached_scenario_overlay_rows(
+    chart_rows, ev_uptake_audit, eruc_audit, fed_uplift_audit, fuel_price_audit = cached_scenario_overlay_rows(
         signature, sensitivity_key, bridge_mode, ev_uptake_key, _pack
     )
+    iran_war_replay = cached_fuel_price_scenario_replay(signature, _pack)
+    iran_war_input_audit = (
+        iran_war_replay.input_audit.copy()
+        if iran_war_replay is not None and isinstance(iran_war_replay.input_audit, pd.DataFrame)
+        else pd.DataFrame()
+    )
+    bridge_components = sensitivity_frames["revenue_bridge_components"]
     filtered_rows, quarterly_disaggregated = _filter_series_rows_with_fallback(
         chart_rows, selected_series, time_grain, fed_path, traces
     )
@@ -941,10 +1317,10 @@ def cached_revenue_outlook_view(
         eruc_values = tuple(float(v) for v in (ev_uptake_key[2] if len(ev_uptake_key) > 2 else ()) or ())
         cone_band = cached_view_cone_band(
             signature, selected_series, time_grain, fed_path, traces,
-            sensitivity_key, bridge_mode, eruc_values, fed_uplift_off, _pack,
+            sensitivity_key, bridge_mode, eruc_values, current_fed_uplift_off, _pack,
         )
     filtered_bridge = _filter_revenue_bridge_rows(
-        sensitivity_frames["revenue_bridge_components"],
+        bridge_components,
         [selected_series],
         _scenario_names_for_traces(chart_rows, list(traces)),
         [fed_path],
@@ -964,8 +1340,14 @@ def cached_revenue_outlook_view(
         "cone_band": cone_band,
         "eruc_applied": eruc_levers is not None and not eruc_audit.empty,
         "eruc_audit": eruc_audit,
-        "fed_uplift_off": fed_uplift_off and not fed_uplift_audit.empty,
+        "fed_uplift_off": current_fed_uplift_off or mbu26_fed_uplift_off,
+        "fed_uplift_delayed": not fed_uplift_audit.empty and not (current_fed_uplift_off and mbu26_fed_uplift_off),
+        "current_fed_uplift_off": current_fed_uplift_off and not fed_uplift_audit.empty,
+        "mbu26_fed_uplift_off": mbu26_fed_uplift_off and not fed_uplift_audit.empty,
         "fed_uplift_audit": fed_uplift_audit,
+        "fuel_price_scenario_applied": not fuel_price_audit.empty,
+        "fuel_price_scenario_audit": fuel_price_audit,
+        "iran_war_input_audit": iran_war_input_audit,
     }
 
 
@@ -984,7 +1366,7 @@ def cached_scenario_comparison_paths(
     """A/B paths for one series, filtered from the per-scenario cached rows."""
 
     def _paths(sensitivity_key, ev_uptake_key) -> tuple[pd.Series, pd.Series, str, str]:
-        scenario_rows, _, _, _ = cached_scenario_overlay_rows(signature, sensitivity_key, bridge_mode, ev_uptake_key, _pack)
+        scenario_rows, _, _, _, _ = cached_scenario_overlay_rows(signature, sensitivity_key, bridge_mode, ev_uptake_key, _pack)
         # The MoT official scenario plots the governed MBU26 trace itself, not
         # the finalist base case with the overlays switched off (the raw
         # finalist petrol bridge keeps all petrol activity to 2050, which is
@@ -1453,8 +1835,8 @@ def _warm_revenue_outlook_caches() -> None:
             return
         signature = revenue_outlook_signature(pack_dir, repo_root)
         default_sens = selected_sensitivity_key("Off", "Off", "Off", freight_rail_shift="Off")
-        default_uptake = (DEFAULT_EV_UPTAKE_MODE, (), (), 0)
-        uptake_12c_off = (DEFAULT_EV_UPTAKE_MODE, (), (), 1)
+        default_uptake = (DEFAULT_EV_UPTAKE_MODE, (), (), 0, 0)
+        uptake_12c_off = (DEFAULT_EV_UPTAKE_MODE, (), (), 1, 1)
 
         def _warm_view(sensitivity_key: tuple[str, ...], ev_uptake_key: tuple[Any, ...]) -> None:
             cached_revenue_outlook_view(
@@ -1569,13 +1951,26 @@ def render_primary_navigation(pages: list[str]) -> str:
 
 
 def render_run_sidebar() -> str:
-    from model_dashboard.engine import engine_evidence_root
+    from model_dashboard.engine import ENGINE_AR1, ENGINE_ENSEMBLE, engine_evidence_root
 
-    requested_root = Path(
+    configured_root = (
         os.environ.get("DASHBOARD_EVIDENCE_PACK_ROOT")
         or os.environ.get("STAGE1_DASHBOARD_EVIDENCE_PACK_ROOT")
-        or engine_evidence_root()
-    ).expanduser()
+        or ""
+    ).strip()
+    requested_root = Path(configured_root).expanduser() if configured_root else engine_evidence_root()
+    if configured_root:
+        # The verifier exports the built-in ensemble path as its data root.
+        # Treat either built-in engine pack as an engine-family selector so a
+        # per-session AR(1)/ensemble switch cannot be pinned to the other
+        # engine. Genuine custom/external data-root overrides remain intact.
+        configured_resolved = requested_root.resolve(strict=False)
+        built_in_roots = {
+            engine_evidence_root(ENGINE_AR1).resolve(strict=False),
+            engine_evidence_root(ENGINE_ENSEMBLE).resolve(strict=False),
+        }
+        if configured_resolved in built_in_roots:
+            requested_root = engine_evidence_root()
     data_root = resolve_evidence_pack_root(requested_root)
     st.session_state["active_data_root"] = str(data_root)
     return str(data_root)
@@ -3032,6 +3427,7 @@ _REVENUE_OUTLOOK_PERSISTED_KEYS = (
     "revenue_outlook_ev_uptake_basis_v2",
     "revenue_outlook_eruc_toggle",
     "revenue_outlook_fed_uplift",
+    "revenue_outlook_mbu_fed_uplift",
 )
 _REVENUE_OUTLOOK_PERSISTED_PREFIXES = ("revenue_outlook_legend_item_", "ev_lever_", "eruc_lever_")
 
@@ -3060,6 +3456,7 @@ def _active_lever_summary(
     uptake_mode: str,
     eruc_on: bool,
     fed_uplift_on: bool,
+    mbu_fed_uplift_on: bool,
 ) -> str:
     """One-line summary of non-default levers, shown while the accordion is closed."""
     parts: list[str] = []
@@ -3073,8 +3470,8 @@ def _active_lever_summary(
         parts.append(f"Uptake {uptake_mode}")
     if eruc_on:
         parts.append("e-RUC on")
-    if not fed_uplift_on:
-        parts.append("12c uplift off")
+    parts.append("Current 12c from Jul 2027" if fed_uplift_on else "Current 12c off")
+    parts.append("MBU26 12c from Jul 2027" if mbu_fed_uplift_on else "MBU26 12c off")
     return " · ".join(parts)
 
 
@@ -3206,20 +3603,36 @@ def _render_lever_accordion(
                     "Applied in this view only; the governed pack is unchanged."
                 )
     with lever_expander:
-        st.markdown("<div class='page5-panel-title'>Policy switches</div><div class='page5-panel-sub'>Legislated 12c FED uplift and the petrol-fleet e-RUC transition.</div>", unsafe_allow_html=True)
-        eruc_cols = st.columns([0.30, 0.70])
-        with eruc_cols[0]:
+        st.markdown(
+            "<div class='page5-panel-title'>Policy switches</div><div class='page5-panel-sub'>The active 12c assumption now starts 1 July 2027 (six months later). Switch it independently for current scenarios and the MBU26 comparator; OFF removes the uplift entirely.</div>",
+            unsafe_allow_html=True,
+        )
+        policy_cols = st.columns([0.30, 0.30, 0.40])
+        with policy_cols[0]:
             if selected_metric_type == "activity":
                 fed_uplift_on = True
-                st.markdown("<div class='control-label'>2027 12c FED uplift</div>", unsafe_allow_html=True)
+                st.markdown("<div class='control-label'>Current: 12c from Jul 2027</div>", unsafe_allow_html=True)
                 st.caption("Not applicable to activity series.")
             else:
                 fed_uplift_on = st.toggle(
-                    "2027 12c FED uplift",
+                    "Current: 12c from Jul 2027",
                     key="revenue_outlook_fed_uplift",
-                    help=FED_UPLIFT_NOTE,
+                    help=FED_UPLIFT_DELAY_NOTE + " ON uses the delayed path; OFF uses no uplift. Scope: Base, High population and Iran-war traces.",
                     **_widget_default_kwargs("revenue_outlook_fed_uplift", value=True),
                 )
+        with policy_cols[1]:
+            if selected_metric_type == "activity":
+                mbu_fed_uplift_on = True
+                st.markdown("<div class='control-label'>MBU26: 12c from Jul 2027</div>", unsafe_allow_html=True)
+                st.caption("Not applicable to activity series.")
+            else:
+                mbu_fed_uplift_on = st.toggle(
+                    "MBU26: 12c from Jul 2027",
+                    key="revenue_outlook_mbu_fed_uplift",
+                    help=FED_UPLIFT_DELAY_NOTE + " ON uses the delayed path; OFF uses no uplift. Scope: MBU26 comparator only; the published source pack is never overwritten.",
+                    **_widget_default_kwargs("revenue_outlook_mbu_fed_uplift", value=True),
+                )
+        with policy_cols[2]:
             eruc_enabled = st.toggle(
                 "Move petrol fleet to e-RUC",
                 key="revenue_outlook_eruc_toggle",
@@ -3227,7 +3640,7 @@ def _render_lever_accordion(
                 **_widget_default_kwargs("revenue_outlook_eruc_toggle", value=False),
             )
         eruc_lever_values: tuple[float, ...] = ()
-        with eruc_cols[1]:
+        with policy_cols[2]:
             if eruc_enabled:
                 eruc_input_cols = st.columns(5)
                 with eruc_input_cols[0]:
@@ -3264,6 +3677,7 @@ def _render_lever_accordion(
         "eruc_enabled": eruc_enabled,
         "eruc_levers": eruc_lever_values,
         "fed_uplift_on": fed_uplift_on,
+        "mbu_fed_uplift_on": mbu_fed_uplift_on,
     }
 
 
@@ -3322,6 +3736,7 @@ def _compare_mode_lever_state(selected_metric_type: str) -> dict[str, Any]:
             float(st.session_state.get("eruc_lever_pump", 2.70)),
         )
     fed_uplift_on = True if selected_metric_type == "activity" else bool(st.session_state.get("revenue_outlook_fed_uplift", True))
+    mbu_fed_uplift_on = True if selected_metric_type == "activity" else bool(st.session_state.get("revenue_outlook_mbu_fed_uplift", True))
     return {
         "fleet": _level("revenue_outlook_sensitivity_fleet_efficiency"),
         "pt": _level("revenue_outlook_sensitivity_pt_mode_shift"),
@@ -3334,6 +3749,7 @@ def _compare_mode_lever_state(selected_metric_type: str) -> dict[str, Any]:
         "eruc_enabled": eruc_enabled,
         "eruc_levers": eruc_levers,
         "fed_uplift_on": fed_uplift_on,
+        "mbu_fed_uplift_on": mbu_fed_uplift_on,
     }
 
 
@@ -3420,6 +3836,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 stream_options,
                 index=default_stream_index,
                 key="revenue_outlook_stream",
+                format_func=_revenue_outlook_series_display_label,
             )
         selected_metric_type = _revenue_outlook_series_metric_type(chart_rows, selected_stream)
         # Rows carry the planned path; the 12c counterfactual is a display
@@ -3520,6 +3937,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     eruc_enabled = lever_state["eruc_enabled"]
     eruc_lever_values = lever_state["eruc_levers"]
     fed_uplift_on = lever_state["fed_uplift_on"]
+    mbu_fed_uplift_on = lever_state["mbu_fed_uplift_on"]
     lever_summary = _active_lever_summary(
         fleet=selected_fleet_efficiency,
         pt_shift=selected_pt_mode_shift,
@@ -3527,6 +3945,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         uptake_mode=selected_ev_uptake_mode,
         eruc_on=eruc_enabled,
         fed_uplift_on=fed_uplift_on,
+        mbu_fed_uplift_on=mbu_fed_uplift_on,
     )
     if lever_summary:
         if compare_mode:
@@ -3538,6 +3957,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         custom_ev_levers,
         eruc_lever_values,
         0 if fed_uplift_on else 1,
+        0 if mbu_fed_uplift_on else 1,
     )
     sensitivity_key = selected_sensitivity_key(
         fleet_efficiency=selected_fleet_efficiency,
@@ -3567,17 +3987,25 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     )
     timer.stop("sensitivity overlay")
     chart_rows = view["chart_rows"]
-    line_reconciliation = view["line_reconciliation"]
-    formula_residuals = view["revenue_formula_residuals"]
-    stack_components = view["revenue_stack_components"]
-    bridge = view["revenue_bridge_components"]
+    line_reconciliation, formula_residuals, stack_components, bridge = cached_aligned_scenario_detail_frames(
+        pack_signature,
+        sensitivity_key,
+        selected_ped_bridge_mode,
+        ev_uptake_key,
+        pack,
+    )
     future_revenue = view["future_revenue_forecasts"]
     ped_revenue_bridge_audit = view["ped_revenue_bridge_audit"]
     ped_bridge_mode_impact_audit = view["ped_bridge_mode_impact_audit"]
     sensitivity_impact_audit = view["sensitivity_impact_audit"]
     filtered_rows = view["filtered_rows"]
-    filtered_bridge = view["filtered_bridge"]
-    gap_summary = str(view.get("gap_summary") or "")
+    filtered_bridge = _filter_revenue_bridge_rows(
+        bridge,
+        [selected_stream],
+        _scenario_names_for_traces(chart_rows, list(selected_traces)),
+        [selected_fed_path],
+    )
+    gap_summary = _revenue_outlook_gap_summary(filtered_bridge)
     if gap_summary:
         warning_panel(gap_summary)
 
@@ -3616,15 +4044,65 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             )
         if view.get("eruc_applied"):
             total_path_notes.append(ERUC_NOTE)
-        if view.get("fed_uplift_off"):
-            total_path_notes.append(FED_UPLIFT_NOTE)
+        if view.get("current_fed_uplift_off"):
+            total_path_notes.append("Current Base, High population and Iran-war traces: " + FED_UPLIFT_NOTE)
+        else:
+            total_path_notes.append("Current Base, High population and Iran-war traces: " + FED_UPLIFT_DELAY_NOTE)
+        if view.get("mbu26_fed_uplift_off"):
+            total_path_notes.append("MBU26 official comparator trace: " + FED_UPLIFT_NOTE)
+        else:
+            total_path_notes.append("MBU26 comparator trace: " + FED_UPLIFT_DELAY_NOTE)
+        fuel_selected = FUEL_PRICE_SCENARIO_TRACE_NAME in selected_traces
+        if fuel_selected:
+            total_path_notes.append(FUEL_PRICE_SCENARIO_NOTE)
         chart_card(
             "Total path chart",
             "\n\n".join(total_path_notes),
             main_path_figure,
-            caption=None,
+            caption=FUEL_PRICE_SCENARIO_NOTE if fuel_selected else None,
             notes_as_tooltip=True,
         )
+
+    if revenue_outlook_lazy_table(
+        "Show Iran-war scenario audit",
+        "revenue_outlook_show_fuel_price_audit",
+        caption="Fixed-finalist Base-versus-shock fuel and RUC inputs and forecasts, including post-shock lag and rebound periods.",
+    ):
+        with st.expander("Iran war: +15% fuel and +20% RUC scenario audit", expanded=False):
+            st.caption(FUEL_PRICE_SCENARIO_NOTE)
+            st.caption(
+                "The 20% RUC shock changes real demand-price inputs only. Nominal Light and Heavy RUC revenue rates remain on the governed Base path."
+            )
+            input_audit = view.get("iran_war_input_audit", pd.DataFrame())
+            fuel_price_audit = view.get("fuel_price_scenario_audit", pd.DataFrame())
+            if (input_audit is None or input_audit.empty) and (fuel_price_audit is None or fuel_price_audit.empty):
+                warning_panel("Iran-war scenario audit is unavailable for the active engine pack.")
+            else:
+                input_tab, effect_tab = st.tabs(["Input shocks", "Forecast and revenue effects"])
+                with input_tab:
+                    if input_audit is None or input_audit.empty:
+                        warning_panel("Input-shock lineage is unavailable for the active engine pack.")
+                    else:
+                        audit_cols = st.columns([0.82, 0.18])
+                        with audit_cols[1]:
+                            dataframe_download(
+                                input_audit,
+                                "Download CSV",
+                                "iran_war_fuel15_ruc20_6q_input_audit.csv",
+                            )
+                        display_table(input_audit, height=360, max_rows=80)
+                with effect_tab:
+                    if fuel_price_audit is None or fuel_price_audit.empty:
+                        warning_panel("Forecast and revenue effects are unavailable for the active engine pack.")
+                    else:
+                        audit_cols = st.columns([0.82, 0.18])
+                        with audit_cols[1]:
+                            dataframe_download(
+                                fuel_price_audit,
+                                "Download CSV",
+                                "iran_war_fuel15_ruc20_6q_effect_audit.csv",
+                            )
+                        display_table(fuel_price_audit, height=360, max_rows=320)
 
     if revenue_outlook_lazy_table(
         "Show scenario role contract",
@@ -3760,13 +4238,6 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         timer.stop("PED bridge diagnostics")
 
     timer.start("composition figure")
-    detail_frames = cached_revenue_outlook_detail_frames(
-        pack_signature,
-        sensitivity_key,
-        selected_ped_bridge_mode,
-        pack,
-    )
-    stack_components = detail_frames["revenue_stack_components"]
     with st.container(border=True):
         st.markdown("<div class='page5-panel-title'>Revenue composition over time</div>", unsafe_allow_html=True)
         st.caption(
@@ -3779,7 +4250,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         # data and mode machinery remain for audits, but the selectors are
         # gone; the formula-audit detail stays available on local audit runs.
         selected_stack_mode = REVENUE_STACK_MODE_BRIDGE
-        stack_source_options = selector_options["stack_source_options"]
+        stack_source_options = _revenue_line_source_options(stack_components)
         stack_section_options = selector_options["stack_section_options"]
         stack_fy_min, stack_fy_max = selector_options["stack_fy_bounds"]
         stack_overlay_options = selector_options["stack_overlay_options"]
@@ -4012,18 +4483,10 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         caption="Line reconciliation table is built only when opened.",
     ):
         timer.start("reconciliation table")
-        detail_frames = cached_revenue_outlook_line_detail_frames(
-            pack_signature,
-            sensitivity_key,
-            selected_ped_bridge_mode,
-            pack,
-        )
-        line_reconciliation = detail_frames["line_reconciliation"]
-        formula_residuals = detail_frames["revenue_formula_residuals"]
         with st.container(border=True):
             st.markdown("<div class='page5-panel-title'>Revenue line reconciliation</div>", unsafe_allow_html=True)
             rec_cols = st.columns([0.35, 0.25, 0.25, 0.15])
-            source_options = selector_options["line_source_options"]
+            source_options = _revenue_line_source_options(line_reconciliation)
             section_options = selector_options["line_section_options"]
             fy_min, fy_max = selector_options["line_fy_bounds"]
             with rec_cols[0]:
@@ -4118,6 +4581,8 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         display_table(_revenue_bridge_display_table(filtered_bridge), height=320, max_rows=240)
         timer.stop("bridge detail table")
 
+    _render_fleet_mix_explorer()
+
     chart_card(
         "Effective rates per 1,000 km",
         RATE_CHART_NOTE,
@@ -4125,8 +4590,6 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         caption=None,
         notes_as_tooltip=True,
     )
-
-    _render_fleet_mix_explorer()
 
     if revenue_outlook_lazy_table(
         "Show Manifest, Source policy and downloads",
@@ -4144,6 +4607,35 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             with download_cols[2]:
                 dataframe_download(chart_rows, "Download revenue chart rows", "revenue_chart_rows.csv")
         timer.stop("manifest downloads")
+
+    timer.start("net revenue timing comparison export")
+    try:
+        delayed_factors = cached_fed_uplift_factors(pack_signature, pack).get("delayed_6m", {})
+        net_timing_rows = net_revenue_timing_comparison_frame(
+            chart_rows,
+            delayed_factors,
+            start_fy=2026,
+            end_fy=2030,
+        )
+    except ValueError as exc:
+        warning_panel(f"Net revenue timing comparison download is unavailable: {exc}")
+    else:
+        with st.container(border=True):
+            export_cols = st.columns([0.76, 0.24])
+            with export_cols[0]:
+                st.caption(
+                    "Download the exact FY2026-FY2030 Net FED, Net RUC and Net MVR comparison for Baseline "
+                    "and Iran-war paths under the original and six-month-shifted 12c timing. Values are NZD "
+                    "millions nominal ex GST with canonical series IDs."
+                )
+            with export_cols[1]:
+                dataframe_download(
+                    net_timing_rows,
+                    "Download 12c timing CSV",
+                    "net_revenue_12c_timing_comparison_fy2026_fy2030.csv",
+                )
+    finally:
+        timer.stop("net revenue timing comparison export")
 
     _render_revenue_outlook_timings(timer)
 
@@ -5916,6 +6408,14 @@ def _revenue_outlook_stream_options(chart_rows: pd.DataFrame) -> list[str]:
     return ordered
 
 
+def _revenue_outlook_series_display_label(label: Any) -> str:
+    """Clarify that the all-class RUC selector is a net, not gross, series."""
+    text = str(label or "")
+    if text == "Total RUC all classes":
+        return "Net RUC revenue (all classes)"
+    return text
+
+
 def _revenue_outlook_series_metric_type(chart_rows: pd.DataFrame, selected_series: str) -> str:
     if chart_rows is None or chart_rows.empty:
         return ""
@@ -5947,8 +6447,11 @@ def _revenue_outlook_trace_options(chart_rows: pd.DataFrame) -> list[str]:
         "MBU26 official",
         "Current finalist Base case",
         "Current finalist High population/comparison",
+        FUEL_PRICE_SCENARIO_TRACE_NAME,
         PED_COMPARISON_BEHAVIOURAL_TRACE_NAME,
     ]
+    if "Current finalist Base case" in available:
+        available.add(FUEL_PRICE_SCENARIO_TRACE_NAME)
     ordered = [trace for trace in preferred if trace in available]
     ordered.extend(sorted(available.difference(ordered)))
     return ordered
@@ -5990,12 +6493,12 @@ def _render_comparison_scenario_column(prefix: str, sensitivity_labels: dict[str
         key=keys["uptake"],
         help=(
             f"'{COMPARISON_MOT_OFFICIAL_OPTION}' plots the governed MBU26 official path exactly as "
-            "committed - every lever is locked off for that scenario."
+            "committed; non-rate levers are locked, while the 12c policy switch remains available."
         ),
     )
     mot_official = uptake == COMPARISON_MOT_OFFICIAL_OPTION
     if mot_official:
-        st.caption("Pure MBU26 official path - levers locked for this scenario.")
+        st.caption("Pure MBU26 official path - non-rate levers locked; the 12c rate switch remains available.")
     levels = list(_COMPARISON_SENSITIVITY_LEVELS)
     for name in ("fleet", "pt", "freight"):
         _validated_select_state(keys[name], levels, defaults[name])
@@ -6024,13 +6527,19 @@ def _render_comparison_scenario_column(prefix: str, sensitivity_labels: dict[str
             pump = st.number_input("Pump price ($/L incl. excise)", min_value=1.0, max_value=6.0, value=2.70, step=0.05, key=f"ro_cmp_{prefix}_eruc_pump")
         eruc_values = (float(start), float(phase), ratio / 100.0, float(elasticity), float(pump))
     st.session_state.setdefault(keys["fed"], defaults["fed"])
-    fed_on = st.toggle("2027 12c FED uplift", key=keys["fed"], help=FED_UPLIFT_NOTE, disabled=mot_official)
+    fed_label = "MBU26: 12c from Jul 2027" if mot_official else "Current: 12c from Jul 2027"
+    fed_scope = "MBU26 official comparator only." if mot_official else "Selected current scenario only."
+    fed_on = st.toggle(
+        fed_label,
+        key=keys["fed"],
+        help=FED_UPLIFT_DELAY_NOTE + " ON uses the delayed path; OFF uses no uplift. Scope: " + fed_scope,
+    )
     if mot_official:
         sensitivity_key = selected_sensitivity_key("Off", "Off", "Off", freight_rail_shift="Off")
-        ev_uptake_key: tuple[Any, ...] = (EV_UPTAKE_GOVERNED_OPTION, (), (), 0)
+        ev_uptake_key: tuple[Any, ...] = (EV_UPTAKE_GOVERNED_OPTION, (), (), 0, 0 if fed_on else 1)
         return sensitivity_key, ev_uptake_key
     sensitivity_key = selected_sensitivity_key(fleet, pt_shift, "Off", freight_rail_shift=freight)
-    ev_uptake_key = (uptake, (), eruc_values, 0 if fed_on else 1)
+    ev_uptake_key = (uptake, (), eruc_values, 0 if fed_on else 1, 0)
     return sensitivity_key, ev_uptake_key
 
 
@@ -6063,8 +6572,15 @@ def _scenario_summary_text(sensitivity_key: tuple, ev_uptake_key: tuple) -> str:
             parts.append(f"{label} {value}")
     if len(ev_uptake_key) > 2 and ev_uptake_key[2]:
         parts.append("e-RUC on")
-    if len(ev_uptake_key) > 3 and ev_uptake_key[3]:
-        parts.append("12c off")
+    current_off, mbu26_off = _fed_uplift_off_scope(ev_uptake_key)
+    if mode == EV_UPTAKE_GOVERNED_OPTION and mbu26_off:
+        parts.append("MBU26 12c off")
+    elif mode == EV_UPTAKE_GOVERNED_OPTION:
+        parts.append("MBU26 12c from Jul 2027")
+    elif mode != EV_UPTAKE_GOVERNED_OPTION and current_off:
+        parts.append("Current 12c off")
+    else:
+        parts.append("Current 12c from Jul 2027")
     return " · ".join(parts)
 
 
@@ -6596,7 +7112,12 @@ def _render_fleet_mix_explorer() -> None:
     )
 
     repo_root = Path(__file__).resolve().parent
-    with st.expander("Fleet mix explorer - MoT's six volume rows across MBU26, the VFM and this dashboard", expanded=False):
+    with st.container(border=True):
+        st.markdown(
+            "<div class='page5-panel-title'>Fleet mix explorer - MoT's six volume rows across MBU26, the VFM "
+            "and this dashboard</div>",
+            unsafe_allow_html=True,
+        )
         st.caption(
             "Everything the class split does happens on MoT's own six volume rows. Compare the sources "
             "on those rows directly - in kilometres, as shares of an explicitly chosen total, or as "
@@ -6691,15 +7212,20 @@ def revenue_rate_paths_figure(frame: pd.DataFrame, *, fed_uplift_on: bool) -> go
     if frame is None or frame.empty:
         return empty_figure("Rate paths are unavailable in the committed source tables.")
     fig = go.Figure()
-    selected_segment = "planned" if fed_uplift_on else "no_uplift"
-    alternative_segment = "no_uplift" if fed_uplift_on else "planned"
-    segment_labels = {"planned": "PED incl. 12c uplift", "no_uplift": "PED excl. 12c uplift"}
+    selected_segment = "delayed_6m" if fed_uplift_on else "no_uplift"
+    alternative_segment = "no_uplift" if fed_uplift_on else "delayed_6m"
+    segment_labels = {
+        "planned": "PED published timing (Jan 2027 reference)",
+        "delayed_6m": "PED 12c from Jul 2027 (selected)",
+        "no_uplift": "PED no 12c uplift",
+    }
     styles = [
         ("Light RUC", None, "#006FAD", "solid", 2.4, "Light RUC"),
         ("Heavy RUC", None, "#102A43", "solid", 2.4, "Heavy RUC"),
         ("PED (petrol excise)", "history", "#00843D", "solid", 2.4, "PED (petrol excise), actual"),
         ("PED (petrol excise)", selected_segment, "#00843D", "dash", 2.4, segment_labels[selected_segment]),
         ("PED (petrol excise)", alternative_segment, "#7FBF9E", "dot", 1.6, segment_labels[alternative_segment]),
+        ("PED (petrol excise)", "planned", "#B45309", "dashdot", 1.4, segment_labels["planned"]),
     ]
     for series, segment, color, dash, width, label in styles:
         group = frame[frame["series"].eq(series)]
@@ -6767,13 +7293,14 @@ def _display_period_label(period: Any) -> str:
 
 def _revenue_outlook_default_traces(trace_options: list[str]) -> list[str]:
     options = list(trace_options or [])
-    # The high-population comparison stays available in the legend picker but
-    # is unticked by default: the default story is base case + the MoT VFM
-    # fast/slow fleet-transition cone.
+    # The requested management comparison is Base vs High population vs the
+    # six-quarter Iran-war fuel/RUC reforecast, with actuals and MBU26 for context.
     preferred = [
         "Actual",
         "MBU26 official",
         "Current finalist Base case",
+        "Current finalist High population/comparison",
+        FUEL_PRICE_SCENARIO_TRACE_NAME,
         # Governed scenario-role policy keeps the PED behavioural comparison
         # path visible (relabelled); it must be in the default legend or the
         # PED VKT per capita comparison disappears by default.
@@ -6835,7 +7362,9 @@ QUARTERLY_DISAGGREGATION_NOTE = (
     "the stream has a native quarterly activity path (PED VKT per capita, "
     "Light/Heavy RUC net km) it supplies the seasonal shape; otherwise the split "
     "minimises quarter-to-quarter movement. Interpolated quarters are indicative "
-    "display values only - not published quarterly actuals or direct model outputs."
+    "display values only - not published quarterly actuals or direct model outputs. "
+    "For the Iran-war trace, the policy-adjusted Base split is retained and signed "
+    "native replay deltas are applied only to the quarters in which the model responds."
 )
 
 
@@ -6859,6 +7388,47 @@ def _june_year_quarters(june_year: int) -> list[str]:
 def _is_average_preserving_unit(unit: Any) -> bool:
     text = str(unit or "").lower()
     return any(token in text for token in ["per capita", "per km", "per litre", "per 1,000"])
+
+
+def _display_unit_scale(unit: Any) -> float:
+    """Return the scale from a displayed unit to its unscaled value."""
+    text = str(unit or "").strip().casefold()
+    if "billion" in text or text.startswith("$b"):
+        return 1_000_000_000.0
+    if "million" in text or text.startswith("$m"):
+        return 1_000_000.0
+    if "thousand" in text or "'000" in text:
+        return 1_000.0
+    return 1.0
+
+
+def _actual_quarter_lookup_in_unit(
+    chart_rows: pd.DataFrame,
+    series_id: Any,
+    target_unit: Any,
+) -> dict[str, float]:
+    """Return published Actual quarters converted to an annual row's unit."""
+    if chart_rows is None or chart_rows.empty:
+        return {}
+    required = {"series_id", "time_grain", "row_type", "period", "value"}
+    if required.difference(chart_rows.columns):
+        return {}
+    actual = chart_rows[
+        chart_rows["series_id"].astype(str).eq(str(series_id or ""))
+        & chart_rows["time_grain"].astype(str).eq("quarterly")
+        & chart_rows["row_type"].astype(str).eq("historical_actual")
+    ].copy()
+    if actual.empty:
+        return {}
+    actual["_numeric"] = pd.to_numeric(actual["value"], errors="coerce")
+    actual = actual.dropna(subset=["_numeric"]).drop_duplicates("period", keep="last")
+    target_scale = _display_unit_scale(target_unit)
+    units = actual.get("value_unit", pd.Series("", index=actual.index)).fillna("").astype(str)
+    return {
+        str(row["period"]): float(row["_numeric"]) * _display_unit_scale(units.at[index]) / target_scale
+        for index, row in actual.iterrows()
+        if re.fullmatch(r"\d{4}Q[1-4]", str(row["period"]))
+    }
 
 
 def _denton_quarterly_split(annual_values: np.ndarray, indicator: np.ndarray, *, average: bool) -> np.ndarray:
@@ -6911,6 +7481,25 @@ def _quarterly_indicator_lookup(chart_rows: pd.DataFrame, indicator_series_id: s
     return lookup
 
 
+def _scenario_quarterly_delta_map(value: Any) -> dict[str, float]:
+    if not isinstance(value, str) or not value.strip():
+        return {}
+    try:
+        parsed = json.loads(value)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return {}
+    if not isinstance(parsed, dict):
+        return {}
+    result: dict[str, float] = {}
+    for period, raw in parsed.items():
+        if not re.fullmatch(r"\d{4}Q[1-4]", str(period)):
+            continue
+        numeric = pd.to_numeric(pd.Series([raw]), errors="coerce").iloc[0]
+        if pd.notna(numeric):
+            result[str(period)] = float(numeric)
+    return result
+
+
 def _disaggregate_annual_rows_to_quarterly(annual_rows: pd.DataFrame, chart_rows: pd.DataFrame) -> pd.DataFrame:
     """Derive display-only quarterly rows for series published at June-year grain.
 
@@ -6939,8 +7528,102 @@ def _disaggregate_annual_rows_to_quarterly(annual_rows: pd.DataFrame, chart_rows
     for _, group in data.groupby(group_cols, dropna=False):
         group = group.sort_values("_june_year_numeric").drop_duplicates("_june_year_numeric", keep="last")
         years = group["_june_year_numeric"].astype(int).tolist()
-        annual_values = group["_value_numeric"].to_numpy(dtype=float)
+        adjusted_annual_values = group["_value_numeric"].to_numpy(dtype=float)
+        if "_fed_baseline_value" in group.columns:
+            baseline_values = pd.to_numeric(group["_fed_baseline_value"], errors="coerce").to_numpy(dtype=float)
+            baseline_values = np.where(np.isfinite(baseline_values), baseline_values, adjusted_annual_values)
+        else:
+            baseline_values = adjusted_annual_values.copy()
         template = group.iloc[0].to_dict()
+        actual_lookup = _actual_quarter_lookup_in_unit(
+            chart_rows,
+            template.get("series_id"),
+            template.get("value_unit"),
+        )
+        is_non_actual_trace = str(template.get("row_type") or "") != "historical_actual"
+
+        # The Iran-war trace is annual for revenue but has native quarterly
+        # replay deltas for its PED/Light/Heavy drivers. Build its quarterly
+        # display from the already policy-adjusted Base quarters, then apply
+        # those signed deltas. This prevents FY2026's loss from leaking into
+        # pre-shock 2025Q3-Q4 while preserving every June-year benchmark.
+        is_iran_war = str(template.get("scenario_name") or "") == FUEL_PRICE_SCENARIO_NAME
+        has_delta_lineage = "_fuel_quarterly_value_deltas" in group.columns and group[
+            "_fuel_quarterly_value_deltas"
+        ].fillna("").astype(str).str.len().gt(0).all()
+        if is_iran_war and has_delta_lineage and chart_rows is not None and not chart_rows.empty:
+            series_id = str(template.get("series_id") or "")
+            fed_path = str(template.get("fed_path") or "")
+            base_annual = chart_rows[
+                chart_rows["time_grain"].astype(str).eq("june_year")
+                & chart_rows["scenario_name"].astype(str).eq("current_basecase")
+                & chart_rows["series_id"].astype(str).eq(series_id)
+                & pd.to_numeric(chart_rows["june_year"], errors="coerce").isin(years)
+            ].copy()
+            if fed_path and "fed_path" in base_annual.columns:
+                base_annual = base_annual[base_annual["fed_path"].astype(str).eq(fed_path)]
+            base_quarterly = _disaggregate_annual_rows_to_quarterly(base_annual, chart_rows)
+            base_lookup = {
+                str(row.period): float(row.value)
+                for row in base_quarterly.itertuples()
+                if pd.notna(getattr(row, "value", np.nan))
+            }
+            # The recursive Base fallback deliberately emits only forecast
+            # quarters after the published Actual handover. Restore the fixed
+            # Actual observations for the annual benchmark calculation; they
+            # are not duplicated in the scenario trace below.
+            base_lookup = {**actual_lookup, **base_lookup}
+            if base_lookup:
+                for year_index, fy in enumerate(years):
+                    year_template = group.iloc[year_index].to_dict()
+                    delta_map = _scenario_quarterly_delta_map(year_template.get("_fuel_quarterly_value_deltas"))
+                    quarter_periods = _june_year_quarters(fy)
+                    quarter_values = np.array(
+                        [base_lookup.get(period, np.nan) + delta_map.get(period, 0.0) for period in quarter_periods],
+                        dtype=float,
+                    )
+                    if not np.all(np.isfinite(quarter_values)):
+                        break
+                    average_preserving = _is_average_preserving_unit(year_template.get("value_unit"))
+                    benchmark_value = float(quarter_values.mean() if average_preserving else quarter_values.sum())
+                    annual_residual = float(adjusted_annual_values[year_index] - benchmark_value)
+                    if average_preserving:
+                        annual_residual *= len(quarter_periods)
+                    active_positions = [
+                        position for position, period in enumerate(quarter_periods) if abs(delta_map.get(period, 0.0)) > 1e-12
+                    ]
+                    correction_position = (
+                        max(active_positions, key=lambda position: abs(delta_map.get(quarter_periods[position], 0.0)))
+                        if active_positions
+                        else len(quarter_periods) - 1
+                    )
+                    quarter_values[correction_position] += annual_residual
+                    for quarter_index, period in enumerate(quarter_periods):
+                        if is_non_actual_trace and period in actual_lookup:
+                            continue
+                        row = dict(year_template)
+                        row.pop("_value_numeric", None)
+                        row.pop("_june_year_numeric", None)
+                        row.update(
+                            {
+                                "period": period,
+                                "time_grain": "quarterly",
+                                "june_year": fy,
+                                "value": float(quarter_values[quarter_index]),
+                                "value_status": "interpolated_iran_scenario_delta",
+                                "data_scope": "quarterly_disaggregated_from_annual_scenario_delta",
+                                "plot_allowed": True,
+                                "horizon": "",
+                                "horizon_scope": "",
+                                "actual_quarters": "",
+                                "forecast_quarters": "",
+                                "quarters_present": "",
+                            }
+                        )
+                        output.append(row)
+                else:
+                    continue
+
         indicator_id = _quarterly_disaggregation_indicator_id(template.get("series_id"))
         lookup = _quarterly_indicator_lookup(chart_rows, indicator_id, template.get("trace_name"))
         quarters = [q for fy in years for q in _june_year_quarters(fy)]
@@ -6952,11 +7635,58 @@ def _disaggregate_annual_rows_to_quarterly(annual_rows: pd.DataFrame, chart_rows
             [lookup.get(q, seasonal_mean.get(q[-2:], 1.0)) for q in quarters], dtype=float
         )
         values = _denton_quarterly_split(
-            annual_values, indicator, average=_is_average_preserving_unit(template.get("value_unit"))
+            baseline_values, indicator, average=_is_average_preserving_unit(template.get("value_unit"))
         )
         for year_index, fy in enumerate(years):
-            for quarter_index, period in enumerate(_june_year_quarters(fy)):
-                row = dict(template)
+            year_template = group.iloc[year_index].to_dict()
+            affected_text = str(year_template.get("_fed_affected_quarters") or "")
+            affected = {
+                period.strip()
+                for period in re.split(r"[;,]", affected_text)
+                if re.fullmatch(r"\d{4}Q[1-4]", period.strip())
+            }
+            annual_delta = float(adjusted_annual_values[year_index] - baseline_values[year_index])
+            if affected and abs(annual_delta) > 1e-12:
+                quarter_periods = _june_year_quarters(fy)
+                affected_positions = [
+                    4 * year_index + position
+                    for position, period in enumerate(quarter_periods)
+                    if period in affected
+                ]
+                if affected_positions:
+                    weights = np.abs(values[affected_positions])
+                    if not np.isfinite(weights).all() or float(weights.sum()) <= 0:
+                        weights = np.ones(len(affected_positions), dtype=float)
+                    delta_to_allocate = annual_delta * (4.0 if _is_average_preserving_unit(year_template.get("value_unit")) else 1.0)
+                    values[affected_positions] += delta_to_allocate * weights / float(weights.sum())
+            quarter_periods = _june_year_quarters(fy)
+            year_slice = slice(4 * year_index, 4 * year_index + 4)
+            year_values = values[year_slice].copy()
+            fixed_positions = [
+                position
+                for position, period in enumerate(quarter_periods)
+                if is_non_actual_trace and period in actual_lookup
+            ]
+            if fixed_positions:
+                forecast_positions = [position for position in range(4) if position not in fixed_positions]
+                annual_total = float(adjusted_annual_values[year_index])
+                if _is_average_preserving_unit(year_template.get("value_unit")):
+                    annual_total *= 4.0
+                fixed_actual = sum(actual_lookup[quarter_periods[position]] for position in fixed_positions)
+                forecast_target = annual_total - fixed_actual
+                forecast_base = float(year_values[forecast_positions].sum())
+                if forecast_positions and forecast_target >= -1e-9:
+                    if forecast_base > 0.0:
+                        year_values[forecast_positions] *= max(forecast_target, 0.0) / forecast_base
+                    else:
+                        year_values[forecast_positions] = max(forecast_target, 0.0) / len(forecast_positions)
+                    correction_position = max(forecast_positions, key=lambda position: abs(year_values[position]))
+                    year_values[correction_position] += forecast_target - float(year_values[forecast_positions].sum())
+                    values[year_slice] = year_values
+            for quarter_index, period in enumerate(quarter_periods):
+                if is_non_actual_trace and period in actual_lookup:
+                    continue
+                row = dict(year_template)
                 row.pop("_value_numeric", None)
                 row.pop("_june_year_numeric", None)
                 row.update(
@@ -6965,8 +7695,20 @@ def _disaggregate_annual_rows_to_quarterly(annual_rows: pd.DataFrame, chart_rows
                         "time_grain": "quarterly",
                         "june_year": fy,
                         "value": float(values[4 * year_index + quarter_index]),
-                        "value_status": "interpolated",
-                        "data_scope": "quarterly_disaggregated_from_annual",
+                        "value_status": (
+                            "interpolated_hybrid_actual_handover"
+                            if fixed_positions
+                            else "interpolated_fed_policy"
+                            if affected
+                            else "interpolated"
+                        ),
+                        "data_scope": (
+                            "quarterly_disaggregated_from_annual_hybrid_actual_handover"
+                            if fixed_positions
+                            else "quarterly_disaggregated_from_annual_fed_policy"
+                            if affected
+                            else "quarterly_disaggregated_from_annual"
+                        ),
                         "plot_allowed": True,
                         "horizon": "",
                         "horizon_scope": "",
@@ -7101,6 +7843,7 @@ def revenue_outlook_total_path_figure(
         "MBU26 official": ("#00843D", "dash", 2.2),
         "Current finalist Base case": ("#006FAD", "solid", 2.8),
         "Current finalist High population/comparison": ("#E56B2B", "solid", 2.4),
+        FUEL_PRICE_SCENARIO_TRACE_NAME: ("#6B4E71", "dashdot", 2.6),
         PED_COMPARISON_BEHAVIOURAL_TRACE_NAME: ("#C2410C", "dot", 2.4),
     }
     trace_names = _ordered_runtime_trace_names(data)
@@ -7740,6 +8483,7 @@ def _ordered_runtime_trace_names(rows: pd.DataFrame) -> list[str]:
         "MBU26 official",
         "Current finalist Base case",
         "Current finalist High population/comparison",
+        FUEL_PRICE_SCENARIO_TRACE_NAME,
         PED_COMPARISON_BEHAVIOURAL_TRACE_NAME,
     ]
     ordered = [trace for trace in preferred if trace in available]
@@ -7973,6 +8717,7 @@ def _scenario_color_map(rows: pd.DataFrame) -> dict[str, str]:
         "MBU26 official": "#00843D",
         "Current finalist Base case": "#006FAD",
         "Current finalist High population/comparison": "#E56B2B",
+        FUEL_PRICE_SCENARIO_TRACE_NAME: "#6B4E71",
         PED_COMPARISON_BEHAVIOURAL_TRACE_NAME: "#C2410C",
     }
     output: dict[str, str] = {}
@@ -8486,9 +9231,19 @@ def _sensitivity_impact_display_table(audit: pd.DataFrame) -> pd.DataFrame:
 
 def _revenue_line_source_options(line_reconciliation: pd.DataFrame) -> list[str]:
     if line_reconciliation is None or line_reconciliation.empty or "source_path" not in line_reconciliation.columns:
-        return ["MBU26 official", "Current finalist Base case", "Current finalist High population/comparison"]
+        return [
+            "MBU26 official",
+            "Current finalist Base case",
+            "Current finalist High population/comparison",
+            FUEL_PRICE_SCENARIO_TRACE_NAME,
+        ]
     values = [value for value in line_reconciliation["source_path"].dropna().astype(str).unique().tolist() if value]
-    preferred = ["MBU26 official", "Current finalist Base case", "Current finalist High population/comparison"]
+    preferred = [
+        "MBU26 official",
+        "Current finalist Base case",
+        "Current finalist High population/comparison",
+        FUEL_PRICE_SCENARIO_TRACE_NAME,
+    ]
     ordered = [value for value in preferred if value in values]
     ordered.extend(sorted(set(values).difference(ordered)))
     return ordered or preferred

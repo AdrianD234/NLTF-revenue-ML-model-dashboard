@@ -206,8 +206,15 @@ def test_revenue_outlook_default_sensitivity_view_uses_fast_path_and_preserves_v
     assert view["line_reconciliation"].empty
     assert view["revenue_formula_residuals"].empty
     assert view["revenue_stack_components"].empty
+    non_fuel = view["chart_rows"][
+        ~view["chart_rows"]["scenario_name"].astype(str).eq("current_iran_war_fuel_15pct_ruc_20pct_6q")
+    ]
+    assert len(non_fuel) == len(expected["chart_rows"])
+    assert set(view["chart_rows"]["trace_name"].astype(str)) >= {
+        "Current finalist Iran war (+15% fuel, +20% RUC; 6 quarters)"
+    }
+    assert len(view["iran_war_input_audit"]) == 42
     for key, value_column in [
-        ("chart_rows", "value"),
         ("revenue_bridge_components", "component_value"),
         ("future_revenue_forecasts", "revenue_forecast_nzd"),
     ]:
@@ -497,16 +504,15 @@ def test_revenue_outlook_default_figure_matches_uncached_path() -> None:
         (app.EV_UPTAKE_GOVERNED_OPTION, ()),
         pack,
     )
-    uncached = apply_ped_bridge_mode_layer(
-        chart_rows=pack.revenue_chart_rows,
-        line_reconciliation=pack.revenue_line_reconciliation,
-        bridge_components=pack.revenue_bridge_components,
-        future_revenue_forecasts=pack.future_revenue_forecasts,
-        ped_revenue_bridge_audit=pack.ped_revenue_bridge_audit,
-        bridge_mode=PED_BRIDGE_DEFAULT_MODE,
+    overlay_rows, _, _, _, _ = app.cached_scenario_overlay_rows(
+        signature,
+        sensitivity_key,
+        PED_BRIDGE_DEFAULT_MODE,
+        (app.EV_UPTAKE_GOVERNED_OPTION, ()),
+        pack,
     )
     expected_rows = app._filter_revenue_outlook_rows(
-        uncached["chart_rows"],
+        overlay_rows,
         time_grain="june_year",
         stream_labels=["Total NLTF revenue"],
         fed_paths=["Current planned path"],
@@ -996,7 +1002,8 @@ def test_revenue_outlook_cloud_hides_debug_toggles_and_shows_full_composition(mo
     # the advanced levers accordion and remain visible in its render order.
     assert [(toggle.label, toggle.key) for toggle in at.toggle] == [
         ("Freight rail shift", "revenue_outlook_sensitivity_freight_rail_toggle"),
-        ("2027 12c FED uplift", "revenue_outlook_fed_uplift"),
+        ("Current: 12c from Jul 2027", "revenue_outlook_fed_uplift"),
+        ("MBU26: 12c from Jul 2027", "revenue_outlook_mbu_fed_uplift"),
         ("Move petrol fleet to e-RUC", "revenue_outlook_eruc_toggle"),
     ]
     assert any("Revenue composition over time" in str(markdown.value) for markdown in at.markdown)
@@ -1097,12 +1104,20 @@ def test_revenue_outlook_comparison_offers_mot_official_locked_scenario() -> Non
     assert "levers locked" in captions
 
 
-def test_revenue_outlook_rates_chart_renders_last() -> None:
+def test_revenue_outlook_fleet_mix_is_always_visible_and_precedes_rates() -> None:
     source = inspect.getsource(app.render_revenue_outlook_page)
+    fleet_index = source.index("_render_fleet_mix_explorer()")
     rates_index = source.index("Effective rates per 1,000 km")
     assert rates_index > source.index("Total path chart")
     assert rates_index > source.index("Show Revenue bridge detail")
+    assert fleet_index < rates_index
     assert rates_index < source.index("Show Manifest, Source policy and downloads")
+
+    fleet_source = inspect.getsource(app._render_fleet_mix_explorer)
+    assert "st.expander" not in fleet_source
+    assert "st.container(border=True)" in fleet_source
+    assert "Fleet mix explorer - MoT's six volume rows across MBU26, the VFM " in fleet_source
+    assert "and this dashboard</div>" in fleet_source
 
 
 def test_governance_page_cloud_visibility_can_be_overridden(monkeypatch) -> None:

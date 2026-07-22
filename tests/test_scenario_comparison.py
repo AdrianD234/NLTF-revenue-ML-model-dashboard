@@ -25,9 +25,9 @@ def comparison_context():
     return pack, signature
 
 
-def _keys(fleet="Off", freight="Off", uptake=None, eruc=(), fed_on=True):
+def _keys(fleet="Off", freight="Off", uptake=None, eruc=(), fed_on=True, mbu_fed_on=True):
     sensitivity = app.selected_sensitivity_key(fleet, "Off", "Off", freight_rail_shift=freight)
-    uptake_key = (uptake or app.DEFAULT_EV_UPTAKE_MODE, (), eruc, 0 if fed_on else 1)
+    uptake_key = (uptake or app.DEFAULT_EV_UPTAKE_MODE, (), eruc, 0 if fed_on else 1, 0 if mbu_fed_on else 1)
     return sensitivity, uptake_key
 
 
@@ -54,12 +54,30 @@ def test_fleet_efficiency_high_lowers_revenue_npv(comparison_context) -> None:
     assert npv_b < npv_a
 
 
-def test_fed_uplift_off_lowers_scenario_b_from_fy2027(comparison_context) -> None:
+def test_fed_uplift_off_matches_delayed_fy2027_then_lowers_path(comparison_context) -> None:
     result = _paths(comparison_context, "Total NLTF revenue", _keys(), _keys(fed_on=False))
     a, b = result["a"], result["b"]
     assert b.loc[2026] == pytest.approx(a.loc[2026])
-    for fy in (2027, 2031, 2040):
+    assert b.loc[2027] == pytest.approx(a.loc[2027])
+    for fy in (2028, 2031, 2040):
         assert b.loc[fy] < a.loc[fy]
+
+
+def test_current_and_mbu26_uplift_switches_are_independent(comparison_context) -> None:
+    current_on = _keys()
+    current_mbu_switch_off = _keys(mbu_fed_on=False)
+    current_result = _paths(comparison_context, "Total NLTF revenue", current_on, current_mbu_switch_off)
+    pd.testing.assert_series_equal(current_result["a"], current_result["b"])
+
+    mbu_on = _keys(uptake=app.EV_UPTAKE_GOVERNED_OPTION)
+    mbu_current_switch_off = _keys(uptake=app.EV_UPTAKE_GOVERNED_OPTION, fed_on=False)
+    mbu_result = _paths(comparison_context, "Total NLTF revenue", mbu_on, mbu_current_switch_off)
+    pd.testing.assert_series_equal(mbu_result["a"], mbu_result["b"])
+
+    mbu_off = _keys(uptake=app.EV_UPTAKE_GOVERNED_OPTION, mbu_fed_on=False)
+    toggled = _paths(comparison_context, "Total NLTF revenue", mbu_on, mbu_off)
+    assert toggled["b"].loc[2030] == pytest.approx(6089.343312, rel=1e-9)
+    assert toggled["b"].loc[2030] < toggled["a"].loc[2030]
 
 
 def test_revenue_cards_use_npv_language_and_activity_cards_do_not(comparison_context) -> None:
@@ -113,7 +131,13 @@ def test_mot_official_scenario_plots_the_mbu26_official_trace(comparison_context
         pd.to_numeric(mbu["value"], errors="coerce").to_numpy(),
         index=pd.to_numeric(mbu["june_year"], errors="coerce").to_numpy(),
     ).dropna().sort_index()
-    pd.testing.assert_series_equal(result["a"], expected, check_index_type=False)
+    pd.testing.assert_series_equal(
+        result["a"].drop(index=2027),
+        expected.drop(index=2027),
+        check_index_type=False,
+    )
+    assert result["a"].loc[2027] == pytest.approx(4835.639826942325, rel=1e-12)
+    assert result["a"].loc[2027] < expected.loc[2027]
     # And it differs from the VFM base preset overlay path.
     vs_base = _paths(comparison_context, "Total NLTF revenue", governed_keys, _keys())
     assert not vs_base["a"].equals(vs_base["b"])

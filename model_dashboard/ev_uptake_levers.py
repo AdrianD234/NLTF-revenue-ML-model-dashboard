@@ -87,6 +87,181 @@ TOTAL_AGGREGATE_SERIES = (
 )
 LEVER_AGGREGATE_SERIES = RUC_AGGREGATE_SERIES + FED_AGGREGATE_SERIES + TOTAL_AGGREGATE_SERIES
 
+# These are the only activity series carried natively at both quarterly and
+# June-year grain in the governed chart pack.  All three are period flows:
+# quarterly values add to the June-year value.  In particular,
+# ``ped_vkt_per_capita`` is annual kilometres travelled per person, not a
+# point-in-time rate, so its four quarterly observations are summed rather
+# than averaged.
+NATIVE_QUARTERLY_ACTIVITY_SERIES = (
+    "ped_vkt_per_capita",
+    "light_ruc_net_km",
+    "heavy_ruc_net_km",
+)
+
+
+def _unit_base_scale(unit: Any) -> float:
+    """Return the multiplier from a displayed unit to its unscaled unit."""
+
+    text = str(unit or "").strip().casefold()
+    if "billion" in text or text.startswith("$b"):
+        return 1_000_000_000.0
+    if "million" in text or text.startswith("$m"):
+        return 1_000_000.0
+    if "thousand" in text or "'000" in text:
+        return 1_000.0
+    return 1.0
+
+
+def _fiscal_quarter_periods(june_year: int) -> tuple[str, str, str, str]:
+    return (
+        f"{june_year - 1}Q3",
+        f"{june_year - 1}Q4",
+        f"{june_year}Q1",
+        f"{june_year}Q2",
+    )
+
+
+def reconcile_native_quarterly_activity_to_annual(
+    chart_rows: pd.DataFrame,
+    *,
+    scenario_names: set[str] | None = None,
+) -> pd.DataFrame:
+    """Rebase native forecast quarters to their adjusted June-year rows.
+
+    Uptake is defined at June-year grain.  This bridge preserves each
+    forecast path's within-FY quarterly shape while making the visible
+    quarters reproduce the adjusted annual benchmark exactly.  In the
+    transition FY, already-published actual quarters stay fixed and only the
+    remaining forecast quarters absorb the required proportional change.
+
+    Official-comparator and historical rows are never eligible.  Callers can
+    additionally restrict the operation to explicit current scenario names;
+    the uptake overlay does this using the governed drift-table scenarios.
+    """
+
+    if chart_rows is None or chart_rows.empty:
+        return chart_rows
+    required = {"scenario_name", "series_id", "time_grain", "june_year", "period", "value"}
+    if required.difference(chart_rows.columns):
+        return chart_rows
+
+    data = chart_rows.copy()
+    scenario = data["scenario_name"].fillna("").astype(str)
+    role = data.get("scenario_role", pd.Series("", index=data.index)).fillna("").astype(str)
+    row_type = data.get("row_type", pd.Series("", index=data.index)).fillna("").astype(str)
+    series = data["series_id"].fillna("").astype(str)
+    grain = data["time_grain"].fillna("").astype(str)
+    fy_numeric = pd.to_numeric(data["june_year"], errors="coerce")
+
+    # The source replay stores native RUC quarters as raw net km while the
+    # June-year rows and dashboard contract use million km.  Normalise the
+    # quarterly display layer once, retaining explicit source-unit lineage.
+    if "value_unit" in data.columns:
+        source_units = data["value_unit"].fillna("").astype(str)
+        raw_ruc_quarters = (
+            grain.eq("quarterly")
+            & series.isin({"light_ruc_net_km", "heavy_ruc_net_km"})
+            & source_units.str.strip().str.casefold().eq("net km")
+        )
+        if raw_ruc_quarters.any():
+            raw_values = pd.to_numeric(data.loc[raw_ruc_quarters, "value"], errors="coerce")
+            data.loc[raw_ruc_quarters, "value"] = raw_values / 1_000_000.0
+            data.loc[raw_ruc_quarters, "_quarterly_source_value_unit"] = "net km"
+            data.loc[raw_ruc_quarters, "value_unit"] = "million km"
+
+    values = pd.to_numeric(data["value"], errors="coerce")
+
+    current_role = role.isin({"basecase", "comparison"})
+    # Compact synthetic/test inputs may omit scenario_role; retain the same
+    # governed boundary via the canonical current_* scenario namespace.
+    current_role |= role.eq("") & scenario.str.startswith("current_")
+    if scenario_names is not None:
+        current_role &= scenario.isin({str(value) for value in scenario_names})
+
+    annual_mask = (
+        current_role
+        & grain.eq("june_year")
+        & ~row_type.eq("historical_actual")
+        & series.isin(NATIVE_QUARTERLY_ACTIVITY_SERIES)
+        & fy_numeric.notna()
+        & values.notna()
+    )
+    if not annual_mask.any():
+        return data
+
+    fed_path = data.get("fed_path", pd.Series("", index=data.index)).fillna("").astype(str)
+    units = data.get("value_unit", pd.Series("", index=data.index)).fillna("").astype(str)
+    actual_mask = row_type.eq("historical_actual") & grain.eq("quarterly")
+    forecast_mask = current_role & ~row_type.eq("historical_actual") & grain.eq("quarterly")
+
+    for annual_index in data.index[annual_mask]:
+        annual_fy = int(fy_numeric.at[annual_index])
+        annual_scenario = scenario.at[annual_index]
+        annual_series = series.at[annual_index]
+        annual_fed_path = fed_path.at[annual_index]
+        expected_periods = set(_fiscal_quarter_periods(annual_fy))
+
+        matching_forecast = (
+            forecast_mask
+            & scenario.eq(annual_scenario)
+            & series.eq(annual_series)
+            & fy_numeric.eq(annual_fy)
+            & fed_path.eq(annual_fed_path)
+            & data["period"].astype(str).isin(expected_periods)
+        )
+        forecast_indices = list(data.index[matching_forecast])
+        if not forecast_indices:
+            continue
+
+        matching_actual = (
+            actual_mask
+            & series.eq(annual_series)
+            & fy_numeric.eq(annual_fy)
+            & fed_path.eq(annual_fed_path)
+            & data["period"].astype(str).isin(expected_periods)
+        )
+        actual_indices = list(data.index[matching_actual])
+        covered_periods = set(data.loc[forecast_indices + actual_indices, "period"].astype(str))
+        if covered_periods != expected_periods or len(forecast_indices) + len(actual_indices) != 4:
+            # Never manufacture or double-count quarters.  Annual-only series
+            # continue through the existing Denton display fallback.
+            continue
+
+        annual_scale = _unit_base_scale(units.at[annual_index])
+        annual_target = float(values.at[annual_index]) * annual_scale
+        fixed_actual = sum(
+            float(values.at[index]) * _unit_base_scale(units.at[index])
+            for index in actual_indices
+            if pd.notna(values.at[index])
+        )
+        forecast_base_values = np.array(
+            [float(values.at[index]) * _unit_base_scale(units.at[index]) for index in forecast_indices],
+            dtype=float,
+        )
+        if not np.all(np.isfinite(forecast_base_values)):
+            continue
+        forecast_total = float(forecast_base_values.sum())
+        forecast_target = annual_target - fixed_actual
+        if forecast_target < -1e-9 or forecast_total <= 0.0:
+            continue
+
+        factor = max(forecast_target, 0.0) / forecast_total
+        adjusted_base = forecast_base_values * factor
+        # Remove the final floating-point residual without materially changing
+        # the preserved quarterly shape.
+        adjusted_base[int(np.argmax(np.abs(adjusted_base)))] += forecast_target - float(adjusted_base.sum())
+        for position, index in enumerate(forecast_indices):
+            data.at[index, "value"] = float(adjusted_base[position] / _unit_base_scale(units.at[index]))
+            data.at[index, "_quarterly_annual_reconciliation_factor"] = factor
+
+        if "value_status" in data.columns:
+            data.loc[forecast_indices, "value_status"] = "lever_adjusted_quarterly_reconciled"
+        if "data_scope" in data.columns:
+            data.loc[forecast_indices, "data_scope"] = "ev_uptake_quarterly_annual_reconciliation"
+
+    return data
+
 
 @dataclass(frozen=True)
 class UptakeLevers:
@@ -269,8 +444,9 @@ def apply_uptake_levers_to_chart_rows(
     scenario's own total (and therefore population response) is preserved
     exactly; only the power-type split changes. Revenue lines are recomputed
     with the MBU26 per-km rates carried in the drift table and aggregate
-    revenue series receive the additive delta. Quarterly rows and historical
-    actuals are untouched.
+    revenue series receive the additive delta. Native forecast quarters are
+    proportionally rebased to the adjusted June-year activity values;
+    historical actuals and official-comparator rows remain untouched.
     """
     if chart_rows is None or chart_rows.empty:
         return chart_rows, pd.DataFrame()
@@ -409,6 +585,7 @@ def apply_uptake_levers_to_chart_rows(
     touched = (
         is_june
         & is_forecast
+        & scenario_str.isin({scenario for scenario, _ in rate_lookup})
         & series_str.isin(
             set(LEVER_SERIES_KM)
             | set(LEVER_SERIES_REVENUE)
@@ -421,4 +598,8 @@ def apply_uptake_levers_to_chart_rows(
         data.loc[touched, "value_status"] = "lever_adjusted"
     if "data_scope" in data.columns:
         data.loc[touched, "data_scope"] = "ev_uptake_lever_overlay"
+    data = reconcile_native_quarterly_activity_to_annual(
+        data,
+        scenario_names={scenario for scenario, _ in rate_lookup},
+    )
     return data, pd.DataFrame(audit_rows)

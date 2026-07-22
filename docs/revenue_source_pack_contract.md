@@ -43,14 +43,22 @@ nearby label.
 The governed hierarchy uses the normalized `aggregation_rules.csv` contract:
 
 - Gross FED = PED + LPG + CNG.
-- Net FED = Gross FED - FED refunds + explicit Crown top-up when selected.
-- Net MVR = MR1/CVL + MR2 + COO + MVR admin - MVR refunds.
-- Total RUC = conventional Light/Heavy plus EV/PHEV classes on the selected
-  gross/net basis.
+- Net FED = Gross FED - FED refunds. Any Crown top-up is a separate explicit
+  overlay and is not part of the canonical `net_fed_revenue` row.
+- Net MVR = Gross MVR - COO - MVR admin - MVR refunds, equivalently MR1/CVL +
+  MR2 - MVR admin - MVR refunds. The MBU26 deduction rows are stored as
+  positive magnitudes and subtracted.
+- Net RUC (canonical ID `total_ruc_net_revenue`) = Gross RUC - RUC admin - RUC
+  refunds. "Total" means all conventional/EV/PHEV RUC classes, not gross.
 - Total NLTF = Net FED + Net RUC + Net MVR + TUC.
 
 `Total RUC+PED revenue` is the legacy Net FED + Net RUC subtotal. It is never
 treated as the root Total NLTF revenue series.
+
+The distilled source workbook's `aggregation_rules.csv` is retained as source
+lineage. Where its legacy wording conflicts with the active MBU26 runtime sign
+convention, `model_dashboard/mbu26_source_spine.py::FORMULA_DEFINITIONS` is the
+dashboard formula authority.
 
 The source workbook current selection may still reference that legacy subtotal.
 Revenue Outlook defaults and promoted-pack manifests use `Total NLTF revenue`

@@ -2,3 +2,4 @@ pytest
 playwright
 pytest-playwright
 kaleido
+statsmodels==0.14.6
