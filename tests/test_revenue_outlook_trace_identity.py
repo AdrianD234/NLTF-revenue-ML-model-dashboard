@@ -4,13 +4,16 @@ from pathlib import Path
 
 import pandas as pd
 
-from model_dashboard.fuel_price_scenario import (
-    FUEL_PRICE_SCENARIO_NAME as BUILDER_SCENARIO_NAME,
-    FUEL_PRICE_SCENARIO_TRACE_NAME as BUILDER_SCENARIO_TRACE_NAME,
+from model_dashboard.conflict_fuel_paths import (
+    CONFLICT_SEVERITIES,
+    SCENARIO_REGISTRY,
+    all_conflict_policy_variants,
+    conflict_policy_variant_name,
+    conflict_scenario_display_name,
+    conflict_scenario_id,
+    conflict_trace_name,
 )
 from model_dashboard.revenue_outlook import (
-    FUEL_PRICE_SCENARIO_NAME,
-    FUEL_PRICE_SCENARIO_TRACE_NAME,
     PED_COMPARISON_BEHAVIOURAL_TRACE_NAME,
     _runtime_current_trace_name,
     _runtime_trace_type,
@@ -20,46 +23,75 @@ from model_dashboard.revenue_outlook import (
 )
 
 
-def test_iran_war_scenario_identity_is_mirrored_exactly() -> None:
-    assert FUEL_PRICE_SCENARIO_NAME == BUILDER_SCENARIO_NAME
-    assert FUEL_PRICE_SCENARIO_TRACE_NAME == BUILDER_SCENARIO_TRACE_NAME
+def test_conflict_registry_has_stable_low_medium_high_identity_and_six_policy_variants() -> None:
+    assert tuple(SCENARIO_REGISTRY) == CONFLICT_SEVERITIES
+    assert [spec.severity for spec in SCENARIO_REGISTRY.values()] == list(CONFLICT_SEVERITIES)
+    assert [conflict_scenario_id(severity) for severity in CONFLICT_SEVERITIES] == [
+        "middle_east_low",
+        "middle_east_medium",
+        "middle_east_high",
+    ]
+    assert [conflict_scenario_display_name(severity) for severity in CONFLICT_SEVERITIES] == [
+        "Middle East conflict: Low",
+        "Middle East conflict: Medium",
+        "Middle East conflict: High",
+    ]
+
+    variants = all_conflict_policy_variants()
+    assert [(variant.severity, variant.policy_variant) for variant in variants] == [
+        (severity, policy_variant)
+        for severity in CONFLICT_SEVERITIES
+        for policy_variant in ("delay_6m", "no_uplift")
+    ]
+    assert len({variant.scenario_id for variant in variants}) == 6
+    for variant in variants:
+        assert variant.scenario_id == conflict_policy_variant_name(
+            variant.severity,
+            variant.policy_variant,
+        )
 
 
-def test_fuel_price_scenario_has_a_distinct_runtime_trace_identity() -> None:
-    fuel_trace = _runtime_current_trace_name(
-        FUEL_PRICE_SCENARIO_NAME,
-        "comparison",
-        series_id="ped_vkt_per_capita",
-        display_policy="keep_trace_relabel_comparison_behavioural_path",
-    )
+def test_each_conflict_scenario_has_a_distinct_runtime_trace_identity() -> None:
     high_trace = _runtime_current_trace_name("current_comparison_1", "comparison")
-
-    assert fuel_trace == FUEL_PRICE_SCENARIO_TRACE_NAME
     assert high_trace == "Current finalist High population/comparison"
-    assert fuel_trace != high_trace
-    assert fuel_trace != PED_COMPARISON_BEHAVIOURAL_TRACE_NAME
-    assert _runtime_trace_type(fuel_trace) == "current finalist Iran war comparison"
+    traces = []
+    for severity in CONFLICT_SEVERITIES:
+        trace = _runtime_current_trace_name(
+            conflict_scenario_id(severity),
+            "comparison",
+            series_id="ped_vkt_per_capita",
+            display_policy="keep_trace_relabel_comparison_behavioural_path",
+        )
+        assert trace == conflict_trace_name(severity)
+        assert trace != high_trace
+        assert trace != PED_COMPARISON_BEHAVIOURAL_TRACE_NAME
+        assert _runtime_trace_type(trace) == "current finalist Middle East conflict comparison"
+        traces.append(trace)
+    assert len(set(traces)) == 3
 
 
-def test_fuel_price_trace_has_a_stable_position_after_high_population() -> None:
+def test_conflict_traces_have_stable_severity_order_after_high_population() -> None:
     ordered = [
         "Actual",
         "MBU26 official",
         "Current finalist Base case",
         "Current finalist High population/comparison",
-        FUEL_PRICE_SCENARIO_TRACE_NAME,
+        *(conflict_trace_name(severity) for severity in CONFLICT_SEVERITIES),
         PED_COMPARISON_BEHAVIOURAL_TRACE_NAME,
     ]
 
     assert [_trace_sort_value(name) for name in ordered] == list(range(len(ordered)))
 
 
-def test_revenue_stack_keeps_fuel_price_as_a_distinct_ordered_source() -> None:
+def test_revenue_stack_keeps_all_conflict_paths_as_distinct_ordered_sources() -> None:
     sources = [
         ("MBU26 official", "mbu26_official", "official_comparator"),
         ("Current finalist Base case", "current_basecase", "basecase"),
         ("Current finalist High population/comparison", "current_comparison_1", "comparison"),
-        (FUEL_PRICE_SCENARIO_TRACE_NAME, FUEL_PRICE_SCENARIO_NAME, "comparison"),
+        *(
+            (conflict_trace_name(severity), conflict_scenario_id(severity), "comparison")
+            for severity in CONFLICT_SEVERITIES
+        ),
     ]
     rows = pd.DataFrame(
         [
@@ -87,7 +119,7 @@ def test_revenue_stack_keeps_fuel_price_as_a_distinct_ordered_source() -> None:
     )
 
     assert source_order["source_path"].tolist() == [source[0] for source in sources]
-    assert source_order["source_path_order"].tolist() == [0, 1, 2, 3]
+    assert source_order["source_path_order"].tolist() == list(range(len(sources)))
 
 
 def test_signature_tracks_materialized_scenario_input_wide(tmp_path: Path) -> None:

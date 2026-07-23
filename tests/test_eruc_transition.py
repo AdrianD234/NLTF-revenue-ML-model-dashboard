@@ -154,14 +154,27 @@ def test_eruc_view_footprint_and_cascade_on_real_pack() -> None:
     act_on = ped_on[ped_on["row_type"].eq("historical_actual")]
     pd.testing.assert_frame_equal(act_off.reset_index(drop=True), act_on.reset_index(drop=True))
 
-    # audit cascade: FED delta + e-RUC gain equals the NLTF total move
+    # Audit cascade: the raw e-RUC deltas compose with the downstream
+    # PED/RUC policy replay factors before reaching the displayed NLTF total.
     audit = v_on["eruc_audit"]
     row = audit[audit["june_year"].eq(2031) & audit["scenario_name"].eq("current_basecase")].iloc[0]
+    policy_audit = v_on["fed_uplift_audit"]
+    policy_factors = policy_audit[
+        policy_audit["june_year"].eq(2031)
+        & policy_audit["scenario_name"].eq("current_basecase")
+        & policy_audit["series_id"].isin(["gross_ped_revenue", "total_ruc_net_revenue"])
+    ].set_index("series_id")["combined_model_and_rate_factor"]
+    ped_factor = float(policy_factors.get("gross_ped_revenue", 1.0))
+    ruc_factor = float(policy_factors.get("total_ruc_net_revenue", 1.0))
+    expected_policy_composed_delta = (
+        float(row["excise_revenue_delta"]) * ped_factor
+        + float(row["eruc_revenue_gained"]) * ruc_factor
+    )
     total_off, _ = view("Total NLTF revenue", key_off)
     total_on, _ = view("Total NLTF revenue", key_on)
     base_off = total_off[total_off["trace_name"].eq("Current finalist Base case") & total_off["period"].eq("FY2031")]["value"].iloc[0]
     base_on = total_on[total_on["trace_name"].eq("Current finalist Base case") & total_on["period"].eq("FY2031")]["value"].iloc[0]
-    assert base_on - base_off == pytest.approx(row["net_nltf_delta"], rel=1e-9)
+    assert base_on - base_off == pytest.approx(expected_policy_composed_delta, rel=1e-9)
 
 
 def test_vkt_per_capita_and_volume_follow_the_demand_response() -> None:

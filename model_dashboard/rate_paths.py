@@ -13,42 +13,58 @@ pack itself (gross PED revenue over volume), and the no-uplift path carries
 the last legislated wedge (12c from FY2028; 6c in FY2027) forward - i.e. the
 alternative stays parallel to the planned schedule.
 
-The '2027 12c FED uplift' policy reprices PED revenue at display time by the
-per-FY rate ratio (volumes unchanged: same litres, cheaper duty), cascading
-the delta into the FED and NLTF rollups.  A governed six-month-delay scenario
-moves only the initial 12c step from 2027Q1 to 2027Q3; later planned increases
-retain their published dates.
+The PED policy schedule also governs model-price inputs.  In every affected
+quarter the selected-minus-published FED wedge is added to the retail petrol
+price input, while the selected/published PED-rate ratio is applied to both
+Light and Heavy RUC price inputs and to all five nominal RUC collection-rate
+leaves.  Fixed-finalist coefficients therefore own the PED and RUC activity
+responses; admin charges and refunds are never scaled.  A governed six-month-
+delay scenario moves only the initial 12c step from 2027Q1 to 2027Q3; later
+planned increases retain their published dates.
 """
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 import pandas as pd
 
-from .ev_uptake_levers import FED_AGGREGATE_SERIES, TOTAL_AGGREGATE_SERIES
+from .ev_uptake_levers import (
+    FED_AGGREGATE_SERIES,
+    NATIVE_QUARTERLY_ACTIVITY_SERIES,
+    RUC_AGGREGATE_SERIES,
+    TOTAL_AGGREGATE_SERIES,
+    reconcile_native_quarterly_activity_to_annual,
+)
 from .revenue_source_pack import REVENUE_LAST_COMPLETE_ACTUAL_FY
 
 FED_UPLIFT_NOTE = (
     "2027 12c FED uplift: the legislated petrol excise increases (+6c/L in "
     "FY2027, +12c/L from FY2028) baked into the Current planned path. "
-    "Switching the toggle off reprices PED revenue at the no-uplift schedule "
-    "(carried parallel beyond the legislated window); litres and km are "
-    "unchanged - this is a pure duty-rate counterfactual."
+    "Switching the toggle off reprices PED and all RUC collection rates at "
+    "the no-uplift schedule (carried parallel beyond the legislated window). "
+    "The FED wedge is also carried in the PED retail-price input, while the "
+    "same PED-rate ratio is applied to real Light/Heavy RUC model inputs, so "
+    "governed coefficients determine the resulting volume response."
 )
 FED_UPLIFT_DELAY_NOTE = (
     "Six-month 12c FED delay: the initial +12c/L step moves from 1 January "
-    "2027 to 1 July 2027. Only calendar 2027Q1-Q2 are repriced; the planned "
-    "path resumes in 2027Q3. Litres and km are unchanged."
+    "2027 to 1 July 2027. The PED retail-price input is 12c/L lower and the "
+    "same proportional reduction is applied to Light and Heavy RUC rates and "
+    "real RUC model-price inputs in calendar 2027Q1-Q2; the published direct "
+    "rate path resumes in 2027Q3. The governed structural demand calibration "
+    "is contemporaneous and does not carry the raw recursive replay beyond "
+    "that direct window; only explicitly rebuilt model-native lag/lead inputs "
+    "can affect their governed quarter."
 )
 RATE_CHART_NOTE = (
-    "Effective rates per 1,000 km. Light and Heavy RUC are MBU26 net revenue "
-    "over net km. PED (petrol excise) is converted from $/litre using the "
-    "MBU26 petrol fleet intensity, so the line embeds fleet efficiency: the "
-    "$/litre schedule rises faster than the per-km line. History is the "
-    "actual effective excise; futures follow the selected 12c-uplift setting, "
-    "with the alternative path shown dotted."
+    "Effective rates per 1,000 km. Light and Heavy RUC start from MBU26 net "
+    "revenue over net km, then follow the same proportional policy change as "
+    "the selected PED path. PED (petrol excise) is converted from $/litre "
+    "using MBU26 petrol-fleet intensity, so that line also embeds fleet "
+    "efficiency. The published January-2027 path remains visible as a reference."
 )
 
 _PLANNED_PATH = "Current planned path"
@@ -65,6 +81,17 @@ FED_POLICY_METADATA_COLUMNS = (
     "_fed_policy",
     "_fed_affected_quarters",
 )
+_RUC_REVENUE_LEAVES = (
+    "light_ruc_net_revenue",
+    "light_bev_ruc_net_revenue",
+    "phev_ruc_net_revenue",
+    "heavy_ruc_net_revenue",
+    "heavy_bev_ruc_net_revenue",
+)
+_POLICY_PAIR_BY_STATE = {
+    FED_POLICY_STATE_DELAYED_6M: "baseline_delayed_6m",
+    FED_POLICY_STATE_NO_UPLIFT: "baseline_no_uplift",
+}
 
 
 def _fed_rate_paths(repo_root: Path) -> pd.DataFrame:
@@ -79,6 +106,27 @@ def _mbu26_spine(repo_root: Path) -> pd.DataFrame:
     return frame.pivot_table(index="FY", columns="series_id", values="value", aggfunc="first").apply(
         pd.to_numeric, errors="coerce"
     )
+
+
+def mbu26_ruc_class_revenue_by_fy(repo_root: Path) -> dict[int, float]:
+    """Five-class MBU26 RUC revenue pool before fixed administration.
+
+    The compact chart omits Heavy-BEV revenue, so its visible RUC leaves are
+    insufficient for a proportional rate counterfactual.  This source-backed
+    pool lets the official comparator reprice all five classes while holding
+    RUC administration fixed in the canonical Net RUC formula.
+    """
+
+    spine = _mbu26_spine(repo_root)
+    missing = [series_id for series_id in _RUC_REVENUE_LEAVES if series_id not in spine.columns]
+    if missing:
+        raise ValueError("MBU26 RUC class revenue is missing: " + ", ".join(sorted(missing)))
+    totals = spine[list(_RUC_REVENUE_LEAVES)].sum(axis=1, min_count=len(_RUC_REVENUE_LEAVES))
+    return {
+        int(fy): float(value)
+        for fy, value in totals.items()
+        if pd.notna(fy) and pd.notna(value)
+    }
 
 
 def _pack_planned_ped_rates(chart_rows: pd.DataFrame) -> pd.Series:
@@ -154,6 +202,67 @@ def fed_policy_affected_periods(repo_root: Path, policy_state: str) -> dict[int,
         int(fy): tuple(group.index.astype(str).tolist())
         for fy, group in changed.groupby("FY", sort=True)
     }
+
+
+def fed_policy_quarterly_factors(repo_root: Path, policy_state: str) -> dict[str, float]:
+    """Selected/published PED-rate multiplier for every governed quarter.
+
+    This is the canonical cross-tax policy signal used for RUC price inputs
+    and nominal RUC rates.  It deliberately uses quarter-level FED rates, not
+    the annual PED-revenue factor: for the delayed window the exact multiplier
+    is ``0.70024 / 0.82024`` in 2027Q1-Q2.
+    """
+
+    schedules = ped_quarterly_rate_schedules(repo_root)
+    target_column = {
+        FED_POLICY_STATE_DELAYED_6M: _DELAYED_SEGMENT,
+        FED_POLICY_STATE_NO_UPLIFT: "no_uplift",
+    }.get(str(policy_state))
+    if not target_column:
+        return {}
+    planned = pd.to_numeric(schedules["planned"], errors="coerce")
+    target = pd.to_numeric(schedules[target_column], errors="coerce")
+    valid = planned.gt(0.0) & target.notna()
+    return {
+        str(period): float(target.at[period]) / float(planned.at[period])
+        for period in schedules.index[valid]
+    }
+
+
+def ped_rate_change_quarterly_factors(
+    repo_root: Path,
+    rate_change_nzd_per_litre_by_period: Mapping[str, float],
+) -> dict[str, float]:
+    """Convert any fixed-period PED change into proportional RUC factors.
+
+    Positive values are PED/FED increases and negative values are deferrals
+    or subsidies, all expressed in nominal NZD per litre. Each target PED
+    rate is divided by the published planned rate for the same calendar
+    quarter. The returned factors are the governed signal for Light and
+    Heavy RUC model-price inputs and nominal collection rates. Periods omitted
+    from the mapping are unchanged.
+    """
+
+    if not isinstance(rate_change_nzd_per_litre_by_period, Mapping):
+        raise TypeError("rate_change_nzd_per_litre_by_period must be a quarter-to-NZD mapping.")
+    schedules = ped_quarterly_rate_schedules(repo_root)
+    planned = pd.to_numeric(schedules["planned"], errors="coerce")
+    factors: dict[str, float] = {}
+    for raw_period, raw_change in rate_change_nzd_per_litre_by_period.items():
+        period = str(raw_period)
+        if period not in schedules.index:
+            raise ValueError(f"PED policy period {period!r} is not in the governed quarterly schedule.")
+        change = pd.to_numeric(pd.Series([raw_change]), errors="coerce").iloc[0]
+        base_rate = planned.at[period]
+        if pd.isna(change) or not np.isfinite(float(change)):
+            raise ValueError(f"PED policy change for {period} must be finite and numeric.")
+        if pd.isna(base_rate) or float(base_rate) <= 0.0:
+            raise ValueError(f"Published PED rate for {period} must be positive.")
+        target_rate = float(base_rate) + float(change)
+        if target_rate < 0.0:
+            raise ValueError(f"PED policy change for {period} would make the target rate negative.")
+        factors[period] = target_rate / float(base_rate)
+    return factors
 
 
 def ped_rate_schedules(repo_root: Path, chart_rows: pd.DataFrame) -> pd.DataFrame:
@@ -234,10 +343,26 @@ def rate_paths_frame(repo_root: Path, chart_rows: pd.DataFrame) -> pd.DataFrame:
     schedules = ped_rate_schedules(repo_root, chart_rows)
 
     rows: list[dict[str, Any]] = []
-    for fy, value in light.items():
-        rows.append({"june_year": int(fy), "series": "Light RUC", "nzd_per_1000km": float(value), "nzd_per_litre": np.nan, "segment": "path"})
-    for fy, value in heavy.items():
-        rows.append({"june_year": int(fy), "series": "Heavy RUC", "nzd_per_1000km": float(value), "nzd_per_litre": np.nan, "segment": "path"})
+    for series_name, path in (("Light RUC", light), ("Heavy RUC", heavy)):
+        for fy, value in path.items():
+            schedule = schedules.loc[int(fy)] if int(fy) in schedules.index else None
+            planned_rate = float(schedule["planned"]) if schedule is not None and pd.notna(schedule["planned"]) else np.nan
+            for segment in ("planned", _DELAYED_SEGMENT, "no_uplift"):
+                selected_rate = (
+                    float(schedule[segment])
+                    if schedule is not None and segment in schedule.index and pd.notna(schedule[segment])
+                    else planned_rate
+                )
+                multiplier = selected_rate / planned_rate if np.isfinite(planned_rate) and planned_rate > 0 else 1.0
+                rows.append(
+                    {
+                        "june_year": int(fy),
+                        "series": series_name,
+                        "nzd_per_1000km": float(value) * float(multiplier),
+                        "nzd_per_litre": np.nan,
+                        "segment": segment,
+                    }
+                )
     for fy, row in schedules.iterrows():
         lp100 = intensity.get(fy, np.nan)
         if pd.isna(lp100):
@@ -292,12 +417,18 @@ def apply_fed_rate_policy_to_chart_rows(
     policy_state: str,
     scenario_roles: set[str] | tuple[str, ...] | None = None,
     affected_periods_by_fy: dict[int, tuple[str, ...]] | None = None,
+    policy_pair_factors: pd.DataFrame | None = None,
+    ruc_class_revenue_by_fy: dict[int, float] | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Reprice PED and dependent rollups using an audited display overlay.
+    """Apply one PED/RUC policy path using an audited display overlay.
 
     ``scenario_roles`` scopes the counterfactual to selected trace families.
     ``affected_periods_by_fy`` lets quarterly disaggregation localise each
-    annual delta to the exact calendar quarters changed by the policy.
+    annual rate delta to the exact calendar quarters changed by the policy.
+    When ``policy_pair_factors`` is supplied, fixed-finalist quarterly and
+    annual factors also carry the RUC activity response (including lags and
+    recursion).  The annual factors come from the full formula-rebuilt bridge,
+    so hidden Heavy-BEV revenue and fixed admin/refunds remain correct.
     """
     if chart_rows is None or chart_rows.empty or not factors:
         return chart_rows, pd.DataFrame()
@@ -324,8 +455,341 @@ def apply_fed_rate_policy_to_chart_rows(
         allowed_roles = {str(role) for role in scenario_roles}
         eligible_role = data.get("scenario_role", pd.Series("", index=data.index)).astype(str).isin(allowed_roles)
 
+    pair_id = _POLICY_PAIR_BY_STATE.get(policy_state)
+    pair = pd.DataFrame()
+    if pair_id and policy_pair_factors is not None and not policy_pair_factors.empty:
+        required_pair_columns = {
+            "pair_id",
+            "time_grain",
+            "period",
+            "june_year",
+            "series_id",
+            "factor",
+            "delta",
+        }
+        missing_pair_columns = required_pair_columns.difference(policy_pair_factors.columns)
+        if missing_pair_columns:
+            raise ValueError(
+                "Policy pair factors are missing columns: " + ", ".join(sorted(missing_pair_columns))
+            )
+        pair = policy_pair_factors[
+            policy_pair_factors["pair_id"].astype(str).eq(pair_id)
+        ].copy()
+        pair["factor_numeric"] = pd.to_numeric(pair["factor"], errors="coerce")
+        pair["fy_numeric"] = pd.to_numeric(pair["june_year"], errors="coerce")
+        pair["delta_numeric"] = pd.to_numeric(pair["delta"], errors="coerce")
+        if pair.empty or pair["factor_numeric"].isna().any():
+            raise ValueError(f"Policy replay pair {pair_id!r} is unavailable or non-numeric.")
+
+    # Current finalist Base/High paths use the direct fixed-finalist replay.
+    # The official MBU comparator has no behavioural model and therefore falls
+    # through to the rate-only branch below with its volumes fixed.
+    current_role = data.get("scenario_role", pd.Series("", index=data.index)).astype(str).isin(
+        {"basecase", "comparison"}
+    )
+    if not pair.empty and bool((eligible_role & current_role).any()):
+        quarterly_lookup = {
+            (str(row.series_id), str(row.period)): float(row.factor_numeric)
+            for row in pair[pair["time_grain"].astype(str).eq("quarterly")].itertuples()
+        }
+        annual_lookup = {
+            (str(row.series_id), int(row.fy_numeric)): float(row.factor_numeric)
+            for row in pair[pair["time_grain"].astype(str).eq("june_year")].itertuples()
+            if pd.notna(row.fy_numeric)
+        }
+        activity_periods: dict[tuple[str, int], set[str]] = {}
+        for row in pair[pair["time_grain"].astype(str).eq("quarterly")].itertuples():
+            if pd.isna(row.fy_numeric) or pd.isna(row.delta_numeric) or abs(float(row.delta_numeric)) <= 1e-9:
+                continue
+            activity_periods.setdefault((str(row.series_id), int(row.fy_numeric)), set()).add(
+                str(row.period)
+            )
+
+        def _pair_affected_periods(series_id: str, fy: int | None) -> tuple[str, ...]:
+            if fy is None:
+                return ()
+            drivers: tuple[str, ...] = ()
+            if series_id in {"ped_vkt_per_capita", "ped_volume", "gross_ped_revenue"} or series_id in FED_AGGREGATE_SERIES:
+                drivers = ("ped_vkt_per_capita",)
+            elif series_id.startswith(("light_ruc", "light_bev_ruc", "phev_ruc")):
+                drivers = ("light_ruc_net_km",)
+            elif series_id.startswith(("heavy_ruc", "heavy_bev_ruc")):
+                drivers = ("heavy_ruc_net_km",)
+            elif series_id in RUC_AGGREGATE_SERIES:
+                drivers = ("light_ruc_net_km", "heavy_ruc_net_km")
+            elif series_id in TOTAL_AGGREGATE_SERIES:
+                drivers = ("ped_vkt_per_capita", "light_ruc_net_km", "heavy_ruc_net_km")
+            periods = set(affected_periods.get(fy, ()))
+            for driver in drivers:
+                periods.update(activity_periods.get((driver, fy), set()))
+            return tuple(sorted(periods, key=_quarter_order))
+        audit_rows: list[dict[str, Any]] = []
+        pair_scope = eligible_role & current_role & is_forecast
+        aggregate_ids = set(RUC_AGGREGATE_SERIES) | set(FED_AGGREGATE_SERIES) | set(TOTAL_AGGREGATE_SERIES)
+        ped_delta_by_key: dict[tuple[str, str, str, int], float] = {}
+        ruc_delta_by_key: dict[tuple[str, str, str, int], float] = {}
+
+        def _record_adjustment(index: Any, new: float, factor: float, basis: str) -> None:
+            old = float(numeric_value.at[index])
+            fy_value = june_year.at[index]
+            fy = int(fy_value) if pd.notna(fy_value) else None
+            periods = _pair_affected_periods(str(data.at[index, "series_id"]), fy)
+            data.at[index, "value"] = float(new)
+            data.at[index, "_fed_baseline_value"] = old
+            data.at[index, "_fed_annual_delta"] = float(new) - old
+            data.at[index, "_fed_policy"] = policy_state
+            data.at[index, "_fed_affected_quarters"] = ";".join(periods)
+            audit_rows.append(
+                {
+                    "scenario_name": str(data.at[index, "scenario_name"]),
+                    "scenario_role": str(data.at[index, "scenario_role"]),
+                    "trace_name": str(data.at[index, "trace_name"]),
+                    "fed_path": str(data.at[index, "fed_path"]),
+                    "june_year": fy,
+                    "time_grain": str(data.at[index, "time_grain"]),
+                    "period": str(data.at[index, "period"]),
+                    "series_id": str(data.at[index, "series_id"]),
+                    "policy_state": policy_state,
+                    "rate_factor": float(factors.get(fy, 1.0)) if fy is not None else 1.0,
+                    "combined_model_and_rate_factor": float(factor),
+                    "baseline_value": old,
+                    "adjusted_value": float(new),
+                    "value_delta": float(new) - old,
+                    "affected_periods": ";".join(periods),
+                    "transformation_basis": basis,
+                }
+            )
+
+        # Apply direct fixed-finalist factors to activity/revenue leaves. Net
+        # RUC is the one chart-carried RUC aggregate that receives its exact
+        # full-bridge factor (it includes hidden Heavy-BEV and fixed admin).
+        for index in data.index[pair_scope]:
+            grain = str(data.at[index, "time_grain"])
+            series_id = str(data.at[index, "series_id"])
+            fy_value = june_year.at[index]
+            if grain == "quarterly":
+                factor = quarterly_lookup.get((series_id, str(data.at[index, "period"])), 1.0)
+            elif grain == "june_year" and pd.notna(fy_value):
+                factor = annual_lookup.get((series_id, int(fy_value)), 1.0)
+            else:
+                factor = 1.0
+            old_value = numeric_value.at[index]
+            if pd.isna(old_value) or abs(float(factor) - 1.0) <= 1e-12:
+                continue
+            if series_id in aggregate_ids and series_id not in RUC_AGGREGATE_SERIES:
+                continue
+            old = float(old_value)
+            new = old * float(factor)
+            _record_adjustment(
+                index,
+                new,
+                float(factor),
+                "fixed_finalist_policy_replay_leaf_or_net_ruc",
+            )
+            if grain == "june_year" and pd.notna(fy_value):
+                key = _policy_row_key(data, index, int(fy_value))
+                if series_id == "gross_ped_revenue":
+                    ped_delta_by_key[key] = new - old
+                elif series_id == "total_ruc_net_revenue":
+                    ruc_delta_by_key[key] = new - old
+
+        # Rebuild FED and whole-of-NLTF chart aggregates additively from the
+        # canonical changed leaves. This holds refunds, TUC, MVR and other
+        # fixed components unchanged and keeps chart/detail formulas exact.
+        formula_scope = pair_scope & is_june & data["series_id"].astype(str).isin(
+            set(FED_AGGREGATE_SERIES) | set(TOTAL_AGGREGATE_SERIES)
+        )
+        for index in data.index[formula_scope]:
+            fy_value = june_year.at[index]
+            old_value = numeric_value.at[index]
+            if pd.isna(fy_value) or pd.isna(old_value):
+                continue
+            key = _policy_row_key(data, index, int(fy_value))
+            ped_delta = ped_delta_by_key.get(key, 0.0)
+            ruc_delta = ruc_delta_by_key.get(key, 0.0)
+            series_id = str(data.at[index, "series_id"])
+            delta = ped_delta if series_id in FED_AGGREGATE_SERIES else ped_delta + ruc_delta
+            if abs(delta) <= 1e-12:
+                continue
+            old = float(old_value)
+            new = old + delta
+            _record_adjustment(
+                index,
+                new,
+                new / old if abs(old) > 1e-12 else 1.0,
+                "formula_rebuilt_from_ped_and_net_ruc_deltas",
+            )
+
+        touched = data["_fed_policy"].astype(str).eq(policy_state)
+        value_status = (
+            "fed_uplift_off"
+            if policy_state == FED_POLICY_STATE_NO_UPLIFT
+            else "fed_uplift_delayed_6m"
+        )
+        data_scope = (
+            "fed_uplift_counterfactual"
+            if policy_state == FED_POLICY_STATE_NO_UPLIFT
+            else "fed_uplift_delay_counterfactual"
+        )
+        if "value_status" in data.columns:
+            data.loc[touched, "value_status"] = value_status
+        if "data_scope" in data.columns:
+            data.loc[touched, "data_scope"] = data_scope
+
+        # The annual pair factors are built from the governed fixed-finalist
+        # bridge, while the visible Base/High quarters may already carry a VFM
+        # uptake overlay.  Multiplying those differently weighted paths can
+        # leave a small annual/quarterly residual even though both replay
+        # factor sets are correct.  Reconcile after the policy overlay and
+        # before Iran is appended, keeping actual and pre-policy quarters
+        # fixed.  Iran's own delta-only reconciler can then inherit an exact
+        # Base benchmark without moving its shock timing.
+        adjusted_scenarios = {
+            str(value)
+            for value in data.loc[touched & current_role, "scenario_name"].dropna()
+        }
+        adjustable_periods_by_key: dict[
+            tuple[str, int, str], tuple[str, ...]
+        ] = {}
+        annual_activity = (
+            touched
+            & current_role
+            & is_june
+            & data["series_id"].astype(str).isin(NATIVE_QUARTERLY_ACTIVITY_SERIES)
+            & june_year.notna()
+        )
+        for index in data.index[annual_activity]:
+            adjustable_periods_by_key[
+                (
+                    str(data.at[index, "scenario_name"]),
+                    int(june_year.at[index]),
+                    str(data.at[index, "series_id"]),
+                )
+            ] = tuple(
+                period
+                for period in str(data.at[index, "_fed_affected_quarters"]).split(";")
+                if period
+            )
+
+        before_reconciliation = pd.to_numeric(data["value"], errors="coerce").copy()
+        before_units = data.get(
+            "value_unit", pd.Series("", index=data.index)
+        ).fillna("").astype(str)
+        before_series = data["series_id"].fillna("").astype(str)
+        before_grain = data["time_grain"].fillna("").astype(str)
+        raw_ruc_quarters = (
+            before_grain.eq("quarterly")
+            & before_series.isin({"light_ruc_net_km", "heavy_ruc_net_km"})
+            & before_units.str.strip().str.casefold().eq("net km")
+        )
+        before_reconciliation.loc[raw_ruc_quarters] = (
+            before_reconciliation.loc[raw_ruc_quarters] / 1_000_000.0
+        )
+        if adjusted_scenarios:
+            reconciliation_status = f"{value_status}_quarterly_reconciled"
+            reconciliation_scope = f"{data_scope}_quarterly_annual_reconciliation"
+            data = reconcile_native_quarterly_activity_to_annual(
+                data,
+                scenario_names=adjusted_scenarios,
+                adjustable_periods_by_key=adjustable_periods_by_key,
+                value_status=reconciliation_status,
+                data_scope=reconciliation_scope,
+                mark_unchanged=False,
+            )
+
+            after_reconciliation = pd.to_numeric(data["value"], errors="coerce")
+            reconciliation_changed = (
+                data["scenario_name"].astype(str).isin(adjusted_scenarios)
+                & data["time_grain"].astype(str).eq("quarterly")
+                & data["series_id"].astype(str).isin(NATIVE_QUARTERLY_ACTIVITY_SERIES)
+                & before_reconciliation.notna()
+                & after_reconciliation.notna()
+                & ~np.isclose(
+                    before_reconciliation,
+                    after_reconciliation,
+                    rtol=0.0,
+                    atol=1e-12,
+                )
+            )
+
+            audit_lookup = {
+                (
+                    str(row.get("scenario_name", "")),
+                    str(row.get("trace_name", "")),
+                    str(row.get("fed_path", "")),
+                    str(row.get("time_grain", "")),
+                    str(row.get("period", "")),
+                    str(row.get("series_id", "")),
+                ): row
+                for row in audit_rows
+            }
+            for index in data.index[reconciliation_changed]:
+                fy_value = june_year.at[index]
+                if pd.isna(fy_value):
+                    continue
+                fy = int(fy_value)
+                scenario_name = str(data.at[index, "scenario_name"])
+                series_id = str(data.at[index, "series_id"])
+                annual_key = (scenario_name, fy, series_id)
+                # A changed key absent from the policy map is a source-pack
+                # unit/annual alignment (not a policy change), so retain its
+                # neutral FED metadata while keeping the explicit data-scope
+                # provenance assigned above.
+                if annual_key not in adjustable_periods_by_key:
+                    continue
+                baseline = pd.to_numeric(
+                    pd.Series([data.at[index, "_fed_baseline_value"]]),
+                    errors="coerce",
+                ).iloc[0]
+                if pd.isna(baseline):
+                    baseline = float(before_reconciliation.at[index])
+                    data.at[index, "_fed_baseline_value"] = baseline
+                final_value = float(after_reconciliation.at[index])
+                data.at[index, "_fed_annual_delta"] = final_value - float(baseline)
+                data.at[index, "_fed_policy"] = policy_state
+                affected = ";".join(adjustable_periods_by_key[annual_key])
+                data.at[index, "_fed_affected_quarters"] = affected
+
+                audit_key = (
+                    scenario_name,
+                    str(data.at[index, "trace_name"]),
+                    str(data.at[index, "fed_path"]),
+                    "quarterly",
+                    str(data.at[index, "period"]),
+                    series_id,
+                )
+                audit_row = audit_lookup.get(audit_key)
+                if audit_row is None:
+                    audit_row = {
+                        "scenario_name": scenario_name,
+                        "scenario_role": str(data.at[index, "scenario_role"]),
+                        "trace_name": str(data.at[index, "trace_name"]),
+                        "fed_path": str(data.at[index, "fed_path"]),
+                        "june_year": fy,
+                        "time_grain": "quarterly",
+                        "period": str(data.at[index, "period"]),
+                        "series_id": series_id,
+                        "policy_state": policy_state,
+                        "rate_factor": float(factors.get(fy, 1.0)),
+                        "affected_periods": affected,
+                        "transformation_basis": "fixed_finalist_policy_replay_leaf_or_net_ruc",
+                    }
+                    audit_rows.append(audit_row)
+                    audit_lookup[audit_key] = audit_row
+                audit_row["combined_model_and_rate_factor"] = (
+                    final_value / float(baseline) if abs(float(baseline)) > 1e-12 else 1.0
+                )
+                audit_row["baseline_value"] = float(baseline)
+                audit_row["adjusted_value"] = final_value
+                audit_row["value_delta"] = final_value - float(baseline)
+                audit_row["quarterly_annual_reconciliation_delta"] = (
+                    final_value - float(before_reconciliation.at[index])
+                )
+        return data, pd.DataFrame(audit_rows)
+
     audit_rows: list[dict[str, Any]] = []
-    delta_by_key: dict[tuple[str, str, str, int], float] = {}
+    ped_delta_by_key: dict[tuple[str, str, str, int], float] = {}
+    ruc_delta_by_key: dict[tuple[str, str, str, int], float] = {}
     ped_mask = is_june & is_forecast & eligible_role & data["series_id"].astype(str).eq("gross_ped_revenue")
     for index in data.index[ped_mask]:
         fy = june_year.at[index]
@@ -336,7 +800,7 @@ def apply_fed_rate_policy_to_chart_rows(
         new = old * factor
         data.at[index, "value"] = new
         key = _policy_row_key(data, index, int(fy))
-        delta_by_key[key] = delta_by_key.get(key, 0.0) + (new - old)
+        ped_delta_by_key[key] = ped_delta_by_key.get(key, 0.0) + (new - old)
         periods = tuple(affected_periods.get(int(fy), ()))
         data.at[index, "_fed_baseline_value"] = old
         data.at[index, "_fed_annual_delta"] = new - old
@@ -359,19 +823,59 @@ def apply_fed_rate_policy_to_chart_rows(
             }
         )
 
-    if delta_by_key:
+    ruc_leaf_mask = (
+        is_june
+        & is_forecast
+        & eligible_role
+        & data["series_id"].astype(str).isin(_RUC_REVENUE_LEAVES)
+    )
+    for index in data.index[ruc_leaf_mask]:
+        fy = june_year.at[index]
+        if pd.isna(fy) or int(fy) not in factors or pd.isna(numeric_value.at[index]):
+            continue
+        factor = float(factors[int(fy)])
+        old = float(numeric_value.at[index])
+        new = old * factor
+        data.at[index, "value"] = new
+        key = _policy_row_key(data, index, int(fy))
+        ruc_delta_by_key[key] = ruc_delta_by_key.get(key, 0.0) + (new - old)
+        periods = tuple(affected_periods.get(int(fy), ()))
+        data.at[index, "_fed_baseline_value"] = old
+        data.at[index, "_fed_annual_delta"] = new - old
+        data.at[index, "_fed_policy"] = policy_state
+        data.at[index, "_fed_affected_quarters"] = ";".join(periods)
+
+    if ped_delta_by_key or ruc_delta_by_key:
         aggregate_mask = (
             is_june
             & is_forecast
             & eligible_role
-            & data["series_id"].astype(str).isin(set(FED_AGGREGATE_SERIES) | set(TOTAL_AGGREGATE_SERIES))
+            & data["series_id"].astype(str).isin(
+                set(RUC_AGGREGATE_SERIES) | set(FED_AGGREGATE_SERIES) | set(TOTAL_AGGREGATE_SERIES)
+            )
         )
         for index in data.index[aggregate_mask]:
             if pd.isna(numeric_value.at[index]) or pd.isna(june_year.at[index]):
                 continue
             fy = int(june_year.at[index])
             key = _policy_row_key(data, index, fy)
-            delta = delta_by_key.get(key)
+            series_id = str(data.at[index, "series_id"])
+            ped_delta = ped_delta_by_key.get(key, 0.0)
+            ruc_delta = ruc_delta_by_key.get(key, 0.0)
+            scenario_role = str(data.at[index, "scenario_role"]) if "scenario_role" in data.columns else ""
+            if (
+                scenario_role == "official_comparator"
+                and ruc_class_revenue_by_fy
+                and fy in ruc_class_revenue_by_fy
+                and fy in factors
+            ):
+                ruc_delta = float(ruc_class_revenue_by_fy[fy]) * (float(factors[fy]) - 1.0)
+            if series_id in RUC_AGGREGATE_SERIES:
+                delta = ruc_delta
+            elif series_id in FED_AGGREGATE_SERIES:
+                delta = ped_delta
+            else:
+                delta = ped_delta + ruc_delta
             if delta:
                 old = float(numeric_value.at[index])
                 data.at[index, "value"] = old + delta
@@ -397,6 +901,8 @@ def apply_fed_uplift_delay_to_chart_rows(
     *,
     scenario_roles: set[str] | tuple[str, ...] | None = None,
     affected_periods_by_fy: dict[int, tuple[str, ...]] | None = None,
+    policy_pair_factors: pd.DataFrame | None = None,
+    ruc_class_revenue_by_fy: dict[int, float] | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Apply the six-month delay while preserving the source pack."""
     return apply_fed_rate_policy_to_chart_rows(
@@ -405,6 +911,8 @@ def apply_fed_uplift_delay_to_chart_rows(
         policy_state=FED_POLICY_STATE_DELAYED_6M,
         scenario_roles=scenario_roles,
         affected_periods_by_fy=affected_periods_by_fy,
+        policy_pair_factors=policy_pair_factors,
+        ruc_class_revenue_by_fy=ruc_class_revenue_by_fy,
     )
 
 
@@ -413,6 +921,8 @@ def apply_fed_uplift_off_to_chart_rows(
     factors: dict[int, float],
     *,
     scenario_roles: set[str] | tuple[str, ...] | None = None,
+    policy_pair_factors: pd.DataFrame | None = None,
+    ruc_class_revenue_by_fy: dict[int, float] | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Backward-compatible no-uplift wrapper around the generic overlay."""
     return apply_fed_rate_policy_to_chart_rows(
@@ -420,4 +930,6 @@ def apply_fed_uplift_off_to_chart_rows(
         factors,
         policy_state=FED_POLICY_STATE_NO_UPLIFT,
         scenario_roles=scenario_roles,
+        policy_pair_factors=policy_pair_factors,
+        ruc_class_revenue_by_fy=ruc_class_revenue_by_fy,
     )

@@ -1721,6 +1721,28 @@ def test_ped_bridge_modes_materialize_raw_optimized_and_reconcile() -> None:
             pd.to_numeric(official_original["value"], errors="coerce").to_numpy(),
             abs=0,
         )
+        current_formula_rows = result["chart_rows"][
+            result["chart_rows"]["time_grain"].astype(str).eq("june_year")
+            & result["chart_rows"]["trace_role"].astype(str).eq("in_house_current_finalist")
+            & result["chart_rows"]["series_id"].astype(str).isin(
+                [
+                    "net_fed_revenue",
+                    "total_ruc_net_revenue",
+                    "total_fed_ruc_net_revenue",
+                ]
+            )
+        ].pivot_table(
+            index=["trace_name", "scenario_name", "fed_path", "june_year"],
+            columns="series_id",
+            values="value",
+            aggfunc="first",
+        )
+        formula_residual = (
+            pd.to_numeric(current_formula_rows["total_fed_ruc_net_revenue"], errors="coerce")
+            - pd.to_numeric(current_formula_rows["net_fed_revenue"], errors="coerce")
+            - pd.to_numeric(current_formula_rows["total_ruc_net_revenue"], errors="coerce")
+        )
+        assert formula_residual.abs().max() == pytest.approx(0.0, abs=1e-9)
 
 
 def test_ped_efficiency_sensitivity_noops_baseline_and_reconciles_rollups() -> None:
@@ -1987,6 +2009,7 @@ def test_revenue_sensitivity_demand_elasticity_responds_to_cost_ratio() -> None:
 def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
     pack_dir = ROOT / CURRENT_REVENUE_OUTLOOK_DIR
     expected_hashes = {
+        "conflict_fuel_price_scenarios.csv": "ad379997aa4044cdabf7d948787c926e06a434447ff076640cfab317eda53c73",
         "ev_phev_ped_light_drift_assumptions.csv": "576ae24883099bb2d2c6b8a7f0162598818c23b7b6381e1613a05c64cfbaf672",
         "ev_phev_ped_light_drift_assumptions.parquet": "26bdc5bcd65782222c60221440157af4efd5fd51bbe27e298cb4060002f28acf",
         "ev_phev_split_assumptions.csv": "f6d678fde5074dd9ec4aa9ed79f10f3f3d02c1a6d72e07f8c050918bfc9f2928",

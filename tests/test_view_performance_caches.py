@@ -14,7 +14,12 @@ import pandas as pd
 import pytest
 
 import app
-from model_dashboard.fuel_price_scenario import FUEL_PRICE_SCENARIO_NAME, FUEL_PRICE_SCENARIO_TRACE_NAME
+from model_dashboard.conflict_fuel_paths import (
+    CONFLICT_FUEL_SCENARIO_LEVELS,
+    conflict_scenario_name,
+    conflict_trace_name,
+    load_conflict_fuel_price_paths,
+)
 from model_dashboard.revenue_outlook import (
     CURRENT_REVENUE_OUTLOOK_DIR,
     PED_BRIDGE_DEFAULT_MODE,
@@ -25,6 +30,12 @@ from model_dashboard.revenue_outlook import (
 ROOT = Path(__file__).resolve().parents[1]
 FED = "Current planned path"
 TRACES = ("Current finalist Base case", "Actual")
+CONFLICT_SCENARIO_NAMES = tuple(
+    conflict_scenario_name(level) for level in CONFLICT_FUEL_SCENARIO_LEVELS
+)
+CONFLICT_TRACE_NAMES = tuple(
+    conflict_trace_name(level) for level in CONFLICT_FUEL_SCENARIO_LEVELS
+)
 
 
 @pytest.fixture(scope="module")
@@ -39,6 +50,39 @@ def _default_keys():
     sens = app.selected_sensitivity_key("Off", "Off", "Off", freight_rail_shift="Off")
     uptake = (app.DEFAULT_EV_UPTAKE_MODE, (), (), 0)
     return sens, uptake
+
+
+def test_missing_policy_replay_fails_closed_for_current_paths_but_keeps_mbu_rate_only() -> None:
+    scopes = (
+        ("delayed_6m", ("basecase", "comparison")),
+        ("delayed_6m", ("official_comparator",)),
+    )
+    governed, audit = app._policy_scopes_for_available_replay(
+        scopes,
+        replay_available=False,
+    )
+    assert governed == (("delayed_6m", ("official_comparator",)),)
+    assert len(audit) == 1
+    assert not bool(audit.iloc[0]["applied"])
+    assert audit.iloc[0]["transformation_basis"] == "policy_replay_unavailable_not_applied"
+    assert "published values" in str(audit.iloc[0]["reason"])
+
+    available_scopes, available_audit = app._policy_scopes_for_available_replay(
+        scopes,
+        replay_available=True,
+    )
+    assert available_scopes == scopes
+    assert available_audit.empty
+
+
+def test_replay_value_error_is_caught_before_streamlit_view_render(monkeypatch) -> None:
+    def broken_replay(*_args, **_kwargs):
+        raise ValueError("annual policy bridge unavailable")
+
+    monkeypatch.setattr(app, "cached_fuel_price_scenario_replay", broken_replay)
+    replay, error_type = app._safe_fuel_price_scenario_replay((), object())
+    assert replay is None
+    assert error_type == "ValueError"
 
 
 def test_view_returns_fresh_copies_across_calls(context) -> None:
@@ -96,7 +140,7 @@ def test_policy_and_fuel_totals_reconcile_across_chart_line_and_stack(context) -
         "current_basecase",
         "current_comparison_1",
         "mbu26_official",
-        "current_iran_war_fuel_15pct_ruc_20pct_6q",
+        *CONFLICT_SCENARIO_NAMES,
     }
     assert expected_scenarios <= set(chart.index)
     assert not fuel_audit.empty
@@ -120,12 +164,13 @@ def test_current_and_mbu_policy_four_state_matrix_keeps_fuel_on_current_scope(co
             )
             states[(current_off, mbu_off)] = rows
 
-    scenarios = {
-        "base": "current_basecase",
-        "high": "current_comparison_1",
-        "fuel": "current_iran_war_fuel_15pct_ruc_20pct_6q",
-        "mbu": "mbu26_official",
-    }
+    base_scenario = "current_basecase"
+    current_scenarios = (
+        base_scenario,
+        "current_comparison_1",
+        *CONFLICT_SCENARIO_NAMES,
+    )
+    mbu_scenario = "mbu26_official"
 
     def total(state: tuple[int, int], scenario: str, fy: int) -> float:
         rows = states[state]
@@ -139,9 +184,10 @@ def test_current_and_mbu_policy_four_state_matrix_keeps_fuel_on_current_scope(co
         return float(pd.to_numeric(selected["value"], errors="coerce").iloc[0])
 
     # Moving only the MBU26 switch cannot alter any Current trace, including
-    # the runtime Iran-war scenario cloned from Current Base after policy overlay.
+    # any registered conflict severity cloned from the matching Current Base
+    # policy replay.
     for current_off in (0, 1):
-        for scenario in (scenarios["base"], scenarios["high"], scenarios["fuel"]):
+        for scenario in current_scenarios:
             for fy in (2027, 2028):
                 assert total((current_off, 0), scenario, fy) == pytest.approx(
                     total((current_off, 1), scenario, fy), abs=1e-9
@@ -150,24 +196,24 @@ def test_current_and_mbu_policy_four_state_matrix_keeps_fuel_on_current_scope(co
     # Moving only the Current switch cannot alter MBU26.
     for mbu_off in (0, 1):
         for fy in (2027, 2028):
-            assert total((0, mbu_off), scenarios["mbu"], fy) == pytest.approx(
-                total((1, mbu_off), scenarios["mbu"], fy), abs=1e-9
+            assert total((0, mbu_off), mbu_scenario, fy) == pytest.approx(
+                total((1, mbu_off), mbu_scenario, fy), abs=1e-9
             )
 
     # Delayed and OFF are equal in FY2027 because both remove the original
     # 2027Q1-Q2 step. From FY2028, only OFF remains below the planned path.
     for mbu_off in (0, 1):
-        for scenario in (scenarios["base"], scenarios["high"], scenarios["fuel"]):
+        for scenario in current_scenarios:
             assert total((0, mbu_off), scenario, 2027) == pytest.approx(
                 total((1, mbu_off), scenario, 2027), abs=1e-9
             )
             assert total((1, mbu_off), scenario, 2028) < total((0, mbu_off), scenario, 2028)
     for current_off in (0, 1):
-        assert total((current_off, 0), scenarios["mbu"], 2027) == pytest.approx(
-            total((current_off, 1), scenarios["mbu"], 2027), abs=1e-9
+        assert total((current_off, 0), mbu_scenario, 2027) == pytest.approx(
+            total((current_off, 1), mbu_scenario, 2027), abs=1e-9
         )
-        assert total((current_off, 1), scenarios["mbu"], 2028) < total(
-            (current_off, 0), scenarios["mbu"], 2028
+        assert total((current_off, 1), mbu_scenario, 2028) < total(
+            (current_off, 0), mbu_scenario, 2028
         )
 
     # Quarterly scenario timing stays correct under both Current 12c states:
@@ -175,23 +221,27 @@ def test_current_and_mbu_policy_four_state_matrix_keeps_fuel_on_current_scope(co
     # delayed/off annual path.
     for current_off in (0, 1):
         rows = states[(current_off, 0)]
+        reconciled_scenarios = (base_scenario, *CONFLICT_SCENARIO_NAMES)
         annual_pair = rows[
             rows["time_grain"].astype(str).eq("june_year")
             & rows["series_id"].astype(str).eq("total_nltf_net_revenue")
-            & rows["scenario_name"].astype(str).isin([scenarios["base"], scenarios["fuel"]])
+            & rows["scenario_name"].astype(str).isin(reconciled_scenarios)
             & pd.to_numeric(rows["june_year"], errors="coerce").isin([2026, 2027, 2028])
         ].copy()
         derived = {
             scenario: app._disaggregate_annual_rows_to_quarterly(
                 annual_pair[annual_pair["scenario_name"].astype(str).eq(scenario)], rows
             )
-            for scenario in (scenarios["base"], scenarios["fuel"])
+            for scenario in reconciled_scenarios
         }
-        base_quarters = derived[scenarios["base"]].set_index("period")["value"].map(float)
-        iran_quarters = derived[scenarios["fuel"]].set_index("period")["value"].map(float)
-        for period in ("2025Q3", "2025Q4"):
-            assert iran_quarters.loc[period] == pytest.approx(base_quarters.loc[period], abs=1e-9)
-        for scenario in (scenarios["base"], scenarios["fuel"]):
+        base_quarters = derived[base_scenario].set_index("period")["value"].map(float)
+        for conflict_scenario in CONFLICT_SCENARIO_NAMES:
+            conflict_quarters = derived[conflict_scenario].set_index("period")["value"].map(float)
+            for period in ("2025Q3", "2025Q4"):
+                assert conflict_quarters.loc[period] == pytest.approx(
+                    base_quarters.loc[period], abs=1e-9
+                )
+        for scenario in reconciled_scenarios:
             annual_values = annual_pair[
                 annual_pair["scenario_name"].astype(str).eq(scenario)
             ].set_index("june_year")["value"].map(float)
@@ -200,10 +250,10 @@ def test_current_and_mbu_policy_four_state_matrix_keeps_fuel_on_current_scope(co
                 assert float(quarterly_sums.loc[fy]) == pytest.approx(float(annual_values.loc[fy]), abs=1e-6)
 
 
-def test_iran_war_default_display_checkpoints_and_quarter_timing(context) -> None:
+def test_middle_east_paths_reconcile_net_revenue_and_quarter_timing(context) -> None:
     pack, signature = context
     sens, uptake = _default_keys()
-    traces = ("Current finalist Base case", FUEL_PRICE_SCENARIO_TRACE_NAME)
+    traces = ("Current finalist Base case", *CONFLICT_TRACE_NAMES)
     annual_view = app.cached_revenue_outlook_view(
         signature,
         "Total NLTF revenue",
@@ -229,36 +279,105 @@ def test_iran_war_default_display_checkpoints_and_quarter_timing(context) -> Non
     annual = annual_view["filtered_rows"].pivot_table(
         index="june_year", columns="scenario_name", values="value", aggfunc="first"
     )
-    expected = {
-        2026: (4579.772378, 4484.197097),
-        2027: (4743.873445, 4596.313769),
-        2028: (5494.738904, 5518.450250),
-    }
-    for fy, (base_value, scenario_value) in expected.items():
-        assert float(annual.at[fy, "current_basecase"]) == pytest.approx(base_value, abs=1e-6)
-        assert float(annual.at[fy, FUEL_PRICE_SCENARIO_NAME]) == pytest.approx(scenario_value, abs=1e-6)
-    assert annual.at[2026, FUEL_PRICE_SCENARIO_NAME] < annual.at[2026, "current_basecase"]
-    assert annual.at[2027, FUEL_PRICE_SCENARIO_NAME] < annual.at[2027, "current_basecase"]
-    assert annual.at[2028, FUEL_PRICE_SCENARIO_NAME] > annual.at[2028, "current_basecase"]
+    expected_years = set(range(2026, 2031))
+    expected_scenarios = ("current_basecase", *CONFLICT_SCENARIO_NAMES)
+    assert expected_years <= set(pd.to_numeric(annual.index, errors="raise").astype(int))
+    assert set(expected_scenarios) <= set(annual.columns)
+    assert annual.loc[sorted(expected_years), list(expected_scenarios)].notna().all().all()
+    assert (annual.loc[sorted(expected_years), list(expected_scenarios)] > 0).all().all()
+    for conflict_scenario in CONFLICT_SCENARIO_NAMES:
+        assert annual.at[2026, conflict_scenario] < annual.at[2026, "current_basecase"]
+        assert annual.at[2027, conflict_scenario] < annual.at[2027, "current_basecase"]
+    # All three paths are identical through FY2026. Future path differences
+    # must not leak backwards through the smoothed EV/PHEV migration split.
+    assert (
+        annual.loc[2026, list(CONFLICT_SCENARIO_NAMES)].max()
+        - annual.loc[2026, list(CONFLICT_SCENARIO_NAMES)].min()
+    ) <= 1e-9
+
+    # Petrol affects Net FED and diesel affects Net RUC. Those two canonical
+    # net deltas must close exactly to each displayed whole-of-NLTF delta for
+    # every severity and every requested June year.
+    component_rows = annual_view["chart_rows"]
+    component_values = component_rows[
+        component_rows["time_grain"].astype(str).eq("june_year")
+        & component_rows["fed_path"].astype(str).eq(FED)
+        & component_rows["scenario_name"].astype(str).isin(
+            expected_scenarios
+        )
+        & component_rows["series_id"].astype(str).isin(
+            ["net_fed_revenue", "total_ruc_net_revenue", "total_nltf_net_revenue"]
+        )
+        & pd.to_numeric(component_rows["june_year"], errors="coerce").isin(expected_years)
+    ].pivot_table(
+        index=["june_year", "series_id"],
+        columns="scenario_name",
+        values="value",
+        aggfunc="first",
+    )
+    for conflict_scenario in CONFLICT_SCENARIO_NAMES:
+        for fy in expected_years:
+            deltas = {
+                series_id: float(
+                    component_values.at[(fy, series_id), conflict_scenario]
+                    - component_values.at[(fy, series_id), "current_basecase"]
+                )
+                for series_id in (
+                    "net_fed_revenue",
+                    "total_ruc_net_revenue",
+                    "total_nltf_net_revenue",
+                )
+            }
+            assert deltas["total_nltf_net_revenue"] == pytest.approx(
+                deltas["net_fed_revenue"] + deltas["total_ruc_net_revenue"],
+                abs=1e-9,
+            )
 
     assert quarterly_view["quarterly_disaggregated"] is True
     quarterly = quarterly_view["filtered_rows"].pivot_table(
         index="period", columns="scenario_name", values="value", aggfunc="first"
     )
-    for period in ("2025Q3", "2025Q4"):
-        assert float(quarterly.at[period, FUEL_PRICE_SCENARIO_NAME]) == pytest.approx(
-            float(quarterly.at[period, "current_basecase"]), abs=1e-9
-        )
-    for period in ("2026Q1", "2026Q2", "2026Q3", "2026Q4", "2027Q1", "2027Q2"):
-        assert float(quarterly.at[period, FUEL_PRICE_SCENARIO_NAME]) < float(
-            quarterly.at[period, "current_basecase"]
-        )
-    for scenario_name in ("current_basecase", FUEL_PRICE_SCENARIO_NAME):
+    for conflict_scenario in CONFLICT_SCENARIO_NAMES:
+        for period in ("2025Q3", "2025Q4", "2026Q1"):
+            assert float(quarterly.at[period, conflict_scenario]) == pytest.approx(
+                float(quarterly.at[period, "current_basecase"]), abs=1e-9
+            )
+        for period in ("2026Q2", "2026Q3", "2026Q4"):
+            assert float(quarterly.at[period, conflict_scenario]) < float(
+                quarterly.at[period, "current_basecase"]
+            )
+
+    # All severities share the observed Q2/Q3 fuel-price anchors, so later
+    # prospective assumptions must not leak backward through annual-to-quarter
+    # reconciliation. Their prospective Q4 then orders Net revenue
+    # Low >= Medium >= High as the fuel premium increases.
+    configured_paths = load_conflict_fuel_price_paths(ROOT)
+    for period in ("2026Q2", "2026Q3"):
+        configured_period = configured_paths[
+            configured_paths["period"].astype(str).eq(period)
+        ]
+        assert len(configured_period) == len(CONFLICT_FUEL_SCENARIO_LEVELS)
+        assert configured_period["scenario_diesel_cpl"].nunique() == 1
+        assert configured_period["scenario_petrol_cpl"].nunique() == 1
+        conflict_values = [
+            float(quarterly.at[period, conflict_scenario])
+            for conflict_scenario in CONFLICT_SCENARIO_NAMES
+        ]
+        assert max(conflict_values) - min(conflict_values) <= 1e-9
+    q4_values = [
+        float(quarterly.at["2026Q4", conflict_scenario])
+        for conflict_scenario in CONFLICT_SCENARIO_NAMES
+    ]
+    assert q4_values == sorted(q4_values, reverse=True)
+
+    for scenario_name in expected_scenarios:
         sums = quarterly_view["filtered_rows"][
             quarterly_view["filtered_rows"]["scenario_name"].astype(str).eq(scenario_name)
-            & pd.to_numeric(quarterly_view["filtered_rows"]["june_year"], errors="coerce").isin(expected)
+            & pd.to_numeric(
+                quarterly_view["filtered_rows"]["june_year"], errors="coerce"
+            ).isin(expected_years)
         ].groupby("june_year")["value"].sum()
-        for fy in expected:
+        for fy in expected_years:
             assert float(sums.loc[fy]) == pytest.approx(float(annual.at[fy, scenario_name]), abs=1e-6)
 
 

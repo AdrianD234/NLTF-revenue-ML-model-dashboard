@@ -9,12 +9,24 @@ from streamlit.testing.v1 import AppTest
 
 import app
 import model_dashboard.revenue_outlook as revenue_outlook_module
+from model_dashboard.conflict_fuel_paths import (
+    CONFLICT_FUEL_SCENARIO_LEVELS,
+    conflict_scenario_name,
+    conflict_trace_name,
+)
 from model_dashboard.revenue_outlook import (
     CURRENT_REVENUE_OUTLOOK_DIR,
     PED_BRIDGE_DEFAULT_MODE,
     apply_ped_bridge_mode_layer,
     load_revenue_outlook_pack,
     revenue_outlook_signature,
+)
+
+CONFLICT_SCENARIO_NAMES = tuple(
+    conflict_scenario_name(level) for level in CONFLICT_FUEL_SCENARIO_LEVELS
+)
+CONFLICT_TRACE_NAMES = tuple(
+    conflict_trace_name(level) for level in CONFLICT_FUEL_SCENARIO_LEVELS
 )
 
 
@@ -168,6 +180,11 @@ def test_revenue_outlook_selector_metadata_is_precomputed() -> None:
     assert selectors["sensitivity_labels"]["pt_mode_shift"]["High"] == "High (1.0% p.a. from FY2030)"
     assert selectors["sensitivity_labels"]["freight_rail_shift"]["High"] == "High (1.0% p.a. from FY2030)"
     assert selectors["sensitivity_labels"]["demand_elasticity"]["Med"] == "Med: PED -0.144 / Light RUC -0.120 / Heavy RUC -0.100"
+    assert set(CONFLICT_TRACE_NAMES) <= set(selectors["trace_options"])
+    default_traces = app._revenue_outlook_default_traces(selectors["trace_options"])
+    assert conflict_trace_name("medium") in default_traces
+    assert conflict_trace_name("low") not in default_traces
+    assert conflict_trace_name("high") not in default_traces
 
 
 def test_revenue_outlook_default_sensitivity_view_uses_fast_path_and_preserves_values() -> None:
@@ -207,13 +224,29 @@ def test_revenue_outlook_default_sensitivity_view_uses_fast_path_and_preserves_v
     assert view["revenue_formula_residuals"].empty
     assert view["revenue_stack_components"].empty
     non_fuel = view["chart_rows"][
-        ~view["chart_rows"]["scenario_name"].astype(str).eq("current_iran_war_fuel_15pct_ruc_20pct_6q")
+        ~view["chart_rows"]["scenario_name"].astype(str).isin(CONFLICT_SCENARIO_NAMES)
     ]
     assert len(non_fuel) == len(expected["chart_rows"])
-    assert set(view["chart_rows"]["trace_name"].astype(str)) >= {
-        "Current finalist Iran war (+15% fuel, +20% RUC; 6 quarters)"
+    assert set(view["chart_rows"]["trace_name"].astype(str)) >= set(CONFLICT_TRACE_NAMES)
+    conflict_input_audit = view["conflict_fuel_input_audit"]
+    assert set(conflict_input_audit["scenario_name"].astype(str)) == set(
+        CONFLICT_SCENARIO_NAMES
+    )
+    assert set(conflict_input_audit["severity"].astype(str)) == set(
+        CONFLICT_FUEL_SCENARIO_LEVELS
+    )
+    assert set(conflict_input_audit["stream"].astype(str)) == {
+        "PED",
+        "LIGHT_RUC",
+        "HEAVY_RUC",
     }
-    assert len(view["iran_war_input_audit"]) == 42
+    assert (
+        conflict_input_audit.groupby(["scenario_name", "stream"])[
+            "canonical_period"
+        ].nunique()
+        == 20
+    ).all()
+    assert not conflict_input_audit["fed_12c_embedded"].fillna(True).astype(bool).any()
     for key, value_column in [
         ("revenue_bridge_components", "component_value"),
         ("future_revenue_forecasts", "revenue_forecast_nzd"),
@@ -1052,6 +1085,26 @@ def test_revenue_outlook_defaults_to_single_scenario_view() -> None:
     # The advanced levers live in one accordion; the old bordered panels are gone.
     expander_labels = [str(expander.label) for expander in at.expander]
     assert "Advanced scenario levers" in expander_labels
+
+
+def test_revenue_outlook_activity_opens_policy_levers() -> None:
+    at = _run_revenue_outlook_page()
+    series = next(
+        selectbox for selectbox in at.selectbox if selectbox.key == "revenue_outlook_stream"
+    )
+    series.set_value("PED VKT per capita")
+    at.run()
+
+    assert not at.exception
+    lever_expander = next(
+        expander for expander in at.expander if expander.label == "Advanced scenario levers"
+    )
+    assert lever_expander.proto.expanded is True
+    toggle_keys = {toggle.key for toggle in at.toggle}
+    assert {
+        "revenue_outlook_fed_uplift",
+        "revenue_outlook_mbu_fed_uplift",
+    }.issubset(toggle_keys)
 
 
 def test_revenue_outlook_compare_mode_swaps_total_path_for_comparison() -> None:

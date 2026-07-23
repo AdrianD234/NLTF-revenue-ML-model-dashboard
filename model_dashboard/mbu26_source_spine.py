@@ -429,6 +429,7 @@ def current_forecast_annual_from_mbu26(
     current_outlook_chart_rows: pd.DataFrame,
     mbu26_official_annual: pd.DataFrame,
     scenario_input_wide: pd.DataFrame | None = None,
+    migration_lambda_reference_scenario: str | None = None,
 ) -> pd.DataFrame:
     columns = [
         "FY",
@@ -481,6 +482,7 @@ def current_forecast_annual_from_mbu26(
         scenario_input_wide=scenario_input_wide,
         modes=(EV_PHEV_MIGRATION_DEFAULT_MODE,),
         include_disabled_extension_boundary=True,
+        optimized_lambda_reference_scenario=migration_lambda_reference_scenario,
     )
     migration_lookup = {
         (str(row.scenario_name), int(row.FY)): row
@@ -665,8 +667,19 @@ def current_forecast_annual_from_mbu26(
             if value
         )
         migration_source_cell = f"{ped_source_cell}; {light_source_cell}; {population_source_cells}; MBU26 migration cells {split_cells}".strip("; ")
-        migration_basis = "optimized PED/light-petrol + total Light RUC migration allocation with scenario-input population where supplied"
+        migration_reference_basis = (
+            f"; optimized lambda schedule anchored to {migration_lambda_reference_scenario}"
+            if migration_lambda_reference_scenario
+            else ""
+        )
+        migration_basis = (
+            "optimized PED/light-petrol + total Light RUC migration allocation "
+            "with scenario-input population where supplied"
+            f"{migration_reference_basis}"
+        )
         migration_revenue_basis = "optimized PED/light-petrol + total Light RUC migration allocation, scenario-input population and MBU26 effective rate"
+        if migration_reference_basis:
+            migration_revenue_basis += migration_reference_basis
         ped_bridge_sources = {
             "vktpc_source_file": "forecast_scenario_comparison.parquet",
             "vktpc_source_cell": ped_source_cell,
@@ -1238,6 +1251,7 @@ def ev_phev_ped_light_migration_assumptions_from_mbu26(
     smoothness_penalty: float = EV_PHEV_MIGRATION_SMOOTHNESS_PENALTY,
     modes: tuple[str, ...] = EV_PHEV_MIGRATION_MODES,
     include_disabled_extension_boundary: bool = False,
+    optimized_lambda_reference_scenario: str | None = None,
 ) -> pd.DataFrame:
     columns = [
         "FY",
@@ -1452,8 +1466,28 @@ def ev_phev_ped_light_migration_assumptions_from_mbu26(
     rows: list[dict[str, Any]] = []
     for item in contexts:
         for mode in modes:
-            lambda_value = _lambda_for_mode(item, mode, optimized_by_key)
-            rows.append(_migration_audit_row(item, mode, lambda_value, smoothness_penalty))
+            audit_item = item
+            lambda_value = _lambda_for_mode(
+                item,
+                mode,
+                optimized_by_key,
+                optimized_lambda_reference_scenario=optimized_lambda_reference_scenario,
+            )
+            if (
+                mode == "optimized"
+                and optimized_lambda_reference_scenario
+                and str(item.get("scenario_name") or "")
+                != str(optimized_lambda_reference_scenario)
+            ):
+                audit_item = {
+                    **item,
+                    "source_formula": (
+                        f"{item['source_formula']} Optimized lambda schedule is anchored to "
+                        f"{optimized_lambda_reference_scenario} and clipped only when the "
+                        "scenario-specific feasibility bounds require it."
+                    ),
+                }
+            rows.append(_migration_audit_row(audit_item, mode, lambda_value, smoothness_penalty))
     return pd.DataFrame(rows, columns=columns)
 
 
@@ -1566,11 +1600,30 @@ def _smooth_bounded_lambdas(
     return np.clip(np.where(np.isnan(fixed), raw_arr, fixed), lower_arr, upper_arr)
 
 
-def _lambda_for_mode(item: dict[str, Any], mode: str, optimized_by_key: dict[tuple[str, int], float]) -> float:
+def _lambda_for_mode(
+    item: dict[str, Any],
+    mode: str,
+    optimized_by_key: dict[tuple[str, int], float],
+    *,
+    optimized_lambda_reference_scenario: str | None = None,
+) -> float:
     lower = float(item["lambda_lower"])
     upper = float(item["lambda_upper"])
     if mode == "optimized":
-        raw_value = optimized_by_key.get((str(item.get("scenario_name") or ""), int(item["FY"])), float(item["lambda_raw"]))
+        scenario_name = str(item.get("scenario_name") or "")
+        lookup_scenario = (
+            str(optimized_lambda_reference_scenario)
+            if optimized_lambda_reference_scenario
+            and scenario_name != str(optimized_lambda_reference_scenario)
+            else scenario_name
+        )
+        raw_value = optimized_by_key.get(
+            (lookup_scenario, int(item["FY"])),
+            optimized_by_key.get(
+                (scenario_name, int(item["FY"])),
+                float(item["lambda_raw"]),
+            ),
+        )
     elif mode == "fixed_light_only":
         raw_value = 1.0
     elif mode == "fixed_ped_only":

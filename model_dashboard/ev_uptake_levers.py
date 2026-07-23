@@ -126,6 +126,13 @@ def reconcile_native_quarterly_activity_to_annual(
     chart_rows: pd.DataFrame,
     *,
     scenario_names: set[str] | None = None,
+    adjustable_periods_by_key: dict[
+        tuple[str, int, str], tuple[str, ...] | set[str]
+    ]
+    | None = None,
+    value_status: str = "lever_adjusted_quarterly_reconciled",
+    data_scope: str = "ev_uptake_quarterly_annual_reconciliation",
+    mark_unchanged: bool = True,
 ) -> pd.DataFrame:
     """Rebase native forecast quarters to their adjusted June-year rows.
 
@@ -134,6 +141,12 @@ def reconcile_native_quarterly_activity_to_annual(
     quarters reproduce the adjusted annual benchmark exactly.  In the
     transition FY, already-published actual quarters stay fixed and only the
     remaining forecast quarters absorb the required proportional change.
+
+    A later policy overlay can pass ``adjustable_periods_by_key`` to keep
+    pre-policy quarters fixed as well.  The mapping key is
+    ``(scenario_name, June year, series_id)``; only the listed forecast
+    quarters absorb that annual residual.  Missing keys retain the original
+    all-forecast-quarter behaviour.
 
     Official-comparator and historical rows are never eligible.  Callers can
     additionally restrict the operation to explicit current scenario names;
@@ -167,6 +180,15 @@ def reconcile_native_quarterly_activity_to_annual(
         if raw_ruc_quarters.any():
             raw_values = pd.to_numeric(data.loc[raw_ruc_quarters, "value"], errors="coerce")
             data.loc[raw_ruc_quarters, "value"] = raw_values / 1_000_000.0
+            for metadata_column in ("_fed_baseline_value", "_fed_annual_delta"):
+                if metadata_column not in data.columns:
+                    continue
+                metadata_values = pd.to_numeric(
+                    data.loc[raw_ruc_quarters, metadata_column], errors="coerce"
+                )
+                data.loc[raw_ruc_quarters, metadata_column] = (
+                    metadata_values / 1_000_000.0
+                )
             data.loc[raw_ruc_quarters, "_quarterly_source_value_unit"] = "net km"
             data.loc[raw_ruc_quarters, "value_unit"] = "million km"
 
@@ -235,14 +257,41 @@ def reconcile_native_quarterly_activity_to_annual(
             for index in actual_indices
             if pd.notna(values.at[index])
         )
+        reconcile_key = (annual_scenario, annual_fy, annual_series)
+        if adjustable_periods_by_key is not None and reconcile_key in adjustable_periods_by_key:
+            adjustable_periods = {
+                str(period) for period in adjustable_periods_by_key[reconcile_key]
+            }
+            adjustable_indices = [
+                index
+                for index in forecast_indices
+                if not adjustable_periods
+                or str(data.at[index, "period"]) in adjustable_periods
+            ]
+        else:
+            adjustable_indices = forecast_indices
+        if not adjustable_indices:
+            continue
+        adjustable_index_set = set(adjustable_indices)
+        fixed_forecast_indices = [
+            index for index in forecast_indices if index not in adjustable_index_set
+        ]
+        fixed_forecast = sum(
+            float(values.at[index]) * _unit_base_scale(units.at[index])
+            for index in fixed_forecast_indices
+            if pd.notna(values.at[index])
+        )
         forecast_base_values = np.array(
-            [float(values.at[index]) * _unit_base_scale(units.at[index]) for index in forecast_indices],
+            [
+                float(values.at[index]) * _unit_base_scale(units.at[index])
+                for index in adjustable_indices
+            ],
             dtype=float,
         )
         if not np.all(np.isfinite(forecast_base_values)):
             continue
         forecast_total = float(forecast_base_values.sum())
-        forecast_target = annual_target - fixed_actual
+        forecast_target = annual_target - fixed_actual - fixed_forecast
         if forecast_target < -1e-9 or forecast_total <= 0.0:
             continue
 
@@ -251,14 +300,22 @@ def reconcile_native_quarterly_activity_to_annual(
         # Remove the final floating-point residual without materially changing
         # the preserved quarterly shape.
         adjusted_base[int(np.argmax(np.abs(adjusted_base)))] += forecast_target - float(adjusted_base.sum())
-        for position, index in enumerate(forecast_indices):
-            data.at[index, "value"] = float(adjusted_base[position] / _unit_base_scale(units.at[index]))
+        changed_indices: list[Any] = []
+        for position, index in enumerate(adjustable_indices):
+            adjusted_value = float(
+                adjusted_base[position] / _unit_base_scale(units.at[index])
+            )
+            original_value = float(values.at[index])
+            data.at[index, "value"] = adjusted_value
             data.at[index, "_quarterly_annual_reconciliation_factor"] = factor
+            if not np.isclose(adjusted_value, original_value, rtol=0.0, atol=1e-12):
+                changed_indices.append(index)
 
-        if "value_status" in data.columns:
-            data.loc[forecast_indices, "value_status"] = "lever_adjusted_quarterly_reconciled"
-        if "data_scope" in data.columns:
-            data.loc[forecast_indices, "data_scope"] = "ev_uptake_quarterly_annual_reconciliation"
+        labelled_indices = adjustable_indices if mark_unchanged else changed_indices
+        if labelled_indices and "value_status" in data.columns:
+            data.loc[labelled_indices, "value_status"] = value_status
+        if labelled_indices and "data_scope" in data.columns:
+            data.loc[labelled_indices, "data_scope"] = data_scope
 
     return data
 

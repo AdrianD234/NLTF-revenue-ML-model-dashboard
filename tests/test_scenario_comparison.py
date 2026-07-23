@@ -76,8 +76,20 @@ def test_current_and_mbu26_uplift_switches_are_independent(comparison_context) -
 
     mbu_off = _keys(uptake=app.EV_UPTAKE_GOVERNED_OPTION, mbu_fed_on=False)
     toggled = _paths(comparison_context, "Total NLTF revenue", mbu_on, mbu_off)
-    assert toggled["b"].loc[2030] == pytest.approx(6089.343312, rel=1e-9)
+    assert toggled["b"].loc[2030] == pytest.approx(5664.522358786646, rel=1e-12)
     assert toggled["b"].loc[2030] < toggled["a"].loc[2030]
+
+    # The governed proportional policy reprices RUC alongside PED/FED. Both
+    # component paths must move, and together they must explain the total.
+    fed_toggled = _paths(comparison_context, "Net FED revenue", mbu_on, mbu_off)
+    ruc_toggled = _paths(comparison_context, "Total RUC all classes", mbu_on, mbu_off)
+    assert fed_toggled["b"].loc[2030] < fed_toggled["a"].loc[2030]
+    assert ruc_toggled["b"].loc[2030] < ruc_toggled["a"].loc[2030]
+    assert toggled["b"].loc[2030] - toggled["a"].loc[2030] == pytest.approx(
+        (fed_toggled["b"].loc[2030] - fed_toggled["a"].loc[2030])
+        + (ruc_toggled["b"].loc[2030] - ruc_toggled["a"].loc[2030]),
+        abs=1e-9,
+    )
 
 
 def test_revenue_cards_use_npv_language_and_activity_cards_do_not(comparison_context) -> None:
@@ -136,7 +148,7 @@ def test_mot_official_scenario_plots_the_mbu26_official_trace(comparison_context
         expected.drop(index=2027),
         check_index_type=False,
     )
-    assert result["a"].loc[2027] == pytest.approx(4835.639826942325, rel=1e-12)
+    assert result["a"].loc[2027] == pytest.approx(4649.8686132182675, rel=1e-12)
     assert result["a"].loc[2027] < expected.loc[2027]
     # And it differs from the VFM base preset overlay path.
     vs_base = _paths(comparison_context, "Total NLTF revenue", governed_keys, _keys())

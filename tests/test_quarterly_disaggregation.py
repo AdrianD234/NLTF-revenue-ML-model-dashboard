@@ -13,6 +13,55 @@ from app import (
     _june_year_quarters,
     _quarterly_disaggregation_indicator_id,
 )
+from model_dashboard.fuel_price_scenario import (
+    BASE_DELAYED_6M_SCENARIO_NAME,
+    FUEL_PRICE_SCENARIO_NAME,
+    IRAN_WAR_DELAYED_6M_SCENARIO_NAME,
+    append_fuel_price_scenario_to_chart_rows,
+    run_fuel_price_scenario_replay,
+)
+from model_dashboard.rate_paths import (
+    FED_POLICY_STATE_DELAYED_6M,
+    apply_fed_uplift_delay_to_chart_rows,
+    fed_policy_affected_periods,
+    fed_uplift_delayed_factors,
+    ped_quarterly_rate_schedules,
+)
+
+
+ROOT = Path(__file__).resolve().parents[1]
+SCENARIO_INPUT_PATH = ROOT / "data/current_revenue_outlook/scenario_inputs/scenario_input_wide.parquet"
+CHART_PATH = ROOT / "data/current_revenue_outlook/revenue_chart_rows.parquet"
+
+
+@pytest.fixture(scope="module")
+def delayed_policy_materialization() -> dict[str, object]:
+    """Real Base/Iran rows after the governed six-month PED/RUC shift."""
+
+    chart_rows = pd.read_parquet(CHART_PATH)
+    replay = run_fuel_price_scenario_replay(
+        pd.read_parquet(SCENARIO_INPUT_PATH),
+        repo_root=ROOT,
+        engine="ensemble",
+    )
+    delayed_rows, policy_audit = apply_fed_uplift_delay_to_chart_rows(
+        chart_rows,
+        fed_uplift_delayed_factors(ROOT, chart_rows),
+        scenario_roles={"basecase", "comparison"},
+        affected_periods_by_fy=fed_policy_affected_periods(
+            ROOT,
+            FED_POLICY_STATE_DELAYED_6M,
+        ),
+        policy_pair_factors=replay.policy_pair_factors,
+    )
+    published_rows, _ = append_fuel_price_scenario_to_chart_rows(chart_rows, replay)
+    combined_rows, _ = append_fuel_price_scenario_to_chart_rows(delayed_rows, replay)
+    return {
+        "chart_rows": combined_rows,
+        "published_chart_rows": published_rows,
+        "replay": replay,
+        "policy_audit": policy_audit,
+    }
 
 
 def test_denton_split_preserves_annual_sums_flat_indicator() -> None:
@@ -210,3 +259,356 @@ def test_quarterly_fallback_fills_mbu_trace_when_current_native_rows_exist() -> 
         + pd.to_numeric(derived_fy2026["value"], errors="coerce").sum()
     )
     assert hybrid_total_million_km == pytest.approx(float(mbu_fy2026.iloc[0]["value"]), abs=1e-9)
+
+
+def test_delayed_base_and_iran_net_revenue_quarters_reconcile_exactly_to_june_years(
+    delayed_policy_materialization: dict[str, object],
+) -> None:
+    """Every displayed revenue year remains an exact four-quarter partition."""
+
+    chart_rows = delayed_policy_materialization["chart_rows"]
+    assert isinstance(chart_rows, pd.DataFrame)
+    series_ids = (
+        "net_fed_revenue",
+        "total_ruc_net_revenue",
+        "net_mvr_revenue",
+    )
+    scenario_names = ("current_basecase", FUEL_PRICE_SCENARIO_NAME)
+
+    for scenario_name in scenario_names:
+        for series_id in series_ids:
+            annual = chart_rows[
+                chart_rows["scenario_name"].astype(str).eq(scenario_name)
+                & chart_rows["series_id"].astype(str).eq(series_id)
+                & chart_rows["time_grain"].astype(str).eq("june_year")
+                & pd.to_numeric(chart_rows["june_year"], errors="coerce").between(2026, 2030)
+            ].copy()
+            assert len(annual) == 5
+            assert not annual.duplicated("june_year").any()
+
+            quarterly = _disaggregate_annual_rows_to_quarterly(annual, chart_rows)
+            for annual_row in annual.itertuples():
+                fy = int(annual_row.june_year)
+                year_quarters = quarterly[
+                    pd.to_numeric(quarterly["june_year"], errors="coerce").eq(fy)
+                ]
+                assert set(year_quarters["period"].astype(str)) == set(_june_year_quarters(fy))
+                assert len(year_quarters) == 4
+                assert pd.to_numeric(year_quarters["value"], errors="coerce").sum() == pytest.approx(
+                    float(annual_row.value),
+                    rel=0.0,
+                    abs=1e-8,
+                )
+
+
+def test_delayed_base_high_and_iran_native_activity_quarters_reconcile_to_june_years(
+    delayed_policy_materialization: dict[str, object],
+) -> None:
+    """The policy bridge must expose one coherent activity path at both grains."""
+
+    chart_rows = delayed_policy_materialization["chart_rows"]
+    published_rows = delayed_policy_materialization["published_chart_rows"]
+    policy_audit = delayed_policy_materialization["policy_audit"]
+    assert isinstance(chart_rows, pd.DataFrame)
+    assert isinstance(published_rows, pd.DataFrame)
+    assert isinstance(policy_audit, pd.DataFrame)
+
+    def base_value(row: object) -> float:
+        value = float(getattr(row, "value"))
+        unit = str(getattr(row, "value_unit", "")).lower()
+        return value * (1_000_000.0 if "million" in unit else 1.0)
+
+    scenario_names = (
+        "current_basecase",
+        "current_comparison_1",
+        FUEL_PRICE_SCENARIO_NAME,
+    )
+    series_ids = (
+        "ped_vkt_per_capita",
+        "light_ruc_net_km",
+        "heavy_ruc_net_km",
+    )
+    for scenario_name in scenario_names:
+        for series_id in series_ids:
+            for fy in range(2026, 2031):
+                annual = chart_rows[
+                    chart_rows["scenario_name"].astype(str).eq(scenario_name)
+                    & chart_rows["series_id"].astype(str).eq(series_id)
+                    & chart_rows["time_grain"].astype(str).eq("june_year")
+                    & pd.to_numeric(chart_rows["june_year"], errors="coerce").eq(fy)
+                ]
+                scenario_quarters = chart_rows[
+                    chart_rows["scenario_name"].astype(str).eq(scenario_name)
+                    & chart_rows["series_id"].astype(str).eq(series_id)
+                    & chart_rows["time_grain"].astype(str).eq("quarterly")
+                    & pd.to_numeric(chart_rows["june_year"], errors="coerce").eq(fy)
+                ]
+                actual_quarters = chart_rows[
+                    chart_rows["row_type"].astype(str).eq("historical_actual")
+                    & chart_rows["series_id"].astype(str).eq(series_id)
+                    & chart_rows["time_grain"].astype(str).eq("quarterly")
+                    & pd.to_numeric(chart_rows["june_year"], errors="coerce").eq(fy)
+                ]
+                quarters = pd.concat(
+                    [actual_quarters, scenario_quarters], ignore_index=True
+                )
+                assert len(annual) == 1
+                assert set(quarters["period"].astype(str)) == set(_june_year_quarters(fy))
+                assert not quarters["period"].astype(str).duplicated().any()
+                assert sum(base_value(row) for row in quarters.itertuples()) == pytest.approx(
+                    base_value(next(annual.itertuples())),
+                    rel=0.0,
+                    abs=1e-5,
+                )
+
+    # FY2026's already-published actual quarters are value-identical in base
+    # units; the bridge may only normalise their display unit to million km.
+    for series_id in series_ids:
+        before = published_rows[
+            published_rows["row_type"].astype(str).eq("historical_actual")
+            & published_rows["series_id"].astype(str).eq(series_id)
+            & published_rows["time_grain"].astype(str).eq("quarterly")
+            & pd.to_numeric(published_rows["june_year"], errors="coerce").eq(2026)
+        ].sort_values("period")
+        after = chart_rows[
+            chart_rows["row_type"].astype(str).eq("historical_actual")
+            & chart_rows["series_id"].astype(str).eq(series_id)
+            & chart_rows["time_grain"].astype(str).eq("quarterly")
+            & pd.to_numeric(chart_rows["june_year"], errors="coerce").eq(2026)
+        ].sort_values("period")
+        assert list(after["period"].astype(str)) == list(before["period"].astype(str))
+        assert [base_value(row) for row in after.itertuples()] == pytest.approx(
+            [base_value(row) for row in before.itertuples()], abs=1e-5
+        )
+
+    # The delayed policy starts in 2027Q1.  The two earlier FY2027 quarters
+    # stay exactly on the published Base path; only policy/model-active
+    # quarters absorb the annual reconciliation.
+    for series_id in series_ids:
+        for period in ("2026Q3", "2026Q4"):
+            before = published_rows[
+                published_rows["scenario_name"].astype(str).eq("current_basecase")
+                & published_rows["series_id"].astype(str).eq(series_id)
+                & published_rows["period"].astype(str).eq(period)
+                & published_rows["time_grain"].astype(str).eq("quarterly")
+            ]
+            after = chart_rows[
+                chart_rows["scenario_name"].astype(str).eq("current_basecase")
+                & chart_rows["series_id"].astype(str).eq(series_id)
+                & chart_rows["period"].astype(str).eq(period)
+                & chart_rows["time_grain"].astype(str).eq("quarterly")
+            ]
+            assert len(before) == len(after) == 1
+            assert base_value(next(after.itertuples())) == pytest.approx(
+                base_value(next(before.itertuples())), abs=1e-5
+            )
+
+    reconciled = chart_rows[
+        chart_rows["scenario_name"].astype(str).isin(
+            {"current_basecase", "current_comparison_1"}
+        )
+        & chart_rows["time_grain"].astype(str).eq("quarterly")
+        & chart_rows["series_id"].astype(str).isin(series_ids)
+        & chart_rows["data_scope"].astype(str).str.endswith(
+            "quarterly_annual_reconciliation"
+        )
+    ]
+    assert not reconciled.empty
+    assert reconciled["value_status"].astype(str).str.endswith(
+        "quarterly_reconciled"
+    ).all()
+    assert pd.to_numeric(
+        policy_audit["quarterly_annual_reconciliation_delta"], errors="coerce"
+    ).abs().gt(0).any()
+
+    # The official MBU comparator has no behavioural replay and is untouched.
+    mbu_columns = [
+        "series_id",
+        "time_grain",
+        "period",
+        "june_year",
+        "value",
+        "value_unit",
+    ]
+    before_mbu = published_rows[
+        published_rows["scenario_name"].astype(str).eq("mbu26_official")
+    ][mbu_columns].reset_index(drop=True)
+    after_mbu = chart_rows[
+        chart_rows["scenario_name"].astype(str).eq("mbu26_official")
+    ][mbu_columns].reset_index(drop=True)
+    pd.testing.assert_frame_equal(after_mbu, before_mbu, check_dtype=False)
+
+
+def test_published_and_delayed_base_and_iran_fed_ruc_subtotals_close_by_year_and_quarter(
+    delayed_policy_materialization: dict[str, object],
+) -> None:
+    """The selectable subtotal is the sum of its canonical net components."""
+
+    series_ids = (
+        "net_fed_revenue",
+        "total_ruc_net_revenue",
+        "total_fed_ruc_net_revenue",
+    )
+    scenario_names = ("current_basecase", FUEL_PRICE_SCENARIO_NAME)
+    for materialization_key in ("published_chart_rows", "chart_rows"):
+        chart_rows = delayed_policy_materialization[materialization_key]
+        assert isinstance(chart_rows, pd.DataFrame)
+        for scenario_name in scenario_names:
+            annual_components: dict[str, pd.DataFrame] = {}
+            quarterly_components: dict[str, pd.DataFrame] = {}
+            for series_id in series_ids:
+                annual = chart_rows[
+                    chart_rows["scenario_name"].astype(str).eq(scenario_name)
+                    & chart_rows["series_id"].astype(str).eq(series_id)
+                    & chart_rows["time_grain"].astype(str).eq("june_year")
+                    & pd.to_numeric(chart_rows["june_year"], errors="coerce").between(2026, 2030)
+                ].copy()
+                assert len(annual) == 5
+                annual_components[series_id] = annual.set_index("june_year")
+                quarterly_components[series_id] = _disaggregate_annual_rows_to_quarterly(
+                    annual,
+                    chart_rows,
+                ).set_index("period")
+
+            annual_residual = (
+                pd.to_numeric(
+                    annual_components["total_fed_ruc_net_revenue"]["value"],
+                    errors="coerce",
+                )
+                - pd.to_numeric(annual_components["net_fed_revenue"]["value"], errors="coerce")
+                - pd.to_numeric(
+                    annual_components["total_ruc_net_revenue"]["value"],
+                    errors="coerce",
+                )
+            )
+            assert annual_residual.abs().max() == pytest.approx(0.0, abs=1e-9)
+
+            quarterly_residual = (
+                pd.to_numeric(
+                    quarterly_components["total_fed_ruc_net_revenue"]["value"],
+                    errors="coerce",
+                )
+                - pd.to_numeric(
+                    quarterly_components["net_fed_revenue"]["value"],
+                    errors="coerce",
+                )
+                - pd.to_numeric(
+                    quarterly_components["total_ruc_net_revenue"]["value"],
+                    errors="coerce",
+                )
+            )
+            assert quarterly_residual.abs().max() == pytest.approx(0.0, abs=1e-9)
+            assert set(
+                quarterly_components["total_fed_ruc_net_revenue"]["value_status"].astype(str)
+            ) == {"interpolated_formula_rebuilt"}
+
+
+def test_delayed_policy_direct_window_is_two_quarters_without_raw_recursive_carry(
+    delayed_policy_materialization: dict[str, object],
+) -> None:
+    replay = delayed_policy_materialization["replay"]
+
+    schedules = ped_quarterly_rate_schedules(ROOT)
+    changed_rate_quarters = set(
+        schedules.index[
+            (
+                pd.to_numeric(schedules["delayed_6m"], errors="coerce")
+                - pd.to_numeric(schedules["planned"], errors="coerce")
+            )
+            .abs()
+            .gt(1e-12)
+        ].astype(str)
+    )
+    assert changed_rate_quarters == {"2027Q1", "2027Q2"}
+
+    source_by_scenario = {
+        BASE_DELAYED_6M_SCENARIO_NAME: "current_basecase",
+        IRAN_WAR_DELAYED_6M_SCENARIO_NAME: FUEL_PRICE_SCENARIO_NAME,
+    }
+    replay_inputs = replay.replay_inputs.set_index(
+        ["scenario_name", "stream", "canonical_period"]
+    ).sort_index()
+    direct_fields = {
+        "PED": ("real_petrol_price_cents_per_litre",),
+        "LIGHT_RUC": ("real_light_ruc_price_nzd_per_1000km",),
+        "HEAVY_RUC": (
+            "real_light_ruc_price_nzd_per_1000km",
+            "real_heavy_ruc_price_nzd_per_1000km",
+        ),
+    }
+    all_periods = sorted(
+        replay.replay_inputs["canonical_period"].dropna().astype(str).unique()
+    )
+    for delayed_name, source_name in source_by_scenario.items():
+        for stream, fields in direct_fields.items():
+            for field in fields:
+                changed_input_quarters = {
+                    period
+                    for period in all_periods
+                    if not np.isclose(
+                        float(replay_inputs.at[(delayed_name, stream, period), field]),
+                        float(replay_inputs.at[(source_name, stream, period), field]),
+                        rtol=0.0,
+                        atol=1e-12,
+                    )
+                }
+                assert changed_input_quarters == {"2027Q1", "2027Q2"}
+
+        lag_field = "lagged_real_light_ruc_price_nzd_per_1000km"
+        changed_lag_quarters = {
+            period
+            for period in all_periods
+            if not np.isclose(
+                float(replay_inputs.at[(delayed_name, "LIGHT_RUC", period), lag_field]),
+                float(replay_inputs.at[(source_name, "LIGHT_RUC", period), lag_field]),
+                rtol=0.0,
+                atol=1e-12,
+            )
+        }
+        assert changed_lag_quarters == {"2027Q2", "2027Q3"}
+
+        forecasts = replay.future_forecasts.set_index(
+            ["scenario_name", "stream", "target_period"]
+        ).sort_index()
+        for stream in ("PED", "LIGHT_RUC", "HEAVY_RUC"):
+            for period in ("2027Q1", "2027Q2"):
+                assert float(
+                    forecasts.at[(delayed_name, stream, period), "forecast"]
+                ) > float(forecasts.at[(source_name, stream, period), "forecast"])
+                assert bool(
+                    forecasts.at[
+                        (delayed_name, stream, period),
+                        "policy_calibration_applied",
+                    ]
+                )
+        # The lagged diagnostic input correctly records the prior-quarter
+        # policy rate, but the delivered calibrated path must not inherit the
+        # raw replay's recursive carry after the two-quarter direct window.
+        assert float(forecasts.at[(delayed_name, "LIGHT_RUC", "2027Q3"), "forecast"]) == pytest.approx(
+            float(forecasts.at[(source_name, "LIGHT_RUC", "2027Q3"), "forecast"]),
+            rel=1e-12,
+        )
+
+    annual_pairs = replay.policy_pair_factors[
+        replay.policy_pair_factors["pair_id"].astype(str).isin(
+            ["baseline_delayed_6m", "iran_vs_baseline_delayed_6m"]
+        )
+        & replay.policy_pair_factors["time_grain"].astype(str).eq("june_year")
+        & replay.policy_pair_factors["series_id"].astype(str).eq("total_ruc_net_revenue")
+        & pd.to_numeric(replay.policy_pair_factors["june_year"], errors="coerce").between(2028, 2030)
+    ]
+    assert len(annual_pairs) == 6
+    annual_delta = annual_pairs.pivot_table(
+        index="pair_id",
+        columns="june_year",
+        values="delta",
+        aggfunc="first",
+    ).apply(pd.to_numeric, errors="coerce")
+    # The Base policy replay has no delivered carry beyond its direct window.
+    assert annual_delta.loc["baseline_delayed_6m"].abs().max() <= 1e-9
+    # The legacy-named comparison key represents the Medium conflict path:
+    # its fuel premium remains in FY2028, then converges to Base.
+    assert abs(float(annual_delta.at["iran_vs_baseline_delayed_6m", 2028])) > 1e-9
+    assert annual_delta.loc[
+        "iran_vs_baseline_delayed_6m", [2029, 2030]
+    ].abs().max() <= 1e-9

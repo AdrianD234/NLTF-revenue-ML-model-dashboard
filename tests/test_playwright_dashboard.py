@@ -8,9 +8,16 @@ import pandas as pd
 import pytest
 from playwright.sync_api import Page, expect
 
+from model_dashboard.conflict_fuel_paths import (
+    CONFLICT_FUEL_SCENARIO_LEVELS,
+    conflict_trace_name,
+)
 
 pytestmark = pytest.mark.e2e
 CHART_SOURCE_DIR = Path(__file__).resolve().parents[1] / "artifacts" / "chart_sources"
+CONFLICT_TRACE_NAMES = tuple(
+    conflict_trace_name(level) for level in CONFLICT_FUEL_SCENARIO_LEVELS
+)
 
 PAGE_DISPLAY_TITLES = {
     "Overview": "Executive Summary",
@@ -260,14 +267,15 @@ def test_revenue_outlook_fleet_layout_and_timing_csv_download(page: Page) -> Non
     download = download_info.value
     assert download.suggested_filename == "net_revenue_12c_timing_comparison_fy2026_fy2030.csv"
     frame = pd.read_csv(download.path())
-    assert len(frame) == 60
+    assert len(frame) == 90
     assert not frame.duplicated(["path_id", "FY", "series_id"]).any()
     assert set(frame["path_id"]) == {
-        "baseline_published",
-        "baseline_shifted_6m",
-        "iran_published",
-        "iran_shifted_6m",
+        f"{level}_{timing}"
+        for level in CONFLICT_FUEL_SCENARIO_LEVELS
+        for timing in ("shifted_6m", "no_uplift")
     }
+    assert set(frame["scenario_id"]) == set(CONFLICT_FUEL_SCENARIO_LEVELS)
+    assert set(frame["timing_id"]) == {"delayed_6m", "no_uplift"}
     assert set(pd.to_numeric(frame["FY"], errors="raise").astype(int)) == set(range(2026, 2031))
     assert set(frame["series_id"]) == {
         "net_fed_revenue",
@@ -285,7 +293,7 @@ def test_revenue_outlook_fleet_layout_and_timing_csv_download(page: Page) -> Non
     assert not page.locator("[data-testid='stException']").count()
 
 
-def test_revenue_outlook_activity_selection_hides_revenue_only_controls(
+def test_revenue_outlook_activity_selection_keeps_policy_controls_and_hides_revenue_only_controls(
     page: Page,
 ) -> None:
     page.set_viewport_size({"width": 1680, "height": 940})
@@ -300,7 +308,9 @@ def test_revenue_outlook_activity_selection_hides_revenue_only_controls(
         page.get_by_text("Revenue Outlook controls", exact=False).first
     ).to_be_visible(timeout=90000)
     select_revenue_outlook_series(page, "PED VKT per capita")
-    assert_visible_text(page, "Not applicable to activity series.")
+    expect(page.get_by_text("Current: 12c from Jul 2027", exact=True).first).to_be_visible()
+    expect(page.get_by_text("MBU26: 12c from Jul 2027", exact=True).first).to_be_visible()
+    assert_visible_text_absent(page, "Not applicable to activity series.")
     assert_visible_text(
         page,
         "Revenue component drill-down and selected-FY revenue split are not applicable to activity-volume series.",
@@ -312,9 +322,10 @@ def test_revenue_outlook_activity_selection_hides_revenue_only_controls(
     )
 
 
-def test_revenue_outlook_iran_war_trace_keeps_quarter_and_year_timing(
+def test_revenue_outlook_middle_east_default_keeps_timing_and_policy_toggle(
     page: Page,
 ) -> None:
+    medium_trace = conflict_trace_name("medium")
     page.set_viewport_size({"width": 1680, "height": 940})
     page.goto(
         os.environ.get("STAGE1_DASHBOARD_URL", "http://localhost:8501"),
@@ -325,12 +336,20 @@ def test_revenue_outlook_iran_war_trace_keeps_quarter_and_year_timing(
     expect(
         page.get_by_text("Revenue Outlook controls", exact=False).first
     ).to_be_visible(timeout=90000)
-    expect(page.locator("body")).to_contain_text(
-        "+15% fuel, +20% RUC; 6 quarters", timeout=90000
-    )
-    expect(page.locator("body")).to_contain_text(
-        "from 2026Q1 through 2027Q2", timeout=90000
-    )
+    expect(page.locator("body")).to_contain_text(medium_trace, timeout=90000)
+
+    legend_button = page.get_by_role("button", name="Select legend items", exact=True)
+    expect(legend_button).to_be_visible(timeout=60000)
+    legend_button.click()
+    for level in CONFLICT_FUEL_SCENARIO_LEVELS:
+        trace_name = conflict_trace_name(level)
+        checkbox = page.get_by_role("checkbox", name=trace_name, exact=True)
+        checkbox_label = page.locator("label").filter(has=checkbox)
+        expect(checkbox).to_be_attached(timeout=60000)
+        expect(checkbox_label).to_have_count(1)
+        expect(checkbox_label).to_be_visible(timeout=60000)
+        assert checkbox.is_checked() is (level == "medium")
+    page.keyboard.press("Escape")
 
     quarterly = (
         page.locator("div[data-testid='stRadio'] label")
@@ -340,20 +359,21 @@ def test_revenue_outlook_iran_war_trace_keeps_quarter_and_year_timing(
     expect(quarterly).to_be_visible(timeout=60000)
     quarterly.click()
     page.wait_for_function(
-        """() => [...document.querySelectorAll('.js-plotly-plot')].some((plot) => {
+        """(mediumTrace) => [...document.querySelectorAll('.js-plotly-plot')].some((plot) => {
             const names = new Set((plot.data || []).map((trace) => String(trace.name || '')));
             const x = (plot.data || []).flatMap((trace) => Array.from(trace.x || []).map(String));
             return names.has('Current finalist Base case') &&
-                names.has('Current finalist Iran war (+15% fuel, +20% RUC; 6 quarters)') &&
+                names.has(mediumTrace) &&
                 x.includes('2026Q1');
         })""",
+        arg=medium_trace,
         timeout=90000,
     )
     paths = page.evaluate(
-        """() => {
+        """(mediumTrace) => {
             const plot = [...document.querySelectorAll('.js-plotly-plot')].find((candidate) =>
                 (candidate.data || []).some((trace) => trace.name === 'Current finalist Base case') &&
-                (candidate.data || []).some((trace) => String(trace.name || '').startsWith('Current finalist Iran war'))
+                (candidate.data || []).some((trace) => trace.name === mediumTrace)
             );
             const pick = (name) => {
                 const trace = (plot.data || []).find((candidate) => candidate.name === name);
@@ -368,14 +388,15 @@ def test_revenue_outlook_iran_war_trace_keeps_quarter_and_year_timing(
             };
             return {
                 base: pick('Current finalist Base case'),
-                iran: pick('Current finalist Iran war (+15% fuel, +20% RUC; 6 quarters)'),
+                conflict: pick(mediumTrace),
             };
-        }"""
+        }""",
+        medium_trace,
     )
-    for period in ["2025Q3", "2025Q4"]:
-        assert paths["iran"][period] == pytest.approx(paths["base"][period], abs=1e-6)
-    for period in ["2026Q1", "2026Q2", "2026Q3", "2026Q4", "2027Q1", "2027Q2"]:
-        assert paths["iran"][period] < paths["base"][period]
+    for period in ["2025Q3", "2025Q4", "2026Q1"]:
+        assert paths["conflict"][period] == pytest.approx(paths["base"][period], abs=1e-6)
+    for period in ["2026Q2", "2026Q3", "2026Q4"]:
+        assert paths["conflict"][period] < paths["base"][period]
 
     june_year = (
         page.locator("div[data-testid='stRadio'] label")
@@ -385,12 +406,75 @@ def test_revenue_outlook_iran_war_trace_keeps_quarter_and_year_timing(
     expect(june_year).to_be_visible(timeout=60000)
     june_year.click()
     page.wait_for_function(
-        """() => [...document.querySelectorAll('.js-plotly-plot')].some((plot) =>
-            (plot.data || []).some((trace) => trace.name === 'Current finalist Iran war (+15% fuel, +20% RUC; 6 quarters)' &&
+        """(mediumTrace) => [...document.querySelectorAll('.js-plotly-plot')].some((plot) =>
+            (plot.data || []).some((trace) => trace.name === mediumTrace &&
                 Array.from(trace.x || []).map(String).includes('FY2027'))
         )""",
+        arg=medium_trace,
         timeout=90000,
     )
+
+    def trace_value(trace_name: str, period: str) -> float:
+        value = page.evaluate(
+            """({traceName, period}) => {
+                const plot = [...document.querySelectorAll('.js-plotly-plot')].find((candidate) =>
+                    (candidate.data || []).some((trace) => trace.name === traceName)
+                );
+                const trace = (plot.data || []).find((candidate) => candidate.name === traceName);
+                const x = Array.from(trace.x || []).map(String);
+                const values = trace.y && trace.y._inputArray
+                    ? Object.keys(trace.y._inputArray)
+                        .sort((left, right) => Number(left) - Number(right))
+                        .map((key) => Number(trace.y._inputArray[key]))
+                    : Array.from(trace.y || [], Number);
+                return values[x.indexOf(period)];
+            }""",
+            {"traceName": trace_name, "period": period},
+        )
+        return float(value)
+
+    delayed_fy2028 = trace_value(medium_trace, "FY2028")
+    levers = page.locator("[data-testid='stExpander']").filter(
+        has_text="Advanced scenario levers"
+    )
+    expect(levers).to_be_visible(timeout=60000)
+    levers.locator("summary").click()
+    current_policy = levers.get_by_role(
+        "checkbox", name="Current: 12c from Jul 2027", exact=True
+    )
+    current_policy_label = levers.locator(
+        'label[data-baseweb="checkbox"]'
+    ).filter(has_text="Current: 12c from Jul 2027")
+    expect(current_policy).to_be_attached(timeout=60000)
+    expect(current_policy_label).to_have_count(1)
+    expect(current_policy_label).to_be_visible(timeout=60000)
+    assert current_policy.is_checked()
+    current_policy_label.click()
+    expect(current_policy).not_to_be_checked(timeout=60000)
+    page.wait_for_function(
+        """({traceName, period, previous}) => {
+            const plot = [...document.querySelectorAll('.js-plotly-plot')].find((candidate) =>
+                (candidate.data || []).some((trace) => trace.name === traceName)
+            );
+            if (!plot) return false;
+            const trace = (plot.data || []).find((candidate) => candidate.name === traceName);
+            const x = Array.from(trace.x || []).map(String);
+            const values = trace.y && trace.y._inputArray
+                ? Object.keys(trace.y._inputArray)
+                    .sort((left, right) => Number(left) - Number(right))
+                    .map((key) => Number(trace.y._inputArray[key]))
+                : Array.from(trace.y || [], Number);
+            const value = values[x.indexOf(period)];
+            return Number.isFinite(value) && Math.abs(value - previous) > 1e-6;
+        }""",
+        arg={
+            "traceName": medium_trace,
+            "period": "FY2028",
+            "previous": delayed_fy2028,
+        },
+        timeout=90000,
+    )
+    assert trace_value(medium_trace, "FY2028") < delayed_fy2028
     assert page.locator("[data-testid='stException']").count() == 0
 
 
@@ -1144,7 +1228,7 @@ def assert_revenue_outlook_primary_runtime_contract(
         "MBU26 official",
         "MBU26 official handover",
         "Current finalist Base case",
-        "Current finalist Iran war (+15% fuel, +20% RUC; 6 quarters)",
+        *CONFLICT_TRACE_NAMES,
         "Current finalist High population/comparison",
         "Current finalist comparison behavioural path",
         "MoT VFM fast bound",
@@ -1152,7 +1236,9 @@ def assert_revenue_outlook_primary_runtime_contract(
     }
     assert trace_names.issubset(allowed), trace_names
     assert "Current finalist Base case" in trace_names
-    assert "Current finalist Iran war (+15% fuel, +20% RUC; 6 quarters)" in trace_names
+    assert conflict_trace_name("medium") in trace_names
+    assert conflict_trace_name("low") not in trace_names
+    assert conflict_trace_name("high") not in trace_names
     expected_comparison_trace = (
         "Current finalist comparison behavioural path"
         if selected_series == "PED VKT per capita"
