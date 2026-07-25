@@ -5,16 +5,16 @@ entry point as the dashboard.  It does not recreate scenario arithmetic in an
 export-only code path.  Four deterministic CSVs are written:
 
 * ``conflict_scenario_assumptions.csv`` - nominal source paths and the exact
-  real-price model inputs for the eight exported policy paths;
+  real-price and macro model inputs for the 12 exported policy paths;
 * ``conflict_scenario_annual_revenue.csv`` - every FY2026-FY2030 annual
   revenue row from the governed replay bridge;
 * ``conflict_scenario_annual_activity.csv`` - every FY2026-FY2030 annual
   activity/volume row from the governed replay bridge;
 * ``conflict_scenario_validation.csv`` - machine-readable invariant checks.
 
-The source fuel paths are policy-free.  The delayed/off 12c FED and matching
-RUC policy states are composed by the replay and are never embedded in the
-nominal conflict-price CSV.
+The source fuel paths are policy-free. Original, delayed and no-uplift 12c FED
+and matching RUC policy states are exposed separately; policy changes are
+never embedded in the nominal conflict-price CSV.
 """
 
 from __future__ import annotations
@@ -42,10 +42,18 @@ from model_dashboard.conflict_fuel_paths import (
     load_conflict_fuel_price_paths,
 )
 from model_dashboard.engine import ENGINE_AR1, engine_revenue_outlook_dir
+from model_dashboard.ev_uptake_levers import (
+    DEFAULT_EV_UPTAKE_MODE,
+    EV_UPTAKE_PRESETS,
+    apply_uptake_levers_to_chart_rows,
+)
 from model_dashboard.fuel_price_scenario import (
     BASE_DELAYED_6M_SCENARIO_NAME,
     BASE_NO_UPLIFT_SCENARIO_NAME,
+    BASE_PUBLISHED_SCENARIO_NAME,
     POLICY_PATH_IDS,
+    apply_treasury_macro_to_chart_rows,
+    append_fuel_price_scenario_to_chart_rows,
     run_fuel_price_scenario_replay,
 )
 from model_dashboard.mbu26_source_spine import (
@@ -56,12 +64,23 @@ from model_dashboard.mbu26_source_spine import (
 from model_dashboard.rate_paths import (
     FED_POLICY_STATE_DELAYED_6M,
     FED_POLICY_STATE_NO_UPLIFT,
+    FED_POLICY_STATE_PUBLISHED,
+    apply_fed_uplift_delay_to_chart_rows,
+    apply_fed_uplift_off_to_chart_rows,
+    fed_uplift_delayed_factors,
+    fed_uplift_off_factors,
+    mbu26_ruc_class_revenue_by_fy,
+)
+from model_dashboard.revenue_outlook import (
+    PED_BRIDGE_DEFAULT_MODE,
+    apply_ped_bridge_mode_layer,
+    load_revenue_outlook_pack,
 )
 
 
 START_FY = 2026
 END_FY = 2030
-EXTRACT_VERSION = "governed-ar1-conflict-scenario-extract-v1"
+EXTRACT_VERSION = "governed-ar1-conflict-scenario-extract-v3"
 ASSUMPTIONS_FILENAME = "conflict_scenario_assumptions.csv"
 REVENUE_FILENAME = "conflict_scenario_annual_revenue.csv"
 ACTIVITY_FILENAME = "conflict_scenario_annual_activity.csv"
@@ -69,6 +88,7 @@ VALIDATION_FILENAME = "conflict_scenario_validation.csv"
 VALUE_TOLERANCE = 1e-8
 
 _POLICY_LABELS = {
+    FED_POLICY_STATE_PUBLISHED: "12c original timing: from 1 Jan 2027",
     FED_POLICY_STATE_DELAYED_6M: "12c deferred six months: from 1 Jul 2027",
     FED_POLICY_STATE_NO_UPLIFT: "12c uplift off",
 }
@@ -107,7 +127,7 @@ _SERIES_METADATA["total_fed_ruc_net_revenue"] = {
 
 @dataclass(frozen=True)
 class ExportPath:
-    """Stable metadata for one of the eight requested export paths."""
+    """Stable metadata for one of the 12 requested export paths."""
 
     family_id: str
     family_order: int
@@ -133,6 +153,7 @@ def _export_paths() -> tuple[ExportPath, ...]:
             "",
             "Current finalist Base case",
             {
+                FED_POLICY_STATE_PUBLISHED: BASE_PUBLISHED_SCENARIO_NAME,
                 FED_POLICY_STATE_DELAYED_6M: BASE_DELAYED_6M_SCENARIO_NAME,
                 FED_POLICY_STATE_NO_UPLIFT: BASE_NO_UPLIFT_SCENARIO_NAME,
             },
@@ -144,11 +165,13 @@ def _export_paths() -> tuple[ExportPath, ...]:
                 severity,
                 conflict_scenario_display_name(severity),
                 {
-                    state: conflict_policy_variant_name(severity, state)
-                    for state in (
-                        FED_POLICY_STATE_DELAYED_6M,
-                        FED_POLICY_STATE_NO_UPLIFT,
-                    )
+                    FED_POLICY_STATE_PUBLISHED: conflict_scenario_name(severity),
+                    FED_POLICY_STATE_DELAYED_6M: conflict_policy_variant_name(
+                        severity, FED_POLICY_STATE_DELAYED_6M
+                    ),
+                    FED_POLICY_STATE_NO_UPLIFT: conflict_policy_variant_name(
+                        severity, FED_POLICY_STATE_NO_UPLIFT
+                    ),
                 },
             )
             for family_order, severity in enumerate(CONFLICT_SEVERITIES, start=1)
@@ -157,6 +180,7 @@ def _export_paths() -> tuple[ExportPath, ...]:
     path_order = 0
     for family_id, family_order, severity, label, scenario_by_state in family_specs:
         for policy_state in (
+            FED_POLICY_STATE_PUBLISHED,
             FED_POLICY_STATE_DELAYED_6M,
             FED_POLICY_STATE_NO_UPLIFT,
         ):
@@ -216,7 +240,7 @@ def _model_input_path(
     *,
     scenario_id: str,
 ) -> pd.DataFrame:
-    """Return one row per quarter with the exact replay price inputs."""
+    """Return one row per quarter with the exact replay price and macro inputs."""
 
     source = replay_inputs[
         replay_inputs["scenario_name"].astype(str).eq(str(scenario_id))
@@ -291,13 +315,33 @@ def _model_input_path(
             "HEAVY_RUC",
             "lead_real_heavy_ruc_price_nzd_per_1000km",
         ),
+        (
+            "model_population",
+            "PED",
+            "population",
+        ),
+        (
+            "model_real_gdp_per_capita_nzd",
+            "PED",
+            "real_gdp_per_capita_nzd",
+        ),
+        (
+            "model_real_gdp_sa_nzd_light_ruc",
+            "LIGHT_RUC",
+            "real_gdp_sa_nzd",
+        ),
+        (
+            "model_real_gdp_sa_nzd_heavy_ruc",
+            "HEAVY_RUC",
+            "real_gdp_sa_nzd",
+        ),
     )
     periods = sorted(source["canonical_period"].dropna().astype(str).unique())
     out = pd.DataFrame({"period": periods})
     for output_column, stream, input_column in field_specs:
         if input_column not in source.columns:
             raise ValueError(
-                f"Replay inputs are missing required model price field {input_column!r}."
+                f"Replay inputs are missing required model input field {input_column!r}."
             )
         values = source[source["stream"].astype(str).eq(stream)][
             ["canonical_period", input_column]
@@ -320,9 +364,15 @@ def _model_input_path(
         "model_lagged_real_light_ruc_price_nzd_per_1000km",
         "model_real_heavy_ruc_price_nzd_per_1000km",
         "model_lead_real_heavy_ruc_price_nzd_per_1000km",
+        "model_population",
+        "model_real_gdp_per_capita_nzd",
+        "model_real_gdp_sa_nzd_light_ruc",
+        "model_real_gdp_sa_nzd_heavy_ruc",
     ]
     if out[required_output_columns].isna().any().any():
-        raise ValueError(f"Replay inputs contain missing price values for {scenario_id!r}.")
+        raise ValueError(
+            f"Replay inputs contain missing price or macro values for {scenario_id!r}."
+        )
     return out
 
 
@@ -410,6 +460,25 @@ def _assumptions_frame(
         frame["scenario_config_file"] = (
             "data/current_revenue_outlook/conflict_fuel_price_scenarios.csv"
         )
+        frame["macro_config_file"] = (
+            "data/current_revenue_outlook/treasury_befu26_macro_path.csv"
+        )
+        frame["conflict_gdp_config_file"] = (
+            "data/current_revenue_outlook/conflict_gdp_calibration.csv"
+        )
+        frame["macro_source_url"] = (
+            "https://www.treasury.govt.nz/sites/default/files/2026-05/"
+            "befu26-suppinfo-charts-data.xlsx"
+        )
+        frame["conflict_gdp_source_url"] = (
+            "https://www.treasury.govt.nz/sites/default/files/2026-05/"
+            "mec-macroecon-scenarios-24-mar-2026.pdf"
+        )
+        frame["macro_overlay_basis"] = (
+            "Treasury BEFU26 quarterly real-GDP path and population anchors; "
+            "conflict GDP is a one-way fuel-to-GDP overlay calibrated to "
+            "Treasury's 2027Q1 moderate and severe level gaps"
+        )
         frame["source_workbook"] = SOURCE_WORKBOOK_NAME
         frame["source_workbook_sha256"] = frame[
             "source_workbook_sha256"
@@ -455,6 +524,10 @@ def _assumptions_frame(
         "model_lagged_real_light_ruc_price_nzd_per_1000km",
         "model_real_heavy_ruc_price_nzd_per_1000km",
         "model_lead_real_heavy_ruc_price_nzd_per_1000km",
+        "model_population",
+        "model_real_gdp_per_capita_nzd",
+        "model_real_gdp_sa_nzd_light_ruc",
+        "model_real_gdp_sa_nzd_heavy_ruc",
         "observation_status",
         "source_note",
         "source_url",
@@ -467,6 +540,11 @@ def _assumptions_frame(
         "source_engine",
         "source_pack",
         "scenario_config_file",
+        "macro_config_file",
+        "conflict_gdp_config_file",
+        "macro_source_url",
+        "conflict_gdp_source_url",
+        "macro_overlay_basis",
         "extract_version",
     ]
     for column in columns:
@@ -477,6 +555,214 @@ def _assumptions_frame(
     ).reset_index(drop=True)
 
 
+def _dashboard_aligned_annual_bridge(
+    replay: Any,
+    paths: tuple[ExportPath, ...],
+    *,
+    repo_root: Path,
+    pack_dir: Path,
+) -> pd.DataFrame:
+    """Build the exact default dashboard-hover rows for all 12 policy paths.
+
+    The standalone replay bridge owns scenario factors and behavioural
+    responses. Dashboard levels additionally use the raw PED bridge, Treasury
+    macro overlay and default MoT VFM uptake overlay. Applying those layers in
+    dashboard order prevents the extract and hover values from drifting apart.
+    """
+
+    pack = load_revenue_outlook_pack(pack_dir, repo_root=repo_root)
+    bridge = apply_ped_bridge_mode_layer(
+        chart_rows=pack.revenue_chart_rows,
+        line_reconciliation=pack.revenue_line_reconciliation,
+        bridge_components=pack.revenue_bridge_components,
+        future_revenue_forecasts=pack.future_revenue_forecasts,
+        ped_revenue_bridge_audit=pack.ped_revenue_bridge_audit,
+        bridge_mode=PED_BRIDGE_DEFAULT_MODE,
+        include_derived_frames=False,
+        include_selected_ped_audit=False,
+    )
+    macro_base, _ = apply_treasury_macro_to_chart_rows(
+        bridge["chart_rows"], replay
+    )
+    visible_base, _ = apply_uptake_levers_to_chart_rows(
+        macro_base,
+        pack.ev_phev_ped_light_drift_assumptions,
+        EV_UPTAKE_PRESETS[DEFAULT_EV_UPTAKE_MODE],
+        adjust_ped=True,
+    )
+    factor_maps = {
+        FED_POLICY_STATE_DELAYED_6M: fed_uplift_delayed_factors(
+            repo_root, pack.revenue_chart_rows
+        ),
+        FED_POLICY_STATE_NO_UPLIFT: fed_uplift_off_factors(
+            repo_root, pack.revenue_chart_rows
+        ),
+    }
+    ruc_class_revenue = mbu26_ruc_class_revenue_by_fy(repo_root)
+    path_lookup = {
+        (path.family_id, path.policy_state): path
+        for path in paths
+    }
+    scenario_family = {
+        BASE_PUBLISHED_SCENARIO_NAME: "base",
+        **{
+            conflict_scenario_name(severity): severity
+            for severity in CONFLICT_SEVERITIES
+        },
+    }
+    frames: list[pd.DataFrame] = []
+    for policy_state in (
+        FED_POLICY_STATE_PUBLISHED,
+        FED_POLICY_STATE_DELAYED_6M,
+        FED_POLICY_STATE_NO_UPLIFT,
+    ):
+        active = visible_base.copy()
+        if policy_state == FED_POLICY_STATE_DELAYED_6M:
+            active, _ = apply_fed_uplift_delay_to_chart_rows(
+                active,
+                factor_maps[policy_state],
+                scenario_roles={"basecase", "comparison"},
+                policy_pair_factors=replay.policy_pair_factors,
+                ruc_class_revenue_by_fy=ruc_class_revenue,
+            )
+        elif policy_state == FED_POLICY_STATE_NO_UPLIFT:
+            active, _ = apply_fed_uplift_off_to_chart_rows(
+                active,
+                factor_maps[policy_state],
+                scenario_roles={"basecase", "comparison"},
+                policy_pair_factors=replay.policy_pair_factors,
+                ruc_class_revenue_by_fy=ruc_class_revenue,
+            )
+        active, _ = append_fuel_price_scenario_to_chart_rows(active, replay)
+        annual = active[
+            active["time_grain"].astype(str).eq("june_year")
+            & active["scenario_name"].astype(str).isin(scenario_family)
+        ].copy()
+        annual["FY"] = pd.to_numeric(annual["june_year"], errors="coerce").astype(
+            "Int64"
+        )
+        annual = annual[
+            annual["FY"].between(START_FY, END_FY, inclusive="both")
+        ].copy()
+        annual["scenario_family_id"] = annual["scenario_name"].astype(str).map(
+            scenario_family
+        )
+        annual["scenario_name"] = annual["scenario_family_id"].map(
+            lambda family: path_lookup[(str(family), policy_state)].scenario_id
+        )
+        annual["policy_path_id"] = annual["scenario_family_id"].map(
+            lambda family: path_lookup[(str(family), policy_state)].policy_path_id
+        )
+        annual["policy_state"] = policy_state
+        annual["unit"] = annual.get(
+            "value_unit", pd.Series("", index=annual.index)
+        ).fillna("").astype(str)
+        annual["extraction_basis"] = (
+            "Default dashboard hover pipeline: raw PED bridge + Treasury BEFU26 "
+            "macro + MoT VFM base uptake + fixed-finalist policy/conflict replay factors"
+        )
+        frames.append(annual)
+
+    visible = pd.concat(frames, ignore_index=True, sort=False)
+    full = replay.annual_bridge[
+        replay.annual_bridge["scenario_name"].astype(str).isin(
+            {path.scenario_id for path in paths}
+        )
+    ].copy()
+    full["FY"] = pd.to_numeric(full["FY"], errors="coerce").astype("Int64")
+    full = full[full["FY"].between(START_FY, END_FY, inclusive="both")].copy()
+    full["scenario_family_id"] = full["scenario_name"].astype(str).map(
+        {path.scenario_id: path.family_id for path in paths}
+    )
+    full["policy_state"] = full["scenario_name"].astype(str).map(
+        {path.scenario_id: path.policy_state for path in paths}
+    )
+    full["base_source_basis"] = full.get(
+        "source_basis", pd.Series("", index=full.index)
+    ).fillna("").astype(str)
+    full["extraction_basis"] = (
+        "Default dashboard hover pipeline: raw PED bridge + Treasury BEFU26 "
+        "macro + MoT VFM base uptake + fixed-finalist policy/conflict replay factors"
+    )
+    full["source_basis"] = full["extraction_basis"]
+    visible["base_source_basis"] = visible.get(
+        "source_basis", pd.Series("", index=visible.index)
+    ).fillna("").astype(str)
+    visible["source_basis"] = visible["extraction_basis"]
+
+    key_columns = ["scenario_name", "FY", "series_id"]
+    if full.duplicated(key_columns, keep=False).any():
+        key_columns.append("fed_path")
+    if full.duplicated(key_columns, keep=False).any() or visible.duplicated(
+        key_columns, keep=False
+    ).any():
+        raise ValueError("Dashboard/replay bridge rows are not unique on their annual series keys.")
+    full = full.set_index(key_columns, drop=False)
+    visible = visible.set_index(key_columns, drop=False)
+    shared_index = full.index.intersection(visible.index)
+    replacement_columns = [
+        column
+        for column in visible.columns
+        if column in full.columns
+        and column
+        not in {
+            "scenario_name",
+            "FY",
+            "series_id",
+            "fed_path",
+        }
+    ]
+    for column in replacement_columns:
+        full.loc[shared_index, column] = visible.loc[shared_index, column].to_numpy()
+    missing_visible = visible.loc[visible.index.difference(full.index)].copy()
+    out = pd.concat(
+        [full.reset_index(drop=True), missing_visible.reset_index(drop=True)],
+        ignore_index=True,
+        sort=False,
+    )
+
+    # Rebuild every governed formula after the visible leaf rows replace the
+    # replay bridge levels. This retains the complete MBU26 revenue breakdown
+    # while ensuring all net/gross totals equal the dashboard-hover lineage.
+    for (_scenario_name, _fy), group_index in out.groupby(
+        ["scenario_name", "FY"], sort=False
+    ).groups.items():
+        indexes = list(group_index)
+        values = {
+            str(out.at[index, "series_id"]): float(out.at[index, "value"])
+            for index in indexes
+            if pd.notna(pd.to_numeric(out.at[index, "value"], errors="coerce"))
+        }
+        for definition in FORMULA_DEFINITIONS:
+            output = str(definition["output_series_id"])
+            terms = tuple(definition["terms"])
+            if not all(str(series_id) in values for series_id, _coefficient in terms):
+                continue
+            calculated = sum(
+                float(coefficient) * values[str(series_id)]
+                for series_id, coefficient in terms
+            )
+            output_indexes = [
+                index
+                for index in indexes
+                if str(out.at[index, "series_id"]) == output
+            ]
+            if output_indexes:
+                for index in output_indexes:
+                    out.at[index, "value"] = calculated
+            values[output] = calculated
+
+    expected_path_ids = {path.scenario_id for path in paths}
+    actual_path_ids = set(out["scenario_name"].dropna().astype(str))
+    if actual_path_ids != expected_path_ids:
+        missing = sorted(expected_path_ids.difference(actual_path_ids))
+        extra = sorted(actual_path_ids.difference(expected_path_ids))
+        raise ValueError(
+            f"Dashboard-aligned annual bridge path mismatch; missing={missing}, extra={extra}."
+        )
+    return out
+
+
 def _annual_export_frame(
     annual_bridge: pd.DataFrame,
     paths: tuple[ExportPath, ...],
@@ -485,7 +771,7 @@ def _annual_export_frame(
     repo_root: Path,
     pack_dir: Path,
 ) -> pd.DataFrame:
-    """Select all annual bridge rows of one metric type for eight paths."""
+    """Select all annual bridge rows of one metric type for 12 paths."""
 
     if annual_bridge is None or annual_bridge.empty:
         raise ValueError("Governed conflict replay produced no annual bridge rows.")
@@ -582,15 +868,36 @@ def _annual_export_frame(
     out["scenario_config_file"] = (
         "data/current_revenue_outlook/conflict_fuel_price_scenarios.csv"
     )
-    out["extraction_basis"] = (
-        "FuelPriceScenarioReplayResult.annual_bridge; same governed replay "
-        "entry point used by the dashboard"
+    out["macro_config_file"] = (
+        "data/current_revenue_outlook/treasury_befu26_macro_path.csv"
+    )
+    out["conflict_gdp_config_file"] = (
+        "data/current_revenue_outlook/conflict_gdp_calibration.csv"
+    )
+    out["macro_source_url"] = (
+        "https://www.treasury.govt.nz/sites/default/files/2026-05/"
+        "befu26-suppinfo-charts-data.xlsx"
+    )
+    out["conflict_gdp_source_url"] = (
+        "https://www.treasury.govt.nz/sites/default/files/2026-05/"
+        "mec-macroecon-scenarios-24-mar-2026.pdf"
+    )
+    if "extraction_basis" not in out.columns:
+        out["extraction_basis"] = ""
+    out["extraction_basis"] = out["extraction_basis"].fillna("").astype(str).where(
+        out["extraction_basis"].fillna("").astype(str).str.len().gt(0),
+        "FuelPriceScenarioReplayResult.annual_bridge",
     )
     out["scenario_note"] = out["scenario_family_id"].map(
         lambda family: (
-            "Current finalist Base case with the selected 12c FED/RUC policy."
+            "Current finalist Base case with Treasury BEFU26 macro inputs and "
+            "the selected 12c FED/RUC policy."
             if family == "base"
-            else conflict_scenario_note(family)
+            else (
+                f"{conflict_scenario_note(family)} Fuel-price stress also "
+                "drives a one-way Treasury-calibrated GDP path; GDP edits do "
+                "not feed back into fuel prices."
+            )
         )
     )
     out["extract_version"] = EXTRACT_VERSION
@@ -629,6 +936,7 @@ def _annual_export_frame(
         "formula",
         "fed_path",
         "source_basis",
+        "base_source_basis",
         "source_file",
         "source_cell",
         "model_id",
@@ -637,6 +945,10 @@ def _annual_export_frame(
         "source_engine",
         "source_pack",
         "scenario_config_file",
+        "macro_config_file",
+        "conflict_gdp_config_file",
+        "macro_source_url",
+        "conflict_gdp_source_url",
         "extraction_basis",
         "extract_version",
     ]
@@ -715,7 +1027,7 @@ def _validation_frame(
             f"inputs={len(actual_internal)}; validation={len(validation_internal)}"
         ),
         expected="12 exact Base/published-conflict/policy scenarios",
-        detail="The governed replay must contain four published paths and eight delayed/off policy paths.",
+        detail="The governed replay contains four original/published paths plus eight delayed/no-uplift variants.",
     )
 
     expected_paths = [path.policy_path_id for path in paths]
@@ -725,7 +1037,7 @@ def _validation_frame(
     add_check(
         "export_path_count_and_order",
         passed=(
-            len(expected_paths) == 8
+            len(expected_paths) == 12
             and observed_assumption_paths == expected_paths
             and observed_revenue_paths == expected_paths
             and observed_activity_paths == expected_paths
@@ -735,8 +1047,184 @@ def _validation_frame(
             f"revenue={len(observed_revenue_paths)}; "
             f"activity={len(observed_activity_paths)}"
         ),
-        expected="8 paths in Base, Low, Medium, High x delayed, off order",
+        expected="12 paths in Base, Low, Medium, High x original, delayed, off order",
         detail="All three export tables share the same stable path IDs and display order.",
+    )
+
+    macro = assumptions.copy()
+    macro_numeric_columns = [
+        "model_population",
+        "model_real_gdp_per_capita_nzd",
+        "model_real_gdp_sa_nzd_light_ruc",
+        "model_real_gdp_sa_nzd_heavy_ruc",
+    ]
+    for column in macro_numeric_columns:
+        macro[column] = pd.to_numeric(macro[column], errors="coerce")
+    light_heavy_gdp_error = (
+        macro["model_real_gdp_sa_nzd_light_ruc"]
+        - macro["model_real_gdp_sa_nzd_heavy_ruc"]
+    ).abs().max()
+    ped_gdp_identity_error = (
+        macro["model_real_gdp_per_capita_nzd"] * macro["model_population"]
+        - macro["model_real_gdp_sa_nzd_light_ruc"]
+    ).abs().max()
+    policy_gdp_range = (
+        macro.groupby(["scenario_family_id", "period"], sort=False)[
+            "model_real_gdp_sa_nzd_light_ruc"
+        ]
+        .agg(lambda values: float(values.max() - values.min()))
+        .max()
+    )
+    add_check(
+        "treasury_macro_stream_and_policy_identity",
+        passed=(
+            macro[macro_numeric_columns].notna().all().all()
+            and pd.notna(light_heavy_gdp_error)
+            and float(light_heavy_gdp_error) <= VALUE_TOLERANCE
+            and pd.notna(ped_gdp_identity_error)
+            and float(ped_gdp_identity_error) <= 0.01
+            and pd.notna(policy_gdp_range)
+            and float(policy_gdp_range) <= VALUE_TOLERANCE
+        ),
+        observed=(
+            f"rows={len(macro)}; "
+            f"max_light_heavy_gdp_delta_nzd={float(light_heavy_gdp_error):.12g}; "
+            f"max_gdp_pc_population_identity_delta_nzd="
+            f"{float(ped_gdp_identity_error):.12g}; "
+            f"max_policy_state_gdp_range_nzd={float(policy_gdp_range):.12g}"
+        ),
+        expected=(
+            "Light GDP = Heavy GDP; GDP per capita x population = aggregate GDP; "
+            "12c policy timing does not alter GDP"
+        ),
+        max_abs_error=max(
+            float(light_heavy_gdp_error),
+            float(ped_gdp_identity_error),
+            float(policy_gdp_range),
+        ),
+        detail=(
+            "Treasury BEFU26 provides one canonical macro path. PED consumes "
+            "GDP per capita while both RUC streams consume the same aggregate GDP."
+        ),
+    )
+
+    anchor = macro[
+        macro["policy_state"].astype(str).eq(FED_POLICY_STATE_PUBLISHED)
+        & macro["period"].astype(str).eq("2027Q1")
+        & macro["scenario_family_id"].astype(str).isin(["base", "medium", "high"])
+    ].drop_duplicates("scenario_family_id")
+    anchor_lookup = anchor.set_index("scenario_family_id")[
+        "model_real_gdp_sa_nzd_light_ruc"
+    ]
+    observed_anchor_impacts = {
+        severity: (
+            float(anchor_lookup.at[severity] / anchor_lookup.at["base"] - 1.0)
+            if severity in anchor_lookup.index and "base" in anchor_lookup.index
+            else float("nan")
+        )
+        for severity in ("medium", "high")
+    }
+    anchor_error = max(
+        abs(observed_anchor_impacts["medium"] - (-0.015)),
+        abs(observed_anchor_impacts["high"] - (-0.031)),
+    )
+    add_check(
+        "treasury_conflict_gdp_anchor_reconciliation",
+        passed=(
+            len(anchor_lookup) == 3
+            and pd.notna(anchor_error)
+            and float(anchor_error) <= 1e-12
+        ),
+        observed=(
+            f"2027Q1 medium={observed_anchor_impacts['medium']:.8%}; "
+            f"high={observed_anchor_impacts['high']:.8%}; "
+            f"max_abs_error={anchor_error:.12g}"
+        ),
+        expected="2027Q1 Medium -1.5%; High -3.1% versus Treasury Base",
+        max_abs_error=float(anchor_error),
+        detail=(
+            "The fuel-to-GDP overlay is calibrated to Treasury's published "
+            "moderate and severe Middle East conflict GDP level gaps."
+        ),
+    )
+
+    ped_activity = activity[
+        activity["series_id"].astype(str).isin(
+            {"light_petrol_vkt", "ped_volume"}
+        )
+    ].copy()
+    ped_activity["FY"] = pd.to_numeric(ped_activity["FY"], errors="coerce")
+    ped_activity["value"] = pd.to_numeric(
+        ped_activity["value"], errors="coerce"
+    )
+    ped_wide = ped_activity.pivot_table(
+        index=["path_id", "FY"],
+        columns="series_id",
+        values="value",
+        aggfunc="first",
+    )
+    replay_activity = replay.annual_bridge[
+        replay.annual_bridge["policy_path_id"].astype(str).eq(
+            "baseline_published"
+        )
+        & replay.annual_bridge["series_id"].astype(str).isin(
+            {"light_petrol_vkt", "ped_volume"}
+        )
+    ].copy()
+    replay_activity["FY"] = pd.to_numeric(
+        replay_activity["FY"], errors="coerce"
+    )
+    replay_activity["value"] = pd.to_numeric(
+        replay_activity["value"], errors="coerce"
+    )
+    replay_wide = replay_activity.pivot_table(
+        index="FY",
+        columns="series_id",
+        values="value",
+        aggfunc="first",
+    )
+    expected_intensity = (
+        replay_wide["ped_volume"]
+        / replay_wide["light_petrol_vkt"]
+        * 100.0
+    )
+    observed_intensity = (
+        ped_wide["ped_volume"]
+        / ped_wide["light_petrol_vkt"]
+        * 100.0
+    )
+    intensity_error = (
+        observed_intensity
+        - ped_wide.index.get_level_values("FY").map(expected_intensity)
+    ).abs()
+    max_intensity_error = (
+        float(intensity_error.max())
+        if not intensity_error.empty and intensity_error.notna().any()
+        else float("inf")
+    )
+    add_check(
+        "petrol_vkt_ped_litres_intensity_reconciliation",
+        passed=(
+            len(ped_wide) == len(paths) * (END_FY - START_FY + 1)
+            and {"light_petrol_vkt", "ped_volume"}.issubset(ped_wide.columns)
+            and ped_wide[["light_petrol_vkt", "ped_volume"]].notna().all().all()
+            and ped_wide[["light_petrol_vkt", "ped_volume"]].gt(0.0).all().all()
+            and max_intensity_error <= VALUE_TOLERANCE
+        ),
+        observed=(
+            f"path_fy_rows={len(ped_wide)}; "
+            f"max_abs_litres_per_100km_error={max_intensity_error:.12g}"
+        ),
+        expected=(
+            "60 path/FY rows whose PED litres divided by light-petrol VKT "
+            f"matches the governed Base intensity within {VALUE_TOLERANCE}"
+        ),
+        max_abs_error=max_intensity_error,
+        detail=(
+            "The selected raw PED bridge, VFM retention, 12c policy response "
+            "and conflict response must scale light-petrol VKT and PED litres "
+            "on one common activity lineage."
+        ),
     )
 
     embedded = assumptions["fed_12c_embedded"].map(_parse_boolean)
@@ -1007,7 +1495,7 @@ def _validation_frame(
                 pd.to_numeric(annual["FY"], errors="coerce").eq(2026)
             ][["metric_type", "series_id"]].drop_duplicates()
         )
-        * 2
+        * 3
     )
     shared_fy2026_range = (
         shared_fy2026_wide.max(axis=1) - shared_fy2026_wide.min(axis=1)
@@ -1039,9 +1527,10 @@ def _validation_frame(
         ),
         detail=(
             "All three conflict paths share the same fuel-price and native "
-            "activity inputs through FY2026. The optimized EV/PHEV migration "
-            "lambda is anchored to Base so future severity differences cannot "
-            "leak backwards into the common annual checkpoint."
+            "activity inputs through FY2026. The raw PED bridge and default "
+            "MoT VFM Base overlay are anchored to the same visible Base path, "
+            "so future severity differences cannot leak backwards into the "
+            "common annual checkpoint."
         ),
     )
 
@@ -1051,6 +1540,9 @@ def _validation_frame(
         "series_id",
         "metric_type",
     ]
+    published = _annual_values_by_family(
+        annual, policy_state=FED_POLICY_STATE_PUBLISHED
+    )[pair_keys + ["value"]].rename(columns={"value": "published_value"})
     delayed = _annual_values_by_family(
         annual, policy_state=FED_POLICY_STATE_DELAYED_6M
     )[pair_keys + ["value"]].rename(columns={"value": "delayed_value"})
@@ -1067,6 +1559,17 @@ def _validation_frame(
     policy_pairs["delta"] = (
         pd.to_numeric(policy_pairs["delayed_value"], errors="coerce")
         - pd.to_numeric(policy_pairs["off_value"], errors="coerce")
+    )
+    original_pairs = published.merge(
+        delayed,
+        on=pair_keys,
+        how="outer",
+        validate="one_to_one",
+        indicator=True,
+    )
+    original_pairs["delta"] = (
+        pd.to_numeric(original_pairs["published_value"], errors="coerce")
+        - pd.to_numeric(original_pairs["delayed_value"], errors="coerce")
     )
 
     unaffected_activity_series = (
@@ -1113,7 +1616,7 @@ def _validation_frame(
         passed=(
             len(unaffected)
             == len(CONFLICT_SEVERITIES)
-            * 2
+            * 3
             * (END_FY - START_FY + 1)
             * len(unaffected_activity_series)
             and unaffected["_merge"].eq("both").all()
@@ -1127,7 +1630,7 @@ def _validation_frame(
             else f"comparisons={len(unaffected)}; max_abs_conflict_minus_matched_base=missing"
         ),
         expected=(
-            "90 Light BEV/PHEV/Heavy BEV annual-km comparisons equal matched "
+            "135 Light BEV/PHEV/Heavy BEV annual-km comparisons equal matched "
             f"Base within {VALUE_TOLERANCE}"
         ),
         max_abs_error=(
@@ -1159,6 +1662,147 @@ def _validation_frame(
         expected=f"all annual delayed/off values equal through FY2027 within {VALUE_TOLERANCE}",
         max_abs_error=float(pre_error) if pd.notna(pre_error) else None,
         detail="The delayed 12c path begins in FY2028; whole-horizon model features must not leak divergence backwards.",
+    )
+
+    original_fy2026 = original_pairs[original_pairs["FY"].eq(2026)]
+    original_fy2026_error = pd.to_numeric(
+        original_fy2026["delta"], errors="coerce"
+    ).abs().max()
+    add_check(
+        "fy2026_original_delayed_identity",
+        passed=(
+            original_fy2026["_merge"].eq("both").all()
+            and pd.notna(original_fy2026_error)
+            and float(original_fy2026_error) <= VALUE_TOLERANCE
+        ),
+        observed=(
+            f"rows={len(original_fy2026)}; max_abs_delta={float(original_fy2026_error):.12g}"
+            if pd.notna(original_fy2026_error)
+            else f"rows={len(original_fy2026)}; max_abs_delta=missing"
+        ),
+        expected=f"all FY2026 original/delayed values equal within {VALUE_TOLERANCE}",
+        max_abs_error=(
+            float(original_fy2026_error)
+            if pd.notna(original_fy2026_error)
+            else None
+        ),
+        detail="The original 12c step does not begin until January 2027, after FY2026 closes.",
+    )
+
+    original_fy2027_tax = original_pairs[
+        original_pairs["FY"].eq(2027)
+        & original_pairs["series_id"].isin(
+            ["net_fed_revenue", "total_ruc_net_revenue"]
+        )
+    ].copy()
+    min_original_fy2027_tax_delta = pd.to_numeric(
+        original_fy2027_tax["delta"], errors="coerce"
+    ).min()
+    add_check(
+        "fy2027_original_revenue_exceeds_deferred",
+        passed=(
+            len(original_fy2027_tax) == 4 * 2
+            and original_fy2027_tax["_merge"].eq("both").all()
+            and pd.notna(min_original_fy2027_tax_delta)
+            and float(min_original_fy2027_tax_delta) > VALUE_TOLERANCE
+        ),
+        observed=(
+            f"rows={len(original_fy2027_tax)}; "
+            f"min_original_minus_delayed={float(min_original_fy2027_tax_delta):.12g}"
+            if pd.notna(min_original_fy2027_tax_delta)
+            else f"rows={len(original_fy2027_tax)}; min_original_minus_delayed=missing"
+        ),
+        expected="8 FY2027 Net FED/Net RUC rows with original timing strictly above deferred",
+        max_abs_error=None,
+        detail=(
+            "Original timing applies from January through June 2027, inside FY2027. "
+            "The deferred path does not begin until 1 July 2027, which is FY2028."
+        ),
+    )
+
+    original_fy2027_ped_volume = original_pairs[
+        original_pairs["FY"].eq(2027)
+        & original_pairs["series_id"].eq("ped_volume")
+    ].copy()
+    max_original_fy2027_volume_delta = pd.to_numeric(
+        original_fy2027_ped_volume["delta"], errors="coerce"
+    ).max()
+    add_check(
+        "fy2027_higher_original_pump_price_lowers_ped_volume",
+        passed=(
+            len(original_fy2027_ped_volume) == 4
+            and original_fy2027_ped_volume["_merge"].eq("both").all()
+            and pd.notna(max_original_fy2027_volume_delta)
+            and float(max_original_fy2027_volume_delta) < -VALUE_TOLERANCE
+        ),
+        observed=(
+            f"rows={len(original_fy2027_ped_volume)}; "
+            f"max_original_minus_delayed_volume={float(max_original_fy2027_volume_delta):.12g}"
+            if pd.notna(max_original_fy2027_volume_delta)
+            else f"rows={len(original_fy2027_ped_volume)}; max_original_minus_delayed_volume=missing"
+        ),
+        expected="4 FY2027 PED-volume rows with original timing below deferred",
+        max_abs_error=None,
+        detail="The higher January-June 2027 pump price must reduce PED volume rather than leave it unchanged.",
+    )
+
+    resumed_original = original_pairs[
+        original_pairs["FY"].between(2028, END_FY, inclusive="both")
+    ].copy()
+    resumed_original_error = pd.to_numeric(
+        resumed_original["delta"], errors="coerce"
+    ).abs().max()
+    resumed_original_scale = pd.concat(
+        [
+            pd.to_numeric(
+                resumed_original["published_value"], errors="coerce"
+            ).abs(),
+            pd.to_numeric(
+                resumed_original["delayed_value"], errors="coerce"
+            ).abs(),
+        ],
+        axis=1,
+    ).max(axis=1)
+    resumed_original_relative_error = (
+        pd.to_numeric(resumed_original["delta"], errors="coerce").abs()
+        / resumed_original_scale.clip(lower=VALUE_TOLERANCE)
+    ).max()
+    post_rejoin_relative_tolerance = 0.001
+    add_check(
+        "fy2028_plus_original_delayed_identity",
+        passed=(
+            not resumed_original.empty
+            and resumed_original["_merge"].eq("both").all()
+            and pd.notna(resumed_original_error)
+            and pd.notna(resumed_original_relative_error)
+            and float(resumed_original_relative_error)
+            <= post_rejoin_relative_tolerance
+        ),
+        observed=(
+            f"rows={len(resumed_original)}; "
+            f"max_abs_delta={float(resumed_original_error):.12g}; "
+            f"max_relative_delta={float(resumed_original_relative_error):.12g}"
+            if pd.notna(resumed_original_error)
+            and pd.notna(resumed_original_relative_error)
+            else (
+                f"rows={len(resumed_original)}; max_abs_delta=missing; "
+                "max_relative_delta=missing"
+            )
+        ),
+        expected=(
+            f"all FY2028-FY{END_FY} original/delayed values within "
+            f"{post_rejoin_relative_tolerance:.2%} after the input schedules rejoin"
+        ),
+        max_abs_error=(
+            float(resumed_original_error)
+            if pd.notna(resumed_original_error)
+            else None
+        ),
+        detail=(
+            "The deferred path rejoins the original published rate schedule on "
+            "1 July 2027. A tightly bounded residual is allowed because lagged "
+            "features preserve genuine path dependence from the preceding six months."
+        ),
     )
 
     post_revenue = policy_pairs[
@@ -1197,6 +1841,17 @@ def _validation_frame(
         "demand_reference_price",
         "demand_variant_price",
         "demand_price_ratio",
+        "demand_raw_forecast",
+        "demand_price_only_raw_forecast",
+        "demand_gdp_input_level_factor",
+        "demand_gdp_model_factor_raw",
+        "demand_gdp_model_factor",
+        "demand_gdp_factor_source_scenario_name",
+        "demand_gdp_factor_source_raw_forecast",
+        "demand_gdp_factor_source_price_only_forecast",
+        "demand_gdp_sign_guard_applied",
+        "demand_gdp_downside_sign_guard_applied",
+        "demand_gdp_identity_guard_applied",
         "demand_reference_fuel_cost_nzd_per_1000km",
         "demand_variant_fuel_cost_nzd_per_1000km",
         "demand_reference_ruc_price_nzd_per_1000km",
@@ -1221,6 +1876,12 @@ def _validation_frame(
         calibrated = pd.DataFrame()
         policy_calibrated = pd.DataFrame()
         calibrated_formula_error = float("inf")
+        raw_gdp_ratio_error = float("inf")
+        gdp_source_name_valid = False
+        identity_guard_valid = False
+        downside_guard_valid = False
+        combined_guard_valid = False
+        sign_guard_valid = False
         generalized_cost_error = float("inf")
         component_audit_error = float("inf")
         compounded_non_equivalent_count = 0
@@ -1240,6 +1901,13 @@ def _validation_frame(
             "demand_reference_price",
             "demand_variant_price",
             "demand_price_ratio",
+            "demand_raw_forecast",
+            "demand_price_only_raw_forecast",
+            "demand_gdp_input_level_factor",
+            "demand_gdp_model_factor_raw",
+            "demand_gdp_model_factor",
+            "demand_gdp_factor_source_raw_forecast",
+            "demand_gdp_factor_source_price_only_forecast",
             "demand_reference_fuel_cost_nzd_per_1000km",
             "demand_variant_fuel_cost_nzd_per_1000km",
             "demand_reference_ruc_price_nzd_per_1000km",
@@ -1260,10 +1928,102 @@ def _validation_frame(
             "demand_reference_forecast"
         ] * calibrated["demand_price_ratio"].pow(
             calibrated["demand_elasticity"]
-        )
+        ) * calibrated["demand_gdp_model_factor"]
         calibrated_formula_error = (
             calibrated["forecast"] - single_formula_expected
         ).abs().max()
+        raw_gdp_ratio_expected = (
+            calibrated["demand_gdp_factor_source_raw_forecast"]
+            / calibrated[
+                "demand_gdp_factor_source_price_only_forecast"
+            ]
+        )
+        raw_gdp_ratio_error = (
+            calibrated["demand_gdp_model_factor_raw"] - raw_gdp_ratio_expected
+        ).abs().max()
+        expected_gdp_source_by_scenario = {
+            path.scenario_id: (
+                str(replay.base_scenario_name)
+                if path.family_id == "base"
+                else conflict_scenario_name(path.severity)
+            )
+            for path in paths
+            if path.policy_state != FED_POLICY_STATE_PUBLISHED
+        }
+        expected_gdp_source_by_scenario.update(
+            {
+                conflict_scenario_name(severity): conflict_scenario_name(
+                    severity
+                )
+                for severity in CONFLICT_SEVERITIES
+            }
+        )
+        expected_gdp_sources = (
+            calibrated["scenario_name"]
+            .astype(str)
+            .map(expected_gdp_source_by_scenario)
+        )
+        gdp_source_name_valid = bool(
+            expected_gdp_sources.notna().all()
+            and calibrated[
+                "demand_gdp_factor_source_scenario_name"
+            ]
+            .astype(str)
+            .eq(expected_gdp_sources)
+            .all()
+        )
+        gdp_input = calibrated["demand_gdp_input_level_factor"]
+        gdp_factor_raw = calibrated["demand_gdp_model_factor_raw"]
+        gdp_factor = calibrated["demand_gdp_model_factor"]
+        identity_input = gdp_input.sub(1.0).abs().le(1e-12)
+        expected_identity_guard = (
+            identity_input & gdp_factor_raw.sub(1.0).abs().gt(1e-12)
+        )
+        expected_downside_guard = (
+            gdp_input.lt(1.0 - 1e-12) & gdp_factor_raw.gt(1.0)
+        )
+        identity_guard = (
+            calibrated["demand_gdp_identity_guard_applied"]
+            .fillna(False)
+            .astype(bool)
+        )
+        downside_guard = (
+            calibrated["demand_gdp_downside_sign_guard_applied"]
+            .fillna(False)
+            .astype(bool)
+        )
+        combined_guard = (
+            calibrated["demand_gdp_sign_guard_applied"].fillna(False).astype(bool)
+        )
+        identity_guard_valid = bool(
+            identity_guard.eq(expected_identity_guard).all()
+            and gdp_factor.loc[identity_input]
+            .sub(1.0)
+            .abs()
+            .le(VALUE_TOLERANCE)
+            .all()
+        )
+        downside_guard_valid = bool(
+            downside_guard.eq(expected_downside_guard).all()
+            and gdp_factor.loc[gdp_input.lt(1.0 - 1e-12)]
+            .le(1.0)
+            .all()
+            and gdp_factor_raw.loc[downside_guard].gt(1.0).all()
+            and gdp_factor.loc[downside_guard]
+            .sub(1.0)
+            .abs()
+            .le(VALUE_TOLERANCE)
+            .all()
+        )
+        combined_guard_valid = bool(
+            combined_guard.eq(identity_guard | downside_guard).all()
+        )
+        sign_guard_valid = bool(
+            identity_guard_valid
+            and downside_guard_valid
+            and combined_guard_valid
+            and gdp_factor.gt(0.0).all()
+        )
         expected_reference_cost = (
             calibrated["demand_reference_fuel_cost_nzd_per_1000km"]
             + calibrated["demand_reference_ruc_price_nzd_per_1000km"]
@@ -1341,7 +2101,7 @@ def _validation_frame(
             policy_calibrated["policy_demand_elasticity"]
         ) * policy_calibrated["policy_ruc_price_ratio"].pow(
             policy_calibrated["policy_demand_elasticity"]
-        )
+        ) * policy_calibrated["demand_gdp_model_factor"]
         compounded_non_equivalent_count = int(
             (
                 separately_compounded - policy_calibrated["forecast"]
@@ -1373,16 +2133,35 @@ def _validation_frame(
         )
         calibrated_valid = (
             not calibrated.empty
-            and calibrated[numeric_columns[:12]].notna().all().all()
+            and calibrated[
+                [
+                    "forecast",
+                    "demand_reference_forecast",
+                    "demand_reference_price",
+                    "demand_variant_price",
+                    "demand_price_ratio",
+                    "demand_raw_forecast",
+                    "demand_price_only_raw_forecast",
+                    "demand_gdp_input_level_factor",
+                    "demand_gdp_model_factor_raw",
+                    "demand_gdp_model_factor",
+                    "demand_gdp_factor_source_raw_forecast",
+                    "demand_gdp_factor_source_price_only_forecast",
+                ]
+            ].notna().all().all()
             and calibrated["demand_reference_scenario_name"]
             .astype(str)
             .eq(str(replay.base_scenario_name))
             .all()
+            and gdp_source_name_valid
             and generalized_field_valid
             and calibration_basis_valid
             and policy_audit_valid
             and pd.notna(calibrated_formula_error)
             and float(calibrated_formula_error) <= VALUE_TOLERANCE
+            and pd.notna(raw_gdp_ratio_error)
+            and float(raw_gdp_ratio_error) <= VALUE_TOLERANCE
+            and sign_guard_valid
             and generalized_cost_error <= VALUE_TOLERANCE
             and component_audit_error <= VALUE_TOLERANCE
             and compounded_non_equivalent_count > 0
@@ -1395,6 +2174,11 @@ def _validation_frame(
             f"policy_rows={len(policy_calibrated)}; "
             f"missing_columns={len(calibrated_missing_columns)}; "
             f"max_formula_error={calibrated_formula_error:.12g}; "
+            f"max_raw_gdp_ratio_error={raw_gdp_ratio_error:.12g}; "
+            f"gdp_source_names_valid={gdp_source_name_valid}; "
+            f"gdp_identity_guard_valid={identity_guard_valid}; "
+            f"gdp_downside_guard_valid={downside_guard_valid}; "
+            f"gdp_combined_guard_valid={combined_guard_valid}; "
             f"max_cost_identity_error={generalized_cost_error:.12g}; "
             f"max_component_audit_error={component_audit_error:.12g}; "
             f"rows_where_separate_compounding_would_differ="
@@ -1402,12 +2186,14 @@ def _validation_frame(
         ),
         expected=(
             "Every calibrated conventional Light/Heavy row equals Base "
-            "reference x (diesel fuel cost + RUC cost ratio)^elasticity once; "
+            "reference x (diesel fuel cost + RUC cost ratio)^elasticity once "
+            "x the published-family GDP-response factor; "
             "component fuel/RUC ratios are audit-only and are not compounded"
         ),
         max_abs_error=(
             max(
                 float(calibrated_formula_error),
+                float(raw_gdp_ratio_error),
                 float(generalized_cost_error),
                 float(component_audit_error),
             )
@@ -1416,9 +2202,10 @@ def _validation_frame(
         ),
         detail=(
             "The replay audit exposes the combined cost numerator, denominator, "
-            "ratio and one governed elasticity. A separate fuel-ratio x "
-            "RUC-ratio elasticity calculation is intentionally not the output "
-            "formula."
+            "ratio, one governed elasticity and the published-family price-plus-GDP "
+            "versus price-only response. Identity-input and lower-GDP sign guards "
+            "are validated separately. A separate fuel-ratio x RUC-ratio elasticity "
+            "calculation is intentionally not the output formula."
         ),
     )
 
@@ -1542,15 +2329,21 @@ def materialize(repo_root: Path, output_dir: Path) -> dict[str, Path]:
         repo_root=root,
         pack_dir=pack_dir,
     )
+    dashboard_annual_bridge = _dashboard_aligned_annual_bridge(
+        replay,
+        paths,
+        repo_root=root,
+        pack_dir=pack_dir,
+    )
     revenue = _annual_export_frame(
-        replay.annual_bridge,
+        dashboard_annual_bridge,
         paths,
         metric_type="revenue",
         repo_root=root,
         pack_dir=pack_dir,
     )
     activity = _annual_export_frame(
-        replay.annual_bridge,
+        dashboard_annual_bridge,
         paths,
         metric_type="activity",
         repo_root=root,

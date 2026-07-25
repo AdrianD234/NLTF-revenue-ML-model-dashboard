@@ -66,6 +66,22 @@ def test_missing_policy_replay_fails_closed_for_current_paths_but_keeps_mbu_rate
     assert not bool(audit.iloc[0]["applied"])
     assert audit.iloc[0]["transformation_basis"] == "policy_replay_unavailable_not_applied"
     assert "published values" in str(audit.iloc[0]["reason"])
+    assert (
+        app._effective_fed_policy_state(
+            app.FED_POLICY_DELAYED_6M,
+            app._CURRENT_FED_UPLIFT_ROLES,
+            audit,
+        )
+        == app.FED_POLICY_PUBLISHED
+    )
+    assert (
+        app._effective_fed_policy_state(
+            app.FED_POLICY_DELAYED_6M,
+            app._MBU26_FED_UPLIFT_ROLES,
+            audit,
+        )
+        == app.FED_POLICY_DELAYED_6M
+    )
 
     available_scopes, available_audit = app._policy_scopes_for_available_replay(
         scopes,
@@ -83,6 +99,110 @@ def test_replay_value_error_is_caught_before_streamlit_view_render(monkeypatch) 
     replay, error_type = app._safe_fuel_price_scenario_replay((), object())
     assert replay is None
     assert error_type == "ValueError"
+
+
+def test_treasury_macro_fallback_survives_conflict_replay_failure(
+    monkeypatch,
+) -> None:
+    source = pd.DataFrame(
+        [
+            {
+                "scenario_name": "current_basecase",
+                "scenario_role": "basecase",
+                "series_id": "ped_vkt_per_capita",
+                "time_grain": "quarterly",
+                "period": "2027Q1",
+                "value": 10.0,
+            }
+        ]
+    )
+    macro_replay = object()
+    macro_audit = pd.DataFrame(
+        [{"audit_type": "treasury_baseline_macro", "factor": 1.1}]
+    )
+
+    monkeypatch.setattr(
+        app,
+        "cached_sensitivity_stage_frames",
+        lambda *_args, **_kwargs: ({}, {"chart_rows": source.copy()}, True),
+    )
+    monkeypatch.setattr(app, "_resolve_ev_uptake_levers", lambda *_args: None)
+    monkeypatch.setattr(app, "_resolve_eruc_levers", lambda *_args: None)
+    monkeypatch.setattr(app, "cached_fed_uplift_factors", lambda *_args: {})
+    monkeypatch.setattr(
+        app,
+        "_safe_fuel_price_scenario_replay",
+        lambda *_args: (None, "ValueError"),
+    )
+    monkeypatch.setattr(
+        app,
+        "_safe_treasury_baseline_macro_replay",
+        lambda *_args: (macro_replay, ""),
+    )
+
+    def apply_macro(rows, replay):
+        assert replay is macro_replay
+        adjusted = rows.copy()
+        adjusted["value"] = pd.to_numeric(adjusted["value"]) * 1.1
+        return adjusted, macro_audit
+
+    monkeypatch.setattr(app, "apply_treasury_macro_to_chart_rows", apply_macro)
+    monkeypatch.setattr(
+        app,
+        "_apply_scenario_overlays",
+        lambda rows, *_args, **_kwargs: (
+            rows.copy(),
+            pd.DataFrame(),
+            pd.DataFrame(),
+            pd.DataFrame(),
+        ),
+    )
+
+    rows, _, _, policy_audit, conflict_audit = app.cached_scenario_overlay_rows(
+        (("macro-fallback", 1, 1),),
+        ("Off",),
+        PED_BRIDGE_DEFAULT_MODE,
+        (app.DEFAULT_EV_UPTAKE_MODE, (), (), app.FED_POLICY_DELAYED_6M),
+        object(),
+    )
+    assert float(rows.iloc[0]["value"]) == pytest.approx(11.0)
+    assert not policy_audit.empty
+    assert policy_audit.iloc[0]["replay_error_type"] == "ValueError"
+    assert conflict_audit.empty
+
+
+def test_dashboard_refuses_silent_legacy_macro_fallback(monkeypatch) -> None:
+    monkeypatch.setattr(
+        app,
+        "cached_sensitivity_stage_frames",
+        lambda *_args, **_kwargs: (
+            {},
+            {"chart_rows": pd.DataFrame([{"value": 1.0}])},
+            True,
+        ),
+    )
+    monkeypatch.setattr(app, "_resolve_ev_uptake_levers", lambda *_args: None)
+    monkeypatch.setattr(app, "_resolve_eruc_levers", lambda *_args: None)
+    monkeypatch.setattr(app, "cached_fed_uplift_factors", lambda *_args: {})
+    monkeypatch.setattr(
+        app,
+        "_safe_fuel_price_scenario_replay",
+        lambda *_args: (None, "ValueError"),
+    )
+    monkeypatch.setattr(
+        app,
+        "_safe_treasury_baseline_macro_replay",
+        lambda *_args: (None, "OSError"),
+    )
+
+    with pytest.raises(RuntimeError, match="refusing to silently revert"):
+        app.cached_scenario_overlay_rows(
+            (("macro-fail-closed", 1, 1),),
+            ("Off",),
+            PED_BRIDGE_DEFAULT_MODE,
+            (app.DEFAULT_EV_UPTAKE_MODE, (), (), app.FED_POLICY_DELAYED_6M),
+            object(),
+        )
 
 
 def test_view_returns_fresh_copies_across_calls(context) -> None:
@@ -149,20 +269,31 @@ def test_policy_and_fuel_totals_reconcile_across_chart_line_and_stack(context) -
         assert stack_total.loc[scenario] == pytest.approx(chart.loc[scenario], abs=1e-9)
 
 
-def test_current_and_mbu_policy_four_state_matrix_keeps_fuel_on_current_scope(context) -> None:
+def test_current_and_mbu_policy_nine_state_matrix_keeps_fuel_on_current_scope(context) -> None:
     pack, signature = context
     sens, _ = _default_keys()
-    states: dict[tuple[int, int], pd.DataFrame] = {}
-    for current_off in (0, 1):
-        for mbu_off in (0, 1):
+    policy_states = (
+        app.FED_POLICY_PUBLISHED,
+        app.FED_POLICY_DELAYED_6M,
+        app.FED_POLICY_OFF,
+    )
+    states: dict[tuple[str, str], pd.DataFrame] = {}
+    for current_policy in policy_states:
+        for mbu_policy in policy_states:
             rows, _, _, _, _ = app.cached_scenario_overlay_rows(
                 signature,
                 sens,
                 PED_BRIDGE_DEFAULT_MODE,
-                (app.DEFAULT_EV_UPTAKE_MODE, (), (), current_off, mbu_off),
+                (
+                    app.DEFAULT_EV_UPTAKE_MODE,
+                    (),
+                    (),
+                    current_policy,
+                    mbu_policy,
+                ),
                 pack,
             )
-            states[(current_off, mbu_off)] = rows
+            states[(current_policy, mbu_policy)] = rows
 
     base_scenario = "current_basecase"
     current_scenarios = (
@@ -172,7 +303,7 @@ def test_current_and_mbu_policy_four_state_matrix_keeps_fuel_on_current_scope(co
     )
     mbu_scenario = "mbu26_official"
 
-    def total(state: tuple[int, int], scenario: str, fy: int) -> float:
+    def total(state: tuple[str, str], scenario: str, fy: int) -> float:
         rows = states[state]
         selected = rows[
             rows["time_grain"].astype(str).eq("june_year")
@@ -186,41 +317,83 @@ def test_current_and_mbu_policy_four_state_matrix_keeps_fuel_on_current_scope(co
     # Moving only the MBU26 switch cannot alter any Current trace, including
     # any registered conflict severity cloned from the matching Current Base
     # policy replay.
-    for current_off in (0, 1):
+    for current_policy in policy_states:
         for scenario in current_scenarios:
             for fy in (2027, 2028):
-                assert total((current_off, 0), scenario, fy) == pytest.approx(
-                    total((current_off, 1), scenario, fy), abs=1e-9
+                reference = total(
+                    (current_policy, app.FED_POLICY_PUBLISHED), scenario, fy
                 )
+                for mbu_policy in policy_states:
+                    assert total((current_policy, mbu_policy), scenario, fy) == pytest.approx(
+                        reference, abs=1e-9
+                    )
 
     # Moving only the Current switch cannot alter MBU26.
-    for mbu_off in (0, 1):
+    for mbu_policy in policy_states:
         for fy in (2027, 2028):
-            assert total((0, mbu_off), mbu_scenario, fy) == pytest.approx(
-                total((1, mbu_off), mbu_scenario, fy), abs=1e-9
+            reference = total(
+                (app.FED_POLICY_PUBLISHED, mbu_policy), mbu_scenario, fy
             )
+            for current_policy in policy_states:
+                assert total((current_policy, mbu_policy), mbu_scenario, fy) == pytest.approx(
+                    reference, abs=1e-9
+                )
 
-    # Delayed and OFF are equal in FY2027 because both remove the original
-    # 2027Q1-Q2 step. From FY2028, only OFF remains below the planned path.
-    for mbu_off in (0, 1):
+    # Original timing applies in 2027Q1-Q2 (inside FY2027). The six-month
+    # deferral starts at FY2028, while OFF never reinstates the step.
+    for mbu_policy in policy_states:
         for scenario in current_scenarios:
-            assert total((0, mbu_off), scenario, 2027) == pytest.approx(
-                total((1, mbu_off), scenario, 2027), abs=1e-9
+            published_2027 = total(
+                (app.FED_POLICY_PUBLISHED, mbu_policy), scenario, 2027
             )
-            assert total((1, mbu_off), scenario, 2028) < total((0, mbu_off), scenario, 2028)
-    for current_off in (0, 1):
-        assert total((current_off, 0), mbu_scenario, 2027) == pytest.approx(
-            total((current_off, 1), mbu_scenario, 2027), abs=1e-9
+            delayed_2027 = total(
+                (app.FED_POLICY_DELAYED_6M, mbu_policy), scenario, 2027
+            )
+            off_2027 = total(
+                (app.FED_POLICY_OFF, mbu_policy), scenario, 2027
+            )
+            assert published_2027 > delayed_2027
+            assert delayed_2027 == pytest.approx(off_2027, abs=1e-9)
+            published_2028 = total(
+                (app.FED_POLICY_PUBLISHED, mbu_policy), scenario, 2028
+            )
+            delayed_2028 = total(
+                (app.FED_POLICY_DELAYED_6M, mbu_policy), scenario, 2028
+            )
+            off_2028 = total(
+                (app.FED_POLICY_OFF, mbu_policy), scenario, 2028
+            )
+            assert published_2028 == pytest.approx(delayed_2028, abs=1e-9)
+            assert off_2028 < delayed_2028
+    for current_policy in policy_states:
+        published_2027 = total(
+            (current_policy, app.FED_POLICY_PUBLISHED), mbu_scenario, 2027
         )
-        assert total((current_off, 1), mbu_scenario, 2028) < total(
-            (current_off, 0), mbu_scenario, 2028
+        delayed_2027 = total(
+            (current_policy, app.FED_POLICY_DELAYED_6M), mbu_scenario, 2027
         )
+        off_2027 = total(
+            (current_policy, app.FED_POLICY_OFF), mbu_scenario, 2027
+        )
+        assert published_2027 > delayed_2027
+        assert delayed_2027 == pytest.approx(off_2027, abs=1e-9)
+        published_2028 = total(
+            (current_policy, app.FED_POLICY_PUBLISHED), mbu_scenario, 2028
+        )
+        delayed_2028 = total(
+            (current_policy, app.FED_POLICY_DELAYED_6M), mbu_scenario, 2028
+        )
+        off_2028 = total(
+            (current_policy, app.FED_POLICY_OFF), mbu_scenario, 2028
+        )
+        assert published_2028 == pytest.approx(delayed_2028, abs=1e-9)
+        assert off_2028 < delayed_2028
 
-    # Quarterly scenario timing stays correct under both Current 12c states:
+    # Quarterly scenario timing stays correct under all three Current states:
     # no pre-shock leakage and exact reconciliation back to the selected
-    # delayed/off annual path.
-    for current_off in (0, 1):
-        rows = states[(current_off, 0)]
+    # original/delayed/off annual path.
+    for current_policy in policy_states:
+        rows = states[(current_policy, app.FED_POLICY_PUBLISHED)]
         reconciled_scenarios = (base_scenario, *CONFLICT_SCENARIO_NAMES)
         annual_pair = rows[
             rows["time_grain"].astype(str).eq("june_year")

@@ -568,6 +568,9 @@ def revenue_outlook_signature(pack_dir: Path | str | None = None, repo_root: Pat
         base / "runtime_cutoff_audit.parquet",
         base / "fan_availability.parquet",
         base / "fan_band_rows.parquet",
+        root / "data" / "current_revenue_outlook" / "conflict_fuel_price_scenarios.csv",
+        root / "data" / "current_revenue_outlook" / "conflict_gdp_calibration.csv",
+        root / "data" / "current_revenue_outlook" / "treasury_befu26_macro_path.csv",
     ]
     signature: list[tuple[str, int, int]] = []
     for path in paths:
@@ -697,7 +700,7 @@ def net_revenue_timing_comparison_frame(
     start_fy: int = 2026,
     end_fy: int = 2030,
 ) -> pd.DataFrame:
-    """Return the six governed conflict-path net-revenue policy combinations.
+    """Return Base and conflict net revenue under all three 12c policy states.
 
     ``policy_timing_rows`` is the full fixed-finalist annual replay bridge.
     Its scenario factors are rebased onto the chart's published Base lineage,
@@ -714,8 +717,11 @@ def net_revenue_timing_comparison_frame(
     columns = [
         "path_id",
         "path_order",
+        "scenario_family_id",
         "scenario_id",
         "scenario",
+        "policy_state",
+        "policy_label",
         "timing_id",
         "12c timing",
         "FY",
@@ -731,34 +737,49 @@ def net_revenue_timing_comparison_frame(
         return pd.DataFrame(columns=columns)
     if policy_timing_rows is None or policy_timing_rows.empty:
         raise ValueError("The conflict-path policy replay is required for the net-revenue timing comparison.")
-    required = {"policy_path_id", "FY", "series_id", "value", "unit"}
+    required = {
+        "policy_path_id",
+        "scenario_name",
+        "policy_state",
+        "FY",
+        "series_id",
+        "value",
+        "unit",
+    }
     missing = sorted(required.difference(policy_timing_rows.columns))
     if missing:
         raise ValueError(f"Net-revenue timing comparison is missing policy replay columns: {', '.join(missing)}")
     if int(end_fy) < int(start_fy):
         raise ValueError("end_fy must be greater than or equal to start_fy")
 
-    path_specs = tuple(
-        spec
-        for scenario_order, level in enumerate(CONFLICT_FUEL_SCENARIO_LEVELS)
-        for spec in (
+    family_specs = (
+        ("baseline", "base", "Current finalist Base case"),
+        *(
+            (level, level, conflict_trace_name(level))
+            for level in CONFLICT_FUEL_SCENARIO_LEVELS
+        ),
+    )
+    timing_specs = (
+        ("published", "published", "12c original timing: from 1 Jan 2027"),
+        ("delayed_6m", "delay_6m", "12c deferred six months: from 1 Jul 2027"),
+        ("no_uplift", "no_uplift", "12c uplift off"),
+    )
+    path_specs: tuple[tuple[str, int, str, str, str, str, str], ...] = tuple(
+        (
             (
-                f"{level}_shifted_6m",
-                scenario_order * 2,
-                level,
-                f"Middle East conflict: {level.title()}",
-                "delayed_6m",
-                "12c deferred six months: from 1 Jul 2027",
+                f"{family_id}_published"
+                if timing_id == "published"
+                else f"{family_id}_{'shifted_6m' if timing_id == 'delayed_6m' else 'no_uplift'}"
             ),
-            (
-                f"{level}_no_uplift",
-                scenario_order * 2 + 1,
-                level,
-                f"Middle East conflict: {level.title()}",
-                "no_uplift",
-                "12c uplift off",
-            ),
+            family_order * len(timing_specs) + timing_order,
+            scenario_family_id,
+            scenario_label,
+            timing_id,
+            policy_state,
+            timing_label,
         )
+        for family_order, (family_id, scenario_family_id, scenario_label) in enumerate(family_specs)
+        for timing_order, (timing_id, policy_state, timing_label) in enumerate(timing_specs)
     )
     requested_paths = {item[0] for item in path_specs}
     requested_replay_paths = requested_paths | {"baseline_published"}
@@ -775,6 +796,26 @@ def net_revenue_timing_comparison_frame(
     if duplicates.any():
         detail = annual.loc[duplicates, duplicate_keys].sort_values(duplicate_keys).head(20)
         raise ValueError("Duplicate conflict-path net-revenue rows:\n" + detail.to_string(index=False))
+
+    metadata = annual[
+        ["policy_path_id", "scenario_name", "policy_state"]
+    ].drop_duplicates()
+    metadata_duplicates = metadata.duplicated("policy_path_id", keep=False)
+    if metadata_duplicates.any():
+        detail = metadata.loc[metadata_duplicates].sort_values(
+            ["policy_path_id", "scenario_name", "policy_state"]
+        )
+        raise ValueError(
+            "Conflict-path metadata is not unique by policy_path_id:\n"
+            + detail.head(20).to_string(index=False)
+        )
+    metadata_lookup = {
+        str(row["policy_path_id"]): (
+            str(row["scenario_name"]),
+            str(row["policy_state"]),
+        )
+        for _, row in metadata.iterrows()
+    }
 
     lookup: dict[tuple[str, int, str], tuple[float, str]] = {}
     for _, row in annual.iterrows():
@@ -826,7 +867,23 @@ def net_revenue_timing_comparison_frame(
         return anchor * raw_value / raw_base, unit
 
     result_rows: list[dict[str, Any]] = []
-    for path_id, path_order, scenario_id, scenario_label, timing_id, timing_label in path_specs:
+    for (
+        path_id,
+        path_order,
+        scenario_family_id,
+        scenario_label,
+        timing_id,
+        policy_state,
+        timing_label,
+    ) in path_specs:
+        if path_id not in metadata_lookup:
+            raise ValueError(f"Missing conflict-path metadata for {path_id}.")
+        scenario_id, replay_policy_state = metadata_lookup[path_id]
+        if replay_policy_state != policy_state:
+            raise ValueError(
+                f"Policy metadata for {path_id} is {replay_policy_state!r}; "
+                f"expected {policy_state!r}."
+            )
         for fy in range(int(start_fy), int(end_fy) + 1):
             for series_order, (series_id, label, definition) in enumerate(NET_REVENUE_COMPARISON_SERIES):
                 key = (path_id, fy, series_id)
@@ -848,8 +905,11 @@ def net_revenue_timing_comparison_frame(
                     {
                         "path_id": path_id,
                         "path_order": path_order,
+                        "scenario_family_id": scenario_family_id,
                         "scenario_id": scenario_id,
                         "scenario": scenario_label,
+                        "policy_state": policy_state,
+                        "policy_label": timing_label,
                         "timing_id": timing_id,
                         "12c timing": timing_label,
                         "FY": fy,
@@ -864,7 +924,7 @@ def net_revenue_timing_comparison_frame(
                 )
 
     out = pd.DataFrame(result_rows, columns=columns)
-    expected_rows = 6 * (int(end_fy) - int(start_fy) + 1) * len(NET_REVENUE_COMPARISON_SERIES)
+    expected_rows = 12 * (int(end_fy) - int(start_fy) + 1) * len(NET_REVENUE_COMPARISON_SERIES)
     if len(out) != expected_rows or out.duplicated(["path_id", "FY", "series_id"]).any():
         raise ValueError(
             f"Net-revenue timing matrix is incomplete or duplicated: expected {expected_rows} unique rows, got {len(out)}."
@@ -872,27 +932,58 @@ def net_revenue_timing_comparison_frame(
     if out["value_million_nzd"].isna().any() or not np.isfinite(out["value_million_nzd"]).all():
         raise ValueError("Net-revenue timing matrix contains missing or non-finite values.")
 
-    timing = out.pivot(index=["scenario_id", "FY", "series_id"], columns="timing_id", values="value_million_nzd")
-    timing["delta"] = timing["delayed_6m"] - timing["no_uplift"]
+    timing = out.pivot(
+        index=["scenario_family_id", "FY", "series_id"],
+        columns="timing_id",
+        values="value_million_nzd",
+    )
+    timing["delayed_minus_off"] = timing["delayed_6m"] - timing["no_uplift"]
+    timing["published_minus_delayed"] = timing["published"] - timing["delayed_6m"]
     mvr = timing.index.get_level_values("series_id") == "net_mvr_revenue"
-    if not np.allclose(timing.loc[mvr, "delta"], 0.0, rtol=0.0, atol=1e-9):
+    if not np.allclose(timing.loc[mvr, "delayed_minus_off"], 0.0, rtol=0.0, atol=1e-9):
         raise ValueError("The 12c FED/RUC timing policy must not change Net MVR.")
+    if not np.allclose(timing.loc[mvr, "published_minus_delayed"], 0.0, rtol=0.0, atol=1e-9):
+        raise ValueError("The original 12c timing policy must not change Net MVR.")
+    fy2026 = timing.index.get_level_values("FY") == 2026
+    if not np.allclose(
+        timing.loc[fy2026, "published_minus_delayed"],
+        0.0,
+        rtol=0.0,
+        atol=1e-9,
+    ):
+        raise ValueError("Original and deferred policy states must be identical in FY2026.")
+    if int(start_fy) <= 2027 <= int(end_fy):
+        fy2027_tax = (
+            timing.index.get_level_values("FY") == 2027
+        ) & timing.index.get_level_values("series_id").isin(
+            ["net_fed_revenue", "total_ruc_net_revenue"]
+        )
+        if not timing.loc[fy2027_tax, "published_minus_delayed"].gt(0.0).all():
+            raise ValueError("Original timing must exceed deferred timing for FY2027 Net FED and Net RUC.")
     if int(start_fy) <= 2028 <= int(end_fy):
         fy2028_fed = timing[
             (timing.index.get_level_values("series_id") == "net_fed_revenue")
             & (timing.index.get_level_values("FY") == 2028)
         ]
-        if len(fy2028_fed) != len(CONFLICT_FUEL_SCENARIO_LEVELS) or not fy2028_fed["delta"].gt(0.0).all():
-            raise ValueError("The deferred 12c path must exceed no-uplift FY2028 Net FED for Low, Medium and High.")
+        if len(fy2028_fed) != len(family_specs) or not fy2028_fed["delayed_minus_off"].gt(0.0).all():
+            raise ValueError("The deferred 12c path must exceed no-uplift FY2028 Net FED for Base, Low, Medium and High.")
         fy2028_ruc = timing[
             (timing.index.get_level_values("series_id") == "total_ruc_net_revenue")
             & (timing.index.get_level_values("FY") == 2028)
         ]
-        if len(fy2028_ruc) != len(CONFLICT_FUEL_SCENARIO_LEVELS) or not fy2028_ruc["delta"].gt(0.0).all():
-            raise ValueError("The deferred 12c path must exceed no-uplift FY2028 Net RUC for Low, Medium and High.")
+        if len(fy2028_ruc) != len(family_specs) or not fy2028_ruc["delayed_minus_off"].gt(0.0).all():
+            raise ValueError("The deferred 12c path must exceed no-uplift FY2028 Net RUC for Base, Low, Medium and High.")
     pre_policy = timing.index.get_level_values("FY") <= 2027
-    if not np.allclose(timing.loc[pre_policy, "delta"], 0.0, rtol=0.0, atol=1e-9):
-        raise ValueError("The six-month shift changed a pre-policy annual value.")
+    if not np.allclose(timing.loc[pre_policy, "delayed_minus_off"], 0.0, rtol=0.0, atol=1e-9):
+        raise ValueError("Deferred and no-uplift states must be identical through FY2027.")
+    resumed = timing.index.get_level_values("FY") >= 2028
+    if not np.allclose(
+        timing.loc[resumed, "published_minus_delayed"],
+        0.0,
+        rtol=0.0,
+        atol=1e-9,
+    ):
+        raise ValueError("Original and deferred policy states must coincide from FY2028 onward.")
     if 2027 in delayed_factors and not (0.0 < float(delayed_factors[2027]) < 1.0):
         raise ValueError("The governed FY2027 delayed-rate factor must lie between zero and one.")
     return out.sort_values(["path_order", "FY", "series_order"], kind="stable").reset_index(drop=True)
@@ -1689,6 +1780,153 @@ def ped_bridge_mode_impact_audit_frame(
     return pd.DataFrame(rows, columns=columns)
 
 
+def _append_selected_light_petrol_vkt_rows(
+    chart_rows: pd.DataFrame,
+    impact_audit: pd.DataFrame,
+) -> pd.DataFrame:
+    """Materialise the selected annual petrol-VKT bridge in chart rows.
+
+    The governed chart pack carries PED VKT per capita, litres and revenue,
+    but historically omitted the corresponding annual light-petrol VKT leaf.
+    That omission allowed downstream exports to fall back to the optimized
+    migration bridge even when the dashboard selected the raw bridge.  Add
+    the missing leaf from the same audited bridge record used for PED litres
+    and revenue so uptake, policy-price and conflict-price overlays all act on
+    one lineage.
+    """
+
+    if chart_rows is None or chart_rows.empty:
+        return pd.DataFrame() if chart_rows is None else chart_rows.copy()
+    if impact_audit is None or impact_audit.empty:
+        return chart_rows.copy()
+
+    required_audit = {
+        "FY",
+        "source_path",
+        "scenario_name",
+        "fed_path",
+        "series_id",
+        "adjusted",
+    }
+    if required_audit.difference(impact_audit.columns):
+        return chart_rows.copy()
+
+    selected = impact_audit[
+        impact_audit["series_id"].astype(str).eq("light_petrol_vkt")
+    ].copy()
+    selected["FY_numeric"] = pd.to_numeric(selected["FY"], errors="coerce")
+    selected["adjusted_numeric"] = pd.to_numeric(
+        selected["adjusted"], errors="coerce"
+    )
+    selected = selected[
+        selected["FY_numeric"].notna() & selected["adjusted_numeric"].notna()
+    ].copy()
+    if selected.empty:
+        return chart_rows.copy()
+
+    out = chart_rows.copy()
+    fy_numeric = pd.to_numeric(out.get("june_year"), errors="coerce")
+    scenario = out.get("scenario_name", pd.Series("", index=out.index)).fillna("").astype(str)
+    trace = out.get("trace_name", pd.Series("", index=out.index)).fillna("").astype(str)
+    fed_path = out.get("fed_path", pd.Series("", index=out.index)).fillna("").astype(str)
+    series = out.get("series_id", pd.Series("", index=out.index)).fillna("").astype(str)
+    grain = out.get("time_grain", pd.Series("", index=out.index)).fillna("").astype(str)
+
+    new_rows: list[pd.Series] = []
+    missing_templates: list[str] = []
+    for record in selected.to_dict("records"):
+        fy = int(record["FY_numeric"])
+        scenario_name = str(record.get("scenario_name") or "")
+        source_path = str(record.get("source_path") or "")
+        selected_fed_path = str(record.get("fed_path") or "")
+        key_mask = (
+            scenario.eq(scenario_name)
+            & trace.eq(source_path)
+            & fed_path.eq(selected_fed_path)
+            & fy_numeric.eq(fy)
+            & grain.eq("june_year")
+        )
+        if bool((key_mask & series.eq("light_petrol_vkt")).any()):
+            continue
+
+        template_rows = out[
+            key_mask & series.isin(("ped_volume", "ped_vkt_per_capita"))
+        ].copy()
+        if template_rows.empty:
+            missing_templates.append(
+                f"{source_path}/{scenario_name}/{selected_fed_path}/FY{fy}"
+            )
+            continue
+        template_rows["_template_order"] = (
+            template_rows["series_id"].astype(str).ne("ped_volume").astype(int)
+        )
+        row = template_rows.sort_values("_template_order").iloc[0].drop(
+            labels=["_template_order"]
+        )
+        row = row.copy()
+        row["metric_type"] = "activity"
+        row["stream"] = "PED"
+        row["stream_label"] = "PED"
+        row["series_id"] = "light_petrol_vkt"
+        row["series_label"] = "Light petrol VKT"
+        row["value"] = float(record["adjusted_numeric"])
+        row["value_unit"] = str(record.get("unit") or "million km")
+        row["bridge_method"] = str(
+            record.get("formula")
+            or "selected PED bridge light-petrol VKT"
+        )
+        row["formula"] = str(
+            record.get("formula")
+            or "selected_light_petrol_vkt = raw_light_petrol_vkt + alpha * optimization_delta"
+        )
+        row["source"] = str(record.get("source_cells") or row.get("source") or "")
+        row["source_cell"] = str(
+            record.get("source_cells") or row.get("source_cell") or ""
+        )
+        row["source_basis"] = (
+            "selected PED bridge light-petrol VKT before the VFM "
+            "petrol-displacement retention overlay"
+        )
+        row["data_scope"] = "ped_bridge_mode_overlay"
+        row["value_status"] = "ped_bridge_selected_activity"
+        row["row_role"] = "bridge_input"
+        row["revenue_basis"] = "not_applicable"
+        row["official_value"] = pd.NA
+        row["residual_vs_official"] = pd.NA
+        row["canonical_stream_key"] = "LIGHT_PETROL_VKT"
+        row["canonical_period_key"] = f"FY{fy}"
+        row["canonical_scenario_key"] = scenario_name
+        row["canonical_join_key"] = (
+            f"LIGHT_PETROL_VKT|FY{fy}|{scenario_name}"
+        )
+        row["ped_bridge_mode_label"] = _ped_bridge_mode_display_label(record)
+        baseline = _finite_float(record.get("baseline"), np.nan)
+        row["ped_bridge_value_delta"] = (
+            float(record["adjusted_numeric"]) - baseline
+            if np.isfinite(baseline)
+            else pd.NA
+        )
+        warning = str(record.get("gap_reason") or "").strip()
+        row["ped_bridge_population_warning"] = (
+            "" if warning.casefold() in {"", "nan", "none"} else warning
+        )
+        new_rows.append(row)
+
+    if missing_templates:
+        detail = ", ".join(missing_templates[:8])
+        raise ValueError(
+            "The selected PED bridge could not materialise light-petrol VKT "
+            f"because matching chart templates were missing: {detail}"
+        )
+    if not new_rows:
+        return out
+    return pd.concat(
+        [out, pd.DataFrame(new_rows).reindex(columns=out.columns)],
+        ignore_index=True,
+        sort=False,
+    )
+
+
 def apply_ped_bridge_mode_layer(
     *,
     chart_rows: pd.DataFrame,
@@ -1749,6 +1987,10 @@ def apply_ped_bridge_mode_layer(
         scenario_column="scenario_name",
         fed_path_column="fed_path",
         current_mask_column="trace_role",
+    )
+    adjusted_chart = _append_selected_light_petrol_vkt_rows(
+        adjusted_chart,
+        impact,
     )
     adjusted_bridge = _apply_ped_bridge_mode_audit_to_frame(
         bridge_components,

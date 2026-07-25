@@ -366,7 +366,13 @@ def latest_known_actual_period(repo_root: Path | str | None = None) -> str:
         try:
             frame = pd.read_parquet(path, columns=["target_period"])
         except Exception:
-            frame = pd.read_parquet(path)
+            csv_path = path.with_suffix(".csv")
+            if not csv_path.exists():
+                continue
+            try:
+                frame = pd.read_csv(csv_path, usecols=["target_period"])
+            except (OSError, ValueError):
+                continue
         if "target_period" in frame.columns:
             periods.extend(frame["target_period"].dropna().astype(str).tolist())
     if not periods:

@@ -63,6 +63,7 @@ SENSITIVITY_FOOTPRINT = {
     "fleet_med": {"ped_volume", "gross_ped_revenue"} | FED_ROLLUPS,
     "pt_med": {
         "ped_vkt_per_capita",
+        "light_petrol_vkt",
         "ped_volume",
         "gross_ped_revenue",
         "light_ruc_net_km",

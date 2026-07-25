@@ -52,6 +52,7 @@ def _fixture(litres_per_100km: float = 9.0, excise: float = 0.76, light_rate: fl
         petrol_km = 30000.0
         for series_id, value in [
             ("ped_vkt_per_capita", 6000.0),
+            ("light_petrol_vkt", petrol_km),
             ("ped_volume", petrol_km * litres_per_100km / 100.0),
             ("gross_ped_revenue", petrol_km * litres_per_100km / 100.0 * excise),
             ("light_ruc_net_km", 12000.0),
@@ -86,6 +87,7 @@ def test_revenue_neutral_when_eruc_rate_matches_excise_per_km_and_no_elasticity(
         assert sel_new["total_nltf_net_revenue"] == pytest.approx(sel_old["total_nltf_net_revenue"])
         # full migration: entire excise base moved onto e-RUC
         assert sel_new["gross_ped_revenue"] == pytest.approx(0.0)
+        assert sel_new["light_petrol_vkt"] == pytest.approx(30000.0)
         assert sel_new["light_ruc_net_km"] == pytest.approx(12000.0 + 30000.0)
     row = audit[audit["june_year"].eq(2027)].iloc[0]
     assert row["net_nltf_delta"] == pytest.approx(0.0)
@@ -186,6 +188,10 @@ def test_vkt_per_capita_and_volume_follow_the_demand_response() -> None:
     old = chart[chart["june_year"].eq(2027)].set_index("series_id")["value"]
     new = adjusted[adjusted["june_year"].eq(2027)].set_index("series_id")["value"]
     assert new["ped_vkt_per_capita"] > old["ped_vkt_per_capita"]
+    assert new["light_petrol_vkt"] > old["light_petrol_vkt"]
     assert new["ped_volume"] > old["ped_volume"]
+    assert (
+        new["ped_volume"] / new["light_petrol_vkt"]
+    ) == pytest.approx(9.0 / 100.0)
     # but the excise base is gone entirely under full migration
     assert new["gross_ped_revenue"] == pytest.approx(0.0)

@@ -43,6 +43,11 @@ from .conflict_fuel_paths import (
     conflict_trace_name,
     load_conflict_fuel_price_paths,
 )
+from .conflict_gdp_paths import (
+    apply_conflict_gdp_impact,
+    build_conflict_gdp_paths,
+    conflict_gdp_input_audit,
+)
 from .forecast_runner import (
     ScenarioInputForecastReplayResult,
     forecast_chart_rows_for_display,
@@ -60,6 +65,7 @@ from .rate_paths import (
     fed_uplift_off_factors,
     ped_quarterly_rate_schedules,
 )
+from .treasury_macro_paths import apply_treasury_baseline_macro_path
 
 
 # Backwards-compatible exports point to Medium while app/revenue-outlook
@@ -117,7 +123,11 @@ FUEL_PRICE_SHOCK_PERIODS = (
 RUC_PRICE_SHOCK_PERIODS: tuple[str, ...] = ()
 RUC_PRICE_LAGGED_EFFECT_PERIODS: tuple[str, ...] = ()
 
-_BASE_SCENARIO_NAME = "current_basecase"
+BASE_PUBLISHED_SCENARIO_NAME = "current_basecase"
+_BASE_SCENARIO_NAME = BASE_PUBLISHED_SCENARIO_NAME
+_LEGACY_BASE_MACRO_SHADOW_SCENARIO_NAME = (
+    "__legacy_current_basecase_macro_shadow"
+)
 POLICY_PATH_IDS: dict[str, str] = {
     _BASE_SCENARIO_NAME: "baseline_published",
     BASE_DELAYED_6M_SCENARIO_NAME: "baseline_shifted_6m",
@@ -245,11 +255,17 @@ class FuelPriceScenarioReplayResult:
     """Fixed-finalist replay plus the input and bridge lineage needed by UI rows."""
 
     base_scenario_name: str
+    treasury_base_inputs: pd.DataFrame
     fuel_scenario_inputs: pd.DataFrame
     policy_scenario_inputs: pd.DataFrame
     replay_inputs: pd.DataFrame
     replay: ScenarioInputForecastReplayResult
+    price_only_replay_inputs: pd.DataFrame
+    price_only_replay: ScenarioInputForecastReplayResult
     input_audit: pd.DataFrame
+    gdp_input_audit: pd.DataFrame
+    baseline_macro_quarterly_factors: pd.DataFrame
+    baseline_macro_annual_factors: pd.DataFrame
     quarterly_factors: pd.DataFrame
     annual_factors: pd.DataFrame
     annual_bridge: pd.DataFrame
@@ -294,6 +310,18 @@ class FuelPriceScenarioReplayResult:
             return pd.DataFrame()
         applied = forecasts["policy_calibration_applied"].fillna(False).astype(bool)
         return forecasts.loc[applied].reset_index(drop=True)
+
+
+@dataclass(frozen=True)
+class TreasuryBaselineMacroReplayResult:
+    """Independent Treasury-versus-legacy Base replay used for safe fallback."""
+
+    base_scenario_name: str
+    treasury_base_inputs: pd.DataFrame
+    replay_inputs: pd.DataFrame
+    replay: ScenarioInputForecastReplayResult
+    baseline_macro_quarterly_factors: pd.DataFrame
+    baseline_macro_annual_factors: pd.DataFrame
 
 
 def _base_scenario_rows(base_inputs: pd.DataFrame) -> tuple[str, pd.DataFrame]:
@@ -896,6 +924,7 @@ def _apply_governed_policy_demand_calibration(
     replay: ScenarioInputForecastReplayResult,
     *,
     replay_inputs: pd.DataFrame,
+    price_only_replay: ScenarioInputForecastReplayResult,
     repo_root: Path,
     base_scenario_name: str = _BASE_SCENARIO_NAME,
 ) -> ScenarioInputForecastReplayResult:
@@ -910,12 +939,21 @@ def _apply_governed_policy_demand_calibration(
     """
 
     forecasts = replay.future_forecasts.copy()
+    price_only_forecasts = price_only_replay.future_forecasts.copy()
     required_forecast = {"scenario_name", "stream", "target_period", "forecast"}
     missing_forecast = required_forecast.difference(forecasts.columns)
     if missing_forecast:
         raise ValueError(
             "Replay forecasts are missing policy calibration columns: "
             + ", ".join(sorted(missing_forecast))
+        )
+    missing_price_only_forecast = required_forecast.difference(
+        price_only_forecasts.columns
+    )
+    if missing_price_only_forecast:
+        raise ValueError(
+            "Price-only replay forecasts are missing policy calibration columns: "
+            + ", ".join(sorted(missing_price_only_forecast))
         )
     required_inputs = {"scenario_name", "stream", "canonical_period"}
     missing_inputs = required_inputs.difference(replay_inputs.columns)
@@ -941,6 +979,33 @@ def _apply_governed_policy_demand_calibration(
     forecast_row_lookup = {
         (str(row.scenario_name), str(row.stream), str(row.target_period)): index
         for index, row in forecasts.iterrows()
+    }
+    raw_forecast_lookup = {
+        (str(row.scenario_name), str(row.stream), str(row.target_period)): float(
+            pd.to_numeric(pd.Series([row.forecast]), errors="coerce").iloc[0]
+        )
+        for row in forecasts.itertuples()
+        if pd.notna(
+            pd.to_numeric(pd.Series([row.forecast]), errors="coerce").iloc[0]
+        )
+    }
+    if price_only_forecasts.duplicated(forecast_keys, keep=False).any():
+        duplicates = price_only_forecasts.loc[
+            price_only_forecasts.duplicated(forecast_keys, keep=False),
+            forecast_keys,
+        ].drop_duplicates()
+        raise ValueError(
+            "Price-only replay forecasts contain duplicate calibration keys: "
+            + duplicates.astype(str).agg("/".join, axis=1).str.cat(sep=", ")
+        )
+    price_only_forecast_lookup = {
+        (str(row.scenario_name), str(row.stream), str(row.target_period)): float(
+            pd.to_numeric(
+                pd.Series([row.forecast]), errors="coerce"
+            ).iloc[0]
+        )
+        for row in price_only_forecasts.itertuples()
+        if pd.notna(pd.to_numeric(pd.Series([row.forecast]), errors="coerce").iloc[0])
     }
     conflict_reference_scenarios = {
         conflict_scenario_name(level): base_scenario_name
@@ -971,6 +1036,18 @@ def _apply_governed_policy_demand_calibration(
     ).to_numpy(dtype=float)
     forecasts["demand_calibrated_delta"] = np.nan
     forecasts.loc[demand_target_mask, "demand_calibrated_delta"] = 0.0
+    forecasts["demand_price_only_raw_forecast"] = np.nan
+    forecasts["demand_gdp_input_level_factor"] = 1.0
+    forecasts["demand_gdp_model_factor_raw"] = np.nan
+    forecasts["demand_gdp_model_factor"] = np.nan
+    forecasts["demand_gdp_model_delta"] = np.nan
+    forecasts["demand_gdp_factor_source_scenario_name"] = ""
+    forecasts["demand_gdp_factor_source_raw_forecast"] = np.nan
+    forecasts["demand_gdp_factor_source_price_only_forecast"] = np.nan
+    forecasts["demand_gdp_model_basis"] = ""
+    forecasts["demand_gdp_sign_guard_applied"] = False
+    forecasts["demand_gdp_downside_sign_guard_applied"] = False
+    forecasts["demand_gdp_identity_guard_applied"] = False
     forecasts["demand_reference_scenario_name"] = ""
     forecasts["demand_reference_forecast"] = np.nan
     forecasts["demand_generalized_price_field"] = ""
@@ -1125,9 +1202,10 @@ def _apply_governed_policy_demand_calibration(
                 if (
                     variant_forecast_key not in forecast_row_lookup
                     or reference_forecast_key not in forecast_row_lookup
+                    or variant_forecast_key not in price_only_forecast_lookup
                 ):
                     raise ValueError(
-                        f"Demand calibration forecasts are incomplete for "
+                        f"Matched price/GDP calibration forecasts are incomplete for "
                         f"{variant_name}/{stream}/{period}."
                     )
                 row_index = forecast_row_lookup[variant_forecast_key]
@@ -1140,16 +1218,83 @@ def _apply_governed_policy_demand_calibration(
                     pd.Series([forecasts.at[reference_row_index, "forecast"]]),
                     errors="coerce",
                 ).iloc[0]
+                price_only_raw_forecast = float(
+                    price_only_forecast_lookup[variant_forecast_key]
+                )
+                gdp_factor_source_name = (
+                    _POLICY_REFERENCE_SCENARIOS[variant_name]
+                    if is_policy_variant
+                    else variant_name
+                )
+                gdp_factor_source_key = (
+                    gdp_factor_source_name,
+                    stream,
+                    period,
+                )
+                if (
+                    gdp_factor_source_key not in raw_forecast_lookup
+                    or gdp_factor_source_key not in price_only_forecast_lookup
+                ):
+                    raise ValueError(
+                        f"GDP-factor source forecasts are incomplete for "
+                        f"{variant_name}/{stream}/{period} via "
+                        f"{gdp_factor_source_name}."
+                    )
+                gdp_factor_source_raw_forecast = float(
+                    raw_forecast_lookup[gdp_factor_source_key]
+                )
+                gdp_factor_source_price_only_forecast = float(
+                    price_only_forecast_lookup[gdp_factor_source_key]
+                )
                 if (
                     pd.isna(raw_forecast)
                     or pd.isna(reference_forecast)
                     or not np.isfinite(float(raw_forecast))
                     or not np.isfinite(float(reference_forecast))
+                    or not np.isfinite(price_only_raw_forecast)
+                    or not np.isfinite(gdp_factor_source_raw_forecast)
+                    or not np.isfinite(gdp_factor_source_price_only_forecast)
+                    or float(raw_forecast) <= 0.0
+                    or float(reference_forecast) <= 0.0
+                    or price_only_raw_forecast <= 0.0
+                    or gdp_factor_source_raw_forecast <= 0.0
+                    or gdp_factor_source_price_only_forecast <= 0.0
                 ):
                     raise ValueError(
                         f"Demand calibration forecasts must be numeric for "
                         f"{variant_name}/{stream}/{period}."
                     )
+                gdp_model_factor_raw = (
+                    gdp_factor_source_raw_forecast
+                    / gdp_factor_source_price_only_forecast
+                )
+                if (
+                    not np.isfinite(gdp_model_factor_raw)
+                    or gdp_model_factor_raw <= 0.0
+                ):
+                    raise ValueError(
+                        f"Matched GDP model factor must be positive for "
+                        f"{variant_name}/{stream}/{period}."
+                    )
+                input_gdp_factor_value = pd.to_numeric(
+                    pd.Series(
+                        [
+                            input_index.at[
+                                variant_key, "conflict_gdp_level_factor"
+                            ]
+                            if "conflict_gdp_level_factor"
+                            in replay_inputs.columns
+                            else 1.0
+                        ]
+                    ),
+                    errors="coerce",
+                ).iloc[0]
+                input_gdp_factor = (
+                    float(input_gdp_factor_value)
+                    if pd.notna(input_gdp_factor_value)
+                    and np.isfinite(float(input_gdp_factor_value))
+                    else 1.0
+                )
 
                 fuel_changed = not np.isclose(
                     fuel_price_ratio, 1.0, rtol=1e-12, atol=1e-12
@@ -1216,8 +1361,41 @@ def _apply_governed_policy_demand_calibration(
                     else _CONFLICT_CALIBRATION_NOTE
                 )
                 elasticity = float(elasticities.at[stream, "value"])
-                calibrated = float(reference_forecast) * float(
-                    np.power(price_ratio, elasticity)
+                gdp_input_is_identity = bool(
+                    np.isclose(
+                        input_gdp_factor,
+                        1.0,
+                        rtol=0.0,
+                        atol=1e-12,
+                    )
+                )
+                gdp_identity_guard_applied = bool(
+                    gdp_input_is_identity
+                    and not np.isclose(
+                        gdp_model_factor_raw,
+                        1.0,
+                        rtol=0.0,
+                        atol=1e-12,
+                    )
+                )
+                gdp_downside_sign_guard_applied = bool(
+                    input_gdp_factor < 1.0 - 1e-12
+                    and gdp_model_factor_raw > 1.0
+                )
+                gdp_sign_guard_applied = bool(
+                    gdp_identity_guard_applied
+                    or gdp_downside_sign_guard_applied
+                )
+                if gdp_input_is_identity:
+                    gdp_model_factor = 1.0
+                elif gdp_downside_sign_guard_applied:
+                    gdp_model_factor = min(gdp_model_factor_raw, 1.0)
+                else:
+                    gdp_model_factor = gdp_model_factor_raw
+                calibrated = (
+                    float(reference_forecast)
+                    * float(np.power(price_ratio, elasticity))
+                    * gdp_model_factor
                 )
                 output_layer = (
                     "governed_structural_identity_to_base"
@@ -1228,6 +1406,50 @@ def _apply_governed_policy_demand_calibration(
                 forecasts.at[row_index, "demand_reference_scenario_name"] = (
                     reference_name
                 )
+                forecasts.at[
+                    row_index, "demand_price_only_raw_forecast"
+                ] = price_only_raw_forecast
+                forecasts.at[
+                    row_index, "demand_gdp_input_level_factor"
+                ] = input_gdp_factor
+                forecasts.at[
+                    row_index, "demand_gdp_model_factor_raw"
+                ] = gdp_model_factor_raw
+                forecasts.at[row_index, "demand_gdp_model_factor"] = (
+                    gdp_model_factor
+                )
+                forecasts.at[row_index, "demand_gdp_model_delta"] = (
+                    gdp_factor_source_raw_forecast
+                    - gdp_factor_source_price_only_forecast
+                )
+                forecasts.at[
+                    row_index, "demand_gdp_factor_source_scenario_name"
+                ] = gdp_factor_source_name
+                forecasts.at[
+                    row_index, "demand_gdp_factor_source_raw_forecast"
+                ] = gdp_factor_source_raw_forecast
+                forecasts.at[
+                    row_index,
+                    "demand_gdp_factor_source_price_only_forecast",
+                ] = gdp_factor_source_price_only_forecast
+                forecasts.at[row_index, "demand_gdp_model_basis"] = (
+                    "published_conflict_family_raw_price_plus_gdp_replay_"
+                    "divided_by_matching_published_price_only_replay; "
+                    "policy timing never changes the GDP family factor; "
+                    "an identity GDP input forces an identity factor and a "
+                    "positive response to lower GDP is capped at identity"
+                )
+                forecasts.at[
+                    row_index, "demand_gdp_sign_guard_applied"
+                ] = gdp_sign_guard_applied
+                forecasts.at[
+                    row_index,
+                    "demand_gdp_downside_sign_guard_applied",
+                ] = gdp_downside_sign_guard_applied
+                forecasts.at[
+                    row_index,
+                    "demand_gdp_identity_guard_applied",
+                ] = gdp_identity_guard_applied
                 forecasts.at[row_index, "demand_reference_forecast"] = float(
                     reference_forecast
                 )
@@ -1342,6 +1564,9 @@ def _apply_governed_policy_demand_calibration(
                 pd.to_numeric(applied_rows["demand_price_ratio"], errors="coerce"),
                 pd.to_numeric(applied_rows["demand_elasticity"], errors="coerce"),
             )
+            * pd.to_numeric(
+                applied_rows["demand_gdp_model_factor"], errors="coerce"
+            )
         )
         final = pd.to_numeric(applied_rows["forecast"], errors="coerce")
         if not np.allclose(final, expected, rtol=1e-12, atol=1e-9):
@@ -1349,11 +1574,26 @@ def _apply_governed_policy_demand_calibration(
         reference = pd.to_numeric(
             applied_rows["demand_reference_forecast"], errors="coerce"
         )
+        gdp_adjusted_reference = reference * pd.to_numeric(
+            applied_rows["demand_gdp_model_factor"], errors="coerce"
+        )
         ratio = pd.to_numeric(applied_rows["demand_price_ratio"], errors="coerce")
         elasticity = pd.to_numeric(applied_rows["demand_elasticity"], errors="coerce")
-        cheaper = ratio.lt(1.0) & elasticity.lt(0.0) & reference.gt(0.0)
-        dearer = ratio.gt(1.0) & elasticity.lt(0.0) & reference.gt(0.0)
-        if (cheaper & final.le(reference)).any() or (dearer & final.ge(reference)).any():
+        cheaper = (
+            ratio.lt(1.0)
+            & elasticity.lt(0.0)
+            & gdp_adjusted_reference.gt(0.0)
+        )
+        dearer = (
+            ratio.gt(1.0)
+            & elasticity.lt(0.0)
+            & gdp_adjusted_reference.gt(0.0)
+        )
+        if (
+            cheaper & final.le(gdp_adjusted_reference)
+        ).any() or (
+            dearer & final.ge(gdp_adjusted_reference)
+        ).any():
             raise ValueError("Demand calibration failed its economic sign invariant.")
     applied = forecasts["demand_calibration_applied"].fillna(False).astype(bool)
     if not applied.loc[demand_target_mask].all():
@@ -1754,6 +1994,8 @@ def _annual_bridge_and_factors(
     repo_root: Path,
     base_scenario_name: str,
     latest_actual_period: str | None = None,
+    require_conflict_factors: bool = True,
+    isolate_non_ice_activity: bool = True,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     quarterly = forecast_chart_rows_for_display(
         replay.future_forecasts,
@@ -1767,6 +2009,7 @@ def _annual_bridge_and_factors(
     scenario_roles = {
         base_scenario_name: "basecase",
         "historical_actual": "actual",
+        _LEGACY_BASE_MACRO_SHADOW_SCENARIO_NAME: "comparison",
         **{
             conflict_scenario_name(level): "comparison"
             for level in CONFLICT_FUEL_SCENARIO_LEVELS
@@ -1791,12 +2034,15 @@ def _annual_bridge_and_factors(
     )
     if annual.empty:
         raise ValueError(
-            "The conflict fuel-price replay could not be bridged to annual Revenue Outlook rows."
+            "The fixed-finalist replay could not be bridged to annual Revenue Outlook rows."
         )
-    annual = _isolate_non_ice_annual_activity(
-        annual,
-        base_scenario_name=base_scenario_name,
-    )
+    if isolate_non_ice_activity:
+        annual = _isolate_non_ice_annual_activity(
+            annual,
+            base_scenario_name=base_scenario_name,
+        )
+    if not require_conflict_factors:
+        return annual.reset_index(drop=True), pd.DataFrame()
 
     values = annual.copy()
     values["value_numeric"] = pd.to_numeric(values["value"], errors="coerce")
@@ -2322,6 +2568,225 @@ def build_policy_scenario_pair_factors(
     return pd.concat(frames, ignore_index=True, sort=False) if frames else pd.DataFrame(columns=columns)
 
 
+def _scenario_clone_with_identity(
+    rows: pd.DataFrame,
+    *,
+    scenario_name: str,
+    role: str,
+    display_name: str,
+) -> pd.DataFrame:
+    """Clone scenario rows under an internal, explicitly labelled identity."""
+
+    out = rows.copy()
+    out["scenario_name"] = str(scenario_name)
+    out["role"] = str(role)
+    if "scenario_role" in out.columns:
+        out["scenario_role"] = str(role)
+    out["scenario_display_name"] = str(display_name)
+    if "source_artifact" in out.columns:
+        out["source_artifact"] = (
+            out["source_artifact"].fillna("").astype(str)
+            + f"; runtime_macro_shadow:{scenario_name}"
+        ).str.strip("; ")
+    return out.reset_index(drop=True)
+
+
+def _baseline_macro_factor_frames(
+    price_only_replay: ScenarioInputForecastReplayResult,
+    price_only_annual_bridge: pd.DataFrame,
+    *,
+    base_scenario_name: str,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Treasury-Base versus the legacy input path at quarter and FY grain."""
+
+    quarterly_source = price_only_replay.future_forecasts.copy()
+    required_quarterly = {
+        "scenario_name",
+        "stream",
+        "target_period",
+        "forecast",
+    }
+    missing = required_quarterly.difference(quarterly_source.columns)
+    if missing:
+        raise ValueError(
+            "Price-only replay cannot build macro factors without columns: "
+            + ", ".join(sorted(missing))
+        )
+    quarterly_source["forecast"] = pd.to_numeric(
+        quarterly_source["forecast"], errors="coerce"
+    )
+    quarterly = quarterly_source[
+        quarterly_source["scenario_name"].astype(str).isin(
+            [base_scenario_name, _LEGACY_BASE_MACRO_SHADOW_SCENARIO_NAME]
+        )
+    ].pivot_table(
+        index=["stream", "target_period"],
+        columns="scenario_name",
+        values="forecast",
+        aggfunc="first",
+    ).reset_index()
+    if (
+        base_scenario_name not in quarterly.columns
+        or _LEGACY_BASE_MACRO_SHADOW_SCENARIO_NAME not in quarterly.columns
+    ):
+        raise ValueError("Price-only replay is missing Treasury or legacy Base rows.")
+    quarterly = quarterly.rename(
+        columns={
+            "target_period": "period",
+            _LEGACY_BASE_MACRO_SHADOW_SCENARIO_NAME: "base_value",
+            base_scenario_name: "scenario_value",
+        }
+    ).dropna(subset=["base_value", "scenario_value"])
+    quarterly["series_id"] = quarterly["stream"].astype(str).map(
+        _STREAM_SERIES_IDS
+    )
+    if quarterly["series_id"].isna().any():
+        raise ValueError("Treasury macro factors contain an unknown activity stream.")
+    quarterly["factor"] = np.where(
+        quarterly["base_value"].abs() > 1e-12,
+        quarterly["scenario_value"] / quarterly["base_value"],
+        1.0,
+    )
+    quarterly["delta"] = quarterly["scenario_value"] - quarterly["base_value"]
+    quarterly["scenario_name"] = base_scenario_name
+    quarterly["trace_name"] = "Current finalist Base case"
+    quarterly["time_grain"] = "quarterly"
+    quarterly["transformation_basis"] = (
+        "Treasury_BEFU26_macro_replay_vs_legacy_macro_replay"
+    )
+
+    annual_source = price_only_annual_bridge.copy()
+    required_annual = {"scenario_name", "FY", "series_id", "value"}
+    missing = required_annual.difference(annual_source.columns)
+    if missing:
+        raise ValueError(
+            "Price-only annual bridge cannot build macro factors without columns: "
+            + ", ".join(sorted(missing))
+        )
+    annual_source["value"] = pd.to_numeric(annual_source["value"], errors="coerce")
+    annual = annual_source[
+        annual_source["scenario_name"].astype(str).isin(
+            [base_scenario_name, _LEGACY_BASE_MACRO_SHADOW_SCENARIO_NAME]
+        )
+    ].pivot_table(
+        index=["FY", "series_id"],
+        columns="scenario_name",
+        values="value",
+        aggfunc="first",
+    ).reset_index()
+    if (
+        base_scenario_name not in annual.columns
+        or _LEGACY_BASE_MACRO_SHADOW_SCENARIO_NAME not in annual.columns
+    ):
+        raise ValueError(
+            "Price-only annual bridge is missing Treasury or legacy Base rows."
+        )
+    annual = annual.rename(
+        columns={
+            "FY": "june_year",
+            _LEGACY_BASE_MACRO_SHADOW_SCENARIO_NAME: "base_value",
+            base_scenario_name: "scenario_value",
+        }
+    ).dropna(subset=["base_value", "scenario_value"])
+    annual["factor"] = np.where(
+        annual["base_value"].abs() > 1e-12,
+        annual["scenario_value"] / annual["base_value"],
+        1.0,
+    )
+    annual["delta"] = annual["scenario_value"] - annual["base_value"]
+    annual["period"] = pd.to_numeric(
+        annual["june_year"], errors="coerce"
+    ).astype("Int64").map(
+        lambda fy: f"FY{int(fy)}" if pd.notna(fy) else ""
+    )
+    annual["scenario_name"] = base_scenario_name
+    annual["trace_name"] = "Current finalist Base case"
+    annual["time_grain"] = "june_year"
+    annual["transformation_basis"] = (
+        "Treasury_BEFU26_macro_annual_bridge_vs_legacy_macro_annual_bridge"
+    )
+    return (
+        quarterly.reset_index(drop=True),
+        annual.reset_index(drop=True),
+    )
+
+
+def run_treasury_baseline_macro_replay(
+    base_inputs: pd.DataFrame,
+    repo_root: Path | str,
+    engine: str = "ensemble",
+    *,
+    latest_actual_period: str | None = None,
+) -> TreasuryBaselineMacroReplayResult:
+    """Replay Treasury and legacy Base macro paths without conflict dependencies.
+
+    The dashboard uses this two-scenario replay as a fail-safe source for the
+    Treasury baseline overlay.  It deliberately does not load fuel-conflict
+    paths or policy variants, so a problem in those optional scenario layers
+    cannot silently revert the visible Base case to the legacy GDP path.
+    """
+
+    root = Path(repo_root)
+    base_scenario_name, legacy_base_rows = _base_scenario_rows(base_inputs)
+    treasury_inputs = apply_treasury_baseline_macro_path(base_inputs, root)
+    treasury_base_scenario_name, treasury_base_rows = _base_scenario_rows(
+        treasury_inputs
+    )
+    if treasury_base_scenario_name != base_scenario_name:
+        raise ValueError("Treasury macro transform changed the Base scenario identity.")
+
+    legacy_shadow_rows = _scenario_clone_with_identity(
+        legacy_base_rows,
+        scenario_name=_LEGACY_BASE_MACRO_SHADOW_SCENARIO_NAME,
+        role="comparison",
+        display_name="Internal legacy macro Base shadow",
+    )
+    replay_inputs = pd.concat(
+        [treasury_base_rows, legacy_shadow_rows],
+        ignore_index=True,
+        sort=False,
+    )
+    replay = replay_forecast_from_scenario_inputs(
+        replay_inputs,
+        repo_root=root,
+        engine=engine,
+        latest_actual_period=latest_actual_period,
+    )
+    replay_scenarios = (
+        base_scenario_name,
+        _LEGACY_BASE_MACRO_SHADOW_SCENARIO_NAME,
+    )
+    _validate_complete_numeric_replay(
+        replay,
+        replay_inputs=replay_inputs,
+        scenario_names=replay_scenarios,
+    )
+    annual_bridge, _ = _annual_bridge_and_factors(
+        replay,
+        replay_inputs=replay_inputs,
+        repo_root=root,
+        base_scenario_name=base_scenario_name,
+        latest_actual_period=latest_actual_period,
+        require_conflict_factors=False,
+        isolate_non_ice_activity=False,
+    )
+    quarterly_factors, annual_factors = _baseline_macro_factor_frames(
+        replay,
+        annual_bridge,
+        base_scenario_name=base_scenario_name,
+    )
+    if quarterly_factors.empty or annual_factors.empty:
+        raise ValueError("Independent Treasury baseline replay produced no factors.")
+    return TreasuryBaselineMacroReplayResult(
+        base_scenario_name=base_scenario_name,
+        treasury_base_inputs=treasury_base_rows.reset_index(drop=True),
+        replay_inputs=replay_inputs.reset_index(drop=True),
+        replay=replay,
+        baseline_macro_quarterly_factors=quarterly_factors,
+        baseline_macro_annual_factors=annual_factors,
+    )
+
+
 def run_fuel_price_scenario_replay(
     base_inputs: pd.DataFrame,
     repo_root: Path | str,
@@ -2332,16 +2797,37 @@ def run_fuel_price_scenario_replay(
     """Build and score Base plus Low/Medium/High under three policy states."""
 
     root = Path(repo_root)
-    base_scenario_name, base_rows = _base_scenario_rows(base_inputs)
+    base_scenario_name, legacy_base_rows = _base_scenario_rows(base_inputs)
+    treasury_inputs = apply_treasury_baseline_macro_path(base_inputs, root)
+    treasury_base_scenario_name, base_rows = _base_scenario_rows(treasury_inputs)
+    if treasury_base_scenario_name != base_scenario_name:
+        raise ValueError("Treasury macro transform changed the Base scenario identity.")
     conflict_paths = load_conflict_fuel_price_paths(root)
-    fuel_frames = [
+    conflict_gdp_paths = build_conflict_gdp_paths(
+        root,
+        fuel_paths=conflict_paths,
+    )
+    price_only_fuel_frames = [
         build_fuel_price_scenario_inputs(
-            base_inputs,
+            base_rows,
             root,
             level=level,
             scenario_paths=conflict_paths,
         )
         for level in CONFLICT_FUEL_SCENARIO_LEVELS
+    ]
+    fuel_frames = [
+        apply_conflict_gdp_impact(
+            price_only_rows,
+            severity=level,
+            repo_root=root,
+            gdp_paths=conflict_gdp_paths,
+        )
+        for level, price_only_rows in zip(
+            CONFLICT_FUEL_SCENARIO_LEVELS,
+            price_only_fuel_frames,
+            strict=True,
+        )
     ]
     fuel_rows = pd.concat(fuel_frames, ignore_index=True, sort=False)
     base_delayed_rows = build_ruc_policy_scenario_inputs(
@@ -2359,6 +2845,29 @@ def run_fuel_price_scenario_replay(
         scenario_display_name="Current finalist Base case (12c off; PED pump + proportional RUC)",
     )
     policy_frames = [base_delayed_rows, base_no_uplift_rows]
+    price_only_base_delayed_rows = build_ruc_policy_scenario_inputs(
+        base_rows,
+        root,
+        policy_state=FED_POLICY_STATE_DELAYED_6M,
+        scenario_name=BASE_DELAYED_6M_SCENARIO_NAME,
+        scenario_display_name=(
+            "Current finalist Base case "
+            "(12c delayed 6m; price-only macro shadow)"
+        ),
+    )
+    price_only_base_no_uplift_rows = build_ruc_policy_scenario_inputs(
+        base_rows,
+        root,
+        policy_state=FED_POLICY_STATE_NO_UPLIFT,
+        scenario_name=BASE_NO_UPLIFT_SCENARIO_NAME,
+        scenario_display_name=(
+            "Current finalist Base case (12c off; price-only macro shadow)"
+        ),
+    )
+    price_only_policy_frames = [
+        price_only_base_delayed_rows,
+        price_only_base_no_uplift_rows,
+    ]
     for level, published_rows in zip(
         CONFLICT_FUEL_SCENARIO_LEVELS, fuel_frames, strict=True
     ):
@@ -2386,6 +2895,39 @@ def run_fuel_price_scenario_replay(
                 ),
             ]
         )
+    for level, published_rows in zip(
+        CONFLICT_FUEL_SCENARIO_LEVELS,
+        price_only_fuel_frames,
+        strict=True,
+    ):
+        price_only_policy_frames.extend(
+            [
+                build_ruc_policy_scenario_inputs(
+                    published_rows,
+                    root,
+                    policy_state=FED_POLICY_STATE_DELAYED_6M,
+                    scenario_name=conflict_policy_variant_name(
+                        level, FED_POLICY_STATE_DELAYED_6M
+                    ),
+                    scenario_display_name=(
+                        f"{conflict_trace_name(level)} "
+                        "(12c delayed 6m; price-only macro shadow)"
+                    ),
+                ),
+                build_ruc_policy_scenario_inputs(
+                    published_rows,
+                    root,
+                    policy_state=FED_POLICY_STATE_NO_UPLIFT,
+                    scenario_name=conflict_policy_variant_name(
+                        level, FED_POLICY_STATE_NO_UPLIFT
+                    ),
+                    scenario_display_name=(
+                        f"{conflict_trace_name(level)} "
+                        "(12c off; price-only macro shadow)"
+                    ),
+                ),
+            ]
+        )
     policy_scenario_inputs = pd.concat(
         policy_frames,
         ignore_index=True,
@@ -2396,8 +2938,35 @@ def run_fuel_price_scenario_replay(
         ignore_index=True,
         sort=False,
     )
+    price_only_policy_scenario_inputs = pd.concat(
+        price_only_policy_frames,
+        ignore_index=True,
+        sort=False,
+    )
+    legacy_shadow_rows = _scenario_clone_with_identity(
+        legacy_base_rows,
+        scenario_name=_LEGACY_BASE_MACRO_SHADOW_SCENARIO_NAME,
+        role="comparison",
+        display_name="Internal legacy macro Base shadow",
+    )
+    price_only_replay_inputs = pd.concat(
+        [
+            base_rows,
+            pd.concat(price_only_fuel_frames, ignore_index=True, sort=False),
+            price_only_policy_scenario_inputs,
+            legacy_shadow_rows,
+        ],
+        ignore_index=True,
+        sort=False,
+    )
     replay = replay_forecast_from_scenario_inputs(
         replay_inputs,
+        repo_root=root,
+        engine=engine,
+        latest_actual_period=latest_actual_period,
+    )
+    price_only_replay = replay_forecast_from_scenario_inputs(
+        price_only_replay_inputs,
         repo_root=root,
         engine=engine,
         latest_actual_period=latest_actual_period,
@@ -2406,6 +2975,22 @@ def run_fuel_price_scenario_replay(
     if validation.empty or not validation["valid"].fillna(False).all():
         details = validation[[column for column in ["scenario_name", "errors"] if column in validation.columns]].to_dict("records")
         raise ValueError(f"Fixed-finalist conflict fuel-price replay failed validation: {details}")
+    price_only_validation = price_only_replay.validation_report.copy()
+    if (
+        price_only_validation.empty
+        or not price_only_validation["valid"].fillna(False).all()
+    ):
+        details = price_only_validation[
+            [
+                column
+                for column in ["scenario_name", "errors"]
+                if column in price_only_validation.columns
+            ]
+        ].to_dict("records")
+        raise ValueError(
+            "Fixed-finalist price-only shadow replay failed validation: "
+            f"{details}"
+        )
     replay_scenario_names = (
         base_scenario_name,
         *(conflict_scenario_name(level) for level in CONFLICT_FUEL_SCENARIO_LEVELS),
@@ -2422,9 +3007,18 @@ def run_fuel_price_scenario_replay(
         replay_inputs=replay_inputs,
         scenario_names=replay_scenario_names,
     )
+    _validate_complete_numeric_replay(
+        price_only_replay,
+        replay_inputs=price_only_replay_inputs,
+        scenario_names=(
+            *replay_scenario_names,
+            _LEGACY_BASE_MACRO_SHADOW_SCENARIO_NAME,
+        ),
+    )
     replay = _apply_governed_policy_demand_calibration(
         replay,
         replay_inputs=replay_inputs,
+        price_only_replay=price_only_replay,
         repo_root=root,
         base_scenario_name=base_scenario_name,
     )
@@ -2434,6 +3028,13 @@ def run_fuel_price_scenario_replay(
         base_scenario_name,
         conflict_paths=conflict_paths,
     )
+    gdp_input_audit = conflict_gdp_input_audit(
+        pd.concat(
+            [fuel_rows, policy_scenario_inputs],
+            ignore_index=True,
+            sort=False,
+        )
+    )
     quarterly_factors = _quarterly_factor_audit(replay, base_scenario_name=base_scenario_name)
     raw_annual_bridge, annual_factors = _annual_bridge_and_factors(
         replay,
@@ -2441,6 +3042,21 @@ def run_fuel_price_scenario_replay(
         repo_root=root,
         base_scenario_name=base_scenario_name,
         latest_actual_period=latest_actual_period,
+    )
+    price_only_annual_bridge, _ = _annual_bridge_and_factors(
+        price_only_replay,
+        replay_inputs=price_only_replay_inputs,
+        repo_root=root,
+        base_scenario_name=base_scenario_name,
+        latest_actual_period=latest_actual_period,
+    )
+    (
+        baseline_macro_quarterly_factors,
+        baseline_macro_annual_factors,
+    ) = _baseline_macro_factor_frames(
+        price_only_replay,
+        price_only_annual_bridge,
+        base_scenario_name=base_scenario_name,
     )
     rate_factor_rows = raw_annual_bridge.copy()
     if "june_year" not in rate_factor_rows.columns and "FY" in rate_factor_rows.columns:
@@ -2467,11 +3083,17 @@ def run_fuel_price_scenario_replay(
     )
     return FuelPriceScenarioReplayResult(
         base_scenario_name=base_scenario_name,
+        treasury_base_inputs=base_rows,
         fuel_scenario_inputs=fuel_rows,
         policy_scenario_inputs=policy_scenario_inputs,
         replay_inputs=replay_inputs,
         replay=replay,
+        price_only_replay_inputs=price_only_replay_inputs,
+        price_only_replay=price_only_replay,
         input_audit=input_audit,
+        gdp_input_audit=gdp_input_audit,
+        baseline_macro_quarterly_factors=baseline_macro_quarterly_factors,
+        baseline_macro_annual_factors=baseline_macro_annual_factors,
         quarterly_factors=quarterly_factors,
         annual_factors=annual_factors,
         annual_bridge=annual_bridge,
@@ -2494,6 +3116,339 @@ def _factor_frames(replay_or_audit: FuelPriceScenarioReplayResult | pd.DataFrame
             audit[audit["time_grain"].astype(str).eq("june_year")].copy(),
         )
     raise TypeError("replay_or_audit must be FuelPriceScenarioReplayResult or a factor-audit DataFrame.")
+
+
+def apply_treasury_macro_to_chart_rows(
+    chart_rows: pd.DataFrame,
+    replay: FuelPriceScenarioReplayResult | TreasuryBaselineMacroReplayResult,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Apply Treasury-versus-legacy Base factors before policy/conflict layers.
+
+    This keeps the committed pack as the visible layout/source skeleton while
+    making the replayed Treasury macro path authoritative for every current
+    model population path.  Applying the same factor to Base and the current
+    comparison path preserves their population differential; MBU26, historical
+    actuals and runtime conflict/policy rows are never changed.
+    """
+
+    if chart_rows is None or chart_rows.empty:
+        return chart_rows, pd.DataFrame()
+    if not isinstance(
+        replay,
+        (FuelPriceScenarioReplayResult, TreasuryBaselineMacroReplayResult),
+    ):
+        raise TypeError("Treasury macro chart overlay requires a replay result.")
+    out = chart_rows.copy()
+    if "scenario_name" not in out.columns or "value" not in out.columns:
+        raise ValueError("Chart rows are missing scenario_name/value for macro overlay.")
+    quarterly = replay.baseline_macro_quarterly_factors
+    annual = replay.baseline_macro_annual_factors
+    if quarterly is None or quarterly.empty or annual is None or annual.empty:
+        raise ValueError("Treasury macro replay factors are unavailable.")
+    q_lookup = {
+        (str(row.series_id), str(row.period)): float(row.factor)
+        for row in quarterly.itertuples()
+        if pd.notna(getattr(row, "factor", np.nan))
+    }
+    a_lookup = {
+        (str(row.series_id), int(row.june_year)): float(row.factor)
+        for row in annual.itertuples()
+        if pd.notna(getattr(row, "factor", np.nan))
+        and pd.notna(getattr(row, "june_year", np.nan))
+    }
+    scenario_names = out["scenario_name"].fillna("").astype(str)
+    if "scenario_role" in out.columns:
+        scenario_roles = (
+            out["scenario_role"].fillna("").astype(str).str.strip().str.casefold()
+        )
+        current_model_mask = scenario_roles.isin({"basecase", "comparison"})
+    else:
+        current_model_mask = scenario_names.eq(replay.base_scenario_name)
+    runtime_scenario_names = set(POLICY_PATH_IDS).difference(
+        {replay.base_scenario_name}
+    )
+    runtime_scenario_names.add(_LEGACY_BASE_MACRO_SHADOW_SCENARIO_NAME)
+    target_mask = current_model_mask & ~scenario_names.isin(
+        runtime_scenario_names
+    )
+    out["_treasury_macro_factor"] = 1.0
+    out["_treasury_macro_source_value"] = pd.to_numeric(
+        out.get("value"), errors="coerce"
+    )
+    out["_treasury_macro_basis"] = ""
+    audit_rows: list[dict[str, Any]] = []
+    audit_by_index: dict[Any, dict[str, Any]] = {}
+    for index in out.index[target_mask]:
+        row = out.loc[index]
+        series_id = str(row.get("series_id") or "")
+        period = str(row.get("period") or "")
+        grain = str(row.get("time_grain") or "")
+        factor: float | None = None
+        basis = ""
+        if grain == "quarterly":
+            factor = q_lookup.get((series_id, period))
+            if factor is not None:
+                basis = "Treasury_BEFU26_native_quarterly_macro_factor"
+        if factor is None:
+            fy_value = pd.to_numeric(
+                pd.Series([row.get("june_year")]), errors="coerce"
+            ).iloc[0]
+            if pd.isna(fy_value) and grain == "quarterly":
+                fy_value = _fiscal_year_from_quarter(period)
+            if pd.notna(fy_value):
+                factor = a_lookup.get((series_id, int(fy_value)))
+                if factor is not None:
+                    basis = "Treasury_BEFU26_annual_bridge_macro_factor"
+        if factor is None:
+            continue
+        source_value = pd.to_numeric(
+            pd.Series([out.at[index, "value"]]), errors="coerce"
+        ).iloc[0]
+        if pd.isna(source_value) or not np.isfinite(float(source_value)):
+            continue
+        adjusted = float(source_value) * float(factor)
+        out.at[index, "value"] = adjusted
+        out.at[index, "_treasury_macro_factor"] = float(factor)
+        out.at[index, "_treasury_macro_basis"] = basis
+        for metadata_column in ("_fed_baseline_value",):
+            if metadata_column not in out.columns:
+                continue
+            metadata_value = pd.to_numeric(
+                pd.Series([out.at[index, metadata_column]]), errors="coerce"
+            ).iloc[0]
+            if pd.notna(metadata_value):
+                out.at[index, metadata_column] = float(metadata_value) * float(
+                    factor
+                )
+        audit_row = {
+            "audit_type": "treasury_baseline_macro",
+            "scenario_name": str(row.get("scenario_name") or ""),
+            "scenario_role": str(row.get("scenario_role") or "basecase"),
+            "trace_name": str(
+                row.get("trace_name") or "Current finalist Base case"
+            ),
+            "severity": "",
+            "time_grain": grain,
+            "period": period,
+            "june_year": row.get("june_year"),
+            "stream": str(row.get("stream") or ""),
+            "series_id": series_id,
+            "transformation_basis": basis,
+            "factor": float(factor),
+            "baseline_value": float(source_value),
+            "adjusted_value": adjusted,
+            "value_delta": adjusted - float(source_value),
+            "scenario_note": (
+                "Current model paths use the Treasury BEFU26 real-GDP and "
+                "population baseline; price inputs are unchanged."
+            ),
+        }
+        audit_rows.append(audit_row)
+        audit_by_index[index] = audit_row
+
+    # Applying independently replayed annual factors to the committed display
+    # skeleton can expose sub-dollar/million rounding differences between a
+    # governed aggregate and its leaves.  Rebuild the annual formula chain
+    # after the macro overlay so the chart and detail tables retain exact
+    # accounting identities.  Quarterly model outputs remain untouched.
+    annual_mask = target_mask & out.get(
+        "time_grain", pd.Series("", index=out.index)
+    ).astype(str).eq("june_year")
+    grouping = ["scenario_name", "june_year"]
+    if "fed_path" in out.columns:
+        grouping.append("fed_path")
+    if annual_mask.any() and "june_year" not in out.columns:
+        raise ValueError(
+            "Treasury macro annual formula replay requires june_year."
+        )
+    annual_groups = (
+        out[annual_mask].groupby(grouping, dropna=False, sort=False)
+        if annual_mask.any()
+        else ()
+    )
+    for _, group in annual_groups:
+        series_ids = group["series_id"].fillna("").astype(str)
+        if series_ids[series_ids.ne("")].duplicated().any():
+            duplicates = sorted(
+                series_ids[series_ids.duplicated(keep=False)].unique()
+            )
+            raise ValueError(
+                "Treasury macro formula replay found duplicate annual rows: "
+                + ", ".join(duplicates)
+            )
+        index_by_series = {
+            str(out.at[index, "series_id"]): index for index in group.index
+        }
+        source_values = {
+            series_id: float(value)
+            for series_id, index in index_by_series.items()
+            if pd.notna(
+                value := pd.to_numeric(
+                    pd.Series(
+                        [out.at[index, "_treasury_macro_source_value"]]
+                    ),
+                    errors="coerce",
+                ).iloc[0]
+            )
+        }
+        adjusted_values = {
+            series_id: float(value)
+            for series_id, index in index_by_series.items()
+            if pd.notna(
+                value := pd.to_numeric(
+                    pd.Series([out.at[index, "value"]]),
+                    errors="coerce",
+                ).iloc[0]
+            )
+        }
+        group_years = (
+            pd.to_numeric(group["june_year"], errors="coerce")
+            .dropna()
+            .astype(int)
+            .unique()
+            .tolist()
+        )
+
+        def _annual_anchor_delta(series_id: str) -> float | None:
+            """Return a present anchor's delta without inventing filtered data."""
+
+            if series_id not in index_by_series:
+                return None
+            if len(group_years) != 1:
+                raise ValueError(
+                    "Treasury macro annual anchor coverage requires exactly "
+                    f"one fiscal year for {series_id}."
+                )
+            fy = int(group_years[0])
+            factor = a_lookup.get((series_id, fy))
+            if factor is None or not np.isfinite(float(factor)):
+                raise ValueError(
+                    "Treasury macro annual anchor factor is missing or "
+                    f"non-finite for {series_id}/FY{fy}."
+                )
+            source_value = source_values.get(series_id)
+            adjusted_value = adjusted_values.get(series_id)
+            if (
+                source_value is None
+                or adjusted_value is None
+                or not np.isfinite(float(source_value))
+                or not np.isfinite(float(adjusted_value))
+            ):
+                raise ValueError(
+                    "Treasury macro annual anchor values are missing or "
+                    f"non-finite for {series_id}/FY{fy}."
+                )
+            return float(adjusted_value) - float(source_value)
+
+        ped_delta = _annual_anchor_delta("gross_ped_revenue")
+        ruc_delta = _annual_anchor_delta("total_ruc_net_revenue")
+        additive_rollups: dict[str, float] = {}
+        if ped_delta is not None:
+            additive_rollups.update(
+                {
+                    series_id: ped_delta
+                    for series_id in FED_AGGREGATE_SERIES
+                }
+            )
+        if ruc_delta is not None:
+            additive_rollups.update(
+                {
+                    series_id: ruc_delta
+                    for series_id in RUC_AGGREGATE_SERIES
+                }
+            )
+        if ped_delta is not None and ruc_delta is not None:
+            additive_rollups.update(
+                {
+                    series_id: ped_delta + ruc_delta
+                    for series_id in TOTAL_AGGREGATE_SERIES
+                }
+            )
+        for series_id, delta in additive_rollups.items():
+            output_index = index_by_series.get(series_id)
+            source_value = source_values.get(series_id)
+            if output_index is None or source_value is None:
+                continue
+            calculated = source_value + float(delta)
+            out.at[output_index, "value"] = calculated
+            effective_factor = (
+                calculated / source_value if abs(source_value) > 1e-12 else 1.0
+            )
+            out.at[output_index, "_treasury_macro_factor"] = effective_factor
+            out.at[
+                output_index, "_treasury_macro_basis"
+            ] = "Treasury_BEFU26_annual_additive_rollup_replay"
+            if output_index in audit_by_index:
+                audit_row = audit_by_index[output_index]
+                audit_row["transformation_basis"] = (
+                    "Treasury_BEFU26_annual_additive_rollup_replay"
+                )
+                audit_row["factor"] = effective_factor
+                audit_row["adjusted_value"] = calculated
+                audit_row["value_delta"] = calculated - source_value
+        replay_columns = ["value"]
+        if "_fed_baseline_value" in out.columns:
+            replay_columns.append("_fed_baseline_value")
+        for value_column in replay_columns:
+            values = {
+                series_id: float(value)
+                for series_id, index in index_by_series.items()
+                if pd.notna(
+                    value := pd.to_numeric(
+                        pd.Series([out.at[index, value_column]]),
+                        errors="coerce",
+                    ).iloc[0]
+                )
+            }
+            for formula in FORMULA_DEFINITIONS:
+                output = str(formula["output_series_id"])
+                output_index = index_by_series.get(output)
+                terms = tuple(formula["terms"])
+                if (
+                    output_index is None
+                    or any(str(series_id) not in values for series_id, _ in terms)
+                ):
+                    continue
+                calculated = sum(
+                    values[str(series_id)] * float(sign)
+                    for series_id, sign in terms
+                )
+                out.at[output_index, value_column] = calculated
+                values[output] = calculated
+                if value_column != "value":
+                    continue
+                source_value = pd.to_numeric(
+                    pd.Series(
+                        [out.at[output_index, "_treasury_macro_source_value"]]
+                    ),
+                    errors="coerce",
+                ).iloc[0]
+                if pd.notna(source_value) and abs(float(source_value)) > 1e-12:
+                    effective_factor = calculated / float(source_value)
+                    out.at[
+                        output_index, "_treasury_macro_factor"
+                    ] = effective_factor
+                else:
+                    effective_factor = 1.0
+                out.at[
+                    output_index, "_treasury_macro_basis"
+                ] = "Treasury_BEFU26_annual_governed_formula_replay"
+                if output_index in audit_by_index:
+                    audit_row = audit_by_index[output_index]
+                    audit_row["transformation_basis"] = (
+                        "Treasury_BEFU26_annual_governed_formula_replay"
+                    )
+                    audit_row["factor"] = effective_factor
+                    audit_row["adjusted_value"] = calculated
+                    audit_row["value_delta"] = calculated - float(source_value)
+    out["treasury_macro_applied"] = (
+        target_mask
+        & pd.to_numeric(out["_treasury_macro_factor"], errors="coerce")
+        .sub(1.0)
+        .abs()
+        .gt(1e-12)
+    )
+    return out, pd.DataFrame(audit_rows)
 
 
 def _lookup_factor(

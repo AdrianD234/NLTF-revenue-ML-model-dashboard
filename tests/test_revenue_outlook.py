@@ -1668,7 +1668,45 @@ def test_ped_bridge_modes_materialize_raw_optimized_and_reconcile() -> None:
         default["ped_revenue_bridge_audit"]["ped_volume_million_litres"], errors="coerce"
     ).to_numpy() == pytest.approx(
         pd.to_numeric(default["ped_revenue_bridge_audit"]["ped_volume_raw_million_litres"], errors="coerce").to_numpy(),
-        abs=0,
+        abs=1e-9,
+    )
+    default_petrol = default["chart_rows"][
+        default["chart_rows"]["series_id"].astype(str).eq("light_petrol_vkt")
+        & default["chart_rows"]["time_grain"].astype(str).eq("june_year")
+        & default["chart_rows"]["trace_role"].astype(str).eq(
+            "in_house_current_finalist"
+        )
+    ].copy()
+    assert not default_petrol.empty
+    assert not default_petrol.duplicated(
+        ["trace_name", "scenario_name", "fed_path", "june_year"]
+    ).any()
+    raw_petrol = default["ped_revenue_bridge_audit"][
+        default["ped_revenue_bridge_audit"]["source_path"]
+        .astype(str)
+        .str.startswith("Current finalist")
+    ][
+        [
+            "source_path",
+            "scenario_name",
+            "fed_path",
+            "FY",
+            "raw_light_petrol_vkt_million_km",
+        ]
+    ].copy()
+    aligned = default_petrol.merge(
+        raw_petrol,
+        left_on=["trace_name", "scenario_name", "fed_path", "june_year"],
+        right_on=["source_path", "scenario_name", "fed_path", "FY"],
+        how="left",
+        validate="one_to_one",
+    )
+    assert aligned["raw_light_petrol_vkt_million_km"].notna().all()
+    assert pd.to_numeric(aligned["value"], errors="coerce").to_numpy() == pytest.approx(
+        pd.to_numeric(
+            aligned["raw_light_petrol_vkt_million_km"], errors="coerce"
+        ).to_numpy(),
+        abs=1e-9,
     )
 
     optimized = apply_ped_bridge_mode_layer(
@@ -1685,6 +1723,21 @@ def test_ped_bridge_modes_materialize_raw_optimized_and_reconcile() -> None:
         ("revenue_bridge_components", "component_value", pack.revenue_bridge_components),
         ("future_revenue_forecasts", "revenue_forecast_nzd", pack.future_revenue_forecasts),
     ]:
+        if key == "chart_rows":
+            existing = optimized[key][
+                ~optimized[key]["series_id"].astype(str).eq("light_petrol_vkt")
+            ]
+            assert pd.to_numeric(
+                existing[value_column], errors="coerce"
+            ).to_numpy() == pytest.approx(
+                pd.to_numeric(original[value_column], errors="coerce").to_numpy(),
+                abs=0,
+            )
+            optimized_petrol = optimized[key][
+                optimized[key]["series_id"].astype(str).eq("light_petrol_vkt")
+            ]
+            assert not optimized_petrol.empty
+            continue
         assert pd.to_numeric(optimized[key][value_column], errors="coerce").to_numpy() == pytest.approx(
             pd.to_numeric(original[value_column], errors="coerce").to_numpy(),
             abs=0,
@@ -2010,6 +2063,7 @@ def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
     pack_dir = ROOT / CURRENT_REVENUE_OUTLOOK_DIR
     expected_hashes = {
         "conflict_fuel_price_scenarios.csv": "ad379997aa4044cdabf7d948787c926e06a434447ff076640cfab317eda53c73",
+        "conflict_gdp_calibration.csv": "032606a84ed1e7716197ced405d3026b39c8c00e0a56882174b45c13eb8fb655",
         "ev_phev_ped_light_drift_assumptions.csv": "576ae24883099bb2d2c6b8a7f0162598818c23b7b6381e1613a05c64cfbaf672",
         "ev_phev_ped_light_drift_assumptions.parquet": "26bdc5bcd65782222c60221440157af4efd5fd51bbe27e298cb4060002f28acf",
         "ev_phev_split_assumptions.csv": "f6d678fde5074dd9ec4aa9ed79f10f3f3d02c1a6d72e07f8c050918bfc9f2928",
@@ -2068,6 +2122,7 @@ def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
         "series_trace_contract.parquet": "7319848ee52ec052d837c924ec4e230571c606b788bde28f86d343140cb83a3c",
         "trace_source_contract.csv": "396a97e28c43adc892c438ce92fe16a847d87b0ad91c6f8ec1334416c85a070a",
         "trace_source_contract.parquet": "74df6e0db3453928fcb159af4dc9d3dfb86fa712b9096d1d672dc8068099ed63",
+        "treasury_befu26_macro_path.csv": "1dd2fcbbc122ad8dd502e44ff1833f93ff26169dcd7dc47026da787adaf8aa1e",
     }
     assert {path.name: _sha256(path) for path in sorted(pack_dir.iterdir()) if path.is_file()} == expected_hashes
 

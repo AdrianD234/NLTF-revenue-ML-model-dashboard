@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 import os
+import re
 from pathlib import Path
 
 import pandas as pd
@@ -12,6 +13,7 @@ from model_dashboard.conflict_fuel_paths import (
     CONFLICT_FUEL_SCENARIO_LEVELS,
     conflict_trace_name,
 )
+from model_dashboard.fuel_price_scenario import POLICY_PATH_IDS
 
 pytestmark = pytest.mark.e2e
 CHART_SOURCE_DIR = Path(__file__).resolve().parents[1] / "artifacts" / "chart_sources"
@@ -267,15 +269,24 @@ def test_revenue_outlook_fleet_layout_and_timing_csv_download(page: Page) -> Non
     download = download_info.value
     assert download.suggested_filename == "net_revenue_12c_timing_comparison_fy2026_fy2030.csv"
     frame = pd.read_csv(download.path())
-    assert len(frame) == 90
+    assert len(frame) == 180
     assert not frame.duplicated(["path_id", "FY", "series_id"]).any()
     assert set(frame["path_id"]) == {
-        f"{level}_{timing}"
-        for level in CONFLICT_FUEL_SCENARIO_LEVELS
-        for timing in ("shifted_6m", "no_uplift")
+        f"{family}_{timing}"
+        for family in ("baseline", *CONFLICT_FUEL_SCENARIO_LEVELS)
+        for timing in ("published", "shifted_6m", "no_uplift")
     }
-    assert set(frame["scenario_id"]) == set(CONFLICT_FUEL_SCENARIO_LEVELS)
-    assert set(frame["timing_id"]) == {"delayed_6m", "no_uplift"}
+    assert set(frame["scenario_family_id"]) == {"base", *CONFLICT_FUEL_SCENARIO_LEVELS}
+    path_metadata = frame[
+        ["path_id", "scenario_id", "policy_state"]
+    ].drop_duplicates()
+    assert len(path_metadata) == 12
+    assert all(
+        POLICY_PATH_IDS[str(row["scenario_id"])] == str(row["path_id"])
+        for _, row in path_metadata.iterrows()
+    )
+    assert set(frame["policy_state"]) == {"published", "delay_6m", "no_uplift"}
+    assert set(frame["timing_id"]) == {"published", "delayed_6m", "no_uplift"}
     assert set(pd.to_numeric(frame["FY"], errors="raise").astype(int)) == set(range(2026, 2031))
     assert set(frame["series_id"]) == {
         "net_fed_revenue",
@@ -308,8 +319,8 @@ def test_revenue_outlook_activity_selection_keeps_policy_controls_and_hides_reve
         page.get_by_text("Revenue Outlook controls", exact=False).first
     ).to_be_visible(timeout=90000)
     select_revenue_outlook_series(page, "PED VKT per capita")
-    expect(page.get_by_text("Current: 12c from Jul 2027", exact=True).first).to_be_visible()
-    expect(page.get_by_text("MBU26: 12c from Jul 2027", exact=True).first).to_be_visible()
+    expect(page.get_by_text("Current 12c policy", exact=True).first).to_be_visible()
+    expect(page.get_by_text("MBU26 12c policy", exact=True).first).to_be_visible()
     assert_visible_text_absent(page, "Not applicable to activity series.")
     assert_visible_text(
         page,
@@ -322,7 +333,7 @@ def test_revenue_outlook_activity_selection_keeps_policy_controls_and_hides_reve
     )
 
 
-def test_revenue_outlook_middle_east_default_keeps_timing_and_policy_toggle(
+def test_revenue_outlook_middle_east_default_keeps_timing_and_policy_selector(
     page: Page,
 ) -> None:
     medium_trace = conflict_trace_name("medium")
@@ -439,18 +450,20 @@ def test_revenue_outlook_middle_east_default_keeps_timing_and_policy_toggle(
     )
     expect(levers).to_be_visible(timeout=60000)
     levers.locator("summary").click()
-    current_policy = levers.get_by_role(
-        "checkbox", name="Current: 12c from Jul 2027", exact=True
+    current_policy = levers.locator(
+        '[role="combobox"][aria-label*="Current 12c policy"]'
+    ).first
+    expect(current_policy).to_be_visible(timeout=60000)
+    expect(current_policy).to_have_attribute(
+        "aria-label", re.compile("Deferred 6 months")
     )
-    current_policy_label = levers.locator(
-        'label[data-baseweb="checkbox"]'
-    ).filter(has_text="Current: 12c from Jul 2027")
-    expect(current_policy).to_be_attached(timeout=60000)
-    expect(current_policy_label).to_have_count(1)
-    expect(current_policy_label).to_be_visible(timeout=60000)
-    assert current_policy.is_checked()
-    current_policy_label.click()
-    expect(current_policy).not_to_be_checked(timeout=60000)
+    current_policy.click()
+    no_uplift = page.get_by_role("option", name="No 12c uplift", exact=True)
+    expect(no_uplift).to_be_visible(timeout=30000)
+    no_uplift.click()
+    expect(current_policy).to_have_attribute(
+        "aria-label", re.compile("No 12c uplift"), timeout=60000
+    )
     page.wait_for_function(
         """({traceName, period, previous}) => {
             const plot = [...document.querySelectorAll('.js-plotly-plot')].find((candidate) =>

@@ -173,6 +173,14 @@ def test_revenue_outlook_selector_metadata_is_precomputed() -> None:
     selectors = app.cached_revenue_outlook_selectors(signature, pack)
 
     assert "Total NLTF revenue" in selectors["stream_options"]
+    assert "Light petrol VKT" in selectors["stream_options"]
+    assert (
+        app._revenue_outlook_series_metric_type(
+            pack.revenue_chart_rows,
+            "Light petrol VKT",
+        )
+        == "activity"
+    )
     assert "Current planned path" in selectors["fed_path_options"]
     assert "FY2031" in selectors["fy_options"]
     assert selectors["stack_fy_bounds"][0] <= 2025 <= selectors["stack_fy_bounds"][1]
@@ -959,13 +967,24 @@ def test_revenue_outlook_activity_figure_cache_matches_direct_builder() -> None:
         PED_BRIDGE_DEFAULT_MODE,
         view["chart_rows"],
     )
-    direct_rows = app._filter_revenue_outlook_rows(
-        view["chart_rows"],
-        time_grain="june_year",
-        stream_labels=["PED VKT per capita", "PED volume", "Light RUC net km", "Heavy RUC net km"],
-        fed_paths=["Current planned path"],
-        trace_names=list(traces),
-    )
+    direct_frames = []
+    for series_label in (
+        "Light petrol VKT",
+        "PED VKT per capita",
+        "PED volume",
+        "Light RUC net km",
+        "Heavy RUC net km",
+    ):
+        selected, _ = app._filter_series_rows_with_fallback(
+            view["chart_rows"],
+            series_label,
+            "june_year",
+            "Current planned path",
+            traces,
+        )
+        if not selected.empty:
+            direct_frames.append(selected)
+    direct_rows = pd.concat(direct_frames, ignore_index=True, sort=False)
     direct_fig = app.revenue_outlook_figure(direct_rows, metric_type="activity")
 
     assert [trace.name for trace in cached_fig.data] == [trace.name for trace in direct_fig.data]
@@ -977,6 +996,40 @@ def test_revenue_outlook_activity_figure_cache_matches_direct_builder() -> None:
             nan_ok=True,
         )
 
+    quarterly_petrol, used_fallback = app._filter_series_rows_with_fallback(
+        view["chart_rows"],
+        "Light petrol VKT",
+        "quarterly",
+        "Current planned path",
+        traces,
+    )
+    assert used_fallback
+    base_petrol = quarterly_petrol[
+        quarterly_petrol["trace_name"].astype(str).eq("Current finalist Base case")
+    ]
+    assert len(base_petrol) == 100
+    assert set(base_petrol["series_id"].astype(str)) == {"light_petrol_vkt"}
+    assert set(base_petrol["data_scope"].astype(str)).issubset(
+        {
+            "quarterly_disaggregated_from_annual",
+            "quarterly_disaggregated_from_annual_fed_policy",
+        }
+    )
+    annual_petrol = view["chart_rows"][
+        view["chart_rows"]["trace_name"].astype(str).eq("Current finalist Base case")
+        & view["chart_rows"]["series_id"].astype(str).eq("light_petrol_vkt")
+        & view["chart_rows"]["time_grain"].astype(str).eq("june_year")
+    ].set_index("june_year")["value"]
+    for fy in range(2026, 2031):
+        quarter_total = pd.to_numeric(
+            base_petrol.loc[
+                pd.to_numeric(base_petrol["june_year"], errors="coerce").eq(fy),
+                "value",
+            ],
+            errors="coerce",
+        ).sum()
+        assert quarter_total == pytest.approx(float(annual_petrol.at[fy]), abs=1e-8)
+
 
 def test_revenue_outlook_activity_branch_uses_cached_figure() -> None:
     source = inspect.getsource(app.render_revenue_outlook_page)
@@ -985,6 +1038,8 @@ def test_revenue_outlook_activity_branch_uses_cached_figure() -> None:
     activity_branch = source[start:end]
     assert "cached_revenue_outlook_activity_figure(" in activity_branch
     assert "revenue_outlook_figure(activity_rows" not in activity_branch
+    cached_source = inspect.getsource(app.cached_revenue_outlook_activity_figure)
+    assert "_filter_series_rows_with_fallback(" in cached_source
 
 
 def test_revenue_outlook_composition_branch_uses_cached_stack_for_table() -> None:
@@ -1030,15 +1085,28 @@ def test_revenue_outlook_cloud_hides_debug_toggles_and_shows_full_composition(mo
     at.run()
 
     assert not at.exception
-    # Debug toggles stay hidden on cloud; the freight rail shift, 12c uplift
-    # and e-RUC transition toggles are user-facing scenario controls inside
-    # the advanced levers accordion and remain visible in its render order.
+    # Debug toggles stay hidden on cloud. The two 12c controls are explicit
+    # three-state selectors rather than ambiguous ON/OFF toggles.
     assert [(toggle.label, toggle.key) for toggle in at.toggle] == [
         ("Freight rail shift", "revenue_outlook_sensitivity_freight_rail_toggle"),
-        ("Current: 12c from Jul 2027", "revenue_outlook_fed_uplift"),
-        ("MBU26: 12c from Jul 2027", "revenue_outlook_mbu_fed_uplift"),
         ("Move petrol fleet to e-RUC", "revenue_outlook_eruc_toggle"),
     ]
+    policy_selectors = {
+        selectbox.key: selectbox
+        for selectbox in at.selectbox
+        if selectbox.key
+        in {
+            "revenue_outlook_fed_policy_state",
+            "revenue_outlook_mbu_fed_policy_state",
+        }
+    }
+    assert set(policy_selectors) == {
+        "revenue_outlook_fed_policy_state",
+        "revenue_outlook_mbu_fed_policy_state",
+    }
+    assert {
+        str(selector.value) for selector in policy_selectors.values()
+    } == {app.FED_POLICY_DELAYED_6M}
     assert any("Revenue composition over time" in str(markdown.value) for markdown in at.markdown)
     rendered_text = "\n".join([*(str(markdown.value) for markdown in at.markdown), *(str(caption.value) for caption in at.caption)])
     for forbidden in [
@@ -1100,11 +1168,11 @@ def test_revenue_outlook_activity_opens_policy_levers() -> None:
         expander for expander in at.expander if expander.label == "Advanced scenario levers"
     )
     assert lever_expander.proto.expanded is True
-    toggle_keys = {toggle.key for toggle in at.toggle}
+    selectbox_keys = {selectbox.key for selectbox in at.selectbox}
     assert {
-        "revenue_outlook_fed_uplift",
-        "revenue_outlook_mbu_fed_uplift",
-    }.issubset(toggle_keys)
+        "revenue_outlook_fed_policy_state",
+        "revenue_outlook_mbu_fed_policy_state",
+    }.issubset(selectbox_keys)
 
 
 def test_revenue_outlook_compare_mode_swaps_total_path_for_comparison() -> None:

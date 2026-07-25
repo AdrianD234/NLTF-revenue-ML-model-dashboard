@@ -24,13 +24,17 @@ from model_dashboard.revenue_outlook import (
     revenue_outlook_signature,
 )
 from model_dashboard.revenue_source_pack import SOURCE_SERIES_ALIASES
+from scripts.materialize_conflict_scenario_extract import (
+    _export_paths,
+    _path_metadata_frame,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
 CONFLICT_POLICY_VARIANTS = all_conflict_policy_variants()
-VISIBLE_POLICY_PATH_IDS = tuple(
-    POLICY_PATH_IDS[variant.scenario_id] for variant in CONFLICT_POLICY_VARIANTS
-)
+EXPORT_PATH_METADATA = _path_metadata_frame(_export_paths())
+ALL_POLICY_PATH_IDS = tuple(EXPORT_PATH_METADATA["path_id"].astype(str))
+ALL_POLICY_SCENARIO_IDS = tuple(EXPORT_PATH_METADATA["scenario_id"].astype(str))
 
 
 @pytest.fixture(scope="module")
@@ -92,21 +96,60 @@ def test_net_ruc_alias_and_active_net_definitions_are_explicit() -> None:
     assert app._revenue_outlook_series_display_label("Total RUC all classes") == "Net RUC revenue (all classes)"
 
 
-def test_six_path_net_revenue_matrix_is_complete_unique_and_registry_driven(
+def test_twelve_path_net_revenue_matrix_is_complete_unique_and_registry_driven(
     timing_materialization,
 ) -> None:
     comparison = timing_materialization["comparison"]
     assert isinstance(comparison, pd.DataFrame)
-    assert len(comparison) == 90
+    assert len(comparison) == 180
     assert not comparison.duplicated(["path_id", "FY", "series_id"]).any()
-    assert comparison["path_id"].drop_duplicates().tolist() == list(VISIBLE_POLICY_PATH_IDS)
-    assert comparison["path_order"].drop_duplicates().tolist() == list(range(6))
-    assert comparison["scenario_id"].drop_duplicates().tolist() == list(CONFLICT_SEVERITIES)
-    assert comparison[["scenario_id", "scenario"]].drop_duplicates().to_records(index=False).tolist() == [
-        (severity, conflict_scenario_display_name(severity))
-        for severity in CONFLICT_SEVERITIES
+    assert comparison["path_id"].drop_duplicates().tolist() == list(ALL_POLICY_PATH_IDS)
+    assert all(
+        POLICY_PATH_IDS[scenario_id] == path_id
+        for scenario_id, path_id in zip(
+            ALL_POLICY_SCENARIO_IDS,
+            ALL_POLICY_PATH_IDS,
+            strict=True,
+        )
+    )
+    assert comparison["path_order"].drop_duplicates().tolist() == list(range(12))
+    assert comparison["scenario_family_id"].drop_duplicates().tolist() == [
+        "base",
+        *CONFLICT_SEVERITIES,
     ]
-    assert comparison["timing_id"].drop_duplicates().tolist() == ["delayed_6m", "no_uplift"]
+    assert comparison["scenario_id"].drop_duplicates().tolist() == list(ALL_POLICY_SCENARIO_IDS)
+    assert comparison[
+        ["scenario_family_id", "scenario"]
+    ].drop_duplicates().to_records(index=False).tolist() == [
+        ("base", "Current finalist Base case"),
+        *(
+            (severity, conflict_scenario_display_name(severity))
+            for severity in CONFLICT_SEVERITIES
+        ),
+    ]
+    assert comparison["timing_id"].drop_duplicates().tolist() == [
+        "published",
+        "delayed_6m",
+        "no_uplift",
+    ]
+    assert comparison["policy_state"].drop_duplicates().tolist() == [
+        "published",
+        "delay_6m",
+        "no_uplift",
+    ]
+    metadata_columns = [
+        "path_id",
+        "scenario_family_id",
+        "scenario_id",
+        "policy_state",
+    ]
+    expected_metadata = EXPORT_PATH_METADATA[metadata_columns]
+    actual_metadata = comparison[metadata_columns].drop_duplicates()
+    pd.testing.assert_frame_equal(
+        actual_metadata.reset_index(drop=True),
+        expected_metadata.reset_index(drop=True),
+        check_dtype=False,
+    )
     assert set(comparison["FY"]) == set(range(2026, 2031))
     assert set(comparison["series_id"]) == {
         "net_fed_revenue",
@@ -122,12 +165,13 @@ def test_delayed_policy_has_no_pre_policy_leakage_and_exceeds_off_after_start(
 ) -> None:
     comparison = timing_materialization["comparison"]
     wide = comparison.pivot(
-        index=["scenario_id", "FY", "series_id"],
+        index=["scenario_family_id", "FY", "series_id"],
         columns="timing_id",
         values="value_million_nzd",
     )
     wide["delta"] = wide["delayed_6m"] - wide["no_uplift"]
-    for severity in CONFLICT_SEVERITIES:
+    wide["original_delta"] = wide["published"] - wide["delayed_6m"]
+    for severity in ("base", *CONFLICT_SEVERITIES):
         # The deferred path starts on 1 July 2027, which belongs to FY2028.
         # The two policy variants must therefore be identical through FY2027.
         pre_policy = wide.loc[(severity, slice(2026, 2027)), "delta"]
@@ -139,6 +183,33 @@ def test_delayed_policy_has_no_pre_policy_leakage_and_exceeds_off_after_start(
 
         mvr = wide.loc[(severity, slice(2026, 2030), "net_mvr_revenue"), "delta"]
         assert mvr.abs().max() <= 1e-12
+        assert wide.loc[(severity, 2026), "original_delta"].abs().max() <= 1e-12
+        for series_id in ("net_fed_revenue", "total_ruc_net_revenue"):
+            assert wide.loc[(severity, 2027, series_id), "original_delta"] > 0.0
+        assert (
+            wide.loc[(severity, slice(2028, 2030)), "original_delta"].abs().max()
+            <= 1e-9
+        )
+
+
+def test_base_original_timing_reconciles_to_default_dashboard_hover_benchmarks(
+    timing_materialization,
+) -> None:
+    comparison = timing_materialization["comparison"]
+    # Checkpoints follow the Treasury-macro Base hover lineage after its
+    # additive FED formula reconstruction, not the legacy pack values.
+    assert _value(
+        comparison, "baseline_published", 2026, "net_fed_revenue"
+    ) == pytest.approx(2084.543721076793, abs=1e-6)
+    assert _value(
+        comparison, "baseline_published", 2027, "net_fed_revenue"
+    ) == pytest.approx(2127.212804135619, abs=1e-6)
+    assert _value(
+        comparison, "baseline_shifted_6m", 2027, "net_fed_revenue"
+    ) == pytest.approx(1963.260560165089, abs=1e-6)
+    assert _value(
+        comparison, "baseline_no_uplift", 2027, "net_fed_revenue"
+    ) == pytest.approx(1963.260560165089, abs=1e-6)
 
 
 def test_export_reconciles_to_authoritative_bridge_and_independent_net_formulas(
@@ -195,7 +266,7 @@ def test_export_reconciles_to_authoritative_bridge_and_independent_net_formulas(
     assert len(anchors) == 5 * len(anchor_series)
 
     raw_by_path: dict[tuple[str, int], dict[str, float]] = {}
-    for path_id in ("baseline_published", *VISIBLE_POLICY_PATH_IDS):
+    for path_id in ALL_POLICY_PATH_IDS:
         for fy in range(2026, 2031):
             rows = annual_bridge[
                 annual_bridge["policy_path_id"].astype(str).eq(path_id)

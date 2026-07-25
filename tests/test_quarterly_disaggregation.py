@@ -95,6 +95,7 @@ def test_june_year_quarter_mapping() -> None:
 
 
 def test_indicator_mapping_uses_stream_activity_paths() -> None:
+    assert _quarterly_disaggregation_indicator_id("light_petrol_vkt") == "ped_vkt_per_capita"
     assert _quarterly_disaggregation_indicator_id("ped_volume") == "ped_vkt_per_capita"
     assert _quarterly_disaggregation_indicator_id("gross_ped_revenue") == "ped_vkt_per_capita"
     assert _quarterly_disaggregation_indicator_id("light_ruc_revenue") == "light_ruc_net_km"

@@ -1,4 +1,4 @@
-"""Effective rate paths (PED / Light RUC / Heavy RUC) and the 12c FED toggle.
+"""Effective rate paths (PED / Light RUC / Heavy RUC) and the 12c FED policy states.
 
 Sources (all committed):
 - data/revenue_model_source_pack/2026_05_19/fed_rate_paths.csv - PED $/litre
@@ -40,10 +40,11 @@ from .ev_uptake_levers import (
 )
 from .revenue_source_pack import REVENUE_LAST_COMPLETE_ACTUAL_FY
 
+FED_POLICY_STATE_PUBLISHED = "published"
 FED_UPLIFT_NOTE = (
     "2027 12c FED uplift: the legislated petrol excise increases (+6c/L in "
     "FY2027, +12c/L from FY2028) baked into the Current planned path. "
-    "Switching the toggle off reprices PED and all RUC collection rates at "
+    "Selecting the no-uplift policy reprices PED and all RUC collection rates at "
     "the no-uplift schedule (carried parallel beyond the legislated window). "
     "The FED wedge is also carried in the PED retail-price input, while the "
     "same PED-rate ratio is applied to real Light/Heavy RUC model inputs, so "
@@ -509,7 +510,12 @@ def apply_fed_rate_policy_to_chart_rows(
             if fy is None:
                 return ()
             drivers: tuple[str, ...] = ()
-            if series_id in {"ped_vkt_per_capita", "ped_volume", "gross_ped_revenue"} or series_id in FED_AGGREGATE_SERIES:
+            if series_id in {
+                "ped_vkt_per_capita",
+                "light_petrol_vkt",
+                "ped_volume",
+                "gross_ped_revenue",
+            } or series_id in FED_AGGREGATE_SERIES:
                 drivers = ("ped_vkt_per_capita",)
             elif series_id.startswith(("light_ruc", "light_bev_ruc", "phev_ruc")):
                 drivers = ("light_ruc_net_km",)

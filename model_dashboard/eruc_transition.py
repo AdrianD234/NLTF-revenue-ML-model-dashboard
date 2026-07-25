@@ -42,7 +42,7 @@ ERUC_NOTE = (
     "overlay - the governed pack is unchanged."
 )
 
-PED_FAMILY_SERIES = ("ped_vkt_per_capita", "ped_volume")
+PED_FAMILY_SERIES = ("ped_vkt_per_capita", "light_petrol_vkt", "ped_volume")
 PED_REVENUE_SERIES = "gross_ped_revenue"
 LIGHT_KM_SERIES = "light_ruc_net_km"
 LIGHT_REVENUE_SERIES = "light_ruc_net_revenue"
@@ -154,6 +154,13 @@ def apply_eruc_transition_to_chart_rows(
         # PED family: volume follows total petrol km (fuel is still burned);
         # the excise base shrinks to the non-migrated share only.
         data.loc[volume_mask, "value"] = km_total_new * intensity
+        petrol_vkt_mask = base_mask & data["series_id"].astype(str).eq(
+            "light_petrol_vkt"
+        )
+        if _row_value(petrol_vkt_mask) is not None:
+            # Keep the explicit petrol-VKT row on the same total-kilometre
+            # lineage as PED litres when kilometres migrate onto e-RUC.
+            data.loc[petrol_vkt_mask, "value"] = km_total_new
         vktpc_mask = base_mask & data["series_id"].astype(str).eq("ped_vkt_per_capita")
         old_vktpc = _row_value(vktpc_mask)
         if old_vktpc is not None:

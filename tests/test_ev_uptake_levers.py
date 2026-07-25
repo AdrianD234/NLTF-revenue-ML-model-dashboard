@@ -146,6 +146,7 @@ def _fixture_chart_rows_and_drift() -> tuple[pd.DataFrame, pd.DataFrame]:
                 ("light_bev_ruc_net_revenue", pool * 0.82 * 0.08),
                 ("phev_ruc_net_revenue", pool * 0.06 * 0.05),
                 ("ped_vkt_per_capita", 1500.0),
+                ("light_petrol_vkt", 32000.0),
                 ("ped_volume", 2800.0),
                 ("gross_ped_revenue", 1960.0),
                 ("gross_fed_revenue", 2100.0),
@@ -224,13 +225,18 @@ def test_ped_displacement_scales_family_and_respects_bridge_gate() -> None:
     assert retention_2050 < 0.35
     sel = adjusted[adjusted["scenario_name"].eq("current_basecase") & adjusted["june_year"].eq(2050)]
     values = {row["series_id"]: row["value"] for _, row in sel.iterrows()}
+    assert values["light_petrol_vkt"] == pytest.approx(32000.0 * retention_2050)
     assert values["ped_volume"] == pytest.approx(2800.0 * retention_2050)
     assert values["ped_vkt_per_capita"] == pytest.approx(1500.0 * retention_2050)
     assert values["gross_ped_revenue"] == pytest.approx(1960.0 * retention_2050)
+    assert values["ped_volume"] / values["light_petrol_vkt"] == pytest.approx(
+        2800.0 / 32000.0
+    )
     # optimized-migration bridge already displaces petrol: gate must skip PED
     gated, gated_audit = apply_uptake_levers_to_chart_rows(chart_rows, drift, levers, adjust_ped=False)
     gsel = gated[gated["scenario_name"].eq("current_basecase") & gated["june_year"].eq(2050)]
     gvalues = {row["series_id"]: row["value"] for _, row in gsel.iterrows()}
+    assert gvalues["light_petrol_vkt"] == pytest.approx(32000.0)
     assert gvalues["ped_volume"] == pytest.approx(2800.0)
     assert set(gated_audit["ped_retention"]) == {1.0}
 

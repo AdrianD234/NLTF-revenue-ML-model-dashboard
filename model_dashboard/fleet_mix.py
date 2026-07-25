@@ -93,31 +93,122 @@ def load_vfm_frame(repo_root: Path, scenario: str) -> pd.DataFrame:
 
 
 def load_dashboard_frame(repo_root: Path) -> pd.DataFrame:
-    """Committed AR(1) pack, base case. Petrol comes from the pack's own
-    migration audit (the post-allocation petrol pool); heavy BEV is the
-    MBU26-fixed line the pack carries verbatim."""
+    """Default dashboard Base path after its governed macro and VFM overlays.
+
+    This deliberately uses the same pipeline as Revenue Outlook: select the
+    raw PED bridge first, apply the Treasury BEFU26 baseline macro replay,
+    then apply the default MoT VFM Base retention and class-mix overlay.
+    Petrol VKT therefore reconciles to the macro-adjusted PED litres at the
+    governed litres/100 km intensity instead of falling back to the optimized
+    migration series carried in the underlying replay pack.
+    """
     from model_dashboard.engine import engine_revenue_outlook_dir
+    from model_dashboard.ev_uptake_levers import (
+        DEFAULT_EV_UPTAKE_MODE,
+        EV_UPTAKE_PRESETS,
+        apply_uptake_levers_to_chart_rows,
+    )
+    from model_dashboard.fuel_price_scenario import (
+        apply_treasury_macro_to_chart_rows,
+        run_treasury_baseline_macro_replay,
+    )
+    from model_dashboard.revenue_outlook import (
+        PED_BRIDGE_DEFAULT_MODE,
+        apply_ped_bridge_mode_layer,
+        load_revenue_outlook_pack,
+    )
 
     pack_dir = repo_root / engine_revenue_outlook_dir("ar1")
-    rows = pd.read_csv(pack_dir / "revenue_chart_rows.csv")
-    annual = rows[(rows["time_grain"] == "june_year") & (rows["scenario_role"] == "basecase")
-                  & (rows["row_type"] == "future_forecast")]
-    packed = {}
-    for key in ["light_ruc_net_km", "light_bev_ruc_net_km", "phev_ruc_net_km", "heavy_ruc_net_km"]:
-        g = annual[annual["series_id"] == key]
-        packed[key] = {int(str(p).replace("FY", "")[:4]): float(v)
-                       for p, v in zip(g["period"], g["value"], strict=False)}
-    drift = pd.read_csv(pack_dir / "ev_phev_ped_light_drift_assumptions.csv")
-    opt = drift[(drift["lambda_mode"] == "optimized") & (drift["scenario_role"] == "basecase")]
-    petrol = dict(zip(opt["FY"].astype(int), opt["current_PED_light_petrol_km"].astype(float), strict=False))
+    pack = load_revenue_outlook_pack(pack_dir, repo_root=repo_root)
+    if pack is None:
+        raise FileNotFoundError(f"Revenue Outlook pack is unavailable: {pack_dir}")
+    bridge = apply_ped_bridge_mode_layer(
+        chart_rows=pack.revenue_chart_rows,
+        line_reconciliation=pack.revenue_line_reconciliation,
+        bridge_components=pack.revenue_bridge_components,
+        future_revenue_forecasts=pack.future_revenue_forecasts,
+        ped_revenue_bridge_audit=pack.ped_revenue_bridge_audit,
+        bridge_mode=PED_BRIDGE_DEFAULT_MODE,
+        include_derived_frames=False,
+        include_selected_ped_audit=False,
+    )
+    scenario_input_path = (
+        pack_dir / "scenario_inputs" / "scenario_input_wide.parquet"
+    )
+    if not scenario_input_path.exists():
+        raise FileNotFoundError(
+            "Treasury macro replay inputs are unavailable for the dashboard "
+            f"fleet-mix path: {scenario_input_path}"
+        )
+    macro_replay = run_treasury_baseline_macro_replay(
+        pd.read_parquet(scenario_input_path),
+        repo_root=repo_root,
+        engine="ar1",
+    )
+    bridge_rows, _ = apply_treasury_macro_to_chart_rows(
+        bridge["chart_rows"],
+        macro_replay,
+    )
+    rows, _ = apply_uptake_levers_to_chart_rows(
+        bridge_rows,
+        pack.ev_phev_ped_light_drift_assumptions,
+        EV_UPTAKE_PRESETS[DEFAULT_EV_UPTAKE_MODE],
+        adjust_ped=True,
+    )
 
-    mbu = load_mbu26_frame(repo_root)["heavy_bev_ruc_net_km"]
-    fys = sorted(set(packed["light_ruc_net_km"]) & set(petrol))
+    def annual_values(frame: pd.DataFrame, key: str) -> dict[int, float]:
+        annual = frame[
+            frame["time_grain"].astype(str).eq("june_year")
+            & frame["scenario_role"].astype(str).eq("basecase")
+            & frame["row_type"].astype(str).eq("future_forecast")
+            & frame["series_id"].astype(str).eq(key)
+        ].copy()
+        return {
+            int(fy): float(value)
+            for fy, value in zip(
+                pd.to_numeric(annual["june_year"], errors="coerce"),
+                pd.to_numeric(annual["value"], errors="coerce"),
+                strict=False,
+            )
+            if pd.notna(fy) and pd.notna(value)
+        }
+
+    packed = {
+        key: annual_values(rows, key)
+        for key in (
+            "light_petrol_vkt",
+            "light_ruc_net_km",
+            "light_bev_ruc_net_km",
+            "phev_ruc_net_km",
+            "heavy_ruc_net_km",
+        )
+    }
+    heavy_before_uptake = annual_values(bridge_rows, "heavy_ruc_net_km")
+    common_years = [set(values) for values in packed.values()]
+    common_years.append(set(heavy_before_uptake))
+    fys = sorted(set.intersection(*common_years)) if common_years else []
+    if not fys:
+        raise ValueError("The dashboard fleet-mix bridge has no complete forecast years.")
+
     frame = pd.DataFrame(index=pd.Index(fys, name="FY"))
-    frame["light_petrol_vkt"] = [petrol[fy] for fy in fys]
-    for key in ["light_ruc_net_km", "light_bev_ruc_net_km", "phev_ruc_net_km", "heavy_ruc_net_km"]:
-        frame[key] = [packed[key].get(fy) for fy in fys]
-    frame["heavy_bev_ruc_net_km"] = [float(mbu.get(fy, 0.0)) for fy in fys]
+    for key in (
+        "light_petrol_vkt",
+        "light_ruc_net_km",
+        "light_bev_ruc_net_km",
+        "phev_ruc_net_km",
+        "heavy_ruc_net_km",
+    ):
+        frame[key] = [packed[key][fy] for fy in fys]
+    frame["heavy_bev_ruc_net_km"] = [
+        max(float(heavy_before_uptake[fy]) - float(packed["heavy_ruc_net_km"][fy]), 0.0)
+        for fy in fys
+    ]
+    # The governed PED bridge begins in FY2026. Retain the common FY2025
+    # actual anchor used by the pack and by MBU26 so the explorer still spans
+    # the full actual-to-forecast junction.
+    if 2025 not in frame.index:
+        actual_anchor = load_mbu26_frame(repo_root).loc[[2025], ROW_KEYS]
+        frame = pd.concat([actual_anchor, frame], axis=0).sort_index()
     return frame[ROW_KEYS].astype(float)
 
 
@@ -163,7 +254,8 @@ def definitions_table() -> pd.DataFrame:
     """The six MBU26 rows mapped to VFM and dashboard terms."""
     rows = [
         ("Light petrol VKT", "MBU26 row 16", "Petrol + petrol-hybrid cars and vans (pay fuel excise, not RUC)",
-         "'Petrol' + 'Hybrid petrol' VKT for LPV+LCV", "light_petrol_vkt (from PED VKT/capita x population)"),
+         "'Petrol' + 'Hybrid petrol' VKT for LPV+LCV",
+         "light_petrol_vkt (selected raw PED bridge x MoT VFM Base petrol-retention curve)"),
         ("Light RUC net km", "MBU26 row 10", "Conventional light RUC vehicles - diesel and diesel-hybrid ONLY; "
          "BEV and PHEV are separate rows", "'Diesel' + 'Hybrid diesel' VKT for LPV+LCV", "light_ruc_net_km"),
         ("Light BEV RUC net km", "MBU26 row 12", "Battery-electric cars and vans (pay light RUC)",

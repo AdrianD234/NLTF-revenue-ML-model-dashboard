@@ -14,11 +14,14 @@ from model_dashboard.fuel_price_scenario import (
     IRAN_WAR_DELAYED_6M_SCENARIO_NAME,
     IRAN_WAR_NO_UPLIFT_SCENARIO_NAME,
     POLICY_PATH_IDS,
+    TreasuryBaselineMacroReplayResult,
     _validate_complete_numeric_replay,
+    apply_treasury_macro_to_chart_rows,
     append_fuel_price_scenario_to_chart_rows,
     build_fuel_price_scenario_inputs,
     build_ruc_policy_scenario_inputs,
     run_fuel_price_scenario_replay,
+    run_treasury_baseline_macro_replay,
 )
 from model_dashboard.conflict_fuel_paths import (
     CONFLICT_FUEL_SCENARIO_LEVELS,
@@ -31,7 +34,13 @@ from model_dashboard.forecast_runner import (
     ScenarioInputForecastReplayResult,
     replay_forecast_from_scenario_inputs,
 )
-from model_dashboard.ev_uptake_levers import EV_UPTAKE_PRESETS, apply_uptake_levers_to_chart_rows
+from model_dashboard.ev_uptake_levers import (
+    EV_UPTAKE_PRESETS,
+    FED_AGGREGATE_SERIES,
+    RUC_AGGREGATE_SERIES,
+    TOTAL_AGGREGATE_SERIES,
+    apply_uptake_levers_to_chart_rows,
+)
 from model_dashboard.rate_paths import (
     FED_POLICY_STATE_DELAYED_6M,
     FED_POLICY_STATE_NO_UPLIFT,
@@ -67,6 +76,15 @@ def fuel_replay(scenario_inputs):
 @pytest.fixture(scope="module")
 def ar1_fuel_replay():
     return run_fuel_price_scenario_replay(
+        pd.read_parquet(AR1_INPUT_PATH),
+        repo_root=ROOT,
+        engine="ar1",
+    )
+
+
+@pytest.fixture(scope="module")
+def ar1_treasury_macro_replay():
+    return run_treasury_baseline_macro_replay(
         pd.read_parquet(AR1_INPUT_PATH),
         repo_root=ROOT,
         engine="ar1",
@@ -148,10 +166,28 @@ def _assert_governed_policy_demand_calibration(replay) -> None:
         * np.power(
             pd.to_numeric(target_rows["demand_price_ratio"], errors="coerce"),
             pd.to_numeric(target_rows["demand_elasticity"], errors="coerce"),
+        )
+        * pd.to_numeric(
+            target_rows["demand_gdp_model_factor"], errors="coerce"
         ),
         rtol=1e-12,
         atol=1e-9,
     )
+    gdp_inputs = pd.to_numeric(
+        target_rows["demand_gdp_input_level_factor"], errors="coerce"
+    )
+    gdp_factors = pd.to_numeric(
+        target_rows["demand_gdp_model_factor"], errors="coerce"
+    )
+    identity_gdp = np.isclose(gdp_inputs, 1.0, rtol=0.0, atol=1e-12)
+    np.testing.assert_allclose(
+        gdp_factors.loc[identity_gdp],
+        1.0,
+        rtol=0.0,
+        atol=0.0,
+    )
+    downside_gdp = gdp_inputs.lt(1.0 - 1e-12)
+    assert gdp_factors.loc[downside_gdp].le(1.0).all()
 
     policy_scenarios = target_scenarios.difference(
         conflict_scenario_name(level) for level in CONFLICT_FUEL_SCENARIO_LEVELS
@@ -255,7 +291,9 @@ def _assert_governed_policy_demand_calibration(replay) -> None:
             assert float(row["demand_elasticity"]) == pytest.approx(elasticity)
             expected_forecast = float(row["demand_reference_forecast"]) * float(
                 row["demand_price_ratio"]
-            ) ** float(row["demand_elasticity"])
+            ) ** float(row["demand_elasticity"]) * float(
+                row["demand_gdp_model_factor"]
+            )
             assert float(row["forecast"]) == pytest.approx(
                 expected_forecast, rel=1e-12, abs=1e-9
             )
@@ -279,6 +317,7 @@ def _assert_governed_policy_demand_calibration(replay) -> None:
     sequential_proxy = base_forecast * float(
         combined["demand_fuel_price_ratio"]
     ) ** elasticity * float(combined["demand_ruc_price_ratio"]) ** elasticity
+    sequential_proxy *= float(combined["demand_gdp_model_factor"])
     assert actual != pytest.approx(sequential_proxy, rel=1e-6)
 
     # Lower delayed-policy RUC cost raises activity relative to the matching
@@ -307,6 +346,39 @@ def _assert_governed_policy_demand_calibration(replay) -> None:
             )
         }
     )
+    for variant_name, source_name in policy_sources.items():
+        variant_rows = raw_forecasts[
+            raw_forecasts["scenario_name"].astype(str).eq(variant_name)
+        ].set_index(["stream", "target_period"]).sort_index()
+        assert set(
+            variant_rows[
+                "demand_gdp_factor_source_scenario_name"
+            ].astype(str)
+        ) == {source_name}
+        variant_factors = pd.to_numeric(
+            variant_rows["demand_gdp_model_factor"], errors="coerce"
+        )
+        if source_name == "current_basecase":
+            np.testing.assert_allclose(
+                variant_factors,
+                1.0,
+                rtol=0.0,
+                atol=0.0,
+            )
+            continue
+        source_rows = raw_forecasts[
+            raw_forecasts["scenario_name"].astype(str).eq(source_name)
+        ].set_index(["stream", "target_period"]).sort_index()
+        pd.testing.assert_index_equal(variant_rows.index, source_rows.index)
+        np.testing.assert_allclose(
+            variant_factors,
+            pd.to_numeric(
+                source_rows["demand_gdp_model_factor"], errors="coerce"
+            ),
+            rtol=0.0,
+            atol=0.0,
+        )
+
     for variant_name, source_name in policy_sources.items():
         for stream in ("LIGHT_RUC", "HEAVY_RUC"):
             variant = replay_inputs.loc[(variant_name, stream)]
@@ -857,7 +929,7 @@ def test_fixed_finalist_replay_preserves_base_and_orders_governed_conflict_paths
     assert set(validation["forecast_horizon_quarters"].astype(int)) == {100}
     assert set(validation["numeric_forecast_rows"].astype(int)) == {300}
 
-    base_inputs = scenario_inputs[scenario_inputs["role"].astype(str).eq("basecase")]
+    base_inputs = fuel_replay.treasury_base_inputs
     control = replay_forecast_from_scenario_inputs(
         base_inputs,
         repo_root=ROOT,
@@ -875,6 +947,20 @@ def test_fixed_finalist_replay_preserves_base_and_orders_governed_conflict_paths
     np.testing.assert_allclose(
         parity["forecast_registry"], parity["forecast_control"], rtol=0.0, atol=0.0
     )
+    legacy_control = replay_forecast_from_scenario_inputs(
+        scenario_inputs[scenario_inputs["role"].astype(str).eq("basecase")],
+        repo_root=ROOT,
+        engine="ensemble",
+    ).future_forecasts[["stream", "target_period", "forecast"]]
+    macro_delta = parity.merge(
+        legacy_control,
+        on=["stream", "target_period"],
+        validate="one_to_one",
+    )
+    assert (
+        pd.to_numeric(macro_delta["forecast_registry"], errors="coerce")
+        - pd.to_numeric(macro_delta["forecast"], errors="coerce")
+    ).abs().gt(1e-9).any()
 
     forecasts = fuel_replay.future_forecasts.set_index(
         ["scenario_name", "stream", "target_period"]
@@ -899,10 +985,16 @@ def test_fixed_finalist_replay_preserves_base_and_orders_governed_conflict_paths
                 if ratio > 1.0 + 1e-12:
                     assert scenario_value < base_value
                 elif np.isclose(ratio, 1.0, rtol=0.0, atol=1e-12):
-                    # Once prices converge, the Base-referenced structural
-                    # overlay removes raw recursive carryover exactly.
+                    # Once prices converge, only the matched model-native
+                    # GDP response (including recursive carryover) remains.
+                    gdp_factor = float(
+                        forecasts.at[
+                            (scenario_name, stream, period),
+                            "demand_gdp_model_factor",
+                        ]
+                    )
                     assert scenario_value == pytest.approx(
-                        base_value, rel=0.0, abs=1e-9
+                        base_value * gdp_factor, rel=1e-12, abs=1e-9
                     )
 
     # In the first prospective ordered quarter, higher fuel prices must
@@ -1003,6 +1095,29 @@ def test_policy_replay_builds_twelve_paths_with_formula_closed_net_ruc(
             assert float(
                 replay_quarters.at[(delayed_name, "PED", period), "forecast"]
             ) > float(replay_quarters.at[(published_name, "PED", period), "forecast"])
+        published = fuel_replay.future_forecasts[
+            fuel_replay.future_forecasts["scenario_name"]
+            .astype(str)
+            .eq(published_name)
+            & fuel_replay.future_forecasts["target_period"]
+            .astype(str)
+            .ge("2027Q3")
+        ].set_index(["stream", "target_period"])["forecast"].sort_index()
+        delayed = fuel_replay.future_forecasts[
+            fuel_replay.future_forecasts["scenario_name"]
+            .astype(str)
+            .eq(delayed_name)
+            & fuel_replay.future_forecasts["target_period"]
+            .astype(str)
+            .ge("2027Q3")
+        ].set_index(["stream", "target_period"])["forecast"].sort_index()
+        pd.testing.assert_index_equal(published.index, delayed.index)
+        np.testing.assert_allclose(
+            pd.to_numeric(published, errors="coerce"),
+            pd.to_numeric(delayed, errors="coerce"),
+            rtol=0.0,
+            atol=0.0,
+        )
 
     # Policy begins in 2027Q1, so FY2026 remains bit-for-bit published.
     for published_id, delayed_id, _ in family_paths.values():
@@ -1191,7 +1306,7 @@ def test_ar1_pack_replays_twelve_paths_and_retains_source_lineage(
 
     ar1_inputs = pd.read_parquet(AR1_INPUT_PATH)
     control = replay_forecast_from_scenario_inputs(
-        ar1_inputs[ar1_inputs["role"].astype(str).eq("basecase")],
+        ar1_fuel_replay.treasury_base_inputs,
         repo_root=ROOT,
         engine="ar1",
     ).future_forecasts[["stream", "target_period", "forecast"]]
@@ -1232,10 +1347,423 @@ def test_ensemble_append_fails_closed_when_direct_conflict_fy_is_missing(
         append_fuel_price_scenario_to_chart_rows(chart, incomplete_factors)
 
 
+def test_independent_treasury_macro_replay_builds_factors_without_changing_prices(
+    ar1_treasury_macro_replay,
+) -> None:
+    result = ar1_treasury_macro_replay
+    assert isinstance(result, TreasuryBaselineMacroReplayResult)
+    assert result.base_scenario_name == "current_basecase"
+    assert not result.baseline_macro_quarterly_factors.empty
+    assert not result.baseline_macro_annual_factors.empty
+
+    for factors in (
+        result.baseline_macro_quarterly_factors,
+        result.baseline_macro_annual_factors,
+    ):
+        numeric = pd.to_numeric(factors["factor"], errors="coerce")
+        assert numeric.notna().all()
+        assert np.isfinite(numeric).all()
+        assert numeric.gt(0).all()
+        assert numeric.sub(1.0).abs().gt(1e-9).any()
+
+    original = pd.read_parquet(AR1_INPUT_PATH)
+    original = original[
+        original["scenario_name"].astype(str).eq(result.base_scenario_name)
+    ].copy()
+    treasury = result.treasury_base_inputs.copy()
+    keys = ["stream", "canonical_period"]
+    price_columns = [
+        "real_petrol_price_cents_per_litre",
+        "real_diesel_price_cents_per_litre",
+        "real_light_ruc_price_nzd_per_1000km",
+        "real_heavy_ruc_price_nzd_per_1000km",
+        "log_real_petrol_price",
+        "log_real_diesel_price",
+        "log_real_light_ruc_price",
+        "log_real_heavy_ruc_price",
+    ]
+    comparison = original[keys + price_columns].merge(
+        treasury[keys + price_columns],
+        on=keys,
+        how="outer",
+        suffixes=("_original", "_treasury"),
+        validate="one_to_one",
+        indicator=True,
+    )
+    assert set(comparison["_merge"].astype(str)) == {"both"}
+    for column in price_columns:
+        np.testing.assert_allclose(
+            pd.to_numeric(comparison[f"{column}_treasury"], errors="coerce"),
+            pd.to_numeric(comparison[f"{column}_original"], errors="coerce"),
+            rtol=0.0,
+            atol=0.0,
+            equal_nan=True,
+        )
+
+
+def _treasury_macro_replay_stub(
+    annual_factors: dict[str, float],
+) -> TreasuryBaselineMacroReplayResult:
+    return TreasuryBaselineMacroReplayResult(
+        base_scenario_name="current_basecase",
+        treasury_base_inputs=pd.DataFrame(),
+        replay_inputs=pd.DataFrame(),
+        replay=None,
+        baseline_macro_quarterly_factors=pd.DataFrame(
+            [
+                {
+                    "series_id": "ped_vkt_per_capita",
+                    "period": "2026Q3",
+                    "factor": 1.0,
+                }
+            ]
+        ),
+        baseline_macro_annual_factors=pd.DataFrame(
+            [
+                {
+                    "series_id": series_id,
+                    "june_year": 2027,
+                    "factor": factor,
+                }
+                for series_id, factor in annual_factors.items()
+            ]
+        ),
+    )
+
+
+def _compact_macro_annual_rows(
+    values_by_scenario: dict[str, dict[str, float]],
+) -> pd.DataFrame:
+    rows: list[dict[str, object]] = []
+    for scenario_name, values in values_by_scenario.items():
+        for series_id, value in values.items():
+            rows.append(
+                {
+                    "scenario_name": scenario_name,
+                    "scenario_role": (
+                        "basecase"
+                        if scenario_name == "current_basecase"
+                        else "comparison"
+                    ),
+                    "trace_name": scenario_name,
+                    "time_grain": "june_year",
+                    "period": "FY2027",
+                    "june_year": 2027,
+                    "series_id": series_id,
+                    "value": value,
+                    "fed_path": "published_12c",
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def test_treasury_macro_compact_annual_rollups_preserve_hidden_components() -> None:
+    source = _compact_macro_annual_rows(
+        {
+            "current_basecase": {
+                "gross_ped_revenue": 100.0,
+                "gross_fed_revenue": 115.0,
+                "net_fed_revenue": 108.0,
+                "gross_ruc_revenue": 215.0,
+                "ruc_revenue_net_admin": 210.0,
+                "total_ruc_net_revenue": 200.0,
+                "total_fed_ruc_net_revenue": 308.0,
+                "total_gross_revenue": 390.0,
+                "total_revenue_net_admin": 370.0,
+                "total_nltf_net_revenue": 360.0,
+            },
+            "current_comparison_1": {
+                "gross_ped_revenue": 120.0,
+                "gross_fed_revenue": 135.0,
+                "net_fed_revenue": 128.0,
+                "gross_ruc_revenue": 265.0,
+                "ruc_revenue_net_admin": 260.0,
+                "total_ruc_net_revenue": 250.0,
+                "total_fed_ruc_net_revenue": 378.0,
+                "total_gross_revenue": 460.0,
+                "total_revenue_net_admin": 440.0,
+                "total_nltf_net_revenue": 430.0,
+            },
+        }
+    )
+    factors = {
+        series_id: 1.25
+        for series_id in source["series_id"].astype(str).unique()
+    }
+    factors["gross_ped_revenue"] = 1.10
+    factors["total_ruc_net_revenue"] = 0.95
+    adjusted, audit = apply_treasury_macro_to_chart_rows(
+        source,
+        _treasury_macro_replay_stub(factors),
+    )
+
+    assert not audit.empty
+    for scenario_name in ("current_basecase", "current_comparison_1"):
+        before = source[
+            source["scenario_name"].astype(str).eq(scenario_name)
+        ].set_index("series_id")["value"].astype(float)
+        after = adjusted[
+            adjusted["scenario_name"].astype(str).eq(scenario_name)
+        ].set_index("series_id")["value"].astype(float)
+        ped_delta = after["gross_ped_revenue"] - before["gross_ped_revenue"]
+        ruc_delta = (
+            after["total_ruc_net_revenue"]
+            - before["total_ruc_net_revenue"]
+        )
+
+        for series_id in FED_AGGREGATE_SERIES:
+            assert after[series_id] - before[series_id] == pytest.approx(
+                ped_delta
+            )
+        for series_id in RUC_AGGREGATE_SERIES:
+            assert after[series_id] - before[series_id] == pytest.approx(
+                ruc_delta
+            )
+        for series_id in TOTAL_AGGREGATE_SERIES:
+            assert after[series_id] - before[series_id] == pytest.approx(
+                ped_delta + ruc_delta
+            )
+
+        assert (
+            after["gross_fed_revenue"] - after["gross_ped_revenue"]
+        ) == pytest.approx(
+            before["gross_fed_revenue"] - before["gross_ped_revenue"]
+        )
+        assert (
+            after["gross_fed_revenue"] - after["net_fed_revenue"]
+        ) == pytest.approx(
+            before["gross_fed_revenue"] - before["net_fed_revenue"]
+        )
+        assert (
+            after["gross_ruc_revenue"] - after["ruc_revenue_net_admin"]
+        ) == pytest.approx(
+            before["gross_ruc_revenue"]
+            - before["ruc_revenue_net_admin"]
+        )
+        assert (
+            after["ruc_revenue_net_admin"]
+            - after["total_ruc_net_revenue"]
+        ) == pytest.approx(
+            before["ruc_revenue_net_admin"]
+            - before["total_ruc_net_revenue"]
+        )
+        assert after["total_fed_ruc_net_revenue"] == pytest.approx(
+            after["net_fed_revenue"] + after["total_ruc_net_revenue"]
+        )
+        assert (
+            after["total_nltf_net_revenue"]
+            - after["total_fed_ruc_net_revenue"]
+        ) == pytest.approx(
+            before["total_nltf_net_revenue"]
+            - before["total_fed_ruc_net_revenue"]
+        )
+
+
+def test_treasury_macro_partial_total_keeps_direct_factor_without_ruc_anchor() -> None:
+    source = _compact_macro_annual_rows(
+        {
+            "current_basecase": {
+                "gross_ped_revenue": 100.0,
+                "total_nltf_net_revenue": 360.0,
+            }
+        }
+    )
+    adjusted, _ = apply_treasury_macro_to_chart_rows(
+        source,
+        _treasury_macro_replay_stub(
+            {
+                "gross_ped_revenue": 1.10,
+                "total_nltf_net_revenue": 1.20,
+            }
+        ),
+    )
+    values = adjusted.set_index("series_id")
+
+    assert float(values.at["gross_ped_revenue", "value"]) == pytest.approx(
+        110.0
+    )
+    assert float(values.at["total_nltf_net_revenue", "value"]) == pytest.approx(
+        432.0
+    )
+    assert (
+        values.at["total_nltf_net_revenue", "_treasury_macro_basis"]
+        == "Treasury_BEFU26_annual_bridge_macro_factor"
+    )
+
+
+@pytest.mark.parametrize(
+    "anchor_series",
+    ("gross_ped_revenue", "total_ruc_net_revenue"),
+)
+def test_treasury_macro_present_anchor_without_factor_fails_closed(
+    anchor_series: str,
+) -> None:
+    source = _compact_macro_annual_rows(
+        {"current_basecase": {anchor_series: 100.0}}
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=rf"{anchor_series}/FY2027",
+    ):
+        apply_treasury_macro_to_chart_rows(
+            source,
+            _treasury_macro_replay_stub({"net_mvr_revenue": 1.0}),
+        )
+
+
+def test_treasury_macro_overlay_updates_current_base_and_comparison_only(
+    ar1_treasury_macro_replay,
+) -> None:
+    source = pd.read_parquet(AR1_CHART_PATH)
+    adjusted, audit = apply_treasury_macro_to_chart_rows(
+        source, ar1_treasury_macro_replay
+    )
+
+    assert not audit.empty
+    assert {"current_basecase", "current_comparison_1"}.issubset(
+        set(audit["scenario_name"].astype(str))
+    )
+    current_mask = (
+        adjusted["scenario_role"].fillna("").astype(str).isin(
+            {"basecase", "comparison"}
+        )
+        & adjusted["scenario_name"]
+        .astype(str)
+        .isin({"current_basecase", "current_comparison_1"})
+    )
+    for scenario_name in ("current_basecase", "current_comparison_1"):
+        scenario = adjusted[
+            current_mask
+            & adjusted["scenario_name"].astype(str).eq(scenario_name)
+        ]
+        assert not scenario.empty
+        assert scenario["treasury_macro_applied"].fillna(False).astype(bool).any()
+
+    protected_mask = (
+        source["scenario_role"].fillna("").astype(str).isin(
+            {"actual", "official_comparator"}
+        )
+        | source["scenario_name"]
+        .astype(str)
+        .isin({"actual", "historical_actual", "mbu26_official"})
+    )
+    pd.testing.assert_series_equal(
+        adjusted.loc[protected_mask, "value"].reset_index(drop=True),
+        source.loc[protected_mask, "value"].reset_index(drop=True),
+        check_names=False,
+        check_dtype=False,
+    )
+    assert not adjusted.loc[
+        protected_mask, "treasury_macro_applied"
+    ].fillna(False).astype(bool).any()
+
+    expected_factor = (
+        ar1_treasury_macro_replay.baseline_macro_annual_factors[
+            ar1_treasury_macro_replay.baseline_macro_annual_factors[
+                "series_id"
+            ]
+            .astype(str)
+            .eq("light_ruc_net_km")
+            & pd.to_numeric(
+                ar1_treasury_macro_replay.baseline_macro_annual_factors[
+                    "june_year"
+                ],
+                errors="coerce",
+            ).eq(2030)
+        ]["factor"]
+        .astype(float)
+        .iloc[0]
+    )
+    for scenario_name in ("current_basecase", "current_comparison_1"):
+        selector = (
+            source["scenario_name"].astype(str).eq(scenario_name)
+            & source["time_grain"].astype(str).eq("june_year")
+            & source["series_id"].astype(str).eq("light_ruc_net_km")
+            & pd.to_numeric(source["june_year"], errors="coerce").eq(2030)
+        )
+        assert selector.sum() == 1
+        source_value = float(source.loc[selector, "value"].iloc[0])
+        adjusted_value = float(adjusted.loc[selector, "value"].iloc[0])
+        assert adjusted_value == pytest.approx(
+            source_value * expected_factor, rel=1e-12, abs=1e-9
+        )
+
+
+def test_treasury_macro_before_uptake_preserves_quarterly_annual_reconciliation(
+    ar1_treasury_macro_replay,
+) -> None:
+    chart, macro_audit = apply_treasury_macro_to_chart_rows(
+        pd.read_parquet(AR1_CHART_PATH), ar1_treasury_macro_replay
+    )
+    assert not macro_audit.empty
+    drift = pd.read_parquet(
+        ROOT
+        / "data/current_revenue_outlook/ev_phev_ped_light_drift_assumptions.parquet"
+    )
+    adjusted, uptake_audit = apply_uptake_levers_to_chart_rows(
+        chart,
+        drift,
+        EV_UPTAKE_PRESETS["MoT VFM base"],
+        adjust_ped=True,
+    )
+    assert not uptake_audit.empty
+
+    for scenario_name in ("current_basecase", "current_comparison_1"):
+        for series_id in (
+            "ped_vkt_per_capita",
+            "light_ruc_net_km",
+            "heavy_ruc_net_km",
+        ):
+            for fy in (2027, 2028, 2030):
+                annual = adjusted[
+                    adjusted["scenario_name"].astype(str).eq(scenario_name)
+                    & adjusted["series_id"].astype(str).eq(series_id)
+                    & adjusted["time_grain"].astype(str).eq("june_year")
+                    & pd.to_numeric(
+                        adjusted["june_year"], errors="coerce"
+                    ).eq(fy)
+                ]
+                quarters = adjusted[
+                    adjusted["scenario_name"].astype(str).eq(scenario_name)
+                    & adjusted["series_id"].astype(str).eq(series_id)
+                    & adjusted["time_grain"].astype(str).eq("quarterly")
+                    & pd.to_numeric(
+                        adjusted["june_year"], errors="coerce"
+                    ).eq(fy)
+                ]
+                assert len(annual) == 1
+                assert quarters["period"].astype(str).nunique() == 4
+                annual_row = annual.iloc[0]
+                annual_scale = (
+                    1_000_000.0
+                    if "million" in str(annual_row["value_unit"]).lower()
+                    else 1.0
+                )
+                quarter_total = sum(
+                    float(row.value)
+                    * (
+                        1_000_000.0
+                        if "million" in str(row.value_unit).lower()
+                        else 1.0
+                    )
+                    for row in quarters.itertuples()
+                )
+                assert quarter_total == pytest.approx(
+                    float(annual_row["value"]) * annual_scale,
+                    rel=0.0,
+                    abs=1e-5,
+                )
+
+
 def test_append_creates_three_distinct_idempotent_traces_with_exact_replay_values_and_annual_bridge(
     ar1_fuel_replay,
 ) -> None:
     chart = pd.read_parquet(AR1_CHART_PATH)
+    chart, macro_audit = apply_treasury_macro_to_chart_rows(
+        chart, ar1_fuel_replay
+    )
+    assert not macro_audit.empty
     combined, audit = append_fuel_price_scenario_to_chart_rows(chart, ar1_fuel_replay)
     base_rows = chart[chart["scenario_name"].astype(str).eq("current_basecase")]
 
@@ -1282,10 +1810,10 @@ def test_append_creates_three_distinct_idempotent_traces_with_exact_replay_value
             atol=1e-8,
         )
 
-        expected_bridge = ar1_fuel_replay.annual_bridge[
-            ar1_fuel_replay.annual_bridge["policy_path_id"]
+        expected_factors = ar1_fuel_replay.annual_factors[
+            ar1_fuel_replay.annual_factors["scenario_name"]
             .astype(str)
-            .eq(POLICY_PATH_IDS[scenario_name])
+            .eq(scenario_name)
         ]
         visible_series = set(
             fuel_rows[fuel_rows["time_grain"].astype(str).eq("june_year")][
@@ -1294,12 +1822,17 @@ def test_append_creates_three_distinct_idempotent_traces_with_exact_replay_value
         )
         for fy in range(2026, 2031):
             annual = _annual(combined, scenario_name, fy)
-            expected = expected_bridge[
-                pd.to_numeric(expected_bridge["FY"], errors="coerce").eq(fy)
+            base_annual = _annual(chart, "current_basecase", fy)
+            expected = expected_factors[
+                pd.to_numeric(expected_factors["june_year"], errors="coerce").eq(fy)
             ].set_index("series_id")
-            for series_id in visible_series.intersection(expected.index):
+            direct_factor_series = visible_series.difference(
+                set(FED_AGGREGATE_SERIES) | set(TOTAL_AGGREGATE_SERIES)
+            )
+            for series_id in direct_factor_series.intersection(expected.index):
                 assert float(annual.at[series_id, "value"]) == pytest.approx(
-                    float(expected.at[series_id, "value"]),
+                    float(base_annual.at[series_id, "value"])
+                    * float(expected.at[series_id, "factor"]),
                     abs=1e-9,
                 )
 
@@ -1463,7 +1996,11 @@ def test_conflict_traces_inherit_reconciled_uptake_base_plus_fixed_quarterly_del
 def test_policy_pair_overlay_matches_formula_rebuilt_base_and_conflict_annual_bridges(
     ar1_fuel_replay,
 ) -> None:
-    chart = pd.read_parquet(AR1_CHART_PATH)
+    source_chart = pd.read_parquet(AR1_CHART_PATH)
+    chart, macro_audit = apply_treasury_macro_to_chart_rows(
+        source_chart, ar1_fuel_replay
+    )
+    assert not macro_audit.empty
     delayed, policy_audit = apply_fed_uplift_delay_to_chart_rows(
         chart,
         fed_uplift_delayed_factors(ROOT, chart),
@@ -1487,30 +2024,36 @@ def test_policy_pair_overlay_matches_formula_rebuilt_base_and_conflict_annual_br
             & chart["time_grain"].astype(str).eq("june_year")
         ]["series_id"].astype(str)
     )
-    bridge = ar1_fuel_replay.annual_bridge.copy()
-    expected_paths = [
-        ("current_basecase", "baseline_shifted_6m"),
-        *(
-            (conflict_scenario_name(level), f"{level}_shifted_6m")
-            for level in CONFLICT_FUEL_SCENARIO_LEVELS
-        ),
-    ]
-    for scenario_name, path_id in expected_paths:
+    for level in CONFLICT_FUEL_SCENARIO_LEVELS:
+        scenario_name = conflict_scenario_name(level)
+        pair_id = f"{level}_vs_baseline_delayed_6m"
+        pair_factors = ar1_fuel_replay.policy_pair_factors[
+            ar1_fuel_replay.policy_pair_factors["pair_id"].astype(str).eq(pair_id)
+            & ar1_fuel_replay.policy_pair_factors["time_grain"]
+            .astype(str)
+            .eq("june_year")
+        ]
         for fy in range(2026, 2031):
             displayed = _annual(combined, scenario_name, fy)
-            expected = bridge[
-                bridge["policy_path_id"].astype(str).eq(path_id)
-                & pd.to_numeric(bridge["FY"], errors="coerce").eq(fy)
+            base_displayed = _annual(combined, "current_basecase", fy)
+            expected = pair_factors[
+                pd.to_numeric(pair_factors["june_year"], errors="coerce").eq(fy)
             ].set_index("series_id")
-            for series_id in visible_series.intersection(expected.index):
+            direct_factor_series = visible_series.difference(
+                set(FED_AGGREGATE_SERIES) | set(TOTAL_AGGREGATE_SERIES)
+            )
+            for series_id in direct_factor_series.intersection(expected.index):
                 assert float(displayed.at[series_id, "value"]) == pytest.approx(
-                    float(expected.at[series_id, "value"]),
+                    float(base_displayed.at[series_id, "value"])
+                    * float(expected.at[series_id, "factor"]),
                     abs=1e-9,
                 )
 
     base_2027 = _annual(combined, "current_basecase", 2027)
     assert float(base_2027.at["total_ruc_net_revenue", "value"]) < float(
-        _annual(chart, "current_basecase", 2027).at["total_ruc_net_revenue", "value"]
+        _annual(source_chart, "current_basecase", 2027).at[
+            "total_ruc_net_revenue", "value"
+        ]
     )
     for level in CONFLICT_FUEL_SCENARIO_LEVELS:
         conflict_2027 = _annual(combined, conflict_scenario_name(level), 2027)

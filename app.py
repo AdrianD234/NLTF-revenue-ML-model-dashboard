@@ -131,6 +131,9 @@ from model_dashboard.npv import (
     npv_to_horizon,
 )
 from model_dashboard.rate_paths import (
+    FED_POLICY_STATE_DELAYED_6M,
+    FED_POLICY_STATE_NO_UPLIFT,
+    FED_POLICY_STATE_PUBLISHED,
     FED_UPLIFT_DELAY_NOTE,
     FED_UPLIFT_NOTE,
     RATE_CHART_NOTE,
@@ -151,8 +154,11 @@ from model_dashboard.fuel_price_scenario import (
     FUEL_PRICE_SCENARIO_NAME,
     FUEL_PRICE_SCENARIO_NOTE,
     FUEL_PRICE_SCENARIO_TRACE_NAME,
+    TreasuryBaselineMacroReplayResult,
+    apply_treasury_macro_to_chart_rows,
     append_fuel_price_scenario_to_chart_rows,
     run_fuel_price_scenario_replay,
+    run_treasury_baseline_macro_replay,
 )
 
 CONFLICT_SCENARIO_NAMES = tuple(
@@ -772,6 +778,81 @@ def _resolve_eruc_levers(ev_uptake_key: tuple[Any, ...]) -> ErucTransitionLevers
 
 _CURRENT_FED_UPLIFT_ROLES = ("basecase", "comparison")
 _MBU26_FED_UPLIFT_ROLES = ("official_comparator",)
+FED_POLICY_PUBLISHED = "published"
+FED_POLICY_DELAYED_6M = "delayed_6m"
+FED_POLICY_OFF = "off"
+FED_POLICY_OPTIONS = (
+    FED_POLICY_PUBLISHED,
+    FED_POLICY_DELAYED_6M,
+    FED_POLICY_OFF,
+)
+FED_POLICY_LABELS = {
+    FED_POLICY_PUBLISHED: "Original timing — 1 Jan 2027",
+    FED_POLICY_DELAYED_6M: "Deferred 6 months — 1 Jul 2027",
+    FED_POLICY_OFF: "No 12c uplift",
+}
+FED_POLICY_NOTES = {
+    FED_POLICY_PUBLISHED: (
+        "Original published timing: the 12c/L step begins 1 January 2027. "
+        "That affects the final two quarters of FY2027, including the PED pump-price "
+        "input and the proportional Light/Heavy RUC rate and model-price inputs."
+    ),
+    FED_POLICY_DELAYED_6M: FED_UPLIFT_DELAY_NOTE,
+    FED_POLICY_OFF: FED_UPLIFT_NOTE,
+}
+
+
+def _normalise_fed_policy_state(value: Any) -> str:
+    """Return one of the three reader-facing FED/RUC policy states.
+
+    Numeric and boolean values retain the former toggle semantics for cached
+    callers: zero/False meant delayed, while one/True meant no uplift.
+    """
+
+    if isinstance(value, bool):
+        return FED_POLICY_OFF if value else FED_POLICY_DELAYED_6M
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return FED_POLICY_OFF if bool(value) else FED_POLICY_DELAYED_6M
+    text = str(value or "").strip()
+    lowered = text.casefold()
+    label_lookup = {label.casefold(): state for state, label in FED_POLICY_LABELS.items()}
+    if lowered in label_lookup:
+        return label_lookup[lowered]
+    if lowered in {
+        FED_POLICY_PUBLISHED,
+        FED_POLICY_STATE_PUBLISHED,
+        "original",
+        "planned",
+        "published_timing",
+    }:
+        return FED_POLICY_PUBLISHED
+    if lowered in {
+        FED_POLICY_DELAYED_6M,
+        FED_POLICY_STATE_DELAYED_6M,
+        "delay_6m",
+        "shifted_6m",
+        "deferred",
+    }:
+        return FED_POLICY_DELAYED_6M
+    if lowered in {
+        FED_POLICY_OFF,
+        FED_POLICY_STATE_NO_UPLIFT,
+        "no_uplift",
+        "none",
+    }:
+        return FED_POLICY_OFF
+    return FED_POLICY_DELAYED_6M
+
+
+def _fed_policy_state_scope(ev_uptake_key: tuple[Any, ...]) -> tuple[str, str]:
+    """Return (Current state, MBU26 state), retaining legacy cache keys."""
+
+    current_raw: Any = ev_uptake_key[3] if len(ev_uptake_key) > 3 else FED_POLICY_DELAYED_6M
+    mbu26_raw: Any = ev_uptake_key[4] if len(ev_uptake_key) > 4 else current_raw
+    return (
+        _normalise_fed_policy_state(current_raw),
+        _normalise_fed_policy_state(mbu26_raw),
+    )
 
 
 def _fed_uplift_off_scope(ev_uptake_key: tuple[Any, ...]) -> tuple[bool, bool]:
@@ -780,9 +861,8 @@ def _fed_uplift_off_scope(ev_uptake_key: tuple[Any, ...]) -> tuple[bool, bool]:
     Five-slot keys carry independent policy states. Four-slot keys retain the
     legacy global behaviour for cached/test callers created before the split.
     """
-    current_off = bool(ev_uptake_key[3]) if len(ev_uptake_key) > 3 else False
-    mbu26_off = bool(ev_uptake_key[4]) if len(ev_uptake_key) > 4 else current_off
-    return current_off, mbu26_off
+    current_state, mbu26_state = _fed_policy_state_scope(ev_uptake_key)
+    return current_state == FED_POLICY_OFF, mbu26_state == FED_POLICY_OFF
 
 
 def _fed_uplift_roles_for_key(ev_uptake_key: tuple[Any, ...]) -> tuple[str, ...]:
@@ -798,15 +878,17 @@ def _fed_uplift_roles_for_key(ev_uptake_key: tuple[Any, ...]) -> tuple[str, ...]
 def _fed_policy_scopes_for_key(ev_uptake_key: tuple[Any, ...]) -> tuple[tuple[str, tuple[str, ...]], ...]:
     """Policy schedule for Current and MBU26 traces.
 
-    The two existing switches stay independent.  ON now means the governed
-    six-month delay (the 12c step starts in 2027Q3); OFF remains the no-uplift
-    counterfactual.
+    Original timing is already the published chart lineage and therefore needs
+    no overlay. Deferred and no-uplift states are applied independently to
+    Current and MBU26 roles.
     """
-    current_off, mbu26_off = _fed_uplift_off_scope(ev_uptake_key)
-    return (
-        ("off" if current_off else "delayed_6m", _CURRENT_FED_UPLIFT_ROLES),
-        ("off" if mbu26_off else "delayed_6m", _MBU26_FED_UPLIFT_ROLES),
-    )
+    current_state, mbu26_state = _fed_policy_state_scope(ev_uptake_key)
+    scopes: list[tuple[str, tuple[str, ...]]] = []
+    if current_state != FED_POLICY_PUBLISHED:
+        scopes.append((current_state, _CURRENT_FED_UPLIFT_ROLES))
+    if mbu26_state != FED_POLICY_PUBLISHED:
+        scopes.append((mbu26_state, _MBU26_FED_UPLIFT_ROLES))
+    return tuple(scopes)
 
 
 def _policy_scopes_for_available_replay(
@@ -848,6 +930,30 @@ def _policy_scopes_for_available_replay(
                 }
             )
     return tuple(governed), pd.DataFrame(audit_rows)
+
+
+def _effective_fed_policy_state(
+    requested_state: str,
+    scenario_roles: tuple[str, ...],
+    policy_audit: pd.DataFrame,
+) -> str:
+    """Resolve the state actually applied after the replay availability gate."""
+
+    requested = _normalise_fed_policy_state(requested_state)
+    if requested == FED_POLICY_PUBLISHED or policy_audit is None or policy_audit.empty:
+        return requested
+    unavailable = policy_audit[
+        policy_audit.get("transformation_basis", pd.Series("", index=policy_audit.index))
+        .astype(str)
+        .eq("policy_replay_unavailable_not_applied")
+    ]
+    if unavailable.empty:
+        return requested
+    governed_roles = {str(role) for role in scenario_roles}
+    for value in unavailable.get("scenario_role", pd.Series(dtype=str)).astype(str):
+        if governed_roles.intersection(part for part in value.split(";") if part):
+            return FED_POLICY_PUBLISHED
+    return requested
 
 
 @st.cache_data(show_spinner=False, max_entries=4)
@@ -932,6 +1038,38 @@ def _safe_fuel_price_scenario_replay(
         return None, type(exc).__name__
 
 
+@st.cache_data(show_spinner=False, max_entries=2)
+def cached_treasury_baseline_macro_replay(
+    signature: tuple[tuple[str, int, int], ...],
+    _pack: RevenueOutlookPack,
+) -> TreasuryBaselineMacroReplayResult | None:
+    """Replay Treasury baseline GDP independently of conflict-path availability."""
+
+    del signature
+    input_path = _pack.output_dir / "scenario_inputs" / "scenario_input_wide.parquet"
+    if not input_path.exists():
+        return None
+    scenario_inputs = pd.read_parquet(input_path)
+    engine = "ar1" if "engine_ar1" in {part.lower() for part in _pack.output_dir.parts} else "ensemble"
+    return run_treasury_baseline_macro_replay(
+        scenario_inputs,
+        repo_root=Path(__file__).resolve().parent,
+        engine=engine,
+    )
+
+
+def _safe_treasury_baseline_macro_replay(
+    signature: tuple[tuple[str, int, int], ...],
+    pack: RevenueOutlookPack,
+) -> tuple[TreasuryBaselineMacroReplayResult | None, str]:
+    """Return the independent Treasury replay or a non-sensitive error type."""
+
+    try:
+        return cached_treasury_baseline_macro_replay(signature, pack), ""
+    except (FileNotFoundError, OSError, KeyError, ValueError) as exc:
+        return None, type(exc).__name__
+
+
 def _apply_scenario_overlays(
     rows: pd.DataFrame,
     drift: pd.DataFrame,
@@ -1010,6 +1148,24 @@ def cached_scenario_overlay_rows(
         and isinstance(fuel_replay.policy_pair_factors, pd.DataFrame)
         and not fuel_replay.policy_pair_factors.empty
     )
+    macro_replay: Any = fuel_replay if replay_available else None
+    macro_error_type = ""
+    if macro_replay is None:
+        macro_replay, macro_error_type = _safe_treasury_baseline_macro_replay(
+            signature,
+            _pack,
+        )
+    if macro_replay is None:
+        failure_types = ", ".join(
+            error_type
+            for error_type in (replay_error_type, macro_error_type)
+            if error_type
+        ) or "unavailable input data"
+        raise RuntimeError(
+            "Treasury baseline macro replay is unavailable "
+            f"({failure_types}); refusing to silently revert the dashboard "
+            "to legacy GDP assumptions."
+        )
     policy_pair_factors = (
         fuel_replay.policy_pair_factors
         if replay_available
@@ -1021,13 +1177,27 @@ def cached_scenario_overlay_rows(
     )
     if replay_error_type and not replay_status_audit.empty:
         replay_status_audit["replay_error_type"] = replay_error_type
-    rows, uptake_audit, eruc_audit, uplift_audit = _apply_scenario_overlays(
+    rows, macro_audit = apply_treasury_macro_to_chart_rows(
         sensitivity_frames["chart_rows"],
+        macro_replay,
+    )
+    rows, uptake_audit, eruc_audit, _ = _apply_scenario_overlays(
+        rows,
         _pack_table(_pack, "ev_phev_ped_light_drift_assumptions"),
         levers,
         eruc_levers,
         uplift_factors,
         adjust_ped=str(bridge_mode) == PED_BRIDGE_DEFAULT_MODE,
+        fed_policy_scopes=(),
+        policy_pair_factors=pd.DataFrame(),
+    )
+    rows, _, _, uplift_audit = _apply_scenario_overlays(
+        rows,
+        _pack_table(_pack, "ev_phev_ped_light_drift_assumptions"),
+        None,
+        None,
+        uplift_factors,
+        adjust_ped=False,
         fed_policy_scopes=fed_policy_scopes,
         policy_pair_factors=policy_pair_factors,
     )
@@ -1036,7 +1206,21 @@ def cached_scenario_overlay_rows(
     if not replay_available:
         return rows, uptake_audit, eruc_audit, uplift_audit, pd.DataFrame()
     rows, fuel_audit = append_fuel_price_scenario_to_chart_rows(rows, fuel_replay)
-    return rows, uptake_audit, eruc_audit, uplift_audit, fuel_audit
+    scenario_audits = [
+        frame for frame in (macro_audit, fuel_audit) if not frame.empty
+    ]
+    combined_scenario_audit = (
+        pd.concat(scenario_audits, ignore_index=True, sort=False)
+        if scenario_audits
+        else pd.DataFrame()
+    )
+    return (
+        rows,
+        uptake_audit,
+        eruc_audit,
+        uplift_audit,
+        combined_scenario_audit,
+    )
 
 
 def _filter_series_rows_with_fallback(
@@ -1089,7 +1273,7 @@ def cached_view_cone_band(
     sensitivity_key: tuple[str, str, str, str, str, str, str, str, str, str, str],
     bridge_mode: str,
     eruc_values: tuple[float, ...],
-    fed_uplift_off: bool,
+    current_fed_policy_state: str,
     _pack: RevenueOutlookPack,
 ) -> pd.DataFrame:
     """MoT VFM fast/slow fleet-transition envelope around the base-case trace.
@@ -1099,7 +1283,13 @@ def cached_view_cone_band(
     """
     bounds: dict[str, pd.Series] = {}
     for bound_name, preset_name in (("fast", "MoT VFM fast"), ("slow", "MoT VFM slow")):
-        preset_key = (preset_name, (), tuple(eruc_values), 1 if fed_uplift_off else 0, 0)
+        preset_key = (
+            preset_name,
+            (),
+            tuple(eruc_values),
+            _normalise_fed_policy_state(current_fed_policy_state),
+            FED_POLICY_PUBLISHED,
+        )
         rows, _, _, _, _ = cached_scenario_overlay_rows(signature, sensitivity_key, bridge_mode, preset_key, _pack)
         bound_rows, _ = _filter_series_rows_with_fallback(rows, selected_series, time_grain, fed_path, traces)
         base_trace = bound_rows[
@@ -1412,15 +1602,33 @@ def cached_revenue_outlook_view(
         signature, bridge_mode, sensitivity_key, _pack
     )
     eruc_levers = _resolve_eruc_levers(ev_uptake_key)
-    current_fed_uplift_off, mbu26_fed_uplift_off = _fed_uplift_off_scope(ev_uptake_key)
+    current_fed_policy_state, mbu26_fed_policy_state = _fed_policy_state_scope(ev_uptake_key)
     ev_uptake_levers = _resolve_ev_uptake_levers(ev_uptake_key)
     chart_rows, ev_uptake_audit, eruc_audit, fed_uplift_audit, fuel_price_audit = cached_scenario_overlay_rows(
         signature, sensitivity_key, bridge_mode, ev_uptake_key, _pack
     )
+    effective_current_fed_policy_state = _effective_fed_policy_state(
+        current_fed_policy_state,
+        _CURRENT_FED_UPLIFT_ROLES,
+        fed_uplift_audit,
+    )
+    effective_mbu26_fed_policy_state = _effective_fed_policy_state(
+        mbu26_fed_policy_state,
+        _MBU26_FED_UPLIFT_ROLES,
+        fed_uplift_audit,
+    )
+    effective_current_fed_uplift_off = effective_current_fed_policy_state == FED_POLICY_OFF
+    effective_mbu26_fed_uplift_off = effective_mbu26_fed_policy_state == FED_POLICY_OFF
     conflict_replay, _ = _safe_fuel_price_scenario_replay(signature, _pack)
     conflict_input_audit = (
         conflict_replay.input_audit.copy()
         if conflict_replay is not None and isinstance(conflict_replay.input_audit, pd.DataFrame)
+        else pd.DataFrame()
+    )
+    conflict_gdp_input_audit = (
+        conflict_replay.gdp_input_audit.copy()
+        if conflict_replay is not None
+        and isinstance(conflict_replay.gdp_input_audit, pd.DataFrame)
         else pd.DataFrame()
     )
     bridge_components = sensitivity_frames["revenue_bridge_components"]
@@ -1436,7 +1644,7 @@ def cached_revenue_outlook_view(
         eruc_values = tuple(float(v) for v in (ev_uptake_key[2] if len(ev_uptake_key) > 2 else ()) or ())
         cone_band = cached_view_cone_band(
             signature, selected_series, time_grain, fed_path, traces,
-            sensitivity_key, bridge_mode, eruc_values, current_fed_uplift_off, _pack,
+            sensitivity_key, bridge_mode, eruc_values, current_fed_policy_state, _pack,
         )
     filtered_bridge = _filter_revenue_bridge_rows(
         bridge_components,
@@ -1459,14 +1667,23 @@ def cached_revenue_outlook_view(
         "cone_band": cone_band,
         "eruc_applied": eruc_levers is not None and not eruc_audit.empty,
         "eruc_audit": eruc_audit,
-        "fed_uplift_off": current_fed_uplift_off or mbu26_fed_uplift_off,
-        "fed_uplift_delayed": not fed_uplift_audit.empty and not (current_fed_uplift_off and mbu26_fed_uplift_off),
-        "current_fed_uplift_off": current_fed_uplift_off and not fed_uplift_audit.empty,
-        "mbu26_fed_uplift_off": mbu26_fed_uplift_off and not fed_uplift_audit.empty,
+        "fed_uplift_off": effective_current_fed_uplift_off or effective_mbu26_fed_uplift_off,
+        "fed_uplift_delayed": (
+            not fed_uplift_audit.empty
+            and FED_POLICY_DELAYED_6M
+            in {effective_current_fed_policy_state, effective_mbu26_fed_policy_state}
+        ),
+        "requested_current_fed_policy_state": current_fed_policy_state,
+        "requested_mbu26_fed_policy_state": mbu26_fed_policy_state,
+        "current_fed_policy_state": effective_current_fed_policy_state,
+        "mbu26_fed_policy_state": effective_mbu26_fed_policy_state,
+        "current_fed_uplift_off": effective_current_fed_uplift_off,
+        "mbu26_fed_uplift_off": effective_mbu26_fed_uplift_off,
         "fed_uplift_audit": fed_uplift_audit,
         "fuel_price_scenario_applied": not fuel_price_audit.empty,
         "fuel_price_scenario_audit": fuel_price_audit,
         "conflict_fuel_input_audit": conflict_input_audit,
+        "conflict_gdp_input_audit": conflict_gdp_input_audit,
         # Compatibility for older callers while the exported schema migrates.
         "iran_war_input_audit": conflict_input_audit,
     }
@@ -1853,12 +2070,27 @@ def cached_revenue_outlook_activity_figure(
     _chart_rows: pd.DataFrame,
 ) -> go.Figure:
     del signature, sensitivity_key, bridge_mode
-    activity_rows = _filter_revenue_outlook_rows(
-        _chart_rows,
-        time_grain=time_grain,
-        stream_labels=["PED VKT per capita", "PED volume", "Light RUC net km", "Heavy RUC net km"],
-        fed_paths=[selected_fed_path],
-        trace_names=list(traces),
+    activity_frames: list[pd.DataFrame] = []
+    for series_label in (
+        "Light petrol VKT",
+        "PED VKT per capita",
+        "PED volume",
+        "Light RUC net km",
+        "Heavy RUC net km",
+    ):
+        selected, _ = _filter_series_rows_with_fallback(
+            _chart_rows,
+            series_label,
+            time_grain,
+            selected_fed_path,
+            traces,
+        )
+        if not selected.empty:
+            activity_frames.append(selected)
+    activity_rows = (
+        pd.concat(activity_frames, ignore_index=True, sort=False)
+        if activity_frames
+        else pd.DataFrame()
     )
     return revenue_outlook_figure(activity_rows, metric_type="activity")
 
@@ -3547,6 +3779,8 @@ _REVENUE_OUTLOOK_PERSISTED_KEYS = (
     "revenue_outlook_sensitivity_freight_rail_shift",
     "revenue_outlook_ev_uptake_basis_v2",
     "revenue_outlook_eruc_toggle",
+    "revenue_outlook_fed_policy_state",
+    "revenue_outlook_mbu_fed_policy_state",
     "revenue_outlook_fed_uplift",
     "revenue_outlook_mbu_fed_uplift",
 )
@@ -3570,14 +3804,32 @@ def _widget_default_kwargs(key: str, **defaults: Any) -> dict[str, Any]:
     return {} if key in st.session_state else defaults
 
 
+def _session_fed_policy_state(
+    key: str,
+    *,
+    legacy_toggle_key: str | None = None,
+    default: str = FED_POLICY_DELAYED_6M,
+) -> str:
+    """Read a three-state policy selection, migrating the former ON/OFF toggle."""
+
+    if key in st.session_state:
+        return _normalise_fed_policy_state(st.session_state.get(key))
+    if legacy_toggle_key and legacy_toggle_key in st.session_state:
+        legacy_on = bool(st.session_state.get(legacy_toggle_key))
+        state = FED_POLICY_DELAYED_6M if legacy_on else FED_POLICY_OFF
+        st.session_state[key] = state
+        return state
+    return _normalise_fed_policy_state(default)
+
+
 def _active_lever_summary(
     fleet: str,
     pt_shift: str,
     freight: str,
     uptake_mode: str,
     eruc_on: bool,
-    fed_uplift_on: bool,
-    mbu_fed_uplift_on: bool,
+    fed_policy_state: str,
+    mbu_fed_policy_state: str,
 ) -> str:
     """One-line summary of non-default levers, shown while the accordion is closed."""
     parts: list[str] = []
@@ -3591,8 +3843,8 @@ def _active_lever_summary(
         parts.append(f"Uptake {uptake_mode}")
     if eruc_on:
         parts.append("e-RUC on")
-    parts.append("Current 12c from Jul 2027" if fed_uplift_on else "Current 12c off")
-    parts.append("MBU26 12c from Jul 2027" if mbu_fed_uplift_on else "MBU26 12c off")
+    parts.append(f"Current: {FED_POLICY_LABELS[_normalise_fed_policy_state(fed_policy_state)]}")
+    parts.append(f"MBU26: {FED_POLICY_LABELS[_normalise_fed_policy_state(mbu_fed_policy_state)]}")
     return " · ".join(parts)
 
 
@@ -3731,28 +3983,50 @@ def _render_lever_accordion(
                     "Applied in this view only; the governed pack is unchanged."
                 )
     with lever_expander:
+        _session_fed_policy_state(
+            "revenue_outlook_fed_policy_state",
+            legacy_toggle_key="revenue_outlook_fed_uplift",
+        )
+        _session_fed_policy_state(
+            "revenue_outlook_mbu_fed_policy_state",
+            legacy_toggle_key="revenue_outlook_mbu_fed_uplift",
+        )
         st.markdown(
-            "<div class='page5-panel-title'>Policy switches</div><div class='page5-panel-sub'>The active 12c assumption now starts 1 July 2027 (six months later). The timing change is carried into the PED retail-price input and proportionately into Light and Heavy RUC rates. For Light and Heavy conventional RUC activity, diesel fuel cost and RUC charges are combined into one running cost per 1,000 km and the governed medium retail-diesel elasticity is applied once, avoiding a second full RUC-ratio shock. BEV/PHEV kilometres stay fixed because no approved class-specific RUC-charge elasticity is available, while their RUC rates and collections still change. Switch the policy independently for current scenarios and the MBU26 comparator; OFF removes the uplift entirely.</div>",
+            "<div class='page5-panel-title'>12c FED / proportional RUC policy</div><div class='page5-panel-sub'>Choose the original 1 January 2027 start, the six-month deferral to 1 July 2027, or no 12c uplift. The choice is carried into the PED retail-price input and proportionately into Light and Heavy RUC rates. Conventional RUC activity responds once to combined diesel-plus-RUC running cost; BEV/PHEV kilometres stay fixed because no approved class-specific charge elasticity is available. Current scenarios and MBU26 can be selected independently.</div>",
             unsafe_allow_html=True,
         )
-        policy_cols = st.columns([0.30, 0.30, 0.40])
+        policy_cols = st.columns([0.34, 0.34, 0.32])
         with policy_cols[0]:
-            fed_uplift_on = st.toggle(
-                "Current: 12c from Jul 2027",
-                key="revenue_outlook_fed_uplift",
+            fed_policy_state = st.selectbox(
+                "Current 12c policy",
+                list(FED_POLICY_OPTIONS),
+                format_func=lambda state: FED_POLICY_LABELS[str(state)],
+                key="revenue_outlook_fed_policy_state",
                 help=(
-                    FED_UPLIFT_DELAY_NOTE
-                    + " ON uses the delayed path; OFF uses no uplift. Scope: Base, High population "
-                    "and all Low/Medium/High conflict traces, including their modelled activity response."
+                    "Scope: Base, High population and all Low/Medium/High conflict traces, including "
+                    "their modelled activity response. Original timing starts 1 Jan 2027; deferred starts "
+                    "1 Jul 2027; no uplift removes the 12c step entirely."
                 ),
-                **_widget_default_kwargs("revenue_outlook_fed_uplift", value=True),
+                **_widget_default_kwargs(
+                    "revenue_outlook_fed_policy_state",
+                    index=FED_POLICY_OPTIONS.index(FED_POLICY_DELAYED_6M),
+                ),
             )
         with policy_cols[1]:
-            mbu_fed_uplift_on = st.toggle(
-                "MBU26: 12c from Jul 2027",
-                key="revenue_outlook_mbu_fed_uplift",
-                help=FED_UPLIFT_DELAY_NOTE + " ON uses the delayed path; OFF uses no uplift. Scope: MBU26 comparator only; the published source pack is never overwritten.",
-                **_widget_default_kwargs("revenue_outlook_mbu_fed_uplift", value=True),
+            mbu_fed_policy_state = st.selectbox(
+                "MBU26 12c policy",
+                list(FED_POLICY_OPTIONS),
+                format_func=lambda state: FED_POLICY_LABELS[str(state)],
+                key="revenue_outlook_mbu_fed_policy_state",
+                help=(
+                    "Scope: MBU26 comparator only. The published source pack is never overwritten. "
+                    "Original timing starts 1 Jan 2027; deferred starts 1 Jul 2027; no uplift removes "
+                    "the 12c step entirely."
+                ),
+                **_widget_default_kwargs(
+                    "revenue_outlook_mbu_fed_policy_state",
+                    index=FED_POLICY_OPTIONS.index(FED_POLICY_DELAYED_6M),
+                ),
             )
         with policy_cols[2]:
             eruc_enabled = st.toggle(
@@ -3798,8 +4072,8 @@ def _render_lever_accordion(
         "custom_ev_levers": custom_ev_levers,
         "eruc_enabled": eruc_enabled,
         "eruc_levers": eruc_lever_values,
-        "fed_uplift_on": fed_uplift_on,
-        "mbu_fed_uplift_on": mbu_fed_uplift_on,
+        "fed_policy_state": fed_policy_state,
+        "mbu_fed_policy_state": mbu_fed_policy_state,
     }
 
 
@@ -3857,8 +4131,14 @@ def _compare_mode_lever_state(selected_metric_type: str) -> dict[str, Any]:
             float(st.session_state.get("eruc_lever_elasticity", -0.15)),
             float(st.session_state.get("eruc_lever_pump", 2.70)),
         )
-    fed_uplift_on = bool(st.session_state.get("revenue_outlook_fed_uplift", True))
-    mbu_fed_uplift_on = bool(st.session_state.get("revenue_outlook_mbu_fed_uplift", True))
+    fed_policy_state = _session_fed_policy_state(
+        "revenue_outlook_fed_policy_state",
+        legacy_toggle_key="revenue_outlook_fed_uplift",
+    )
+    mbu_fed_policy_state = _session_fed_policy_state(
+        "revenue_outlook_mbu_fed_policy_state",
+        legacy_toggle_key="revenue_outlook_mbu_fed_uplift",
+    )
     return {
         "fleet": _level("revenue_outlook_sensitivity_fleet_efficiency"),
         "pt": _level("revenue_outlook_sensitivity_pt_mode_shift"),
@@ -3870,8 +4150,8 @@ def _compare_mode_lever_state(selected_metric_type: str) -> dict[str, Any]:
         "custom_ev_levers": custom_ev_levers,
         "eruc_enabled": eruc_enabled,
         "eruc_levers": eruc_levers,
-        "fed_uplift_on": fed_uplift_on,
-        "mbu_fed_uplift_on": mbu_fed_uplift_on,
+        "fed_policy_state": fed_policy_state,
+        "mbu_fed_policy_state": mbu_fed_policy_state,
     }
 
 
@@ -3962,7 +4242,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             )
         selected_metric_type = _revenue_outlook_series_metric_type(chart_rows, selected_stream)
         # Rows carry the planned path; the 12c counterfactual is a display
-        # reprice handled by the policy toggle in the lever accordion.
+        # reprice handled by the policy selector in the lever accordion.
         selected_fed_path = fed_path_options[default_fed_index] if fed_path_options else ""
         selected_trace_defaults = _revenue_outlook_default_traces(trace_options)
         if compare_mode:
@@ -4058,16 +4338,16 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     custom_ev_levers = lever_state["custom_ev_levers"]
     eruc_enabled = lever_state["eruc_enabled"]
     eruc_lever_values = lever_state["eruc_levers"]
-    fed_uplift_on = lever_state["fed_uplift_on"]
-    mbu_fed_uplift_on = lever_state["mbu_fed_uplift_on"]
+    fed_policy_state = _normalise_fed_policy_state(lever_state["fed_policy_state"])
+    mbu_fed_policy_state = _normalise_fed_policy_state(lever_state["mbu_fed_policy_state"])
     lever_summary = _active_lever_summary(
         fleet=selected_fleet_efficiency,
         pt_shift=selected_pt_mode_shift,
         freight=selected_freight_rail_shift,
         uptake_mode=selected_ev_uptake_mode,
         eruc_on=eruc_enabled,
-        fed_uplift_on=fed_uplift_on,
-        mbu_fed_uplift_on=mbu_fed_uplift_on,
+        fed_policy_state=fed_policy_state,
+        mbu_fed_policy_state=mbu_fed_policy_state,
     )
     if lever_summary:
         if compare_mode:
@@ -4078,8 +4358,8 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         selected_ev_uptake_mode,
         custom_ev_levers,
         eruc_lever_values,
-        0 if fed_uplift_on else 1,
-        0 if mbu_fed_uplift_on else 1,
+        fed_policy_state,
+        mbu_fed_policy_state,
     )
     sensitivity_key = selected_sensitivity_key(
         fleet_efficiency=selected_fleet_efficiency,
@@ -4174,24 +4454,33 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         if view.get("ev_uptake_applied"):
             total_path_notes.append(
                 f"EV/PHEV uptake basis: {selected_ev_uptake_mode}. Light RUC conventional/BEV/PHEV km and "
-                "revenue lines (plus dependent rollups) are reallocated in this view with lever share curves; "
+                "revenue lines are reallocated with the lever share curves; light-petrol VKT, PED litres and "
+                "PED/FED revenue move together on the matching petrol-retention curve (plus dependent rollups); "
                 "the governed pack is unchanged. " + VFM_SOURCE_NOTE
             )
         if view.get("eruc_applied"):
             total_path_notes.append(ERUC_NOTE)
-        if view.get("current_fed_uplift_off"):
-            total_path_notes.append(
-                "Current Base, High population and Middle East conflict traces: " + FED_UPLIFT_NOTE
-            )
-        else:
-            total_path_notes.append(
-                "Current Base, High population and Middle East conflict traces: "
-                + FED_UPLIFT_DELAY_NOTE
-            )
-        if view.get("mbu26_fed_uplift_off"):
-            total_path_notes.append("MBU26 official comparator trace: " + FED_UPLIFT_NOTE)
-        else:
-            total_path_notes.append("MBU26 comparator trace: " + FED_UPLIFT_DELAY_NOTE)
+        active_current_policy = _normalise_fed_policy_state(
+            view.get("current_fed_policy_state", fed_policy_state)
+        )
+        active_mbu_policy = _normalise_fed_policy_state(
+            view.get("mbu26_fed_policy_state", mbu_fed_policy_state)
+        )
+        total_path_notes.append(
+            "Current Base, High population and Middle East conflict traces: "
+            + FED_POLICY_NOTES[active_current_policy]
+        )
+        total_path_notes.append(
+            "MBU26 official comparator trace: " + FED_POLICY_NOTES[active_mbu_policy]
+        )
+        total_path_notes.append(
+            "Macro basis: current Base and High-population paths use the Treasury "
+            "BEFU26 quarterly real-GDP forecast and June population anchors; PED "
+            "uses the implied real GDP per capita, while Light and Heavy RUC use "
+            "the same aggregate-GDP path. Middle East fuel paths add a one-way "
+            "fuel-to-GDP overlay calibrated to Treasury's published 2027Q1 GDP "
+            "gaps. GDP assumptions never synthesize or alter a fuel-price path."
+        )
         selected_conflict_traces = [
             trace for trace in CONFLICT_TRACE_NAMES if trace in selected_traces
         ]
@@ -4220,6 +4509,13 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 "The committed Low, Medium and High nominal price paths are converted to ratios "
                 "against their nominal base paths, then applied to the model's real petrol and "
                 "diesel inputs. Petrol drives PED; diesel drives Light and Heavy RUC activity."
+            )
+            st.caption(
+                "The baseline macro path is Treasury BEFU26. Conflict fuel severity also selects "
+                "a one-way Treasury-calibrated GDP path: Medium is 1.5% below Base and High is "
+                "3.1% below Base at 2027Q1, with Low derived from the governed fuel-severity "
+                "curve. The direction is intentionally asymmetric—changing GDP alone does not "
+                "rewrite petrol or diesel prices."
             )
             st.caption(
                 "The conflict path does not directly increase RUC tax rates. The separate 12c "
@@ -4550,7 +4846,9 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                     key="revenue_outlook_migration_allocation_mode",
                 )
                 info_panel(
-                    "EV/PHEV uptake is allocated between PED/light-petrol and total Light RUC to match MBU proportions; it is not a new model."
+                    "Governance audit only: these rows compare candidate PED-Light migration allocations. "
+                    "The visible default path uses the selected raw PED bridge followed by the MoT VFM Base "
+                    "retention overlay, which scales light-petrol VKT, PED litres and PED/FED revenue together."
                 )
                 drift_view, drift_display = cached_revenue_outlook_ev_phev_drift_view(
                     pack_signature,
@@ -4580,7 +4878,8 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                     "Legacy continuity view: MBU26 Light RUC split/rate rows and old fixed-add-on comparators are retained for governance review."
                 )
                 st.caption(
-                    "The active current-finalist path is the PED-Light migration audit above. BEV/PHEV are not fixed add-ons."
+                    "The visible current-finalist path uses raw PED bridge + MoT VFM Base retention. "
+                    "BEV/PHEV are not fixed add-ons; this legacy split table is retained for audit only."
                 )
                 if target_audit:
                     st.caption(f"Target semantics status: {target_audit.get('status', '')}. Allocation status: {allocation_status}.")
@@ -4719,7 +5018,9 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             )
             chart_card(
                 "Activity and volume outlook",
-                "PED uses VKT per capita; Light and Heavy RUC use net kilometres. Actuals end at FY2025.",
+                "Light-petrol VKT and PED litres share one aligned petrol-activity lineage; "
+                "PED VKT per capita is retained as its demand driver. Light and Heavy RUC use "
+                "net kilometres. Actuals end at FY2025.",
                 activity_figure,
                 caption="Forecast start and H13 markers are shown where numeric reviewed forecasts exist. Units are kept separate by stream.",
                 notes_as_tooltip=False,
@@ -4741,7 +5042,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     chart_card(
         "Effective rates per 1,000 km",
         RATE_CHART_NOTE,
-        cached_revenue_rate_paths_figure(pack_signature, fed_uplift_on, pack.revenue_chart_rows),
+        cached_revenue_rate_paths_figure(pack_signature, fed_policy_state, pack.revenue_chart_rows),
         caption=None,
         notes_as_tooltip=True,
     )
@@ -4783,9 +5084,11 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             export_cols = st.columns([0.76, 0.24])
             with export_cols[0]:
                 st.caption(
-                    "Download the exact FY2026-FY2030 Net FED, Net RUC and Net MVR comparison for the "
-                    "Low, Medium and High Middle East paths under the six-month-deferred and no-uplift "
-                    "12c policy states. The deferred paths "
+                    "Download the exact FY2026-FY2030 Net FED, Net RUC and Net MVR comparison for Base "
+                    "and the Low, Medium and High Middle East paths under original 1 January 2027 timing, "
+                    "the six-month deferral to 1 July 2027, and no 12c uplift. FY2027 is the year ending "
+                    "June 2027, so deferred and no-uplift are intentionally equal in FY2027; original timing "
+                    "differs because it applies for January-June 2027. The policy paths "
                     "carry the FED wedge into PED retail prices, apply the FED-rate percentage change to "
                     "Light/Heavy RUC rates and all five RUC collection classes, and apply the governed medium "
                     "retail-diesel elasticity once to a combined diesel-plus-RUC running-cost ratio for conventional "
@@ -6550,6 +6853,7 @@ def _revenue_outlook_stream_options(chart_rows: pd.DataFrame) -> list[str]:
     if label_column not in chart_rows.columns:
         return []
     preferred = [
+        "Light petrol VKT",
         "PED VKT per capita",
         "PED volume",
         "Light RUC net km",
@@ -6570,6 +6874,11 @@ def _revenue_outlook_stream_options(chart_rows: pd.DataFrame) -> list[str]:
     if "plot_allowed" in data.columns:
         data = data[data["plot_allowed"].fillna(True).astype(bool)].copy()
     available = set(data[label_column].dropna().astype(str))
+    # The governed raw/optimized bridge materializes this annual series at
+    # runtime from the PED audit, so it is intentionally absent from the
+    # immutable chart-row pack but must remain directly selectable.
+    if {"PED VKT per capita", "PED volume"}.issubset(available):
+        available.add("Light petrol VKT")
     ordered = [label for label in preferred if label in available]
     ordered.extend(sorted(available.difference(ordered)))
     return ordered
@@ -6584,6 +6893,8 @@ def _revenue_outlook_series_display_label(label: Any) -> str:
 
 
 def _revenue_outlook_series_metric_type(chart_rows: pd.DataFrame, selected_series: str) -> str:
+    if str(selected_series) == "Light petrol VKT":
+        return "activity"
     if chart_rows is None or chart_rows.empty:
         return ""
     label_column = "series_label" if "series_label" in chart_rows.columns else "stream_label"
@@ -6646,7 +6957,7 @@ def _comparison_scenario_defaults(prefix: str) -> dict[str, Any]:
         "pt": "Off",
         "freight": "Off",
         "eruc": False,
-        "fed": True,
+        "fed_policy": FED_POLICY_DELAYED_6M,
     }
 
 
@@ -6654,7 +6965,10 @@ def _render_comparison_scenario_column(prefix: str, sensitivity_labels: dict[str
     defaults = _comparison_scenario_defaults(prefix)
     uptake_options = [mode for mode in EV_UPTAKE_MODE_OPTIONS if mode != EV_UPTAKE_CUSTOM_OPTION]
     uptake_options.append(COMPARISON_MOT_OFFICIAL_OPTION)
-    keys = {name: f"ro_cmp_{prefix}_{name}" for name in ["uptake", "fleet", "pt", "freight", "eruc", "fed"]}
+    keys = {
+        name: f"ro_cmp_{prefix}_{name}"
+        for name in ["uptake", "fleet", "pt", "freight", "eruc", "fed_policy"]
+    }
     _validated_select_state(keys["uptake"], uptake_options, defaults["uptake"])
     st.session_state.setdefault(keys["uptake"], defaults["uptake"])
     uptake = st.selectbox(
@@ -6668,7 +6982,7 @@ def _render_comparison_scenario_column(prefix: str, sensitivity_labels: dict[str
     )
     mot_official = uptake == COMPARISON_MOT_OFFICIAL_OPTION
     if mot_official:
-        st.caption("Pure MBU26 official path - non-rate levers locked; the 12c rate switch remains available.")
+        st.caption("Pure MBU26 official path - non-rate levers locked; the three-state 12c policy selector remains available.")
     levels = list(_COMPARISON_SENSITIVITY_LEVELS)
     for name in ("fleet", "pt", "freight"):
         _validated_select_state(keys[name], levels, defaults[name])
@@ -6696,20 +7010,42 @@ def _render_comparison_scenario_column(prefix: str, sensitivity_labels: dict[str
             elasticity = st.number_input("VKT elasticity", min_value=-1.0, max_value=0.0, value=-0.15, step=0.05, key=f"ro_cmp_{prefix}_eruc_elasticity")
             pump = st.number_input("Pump price ($/L incl. excise)", min_value=1.0, max_value=6.0, value=2.70, step=0.05, key=f"ro_cmp_{prefix}_eruc_pump")
         eruc_values = (float(start), float(phase), ratio / 100.0, float(elasticity), float(pump))
-    st.session_state.setdefault(keys["fed"], defaults["fed"])
-    fed_label = "MBU26: 12c from Jul 2027" if mot_official else "Current: 12c from Jul 2027"
+    _validated_select_state(
+        keys["fed_policy"],
+        list(FED_POLICY_OPTIONS),
+        defaults["fed_policy"],
+    )
+    st.session_state.setdefault(keys["fed_policy"], defaults["fed_policy"])
+    fed_label = "MBU26 12c policy" if mot_official else "Current 12c policy"
     fed_scope = "MBU26 official comparator only." if mot_official else "Selected current scenario only."
-    fed_on = st.toggle(
+    fed_policy_state = st.selectbox(
         fed_label,
-        key=keys["fed"],
-        help=FED_UPLIFT_DELAY_NOTE + " ON uses the delayed path; OFF uses no uplift. Scope: " + fed_scope,
+        list(FED_POLICY_OPTIONS),
+        format_func=lambda state: FED_POLICY_LABELS[str(state)],
+        key=keys["fed_policy"],
+        help=(
+            "Original timing starts 1 Jan 2027; deferred starts 1 Jul 2027; "
+            "no uplift removes the 12c step entirely. Scope: " + fed_scope
+        ),
     )
     if mot_official:
         sensitivity_key = selected_sensitivity_key("Off", "Off", "Off", freight_rail_shift="Off")
-        ev_uptake_key: tuple[Any, ...] = (EV_UPTAKE_GOVERNED_OPTION, (), (), 0, 0 if fed_on else 1)
+        ev_uptake_key: tuple[Any, ...] = (
+            EV_UPTAKE_GOVERNED_OPTION,
+            (),
+            (),
+            FED_POLICY_PUBLISHED,
+            fed_policy_state,
+        )
         return sensitivity_key, ev_uptake_key
     sensitivity_key = selected_sensitivity_key(fleet, pt_shift, "Off", freight_rail_shift=freight)
-    ev_uptake_key = (uptake, (), eruc_values, 0 if fed_on else 1, 0)
+    ev_uptake_key = (
+        uptake,
+        (),
+        eruc_values,
+        fed_policy_state,
+        FED_POLICY_PUBLISHED,
+    )
     return sensitivity_key, ev_uptake_key
 
 
@@ -6731,7 +7067,10 @@ def _copy_page_settings_to_scenario_a() -> None:
         freight_level = candidate if candidate in _COMPARISON_SENSITIVITY_LEVELS else "Med"
     st.session_state["ro_cmp_a_freight"] = freight_level
     st.session_state["ro_cmp_a_eruc"] = bool(st.session_state.get("revenue_outlook_eruc_toggle", False))
-    st.session_state["ro_cmp_a_fed"] = bool(st.session_state.get("revenue_outlook_fed_uplift", True))
+    st.session_state["ro_cmp_a_fed_policy"] = _session_fed_policy_state(
+        "revenue_outlook_fed_policy_state",
+        legacy_toggle_key="revenue_outlook_fed_uplift",
+    )
 
 
 def _scenario_summary_text(sensitivity_key: tuple, ev_uptake_key: tuple) -> str:
@@ -6742,15 +7081,11 @@ def _scenario_summary_text(sensitivity_key: tuple, ev_uptake_key: tuple) -> str:
             parts.append(f"{label} {value}")
     if len(ev_uptake_key) > 2 and ev_uptake_key[2]:
         parts.append("e-RUC on")
-    current_off, mbu26_off = _fed_uplift_off_scope(ev_uptake_key)
-    if mode == EV_UPTAKE_GOVERNED_OPTION and mbu26_off:
-        parts.append("MBU26 12c off")
-    elif mode == EV_UPTAKE_GOVERNED_OPTION:
-        parts.append("MBU26 12c from Jul 2027")
-    elif mode != EV_UPTAKE_GOVERNED_OPTION and current_off:
-        parts.append("Current 12c off")
+    current_state, mbu26_state = _fed_policy_state_scope(ev_uptake_key)
+    if mode == EV_UPTAKE_GOVERNED_OPTION:
+        parts.append(f"MBU26: {FED_POLICY_LABELS[mbu26_state]}")
     else:
-        parts.append("Current 12c from Jul 2027")
+        parts.append(f"Current: {FED_POLICY_LABELS[current_state]}")
     return " · ".join(parts)
 
 
@@ -7242,21 +7577,35 @@ def _scenario_npv_component_bridge_figure(
 
 
 @st.cache_data(show_spinner=False, max_entries=8)
-def cached_fleet_mix_frame(source: str, signature: tuple[float, ...]) -> pd.DataFrame:
+def cached_fleet_mix_frame(
+    source: str,
+    signature: tuple[tuple[str, int, int], ...],
+) -> pd.DataFrame:
     del signature
     from model_dashboard.fleet_mix import load_source_frame
 
     return load_source_frame(Path(__file__).resolve().parent, source)
 
 
-def _fleet_mix_signature() -> tuple[float, ...]:
+def _fleet_mix_signature() -> tuple[tuple[str, int, int], ...]:
+    from model_dashboard.engine import engine_revenue_outlook_dir
+
     repo_root = Path(__file__).resolve().parent
-    paths = [
+    static_paths = [
         repo_root / "data" / "revenue_model_source_pack" / "mbu26_annual_spine" / "mbu26_official_annual.csv",
         repo_root / "data" / "vfm_202405" / "vfm_vkt_shares.csv",
-        repo_root / "data" / "engine_ar1" / "current_revenue_outlook" / "revenue_chart_rows.csv",
     ]
-    return tuple(path.stat().st_mtime if path.exists() else 0.0 for path in paths)
+    signature: list[tuple[str, int, int]] = []
+    for path in static_paths:
+        try:
+            stat = path.stat()
+        except OSError:
+            signature.append((path.as_posix(), 0, 0))
+            continue
+        signature.append((path.as_posix(), int(stat.st_size), int(stat.st_mtime_ns)))
+    pack_dir = repo_root / engine_revenue_outlook_dir("ar1")
+    signature.extend(revenue_outlook_signature(pack_dir, repo_root))
+    return tuple(signature)
 
 
 def _render_fleet_mix_explorer() -> None:
@@ -7265,6 +7614,7 @@ def _render_fleet_mix_explorer() -> None:
     of all road travel and 6.1% of the light RUC pool, and mixing those
     silently is how trust dies."""
     from model_dashboard.fleet_mix import (
+        DASHBOARD_SOURCE,
         DENOMINATORS,
         MBU26_SOURCE,
         METRIC_KM,
@@ -7365,40 +7715,65 @@ def _render_fleet_mix_explorer() -> None:
         if source == MBU26_SOURCE:
             st.caption("MBU26 covers FY2001-FY2050 (actuals then official forecast). The VFM scenarios and the "
                        "dashboard pack cover the forecast era, FY2025-FY2050.")
+        elif source == DASHBOARD_SOURCE:
+            st.caption(
+                "Dashboard Base uses the raw PED bridge followed by the MoT VFM Base "
+                "petrol-retention overlay, with the FY2025 MBU26 actual as the common anchor. "
+                "Light-petrol VKT, PED litres and FED revenue therefore share one volume lineage "
+                "before policy-price, e-RUC and conflict-price responses."
+            )
 
 
 @st.cache_data(show_spinner=False, max_entries=6)
 def cached_revenue_rate_paths_figure(
     signature: tuple[tuple[str, int, int], ...],
-    fed_uplift_on: bool,
+    fed_policy_state: str,
     _chart_rows: pd.DataFrame,
 ) -> go.Figure:
     del signature
     frame = rate_paths_frame(Path(__file__).resolve().parent, _chart_rows)
-    return revenue_rate_paths_figure(frame, fed_uplift_on=fed_uplift_on)
+    return revenue_rate_paths_figure(frame, fed_policy_state=fed_policy_state)
 
 
-def revenue_rate_paths_figure(frame: pd.DataFrame, *, fed_uplift_on: bool) -> go.Figure:
+def revenue_rate_paths_figure(frame: pd.DataFrame, *, fed_policy_state: str) -> go.Figure:
     if frame is None or frame.empty:
         return empty_figure("Rate paths are unavailable in the committed source tables.")
     fig = go.Figure()
-    selected_segment = "delayed_6m" if fed_uplift_on else "no_uplift"
-    alternative_segment = "no_uplift" if fed_uplift_on else "delayed_6m"
+    selected_state = _normalise_fed_policy_state(fed_policy_state)
+    selected_segment = {
+        FED_POLICY_PUBLISHED: "planned",
+        FED_POLICY_DELAYED_6M: "delayed_6m",
+        FED_POLICY_OFF: "no_uplift",
+    }[selected_state]
     segment_labels = {
-        "planned": "PED published timing (Jan 2027 reference)",
-        "delayed_6m": "PED 12c from Jul 2027 (selected)",
-        "no_uplift": "PED no 12c uplift",
+        "planned": "Original timing — 12c from Jan 2027",
+        "delayed_6m": "Deferred 6 months — 12c from Jul 2027",
+        "no_uplift": "No 12c FED / proportional RUC uplift",
     }
-    styles = [
-        ("Light RUC", selected_segment, "#006FAD", "solid", 2.4, "Light RUC, selected policy"),
-        ("Light RUC", "planned", "#8DBDD8", "dot", 1.4, "Light RUC, published timing"),
-        ("Heavy RUC", selected_segment, "#102A43", "solid", 2.4, "Heavy RUC, selected policy"),
-        ("Heavy RUC", "planned", "#94A3B8", "dot", 1.4, "Heavy RUC, published timing"),
-        ("PED (petrol excise)", "history", "#00843D", "solid", 2.4, "PED (petrol excise), actual"),
-        ("PED (petrol excise)", selected_segment, "#00843D", "dash", 2.4, segment_labels[selected_segment]),
-        ("PED (petrol excise)", alternative_segment, "#7FBF9E", "dot", 1.6, segment_labels[alternative_segment]),
-        ("PED (petrol excise)", "planned", "#B45309", "dashdot", 1.4, segment_labels["planned"]),
-    ]
+    segment_order = ("planned", "delayed_6m", "no_uplift")
+    styles = [("PED (petrol excise)", "history", "#00843D", "solid", 2.4, "PED, actual")]
+    for series, selected_color, reference_color in (
+        ("Light RUC", "#006FAD", "#8DBDD8"),
+        ("Heavy RUC", "#102A43", "#94A3B8"),
+        ("PED (petrol excise)", "#00843D", "#9ABFA8"),
+    ):
+        for segment in segment_order:
+            selected = segment == selected_segment
+            label = (
+                f"{series}, selected: {segment_labels[segment]}"
+                if selected
+                else f"{series}, reference: {segment_labels[segment]}"
+            )
+            styles.append(
+                (
+                    series,
+                    segment,
+                    selected_color if selected else reference_color,
+                    "solid" if selected else ("dash" if segment == "planned" else "dot"),
+                    2.6 if selected else 1.2,
+                    label,
+                )
+            )
     for series, segment, color, dash, width, label in styles:
         group = frame[frame["series"].eq(series)]
         if segment is not None:
@@ -7549,6 +7924,8 @@ def _quarterly_disaggregation_indicator_id(series_id: Any) -> str:
     sid = str(series_id or "")
     if sid in {"ped_vkt_per_capita", "light_ruc_net_km", "heavy_ruc_net_km"}:
         return ""
+    if sid == "light_petrol_vkt":
+        return "ped_vkt_per_capita"
     if sid.startswith(("ped", "gross_ped", "gross_fed", "net_fed", "fed")):
         return "ped_vkt_per_capita"
     if sid.startswith(("light", "phev")):

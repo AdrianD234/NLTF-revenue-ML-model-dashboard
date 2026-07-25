@@ -60,8 +60,10 @@ LEVER_SERIES_REVENUE = {
     "light_bev_ruc_net_revenue": ("bev", "light_bev_rate"),
     "phev_ruc_net_revenue": ("phev", "phev_rate"),
 }
-# PED family adjusted by the petrol-displacement retention curve.
-PED_ACTIVITY_SERIES = ("ped_vkt_per_capita", "ped_volume")
+# PED family adjusted by the petrol-displacement retention curve.  Keep the
+# explicit annual VKT leaf alongside its per-capita and litres counterparts
+# so every exported/displayed PED volume uses the same selected bridge.
+PED_ACTIVITY_SERIES = ("ped_vkt_per_capita", "light_petrol_vkt", "ped_volume")
 PED_REVENUE_SERIES = "gross_ped_revenue"
 # Heavy family: the finalist heavy total splits into conventional + BEV.
 HEAVY_KM_SERIES = "heavy_ruc_net_km"
@@ -592,8 +594,49 @@ def apply_uptake_levers_to_chart_rows(
         ped_factor = float(retention.get(fy, 1.0))
         if adjust_ped and ped_factor < 1.0:
             for series_id in PED_ACTIVITY_SERIES:
-                _scale_series(_labels_for(scenario, fy, series_id), ped_factor)
-            ped_revenue_delta = _scale_series(_labels_for(scenario, fy, PED_REVENUE_SERIES), ped_factor)
+                labels = _labels_for(scenario, fy, series_id)
+                _scale_series(labels, ped_factor)
+                if labels and "source_basis" in data.columns:
+                    source_basis = {
+                        "ped_vkt_per_capita": (
+                            "current-finalist PED activity × governed VFM "
+                            "petrol-retention overlay"
+                        ),
+                        "light_petrol_vkt": (
+                            "selected PED bridge light-petrol VKT × governed "
+                            "VFM petrol-retention overlay"
+                        ),
+                        "ped_volume": (
+                            "selected PED bridge light-petrol VKT × governed "
+                            "VFM petrol-retention overlay × governed "
+                            "litres/100km"
+                        ),
+                    }[series_id]
+                    data.loc[labels, "source_basis"] = source_basis
+                if labels and "formula" in data.columns:
+                    formula = {
+                        "ped_vkt_per_capita": (
+                            "baseline PED VKT per capita * VFM petrol-retention factor"
+                        ),
+                        "light_petrol_vkt": (
+                            "selected bridge light-petrol VKT * VFM petrol-retention factor"
+                        ),
+                        "ped_volume": (
+                            "aligned light-petrol VKT * governed litres per 100 km / 100"
+                        ),
+                    }[series_id]
+                    data.loc[labels, "formula"] = formula
+            revenue_labels = _labels_for(scenario, fy, PED_REVENUE_SERIES)
+            ped_revenue_delta = _scale_series(revenue_labels, ped_factor)
+            if revenue_labels and "source_basis" in data.columns:
+                data.loc[revenue_labels, "source_basis"] = (
+                    "aligned PED litres after the governed VFM "
+                    "petrol-retention overlay × governed PED rate"
+                )
+            if revenue_labels and "formula" in data.columns:
+                data.loc[revenue_labels, "formula"] = (
+                    "aligned PED volume * governed PED rate"
+                )
 
         # Heavy BEV split: MBU26 charges heavy BEVs the same per-km RUC, so
         # the split moves km/revenue out of the charted conventional heavy
