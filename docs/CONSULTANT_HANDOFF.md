@@ -1,5 +1,10 @@
 # Consultant handoff — the MoT-shape question
 
+> **Latest continuation (25 July 2026):** for the Treasury BEFU26 baseline,
+> Middle East conflict fuel/GDP scenarios, 12 c/L Original/Deferred/Off policy
+> matrix, reconciliation fixes and final validation, continue with
+> [`CONSULTANT_HANDOFF_TREASURY_CONFLICT_SCENARIOS_2026-07-25.md`](CONSULTANT_HANDOFF_TREASURY_CONFLICT_SCENARIOS_2026-07-25.md).
+
 **Repo:** https://github.com/AdrianD234/NLTF-revenue-ML-model-dashboard (branch `main`)
 **Prepared:** 11 July 2026
 **Scope of this document:** the line of work that connects our revenue model's EV/PHEV
