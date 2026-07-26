@@ -36,10 +36,9 @@ from .conflict_fuel_paths import (
 )
 from .forecast_imports import (
     BACKTEST_SUPPORTED_MAX_HORIZON,
-    FORECAST_HORIZON_ZONE_ACTUAL,
-    FORECAST_HORIZON_ZONE_EXTRAPOLATION,
-    FORECAST_HORIZON_ZONE_STRADDLE,
-    FORECAST_HORIZON_ZONE_VALIDATED,
+    FORECAST_HORIZON_ZONE_EXTENDED,
+    FORECAST_HORIZON_ZONE_MIXED,
+    FORECAST_HORIZON_ZONE_UNVALIDATED,
     LONG_RANGE_EXTRAPOLATION_WARNING,
     SCENARIO_ROLE_BASECASE,
     SCENARIO_ROLE_COMPARISON,
@@ -643,6 +642,21 @@ def load_revenue_outlook_pack(
 CURRENT_FINALIST_SCENARIO_ROLES = frozenset(
     {SCENARIO_ROLE_BASECASE, SCENARIO_ROLE_COMPARISON}
 )
+# Quarter counts per governed support state, exposed on every annual row so a
+# downloaded table carries the same support information as the chart.
+# Column name -> profile key.  "actual_quarters" is renamed because chart rows
+# already carry a string column of that name listing the quarter labels.
+HORIZON_ZONE_COUNT_FIELDS = {
+    "first_horizon": "first_horizon",
+    "last_horizon": "last_horizon",
+    "actual_quarters_in_year": "actual_quarters",
+    "quarters_backtest_supported": "quarters_backtest_supported",
+    "quarters_extended_evidence": "quarters_extended_evidence",
+    "quarters_unvalidated": "quarters_unvalidated",
+    "quarters_beyond_validated_horizon": "quarters_beyond_validated_horizon",
+    "share_beyond_validated_horizon": "share_beyond_validated_horizon",
+}
+HORIZON_ZONE_COUNT_COLUMNS = tuple(HORIZON_ZONE_COUNT_FIELDS)
 
 
 def _model_training_cutoff(manifest: dict[str, Any] | None) -> str:
@@ -693,12 +707,13 @@ def annotate_forecast_horizon_zones(
     for column, default in (
         ("horizon_zone", ""),
         ("horizon_zone_label", ""),
-        ("quarters_beyond_validated_horizon", pd.NA),
-        ("share_beyond_validated_horizon", pd.NA),
         ("horizon_validation_warning", ""),
     ):
         if column not in out.columns:
             out[column] = default
+    for column in HORIZON_ZONE_COUNT_COLUMNS:
+        if column not in out.columns:
+            out[column] = pd.NA
     if "horizon_scope" not in out.columns:
         out["horizon_scope"] = ""
 
@@ -719,32 +734,26 @@ def annotate_forecast_horizon_zones(
         .unique()
     }
     years = pd.to_numeric(out.loc[target, "june_year"], errors="coerce")
-    for field in (
-        "horizon_zone",
-        "horizon_zone_label",
-        "quarters_beyond_validated_horizon",
-        "share_beyond_validated_horizon",
-    ):
-        out.loc[target, field] = years.map(
+    field_by_column = {
+        "horizon_zone": "horizon_zone",
+        "horizon_zone_label": "horizon_zone_label",
+        "horizon_scope": "horizon_scope",
+        **HORIZON_ZONE_COUNT_FIELDS,
+    }
+    for column, field in field_by_column.items():
+        out.loc[target, column] = years.map(
             lambda value, field=field: profiles.get(int(value), {}).get(field)
             if pd.notna(value)
             else None
         )
     zone = out.loc[target, "horizon_zone"].astype(str)
-    # horizon_scope is the existing coarse hover field.  A straddling year gets
-    # its own value rather than being rounded to "H1-H12", which would claim
-    # backtest support for quarters that do not have it.
-    out.loc[target, "horizon_scope"] = zone.map(
-        {
-            FORECAST_HORIZON_ZONE_ACTUAL: "",
-            FORECAST_HORIZON_ZONE_VALIDATED: "H1-H12",
-            FORECAST_HORIZON_ZONE_STRADDLE: "H1-H12/H13+",
-            FORECAST_HORIZON_ZONE_EXTRAPOLATION: "H13+",
-        }
-    ).fillna("")
     out.loc[target, "horizon_validation_warning"] = np.where(
         zone.isin(
-            [FORECAST_HORIZON_ZONE_EXTRAPOLATION, FORECAST_HORIZON_ZONE_STRADDLE]
+            [
+                FORECAST_HORIZON_ZONE_EXTENDED,
+                FORECAST_HORIZON_ZONE_UNVALIDATED,
+                FORECAST_HORIZON_ZONE_MIXED,
+            ]
         ),
         LONG_RANGE_EXTRAPOLATION_WARNING,
         "",
@@ -6045,7 +6054,90 @@ def revenue_outlook_fan_tables(
         )
     _assert_no_structural_overlay_fan_bands(bands)
     availability = _fan_availability_frame(series, bands)
+    availability = _append_structural_overlay_fan_gaps(availability, chart_rows)
     return availability, bands
+
+
+INTERVAL_UNAVAILABLE_STRUCTURAL_OVERLAY = "unavailable_structural_overlay"
+
+
+def _append_structural_overlay_fan_gaps(
+    availability: pd.DataFrame,
+    chart_rows: pd.DataFrame,
+) -> pd.DataFrame:
+    """State overlay interval unavailability rather than silently omitting it.
+
+    An absent band is indistinguishable from an oversight. These rows say the
+    interval is withheld because every governed fan source describes the raw
+    fitted layer, which is not the layer the overlay scenario displays.
+    """
+
+    if availability is None or chart_rows is None or chart_rows.empty:
+        return availability
+    if "scenario_name" not in chart_rows.columns:
+        return availability
+    overlay = structural_overlay_scenario_ids()
+    present = sorted(
+        {
+            str(value)
+            for value in chart_rows["scenario_name"].dropna().astype(str).unique()
+            if str(value) in overlay
+        }
+    )
+    if not present:
+        return availability
+    out = availability.copy() if not availability.empty else pd.DataFrame()
+    if not out.empty:
+        if "scenario_name" not in out.columns:
+            out["scenario_name"] = ""
+        if "availability_status" not in out.columns:
+            out["availability_status"] = np.where(
+                out.get("available", pd.Series(False, index=out.index))
+                .fillna(False)
+                .astype(bool),
+                "available",
+                "governed_gap",
+            )
+    series_ids = sorted(
+        {
+            str(value)
+            for value in chart_rows.loc[
+                chart_rows["scenario_name"].astype(str).isin(present), "series_id"
+            ]
+            .dropna()
+            .astype(str)
+            .unique()
+            if str(value).strip()
+        }
+    )
+    rows = [
+        {
+            "series_id": series_id,
+            "series_label": series_id,
+            "fan_source": FAN_SOURCE_AUTO,
+            "scenario_name": scenario_name,
+            "available": False,
+            "availability_status": INTERVAL_UNAVAILABLE_STRUCTURAL_OVERLAY,
+            "reason": (
+                "Interval unavailable for structurally overlaid scenario. Every "
+                "governed fan source is derived from the raw fitted replay, which "
+                "is not the layer this scenario displays; a band drawn from it "
+                "would not be centred on the shown central value."
+            ),
+            "source_file": "",
+            "model_id": "",
+            "horizon_scope": "not_applicable",
+            "interpretation": (
+                "No probabilistic interval is published for governed structural "
+                "overlay scenarios."
+            ),
+        }
+        for scenario_name in present
+        for series_id in series_ids
+    ]
+    if not rows:
+        return out
+    return pd.concat([out, pd.DataFrame(rows)], ignore_index=True, sort=False)
 
 
 def _assert_no_structural_overlay_fan_bands(bands: pd.DataFrame) -> None:

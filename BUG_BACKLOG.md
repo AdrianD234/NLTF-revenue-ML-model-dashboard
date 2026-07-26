@@ -132,3 +132,18 @@ Backlog state for the Stage 1 Model Governance Dashboard Parquet refresh and vis
 - [x] Kept runtime model-state gaps in `forecast_run_manifest.json`, `forecast_capability_report.*`, and `forecast_validation_report.md` rather than adding unchecked dashboard backlog defects.
 
 No unchecked backlog items remain.
+
+## Known test-isolation issue (pre-existing, not a product defect)
+
+- `tests/test_streamlit_smoke.py::test_revenue_outlook_cloud_hides_debug_toggles_and_shows_full_composition`
+  times out at the 90-second Streamlit `AppTest` ceiling when run **in
+  isolation** on a cold cache, and passes when run as part of the full suite or
+  after other Streamlit tests have warmed the caches.
+  - Reproduced identically on unmodified `8431c61`, so it is not caused by the
+    structural-overlay or horizon-governance work.
+  - Symptom is a wall-clock timeout, not an assertion failure; no product
+    behaviour is implicated.
+  - Indicates cache/ordering/timing dependence in the test rather than in the
+    dashboard. Should be de-flaked by warming or raising the per-test timeout,
+    tracked separately from the current review branch.
+  - Clean-environment CI on the draft PR is the authoritative next check.

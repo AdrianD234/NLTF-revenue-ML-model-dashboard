@@ -32,26 +32,47 @@ TEMPLATE_FILENAME = "NLTF_forecast_input_template_20q.xlsx"
 #
 # The quarterly forecast rows already carry H1-H12 / H13+ scope, but the
 # decision-facing Revenue Outlook is aggregated to June years, and a June year
-# can straddle the end of the validated horizon.  Classifying at the fiscal-year
-# level is therefore its own governed step: FY2029 is half extrapolation and
-# FY2030 is entirely extrapolation, which is invisible if only the quarterly
-# rows are labelled.
+# can straddle a support boundary.  Classifying at the fiscal-year level is
+# therefore its own governed step: FY2029 is half beyond H12 and FY2030 is
+# entirely beyond it, which is invisible if only the quarterly rows are
+# labelled.
+#
+# Three governed support states, not two.  Collapsing everything past H12 into
+# one bucket would equate FY2030 - which has extended rolling-origin evidence
+# from scripts/evaluate_long_horizon_rolling_origin.py - with FY2035, which has
+# none at all.
+EXTENDED_EVIDENCE_MAX_HORIZON = 20
 FORECAST_HORIZON_ZONE_ACTUAL = "actual_or_nowcast"
 FORECAST_HORIZON_ZONE_VALIDATED = "backtest_supported_h1_h12"
-FORECAST_HORIZON_ZONE_STRADDLE = "straddles_validated_horizon_end"
-FORECAST_HORIZON_ZONE_EXTRAPOLATION = "long_range_extrapolation_h13_plus"
+FORECAST_HORIZON_ZONE_EXTENDED = "extended_conditional_evidence_h13_h20"
+FORECAST_HORIZON_ZONE_UNVALIDATED = "unvalidated_extrapolation_h21_plus"
+FORECAST_HORIZON_ZONE_MIXED = "mixed_horizon_support"
+# Retained for callers that predate the three-state split.
+FORECAST_HORIZON_ZONE_STRADDLE = FORECAST_HORIZON_ZONE_MIXED
+FORECAST_HORIZON_ZONE_EXTRAPOLATION = FORECAST_HORIZON_ZONE_UNVALIDATED
 LONG_RANGE_EXTRAPOLATION_WARNING = (
     "long-range extrapolation - not validated to the short-term standard"
 )
 FORECAST_HORIZON_ZONE_LABELS = {
     FORECAST_HORIZON_ZONE_ACTUAL: "Actual or nowcast quarters",
     FORECAST_HORIZON_ZONE_VALIDATED: "H1-H12 backtest-supported horizon",
-    FORECAST_HORIZON_ZONE_STRADDLE: (
-        "Straddles H12: part of this year is " + LONG_RANGE_EXTRAPOLATION_WARNING
+    FORECAST_HORIZON_ZONE_EXTENDED: (
+        "H13-H20 extended conditional evidence - thinner samples, "
+        + LONG_RANGE_EXTRAPOLATION_WARNING
     ),
-    FORECAST_HORIZON_ZONE_EXTRAPOLATION: (
-        "H13+ " + LONG_RANGE_EXTRAPOLATION_WARNING
+    FORECAST_HORIZON_ZONE_UNVALIDATED: (
+        "H21+ no extended evaluation evidence - " + LONG_RANGE_EXTRAPOLATION_WARNING
     ),
+    FORECAST_HORIZON_ZONE_MIXED: (
+        "Mixed horizon support across this year - part is "
+        + LONG_RANGE_EXTRAPOLATION_WARNING
+    ),
+}
+FORECAST_HORIZON_SCOPE_LABELS = {
+    FORECAST_HORIZON_ZONE_ACTUAL: "",
+    FORECAST_HORIZON_ZONE_VALIDATED: "H1-H12",
+    FORECAST_HORIZON_ZONE_EXTENDED: "H13-H20",
+    FORECAST_HORIZON_ZONE_UNVALIDATED: "H21+",
 }
 
 
@@ -72,46 +93,110 @@ def horizon_for_quarter(period: Any, model_training_cutoff: str) -> int | None:
     return target - cutoff
 
 
+def horizon_support_zone(
+    horizon: Any,
+    *,
+    backtest_supported_max_horizon: int = BACKTEST_SUPPORTED_MAX_HORIZON,
+    extended_evidence_max_horizon: int = EXTENDED_EVIDENCE_MAX_HORIZON,
+) -> str:
+    """Governed support state for one forecast horizon."""
+
+    value = int(horizon)
+    if value <= 0:
+        return FORECAST_HORIZON_ZONE_ACTUAL
+    if value <= backtest_supported_max_horizon:
+        return FORECAST_HORIZON_ZONE_VALIDATED
+    if value <= extended_evidence_max_horizon:
+        return FORECAST_HORIZON_ZONE_EXTENDED
+    return FORECAST_HORIZON_ZONE_UNVALIDATED
+
+
 def june_year_horizon_profile(
     june_year: Any,
     model_training_cutoff: str,
     *,
     backtest_supported_max_horizon: int = BACKTEST_SUPPORTED_MAX_HORIZON,
+    extended_evidence_max_horizon: int = EXTENDED_EVIDENCE_MAX_HORIZON,
 ) -> dict[str, Any]:
-    """Classify one June year against the validated backtest horizon."""
+    """Classify one June year across the three governed support states."""
 
+    empty = {
+        "horizon_zone": "",
+        "horizon_zone_label": "",
+        "horizon_scope": "",
+        "first_horizon": None,
+        "last_horizon": None,
+        "forecast_quarters": 0,
+        "actual_quarters": 0,
+        "quarters_backtest_supported": 0,
+        "quarters_extended_evidence": 0,
+        "quarters_unvalidated": 0,
+        "quarters_beyond_validated_horizon": 0,
+        "share_beyond_validated_horizon": 0.0,
+    }
     horizons = [
         horizon_for_quarter(period, model_training_cutoff)
         for period in june_year_quarters(june_year)
     ]
     if any(value is None for value in horizons):
-        return {
-            "horizon_zone": "",
-            "horizon_zone_label": "",
-            "first_horizon": None,
-            "last_horizon": None,
-            "forecast_quarters": 0,
-            "quarters_beyond_validated_horizon": 0,
-            "share_beyond_validated_horizon": 0.0,
-        }
-    forecast_horizons = [value for value in horizons if value > 0]
-    beyond = [value for value in forecast_horizons if value > backtest_supported_max_horizon]
-    if not forecast_horizons:
+        return empty
+    zones = [
+        horizon_support_zone(
+            value,
+            backtest_supported_max_horizon=backtest_supported_max_horizon,
+            extended_evidence_max_horizon=extended_evidence_max_horizon,
+        )
+        for value in horizons
+    ]
+    counts = {
+        FORECAST_HORIZON_ZONE_ACTUAL: zones.count(FORECAST_HORIZON_ZONE_ACTUAL),
+        FORECAST_HORIZON_ZONE_VALIDATED: zones.count(FORECAST_HORIZON_ZONE_VALIDATED),
+        FORECAST_HORIZON_ZONE_EXTENDED: zones.count(FORECAST_HORIZON_ZONE_EXTENDED),
+        FORECAST_HORIZON_ZONE_UNVALIDATED: zones.count(
+            FORECAST_HORIZON_ZONE_UNVALIDATED
+        ),
+    }
+    forecast_zones = [zone for zone in zones if zone != FORECAST_HORIZON_ZONE_ACTUAL]
+    if not forecast_zones:
         zone = FORECAST_HORIZON_ZONE_ACTUAL
-    elif not beyond:
-        zone = FORECAST_HORIZON_ZONE_VALIDATED
-    elif len(beyond) == len(horizons):
-        zone = FORECAST_HORIZON_ZONE_EXTRAPOLATION
+    elif len(set(zones)) == 1:
+        zone = zones[0]
+    elif len(set(forecast_zones)) == 1 and counts[FORECAST_HORIZON_ZONE_ACTUAL]:
+        # Part actual, part forecast, but the forecast half is one support
+        # state - report that state rather than the vaguer "mixed".
+        zone = forecast_zones[0]
     else:
-        zone = FORECAST_HORIZON_ZONE_STRADDLE
+        zone = FORECAST_HORIZON_ZONE_MIXED
+    if zone == FORECAST_HORIZON_ZONE_MIXED:
+        present = [
+            FORECAST_HORIZON_SCOPE_LABELS[state]
+            for state in (
+                FORECAST_HORIZON_ZONE_VALIDATED,
+                FORECAST_HORIZON_ZONE_EXTENDED,
+                FORECAST_HORIZON_ZONE_UNVALIDATED,
+            )
+            if counts[state]
+        ]
+        scope = "/".join(present)
+    else:
+        scope = FORECAST_HORIZON_SCOPE_LABELS[zone]
+    beyond = (
+        counts[FORECAST_HORIZON_ZONE_EXTENDED]
+        + counts[FORECAST_HORIZON_ZONE_UNVALIDATED]
+    )
     return {
         "horizon_zone": zone,
         "horizon_zone_label": FORECAST_HORIZON_ZONE_LABELS[zone],
+        "horizon_scope": scope,
         "first_horizon": min(horizons),
         "last_horizon": max(horizons),
-        "forecast_quarters": len(forecast_horizons),
-        "quarters_beyond_validated_horizon": len(beyond),
-        "share_beyond_validated_horizon": len(beyond) / len(horizons),
+        "forecast_quarters": len(forecast_zones),
+        "actual_quarters": counts[FORECAST_HORIZON_ZONE_ACTUAL],
+        "quarters_backtest_supported": counts[FORECAST_HORIZON_ZONE_VALIDATED],
+        "quarters_extended_evidence": counts[FORECAST_HORIZON_ZONE_EXTENDED],
+        "quarters_unvalidated": counts[FORECAST_HORIZON_ZONE_UNVALIDATED],
+        "quarters_beyond_validated_horizon": beyond,
+        "share_beyond_validated_horizon": beyond / len(horizons),
     }
 
 _FORECAST_SYMBOLS = {

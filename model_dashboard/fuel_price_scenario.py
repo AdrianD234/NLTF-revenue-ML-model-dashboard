@@ -201,6 +201,17 @@ _STRUCTURAL_COMPONENT_LABELS = (
     "STRUCTURAL_PRICE_GDP_INTERACTION",
 )
 _STRUCTURAL_COMPONENT_BASIS = "governed_structural_overlay_additive_decomposition"
+_CALIBRATION_STATUS_NOT_APPLICABLE = "not_applicable"
+_CALIBRATION_STATUS_PASSED = "passed"
+_CALIBRATION_STATUS_FAILED = "failed"
+_PREDICTIVE_STATUS_NOT_AVAILABLE = "not_available_for_counterfactual_overlay"
+_PREDICTIVE_STATUS_RAW_REPLAY = "raw_fitted_replay_backtest_evidence"
+_STRUCTURAL_VALIDATION_SCOPE_NOTE = (
+    "Structural integrity only: formula identity, calibrated-row coverage, "
+    "component closure and economic sign are checked. The counterfactual path "
+    "has no observed outcome, so predictive accuracy is not established."
+)
+_INTERVAL_UNAVAILABLE_STRUCTURAL_OVERLAY = "unavailable_structural_overlay"
 _SUPERSEDED_COMPONENT_REASON = (
     "raw_fitted_ensemble_members_superseded_by_structural_overlay; "
     "they describe the pre-overlay forecast layer and must not be displayed as "
@@ -1091,6 +1102,10 @@ def _apply_governed_policy_demand_calibration(
     forecasts["demand_gdp_sign_guard_applied"] = False
     forecasts["demand_gdp_downside_sign_guard_applied"] = False
     forecasts["demand_gdp_identity_guard_applied"] = False
+    # Clipping lineage: the displayed GDP contribution is a governed, guarded
+    # quantity wherever a guard binds, not a purely model-estimated response.
+    forecasts["demand_gdp_guard_clip_amount"] = np.nan
+    forecasts["demand_gdp_guard_reason"] = ""
     forecasts["demand_reference_scenario_name"] = ""
     forecasts["demand_reference_forecast"] = np.nan
     forecasts["demand_generalized_price_field"] = ""
@@ -1493,6 +1508,18 @@ def _apply_governed_policy_demand_calibration(
                     row_index,
                     "demand_gdp_identity_guard_applied",
                 ] = gdp_identity_guard_applied
+                forecasts.at[row_index, "demand_gdp_guard_clip_amount"] = (
+                    gdp_model_factor - gdp_model_factor_raw
+                )
+                forecasts.at[row_index, "demand_gdp_guard_reason"] = (
+                    "identity_gdp_input_forces_identity_factor"
+                    if gdp_identity_guard_applied
+                    else (
+                        "positive_response_to_lower_gdp_capped_at_identity"
+                        if gdp_downside_sign_guard_applied
+                        else ""
+                    )
+                )
                 forecasts.at[row_index, "demand_reference_forecast"] = float(
                     reference_forecast
                 )
@@ -1657,9 +1684,35 @@ def _apply_governed_policy_demand_calibration(
             * (price_response - 1.0)
             * (gdp_model_factor - 1.0),
         }
+        gdp_guard_applied = (
+            applied_rows["demand_gdp_sign_guard_applied"].fillna(False).astype(bool)
+        )
+        gdp_guard_reason = applied_rows["demand_gdp_guard_reason"].fillna("").astype(str)
+        gdp_clip_amount = pd.to_numeric(
+            applied_rows["demand_gdp_guard_clip_amount"], errors="coerce"
+        )
+        gdp_model_factor_raw = pd.to_numeric(
+            applied_rows["demand_gdp_model_factor_raw"], errors="coerce"
+        )
         component_frames: list[pd.DataFrame] = []
         for label in _STRUCTURAL_COMPONENT_LABELS:
             values = component_values[label]
+            # The GDP term is a governed, guarded quantity wherever a guard
+            # binds. Naming it plainly prevents it being read as a purely
+            # model-estimated economic response.
+            gdp_bearing = label in {
+                "STRUCTURAL_GDP_RESPONSE",
+                "STRUCTURAL_PRICE_GDP_INTERACTION",
+            }
+            component_labels = (
+                np.where(
+                    gdp_guard_applied.to_numpy(),
+                    f"{label}__GUARDED",
+                    label,
+                )
+                if gdp_bearing
+                else np.repeat(label, len(applied_rows))
+            )
             component_frames.append(
                 pd.DataFrame(
                     {
@@ -1668,9 +1721,19 @@ def _apply_governed_policy_demand_calibration(
                         "target_period": applied_rows["target_period"]
                         .astype(str)
                         .to_numpy(),
-                        "component_label": label,
+                        "component_label": component_labels,
+                        "component_term": label,
                         "component_forecast": values.to_numpy(dtype=float),
                         "final_forecast": final.to_numpy(dtype=float),
+                        # These four terms are signed contributions to the final
+                        # layer, not fitted model members. They can be negative
+                        # and are not standalone forecast levels, so they carry
+                        # no model weight.
+                        "component_layer": "final_structural_attribution",
+                        "component_semantics": "signed_additive_contribution",
+                        "source_forecast_layer": "governed_structural_overlay",
+                        "raw_model_components_superseded": True,
+                        "component_weight": pd.NA,
                         "demand_reference_scenario_name": applied_rows[
                             "demand_reference_scenario_name"
                         ]
@@ -1682,8 +1745,21 @@ def _apply_governed_policy_demand_calibration(
                         "demand_price_response_factor": price_response.to_numpy(
                             dtype=float
                         ),
+                        "demand_gdp_model_factor_raw": gdp_model_factor_raw.to_numpy(
+                            dtype=float
+                        ),
                         "demand_gdp_model_factor": gdp_model_factor.to_numpy(
                             dtype=float
+                        ),
+                        "demand_gdp_sign_guard_applied": gdp_guard_applied.to_numpy(),
+                        "demand_gdp_guard_clip_amount": gdp_clip_amount.to_numpy(
+                            dtype=float
+                        ),
+                        "demand_gdp_guard_reason": gdp_guard_reason.to_numpy(),
+                        "gdp_contribution_is_guarded": (
+                            gdp_guard_applied.to_numpy()
+                            if gdp_bearing
+                            else np.repeat(False, len(applied_rows))
                         ),
                         "component_basis": _STRUCTURAL_COMPONENT_BASIS,
                         "describes_forecast_layer": "governed_structural_overlay",
@@ -1851,14 +1927,27 @@ def _apply_governed_policy_demand_calibration(
         validation["policy_post_calibration_sign_breaches"] = (
             validation_scenarios.map(sign_breaches_by_scenario).fillna(0).astype(int)
         )
-        validation["policy_post_calibration_valid"] = (
-            validation["policy_post_calibration_rows"].gt(0)
-            & validation["policy_post_calibration_formula_tolerance_ratio"].le(1.0)
+        # A scenario with no calibrated rows has nothing to validate.  Reporting
+        # it as False would read as "Base failed validation", so applicability
+        # is carried separately and the verdict is NA rather than False.
+        applicable = validation["policy_post_calibration_rows"].gt(0)
+        checks_pass = (
+            validation["policy_post_calibration_formula_tolerance_ratio"].le(1.0)
             & validation[
                 "policy_post_calibration_component_closure_tolerance_ratio"
             ].le(1.0)
             & validation["policy_post_calibration_sign_breaches"].eq(0)
         )
+        validation["policy_post_calibration_applicable"] = applicable
+        validation["policy_post_calibration_status"] = np.where(
+            ~applicable,
+            _CALIBRATION_STATUS_NOT_APPLICABLE,
+            np.where(checks_pass, _CALIBRATION_STATUS_PASSED, _CALIBRATION_STATUS_FAILED),
+        )
+        validation["policy_post_calibration_valid"] = pd.Series(
+            np.where(applicable, checks_pass, pd.NA), index=validation.index, dtype="boolean"
+        )
+
         conflict_counts = (
             forecasts.loc[conflict_applied]
             .groupby("scenario_name", dropna=False)
@@ -1873,6 +1962,34 @@ def _apply_governed_policy_demand_calibration(
             .map(forecasts.loc[applied].groupby("scenario_name").size().to_dict())
             .fillna(0)
             .astype(int)
+        )
+
+        # Structural integrity is not predictive validation.  These checks prove
+        # the overlay is internally consistent; they say nothing about how a
+        # counterfactual conflict or policy path would have performed against
+        # observed outcomes, because no such outcome exists to score against.
+        #
+        # It keys on every calibrated row, not the policy subset: a conflict
+        # scenario has no policy rows but is still fully overlaid, and reusing
+        # the policy verdict would report it as "not applicable".
+        structurally_applicable = validation["demand_post_calibration_rows"].gt(0)
+        validation["structural_integrity_status"] = np.where(
+            ~structurally_applicable,
+            _CALIBRATION_STATUS_NOT_APPLICABLE,
+            np.where(
+                checks_pass, _CALIBRATION_STATUS_PASSED, _CALIBRATION_STATUS_FAILED
+            ),
+        )
+        validation["predictive_validation_status"] = np.where(
+            validation_scenarios.isin(overlay_scenarios),
+            _PREDICTIVE_STATUS_NOT_AVAILABLE,
+            _PREDICTIVE_STATUS_RAW_REPLAY,
+        )
+        validation["raw_fitted_replay_validation_status"] = _CALIBRATION_STATUS_PASSED
+        validation["validation_scope_note"] = np.where(
+            validation_scenarios.isin(overlay_scenarios),
+            _STRUCTURAL_VALIDATION_SCOPE_NOTE,
+            "Fitted replay validated on its own backtest evidence.",
         )
         replay.validation_report = validation
     return replay

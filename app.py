@@ -51,6 +51,10 @@ from model_dashboard.forecast_imports import (
     BACKTEST_SUPPORTED_MAX_HORIZON,
     FORECAST_BUILDER_NOTE,
     FORECAST_BUILDER_TITLE,
+    FORECAST_HORIZON_ZONE_EXTENDED,
+    FORECAST_HORIZON_ZONE_MIXED,
+    FORECAST_HORIZON_ZONE_UNVALIDATED,
+    FORECAST_HORIZON_ZONE_VALIDATED,
     FORECAST_RUNNER_IMPORT_ERROR,
     HORIZON_SUPPORT_NOTE,
     SCENARIO_ROLE_BASECASE,
@@ -4200,6 +4204,8 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     if chart_rows.empty:
         warning_panel("The promoted Revenue Outlook pack has no chart rows.")
         return
+
+    _render_forecast_horizon_support_note(chart_rows)
 
     timer.start("selector metadata")
     selector_options = cached_revenue_outlook_selectors(pack_signature, pack)
@@ -9577,6 +9583,126 @@ def _revenue_path_hover_customdata(rows: pd.DataFrame) -> Any:
             )
 
     return list(zip(horizon_hover, bridge_hover, scope_hover, efficiency_hover))
+
+
+def _forecast_horizon_support_note(chart_rows: pd.DataFrame) -> str:
+    """Persistent statement of which fiscal years are backtest-supported.
+
+    A hover only reaches a reader who hovers. The support boundary changes what
+    the number means, so it belongs on the page and in the exported columns as
+    well as in the tooltip.
+    """
+
+    if chart_rows is None or chart_rows.empty:
+        return ""
+    if "horizon_zone" not in chart_rows.columns or "june_year" not in chart_rows.columns:
+        return ""
+    rows = chart_rows[
+        chart_rows["horizon_zone"].fillna("").astype(str).str.len().gt(0)
+    ]
+    if rows.empty:
+        return ""
+    years = rows.drop_duplicates("june_year")
+    supported = pd.to_numeric(
+        years.loc[
+            years["horizon_zone"].astype(str).eq(FORECAST_HORIZON_ZONE_VALIDATED),
+            "june_year",
+        ],
+        errors="coerce",
+    ).dropna()
+    extended = pd.to_numeric(
+        years.loc[
+            years["horizon_zone"].astype(str).eq(FORECAST_HORIZON_ZONE_EXTENDED),
+            "june_year",
+        ],
+        errors="coerce",
+    ).dropna()
+    unvalidated = pd.to_numeric(
+        years.loc[
+            years["horizon_zone"].astype(str).eq(FORECAST_HORIZON_ZONE_UNVALIDATED),
+            "june_year",
+        ],
+        errors="coerce",
+    ).dropna()
+    mixed = pd.to_numeric(
+        years.loc[
+            years["horizon_zone"].astype(str).eq(FORECAST_HORIZON_ZONE_MIXED),
+            "june_year",
+        ],
+        errors="coerce",
+    ).dropna()
+
+    def span(values: pd.Series) -> str:
+        """Contiguous runs, so a gap is never papered over as one range."""
+
+        years = sorted({int(value) for value in values})
+        if not years:
+            return ""
+        runs: list[tuple[int, int]] = []
+        start = previous = years[0]
+        for year in years[1:]:
+            if year == previous + 1:
+                previous = year
+                continue
+            runs.append((start, previous))
+            start = previous = year
+        runs.append((start, previous))
+        return ", ".join(
+            f"FY{low}" if low == high else f"FY{low}-FY{high}" for low, high in runs
+        )
+
+    def verb(values: pd.Series, singular: str, plural: str) -> str:
+        return singular if len({int(value) for value in values}) == 1 else plural
+
+    parts: list[str] = []
+    if not supported.empty:
+        parts.append(
+            f"**{span(supported)}** {verb(supported, 'sits', 'sit')} inside the "
+            "backtest-supported H1-H12 horizon."
+        )
+    beyond = pd.concat([extended, unvalidated, mixed])
+    if not beyond.empty:
+        parts.append(
+            f"**{span(beyond)}** {verb(beyond, 'extends', 'extend')} past it: "
+            + "; ".join(
+                fragment
+                for fragment in (
+                    (
+                        f"{span(mixed)} {verb(mixed, 'mixes', 'mix')} support states"
+                        if not mixed.empty
+                        else ""
+                    ),
+                    (
+                        f"{span(extended)} {verb(extended, 'has', 'have')} H13-H20 "
+                        "extended conditional evidence only"
+                        if not extended.empty
+                        else ""
+                    ),
+                    (
+                        f"{span(unvalidated)} {verb(unvalidated, 'has', 'have')} no "
+                        "extended evaluation evidence at all"
+                        if not unvalidated.empty
+                        else ""
+                    ),
+                )
+                if fragment
+            )
+            + "."
+        )
+    if not parts:
+        return ""
+    parts.append(
+        "Years past H12 are long-range extrapolation, not validated to the "
+        "short-term standard. Every downloaded June-year row carries "
+        "`horizon_scope` and per-state quarter counts."
+    )
+    return " ".join(parts)
+
+
+def _render_forecast_horizon_support_note(chart_rows: pd.DataFrame) -> None:
+    note = _forecast_horizon_support_note(chart_rows)
+    if note:
+        warning_panel(note)
 
 
 def _revenue_horizon_zone_suffix(row: pd.Series) -> str:

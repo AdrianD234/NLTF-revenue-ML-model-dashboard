@@ -2074,7 +2074,7 @@ def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
         "fan_band_rows.parquet": "461917e6ca288f866adc9f5e1a96c1db44dc7490b68551286ddde11b925817f9",
         "future_revenue_forecasts.csv": "31bc0ab32312cfb37598ca0bcd7db7abbab89d259c6785b3a9787208c9bd2c05",
         "future_revenue_forecasts.parquet": "d90c4cc70776fe3ba572a9e960f36d6f36d9909b0a721fece9197776d0c8c4c8",
-        "manifest.json": "1b43c567d39db8e0720239007cb43652f532cabd14d64b205ec66b15246158bb",
+        "manifest.json": "cec1671265c136f3ae2696af4b69a68f54aafaa6fff3316b76462203d83c01ec",
         "manifest.md": "f76666a8af7cc3c4388ecd6c33533708ddd2b4e58d777db179c452bee6a6a523",
         "path_trace_status.csv": "9aee7a4e7003ec6541476ca3e4afef6d8586b6c358e41db1c8e06623e5ffcaa3",
         "path_trace_status.parquet": "e8d295393c0586167da97d2f0c054eb77419e8c9e4acf134198c0a5f53010eaa",
