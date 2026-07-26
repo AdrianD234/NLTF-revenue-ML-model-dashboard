@@ -36,8 +36,14 @@ from .conflict_fuel_paths import (
 )
 from .forecast_imports import (
     BACKTEST_SUPPORTED_MAX_HORIZON,
+    FORECAST_HORIZON_ZONE_ACTUAL,
+    FORECAST_HORIZON_ZONE_EXTRAPOLATION,
+    FORECAST_HORIZON_ZONE_STRADDLE,
+    FORECAST_HORIZON_ZONE_VALIDATED,
+    LONG_RANGE_EXTRAPOLATION_WARNING,
     SCENARIO_ROLE_BASECASE,
     SCENARIO_ROLE_COMPARISON,
+    june_year_horizon_profile,
     quarter_sort_key,
 )
 from .mbu26_source_spine import (
@@ -597,12 +603,20 @@ def load_revenue_outlook_pack(
     hash_errors = _validate_output_hashes(base, manifest)
     if hash_errors:
         raise ValueError("Revenue Outlook promoted pack failed hash validation: " + " ".join(hash_errors))
+    # Applied at load rather than baked into the pack: the committed parquet is
+    # hash-validated above, and the zone depends on the training cutoff, which
+    # moves whenever actuals are refreshed.
+    training_cutoff = _model_training_cutoff(manifest)
+    chart_rows = annotate_forecast_horizon_zones(
+        _read_optional_parquet(base / "revenue_chart_rows.parquet"),
+        model_training_cutoff=training_cutoff,
+    )
     return RevenueOutlookPack(
         output_dir=base,
         manifest=manifest,
         future_revenue_forecasts=_read_optional_parquet(base / "future_revenue_forecasts.parquet"),
         revenue_bridge_components=_read_optional_parquet(base / "revenue_bridge_components.parquet"),
-        revenue_chart_rows=_read_optional_parquet(base / "revenue_chart_rows.parquet"),
+        revenue_chart_rows=chart_rows,
         revenue_line_reconciliation=_read_optional_parquet(base / "revenue_line_reconciliation.parquet"),
         revenue_stack_components=_read_optional_parquet(base / "revenue_stack_components.parquet"),
         ev_phev_split_assumptions=_read_optional_parquet(base / "ev_phev_split_assumptions.parquet"),
@@ -624,6 +638,118 @@ def load_revenue_outlook_pack(
         fan_availability=_read_optional_parquet(base / "fan_availability.parquet"),
         fan_band_rows=_read_optional_parquet(base / "fan_band_rows.parquet"),
     )
+
+
+CURRENT_FINALIST_SCENARIO_ROLES = frozenset(
+    {SCENARIO_ROLE_BASECASE, SCENARIO_ROLE_COMPARISON}
+)
+
+
+def _model_training_cutoff(manifest: dict[str, Any] | None) -> str:
+    """Training cutoff the validated horizon is measured from.
+
+    Prefers the pack's own ``period_rule`` so an older pack is measured against
+    its own vintage, and otherwise falls back to the governed repository
+    constant.  The fallback is a declared value, not an inferred one; a cutoff
+    that cannot be parsed as a quarter fails closed, because a wrong cutoff
+    would mislabel which fiscal years are extrapolation.
+    """
+
+    period_rule = (manifest or {}).get("period_rule")
+    cutoff = (period_rule or {}).get("model_training_cutoff") if isinstance(period_rule, dict) else None
+    resolved = str(cutoff or "").strip() or str(REVENUE_MODEL_TRAINING_CUTOFF).strip()
+    try:
+        invalid = quarter_sort_key(resolved) >= 999999
+    except Exception:
+        invalid = True
+    if invalid:
+        raise ValueError(
+            "Revenue Outlook model training cutoff is not a canonical quarter: "
+            f"{resolved!r}. The validated forecast horizon cannot be established."
+        )
+    return resolved
+
+
+def annotate_forecast_horizon_zones(
+    chart_rows: pd.DataFrame,
+    *,
+    model_training_cutoff: str,
+) -> pd.DataFrame:
+    """Mark June-year current-finalist rows against the validated horizon.
+
+    Quarterly rows already carry H1-H12 / H13+ scope, but the Revenue Outlook
+    is read at June-year level, where the label was blank.  FY2030 is entirely
+    H13+ and FY2029 straddles H12, so an unmarked fiscal-year total invites the
+    reader to treat long-range extrapolation as a validated forecast.
+
+    Only current-finalist rows are marked.  The validated horizon describes
+    *this* model's backtests; MBU26 is an external comparator with its own
+    published error bands, and actual rows have no horizon at all.
+    """
+
+    if chart_rows is None or chart_rows.empty:
+        return chart_rows
+    out = chart_rows.copy()
+    for column, default in (
+        ("horizon_zone", ""),
+        ("horizon_zone_label", ""),
+        ("quarters_beyond_validated_horizon", pd.NA),
+        ("share_beyond_validated_horizon", pd.NA),
+        ("horizon_validation_warning", ""),
+    ):
+        if column not in out.columns:
+            out[column] = default
+    if "horizon_scope" not in out.columns:
+        out["horizon_scope"] = ""
+
+    june_year = out.get("time_grain", pd.Series("", index=out.index)).astype(str).eq(
+        "june_year"
+    )
+    current_finalist = out.get(
+        "scenario_role", pd.Series("", index=out.index)
+    ).astype(str).isin(CURRENT_FINALIST_SCENARIO_ROLES)
+    target = june_year & current_finalist
+    if not target.any():
+        return out
+
+    profiles = {
+        int(value): june_year_horizon_profile(value, model_training_cutoff)
+        for value in pd.to_numeric(out.loc[target, "june_year"], errors="coerce")
+        .dropna()
+        .unique()
+    }
+    years = pd.to_numeric(out.loc[target, "june_year"], errors="coerce")
+    for field in (
+        "horizon_zone",
+        "horizon_zone_label",
+        "quarters_beyond_validated_horizon",
+        "share_beyond_validated_horizon",
+    ):
+        out.loc[target, field] = years.map(
+            lambda value, field=field: profiles.get(int(value), {}).get(field)
+            if pd.notna(value)
+            else None
+        )
+    zone = out.loc[target, "horizon_zone"].astype(str)
+    # horizon_scope is the existing coarse hover field.  A straddling year gets
+    # its own value rather than being rounded to "H1-H12", which would claim
+    # backtest support for quarters that do not have it.
+    out.loc[target, "horizon_scope"] = zone.map(
+        {
+            FORECAST_HORIZON_ZONE_ACTUAL: "",
+            FORECAST_HORIZON_ZONE_VALIDATED: "H1-H12",
+            FORECAST_HORIZON_ZONE_STRADDLE: "H1-H12/H13+",
+            FORECAST_HORIZON_ZONE_EXTRAPOLATION: "H13+",
+        }
+    ).fillna("")
+    out.loc[target, "horizon_validation_warning"] = np.where(
+        zone.isin(
+            [FORECAST_HORIZON_ZONE_EXTRAPOLATION, FORECAST_HORIZON_ZONE_STRADDLE]
+        ),
+        LONG_RANGE_EXTRAPOLATION_WARNING,
+        "",
+    )
+    return out
 
 
 def validate_promotable_comparison(comparison: ForecastScenarioComparisonResult) -> list[str]:

@@ -28,6 +28,92 @@ SCENARIO_ROLE_COMPARISON = "comparison"
 SCENARIO_ROLE_OPTIONS = (SCENARIO_ROLE_BASECASE, SCENARIO_ROLE_COMPARISON)
 TEMPLATE_FILENAME = "NLTF_forecast_input_template_20q.xlsx"
 
+# Horizon zones for June-year (fiscal) rows.
+#
+# The quarterly forecast rows already carry H1-H12 / H13+ scope, but the
+# decision-facing Revenue Outlook is aggregated to June years, and a June year
+# can straddle the end of the validated horizon.  Classifying at the fiscal-year
+# level is therefore its own governed step: FY2029 is half extrapolation and
+# FY2030 is entirely extrapolation, which is invisible if only the quarterly
+# rows are labelled.
+FORECAST_HORIZON_ZONE_ACTUAL = "actual_or_nowcast"
+FORECAST_HORIZON_ZONE_VALIDATED = "backtest_supported_h1_h12"
+FORECAST_HORIZON_ZONE_STRADDLE = "straddles_validated_horizon_end"
+FORECAST_HORIZON_ZONE_EXTRAPOLATION = "long_range_extrapolation_h13_plus"
+LONG_RANGE_EXTRAPOLATION_WARNING = (
+    "long-range extrapolation - not validated to the short-term standard"
+)
+FORECAST_HORIZON_ZONE_LABELS = {
+    FORECAST_HORIZON_ZONE_ACTUAL: "Actual or nowcast quarters",
+    FORECAST_HORIZON_ZONE_VALIDATED: "H1-H12 backtest-supported horizon",
+    FORECAST_HORIZON_ZONE_STRADDLE: (
+        "Straddles H12: part of this year is " + LONG_RANGE_EXTRAPOLATION_WARNING
+    ),
+    FORECAST_HORIZON_ZONE_EXTRAPOLATION: (
+        "H13+ " + LONG_RANGE_EXTRAPOLATION_WARNING
+    ),
+}
+
+
+def june_year_quarters(june_year: Any) -> tuple[str, ...]:
+    """Return the four canonical quarters of a NZ June fiscal year."""
+
+    year = int(june_year)
+    return (f"{year - 1}Q3", f"{year - 1}Q4", f"{year}Q1", f"{year}Q2")
+
+
+def horizon_for_quarter(period: Any, model_training_cutoff: str) -> int | None:
+    """Steps ahead of the training cutoff; <= 0 means actual or in-sample."""
+
+    target = quarter_sort_key(period)
+    cutoff = quarter_sort_key(model_training_cutoff)
+    if target >= 999999 or cutoff >= 999999:
+        return None
+    return target - cutoff
+
+
+def june_year_horizon_profile(
+    june_year: Any,
+    model_training_cutoff: str,
+    *,
+    backtest_supported_max_horizon: int = BACKTEST_SUPPORTED_MAX_HORIZON,
+) -> dict[str, Any]:
+    """Classify one June year against the validated backtest horizon."""
+
+    horizons = [
+        horizon_for_quarter(period, model_training_cutoff)
+        for period in june_year_quarters(june_year)
+    ]
+    if any(value is None for value in horizons):
+        return {
+            "horizon_zone": "",
+            "horizon_zone_label": "",
+            "first_horizon": None,
+            "last_horizon": None,
+            "forecast_quarters": 0,
+            "quarters_beyond_validated_horizon": 0,
+            "share_beyond_validated_horizon": 0.0,
+        }
+    forecast_horizons = [value for value in horizons if value > 0]
+    beyond = [value for value in forecast_horizons if value > backtest_supported_max_horizon]
+    if not forecast_horizons:
+        zone = FORECAST_HORIZON_ZONE_ACTUAL
+    elif not beyond:
+        zone = FORECAST_HORIZON_ZONE_VALIDATED
+    elif len(beyond) == len(horizons):
+        zone = FORECAST_HORIZON_ZONE_EXTRAPOLATION
+    else:
+        zone = FORECAST_HORIZON_ZONE_STRADDLE
+    return {
+        "horizon_zone": zone,
+        "horizon_zone_label": FORECAST_HORIZON_ZONE_LABELS[zone],
+        "first_horizon": min(horizons),
+        "last_horizon": max(horizons),
+        "forecast_quarters": len(forecast_horizons),
+        "quarters_beyond_validated_horizon": len(beyond),
+        "share_beyond_validated_horizon": len(beyond) / len(horizons),
+    }
+
 _FORECAST_SYMBOLS = {
     "FORECAST_BUILDER_NOTE",
     "FORECAST_BUILDER_TITLE",

@@ -9504,16 +9504,30 @@ def _revenue_path_hover_customdata(rows: pd.DataFrame) -> Any:
     actual_scope = {"actual_anchor", "current_nowcast", "current_forecast", "official_comparator"}
     value_status_labels = _human_revenue_label_values(value_status)
     data_scope_labels = _human_revenue_label_values(data_scope)
+    # June-year rows land in actual_scope below, so without this the fiscal
+    # totals carry no validated-horizon warning at all.
+    zone_labels = _revenue_hover_text_values(rows, "horizon_zone_label")
+    zone_warnings = _revenue_hover_text_values(rows, "horizon_validation_warning")
+    beyond_counts = _revenue_hover_float_values(rows, "quarters_beyond_validated_horizon")
     horizon_hover: list[str] = []
-    for scope, status_label, scope_label, horizon, scope_label_raw in zip(
+    for scope, status_label, scope_label, horizon, scope_label_raw, zone_label, zone_warning, beyond in zip(
         data_scope,
         value_status_labels,
         data_scope_labels,
         horizon_values,
         horizon_scope,
+        zone_labels,
+        zone_warnings,
+        beyond_counts,
     ):
         if scope in actual_scope:
-            horizon_hover.append(status_label or scope_label)
+            base_label = status_label or scope_label
+            if zone_warning:
+                detail = zone_label or zone_warning
+                if beyond is not None and int(float(beyond)) > 0:
+                    detail = f"{detail} ({int(float(beyond))} of 4 quarters)"
+                base_label = f"{base_label}<br>Horizon: {html.escape(detail)}"
+            horizon_hover.append(base_label)
             continue
         if horizon is None:
             horizon_hover.append("Latest actual join point")
@@ -9565,10 +9579,31 @@ def _revenue_path_hover_customdata(rows: pd.DataFrame) -> Any:
     return list(zip(horizon_hover, bridge_hover, scope_hover, efficiency_hover))
 
 
+def _revenue_horizon_zone_suffix(row: pd.Series) -> str:
+    """Append the validated-horizon warning to a June-year hover.
+
+    June-year rows return early on data_scope below, which is why the fiscal
+    totals carried no horizon label at all. FY2030 is entirely H13+ and FY2029
+    straddles H12, so the warning belongs on the number the reader acts on.
+    """
+
+    warning = str(row.get("horizon_validation_warning") or "").strip()
+    if not warning:
+        return ""
+    label = str(row.get("horizon_zone_label") or "").strip() or warning
+    beyond = pd.to_numeric(
+        pd.Series([row.get("quarters_beyond_validated_horizon")]), errors="coerce"
+    ).iloc[0]
+    if pd.notna(beyond) and int(beyond) > 0:
+        return f"<br>Horizon: {html.escape(label)} ({int(beyond)} of 4 quarters)"
+    return f"<br>Horizon: {html.escape(label)}"
+
+
 def _revenue_horizon_hover_label(row: pd.Series) -> str:
     data_scope = str(row.get("data_scope") or "").strip()
     if data_scope in {"actual_anchor", "current_nowcast", "current_forecast", "official_comparator"}:
-        return _human_revenue_code_label(str(row.get("value_status") or data_scope))
+        base_label = _human_revenue_code_label(str(row.get("value_status") or data_scope))
+        return f"{base_label}{_revenue_horizon_zone_suffix(row)}"
     try:
         horizon = int(float(row.get("horizon")))
     except Exception:
