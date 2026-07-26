@@ -286,6 +286,35 @@ def all_conflict_policy_variants() -> tuple[ConflictPolicyVariant, ...]:
     )
 
 
+BASE_SCENARIO_ID = "current_basecase"
+BASE_POLICY_VARIANT_IDS: Mapping[str, str] = MappingProxyType(
+    {
+        policy_key: f"{BASE_SCENARIO_ID}_{spec.id_suffix}"
+        for policy_key, spec in POLICY_VARIANT_REGISTRY.items()
+    }
+)
+
+
+def structural_overlay_scenario_ids() -> frozenset[str]:
+    """Scenario IDs whose displayed forecast is the governed structural overlay.
+
+    For these scenarios the fitted point forecast is replaced by
+    ``reference x price ratio ^ elasticity x GDP factor``.  Fitted ensemble
+    components, model-validation statistics and fitted prediction intervals
+    describe the pre-overlay layer and must not be presented as belonging to
+    the displayed forecast.  ``BASE_SCENARIO_ID`` is deliberately excluded: it
+    is the reference the overlay is built from and is shown unmodified.
+    """
+
+    return frozenset(
+        {
+            *BASE_POLICY_VARIANT_IDS.values(),
+            *(conflict_scenario_id(severity) for severity in CONFLICT_SEVERITIES),
+            *(variant.scenario_id for variant in all_conflict_policy_variants()),
+        }
+    )
+
+
 def _bool_series(series: pd.Series) -> pd.Series:
     parsed = series.map(
         lambda value: value

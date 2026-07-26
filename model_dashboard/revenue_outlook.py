@@ -32,6 +32,7 @@ from .conflict_fuel_paths import (
     CONFLICT_FUEL_SCENARIO_LEVELS,
     conflict_scenario_name,
     conflict_trace_name,
+    structural_overlay_scenario_ids,
 )
 from .forecast_imports import (
     BACKTEST_SUPPORTED_MAX_HORIZON,
@@ -5916,8 +5917,38 @@ def revenue_outlook_fan_tables(
         bands = bands.sort_values(["_series_order", "_source_order", "_fy_order", "period", "scenario_name"], kind="stable").drop(
             columns=["_series_order", "_source_order", "_fy_order"]
         )
+    _assert_no_structural_overlay_fan_bands(bands)
     availability = _fan_availability_frame(series, bands)
     return availability, bands
+
+
+def _assert_no_structural_overlay_fan_bands(bands: pd.DataFrame) -> None:
+    """Fail closed if an interval is attached to a structural-overlay scenario.
+
+    Fan bands are derived from fitted backtest quantiles and archived forecast
+    error, both of which describe the raw fitted replay.  For a structural
+    overlay the displayed central value is not that forecast, so such a band
+    would not be centred on the series it is drawn against.  Today only Base,
+    the comparison path and MBU26 carry fans; this keeps it that way.
+    """
+
+    if bands is None or bands.empty or "scenario_name" not in bands.columns:
+        return
+    overlay = structural_overlay_scenario_ids()
+    offending = bands[bands["scenario_name"].astype(str).isin(overlay)]
+    if not offending.empty:
+        detail = (
+            offending[["series_id", "fan_source", "scenario_name"]]
+            .drop_duplicates()
+            .astype(str)
+            .agg("/".join, axis=1)
+            .str.cat(sep=", ")
+        )
+        raise ValueError(
+            "Prediction intervals may not be attached to structural-overlay "
+            "scenarios: the band would not be generated from the displayed "
+            f"forecast layer. Offending rows: {detail}."
+        )
 
 
 def _fan_band_columns() -> list[str]:

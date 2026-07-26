@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from io import BytesIO
 import hashlib
@@ -347,6 +347,13 @@ class ScenarioInputForecastReplayResult:
     component_forecasts: pd.DataFrame
     assumptions: pd.DataFrame
     validation_report: pd.DataFrame
+    # Governed structural-overlay scenarios replace the fitted point forecast
+    # with an explicit reference/price/GDP formula.  Their fitted ensemble
+    # members therefore no longer describe the displayed forecast: they move to
+    # ``superseded_component_forecasts`` and the frame below carries the
+    # decomposition that does close to the displayed value.
+    structural_component_forecasts: pd.DataFrame = field(default_factory=pd.DataFrame)
+    superseded_component_forecasts: pd.DataFrame = field(default_factory=pd.DataFrame)
 
 
 def repo_root_from_here() -> Path:

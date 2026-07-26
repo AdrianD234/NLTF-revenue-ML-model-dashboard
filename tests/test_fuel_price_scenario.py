@@ -9,6 +9,7 @@ import pytest
 from model_dashboard.fuel_price_scenario import (
     BASE_DELAYED_6M_SCENARIO_NAME,
     BASE_NO_UPLIFT_SCENARIO_NAME,
+    BASE_PUBLISHED_SCENARIO_NAME,
     FUEL_PRICE_SCENARIO_NAME,
     FUEL_PRICE_SCENARIO_TRACE_NAME,
     IRAN_WAR_DELAYED_6M_SCENARIO_NAME,
@@ -29,6 +30,7 @@ from model_dashboard.conflict_fuel_paths import (
     conflict_scenario_name,
     conflict_trace_name,
     load_conflict_fuel_price_paths,
+    structural_overlay_scenario_ids,
 )
 from model_dashboard.forecast_runner import (
     ScenarioInputForecastReplayResult,
@@ -261,9 +263,26 @@ def _assert_governed_policy_demand_calibration(replay) -> None:
                 assert len(str(row["policy_elasticity_source_sha256"])) == 64
 
     validation = replay.policy_validation_report.set_index("scenario_name")
-    assert set(validation["model_validation_basis"].astype(str)) == {
-        "raw_fitted_replay_before_structural_overlay"
-    }
+    # Only structural-overlay scenarios carry the pre-overlay validation basis.
+    # Base is shown unmodified, so labelling it "before structural overlay"
+    # would itself be wrong.
+    overlay_scenarios = structural_overlay_scenario_ids()
+    for scenario_name, basis in validation["model_validation_basis"].astype(str).items():
+        expected_basis = (
+            "raw_fitted_replay_before_structural_overlay"
+            if str(scenario_name) in overlay_scenarios
+            else "raw_fitted_replay"
+        )
+        assert basis == expected_basis, scenario_name
+    assert not validation.loc[
+        validation.index.astype(str).isin(overlay_scenarios),
+        "component_forecasts_available",
+    ].any()
+    assert validation.loc[
+        ~validation.index.astype(str).isin(overlay_scenarios),
+        "component_forecasts_available",
+    ].all()
+
     for scenario_name in policy_scenarios:
         expected_rows = len(
             raw_forecasts[
@@ -275,6 +294,36 @@ def _assert_governed_policy_demand_calibration(replay) -> None:
             == expected_rows
         )
         assert bool(validation.at[scenario_name, "policy_post_calibration_valid"])
+        # The flag must be derived from measured residuals, not assigned.
+        assert (
+            float(
+                validation.at[
+                    scenario_name,
+                    "policy_post_calibration_formula_tolerance_ratio",
+                ]
+            )
+            <= 1.0
+        )
+        assert (
+            float(
+                validation.at[
+                    scenario_name,
+                    "policy_post_calibration_component_closure_tolerance_ratio",
+                ]
+            )
+            <= 1.0
+        )
+        assert (
+            int(
+                validation.at[scenario_name, "policy_post_calibration_sign_breaches"]
+            )
+            == 0
+        )
+
+    # A scenario that was never calibrated is not "valid" - it is not applicable.
+    base_row = validation.loc[BASE_PUBLISHED_SCENARIO_NAME]
+    assert int(base_row["policy_post_calibration_rows"]) == 0
+    assert not bool(base_row["policy_post_calibration_valid"])
 
     for level in CONFLICT_FUEL_SCENARIO_LEVELS:
         scenario_name = conflict_scenario_name(level)
@@ -2086,3 +2135,100 @@ def test_policy_pair_overlay_matches_formula_rebuilt_base_and_conflict_annual_br
     }
     asserted_policies = set(annual_audit["fed_policy"].astype(str)) - {""}
     assert asserted_policies == {FED_POLICY_STATE_DELAYED_6M}
+
+
+def test_structural_components_sum_exactly_to_the_displayed_forecast(fuel_replay):
+    """P0: displayed totals and component attribution must be the same layer."""
+
+    components = fuel_replay.structural_component_forecasts
+    assert not components.empty
+    overlay_scenarios = structural_overlay_scenario_ids()
+    assert set(components["scenario_name"].astype(str)) == set(overlay_scenarios)
+    assert set(components["component_label"].astype(str)) == {
+        "STRUCTURAL_REFERENCE_BASE",
+        "STRUCTURAL_PRICE_RESPONSE",
+        "STRUCTURAL_GDP_RESPONSE",
+        "STRUCTURAL_PRICE_GDP_INTERACTION",
+    }
+
+    keys = ["scenario_name", "stream", "target_period"]
+    closure = components.groupby(keys, dropna=False).agg(
+        component_sum=("component_forecast", "sum"),
+        final_forecast=("final_forecast", "first"),
+    )
+    np.testing.assert_allclose(
+        closure["component_sum"],
+        closure["final_forecast"],
+        rtol=1e-12,
+        atol=1e-9,
+    )
+
+    # Every calibrated forecast row is covered - no silent gaps.
+    forecasts = fuel_replay.future_forecasts
+    calibrated = forecasts[
+        forecasts["demand_calibration_applied"].fillna(False).astype(bool)
+    ]
+    assert len(closure) == len(calibrated)
+
+
+def test_overlay_scenario_fitted_components_are_suppressed_not_displayed(fuel_replay):
+    """P0: fitted ensemble members must not attribute the overlay forecast."""
+
+    overlay_scenarios = structural_overlay_scenario_ids()
+    components = fuel_replay.replay.component_forecasts
+    if not components.empty and "scenario_name" in components.columns:
+        assert not components["scenario_name"].astype(str).isin(overlay_scenarios).any()
+
+    superseded = fuel_replay.superseded_component_forecasts
+    if not superseded.empty:
+        assert set(superseded["scenario_name"].astype(str)).issubset(overlay_scenarios)
+        assert set(superseded["component_forecast_status"].astype(str)) == {
+            "superseded_by_structural_overlay"
+        }
+        assert set(superseded["describes_forecast_layer"].astype(str)) == {
+            "raw_fitted_replay_pre_overlay"
+        }
+
+
+def test_post_calibration_valid_is_derived_and_can_be_false(fuel_replay):
+    """P0: the flag must reflect measured checks, not be assigned True."""
+
+    validation = fuel_replay.policy_validation_report.set_index("scenario_name")
+    flags = validation["policy_post_calibration_valid"].astype(bool)
+    rows = validation["policy_post_calibration_rows"].astype(int)
+
+    # Not a constant: uncalibrated scenarios are False, calibrated ones True.
+    assert set(flags.unique()) == {True, False}
+    assert (flags == rows.gt(0)).all()
+
+    # And it is reproducible from the recorded evidence columns alone.
+    recomputed = (
+        rows.gt(0)
+        & validation["policy_post_calibration_formula_tolerance_ratio"].le(1.0)
+        & validation[
+            "policy_post_calibration_component_closure_tolerance_ratio"
+        ].le(1.0)
+        & validation["policy_post_calibration_sign_breaches"].eq(0)
+    )
+    assert (recomputed == flags).all()
+
+
+def test_fan_bands_reject_structural_overlay_scenarios():
+    """P0: an interval must be generated from the displayed forecast layer."""
+
+    from model_dashboard.revenue_outlook import _assert_no_structural_overlay_fan_bands
+
+    overlay_scenario = sorted(structural_overlay_scenario_ids())[0]
+    _assert_no_structural_overlay_fan_bands(
+        pd.DataFrame({"scenario_name": ["current_basecase", "mbu26_official"]})
+    )
+    with pytest.raises(ValueError, match="structural-overlay"):
+        _assert_no_structural_overlay_fan_bands(
+            pd.DataFrame(
+                {
+                    "series_id": ["net_fed_revenue"],
+                    "fan_source": ["current_finalist_backtest"],
+                    "scenario_name": [overlay_scenario],
+                }
+            )
+        )

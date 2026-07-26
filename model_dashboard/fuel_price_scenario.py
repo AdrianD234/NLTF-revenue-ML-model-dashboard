@@ -35,6 +35,8 @@ import pandas as pd
 
 from .ev_uptake_levers import FED_AGGREGATE_SERIES, RUC_AGGREGATE_SERIES, TOTAL_AGGREGATE_SERIES
 from .conflict_fuel_paths import (
+    BASE_POLICY_VARIANT_IDS,
+    BASE_SCENARIO_ID,
     CONFLICT_FUEL_SCENARIO_LEVELS,
     CONFLICT_FUEL_SCENARIO_SPECS,
     conflict_policy_variant_name,
@@ -42,6 +44,7 @@ from .conflict_fuel_paths import (
     conflict_scenario_note,
     conflict_trace_name,
     load_conflict_fuel_price_paths,
+    structural_overlay_scenario_ids,
 )
 from .conflict_gdp_paths import (
     apply_conflict_gdp_impact,
@@ -80,8 +83,8 @@ IRAN_WAR_SCENARIO_NOTE = FUEL_PRICE_SCENARIO_NOTE
 # The published paths above remain the backwards-compatible scenario IDs.
 # Policy variants are separate replay rows because changing the RUC price
 # input affects activity as well as the nominal revenue rate applied later.
-BASE_DELAYED_6M_SCENARIO_NAME = "current_basecase_12c_delay_6m"
-BASE_NO_UPLIFT_SCENARIO_NAME = "current_basecase_12c_no_uplift"
+BASE_DELAYED_6M_SCENARIO_NAME = BASE_POLICY_VARIANT_IDS["delay_6m"]
+BASE_NO_UPLIFT_SCENARIO_NAME = BASE_POLICY_VARIANT_IDS["no_uplift"]
 IRAN_WAR_DELAYED_6M_SCENARIO_NAME = conflict_policy_variant_name(
     "medium", FED_POLICY_STATE_DELAYED_6M
 )
@@ -123,7 +126,7 @@ FUEL_PRICE_SHOCK_PERIODS = (
 RUC_PRICE_SHOCK_PERIODS: tuple[str, ...] = ()
 RUC_PRICE_LAGGED_EFFECT_PERIODS: tuple[str, ...] = ()
 
-BASE_PUBLISHED_SCENARIO_NAME = "current_basecase"
+BASE_PUBLISHED_SCENARIO_NAME = BASE_SCENARIO_ID
 _BASE_SCENARIO_NAME = BASE_PUBLISHED_SCENARIO_NAME
 _LEGACY_BASE_MACRO_SHADOW_SCENARIO_NAME = (
     "__legacy_current_basecase_macro_shadow"
@@ -183,6 +186,29 @@ _CONFLICT_CALIBRATION_NOTE = (
     "ratio against Base. The calibrated value replaces, rather than multiplies, "
     "the raw fixed-finalist replay."
 )
+# Because the structural overlay replaces the fitted point forecast, the fitted
+# ensemble members no longer describe the displayed value.  The displayed value
+# is decomposed instead into the exact additive identity
+#     R*P*G = R + R*(P-1) + R*(G-1) + R*(P-1)*(G-1)
+# where R is the Base reference forecast, P the generalized-price response and
+# G the fitted GDP factor.  These four terms sum to the displayed forecast by
+# construction and are the only component attribution that may be shown for a
+# structural-overlay scenario.
+_STRUCTURAL_COMPONENT_LABELS = (
+    "STRUCTURAL_REFERENCE_BASE",
+    "STRUCTURAL_PRICE_RESPONSE",
+    "STRUCTURAL_GDP_RESPONSE",
+    "STRUCTURAL_PRICE_GDP_INTERACTION",
+)
+_STRUCTURAL_COMPONENT_BASIS = "governed_structural_overlay_additive_decomposition"
+_SUPERSEDED_COMPONENT_REASON = (
+    "raw_fitted_ensemble_members_superseded_by_structural_overlay; "
+    "they describe the pre-overlay forecast layer and must not be displayed as "
+    "attribution for the governed scenario forecast"
+)
+# Closure tolerances for the displayed-forecast invariants.
+_STRUCTURAL_CLOSURE_RTOL = 1e-12
+_STRUCTURAL_CLOSURE_ATOL = 1e-9
 # Calibrated operating-cost weights. The light value is the midpoint of the
 # Ministry of Transport's statement that light diesel is 20-30% more efficient
 # than its 9.5 L/100 km average petrol vehicle (9.5 * 75% = 7.125). The heavy
@@ -296,6 +322,23 @@ class FuelPriceScenarioReplayResult:
     @property
     def policy_validation_report(self) -> pd.DataFrame:
         return self.replay.validation_report
+
+    @property
+    def structural_component_forecasts(self) -> pd.DataFrame:
+        """Additive decomposition that sums exactly to the displayed forecast.
+
+        This is the only component attribution valid for structural-overlay
+        scenarios.  Fitted ensemble members for those scenarios describe the
+        pre-overlay layer and are held in ``superseded_component_forecasts``.
+        """
+
+        return self.replay.structural_component_forecasts
+
+    @property
+    def superseded_component_forecasts(self) -> pd.DataFrame:
+        """Fitted ensemble members that no longer describe the shown forecast."""
+
+        return self.replay.superseded_component_forecasts
 
     @property
     def policy_demand_calibration_audit(self) -> pd.DataFrame:
@@ -1555,30 +1598,37 @@ def _apply_governed_policy_demand_calibration(
                 )
 
     directly_applied = pd.Series(False, index=forecasts.index)
+    structural_components = pd.DataFrame()
+    formula_residual_by_scenario: dict[str, float] = {}
+    formula_ratio_by_scenario: dict[str, float] = {}
+    closure_residual_by_scenario: dict[str, float] = {}
+    closure_ratio_by_scenario: dict[str, float] = {}
+    sign_breaches_by_scenario: dict[str, int] = {}
     if directly_calibrated_rows:
         directly_applied.loc[directly_calibrated_rows] = True
         applied_rows = forecasts.loc[directly_applied].copy()
-        expected = (
-            pd.to_numeric(applied_rows["demand_reference_forecast"], errors="coerce")
-            * np.power(
-                pd.to_numeric(applied_rows["demand_price_ratio"], errors="coerce"),
-                pd.to_numeric(applied_rows["demand_elasticity"], errors="coerce"),
-            )
-            * pd.to_numeric(
-                applied_rows["demand_gdp_model_factor"], errors="coerce"
-            )
-        )
-        final = pd.to_numeric(applied_rows["forecast"], errors="coerce")
-        if not np.allclose(final, expected, rtol=1e-12, atol=1e-9):
-            raise ValueError("Demand calibration failed its exact formula invariant.")
         reference = pd.to_numeric(
             applied_rows["demand_reference_forecast"], errors="coerce"
         )
-        gdp_adjusted_reference = reference * pd.to_numeric(
-            applied_rows["demand_gdp_model_factor"], errors="coerce"
-        )
         ratio = pd.to_numeric(applied_rows["demand_price_ratio"], errors="coerce")
         elasticity = pd.to_numeric(applied_rows["demand_elasticity"], errors="coerce")
+        gdp_model_factor = pd.to_numeric(
+            applied_rows["demand_gdp_model_factor"], errors="coerce"
+        )
+        price_response = pd.Series(
+            np.power(ratio.to_numpy(dtype=float), elasticity.to_numpy(dtype=float)),
+            index=applied_rows.index,
+        )
+        expected = reference * price_response * gdp_model_factor
+        final = pd.to_numeric(applied_rows["forecast"], errors="coerce")
+        if not np.allclose(
+            final,
+            expected,
+            rtol=_STRUCTURAL_CLOSURE_RTOL,
+            atol=_STRUCTURAL_CLOSURE_ATOL,
+        ):
+            raise ValueError("Demand calibration failed its exact formula invariant.")
+        gdp_adjusted_reference = reference * gdp_model_factor
         cheaper = (
             ratio.lt(1.0)
             & elasticity.lt(0.0)
@@ -1589,12 +1639,131 @@ def _apply_governed_policy_demand_calibration(
             & elasticity.lt(0.0)
             & gdp_adjusted_reference.gt(0.0)
         )
-        if (
-            cheaper & final.le(gdp_adjusted_reference)
-        ).any() or (
+        sign_breach = (cheaper & final.le(gdp_adjusted_reference)) | (
             dearer & final.ge(gdp_adjusted_reference)
-        ).any():
+        )
+        if sign_breach.any():
             raise ValueError("Demand calibration failed its economic sign invariant.")
+
+        # The displayed forecast is decomposed into terms that sum to it
+        # exactly.  This is the only attribution that describes the structural
+        # layer; the fitted ensemble members describe the pre-overlay layer.
+        scenario_names = applied_rows["scenario_name"].astype(str)
+        component_values = {
+            "STRUCTURAL_REFERENCE_BASE": reference,
+            "STRUCTURAL_PRICE_RESPONSE": reference * (price_response - 1.0),
+            "STRUCTURAL_GDP_RESPONSE": reference * (gdp_model_factor - 1.0),
+            "STRUCTURAL_PRICE_GDP_INTERACTION": reference
+            * (price_response - 1.0)
+            * (gdp_model_factor - 1.0),
+        }
+        component_frames: list[pd.DataFrame] = []
+        for label in _STRUCTURAL_COMPONENT_LABELS:
+            values = component_values[label]
+            component_frames.append(
+                pd.DataFrame(
+                    {
+                        "scenario_name": scenario_names.to_numpy(),
+                        "stream": applied_rows["stream"].astype(str).to_numpy(),
+                        "target_period": applied_rows["target_period"]
+                        .astype(str)
+                        .to_numpy(),
+                        "component_label": label,
+                        "component_forecast": values.to_numpy(dtype=float),
+                        "final_forecast": final.to_numpy(dtype=float),
+                        "demand_reference_scenario_name": applied_rows[
+                            "demand_reference_scenario_name"
+                        ]
+                        .astype(str)
+                        .to_numpy(),
+                        "demand_reference_forecast": reference.to_numpy(dtype=float),
+                        "demand_price_ratio": ratio.to_numpy(dtype=float),
+                        "demand_elasticity": elasticity.to_numpy(dtype=float),
+                        "demand_price_response_factor": price_response.to_numpy(
+                            dtype=float
+                        ),
+                        "demand_gdp_model_factor": gdp_model_factor.to_numpy(
+                            dtype=float
+                        ),
+                        "component_basis": _STRUCTURAL_COMPONENT_BASIS,
+                        "describes_forecast_layer": "governed_structural_overlay",
+                    }
+                )
+            )
+        structural_components = pd.concat(
+            component_frames, ignore_index=True, sort=False
+        )
+        closure = (
+            structural_components.groupby(
+                ["scenario_name", "stream", "target_period"], dropna=False
+            )["component_forecast"]
+            .sum()
+            .rename("component_sum")
+            .reset_index()
+        )
+        closure_keys = pd.DataFrame(
+            {
+                "scenario_name": scenario_names.to_numpy(),
+                "stream": applied_rows["stream"].astype(str).to_numpy(),
+                "target_period": applied_rows["target_period"].astype(str).to_numpy(),
+                "final_forecast": final.to_numpy(dtype=float),
+            }
+        )
+        closure = closure.merge(
+            closure_keys,
+            on=["scenario_name", "stream", "target_period"],
+            how="outer",
+            validate="one_to_one",
+        )
+        if closure["component_sum"].isna().any() or closure["final_forecast"].isna().any():
+            raise ValueError(
+                "Structural component decomposition does not cover every "
+                "calibrated scenario/stream/quarter."
+            )
+        closure["closure_residual"] = (
+            closure["component_sum"] - closure["final_forecast"]
+        ).abs()
+        closure_tolerance = _STRUCTURAL_CLOSURE_ATOL + _STRUCTURAL_CLOSURE_RTOL * closure[
+            "final_forecast"
+        ].abs()
+        if closure["closure_residual"].gt(closure_tolerance).any():
+            worst = closure.loc[closure["closure_residual"].idxmax()]
+            raise ValueError(
+                "Structural component decomposition does not sum to the displayed "
+                f"forecast for {worst['scenario_name']}/{worst['stream']}/"
+                f"{worst['target_period']}: residual "
+                f"{float(worst['closure_residual']):.3e}."
+            )
+
+        # Residuals are reported in absolute units for readability, but the
+        # validity gate uses the same rtol/atol envelope as the invariants
+        # above so that a large-magnitude series is not judged more harshly
+        # than the check it mirrors.  A ratio of <= 1 means "within tolerance".
+        formula_residual = (final - expected).abs()
+        formula_tolerance = (
+            _STRUCTURAL_CLOSURE_ATOL + _STRUCTURAL_CLOSURE_RTOL * expected.abs()
+        )
+        formula_residual_by_scenario = (
+            formula_residual.groupby(scenario_names).max().to_dict()
+        )
+        formula_ratio_by_scenario = (
+            (formula_residual / formula_tolerance)
+            .groupby(scenario_names)
+            .max()
+            .to_dict()
+        )
+        closure_residual_by_scenario = (
+            closure.groupby("scenario_name")["closure_residual"].max().to_dict()
+        )
+        closure_ratio_by_scenario = (
+            (closure["closure_residual"] / closure_tolerance)
+            .groupby(closure["scenario_name"])
+            .max()
+            .to_dict()
+        )
+        sign_breaches_by_scenario = (
+            sign_breach.astype(int).groupby(scenario_names).sum().to_dict()
+        )
     applied = forecasts["demand_calibration_applied"].fillna(False).astype(bool)
     if not applied.loc[demand_target_mask].all():
         raise ValueError(
@@ -1603,23 +1772,56 @@ def _apply_governed_policy_demand_calibration(
         )
 
     replay.future_forecasts = forecasts
+    replay.structural_component_forecasts = structural_components
+
+    # Fitted ensemble members for overlay scenarios describe the pre-overlay
+    # layer.  They are removed from ``component_forecasts`` so no consumer can
+    # attribute the displayed forecast to them, and retained separately for audit.
+    overlay_scenarios = {*conflict_reference_scenarios, *policy_reference_scenarios}
+    if overlay_scenarios != set(structural_overlay_scenario_ids()):
+        raise ValueError(
+            "Structural-overlay scenarios diverge from the governed registry; "
+            "downstream component and interval guards would not cover them all. "
+            "Registry-only: "
+            + ", ".join(sorted(set(structural_overlay_scenario_ids()) - overlay_scenarios))
+            + "; replay-only: "
+            + ", ".join(sorted(overlay_scenarios - set(structural_overlay_scenario_ids())))
+            + "."
+        )
     components = (
         replay.component_forecasts.copy()
         if replay.component_forecasts is not None
         else pd.DataFrame()
     )
+    superseded = pd.DataFrame()
     if not components.empty and "scenario_name" in components.columns:
-        components["policy_component_forecast_basis"] = np.where(
-            components["scenario_name"].astype(str).isin(
-                {*conflict_reference_scenarios, *policy_reference_scenarios}
-            ),
-            "raw_fitted_replay_not_reconciled_to_structural_overlay",
-            "",
-        )
-        replay.component_forecasts = components
+        overlay_mask = components["scenario_name"].astype(str).isin(overlay_scenarios)
+        superseded = components.loc[overlay_mask].copy()
+        if not superseded.empty:
+            superseded["component_forecast_status"] = "superseded_by_structural_overlay"
+            superseded["component_forecast_reason"] = _SUPERSEDED_COMPONENT_REASON
+            superseded["describes_forecast_layer"] = "raw_fitted_replay_pre_overlay"
+        components = components.loc[~overlay_mask].copy()
+        components["describes_forecast_layer"] = "raw_fitted_replay"
+        replay.component_forecasts = components.reset_index(drop=True)
+    replay.superseded_component_forecasts = superseded.reset_index(drop=True)
+
     validation = replay.validation_report.copy()
     if validation is not None and not validation.empty and "scenario_name" in validation.columns:
-        validation["model_validation_basis"] = "raw_fitted_replay_before_structural_overlay"
+        validation_scenarios = validation["scenario_name"].astype(str)
+        validation["model_validation_basis"] = np.where(
+            validation_scenarios.isin(overlay_scenarios),
+            "raw_fitted_replay_before_structural_overlay",
+            "raw_fitted_replay",
+        )
+        validation["component_forecasts_available"] = ~validation_scenarios.isin(
+            overlay_scenarios
+        )
+        validation["component_attribution_basis"] = np.where(
+            validation_scenarios.isin(overlay_scenarios),
+            _STRUCTURAL_COMPONENT_BASIS,
+            "fitted_ensemble_members",
+        )
         policy_applied = forecasts["policy_calibration_applied"].fillna(False).astype(bool)
         conflict_applied = forecasts["conflict_calibration_applied"].fillna(False).astype(bool)
         applied_counts = (
@@ -1629,9 +1831,34 @@ def _apply_governed_policy_demand_calibration(
             .to_dict()
         )
         validation["policy_post_calibration_rows"] = (
-            validation["scenario_name"].astype(str).map(applied_counts).fillna(0).astype(int)
+            validation_scenarios.map(applied_counts).fillna(0).astype(int)
         )
-        validation["policy_post_calibration_valid"] = True
+        # Derived from the measured residuals above, never assigned. A scenario
+        # with no calibrated rows is not "valid" - it is not applicable.
+        validation["policy_post_calibration_formula_residual"] = (
+            validation_scenarios.map(formula_residual_by_scenario).astype(float)
+        )
+        validation["policy_post_calibration_component_closure_residual"] = (
+            validation_scenarios.map(closure_residual_by_scenario).astype(float)
+        )
+        # <= 1.0 means "inside the same rtol/atol envelope as the invariants".
+        validation["policy_post_calibration_formula_tolerance_ratio"] = (
+            validation_scenarios.map(formula_ratio_by_scenario).astype(float)
+        )
+        validation["policy_post_calibration_component_closure_tolerance_ratio"] = (
+            validation_scenarios.map(closure_ratio_by_scenario).astype(float)
+        )
+        validation["policy_post_calibration_sign_breaches"] = (
+            validation_scenarios.map(sign_breaches_by_scenario).fillna(0).astype(int)
+        )
+        validation["policy_post_calibration_valid"] = (
+            validation["policy_post_calibration_rows"].gt(0)
+            & validation["policy_post_calibration_formula_tolerance_ratio"].le(1.0)
+            & validation[
+                "policy_post_calibration_component_closure_tolerance_ratio"
+            ].le(1.0)
+            & validation["policy_post_calibration_sign_breaches"].eq(0)
+        )
         conflict_counts = (
             forecasts.loc[conflict_applied]
             .groupby("scenario_name", dropna=False)
@@ -1639,11 +1866,10 @@ def _apply_governed_policy_demand_calibration(
             .to_dict()
         )
         validation["conflict_post_calibration_rows"] = (
-            validation["scenario_name"].astype(str).map(conflict_counts).fillna(0).astype(int)
+            validation_scenarios.map(conflict_counts).fillna(0).astype(int)
         )
         validation["demand_post_calibration_rows"] = (
-            validation["scenario_name"]
-            .astype(str)
+            validation_scenarios
             .map(forecasts.loc[applied].groupby("scenario_name").size().to_dict())
             .fillna(0)
             .astype(int)
