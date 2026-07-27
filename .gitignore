@@ -38,6 +38,8 @@ artifacts/**
 !artifacts/long_horizon_validation/**
 !artifacts/gdp_sign_guard_audit/
 !artifacts/gdp_sign_guard_audit/**
+!artifacts/ci_baseline_comparison/
+!artifacts/ci_baseline_comparison/**
 data/**
 !data/.gitkeep
 !data/dashboard_evidence_pack/

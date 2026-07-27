@@ -1,11 +1,23 @@
 name: CI
 
-# Clean-environment verification for the governed dashboard. Everything here
-# runs without a browser: pytest.ini deselects the e2e marker, and the
-# Playwright host phase stays a manual step (see AGENTS.md - it needs an
-# approved host shell on Windows and cannot run in this sandbox). The Playwright
-# package is installed but its browsers are not, which reproduces the local
-# deselection exactly.
+# Clean-environment verification for the governed dashboard.
+#
+# The suite is split by what it can honestly claim from committed content:
+#
+#   core            blocking. Runs from committed content only, after
+#                   deterministically rebuilding artifacts/curated_data/ from
+#                   the vendored arbitration run. Tests needing developer-local
+#                   scratch that CANNOT be rebuilt (screenshots, hand-kept audit
+#                   logs) carry the requires_local_scratch marker, are excluded
+#                   here, and the count is reported rather than hidden.
+#
+#   replay-parity   the governed fixed-finalist replay on both ubuntu and
+#                   windows, to detect cross-platform numerical divergence in
+#                   the model itself rather than in the tests.
+#
+# Browser tests stay out: pytest.ini deselects the e2e marker and the Playwright
+# host phase is a manual step per AGENTS.md. The Playwright *package* is
+# installed because marker deselection happens after collection.
 on:
   push:
     branches: [main]
@@ -17,9 +29,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  verify:
+  core:
+    name: Core clean-clone suite
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
 
@@ -33,19 +46,56 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          # The dev requirements include the Playwright *package*. It is needed
-          # even though the e2e marker is deselected: marker deselection happens
-          # after collection, and the browser test modules import playwright at
-          # import time. The browser binaries are deliberately NOT installed
-          # (no `playwright install`), so the e2e tests stay deselected exactly
-          # as they are locally.
           pip install -r requirements-dev.txt
+
+      - name: Record the resolved environment
+        run: |
+          mkdir -p artifacts/ci_environment
+          python -c "import sys; print(sys.version)" | tee artifacts/ci_environment/python_version.txt
+          pip freeze | tee artifacts/ci_environment/pip_freeze.txt
+          python -c "
+          import json
+          import numpy as np
+          record = {'numpy': np.__version__, 'numpy_config': {}}
+          try:
+              import threadpoolctl
+              record['threadpool'] = threadpoolctl.threadpool_info()
+          except Exception as exc:
+              record['threadpool_error'] = str(exc)
+          for module in ('pandas', 'scipy', 'sklearn', 'joblib', 'pyarrow', 'statsmodels'):
+              try:
+                  record[module] = __import__(module).__version__
+              except Exception as exc:
+                  record[module] = f'unavailable: {exc}'
+          print(json.dumps(record, indent=2))
+          open('artifacts/ci_environment/runtime_versions.json', 'w').write(json.dumps(record, indent=2))
+          "
 
       - name: Compile all sources
         run: python -m compileall -q .
 
-      - name: Full test suite
-        run: python -m pytest -q
+      - name: Rebuild curated data from the committed pack
+        # artifacts/ is gitignored scratch, but this content is deterministically
+        # rebuildable from the vendored arbitration run, so the tests that depend
+        # on it are genuine clean-clone assurance once it is built.
+        run: python scripts/regenerate_curated_data_from_pack.py
+
+      - name: GDP sign-guard binding register
+        # Regenerated before the suite so the guard tests assert a fresh run
+        # rather than the committed copy, and drift fails here.
+        run: python scripts/audit_gdp_sign_guard_bindings.py
+
+      - name: Report clean-clone coverage
+        run: |
+          python -m pytest -q --collect-only -m "not e2e and not requires_local_scratch" \
+            2>/dev/null | tail -3 || true
+          echo "--- excluded from the clean-clone claim ---"
+          python -m pytest -q --collect-only -m "requires_local_scratch" 2>/dev/null | tail -3 || true
+          echo "Excluded tests need developer-local scratch that cannot be rebuilt"
+          echo "from committed content (screenshots, hand-kept audit logs)."
+
+      - name: Core test suite
+        run: python -m pytest -q -m "not e2e and not requires_local_scratch"
 
       - name: Conflict scenario extract validation
         run: |
@@ -74,15 +124,46 @@ jobs:
       - name: Streamlit deployment readiness
         run: python scripts/check_streamlit_deploy_readiness.py
 
-      - name: GDP sign-guard binding register
-        run: python scripts/audit_gdp_sign_guard_bindings.py
-
       - name: Upload evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: verification-evidence
+          name: core-evidence
           path: |
             artifacts/long_horizon_validation/
             artifacts/gdp_sign_guard_audit/
+            artifacts/ci_environment/
+          if-no-files-found: ignore
+
+  replay-parity:
+    name: Replay parity (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Governed replay fingerprint
+        run: python scripts/replay_parity_fingerprint.py --output artifacts/replay_parity
+
+      - name: Upload fingerprint
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: replay-fingerprint-${{ matrix.os }}
+          path: artifacts/replay_parity/
           if-no-files-found: ignore

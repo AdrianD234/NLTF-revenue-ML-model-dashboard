@@ -3,6 +3,15 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
+# artifacts/recursive_audit_loops.json is a hand-maintained record of past
+# audit passes. It cannot be regenerated from committed content, so this is
+# developer-local scratch rather than clean-clone assurance.
+
+pytestmark = pytest.mark.requires_local_scratch
+
+
 
 ROOT = Path(__file__).resolve().parents[1]
 LOOP_LOG = ROOT / "artifacts" / "recursive_audit_loops.json"

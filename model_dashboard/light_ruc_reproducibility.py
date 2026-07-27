@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 import pandas as pd
@@ -506,7 +506,7 @@ def reproducibility_replay_summary(pack: ReproducibilityPack) -> dict[str, Any]:
         "status": status,
         "model": model,
         "max_abs_pred_delta": max_delta,
-        "workbook": Path(source_workbook).name if source_workbook else "Master Copy revenue modelling workbook.xlsx",
+        "workbook": provenance_basename(source_workbook) if source_workbook else "Master Copy revenue modelling workbook.xlsx",
         "source_sheet": source_sheet,
         "description": pack.config.description,
     }
@@ -1071,7 +1071,7 @@ def _ped_source_artifact_status(pack: PedInnerHpoAuditPack) -> str:
 
 def _ped_source_stage_hint(source_file: Any) -> str | None:
     text = str(source_file).replace("\\", "/").lower()
-    name = Path(text).name
+    name = provenance_basename(text)
     if "hpo_refinement_core_outputs" in text or name in {
         "hpo_refined_ensemble_weights.csv",
         "hpo_full_validation_summary.csv",
@@ -1092,8 +1092,7 @@ def _ped_source_stage_hint(source_file: Any) -> str | None:
 
 
 def _ped_source_artifact_for_reference(pack: PedInnerHpoAuditPack, source_file: Any) -> dict[str, Any] | None:
-    text = str(source_file)
-    name = Path(text).name
+    name = provenance_basename(source_file)
     if not name:
         return None
     artifacts = _ped_source_artifacts(pack)
@@ -1242,8 +1241,23 @@ def _max_abs_for_columns(frame: pd.DataFrame, columns: tuple[str, ...]) -> float
     return max(values) if values else pd.NA
 
 
+def provenance_basename(source_file: Any) -> str:
+    """Basename of a stored provenance path, independent of platform.
+
+    Committed provenance records absolute paths from wherever the artefact was
+    produced, which for this repository means Windows paths with backslashes.
+    ``Path(r"a\\b.csv").name`` returns the whole string on POSIX because the
+    backslash is a valid filename character there, so any classification built
+    on it silently changes meaning between Windows and Linux. Normalising the
+    separator first makes the answer the same on both.
+    """
+
+    text = str(source_file or "").strip().replace("\\", "/")
+    return PurePosixPath(text).name if text else ""
+
+
 def _ped_inner_source_role(source_file: Any) -> str:
-    name = Path(str(source_file)).name.lower()
+    name = provenance_basename(source_file).lower()
     if name == "hpo_refined_ensemble_weights.csv":
         return "HPO refinement source"
     if name == "ensemble_weights.csv":

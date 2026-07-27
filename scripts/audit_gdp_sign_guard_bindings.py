@@ -155,15 +155,87 @@ def build_guard_binding_table(replay: Any) -> pd.DataFrame:
             "forecast_delta_pct": np.asarray(forecast_delta_pct, dtype=float),
         }
     )
+    # Economic monotonicity: for a downside GDP input the guarded activity must
+    # not exceed the same-price Base activity. The guard caps at identity, so
+    # equality is the expected outcome and anything above it is a failure.
+    base_at_same_price = reference * price_response
+    out["input_gdp_level_factor"] = pd.to_numeric(
+        bound["demand_gdp_input_level_factor"], errors="coerce"
+    ).to_numpy(dtype=float)
+    out["price_response_factor"] = price_response.to_numpy(dtype=float)
+    out["base_reference_forecast"] = reference.to_numpy(dtype=float)
+    out["base_at_same_price_forecast"] = base_at_same_price.to_numpy(dtype=float)
+    out["gdp_factor_source_scenario"] = (
+        bound["demand_gdp_factor_source_scenario_name"].astype(str).to_numpy()
+        if "demand_gdp_factor_source_scenario_name" in bound.columns
+        else ""
+    )
+    out["responding_model"] = stream.map(_finalist_model_by_stream()).to_numpy()
+    tolerance = 1e-9 + 1e-12 * base_at_same_price.abs()
+    out["monotonicity_holds"] = (
+        guarded_forecast <= base_at_same_price + tolerance
+    ).to_numpy()
+    out["base_vs_scenario_direction"] = np.where(
+        out["guarded_forecast"] < out["base_at_same_price_forecast"] - 1e-9,
+        "scenario_below_base",
+        np.where(
+            out["guarded_forecast"] > out["base_at_same_price_forecast"] + 1e-9,
+            "scenario_above_base",
+            "scenario_equals_base_at_identity",
+        ),
+    )
     out["revenue_equivalent_delta_nzd_m"] = out.apply(
         lambda row: row["forecast_delta_pct"] / 100.0
         * reference_revenue.get(str(row["stream"]), float("nan")),
         axis=1,
     )
     out["revenue_equivalent_basis"] = REVENUE_EQUIVALENT_BASIS
+    # The two guard types have different acceptance conditions.
+    #
+    # An identity guard restores a definition the scenario requires, so it may
+    # legitimately clip in either direction - the raw factor can sit either side
+    # of 1 - and is accepted when the guarded factor is exactly 1.
+    #
+    # A downside guard corrects a wrong-sign response, so it must clip DOWNWARD
+    # and the guarded result must satisfy economic monotonicity. Anything else
+    # stays unresolved rather than being quietly absorbed.
+    identity_restored = out["identity_guard"] & np.isclose(
+        out["guarded_gdp_model_factor"], 1.0, rtol=0.0, atol=1e-12
+    )
+    downside_accepted = (
+        out["downside_guard"] & out["monotonicity_holds"] & (out["clip_amount"] <= 1e-15)
+    )
+    out["disposition"] = np.where(
+        identity_restored,
+        "accepted_definitional_restoration",
+        np.where(downside_accepted, "accepted_expected_guard", "unresolved"),
+    )
     return out.sort_values(
         ["severity", "scenario_name", "stream", "quarter"], kind="stable"
     ).reset_index(drop=True)
+
+
+def _finalist_model_by_stream() -> dict[str, str]:
+    import json
+
+    out: dict[str, str] = {}
+    for stream, directory in (
+        ("PED", "ped_vnext"),
+        ("LIGHT_RUC", "light_ruc_vnext"),
+        ("HEAVY_RUC", "heavy_ruc_vnext"),
+    ):
+        path = (
+            REPO_ROOT
+            / "data"
+            / "dashboard_evidence_pack_reproducibility"
+            / directory
+            / "fitted_model_manifest.json"
+        )
+        if path.exists():
+            out[stream] = str(
+                json.loads(path.read_text(encoding="utf-8")).get("finalist_model", "")
+            )
+    return out
 
 
 def summarise_bindings(bindings: pd.DataFrame) -> pd.DataFrame:
@@ -267,26 +339,33 @@ def evaluate_acceptance(bindings: pd.DataFrame) -> pd.DataFrame:
         }
     )
     low_downside = subset("low", downside=True)
+    if low_downside.empty:
+        low_status, low_detail = "passed", "No wrong-sign responses in the Low path."
+    else:
+        accepted = low_downside["disposition"].astype(str).eq("accepted_expected_guard")
+        low_status = "accepted_expected_guard" if accepted.all() else "unresolved"
+        low_detail = (
+            f"{len(low_downside)} wrong-sign bindings inside the Low stress "
+            f"window ({low_downside['quarter'].min()}-{low_downside['quarter'].max()}), "
+            f"maximum impact {float(low_downside['forecast_delta_pct'].abs().max()):.4f}%, "
+            f"cumulative revenue-equivalent "
+            f"{float(low_downside['revenue_equivalent_delta_nzd_m'].sum()):.2f} $m. "
+            f"{int(accepted.sum())}/{len(low_downside)} satisfy the economic "
+            "monotonicity invariant after guarding. " + DOWNSIDE_GUARD_EXPLANATION
+        )
     rows.append(
         {
             "severity": "low",
             "guard_type": "downside_sign",
-            "rule": "zero unexpected bindings",
+            "rule": "zero unexpected bindings; each explicitly disposed",
             "n_bindings": int(len(low_downside)),
             "max_abs_forecast_delta_pct": (
                 0.0
                 if low_downside.empty
                 else float(low_downside["forecast_delta_pct"].abs().max())
             ),
-            "status": "passed" if low_downside.empty else "review_required",
-            "detail": (
-                "No wrong-sign responses in the Low path."
-                if low_downside.empty
-                else (
-                    f"{len(low_downside)} wrong-sign bindings inside the Low "
-                    "stress window. " + DOWNSIDE_GUARD_EXPLANATION
-                )
-            ),
+            "status": low_status,
+            "detail": low_detail,
         }
     )
 
@@ -357,6 +436,25 @@ _DETAIL_COLUMNS = [
     "forecast_delta",
     "forecast_delta_pct",
     "revenue_equivalent_delta_nzd_m",
+    "disposition",
+]
+_LOW_DOWNSIDE_COLUMNS = [
+    "scenario_name",
+    "stream",
+    "quarter",
+    "responding_model",
+    "input_gdp_level_factor",
+    "price_response_factor",
+    "raw_gdp_model_factor",
+    "guarded_gdp_model_factor",
+    "clip_amount",
+    "base_at_same_price_forecast",
+    "guarded_forecast",
+    "base_vs_scenario_direction",
+    "monotonicity_holds",
+    "forecast_delta_pct",
+    "revenue_equivalent_delta_nzd_m",
+    "disposition",
 ]
 
 
@@ -380,6 +478,21 @@ def build_report(
         _markdown_table(summary),
         "",
         f"Total bindings: {0 if bindings.empty else len(bindings)}.",
+        "",
+        "## Low wrong-sign bindings, individually disposed",
+        "",
+        "These are the bindings that indicate the fitted model responding with the",
+        "wrong sign, as distinct from the definitional identity restorations. Each",
+        "is listed in full with its disposition.",
+        "",
+        _markdown_table(
+            bindings[
+                bindings["severity"].astype(str).eq("low")
+                & bindings["downside_guard"].astype(bool)
+            ][_LOW_DOWNSIDE_COLUMNS]
+            if not bindings.empty
+            else bindings
+        ),
         "",
         "## Every binding",
         "",
