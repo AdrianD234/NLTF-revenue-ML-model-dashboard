@@ -95,3 +95,70 @@ June-year chart rows for both scenarios, so they are absent from this
 census. They are recoverable from the bridge if the financial
 decomposition needs them.
 
+
+---
+
+# Phase A2 closeout: the financial decomposition
+
+## Correction to the first pass
+
+The first decomposition attributed 44% of the FY2030 gap to population. **That
+was wrong.** It derived current population by inverting light-petrol VKT, which
+folds the EV/PHEV migration allocation into the population term.
+
+Taking current population from the scenario inputs and treating migration as
+its own bridge term, with an order-neutral three-factor Shapley over
+VKT per capita x population x migration:
+
+| FY | VKT per capita | Population scaling | EV/PHEV migration |
+|---|---:|---:|---:|
+| 2026 | +71.11 | −1.20 | **−75.91** |
+| 2027 | +15.28 | −10.17 | **−102.79** |
+| 2028 | +1.15 | −15.60 | **−141.24** |
+| 2029 | −3.36 | −21.14 | **−180.14** |
+| 2030 | −7.32 | −26.61 | **−219.85** |
+
+The FED-side gap is driven by **EV/PHEV migration allocation**, not population
+and not driving behaviour. The current migration factor falls from 0.964 in
+FY2026 to 0.918 in FY2030 against an official baseline of exactly 1: the
+current path moves roughly 8% more light travel out of petrol and into
+BEV/PHEV by FY2030 than MBU26's implied allocation.
+
+VKT per capita is *positive* early (+71.1m in FY2026) and only turns negative
+from FY2029. Population contributes at most −26.6m.
+
+Caveat: official population is not published, so the official side is an
+output-implied population with a migration factor of 1 by construction. The
+migration term therefore carries whatever MBU26 folded into its own implied
+population. It is an upper bound on the true allocation difference.
+
+## RUC, sourced rather than differenced
+
+| Component | FY2030 $m | Status |
+|---|---:|---|
+| conventional Light RUC | −169.38 | observable |
+| Heavy RUC | −99.43 | observable |
+| Light BEV RUC | −29.05 | observable |
+| PHEV RUC | −7.87 | observable |
+| Heavy BEV revenue | 0.00 | inherited from MBU26 |
+| RUC administration | 0.00 | inherited from MBU26 |
+| RUC refunds | 0.00 | cancels in the Total RUC identity |
+| official formula/rounding residual | −0.38 | official workbook residual |
+
+Refunds cancel algebraically: gross RUC includes them and
+`ruc_revenue_net_admin − ruc_refunds` removes them. No gap is attributed to
+them. The remaining −0.38m is named as an official workbook residual rather
+than bundled into a difference-derived balancing term.
+
+## Conclusion
+
+**Financial.** The FY2026–FY2030 gap closes exactly through named observable
+lines. Maximum closure residual 5.7e-13, inside the 1e-6 tolerance.
+
+**Causal.** Partial. The EV/PHEV migration allocation, VKT per capita and
+population scaling are observable and measured. MBU26's GDP, unemployment,
+petrol, diesel and RUC-price assumptions remain unavailable and are recorded
+as NA, never zero. Why MBU26 chose its fleet-electrification path is not
+recoverable from the published workbook.
+
+No model has been calibrated toward MBU26 at any point.

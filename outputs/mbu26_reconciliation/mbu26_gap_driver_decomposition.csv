@@ -1,0 +1,15 @@
+driver,availability,source,counterfactual_run,measured_contribution,reason_if_unavailable
+PED VKT per capita,direct,AR(1) output vs MBU26 official row,yes,measured in the financial decomposition,
+population,derived,light_petrol_vkt x 1e6 / ped_vkt_per_capita,yes,measured as an output-implied proxy,
+EV/PHEV class allocation,direct,class km rows on both sides,yes,measured via class activity differences,
+fuel intensity,direct,official litres / official VKT,shared,0 by construction - identical on both sides,
+effective PED rate,direct,official revenue / official litres,shared,0 by construction - identical on both sides,
+class RUC effective rates,direct,official revenue / official km,shared,0 by construction - identical on both sides,
+"refunds, admin, LPG, CNG, MVR, TUC",direct,MBU26 official rows,shared,0 by construction - inherited unchanged,
+real GDP,unavailable,not published in the MBU26 source pack,no,NA,"MBU26 publishes outputs, not the driver assumptions behind them"
+population as an independent input,unavailable,not published in the MBU26 source pack,no,NA,"only recoverable as an output-implied proxy, which is not the same thing"
+unemployment rate,unavailable,not published in the MBU26 source pack,no,NA,"MBU26 publishes outputs, not the driver assumptions behind them"
+real petrol price,unavailable,not published in the MBU26 source pack,no,NA,"MBU26 publishes outputs, not the driver assumptions behind them"
+real diesel price,unavailable,not published in the MBU26 source pack,no,NA,"MBU26 publishes outputs, not the driver assumptions behind them"
+real Light/Heavy RUC prices,unavailable,not published in the MBU26 source pack,no,NA,"MBU26 publishes outputs, not the driver assumptions behind them"
+judgemental adjustment,unavailable,not disclosed,no,NA,presence or absence cannot be established from the workbook
