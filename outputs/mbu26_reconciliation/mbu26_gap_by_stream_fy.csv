@@ -1,0 +1,86 @@
+series_id,june_year,value_current,value_unit,value_mbu26,absolute_difference,percent_difference,production_class,how_produced,common_input_counterfactual
+gross_fed_revenue,2026,2098.82866797998,$m nominal ex GST,2104.82984947749,-6.001181497510061,-0.2851148038878209,bridge,gross PED plus fixed LPG/CNG rows,blocked_mbu26_drivers_unavailable
+gross_fed_revenue,2027,2145.823719922286,$m nominal ex GST,2243.51058535005,-97.68686542776413,-4.354196769369032,bridge,gross PED plus fixed LPG/CNG rows,blocked_mbu26_drivers_unavailable
+gross_fed_revenue,2028,2343.1853103724893,$m nominal ex GST,2498.87973046832,-155.69442009583054,-6.2305687703766175,bridge,gross PED plus fixed LPG/CNG rows,blocked_mbu26_drivers_unavailable
+gross_fed_revenue,2029,2434.4391989459855,$m nominal ex GST,2639.07950143754,-204.6403024915544,-7.754230305683639,bridge,gross PED plus fixed LPG/CNG rows,blocked_mbu26_drivers_unavailable
+gross_fed_revenue,2030,2495.632650420846,$m nominal ex GST,2749.40823186396,-253.77558144311388,-9.230189191332524,bridge,gross PED plus fixed LPG/CNG rows,blocked_mbu26_drivers_unavailable
+gross_ped_revenue,2026,2056.7835053397894,$m nominal ex GST,2062.7846868373,-6.001181497510515,-0.2909262190961694,bridge,PED litres x MBU26 effective rate,blocked_mbu26_drivers_unavailable
+gross_ped_revenue,2027,2103.1910301019448,$m nominal ex GST,2200.87789552971,-97.68686542776504,-4.4385408943486,bridge,PED litres x MBU26 effective rate,blocked_mbu26_drivers_unavailable
+gross_ped_revenue,2028,2300.331933510302,$m nominal ex GST,2456.02635360613,-155.69442009582826,-6.339281330073088,bridge,PED litres x MBU26 effective rate,blocked_mbu26_drivers_unavailable
+gross_ped_revenue,2029,2391.382652289875,$m nominal ex GST,2596.02295478143,-204.6403024915553,-7.882838713526892,bridge,PED litres x MBU26 effective rate,blocked_mbu26_drivers_unavailable
+gross_ped_revenue,2030,2452.3878725737522,$m nominal ex GST,2706.16345401687,-253.77558144311797,-9.377688589594555,bridge,PED litres x MBU26 effective rate,blocked_mbu26_drivers_unavailable
+heavy_ruc_net_km,2026,4045.112836987535,million km,4106.65708028096,-61.5442432934251,-1.4986457863487959,model,Heavy RUC finalist forecast,blocked_mbu26_drivers_unavailable
+heavy_ruc_net_km,2027,4100.270092100126,million km,4256.14265648045,-155.87256438032364,-3.662296519666472,model,Heavy RUC finalist forecast,blocked_mbu26_drivers_unavailable
+heavy_ruc_net_km,2028,4134.118313509229,million km,4323.42005434382,-189.30174083459133,-4.3785183594269625,model,Heavy RUC finalist forecast,blocked_mbu26_drivers_unavailable
+heavy_ruc_net_km,2029,4171.7860513357455,million km,4400.67521803142,-228.88916669567425,-5.201228342364802,model,Heavy RUC finalist forecast,blocked_mbu26_drivers_unavailable
+heavy_ruc_net_km,2030,4205.391266929527,million km,4474.70373343995,-269.3124665104233,-6.018554133490935,model,Heavy RUC finalist forecast,blocked_mbu26_drivers_unavailable
+heavy_ruc_net_revenue,2026,1129.3227625959253,$m nominal ex GST,1146.5048086003,-17.182046004374797,-1.4986457863488023,bridge,heavy km x MBU26 effective rate,blocked_mbu26_drivers_unavailable
+heavy_ruc_net_revenue,2027,1231.4061163927752,$m nominal ex GST,1278.2182592137,-46.81214282092492,-3.6622965196664885,bridge,heavy km x MBU26 effective rate,blocked_mbu26_drivers_unavailable
+heavy_ruc_net_revenue,2028,1380.1167259757658,$m nominal ex GST,1443.31242551064,-63.195699534874166,-4.378518359426976,bridge,heavy km x MBU26 effective rate,blocked_mbu26_drivers_unavailable
+heavy_ruc_net_revenue,2029,1474.7557193376201,$m nominal ex GST,1555.66965009176,-80.91393075413998,-5.201228342364803,bridge,heavy km x MBU26 effective rate,blocked_mbu26_drivers_unavailable
+heavy_ruc_net_revenue,2030,1552.6890410773983,$m nominal ex GST,1652.12295550638,-99.43391442898178,-6.018554133490931,bridge,heavy km x MBU26 effective rate,blocked_mbu26_drivers_unavailable
+light_bev_ruc_net_km,2026,1192.0988218478135,million km,1209.37911079624,-17.28028894842646,-1.428856244841978,bridge,EV/PHEV migration allocation from the light pool,blocked_mbu26_drivers_unavailable
+light_bev_ruc_net_km,2027,1485.95887922949,million km,1572.19480045545,-86.23592122595983,-5.485065921918715,bridge,EV/PHEV migration allocation from the light pool,blocked_mbu26_drivers_unavailable
+light_bev_ruc_net_km,2028,1852.8197111800268,million km,1989.37597979678,-136.5562686167532,-6.864276537143208,bridge,EV/PHEV migration allocation from the light pool,blocked_mbu26_drivers_unavailable
+light_bev_ruc_net_km,2029,2288.40837340828,million km,2502.17964433063,-213.7712709223497,-8.543402205621279,bridge,EV/PHEV migration allocation from the light pool,blocked_mbu26_drivers_unavailable
+light_bev_ruc_net_km,2030,2751.233821402135,million km,3074.13637597232,-322.90255457018475,-10.503846123874506,bridge,EV/PHEV migration allocation from the light pool,blocked_mbu26_drivers_unavailable
+light_bev_ruc_net_revenue,2026,80.30079241604851,$m nominal ex GST,81.4648074039889,-1.1640149879403907,-1.4288562448419844,bridge,class km x MBU26 effective class rate,blocked_mbu26_drivers_unavailable
+light_bev_ruc_net_revenue,2027,108.34636007108541,$m nominal ex GST,114.634116955081,-6.287756883995584,-5.485065921918709,bridge,class km x MBU26 effective class rate,blocked_mbu26_drivers_unavailable
+light_bev_ruc_net_revenue,2028,150.72688350449513,$m nominal ex GST,161.835735956468,-11.108852451972865,-6.8642765371432075,bridge,class km x MBU26 effective class rate,blocked_mbu26_drivers_unavailable
+light_bev_ruc_net_revenue,2029,197.1120552435215,$m nominal ex GST,215.525243664418,-18.413188420896518,-8.543402205621275,bridge,class km x MBU26 effective class rate,blocked_mbu26_drivers_unavailable
+light_bev_ruc_net_revenue,2030,247.51475074244328,$m nominal ex GST,276.56467906435,-29.04992832190672,-10.503846123874515,bridge,class km x MBU26 effective class rate,blocked_mbu26_drivers_unavailable
+light_ruc_net_km,2026,12352.557824257878,million km,12899.1247322853,-546.566908027422,-4.237240273050591,model+bridge,"Light RUC finalist total pool, class-allocated",blocked_mbu26_drivers_unavailable
+light_ruc_net_km,2027,11893.795047719985,million km,12939.636710647,-1045.841662927016,-8.08246542243706,model+bridge,"Light RUC finalist total pool, class-allocated",blocked_mbu26_drivers_unavailable
+light_ruc_net_km,2028,12336.184183531306,million km,13427.7171481819,-1091.5329646505943,-8.128954107425377,model+bridge,"Light RUC finalist total pool, class-allocated",blocked_mbu26_drivers_unavailable
+light_ruc_net_km,2029,12521.359028290877,million km,13926.5605658137,-1405.201537522822,-10.09008312484741,model+bridge,"Light RUC finalist total pool, class-allocated",blocked_mbu26_drivers_unavailable
+light_ruc_net_km,2030,12519.461907387322,million km,14402.4384228319,-1882.9765154445777,-13.074011914951377,model+bridge,"Light RUC finalist total pool, class-allocated",blocked_mbu26_drivers_unavailable
+light_ruc_net_revenue,2026,836.7902919695113,$m nominal ex GST,873.815974346887,-37.02568237737569,-4.237240273050588,bridge,class km x MBU26 effective class rate,blocked_mbu26_drivers_unavailable
+light_ruc_net_revenue,2027,867.4413894143005,$m nominal ex GST,943.716988712666,-76.27559929836548,-8.08246542243706,bridge,class km x MBU26 effective class rate,blocked_mbu26_drivers_unavailable
+light_ruc_net_revenue,2028,1003.0816347774778,$m nominal ex GST,1091.83652480716,-88.7548900296822,-8.128954107425383,bridge,class km x MBU26 effective class rate,blocked_mbu26_drivers_unavailable
+light_ruc_net_revenue,2029,1078.3878860719071,$m nominal ex GST,1199.40927936719,-121.0213932952829,-10.090083124847421,bridge,class km x MBU26 effective class rate,blocked_mbu26_drivers_unavailable
+light_ruc_net_revenue,2030,1126.1775014077411,$m nominal ex GST,1295.55904536384,-169.38154395609877,-13.074011914951377,bridge,class km x MBU26 effective class rate,blocked_mbu26_drivers_unavailable
+net_fed_revenue,2026,2025.5611432843793,$m nominal ex GST,2031.56232478189,-6.001181497510743,-0.2953973611493821,formula,gross_fed_revenue - fed_refunds,not_required_inherited_or_derived
+net_fed_revenue,2027,2063.7187580183295,$m nominal ex GST,2161.40562344609,-97.6868654277605,-4.5195989298857775,formula,gross_fed_revenue - fed_refunds,not_required_inherited_or_derived
+net_fed_revenue,2028,2251.073595371036,$m nominal ex GST,2406.76801546686,-155.69442009582417,-6.469024812332106,formula,gross_fed_revenue - fed_refunds,not_required_inherited_or_derived
+net_fed_revenue,2029,2336.6086821512836,$m nominal ex GST,2541.24898464284,-204.6403024915562,-8.052745076465516,formula,gross_fed_revenue - fed_refunds,not_required_inherited_or_derived
+net_fed_revenue,2030,2393.219658030332,$m nominal ex GST,2646.99523947345,-253.77558144311797,-9.587307814486284,formula,gross_fed_revenue - fed_refunds,not_required_inherited_or_derived
+net_mvr_revenue,2026,425.1291935285919,$m nominal ex GST,425.129193528592,-1.1368683772161603e-13,-2.674171509559483e-14,fixed,inherited from MBU26 unchanged,not_required_inherited_or_derived
+net_mvr_revenue,2027,496.1497521504495,$m nominal ex GST,496.149752150449,5.115907697472721e-13,1.0311216876152766e-13,fixed,inherited from MBU26 unchanged,not_required_inherited_or_derived
+net_mvr_revenue,2028,490.25051027658566,$m nominal ex GST,490.250510276586,-3.410605131648481e-13,-6.956861971901489e-14,fixed,inherited from MBU26 unchanged,not_required_inherited_or_derived
+net_mvr_revenue,2029,484.84310999369575,$m nominal ex GST,484.843109993696,-2.2737367544323206e-13,-4.689634043602031e-14,fixed,inherited from MBU26 unchanged,not_required_inherited_or_derived
+net_mvr_revenue,2030,479.8837182888595,$m nominal ex GST,479.88371828886,-5.115907697472721e-13,-1.0660723634706158e-13,fixed,inherited from MBU26 unchanged,not_required_inherited_or_derived
+ped_vkt_per_capita,2026,6144.321779043229,km/person,5935.87599744435,208.44578159887897,3.511626282095917,model,AR(1) PED econometric forecast,blocked_mbu26_drivers_unavailable
+ped_vkt_per_capita,2027,5966.778677198156,km/person,5924.5731702763,42.205506921856795,0.7123805497685919,model,AR(1) PED econometric forecast,blocked_mbu26_drivers_unavailable
+ped_vkt_per_capita,2028,5911.505385511109,km/person,5908.65677079833,2.8486147127787262,0.048210867939683086,model,AR(1) PED econometric forecast,blocked_mbu26_drivers_unavailable
+ped_vkt_per_capita,2029,5889.9724021517095,km/person,5897.91062691712,-7.9382247654102684,-0.1345938463221447,model,AR(1) PED econometric forecast,blocked_mbu26_drivers_unavailable
+ped_vkt_per_capita,2030,5870.472750433319,km/person,5887.16953577159,-16.696785338271184,-0.28361312234713576,model,AR(1) PED econometric forecast,blocked_mbu26_drivers_unavailable
+ped_volume,2026,2937.2550915968645,million litres,2945.82526967511,-8.57017807824559,-0.2909262190961781,bridge,light petrol VKT x MBU26 fuel intensity,blocked_mbu26_drivers_unavailable
+ped_volume,2027,2767.9275639520765,million litres,2896.48943188686,-128.56186793478355,-4.438540894348594,bridge,light petrol VKT x MBU26 fuel intensity,blocked_mbu26_drivers_unavailable
+ped_volume,2028,2705.988211855552,million litres,2889.13885167999,-183.1506398244378,-6.339281330073095,bridge,light petrol VKT x MBU26 fuel intensity,blocked_mbu26_drivers_unavailable
+ped_volume,2029,2656.765045661623,million litres,2884.11519477832,-227.35014911669714,-7.882838713526899,bridge,light petrol VKT x MBU26 fuel intensity,blocked_mbu26_drivers_unavailable
+ped_volume,2030,2608.6477906508626,million litres,2878.59330671556,-269.9455160646976,-9.377688589594552,bridge,light petrol VKT x MBU26 fuel intensity,blocked_mbu26_drivers_unavailable
+phev_ruc_net_km,2026,624.3438192266098,million km,633.39411052937,-9.050291302760229,-1.428856244841982,bridge,EV/PHEV migration allocation from the light pool,blocked_mbu26_drivers_unavailable
+phev_ruc_net_km,2027,818.9278962586613,million km,866.45343854562,-47.525542286958625,-5.485065921918705,bridge,EV/PHEV migration allocation from the light pool,blocked_mbu26_drivers_unavailable
+phev_ruc_net_km,2028,1037.662324130385,million km,1114.1399728797,-76.477648749315,-6.864276537143212,bridge,EV/PHEV migration allocation from the light pool,blocked_mbu26_drivers_unavailable
+phev_ruc_net_km,2029,1275.0892857965052,million km,1394.20153006706,-119.11224427055481,-8.543402205621279,bridge,EV/PHEV migration allocation from the light pool,blocked_mbu26_drivers_unavailable
+phev_ruc_net_km,2030,1511.5166685185566,million km,1688.91801832143,-177.40134980287348,-10.503846123874498,bridge,EV/PHEV migration allocation from the light pool,blocked_mbu26_drivers_unavailable
+phev_ruc_net_revenue,2026,21.528254702237074,$m nominal ex GST,21.8403214998817,-0.31206679764462564,-1.4288562448419817,bridge,class km x MBU26 effective class rate,blocked_mbu26_drivers_unavailable
+phev_ruc_net_revenue,2027,29.96897133827872,$m nominal ex GST,31.7081862571269,-1.7392149188481802,-5.485065921918713,bridge,class km x MBU26 effective class rate,blocked_mbu26_drivers_unavailable
+phev_ruc_net_revenue,2028,41.62582413249052,$m nominal ex GST,44.6937250120693,-3.0679008795787794,-6.86427653714321,bridge,class km x MBU26 effective class rate,blocked_mbu26_drivers_unavailable
+phev_ruc_net_revenue,2029,54.159417414206494,$m nominal ex GST,59.2187099895983,-5.059292575391808,-8.543402205621275,bridge,class km x MBU26 effective class rate,blocked_mbu26_drivers_unavailable
+phev_ruc_net_revenue,2030,67.05843699882554,$m nominal ex GST,74.92884788283,-7.870410884004457,-10.503846123874498,bridge,class km x MBU26 effective class rate,blocked_mbu26_drivers_unavailable
+total_fed_ruc_net_revenue,2026,4058.9323737620216,$m nominal ex GST,4120.61600894202,-61.68363517999842,-1.4969517918228898,unclassified,unclassified,blocked_mbu26_drivers_unavailable
+total_fed_ruc_net_revenue,2027,4265.143719467869,$m nominal ex GST,4494.5723108443,-229.42859137643063,-5.104570034903561,unclassified,unclassified,blocked_mbu26_drivers_unavailable
+total_fed_ruc_net_revenue,2028,4809.037883226649,$m nominal ex GST,5131.325919888461,-322.28803666181193,-6.280794509907441,unclassified,unclassified,blocked_mbu26_drivers_unavailable
+total_fed_ruc_net_revenue,2029,5127.015783079683,$m nominal ex GST,5557.426791662339,-430.411008582656,-7.744789535120647,unclassified,unclassified,blocked_mbu26_drivers_unavailable
+total_fed_ruc_net_revenue,2030,5377.033147873892,$m nominal ex GST,5936.92777366741,-559.8946257935186,-9.430713108501497,unclassified,unclassified,blocked_mbu26_drivers_unavailable
+total_nltf_net_revenue,2026,4501.467644777026,$m nominal ex GST,4563.15127995703,-61.683635180003876,-1.3517771249649373,formula,sum of governed revenue lines,not_required_inherited_or_derived
+total_nltf_net_revenue,2027,4778.851371311143,$m nominal ex GST,5008.27996268758,-229.428591376437,-4.58098574931341,formula,sum of governed revenue lines,not_required_inherited_or_derived
+total_nltf_net_revenue,2028,5316.84629319606,$m nominal ex GST,5639.13432985787,-322.2880366618101,-5.715204104207483,formula,sum of governed revenue lines,not_required_inherited_or_derived
+total_nltf_net_revenue,2029,5629.416792766205,$m nominal ex GST,6059.82780134886,-430.4110085826551,-7.102693718241461,formula,sum of governed revenue lines,not_required_inherited_or_derived
+total_nltf_net_revenue,2030,5874.474765855576,$m nominal ex GST,6434.36939164909,-559.894625793514,-8.701623915471481,formula,sum of governed revenue lines,not_required_inherited_or_derived
+total_ruc_net_revenue,2026,2033.3712304776423,$m nominal ex GST,2089.05368416013,-55.6824536824879,-2.665439098319492,formula,ruc_revenue_net_admin - ruc_refunds,not_required_inherited_or_derived
+total_ruc_net_revenue,2027,2201.42496144954,$m nominal ex GST,2333.16668739821,-131.74172594866968,-5.6464772388628255,formula,ruc_revenue_net_admin - ruc_refunds,not_required_inherited_or_derived
+total_ruc_net_revenue,2028,2557.9642878556133,$m nominal ex GST,2724.5579044216,-166.59361656598685,-6.114519214131117,formula,ruc_revenue_net_admin - ruc_refunds,not_required_inherited_or_derived
+total_ruc_net_revenue,2029,2790.4071009284003,$m nominal ex GST,3016.1778070195,-225.77070609109978,-7.4853248228823706,formula,ruc_revenue_net_admin - ruc_refunds,not_required_inherited_or_derived
+total_ruc_net_revenue,2030,2983.8134898435596,$m nominal ex GST,3289.93253419396,-306.11904435040015,-9.304721029040795,formula,ruc_revenue_net_admin - ruc_refunds,not_required_inherited_or_derived

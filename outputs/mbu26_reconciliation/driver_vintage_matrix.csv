@@ -1,0 +1,15 @@
+driver,streams_affected,current_model_source,mbu26_source,mbu26_vintage_reproducible
+real GDP,PED / Light RUC / Heavy RUC,Treasury BEFU26 overlay (committed CSV),not published in the MBU26 source pack,no
+population,PED (per-capita denominator),"Treasury BEFU26 June anchors, log-linear interpolation",not published in the MBU26 source pack,no
+unemployment rate,PED,scenario input workbook,not published in the MBU26 source pack,no
+real petrol price,PED,scenario input workbook,not published in the MBU26 source pack,no
+real diesel price,Light RUC,scenario input workbook,not published in the MBU26 source pack,no
+real Light RUC price,Light RUC,scenario input workbook,not published in the MBU26 source pack,no
+real Heavy RUC price,Heavy RUC,scenario input workbook,not published in the MBU26 source pack,no
+PED effective rate,PED revenue bridge,inherited from MBU26,MBU26 official annual (revenue / volume),yes
+class RUC effective rates,Light/Heavy RUC revenue bridge,inherited from MBU26,MBU26 official annual (revenue / km),yes
+fuel intensity (litres per km),PED volume bridge,inherited from MBU26,MBU26 official annual (litres / VKT),yes
+EV/PHEV class allocation,Light RUC class mix,MoT VFM 202405 uptake levers,MBU26 official class km rows,yes
+refunds and admin,net revenue formulas,inherited from MBU26,MBU26 official annual,yes
+MVR / TUC / LPG / CNG,fixed revenue rows,inherited from MBU26,MBU26 official annual,yes
+judgemental adjustment,any,none applied,unknown; not disclosed in the workbook,no

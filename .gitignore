@@ -128,8 +128,6 @@ data/dashboard_evidence_pack_reproducibility/ped_inner_hpo/source_artifacts/**/*
 !deliverables/PED-VKT-model-review.zip
 
 # local task exports, workbook previews and inspection scratch
-outputs/
-
-# Workstream A reconciliation evidence (must be reviewable on GitHub)
+outputs/*
 !outputs/mbu26_reconciliation/
 !outputs/mbu26_reconciliation/**
