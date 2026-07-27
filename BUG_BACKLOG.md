@@ -132,3 +132,38 @@ Backlog state for the Stage 1 Model Governance Dashboard Parquet refresh and vis
 - [x] Kept runtime model-state gaps in `forecast_run_manifest.json`, `forecast_capability_report.*`, and `forecast_validation_report.md` rather than adding unchecked dashboard backlog defects.
 
 No unchecked backlog items remain.
+
+## Assurance items found by clean-environment CI
+
+This file is a locked completion gate and deliberately carries no unchecked
+items. Open investigation work is tracked in its own document:
+
+- **Governed replay cross-environment parity** — open. Replay values differ by
+  up to 0.42% between the local Windows run and clean Linux CI. Tracked with
+  evidence, hypotheses and the decision rule in
+  [`docs/REPLAY_PARITY_INVESTIGATION.md`](docs/REPLAY_PARITY_INVESTIGATION.md).
+  Tolerances must not be relaxed until the cause is identified.
+- **Local environment does not match the pinned runtime** — open, same
+  document. The local `.venv` runs Python 3.13.5 / scikit-learn 1.7.2 while
+  `runtime.txt` and `requirements.txt` pin 3.11 / 1.9.0, so local suite results
+  describe a different environment than the one that ships.
+- **Four tests need unrebuildable developer-local scratch** — resolved as a
+  contract rather than a defect. `test_visual_artifacts.py` (browser
+  screenshots) and `test_recursive_audit_log.py` (hand-kept audit log) now carry
+  the `requires_local_scratch` marker, are excluded from the clean-clone CI
+  claim, and the exclusion count is reported by the CI job rather than hidden.
+
+## Known test-isolation issue (pre-existing, not a product defect)
+
+- `tests/test_streamlit_smoke.py::test_revenue_outlook_cloud_hides_debug_toggles_and_shows_full_composition`
+  times out at the 90-second Streamlit `AppTest` ceiling when run **in
+  isolation** on a cold cache, and passes when run as part of the full suite or
+  after other Streamlit tests have warmed the caches.
+  - Reproduced identically on unmodified `8431c61`, so it is not caused by the
+    structural-overlay or horizon-governance work.
+  - Symptom is a wall-clock timeout, not an assertion failure; no product
+    behaviour is implicated.
+  - Indicates cache/ordering/timing dependence in the test rather than in the
+    dashboard. Should be de-flaked by warming or raising the per-test timeout,
+    tracked separately from the current review branch.
+  - Clean-environment CI on the draft PR is the authoritative next check.

@@ -51,6 +51,10 @@ from model_dashboard.forecast_imports import (
     BACKTEST_SUPPORTED_MAX_HORIZON,
     FORECAST_BUILDER_NOTE,
     FORECAST_BUILDER_TITLE,
+    FORECAST_HORIZON_ZONE_EXTENDED,
+    FORECAST_HORIZON_ZONE_MIXED,
+    FORECAST_HORIZON_ZONE_UNVALIDATED,
+    FORECAST_HORIZON_ZONE_VALIDATED,
     FORECAST_RUNNER_IMPORT_ERROR,
     HORIZON_SUPPORT_NOTE,
     SCENARIO_ROLE_BASECASE,
@@ -4200,6 +4204,8 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     if chart_rows.empty:
         warning_panel("The promoted Revenue Outlook pack has no chart rows.")
         return
+
+    _render_forecast_horizon_support_note(chart_rows)
 
     timer.start("selector metadata")
     selector_options = cached_revenue_outlook_selectors(pack_signature, pack)
@@ -9504,16 +9510,30 @@ def _revenue_path_hover_customdata(rows: pd.DataFrame) -> Any:
     actual_scope = {"actual_anchor", "current_nowcast", "current_forecast", "official_comparator"}
     value_status_labels = _human_revenue_label_values(value_status)
     data_scope_labels = _human_revenue_label_values(data_scope)
+    # June-year rows land in actual_scope below, so without this the fiscal
+    # totals carry no validated-horizon warning at all.
+    zone_labels = _revenue_hover_text_values(rows, "horizon_zone_label")
+    zone_warnings = _revenue_hover_text_values(rows, "horizon_validation_warning")
+    beyond_counts = _revenue_hover_float_values(rows, "quarters_beyond_validated_horizon")
     horizon_hover: list[str] = []
-    for scope, status_label, scope_label, horizon, scope_label_raw in zip(
+    for scope, status_label, scope_label, horizon, scope_label_raw, zone_label, zone_warning, beyond in zip(
         data_scope,
         value_status_labels,
         data_scope_labels,
         horizon_values,
         horizon_scope,
+        zone_labels,
+        zone_warnings,
+        beyond_counts,
     ):
         if scope in actual_scope:
-            horizon_hover.append(status_label or scope_label)
+            base_label = status_label or scope_label
+            if zone_warning:
+                detail = zone_label or zone_warning
+                if beyond is not None and int(float(beyond)) > 0:
+                    detail = f"{detail} ({int(float(beyond))} of 4 quarters)"
+                base_label = f"{base_label}<br>Horizon: {html.escape(detail)}"
+            horizon_hover.append(base_label)
             continue
         if horizon is None:
             horizon_hover.append("Latest actual join point")
@@ -9565,10 +9585,151 @@ def _revenue_path_hover_customdata(rows: pd.DataFrame) -> Any:
     return list(zip(horizon_hover, bridge_hover, scope_hover, efficiency_hover))
 
 
+def _forecast_horizon_support_note(chart_rows: pd.DataFrame) -> str:
+    """Persistent statement of which fiscal years are backtest-supported.
+
+    A hover only reaches a reader who hovers. The support boundary changes what
+    the number means, so it belongs on the page and in the exported columns as
+    well as in the tooltip.
+    """
+
+    if chart_rows is None or chart_rows.empty:
+        return ""
+    if "horizon_zone" not in chart_rows.columns or "june_year" not in chart_rows.columns:
+        return ""
+    rows = chart_rows[
+        chart_rows["horizon_zone"].fillna("").astype(str).str.len().gt(0)
+    ]
+    if rows.empty:
+        return ""
+    years = rows.drop_duplicates("june_year")
+    supported = pd.to_numeric(
+        years.loc[
+            years["horizon_zone"].astype(str).eq(FORECAST_HORIZON_ZONE_VALIDATED),
+            "june_year",
+        ],
+        errors="coerce",
+    ).dropna()
+    extended = pd.to_numeric(
+        years.loc[
+            years["horizon_zone"].astype(str).eq(FORECAST_HORIZON_ZONE_EXTENDED),
+            "june_year",
+        ],
+        errors="coerce",
+    ).dropna()
+    unvalidated = pd.to_numeric(
+        years.loc[
+            years["horizon_zone"].astype(str).eq(FORECAST_HORIZON_ZONE_UNVALIDATED),
+            "june_year",
+        ],
+        errors="coerce",
+    ).dropna()
+    mixed = pd.to_numeric(
+        years.loc[
+            years["horizon_zone"].astype(str).eq(FORECAST_HORIZON_ZONE_MIXED),
+            "june_year",
+        ],
+        errors="coerce",
+    ).dropna()
+
+    def span(values: pd.Series) -> str:
+        """Contiguous runs, so a gap is never papered over as one range."""
+
+        years = sorted({int(value) for value in values})
+        if not years:
+            return ""
+        runs: list[tuple[int, int]] = []
+        start = previous = years[0]
+        for year in years[1:]:
+            if year == previous + 1:
+                previous = year
+                continue
+            runs.append((start, previous))
+            start = previous = year
+        runs.append((start, previous))
+        return ", ".join(
+            f"FY{low}" if low == high else f"FY{low}-FY{high}" for low, high in runs
+        )
+
+    def verb(values: pd.Series, singular: str, plural: str) -> str:
+        return singular if len({int(value) for value in values}) == 1 else plural
+
+    parts: list[str] = []
+    if not supported.empty:
+        parts.append(
+            f"**{span(supported)}** {verb(supported, 'sits', 'sit')} inside the "
+            "backtest-supported H1-H12 horizon."
+        )
+    beyond = pd.concat([extended, unvalidated, mixed])
+    if not beyond.empty:
+        parts.append(
+            f"**{span(beyond)}** {verb(beyond, 'extends', 'extend')} past it: "
+            + "; ".join(
+                fragment
+                for fragment in (
+                    (
+                        f"{span(mixed)} {verb(mixed, 'mixes', 'mix')} support states"
+                        if not mixed.empty
+                        else ""
+                    ),
+                    (
+                        f"{span(extended)} {verb(extended, 'has', 'have')} H13-H20 "
+                        "extended conditional evidence only"
+                        if not extended.empty
+                        else ""
+                    ),
+                    (
+                        f"{span(unvalidated)} {verb(unvalidated, 'has', 'have')} no "
+                        "extended evaluation evidence at all"
+                        if not unvalidated.empty
+                        else ""
+                    ),
+                )
+                if fragment
+            )
+            + "."
+        )
+    if not parts:
+        return ""
+    parts.append(
+        "Years past H12 are long-range extrapolation, not validated to the "
+        "short-term standard. Every downloaded June-year row carries "
+        "`horizon_scope` and per-state quarter counts."
+    )
+    return " ".join(parts)
+
+
+def _render_forecast_horizon_support_note(chart_rows: pd.DataFrame) -> None:
+    note = _forecast_horizon_support_note(chart_rows)
+    if note:
+        warning_panel(note)
+
+
+def _revenue_horizon_zone_suffix(row: pd.Series) -> str:
+    """Append the validated-horizon warning to a June-year hover.
+
+    June-year rows return early on data_scope below, which is why the fiscal
+    totals carried no horizon label at all. FY2030 is entirely H13+ and FY2029
+    straddles H12, so the warning belongs on the number the reader acts on.
+    """
+
+    warning = str(row.get("horizon_validation_warning") or "").strip()
+    if not warning:
+        return ""
+    label = str(row.get("horizon_zone_label") or "").strip() or warning
+    beyond = pd.to_numeric(
+        pd.Series([row.get("quarters_beyond_validated_horizon")]), errors="coerce"
+    ).iloc[0]
+    if pd.notna(beyond) and int(beyond) > 0:
+        return f"<br>Horizon: {html.escape(label)} ({int(beyond)} of 4 quarters)"
+    return f"<br>Horizon: {html.escape(label)}"
+
+
 def _revenue_horizon_hover_label(row: pd.Series) -> str:
     data_scope = str(row.get("data_scope") or "").strip()
     if data_scope in {"actual_anchor", "current_nowcast", "current_forecast", "official_comparator"}:
-        return _human_revenue_code_label(str(row.get("value_status") or data_scope))
+        base_label = _human_revenue_code_label(str(row.get("value_status") or data_scope))
+        return f"{base_label}{_revenue_horizon_zone_suffix(row)}"
     try:
         horizon = int(float(row.get("horizon")))
     except Exception:

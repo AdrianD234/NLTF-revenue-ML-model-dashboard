@@ -34,6 +34,16 @@ artifacts/**
 !artifacts/heavy_ruc_forward_parity_debug/**
 !artifacts/uptake_shape_lab/
 !artifacts/uptake_shape_lab/**
+!artifacts/long_horizon_validation/
+!artifacts/long_horizon_validation/**
+!artifacts/gdp_sign_guard_audit/
+!artifacts/gdp_sign_guard_audit/**
+!artifacts/ci_baseline_comparison/
+!artifacts/ci_baseline_comparison/**
+!artifacts/replay_parity_evidence/
+!artifacts/replay_parity_evidence/**
+!artifacts/light_ruc_promoted_state_impact/
+!artifacts/light_ruc_promoted_state_impact/**
 data/**
 !data/.gitkeep
 !data/dashboard_evidence_pack/

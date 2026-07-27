@@ -32,11 +32,17 @@ from .conflict_fuel_paths import (
     CONFLICT_FUEL_SCENARIO_LEVELS,
     conflict_scenario_name,
     conflict_trace_name,
+    structural_overlay_scenario_ids,
 )
 from .forecast_imports import (
     BACKTEST_SUPPORTED_MAX_HORIZON,
+    FORECAST_HORIZON_ZONE_EXTENDED,
+    FORECAST_HORIZON_ZONE_MIXED,
+    FORECAST_HORIZON_ZONE_UNVALIDATED,
+    LONG_RANGE_EXTRAPOLATION_WARNING,
     SCENARIO_ROLE_BASECASE,
     SCENARIO_ROLE_COMPARISON,
+    june_year_horizon_profile,
     quarter_sort_key,
 )
 from .mbu26_source_spine import (
@@ -596,12 +602,20 @@ def load_revenue_outlook_pack(
     hash_errors = _validate_output_hashes(base, manifest)
     if hash_errors:
         raise ValueError("Revenue Outlook promoted pack failed hash validation: " + " ".join(hash_errors))
+    # Applied at load rather than baked into the pack: the committed parquet is
+    # hash-validated above, and the zone depends on the training cutoff, which
+    # moves whenever actuals are refreshed.
+    training_cutoff = _model_training_cutoff(manifest)
+    chart_rows = annotate_forecast_horizon_zones(
+        _read_optional_parquet(base / "revenue_chart_rows.parquet"),
+        model_training_cutoff=training_cutoff,
+    )
     return RevenueOutlookPack(
         output_dir=base,
         manifest=manifest,
         future_revenue_forecasts=_read_optional_parquet(base / "future_revenue_forecasts.parquet"),
         revenue_bridge_components=_read_optional_parquet(base / "revenue_bridge_components.parquet"),
-        revenue_chart_rows=_read_optional_parquet(base / "revenue_chart_rows.parquet"),
+        revenue_chart_rows=chart_rows,
         revenue_line_reconciliation=_read_optional_parquet(base / "revenue_line_reconciliation.parquet"),
         revenue_stack_components=_read_optional_parquet(base / "revenue_stack_components.parquet"),
         ev_phev_split_assumptions=_read_optional_parquet(base / "ev_phev_split_assumptions.parquet"),
@@ -623,6 +637,128 @@ def load_revenue_outlook_pack(
         fan_availability=_read_optional_parquet(base / "fan_availability.parquet"),
         fan_band_rows=_read_optional_parquet(base / "fan_band_rows.parquet"),
     )
+
+
+CURRENT_FINALIST_SCENARIO_ROLES = frozenset(
+    {SCENARIO_ROLE_BASECASE, SCENARIO_ROLE_COMPARISON}
+)
+# Quarter counts per governed support state, exposed on every annual row so a
+# downloaded table carries the same support information as the chart.
+# Column name -> profile key.  "actual_quarters" is renamed because chart rows
+# already carry a string column of that name listing the quarter labels.
+HORIZON_ZONE_COUNT_FIELDS = {
+    "first_horizon": "first_horizon",
+    "last_horizon": "last_horizon",
+    "actual_quarters_in_year": "actual_quarters",
+    "quarters_backtest_supported": "quarters_backtest_supported",
+    "quarters_extended_evidence": "quarters_extended_evidence",
+    "quarters_unvalidated": "quarters_unvalidated",
+    "quarters_beyond_validated_horizon": "quarters_beyond_validated_horizon",
+    "share_beyond_validated_horizon": "share_beyond_validated_horizon",
+}
+HORIZON_ZONE_COUNT_COLUMNS = tuple(HORIZON_ZONE_COUNT_FIELDS)
+
+
+def _model_training_cutoff(manifest: dict[str, Any] | None) -> str:
+    """Training cutoff the validated horizon is measured from.
+
+    Prefers the pack's own ``period_rule`` so an older pack is measured against
+    its own vintage, and otherwise falls back to the governed repository
+    constant.  The fallback is a declared value, not an inferred one; a cutoff
+    that cannot be parsed as a quarter fails closed, because a wrong cutoff
+    would mislabel which fiscal years are extrapolation.
+    """
+
+    period_rule = (manifest or {}).get("period_rule")
+    cutoff = (period_rule or {}).get("model_training_cutoff") if isinstance(period_rule, dict) else None
+    resolved = str(cutoff or "").strip() or str(REVENUE_MODEL_TRAINING_CUTOFF).strip()
+    try:
+        invalid = quarter_sort_key(resolved) >= 999999
+    except Exception:
+        invalid = True
+    if invalid:
+        raise ValueError(
+            "Revenue Outlook model training cutoff is not a canonical quarter: "
+            f"{resolved!r}. The validated forecast horizon cannot be established."
+        )
+    return resolved
+
+
+def annotate_forecast_horizon_zones(
+    chart_rows: pd.DataFrame,
+    *,
+    model_training_cutoff: str,
+) -> pd.DataFrame:
+    """Mark June-year current-finalist rows against the validated horizon.
+
+    Quarterly rows already carry H1-H12 / H13+ scope, but the Revenue Outlook
+    is read at June-year level, where the label was blank.  FY2030 is entirely
+    H13+ and FY2029 straddles H12, so an unmarked fiscal-year total invites the
+    reader to treat long-range extrapolation as a validated forecast.
+
+    Only current-finalist rows are marked.  The validated horizon describes
+    *this* model's backtests; MBU26 is an external comparator with its own
+    published error bands, and actual rows have no horizon at all.
+    """
+
+    if chart_rows is None or chart_rows.empty:
+        return chart_rows
+    out = chart_rows.copy()
+    for column, default in (
+        ("horizon_zone", ""),
+        ("horizon_zone_label", ""),
+        ("horizon_validation_warning", ""),
+    ):
+        if column not in out.columns:
+            out[column] = default
+    for column in HORIZON_ZONE_COUNT_COLUMNS:
+        if column not in out.columns:
+            out[column] = pd.NA
+    if "horizon_scope" not in out.columns:
+        out["horizon_scope"] = ""
+
+    june_year = out.get("time_grain", pd.Series("", index=out.index)).astype(str).eq(
+        "june_year"
+    )
+    current_finalist = out.get(
+        "scenario_role", pd.Series("", index=out.index)
+    ).astype(str).isin(CURRENT_FINALIST_SCENARIO_ROLES)
+    target = june_year & current_finalist
+    if not target.any():
+        return out
+
+    profiles = {
+        int(value): june_year_horizon_profile(value, model_training_cutoff)
+        for value in pd.to_numeric(out.loc[target, "june_year"], errors="coerce")
+        .dropna()
+        .unique()
+    }
+    years = pd.to_numeric(out.loc[target, "june_year"], errors="coerce")
+    field_by_column = {
+        "horizon_zone": "horizon_zone",
+        "horizon_zone_label": "horizon_zone_label",
+        "horizon_scope": "horizon_scope",
+        **HORIZON_ZONE_COUNT_FIELDS,
+    }
+    for column, field in field_by_column.items():
+        out.loc[target, column] = years.map(
+            lambda value, field=field: profiles.get(int(value), {}).get(field)
+            if pd.notna(value)
+            else None
+        )
+    zone = out.loc[target, "horizon_zone"].astype(str)
+    out.loc[target, "horizon_validation_warning"] = np.where(
+        zone.isin(
+            [
+                FORECAST_HORIZON_ZONE_EXTENDED,
+                FORECAST_HORIZON_ZONE_UNVALIDATED,
+                FORECAST_HORIZON_ZONE_MIXED,
+            ]
+        ),
+        LONG_RANGE_EXTRAPOLATION_WARNING,
+        "",
+    )
+    return out
 
 
 def validate_promotable_comparison(comparison: ForecastScenarioComparisonResult) -> list[str]:
@@ -3555,9 +3691,27 @@ def build_current_revenue_outlook_runtime_pack(
             ),
         },
         "data_vintage_manifest_notes": {
+            # Emitted by the generator, not hand-edited, so a pack rebuild
+            # cannot silently drop the horizon-support governance.
             "runtime_cutoff": (
-                f"No extrapolated model extension is used; last displayed/current calculation FY is FY{runtime_cutoff_fy}. "
-                "Current-finalist paths stop where governed model and source assumptions stop."
+                f"No extrapolated model extension is used beyond FY{runtime_cutoff_fy}: the "
+                "FY2051-FY2055 gradient extension is disabled and current-finalist paths stop "
+                "where governed model and source assumptions stop. Last displayed/current "
+                f"calculation FY is FY{runtime_cutoff_fy}. This is NOT a statement that the "
+                "whole displayed path is validated. See forecast_horizon_validation for the "
+                "three governed support states."
+            ),
+            "forecast_horizon_validation": (
+                f"Model training cutoff {REVENUE_MODEL_TRAINING_CUTOFF}. Three governed support "
+                "states, exposed on every June-year row as horizon_zone/horizon_scope plus "
+                "quarter counts (quarters_backtest_supported, quarters_extended_evidence, "
+                f"quarters_unvalidated): H1-H{BACKTEST_SUPPORTED_MAX_HORIZON} backtest-supported "
+                "by the committed evidence pack; H13-H20 extended conditional evidence from "
+                "artifacts/long_horizon_validation, thinner samples and not validated to the "
+                "short-term standard; H21+ no extended evaluation evidence, unvalidated "
+                "long-range extrapolation. FY2026-FY2028 are H1-H12; FY2029 mixes H1-H12 and "
+                "H13-H20; FY2030 is entirely H13-H20; FY2031 mixes H13-H20 and H21+; FY2032 "
+                "onward is entirely H21+."
             ),
             "official_horizon_note": (
                 f"Comparative charts stop at FY{runtime_cutoff_fy}."
@@ -5916,8 +6070,121 @@ def revenue_outlook_fan_tables(
         bands = bands.sort_values(["_series_order", "_source_order", "_fy_order", "period", "scenario_name"], kind="stable").drop(
             columns=["_series_order", "_source_order", "_fy_order"]
         )
+    _assert_no_structural_overlay_fan_bands(bands)
     availability = _fan_availability_frame(series, bands)
+    availability = _append_structural_overlay_fan_gaps(availability, chart_rows)
     return availability, bands
+
+
+INTERVAL_UNAVAILABLE_STRUCTURAL_OVERLAY = "unavailable_structural_overlay"
+
+
+def _append_structural_overlay_fan_gaps(
+    availability: pd.DataFrame,
+    chart_rows: pd.DataFrame,
+) -> pd.DataFrame:
+    """State overlay interval unavailability rather than silently omitting it.
+
+    An absent band is indistinguishable from an oversight. These rows say the
+    interval is withheld because every governed fan source describes the raw
+    fitted layer, which is not the layer the overlay scenario displays.
+    """
+
+    if availability is None or chart_rows is None or chart_rows.empty:
+        return availability
+    if "scenario_name" not in chart_rows.columns:
+        return availability
+    overlay = structural_overlay_scenario_ids()
+    present = sorted(
+        {
+            str(value)
+            for value in chart_rows["scenario_name"].dropna().astype(str).unique()
+            if str(value) in overlay
+        }
+    )
+    if not present:
+        return availability
+    out = availability.copy() if not availability.empty else pd.DataFrame()
+    if not out.empty:
+        if "scenario_name" not in out.columns:
+            out["scenario_name"] = ""
+        if "availability_status" not in out.columns:
+            out["availability_status"] = np.where(
+                out.get("available", pd.Series(False, index=out.index))
+                .fillna(False)
+                .astype(bool),
+                "available",
+                "governed_gap",
+            )
+    series_ids = sorted(
+        {
+            str(value)
+            for value in chart_rows.loc[
+                chart_rows["scenario_name"].astype(str).isin(present), "series_id"
+            ]
+            .dropna()
+            .astype(str)
+            .unique()
+            if str(value).strip()
+        }
+    )
+    rows = [
+        {
+            "series_id": series_id,
+            "series_label": series_id,
+            "fan_source": FAN_SOURCE_AUTO,
+            "scenario_name": scenario_name,
+            "available": False,
+            "availability_status": INTERVAL_UNAVAILABLE_STRUCTURAL_OVERLAY,
+            "reason": (
+                "Interval unavailable for structurally overlaid scenario. Every "
+                "governed fan source is derived from the raw fitted replay, which "
+                "is not the layer this scenario displays; a band drawn from it "
+                "would not be centred on the shown central value."
+            ),
+            "source_file": "",
+            "model_id": "",
+            "horizon_scope": "not_applicable",
+            "interpretation": (
+                "No probabilistic interval is published for governed structural "
+                "overlay scenarios."
+            ),
+        }
+        for scenario_name in present
+        for series_id in series_ids
+    ]
+    if not rows:
+        return out
+    return pd.concat([out, pd.DataFrame(rows)], ignore_index=True, sort=False)
+
+
+def _assert_no_structural_overlay_fan_bands(bands: pd.DataFrame) -> None:
+    """Fail closed if an interval is attached to a structural-overlay scenario.
+
+    Fan bands are derived from fitted backtest quantiles and archived forecast
+    error, both of which describe the raw fitted replay.  For a structural
+    overlay the displayed central value is not that forecast, so such a band
+    would not be centred on the series it is drawn against.  Today only Base,
+    the comparison path and MBU26 carry fans; this keeps it that way.
+    """
+
+    if bands is None or bands.empty or "scenario_name" not in bands.columns:
+        return
+    overlay = structural_overlay_scenario_ids()
+    offending = bands[bands["scenario_name"].astype(str).isin(overlay)]
+    if not offending.empty:
+        detail = (
+            offending[["series_id", "fan_source", "scenario_name"]]
+            .drop_duplicates()
+            .astype(str)
+            .agg("/".join, axis=1)
+            .str.cat(sep=", ")
+        )
+        raise ValueError(
+            "Prediction intervals may not be attached to structural-overlay "
+            "scenarios: the band would not be generated from the displayed "
+            f"forecast layer. Offending rows: {detail}."
+        )
 
 
 def _fan_band_columns() -> list[str]:

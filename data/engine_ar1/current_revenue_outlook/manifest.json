@@ -32,7 +32,8 @@
     "rule": "Actual line ends FY2025; FY2026 actual-to-date rows are nowcast inputs only and are not plotted as actuals. Current-finalist comparative charts and runtime calculations stop at FY2050, the last governed common non-extrapolated horizon."
   },
   "data_vintage_manifest_notes": {
-    "runtime_cutoff": "No extrapolated model extension is used; last displayed/current calculation FY is FY2050. Current-finalist paths stop where governed model and source assumptions stop.",
+    "runtime_cutoff": "No extrapolated model extension is used beyond FY2050: the FY2051-FY2055 gradient extension is disabled and current-finalist paths stop where governed model and source assumptions stop. Last displayed/current calculation FY is FY2050. This is NOT a statement that the whole displayed path is validated. See forecast_horizon_validation for the three governed support states.",
+    "forecast_horizon_validation": "Model training cutoff 2025Q4. Three governed support states, exposed on every June-year row as horizon_zone/horizon_scope plus quarter counts (quarters_backtest_supported, quarters_extended_evidence, quarters_unvalidated): H1-H12 backtest-supported by the committed evidence pack; H13-H20 extended conditional evidence from artifacts/long_horizon_validation, thinner samples and not validated to the short-term standard; H21+ no extended evaluation evidence, unvalidated long-range extrapolation. FY2026-FY2028 are H1-H12; FY2029 mixes H1-H12 and H13-H20; FY2030 is entirely H13-H20; FY2031 mixes H13-H20 and H21+; FY2032 onward is entirely H21+.",
     "official_horizon_note": "Comparative charts stop at FY2050.",
     "light_ruc_target_semantics": "Business rule update: current-finalist Light RUC is treated as total light-RUC net km, while EV/PHEV migration is sourced from both current PED/light-petrol activity and total Light RUC using an optimized deterministic bridge calibrated to MBU26 light-mobility proportions. BEV/PHEV are not fixed add-ons.",
     "ev_phev_migration_allocation": "Default lambda_mode is optimized; alternatives are recorded for audit only and do not replace the current runtime path unless explicitly selected in governance review.",
@@ -426,7 +427,7 @@
       {
         "scenario_name": "current_basecase",
         "role": "basecase",
-        "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_basecase (2) - Copy.xlsx",
+        "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_basecase _2_ - Copy.xlsx",
         "workbook_sha256": "d0644d353ee5a073602186cf7ac5c16e707d5350e16fd037b73a65528067cc6a",
         "size_bytes": 72729,
         "raw_status": "copied_repo_local_raw_workbook",
@@ -439,7 +440,7 @@
           {
             "scenario_name": "current_basecase",
             "role": "basecase",
-            "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_basecase (2) - Copy.xlsx",
+            "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_basecase _2_ - Copy.xlsx",
             "workbook_sha256": "d0644d353ee5a073602186cf7ac5c16e707d5350e16fd037b73a65528067cc6a",
             "sheet": "Assumptions",
             "stream": "",
@@ -455,7 +456,7 @@
           {
             "scenario_name": "current_basecase",
             "role": "basecase",
-            "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_basecase (2) - Copy.xlsx",
+            "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_basecase _2_ - Copy.xlsx",
             "workbook_sha256": "d0644d353ee5a073602186cf7ac5c16e707d5350e16fd037b73a65528067cc6a",
             "sheet": "Heavy RUC Inputs",
             "stream": "HEAVY_RUC",
@@ -471,7 +472,7 @@
           {
             "scenario_name": "current_basecase",
             "role": "basecase",
-            "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_basecase (2) - Copy.xlsx",
+            "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_basecase _2_ - Copy.xlsx",
             "workbook_sha256": "d0644d353ee5a073602186cf7ac5c16e707d5350e16fd037b73a65528067cc6a",
             "sheet": "Light RUC Inputs",
             "stream": "LIGHT_RUC",
@@ -487,7 +488,7 @@
           {
             "scenario_name": "current_basecase",
             "role": "basecase",
-            "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_basecase (2) - Copy.xlsx",
+            "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_basecase _2_ - Copy.xlsx",
             "workbook_sha256": "d0644d353ee5a073602186cf7ac5c16e707d5350e16fd037b73a65528067cc6a",
             "sheet": "PED Inputs",
             "stream": "PED",
@@ -503,7 +504,7 @@
           {
             "scenario_name": "current_basecase",
             "role": "basecase",
-            "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_basecase (2) - Copy.xlsx",
+            "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_basecase _2_ - Copy.xlsx",
             "workbook_sha256": "d0644d353ee5a073602186cf7ac5c16e707d5350e16fd037b73a65528067cc6a",
             "sheet": "README",
             "stream": "",
@@ -521,7 +522,7 @@
       {
         "scenario_name": "current_comparison_1",
         "role": "comparison",
-        "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_high_population (2) - Copy.xlsx",
+        "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_high_population _2_ - Copy.xlsx",
         "workbook_sha256": "6213ce565cf1f4a058a3ea9f1af4d5476a8b0423a4d8747905c3cba128380ce1",
         "size_bytes": 72716,
         "raw_status": "copied_repo_local_raw_workbook",
@@ -534,7 +535,7 @@
           {
             "scenario_name": "current_comparison_1",
             "role": "comparison",
-            "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_high_population (2) - Copy.xlsx",
+            "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_high_population _2_ - Copy.xlsx",
             "workbook_sha256": "6213ce565cf1f4a058a3ea9f1af4d5476a8b0423a4d8747905c3cba128380ce1",
             "sheet": "Assumptions",
             "stream": "",
@@ -550,7 +551,7 @@
           {
             "scenario_name": "current_comparison_1",
             "role": "comparison",
-            "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_high_population (2) - Copy.xlsx",
+            "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_high_population _2_ - Copy.xlsx",
             "workbook_sha256": "6213ce565cf1f4a058a3ea9f1af4d5476a8b0423a4d8747905c3cba128380ce1",
             "sheet": "Heavy RUC Inputs",
             "stream": "HEAVY_RUC",
@@ -566,7 +567,7 @@
           {
             "scenario_name": "current_comparison_1",
             "role": "comparison",
-            "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_high_population (2) - Copy.xlsx",
+            "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_high_population _2_ - Copy.xlsx",
             "workbook_sha256": "6213ce565cf1f4a058a3ea9f1af4d5476a8b0423a4d8747905c3cba128380ce1",
             "sheet": "Light RUC Inputs",
             "stream": "LIGHT_RUC",
@@ -582,7 +583,7 @@
           {
             "scenario_name": "current_comparison_1",
             "role": "comparison",
-            "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_high_population (2) - Copy.xlsx",
+            "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_high_population _2_ - Copy.xlsx",
             "workbook_sha256": "6213ce565cf1f4a058a3ea9f1af4d5476a8b0423a4d8747905c3cba128380ce1",
             "sheet": "PED Inputs",
             "stream": "PED",
@@ -598,7 +599,7 @@
           {
             "scenario_name": "current_comparison_1",
             "role": "comparison",
-            "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_high_population (2) - Copy.xlsx",
+            "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_high_population _2_ - Copy.xlsx",
             "workbook_sha256": "6213ce565cf1f4a058a3ea9f1af4d5476a8b0423a4d8747905c3cba128380ce1",
             "sheet": "README",
             "stream": "",
@@ -614,7 +615,7 @@
         ]
       }
     ],
-    "manifest_sha256": "dd296dc6a7ecb5e5367d9e78d2a942b970c287d8da76d795fbed5e08ffae2c7f"
+    "manifest_sha256": "7e6232cf616381a48530e57b95f0908b5237df11e3c3b2fdcb6dc17b7d072bf1"
   },
   "scenario_input_delta_audit": {
     "repo_relative_path": "data/engine_ar1/current_revenue_outlook/scenario_input_delta_audit.csv",
@@ -686,20 +687,20 @@
   "validation_status": "runtime_rebuilt",
   "output_hashes": {
     "ev_phev_ped_light_drift_assumptions.csv": {
-      "sha256": "e9c471675ece4de7f18b6397089b0ac514ccda14d4f2d6de074103426552256b",
-      "size_bytes": 498269
+      "sha256": "0f1aa6448d4c1c05ad56921db6ace936d58f978c7e69c42468d5cff570ddd94e",
+      "size_bytes": 498675
     },
     "ev_phev_ped_light_drift_assumptions.parquet": {
-      "sha256": "a7857c3f19bccd4cca3d1dfba94617b97df293eb6ac4839bf07d11cc4be8cb89",
-      "size_bytes": 102688
+      "sha256": "726ed459a6ffd859f8ae437cf5dbb92112f4ccd21113a0a7fc03e200f372a7ee",
+      "size_bytes": 102936
     },
     "ev_phev_split_assumptions.csv": {
-      "sha256": "5a03e619d73eef8df90035f01fbc2faf7f14dfbbd0e3a9455c66670a546b73f3",
-      "size_bytes": 65903
+      "sha256": "f4be2f1d5a42eba6212d02f3a45aee28f48985abea4d8024dbd0485d23aaa5ea",
+      "size_bytes": 65888
     },
     "ev_phev_split_assumptions.parquet": {
-      "sha256": "62b947336908c45a62525a557a562ddd3cf7b15437f4491547bf57501f428b1f",
-      "size_bytes": 54504
+      "sha256": "a7d683f4a6816a072ff7e800cb0a57d199bb30cb6625e6e66ac68c1edf7e79b6",
+      "size_bytes": 54511
     },
     "fan_availability.csv": {
       "sha256": "ab75896e5d4ad2fb3aa341d6f3bc0121ed625043c5bdd5bd9142dde6a1336065",
@@ -710,19 +711,19 @@
       "size_bytes": 10150
     },
     "fan_band_rows.csv": {
-      "sha256": "227e664de4c8d732b1fee0cf7dbb2db4da7972ee3e00d251d2d21de0d47124b3",
-      "size_bytes": 368884
+      "sha256": "b60054b12160fd4df6172d9dca5e428d7738786d1cc5a493861ec47c7f563826",
+      "size_bytes": 368929
     },
     "fan_band_rows.parquet": {
-      "sha256": "c9e350aedcd3439d9238008df7a8c46530a683640368ce811994b6c9b71a746a",
-      "size_bytes": 48133
+      "sha256": "f53b5fd31748558484a986514e6b25bf2974c53a0acadf3c941a37c42f60b13a",
+      "size_bytes": 48131
     },
     "future_revenue_forecasts.csv": {
-      "sha256": "59938641dc3e438eb98010ed9c6f3c86e3e5115b5c1530afba38430647186c88",
-      "size_bytes": 278986
+      "sha256": "5037b4bc6024de82d966f660d932372be3cf1a4f4751cdce6270eec0129e6c2b",
+      "size_bytes": 278976
     },
     "future_revenue_forecasts.parquet": {
-      "sha256": "993c2adc946c1083ff932c9976dca7d361b07e18ae91c4931b011085c20b3f4d",
+      "sha256": "b823ff937d0beb4318d46f91eae771d3383f65b72f31f9b2fce0ab913d63fd56",
       "size_bytes": 27204
     },
     "path_trace_status.csv": {
@@ -742,12 +743,12 @@
       "size_bytes": 6017
     },
     "ped_bridge_shape_fit_metrics.csv": {
-      "sha256": "2d86af966da6b362bb28a937ad595fadf8ad1dffbd5ef8bbd7d5144c4e0eae9d",
-      "size_bytes": 4831
+      "sha256": "a0829075d7f56256914988ae43c3dfeb5a149320e3f6b2e816fce9371c2afb27",
+      "size_bytes": 4839
     },
     "ped_bridge_shape_fit_metrics.parquet": {
-      "sha256": "374c0d81caf20cff7276a088eee9dc8b317e498abfff7298d36f620a7030a7be",
-      "size_bytes": 12798
+      "sha256": "0d36678a30c7d7808264ab12918653491acba210cda1028cc9fbc350412fc157",
+      "size_bytes": 12802
     },
     "ped_efficiency_scenarios.csv": {
       "sha256": "e23f4ad04f3b7b4e18eee7d185b4d2fa8d3d54c0542695d1c8be59cd395788b8",
@@ -758,52 +759,52 @@
       "size_bytes": 6199
     },
     "ped_revenue_bridge_audit.csv": {
-      "sha256": "807be028c337e9fcd05d96212127706074dd85270ee1a8f366b510d50597eaeb",
-      "size_bytes": 138754
+      "sha256": "29ea757e5c7201eba83a8ce2c4a5953e0992f537a63ed63bb6737b1b391c708a",
+      "size_bytes": 138740
     },
     "ped_revenue_bridge_audit.parquet": {
-      "sha256": "22c5da7cae1de0661c2bccfd45e3f068959d68dd8215ae02dbdfea302cddd199",
+      "sha256": "287535a387544ff4b7fa552440803a53dfd1c1200cc9b20310305b9f8a70d38f",
       "size_bytes": 74191
     },
     "revenue_bridge_components.csv": {
-      "sha256": "4a9b08c616b452d641b00c5ce3a49828822810beb3fe641bf3ebf7489205f116",
-      "size_bytes": 585717
+      "sha256": "eccec4b1634bcca226cdcd5c0bfa6265bcee9b80012fbaf89acca8bf6e2e9b0a",
+      "size_bytes": 585750
     },
     "revenue_bridge_components.parquet": {
-      "sha256": "9a722aa7db4ede938c4f2c4b8194c96e1a4809a1503fe014e1a929fa627964d8",
-      "size_bytes": 60304
+      "sha256": "0f0ddd9aad21ccdfac31fe448cbf76e39ccf484aedb3485b89871c4cbf0ab57d",
+      "size_bytes": 60311
     },
     "revenue_chart_rows.csv": {
-      "sha256": "083808e68d5e906db975a5641f011650b02c8aaa78f0382604d50edad9f91b96",
-      "size_bytes": 2448486
+      "sha256": "8817d0dbbd09210869b32aea4d166db0a4749b6286dc3c760c43425eca60215e",
+      "size_bytes": 2448516
     },
     "revenue_chart_rows.parquet": {
-      "sha256": "41d8c1efb05ab84a7686940fd6a8589b5b1c8450d72f9371b2a523dc7a1dc51e",
-      "size_bytes": 126789
+      "sha256": "de81f5ce2820f02de7715026e1f24914651312c0aea087f8a4b8d25b36ee5cae",
+      "size_bytes": 126771
     },
     "revenue_formula_residuals.csv": {
-      "sha256": "8f8175ec78da37146d51bd9be8f915b70630a488f143088aeeeeff8af41ed92a",
-      "size_bytes": 284339
+      "sha256": "83c3facaf48522f74a24015045e924e7785a2562203c7a0fedaaa606a60a1ce2",
+      "size_bytes": 284210
     },
     "revenue_formula_residuals.parquet": {
-      "sha256": "5b0a69025d45ab02c1bfd4ed02fa69bf12af557f92133744b278ffb339dff9d6",
-      "size_bytes": 34090
+      "sha256": "9cb5bf3d2e1e36b2c714a3a5a50accde02230364bb459f4199a94a4faa786aa7",
+      "size_bytes": 34069
     },
     "revenue_line_reconciliation.csv": {
-      "sha256": "823ada760cde542ab33a6457e88a944dc56b5c4f261b3d47dcacffc7fda425c0",
-      "size_bytes": 2182622
+      "sha256": "b6a6b490f1b2a86ddf04ad29435b580cadba1f45412a8fabe5e59c8cef9ba33d",
+      "size_bytes": 2182620
     },
     "revenue_line_reconciliation.parquet": {
-      "sha256": "8c3ddb8b7aca8092e1a5fa2e6d2615c4e5e63739ce6492498f32c1760fc94eef",
-      "size_bytes": 90558
+      "sha256": "d9644214b39458a09f86cc18ff4eff3a09fdfaaefff724d7f749b91baafb5887",
+      "size_bytes": 90545
     },
     "revenue_stack_components.csv": {
-      "sha256": "66339f8945f69c58f7ffbe2d603a752dbc29bc1ff793597a254381ecf6d1fc16",
-      "size_bytes": 10673690
+      "sha256": "78085ee006e5df5b76ad0f3fb04184fb46da0434aad32ed63d3c4f2a486869f2",
+      "size_bytes": 10643216
     },
     "revenue_stack_components.parquet": {
-      "sha256": "e2d720c9739eb1e806bcabd3ae52ece156a3f0ab00d31f653529717f82aa897f",
-      "size_bytes": 240604
+      "sha256": "f105d904549e33ca12a14efdf388e5a5cb5c836b54f4bbb355899520adf1194d",
+      "size_bytes": 240570
     },
     "row_reconciliation.csv": {
       "sha256": "d484f5d75cce88e30ce7bcf5dd70058505cc02e5dff93f457a579f119c2fc7ce",
@@ -822,11 +823,11 @@
       "size_bytes": 5888
     },
     "runtime_trace_audit.csv": {
-      "sha256": "668757ec833108e91fd7f0ed2a4ffe22971c07fe52bf3378fed97ee85c13a496",
+      "sha256": "d48d0c921d4c773739f53c3318bb7f18babdbfef9cc42ec7f5d18a27d6bcb7e6",
       "size_bytes": 108583
     },
     "runtime_trace_audit.parquet": {
-      "sha256": "551ab2a16cd008fa3865b3c7a0e5e0f52f3198c4297d88feb3012a12e8f9d157",
+      "sha256": "a34f7fad00af883698b858e42874a8200cf25a793111cb7dcc0a49526244e7f2",
       "size_bytes": 22647
     },
     "scenario_feature_lineage.csv": {
@@ -838,27 +839,27 @@
       "size_bytes": 188310
     },
     "scenario_input_delta_audit.csv": {
-      "sha256": "c59457c56e9dbfcad284bcdf731d27616f3da766760c9858ec503d3e045e0f13",
+      "sha256": "546a2e00c02b247368196a106499d1a1473619f5770d70794ab76428e1919cf8",
       "size_bytes": 3049895
     },
     "scenario_input_delta_audit.parquet": {
-      "sha256": "70a98305ff252f5ee3045aa14c4434e71b09dbb5689b020480b767f8ed9771ed",
+      "sha256": "578f75991a26df530ba6715c8ff1a0b842800b3c76b29914b06be1643f486c5a",
       "size_bytes": 185119
     },
     "scenario_input_replay_mismatch_report.csv": {
-      "sha256": "97a5c0d8bc7483ddb659b1437875edd6e12aab021b38b0412b84330f1d638801",
-      "size_bytes": 240991
+      "sha256": "bbbe0c85c253ee9420bcb7ab1ef06a964a507ab459bf1d712d298bd454037caf",
+      "size_bytes": 240979
     },
     "scenario_input_replay_mismatch_report.parquet": {
-      "sha256": "e227b192d4746fad8272bf63e403b8add2abd4341dc183aa6844032395eb6725",
-      "size_bytes": 47365
+      "sha256": "875f407a8ebbb244678f942b35d6eee7cd8c2ad6d4c15b97c8bf130ea79916bd",
+      "size_bytes": 47504
     },
     "scenario_role_contract.csv": {
-      "sha256": "1891f3533cb85f44e1237faeae8e0b7d282ea99b971b8c7c7a34ce57f7704b94",
-      "size_bytes": 18215
+      "sha256": "9e4c1f80a7c4f69cfd9d40c42598e1058c750bad846873149857b3e0673f1f29",
+      "size_bytes": 18213
     },
     "scenario_role_contract.parquet": {
-      "sha256": "be168cb3e0fa4658cb8607d2cd894838c18fe67ef4b53d9febf64bde435eae9a",
+      "sha256": "2d848f7e5539f3ebc731274f6004d23a456dd529df83c831a4c9a305519508e7",
       "size_bytes": 20965
     },
     "sensitivity_config.csv": {
@@ -870,11 +871,11 @@
       "size_bytes": 10806
     },
     "sensitivity_impact_audit.csv": {
-      "sha256": "bd6e0e18cafda850d306e70e478eb2c22a00cf86175d8ede34739e7ed2363326",
-      "size_bytes": 890255
+      "sha256": "db5b870fddd3d61c6507966cd95686a43b84bbdbdeb801fa82feb20f981d47fe",
+      "size_bytes": 890265
     },
     "sensitivity_impact_audit.parquet": {
-      "sha256": "cef1778c06a8c9669567133326c6a4a4e5d98fc6fa07f65d92d28d7529bd36dd",
+      "sha256": "1999c8c4bc585936b0d49dd8f35b25a442d7bd0f62e6af3ca3f966fa40ea125c",
       "size_bytes": 49447
     },
     "sensitivity_seed_inputs.csv": {

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from io import BytesIO
 import hashlib
@@ -169,6 +169,193 @@ LIGHT_RUC_RESIDUAL_FEATURES = [
     "log_real_gdp_lag1",
     "log_real_gdp_lag4",
 ]
+
+# Light RUC promoted fitted state.
+#
+# Light RUC used to refit its OLS base and residual GBM at score time. That made
+# it the only stream whose governed forecast depended on the machine running it:
+# the OLS solve goes through BLAS, whose kernel selection varies with CPU
+# architecture, and the residual GBM amplifies a last-digit change into a flipped
+# split. Measured cross-platform divergence was up to 0.48% on every replay row,
+# while PED and Heavy RUC - which load committed state - agreed to machine
+# epsilon. See docs/REPLAY_PARITY_INVESTIGATION.md.
+#
+# Decision-facing paths now load the promoted state, as PED and Heavy RUC do.
+# The refit remains available only as a promotion utility, never in production.
+LIGHT_RUC_STATE_DIR = (
+    "data/dashboard_evidence_pack_reproducibility/light_ruc_vnext"
+)
+LIGHT_RUC_STATE_FILE = "fitted_state/light_ruc_production.joblib"
+LIGHT_RUC_STATE_MANIFEST = "fitted_model_manifest.json"
+LIGHT_RUC_STATE_RECIPE = (
+    "Schiff-style OLS base plus GBM residual correction (log target)"
+)
+LIGHT_RUC_STATE_HYPERPARAMETERS = {
+    "n_estimators": 150,
+    "max_depth": 1,
+    "learning_rate": 0.05,
+    "subsample": 0.85,
+    "random_state": 42,
+    "loss": "squared_error",
+}
+# Training-fit replay tolerance in log space. The archived fit was produced on
+# one machine; a state that reproduces it this closely is the same state.
+LIGHT_RUC_STATE_PARITY_TOLERANCE = 1e-9
+
+
+@dataclass(frozen=True)
+class LightRucPromotedState:
+    """Immutable promoted Light RUC fitted state plus its lineage."""
+
+    ols_beta: Any
+    base_features: tuple[str, ...]
+    residual_model: Any
+    residual_features: tuple[str, ...]
+    window: int
+    random_state: int
+    recipe: str
+    sha256: str
+    train_window_start: str
+    train_window_end: str
+    train_rows: int
+    max_training_fit_replay_delta: float
+
+
+def load_light_ruc_promoted_state(
+    repo_root: Path | str | None = None,
+) -> LightRucPromotedState:
+    """Load and fail-closed validate the promoted Light RUC fitted state.
+
+    Gates, in order: manifest present, state hash matches the manifest, feature
+    names and ordering match the governed contract, hyperparameters match, the
+    training window matches, and the state reproduces the archived training fit
+    within tolerance. Any failure raises rather than silently refitting, because
+    a silent refit is the defect this replaces.
+    """
+
+    import joblib
+
+    root = Path(repo_root) if repo_root is not None else repo_root_from_here()
+    base = root / LIGHT_RUC_STATE_DIR
+    manifest_path = base / LIGHT_RUC_STATE_MANIFEST
+    state_path = base / LIGHT_RUC_STATE_FILE
+    if not manifest_path.exists() or not state_path.exists():
+        raise ValueError(
+            "Light RUC promoted fitted state is missing; expected "
+            f"{LIGHT_RUC_STATE_DIR}/{LIGHT_RUC_STATE_FILE} and its manifest."
+        )
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    production = (manifest.get("production_states") or {}).get("LIGHT") or {}
+    expected_sha = str(production.get("sha256") or "").strip().lower()
+    actual_sha = hashlib.sha256(state_path.read_bytes()).hexdigest()
+    if not expected_sha:
+        raise ValueError("Light RUC manifest records no promoted-state SHA-256.")
+    if actual_sha != expected_sha:
+        raise ValueError(
+            "Light RUC promoted fitted state does not match its manifest hash: "
+            f"expected {expected_sha}, found {actual_sha}."
+        )
+
+    state = joblib.load(state_path)
+    base_features = tuple(str(value) for value in state.get("base_features", ()))
+    residual_features = tuple(
+        str(value) for value in state.get("residual_features", ())
+    )
+    if list(base_features) != list(LIGHT_RUC_BASE_FEATURES):
+        raise ValueError(
+            "Light RUC promoted state base-feature contract does not match the "
+            "governed feature list, including order."
+        )
+    if list(residual_features) != list(LIGHT_RUC_RESIDUAL_FEATURES):
+        raise ValueError(
+            "Light RUC promoted state residual-feature contract does not match "
+            "the governed feature list, including order."
+        )
+    if int(state.get("window", -1)) != LIGHT_RUC_WINDOW:
+        raise ValueError(
+            f"Light RUC promoted state window {state.get('window')!r} does not "
+            f"match the governed window {LIGHT_RUC_WINDOW}."
+        )
+    residual_model = state.get("residual_model")
+    for name, expected in LIGHT_RUC_STATE_HYPERPARAMETERS.items():
+        found = getattr(residual_model, name, None)
+        if found != expected:
+            raise ValueError(
+                f"Light RUC promoted state residual model {name}={found!r} does "
+                f"not match the governed recipe value {expected!r}."
+            )
+    ols_beta = np.asarray(state.get("ols_beta"), dtype=float)
+    if ols_beta.shape != (len(LIGHT_RUC_BASE_FEATURES) + 1,):
+        raise ValueError(
+            "Light RUC promoted state OLS coefficients do not match the base "
+            f"feature count; expected {len(LIGHT_RUC_BASE_FEATURES) + 1}, found "
+            f"{ols_beta.shape}."
+        )
+
+    replay_delta = _light_ruc_training_fit_replay_delta(
+        base, ols_beta, residual_model
+    )
+    if replay_delta > LIGHT_RUC_STATE_PARITY_TOLERANCE:
+        raise ValueError(
+            "Light RUC promoted state fails its archived training-fit replay: "
+            f"max log-space delta {replay_delta:.3e} exceeds "
+            f"{LIGHT_RUC_STATE_PARITY_TOLERANCE:.0e}."
+        )
+
+    return LightRucPromotedState(
+        ols_beta=ols_beta,
+        base_features=base_features,
+        residual_model=residual_model,
+        residual_features=residual_features,
+        window=int(state["window"]),
+        random_state=int(state.get("random_state", -1)),
+        recipe=str(state.get("recipe") or LIGHT_RUC_STATE_RECIPE),
+        sha256=actual_sha,
+        train_window_start=str(production.get("train_window_start") or ""),
+        train_window_end=str(production.get("train_window_end") or ""),
+        train_rows=int(production.get("train_rows") or 0),
+        max_training_fit_replay_delta=replay_delta,
+    )
+
+
+def _light_ruc_training_fit_replay_delta(
+    base: Path, ols_beta: Any, residual_model: Any
+) -> float:
+    """Max log-space delta between the state's fit and the archived fit."""
+
+    matrices_path = base / "training_feature_matrices.parquet"
+    fit_path = base / "training_fit_predictions.parquet"
+    if not matrices_path.exists() or not fit_path.exists():
+        raise ValueError(
+            "Light RUC promoted state cannot be replay-verified: archived "
+            "training feature matrices or fit predictions are missing."
+        )
+    matrices = pd.read_parquet(matrices_path)
+    archived = pd.read_parquet(fit_path)
+    archived = archived[archived["component_label"].astype(str).eq("FINAL")]
+    merged = matrices.merge(
+        archived[["training_period", "training_fit_pred_log"]],
+        left_on="period",
+        right_on="training_period",
+        how="inner",
+        validate="one_to_one",
+    )
+    if merged.empty or len(merged) != len(matrices):
+        raise ValueError(
+            "Light RUC archived training fit does not cover the training matrix."
+        )
+    base_log = _ols_predict(
+        merged[LIGHT_RUC_BASE_FEATURES].to_numpy(dtype=float), ols_beta
+    )
+    residual_log = residual_model.predict(
+        merged[LIGHT_RUC_RESIDUAL_FEATURES].to_numpy(dtype=float)
+    )
+    replayed = base_log + residual_log
+    archived_log = pd.to_numeric(
+        merged["training_fit_pred_log"], errors="coerce"
+    ).to_numpy(dtype=float)
+    return float(np.nanmax(np.abs(replayed - archived_log)))
 
 
 @dataclass(frozen=True)
@@ -347,6 +534,13 @@ class ScenarioInputForecastReplayResult:
     component_forecasts: pd.DataFrame
     assumptions: pd.DataFrame
     validation_report: pd.DataFrame
+    # Governed structural-overlay scenarios replace the fitted point forecast
+    # with an explicit reference/price/GDP formula.  Their fitted ensemble
+    # members therefore no longer describe the displayed forecast: they move to
+    # ``superseded_component_forecasts`` and the frame below carries the
+    # decomposition that does close to the displayed value.
+    structural_component_forecasts: pd.DataFrame = field(default_factory=pd.DataFrame)
+    superseded_component_forecasts: pd.DataFrame = field(default_factory=pd.DataFrame)
 
 
 def repo_root_from_here() -> Path:
@@ -2082,7 +2276,9 @@ def _attach_capability_metadata(frame: pd.DataFrame, capabilities: pd.DataFrame)
 
 
 def _light_ruc_forward_forecast(validation: ForecastValidationResult, repo_root: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
-    from sklearn.ensemble import GradientBoostingRegressor
+    # Loads the promoted fitted state rather than refitting. Refitting here made
+    # Light RUC the only machine-dependent stream; see LIGHT_RUC_STATE_DIR.
+    state = load_light_ruc_promoted_state(repo_root)
 
     history_path = repo_root / MODEL_INPUT_HISTORY_DIR / MODEL_INPUT_HISTORY_FILES["LIGHT_RUC"]
     history = pd.read_parquet(history_path)
@@ -2091,14 +2287,6 @@ def _light_ruc_forward_forecast(validation: ForecastValidationResult, repo_root:
         raise ValueError("Light RUC future assumption rows are missing from the validated workbook.")
 
     feature_frame = _light_ruc_feature_frame(history, future, validation.latest_actual_period)
-    train = feature_frame[feature_frame["sample_scope"].eq("history")].copy()
-    train = train[train["period_key"].le(quarter_sort_key(validation.latest_actual_period))].copy()
-    train["target"] = pd.to_numeric(train["target"], errors="coerce")
-    required = ["target", *LIGHT_RUC_BASE_FEATURES, *LIGHT_RUC_RESIDUAL_FEATURES]
-    train = train.replace([np.inf, -np.inf], np.nan).dropna(subset=required)
-    train = train[train["target"].gt(0)].sort_values("period_key").tail(LIGHT_RUC_WINDOW).copy()
-    if len(train) < LIGHT_RUC_WINDOW:
-        raise ValueError(f"Light RUC scorer requires {LIGHT_RUC_WINDOW} usable training rows; found {len(train)}.")
 
     future_features = feature_frame[feature_frame["sample_scope"].eq("future")].copy()
     future_features = future_features.replace([np.inf, -np.inf], np.nan)
@@ -2106,30 +2294,20 @@ def _light_ruc_forward_forecast(validation: ForecastValidationResult, repo_root:
     if missing_future:
         raise ValueError("Light RUC future rows are missing required residual features: " + ", ".join(missing_future))
 
-    y = np.log(train["target"].to_numpy(dtype=float))
-    base_x = train[LIGHT_RUC_BASE_FEATURES].to_numpy(dtype=float)
-    beta = _ols_fit(base_x, y)
-    train_base_log = _ols_predict(base_x, beta)
-    residual_target = y - train_base_log
-    residual_model = GradientBoostingRegressor(
-        n_estimators=150,
-        max_depth=1,
-        learning_rate=0.05,
-        subsample=0.85,
-        random_state=42,
-        loss="squared_error",
+    future_base_log = _ols_predict(
+        future_features[LIGHT_RUC_BASE_FEATURES].to_numpy(dtype=float), state.ols_beta
     )
-    residual_model.fit(train[LIGHT_RUC_RESIDUAL_FEATURES].to_numpy(dtype=float), residual_target)
-
-    future_base_log = _ols_predict(future_features[LIGHT_RUC_BASE_FEATURES].to_numpy(dtype=float), beta)
-    future_residual_log = residual_model.predict(future_features[LIGHT_RUC_RESIDUAL_FEATURES].to_numpy(dtype=float))
+    future_residual_log = state.residual_model.predict(
+        future_features[LIGHT_RUC_RESIDUAL_FEATURES].to_numpy(dtype=float)
+    )
     final_log = future_base_log + future_residual_log
     forecast = np.exp(final_log)
 
     future_rows: list[dict[str, Any]] = []
     component_rows: list[dict[str, Any]] = []
-    train_start = str(train.iloc[0]["period"])
-    train_end = str(train.iloc[-1]["period"])
+    train_start = state.train_window_start
+    train_end = state.train_window_end
+    train = range(state.train_rows)
     for idx, (_, row) in enumerate(future_features.sort_values("horizon").iterrows()):
         horizon = int(row["horizon"])
         period = str(row["period"])
@@ -2155,6 +2333,9 @@ def _light_ruc_forward_forecast(validation: ForecastValidationResult, repo_root:
             "training_window_end": train_end,
             "training_window_rows": len(train),
             "score_basis": "forward_assumption_workbook",
+            "fitted_state_basis": "promoted_fitted_state_loaded_not_refit",
+            "fitted_state_sha256": state.sha256,
+            "fitted_state_training_fit_replay_delta": state.max_training_fit_replay_delta,
         }
         future_rows.append(
             {
