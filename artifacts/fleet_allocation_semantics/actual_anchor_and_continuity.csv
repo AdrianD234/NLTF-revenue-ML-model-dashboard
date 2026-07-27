@@ -1,0 +1,13 @@
+variant,series,fy2025,fy2026,step_pct
+B_stored_pack,light_ruc_net_km,12273.983872,12352.557824,0.640167
+B_stored_pack,light_petrol_vkt_million_km,31705.229162,31742.115079,0.11634
+B_stored_pack,light_ruc_pool_km,13529.742736,14169.000465,4.724833
+C_semantic_clean_anchor,light_ruc_net_km,12273.983872,12968.092014,5.655117
+C_semantic_clean_anchor,light_petrol_vkt_million_km,31705.229162,32943.02353,3.90407
+C_semantic_clean_anchor,light_ruc_pool_km,13529.742736,14879.277618,9.974579
+D_isolate_ped,light_ruc_net_km,12273.983872,12352.557824,0.640167
+D_isolate_ped,light_petrol_vkt_million_km,31705.229162,32943.02353,3.90407
+D_isolate_ped,light_ruc_pool_km,13529.742736,14169.000465,4.724833
+E_isolate_light_ruc,light_ruc_net_km,12273.983872,12968.092014,5.655117
+E_isolate_light_ruc,light_petrol_vkt_million_km,31705.229162,31742.115079,0.11634
+E_isolate_light_ruc,light_ruc_pool_km,13529.742736,14879.277618,9.974579

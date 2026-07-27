@@ -1,0 +1,5 @@
+variant,ped_treatment,light_ruc_treatment
+B_stored_pack,raw PED minus (1-lambda)M,raw Light RUC minus lambda*M; BEV/PHEV = M x MBU26 shares
+C_semantic_clean_anchor,"raw AR(1) vktpc x population, no migration transfer",raw model = conventional anchor; pool = conventional / VFM Base share
+D_isolate_ped,"raw AR(1) vktpc x population, no migration transfer",unchanged: stored pack lambda allocation
+E_isolate_light_ruc,unchanged: stored pack lambda allocation,raw model = conventional anchor; pool = conventional / VFM Base share

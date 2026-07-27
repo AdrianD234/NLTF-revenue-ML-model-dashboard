@@ -1,0 +1,11 @@
+series_id,stage_created,row_role,pack_formula,lambda_applied_to_this_level,downstream_consumers
+current_light_ruc_total_modelled_km,S0,audit_only,sum quarterly current finalist Light RUC total net km before EV/PHEV allocation,False,audit only; not read by any revenue line
+light_ruc_net_km,S1,bridge_input,current Light RUC total modelled km - lambda * optimized EV/PHEV migration total,True,light_ruc_net_revenue; VFM overlay pool; front end
+light_bev_ruc_net_km,S1,bridge_input,optimized EV/PHEV migration total * MBU26 Light BEV share within EV/PHEV,True,light_bev_ruc_net_revenue; VFM overlay pool; front end
+phev_ruc_net_km,S1,bridge_input,optimized EV/PHEV migration total * MBU26 PHEV share within EV/PHEV,True,phev_ruc_net_revenue; VFM overlay pool; front end
+light_petrol_vkt,S1,bridge_input,current PED-derived light-petrol VKT - (1 - lambda) * optimized EV/PHEV migration total,True,ped_volume -> gross_ped_revenue; VFM PED retention overlay
+ped_volume,S2,bridge_input,adjusted PED/light-petrol VKT after optimized EV/PHEV migration * MBU26 litres intensity / 100,True,gross_ped_revenue
+gross_ped_revenue,S2,replacement_line,adjusted PED/light-petrol VKT after optimized EV/PHEV migration * MBU26 litres intensity / 100 * MBU26 PED rate,True,gross_fed_revenue -> net_fed_revenue -> total_nltf
+heavy_ruc_net_km,S1,bridge_input,sum quarterly current finalist Heavy RUC net km,False,heavy_ruc_net_revenue
+total_ruc_net_revenue,S5,calculated_rollup,ruc_revenue_net_admin - MBU26 ruc_refunds,True,front end
+total_nltf_net_revenue,S5,calculated_rollup,total_revenue_net_admin - total_refunds,True,front end; Workstream A decomposition
