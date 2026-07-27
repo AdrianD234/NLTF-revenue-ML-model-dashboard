@@ -36,6 +36,8 @@ artifacts/**
 !artifacts/uptake_shape_lab/**
 !artifacts/long_horizon_validation/
 !artifacts/long_horizon_validation/**
+!artifacts/gdp_sign_guard_audit/
+!artifacts/gdp_sign_guard_audit/**
 data/**
 !data/.gitkeep
 !data/dashboard_evidence_pack/

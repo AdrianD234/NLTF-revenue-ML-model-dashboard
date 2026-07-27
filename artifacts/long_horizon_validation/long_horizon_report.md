@@ -9,9 +9,17 @@ Fixed finalists scored to H20 on the committed input history.
   real forward error, which also carries driver-forecast error.
 * Origin-correct: every origin refits on rows at or before that origin.
   PED and Heavy RUC use recursive predicted target lags; Light RUC has no
-  target lags. Realized future target values never enter a lagged
-  dependent variable. Origin/target ordering is asserted, not assumed -
-  see `_assert_no_future_target_leakage`.
+  target lags. Realized future target values never enter a training row,
+  a fitted coefficient or a lagged feature.
+* No-target-leakage is proven, not asserted. `_assert_no_future_target_leakage`
+  checks the ordering and horizon arithmetic of every scored row, and
+  `tests/test_long_horizon_rolling_origin.py` proves the stronger claim
+  directly: multiply every actual target after the origin by 1.75 and the
+  forecasts do not move at all, for the recursive-lag Heavy RUC member,
+  for the fitted state itself, and for the Light RUC recipe. The scored
+  actuals do move, so the comparison is not vacuous.
+* Future actual values are used only as the declared actual-driver
+  exogenous inputs and for scoring.
 * Signed error: `(forecast - actual) / actual * 100; positive = overprediction`.
 * Prediction-interval coverage is not reported: the production scorer
   publishes no governed interval, and manufacturing one would be worse

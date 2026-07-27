@@ -184,8 +184,8 @@ def _vnext_rolling_origin(stream: str, max_horizon: int) -> pd.DataFrame:
     return ensemble_predictions(component_predictions, weights, finalist, stream)
 
 
-def _light_ruc_rolling_origin(max_horizon: int) -> pd.DataFrame:
-    """Replay the committed Light RUC fixed recipe at every rolling origin."""
+def light_ruc_feature_frame() -> pd.DataFrame:
+    """Engineered Light RUC history rows, ordered by period."""
 
     history = pd.read_parquet(
         REPO_ROOT / MODEL_INPUT_HISTORY_DIR / MODEL_INPUT_HISTORY_FILES["LIGHT_RUC"]
@@ -197,7 +197,19 @@ def _light_ruc_rolling_origin(max_horizon: int) -> pd.DataFrame:
     required = ["target", *LIGHT_RUC_RESIDUAL_FEATURES]
     frame = frame.replace([np.inf, -np.inf], np.nan).dropna(subset=required)
     frame = frame[pd.to_numeric(frame["target"], errors="coerce").gt(0)]
-    frame = frame.sort_values("period_key").reset_index(drop=True)
+    return frame.sort_values("period_key").reset_index(drop=True)
+
+
+def _light_ruc_rolling_origin(
+    max_horizon: int, *, frame: pd.DataFrame | None = None
+) -> pd.DataFrame:
+    """Replay the committed Light RUC fixed recipe at every rolling origin.
+
+    ``frame`` exists so a leakage test can supply a history whose post-origin
+    targets have been corrupted and assert the forecasts do not move.
+    """
+
+    frame = light_ruc_feature_frame() if frame is None else frame.copy()
 
     from sklearn.ensemble import GradientBoostingRegressor
 
@@ -557,9 +569,17 @@ def _report(
         "  real forward error, which also carries driver-forecast error.",
         "* Origin-correct: every origin refits on rows at or before that origin.",
         "  PED and Heavy RUC use recursive predicted target lags; Light RUC has no",
-        "  target lags. Realized future target values never enter a lagged",
-        "  dependent variable. Origin/target ordering is asserted, not assumed -",
-        "  see `_assert_no_future_target_leakage`.",
+        "  target lags. Realized future target values never enter a training row,",
+        "  a fitted coefficient or a lagged feature.",
+        "* No-target-leakage is proven, not asserted. `_assert_no_future_target_leakage`",
+        "  checks the ordering and horizon arithmetic of every scored row, and",
+        "  `tests/test_long_horizon_rolling_origin.py` proves the stronger claim",
+        "  directly: multiply every actual target after the origin by 1.75 and the",
+        "  forecasts do not move at all, for the recursive-lag Heavy RUC member,",
+        "  for the fitted state itself, and for the Light RUC recipe. The scored",
+        "  actuals do move, so the comparison is not vacuous.",
+        "* Future actual values are used only as the declared actual-driver",
+        "  exogenous inputs and for scoring.",
         f"* Signed error: `{SIGNED_ERROR_DEFINITION}`.",
         "* Prediction-interval coverage is not reported: the production scorer",
         "  publishes no governed interval, and manufacturing one would be worse",
