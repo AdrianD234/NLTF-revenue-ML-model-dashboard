@@ -129,3 +129,7 @@ data/dashboard_evidence_pack_reproducibility/ped_inner_hpo/source_artifacts/**/*
 
 # local task exports, workbook previews and inspection scratch
 outputs/
+
+# Workstream A reconciliation evidence (must be reviewable on GitHub)
+!outputs/mbu26_reconciliation/
+!outputs/mbu26_reconciliation/**
