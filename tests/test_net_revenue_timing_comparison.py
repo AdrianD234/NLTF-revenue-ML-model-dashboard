@@ -198,9 +198,17 @@ def test_base_original_timing_reconciles_to_default_dashboard_hover_benchmarks(
     comparison = timing_materialization["comparison"]
     # Checkpoints follow the Treasury-macro Base hover lineage after its
     # additive FED formula reconstruction, not the legacy pack values.
+    #
+    # Re-promoted when Light RUC moved from a runtime refit to the promoted
+    # fitted state. The former value, 2084.543721076793, came from a refit on
+    # one Windows machine; Linux produced 2084.543502923883 from the same code.
+    # Both now converge on the promoted state. This is a re-promotion against a
+    # documented -0.0000105% change, not a widened tolerance: the tolerance is
+    # unchanged at 1e-6 absolute. See docs/REPLAY_PARITY_INVESTIGATION.md and
+    # artifacts/light_ruc_promoted_state_impact/.
     assert _value(
         comparison, "baseline_published", 2026, "net_fed_revenue"
-    ) == pytest.approx(2084.543721076793, abs=1e-6)
+    ) == pytest.approx(2084.543502923882, abs=1e-6)
     assert _value(
         comparison, "baseline_published", 2027, "net_fed_revenue"
     ) == pytest.approx(2127.212804135619, abs=1e-6)

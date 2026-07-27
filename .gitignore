@@ -42,6 +42,8 @@ artifacts/**
 !artifacts/ci_baseline_comparison/**
 !artifacts/replay_parity_evidence/
 !artifacts/replay_parity_evidence/**
+!artifacts/light_ruc_promoted_state_impact/
+!artifacts/light_ruc_promoted_state_impact/**
 data/**
 !data/.gitkeep
 !data/dashboard_evidence_pack/
