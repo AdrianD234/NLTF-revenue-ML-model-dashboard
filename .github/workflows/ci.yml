@@ -1,0 +1,88 @@
+name: CI
+
+# Clean-environment verification for the governed dashboard. Everything here
+# runs without a browser: pytest.ini deselects the e2e marker, and the
+# Playwright host phase stays a manual step (see AGENTS.md - it needs an
+# approved host shell on Windows and cannot run in this sandbox). The Playwright
+# package is installed but its browsers are not, which reproduces the local
+# deselection exactly.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          # The dev requirements include the Playwright *package*. It is needed
+          # even though the e2e marker is deselected: marker deselection happens
+          # after collection, and the browser test modules import playwright at
+          # import time. The browser binaries are deliberately NOT installed
+          # (no `playwright install`), so the e2e tests stay deselected exactly
+          # as they are locally.
+          pip install -r requirements-dev.txt
+
+      - name: Compile all sources
+        run: python -m compileall -q .
+
+      - name: Full test suite
+        run: python -m pytest -q
+
+      - name: Conflict scenario extract validation
+        run: |
+          python scripts/materialize_conflict_scenario_extract.py \
+            --output-dir "${RUNNER_TEMP}/conflict_scenario_extract"
+          python - <<'PY'
+          import os
+          import pathlib
+          import sys
+
+          import pandas as pd
+
+          path = (
+              pathlib.Path(os.environ["RUNNER_TEMP"])
+              / "conflict_scenario_extract"
+              / "conflict_scenario_validation.csv"
+          )
+          frame = pd.read_csv(path)
+          passed = frame["passed"].astype(str).str.lower().isin(["true", "1"])
+          print(f"{int(passed.sum())}/{len(frame)} extract validations passed")
+          if not passed.all():
+              print(frame.loc[~passed, ["check_id", "observed"]].to_string(index=False))
+              sys.exit(1)
+          PY
+
+      - name: Streamlit deployment readiness
+        run: python scripts/check_streamlit_deploy_readiness.py
+
+      - name: GDP sign-guard binding register
+        run: python scripts/audit_gdp_sign_guard_bindings.py
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verification-evidence
+          path: |
+            artifacts/long_horizon_validation/
+            artifacts/gdp_sign_guard_audit/
+          if-no-files-found: ignore
