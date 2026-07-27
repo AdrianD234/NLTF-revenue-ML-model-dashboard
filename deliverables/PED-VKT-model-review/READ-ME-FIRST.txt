@@ -82,26 +82,15 @@ DATA
 observation but cannot itself be estimated on.
 
 
-ON 2026 Q1 - REMOVED
-
-An earlier version of this pack included a 2026 Q1 row. It has been removed
-and the reason is worth stating.
-
-That row is forward scenario scaffolding, not an observation. It carries a
-petrol price assumption of 269.8 and literal zeros for the dependent
-variable, GDP per capita, unemployment and population. A zero in the logged
-GDP column would read as GDP per capita of one dollar, and a zero
-unemployment rate is not a plausible value.
-
-It was excluded from estimation in any case, but shipping it invited exactly
-the kind of accident that flags are supposed to prevent. The dataset now
-contains observations only.
-
 
 VARIABLES
 
-  period          quarter label
-  qdate           Stata quarterly date
+  period          quarter label, e.g. 2002Q1
+  qdate           quarter as a Stata date. In the .dta this is a proper
+                  quarterly variable and displays as 2002q1. In the .csv it
+                  is the underlying integer on Stata's scale, where
+                  1960 Q1 = 0, so 2002 Q1 = 168 and 2025 Q4 = 263. Use
+                  "period" if you would rather read the label.
   vktpc           kilometres per capita per quarter - dependent variable
   lnvktpc         log of vktpc
   lnvktpclag1     lnvktpc lagged one quarter
