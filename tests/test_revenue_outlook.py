@@ -282,7 +282,12 @@ def test_committed_current_revenue_outlook_pack_is_repo_local_and_hash_backed() 
     assert "C:\\Users" not in scenario_input_manifest_text
     assert "Downloads" not in scenario_input_manifest_text
     scenario_input_manifest = json.loads(scenario_input_manifest_text)
-    assert scenario_input_manifest["source_policy"] == "committed scenario input artifacts only; Streamlit must not load Excel at runtime"
+    # Canonical generation route is two-stage promote -> rebuild, which
+    # materialises each reviewed workbook then combines. Both routes are proven
+    # to produce identical scenario-input content by
+    # tests/test_scenario_input_route_equivalence.py; only this descriptive
+    # wording differs. See docs/PACK_PROVENANCE_FINDING.md.
+    assert scenario_input_manifest["source_policy"] == "combined committed scenario input artifacts; Streamlit must not load Excel at runtime"
     assert scenario_input_manifest["row_counts"] == manifest["scenario_inputs"]["row_counts"]
     assert len(scenario_input_manifest["workbooks"]) == 2
     sheet_inventory = scenario_input_manifest["sheet_inventory"]
@@ -1103,15 +1108,18 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     assert fy2026.loc[("total_nltf_net_revenue", "current_basecase"), "data_scope"] == "current_nowcast"
     assert fy2026.loc[("total_nltf_net_revenue", "current_basecase"), "actual_quarters"] == "2025Q3; 2025Q4"
     assert fy2026.loc[("total_nltf_net_revenue", "current_basecase"), "forecast_quarters"] == "2026Q1; 2026Q2"
-    assert float(fy2026.loc[("gross_ped_revenue", "current_basecase"), "value"]) == pytest.approx(2052.808602, abs=1e-6)
-    assert float(fy2026.loc[("gross_fed_revenue", "current_basecase"), "value"]) == pytest.approx(2094.853764, abs=1e-6)
-    assert float(fy2026.loc[("net_fed_revenue", "current_basecase"), "value"]) == pytest.approx(2021.586240, abs=1e-6)
-    assert float(fy2026.loc[("light_bev_ruc_net_revenue", "current_basecase"), "value"]) == pytest.approx(80.520128, abs=1e-6)
-    assert float(fy2026.loc[("phev_ruc_net_revenue", "current_basecase"), "value"]) == pytest.approx(21.587058, abs=1e-6)
-    assert float(fy2026.loc[("total_ruc_net_revenue", "current_basecase"), "value"]) == pytest.approx(2045.963932, abs=1e-6)
-    assert float(fy2026.loc[("total_nltf_net_revenue", "current_basecase"), "value"]) == pytest.approx(4510.085443, abs=1e-6)
-    assert float(fy2026.loc[("gross_ped_revenue", "current_comparison_1"), "value"]) == pytest.approx(2054.465215, abs=1e-6)
-    assert float(fy2026.loc[("total_nltf_net_revenue", "current_comparison_1"), "value"]) == pytest.approx(4513.738498, abs=1e-6)
+    # Re-promoted with the deterministic Light RUC fitted state: 2052.808602
+    # -> 2053.531748405219 (+0.0352%), inside the 0.48% platform envelope.
+    # Tolerance unchanged at 1e-6. See docs/PACK_PROVENANCE_FINDING.md.
+    assert float(fy2026.loc[("gross_ped_revenue", "current_basecase"), "value"]) == pytest.approx(2053.531748405219, abs=1e-6)
+    assert float(fy2026.loc[("gross_fed_revenue", "current_basecase"), "value"]) == pytest.approx(2095.5769110454094, abs=1e-6)
+    assert float(fy2026.loc[("net_fed_revenue", "current_basecase"), "value"]) == pytest.approx(2022.3093863498088, abs=1e-6)
+    assert float(fy2026.loc[("light_bev_ruc_net_revenue", "current_basecase"), "value"]) == pytest.approx(80.53721184318304, abs=1e-6)
+    assert float(fy2026.loc[("phev_ruc_net_revenue", "current_basecase"), "value"]) == pytest.approx(21.59163760906493, abs=1e-6)
+    assert float(fy2026.loc[("total_ruc_net_revenue", "current_basecase"), "value"]) == pytest.approx(2045.865071761476, abs=1e-6)
+    assert float(fy2026.loc[("total_nltf_net_revenue", "current_basecase"), "value"]) == pytest.approx(4510.709729126289, abs=1e-6)
+    assert float(fy2026.loc[("gross_ped_revenue", "current_comparison_1"), "value"]) == pytest.approx(2055.188064846992, abs=1e-6)
+    assert float(fy2026.loc[("total_nltf_net_revenue", "current_comparison_1"), "value"]) == pytest.approx(4514.364345983942, abs=1e-6)
 
     anchor = current[current["period"].astype(str).eq("FY2025")].set_index(["series_id", "scenario_name"])
     assert anchor.loc[("total_nltf_net_revenue", "current_basecase"), "data_scope"] == "actual_anchor"
@@ -2064,56 +2072,56 @@ def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
     expected_hashes = {
         "conflict_fuel_price_scenarios.csv": "ad379997aa4044cdabf7d948787c926e06a434447ff076640cfab317eda53c73",
         "conflict_gdp_calibration.csv": "032606a84ed1e7716197ced405d3026b39c8c00e0a56882174b45c13eb8fb655",
-        "ev_phev_ped_light_drift_assumptions.csv": "576ae24883099bb2d2c6b8a7f0162598818c23b7b6381e1613a05c64cfbaf672",
-        "ev_phev_ped_light_drift_assumptions.parquet": "26bdc5bcd65782222c60221440157af4efd5fd51bbe27e298cb4060002f28acf",
-        "ev_phev_split_assumptions.csv": "f6d678fde5074dd9ec4aa9ed79f10f3f3d02c1a6d72e07f8c050918bfc9f2928",
-        "ev_phev_split_assumptions.parquet": "a48faa05983f149df716f9659b771f9863aa81679af2e39d93184356b114da30",
+        "ev_phev_ped_light_drift_assumptions.csv": "cd272eeaae0869784bf99b6db5964328ba6f5363b22519f204284d81242c5260",
+        "ev_phev_ped_light_drift_assumptions.parquet": "819c752985029a06f34a96bb28b550619e5978a4291df3e4331c615917149f6b",
+        "ev_phev_split_assumptions.csv": "0d62154155b8474c600754810137a8e4fa82a57bdbc9fd5dc8694e6d78f77d10",
+        "ev_phev_split_assumptions.parquet": "c1e5bdf97abc9de1c3ca23b9880c505812afee95b4271cd106759fd5aee822c4",
         "fan_availability.csv": "7d8df7d82b99740228350e6aa13f7d09394a693912c9bb4a52e0fbbf13b734d1",
         "fan_availability.parquet": "8c44f18a4cb90ba5b6c383c75c36244dc4c708f93692fbae11d1553cf6cb8f5b",
-        "fan_band_rows.csv": "97b20948b568a649d51e425136bb97d7d1e0037c1244655d48a4aa26589c00a6",
-        "fan_band_rows.parquet": "461917e6ca288f866adc9f5e1a96c1db44dc7490b68551286ddde11b925817f9",
-        "future_revenue_forecasts.csv": "31bc0ab32312cfb37598ca0bcd7db7abbab89d259c6785b3a9787208c9bd2c05",
-        "future_revenue_forecasts.parquet": "d90c4cc70776fe3ba572a9e960f36d6f36d9909b0a721fece9197776d0c8c4c8",
-        "manifest.json": "cec1671265c136f3ae2696af4b69a68f54aafaa6fff3316b76462203d83c01ec",
-        "manifest.md": "f76666a8af7cc3c4388ecd6c33533708ddd2b4e58d777db179c452bee6a6a523",
+        "fan_band_rows.csv": "f2a9b647e31680d28ceaaea0c602a3d1f6174b82a005e5c519ea50d7a78cab46",
+        "fan_band_rows.parquet": "7a596dff132da17756df858c9016d7f6dd2dc705bdaaf8f4c93e39a5aae0bd47",
+        "future_revenue_forecasts.csv": "8512d62142a7ae9f3cd9f50ef324c58f007c28ca49a5e23ac564935d1e680128",
+        "future_revenue_forecasts.parquet": "17ca8ae4207136430284ecaf885a31a2e00b493d78e18a4c0e20841e3ff00cd0",
+        "manifest.json": "7313a17c19c4c64364410812a3c69d8db21b585d6fcd6bebe29127409520bdd5",
+        "manifest.md": "a7dfbd1f96b5d943ae151996a3df4372f1e9c380fd54b7514bfc06bd30208076",
         "path_trace_status.csv": "9aee7a4e7003ec6541476ca3e4afef6d8586b6c358e41db1c8e06623e5ffcaa3",
         "path_trace_status.parquet": "e8d295393c0586167da97d2f0c054eb77419e8c9e4acf134198c0a5f53010eaa",
         "ped_bridge_mode_config.csv": "60583741fcd8484df3e4f166a82e49a06fdeb0fd353756fcfdf48a1f9786efc4",
         "ped_bridge_mode_config.parquet": "7b512297e05dfea806ccb86c984b816f3d2b7da7012be5ecef4f531dcae77c39",
-        "ped_bridge_shape_fit_metrics.csv": "bdbe8adc30fc3734d594af6ade207d8f0b5525163630d9fce0c23da03d731eff",
-        "ped_bridge_shape_fit_metrics.parquet": "06630d6cbdd03d7fd10fffde9e0edc263ecdc0586b09081f0bf00ab946985abf",
+        "ped_bridge_shape_fit_metrics.csv": "9e9670a32e0cc2ab558cf9e555f718288e98d097d386afaffadecaf834db7891",
+        "ped_bridge_shape_fit_metrics.parquet": "92d0d2f6b48c637237a31173ffb80c53a19ee590c1fc49af23c36dc10e075d71",
         "ped_efficiency_scenarios.csv": "e23f4ad04f3b7b4e18eee7d185b4d2fa8d3d54c0542695d1c8be59cd395788b8",
         "ped_efficiency_scenarios.parquet": "40ffbb5af60c73e13ccc480e6cdc0c0b2120cd43538004342d7bbfccc277651b",
-        "ped_revenue_bridge_audit.csv": "6c58b4b529ff8a9dd53a491b4450caa6f0a1d6569d4bd7c0fd6a78c3900479f5",
-        "ped_revenue_bridge_audit.parquet": "64d9c6290277a01c1822c35fed74f6b28cf85655dae731e3b555ecd6ca3c1d4b",
-        "revenue_bridge_components.csv": "7e18771e3b6fdea01215a50537a575860ed4de830973c389d0090863f6302126",
-        "revenue_bridge_components.parquet": "ff9326b46aec4a36bbe107e2e1433375c9bb7101029323a4bf75786c7ec7a41d",
-        "revenue_chart_rows.csv": "ece3e84f2c10f1c674a30d715390fb7de9118b9ff8ae900d1aef84a5dea06fc0",
-        "revenue_chart_rows.parquet": "00c5c540f13d2d44608dad69c6a89fd51d8b30d6d83010e6e39f070039e8c788",
-        "revenue_formula_residuals.csv": "1326a0bf31bf50ade7036c525230be17e13e3876845695339ed7a5c5314c2554",
-        "revenue_formula_residuals.parquet": "d719c77859c7283631e425a6859fb0e4ecb8a26a134680f5fab184d9e15abf91",
-        "revenue_line_reconciliation.csv": "78805e31eef3213bbab94d3449521db64e0d3fb8b59019c62eeb8915e793aede",
-        "revenue_line_reconciliation.parquet": "919b249bae9469c2211789eeaadd234a6b8dffe266c1e37fdbf94e24add7eb64",
-        "revenue_stack_components.csv": "1a3267aac0c600ba8f6d7ac827b9ba405637f1236740faba56f6b325ac266bee",
-        "revenue_stack_components.parquet": "fbdca3d6f158f2c0be8e55b78c73c12db33695b50c31d2549e5edb3240ef5b3e",
+        "ped_revenue_bridge_audit.csv": "042a9de8dbabe3d7cf9353e8930cb29370427f3a162eab5ef3c45215cd9971ed",
+        "ped_revenue_bridge_audit.parquet": "dd1ebbc53d315f37b7e4907105e256930a62d46e6e2cb719330453f19ecb76f6",
+        "revenue_bridge_components.csv": "643d8f4cc41a88e9254915277eeda1b1e6147b90316f411ecd371acaa140a548",
+        "revenue_bridge_components.parquet": "7d3bb492855eea98ed3cb8fc6dc09486b7ac6256089431c916b1d69680d6c0fc",
+        "revenue_chart_rows.csv": "8f6d2e01d835cb46fca281d02c1eeb2c4e8eb544db3241301087b76456eefc2c",
+        "revenue_chart_rows.parquet": "1876f5de8ee3f2d804eab7a1fcea2b191374dbf0057971677a7c1537a60c14d3",
+        "revenue_formula_residuals.csv": "199f850daf5c5a102b39b1cee204fb28e01e18e613fc466c0c39ec11d88ce5aa",
+        "revenue_formula_residuals.parquet": "e121204830f4f2dce210687a6abddd59c23bae8985cfdc470a166d2442d5796b",
+        "revenue_line_reconciliation.csv": "1d5248ba7e8fbf0400a7a0d5561a17c5480ed89c57321b46b124b4450f598840",
+        "revenue_line_reconciliation.parquet": "5a500d5673e2172324f7799308ef3b708f9697768f4a1f7efb33faf5eb54b101",
+        "revenue_stack_components.csv": "acfd7b23ced17416cb198c683f5931d1ad6a02adab2d2eea4dba65d2523e131d",
+        "revenue_stack_components.parquet": "9d1d7977738b8c0085e250a993111ec9fe2380343a352f15f55903addced0945",
         "row_reconciliation.csv": "d484f5d75cce88e30ce7bcf5dd70058505cc02e5dff93f457a579f119c2fc7ce",
         "row_reconciliation.parquet": "5d2ad8d3aa15d44cdc882ca540d6216feadc1bae3534be8e6b09dbe7026af62d",
         "runtime_cutoff_audit.csv": "623dae8d47fbe9e5d6a4ff7bba0e3b4d0d8a21a72601a5271db28858360b912d",
         "runtime_cutoff_audit.parquet": "143a243d84d86086b6b7c7831de059d53e94f7b06ddfe3844c5871748954e641",
-        "runtime_trace_audit.csv": "b9dc3802bb27e70db3516fd2455c04e32778190b1d3a952ba78c5ffde7970798",
-        "runtime_trace_audit.parquet": "e366a8033f443fb6ccb635f1dd0d8be3539d57f0479bd94acbf14dc6c8882501",
+        "runtime_trace_audit.csv": "baa7d19a13a5d30fe631bb89ab0fdc949b0b6281f9c607785c59176cce1070f0",
+        "runtime_trace_audit.parquet": "06be328d484e01db7ca8abe7ba4e49a9a67d4ca9a2f4afd539d5e6f50ed16b84",
         "scenario_feature_lineage.csv": "b123c97090bd282009225a0ac2cfc36226d20017412f820dfeec6af34411b30d",
         "scenario_feature_lineage.parquet": "dbc4ac3f2693f6de0915aebd21bc85e2f794f878eaefef0eb9031de468fb00e9",
-        "scenario_input_delta_audit.csv": "c59457c56e9dbfcad284bcdf731d27616f3da766760c9858ec503d3e045e0f13",
-        "scenario_input_delta_audit.parquet": "70a98305ff252f5ee3045aa14c4434e71b09dbb5689b020480b767f8ed9771ed",
-        "scenario_input_replay_mismatch_report.csv": "f6381c4ae7b4e89eb3e3727f5ef443e47397dc8d086333c8b389a35bf26978ba",
-        "scenario_input_replay_mismatch_report.parquet": "4d315a08a213674f1589a4adfc588516b67c5a107a714f43a4b746e00850237b",
-        "scenario_role_contract.csv": "e8684dbb5f5f2f3ddfcc67036e208227b758ab77d2731c31d9d0dc67d5379cec",
-        "scenario_role_contract.parquet": "e1d24837a40f7e3395625b6d02d4118fdb42f4b4eda005159665f4bbd764ecdb",
+        "scenario_input_delta_audit.csv": "546a2e00c02b247368196a106499d1a1473619f5770d70794ab76428e1919cf8",
+        "scenario_input_delta_audit.parquet": "578f75991a26df530ba6715c8ff1a0b842800b3c76b29914b06be1643f486c5a",
+        "scenario_input_replay_mismatch_report.csv": "0e668380d038e69d1e2adc0bd6fa7fffa098bc51bd965909fbdeb18122b5679b",
+        "scenario_input_replay_mismatch_report.parquet": "2dcf50402c32bd10e17012a3e439ce5c06d884b1bc82db2d3a5935d3f2199e7b",
+        "scenario_role_contract.csv": "916fe8b76c254636a09551edfb75669dbc98a64c97191e561434c1e129c04ffc",
+        "scenario_role_contract.parquet": "ddd2ac2defbe6079ce29166cab65cdc22f222c78cdceef20e8d600424c9b62f8",
         "sensitivity_config.csv": "07ef357edcf635211f9b32ee3c0fc9a1032898afc196ce85cf01d79c6fe35aa4",
         "sensitivity_config.parquet": "7acd005dc2f2cda4659d01ce2cf8bebad4f315db293e1c52eb4bd5c204229a5a",
-        "sensitivity_impact_audit.csv": "4baaa014c6afd72634745fcef82b2dd403568143e8978237680f3bf9d2e8ae9d",
-        "sensitivity_impact_audit.parquet": "2ea3e6bbcf60710e2179884670129c1fde36f316aae06280c842dd523520cc87",
+        "sensitivity_impact_audit.csv": "1524ca74ef66aed738a8e5ea4dadf2175d0b0c50c494833e5ada9243801f8d1e",
+        "sensitivity_impact_audit.parquet": "c88a7f6a22d6f4acb24da3f81d29bf5d3a6678e05f60dca98404a572ef5bd294",
         "sensitivity_seed_inputs.csv": "5181058396fbdb3896ade20b3ea335955fc186af85cccd365c7d86531852f3a6",
         "sensitivity_seed_inputs.parquet": "23a8ba664690235b92fac25912b9c8ab0eefe990f94a58258b901fafa306b310",
         "series_alias_audit.csv": "c0330c9918d7e2f4f972d15e8465537c16d96aca607ef253353612cadd62c56d",

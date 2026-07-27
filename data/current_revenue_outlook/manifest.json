@@ -1,8 +1,9 @@
 {
   "schema_version": "revenue-outlook-pack-v1",
+  "engine": "ensemble",
   "pack_status": "explicitly_promoted_current_outlook",
   "runtime_pack_type": "mbu26_actual_current_finalist_official_comparator",
-  "promotion_time": "2026-06-25T21:42:25.800323+00:00",
+  "promotion_time": "2026-07-27T03:59:12.371742+00:00",
   "promoted_by": "repo_source_runtime_rebuild",
   "repo_relative_output_dir": "data/current_revenue_outlook",
   "source_policy": "committed_current_runtime_pack_only; MBU26 annual source spine is repo-local; Streamlit does not load the offline workbook or legacy Excel forecast paths",
@@ -31,12 +32,11 @@
     "rule": "Actual line ends FY2025; FY2026 actual-to-date rows are nowcast inputs only and are not plotted as actuals. Current-finalist comparative charts and runtime calculations stop at FY2050, the last governed common non-extrapolated horizon."
   },
   "data_vintage_manifest_notes": {
-    "runtime_cutoff": "No extrapolated model extension is used beyond FY2050: the FY2051-FY2055 gradient extension is disabled and current-finalist paths stop where governed model and source assumptions stop. Last displayed/current calculation FY is FY2050. This is NOT a statement that the whole displayed path is validated. See forecast_horizon_validation for the three governed support states.",
+    "runtime_cutoff": "No extrapolated model extension is used; last displayed/current calculation FY is FY2050. Current-finalist paths stop where governed model and source assumptions stop.",
     "official_horizon_note": "Comparative charts stop at FY2050.",
     "light_ruc_target_semantics": "Business rule update: current-finalist Light RUC is treated as total light-RUC net km, while EV/PHEV migration is sourced from both current PED/light-petrol activity and total Light RUC using an optimized deterministic bridge calibrated to MBU26 light-mobility proportions. BEV/PHEV are not fixed add-ons.",
     "ev_phev_migration_allocation": "Default lambda_mode is optimized; alternatives are recorded for audit only and do not replace the current runtime path unless explicitly selected in governance review.",
-    "scenario_role_contract": "PED VKT per capita is a behavioural intensity metric. Value-changing comparison PED intensity is labelled as a behavioural comparison path; aggregate and revenue rows keep comparison traces.",
-    "forecast_horizon_validation": "Model training cutoff 2025Q4. Three governed support states, exposed on every June-year row as horizon_zone/horizon_scope plus quarter counts (quarters_backtest_supported, quarters_extended_evidence, quarters_unvalidated): H1-H12 (to 2028Q4) backtest-supported by the committed evidence pack; H13-H20 (2029Q1-2030Q4) extended conditional evidence from artifacts/long_horizon_validation, thinner samples and not validated to the short-term standard; H21+ (2031Q1 onward) no extended evaluation evidence, unvalidated long-range extrapolation. FY2026-FY2028 are H1-H12; FY2029 mixes H1-H12 and H13-H20; FY2030 is entirely H13-H20; FY2031 mixes H13-H20 and H21+; FY2032 onward is entirely H21+."
+    "scenario_role_contract": "PED VKT per capita is a behavioural intensity metric. Value-changing comparison PED intensity is labelled as a behavioural comparison path; aggregate and revenue rows keep comparison traces."
   },
   "source_comparison": {
     "comparison_id": "current_revenue_outlook_scenario_comparison",
@@ -57,7 +57,7 @@
         "scenario_display_name": "current_basecase",
         "is_test_fixture": false,
         "run_id": "current_revenue_outlook_current_basecase",
-        "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_basecase (2) - Copy.xlsx",
+        "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_basecase _2_ - Copy.xlsx",
         "workbook_sha256": "d0644d353ee5a073602186cf7ac5c16e707d5350e16fd037b73a65528067cc6a",
         "forecast_horizon_quarters": 100,
         "forecast_start_period": "2026Q1",
@@ -71,7 +71,7 @@
         "scenario_display_name": "current_comparison_1",
         "is_test_fixture": false,
         "run_id": "current_revenue_outlook_current_comparison_1",
-        "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_high_population (2) - Copy.xlsx",
+        "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_high_population _2_ - Copy.xlsx",
         "workbook_sha256": "6213ce565cf1f4a058a3ea9f1af4d5476a8b0423a4d8747905c3cba128380ce1",
         "forecast_horizon_quarters": 100,
         "forecast_start_period": "2026Q1",
@@ -88,7 +88,7 @@
       "scenario_display_name": "current_basecase",
       "is_test_fixture": false,
       "run_id": "current_revenue_outlook_current_basecase",
-      "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_basecase (2) - Copy.xlsx",
+      "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_basecase _2_ - Copy.xlsx",
       "workbook_sha256": "d0644d353ee5a073602186cf7ac5c16e707d5350e16fd037b73a65528067cc6a",
       "forecast_horizon_quarters": 100,
       "forecast_start_period": "2026Q1",
@@ -102,7 +102,7 @@
       "scenario_display_name": "current_comparison_1",
       "is_test_fixture": false,
       "run_id": "current_revenue_outlook_current_comparison_1",
-      "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_high_population (2) - Copy.xlsx",
+      "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_high_population _2_ - Copy.xlsx",
       "workbook_sha256": "6213ce565cf1f4a058a3ea9f1af4d5476a8b0423a4d8747905c3cba128380ce1",
       "forecast_horizon_quarters": 100,
       "forecast_start_period": "2026Q1",
@@ -154,13 +154,13 @@
       {
         "scenario_name": "current_basecase",
         "scenario_role": "basecase",
-        "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_basecase (2) - Copy.xlsx",
+        "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_basecase _2_ - Copy.xlsx",
         "workbook_sha256": "d0644d353ee5a073602186cf7ac5c16e707d5350e16fd037b73a65528067cc6a"
       },
       {
         "scenario_name": "current_comparison_1",
         "scenario_role": "comparison",
-        "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_high_population (2) - Copy.xlsx",
+        "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_high_population _2_ - Copy.xlsx",
         "workbook_sha256": "6213ce565cf1f4a058a3ea9f1af4d5476a8b0423a4d8747905c3cba128380ce1"
       }
     ],
@@ -458,7 +458,7 @@
       {
         "scenario_name": "current_basecase",
         "role": "basecase",
-        "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_basecase (2) - Copy.xlsx",
+        "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_basecase _2_ - Copy.xlsx",
         "workbook_sha256": "d0644d353ee5a073602186cf7ac5c16e707d5350e16fd037b73a65528067cc6a",
         "size_bytes": 72729,
         "raw_status": "copied_repo_local_raw_workbook",
@@ -471,7 +471,7 @@
           {
             "scenario_name": "current_basecase",
             "role": "basecase",
-            "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_basecase (2) - Copy.xlsx",
+            "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_basecase _2_ - Copy.xlsx",
             "workbook_sha256": "d0644d353ee5a073602186cf7ac5c16e707d5350e16fd037b73a65528067cc6a",
             "sheet": "Assumptions",
             "stream": "",
@@ -487,7 +487,7 @@
           {
             "scenario_name": "current_basecase",
             "role": "basecase",
-            "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_basecase (2) - Copy.xlsx",
+            "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_basecase _2_ - Copy.xlsx",
             "workbook_sha256": "d0644d353ee5a073602186cf7ac5c16e707d5350e16fd037b73a65528067cc6a",
             "sheet": "Heavy RUC Inputs",
             "stream": "HEAVY_RUC",
@@ -503,7 +503,7 @@
           {
             "scenario_name": "current_basecase",
             "role": "basecase",
-            "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_basecase (2) - Copy.xlsx",
+            "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_basecase _2_ - Copy.xlsx",
             "workbook_sha256": "d0644d353ee5a073602186cf7ac5c16e707d5350e16fd037b73a65528067cc6a",
             "sheet": "Light RUC Inputs",
             "stream": "LIGHT_RUC",
@@ -519,7 +519,7 @@
           {
             "scenario_name": "current_basecase",
             "role": "basecase",
-            "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_basecase (2) - Copy.xlsx",
+            "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_basecase _2_ - Copy.xlsx",
             "workbook_sha256": "d0644d353ee5a073602186cf7ac5c16e707d5350e16fd037b73a65528067cc6a",
             "sheet": "PED Inputs",
             "stream": "PED",
@@ -535,7 +535,7 @@
           {
             "scenario_name": "current_basecase",
             "role": "basecase",
-            "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_basecase (2) - Copy.xlsx",
+            "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_basecase _2_ - Copy.xlsx",
             "workbook_sha256": "d0644d353ee5a073602186cf7ac5c16e707d5350e16fd037b73a65528067cc6a",
             "sheet": "README",
             "stream": "",
@@ -553,7 +553,7 @@
       {
         "scenario_name": "current_comparison_1",
         "role": "comparison",
-        "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_high_population (2) - Copy.xlsx",
+        "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_high_population _2_ - Copy.xlsx",
         "workbook_sha256": "6213ce565cf1f4a058a3ea9f1af4d5476a8b0423a4d8747905c3cba128380ce1",
         "size_bytes": 72716,
         "raw_status": "copied_repo_local_raw_workbook",
@@ -566,7 +566,7 @@
           {
             "scenario_name": "current_comparison_1",
             "role": "comparison",
-            "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_high_population (2) - Copy.xlsx",
+            "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_high_population _2_ - Copy.xlsx",
             "workbook_sha256": "6213ce565cf1f4a058a3ea9f1af4d5476a8b0423a4d8747905c3cba128380ce1",
             "sheet": "Assumptions",
             "stream": "",
@@ -582,7 +582,7 @@
           {
             "scenario_name": "current_comparison_1",
             "role": "comparison",
-            "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_high_population (2) - Copy.xlsx",
+            "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_high_population _2_ - Copy.xlsx",
             "workbook_sha256": "6213ce565cf1f4a058a3ea9f1af4d5476a8b0423a4d8747905c3cba128380ce1",
             "sheet": "Heavy RUC Inputs",
             "stream": "HEAVY_RUC",
@@ -598,7 +598,7 @@
           {
             "scenario_name": "current_comparison_1",
             "role": "comparison",
-            "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_high_population (2) - Copy.xlsx",
+            "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_high_population _2_ - Copy.xlsx",
             "workbook_sha256": "6213ce565cf1f4a058a3ea9f1af4d5476a8b0423a4d8747905c3cba128380ce1",
             "sheet": "Light RUC Inputs",
             "stream": "LIGHT_RUC",
@@ -614,7 +614,7 @@
           {
             "scenario_name": "current_comparison_1",
             "role": "comparison",
-            "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_high_population (2) - Copy.xlsx",
+            "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_high_population _2_ - Copy.xlsx",
             "workbook_sha256": "6213ce565cf1f4a058a3ea9f1af4d5476a8b0423a4d8747905c3cba128380ce1",
             "sheet": "PED Inputs",
             "stream": "PED",
@@ -630,7 +630,7 @@
           {
             "scenario_name": "current_comparison_1",
             "role": "comparison",
-            "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_high_population (2) - Copy.xlsx",
+            "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_high_population _2_ - Copy.xlsx",
             "workbook_sha256": "6213ce565cf1f4a058a3ea9f1af4d5476a8b0423a4d8747905c3cba128380ce1",
             "sheet": "README",
             "stream": "",
@@ -646,7 +646,7 @@
         ]
       }
     ],
-    "manifest_sha256": "dd296dc6a7ecb5e5367d9e78d2a942b970c287d8da76d795fbed5e08ffae2c7f"
+    "manifest_sha256": "7e6232cf616381a48530e57b95f0908b5237df11e3c3b2fdcb6dc17b7d072bf1"
   },
   "scenario_input_delta_audit": {
     "repo_relative_path": "data/current_revenue_outlook/scenario_input_delta_audit.csv",
@@ -718,20 +718,20 @@
   "validation_status": "runtime_rebuilt",
   "output_hashes": {
     "ev_phev_ped_light_drift_assumptions.csv": {
-      "sha256": "576ae24883099bb2d2c6b8a7f0162598818c23b7b6381e1613a05c64cfbaf672",
-      "size_bytes": 497980
+      "sha256": "cd272eeaae0869784bf99b6db5964328ba6f5363b22519f204284d81242c5260",
+      "size_bytes": 497939
     },
     "ev_phev_ped_light_drift_assumptions.parquet": {
-      "sha256": "26bdc5bcd65782222c60221440157af4efd5fd51bbe27e298cb4060002f28acf",
-      "size_bytes": 102645
+      "sha256": "819c752985029a06f34a96bb28b550619e5978a4291df3e4331c615917149f6b",
+      "size_bytes": 102666
     },
     "ev_phev_split_assumptions.csv": {
-      "sha256": "f6d678fde5074dd9ec4aa9ed79f10f3f3d02c1a6d72e07f8c050918bfc9f2928",
-      "size_bytes": 65921
+      "sha256": "0d62154155b8474c600754810137a8e4fa82a57bdbc9fd5dc8694e6d78f77d10",
+      "size_bytes": 65893
     },
     "ev_phev_split_assumptions.parquet": {
-      "sha256": "a48faa05983f149df716f9659b771f9863aa81679af2e39d93184356b114da30",
-      "size_bytes": 54510
+      "sha256": "c1e5bdf97abc9de1c3ca23b9880c505812afee95b4271cd106759fd5aee822c4",
+      "size_bytes": 54520
     },
     "fan_availability.csv": {
       "sha256": "7d8df7d82b99740228350e6aa13f7d09394a693912c9bb4a52e0fbbf13b734d1",
@@ -742,19 +742,19 @@
       "size_bytes": 10112
     },
     "fan_band_rows.csv": {
-      "sha256": "97b20948b568a649d51e425136bb97d7d1e0037c1244655d48a4aa26589c00a6",
-      "size_bytes": 365675
+      "sha256": "f2a9b647e31680d28ceaaea0c602a3d1f6174b82a005e5c519ea50d7a78cab46",
+      "size_bytes": 365656
     },
     "fan_band_rows.parquet": {
-      "sha256": "461917e6ca288f866adc9f5e1a96c1db44dc7490b68551286ddde11b925817f9",
+      "sha256": "7a596dff132da17756df858c9016d7f6dd2dc705bdaaf8f4c93e39a5aae0bd47",
       "size_bytes": 48092
     },
     "future_revenue_forecasts.csv": {
-      "sha256": "31bc0ab32312cfb37598ca0bcd7db7abbab89d259c6785b3a9787208c9bd2c05",
-      "size_bytes": 274591
+      "sha256": "8512d62142a7ae9f3cd9f50ef324c58f007c28ca49a5e23ac564935d1e680128",
+      "size_bytes": 274593
     },
     "future_revenue_forecasts.parquet": {
-      "sha256": "d90c4cc70776fe3ba572a9e960f36d6f36d9909b0a721fece9197776d0c8c4c8",
+      "sha256": "17ca8ae4207136430284ecaf885a31a2e00b493d78e18a4c0e20841e3ff00cd0",
       "size_bytes": 27170
     },
     "path_trace_status.csv": {
@@ -774,11 +774,11 @@
       "size_bytes": 6017
     },
     "ped_bridge_shape_fit_metrics.csv": {
-      "sha256": "bdbe8adc30fc3734d594af6ade207d8f0b5525163630d9fce0c23da03d731eff",
-      "size_bytes": 4849
+      "sha256": "9e9670a32e0cc2ab558cf9e555f718288e98d097d386afaffadecaf834db7891",
+      "size_bytes": 4843
     },
     "ped_bridge_shape_fit_metrics.parquet": {
-      "sha256": "06630d6cbdd03d7fd10fffde9e0edc263ecdc0586b09081f0bf00ab946985abf",
+      "sha256": "92d0d2f6b48c637237a31173ffb80c53a19ee590c1fc49af23c36dc10e075d71",
       "size_bytes": 12807
     },
     "ped_efficiency_scenarios.csv": {
@@ -790,52 +790,52 @@
       "size_bytes": 6199
     },
     "ped_revenue_bridge_audit.csv": {
-      "sha256": "6c58b4b529ff8a9dd53a491b4450caa6f0a1d6569d4bd7c0fd6a78c3900479f5",
-      "size_bytes": 138647
+      "sha256": "042a9de8dbabe3d7cf9353e8930cb29370427f3a162eab5ef3c45215cd9971ed",
+      "size_bytes": 138692
     },
     "ped_revenue_bridge_audit.parquet": {
-      "sha256": "64d9c6290277a01c1822c35fed74f6b28cf85655dae731e3b555ecd6ca3c1d4b",
+      "sha256": "dd1ebbc53d315f37b7e4907105e256930a62d46e6e2cb719330453f19ecb76f6",
       "size_bytes": 74185
     },
     "revenue_bridge_components.csv": {
-      "sha256": "7e18771e3b6fdea01215a50537a575860ed4de830973c389d0090863f6302126",
-      "size_bytes": 578749
+      "sha256": "643d8f4cc41a88e9254915277eeda1b1e6147b90316f411ecd371acaa140a548",
+      "size_bytes": 578740
     },
     "revenue_bridge_components.parquet": {
-      "sha256": "ff9326b46aec4a36bbe107e2e1433375c9bb7101029323a4bf75786c7ec7a41d",
-      "size_bytes": 60243
+      "sha256": "7d3bb492855eea98ed3cb8fc6dc09486b7ac6256089431c916b1d69680d6c0fc",
+      "size_bytes": 60312
     },
     "revenue_chart_rows.csv": {
-      "sha256": "ece3e84f2c10f1c674a30d715390fb7de9118b9ff8ae900d1aef84a5dea06fc0",
-      "size_bytes": 2438301
+      "sha256": "8f6d2e01d835cb46fca281d02c1eeb2c4e8eb544db3241301087b76456eefc2c",
+      "size_bytes": 2438289
     },
     "revenue_chart_rows.parquet": {
-      "sha256": "00c5c540f13d2d44608dad69c6a89fd51d8b30d6d83010e6e39f070039e8c788",
-      "size_bytes": 126739
+      "sha256": "1876f5de8ee3f2d804eab7a1fcea2b191374dbf0057971677a7c1537a60c14d3",
+      "size_bytes": 126799
     },
     "revenue_formula_residuals.csv": {
-      "sha256": "1326a0bf31bf50ade7036c525230be17e13e3876845695339ed7a5c5314c2554",
-      "size_bytes": 284432
+      "sha256": "199f850daf5c5a102b39b1cee204fb28e01e18e613fc466c0c39ec11d88ce5aa",
+      "size_bytes": 284139
     },
     "revenue_formula_residuals.parquet": {
-      "sha256": "d719c77859c7283631e425a6859fb0e4ecb8a26a134680f5fab184d9e15abf91",
-      "size_bytes": 34096
+      "sha256": "e121204830f4f2dce210687a6abddd59c23bae8985cfdc470a166d2442d5796b",
+      "size_bytes": 34056
     },
     "revenue_line_reconciliation.csv": {
-      "sha256": "78805e31eef3213bbab94d3449521db64e0d3fb8b59019c62eeb8915e793aede",
-      "size_bytes": 2176168
+      "sha256": "1d5248ba7e8fbf0400a7a0d5561a17c5480ed89c57321b46b124b4450f598840",
+      "size_bytes": 2176178
     },
     "revenue_line_reconciliation.parquet": {
-      "sha256": "919b249bae9469c2211789eeaadd234a6b8dffe266c1e37fdbf94e24add7eb64",
-      "size_bytes": 90516
+      "sha256": "5a500d5673e2172324f7799308ef3b708f9697768f4a1f7efb33faf5eb54b101",
+      "size_bytes": 90525
     },
     "revenue_stack_components.csv": {
-      "sha256": "1a3267aac0c600ba8f6d7ac827b9ba405637f1236740faba56f6b325ac266bee",
-      "size_bytes": 10640594
+      "sha256": "acfd7b23ced17416cb198c683f5931d1ad6a02adab2d2eea4dba65d2523e131d",
+      "size_bytes": 10641110
     },
     "revenue_stack_components.parquet": {
-      "sha256": "fbdca3d6f158f2c0be8e55b78c73c12db33695b50c31d2549e5edb3240ef5b3e",
-      "size_bytes": 240407
+      "sha256": "9d1d7977738b8c0085e250a993111ec9fe2380343a352f15f55903addced0945",
+      "size_bytes": 240489
     },
     "row_reconciliation.csv": {
       "sha256": "d484f5d75cce88e30ce7bcf5dd70058505cc02e5dff93f457a579f119c2fc7ce",
@@ -854,11 +854,11 @@
       "size_bytes": 5888
     },
     "runtime_trace_audit.csv": {
-      "sha256": "b9dc3802bb27e70db3516fd2455c04e32778190b1d3a952ba78c5ffde7970798",
+      "sha256": "baa7d19a13a5d30fe631bb89ab0fdc949b0b6281f9c607785c59176cce1070f0",
       "size_bytes": 107786
     },
     "runtime_trace_audit.parquet": {
-      "sha256": "e366a8033f443fb6ccb635f1dd0d8be3539d57f0479bd94acbf14dc6c8882501",
+      "sha256": "06be328d484e01db7ca8abe7ba4e49a9a67d4ca9a2f4afd539d5e6f50ed16b84",
       "size_bytes": 22625
     },
     "scenario_feature_lineage.csv": {
@@ -870,28 +870,28 @@
       "size_bytes": 188310
     },
     "scenario_input_delta_audit.csv": {
-      "sha256": "c59457c56e9dbfcad284bcdf731d27616f3da766760c9858ec503d3e045e0f13",
+      "sha256": "546a2e00c02b247368196a106499d1a1473619f5770d70794ab76428e1919cf8",
       "size_bytes": 3049895
     },
     "scenario_input_delta_audit.parquet": {
-      "sha256": "70a98305ff252f5ee3045aa14c4434e71b09dbb5689b020480b767f8ed9771ed",
+      "sha256": "578f75991a26df530ba6715c8ff1a0b842800b3c76b29914b06be1643f486c5a",
       "size_bytes": 185119
     },
     "scenario_input_replay_mismatch_report.csv": {
-      "sha256": "f6381c4ae7b4e89eb3e3727f5ef443e47397dc8d086333c8b389a35bf26978ba",
-      "size_bytes": 241027
+      "sha256": "0e668380d038e69d1e2adc0bd6fa7fffa098bc51bd965909fbdeb18122b5679b",
+      "size_bytes": 241015
     },
     "scenario_input_replay_mismatch_report.parquet": {
-      "sha256": "4d315a08a213674f1589a4adfc588516b67c5a107a714f43a4b746e00850237b",
-      "size_bytes": 47291
+      "sha256": "2dcf50402c32bd10e17012a3e439ce5c06d884b1bc82db2d3a5935d3f2199e7b",
+      "size_bytes": 47472
     },
     "scenario_role_contract.csv": {
-      "sha256": "e8684dbb5f5f2f3ddfcc67036e208227b758ab77d2731c31d9d0dc67d5379cec",
+      "sha256": "916fe8b76c254636a09551edfb75669dbc98a64c97191e561434c1e129c04ffc",
       "size_bytes": 18217
     },
     "scenario_role_contract.parquet": {
-      "sha256": "e1d24837a40f7e3395625b6d02d4118fdb42f4b4eda005159665f4bbd764ecdb",
-      "size_bytes": 20973
+      "sha256": "ddd2ac2defbe6079ce29166cab65cdc22f222c78cdceef20e8d600424c9b62f8",
+      "size_bytes": 20966
     },
     "sensitivity_config.csv": {
       "sha256": "07ef357edcf635211f9b32ee3c0fc9a1032898afc196ce85cf01d79c6fe35aa4",
@@ -902,11 +902,11 @@
       "size_bytes": 10806
     },
     "sensitivity_impact_audit.csv": {
-      "sha256": "4baaa014c6afd72634745fcef82b2dd403568143e8978237680f3bf9d2e8ae9d",
-      "size_bytes": 890325
+      "sha256": "1524ca74ef66aed738a8e5ea4dadf2175d0b0c50c494833e5ada9243801f8d1e",
+      "size_bytes": 890301
     },
     "sensitivity_impact_audit.parquet": {
-      "sha256": "2ea3e6bbcf60710e2179884670129c1fde36f316aae06280c842dd523520cc87",
+      "sha256": "c88a7f6a22d6f4acb24da3f81d29bf5d3a6678e05f60dca98404a572ef5bd294",
       "size_bytes": 49447
     },
     "sensitivity_seed_inputs.csv": {
@@ -941,5 +941,17 @@
       "sha256": "74df6e0db3453928fcb159af4dc9d3dfb86fa712b9096d1d672dc8068099ed63",
       "size_bytes": 10417
     }
+  },
+  "generation_route": {
+    "migration_id": "light-ruc-deterministic-state-2026-07",
+    "canonical_route_version": "promote-then-rebuild-v2",
+    "promotion_revision": 2,
+    "stage_1": "scripts/promote_revenue_outlook_from_workbooks.py from committed, de-prefixed original workbooks",
+    "stage_2": "scripts/rebuild_current_revenue_outlook_runtime.py for the MBU26 spine and historical actuals",
+    "light_ruc_runtime": "loads the hash-gated promoted fitted state; runtime refitting is disabled",
+    "light_ruc_state_sha256": "41669526945c546fc66a1e6d327bde3c9077b4fe6f6f4ca24fda3709654a1294",
+    "light_ruc_training_cutoff": "2025Q4",
+    "schema_unchanged": true,
+    "note": "Row structure, series identities and formulas are unchanged. Values move only for Light RUC and its governed downstream cascade."
   }
 }
