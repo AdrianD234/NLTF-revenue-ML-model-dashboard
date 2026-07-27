@@ -3691,9 +3691,27 @@ def build_current_revenue_outlook_runtime_pack(
             ),
         },
         "data_vintage_manifest_notes": {
+            # Emitted by the generator, not hand-edited, so a pack rebuild
+            # cannot silently drop the horizon-support governance.
             "runtime_cutoff": (
-                f"No extrapolated model extension is used; last displayed/current calculation FY is FY{runtime_cutoff_fy}. "
-                "Current-finalist paths stop where governed model and source assumptions stop."
+                f"No extrapolated model extension is used beyond FY{runtime_cutoff_fy}: the "
+                "FY2051-FY2055 gradient extension is disabled and current-finalist paths stop "
+                "where governed model and source assumptions stop. Last displayed/current "
+                f"calculation FY is FY{runtime_cutoff_fy}. This is NOT a statement that the "
+                "whole displayed path is validated. See forecast_horizon_validation for the "
+                "three governed support states."
+            ),
+            "forecast_horizon_validation": (
+                f"Model training cutoff {REVENUE_MODEL_TRAINING_CUTOFF}. Three governed support "
+                "states, exposed on every June-year row as horizon_zone/horizon_scope plus "
+                "quarter counts (quarters_backtest_supported, quarters_extended_evidence, "
+                f"quarters_unvalidated): H1-H{BACKTEST_SUPPORTED_MAX_HORIZON} backtest-supported "
+                "by the committed evidence pack; H13-H20 extended conditional evidence from "
+                "artifacts/long_horizon_validation, thinner samples and not validated to the "
+                "short-term standard; H21+ no extended evaluation evidence, unvalidated "
+                "long-range extrapolation. FY2026-FY2028 are H1-H12; FY2029 mixes H1-H12 and "
+                "H13-H20; FY2030 is entirely H13-H20; FY2031 mixes H13-H20 and H21+; FY2032 "
+                "onward is entirely H21+."
             ),
             "official_horizon_note": (
                 f"Comparative charts stop at FY{runtime_cutoff_fy}."
