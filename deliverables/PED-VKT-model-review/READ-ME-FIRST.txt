@@ -1,0 +1,187 @@
+===========================================================================
+PETROL VEHICLE TRAVEL MODEL - SPECIFICATION AND DATA
+===========================================================================
+
+PURPOSE
+
+Quarterly forecast of light petrol vehicle kilometres travelled per capita
+in New Zealand.
+
+This quantity subsequently feeds a fuel excise revenue forecast through a
+separate chain covering population, fleet composition and fuel efficiency.
+That chain is out of scope here. This pack covers the travel equation only.
+
+
+CONTENTS
+
+  READ-ME-FIRST.txt          specification, data notes, accuracy record
+  ped-vkt-data.dta           estimation data, Stata format
+  ped-vkt-data.csv           the same data, comma separated
+  run-in-stata.do            optional starter script
+  ped-vkt-forecast-test.csv  out of sample forecast record
+
+
+===========================================================================
+SPECIFICATION
+===========================================================================
+
+Dependent variable is log kilometres per capita per quarter.
+
+  log(VKT per capita)
+      =  constant
+       + b1  x log(real petrol price)
+       + b2  x log(real GDP per capita)
+       + b3  x unemployment rate
+       + b4  x trend
+       + b5  x (trend, 2011 onward)
+       + b6  x (indicator, 2020 onward)
+       + b7  x (indicator, calendar 2020)
+       + b8  x Q2  +  b9 x Q3  +  b10 x Q4
+       + b11 x log(VKT per capita, lagged one quarter)
+       + u
+
+  u(t) = rho x u(t-1) + e(t)
+
+Estimator is feasible GLS with AR(1) errors, fitted in logs on an expanding
+window. Maximum eight iterations. Q1 is the omitted season.
+
+
+COEFFICIENTS
+
+  constant                                   1.9383
+  log real petrol price                     -0.0628
+  log real GDP per capita                    0.1966
+  unemployment rate                          0.1356
+  trend                                     -0.0012
+  trend from 2011                           -0.0001
+  2020 onward                               -0.0237
+  calendar 2020                             -0.0036
+  Q2                                         0.0014
+  Q3                                         0.0091
+  Q4                                         0.0194
+  lagged dependent variable                  0.5342
+
+  rho                                        0.5233
+
+The first two are short run elasticities. With a lagged dependent variable
+of 0.5342 the implied long run multiplier is about 2.15, giving a long run
+petrol price elasticity near -0.135.
+
+Standard errors are not carried in the production state. Any inference you
+need will have to be re-estimated.
+
+
+===========================================================================
+DATA
+===========================================================================
+
+96 quarters, 2002 Q1 to 2025 Q4. The estimation sample is 95 quarters,
+2002 Q2 to 2025 Q4. Column "insample" flags those 95.
+
+2002 Q1 is retained solely to supply the first lag. It is a complete
+observation but cannot itself be estimated on.
+
+
+
+VARIABLES
+
+  period          quarter label, e.g. 2002Q1
+  qdate           quarter as a Stata date. In the .dta this is a proper
+                  quarterly variable and displays as 2002q1. In the .csv it
+                  is the underlying integer on Stata's scale, where
+                  1960 Q1 = 0, so 2002 Q1 = 168 and 2025 Q4 = 263. Use
+                  "period" if you would rather read the label.
+  vktpc           kilometres per capita per quarter - dependent variable
+  lnvktpc         log of vktpc
+  lnvktpclag1     lnvktpc lagged one quarter
+  petrolprice     real petrol price, cents per litre
+  lnpetrol        log of petrolprice
+  gdppc           real GDP per capita, NZD
+  lngdppc         log of gdppc
+  unemppct        unemployment in percentage points, e.g. 5.3
+  unemprate       unemployment as a decimal, e.g. 0.053 - USED IN MODEL
+  population      supplied for context, not in the equation
+  trend           quarters since 2000 Q1, where 2000 Q1 = 1
+  post2011        indicator, year >= 2011
+  post2011trend   trend x post2011
+  post2020        indicator, year >= 2020
+  covid2020       indicator, calendar 2020 only
+  q2, q3, q4      seasonal indicators, Q1 omitted
+  insample        1 for the 95 estimation quarters
+
+
+THREE CONVENTIONS WORTH CONFIRMING BEFORE YOU ESTIMATE
+
+  1. Unemployment enters as a decimal fraction, not percentage points.
+     The coefficient of 0.1356 therefore corresponds to roughly 0.14 per
+     cent on VKT per capita for a one percentage point move in the
+     unemployment rate. The column unemppct holds the percentage point
+     series if you prefer that scale.
+
+  2. Unemployment is the only driver not in logs.
+
+  3. The trend is an uncentred quarter counter from 2000 Q1, and
+     post2011trend is its product with the post 2011 indicator rather than
+     a separate slope dummy.
+
+
+===========================================================================
+OUT OF SAMPLE PERFORMANCE
+===========================================================================
+
+Rolling origin, actual drivers. Mean absolute percentage error:
+
+  1 quarter ahead        1.1
+  4 quarters ahead       2.0
+  12 quarters ahead      4.3
+  20 quarters ahead      6.0
+
+Two qualifications.
+
+Horizons out to 12 quarters sit inside the range covered by the governed
+backtest evidence. Horizons 13 to 20 have been tested but on thinner
+samples. Beyond 20 quarters there is no comparable evidence.
+
+Mean signed error moves from -0.1 per cent at one quarter to +4.3 per cent
+at twenty. The model over predicts at longer horizons rather than erring
+symmetrically. Excluding 2020 and 2021 targets reduces this but does not
+remove it.
+
+Quarter by quarter detail is in ped-vkt-forecast-test.csv.
+
+
+===========================================================================
+OPEN QUESTIONS
+===========================================================================
+
+Set out for your assessment rather than as settled positions.
+
+  Unemployment carries a positive coefficient. The expected sign is
+  negative. It may be proxying for something correlated with the post 2011
+  and post 2020 controls.
+
+  The lagged dependent variable and the AR(1) error term are close in
+  magnitude, 0.5342 and 0.5233. Whether both are separately identified is a
+  reasonable question.
+
+  The deterministic trend, the 2011 slope change and the 2020 level shift
+  carry substantial explanatory weight between them. The break dates were
+  imposed rather than estimated.
+
+  The short run petrol price elasticity of -0.063 is low relative to the
+  published road fuel demand literature, and the implied long run value of
+  about -0.135 remains low.
+
+  Levels are recovered by exponentiating with no smearing adjustment, so
+  forecasts are conditional medians rather than conditional means.
+
+
+===========================================================================
+SCOPE OF THE ASSURANCE
+===========================================================================
+
+The model and data are version controlled and reproduce deterministically,
+so this pack and the production system are demonstrably the same object.
+
+That is a statement about reproducibility, not about specification. The
+economic question is the one being put to you.
