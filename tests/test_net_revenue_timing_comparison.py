@@ -209,15 +209,21 @@ def test_base_original_timing_reconciles_to_default_dashboard_hover_benchmarks(
     assert _value(
         comparison, "baseline_published", 2026, "net_fed_revenue"
     ) == pytest.approx(2084.543502923882, abs=1e-6)
+    # Re-promoted with the migrated packs: 2127.212804135619 ->
+    # 2127.212721514306, a movement of -8.26e-5 absolute (-3.9e-6%). Net FED is
+    # gross FED minus refunds; gross FED follows PED litres, which follow
+    # light_petrol_vkt from the migration bridge, and that bridge allocates
+    # EV/PHEV km against the Light RUC pool. So a deterministic Light RUC change
+    # propagates here. Tolerance unchanged at 1e-6 absolute.
     assert _value(
         comparison, "baseline_published", 2027, "net_fed_revenue"
-    ) == pytest.approx(2127.212804135619, abs=1e-6)
+    ) == pytest.approx(2127.212721514306, abs=1e-6)
     assert _value(
         comparison, "baseline_shifted_6m", 2027, "net_fed_revenue"
-    ) == pytest.approx(1963.260560165089, abs=1e-6)
+    ) == pytest.approx(1963.2605635246732, abs=1e-6)
     assert _value(
         comparison, "baseline_no_uplift", 2027, "net_fed_revenue"
-    ) == pytest.approx(1963.260560165089, abs=1e-6)
+    ) == pytest.approx(1963.2605635246732, abs=1e-6)
 
 
 def test_export_reconciles_to_authoritative_bridge_and_independent_net_formulas(
