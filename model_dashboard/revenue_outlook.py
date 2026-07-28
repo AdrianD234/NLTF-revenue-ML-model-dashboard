@@ -1598,6 +1598,223 @@ def raw_quarterly_forecast_audit_frame(
     ).reset_index(drop=True)
 
 
+HORIZON_CONTRACT_AUDIT_COLUMNS = [
+    "scope",
+    "series_family",
+    "series_ids",
+    "time_grain",
+    "source_horizon",
+    "decision_facing_cutoff",
+    "available_beyond_h20",
+    "availability_status",
+    "cutoff_driver",
+    "dependent_totals",
+    "rule",
+    "notes",
+]
+
+# Which totals stop when a family stops. Stated per family so a reader can see
+# WHY a row is unavailable, not just that it is.
+_RUC_CHAIN = (
+    "gross_ruc_revenue; ruc_revenue_net_admin; total_ruc_net_revenue; "
+    "total_fed_ruc_net_revenue; total_gross_revenue; total_revenue_net_admin; total_nltf_net_revenue"
+)
+_FED_CHAIN = (
+    "gross_fed_revenue; net_fed_revenue; total_fed_ruc_net_revenue; "
+    "total_gross_revenue; total_revenue_net_admin; total_nltf_net_revenue"
+)
+
+HORIZON_CONTRACT_FAMILIES = (
+    (
+        "LIGHT_RUC",
+        f"{CURRENT_LIGHT_TOTAL_SERIES_ID}; light_ruc_net_km; light_ruc_net_revenue; "
+        "light_bev_ruc_net_km; light_bev_ruc_net_revenue; phev_ruc_net_km; phev_ruc_net_revenue",
+        "own_horizon_policy",
+        _RUC_CHAIN,
+        "Decision-facing Light RUC stops at H20/FY2030 by the approved horizon policy.",
+    ),
+    (
+        "PED",
+        "ped_vkt_per_capita; ped_volume; light_petrol_vkt; gross_ped_revenue",
+        "combined_total_emission_gate",
+        _FED_CHAIN,
+        (
+            "PED's own model source runs to the full replay horizon. Its ANNUAL rows stop at "
+            "FY2030 because the current annual spine emits one complete June-year record whose "
+            "totals require Light RUC; a standalone PED annual beyond FY2030 would either be "
+            "orphaned or feed an unsupported total. The raw PED path is retained in "
+            "raw_quarterly_forecast_audit as non-decision-facing evidence."
+        ),
+    ),
+    (
+        "HEAVY_RUC",
+        "heavy_ruc_net_km; heavy_ruc_net_revenue",
+        "combined_total_emission_gate",
+        _RUC_CHAIN,
+        (
+            "Heavy RUC's own model source runs to the full replay horizon. As with PED, its "
+            "annual rows stop at FY2030 because they are emitted with the Light RUC-dependent "
+            "totals. Raw evidence is retained in raw_quarterly_forecast_audit."
+        ),
+    ),
+    (
+        "MBU26_FIXED_COMPONENTS",
+        "heavy_bev_ruc_net_km; heavy_bev_ruc_net_revenue; ruc_refunds; ruc_admin_revenue; "
+        "fed_refunds; gross_lpg_revenue; gross_cng_revenue; mr1_revenue; mr2_revenue; "
+        "coo_revenue; mvr_admin_revenue; mvr_refunds; tuc_net_revenue; tuc_gtk",
+        "combined_total_emission_gate",
+        _RUC_CHAIN,
+        (
+            "Fixed MBU26 components carried into current-model June years. Available from the "
+            "official source well beyond FY2030, but only emitted where a complete current "
+            "June-year record is emitted."
+        ),
+    ),
+)
+
+
+def _raw_audit_source_horizon(raw_quarterly_audit: pd.DataFrame) -> str:
+    """Furthest quarter the raw replay evidence actually reaches.
+
+    Read off the built frame rather than declared, so the manifest cannot claim
+    a horizon the committed scenario inputs do not support.
+    """
+    if raw_quarterly_audit is None or raw_quarterly_audit.empty:
+        return "unavailable"
+    horizons = pd.to_numeric(raw_quarterly_audit.get("horizon"), errors="coerce")
+    periods = raw_quarterly_audit.get("period", pd.Series(dtype=str)).astype(str)
+    if not horizons.notna().any():
+        return "unavailable"
+    index = int(horizons.idxmax())
+    return f"{periods.loc[index]} (H{int(horizons.max())})"
+
+
+def horizon_contract_audit_frame(
+    chart_rows: pd.DataFrame,
+    raw_quarterly_audit: pd.DataFrame,
+    *,
+    current_annual_cutoff_fy: int,
+    official_cutoff_fy: int,
+) -> pd.DataFrame:
+    """The three horizon contracts, stated per series family.
+
+    A single scalar cutoff on a mixed frame is what let the current-model H20
+    rule truncate the official comparator. This frame is the antidote: every
+    family declares its own source horizon, its own decision-facing cutoff, and
+    what makes it stop.
+    """
+    raw_horizon = ""
+    raw_max = pd.NA
+    if raw_quarterly_audit is not None and not raw_quarterly_audit.empty:
+        horizons = pd.to_numeric(raw_quarterly_audit.get("horizon"), errors="coerce")
+        periods = raw_quarterly_audit.get("period", pd.Series(dtype=str)).astype(str)
+        if horizons.notna().any():
+            raw_max = int(horizons.max())
+            raw_horizon = f"{periods.iloc[int(horizons.idxmax())]} (H{raw_max})"
+
+    official_annual_max = pd.NA
+    if chart_rows is not None and not chart_rows.empty and "scenario_role" in chart_rows.columns:
+        official = chart_rows[chart_rows["scenario_role"].astype(str).eq("official_comparator")]
+        years = pd.to_numeric(official.get("june_year"), errors="coerce")
+        if years.notna().any():
+            official_annual_max = int(years.max())
+
+    rows: list[dict[str, Any]] = []
+    for family, series_ids, driver, dependents, note in HORIZON_CONTRACT_FAMILIES:
+        is_light = family == "LIGHT_RUC"
+        rows.append(
+            {
+                "scope": "current_decision_facing",
+                "series_family": family,
+                "series_ids": series_ids,
+                "time_grain": "quarterly" if family != "MBU26_FIXED_COMPONENTS" else "june_year",
+                "source_horizon": raw_horizon if family != "MBU26_FIXED_COMPONENTS" else f"FY{official_cutoff_fy}",
+                "decision_facing_cutoff": LAST_DECISION_GRADE_QUARTER
+                if family != "MBU26_FIXED_COMPONENTS"
+                else f"FY{current_annual_cutoff_fy}",
+                "available_beyond_h20": False,
+                "availability_status": "available_through_cutoff_then_withheld",
+                "cutoff_driver": driver,
+                "dependent_totals": dependents,
+                "rule": (
+                    f"Quarterly publishes H1-H{EXTENDED_EVIDENCE_MAX_HORIZON} "
+                    f"({LAST_DECISION_GRADE_QUARTER}); a June year publishes only when all four "
+                    f"of its quarters do, so FY{current_annual_cutoff_fy} is the last annual."
+                ),
+                "notes": note,
+            }
+        )
+        if is_light:
+            rows.append(
+                {
+                    "scope": "current_decision_facing",
+                    "series_family": "LIGHT_RUC",
+                    "series_ids": series_ids,
+                    "time_grain": "june_year",
+                    "source_horizon": raw_horizon,
+                    "decision_facing_cutoff": f"FY{current_annual_cutoff_fy}",
+                    "available_beyond_h20": False,
+                    "availability_status": "available_through_cutoff_then_withheld",
+                    "cutoff_driver": "own_horizon_policy",
+                    "dependent_totals": dependents,
+                    "rule": (
+                        f"FY{current_annual_cutoff_fy + 1} straddles H19-H22 and is withheld even "
+                        "though 2030Q3/H19 and 2030Q4/H20 publish as quarters."
+                    ),
+                    "notes": (
+                        "Annual availability is a completeness rule over four quarters, not the "
+                        "quarterly horizon rule. The two are independent."
+                    ),
+                }
+            )
+
+    rows.append(
+        {
+            "scope": "official_comparator",
+            "series_family": "MBU26_OFFICIAL",
+            "series_ids": "all published MBU26 official rows",
+            "time_grain": "june_year",
+            "source_horizon": f"FY{official_cutoff_fy}",
+            "decision_facing_cutoff": f"FY{official_cutoff_fy}",
+            "available_beyond_h20": True,
+            "availability_status": "available_through_source_horizon",
+            "cutoff_driver": "own_source_horizon",
+            "dependent_totals": "official Net FED; official Total RUC; official Total NLTF",
+            "rule": (
+                "The official horizon is derived from the official source spine and is NEVER "
+                "inferred from the current Base or comparison rows."
+            ),
+            "notes": (
+                f"Last official annual present in the built chart rows: FY{official_annual_max}. "
+                "The current-model H20 rule must never truncate this scope."
+            ),
+        }
+    )
+    rows.append(
+        {
+            "scope": "raw_audit",
+            "series_family": "RAW_REPLAY_EVIDENCE",
+            "series_ids": "; ".join(sorted(QUARTERLY_STREAM_TO_SERIES_ID.values())),
+            "time_grain": "quarterly",
+            "source_horizon": raw_horizon,
+            "decision_facing_cutoff": "not_decision_facing",
+            "available_beyond_h20": True,
+            "availability_status": "retained_non_decision_facing",
+            "cutoff_driver": "own_source_horizon",
+            "dependent_totals": "none - may not feed any total",
+            "rule": (
+                "Raw replay evidence keeps its full source horizon. decision_facing=false on "
+                "every row; it is never plotted, annualized or summed."
+            ),
+            "notes": (
+                "Kept so the H20 decision-facing cutoff does not destroy standalone PED and "
+                "Heavy RUC model evidence as collateral damage of a Light RUC rule."
+            ),
+        }
+    )
+    return pd.DataFrame(rows, columns=HORIZON_CONTRACT_AUDIT_COLUMNS)
+
+
 def _filter_frame_to_runtime_cutoff(frame: pd.DataFrame, runtime_cutoff_fy: int) -> pd.DataFrame:
     if frame is None or frame.empty:
         return frame
@@ -3988,6 +4205,12 @@ def build_current_revenue_outlook_runtime_pack(
         current_cutoff_fy=runtime_cutoff_fy,
         official_cutoff_fy=official_comparator_cutoff_fy,
     )
+    horizon_contract_audit = horizon_contract_audit_frame(
+        chart_rows,
+        raw_quarterly_forecast_audit,
+        current_annual_cutoff_fy=runtime_cutoff_fy,
+        official_cutoff_fy=official_comparator_cutoff_fy,
+    )
     future_revenue = _runtime_future_revenue_forecasts(current, series_meta)
     bridge_components = _runtime_bridge_components(current, series_meta)
     trace_audit = _runtime_trace_audit(chart_rows)
@@ -4038,6 +4261,10 @@ def build_current_revenue_outlook_runtime_pack(
             "current_light_ruc_quarterly_cutoff": LAST_DECISION_GRADE_QUARTER,
             "current_light_ruc_annual_cutoff_fy": LAST_DECISION_GRADE_ANNUAL_FY,
             "official_comparator_cutoff_fy": official_comparator_cutoff_fy,
+            # Source-derived, never hard-coded: the raw replay keeps whatever
+            # horizon the committed scenario inputs actually support.
+            "raw_audit_source_horizon": _raw_audit_source_horizon(raw_quarterly_forecast_audit),
+            "horizon_contract_audit": _repo_relative(root, base / "horizon_contract_audit.csv"),
             "horizon_scope_policy": (
                 "Three horizon contracts. Current decision-facing Light RUC and every "
                 "total that depends on it stop at H20/FY2030. The official comparator "
@@ -4251,6 +4478,8 @@ def build_current_revenue_outlook_runtime_pack(
             "current_light_ruc_quarterly_cutoff": LAST_DECISION_GRADE_QUARTER,
             "current_light_ruc_annual_cutoff_fy": LAST_DECISION_GRADE_ANNUAL_FY,
             "official_comparator_cutoff_fy": official_comparator_cutoff_fy,
+            "raw_audit_source_horizon": _raw_audit_source_horizon(raw_quarterly_forecast_audit),
+            "horizon_contract_audit": _repo_relative(root, base / "horizon_contract_audit.csv"),
             "horizon_scope_policy": (
                 "Three horizon contracts. Current decision-facing Light RUC and every "
                 "total that depends on it stop at H20/FY2030. The official comparator "
@@ -4315,6 +4544,7 @@ def build_current_revenue_outlook_runtime_pack(
             "light_ruc_horizon_availability": light_ruc_horizon_availability,
             "raw_quarterly_forecast_audit": raw_quarterly_forecast_audit,
             "quarterly_reconstitution_audit": quarterly_reconstitution_audit,
+            "horizon_contract_audit": horizon_contract_audit,
             "ped_revenue_bridge_audit": ped_revenue_bridge_audit,
             "ped_bridge_shape_fit_metrics": ped_bridge_shape_fit_metrics,
             "ped_bridge_mode_config": ped_bridge_mode_config,

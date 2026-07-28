@@ -31,6 +31,8 @@
     "current_light_ruc_quarterly_cutoff": "2030Q4",
     "current_light_ruc_annual_cutoff_fy": 2030,
     "official_comparator_cutoff_fy": 2055,
+    "raw_audit_source_horizon": "2050Q4 (H100)",
+    "horizon_contract_audit": "data/current_revenue_outlook/horizon_contract_audit.csv",
     "horizon_scope_policy": "Three horizon contracts. Current decision-facing Light RUC and every total that depends on it stop at H20/FY2030. The official comparator publishes over its own source horizon. Raw model and replay evidence keep their full source horizon as non-decision-facing audit.",
     "fy2026_nowcast": "2025Q3+2025Q4 source actuals plus 2026Q1+2026Q2 current finalist forecasts",
     "rule": "Actual line ends FY2025; FY2026 actual-to-date rows are nowcast inputs only and are not plotted as actuals. Current-finalist comparative charts and runtime calculations stop at FY2030, the last governed common non-extrapolated horizon."
@@ -665,6 +667,8 @@
     "current_light_ruc_quarterly_cutoff": "2030Q4",
     "current_light_ruc_annual_cutoff_fy": 2030,
     "official_comparator_cutoff_fy": 2055,
+    "raw_audit_source_horizon": "2050Q4 (H100)",
+    "horizon_contract_audit": "data/current_revenue_outlook/horizon_contract_audit.csv",
     "horizon_scope_policy": "Three horizon contracts. Current decision-facing Light RUC and every total that depends on it stop at H20/FY2030. The official comparator publishes over its own source horizon. Raw model and replay evidence keep their full source horizon as non-decision-facing audit.",
     "scope": "Dynamic Revenue Outlook runtime cutoff audit from current Base, current comparison and required MBU26 input horizons.",
     "status": "available"
@@ -745,6 +749,14 @@
     "future_revenue_forecasts.parquet": {
       "sha256": "587c173ee0acd86ab0e951721b8a38c4c1ec51dfb42cec280e26110428ac3d31",
       "size_bytes": 18119
+    },
+    "horizon_contract_audit.csv": {
+      "sha256": "bac941ae6c79f3d9dc9a4a70431bddf24e042ecf7b617e72d2912073d011b98b",
+      "size_bytes": 4857
+    },
+    "horizon_contract_audit.parquet": {
+      "sha256": "424bc5aef14f744f482ea050e7c0e759f48b5d9ee26b096b63506c1d3ad5d9d1",
+      "size_bytes": 11594
     },
     "light_ruc_horizon_availability.csv": {
       "sha256": "7bc46c81387d263744aa35c08bf1591b8e056af78b8c8bebd407b372d6783d41",
