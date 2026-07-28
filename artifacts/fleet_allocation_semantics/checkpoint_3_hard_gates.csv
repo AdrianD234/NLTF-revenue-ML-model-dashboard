@@ -1,0 +1,8 @@
+check,max_abs_delta,tolerance,status
+class_sum_closes,0.0,1e-06,pass
+total_light_vkt_conserved,0.0,1e-06,pass
+pool_shares_sum_to_one,2.220446049250313e-16,1e-06,pass
+raw_conventional_preserved_under_base,0.0,1e-06,pass
+presets_preserve_base_pool,3.637978807091713e-12,1e-06,pass
+no_lambda_transfer_in_L1,0.0,1e-06,pass
+fy2025_classes_are_the_actuals,0.0,1e-06,pass

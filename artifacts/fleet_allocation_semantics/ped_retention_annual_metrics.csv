@@ -1,0 +1,9 @@
+source,cohort,n_annual,P0_annual_mape,P0_annual_wape,P0_annual_signed_pct,P1_annual_mape,P1_annual_wape,P1_annual_signed_pct,annual_wape_improvement_pct
+ar1_production_h1_h12,all_available,109,2.454528,2.358762,1.003881,2.580647,2.485582,0.459926,-5.376532
+ar1_production_h1_h12,balanced,101,2.570021,2.459025,1.142973,2.655576,2.548087,0.625834,-3.621857
+ar1_production_h1_h12,all_available_ex_covid,91,1.386509,1.325112,-0.243648,1.638713,1.571945,-0.777459,-18.627397
+ar1_production_h1_h12,balanced_ex_covid,59,1.116562,1.07352,-0.965841,1.511731,1.455049,-1.420813,-35.540083
+vnext_ensemble_h1_h20,all_available,189,3.550465,3.434652,1.818245,3.604287,3.500966,0.986481,-1.930734
+vnext_ensemble_h1_h20,balanced,157,3.865869,3.705926,2.54393,3.728471,3.59583,1.772466,2.970827
+vnext_ensemble_h1_h20,all_available_ex_covid,155,2.488596,2.398265,0.410833,2.733306,2.649265,-0.414442,-10.46588
+vnext_ensemble_h1_h20,balanced_ex_covid,47,1.167718,1.176005,-1.00343,1.491179,1.501749,-1.387347,-27.699205
