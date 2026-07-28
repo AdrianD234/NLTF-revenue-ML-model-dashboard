@@ -6,7 +6,9 @@ fy,measure,unit,current,official,gap,basis
 2026,light_bev_km,m km,1252.9473101940355,1209.37911079624,43.568199397795524,observable_series
 2026,phev_km,m km,656.1401180999512,633.39411052937,22.74600757058124,observable_series
 2026,heavy_ruc_km,m km,4042.7794536049623,4106.65708028096,-63.87762667599782,observable_series
-2026,population_implied,persons,5363574.882285482,5363105.743888369,469.13839711342007,derived_output_implied (light_petrol_vkt / vkt_per_capita)
+2026,population,persons,,5363105.743888369,,current_population_direct_scenario_input vs official_population_output_implied (derived_from_official_outputs_not_independently_published)
+2026,population_implied_pack_stage,persons,5361539.436754805,,,current pack-stage output-implied; GATED to match the direct input within 1e-3
+2026,population_implied_post_macro,persons (not a population),5363574.882285482,,,direct input unavailable for the cross-check: 2025Q3/2025Q4 are actual quarters outside the scenario-input horizon. REPORTED ONLY - flagged for P1.2 direct scenario replay.
 2026,ped_effective_rate,NZD/L,0.7002400000000003,0.7002400000000003,0.0,derived_output_implied (gross_ped / litres)
 2027,ped_vkt_per_capita,km/person,5961.306920442689,5924.5731702763,36.733750166389655,observable_series
 2027,light_petrol_vkt,m km,32242.11048256905,32115.2433469839,126.86713558514748,observable_series
@@ -15,7 +17,9 @@ fy,measure,unit,current,official,gap,basis
 2027,light_bev_km,m km,1518.7396750713742,1572.19480045545,-53.4551253840757,observable_series
 2027,phev_km,m km,832.7250783179857,866.45343854562,-33.72836022763431,observable_series
 2027,heavy_ruc_km,m km,4104.509276643156,4256.14265648045,-151.63337983729343,observable_series
-2027,population_implied,persons,5408564.080470921,5420684.735249234,-12120.654778313823,derived_output_implied (light_petrol_vkt / vkt_per_capita)
+2027,population,persons,5395129.353543401,5420684.735249234,-25555.3817058336,current_population_direct_scenario_input vs official_population_output_implied (derived_from_official_outputs_not_independently_published)
+2027,population_implied_pack_stage,persons,5395033.188649469,,-96.16489393170923,current pack-stage output-implied; GATED to match the direct input within 1e-3
+2027,population_implied_post_macro,persons (not a population),5408564.080470921,,13434.726927519776,"post-macro petrol_vkt / vktpc ratio = population x 1.00249; the Treasury macro replay applies stream-specific factors, so this ratio drifts from the input. REPORTED ONLY - cross-row macro consistency is flagged for P1.2 direct scenario replay."
 2027,ped_effective_rate,NZD/L,0.7598432334330982,0.7598432334330983,-1.1102230246251565e-16,derived_output_implied (gross_ped / litres)
 2028,ped_vkt_per_capita,km/person,5916.055674224165,5908.65677079833,7.39890342583476,observable_series
 2028,light_petrol_vkt,m km,32375.58680046918,32346.4528222451,29.13397822407933,observable_series
@@ -24,7 +28,9 @@ fy,measure,unit,current,official,gap,basis
 2028,light_bev_km,m km,2047.1005382667586,1989.37597979678,57.72455846997855,observable_series
 2028,phev_km,m km,1140.5757203778505,1114.1399728797,26.435747498150477,observable_series
 2028,heavy_ruc_km,m km,4152.675334825286,4323.42005434382,-170.7447195185341,observable_series
-2028,population_implied,persons,5472495.287954661,5474417.296010022,-1922.0080553609878,derived_output_implied (light_petrol_vkt / vkt_per_capita)
+2028,population,persons,5438626.389527487,5474417.296010022,-35790.906482535414,current_population_direct_scenario_input vs official_population_output_implied (derived_from_official_outputs_not_independently_published)
+2028,population_implied_pack_stage,persons,5438574.545647807,,-51.843879679217935,current pack-stage output-implied; GATED to match the direct input within 1e-3
+2028,population_implied_post_macro,persons (not a population),5472495.287954661,,33868.89842717443,"post-macro petrol_vkt / vktpc ratio = population x 1.00623; the Treasury macro replay applies stream-specific factors, so this ratio drifts from the input. REPORTED ONLY - cross-row macro consistency is flagged for P1.2 direct scenario replay."
 2028,ped_effective_rate,NZD/L,0.8500894140750586,0.8500894140750587,-1.1102230246251565e-16,derived_output_implied (gross_ped / litres)
 2029,ped_vkt_per_capita,km/person,5902.064077713241,5897.91062691712,4.153450796121433,observable_series
 2029,light_petrol_vkt,m km,32682.67332088302,32608.4407560831,74.23256479992051,observable_series
@@ -33,7 +39,9 @@ fy,measure,unit,current,official,gap,basis
 2029,light_bev_km,m km,2695.8212982561504,2502.17964433063,193.6416539255206,observable_series
 2029,phev_km,m km,1495.51845432587,1394.20153006706,101.31692425880988,observable_series
 2029,heavy_ruc_km,m km,4192.721388495946,4400.67521803142,-207.95382953547414,observable_series
-2029,population_implied,persons,5537498.897088549,5528812.289434058,8686.60765449144,derived_output_implied (light_petrol_vkt / vkt_per_capita)
+2029,population,persons,5482135.400643706,5528812.289434058,-46676.88879035134,current_population_direct_scenario_input vs official_population_output_implied (derived_from_official_outputs_not_independently_published)
+2029,population_implied_pack_stage,persons,5482087.280881718,,-48.11976198852062,current pack-stage output-implied; GATED to match the direct input within 1e-3
+2029,population_implied_post_macro,persons (not a population),5537498.897088549,,55363.49644484278,"post-macro petrol_vkt / vktpc ratio = population x 1.01010; the Treasury macro replay applies stream-specific factors, so this ratio drifts from the input. REPORTED ONLY - cross-row macro consistency is flagged for P1.2 direct scenario replay."
 2029,ped_effective_rate,NZD/L,0.9001107027491551,0.9001107027491552,-1.1102230246251565e-16,derived_output_implied (gross_ped / litres)
 2030,ped_vkt_per_capita,km/person,5888.384227680278,5887.16953577159,1.2146919086881098,observable_series
 2030,light_petrol_vkt,m km,32993.321829443696,32869.8724784727,123.44935097099369,observable_series
@@ -42,5 +50,7 @@ fy,measure,unit,current,official,gap,basis
 2030,light_bev_km,m km,3437.1140934214673,3074.13637597232,362.97771744914735,observable_series
 2030,phev_km,m km,1878.889739407174,1688.91801832143,189.97172108574387,observable_series
 2030,heavy_ruc_km,m km,4230.412272404483,4474.70373343995,-244.29146103546736,observable_series
-2030,population_implied,persons,5603119.727538802,5583306.592200029,19813.13533877302,derived_output_implied (light_petrol_vkt / vkt_per_capita)
+2030,population,persons,5525992.483848856,5583306.592200029,-57314.10835117288,current_population_direct_scenario_input vs official_population_output_implied (derived_from_official_outputs_not_independently_published)
+2030,population_implied_pack_stage,persons,5525943.3279658845,,-49.15588297136128,current pack-stage output-implied; GATED to match the direct input within 1e-3
+2030,population_implied_post_macro,persons (not a population),5603119.727538802,,77127.2436899459,"post-macro petrol_vkt / vktpc ratio = population x 1.01396; the Treasury macro replay applies stream-specific factors, so this ratio drifts from the input. REPORTED ONLY - cross-row macro consistency is flagged for P1.2 direct scenario replay."
 2030,ped_effective_rate,NZD/L,0.9400992657432979,0.9400992657432979,0.0,derived_output_implied (gross_ped / litres)

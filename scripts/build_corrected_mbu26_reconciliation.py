@@ -6,10 +6,21 @@ architecture, so its attribution is superseded. This rerun decomposes the
 FINAL decision-facing path exactly as the app ships it: corrected pack ->
 Treasury macro -> exact-VFM composition -> policy applied once.
 
-Two explicitly separate comparisons, never conflated:
+Three explicitly separate comparisons, never conflated:
 
-  policy_normalised   current published-policy  vs MBU26 published
-  default_ui          current delayed-policy    vs MBU26 delayed
+  policy_normalised       current published  vs MBU26 published
+  actual_default_ui       current delayed    vs MBU26 published
+  policy_aligned_delayed  current delayed    vs MBU26 delayed
+
+actual_default_ui is what the merged gold path actually displays (its key is
+current=delayed_6m, official=published), so its FY2027 gap is dominated by the
+policy-basis mismatch, not model performance. The identities
+
+  actual_default_ui_gap      = policy_normalised_gap + current_delay_effect
+  policy_aligned_delayed_gap = policy_normalised_gap + current_delay_effect
+                               - official_delay_effect
+
+are asserted to 1e-6 for every FY and stream.
 
 Current values come from the real app-supported final stage
 (cached_scenario_overlay_rows). Official values come from the MBU26 spine and
@@ -185,7 +196,11 @@ def main() -> int:
     }
     comparisons = {
         "policy_normalised": ("current_published", "official_published"),
-        "default_ui": ("current_delayed", "official_delayed"),
+        # The merged gold path's default key: current delayed, official
+        # published. Its gap is NOT a model gap - the two traces sit on
+        # different policy bases, and that mismatch is quantified below.
+        "actual_default_ui": ("current_delayed", "official_published"),
+        "policy_aligned_delayed": ("current_delayed", "official_delayed"),
     }
     failures: list[str] = []
 
@@ -295,16 +310,66 @@ def main() -> int:
     pd.DataFrame(decomposition_rows).to_csv(OUT / "financial_decomposition.csv", index=False)
 
     # ---- activity bridge ---------------------------------------------------
+    # Current population is a governed scenario INPUT and is read directly.
+    # MBU26 does not publish its population input at input grain, so the
+    # official figure is derived from published outputs and labelled as such.
+    # The current output-implied value is kept only as a cross-check against
+    # the direct input.
+    scenario_inputs = pd.read_parquet(
+        PACK_DIR / "scenario_inputs" / "scenario_input_wide.parquet"
+    )
+    ped_inputs = scenario_inputs[
+        scenario_inputs["scenario_name"].astype(str).eq("current_basecase")
+        & scenario_inputs["stream"].astype(str).eq("PED")
+    ]
+    population_by_quarter = {
+        str(row.canonical_period).upper(): float(row.population)
+        for row in ped_inputs.itertuples()
+        if pd.notna(row.population)
+    }
+
+    def direct_population(fy: int) -> float | None:
+        quarters = [f"{fy - 1}Q3", f"{fy - 1}Q4", f"{fy}Q1", f"{fy}Q2"]
+        values = [population_by_quarter.get(q) for q in quarters]
+        if any(v is None for v in values):
+            return None
+        return sum(values) / len(values)
+
+    # light_petrol_vkt materialises at the PED-bridge stage, not in the raw
+    # pack, so the pre-macro check uses the same S0 frame as the gold path.
+    sensitivity_key = app.selected_sensitivity_key("Off", "Off", "Off", freight_rail_shift="Off")
+    _bridge_frames, s0_frames, _fast = app.cached_sensitivity_stage_frames(
+        SIGNATURE, PED_BRIDGE_DEFAULT_MODE, sensitivity_key, pack
+    )
+    pack_rows = s0_frames["chart_rows"]
     activity_rows = []
     for fy in FYS:
         c = states["current_published"][fy]
         o = states["official_published"][fy]
-        cur_population = (
+        cur_pop_direct = direct_population(fy)
+        pack_vkt = _annual(pack_rows, "light_petrol_vkt", fy, "basecase")
+        pack_vktpc = _annual(pack_rows, "ped_vkt_per_capita", fy, "basecase")
+        pack_implied = pack_vkt * 1e6 / pack_vktpc if pack_vkt and pack_vktpc else None
+        post_macro_implied = (
             c["light_petrol_vkt"] * 1e6 / c["ped_vkt_per_capita"] if c["ped_vkt_per_capita"] else None
         )
-        off_population = (
-            o["light_petrol_vkt"] * 1e6 / o["ped_vkt_per_capita"] if o.get("ped_vkt_per_capita") else None
+        off_pop_implied = (
+            o["light_petrol_vkt"] * 1e6 / o.get("ped_vkt_per_capita") if o.get("ped_vkt_per_capita") else None
         )
+        # GATED cross-check at PACK stage: the pack builds petrol VKT from
+        # these same quarterly population inputs, so implied and direct must
+        # agree tightly (the residual is the VKT-weighted vs simple mean of a
+        # slowly moving series).
+        if cur_pop_direct and pack_implied:
+            rel = abs(pack_implied - cur_pop_direct) / cur_pop_direct
+            if rel > 1e-3:
+                failures.append(f"FY{fy}: pack-stage implied population deviates from direct input by {rel:.2e}")
+        # NOT gated: post-macro, the Treasury replay moves light_petrol_vkt and
+        # ped_vkt_per_capita by stream-specific factors, so their ratio is no
+        # longer a population (drifts to ~1.4% above the input by FY2030). That
+        # cross-row consistency question belongs to P1.2 direct replay; here it
+        # is reported, not absorbed and not failed.
+        macro_ratio = (post_macro_implied / cur_pop_direct) if cur_pop_direct and post_macro_implied else None
         for name, _series, unit in ACTIVITY:
             activity_rows.append(
                 {
@@ -320,12 +385,49 @@ def main() -> int:
         activity_rows.append(
             {
                 "fy": fy,
-                "measure": "population_implied",
+                "measure": "population",
                 "unit": "persons",
-                "current": cur_population,
-                "official": off_population,
-                "gap": (cur_population - off_population) if cur_population and off_population else None,
-                "basis": "derived_output_implied (light_petrol_vkt / vkt_per_capita)",
+                "current": cur_pop_direct,
+                "official": off_pop_implied,
+                "gap": (cur_pop_direct - off_pop_implied) if cur_pop_direct and off_pop_implied else None,
+                "basis": (
+                    "current_population_direct_scenario_input vs "
+                    "official_population_output_implied "
+                    "(derived_from_official_outputs_not_independently_published)"
+                ),
+            }
+        )
+        activity_rows.append(
+            {
+                "fy": fy,
+                "measure": "population_implied_pack_stage",
+                "unit": "persons",
+                "current": pack_implied,
+                "official": None,
+                "gap": (pack_implied - cur_pop_direct) if cur_pop_direct and pack_implied else None,
+                "basis": "current pack-stage output-implied; GATED to match the direct input within 1e-3",
+            }
+        )
+        activity_rows.append(
+            {
+                "fy": fy,
+                "measure": "population_implied_post_macro",
+                "unit": "persons (not a population)",
+                "current": post_macro_implied,
+                "official": None,
+                "gap": (post_macro_implied - cur_pop_direct) if cur_pop_direct and post_macro_implied else None,
+                "basis": (
+                    f"post-macro petrol_vkt / vktpc ratio = population x {macro_ratio:.5f}; "
+                    "the Treasury macro replay applies stream-specific factors, so this "
+                    "ratio drifts from the input. REPORTED ONLY - cross-row macro "
+                    "consistency is flagged for P1.2 direct scenario replay."
+                )
+                if macro_ratio
+                else (
+                    "direct input unavailable for the cross-check: 2025Q3/2025Q4 are "
+                    "actual quarters outside the scenario-input horizon. REPORTED ONLY - "
+                    "flagged for P1.2 direct scenario replay."
+                ),
             }
         )
         cur_rate = c["gross_ped"] / c["ped_volume"] if c["ped_volume"] else None
@@ -344,22 +446,37 @@ def main() -> int:
     pd.DataFrame(activity_rows).to_csv(OUT / "activity_bridge.csv", index=False)
 
     # ---- policy-state comparison ------------------------------------------
+    # default_ui_policy_basis_mismatch is the part of the DISPLAYED gap that
+    # exists only because current is delayed while official stays published:
+    # exactly the current delay effect. aligned_policy_differential is what
+    # remains of the policy states once both sides delay together.
     policy_rows = []
     for fy in FYS:
         for name, _series in REPLACED:
             normalised = states["current_published"][fy][name] - states["official_published"][fy][name]
-            default_ui = states["current_delayed"][fy][name] - states["official_delayed"][fy][name]
+            actual_default = states["current_delayed"][fy][name] - states["official_published"][fy][name]
+            aligned = states["current_delayed"][fy][name] - states["official_delayed"][fy][name]
+            current_delay = states["current_delayed"][fy][name] - states["current_published"][fy][name]
+            official_delay = states["official_delayed"][fy][name] - states["official_published"][fy][name]
+            identity_default = actual_default - (normalised + current_delay)
+            identity_aligned = aligned - (normalised + current_delay - official_delay)
+            if abs(identity_default) > TOL:
+                failures.append(f"policy identity (default UI) {name} FY{fy}: {identity_default}")
+            if abs(identity_aligned) > TOL:
+                failures.append(f"policy identity (aligned) {name} FY{fy}: {identity_aligned}")
             policy_rows.append(
                 {
                     "fy": fy,
                     "stream": name,
                     "policy_normalised_gap": normalised,
-                    "default_ui_gap": default_ui,
-                    "difference_due_to_policy_states": default_ui - normalised,
-                    "current_policy_effect": states["current_delayed"][fy][name]
-                    - states["current_published"][fy][name],
-                    "official_policy_effect": states["official_delayed"][fy][name]
-                    - states["official_published"][fy][name],
+                    "actual_default_ui_gap": actual_default,
+                    "policy_aligned_delayed_gap": aligned,
+                    "current_delay_effect": current_delay,
+                    "official_delay_effect": official_delay,
+                    "default_ui_policy_basis_mismatch": current_delay,
+                    "aligned_policy_differential": current_delay - official_delay,
+                    "identity_default_ui_residual": identity_default,
+                    "identity_aligned_residual": identity_aligned,
                 }
             )
     pd.DataFrame(policy_rows).to_csv(OUT / "policy_state_comparison.csv", index=False)
@@ -445,13 +562,32 @@ def main() -> int:
 
     # ---- report ------------------------------------------------------------
     decomposition = pd.DataFrame(decomposition_rows)
+    policy_frame = pd.DataFrame(policy_rows)
+    nltf_policy = policy_frame[policy_frame["stream"].eq("total_nltf")].set_index("fy")
     report = ["# Corrected MBU26 reconciliation (post-P0 baseline)", ""]
     report.append(
         "Current values are the real app-supported final stage (pack -> Treasury macro -> "
         "exact-VFM composition -> policy applied once) at merged main f8719f3. Official "
-        "values are the MBU26 spine and its governed rate-only policy counterfactual. "
-        "The two comparisons are kept separate throughout; a delayed-vs-published mix is "
-        "never described as a model gap."
+        "values are the MBU26 spine and its governed rate-only policy counterfactual."
+    )
+    report.append(
+        "\n## Headline\n\n"
+        "- **Policy-normalised model gap** (both sides published): within roughly "
+        "**+-$62m** over FY2026-FY2030.\n"
+        "- **The actual default UI shows a much larger FY2027 difference** "
+        f"({nltf_policy.at[2027, 'actual_default_ui_gap']:.1f}m): the displayed Current "
+        "trace is on the DELAYED policy while MBU26 remains PUBLISHED, so most of that "
+        "gap is a policy-basis mismatch "
+        f"({nltf_policy.at[2027, 'default_ui_policy_basis_mismatch']:.1f}m), not model "
+        "performance.\n"
+        "- **The policy-aligned delayed comparison** removes that basis mismatch by "
+        "delaying both sides "
+        f"(FY2027 gap {nltf_policy.at[2027, 'policy_aligned_delayed_gap']:.1f}m).\n"
+        "- None of these comparisons proves that either the current model or MBU26 is "
+        "correct; they measure difference, not truth.\n\n"
+        "The earlier -8.7% figure was the **superseded pre-P0 stored-pack "
+        "reconciliation**: it described the retired post-lambda pack layer, not the true "
+        "former final front end, and must not be quoted as the pre-P0 model gap."
     )
     for comparison in comparisons:
         subset = decomposition[decomposition["comparison"].eq(comparison)]
@@ -467,13 +603,15 @@ def main() -> int:
             )
     report.append(
         "\nFixed shared components (Heavy BEV under published, admin, refunds, MVR, TUC, "
-        "LPG, CNG) contribute zero by construction in the policy-normalised comparison; "
-        "under default_ui the official side reprices its class leaves (including Heavy "
-        "BEV) while the current side holds fixed components at published values, and that "
-        "difference is carried explicitly in the stream gaps, not hidden. Unavailable "
-        "official drivers (GDP, unemployment, fuel price, fleet-model internals, "
-        "judgment) receive NO fabricated dollar attribution; see "
-        "driver_availability_matrix.csv."
+        "LPG, CNG) contribute zero by construction where both sides are published; in "
+        "policy_aligned_delayed the official side reprices its class leaves (including "
+        "Heavy BEV) while the current side holds fixed components at published values, "
+        "and that difference is carried explicitly in the stream gaps, not hidden. "
+        "Unavailable official drivers (GDP, unemployment, fuel price, fleet-model "
+        "internals, judgment) receive NO fabricated dollar attribution; see "
+        "driver_availability_matrix.csv. Current population is the direct governed "
+        "scenario input; the official population is derived from published outputs and "
+        "labelled derived_from_official_outputs_not_independently_published."
     )
     (OUT / "corrected_reconciliation_report.md").write_text("\n".join(report) + "\n", encoding="utf-8")
 
