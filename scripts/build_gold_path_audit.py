@@ -4,14 +4,16 @@ Not a hand-built approximation: this drives the same cached_* entry points the
 Streamlit views call, with the default front-end settings, so what it reports
 is what a user sees.
 
-    corrected AR(1) pack
-      -> raw PED bridge
-      -> Treasury baseline macro replay
-      -> conventional-anchor Light RUC allocation
-      -> PED retention Off
-      -> default current delayed policy
-      -> independently selected MBU policy
-      -> final chart / detail / stack rows
+The gates are stated PER STAGE. An earlier version compared the corrected pack
+directly against the final front-end value, which spans Treasury macro, fleet
+composition and the FED/RUC policy response at once, and so wrongly required
+the final value to equal the pre-macro pack value.
+
+    S0  corrected pack (pre-macro)
+    S1  after Treasury macro replay
+    S2  canonical exact-VFM Base composition around the S1 anchor
+    S3  after selected optional composition sensitivities (none by default)
+    S4  after the FED/RUC policy response
 
 Usage: python scripts/build_gold_path_audit.py
 """
@@ -29,8 +31,15 @@ sys.path.insert(0, str(ROOT))
 os.environ.setdefault("DASHBOARD_ENGINE_DEFAULT", "ar1")
 
 import app  # noqa: E402
-from model_dashboard.ev_uptake_levers import DEFAULT_EV_UPTAKE_MODE  # noqa: E402
-from model_dashboard.light_fleet_allocation import LAST_DECISION_GRADE_ANNUAL_FY  # noqa: E402
+from model_dashboard.ev_uptake_levers import (  # noqa: E402
+    DEFAULT_EV_UPTAKE_MODE,
+    EXACT_VFM_UPTAKE_BASES,
+)
+from model_dashboard.fuel_price_scenario import apply_treasury_macro_to_chart_rows  # noqa: E402
+from model_dashboard.light_fleet_allocation import (  # noqa: E402
+    LAST_DECISION_GRADE_ANNUAL_FY,
+    composition_shares,
+)
 from model_dashboard.revenue_outlook import (  # noqa: E402
     PED_BRIDGE_DEFAULT_MODE,
     load_revenue_outlook_pack,
@@ -38,49 +47,25 @@ from model_dashboard.revenue_outlook import (  # noqa: E402
 
 OUT = ROOT / "artifacts" / "p0_light_fleet_fix"
 PACK_DIR = ROOT / "data" / "engine_ar1" / "current_revenue_outlook"
+FYS = (2026, 2027, 2028, 2030)
+ROLES = ("basecase", "comparison")
 TOL = 1e-6
-
-CURRENT_FYS = (2026, 2027, 2030)
-OFFICIAL_FYS = (2027, 2030, 2055)
-CURRENT_SERIES = (
-    ("light_petrol_vkt", "Light petrol VKT"),
-    ("light_ruc_net_km", "Conventional Light RUC (km)"),
-    ("light_ruc_net_revenue", "Conventional Light RUC (revenue)"),
-    ("light_bev_ruc_net_km", "Light BEV (km)"),
-    ("light_bev_ruc_net_revenue", "Light BEV (revenue)"),
-    ("phev_ruc_net_km", "PHEV (km)"),
-    ("phev_ruc_net_revenue", "PHEV (revenue)"),
-    ("net_fed_revenue", "Net FED"),
-    ("total_ruc_net_revenue", "Total RUC"),
-    ("total_nltf_net_revenue", "Total NLTF"),
-)
-OFFICIAL_SERIES = ("net_fed_revenue", "total_ruc_net_revenue", "total_nltf_net_revenue")
 SIGNATURE: tuple[tuple[str, int, int], ...] = ()
 
-
-def _key(current_policy: str, mbu_policy: str, *, retention: bool = False, uptake: str | None = None):
-    """The default front-end key, with one dimension varied at a time."""
-    sensitivity_key = app.selected_sensitivity_key("Off", "Off", "Off", freight_rail_shift="Off")
-    ev_uptake_key = (
-        uptake or DEFAULT_EV_UPTAKE_MODE,
-        (),
-        (),
-        current_policy,
-        mbu_policy,
-        retention,
-    )
-    return sensitivity_key, ev_uptake_key
+MEASURES = {
+    "light_petrol_vkt": "light_petrol_vkt",
+    "light_ruc_conventional_km": "light_ruc_net_km",
+    "light_bev_km": "light_bev_ruc_net_km",
+    "phev_km": "phev_ruc_net_km",
+    "heavy_ruc_conventional_km": "heavy_ruc_net_km",
+    "net_fed_revenue": "net_fed_revenue",
+    "total_ruc_net_revenue": "total_ruc_net_revenue",
+    "total_nltf_net_revenue": "total_nltf_net_revenue",
+}
+LIGHT_POOL = ("light_ruc_net_km", "light_bev_ruc_net_km", "phev_ruc_net_km")
 
 
-def _rows(pack, current_policy: str, mbu_policy: str, **kwargs) -> pd.DataFrame:
-    sensitivity_key, ev_uptake_key = _key(current_policy, mbu_policy, **kwargs)
-    rows, *_ = app.cached_scenario_overlay_rows(
-        SIGNATURE, sensitivity_key, PED_BRIDGE_DEFAULT_MODE, ev_uptake_key, pack
-    )
-    return rows
-
-
-def _value(rows: pd.DataFrame, role: str, series: str, fy: int) -> float | None:
+def _value(rows: pd.DataFrame, series: str, fy: int, role: str) -> float:
     selected = rows[
         rows["time_grain"].astype(str).eq("june_year")
         & rows["scenario_role"].astype(str).eq(role)
@@ -88,174 +73,174 @@ def _value(rows: pd.DataFrame, role: str, series: str, fy: int) -> float | None:
         & pd.to_numeric(rows["june_year"], errors="coerce").eq(fy)
     ]
     values = pd.to_numeric(selected["value"], errors="coerce").dropna()
-    return float(values.iloc[0]) if len(values) else None
+    return float(values.iloc[0]) if len(values) else float("nan")
+
+
+def _pool(rows: pd.DataFrame, fy: int, role: str) -> float:
+    return sum(_value(rows, series, fy, role) for series in LIGHT_POOL)
+
+
+def _key(mode: str, current_policy: str, mbu_policy: str, *, retention: bool = False, heavy: bool = False):
+    return (mode, (), (), current_policy, mbu_policy, retention, heavy)
+
+
+def _compose(rows: pd.DataFrame, pack, key) -> pd.DataFrame:
+    out, *_ = app._apply_scenario_overlays(
+        rows.copy(),
+        app._pack_table(pack, "ev_phev_ped_light_drift_assumptions"),
+        app._resolve_ev_uptake_levers(key),
+        app._resolve_eruc_levers(key),
+        app.cached_fed_uplift_factors(SIGNATURE, pack),
+        adjust_ped=False,
+        fed_policy_scopes=(),
+        uptake_basis=app._resolve_uptake_basis(key),
+        heavy_bev_transition=app._heavy_bev_transition_enabled(key),
+    )
+    return out
 
 
 def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
     pack = load_revenue_outlook_pack(PACK_DIR, repo_root=ROOT)
-    pack_rows = pack.revenue_chart_rows
+    sensitivity_key = app.selected_sensitivity_key("Off", "Off", "Off", freight_rail_shift="Off")
     failures: list[str] = []
+
+    _bridge, frames, _fast = app.cached_sensitivity_stage_frames(
+        SIGNATURE, PED_BRIDGE_DEFAULT_MODE, sensitivity_key, pack
+    )
+    s0 = frames["chart_rows"]
+
+    macro_replay, macro_error = app._safe_treasury_baseline_macro_replay(SIGNATURE, pack)
+    fuel_replay, _ = app._safe_fuel_price_scenario_replay(SIGNATURE, pack)
+    if fuel_replay is not None and not fuel_replay.policy_pair_factors.empty:
+        macro_replay = fuel_replay
+    if macro_replay is None:
+        raise SystemExit(f"Treasury macro replay unavailable ({macro_error})")
+    s1, _ = apply_treasury_macro_to_chart_rows(s0, macro_replay)
+
+    default_key = _key(DEFAULT_EV_UPTAKE_MODE, app.FED_POLICY_PUBLISHED, app.FED_POLICY_PUBLISHED)
+    s2 = _compose(s1, pack, default_key)
+    s3 = _compose(s1, pack, default_key)  # no optional sensitivity selected
+    s4_key = _key(DEFAULT_EV_UPTAKE_MODE, app.FED_POLICY_DELAYED_6M, app.FED_POLICY_PUBLISHED)
+    s4, *_ = app.cached_scenario_overlay_rows(
+        SIGNATURE, sensitivity_key, PED_BRIDGE_DEFAULT_MODE, s4_key, pack
+    )
+
     records: list[dict[str, object]] = []
-
-    # Default front end: current delayed, MBU published, retention Off.
-    default_rows = _rows(pack, app.FED_POLICY_DELAYED_6M, app.FED_POLICY_PUBLISHED)
-
-    for series, label in CURRENT_SERIES:
-        for fy in CURRENT_FYS:
+    for role in ROLES:
+        for fy in FYS:
+            shares, _ = composition_shares(fy, repo_root=ROOT, uptake_basis=DEFAULT_EV_UPTAKE_MODE)
+            for label, series in MEASURES.items():
+                records.append(
+                    {
+                        "scenario_role": role,
+                        "fy": fy,
+                        "measure": label,
+                        "S0_pack": _value(s0, series, fy, role),
+                        "S1_post_macro": _value(s1, series, fy, role),
+                        "S2_canonical_exact_vfm": _value(s2, series, fy, role),
+                        "S3_selected_sensitivities": _value(s3, series, fy, role),
+                        "S4_post_policy": _value(s4, series, fy, role),
+                    }
+                )
             records.append(
                 {
-                    "stage": "final_default_front_end",
-                    "scope": "current_basecase",
-                    "policy": "current=delayed_6m; mbu26=published",
+                    "scenario_role": role,
                     "fy": fy,
-                    "series_id": series,
-                    "label": label,
-                    "value": _value(default_rows, "basecase", series, fy),
-                    "pack_stage_value": _value(pack_rows, "basecase", series, fy),
+                    "measure": "light_ruc_pool_km",
+                    "S0_pack": _pool(s0, fy, role),
+                    "S1_post_macro": _pool(s1, fy, role),
+                    "S2_canonical_exact_vfm": _pool(s2, fy, role),
+                    "S3_selected_sensitivities": _pool(s3, fy, role),
+                    "S4_post_policy": _pool(s4, fy, role),
                 }
             )
 
-    for state in (app.FED_POLICY_PUBLISHED, app.FED_POLICY_DELAYED_6M, app.FED_POLICY_OFF):
-        rows = _rows(pack, app.FED_POLICY_DELAYED_6M, state)
-        for series in OFFICIAL_SERIES:
-            for fy in OFFICIAL_FYS:
-                records.append(
-                    {
-                        "stage": "final_default_front_end",
-                        "scope": "official_comparator",
-                        "policy": f"mbu26={state}",
-                        "fy": fy,
-                        "series_id": series,
-                        "label": f"MBU26 {series}",
-                        "value": _value(rows, "official_comparator", series, fy),
-                        "pack_stage_value": _value(pack_rows, "official_comparator", series, fy),
-                    }
-                )
+            # ---- hard default gates, per stage --------------------------
+            if abs(_value(s2, "light_ruc_net_km", fy, role) - _value(s1, "light_ruc_net_km", fy, role)) > TOL:
+                failures.append(f"{role} FY{fy}: S2 Light conventional != S1 anchor")
+            if abs(_pool(s2, fy, role) - _value(s2, "light_ruc_net_km", fy, role) / shares["conventional"]) > TOL:
+                failures.append(f"{role} FY{fy}: S2 pool != conventional / exact Base conventional share")
+            for series in LIGHT_POOL + ("heavy_ruc_net_km", "heavy_ruc_net_revenue", "light_petrol_vkt"):
+                if abs(_value(s3, series, fy, role) - _value(s2, series, fy, role)) > TOL:
+                    failures.append(f"{role} FY{fy}: S3 != S2 for {series} with no sensitivity selected")
+            for series in ("heavy_ruc_net_km", "heavy_ruc_net_revenue"):
+                if abs(_value(s2, series, fy, role) - _value(s1, series, fy, role)) > TOL:
+                    failures.append(f"{role} FY{fy}: composition moved {series}")
+            if abs(_value(s2, "light_petrol_vkt", fy, role) - _value(s1, "light_petrol_vkt", fy, role)) > TOL:
+                failures.append(f"{role} FY{fy}: composition moved PED activity (retention must be Off)")
+            for series in ("light_bev_ruc_net_km", "phev_ruc_net_km"):
+                if abs(_value(s4, series, fy, role) - _value(s3, series, fy, role)) > TOL:
+                    failures.append(f"{role} FY{fy}: policy moved {series}")
 
-    audit = pd.DataFrame(records)
-    audit.to_csv(OUT / "gold_path_audit.csv", index=False)
+    # Policy applied exactly once: the delayed response lands in FY2027 only.
+    for role in ROLES:
+        moved = [
+            fy
+            for fy in FYS
+            if abs(_value(s4, "light_ruc_net_km", fy, role) - _value(s3, "light_ruc_net_km", fy, role)) > TOL
+        ]
+        if moved != [2027]:
+            failures.append(f"{role}: delayed policy moved conventional in {moved}, expected [2027]")
 
-    # ---- hard gates -------------------------------------------------------
-
-    # PED retention is Off by default: turning it on must change something, so
-    # "Off by default" is a real default rather than a dead control.
-    retention_rows = _rows(pack, app.FED_POLICY_DELAYED_6M, app.FED_POLICY_PUBLISHED, retention=True)
-    if _value(retention_rows, "basecase", "light_petrol_vkt", 2030) == _value(
-        default_rows, "basecase", "light_petrol_vkt", 2030
-    ):
-        failures.append("PED retention overlay has no effect; the default cannot be verified as Off")
-
-    # Raw conventional Light RUC is preserved before the current policy response.
-    published_rows = _rows(pack, app.FED_POLICY_PUBLISHED, app.FED_POLICY_PUBLISHED)
-    for fy in CURRENT_FYS:
-        raw = _value(pack_rows, "basecase", "light_ruc_net_km", fy)
-        front = _value(published_rows, "basecase", "light_ruc_net_km", fy)
-        if raw is None or front is None or abs(raw - front) > TOL:
-            failures.append(f"FY{fy} conventional Light RUC km not preserved: pack={raw} front={front}")
-
-    # The current policy is applied exactly once: applying it twice would
-    # double the delta.
-    for fy in (2027,):
-        published = _value(published_rows, "basecase", "total_nltf_net_revenue", fy)
-        delayed = _value(default_rows, "basecase", "total_nltf_net_revenue", fy)
-        if published is None or delayed is None or abs(published - delayed) < TOL:
-            failures.append(f"current delayed policy had no FY{fy} effect")
-
-    # Official policy is applied once and only to official rows.
-    off_rows = _rows(pack, app.FED_POLICY_DELAYED_6M, app.FED_POLICY_OFF)
-    for fy in CURRENT_FYS:
-        if _value(off_rows, "basecase", "total_nltf_net_revenue", fy) != _value(
-            default_rows, "basecase", "total_nltf_net_revenue", fy
-        ):
-            failures.append(f"MBU26 policy moved a current row in FY{fy}; selectors are not independent")
-
-    # Base pool is preserved under uptake presets: reallocation, not resizing.
-    for preset in ("Fast", "Slow"):
-        try:
-            preset_rows = _rows(
-                pack, app.FED_POLICY_DELAYED_6M, app.FED_POLICY_PUBLISHED, uptake=preset
-            )
-        except Exception:
-            continue
-        for fy in CURRENT_FYS:
-            pool_default = sum(
-                _value(default_rows, "basecase", series, fy) or 0.0
-                for series in ("light_ruc_net_km", "light_bev_ruc_net_km", "phev_ruc_net_km")
-            )
-            pool_preset = sum(
-                _value(preset_rows, "basecase", series, fy) or 0.0
-                for series in ("light_ruc_net_km", "light_bev_ruc_net_km", "phev_ruc_net_km")
-            )
-            if pool_default and abs(pool_default - pool_preset) > 1e-3:
-                failures.append(
-                    f"{preset} uptake resized the FY{fy} Base pool: {pool_default} vs {pool_preset}"
-                )
-
-    # FY2030 is the last complete current Light RUC-dependent annual result.
-    current_annual = default_rows[
-        default_rows["time_grain"].astype(str).eq("june_year")
-        & default_rows["scenario_role"].astype(str).isin({"basecase", "comparison"})
+    # Horizon contracts survive the exact-share tables, which run to FY2050.
+    current_annual = s4[
+        s4["time_grain"].astype(str).eq("june_year") & s4["scenario_role"].astype(str).isin(ROLES)
     ]
     last_current = int(pd.to_numeric(current_annual["june_year"], errors="coerce").max())
     if last_current != LAST_DECISION_GRADE_ANNUAL_FY:
-        failures.append(f"last current annual FY is {last_current}, expected {LAST_DECISION_GRADE_ANNUAL_FY}")
-
-    # The official comparator continues through its own horizon.
-    official_annual = default_rows[
-        default_rows["scenario_role"].astype(str).eq("official_comparator")
-    ]
+        failures.append(f"current annual reaches FY{last_current}, expected FY{LAST_DECISION_GRADE_ANNUAL_FY}")
+    official_annual = s4[s4["scenario_role"].astype(str).eq("official_comparator")]
     last_official = int(pd.to_numeric(official_annual["june_year"], errors="coerce").max())
     if last_official <= LAST_DECISION_GRADE_ANNUAL_FY:
         failures.append(f"official comparator stops at FY{last_official}")
 
-    # Chart, line reconciliation and stack agree.
-    sensitivity_key, ev_uptake_key = _key(app.FED_POLICY_DELAYED_6M, app.FED_POLICY_PUBLISHED)
+    # Alternative composition modes preserve each scenario's own Base pool.
+    for mode in EXACT_VFM_UPTAKE_BASES:
+        alt = _compose(s1, pack, _key(mode, app.FED_POLICY_PUBLISHED, app.FED_POLICY_PUBLISHED))
+        for role in ROLES:
+            for fy in FYS:
+                if abs(_pool(alt, fy, role) - _pool(s2, fy, role)) > TOL:
+                    failures.append(f"{mode} resized the {role} FY{fy} Base pool")
+
+    # Chart and line reconciliation agree on the final default output.
     line, _residuals, stack, _bridge = app.cached_aligned_scenario_detail_frames(
-        SIGNATURE, sensitivity_key, PED_BRIDGE_DEFAULT_MODE, ev_uptake_key, pack
+        SIGNATURE, sensitivity_key, PED_BRIDGE_DEFAULT_MODE, s4_key, pack
     )
-    for fy in CURRENT_FYS:
-        chart_value = _value(default_rows, "basecase", "total_nltf_net_revenue", fy)
+    for fy in FYS:
+        chart_value = _value(s4, "total_nltf_net_revenue", fy, "basecase")
         matched = line[
             line["FY"].astype("Int64").eq(fy)
             & line["series_id"].astype(str).eq("total_nltf_net_revenue")
             & line["source_path"].astype(str).str.contains("Base", case=False, na=False)
         ]
-        line_values = pd.to_numeric(matched["value"], errors="coerce").dropna()
-        if chart_value is not None and len(line_values):
-            if abs(float(line_values.iloc[0]) - chart_value) > TOL:
-                failures.append(
-                    f"FY{fy} chart and line reconciliation disagree: "
-                    f"{chart_value} vs {float(line_values.iloc[0])}"
-                )
+        values = pd.to_numeric(matched["value"], errors="coerce").dropna()
+        if not len(values) or abs(float(values.iloc[0]) - chart_value) > TOL:
+            failures.append(f"FY{fy}: chart and line reconciliation disagree")
 
-    # ---- report -----------------------------------------------------------
-    pd.set_option("display.width", 200)
+    audit = pd.DataFrame(records)
+    audit.to_csv(OUT / "gold_path_audit.csv", index=False)
+
+    pd.set_option("display.width", 240)
     print(f"gold path audit rows: {len(audit)} -> {OUT / 'gold_path_audit.csv'}")
-    print(f"\ncurrent basecase (current=delayed_6m, mbu26=published, retention Off)")
-    current = audit[audit["scope"].eq("current_basecase")]
-    print(
-        current.pivot_table(index="label", columns="fy", values="value", sort=False).to_string(
-            float_format=lambda value: f"{value:,.3f}"
+    for role in ROLES:
+        subset = audit[audit["scenario_role"].eq(role)]
+        print(f"\n=== {role}: final displayed values (S4, current delayed / MBU26 published) ===")
+        print(
+            subset.pivot_table(index="measure", columns="fy", values="S4_post_policy", sort=False).to_string(
+                float_format=lambda value: f"{value:,.3f}"
+            )
         )
-    )
-    print(f"\nMBU26 official comparator by policy state")
-    official = audit[audit["scope"].eq("official_comparator")]
-    print(
-        official.pivot_table(
-            index=["series_id", "policy"], columns="fy", values="value", sort=False
-        ).to_string(float_format=lambda value: f"{value:,.3f}")
-    )
     print(f"\nlast current annual FY : {last_current}")
     print(f"last official annual FY: {last_official}")
     print(f"stack rows             : {len(stack)}")
 
     if failures:
         print("\nFAIL")
-        for item in failures:
+        for item in dict.fromkeys(failures):
             print(f"  - {item}")
         return 1
-    print("\nPASS: every gold-path gate holds")
+    print("\nPASS: every gold-path stage gate holds")
     return 0
 
 
