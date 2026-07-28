@@ -26,8 +26,11 @@ from model_dashboard.light_fleet_allocation import LAST_DECISION_GRADE_ANNUAL_FY
 from model_dashboard.rate_paths import (
     FED_POLICY_STATE_DELAYED_6M,
     FED_POLICY_STATE_NO_UPLIFT,
+    FED_POLICY_STATE_PUBLISHED,
     OFFICIAL_FACTOR_COLUMNS,
+    OFFICIAL_POLICY_AUDIT_COLUMNS,
     OFFICIAL_SCOPE,
+    official_comparator_policy_audit_frame,
     fed_uplift_off_factors,
     governed_no_uplift_wedge_schedule,
     official_comparator_factor_map,
@@ -316,3 +319,115 @@ def test_the_two_policy_selectors_stay_independent(pack_chart_rows) -> None:
     assert _annual(current_only, "basecase", 2030) != pytest.approx(
         _annual(pack_chart_rows, "basecase", 2030), abs=TOL
     )
+
+
+# ---------------------------------------------------------------------------
+# Job 4: the audit must evidence every affected component, not four rows.
+# ---------------------------------------------------------------------------
+
+CLOSURE_TOL = 1e-6
+_RUC_CLASS_LEAVES = {
+    "conventional_light_ruc_revenue",
+    "light_bev_revenue",
+    "phev_revenue",
+    "heavy_ruc_revenue",
+    "heavy_bev_revenue",
+}
+_REQUIRED_AUDIT_COMPONENTS = _RUC_CLASS_LEAVES | {
+    "gross_ped_revenue",
+    "net_fed_revenue",
+    "total_ruc_net_revenue",
+    "total_nltf_net_revenue",
+}
+
+
+@pytest.fixture(scope="module")
+def no_uplift_audit() -> pd.DataFrame:
+    return official_comparator_policy_audit_frame(ROOT, FED_POLICY_STATE_NO_UPLIFT)
+
+
+@pytest.fixture(scope="module")
+def delayed_audit() -> pd.DataFrame:
+    return official_comparator_policy_audit_frame(ROOT, FED_POLICY_STATE_DELAYED_6M)
+
+
+def test_audit_covers_every_affected_component(no_uplift_audit, delayed_audit) -> None:
+    """Including Heavy BEV, which is never a visible chart row but moves totals."""
+    for frame in (no_uplift_audit, delayed_audit):
+        assert _REQUIRED_AUDIT_COMPONENTS <= set(frame["component"].astype(str))
+        assert list(frame.columns) == list(OFFICIAL_POLICY_AUDIT_COLUMNS)
+    assert "heavy_bev_revenue" in set(no_uplift_audit["component"].astype(str))
+
+
+def test_every_audit_row_carries_its_full_derivation(no_uplift_audit) -> None:
+    for column in (
+        "original_value",
+        "source_effective_ped_rate",
+        "nominal_wedge_nzd_per_litre",
+        "target_ped_rate",
+        "selected_rate_factor",
+        "adjusted_value",
+        "delta",
+    ):
+        assert no_uplift_audit[column].notna().all()
+    assert no_uplift_audit["wedge_basis"].isin({"direct_source", "carried_terminal"}).all()
+    assert no_uplift_audit["source_sha256"].str.len().eq(64).all()
+    assert no_uplift_audit["transformation_basis"].str.len().gt(0).all()
+    assert no_uplift_audit["fixed_volume_status"].str.len().gt(0).all()
+
+
+def test_published_state_leaves_mbu26_untouched() -> None:
+    assert official_comparator_policy_audit_frame(ROOT, FED_POLICY_STATE_PUBLISHED).empty
+
+
+def test_delayed_touches_fy2027_only(delayed_audit) -> None:
+    assert sorted(set(delayed_audit["fy"].astype(int))) == [2027]
+
+
+def test_no_uplift_covers_every_official_fy_without_gaps(no_uplift_audit) -> None:
+    years = sorted(set(no_uplift_audit["fy"].astype(int)))
+    assert years == list(range(years[0], years[-1] + 1))
+    assert years[-1] > LAST_DECISION_GRADE_ANNUAL_FY
+
+
+def test_administration_and_refunds_never_move(no_uplift_audit, delayed_audit) -> None:
+    fixed_ids = {"ruc_admin_revenue", "ruc_refunds", "fed_refunds", "mvr_admin_revenue", "mvr_refunds"}
+    for frame in (no_uplift_audit, delayed_audit):
+        fixed = frame[frame["component"].isin(fixed_ids)]
+        assert not fixed.empty
+        assert float(fixed["delta"].abs().max()) == 0.0
+        assert fixed["component_kind"].eq("fixed").all()
+
+
+def test_totals_close_within_tolerance(no_uplift_audit, delayed_audit) -> None:
+    """Policy arithmetic must close exactly, net of the source's own residual."""
+    for frame in (no_uplift_audit, delayed_audit):
+        assert float(frame["closure_residual"].abs().max()) <= CLOSURE_TOL
+
+
+def test_the_published_source_residual_is_reported_not_corrected(no_uplift_audit) -> None:
+    """FY2027 Total RUC is inconsistent in the published spine by about 0.63.
+
+    Published MBU26 must stay unchanged, so the counterfactual reports that
+    residual rather than quietly rebasing it away. If this ever reaches zero
+    because the source was 'fixed', that is a change to published MBU26 and
+    must be reviewed, not absorbed.
+    """
+    fy2027 = no_uplift_audit[
+        no_uplift_audit["fy"].eq(2027) & no_uplift_audit["component"].eq("total_ruc_net_revenue")
+    ]
+    assert not fy2027.empty
+    residual = float(fy2027["published_source_residual"].iloc[0])
+    assert abs(residual) == pytest.approx(0.6270120265, abs=1e-6)
+    # The reported value still preserves the published trace plus the delta.
+    assert float(fy2027["closure_residual"].iloc[0]) == pytest.approx(0.0, abs=CLOSURE_TOL)
+
+
+def test_the_audit_wedge_matches_the_legislated_shape(no_uplift_audit) -> None:
+    for fy, expected in ((2027, 0.06), (2028, 0.12)):
+        rows = no_uplift_audit[no_uplift_audit["fy"].eq(fy)]
+        assert not rows.empty
+        assert float(rows["nominal_wedge_nzd_per_litre"].iloc[0]) == pytest.approx(expected, abs=2e-3)
+    terminal = no_uplift_audit[no_uplift_audit["wedge_basis"].eq("carried_terminal")]
+    assert not terminal.empty
+    assert float(terminal["nominal_wedge_nzd_per_litre"].max()) == pytest.approx(0.12, abs=2e-3)

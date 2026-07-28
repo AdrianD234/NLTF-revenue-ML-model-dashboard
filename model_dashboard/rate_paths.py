@@ -1212,3 +1212,207 @@ def apply_official_comparator_rate_policy_to_chart_rows(
         audit["rate_only_fixed_volumes"] = True
         audit["factor_source"] = "official_comparator_policy_factors"
     return adjusted, audit
+
+
+# ---------------------------------------------------------------------------
+# Official-comparator policy audit
+#
+# Four audit rows are not enough to review a counterfactual that moves nine
+# reported components. Every affected component gets a row per June year,
+# including hidden source leaves such as Heavy BEV that never become visible
+# chart rows but do change the totals.
+# ---------------------------------------------------------------------------
+
+OFFICIAL_POLICY_AUDIT_COLUMNS = (
+    "fy",
+    "policy_state",
+    "component",
+    "component_kind",
+    "source_series",
+    "original_value",
+    "source_effective_ped_rate",
+    "nominal_wedge_nzd_per_litre",
+    "wedge_basis",
+    "source_schedule_fy",
+    "target_ped_rate",
+    "selected_rate_factor",
+    "adjusted_value",
+    "delta",
+    "fixed_volume_status",
+    "published_source_residual",
+    "closure_residual",
+    "source_file",
+    "source_sha256",
+    "transformation_basis",
+)
+
+# component -> (reporting name, source series). Order is the reporting order.
+_OFFICIAL_AUDIT_REPRICED = (
+    ("gross_ped_revenue", "gross_ped_revenue"),
+    ("conventional_light_ruc_revenue", "light_ruc_net_revenue"),
+    ("light_bev_revenue", "light_bev_ruc_net_revenue"),
+    ("phev_revenue", "phev_ruc_net_revenue"),
+    ("heavy_ruc_revenue", "heavy_ruc_net_revenue"),
+    ("heavy_bev_revenue", "heavy_bev_ruc_net_revenue"),
+)
+_OFFICIAL_AUDIT_FIXED = (
+    "ruc_admin_revenue",
+    "ruc_refunds",
+    "fed_refunds",
+    "mvr_admin_revenue",
+    "mvr_refunds",
+    "gross_lpg_revenue",
+    "gross_cng_revenue",
+    "tuc_net_revenue",
+)
+_OFFICIAL_AUDIT_AGGREGATES = ("net_fed_revenue", "total_ruc_net_revenue", "total_nltf_net_revenue")
+
+
+def _official_formula_totals(row: pd.Series, ped: float, ruc_leaves: dict[str, float]) -> dict[str, float]:
+    """Rebuild the three official totals from leaves and fixed components.
+
+    Run twice per June year - once on published values and once on adjusted
+    values - so the published spine's own residual can be separated from the
+    policy arithmetic instead of being silently absorbed into it.
+    """
+    gross_ruc = sum(ruc_leaves.values()) + float(row["ruc_refunds"])
+    total_ruc = gross_ruc - float(row["ruc_admin_revenue"]) - float(row["ruc_refunds"])
+    gross_fed = ped + float(row["gross_lpg_revenue"]) + float(row["gross_cng_revenue"])
+    net_fed = gross_fed - float(row["fed_refunds"])
+    gross_mvr = float(row["mr1_revenue"]) + float(row["mr2_revenue"]) + float(row["coo_revenue"])
+    total_gross = gross_ruc + gross_fed + gross_mvr + float(row["tuc_net_revenue"])
+    total_admin = float(row["ruc_admin_revenue"]) + float(row["mvr_admin_revenue"]) + float(row["coo_revenue"])
+    total_refunds = float(row["ruc_refunds"]) + float(row["fed_refunds"]) + float(row["mvr_refunds"])
+    return {
+        "net_fed_revenue": net_fed,
+        "total_ruc_net_revenue": total_ruc,
+        "total_nltf_net_revenue": total_gross - total_admin - total_refunds,
+    }
+
+
+def official_comparator_policy_audit_frame(
+    repo_root: Path, policy_state: str = FED_POLICY_STATE_NO_UPLIFT
+) -> pd.DataFrame:
+    """Per-FY, per-component audit of the official rate-only counterfactual.
+
+    Covers all nine affected components plus the fixed rows that must NOT
+    move, so "administration and refunds are unchanged" is evidenced rather
+    than asserted.
+
+    ``published_source_residual`` carries the MBU26 spine's own formula
+    inconsistency where one exists - FY2027 Total RUC is about 0.63 off in the
+    published source. It is reported, never corrected: published MBU26 must
+    stay unchanged. ``closure_residual`` is the policy arithmetic alone, net of
+    that source residual, and must close to 1e-6.
+    """
+    spine = _mbu26_spine(repo_root)
+    factors = official_comparator_policy_factors(repo_root, policy_state)
+    if factors.empty:
+        return pd.DataFrame(columns=list(OFFICIAL_POLICY_AUDIT_COLUMNS))
+    source_sha = _sha256_of(repo_root / _OFFICIAL_SPINE_REL)
+
+    rows: list[dict[str, Any]] = []
+    for record in factors.itertuples():
+        fy = int(record.june_year)
+        if fy not in spine.index:
+            continue
+        source = spine.loc[fy]
+        factor = float(record.factor)
+        common = {
+            "fy": fy,
+            "policy_state": policy_state,
+            "source_effective_ped_rate": float(record.source_rate_nzd_per_litre),
+            "nominal_wedge_nzd_per_litre": float(record.nominal_wedge_nzd_per_litre),
+            "wedge_basis": str(record.wedge_basis),
+            "source_schedule_fy": int(record.source_schedule_fy),
+            "target_ped_rate": float(record.target_rate_nzd_per_litre),
+            "selected_rate_factor": factor,
+            "source_file": _OFFICIAL_SPINE_REL,
+            "source_sha256": source_sha,
+        }
+
+        published_ped = float(source["gross_ped_revenue"])
+        adjusted_ped = published_ped * factor
+        published_leaves = {series: float(source[series]) for series in _RUC_REVENUE_LEAVES}
+        adjusted_leaves = {series: value * factor for series, value in published_leaves.items()}
+
+        for component, series in _OFFICIAL_AUDIT_REPRICED:
+            original = float(source[series])
+            adjusted = original * factor
+            rows.append(
+                {
+                    **common,
+                    "component": component,
+                    "component_kind": "repriced_leaf",
+                    "source_series": series,
+                    "original_value": original,
+                    "adjusted_value": adjusted,
+                    "delta": adjusted - original,
+                    "fixed_volume_status": "volume_fixed_rate_only",
+                    "published_source_residual": 0.0,
+                    "closure_residual": 0.0,
+                    "transformation_basis": (
+                        f"{series} x official rate factor {factor:.12f}; official volume held "
+                        f"fixed. {record.transformation_basis}"
+                    ),
+                }
+            )
+
+        for series in _OFFICIAL_AUDIT_FIXED:
+            original = float(source[series])
+            rows.append(
+                {
+                    **common,
+                    "component": series,
+                    "component_kind": "fixed",
+                    "source_series": series,
+                    "original_value": original,
+                    "adjusted_value": original,
+                    "delta": 0.0,
+                    "fixed_volume_status": "fixed_component_not_repriced",
+                    "published_source_residual": 0.0,
+                    "closure_residual": 0.0,
+                    "transformation_basis": (
+                        "MBU26 fixed component: administration, refunds and non-PED fuel "
+                        "duties are unaffected by a PED rate counterfactual."
+                    ),
+                }
+            )
+
+        published_totals = _official_formula_totals(source, published_ped, published_leaves)
+        adjusted_totals = _official_formula_totals(source, adjusted_ped, adjusted_leaves)
+        ped_delta = adjusted_ped - published_ped
+        ruc_delta = sum(adjusted_leaves.values()) - sum(published_leaves.values())
+        expected_delta = {
+            "net_fed_revenue": ped_delta,
+            "total_ruc_net_revenue": ruc_delta,
+            "total_nltf_net_revenue": ped_delta + ruc_delta,
+        }
+        for component in _OFFICIAL_AUDIT_AGGREGATES:
+            published = float(source[component])
+            source_residual = published_totals[component] - published
+            # The reported value keeps the published source trace and adds only
+            # the policy delta, so a source inconsistency is never quietly
+            # rebased away by the counterfactual.
+            adjusted = published + expected_delta[component]
+            closure = (adjusted_totals[component] - source_residual) - adjusted
+            rows.append(
+                {
+                    **common,
+                    "component": component,
+                    "component_kind": "rebuilt_aggregate",
+                    "source_series": component,
+                    "original_value": published,
+                    "adjusted_value": adjusted,
+                    "delta": expected_delta[component],
+                    "fixed_volume_status": "volume_fixed_rate_only",
+                    "published_source_residual": source_residual,
+                    "closure_residual": closure,
+                    "transformation_basis": (
+                        "rebuilt formulaically from repriced leaves plus fixed MBU26 "
+                        "components; published source value preserved and only the policy "
+                        "delta added"
+                    ),
+                }
+            )
+    return pd.DataFrame(rows, columns=list(OFFICIAL_POLICY_AUDIT_COLUMNS))
