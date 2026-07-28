@@ -28,6 +28,10 @@
     "first_forecast_quarter": "2026Q1",
     "model_training_cutoff": "2025Q4",
     "runtime_cutoff_fy": 2030,
+    "current_light_ruc_quarterly_cutoff": "2030Q4",
+    "current_light_ruc_annual_cutoff_fy": 2030,
+    "official_comparator_cutoff_fy": 2055,
+    "horizon_scope_policy": "Three horizon contracts. Current decision-facing Light RUC and every total that depends on it stop at H20/FY2030. The official comparator publishes over its own source horizon. Raw model and replay evidence keep their full source horizon as non-decision-facing audit.",
     "fy2026_nowcast": "2025Q3+2025Q4 source actuals plus 2026Q1+2026Q2 current finalist forecasts",
     "rule": "Actual line ends FY2025; FY2026 actual-to-date rows are nowcast inputs only and are not plotted as actuals. Current-finalist comparative charts and runtime calculations stop at FY2030, the last governed common non-extrapolated horizon."
   },
@@ -626,6 +630,10 @@
   "runtime_cutoff_audit": {
     "repo_relative_path": "data/engine_ar1/current_revenue_outlook/runtime_cutoff_audit.csv",
     "runtime_cutoff_fy": 2030,
+    "current_light_ruc_quarterly_cutoff": "2030Q4",
+    "current_light_ruc_annual_cutoff_fy": 2030,
+    "official_comparator_cutoff_fy": 2055,
+    "horizon_scope_policy": "Three horizon contracts. Current decision-facing Light RUC and every total that depends on it stop at H20/FY2030. The official comparator publishes over its own source horizon. Raw model and replay evidence keep their full source horizon as non-decision-facing audit.",
     "scope": "Dynamic Revenue Outlook runtime cutoff audit from current Base, current comparison and required MBU26 input horizons.",
     "status": "available"
   },
@@ -667,11 +675,11 @@
   "validation_status": "runtime_rebuilt",
   "output_hashes": {
     "ev_phev_ped_light_drift_assumptions.csv": {
-      "sha256": "b49c221a2bbecf59b0607adcbd88862f0c046ccaebe545e4fa71c44c418b5ca8",
-      "size_bytes": 121021
+      "sha256": "75abf63ffa000db4a9eedc2b9f752176c1870a5e8621a5320eae5a1995ff942e",
+      "size_bytes": 121033
     },
     "ev_phev_ped_light_drift_assumptions.parquet": {
-      "sha256": "ec63d678716c19f00bda145a31a9878ff3ad45686cf0d83ba9000be1f486df8b",
+      "sha256": "1538ae0518cfaabf3bceed1d5dbc7d6a64adfc2520405e8d9b1a4d39f3ed831d",
       "size_bytes": 66483
     },
     "ev_phev_split_assumptions.csv": {
@@ -691,12 +699,12 @@
       "size_bytes": 10150
     },
     "fan_band_rows.csv": {
-      "sha256": "9ad734d3f5a4120bffe43af0860821081fe72aef1cd9af7a8e2f8f7f8b8c404a",
-      "size_bytes": 85833
+      "sha256": "4e639c3f2292ea38e0aa8e0b976d6914eb345feef97612dc114f42fa8816bba5",
+      "size_bytes": 97710
     },
     "fan_band_rows.parquet": {
-      "sha256": "2fbb56a4e275607ff05b7b76a2ec253cfd7663006fb91967176df1784c92ecde",
-      "size_bytes": 24936
+      "sha256": "11d42179b96d6231d76c755a26bf8a0b5fb8a999e030ac4f91654249000e2728",
+      "size_bytes": 27352
     },
     "future_revenue_forecasts.csv": {
       "sha256": "a418118e65ad782dbac3e55414dcfb24059de92c83f89df2ba7155a902942c0a",
@@ -707,12 +715,12 @@
       "size_bytes": 18152
     },
     "light_ruc_horizon_availability.csv": {
-      "sha256": "5807c790502373b1878e336e57d9f55943c1be5887b971d2d11293ec02bcd836",
-      "size_bytes": 53716
+      "sha256": "7bc46c81387d263744aa35c08bf1591b8e056af78b8c8bebd407b372d6783d41",
+      "size_bytes": 63291
     },
     "light_ruc_horizon_availability.parquet": {
-      "sha256": "c1810e4fa76fc50c1ed575686b7cd7a25d5672fb32426585f708bd76357feabb",
-      "size_bytes": 8615
+      "sha256": "412ee161c660516f6878f78ffdfaf87d9048e2116d0c2bcb2c2e541af6dfdf95",
+      "size_bytes": 8994
     },
     "path_trace_status.csv": {
       "sha256": "9aee7a4e7003ec6541476ca3e4afef6d8586b6c358e41db1c8e06623e5ffcaa3",
@@ -731,11 +739,11 @@
       "size_bytes": 6017
     },
     "ped_bridge_shape_fit_metrics.csv": {
-      "sha256": "cfbfe120db99a0546f32e1b6014ea125d3d9516803180906f439e972bb4922f2",
-      "size_bytes": 4758
+      "sha256": "5356a2c9ec96a44b71034bb42e35aba9a9d204f0e29acbeb164cf754768d1a85",
+      "size_bytes": 4760
     },
     "ped_bridge_shape_fit_metrics.parquet": {
-      "sha256": "ee78924b1f39a9742e63c24c5c5ced707223d7321f9023af497ff9c852df218b",
+      "sha256": "7ac6a96fb30eff87e90b6d318dd9ee9285cc4cc3d7c2d5592efefd4484208095",
       "size_bytes": 12761
     },
     "ped_efficiency_scenarios.csv": {
@@ -747,11 +755,11 @@
       "size_bytes": 6199
     },
     "ped_revenue_bridge_audit.csv": {
-      "sha256": "f83e2d103cb5993a8c3fdeec71cf57787223550fe21c8f0912cdb5ce07aa45d1",
-      "size_bytes": 29417
+      "sha256": "31f26aeea115afc21991694ee82dd3cc2c1e8956d4258e54a64f61bcde2f2fc6",
+      "size_bytes": 29443
     },
     "ped_revenue_bridge_audit.parquet": {
-      "sha256": "ef411e7402f5654d2579671c6e0e157c2e5331655cfa86854fcfd2ba8d986c26",
+      "sha256": "6662196620acac1b5efadbcad2f5ac451600a0c662263529005df92a1e262400",
       "size_bytes": 57639
     },
     "revenue_bridge_components.csv": {
@@ -763,12 +771,12 @@
       "size_bytes": 29191
     },
     "revenue_chart_rows.csv": {
-      "sha256": "85f14dc65598b93f0fbd79856b466d19b82310713ce06ad09ab13f9664d6ac00",
-      "size_bytes": 822853
+      "sha256": "a46ed024779c57ef0d6022dc077d9dc1c7166286db5637a512bfcde0e217a989",
+      "size_bytes": 1094804
     },
     "revenue_chart_rows.parquet": {
-      "sha256": "ca0716dadadeac050b37d493dd6595af0a2faecdfefcc8aa85a195f05e59d7f9",
-      "size_bytes": 76114
+      "sha256": "1391c9eaee9596fad4cbada3b01844dcd1b3588fd7fbeda8e4fa41e6989c93b9",
+      "size_bytes": 90802
     },
     "revenue_formula_residuals.csv": {
       "sha256": "00d814252a6e56933f2873ef595134d7c42eabc41c5a8191046fc807d5e35905",

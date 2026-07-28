@@ -45,6 +45,12 @@ from .forecast_imports import (
     june_year_horizon_profile,
     quarter_sort_key,
 )
+from .light_fleet_allocation import (
+    EXTENDED_EVIDENCE_MAX_HORIZON,
+    LAST_DECISION_GRADE_ANNUAL_FY,
+    LAST_DECISION_GRADE_QUARTER,
+    quarter_horizon,
+)
 from .mbu26_source_spine import (
     CURRENT_LIGHT_TOTAL_SERIES_ID,
     light_ruc_horizon_availability_frame,
@@ -1279,6 +1285,60 @@ def _max_numeric_year(frame: pd.DataFrame, column: str) -> int | None:
     if values.notna().any():
         return int(values.max())
     return None
+
+
+def _filter_chart_rows_by_horizon_scope(
+    chart_rows: pd.DataFrame,
+    *,
+    current_cutoff_fy: int,
+    official_cutoff_fy: int,
+) -> pd.DataFrame:
+    """Apply each scope's own horizon to a mixed chart-row frame.
+
+    The concatenated frame carries three different horizon contracts. Applying
+    one scalar cutoff to all of them is what let the current-model H20 rule
+    silently truncate the MBU26 official comparator, which remains fully
+    sourced well beyond FY2030.
+
+    Current-model rows stop at the current cutoff. Official-comparator rows
+    stop at their own source-derived horizon.
+    """
+    if chart_rows is None or chart_rows.empty:
+        return chart_rows
+    out = chart_rows.copy()
+    years = pd.to_numeric(out.get("june_year"), errors="coerce")
+    grain = out.get("time_grain", pd.Series("", index=out.index)).astype(str)
+    is_official = out.get("scenario_role", pd.Series("", index=out.index)).astype(str).eq(
+        "official_comparator"
+    )
+    cutoff = np.where(is_official, official_cutoff_fy, current_cutoff_fy)
+    keep_annual = years.isna() | years.le(pd.Series(cutoff, index=out.index))
+
+    # Quarterly rows are governed by HORIZON, not by their June year. FY2031
+    # straddles H19-H22: its annual total is withheld, but 2030Q3 (H19) and
+    # 2030Q4 (H20) are inside the supported horizon and must survive. Cutting
+    # quarterly rows by june_year would drop them with the annual and leave the
+    # replay seed short two supported quarters per scenario.
+    is_quarterly = grain.eq("quarterly")
+    periods = out.get("period", pd.Series("", index=out.index)).astype(str)
+    horizons = periods.map(
+        lambda value: _safe_quarter_horizon(value) if value else None
+    )
+    keep_quarterly = pd.Series(True, index=out.index)
+    measurable = is_quarterly & horizons.notna()
+    keep_quarterly[measurable & ~is_official] = (
+        horizons[measurable & ~is_official].astype(float) <= EXTENDED_EVIDENCE_MAX_HORIZON
+    )
+
+    keep = np.where(is_quarterly, keep_quarterly, keep_annual)
+    return out[pd.Series(keep, index=out.index)].copy()
+
+
+def _safe_quarter_horizon(period: str) -> float | None:
+    try:
+        return float(quarter_horizon(str(period)))
+    except (ValueError, IndexError, TypeError):
+        return None
 
 
 def _filter_frame_to_runtime_cutoff(frame: pd.DataFrame, runtime_cutoff_fy: int) -> pd.DataFrame:
@@ -3545,6 +3605,12 @@ def build_current_revenue_outlook_runtime_pack(
     runtime_cutoff_fy, runtime_cutoff_audit = _runtime_cutoff_fy_and_audit(current, mbu26_pack.official_annual)
     current = _filter_frame_to_runtime_cutoff(current, runtime_cutoff_fy)
     runtime_official_annual = _filter_frame_to_runtime_cutoff(mbu26_pack.official_annual, runtime_cutoff_fy)
+    # The official comparator publishes over its OWN horizon, taken from the
+    # official spine. It must never be inferred from the current Base or
+    # comparison rows.
+    official_comparator_cutoff_fy = int(
+        _max_numeric_year(mbu26_pack.official_annual, "FY") or runtime_cutoff_fy
+    )
     line_reconciliation = revenue_line_reconciliation_frame(
         mbu26_official_annual=runtime_official_annual,
         current_forecast_annual=current,
@@ -3627,7 +3693,9 @@ def build_current_revenue_outlook_runtime_pack(
     quarterly_inputs = _runtime_quarterly_activity_inputs(existing_chart_rows, series_meta, scenario_role_contract=scenario_role_contract)
     actual_rows = _runtime_mbu26_actual_rows(runtime_official_annual, series_meta)
     current_rows = _runtime_current_rows(current, series_meta, scenario_role_contract=scenario_role_contract)
-    mbu26_official_rows = _runtime_mbu26_official_rows(runtime_official_annual, series_meta)
+    # Built from the unfiltered official annual: see the horizon-scope note on
+    # _filter_chart_rows_by_horizon_scope.
+    mbu26_official_rows = _runtime_mbu26_official_rows(mbu26_pack.official_annual, series_meta)
     chart_rows = pd.concat(
         [quarterly_inputs, actual_rows, current_rows, mbu26_official_rows],
         ignore_index=True,
@@ -3637,7 +3705,11 @@ def build_current_revenue_outlook_runtime_pack(
         raise ValueError("Cannot rebuild current Revenue Outlook runtime pack: no chart rows were produced.")
     chart_rows = _normalize_runtime_chart_rows(chart_rows)
     chart_rows = _suppress_unreconciled_current_chart_rows(chart_rows, formula_residuals)
-    chart_rows = _filter_frame_to_runtime_cutoff(chart_rows, runtime_cutoff_fy)
+    chart_rows = _filter_chart_rows_by_horizon_scope(
+        chart_rows,
+        current_cutoff_fy=runtime_cutoff_fy,
+        official_cutoff_fy=official_comparator_cutoff_fy,
+    )
     future_revenue = _runtime_future_revenue_forecasts(current, series_meta)
     bridge_components = _runtime_bridge_components(current, series_meta)
     trace_audit = _runtime_trace_audit(chart_rows)
@@ -3685,6 +3757,15 @@ def build_current_revenue_outlook_runtime_pack(
             "first_forecast_quarter": REVENUE_FIRST_FORECAST_QUARTER,
             "model_training_cutoff": REVENUE_MODEL_TRAINING_CUTOFF,
             "runtime_cutoff_fy": runtime_cutoff_fy,
+            "current_light_ruc_quarterly_cutoff": LAST_DECISION_GRADE_QUARTER,
+            "current_light_ruc_annual_cutoff_fy": LAST_DECISION_GRADE_ANNUAL_FY,
+            "official_comparator_cutoff_fy": official_comparator_cutoff_fy,
+            "horizon_scope_policy": (
+                "Three horizon contracts. Current decision-facing Light RUC and every "
+                "total that depends on it stop at H20/FY2030. The official comparator "
+                "publishes over its own source horizon. Raw model and replay evidence "
+                "keep their full source horizon as non-decision-facing audit."
+            ),
             "fy2026_nowcast": "2025Q3+2025Q4 source actuals plus 2026Q1+2026Q2 current finalist forecasts",
             "rule": (
                 "Actual line ends FY2025; FY2026 actual-to-date rows are nowcast inputs only and are not plotted as actuals. "
@@ -3889,6 +3970,15 @@ def build_current_revenue_outlook_runtime_pack(
         "runtime_cutoff_audit": {
             "repo_relative_path": _repo_relative(root, base / "runtime_cutoff_audit.csv"),
             "runtime_cutoff_fy": runtime_cutoff_fy,
+            "current_light_ruc_quarterly_cutoff": LAST_DECISION_GRADE_QUARTER,
+            "current_light_ruc_annual_cutoff_fy": LAST_DECISION_GRADE_ANNUAL_FY,
+            "official_comparator_cutoff_fy": official_comparator_cutoff_fy,
+            "horizon_scope_policy": (
+                "Three horizon contracts. Current decision-facing Light RUC and every "
+                "total that depends on it stop at H20/FY2030. The official comparator "
+                "publishes over its own source horizon. Raw model and replay evidence "
+                "keep their full source horizon as non-decision-facing audit."
+            ),
             "scope": "Dynamic Revenue Outlook runtime cutoff audit from current Base, current comparison and required MBU26 input horizons.",
             "status": "available",
         },
