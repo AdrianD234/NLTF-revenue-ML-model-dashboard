@@ -241,7 +241,12 @@ _RUC_DIESEL_INTENSITY_SOURCE = {
     ),
 }
 _GENERALIZED_RUNNING_COST_FIELD = "diesel_plus_ruc_cost_nzd_per_1000km"
-from .light_fleet_allocation import CONVENTIONAL_ANCHOR_SERIES_ID as _CURRENT_LIGHT_TOTAL_SERIES_ID
+from .light_fleet_allocation import (
+    AVAILABILITY_AVAILABLE,
+    CONVENTIONAL_ANCHOR_SERIES_ID as _CURRENT_LIGHT_TOTAL_SERIES_ID,
+    annual_availability,
+    quarterly_availability,
+)
 _LIGHT_RUC_LAGGED_PRICE_FIELD = "lagged_real_light_ruc_price_nzd_per_1000km"
 _HEAVY_RUC_LEAD_PRICE_FIELD = "lead_real_heavy_ruc_price_nzd_per_1000km"
 _STREAM_SERIES_IDS = {
@@ -4368,6 +4373,16 @@ def _append_one_fuel_price_scenario_to_chart_rows(
         annual_factors = annual_factors[
             annual_factors["scenario_name"].astype(str).eq(scenario_name)
         ].copy()
+    # The current-model path is withheld beyond H20, so conflict effects are
+    # truncated at the same boundary. Without this the direct quarterly
+    # response would run past the last published annual checkpoint and trip
+    # the missing-annual-bridge guard below.
+    if "period" in quarterly_factors.columns:
+        quarterly_factors = quarterly_factors[
+            quarterly_factors["period"].astype(str).map(
+                lambda period: quarterly_availability(period)[0] == AVAILABILITY_AVAILABLE
+            )
+        ].copy()
     if quarterly_factors.empty or annual_factors.empty:
         raise ValueError(f"Factor audit has no rows for conflict severity {severity!r}.")
     # Never let a missing annual bridge silently turn a direct quarterly
@@ -4392,8 +4407,21 @@ def _append_one_fuel_price_scenario_to_chart_rows(
         .dropna()
         .astype(int)
     )
+    # A June year that the horizon policy deliberately withholds has no annual
+    # checkpoint by design, so its absence is not a missing bridge. FY2031 is
+    # the live case: 2030Q3 (H19) and 2030Q4 (H20) are published quarterly and
+    # carry direct conflict effects, but FY2031 straddles H19-H22 and is never
+    # published as an annual total. Only genuinely missing bridges - such as a
+    # stale actual-quarter cutoff leaving FY2026 short - must still fail.
+    withheld_fiscal_years = {
+        fiscal_year
+        for fiscal_year in direct_fiscal_years
+        if annual_availability(fiscal_year)[0] != AVAILABILITY_AVAILABLE
+    }
     missing_direct_fiscal_years = sorted(
-        direct_fiscal_years.difference(available_annual_fiscal_years)
+        direct_fiscal_years.difference(available_annual_fiscal_years).difference(
+            withheld_fiscal_years
+        )
     )
     if missing_direct_fiscal_years:
         missing_labels = ", ".join(

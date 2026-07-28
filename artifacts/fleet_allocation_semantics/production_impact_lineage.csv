@@ -1,0 +1,42 @@
+series_id,old_formula,new_formula,changed
+coo_revenue,nan,nan,False
+current_light_ruc_conventional_modelled_km,,sum quarterly current finalist Light RUC conventional model forecast,True
+current_light_ruc_total_modelled_km,sum quarterly current finalist Light RUC total net km before EV/PHEV allocation,,True
+fed_refunds,nan,nan,False
+gross_cng_revenue,nan,nan,False
+gross_fed_revenue,gross_ped_revenue + MBU26 gross_lpg_revenue + MBU26 gross_cng_revenue,gross_ped_revenue + MBU26 gross_lpg_revenue + MBU26 gross_cng_revenue,False
+gross_lpg_revenue,nan,nan,False
+gross_mvr_revenue,mr1_revenue + mr2_revenue + coo_revenue,mr1_revenue + mr2_revenue + coo_revenue,False
+gross_ped_revenue,adjusted PED/light-petrol VKT after optimized EV/PHEV migration * MBU26 litres intensity / 100 * MBU26 PED rate,raw PED/light-petrol VKT * MBU26 litres intensity / 100 * MBU26 PED rate,True
+gross_ruc_revenue,optimized light_ruc_net_revenue + heavy_ruc_net_revenue + optimized light_bev_ruc_net_revenue + MBU26 heavy_bev_ruc_net_revenue + optimized phev_ruc_net_revenue + MBU26 ruc_refunds,optimized light_ruc_net_revenue + heavy_ruc_net_revenue + optimized light_bev_ruc_net_revenue + MBU26 heavy_bev_ruc_net_revenue + optimized phev_ruc_net_revenue + MBU26 ruc_refunds,False
+heavy_bev_ruc_net_km,nan,nan,False
+heavy_bev_ruc_net_revenue,nan,nan,False
+heavy_ruc_net_km,sum quarterly current finalist Heavy RUC net km,sum quarterly current finalist Heavy RUC net km,False
+heavy_ruc_net_revenue,sum quarterly current Heavy RUC net km * MBU26 effective rate,sum quarterly current Heavy RUC net km * MBU26 effective rate,False
+light_bev_ruc_net_km,optimized EV/PHEV migration total * MBU26 Light BEV share within EV/PHEV,base pool (conventional / VFM Base conventional share) * VFM Base Light BEV share,True
+light_bev_ruc_net_revenue,optimized Light BEV RUC km * MBU26 Light BEV effective rate,allocated Light BEV RUC km * MBU26 Light BEV effective rate,True
+light_petrol_vkt,current PED-derived light-petrol VKT - (1 - lambda) * optimized EV/PHEV migration total,raw AR(1) PED VKT per capita * scenario-input population,True
+light_ruc_net_km,current Light RUC total modelled km - lambda * optimized EV/PHEV migration total,raw Light RUC conventional model forecast (preserved exactly under the Base uptake basis),True
+light_ruc_net_revenue,optimized conventional Light RUC km * MBU26 conventional Light effective rate,conventional Light RUC km * MBU26 conventional Light effective rate,True
+mr1_revenue,nan,nan,False
+mr2_revenue,nan,nan,False
+mvr_admin_revenue,nan,nan,False
+mvr_refunds,nan,nan,False
+mvr_revenue_net_admin_coo,mr1_revenue + mr2_revenue - mvr_admin_revenue,mr1_revenue + mr2_revenue - mvr_admin_revenue,False
+net_fed_revenue,gross_fed_revenue - MBU26 fed_refunds,gross_fed_revenue - MBU26 fed_refunds,False
+net_mvr_revenue,mvr_revenue_net_admin_coo - mvr_refunds,mvr_revenue_net_admin_coo - mvr_refunds,False
+ped_vkt_per_capita,sum quarterly current finalist PED VKT/capita,sum quarterly current finalist PED VKT/capita,False
+ped_volume,adjusted PED/light-petrol VKT after optimized EV/PHEV migration * MBU26 litres intensity / 100,raw PED/light-petrol VKT * MBU26 litres intensity / 100,True
+phev_ruc_net_km,optimized EV/PHEV migration total * MBU26 PHEV share within EV/PHEV,base pool (conventional / VFM Base conventional share) * VFM Base PHEV share,True
+phev_ruc_net_revenue,optimized PHEV RUC km * MBU26 PHEV effective rate,allocated PHEV RUC km * MBU26 PHEV effective rate,True
+ruc_admin_revenue,nan,nan,False
+ruc_refunds,nan,nan,False
+ruc_revenue_net_admin,gross_ruc_revenue - MBU26 ruc_admin_revenue,gross_ruc_revenue - MBU26 ruc_admin_revenue,False
+total_admin_fees,ruc_admin_revenue + mvr_admin_revenue + coo_revenue,ruc_admin_revenue + mvr_admin_revenue + coo_revenue,False
+total_gross_revenue,gross_ruc_revenue + gross_fed_revenue + gross_mvr_revenue + tuc_net_revenue,gross_ruc_revenue + gross_fed_revenue + gross_mvr_revenue + tuc_net_revenue,False
+total_nltf_net_revenue,total_revenue_net_admin - total_refunds,total_revenue_net_admin - total_refunds,False
+total_refunds,ruc_refunds + fed_refunds + mvr_refunds,ruc_refunds + fed_refunds + mvr_refunds,False
+total_revenue_net_admin,total_gross_revenue - total_admin_fees,total_gross_revenue - total_admin_fees,False
+total_ruc_net_revenue,ruc_revenue_net_admin - MBU26 ruc_refunds,ruc_revenue_net_admin - MBU26 ruc_refunds,False
+tuc_gtk,nan,nan,False
+tuc_net_revenue,nan,nan,False

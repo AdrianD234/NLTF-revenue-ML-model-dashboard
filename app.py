@@ -848,6 +848,27 @@ def _normalise_fed_policy_state(value: Any) -> str:
     return FED_POLICY_DELAYED_6M
 
 
+PED_RETENTION_SENSITIVITY_LABEL = "VFM petrol-retention sensitivity"
+PED_RETENTION_SENSITIVITY_HELP = (
+    "Structural sensitivity only. A rolling-origin comparison against the raw "
+    "AR(1) petrol path found this overlay WORSE in every cohort and at every "
+    "horizon H1-H12 (balanced WAPE -4.6%, -29.6% excluding 2020Q1-2021Q4), so "
+    "it is not supported as the Base forecast and is off by default. The Base "
+    "path is raw AR(1) VKT per capita x population."
+)
+
+
+def _ped_retention_enabled(ev_uptake_key: tuple[Any, ...]) -> bool:
+    """The PED petrol-retention sensitivity rides in slot 5 and defaults Off.
+
+    Older five-slot keys (cached callers and tests) therefore resolve to the
+    new default, which is the raw AR(1) Base path with no retention overlay.
+    """
+    if len(ev_uptake_key) <= 5:
+        return False
+    return bool(ev_uptake_key[5])
+
+
 def _fed_policy_state_scope(ev_uptake_key: tuple[Any, ...]) -> tuple[str, str]:
     """Return (Current state, MBU26 state), retaining legacy cache keys."""
 
@@ -1191,7 +1212,14 @@ def cached_scenario_overlay_rows(
         levers,
         eruc_levers,
         uplift_factors,
-        adjust_ped=str(bridge_mode) == PED_BRIDGE_DEFAULT_MODE,
+        # The PED petrol-retention overlay is an explicit sensitivity, off by
+        # default. It is additionally refused on the optimized-migration
+        # bridge, which already displaces petrol activity, so the two can
+        # never combine into a double deduction.
+        adjust_ped=(
+            _ped_retention_enabled(ev_uptake_key)
+            and str(bridge_mode) == PED_BRIDGE_DEFAULT_MODE
+        ),
         fed_policy_scopes=(),
         policy_pair_factors=pd.DataFrame(),
     )
@@ -3922,7 +3950,7 @@ def _render_lever_accordion(
             if all(value != "Custom" for value in [selected_fleet_efficiency, selected_pt_mode_shift, selected_freight_rail_shift]):
                 st.caption("Custom inputs appear only when selected.")
     with lever_expander:
-        st.markdown("<div class='page5-panel-title'>EV/PHEV uptake</div><div class='page5-panel-sub'>Fleet-transition share curves inferred from the MoT Vehicle Fleet Model.</div>", unsafe_allow_html=True)
+        st.markdown("<div class='page5-panel-title'>EV/PHEV uptake</div><div class='page5-panel-sub'>Light RUC fleet composition, from the MoT Vehicle Fleet Model. This sets the class mix only; it does not change total light RUC travel.</div>", unsafe_allow_html=True)
         uptake_cols = st.columns([0.30, 0.70])
         with uptake_cols[0]:
             selected_ev_uptake_mode = st.selectbox(
@@ -3932,6 +3960,17 @@ def _render_lever_accordion(
                 help=VFM_SOURCE_NOTE + "\n\n" + SENSITIVITY_INTERPLAY_NOTE,
                 **_widget_default_kwargs("revenue_outlook_ev_uptake_basis_v2", index=list(EV_UPTAKE_MODE_OPTIONS).index(DEFAULT_EV_UPTAKE_MODE)),
             )
+        st.checkbox(
+            f"{PED_RETENTION_SENSITIVITY_LABEL} (off by default)",
+            key="revenue_outlook_ped_retention_sensitivity",
+            help=PED_RETENTION_SENSITIVITY_HELP,
+            **_widget_default_kwargs("revenue_outlook_ped_retention_sensitivity", value=False),
+        )
+        st.caption(
+            "Base PED forecast is the raw AR(1) VKT per capita times population. "
+            "The petrol-retention curve is a structural sensitivity: a rolling-origin "
+            "comparison did not support it as the Base path."
+        )
         custom_ev_levers: tuple[float, ...] = ()
         with uptake_cols[1]:
             if selected_ev_uptake_mode == EV_UPTAKE_CUSTOM_OPTION:
@@ -4078,6 +4117,9 @@ def _render_lever_accordion(
         "eruc_levers": eruc_lever_values,
         "fed_policy_state": fed_policy_state,
         "mbu_fed_policy_state": mbu_fed_policy_state,
+        "ped_retention_sensitivity": bool(
+            st.session_state.get("revenue_outlook_ped_retention_sensitivity", False)
+        ),
     }
 
 
@@ -4346,6 +4388,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     eruc_lever_values = lever_state["eruc_levers"]
     fed_policy_state = _normalise_fed_policy_state(lever_state["fed_policy_state"])
     mbu_fed_policy_state = _normalise_fed_policy_state(lever_state["mbu_fed_policy_state"])
+    ped_retention_sensitivity = bool(lever_state.get("ped_retention_sensitivity", False))
     lever_summary = _active_lever_summary(
         fleet=selected_fleet_efficiency,
         pt_shift=selected_pt_mode_shift,
@@ -4366,6 +4409,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         eruc_lever_values,
         fed_policy_state,
         mbu_fed_policy_state,
+        ped_retention_sensitivity,
     )
     sensitivity_key = selected_sensitivity_key(
         fleet_efficiency=selected_fleet_efficiency,
@@ -7042,6 +7086,7 @@ def _render_comparison_scenario_column(prefix: str, sensitivity_labels: dict[str
             (),
             FED_POLICY_PUBLISHED,
             fed_policy_state,
+            False,
         )
         return sensitivity_key, ev_uptake_key
     sensitivity_key = selected_sensitivity_key(fleet, pt_shift, "Off", freight_rail_shift=freight)
@@ -7051,6 +7096,7 @@ def _render_comparison_scenario_column(prefix: str, sensitivity_labels: dict[str
         eruc_values,
         fed_policy_state,
         FED_POLICY_PUBLISHED,
+        bool(st.session_state.get("revenue_outlook_ped_retention_sensitivity", False)),
     )
     return sensitivity_key, ev_uptake_key
 
