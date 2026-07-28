@@ -1267,12 +1267,12 @@ def test_policy_replay_builds_twelve_paths_with_formula_closed_net_ruc(
             ) == pytest.approx(
                 float(
                     rows.at[
-                        "current_light_ruc_total_modelled_km", "value"
+                        "current_light_ruc_conventional_modelled_km", "value"
                     ]
                 )
                 - float(
                     base.at[
-                        "current_light_ruc_total_modelled_km", "value"
+                        "current_light_ruc_conventional_modelled_km", "value"
                     ]
                 ),
                 rel=1e-12,

@@ -1016,7 +1016,7 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
         "total_nltf_net_revenue",
         "total_ruc_net_revenue",
     }
-    assert "current_light_ruc_total_modelled_km" not in dashboard_series
+    assert "current_light_ruc_conventional_modelled_km" not in dashboard_series
     for series_id, series_rows in displayed.groupby("series_id"):
         traces = set(series_rows["trace_name"].dropna().astype(str))
         expected_current_trace = (
@@ -1517,7 +1517,7 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
         optimized_drift["source_path"].astype(str).eq("Current finalist Base case")
         & pd.to_numeric(optimized_drift["FY"], errors="coerce").eq(2026)
     ].iloc[0]
-    assert value("current_light_ruc_total_modelled_km") == pytest.approx(
+    assert value("current_light_ruc_conventional_modelled_km") == pytest.approx(
         float(drift_base_2026["current_L_t_total_light_ruc_km"]),
         abs=1e-9,
     )
@@ -1582,7 +1582,7 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
 
     base_cutoff_line = line_reconciliation[
         line_reconciliation["source_path"].astype(str).eq("Current finalist Base case")
-        & line_reconciliation["series_id"].astype(str).eq("current_light_ruc_total_modelled_km")
+        & line_reconciliation["series_id"].astype(str).eq("current_light_ruc_conventional_modelled_km")
         & pd.to_numeric(line_reconciliation["FY"], errors="coerce").between(2046, runtime_cutoff_fy, inclusive="both")
     ].copy()
     base_cutoff_line["FY_numeric"] = pd.to_numeric(base_cutoff_line["FY"], errors="coerce").astype(int)
