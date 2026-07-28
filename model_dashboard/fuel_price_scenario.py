@@ -241,7 +241,7 @@ _RUC_DIESEL_INTENSITY_SOURCE = {
     ),
 }
 _GENERALIZED_RUNNING_COST_FIELD = "diesel_plus_ruc_cost_nzd_per_1000km"
-_CURRENT_LIGHT_TOTAL_SERIES_ID = "current_light_ruc_total_modelled_km"
+from .light_fleet_allocation import CONVENTIONAL_ANCHOR_SERIES_ID as _CURRENT_LIGHT_TOTAL_SERIES_ID
 _LIGHT_RUC_LAGGED_PRICE_FIELD = "lagged_real_light_ruc_price_nzd_per_1000km"
 _HEAVY_RUC_LEAD_PRICE_FIELD = "lead_real_heavy_ruc_price_nzd_per_1000km"
 _STREAM_SERIES_IDS = {

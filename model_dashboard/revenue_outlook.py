@@ -47,6 +47,7 @@ from .forecast_imports import (
 )
 from .mbu26_source_spine import (
     CURRENT_LIGHT_TOTAL_SERIES_ID,
+    light_ruc_horizon_availability_frame,
     EV_PHEV_MIGRATION_DEFAULT_MODE,
     EV_PHEV_MIGRATION_SMOOTHNESS_PENALTY,
     MBU26_RELEASE_ROUND,
@@ -321,7 +322,7 @@ SENSITIVITY_LIGHT_ACTIVITY_SERIES = {
     "light_ruc_net_km",
     "light_bev_ruc_net_km",
     "phev_ruc_net_km",
-    "current_light_ruc_total_modelled_km",
+    CURRENT_LIGHT_TOTAL_SERIES_ID,
 }
 SENSITIVITY_REVENUE_SERIES = {
     "gross_ped_revenue",
@@ -3062,7 +3063,7 @@ def revenue_sensitivity_impact_audit_frame(
         adjusted["ped_volume"] = adjusted_ped_volume
         adjusted["gross_ped_revenue"] = adjusted_ped_revenue
         adjusted["ped_vkt_per_capita"] = value("ped_vkt_per_capita") * ped_activity_factor if np.isfinite(value("ped_vkt_per_capita")) else np.nan
-        for series_id in ["light_ruc_net_km", "light_bev_ruc_net_km", "phev_ruc_net_km", "current_light_ruc_total_modelled_km"]:
+        for series_id in ["light_ruc_net_km", "light_bev_ruc_net_km", "phev_ruc_net_km", CURRENT_LIGHT_TOTAL_SERIES_ID]:
             base_value = value(series_id)
             adjusted[series_id] = base_value * light_activity_factor if np.isfinite(base_value) else np.nan
         for km_id, revenue_id in [
@@ -3149,8 +3150,8 @@ def revenue_sensitivity_impact_audit_frame(
         add_row("ped_vkt_per_capita", "PED", "ped_vkt_per_capita * pt_factor * petrol_demand_factor", petrol_elasticity, petrol_demand_factor, f"{pt_ped_cells}; {demand_ped_cells}")
         add_row("ped_volume", "PED", "adjusted_light_petrol_vkt * adjusted_litres_per_100km / 100", petrol_elasticity, petrol_demand_factor, f"{pt_ped_cells}; {demand_ped_cells}; {fleet_cells}")
         add_row("gross_ped_revenue", "PED", "adjusted_ped_volume * ped_rate", petrol_elasticity, petrol_demand_factor, f"{pt_ped_cells}; {demand_ped_cells}; {fleet_cells}")
-        for series_id in ["light_ruc_net_km", "light_bev_ruc_net_km", "phev_ruc_net_km", "current_light_ruc_total_modelled_km"]:
-            stream = "LIGHT_RUC" if series_id in {"light_ruc_net_km", "current_light_ruc_total_modelled_km"} else ("LIGHT_BEV" if "bev" in series_id else "PHEV")
+        for series_id in ["light_ruc_net_km", "light_bev_ruc_net_km", "phev_ruc_net_km", CURRENT_LIGHT_TOTAL_SERIES_ID]:
+            stream = "LIGHT_RUC" if series_id in {"light_ruc_net_km", CURRENT_LIGHT_TOTAL_SERIES_ID} else ("LIGHT_BEV" if "bev" in series_id else "PHEV")
             add_row(series_id, stream, f"{series_id} * pt_factor * light_demand_factor", light_elasticity, light_demand_factor, f"{pt_light_cells}; {demand_light_cells}")
         for series_id in ["light_ruc_net_revenue", "light_bev_ruc_net_revenue", "phev_ruc_net_revenue"]:
             stream = "LIGHT_RUC" if series_id == "light_ruc_net_revenue" else ("LIGHT_BEV" if "bev" in series_id else "PHEV")
@@ -3555,6 +3556,7 @@ def build_current_revenue_outlook_runtime_pack(
         current_forecast_annual=current,
         repo_root=root,
     )
+    light_ruc_horizon_availability = light_ruc_horizon_availability_frame(existing_chart_rows)
     ev_phev_ped_light_drift_assumptions = ev_phev_ped_light_migration_assumptions_from_mbu26(
         current_outlook_chart_rows=existing_chart_rows,
         mbu26_official_annual=mbu26_pack.official_annual,
@@ -3942,6 +3944,7 @@ def build_current_revenue_outlook_runtime_pack(
             "revenue_stack_components": stack_components,
             "ev_phev_split_assumptions": ev_phev_split_assumptions,
             "ev_phev_ped_light_drift_assumptions": ev_phev_ped_light_drift_assumptions,
+            "light_ruc_horizon_availability": light_ruc_horizon_availability,
             "ped_revenue_bridge_audit": ped_revenue_bridge_audit,
             "ped_bridge_shape_fit_metrics": ped_bridge_shape_fit_metrics,
             "ped_bridge_mode_config": ped_bridge_mode_config,

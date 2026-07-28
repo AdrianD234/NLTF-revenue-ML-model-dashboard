@@ -213,11 +213,17 @@ def test_no_allocation_reproduces_the_retired_lambda_level(anchors) -> None:
 # ---------------------------------------------------------------- fail-closed
 
 
-def test_beyond_h20_the_allocator_fails_closed_rather_than_extrapolating(anchors) -> None:
+def test_beyond_h20_the_allocator_fails_closed_rather_than_extrapolating() -> None:
+    """A perfectly good anchor must still not publish beyond H20.
+
+    The anchor is supplied explicitly rather than read from the pack, because
+    the pack itself now stops at FY2030 - so reading it would make this test
+    pass for the wrong reason.
+    """
     for fy in [2031, 2035, 2050]:
         result = allocate_light_fleet(
             fy,
-            float(anchors.loc[fy, "current_light_total_modelled_km"]),
+            15_000.0,
             repo_root=ROOT,
             uptake_basis="MoT VFM base",
             last_actual_fy=LAST_ACTUAL_FY,
