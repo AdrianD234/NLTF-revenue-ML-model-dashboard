@@ -200,3 +200,119 @@ def test_official_factors_fail_closed_when_the_spine_is_missing(tmp_path) -> Non
     (empty / "data" / "revenue_model_source_pack" / "mbu26_annual_spine").mkdir(parents=True)
     with pytest.raises((FileNotFoundError, ValueError)):
         official_comparator_policy_factors(empty, FED_POLICY_STATE_NO_UPLIFT)
+
+
+# ---------------------------------------------------------------------------
+# Runtime wiring: the helper is reached by the app, and the two scopes never
+# touch the same row.
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="module")
+def pack_chart_rows() -> pd.DataFrame:
+    return pd.read_csv(
+        ROOT / "data/engine_ar1/current_revenue_outlook/revenue_chart_rows.csv",
+        low_memory=False,
+    )
+
+
+def _annual(rows: pd.DataFrame, role: str, fy: int, series: str = "total_nltf_net_revenue") -> float:
+    selected = rows[
+        rows["time_grain"].astype(str).eq("june_year")
+        & rows["scenario_role"].astype(str).eq(role)
+        & rows["series_id"].astype(str).eq(series)
+        & pd.to_numeric(rows["june_year"], errors="coerce").eq(fy)
+    ]
+    return float(pd.to_numeric(selected["value"], errors="coerce").iloc[0])
+
+
+def test_current_model_helpers_refuse_official_rows() -> None:
+    """No row may be processed by both helpers."""
+    from model_dashboard.rate_paths import (
+        apply_fed_uplift_delay_to_chart_rows,
+        apply_fed_uplift_off_to_chart_rows,
+    )
+
+    for helper in (apply_fed_uplift_off_to_chart_rows, apply_fed_uplift_delay_to_chart_rows):
+        with pytest.raises(ValueError, match="current-model helper"):
+            helper(pd.DataFrame(), {2027: 0.9}, scenario_roles={OFFICIAL_SCOPE})
+        with pytest.raises(ValueError, match="current-model helper"):
+            helper(pd.DataFrame(), {2027: 0.9}, scenario_roles={"basecase", OFFICIAL_SCOPE})
+
+
+def test_app_routes_the_official_scope_to_the_official_helper(pack_chart_rows) -> None:
+    """The helper is wired into the real overlay path, not merely importable."""
+    import app
+
+    assert app._MBU26_FED_UPLIFT_ROLES == (OFFICIAL_SCOPE,)
+    assert OFFICIAL_SCOPE not in app._CURRENT_FED_UPLIFT_ROLES
+
+    for ui_label, state in app._OFFICIAL_POLICY_STATE_BY_UI_LABEL.items():
+        rows, _, _, audit = app._apply_scenario_overlays(
+            pack_chart_rows.copy(),
+            pd.DataFrame(),
+            None,
+            None,
+            {"mbu26_ruc_class_revenue": {}},
+            adjust_ped=False,
+            fed_policy_scopes=((ui_label, app._MBU26_FED_UPLIFT_ROLES),),
+        )
+        published = _annual(pack_chart_rows, OFFICIAL_SCOPE, 2027)
+        if state == "published":
+            assert _annual(rows, OFFICIAL_SCOPE, 2027) == pytest.approx(published, abs=TOL)
+            continue
+
+        # The policy actually reached the official rows.
+        assert _annual(rows, OFFICIAL_SCOPE, 2027) != pytest.approx(published, abs=TOL)
+        assert not audit.empty
+        assert set(audit["scenario_role"].astype(str)) == {OFFICIAL_SCOPE}
+
+        # ...and left every current-model row alone.
+        for fy in (2027, LAST_DECISION_GRADE_ANNUAL_FY):
+            assert _annual(rows, "basecase", fy) == pytest.approx(
+                _annual(pack_chart_rows, "basecase", fy), abs=TOL
+            )
+
+
+def test_official_policy_reaches_beyond_the_current_model_horizon(pack_chart_rows) -> None:
+    """The whole point of the split: FY2031+ official rows still get repriced."""
+    import app
+
+    rows, _, _, _ = app._apply_scenario_overlays(
+        pack_chart_rows.copy(),
+        pd.DataFrame(),
+        None,
+        None,
+        {"mbu26_ruc_class_revenue": {}},
+        adjust_ped=False,
+        fed_policy_scopes=(("off", app._MBU26_FED_UPLIFT_ROLES),),
+    )
+    for fy in (2031, 2040, 2050):
+        assert _annual(rows, OFFICIAL_SCOPE, fy) != pytest.approx(
+            _annual(pack_chart_rows, OFFICIAL_SCOPE, fy), abs=TOL
+        )
+
+
+def test_the_two_policy_selectors_stay_independent(pack_chart_rows) -> None:
+    """Choosing a current policy must not move official rows, and vice versa."""
+    import app
+
+    current_only, _, _, _ = app._apply_scenario_overlays(
+        pack_chart_rows.copy(),
+        pd.DataFrame(),
+        None,
+        None,
+        {
+            "off": {2027: 0.95, 2030: 0.95},
+            "mbu26_ruc_class_revenue": {},
+        },
+        adjust_ped=False,
+        fed_policy_scopes=(("off", app._CURRENT_FED_UPLIFT_ROLES),),
+    )
+    for fy in (2027, 2031, 2050):
+        assert _annual(current_only, OFFICIAL_SCOPE, fy) == pytest.approx(
+            _annual(pack_chart_rows, OFFICIAL_SCOPE, fy), abs=TOL
+        )
+    assert _annual(current_only, "basecase", 2030) != pytest.approx(
+        _annual(pack_chart_rows, "basecase", 2030), abs=TOL
+    )

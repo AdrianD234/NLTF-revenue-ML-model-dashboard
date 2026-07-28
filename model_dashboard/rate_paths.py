@@ -901,6 +901,24 @@ def apply_fed_rate_policy_to_chart_rows(
     return data, pd.DataFrame(audit_rows)
 
 
+def _reject_official_scope(scenario_roles: set[str] | tuple[str, ...] | None, helper: str) -> None:
+    """The current-model helpers may not touch official-comparator rows.
+
+    The two scopes are different calculations, not one calculation over two
+    role sets. The current model gets a behavioural fixed-finalist replay
+    bounded by its own horizon; the official comparator gets a rate-only
+    counterfactual with volumes fixed, over the source horizon. Routing an
+    official row through here is what let the current-model horizon truncate
+    the published comparator, so it fails loudly rather than silently.
+    """
+    if scenario_roles and OFFICIAL_SCOPE in {str(role) for role in scenario_roles}:
+        raise ValueError(
+            f"{helper} is a current-model helper and cannot process '{OFFICIAL_SCOPE}' rows. "
+            "Use apply_official_comparator_rate_policy_to_chart_rows, which sources its own "
+            "schedule from the MBU26 spine and publishes over the official horizon."
+        )
+
+
 def apply_fed_uplift_delay_to_chart_rows(
     chart_rows: pd.DataFrame,
     factors: dict[int, float],
@@ -911,6 +929,7 @@ def apply_fed_uplift_delay_to_chart_rows(
     ruc_class_revenue_by_fy: dict[int, float] | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Apply the six-month delay while preserving the source pack."""
+    _reject_official_scope(scenario_roles, "apply_fed_uplift_delay_to_chart_rows")
     return apply_fed_rate_policy_to_chart_rows(
         chart_rows,
         factors,
@@ -931,6 +950,7 @@ def apply_fed_uplift_off_to_chart_rows(
     ruc_class_revenue_by_fy: dict[int, float] | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Backward-compatible no-uplift wrapper around the generic overlay."""
+    _reject_official_scope(scenario_roles, "apply_fed_uplift_off_to_chart_rows")
     return apply_fed_rate_policy_to_chart_rows(
         chart_rows,
         factors,

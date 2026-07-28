@@ -140,9 +140,11 @@ from model_dashboard.rate_paths import (
     FED_POLICY_STATE_PUBLISHED,
     FED_UPLIFT_DELAY_NOTE,
     FED_UPLIFT_NOTE,
+    OFFICIAL_SCOPE,
     RATE_CHART_NOTE,
     apply_fed_uplift_delay_to_chart_rows,
     apply_fed_uplift_off_to_chart_rows,
+    apply_official_comparator_rate_policy_to_chart_rows,
     fed_uplift_delayed_factors,
     fed_uplift_off_factors,
     mbu26_ruc_class_revenue_by_fy,
@@ -790,6 +792,15 @@ FED_POLICY_OPTIONS = (
     FED_POLICY_DELAYED_6M,
     FED_POLICY_OFF,
 )
+# The UI labels and the rate_paths policy states are separate vocabularies
+# ("off" vs "no_uplift", "delayed_6m" vs "delay_6m"). The current-model path
+# hides this by choosing a wrapper per label; the official helper takes the
+# state directly, so the translation has to be explicit rather than implied.
+_OFFICIAL_POLICY_STATE_BY_UI_LABEL = {
+    FED_POLICY_PUBLISHED: FED_POLICY_STATE_PUBLISHED,
+    FED_POLICY_DELAYED_6M: FED_POLICY_STATE_DELAYED_6M,
+    FED_POLICY_OFF: FED_POLICY_STATE_NO_UPLIFT,
+}
 FED_POLICY_LABELS = {
     FED_POLICY_PUBLISHED: "Original timing — 1 Jan 2027",
     FED_POLICY_DELAYED_6M: "Deferred 6 months — 1 Jul 2027",
@@ -1121,9 +1132,35 @@ def _apply_scenario_overlays(
         rows, eruc_audit = apply_eruc_transition_to_chart_rows(rows, drift, eruc_levers)
     policy_audits: list[pd.DataFrame] = []
     mbu26_ruc_class_revenue = uplift_factors.get("mbu26_ruc_class_revenue", {})
+    repo_root = Path(__file__).resolve().parent
     for policy, scenario_roles in fed_policy_scopes:
+        roles = {str(role) for role in scenario_roles}
+        if not roles:
+            continue
+        if OFFICIAL_SCOPE in roles:
+            # The official comparator is a different calculation, not the same
+            # one over another role set: rate-only, volumes fixed, sourced from
+            # the MBU26 spine and published over the official horizon. It must
+            # never borrow the current model's factor map, whose horizon stops
+            # at FY2030. Roles are disjoint, so no row is processed twice.
+            if roles != {OFFICIAL_SCOPE}:
+                raise ValueError(
+                    f"Official and current policy scopes must stay disjoint; got {sorted(roles)}."
+                )
+            official_state = _OFFICIAL_POLICY_STATE_BY_UI_LABEL.get(str(policy))
+            if official_state is None:
+                raise ValueError(f"Unknown official comparator policy state: {policy!r}")
+            rows, policy_audit = apply_official_comparator_rate_policy_to_chart_rows(
+                rows,
+                repo_root,
+                policy_state=official_state,
+                ruc_class_revenue_by_fy=mbu26_ruc_class_revenue,
+            )
+            if policy_audit is not None and not policy_audit.empty:
+                policy_audits.append(policy_audit)
+            continue
         factors = uplift_factors.get(policy, {})
-        if not factors or not scenario_roles:
+        if not factors:
             continue
         if policy == "off":
             rows, policy_audit = apply_fed_uplift_off_to_chart_rows(
