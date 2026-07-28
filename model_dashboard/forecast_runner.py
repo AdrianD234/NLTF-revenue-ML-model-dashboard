@@ -1282,6 +1282,17 @@ def forecast_pack_zip_bytes(output_dir: Path | str) -> bytes:
     return stream.getvalue()
 
 
+# Native units of the model outputs, declared so every downstream consumer can
+# convert by declaration instead of magnitude (the unit contract fails closed
+# on undeclared rows). These match the governed seed convention exactly: PED
+# emits annualised VKT per capita per quarter; the RUC models emit raw net km.
+NATIVE_STREAM_UNITS = {
+    "PED": "VKT per capita",
+    "LIGHT_RUC": "net km",
+    "HEAVY_RUC": "net km",
+}
+
+
 def forecast_chart_rows_for_display(
     future_forecasts: pd.DataFrame,
     *,
@@ -1347,6 +1358,7 @@ def _model_input_history_rows(root: Path, stream: str, latest_actual_period: str
             "period": str(row["period"]),
             "target_period": str(row["period"]),
             "value": float(row["value"]),
+            "value_unit": NATIVE_STREAM_UNITS.get(stream, ""),
             "availability_status": "historical_actual",
             "forecast_available": pd.NA,
             "gap_code": None,
@@ -1386,6 +1398,7 @@ def _evidence_pack_actual_rows(root: Path, streams: list[str], latest_actual_per
             "period": str(row["period"]),
             "target_period": str(row["period"]),
             "value": float(row["value"]),
+            "value_unit": NATIVE_STREAM_UNITS.get(str(row["stream"]), ""),
             "availability_status": "historical_actual",
             "forecast_available": pd.NA,
             "gap_code": None,
@@ -1421,6 +1434,7 @@ def _future_forecast_chart_rows(future_forecasts: pd.DataFrame) -> pd.DataFrame:
                 "horizon_support_note": row.get("horizon_support_note"),
                 "backtest_supported_max_horizon": row.get("backtest_supported_max_horizon"),
                 "value": float(value) if pd.notna(value) else pd.NA,
+                "value_unit": NATIVE_STREAM_UNITS.get(str(row.get("stream", "")), ""),
                 "availability_status": row.get("availability_status"),
                 "forecast_available": row.get("forecast_available"),
                 "gap_code": row.get("gap_code"),
