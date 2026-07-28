@@ -12,8 +12,6 @@ same macro, rate and policy states, that is a defect and the script says so.
 
 from __future__ import annotations
 
-import io
-import subprocess
 import sys
 from pathlib import Path
 
@@ -30,7 +28,9 @@ from model_dashboard.light_fleet_allocation import (  # noqa: E402
 OUT = ROOT / "artifacts" / "fleet_allocation_semantics"
 OUT.mkdir(parents=True, exist_ok=True)
 
-BEFORE_REF = "1118ef363a5a19ee34e34ee6ec2f9914b3686f26"
+# Committed, hash-pinned snapshot of the pre-correction pack. Not a Git object:
+# a shallow CI checkout may not contain the investigation head commit.
+LEGACY_SNAPSHOT = OUT / "legacy_investigation_snapshot"
 SCENARIO = "current_basecase"
 FYS = list(range(2025, LAST_DECISION_GRADE_ANNUAL_FY + 1))
 PACK_REL = "data/engine_ar1/current_revenue_outlook"
@@ -56,11 +56,19 @@ REVENUE = [
 ]
 
 
-def _git_show(ref: str, path: str) -> pd.DataFrame:
-    result = subprocess.run(  # noqa: S603
-        ["git", "show", f"{ref}:{path}"], capture_output=True, text=True, cwd=ROOT, check=True
-    )
-    return pd.read_csv(io.StringIO(result.stdout))
+def _legacy(path: str) -> pd.DataFrame:
+    """Read a pre-correction pack table from the hash-pinned legacy snapshot."""
+    import hashlib
+    import json
+
+    name = path.rsplit("/", 1)[-1]
+    manifest = json.loads((LEGACY_SNAPSHOT / "manifest.json").read_text(encoding="utf-8"))
+    entry = next(item for item in manifest["files"] if item["file"] == name)
+    target = LEGACY_SNAPSHOT / name
+    digest = hashlib.sha256(target.read_bytes()).hexdigest()
+    if digest != entry["sha256"]:
+        raise ValueError(f"Legacy snapshot {name} has changed: expected {entry['sha256']}, found {digest}.")
+    return pd.read_csv(target)
 
 
 def _annual(frame: pd.DataFrame, scenario: str = SCENARIO) -> pd.DataFrame:
@@ -72,9 +80,9 @@ def _annual(frame: pd.DataFrame, scenario: str = SCENARIO) -> pd.DataFrame:
 
 
 def main() -> int:
-    before = _annual(_git_show(BEFORE_REF, f"{PACK_REL}/revenue_line_reconciliation.csv"))
+    before = _annual(_legacy(f"{PACK_REL}/revenue_line_reconciliation.csv"))
     after = _annual(pd.read_csv(ROOT / PACK_REL / "revenue_line_reconciliation.csv"))
-    official = _git_show(BEFORE_REF, f"{PACK_REL}/revenue_line_reconciliation.csv")
+    official = _legacy(f"{PACK_REL}/revenue_line_reconciliation.csv")
     official = _annual(official, "mbu26_official")
 
     rows = []
@@ -101,7 +109,7 @@ def main() -> int:
     impact = pd.DataFrame(rows)
 
     # ---- lineage: formula text before and after -------------------------
-    before_lines = _git_show(BEFORE_REF, f"{PACK_REL}/revenue_line_reconciliation.csv")
+    before_lines = _legacy(f"{PACK_REL}/revenue_line_reconciliation.csv")
     after_lines = pd.read_csv(ROOT / PACK_REL / "revenue_line_reconciliation.csv")
 
     def _formulas(frame: pd.DataFrame) -> dict[str, str]:

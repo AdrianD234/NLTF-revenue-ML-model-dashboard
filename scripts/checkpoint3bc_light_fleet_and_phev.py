@@ -47,27 +47,29 @@ FYS = list(range(2025, 2036))
 FORECAST_FYS = [fy for fy in FYS if fy != 2025]
 TOL = 1e-6
 
-# The corrected production pack deliberately stops publishing current-model
-# Light RUC beyond FY2030 (see the H21+ policy). This checkpoint is the
-# investigation record that JUSTIFIED that boundary, so it must still be able
-# to read the long-horizon anchors it analysed. It therefore reads them from
-# the investigation head commit rather than the working tree, which keeps the
-# evidence reproducible and explicitly historical.
-INVESTIGATION_HEAD = "1118ef363a5a19ee34e34ee6ec2f9914b3686f26"
+# The Checkpoint studies analysed current-model anchors out to FY2050 and
+# produced the evidence that justified withholding them beyond H20. The
+# corrected pack no longer publishes those years, so the inputs are read from
+# a committed, hash-pinned legacy snapshot. This deliberately does NOT read a
+# historical Git object: a shallow CI checkout may not contain that commit.
+LEGACY_SNAPSHOT = ROOT / "artifacts" / "fleet_allocation_semantics" / "legacy_investigation_snapshot"
 
 
 def _read_investigation_csv(repo_relative: str) -> pd.DataFrame:
-    import io
-    import subprocess
+    import hashlib
+    import json
 
-    result = subprocess.run(  # noqa: S603
-        ["git", "show", f"{INVESTIGATION_HEAD}:{repo_relative}"],
-        capture_output=True,
-        text=True,
-        cwd=ROOT,
-        check=True,
-    )
-    return pd.read_csv(io.StringIO(result.stdout))
+    name = repo_relative.rsplit("/", 1)[-1]
+    manifest = json.loads((LEGACY_SNAPSHOT / "manifest.json").read_text(encoding="utf-8"))
+    entry = next(item for item in manifest["files"] if item["file"] == name)
+    path = LEGACY_SNAPSHOT / name
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    if digest != entry["sha256"]:
+        raise ValueError(
+            f"Legacy investigation snapshot {name} has changed: expected "
+            f"{entry['sha256']}, found {digest}."
+        )
+    return pd.read_csv(path)
 
 
 PHEV_PETROL_FRACTIONS = [0.0, 0.25, 0.50, 0.75, 1.0]

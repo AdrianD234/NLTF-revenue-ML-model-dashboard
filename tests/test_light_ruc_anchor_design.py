@@ -17,6 +17,7 @@ See artifacts/fleet_allocation_semantics/checkpoint_3_final_design_verdict.md.
 
 from __future__ import annotations
 
+import pathlib
 import subprocess
 import sys
 from pathlib import Path
@@ -243,3 +244,45 @@ def test_the_seam_and_guard_scripts_reproduce_their_artifacts() -> None:
     )
     assert result.returncode == 0, result.stderr.decode(errors="replace")[-2000:]
     assert (ARTIFACTS / "light_ruc_seam_method_paths.csv").read_bytes() == before
+
+
+def test_no_test_or_generator_depends_on_a_historical_git_object() -> None:
+    """Shallow CI checkouts may not contain the investigation head commit.
+
+    The Checkpoint studies need pre-correction anchors that the corrected pack
+    no longer publishes. Those must come from a committed, hash-pinned legacy
+    snapshot, never from `git show <sha>:<path>`.
+    """
+    banned_sha = "1118ef3" + "63a5a19ee34e34ee6ec2f9914b3686f26"
+    banned_call = '"git", ' + '"show"'
+    for folder in ["scripts", "tests"]:
+        for path in sorted((ROOT / folder).glob("*.py")):
+            if path.name == pathlib.Path(__file__).name:
+                continue  # this module names them in order to ban them
+            source = path.read_text(encoding="utf-8")
+            assert banned_sha[:8] not in source, f"{path.name} pins a historical commit sha"
+            assert banned_call not in source, f"{path.name} reads a historical Git object"
+
+
+def test_the_legacy_snapshot_is_hash_pinned_and_marked_non_decision_facing() -> None:
+    import hashlib
+    import json
+
+    snapshot = ARTIFACTS / "legacy_investigation_snapshot"
+    manifest = json.loads((snapshot / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["decision_facing"] is False
+    assert manifest["status"] == "superseded_investigation_evidence"
+    assert "PROHIBITED" in manifest["production_use"]
+    assert manifest["files"]
+    for entry in manifest["files"]:
+        path = snapshot / entry["file"]
+        assert path.exists(), entry["file"]
+        assert hashlib.sha256(path.read_bytes()).hexdigest() == entry["sha256"], entry["file"]
+
+
+def test_no_production_loader_reads_the_legacy_snapshot() -> None:
+    """The runtime must never be able to reach superseded investigation data."""
+    for path in sorted((ROOT / "model_dashboard").rglob("*.py")):
+        source = path.read_text(encoding="utf-8")
+        assert "legacy_investigation_snapshot" not in source, path.name
+    assert "legacy_investigation_snapshot" not in (ROOT / "app.py").read_text(encoding="utf-8")
