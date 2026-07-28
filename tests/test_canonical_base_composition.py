@@ -287,3 +287,103 @@ def test_chart_line_and_stack_agree_under_the_canonical_base(pack) -> None:
         values = pd.to_numeric(matched["value"], errors="coerce").dropna()
         assert len(values), f"line reconciliation has no FY{fy} Base total"
         assert float(values.iloc[0]) == pytest.approx(chart_value, abs=1e-6)
+
+
+# ---------------------------------------------------------------------------
+# Scenario / policy matrix
+# ---------------------------------------------------------------------------
+
+_CONFLICT_SCENARIOS = ("middle_east_low", "middle_east_medium", "middle_east_high")
+
+
+def _scenario_value(rows: pd.DataFrame, scenario: str, series: str, fy: int) -> float:
+    selected = rows[
+        rows["time_grain"].astype(str).eq("june_year")
+        & rows["scenario_name"].astype(str).eq(scenario)
+        & rows["series_id"].astype(str).eq(series)
+        & pd.to_numeric(rows["june_year"], errors="coerce").eq(fy)
+    ]
+    values = pd.to_numeric(selected["value"], errors="coerce").dropna()
+    return float(values.iloc[0]) if len(values) else float("nan")
+
+
+@pytest.mark.parametrize("mode", list(EXACT_VFM_UPTAKE_BASES))
+def test_every_current_scenario_derives_its_own_base_pool(pack, post_macro, mode) -> None:
+    """Each scenario's pool comes from its own post-macro conventional anchor.
+
+    Asserted at the COMPOSITION stage. The pool identity is a property of the
+    allocation, not of the final output: the governed policy response then
+    changes conventional activity while BEV and PHEV stay fixed, which
+    deliberately leaves the identity behind. That policy behaviour is gated
+    separately in
+    test_policy_changes_conventional_once_and_leaves_bev_phev_fixed.
+    """
+    composed = _compose(post_macro, pack, _key(mode))
+    pools = {}
+    for role in ROLES:
+        for fy in FYS:
+            shares, _ = composition_shares(fy, repo_root=ROOT, uptake_basis=mode)
+            conventional = _value(composed, "light_ruc_net_km", fy, role)
+            pool = _pool(composed, fy, role)
+            assert pool == pytest.approx(conventional / shares["conventional"], abs=1e-6), (
+                f"{role} FY{fy} pool identity broke under {mode}"
+            )
+            pools[(role, fy)] = pool
+    # Base and comparison must not collapse onto one pool.
+    for fy in FYS:
+        assert pools[("basecase", fy)] != pytest.approx(pools[("comparison", fy)], abs=1e-3)
+
+
+@pytest.mark.parametrize("current_policy", ["published", "delayed_6m", "off"])
+def test_policy_states_move_conventional_only(pack, current_policy) -> None:
+    """Across every current policy state, only conventional Light RUC moves."""
+    sensitivity_key = app.selected_sensitivity_key("Off", "Off", "Off", freight_rail_shift="Off")
+    published, *_ = app.cached_scenario_overlay_rows(
+        SIGNATURE, sensitivity_key, PED_BRIDGE_DEFAULT_MODE,
+        _key(DEFAULT_EV_UPTAKE_MODE, policy=app.FED_POLICY_PUBLISHED), pack,
+    )
+    rows, *_ = app.cached_scenario_overlay_rows(
+        SIGNATURE, sensitivity_key, PED_BRIDGE_DEFAULT_MODE,
+        _key(DEFAULT_EV_UPTAKE_MODE, policy=current_policy), pack,
+    )
+    for role in ROLES:
+        for fy in FYS:
+            for series in ("light_bev_ruc_net_km", "phev_ruc_net_km"):
+                assert _value(rows, series, fy, role) == pytest.approx(
+                    _value(published, series, fy, role), abs=1e-6
+                ), f"{current_policy} moved {series} for {role} FY{fy}"
+
+
+def test_conflict_paths_move_conventional_only(pack) -> None:
+    """The conflict response is an activity response, not a composition one.
+
+    It applies generalized fuel/RUC cost elasticity to CONVENTIONAL Light and
+    Heavy activity; electric activity must not inherit a diesel multiplier. It
+    therefore deliberately does NOT preserve the Base composition identity, and
+    asserting that identity on a conflict path would be wrong. What must hold
+    is that BEV and PHEV are untouched.
+    """
+    sensitivity_key = app.selected_sensitivity_key("Off", "Off", "Off", freight_rail_shift="Off")
+    key = _key(DEFAULT_EV_UPTAKE_MODE, policy=app.FED_POLICY_DELAYED_6M)
+    rows, *_ = app.cached_scenario_overlay_rows(
+        SIGNATURE, sensitivity_key, PED_BRIDGE_DEFAULT_MODE, key, pack
+    )
+    present = set(rows["scenario_name"].astype(str))
+    if not set(_CONFLICT_SCENARIOS) <= present:
+        pytest.skip("conflict replay unavailable in this environment")
+
+    moved_somewhere = False
+    for scenario in _CONFLICT_SCENARIOS:
+        for fy in FYS:
+            for series in ("light_bev_ruc_net_km", "phev_ruc_net_km"):
+                assert _scenario_value(rows, scenario, series, fy) == pytest.approx(
+                    _scenario_value(rows, "current_basecase", series, fy), abs=1e-6
+                ), f"{scenario} FY{fy} moved {series}; electric activity must not follow diesel cost"
+            conventional = _scenario_value(rows, scenario, "light_ruc_net_km", fy)
+            base_conventional = _scenario_value(rows, "current_basecase", "light_ruc_net_km", fy)
+            if abs(conventional - base_conventional) > 1e-6:
+                moved_somewhere = True
+                assert conventional < base_conventional, (
+                    f"{scenario} FY{fy} raised conventional activity under a cost shock"
+                )
+    assert moved_somewhere, "no conflict path moved conventional activity at all"
