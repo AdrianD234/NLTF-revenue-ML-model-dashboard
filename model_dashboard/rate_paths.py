@@ -964,6 +964,8 @@ OFFICIAL_FACTOR_COLUMNS = (
     "source_rate_nzd_per_litre",
     "target_rate_nzd_per_litre",
     "nominal_wedge_nzd_per_litre",
+    "wedge_basis",
+    "source_schedule_fy",
     "factor",
     "first_supported_fy",
     "last_supported_fy",
@@ -980,11 +982,24 @@ def _sha256_of(path: Path) -> str:
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def governed_no_uplift_wedge(repo_root: Path) -> tuple[float, int]:
-    """The final nominal 12c wedge, from the governed source rate schedules.
+def governed_no_uplift_wedge_schedule(
+    repo_root: Path,
+) -> tuple[dict[int, float], float, int, int]:
+    """Per-June-year nominal no-uplift wedge, from the governed schedules.
 
-    Derived as planned minus no-uplift at the last June year where the
-    governed schedule carries both, rather than hard-coded.
+    Returns ``(wedge_by_fy, terminal_wedge, last_source_fy, first_uplift_fy)``.
+
+    The wedge is NOT a single constant. The 12c uplift lands in January 2027,
+    which is halfway through FY2027, so the governed annual planned rate for
+    FY2027 carries only about half of it:
+
+        FY2026 and earlier   wedge 0.00
+        FY2027               wedge 0.06   (two quarters pre-step, two post)
+        FY2028 onward        wedge 0.12
+
+    Every directly governed year therefore uses its own source-derived wedge.
+    Only years beyond the source schedule carry the terminal wedge forward, so
+    the no-uplift path stays parallel to the planned path.
     """
     fed = _fed_rate_paths(repo_root)
     by_path = fed.groupby(["fed_path", "FY"])["rate_nzd_per_litre"].mean()
@@ -996,19 +1011,19 @@ def governed_no_uplift_wedge(repo_root: Path) -> tuple[float, int]:
             "Governed FED rate schedules carry no year with both a planned and a "
             "no-uplift rate; the nominal wedge cannot be derived."
         )
-    last = int(shared[-1])
-    wedge = float(planned.loc[last]) - float(no_uplift.loc[last])
-    if wedge <= 0:
-        raise ValueError(f"Derived no-uplift wedge is not positive ({wedge}).")
-    first = next(
-        (
-            year
-            for year in shared
-            if abs(float(planned.loc[year]) - float(no_uplift.loc[year])) > 1e-9
-        ),
-        last,
+    wedge_by_fy = {
+        int(year): float(planned.loc[year]) - float(no_uplift.loc[year]) for year in shared
+    }
+    if any(value < -1e-9 for value in wedge_by_fy.values()):
+        raise ValueError("Governed no-uplift schedule is above the planned schedule.")
+    last_source_fy = int(shared[-1])
+    terminal_wedge = wedge_by_fy[last_source_fy]
+    if terminal_wedge <= 0:
+        raise ValueError(f"Terminal no-uplift wedge is not positive ({terminal_wedge}).")
+    first_uplift_fy = next(
+        (year for year in shared if wedge_by_fy[year] > 1e-9), last_source_fy
     )
-    return wedge, last, int(first)
+    return wedge_by_fy, terminal_wedge, last_source_fy, int(first_uplift_fy)
 
 
 def official_comparator_policy_factors(
@@ -1016,8 +1031,8 @@ def official_comparator_policy_factors(
 ) -> pd.DataFrame:
     """Rate-only MBU26 counterfactual factors over the official horizon.
 
-    ``no_uplift``: carry the final governed nominal wedge from the first
-    uplift year through every displayed official June year, so the comparator stays parallel to the
+    ``no_uplift``: carry the final governed per-year wedge where the source
+    schedule has one, and the terminal wedge only beyond it, so the comparator stays parallel to the
     planned schedule instead of stopping where the current model stops.
 
     ``delay_6m``: identity outside the affected FY2027 window, because the
@@ -1034,7 +1049,9 @@ def official_comparator_policy_factors(
                 f"MBU26 spine is missing {column}; official policy factors cannot be derived."
             )
 
-    wedge, wedge_fy, uplift_start_fy = governed_no_uplift_wedge(repo_root)
+    wedge_by_fy, terminal_wedge, last_source_fy, uplift_start_fy = (
+        governed_no_uplift_wedge_schedule(repo_root)
+    )
     delayed_years = set(fed_policy_affected_periods(repo_root, FED_POLICY_STATE_DELAYED_6M))
     quarterly = ped_quarterly_rate_schedules(repo_root)
     delayed_src = quarterly.groupby("FY")[_DELAYED_SEGMENT].mean()
@@ -1056,12 +1073,25 @@ def official_comparator_policy_factors(
         if policy_state == FED_POLICY_STATE_NO_UPLIFT:
             if fy < uplift_start_fy:
                 continue  # the uplift does not exist yet, so no counterfactual
-            target_rate = source_rate - wedge
-            nominal_wedge = wedge
-            basis = (
-                "official published rate = gross_ped_revenue / ped_volume; nominal wedge "
-                f"{wedge:.6f} carried forward from the governed FY{wedge_fy} schedules"
-            )
+            if fy in wedge_by_fy:
+                nominal_wedge = wedge_by_fy[fy]
+                wedge_basis = "direct_source"
+                source_schedule_fy = fy
+                basis = (
+                    "official published rate = gross_ped_revenue / ped_volume; nominal "
+                    f"wedge {nominal_wedge:.6f} taken directly from the governed FY{fy} "
+                    "planned-minus-no-uplift schedules"
+                )
+            else:
+                nominal_wedge = terminal_wedge
+                wedge_basis = "carried_terminal"
+                source_schedule_fy = last_source_fy
+                basis = (
+                    "official published rate = gross_ped_revenue / ped_volume; terminal "
+                    f"wedge {terminal_wedge:.6f} from governed FY{last_source_fy} carried "
+                    "forward beyond the source schedule"
+                )
+            target_rate = source_rate - nominal_wedge
         elif policy_state == FED_POLICY_STATE_DELAYED_6M:
             if fy not in delayed_years:
                 continue  # identity outside the affected window
@@ -1075,6 +1105,8 @@ def official_comparator_policy_factors(
             ratio = float(delayed_src.loc[fy]) / float(planned_by_fy.loc[fy])
             target_rate = source_rate * ratio
             nominal_wedge = source_rate - target_rate
+            wedge_basis = "direct_source"
+            source_schedule_fy = fy
             basis = "official published rate scaled by the governed delayed/planned rate ratio"
         else:
             continue
@@ -1090,6 +1122,8 @@ def official_comparator_policy_factors(
                 "source_rate_nzd_per_litre": source_rate,
                 "target_rate_nzd_per_litre": target_rate,
                 "nominal_wedge_nzd_per_litre": nominal_wedge,
+                "wedge_basis": wedge_basis,
+                "source_schedule_fy": source_schedule_fy,
                 "factor": target_rate / source_rate,
                 "first_supported_fy": first_fy,
                 "last_supported_fy": last_fy,
