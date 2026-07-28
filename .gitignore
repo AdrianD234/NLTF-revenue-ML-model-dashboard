@@ -48,6 +48,8 @@ artifacts/**
 !artifacts/fleet_allocation_semantics/**
 !artifacts/p0_light_fleet_fix/
 !artifacts/p0_light_fleet_fix/**
+!artifacts/mbu26_reconciliation_corrected/
+!artifacts/mbu26_reconciliation_corrected/**
 data/**
 !data/.gitkeep
 !data/dashboard_evidence_pack/
