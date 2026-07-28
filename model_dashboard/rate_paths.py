@@ -939,3 +939,175 @@ def apply_fed_uplift_off_to_chart_rows(
         policy_pair_factors=policy_pair_factors,
         ruc_class_revenue_by_fy=ruc_class_revenue_by_fy,
     )
+
+
+# ---------------------------------------------------------------------------
+# Official-comparator policy factors
+#
+# The current-model policy replay is bounded by the supported current-model
+# horizon (H20 / FY2030). The MBU26 official comparator is a different scope:
+# it has no behavioural replay, receives a rate-only counterfactual with
+# official volumes held fixed, and publishes over its own horizon. The two
+# must not share one factor map, or the current-model cutoff would silently
+# truncate the official comparator.
+#
+# These factors are derived from the MBU26 spine and the governed rate
+# schedules - never from current-model chart rows.
+# ---------------------------------------------------------------------------
+
+OFFICIAL_SCOPE = "official_comparator"
+CURRENT_MODEL_SCOPE = "current_model"
+OFFICIAL_FACTOR_COLUMNS = (
+    "scenario_scope",
+    "policy_state",
+    "june_year",
+    "source_rate_nzd_per_litre",
+    "target_rate_nzd_per_litre",
+    "nominal_wedge_nzd_per_litre",
+    "factor",
+    "first_supported_fy",
+    "last_supported_fy",
+    "source_file",
+    "source_sha256",
+    "transformation_basis",
+)
+_OFFICIAL_SPINE_REL = "data/revenue_model_source_pack/mbu26_annual_spine/mbu26_official_annual.csv"
+
+
+def _sha256_of(path: Path) -> str:
+    import hashlib
+
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def governed_no_uplift_wedge(repo_root: Path) -> tuple[float, int]:
+    """The final nominal 12c wedge, from the governed source rate schedules.
+
+    Derived as planned minus no-uplift at the last June year where the
+    governed schedule carries both, rather than hard-coded.
+    """
+    fed = _fed_rate_paths(repo_root)
+    by_path = fed.groupby(["fed_path", "FY"])["rate_nzd_per_litre"].mean()
+    planned = by_path.get(_PLANNED_PATH, pd.Series(dtype=float))
+    no_uplift = by_path.get(_NO_UPLIFT_PATH, pd.Series(dtype=float))
+    shared = sorted(set(planned.index.astype(int)) & set(no_uplift.index.astype(int)))
+    if not shared:
+        raise ValueError(
+            "Governed FED rate schedules carry no year with both a planned and a "
+            "no-uplift rate; the nominal wedge cannot be derived."
+        )
+    last = int(shared[-1])
+    wedge = float(planned.loc[last]) - float(no_uplift.loc[last])
+    if wedge <= 0:
+        raise ValueError(f"Derived no-uplift wedge is not positive ({wedge}).")
+    first = next(
+        (
+            year
+            for year in shared
+            if abs(float(planned.loc[year]) - float(no_uplift.loc[year])) > 1e-9
+        ),
+        last,
+    )
+    return wedge, last, int(first)
+
+
+def official_comparator_policy_factors(
+    repo_root: Path, policy_state: str = FED_POLICY_STATE_NO_UPLIFT
+) -> pd.DataFrame:
+    """Rate-only MBU26 counterfactual factors over the official horizon.
+
+    ``no_uplift``: carry the final governed nominal wedge from the first
+    uplift year through every displayed official June year, so the comparator stays parallel to the
+    planned schedule instead of stopping where the current model stops.
+
+    ``delay_6m``: identity outside the affected FY2027 window, because the
+    six-month delay only shifts the timing of the initial step.
+
+    Fails closed for a June year whose official published PED rate cannot be
+    derived: the policy-adjusted official trace must never silently fall back
+    to published values while claiming the policy was applied.
+    """
+    spine = _mbu26_spine(repo_root)
+    for column in ("gross_ped_revenue", "ped_volume"):
+        if column not in spine.columns:
+            raise ValueError(
+                f"MBU26 spine is missing {column}; official policy factors cannot be derived."
+            )
+
+    wedge, wedge_fy, uplift_start_fy = governed_no_uplift_wedge(repo_root)
+    delayed_years = set(fed_policy_affected_periods(repo_root, FED_POLICY_STATE_DELAYED_6M))
+    quarterly = ped_quarterly_rate_schedules(repo_root)
+    delayed_src = quarterly.groupby("FY")[_DELAYED_SEGMENT].mean()
+    fed = _fed_rate_paths(repo_root)
+    planned_by_fy = (
+        fed[fed["fed_path"].astype(str).eq(_PLANNED_PATH)].groupby("FY")["rate_nzd_per_litre"].mean()
+    )
+    source_sha = _sha256_of(repo_root / _OFFICIAL_SPINE_REL)
+
+    published = (spine["gross_ped_revenue"] / spine["ped_volume"]).dropna()
+    published = published[published > 0]
+    if published.empty:
+        raise ValueError("No official published PED rate could be derived from the MBU26 spine.")
+    first_fy, last_fy = int(published.index.min()), int(published.index.max())
+
+    rows: list[dict[str, Any]] = []
+    for fy in sorted(int(value) for value in published.index):
+        source_rate = float(published.loc[fy])
+        if policy_state == FED_POLICY_STATE_NO_UPLIFT:
+            if fy < uplift_start_fy:
+                continue  # the uplift does not exist yet, so no counterfactual
+            target_rate = source_rate - wedge
+            nominal_wedge = wedge
+            basis = (
+                "official published rate = gross_ped_revenue / ped_volume; nominal wedge "
+                f"{wedge:.6f} carried forward from the governed FY{wedge_fy} schedules"
+            )
+        elif policy_state == FED_POLICY_STATE_DELAYED_6M:
+            if fy not in delayed_years:
+                continue  # identity outside the affected window
+            if fy not in set(delayed_src.index.astype(int)) or fy not in set(
+                planned_by_fy.index.astype(int)
+            ):
+                raise ValueError(
+                    f"Official delayed policy needs governed planned and delayed rates for "
+                    f"FY{fy}; at least one is unavailable. Refusing to fall back to published."
+                )
+            ratio = float(delayed_src.loc[fy]) / float(planned_by_fy.loc[fy])
+            target_rate = source_rate * ratio
+            nominal_wedge = source_rate - target_rate
+            basis = "official published rate scaled by the governed delayed/planned rate ratio"
+        else:
+            continue
+        if target_rate <= 0:
+            raise ValueError(
+                f"Official {policy_state} target rate for FY{fy} is not positive ({target_rate})."
+            )
+        rows.append(
+            {
+                "scenario_scope": OFFICIAL_SCOPE,
+                "policy_state": policy_state,
+                "june_year": fy,
+                "source_rate_nzd_per_litre": source_rate,
+                "target_rate_nzd_per_litre": target_rate,
+                "nominal_wedge_nzd_per_litre": nominal_wedge,
+                "factor": target_rate / source_rate,
+                "first_supported_fy": first_fy,
+                "last_supported_fy": last_fy,
+                "source_file": _OFFICIAL_SPINE_REL,
+                "source_sha256": source_sha,
+                "transformation_basis": basis,
+            }
+        )
+    return pd.DataFrame(rows, columns=list(OFFICIAL_FACTOR_COLUMNS))
+
+
+def official_comparator_factor_map(
+    repo_root: Path, policy_state: str = FED_POLICY_STATE_NO_UPLIFT
+) -> dict[int, float]:
+    """Per-FY multiplier for the official comparator, keyed by June year."""
+    frame = official_comparator_policy_factors(repo_root, policy_state)
+    return {
+        int(record.june_year): float(record.factor)
+        for record in frame.itertuples()
+        if abs(float(record.factor) - 1.0) > 1e-9
+    }
