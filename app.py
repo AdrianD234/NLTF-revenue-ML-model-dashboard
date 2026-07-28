@@ -192,6 +192,9 @@ from model_dashboard.ev_uptake_levers import (
     DEFAULT_EV_UPTAKE_MODE,
     EV_UPTAKE_MODE_OPTIONS,
     EV_UPTAKE_PRESETS,
+    EXACT_VFM_UPTAKE_BASES,
+    HEAVY_BEV_TRANSITION_NOTE,
+    PARAMETRIC_VFM_BASE_FIT_OPTION,
     GOVERNED_PACK_OPTION as EV_UPTAKE_GOVERNED_OPTION,
     UptakeLevers,
     SENSITIVITY_INTERPLAY_NOTE,
@@ -777,7 +780,36 @@ def _resolve_ev_uptake_levers(ev_uptake_key: tuple[Any, ...]) -> UptakeLevers | 
         if len(values) != 13:
             return None
         return UptakeLevers(*[float(v) for v in values])
+    if mode == PARAMETRIC_VFM_BASE_FIT_OPTION:
+        return EV_UPTAKE_PRESETS[DEFAULT_EV_UPTAKE_MODE]
+    # Named VFM modes still carry a lever object, but only so the PED retention
+    # curve has parameters if that separate sensitivity is switched on. Their
+    # COMPOSITION comes from the exact vendored table via _resolve_uptake_basis.
     return EV_UPTAKE_PRESETS.get(mode)
+
+
+def _resolve_uptake_basis(ev_uptake_key: tuple[Any, ...]) -> str | None:
+    """The exact vendored VFM scenario to compose with, or None for parametric.
+
+    Returning a basis is what routes the composition through the governed
+    table. Custom levers and the explicitly-labelled parametric approximation
+    return None and fall back to the fitted curve.
+    """
+    mode = str(ev_uptake_key[0]) if ev_uptake_key else EV_UPTAKE_GOVERNED_OPTION
+    return mode if mode in EXACT_VFM_UPTAKE_BASES else None
+
+
+def _heavy_bev_transition_enabled(ev_uptake_key: tuple[Any, ...]) -> bool:
+    """Heavy BEV reclassification rides in slot 6 and defaults Off.
+
+    It previously ran unconditionally inside the light-fleet overlay, so
+    picking any light uptake basis silently moved Heavy RUC km and revenue
+    into Heavy BEV against the settled HEAVY_RUC: not_reclassified contract.
+    Older keys resolve to the new default.
+    """
+    if len(ev_uptake_key) <= 6:
+        return False
+    return bool(ev_uptake_key[6])
 
 
 def _resolve_eruc_levers(ev_uptake_key: tuple[Any, ...]) -> ErucTransitionLevers | None:
@@ -1122,6 +1154,8 @@ def _apply_scenario_overlays(
     adjust_ped: bool,
     fed_policy_scopes: tuple[tuple[str, tuple[str, ...]], ...] = (),
     policy_pair_factors: pd.DataFrame | None = None,
+    uptake_basis: str | None = None,
+    heavy_bev_transition: bool = False,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """uptake -> e-RUC -> PED/RUC policy overlay chain shared by every view.
 
@@ -1130,15 +1164,23 @@ def _apply_scenario_overlays(
     uptake_audit = pd.DataFrame()
     eruc_audit = pd.DataFrame()
     uplift_audit = pd.DataFrame()
+    repo_root = Path(__file__).resolve().parent
     if levers is not None:
         # The optimized-migration PED bridge already displaces petrol
         # activity; only the raw bridge needs the displacement lever.
-        rows, uptake_audit = apply_uptake_levers_to_chart_rows(rows, drift, levers, adjust_ped=adjust_ped)
+        rows, uptake_audit = apply_uptake_levers_to_chart_rows(
+            rows,
+            drift,
+            levers,
+            adjust_ped=adjust_ped,
+            uptake_basis=uptake_basis,
+            repo_root=repo_root,
+            heavy_bev_transition=heavy_bev_transition,
+        )
     if eruc_levers is not None:
         rows, eruc_audit = apply_eruc_transition_to_chart_rows(rows, drift, eruc_levers)
     policy_audits: list[pd.DataFrame] = []
     mbu26_ruc_class_revenue = uplift_factors.get("mbu26_ruc_class_revenue", {})
-    repo_root = Path(__file__).resolve().parent
     for policy, scenario_roles in fed_policy_scopes:
         roles = {str(role) for role in scenario_roles}
         if not roles:
@@ -1265,6 +1307,11 @@ def cached_scenario_overlay_rows(
         ),
         fed_policy_scopes=(),
         policy_pair_factors=pd.DataFrame(),
+        # Compose from the exact vendored VFM table, so the Base setting
+        # reproduces the canonical allocation around the post-macro anchor
+        # instead of a fitted approximation of it.
+        uptake_basis=_resolve_uptake_basis(ev_uptake_key),
+        heavy_bev_transition=_heavy_bev_transition_enabled(ev_uptake_key),
     )
     rows, _, _, uplift_audit = _apply_scenario_overlays(
         rows,
