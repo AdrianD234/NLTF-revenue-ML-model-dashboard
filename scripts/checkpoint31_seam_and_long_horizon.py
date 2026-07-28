@@ -44,6 +44,30 @@ SEAM_FYS = list(range(2025, 2036))
 LONG_FYS = list(range(2025, 2051))
 TOL = 1e-6
 
+# The corrected production pack deliberately stops publishing current-model
+# Light RUC beyond FY2030 (see the H21+ policy). This checkpoint is the
+# investigation record that JUSTIFIED that boundary, so it must still be able
+# to read the long-horizon anchors it analysed. It therefore reads them from
+# the investigation head commit rather than the working tree, which keeps the
+# evidence reproducible and explicitly historical.
+INVESTIGATION_HEAD = "1118ef363a5a19ee34e34ee6ec2f9914b3686f26"
+
+
+def _read_investigation_csv(repo_relative: str) -> pd.DataFrame:
+    import io
+    import subprocess
+
+    result = subprocess.run(  # noqa: S603
+        ["git", "show", f"{INVESTIGATION_HEAD}:{repo_relative}"],
+        capture_output=True,
+        text=True,
+        cwd=ROOT,
+        check=True,
+    )
+    return pd.read_csv(io.StringIO(result.stdout))
+
+
+
 # Horizon governance: training cutoff 2025Q4, so FY2026 starts at H1.
 VALIDATED_MAX_FY = 2028  # H1-H12
 EXTENDED_MAX_FY = 2030  # H13-H20
@@ -64,14 +88,14 @@ VFM_RATIO_FAIL = 1.50
 
 
 def load() -> dict:
-    split = pd.read_csv(PACK / "ev_phev_split_assumptions.csv")
+    split = _read_investigation_csv("data/engine_ar1/current_revenue_outlook/ev_phev_split_assumptions.csv")
     base = split[split["scenario_name"].eq(SCENARIO)].set_index("FY").sort_index()
     official = split[split["scenario_name"].isna()].set_index("FY").sort_index()
-    drift = pd.read_csv(PACK / "ev_phev_ped_light_drift_assumptions.csv")
+    drift = _read_investigation_csv("data/engine_ar1/current_revenue_outlook/ev_phev_ped_light_drift_assumptions.csv")
     drift = drift[
         drift["scenario_name"].eq(SCENARIO) & drift["lambda_mode"].astype(str).eq("optimized")
     ].set_index("FY").sort_index()
-    bridge = pd.read_csv(PACK / "ped_revenue_bridge_audit.csv")
+    bridge = _read_investigation_csv("data/engine_ar1/current_revenue_outlook/ped_revenue_bridge_audit.csv")
     bridge = bridge[bridge["scenario_name"].eq(SCENARIO)].set_index("FY").sort_index()
     vfm = pd.read_csv(ROOT / "data" / "vfm_202405" / "vfm_vkt_shares.csv")
     return {

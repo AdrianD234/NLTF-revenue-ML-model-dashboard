@@ -50,10 +50,20 @@ def guard() -> pd.DataFrame:
 
 
 def test_raw_conventional_is_preserved_under_every_seam_method(seam_paths) -> None:
-    split = pd.read_csv(PACK / "ev_phev_split_assumptions.csv")
-    split = split[split["scenario_name"].eq("current_basecase")].set_index("FY")
-    raw = split["current_light_total_modelled_km"].astype(float)
+    """The anchor comes from the artifact itself, not the live pack.
+
+    The seam study spans FY2050, but the corrected production pack stops
+    publishing current-model Light RUC at FY2030. The artifact carries the
+    raw anchor it used in ``raw_conventional``, so the preservation invariant
+    is checked against that rather than against a pack that deliberately no
+    longer holds those years.
+    """
     forecast = seam_paths[seam_paths["june_year"].gt(ANCHOR_FY)]
+    raw = (
+        forecast[forecast["method"].eq("A_immediate")]
+        .set_index("june_year")["raw_conventional"]
+        .astype(float)
+    )
     assert not forecast.empty
     for method, rows in forecast.groupby("method"):
         for record in rows.itertuples():
