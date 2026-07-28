@@ -12,10 +12,10 @@ the VFM petrol displacement lever is applied only when that bridge is
 selected. These tests pin that behaviour so a future change cannot silently
 reintroduce a double deduction.
 
-They also pin the finding that no supported runtime step restores the raw
-conventional Light RUC forecast, so the decision-facing conventional line and
-pool level remain lambda-constructed. That is a live finding, not approved
-behaviour: if it is fixed, this test should be updated deliberately.
+They also pin the corrected Light RUC contract: the raw conventional model
+forecast IS the decision-facing conventional class, and the pool is inferred
+around it. Before the production fix this module asserted the opposite, which
+was the defect being investigated.
 
 See artifacts/fleet_allocation_semantics/checkpoint_2_structural_verdict.md.
 """
@@ -164,26 +164,33 @@ def test_the_raw_bridge_leaves_the_light_ruc_classes_untouched(stages) -> None:
             )
 
 
-def test_no_runtime_step_restores_the_raw_conventional_light_ruc_forecast(stages) -> None:
-    """Live finding: the decision-facing conventional line stays lambda-built.
+def test_every_runtime_step_preserves_the_raw_conventional_light_ruc_forecast(stages) -> None:
+    """The corrected contract, replacing the finding this test used to pin.
 
-    If a future change makes the runtime preserve the raw Light RUC model
-    output as the conventional class, this test should be updated as a
-    deliberate decision rather than relaxed.
+    Before the production fix this asserted the opposite: that NO supported
+    runtime step restored the raw conventional model forecast, because lambda
+    reduced it in the pack and every later stage inherited that level. The fix
+    makes the raw model output the conventional class, so the invariant is
+    inverted deliberately - not relaxed.
     """
-    for fy in FORECAST_FYS:
-        raw = float(stages["split"].loc[fy, "current_light_total_modelled_km"])
-        for stage in ["S1", "S2", "S3", "S4"]:
-            assert float(stages[stage].loc[fy, "light_ruc_net_km"]) != pytest.approx(raw, abs=1.0)
-    # The gap widens, and at FY2030 the conventional line sits well below the
-    # model output while the pool sits well above it.
-    raw_2030 = float(stages["split"].loc[2030, "current_light_total_modelled_km"])
-    assert float(stages["S4"].loc[2030, "light_ruc_net_km"]) < raw_2030
-    pool_2030 = sum(
-        float(stages["S4"].loc[2030, series])
-        for series in ["light_ruc_net_km", "light_bev_ruc_net_km", "phev_ruc_net_km"]
+    split = pd.read_csv(
+        ROOT / engine_revenue_outlook_dir("ar1") / "ev_phev_split_assumptions.csv"
     )
-    assert pool_2030 > raw_2030
+    split = split[split["scenario_name"].eq(SCENARIO)].set_index("FY")
+    for fy in FORECAST_FYS:
+        raw = float(split.loc[fy, "current_light_total_modelled_km"])
+        for stage in ["S1", "S2"]:
+            assert float(stages[stage].loc[fy, "light_ruc_net_km"]) == pytest.approx(raw, abs=TOL), (
+                f"{stage} no longer carries the raw conventional model forecast at FY{fy}"
+            )
+    # The pool still exceeds the conventional class, because BEV and PHEV are
+    # inferred around it rather than carved out of it.
+    for fy in FORECAST_FYS:
+        pool = sum(
+            float(stages["S1"].loc[fy, series])
+            for series in ["light_ruc_net_km", "light_bev_ruc_net_km", "phev_ruc_net_km"]
+        )
+        assert pool > float(split.loc[fy, "current_light_total_modelled_km"])
 
 
 def test_stage_four_matches_the_supported_fleet_mix_builder(stages) -> None:

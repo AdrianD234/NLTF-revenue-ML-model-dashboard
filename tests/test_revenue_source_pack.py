@@ -308,8 +308,12 @@ def test_hybrid_annual_revenue_replaces_only_three_lines_and_preserves_mot_fixed
         - (rows.loc["total_nltf_net_revenue", "value"] - rows.loc["total_nltf_net_revenue", "official_value"])
     ) <= 1e-9
 
-    fy2031 = hybrid[hybrid["FY"].eq(2031) & hybrid["series_id"].eq("gross_ped_revenue")].set_index("fed_path")
-    assert fy2031.loc["Current planned path", "value"] > fy2031.loc["No 2027 12c uplift", "value"]
+    # FY2030 is the last published current-model June year, so the policy
+    # comparison moved off FY2031 when the H21+ boundary was introduced.
+    last_fy = hybrid[hybrid["series_id"].eq("gross_ped_revenue")]["FY"].max()
+    assert int(last_fy) == 2030
+    policy = hybrid[hybrid["FY"].eq(last_fy) & hybrid["series_id"].eq("gross_ped_revenue")].set_index("fed_path")
+    assert policy.loc["Current planned path", "value"] > policy.loc["No 2027 12c uplift", "value"]
 
 
 def test_revenue_source_pack_rollups_reconcile_where_inputs_exist_and_report_gaps() -> None:

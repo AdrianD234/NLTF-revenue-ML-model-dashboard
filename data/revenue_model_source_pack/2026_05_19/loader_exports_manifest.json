@@ -16,12 +16,12 @@
     "data_vintage_manifest.json": {
       "role": "Model/source observation cutoffs and repo-local current Revenue Outlook/source-pack hashes.",
       "row_count": null,
-      "sha256": "01191f4457f1a7d074f0e2a4430a36618aa5bc3894843294101c4b597b8acdff"
+      "sha256": "8ad719d1065567ec6ea8b00be1e4f99d9507fb7a7eedf85a5e41c0cce06b3686"
     },
     "hybrid_annual_revenue.csv": {
       "role": "Replacement-only annual NLTF hybrid roll-up audit using source-backed PED/FED, Light RUC and Heavy RUC bridge inputs plus MOT fixed components.",
-      "row_count": 525,
-      "sha256": "30b2ec2b1540c51e5d60d95984bc26d8e5ea3331a98d04a57633800874dd0d3d"
+      "row_count": 450,
+      "sha256": "643e12178e4e094d32084d6279623279e08c3d8758d728b306fd0f540d397d51"
     },
     "path_trace_status.csv": {
       "role": "Availability and plotting status for required Revenue Outlook total-path traces.",
@@ -41,7 +41,7 @@
     "series_junction_audit.csv": {
       "role": "FY2024-FY2027 source-actual/current-finalist junction audit with quarter coverage, cutoffs, nowcast components and discontinuity flags.",
       "row_count": 176,
-      "sha256": "8b2a7f16d03167ed3fed92cf4bde61c52b9afb5270e78717f8f234b19271b8d4"
+      "sha256": "1460894f242f2b64634b1046981b2de18b0d3aa6f0ec70fda15d1c9435e66b70"
     },
     "series_role_audit.csv": {
       "role": "Explicit role contract for modeled activity, revenue bridges, pass-through lines, deductions, overlays, and source gaps.",
@@ -51,7 +51,7 @@
     "series_trace_contract.csv": {
       "role": "Per-series trace contract for valid controls, source actuals, primary current-finalist forecast source, bridge and cutoffs.",
       "row_count": 25,
-      "sha256": "bbfe7a0fb06569540ee6ad94f5d6f1b8924af0c0490eeebd053eaee30cdd0d16"
+      "sha256": "56e79819b036bf1ab9b99f5f4cca5185d0e4fcaebe100b51a057205b2cb57e39"
     },
     "source_gap_register.csv": {
       "role": "Structured source-pack gaps for release values, FED path scenarios, Crown top-up, quarterly rows, and bridge replay.",
