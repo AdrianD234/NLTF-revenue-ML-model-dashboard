@@ -1341,6 +1341,263 @@ def _safe_quarter_horizon(period: str) -> float | None:
         return None
 
 
+QUARTERLY_STREAM_TO_SERIES_ID = {
+    "PED": "ped_vkt_per_capita",
+    "LIGHT_RUC": "light_ruc_net_km",
+    "HEAVY_RUC": "heavy_ruc_net_km",
+}
+
+QUARTERLY_RECONSTITUTION_AUDIT_COLUMNS = [
+    "scenario_name",
+    "stream",
+    "series_id",
+    "period",
+    "june_year",
+    "horizon",
+    "value",
+    "action",
+    "reason",
+    "source",
+]
+
+RAW_AUDIT_WITHIN_DECISION_HORIZON = "within_decision_facing_horizon"
+RAW_AUDIT_BEYOND_DECISION_HORIZON = "withheld_beyond_decision_facing_horizon"
+
+RAW_QUARTERLY_FORECAST_AUDIT_COLUMNS = [
+    "scenario_name",
+    "scenario_role",
+    "stream",
+    "series_id",
+    "period",
+    "june_year",
+    "horizon",
+    "value",
+    "value_unit",
+    "engine",
+    "decision_facing",
+    "availability_status",
+    "unavailable_reason",
+    "status",
+    "source",
+    "notes",
+]
+
+
+def _june_year_for_quarter(period: str) -> int | None:
+    """June year containing a calendar quarter: 2030Q3 and 2030Q4 sit in FY2031."""
+    try:
+        year, quarter = int(str(period)[:4]), int(str(period)[5])
+    except (ValueError, IndexError):
+        return None
+    return year + 1 if quarter in (3, 4) else year
+
+
+def _quarterly_horizon_scope_label(horizon: float) -> str:
+    return "H1-H12" if horizon <= BACKTEST_SUPPORTED_MAX_HORIZON else "H13+"
+
+
+def _reconstitute_decision_facing_quarterly_rows(
+    chart_rows: pd.DataFrame,
+    replay_lookup: dict[tuple[str, str, str], dict[str, Any]],
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Restore decision-facing quarters the committed seed no longer carries.
+
+    The runtime rebuild reads its quarterly inventory from the pack it is about
+    to overwrite, so a quarter dropped by one build is gone from the lineage for
+    good. An earlier June-year cut removed 2030Q3/H19 and 2030Q4/H20 along with
+    the correctly withheld FY2031 annual, and a horizon-correct filter cannot
+    bring them back: there is no longer a row to keep.
+
+    Quarterly availability is governed by HORIZON and annual availability by
+    whether all four of a June year's quarters publish. Those two rules are
+    independent, so restoring H19/H20 does not and must not create an FY2031
+    annual - `_current_activity_annual_values` still requires four quarters and
+    FY2031 only ever has two.
+
+    The committed scenario-input replay is the governed non-lossy source; it is
+    already the authority `_scenario_input_replay_mismatch_report` gates the
+    committed rows against. Rows that already exist are never rewritten, so
+    every committed value stays byte-stable.
+    """
+    empty_audit = pd.DataFrame(columns=QUARTERLY_RECONSTITUTION_AUDIT_COLUMNS)
+    if chart_rows is None or chart_rows.empty or not replay_lookup:
+        return chart_rows, empty_audit
+    required = {"time_grain", "metric_type", "row_type", "scenario_name", "stream", "period"}
+    if required.difference(chart_rows.columns):
+        return chart_rows, empty_audit
+
+    quarterly = chart_rows[
+        chart_rows["time_grain"].astype(str).eq("quarterly")
+        & chart_rows["metric_type"].astype(str).eq("activity")
+        & chart_rows["row_type"].astype(str).eq("future_forecast")
+    ]
+    if quarterly.empty:
+        return chart_rows, empty_audit
+
+    present = {
+        (str(row.scenario_name), str(row.stream), str(row.period))
+        for row in quarterly.itertuples(index=False)
+    }
+    # One template per (scenario, stream): the furthest quarter that survived.
+    # Cloning it keeps trace naming, model_id and provenance columns identical
+    # to the rows either side of the gap.
+    templates: dict[tuple[str, str], pd.Series] = {}
+    for (scenario, stream), group in quarterly.groupby(["scenario_name", "stream"], dropna=False):
+        horizons = group["period"].astype(str).map(_safe_quarter_horizon)
+        if horizons.notna().any():
+            templates[(str(scenario), str(stream))] = group.loc[horizons.idxmax()]
+
+    restored: list[dict[str, Any]] = []
+    audit: list[dict[str, Any]] = []
+    for (scenario, stream, period), payload in sorted(replay_lookup.items()):
+        template = templates.get((scenario, stream))
+        if template is None or not payload.get("forecast_available"):
+            continue
+        horizon = _safe_quarter_horizon(period)
+        value = payload.get("forecast")
+        if horizon is None or horizon < 1 or pd.isna(value):
+            continue
+        if horizon > EXTENDED_EVIDENCE_MAX_HORIZON:
+            # H21+ is withheld from the decision-facing frame by policy. The
+            # raw value is kept in raw_quarterly_forecast_audit instead.
+            continue
+        if (scenario, stream, period) in present:
+            continue
+        row = template.to_dict()
+        june_year = _june_year_for_quarter(period)
+        row.update(
+            {
+                "period": period,
+                "target_period": period,
+                "june_year": june_year,
+                "horizon": float(horizon),
+                "horizon_scope": _quarterly_horizon_scope_label(float(horizon)),
+                "value": float(value),
+                "source_cell": (
+                    f"{SCENARIO_INPUT_DIRNAME}/{SCENARIO_INPUT_WIDE_STEM}.parquet:{scenario}:{period}"
+                ),
+                "canonical_period_key": period,
+                "canonical_join_key": f"{stream}|{period}|{scenario}",
+            }
+        )
+        restored.append(row)
+        audit.append(
+            {
+                "scenario_name": scenario,
+                "stream": stream,
+                "series_id": QUARTERLY_STREAM_TO_SERIES_ID.get(stream, ""),
+                "period": period,
+                "june_year": june_year,
+                "horizon": float(horizon),
+                "value": float(value),
+                "action": "restored_from_committed_scenario_input_replay",
+                "reason": (
+                    "Supported quarter (H1-H20) absent from the committed seed. The seed is "
+                    "the pack the rebuild overwrites, so an earlier June-year cut removed this "
+                    "row permanently; the deterministic replay is the governed source of record."
+                ),
+                "source": f"{SCENARIO_INPUT_DIRNAME}/{SCENARIO_INPUT_WIDE_STEM}.parquet",
+            }
+        )
+    if not restored:
+        return chart_rows, empty_audit
+    out = pd.concat([chart_rows, pd.DataFrame(restored)], ignore_index=True, sort=False)
+    return out, pd.DataFrame(audit, columns=QUARTERLY_RECONSTITUTION_AUDIT_COLUMNS)
+
+
+def raw_quarterly_forecast_audit_frame(
+    chart_rows: pd.DataFrame,
+    replay_lookup: dict[tuple[str, str, str], dict[str, Any]],
+    *,
+    engine: str = "ensemble",
+) -> pd.DataFrame:
+    """Full source-horizon quarterly replay evidence, explicitly non-decision-facing.
+
+    The H20 decision-facing cutoff governs what may be plotted, summed or
+    published. It must not destroy the underlying model evidence: the raw
+    forecast keeps its full source horizon here so a reviewer can still see what
+    the model produced beyond H20, and so standalone PED and Heavy RUC evidence
+    is not collateral damage of a Light RUC rule.
+
+    Every row carries decision_facing=false. Nothing in this frame may feed a
+    chart row, a June-year annual or any total.
+    """
+    if not replay_lookup:
+        return pd.DataFrame(columns=RAW_QUARTERLY_FORECAST_AUDIT_COLUMNS)
+    roles: dict[str, str] = {}
+    units: dict[str, str] = {}
+    if chart_rows is not None and not chart_rows.empty and "scenario_name" in chart_rows.columns:
+        for row in chart_rows.itertuples(index=False):
+            scenario = str(getattr(row, "scenario_name", "") or "")
+            role = str(getattr(row, "scenario_role", "") or "")
+            if scenario and role and scenario not in roles:
+                roles[scenario] = role
+            stream = str(getattr(row, "stream", "") or "")
+            unit = str(getattr(row, "value_unit", "") or "")
+            if stream and unit and stream not in units:
+                units[stream] = unit
+
+    rows: list[dict[str, Any]] = []
+    for (scenario, stream, period), payload in sorted(replay_lookup.items()):
+        if stream not in QUARTERLY_STREAM_TO_SERIES_ID:
+            continue
+        horizon = _safe_quarter_horizon(period)
+        value = payload.get("forecast")
+        if horizon is None or pd.isna(value):
+            continue
+        supported = horizon <= EXTENDED_EVIDENCE_MAX_HORIZON
+        # Deliberately NOT light_fleet_allocation.quarterly_availability: that
+        # reason is specific to the Light RUC structural bridge and would
+        # mislabel standalone PED and Heavy RUC evidence. The rule that governs
+        # this frame is the decision-facing horizon itself.
+        availability_status = (
+            RAW_AUDIT_WITHIN_DECISION_HORIZON if supported else RAW_AUDIT_BEYOND_DECISION_HORIZON
+        )
+        unavailable_reason = (
+            ""
+            if supported
+            else (
+                f"Beyond H{EXTENDED_EVIDENCE_MAX_HORIZON}, the last decision-grade quarter "
+                f"({LAST_DECISION_GRADE_QUARTER}). Retained as unvalidated long-range model "
+                "evidence only; it is not published, plotted or summed."
+            )
+        )
+        rows.append(
+            {
+                "scenario_name": scenario,
+                "scenario_role": roles.get(scenario, ""),
+                "stream": stream,
+                "series_id": QUARTERLY_STREAM_TO_SERIES_ID[stream],
+                "period": period,
+                "june_year": _june_year_for_quarter(period),
+                "horizon": float(horizon),
+                "value": float(value),
+                "value_unit": units.get(stream, ""),
+                "engine": engine,
+                "decision_facing": False,
+                "availability_status": availability_status,
+                "unavailable_reason": unavailable_reason,
+                "status": (
+                    "raw_replay_audit_evidence_mirrors_decision_facing_row"
+                    if supported
+                    else "raw_replay_audit_evidence_beyond_decision_facing_horizon"
+                ),
+                "source": f"{SCENARIO_INPUT_DIRNAME}/{SCENARIO_INPUT_WIDE_STEM}.parquet",
+                "notes": (
+                    "Raw deterministic replay of the committed scenario inputs over the full "
+                    "model source horizon. Non-decision-facing audit evidence only: it is never "
+                    "plotted, never annualized and never summed into a total. Beyond H20 it is "
+                    "unvalidated long-range extrapolation."
+                ),
+            }
+        )
+    if not rows:
+        return pd.DataFrame(columns=RAW_QUARTERLY_FORECAST_AUDIT_COLUMNS)
+    return pd.DataFrame(rows, columns=RAW_QUARTERLY_FORECAST_AUDIT_COLUMNS).sort_values(
+        ["scenario_name", "stream", "horizon"], kind="stable"
+    ).reset_index(drop=True)
+
+
 def _filter_frame_to_runtime_cutoff(frame: pd.DataFrame, runtime_cutoff_fy: int) -> pd.DataFrame:
     if frame is None or frame.empty:
         return frame
@@ -3595,6 +3852,25 @@ def build_current_revenue_outlook_runtime_pack(
             f"{MBU26_SOURCE_PACK_DIR.as_posix()} is missing."
         )
     existing_chart_rows = _read_optional_csv(base / "revenue_chart_rows.csv")
+    # The quarterly inventory is reconstituted BEFORE anything derives from it.
+    # The seed is this same pack, so it can only ever lose rows; the committed
+    # scenario-input replay is the governed non-lossy source. Restoring here
+    # means the annual spine, the horizon-availability frame and the chart rows
+    # all see the same supported H1-H20 quarters.
+    replay_lookup, replay_validation = _scenario_input_forecast_replay_lookup(
+        scenario_input_wide,
+        repo_root=root,
+        engine=engine,
+    )
+    existing_chart_rows, quarterly_reconstitution_audit = _reconstitute_decision_facing_quarterly_rows(
+        existing_chart_rows,
+        replay_lookup,
+    )
+    raw_quarterly_forecast_audit = raw_quarterly_forecast_audit_frame(
+        existing_chart_rows,
+        replay_lookup,
+        engine=engine,
+    )
     current = current_forecast_annual_from_mbu26(
         current_outlook_chart_rows=existing_chart_rows,
         mbu26_official_annual=mbu26_pack.official_annual,
@@ -3674,6 +3950,8 @@ def build_current_revenue_outlook_runtime_pack(
         promoted_chart_rows=existing_chart_rows,
         repo_root=root,
         engine=engine,
+        replay_lookup=replay_lookup,
+        replay_validation_report=replay_validation,
     )
     replay_mismatches = scenario_input_replay_mismatch_report[
         scenario_input_replay_mismatch_report.get("mismatch_status", pd.Series("", index=scenario_input_replay_mismatch_report.index))
@@ -4035,6 +4313,8 @@ def build_current_revenue_outlook_runtime_pack(
             "ev_phev_split_assumptions": ev_phev_split_assumptions,
             "ev_phev_ped_light_drift_assumptions": ev_phev_ped_light_drift_assumptions,
             "light_ruc_horizon_availability": light_ruc_horizon_availability,
+            "raw_quarterly_forecast_audit": raw_quarterly_forecast_audit,
+            "quarterly_reconstitution_audit": quarterly_reconstitution_audit,
             "ped_revenue_bridge_audit": ped_revenue_bridge_audit,
             "ped_bridge_shape_fit_metrics": ped_bridge_shape_fit_metrics,
             "ped_bridge_mode_config": ped_bridge_mode_config,
@@ -4508,6 +4788,8 @@ def _scenario_input_replay_mismatch_report(
     promoted_chart_rows: pd.DataFrame | None = None,
     repo_root: Path | str | None = None,
     engine: str = "ensemble",
+    replay_lookup: dict[tuple[str, str, str], dict[str, Any]] | None = None,
+    replay_validation_report: dict[str, dict[str, Any]] | None = None,
 ) -> pd.DataFrame:
     """Verify promoted current-finalist rows are backed by committed scenario inputs.
 
@@ -4573,7 +4855,12 @@ def _scenario_input_replay_mismatch_report(
         for item in scenario_input_manifest.get("workbooks", [])
         if isinstance(item, dict)
     }
-    replay_lookup, replay_validation = _scenario_input_forecast_replay_lookup(scenario_input_wide, repo_root=repo_root, engine=engine)
+    # The caller may already have replayed (the rebuild does, to reconstitute
+    # the quarterly inventory). Reuse it rather than paying for a second replay.
+    if replay_lookup is None:
+        replay_lookup, replay_validation = _scenario_input_forecast_replay_lookup(scenario_input_wide, repo_root=repo_root, engine=engine)
+    else:
+        replay_validation = replay_validation_report or {}
     promoted_lookup = _promoted_quarterly_forecast_lookup(promoted_chart_rows)
     rows: list[dict[str, Any]] = []
     source = current_forecast_annual.copy()

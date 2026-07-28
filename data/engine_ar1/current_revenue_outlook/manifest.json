@@ -762,6 +762,22 @@
       "sha256": "6662196620acac1b5efadbcad2f5ac451600a0c662263529005df92a1e262400",
       "size_bytes": 57639
     },
+    "quarterly_reconstitution_audit.csv": {
+      "sha256": "0960e1d20d0a8cea8a6f9042d2a704ee9d10995d70770322350a45e43bdfb304",
+      "size_bytes": 84
+    },
+    "quarterly_reconstitution_audit.parquet": {
+      "sha256": "02330b0320ace399dd885815c2f5d27e177f3d3b56106f6c51d2ac8682971a5f",
+      "size_bytes": 4654
+    },
+    "raw_quarterly_forecast_audit.csv": {
+      "sha256": "98487b8e7a104eda3f1f8e1144994c92d347c8bbeb5bda6159544cc4729aa4f7",
+      "size_bytes": 379517
+    },
+    "raw_quarterly_forecast_audit.parquet": {
+      "sha256": "359027c86c33ca674fd8a2ed10d5b713463023842b97b154dc66fed36f2ec2e6",
+      "size_bytes": 18849
+    },
     "revenue_bridge_components.csv": {
       "sha256": "28454cc4018a3d36324b54ee99346d1305b5433e72ce20ddce9f6f144f011f84",
       "size_bytes": 131249
@@ -771,12 +787,12 @@
       "size_bytes": 29191
     },
     "revenue_chart_rows.csv": {
-      "sha256": "a46ed024779c57ef0d6022dc077d9dc1c7166286db5637a512bfcde0e217a989",
-      "size_bytes": 1094804
+      "sha256": "249daea6348f734b5b549505b39c7e60ec18cceedd79e430597fde1061cad9cb",
+      "size_bytes": 1103623
     },
     "revenue_chart_rows.parquet": {
-      "sha256": "1391c9eaee9596fad4cbada3b01844dcd1b3588fd7fbeda8e4fa41e6989c93b9",
-      "size_bytes": 90802
+      "sha256": "72194d77ce3cb4f18a6a1a04e6ac9f2834c5f556bfa4b043696fabf09144680a",
+      "size_bytes": 91009
     },
     "revenue_formula_residuals.csv": {
       "sha256": "00d814252a6e56933f2873ef595134d7c42eabc41c5a8191046fc807d5e35905",

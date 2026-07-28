@@ -747,12 +747,12 @@
       "size_bytes": 18119
     },
     "light_ruc_horizon_availability.csv": {
-      "sha256": "5807c790502373b1878e336e57d9f55943c1be5887b971d2d11293ec02bcd836",
-      "size_bytes": 53716
+      "sha256": "7bc46c81387d263744aa35c08bf1591b8e056af78b8c8bebd407b372d6783d41",
+      "size_bytes": 63291
     },
     "light_ruc_horizon_availability.parquet": {
-      "sha256": "c1810e4fa76fc50c1ed575686b7cd7a25d5672fb32426585f708bd76357feabb",
-      "size_bytes": 8615
+      "sha256": "412ee161c660516f6878f78ffdfaf87d9048e2116d0c2bcb2c2e541af6dfdf95",
+      "size_bytes": 8994
     },
     "path_trace_status.csv": {
       "sha256": "9aee7a4e7003ec6541476ca3e4afef6d8586b6c358e41db1c8e06623e5ffcaa3",
@@ -794,6 +794,22 @@
       "sha256": "777f32e4eb9ce9524710eaa8a0389c1fa2dd9ba799fcc017c3f810742316c814",
       "size_bytes": 57630
     },
+    "quarterly_reconstitution_audit.csv": {
+      "sha256": "0960e1d20d0a8cea8a6f9042d2a704ee9d10995d70770322350a45e43bdfb304",
+      "size_bytes": 84
+    },
+    "quarterly_reconstitution_audit.parquet": {
+      "sha256": "02330b0320ace399dd885815c2f5d27e177f3d3b56106f6c51d2ac8682971a5f",
+      "size_bytes": 4654
+    },
+    "raw_quarterly_forecast_audit.csv": {
+      "sha256": "7c104914fbb62e452244b5c9149f385b6a6b080c3208ba31dbc1b2ae9b8bab52",
+      "size_bytes": 382511
+    },
+    "raw_quarterly_forecast_audit.parquet": {
+      "sha256": "b912e9d2c1bafc66e618bff64d121328f4aa66af8df78310649b714fc810f167",
+      "size_bytes": 18874
+    },
     "revenue_bridge_components.csv": {
       "sha256": "50ac5ccd1f073a1808dcee761369785c937d51b2801f2a1516a73b767f06acdb",
       "size_bytes": 129624
@@ -803,12 +819,12 @@
       "size_bytes": 29167
     },
     "revenue_chart_rows.csv": {
-      "sha256": "68b75c33a0b2c2a917312d50f0d9b99b2add7dff7497c95297f01de2687b61c8",
-      "size_bytes": 1091721
+      "sha256": "a0f730eff1e40404f6b59dae4365c6013cc08a3adac483d0fc41ac3a5fe8f68b",
+      "size_bytes": 1100497
     },
     "revenue_chart_rows.parquet": {
-      "sha256": "8fa36065940ee47d342c03b91f686acf89d14f4fada22b4b77f68f2df157abc4",
-      "size_bytes": 90777
+      "sha256": "dfa2c8cf454850b998156d4bd03e62e6a0342525460fb718e3440255aaeb4a33",
+      "size_bytes": 90984
     },
     "revenue_formula_residuals.csv": {
       "sha256": "3df81931302cb18422c6cadff651b8247acc2d3da11bd707bdc14db31afb979c",
