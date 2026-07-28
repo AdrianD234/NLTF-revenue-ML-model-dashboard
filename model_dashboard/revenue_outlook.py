@@ -3018,6 +3018,29 @@ def _apply_ped_efficiency_to_value_frame(
         adjusted_lookup[key] = record
 
     out["_eff_fy"] = out.get(fy_column, pd.Series("", index=out.index)).map(_extract_fy_number)
+
+    # The frame's OWN gross_ped_revenue baseline, keyed the same way as the
+    # audit lookup. Rollups are shifted by the PED delta measured against this,
+    # not against the audit's lambda-era baseline.
+    ped_baseline_lookup: dict[tuple[str, int, str, str], float] = {}
+    for idx, row in out.iterrows():
+        if str(row.get(series_column) or "") != "gross_ped_revenue":
+            continue
+        fy = out.at[idx, "_eff_fy"]
+        if pd.isna(fy):
+            continue
+        value = pd.to_numeric(row.get(value_column), errors="coerce")
+        if pd.isna(value):
+            continue
+        ped_baseline_lookup[
+            (
+                str(row.get(source_path_column) or row.get("trace_name") or "") if source_path_column else str(row.get("trace_name") or ""),
+                int(fy),
+                str(row.get(scenario_column) or row.get("scenario_name") or "") if scenario_column else str(row.get("scenario_name") or ""),
+                str(row.get(fed_path_column) or row.get("fed_path") or "") if fed_path_column else str(row.get("fed_path") or ""),
+            )
+        ] = float(value)
+
     for idx, row in out.iterrows():
         if current_mask_column and str(row.get(current_mask_column) or "") not in {"", "in_house_current_finalist"}:
             continue
@@ -3052,12 +3075,42 @@ def _apply_ped_efficiency_to_value_frame(
         if not record:
             continue
         baseline_value = pd.to_numeric(row.get(value_column), errors="coerce")
+        # Apply the efficiency scenario as a RATIO against whatever baseline the
+        # frame itself carries, never by substituting the audit's absolute
+        # value. ped_revenue_bridge_audit is built from the retired lambda
+        # migration frame, so its baseline PED level is not the decision-facing
+        # raw AR(1) level. Substituting it moved the gross_ped_revenue leaf onto
+        # the lambda basis while the rollups only shifted by the audit delta,
+        # breaking gross_fed = gross_ped + LPG + CNG by the difference between
+        # the two baselines.
         if series_id == "ped_volume":
-            adjusted_value = record.get("adjusted_ped_volume_million_litres")
+            adjusted_value = _scaled_by_audit_ratio(
+                baseline_value,
+                record.get("baseline_ped_volume_million_litres"),
+                record.get("adjusted_ped_volume_million_litres"),
+            )
         elif series_id == "gross_ped_revenue":
-            adjusted_value = record.get("adjusted_gross_ped_revenue_million_nzd")
+            adjusted_value = _scaled_by_audit_ratio(
+                baseline_value,
+                record.get("baseline_gross_ped_revenue_million_nzd"),
+                record.get("adjusted_gross_ped_revenue_million_nzd"),
+            )
         else:
-            adjusted_value = baseline_value + pd.to_numeric(record.get("gross_ped_revenue_delta_million_nzd"), errors="coerce")
+            # Rollups move by the PED delta measured on the SAME basis as the
+            # leaf, so the formula still closes.
+            ped_baseline = ped_baseline_lookup.get(
+                (source_path, int(fy), scenario_name, fed_path)
+            )
+            if ped_baseline is None or pd.isna(ped_baseline):
+                continue
+            adjusted_ped = _scaled_by_audit_ratio(
+                ped_baseline,
+                record.get("baseline_gross_ped_revenue_million_nzd"),
+                record.get("adjusted_gross_ped_revenue_million_nzd"),
+            )
+            if pd.isna(adjusted_ped):
+                continue
+            adjusted_value = baseline_value + (float(adjusted_ped) - float(ped_baseline))
         if pd.isna(adjusted_value):
             continue
         out.at[idx, value_column] = float(adjusted_value)
@@ -3067,6 +3120,19 @@ def _apply_ped_efficiency_to_value_frame(
         out.at[idx, "adjusted_litres_per_100km"] = record.get("adjusted_litres_per_100km")
         out.at[idx, "ped_efficiency_value_delta"] = float(adjusted_value) - float(baseline_value) if pd.notna(baseline_value) else pd.NA
     return out.drop(columns=["_eff_fy"], errors="ignore")
+
+
+def _scaled_by_audit_ratio(baseline_value: Any, audit_baseline: Any, audit_adjusted: Any) -> Any:
+    """Scale the frame's own baseline by the audit's adjusted/baseline ratio.
+
+    The efficiency scenario is a proportional change in litres per 100 km, so
+    the ratio transfers cleanly between bases. The absolute audit value does
+    not: it is computed on the retired lambda migration basis.
+    """
+    values = pd.to_numeric(pd.Series([baseline_value, audit_baseline, audit_adjusted]), errors="coerce")
+    if values.isna().any() or float(values.iloc[1]) == 0.0:
+        return pd.NA
+    return float(values.iloc[0]) * (float(values.iloc[2]) / float(values.iloc[1]))
 
 
 def _extract_fy_number(value: Any) -> float:

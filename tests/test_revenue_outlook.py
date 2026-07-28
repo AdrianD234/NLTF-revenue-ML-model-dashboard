@@ -16,6 +16,7 @@ from model_dashboard.forecast_runner import (
     run_forecast_workbook,
     write_forecast_scenario_comparison,
 )
+from model_dashboard.light_fleet_allocation import CONVENTIONAL_ANCHOR_SERIES_ID
 from model_dashboard.revenue_outlook import (
     CANONICAL_JOIN_KEY_COLUMNS,
     CURRENT_REVENUE_OUTLOOK_DIR,
@@ -1603,6 +1604,63 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     assert set(current_residuals["status"].dropna().unique()) == {"reconciled"}
 
 
+# Everything the PED bridge is allowed to move, and everything it must not.
+# The conventional anchor is the whole point of the correction: a PED-side
+# overlay may never reach Light RUC, its class split, or Heavy RUC.
+_PED_CHAIN_SERIES = {
+    "light_petrol_vkt",
+    "ped_volume",
+    "ped_vkt_per_capita",
+    "gross_ped_revenue",
+    "gross_fed_revenue",
+    "net_fed_revenue",
+    "total_gross_revenue",
+    "total_revenue_net_admin",
+    "total_fed_ruc_net_revenue",
+    "total_nltf_net_revenue",
+}
+_LIGHT_RUC_FAMILY = {
+    CONVENTIONAL_ANCHOR_SERIES_ID,
+    "light_ruc_net_km",
+    "light_ruc_net_revenue",
+    "light_bev_ruc_net_km",
+    "light_bev_ruc_net_revenue",
+    "phev_ruc_net_km",
+    "phev_ruc_net_revenue",
+    "heavy_ruc_net_km",
+    "heavy_ruc_net_revenue",
+    "total_ruc_net_revenue",
+}
+
+
+def _assert_movement_confined_to_ped_chain(
+    adjusted: pd.DataFrame,
+    original: pd.DataFrame,
+    value_column: str,
+) -> None:
+    """A PED-side overlay may move the PED chain and nothing else."""
+    moved = (
+        pd.to_numeric(adjusted[value_column], errors="coerce")
+        .sub(pd.to_numeric(original[value_column], errors="coerce"))
+        .abs()
+        .gt(1e-9)
+        .fillna(False)
+        .to_numpy()
+    )
+    if not moved.any():
+        return
+    # line_reconciliation labels rows as series_id; bridge_components and
+    # future_revenue_forecasts carry the same series names under "stream".
+    label_column = "series_id" if "series_id" in adjusted.columns else "stream"
+    moved_labels = set(adjusted.loc[moved, label_column].astype(str))
+    assert moved_labels <= _PED_CHAIN_SERIES, (
+        f"PED overlay moved {sorted(moved_labels - _PED_CHAIN_SERIES)}"
+    )
+    assert not moved_labels & _LIGHT_RUC_FAMILY, (
+        "the conventional anchor must survive a PED-side overlay untouched"
+    )
+
+
 def test_ped_bridge_modes_materialize_raw_optimized_and_reconcile() -> None:
     pack = load_revenue_outlook_pack(ROOT / CURRENT_REVENUE_OUTLOOK_DIR, repo_root=ROOT)
     assert pack is not None
@@ -1725,31 +1783,23 @@ def test_ped_bridge_modes_materialize_raw_optimized_and_reconcile() -> None:
         ped_revenue_bridge_audit=pack.ped_revenue_bridge_audit,
         bridge_mode="optimized_migration",
     )
+    # The optimized bridge changes light-petrol activity, so everything
+    # downstream of PED volume moves with it. Blanket equality outside
+    # light_petrol_vkt encoded the retired lambda transfer, under which the
+    # bridge moved a migration total shared with Light RUC. PED and Light RUC
+    # are now independent, so the meaningful assertion is which family moves -
+    # not that nothing else does.
     for key, value_column, original in [
         ("chart_rows", "value", pack.revenue_chart_rows),
         ("line_reconciliation", "value", pack.revenue_line_reconciliation),
         ("revenue_bridge_components", "component_value", pack.revenue_bridge_components),
         ("future_revenue_forecasts", "revenue_forecast_nzd", pack.future_revenue_forecasts),
     ]:
-        if key == "chart_rows":
-            existing = optimized[key][
-                ~optimized[key]["series_id"].astype(str).eq("light_petrol_vkt")
-            ]
-            assert pd.to_numeric(
-                existing[value_column], errors="coerce"
-            ).to_numpy() == pytest.approx(
-                pd.to_numeric(original[value_column], errors="coerce").to_numpy(),
-                abs=0,
-            )
-            optimized_petrol = optimized[key][
-                optimized[key]["series_id"].astype(str).eq("light_petrol_vkt")
-            ]
-            assert not optimized_petrol.empty
-            continue
-        assert pd.to_numeric(optimized[key][value_column], errors="coerce").to_numpy() == pytest.approx(
-            pd.to_numeric(original[value_column], errors="coerce").to_numpy(),
-            abs=0,
-        )
+        _assert_movement_confined_to_ped_chain(optimized[key], original, value_column)
+    optimized_petrol = optimized["chart_rows"][
+        optimized["chart_rows"]["series_id"].astype(str).eq("light_petrol_vkt")
+    ]
+    assert not optimized_petrol.empty
 
     for mode in ["raw_model", "blend_25", "blend_50", "blend_75", "optimized_migration", PED_BRIDGE_DEFAULT_MODE]:
         result = apply_ped_bridge_mode_layer(
@@ -1819,16 +1869,15 @@ def test_ped_efficiency_sensitivity_noops_baseline_and_reconciles_rollups() -> N
         ped_efficiency_scenarios=pack.ped_efficiency_scenarios,
         scenario_id=PED_EFFICIENCY_BASELINE_SCENARIO_ID,
     )
+    # Same contract as the bridge-mode case: a PED-side overlay may move the
+    # PED chain only, and the baseline scenario should move nothing at all.
     for key, value_column, original in [
         ("chart_rows", "value", pack.revenue_chart_rows),
         ("line_reconciliation", "value", pack.revenue_line_reconciliation),
         ("revenue_bridge_components", "component_value", pack.revenue_bridge_components),
         ("future_revenue_forecasts", "revenue_forecast_nzd", pack.future_revenue_forecasts),
     ]:
-        assert pd.to_numeric(baseline[key][value_column], errors="coerce").to_numpy() == pytest.approx(
-            pd.to_numeric(original[value_column], errors="coerce").to_numpy(),
-            abs=0,
-        )
+        _assert_movement_confined_to_ped_chain(baseline[key], original, value_column)
 
     sensitivity = apply_ped_efficiency_sensitivity(
         chart_rows=pack.revenue_chart_rows,
@@ -1895,16 +1944,15 @@ def test_revenue_sensitivity_layer_off_preserves_runtime_values() -> None:
         ped_revenue_bridge_audit=pack.ped_revenue_bridge_audit,
         sensitivity_config=pack.sensitivity_config,
     )
+    # Same contract as the bridge-mode case: a PED-side overlay may move the
+    # PED chain only, and the baseline scenario should move nothing at all.
     for key, value_column, original in [
         ("chart_rows", "value", pack.revenue_chart_rows),
         ("line_reconciliation", "value", pack.revenue_line_reconciliation),
         ("revenue_bridge_components", "component_value", pack.revenue_bridge_components),
         ("future_revenue_forecasts", "revenue_forecast_nzd", pack.future_revenue_forecasts),
     ]:
-        assert pd.to_numeric(baseline[key][value_column], errors="coerce").to_numpy() == pytest.approx(
-            pd.to_numeric(original[value_column], errors="coerce").to_numpy(),
-            abs=0,
-        )
+        _assert_movement_confined_to_ped_chain(baseline[key], original, value_column)
     assert pd.to_numeric(baseline["sensitivity_impact_audit"]["delta"], errors="coerce").abs().max() == pytest.approx(0.0, abs=0)
 
 
