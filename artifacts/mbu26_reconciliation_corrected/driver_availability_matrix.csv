@@ -1,0 +1,13 @@
+side,driver,availability,source_or_note
+current,"Treasury BEFU26 macro path (GDP, deflators)",available,data/current_revenue_outlook/treasury_befu26_macro_path.csv
+current,scenario population inputs,available,scenario_inputs/scenario_input_wide.parquet
+current,raw AR(1) PED VKT/capita model,available,"promoted fitted state, replayed"
+current,raw conventional Light RUC model,available,"promoted fitted state, replayed"
+current,exact VFM 202405 Base shares,available,data/vfm_202405/vfm_vkt_shares.csv
+current,governed FED/RUC rate schedules,available,data/revenue_model_source_pack/2026_05_19/fed_rate_paths.csv
+official,MBU26 published annual rows,available,data/revenue_model_source_pack/mbu26_annual_spine
+official,MBU26 GDP path assumption,unavailable_official_input,not published at input grain; NO dollar attribution assigned
+official,MBU26 unemployment assumption,unavailable_official_input,not published at input grain; NO dollar attribution assigned
+official,MBU26 fuel price path,unavailable_official_input,not published at input grain; NO dollar attribution assigned
+official,MBU26 fleet model internals,unavailable_official_input,VFM vintage differences not observable; NO dollar attribution assigned
+official,MBU26 analyst judgment overlays,unavailable_official_input,not published; NO dollar attribution assigned
