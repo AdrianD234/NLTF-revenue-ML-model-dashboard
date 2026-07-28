@@ -402,10 +402,14 @@ def main() -> int:
     gates_df = pd.DataFrame(gates)
 
     # ---- write -----------------------------------------------------------
-    paths.round(6).to_csv(OUT / "light_ruc_seam_method_paths.csv", index=False)
-    scorecard.round(4).to_csv(OUT / "light_ruc_seam_scorecard.csv", index=False)
-    guard.round(6).to_csv(OUT / "light_ruc_long_horizon_guard.csv", index=False)
-    gates_df.to_csv(OUT / "checkpoint_31_hard_gates.csv", index=False)
+    # lineterminator pinned: pandas defaults to os.linesep, so a Windows
+    # regeneration writes CRLF while Linux writes LF, and the byte-exact
+    # reproduce gate (test_the_seam_and_guard_scripts_reproduce_their_artifacts)
+    # then fails on whichever platform did not commit the artifact.
+    paths.round(6).to_csv(OUT / "light_ruc_seam_method_paths.csv", index=False, lineterminator="\n")
+    scorecard.round(4).to_csv(OUT / "light_ruc_seam_scorecard.csv", index=False, lineterminator="\n")
+    guard.round(6).to_csv(OUT / "light_ruc_long_horizon_guard.csv", index=False, lineterminator="\n")
+    gates_df.to_csv(OUT / "checkpoint_31_hard_gates.csv", index=False, lineterminator="\n")
 
     # ---- console ---------------------------------------------------------
     print("=== 3.1B seam scorecard ===")
