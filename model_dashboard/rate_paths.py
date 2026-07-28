@@ -1145,3 +1145,50 @@ def official_comparator_factor_map(
         for record in frame.itertuples()
         if abs(float(record.factor) - 1.0) > 1e-9
     }
+
+
+def apply_official_comparator_rate_policy_to_chart_rows(
+    chart_rows: pd.DataFrame,
+    repo_root: Path,
+    *,
+    policy_state: str,
+    ruc_class_revenue_by_fy: dict[int, float] | None = None,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Apply the rate-only MBU26 counterfactual over the official horizon.
+
+    Deliberately does NOT accept a factor dictionary. The official comparator
+    sources its own schedule from the MBU26 spine and the governed rate paths,
+    so a current-model factor map can never be looked up for an official row -
+    which is what allowed the current-model H20 cutoff to truncate the
+    published official horizon.
+
+    Official activity, administration and refunds stay fixed; only the rate is
+    counterfactual, and all five official RUC class-revenue leaves are
+    repriced by the same ratio.
+    """
+    if chart_rows is None or chart_rows.empty:
+        return chart_rows, pd.DataFrame()
+    if str(policy_state) == FED_POLICY_STATE_PUBLISHED:
+        return chart_rows, pd.DataFrame()  # published leaves MBU26 unchanged
+
+    factors = official_comparator_factor_map(repo_root, policy_state)
+    if not factors:
+        return chart_rows, pd.DataFrame()
+
+    adjusted, audit = apply_fed_rate_policy_to_chart_rows(
+        chart_rows,
+        factors,
+        policy_state=policy_state,
+        scenario_roles={OFFICIAL_SCOPE},
+        ruc_class_revenue_by_fy=(
+            ruc_class_revenue_by_fy
+            if ruc_class_revenue_by_fy is not None
+            else mbu26_ruc_class_revenue_by_fy(repo_root)
+        ),
+    )
+    if not audit.empty:
+        audit = audit.copy()
+        audit["scenario_scope"] = OFFICIAL_SCOPE
+        audit["rate_only_fixed_volumes"] = True
+        audit["factor_source"] = "official_comparator_policy_factors"
+    return adjusted, audit
