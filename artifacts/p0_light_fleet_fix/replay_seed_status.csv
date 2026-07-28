@@ -1,0 +1,201 @@
+scenario,stream,period,horizon,source_row_exists,decision_facing_row_exists,status,reason
+current_basecase,PED,2026Q1,1,True,True,patched_supported,H1-H20 seed row present and patched
+current_basecase,PED,2026Q2,2,True,True,patched_supported,H1-H20 seed row present and patched
+current_basecase,PED,2026Q3,3,True,True,patched_supported,H1-H20 seed row present and patched
+current_basecase,PED,2026Q4,4,True,True,patched_supported,H1-H20 seed row present and patched
+current_basecase,PED,2027Q1,5,True,True,patched_supported,H1-H20 seed row present and patched
+current_basecase,PED,2027Q2,6,True,True,patched_supported,H1-H20 seed row present and patched
+current_basecase,PED,2027Q3,7,True,True,patched_supported,H1-H20 seed row present and patched
+current_basecase,PED,2027Q4,8,True,True,patched_supported,H1-H20 seed row present and patched
+current_basecase,PED,2028Q1,9,True,True,patched_supported,H1-H20 seed row present and patched
+current_basecase,PED,2028Q2,10,True,True,patched_supported,H1-H20 seed row present and patched
+current_basecase,PED,2028Q3,11,True,True,patched_supported,H1-H20 seed row present and patched
+current_basecase,PED,2028Q4,12,True,True,patched_supported,H1-H20 seed row present and patched
+current_basecase,PED,2029Q1,13,True,True,patched_supported,H1-H20 seed row present and patched
+current_basecase,PED,2029Q2,14,True,True,patched_supported,H1-H20 seed row present and patched
+current_basecase,PED,2029Q3,15,True,True,patched_supported,H1-H20 seed row present and patched
+current_basecase,PED,2029Q4,16,True,True,patched_supported,H1-H20 seed row present and patched
+current_basecase,PED,2030Q1,17,True,True,patched_supported,H1-H20 seed row present and patched
+current_basecase,PED,2030Q2,18,True,True,patched_supported,H1-H20 seed row present and patched
+current_basecase,PED,2030Q3,19,True,True,patched_supported,H1-H20 seed row present and patched
+current_basecase,PED,2030Q4,20,True,True,patched_supported,H1-H20 seed row present and patched
+current_basecase,PED,2031Q1,21,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2031Q2,22,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2031Q3,23,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2031Q4,24,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2032Q1,25,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2032Q2,26,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2032Q3,27,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2032Q4,28,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2033Q1,29,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2033Q2,30,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2033Q3,31,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2033Q4,32,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2034Q1,33,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2034Q2,34,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2034Q3,35,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2034Q4,36,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2035Q1,37,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2035Q2,38,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2035Q3,39,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2035Q4,40,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2036Q1,41,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2036Q2,42,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2036Q3,43,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2036Q4,44,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2037Q1,45,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2037Q2,46,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2037Q3,47,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2037Q4,48,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2038Q1,49,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2038Q2,50,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2038Q3,51,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2038Q4,52,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2039Q1,53,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2039Q2,54,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2039Q3,55,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2039Q4,56,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2040Q1,57,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2040Q2,58,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2040Q3,59,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2040Q4,60,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2041Q1,61,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2041Q2,62,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2041Q3,63,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2041Q4,64,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2042Q1,65,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2042Q2,66,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2042Q3,67,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2042Q4,68,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2043Q1,69,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2043Q2,70,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2043Q3,71,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2043Q4,72,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2044Q1,73,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2044Q2,74,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2044Q3,75,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2044Q4,76,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2045Q1,77,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2045Q2,78,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2045Q3,79,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2045Q4,80,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2046Q1,81,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2046Q2,82,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2046Q3,83,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2046Q4,84,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2047Q1,85,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2047Q2,86,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2047Q3,87,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2047Q4,88,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2048Q1,89,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2048Q2,90,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2048Q3,91,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2048Q4,92,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2049Q1,93,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2049Q2,94,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2049Q3,95,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2049Q4,96,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2050Q1,97,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2050Q2,98,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2050Q3,99,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_basecase,PED,2050Q4,100,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2026Q1,1,True,True,patched_supported,H1-H20 seed row present and patched
+current_comparison_1,PED,2026Q2,2,True,True,patched_supported,H1-H20 seed row present and patched
+current_comparison_1,PED,2026Q3,3,True,True,patched_supported,H1-H20 seed row present and patched
+current_comparison_1,PED,2026Q4,4,True,True,patched_supported,H1-H20 seed row present and patched
+current_comparison_1,PED,2027Q1,5,True,True,patched_supported,H1-H20 seed row present and patched
+current_comparison_1,PED,2027Q2,6,True,True,patched_supported,H1-H20 seed row present and patched
+current_comparison_1,PED,2027Q3,7,True,True,patched_supported,H1-H20 seed row present and patched
+current_comparison_1,PED,2027Q4,8,True,True,patched_supported,H1-H20 seed row present and patched
+current_comparison_1,PED,2028Q1,9,True,True,patched_supported,H1-H20 seed row present and patched
+current_comparison_1,PED,2028Q2,10,True,True,patched_supported,H1-H20 seed row present and patched
+current_comparison_1,PED,2028Q3,11,True,True,patched_supported,H1-H20 seed row present and patched
+current_comparison_1,PED,2028Q4,12,True,True,patched_supported,H1-H20 seed row present and patched
+current_comparison_1,PED,2029Q1,13,True,True,patched_supported,H1-H20 seed row present and patched
+current_comparison_1,PED,2029Q2,14,True,True,patched_supported,H1-H20 seed row present and patched
+current_comparison_1,PED,2029Q3,15,True,True,patched_supported,H1-H20 seed row present and patched
+current_comparison_1,PED,2029Q4,16,True,True,patched_supported,H1-H20 seed row present and patched
+current_comparison_1,PED,2030Q1,17,True,True,patched_supported,H1-H20 seed row present and patched
+current_comparison_1,PED,2030Q2,18,True,True,patched_supported,H1-H20 seed row present and patched
+current_comparison_1,PED,2030Q3,19,True,True,patched_supported,H1-H20 seed row present and patched
+current_comparison_1,PED,2030Q4,20,True,True,patched_supported,H1-H20 seed row present and patched
+current_comparison_1,PED,2031Q1,21,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2031Q2,22,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2031Q3,23,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2031Q4,24,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2032Q1,25,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2032Q2,26,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2032Q3,27,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2032Q4,28,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2033Q1,29,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2033Q2,30,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2033Q3,31,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2033Q4,32,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2034Q1,33,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2034Q2,34,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2034Q3,35,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2034Q4,36,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2035Q1,37,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2035Q2,38,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2035Q3,39,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2035Q4,40,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2036Q1,41,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2036Q2,42,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2036Q3,43,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2036Q4,44,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2037Q1,45,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2037Q2,46,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2037Q3,47,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2037Q4,48,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2038Q1,49,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2038Q2,50,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2038Q3,51,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2038Q4,52,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2039Q1,53,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2039Q2,54,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2039Q3,55,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2039Q4,56,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2040Q1,57,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2040Q2,58,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2040Q3,59,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2040Q4,60,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2041Q1,61,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2041Q2,62,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2041Q3,63,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2041Q4,64,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2042Q1,65,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2042Q2,66,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2042Q3,67,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2042Q4,68,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2043Q1,69,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2043Q2,70,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2043Q3,71,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2043Q4,72,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2044Q1,73,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2044Q2,74,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2044Q3,75,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2044Q4,76,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2045Q1,77,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2045Q2,78,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2045Q3,79,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2045Q4,80,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2046Q1,81,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2046Q2,82,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2046Q3,83,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2046Q4,84,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2047Q1,85,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2047Q2,86,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2047Q3,87,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2047Q4,88,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2048Q1,89,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2048Q2,90,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2048Q3,91,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2048Q4,92,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2049Q1,93,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2049Q2,94,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2049Q3,95,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2049Q4,96,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2050Q1,97,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2050Q2,98,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2050Q3,99,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit
+current_comparison_1,PED,2050Q4,100,True,False,intentionally_withheld_h21_plus,beyond H20: withheld from decision-facing output by the horizon policy; the raw replay value remains available as non-decision-facing audit

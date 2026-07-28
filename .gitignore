@@ -46,6 +46,8 @@ artifacts/**
 !artifacts/light_ruc_promoted_state_impact/**
 !artifacts/fleet_allocation_semantics/
 !artifacts/fleet_allocation_semantics/**
+!artifacts/p0_light_fleet_fix/
+!artifacts/p0_light_fleet_fix/**
 data/**
 !data/.gitkeep
 !data/dashboard_evidence_pack/
