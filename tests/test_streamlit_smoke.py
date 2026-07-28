@@ -4,6 +4,8 @@ import inspect
 from pathlib import Path
 
 import pandas as pd
+
+from model_dashboard.light_fleet_allocation import EXTENDED_EVIDENCE_MAX_HORIZON
 import pytest
 from streamlit.testing.v1 import AppTest
 
@@ -1007,7 +1009,10 @@ def test_revenue_outlook_activity_figure_cache_matches_direct_builder() -> None:
     base_petrol = quarterly_petrol[
         quarterly_petrol["trace_name"].astype(str).eq("Current finalist Base case")
     ]
-    assert len(base_petrol) == 100
+    # 100 quarters was the pre-policy full source horizon. The decision-facing
+    # path now stops at H20; the 100-quarter source horizon is retained as
+    # non-decision-facing evidence in raw_quarterly_forecast_audit.
+    assert len(base_petrol) == EXTENDED_EVIDENCE_MAX_HORIZON
     assert set(base_petrol["series_id"].astype(str)) == {"light_petrol_vkt"}
     assert set(base_petrol["data_scope"].astype(str)).issubset(
         {

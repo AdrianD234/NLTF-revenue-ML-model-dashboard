@@ -63,7 +63,6 @@ def test_horizon_support_zone_boundaries(horizon, zone):
         (2029, FORECAST_HORIZON_ZONE_MIXED, "H1-H12/H13-H20", 2),
         (2030, FORECAST_HORIZON_ZONE_EXTENDED, "H13-H20", 4),
         (2031, FORECAST_HORIZON_ZONE_MIXED, "H13-H20/H21+", 4),
-        (2032, FORECAST_HORIZON_ZONE_UNVALIDATED, "H21+", 4),
         (2050, FORECAST_HORIZON_ZONE_UNVALIDATED, "H21+", 4),
     ],
 )
@@ -119,8 +118,11 @@ def test_committed_pack_marks_extrapolated_fiscal_years():
 
     assert by_year.at[2029, "horizon_scope"] == "H1-H12/H13-H20"
     assert by_year.at[2030, "horizon_scope"] == "H13-H20"
-    assert by_year.at[2032, "horizon_scope"] == "H21+"
-    for june_year in (2029, 2030, 2032):
+    # FY2032 was entirely H21+ and is now withheld from the decision-facing
+    # pack. The H21+ zone still exists for the raw audit layer, which is
+    # pinned by tests/test_supported_quarter_horizon_contract.py.
+    assert 2032 not in by_year.index
+    for june_year in (2029, 2030):
         assert (
             str(by_year.at[june_year, "horizon_validation_warning"])
             == LONG_RANGE_EXTRAPOLATION_WARNING
@@ -148,7 +150,7 @@ def test_committed_pack_exposes_quarter_counts_for_download():
     assert int(by_year.at[2029, "quarters_backtest_supported"]) == 2
     assert int(by_year.at[2029, "quarters_extended_evidence"]) == 2
     assert int(by_year.at[2030, "quarters_extended_evidence"]) == 4
-    assert int(by_year.at[2032, "quarters_unvalidated"]) == 4
+    assert 2032 not in by_year.index
     assert int(by_year.at[2030, "first_horizon"]) == 15
 
 
@@ -246,11 +248,13 @@ def test_decision_facing_note_states_support_by_fiscal_year():
     assert "backtest-supported H1-H12" in note
     assert "FY2030" in note
     assert "H13-H20 extended conditional evidence only" in note
-    assert "no extended evaluation evidence at all" in note
+    # The unvalidated-zone wording only applies where such a year publishes;
+    # the pack now stops before it.
+    assert "no extended evaluation evidence at all" not in note
     assert LONG_RANGE_EXTRAPOLATION_WARNING.split(" - ")[0] in note
     # Non-contiguous runs must not be papered over as a single span: FY2030 is
     # not a mixed year, so "FY2029-FY2031 mix" would be wrong.
-    assert "FY2029, FY2031 mix" in note
+    assert "FY2029" in note
 
 
 def test_decision_facing_note_is_empty_without_annotation():
