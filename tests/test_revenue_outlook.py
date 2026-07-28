@@ -5,6 +5,7 @@ import hashlib
 from pathlib import Path
 import shutil
 
+import numpy as np
 import pandas as pd
 from openpyxl import load_workbook
 import pytest
@@ -16,7 +17,11 @@ from model_dashboard.forecast_runner import (
     run_forecast_workbook,
     write_forecast_scenario_comparison,
 )
-from model_dashboard.light_fleet_allocation import CONVENTIONAL_ANCHOR_SERIES_ID
+from model_dashboard.light_fleet_allocation import (
+    CONVENTIONAL_ANCHOR_SERIES_ID,
+    LAST_DECISION_GRADE_ANNUAL_FY,
+    LAST_DECISION_GRADE_QUARTER,
+)
 from model_dashboard.revenue_outlook import (
     CANONICAL_JOIN_KEY_COLUMNS,
     CURRENT_REVENUE_OUTLOOK_DIR,
@@ -454,7 +459,15 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     assert "extrapolated_model_extension" not in json.dumps(manifest)
     assert "extrapolated from FY2046" not in json.dumps(manifest)
     runtime_cutoff_fy = int(manifest["period_rule"]["runtime_cutoff_fy"])
-    assert runtime_cutoff_fy == 2050
+    # FY2050 was the pre-policy horizon. The current model now stops at the
+    # governed decision-facing cutoff; the official comparator publishes over
+    # its own source horizon, which the same manifest records separately.
+    assert runtime_cutoff_fy == LAST_DECISION_GRADE_ANNUAL_FY
+    period_rule = manifest["period_rule"]
+    assert period_rule["current_light_ruc_quarterly_cutoff"] == LAST_DECISION_GRADE_QUARTER
+    assert int(period_rule["current_light_ruc_annual_cutoff_fy"]) == LAST_DECISION_GRADE_ANNUAL_FY
+    assert int(period_rule["official_comparator_cutoff_fy"]) > runtime_cutoff_fy
+    assert str(period_rule["raw_audit_source_horizon"]).startswith("20")
     assert manifest["runtime_cutoff_audit"]["repo_relative_path"] == "data/current_revenue_outlook/runtime_cutoff_audit.csv"
     assert manifest["runtime_cutoff_audit"]["runtime_cutoff_fy"] == runtime_cutoff_fy
     assert not runtime_cutoff_audit.empty
@@ -467,19 +480,69 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     assert pd.to_numeric(runtime_cutoff_audit["runtime_cutoff_fy"], errors="coerce").eq(runtime_cutoff_fy).all()
     assert "no extrapolated model extension is used" in manifest["data_vintage_manifest_notes"]["runtime_cutoff"].lower()
     assert f"FY{runtime_cutoff_fy}" in manifest["data_vintage_manifest_notes"]["official_horizon_note"]
-    assert _max_fy(chart) == runtime_cutoff_fy
-    assert _max_fy(line_reconciliation) == runtime_cutoff_fy
-    assert _max_fy(stack_components) == runtime_cutoff_fy
-    assert _max_fy(fan_bands) == runtime_cutoff_fy
-    assert _max_fy(future) == runtime_cutoff_fy
-    assert _max_fy(bridge) == runtime_cutoff_fy
+    # These frames are MIXED: they carry current-model rows and official
+    # comparator rows together. Asserting one scalar cutoff over the whole
+    # frame is precisely what let the current-model H20 rule truncate the
+    # published official comparator, so each scope is checked against its own
+    # horizon.
+    official_cutoff_fy = int(manifest["period_rule"]["official_comparator_cutoff_fy"])
+
+    def _is_official(frame: pd.DataFrame) -> pd.Series:
+        """Official-comparator rows, however this frame labels its scope.
+
+        Fan bands carry no scenario_role and identify the comparator only by
+        scenario_name, so a role-only test would silently classify official
+        rows as current and re-impose the current cutoff on them.
+        """
+        mask = pd.Series(False, index=frame.index)
+        if "scenario_role" in frame.columns:
+            mask |= frame["scenario_role"].astype(str).eq("official_comparator")
+        if "scenario_name" in frame.columns:
+            mask |= frame["scenario_name"].astype(str).eq("mbu26_official")
+        if "source_path" in frame.columns:
+            mask |= frame["source_path"].astype(str).str.contains("MBU26", na=False)
+        return mask
+
+    def _current_only(frame: pd.DataFrame) -> pd.DataFrame:
+        return frame[~_is_official(frame)].copy()
+
+    def _official_only(frame: pd.DataFrame) -> pd.DataFrame:
+        return frame[_is_official(frame)].copy()
+
+    def _annual_only(frame: pd.DataFrame) -> pd.DataFrame:
+        # Quarterly rows are governed by HORIZON, not by June year: 2030Q3/H19
+        # and 2030Q4/H20 publish and both sit in June year 2031, whose ANNUAL
+        # result is correctly withheld. Mixing the two grains under one June-year
+        # ceiling is what entangled the quarterly and annual contracts.
+        if "time_grain" in frame.columns:
+            return frame[frame["time_grain"].astype(str).eq("june_year")].copy()
+        return frame
+
+    for frame in (chart, line_reconciliation, stack_components, fan_bands, future, bridge):
+        current_rows = _annual_only(_current_only(frame))
+        if not current_rows.empty:
+            assert _max_fy(current_rows) == runtime_cutoff_fy
+
+    # The supported quarters survive and carry the next June year.
+    current_quarterly = chart[
+        chart["time_grain"].astype(str).eq("quarterly")
+        & chart["row_type"].astype(str).eq("future_forecast")
+    ]
+    assert set(current_quarterly["period"].astype(str)) >= {"2030Q3", "2030Q4"}
+    assert _max_fy(current_quarterly) == runtime_cutoff_fy + 1
+
+    official_rows = _official_only(chart)
+    assert not official_rows.empty
+    assert _max_fy(official_rows) == official_cutoff_fy
+
     official_source = pd.read_parquet(ROOT / "data/revenue_model_source_pack/mbu26_annual_spine/mbu26_official_annual.parquet")
     assert (_max_fy(official_source) or 0) > runtime_cutoff_fy
+    assert _max_fy(official_source) == official_cutoff_fy
     displayed = chart[
         chart["time_grain"].astype(str).eq("june_year")
         & chart["plot_allowed"].astype(str).str.lower().isin(["true", "1"])
     ].copy()
-    assert _max_fy(displayed) == runtime_cutoff_fy
+    assert _max_fy(_current_only(displayed)) == runtime_cutoff_fy
     current_line = line_reconciliation[line_reconciliation["source_path"].astype(str).str.startswith("Current finalist")].copy()
     assert _max_fy(current_line) == runtime_cutoff_fy
     runtime_tables = [chart, line_reconciliation, stack_components, audit, fan_bands]
@@ -893,7 +956,14 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     ]
     raw_mae = float(base_light_fit.loc[base_light_fit["bridge_variant"].astype(str).eq("raw"), "mean_abs_error"].iloc[0])
     opt_mae = float(base_light_fit.loc[base_light_fit["bridge_variant"].astype(str).eq("optimized"), "mean_abs_error"].iloc[0])
-    assert opt_mae < raw_mae
+    # Both variants must be measured and reported. Which one sits closer to
+    # MBU26 is deliberately NOT asserted: MBU26 proximity is descriptive, not a
+    # target, and "optimized" named a fit calibrated under the retired lambda
+    # architecture. The governed decision is that the raw AR(1) bridge is the
+    # production default, which is asserted directly below.
+    assert np.isfinite(raw_mae) and raw_mae > 0
+    assert np.isfinite(opt_mae) and opt_mae > 0
+    assert PED_BRIDGE_DEFAULT_MODE == "raw_model"
     assert set(ped_bridge_mode_config["bridge_mode"].astype(str)) == {
         "raw_model",
         "blend_25",
@@ -2028,9 +2098,9 @@ def test_revenue_sensitivity_pt_shift_preserves_ev_phev_shares() -> None:
     audit = sensitivity["sensitivity_impact_audit"]
     rows = audit[
         audit["source_path"].astype(str).eq("Current finalist Base case")
-        & pd.to_numeric(audit["FY"], errors="coerce").eq(2031)
+        & pd.to_numeric(audit["FY"], errors="coerce").eq(LAST_DECISION_GRADE_ANNUAL_FY)
     ].set_index("series_id")
-    expected_factor = (1 - 0.005) ** (2031 - 2030 + 1)
+    expected_factor = (1 - 0.005) ** (LAST_DECISION_GRADE_ANNUAL_FY - 2030 + 1)
     for series_id in ["light_petrol_vkt", "light_ruc_net_km", "light_bev_ruc_net_km", "phev_ruc_net_km"]:
         assert rows.loc[series_id, "adjusted"] == pytest.approx(rows.loc[series_id, "baseline"] * expected_factor)
     baseline_total = rows.loc["light_ruc_net_km", "baseline"] + rows.loc["light_bev_ruc_net_km", "baseline"] + rows.loc["phev_ruc_net_km", "baseline"]
@@ -2057,9 +2127,9 @@ def test_revenue_sensitivity_freight_rail_shift_scales_heavy_ruc_only() -> None:
     assert set(audit["selected_freight_rail_shift"].astype(str)) == {"Med"}
     rows = audit[
         audit["source_path"].astype(str).eq("Current finalist Base case")
-        & pd.to_numeric(audit["FY"], errors="coerce").eq(2031)
+        & pd.to_numeric(audit["FY"], errors="coerce").eq(LAST_DECISION_GRADE_ANNUAL_FY)
     ].set_index("series_id")
-    expected_factor = (1 - 0.005) ** (2031 - 2030 + 1)
+    expected_factor = (1 - 0.005) ** (LAST_DECISION_GRADE_ANNUAL_FY - 2030 + 1)
     for series_id in ["heavy_ruc_net_km", "heavy_ruc_net_revenue"]:
         assert rows.loc[series_id, "adjusted"] == pytest.approx(rows.loc[series_id, "baseline"] * expected_factor)
     for series_id in ["light_petrol_vkt", "light_ruc_net_km", "light_bev_ruc_net_km", "phev_ruc_net_km", "ped_volume", "gross_ped_revenue"]:

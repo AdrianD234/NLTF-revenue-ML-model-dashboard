@@ -150,6 +150,7 @@ from model_dashboard.rate_paths import (
     mbu26_ruc_class_revenue_by_fy,
     rate_paths_frame,
 )
+from model_dashboard.light_fleet_allocation import LAST_DECISION_GRADE_ANNUAL_FY
 from model_dashboard.conflict_fuel_paths import (
     CONFLICT_FUEL_SCENARIO_LEVELS,
     conflict_scenario_name,
@@ -339,7 +340,12 @@ from model_dashboard.ui import (
 LOADER_SCHEMA_VERSION = "stage1-governance-loader-v9-parquet-contract-schiff-class"
 STREAMLIT_IMPORT_SURFACE_REVISION = "2026-06-25-revenue-source-pack-normalized-source-hashes-v1"
 REVENUE_SOURCE_PACK_CACHE_REVISION = REVENUE_SOURCE_PACK_RUNTIME_REVISION
-REVENUE_SOURCE_HORIZON_OPTIONS = ["Next 5 FY", "To FY2031", "Full common horizon"]
+# The bounded-horizon option is named from the governed current cutoff, not
+# hard-coded. It read "To FY2031" while the current model published to
+# FY2050; under the H20 policy FY2031 no longer exists, so a fixed label
+# would name a year the user can never see.
+REVENUE_SOURCE_HORIZON_TO_CUTOFF = f"To FY{LAST_DECISION_GRADE_ANNUAL_FY}"
+REVENUE_SOURCE_HORIZON_OPTIONS = ["Next 5 FY", REVENUE_SOURCE_HORIZON_TO_CUTOFF, "Full common horizon"]
 CURATED_DATA_DIR = Path("artifacts") / "curated_data"
 REPRODUCIBILITY_PAGE = "Governance & Reproducibility"
 REVENUE_OUTLOOK_PAGE = "Revenue Outlook"
@@ -5301,7 +5307,7 @@ def _render_revenue_source_controls(source_pack: RevenueSourcePack | None) -> di
             horizon = st.selectbox(
                 "Horizon",
                 horizon_options,
-                index=_option_index(horizon_options, "To FY2031", fallback=horizon_options[0]),
+                index=_option_index(horizon_options, REVENUE_SOURCE_HORIZON_TO_CUTOFF, fallback=horizon_options[0]),
                 key="revenue_source_horizon",
             )
         with row2[6]:
@@ -6666,7 +6672,7 @@ def _filter_source_horizon_rows(rows: pd.DataFrame, source_pack: RevenueSourcePa
 
 
 def _source_horizon_bounds(source_pack: RevenueSourcePack, controls: dict[str, Any]) -> tuple[int | None, int | None]:
-    selection = str(controls.get("horizon") or "To FY2031").strip()
+    selection = str(controls.get("horizon") or REVENUE_SOURCE_HORIZON_TO_CUTOFF).strip()
     common_start, common_end = _source_common_horizon_bounds(source_pack, controls)
     if selection == "Next 5 FY":
         forecast_start = _source_forecast_start_fy(source_pack)
@@ -6680,7 +6686,7 @@ def _source_horizon_bounds(source_pack: RevenueSourcePack, controls: dict[str, A
         return forecast_start, upper
     if selection == "Full common horizon":
         return common_start, common_end
-    upper = 2031
+    upper = LAST_DECISION_GRADE_ANNUAL_FY
     if common_end is not None:
         upper = min(upper, common_end)
     return None, upper

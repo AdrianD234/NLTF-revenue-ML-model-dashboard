@@ -5,6 +5,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+from model_dashboard.light_fleet_allocation import LAST_DECISION_GRADE_ANNUAL_FY
 from model_dashboard.rate_paths import (
     FED_POLICY_METADATA_COLUMNS,
     FED_POLICY_STATE_DELAYED_6M,
@@ -38,9 +39,17 @@ def test_ped_schedules_carry_the_legislated_wedge_forward(pack_chart_rows) -> No
     # rates carry sub-cent rounding, hence the 2e-3 tolerance)
     assert schedules.loc[2027, "planned"] - schedules.loc[2027, "no_uplift"] == pytest.approx(0.06, abs=2e-3)
     assert schedules.loc[2028, "planned"] - schedules.loc[2028, "no_uplift"] == pytest.approx(0.12, abs=2e-3)
-    # beyond the window the wedge stays parallel
-    assert schedules.loc[2040, "planned"] - schedules.loc[2040, "no_uplift"] == pytest.approx(0.12, abs=2e-3)
-    assert schedules.loc[2050, "planned"] - schedules.loc[2050, "no_uplift"] == pytest.approx(0.12, abs=2e-3)
+    # Beyond the legislated window the wedge stays parallel, for every year the
+    # schedule actually reaches. Pinning FY2040/FY2050 assumed the pre-policy
+    # current-model horizon; the schedule now ends with the current
+    # decision-facing horizon, while the official comparator keeps its own
+    # reach (see test_official_comparator_policy_horizon.py).
+    beyond_window = [year for year in schedules.index if int(year) >= 2028]
+    assert beyond_window, "the schedule must extend past the legislated step"
+    for year in beyond_window:
+        assert schedules.loc[year, "planned"] - schedules.loc[year, "no_uplift"] == pytest.approx(
+            0.12, abs=2e-3
+        ), f"wedge is not parallel in FY{year}"
     # pre-policy years have no wedge
     assert schedules.loc[2026, "planned"] - schedules.loc[2026, "no_uplift"] == pytest.approx(0.0, abs=1e-9)
     # history stops at the last complete actual June year
@@ -71,8 +80,12 @@ def test_six_month_delay_moves_only_calendar_2027_q1_q2(pack_chart_rows) -> None
     annual = ped_rate_schedules(ROOT, pack_chart_rows)
     assert annual.loc[2026, "delayed_6m"] == pytest.approx(annual.loc[2026, "planned"])
     assert annual.loc[2027, "delayed_6m"] == pytest.approx(0.70024)
-    assert annual.loc[2028, "delayed_6m"] == pytest.approx(annual.loc[2028, "planned"])
-    assert annual.loc[2050, "delayed_6m"] == pytest.approx(annual.loc[2050, "planned"])
+    # Identity from FY2028 onward, for every year the schedule reaches rather
+    # than a single pinned far year.
+    for year in [value for value in annual.index if int(value) >= 2028]:
+        assert annual.loc[year, "delayed_6m"] == pytest.approx(
+            annual.loc[year, "planned"]
+        ), f"delayed diverges from planned in FY{year}"
 
 
 def test_six_month_delay_factor_is_confined_to_fy2027(pack_chart_rows) -> None:
@@ -111,7 +124,13 @@ def test_uplift_factors_exist_only_from_fy2027(pack_chart_rows) -> None:
     assert 2026 not in factors
     assert factors[2027] == pytest.approx(0.70 / 0.76, rel=1e-3)
     assert all(0.8 < f < 1.0 for f in factors.values())
-    assert max(factors) >= 2050
+    # The current-model factor map covers the current decision-facing horizon.
+    # Reaching FY2050 is exactly what the H20 policy ends for the current
+    # model; the official comparator keeps its own source horizon and is
+    # pinned separately by
+    # test_official_policy_reaches_beyond_the_current_model_horizon.
+    assert min(factors) == 2027
+    assert max(factors) >= LAST_DECISION_GRADE_ANNUAL_FY
 
 
 def test_rate_paths_frame_has_three_streams_on_a_per_1000km_basis(pack_chart_rows) -> None:
@@ -172,7 +191,22 @@ def test_uplift_off_repriced_revenue_cascades_to_rollups(pack_chart_rows) -> Non
             errors="coerce",
         ).iloc[0]
     )
-    for fy in (2030, 2050):
+    # FY2050 was a current-model June year before the H20 policy. The cascade
+    # is a per-year identity, so exercise it across every current June year the
+    # factor map covers rather than pinning a year that no longer publishes.
+    covered = sorted(
+        fy
+        for fy in factors
+        if not pack_chart_rows[
+            pack_chart_rows["time_grain"].astype(str).eq("june_year")
+            & pack_chart_rows["series_id"].astype(str).eq("gross_ped_revenue")
+            & pd.to_numeric(pack_chart_rows["june_year"], errors="coerce").eq(fy)
+            & pack_chart_rows["trace_name"].astype(str).eq("Current finalist Base case")
+        ].empty
+    )
+    assert covered, "no current June year is covered by the no-uplift factor map"
+    assert max(covered) == LAST_DECISION_GRADE_ANNUAL_FY
+    for fy in covered:
         old_ped = jy(pack_chart_rows, "gross_ped_revenue", fy)
         new_ped = jy(adjusted, "gross_ped_revenue", fy)
         assert new_ped == pytest.approx(old_ped * factors[fy])
