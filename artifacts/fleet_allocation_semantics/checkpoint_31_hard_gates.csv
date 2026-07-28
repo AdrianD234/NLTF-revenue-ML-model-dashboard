@@ -1,0 +1,6 @@
+check,max_abs_delta,tolerance,status
+raw_conventional_preserved_under_every_seam_method,0.0,1e-06,pass
+share_vector_closes_to_one,2.220446049250313e-16,1e-06,pass
+pool_equals_class_sum,0.0,1e-06,pass
+no_lambda_level_in_any_candidate_path,0.0,1e-06,pass
+presets_preserve_the_base_pool,3.637978807091713e-12,1e-06,pass

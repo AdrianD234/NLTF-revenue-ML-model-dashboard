@@ -1,0 +1,5 @@
+method,fy2025_conventional_closes,fy2025_bev_closes,fy2026_bev_growth_pct,fy2027_bev_growth_pct,fy2026_phev_growth_pct,fy2027_phev_growth_pct,fy2026_pool_growth_pct,fy2026_conventional_share_move_pp,vfm_base_shares_reached_by_fy,fy2030_pool,fy2030_pool_vs_vfm_ratio,observed_fy2024_fy2025_bev_growth_pct,observed_fy2024_fy2025_phev_growth_pct,observed_fy2024_fy2025_pool_growth_pct
+A_immediate,True,True,52.8468,20.9499,50.9618,26.6368,9.9746,-3.5631,2028.0,19291.1581,1.0929,98.4532,123.2031,23.4014
+B_two_year,True,True,28.7783,43.5553,27.8547,49.5239,7.7716,-1.7816,2028.0,19291.1581,1.0929,98.4532,123.2031,23.4014
+C_three_year,True,True,20.9683,29.2941,20.3567,33.3585,7.0567,-1.1877,2028.0,19291.1581,1.0929,98.4532,123.2031,23.4014
+D_actual_anchored_add_on,True,True,26.4113,29.3226,33.7138,34.0379,7.8164,-1.8186,,18541.2407,1.0504,98.4532,123.2031,23.4014

@@ -136,14 +136,38 @@ def balanced_origins(frame: pd.DataFrame) -> pd.DataFrame:
     return frame[frame["origin"].isin(keep)]
 
 
-def cohort_frames(pairs: pd.DataFrame) -> dict[str, pd.DataFrame]:
-    no_covid = pairs[~pairs["target_june_year"].isin(COVID_TARGET_YEARS)]
+def covid_masks(pairs: pd.DataFrame) -> dict[str, pd.Series]:
+    """Three COVID definitions, kept distinct and labelled.
+
+    The production specification defines the COVID control on *calendar*
+    quarters 2020Q1-2021Q4 (see deliverables/PED-VKT-model-review, covid2020).
+    An earlier version of this script excluded June years FY2020-FY2021, which
+    is the window 2019Q3-2021Q2 - a different set. All three are reported.
+    """
+    period = pairs["target_period"].astype(str)
+    calendar_year = period.str.slice(0, 4).astype(int)
     return {
+        # primary: the stated specification window, by calendar quarter
+        "ex_covid_2020Q1_2021Q4": ~period.between("2020Q1", "2021Q4"),
+        # secondary: calendar years 2020 and 2021
+        "ex_covid_calendar_2020_2021": ~calendar_year.isin((2020, 2021)),
+        # relabelled original: June years FY2020-FY2021 = 2019Q3-2021Q2
+        "ex_covid_june_years_fy2020_fy2021": ~pairs["target_june_year"].isin(COVID_TARGET_YEARS),
+    }
+
+
+def cohort_frames(pairs: pd.DataFrame) -> dict[str, pd.DataFrame]:
+    frames = {
         "all_available": pairs,
         "balanced": balanced_origins(pairs),
-        "all_available_ex_covid": no_covid,
-        "balanced_ex_covid": balanced_origins(no_covid),
     }
+    for label, mask in covid_masks(pairs).items():
+        subset = pairs[mask]
+        frames[f"all_available_{label}"] = subset
+        # Balancing is recomputed inside each exclusion so that P0 and P1 always
+        # share an identical origin grid within a sensitivity.
+        frames[f"balanced_{label}"] = balanced_origins(subset)
+    return frames
 
 
 def main() -> int:
@@ -189,7 +213,7 @@ def main() -> int:
             ]:
                 if subset.empty:
                     continue
-                record = {"source": source, "cohort": cohort, "horizon_band": label}
+                record = {"source": source, "cohort": cohort, "horizon_band": label, "n_origins": int(subset["origin"].nunique()), "n_predictions": int(len(subset))}
                 for variant in ["P0", "P1"]:
                     for key, value in metrics(subset, variant).items():
                         record[f"{variant}_{key}"] = value
@@ -255,7 +279,7 @@ def main() -> int:
         bias_change = abs(float(row["signed_bias_change"]))
         base_bias = abs(float(row["P0_signed_error_pct"]))
         consistent = []
-        for cohort in ["balanced", "balanced_ex_covid", "all_available", "all_available_ex_covid"]:
+        for cohort in ["balanced", "balanced_ex_covid_2020Q1_2021Q4", "all_available", "all_available_ex_covid_2020Q1_2021Q4"]:
             sub = summary[
                 summary["source"].eq("ar1_production_h1_h12")
                 & summary["cohort"].eq(cohort)

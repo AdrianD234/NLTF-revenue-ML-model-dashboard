@@ -17,9 +17,10 @@ double-count question are treated as settled and were not reopened.
 
 | question | verdict |
 |---|---|
-| **1. Light RUC production treatment** | **conventional-anchor share expansion** |
+| **1. Light RUC production treatment** | **conventional-anchor share expansion, immediate VFM shares from FY2026** (seam resolved in Checkpoint 3.1B) |
 | **2. PED baseline** | **P0 — raw AR(1), no retention overlay in the Base path** |
 | **3. PHEV petrol treatment** | **unresolved — sensitivity only** |
+| **4. H21+ policy** | **current-model numeric Light RUC path ends at FY2030** (Checkpoint 3.1C) |
 
 ---
 
@@ -56,9 +57,14 @@ FY2025 BEV actual is 820.6 million km against VFM's own FY2025 BEV of 1054.8 —
 BEV steps +52.8% into FY2026. The add-on avoids this by construction because it
 starts from the actual and applies VFM *changes*.
 
-This is worth resolving at implementation time, most likely by blending the two
-over a short seam window rather than by switching methods. I am not deciding
-that here; it is a production design detail, not a Checkpoint 3 question.
+> **SUPERSEDED by Checkpoint 3.1B.** I suggested here that this be resolved by
+> blending over a short seam window. That was a judgement offered without
+> checking it, and the evidence overturns it: the FY2025 actual conventional
+> share sits *above* the whole VFM cone, so blending pushes the share vector
+> outside it, and a multi-year blend defers the adjustment into a larger later
+> jump. The observed FY2024→FY2025 BEV outturn was +98.5%, against which a
+> +52.8% step is a deceleration. **Immediate VFM shares from FY2026 is the
+> recommendation.** See §3.1B.
 
 ### Long-horizon caution
 
@@ -78,6 +84,12 @@ already classifies as `unvalidated_extrapolation_h21_plus`. So this is a known
 horizon-governance problem rather than a new defect, and it applies to the
 current architecture too. It should not block the FY2026–FY2030 correction, but
 it should be flagged wherever the pool is read beyond FY2030.
+
+> **STRENGTHENED by Checkpoint 3.1C.** "Flagged" is not sufficient. Run to
+> FY2050 the construction implies a pool of 185,828 million km, 3.87× VFM's own
+> pool, because dividing by a conventional share falling to 0.120 amplifies
+> without bound. The recommendation is now to **end the current-model numeric
+> Light RUC path at FY2030**, not to label it. See §3.1C.
 
 ---
 
@@ -264,3 +276,188 @@ from the pool.
 
 No production change has been made and no PR has been opened. Workstream A has
 not been rerun.
+
+---
+
+# Checkpoint 3.1 — design closure
+
+Three matters were reopened. Two changed my recommendation.
+
+Regenerate with:
+
+    .venv\Scripts\python.exe scripts\checkpoint3a_ped_retention_falsification.py
+    .venv\Scripts\python.exe scripts\checkpoint31_seam_and_long_horizon.py
+
+Tests: `tests/test_light_ruc_anchor_design.py` (13) and
+`tests/test_fleet_allocation_runtime_semantics.py` (9). All 22 pass.
+
+---
+
+## 3.1A — COVID window corrected. The claim survives.
+
+You were right that the exclusion was coded on the wrong definition. The
+specification window is calendar quarters 2020Q1–2021Q4; I had excluded June
+years FY2020–FY2021, which is 2019Q3–2021Q2. All three are now reported and
+kept distinct, with the origin grid rebalanced inside each so P0 and P1 always
+share an identical grid.
+
+AR(1) production, H1–H12, balanced:
+
+| exclusion | n | P0 WAPE | P1 WAPE | improvement | P0 signed | P1 signed |
+|---|---:|---:|---:|---:|---:|---:|
+| none | 540 | 2.535 | 2.653 | −4.65% | +1.114 | +0.597 |
+| **2020Q1–2021Q4 (primary)** | 312 | **1.065** | **1.381** | **−29.59%** | **−0.818** | **−1.227** |
+| calendar 2020–2021 | 312 | 1.065 | 1.381 | −29.59% | −0.818 | −1.227 |
+| June years FY2020–21 (old) | 312 | 1.146 | 1.520 | −32.61% | −0.953 | −1.401 |
+
+June-year annual WAPE on the primary window: −34.95% (balanced), −33.25% (all
+available).
+
+The two calendar definitions are the same set of quarters given the period
+labels, and they return byte-identical metrics — a test pins that so they are
+never conflated again.
+
+**The COVID-artefact statement stands, on the correct window.** Excluding
+2020Q1–2021Q4, P0's signed bias is −0.818% and P1 moves it to −1.227%: the
+overlay makes bias *worse*, not better, once the pandemic quarters are removed.
+The apparent full-sample bias gain is confined to those quarters. The P0 verdict
+is unchanged and slightly stronger.
+
+---
+
+## 3.1B — seam resolved, and it reverses my earlier lean
+
+I previously called the FY2026 BEV step "implausible" and suggested blending.
+Two pieces of evidence say otherwise, and I should not have offered that
+judgement without checking them.
+
+**First, the observed actuals.** FY2024 → FY2025 outturn was BEV **+98.5%**,
+PHEV **+123.2%**, pool **+23.4%**. Against that, the immediate method's FY2026
+BEV step of **+52.8%** is a deceleration, not a discontinuity. (Caveat: FY2024
+is the first year in which BEV and PHEV were separately recorded, so its base
+may be incomplete — the direction is clear but the exact multiple is not.)
+
+**Second, the VFM cone.** The FY2025 *actual* conventional share is 0.9072,
+which sits above the entire VFM Base/Fast/Slow cone. Blending toward it
+therefore pushes the share vector **outside** the cone:
+
+| method | FY2026 conventional share | inside cone [0.8607, 0.8877] | FY2026 BEV step |
+|---|---:|---|---:|
+| **A immediate** | **0.8716** | **yes** | +52.8% |
+| B two-year | 0.8894 | no | +28.8% |
+| C three-year | 0.8953 | no | +21.0% |
+| D actual-anchored add-on | 0.8890 | no | +26.4% |
+
+**Third, blending does not smooth — it defers and concentrates.** When the blend
+weight reaches 1 the pool catches up in a single step. For the three-year
+transition that step lands at **FY2028, inside the backtest-supported zone**,
+with pool growth of 12.5% against 1.3% the year before. That is worse than the
+seam it was meant to fix. The two-year method also produces a non-monotonic BEV
+path (+28.8% then +43.6%).
+
+**Recommendation: A, immediate VFM shares from FY2026.** It is the shortest
+transition, the only one inside the VFM cone at FY2026, its seam step is below
+recent outturn, and it is the only one that does not manufacture a later
+catch-up jump. Blending is rejected on evidence, not on simplicity.
+
+Every method preserves the raw conventional anchor exactly (gate: 0.0).
+
+---
+
+## 3.1C — long-horizon guard: unrestricted share expansion fails
+
+This is the most serious result in the checkpoint. Two-year method shown; A and
+B are near-identical, and all three share-anchor methods behave the same way.
+
+| FY | horizon state | raw conventional | conv share | pool | pool YoY | pool ÷ VFM | flag |
+|---|---|---:|---:|---:|---:|---:|---|
+| 2026 | H1–H12 | 12,968 | 0.889 | 14,581 | +7.8% | 0.97 | WATCH |
+| 2028 | H1–H12 | 13,372 | 0.809 | 16,520 | +9.8% | 1.02 | WATCH |
+| 2030 | H13–H20 | 14,130 | 0.732 | 19,291 | +7.6% | 1.09 | WATCH |
+| 2035 | H21+ | 15,945 | 0.530 | 30,070 | +10.8% | 1.35 | **FAIL** |
+| 2040 | H21+ | 17,908 | 0.322 | 55,561 | +14.9% | 1.84 | **FAIL** |
+| 2045 | H21+ | 19,978 | 0.189 | 105,844 | +12.4% | 2.65 | **FAIL** |
+| 2050 | H21+ | 22,261 | **0.120** | **185,828** | +11.2% | **3.87** | **FAIL** |
+
+By FY2050 the construction implies **185.8 billion light-vehicle kilometres**,
+3.87× VFM's own pool, from a conventional anchor of 22,261. That is not a
+forecast; it is a division by a share approaching zero. `pool = conventional /
+conventional_share` amplifies without bound as the share falls, and the raw
+conventional model keeps growing (+35.1% above VFM conventional by FY2035).
+
+First FAIL: FY2035 for A and B; FY2028 for C. The add-on method D never FAILs to
+FY2050 (WATCH throughout, FY2050 ratio 1.34) because it never divides by a
+shrinking share — that is a genuine long-horizon advantage for D, and the only
+criterion on which it wins.
+
+**Recommendation: option 1 — end the current-model numeric path at FY2030.**
+The decision-grade window is clean (no FAIL through FY2030 for the recommended
+method), and beyond it the construction is not defensible. FY2031+ should not
+publish a current-model numeric Light RUC path pending the deferred structural
+bridge (P0 #2B). I have not invented that transition here, per instruction.
+
+Note this is a stronger statement than the existing H21+ warning label. A label
+is not sufficient when the underlying number is arithmetically divergent rather
+than merely uncertain.
+
+---
+
+## 3.1D — production specification
+
+### PED
+- **Base:** `light_petrol_vkt = raw AR(1) VKT per capita × population`. No
+  retention overlay.
+- The VFM petrol-retention curve becomes a **named optional sensitivity**, off
+  by default.
+- λ has no PED effect: already true at runtime via the raw bridge (alpha 0).
+
+### Light RUC
+- **Conventional:** the raw Light RUC model forecast, preserved exactly.
+- **Seam:** none. VFM Base shares apply immediately from FY2026 (method A).
+- **Pool:** `pool = conventional / VFM_Base_conventional_share`
+- **Classes:** `BEV = pool × VFM_Base_BEV_share`, `PHEV = pool × VFM_Base_PHEV_share`
+- **FY2025:** the actual class values, untouched.
+
+### Fast / Slow / custom uptake
+Preserve the Base-derived pool and reallocate composition only. Verified to
+3.6e-12. An uptake preset is a composition lever, never a level lever.
+
+### H21+ policy
+The current-model numeric Light RUC path ends at **FY2030**. FY2031+ is
+unavailable pending the structural bridge. Do not publish the share-expansion
+result beyond FY2030 on the strength of a warning label.
+
+### PHEV petrol
+Unresolved. Carry the 0/25/50/75/100% sensitivity; adopt no production figure
+until the scope of the MBU26 litres-intensity series is sourced. Direction of
+the error is *understatement* of PED.
+
+### λ retirement
+Remove from every decision-facing level. Retain `ev_phev_ped_light_drift_assumptions`
+and `ev_phev_split_assumptions` as clearly labelled historical audit lineage.
+Rename or deprecate `current_light_ruc_total_modelled_km`, which is the raw
+conventional model output and is currently named as though it were a total.
+
+---
+
+## Checkpoint 3.1 gates
+
+| gate | max abs delta | status |
+|---|---:|---|
+| raw conventional preserved under every seam method | 0.0 | pass |
+| share vector closes to one | 2.2e-16 | pass |
+| pool equals the class sum | 0.0 | pass |
+| no λ level in any candidate path | 0.0 | pass |
+| presets preserve the Base pool | 3.6e-12 | pass |
+
+## Checkpoint 3.1 artifacts
+
+| file | contents |
+|---|---|
+| `light_ruc_seam_method_paths.csv` | A/B/C/D, FY2025–FY2050, shares, classes, cone membership |
+| `light_ruc_seam_scorecard.csv` | seam criteria plus observed FY2024→FY2025 growth |
+| `light_ruc_long_horizon_guard.csv` | FY2050 paths with watch/fail flags and horizon state |
+| `checkpoint_31_hard_gates.csv` | the five gates |
+| `ped_retention_band_summary.csv` | now carries all three COVID definitions |
+
+No production change has been made and no PR has been opened.
