@@ -1,0 +1,2 @@
+bridge_mode,ev_uptake_key,sensitivity_key,fed_path,adjust_ped_follows_bridge_mode
+raw_model,"('MoT VFM base', (), (), 0, 0)","('Off', 'Off', 'Off', '', '', '', '', '', '', 'Off', '')",Current planned path,True

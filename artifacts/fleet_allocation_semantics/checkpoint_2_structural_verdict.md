@@ -1,14 +1,50 @@
-# Checkpoint 2 — structural verdict
+# Checkpoint 2 — structural verdict (corrected)
 
 Branch `investigation/p0-fleet-allocation-semantics`. Investigation only: no
 production code, governed pack, checkpoint or dashboard value was changed.
 
 Regenerate with:
 
-    .venv\Scripts\python.exe scripts\checkpoint2_structural_variants.py
+    .venv\Scripts\python.exe scripts\checkpoint2_runtime_parity.py       # runtime path
+    .venv\Scripts\python.exe scripts\checkpoint2_structural_variants.py  # stored-pack mechanics
 
-All 16 hard gates pass. Every number below is reproduced by that script from
-committed, replay-verified sources.
+Tests: `tests/test_fleet_allocation_runtime_semantics.py` (9 passing).
+
+---
+
+## CORRECTION — the first pass mis-specified the runtime path
+
+My first Checkpoint 2 defined Reference A as "stored pack + VFM overlay" and
+called `apply_uptake_levers_to_chart_rows()` directly on the committed chart
+rows. **That omitted two runtime stages: the raw PED bridge and the Treasury
+macro replay.** The result was that I reconstructed the λ-plus-VFM PED
+combination the front end is specifically built to avoid, and then diagnosed
+it as the live path.
+
+The repository's actual sequence, implemented in `fleet_mix.load_dashboard_frame()`
+and in `app.cached_scenario_overlay_rows()`:
+
+    committed pack -> raw PED bridge -> Treasury macro replay -> VFM overlay
+    -> FED policy overlay -> front end
+
+`PED_BRIDGE_DEFAULT_MODE = "raw_model"` with **alpha = 0.0**, so the default
+bridge restores the raw PED level and discards the λ PED deduction entirely.
+`app.py:1194` then sets `adjust_ped = (bridge_mode == PED_BRIDGE_DEFAULT_MODE)`,
+with the comment: the optimized bridge already displaces petrol activity, so
+only the raw bridge needs the VFM lever. It is a deliberate either/or guard.
+
+**Withdrawn from the first pass:**
+
+| claim | status |
+|---|---|
+| "Reference A is the actual front end" | wrong — it omitted S2 and S3 |
+| "FY2030 front-end total = 5721.97" | wrong — the true value is **6019.02** |
+| "PED is displaced twice in the final front end" | **wrong** — see §5 |
+| "Three quarters of the displayed gap is post-model" | recomputed against the true S5 value in §4 |
+| "Interaction is exactly zero" | still zero, but it is structural, not a finding — see §4 |
+
+**Retained:** everything in §1 about the stored pack. Those level mechanics
+were correct and are unaffected.
 
 ---
 
@@ -123,158 +159,162 @@ whose definition does not match the shares applied to it.
 
 ---
 
-## 2. Hard gates
+## 2. The corrected runtime waterfall
 
-| gate | result |
+Nine parity gates pass (`corrected_runtime_parity_gates.csv`), including:
+
+| gate | max abs delta |
 |---|---|
-| S5 reproduces the decision-facing front end exactly | pass — Variant B matches the stored pack on all 7 series, max delta 8.2e-12 |
-| Identify which stage Workstream A decomposed | **S1** (the stored pack, post-λ). Workstream A read `light_ruc_net_km` and `light_petrol_vkt`, i.e. λ-adjusted levels, and attributed their MBU26 shortfall to population/migration/econometrics. It never saw S0. |
-| Does λ change a decision-facing LEVEL? | **Yes.** λ sets `light_ruc_net_km` and `light_petrol_vkt`, both `bridge_input` rows that feed revenue. The raw model output is tagged `audit_only`. |
-| Is λ lineage-only if VFM replaces its shares? | **No.** The VFM overlay preserves the λ-created pool *exactly* — gate `vfm_overlay_preserves_the_lambda_created_pool_level`, max delta 1.8e-12. S4 and S5 inherit a level λ created. |
+| S2 raw bridge restores the raw PED level | 0.0 |
+| S2 − S1 on PED equals exactly (1−λ)·M | 1.8e-12 |
+| S2 leaves the Light RUC classes unchanged | 0.0 |
+| S4 matches `load_dashboard_frame` on 5 series | 0.0 |
+| Matrix cell P1/L0 reproduces the S5 front end | 0.0 |
+| Signed gap decomposition closes | 0.0 |
 
-Remaining gates (all pass, tolerance 1e-6): raw conventional preserved in C
-and E (0.0); PED level matches each variant's definition (0.0); Variant C
-removes exactly the λ PED transfer (1.8e-12); physical class sums close (0.0);
-FY2025 actual classes unchanged across variants (0.0); revenue identity closes
-(1.8e-12).
+Default state recorded in `front_end_default_state.csv`: bridge `raw_model`,
+uptake `MoT VFM base`, sensitivities Off/Off/Off, FED policy `delayed_6m`
+(the app's own default), FED path "Current planned path".
+
+**Which stage Workstream A decomposed: S1.** It read the stored pack's post-λ
+annual spine, so it explained the stored pack's −8.70% FY2030 gap, not the
+−6.46% actually displayed. That finding is reconfirmed.
 
 ---
 
-## 3. Variant matrix
+## 3. PED — one displacement, not two
 
-Rates, litres intensity, refunds, admin, Heavy RUC, MVR, TUC, LPG and CNG are
-identical in every variant and taken from the official spine. Only the four
-light activity levels differ. FY2030:
-
-| variant | light petrol VKT | conventional | pool | gross PED | total RUC | total NLTF | gap vs MBU26 |
+| FY | S0 raw | S1 pack (λ) | S2 raw bridge | S3 macro | S4 VFM | surviving λ effect | VFM factor |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| B stored pack | 29787.438 | 12519.462 | 16782.212 | 2452.388 | 2983.813 | 5874.475 | −8.70% |
-| C semantic clean anchor | 32439.900 | 14129.751 | 19291.158 | 2670.764 | 3195.253 | 6304.290 | **−2.02%** |
-| D isolate PED | 32439.900 | 12519.462 | 16782.212 | 2670.764 | 2983.813 | 6092.851 | −5.31% |
-| E isolate Light RUC | 29787.438 | 14129.751 | 19291.158 | 2452.388 | 3195.253 | 6085.914 | −5.42% |
+| 2026 | 32943.024 | 31742.115 | 32943.024 | 32947.572 | 32652.383 | **0.0** | 0.991 |
+| 2028 | 32150.163 | 30295.920 | 32150.163 | 32372.423 | 31350.174 | **0.0** | 0.968 |
+| 2030 | 32439.900 | 29787.438 | 32439.900 | 32982.422 | 30940.960 | **0.0** | 0.938 |
 
-Reference A (the actual front end, stored pack plus the default `MoT VFM base`
-overlay) is *below* B, because the overlay adds a further PED reduction:
-FY2030 total NLTF 5721.97, −11.07% vs MBU26.
+The raw bridge restores the raw level exactly, and the surviving λ PED effect
+is exactly zero in every year. **PED is not double-counted in the
+decision-facing view.** My previous claim is withdrawn.
 
----
+The λ PED deduction exists in the stored pack and nowhere downstream of it.
+That is the architecture working as designed.
 
-## 4. Gap attribution
-
-PED and Light RUC feed separate revenue lines at fixed rates, so the
-decomposition is exactly additive — the measured interaction term is 0.00 in
-every year. Total NLTF, $m vs MBU26:
-
-| FY | total gap | PED post-model | Light RUC post-model | underlying econometrics + other |
-|---|---:|---:|---:|---:|
-| 2026 | −61.68 | 77.81 | 47.01 | +63.14 |
-| 2027 | −229.43 | 102.88 | 61.36 | −65.19 |
-| 2028 | −322.29 | 140.79 | 101.53 | −79.97 |
-| 2029 | −430.41 | 179.24 | 151.23 | −99.95 |
-| 2030 | **−559.89** | **218.38** | **211.44** | **−130.08** |
-
-At FY2030: 39.0% of the gap is the PED post-model reduction, 37.8% the Light
-RUC post-model allocation, and 23.2% everything else including the underlying
-econometrics. **Roughly three quarters of the FY2030 shortfall is created
-after the model stage.**
+What remains open is a single-overlay question: whether the VFM retention
+curve adds prospective information or duplicates electrification already
+implicit in the AR(1) path. That needs its own falsification test and is not a
+λ question.
 
 ---
 
-## 5. PED: petrol activity is displaced twice
+## 4. Light RUC — λ still controls the decision-facing pool
 
-Gross PED revenue, $m, and distance from MBU26:
+| FY | S0 raw model | S1 | S2 | S3 | S4 | S5 | S5 − raw | S5 pool |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 2026 | 12968.092 | 12352.558 | 12352.558 | 12338.415 | 12208.402 | 12208.402 | −759.690 | 14154.458 |
+| 2028 | 13372.424 | 12336.184 | 12336.184 | 12497.243 | 12416.408 | 12416.408 | −956.016 | 15412.818 |
+| 2030 | 14129.751 | 12519.462 | 12519.462 | 12909.794 | 12738.719 | 12738.719 | **−1391.032** | 17261.942 |
 
-| FY | L0 raw model | L1 after λ | L2 after VFM overlay | MBU26 | L0 % | L1 % | L2 % |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| 2026 | 2134.60 | 2056.78 | 2038.36 | 2062.78 | +3.48 | −0.29 | −1.18 |
-| 2027 | 2206.07 | 2103.19 | 2062.35 | 2200.88 | +0.24 | −4.44 | −6.29 |
-| 2028 | 2441.12 | 2300.33 | 2227.69 | 2456.03 | −0.61 | −6.34 | −9.30 |
-| 2029 | 2570.62 | 2391.38 | 2282.19 | 2596.02 | −0.98 | −7.88 | −12.09 |
-| 2030 | 2670.76 | 2452.39 | 2300.60 | 2706.16 | −1.31 | −9.38 | −14.99 |
+**No supported runtime step restores the raw conventional Light RUC forecast.**
+The raw bridge explicitly leaves the Light RUC classes untouched (delta 0.0),
+and the VFM overlay preserves the incoming pool level and only re-splits it.
+So the decision-facing conventional line stays λ-reduced and the pool stays
+λ-inflated all the way to the front end.
 
-L1 → L2 is `ped_retention_curve`, a prospective logistic displacement of
-petrol activity to electric vehicles, normalised to 1.0 at FY2025. L0 → L1 is
-`(1−λ)·M`, also a prospective displacement of petrol activity to electric
-vehicles. They are applied sequentially to the same base.
+This is the finding that survives the correction intact, and it is now the
+whole of the structural case.
 
-This is now direct evidence for the double-count hypothesis rather than
-suspicion. I flagged previously that the VFM retention curve being normalised
-to FY2025 and prospective might make it a legitimate standalone overlay — that
-remains true *in isolation*, but it is not applied in isolation. It is applied
-on top of a base from which the same displacement has already been subtracted.
+---
 
-Falsification note: this is not proved by MBU26 proximity. The evidence is
-that the two deductions have the same economic content (petrol VKT lost to
-EVs), the same sign, the same prospective phasing, and no offsetting term
-anywhere in the chain. The MBU26 comparison is corroborating, not the test.
+## 5. Corrected 2×2 matrix and signed attribution
+
+Factor P: P0 = raw bridge, no VFM retention; P1 = raw bridge + one retention.
+Factor L: L0 = current λ-created pool; L1 = raw model preserved as
+conventional, pool = conventional / VFM Base conventional share.
+
+All four cells run inside the same macro, policy, rate and fixed-line
+environment; effective rates are derived from S5 so P1/L0 reproduces the front
+end by construction. FY2030:
+
+| cell | light petrol VKT | conventional | pool | gross PED | total NLTF | gap vs MBU26 |
+|---|---:|---:|---:|---:|---:|---:|
+| P0/L0 | 32982.422 | 12738.719 | 17261.942 | 2715.430 | 6187.096 | −3.84% |
+| P0/L1 | 32982.422 | 14570.289 | 19892.619 | 2715.430 | 6409.596 | **−0.39%** |
+| **P1/L0** (front end) | 30940.960 | 12738.719 | 17261.942 | 2547.357 | **6019.023** | **−6.46%** |
+| P1/L1 | 30940.960 | 14570.289 | 19892.619 | 2547.357 | 6241.523 | −3.00% |
+
+Signed contributions to the **true** displayed gap. Each is the amount by which
+that treatment moves the final value, so a term that widens a negative gap
+reads negative. Closure residual is 0.0 in every year.
+
+| FY | final gap | PED VFM retention | Light pool λ effect | interaction | residual clean-architecture gap |
+|---|---:|---:|---:|---:|---:|
+| 2026 | −5.73 | −19.13 | −48.26 | 0.00 | +61.66 |
+| 2027 | −498.56 | −39.66 | −53.93 | 0.00 | −404.97 |
+| 2028 | −221.99 | −77.62 | −104.39 | 0.00 | −39.99 |
+| 2029 | −304.89 | −118.79 | −157.26 | 0.00 | −28.85 |
+| 2030 | **−415.35** | **−168.07** | **−222.50** | 0.00 | **−24.77** |
+
+At FY2030 the Light RUC λ pool effect is the single largest term (−222.50,
+53.6% of the gap), the VFM PED retention is −168.07 (40.5%), and everything
+else — underlying econometrics, macro and fixed lines — accounts for only
+−24.77 (6.0%).
+
+Two caveats on reading this table:
+
+- **FY2027 is dominated by policy, not modelling.** The −404.97 residual is the
+  `delayed_6m` FED uplift, which is the app's default policy state and a
+  deliberate choice, not a defect. FY2027 should not be read as a model gap.
+- **The zero interaction is structural, not empirical.** PED and Light RUC
+  enter separate linear revenue lines at fixed rates, so the cross term is zero
+  by construction. It is not evidence about the model.
 
 ---
 
 ## 6. Structural diagnostic (corroborating, not a selection criterion)
 
-Per your instruction this is descriptive only. No variant is chosen because it
-is closer to MBU26.
+No variant is chosen because it is closer to MBU26.
 
-| FY | raw model vs MBU26 conventional | pack conventional vs MBU26 | conventional-anchor pool vs MBU26 pool | pack pool vs MBU26 pool |
-|---|---:|---:|---:|---:|
-| 2026 | +0.53% | −4.24% | +0.93% | −3.89% |
-| 2027 | −1.87% | −8.08% | −2.16% | −7.67% |
-| 2028 | −0.41% | −8.13% | −0.07% | −7.89% |
-| 2029 | −0.67% | −10.09% | +0.64% | −9.75% |
-| 2030 | −1.89% | −13.07% | +0.66% | −12.44% |
-
-The raw Light RUC econometric forecast is within about 2% of MBU26's
-conventional Light RUC line throughout. Expanding it by the VFM Base
-conventional share gives a total pool within about 2.2% of the official pool
-across FY2026–FY2030 and within 1% at both endpoints. Raw light-petrol VKT is
-likewise within 1.31% of MBU26 by FY2030.
-
-The econometric forecasts are close to the official activity paths. The
-divergence is introduced downstream.
+The raw Light RUC econometric forecast sits within about 2% of MBU26's
+conventional line throughout FY2026–FY2030, and expanding it by the VFM Base
+conventional share gives a pool within about 2.2% of the official pool. Raw
+light-petrol VKT is within 1.31% of MBU26 by FY2030. The econometric forecasts
+track the official activity paths closely; the divergence is introduced
+downstream.
 
 ---
 
 ## 7. Provisional verdict
 
 **1. Does λ change the level supplied to the final VFM overlay?**
-Yes, decisively. λ sets both decision-facing activity levels, and the VFM
-overlay preserves the λ-created pool to 1.8e-12 while re-splitting it. λ must
-not be described as lineage-only.
+Yes for Light RUC, no for PED. λ sets the conventional Light RUC line and the
+pool level that the VFM overlay preserves and re-splits, and nothing restores
+the raw forecast. On PED, the raw bridge discards λ's deduction entirely before
+the overlay runs. λ must not be described as lineage-only, but its only
+*decision-facing* effect is on Light RUC.
 
 **2. Should the raw Light RUC model be treated as the conventional anchor?**
-On the evidence, yes — and this is a semantic argument, not a fit argument.
-The Light RUC model's target is conventional-only (established decisively in
-Phase 2: residual exactly 0.0 million km in every year, with the FY2024
-definition break confirming it). A conventional-only forecast is a
-conventional anchor. The present pipeline instead treats it as one of two
-inputs to a universe and then reduces it. Variant C's method — preserve the
-raw forecast as conventional, infer BEV and PHEV by expanding through
-independently sourced VFM Base shares — is the interpretation consistent with
-what the model estimates. It is also the method you correctly defended as
-legitimate when you rejected my broader claim.
+Yes, on semantic grounds. The target is conventional-only (Phase 2: residual
+exactly 0.0 in every year, with the FY2024 definition break confirming it), so a
+conventional-only forecast is a conventional anchor. The pipeline instead treats
+it as one of two inputs to a universe whose shares come from a universe that
+includes EV kilometres, and then reduces it.
 
-**3. FY2030 gap attribution.** PED post-model reduction 218.38 (39.0%), Light
-RUC post-model allocation 211.44 (37.8%), underlying econometrics and all
-other lines −130.08 (23.2%). Additive, interaction exactly zero.
+**3. Is PED double-counted in S5?** No. Withdrawn.
 
-**Layering verdict.** The PED stream carries two sequential prospective
-displacements of petrol activity to EVs with no offset. This is a
-double-count on the evidence available. The Light RUC stream carries one
-allocation, but it is an allocation that lowers the conventional line below
-the model output and inflates the pool by the PED-side deduction.
+**4. Does λ still control the Light RUC pool in S5?** Yes, entirely.
 
-### What is not yet settled
+**5. Is P1/L1 still the preferred candidate?** Partly. **L1 is well supported** —
+it preserves what the model estimates and gives the VFM machinery one job,
+composition. **The choice between P0 and P1 is not settled** by this checkpoint:
+it turns on whether the VFM petrol retention duplicates electrification already
+in the AR(1) path, which is a separate falsification test. My provisional lean
+is P1/L1, because one prospective retention overlay on a raw anchor is
+coherent, but I would not commit to P1 without that test.
 
-- Whether the correct fix is to drop the λ transfer, drop the VFM PED
-  retention, or reconcile them into a single displacement term. That is a
-  design decision for Checkpoint 3, not a finding.
-- Whether MBU26 itself applies any equivalent deduction. I have not
-  re-opened the search for unpublished MBU26 drivers, per your instruction.
-- `_light_ruc_feature_frame` raises `InvalidIndexError: Reindexing only valid
-  with uniquely valued Index objects` when passed scenario-input future rows.
-  Logged as a separate technical defect. It did not block this checkpoint and
-  the public replay path was not needed either, since the committed replay
-  artifacts already carry the raw forecast.
+### What is not settled
+
+- Whether the VFM PED retention duplicates the AR(1) trend. Needs its own test.
+- Whether MBU26 applies an equivalent deduction. Not re-opened, per instruction.
+- `_light_ruc_feature_frame` raises `InvalidIndexError` on scenario-input future
+  rows. Separate technical defect; blocked nothing here.
 
 No production change has been made and no PR has been opened.
 
@@ -282,16 +322,29 @@ No production change has been made and no PR has been opened.
 
 ## 8. Artifacts
 
+Corrected runtime path:
+
 | file | contents |
 |---|---|
-| `runtime_stage_waterfall.csv` | S0→S1 levels, λ, migration total, both transfers, universe construction |
-| `structural_variant_definitions.csv` | PED and Light RUC treatment per variant |
-| `structural_variant_results_fy.csv` | FY2025–FY2030 activity and revenue lines, all variants, MBU26 gap |
-| `reference_a_vs_stored_pack.csv` | S4 overlay vs S1 pack; pool preservation |
-| `ped_displacement_layering.csv` | L0 raw → L1 λ → L2 VFM, per FY |
-| `fy_gap_attribution.csv` | additive decomposition with interaction term |
-| `conservation_audit.csv` | class sums and pool-minus-raw per variant per FY |
-| `revenue_identity_audit.csv` | total NLTF recomputed from components |
-| `checkpoint_2_hard_gates.csv` | all 16 gates with deltas and tolerances |
+| `corrected_runtime_stage_waterfall.csv` | S0–S5 for every activity and revenue series |
+| `corrected_ped_stage_layering.csv` | raw → λ → bridge → macro → VFM, with surviving λ effect |
+| `corrected_light_ruc_stage_trace.csv` | conventional and pool at each stage vs the raw model |
+| `corrected_structural_matrix_2x2.csv` | P0/P1 × L0/L1, FY2026–FY2030 |
+| `corrected_signed_gap_attribution.csv` | signed contributions, closure residual 0.0 |
+| `corrected_runtime_parity_gates.csv` | the nine parity gates |
+| `front_end_default_state.csv` | the default selector and policy states used |
+| `s5_front_end_rows.csv` | the decision-facing values |
+
+Stored-pack mechanics (first pass, still valid for §1):
+
+| file | contents |
+|---|---|
+| `runtime_stage_waterfall.csv` | S0→S1 λ transfer and universe construction |
+| `structural_variant_results_fy.csv` | stored-pack variant matrix |
+| `conservation_audit.csv`, `revenue_identity_audit.csv` | closure checks |
+| `checkpoint_2_hard_gates.csv` | the sixteen stored-pack gates |
 | `compact_falsification_metrics.csv` | structural diagnostic percentages |
-| `actual_anchor_and_continuity.csv` | FY2025 anchor and FY2025→FY2026 step |
+
+Superseded, retained only as the correction record:
+`ped_displacement_layering.csv`, `reference_a_vs_stored_pack.csv`,
+`reference_a_front_end_with_vfm_overlay.csv`, `fy_gap_attribution.csv`.
