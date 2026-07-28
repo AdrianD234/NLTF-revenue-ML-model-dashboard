@@ -1267,12 +1267,12 @@ def test_policy_replay_builds_twelve_paths_with_formula_closed_net_ruc(
             ) == pytest.approx(
                 float(
                     rows.at[
-                        "current_light_ruc_total_modelled_km", "value"
+                        "current_light_ruc_conventional_modelled_km", "value"
                     ]
                 )
                 - float(
                     base.at[
-                        "current_light_ruc_total_modelled_km", "value"
+                        "current_light_ruc_conventional_modelled_km", "value"
                     ]
                 ),
                 rel=1e-12,
@@ -1833,7 +1833,9 @@ def test_append_creates_three_distinct_idempotent_traces_with_exact_replay_value
     for level in CONFLICT_FUEL_SCENARIO_LEVELS:
         scenario_name = conflict_scenario_name(level)
         fuel_rows = combined[combined["scenario_name"].astype(str).eq(scenario_name)]
-        assert len(fuel_rows) == len(base_rows) == 736
+        # 736 was the pre-H20 row count. The invariant is that a conflict
+        # trace mirrors the Base rows one-for-one, so derive it.
+        assert len(fuel_rows) == len(base_rows) > 0
         assert set(fuel_rows["trace_name"].astype(str)) == {conflict_trace_name(level)}
         assert set(fuel_rows["scenario_role"].astype(str)) == {"comparison"}
         assert set(fuel_rows["conflict_fuel_severity"].astype(str)) == {level}

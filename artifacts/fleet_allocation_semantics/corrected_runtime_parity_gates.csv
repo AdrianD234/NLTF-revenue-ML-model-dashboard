@@ -1,0 +1,10 @@
+check,max_abs_delta,tolerance,status
+S2_raw_bridge_restores_raw_ped_vkt,0.0,1e-06,pass
+S2_minus_S1_ped_equals_one_minus_lambda_times_M,1.8189894035458565e-12,1e-06,pass
+S2_leaves_light_ruc_classes_unchanged,0.0,1e-06,pass
+S4_matches_load_dashboard_frame[5_series],0.0,1e-06,pass
+S5_fed_policy_leaves_ev_class_km_unchanged,0.0,1e-06,pass
+additive_revenue_identity_holds,4.547473508864641e-13,1e-06,pass
+no_surviving_lambda_ped_deduction_after_S2,0.0,1e-06,pass
+matrix_cell_P1_L0_reproduces_S5_front_end,0.0,1e-06,pass
+signed_gap_decomposition_closes,0.0,1e-06,pass

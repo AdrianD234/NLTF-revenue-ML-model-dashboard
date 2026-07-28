@@ -30,6 +30,7 @@ from model_dashboard.fuel_price_scenario import (
     apply_treasury_macro_to_chart_rows,
     run_treasury_baseline_macro_replay,
 )
+from model_dashboard.light_fleet_allocation import LAST_DECISION_GRADE_ANNUAL_FY
 from model_dashboard.revenue_outlook import (
     PED_BRIDGE_DEFAULT_MODE,
     apply_ped_bridge_mode_layer,
@@ -41,15 +42,31 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 @pytest.mark.parametrize("source", SOURCE_OPTIONS)
-def test_every_source_carries_the_six_rows_over_the_forecast_era(
+def test_every_source_carries_the_six_rows_over_its_published_era(
     source: str,
 ) -> None:
+    """External sources run to FY2050; the current model stops at FY2030.
+
+    The current-model Light RUC path is withheld beyond H20 because the
+    conventional-anchor share expansion diverges at long horizons, so the
+    dashboard source deliberately ends at FY2030 while MBU26 and the VFM
+    scenarios continue over their published horizon.
+    """
     frame = load_source_frame(ROOT, source)
     assert list(frame.columns) == ROW_KEYS
-    for fy in (2025, 2030, 2040, 2050):
+    expected = (
+        (2025, 2030)
+        if source == DASHBOARD_SOURCE
+        else (2025, 2030, 2040, 2050)
+    )
+    for fy in expected:
         assert fy in frame.index, f"{source} missing FY{fy}"
+    if source == DASHBOARD_SOURCE:
+        assert frame.index.max() == LAST_DECISION_GRADE_ANNUAL_FY, (
+            "the current-model path must stop at the last decision-grade June year"
+        )
     forecast = frame.loc[2025:2050]
-    assert not forecast.isna().any().any(), f"{source} has gaps in the forecast era"
+    assert not forecast.isna().any().any(), f"{source} has gaps in its published era"
     assert (forecast >= 0).all().all(), f"{source} has negative volumes"
 
 
@@ -122,8 +139,12 @@ def test_dashboard_fleet_petrol_vkt_uses_same_lineage_as_ped_litres() -> None:
         - 1.0
     )
     # Treasury's stronger governed baseline narrows the dashboard-versus-MBU
-    # FY2030 gap from the legacy macro path's roughly -7.42%.
-    assert fy2030_change == pytest.approx(-0.0587, abs=0.0002)
+    # FY2030 gap from the legacy macro path's roughly -7.42%. The expected
+    # value moved from -0.0587 when the pack stopped carrying a lambda-reduced
+    # PED level: the raw bridge always restored raw PED, but the macro replay
+    # rescales relative to the pack baseline, so removing lambda from the pack
+    # shifts this by about 0.03pp. The tolerance is unchanged.
+    assert fy2030_change == pytest.approx(-0.0584, abs=0.0002)
 
 
 def test_dashboard_fleet_preserves_light_and_heavy_class_pools() -> None:
@@ -172,7 +193,7 @@ def test_dashboard_fleet_preserves_light_and_heavy_class_pools() -> None:
         & bridge_rows["time_grain"].astype(str).eq("june_year")
         & bridge_rows["series_id"].astype(str).eq("heavy_ruc_net_km")
     ].set_index("june_year")["value"]
-    for fy in range(2026, 2051):
+    for fy in range(2026, LAST_DECISION_GRADE_ANNUAL_FY + 1):
         light_total = dashboard.loc[
             fy,
             ["light_ruc_net_km", "light_bev_ruc_net_km", "phev_ruc_net_km"],

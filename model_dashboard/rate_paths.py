@@ -901,6 +901,24 @@ def apply_fed_rate_policy_to_chart_rows(
     return data, pd.DataFrame(audit_rows)
 
 
+def _reject_official_scope(scenario_roles: set[str] | tuple[str, ...] | None, helper: str) -> None:
+    """The current-model helpers may not touch official-comparator rows.
+
+    The two scopes are different calculations, not one calculation over two
+    role sets. The current model gets a behavioural fixed-finalist replay
+    bounded by its own horizon; the official comparator gets a rate-only
+    counterfactual with volumes fixed, over the source horizon. Routing an
+    official row through here is what let the current-model horizon truncate
+    the published comparator, so it fails loudly rather than silently.
+    """
+    if scenario_roles and OFFICIAL_SCOPE in {str(role) for role in scenario_roles}:
+        raise ValueError(
+            f"{helper} is a current-model helper and cannot process '{OFFICIAL_SCOPE}' rows. "
+            "Use apply_official_comparator_rate_policy_to_chart_rows, which sources its own "
+            "schedule from the MBU26 spine and publishes over the official horizon."
+        )
+
+
 def apply_fed_uplift_delay_to_chart_rows(
     chart_rows: pd.DataFrame,
     factors: dict[int, float],
@@ -911,6 +929,7 @@ def apply_fed_uplift_delay_to_chart_rows(
     ruc_class_revenue_by_fy: dict[int, float] | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Apply the six-month delay while preserving the source pack."""
+    _reject_official_scope(scenario_roles, "apply_fed_uplift_delay_to_chart_rows")
     return apply_fed_rate_policy_to_chart_rows(
         chart_rows,
         factors,
@@ -931,6 +950,7 @@ def apply_fed_uplift_off_to_chart_rows(
     ruc_class_revenue_by_fy: dict[int, float] | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Backward-compatible no-uplift wrapper around the generic overlay."""
+    _reject_official_scope(scenario_roles, "apply_fed_uplift_off_to_chart_rows")
     return apply_fed_rate_policy_to_chart_rows(
         chart_rows,
         factors,
@@ -939,3 +959,460 @@ def apply_fed_uplift_off_to_chart_rows(
         policy_pair_factors=policy_pair_factors,
         ruc_class_revenue_by_fy=ruc_class_revenue_by_fy,
     )
+
+
+# ---------------------------------------------------------------------------
+# Official-comparator policy factors
+#
+# The current-model policy replay is bounded by the supported current-model
+# horizon (H20 / FY2030). The MBU26 official comparator is a different scope:
+# it has no behavioural replay, receives a rate-only counterfactual with
+# official volumes held fixed, and publishes over its own horizon. The two
+# must not share one factor map, or the current-model cutoff would silently
+# truncate the official comparator.
+#
+# These factors are derived from the MBU26 spine and the governed rate
+# schedules - never from current-model chart rows.
+# ---------------------------------------------------------------------------
+
+OFFICIAL_SCOPE = "official_comparator"
+CURRENT_MODEL_SCOPE = "current_model"
+OFFICIAL_FACTOR_COLUMNS = (
+    "scenario_scope",
+    "policy_state",
+    "june_year",
+    "source_rate_nzd_per_litre",
+    "target_rate_nzd_per_litre",
+    "nominal_wedge_nzd_per_litre",
+    "wedge_basis",
+    "source_schedule_fy",
+    "factor",
+    "first_supported_fy",
+    "last_supported_fy",
+    "source_file",
+    "source_sha256",
+    "transformation_basis",
+)
+_OFFICIAL_SPINE_REL = "data/revenue_model_source_pack/mbu26_annual_spine/mbu26_official_annual.csv"
+
+
+def _sha256_of(path: Path) -> str:
+    import hashlib
+
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def governed_no_uplift_wedge_schedule(
+    repo_root: Path,
+) -> tuple[dict[int, float], float, int, int]:
+    """Per-June-year nominal no-uplift wedge, from the governed schedules.
+
+    Returns ``(wedge_by_fy, terminal_wedge, last_source_fy, first_uplift_fy)``.
+
+    The wedge is NOT a single constant. The 12c uplift lands in January 2027,
+    which is halfway through FY2027, so the governed annual planned rate for
+    FY2027 carries only about half of it:
+
+        FY2026 and earlier   wedge 0.00
+        FY2027               wedge 0.06   (two quarters pre-step, two post)
+        FY2028 onward        wedge 0.12
+
+    Every directly governed year therefore uses its own source-derived wedge.
+    Only years beyond the source schedule carry the terminal wedge forward, so
+    the no-uplift path stays parallel to the planned path.
+    """
+    fed = _fed_rate_paths(repo_root)
+    by_path = fed.groupby(["fed_path", "FY"])["rate_nzd_per_litre"].mean()
+    planned = by_path.get(_PLANNED_PATH, pd.Series(dtype=float))
+    no_uplift = by_path.get(_NO_UPLIFT_PATH, pd.Series(dtype=float))
+    shared = sorted(set(planned.index.astype(int)) & set(no_uplift.index.astype(int)))
+    if not shared:
+        raise ValueError(
+            "Governed FED rate schedules carry no year with both a planned and a "
+            "no-uplift rate; the nominal wedge cannot be derived."
+        )
+    wedge_by_fy = {
+        int(year): float(planned.loc[year]) - float(no_uplift.loc[year]) for year in shared
+    }
+    if any(value < -1e-9 for value in wedge_by_fy.values()):
+        raise ValueError("Governed no-uplift schedule is above the planned schedule.")
+    last_source_fy = int(shared[-1])
+    terminal_wedge = wedge_by_fy[last_source_fy]
+    if terminal_wedge <= 0:
+        raise ValueError(f"Terminal no-uplift wedge is not positive ({terminal_wedge}).")
+    first_uplift_fy = next(
+        (year for year in shared if wedge_by_fy[year] > 1e-9), last_source_fy
+    )
+    return wedge_by_fy, terminal_wedge, last_source_fy, int(first_uplift_fy)
+
+
+def official_comparator_policy_factors(
+    repo_root: Path, policy_state: str = FED_POLICY_STATE_NO_UPLIFT
+) -> pd.DataFrame:
+    """Rate-only MBU26 counterfactual factors over the official horizon.
+
+    ``no_uplift``: carry the final governed per-year wedge where the source
+    schedule has one, and the terminal wedge only beyond it, so the comparator stays parallel to the
+    planned schedule instead of stopping where the current model stops.
+
+    ``delay_6m``: identity outside the affected FY2027 window, because the
+    six-month delay only shifts the timing of the initial step.
+
+    Fails closed for a June year whose official published PED rate cannot be
+    derived: the policy-adjusted official trace must never silently fall back
+    to published values while claiming the policy was applied.
+    """
+    spine = _mbu26_spine(repo_root)
+    for column in ("gross_ped_revenue", "ped_volume"):
+        if column not in spine.columns:
+            raise ValueError(
+                f"MBU26 spine is missing {column}; official policy factors cannot be derived."
+            )
+
+    wedge_by_fy, terminal_wedge, last_source_fy, uplift_start_fy = (
+        governed_no_uplift_wedge_schedule(repo_root)
+    )
+    delayed_years = set(fed_policy_affected_periods(repo_root, FED_POLICY_STATE_DELAYED_6M))
+    quarterly = ped_quarterly_rate_schedules(repo_root)
+    delayed_src = quarterly.groupby("FY")[_DELAYED_SEGMENT].mean()
+    fed = _fed_rate_paths(repo_root)
+    planned_by_fy = (
+        fed[fed["fed_path"].astype(str).eq(_PLANNED_PATH)].groupby("FY")["rate_nzd_per_litre"].mean()
+    )
+    source_sha = _sha256_of(repo_root / _OFFICIAL_SPINE_REL)
+
+    published = (spine["gross_ped_revenue"] / spine["ped_volume"]).dropna()
+    published = published[published > 0]
+    if published.empty:
+        raise ValueError("No official published PED rate could be derived from the MBU26 spine.")
+    first_fy, last_fy = int(published.index.min()), int(published.index.max())
+
+    rows: list[dict[str, Any]] = []
+    for fy in sorted(int(value) for value in published.index):
+        source_rate = float(published.loc[fy])
+        if policy_state == FED_POLICY_STATE_NO_UPLIFT:
+            if fy < uplift_start_fy:
+                continue  # the uplift does not exist yet, so no counterfactual
+            if fy in wedge_by_fy:
+                nominal_wedge = wedge_by_fy[fy]
+                wedge_basis = "direct_source"
+                source_schedule_fy = fy
+                basis = (
+                    "official published rate = gross_ped_revenue / ped_volume; nominal "
+                    f"wedge {nominal_wedge:.6f} taken directly from the governed FY{fy} "
+                    "planned-minus-no-uplift schedules"
+                )
+            else:
+                nominal_wedge = terminal_wedge
+                wedge_basis = "carried_terminal"
+                source_schedule_fy = last_source_fy
+                basis = (
+                    "official published rate = gross_ped_revenue / ped_volume; terminal "
+                    f"wedge {terminal_wedge:.6f} from governed FY{last_source_fy} carried "
+                    "forward beyond the source schedule"
+                )
+            target_rate = source_rate - nominal_wedge
+        elif policy_state == FED_POLICY_STATE_DELAYED_6M:
+            if fy not in delayed_years:
+                continue  # identity outside the affected window
+            if fy not in set(delayed_src.index.astype(int)) or fy not in set(
+                planned_by_fy.index.astype(int)
+            ):
+                raise ValueError(
+                    f"Official delayed policy needs governed planned and delayed rates for "
+                    f"FY{fy}; at least one is unavailable. Refusing to fall back to published."
+                )
+            ratio = float(delayed_src.loc[fy]) / float(planned_by_fy.loc[fy])
+            target_rate = source_rate * ratio
+            nominal_wedge = source_rate - target_rate
+            wedge_basis = "direct_source"
+            source_schedule_fy = fy
+            basis = "official published rate scaled by the governed delayed/planned rate ratio"
+        else:
+            continue
+        if target_rate <= 0:
+            raise ValueError(
+                f"Official {policy_state} target rate for FY{fy} is not positive ({target_rate})."
+            )
+        rows.append(
+            {
+                "scenario_scope": OFFICIAL_SCOPE,
+                "policy_state": policy_state,
+                "june_year": fy,
+                "source_rate_nzd_per_litre": source_rate,
+                "target_rate_nzd_per_litre": target_rate,
+                "nominal_wedge_nzd_per_litre": nominal_wedge,
+                "wedge_basis": wedge_basis,
+                "source_schedule_fy": source_schedule_fy,
+                "factor": target_rate / source_rate,
+                "first_supported_fy": first_fy,
+                "last_supported_fy": last_fy,
+                "source_file": _OFFICIAL_SPINE_REL,
+                "source_sha256": source_sha,
+                "transformation_basis": basis,
+            }
+        )
+    return pd.DataFrame(rows, columns=list(OFFICIAL_FACTOR_COLUMNS))
+
+
+def official_comparator_factor_map(
+    repo_root: Path, policy_state: str = FED_POLICY_STATE_NO_UPLIFT
+) -> dict[int, float]:
+    """Per-FY multiplier for the official comparator, keyed by June year."""
+    frame = official_comparator_policy_factors(repo_root, policy_state)
+    return {
+        int(record.june_year): float(record.factor)
+        for record in frame.itertuples()
+        if abs(float(record.factor) - 1.0) > 1e-9
+    }
+
+
+def apply_official_comparator_rate_policy_to_chart_rows(
+    chart_rows: pd.DataFrame,
+    repo_root: Path,
+    *,
+    policy_state: str,
+    ruc_class_revenue_by_fy: dict[int, float] | None = None,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Apply the rate-only MBU26 counterfactual over the official horizon.
+
+    Deliberately does NOT accept a factor dictionary. The official comparator
+    sources its own schedule from the MBU26 spine and the governed rate paths,
+    so a current-model factor map can never be looked up for an official row -
+    which is what allowed the current-model H20 cutoff to truncate the
+    published official horizon.
+
+    Official activity, administration and refunds stay fixed; only the rate is
+    counterfactual, and all five official RUC class-revenue leaves are
+    repriced by the same ratio.
+    """
+    if chart_rows is None or chart_rows.empty:
+        return chart_rows, pd.DataFrame()
+    if str(policy_state) == FED_POLICY_STATE_PUBLISHED:
+        return chart_rows, pd.DataFrame()  # published leaves MBU26 unchanged
+
+    factors = official_comparator_factor_map(repo_root, policy_state)
+    if not factors:
+        return chart_rows, pd.DataFrame()
+
+    adjusted, audit = apply_fed_rate_policy_to_chart_rows(
+        chart_rows,
+        factors,
+        policy_state=policy_state,
+        scenario_roles={OFFICIAL_SCOPE},
+        ruc_class_revenue_by_fy=(
+            ruc_class_revenue_by_fy
+            if ruc_class_revenue_by_fy is not None
+            else mbu26_ruc_class_revenue_by_fy(repo_root)
+        ),
+    )
+    if not audit.empty:
+        audit = audit.copy()
+        audit["scenario_scope"] = OFFICIAL_SCOPE
+        audit["rate_only_fixed_volumes"] = True
+        audit["factor_source"] = "official_comparator_policy_factors"
+    return adjusted, audit
+
+
+# ---------------------------------------------------------------------------
+# Official-comparator policy audit
+#
+# Four audit rows are not enough to review a counterfactual that moves nine
+# reported components. Every affected component gets a row per June year,
+# including hidden source leaves such as Heavy BEV that never become visible
+# chart rows but do change the totals.
+# ---------------------------------------------------------------------------
+
+OFFICIAL_POLICY_AUDIT_COLUMNS = (
+    "fy",
+    "policy_state",
+    "component",
+    "component_kind",
+    "source_series",
+    "original_value",
+    "source_effective_ped_rate",
+    "nominal_wedge_nzd_per_litre",
+    "wedge_basis",
+    "source_schedule_fy",
+    "target_ped_rate",
+    "selected_rate_factor",
+    "adjusted_value",
+    "delta",
+    "fixed_volume_status",
+    "published_source_residual",
+    "closure_residual",
+    "source_file",
+    "source_sha256",
+    "transformation_basis",
+)
+
+# component -> (reporting name, source series). Order is the reporting order.
+_OFFICIAL_AUDIT_REPRICED = (
+    ("gross_ped_revenue", "gross_ped_revenue"),
+    ("conventional_light_ruc_revenue", "light_ruc_net_revenue"),
+    ("light_bev_revenue", "light_bev_ruc_net_revenue"),
+    ("phev_revenue", "phev_ruc_net_revenue"),
+    ("heavy_ruc_revenue", "heavy_ruc_net_revenue"),
+    ("heavy_bev_revenue", "heavy_bev_ruc_net_revenue"),
+)
+_OFFICIAL_AUDIT_FIXED = (
+    "ruc_admin_revenue",
+    "ruc_refunds",
+    "fed_refunds",
+    "mvr_admin_revenue",
+    "mvr_refunds",
+    "gross_lpg_revenue",
+    "gross_cng_revenue",
+    "tuc_net_revenue",
+)
+_OFFICIAL_AUDIT_AGGREGATES = ("net_fed_revenue", "total_ruc_net_revenue", "total_nltf_net_revenue")
+
+
+def _official_formula_totals(row: pd.Series, ped: float, ruc_leaves: dict[str, float]) -> dict[str, float]:
+    """Rebuild the three official totals from leaves and fixed components.
+
+    Run twice per June year - once on published values and once on adjusted
+    values - so the published spine's own residual can be separated from the
+    policy arithmetic instead of being silently absorbed into it.
+    """
+    gross_ruc = sum(ruc_leaves.values()) + float(row["ruc_refunds"])
+    total_ruc = gross_ruc - float(row["ruc_admin_revenue"]) - float(row["ruc_refunds"])
+    gross_fed = ped + float(row["gross_lpg_revenue"]) + float(row["gross_cng_revenue"])
+    net_fed = gross_fed - float(row["fed_refunds"])
+    gross_mvr = float(row["mr1_revenue"]) + float(row["mr2_revenue"]) + float(row["coo_revenue"])
+    total_gross = gross_ruc + gross_fed + gross_mvr + float(row["tuc_net_revenue"])
+    total_admin = float(row["ruc_admin_revenue"]) + float(row["mvr_admin_revenue"]) + float(row["coo_revenue"])
+    total_refunds = float(row["ruc_refunds"]) + float(row["fed_refunds"]) + float(row["mvr_refunds"])
+    return {
+        "net_fed_revenue": net_fed,
+        "total_ruc_net_revenue": total_ruc,
+        "total_nltf_net_revenue": total_gross - total_admin - total_refunds,
+    }
+
+
+def official_comparator_policy_audit_frame(
+    repo_root: Path, policy_state: str = FED_POLICY_STATE_NO_UPLIFT
+) -> pd.DataFrame:
+    """Per-FY, per-component audit of the official rate-only counterfactual.
+
+    Covers all nine affected components plus the fixed rows that must NOT
+    move, so "administration and refunds are unchanged" is evidenced rather
+    than asserted.
+
+    ``published_source_residual`` carries the MBU26 spine's own formula
+    inconsistency where one exists - FY2027 Total RUC is about 0.63 off in the
+    published source. It is reported, never corrected: published MBU26 must
+    stay unchanged. ``closure_residual`` is the policy arithmetic alone, net of
+    that source residual, and must close to 1e-6.
+    """
+    spine = _mbu26_spine(repo_root)
+    factors = official_comparator_policy_factors(repo_root, policy_state)
+    if factors.empty:
+        return pd.DataFrame(columns=list(OFFICIAL_POLICY_AUDIT_COLUMNS))
+    source_sha = _sha256_of(repo_root / _OFFICIAL_SPINE_REL)
+
+    rows: list[dict[str, Any]] = []
+    for record in factors.itertuples():
+        fy = int(record.june_year)
+        if fy not in spine.index:
+            continue
+        source = spine.loc[fy]
+        factor = float(record.factor)
+        common = {
+            "fy": fy,
+            "policy_state": policy_state,
+            "source_effective_ped_rate": float(record.source_rate_nzd_per_litre),
+            "nominal_wedge_nzd_per_litre": float(record.nominal_wedge_nzd_per_litre),
+            "wedge_basis": str(record.wedge_basis),
+            "source_schedule_fy": int(record.source_schedule_fy),
+            "target_ped_rate": float(record.target_rate_nzd_per_litre),
+            "selected_rate_factor": factor,
+            "source_file": _OFFICIAL_SPINE_REL,
+            "source_sha256": source_sha,
+        }
+
+        published_ped = float(source["gross_ped_revenue"])
+        adjusted_ped = published_ped * factor
+        published_leaves = {series: float(source[series]) for series in _RUC_REVENUE_LEAVES}
+        adjusted_leaves = {series: value * factor for series, value in published_leaves.items()}
+
+        for component, series in _OFFICIAL_AUDIT_REPRICED:
+            original = float(source[series])
+            adjusted = original * factor
+            rows.append(
+                {
+                    **common,
+                    "component": component,
+                    "component_kind": "repriced_leaf",
+                    "source_series": series,
+                    "original_value": original,
+                    "adjusted_value": adjusted,
+                    "delta": adjusted - original,
+                    "fixed_volume_status": "volume_fixed_rate_only",
+                    "published_source_residual": 0.0,
+                    "closure_residual": 0.0,
+                    "transformation_basis": (
+                        f"{series} x official rate factor {factor:.12f}; official volume held "
+                        f"fixed. {record.transformation_basis}"
+                    ),
+                }
+            )
+
+        for series in _OFFICIAL_AUDIT_FIXED:
+            original = float(source[series])
+            rows.append(
+                {
+                    **common,
+                    "component": series,
+                    "component_kind": "fixed",
+                    "source_series": series,
+                    "original_value": original,
+                    "adjusted_value": original,
+                    "delta": 0.0,
+                    "fixed_volume_status": "fixed_component_not_repriced",
+                    "published_source_residual": 0.0,
+                    "closure_residual": 0.0,
+                    "transformation_basis": (
+                        "MBU26 fixed component: administration, refunds and non-PED fuel "
+                        "duties are unaffected by a PED rate counterfactual."
+                    ),
+                }
+            )
+
+        published_totals = _official_formula_totals(source, published_ped, published_leaves)
+        adjusted_totals = _official_formula_totals(source, adjusted_ped, adjusted_leaves)
+        ped_delta = adjusted_ped - published_ped
+        ruc_delta = sum(adjusted_leaves.values()) - sum(published_leaves.values())
+        expected_delta = {
+            "net_fed_revenue": ped_delta,
+            "total_ruc_net_revenue": ruc_delta,
+            "total_nltf_net_revenue": ped_delta + ruc_delta,
+        }
+        for component in _OFFICIAL_AUDIT_AGGREGATES:
+            published = float(source[component])
+            source_residual = published_totals[component] - published
+            # The reported value keeps the published source trace and adds only
+            # the policy delta, so a source inconsistency is never quietly
+            # rebased away by the counterfactual.
+            adjusted = published + expected_delta[component]
+            closure = (adjusted_totals[component] - source_residual) - adjusted
+            rows.append(
+                {
+                    **common,
+                    "component": component,
+                    "component_kind": "rebuilt_aggregate",
+                    "source_series": component,
+                    "original_value": published,
+                    "adjusted_value": adjusted,
+                    "delta": expected_delta[component],
+                    "fixed_volume_status": "volume_fixed_rate_only",
+                    "published_source_residual": source_residual,
+                    "closure_residual": closure,
+                    "transformation_basis": (
+                        "rebuilt formulaically from repriced leaves plus fixed MBU26 "
+                        "components; published source value preserved and only the policy "
+                        "delta added"
+                    ),
+                }
+            )
+    return pd.DataFrame(rows, columns=list(OFFICIAL_POLICY_AUDIT_COLUMNS))

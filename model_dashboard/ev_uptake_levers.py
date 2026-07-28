@@ -23,11 +23,15 @@ and overlay rows are tagged (value_status="lever_adjusted").
 """
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, asdict
+from pathlib import Path
 from typing import Any
 
 import numpy as np
 import pandas as pd
+
+from .light_fleet_allocation import composition_shares
 
 VFM_SOURCE_NOTE = (
     "Share curves follow the MoT Vehicle Fleet Model 202405. The S-shape is a "
@@ -378,7 +382,22 @@ EV_UPTAKE_PRESETS: dict[str, UptakeLevers] = {
 # retained so parity tests and diagnostics can request a no-overlay view.
 GOVERNED_PACK_OPTION = "Governed pack (MBU26 λ-migration)"
 CUSTOM_OPTION = "Custom levers"
-EV_UPTAKE_MODE_OPTIONS = (*EV_UPTAKE_PRESETS.keys(), CUSTOM_OPTION)
+
+# The named MoT VFM modes read the EXACT vendored scenario tables. The fitted
+# logistic presets above track those tables to within ~1.5pp, which is fine for
+# a sensitivity but is not the governed source: shipping the fit as "MoT VFM
+# base" put an approximation on the decision-facing default path and moved
+# conventional Light RUC off its post-macro anchor. The fit is still available,
+# but only under a name that says what it is.
+EXACT_VFM_UPTAKE_BASES = ("MoT VFM base", "MoT VFM fast", "MoT VFM slow")
+PARAMETRIC_VFM_BASE_FIT_OPTION = "Parametric approximation to VFM Base (audit sensitivity)"
+HEAVY_BEV_TRANSITION_NOTE = (
+    "Heavy BEV transition is a separate, explicit sensitivity and is Off by "
+    "default. Under the settled HEAVY_RUC: not_reclassified contract, Heavy "
+    "BEV is a fixed MBU26 component of the current-finalist path, so a LIGHT "
+    "fleet composition choice must never reclassify Heavy RUC kilometres."
+)
+EV_UPTAKE_MODE_OPTIONS = (*EXACT_VFM_UPTAKE_BASES, CUSTOM_OPTION, PARAMETRIC_VFM_BASE_FIT_OPTION)
 DEFAULT_EV_UPTAKE_MODE = "MoT VFM base"
 
 
@@ -489,14 +508,50 @@ def _pool_from_labels(
     return total
 
 
+def exact_vfm_share_curves(
+    june_years: Iterable[int],
+    uptake_basis: str,
+    *,
+    repo_root: Path | str,
+) -> pd.DataFrame:
+    """Composition shares read from the vendored VFM tables, not a fitted curve.
+
+    ``lever_share_curves`` returns a logistic approximation fitted to the VFM
+    scenarios to within about 1.5 percentage points. That is a legitimate
+    sensitivity, but it is not the governed source, and it must never stand in
+    for the exact table on the decision-facing path: at the Base setting the
+    fitted curve moved conventional Light RUC off its post-macro anchor by
+    -134 to +110 million km.
+    """
+    rows = []
+    for june_year in sorted({int(value) for value in june_years}):
+        shares, vfm_scenario = composition_shares(
+            june_year, repo_root=repo_root, uptake_basis=uptake_basis
+        )
+        rows.append(
+            {
+                "june_year": june_year,
+                "conventional": shares["conventional"],
+                "bev": shares["bev"],
+                "phev": shares["phev"],
+                "vfm_scenario": vfm_scenario,
+                "share_source": "exact_vendored_vfm_table",
+            }
+        )
+    return pd.DataFrame(rows)
+
+
 def apply_uptake_levers_to_chart_rows(
     chart_rows: pd.DataFrame,
     drift_assumptions: pd.DataFrame,
     levers: UptakeLevers,
     *,
     adjust_ped: bool = True,
+    uptake_basis: str | None = None,
+    repo_root: Path | str | None = None,
+    heavy_bev_transition: bool = False,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Reallocate the light RUC pool with lever shares (display overlay).
+    """Reallocate the light RUC pool with the selected composition shares.
 
     The pool for each (scenario, FY) is the full displayed light RUC universe
     - the sum of the conventional/BEV/PHEV km series in the pack - so the
@@ -506,6 +561,18 @@ def apply_uptake_levers_to_chart_rows(
     revenue series receive the additive delta. Native forecast quarters are
     proportionally rebased to the adjusted June-year activity values;
     historical actuals and official-comparator rows remain untouched.
+
+    ``uptake_basis`` selects the EXACT vendored VFM scenario table. Passing it
+    is what makes the Base setting reproduce the canonical allocation around
+    the post-macro conventional anchor rather than a fitted approximation of
+    it. Only an explicit custom composition falls back to the parametric
+    ``levers`` curve.
+
+    ``heavy_bev_transition`` gates the Heavy BEV reclassification, which is
+    Off by default. It ran unconditionally, so choosing a LIGHT uptake basis
+    silently moved Heavy RUC km and revenue into Heavy BEV - contradicting the
+    settled ``HEAVY_RUC: not_reclassified`` contract, under which Heavy BEV is
+    a fixed MBU26 component of the current-finalist path.
     """
     if chart_rows is None or chart_rows.empty:
         return chart_rows, pd.DataFrame()
@@ -514,7 +581,14 @@ def apply_uptake_levers_to_chart_rows(
         return chart_rows, pd.DataFrame()
 
     fys = sorted({fy for _, fy in rate_lookup})
-    shares = lever_share_curves(fys, levers).set_index("june_year")
+    if uptake_basis is not None:
+        if repo_root is None:
+            raise ValueError("An exact VFM uptake basis requires repo_root to locate the table.")
+        shares = exact_vfm_share_curves(fys, uptake_basis, repo_root=repo_root).set_index("june_year")
+        share_source = "exact_vendored_vfm_table"
+    else:
+        shares = lever_share_curves(fys, levers).set_index("june_year")
+        share_source = "parametric_custom_levers"
 
     data = chart_rows.copy()
     numeric_value = pd.to_numeric(data.get("value"), errors="coerce")
@@ -524,7 +598,12 @@ def apply_uptake_levers_to_chart_rows(
 
     fys_index = shares.index
     retention = ped_retention_curve(fys_index, levers)
-    heavy_share = heavy_bev_share_curve(fys_index, levers)
+    # Off by default: a Light RUC composition choice must not reclassify Heavy.
+    heavy_share = (
+        heavy_bev_share_curve(fys_index, levers)
+        if heavy_bev_transition
+        else pd.Series(0.0, index=fys_index)
+    )
 
     # One pass builds (scenario, FY, series) -> row labels for the june-year
     # forecast rows; the per-(scenario, FY) loop below then never recomputes
@@ -664,6 +743,11 @@ def apply_uptake_levers_to_chart_rows(
                 "ped_revenue_delta_vs_pack": ped_revenue_delta,
                 "heavy_bev_share": 1.0 - heavy_factor,
                 "heavy_revenue_reallocated_to_bev": heavy_reallocated,
+                # Records whether the shares came from the governed table or a
+                # fitted curve, so a reviewer can tell the two apart on sight.
+                "share_source": share_source,
+                "uptake_basis": str(uptake_basis or "custom_levers"),
+                "heavy_bev_transition_enabled": bool(heavy_bev_transition),
             }
         )
 

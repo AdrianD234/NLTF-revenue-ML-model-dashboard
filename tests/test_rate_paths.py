@@ -5,17 +5,20 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+from model_dashboard.light_fleet_allocation import LAST_DECISION_GRADE_ANNUAL_FY
 from model_dashboard.rate_paths import (
     FED_POLICY_METADATA_COLUMNS,
     FED_POLICY_STATE_DELAYED_6M,
     FED_POLICY_STATE_NO_UPLIFT,
     apply_fed_uplift_delay_to_chart_rows,
     apply_fed_uplift_off_to_chart_rows,
+    apply_official_comparator_rate_policy_to_chart_rows,
     fed_policy_affected_periods,
     fed_policy_quarterly_factors,
     fed_uplift_delayed_factors,
     fed_uplift_off_factors,
     mbu26_ruc_class_revenue_by_fy,
+    official_comparator_factor_map,
     ped_rate_change_quarterly_factors,
     ped_quarterly_rate_schedules,
     ped_rate_schedules,
@@ -36,9 +39,17 @@ def test_ped_schedules_carry_the_legislated_wedge_forward(pack_chart_rows) -> No
     # rates carry sub-cent rounding, hence the 2e-3 tolerance)
     assert schedules.loc[2027, "planned"] - schedules.loc[2027, "no_uplift"] == pytest.approx(0.06, abs=2e-3)
     assert schedules.loc[2028, "planned"] - schedules.loc[2028, "no_uplift"] == pytest.approx(0.12, abs=2e-3)
-    # beyond the window the wedge stays parallel
-    assert schedules.loc[2040, "planned"] - schedules.loc[2040, "no_uplift"] == pytest.approx(0.12, abs=2e-3)
-    assert schedules.loc[2050, "planned"] - schedules.loc[2050, "no_uplift"] == pytest.approx(0.12, abs=2e-3)
+    # Beyond the legislated window the wedge stays parallel, for every year the
+    # schedule actually reaches. Pinning FY2040/FY2050 assumed the pre-policy
+    # current-model horizon; the schedule now ends with the current
+    # decision-facing horizon, while the official comparator keeps its own
+    # reach (see test_official_comparator_policy_horizon.py).
+    beyond_window = [year for year in schedules.index if int(year) >= 2028]
+    assert beyond_window, "the schedule must extend past the legislated step"
+    for year in beyond_window:
+        assert schedules.loc[year, "planned"] - schedules.loc[year, "no_uplift"] == pytest.approx(
+            0.12, abs=2e-3
+        ), f"wedge is not parallel in FY{year}"
     # pre-policy years have no wedge
     assert schedules.loc[2026, "planned"] - schedules.loc[2026, "no_uplift"] == pytest.approx(0.0, abs=1e-9)
     # history stops at the last complete actual June year
@@ -69,8 +80,12 @@ def test_six_month_delay_moves_only_calendar_2027_q1_q2(pack_chart_rows) -> None
     annual = ped_rate_schedules(ROOT, pack_chart_rows)
     assert annual.loc[2026, "delayed_6m"] == pytest.approx(annual.loc[2026, "planned"])
     assert annual.loc[2027, "delayed_6m"] == pytest.approx(0.70024)
-    assert annual.loc[2028, "delayed_6m"] == pytest.approx(annual.loc[2028, "planned"])
-    assert annual.loc[2050, "delayed_6m"] == pytest.approx(annual.loc[2050, "planned"])
+    # Identity from FY2028 onward, for every year the schedule reaches rather
+    # than a single pinned far year.
+    for year in [value for value in annual.index if int(value) >= 2028]:
+        assert annual.loc[year, "delayed_6m"] == pytest.approx(
+            annual.loc[year, "planned"]
+        ), f"delayed diverges from planned in FY{year}"
 
 
 def test_six_month_delay_factor_is_confined_to_fy2027(pack_chart_rows) -> None:
@@ -109,7 +124,13 @@ def test_uplift_factors_exist_only_from_fy2027(pack_chart_rows) -> None:
     assert 2026 not in factors
     assert factors[2027] == pytest.approx(0.70 / 0.76, rel=1e-3)
     assert all(0.8 < f < 1.0 for f in factors.values())
-    assert max(factors) >= 2050
+    # The current-model factor map covers the current decision-facing horizon.
+    # Reaching FY2050 is exactly what the H20 policy ends for the current
+    # model; the official comparator keeps its own source horizon and is
+    # pinned separately by
+    # test_official_policy_reaches_beyond_the_current_model_horizon.
+    assert min(factors) == 2027
+    assert max(factors) >= LAST_DECISION_GRADE_ANNUAL_FY
 
 
 def test_rate_paths_frame_has_three_streams_on_a_per_1000km_basis(pack_chart_rows) -> None:
@@ -170,7 +191,22 @@ def test_uplift_off_repriced_revenue_cascades_to_rollups(pack_chart_rows) -> Non
             errors="coerce",
         ).iloc[0]
     )
-    for fy in (2030, 2050):
+    # FY2050 was a current-model June year before the H20 policy. The cascade
+    # is a per-year identity, so exercise it across every current June year the
+    # factor map covers rather than pinning a year that no longer publishes.
+    covered = sorted(
+        fy
+        for fy in factors
+        if not pack_chart_rows[
+            pack_chart_rows["time_grain"].astype(str).eq("june_year")
+            & pack_chart_rows["series_id"].astype(str).eq("gross_ped_revenue")
+            & pd.to_numeric(pack_chart_rows["june_year"], errors="coerce").eq(fy)
+            & pack_chart_rows["trace_name"].astype(str).eq("Current finalist Base case")
+        ].empty
+    )
+    assert covered, "no current June year is covered by the no-uplift factor map"
+    assert max(covered) == LAST_DECISION_GRADE_ANNUAL_FY
+    for fy in covered:
         old_ped = jy(pack_chart_rows, "gross_ped_revenue", fy)
         new_ped = jy(adjusted, "gross_ped_revenue", fy)
         assert new_ped == pytest.approx(old_ped * factors[fy])
@@ -227,21 +263,32 @@ def test_uplift_off_can_be_scoped_independently_to_current_or_mbu26(pack_chart_r
     current_off, current_audit = apply_fed_uplift_off_to_chart_rows(
         pack_chart_rows, factors, scenario_roles={"basecase", "comparison"}
     )
-    mbu_off, mbu_audit = apply_fed_uplift_off_to_chart_rows(
+    # The official comparator is a separate calculation with its own
+    # source-derived schedule, not the current-model factor map applied to
+    # another role set. Routing it through the current helper is what let the
+    # current-model horizon truncate the published comparator.
+    with pytest.raises(ValueError, match="current-model helper"):
+        apply_fed_uplift_off_to_chart_rows(
+            pack_chart_rows, factors, scenario_roles={"official_comparator"}
+        )
+    mbu_off, mbu_audit = apply_official_comparator_rate_policy_to_chart_rows(
         pack_chart_rows,
-        factors,
-        scenario_roles={"official_comparator"},
+        ROOT,
+        policy_state=FED_POLICY_STATE_NO_UPLIFT,
         ruc_class_revenue_by_fy=mbu26_ruc_class_revenue_by_fy(ROOT),
     )
 
+    # Each scope moves only its own rows.
     assert value(current_off, "Current finalist Base case", 2030) < value(pack_chart_rows, "Current finalist Base case", 2030)
     assert value(current_off, "MBU26 official", 2030) == pytest.approx(value(pack_chart_rows, "MBU26 official", 2030))
     assert value(mbu_off, "Current finalist Base case", 2030) == pytest.approx(value(pack_chart_rows, "Current finalist Base case", 2030))
+
+    official_factors = official_comparator_factor_map(ROOT, FED_POLICY_STATE_NO_UPLIFT)
     class_pool = mbu26_ruc_class_revenue_by_fy(ROOT)
     expected_mbu = value(pack_chart_rows, "MBU26 official", 2030) + (
         value(pack_chart_rows, "MBU26 official", 2030, "gross_ped_revenue")
         + class_pool[2030]
-    ) * (factors[2030] - 1.0)
+    ) * (official_factors[2030] - 1.0)
     assert value(mbu_off, "MBU26 official", 2030) == pytest.approx(expected_mbu, abs=1e-9)
     assert set(current_audit["scenario_role"]) <= {"basecase", "comparison"}
     assert set(mbu_audit["scenario_role"]) == {"official_comparator"}
@@ -330,14 +377,36 @@ def test_six_month_delay_is_audited_and_reconciles_every_annual_rollup(pack_char
     assert set(audit["policy_state"]) == {FED_POLICY_STATE_DELAYED_6M}
     assert set(audit["affected_periods"]) == {"2027Q1;2027Q2"}
 
-    mbu_adjusted, mbu_audit = apply_fed_uplift_delay_to_chart_rows(
+    # The official delayed counterfactual is sourced from the governed
+    # delayed/planned rate ratio, not from the current-model factor map.
+    mbu_adjusted, mbu_audit = apply_official_comparator_rate_policy_to_chart_rows(
         pack_chart_rows,
-        factors,
-        scenario_roles={"official_comparator"},
+        ROOT,
+        policy_state=FED_POLICY_STATE_DELAYED_6M,
     )
+    official_factors = official_comparator_factor_map(ROOT, FED_POLICY_STATE_DELAYED_6M)
+
+    def expected_official_total(fy: int) -> float:
+        repriced = {"gross_ped_revenue", *ruc_leaves}
+        source = pack_chart_rows[
+            pack_chart_rows["time_grain"].astype(str).eq("june_year")
+            & pack_chart_rows["trace_name"].astype(str).eq("MBU26 official")
+            & pd.to_numeric(pack_chart_rows["june_year"], errors="coerce").eq(fy)
+            & pack_chart_rows["series_id"].astype(str).isin(repriced)
+        ]
+        delta = pd.to_numeric(source["value"], errors="coerce").sum() * (official_factors[fy] - 1.0)
+        return value(pack_chart_rows, "MBU26 official", fy) + float(delta)
+
     assert value(mbu_adjusted, "MBU26 official", 2027) == pytest.approx(
-        expected_rate_only_total("MBU26 official", 2027), abs=1e-9
+        expected_official_total(2027), abs=1e-9
     )
+    # Delayed differs from published in FY2027 only; identity from FY2028 on.
+    assert 2027 in official_factors
+    assert not any(fy != 2027 for fy in official_factors)
+    for fy in (2028, 2030, 2031):
+        assert value(mbu_adjusted, "MBU26 official", fy) == pytest.approx(
+            value(pack_chart_rows, "MBU26 official", fy), abs=1e-9
+        )
     assert value(mbu_adjusted, "Current finalist Base case", 2027) == pytest.approx(
         value(pack_chart_rows, "Current finalist Base case", 2027)
     )
@@ -345,15 +414,17 @@ def test_six_month_delay_is_audited_and_reconciles_every_annual_rollup(pack_char
 
 
 def test_no_uplift_wrapper_retains_status_and_quarter_metadata(pack_chart_rows) -> None:
+    # The wrapper under test is the CURRENT-model one, so it is exercised on a
+    # current role. Official rows go through the official helper.
     adjusted, audit = apply_fed_uplift_off_to_chart_rows(
         pack_chart_rows,
         fed_uplift_off_factors(ROOT, pack_chart_rows),
-        scenario_roles={"official_comparator"},
+        scenario_roles={"basecase", "comparison"},
     )
     selected = adjusted[
         adjusted["time_grain"].astype(str).eq("june_year")
         & adjusted["series_id"].astype(str).eq("total_nltf_net_revenue")
-        & adjusted["trace_name"].astype(str).eq("MBU26 official")
+        & adjusted["trace_name"].astype(str).eq("Current finalist Base case")
         & pd.to_numeric(adjusted["june_year"], errors="coerce").eq(2030)
     ].iloc[0]
     assert selected["_fed_policy"] == FED_POLICY_STATE_NO_UPLIFT

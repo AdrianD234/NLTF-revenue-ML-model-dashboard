@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import pandas as pd
+
+from model_dashboard.light_fleet_allocation import LAST_DECISION_GRADE_ANNUAL_FY
 import pytest
 
 from model_dashboard.eruc_transition import (
@@ -159,7 +161,11 @@ def test_eruc_view_footprint_and_cascade_on_real_pack() -> None:
     # Audit cascade: the raw e-RUC deltas compose with the downstream
     # PED/RUC policy replay factors before reaching the displayed NLTF total.
     audit = v_on["eruc_audit"]
-    row = audit[audit["june_year"].eq(2031) & audit["scenario_name"].eq("current_basecase")].iloc[0]
+    # FY2031 was a current June year before the H20 policy; use the last
+    # June year the current model actually publishes.
+    last_fy = int(pd.to_numeric(audit["june_year"], errors="coerce").max())
+    assert last_fy == LAST_DECISION_GRADE_ANNUAL_FY
+    row = audit[audit["june_year"].eq(last_fy) & audit["scenario_name"].eq("current_basecase")].iloc[0]
     policy_audit = v_on["fed_uplift_audit"]
     policy_factors = policy_audit[
         policy_audit["june_year"].eq(2031)
@@ -174,8 +180,8 @@ def test_eruc_view_footprint_and_cascade_on_real_pack() -> None:
     )
     total_off, _ = view("Total NLTF revenue", key_off)
     total_on, _ = view("Total NLTF revenue", key_on)
-    base_off = total_off[total_off["trace_name"].eq("Current finalist Base case") & total_off["period"].eq("FY2031")]["value"].iloc[0]
-    base_on = total_on[total_on["trace_name"].eq("Current finalist Base case") & total_on["period"].eq("FY2031")]["value"].iloc[0]
+    base_off = total_off[total_off["trace_name"].eq("Current finalist Base case") & total_off["period"].eq(f"FY{LAST_DECISION_GRADE_ANNUAL_FY}")]["value"].iloc[0]
+    base_on = total_on[total_on["trace_name"].eq("Current finalist Base case") & total_on["period"].eq(f"FY{LAST_DECISION_GRADE_ANNUAL_FY}")]["value"].iloc[0]
     assert base_on - base_off == pytest.approx(expected_policy_composed_delta, rel=1e-9)
 
 

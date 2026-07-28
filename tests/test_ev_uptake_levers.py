@@ -244,7 +244,12 @@ def test_ped_displacement_scales_family_and_respects_bridge_gate() -> None:
 def test_heavy_split_moves_km_but_is_rollup_neutral() -> None:
     chart_rows, drift = _fixture_chart_rows_and_drift()
     levers = EV_UPTAKE_PRESETS["MoT VFM base"]
-    adjusted, audit = apply_uptake_levers_to_chart_rows(chart_rows, drift, levers, adjust_ped=False)
+    # The heavy split is now an explicit sensitivity, Off by default: a LIGHT
+    # composition choice must not reclassify Heavy RUC. Its mechanics are
+    # unchanged, so the test asks for it directly.
+    adjusted, audit = apply_uptake_levers_to_chart_rows(
+        chart_rows, drift, levers, adjust_ped=False, heavy_bev_transition=True
+    )
     share_2050 = float(audit[audit["june_year"].eq(2050)]["heavy_bev_share"].iloc[0])
     assert 0.15 < share_2050 < 0.30
     sel = adjusted[adjusted["scenario_name"].eq("current_basecase") & adjusted["june_year"].eq(2050)]
@@ -310,11 +315,30 @@ def test_default_uptake_reconciles_native_quarters_to_adjusted_annual_activity()
         drift,
         EV_UPTAKE_PRESETS["MoT VFM base"],
         adjust_ped=True,
+        uptake_basis="MoT VFM base",
+        repo_root=ROOT,
     )
 
     native_series = ("light_ruc_net_km", "heavy_ruc_net_km", "ped_vkt_per_capita")
+    # FY2050 was inside the current horizon before the H20 policy. Quarterly
+    # and annual availability are independent contracts now, so reconcile only
+    # the June years that actually publish an annual result.
+    def _published_fys(scenario: str) -> list[int]:
+        years = pd.to_numeric(
+            adjusted.loc[
+                adjusted["time_grain"].astype(str).eq("june_year")
+                & adjusted["scenario_name"].astype(str).eq(scenario)
+                & adjusted["series_id"].astype(str).eq("light_ruc_net_km"),
+                "june_year",
+            ],
+            errors="coerce",
+        ).dropna()
+        return sorted(int(value) for value in years.unique() if int(value) >= 2026)
+
     for scenario in ("current_basecase", "current_comparison_1"):
-        for fy in (2026, 2030, 2050):
+        published_fys = _published_fys(scenario)
+        assert published_fys, f"{scenario} publishes no current annual result"
+        for fy in published_fys:
             for series_id in native_series:
                 annual = adjusted[
                     adjusted["scenario_name"].astype(str).eq(scenario)
@@ -381,3 +405,26 @@ def test_default_uptake_reconciles_native_quarters_to_adjusted_annual_activity()
     original_mbu = chart[chart["scenario_name"].astype(str).eq("mbu26_official")].reset_index(drop=True)
     adjusted_mbu = adjusted[adjusted["scenario_name"].astype(str).eq("mbu26_official")].reset_index(drop=True)
     pd.testing.assert_frame_equal(adjusted_mbu[original_mbu.columns], original_mbu, check_dtype=False)
+
+
+def test_heavy_bev_transition_is_off_by_default_in_the_overlay() -> None:
+    """A LIGHT composition choice must not reclassify Heavy RUC.
+
+    Settled contract: HEAVY_RUC = not_reclassified. Heavy BEV is a fixed MBU26
+    component of the current-finalist path, so the heavy split only runs when
+    its own sensitivity is selected.
+    """
+    chart_rows, drift = _fixture_chart_rows_and_drift()
+    levers = EV_UPTAKE_PRESETS["MoT VFM base"]
+    adjusted, audit = apply_uptake_levers_to_chart_rows(chart_rows, drift, levers, adjust_ped=False)
+
+    before = chart_rows[
+        chart_rows["scenario_name"].eq("current_basecase") & chart_rows["june_year"].eq(2050)
+    ].set_index("series_id")["value"]
+    after = adjusted[
+        adjusted["scenario_name"].eq("current_basecase") & adjusted["june_year"].eq(2050)
+    ].set_index("series_id")["value"]
+    for series_id in ("heavy_ruc_net_km", "heavy_ruc_net_revenue"):
+        assert float(after[series_id]) == pytest.approx(float(before[series_id]), abs=1e-9)
+    assert set(audit["heavy_bev_share"]) == {0.0}
+    assert not audit["heavy_bev_transition_enabled"].any()

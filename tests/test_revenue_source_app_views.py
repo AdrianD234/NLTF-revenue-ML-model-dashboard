@@ -4,10 +4,13 @@ from itertools import product
 from pathlib import Path
 
 import pandas as pd
+
+from model_dashboard.light_fleet_allocation import LAST_DECISION_GRADE_ANNUAL_FY
 import pytest
 
 from app import (
     REVENUE_SOURCE_HORIZON_OPTIONS,
+    REVENUE_SOURCE_HORIZON_TO_CUTOFF,
     REVENUE_SOURCE_PACK_CACHE_REVISION,
     _source_axis_title,
     _source_component_long_form_options,
@@ -193,10 +196,10 @@ def test_hybrid_annual_view_exposes_replacement_audit_for_selected_fy() -> None:
     pack = load_revenue_source_pack(repo_root=ROOT)
     assert pack is not None
 
-    view = _source_hybrid_annual_view(pack, {"selected_fy": "FY2031"})
+    view = _source_hybrid_annual_view(pack, {"selected_fy": "FY2030"})
 
     assert not view.empty
-    assert set(view["FY"]) == {2031}
+    assert set(view["FY"]) == {2030}
     assert {"row_role", "source_file", "residual_vs_official", "replacement_only"}.issubset(view.columns)
     replacements = view[view["replacement_only"].astype(bool)]
     assert set(replacements["series_id"]) == {"gross_ped_revenue", "light_ruc_net_revenue", "heavy_ruc_net_revenue"}
@@ -216,7 +219,7 @@ def test_hybrid_annual_view_exposes_replacement_audit_for_selected_fy() -> None:
 
     no_uplift = _source_hybrid_annual_view(
         pack,
-        {"selected_fy": "FY2031", "fed_path": "No 2027 12c uplift"},
+        {"selected_fy": "FY2030", "fed_path": "No 2027 12c uplift"},
     )
     current_ped = float(replacements[replacements["series_id"].eq("gross_ped_revenue")]["value"].iloc[0])
     no_uplift_ped = float(no_uplift[no_uplift["series_id"].eq("gross_ped_revenue")]["value"].iloc[0])
@@ -249,13 +252,13 @@ def test_revenue_source_horizon_control_limits_path_chart_without_selected_fy_co
         "series": "Total NLTF revenue",
         "release_round": "BEFU25",
         "model_basis": "Current finalist ensemble",
-        "selected_fy": "FY2031",
+        "selected_fy": "FY2030",
         "horizon": "Next 5 FY",
     }
     fig = _source_total_path_figure(pack, controls)
     lower, upper = _source_horizon_bounds(pack, controls)
 
-    assert REVENUE_SOURCE_HORIZON_OPTIONS == ["Next 5 FY", "To FY2031", "Full common horizon"]
+    assert REVENUE_SOURCE_HORIZON_OPTIONS == ["Next 5 FY", f"To FY{LAST_DECISION_GRADE_ANNUAL_FY}", "Full common horizon"]
     assert lower is not None and upper is not None
     assert upper - lower == 4
     assert fig.data
@@ -266,7 +269,7 @@ def test_revenue_source_horizon_control_limits_path_chart_without_selected_fy_co
             assert max(xs) <= upper
 
     audit = _source_hybrid_annual_view(pack, controls)
-    assert set(audit["FY"]) == {2031}
+    assert set(audit["FY"]) == {2030}
 
 
 def test_component_deduction_long_form_is_selectable_signed_and_download_ready() -> None:
@@ -274,7 +277,7 @@ def test_component_deduction_long_form_is_selectable_signed_and_download_ready()
     assert pack is not None
 
     controls = {
-        "selected_fy": "FY2031",
+        "selected_fy": "FY2030",
         "fed_path": "No 2027 12c uplift",
         "crown_top_up": "Exclude",
     }
@@ -296,7 +299,7 @@ def test_component_deduction_long_form_is_selectable_signed_and_download_ready()
         "availability_status",
     }
     assert required.issubset(view.columns)
-    assert set(view["FY"]) == {2031}
+    assert set(view["FY"]) == {2030}
     assert set(view["fed_path"]) == {"No 2027 12c uplift"}
     assert _source_component_long_form_options(view)
 
@@ -334,12 +337,12 @@ def test_full_common_horizon_stops_at_last_fixed_or_replacement_row() -> None:
     lower, upper = _source_horizon_bounds(pack, controls)
     fig = _source_total_path_figure(pack, controls)
 
-    assert (lower, upper) == (2025, 2031)
+    assert (lower, upper) == (2025, 2030)
     for trace in fig.data:
         xs = [int(x) for x in getattr(trace, "x", []) if x is not None]
         if xs:
             assert min(xs) >= 2025
-            assert max(xs) <= 2031
+            assert max(xs) <= 2030
 
 
 def test_path_trace_status_view_reflects_active_release_selection() -> None:
@@ -366,7 +369,7 @@ def test_total_path_chart_plots_vendored_release_paths_from_source_rows() -> Non
             "series": "Total NLTF revenue",
             "release_round": "BEFU25",
             "model_basis": "Current finalist ensemble",
-            "selected_fy": "FY2031",
+            "selected_fy": "FY2030",
         },
     )
 
@@ -404,7 +407,7 @@ def test_total_path_chart_uses_source_actual_anchor_and_current_finalist_nowcast
             "series": "Total NLTF revenue",
             "release_round": "BEFU25",
             "model_basis": "Current finalist ensemble",
-            "selected_fy": "FY2031",
+            "selected_fy": "FY2030",
         },
     )
     by_name = {trace.name: trace for trace in fig.data}
@@ -443,7 +446,7 @@ def test_total_path_chart_uses_source_actual_anchor_and_current_finalist_nowcast
 
     marker_shapes = {(int(shape.x0), shape.line.dash) for shape in fig.layout.shapes}
     assert (2026, "dash") in marker_shapes
-    assert (2031, "dot") in marker_shapes
+    assert (2030, "dot") in marker_shapes
 
 
 def test_revenue_source_control_applicability_resolves_invalid_series_controls() -> None:
@@ -510,8 +513,8 @@ def test_revenue_source_every_series_valid_control_permutation_has_governed_trac
                 "series": series,
                 "release_round": "BEFU25",
                 "model_basis": "Current finalist ensemble",
-                "selected_fy": "FY2031",
-                "horizon": "To FY2031",
+                "selected_fy": "FY2030",
+                "horizon": REVENUE_SOURCE_HORIZON_TO_CUTOFF,
                 "revenue_basis": basis,
                 "revenue_path": (
                     "Gross / benchmark actual"
@@ -566,7 +569,7 @@ def test_revenue_source_charts_use_explicit_units_and_annual_ticks() -> None:
         "series": "Total NLTF revenue",
         "release_round": "BEFU25",
         "model_basis": "Current finalist ensemble",
-        "selected_fy": "FY2031",
+        "selected_fy": "FY2030",
     }
     frame = pack.canonical_long[pack.canonical_long["series_id"].eq("total_nltf_net_revenue")]
 
@@ -607,7 +610,7 @@ def test_uncertainty_source_control_does_not_fabricate_mot_release_fan() -> None
         "series": "Total NLTF revenue",
         "release_round": "BEFU25",
         "model_basis": "Current finalist ensemble",
-        "selected_fy": "FY2031",
+        "selected_fy": "FY2030",
         "uncertainty": "MOT release round",
     }
 
@@ -628,7 +631,7 @@ def test_uncertainty_source_control_uses_mot_archived_error_bands_when_available
         "series": "Total RUC+PED revenue",
         "release_round": "BEFU25",
         "model_basis": "Current finalist ensemble",
-        "selected_fy": "FY2031",
+        "selected_fy": "FY2030",
         "uncertainty": "MOT release round",
     }
 
@@ -757,7 +760,7 @@ def test_revenue_outlook_primary_figures_use_runtime_pack_selected_series_only()
         fed_paths=["Current planned path"],
         trace_names=traces,
     )
-    total_fig = revenue_outlook_total_path_figure(rows, selected_series="Total NLTF revenue", selected_fy="FY2031")
+    total_fig = revenue_outlook_total_path_figure(rows, selected_series="Total NLTF revenue", selected_fy="FY2030")
     trace_names = {str(trace.name) for trace in total_fig.data if trace.name}
     annotation_text = " ".join(str(annotation.text) for annotation in total_fig.layout.annotations or [])
 
@@ -766,7 +769,7 @@ def test_revenue_outlook_primary_figures_use_runtime_pack_selected_series_only()
     assert "Current finalist forecast" not in trace_names
     assert not any("Schiff" in name or "selected_dashboard" in name for name in trace_names)
     assert all(
-        getattr(trace, "x", None) is None or "FY2031" in list(trace.x)
+        getattr(trace, "x", None) is None or "FY2030" in list(trace.x)
         for trace in total_fig.data
         if trace.name == "Current finalist Base case"
     )
@@ -822,8 +825,8 @@ def test_revenue_outlook_primary_figures_use_runtime_pack_selected_series_only()
     )
     assert independent_fan.data
 
-    component_fig = revenue_outlook_component_figure(bridge, selected_fy="FY2031", selected_fed_path="Current planned path")
-    split_fig = revenue_outlook_split_figure(bridge, selected_fy="FY2031", selected_fed_path="Current planned path")
+    component_fig = revenue_outlook_component_figure(bridge, selected_fy="FY2030", selected_fed_path="Current planned path")
+    split_fig = revenue_outlook_split_figure(bridge, selected_fy="FY2030", selected_fed_path="Current planned path")
     assert component_fig.data
     assert split_fig.data
 
@@ -833,7 +836,7 @@ def test_revenue_outlook_composition_figure_stacks_components_and_overlays_aggre
     source = "Current finalist Base case"
     view = stack[
         stack["source_path"].astype(str).eq(source)
-        & pd.to_numeric(stack["FY"], errors="coerce").between(2026, 2031)
+        & pd.to_numeric(stack["FY"], errors="coerce").between(2026, 2030)
         & stack["section"].astype(str).isin(["RUC", "FED", "MVR", "TUC", "Totals"])
     ].copy()
 

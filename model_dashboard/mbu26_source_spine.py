@@ -27,12 +27,29 @@ if (
 import numpy as np
 import pandas as pd
 
+from .light_fleet_allocation import (
+    ALLOCATION_BASIS_ID,
+    AVAILABILITY_AVAILABLE as ALLOCATION_AVAILABLE,
+    CONVENTIONAL_ANCHOR_SERIES_ID,
+    DEPRECATED_TOTAL_SERIES_ID,
+    LAST_DECISION_GRADE_ANNUAL_FY,
+    allocate_light_fleet,
+    annual_availability,
+    horizon_state,
+    june_year_quarters,
+)
 from .revenue_source_pack import (
     CURRENT_FINALIST_MODEL_IDS,
     REVENUE_FIRST_FORECAST_QUARTER,
     REVENUE_LAST_COMPLETE_ACTUAL_FY,
     REVENUE_MODEL_TRAINING_CUTOFF,
 )
+
+# The Base decision-facing composition basis. Alternative uptake presets are a
+# runtime overlay that reallocates this pool; they never enter pack levels.
+LIGHT_FLEET_BASE_UPTAKE_BASIS = "MoT VFM base"
+# The horizon the official spine publishes; withheld years are enumerated to here.
+CURRENT_MODEL_HORIZON_END_FY = 2050
 
 
 MBU26_SOURCE_PACK_DIR = Path("data") / "revenue_model_source_pack" / "mbu26_annual_spine"
@@ -45,7 +62,13 @@ CURRENT_MODEL_EXTENSION_START_FY = 2051
 CURRENT_MODEL_EXTENSION_END_FY = 2055
 CURRENT_MODEL_EXTENSION_BASE_START_FY = 2046
 CURRENT_MODEL_EXTENSION_BASE_END_FY = 2050
-CURRENT_LIGHT_TOTAL_SERIES_ID = "current_light_ruc_total_modelled_km"
+# The raw Light RUC model output is the CONVENTIONAL class, not a total pool.
+# The old identifier named it as a total, which is what invited the retired
+# lambda allocation. The legacy name is retained only as a deprecated,
+# non-authoritative alias; no new runtime code may consume it.
+CURRENT_LIGHT_CONVENTIONAL_SERIES_ID = CONVENTIONAL_ANCHOR_SERIES_ID
+CURRENT_LIGHT_TOTAL_SERIES_ID = CURRENT_LIGHT_CONVENTIONAL_SERIES_ID  # deprecated alias
+DEPRECATED_LIGHT_TOTAL_SERIES_ID = DEPRECATED_TOTAL_SERIES_ID
 EV_PHEV_MIGRATION_DEFAULT_MODE = "optimized"
 EV_PHEV_MIGRATION_MODES: tuple[str, ...] = ("optimized", "fixed_light_only", "fixed_ped_only", "mbu_ratio")
 EV_PHEV_MIGRATION_SMOOTHNESS_PENALTY = 25.0
@@ -430,7 +453,9 @@ def current_forecast_annual_from_mbu26(
     mbu26_official_annual: pd.DataFrame,
     scenario_input_wide: pd.DataFrame | None = None,
     migration_lambda_reference_scenario: str | None = None,
+    repo_root: Path | str | None = None,
 ) -> pd.DataFrame:
+    repo_root = Path(repo_root) if repo_root is not None else repo_root_from_here()
     columns = [
         "FY",
         "period",
@@ -587,8 +612,11 @@ def current_forecast_annual_from_mbu26(
         if abs(heavy_km_million) > 10_000_000:
             heavy_km_million /= 1_000_000.0
         split = _light_ev_phev_split_from_official(off)
+        # The lambda migration record is retired from the decision-facing path.
+        # It is still looked up so its absence remains a governed availability
+        # signal for the legacy audit tables, but no level is read from it.
         migration = migration_lookup.get((scenario_name, fy))
-        if split["availability_status"] != "available" or migration is None:
+        if split["availability_status"] != "available":
             continue
         fallback_population_count = float(off["light_petrol_vkt"]) * 1_000_000.0 / float(off["ped_vkt_per_capita"])
         ped_litres_per_100km = float(off["ped_volume"]) / float(off["light_petrol_vkt"]) * 100.0
@@ -599,19 +627,57 @@ def current_forecast_annual_from_mbu26(
             quarters=str(ped_quarters.get("quarters_present") or "").split("; "),
             fallback_population=fallback_population_count,
         )
-        light_total_modelled_km = light_km_million
-        current_ped_light_petrol_vkt = float(getattr(migration, "current_PED_light_petrol_km"))
-        conventional_light_km = float(getattr(migration, "current_conventional_light_km"))
-        current_light_bev_km = float(getattr(migration, "current_BEV_km"))
-        current_phev_km = float(getattr(migration, "current_PHEV_km"))
-        migration_residual = float(getattr(migration, "component_sum_residual_km"))
-        if abs(migration_residual) > 1e-6:
-            conventional_light_km += migration_residual
+        # Decision-facing activity. The retired lambda transfer subtracted a
+        # migration total from both the petrol and conventional Light RUC
+        # streams; neither level is read here any more. PED is the raw AR(1)
+        # bridge, and the Light RUC model output is the conventional class.
+        light_conventional_modelled_km = light_km_million
+        current_ped_light_petrol_vkt = sum(
+            value * population / 1_000_000.0
+            for value, population in zip(ped_values, population_values, strict=False)
+        )
+        is_actual_anchor_fy = fy == REVENUE_LAST_COMPLETE_ACTUAL_FY
+        allocation = allocate_light_fleet(
+            fy,
+            light_conventional_modelled_km,
+            repo_root=repo_root,
+            scenario_name=scenario_name,
+            uptake_basis=LIGHT_FLEET_BASE_UPTAKE_BASIS,
+            actual_classes=(
+                {
+                    "conventional": float(off["light_ruc_net_km"]),
+                    "bev": float(off["light_bev_ruc_net_km"]),
+                    "phev": float(off["phev_ruc_net_km"]),
+                }
+                if is_actual_anchor_fy
+                else None
+            ),
+            last_actual_fy=REVENUE_LAST_COMPLETE_ACTUAL_FY,
+            source_lineage=f"{light_source_cell}; MoT VFM 202405 Base uptake shares",
+        )
+        if allocation.availability_status != ALLOCATION_AVAILABLE:
+            # Fail closed: no forward fill, no extrapolation, no MBU26
+            # substitution and no stale lambda-pack total. The June year does
+            # not publish a numeric value at all, so nothing can be plotted or
+            # summed. light_ruc_horizon_availability_frame() records which
+            # June years were withheld and why.
+            continue
+        conventional_light_km = allocation.conventional_km
+        current_light_bev_km = allocation.light_bev_km
+        current_phev_km = allocation.phev_km
+        if abs(allocation.closure_residual_km) > 1e-6:
+            raise ValueError(
+                f"Light fleet allocation failed to close for {scenario_name} FY{fy}: "
+                f"residual {allocation.closure_residual_km}"
+            )
         ped_volume = current_ped_light_petrol_vkt * ped_litres_per_100km / 100.0
         ped_revenue = ped_volume * ped_rate
-        light_rate = float(getattr(migration, "conventional_light_rate"))
-        light_bev_rate = float(getattr(migration, "light_bev_rate"))
-        phev_rate = float(getattr(migration, "phev_rate"))
+        # MBU26 effective per-km rates, taken from the official split directly.
+        # The decision-facing path no longer reads anything from the retired
+        # lambda migration record.
+        light_rate = float(split["conventional_rate"])
+        light_bev_rate = float(split["light_bev_rate"])
+        phev_rate = float(split["phev_rate"])
         heavy_rate = float(off["heavy_ruc_net_revenue"]) / float(off["heavy_ruc_net_km"])
         light_revenue = conventional_light_km * light_rate
         light_bev_revenue = current_light_bev_km * light_bev_rate
@@ -666,20 +732,22 @@ def current_forecast_annual_from_mbu26(
             ]
             if value
         )
-        migration_source_cell = f"{ped_source_cell}; {light_source_cell}; {population_source_cells}; MBU26 migration cells {split_cells}".strip("; ")
+        migration_source_cell = f"{ped_source_cell}; {light_source_cell}; {population_source_cells}; VFM 202405 Base uptake shares; MBU26 rate cells {split_cells}".strip("; ")
         migration_reference_basis = (
             f"; optimized lambda schedule anchored to {migration_lambda_reference_scenario}"
             if migration_lambda_reference_scenario
             else ""
         )
+        del migration_reference_basis
         migration_basis = (
-            "optimized PED/light-petrol + total Light RUC migration allocation "
-            "with scenario-input population where supplied"
-            f"{migration_reference_basis}"
+            "raw AR(1) PED VKT per capita x scenario-input population; "
+            "raw Light RUC conventional model forecast expanded by MoT VFM 202405 "
+            f"Base uptake shares ({ALLOCATION_BASIS_ID})"
         )
-        migration_revenue_basis = "optimized PED/light-petrol + total Light RUC migration allocation, scenario-input population and MBU26 effective rate"
-        if migration_reference_basis:
-            migration_revenue_basis += migration_reference_basis
+        migration_revenue_basis = (
+            "raw AR(1) PED bridge and conventional-anchor VFM composition, "
+            "scenario-input population and MBU26 effective rate"
+        )
         ped_bridge_sources = {
             "vktpc_source_file": "forecast_scenario_comparison.parquet",
             "vktpc_source_cell": ped_source_cell,
@@ -691,21 +759,21 @@ def current_forecast_annual_from_mbu26(
         rows.extend(
             [
                 _current_annual_row(**common, series_id="ped_vkt_per_capita", display_name="PED VKT per capita", section="Key volumes", value=ped_vkt_per_capita, unit="km/person", row_role="bridge_input", source_basis="current_finalist_model", source_file="forecast_scenario_comparison.parquet", source_cell=ped_source_cell, formula="sum quarterly current finalist PED VKT/capita", official_value=off["ped_vkt_per_capita"], vktpc_source_file="forecast_scenario_comparison.parquet", vktpc_source_cell=ped_source_cell, vktpc_source_status="current_finalist_model"),
-                _current_annual_row(**common, series_id="ped_volume", display_name="PED volume", section="Key volumes", value=ped_volume, unit="million litres", row_role="bridge_input", source_basis=f"current finalist PED VKT/capita + scenario-input population ({population_source_status}) + optimized EV/PHEV migration + MBU26 intensity", source_file="forecast_scenario_comparison.parquet; scenario_inputs/scenario_input_wide.parquet; mbu26_official_annual.csv", source_cell=migration_source_cell, formula="adjusted PED/light-petrol VKT after optimized EV/PHEV migration * MBU26 litres intensity / 100", official_value=off["ped_volume"], **ped_bridge_sources),
-                _current_annual_row(**common, series_id="light_petrol_vkt", display_name="Light petrol VKT", section="Key volumes", value=current_ped_light_petrol_vkt, unit="million km", row_role="bridge_input", source_basis=migration_basis, source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=migration_source_cell, formula="current PED-derived light-petrol VKT - (1 - lambda) * optimized EV/PHEV migration total", official_value=off["light_petrol_vkt"], **ped_bridge_sources),
-                _current_annual_row(**common, series_id=CURRENT_LIGHT_TOTAL_SERIES_ID, display_name="Current finalist Light RUC total modelled km", section="Key volumes", value=light_total_modelled_km, unit="million km", row_role="audit_only", source_basis="current_finalist_model_total_light_ruc_universe", source_file="forecast_scenario_comparison.parquet", source_cell=light_source_cell, formula="sum quarterly current finalist Light RUC total net km before EV/PHEV allocation", official_value=pd.NA, model_id=CURRENT_FINALIST_MODEL_IDS["LIGHT_RUC"]),
-                _current_annual_row(**common, series_id="light_ruc_net_km", display_name="Light RUC net km", section="Key volumes", value=conventional_light_km, unit="million km", row_role="bridge_input", source_basis=migration_basis, source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=migration_source_cell, formula="current Light RUC total modelled km - lambda * optimized EV/PHEV migration total", official_value=off["light_ruc_net_km"], model_id=CURRENT_FINALIST_MODEL_IDS["LIGHT_RUC"]),
+                _current_annual_row(**common, series_id="ped_volume", display_name="PED volume", section="Key volumes", value=ped_volume, unit="million litres", row_role="bridge_input", source_basis=f"raw AR(1) PED VKT/capita + scenario-input population ({population_source_status}) + MBU26 intensity", source_file="forecast_scenario_comparison.parquet; scenario_inputs/scenario_input_wide.parquet; mbu26_official_annual.csv", source_cell=migration_source_cell, formula="raw PED/light-petrol VKT * MBU26 litres intensity / 100", official_value=off["ped_volume"], **ped_bridge_sources),
+                _current_annual_row(**common, series_id="light_petrol_vkt", display_name="Light petrol VKT", section="Key volumes", value=current_ped_light_petrol_vkt, unit="million km", row_role="bridge_input", source_basis=migration_basis, source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=migration_source_cell, formula="raw AR(1) PED VKT per capita * scenario-input population", official_value=off["light_petrol_vkt"], **ped_bridge_sources),
+                _current_annual_row(**common, series_id=CONVENTIONAL_ANCHOR_SERIES_ID, display_name="Current finalist Light RUC conventional modelled km", section="Key volumes", value=light_conventional_modelled_km, unit="million km", row_role="audit_only", source_basis="current_finalist_model_conventional_light_ruc_forecast", source_file="forecast_scenario_comparison.parquet", source_cell=light_source_cell, formula="sum quarterly current finalist Light RUC conventional model forecast", official_value=pd.NA, model_id=CURRENT_FINALIST_MODEL_IDS["LIGHT_RUC"]),
+                _current_annual_row(**common, series_id="light_ruc_net_km", display_name="Light RUC net km", section="Key volumes", value=conventional_light_km, unit="million km", row_role="bridge_input", source_basis=migration_basis, source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=migration_source_cell, formula="raw Light RUC conventional model forecast (preserved exactly under the Base uptake basis)", official_value=off["light_ruc_net_km"], model_id=CURRENT_FINALIST_MODEL_IDS["LIGHT_RUC"]),
                 _current_annual_row(**common, series_id="heavy_ruc_net_km", display_name="Heavy RUC net km", section="Key volumes", value=heavy_km_million, unit="million km", row_role="bridge_input", source_basis="current_finalist_model", source_file="forecast_scenario_comparison.parquet", source_cell=heavy_source_cell, formula="sum quarterly current finalist Heavy RUC net km", official_value=off["heavy_ruc_net_km"]),
-                _current_annual_row(**common, series_id="light_bev_ruc_net_km", display_name="Light BEV RUC net km", section="Key volumes", value=current_light_bev_km, unit="million km", row_role="bridge_input", source_basis=migration_basis, source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=migration_source_cell, formula="optimized EV/PHEV migration total * MBU26 Light BEV share within EV/PHEV", official_value=off["light_bev_ruc_net_km"], model_id=_current_composite_model_id()),
+                _current_annual_row(**common, series_id="light_bev_ruc_net_km", display_name="Light BEV RUC net km", section="Key volumes", value=current_light_bev_km, unit="million km", row_role="bridge_input", source_basis=migration_basis, source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=migration_source_cell, formula="base pool (conventional / VFM Base conventional share) * VFM Base Light BEV share", official_value=off["light_bev_ruc_net_km"], model_id=_current_composite_model_id()),
                 fixed("heavy_bev_ruc_net_km"),
-                _current_annual_row(**common, series_id="phev_ruc_net_km", display_name="PHEV RUC net km", section="Key volumes", value=current_phev_km, unit="million km", row_role="bridge_input", source_basis=migration_basis, source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=migration_source_cell, formula="optimized EV/PHEV migration total * MBU26 PHEV share within EV/PHEV", official_value=off["phev_ruc_net_km"], model_id=_current_composite_model_id()),
+                _current_annual_row(**common, series_id="phev_ruc_net_km", display_name="PHEV RUC net km", section="Key volumes", value=current_phev_km, unit="million km", row_role="bridge_input", source_basis=migration_basis, source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=migration_source_cell, formula="base pool (conventional / VFM Base conventional share) * VFM Base PHEV share", official_value=off["phev_ruc_net_km"], model_id=_current_composite_model_id()),
                 fixed("tuc_gtk"),
-                _current_annual_row(**common, series_id="gross_ped_revenue", display_name="PED revenue", section="FED", value=ped_revenue, unit="$m nominal ex GST", row_role="replacement_line", source_basis=f"{migration_revenue_basis}; population_source={population_source_status}", source_file="forecast_scenario_comparison.parquet; scenario_inputs/scenario_input_wide.parquet; mbu26_official_annual.csv", source_cell=migration_source_cell, formula="adjusted PED/light-petrol VKT after optimized EV/PHEV migration * MBU26 litres intensity / 100 * MBU26 PED rate", replacement_only=True, official_value=off["gross_ped_revenue"], **ped_bridge_sources),
-                _current_annual_row(**common, series_id="light_ruc_net_revenue", display_name="Light RUC revenue", section="RUC", value=light_revenue, unit="$m nominal ex GST", row_role="replacement_line", source_basis=migration_revenue_basis, source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=migration_source_cell, formula="optimized conventional Light RUC km * MBU26 conventional Light effective rate", replacement_only=True, official_value=off["light_ruc_net_revenue"], model_id=CURRENT_FINALIST_MODEL_IDS["LIGHT_RUC"]),
+                _current_annual_row(**common, series_id="gross_ped_revenue", display_name="PED revenue", section="FED", value=ped_revenue, unit="$m nominal ex GST", row_role="replacement_line", source_basis=f"{migration_revenue_basis}; population_source={population_source_status}", source_file="forecast_scenario_comparison.parquet; scenario_inputs/scenario_input_wide.parquet; mbu26_official_annual.csv", source_cell=migration_source_cell, formula="raw PED/light-petrol VKT * MBU26 litres intensity / 100 * MBU26 PED rate", replacement_only=True, official_value=off["gross_ped_revenue"], **ped_bridge_sources),
+                _current_annual_row(**common, series_id="light_ruc_net_revenue", display_name="Light RUC revenue", section="RUC", value=light_revenue, unit="$m nominal ex GST", row_role="replacement_line", source_basis=migration_revenue_basis, source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=migration_source_cell, formula="conventional Light RUC km * MBU26 conventional Light effective rate", replacement_only=True, official_value=off["light_ruc_net_revenue"], model_id=CURRENT_FINALIST_MODEL_IDS["LIGHT_RUC"]),
                 _current_annual_row(**common, series_id="heavy_ruc_net_revenue", display_name="Heavy RUC revenue", section="RUC", value=heavy_revenue, unit="$m nominal ex GST", row_role="replacement_line", source_basis="current_finalist_model + MBU26 effective rate", source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=heavy_source_cell, formula="sum quarterly current Heavy RUC net km * MBU26 effective rate", replacement_only=True, official_value=off["heavy_ruc_net_revenue"]),
-                _current_annual_row(**common, series_id="light_bev_ruc_net_revenue", display_name="Light BEV RUC net revenue", section="RUC", value=light_bev_revenue, unit="$m nominal ex GST", row_role="replacement_line", source_basis=migration_revenue_basis, source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=migration_source_cell, formula="optimized Light BEV RUC km * MBU26 Light BEV effective rate", replacement_only=True, official_value=off["light_bev_ruc_net_revenue"], model_id=_current_composite_model_id()),
+                _current_annual_row(**common, series_id="light_bev_ruc_net_revenue", display_name="Light BEV RUC net revenue", section="RUC", value=light_bev_revenue, unit="$m nominal ex GST", row_role="replacement_line", source_basis=migration_revenue_basis, source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=migration_source_cell, formula="allocated Light BEV RUC km * MBU26 Light BEV effective rate", replacement_only=True, official_value=off["light_bev_ruc_net_revenue"], model_id=_current_composite_model_id()),
                 fixed("heavy_bev_ruc_net_revenue"),
-                _current_annual_row(**common, series_id="phev_ruc_net_revenue", display_name="PHEV RUC net revenue", section="RUC", value=phev_revenue, unit="$m nominal ex GST", row_role="replacement_line", source_basis=migration_revenue_basis, source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=migration_source_cell, formula="optimized PHEV RUC km * MBU26 PHEV effective rate", replacement_only=True, official_value=off["phev_ruc_net_revenue"], model_id=_current_composite_model_id()),
+                _current_annual_row(**common, series_id="phev_ruc_net_revenue", display_name="PHEV RUC net revenue", section="RUC", value=phev_revenue, unit="$m nominal ex GST", row_role="replacement_line", source_basis=migration_revenue_basis, source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=migration_source_cell, formula="allocated PHEV RUC km * MBU26 PHEV effective rate", replacement_only=True, official_value=off["phev_ruc_net_revenue"], model_id=_current_composite_model_id()),
                 fixed("ruc_refunds"),
                 _current_annual_row(**common, series_id="gross_ruc_revenue", display_name="Gross RUC revenue", section="RUC", value=gross_ruc, unit="$m nominal ex GST", row_role="calculated_rollup", source_basis="current_hybrid_formula", source_file="current_hybrid_formula", source_cell=current_source_cell, formula="optimized light_ruc_net_revenue + heavy_ruc_net_revenue + optimized light_bev_ruc_net_revenue + MBU26 heavy_bev_ruc_net_revenue + optimized phev_ruc_net_revenue + MBU26 ruc_refunds", official_value=off["gross_ruc_revenue"]),
                 fixed("ruc_admin_revenue"),
@@ -1254,6 +1322,9 @@ def ev_phev_ped_light_migration_assumptions_from_mbu26(
     optimized_lambda_reference_scenario: str | None = None,
 ) -> pd.DataFrame:
     columns = [
+        "decision_facing",
+        "status",
+        "superseded_by",
         "FY",
         "period",
         "source_path",
@@ -1690,6 +1761,9 @@ def _migration_audit_row(item: dict[str, Any], mode: str, lambda_value: float, s
         "scenario_name": item["scenario_name"],
         "scenario_role": item["scenario_role"],
         "lambda_mode": mode,
+        "decision_facing": False,
+        "status": "retired_legacy_allocation_audit",
+        "superseded_by": ALLOCATION_BASIS_ID,
         "lambda_value": lambda_value,
         "lambda_raw_unconstrained": float(item["lambda_raw"]),
         "lambda_lower_bound": float(item["lambda_lower"]),
@@ -2196,7 +2270,7 @@ def revenue_formula_residual_frame(line_reconciliation: pd.DataFrame) -> pd.Data
 def _line_display_label(series_id: Any, fallback: Any = "") -> str:
     text = str(series_id or "")
     requested_labels = {
-        CURRENT_LIGHT_TOTAL_SERIES_ID: "Current finalist Light RUC total modelled km",
+        CURRENT_LIGHT_CONVENTIONAL_SERIES_ID: "Current finalist Light RUC conventional modelled km",
         "light_ruc_net_revenue": "Light RUC net revenue",
         "heavy_ruc_net_revenue": "Heavy RUC net revenue",
         "gross_ruc_revenue": "Gross RUC",
@@ -2492,3 +2566,74 @@ def _manifest_markdown(manifest: dict[str, Any]) -> str:
         str(manifest.get("formula_policy") or ""),
     ]
     return "\n".join(rows) + "\n"
+
+
+def light_ruc_horizon_availability_frame(
+    current_outlook_chart_rows: pd.DataFrame,
+    *,
+    last_actual_fy: int = REVENUE_LAST_COMPLETE_ACTUAL_FY,
+) -> pd.DataFrame:
+    """Which June years the current-model path publishes, and why not.
+
+    The conventional-anchor share expansion divides by a conventional share
+    that falls over time, so the implied pool diverges without bound at long
+    horizons. Rather than publish a divergent number behind a warning label,
+    the spine withholds the June year entirely. This frame makes the
+    withholding explicit and auditable: a consumer can tell the difference
+    between "not computed" and "deliberately unavailable".
+    """
+    rows: list[dict[str, Any]] = []
+    if current_outlook_chart_rows is None or current_outlook_chart_rows.empty:
+        return pd.DataFrame(
+            columns=[
+                "FY",
+                "period",
+                "scenario_name",
+                "quarters",
+                "availability_status",
+                "unavailable_reason",
+                "horizon_state",
+                "allocation_basis",
+                "notes",
+            ]
+        )
+    source = current_outlook_chart_rows
+    june_years = pd.to_numeric(source.get("june_year"), errors="coerce").dropna()
+    scenarios = sorted(
+        {
+            str(value)
+            for value in source.get("scenario_name", pd.Series(dtype=str)).astype(str)
+            if value and value.lower() not in {"nan", "mbu26_official"}
+        }
+    )
+    # Span the full published horizon, not just the June years that survived
+    # the cutoff, so the withheld years are enumerated rather than absent.
+    present = {int(value) for value in june_years}
+    horizon_end = max(max(present, default=LAST_DECISION_GRADE_ANNUAL_FY), CURRENT_MODEL_HORIZON_END_FY)
+    span = sorted(present | set(range(LAST_DECISION_GRADE_ANNUAL_FY + 1, horizon_end + 1)))
+    for scenario in scenarios or [""]:
+        for fy in span:
+            status, reason = annual_availability(fy)
+            rows.append(
+                {
+                    "FY": fy,
+                    "period": f"FY{fy}",
+                    "scenario_name": scenario,
+                    "quarters": "; ".join(june_year_quarters(fy)),
+                    "availability_status": status,
+                    "unavailable_reason": reason,
+                    "horizon_state": horizon_state(fy, last_actual_fy),
+                    "allocation_basis": ALLOCATION_BASIS_ID,
+                    "notes": (
+                        ""
+                        if status == ALLOCATION_AVAILABLE
+                        else (
+                            "Current-model Light RUC and every dependent revenue line are "
+                            "withheld beyond H20. Publication resumes only with the governed "
+                            "structural long-term bridge. Do not forward-fill, extrapolate or "
+                            "substitute MBU26 values for these periods."
+                        )
+                    ),
+                }
+            )
+    return pd.DataFrame(rows)

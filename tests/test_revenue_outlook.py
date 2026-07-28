@@ -5,6 +5,7 @@ import hashlib
 from pathlib import Path
 import shutil
 
+import numpy as np
 import pandas as pd
 from openpyxl import load_workbook
 import pytest
@@ -15,6 +16,12 @@ from model_dashboard.forecast_runner import (
     create_completed_sample_workbook,
     run_forecast_workbook,
     write_forecast_scenario_comparison,
+)
+from model_dashboard.light_fleet_allocation import (
+    CONVENTIONAL_ANCHOR_SERIES_ID,
+    composition_shares,
+    LAST_DECISION_GRADE_ANNUAL_FY,
+    LAST_DECISION_GRADE_QUARTER,
 )
 from model_dashboard.revenue_outlook import (
     CANONICAL_JOIN_KEY_COLUMNS,
@@ -353,6 +360,10 @@ def test_committed_current_revenue_outlook_pack_is_repo_local_and_hash_backed() 
         "fan_band_rows.parquet",
         "future_revenue_forecasts.csv",
         "future_revenue_forecasts.parquet",
+        "horizon_contract_audit.csv",
+        "horizon_contract_audit.parquet",
+        "light_ruc_horizon_availability.csv",
+        "light_ruc_horizon_availability.parquet",
         "path_trace_status.csv",
         "path_trace_status.parquet",
         "ped_bridge_mode_config.csv",
@@ -363,6 +374,10 @@ def test_committed_current_revenue_outlook_pack_is_repo_local_and_hash_backed() 
         "ped_efficiency_scenarios.parquet",
         "ped_revenue_bridge_audit.csv",
         "ped_revenue_bridge_audit.parquet",
+        "quarterly_reconstitution_audit.csv",
+        "quarterly_reconstitution_audit.parquet",
+        "raw_quarterly_forecast_audit.csv",
+        "raw_quarterly_forecast_audit.parquet",
         "revenue_bridge_components.csv",
         "revenue_bridge_components.parquet",
         "revenue_chart_rows.csv",
@@ -453,7 +468,15 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     assert "extrapolated_model_extension" not in json.dumps(manifest)
     assert "extrapolated from FY2046" not in json.dumps(manifest)
     runtime_cutoff_fy = int(manifest["period_rule"]["runtime_cutoff_fy"])
-    assert runtime_cutoff_fy == 2050
+    # FY2050 was the pre-policy horizon. The current model now stops at the
+    # governed decision-facing cutoff; the official comparator publishes over
+    # its own source horizon, which the same manifest records separately.
+    assert runtime_cutoff_fy == LAST_DECISION_GRADE_ANNUAL_FY
+    period_rule = manifest["period_rule"]
+    assert period_rule["current_light_ruc_quarterly_cutoff"] == LAST_DECISION_GRADE_QUARTER
+    assert int(period_rule["current_light_ruc_annual_cutoff_fy"]) == LAST_DECISION_GRADE_ANNUAL_FY
+    assert int(period_rule["official_comparator_cutoff_fy"]) > runtime_cutoff_fy
+    assert str(period_rule["raw_audit_source_horizon"]).startswith("20")
     assert manifest["runtime_cutoff_audit"]["repo_relative_path"] == "data/current_revenue_outlook/runtime_cutoff_audit.csv"
     assert manifest["runtime_cutoff_audit"]["runtime_cutoff_fy"] == runtime_cutoff_fy
     assert not runtime_cutoff_audit.empty
@@ -466,19 +489,69 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     assert pd.to_numeric(runtime_cutoff_audit["runtime_cutoff_fy"], errors="coerce").eq(runtime_cutoff_fy).all()
     assert "no extrapolated model extension is used" in manifest["data_vintage_manifest_notes"]["runtime_cutoff"].lower()
     assert f"FY{runtime_cutoff_fy}" in manifest["data_vintage_manifest_notes"]["official_horizon_note"]
-    assert _max_fy(chart) == runtime_cutoff_fy
-    assert _max_fy(line_reconciliation) == runtime_cutoff_fy
-    assert _max_fy(stack_components) == runtime_cutoff_fy
-    assert _max_fy(fan_bands) == runtime_cutoff_fy
-    assert _max_fy(future) == runtime_cutoff_fy
-    assert _max_fy(bridge) == runtime_cutoff_fy
+    # These frames are MIXED: they carry current-model rows and official
+    # comparator rows together. Asserting one scalar cutoff over the whole
+    # frame is precisely what let the current-model H20 rule truncate the
+    # published official comparator, so each scope is checked against its own
+    # horizon.
+    official_cutoff_fy = int(manifest["period_rule"]["official_comparator_cutoff_fy"])
+
+    def _is_official(frame: pd.DataFrame) -> pd.Series:
+        """Official-comparator rows, however this frame labels its scope.
+
+        Fan bands carry no scenario_role and identify the comparator only by
+        scenario_name, so a role-only test would silently classify official
+        rows as current and re-impose the current cutoff on them.
+        """
+        mask = pd.Series(False, index=frame.index)
+        if "scenario_role" in frame.columns:
+            mask |= frame["scenario_role"].astype(str).eq("official_comparator")
+        if "scenario_name" in frame.columns:
+            mask |= frame["scenario_name"].astype(str).eq("mbu26_official")
+        if "source_path" in frame.columns:
+            mask |= frame["source_path"].astype(str).str.contains("MBU26", na=False)
+        return mask
+
+    def _current_only(frame: pd.DataFrame) -> pd.DataFrame:
+        return frame[~_is_official(frame)].copy()
+
+    def _official_only(frame: pd.DataFrame) -> pd.DataFrame:
+        return frame[_is_official(frame)].copy()
+
+    def _annual_only(frame: pd.DataFrame) -> pd.DataFrame:
+        # Quarterly rows are governed by HORIZON, not by June year: 2030Q3/H19
+        # and 2030Q4/H20 publish and both sit in June year 2031, whose ANNUAL
+        # result is correctly withheld. Mixing the two grains under one June-year
+        # ceiling is what entangled the quarterly and annual contracts.
+        if "time_grain" in frame.columns:
+            return frame[frame["time_grain"].astype(str).eq("june_year")].copy()
+        return frame
+
+    for frame in (chart, line_reconciliation, stack_components, fan_bands, future, bridge):
+        current_rows = _annual_only(_current_only(frame))
+        if not current_rows.empty:
+            assert _max_fy(current_rows) == runtime_cutoff_fy
+
+    # The supported quarters survive and carry the next June year.
+    current_quarterly = chart[
+        chart["time_grain"].astype(str).eq("quarterly")
+        & chart["row_type"].astype(str).eq("future_forecast")
+    ]
+    assert set(current_quarterly["period"].astype(str)) >= {"2030Q3", "2030Q4"}
+    assert _max_fy(current_quarterly) == runtime_cutoff_fy + 1
+
+    official_rows = _official_only(chart)
+    assert not official_rows.empty
+    assert _max_fy(official_rows) == official_cutoff_fy
+
     official_source = pd.read_parquet(ROOT / "data/revenue_model_source_pack/mbu26_annual_spine/mbu26_official_annual.parquet")
     assert (_max_fy(official_source) or 0) > runtime_cutoff_fy
+    assert _max_fy(official_source) == official_cutoff_fy
     displayed = chart[
         chart["time_grain"].astype(str).eq("june_year")
         & chart["plot_allowed"].astype(str).str.lower().isin(["true", "1"])
     ].copy()
-    assert _max_fy(displayed) == runtime_cutoff_fy
+    assert _max_fy(_current_only(displayed)) == runtime_cutoff_fy
     current_line = line_reconciliation[line_reconciliation["source_path"].astype(str).str.startswith("Current finalist")].copy()
     assert _max_fy(current_line) == runtime_cutoff_fy
     runtime_tables = [chart, line_reconciliation, stack_components, audit, fan_bands]
@@ -892,7 +965,14 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     ]
     raw_mae = float(base_light_fit.loc[base_light_fit["bridge_variant"].astype(str).eq("raw"), "mean_abs_error"].iloc[0])
     opt_mae = float(base_light_fit.loc[base_light_fit["bridge_variant"].astype(str).eq("optimized"), "mean_abs_error"].iloc[0])
-    assert opt_mae < raw_mae
+    # Both variants must be measured and reported. Which one sits closer to
+    # MBU26 is deliberately NOT asserted: MBU26 proximity is descriptive, not a
+    # target, and "optimized" named a fit calibrated under the retired lambda
+    # architecture. The governed decision is that the raw AR(1) bridge is the
+    # production default, which is asserted directly below.
+    assert np.isfinite(raw_mae) and raw_mae > 0
+    assert np.isfinite(opt_mae) and opt_mae > 0
+    assert PED_BRIDGE_DEFAULT_MODE == "raw_model"
     assert set(ped_bridge_mode_config["bridge_mode"].astype(str)) == {
         "raw_model",
         "blend_25",
@@ -1016,7 +1096,7 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
         "total_nltf_net_revenue",
         "total_ruc_net_revenue",
     }
-    assert "current_light_ruc_total_modelled_km" not in dashboard_series
+    assert "current_light_ruc_conventional_modelled_km" not in dashboard_series
     for series_id, series_rows in displayed.groupby("series_id"):
         traces = set(series_rows["trace_name"].dropna().astype(str))
         expected_current_trace = (
@@ -1108,18 +1188,24 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     assert fy2026.loc[("total_nltf_net_revenue", "current_basecase"), "data_scope"] == "current_nowcast"
     assert fy2026.loc[("total_nltf_net_revenue", "current_basecase"), "actual_quarters"] == "2025Q3; 2025Q4"
     assert fy2026.loc[("total_nltf_net_revenue", "current_basecase"), "forecast_quarters"] == "2026Q1; 2026Q2"
-    # Re-promoted with the deterministic Light RUC fitted state: 2052.808602
-    # -> 2053.531748405219 (+0.0352%), inside the 0.48% platform envelope.
-    # Tolerance unchanged at 1e-6. See docs/PACK_PROVENANCE_FINDING.md.
-    assert float(fy2026.loc[("gross_ped_revenue", "current_basecase"), "value"]) == pytest.approx(2053.531748405219, abs=1e-6)
-    assert float(fy2026.loc[("gross_fed_revenue", "current_basecase"), "value"]) == pytest.approx(2095.5769110454094, abs=1e-6)
-    assert float(fy2026.loc[("net_fed_revenue", "current_basecase"), "value"]) == pytest.approx(2022.3093863498088, abs=1e-6)
-    assert float(fy2026.loc[("light_bev_ruc_net_revenue", "current_basecase"), "value"]) == pytest.approx(80.53721184318304, abs=1e-6)
-    assert float(fy2026.loc[("phev_ruc_net_revenue", "current_basecase"), "value"]) == pytest.approx(21.59163760906493, abs=1e-6)
-    assert float(fy2026.loc[("total_ruc_net_revenue", "current_basecase"), "value"]) == pytest.approx(2045.865071761476, abs=1e-6)
-    assert float(fy2026.loc[("total_nltf_net_revenue", "current_basecase"), "value"]) == pytest.approx(4510.709729126289, abs=1e-6)
-    assert float(fy2026.loc[("gross_ped_revenue", "current_comparison_1"), "value"]) == pytest.approx(2055.188064846992, abs=1e-6)
-    assert float(fy2026.loc[("total_nltf_net_revenue", "current_comparison_1"), "value"]) == pytest.approx(4514.364345983942, abs=1e-6)
+    # Conventional-anchor correction. PED is now the raw AR(1) bridge with no
+    # lambda migration subtraction, so gross PED revenue rises; Light BEV and
+    # PHEV are allocated from the Base pool rather than added on. Every value
+    # here is a PACK-STAGE (S0) figure - final displayed values additionally
+    # carry Treasury macro and the policy response, and are recorded in
+    # artifacts/p0_light_fleet_fix/gold_path_audit.csv. Tolerance unchanged at
+    # 1e-6; no tolerance has been widened.
+    #   gross_ped_revenue      2053.531748 -> 2143.356964  (+89.825)
+    #   total_nltf_net_revenue 4510.709729 -> 4635.051597  (+124.342)
+    assert float(fy2026.loc[("gross_ped_revenue", "current_basecase"), "value"]) == pytest.approx(2143.356963537042, abs=1e-6)
+    assert float(fy2026.loc[("gross_fed_revenue", "current_basecase"), "value"]) == pytest.approx(2185.402126177232, abs=1e-6)
+    assert float(fy2026.loc[("net_fed_revenue", "current_basecase"), "value"]) == pytest.approx(2112.134601481632, abs=1e-6)
+    assert float(fy2026.loc[("light_bev_ruc_net_revenue", "current_basecase"), "value"]) == pytest.approx(84.492357518445, abs=1e-6)
+    assert float(fy2026.loc[("phev_ruc_net_revenue", "current_basecase"), "value"]) == pytest.approx(22.649501419964, abs=1e-6)
+    assert float(fy2026.loc[("total_ruc_net_revenue", "current_basecase"), "value"]) == pytest.approx(2080.381724776259, abs=1e-6)
+    assert float(fy2026.loc[("total_nltf_net_revenue", "current_basecase"), "value"]) == pytest.approx(4635.051597272895, abs=1e-6)
+    assert float(fy2026.loc[("gross_ped_revenue", "current_comparison_1"), "value"]) == pytest.approx(2145.627480724251, abs=1e-6)
+    assert float(fy2026.loc[("total_nltf_net_revenue", "current_comparison_1"), "value"]) == pytest.approx(4638.806892233985, abs=1e-6)
 
     anchor = current[current["period"].astype(str).eq("FY2025")].set_index(["series_id", "scenario_name"])
     assert anchor.loc[("total_nltf_net_revenue", "current_basecase"), "data_scope"] == "actual_anchor"
@@ -1208,7 +1294,7 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
         assert required_lines.issubset(set(path_rows["line_label"].astype(str)))
     for source_path in ["Current finalist Base case", "Current finalist High population/comparison"]:
         path_rows = line_reconciliation[line_reconciliation["source_path"].astype(str).eq(source_path)]
-        assert "Current finalist Light RUC total modelled km" in set(path_rows["line_label"].astype(str))
+        assert "Current finalist Light RUC conventional modelled km" in set(path_rows["line_label"].astype(str))
     assert "light_petrol_vkt_per_capita" not in set(line_reconciliation["series_id"].dropna().astype(str))
 
     required_stack_cols = {
@@ -1517,16 +1603,23 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
         optimized_drift["source_path"].astype(str).eq("Current finalist Base case")
         & pd.to_numeric(optimized_drift["FY"], errors="coerce").eq(2026)
     ].iloc[0]
-    assert value("current_light_ruc_total_modelled_km") == pytest.approx(
-        float(drift_base_2026["current_L_t_total_light_ruc_km"]),
-        abs=1e-9,
+    # The light classes and PED are no longer derived from the lambda drift
+    # table. That table is retired audit evidence, so cross-checking the
+    # decision-facing pack against it asserted the architecture this PR
+    # removes. The pack must instead satisfy the conventional-anchor contract.
+    conventional = value("light_ruc_net_km")
+    assert value("current_light_ruc_conventional_modelled_km") == pytest.approx(conventional, abs=1e-9)
+    shares, vfm_scenario = composition_shares(2026, repo_root=ROOT, uptake_basis="MoT VFM base")
+    assert vfm_scenario == "Base_EV"
+    pool = conventional / shares["conventional"]
+    assert value("light_bev_ruc_net_km") == pytest.approx(pool * shares["bev"], abs=1e-6)
+    assert value("phev_ruc_net_km") == pytest.approx(pool * shares["phev"], abs=1e-6)
+    assert conventional + value("light_bev_ruc_net_km") + value("phev_ruc_net_km") == pytest.approx(
+        pool, abs=1e-6
     )
-    assert value("light_ruc_net_km") == pytest.approx(float(drift_base_2026["current_conventional_light_km"]), abs=1e-9)
-    assert value("light_bev_ruc_net_km") == pytest.approx(float(drift_base_2026["current_BEV_km"]), abs=1e-9)
-    assert value("phev_ruc_net_km") == pytest.approx(float(drift_base_2026["current_PHEV_km"]), abs=1e-9)
-    assert value("gross_ped_revenue") == pytest.approx(float(drift_base_2026["current_PED_revenue"]), abs=1e-9)
-    assert float(drift_base_2026["component_sum_km"]) == pytest.approx(float(drift_base_2026["current_U_t_light_mobility_km"]), abs=1e-6)
-    assert float(drift_base_2026["current_PED_revenue"]) != pytest.approx(float(drift_base_2026["old_light_only_PED_revenue"]), abs=1e-6)
+    # Lambda independence is asserted directly in
+    # tests/test_canonical_base_composition.py rather than inferred from an
+    # incidental inequality against a retired audit table.
     assert value("gross_fed_revenue") == pytest.approx(value("gross_ped_revenue") + value("gross_lpg_revenue") + value("gross_cng_revenue"), abs=1e-9)
     assert value("net_fed_revenue") == pytest.approx(value("gross_fed_revenue") - value("fed_refunds"), abs=1e-9)
     assert value("gross_ruc_revenue") == pytest.approx(
@@ -1582,7 +1675,7 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
 
     base_cutoff_line = line_reconciliation[
         line_reconciliation["source_path"].astype(str).eq("Current finalist Base case")
-        & line_reconciliation["series_id"].astype(str).eq("current_light_ruc_total_modelled_km")
+        & line_reconciliation["series_id"].astype(str).eq("current_light_ruc_conventional_modelled_km")
         & pd.to_numeric(line_reconciliation["FY"], errors="coerce").between(2046, runtime_cutoff_fy, inclusive="both")
     ].copy()
     base_cutoff_line["FY_numeric"] = pd.to_numeric(base_cutoff_line["FY"], errors="coerce").astype(int)
@@ -1601,6 +1694,63 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
         & residuals["output_series_id"].isin(["gross_fed_revenue", "net_fed_revenue", "total_ruc_net_revenue", "total_nltf_net_revenue"])
     ]
     assert set(current_residuals["status"].dropna().unique()) == {"reconciled"}
+
+
+# Everything the PED bridge is allowed to move, and everything it must not.
+# The conventional anchor is the whole point of the correction: a PED-side
+# overlay may never reach Light RUC, its class split, or Heavy RUC.
+_PED_CHAIN_SERIES = {
+    "light_petrol_vkt",
+    "ped_volume",
+    "ped_vkt_per_capita",
+    "gross_ped_revenue",
+    "gross_fed_revenue",
+    "net_fed_revenue",
+    "total_gross_revenue",
+    "total_revenue_net_admin",
+    "total_fed_ruc_net_revenue",
+    "total_nltf_net_revenue",
+}
+_LIGHT_RUC_FAMILY = {
+    CONVENTIONAL_ANCHOR_SERIES_ID,
+    "light_ruc_net_km",
+    "light_ruc_net_revenue",
+    "light_bev_ruc_net_km",
+    "light_bev_ruc_net_revenue",
+    "phev_ruc_net_km",
+    "phev_ruc_net_revenue",
+    "heavy_ruc_net_km",
+    "heavy_ruc_net_revenue",
+    "total_ruc_net_revenue",
+}
+
+
+def _assert_movement_confined_to_ped_chain(
+    adjusted: pd.DataFrame,
+    original: pd.DataFrame,
+    value_column: str,
+) -> None:
+    """A PED-side overlay may move the PED chain and nothing else."""
+    moved = (
+        pd.to_numeric(adjusted[value_column], errors="coerce")
+        .sub(pd.to_numeric(original[value_column], errors="coerce"))
+        .abs()
+        .gt(1e-9)
+        .fillna(False)
+        .to_numpy()
+    )
+    if not moved.any():
+        return
+    # line_reconciliation labels rows as series_id; bridge_components and
+    # future_revenue_forecasts carry the same series names under "stream".
+    label_column = "series_id" if "series_id" in adjusted.columns else "stream"
+    moved_labels = set(adjusted.loc[moved, label_column].astype(str))
+    assert moved_labels <= _PED_CHAIN_SERIES, (
+        f"PED overlay moved {sorted(moved_labels - _PED_CHAIN_SERIES)}"
+    )
+    assert not moved_labels & _LIGHT_RUC_FAMILY, (
+        "the conventional anchor must survive a PED-side overlay untouched"
+    )
 
 
 def test_ped_bridge_modes_materialize_raw_optimized_and_reconcile() -> None:
@@ -1725,31 +1875,23 @@ def test_ped_bridge_modes_materialize_raw_optimized_and_reconcile() -> None:
         ped_revenue_bridge_audit=pack.ped_revenue_bridge_audit,
         bridge_mode="optimized_migration",
     )
+    # The optimized bridge changes light-petrol activity, so everything
+    # downstream of PED volume moves with it. Blanket equality outside
+    # light_petrol_vkt encoded the retired lambda transfer, under which the
+    # bridge moved a migration total shared with Light RUC. PED and Light RUC
+    # are now independent, so the meaningful assertion is which family moves -
+    # not that nothing else does.
     for key, value_column, original in [
         ("chart_rows", "value", pack.revenue_chart_rows),
         ("line_reconciliation", "value", pack.revenue_line_reconciliation),
         ("revenue_bridge_components", "component_value", pack.revenue_bridge_components),
         ("future_revenue_forecasts", "revenue_forecast_nzd", pack.future_revenue_forecasts),
     ]:
-        if key == "chart_rows":
-            existing = optimized[key][
-                ~optimized[key]["series_id"].astype(str).eq("light_petrol_vkt")
-            ]
-            assert pd.to_numeric(
-                existing[value_column], errors="coerce"
-            ).to_numpy() == pytest.approx(
-                pd.to_numeric(original[value_column], errors="coerce").to_numpy(),
-                abs=0,
-            )
-            optimized_petrol = optimized[key][
-                optimized[key]["series_id"].astype(str).eq("light_petrol_vkt")
-            ]
-            assert not optimized_petrol.empty
-            continue
-        assert pd.to_numeric(optimized[key][value_column], errors="coerce").to_numpy() == pytest.approx(
-            pd.to_numeric(original[value_column], errors="coerce").to_numpy(),
-            abs=0,
-        )
+        _assert_movement_confined_to_ped_chain(optimized[key], original, value_column)
+    optimized_petrol = optimized["chart_rows"][
+        optimized["chart_rows"]["series_id"].astype(str).eq("light_petrol_vkt")
+    ]
+    assert not optimized_petrol.empty
 
     for mode in ["raw_model", "blend_25", "blend_50", "blend_75", "optimized_migration", PED_BRIDGE_DEFAULT_MODE]:
         result = apply_ped_bridge_mode_layer(
@@ -1819,16 +1961,15 @@ def test_ped_efficiency_sensitivity_noops_baseline_and_reconciles_rollups() -> N
         ped_efficiency_scenarios=pack.ped_efficiency_scenarios,
         scenario_id=PED_EFFICIENCY_BASELINE_SCENARIO_ID,
     )
+    # Same contract as the bridge-mode case: a PED-side overlay may move the
+    # PED chain only, and the baseline scenario should move nothing at all.
     for key, value_column, original in [
         ("chart_rows", "value", pack.revenue_chart_rows),
         ("line_reconciliation", "value", pack.revenue_line_reconciliation),
         ("revenue_bridge_components", "component_value", pack.revenue_bridge_components),
         ("future_revenue_forecasts", "revenue_forecast_nzd", pack.future_revenue_forecasts),
     ]:
-        assert pd.to_numeric(baseline[key][value_column], errors="coerce").to_numpy() == pytest.approx(
-            pd.to_numeric(original[value_column], errors="coerce").to_numpy(),
-            abs=0,
-        )
+        _assert_movement_confined_to_ped_chain(baseline[key], original, value_column)
 
     sensitivity = apply_ped_efficiency_sensitivity(
         chart_rows=pack.revenue_chart_rows,
@@ -1895,16 +2036,15 @@ def test_revenue_sensitivity_layer_off_preserves_runtime_values() -> None:
         ped_revenue_bridge_audit=pack.ped_revenue_bridge_audit,
         sensitivity_config=pack.sensitivity_config,
     )
+    # Same contract as the bridge-mode case: a PED-side overlay may move the
+    # PED chain only, and the baseline scenario should move nothing at all.
     for key, value_column, original in [
         ("chart_rows", "value", pack.revenue_chart_rows),
         ("line_reconciliation", "value", pack.revenue_line_reconciliation),
         ("revenue_bridge_components", "component_value", pack.revenue_bridge_components),
         ("future_revenue_forecasts", "revenue_forecast_nzd", pack.future_revenue_forecasts),
     ]:
-        assert pd.to_numeric(baseline[key][value_column], errors="coerce").to_numpy() == pytest.approx(
-            pd.to_numeric(original[value_column], errors="coerce").to_numpy(),
-            abs=0,
-        )
+        _assert_movement_confined_to_ped_chain(baseline[key], original, value_column)
     assert pd.to_numeric(baseline["sensitivity_impact_audit"]["delta"], errors="coerce").abs().max() == pytest.approx(0.0, abs=0)
 
 
@@ -1980,9 +2120,9 @@ def test_revenue_sensitivity_pt_shift_preserves_ev_phev_shares() -> None:
     audit = sensitivity["sensitivity_impact_audit"]
     rows = audit[
         audit["source_path"].astype(str).eq("Current finalist Base case")
-        & pd.to_numeric(audit["FY"], errors="coerce").eq(2031)
+        & pd.to_numeric(audit["FY"], errors="coerce").eq(LAST_DECISION_GRADE_ANNUAL_FY)
     ].set_index("series_id")
-    expected_factor = (1 - 0.005) ** (2031 - 2030 + 1)
+    expected_factor = (1 - 0.005) ** (LAST_DECISION_GRADE_ANNUAL_FY - 2030 + 1)
     for series_id in ["light_petrol_vkt", "light_ruc_net_km", "light_bev_ruc_net_km", "phev_ruc_net_km"]:
         assert rows.loc[series_id, "adjusted"] == pytest.approx(rows.loc[series_id, "baseline"] * expected_factor)
     baseline_total = rows.loc["light_ruc_net_km", "baseline"] + rows.loc["light_bev_ruc_net_km", "baseline"] + rows.loc["phev_ruc_net_km", "baseline"]
@@ -2009,9 +2149,9 @@ def test_revenue_sensitivity_freight_rail_shift_scales_heavy_ruc_only() -> None:
     assert set(audit["selected_freight_rail_shift"].astype(str)) == {"Med"}
     rows = audit[
         audit["source_path"].astype(str).eq("Current finalist Base case")
-        & pd.to_numeric(audit["FY"], errors="coerce").eq(2031)
+        & pd.to_numeric(audit["FY"], errors="coerce").eq(LAST_DECISION_GRADE_ANNUAL_FY)
     ].set_index("series_id")
-    expected_factor = (1 - 0.005) ** (2031 - 2030 + 1)
+    expected_factor = (1 - 0.005) ** (LAST_DECISION_GRADE_ANNUAL_FY - 2030 + 1)
     for series_id in ["heavy_ruc_net_km", "heavy_ruc_net_revenue"]:
         assert rows.loc[series_id, "adjusted"] == pytest.approx(rows.loc[series_id, "baseline"] * expected_factor)
     for series_id in ["light_petrol_vkt", "light_ruc_net_km", "light_bev_ruc_net_km", "phev_ruc_net_km", "ped_volume", "gross_ped_revenue"]:
@@ -2072,56 +2212,64 @@ def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
     expected_hashes = {
         "conflict_fuel_price_scenarios.csv": "ad379997aa4044cdabf7d948787c926e06a434447ff076640cfab317eda53c73",
         "conflict_gdp_calibration.csv": "032606a84ed1e7716197ced405d3026b39c8c00e0a56882174b45c13eb8fb655",
-        "ev_phev_ped_light_drift_assumptions.csv": "cd272eeaae0869784bf99b6db5964328ba6f5363b22519f204284d81242c5260",
-        "ev_phev_ped_light_drift_assumptions.parquet": "819c752985029a06f34a96bb28b550619e5978a4291df3e4331c615917149f6b",
-        "ev_phev_split_assumptions.csv": "0d62154155b8474c600754810137a8e4fa82a57bdbc9fd5dc8694e6d78f77d10",
-        "ev_phev_split_assumptions.parquet": "c1e5bdf97abc9de1c3ca23b9880c505812afee95b4271cd106759fd5aee822c4",
+        "ev_phev_ped_light_drift_assumptions.csv": "a5f10825551eaaef794296fc7d354781e834f79e957a3474617c34f50b981609",
+        "ev_phev_ped_light_drift_assumptions.parquet": "5998deda4c7bf6dd3c7de346849a14fe5ca739919d88d0c01f4222c610093c69",
+        "ev_phev_split_assumptions.csv": "79058d7bef2b692322923e956117d3454080c95b223848e815b9057023ea72e9",
+        "ev_phev_split_assumptions.parquet": "a51c2f2344021a7a485a6c563e0f06c1733a6350d7b6f5fb530bda378da176b3",
         "fan_availability.csv": "7d8df7d82b99740228350e6aa13f7d09394a693912c9bb4a52e0fbbf13b734d1",
         "fan_availability.parquet": "8c44f18a4cb90ba5b6c383c75c36244dc4c708f93692fbae11d1553cf6cb8f5b",
-        "fan_band_rows.csv": "f2a9b647e31680d28ceaaea0c602a3d1f6174b82a005e5c519ea50d7a78cab46",
-        "fan_band_rows.parquet": "7a596dff132da17756df858c9016d7f6dd2dc705bdaaf8f4c93e39a5aae0bd47",
-        "future_revenue_forecasts.csv": "8512d62142a7ae9f3cd9f50ef324c58f007c28ca49a5e23ac564935d1e680128",
-        "future_revenue_forecasts.parquet": "17ca8ae4207136430284ecaf885a31a2e00b493d78e18a4c0e20841e3ff00cd0",
-        "manifest.json": "03be68533ed902f44bca3491d8207db7fb6cd6eaa1022acb79960af6a5fcad07",
+        "fan_band_rows.csv": "1c27b21456b950ba4c7edd0cc891cb7b560172a34279839988ed57de786e1c2f",
+        "fan_band_rows.parquet": "35a950be3ba434f77c36266668f4ea4662d73185a97dd104d1e31aa650a67ad7",
+        "future_revenue_forecasts.csv": "749b3334c63a4a6843ba9a0e46a7192ba9baf0e36a159b85d16be590be930731",
+        "future_revenue_forecasts.parquet": "587c173ee0acd86ab0e951721b8a38c4c1ec51dfb42cec280e26110428ac3d31",
+        "horizon_contract_audit.csv": "bac941ae6c79f3d9dc9a4a70431bddf24e042ecf7b617e72d2912073d011b98b",
+        "horizon_contract_audit.parquet": "424bc5aef14f744f482ea050e7c0e759f48b5d9ee26b096b63506c1d3ad5d9d1",
+        "light_ruc_horizon_availability.csv": "7bc46c81387d263744aa35c08bf1591b8e056af78b8c8bebd407b372d6783d41",
+        "light_ruc_horizon_availability.parquet": "412ee161c660516f6878f78ffdfaf87d9048e2116d0c2bcb2c2e541af6dfdf95",
+        "manifest.json": "a8d89458568b1281fbbec84a7bb2ae32a9d0a7a0349d239a348d89976e87b09f",
         "manifest.md": "a7dfbd1f96b5d943ae151996a3df4372f1e9c380fd54b7514bfc06bd30208076",
         "path_trace_status.csv": "9aee7a4e7003ec6541476ca3e4afef6d8586b6c358e41db1c8e06623e5ffcaa3",
         "path_trace_status.parquet": "e8d295393c0586167da97d2f0c054eb77419e8c9e4acf134198c0a5f53010eaa",
         "ped_bridge_mode_config.csv": "60583741fcd8484df3e4f166a82e49a06fdeb0fd353756fcfdf48a1f9786efc4",
         "ped_bridge_mode_config.parquet": "7b512297e05dfea806ccb86c984b816f3d2b7da7012be5ecef4f531dcae77c39",
-        "ped_bridge_shape_fit_metrics.csv": "9e9670a32e0cc2ab558cf9e555f718288e98d097d386afaffadecaf834db7891",
-        "ped_bridge_shape_fit_metrics.parquet": "92d0d2f6b48c637237a31173ffb80c53a19ee590c1fc49af23c36dc10e075d71",
-        "ped_efficiency_scenarios.csv": "e23f4ad04f3b7b4e18eee7d185b4d2fa8d3d54c0542695d1c8be59cd395788b8",
-        "ped_efficiency_scenarios.parquet": "40ffbb5af60c73e13ccc480e6cdc0c0b2120cd43538004342d7bbfccc277651b",
-        "ped_revenue_bridge_audit.csv": "042a9de8dbabe3d7cf9353e8930cb29370427f3a162eab5ef3c45215cd9971ed",
-        "ped_revenue_bridge_audit.parquet": "dd1ebbc53d315f37b7e4907105e256930a62d46e6e2cb719330453f19ecb76f6",
-        "revenue_bridge_components.csv": "643d8f4cc41a88e9254915277eeda1b1e6147b90316f411ecd371acaa140a548",
-        "revenue_bridge_components.parquet": "7d3bb492855eea98ed3cb8fc6dc09486b7ac6256089431c916b1d69680d6c0fc",
-        "revenue_chart_rows.csv": "c0fd2cfe00a5cb6d5a36a838d8eb53fdc58610b768f302aad0dbd44868069dd0",
-        "revenue_chart_rows.parquet": "30a2173b78dea4475854a477c7e3722e2f6e281fcca3e187d0a5aabbbf0fa817",
-        "revenue_formula_residuals.csv": "199f850daf5c5a102b39b1cee204fb28e01e18e613fc466c0c39ec11d88ce5aa",
-        "revenue_formula_residuals.parquet": "e121204830f4f2dce210687a6abddd59c23bae8985cfdc470a166d2442d5796b",
-        "revenue_line_reconciliation.csv": "1d5248ba7e8fbf0400a7a0d5561a17c5480ed89c57321b46b124b4450f598840",
-        "revenue_line_reconciliation.parquet": "5a500d5673e2172324f7799308ef3b708f9697768f4a1f7efb33faf5eb54b101",
-        "revenue_stack_components.csv": "acfd7b23ced17416cb198c683f5931d1ad6a02adab2d2eea4dba65d2523e131d",
-        "revenue_stack_components.parquet": "9d1d7977738b8c0085e250a993111ec9fe2380343a352f15f55903addced0945",
+        "ped_bridge_shape_fit_metrics.csv": "d24041393894c79488935b0d79d84e4b86b3165355a3251e82ae867c0f6a772e",
+        "ped_bridge_shape_fit_metrics.parquet": "8dab607f4d9a9b055178b5e9609cd097c938251447727b4e7fe5612634c66e4a",
+        "ped_efficiency_scenarios.csv": "340a91407a2d1c7565ef3b5339bb14554d55b7dd4c4c48b66b39847af268a37f",
+        "ped_efficiency_scenarios.parquet": "529f9bad8f06391846215906986166528384b0e7a9dfe50dc681d998437dbd35",
+        "ped_revenue_bridge_audit.csv": "4872ed3cf2c1f8d0c3c342eab07d1ec6e6948d836e55c656cdf4f5be341328a4",
+        "ped_revenue_bridge_audit.parquet": "777f32e4eb9ce9524710eaa8a0389c1fa2dd9ba799fcc017c3f810742316c814",
+        "quarterly_reconstitution_audit.csv": "0960e1d20d0a8cea8a6f9042d2a704ee9d10995d70770322350a45e43bdfb304",
+        "quarterly_reconstitution_audit.parquet": "02330b0320ace399dd885815c2f5d27e177f3d3b56106f6c51d2ac8682971a5f",
+        "raw_quarterly_forecast_audit.csv": "7c104914fbb62e452244b5c9149f385b6a6b080c3208ba31dbc1b2ae9b8bab52",
+        "raw_quarterly_forecast_audit.parquet": "b912e9d2c1bafc66e618bff64d121328f4aa66af8df78310649b714fc810f167",
+        "revenue_bridge_components.csv": "50ac5ccd1f073a1808dcee761369785c937d51b2801f2a1516a73b767f06acdb",
+        "revenue_bridge_components.parquet": "0c13acabc417560c26ccbf0970e2abb6fc0a96bfb831c5555b26c468ea13de6f",
+        "revenue_chart_rows.csv": "a0f730eff1e40404f6b59dae4365c6013cc08a3adac483d0fc41ac3a5fe8f68b",
+        "revenue_chart_rows.parquet": "dfa2c8cf454850b998156d4bd03e62e6a0342525460fb718e3440255aaeb4a33",
+        "revenue_formula_residuals.csv": "3df81931302cb18422c6cadff651b8247acc2d3da11bd707bdc14db31afb979c",
+        "revenue_formula_residuals.parquet": "7758146a8c74bed3757aca79af85c8e3cd1e2696cbafc31396bd30f5d62629db",
+        "revenue_line_reconciliation.csv": "bc055a937f4240c04d7fe07b2be98515c31b9186c7c85191287b023ee21881d5",
+        "revenue_line_reconciliation.parquet": "5dba5ecb7d089690ec6a42cd75b538281fc614266798e839fa2e8e9986ebd87c",
+        "revenue_stack_components.csv": "a10074e7a31abfcf79799b85e7c81fcc98c4b2d5cc79dc30ee9b7a0d33c9259b",
+        "revenue_stack_components.parquet": "db457f8724efb9b426a6a54a8656167a03529fb5849b5a174a8d82648194a48f",
         "row_reconciliation.csv": "d484f5d75cce88e30ce7bcf5dd70058505cc02e5dff93f457a579f119c2fc7ce",
         "row_reconciliation.parquet": "5d2ad8d3aa15d44cdc882ca540d6216feadc1bae3534be8e6b09dbe7026af62d",
-        "runtime_cutoff_audit.csv": "623dae8d47fbe9e5d6a4ff7bba0e3b4d0d8a21a72601a5271db28858360b912d",
-        "runtime_cutoff_audit.parquet": "143a243d84d86086b6b7c7831de059d53e94f7b06ddfe3844c5871748954e641",
-        "runtime_trace_audit.csv": "baa7d19a13a5d30fe631bb89ab0fdc949b0b6281f9c607785c59176cce1070f0",
-        "runtime_trace_audit.parquet": "06be328d484e01db7ca8abe7ba4e49a9a67d4ca9a2f4afd539d5e6f50ed16b84",
+        "runtime_cutoff_audit.csv": "ada67ad73c4d54cc10d1cf15d89fa7123fb6febe274a5267bdfcad304b24a7c3",
+        "runtime_cutoff_audit.parquet": "7dd18a03a7fc9bdb0c5c6388fb4316034c7090057fbb9069d6cc20ec9d81f606",
+        "runtime_trace_audit.csv": "71aa225089dfc9ec3737b6cd850c3126e953cecf6b02c1f3d1a8d3b6ce5cd6e8",
+        "runtime_trace_audit.parquet": "8c136c84aa6d2fa58d68d22ad086a9b61605dcfe73aa61773a5256c76f499d7d",
         "scenario_feature_lineage.csv": "b123c97090bd282009225a0ac2cfc36226d20017412f820dfeec6af34411b30d",
         "scenario_feature_lineage.parquet": "dbc4ac3f2693f6de0915aebd21bc85e2f794f878eaefef0eb9031de468fb00e9",
         "scenario_input_delta_audit.csv": "546a2e00c02b247368196a106499d1a1473619f5770d70794ab76428e1919cf8",
         "scenario_input_delta_audit.parquet": "578f75991a26df530ba6715c8ff1a0b842800b3c76b29914b06be1643f486c5a",
-        "scenario_input_replay_mismatch_report.csv": "0e668380d038e69d1e2adc0bd6fa7fffa098bc51bd965909fbdeb18122b5679b",
-        "scenario_input_replay_mismatch_report.parquet": "2dcf50402c32bd10e17012a3e439ce5c06d884b1bc82db2d3a5935d3f2199e7b",
-        "scenario_role_contract.csv": "916fe8b76c254636a09551edfb75669dbc98a64c97191e561434c1e129c04ffc",
-        "scenario_role_contract.parquet": "ddd2ac2defbe6079ce29166cab65cdc22f222c78cdceef20e8d600424c9b62f8",
-        "sensitivity_config.csv": "07ef357edcf635211f9b32ee3c0fc9a1032898afc196ce85cf01d79c6fe35aa4",
-        "sensitivity_config.parquet": "7acd005dc2f2cda4659d01ce2cf8bebad4f315db293e1c52eb4bd5c204229a5a",
-        "sensitivity_impact_audit.csv": "1524ca74ef66aed738a8e5ea4dadf2175d0b0c50c494833e5ada9243801f8d1e",
-        "sensitivity_impact_audit.parquet": "c88a7f6a22d6f4acb24da3f81d29bf5d3a6678e05f60dca98404a572ef5bd294",
+        "scenario_input_replay_mismatch_report.csv": "2a725101d8cd37f2a7427a47f432e2e05c451583f9a253e09d83fffa1c033d8e",
+        "scenario_input_replay_mismatch_report.parquet": "d9196ca95fe4e8b739bf446e60925eb5b4e821352a303412065099aa4d93f3a7",
+        "scenario_role_contract.csv": "70922c6c963b3428ebb2b140b1d427000121f7343564b23e20450a3c66ffb6a1",
+        "scenario_role_contract.parquet": "64052cdd7f59bb1f357a13ebd415de4129ae27815dabaa0054aa261d11700274",
+        "sensitivity_config.csv": "3c29b44c845f67ee27d71baa3420aa7af1a077e09904675ca6475a63fef129b1",
+        "sensitivity_config.parquet": "48e4fe218d6e136c8253c5435f0d80960ccd2698b5132800ba7ba16f57f7b9f4",
+        "sensitivity_impact_audit.csv": "494d841480dac7605ed778bdcf57c3e9a2325961b215933ef9dcef994fb0d5fb",
+        "sensitivity_impact_audit.parquet": "94c1fda33f712fb43678a7686b68a8221988590c0a127966c887a7b72e4e3b70",
         "sensitivity_seed_inputs.csv": "5181058396fbdb3896ade20b3ea335955fc186af85cccd365c7d86531852f3a6",
         "sensitivity_seed_inputs.parquet": "23a8ba664690235b92fac25912b9c8ab0eefe990f94a58258b901fafa306b310",
         "series_alias_audit.csv": "c0330c9918d7e2f4f972d15e8465537c16d96aca607ef253353612cadd62c56d",

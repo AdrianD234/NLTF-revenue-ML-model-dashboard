@@ -1,0 +1,35 @@
+{
+  "schema_version": "nltf-legacy-investigation-snapshot-v1",
+  "captured_from_commit": "1118ef363a5a19ee34e34ee6ec2f9914b3686f26",
+  "status": "superseded_investigation_evidence",
+  "decision_facing": false,
+  "superseded_by": "conventional_anchor_vfm_composition_v1",
+  "purpose": "Frozen inputs for the Checkpoint 2/3/3.1 investigation scripts. Those studies analysed current-model Light RUC anchors out to FY2050 and produced the evidence that justified withholding them beyond H20. The corrected production pack no longer publishes those years, so the evidence is pinned here instead of being read back from a historical Git object - a shallow CI checkout may not contain that commit.",
+  "production_use": "PROHIBITED. No runtime loader, pack builder or dashboard consumer may read this directory.",
+  "files": [
+    {
+      "file": "ev_phev_split_assumptions.csv",
+      "source_repo_path": "data/engine_ar1/current_revenue_outlook/ev_phev_split_assumptions.csv",
+      "sha256": "810e0c9c17684be556ddaed20e398c2bf4b1adbee296895013cbee09b15fcf8f",
+      "rows": 76
+    },
+    {
+      "file": "ev_phev_ped_light_drift_assumptions.csv",
+      "source_repo_path": "data/engine_ar1/current_revenue_outlook/ev_phev_ped_light_drift_assumptions.csv",
+      "sha256": "342db4199fd2012fed273853466831d9eb61bfc5601ed821368fd138ee9dda70",
+      "rows": 208
+    },
+    {
+      "file": "ped_revenue_bridge_audit.csv",
+      "source_repo_path": "data/engine_ar1/current_revenue_outlook/ped_revenue_bridge_audit.csv",
+      "sha256": "ec643bb513a01b4b2d249e78dda55d2b25f8de82a34768e4e8fd3b6d6f69e80a",
+      "rows": 50
+    },
+    {
+      "file": "revenue_line_reconciliation.csv",
+      "source_repo_path": "data/engine_ar1/current_revenue_outlook/revenue_line_reconciliation.csv",
+      "sha256": "71e6f9acf6db4802f0e82486fc2f4b1fdfbfd54dac0153aaa3d4857d50e55a69",
+      "rows": 4026
+    }
+  ]
+}

@@ -40,6 +40,26 @@ def _paths(comparison_context, series, keys_a, keys_b):
     )
 
 
+def _scenario_rows(comparison_context, keys):
+    """Raw overlay rows for one scenario key, for series-level assertions."""
+    pack, signature = comparison_context
+    rows, *_ = app.cached_scenario_overlay_rows(
+        signature, keys[0], PED_BRIDGE_DEFAULT_MODE, keys[1], pack
+    )
+    return rows
+
+
+def _annual(rows, series_id: str, fy: int, role: str = "basecase") -> float:
+    selected = rows[
+        rows["time_grain"].astype(str).eq("june_year")
+        & rows["scenario_role"].astype(str).eq(role)
+        & rows["series_id"].astype(str).eq(series_id)
+        & pd.to_numeric(rows["june_year"], errors="coerce").eq(fy)
+    ]
+    values = pd.to_numeric(selected["value"], errors="coerce").dropna()
+    return float(values.iloc[0]) if len(values) else float("nan")
+
+
 def test_identical_scenarios_give_identical_paths(comparison_context) -> None:
     result = _paths(comparison_context, "Total NLTF revenue", _keys(), _keys())
     pd.testing.assert_series_equal(result["a"], result["b"])
@@ -59,8 +79,13 @@ def test_fed_uplift_off_matches_delayed_fy2027_then_lowers_path(comparison_conte
     a, b = result["a"], result["b"]
     assert b.loc[2026] == pytest.approx(a.loc[2026])
     assert b.loc[2027] == pytest.approx(a.loc[2027])
-    for fy in (2028, 2031, 2040):
-        assert b.loc[fy] < a.loc[fy]
+    # FY2031 and FY2040 were current June years before the H20 policy. The
+    # no-uplift path is lower for every year that publishes, so assert the
+    # property over the published index rather than pinned far years.
+    later = [fy for fy in a.index if int(fy) >= 2028]
+    assert later, "no June year past the legislated step publishes"
+    for fy in later:
+        assert b.loc[fy] < a.loc[fy], f"no-uplift is not below published in FY{fy}"
 
 
 def test_current_and_mbu26_uplift_switches_are_independent(comparison_context) -> None:
@@ -76,7 +101,10 @@ def test_current_and_mbu26_uplift_switches_are_independent(comparison_context) -
 
     mbu_off = _keys(uptake=app.EV_UPTAKE_GOVERNED_OPTION, mbu_fed_on=False)
     toggled = _paths(comparison_context, "Total NLTF revenue", mbu_on, mbu_off)
-    assert toggled["b"].loc[2030] == pytest.approx(5664.522358786646, rel=1e-12)
+    # Source-derived official no-uplift, not the current-model factor map.
+    # Evidence: artifacts/p0_light_fleet_fix/official_policy_audit.csv,
+    # FY2030 no_uplift total_nltf_net_revenue.
+    assert toggled["b"].loc[2030] == pytest.approx(5663.618433259718, rel=1e-12)
     assert toggled["b"].loc[2030] < toggled["a"].loc[2030]
 
     # The governed proportional policy reprices RUC alongside PED/FED. Both
@@ -148,7 +176,10 @@ def test_mot_official_scenario_plots_the_mbu26_official_trace(comparison_context
         expected.drop(index=2027),
         check_index_type=False,
     )
-    assert result["a"].loc[2027] == pytest.approx(4649.8686132182675, rel=1e-12)
+    # Source-derived official delayed wedge (0.059969 NZD/L, direct_source),
+    # replacing 4649.868613 which came from the current-model factor map.
+    # Evidence: official_policy_audit.csv FY2027 delay_6m.
+    assert result["a"].loc[2027] == pytest.approx(4647.671040768058, rel=1e-12)
     assert result["a"].loc[2027] < expected.loc[2027]
     # And it differs from the VFM base preset overlay path.
     vs_base = _paths(comparison_context, "Total NLTF revenue", governed_keys, _keys())
@@ -195,18 +226,47 @@ def test_component_breakdown_closes_total_npv_exactly(comparison_context) -> Non
     assert delta_sum == pytest.approx(npv_b - npv_a, abs=1e-6)
 
 
-def test_uptake_delta_stays_out_of_heavy_and_mvr(comparison_context) -> None:
-    # Heavy BEV reallocation is rollup-neutral, so a pure light-uptake change
-    # must leave the heavy block and MVR untouched in the bridge.
+def test_uptake_delta_stays_out_of_heavy_ped_and_mvr(comparison_context) -> None:
+    """A light-uptake change reallocates the Light pool and nothing else.
+
+    Two expectations here are obsolete. PED used to fall because the retired
+    lambda transfer coupled uptake to petrol displacement; lambda is gone and
+    the VFM petrol-retention overlay is Off by default, so PED is now exactly
+    unchanged. Heavy used to drift within a 1.0 tolerance because the heavy BEV
+    curve rode along with the light selector; that is now Off by default, so
+    Heavy is exactly unchanged rather than approximately so.
+    """
     components, _, _ = _component_breakdown(
         comparison_context, _keys(), _keys(uptake="MoT VFM fast")
     )
     by_label = {label: b - a for label, a, b in components}
-    assert abs(by_label["Heavy & other RUC"]) < 1.0
+
     assert by_label["Net MVR"] == pytest.approx(0.0, abs=1e-9)
-    assert by_label["PED / FED (net)"] < 0
+    assert by_label["PED / FED (net)"] == pytest.approx(0.0, abs=1e-9)
+
+    # The reallocation itself still happens, inside the Light classes.
     assert by_label["Light RUC (conventional)"] < 0
     assert by_label["Light BEV RUC"] > 0
+
+    # "Heavy & other RUC" is the RUC rollup LESS the light classes, so it is
+    # not a pure Heavy line. In the policy year the rollup carries a
+    # second-order policy-by-composition term: the delayed policy reprices each
+    # leaf proportionally, and the light classes carry different effective
+    # per-km rates, so changing the mix changes what the policy acts on. Both
+    # scenarios stay internally consistent (formula residuals ~1e-12), so this
+    # is not an identity break, and it sits far below the chart's own
+    # materiality floor.
+    assert abs(by_label["Heavy & other RUC"]) < app._SCENARIO_COMPONENT_MATERIALITY
+
+    # The contract that actually matters is asserted directly on the series:
+    # a light uptake choice must not move Heavy RUC at all.
+    base_rows = _scenario_rows(comparison_context, _keys())
+    fast_rows = _scenario_rows(comparison_context, _keys(uptake="MoT VFM fast"))
+    for series_id in ("heavy_ruc_net_km", "heavy_ruc_net_revenue"):
+        for fy in (2026, 2027, 2030):
+            assert _annual(fast_rows, series_id, fy) == pytest.approx(
+                _annual(base_rows, series_id, fy), abs=1e-9
+            ), f"light uptake moved {series_id} in FY{fy}"
 
 
 def test_freight_shift_lands_in_heavy_component(comparison_context) -> None:
