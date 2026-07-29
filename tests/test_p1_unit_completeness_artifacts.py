@@ -141,3 +141,35 @@ def test_production_values_are_stable() -> None:
         "P1.1 is value-neutral; a changed production value must be explained, not repinned"
     )
     assert stability["rows_before"].equals(stability["rows_after"])
+
+
+def test_stability_audit_covers_non_numeric_columns() -> None:
+    """A numeric-only comparison cannot see a provenance defect.
+
+    An engine mix-up rewrites model_id while every number stays identical.
+    An earlier revision of the audit compared numeric columns only and
+    reported max delta 0.0 over a pack contaminated with AR(1) model ids, so
+    the emptiness of ``changed_columns`` is the assertion that has teeth.
+    """
+    stability = pd.read_csv(OUT / "production_value_stability.csv")
+    changed = stability[stability["changed_columns"].fillna("").str.len().gt(0)]
+    assert changed.empty, changed[["path", "changed_columns"]].to_dict("records")
+    assert stability["status"].eq("value_stable").all()
+    assert stability["basis"].str.contains("all_columns").all(), (
+        "the recorded basis must state that every column was compared"
+    )
+
+
+def test_each_pack_carries_its_own_engine_provenance() -> None:
+    """The incumbent and AR(1) packs must not share model ids."""
+    incumbent = pd.read_csv(ROOT / "data/current_revenue_outlook/revenue_chart_rows.csv", low_memory=False)
+    ar1 = pd.read_csv(ROOT / "data/engine_ar1/current_revenue_outlook/revenue_chart_rows.csv", low_memory=False)
+    if "model_id" not in incumbent.columns:
+        pytest.skip("packs do not carry model_id")
+    incumbent_ids = set(incumbent["model_id"].dropna().astype(str))
+    ar1_ids = set(ar1["model_id"].dropna().astype(str))
+    assert not any("__ar1__" in value for value in incumbent_ids), (
+        f"AR(1) provenance leaked into the incumbent pack: "
+        f"{sorted(value for value in incumbent_ids if '__ar1__' in value)}"
+    )
+    assert any("__ar1__" in value for value in ar1_ids), "the AR(1) pack lost its own provenance"

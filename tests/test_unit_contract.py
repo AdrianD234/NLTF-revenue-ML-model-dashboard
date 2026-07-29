@@ -60,6 +60,25 @@ def test_no_production_substring_unit_scaling_remains() -> None:
     assert not offenders, "substring-driven unit scaling reintroduced:\n" + "\n".join(offenders)
 
 
+def test_no_production_file_mixes_line_endings() -> None:
+    """`.gitattributes` pins `* -text`, so committed bytes are the diff.
+
+    A patch script that rewrites a whole file with the other convention
+    produces a diff of thousands of lines for a change of fourteen, which
+    hides the real edit from review. A whole-file conversion is internally
+    consistent and only diff inspection catches it; a partial rewrite leaves
+    mixed endings, and this gate catches that.
+    """
+    offenders = []
+    for path in PRODUCTION_FILES:
+        raw = path.read_bytes()
+        crlf = raw.count(b"\r\n")
+        lf_only = raw.count(b"\n") - crlf
+        if crlf and lf_only:
+            offenders.append(f"{path.relative_to(ROOT).as_posix()}: {crlf} CRLF, {lf_only} bare LF")
+    assert not offenders, "mixed line endings (partial rewrite):\n" + "\n".join(offenders)
+
+
 def test_every_decision_facing_series_declares_a_canonical_unit() -> None:
     assert len(SERIES_CANONICAL_UNITS) >= 40
     for series, canonical in SERIES_CANONICAL_UNITS.items():
