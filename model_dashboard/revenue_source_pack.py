@@ -16,6 +16,25 @@ from typing import Any
 
 import pandas as pd
 
+from .unit_contract import KM_MILLION, VKT_PER_CAPITA_KM, convert_declared
+
+
+def _sum_declared(values, units, target: str, *, context: str) -> float:
+    """Sum quarterly values into ``target`` using only declared units.
+
+    Uniform declarations sum first and convert once, preserving the exact
+    floating-point operation order of the governed packs; mixed declarations
+    convert per quarter. Unknown or missing declarations fail closed.
+    """
+    declared = list(units)
+    if len(set(str(unit or "").strip().casefold() for unit in declared)) == 1:
+        return convert_declared(float(sum(float(v) for v in values)), declared[0], target, context=context).converted
+    return float(sum(
+        convert_declared(float(v), u, target, context=f"{context} quarter {i + 1}").converted
+        for i, (v, u) in enumerate(zip(values, declared, strict=True))
+    ))
+
+
 
 REVENUE_SOURCE_PACK_DIR = Path("data") / "revenue_model_source_pack" / "2026_05_19"
 CURRENT_REVENUE_OUTLOOK_DIR = Path("data") / "current_revenue_outlook"
@@ -1317,27 +1336,29 @@ def _current_activity_annual_values(chart_rows: pd.DataFrame) -> pd.DataFrame:
             values = []
             actual_quarters = []
             forecast_quarters = []
+            value_units = []
             for quarter in expected:
                 row = future_lookup.get(quarter)
                 if row is not None:
                     values.append(float(row.value_numeric))
+                    value_units.append(str(getattr(row, "value_unit", "") or ""))
                     forecast_quarters.append(quarter)
                     continue
                 hist_row = hist_lookup.get((str(series_id), quarter))
                 if hist_row is not None:
                     values.append(float(hist_row.value_numeric))
+                    value_units.append(str(getattr(hist_row, "value_unit", "") or ""))
                     actual_quarters.append(quarter)
             if len(values) != 4:
                 continue
+            # Conversion is driven only by each quarter's DECLARED unit; the
+            # magnitude fallback is retired and unknown units fail closed.
             if str(series_id) == "ped_vkt_per_capita":
-                annual_value = sum(values) / 4.0
+                annual_value = _sum_declared(values, value_units, VKT_PER_CAPITA_KM, context=f"{scenario_name} FY{fy} PED") / 4.0
                 unit = "km/person"
             else:
-                annual_value = sum(values)
-                unit_text = _first_text(group, "value_unit")
+                annual_value = _sum_declared(values, value_units, KM_MILLION, context=f"{scenario_name} FY{fy} {series_id}")
                 unit = "million km"
-                if str(unit_text).lower() == "net km" or abs(annual_value) > 10_000_000:
-                    annual_value = annual_value / 1_000_000.0
             rows.append(
                 {
                     "FY": int(fy),
@@ -1355,20 +1376,19 @@ def _current_activity_annual_values(chart_rows: pd.DataFrame) -> pd.DataFrame:
             )
         anchor_expected = _expected_june_year_quarters(REVENUE_LAST_COMPLETE_ACTUAL_FY)
         anchor_values = []
+        anchor_units = []
         for quarter in anchor_expected:
             hist_row = hist_lookup.get((str(series_id), quarter))
             if hist_row is not None:
                 anchor_values.append(float(hist_row.value_numeric))
+                anchor_units.append(str(getattr(hist_row, "value_unit", "") or ""))
         if len(anchor_values) == 4:
             if str(series_id) == "ped_vkt_per_capita":
-                anchor_value = sum(anchor_values) / 4.0
+                anchor_value = _sum_declared(anchor_values, anchor_units, VKT_PER_CAPITA_KM, context="PED anchor") / 4.0
                 anchor_unit = "km/person"
             else:
-                anchor_value = sum(anchor_values)
-                unit_text = _first_text(group, "value_unit")
+                anchor_value = _sum_declared(anchor_values, anchor_units, KM_MILLION, context=f"{series_id} anchor")
                 anchor_unit = "million km"
-                if str(unit_text).lower() == "net km" or abs(anchor_value) > 10_000_000:
-                    anchor_value = anchor_value / 1_000_000.0
             rows.append(
                 {
                     "FY": REVENUE_LAST_COMPLETE_ACTUAL_FY,

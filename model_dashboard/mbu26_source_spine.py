@@ -27,6 +27,11 @@ if (
 import numpy as np
 import pandas as pd
 
+from .unit_contract import (
+    KM_MILLION,
+    VKT_PER_CAPITA_KM,
+    convert_declared,
+)
 from .light_fleet_allocation import (
     ALLOCATION_BASIS_ID,
     AVAILABILITY_AVAILABLE as ALLOCATION_AVAILABLE,
@@ -447,6 +452,39 @@ def revenue_series_alias_audit_frame(annual_spine: pd.DataFrame | None = None) -
     return pd.DataFrame(rows, columns=columns).sort_values(["runtime_series_id", "source_label"], kind="stable").reset_index(drop=True)
 
 
+# Canonical annualisation targets for the three quarterly activity streams.
+_ACTIVITY_ANNUAL_TARGETS = {
+    "ped_vkt_per_capita": VKT_PER_CAPITA_KM,
+    "light_ruc_net_km": KM_MILLION,
+    "heavy_ruc_net_km": KM_MILLION,
+}
+
+
+def _sum_quarters_declared(values, units, series_id: str, *, context: str) -> float:
+    """Sum quarterly values into the series' canonical annual unit.
+
+    Every quarter converts by its own DECLARED unit; a missing or unknown
+    declaration raises (the unit contract fails closed). This replaces the
+    retired magnitude inference, which divided by 1e6 whenever a sum "looked
+    like" raw kilometres.
+    """
+    target = _ACTIVITY_ANNUAL_TARGETS[str(series_id)]
+    declared = [units[index] if index < len(units) else None for index in range(len(values))]
+    # Uniform declarations sum first and convert once, preserving the exact
+    # floating-point operation order of the governed packs (byte-stable
+    # rebuilds). Mixed declarations convert per quarter.
+    if len(set(str(unit or "").strip().casefold() for unit in declared)) == 1:
+        return convert_declared(
+            float(sum(float(value) for value in values)), declared[0], target, context=context
+        ).converted
+    total = 0.0
+    for index, value in enumerate(values):
+        total += convert_declared(
+            float(value), declared[index], target, context=f"{context} quarter {index + 1}"
+        ).converted
+    return total
+
+
 def current_forecast_annual_from_mbu26(
     *,
     current_outlook_chart_rows: pd.DataFrame,
@@ -604,13 +642,20 @@ def current_forecast_annual_from_mbu26(
         ped_values = [float(value) for value in ped_quarters.get("values", [])]
         light_values = [float(value) for value in light_quarters.get("values", [])]
         heavy_values = [float(value) for value in heavy_quarters.get("values", [])]
-        ped_vkt_per_capita = sum(ped_values)
-        light_km_million = sum(light_values)
-        heavy_km_million = sum(heavy_values)
-        if abs(light_km_million) > 10_000_000:
-            light_km_million /= 1_000_000.0
-        if abs(heavy_km_million) > 10_000_000:
-            heavy_km_million /= 1_000_000.0
+        # Annualisation converts each quarter by its DECLARED unit and fails
+        # closed on an undeclared one; magnitude inference is retired.
+        ped_vkt_per_capita = _sum_quarters_declared(
+            ped_values, ped_quarters.get("value_units", []), "ped_vkt_per_capita",
+            context=f"{scenario_name} FY{fy} PED",
+        )
+        light_km_million = _sum_quarters_declared(
+            light_values, light_quarters.get("value_units", []), "light_ruc_net_km",
+            context=f"{scenario_name} FY{fy} LIGHT_RUC",
+        )
+        heavy_km_million = _sum_quarters_declared(
+            heavy_values, heavy_quarters.get("value_units", []), "heavy_ruc_net_km",
+            context=f"{scenario_name} FY{fy} HEAVY_RUC",
+        )
         split = _light_ev_phev_split_from_official(off)
         # The lambda migration record is retired from the decision-facing path.
         # It is still looked up so its absence remains a governed availability
@@ -1067,28 +1112,28 @@ def _current_activity_annual_values(
         for fy in fys:
             expected = _expected_june_year_quarters(int(fy))
             values: list[float] = []
+            value_units: list[str] = []
             actual_quarters: list[str] = []
             forecast_quarters: list[str] = []
             for quarter in expected:
                 row = future_lookup.get(quarter)
                 if row is not None:
                     values.append(float(row.value_numeric))
+                    value_units.append(str(getattr(row, "value_unit", "") or ""))
                     forecast_quarters.append(quarter)
                     continue
                 hist_row = hist_lookup.get((str(series_id), quarter))
                 if hist_row is not None:
                     values.append(float(hist_row.value_numeric))
+                    value_units.append(str(getattr(hist_row, "value_unit", "") or ""))
                     actual_quarters.append(quarter)
             if len(values) != 4:
                 continue
-            if str(series_id) == "ped_vkt_per_capita":
-                annual_value = sum(values)
-                unit = "km/person"
-            else:
-                annual_value = sum(values)
-                unit = "million km"
-                if abs(annual_value) > 10_000_000:
-                    annual_value /= 1_000_000.0
+            annual_value = _sum_quarters_declared(
+                values, value_units, str(series_id),
+                context=f"{scenario_name} FY{fy} {series_id} annualisation",
+            )
+            unit = "km/person" if str(series_id) == "ped_vkt_per_capita" else "million km"
             rows.append(
                 {
                     "FY": int(fy),
@@ -1107,14 +1152,21 @@ def _current_activity_annual_values(
             )
         anchor_expected = _expected_june_year_quarters(REVENUE_LAST_COMPLETE_ACTUAL_FY)
         anchor_values = []
+        anchor_units = []
         for quarter in anchor_expected:
             hist_row = hist_lookup.get((str(series_id), quarter))
             if hist_row is not None:
                 anchor_values.append(float(hist_row.value_numeric))
+                anchor_units.append(str(getattr(hist_row, "value_unit", "") or ""))
         if len(anchor_values) == 4:
-            anchor_value = sum(anchor_values) / 4.0 if str(series_id) == "ped_vkt_per_capita" else sum(anchor_values)
-            if str(series_id) != "ped_vkt_per_capita" and abs(anchor_value) > 10_000_000:
-                anchor_value /= 1_000_000.0
+            # Declared-unit conversion replaces the magnitude inference; the
+            # PED anchor keeps its existing quarterly-mean aggregation.
+            anchor_value = _sum_quarters_declared(
+                anchor_values, anchor_units, str(series_id),
+                context=f"{scenario_name} FY{REVENUE_LAST_COMPLETE_ACTUAL_FY} {series_id} anchor",
+            )
+            if str(series_id) == "ped_vkt_per_capita":
+                anchor_value /= 4.0
             rows.append(
                 {
                     "FY": REVENUE_LAST_COMPLETE_ACTUAL_FY,
@@ -1195,8 +1247,14 @@ def _extrapolated_activity_quarter_payload(row: Any, series_id: str) -> dict[str
     fy = int(getattr(row, "FY"))
     scenario_name = str(getattr(row, "scenario_name", "") or "")
     per_quarter = float(annual_value) / 4.0
+    # The extrapolated quarters inherit the ANNUAL frame's declared unit
+    # (million km / km-person), unlike native seed quarters which declare raw
+    # "net km" - carrying the declaration is what lets the annualiser convert
+    # each source correctly without inspecting magnitudes.
+    declared_unit = str(getattr(row, "unit", "") or "")
     return {
         "values": [per_quarter, per_quarter, per_quarter, per_quarter],
+        "value_units": [declared_unit, declared_unit, declared_unit, declared_unit],
         "quarters_present": f"FY{fy} extrapolated_model_extension",
         "actual_quarters": "",
         "forecast_quarters": f"FY{fy} extrapolated from FY{CURRENT_MODEL_EXTENSION_BASE_START_FY}-FY{CURRENT_MODEL_EXTENSION_BASE_END_FY} annual current-finalist gradient",
@@ -1451,9 +1509,10 @@ def ev_phev_ped_light_migration_assumptions_from_mbu26(
             fallback_population=fallback_population_count,
         )
         p_t = sum(value * population / 1_000_000.0 for value, population in zip(ped_values, population_values, strict=False))
-        l_t = sum(light_values)
-        if abs(l_t) > 10_000_000:
-            l_t /= 1_000_000.0
+        l_t = _sum_quarters_declared(
+            light_values, light_quarters.get("value_units", []), "light_ruc_net_km",
+            context=f"{scenario_name} FY{fy} migration-audit LIGHT_RUC",
+        )
         u_t = p_t + l_t
         if u_t <= 0:
             continue
@@ -1862,6 +1921,7 @@ def _current_activity_quarter_lookup(chart_rows: pd.DataFrame) -> dict[tuple[str
         for fy in sorted(set(int(value) for value in fys if value is not None)):
             expected = _expected_june_year_quarters(fy)
             values: list[float] = []
+            value_units: list[str] = []
             actual_quarters: list[str] = []
             forecast_quarters: list[str] = []
             source_cells: list[str] = []
@@ -1869,18 +1929,21 @@ def _current_activity_quarter_lookup(chart_rows: pd.DataFrame) -> dict[tuple[str
                 row = future_lookup.get(quarter)
                 if row is not None:
                     values.append(float(row.value_numeric))
+                    value_units.append(str(getattr(row, "value_unit", "") or ""))
                     forecast_quarters.append(quarter)
                     source_cells.append(str(getattr(row, "source_cell", "") or f"data/current_revenue_outlook/revenue_chart_rows.csv:{scenario_name}:{quarter}"))
                     continue
                 hist_row = hist_lookup.get((str(series_id), quarter))
                 if hist_row is not None:
                     values.append(float(hist_row.value_numeric))
+                    value_units.append(str(getattr(hist_row, "value_unit", "") or ""))
                     actual_quarters.append(quarter)
                     source_cells.append(str(getattr(hist_row, "source_cell", "") or f"data/current_revenue_outlook/revenue_chart_rows.csv:historical_actual:{quarter}"))
             if len(values) != 4:
                 continue
             output[(str(scenario_name), fy, str(series_id))] = {
                 "values": values,
+                "value_units": value_units,
                 "quarters_present": "; ".join(expected),
                 "actual_quarters": "; ".join(actual_quarters),
                 "forecast_quarters": "; ".join(forecast_quarters),

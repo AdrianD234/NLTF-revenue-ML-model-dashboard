@@ -45,6 +45,7 @@ from .forecast_imports import (
     june_year_horizon_profile,
     quarter_sort_key,
 )
+from .completeness_contract import validate_frame_completeness
 from .light_fleet_allocation import (
     EXTENDED_EVIDENCE_MAX_HORIZON,
     LAST_DECISION_GRADE_ANNUAL_FY,
@@ -616,6 +617,17 @@ def load_revenue_outlook_pack(
     chart_rows = annotate_forecast_horizon_zones(
         _read_optional_parquet(base / "revenue_chart_rows.parquet"),
         model_training_cutoff=training_cutoff,
+    )
+    # Blocking completeness gate at the load boundary. The hash check above
+    # proves the bytes are the promoted ones; this proves the promoted content
+    # satisfies the governed inventory. Callers reach this through
+    # ``cached_load_revenue_outlook_pack``, which is keyed on the pack
+    # signature, so the cost is paid once per pack rather than per rerun.
+    validate_frame_completeness(
+        chart_rows,
+        stage="production",
+        context=f"pack load {base.as_posix()}",
+        raise_on_failure=True,
     )
     return RevenueOutlookPack(
         output_dir=base,
@@ -4589,6 +4601,17 @@ def build_current_revenue_outlook_runtime_pack(
         },
         "validation_status": "runtime_rebuilt",
     }
+
+    # Blocking completeness gate at the build/promotion boundary. Placed BEFORE
+    # the write so a frame that violates the governed inventory is never
+    # materialised, rather than being caught only if someone later runs the
+    # standalone evidence generator.
+    validate_frame_completeness(
+        chart_rows,
+        stage="production",
+        context=f"pack build {_repo_relative(root, base)}",
+        raise_on_failure=True,
+    )
 
     _write_pack_files(
         base,

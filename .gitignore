@@ -50,6 +50,8 @@ artifacts/**
 !artifacts/p0_light_fleet_fix/**
 !artifacts/mbu26_reconciliation_corrected/
 !artifacts/mbu26_reconciliation_corrected/**
+!artifacts/p1_unit_completeness/
+!artifacts/p1_unit_completeness/**
 data/**
 !data/.gitkeep
 !data/dashboard_evidence_pack/

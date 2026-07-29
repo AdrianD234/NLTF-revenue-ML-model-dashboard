@@ -56,6 +56,7 @@ from .forecast_runner import (
     forecast_chart_rows_for_display,
     replay_forecast_from_scenario_inputs,
 )
+from .unit_contract import display_scale_for
 from .mbu26_source_spine import (
     FORMULA_DEFINITIONS,
     current_forecast_annual_from_mbu26,
@@ -4188,14 +4189,12 @@ _NATIVE_QUARTERLY_ACTIVITY_SERIES = {
 
 
 def _display_unit_scale(unit: Any) -> float:
-    text = str(unit or "").strip().casefold()
-    if "billion" in text or text.startswith("$b"):
-        return 1_000_000_000.0
-    if "million" in text or text.startswith("$m"):
-        return 1_000_000.0
-    if "thousand" in text or "'000" in text:
-        return 1_000.0
-    return 1.0
+    # Registry-backed: an unknown declaration raises rather than silently
+    # returning 1.0, which used to make a typo indistinguishable from an
+    # already-unscaled unit. Absent declarations stay unscaled for display.
+    if not str(unit or "").strip():
+        return 1.0
+    return display_scale_for(unit)
 
 
 def _reconcile_native_activity_quarters_to_annual(

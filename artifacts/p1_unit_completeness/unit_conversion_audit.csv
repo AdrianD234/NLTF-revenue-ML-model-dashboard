@@ -1,0 +1,13 @@
+from_unit,to_unit,dimension,operation,operand,conversion_factor,permitted_direction,lossless,conversion_basis
+cents_per_litre,nzd_per_litre,currency_per_volume,/,100.0,0.01,one_way_pair_declared_both_ways,True,canonical_registry
+km,million_km,distance,/,1000000.0,1e-06,one_way_pair_declared_both_ways,True,canonical_registry
+litres,million_litres,volume,/,1000000.0,1e-06,one_way_pair_declared_both_ways,True,canonical_registry
+million_km,km,distance,*,1000000.0,1000000.0,one_way_pair_declared_both_ways,True,canonical_registry
+million_litres,litres,volume,*,1000000.0,1000000.0,one_way_pair_declared_both_ways,True,canonical_registry
+million_nzd,nzd,currency,*,1000000.0,1000000.0,one_way_pair_declared_both_ways,True,canonical_registry
+million_persons,persons,population,*,1000000.0,1000000.0,one_way_pair_declared_both_ways,True,canonical_registry
+nzd,million_nzd,currency,/,1000000.0,1e-06,one_way_pair_declared_both_ways,True,canonical_registry
+nzd_per_litre,cents_per_litre,currency_per_volume,*,100.0,100.0,one_way_pair_declared_both_ways,True,canonical_registry
+percent,share_fraction,proportion,/,100.0,0.01,one_way_pair_declared_both_ways,True,canonical_registry
+persons,million_persons,population,/,1000000.0,1e-06,one_way_pair_declared_both_ways,True,canonical_registry
+share_fraction,percent,proportion,*,100.0,100.0,one_way_pair_declared_both_ways,True,canonical_registry

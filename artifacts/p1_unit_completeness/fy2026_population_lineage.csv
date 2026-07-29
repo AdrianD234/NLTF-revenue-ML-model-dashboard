@@ -1,0 +1,5 @@
+fy,quarter,population,lineage,source_path,unit,status
+2026,2025Q3,5363105.743888369,historical_actual,mbu26_official_annual.csv:population_proxy,persons,available
+2026,2025Q4,5363105.743888369,historical_actual,mbu26_official_annual.csv:population_proxy,persons,available
+2026,2026Q1,5353979.145849093,scenario_forecast,scenario_inputs/scenario_input_wide.parquet:PED:population,persons,available
+2026,2026Q2,5365985.154284347,scenario_forecast,scenario_inputs/scenario_input_wide.parquet:PED:population,persons,available
