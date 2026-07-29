@@ -52,6 +52,8 @@ artifacts/**
 !artifacts/mbu26_reconciliation_corrected/**
 !artifacts/p1_unit_completeness/
 !artifacts/p1_unit_completeness/**
+!artifacts/p1_direct_macro_replay/
+!artifacts/p1_direct_macro_replay/**
 data/**
 !data/.gitkeep
 !data/dashboard_evidence_pack/

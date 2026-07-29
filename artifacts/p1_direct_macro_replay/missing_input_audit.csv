@@ -1,0 +1,7 @@
+scenario_name,stream,input_rows,replayed_quarters,non_numeric_forecasts,status
+current_basecase,PED,100,100,0,complete
+current_basecase,LIGHT_RUC,100,100,0,complete
+current_basecase,HEAVY_RUC,100,100,0,complete
+current_comparison_1,PED,100,100,0,complete
+current_comparison_1,LIGHT_RUC,100,100,0,complete
+current_comparison_1,HEAVY_RUC,100,100,0,complete
