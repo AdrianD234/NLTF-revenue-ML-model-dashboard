@@ -162,11 +162,11 @@ from model_dashboard.fuel_price_scenario import (
     FUEL_PRICE_SCENARIO_NAME,
     FUEL_PRICE_SCENARIO_NOTE,
     FUEL_PRICE_SCENARIO_TRACE_NAME,
-    TreasuryBaselineMacroReplayResult,
+    DirectTreasuryScenarioReplayResult,
     apply_treasury_macro_to_chart_rows,
     append_fuel_price_scenario_to_chart_rows,
+    run_direct_treasury_scenario_replay,
     run_fuel_price_scenario_replay,
-    run_treasury_baseline_macro_replay,
 )
 
 CONFLICT_SCENARIO_NAMES = tuple(
@@ -1117,8 +1117,15 @@ def _safe_fuel_price_scenario_replay(
 def cached_treasury_baseline_macro_replay(
     signature: tuple[tuple[str, int, int], ...],
     _pack: RevenueOutlookPack,
-) -> TreasuryBaselineMacroReplayResult | None:
-    """Replay Treasury baseline GDP independently of conflict-path availability."""
+) -> DirectTreasuryScenarioReplayResult | None:
+    """Replay Treasury macro for EVERY governed scenario, conflict-independent.
+
+    P1.2: this returns the direct per-scenario replay, so the overlay looks
+    factors up by (scenario, series, period) and a Base-derived factor can
+    never silently serve the comparison. It remains deliberately independent
+    of the conflict/policy layers so a problem there cannot revert the
+    visible Base case to the legacy GDP path.
+    """
 
     del signature
     input_path = _pack.output_dir / "scenario_inputs" / "scenario_input_wide.parquet"
@@ -1126,7 +1133,7 @@ def cached_treasury_baseline_macro_replay(
         return None
     scenario_inputs = pd.read_parquet(input_path)
     engine = "ar1" if "engine_ar1" in {part.lower() for part in _pack.output_dir.parts} else "ensemble"
-    return run_treasury_baseline_macro_replay(
+    return run_direct_treasury_scenario_replay(
         scenario_inputs,
         repo_root=Path(__file__).resolve().parent,
         engine=engine,
@@ -1136,8 +1143,8 @@ def cached_treasury_baseline_macro_replay(
 def _safe_treasury_baseline_macro_replay(
     signature: tuple[tuple[str, int, int], ...],
     pack: RevenueOutlookPack,
-) -> tuple[TreasuryBaselineMacroReplayResult | None, str]:
-    """Return the independent Treasury replay or a non-sensitive error type."""
+) -> tuple[DirectTreasuryScenarioReplayResult | None, str]:
+    """Return the direct per-scenario Treasury replay or an error type."""
 
     try:
         return cached_treasury_baseline_macro_replay(signature, pack), ""
@@ -1259,13 +1266,14 @@ def cached_scenario_overlay_rows(
         and isinstance(fuel_replay.policy_pair_factors, pd.DataFrame)
         and not fuel_replay.policy_pair_factors.empty
     )
-    macro_replay: Any = fuel_replay if replay_available else None
-    macro_error_type = ""
-    if macro_replay is None:
-        macro_replay, macro_error_type = _safe_treasury_baseline_macro_replay(
-            signature,
-            _pack,
-        )
+    # P1.2: the baseline macro overlay ALWAYS uses the direct per-scenario
+    # replay. The fuel replay's baseline factors are Base-derived and must
+    # never be transferred to the comparison; it remains the source for the
+    # conflict/policy pair factors only.
+    macro_replay, macro_error_type = _safe_treasury_baseline_macro_replay(
+        signature,
+        _pack,
+    )
     if macro_replay is None:
         failure_types = ", ".join(
             error_type

@@ -110,7 +110,7 @@ def load_dashboard_frame(repo_root: Path) -> pd.DataFrame:
     )
     from model_dashboard.fuel_price_scenario import (
         apply_treasury_macro_to_chart_rows,
-        run_treasury_baseline_macro_replay,
+        run_direct_treasury_scenario_replay,
     )
     from model_dashboard.revenue_outlook import (
         PED_BRIDGE_DEFAULT_MODE,
@@ -140,7 +140,8 @@ def load_dashboard_frame(repo_root: Path) -> pd.DataFrame:
             "Treasury macro replay inputs are unavailable for the dashboard "
             f"fleet-mix path: {scenario_input_path}"
         )
-    macro_replay = run_treasury_baseline_macro_replay(
+    # P1.2: per-scenario factors, so the comparison never borrows Base's.
+    macro_replay = run_direct_treasury_scenario_replay(
         pd.read_parquet(scenario_input_path),
         repo_root=repo_root,
         engine="ar1",

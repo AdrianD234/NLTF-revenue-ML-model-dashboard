@@ -110,10 +110,9 @@ def main() -> int:
     )
     s0 = frames["chart_rows"]
 
+    # P1.2: the overlay requires per-scenario factors; the fuel result's
+    # baseline factors are Base-only and would fail closed on the comparison.
     macro_replay, macro_error = app._safe_treasury_baseline_macro_replay(SIGNATURE, pack)
-    fuel_replay, _ = app._safe_fuel_price_scenario_replay(SIGNATURE, pack)
-    if fuel_replay is not None and not fuel_replay.policy_pair_factors.empty:
-        macro_replay = fuel_replay
     if macro_replay is None:
         raise SystemExit(f"Treasury macro replay unavailable ({macro_error})")
     s1, _ = apply_treasury_macro_to_chart_rows(s0, macro_replay)

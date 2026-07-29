@@ -54,6 +54,7 @@ from model_dashboard.fuel_price_scenario import (
     POLICY_PATH_IDS,
     apply_treasury_macro_to_chart_rows,
     append_fuel_price_scenario_to_chart_rows,
+    run_direct_treasury_scenario_replay,
     run_fuel_price_scenario_replay,
 )
 from model_dashboard.mbu26_source_spine import (
@@ -581,8 +582,17 @@ def _dashboard_aligned_annual_bridge(
         include_derived_frames=False,
         include_selected_ped_audit=False,
     )
+    # P1.2: the baseline macro overlay requires per-scenario factors; the fuel
+    # replay's baseline factors are Base-only and would fail closed on the
+    # comparison rows this frame carries.
+    input_path = pack_dir / "scenario_inputs" / "scenario_input_wide.parquet"
+    direct_macro = run_direct_treasury_scenario_replay(
+        pd.read_parquet(input_path),
+        repo_root=repo_root,
+        engine=ENGINE_AR1,
+    )
     macro_base, _ = apply_treasury_macro_to_chart_rows(
-        bridge["chart_rows"], replay
+        bridge["chart_rows"], direct_macro
     )
     visible_base, _ = apply_uptake_levers_to_chart_rows(
         macro_base,
