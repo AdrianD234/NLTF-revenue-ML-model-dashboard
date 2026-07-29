@@ -1,0 +1,21 @@
+mutation,expected_status,observed_status,failed_closed,detail
+drop one required annual row (basecase FY2030 total),missing_derived_output,missing_derived_output,True,basecase/june_year/total_nltf_net_revenue/FY2030
+drop one required H20 quarter (2030Q4 light RUC),missing_derived_output,missing_derived_output,True,basecase/quarterly/light_ruc_net_km/2030Q4
+drop one required H19 quarter (2030Q3 light RUC),missing_derived_output,missing_derived_output,True,basecase/quarterly/light_ruc_net_km/2030Q3
+drop one required H1 quarter (2026Q1 heavy RUC),missing_derived_output,missing_derived_output,True,basecase/quarterly/heavy_ruc_net_km/2026Q1
+drop one required official row (FY2049 net FED),missing_derived_output,missing_derived_output,True,official_comparator/june_year/net_fed_revenue/FY2049
+delete entire current Light RUC class,missing_required_series,missing_required_series,True,basecase/june_year/light_ruc_net_km/FY2025..FY2030
+delete entire Light BEV class,missing_required_series,missing_required_series,True,basecase/june_year/light_bev_ruc_net_km/FY2025..FY2030
+delete entire PED leaf,missing_required_series,missing_required_series,True,basecase/june_year/ped_vkt_per_capita/FY2025..FY2030
+delete entire top aggregate,missing_required_series,missing_required_series,True,basecase/june_year/total_nltf_net_revenue/FY2025..FY2030
+delete the entire required quarterly heavy RUC stream,missing_required_series,missing_required_series,True,basecase/quarterly/heavy_ruc_net_km/2026Q1..2030Q4
+blank every unit for one required series,missing_unit_declaration,missing_unit_declaration,True,basecase/june_year/light_ruc_net_km/FY2025
+blank the unit on one required row,missing_unit_declaration,missing_unit_declaration,True,basecase/june_year/net_mvr_revenue/FY2029
+drop the unit column entirely,missing_unit_declaration,missing_unit_declaration,True,basecase/june_year/gross_fed_revenue/FY2025
+declare an unregistered unit,unit_invalid,unit_invalid,True,basecase/june_year/ped_volume/FY2025
+declare a dimensionally incompatible unit,unit_invalid,unit_invalid,True,basecase/june_year/light_ruc_net_km/FY2025
+duplicate a required key with an identical value,duplicate_or_ambiguous,duplicate_or_ambiguous,True,basecase/june_year/total_nltf_net_revenue/FY2028
+duplicate a required key with a different value,duplicate_or_ambiguous,duplicate_or_ambiguous,True,basecase/june_year/total_nltf_net_revenue/FY2028
+duplicate a required key with a different unit,duplicate_or_ambiguous,duplicate_or_ambiguous,True,basecase/june_year/light_ruc_net_km/FY2027
+replace a required value with NaN,non_numeric,non_numeric,True,basecase/june_year/gross_ped_revenue/FY2027
+replace a required value with infinity,non_finite,non_finite,True,basecase/june_year/net_mvr_revenue/FY2026

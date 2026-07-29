@@ -35,6 +35,9 @@ def test_every_expected_artifact_is_committed() -> None:
         "allocation_residual_audit.csv",
         "formula_residual_audit.csv",
         "production_value_stability.csv",
+        "governed_series_inventory.csv",
+        "completeness_coverage_by_class.csv",
+        "fault_injection_results.csv",
         "p1_1_report.md",
     }
     assert expected <= {path.name for path in OUT.iterdir()}
@@ -54,24 +57,78 @@ def test_implicit_unit_scan_reports_zero_defects() -> None:
 
 
 def test_completeness_matrix_has_no_fail_closed_findings() -> None:
+    from model_dashboard.completeness_contract import _FAILURE_STATUSES
+
     matrix = pd.read_csv(OUT / "completeness_matrix.csv")
-    failures = matrix[
-        matrix["status"].isin(
-            [
-                "missing_source_input",
-                "missing_derived_output",
-                "duplicate_or_ambiguous",
-                "non_numeric",
-                "non_finite",
-                "unit_invalid",
-                "formula_invalid",
-            ]
-        )
-    ]
+    failures = matrix[matrix["status"].isin(sorted(_FAILURE_STATUSES))]
     assert failures.empty, failures.head(10).to_dict("records")
-    assert set(matrix["fy"].astype(int)) == FYS if "fy" in matrix.columns else True
-    available = matrix[matrix["status"].eq("required_and_available")]
-    assert len(available) / len(matrix) > 0.95
+
+
+def test_the_matrix_covers_quarterly_as_well_as_annual() -> None:
+    """Annual-only coverage cannot see the quarterly stream at all.
+
+    Quarterly rows drive H1-H20 availability, the Treasury macro replay, FED
+    timing and quarterly-to-June-year reconciliation, so they need a full
+    inventory sweep rather than a handful of mutation cases.
+    """
+    matrix = pd.read_csv(OUT / "completeness_matrix.csv")
+    quarterly = matrix[matrix["time_grain"].eq("quarterly")]
+    assert not quarterly.empty, "the matrix must enumerate quarterly cells"
+    current = quarterly[quarterly["role"].isin(["basecase", "comparison"])]
+    periods = set(current["period"].astype(str))
+    assert "2026Q1" in periods, "H1 must be enumerated"
+    assert "2030Q4" in periods, "H20 must be enumerated"
+    assert "2030Q3" in periods, "H19 must stay required"
+    assert len(periods) == 20, f"expected H1..H20, got {len(periods)}"
+    # H21+ is withheld by the governed rule and must never be a required cell.
+    assert not any(period.startswith("2031") for period in periods)
+    assert current["status"].eq("required_and_available").all()
+
+
+def test_coverage_is_reported_per_class_not_as_one_aggregate() -> None:
+    coverage = pd.read_csv(OUT / "completeness_coverage_by_class.csv")
+    classes = set(coverage["cell_class"])
+    assert {"required_quarterly_current", "required_annual_current", "official_comparator"} <= classes
+    for name in ("required_quarterly_current", "required_annual_current", "official_comparator"):
+        row = coverage[coverage["cell_class"].eq(name)].iloc[0]
+        assert row["fail_closed"] == 0, name
+        assert row["coverage_pct"] == 100.0, f"{name} is at {row['coverage_pct']}%"
+        assert row["cells"] > 0
+
+
+def test_fault_injection_ran_against_the_real_frame_and_every_case_failed_closed() -> None:
+    faults = pd.read_csv(OUT / "fault_injection_results.csv")
+    assert len(faults) >= 20, "the mutation set must not shrink"
+    assert faults["failed_closed"].all(), faults[~faults["failed_closed"]].to_dict("records")
+    observed = set(faults["expected_status"])
+    assert {
+        "missing_derived_output",
+        "missing_required_series",
+        "missing_unit_declaration",
+        "duplicate_or_ambiguous",
+        "unit_invalid",
+        "non_numeric",
+        "non_finite",
+    } <= observed, f"a failure class is untested: {observed}"
+    # The quarterly horizon edges must each have a dedicated mutation.
+    mutations = " ".join(faults["mutation"])
+    for edge in ("2030Q4", "2030Q3", "2026Q1"):
+        assert edge in mutations, f"no mutation covers {edge}"
+
+
+def test_the_governed_inventory_artifact_is_committed_and_static() -> None:
+    inventory = pd.read_csv(OUT / "governed_series_inventory.csv")
+    assert not inventory.empty
+    assert set(inventory["requirement"]) <= {"required", "optional", "not_applicable"}
+    required = inventory[inventory["requirement"].eq("required")]
+    quarterly = required[required["time_grain"].eq("quarterly")]
+    assert (quarterly["required_period_count"] == 20).all(), "H1..H20"
+    annual_current = required[
+        required["time_grain"].eq("june_year") & required["scenario_role"].isin(["basecase", "comparison"])
+    ]
+    assert (annual_current["last_period"] == "FY2030").all()
+    official = required[required["scenario_role"].eq("official_comparator")]
+    assert (official["last_period"] == "FY2055").all()
 
 
 def test_ped_identity_closes_before_macro_and_drift_is_enumerated() -> None:

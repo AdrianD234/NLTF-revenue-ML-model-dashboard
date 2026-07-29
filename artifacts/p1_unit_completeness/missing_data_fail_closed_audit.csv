@@ -1,1 +1,1 @@
-scenario,role,stage,time_grain,period,series,horizon_state,status,decision_facing,expected_unit,actual_unit,reason,source,dependants,inventory
+scenario,role,stage,time_grain,period,series,horizon_state,status,decision_facing,expected_unit,actual_unit,observed_count,unit_status,value_status,reason,source,dependants,inventory

@@ -27,8 +27,52 @@
 
 - Unit registry: 41 series, 40 aliases, 12 conversions.
 - Unit coverage: 100% - every declared unit in both committed packs resolves.
-- Completeness: 1575 cells, 1550 available (98.4%), 0 fail-closed findings.
-- Mutation tests: 14 scenarios; 13 fail closed, the H21+ case stays withheld.
+- Completeness: 5247 cells, 5229 available (99.7%), 0 fail-closed findings.
+- Fault injection: 20 mutations of the real promoted frame; 20 failed closed with the expected status.
+
+Coverage is reported per class rather than as one aggregate, because a
+single headline percentage hides which class is thin. See
+`completeness_coverage_by_class.csv`.
+
+| class | cells | available | not applicable | withheld | fail-closed | coverage |
+|---|---|---|---|---|---|---|
+| hidden_source_leaf | 225 | 225 | 0 | 0 | 0 | 100.00% |
+| official_comparator | 3060 | 3060 | 0 | 0 | 0 | 100.00% |
+| official_quarterly_not_supplied | 18 | 0 | 18 | 0 | 0 | 0.00% |
+| required_annual_current | 1224 | 1224 | 0 | 0 | 0 | 100.00% |
+| required_quarterly_current | 720 | 720 | 0 | 0 | 0 | 100.00% |
+
+## The expected inventory is governed, not observed
+
+The first revision built its role/series inventory from the rows present in
+the frame being checked. That is self-masking: a series that disappears
+entirely also disappears from the expected set, so the engine stops
+expecting it and reports `not_applicable` - the most serious failure
+presenting as the most benign status. Removing one row was tested; removing
+the whole family was not detectable.
+
+`model_dashboard/series_inventory_contract.py` now defines the expected set
+as a static literal, resolved to `governed_series_inventory.csv` and pinned
+to the code by test. It reads no pack.
+
+The quarterly km declaration is stage-dependent and legitimately so: the
+composition overlay between S1 and S2 divides quarterly km by 1e6 and
+relabels in the same step (3_791_499_897 net km -> 3_791.4999 million km).
+That is the unit contract working, not a defect. The annual-only matrix
+could not see it; the contract now names the conversion boundary.
+
+## Enforced at a production boundary
+
+The validator is called as a blocking gate in two places, not only by this
+generator: before the pack is written in
+`build_current_revenue_outlook_runtime_pack`, and at
+`load_revenue_outlook_pack`. Callers reach the load through
+`cached_load_revenue_outlook_pack`, which is keyed on the pack signature,
+so validation costs once per pack rather than once per Streamlit rerun.
+
+`test_production_completeness_boundary.py` re-stamps the manifest hashes
+after damaging a pack, so the pack passes every integrity check and is
+still missing a required row. The completeness gate is what stops it.
 
 ## PED cross-row identity
 

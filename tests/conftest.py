@@ -29,3 +29,19 @@ def tmp_path() -> Path:
     path = root / uuid4().hex
     path.mkdir()
     return path
+
+
+@pytest.fixture
+def real_chart_rows():
+    """The committed production chart rows.
+
+    Fault injection runs against the real promoted frame rather than a
+    hand-built stub, so a mutation test proves the gate fires on the shape
+    production actually has.
+    """
+    import pandas as pd
+
+    path = Path(__file__).resolve().parents[1] / "data" / "current_revenue_outlook" / "revenue_chart_rows.csv"
+    if not path.exists():
+        pytest.skip("committed revenue outlook pack is not present")
+    return pd.read_csv(path, low_memory=False)

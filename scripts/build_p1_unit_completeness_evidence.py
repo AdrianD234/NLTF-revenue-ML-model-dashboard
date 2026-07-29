@@ -24,8 +24,14 @@ import app  # noqa: E402
 from model_dashboard.completeness_contract import (  # noqa: E402
     AVAILABLE,
     WITHHELD_H21,
+    CompletenessContractError,
     completeness_matrix,
-    role_series_inventory,
+    evaluate_cell,
+    validate_frame_completeness,
+)
+from model_dashboard.series_inventory_contract import (  # noqa: E402
+    HISTORICAL_ACTUAL_KNOWN_GAPS,
+    resolved_contract_rows,
 )
 from model_dashboard.fuel_price_scenario import apply_treasury_macro_to_chart_rows  # noqa: E402
 from model_dashboard.light_fleet_allocation import composition_shares  # noqa: E402
@@ -81,7 +87,45 @@ REPORT_TEMPLATE = [
     'SERIES_COVERAGE_LINE',
     '- Unit coverage: 100% - every declared unit in both committed packs resolves.',
     'COMPLETENESS_LINE',
-    '- Mutation tests: 14 scenarios; 13 fail closed, the H21+ case stays withheld.',
+    'FAULT_LINE',
+    '',
+    'Coverage is reported per class rather than as one aggregate, because a',
+    'single headline percentage hides which class is thin. See',
+    '`completeness_coverage_by_class.csv`.',
+    '',
+    'COVERAGE_TABLE',
+    '',
+    '## The expected inventory is governed, not observed',
+    '',
+    'The first revision built its role/series inventory from the rows present in',
+    'the frame being checked. That is self-masking: a series that disappears',
+    'entirely also disappears from the expected set, so the engine stops',
+    'expecting it and reports `not_applicable` - the most serious failure',
+    'presenting as the most benign status. Removing one row was tested; removing',
+    'the whole family was not detectable.',
+    '',
+    '`model_dashboard/series_inventory_contract.py` now defines the expected set',
+    'as a static literal, resolved to `governed_series_inventory.csv` and pinned',
+    'to the code by test. It reads no pack.',
+    '',
+    'The quarterly km declaration is stage-dependent and legitimately so: the',
+    'composition overlay between S1 and S2 divides quarterly km by 1e6 and',
+    'relabels in the same step (3_791_499_897 net km -> 3_791.4999 million km).',
+    'That is the unit contract working, not a defect. The annual-only matrix',
+    'could not see it; the contract now names the conversion boundary.',
+    '',
+    '## Enforced at a production boundary',
+    '',
+    'The validator is called as a blocking gate in two places, not only by this',
+    'generator: before the pack is written in',
+    '`build_current_revenue_outlook_runtime_pack`, and at',
+    '`load_revenue_outlook_pack`. Callers reach the load through',
+    '`cached_load_revenue_outlook_pack`, which is keyed on the pack signature,',
+    'so validation costs once per pack rather than once per Streamlit rerun.',
+    '',
+    '`test_production_completeness_boundary.py` re-stamps the manifest hashes',
+    'after damaging a pack, so the pack passes every integrity check and is',
+    'still missing a required row. The completeness gate is what stops it.',
     '',
     '## PED cross-row identity',
     '',
@@ -505,6 +549,197 @@ def residual_audits(pack, stages) -> tuple[pd.DataFrame, pd.DataFrame]:
 
 
 # ---------------------------------------------- 8. production value stability
+def completeness_coverage(matrix: pd.DataFrame) -> pd.DataFrame:
+    """Coverage per cell class.
+
+    One aggregate percentage hides which class is thin: 98% overall can still
+    mean the quarterly stream is barely covered. Required quarterly, required
+    annual, official and intentionally-unavailable cells are reported apart.
+    """
+    scoped = matrix.copy()
+    scoped["cell_class"] = "required_annual_current"
+    is_quarterly = scoped["time_grain"].astype(str).eq("quarterly")
+    is_official = scoped["role"].astype(str).eq("official_comparator")
+    scoped.loc[is_quarterly, "cell_class"] = "required_quarterly_current"
+    scoped.loc[is_official, "cell_class"] = "official_comparator"
+    scoped.loc[is_official & is_quarterly, "cell_class"] = "official_quarterly_not_supplied"
+    scoped.loc[scoped["status"].eq(WITHHELD_H21), "cell_class"] = "intentionally_unavailable_h21_plus"
+    scoped.loc[scoped["stage"].astype(str).eq("line_reconciliation"), "cell_class"] = "hidden_source_leaf"
+
+    rows: list[dict[str, object]] = []
+    for cell_class, group in scoped.groupby("cell_class"):
+        available = int(group["status"].eq(AVAILABLE).sum())
+        failures_here = int(group["status"].isin(sorted(_failure_statuses())).sum())
+        rows.append(
+            {
+                "cell_class": cell_class,
+                "cells": int(len(group)),
+                "available": available,
+                "not_applicable": int(group["status"].eq("not_applicable").sum()),
+                "withheld": int(group["status"].eq(WITHHELD_H21).sum()),
+                "fail_closed": failures_here,
+                "coverage_pct": round(100.0 * available / len(group), 3) if len(group) else 0.0,
+            }
+        )
+    return pd.DataFrame(rows).sort_values("cell_class").reset_index(drop=True)
+
+
+def _failure_statuses() -> frozenset:
+    from model_dashboard.completeness_contract import _FAILURE_STATUSES
+
+    return _FAILURE_STATUSES
+
+
+def fault_injection_results(chart_rows: pd.DataFrame) -> pd.DataFrame:
+    """Mutate the real promoted frame and record what the gate did.
+
+    Every case runs against production's own chart rows, so a passing result
+    means the contract fires on the shape production actually has.
+    """
+    rows: list[dict[str, object]] = []
+
+    def attempt(name: str, expected: str, frame: pd.DataFrame) -> None:
+        try:
+            validate_frame_completeness(frame, raise_on_failure=True)
+            rows.append({"mutation": name, "expected_status": expected,
+                         "observed_status": "no_failure", "failed_closed": False,
+                         "detail": "the gate did not fire"})
+        except CompletenessContractError as error:
+            record = error.record
+            rows.append({
+                "mutation": name, "expected_status": expected,
+                "observed_status": record.status,
+                "failed_closed": record.status == expected,
+                "detail": f"{record.role}/{record.time_grain}/{record.series}/{record.period}",
+            })
+
+    base = chart_rows
+    attempt(
+        "drop one required annual row (basecase FY2030 total)",
+        "missing_derived_output",
+        base[~(base["series_id"].eq("total_nltf_net_revenue")
+               & base["scenario_role"].eq("basecase")
+               & base["period"].astype(str).eq("FY2030"))],
+    )
+    attempt(
+        "drop one required H20 quarter (2030Q4 light RUC)",
+        "missing_derived_output",
+        base[~(base["time_grain"].eq("quarterly")
+               & base["series_id"].eq("light_ruc_net_km")
+               & base["period"].astype(str).eq("2030Q4"))],
+    )
+    attempt(
+        "drop one required H19 quarter (2030Q3 light RUC)",
+        "missing_derived_output",
+        base[~(base["time_grain"].eq("quarterly")
+               & base["series_id"].eq("light_ruc_net_km")
+               & base["period"].astype(str).eq("2030Q3"))],
+    )
+    attempt(
+        "drop one required H1 quarter (2026Q1 heavy RUC)",
+        "missing_derived_output",
+        base[~(base["time_grain"].eq("quarterly")
+               & base["series_id"].eq("heavy_ruc_net_km")
+               & base["period"].astype(str).eq("2026Q1"))],
+    )
+    attempt(
+        "drop one required official row (FY2049 net FED)",
+        "missing_derived_output",
+        base[~(base["scenario_role"].eq("official_comparator")
+               & base["series_id"].eq("net_fed_revenue")
+               & base["period"].astype(str).eq("FY2049"))],
+    )
+    for series, label in (
+        ("light_ruc_net_km", "entire current Light RUC class"),
+        ("light_bev_ruc_net_km", "entire Light BEV class"),
+        ("ped_vkt_per_capita", "entire PED leaf"),
+        ("total_nltf_net_revenue", "entire top aggregate"),
+    ):
+        attempt(f"delete {label}", "missing_required_series", base[~base["series_id"].eq(series)])
+    attempt(
+        "delete the entire required quarterly heavy RUC stream",
+        "missing_required_series",
+        base[~(base["time_grain"].eq("quarterly") & base["series_id"].eq("heavy_ruc_net_km"))],
+    )
+
+    blanked = base.copy()
+    blanked.loc[blanked["series_id"].eq("light_ruc_net_km"), "value_unit"] = ""
+    attempt("blank every unit for one required series", "missing_unit_declaration", blanked)
+
+    one_blank = base.copy()
+    mask = (one_blank["series_id"].eq("net_mvr_revenue")
+            & one_blank["scenario_role"].eq("basecase")
+            & one_blank["period"].astype(str).eq("FY2029"))
+    one_blank.loc[mask, "value_unit"] = ""
+    attempt("blank the unit on one required row", "missing_unit_declaration", one_blank)
+
+    attempt("drop the unit column entirely", "missing_unit_declaration", base.drop(columns=["value_unit"]))
+
+    unknown = base.copy()
+    unknown.loc[unknown["series_id"].eq("ped_volume"), "value_unit"] = "furlongs"
+    attempt("declare an unregistered unit", "unit_invalid", unknown)
+
+    incompatible = base.copy()
+    incompatible.loc[
+        incompatible["series_id"].eq("light_ruc_net_km") & incompatible["time_grain"].eq("june_year"),
+        "value_unit",
+    ] = "$m nominal ex GST"
+    attempt("declare a dimensionally incompatible unit", "unit_invalid", incompatible)
+
+    duplicated_same = pd.concat(
+        [base, base[base["series_id"].eq("total_nltf_net_revenue")
+                    & base["scenario_role"].eq("basecase")
+                    & base["period"].astype(str).eq("FY2028")]],
+        ignore_index=True,
+    )
+    attempt("duplicate a required key with an identical value", "duplicate_or_ambiguous", duplicated_same)
+
+    conflicting = base[base["series_id"].eq("total_nltf_net_revenue")
+                       & base["scenario_role"].eq("basecase")
+                       & base["period"].astype(str).eq("FY2028")].copy()
+    conflicting["value"] = conflicting["value"] * 1.5
+    attempt(
+        "duplicate a required key with a different value",
+        "duplicate_or_ambiguous",
+        pd.concat([base, conflicting], ignore_index=True),
+    )
+
+    different_unit = base[base["series_id"].eq("light_ruc_net_km")
+                          & base["scenario_role"].eq("basecase")
+                          & base["time_grain"].eq("june_year")
+                          & base["period"].astype(str).eq("FY2027")].copy()
+    different_unit["value_unit"] = "net km"
+    attempt(
+        "duplicate a required key with a different unit",
+        "duplicate_or_ambiguous",
+        pd.concat([base, different_unit], ignore_index=True),
+    )
+
+    nan_value = base.copy()
+    nan_value.loc[
+        nan_value["series_id"].eq("gross_ped_revenue")
+        & nan_value["scenario_role"].eq("basecase")
+        & nan_value["period"].astype(str).eq("FY2027"),
+        "value",
+    ] = float("nan")
+    attempt("replace a required value with NaN", "non_numeric", nan_value)
+
+    infinite = base.copy()
+    infinite.loc[
+        infinite["series_id"].eq("net_mvr_revenue")
+        & infinite["scenario_role"].eq("basecase")
+        & infinite["period"].astype(str).eq("FY2026"),
+        "value",
+    ] = float("inf")
+    attempt("replace a required value with infinity", "non_finite", infinite)
+
+    frame = pd.DataFrame(rows)
+    unchecked = frame[~frame["failed_closed"]]
+    if len(unchecked):
+        failures.append(f"fault injection did not fail closed: {unchecked['mutation'].tolist()}")
+    return frame
+
+
 def production_value_stability() -> pd.DataFrame:
     """Prove the committed packs reproduce byte-for-byte from current code.
 
@@ -610,13 +845,11 @@ def main() -> int:
     if orphans:
         failures.append(f"series in neither chart rows nor line reconciliation: {orphans}")
 
-    matrix = completeness_matrix(
-        stages,
-        series_ids=chart_series,
-        scenarios={"current_basecase": "basecase", "current_comparison_1": "comparison", "mbu26_official": "official_comparator"},
-        fys=FYS,
-        role_inventory=role_series_inventory(stages["S4"]),
-    )
+    # The expected set is the governed contract, never the observed frame. The
+    # committed pack is included as the "production" stage so the matrix covers
+    # the frame that actually reaches the dashboard.
+    pd.DataFrame(resolved_contract_rows()).to_csv(OUT / "governed_series_inventory.csv", index=False)
+    matrix = completeness_matrix({**stages, "production": pack.revenue_chart_rows})
     matrix["inventory"] = "chart_row_series"
 
     # Hidden leaves: evaluated once against the line reconciliation, which is
@@ -632,8 +865,6 @@ def main() -> int:
                 if series not in role_leaves:
                     continue
                 matched = at_fy[at_fy["series_id"].astype(str).eq(series)]
-                from model_dashboard.completeness_contract import evaluate_cell
-
                 leaf_records.append(
                     evaluate_cell(
                         scenario=source_path,
@@ -643,6 +874,10 @@ def main() -> int:
                         period=f"FY{fy}",
                         series=series,
                         values=matched["value"] if len(matched) else None,
+                        # Units are mandatory now, so the leaf path must carry
+                        # the declaration the line reconciliation records
+                        # rather than relying on the old permissive fall-through.
+                        units=matched["unit"] if len(matched) else None,
                         source="revenue_line_reconciliation",
                     ).__dict__
                 )
@@ -650,11 +885,23 @@ def main() -> int:
     leaf_frame["inventory"] = "hidden_source_leaf"
     matrix = pd.concat([matrix, leaf_frame], ignore_index=True, sort=False)
     matrix.to_csv(OUT / "completeness_matrix.csv", index=False)
-    fail_closed = matrix[matrix["status"].isin(
-        ["missing_source_input", "missing_derived_output", "duplicate_or_ambiguous",
-         "non_numeric", "non_finite", "unit_invalid", "formula_invalid"]
-    )]
+    # Read the failure vocabulary from the engine so the audit cannot drift out
+    # of step with it when a new status is added.
+    from model_dashboard.completeness_contract import _FAILURE_STATUSES
+
+    fail_closed = matrix[matrix["status"].isin(sorted(_FAILURE_STATUSES))]
     fail_closed.to_csv(OUT / "missing_data_fail_closed_audit.csv", index=False)
+    # The run must not report PASS while the matrix carries findings. An
+    # earlier revision printed PASS over 162 of them because nothing here
+    # consulted the audit it had just written.
+    if len(fail_closed):
+        summary = fail_closed.groupby(["stage", "role", "time_grain", "status"]).size().to_dict()
+        failures.append(f"completeness matrix has {len(fail_closed)} fail-closed findings: {summary}")
+
+    coverage_frame = completeness_coverage(matrix)
+    coverage_frame.to_csv(OUT / "completeness_coverage_by_class.csv", index=False)
+    fault_frame = fault_injection_results(pack.revenue_chart_rows)
+    fault_frame.to_csv(OUT / "fault_injection_results.csv", index=False)
 
     identity, lineage = ped_cross_row_identity(pack, stages)
     identity.to_csv(OUT / "ped_cross_row_identity.csv", index=False)
@@ -674,6 +921,12 @@ def main() -> int:
     print(f"implicit-unit scan   : {len(scan)} matches, defects "
           f"{int((scan['classification'].eq('defect_requiring_correction')).sum()) if len(scan) else 0}")
     print(f"completeness matrix  : {len(matrix)} cells, available {len(required)} ({coverage:.1f}%), withheld {len(withheld)}")
+    for row in coverage_frame.to_dict("records"):
+        print(f"  {row['cell_class']:38s}: {row['cells']:5d} cells, "
+              f"{row['available']:5d} available ({row['coverage_pct']:6.2f}%), "
+              f"fail-closed {row['fail_closed']}")
+    print(f"fault injection      : {len(fault_frame)} mutations, "
+          f"{int(fault_frame['failed_closed'].sum())} failed closed")
     print(f"fail-closed findings : {len(fail_closed)}")
     if len(identity):
         drift = identity[identity['contract_status'] == MACRO_DRIFT_STATUS]
@@ -698,6 +951,21 @@ def main() -> int:
         "COMPLETENESS_LINE": (
             f"- Completeness: {len(matrix)} cells, {len(required)} available "
             f"({coverage:.1f}%), {len(fail_closed)} fail-closed findings."
+        ),
+        "FAULT_LINE": (
+            f"- Fault injection: {len(fault_frame)} mutations of the real promoted "
+            f"frame; {int(fault_frame['failed_closed'].sum())} failed closed with the "
+            "expected status."
+        ),
+        "COVERAGE_TABLE": "\n".join(
+            ["| class | cells | available | not applicable | withheld | fail-closed | coverage |",
+             "|---|---|---|---|---|---|---|"]
+            + [
+                f"| {row['cell_class']} | {row['cells']} | {row['available']} | "
+                f"{row['not_applicable']} | {row['withheld']} | {row['fail_closed']} | "
+                f"{row['coverage_pct']:.2f}% |"
+                for row in coverage_frame.to_dict("records")
+            ]
         ),
         "S0_LINE": f"- Pre-macro (S0): closes at {s0_worst:.2e}%.",
         "DRIFT_LINE": f"- Post-macro (S1-S4): diverges up to {drift_worst:.3f}% (FY2030).",

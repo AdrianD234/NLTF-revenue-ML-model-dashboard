@@ -6,11 +6,11 @@ model_dashboard/mbu26_source_spine.py,681,bare_million_divide,value * population
 model_dashboard/mbu26_source_spine.py,1504,bare_million_multiply,"fallback_population_count = float(off[""light_petrol_vkt""]) * 1_000_000.0 / float(off[""ped_vkt_per_capita""])",legitimate_economic_formula
 model_dashboard/mbu26_source_spine.py,1511,bare_million_divide,"p_t = sum(value * population / 1_000_000.0 for value, population in zip(ped_values, population_values, strict=False))",legitimate_economic_formula
 model_dashboard/rate_paths.py,692,bare_million_divide,before_reconciliation.loc[raw_ruc_quarters] / 1_000_000.0,legitimate_economic_formula
-model_dashboard/revenue_outlook.py,1998,bare_million_multiply,scenario_population = float(raw_light_petrol_vkt) * 1_000_000.0 / float(ped_vktpc),legitimate_economic_formula
-model_dashboard/revenue_outlook.py,1999,bare_million_divide,population_million = float(scenario_population) / 1_000_000.0 if pd.notna(scenario_population) else pd.NA,legitimate_economic_formula
-model_dashboard/revenue_outlook.py,2037,bare_million_multiply,float(mbu_light_petrol_vkt) * 1_000_000.0 / float(mbu_ped_vktpc),legitimate_economic_formula
-model_dashboard/revenue_outlook.py,2092,bare_million_divide,float(raw_light_petrol_vkt) - float(ped_vktpc) * float(scenario_population) / 1_000_000.0,legitimate_economic_formula
-model_dashboard/revenue_outlook.py,6148,bare_million_divide,"""target_million_km"": float(positive_targets.sum() / 1_000_000.0) if len(positive_targets) else pd.NA,",legitimate_economic_formula
+model_dashboard/revenue_outlook.py,2010,bare_million_multiply,scenario_population = float(raw_light_petrol_vkt) * 1_000_000.0 / float(ped_vktpc),legitimate_economic_formula
+model_dashboard/revenue_outlook.py,2011,bare_million_divide,population_million = float(scenario_population) / 1_000_000.0 if pd.notna(scenario_population) else pd.NA,legitimate_economic_formula
+model_dashboard/revenue_outlook.py,2049,bare_million_multiply,float(mbu_light_petrol_vkt) * 1_000_000.0 / float(mbu_ped_vktpc),legitimate_economic_formula
+model_dashboard/revenue_outlook.py,2104,bare_million_divide,float(raw_light_petrol_vkt) - float(ped_vktpc) * float(scenario_population) / 1_000_000.0,legitimate_economic_formula
+model_dashboard/revenue_outlook.py,6171,bare_million_divide,"""target_million_km"": float(positive_targets.sum() / 1_000_000.0) if len(positive_targets) else pd.NA,",legitimate_economic_formula
 model_dashboard/revenue_source_pack.py,1156,bare_million_divide,ped_total_vkt = ped_vkt_per_capita * population_count / 1_000_000.0,legitimate_economic_formula
 model_dashboard/treasury_macro_paths.py,501,bare_million_multiply,treasury_population[TREASURY_PATH_END_PERIOD] * 1_000_000.0,legitimate_economic_formula
 model_dashboard/treasury_macro_paths.py,507,bare_million_multiply,population_path[period] = treasury_population[period] * 1_000_000.0,legitimate_economic_formula
