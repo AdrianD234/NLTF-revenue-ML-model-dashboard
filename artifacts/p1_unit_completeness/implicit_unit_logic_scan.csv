@@ -14,6 +14,6 @@ model_dashboard/revenue_outlook.py,6171,bare_million_divide,"""target_million_km
 model_dashboard/revenue_source_pack.py,1156,bare_million_divide,ped_total_vkt = ped_vkt_per_capita * population_count / 1_000_000.0,legitimate_economic_formula
 model_dashboard/treasury_macro_paths.py,501,bare_million_multiply,treasury_population[TREASURY_PATH_END_PERIOD] * 1_000_000.0,legitimate_economic_formula
 model_dashboard/treasury_macro_paths.py,507,bare_million_multiply,population_path[period] = treasury_population[period] * 1_000_000.0,legitimate_economic_formula
-app.py,7377,unit_string_heuristic,"elif ""million"" in unit_text.lower():",display_formatting_only
-app.py,9318,unit_string_heuristic,"return text.startswith(""$m"") or ""million nzd"" in text or ""million nz$"" in text",display_formatting_only
-app.py,9329,unit_string_heuristic,"if text.startswith(""$m""):",display_formatting_only
+app.py,7385,unit_string_heuristic,"elif ""million"" in unit_text.lower():",display_formatting_only
+app.py,9326,unit_string_heuristic,"return text.startswith(""$m"") or ""million nzd"" in text or ""million nz$"" in text",display_formatting_only
+app.py,9337,unit_string_heuristic,"if text.startswith(""$m""):",display_formatting_only

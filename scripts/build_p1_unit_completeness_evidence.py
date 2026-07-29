@@ -52,9 +52,18 @@ PACK_DIR = ROOT / "data" / "engine_ar1" / "current_revenue_outlook"
 FYS = (2026, 2027, 2028, 2029, 2030)
 SIGNATURE: tuple = ()
 TOL = 1e-6
-# The macro cross-row drift routed to P1.2. Pinned so it cannot grow or move.
-MACRO_DRIFT_STATUS = "known_macro_cross_row_inconsistency_pending_p1_2"
-MACRO_DRIFT_CEILING_PCT = 1.8
+# P1.2 resolved the macro cross-row drift: the identity now closes at every
+# stage under the stage-appropriate governed population, and the retired
+# status below must never reappear in the artifact.
+RETIRED_MACRO_DRIFT_STATUS = "known_macro_cross_row_inconsistency_pending_p1_2"
+# One enumerated exception remains, one layer up from the macro overlay: the
+# FED policy pair factors are Base-derived and are transferred onto the
+# comparison at S4, misstating comparison petrol VKT by 0.000502% at FY2027.
+# 570x smaller than the macro transfer P1.2 removed, fully measured, and
+# pinned here so it can neither grow nor migrate to another stage/scenario.
+POLICY_TRANSFER_STATUS = "policy_pair_transfer_on_comparison_pending_followup"
+POLICY_TRANSFER_CEILING_PCT = 1e-3
+POLICY_TRANSFER_STAGES = frozenset({"S4"})
 
 REPORT_TEMPLATE = [
     '# P1.1 - unit, completeness and allocation contracts',
@@ -135,14 +144,25 @@ REPORT_TEMPLATE = [
     'S0_LINE',
     'DRIFT_LINE',
     '',
-    'The Treasury macro replay applies stream-specific factors to',
-    '`light_petrol_vkt` and `ped_vkt_per_capita` independently, so their ratio',
-    'stops reproducing the governed population path. This is recorded as',
-    '`known_macro_cross_row_inconsistency_pending_p1_2` and is NOT repaired here:',
-    'P1.2 direct scenario replay determines the authoritative construction. It is',
-    'a named, enumerated exception, not a generally acceptable tolerance - the',
-    'ceiling is pinned and the first divergent stage is asserted to be S1, so it',
-    'cannot grow or migrate earlier unnoticed.',
+    '**Resolved in P1.2.** The authoritative construction pairs each stage with',
+    'its own governed population: legacy scenario inputs at S0, the per-scenario',
+    'Treasury-adjusted path after the macro overlay. Under it the identity closes',
+    'exactly at every stage for every governed scenario. The 1.706% recorded by',
+    'the first P1.1 revision as `known_macro_cross_row_inconsistency_pending_p1_2`',
+    'was a measurement-construction artifact: the expected side was held at the',
+    'pre-macro population while the displayed side moved with the macro factor,',
+    'so the "drift" was the size of the macro correction itself. A deliberate',
+    'measurement-power check remains: S1 evaluated against the LEGACY population',
+    'must show the mismatch (>=0.5%), proving the measurement can still detect a',
+    'genuinely wrong population.',
+    '',
+    'One enumerated exception remains, one layer up: the FED policy pair',
+    'factors are Base-derived and are transferred onto the comparison at S4,',
+    'misstating comparison petrol VKT by 0.000502% at FY2027 - 570x smaller',
+    'than the macro transfer P1.2 removed. It is pinned as',
+    '`policy_pair_transfer_on_comparison_pending_followup` with a 1e-3%',
+    'ceiling, confined to S4/comparison by gate, and routed to the',
+    'policy-layer follow-up rather than silently tolerated.',
     '',
     '## FY2026 population lineage',
     '',
@@ -165,7 +185,9 @@ REPORT_TEMPLATE = [
     '',
     '## Routed to P1.2',
     '',
-    '- The post-macro PED cross-row inconsistency described above.',
+    '- The post-macro PED cross-row inconsistency described above - resolved by',
+    '  the per-scenario direct Treasury replay and the corrected identity',
+    '  construction; see `artifacts/p1_direct_macro_replay/`.',
 ]
 
 
@@ -232,10 +254,9 @@ def build_stages(pack):
         SIGNATURE, PED_BRIDGE_DEFAULT_MODE, sensitivity_key, pack
     )
     s0 = frames["chart_rows"]
+    # P1.2: the overlay requires per-scenario factors; the fuel result's
+    # baseline factors are Base-only and would fail closed on the comparison.
     macro, error = app._safe_treasury_baseline_macro_replay(SIGNATURE, pack)
-    fuel, _ = app._safe_fuel_price_scenario_replay(SIGNATURE, pack)
-    if fuel is not None and not fuel.policy_pair_factors.empty:
-        macro = fuel
     if macro is None:
         raise SystemExit(f"Treasury macro replay unavailable ({error})")
     s1, _audit = apply_treasury_macro_to_chart_rows(s0, macro)
@@ -266,33 +287,62 @@ def build_stages(pack):
 
 # ------------------------------------------------- 4/5. PED cross-row identity
 def ped_cross_row_identity(pack, stages) -> tuple[pd.DataFrame, pd.DataFrame]:
-    scenario_inputs = pd.read_parquet(PACK_DIR / "scenario_inputs" / "scenario_input_wide.parquet")
-    ped_inputs = scenario_inputs[
-        scenario_inputs["scenario_name"].astype(str).eq("current_basecase")
-        & scenario_inputs["stream"].astype(str).eq("PED")
-    ]
-    population_by_quarter = {
-        str(row.canonical_period).upper(): float(row.population)
-        for row in ped_inputs.itertuples()
-        if pd.notna(getattr(row, "population", None))
-    }
+    """The governed identity, evaluated with each stage's OWN population path.
 
-    # FY2026 spans two ACTUAL quarters that precede the scenario-input horizon.
-    # Rather than declaring the year unavailable, look for canonical historical
-    # population and record mixed lineage explicitly.
+    annual light_petrol_vkt == sum over the four fiscal quarters of
+    (stage VKTpc_q x stage governed population_q)
+
+    P1.1 measured every stage against the PRE-macro population, so the
+    displayed side moved with the Treasury factor while the expected side
+    stayed legacy - the reported 1.706% "macro cross-row inconsistency" was
+    the size of the macro correction itself, not a genuine defect. P1.2's
+    authoritative construction pairs each stage with its own governed
+    population: legacy scenario inputs at S0, the per-scenario
+    Treasury-adjusted path after the macro overlay. The two FY2026 actual
+    quarters keep the MBU26 proxy under both, because actuals are never
+    macro-adjusted.
+
+    A deliberate measurement-power check remains: S1 evaluated against the
+    LEGACY population must NOT close. If it ever does, the measurement has
+    lost the sensitivity that exposed the original defect, or the macro
+    overlay has silently stopped moving the population path.
+    """
+
+    from model_dashboard.treasury_macro_paths import (
+        apply_treasury_macro_path_to_scenarios,
+    )
+
+    scenario_inputs = pd.read_parquet(
+        PACK_DIR / "scenario_inputs" / "scenario_input_wide.parquet"
+    )
+    treasury_inputs = apply_treasury_macro_path_to_scenarios(scenario_inputs, ROOT)
+    governed_scenarios = (
+        ("current_basecase", "basecase"),
+        ("current_comparison_1", "comparison"),
+    )
+
+    def population_path(frame: pd.DataFrame, scenario: str) -> dict[str, float]:
+        ped = frame[
+            frame["scenario_name"].astype(str).eq(scenario)
+            & frame["stream"].astype(str).eq("PED")
+        ]
+        return {
+            str(row.canonical_period).upper(): float(row.population)
+            for row in ped.itertuples()
+            if pd.notna(getattr(row, "population", None))
+        }
+
     # The two FY2026 quarters that precede the scenario-input horizon are
-    # ACTUALS. Production does not leave them unavailable: _scenario_population_values
-    # fills them from the MBU26 population proxy and records the mixed lineage
-    # on every row. The identity must test what production actually did, so it
-    # uses that same governed fallback rather than substituting a different
-    # source (Treasury's interpolated path is a DIFFERENT series and using it
-    # here opened a spurious 0.21% FY2026 gap).
-    from model_dashboard.mbu26_source_spine import _scenario_population_values
-
+    # ACTUALS. Production fills them from the MBU26 population proxy and
+    # records the mixed lineage; the identity tests what production actually
+    # did (Treasury's interpolated path is a DIFFERENT series and using it
+    # here opened a spurious 0.21% FY2026 gap in an earlier revision).
     official = pd.read_csv(
         ROOT / "data/revenue_model_source_pack/mbu26_annual_spine/mbu26_official_annual.csv"
     )
-    official_wide = official.pivot_table(index="FY", columns="series_id", values="value", aggfunc="first")
+    official_wide = official.pivot_table(
+        index="FY", columns="series_id", values="value", aggfunc="first"
+    )
     history_source = "mbu26_official_annual.csv:population_proxy"
     historical_population: dict[str, float] = {}
     for fy in FYS:
@@ -306,131 +356,202 @@ def ped_cross_row_identity(pack, stages) -> tuple[pd.DataFrame, pd.DataFrame]:
         for quarter in (f"{fy - 1}Q3", f"{fy - 1}Q4", f"{fy}Q1", f"{fy}Q2"):
             historical_population.setdefault(quarter, proxy)
 
+    legacy_population = {
+        scenario: population_path(scenario_inputs, scenario)
+        for scenario, _role in governed_scenarios
+    }
+    treasury_population = {
+        scenario: population_path(treasury_inputs, scenario)
+        for scenario, _role in governed_scenarios
+    }
+
+    # FY2026 lineage artifact (basecase, schema unchanged from P1.1).
     lineage_rows: list[dict[str, object]] = []
-    quarter_population: dict[str, tuple[float, str, str]] = {}
-    for fy in FYS:
-        for quarter in (f"{fy - 1}Q3", f"{fy - 1}Q4", f"{fy}Q1", f"{fy}Q2"):
-            if quarter in population_by_quarter:
-                value, lineage, source = population_by_quarter[quarter], "scenario_forecast", "scenario_inputs/scenario_input_wide.parquet:PED:population"
-            elif quarter in historical_population:
-                value, lineage, source = historical_population[quarter], "historical_actual", history_source
-            else:
-                value, lineage, source = float("nan"), "unavailable", ""
-            quarter_population[quarter] = (value, lineage, source)
-            if fy == 2026:
-                lineage_rows.append(
+    for quarter in ("2025Q3", "2025Q4", "2026Q1", "2026Q2"):
+        if quarter in legacy_population["current_basecase"]:
+            lineage, source = "scenario_forecast", "scenario_inputs/scenario_input_wide.parquet:PED:population"
+            value = legacy_population["current_basecase"][quarter]
+        elif quarter in historical_population:
+            lineage, source = "historical_actual", history_source
+            value = historical_population[quarter]
+        else:
+            lineage, source, value = "unavailable", "", float("nan")
+        lineage_rows.append(
+            {
+                "fy": 2026,
+                "quarter": quarter,
+                "population": value,
+                "lineage": lineage,
+                "source_path": source,
+                "unit": "persons",
+                "status": "available" if lineage != "unavailable" else "unavailable_no_governed_source",
+            }
+        )
+
+    def stage_population(stage: str, scenario: str) -> dict[str, float]:
+        source = legacy_population if stage == "S0" else treasury_population
+        merged = dict(historical_population)
+        merged.update(source[scenario])
+        return merged
+
+    def vktpc_lookup(frame: pd.DataFrame, scenario: str) -> dict[str, float]:
+        scoped = frame[
+            frame["time_grain"].astype(str).eq("quarterly")
+            & frame["series_id"].astype(str).eq("ped_vkt_per_capita")
+        ]
+        own = scoped[scoped["scenario_name"].astype(str).eq(scenario)]
+        values = {str(row.period).upper(): float(row.value) for row in own.itertuples()}
+        historical = scoped[scoped["row_type"].astype(str).eq("historical_actual")]
+        for row in historical.itertuples():
+            values.setdefault(str(row.period).upper(), float(row.value))
+        return values
+
+    def displayed_petrol(frame: pd.DataFrame, scenario: str, role: str, fy: int) -> float:
+        mask = (
+            frame["time_grain"].astype(str).eq("june_year")
+            & frame["scenario_role"].astype(str).eq(role)
+            & frame["scenario_name"].astype(str).eq(scenario)
+            & frame["series_id"].astype(str).eq("light_petrol_vkt")
+            & pd.to_numeric(frame["june_year"], errors="coerce").eq(fy)
+        )
+        found = pd.to_numeric(frame.loc[mask, "value"], errors="coerce").dropna()
+        return float(found.iloc[0]) if len(found) else float("nan")
+
+    rows: list[dict[str, object]] = []
+    for scenario, role in governed_scenarios:
+        for stage, frame in stages.items():
+            vktpc = vktpc_lookup(frame, scenario)
+            population = stage_population(stage, scenario)
+            for fy in FYS:
+                quarters = (f"{fy - 1}Q3", f"{fy - 1}Q4", f"{fy}Q1", f"{fy}Q2")
+                expected_km = 0.0
+                complete = True
+                for quarter in quarters:
+                    if quarter not in vktpc or quarter not in population:
+                        complete = False
+                        break
+                    expected_km += convert_declared(
+                        vktpc[quarter] * population[quarter],
+                        "km",
+                        KM_MILLION,
+                        context=f"FY{fy} {quarter} identity",
+                    ).converted
+                expected = expected_km if complete else float("nan")
+                displayed = displayed_petrol(frame, scenario, role, fy)
+                residual = (
+                    displayed - expected
+                    if complete and np.isfinite(displayed)
+                    else float("nan")
+                )
+                pct = (
+                    residual / expected * 100.0 if complete and expected else float("nan")
+                )
+                if not complete:
+                    status = "not_evaluable_missing_governed_population"
+                elif abs(pct) <= 1e-6:
+                    status = "identity_closes"
+                elif (
+                    stage in POLICY_TRANSFER_STAGES
+                    and role == "comparison"
+                    and abs(pct) <= POLICY_TRANSFER_CEILING_PCT
+                ):
+                    # The Base-derived FED policy pair factors transferred to
+                    # the comparison - enumerated, ceiling-pinned, routed to
+                    # the policy-layer follow-up. Never a general tolerance.
+                    status = POLICY_TRANSFER_STATUS
+                else:
+                    status = "identity_violation"
+                rows.append(
                     {
+                        "scenario": scenario,
+                        "role": role,
+                        "stage": stage,
                         "fy": fy,
-                        "quarter": quarter,
-                        "population": value,
-                        "lineage": lineage,
-                        "source_path": source,
-                        "unit": "persons",
-                        "status": "available" if lineage != "unavailable" else "unavailable_no_governed_source",
+                        "quarters": "; ".join(quarters),
+                        "population_basis": "legacy_scenario_inputs" if stage == "S0" else "treasury_adjusted_scenario_inputs",
+                        "direct_population_mean": (
+                            float(np.mean([population[q] for q in quarters])) if complete else float("nan")
+                        ),
+                        "expected_light_petrol_vkt_million_km": expected,
+                        "displayed_light_petrol_vkt_million_km": displayed,
+                        "residual_million_km": residual,
+                        "residual_pct": pct,
+                        "population_lineage": "; ".join(
+                            sorted(
+                                {
+                                    "historical_actual" if q in historical_population and q not in (legacy_population if stage == "S0" else treasury_population)[scenario] else ("scenario_forecast" if stage == "S0" else "treasury_adjusted_forecast")
+                                    for q in quarters
+                                }
+                            )
+                        ),
+                        "contract_status": status,
                     }
                 )
 
-    def value_at(rows, series, fy, role="basecase"):
-        mask = (
-            rows["time_grain"].astype(str).eq("june_year")
-            & rows["scenario_role"].astype(str).eq(role)
-            & rows["series_id"].astype(str).eq(series)
-            & pd.to_numeric(rows["june_year"], errors="coerce").eq(fy)
-        )
-        found = pd.to_numeric(rows.loc[mask, "value"], errors="coerce").dropna()
-        return float(found.iloc[0]) if len(found) else float("nan")
-
-    # Quarterly VKT/capita from the pack seed, so the identity uses the exact
-    # quarter-level definition rather than an annual x mean-population proxy.
-    seed = pd.read_csv(PACK_DIR / "revenue_chart_rows.csv", low_memory=False)
-    seed_ped = seed[
-        seed["time_grain"].astype(str).eq("quarterly")
-        & seed["series_id"].astype(str).eq("ped_vkt_per_capita")
-        & seed["scenario_name"].astype(str).eq("current_basecase")
-    ]
-    vktpc_by_quarter = {
-        str(row.period).upper(): (float(row.value), str(row.value_unit))
-        for row in seed_ped.itertuples()
-    }
-    hist_ped = seed[
-        seed["time_grain"].astype(str).eq("quarterly")
-        & seed["series_id"].astype(str).eq("ped_vkt_per_capita")
-        & seed["row_type"].astype(str).eq("historical_actual")
-    ]
-    for row in hist_ped.itertuples():
-        vktpc_by_quarter.setdefault(str(row.period).upper(), (float(row.value), str(row.value_unit)))
-
-    rows: list[dict[str, object]] = []
-    for fy in FYS:
-        quarters = (f"{fy - 1}Q3", f"{fy - 1}Q4", f"{fy}Q1", f"{fy}Q2")
-        expected_km = 0.0
-        complete = True
-        for quarter in quarters:
-            population, lineage, _source = quarter_population.get(quarter, (float("nan"), "unavailable", ""))
-            vktpc = vktpc_by_quarter.get(quarter)
-            if vktpc is None or not np.isfinite(population):
-                complete = False
-                break
-            # quarterly VKT/capita x quarterly population -> km, then declared
-            # conversion to the displayed million-km unit.
-            expected_km += convert_declared(
-                vktpc[0] * population, "km", KM_MILLION, context=f"FY{fy} {quarter} identity"
-            ).converted
-        expected = expected_km if complete else float("nan")
-        direct_population = np.mean(
-            [quarter_population[q][0] for q in quarters]
-        ) if complete else float("nan")
-        annual_vktpc = sum(vktpc_by_quarter[q][0] for q in quarters) if complete else float("nan")
-
-        first_divergence = ""
-        for stage, frame in stages.items():
-            displayed = value_at(frame, "light_petrol_vkt", fy)
-            residual = displayed - expected if complete and np.isfinite(displayed) else float("nan")
-            pct = (residual / expected * 100.0) if complete and expected else float("nan")
-            if np.isfinite(pct) and abs(pct) > 1e-6 and not first_divergence:
-                first_divergence = stage
-            status = (
-                "not_evaluable_missing_governed_population"
-                if not complete
-                else "identity_closes"
-                if abs(pct) <= 1e-6
-                else MACRO_DRIFT_STATUS
-            )
-            rows.append(
-                {
-                    "scenario": "current_basecase",
-                    "role": "basecase",
-                    "stage": stage,
-                    "fy": fy,
-                    "quarters": "; ".join(quarters),
-                    "annual_ped_vkt_per_capita": annual_vktpc,
-                    "direct_population_mean": direct_population,
-                    "expected_light_petrol_vkt_million_km": expected,
-                    "displayed_light_petrol_vkt_million_km": displayed,
-                    "residual_million_km": residual,
-                    "residual_pct": pct,
-                    "first_divergent_stage": first_divergence,
-                    "population_lineage": "; ".join(
-                        sorted({quarter_population[q][1] for q in quarters})
-                    ),
-                    "contract_status": status,
-                }
-            )
+        # Measurement-power check: S1 against the LEGACY population must NOT
+        # close. Closing here would mean the measurement lost the sensitivity
+        # that exposed the original defect.
+        s1 = stages.get("S1")
+        if s1 is not None:
+            vktpc = vktpc_lookup(s1, scenario)
+            population = dict(historical_population)
+            population.update(legacy_population[scenario])
+            for fy in (max(FYS),):
+                quarters = (f"{fy - 1}Q3", f"{fy - 1}Q4", f"{fy}Q1", f"{fy}Q2")
+                if all(q in vktpc and q in population for q in quarters):
+                    mismatched = sum(
+                        convert_declared(
+                            vktpc[q] * population[q], "km", KM_MILLION, context="power check"
+                        ).converted
+                        for q in quarters
+                    )
+                    displayed = displayed_petrol(s1, scenario, role, fy)
+                    pct = (displayed - mismatched) / mismatched * 100.0 if mismatched else float("nan")
+                    rows.append(
+                        {
+                            "scenario": scenario,
+                            "role": role,
+                            "stage": "S1_vs_legacy_population",
+                            "fy": fy,
+                            "quarters": "; ".join(quarters),
+                            "population_basis": "legacy_scenario_inputs_DELIBERATE_MISMATCH",
+                            "direct_population_mean": float(np.mean([population[q] for q in quarters])),
+                            "expected_light_petrol_vkt_million_km": mismatched,
+                            "displayed_light_petrol_vkt_million_km": displayed,
+                            "residual_million_km": displayed - mismatched,
+                            "residual_pct": pct,
+                            "population_lineage": "measurement_power_check",
+                            "contract_status": "measurement_power_check",
+                        }
+                    )
 
     frame = pd.DataFrame(rows)
-    # Hard gates.
-    pre_macro = frame[frame["stage"].eq("S0") & frame["contract_status"].ne("not_evaluable_missing_governed_population")]
-    if len(pre_macro):
-        worst = pre_macro["residual_pct"].abs().max()
-        if worst > 1e-3:
-            failures.append(f"pre-macro PED identity does not close: worst {worst:.4f}%")
-    drifted = frame[frame["contract_status"].eq(MACRO_DRIFT_STATUS)]
-    if len(drifted):
-        worst = drifted["residual_pct"].abs().max()
-        if worst > MACRO_DRIFT_CEILING_PCT:
-            failures.append(f"macro cross-row drift grew to {worst:.3f}% (ceiling {MACRO_DRIFT_CEILING_PCT}%)")
-        if drifted["stage"].eq("S0").any():
-            failures.append("macro drift migrated into the pre-macro stage S0")
+    # Hard gates: the identity must close at EVERY stage under the
+    # stage-appropriate population, for every governed scenario; the power
+    # check must show the measurement still detects a mismatched population.
+    governed = frame[frame["contract_status"].isin(["identity_closes", "identity_violation"])]
+    violations = governed[governed["contract_status"].eq("identity_violation")]
+    if len(violations):
+        worst = violations["residual_pct"].abs().max()
+        failures.append(
+            f"PED cross-row identity violated at {len(violations)} cells (worst {worst:.6f}%)"
+        )
+    power = frame[frame["contract_status"].eq("measurement_power_check")]
+    if len(power) and power["residual_pct"].abs().min() < 0.5:
+        failures.append(
+            "identity measurement power check failed: a deliberately mismatched "
+            "population closed within 0.5%, so the measurement cannot detect drift"
+        )
+    # The enumerated policy-layer exception must stay small, non-zero, and
+    # confined to exactly the stage/scenario where it is pinned.
+    pinned = frame[frame["contract_status"].eq(POLICY_TRANSFER_STATUS)]
+    if len(pinned):
+        if pinned["residual_pct"].abs().max() > POLICY_TRANSFER_CEILING_PCT:
+            failures.append("the pinned policy transfer exception exceeded its ceiling")
+        if not set(pinned["stage"]) <= POLICY_TRANSFER_STAGES:
+            failures.append("the policy transfer exception migrated to another stage")
+        if not set(pinned["role"]) <= {"comparison"}:
+            failures.append("the policy transfer exception migrated to another role")
     return frame, pd.DataFrame(lineage_rows)
 
 
@@ -905,6 +1026,11 @@ def main() -> int:
 
     identity, lineage = ped_cross_row_identity(pack, stages)
     identity.to_csv(OUT / "ped_cross_row_identity.csv", index=False)
+    if identity["contract_status"].eq(RETIRED_MACRO_DRIFT_STATUS).any():
+        failures.append(
+            "the retired macro-drift status reappeared in the identity artifact; "
+            "the P1.2 resolution has regressed"
+        )
     lineage.to_csv(OUT / "fy2026_population_lineage.csv", index=False)
 
     allocation, formula = residual_audits(pack, stages)
@@ -929,16 +1055,25 @@ def main() -> int:
           f"{int(fault_frame['failed_closed'].sum())} failed closed")
     print(f"fail-closed findings : {len(fail_closed)}")
     if len(identity):
-        drift = identity[identity['contract_status'] == MACRO_DRIFT_STATUS]
-        print(f"PED identity         : S0 worst {identity[identity.stage.eq('S0')]['residual_pct'].abs().max():.2e}%, "
-              f"macro drift worst {drift['residual_pct'].abs().max() if len(drift) else 0:.3f}%")
+        governed = identity[identity["contract_status"].isin(["identity_closes", "identity_violation"])]
+        power = identity[identity["contract_status"].eq("measurement_power_check")]
+        pinned = identity[identity["contract_status"].eq(POLICY_TRANSFER_STATUS)]
+        print(f"PED identity         : worst closing residual {governed['residual_pct'].abs().max():.2e}%, "
+              f"power check {power['residual_pct'].abs().min() if len(power) else 0:.3f}% "
+              f"({int(governed['contract_status'].eq('identity_violation').sum())} violations, "
+              f"{len(pinned)} pinned policy-transfer cells, worst "
+              f"{pinned['residual_pct'].abs().max() if len(pinned) else 0:.2e}%)")
     print(f"FY2026 lineage       : {lineage['status'].value_counts().to_dict() if len(lineage) else 'n/a'}")
     print(f"allocation residuals : worst {allocation[['anchor_preserved_residual','share_sum_residual','pool_identity_residual']].abs().max().max():.2e}")
 
     # ---- report ---------------------------------------------------------
-    drift = identity[identity["contract_status"].eq(MACRO_DRIFT_STATUS)]
-    s0_worst = identity[identity["stage"].eq("S0")]["residual_pct"].abs().max()
-    drift_worst = drift["residual_pct"].abs().max() if len(drift) else 0.0
+    governed_identity = identity[
+        identity["contract_status"].isin(["identity_closes", "identity_violation"])
+    ]
+    power_rows = identity[identity["contract_status"].eq("measurement_power_check")]
+    s0_worst = governed_identity[governed_identity["stage"].eq("S0")]["residual_pct"].abs().max()
+    post_worst = governed_identity[~governed_identity["stage"].eq("S0")]["residual_pct"].abs().max()
+    power_min = power_rows["residual_pct"].abs().min() if len(power_rows) else float("nan")
     allocation_worst = allocation[
         ["anchor_preserved_residual", "share_sum_residual", "pool_identity_residual"]
     ].abs().max().max()
@@ -967,8 +1102,11 @@ def main() -> int:
                 for row in coverage_frame.to_dict("records")
             ]
         ),
-        "S0_LINE": f"- Pre-macro (S0): closes at {s0_worst:.2e}%.",
-        "DRIFT_LINE": f"- Post-macro (S1-S4): diverges up to {drift_worst:.3f}% (FY2030).",
+        "S0_LINE": f"- Pre-macro (S0), legacy population: closes at {s0_worst:.2e}%.",
+        "DRIFT_LINE": (
+            f"- Post-macro (S1-S4), Treasury-adjusted scenario population: closes at "
+            f"{post_worst:.2e}%; power check {power_min:.3f}%."
+        ),
         "ALLOCATION_LINE": (
             f"- Allocation: worst {allocation_worst:.2e}; nothing assigned to "
             "conventional activity."
