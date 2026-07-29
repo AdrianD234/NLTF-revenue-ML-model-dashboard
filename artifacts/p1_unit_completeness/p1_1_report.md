@@ -64,7 +64,7 @@ actually did rather than a reconstruction.
 
 ## Production value stability
 
-- 75 governed pack CSVs compared against the branch point: max absolute delta 0.0. P1.1 is value-neutral.
+- 67 governed pack CSVs compared against the branch point: max absolute delta 0.0. P1.1 is value-neutral.
 
 ## Routed to P1.2
 

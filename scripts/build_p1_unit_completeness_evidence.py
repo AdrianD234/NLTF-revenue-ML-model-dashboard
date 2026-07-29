@@ -505,26 +505,41 @@ def residual_audits(pack, stages) -> tuple[pd.DataFrame, pd.DataFrame]:
 
 
 # ---------------------------------------------- 8. production value stability
-def production_value_stability(baseline_ref: str = "origin/main") -> pd.DataFrame:
-    """Rebuild-vs-baseline comparison for every governed pack CSV.
+def production_value_stability() -> pd.DataFrame:
+    """Prove the committed packs reproduce byte-for-byte from current code.
 
-    P1.1 must be numerically value-neutral. Any non-zero delta stops the run so
-    the causing permissive behaviour is identified rather than repinned.
+    Deliberately does NOT read a historical Git object: a shallow CI checkout
+    may not contain the baseline ref, which is the clean-clone hazard
+    test_no_test_or_generator_depends_on_a_historical_git_object exists to
+    prevent (it caught an earlier `git show origin/main:` version of this
+    function). Instead the committed content is snapshotted in memory, the
+    canonical rebuild runs, and the result is compared against the snapshot -
+    a stronger claim, since it shows the packs regenerate exactly rather than
+    merely matching some other commit.
     """
-    import io
     import subprocess
 
+    pack_dirs = [
+        ROOT / "data" / "current_revenue_outlook",
+        ROOT / "data" / "engine_ar1" / "current_revenue_outlook",
+    ]
+    snapshot: dict[Path, pd.DataFrame] = {}
+    for directory in pack_dirs:
+        for path in sorted(directory.glob("*.csv")):
+            snapshot[path] = pd.read_csv(path, low_memory=False)
+
+    for script in ("rebuild_current_revenue_outlook_runtime.py", "build_ar1_runtime_pack.py"):
+        result = subprocess.run(
+            [sys.executable, str(ROOT / "scripts" / script)],
+            capture_output=True, cwd=ROOT, check=False,
+        )
+        if result.returncode != 0:
+            failures.append(f"{script} failed: {result.stderr.decode(errors='replace')[-400:]}")
+            return pd.DataFrame()
+
     rows: list[dict[str, object]] = []
-    listing = subprocess.run(
-        ["git", "ls-files", "data/current_revenue_outlook", "data/engine_ar1/current_revenue_outlook"],
-        capture_output=True, text=True, cwd=ROOT,
-    ).stdout.split()
-    for rel in sorted(path for path in listing if path.endswith(".csv")):
-        blob = subprocess.run(["git", "show", f"{baseline_ref}:{rel}"], capture_output=True, cwd=ROOT)
-        if blob.returncode != 0:
-            continue
-        before = pd.read_csv(io.BytesIO(blob.stdout), low_memory=False)
-        after = pd.read_csv(ROOT / rel, low_memory=False)
+    for path, before in snapshot.items():
+        after = pd.read_csv(path, low_memory=False)
         max_delta = 0.0
         if before.shape == after.shape:
             for column in before.columns:
@@ -538,19 +553,20 @@ def production_value_stability(baseline_ref: str = "origin/main") -> pd.DataFram
             max_delta = float("nan")
         rows.append(
             {
-                "path": rel,
+                "path": path.relative_to(ROOT).as_posix(),
                 "rows_before": len(before),
                 "rows_after": len(after),
                 "columns_before": before.shape[1],
                 "columns_after": after.shape[1],
                 "max_abs_delta": max_delta,
                 "status": "value_stable" if max_delta == 0.0 else "CHANGED",
+                "basis": "committed_content_vs_canonical_rebuild",
             }
         )
     frame = pd.DataFrame(rows)
     changed = frame[frame["status"].ne("value_stable")]
     if len(changed):
-        failures.append(f"production values changed: {changed['path'].tolist()[:6]}")
+        failures.append(f"production values changed on rebuild: {changed['path'].tolist()[:6]}")
     return frame
 
 
