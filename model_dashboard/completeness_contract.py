@@ -52,8 +52,12 @@ from .light_fleet_allocation import (
     quarter_horizon,
 )
 from .series_inventory_contract import (
+    ECONOMETRIC_SEGMENT_NAME,
     GOVERNED_STAGES,
+    LAST_POST_MODEL_FY,
+    POST_MODEL_SEGMENT_NAME,
     REQUIRED_SERIES_BY_STAGE_ROLE_GRAIN,
+    post_model_periods,
     required_periods,
 )
 from .unit_contract import (
@@ -190,7 +194,11 @@ def _horizon_state(time_grain: str, period: str, series: str, role: str) -> str:
     fy = pd.to_numeric(pd.Series([str(period).replace("FY", "")]), errors="coerce").iloc[0]
     if pd.isna(fy):
         return "unparseable_period"
-    return "within_annual_cutoff" if int(fy) <= LAST_DECISION_GRADE_ANNUAL_FY else "beyond_annual_cutoff"
+    if int(fy) <= LAST_DECISION_GRADE_ANNUAL_FY:
+        return "within_annual_cutoff"
+    if int(fy) <= LAST_POST_MODEL_FY:
+        return "post_model_extrapolation_window"
+    return "beyond_annual_cutoff"
 
 
 def _declared_unit(units: pd.Series | None) -> str:
@@ -218,6 +226,7 @@ def evaluate_cell(
     units: pd.Series | None = None,
     decision_facing: bool = True,
     expected_unit: str | None = None,
+    forecast_segment: str = "",
     source: str = "",
     raise_on_failure: bool = False,
 ) -> CompletenessRecord:
@@ -225,7 +234,10 @@ def evaluate_cell(
 
     ``expected_unit`` overrides the per-series default, because the canonical
     unit is grain-specific: the km streams publish ``net km`` quarterly and
-    ``million km`` annually.
+    ``million km`` annually. ``forecast_segment`` is the label the matched
+    rows carry; inside the FY2031-FY2050 window a current-role value is valid
+    ONLY under the post-model segment - an unlabelled long-run value is the
+    retired defect coming back and fails closed.
     """
     horizon_state = _horizon_state(time_grain, period, series, role)
     contract_unit = expected_unit if expected_unit is not None else SERIES_CANONICAL_UNITS.get(str(series), "")
@@ -267,7 +279,9 @@ def evaluate_cell(
         empty = values is None or len(values) == 0
         return record(NOT_APPLICABLE if empty else OPTIONAL_AVAILABLE, reason="raw_audit_layer")
 
-    # H21+ / beyond-cutoff cells are withheld by policy, not missing.
+    # H21+ quarterly and beyond-FY2050 annual cells are withheld by policy,
+    # not missing. The FY2031-FY2050 annual window belongs to the post-model
+    # segment: a value there is valid ONLY when labelled as such.
     if horizon_state in {"beyond_h20", "beyond_annual_cutoff"} and role in CURRENT_ROLES:
         if str(series) in LIGHT_RUC_DEPENDENT or horizon_state == "beyond_h20":
             if values is not None and len(values):
@@ -277,6 +291,19 @@ def evaluate_cell(
                     value_status="present_beyond_horizon",
                 )
             return record(WITHHELD_H21, reason="withheld by the governed H20/FY2030 rule")
+    if horizon_state == "post_model_extrapolation_window" and role in CURRENT_ROLES:
+        segment = str(forecast_segment or "").strip()
+        if values is not None and len(values) and segment != POST_MODEL_SEGMENT_NAME:
+            return record(
+                FORMULA_INVALID,
+                reason=(
+                    "a current-role value inside FY2031-FY2050 must carry "
+                    f"forecast_segment={POST_MODEL_SEGMENT_NAME!r}; an unlabelled "
+                    "long-run value is the retired divergent construction returning "
+                    f"(found segment {segment!r})"
+                ),
+                value_status="unlabelled_post_model_value",
+            )
 
     if values is None or len(values) == 0:
         return record(
@@ -390,6 +417,11 @@ def _evaluate_against_contract(
     has_frame = frame is not None and not frame.empty
     values = frame["value"].to_numpy() if has_frame and "value" in frame.columns else None
     units = frame["value_unit"].to_numpy() if has_frame and "value_unit" in frame.columns else None
+    segments = (
+        frame["forecast_segment"].fillna("").astype(str).to_numpy()
+        if has_frame and "forecast_segment" in frame.columns
+        else None
+    )
 
     for (contract_stage, role, grain), items in sorted(REQUIRED_SERIES_BY_STAGE_ROLE_GRAIN.items()):
         if contract_stage != stage:
@@ -429,7 +461,7 @@ def _evaluate_against_contract(
                     raise CompletenessContractError(entry)
                 records.append(entry)
                 continue
-            for period in periods:
+            def _evaluate_period(period: str, *, segment_window: str) -> None:
                 positions = index.get((scenario, role, grain, item.series_id, period), [])
                 if not positions and "scenario_name" not in getattr(frame, "columns", []):
                     positions = index.get((role, role, grain, item.series_id, period), [])
@@ -443,15 +475,29 @@ def _evaluate_against_contract(
                     if positions and units is not None
                     else None
                 )
+                matched_segment = ""
+                if positions and segments is not None:
+                    distinct = sorted({segments[position] for position in positions})
+                    matched_segment = distinct[0] if len(distinct) == 1 else ";".join(distinct)
+                elif positions and segment_window == POST_MODEL_SEGMENT_NAME:
+                    # A frame without the segment column cannot label its
+                    # long-run rows; evaluate_cell fails that closed.
+                    matched_segment = ""
                 records.append(
                     evaluate_cell(
                         scenario=scenario, role=role, stage=stage, time_grain=grain,
                         period=period, series=item.series_id,
                         values=matched_values, units=matched_units,
                         expected_unit=item.canonical_unit,
+                        forecast_segment=matched_segment,
                         source=source, raise_on_failure=raise_on_failure,
                     )
                 )
+
+            for period in periods:
+                _evaluate_period(period, segment_window=ECONOMETRIC_SEGMENT_NAME)
+            for period in post_model_periods(role, grain):
+                _evaluate_period(period, segment_window=POST_MODEL_SEGMENT_NAME)
     return records
 
 

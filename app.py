@@ -4337,6 +4337,8 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
 
     manifest = pack.manifest if pack is not None and isinstance(pack.manifest, dict) else {}
     chart_rows = _pack_table(pack, "revenue_chart_rows")
+    fan_availability = _pack_table(pack, "fan_availability")
+    fan_band_rows = _pack_table(pack, "fan_band_rows")
 
     section_title(REVENUE_OUTLOOK_TITLE)
     period_rule = manifest.get("period_rule") if isinstance(manifest, dict) else {}
@@ -4346,7 +4348,11 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         warning_panel("The promoted Revenue Outlook pack has no chart rows.")
         return
 
-    _render_forecast_horizon_support_note(chart_rows)
+    # The horizon-support prose is governance metadata, not public copy. It
+    # stays in downloads (horizon_scope, horizon_zone, per-state quarter
+    # counts), the manifest, hover labels and audit tables;
+    # _forecast_horizon_support_note remains available to governance views.
+    # The public page renders no warning banner for it.
 
     timer.start("selector metadata")
     selector_options = cached_revenue_outlook_selectors(pack_signature, pack)
@@ -4637,13 +4643,28 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             CONFLICT_NOTE_BY_TRACE[trace] for trace in selected_conflict_traces
         ]
         total_path_notes.extend(conflict_notes)
-        chart_card(
-            "Total path chart",
-            "\n\n".join(total_path_notes),
-            main_path_figure,
-            caption="\n\n".join(conflict_notes) if conflict_notes else None,
-            notes_as_tooltip=True,
-        )
+        # Restored layout (removed in 417f34a): total path beside the
+        # uncertainty fan, 64/36 on desktop. Streamlit columns stack
+        # automatically on narrow viewports.
+        primary_cols = st.columns([0.64, 0.36])
+        with primary_cols[0]:
+            chart_card(
+                "Total path chart",
+                "\n\n".join(total_path_notes),
+                main_path_figure,
+                caption="\n\n".join(conflict_notes) if conflict_notes else None,
+                notes_as_tooltip=True,
+            )
+        with primary_cols[1]:
+            timer.start("fan figure")
+            _render_revenue_outlook_fan_card(
+                pack_signature,
+                fan_band_rows,
+                fan_availability,
+                selected_series=selected_stream,
+                selected_fed_path=selected_fed_path,
+            )
+            timer.stop("fan figure")
 
     if revenue_outlook_lazy_table(
         "Show Middle East fuel-scenario audit",
@@ -4852,7 +4873,6 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         selected_stack_mode = REVENUE_STACK_MODE_BRIDGE
         stack_source_options = _revenue_line_source_options(stack_components)
         stack_section_options = selector_options["stack_section_options"]
-        stack_fy_min, stack_fy_max = selector_options["stack_fy_bounds"]
         stack_overlay_options = selector_options["stack_overlay_options"]
         default_stack_sections = [section for section in ["RUC", "FED", "MVR", "TUC"] if section in stack_section_options]
         default_stack_overlays = _revenue_stack_default_overlays(selected_stack_mode, stack_overlay_options)
@@ -4897,13 +4917,37 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 index=0,
                 key="revenue_stack_source_path",
             )
+        # Source-specific FY bounds, derived AFTER the source is selected.
+        # The former global bounds were computed over the whole stack frame
+        # before any source choice, so the Current FY2030 cutoff silently
+        # capped MBU26 even though its rows run to FY2055.
+        stack_fy_min, stack_fy_max = _revenue_line_fy_bounds(
+            stack_components[
+                stack_components["source_path"].astype(str).eq(str(selected_stack_source))
+            ]
+        )
+        # Long-run sources open at FY2050 by default; MBU26 can be extended
+        # to its own FY2055 source horizon with the slider.
+        stack_fy_default_end = min(int(stack_fy_max), 2050)
+        state_key = "revenue_stack_fy_range"
+        source_state_key = "revenue_stack_fy_range_source"
+        stored_range = st.session_state.get(state_key)
+        source_changed = st.session_state.get(source_state_key) != selected_stack_source
+        out_of_bounds = (
+            not isinstance(stored_range, (tuple, list))
+            or len(stored_range) != 2
+            or int(stored_range[0]) < int(stack_fy_min)
+            or int(stored_range[1]) > int(stack_fy_max)
+        )
+        if source_changed or out_of_bounds:
+            st.session_state[state_key] = (int(stack_fy_min), stack_fy_default_end)
+        st.session_state[source_state_key] = selected_stack_source
         with slider_col:
             selected_stack_fy_range = st.slider(
                 "FY range / horizon",
-                min_value=stack_fy_min,
-                max_value=stack_fy_max,
-                value=(stack_fy_min, stack_fy_max),
-                key="revenue_stack_fy_range",
+                min_value=int(stack_fy_min),
+                max_value=int(stack_fy_max),
+                key=state_key,
             )
 
         selected_stack_sections_tuple = tuple(str(value) for value in selected_stack_sections)
@@ -5403,13 +5447,25 @@ def _render_revenue_source_architecture(source_pack: RevenueSourcePack, controls
         f"validation status {source_pack.validation_status}."
     )
     info_panel(source_status)
-    chart_card(
-        "Total path chart",
-        "Source actuals, current finalist forecast and official MOT/BEFU comparators from repo-local governed sources.",
-        _source_total_path_figure(source_pack, controls),
-        caption="Current finalist forecast is the only in-house forecast source. Workbook model paths are offline lineage only and are not plotted.",
-        notes_as_tooltip=False,
-    )
+    # Restored layout (removed in 417f34a): source total path beside the
+    # source uncertainty fan.
+    chart_cols = st.columns(2)
+    with chart_cols[0]:
+        chart_card(
+            "Total path chart",
+            "Source actuals, current finalist forecast and official MOT/BEFU comparators from repo-local governed sources.",
+            _source_total_path_figure(source_pack, controls),
+            caption="Current finalist forecast is the only in-house forecast source. Workbook model paths are offline lineage only and are not plotted.",
+            notes_as_tooltip=False,
+        )
+    with chart_cols[1]:
+        chart_card(
+            "Uncertainty fan",
+            "Displayed only from available governed model paths; no probabilistic residual fan is fabricated.",
+            _source_uncertainty_figure(source_pack, controls),
+            caption="No workbook model-spread fallback is used; unavailable uncertainty evidence is shown as a governed gap.",
+            notes_as_tooltip=False,
+        )
 
     drill_cols = st.columns(2)
     with drill_cols[0]:
@@ -8577,6 +8633,22 @@ def _filter_revenue_bridge_rows(
     return data
 
 
+def _public_segment_hover_label(row: pd.Series) -> str:
+    """Simple public wording only - no internal H13/H20/H21 language."""
+
+    segment = str(row.get("forecast_segment") or "").strip()
+    if segment == "post_model_extrapolation":
+        return "<br>Post-model extrapolation"
+    if segment == "econometric_forecast":
+        return "<br>Econometric forecast"
+    role = str(row.get("scenario_role") or "").strip()
+    if role == "official_comparator":
+        return "<br>Official comparator"
+    if role == "actual" or str(row.get("row_type") or "") == "historical_actual":
+        return "<br>Actual"
+    return ""
+
+
 def revenue_outlook_total_path_figure(
     rows: pd.DataFrame,
     *,
@@ -8665,27 +8737,53 @@ def revenue_outlook_total_path_figure(
             "forecast_quarters",
             "ped_bridge_mode_label",
             "revenue_sensitivity_label",
+            "forecast_segment",
         ]:
             if column not in group.columns:
                 group[column] = ""
         group["hover_unit"] = hover_unit
+        group["_segment"] = group["forecast_segment"].fillna("").astype(str)
+        group["_hover_segment"] = group.apply(_public_segment_hover_label, axis=1)
         color, dash, width = trace_styles.get(trace_name, (scenario_colors.get(trace_name, "#006FAD"), "solid", 2.2))
-        fig.add_trace(
-            go.Scatter(
-                x=group["period"],
-                y=group["value_display"],
-                mode="lines+markers",
-                name=trace_name,
-                line={"color": color, "dash": dash, "width": width},
-                marker={"size": 6},
-                customdata=group[["hover_unit"]].to_numpy(),
-                hovertemplate=(
-                    "<b>%{fullData.name}</b><br>"
-                    "%{y:,.2f} %{customdata[0]}"
-                    "<extra></extra>"
-                ),
+        post_model = group[group["_segment"].eq("post_model_extrapolation")]
+        within_model = group[~group["_segment"].eq("post_model_extrapolation")]
+
+        def _add_path_trace(portion: pd.DataFrame, *, dash_style: str, show_legend: bool, suffix: str = "") -> None:
+            if portion.empty:
+                return
+            fig.add_trace(
+                go.Scatter(
+                    x=portion["period"],
+                    y=portion["value_display"],
+                    mode="lines+markers",
+                    name=trace_name,
+                    legendgroup=trace_name,
+                    showlegend=show_legend,
+                    line={"color": color, "dash": dash_style, "width": width},
+                    marker={"size": 6 if not suffix else 5},
+                    customdata=portion[["hover_unit", "_hover_segment"]].to_numpy(),
+                    hovertemplate=(
+                        "<b>%{fullData.name}</b><br>"
+                        "%{y:,.2f} %{customdata[0]}"
+                        "%{customdata[1]}"
+                        "<extra></extra>"
+                    ),
+                )
             )
-        )
+
+        if post_model.empty:
+            _add_path_trace(within_model, dash_style=dash, show_legend=True)
+        else:
+            # Segmented current path: solid econometric years, then the same
+            # colour dashed for the post-model structural extrapolation. The
+            # dashed portion re-includes the FY2030 point so the two segments
+            # join continuously with no gap and no duplicate hover (the seam
+            # point keeps the econometric hover only).
+            _add_path_trace(within_model, dash_style=dash, show_legend=True)
+            seam = within_model.tail(1)
+            joined = pd.concat([seam, post_model], ignore_index=True)
+            joined.loc[joined.index[0], "_hover_segment"] = ""
+            _add_path_trace(joined, dash_style="dash", show_legend=False, suffix="post_model")
 
     # Bridge the visual gap between the last actual and the first point of each
     # forecast trace with an actual-coloured connector segment so the handover
@@ -8750,6 +8848,39 @@ def revenue_outlook_total_path_figure(
                 "showarrow": False,
                 "yanchor": "top",
                 "font": {"color": "#B45309", "size": 11},
+            }
+        )
+    # Subtle boundary where the econometric forecast hands over to the
+    # post-model structural extrapolation. Drawn only when post-model rows
+    # are actually visible on this axis.
+    has_post_model = (
+        "forecast_segment" in data.columns
+        and data["forecast_segment"].fillna("").astype(str).eq("post_model_extrapolation").any()
+    )
+    if has_post_model and "FY2030" in periods:
+        shapes.append(
+            {
+                "type": "line",
+                "xref": "x",
+                "yref": "paper",
+                "x0": "FY2030",
+                "x1": "FY2030",
+                "y0": 0,
+                "y1": 1,
+                "line": {"dash": "dot", "color": "#8A96A3", "width": 1.1},
+            }
+        )
+        annotations.append(
+            {
+                "xref": "x",
+                "yref": "paper",
+                "x": "FY2030",
+                "y": 0.03,
+                "text": "Post-model extrapolation →",
+                "showarrow": False,
+                "xanchor": "left",
+                "yanchor": "bottom",
+                "font": {"color": "#8A96A3", "size": 10},
             }
         )
     if selected_fy in periods:
@@ -8819,16 +8950,26 @@ def _render_revenue_outlook_fan_card(
         st.markdown(
             "<div class='gov-chart-card chart-card'>"
             "<div class='chart-card-title'>Uncertainty fan</div>"
-            "<div class='chart-card-subtitle'>Fan source is controlled independently from the main trace selector.</div>"
+            "<div class='chart-card-subtitle'>Best available governed uncertainty source; details below the chart.</div>"
             "</div>",
             unsafe_allow_html=True,
         )
-        selected_fan_source = st.selectbox(
-            "Fan source",
-            list(FAN_SOURCE_OPTIONS),
-            index=0,
-            key="revenue_outlook_fan_source",
-        )
+        # Auto / best-available by default; the explicit source override lives
+        # in a compact popover rather than a permanent selector.
+        with st.popover("Fan source details", use_container_width=False):
+            selected_fan_source = st.selectbox(
+                "Fan source",
+                list(FAN_SOURCE_OPTIONS),
+                index=0,
+                key="revenue_outlook_fan_source",
+            )
+            st.caption(
+                "Sources in governed priority order: current-finalist empirical "
+                "backtest error, archived official forecast error, scenario "
+                "range. A scenario range is a spread of governed scenarios, "
+                "not a probabilistic confidence interval, and is labelled "
+                "accordingly."
+            )
         fig, caption = cached_revenue_outlook_fan_figure(
             pack_signature,
             selected_series,
@@ -8879,32 +9020,62 @@ def revenue_outlook_uncertainty_fan_figure(
     data["hover_unit"] = hover_unit
     fig = go.Figure()
     is_scenario_spread = resolved_source == FAN_SOURCE_SCENARIO_SPREAD
+    # Gray fan treatment: outer 80% lighter, inner 50% darker. The light-blue
+    # MoT VFM fast-slow range on the main chart is a composition range and
+    # keeps its own colour - the concepts must not share a visual language.
     band_specs = (
         [
-            ("upper80", "lower80", "Scenario spread outer range (not probabilistic)", "rgba(0, 43, 92, 0.14)"),
-            ("upper50", "lower50", "Scenario spread inner range (not probabilistic)", "rgba(0, 132, 61, 0.18)"),
+            ("upper80", "lower80", "Scenario spread outer range (not probabilistic)", "rgba(128, 128, 128, 0.16)"),
+            ("upper50", "lower50", "Scenario spread inner range (not probabilistic)", "rgba(96, 96, 96, 0.28)"),
         ]
         if is_scenario_spread
         else [
-            ("upper80", "lower80", f"{resolved_source} 80% empirical band", "rgba(0, 43, 92, 0.14)"),
-            ("upper50", "lower50", f"{resolved_source} 50% empirical band", "rgba(0, 132, 61, 0.18)"),
+            ("upper80", "lower80", f"{resolved_source} 80% empirical band", "rgba(128, 128, 128, 0.16)"),
+            ("upper50", "lower50", f"{resolved_source} 50% empirical band", "rgba(96, 96, 96, 0.28)"),
         ]
     )
-    for upper, lower, name, color in band_specs:
-        fig.add_trace(go.Scatter(x=data["period"], y=data[f"{upper}_display"], mode="lines", line={"width": 0}, showlegend=False, hoverinfo="skip"))
-        fig.add_trace(
-            go.Scatter(
-                x=data["period"],
-                y=data[f"{lower}_display"],
-                mode="lines",
-                fill="tonexty",
-                fillcolor=color,
-                line={"width": 0},
-                name=name,
-                customdata=data[["hover_unit", "method", "source_file"]].to_numpy(),
-                hovertemplate="%{x}<br>%{y:,.2f} %{customdata[0]}<br>%{customdata[1]}<br>%{customdata[2]}<extra>%{fullData.name}</extra>",
+    # Split the fan at the FY2030 seam. Empirical sources are already
+    # truncated there by the pack builder; the scenario spread continues, but
+    # as a separately named long-run envelope so one interval is never
+    # presented as retaining the same statistical meaning across both
+    # horizons.
+    if "fan_segment" in data.columns:
+        long_run = data["fan_segment"].astype(str).eq("long_run_scenario_envelope")
+    else:
+        long_run = pd.Series(False, index=data.index)
+    def _draw_bands(portion: pd.DataFrame, *, suffix: str, fillcolor_scale: float) -> None:
+        if portion.empty:
+            return
+        for upper, lower, name, color in band_specs:
+            label = f"{name}{suffix}"
+            fig.add_trace(
+                go.Scatter(
+                    x=portion["period"], y=portion[f"{upper}_display"], mode="lines",
+                    line={"width": 0}, showlegend=False, hoverinfo="skip",
+                )
             )
-        )
+            fig.add_trace(
+                go.Scatter(
+                    x=portion["period"],
+                    y=portion[f"{lower}_display"],
+                    mode="lines",
+                    fill="tonexty",
+                    fillcolor=color if fillcolor_scale == 1.0 else _fade_rgba(color, fillcolor_scale),
+                    line={"width": 0},
+                    name=label,
+                    customdata=portion[["hover_unit", "method", "source_file"]].to_numpy(),
+                    hovertemplate="%{x}<br>%{y:,.2f} %{customdata[0]}<br>%{customdata[1]}<br>%{customdata[2]}<extra>%{fullData.name}</extra>",
+                )
+            )
+
+    empirical_portion = data[~long_run]
+    long_run_portion = data[long_run]
+    _draw_bands(empirical_portion, suffix="", fillcolor_scale=1.0)
+    if not long_run_portion.empty:
+        # Include the seam row so the envelope joins the band with no gap.
+        seam = empirical_portion.tail(1)
+        joined = pd.concat([seam, long_run_portion], ignore_index=True)
+        _draw_bands(joined, suffix=" — long-run scenario envelope", fillcolor_scale=0.6)
     central_name = "Current finalist base case" if is_scenario_spread else resolved_source
     fig.add_trace(
         go.Scatter(
@@ -8918,14 +9089,40 @@ def revenue_outlook_uncertainty_fan_figure(
             hovertemplate="%{x}<br>%{y:,.2f} %{customdata[0]}<br>%{customdata[1]}<extra>%{fullData.name}</extra>",
         )
     )
+    shapes: list[dict[str, Any]] = []
+    if not long_run_portion.empty and not empirical_portion.empty:
+        seam_period = str(empirical_portion["period"].iloc[-1])
+        shapes.append(
+            {
+                "type": "line", "xref": "x", "yref": "paper",
+                "x0": seam_period, "x1": seam_period, "y0": 0, "y1": 1,
+                "line": {"dash": "dot", "color": "#8A96A3", "width": 1.0},
+            }
+        )
     fig.update_layout(
         height=220,
         margin={"l": 40, "r": 12, "t": 16, "b": 40},
         hovermode="x unified",
         yaxis_title=display_axis_title,
         legend={"orientation": "h", "y": -0.24, "x": 0.0},
+        shapes=shapes,
     )
     return fig
+
+
+def _fade_rgba(color: str, scale: float) -> str:
+    """Weaken an rgba fill so the long-run envelope reads as less certain."""
+
+    if not color.startswith("rgba("):
+        return color
+    parts = [part.strip() for part in color[5:-1].split(",")]
+    if len(parts) != 4:
+        return color
+    try:
+        alpha = float(parts[3]) * scale
+    except ValueError:
+        return color
+    return f"rgba({parts[0]}, {parts[1]}, {parts[2]}, {alpha:.3f})"
 
 
 def _revenue_outlook_fan_series_id(fan_availability: pd.DataFrame | None, selected_series: str) -> str:

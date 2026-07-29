@@ -1,0 +1,4 @@
+path,main_rows,rows_after,preexisting_rows_matched,values_changed,values_missing,max_abs_delta,status,basis
+data/current_revenue_outlook/revenue_chart_rows.csv,1485,2165,1485,0,0,0.0,unchanged,csv_vs_csv_exact
+data/engine_ar1/current_revenue_outlook/revenue_chart_rows.csv,1485,2165,1485,0,0,0.0,unchanged,csv_vs_csv_exact
+data/current_revenue_outlook/revenue_line_reconciliation.csv,1646,4221,1646,0,0,0.0,unchanged,csv_vs_csv_exact

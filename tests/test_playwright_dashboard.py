@@ -211,11 +211,10 @@ def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
             for title in [
                 "Revenue Outlook controls",
                 "Total path chart",
+                # Restored beside the total path chart (417f34a undone).
+                "Uncertainty fan",
             ]:
                 assert_text_above_fold(page, title)
-            expect(
-                page.get_by_text("Uncertainty fan", exact=False).first
-            ).not_to_be_visible(timeout=60000)
             for title in [
                 "Revenue composition over time",
                 "Fleet mix explorer",
@@ -503,7 +502,7 @@ def test_revenue_outlook_is_responsive_without_horizontal_overflow(page: Page) -
     expect(page.get_by_text("Total path chart", exact=False).first).to_be_visible(
         timeout=90000
     )
-    expect(page.get_by_text("Uncertainty fan", exact=False).first).not_to_be_visible(
+    expect(page.get_by_text("Uncertainty fan", exact=False).first).to_be_visible(
         timeout=90000
     )
     overflow = page.evaluate(

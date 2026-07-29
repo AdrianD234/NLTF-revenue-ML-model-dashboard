@@ -3593,6 +3593,19 @@ def apply_treasury_macro_to_chart_rows(
                 factor = a_lookup.get((scenario, series_id, int(fy_value)))
                 if factor is not None:
                     basis = "Treasury_BEFU26_annual_bridge_macro_factor"
+        if factor is None and str(row.get("forecast_segment") or "") == "post_model_extrapolation":
+            # Post-model rows carry the anchor year's factor forward. This is
+            # exact, not approximate: beyond the BEFU26 window the Treasury
+            # transform itself reverts to re-anchored original growth, so
+            # post_fy = pre_fy x factor_2030 IS anchor-and-growth in
+            # post-macro space, and FY2030->FY2031 continuity is automatic.
+            fy_value = pd.to_numeric(
+                pd.Series([row.get("june_year")]), errors="coerce"
+            ).iloc[0]
+            if pd.notna(fy_value) and int(fy_value) > 2030:
+                factor = a_lookup.get((scenario, series_id, 2030))
+                if factor is not None:
+                    basis = "Treasury_BEFU26_terminal_annual_factor_carry"
         if factor is None:
             # Silently retaining the legacy macro value was the fail-open
             # path: "no factor" and "factor of exactly 1" were
@@ -3730,6 +3743,10 @@ def apply_treasury_macro_to_chart_rows(
                 )
             fy = int(group_years[0])
             factor = a_lookup.get((group_scenario, series_id, fy))
+            if factor is None and fy > 2030:
+                # Post-model years carry the anchor-year factor forward (see
+                # the terminal-carry rule in the row loop above).
+                factor = a_lookup.get((group_scenario, series_id, 2030))
             if factor is None or not np.isfinite(float(factor)):
                 raise ValueError(
                     "Treasury macro annual anchor factor is missing or "

@@ -105,9 +105,19 @@ def required_quarters() -> tuple[str, ...]:
 
 REQUIRED_QUARTERS = required_quarters()
 # FY2025 is the anchor year the forecast joins onto; FY2026..FY2030 are the
-# decision-grade forecast years. FY2031+ is withheld by the governed rule.
+# decision-grade ECONOMETRIC forecast years. Beyond them sits a separately
+# named and separately constructed segment: the post-model structural
+# extrapolation, FY2031-FY2050. The econometric segment's own rules are
+# unchanged - an econometric value beyond FY2030 remains a violation; a
+# post-model value is valid only inside its own window and only when labelled
+# with its own segment and value_status. Quarterly emission stays H1-H20.
 FIRST_CURRENT_ANNUAL_FY = 2025
 REQUIRED_CURRENT_FYS = tuple(range(FIRST_CURRENT_ANNUAL_FY, LAST_DECISION_GRADE_ANNUAL_FY + 1))
+FIRST_POST_MODEL_FY = 2031
+LAST_POST_MODEL_FY = 2050
+POST_MODEL_FYS = tuple(range(FIRST_POST_MODEL_FY, LAST_POST_MODEL_FY + 1))
+POST_MODEL_SEGMENT_NAME = "post_model_extrapolation"
+ECONOMETRIC_SEGMENT_NAME = "econometric_forecast"
 # The official comparator runs to its own source horizon, not ours.
 FIRST_OFFICIAL_FY = 2026
 LAST_OFFICIAL_FY = 2055
@@ -219,12 +229,30 @@ REQUIRED_SERIES_BY_STAGE_ROLE_GRAIN = _build()
 
 
 def required_periods(role: str, grain: str) -> tuple[str, ...]:
-    """The governed period set for a role and grain."""
+    """The governed ECONOMETRIC period set for a role and grain.
+
+    The post-model extrapolation window is deliberately not folded in here:
+    its cells carry a different value_status and a different horizon rule, so
+    they are enumerated by ``post_model_periods`` and evaluated under their
+    own segment by the completeness engine.
+    """
     if str(grain) == "quarterly":
         return REQUIRED_QUARTERS if str(role) in CURRENT_ROLES else ()
     if str(role) == "official_comparator":
         return tuple(f"FY{fy}" for fy in REQUIRED_OFFICIAL_FYS)
     return tuple(f"FY{fy}" for fy in REQUIRED_CURRENT_FYS)
+
+
+def post_model_periods(role: str, grain: str) -> tuple[str, ...]:
+    """The governed post-model extrapolation window for a role and grain.
+
+    Annual-only and current-roles-only by construction: the extrapolation
+    never emits quarters (H21+ quarterly stays withheld) and the official
+    comparator keeps its own independent source horizon.
+    """
+    if str(grain) != "june_year" or str(role) not in CURRENT_ROLES:
+        return ()
+    return tuple(f"FY{fy}" for fy in POST_MODEL_FYS)
 
 
 def resolved_contract_rows() -> list[dict[str, object]]:

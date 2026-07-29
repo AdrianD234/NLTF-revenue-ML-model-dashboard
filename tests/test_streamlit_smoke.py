@@ -1059,14 +1059,21 @@ def test_revenue_outlook_composition_branch_uses_cached_stack_for_table() -> Non
     assert "cached_revenue_outlook_composition_table_view(" in composition_branch
     assert "_revenue_stack_components_display_table(chart_stack)" not in composition_branch
     assert "cached_revenue_outlook_composition_stack(" in composition_branch
-    assert "value=(stack_fy_min, stack_fy_max)" in composition_branch
+    # Source-specific FY bounds: derived AFTER the source selectbox, with
+    # session-state clamping on source change, so MBU26 can never inherit
+    # the Current FY2030 cutoff.
+    assert "_revenue_line_fy_bounds(" in composition_branch
+    assert 'selector_options["stack_fy_bounds"]' not in composition_branch
+    assert "revenue_stack_fy_range_source" in composition_branch
+    assert "stack_fy_default_end = min(int(stack_fy_max), 2050)" in composition_branch
 
 
 def test_revenue_outlook_page_does_not_render_summary_kpi_cards() -> None:
     source = inspect.getsource(app.render_revenue_outlook_page)
     assert "_revenue_outlook_summary_cards(" not in source
     assert "kpi_grid(revenue_kpis)" not in source
-    assert "_render_revenue_outlook_fan_card(" not in source
+    # The fan card is deliberately BACK on the page (417f34a undone).
+    assert "_render_revenue_outlook_fan_card(" in source
     assert "revenue_outlook_sensitivity_demand_elasticity" not in source
     assert "revenue_outlook_sensitivity_cost_ratio" not in source
     assert '"Traces"' not in source
@@ -1121,13 +1128,17 @@ def test_revenue_outlook_cloud_hides_debug_toggles_and_shows_full_composition(mo
         "Post-model overlays; default Off preserves model forecast",
         "Clean bridge mode hides internal add-back rows",
         "Line-item contributions from revenue_stack_components",
-        "Uncertainty fan",
         "Showing first",
     ]:
         assert forbidden not in rendered_text
     fy_sliders = [slider for slider in at.slider if slider.label == "FY range / horizon"]
     assert len(fy_sliders) == 1
-    assert tuple(fy_sliders[0].value) == tuple(selectors["stack_fy_bounds"])
+    # Per-source bounds: the default source opens from its own first FY to
+    # FY2050 (long-run sources default to 2050 even where, like MBU26, the
+    # slider can be extended to the FY2055 source horizon).
+    slider_value = tuple(int(v) for v in fy_sliders[0].value)
+    assert slider_value[0] == int(selectors["stack_fy_bounds"][0])
+    assert slider_value[1] == 2050
     # The section/overlay multiselects duplicated their defaults for everyone;
     # they are local-audit-only now.
     multiselect_labels = {str(widget.label) for widget in at.multiselect}

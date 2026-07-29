@@ -1,0 +1,5 @@
+fan_source,fan_segment,rows,first_fy,last_fy,is_probabilistic_claim,interpretation_sample
+Current finalist backtest error,empirical_supported,30,2026,2030,True,PED finalist backtest residuals mapped directly to PED VKT per capita. Empirical bands use actual/predicted annual final
+MBU26 archived forecast error,empirical_supported,30,2026,2030,True,Archived MBU26/MOT forecast-error quantiles by matching source series and June-year horizon.
+Scenario spread,empirical_supported,85,2026,2030,False,Base and comparison current-finalist values define a scenario spread; this is not probabilistic uncertainty.
+Scenario spread,long_run_scenario_envelope,340,2031,2050,False,Base and comparison current-finalist values define a scenario spread; this is not probabilistic uncertainty.

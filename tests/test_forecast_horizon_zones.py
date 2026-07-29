@@ -238,7 +238,12 @@ def _app_module():
 
 
 def test_decision_facing_note_states_support_by_fiscal_year():
-    """The warning must exist on the page, not only in hover text."""
+    """The governance note text stays available to downloads and audit views.
+
+    Since the long-run restoration, the PUBLIC Revenue Outlook page renders no
+    horizon banner (test_revenue_outlook_long_run.py proves that); this
+    builder remains the governed source of the prose for non-public surfaces.
+    """
 
     app = _app_module()
     pack = load_revenue_outlook_pack(repo_root=ROOT)
