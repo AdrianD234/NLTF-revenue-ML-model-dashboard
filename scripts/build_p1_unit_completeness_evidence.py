@@ -528,10 +528,16 @@ def production_value_stability() -> pd.DataFrame:
         for path in sorted(directory.glob("*.csv")):
             snapshot[path] = pd.read_csv(path, low_memory=False)
 
+    # Each rebuild script picks its OWN engine via os.environ.setdefault. This
+    # module exports DASHBOARD_ENGINE_DEFAULT=ar1 for its own analysis, and an
+    # inherited value defeats that setdefault - which silently stamped the
+    # INCUMBENT (ensemble) pack with AR(1) model ids. Strip the variable so
+    # each script chooses its own engine.
+    child_env = {k: v for k, v in os.environ.items() if k != "DASHBOARD_ENGINE_DEFAULT"}
     for script in ("rebuild_current_revenue_outlook_runtime.py", "build_ar1_runtime_pack.py"):
         result = subprocess.run(
             [sys.executable, str(ROOT / "scripts" / script)],
-            capture_output=True, cwd=ROOT, check=False,
+            capture_output=True, cwd=ROOT, check=False, env=child_env,
         )
         if result.returncode != 0:
             failures.append(f"{script} failed: {result.stderr.decode(errors='replace')[-400:]}")
@@ -541,6 +547,7 @@ def production_value_stability() -> pd.DataFrame:
     for path, before in snapshot.items():
         after = pd.read_csv(path, low_memory=False)
         max_delta = 0.0
+        changed_columns: list[str] = []
         if before.shape == after.shape:
             for column in before.columns:
                 left = pd.to_numeric(before[column].astype(str), errors="coerce")
@@ -549,8 +556,15 @@ def production_value_stability() -> pd.DataFrame:
                     delta = (left - right).abs().max()
                     if pd.notna(delta):
                         max_delta = max(max_delta, float(delta))
+                # Non-numeric columns matter too: an engine mix-up changes
+                # model_id and provenance strings while every number stays
+                # identical, so a numeric-only comparison would report a clean
+                # rebuild over a contaminated pack.
+                if not before[column].astype(str).equals(after[column].astype(str)):
+                    changed_columns.append(column)
         else:
             max_delta = float("nan")
+            changed_columns = ["<shape changed>"]
         rows.append(
             {
                 "path": path.relative_to(ROOT).as_posix(),
@@ -559,8 +573,9 @@ def production_value_stability() -> pd.DataFrame:
                 "columns_before": before.shape[1],
                 "columns_after": after.shape[1],
                 "max_abs_delta": max_delta,
-                "status": "value_stable" if max_delta == 0.0 else "CHANGED",
-                "basis": "committed_content_vs_canonical_rebuild",
+                "changed_columns": "; ".join(changed_columns),
+                "status": "value_stable" if (max_delta == 0.0 and not changed_columns) else "CHANGED",
+                "basis": "committed_content_vs_canonical_rebuild_all_columns",
             }
         )
     frame = pd.DataFrame(rows)
