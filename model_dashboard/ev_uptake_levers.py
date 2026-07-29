@@ -32,6 +32,7 @@ import numpy as np
 import pandas as pd
 
 from .light_fleet_allocation import composition_shares
+from .unit_contract import display_scale_for
 
 VFM_SOURCE_NOTE = (
     "Share curves follow the MoT Vehicle Fleet Model 202405. The S-shape is a "
@@ -109,14 +110,12 @@ NATIVE_QUARTERLY_ACTIVITY_SERIES = (
 def _unit_base_scale(unit: Any) -> float:
     """Return the multiplier from a displayed unit to its unscaled unit."""
 
-    text = str(unit or "").strip().casefold()
-    if "billion" in text or text.startswith("$b"):
-        return 1_000_000_000.0
-    if "million" in text or text.startswith("$m"):
-        return 1_000_000.0
-    if "thousand" in text or "'000" in text:
-        return 1_000.0
-    return 1.0
+    # Registry-backed: an unknown declaration raises rather than silently
+    # returning 1.0, which used to make a typo indistinguishable from an
+    # already-unscaled unit. Absent declarations stay unscaled for display.
+    if not str(unit or "").strip():
+        return 1.0
+    return display_scale_for(unit)
 
 
 def _fiscal_quarter_periods(june_year: int) -> tuple[str, str, str, str]:

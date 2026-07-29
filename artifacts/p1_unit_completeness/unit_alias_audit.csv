@@ -1,0 +1,41 @@
+source_unit,canonical_unit,dimension,declaration_source,conversion_basis
+$ nominal ex gst,nzd,currency,row value_unit / unit column,declared_alias
+$m,million_nzd,currency,row value_unit / unit column,declared_alias
+$m ex gst,million_nzd,currency,row value_unit / unit column,declared_alias
+$m nominal ex gst,million_nzd,currency,row value_unit / unit column,declared_alias
+0/1,boolean_flag,dimensionless,row value_unit / unit column,declared_alias
+cents/litre,cents_per_litre,currency_per_volume,row value_unit / unit column,declared_alias
+derived interaction,dimensionless_factor,dimensionless,row value_unit / unit column,declared_alias
+elasticity,dimensionless_factor,dimensionless,row value_unit / unit column,declared_alias
+factor,dimensionless_factor,dimensionless,row value_unit / unit column,declared_alias
+fraction,share_fraction,proportion,row value_unit / unit column,declared_alias
+fraction p.a.,fraction_per_annum,rate_per_time,row value_unit / unit column,declared_alias
+index,dimensionless_factor,dimensionless,row value_unit / unit column,declared_alias
+km,km,distance,row value_unit / unit column,declared_alias
+km/person,km_per_person,distance_per_person,row value_unit / unit column,declared_alias
+km/person/fy,km_per_person,distance_per_person,row value_unit / unit column,declared_alias
+l/100km,litres_per_100km,volume_per_distance,row value_unit / unit column,declared_alias
+litres,litres,volume,row value_unit / unit column,declared_alias
+log transformed,log_transformed,opaque_model_space,row value_unit / unit column,declared_alias
+m km,million_km,distance,row value_unit / unit column,declared_alias
+m l,million_litres,volume,row value_unit / unit column,declared_alias
+million km,million_km,distance,row value_unit / unit column,declared_alias
+million l,million_litres,volume,row value_unit / unit column,declared_alias
+million litres,million_litres,volume,row value_unit / unit column,declared_alias
+million people,million_persons,population,row value_unit / unit column,declared_alias
+model target units,model_target_units,opaque_model_space,row value_unit / unit column,declared_alias
+net km,km,distance,row value_unit / unit column,declared_alias
+"nzd/1,000 km",nzd_per_1000km,currency_per_distance,row value_unit / unit column,declared_alias
+nzd/1000km,nzd_per_1000km,currency_per_distance,row value_unit / unit column,declared_alias
+nzd/l,nzd_per_litre,currency_per_volume,row value_unit / unit column,declared_alias
+nzd/litre,nzd_per_litre,currency_per_volume,row value_unit / unit column,declared_alias
+people,persons,population,row value_unit / unit column,declared_alias
+percent,percent,proportion,row value_unit / unit column,declared_alias
+percentage points,percentage_points,proportion_difference,row value_unit / unit column,declared_alias
+persons,persons,population,row value_unit / unit column,declared_alias
+real nzd,real_nzd,currency_real,row value_unit / unit column,declared_alias
+real nzd/person,real_nzd_per_person,currency_real_per_person,row value_unit / unit column,declared_alias
+share,share_fraction,proportion,row value_unit / unit column,declared_alias
+system,system_metadata,metadata,row value_unit / unit column,declared_alias
+tonne-km,tonne_km,freight_task,row value_unit / unit column,declared_alias
+vkt per capita,km_per_person,distance_per_person,row value_unit / unit column,declared_alias

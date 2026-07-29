@@ -151,6 +151,7 @@ from model_dashboard.rate_paths import (
     rate_paths_frame,
 )
 from model_dashboard.light_fleet_allocation import LAST_DECISION_GRADE_ANNUAL_FY
+from model_dashboard.unit_contract import display_scale_for
 from model_dashboard.conflict_fuel_paths import (
     CONFLICT_FUEL_SCENARIO_LEVELS,
     conflict_scenario_name,
@@ -8088,14 +8089,12 @@ def _is_average_preserving_unit(unit: Any) -> bool:
 
 def _display_unit_scale(unit: Any) -> float:
     """Return the scale from a displayed unit to its unscaled value."""
-    text = str(unit or "").strip().casefold()
-    if "billion" in text or text.startswith("$b"):
-        return 1_000_000_000.0
-    if "million" in text or text.startswith("$m"):
-        return 1_000_000.0
-    if "thousand" in text or "'000" in text:
-        return 1_000.0
-    return 1.0
+    # Registry-backed: an unknown declaration raises rather than silently
+    # returning 1.0, which used to make a typo indistinguishable from an
+    # already-unscaled unit. Absent declarations stay unscaled for display.
+    if not str(unit or "").strip():
+        return 1.0
+    return display_scale_for(unit)
 
 
 def _actual_quarter_lookup_in_unit(

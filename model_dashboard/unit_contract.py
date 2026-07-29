@@ -7,8 +7,14 @@ point the wrong rows are silently rescaled by six orders of magnitude. P1.1
 replaces every such inference: a conversion happens only because the source row
 DECLARES a unit, and an undeclared or unknown unit fails closed.
 
-The registry is deliberately small and closed: adding a unit means adding it
-here, with its conversions, in one reviewed place.
+A second, quieter permissiveness is also closed here. Three copies of a
+``_display_unit_scale`` helper substring-matched the declared unit ("million"
+in the text -> 1e6) and returned 1.0 for anything unrecognised, so a typo or a
+new unit silently became "already unscaled". Scale now resolves through this
+registry and raises on an unknown declaration.
+
+The registry is deliberately closed: adding a unit means adding it here, with
+its dimension and conversions, in one reviewed place.
 """
 
 from __future__ import annotations
@@ -17,12 +23,14 @@ from dataclasses import dataclass
 
 __all__ = [
     "CANONICAL_UNITS",
+    "DIMENSION_BY_UNIT",
     "SERIES_CANONICAL_UNITS",
     "SOURCE_UNIT_ALIASES",
     "UnitContractError",
     "canonical_unit_for",
     "convert_declared",
-    "unit_registry_frame",
+    "display_scale_for",
+    "unit_registry_frames",
 ]
 
 
@@ -31,39 +39,65 @@ class UnitContractError(ValueError):
 
 
 # ---------------------------------------------------------------- canonical
-# One identifier per physical meaning-and-scale. These are the only units a
-# decision-facing series may carry after normalisation.
+# One identifier per physical meaning-and-scale.
 KM_RAW = "km"
 KM_MILLION = "million_km"
 VKT_PER_CAPITA_KM = "km_per_person"
+LITRES_RAW = "litres"
 LITRES_MILLION = "million_litres"
+LITRES_PER_100KM = "litres_per_100km"
+NZD = "nzd"
 NZD_MILLION = "million_nzd"
+NZD_REAL = "real_nzd"
+NZD_REAL_PER_PERSON = "real_nzd_per_person"
 NZD_PER_LITRE = "nzd_per_litre"
+CENTS_PER_LITRE = "cents_per_litre"
 NZD_PER_1000KM = "nzd_per_1000km"
 PERSONS = "persons"
 PERSONS_MILLION = "million_persons"
 SHARE_FRACTION = "share_fraction"
+PERCENT = "percent"
+PERCENTAGE_POINTS = "percentage_points"
+FRACTION_PER_ANNUM = "fraction_per_annum"
 FACTOR = "dimensionless_factor"
+BOOLEAN_FLAG = "boolean_flag"
 TONNE_KM = "tonne_km"
+MODEL_TARGET_UNITS = "model_target_units"
+LOG_TRANSFORMED = "log_transformed"
+SYSTEM = "system_metadata"
 
-CANONICAL_UNITS = (
-    KM_RAW,
-    KM_MILLION,
-    VKT_PER_CAPITA_KM,
-    LITRES_MILLION,
-    NZD_MILLION,
-    NZD_PER_LITRE,
-    NZD_PER_1000KM,
-    PERSONS,
-    PERSONS_MILLION,
-    SHARE_FRACTION,
-    FACTOR,
-    TONNE_KM,
-)
+# dimension -> conversions are only ever permitted WITHIN a dimension.
+DIMENSION_BY_UNIT: dict[str, str] = {
+    KM_RAW: "distance",
+    KM_MILLION: "distance",
+    VKT_PER_CAPITA_KM: "distance_per_person",
+    LITRES_RAW: "volume",
+    LITRES_MILLION: "volume",
+    LITRES_PER_100KM: "volume_per_distance",
+    NZD: "currency",
+    NZD_MILLION: "currency",
+    NZD_REAL: "currency_real",
+    NZD_REAL_PER_PERSON: "currency_real_per_person",
+    NZD_PER_LITRE: "currency_per_volume",
+    CENTS_PER_LITRE: "currency_per_volume",
+    NZD_PER_1000KM: "currency_per_distance",
+    PERSONS: "population",
+    PERSONS_MILLION: "population",
+    SHARE_FRACTION: "proportion",
+    PERCENT: "proportion",
+    PERCENTAGE_POINTS: "proportion_difference",
+    FRACTION_PER_ANNUM: "rate_per_time",
+    FACTOR: "dimensionless",
+    BOOLEAN_FLAG: "dimensionless",
+    TONNE_KM: "freight_task",
+    MODEL_TARGET_UNITS: "opaque_model_space",
+    LOG_TRANSFORMED: "opaque_model_space",
+    SYSTEM: "metadata",
+}
+CANONICAL_UNITS = tuple(DIMENSION_BY_UNIT)
 
-# Every source-unit string that may legitimately appear on a governed row,
-# mapped to its canonical identifier. Matching is case-insensitive on the
-# stripped string; anything absent here fails closed.
+# Every source-unit string that may appear on a governed row. Matching is
+# case-insensitive on the stripped string; anything absent fails closed.
 SOURCE_UNIT_ALIASES: dict[str, str] = {
     "net km": KM_RAW,
     "km": KM_RAW,
@@ -71,38 +105,70 @@ SOURCE_UNIT_ALIASES: dict[str, str] = {
     "m km": KM_MILLION,
     "vkt per capita": VKT_PER_CAPITA_KM,
     "km/person": VKT_PER_CAPITA_KM,
+    "km/person/fy": VKT_PER_CAPITA_KM,
+    "litres": LITRES_RAW,
     "million litres": LITRES_MILLION,
+    "million l": LITRES_MILLION,
     "m l": LITRES_MILLION,
+    "l/100km": LITRES_PER_100KM,
+    "$ nominal ex gst": NZD,
     "$m nominal ex gst": NZD_MILLION,
+    "$m ex gst": NZD_MILLION,
     "$m": NZD_MILLION,
+    "real nzd": NZD_REAL,
+    "real nzd/person": NZD_REAL_PER_PERSON,
     "nzd/l": NZD_PER_LITRE,
     "nzd/litre": NZD_PER_LITRE,
-    "nzd per 1,000 km": NZD_PER_1000KM,
+    "cents/litre": CENTS_PER_LITRE,
+    "nzd/1,000 km": NZD_PER_1000KM,
     "nzd/1000km": NZD_PER_1000KM,
     "people": PERSONS,
     "persons": PERSONS,
     "million people": PERSONS_MILLION,
     "share": SHARE_FRACTION,
     "fraction": SHARE_FRACTION,
+    "percent": PERCENT,
+    "percentage points": PERCENTAGE_POINTS,
+    "fraction p.a.": FRACTION_PER_ANNUM,
+    "elasticity": FACTOR,
     "factor": FACTOR,
     "index": FACTOR,
+    "derived interaction": FACTOR,
+    "0/1": BOOLEAN_FLAG,
     "tonne-km": TONNE_KM,
+    "model target units": MODEL_TARGET_UNITS,
+    "log transformed": LOG_TRANSFORMED,
+    "system": SYSTEM,
 }
 
-# Conversions between canonical units, stored as (operation, operand) so the
-# exact floating-point operation of the governed packs is preserved: the packs
-# have always DIVIDED raw km by 1e6, and x / 1e6 differs from x * 1e-6 in the
-# last ulp. Absent pair = refuse.
+# Conversions stored as (operation, operand) so the exact floating-point
+# operation of the governed packs survives: they have always DIVIDED raw km by
+# 1e6, and x / 1e6 differs from x * 1e-6 in the last ulp. Absent pair = refuse.
 _CONVERSIONS: dict[tuple[str, str], tuple[str, float]] = {
     (KM_RAW, KM_MILLION): ("/", 1_000_000.0),
     (KM_MILLION, KM_RAW): ("*", 1_000_000.0),
+    (LITRES_RAW, LITRES_MILLION): ("/", 1_000_000.0),
+    (LITRES_MILLION, LITRES_RAW): ("*", 1_000_000.0),
+    (NZD, NZD_MILLION): ("/", 1_000_000.0),
+    (NZD_MILLION, NZD): ("*", 1_000_000.0),
     (PERSONS, PERSONS_MILLION): ("/", 1_000_000.0),
     (PERSONS_MILLION, PERSONS): ("*", 1_000_000.0),
+    (CENTS_PER_LITRE, NZD_PER_LITRE): ("/", 100.0),
+    (NZD_PER_LITRE, CENTS_PER_LITRE): ("*", 100.0),
+    (PERCENT, SHARE_FRACTION): ("/", 100.0),
+    (SHARE_FRACTION, PERCENT): ("*", 100.0),
 }
 
-# Decision-facing series and the canonical unit each must carry after
-# normalisation. This is the inventory the unit registry artifact reports and
-# the completeness tests assert over.
+# Scale from a DISPLAYED unit to its unscaled base, replacing the substring
+# heuristics. Only scaled units carry a factor; everything else is 1.0.
+_DISPLAY_SCALE: dict[str, float] = {
+    KM_MILLION: 1_000_000.0,
+    LITRES_MILLION: 1_000_000.0,
+    NZD_MILLION: 1_000_000.0,
+    PERSONS_MILLION: 1_000_000.0,
+}
+
+# Decision-facing series and the canonical unit each must carry.
 SERIES_CANONICAL_UNITS: dict[str, str] = {
     "ped_vkt_per_capita": VKT_PER_CAPITA_KM,
     "ped_volume": LITRES_MILLION,
@@ -152,7 +218,7 @@ def canonical_unit_for(source_unit: object, *, context: str = "") -> str:
     """Resolve a declared source-unit string to its canonical identifier.
 
     Fails closed on an empty, missing or unknown declaration - the caller may
-    not guess from magnitude.
+    not guess from magnitude or from a substring.
     """
     text = str(source_unit or "").strip()
     if not text:
@@ -204,11 +270,18 @@ def convert_declared(
 ) -> DeclaredConversion:
     """Convert ``value`` to ``target_canonical`` using only its declared unit."""
     canonical_source = canonical_unit_for(source_unit, context=context)
-    if target_canonical not in CANONICAL_UNITS:
+    if target_canonical not in DIMENSION_BY_UNIT:
         raise UnitContractError(f"Unknown target canonical unit {target_canonical!r}.")
     if canonical_source == target_canonical:
         operation, operand = "identity", 1.0
     else:
+        if DIMENSION_BY_UNIT[canonical_source] != DIMENSION_BY_UNIT[target_canonical]:
+            raise UnitContractError(
+                f"Dimensionally incompatible conversion {canonical_source!r} "
+                f"({DIMENSION_BY_UNIT[canonical_source]}) -> {target_canonical!r} "
+                f"({DIMENSION_BY_UNIT[target_canonical]})"
+                f"{f' ({context})' if context else ''}."
+            )
         pair = _CONVERSIONS.get((canonical_source, target_canonical))
         if pair is None:
             raise UnitContractError(
@@ -226,14 +299,27 @@ def convert_declared(
     )
 
 
-def unit_registry_frame():
-    """The unit inventory as a frame, for the committed registry artifact."""
+def display_scale_for(unit: object, *, context: str = "") -> float:
+    """Scale from a displayed unit to its unscaled base, by declaration.
+
+    Replaces the three substring copies of ``_display_unit_scale``. An unknown
+    declaration raises instead of silently returning 1.0, which previously made
+    a typo indistinguishable from an already-unscaled unit.
+    """
+    canonical = canonical_unit_for(unit, context=context)
+    return _DISPLAY_SCALE.get(canonical, 1.0)
+
+
+def unit_registry_frames():
+    """(series, aliases, conversions) frames for the committed artifacts."""
     import pandas as pd
 
-    rows = [
+    series_rows = [
         {
             "series_id": series_id,
             "canonical_unit": canonical,
+            "dimension": DIMENSION_BY_UNIT[canonical],
+            "display_scale_to_base": _DISPLAY_SCALE.get(canonical, 1.0),
             "unit_contract_status": "declared",
         }
         for series_id, canonical in sorted(SERIES_CANONICAL_UNITS.items())
@@ -242,22 +328,30 @@ def unit_registry_frame():
         {
             "source_unit": alias,
             "canonical_unit": canonical,
+            "dimension": DIMENSION_BY_UNIT[canonical],
+            "declaration_source": "row value_unit / unit column",
             "conversion_basis": "declared_alias",
         }
         for alias, canonical in sorted(SOURCE_UNIT_ALIASES.items())
     ]
     conversion_rows = [
         {
-            "from_unit": pair[0],
-            "to_unit": pair[1],
-            "operation": f"{operation} {operand:g}",
+            "from_unit": source,
+            "to_unit": target,
+            "dimension": DIMENSION_BY_UNIT[source],
+            "operation": operation,
+            "operand": operand,
             "conversion_factor": (1.0 / operand if operation == "/" else operand),
+            "permitted_direction": "one_way_pair_declared_both_ways"
+            if (target, source) in _CONVERSIONS
+            else "one_way",
+            "lossless": True,
             "conversion_basis": "canonical_registry",
         }
-        for pair, (operation, operand) in sorted(_CONVERSIONS.items())
+        for (source, target), (operation, operand) in sorted(_CONVERSIONS.items())
     ]
     return (
-        pd.DataFrame(rows),
+        pd.DataFrame(series_rows),
         pd.DataFrame(alias_rows),
         pd.DataFrame(conversion_rows),
     )
