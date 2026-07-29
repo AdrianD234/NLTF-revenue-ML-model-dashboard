@@ -36,7 +36,7 @@ from model_dashboard.ev_uptake_levers import (
 from model_dashboard.fleet_mix import load_dashboard_frame
 from model_dashboard.fuel_price_scenario import (
     apply_treasury_macro_to_chart_rows,
-    run_treasury_baseline_macro_replay,
+    run_direct_treasury_scenario_replay,
 )
 from model_dashboard.revenue_outlook import (
     PED_BRIDGE_DEFAULT_MODE,
@@ -81,7 +81,7 @@ def stages() -> dict:
         include_derived_frames=False,
         include_selected_ped_audit=False,
     )
-    macro = run_treasury_baseline_macro_replay(
+    macro = run_direct_treasury_scenario_replay(
         pd.read_parquet(scenario_input_path), repo_root=ROOT, engine="ar1"
     )
     s3, _ = apply_treasury_macro_to_chart_rows(bridge["chart_rows"], macro)

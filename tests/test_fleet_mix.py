@@ -28,7 +28,7 @@ from model_dashboard.fleet_mix import (
 )
 from model_dashboard.fuel_price_scenario import (
     apply_treasury_macro_to_chart_rows,
-    run_treasury_baseline_macro_replay,
+    run_direct_treasury_scenario_replay,
 )
 from model_dashboard.light_fleet_allocation import LAST_DECISION_GRADE_ANNUAL_FY
 from model_dashboard.revenue_outlook import (
@@ -170,7 +170,7 @@ def test_dashboard_fleet_preserves_light_and_heavy_class_pools() -> None:
         / "scenario_inputs"
         / "scenario_input_wide.parquet"
     )
-    macro_replay = run_treasury_baseline_macro_replay(
+    macro_replay = run_direct_treasury_scenario_replay(
         scenario_inputs,
         repo_root=ROOT,
         engine="ar1",

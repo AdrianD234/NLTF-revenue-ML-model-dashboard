@@ -79,17 +79,28 @@ still missing a required row. The completeness gate is what stops it.
 The governed identity is quarterly VKT-per-capita x quarterly population,
 summed over the four fiscal quarters - not annual VKTpc x a mean population.
 
-- Pre-macro (S0): closes at 2.21e-14%.
-- Post-macro (S1-S4): diverges up to 1.706% (FY2030).
+- Pre-macro (S0), legacy population: closes at 2.21e-14%.
+- Post-macro (S1-S4), Treasury-adjusted scenario population: closes at 3.36e-14%; power check 1.397%.
 
-The Treasury macro replay applies stream-specific factors to
-`light_petrol_vkt` and `ped_vkt_per_capita` independently, so their ratio
-stops reproducing the governed population path. This is recorded as
-`known_macro_cross_row_inconsistency_pending_p1_2` and is NOT repaired here:
-P1.2 direct scenario replay determines the authoritative construction. It is
-a named, enumerated exception, not a generally acceptable tolerance - the
-ceiling is pinned and the first divergent stage is asserted to be S1, so it
-cannot grow or migrate earlier unnoticed.
+**Resolved in P1.2.** The authoritative construction pairs each stage with
+its own governed population: legacy scenario inputs at S0, the per-scenario
+Treasury-adjusted path after the macro overlay. Under it the identity closes
+exactly at every stage for every governed scenario. The 1.706% recorded by
+the first P1.1 revision as `known_macro_cross_row_inconsistency_pending_p1_2`
+was a measurement-construction artifact: the expected side was held at the
+pre-macro population while the displayed side moved with the macro factor,
+so the "drift" was the size of the macro correction itself. A deliberate
+measurement-power check remains: S1 evaluated against the LEGACY population
+must show the mismatch (>=0.5%), proving the measurement can still detect a
+genuinely wrong population.
+
+One enumerated exception remains, one layer up: the FED policy pair
+factors are Base-derived and are transferred onto the comparison at S4,
+misstating comparison petrol VKT by 0.000502% at FY2027 - 570x smaller
+than the macro transfer P1.2 removed. It is pinned as
+`policy_pair_transfer_on_comparison_pending_followup` with a 1e-3%
+ceiling, confined to S4/comparison by gate, and routed to the
+policy-layer follow-up rather than silently tolerated.
 
 ## FY2026 population lineage
 
@@ -112,4 +123,6 @@ actually did rather than a reconstruction.
 
 ## Routed to P1.2
 
-- The post-macro PED cross-row inconsistency described above.
+- The post-macro PED cross-row inconsistency described above - resolved by
+  the per-scenario direct Treasury replay and the corrected identity
+  construction; see `artifacts/p1_direct_macro_replay/`.

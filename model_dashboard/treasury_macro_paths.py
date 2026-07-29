@@ -591,3 +591,155 @@ def apply_treasury_baseline_macro_path(
                 f"Treasury macro transform unexpectedly changed price input {column!r}."
             )
     return result
+
+
+def apply_treasury_macro_path_to_scenarios(
+    inputs: pd.DataFrame,
+    repo_root: str | Path | None = None,
+) -> pd.DataFrame:
+    """Treasury-adjust EVERY governed current scenario, not only Base.
+
+    ``apply_treasury_baseline_macro_path`` is Base-only by design, which is
+    why non-Base scenarios historically had Base-derived output factors
+    transferred onto them - inexact for nonlinear GBM members and recursive
+    lag models. This wrapper moves the adjustment into INPUT space, where it
+    is exact by construction:
+
+    1. run the vetted Base transform;
+    2. derive per-period multiplicative adjustments from it
+       (``gdp_ratio = treasury_base / legacy_base``, likewise population);
+    3. apply those ratios to every other scenario's OWN macro columns.
+
+    Base therefore reproduces the existing transform bit-for-bit, and every
+    other scenario keeps its defining input differentials exactly
+    (``comparison_pop / base_pop`` is invariant per period). The models are
+    then replayed per scenario, so no output-space factor transfer remains.
+    """
+
+    if inputs is None or inputs.empty:
+        raise ValueError("scenario_input_wide rows are required.")
+    result = apply_treasury_baseline_macro_path(inputs, repo_root)
+    base_name = _base_scenario_name(result)
+    scenario_names = [
+        name
+        for name in result["scenario_name"].dropna().astype(str).unique()
+        if name != base_name
+    ]
+    if not scenario_names:
+        return result
+
+    period_of = result["canonical_period"].astype(str)
+    base_mask_all = result["scenario_name"].astype(str).eq(base_name)
+
+    def _ratio_lookup(stream: str, column: str, context: str) -> dict[str, float]:
+        stream_mask = base_mask_all & result["stream"].astype(str).eq(stream)
+        after = _period_value_lookup(result.loc[stream_mask], column=column, context=context)
+        before = _period_value_lookup(
+            inputs.loc[
+                inputs["scenario_name"].astype(str).eq(base_name)
+                & inputs["stream"].astype(str).eq(stream)
+            ],
+            column=column,
+            context=f"legacy {context}",
+        )
+        missing = sorted(set(after).symmetric_difference(before))
+        if missing:
+            raise ValueError(
+                f"Treasury scenario adjustment cannot derive {context} ratios; "
+                f"period mismatch: {missing[:6]}"
+            )
+        ratios: dict[str, float] = {}
+        for period, value in after.items():
+            legacy = before[period]
+            if not np.isfinite(legacy) or abs(legacy) <= 0.0:
+                raise ValueError(f"{context} legacy value is unusable in {period}.")
+            ratios[period] = float(value) / float(legacy)
+        return ratios
+
+    gdp_ratio = _ratio_lookup("LIGHT_RUC", "real_gdp_sa_nzd", "Base GDP path")
+    population_ratio = _ratio_lookup("PED", "population", "Base population path")
+
+    macro = load_treasury_macro_path(repo_root)
+    treasury_gdp_million = (
+        macro.set_index("period")["treasury_real_gdp_sa_nzd_million"].astype(float).to_dict()
+    )
+
+    def assign_numeric(column: str, mask: pd.Series, values: np.ndarray) -> None:
+        if pd.api.types.is_string_dtype(result[column].dtype):
+            result.loc[mask, column] = [format(float(value), ".17g") for value in values]
+        else:
+            result.loc[mask, column] = values
+
+    def _mapped(mask: pd.Series, ratios: dict[str, float], context: str) -> np.ndarray:
+        mapped = period_of.loc[mask].map(ratios)
+        if mapped.isna().any():
+            missing = sorted(period_of.loc[mask][mapped.isna()].unique())
+            raise ValueError(
+                f"Treasury scenario adjustment cannot map {context}: {missing[:6]}"
+            )
+        return mapped.to_numpy(dtype=float)
+
+    for scenario in scenario_names:
+        scenario_mask = result["scenario_name"].astype(str).eq(scenario)
+        streams = set(result.loc[scenario_mask, "stream"].dropna().astype(str))
+        missing_streams = sorted({"PED", "LIGHT_RUC", "HEAVY_RUC"}.difference(streams))
+        if missing_streams:
+            raise ValueError(
+                f"Scenario {scenario!r} is missing streams {missing_streams}; "
+                "it cannot be Treasury-adjusted and must not fall back to Base factors."
+            )
+        for stream_name in ("LIGHT_RUC", "HEAVY_RUC"):
+            mask = scenario_mask & result["stream"].astype(str).eq(stream_name)
+            ratios = _mapped(mask, gdp_ratio, f"{scenario} {stream_name} GDP")
+            legacy = pd.to_numeric(result.loc[mask, "real_gdp_sa_nzd"], errors="coerce")
+            if legacy.isna().any():
+                raise ValueError(f"{scenario} {stream_name} GDP path is not numeric.")
+            assign_numeric("real_gdp_sa_nzd", mask, legacy.to_numpy(dtype=float) * ratios)
+
+        ped_mask = scenario_mask & result["stream"].astype(str).eq("PED")
+        pop_ratios = _mapped(ped_mask, population_ratio, f"{scenario} PED population")
+        gdp_ratios = _mapped(ped_mask, gdp_ratio, f"{scenario} PED GDP")
+        legacy_population = pd.to_numeric(result.loc[ped_mask, "population"], errors="coerce")
+        legacy_per_capita = pd.to_numeric(
+            result.loc[ped_mask, "real_gdp_per_capita_nzd"], errors="coerce"
+        )
+        if legacy_population.isna().any() or legacy_per_capita.isna().any():
+            raise ValueError(f"{scenario} PED macro columns are not numeric.")
+        assign_numeric(
+            "population", ped_mask, legacy_population.to_numpy(dtype=float) * pop_ratios
+        )
+        # per-capita = aggregate GDP / population, so the exact multiplicative
+        # update is gdp_ratio / pop_ratio - no aggregate-GDP column is needed
+        # on the PED rows.
+        assign_numeric(
+            "real_gdp_per_capita_nzd",
+            ped_mask,
+            legacy_per_capita.to_numpy(dtype=float) * gdp_ratios / pop_ratios,
+        )
+
+        result.loc[scenario_mask, "treasury_macro_applied"] = True
+        official = scenario_mask & period_of.map(lambda p: p in treasury_gdp_million)
+        continuation = scenario_mask & period_of.map(_quarter_number).gt(
+            _quarter_number(TREASURY_PATH_END_PERIOD)
+        )
+        result.loc[official, "treasury_macro_phase"] = "befu26_quarterly_path"
+        result.loc[continuation, "treasury_macro_phase"] = (
+            "reanchored_original_quarterly_growth"
+        )
+        result.loc[scenario_mask, "treasury_macro_source_url"] = TREASURY_BEFU26_SOURCE_URL
+        result.loc[scenario_mask, "treasury_macro_source_workbook_sha256"] = (
+            TREASURY_BEFU26_SOURCE_SHA256
+        )
+        _rebuild_macro_features(
+            result,
+            base_mask=scenario_mask,
+            treasury_gdp_million=treasury_gdp_million,
+        )
+
+    price_columns = [c for c in inputs.columns if _is_price_input_column(c)]
+    for column in price_columns:
+        if not result[column].equals(inputs[column]):
+            raise AssertionError(
+                f"Treasury scenario adjustment unexpectedly changed price input {column!r}."
+            )
+    return result

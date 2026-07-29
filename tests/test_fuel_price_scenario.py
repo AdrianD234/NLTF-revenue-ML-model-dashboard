@@ -17,7 +17,9 @@ from model_dashboard.fuel_price_scenario import (
     POLICY_PATH_IDS,
     TreasuryBaselineMacroReplayResult,
     _validate_complete_numeric_replay,
+    DirectTreasuryScenarioReplayResult,
     apply_treasury_macro_to_chart_rows,
+    run_direct_treasury_scenario_replay,
     append_fuel_price_scenario_to_chart_rows,
     build_fuel_price_scenario_inputs,
     build_ruc_policy_scenario_inputs,
@@ -86,7 +88,10 @@ def ar1_fuel_replay():
 
 @pytest.fixture(scope="module")
 def ar1_treasury_macro_replay():
-    return run_treasury_baseline_macro_replay(
+    # P1.2: the overlay requires per-scenario factors, so the fixture runs the
+    # direct replay; the legacy Base-pair runner stays covered by the tests
+    # that prove it fails closed on non-Base rows.
+    return run_direct_treasury_scenario_replay(
         pd.read_parquet(AR1_INPUT_PATH),
         repo_root=ROOT,
         engine="ar1",
@@ -1411,8 +1416,9 @@ def test_independent_treasury_macro_replay_builds_factors_without_changing_price
     ar1_treasury_macro_replay,
 ) -> None:
     result = ar1_treasury_macro_replay
-    assert isinstance(result, TreasuryBaselineMacroReplayResult)
+    assert isinstance(result, DirectTreasuryScenarioReplayResult)
     assert result.base_scenario_name == "current_basecase"
+    assert set(result.scenario_names) == {"current_basecase", "current_comparison_1"}
     assert not result.baseline_macro_quarterly_factors.empty
     assert not result.baseline_macro_annual_factors.empty
 
@@ -1420,6 +1426,8 @@ def test_independent_treasury_macro_replay_builds_factors_without_changing_price
         result.baseline_macro_quarterly_factors,
         result.baseline_macro_annual_factors,
     ):
+        # Every governed scenario carries its own factor rows.
+        assert set(factors["scenario_name"].astype(str)) == set(result.scenario_names)
         numeric = pd.to_numeric(factors["factor"], errors="coerce")
         assert numeric.notna().all()
         assert np.isfinite(numeric).all()
@@ -1430,7 +1438,9 @@ def test_independent_treasury_macro_replay_builds_factors_without_changing_price
     original = original[
         original["scenario_name"].astype(str).eq(result.base_scenario_name)
     ].copy()
-    treasury = result.treasury_base_inputs.copy()
+    treasury = result.replay_inputs[
+        result.replay_inputs["scenario_name"].astype(str).eq(result.base_scenario_name)
+    ].copy()
     keys = ["stream", "canonical_period"]
     price_columns = [
         "real_petrol_price_cents_per_litre",
@@ -1463,31 +1473,41 @@ def test_independent_treasury_macro_replay_builds_factors_without_changing_price
 
 def _treasury_macro_replay_stub(
     annual_factors: dict[str, float],
-) -> TreasuryBaselineMacroReplayResult:
-    return TreasuryBaselineMacroReplayResult(
+) -> DirectTreasuryScenarioReplayResult:
+    # P1.2: factors are keyed by scenario, so the stub carries an identical
+    # factor row for each governed scenario. Identical values here are a test
+    # convenience only - production factors come from each scenario's own
+    # replay and are asserted to differ where the models are nonlinear.
+    scenarios = ("current_basecase", "current_comparison_1")
+    return DirectTreasuryScenarioReplayResult(
         base_scenario_name="current_basecase",
-        treasury_base_inputs=pd.DataFrame(),
+        scenario_names=scenarios,
         replay_inputs=pd.DataFrame(),
         replay=None,
         baseline_macro_quarterly_factors=pd.DataFrame(
             [
                 {
+                    "scenario_name": scenario,
                     "series_id": "ped_vkt_per_capita",
                     "period": "2026Q3",
                     "factor": 1.0,
                 }
+                for scenario in scenarios
             ]
         ),
         baseline_macro_annual_factors=pd.DataFrame(
             [
                 {
+                    "scenario_name": scenario,
                     "series_id": series_id,
                     "june_year": 2027,
                     "factor": factor,
                 }
+                for scenario in scenarios
                 for series_id, factor in annual_factors.items()
             ]
         ),
+        scenario_replay_lineage=pd.DataFrame(),
     )
 
 
@@ -1664,7 +1684,7 @@ def test_treasury_macro_present_anchor_without_factor_fails_closed(
 
     with pytest.raises(
         ValueError,
-        match=rf"{anchor_series}/FY2027",
+        match=rf"series='{anchor_series}' period='FY2027'",
     ):
         apply_treasury_macro_to_chart_rows(
             source,
@@ -1718,24 +1738,17 @@ def test_treasury_macro_overlay_updates_current_base_and_comparison_only(
         protected_mask, "treasury_macro_applied"
     ].fillna(False).astype(bool).any()
 
-    expected_factor = (
-        ar1_treasury_macro_replay.baseline_macro_annual_factors[
-            ar1_treasury_macro_replay.baseline_macro_annual_factors[
-                "series_id"
-            ]
-            .astype(str)
-            .eq("light_ruc_net_km")
-            & pd.to_numeric(
-                ar1_treasury_macro_replay.baseline_macro_annual_factors[
-                    "june_year"
-                ],
-                errors="coerce",
-            ).eq(2030)
-        ]["factor"]
-        .astype(float)
-        .iloc[0]
-    )
+    annual_factors = ar1_treasury_macro_replay.baseline_macro_annual_factors
     for scenario_name in ("current_basecase", "current_comparison_1"):
+        expected_factor = (
+            annual_factors[
+                annual_factors["scenario_name"].astype(str).eq(scenario_name)
+                & annual_factors["series_id"].astype(str).eq("light_ruc_net_km")
+                & pd.to_numeric(annual_factors["june_year"], errors="coerce").eq(2030)
+            ]["factor"]
+            .astype(float)
+            .iloc[0]
+        )
         selector = (
             source["scenario_name"].astype(str).eq(scenario_name)
             & source["time_grain"].astype(str).eq("june_year")
@@ -1818,10 +1831,11 @@ def test_treasury_macro_before_uptake_preserves_quarterly_annual_reconciliation(
 
 def test_append_creates_three_distinct_idempotent_traces_with_exact_replay_values_and_annual_bridge(
     ar1_fuel_replay,
+    ar1_treasury_macro_replay,
 ) -> None:
     chart = pd.read_parquet(AR1_CHART_PATH)
     chart, macro_audit = apply_treasury_macro_to_chart_rows(
-        chart, ar1_fuel_replay
+        chart, ar1_treasury_macro_replay
     )
     assert not macro_audit.empty
     combined, audit = append_fuel_price_scenario_to_chart_rows(chart, ar1_fuel_replay)
@@ -2057,10 +2071,11 @@ def test_conflict_traces_inherit_reconciled_uptake_base_plus_fixed_quarterly_del
 
 def test_policy_pair_overlay_matches_formula_rebuilt_base_and_conflict_annual_bridges(
     ar1_fuel_replay,
+    ar1_treasury_macro_replay,
 ) -> None:
     source_chart = pd.read_parquet(AR1_CHART_PATH)
     chart, macro_audit = apply_treasury_macro_to_chart_rows(
-        source_chart, ar1_fuel_replay
+        source_chart, ar1_treasury_macro_replay
     )
     assert not macro_audit.empty
     delayed, policy_audit = apply_fed_uplift_delay_to_chart_rows(

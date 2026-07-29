@@ -69,7 +69,10 @@ from .rate_paths import (
     fed_uplift_off_factors,
     ped_quarterly_rate_schedules,
 )
-from .treasury_macro_paths import apply_treasury_baseline_macro_path
+from .treasury_macro_paths import (
+    apply_treasury_baseline_macro_path,
+    apply_treasury_macro_path_to_scenarios,
+)
 
 
 # Backwards-compatible exports point to Medium while app/revenue-outlook
@@ -3469,24 +3472,41 @@ def _factor_frames(replay_or_audit: FuelPriceScenarioReplayResult | pd.DataFrame
 
 def apply_treasury_macro_to_chart_rows(
     chart_rows: pd.DataFrame,
-    replay: FuelPriceScenarioReplayResult | TreasuryBaselineMacroReplayResult,
+    replay: (
+        DirectTreasuryScenarioReplayResult
+        | FuelPriceScenarioReplayResult
+        | TreasuryBaselineMacroReplayResult
+    ),
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Apply Treasury-versus-legacy Base factors before policy/conflict layers.
+    """Apply Treasury-versus-legacy macro factors before policy/conflict layers.
 
     This keeps the committed pack as the visible layout/source skeleton while
     making the replayed Treasury macro path authoritative for every current
-    model population path.  Applying the same factor to Base and the current
-    comparison path preserves their population differential; MBU26, historical
-    actuals and runtime conflict/policy rows are never changed.
+    model population path.  MBU26, historical actuals and runtime
+    conflict/policy rows are never changed.
+
+    With a ``DirectTreasuryScenarioReplayResult`` every factor is looked up by
+    ``(scenario_name, series_id, period)``: each governed scenario carries
+    factors from its OWN replay against its own legacy shadow. With one of the
+    legacy Base-pair results, factors exist only for the Base scenario, and
+    any other current-model row fails closed - transferring a Base-derived
+    factor to another scenario is inexact for nonlinear and recursive models
+    and was retired in P1.2. Either way a targeted row with no factor raises:
+    silently retaining the legacy macro value was the fail-open path.
     """
 
     if chart_rows is None or chart_rows.empty:
         return chart_rows, pd.DataFrame()
     if not isinstance(
         replay,
-        (FuelPriceScenarioReplayResult, TreasuryBaselineMacroReplayResult),
+        (
+            DirectTreasuryScenarioReplayResult,
+            FuelPriceScenarioReplayResult,
+            TreasuryBaselineMacroReplayResult,
+        ),
     ):
         raise TypeError("Treasury macro chart overlay requires a replay result.")
+    scenario_aware = isinstance(replay, DirectTreasuryScenarioReplayResult)
     out = chart_rows.copy()
     if "scenario_name" not in out.columns or "value" not in out.columns:
         raise ValueError("Chart rows are missing scenario_name/value for macro overlay.")
@@ -3494,17 +3514,30 @@ def apply_treasury_macro_to_chart_rows(
     annual = replay.baseline_macro_annual_factors
     if quarterly is None or quarterly.empty or annual is None or annual.empty:
         raise ValueError("Treasury macro replay factors are unavailable.")
-    q_lookup = {
-        (str(row.series_id), str(row.period)): float(row.factor)
-        for row in quarterly.itertuples()
-        if pd.notna(getattr(row, "factor", np.nan))
-    }
-    a_lookup = {
-        (str(row.series_id), int(row.june_year)): float(row.factor)
-        for row in annual.itertuples()
-        if pd.notna(getattr(row, "factor", np.nan))
-        and pd.notna(getattr(row, "june_year", np.nan))
-    }
+    if scenario_aware:
+        q_lookup = {
+            (str(row.scenario_name), str(row.series_id), str(row.period)): float(row.factor)
+            for row in quarterly.itertuples()
+            if pd.notna(getattr(row, "factor", np.nan))
+        }
+        a_lookup = {
+            (str(row.scenario_name), str(row.series_id), int(row.june_year)): float(row.factor)
+            for row in annual.itertuples()
+            if pd.notna(getattr(row, "factor", np.nan))
+            and pd.notna(getattr(row, "june_year", np.nan))
+        }
+    else:
+        q_lookup = {
+            (replay.base_scenario_name, str(row.series_id), str(row.period)): float(row.factor)
+            for row in quarterly.itertuples()
+            if pd.notna(getattr(row, "factor", np.nan))
+        }
+        a_lookup = {
+            (replay.base_scenario_name, str(row.series_id), int(row.june_year)): float(row.factor)
+            for row in annual.itertuples()
+            if pd.notna(getattr(row, "factor", np.nan))
+            and pd.notna(getattr(row, "june_year", np.nan))
+        }
     scenario_names = out["scenario_name"].fillna("").astype(str)
     if "scenario_role" in out.columns:
         scenario_roles = (
@@ -3517,8 +3550,11 @@ def apply_treasury_macro_to_chart_rows(
         {replay.base_scenario_name}
     )
     runtime_scenario_names.add(_LEGACY_BASE_MACRO_SHADOW_SCENARIO_NAME)
-    target_mask = current_model_mask & ~scenario_names.isin(
-        runtime_scenario_names
+    shadow_mask = scenario_names.str.endswith(_DIRECT_SHADOW_SUFFIX)
+    target_mask = (
+        current_model_mask
+        & ~scenario_names.isin(runtime_scenario_names)
+        & ~shadow_mask
     )
     out["_treasury_macro_factor"] = 1.0
     out["_treasury_macro_source_value"] = pd.to_numeric(
@@ -3529,13 +3565,22 @@ def apply_treasury_macro_to_chart_rows(
     audit_by_index: dict[Any, dict[str, Any]] = {}
     for index in out.index[target_mask]:
         row = out.loc[index]
+        scenario = str(row.get("scenario_name") or "")
         series_id = str(row.get("series_id") or "")
         period = str(row.get("period") or "")
         grain = str(row.get("time_grain") or "")
+        if not scenario_aware and scenario != replay.base_scenario_name:
+            raise ValueError(
+                "Base-derived Treasury macro factors cannot be applied to "
+                f"scenario {scenario!r} ({series_id} {period}): factor transfer "
+                "across scenarios is inexact for nonlinear and recursive models. "
+                "Use run_direct_treasury_scenario_replay so every governed "
+                "scenario carries factors from its own replay."
+            )
         factor: float | None = None
         basis = ""
         if grain == "quarterly":
-            factor = q_lookup.get((series_id, period))
+            factor = q_lookup.get((scenario, series_id, period))
             if factor is not None:
                 basis = "Treasury_BEFU26_native_quarterly_macro_factor"
         if factor is None:
@@ -3545,16 +3590,28 @@ def apply_treasury_macro_to_chart_rows(
             if pd.isna(fy_value) and grain == "quarterly":
                 fy_value = _fiscal_year_from_quarter(period)
             if pd.notna(fy_value):
-                factor = a_lookup.get((series_id, int(fy_value)))
+                factor = a_lookup.get((scenario, series_id, int(fy_value)))
                 if factor is not None:
                     basis = "Treasury_BEFU26_annual_bridge_macro_factor"
         if factor is None:
-            continue
+            # Silently retaining the legacy macro value was the fail-open
+            # path: "no factor" and "factor of exactly 1" were
+            # indistinguishable downstream.
+            raise ValueError(
+                "No Treasury macro factor for a current-model row: "
+                f"scenario={scenario!r} series={series_id!r} period={period!r} "
+                f"grain={grain!r}. A row the overlay targets must either "
+                "receive its scenario's own factor or fail closed."
+            )
         source_value = pd.to_numeric(
             pd.Series([out.at[index, "value"]]), errors="coerce"
         ).iloc[0]
         if pd.isna(source_value) or not np.isfinite(float(source_value)):
-            continue
+            raise ValueError(
+                "Treasury macro overlay found a non-numeric value on a "
+                f"current-model row: scenario={scenario!r} series={series_id!r} "
+                f"period={period!r}."
+            )
         adjusted = float(source_value) * float(factor)
         out.at[index, "value"] = adjusted
         out.at[index, "_treasury_macro_factor"] = float(factor)
@@ -3615,7 +3672,10 @@ def apply_treasury_macro_to_chart_rows(
         if annual_mask.any()
         else ()
     )
-    for _, group in annual_groups:
+    for group_key, group in annual_groups:
+        group_scenario = str(
+            group_key[0] if isinstance(group_key, tuple) else group_key
+        )
         series_ids = group["series_id"].fillna("").astype(str)
         if series_ids[series_ids.ne("")].duplicated().any():
             duplicates = sorted(
@@ -3669,7 +3729,7 @@ def apply_treasury_macro_to_chart_rows(
                     f"one fiscal year for {series_id}."
                 )
             fy = int(group_years[0])
-            factor = a_lookup.get((series_id, fy))
+            factor = a_lookup.get((group_scenario, series_id, fy))
             if factor is None or not np.isfinite(float(factor)):
                 raise ValueError(
                     "Treasury macro annual anchor factor is missing or "
@@ -4802,3 +4862,366 @@ def append_fuel_price_scenario_to_chart_rows(
         if audits
         else pd.DataFrame(columns=_FUEL_AUDIT_COLUMNS),
     )
+
+
+# --------------------------------------------------------------------------
+# P1.2: direct Treasury macro replay for every governed current scenario
+# --------------------------------------------------------------------------
+
+_DIRECT_SHADOW_SUFFIX = "__legacy_macro_shadow"
+
+
+def direct_shadow_scenario_name(scenario_name: str) -> str:
+    """The internal legacy-macro shadow identity for one governed scenario."""
+
+    return f"{scenario_name}{_DIRECT_SHADOW_SUFFIX}"
+
+
+@dataclass(frozen=True)
+class DirectTreasuryScenarioReplayResult:
+    """Per-scenario Treasury macro replay: every factor is scenario-specific.
+
+    The historical ``TreasuryBaselineMacroReplayResult`` replayed only the
+    Base pair and transferred Base-derived factors onto the comparison in
+    output space - inexact for nonlinear GBM members and recursive lag
+    models. Here every governed current scenario is replayed against its OWN
+    legacy shadow, so ``baseline_macro_*_factors`` carry a real
+    ``scenario_name`` key and a Base factor can never serve another scenario.
+    """
+
+    base_scenario_name: str
+    scenario_names: tuple[str, ...]
+    replay_inputs: pd.DataFrame
+    replay: ScenarioInputForecastReplayResult
+    baseline_macro_quarterly_factors: pd.DataFrame
+    baseline_macro_annual_factors: pd.DataFrame
+    scenario_replay_lineage: pd.DataFrame
+
+
+def _macro_factor_frames_for_pair(
+    replay: ScenarioInputForecastReplayResult,
+    annual_bridge: pd.DataFrame,
+    *,
+    scenario_name: str,
+    shadow_name: str,
+    trace_name: str,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Treasury-vs-legacy factors for ONE scenario against its own shadow."""
+
+    quarterly_source = replay.future_forecasts.copy()
+    required_quarterly = {"scenario_name", "stream", "target_period", "forecast"}
+    missing = required_quarterly.difference(quarterly_source.columns)
+    if missing:
+        raise ValueError(
+            "Direct replay cannot build macro factors without columns: "
+            + ", ".join(sorted(missing))
+        )
+    quarterly_source["forecast"] = pd.to_numeric(
+        quarterly_source["forecast"], errors="coerce"
+    )
+    quarterly = quarterly_source[
+        quarterly_source["scenario_name"].astype(str).isin([scenario_name, shadow_name])
+    ].pivot_table(
+        index=["stream", "target_period"],
+        columns="scenario_name",
+        values="forecast",
+        aggfunc="first",
+    ).reset_index()
+    if scenario_name not in quarterly.columns or shadow_name not in quarterly.columns:
+        raise ValueError(
+            f"Direct replay is missing Treasury or legacy rows for {scenario_name!r}."
+        )
+    quarterly = quarterly.rename(
+        columns={
+            "target_period": "period",
+            shadow_name: "base_value",
+            scenario_name: "scenario_value",
+        }
+    ).dropna(subset=["base_value", "scenario_value"])
+    quarterly["series_id"] = quarterly["stream"].astype(str).map(_STREAM_SERIES_IDS)
+    if quarterly["series_id"].isna().any():
+        raise ValueError(
+            f"Direct replay factors for {scenario_name!r} contain an unknown stream."
+        )
+    quarterly["factor"] = np.where(
+        quarterly["base_value"].abs() > 1e-12,
+        quarterly["scenario_value"] / quarterly["base_value"],
+        1.0,
+    )
+    quarterly["delta"] = quarterly["scenario_value"] - quarterly["base_value"]
+    quarterly["scenario_name"] = scenario_name
+    quarterly["trace_name"] = trace_name
+    quarterly["time_grain"] = "quarterly"
+    quarterly["transformation_basis"] = (
+        "Treasury_BEFU26_scenario_replay_vs_own_legacy_macro_replay"
+    )
+
+    annual_source = annual_bridge.copy()
+    required_annual = {"scenario_name", "FY", "series_id", "value"}
+    missing = required_annual.difference(annual_source.columns)
+    if missing:
+        raise ValueError(
+            "Direct replay annual bridge cannot build macro factors without columns: "
+            + ", ".join(sorted(missing))
+        )
+    annual_source["value"] = pd.to_numeric(annual_source["value"], errors="coerce")
+    annual = annual_source[
+        annual_source["scenario_name"].astype(str).isin([scenario_name, shadow_name])
+    ].pivot_table(
+        index=["FY", "series_id"],
+        columns="scenario_name",
+        values="value",
+        aggfunc="first",
+    ).reset_index()
+    if scenario_name not in annual.columns or shadow_name not in annual.columns:
+        raise ValueError(
+            f"Direct replay annual bridge is missing rows for {scenario_name!r}."
+        )
+    annual = annual.rename(
+        columns={
+            "FY": "june_year",
+            shadow_name: "base_value",
+            scenario_name: "scenario_value",
+        }
+    ).dropna(subset=["base_value", "scenario_value"])
+    annual["factor"] = np.where(
+        annual["base_value"].abs() > 1e-12,
+        annual["scenario_value"] / annual["base_value"],
+        1.0,
+    )
+    annual["delta"] = annual["scenario_value"] - annual["base_value"]
+    annual["period"] = pd.to_numeric(annual["june_year"], errors="coerce").astype(
+        "Int64"
+    ).map(lambda fy: f"FY{int(fy)}" if pd.notna(fy) else "")
+    annual["scenario_name"] = scenario_name
+    annual["trace_name"] = trace_name
+    annual["time_grain"] = "june_year"
+    annual["transformation_basis"] = (
+        "Treasury_BEFU26_scenario_annual_bridge_vs_own_legacy_annual_bridge"
+    )
+    return quarterly.reset_index(drop=True), annual.reset_index(drop=True)
+
+
+def run_direct_treasury_scenario_replay(
+    scenario_input_wide: pd.DataFrame,
+    repo_root: Path | str,
+    engine: str = "ensemble",
+    *,
+    latest_actual_period: str | None = None,
+) -> DirectTreasuryScenarioReplayResult:
+    """Replay every governed current scenario on its own Treasury inputs.
+
+    For each scenario in ``scenario_input_wide`` this builds a
+    Treasury-adjusted variant (input-space adjustment preserving the
+    scenario's own differentials; see
+    ``apply_treasury_macro_path_to_scenarios``) plus a legacy shadow of the
+    scenario's unadjusted rows, replays the fixed promoted models over all of
+    them in one pass, and derives per-scenario factor frames. MBU26 official
+    rows are never part of this replay.
+    """
+
+    root = Path(repo_root)
+    base_scenario_name, _ = _base_scenario_rows(scenario_input_wide)
+    treasury_all = apply_treasury_macro_path_to_scenarios(scenario_input_wide, root)
+    ordered_names = [base_scenario_name] + sorted(
+        name
+        for name in scenario_input_wide["scenario_name"].dropna().astype(str).unique()
+        if name != base_scenario_name
+    )
+    frames: list[pd.DataFrame] = []
+    replay_scenario_names: list[str] = []
+    for scenario in ordered_names:
+        treasury_rows = treasury_all[
+            treasury_all["scenario_name"].astype(str).eq(scenario)
+        ].copy()
+        legacy_rows = scenario_input_wide[
+            scenario_input_wide["scenario_name"].astype(str).eq(scenario)
+        ]
+        if treasury_rows.empty or legacy_rows.empty:
+            raise ValueError(
+                f"Scenario {scenario!r} has no input rows; a governed scenario "
+                "must fail closed rather than borrow another scenario's replay."
+            )
+        shadow = _scenario_clone_with_identity(
+            legacy_rows,
+            scenario_name=direct_shadow_scenario_name(scenario),
+            role="comparison",
+            display_name=f"Internal legacy macro shadow ({scenario})",
+        )
+        frames.extend([treasury_rows, shadow])
+        replay_scenario_names.extend([scenario, direct_shadow_scenario_name(scenario)])
+    replay_inputs = pd.concat(frames, ignore_index=True, sort=False)
+    replay = replay_forecast_from_scenario_inputs(
+        replay_inputs,
+        repo_root=root,
+        engine=engine,
+        latest_actual_period=latest_actual_period,
+    )
+    _validate_complete_numeric_replay(
+        replay,
+        replay_inputs=replay_inputs,
+        scenario_names=tuple(replay_scenario_names),
+    )
+    annual_bridge, _ = _annual_bridge_and_factors(
+        replay,
+        replay_inputs=replay_inputs,
+        repo_root=root,
+        base_scenario_name=base_scenario_name,
+        latest_actual_period=latest_actual_period,
+        require_conflict_factors=False,
+        isolate_non_ice_activity=False,
+    )
+
+    quarterly_frames: list[pd.DataFrame] = []
+    annual_frames: list[pd.DataFrame] = []
+    for scenario in ordered_names:
+        trace = (
+            "Current finalist Base case"
+            if scenario == base_scenario_name
+            else f"Current finalist comparison ({scenario})"
+        )
+        quarterly, annual = _macro_factor_frames_for_pair(
+            replay,
+            annual_bridge,
+            scenario_name=scenario,
+            shadow_name=direct_shadow_scenario_name(scenario),
+            trace_name=trace,
+        )
+        if quarterly.empty or annual.empty:
+            raise ValueError(
+                f"Direct replay produced no factors for {scenario!r}; refusing "
+                "to fall back to Base factors."
+            )
+        quarterly_frames.append(quarterly)
+        annual_frames.append(annual)
+
+    quarterly_factors = pd.concat(quarterly_frames, ignore_index=True, sort=False)
+    annual_factors = pd.concat(annual_frames, ignore_index=True, sort=False)
+
+    # Factor completeness: every scenario must cover the same quarterly
+    # series/period grid as Base. A hole here means a scenario would silently
+    # keep its legacy value under the overlay, which is the fail-open path
+    # P1.2 exists to remove.
+    base_grid = {
+        (row.series_id, row.period)
+        for row in quarterly_factors[
+            quarterly_factors["scenario_name"].eq(base_scenario_name)
+        ].itertuples()
+    }
+    for scenario in ordered_names[1:]:
+        grid = {
+            (row.series_id, row.period)
+            for row in quarterly_factors[
+                quarterly_factors["scenario_name"].eq(scenario)
+            ].itertuples()
+        }
+        holes = sorted(base_grid.symmetric_difference(grid))
+        if holes:
+            raise ValueError(
+                f"Scenario {scenario!r} factor grid does not match Base: {holes[:6]}"
+            )
+
+    lineage = _direct_replay_lineage(
+        replay,
+        replay_inputs=replay_inputs,
+        scenario_names=tuple(ordered_names),
+        base_scenario_name=base_scenario_name,
+        engine=engine,
+    )
+    return DirectTreasuryScenarioReplayResult(
+        base_scenario_name=base_scenario_name,
+        scenario_names=tuple(ordered_names),
+        replay_inputs=replay_inputs.reset_index(drop=True),
+        replay=replay,
+        baseline_macro_quarterly_factors=quarterly_factors,
+        baseline_macro_annual_factors=annual_factors,
+        scenario_replay_lineage=lineage,
+    )
+
+
+def _direct_replay_lineage(
+    replay: ScenarioInputForecastReplayResult,
+    *,
+    replay_inputs: pd.DataFrame,
+    scenario_names: tuple[str, ...],
+    base_scenario_name: str,
+    engine: str,
+) -> pd.DataFrame:
+    """One structured record per scenario/stream/quarter of the direct replay."""
+
+    forecasts = replay.future_forecasts
+    rows: list[dict[str, Any]] = []
+    input_hash_by_scenario: dict[str, str] = {}
+    for scenario in scenario_names:
+        scoped = replay_inputs[
+            replay_inputs["scenario_name"].astype(str).eq(scenario)
+        ]
+        hashes = sorted(
+            scoped.get("workbook_sha256", pd.Series(dtype=str)).dropna().astype(str).unique()
+        )
+        input_hash_by_scenario[scenario] = ";".join(hashes)
+    driver_columns = ("real_gdp_sa_nzd", "population", "real_gdp_per_capita_nzd")
+    for scenario in scenario_names:
+        shadow = direct_shadow_scenario_name(scenario)
+        treasury = forecasts[forecasts["scenario_name"].astype(str).eq(scenario)]
+        legacy = forecasts[forecasts["scenario_name"].astype(str).eq(shadow)]
+        legacy_lookup = {
+            (str(row.stream), str(row.target_period)): float(row.forecast)
+            for row in legacy.itertuples()
+            if pd.notna(getattr(row, "forecast", np.nan))
+        }
+        scenario_inputs = replay_inputs[
+            replay_inputs["scenario_name"].astype(str).eq(scenario)
+        ]
+        shadow_inputs = replay_inputs[
+            replay_inputs["scenario_name"].astype(str).eq(shadow)
+        ]
+        for row in treasury.itertuples():
+            stream = str(row.stream)
+            period = str(row.target_period)
+            raw = legacy_lookup.get((stream, period))
+            drivers_changed: list[str] = []
+            treasury_quarter = scenario_inputs[
+                scenario_inputs["stream"].astype(str).eq(stream)
+                & scenario_inputs["canonical_period"].astype(str).eq(period)
+            ]
+            shadow_quarter = shadow_inputs[
+                shadow_inputs["stream"].astype(str).eq(stream)
+                & shadow_inputs["canonical_period"].astype(str).eq(period)
+            ]
+            if len(treasury_quarter) == 1 and len(shadow_quarter) == 1:
+                for column in driver_columns:
+                    if column not in treasury_quarter.columns:
+                        continue
+                    after = pd.to_numeric(treasury_quarter[column], errors="coerce").iloc[0]
+                    before = pd.to_numeric(shadow_quarter[column], errors="coerce").iloc[0]
+                    if pd.notna(after) and pd.notna(before) and not np.isclose(
+                        float(after), float(before), rtol=1e-12, atol=0.0
+                    ):
+                        drivers_changed.append(
+                            f"{column}:{float(before):.6g}->{float(after):.6g}"
+                        )
+            forecast_value = getattr(row, "forecast", np.nan)
+            status = "replayed" if pd.notna(forecast_value) else "missing_forecast"
+            rows.append(
+                {
+                    "scenario_name": scenario,
+                    "scenario_role": (
+                        "basecase" if scenario == base_scenario_name else "comparison"
+                    ),
+                    "stream": stream,
+                    "period": period,
+                    "engine": engine,
+                    "input_workbook_sha256": input_hash_by_scenario.get(scenario, ""),
+                    "drivers_changed": "; ".join(drivers_changed),
+                    "raw_model_output": raw,
+                    "post_macro_output": (
+                        float(forecast_value) if pd.notna(forecast_value) else np.nan
+                    ),
+                    "replay_status": status,
+                    "error_class": "",
+                    "error_message": "",
+                    "fallback_used": "none",
+                }
+            )
+    return pd.DataFrame(rows)

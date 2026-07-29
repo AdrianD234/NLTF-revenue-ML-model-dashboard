@@ -16,10 +16,9 @@ ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "artifacts" / "p1_unit_completeness"
 TOL = 1e-6
 FYS = {2026, 2027, 2028, 2029, 2030}
-MACRO_DRIFT_STATUS = "known_macro_cross_row_inconsistency_pending_p1_2"
-# Measured 1.706% at FY2030. Pinned just above so numerical noise does not
-# false-alarm, far below anything that would let the drift double.
-MACRO_DRIFT_CEILING_PCT = 1.8
+# P1.2 resolved the macro cross-row drift; the status it used to carry must
+# never reappear in the identity artifact.
+RETIRED_MACRO_DRIFT_STATUS = "known_macro_cross_row_inconsistency_pending_p1_2"
 
 
 def test_every_expected_artifact_is_committed() -> None:
@@ -131,32 +130,74 @@ def test_the_governed_inventory_artifact_is_committed_and_static() -> None:
     assert (official["last_period"] == "FY2055").all()
 
 
-def test_ped_identity_closes_before_macro_and_drift_is_enumerated() -> None:
+def test_ped_identity_closes_at_every_stage_for_every_governed_scenario() -> None:
+    """P1.2: the identity closes under the stage-appropriate population.
+
+    S0 pairs with the legacy scenario inputs; S1-S4 pair with the
+    per-scenario Treasury-adjusted path. The 1.706% the first P1.1 revision
+    pinned as `known_macro_cross_row_inconsistency_pending_p1_2` was the
+    expected side being held at the pre-macro population - a
+    measurement-construction artifact, not a production defect.
+    """
     identity = pd.read_csv(OUT / "ped_cross_row_identity.csv")
-    evaluable = identity[identity["contract_status"].ne("not_evaluable_missing_governed_population")]
-    assert len(evaluable) > 0
+    governed = identity[identity["contract_status"].isin(["identity_closes", "identity_violation"])]
+    assert len(governed) > 0
+    assert not governed["contract_status"].eq("identity_violation").any(), (
+        governed[governed["contract_status"].eq("identity_violation")].to_dict("records")
+    )
+    assert governed["residual_pct"].abs().max() <= 1e-6
 
-    pre_macro = evaluable[evaluable["stage"].eq("S0")]
-    assert len(pre_macro) == len(FYS)
-    assert pre_macro["residual_pct"].abs().max() <= 1e-3, "pre-macro identity must close"
-    assert pre_macro["contract_status"].eq("identity_closes").all()
+    # Both governed scenarios, every stage.
+    assert set(governed["scenario"]) == {"current_basecase", "current_comparison_1"}
+    assert {"S0", "S1", "S2", "S3", "S4"} <= set(governed["stage"])
+    post = governed[governed["stage"].isin(["S1", "S2", "S3", "S4"])]
+    assert (post["population_basis"] == "treasury_adjusted_scenario_inputs").all()
 
-    drifted = evaluable[evaluable["contract_status"].eq(MACRO_DRIFT_STATUS)]
-    assert len(drifted) > 0, "the known macro drift must stay enumerated, not silently fixed"
-    assert drifted["residual_pct"].abs().max() <= MACRO_DRIFT_CEILING_PCT
-    # It must never migrate earlier than the macro stage.
-    assert not drifted["stage"].eq("S0").any()
-    assert set(drifted["stage"]) <= {"S1", "S2", "S3", "S4"}
-    assert drifted["first_divergent_stage"].eq("S1").all()
+    # The retired drift status must never reappear.
+    assert not identity["contract_status"].eq(RETIRED_MACRO_DRIFT_STATUS).any()
 
 
-def test_no_population_is_inferred_to_force_the_identity_to_close() -> None:
+def test_the_remaining_policy_transfer_exception_is_pinned_not_tolerated() -> None:
+    """The FED policy pair factors are still Base-derived on the comparison.
+
+    That is the same defect class P1.2 removed from the macro layer, one
+    layer up and 570x smaller (0.000502% on comparison petrol VKT at FY2027
+    under the delayed policy). It stays enumerated with a ceiling and an
+    exact stage/role confinement until the policy-layer follow-up replays
+    policy variants per scenario. It must never become a general tolerance,
+    never migrate, and never silently close (its non-zero residual proves the
+    Base-derived transfer is still in effect - when the follow-up lands this
+    test flips to requiring closure).
+    """
     identity = pd.read_csv(OUT / "ped_cross_row_identity.csv")
+    pinned = identity[
+        identity["contract_status"].eq("policy_pair_transfer_on_comparison_pending_followup")
+    ]
+    assert len(pinned) > 0, "the enumerated exception disappeared without the follow-up landing"
+    assert pinned["residual_pct"].abs().max() <= 1e-3
+    assert pinned["residual_pct"].abs().min() > 0.0
+    assert set(pinned["stage"]) <= {"S4"}
+    assert set(pinned["role"]) <= {"comparison"}
+    # S0-S3 must be exception-free: the macro layer itself is fully resolved.
+    early = identity[identity["stage"].isin(["S0", "S1", "S2", "S3"])]
+    assert early["contract_status"].isin(
+        ["identity_closes", "not_evaluable_missing_governed_population"]
+    ).all()
+
+
+def test_identity_measurement_still_detects_a_mismatched_population() -> None:
+    """Non-vacuity: closure must not come from an insensitive measurement.
+
+    A deliberately mismatched pairing - S1 values against the LEGACY
+    population - must show a material residual. If this ever closes, either
+    the measurement lost its power or the macro overlay silently stopped
+    moving the population path, and "identity closes" would be meaningless.
+    """
+    identity = pd.read_csv(OUT / "ped_cross_row_identity.csv")
+    power = identity[identity["contract_status"].eq("measurement_power_check")]
+    assert len(power) >= 2, "both governed scenarios need a power check"
+    assert power["residual_pct"].abs().min() >= 0.5
     assert "direct_population_mean" in identity.columns
-    # An output-implied population would make every stage close by
-    # construction; the drift proves the direct input is being used.
-    drifted = identity[identity["contract_status"].eq(MACRO_DRIFT_STATUS)]
-    assert drifted["residual_pct"].abs().min() > 0.0
 
 
 def test_fy2026_population_lineage_is_complete_and_mixed() -> None:
