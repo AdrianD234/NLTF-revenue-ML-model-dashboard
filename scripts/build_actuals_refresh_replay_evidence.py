@@ -103,16 +103,48 @@ def load_ped_sensitivity_variants() -> dict[str, dict[str, float]]:
     return {name: {period: value} for name, value in variants.items()}
 
 
+PRE_REFRESH_BASELINE = (
+    ROOT / "artifacts" / "actuals_refresh_2026q1" / "pre_refresh_quarterly_baseline.csv"
+)
+
+
 def committed_baseline(engine: str) -> pd.DataFrame:
-    """Pre-refresh committed quarterly forecast rows (the old 2026Q1-origin vintage)."""
-    cr = pd.read_csv(PACK_DIRS[engine] / "revenue_chart_rows.csv", low_memory=False)
-    out = cr[
-        cr["time_grain"].astype(str).eq("quarterly")
-        & cr["row_type"].astype(str).eq("future_forecast")
-        & cr["series_id"].astype(str).isin(SERIES_IDS.values())
-    ][["scenario_name", "stream", "series_id", "period", "value"]].copy()
+    """Pre-refresh committed quarterly forecast rows (the old 2026Q1-origin vintage).
+
+    Read from a COMMITTED snapshot, never from the live pack. The live pack is
+    the thing this refresh rebuilds: once the packs are rebuilt its 2026Q1
+    Light/Heavy forecast rows become accepted actuals, so sourcing the baseline
+    from it made a re-run silently self-referential (FY2026 unbuildable, FY2027+
+    baseline == candidate). The snapshot is captured from ``origin/main`` with
+    its source hashes in ``pre_refresh_quarterly_baseline_manifest.json``.
+
+    Fails closed if the snapshot does not look like a genuine pre-refresh
+    vintage - a pre-refresh pack MUST still carry 2026Q1 Light/Heavy forecast
+    rows, because that quarter had not yet been accepted as an actual.
+    """
+    if not PRE_REFRESH_BASELINE.exists():
+        raise SystemExit(
+            f"Pre-refresh baseline snapshot is missing at {PRE_REFRESH_BASELINE}. "
+            "Recapture it from the pre-refresh vintage (origin/main) before "
+            "regenerating replay evidence; do not fall back to the live pack."
+        )
+    frame = pd.read_csv(PRE_REFRESH_BASELINE, low_memory=False)
+    out = frame[frame["engine"].astype(str).eq(engine)].copy()
+    if out.empty:
+        raise SystemExit(f"Pre-refresh baseline snapshot has no rows for engine {engine!r}.")
+    superseded = out[
+        out["period"].astype(str).eq("2026Q1")
+        & out["stream"].astype(str).isin(["LIGHT_RUC", "HEAVY_RUC"])
+    ]
+    if superseded.empty:
+        raise SystemExit(
+            f"Pre-refresh baseline snapshot for {engine!r} carries no 2026Q1 Light/Heavy "
+            "forecast rows, so it is not a pre-refresh vintage. Refusing to report a "
+            "self-referential impact."
+        )
+    out = out[out["series_id"].astype(str).isin(SERIES_IDS.values())]
     out = out.rename(columns={"value": "baseline_forecast", "period": "target_period"})
-    return out
+    return out[["scenario_name", "stream", "series_id", "target_period", "baseline_forecast"]]
 
 
 def actual_rows_for_impact(latest_by_stream: dict[str, str]) -> pd.DataFrame:

@@ -180,3 +180,31 @@ the FY2025/FY2026 boundary. That is the MBU26 annual-spine handover, which
 this PR deliberately does not touch — the total historical NLTF actual line
 needs the complete governed MVR/TUC/refund/admin contract, which this workbook
 does not carry.
+
+## Impact baseline is pinned, not self-referential
+
+Regenerating the replay evidence during closure exposed a defect in the
+evidence generator itself. `committed_baseline()` read the *live* pack's
+`revenue_chart_rows.csv` as the "pre-refresh committed vintage". That was true
+on the first run, but the packs are the thing this refresh rebuilds: once
+rebuilt, their 2026Q1 Light/Heavy forecast rows are accepted actuals, so a
+re-run produced `pre_refresh_committed = NaN` for FY2026 and
+`pre_refresh_committed == candidate` from FY2027 — an impact table that would
+have reported ~0 movement while looking healthy.
+
+Fixed by pinning the baseline to a committed snapshot,
+`pre_refresh_quarterly_baseline.csv` (240 quarterly forecast rows, both
+engines), captured from `origin/main` with source hashes in
+`pre_refresh_quarterly_baseline_manifest.json`. The generator now refuses to
+run if the snapshot lacks 2026Q1 Light/Heavy forecast rows, since a genuine
+pre-refresh vintage must still carry them — verified by deliberately feeding it
+a post-refresh baseline, which fails closed with "Refusing to report a
+self-referential impact".
+
+After the fix the regenerated tables are byte-identical to the originally
+reported figures (max absolute delta 0.0 across every numeric column of
+`replay_impact_fy.csv` and `replay_predictions_quarterly.csv`), so every
+number in the decision table stands: Light RUC −1.2575% FY2026 / +1.4720%
+FY2027, Heavy RUC +0.4881% FY2026, PED 0.0000% throughout, Total NLTF
+FY2026 −0.149% / FY2027 +0.332%. Two further gates in
+`tests/test_stream_vintage_exposure.py` keep the baseline honest.

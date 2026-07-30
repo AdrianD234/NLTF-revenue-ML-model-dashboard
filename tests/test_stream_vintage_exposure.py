@@ -153,6 +153,62 @@ def test_fy2026_quarter_mix_labels_match_the_per_stream_seam(engine: str) -> Non
     assert fy2026["nowcast_flag"].astype(bool).all()
 
 
+# ------------------------------------- the reported impact stays measurable
+
+
+def test_pre_refresh_baseline_snapshot_is_a_genuine_pre_refresh_vintage() -> None:
+    """The impact baseline must never become the post-refresh pack itself.
+
+    The replay-impact tables compare the refreshed candidates against the
+    pre-refresh committed vintage. Sourcing that baseline from the live pack
+    made a re-run self-referential once the packs were rebuilt (FY2026
+    unbuildable, FY2027+ baseline == candidate), so it is a committed snapshot
+    with a fail-closed shape check. A pre-refresh vintage MUST still carry
+    2026Q1 Light/Heavy forecast rows, because that quarter was not yet an
+    accepted actual.
+    """
+    snapshot = ROOT / "artifacts" / "actuals_refresh_2026q1" / "pre_refresh_quarterly_baseline.csv"
+    assert snapshot.exists(), "pre-refresh baseline snapshot is missing"
+    frame = pd.read_csv(snapshot, low_memory=False)
+    assert set(frame["engine"]) == set(ENGINES)
+    for engine in ENGINES:
+        rows = frame[frame["engine"].eq(engine)]
+        superseded = rows[
+            rows["period"].astype(str).eq("2026Q1")
+            & rows["stream"].astype(str).isin(["LIGHT_RUC", "HEAVY_RUC"])
+        ]
+        assert not superseded.empty, (
+            f"{engine}: snapshot has no 2026Q1 Light/Heavy forecast rows, so it is not a "
+            "pre-refresh vintage and the reported impact would be self-referential"
+        )
+
+    manifest_path = snapshot.with_name("pre_refresh_quarterly_baseline_manifest.json")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert set(manifest) == set(ENGINES)
+    for entry in manifest.values():
+        assert len(str(entry["sha256"])) == 64
+        assert entry["git_ref"] == "origin/main"
+
+
+def test_reported_fy_impact_is_measured_against_the_pre_refresh_vintage() -> None:
+    """FY2026-30 impact must be populated for every stream and FY, not NaN."""
+    impact = pd.read_csv(
+        ROOT / "artifacts" / "actuals_refresh_2026q1" / "replay_impact_fy.csv", low_memory=False
+    )
+    assert "pre_refresh_committed" in impact.columns
+    scoped = impact[impact["fy"].between(2026, 2030)]
+    assert not scoped.empty
+    assert scoped["pre_refresh_committed"].notna().all(), (
+        "a missing pre-refresh baseline value means the impact was measured against "
+        "the refreshed pack rather than the pre-refresh vintage"
+    )
+    # The candidate must differ from the baseline somewhere in FY2026-27 -
+    # an all-zero delta would mean the baseline collapsed onto the candidate.
+    light = scoped[scoped["stream"].eq("LIGHT_RUC")]
+    delta = (light["A_strict_accepted_actual"] - light["pre_refresh_committed"]).abs()
+    assert float(delta.max()) > 0.0
+
+
 @pytest.mark.parametrize("engine", ENGINES)
 def test_no_quarterly_forecast_row_survives_at_an_accepted_actual(engine: str) -> None:
     """The seam must not leave a stale forecast row where history now exists."""

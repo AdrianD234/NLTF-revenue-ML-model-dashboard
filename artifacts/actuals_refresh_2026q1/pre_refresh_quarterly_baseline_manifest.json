@@ -1,0 +1,12 @@
+{
+  "ensemble": {
+    "source": "data/current_revenue_outlook/revenue_chart_rows.csv",
+    "git_ref": "origin/main",
+    "sha256": "fe82106d543bbf4f4c1dd5528e77465921d81772c65f564f32ff89831bca2fab"
+  },
+  "ar1": {
+    "source": "data/engine_ar1/current_revenue_outlook/revenue_chart_rows.csv",
+    "git_ref": "origin/main",
+    "sha256": "6bde87d7db8577c0fb006a9342302d03fe40c1a0fd2e9b3c9026dc823eab3684"
+  }
+}
