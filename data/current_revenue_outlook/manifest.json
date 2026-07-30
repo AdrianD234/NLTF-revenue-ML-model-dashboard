@@ -34,8 +34,29 @@
     "raw_audit_source_horizon": "2050Q4 (H100)",
     "horizon_contract_audit": "data/current_revenue_outlook/horizon_contract_audit.csv",
     "horizon_scope_policy": "Three horizon contracts. Current decision-facing Light RUC and every total that depends on it stop at H20/FY2030. The official comparator publishes over its own source horizon. Raw model and replay evidence keep their full source horizon as non-decision-facing audit.",
-    "fy2026_nowcast": "2025Q3+2025Q4 source actuals plus 2026Q1+2026Q2 current finalist forecasts",
-    "rule": "Actual line ends FY2025; FY2026 actual-to-date rows are nowcast inputs only and are not plotted as actuals. Current-finalist comparative charts and runtime calculations stop at FY2030, the last governed common non-extrapolated horizon."
+    "fy2026_nowcast": "FY2026 mixes accepted actuals and forecasts per stream (PED: actuals through 2025Q4, forecasts from 2026Q1; LIGHT_RUC: actuals through 2026Q1, forecasts from 2026Q2; HEAVY_RUC: actuals through 2026Q1, forecasts from 2026Q2)",
+    "rule": "Actual line ends FY2025; FY2026 actual-to-date rows are nowcast inputs only and are not plotted as actuals. Current-finalist comparative charts and runtime calculations stop at FY2030, the last governed common non-extrapolated horizon.",
+    "input_history_vintage": "2026Q1",
+    "stream_vintages": {
+      "PED": {
+        "latest_accepted_exact_actual": "2025Q4",
+        "first_forecast_quarter": "2026Q1",
+        "observation_status": "accepted_exact_actual_through_2025Q4",
+        "provisional_seed": "provisional_annual_bridge seed available for 2026Q1 (method mbu26_residual_core_ped_share; ped_mode provisional_replay_only); not an observed actual and excluded from estimation"
+      },
+      "LIGHT_RUC": {
+        "latest_accepted_exact_actual": "2026Q1",
+        "first_forecast_quarter": "2026Q2",
+        "observation_status": "accepted_exact_actual_through_2026Q1",
+        "provisional_seed": ""
+      },
+      "HEAVY_RUC": {
+        "latest_accepted_exact_actual": "2026Q1",
+        "first_forecast_quarter": "2026Q2",
+        "observation_status": "accepted_exact_actual_through_2026Q1",
+        "provisional_seed": ""
+      }
+    }
   },
   "data_vintage_manifest_notes": {
     "runtime_cutoff": "No extrapolated model extension is used beyond FY2030: the FY2051-FY2055 gradient extension is disabled and current-finalist paths stop where governed model and source assumptions stop. Last displayed/current calculation FY is FY2030. This is NOT a statement that the whole displayed path is validated. See forecast_horizon_validation for the three governed support states.",
@@ -143,18 +164,18 @@
     "model_input_history": {
       "PED": {
         "repo_relative_path": "data/model_input_history/ped_inputs.parquet",
-        "sha256": "d1955e01e07c74ad5aff08736cc822cd914cfa2df201e1f7dd8872116219a1f9",
-        "size_bytes": 46549
+        "sha256": "85e45e2d8dbf28e0d8929750e7126dc9d2a97d63c8e314479aff92a3b571290a",
+        "size_bytes": 47211
       },
       "LIGHT_RUC": {
         "repo_relative_path": "data/model_input_history/light_ruc_inputs.parquet",
-        "sha256": "ab0a7ccc4b9c7f2a92c596fe3c25c2a21f973a8643733c50da08c4db0ceea76d",
-        "size_bytes": 59138
+        "sha256": "f7a74d2f974bf51e5a02796b24a45145659e43f942cd3afb652490a026fd5f75",
+        "size_bytes": 59923
       },
       "HEAVY_RUC": {
         "repo_relative_path": "data/model_input_history/heavy_ruc_inputs.parquet",
-        "sha256": "751d6f71ac0941c2c606b4bd87980c249b798df4ddd93d1e7c372b51394dc5bb",
-        "size_bytes": 44847
+        "sha256": "5e410922777dc90d77c6ce0dcca9ede686c1395e65c386f21724c5814c1af030",
+        "size_bytes": 45607
       }
     },
     "workbooks": [
@@ -711,20 +732,20 @@
   "validation_status": "runtime_rebuilt",
   "output_hashes": {
     "ev_phev_ped_light_drift_assumptions.csv": {
-      "sha256": "a5f10825551eaaef794296fc7d354781e834f79e957a3474617c34f50b981609",
-      "size_bytes": 120941
+      "sha256": "4e311c3b4ad0d2b3589e205172b038d5eaf93cd71c15550ca74362b95b87c6b4",
+      "size_bytes": 121250
     },
     "ev_phev_ped_light_drift_assumptions.parquet": {
-      "sha256": "5998deda4c7bf6dd3c7de346849a14fe5ca739919d88d0c01f4222c610093c69",
-      "size_bytes": 66473
+      "sha256": "5cb8512b3de524b5ebbf1d0580e8f9321c7b7e4748403a43baf944d6db082699",
+      "size_bytes": 66452
     },
     "ev_phev_split_assumptions.csv": {
-      "sha256": "79058d7bef2b692322923e956117d3454080c95b223848e815b9057023ea72e9",
-      "size_bytes": 26569
+      "sha256": "c892a5c1afabbdb2d930e49de5ba71a9b74b2b2f99f6f1ebae9d10ad46a6c0a7",
+      "size_bytes": 26572
     },
     "ev_phev_split_assumptions.parquet": {
-      "sha256": "a51c2f2344021a7a485a6c563e0f06c1733a6350d7b6f5fb530bda378da176b3",
-      "size_bytes": 42409
+      "sha256": "1f259fe7325208c6159e15f4375b079ff419aecda3797681a17aa74135832ad2",
+      "size_bytes": 42394
     },
     "fan_availability.csv": {
       "sha256": "286878a9c131023f5c1ecb6d0145d447f1ade3e2e397ec1279e736bc8be0636e",
@@ -735,20 +756,20 @@
       "size_bytes": 10190
     },
     "fan_band_rows.csv": {
-      "sha256": "0dd105f2af18f7316424a27023684d47e447e2a2bb2a6f77958bd0f3562293d8",
-      "size_bytes": 268862
+      "sha256": "26eabe689bef59fe73f4413b7de4d52907095a182f6d5c4cd8b73a8c7ff12cc9",
+      "size_bytes": 268886
     },
     "fan_band_rows.parquet": {
-      "sha256": "a95f7c52988f07de0ebf0cc252e51866994ecb0434a026a54b0746a7077121ef",
+      "sha256": "7b5c15bf1c0293387484ebc1a9b865858297f3ea066e3fff3911ace4af003986",
       "size_bytes": 41593
     },
     "future_revenue_forecasts.csv": {
-      "sha256": "749b3334c63a4a6843ba9a0e46a7192ba9baf0e36a159b85d16be590be930731",
+      "sha256": "6560e7ef0b83a3608dcd13adb0d3919b41ba58c3928ff9e087ac1c91d0de7194",
       "size_bytes": 55095
     },
     "future_revenue_forecasts.parquet": {
-      "sha256": "587c173ee0acd86ab0e951721b8a38c4c1ec51dfb42cec280e26110428ac3d31",
-      "size_bytes": 18119
+      "sha256": "87c7d116327d9d03175fffc1e5c0eac2babb703207ed5048d25b08456d9918e7",
+      "size_bytes": 18180
     },
     "horizon_contract_audit.csv": {
       "sha256": "bac941ae6c79f3d9dc9a4a70431bddf24e042ecf7b617e72d2912073d011b98b",
@@ -783,12 +804,12 @@
       "size_bytes": 6017
     },
     "ped_bridge_shape_fit_metrics.csv": {
-      "sha256": "d24041393894c79488935b0d79d84e4b86b3165355a3251e82ae867c0f6a772e",
-      "size_bytes": 4756
+      "sha256": "14c0106508d677b04c239244d376ff466b062a7af110a13ca79080df2610dcf8",
+      "size_bytes": 4760
     },
     "ped_bridge_shape_fit_metrics.parquet": {
-      "sha256": "8dab607f4d9a9b055178b5e9609cd097c938251447727b4e7fe5612634c66e4a",
-      "size_bytes": 12819
+      "sha256": "c8295d58890cd15e299636c8f3336935db861e0444c5300efd5750fdafc5413e",
+      "size_bytes": 12823
     },
     "ped_efficiency_scenarios.csv": {
       "sha256": "340a91407a2d1c7565ef3b5339bb14554d55b7dd4c4c48b66b39847af268a37f",
@@ -799,12 +820,12 @@
       "size_bytes": 6199
     },
     "ped_revenue_bridge_audit.csv": {
-      "sha256": "4872ed3cf2c1f8d0c3c342eab07d1ec6e6948d836e55c656cdf4f5be341328a4",
-      "size_bytes": 29365
+      "sha256": "2c6a89c9a61d9b315c4455f0215ee0645453b108de2ce767c4b9348eb0d90747",
+      "size_bytes": 29358
     },
     "ped_revenue_bridge_audit.parquet": {
-      "sha256": "777f32e4eb9ce9524710eaa8a0389c1fa2dd9ba799fcc017c3f810742316c814",
-      "size_bytes": 57630
+      "sha256": "d4cac9fffbeaccc96ed2b6da6b93205d4ac58cb41f62617c1ef71ef903de349a",
+      "size_bytes": 57622
     },
     "quarterly_reconstitution_audit.csv": {
       "sha256": "0960e1d20d0a8cea8a6f9042d2a704ee9d10995d70770322350a45e43bdfb304",
@@ -815,52 +836,52 @@
       "size_bytes": 4654
     },
     "raw_quarterly_forecast_audit.csv": {
-      "sha256": "7c104914fbb62e452244b5c9149f385b6a6b080c3208ba31dbc1b2ae9b8bab52",
-      "size_bytes": 382511
+      "sha256": "2d84801c1c39073b5f340a06ed9fec644ce2faf8abb30a288a4314eaee4ec222",
+      "size_bytes": 380493
     },
     "raw_quarterly_forecast_audit.parquet": {
-      "sha256": "b912e9d2c1bafc66e618bff64d121328f4aa66af8df78310649b714fc810f167",
-      "size_bytes": 18874
+      "sha256": "5062e4c77f4d7e926d9a9494b51132f476623710adab1ba19f35e2b68a98f300",
+      "size_bytes": 19768
     },
     "revenue_bridge_components.csv": {
-      "sha256": "50ac5ccd1f073a1808dcee761369785c937d51b2801f2a1516a73b767f06acdb",
-      "size_bytes": 129624
+      "sha256": "e3b45d2ff4e3bc5be3700ff2dd48cc1b6d158360c18387051538338d901f8ba7",
+      "size_bytes": 129633
     },
     "revenue_bridge_components.parquet": {
-      "sha256": "0c13acabc417560c26ccbf0970e2abb6fc0a96bfb831c5555b26c468ea13de6f",
-      "size_bytes": 29167
+      "sha256": "891d08b0fef3089d4077069478cd8359bbfeae24eb1e2e0d4292e74f2c7b3d2e",
+      "size_bytes": 29235
     },
     "revenue_chart_rows.csv": {
-      "sha256": "fe82106d543bbf4f4c1dd5528e77465921d81772c65f564f32ff89831bca2fab",
-      "size_bytes": 1861336
+      "sha256": "394ff2a21d02f87648fb84b381f43ae741d1f936e6c71ad237147084398322cb",
+      "size_bytes": 1859636
     },
     "revenue_chart_rows.parquet": {
-      "sha256": "c6caabf029d0c76786f8748a3e07bea9a57af96070d1ff866ca2f4b8895afa72",
-      "size_bytes": 101936
+      "sha256": "f5f922bd9284db94f33647aaa8b9ac95bb46942533d8c0ce024467873f0ed9d6",
+      "size_bytes": 102293
     },
     "revenue_formula_residuals.csv": {
-      "sha256": "e71a2a14c08352e97bfd181284a6018a6cba472766e45858f86a67415acf9003",
-      "size_bytes": 298786
+      "sha256": "c91012796b9c9b0cf6358d0de372bb266deaa4f739a519b94bc0bf5319d980ea",
+      "size_bytes": 298697
     },
     "revenue_formula_residuals.parquet": {
-      "sha256": "87eb745c1167f48b711762a1f9dab3f6a78e0159b34d78652208db9fce879b37",
-      "size_bytes": 35594
+      "sha256": "fd326bbd2618bc7dbfaf049f3145f2a1000113e8f6130a2374f94f1031036268",
+      "size_bytes": 35581
     },
     "revenue_line_reconciliation.csv": {
-      "sha256": "9551f4f43b8033f8c5a1d6f956069a342325cf793ed9d919c6bba13dc2320214",
-      "size_bytes": 1865328
+      "sha256": "3c9b4a9b28497cc188a65603570546d165eccf6a83e247001e1ed99f5d57066a",
+      "size_bytes": 1865320
     },
     "revenue_line_reconciliation.parquet": {
-      "sha256": "563104e333864b7886521a80318d0f0fa2282ab25297ee771df0b4ab9125f27c",
-      "size_bytes": 76761
+      "sha256": "953cf7781629fe0532100d235f983ebdc3c35288d7ca53e23f31974ba6de67b2",
+      "size_bytes": 76890
     },
     "revenue_stack_components.csv": {
-      "sha256": "da41054b943ccd98c53785edda431a7475c1cf931fbde5a7f80d04b27f4f78a2",
-      "size_bytes": 10209527
+      "sha256": "178eb980bbf5ec87ee81d93099d305a10bcb031c773d4f4fc99f017b070056de",
+      "size_bytes": 10198787
     },
     "revenue_stack_components.parquet": {
-      "sha256": "b622f1e5d95e277af0f30162a86f75c73a8bc114f16d0b50232f9610d068c8d6",
-      "size_bytes": 230132
+      "sha256": "c4ab8d86cc9f8c9f810abbe96a55ec550d44a34f2fdad1148337da03d61a689d",
+      "size_bytes": 230250
     },
     "row_reconciliation.csv": {
       "sha256": "d484f5d75cce88e30ce7bcf5dd70058505cc02e5dff93f457a579f119c2fc7ce",
@@ -879,12 +900,12 @@
       "size_bytes": 5888
     },
     "runtime_trace_audit.csv": {
-      "sha256": "71aa225089dfc9ec3737b6cd850c3126e953cecf6b02c1f3d1a8d3b6ce5cd6e8",
-      "size_bytes": 108380
+      "sha256": "1e8e93608389f4177e194303cae8ba2d4216df36baa50c249cc3f45119ffe61a",
+      "size_bytes": 108362
     },
     "runtime_trace_audit.parquet": {
-      "sha256": "8c136c84aa6d2fa58d68d22ad086a9b61605dcfe73aa61773a5256c76f499d7d",
-      "size_bytes": 22641
+      "sha256": "e473d91804a6293dcdf61f4c425cc1a4a69bb9e4cdc7412359a0ee236360d7bb",
+      "size_bytes": 21754
     },
     "scenario_feature_lineage.csv": {
       "sha256": "b123c97090bd282009225a0ac2cfc36226d20017412f820dfeec6af34411b30d",
@@ -903,20 +924,20 @@
       "size_bytes": 185119
     },
     "scenario_input_replay_mismatch_report.csv": {
-      "sha256": "2a725101d8cd37f2a7427a47f432e2e05c451583f9a253e09d83fffa1c033d8e",
-      "size_bytes": 47016
+      "sha256": "e7e428ac453af69dd9a708be0c38fcacfbe3f45d16cf1bf4defa5d779caf4419",
+      "size_bytes": 45174
     },
     "scenario_input_replay_mismatch_report.parquet": {
-      "sha256": "d9196ca95fe4e8b739bf446e60925eb5b4e821352a303412065099aa4d93f3a7",
-      "size_bytes": 21608
+      "sha256": "fd5a346563f13cd8b1431ff5573dc11648d97ef22d0ffe05032fd8c270f40f58",
+      "size_bytes": 21487
     },
     "scenario_role_contract.csv": {
-      "sha256": "70922c6c963b3428ebb2b140b1d427000121f7343564b23e20450a3c66ffb6a1",
-      "size_bytes": 18199
+      "sha256": "5dcfbc50bbeff276271d1b461867441e7d11be5239f9ce8ebc0bef47162bfd00",
+      "size_bytes": 18198
     },
     "scenario_role_contract.parquet": {
-      "sha256": "64052cdd7f59bb1f357a13ebd415de4129ae27815dabaa0054aa261d11700274",
-      "size_bytes": 20945
+      "sha256": "85d041a358f571b920c179ba9120f1a0f514bafcc91ce1d6e5622885a6d17668",
+      "size_bytes": 20946
     },
     "sensitivity_config.csv": {
       "sha256": "3c29b44c845f67ee27d71baa3420aa7af1a077e09904675ca6475a63fef129b1",
@@ -927,12 +948,12 @@
       "size_bytes": 10806
     },
     "sensitivity_impact_audit.csv": {
-      "sha256": "26bde776db553d898b3a0b5d21c1bb3ce047082b388d197a558f81b0f4d71a87",
-      "size_bytes": 556245
+      "sha256": "5d0d6afb22d98cbe01509eced3263884b3b80c70a05d0d6b0d55e087c73d1310",
+      "size_bytes": 556229
     },
     "sensitivity_impact_audit.parquet": {
-      "sha256": "67e996033f6e4d513af24e213cdf9524c97aa989e0533e537eff24c810fdbabc",
-      "size_bytes": 39337
+      "sha256": "a546283383a27804fb7fe670cb935799c366b34ca30dc559a115c3f26a7e6437",
+      "size_bytes": 39391
     },
     "sensitivity_seed_inputs.csv": {
       "sha256": "5181058396fbdb3896ade20b3ea335955fc186af85cccd365c7d86531852f3a6",
@@ -957,6 +978,14 @@
     "series_trace_contract.parquet": {
       "sha256": "7319848ee52ec052d837c924ec4e230571c606b788bde28f86d343140cb83a3c",
       "size_bytes": 13434
+    },
+    "stream_vintage_status.csv": {
+      "sha256": "c606a559f4f96634cace973eda9b78f4c6975f08b45842a2186a818f1a845b05",
+      "size_bytes": 1395
+    },
+    "stream_vintage_status.parquet": {
+      "sha256": "c9d5e63a9418cb87c505f98d55a78e4a9d813c04d7dbc26c625ddaee4fb2a73c",
+      "size_bytes": 7364
     },
     "trace_source_contract.csv": {
       "sha256": "396a97e28c43adc892c438ce92fe16a847d87b0ad91c6f8ec1334416c85a070a",

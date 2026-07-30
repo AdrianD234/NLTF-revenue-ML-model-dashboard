@@ -1,0 +1,2 @@
+check,lead_features_in_promoted_state,lead_feature_count,conclusion
+promoted_heavy_state_uses_lead_features,(none),0,"The promoted Heavy RUC vNext ensemble excludes lead-price features by governance ('no leads'), so the production replay is identical under the retrospective_history and real_time_vintage treatments of the 2026Q1 lead. The retrospective lead is stored for legacy-spec refit/evaluation evidence only."

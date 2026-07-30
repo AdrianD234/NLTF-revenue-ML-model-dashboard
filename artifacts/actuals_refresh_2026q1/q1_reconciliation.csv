@@ -1,0 +1,37 @@
+Unnamed: 0,Unnamed: 1,Unnamed: 2,Unnamed: 3,Unnamed: 4,Unnamed: 5,Unnamed: 6
+Check,Source / anchor,Q1 2026 output,Units,Method,Difference / result,Status
+MACRO ACTUALS,,,,,,
+Nominal GDP SA,113094000000,114677316000,NZD,Q4 workbook level × 1.014,0.014000000000000012,Reconciles to official +1.4% q/q SA
+Real GDP SA,113094000000,114224940000,NZD in Q4-2025 model prices,Nominal GDP × GDP rebasing factor,0.010000000000000009,Reconciles exactly to official +1.0% q/q SA
+GDP deflator SA,1561,1567.1821782178217,index,Q4 deflator × 1.014 / 1.010,0.003960396039603964,Solved consistently with nominal and real growth
+Population,5342000,5361300,persons,Direct March-2026 RBNZ M12 / Stats NZ quarterly actual,19300,Published quarterly actual
+Unemployment,5.4,5.3,% s.a.,Direct March-2026 RBNZ M9 / Stats NZ quarterly actual,-0.10000000000000053,Published quarterly actual
+CPI and real-price base,1327,1339,index,March-2026 CPI is the chosen real-price base; Q1 factor = 1,1,Published quarterly actual
+Petrol price,,269.8,cents/litre,Q1 quarterly price average in source pack; validated against MBIE quarterly price publication,,Quarterly price input
+Diesel price,,214.6,cents/litre,Q1 quarterly price average in source pack; validated against MBIE quarterly price publication,,Quarterly price input
+RUC ACTUAL IDENTITIES,,,,,,
+Light RUC net km,Core N77,3196014020,km,Direct Q3/Mar-26 Core Data column Net RUC KM 1–6T,,Exact actual
+Light RUC net revenue,Core B77,248999340.25,NZD,Direct Q3/Mar-26 Core Data column Net RUC Revenue 1–6T,,Exact actual
+Light effective rate,"B77 / N77 × 1,000",77.90933916178503,"NZD/1,000 km",Revenue identity,0,Zero residual
+Heavy RUC net km,Core O77,1039372457,km,Direct Q3/Mar-26 Core Data column Net RUC KM >6T,,Exact actual
+Heavy RUC net revenue,Core C77,334926318.92,NZD,Direct Q3/Mar-26 Core Data column Net RUC Revenue >6T,,Exact actual
+Heavy effective rate,"C77 / O77 × 1,000",322.2389785916754,"NZD/1,000 km",Revenue identity,0,Zero residual
+Heavy Q1 lead price,"Core C78 / O78 × 1,000 × 1339 / 1359",318.7803374122621,"real NZD/1,000 km",Retrospective Q2 actual converted to Q1 CPI base,,Exact retrospective lead
+PED PROVISIONAL BRIDGE,,,,,,
+MBU26 FY2026 Light petrol VKT,"MBU26 row 16, AB16",31834730656.902897,km,Latest official annual petrol-only VKT total,,Official annual forecast benchmark
+Less actual 2025Q3 VKT,PED Inputs!W96,8234842155.17112,km,Existing quarterly historical observation,,Historical actual
+Less actual 2025Q4 VKT,PED Inputs!W97,8363133560.737617,km,Existing quarterly historical observation,,Historical actual
+Residual for 2026Q1 + Q2,FY2026 less 2025Q3/Q4,15236754940.99416,km,Annual residual identity,,Derived
+Q1 Gross PED,Core S77,475062158.43,NZD excl GST,Exact Core Data quarterly indicator,,Exact actual
+Q2 Gross PED,Core S78,520735253.27,NZD excl GST,Exact Core Data quarterly indicator,,Exact actual
+Q1 share of remaining half-year,S77 / (S77 + S78),0.4770670749374473,share,Revenue share used as fuel-use/VKT timing indicator,,Derived
+Q1 petrol-only VKT,Residual × Q1 share,7268954111.238782,km,Selected provisional quarterly allocation,,Provisional
+Q2 petrol-only VKT,Residual less Q1,7967800829.755378,km,Residual allocation,,Provisional
+Q1 population,RBNZ M12,5361300,persons,Published quarterly actual,,Exact actual
+Q1 PED target,Q1 VKT / population,1355.8193183068997,km/person,Selected value written to PED Inputs!G98,,Provisional target
+FY2026 annual identity residual,Q3 + Q4 + Q1 + Q2 − MBU26,0,km,Exact arithmetic reconciliation,0,Zero residual
+PED SENSITIVITY,,,,,,
+Selected Core PED-revenue share,0.4770670749374473,1355.8193183068997,km/person,Uses exact Q1/Q2 Gross PED revenue timing,-65.17511783677446,Selected provisional bridge
+Equal residual split,0.5,1420.9944361436742,km/person,No quarterly indicator,0,Sensitivity
+2025 Q1/Q2 VKT seasonal share,0.5037871057029395,1431.757348409604,km/person,Uses the immediately preceding calendar Q1/Q2 VKT timing,10.762912265929799,Sensitivity
+PED governance conclusion,,,,"Q1 can be populated for runner completeness, but must remain visibly provisional and excluded from coefficient re-estimation by default until an independently observed petrol-only quarterly VKT actual is accepted.",,Action required

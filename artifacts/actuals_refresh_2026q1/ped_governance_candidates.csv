@@ -1,0 +1,3 @@
+candidate,ped_accepted_exact_cutoff,ped_replay_seed,ped_first_forecast_quarter,ped_refit_performed,seed_displayed_as_observed_actual,max_abs_pct_move_vs_pre_refresh_h1_h8,engine
+A_strict_accepted_actual,2025Q4,,2026Q1,False,False,0.0,ar1
+B_ped_provisional_replay_only,2025Q4,2026Q1,2026Q2,False,False,6.2280193082952735,ar1

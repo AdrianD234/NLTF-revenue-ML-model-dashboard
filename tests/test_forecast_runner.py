@@ -29,6 +29,7 @@ from model_dashboard.forecast_runner import (
     future_quarters_after,
     latest_known_actual_period,
     model_capability_gap_register,
+    quarter_sort_key,
     resolve_scenario_role,
     replay_forecast_from_scenario_inputs,
     run_forecast_workbook,
@@ -322,7 +323,9 @@ def test_completed_workbook_builds_transforms_and_numeric_light_outputs(tmp_path
     assert result.manifest["broad_search_run"] is False
     assert result.manifest["evidence_pack_modified"] is False
     assert result.manifest["chart_sources_modified"] is False
-    assert len(result.future_forecasts) == DEFAULT_FORECAST_HORIZON_QUARTERS * len(STREAM_ORDER)
+    # Per-stream seam: Light/Heavy hold accepted 2026Q1 actuals, so their
+    # first workbook quarter is history rather than a scored forecast row.
+    assert len(result.future_forecasts) == DEFAULT_FORECAST_HORIZON_QUARTERS * len(STREAM_ORDER) - 2
     assert "row_type" not in result.future_forecasts.columns
     assert result.future_forecasts["scenario_name"].eq("basecase").all()
     assert result.capability_report["scenario_name"].eq("basecase").all()
@@ -342,7 +345,7 @@ def test_completed_workbook_builds_transforms_and_numeric_light_outputs(tmp_path
     assert metadata_columns.issubset(result.forecast_chart_rows.columns)
     light = result.future_forecasts[result.future_forecasts["stream"].eq("LIGHT_RUC")]
     gaps = result.future_forecasts[~result.future_forecasts["stream"].eq("LIGHT_RUC")]
-    assert len(light) == DEFAULT_FORECAST_HORIZON_QUARTERS
+    assert len(light) == DEFAULT_FORECAST_HORIZON_QUARTERS - 1
     assert light["forecast_available"].eq(True).all()
     assert pd.to_numeric(light["forecast"], errors="coerce").notna().all()
     assert (pd.to_numeric(light["forecast"], errors="coerce") > 0).all()
@@ -376,7 +379,7 @@ def test_completed_workbook_builds_transforms_and_numeric_light_outputs(tmp_path
     assert (result.future_forecasts["forecast_available"] == result.future_forecasts["stream"].eq("LIGHT_RUC")).all()
     capability = result.capability_report.set_index("stream")
     assert capability.loc["LIGHT_RUC", "forecast_available"] == True
-    assert capability.loc["LIGHT_RUC", "numeric_forecast_rows"] == DEFAULT_FORECAST_HORIZON_QUARTERS
+    assert capability.loc["LIGHT_RUC", "numeric_forecast_rows"] == DEFAULT_FORECAST_HORIZON_QUARTERS - 1
     assert capability.loc["LIGHT_RUC", "capability_status"] == "numeric_forecast_available"
     assert capability.loc["PED", "capability_status"] == "parity_failed"
     assert capability.loc["HEAVY_RUC", "capability_status"] == "parity_failed"
@@ -419,7 +422,11 @@ def test_completed_workbook_builds_transforms_and_numeric_light_outputs(tmp_path
     historical = chart_rows[chart_rows["row_type"].eq("historical_actual")]
     assert set(historical["stream"]) == set(STREAM_ORDER)
     assert historical["scenario_name"].eq("historical_actual").all()
-    assert historical["period"].map(lambda value: int(str(value)[:4])).max() == 2025
+    # Per-stream seam: Light/Heavy publish their accepted 2026Q1 actuals as
+    # history; PED history still ends at 2025Q4.
+    assert historical["period"].map(lambda value: int(str(value)[:4])).max() == 2026
+    ped_history = historical[historical["stream"].eq("PED")]
+    assert ped_history["period"].map(lambda value: quarter_sort_key(str(value))).max() == quarter_sort_key("2025Q4")
     future_chart = chart_rows[chart_rows["row_type"].eq("future_forecast")]
     assert len(future_chart) == len(result.future_forecasts)
     light_chart = future_chart[future_chart["stream"].eq("LIGHT_RUC")].sort_values("period")
@@ -541,22 +548,28 @@ def test_cli_runs_variable_horizon_with_scenario_name(tmp_path: Path) -> None:
     assert manifest["scenario_role"] is None
     assert manifest["forecast_horizon_quarters"] == 1
     future = pd.read_parquet(output_dir / "future_forecasts.parquet")
-    assert len(future) == len(STREAM_ORDER)
+    # Per-stream seam: the single workbook quarter (2026Q1) is an accepted
+    # Light/Heavy actual, so only PED scores it; Light/Heavy publish no
+    # forecast rows for a quarter already covered by canonical history.
+    assert len(future) == 1
+    assert set(future["stream"]) == {"PED"}
     light = future[future["stream"].eq("LIGHT_RUC")]
-    assert len(light) == 1
-    assert light["forecast_available"].eq(True).all()
+    assert light.empty
 
 
 def test_scenario_comparison_artifacts(tmp_path: Path) -> None:
+    # Two forecast quarters minimum: under the per-stream seam the first
+    # workbook quarter (2026Q1) is an accepted Light/Heavy actual, so a
+    # 1-quarter workbook would leave those streams with nothing to score.
     base = create_completed_sample_workbook(
         tmp_path / "NLTF forecast input template to 2050Q4 Basecase (2) Copy.xlsx",
         repo_root=ROOT,
-        quarters=1,
+        quarters=2,
     )
     high_population = create_completed_sample_workbook(
         tmp_path / "NLTF_forecast_input_template_to_2050Q4_high population Copy.xlsx",
         repo_root=ROOT,
-        quarters=2,
+        quarters=3,
         value_multiplier=1.02,
     )
     results = [
@@ -862,6 +875,11 @@ def test_forecast_run_artifacts_are_repo_ignored() -> None:
         # glass-box walkthrough deliverable, regenerated by
         # scripts/build_glass_box_workbook.py from committed pack data
         "deliverables/NLTF_revenue_glass_box.xlsx",
+        # governed quarterly-actuals source snapshot, vendored 2026-07-30
+        # (sha256 recorded in artifacts/actuals_refresh_2026q1/
+        # source_workbook_manifest.json; ingested by
+        # scripts/refresh_model_actuals.py, never read at runtime)
+        "references/NLTF_model_input_sheet_actuals_to_2026Q1_complete1.xlsx",
     }
 
 
@@ -961,7 +979,9 @@ def test_100q_forecast_builder_current_finalists_all_streams_numeric_and_determi
         assert first.manifest["fixed_finalists_only"] is True
         assert first.manifest["broad_search_run"] is False
         assert first.manifest["horizon_support_note"] == HORIZON_SUPPORT_NOTE
-        assert len(first.future_forecasts) == 300
+        # Per-stream seam: Light/Heavy 2026Q1 is an accepted actual (99 scored
+        # quarters each); PED scores all 100.
+        assert len(first.future_forecasts) == 298
         model_by_stream = first.future_forecasts.drop_duplicates("stream").set_index("stream")["model"].to_dict()
         assert model_by_stream == {
             "PED": CURRENT_PED_FINALIST,
@@ -971,7 +991,7 @@ def test_100q_forecast_builder_current_finalists_all_streams_numeric_and_determi
         for stream in STREAM_ORDER:
             rows = first.future_forecasts[first.future_forecasts["stream"].eq(stream)].sort_values("target_period")
             values = pd.to_numeric(rows["forecast"], errors="coerce")
-            assert len(rows) == 100
+            assert len(rows) == (100 if stream == "PED" else 99)
             assert rows["forecast_available"].astype(bool).all()
             assert values.notna().all() and np.isfinite(values).all()
             assert values.gt(0).all()
@@ -1009,7 +1029,7 @@ def test_100q_forecast_builder_current_finalists_all_streams_numeric_and_determi
         repo_root=ROOT,
         run_timestamp="determinism-comparison",
     )
-    assert len(comparison.future_forecasts) == 600
+    assert len(comparison.future_forecasts) == 596
     assert comparison.manifest["fixed_finalists_only"] is True
     assert comparison.manifest["broad_search_run"] is False
     assert comparison.manifest["horizon_support_note"] == HORIZON_SUPPORT_NOTE
@@ -1019,11 +1039,14 @@ def test_100q_forecast_builder_current_finalists_all_streams_numeric_and_determi
     assert "scenario_input_delta_audit.csv" in comparison.manifest["output_files"]
     for scenario in ["basecase", "high_population"]:
         rows = comparison.future_forecasts[comparison.future_forecasts["scenario_name"].eq(scenario)]
-        assert len(rows) == 300
+        assert len(rows) == 298
         assert set(rows["stream"]) == set(STREAM_ORDER)
         for stream in STREAM_ORDER:
             stream_rows = rows[rows["stream"].eq(stream)].sort_values("target_period")
-            assert stream_rows["target_period"].tolist() == _expected_periods(100)
+            expected_stream_periods = (
+                _expected_periods(100) if stream == "PED" else _expected_periods(100)[1:]
+            )
+            assert stream_rows["target_period"].tolist() == expected_stream_periods
     audit = comparison.scenario_input_delta_audit
     assert len(audit) == 100 * sum(
         len([column for column in STREAM_COLUMNS[stream] if column.role == "user" and column.required])
@@ -1080,7 +1103,8 @@ def test_exact_2050q4_workbooks_preserve_forecasts_and_source_continuity(tmp_pat
         assert result.manifest["forecast_horizon_quarters"] == 100
         assert result.manifest["forecast_start_period"] == "2026Q1"
         assert result.manifest["forecast_end_period"] == "2050Q4"
-        assert len(result.future_forecasts) == 300
+        # Per-stream seam: Light/Heavy 2026Q1 is an accepted actual.
+        assert len(result.future_forecasts) == 298
         assert set(result.future_forecasts["model"]) == {CURRENT_PED_FINALIST, CURRENT_LIGHT_FINALIST, CURRENT_HEAVY_FINALIST}
         _assert_source_derived_continuity(result)
 
@@ -1090,7 +1114,7 @@ def test_exact_2050q4_workbooks_preserve_forecasts_and_source_continuity(tmp_pat
         repo_root=ROOT,
         run_timestamp="exact-env-comparison",
     )
-    assert len(comparison.future_forecasts) == 600
+    assert len(comparison.future_forecasts) == 596
     assert comparison.manifest["scenario_role_validation"]["base_scenario"] == results[0].manifest["scenario_name"]
     assert comparison.manifest["scenario_role_validation"]["comparison_scenarios"] == [results[1].manifest["scenario_name"]]
     assert "high_population_fixture_note" not in comparison.manifest

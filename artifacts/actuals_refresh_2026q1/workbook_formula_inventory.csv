@@ -1,0 +1,3 @@
+sheet,cell,formula,cached_value
+Heavy RUC Inputs,U97,"=IF(N(S98)>0,S98,"""")",322.2389785916754
+Heavy RUC Inputs,V97,"=IF(N(U97)>0,LN(U97),"""")",5.775293439812151

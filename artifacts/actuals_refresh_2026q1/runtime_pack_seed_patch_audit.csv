@@ -1,0 +1,15 @@
+action,scenario_name,stream,period,old_value,new_value,reason
+repromoted_forecast_value,current_comparison_1,LIGHT_RUC,2028Q1,3434701192.375812,3434701192.3758116,Deterministic per-stream-seam replay from the refreshed canonical history.
+repromoted_forecast_value,current_basecase,LIGHT_RUC,2030Q3,3447750923.778664,3447750923.7786636,Deterministic per-stream-seam replay from the refreshed canonical history.
+repromoted_forecast_value,current_basecase,HEAVY_RUC,2026Q3,996995005.0187112,996995005.0187113,Deterministic per-stream-seam replay from the refreshed canonical history.
+repromoted_forecast_value,current_basecase,HEAVY_RUC,2027Q1,1036733167.622822,1036733167.6228219,Deterministic per-stream-seam replay from the refreshed canonical history.
+repromoted_forecast_value,current_basecase,HEAVY_RUC,2027Q3,1014453715.78637,1014453715.7863699,Deterministic per-stream-seam replay from the refreshed canonical history.
+repromoted_forecast_value,current_basecase,HEAVY_RUC,2027Q4,1070991568.5059284,1070991568.5059285,Deterministic per-stream-seam replay from the refreshed canonical history.
+repromoted_forecast_value,current_comparison_1,HEAVY_RUC,2027Q4,1073110469.6167308,1073110469.6167307,Deterministic per-stream-seam replay from the refreshed canonical history.
+repromoted_forecast_value,current_comparison_1,HEAVY_RUC,2028Q2,1012379234.24335,1012379234.2433499,Deterministic per-stream-seam replay from the refreshed canonical history.
+repromoted_forecast_value,current_comparison_1,HEAVY_RUC,2028Q3,1025119449.5666744,1025119449.5666745,Deterministic per-stream-seam replay from the refreshed canonical history.
+repromoted_forecast_value,current_comparison_1,HEAVY_RUC,2029Q1,1048800549.496342,1048800549.4963421,Deterministic per-stream-seam replay from the refreshed canonical history.
+repromoted_forecast_value,current_comparison_1,HEAVY_RUC,2029Q3,1033696637.4149588,1033696637.4149587,Deterministic per-stream-seam replay from the refreshed canonical history.
+repromoted_forecast_value,current_basecase,HEAVY_RUC,2030Q1,1055840902.555674,1055840902.5556741,Deterministic per-stream-seam replay from the refreshed canonical history.
+repromoted_forecast_value,current_comparison_1,HEAVY_RUC,2030Q1,1057235549.4740604,1057235549.4740605,Deterministic per-stream-seam replay from the refreshed canonical history.
+repromoted_forecast_value,current_basecase,HEAVY_RUC,2030Q2,1027619612.578018,1027619612.5780181,Deterministic per-stream-seam replay from the refreshed canonical history.

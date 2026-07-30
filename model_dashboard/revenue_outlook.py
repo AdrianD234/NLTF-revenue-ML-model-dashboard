@@ -4642,6 +4642,28 @@ def build_current_revenue_outlook_runtime_pack(
         "validation_status": "runtime_rebuilt",
     }
 
+    # Per-stream input-history vintage and forecast-origin status. Streams may
+    # legitimately hold different accepted cutoffs (exact Light/Heavy actuals
+    # with a still-provisional PED quarter), so the seam is published per
+    # stream in the details/downloads rather than as a single global cutoff.
+    stream_vintage_status = _stream_vintage_status_frame(root)
+    if not stream_vintage_status.empty:
+        manifest["period_rule"]["input_history_vintage"] = str(
+            stream_vintage_status["input_history_vintage"].iloc[0]
+        )
+        manifest["period_rule"]["stream_vintages"] = {
+            str(row["stream"]): {
+                "latest_accepted_exact_actual": str(row["latest_accepted_exact_actual"]),
+                "first_forecast_quarter": str(row["first_forecast_quarter"]),
+                "observation_status": str(row["observation_status"]),
+                "provisional_seed": str(row["provisional_seed"] or ""),
+            }
+            for _, row in stream_vintage_status.iterrows()
+        }
+        manifest["period_rule"]["fy2026_nowcast"] = str(
+            stream_vintage_status["fy2026_construction"].iloc[0]
+        )
+
     # Blocking completeness gate at the build/promotion boundary. Placed BEFORE
     # the write so a frame that violates the governed inventory is never
     # materialised, rather than being caught only if someone later runs the
@@ -4689,6 +4711,7 @@ def build_current_revenue_outlook_runtime_pack(
             "runtime_cutoff_audit": runtime_cutoff_audit,
             "fan_availability": fan_availability,
             "fan_band_rows": fan_band_rows,
+            "stream_vintage_status": stream_vintage_status,
         },
     )
     return load_revenue_outlook_pack(base, repo_root=root)  # type: ignore[return-value]
@@ -5364,6 +5387,92 @@ def _scenario_input_replay_mismatch_report(
         ["scenario_name", "stream", "annual_period", "forecast_quarter"],
         kind="stable",
     )
+
+
+def _stream_vintage_status_frame(repo_root: Path | str | None) -> pd.DataFrame:
+    """Per-stream input-history vintage, accepted cutoff and forecast origin.
+
+    Published in the pack details/downloads (not as a public warning banner):
+    the input-history vintage, each stream's latest accepted exact actual, the
+    stream's first forecast quarter, and - when a governed provisional PED
+    bridge sidecar exists - its status. The provisional value is never
+    displayed as an observed actual.
+    """
+    from .forecast_runner import (
+        add_quarters,
+        quarter_sort_key,
+        stream_latest_accepted_periods,
+    )
+
+    root = Path(repo_root) if repo_root is not None else repo_root_from_here()
+    try:
+        latest = stream_latest_accepted_periods(root)
+    except Exception:
+        return pd.DataFrame()
+    if not latest:
+        return pd.DataFrame()
+    input_history_vintage = ""
+    sidecar_path = root / "data" / "model_input_history" / "ped_provisional_bridge.json"
+    ped_seed_note = ""
+    ped_seed_period = ""
+    if sidecar_path.exists():
+        try:
+            sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+            entries = sidecar.get("entries", [])
+            if entries:
+                ped_seed_period = str(entries[-1].get("period", ""))
+                ped_seed_note = (
+                    f"provisional_annual_bridge seed available for {ped_seed_period} "
+                    f"(method {entries[-1].get('target_method', '')}; ped_mode "
+                    f"{sidecar.get('ped_mode', '')}); not an observed actual and excluded "
+                    "from estimation"
+                )
+        except Exception:
+            ped_seed_note = ""
+    history_manifest_path = root / "data" / "model_input_history" / "manifest.json"
+    try:
+        history_manifest = json.loads(history_manifest_path.read_text(encoding="utf-8"))
+        periods = [
+            str(item.get("last_period", ""))
+            for item in history_manifest.get("artifacts", [])
+            if item.get("last_period")
+        ]
+        if periods:
+            input_history_vintage = max(periods, key=quarter_sort_key)
+    except Exception:
+        input_history_vintage = max(latest.values(), key=quarter_sort_key)
+
+    fy2026_parts = []
+    rows = []
+    for stream in ("PED", "LIGHT_RUC", "HEAVY_RUC"):
+        accepted = latest.get(stream, "")
+        if not accepted:
+            continue
+        first_forecast = add_quarters(accepted, 1)
+        observation_status = "accepted_exact_actual_through_" + accepted
+        provisional = ""
+        if stream == "PED" and ped_seed_note:
+            provisional = ped_seed_note
+        rows.append(
+            {
+                "stream": stream,
+                "input_history_vintage": input_history_vintage,
+                "latest_accepted_exact_actual": accepted,
+                "first_forecast_quarter": first_forecast,
+                "observation_status": observation_status,
+                "provisional_seed": provisional,
+                "source_lineage": "data/model_input_history (see manifest.json refresh_history)",
+            }
+        )
+        fy2026_parts.append(f"{stream}: actuals through {accepted}, forecasts from {first_forecast}")
+    frame = pd.DataFrame(rows)
+    if not frame.empty:
+        frame["fy2026_construction"] = (
+            "FY2026 mixes accepted actuals and forecasts per stream ("
+            + "; ".join(fy2026_parts)
+            + ")"
+        )
+    return frame
 
 
 def _scenario_input_forecast_replay_lookup(

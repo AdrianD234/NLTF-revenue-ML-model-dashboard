@@ -34,6 +34,8 @@ artifacts/**
 !artifacts/heavy_ruc_forward_parity_debug/**
 !artifacts/uptake_shape_lab/
 !artifacts/uptake_shape_lab/**
+!artifacts/actuals_refresh_2026q1/
+!artifacts/actuals_refresh_2026q1/**
 !artifacts/long_horizon_validation/
 !artifacts/long_horizon_validation/**
 !artifacts/gdp_sign_guard_audit/
@@ -126,6 +128,8 @@ data/dashboard_evidence_pack_reproducibility/ped_inner_hpo/source_artifacts/**/*
 !data/source_workbooks/
 !data/source_workbooks/*.xlsx
 !data/source_workbooks/*.pdf
+!references/
+!references/NLTF_model_input_sheet_actuals_to_*.xlsx
 
 # MoT VFM 202405 derived uptake shares (governed lineage for EV lever presets)
 !data/vfm_202405/

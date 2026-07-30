@@ -11,7 +11,7 @@
   "workbook_full_path_public": false,
   "raw_workbook_vendored": true,
   "raw_repo_relative_path": "data/source_workbooks/Master Copy revenue modelling workbook.xlsx",
-  "notes": "Compact model-input history built from the master workbook input sheets. The raw workbook is vendored at data/source_workbooks/ (sha256 verified against source_sha256).",
+  "notes": "Compact model-input history built from the master workbook input sheets. The raw workbook is vendored at data/source_workbooks/ (sha256 verified against source_sha256). Refreshed through 2026Q1 from NLTF_model_input_sheet_actuals_to_2026Q1_complete1.xlsx (sha256 be951103cfa0...).",
   "artifacts": [
     {
       "stream": "PED",
@@ -62,8 +62,8 @@
       "first_period": "2002Q1",
       "last_period": "2026Q1",
       "positive_target_rows": 96,
-      "sha256": "d1955e01e07c74ad5aff08736cc822cd914cfa2df201e1f7dd8872116219a1f9",
-      "size_bytes": 46549
+      "sha256": "85e45e2d8dbf28e0d8929750e7126dc9d2a97d63c8e314479aff92a3b571290a",
+      "size_bytes": 47211
     },
     {
       "stream": "LIGHT_RUC",
@@ -123,9 +123,9 @@
       ],
       "first_period": "2002Q1",
       "last_period": "2026Q1",
-      "positive_target_rows": 66,
-      "sha256": "ab0a7ccc4b9c7f2a92c596fe3c25c2a21f973a8643733c50da08c4db0ceea76d",
-      "size_bytes": 59138
+      "positive_target_rows": 67,
+      "sha256": "f7a74d2f974bf51e5a02796b24a45145659e43f942cd3afb652490a026fd5f75",
+      "size_bytes": 59923
     },
     {
       "stream": "HEAVY_RUC",
@@ -174,9 +174,21 @@
       ],
       "first_period": "2002Q1",
       "last_period": "2026Q1",
-      "positive_target_rows": 66,
-      "sha256": "751d6f71ac0941c2c606b4bd87980c249b798df4ddd93d1e7c372b51394dc5bb",
-      "size_bytes": 44847
+      "positive_target_rows": 67,
+      "sha256": "5e410922777dc90d77c6ce0dcca9ede686c1395e65c386f21724c5814c1af030",
+      "size_bytes": 45607
+    }
+  ],
+  "refresh_history": [
+    {
+      "refreshed_at": "2026-07-30T04:43:18Z",
+      "workbook": "NLTF_model_input_sheet_actuals_to_2026Q1_complete1.xlsx",
+      "workbook_sha256": "be951103cfa0fc4415583044397eea11982c2d83b0679bd97984cb0b0cf305a3",
+      "periods": [
+        "2026Q1"
+      ],
+      "ped_mode": "provisional_replay_only",
+      "tool": "scripts/refresh_model_actuals.py"
     }
   ]
 }

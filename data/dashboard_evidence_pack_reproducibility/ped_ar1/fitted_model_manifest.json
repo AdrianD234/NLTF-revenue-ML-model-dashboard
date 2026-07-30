@@ -18,7 +18,7 @@
   "production_states": {
     "AR1": {
       "file": "ar1_fitted_state.json",
-      "sha256": "7c6a7c8b9089db9379f1f09ab9cc077f54fa2f9c08f9e92ed993ef115e154138",
+      "sha256": "361c3364836b21374f9c99f798da94742f3674b3a177484e8f4d4601f700c7a6",
       "train_window_start": "2002Q2",
       "train_window_end": "2025Q4",
       "train_rows": 95

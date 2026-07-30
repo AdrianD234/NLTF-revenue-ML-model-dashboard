@@ -574,6 +574,35 @@ def latest_known_actual_period(repo_root: Path | str | None = None) -> str:
     return max(periods, key=quarter_sort_key)
 
 
+def stream_latest_accepted_periods(repo_root: Path | str | None = None) -> dict[str, str]:
+    """Per-stream latest accepted actual quarter from the canonical history.
+
+    A quarter counts as accepted for a stream when its canonical
+    ``model_input_history`` row carries a positive target - the same rule the
+    fitting/scoring engines use (``target > 0``). Streams may legitimately
+    disagree: an exact Light/Heavy actual can be accepted for a quarter whose
+    PED target is still provisional (kept at the 0.0 placeholder), so PED's
+    accepted cutoff stays one quarter behind. Falls back to the global
+    ``latest_known_actual_period`` for any stream whose history is unreadable.
+    """
+    root = Path(repo_root) if repo_root is not None else repo_root_from_here()
+    fallback = latest_known_actual_period(root)
+    out: dict[str, str] = {}
+    for stream, filename in MODEL_INPUT_HISTORY_FILES.items():
+        path = root / MODEL_INPUT_HISTORY_DIR / filename
+        latest = fallback
+        try:
+            frame = pd.read_parquet(path, columns=["period", "target"])
+            targets = pd.to_numeric(frame["target"], errors="coerce")
+            periods = frame.loc[targets.gt(0), "period"].astype(str).tolist()
+            if periods:
+                latest = max(periods, key=quarter_sort_key)
+        except Exception:
+            pass
+        out[stream] = latest
+    return out
+
+
 def quarter_sort_key(period: str) -> int:
     year, quarter = parse_period(period)
     return year * 4 + quarter
@@ -1012,7 +1041,9 @@ def run_forecast_workbook(
         scenario_name=scenario,
         scenario_role=resolved_role,
     )
-    chart_rows = forecast_chart_rows_for_display(future, repo_root=root, latest_actual_period=validation.latest_actual_period)
+    # No explicit cutoff: each stream displays history through its own
+    # accepted actual (per-stream seam), matching the scored output rows.
+    chart_rows = forecast_chart_rows_for_display(future, repo_root=root)
     report = _forecast_validation_report(validation, capabilities)
     forecast_status = _forecast_status(validation, future)
     manifest = {
@@ -1131,16 +1162,39 @@ def replay_forecast_from_scenario_inputs(
     repo_root: Path | str | None = None,
     latest_actual_period: str | None = None,
     engine: str = "ensemble",
+    seam: str = "per_stream",
+    ped_seed: dict[str, float] | None = None,
 ) -> ScenarioInputForecastReplayResult:
     """Replay fixed-finalist forecasts from committed scenario_input_wide rows.
 
     This is the repo-local runtime counterpart to ``run_forecast_workbook``:
     no Excel file is loaded, and every scored row comes from materialized
     scenario input artifacts.
+
+    ``seam`` selects how the actual/forecast boundary is drawn:
+
+    - ``"common"`` (legacy, pre-2026Q1-refresh): every stream scores every
+      scenario period, and the single ``latest_actual_period`` describes the
+      shared history cutoff.
+    - ``"per_stream"`` (default since the 2026Q1 actuals refresh): each
+      stream scores only scenario periods AFTER its own
+      latest accepted actual (``stream_latest_accepted_periods``), so a
+      scenario quarter superseded by an accepted actual is never re-forecast
+      and recursive target lags roll from that actual. Streams may therefore
+      have different forecast origins (e.g. an exact Light/Heavy actual with a
+      still-provisional PED quarter).
+
+    ``ped_seed`` (per-stream seam only) maps period -> level for a governed
+    provisional PED recursive-history seed (Candidate B replay). It is only
+    ever used as a lag seed for scoring later quarters; it is never fitted on
+    and never emitted as a forecast or an actual row.
     """
 
+    if seam not in ("common", "per_stream"):
+        raise ValueError(f"Unknown seam mode: {seam!r}")
     root = Path(repo_root) if repo_root is not None else repo_root_from_here()
     latest = latest_actual_period or latest_known_actual_period(root)
+    stream_latest = stream_latest_accepted_periods(root) if seam == "per_stream" else {}
     columns = [
         "scenario_name",
         "scenario_role",
@@ -1204,16 +1258,129 @@ def replay_forecast_from_scenario_inputs(
             periods = stream_rows["canonical_period"].dropna().astype(str).tolist()
             periods_by_stream[stream] = periods
             frames_by_stream[stream] = stream_rows.assign(period=stream_rows["canonical_period"])
-        periods = _common_forecast_periods(periods_by_stream)
         errors: list[str] = []
         warnings: list[str] = []
+        missing_streams = [stream for stream in STREAM_ORDER if stream not in frames_by_stream]
+        if missing_streams:
+            errors.append("Scenario input rows missing streams: " + ", ".join(missing_streams))
+
+        if seam == "per_stream":
+            scenario_futures: list[pd.DataFrame] = []
+            scenario_components: list[pd.DataFrame] = []
+            scenario_assumptions: list[pd.DataFrame] = []
+            start_periods: list[str] = []
+            end_periods: list[str] = []
+            for stream in STREAM_ORDER:
+                frame = frames_by_stream.get(stream)
+                if frame is None:
+                    continue
+                origin = stream_latest.get(stream, latest)
+                if stream == "PED" and ped_seed:
+                    # Candidate-B provisional replay: the seeded quarter(s)
+                    # become recursive history, so PED forecasts start after
+                    # the last seeded quarter. The seed itself is never
+                    # emitted as a forecast or an actual row.
+                    origin = max([origin, *ped_seed.keys()], key=quarter_sort_key)
+                all_periods = periods_by_stream.get(stream, [])
+                stream_periods = [
+                    p for p in all_periods if quarter_sort_key(p) > quarter_sort_key(origin)
+                ]
+                superseded = [
+                    p for p in all_periods if quarter_sort_key(p) <= quarter_sort_key(origin)
+                ]
+                if superseded:
+                    warnings.append(
+                        f"{stream}: scenario quarters {superseded} are superseded by accepted "
+                        f"actuals through {origin} and are not re-forecast."
+                    )
+                stream_errors = list(errors)
+                if stream_periods:
+                    expected_first = add_quarters(origin, 1)
+                    if stream_periods[0] != expected_first:
+                        stream_errors.append(
+                            f"{stream}: scenario periods must continue from {expected_first} "
+                            f"(latest accepted actual {origin}); found {stream_periods[0]}."
+                        )
+                else:
+                    stream_errors.append(
+                        f"{stream}: no scenario periods remain after the latest accepted actual {origin}."
+                    )
+                stream_frame = frame[frame["period"].astype(str).isin(stream_periods)]
+                stream_assumptions = (
+                    _build_stream_assumptions(stream_frame, stream, stream_periods)
+                    if stream_periods and not stream_errors
+                    else pd.DataFrame()
+                )
+                _add_scenario_columns(stream_assumptions, scenario, scenario_role)
+                stream_validation = ForecastValidationResult(
+                    valid=not stream_errors and not stream_assumptions.empty,
+                    errors=stream_errors,
+                    warnings=warnings,
+                    assumptions=stream_assumptions,
+                    latest_actual_period=origin,
+                    forecast_periods=stream_periods,
+                )
+                stream_future, stream_component = _forecast_output_rows(
+                    stream_validation,
+                    capabilities,
+                    root,
+                    engine=engine,
+                    streams=[stream],
+                    ped_seed=ped_seed if stream == "PED" else None,
+                )
+                scenario_futures.append(stream_future)
+                scenario_components.append(stream_component)
+                scenario_assumptions.append(stream_assumptions)
+                for stream_error in stream_errors:
+                    if stream_error not in errors:
+                        errors.append(stream_error)
+                if stream_periods:
+                    start_periods.append(stream_periods[0])
+                    end_periods.append(stream_periods[-1])
+            future = pd.concat(scenario_futures, ignore_index=True, sort=False) if scenario_futures else pd.DataFrame()
+            components = (
+                pd.concat(scenario_components, ignore_index=True, sort=False) if scenario_components else pd.DataFrame()
+            )
+            assumptions = (
+                pd.concat(scenario_assumptions, ignore_index=True, sort=False)
+                if scenario_assumptions
+                else pd.DataFrame()
+            )
+            _add_scenario_columns(future, scenario, scenario_role)
+            _add_scenario_columns(components, scenario, scenario_role)
+            start = min(start_periods, key=quarter_sort_key) if start_periods else ""
+            end = max(end_periods, key=quarter_sort_key) if end_periods else ""
+            horizon_quarters = (
+                (quarter_sort_key(end) - quarter_sort_key(start) + 1) if start and end else 0
+            )
+            future_frames.append(future)
+            component_frames.append(components)
+            assumption_frames.append(assumptions)
+            report_rows.append(
+                {
+                    "scenario_name": scenario,
+                    "scenario_role": scenario_role,
+                    "valid": not errors and not assumptions.empty,
+                    "errors": "; ".join(errors),
+                    "warnings": "; ".join(warnings),
+                    "forecast_start_period": start,
+                    "forecast_end_period": end,
+                    "forecast_horizon_quarters": horizon_quarters,
+                    "assumption_rows": int(len(assumptions)),
+                    "numeric_forecast_rows": int(
+                        pd.to_numeric(future.get("forecast"), errors="coerce").notna().sum()
+                        if not future.empty and "forecast" in future.columns
+                        else 0
+                    ),
+                }
+            )
+            continue
+
+        periods = _common_forecast_periods(periods_by_stream)
         if periods is None:
             details = "; ".join(f"{stream}={periods_by_stream.get(stream, [])}" for stream in STREAM_ORDER)
             errors.append("Scenario input streams do not share identical forecast periods. " + details)
             periods = next(iter(periods_by_stream.values()), [])
-        missing_streams = [stream for stream in STREAM_ORDER if stream not in frames_by_stream]
-        if missing_streams:
-            errors.append("Scenario input rows missing streams: " + ", ".join(missing_streams))
         frames: list[pd.DataFrame] = []
         if periods and not errors:
             for stream in STREAM_ORDER:
@@ -1300,13 +1467,14 @@ def forecast_chart_rows_for_display(
     latest_actual_period: str | None = None,
 ) -> pd.DataFrame:
     root = Path(repo_root) if repo_root is not None else repo_root_from_here()
-    latest = latest_actual_period or latest_known_actual_period(root)
     streams = (
         future_forecasts["stream"].dropna().astype(str).unique().tolist()
         if future_forecasts is not None and not future_forecasts.empty and "stream" in future_forecasts.columns
         else STREAM_ORDER
     )
-    historical = historical_actual_rows(root, latest_actual_period=latest, streams=streams)
+    # When no explicit cutoff is given, each stream publishes history through
+    # its OWN latest accepted actual (per-stream seam).
+    historical = historical_actual_rows(root, latest_actual_period=latest_actual_period, streams=streams)
     future = _future_forecast_chart_rows(future_forecasts)
     chart_rows = pd.concat([historical, future], ignore_index=True, sort=False)
     if chart_rows.empty:
@@ -1322,15 +1490,28 @@ def historical_actual_rows(
     latest_actual_period: str | None = None,
     streams: list[str] | tuple[str, ...] | None = None,
 ) -> pd.DataFrame:
+    """Historical actual rows per stream.
+
+    With an explicit ``latest_actual_period`` every stream is cut at that
+    quarter (legacy behaviour). Without one, each stream publishes through its
+    OWN latest accepted actual from canonical history, so an accepted
+    Light/Heavy quarter is displayed as an actual even while the PED quarter
+    remains provisional.
+    """
     root = Path(repo_root) if repo_root is not None else repo_root_from_here()
-    latest = latest_actual_period or latest_known_actual_period(root)
     selected_streams = list(streams) if streams is not None else list(STREAM_ORDER)
+    if latest_actual_period:
+        per_stream = {stream: latest_actual_period for stream in selected_streams}
+        fallback_latest = latest_actual_period
+    else:
+        per_stream = stream_latest_accepted_periods(root)
+        fallback_latest = latest_known_actual_period(root)
     rows: list[dict[str, Any]] = []
     for stream in selected_streams:
-        rows.extend(_model_input_history_rows(root, stream, latest))
+        rows.extend(_model_input_history_rows(root, stream, per_stream.get(stream, fallback_latest)))
     if rows:
         return pd.DataFrame(rows)
-    return _evidence_pack_actual_rows(root, selected_streams, latest)
+    return _evidence_pack_actual_rows(root, selected_streams, fallback_latest)
 
 
 def _model_input_history_rows(root: Path, stream: str, latest_actual_period: str) -> list[dict[str, Any]]:
@@ -2152,35 +2333,89 @@ def _forecast_output_rows(
     capabilities: pd.DataFrame,
     repo_root: Path,
     engine: str = "ensemble",
+    streams: list[str] | tuple[str, ...] | None = None,
+    ped_seed: dict[str, float] | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
+    selected_streams = [s for s in STREAM_ORDER if streams is None or s in set(streams)]
+
+    # Per-stream seam: quarters at or before a stream's accepted actual are
+    # canonical history and are never scored or emitted as forecast rows,
+    # regardless of which input path (committed scenario replay or uploaded
+    # workbook) supplied them. The stream's recursion then rolls from the
+    # accepted actual.
+    try:
+        accepted_cutoffs = stream_latest_accepted_periods(repo_root)
+    except Exception:
+        accepted_cutoffs = {}
+
+    def _stream_validation(stream: str) -> ForecastValidationResult:
+        cutoff = accepted_cutoffs.get(stream)
+        if not cutoff or not validation.forecast_periods:
+            return validation
+        if quarter_sort_key(cutoff) <= quarter_sort_key(validation.latest_actual_period):
+            return validation
+        periods = [
+            p for p in validation.forecast_periods if quarter_sort_key(p) > quarter_sort_key(cutoff)
+        ]
+        if periods == list(validation.forecast_periods):
+            return validation
+        assumptions = validation.assumptions
+        if assumptions is not None and not assumptions.empty and "period" in assumptions.columns:
+            keep = ~assumptions["stream"].astype(str).eq(stream) | assumptions["period"].astype(str).isin(periods)
+            assumptions = assumptions[keep]
+        return ForecastValidationResult(
+            valid=validation.valid,
+            errors=validation.errors,
+            warnings=validation.warnings,
+            assumptions=assumptions,
+            latest_actual_period=cutoff,
+            forecast_periods=periods,
+        )
+
     light_future: pd.DataFrame | None = None
     light_components: pd.DataFrame | None = None
     scorer_errors: dict[str, str] = {}
     cap_lookup = capabilities.set_index("stream").to_dict(orient="index")
-    if validation.valid and cap_lookup.get("LIGHT_RUC", {}).get("forecast_capability_available"):
+    if (
+        "LIGHT_RUC" in selected_streams
+        and validation.valid
+        and cap_lookup.get("LIGHT_RUC", {}).get("forecast_capability_available")
+    ):
         try:
-            light_future, light_components = _light_ruc_forward_forecast(validation, repo_root)
+            light_future, light_components = _light_ruc_forward_forecast(
+                _stream_validation("LIGHT_RUC"), repo_root
+            )
         except Exception as exc:
             scorer_errors["LIGHT_RUC"] = f"{type(exc).__name__}: {exc}"
 
     vnext_outputs: dict[str, tuple[pd.DataFrame, pd.DataFrame]] = {}
     for stream in ("PED", "HEAVY_RUC"):
+        if stream not in selected_streams:
+            continue
         if validation.valid and cap_lookup.get(stream, {}).get("forecast_capability_available"):
             try:
+                stream_validation = _stream_validation(stream)
                 if stream == "PED" and engine == "ar1":
                     from pipeline.ar1_engine import ar1_forward_forecast
 
-                    vnext_outputs[stream] = ar1_forward_forecast(validation, repo_root)
+                    vnext_outputs[stream] = ar1_forward_forecast(
+                        stream_validation, repo_root, history_seed=ped_seed if stream == "PED" else None
+                    )
                 else:
                     from .vnext_forward_integration import vnext_forward_forecast
 
-                    vnext_outputs[stream] = vnext_forward_forecast(validation, repo_root, stream)
+                    vnext_outputs[stream] = vnext_forward_forecast(
+                        stream_validation,
+                        repo_root,
+                        stream,
+                        y_seed=ped_seed if stream == "PED" else None,
+                    )
             except Exception as exc:
                 scorer_errors[stream] = f"{type(exc).__name__}: {exc}"
 
     future_rows: list[pd.DataFrame] = []
     component_rows: list[pd.DataFrame] = []
-    for stream in STREAM_ORDER:
+    for stream in selected_streams:
         if stream == "LIGHT_RUC" and light_future is not None and light_components is not None:
             future_rows.append(light_future)
             component_rows.append(light_components)
@@ -2190,8 +2425,9 @@ def _forecast_output_rows(
             component_rows.append(vnext_outputs[stream][1])
             continue
         error_suffix = f" Scorer error: {scorer_errors[stream]}" if stream in scorer_errors else ""
-        future_rows.append(_gap_future_forecast_rows(validation, capabilities, stream, error_suffix=error_suffix))
-        component_rows.append(_gap_component_forecast_rows(validation, capabilities, repo_root, stream, error_suffix=error_suffix))
+        stream_validation = _stream_validation(stream)
+        future_rows.append(_gap_future_forecast_rows(stream_validation, capabilities, stream, error_suffix=error_suffix))
+        component_rows.append(_gap_component_forecast_rows(stream_validation, capabilities, repo_root, stream, error_suffix=error_suffix))
     future = pd.concat(future_rows, ignore_index=True, sort=False) if future_rows else pd.DataFrame()
     components = pd.concat(component_rows, ignore_index=True, sort=False) if component_rows else pd.DataFrame()
     future = _attach_capability_metadata(future, capabilities)

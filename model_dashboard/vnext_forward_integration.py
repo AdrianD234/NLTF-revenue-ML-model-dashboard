@@ -106,11 +106,18 @@ def evaluate_vnext_forward_scorer(root: Path, stream: str) -> ForwardScorerAudit
     )
 
 
-def vnext_forward_forecast(validation: Any, repo_root: Path, stream: str) -> tuple[pd.DataFrame, pd.DataFrame]:
+def vnext_forward_forecast(
+    validation: Any,
+    repo_root: Path,
+    stream: str,
+    y_seed: dict[str, float] | None = None,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Score validated workbook assumption rows with the fixed vNext finalist.
 
     Returns (future_rows, component_rows) shaped for the Forecast Builder.
     Raises on any inconsistency so the caller can fall back to governed gaps.
+    ``y_seed`` is the governed provisional recursive-history seed (see
+    ``pipeline.vnext_forward.forward_forecast``).
     """
     from pipeline.vnext_core import load_stream_data, parse_period
     from pipeline.vnext_forward import REQUIRED_USER_COLUMNS, forward_forecast, load_scorer
@@ -127,7 +134,7 @@ def vnext_forward_forecast(validation: Any, repo_root: Path, stream: str) -> tup
     missing = [c for c in REQUIRED_USER_COLUMNS[stream] if c not in sub.columns]
     if missing:
         raise ValueError(f"{stream}: validated assumptions missing columns {missing}")
-    future, components, capability = forward_forecast(stream, sub, scorer)
+    future, components, capability = forward_forecast(stream, sub, scorer, y_seed=y_seed)
     if not bool(capability.get("forecast_capability_available")):
         raise RuntimeError(f"{stream}: scorer reported {capability.get('capability_status')}")
 

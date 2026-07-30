@@ -271,11 +271,18 @@ def build_future_canonical_frame(assumptions: pd.DataFrame, stream: str) -> pd.D
 
 
 def forward_forecast(stream: str, assumptions: pd.DataFrame,
-                     scorer: Optional[VNextScorer] = None) -> Tuple[pd.DataFrame, pd.DataFrame, Dict[str, Any]]:
+                     scorer: Optional[VNextScorer] = None,
+                     y_seed: Optional[Dict[str, float]] = None) -> Tuple[pd.DataFrame, pd.DataFrame, Dict[str, Any]]:
     """Score future assumption rows with the fixed vNext finalist.
 
     Returns (future_rows, component_rows, capability_record). When the
     parity/state gates fail, forecast values are missing (governed gap).
+
+    ``y_seed`` maps period string -> LEVEL for governed recursive-history
+    seeds beyond the stream's latest accepted actual (e.g. a provisional PED
+    annual-bridge quarter under the Candidate-B replay). Seeds only feed the
+    target-lag recursion; they are never fitted on and never emitted as
+    forecast rows.
     """
     scorer = scorer or load_scorer(stream)
     sd = load_stream_data(repo_root(), stream)
@@ -299,6 +306,17 @@ def forward_forecast(stream: str, assumptions: pd.DataFrame,
     weights = {m["component_label"]: float(m["component_weight"]) for m in members}
     base_y_hist = {p: float(sd.y_log.loc[p]) for p in sd.y_log.index
                    if pd.notna(sd.y_log.loc[p]) and p <= sd.latest_actual}
+    if y_seed:
+        for seed_period, seed_level in y_seed.items():
+            sp = parse_period(seed_period)
+            if sp <= sd.latest_actual:
+                raise ValueError(
+                    f"{stream}: y_seed {seed_period} does not postdate the latest accepted actual "
+                    f"{period_str(sd.latest_actual)}; refusing to overwrite observed history."
+                )
+            if not np.isfinite(float(seed_level)) or float(seed_level) <= 0:
+                raise ValueError(f"{stream}: y_seed {seed_period} must be a positive level.")
+            base_y_hist[sp] = float(np.log(float(seed_level)))
 
     comp_levels: Dict[str, List[float]] = {}
     comp_logs: Dict[str, List[float]] = {}

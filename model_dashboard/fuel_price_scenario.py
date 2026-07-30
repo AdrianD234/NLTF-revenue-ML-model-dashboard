@@ -1176,6 +1176,16 @@ def _apply_governed_policy_demand_calibration(
         _POLICY_CALIBRATION_NOTE
     )
 
+    # Per-stream seam: scenario quarters at or before a stream's latest
+    # accepted actual are canonical history, never calibrated forecasts.
+    from .forecast_runner import quarter_sort_key as _seam_qkey
+    from .forecast_runner import stream_latest_accepted_periods as _seam_latest
+
+    try:
+        _seam_cutoffs = _seam_latest(None)
+    except Exception:
+        _seam_cutoffs = {}
+
     directly_calibrated_rows: list[int] = []
     for variant_name, reference_name in variant_reference_scenarios.items():
         is_policy_variant = variant_name in policy_reference_scenarios
@@ -1199,6 +1209,9 @@ def _apply_governed_policy_demand_calibration(
                 & replay_inputs["stream"].astype(str).eq(stream)
             ]
             for period in variant_rows["canonical_period"].dropna().astype(str):
+                _cutoff = _seam_cutoffs.get(str(stream))
+                if _cutoff and _seam_qkey(period) <= _seam_qkey(_cutoff):
+                    continue
                 variant_key = (variant_name, stream, period)
                 reference_key = (reference_name, stream, period)
                 if (
@@ -2470,6 +2483,16 @@ def _validate_complete_numeric_replay(
     if forecasts is None or forecasts.empty or required_forecast_columns.difference(forecasts.columns):
         raise ValueError("Fixed-finalist conflict replay produced no usable forecast rows.")
 
+    # Per-stream seam: scenario quarters at or before a stream's latest
+    # accepted actual are covered by canonical history, never re-forecast.
+    from .forecast_runner import quarter_sort_key as _qkey
+    from .forecast_runner import stream_latest_accepted_periods as _stream_latest
+
+    try:
+        accepted_cutoffs = _stream_latest(None)
+    except Exception:
+        accepted_cutoffs = {}
+
     problems: list[str] = []
     for scenario_name in scenario_names:
         scenario_inputs = replay_inputs[
@@ -2484,6 +2507,11 @@ def _validate_complete_numeric_replay(
                     scenario_inputs["stream"].astype(str).eq(stream), "canonical_period"
                 ].dropna().astype(str)
             )
+            cutoff = accepted_cutoffs.get(str(stream))
+            if cutoff:
+                expected_periods = {
+                    period for period in expected_periods if _qkey(period) > _qkey(cutoff)
+                }
             stream_forecasts = scenario_forecasts[
                 scenario_forecasts["stream"].astype(str).eq(stream)
             ].copy()

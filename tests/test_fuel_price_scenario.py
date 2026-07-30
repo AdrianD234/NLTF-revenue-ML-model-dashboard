@@ -501,8 +501,11 @@ def test_conflict_replay_rejects_partial_numeric_stream_coverage() -> None:
         )
 
     message = str(excinfo.value)
+    # Per-stream seam: PED's accepted cutoff is 2025Q4 so both fixture
+    # quarters are required; Light/Heavy hold accepted 2026Q1 actuals so only
+    # 2026Q2 remains a required forecast quarter.
     assert "current_basecase/PED: 0 of 2 required quarters are numeric" in message
-    assert "current_basecase/HEAVY_RUC: 0 of 2 required quarters are numeric" in message
+    assert "current_basecase/HEAVY_RUC: 0 of 1 required quarters are numeric" in message
     assert "No module named '_loss'" in message
 
 
@@ -558,8 +561,10 @@ def test_run_rejects_partial_replay_before_annual_bridge(
         run_fuel_price_scenario_replay(scenario_inputs, repo_root=ROOT, engine="ensemble")
 
     message = str(excinfo.value)
+    # Per-stream seam: Light/Heavy hold an accepted 2026Q1 actual, so 99 of
+    # the 100 committed scenario quarters remain required forecasts.
     assert "current_basecase/PED: 0 of 100 required quarters are numeric" in message
-    assert "current_basecase/HEAVY_RUC: 0 of 100 required quarters are numeric" in message
+    assert "current_basecase/HEAVY_RUC: 0 of 99 required quarters are numeric" in message
     assert "ped_ar1_parity_failed" in message
 
 
@@ -992,7 +997,8 @@ def test_fixed_finalist_replay_preserves_base_and_orders_governed_conflict_paths
     assert set(validation.index) == expected_scenarios
     assert validation["valid"].all()
     assert set(validation["forecast_horizon_quarters"].astype(int)) == {100}
-    assert set(validation["numeric_forecast_rows"].astype(int)) == {300}
+    # Per-stream seam: PED 100 + Light 99 + Heavy 99 scored quarters.
+    assert set(validation["numeric_forecast_rows"].astype(int)) == {298}
 
     base_inputs = fuel_replay.treasury_base_inputs
     control = replay_forecast_from_scenario_inputs(
@@ -1040,6 +1046,11 @@ def test_fixed_finalist_replay_preserves_base_and_orders_governed_conflict_paths
             "HEAVY_RUC": "diesel_ratio",
         }.items():
             for period, row in level_path.iterrows():
+                if (scenario_name, stream, period) not in forecasts.index:
+                    # Per-stream seam: quarters at or before the stream's
+                    # accepted actual (Light/Heavy 2026Q1) are canonical
+                    # history and are not replayed.
+                    continue
                 ratio = float(row[ratio_field])
                 scenario_value = float(
                     forecasts.at[(scenario_name, stream, period), "forecast"]
@@ -1099,7 +1110,8 @@ def test_policy_replay_builds_twelve_paths_with_formula_closed_net_ruc(
     validation = fuel_replay.policy_validation_report.set_index("scenario_name")
     assert len(validation) == 12
     assert validation["valid"].all()
-    assert set(validation["numeric_forecast_rows"].astype(int)) == {300}
+    # Per-stream seam: PED 100 + Light 99 + Heavy 99 scored quarters.
+    assert set(validation["numeric_forecast_rows"].astype(int)) == {298}
     _assert_governed_policy_demand_calibration(fuel_replay)
 
     family_paths = {
@@ -1307,7 +1319,8 @@ def test_ar1_pack_replays_twelve_paths_and_retains_source_lineage(
     assert len(validation) == 12
     assert validation["valid"].all()
     assert set(validation["forecast_horizon_quarters"].astype(int)) == {100}
-    assert set(validation["numeric_forecast_rows"].astype(int)) == {300}
+    # Per-stream seam: PED 100 + Light 99 + Heavy 99 scored quarters.
+    assert set(validation["numeric_forecast_rows"].astype(int)) == {298}
 
     input_audit = ar1_fuel_replay.input_audit
     assert len(input_audit) == 3 * 20 * 3
