@@ -130,23 +130,45 @@ def test_no_decision_facing_quarter_beyond_h20(chart_rows: pd.DataFrame) -> None
     assert horizons.min() >= 1
 
 
-def test_fy2031_annual_light_ruc_is_unavailable(chart_rows: pd.DataFrame) -> None:
-    """5. Two supported quarters do not make a publishable June year."""
+def test_fy2031_annual_light_ruc_is_not_an_econometric_value(chart_rows: pd.DataFrame) -> None:
+    """5. Two supported quarters still do not make a publishable ECONOMETRIC year.
+
+    FY2031 now publishes, but only as the separately governed post-model
+    structural extrapolation. The original protection is unchanged and is
+    what this asserts: the quarterly-completeness rule still forbids an
+    econometric FY2031, because 2031Q1/Q2 are H21/H22.
+    """
     annual = _current_annual(chart_rows)
     fy2031 = annual[annual["june_year_numeric"].eq(2031)]
     light = fy2031[fy2031["series_id"].astype(str).eq("light_ruc_net_km")]
-    assert light.empty, "FY2031 needs all four quarters; 2031Q1/Q2 are H21/H22"
+    segments = set(light["forecast_segment"].fillna("").astype(str))
+    assert segments <= {"post_model_extrapolation"}, (
+        f"FY2031 Light RUC must not carry an econometric value; found {segments}"
+    )
+    econometric = annual[annual["forecast_segment"].fillna("").astype(str).eq("econometric_forecast")]
+    assert int(econometric["june_year_numeric"].max()) == LAST_DECISION_GRADE_ANNUAL_FY, (
+        "the econometric segment must still stop at the governed annual cutoff"
+    )
 
 
-def test_fy2031_light_ruc_dependent_totals_are_unavailable(chart_rows: pd.DataFrame) -> None:
-    """6. No total that reads Light RUC may exist past the annual cutoff."""
+def test_light_ruc_dependent_totals_past_the_cutoff_are_only_post_model(chart_rows: pd.DataFrame) -> None:
+    """6. Past the annual cutoff, every Light RUC-dependent total must be labelled.
+
+    An unlabelled long-run total is the retired divergent construction
+    returning, which is exactly what P0 withheld.
+    """
     annual = _current_annual(chart_rows)
     beyond = annual[annual["june_year_numeric"].gt(LAST_DECISION_GRADE_ANNUAL_FY)]
-    leaked = sorted(
-        set(beyond["series_id"].astype(str)) & LIGHT_RUC_DEPENDENT_ANNUAL_SERIES
+    dependent = beyond[beyond["series_id"].astype(str).isin(LIGHT_RUC_DEPENDENT_ANNUAL_SERIES)]
+    unlabelled = dependent[
+        ~dependent["forecast_segment"].fillna("").astype(str).eq("post_model_extrapolation")
+    ]
+    leaked = sorted(set(unlabelled["series_id"].astype(str)))
+    assert not leaked, (
+        f"unlabelled Light RUC-dependent annual rows past FY{LAST_DECISION_GRADE_ANNUAL_FY}: {leaked}"
     )
-    assert not leaked, f"Light RUC-dependent annual rows past FY{LAST_DECISION_GRADE_ANNUAL_FY}: {leaked}"
-    assert int(annual["june_year_numeric"].max()) == LAST_DECISION_GRADE_ANNUAL_FY
+    # The post-model window itself is bounded; nothing may run past it.
+    assert int(annual["june_year_numeric"].max()) == 2050
 
 
 def test_official_comparator_fy2031_remains_available(chart_rows: pd.DataFrame) -> None:

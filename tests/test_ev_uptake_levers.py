@@ -324,15 +324,21 @@ def test_default_uptake_reconciles_native_quarters_to_adjusted_annual_activity()
     # and annual availability are independent contracts now, so reconcile only
     # the June years that actually publish an annual result.
     def _published_fys(scenario: str) -> list[int]:
-        years = pd.to_numeric(
-            adjusted.loc[
-                adjusted["time_grain"].astype(str).eq("june_year")
-                & adjusted["scenario_name"].astype(str).eq(scenario)
-                & adjusted["series_id"].astype(str).eq("light_ruc_net_km"),
-                "june_year",
-            ],
-            errors="coerce",
-        ).dropna()
+        # Quarter-to-annual reconciliation applies to the ECONOMETRIC years
+        # only. The post-model extrapolation is annual by construction -
+        # H21+ quarterly emission stays withheld - so its June years have no
+        # quarters to reconcile against and requiring four would contradict
+        # the horizon contract.
+        selected = adjusted[
+            adjusted["time_grain"].astype(str).eq("june_year")
+            & adjusted["scenario_name"].astype(str).eq(scenario)
+            & adjusted["series_id"].astype(str).eq("light_ruc_net_km")
+        ]
+        if "forecast_segment" in selected.columns:
+            selected = selected[
+                ~selected["forecast_segment"].fillna("").astype(str).eq("post_model_extrapolation")
+            ]
+        years = pd.to_numeric(selected["june_year"], errors="coerce").dropna()
         return sorted(int(value) for value in years.unique() if int(value) >= 2026)
 
     for scenario in ("current_basecase", "current_comparison_1"):

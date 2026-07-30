@@ -211,11 +211,10 @@ def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
             for title in [
                 "Revenue Outlook controls",
                 "Total path chart",
+                # Restored beside the total path chart (417f34a undone).
+                "Uncertainty fan",
             ]:
                 assert_text_above_fold(page, title)
-            expect(
-                page.get_by_text("Uncertainty fan", exact=False).first
-            ).not_to_be_visible(timeout=60000)
             for title in [
                 "Revenue composition over time",
                 "Fleet mix explorer",
@@ -503,7 +502,7 @@ def test_revenue_outlook_is_responsive_without_horizontal_overflow(page: Page) -
     expect(page.get_by_text("Total path chart", exact=False).first).to_be_visible(
         timeout=90000
     )
-    expect(page.get_by_text("Uncertainty fan", exact=False).first).not_to_be_visible(
+    expect(page.get_by_text("Uncertainty fan", exact=False).first).to_be_visible(
         timeout=90000
     )
     overflow = page.evaluate(
@@ -1281,7 +1280,20 @@ def assert_revenue_outlook_primary_runtime_contract(
     )
     assert any("Actuals to 2025" in text for text in contract["annotations"])
 
-    by_name = {trace["name"]: trace for trace in contract["traces"]}
+    # A segmented path emits SEVERAL plotly traces under one name (solid
+    # econometric, dashed post-model extrapolation). Keying a dict by name
+    # would keep only the last, so aggregate across segments first.
+    by_name: dict = {}
+    for item in contract["traces"]:
+        existing = by_name.get(item["name"])
+        if existing is None:
+            merged = dict(item)
+            merged["x"] = list(item["x"])
+            merged["dashes"] = [item.get("dash")]
+            by_name[item["name"]] = merged
+        else:
+            existing["x"] = list(existing["x"]) + list(item["x"])
+            existing["dashes"].append(item.get("dash"))
     actual = by_name.get("Actual")
     if actual is not None and actual["x"]:
         assert max(actual["x"]) <= "FY2025"
@@ -1289,6 +1301,12 @@ def assert_revenue_outlook_primary_runtime_contract(
     for name in ["Current finalist Base case", expected_comparison_trace]:
         trace = by_name[name]
         assert "FY2025" in trace["x"], f"{name} should include the FY2025 actual anchor"
+        # The long-run restoration: current paths run through FY2050, with
+        # the post-model segment dashed and joined to the solid one.
+        assert "FY2050" in trace["x"], f"{name} should extend through FY2050"
+        assert "dash" in trace["dashes"], (
+            f"{name} should render its post-model segment dashed"
+        )
         assert "FY2026" in trace["x"], (
             f"{name} should join to the FY2026 nowcast/forecast"
         )
@@ -1300,9 +1318,11 @@ def assert_revenue_outlook_primary_runtime_contract(
         assert by_name["MBU26 official"]["dash"] in {"dash", "dashdot"}
     page_text = page.locator("body").inner_text(timeout=60000)
     assert selected_series in page_text
-    # The uncertainty fan card is intentionally hidden on Revenue Outlook
-    # (commit 417f34a); its "Fan source" control must not be on the page.
-    assert "Fan source" not in page_text
+    # The uncertainty fan card is restored on Revenue Outlook (417f34a
+    # undone). Its source control is a compact popover, not the old
+    # permanent selectbox that sat above the chart.
+    assert "Uncertainty fan" in page_text
+    assert "Fan source details" in page_text
 
 
 def assert_revenue_outlook_composition_below_primary(page: Page) -> None:

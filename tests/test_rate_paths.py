@@ -6,6 +6,7 @@ import pandas as pd
 import pytest
 
 from model_dashboard.light_fleet_allocation import LAST_DECISION_GRADE_ANNUAL_FY
+from model_dashboard.series_inventory_contract import LAST_POST_MODEL_FY
 from model_dashboard.rate_paths import (
     FED_POLICY_METADATA_COLUMNS,
     FED_POLICY_STATE_DELAYED_6M,
@@ -205,7 +206,12 @@ def test_uplift_off_repriced_revenue_cascades_to_rollups(pack_chart_rows) -> Non
         ].empty
     )
     assert covered, "no current June year is covered by the no-uplift factor map"
-    assert max(covered) == LAST_DECISION_GRADE_ANNUAL_FY
+    # The long-run restoration puts FY2031-FY2050 back as a governed
+    # post-model segment, and a 12c rate change is permanent, so the
+    # no-uplift factor map must cover every published current June year -
+    # not stop at the econometric cutoff.
+    assert max(covered) == LAST_POST_MODEL_FY
+    assert LAST_DECISION_GRADE_ANNUAL_FY in covered
     for fy in covered:
         old_ped = jy(pack_chart_rows, "gross_ped_revenue", fy)
         new_ped = jy(adjusted, "gross_ped_revenue", fy)

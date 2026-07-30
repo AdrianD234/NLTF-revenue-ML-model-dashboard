@@ -46,6 +46,12 @@ from .forecast_imports import (
     quarter_sort_key,
 )
 from .completeness_contract import validate_frame_completeness
+from .post_model_extrapolation import (
+    build_post_model_extrapolation_annual,
+    post_model_chart_rows,
+    post_model_line_reconciliation_rows,
+    stamp_forecast_segments,
+)
 from .light_fleet_allocation import (
     EXTENDED_EVIDENCE_MAX_HORIZON,
     LAST_DECISION_GRADE_ANNUAL_FY,
@@ -4182,9 +4188,33 @@ def build_current_revenue_outlook_runtime_pack(
     official_comparator_cutoff_fy = int(
         _max_numeric_year(mbu26_pack.official_annual, "FY") or runtime_cutoff_fy
     )
+    # The official comparator's line and stack rows run to ITS OWN source
+    # horizon (FY2055), not the current-model cutoff: truncating them here is
+    # what capped the MBU26 composition chart at FY2030.
     line_reconciliation = revenue_line_reconciliation_frame(
-        mbu26_official_annual=runtime_official_annual,
+        mbu26_official_annual=mbu26_pack.official_annual,
         current_forecast_annual=current,
+    )
+    # The governed FY2031-FY2050 post-model extrapolation, anchored on the
+    # FY2030 econometric values this frame already carries. Appended BEFORE
+    # the residual and stack frames so both see it: residuals prove its
+    # aggregates close, and the composition chart gains the long-run years.
+    post_model_annual = build_post_model_extrapolation_annual(
+        line_reconciliation=line_reconciliation,
+        raw_quarterly_audit=raw_quarterly_forecast_audit,
+        scenario_input_wide=scenario_input_wide,
+        mbu26_official_annual=mbu26_pack.official_annual,
+        repo_root=root,
+    )
+    if "forecast_segment" not in line_reconciliation.columns:
+        line_reconciliation["forecast_segment"] = ""
+    line_reconciliation = pd.concat(
+        [
+            line_reconciliation,
+            post_model_line_reconciliation_rows(line_reconciliation, post_model_annual),
+        ],
+        ignore_index=True,
+        sort=False,
     )
     formula_residuals = revenue_formula_residual_frame(line_reconciliation)
     stack_components = revenue_stack_components_frame(line_reconciliation, formula_residuals)
@@ -4282,6 +4312,16 @@ def build_current_revenue_outlook_runtime_pack(
         chart_rows,
         current_cutoff_fy=runtime_cutoff_fy,
         official_cutoff_fy=official_comparator_cutoff_fy,
+    )
+    # Segment stamping and the post-model layer come AFTER the econometric
+    # horizon filter, so the filter's rule (no unlabelled current value past
+    # FY2030) is enforced first and the extrapolation can never slip through
+    # it unlabelled.
+    chart_rows = stamp_forecast_segments(chart_rows)
+    chart_rows = pd.concat(
+        [chart_rows, post_model_chart_rows(chart_rows, post_model_annual)],
+        ignore_index=True,
+        sort=False,
     )
     horizon_contract_audit = horizon_contract_audit_frame(
         chart_rows,
@@ -6769,6 +6809,7 @@ def revenue_outlook_fan_tables(
         bands = bands.sort_values(["_series_order", "_source_order", "_fy_order", "period", "scenario_name"], kind="stable").drop(
             columns=["_series_order", "_source_order", "_fy_order"]
         )
+    bands = _segment_fan_bands(bands)
     _assert_no_structural_overlay_fan_bands(bands)
     availability = _fan_availability_frame(series, bands)
     availability = _append_structural_overlay_fan_gaps(availability, chart_rows)
@@ -6910,7 +6951,44 @@ def _fan_band_columns() -> list[str]:
         "horizon_scope",
         "interpretation",
         "fed_path",
+        "fan_segment",
     ]
+
+
+# The two fan horizons are not the same kind of object. An empirical band is
+# calibrated from realised forecast error over the backtested horizon; it has
+# no meaning once extrapolated past the model's own forecast. A post-model
+# band can only ever be a scenario envelope.
+FAN_SEGMENT_EMPIRICAL = "empirical_supported"
+FAN_SEGMENT_LONG_RUN_ENVELOPE = "long_run_scenario_envelope"
+_EMPIRICAL_FAN_SOURCES = (
+    FAN_SOURCE_MBU26_ARCHIVED,
+    FAN_SOURCE_CURRENT_BACKTEST,
+)
+
+
+def _segment_fan_bands(bands: pd.DataFrame) -> pd.DataFrame:
+    """Label each band row's horizon, and truncate empirical bands at FY2030.
+
+    An empirical 50/80 band carried into FY2031-FY2050 would assert that
+    realised backtest error still calibrates an interval around a structural
+    extrapolation. It does not, so those rows are dropped rather than
+    relabelled. The scenario spread survives into the long run because a
+    spread of governed scenarios remains exactly what it claims to be - and
+    it is labelled as an envelope, never as a confidence interval.
+    """
+
+    if bands is None or bands.empty:
+        return bands
+    out = bands.copy()
+    fy = pd.to_numeric(out.get("FY"), errors="coerce")
+    is_long_run = fy.gt(LAST_DECISION_GRADE_ANNUAL_FY).fillna(False)
+    out["fan_segment"] = np.where(is_long_run, FAN_SEGMENT_LONG_RUN_ENVELOPE, FAN_SEGMENT_EMPIRICAL)
+    empirical_source = out["fan_source"].astype(str).isin(_EMPIRICAL_FAN_SOURCES)
+    drop = empirical_source & is_long_run
+    if drop.any():
+        out = out[~drop].copy()
+    return out.reset_index(drop=True)
 
 
 def _fan_availability_columns() -> list[str]:

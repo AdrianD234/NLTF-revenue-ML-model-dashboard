@@ -54,6 +54,8 @@ artifacts/**
 !artifacts/p1_unit_completeness/**
 !artifacts/p1_direct_macro_replay/
 !artifacts/p1_direct_macro_replay/**
+!artifacts/revenue_outlook_long_run/
+!artifacts/revenue_outlook_long_run/**
 data/**
 !data/.gitkeep
 !data/dashboard_evidence_pack/

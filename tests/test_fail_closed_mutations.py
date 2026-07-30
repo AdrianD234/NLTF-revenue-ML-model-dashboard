@@ -227,28 +227,52 @@ def test_withheld_h21_quarter_is_not_reported_missing(period) -> None:
     assert record.horizon_state == "beyond_h20"
 
 
-def test_withheld_fy2031_annual_is_not_reported_missing() -> None:
-    record = _evaluate(period="FY2031", values=None, units=None)
+def test_withheld_annual_beyond_the_post_model_window_is_not_reported_missing() -> None:
+    """FY2051+ is still withheld; FY2031-FY2050 is now a governed segment.
+
+    The withheld rule did not go away - its boundary moved to the end of the
+    post-model extrapolation window. Inside that window an absent required
+    cell is a genuine gap, which is why FY2031 now reports missing rather
+    than withheld.
+    """
+    record = _evaluate(period="FY2051", values=None, units=None)
     assert record.status == "intentionally_unavailable_h21_plus"
     assert not record.is_failure
+    inside_window = _evaluate(period="FY2031", values=None, units=None)
+    assert inside_window.status == "missing_derived_output"
+    assert inside_window.is_failure
 
 
 def test_a_value_appearing_beyond_the_horizon_is_itself_a_failure() -> None:
-    """The withheld rule cuts both ways: H21+ must not carry a live value."""
-    record = _evaluate(period="FY2031")
+    """The withheld rule cuts both ways: past FY2050 no live value may exist."""
+    record = _evaluate(period="FY2051")
     assert record.status == "formula_invalid"
     assert record.is_failure
 
 
 # raw audit ------------------------------------------------------------------
 def test_raw_audit_evidence_cannot_satisfy_a_decision_facing_requirement() -> None:
-    audit = _evaluate(period="FY2031", decision_facing=False)
+    audit = _evaluate(period="FY2051", decision_facing=False)
     assert audit.status == "optional_and_available"
     assert not audit.decision_facing
-    required = _evaluate(period="FY2031", values=None, units=None)
+    required = _evaluate(period="FY2051", values=None, units=None)
     assert required.status == "intentionally_unavailable_h21_plus"
     # The audit row exists, yet the decision-facing cell is still not available.
     assert required.status != "required_and_available"
+
+
+def test_an_unlabelled_long_run_value_fails_closed() -> None:
+    """Inside FY2031-FY2050 a value must declare its post-model segment.
+
+    An unlabelled value there is the retired divergent construction coming
+    back under the econometric contract's name.
+    """
+    unlabelled = _evaluate(period="FY2040")
+    assert unlabelled.status == "formula_invalid"
+    assert unlabelled.is_failure
+    assert "post_model_extrapolation" in unlabelled.reason
+    labelled = _evaluate(period="FY2040", forecast_segment="post_model_extrapolation")
+    assert labelled.status == "required_and_available"
 
 
 def test_no_failure_status_is_silently_swallowed() -> None:

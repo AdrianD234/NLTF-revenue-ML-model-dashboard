@@ -118,10 +118,11 @@ def test_committed_pack_marks_extrapolated_fiscal_years():
 
     assert by_year.at[2029, "horizon_scope"] == "H1-H12/H13-H20"
     assert by_year.at[2030, "horizon_scope"] == "H13-H20"
-    # FY2032 was entirely H21+ and is now withheld from the decision-facing
-    # pack. The H21+ zone still exists for the raw audit layer, which is
-    # pinned by tests/test_supported_quarter_horizon_contract.py.
-    assert 2032 not in by_year.index
+    # FY2032 is entirely H21+, so it carries no econometric value. It now
+    # publishes as the labelled post-model structural extrapolation, which is
+    # what this asserts: present, but never as an econometric row.
+    assert 2032 in by_year.index
+    assert by_year.at[2032, "forecast_segment"] == "post_model_extrapolation"
     for june_year in (2029, 2030):
         assert (
             str(by_year.at[june_year, "horizon_validation_warning"])
@@ -150,7 +151,7 @@ def test_committed_pack_exposes_quarter_counts_for_download():
     assert int(by_year.at[2029, "quarters_backtest_supported"]) == 2
     assert int(by_year.at[2029, "quarters_extended_evidence"]) == 2
     assert int(by_year.at[2030, "quarters_extended_evidence"]) == 4
-    assert 2032 not in by_year.index
+    assert by_year.at[2032, "forecast_segment"] == "post_model_extrapolation"
     assert int(by_year.at[2030, "first_horizon"]) == 15
 
 
@@ -238,7 +239,12 @@ def _app_module():
 
 
 def test_decision_facing_note_states_support_by_fiscal_year():
-    """The warning must exist on the page, not only in hover text."""
+    """The governance note text stays available to downloads and audit views.
+
+    Since the long-run restoration, the PUBLIC Revenue Outlook page renders no
+    horizon banner (test_revenue_outlook_long_run.py proves that); this
+    builder remains the governed source of the prose for non-public surfaces.
+    """
 
     app = _app_module()
     pack = load_revenue_outlook_pack(repo_root=ROOT)
@@ -250,7 +256,11 @@ def test_decision_facing_note_states_support_by_fiscal_year():
     assert "H13-H20 extended conditional evidence only" in note
     # The unvalidated-zone wording only applies where such a year publishes;
     # the pack now stops before it.
-    assert "no extended evaluation evidence at all" not in note
+    # FY2031-FY2050 genuinely have no extended evaluation evidence - they are
+    # the post-model structural extrapolation - so the governance prose now
+    # says so. That wording is correct for the download/audit surfaces; it is
+    # the PUBLIC banner that was removed, not the sentence.
+    assert "no extended evaluation evidence at all" in note
     assert LONG_RANGE_EXTRAPOLATION_WARNING.split(" - ")[0] in note
     # Non-contiguous runs must not be papered over as a single span: FY2030 is
     # not a mixed year, so "FY2029-FY2031 mix" would be wrong.
