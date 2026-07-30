@@ -879,9 +879,69 @@ def run_refresh(args: argparse.Namespace) -> dict[str, Any]:
                 existing = hist[hist["period"].astype(str) == period]
                 if not existing.empty:
                     cross[stream] = existing.iloc[0].to_dict()
+                    if stream == "heavy_ruc":
+                        lead_value = float(
+                            cross[stream].get("lead_real_heavy_ruc_price_nzd_per_1000km") or 0.0
+                        )
+                        lead_audit_rows.append(
+                            {
+                                "period": period,
+                                "column": "lead_real_heavy_ruc_price_nzd_per_1000km",
+                                "canonical_value": lead_value,
+                                "workbook_value": lead_value,
+                                "vintage_status": "retrospective_history" if lead_value > 0 else "real_time_unknown",
+                                "applied_to_canonical_history": True,
+                                "note": (
+                                    "Accepted canonical row; the lead price at this quarter uses the "
+                                    "subsequently observed next-quarter effective rate (retrospective "
+                                    "vintage). Production vNext Heavy uses no lead features, so the "
+                                    "production replay is identical under retrospective and real-time "
+                                    "vintages."
+                                    if lead_value > 0
+                                    else "Accepted canonical row; lead placeholder retained."
+                                ),
+                            }
+                        )
                 continue
             frame = frames[stream]
             wb_row = frame[frame["period"].astype(str).str.strip().str.upper() == period].iloc[0]
+
+            # Idempotency short-circuit: an updatable row whose workbook values
+            # are identical to the existing canonical row is a governed no-op.
+            # It is reused verbatim (also as the lag/cross-join source for any
+            # later appended quarters) without re-deriving or re-validating,
+            # so e.g. a provisional PED placeholder row (target 0) never has
+            # to pass exact-actual raw validation on a later-quarter refresh.
+            existing_rows = history[stream][history[stream]["period"].astype(str) == period]
+            if not existing_rows.empty:
+                wb_full = {c: wb_row.get(c) for c in history[stream].columns}
+                if rows_equivalent(existing_rows.iloc[0], wb_full, list(history[stream].columns)):
+                    unchanged = existing_rows.iloc[0].to_dict()
+                    cross[stream] = unchanged
+                    pending[stream].append(unchanged)
+                    if stream == "heavy_ruc":
+                        lead_value = float(unchanged.get("lead_real_heavy_ruc_price_nzd_per_1000km") or 0.0)
+                        lead_audit_rows.append(
+                            {
+                                "period": period,
+                                "column": "lead_real_heavy_ruc_price_nzd_per_1000km",
+                                "canonical_value": lead_value,
+                                "workbook_value": lead_value,
+                                "vintage_status": "retrospective_history" if lead_value > 0 else "real_time_unknown",
+                                "applied_to_canonical_history": True,
+                                "note": (
+                                    "Unchanged canonical row (no-op refresh); the lead price at this "
+                                    "quarter uses the subsequently observed next-quarter effective rate "
+                                    "(retrospective vintage). Production vNext Heavy uses no lead "
+                                    "features, so the production replay is identical under retrospective "
+                                    "and real-time vintages."
+                                    if lead_value > 0
+                                    else "Unchanged canonical row (no-op refresh); lead placeholder retained."
+                                ),
+                            }
+                        )
+                    continue
+
             raw = extract_raw(stream, wb_row)
             unit_sanity_check(stream, raw, history[stream])
 

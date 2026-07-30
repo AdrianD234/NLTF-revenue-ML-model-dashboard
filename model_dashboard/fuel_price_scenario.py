@@ -2470,6 +2470,16 @@ def _validate_complete_numeric_replay(
     if forecasts is None or forecasts.empty or required_forecast_columns.difference(forecasts.columns):
         raise ValueError("Fixed-finalist conflict replay produced no usable forecast rows.")
 
+    # Per-stream seam: scenario quarters at or before a stream's latest
+    # accepted actual are covered by canonical history, never re-forecast.
+    from .forecast_runner import quarter_sort_key as _qkey
+    from .forecast_runner import stream_latest_accepted_periods as _stream_latest
+
+    try:
+        accepted_cutoffs = _stream_latest(None)
+    except Exception:
+        accepted_cutoffs = {}
+
     problems: list[str] = []
     for scenario_name in scenario_names:
         scenario_inputs = replay_inputs[
@@ -2484,6 +2494,11 @@ def _validate_complete_numeric_replay(
                     scenario_inputs["stream"].astype(str).eq(stream), "canonical_period"
                 ].dropna().astype(str)
             )
+            cutoff = accepted_cutoffs.get(str(stream))
+            if cutoff:
+                expected_periods = {
+                    period for period in expected_periods if _qkey(period) > _qkey(cutoff)
+                }
             stream_forecasts = scenario_forecasts[
                 scenario_forecasts["stream"].astype(str).eq(stream)
             ].copy()
