@@ -8751,16 +8751,22 @@ def revenue_outlook_total_path_figure(
         def _add_path_trace(portion: pd.DataFrame, *, dash_style: str, show_legend: bool, suffix: str = "") -> None:
             if portion.empty:
                 return
+            # The post-model segment drops its per-year markers. With 20
+            # densely packed annual points the markers close the dash gaps and
+            # the line reads as solid, so the segmentation becomes invisible;
+            # a marker-free dashed line is unambiguous at chart scale.
+            is_post_model = bool(suffix)
             fig.add_trace(
                 go.Scatter(
                     x=portion["period"],
                     y=portion["value_display"],
-                    mode="lines+markers",
+                    mode="lines" if is_post_model else "lines+markers",
                     name=trace_name,
                     legendgroup=trace_name,
                     showlegend=show_legend,
                     line={"color": color, "dash": dash_style, "width": width},
-                    marker={"size": 6 if not suffix else 5},
+                    marker={"size": 6},
+                    opacity=0.85 if is_post_model else 1.0,
                     customdata=portion[["hover_unit", "_hover_segment"]].to_numpy(),
                     hovertemplate=(
                         "<b>%{fullData.name}</b><br>"
@@ -9046,8 +9052,12 @@ def revenue_outlook_uncertainty_fan_figure(
     def _draw_bands(portion: pd.DataFrame, *, suffix: str, fillcolor_scale: float) -> None:
         if portion.empty:
             return
-        for upper, lower, name, color in band_specs:
-            label = f"{name}{suffix}"
+        # The long-run envelope earns ONE legend entry, not one per band: its
+        # inner/outer split carries no extra meaning once the whole thing is
+        # labelled a scenario envelope rather than an interval.
+        is_envelope = bool(suffix)
+        for index, (upper, lower, name, color) in enumerate(band_specs):
+            label = "Long-run scenario envelope (not probabilistic)" if is_envelope else name
             fig.add_trace(
                 go.Scatter(
                     x=portion["period"], y=portion[f"{upper}_display"], mode="lines",
@@ -9063,6 +9073,8 @@ def revenue_outlook_uncertainty_fan_figure(
                     fillcolor=color if fillcolor_scale == 1.0 else _fade_rgba(color, fillcolor_scale),
                     line={"width": 0},
                     name=label,
+                    legendgroup="long_run_envelope" if is_envelope else f"band_{index}",
+                    showlegend=(index == 0) if is_envelope else True,
                     customdata=portion[["hover_unit", "method", "source_file"]].to_numpy(),
                     hovertemplate="%{x}<br>%{y:,.2f} %{customdata[0]}<br>%{customdata[1]}<br>%{customdata[2]}<extra>%{fullData.name}</extra>",
                 )

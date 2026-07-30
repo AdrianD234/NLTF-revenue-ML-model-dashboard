@@ -170,63 +170,111 @@ def test_the_vfm_composition_band_stays_separate_from_the_fan() -> None:
 
 
 # --------------------------------------------------- 7, 8. short-run unchanged
-def test_current_short_run_values_are_unchanged_from_main() -> None:
-    """Every pre-existing row must be EXACTLY equal, compared like with like.
+BASELINE = ROOT / "artifacts" / "revenue_outlook_long_run" / "short_run_baseline.csv"
+_CHART_KEY = [
+    "scenario_name", "scenario_role", "time_grain", "series_id",
+    "period", "fed_path", "row_type", "trace_name",
+]
+_LINE_KEY = ["source_path", "scenario_name", "series_id", "period_fy"]
+def _normalise_key(frame, key):
+    """Stringify key columns consistently.
 
-    Deliberately CSV-against-CSV. main's own CSV and parquet already disagree
-    on 26 annual rows by one ULP (max 1.82e-12, relative 2.2e-16) purely from
-    CSV text precision, so a CSV-vs-parquet comparison would report a value
-    move that predates this branch. Comparing the same serialisation on both
-    sides keeps the assertion exact rather than tolerance-based.
+    An FY column read as float renders "2001.0" against the pack's "2001",
+    so every row misses and an .all() over the empty selection passes
+    vacuously. Numeric-looking keys are canonicalised to integers first.
     """
-    import subprocess
-    from io import BytesIO
+    import pandas as _pd
 
-    key = ["scenario_name", "scenario_role", "time_grain", "series_id", "period", "fed_path", "row_type", "trace_name"]
-    for rel in (
-        "data/current_revenue_outlook/revenue_chart_rows.csv",
-        "data/engine_ar1/current_revenue_outlook/revenue_chart_rows.csv",
-    ):
-        blob = subprocess.run(["git", "show", f"main:{rel}"], capture_output=True, cwd=ROOT)
-        if blob.returncode != 0:
-            pytest.skip("main revision unavailable")
-        before = pd.read_csv(BytesIO(blob.stdout), low_memory=False)
-        after = pd.read_csv(ROOT / rel, low_memory=False)
-        for frame in (before, after):
-            for column in key:
-                frame[column] = frame[column].fillna("").astype(str)
-        merged = before.merge(after, on=key, how="left", suffixes=("_main", "_now"))
+    for column in key:
+        values = frame[column]
+        numeric = _pd.to_numeric(values, errors="coerce")
+        if numeric.notna().all():
+            frame[column] = numeric.astype("Int64").astype(str)
+        else:
+            frame[column] = values.fillna("").astype(str)
+    return frame
+
+
+
+def test_current_short_run_values_are_unchanged() -> None:
+    """Every pre-existing row must be EXACTLY equal to the frozen baseline.
+
+    The baseline is a COMMITTED artifact, not a Git object. Reading
+    `git show main:...` here would break a shallow CI checkout, which is
+    exactly what test_no_test_or_generator_depends_on_a_historical_git_object
+    exists to prevent - it caught an earlier revision of this test.
+
+    Comparison is CSV-against-CSV: main's own CSV and parquet already
+    disagree on 26 annual rows by one ULP (max 1.82e-12, relative 2.2e-16)
+    from CSV text precision, so a CSV-vs-parquet check would report a
+    serialisation artifact as a value move.
+    """
+    assert BASELINE.exists(), "regenerate the long-run evidence"
+    baseline = pd.read_csv(BASELINE, low_memory=False, float_precision="round_trip")
+    sources = {
+        "incumbent_chart_rows": ("data/current_revenue_outlook/revenue_chart_rows.csv", _CHART_KEY),
+        "ar1_chart_rows": ("data/engine_ar1/current_revenue_outlook/revenue_chart_rows.csv", _CHART_KEY),
+    }
+    for label, (rel, key) in sources.items():
+        before = baseline[baseline["baseline_source"].eq(label)].copy()
+        assert not before.empty, label
+        after = pd.read_csv(ROOT / rel, low_memory=False, float_precision="round_trip")
+        before = _normalise_key(before, key)
+        after = _normalise_key(after, key)
+        merged = before.merge(after, on=key, how="left", suffixes=("_base", "_now"))
         assert len(merged) == len(before), f"{rel}: a pre-existing row lost or duplicated"
-        left = pd.to_numeric(merged["value_main"], errors="coerce")
+        left = pd.to_numeric(merged["value_base"], errors="coerce")
         right = pd.to_numeric(merged["value_now"], errors="coerce")
         assert right[left.notna()].notna().all(), f"{rel}: a pre-existing value went missing"
         both = left.notna() & right.notna()
+        assert int(both.sum()) >= int(0.99 * len(before)), (
+            f"{rel}: only {int(both.sum())} of {len(before)} baseline rows matched"
+        )
         assert (left[both] == right[both]).all(), f"{rel}: a pre-existing value moved"
 
 
-def test_short_run_line_and_stack_values_are_unchanged_from_main() -> None:
-    import subprocess
-    from io import BytesIO
-
-    checks = (
-        ("data/current_revenue_outlook/revenue_line_reconciliation.csv",
-         ["source_path", "scenario_name", "series_id", "FY"]),
+def test_short_run_line_reconciliation_values_are_unchanged() -> None:
+    assert BASELINE.exists(), "regenerate the long-run evidence"
+    baseline = pd.read_csv(BASELINE, low_memory=False, float_precision="round_trip")
+    before = baseline[baseline["baseline_source"].eq("incumbent_line_reconciliation")].copy()
+    assert not before.empty
+    after = pd.read_csv(
+        ROOT / "data/current_revenue_outlook/revenue_line_reconciliation.csv",
+        low_memory=False, float_precision="round_trip",
+    ).rename(columns={"FY": "period_fy"})
+    before = _normalise_key(before, _LINE_KEY)
+    after = _normalise_key(after, _LINE_KEY)
+    merged = before.merge(after, on=_LINE_KEY, how="left", suffixes=("_base", "_now"))
+    assert len(merged) == len(before), "a pre-existing line row lost or duplicated"
+    left = pd.to_numeric(merged["value_base"], errors="coerce")
+    right = pd.to_numeric(merged["value_now"], errors="coerce")
+    both = left.notna() & right.notna()
+    # Non-vacuity: an all-missing join would make the comparison below pass
+    # over an empty selection. The evidence script caught exactly that.
+    assert int(both.sum()) >= int(0.99 * len(before)), (
+        f"only {int(both.sum())} of {len(before)} baseline line rows matched"
     )
-    for rel, key in checks:
-        blob = subprocess.run(["git", "show", f"main:{rel}"], capture_output=True, cwd=ROOT)
-        if blob.returncode != 0:
-            pytest.skip("main revision unavailable")
-        before = pd.read_csv(BytesIO(blob.stdout), low_memory=False)
-        after = pd.read_csv(ROOT / rel, low_memory=False)
-        for frame in (before, after):
-            for column in key:
-                frame[column] = frame[column].fillna("").astype(str)
-        merged = before.merge(after, on=key, how="left", suffixes=("_main", "_now"))
-        assert len(merged) == len(before), f"{rel}: row lost or duplicated"
-        left = pd.to_numeric(merged["value_main"], errors="coerce")
-        right = pd.to_numeric(merged["value_now"], errors="coerce")
-        both = left.notna() & right.notna()
-        assert (left[both] == right[both]).all(), f"{rel}: a pre-existing value moved"
+    assert (left[both] == right[both]).all(), "a pre-existing line value moved"
+
+
+def test_the_short_run_baseline_covers_only_the_pre_existing_horizon() -> None:
+    """The baseline must not silently acquire post-model rows.
+
+    If a regeneration folded FY2031+ into the baseline, the identity check
+    would compare the new layer against itself and pass vacuously.
+    """
+    baseline = pd.read_csv(BASELINE, low_memory=False, float_precision="round_trip")
+    chart = baseline[baseline["baseline_source"].str.endswith("chart_rows")]
+    annual = chart[chart["time_grain"].eq("june_year")]
+    years = pd.to_numeric(annual["period"].astype(str).str.replace("FY", ""), errors="coerce")
+    assert int(years.max()) <= 2055, "baseline horizon is implausible"
+    current = annual[annual["scenario_role"].isin(["basecase", "comparison"])]
+    current_years = pd.to_numeric(
+        current["period"].astype(str).str.replace("FY", ""), errors="coerce"
+    )
+    assert int(current_years.max()) == ANCHOR_FY, (
+        "the baseline must stop at the pre-change FY2030 current horizon"
+    )
 
 
 def test_actuals_and_official_rows_are_untouched(chart) -> None:

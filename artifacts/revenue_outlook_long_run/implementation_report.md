@@ -17,12 +17,12 @@ appears anywhere, and a test bans the idiom by pattern.
 
 ## Headline results
 
-- Base Total NLTF: FY2030 $6,415.2m -> FY2050 $16,904.3m
-- Comparison Total NLTF: FY2030 $6,526.3m -> FY2050 $18,031.7m
+- Base Total NLTF: FY2030 $6,415.2m -> FY2050 $17,264.7m
+- Comparison Total NLTF: FY2030 $6,526.3m -> FY2050 $18,392.0m
 - Base Light RUC pool FY2050: 52,461 Mkm (1.093x the VFM pool, 0.282x the retired pathology)
 - Short run: 0 values changed across 4616 pre-existing rows
-- Seam continuity: worst step 3.64%
-- Formula closure: 160 checks, worst residual 0.00e+00
+- Seam continuity: worst step 5.45%
+- Formula closure: 520 checks, worst residual 3.64e-12
 
 ## Uncertainty presentation
 

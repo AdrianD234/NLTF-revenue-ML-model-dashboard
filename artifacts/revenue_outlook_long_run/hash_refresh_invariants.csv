@@ -1,0 +1,8 @@
+invariant,status,detail
+every pre-existing row matched,PASS,1485 of 1485 matched
+no pre-existing value moved,PASS,0 changed
+historical actuals unchanged,PASS,651 actual rows compared
+published MBU26 unchanged,PASS,510 official rows compared
+Current FY2026-FY2030 unchanged,PASS,170 current annual rows compared
+only FY2031-FY2050 post-model rows added,PASS,"680 added, 0 unexpected"
+no lambda / shrinking-share formula,PASS,structural pool index only

@@ -457,7 +457,21 @@ def build_post_model_extrapolation_annual(
                 emit(scenario, fy, series, value, unit, "carried from MBU26 official (fixed line)")
 
             # ---------------- aggregates (the committed formula chain)
-            gross_ruc = light_rev + heavy_rev + bev_rev + carried["heavy_bev_ruc_net_revenue"] + phev_rev
+            # The governed expression is gross RUC INCLUSIVE of refunds:
+            #   gross_ruc = light + heavy + light BEV + heavy BEV + PHEV + ruc_refunds
+            # and total_ruc_net_revenue subtracts them again downstream. An
+            # earlier revision omitted the refunds term, so gross RUC and every
+            # aggregate above it failed the governed residual check by ~$118m
+            # at FY2031. Mirror the committed formula exactly rather than a
+            # plausible reconstruction of it.
+            gross_ruc = (
+                light_rev
+                + heavy_rev
+                + bev_rev
+                + carried["heavy_bev_ruc_net_revenue"]
+                + phev_rev
+                + carried["ruc_refunds"]
+            )
             ruc_net_admin = gross_ruc - carried["ruc_admin_revenue"]
             total_ruc = ruc_net_admin - carried["ruc_refunds"]
             gross_fed = gross_ped + carried["gross_lpg_revenue"] + carried["gross_cng_revenue"]
@@ -472,7 +486,7 @@ def build_post_model_extrapolation_annual(
             total_nltf = total_net_admin - total_refunds
             for series, value, formula in (
                 ("gross_ruc_revenue", gross_ruc,
-                 "light + heavy + light BEV + MBU26 heavy BEV + PHEV RUC revenue"),
+                 "light + heavy + light BEV + MBU26 heavy BEV + PHEV RUC revenue + MBU26 ruc_refunds"),
                 ("ruc_revenue_net_admin", ruc_net_admin, "gross_ruc_revenue - MBU26 ruc_admin_revenue"),
                 ("total_ruc_net_revenue", total_ruc, "ruc_revenue_net_admin - MBU26 ruc_refunds"),
                 ("gross_fed_revenue", gross_fed, "gross_ped_revenue + MBU26 LPG + MBU26 CNG"),

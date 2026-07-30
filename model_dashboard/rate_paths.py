@@ -38,6 +38,7 @@ from .ev_uptake_levers import (
     TOTAL_AGGREGATE_SERIES,
     reconcile_native_quarterly_activity_to_annual,
 )
+from .light_fleet_allocation import LAST_DECISION_GRADE_ANNUAL_FY
 from .revenue_source_pack import REVENUE_LAST_COMPLETE_ACTUAL_FY
 
 FED_POLICY_STATE_PUBLISHED = "published"
@@ -577,6 +578,14 @@ def apply_fed_rate_policy_to_chart_rows(
                 factor = quarterly_lookup.get((series_id, str(data.at[index, "period"])), 1.0)
             elif grain == "june_year" and pd.notna(fy_value):
                 factor = annual_lookup.get((series_id, int(fy_value)), 1.0)
+                if factor == 1.0 and int(fy_value) > LAST_DECISION_GRADE_ANNUAL_FY:
+                    # The fixed-finalist pair factors only span the replay's
+                    # own scenario window, so beyond it every post-model year
+                    # would silently receive 1.0 and the policy lever would
+                    # vanish from the long run. A rate change is permanent:
+                    # fall back to the governed scalar rate ratio, which
+                    # carries the terminal wedge to FY2055 by construction.
+                    factor = float(factors.get(int(fy_value), 1.0))
             else:
                 factor = 1.0
             old_value = numeric_value.at[index]

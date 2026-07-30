@@ -23,6 +23,7 @@ import pandas as pd
 import pytest
 
 from model_dashboard.light_fleet_allocation import LAST_DECISION_GRADE_ANNUAL_FY
+from model_dashboard.series_inventory_contract import LAST_POST_MODEL_FY
 from model_dashboard.rate_paths import (
     FED_POLICY_STATE_DELAYED_6M,
     FED_POLICY_STATE_NO_UPLIFT,
@@ -162,9 +163,14 @@ def test_official_factors_are_not_derived_from_current_model_chart_rows() -> Non
     )
     current = fed_uplift_off_factors(ROOT, pack_rows)
     official = official_comparator_factor_map(ROOT, FED_POLICY_STATE_NO_UPLIFT)
-    assert max(current) <= LAST_DECISION_GRADE_ANNUAL_FY + 1
+    # The current map now spans the post-model window too (a rate change is
+    # permanent, so the lever must reach FY2050). The separation this test
+    # exists to prove is unchanged and is asserted below: the official
+    # comparator keeps its OWN longer horizon and the two maps are distinct.
+    assert max(current) <= LAST_POST_MODEL_FY
     assert max(official) >= OFFICIAL_HORIZON_END_FY
     assert max(official) > max(current)
+    assert current != official
 
 
 def test_the_official_horizon_extends_past_the_current_model_cutoff(no_uplift) -> None:

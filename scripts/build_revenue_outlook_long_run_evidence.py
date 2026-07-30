@@ -10,9 +10,7 @@ Usage: python scripts/build_revenue_outlook_long_run_evidence.py
 from __future__ import annotations
 
 import os
-import subprocess
 import sys
-from io import BytesIO
 from pathlib import Path
 
 import numpy as np
@@ -59,41 +57,66 @@ def _annual(frame: pd.DataFrame, scenario: str, series: str) -> pd.Series:
 
 
 def short_run_unchanged() -> pd.DataFrame:
-    """CSV-against-CSV, because main's own CSV and parquet differ by 1 ULP."""
-    key = ["scenario_name", "scenario_role", "time_grain", "series_id", "period", "fed_path", "row_type", "trace_name"]
+    """Compare against the COMMITTED baseline, never a historical Git object.
+
+    Reading `git show main:...` would break a shallow CI checkout - the
+    clean-clone gate exists for exactly that reason and caught an earlier
+    revision of this function. The baseline is frozen into
+    short_run_baseline.csv and committed alongside this evidence.
+
+    CSV-against-CSV: main's own CSV and parquet already differ by 1 ULP on
+    26 annual rows, so mixing serialisations would report an artifact as a
+    value move.
+    """
+    baseline_path = OUT / "short_run_baseline.csv"
+    if not baseline_path.exists():
+        failures.append("short_run_baseline.csv is missing; the identity check cannot run")
+        return pd.DataFrame()
+    baseline = pd.read_csv(baseline_path, low_memory=False, float_precision="round_trip")
+    chart_key = ["scenario_name", "scenario_role", "time_grain", "series_id", "period", "fed_path", "row_type", "trace_name"]
+    line_key = ["source_path", "scenario_name", "series_id", "period_fy"]
+    sources = (
+        ("incumbent_chart_rows", "data/current_revenue_outlook/revenue_chart_rows.csv", chart_key),
+        ("ar1_chart_rows", "data/engine_ar1/current_revenue_outlook/revenue_chart_rows.csv", chart_key),
+        ("incumbent_line_reconciliation", "data/current_revenue_outlook/revenue_line_reconciliation.csv", line_key),
+    )
     rows: list[dict[str, object]] = []
-    for rel in (
-        "data/current_revenue_outlook/revenue_chart_rows.csv",
-        "data/engine_ar1/current_revenue_outlook/revenue_chart_rows.csv",
-        "data/current_revenue_outlook/revenue_line_reconciliation.csv",
-    ):
-        blob = subprocess.run(["git", "show", f"main:{rel}"], capture_output=True, cwd=ROOT)
-        if blob.returncode != 0:
-            failures.append(f"cannot read main:{rel}")
+    for label, rel, key in sources:
+        before = baseline[baseline["baseline_source"].eq(label)].copy()
+        if before.empty:
+            failures.append(f"baseline has no rows for {label}")
             continue
-        before = pd.read_csv(BytesIO(blob.stdout), low_memory=False)
-        after = pd.read_csv(ROOT / rel, low_memory=False)
-        this_key = key if "chart_rows" in rel else ["source_path", "scenario_name", "series_id", "FY"]
+        after = pd.read_csv(ROOT / rel, low_memory=False, float_precision="round_trip")
+        if "period_fy" in key:
+            after = after.rename(columns={"FY": "period_fy"})
+        # An FY read as float renders "2001.0" against the pack's "2001" and
+        # every row misses, which reads as "0 changed" unless missing is
+        # counted separately. Canonicalise numeric keys to integers.
         for frame in (before, after):
-            for column in this_key:
-                frame[column] = frame[column].fillna("").astype(str)
-        merged = before.merge(after, on=this_key, how="left", suffixes=("_main", "_now"))
-        left = pd.to_numeric(merged["value_main"], errors="coerce")
+            for column in key:
+                numeric = pd.to_numeric(frame[column], errors="coerce")
+                if numeric.notna().all():
+                    frame[column] = numeric.astype("Int64").astype(str)
+                else:
+                    frame[column] = frame[column].fillna("").astype(str)
+        merged = before.merge(after, on=key, how="left", suffixes=("_base", "_now"))
+        left = pd.to_numeric(merged["value_base"], errors="coerce")
         right = pd.to_numeric(merged["value_now"], errors="coerce")
         both = left.notna() & right.notna()
         changed = int((left[both] != right[both]).sum())
         missing = int(right[left.notna()].isna().sum())
         rows.append(
             {
+                "baseline_source": label,
                 "path": rel,
-                "main_rows": len(before),
+                "baseline_rows": len(before),
                 "rows_after": len(after),
                 "preexisting_rows_matched": int(both.sum()),
                 "values_changed": changed,
                 "values_missing": missing,
                 "max_abs_delta": float((left[both] - right[both]).abs().max()) if both.any() else 0.0,
                 "status": "unchanged" if changed == 0 and missing == 0 else "CHANGED",
-                "basis": "csv_vs_csv_exact",
+                "basis": "committed_baseline_csv_vs_csv_exact",
             }
         )
         if changed or missing:
@@ -163,6 +186,19 @@ def continuity_audit(chart: pd.DataFrame, line: pd.DataFrame) -> pd.DataFrame:
 
 
 def formula_reconciliation(line: pd.DataFrame) -> pd.DataFrame:
+    """Recompute every governed aggregate from the GOVERNED formula registry.
+
+    Deliberately not hand-written arithmetic. An earlier revision recomputed
+    the identities using the same expressions the extrapolation was built
+    with, so it was guaranteed to close and reported 0.00e+00 while the
+    production residual checker was flagging a $118m gap at FY2031 - the
+    governed gross_ruc_revenue is INCLUSIVE of ruc_refunds and the
+    reconstruction had omitted that term. Reading the registry means the
+    check can disagree with the constructor, which is the only way it can
+    catch anything.
+    """
+    from model_dashboard.mbu26_source_spine import FORMULA_DEFINITIONS
+
     rows: list[dict[str, object]] = []
     for scenario, source_path in SCENARIOS:
         scoped = line[line["source_path"].astype(str).eq(source_path)]
@@ -172,22 +208,37 @@ def formula_reconciliation(line: pd.DataFrame) -> pd.DataFrame:
         )
         long_run = wide.loc[wide.index >= FIRST_EXTRAPOLATION_FY]
         for fy, row in long_run.iterrows():
-            checks = {
-                "gross_ruc_revenue": row["light_ruc_net_revenue"] + row["heavy_ruc_net_revenue"]
-                + row["light_bev_ruc_net_revenue"] + row["heavy_bev_ruc_net_revenue"]
-                + row["phev_ruc_net_revenue"],
-                "total_ruc_net_revenue": row["ruc_revenue_net_admin"] - row["ruc_refunds"],
-                "net_fed_revenue": row["gross_fed_revenue"] - row["fed_refunds"],
-                "total_nltf_net_revenue": row["total_revenue_net_admin"] - row["total_refunds"],
-            }
-            for series, calculated in checks.items():
+            for definition in FORMULA_DEFINITIONS:
+                series = str(definition["output_series_id"])
+                if series not in row.index or pd.isna(row.get(series)):
+                    continue
+                missing = [
+                    term for term, _ in definition["terms"]
+                    if term not in row.index or pd.isna(row.get(term))
+                ]
+                if missing:
+                    rows.append(
+                        {
+                            "scenario_name": scenario, "fy": int(fy), "series_id": series,
+                            "expression": definition["expression"],
+                            "observed": float(row[series]), "calculated": float("nan"),
+                            "residual": float("nan"), "status": "inputs_missing",
+                            "missing_inputs": "; ".join(missing),
+                        }
+                    )
+                    failures.append(f"{scenario} FY{int(fy)} {series}: missing {missing}")
+                    continue
+                calculated = sum(
+                    float(row[term]) * float(sign) for term, sign in definition["terms"]
+                )
                 observed = float(row[series])
-                residual = observed - float(calculated)
+                residual = observed - calculated
                 rows.append(
                     {
                         "scenario_name": scenario, "fy": int(fy), "series_id": series,
-                        "observed": observed, "calculated": float(calculated),
-                        "residual": residual,
+                        "expression": definition["expression"],
+                        "observed": observed, "calculated": calculated,
+                        "residual": residual, "missing_inputs": "",
                         "status": "closes" if abs(residual) <= 1e-6 else "OPEN",
                     }
                 )

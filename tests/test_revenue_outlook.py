@@ -23,6 +23,10 @@ from model_dashboard.light_fleet_allocation import (
     LAST_DECISION_GRADE_ANNUAL_FY,
     LAST_DECISION_GRADE_QUARTER,
 )
+from model_dashboard.series_inventory_contract import (
+    FIRST_POST_MODEL_FY,
+    LAST_POST_MODEL_FY,
+)
 from model_dashboard.revenue_outlook import (
     CANONICAL_JOIN_KEY_COLUMNS,
     CURRENT_REVENUE_OUTLOOK_DIR,
@@ -56,6 +60,24 @@ def _sha256(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _min_fy(frame: pd.DataFrame) -> int | None:
+    """Mirror of _max_fy; frames disagree on whether the column is FY or june_year."""
+    if frame is None or frame.empty:
+        return None
+    for column in ("FY", "june_year"):
+        if column in frame.columns:
+            years = pd.to_numeric(frame[column], errors="coerce")
+            if years.notna().any():
+                return int(years.min())
+    for column in ("target_period", "annual_period", "period"):
+        if column in frame.columns:
+            years = frame[column].astype(str).str.extract(r"FY(\d{4})", expand=False)
+            years = pd.to_numeric(years, errors="coerce")
+            if years.notna().any():
+                return int(years.min())
+    return None
 
 
 def _max_fy(frame: pd.DataFrame) -> int | None:
@@ -527,10 +549,33 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
             return frame[frame["time_grain"].astype(str).eq("june_year")].copy()
         return frame
 
+    # The ECONOMETRIC segment still stops at the runtime cutoff. FY2031-FY2050
+    # now publishes as the separately governed post-model extrapolation, so
+    # the ceiling is asserted per segment rather than over the whole frame -
+    # otherwise the long-run layer would look like a cutoff breach.
     for frame in (chart, line_reconciliation, stack_components, fan_bands, future, bridge):
         current_rows = _annual_only(_current_only(frame))
-        if not current_rows.empty:
+        if current_rows.empty:
+            continue
+        # Two frames carry a segment label under different names: chart/line
+        # rows use forecast_segment, the fan bands use fan_segment. Both split
+        # at the same FY2030 seam.
+        if "forecast_segment" in current_rows.columns:
+            segments = current_rows["forecast_segment"].fillna("").astype(str)
+            long_run = segments.eq("post_model_extrapolation")
+        elif "fan_segment" in current_rows.columns:
+            segments = current_rows["fan_segment"].fillna("").astype(str)
+            long_run = segments.eq("long_run_scenario_envelope")
+        else:
             assert _max_fy(current_rows) == runtime_cutoff_fy
+            continue
+        within = current_rows[~long_run]
+        beyond = current_rows[long_run]
+        if not within.empty:
+            assert _max_fy(within) == runtime_cutoff_fy
+        if not beyond.empty:
+            assert _max_fy(beyond) == LAST_POST_MODEL_FY
+            assert _min_fy(beyond) >= FIRST_POST_MODEL_FY
 
     # The supported quarters survive and carry the next June year.
     current_quarterly = chart[
@@ -551,9 +596,17 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
         chart["time_grain"].astype(str).eq("june_year")
         & chart["plot_allowed"].astype(str).str.lower().isin(["true", "1"])
     ].copy()
-    assert _max_fy(_current_only(displayed)) == runtime_cutoff_fy
+    # Displayed current rows now run to FY2050; the ECONOMETRIC portion still
+    # stops at the runtime cutoff and the remainder is the labelled
+    # post-model segment.
+    displayed_current = _current_only(displayed)
+    displayed_segments = displayed_current["forecast_segment"].fillna("").astype(str)
+    assert _max_fy(displayed_current[~displayed_segments.eq("post_model_extrapolation")]) == runtime_cutoff_fy
+    assert _max_fy(displayed_current[displayed_segments.eq("post_model_extrapolation")]) == LAST_POST_MODEL_FY
     current_line = line_reconciliation[line_reconciliation["source_path"].astype(str).str.startswith("Current finalist")].copy()
-    assert _max_fy(current_line) == runtime_cutoff_fy
+    line_segments = current_line["forecast_segment"].fillna("").astype(str)
+    assert _max_fy(current_line[~line_segments.eq("post_model_extrapolation")]) == runtime_cutoff_fy
+    assert _max_fy(current_line[line_segments.eq("post_model_extrapolation")]) == LAST_POST_MODEL_FY
     runtime_tables = [chart, line_reconciliation, stack_components, audit, fan_bands]
     for frame in runtime_tables:
         assert not frame.astype(str).stack().str.contains("extrapolated_model_extension", regex=False).any()
@@ -1681,13 +1734,19 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     base_cutoff_line["FY_numeric"] = pd.to_numeric(base_cutoff_line["FY"], errors="coerce").astype(int)
     assert set(base_cutoff_line["FY_numeric"]) == set(range(2046, runtime_cutoff_fy + 1))
     assert base_cutoff_line["value_status"].astype(str).ne("extrapolated_model_extension").all()
-    assert pd.to_numeric(
-        line_reconciliation.loc[
-            line_reconciliation["source_path"].astype(str).str.startswith("Current finalist"),
-            "FY",
-        ],
-        errors="coerce",
-    ).max() == runtime_cutoff_fy
+    # The econometric segment still ends at the runtime cutoff; the labelled
+    # post-model segment carries FY2031-FY2050.
+    current_line_rows = line_reconciliation[
+        line_reconciliation["source_path"].astype(str).str.startswith("Current finalist")
+    ]
+    econometric_line = current_line_rows[
+        ~current_line_rows["forecast_segment"].fillna("").astype(str).eq("post_model_extrapolation")
+    ]
+    assert pd.to_numeric(econometric_line["FY"], errors="coerce").max() == runtime_cutoff_fy
+    post_model_line = current_line_rows[
+        current_line_rows["forecast_segment"].fillna("").astype(str).eq("post_model_extrapolation")
+    ]
+    assert pd.to_numeric(post_model_line["FY"], errors="coerce").max() == LAST_POST_MODEL_FY
 
     current_residuals = residuals[
         residuals["source_path"].astype(str).str.startswith("Current finalist")
@@ -2216,17 +2275,17 @@ def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
         "ev_phev_ped_light_drift_assumptions.parquet": "5998deda4c7bf6dd3c7de346849a14fe5ca739919d88d0c01f4222c610093c69",
         "ev_phev_split_assumptions.csv": "79058d7bef2b692322923e956117d3454080c95b223848e815b9057023ea72e9",
         "ev_phev_split_assumptions.parquet": "a51c2f2344021a7a485a6c563e0f06c1733a6350d7b6f5fb530bda378da176b3",
-        "fan_availability.csv": "7d8df7d82b99740228350e6aa13f7d09394a693912c9bb4a52e0fbbf13b734d1",
-        "fan_availability.parquet": "8c44f18a4cb90ba5b6c383c75c36244dc4c708f93692fbae11d1553cf6cb8f5b",
-        "fan_band_rows.csv": "1c27b21456b950ba4c7edd0cc891cb7b560172a34279839988ed57de786e1c2f",
-        "fan_band_rows.parquet": "35a950be3ba434f77c36266668f4ea4662d73185a97dd104d1e31aa650a67ad7",
+        "fan_availability.csv": "286878a9c131023f5c1ecb6d0145d447f1ade3e2e397ec1279e736bc8be0636e",
+        "fan_availability.parquet": "87c2dfd3ddf5e81a82f6258a06bb01c8e86ffb7679fd12e22a7df036096266ab",
+        "fan_band_rows.csv": "0dd105f2af18f7316424a27023684d47e447e2a2bb2a6f77958bd0f3562293d8",
+        "fan_band_rows.parquet": "a95f7c52988f07de0ebf0cc252e51866994ecb0434a026a54b0746a7077121ef",
         "future_revenue_forecasts.csv": "749b3334c63a4a6843ba9a0e46a7192ba9baf0e36a159b85d16be590be930731",
         "future_revenue_forecasts.parquet": "587c173ee0acd86ab0e951721b8a38c4c1ec51dfb42cec280e26110428ac3d31",
         "horizon_contract_audit.csv": "bac941ae6c79f3d9dc9a4a70431bddf24e042ecf7b617e72d2912073d011b98b",
         "horizon_contract_audit.parquet": "424bc5aef14f744f482ea050e7c0e759f48b5d9ee26b096b63506c1d3ad5d9d1",
         "light_ruc_horizon_availability.csv": "7bc46c81387d263744aa35c08bf1591b8e056af78b8c8bebd407b372d6783d41",
         "light_ruc_horizon_availability.parquet": "412ee161c660516f6878f78ffdfaf87d9048e2116d0c2bcb2c2e541af6dfdf95",
-        "manifest.json": "a8d89458568b1281fbbec84a7bb2ae32a9d0a7a0349d239a348d89976e87b09f",
+        "manifest.json": "ffa4c3ce4e57c473c14eee9285dcf325fc5aea359c0094ba2cd6a73088fad256",
         "manifest.md": "a7dfbd1f96b5d943ae151996a3df4372f1e9c380fd54b7514bfc06bd30208076",
         "path_trace_status.csv": "9aee7a4e7003ec6541476ca3e4afef6d8586b6c358e41db1c8e06623e5ffcaa3",
         "path_trace_status.parquet": "e8d295393c0586167da97d2f0c054eb77419e8c9e4acf134198c0a5f53010eaa",
@@ -2244,14 +2303,14 @@ def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
         "raw_quarterly_forecast_audit.parquet": "b912e9d2c1bafc66e618bff64d121328f4aa66af8df78310649b714fc810f167",
         "revenue_bridge_components.csv": "50ac5ccd1f073a1808dcee761369785c937d51b2801f2a1516a73b767f06acdb",
         "revenue_bridge_components.parquet": "0c13acabc417560c26ccbf0970e2abb6fc0a96bfb831c5555b26c468ea13de6f",
-        "revenue_chart_rows.csv": "a0f730eff1e40404f6b59dae4365c6013cc08a3adac483d0fc41ac3a5fe8f68b",
-        "revenue_chart_rows.parquet": "dfa2c8cf454850b998156d4bd03e62e6a0342525460fb718e3440255aaeb4a33",
-        "revenue_formula_residuals.csv": "3df81931302cb18422c6cadff651b8247acc2d3da11bd707bdc14db31afb979c",
-        "revenue_formula_residuals.parquet": "7758146a8c74bed3757aca79af85c8e3cd1e2696cbafc31396bd30f5d62629db",
-        "revenue_line_reconciliation.csv": "bc055a937f4240c04d7fe07b2be98515c31b9186c7c85191287b023ee21881d5",
-        "revenue_line_reconciliation.parquet": "5dba5ecb7d089690ec6a42cd75b538281fc614266798e839fa2e8e9986ebd87c",
-        "revenue_stack_components.csv": "a10074e7a31abfcf79799b85e7c81fcc98c4b2d5cc79dc30ee9b7a0d33c9259b",
-        "revenue_stack_components.parquet": "db457f8724efb9b426a6a54a8656167a03529fb5849b5a174a8d82648194a48f",
+        "revenue_chart_rows.csv": "fe82106d543bbf4f4c1dd5528e77465921d81772c65f564f32ff89831bca2fab",
+        "revenue_chart_rows.parquet": "c6caabf029d0c76786f8748a3e07bea9a57af96070d1ff866ca2f4b8895afa72",
+        "revenue_formula_residuals.csv": "e71a2a14c08352e97bfd181284a6018a6cba472766e45858f86a67415acf9003",
+        "revenue_formula_residuals.parquet": "87eb745c1167f48b711762a1f9dab3f6a78e0159b34d78652208db9fce879b37",
+        "revenue_line_reconciliation.csv": "9551f4f43b8033f8c5a1d6f956069a342325cf793ed9d919c6bba13dc2320214",
+        "revenue_line_reconciliation.parquet": "563104e333864b7886521a80318d0f0fa2282ab25297ee771df0b4ab9125f27c",
+        "revenue_stack_components.csv": "da41054b943ccd98c53785edda431a7475c1cf931fbde5a7f80d04b27f4f78a2",
+        "revenue_stack_components.parquet": "b622f1e5d95e277af0f30162a86f75c73a8bc114f16d0b50232f9610d068c8d6",
         "row_reconciliation.csv": "d484f5d75cce88e30ce7bcf5dd70058505cc02e5dff93f457a579f119c2fc7ce",
         "row_reconciliation.parquet": "5d2ad8d3aa15d44cdc882ca540d6216feadc1bae3534be8e6b09dbe7026af62d",
         "runtime_cutoff_audit.csv": "ada67ad73c4d54cc10d1cf15d89fa7123fb6febe274a5267bdfcad304b24a7c3",
@@ -2268,8 +2327,8 @@ def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
         "scenario_role_contract.parquet": "64052cdd7f59bb1f357a13ebd415de4129ae27815dabaa0054aa261d11700274",
         "sensitivity_config.csv": "3c29b44c845f67ee27d71baa3420aa7af1a077e09904675ca6475a63fef129b1",
         "sensitivity_config.parquet": "48e4fe218d6e136c8253c5435f0d80960ccd2698b5132800ba7ba16f57f7b9f4",
-        "sensitivity_impact_audit.csv": "494d841480dac7605ed778bdcf57c3e9a2325961b215933ef9dcef994fb0d5fb",
-        "sensitivity_impact_audit.parquet": "94c1fda33f712fb43678a7686b68a8221988590c0a127966c887a7b72e4e3b70",
+        "sensitivity_impact_audit.csv": "26bde776db553d898b3a0b5d21c1bb3ce047082b388d197a558f81b0f4d71a87",
+        "sensitivity_impact_audit.parquet": "67e996033f6e4d513af24e213cdf9524c97aa989e0533e537eff24c810fdbabc",
         "sensitivity_seed_inputs.csv": "5181058396fbdb3896ade20b3ea335955fc186af85cccd365c7d86531852f3a6",
         "sensitivity_seed_inputs.parquet": "23a8ba664690235b92fac25912b9c8ab0eefe990f94a58258b901fafa306b310",
         "series_alias_audit.csv": "c0330c9918d7e2f4f972d15e8465537c16d96aca607ef253353612cadd62c56d",
