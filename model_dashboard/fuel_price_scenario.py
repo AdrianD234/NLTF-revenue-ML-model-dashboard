@@ -1176,6 +1176,16 @@ def _apply_governed_policy_demand_calibration(
         _POLICY_CALIBRATION_NOTE
     )
 
+    # Per-stream seam: scenario quarters at or before a stream's latest
+    # accepted actual are canonical history, never calibrated forecasts.
+    from .forecast_runner import quarter_sort_key as _seam_qkey
+    from .forecast_runner import stream_latest_accepted_periods as _seam_latest
+
+    try:
+        _seam_cutoffs = _seam_latest(None)
+    except Exception:
+        _seam_cutoffs = {}
+
     directly_calibrated_rows: list[int] = []
     for variant_name, reference_name in variant_reference_scenarios.items():
         is_policy_variant = variant_name in policy_reference_scenarios
@@ -1199,6 +1209,9 @@ def _apply_governed_policy_demand_calibration(
                 & replay_inputs["stream"].astype(str).eq(stream)
             ]
             for period in variant_rows["canonical_period"].dropna().astype(str):
+                _cutoff = _seam_cutoffs.get(str(stream))
+                if _cutoff and _seam_qkey(period) <= _seam_qkey(_cutoff):
+                    continue
                 variant_key = (variant_name, stream, period)
                 reference_key = (reference_name, stream, period)
                 if (

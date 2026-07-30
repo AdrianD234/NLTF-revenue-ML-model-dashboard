@@ -10,27 +10,27 @@ doing substantial work.
 | severity | guard_type | rule | n_bindings | max_abs_forecast_delta_pct | status | detail |
 |---|---|---|---|---|---|---|
 | base | any | no binding should be possible | 0 | 0 | passed | Base is the reference the overlay is built from; a binding there would mean the reference itself was clipped. |
-| low | identity | explained or zero | 126 | 0.188001 | explained | Definitional, not a model pathology. The scenario requires that where a quarter's GDP input equals Base, the GDP factor is exactly 1. The fitted replay carries recursive lag persistence from earlier stressed quarters, so its ratio drifts off 1 after the conflict path has already converged back to Base. The guard restores the identity the scenario definition demands. |
-| low | downside_sign | zero unexpected bindings; each explicitly disposed | 6 | 0.227134 | accepted_expected_guard | 6 wrong-sign bindings inside the Low stress window (2026Q4-2027Q1), maximum impact 0.2271%, cumulative revenue-equivalent -9.98 $m. 6/6 satisfy the economic monotonicity invariant after guarding. Model pathology correction. A lower GDP input produced a HIGHER fitted activity factor - a wrong-sign out-of-distribution response. The guard caps it at no-change rather than reversing it, so the overlay never lets a downside scenario mechanically raise activity. |
-| medium | any | retained as governed protection; disclose and quantify | 132 | 0.463269 | disclosed | 132 bindings, of which 9 are wrong-sign; 0 move the forecast by at least 0.5%; maximum 0.4633%; cumulative revenue-equivalent -85.9 $m. |
-| high | any | retained as governed protection; disclose and quantify | 114 | 0.509457 | disclosed | 114 bindings, of which 42 are wrong-sign; 3 move the forecast by at least 0.5%; maximum 0.5095%; cumulative revenue-equivalent -109.4 $m. |
+| low | identity | explained or zero | 126 | 0.188009 | explained | Definitional, not a model pathology. The scenario requires that where a quarter's GDP input equals Base, the GDP factor is exactly 1. The fitted replay carries recursive lag persistence from earlier stressed quarters, so its ratio drifts off 1 after the conflict path has already converged back to Base. The guard restores the identity the scenario definition demands. |
+| low | downside_sign | zero unexpected bindings; each explicitly disposed | 6 | 0.226663 | accepted_expected_guard | 6 wrong-sign bindings inside the Low stress window (2026Q4-2027Q1), maximum impact 0.2267%, cumulative revenue-equivalent -8.95 $m. 6/6 satisfy the economic monotonicity invariant after guarding. Model pathology correction. A lower GDP input produced a HIGHER fitted activity factor - a wrong-sign out-of-distribution response. The guard caps it at no-change rather than reversing it, so the overlay never lets a downside scenario mechanically raise activity. |
+| medium | any | retained as governed protection; disclose and quantify | 132 | 0.463435 | disclosed | 132 bindings, of which 9 are wrong-sign; 0 move the forecast by at least 0.5%; maximum 0.4634%; cumulative revenue-equivalent -85.8 $m. |
+| high | any | retained as governed protection; disclose and quantify | 108 | 0.478131 | disclosed | 108 bindings, of which 36 are wrong-sign; 0 move the forecast by at least 0.5%; maximum 0.4781%; cumulative revenue-equivalent -73.6 $m. |
 
 ## Summary by severity, stream and reason
 
 | severity | stream | guard_reason | n_bindings | first_quarter | last_quarter | max_abs_clip_amount | max_abs_forecast_delta_pct | cumulative_revenue_equivalent_nzd_m |
 |---|---|---|---|---|---|---|---|---|
-| high | HEAVY_RUC | identity_gdp_input_forces_identity_factor | 72 | 2031Q1 | 2036Q4 | 0.0003313 | 0.033119 | -2.23836 |
-| high | HEAVY_RUC | positive_response_to_lower_gdp_capped_at_identity | 36 | 2028Q1 | 2030Q4 | 0.00512066 | 0.509457 | -93.1837 |
+| high | HEAVY_RUC | identity_gdp_input_forces_identity_factor | 72 | 2031Q1 | 2036Q4 | 0.00222024 | 0.222518 | 15.3509 |
+| high | HEAVY_RUC | positive_response_to_lower_gdp_capped_at_identity | 30 | 2028Q2 | 2030Q4 | 0.00480429 | 0.478131 | -74.9395 |
 | high | PED | positive_response_to_lower_gdp_capped_at_identity | 6 | 2029Q2 | 2029Q3 | 0.0013363 | 0.133452 | -13.9914 |
-| low | HEAVY_RUC | identity_gdp_input_forces_identity_factor | 81 | 2027Q2 | 2033Q4 | 0.00188355 | 0.188001 | -12.8856 |
-| low | HEAVY_RUC | positive_response_to_lower_gdp_capped_at_identity | 6 | 2026Q4 | 2027Q1 | 0.00227651 | 0.227134 | -9.98367 |
+| low | HEAVY_RUC | identity_gdp_input_forces_identity_factor | 81 | 2027Q2 | 2033Q4 | 0.00188363 | 0.188009 | -13.3108 |
+| low | HEAVY_RUC | positive_response_to_lower_gdp_capped_at_identity | 6 | 2026Q4 | 2027Q1 | 0.00227178 | 0.226663 | -8.94689 |
 | low | PED | identity_gdp_input_forces_identity_factor | 45 | 2027Q2 | 2032Q1 | 0.00137853 | 0.138043 | 39.6046 |
-| medium | HEAVY_RUC | identity_gdp_input_forces_identity_factor | 84 | 2028Q2 | 2035Q1 | 0.00465425 | 0.463269 | -32.9648 |
-| medium | HEAVY_RUC | positive_response_to_lower_gdp_capped_at_identity | 6 | 2027Q4 | 2028Q1 | 0.00454923 | 0.452863 | -21.1031 |
+| medium | HEAVY_RUC | identity_gdp_input_forces_identity_factor | 84 | 2028Q2 | 2035Q1 | 0.00465593 | 0.463435 | -32.9144 |
+| medium | HEAVY_RUC | positive_response_to_lower_gdp_capped_at_identity | 6 | 2027Q4 | 2028Q1 | 0.00455262 | 0.453198 | -21.1143 |
 | medium | PED | identity_gdp_input_forces_identity_factor | 39 | 2028Q2 | 2032Q1 | 0.00138043 | 0.137853 | -31.4691 |
 | medium | PED | positive_response_to_lower_gdp_capped_at_identity | 3 | 2028Q1 | 2028Q1 | 5.47486e-05 | 0.00547456 | -0.3281 |
 
-Total bindings: 378.
+Total bindings: 372.
 
 ## Low wrong-sign bindings, individually disposed
 
@@ -40,38 +40,36 @@ is listed in full with its disposition.
 
 | scenario_name | stream | quarter | responding_model | input_gdp_level_factor | price_response_factor | raw_gdp_model_factor | guarded_gdp_model_factor | clip_amount | base_at_same_price_forecast | guarded_forecast | base_vs_scenario_direction | monotonicity_holds | forecast_delta_pct | revenue_equivalent_delta_nzd_m | disposition |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| middle_east_low | HEAVY_RUC | 2026Q4 | HEAVY_RUC__VNEXT_SOLVED_CONVEX_TOP4 | 0.997925 | 0.996234 | 1.00228 | 1 | -0.00227651 | 1.06296e+09 | 1.06296e+09 | scenario_equals_base_at_identity | True | -0.227134 | -2.52108 | accepted_expected_guard |
-| middle_east_low | HEAVY_RUC | 2027Q1 | HEAVY_RUC__VNEXT_SOLVED_CONVEX_TOP4 | 0.999429 | 1 | 1.00073 | 1 | -0.000727421 | 1.03627e+09 | 1.03627e+09 | scenario_equals_base_at_identity | True | -0.0726892 | -0.806814 | accepted_expected_guard |
-| middle_east_low__12c_delay_6m | HEAVY_RUC | 2026Q4 | HEAVY_RUC__VNEXT_SOLVED_CONVEX_TOP4 | 0.997925 | 0.996234 | 1.00228 | 1 | -0.00227651 | 1.06296e+09 | 1.06296e+09 | scenario_equals_base_at_identity | True | -0.227134 | -2.52108 | accepted_expected_guard |
-| middle_east_low__12c_delay_6m | HEAVY_RUC | 2027Q1 | HEAVY_RUC__VNEXT_SOLVED_CONVEX_TOP4 | 0.999429 | 1.00352 | 1.00073 | 1 | -0.000727421 | 1.03992e+09 | 1.03992e+09 | scenario_equals_base_at_identity | True | -0.0726892 | -0.806814 | accepted_expected_guard |
-| middle_east_low__12c_no_uplift | HEAVY_RUC | 2026Q4 | HEAVY_RUC__VNEXT_SOLVED_CONVEX_TOP4 | 0.997925 | 0.996234 | 1.00228 | 1 | -0.00227651 | 1.06296e+09 | 1.06296e+09 | scenario_equals_base_at_identity | True | -0.227134 | -2.52108 | accepted_expected_guard |
-| middle_east_low__12c_no_uplift | HEAVY_RUC | 2027Q1 | HEAVY_RUC__VNEXT_SOLVED_CONVEX_TOP4 | 0.999429 | 1.00352 | 1.00073 | 1 | -0.000727421 | 1.03992e+09 | 1.03992e+09 | scenario_equals_base_at_identity | True | -0.0726892 | -0.806814 | accepted_expected_guard |
+| middle_east_low | HEAVY_RUC | 2026Q4 | HEAVY_RUC__VNEXT_SOLVED_CONVEX_TOP4 | 0.997925 | 0.996234 | 1.00227 | 1 | -0.00227178 | 1.06333e+09 | 1.06333e+09 | scenario_equals_base_at_identity | True | -0.226663 | -2.51585 | accepted_expected_guard |
+| middle_east_low | HEAVY_RUC | 2027Q1 | HEAVY_RUC__VNEXT_SOLVED_CONVEX_TOP4 | 0.999429 | 1 | 1.00042 | 1 | -0.000420419 | 1.0384e+09 | 1.0384e+09 | scenario_equals_base_at_identity | True | -0.0420242 | -0.466448 | accepted_expected_guard |
+| middle_east_low__12c_delay_6m | HEAVY_RUC | 2026Q4 | HEAVY_RUC__VNEXT_SOLVED_CONVEX_TOP4 | 0.997925 | 0.996234 | 1.00227 | 1 | -0.00227178 | 1.06333e+09 | 1.06333e+09 | scenario_equals_base_at_identity | True | -0.226663 | -2.51585 | accepted_expected_guard |
+| middle_east_low__12c_delay_6m | HEAVY_RUC | 2027Q1 | HEAVY_RUC__VNEXT_SOLVED_CONVEX_TOP4 | 0.999429 | 1.00352 | 1.00042 | 1 | -0.000420419 | 1.04206e+09 | 1.04206e+09 | scenario_equals_base_at_identity | True | -0.0420242 | -0.466448 | accepted_expected_guard |
+| middle_east_low__12c_no_uplift | HEAVY_RUC | 2026Q4 | HEAVY_RUC__VNEXT_SOLVED_CONVEX_TOP4 | 0.997925 | 0.996234 | 1.00227 | 1 | -0.00227178 | 1.06333e+09 | 1.06333e+09 | scenario_equals_base_at_identity | True | -0.226663 | -2.51585 | accepted_expected_guard |
+| middle_east_low__12c_no_uplift | HEAVY_RUC | 2027Q1 | HEAVY_RUC__VNEXT_SOLVED_CONVEX_TOP4 | 0.999429 | 1.00352 | 1.00042 | 1 | -0.000420419 | 1.04206e+09 | 1.04206e+09 | scenario_equals_base_at_identity | True | -0.0420242 | -0.466448 | accepted_expected_guard |
 
 ## Every binding
 
 | severity | scenario_name | stream | quarter | raw_gdp_model_factor | guarded_gdp_model_factor | clip_amount | guard_reason | forecast_delta | forecast_delta_pct | revenue_equivalent_delta_nzd_m | disposition |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| high | middle_east_high | HEAVY_RUC | 2028Q1 | 1.0012 | 1 | -0.00119659 | positive_response_to_lower_gdp_capped_at_identity | -1.21338e+06 | -0.119516 | -1.32656 | accepted_expected_guard |
-| high | middle_east_high | HEAVY_RUC | 2028Q2 | 1.00512 | 1 | -0.00512066 | positive_response_to_lower_gdp_capped_at_identity | -5.08854e+06 | -0.509457 | -5.65472 | accepted_expected_guard |
-| high | middle_east_high | HEAVY_RUC | 2028Q3 | 1.00439 | 1 | -0.0043918 | positive_response_to_lower_gdp_capped_at_identity | -4.44153e+06 | -0.43726 | -4.85337 | accepted_expected_guard |
+| high | middle_east_high | HEAVY_RUC | 2028Q2 | 1.0048 | 1 | -0.00480429 | positive_response_to_lower_gdp_capped_at_identity | -4.77413e+06 | -0.478131 | -5.30702 | accepted_expected_guard |
+| high | middle_east_high | HEAVY_RUC | 2028Q3 | 1.00443 | 1 | -0.00443228 | positive_response_to_lower_gdp_capped_at_identity | -4.48246e+06 | -0.441272 | -4.8979 | accepted_expected_guard |
 | high | middle_east_high | HEAVY_RUC | 2028Q4 | 1.00402 | 1 | -0.00402462 | positive_response_to_lower_gdp_capped_at_identity | -4.31493e+06 | -0.400849 | -4.44922 | accepted_expected_guard |
-| high | middle_east_high | HEAVY_RUC | 2029Q1 | 1.00357 | 1 | -0.00356653 | positive_response_to_lower_gdp_capped_at_identity | -3.72144e+06 | -0.355386 | -3.94461 | accepted_expected_guard |
-| high | middle_east_high | HEAVY_RUC | 2029Q2 | 1.00294 | 1 | -0.00293704 | positive_response_to_lower_gdp_capped_at_identity | -2.99216e+06 | -0.292844 | -3.25042 | accepted_expected_guard |
-| high | middle_east_high | HEAVY_RUC | 2029Q3 | 1.00209 | 1 | -0.0020859 | positive_response_to_lower_gdp_capped_at_identity | -2.15581e+06 | -0.208156 | -2.31043 | accepted_expected_guard |
+| high | middle_east_high | HEAVY_RUC | 2029Q1 | 1.00121 | 1 | -0.00121196 | positive_response_to_lower_gdp_capped_at_identity | -1.2646e+06 | -0.121049 | -1.34358 | accepted_expected_guard |
+| high | middle_east_high | HEAVY_RUC | 2029Q2 | 1.00264 | 1 | -0.00263597 | positive_response_to_lower_gdp_capped_at_identity | -2.68544e+06 | -0.262904 | -2.9181 | accepted_expected_guard |
+| high | middle_east_high | HEAVY_RUC | 2029Q3 | 1.00215 | 1 | -0.00214691 | positive_response_to_lower_gdp_capped_at_identity | -2.21887e+06 | -0.214231 | -2.37786 | accepted_expected_guard |
 | high | middle_east_high | HEAVY_RUC | 2029Q4 | 1.00153 | 1 | -0.00153295 | positive_response_to_lower_gdp_capped_at_identity | -1.67435e+06 | -0.15306 | -1.69889 | accepted_expected_guard |
-| high | middle_east_high | HEAVY_RUC | 2030Q1 | 1.00118 | 1 | -0.00117556 | positive_response_to_lower_gdp_capped_at_identity | -1.24645e+06 | -0.117418 | -1.30328 | accepted_expected_guard |
-| high | middle_east_high | HEAVY_RUC | 2030Q2 | 1.0009 | 1 | -0.000898579 | positive_response_to_lower_gdp_capped_at_identity | -928314 | -0.0897772 | -0.996482 | accepted_expected_guard |
-| high | middle_east_high | HEAVY_RUC | 2030Q3 | 1.00065 | 1 | -0.000651512 | positive_response_to_lower_gdp_capped_at_identity | -681726 | -0.0651087 | -0.722675 | accepted_expected_guard |
+| high | middle_east_high | HEAVY_RUC | 2030Q2 | 1.00061 | 1 | -0.000605673 | positive_response_to_lower_gdp_capped_at_identity | -625716 | -0.0605307 | -0.67186 | accepted_expected_guard |
+| high | middle_east_high | HEAVY_RUC | 2030Q3 | 1.00069 | 1 | -0.000689525 | positive_response_to_lower_gdp_capped_at_identity | -721503 | -0.068905 | -0.764812 | accepted_expected_guard |
 | high | middle_east_high | HEAVY_RUC | 2030Q4 | 1.0005 | 1 | -0.000496296 | positive_response_to_lower_gdp_capped_at_identity | -547944 | -0.049605 | -0.550591 | accepted_expected_guard |
-| high | middle_east_high | HEAVY_RUC | 2031Q1 | 1.00033 | 1 | -0.0003313 | identity_gdp_input_forces_identity_factor | -354626 | -0.033119 | -0.367605 | accepted_definitional_restoration |
-| high | middle_east_high | HEAVY_RUC | 2031Q2 | 1.00018 | 1 | -0.000177565 | identity_gdp_input_forces_identity_factor | -185077 | -0.0177533 | -0.197053 | accepted_definitional_restoration |
-| high | middle_east_high | HEAVY_RUC | 2031Q3 | 1.0001 | 1 | -9.55036e-05 | identity_gdp_input_forces_identity_factor | -100681 | -0.00954945 | -0.105994 | accepted_definitional_restoration |
+| high | middle_east_high | HEAVY_RUC | 2031Q1 | 0.998102 | 1 | 0.0018976 | identity_gdp_input_forces_identity_factor | 2.03121e+06 | 0.190121 | 2.11025 | accepted_definitional_restoration |
+| high | middle_east_high | HEAVY_RUC | 2031Q2 | 0.999891 | 1 | 0.000108655 | identity_gdp_input_forces_identity_factor | 113251 | 0.0108666 | 0.120614 | accepted_definitional_restoration |
+| high | middle_east_high | HEAVY_RUC | 2031Q3 | 1.00015 | 1 | -0.000151941 | identity_gdp_input_forces_identity_factor | -160177 | -0.0151918 | -0.168621 | accepted_definitional_restoration |
 | high | middle_east_high | HEAVY_RUC | 2031Q4 | 1.00004 | 1 | -4.22364e-05 | identity_gdp_input_forces_identity_factor | -46984.3 | -0.00422346 | -0.0468783 | accepted_definitional_restoration |
-| high | middle_east_high | HEAVY_RUC | 2032Q1 | 1.00001 | 1 | -1.4058e-05 | identity_gdp_input_forces_identity_factor | -15146.9 | -0.00140578 | -0.0156035 | accepted_definitional_restoration |
-| high | middle_east_high | HEAVY_RUC | 2032Q2 | 1.00001 | 1 | -6.17405e-06 | identity_gdp_input_forces_identity_factor | -6472.43 | -0.000617402 | -0.00685285 | accepted_definitional_restoration |
+| high | middle_east_high | HEAVY_RUC | 2032Q1 | 0.99778 | 1 | 0.00222024 | identity_gdp_input_forces_identity_factor | 2.39221e+06 | 0.222518 | 2.46984 | accepted_definitional_restoration |
+| high | middle_east_high | HEAVY_RUC | 2032Q2 | 1.00001 | 1 | -1.22579e-05 | identity_gdp_input_forces_identity_factor | -12850.3 | -0.00122578 | -0.0136055 | accepted_definitional_restoration |
 | high | middle_east_high | HEAVY_RUC | 2032Q3 | 1 | 1 | -3.23259e-06 | identity_gdp_input_forces_identity_factor | -3429.51 | -0.000323258 | -0.003588 | accepted_definitional_restoration |
 | high | middle_east_high | HEAVY_RUC | 2032Q4 | 1 | 1 | -1.39441e-06 | identity_gdp_input_forces_identity_factor | -1560.59 | -0.000139441 | -0.00154772 | accepted_definitional_restoration |
-| high | middle_east_high | HEAVY_RUC | 2033Q1 | 1 | 1 | -4.89875e-07 | identity_gdp_input_forces_identity_factor | -531.238 | -4.89875e-05 | -0.000543737 | accepted_definitional_restoration |
+| high | middle_east_high | HEAVY_RUC | 2033Q1 | 0.999414 | 1 | 0.000586143 | identity_gdp_input_forces_identity_factor | 635634 | 0.0586486 | 0.650971 | accepted_definitional_restoration |
 | high | middle_east_high | HEAVY_RUC | 2033Q2 | 1 | 1 | -2.17391e-07 | identity_gdp_input_forces_identity_factor | -229.384 | -2.17391e-05 | -0.000241293 | accepted_definitional_restoration |
 | high | middle_east_high | HEAVY_RUC | 2033Q3 | 1 | 1 | -1.12264e-07 | identity_gdp_input_forces_identity_factor | -119.901 | -1.12264e-05 | -0.000124608 | accepted_definitional_restoration |
 | high | middle_east_high | HEAVY_RUC | 2033Q4 | 1 | 1 | -4.77401e-08 | identity_gdp_input_forces_identity_factor | -53.7705 | -4.77401e-06 | -5.29892e-05 | accepted_definitional_restoration |
@@ -79,7 +77,7 @@ is listed in full with its disposition.
 | high | middle_east_high | HEAVY_RUC | 2034Q2 | 1 | 1 | -7.6724e-09 | identity_gdp_input_forces_identity_factor | -8.15257 | -7.6724e-07 | -8.51598e-06 | accepted_definitional_restoration |
 | high | middle_east_high | HEAVY_RUC | 2034Q3 | 1 | 1 | -3.884e-09 | identity_gdp_input_forces_identity_factor | -4.1764 | -3.884e-07 | -4.31105e-06 | accepted_definitional_restoration |
 | high | middle_east_high | HEAVY_RUC | 2034Q4 | 1 | 1 | -1.63647e-09 | identity_gdp_input_forces_identity_factor | -1.85544 | -1.63647e-07 | -1.8164e-06 | accepted_definitional_restoration |
-| high | middle_east_high | HEAVY_RUC | 2035Q1 | 1 | 1 | -6.04492e-10 | identity_gdp_input_forces_identity_factor | -0.664345 | -6.04491e-08 | -6.70955e-07 | accepted_definitional_restoration |
+| high | middle_east_high | HEAVY_RUC | 2035Q1 | 1 | 1 | -6.04489e-10 | identity_gdp_input_forces_identity_factor | -0.664342 | -6.04489e-08 | -6.70952e-07 | accepted_definitional_restoration |
 | high | middle_east_high | HEAVY_RUC | 2035Q2 | 1 | 1 | -2.70348e-10 | identity_gdp_input_forces_identity_factor | -0.289005 | -2.70348e-08 | -3.00073e-07 | accepted_definitional_restoration |
 | high | middle_east_high | HEAVY_RUC | 2035Q3 | 1 | 1 | -1.34244e-10 | identity_gdp_input_forces_identity_factor | -0.145207 | -1.34244e-08 | -1.49004e-07 | accepted_definitional_restoration |
 | high | middle_east_high | HEAVY_RUC | 2035Q4 | 1 | 1 | -5.62317e-11 | identity_gdp_input_forces_identity_factor | -0.0641317 | -5.62317e-09 | -6.24144e-08 | accepted_definitional_restoration |
@@ -89,27 +87,25 @@ is listed in full with its disposition.
 | high | middle_east_high | HEAVY_RUC | 2036Q4 | 1 | 1 | -1.93578e-12 | identity_gdp_input_forces_identity_factor | -0.00221944 | -1.93577e-10 | -2.14861e-09 | accepted_definitional_restoration |
 | high | middle_east_high | PED | 2029Q2 | 1.00134 | 1 | -0.0013363 | positive_response_to_lower_gdp_capped_at_identity | -2.02354 | -0.133452 | -2.666 | accepted_expected_guard |
 | high | middle_east_high | PED | 2029Q3 | 1.001 | 1 | -0.00100104 | positive_response_to_lower_gdp_capped_at_identity | -1.52411 | -0.100004 | -1.99781 | accepted_expected_guard |
-| high | middle_east_high__12c_delay_6m | HEAVY_RUC | 2028Q1 | 1.0012 | 1 | -0.00119659 | positive_response_to_lower_gdp_capped_at_identity | -1.21338e+06 | -0.119516 | -1.32656 | accepted_expected_guard |
-| high | middle_east_high__12c_delay_6m | HEAVY_RUC | 2028Q2 | 1.00512 | 1 | -0.00512066 | positive_response_to_lower_gdp_capped_at_identity | -5.08854e+06 | -0.509457 | -5.65472 | accepted_expected_guard |
-| high | middle_east_high__12c_delay_6m | HEAVY_RUC | 2028Q3 | 1.00439 | 1 | -0.0043918 | positive_response_to_lower_gdp_capped_at_identity | -4.44153e+06 | -0.43726 | -4.85337 | accepted_expected_guard |
+| high | middle_east_high__12c_delay_6m | HEAVY_RUC | 2028Q2 | 1.0048 | 1 | -0.00480429 | positive_response_to_lower_gdp_capped_at_identity | -4.77413e+06 | -0.478131 | -5.30702 | accepted_expected_guard |
+| high | middle_east_high__12c_delay_6m | HEAVY_RUC | 2028Q3 | 1.00443 | 1 | -0.00443228 | positive_response_to_lower_gdp_capped_at_identity | -4.48246e+06 | -0.441272 | -4.8979 | accepted_expected_guard |
 | high | middle_east_high__12c_delay_6m | HEAVY_RUC | 2028Q4 | 1.00402 | 1 | -0.00402462 | positive_response_to_lower_gdp_capped_at_identity | -4.31493e+06 | -0.400849 | -4.44922 | accepted_expected_guard |
-| high | middle_east_high__12c_delay_6m | HEAVY_RUC | 2029Q1 | 1.00357 | 1 | -0.00356653 | positive_response_to_lower_gdp_capped_at_identity | -3.72144e+06 | -0.355386 | -3.94461 | accepted_expected_guard |
-| high | middle_east_high__12c_delay_6m | HEAVY_RUC | 2029Q2 | 1.00294 | 1 | -0.00293704 | positive_response_to_lower_gdp_capped_at_identity | -2.99216e+06 | -0.292844 | -3.25042 | accepted_expected_guard |
-| high | middle_east_high__12c_delay_6m | HEAVY_RUC | 2029Q3 | 1.00209 | 1 | -0.0020859 | positive_response_to_lower_gdp_capped_at_identity | -2.15581e+06 | -0.208156 | -2.31043 | accepted_expected_guard |
+| high | middle_east_high__12c_delay_6m | HEAVY_RUC | 2029Q1 | 1.00121 | 1 | -0.00121196 | positive_response_to_lower_gdp_capped_at_identity | -1.2646e+06 | -0.121049 | -1.34358 | accepted_expected_guard |
+| high | middle_east_high__12c_delay_6m | HEAVY_RUC | 2029Q2 | 1.00264 | 1 | -0.00263597 | positive_response_to_lower_gdp_capped_at_identity | -2.68544e+06 | -0.262904 | -2.9181 | accepted_expected_guard |
+| high | middle_east_high__12c_delay_6m | HEAVY_RUC | 2029Q3 | 1.00215 | 1 | -0.00214691 | positive_response_to_lower_gdp_capped_at_identity | -2.21887e+06 | -0.214231 | -2.37786 | accepted_expected_guard |
 | high | middle_east_high__12c_delay_6m | HEAVY_RUC | 2029Q4 | 1.00153 | 1 | -0.00153295 | positive_response_to_lower_gdp_capped_at_identity | -1.67435e+06 | -0.15306 | -1.69889 | accepted_expected_guard |
-| high | middle_east_high__12c_delay_6m | HEAVY_RUC | 2030Q1 | 1.00118 | 1 | -0.00117556 | positive_response_to_lower_gdp_capped_at_identity | -1.24645e+06 | -0.117418 | -1.30328 | accepted_expected_guard |
-| high | middle_east_high__12c_delay_6m | HEAVY_RUC | 2030Q2 | 1.0009 | 1 | -0.000898579 | positive_response_to_lower_gdp_capped_at_identity | -928314 | -0.0897772 | -0.996482 | accepted_expected_guard |
-| high | middle_east_high__12c_delay_6m | HEAVY_RUC | 2030Q3 | 1.00065 | 1 | -0.000651512 | positive_response_to_lower_gdp_capped_at_identity | -681726 | -0.0651087 | -0.722675 | accepted_expected_guard |
+| high | middle_east_high__12c_delay_6m | HEAVY_RUC | 2030Q2 | 1.00061 | 1 | -0.000605673 | positive_response_to_lower_gdp_capped_at_identity | -625716 | -0.0605307 | -0.67186 | accepted_expected_guard |
+| high | middle_east_high__12c_delay_6m | HEAVY_RUC | 2030Q3 | 1.00069 | 1 | -0.000689525 | positive_response_to_lower_gdp_capped_at_identity | -721503 | -0.068905 | -0.764812 | accepted_expected_guard |
 | high | middle_east_high__12c_delay_6m | HEAVY_RUC | 2030Q4 | 1.0005 | 1 | -0.000496296 | positive_response_to_lower_gdp_capped_at_identity | -547944 | -0.049605 | -0.550591 | accepted_expected_guard |
-| high | middle_east_high__12c_delay_6m | HEAVY_RUC | 2031Q1 | 1.00033 | 1 | -0.0003313 | identity_gdp_input_forces_identity_factor | -354626 | -0.033119 | -0.367605 | accepted_definitional_restoration |
-| high | middle_east_high__12c_delay_6m | HEAVY_RUC | 2031Q2 | 1.00018 | 1 | -0.000177565 | identity_gdp_input_forces_identity_factor | -185077 | -0.0177533 | -0.197053 | accepted_definitional_restoration |
-| high | middle_east_high__12c_delay_6m | HEAVY_RUC | 2031Q3 | 1.0001 | 1 | -9.55036e-05 | identity_gdp_input_forces_identity_factor | -100681 | -0.00954945 | -0.105994 | accepted_definitional_restoration |
+| high | middle_east_high__12c_delay_6m | HEAVY_RUC | 2031Q1 | 0.998102 | 1 | 0.0018976 | identity_gdp_input_forces_identity_factor | 2.03121e+06 | 0.190121 | 2.11025 | accepted_definitional_restoration |
+| high | middle_east_high__12c_delay_6m | HEAVY_RUC | 2031Q2 | 0.999891 | 1 | 0.000108655 | identity_gdp_input_forces_identity_factor | 113251 | 0.0108666 | 0.120614 | accepted_definitional_restoration |
+| high | middle_east_high__12c_delay_6m | HEAVY_RUC | 2031Q3 | 1.00015 | 1 | -0.000151941 | identity_gdp_input_forces_identity_factor | -160177 | -0.0151918 | -0.168621 | accepted_definitional_restoration |
 | high | middle_east_high__12c_delay_6m | HEAVY_RUC | 2031Q4 | 1.00004 | 1 | -4.22364e-05 | identity_gdp_input_forces_identity_factor | -46984.3 | -0.00422346 | -0.0468783 | accepted_definitional_restoration |
-| high | middle_east_high__12c_delay_6m | HEAVY_RUC | 2032Q1 | 1.00001 | 1 | -1.4058e-05 | identity_gdp_input_forces_identity_factor | -15146.9 | -0.00140578 | -0.0156035 | accepted_definitional_restoration |
-| high | middle_east_high__12c_delay_6m | HEAVY_RUC | 2032Q2 | 1.00001 | 1 | -6.17405e-06 | identity_gdp_input_forces_identity_factor | -6472.43 | -0.000617402 | -0.00685285 | accepted_definitional_restoration |
+| high | middle_east_high__12c_delay_6m | HEAVY_RUC | 2032Q1 | 0.99778 | 1 | 0.00222024 | identity_gdp_input_forces_identity_factor | 2.39221e+06 | 0.222518 | 2.46984 | accepted_definitional_restoration |
+| high | middle_east_high__12c_delay_6m | HEAVY_RUC | 2032Q2 | 1.00001 | 1 | -1.22579e-05 | identity_gdp_input_forces_identity_factor | -12850.3 | -0.00122578 | -0.0136055 | accepted_definitional_restoration |
 | high | middle_east_high__12c_delay_6m | HEAVY_RUC | 2032Q3 | 1 | 1 | -3.23259e-06 | identity_gdp_input_forces_identity_factor | -3429.51 | -0.000323258 | -0.003588 | accepted_definitional_restoration |
 | high | middle_east_high__12c_delay_6m | HEAVY_RUC | 2032Q4 | 1 | 1 | -1.39441e-06 | identity_gdp_input_forces_identity_factor | -1560.59 | -0.000139441 | -0.00154772 | accepted_definitional_restoration |
-| high | middle_east_high__12c_delay_6m | HEAVY_RUC | 2033Q1 | 1 | 1 | -4.89875e-07 | identity_gdp_input_forces_identity_factor | -531.238 | -4.89875e-05 | -0.000543737 | accepted_definitional_restoration |
+| high | middle_east_high__12c_delay_6m | HEAVY_RUC | 2033Q1 | 0.999414 | 1 | 0.000586143 | identity_gdp_input_forces_identity_factor | 635634 | 0.0586486 | 0.650971 | accepted_definitional_restoration |
 | high | middle_east_high__12c_delay_6m | HEAVY_RUC | 2033Q2 | 1 | 1 | -2.17391e-07 | identity_gdp_input_forces_identity_factor | -229.384 | -2.17391e-05 | -0.000241293 | accepted_definitional_restoration |
 | high | middle_east_high__12c_delay_6m | HEAVY_RUC | 2033Q3 | 1 | 1 | -1.12264e-07 | identity_gdp_input_forces_identity_factor | -119.901 | -1.12264e-05 | -0.000124608 | accepted_definitional_restoration |
 | high | middle_east_high__12c_delay_6m | HEAVY_RUC | 2033Q4 | 1 | 1 | -4.77401e-08 | identity_gdp_input_forces_identity_factor | -53.7705 | -4.77401e-06 | -5.29892e-05 | accepted_definitional_restoration |
@@ -117,7 +113,7 @@ is listed in full with its disposition.
 | high | middle_east_high__12c_delay_6m | HEAVY_RUC | 2034Q2 | 1 | 1 | -7.6724e-09 | identity_gdp_input_forces_identity_factor | -8.15257 | -7.6724e-07 | -8.51598e-06 | accepted_definitional_restoration |
 | high | middle_east_high__12c_delay_6m | HEAVY_RUC | 2034Q3 | 1 | 1 | -3.884e-09 | identity_gdp_input_forces_identity_factor | -4.1764 | -3.884e-07 | -4.31105e-06 | accepted_definitional_restoration |
 | high | middle_east_high__12c_delay_6m | HEAVY_RUC | 2034Q4 | 1 | 1 | -1.63647e-09 | identity_gdp_input_forces_identity_factor | -1.85544 | -1.63647e-07 | -1.8164e-06 | accepted_definitional_restoration |
-| high | middle_east_high__12c_delay_6m | HEAVY_RUC | 2035Q1 | 1 | 1 | -6.04492e-10 | identity_gdp_input_forces_identity_factor | -0.664345 | -6.04491e-08 | -6.70955e-07 | accepted_definitional_restoration |
+| high | middle_east_high__12c_delay_6m | HEAVY_RUC | 2035Q1 | 1 | 1 | -6.04489e-10 | identity_gdp_input_forces_identity_factor | -0.664342 | -6.04489e-08 | -6.70952e-07 | accepted_definitional_restoration |
 | high | middle_east_high__12c_delay_6m | HEAVY_RUC | 2035Q2 | 1 | 1 | -2.70348e-10 | identity_gdp_input_forces_identity_factor | -0.289005 | -2.70348e-08 | -3.00073e-07 | accepted_definitional_restoration |
 | high | middle_east_high__12c_delay_6m | HEAVY_RUC | 2035Q3 | 1 | 1 | -1.34244e-10 | identity_gdp_input_forces_identity_factor | -0.145207 | -1.34244e-08 | -1.49004e-07 | accepted_definitional_restoration |
 | high | middle_east_high__12c_delay_6m | HEAVY_RUC | 2035Q4 | 1 | 1 | -5.62317e-11 | identity_gdp_input_forces_identity_factor | -0.0641317 | -5.62317e-09 | -6.24144e-08 | accepted_definitional_restoration |
@@ -127,27 +123,25 @@ is listed in full with its disposition.
 | high | middle_east_high__12c_delay_6m | HEAVY_RUC | 2036Q4 | 1 | 1 | -1.93578e-12 | identity_gdp_input_forces_identity_factor | -0.00221944 | -1.93577e-10 | -2.14861e-09 | accepted_definitional_restoration |
 | high | middle_east_high__12c_delay_6m | PED | 2029Q2 | 1.00134 | 1 | -0.0013363 | positive_response_to_lower_gdp_capped_at_identity | -2.02354 | -0.133452 | -2.666 | accepted_expected_guard |
 | high | middle_east_high__12c_delay_6m | PED | 2029Q3 | 1.001 | 1 | -0.00100104 | positive_response_to_lower_gdp_capped_at_identity | -1.52411 | -0.100004 | -1.99781 | accepted_expected_guard |
-| high | middle_east_high__12c_no_uplift | HEAVY_RUC | 2028Q1 | 1.0012 | 1 | -0.00119659 | positive_response_to_lower_gdp_capped_at_identity | -1.21643e+06 | -0.119516 | -1.32656 | accepted_expected_guard |
-| high | middle_east_high__12c_no_uplift | HEAVY_RUC | 2028Q2 | 1.00512 | 1 | -0.00512066 | positive_response_to_lower_gdp_capped_at_identity | -5.10221e+06 | -0.509457 | -5.65472 | accepted_expected_guard |
-| high | middle_east_high__12c_no_uplift | HEAVY_RUC | 2028Q3 | 1.00439 | 1 | -0.0043918 | positive_response_to_lower_gdp_capped_at_identity | -4.45413e+06 | -0.43726 | -4.85337 | accepted_expected_guard |
+| high | middle_east_high__12c_no_uplift | HEAVY_RUC | 2028Q2 | 1.0048 | 1 | -0.00480429 | positive_response_to_lower_gdp_capped_at_identity | -4.78695e+06 | -0.478131 | -5.30702 | accepted_expected_guard |
+| high | middle_east_high__12c_no_uplift | HEAVY_RUC | 2028Q3 | 1.00443 | 1 | -0.00443228 | positive_response_to_lower_gdp_capped_at_identity | -4.49517e+06 | -0.441272 | -4.8979 | accepted_expected_guard |
 | high | middle_east_high__12c_no_uplift | HEAVY_RUC | 2028Q4 | 1.00402 | 1 | -0.00402462 | positive_response_to_lower_gdp_capped_at_identity | -4.32777e+06 | -0.400849 | -4.44922 | accepted_expected_guard |
-| high | middle_east_high__12c_no_uplift | HEAVY_RUC | 2029Q1 | 1.00357 | 1 | -0.00356653 | positive_response_to_lower_gdp_capped_at_identity | -3.73246e+06 | -0.355386 | -3.94461 | accepted_expected_guard |
-| high | middle_east_high__12c_no_uplift | HEAVY_RUC | 2029Q2 | 1.00294 | 1 | -0.00293704 | positive_response_to_lower_gdp_capped_at_identity | -3.00131e+06 | -0.292844 | -3.25042 | accepted_expected_guard |
-| high | middle_east_high__12c_no_uplift | HEAVY_RUC | 2029Q3 | 1.00209 | 1 | -0.0020859 | positive_response_to_lower_gdp_capped_at_identity | -2.16256e+06 | -0.208156 | -2.31043 | accepted_expected_guard |
+| high | middle_east_high__12c_no_uplift | HEAVY_RUC | 2029Q1 | 1.00121 | 1 | -0.00121196 | positive_response_to_lower_gdp_capped_at_identity | -1.26834e+06 | -0.121049 | -1.34358 | accepted_expected_guard |
+| high | middle_east_high__12c_no_uplift | HEAVY_RUC | 2029Q2 | 1.00264 | 1 | -0.00263597 | positive_response_to_lower_gdp_capped_at_identity | -2.69366e+06 | -0.262904 | -2.9181 | accepted_expected_guard |
+| high | middle_east_high__12c_no_uplift | HEAVY_RUC | 2029Q3 | 1.00215 | 1 | -0.00214691 | positive_response_to_lower_gdp_capped_at_identity | -2.22582e+06 | -0.214231 | -2.37786 | accepted_expected_guard |
 | high | middle_east_high__12c_no_uplift | HEAVY_RUC | 2029Q4 | 1.00153 | 1 | -0.00153295 | positive_response_to_lower_gdp_capped_at_identity | -1.67969e+06 | -0.15306 | -1.69889 | accepted_expected_guard |
-| high | middle_east_high__12c_no_uplift | HEAVY_RUC | 2030Q1 | 1.00118 | 1 | -0.00117556 | positive_response_to_lower_gdp_capped_at_identity | -1.25033e+06 | -0.117418 | -1.30328 | accepted_expected_guard |
-| high | middle_east_high__12c_no_uplift | HEAVY_RUC | 2030Q2 | 1.0009 | 1 | -0.000898579 | positive_response_to_lower_gdp_capped_at_identity | -931248 | -0.0897772 | -0.996482 | accepted_expected_guard |
-| high | middle_east_high__12c_no_uplift | HEAVY_RUC | 2030Q3 | 1.00065 | 1 | -0.000651512 | positive_response_to_lower_gdp_capped_at_identity | -683901 | -0.0651087 | -0.722675 | accepted_expected_guard |
+| high | middle_east_high__12c_no_uplift | HEAVY_RUC | 2030Q2 | 1.00061 | 1 | -0.000605673 | positive_response_to_lower_gdp_capped_at_identity | -627693 | -0.0605307 | -0.67186 | accepted_expected_guard |
+| high | middle_east_high__12c_no_uplift | HEAVY_RUC | 2030Q3 | 1.00069 | 1 | -0.000689525 | positive_response_to_lower_gdp_capped_at_identity | -723805 | -0.068905 | -0.764812 | accepted_expected_guard |
 | high | middle_east_high__12c_no_uplift | HEAVY_RUC | 2030Q4 | 1.0005 | 1 | -0.000496296 | positive_response_to_lower_gdp_capped_at_identity | -549709 | -0.049605 | -0.550591 | accepted_expected_guard |
-| high | middle_east_high__12c_no_uplift | HEAVY_RUC | 2031Q1 | 1.00033 | 1 | -0.0003313 | identity_gdp_input_forces_identity_factor | -355722 | -0.033119 | -0.367605 | accepted_definitional_restoration |
-| high | middle_east_high__12c_no_uplift | HEAVY_RUC | 2031Q2 | 1.00018 | 1 | -0.000177565 | identity_gdp_input_forces_identity_factor | -185649 | -0.0177533 | -0.197053 | accepted_definitional_restoration |
-| high | middle_east_high__12c_no_uplift | HEAVY_RUC | 2031Q3 | 1.0001 | 1 | -9.55036e-05 | identity_gdp_input_forces_identity_factor | -100681 | -0.00954945 | -0.105994 | accepted_definitional_restoration |
+| high | middle_east_high__12c_no_uplift | HEAVY_RUC | 2031Q1 | 0.998102 | 1 | 0.0018976 | identity_gdp_input_forces_identity_factor | 2.03748e+06 | 0.190121 | 2.11025 | accepted_definitional_restoration |
+| high | middle_east_high__12c_no_uplift | HEAVY_RUC | 2031Q2 | 0.999891 | 1 | 0.000108655 | identity_gdp_input_forces_identity_factor | 113601 | 0.0108666 | 0.120614 | accepted_definitional_restoration |
+| high | middle_east_high__12c_no_uplift | HEAVY_RUC | 2031Q3 | 1.00015 | 1 | -0.000151941 | identity_gdp_input_forces_identity_factor | -160177 | -0.0151918 | -0.168621 | accepted_definitional_restoration |
 | high | middle_east_high__12c_no_uplift | HEAVY_RUC | 2031Q4 | 1.00004 | 1 | -4.22364e-05 | identity_gdp_input_forces_identity_factor | -46984.3 | -0.00422346 | -0.0468783 | accepted_definitional_restoration |
-| high | middle_east_high__12c_no_uplift | HEAVY_RUC | 2032Q1 | 1.00001 | 1 | -1.4058e-05 | identity_gdp_input_forces_identity_factor | -15146.9 | -0.00140578 | -0.0156035 | accepted_definitional_restoration |
-| high | middle_east_high__12c_no_uplift | HEAVY_RUC | 2032Q2 | 1.00001 | 1 | -6.17405e-06 | identity_gdp_input_forces_identity_factor | -6472.43 | -0.000617402 | -0.00685285 | accepted_definitional_restoration |
+| high | middle_east_high__12c_no_uplift | HEAVY_RUC | 2032Q1 | 0.99778 | 1 | 0.00222024 | identity_gdp_input_forces_identity_factor | 2.39221e+06 | 0.222518 | 2.46984 | accepted_definitional_restoration |
+| high | middle_east_high__12c_no_uplift | HEAVY_RUC | 2032Q2 | 1.00001 | 1 | -1.22579e-05 | identity_gdp_input_forces_identity_factor | -12850.3 | -0.00122578 | -0.0136055 | accepted_definitional_restoration |
 | high | middle_east_high__12c_no_uplift | HEAVY_RUC | 2032Q3 | 1 | 1 | -3.23259e-06 | identity_gdp_input_forces_identity_factor | -3429.51 | -0.000323258 | -0.003588 | accepted_definitional_restoration |
 | high | middle_east_high__12c_no_uplift | HEAVY_RUC | 2032Q4 | 1 | 1 | -1.39441e-06 | identity_gdp_input_forces_identity_factor | -1560.59 | -0.000139441 | -0.00154772 | accepted_definitional_restoration |
-| high | middle_east_high__12c_no_uplift | HEAVY_RUC | 2033Q1 | 1 | 1 | -4.89875e-07 | identity_gdp_input_forces_identity_factor | -531.238 | -4.89875e-05 | -0.000543737 | accepted_definitional_restoration |
+| high | middle_east_high__12c_no_uplift | HEAVY_RUC | 2033Q1 | 0.999414 | 1 | 0.000586143 | identity_gdp_input_forces_identity_factor | 635634 | 0.0586486 | 0.650971 | accepted_definitional_restoration |
 | high | middle_east_high__12c_no_uplift | HEAVY_RUC | 2033Q2 | 1 | 1 | -2.17391e-07 | identity_gdp_input_forces_identity_factor | -229.384 | -2.17391e-05 | -0.000241293 | accepted_definitional_restoration |
 | high | middle_east_high__12c_no_uplift | HEAVY_RUC | 2033Q3 | 1 | 1 | -1.12264e-07 | identity_gdp_input_forces_identity_factor | -119.901 | -1.12264e-05 | -0.000124608 | accepted_definitional_restoration |
 | high | middle_east_high__12c_no_uplift | HEAVY_RUC | 2033Q4 | 1 | 1 | -4.77401e-08 | identity_gdp_input_forces_identity_factor | -53.7705 | -4.77401e-06 | -5.29892e-05 | accepted_definitional_restoration |
@@ -155,7 +149,7 @@ is listed in full with its disposition.
 | high | middle_east_high__12c_no_uplift | HEAVY_RUC | 2034Q2 | 1 | 1 | -7.6724e-09 | identity_gdp_input_forces_identity_factor | -8.15257 | -7.6724e-07 | -8.51598e-06 | accepted_definitional_restoration |
 | high | middle_east_high__12c_no_uplift | HEAVY_RUC | 2034Q3 | 1 | 1 | -3.884e-09 | identity_gdp_input_forces_identity_factor | -4.1764 | -3.884e-07 | -4.31105e-06 | accepted_definitional_restoration |
 | high | middle_east_high__12c_no_uplift | HEAVY_RUC | 2034Q4 | 1 | 1 | -1.63647e-09 | identity_gdp_input_forces_identity_factor | -1.85544 | -1.63647e-07 | -1.8164e-06 | accepted_definitional_restoration |
-| high | middle_east_high__12c_no_uplift | HEAVY_RUC | 2035Q1 | 1 | 1 | -6.04492e-10 | identity_gdp_input_forces_identity_factor | -0.664345 | -6.04491e-08 | -6.70955e-07 | accepted_definitional_restoration |
+| high | middle_east_high__12c_no_uplift | HEAVY_RUC | 2035Q1 | 1 | 1 | -6.04489e-10 | identity_gdp_input_forces_identity_factor | -0.664342 | -6.04489e-08 | -6.70952e-07 | accepted_definitional_restoration |
 | high | middle_east_high__12c_no_uplift | HEAVY_RUC | 2035Q2 | 1 | 1 | -2.70348e-10 | identity_gdp_input_forces_identity_factor | -0.289005 | -2.70348e-08 | -3.00073e-07 | accepted_definitional_restoration |
 | high | middle_east_high__12c_no_uplift | HEAVY_RUC | 2035Q3 | 1 | 1 | -1.34244e-10 | identity_gdp_input_forces_identity_factor | -0.145207 | -1.34244e-08 | -1.49004e-07 | accepted_definitional_restoration |
 | high | middle_east_high__12c_no_uplift | HEAVY_RUC | 2035Q4 | 1 | 1 | -5.62317e-11 | identity_gdp_input_forces_identity_factor | -0.0641317 | -5.62317e-09 | -6.24144e-08 | accepted_definitional_restoration |
@@ -165,16 +159,16 @@ is listed in full with its disposition.
 | high | middle_east_high__12c_no_uplift | HEAVY_RUC | 2036Q4 | 1 | 1 | -1.93578e-12 | identity_gdp_input_forces_identity_factor | -0.00221944 | -1.93577e-10 | -2.14861e-09 | accepted_definitional_restoration |
 | high | middle_east_high__12c_no_uplift | PED | 2029Q2 | 1.00134 | 1 | -0.0013363 | positive_response_to_lower_gdp_capped_at_identity | -2.03496 | -0.133452 | -2.666 | accepted_expected_guard |
 | high | middle_east_high__12c_no_uplift | PED | 2029Q3 | 1.001 | 1 | -0.00100104 | positive_response_to_lower_gdp_capped_at_identity | -1.53278 | -0.100004 | -1.99781 | accepted_expected_guard |
-| low | middle_east_low | HEAVY_RUC | 2026Q4 | 1.00228 | 1 | -0.00227651 | positive_response_to_lower_gdp_capped_at_identity | -2.41984e+06 | -0.227134 | -2.52108 | accepted_expected_guard |
-| low | middle_east_low | HEAVY_RUC | 2027Q1 | 1.00073 | 1 | -0.000727421 | positive_response_to_lower_gdp_capped_at_identity | -753803 | -0.0726892 | -0.806814 | accepted_expected_guard |
-| low | middle_east_low | HEAVY_RUC | 2027Q2 | 1.00082 | 1 | -0.000824261 | identity_gdp_input_forces_identity_factor | -828598 | -0.0823583 | -0.914136 | accepted_definitional_restoration |
-| low | middle_east_low | HEAVY_RUC | 2027Q3 | 1.00188 | 1 | -0.00188355 | identity_gdp_input_forces_identity_factor | -1.91859e+06 | -0.188001 | -2.08672 | accepted_definitional_restoration |
-| low | middle_east_low | HEAVY_RUC | 2027Q4 | 1.00075 | 1 | -0.000745769 | identity_gdp_input_forces_identity_factor | -802132 | -0.0745213 | -0.827149 | accepted_definitional_restoration |
-| low | middle_east_low | HEAVY_RUC | 2028Q1 | 1.00023 | 1 | -0.000229598 | identity_gdp_input_forces_identity_factor | -239439 | -0.0229545 | -0.254784 | accepted_definitional_restoration |
-| low | middle_east_low | HEAVY_RUC | 2028Q2 | 1.00009 | 1 | -9.13792e-05 | identity_gdp_input_forces_identity_factor | -92807.9 | -0.00913709 | -0.101417 | accepted_definitional_restoration |
-| low | middle_east_low | HEAVY_RUC | 2028Q3 | 1.00006 | 1 | -6.0907e-05 | identity_gdp_input_forces_identity_factor | -62646.3 | -0.00609032 | -0.0675996 | accepted_definitional_restoration |
-| low | middle_east_low | HEAVY_RUC | 2028Q4 | 1.00002 | 1 | -2.48245e-05 | identity_gdp_input_forces_identity_factor | -26954 | -0.00248238 | -0.0275532 | accepted_definitional_restoration |
-| low | middle_east_low | HEAVY_RUC | 2029Q1 | 1.00001 | 1 | -7.52518e-06 | identity_gdp_input_forces_identity_factor | -7924.15 | -0.000752512 | -0.00835251 | accepted_definitional_restoration |
+| low | middle_east_low | HEAVY_RUC | 2026Q4 | 1.00227 | 1 | -0.00227178 | positive_response_to_lower_gdp_capped_at_identity | -2.41564e+06 | -0.226663 | -2.51585 | accepted_expected_guard |
+| low | middle_east_low | HEAVY_RUC | 2027Q1 | 1.00042 | 1 | -0.000420419 | positive_response_to_lower_gdp_capped_at_identity | -436564 | -0.0420242 | -0.466448 | accepted_expected_guard |
+| low | middle_east_low | HEAVY_RUC | 2027Q2 | 1.00106 | 1 | -0.00106283 | identity_gdp_input_forces_identity_factor | -1.06842e+06 | -0.10617 | -1.17843 | accepted_definitional_restoration |
+| low | middle_east_low | HEAVY_RUC | 2027Q3 | 1.00188 | 1 | -0.00188363 | identity_gdp_input_forces_identity_factor | -1.91863e+06 | -0.188009 | -2.0868 | accepted_definitional_restoration |
+| low | middle_east_low | HEAVY_RUC | 2027Q4 | 1.00077 | 1 | -0.000766776 | identity_gdp_input_forces_identity_factor | -824727 | -0.0766189 | -0.850432 | accepted_definitional_restoration |
+| low | middle_east_low | HEAVY_RUC | 2028Q1 | 1.00023 | 1 | -0.000229061 | identity_gdp_input_forces_identity_factor | -239023 | -0.0229009 | -0.254188 | accepted_definitional_restoration |
+| low | middle_east_low | HEAVY_RUC | 2028Q2 | 0.99996 | 1 | 3.95595e-05 | identity_gdp_input_forces_identity_factor | 40177.8 | 0.0039561 | 0.0439108 | accepted_definitional_restoration |
+| low | middle_east_low | HEAVY_RUC | 2028Q3 | 1.00006 | 1 | -6.09073e-05 | identity_gdp_input_forces_identity_factor | -62646.6 | -0.00609036 | -0.0676 | accepted_definitional_restoration |
+| low | middle_east_low | HEAVY_RUC | 2028Q4 | 1.00002 | 1 | -2.48246e-05 | identity_gdp_input_forces_identity_factor | -26954.1 | -0.0024824 | -0.0275534 | accepted_definitional_restoration |
+| low | middle_east_low | HEAVY_RUC | 2029Q1 | 1.00001 | 1 | -7.52059e-06 | identity_gdp_input_forces_identity_factor | -7919.32 | -0.000752053 | -0.00834741 | accepted_definitional_restoration |
 | low | middle_east_low | HEAVY_RUC | 2029Q2 | 1 | 1 | -3.32747e-06 | identity_gdp_input_forces_identity_factor | -3411.86 | -0.000332746 | -0.00369331 | accepted_definitional_restoration |
 | low | middle_east_low | HEAVY_RUC | 2029Q3 | 1 | 1 | -2.0736e-06 | identity_gdp_input_forces_identity_factor | -2153.03 | -0.000207359 | -0.00230159 | accepted_definitional_restoration |
 | low | middle_east_low | HEAVY_RUC | 2029Q4 | 1 | 1 | -8.50645e-07 | identity_gdp_input_forces_identity_factor | -932.125 | -8.50644e-05 | -0.000944173 | accepted_definitional_restoration |
@@ -182,18 +176,18 @@ is listed in full with its disposition.
 | low | middle_east_low | HEAVY_RUC | 2030Q2 | 1 | 1 | -1.20833e-07 | identity_gdp_input_forces_identity_factor | -124.947 | -1.20833e-05 | -0.000134118 | accepted_definitional_restoration |
 | low | middle_east_low | HEAVY_RUC | 2030Q3 | 1 | 1 | -7.09904e-08 | identity_gdp_input_forces_identity_factor | -74.3169 | -7.09904e-06 | -7.87958e-05 | accepted_definitional_restoration |
 | low | middle_east_low | HEAVY_RUC | 2030Q4 | 1 | 1 | -2.89638e-08 | identity_gdp_input_forces_identity_factor | -31.978 | -2.89638e-06 | -3.21484e-05 | accepted_definitional_restoration |
-| low | middle_east_low | HEAVY_RUC | 2031Q1 | 1 | 1 | -9.31027e-09 | identity_gdp_input_forces_identity_factor | -9.96578 | -9.31027e-07 | -1.03339e-05 | accepted_definitional_restoration |
-| low | middle_east_low | HEAVY_RUC | 2031Q2 | 1 | 1 | -4.33016e-09 | identity_gdp_input_forces_identity_factor | -4.51336 | -4.33016e-07 | -4.80626e-06 | accepted_definitional_restoration |
+| low | middle_east_low | HEAVY_RUC | 2031Q1 | 1 | 1 | -9.31028e-09 | identity_gdp_input_forces_identity_factor | -9.96578 | -9.31028e-07 | -1.03339e-05 | accepted_definitional_restoration |
+| low | middle_east_low | HEAVY_RUC | 2031Q2 | 1 | 1 | -4.33016e-09 | identity_gdp_input_forces_identity_factor | -4.51335 | -4.33016e-07 | -4.80626e-06 | accepted_definitional_restoration |
 | low | middle_east_low | HEAVY_RUC | 2031Q3 | 1 | 1 | -2.44078e-09 | identity_gdp_input_forces_identity_factor | -2.57309 | -2.44078e-07 | -2.70914e-06 | accepted_definitional_restoration |
 | low | middle_east_low | HEAVY_RUC | 2031Q4 | 1 | 1 | -9.89366e-10 | identity_gdp_input_forces_identity_factor | -1.10058 | -9.89366e-08 | -1.09815e-06 | accepted_definitional_restoration |
-| low | middle_east_low | HEAVY_RUC | 2032Q1 | 1 | 1 | -3.29418e-10 | identity_gdp_input_forces_identity_factor | -0.354934 | -3.29418e-08 | -3.65638e-07 | accepted_definitional_restoration |
+| low | middle_east_low | HEAVY_RUC | 2032Q1 | 1 | 1 | -3.29416e-10 | identity_gdp_input_forces_identity_factor | -0.354931 | -3.29416e-08 | -3.65635e-07 | accepted_definitional_restoration |
 | low | middle_east_low | HEAVY_RUC | 2032Q2 | 1 | 1 | -1.54599e-10 | identity_gdp_input_forces_identity_factor | -0.16207 | -1.54599e-08 | -1.71597e-07 | accepted_definitional_restoration |
 | low | middle_east_low | HEAVY_RUC | 2032Q3 | 1 | 1 | -8.3938e-11 | identity_gdp_input_forces_identity_factor | -0.0890514 | -8.3938e-09 | -9.3167e-08 | accepted_definitional_restoration |
-| low | middle_east_low | HEAVY_RUC | 2032Q4 | 1 | 1 | -3.38358e-11 | identity_gdp_input_forces_identity_factor | -0.0378683 | -3.38358e-09 | -3.7556e-08 | accepted_definitional_restoration |
+| low | middle_east_low | HEAVY_RUC | 2032Q4 | 1 | 1 | -3.3836e-11 | identity_gdp_input_forces_identity_factor | -0.0378685 | -3.3836e-09 | -3.75563e-08 | accepted_definitional_restoration |
 | low | middle_east_low | HEAVY_RUC | 2033Q1 | 1 | 1 | -1.16329e-11 | identity_gdp_input_forces_identity_factor | -0.0126152 | -1.1633e-09 | -1.2912e-08 | accepted_definitional_restoration |
 | low | middle_east_low | HEAVY_RUC | 2033Q2 | 1 | 1 | -5.48628e-12 | identity_gdp_input_forces_identity_factor | -0.00578892 | -5.48626e-10 | -6.08947e-09 | accepted_definitional_restoration |
-| low | middle_east_low | HEAVY_RUC | 2033Q3 | 1 | 1 | -2.88436e-12 | identity_gdp_input_forces_identity_factor | -0.00308061 | -2.8844e-10 | -3.20154e-09 | accepted_definitional_restoration |
-| low | middle_east_low | HEAVY_RUC | 2033Q4 | 1 | 1 | -1.16041e-12 | identity_gdp_input_forces_identity_factor | -0.00130701 | -1.16043e-10 | -1.28802e-09 | accepted_definitional_restoration |
+| low | middle_east_low | HEAVY_RUC | 2033Q3 | 1 | 1 | -2.8868e-12 | identity_gdp_input_forces_identity_factor | -0.00308323 | -2.88685e-10 | -3.20426e-09 | accepted_definitional_restoration |
+| low | middle_east_low | HEAVY_RUC | 2033Q4 | 1 | 1 | -1.16018e-12 | identity_gdp_input_forces_identity_factor | -0.00130677 | -1.16022e-10 | -1.28778e-09 | accepted_definitional_restoration |
 | low | middle_east_low | PED | 2027Q2 | 0.9988 | 1 | 0.00119997 | identity_gdp_input_forces_identity_factor | 1.82923 | 0.120141 | 2.4001 | accepted_definitional_restoration |
 | low | middle_east_low | PED | 2027Q3 | 0.999946 | 1 | 5.42344e-05 | identity_gdp_input_forces_identity_factor | 0.0830638 | 0.00542373 | 0.108351 | accepted_definitional_restoration |
 | low | middle_east_low | PED | 2027Q4 | 1.00009 | 1 | -9.24272e-05 | identity_gdp_input_forces_identity_factor | -0.142972 | -0.00924186 | -0.184627 | accepted_definitional_restoration |
@@ -209,16 +203,16 @@ is listed in full with its disposition.
 | low | middle_east_low | PED | 2031Q3 | 1.00024 | 1 | -0.00024151 | identity_gdp_input_forces_identity_factor | -0.368935 | -0.0241451 | -0.482354 | accepted_definitional_restoration |
 | low | middle_east_low | PED | 2031Q4 | 1.00024 | 1 | -0.000241076 | identity_gdp_input_forces_identity_factor | -0.371277 | -0.0241018 | -0.481489 | accepted_definitional_restoration |
 | low | middle_east_low | PED | 2032Q1 | 1.00016 | 1 | -0.000161834 | identity_gdp_input_forces_identity_factor | -0.246832 | -0.0161808 | -0.323248 | accepted_definitional_restoration |
-| low | middle_east_low__12c_delay_6m | HEAVY_RUC | 2026Q4 | 1.00228 | 1 | -0.00227651 | positive_response_to_lower_gdp_capped_at_identity | -2.41984e+06 | -0.227134 | -2.52108 | accepted_expected_guard |
-| low | middle_east_low__12c_delay_6m | HEAVY_RUC | 2027Q1 | 1.00073 | 1 | -0.000727421 | positive_response_to_lower_gdp_capped_at_identity | -756457 | -0.0726892 | -0.806814 | accepted_expected_guard |
-| low | middle_east_low__12c_delay_6m | HEAVY_RUC | 2027Q2 | 1.00082 | 1 | -0.000824261 | identity_gdp_input_forces_identity_factor | -831528 | -0.0823583 | -0.914136 | accepted_definitional_restoration |
-| low | middle_east_low__12c_delay_6m | HEAVY_RUC | 2027Q3 | 1.00188 | 1 | -0.00188355 | identity_gdp_input_forces_identity_factor | -1.91859e+06 | -0.188001 | -2.08672 | accepted_definitional_restoration |
-| low | middle_east_low__12c_delay_6m | HEAVY_RUC | 2027Q4 | 1.00075 | 1 | -0.000745769 | identity_gdp_input_forces_identity_factor | -802132 | -0.0745213 | -0.827149 | accepted_definitional_restoration |
-| low | middle_east_low__12c_delay_6m | HEAVY_RUC | 2028Q1 | 1.00023 | 1 | -0.000229598 | identity_gdp_input_forces_identity_factor | -239439 | -0.0229545 | -0.254784 | accepted_definitional_restoration |
-| low | middle_east_low__12c_delay_6m | HEAVY_RUC | 2028Q2 | 1.00009 | 1 | -9.13792e-05 | identity_gdp_input_forces_identity_factor | -92807.9 | -0.00913709 | -0.101417 | accepted_definitional_restoration |
-| low | middle_east_low__12c_delay_6m | HEAVY_RUC | 2028Q3 | 1.00006 | 1 | -6.0907e-05 | identity_gdp_input_forces_identity_factor | -62646.3 | -0.00609032 | -0.0675996 | accepted_definitional_restoration |
-| low | middle_east_low__12c_delay_6m | HEAVY_RUC | 2028Q4 | 1.00002 | 1 | -2.48245e-05 | identity_gdp_input_forces_identity_factor | -26954 | -0.00248238 | -0.0275532 | accepted_definitional_restoration |
-| low | middle_east_low__12c_delay_6m | HEAVY_RUC | 2029Q1 | 1.00001 | 1 | -7.52518e-06 | identity_gdp_input_forces_identity_factor | -7924.15 | -0.000752512 | -0.00835251 | accepted_definitional_restoration |
+| low | middle_east_low__12c_delay_6m | HEAVY_RUC | 2026Q4 | 1.00227 | 1 | -0.00227178 | positive_response_to_lower_gdp_capped_at_identity | -2.41564e+06 | -0.226663 | -2.51585 | accepted_expected_guard |
+| low | middle_east_low__12c_delay_6m | HEAVY_RUC | 2027Q1 | 1.00042 | 1 | -0.000420419 | positive_response_to_lower_gdp_capped_at_identity | -438100 | -0.0420242 | -0.466448 | accepted_expected_guard |
+| low | middle_east_low__12c_delay_6m | HEAVY_RUC | 2027Q2 | 1.00106 | 1 | -0.00106283 | identity_gdp_input_forces_identity_factor | -1.07219e+06 | -0.10617 | -1.17843 | accepted_definitional_restoration |
+| low | middle_east_low__12c_delay_6m | HEAVY_RUC | 2027Q3 | 1.00188 | 1 | -0.00188363 | identity_gdp_input_forces_identity_factor | -1.91863e+06 | -0.188009 | -2.0868 | accepted_definitional_restoration |
+| low | middle_east_low__12c_delay_6m | HEAVY_RUC | 2027Q4 | 1.00077 | 1 | -0.000766776 | identity_gdp_input_forces_identity_factor | -824727 | -0.0766189 | -0.850432 | accepted_definitional_restoration |
+| low | middle_east_low__12c_delay_6m | HEAVY_RUC | 2028Q1 | 1.00023 | 1 | -0.000229061 | identity_gdp_input_forces_identity_factor | -239023 | -0.0229009 | -0.254188 | accepted_definitional_restoration |
+| low | middle_east_low__12c_delay_6m | HEAVY_RUC | 2028Q2 | 0.99996 | 1 | 3.95595e-05 | identity_gdp_input_forces_identity_factor | 40177.8 | 0.0039561 | 0.0439108 | accepted_definitional_restoration |
+| low | middle_east_low__12c_delay_6m | HEAVY_RUC | 2028Q3 | 1.00006 | 1 | -6.09073e-05 | identity_gdp_input_forces_identity_factor | -62646.6 | -0.00609036 | -0.0676 | accepted_definitional_restoration |
+| low | middle_east_low__12c_delay_6m | HEAVY_RUC | 2028Q4 | 1.00002 | 1 | -2.48246e-05 | identity_gdp_input_forces_identity_factor | -26954.1 | -0.0024824 | -0.0275534 | accepted_definitional_restoration |
+| low | middle_east_low__12c_delay_6m | HEAVY_RUC | 2029Q1 | 1.00001 | 1 | -7.52059e-06 | identity_gdp_input_forces_identity_factor | -7919.32 | -0.000752053 | -0.00834741 | accepted_definitional_restoration |
 | low | middle_east_low__12c_delay_6m | HEAVY_RUC | 2029Q2 | 1 | 1 | -3.32747e-06 | identity_gdp_input_forces_identity_factor | -3411.86 | -0.000332746 | -0.00369331 | accepted_definitional_restoration |
 | low | middle_east_low__12c_delay_6m | HEAVY_RUC | 2029Q3 | 1 | 1 | -2.0736e-06 | identity_gdp_input_forces_identity_factor | -2153.03 | -0.000207359 | -0.00230159 | accepted_definitional_restoration |
 | low | middle_east_low__12c_delay_6m | HEAVY_RUC | 2029Q4 | 1 | 1 | -8.50645e-07 | identity_gdp_input_forces_identity_factor | -932.125 | -8.50644e-05 | -0.000944173 | accepted_definitional_restoration |
@@ -226,18 +220,18 @@ is listed in full with its disposition.
 | low | middle_east_low__12c_delay_6m | HEAVY_RUC | 2030Q2 | 1 | 1 | -1.20833e-07 | identity_gdp_input_forces_identity_factor | -124.947 | -1.20833e-05 | -0.000134118 | accepted_definitional_restoration |
 | low | middle_east_low__12c_delay_6m | HEAVY_RUC | 2030Q3 | 1 | 1 | -7.09904e-08 | identity_gdp_input_forces_identity_factor | -74.3169 | -7.09904e-06 | -7.87958e-05 | accepted_definitional_restoration |
 | low | middle_east_low__12c_delay_6m | HEAVY_RUC | 2030Q4 | 1 | 1 | -2.89638e-08 | identity_gdp_input_forces_identity_factor | -31.978 | -2.89638e-06 | -3.21484e-05 | accepted_definitional_restoration |
-| low | middle_east_low__12c_delay_6m | HEAVY_RUC | 2031Q1 | 1 | 1 | -9.31027e-09 | identity_gdp_input_forces_identity_factor | -9.96578 | -9.31027e-07 | -1.03339e-05 | accepted_definitional_restoration |
-| low | middle_east_low__12c_delay_6m | HEAVY_RUC | 2031Q2 | 1 | 1 | -4.33016e-09 | identity_gdp_input_forces_identity_factor | -4.51336 | -4.33016e-07 | -4.80626e-06 | accepted_definitional_restoration |
+| low | middle_east_low__12c_delay_6m | HEAVY_RUC | 2031Q1 | 1 | 1 | -9.31028e-09 | identity_gdp_input_forces_identity_factor | -9.96578 | -9.31028e-07 | -1.03339e-05 | accepted_definitional_restoration |
+| low | middle_east_low__12c_delay_6m | HEAVY_RUC | 2031Q2 | 1 | 1 | -4.33016e-09 | identity_gdp_input_forces_identity_factor | -4.51335 | -4.33016e-07 | -4.80626e-06 | accepted_definitional_restoration |
 | low | middle_east_low__12c_delay_6m | HEAVY_RUC | 2031Q3 | 1 | 1 | -2.44078e-09 | identity_gdp_input_forces_identity_factor | -2.57309 | -2.44078e-07 | -2.70914e-06 | accepted_definitional_restoration |
 | low | middle_east_low__12c_delay_6m | HEAVY_RUC | 2031Q4 | 1 | 1 | -9.89366e-10 | identity_gdp_input_forces_identity_factor | -1.10058 | -9.89366e-08 | -1.09815e-06 | accepted_definitional_restoration |
-| low | middle_east_low__12c_delay_6m | HEAVY_RUC | 2032Q1 | 1 | 1 | -3.29418e-10 | identity_gdp_input_forces_identity_factor | -0.354934 | -3.29418e-08 | -3.65638e-07 | accepted_definitional_restoration |
+| low | middle_east_low__12c_delay_6m | HEAVY_RUC | 2032Q1 | 1 | 1 | -3.29416e-10 | identity_gdp_input_forces_identity_factor | -0.354931 | -3.29416e-08 | -3.65635e-07 | accepted_definitional_restoration |
 | low | middle_east_low__12c_delay_6m | HEAVY_RUC | 2032Q2 | 1 | 1 | -1.54599e-10 | identity_gdp_input_forces_identity_factor | -0.16207 | -1.54599e-08 | -1.71597e-07 | accepted_definitional_restoration |
 | low | middle_east_low__12c_delay_6m | HEAVY_RUC | 2032Q3 | 1 | 1 | -8.3938e-11 | identity_gdp_input_forces_identity_factor | -0.0890514 | -8.3938e-09 | -9.3167e-08 | accepted_definitional_restoration |
-| low | middle_east_low__12c_delay_6m | HEAVY_RUC | 2032Q4 | 1 | 1 | -3.38358e-11 | identity_gdp_input_forces_identity_factor | -0.0378683 | -3.38358e-09 | -3.7556e-08 | accepted_definitional_restoration |
+| low | middle_east_low__12c_delay_6m | HEAVY_RUC | 2032Q4 | 1 | 1 | -3.3836e-11 | identity_gdp_input_forces_identity_factor | -0.0378685 | -3.3836e-09 | -3.75563e-08 | accepted_definitional_restoration |
 | low | middle_east_low__12c_delay_6m | HEAVY_RUC | 2033Q1 | 1 | 1 | -1.16329e-11 | identity_gdp_input_forces_identity_factor | -0.0126152 | -1.1633e-09 | -1.2912e-08 | accepted_definitional_restoration |
 | low | middle_east_low__12c_delay_6m | HEAVY_RUC | 2033Q2 | 1 | 1 | -5.48628e-12 | identity_gdp_input_forces_identity_factor | -0.00578892 | -5.48626e-10 | -6.08947e-09 | accepted_definitional_restoration |
-| low | middle_east_low__12c_delay_6m | HEAVY_RUC | 2033Q3 | 1 | 1 | -2.88436e-12 | identity_gdp_input_forces_identity_factor | -0.00308061 | -2.8844e-10 | -3.20154e-09 | accepted_definitional_restoration |
-| low | middle_east_low__12c_delay_6m | HEAVY_RUC | 2033Q4 | 1 | 1 | -1.16041e-12 | identity_gdp_input_forces_identity_factor | -0.00130701 | -1.16043e-10 | -1.28802e-09 | accepted_definitional_restoration |
+| low | middle_east_low__12c_delay_6m | HEAVY_RUC | 2033Q3 | 1 | 1 | -2.8868e-12 | identity_gdp_input_forces_identity_factor | -0.00308323 | -2.88685e-10 | -3.20426e-09 | accepted_definitional_restoration |
+| low | middle_east_low__12c_delay_6m | HEAVY_RUC | 2033Q4 | 1 | 1 | -1.16018e-12 | identity_gdp_input_forces_identity_factor | -0.00130677 | -1.16022e-10 | -1.28778e-09 | accepted_definitional_restoration |
 | low | middle_east_low__12c_delay_6m | PED | 2027Q2 | 0.9988 | 1 | 0.00119997 | identity_gdp_input_forces_identity_factor | 1.84029 | 0.120141 | 2.4001 | accepted_definitional_restoration |
 | low | middle_east_low__12c_delay_6m | PED | 2027Q3 | 0.999946 | 1 | 5.42344e-05 | identity_gdp_input_forces_identity_factor | 0.0830638 | 0.00542373 | 0.108351 | accepted_definitional_restoration |
 | low | middle_east_low__12c_delay_6m | PED | 2027Q4 | 1.00009 | 1 | -9.24272e-05 | identity_gdp_input_forces_identity_factor | -0.142972 | -0.00924186 | -0.184627 | accepted_definitional_restoration |
@@ -253,35 +247,35 @@ is listed in full with its disposition.
 | low | middle_east_low__12c_delay_6m | PED | 2031Q3 | 1.00024 | 1 | -0.00024151 | identity_gdp_input_forces_identity_factor | -0.368935 | -0.0241451 | -0.482354 | accepted_definitional_restoration |
 | low | middle_east_low__12c_delay_6m | PED | 2031Q4 | 1.00024 | 1 | -0.000241076 | identity_gdp_input_forces_identity_factor | -0.371277 | -0.0241018 | -0.481489 | accepted_definitional_restoration |
 | low | middle_east_low__12c_delay_6m | PED | 2032Q1 | 1.00016 | 1 | -0.000161834 | identity_gdp_input_forces_identity_factor | -0.246832 | -0.0161808 | -0.323248 | accepted_definitional_restoration |
-| low | middle_east_low__12c_no_uplift | HEAVY_RUC | 2026Q4 | 1.00228 | 1 | -0.00227651 | positive_response_to_lower_gdp_capped_at_identity | -2.41984e+06 | -0.227134 | -2.52108 | accepted_expected_guard |
-| low | middle_east_low__12c_no_uplift | HEAVY_RUC | 2027Q1 | 1.00073 | 1 | -0.000727421 | positive_response_to_lower_gdp_capped_at_identity | -756457 | -0.0726892 | -0.806814 | accepted_expected_guard |
-| low | middle_east_low__12c_no_uplift | HEAVY_RUC | 2027Q2 | 1.00082 | 1 | -0.000824261 | identity_gdp_input_forces_identity_factor | -831528 | -0.0823583 | -0.914136 | accepted_definitional_restoration |
-| low | middle_east_low__12c_no_uplift | HEAVY_RUC | 2027Q3 | 1.00188 | 1 | -0.00188355 | identity_gdp_input_forces_identity_factor | -1.92541e+06 | -0.188001 | -2.08672 | accepted_definitional_restoration |
-| low | middle_east_low__12c_no_uplift | HEAVY_RUC | 2027Q4 | 1.00075 | 1 | -0.000745769 | identity_gdp_input_forces_identity_factor | -804995 | -0.0745213 | -0.827149 | accepted_definitional_restoration |
-| low | middle_east_low__12c_no_uplift | HEAVY_RUC | 2028Q1 | 1.00023 | 1 | -0.000229598 | identity_gdp_input_forces_identity_factor | -240238 | -0.0229545 | -0.254784 | accepted_definitional_restoration |
-| low | middle_east_low__12c_no_uplift | HEAVY_RUC | 2028Q2 | 1.00009 | 1 | -9.13792e-05 | identity_gdp_input_forces_identity_factor | -93119.1 | -0.00913709 | -0.101417 | accepted_definitional_restoration |
-| low | middle_east_low__12c_no_uplift | HEAVY_RUC | 2028Q3 | 1.00006 | 1 | -6.0907e-05 | identity_gdp_input_forces_identity_factor | -62857.3 | -0.00609032 | -0.0675996 | accepted_definitional_restoration |
-| low | middle_east_low__12c_no_uplift | HEAVY_RUC | 2028Q4 | 1.00002 | 1 | -2.48245e-05 | identity_gdp_input_forces_identity_factor | -27045.2 | -0.00248238 | -0.0275532 | accepted_definitional_restoration |
-| low | middle_east_low__12c_no_uplift | HEAVY_RUC | 2029Q1 | 1.00001 | 1 | -7.52518e-06 | identity_gdp_input_forces_identity_factor | -7949.92 | -0.000752512 | -0.00835251 | accepted_definitional_restoration |
-| low | middle_east_low__12c_no_uplift | HEAVY_RUC | 2029Q2 | 1 | 1 | -3.32747e-06 | identity_gdp_input_forces_identity_factor | -3423.01 | -0.000332746 | -0.00369331 | accepted_definitional_restoration |
+| low | middle_east_low__12c_no_uplift | HEAVY_RUC | 2026Q4 | 1.00227 | 1 | -0.00227178 | positive_response_to_lower_gdp_capped_at_identity | -2.41564e+06 | -0.226663 | -2.51585 | accepted_expected_guard |
+| low | middle_east_low__12c_no_uplift | HEAVY_RUC | 2027Q1 | 1.00042 | 1 | -0.000420419 | positive_response_to_lower_gdp_capped_at_identity | -438100 | -0.0420242 | -0.466448 | accepted_expected_guard |
+| low | middle_east_low__12c_no_uplift | HEAVY_RUC | 2027Q2 | 1.00106 | 1 | -0.00106283 | identity_gdp_input_forces_identity_factor | -1.07219e+06 | -0.10617 | -1.17843 | accepted_definitional_restoration |
+| low | middle_east_low__12c_no_uplift | HEAVY_RUC | 2027Q3 | 1.00188 | 1 | -0.00188363 | identity_gdp_input_forces_identity_factor | -1.92544e+06 | -0.188009 | -2.0868 | accepted_definitional_restoration |
+| low | middle_east_low__12c_no_uplift | HEAVY_RUC | 2027Q4 | 1.00077 | 1 | -0.000766776 | identity_gdp_input_forces_identity_factor | -827671 | -0.0766189 | -0.850432 | accepted_definitional_restoration |
+| low | middle_east_low__12c_no_uplift | HEAVY_RUC | 2028Q1 | 1.00023 | 1 | -0.000229061 | identity_gdp_input_forces_identity_factor | -239820 | -0.0229009 | -0.254188 | accepted_definitional_restoration |
+| low | middle_east_low__12c_no_uplift | HEAVY_RUC | 2028Q2 | 0.99996 | 1 | 3.95595e-05 | identity_gdp_input_forces_identity_factor | 40312.5 | 0.0039561 | 0.0439108 | accepted_definitional_restoration |
+| low | middle_east_low__12c_no_uplift | HEAVY_RUC | 2028Q3 | 1.00006 | 1 | -6.09073e-05 | identity_gdp_input_forces_identity_factor | -62857.7 | -0.00609036 | -0.0676 | accepted_definitional_restoration |
+| low | middle_east_low__12c_no_uplift | HEAVY_RUC | 2028Q4 | 1.00002 | 1 | -2.48246e-05 | identity_gdp_input_forces_identity_factor | -27045.4 | -0.0024824 | -0.0275534 | accepted_definitional_restoration |
+| low | middle_east_low__12c_no_uplift | HEAVY_RUC | 2029Q1 | 1.00001 | 1 | -7.52059e-06 | identity_gdp_input_forces_identity_factor | -7945.06 | -0.000752053 | -0.00834741 | accepted_definitional_restoration |
+| low | middle_east_low__12c_no_uplift | HEAVY_RUC | 2029Q2 | 1 | 1 | -3.32747e-06 | identity_gdp_input_forces_identity_factor | -3423 | -0.000332746 | -0.00369331 | accepted_definitional_restoration |
 | low | middle_east_low__12c_no_uplift | HEAVY_RUC | 2029Q3 | 1 | 1 | -2.0736e-06 | identity_gdp_input_forces_identity_factor | -2160.1 | -0.000207359 | -0.00230159 | accepted_definitional_restoration |
 | low | middle_east_low__12c_no_uplift | HEAVY_RUC | 2029Q4 | 1 | 1 | -8.50645e-07 | identity_gdp_input_forces_identity_factor | -935.2 | -8.50644e-05 | -0.000944173 | accepted_definitional_restoration |
 | low | middle_east_low__12c_no_uplift | HEAVY_RUC | 2030Q1 | 1 | 1 | -2.64428e-07 | identity_gdp_input_forces_identity_factor | -281.785 | -2.64428e-05 | -0.000293502 | accepted_definitional_restoration |
 | low | middle_east_low__12c_no_uplift | HEAVY_RUC | 2030Q2 | 1 | 1 | -1.20833e-07 | identity_gdp_input_forces_identity_factor | -125.345 | -1.20833e-05 | -0.000134118 | accepted_definitional_restoration |
 | low | middle_east_low__12c_no_uplift | HEAVY_RUC | 2030Q3 | 1 | 1 | -7.09904e-08 | identity_gdp_input_forces_identity_factor | -74.5552 | -7.09904e-06 | -7.87958e-05 | accepted_definitional_restoration |
 | low | middle_east_low__12c_no_uplift | HEAVY_RUC | 2030Q4 | 1 | 1 | -2.89638e-08 | identity_gdp_input_forces_identity_factor | -32.081 | -2.89638e-06 | -3.21484e-05 | accepted_definitional_restoration |
-| low | middle_east_low__12c_no_uplift | HEAVY_RUC | 2031Q1 | 1 | 1 | -9.31027e-09 | identity_gdp_input_forces_identity_factor | -9.99658 | -9.31027e-07 | -1.03339e-05 | accepted_definitional_restoration |
+| low | middle_east_low__12c_no_uplift | HEAVY_RUC | 2031Q1 | 1 | 1 | -9.31028e-09 | identity_gdp_input_forces_identity_factor | -9.99658 | -9.31028e-07 | -1.03339e-05 | accepted_definitional_restoration |
 | low | middle_east_low__12c_no_uplift | HEAVY_RUC | 2031Q2 | 1 | 1 | -4.33016e-09 | identity_gdp_input_forces_identity_factor | -4.52731 | -4.33016e-07 | -4.80626e-06 | accepted_definitional_restoration |
 | low | middle_east_low__12c_no_uplift | HEAVY_RUC | 2031Q3 | 1 | 1 | -2.44078e-09 | identity_gdp_input_forces_identity_factor | -2.57309 | -2.44078e-07 | -2.70914e-06 | accepted_definitional_restoration |
 | low | middle_east_low__12c_no_uplift | HEAVY_RUC | 2031Q4 | 1 | 1 | -9.89366e-10 | identity_gdp_input_forces_identity_factor | -1.10058 | -9.89366e-08 | -1.09815e-06 | accepted_definitional_restoration |
-| low | middle_east_low__12c_no_uplift | HEAVY_RUC | 2032Q1 | 1 | 1 | -3.29418e-10 | identity_gdp_input_forces_identity_factor | -0.354934 | -3.29418e-08 | -3.65638e-07 | accepted_definitional_restoration |
+| low | middle_east_low__12c_no_uplift | HEAVY_RUC | 2032Q1 | 1 | 1 | -3.29416e-10 | identity_gdp_input_forces_identity_factor | -0.354931 | -3.29416e-08 | -3.65635e-07 | accepted_definitional_restoration |
 | low | middle_east_low__12c_no_uplift | HEAVY_RUC | 2032Q2 | 1 | 1 | -1.54599e-10 | identity_gdp_input_forces_identity_factor | -0.16207 | -1.54599e-08 | -1.71597e-07 | accepted_definitional_restoration |
 | low | middle_east_low__12c_no_uplift | HEAVY_RUC | 2032Q3 | 1 | 1 | -8.3938e-11 | identity_gdp_input_forces_identity_factor | -0.0890514 | -8.3938e-09 | -9.3167e-08 | accepted_definitional_restoration |
-| low | middle_east_low__12c_no_uplift | HEAVY_RUC | 2032Q4 | 1 | 1 | -3.38358e-11 | identity_gdp_input_forces_identity_factor | -0.0378683 | -3.38358e-09 | -3.7556e-08 | accepted_definitional_restoration |
+| low | middle_east_low__12c_no_uplift | HEAVY_RUC | 2032Q4 | 1 | 1 | -3.3836e-11 | identity_gdp_input_forces_identity_factor | -0.0378685 | -3.3836e-09 | -3.75563e-08 | accepted_definitional_restoration |
 | low | middle_east_low__12c_no_uplift | HEAVY_RUC | 2033Q1 | 1 | 1 | -1.16329e-11 | identity_gdp_input_forces_identity_factor | -0.0126152 | -1.1633e-09 | -1.2912e-08 | accepted_definitional_restoration |
 | low | middle_east_low__12c_no_uplift | HEAVY_RUC | 2033Q2 | 1 | 1 | -5.48628e-12 | identity_gdp_input_forces_identity_factor | -0.00578892 | -5.48626e-10 | -6.08947e-09 | accepted_definitional_restoration |
-| low | middle_east_low__12c_no_uplift | HEAVY_RUC | 2033Q3 | 1 | 1 | -2.88436e-12 | identity_gdp_input_forces_identity_factor | -0.00308061 | -2.8844e-10 | -3.20154e-09 | accepted_definitional_restoration |
-| low | middle_east_low__12c_no_uplift | HEAVY_RUC | 2033Q4 | 1 | 1 | -1.16041e-12 | identity_gdp_input_forces_identity_factor | -0.00130701 | -1.16043e-10 | -1.28802e-09 | accepted_definitional_restoration |
+| low | middle_east_low__12c_no_uplift | HEAVY_RUC | 2033Q3 | 1 | 1 | -2.8868e-12 | identity_gdp_input_forces_identity_factor | -0.00308323 | -2.88685e-10 | -3.20426e-09 | accepted_definitional_restoration |
+| low | middle_east_low__12c_no_uplift | HEAVY_RUC | 2033Q4 | 1 | 1 | -1.16018e-12 | identity_gdp_input_forces_identity_factor | -0.00130677 | -1.16022e-10 | -1.28778e-09 | accepted_definitional_restoration |
 | low | middle_east_low__12c_no_uplift | PED | 2027Q2 | 0.9988 | 1 | 0.00119997 | identity_gdp_input_forces_identity_factor | 1.84029 | 0.120141 | 2.4001 | accepted_definitional_restoration |
 | low | middle_east_low__12c_no_uplift | PED | 2027Q3 | 0.999946 | 1 | 5.42344e-05 | identity_gdp_input_forces_identity_factor | 0.0835641 | 0.00542373 | 0.108351 | accepted_definitional_restoration |
 | low | middle_east_low__12c_no_uplift | PED | 2027Q4 | 1.00009 | 1 | -9.24272e-05 | identity_gdp_input_forces_identity_factor | -0.14383 | -0.00924186 | -0.184627 | accepted_definitional_restoration |
@@ -298,15 +292,15 @@ is listed in full with its disposition.
 | low | middle_east_low__12c_no_uplift | PED | 2031Q4 | 1.00024 | 1 | -0.000241076 | identity_gdp_input_forces_identity_factor | -0.371277 | -0.0241018 | -0.481489 | accepted_definitional_restoration |
 | low | middle_east_low__12c_no_uplift | PED | 2032Q1 | 1.00016 | 1 | -0.000161834 | identity_gdp_input_forces_identity_factor | -0.246832 | -0.0161808 | -0.323248 | accepted_definitional_restoration |
 | medium | middle_east_medium | HEAVY_RUC | 2027Q4 | 1.00181 | 1 | -0.0018122 | positive_response_to_lower_gdp_capped_at_identity | -1.93101e+06 | -0.180892 | -2.00782 | accepted_expected_guard |
-| medium | middle_east_medium | HEAVY_RUC | 2028Q1 | 1.00455 | 1 | -0.00454923 | positive_response_to_lower_gdp_capped_at_identity | -4.74421e+06 | -0.452863 | -5.02655 | accepted_expected_guard |
-| medium | middle_east_medium | HEAVY_RUC | 2028Q2 | 1.00465 | 1 | -0.00465425 | identity_gdp_input_forces_identity_factor | -4.72702e+06 | -0.463269 | -5.14206 | accepted_definitional_restoration |
-| medium | middle_east_medium | HEAVY_RUC | 2028Q3 | 1.0026 | 1 | -0.0025987 | identity_gdp_input_forces_identity_factor | -2.67291e+06 | -0.259197 | -2.87695 | accepted_definitional_restoration |
-| medium | middle_east_medium | HEAVY_RUC | 2028Q4 | 1.00162 | 1 | -0.00161756 | identity_gdp_input_forces_identity_factor | -1.75631e+06 | -0.161494 | -1.79251 | accepted_definitional_restoration |
-| medium | middle_east_medium | HEAVY_RUC | 2029Q1 | 1.00069 | 1 | -0.000687164 | identity_gdp_input_forces_identity_factor | -723597 | -0.0686692 | -0.762194 | accepted_definitional_restoration |
-| medium | middle_east_medium | HEAVY_RUC | 2029Q2 | 1.00019 | 1 | -0.000192813 | identity_gdp_input_forces_identity_factor | -197704 | -0.0192776 | -0.213972 | accepted_definitional_restoration |
+| medium | middle_east_medium | HEAVY_RUC | 2028Q1 | 1.00455 | 1 | -0.00455262 | positive_response_to_lower_gdp_capped_at_identity | -4.7506e+06 | -0.453198 | -5.03028 | accepted_expected_guard |
+| medium | middle_east_medium | HEAVY_RUC | 2028Q2 | 1.00466 | 1 | -0.00465593 | identity_gdp_input_forces_identity_factor | -4.7287e+06 | -0.463435 | -5.1439 | accepted_definitional_restoration |
+| medium | middle_east_medium | HEAVY_RUC | 2028Q3 | 1.0026 | 1 | -0.00259883 | identity_gdp_input_forces_identity_factor | -2.67305e+06 | -0.25921 | -2.8771 | accepted_definitional_restoration |
+| medium | middle_east_medium | HEAVY_RUC | 2028Q4 | 1.0016 | 1 | -0.00159669 | identity_gdp_input_forces_identity_factor | -1.73366e+06 | -0.159415 | -1.76942 | accepted_definitional_restoration |
+| medium | middle_east_medium | HEAVY_RUC | 2029Q1 | 1.00069 | 1 | -0.000685567 | identity_gdp_input_forces_identity_factor | -721915 | -0.0685097 | -0.760424 | accepted_definitional_restoration |
+| medium | middle_east_medium | HEAVY_RUC | 2029Q2 | 1.00032 | 1 | -0.000322931 | identity_gdp_input_forces_identity_factor | -331121 | -0.0322827 | -0.358321 | accepted_definitional_restoration |
 | medium | middle_east_medium | HEAVY_RUC | 2029Q3 | 1.00009 | 1 | -9.12137e-05 | identity_gdp_input_forces_identity_factor | -94707.8 | -0.00912054 | -0.101233 | accepted_definitional_restoration |
-| medium | middle_east_medium | HEAVY_RUC | 2029Q4 | 1.00005 | 1 | -5.41745e-05 | identity_gdp_input_forces_identity_factor | -59363.7 | -0.00541715 | -0.0601277 | accepted_definitional_restoration |
-| medium | middle_east_medium | HEAVY_RUC | 2030Q1 | 1.00002 | 1 | -2.22489e-05 | identity_gdp_input_forces_identity_factor | -23634.3 | -0.00222484 | -0.0246946 | accepted_definitional_restoration |
+| medium | middle_east_medium | HEAVY_RUC | 2029Q4 | 0.999936 | 1 | 6.43265e-05 | identity_gdp_input_forces_identity_factor | 70488.1 | 0.00643307 | 0.0714039 | accepted_definitional_restoration |
+| medium | middle_east_medium | HEAVY_RUC | 2030Q1 | 1.00002 | 1 | -1.61509e-05 | identity_gdp_input_forces_identity_factor | -17156.6 | -0.00161506 | -0.0179264 | accepted_definitional_restoration |
 | medium | middle_east_medium | HEAVY_RUC | 2030Q2 | 1.00001 | 1 | -6.76794e-06 | identity_gdp_input_forces_identity_factor | -6998.38 | -0.00067679 | -0.00751203 | accepted_definitional_restoration |
 | medium | middle_east_medium | HEAVY_RUC | 2030Q3 | 1 | 1 | -3.24058e-06 | identity_gdp_input_forces_identity_factor | -3392.43 | -0.000324057 | -0.00359687 | accepted_definitional_restoration |
 | medium | middle_east_medium | HEAVY_RUC | 2030Q4 | 1 | 1 | -1.87241e-06 | identity_gdp_input_forces_identity_factor | -2067.27 | -0.000187241 | -0.00207828 | accepted_definitional_restoration |
@@ -318,12 +312,12 @@ is listed in full with its disposition.
 | medium | middle_east_medium | HEAVY_RUC | 2032Q2 | 1 | 1 | -8.55656e-09 | identity_gdp_input_forces_identity_factor | -8.97007 | -8.55655e-07 | -9.49735e-06 | accepted_definitional_restoration |
 | medium | middle_east_medium | HEAVY_RUC | 2032Q3 | 1 | 1 | -4.11119e-09 | identity_gdp_input_forces_identity_factor | -4.36164 | -4.11119e-07 | -4.56322e-06 | accepted_definitional_restoration |
 | medium | middle_east_medium | HEAVY_RUC | 2032Q4 | 1 | 1 | -2.21801e-09 | identity_gdp_input_forces_identity_factor | -2.48235 | -2.21801e-07 | -2.46188e-06 | accepted_definitional_restoration |
-| medium | middle_east_medium | HEAVY_RUC | 2033Q1 | 1 | 1 | -8.80012e-10 | identity_gdp_input_forces_identity_factor | -0.954316 | -8.80012e-08 | -9.76769e-07 | accepted_definitional_restoration |
+| medium | middle_east_medium | HEAVY_RUC | 2033Q1 | 1 | 1 | -8.80015e-10 | identity_gdp_input_forces_identity_factor | -0.954319 | -8.80015e-08 | -9.76772e-07 | accepted_definitional_restoration |
 | medium | middle_east_medium | HEAVY_RUC | 2033Q2 | 1 | 1 | -3.02855e-10 | identity_gdp_input_forces_identity_factor | -0.319563 | -3.02855e-08 | -3.36154e-07 | accepted_definitional_restoration |
 | medium | middle_east_medium | HEAVY_RUC | 2033Q3 | 1 | 1 | -1.45577e-10 | identity_gdp_input_forces_identity_factor | -0.155479 | -1.45577e-08 | -1.61583e-07 | accepted_definitional_restoration |
-| medium | middle_east_medium | HEAVY_RUC | 2033Q4 | 1 | 1 | -7.62648e-11 | identity_gdp_input_forces_identity_factor | -0.0858984 | -7.62649e-09 | -8.46502e-08 | accepted_definitional_restoration |
+| medium | middle_east_medium | HEAVY_RUC | 2033Q4 | 1 | 1 | -7.6265e-11 | identity_gdp_input_forces_identity_factor | -0.0858986 | -7.62651e-09 | -8.46504e-08 | accepted_definitional_restoration |
 | medium | middle_east_medium | HEAVY_RUC | 2034Q1 | 1 | 1 | -3.01599e-11 | identity_gdp_input_forces_identity_factor | -0.0329349 | -3.01598e-09 | -3.34759e-08 | accepted_definitional_restoration |
-| medium | middle_east_medium | HEAVY_RUC | 2034Q2 | 1 | 1 | -1.07048e-11 | identity_gdp_input_forces_identity_factor | -0.0113747 | -1.07048e-09 | -1.18818e-08 | accepted_definitional_restoration |
+| medium | middle_east_medium | HEAVY_RUC | 2034Q2 | 1 | 1 | -1.07023e-11 | identity_gdp_input_forces_identity_factor | -0.0113721 | -1.07023e-09 | -1.1879e-08 | accepted_definitional_restoration |
 | medium | middle_east_medium | HEAVY_RUC | 2034Q3 | 1 | 1 | -5.13944e-12 | identity_gdp_input_forces_identity_factor | -0.0055263 | -5.13939e-10 | -5.70447e-09 | accepted_definitional_restoration |
 | medium | middle_east_medium | HEAVY_RUC | 2034Q4 | 1 | 1 | -2.62035e-12 | identity_gdp_input_forces_identity_factor | -0.00297093 | -2.62032e-10 | -2.90843e-09 | accepted_definitional_restoration |
 | medium | middle_east_medium | HEAVY_RUC | 2035Q1 | 1 | 1 | -1.03473e-12 | identity_gdp_input_forces_identity_factor | -0.00113726 | -1.0348e-10 | -1.14857e-09 | accepted_definitional_restoration |
@@ -342,15 +336,15 @@ is listed in full with its disposition.
 | medium | middle_east_medium | PED | 2031Q4 | 0.999759 | 1 | 0.000241018 | identity_gdp_input_forces_identity_factor | 0.371187 | 0.0241076 | 0.481605 | accepted_definitional_restoration |
 | medium | middle_east_medium | PED | 2032Q1 | 0.999838 | 1 | 0.000161808 | identity_gdp_input_forces_identity_factor | 0.246792 | 0.0161834 | 0.3233 | accepted_definitional_restoration |
 | medium | middle_east_medium__12c_delay_6m | HEAVY_RUC | 2027Q4 | 1.00181 | 1 | -0.0018122 | positive_response_to_lower_gdp_capped_at_identity | -1.93101e+06 | -0.180892 | -2.00782 | accepted_expected_guard |
-| medium | middle_east_medium__12c_delay_6m | HEAVY_RUC | 2028Q1 | 1.00455 | 1 | -0.00454923 | positive_response_to_lower_gdp_capped_at_identity | -4.74421e+06 | -0.452863 | -5.02655 | accepted_expected_guard |
-| medium | middle_east_medium__12c_delay_6m | HEAVY_RUC | 2028Q2 | 1.00465 | 1 | -0.00465425 | identity_gdp_input_forces_identity_factor | -4.72702e+06 | -0.463269 | -5.14206 | accepted_definitional_restoration |
-| medium | middle_east_medium__12c_delay_6m | HEAVY_RUC | 2028Q3 | 1.0026 | 1 | -0.0025987 | identity_gdp_input_forces_identity_factor | -2.67291e+06 | -0.259197 | -2.87695 | accepted_definitional_restoration |
-| medium | middle_east_medium__12c_delay_6m | HEAVY_RUC | 2028Q4 | 1.00162 | 1 | -0.00161756 | identity_gdp_input_forces_identity_factor | -1.75631e+06 | -0.161494 | -1.79251 | accepted_definitional_restoration |
-| medium | middle_east_medium__12c_delay_6m | HEAVY_RUC | 2029Q1 | 1.00069 | 1 | -0.000687164 | identity_gdp_input_forces_identity_factor | -723597 | -0.0686692 | -0.762194 | accepted_definitional_restoration |
-| medium | middle_east_medium__12c_delay_6m | HEAVY_RUC | 2029Q2 | 1.00019 | 1 | -0.000192813 | identity_gdp_input_forces_identity_factor | -197704 | -0.0192776 | -0.213972 | accepted_definitional_restoration |
+| medium | middle_east_medium__12c_delay_6m | HEAVY_RUC | 2028Q1 | 1.00455 | 1 | -0.00455262 | positive_response_to_lower_gdp_capped_at_identity | -4.7506e+06 | -0.453198 | -5.03028 | accepted_expected_guard |
+| medium | middle_east_medium__12c_delay_6m | HEAVY_RUC | 2028Q2 | 1.00466 | 1 | -0.00465593 | identity_gdp_input_forces_identity_factor | -4.7287e+06 | -0.463435 | -5.1439 | accepted_definitional_restoration |
+| medium | middle_east_medium__12c_delay_6m | HEAVY_RUC | 2028Q3 | 1.0026 | 1 | -0.00259883 | identity_gdp_input_forces_identity_factor | -2.67305e+06 | -0.25921 | -2.8771 | accepted_definitional_restoration |
+| medium | middle_east_medium__12c_delay_6m | HEAVY_RUC | 2028Q4 | 1.0016 | 1 | -0.00159669 | identity_gdp_input_forces_identity_factor | -1.73366e+06 | -0.159415 | -1.76942 | accepted_definitional_restoration |
+| medium | middle_east_medium__12c_delay_6m | HEAVY_RUC | 2029Q1 | 1.00069 | 1 | -0.000685567 | identity_gdp_input_forces_identity_factor | -721915 | -0.0685097 | -0.760424 | accepted_definitional_restoration |
+| medium | middle_east_medium__12c_delay_6m | HEAVY_RUC | 2029Q2 | 1.00032 | 1 | -0.000322931 | identity_gdp_input_forces_identity_factor | -331121 | -0.0322827 | -0.358321 | accepted_definitional_restoration |
 | medium | middle_east_medium__12c_delay_6m | HEAVY_RUC | 2029Q3 | 1.00009 | 1 | -9.12137e-05 | identity_gdp_input_forces_identity_factor | -94707.8 | -0.00912054 | -0.101233 | accepted_definitional_restoration |
-| medium | middle_east_medium__12c_delay_6m | HEAVY_RUC | 2029Q4 | 1.00005 | 1 | -5.41745e-05 | identity_gdp_input_forces_identity_factor | -59363.7 | -0.00541715 | -0.0601277 | accepted_definitional_restoration |
-| medium | middle_east_medium__12c_delay_6m | HEAVY_RUC | 2030Q1 | 1.00002 | 1 | -2.22489e-05 | identity_gdp_input_forces_identity_factor | -23634.3 | -0.00222484 | -0.0246946 | accepted_definitional_restoration |
+| medium | middle_east_medium__12c_delay_6m | HEAVY_RUC | 2029Q4 | 0.999936 | 1 | 6.43265e-05 | identity_gdp_input_forces_identity_factor | 70488.1 | 0.00643307 | 0.0714039 | accepted_definitional_restoration |
+| medium | middle_east_medium__12c_delay_6m | HEAVY_RUC | 2030Q1 | 1.00002 | 1 | -1.61509e-05 | identity_gdp_input_forces_identity_factor | -17156.6 | -0.00161506 | -0.0179264 | accepted_definitional_restoration |
 | medium | middle_east_medium__12c_delay_6m | HEAVY_RUC | 2030Q2 | 1.00001 | 1 | -6.76794e-06 | identity_gdp_input_forces_identity_factor | -6998.38 | -0.00067679 | -0.00751203 | accepted_definitional_restoration |
 | medium | middle_east_medium__12c_delay_6m | HEAVY_RUC | 2030Q3 | 1 | 1 | -3.24058e-06 | identity_gdp_input_forces_identity_factor | -3392.43 | -0.000324057 | -0.00359687 | accepted_definitional_restoration |
 | medium | middle_east_medium__12c_delay_6m | HEAVY_RUC | 2030Q4 | 1 | 1 | -1.87241e-06 | identity_gdp_input_forces_identity_factor | -2067.27 | -0.000187241 | -0.00207828 | accepted_definitional_restoration |
@@ -362,12 +356,12 @@ is listed in full with its disposition.
 | medium | middle_east_medium__12c_delay_6m | HEAVY_RUC | 2032Q2 | 1 | 1 | -8.55656e-09 | identity_gdp_input_forces_identity_factor | -8.97007 | -8.55655e-07 | -9.49735e-06 | accepted_definitional_restoration |
 | medium | middle_east_medium__12c_delay_6m | HEAVY_RUC | 2032Q3 | 1 | 1 | -4.11119e-09 | identity_gdp_input_forces_identity_factor | -4.36164 | -4.11119e-07 | -4.56322e-06 | accepted_definitional_restoration |
 | medium | middle_east_medium__12c_delay_6m | HEAVY_RUC | 2032Q4 | 1 | 1 | -2.21801e-09 | identity_gdp_input_forces_identity_factor | -2.48235 | -2.21801e-07 | -2.46188e-06 | accepted_definitional_restoration |
-| medium | middle_east_medium__12c_delay_6m | HEAVY_RUC | 2033Q1 | 1 | 1 | -8.80012e-10 | identity_gdp_input_forces_identity_factor | -0.954316 | -8.80012e-08 | -9.76769e-07 | accepted_definitional_restoration |
+| medium | middle_east_medium__12c_delay_6m | HEAVY_RUC | 2033Q1 | 1 | 1 | -8.80015e-10 | identity_gdp_input_forces_identity_factor | -0.954319 | -8.80015e-08 | -9.76772e-07 | accepted_definitional_restoration |
 | medium | middle_east_medium__12c_delay_6m | HEAVY_RUC | 2033Q2 | 1 | 1 | -3.02855e-10 | identity_gdp_input_forces_identity_factor | -0.319563 | -3.02855e-08 | -3.36154e-07 | accepted_definitional_restoration |
 | medium | middle_east_medium__12c_delay_6m | HEAVY_RUC | 2033Q3 | 1 | 1 | -1.45577e-10 | identity_gdp_input_forces_identity_factor | -0.155479 | -1.45577e-08 | -1.61583e-07 | accepted_definitional_restoration |
-| medium | middle_east_medium__12c_delay_6m | HEAVY_RUC | 2033Q4 | 1 | 1 | -7.62648e-11 | identity_gdp_input_forces_identity_factor | -0.0858984 | -7.62649e-09 | -8.46502e-08 | accepted_definitional_restoration |
+| medium | middle_east_medium__12c_delay_6m | HEAVY_RUC | 2033Q4 | 1 | 1 | -7.6265e-11 | identity_gdp_input_forces_identity_factor | -0.0858986 | -7.62651e-09 | -8.46504e-08 | accepted_definitional_restoration |
 | medium | middle_east_medium__12c_delay_6m | HEAVY_RUC | 2034Q1 | 1 | 1 | -3.01599e-11 | identity_gdp_input_forces_identity_factor | -0.0329349 | -3.01598e-09 | -3.34759e-08 | accepted_definitional_restoration |
-| medium | middle_east_medium__12c_delay_6m | HEAVY_RUC | 2034Q2 | 1 | 1 | -1.07048e-11 | identity_gdp_input_forces_identity_factor | -0.0113747 | -1.07048e-09 | -1.18818e-08 | accepted_definitional_restoration |
+| medium | middle_east_medium__12c_delay_6m | HEAVY_RUC | 2034Q2 | 1 | 1 | -1.07023e-11 | identity_gdp_input_forces_identity_factor | -0.0113721 | -1.07023e-09 | -1.1879e-08 | accepted_definitional_restoration |
 | medium | middle_east_medium__12c_delay_6m | HEAVY_RUC | 2034Q3 | 1 | 1 | -5.13944e-12 | identity_gdp_input_forces_identity_factor | -0.0055263 | -5.13939e-10 | -5.70447e-09 | accepted_definitional_restoration |
 | medium | middle_east_medium__12c_delay_6m | HEAVY_RUC | 2034Q4 | 1 | 1 | -2.62035e-12 | identity_gdp_input_forces_identity_factor | -0.00297093 | -2.62032e-10 | -2.90843e-09 | accepted_definitional_restoration |
 | medium | middle_east_medium__12c_delay_6m | HEAVY_RUC | 2035Q1 | 1 | 1 | -1.03473e-12 | identity_gdp_input_forces_identity_factor | -0.00113726 | -1.0348e-10 | -1.14857e-09 | accepted_definitional_restoration |
@@ -386,15 +380,15 @@ is listed in full with its disposition.
 | medium | middle_east_medium__12c_delay_6m | PED | 2031Q4 | 0.999759 | 1 | 0.000241018 | identity_gdp_input_forces_identity_factor | 0.371187 | 0.0241076 | 0.481605 | accepted_definitional_restoration |
 | medium | middle_east_medium__12c_delay_6m | PED | 2032Q1 | 0.999838 | 1 | 0.000161808 | identity_gdp_input_forces_identity_factor | 0.246792 | 0.0161834 | 0.3233 | accepted_definitional_restoration |
 | medium | middle_east_medium__12c_no_uplift | HEAVY_RUC | 2027Q4 | 1.00181 | 1 | -0.0018122 | positive_response_to_lower_gdp_capped_at_identity | -1.93728e+06 | -0.180892 | -2.00782 | accepted_expected_guard |
-| medium | middle_east_medium__12c_no_uplift | HEAVY_RUC | 2028Q1 | 1.00455 | 1 | -0.00454923 | positive_response_to_lower_gdp_capped_at_identity | -4.76005e+06 | -0.452863 | -5.02655 | accepted_expected_guard |
-| medium | middle_east_medium__12c_no_uplift | HEAVY_RUC | 2028Q2 | 1.00465 | 1 | -0.00465425 | identity_gdp_input_forces_identity_factor | -4.74287e+06 | -0.463269 | -5.14206 | accepted_definitional_restoration |
-| medium | middle_east_medium__12c_no_uplift | HEAVY_RUC | 2028Q3 | 1.0026 | 1 | -0.0025987 | identity_gdp_input_forces_identity_factor | -2.68192e+06 | -0.259197 | -2.87695 | accepted_definitional_restoration |
-| medium | middle_east_medium__12c_no_uplift | HEAVY_RUC | 2028Q4 | 1.00162 | 1 | -0.00161756 | identity_gdp_input_forces_identity_factor | -1.76226e+06 | -0.161494 | -1.79251 | accepted_definitional_restoration |
-| medium | middle_east_medium__12c_no_uplift | HEAVY_RUC | 2029Q1 | 1.00069 | 1 | -0.000687164 | identity_gdp_input_forces_identity_factor | -725949 | -0.0686692 | -0.762194 | accepted_definitional_restoration |
-| medium | middle_east_medium__12c_no_uplift | HEAVY_RUC | 2029Q2 | 1.00019 | 1 | -0.000192813 | identity_gdp_input_forces_identity_factor | -198349 | -0.0192776 | -0.213972 | accepted_definitional_restoration |
+| medium | middle_east_medium__12c_no_uplift | HEAVY_RUC | 2028Q1 | 1.00455 | 1 | -0.00455262 | positive_response_to_lower_gdp_capped_at_identity | -4.76645e+06 | -0.453198 | -5.03028 | accepted_expected_guard |
+| medium | middle_east_medium__12c_no_uplift | HEAVY_RUC | 2028Q2 | 1.00466 | 1 | -0.00465593 | identity_gdp_input_forces_identity_factor | -4.74456e+06 | -0.463435 | -5.1439 | accepted_definitional_restoration |
+| medium | middle_east_medium__12c_no_uplift | HEAVY_RUC | 2028Q3 | 1.0026 | 1 | -0.00259883 | identity_gdp_input_forces_identity_factor | -2.68205e+06 | -0.25921 | -2.8771 | accepted_definitional_restoration |
+| medium | middle_east_medium__12c_no_uplift | HEAVY_RUC | 2028Q4 | 1.0016 | 1 | -0.00159669 | identity_gdp_input_forces_identity_factor | -1.73953e+06 | -0.159415 | -1.76942 | accepted_definitional_restoration |
+| medium | middle_east_medium__12c_no_uplift | HEAVY_RUC | 2029Q1 | 1.00069 | 1 | -0.000685567 | identity_gdp_input_forces_identity_factor | -724262 | -0.0685097 | -0.760424 | accepted_definitional_restoration |
+| medium | middle_east_medium__12c_no_uplift | HEAVY_RUC | 2029Q2 | 1.00032 | 1 | -0.000322931 | identity_gdp_input_forces_identity_factor | -332203 | -0.0322827 | -0.358321 | accepted_definitional_restoration |
 | medium | middle_east_medium__12c_no_uplift | HEAVY_RUC | 2029Q3 | 1.00009 | 1 | -9.12137e-05 | identity_gdp_input_forces_identity_factor | -95018.7 | -0.00912054 | -0.101233 | accepted_definitional_restoration |
-| medium | middle_east_medium__12c_no_uplift | HEAVY_RUC | 2029Q4 | 1.00005 | 1 | -5.41745e-05 | identity_gdp_input_forces_identity_factor | -59559.5 | -0.00541715 | -0.0601277 | accepted_definitional_restoration |
-| medium | middle_east_medium__12c_no_uplift | HEAVY_RUC | 2030Q1 | 1.00002 | 1 | -2.22489e-05 | identity_gdp_input_forces_identity_factor | -23709.3 | -0.00222484 | -0.0246946 | accepted_definitional_restoration |
+| medium | middle_east_medium__12c_no_uplift | HEAVY_RUC | 2029Q4 | 0.999936 | 1 | 6.43265e-05 | identity_gdp_input_forces_identity_factor | 70720.7 | 0.00643307 | 0.0714039 | accepted_definitional_restoration |
+| medium | middle_east_medium__12c_no_uplift | HEAVY_RUC | 2030Q1 | 1.00002 | 1 | -1.61509e-05 | identity_gdp_input_forces_identity_factor | -17211.1 | -0.00161506 | -0.0179264 | accepted_definitional_restoration |
 | medium | middle_east_medium__12c_no_uplift | HEAVY_RUC | 2030Q2 | 1.00001 | 1 | -6.76794e-06 | identity_gdp_input_forces_identity_factor | -7020.7 | -0.00067679 | -0.00751203 | accepted_definitional_restoration |
 | medium | middle_east_medium__12c_no_uplift | HEAVY_RUC | 2030Q3 | 1 | 1 | -3.24058e-06 | identity_gdp_input_forces_identity_factor | -3403.31 | -0.000324057 | -0.00359687 | accepted_definitional_restoration |
 | medium | middle_east_medium__12c_no_uplift | HEAVY_RUC | 2030Q4 | 1 | 1 | -1.87241e-06 | identity_gdp_input_forces_identity_factor | -2073.93 | -0.000187241 | -0.00207828 | accepted_definitional_restoration |
@@ -406,12 +400,12 @@ is listed in full with its disposition.
 | medium | middle_east_medium__12c_no_uplift | HEAVY_RUC | 2032Q2 | 1 | 1 | -8.55656e-09 | identity_gdp_input_forces_identity_factor | -8.97007 | -8.55655e-07 | -9.49735e-06 | accepted_definitional_restoration |
 | medium | middle_east_medium__12c_no_uplift | HEAVY_RUC | 2032Q3 | 1 | 1 | -4.11119e-09 | identity_gdp_input_forces_identity_factor | -4.36164 | -4.11119e-07 | -4.56322e-06 | accepted_definitional_restoration |
 | medium | middle_east_medium__12c_no_uplift | HEAVY_RUC | 2032Q4 | 1 | 1 | -2.21801e-09 | identity_gdp_input_forces_identity_factor | -2.48235 | -2.21801e-07 | -2.46188e-06 | accepted_definitional_restoration |
-| medium | middle_east_medium__12c_no_uplift | HEAVY_RUC | 2033Q1 | 1 | 1 | -8.80012e-10 | identity_gdp_input_forces_identity_factor | -0.954316 | -8.80012e-08 | -9.76769e-07 | accepted_definitional_restoration |
+| medium | middle_east_medium__12c_no_uplift | HEAVY_RUC | 2033Q1 | 1 | 1 | -8.80015e-10 | identity_gdp_input_forces_identity_factor | -0.954319 | -8.80015e-08 | -9.76772e-07 | accepted_definitional_restoration |
 | medium | middle_east_medium__12c_no_uplift | HEAVY_RUC | 2033Q2 | 1 | 1 | -3.02855e-10 | identity_gdp_input_forces_identity_factor | -0.319563 | -3.02855e-08 | -3.36154e-07 | accepted_definitional_restoration |
 | medium | middle_east_medium__12c_no_uplift | HEAVY_RUC | 2033Q3 | 1 | 1 | -1.45577e-10 | identity_gdp_input_forces_identity_factor | -0.155479 | -1.45577e-08 | -1.61583e-07 | accepted_definitional_restoration |
-| medium | middle_east_medium__12c_no_uplift | HEAVY_RUC | 2033Q4 | 1 | 1 | -7.62648e-11 | identity_gdp_input_forces_identity_factor | -0.0858984 | -7.62649e-09 | -8.46502e-08 | accepted_definitional_restoration |
+| medium | middle_east_medium__12c_no_uplift | HEAVY_RUC | 2033Q4 | 1 | 1 | -7.6265e-11 | identity_gdp_input_forces_identity_factor | -0.0858986 | -7.62651e-09 | -8.46504e-08 | accepted_definitional_restoration |
 | medium | middle_east_medium__12c_no_uplift | HEAVY_RUC | 2034Q1 | 1 | 1 | -3.01599e-11 | identity_gdp_input_forces_identity_factor | -0.0329349 | -3.01598e-09 | -3.34759e-08 | accepted_definitional_restoration |
-| medium | middle_east_medium__12c_no_uplift | HEAVY_RUC | 2034Q2 | 1 | 1 | -1.07048e-11 | identity_gdp_input_forces_identity_factor | -0.0113747 | -1.07048e-09 | -1.18818e-08 | accepted_definitional_restoration |
+| medium | middle_east_medium__12c_no_uplift | HEAVY_RUC | 2034Q2 | 1 | 1 | -1.07023e-11 | identity_gdp_input_forces_identity_factor | -0.0113721 | -1.07023e-09 | -1.1879e-08 | accepted_definitional_restoration |
 | medium | middle_east_medium__12c_no_uplift | HEAVY_RUC | 2034Q3 | 1 | 1 | -5.13944e-12 | identity_gdp_input_forces_identity_factor | -0.0055263 | -5.13939e-10 | -5.70447e-09 | accepted_definitional_restoration |
 | medium | middle_east_medium__12c_no_uplift | HEAVY_RUC | 2034Q4 | 1 | 1 | -2.62035e-12 | identity_gdp_input_forces_identity_factor | -0.00297093 | -2.62032e-10 | -2.90843e-09 | accepted_definitional_restoration |
 | medium | middle_east_medium__12c_no_uplift | HEAVY_RUC | 2035Q1 | 1 | 1 | -1.03473e-12 | identity_gdp_input_forces_identity_factor | -0.00113726 | -1.0348e-10 | -1.14857e-09 | accepted_definitional_restoration |

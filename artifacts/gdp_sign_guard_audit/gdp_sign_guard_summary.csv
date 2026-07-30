@@ -1,11 +1,11 @@
 severity,stream,guard_reason,n_bindings,first_quarter,last_quarter,max_abs_clip_amount,max_abs_forecast_delta_pct,cumulative_revenue_equivalent_nzd_m
-high,HEAVY_RUC,identity_gdp_input_forces_identity_factor,72,2031Q1,2036Q4,0.00033129997298586567,0.03311902496651826,-2.238358991672532
-high,HEAVY_RUC,positive_response_to_lower_gdp_capped_at_identity,36,2028Q1,2030Q4,0.005120655791822193,0.5094568261347904,-93.18371831966259
+high,HEAVY_RUC,identity_gdp_input_forces_identity_factor,72,2031Q1,2036Q4,0.0022202418635410837,0.22251823064518328,15.350943468669561
+high,HEAVY_RUC,positive_response_to_lower_gdp_capped_at_identity,30,2028Q2,2030Q4,0.004804285551451182,0.47813147500804143,-74.93950860241164
 high,PED,positive_response_to_lower_gdp_capped_at_identity,6,2029Q2,2029Q3,0.0013363000256900737,0.1334516710974956,-13.991417723549684
-low,HEAVY_RUC,identity_gdp_input_forces_identity_factor,81,2027Q2,2033Q4,0.0018835525201390535,0.18800114198912843,-12.88562319462592
-low,HEAVY_RUC,positive_response_to_lower_gdp_capped_at_identity,6,2026Q4,2027Q1,0.002276512155124255,0.22713414187759276,-9.98367062259126
+low,HEAVY_RUC,identity_gdp_input_forces_identity_factor,81,2027Q2,2033Q4,0.001883629983372881,0.18800885921293956,-13.31082918151957
+low,HEAVY_RUC,positive_response_to_lower_gdp_capped_at_identity,6,2026Q4,2027Q1,0.0022717813974098,0.22666321047594856,-8.94689100667121
 low,PED,identity_gdp_input_forces_identity_factor,45,2027Q2,2032Q1,0.001378526169008798,0.13804291266844643,39.60455607373054
-medium,HEAVY_RUC,identity_gdp_input_forces_identity_factor,84,2028Q2,2035Q1,0.004654251905654716,0.46326901984702334,-32.96482607126664
-medium,HEAVY_RUC,positive_response_to_lower_gdp_capped_at_identity,6,2027Q4,2028Q1,0.004549229925638665,0.4528628154914295,-21.103101992816008
+medium,HEAVY_RUC,identity_gdp_input_forces_identity_factor,84,2028Q2,2035Q1,0.004655929619712396,0.4634352401099975,-32.91438681851496
+medium,HEAVY_RUC,positive_response_to_lower_gdp_capped_at_identity,6,2027Q4,2028Q1,0.004552615262482851,0.4531982888017568,-21.114272696246196
 medium,PED,identity_gdp_input_forces_identity_factor,39,2028Q2,2032Q1,0.001380429126684346,0.13785261690088058,-31.46913356351418
 medium,PED,positive_response_to_lower_gdp_capped_at_identity,3,2028Q1,2028Q1,5.4748609689792005e-05,0.005474561244368239,-0.3281003884079148

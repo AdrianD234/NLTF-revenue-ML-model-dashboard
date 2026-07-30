@@ -1465,13 +1465,14 @@ def forecast_chart_rows_for_display(
     latest_actual_period: str | None = None,
 ) -> pd.DataFrame:
     root = Path(repo_root) if repo_root is not None else repo_root_from_here()
-    latest = latest_actual_period or latest_known_actual_period(root)
     streams = (
         future_forecasts["stream"].dropna().astype(str).unique().tolist()
         if future_forecasts is not None and not future_forecasts.empty and "stream" in future_forecasts.columns
         else STREAM_ORDER
     )
-    historical = historical_actual_rows(root, latest_actual_period=latest, streams=streams)
+    # When no explicit cutoff is given, each stream publishes history through
+    # its OWN latest accepted actual (per-stream seam).
+    historical = historical_actual_rows(root, latest_actual_period=latest_actual_period, streams=streams)
     future = _future_forecast_chart_rows(future_forecasts)
     chart_rows = pd.concat([historical, future], ignore_index=True, sort=False)
     if chart_rows.empty:
@@ -1487,15 +1488,28 @@ def historical_actual_rows(
     latest_actual_period: str | None = None,
     streams: list[str] | tuple[str, ...] | None = None,
 ) -> pd.DataFrame:
+    """Historical actual rows per stream.
+
+    With an explicit ``latest_actual_period`` every stream is cut at that
+    quarter (legacy behaviour). Without one, each stream publishes through its
+    OWN latest accepted actual from canonical history, so an accepted
+    Light/Heavy quarter is displayed as an actual even while the PED quarter
+    remains provisional.
+    """
     root = Path(repo_root) if repo_root is not None else repo_root_from_here()
-    latest = latest_actual_period or latest_known_actual_period(root)
     selected_streams = list(streams) if streams is not None else list(STREAM_ORDER)
+    if latest_actual_period:
+        per_stream = {stream: latest_actual_period for stream in selected_streams}
+        fallback_latest = latest_actual_period
+    else:
+        per_stream = stream_latest_accepted_periods(root)
+        fallback_latest = latest_known_actual_period(root)
     rows: list[dict[str, Any]] = []
     for stream in selected_streams:
-        rows.extend(_model_input_history_rows(root, stream, latest))
+        rows.extend(_model_input_history_rows(root, stream, per_stream.get(stream, fallback_latest)))
     if rows:
         return pd.DataFrame(rows)
-    return _evidence_pack_actual_rows(root, selected_streams, latest)
+    return _evidence_pack_actual_rows(root, selected_streams, fallback_latest)
 
 
 def _model_input_history_rows(root: Path, stream: str, latest_actual_period: str) -> list[dict[str, Any]]:
