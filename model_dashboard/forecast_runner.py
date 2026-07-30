@@ -1160,7 +1160,7 @@ def replay_forecast_from_scenario_inputs(
     repo_root: Path | str | None = None,
     latest_actual_period: str | None = None,
     engine: str = "ensemble",
-    seam: str = "common",
+    seam: str = "per_stream",
     ped_seed: dict[str, float] | None = None,
 ) -> ScenarioInputForecastReplayResult:
     """Replay fixed-finalist forecasts from committed scenario_input_wide rows.
@@ -1171,9 +1171,11 @@ def replay_forecast_from_scenario_inputs(
 
     ``seam`` selects how the actual/forecast boundary is drawn:
 
-    - ``"common"`` (legacy): every stream scores every scenario period, and
-      the single ``latest_actual_period`` describes the shared history cutoff.
-    - ``"per_stream"``: each stream scores only scenario periods AFTER its own
+    - ``"common"`` (legacy, pre-2026Q1-refresh): every stream scores every
+      scenario period, and the single ``latest_actual_period`` describes the
+      shared history cutoff.
+    - ``"per_stream"`` (default since the 2026Q1 actuals refresh): each
+      stream scores only scenario periods AFTER its own
       latest accepted actual (``stream_latest_accepted_periods``), so a
       scenario quarter superseded by an accepted actual is never re-forecast
       and recursive target lags roll from that actual. Streams may therefore

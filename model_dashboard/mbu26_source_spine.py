@@ -623,17 +623,39 @@ def current_forecast_annual_from_mbu26(
             continue
         scenario_role = str(getattr(ped_activity, "scenario_role", "") or "")
         source_path = _current_source_path_label(scenario_name, scenario_role)
-        value_status = (
-            "Actual anchor"
-            if fy == REVENUE_LAST_COMPLETE_ACTUAL_FY
-            else "extrapolated_model_extension"
-            if _is_extrapolated_activity_row(ped_activity)
-            else "Current-finalist FY nowcast (2 actual + 2 forecast)"
-            if bool(getattr(ped_activity, "nowcast_flag", False))
-            else "current_finalist_forecast"
-        )
-        actual_quarters = str(getattr(ped_activity, "actual_quarters", "") or "")
-        forecast_quarters = str(getattr(ped_activity, "forecast_quarters", "") or "")
+
+        def _quarter_meta(activity_row: Any) -> dict[str, Any]:
+            """Per-stream actual/forecast quarter mix. Streams may hold
+            different accepted-actual cutoffs (e.g. exact Light/Heavy 2026Q1
+            actuals with a still-provisional PED quarter), so each stream's
+            annual rows must describe their own seam rather than inheriting
+            PED's."""
+            aq = str(getattr(activity_row, "actual_quarters", "") or "")
+            fq = str(getattr(activity_row, "forecast_quarters", "") or "")
+            n_actual = len([q for q in aq.split("; ") if q])
+            n_forecast = len([q for q in fq.split("; ") if q])
+            status = (
+                "Actual anchor"
+                if fy == REVENUE_LAST_COMPLETE_ACTUAL_FY
+                else "extrapolated_model_extension"
+                if _is_extrapolated_activity_row(activity_row)
+                else f"Current-finalist FY nowcast ({n_actual} actual + {n_forecast} forecast)"
+                if bool(getattr(activity_row, "nowcast_flag", False))
+                else "current_finalist_forecast"
+            )
+            return {
+                "actual_quarters": aq,
+                "forecast_quarters": fq,
+                "nowcast_flag": bool(getattr(activity_row, "nowcast_flag", False)),
+                "value_status": status,
+            }
+
+        ped_meta = _quarter_meta(ped_activity)
+        light_meta = _quarter_meta(light_activity)
+        heavy_meta = _quarter_meta(heavy_activity)
+        value_status = ped_meta["value_status"]
+        actual_quarters = ped_meta["actual_quarters"]
+        forecast_quarters = ped_meta["forecast_quarters"]
         quarters_present = str(getattr(ped_activity, "quarters_present", "") or "")
         ped_source_cell = str(ped_quarters.get("source_cells") or f"current_revenue_outlook:{scenario_name}:FY{fy}:PED")
         light_source_cell = str(light_quarters.get("source_cells") or f"current_revenue_outlook:{scenario_name}:FY{fy}:LIGHT_RUC")
@@ -806,16 +828,16 @@ def current_forecast_annual_from_mbu26(
                 _current_annual_row(**common, series_id="ped_vkt_per_capita", display_name="PED VKT per capita", section="Key volumes", value=ped_vkt_per_capita, unit="km/person", row_role="bridge_input", source_basis="current_finalist_model", source_file="forecast_scenario_comparison.parquet", source_cell=ped_source_cell, formula="sum quarterly current finalist PED VKT/capita", official_value=off["ped_vkt_per_capita"], vktpc_source_file="forecast_scenario_comparison.parquet", vktpc_source_cell=ped_source_cell, vktpc_source_status="current_finalist_model"),
                 _current_annual_row(**common, series_id="ped_volume", display_name="PED volume", section="Key volumes", value=ped_volume, unit="million litres", row_role="bridge_input", source_basis=f"raw AR(1) PED VKT/capita + scenario-input population ({population_source_status}) + MBU26 intensity", source_file="forecast_scenario_comparison.parquet; scenario_inputs/scenario_input_wide.parquet; mbu26_official_annual.csv", source_cell=migration_source_cell, formula="raw PED/light-petrol VKT * MBU26 litres intensity / 100", official_value=off["ped_volume"], **ped_bridge_sources),
                 _current_annual_row(**common, series_id="light_petrol_vkt", display_name="Light petrol VKT", section="Key volumes", value=current_ped_light_petrol_vkt, unit="million km", row_role="bridge_input", source_basis=migration_basis, source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=migration_source_cell, formula="raw AR(1) PED VKT per capita * scenario-input population", official_value=off["light_petrol_vkt"], **ped_bridge_sources),
-                _current_annual_row(**common, series_id=CONVENTIONAL_ANCHOR_SERIES_ID, display_name="Current finalist Light RUC conventional modelled km", section="Key volumes", value=light_conventional_modelled_km, unit="million km", row_role="audit_only", source_basis="current_finalist_model_conventional_light_ruc_forecast", source_file="forecast_scenario_comparison.parquet", source_cell=light_source_cell, formula="sum quarterly current finalist Light RUC conventional model forecast", official_value=pd.NA, model_id=CURRENT_FINALIST_MODEL_IDS["LIGHT_RUC"]),
-                _current_annual_row(**common, series_id="light_ruc_net_km", display_name="Light RUC net km", section="Key volumes", value=conventional_light_km, unit="million km", row_role="bridge_input", source_basis=migration_basis, source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=migration_source_cell, formula="raw Light RUC conventional model forecast (preserved exactly under the Base uptake basis)", official_value=off["light_ruc_net_km"], model_id=CURRENT_FINALIST_MODEL_IDS["LIGHT_RUC"]),
-                _current_annual_row(**common, series_id="heavy_ruc_net_km", display_name="Heavy RUC net km", section="Key volumes", value=heavy_km_million, unit="million km", row_role="bridge_input", source_basis="current_finalist_model", source_file="forecast_scenario_comparison.parquet", source_cell=heavy_source_cell, formula="sum quarterly current finalist Heavy RUC net km", official_value=off["heavy_ruc_net_km"]),
+                _current_annual_row(**{**common, **light_meta}, series_id=CONVENTIONAL_ANCHOR_SERIES_ID, display_name="Current finalist Light RUC conventional modelled km", section="Key volumes", value=light_conventional_modelled_km, unit="million km", row_role="audit_only", source_basis="current_finalist_model_conventional_light_ruc_forecast", source_file="forecast_scenario_comparison.parquet", source_cell=light_source_cell, formula="sum quarterly current finalist Light RUC conventional model forecast", official_value=pd.NA, model_id=CURRENT_FINALIST_MODEL_IDS["LIGHT_RUC"]),
+                _current_annual_row(**{**common, **light_meta}, series_id="light_ruc_net_km", display_name="Light RUC net km", section="Key volumes", value=conventional_light_km, unit="million km", row_role="bridge_input", source_basis=migration_basis, source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=migration_source_cell, formula="raw Light RUC conventional model forecast (preserved exactly under the Base uptake basis)", official_value=off["light_ruc_net_km"], model_id=CURRENT_FINALIST_MODEL_IDS["LIGHT_RUC"]),
+                _current_annual_row(**{**common, **heavy_meta}, series_id="heavy_ruc_net_km", display_name="Heavy RUC net km", section="Key volumes", value=heavy_km_million, unit="million km", row_role="bridge_input", source_basis="current_finalist_model", source_file="forecast_scenario_comparison.parquet", source_cell=heavy_source_cell, formula="sum quarterly current finalist Heavy RUC net km", official_value=off["heavy_ruc_net_km"]),
                 _current_annual_row(**common, series_id="light_bev_ruc_net_km", display_name="Light BEV RUC net km", section="Key volumes", value=current_light_bev_km, unit="million km", row_role="bridge_input", source_basis=migration_basis, source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=migration_source_cell, formula="base pool (conventional / VFM Base conventional share) * VFM Base Light BEV share", official_value=off["light_bev_ruc_net_km"], model_id=_current_composite_model_id()),
                 fixed("heavy_bev_ruc_net_km"),
                 _current_annual_row(**common, series_id="phev_ruc_net_km", display_name="PHEV RUC net km", section="Key volumes", value=current_phev_km, unit="million km", row_role="bridge_input", source_basis=migration_basis, source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=migration_source_cell, formula="base pool (conventional / VFM Base conventional share) * VFM Base PHEV share", official_value=off["phev_ruc_net_km"], model_id=_current_composite_model_id()),
                 fixed("tuc_gtk"),
                 _current_annual_row(**common, series_id="gross_ped_revenue", display_name="PED revenue", section="FED", value=ped_revenue, unit="$m nominal ex GST", row_role="replacement_line", source_basis=f"{migration_revenue_basis}; population_source={population_source_status}", source_file="forecast_scenario_comparison.parquet; scenario_inputs/scenario_input_wide.parquet; mbu26_official_annual.csv", source_cell=migration_source_cell, formula="raw PED/light-petrol VKT * MBU26 litres intensity / 100 * MBU26 PED rate", replacement_only=True, official_value=off["gross_ped_revenue"], **ped_bridge_sources),
-                _current_annual_row(**common, series_id="light_ruc_net_revenue", display_name="Light RUC revenue", section="RUC", value=light_revenue, unit="$m nominal ex GST", row_role="replacement_line", source_basis=migration_revenue_basis, source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=migration_source_cell, formula="conventional Light RUC km * MBU26 conventional Light effective rate", replacement_only=True, official_value=off["light_ruc_net_revenue"], model_id=CURRENT_FINALIST_MODEL_IDS["LIGHT_RUC"]),
-                _current_annual_row(**common, series_id="heavy_ruc_net_revenue", display_name="Heavy RUC revenue", section="RUC", value=heavy_revenue, unit="$m nominal ex GST", row_role="replacement_line", source_basis="current_finalist_model + MBU26 effective rate", source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=heavy_source_cell, formula="sum quarterly current Heavy RUC net km * MBU26 effective rate", replacement_only=True, official_value=off["heavy_ruc_net_revenue"]),
+                _current_annual_row(**{**common, **light_meta}, series_id="light_ruc_net_revenue", display_name="Light RUC revenue", section="RUC", value=light_revenue, unit="$m nominal ex GST", row_role="replacement_line", source_basis=migration_revenue_basis, source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=migration_source_cell, formula="conventional Light RUC km * MBU26 conventional Light effective rate", replacement_only=True, official_value=off["light_ruc_net_revenue"], model_id=CURRENT_FINALIST_MODEL_IDS["LIGHT_RUC"]),
+                _current_annual_row(**{**common, **heavy_meta}, series_id="heavy_ruc_net_revenue", display_name="Heavy RUC revenue", section="RUC", value=heavy_revenue, unit="$m nominal ex GST", row_role="replacement_line", source_basis="current_finalist_model + MBU26 effective rate", source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=heavy_source_cell, formula="sum quarterly current Heavy RUC net km * MBU26 effective rate", replacement_only=True, official_value=off["heavy_ruc_net_revenue"]),
                 _current_annual_row(**common, series_id="light_bev_ruc_net_revenue", display_name="Light BEV RUC net revenue", section="RUC", value=light_bev_revenue, unit="$m nominal ex GST", row_role="replacement_line", source_basis=migration_revenue_basis, source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=migration_source_cell, formula="allocated Light BEV RUC km * MBU26 Light BEV effective rate", replacement_only=True, official_value=off["light_bev_ruc_net_revenue"], model_id=_current_composite_model_id()),
                 fixed("heavy_bev_ruc_net_revenue"),
                 _current_annual_row(**common, series_id="phev_ruc_net_revenue", display_name="PHEV RUC net revenue", section="RUC", value=phev_revenue, unit="$m nominal ex GST", row_role="replacement_line", source_basis=migration_revenue_basis, source_file="forecast_scenario_comparison.parquet; mbu26_official_annual.csv", source_cell=migration_source_cell, formula="allocated PHEV RUC km * MBU26 PHEV effective rate", replacement_only=True, official_value=off["phev_ruc_net_revenue"], model_id=_current_composite_model_id()),

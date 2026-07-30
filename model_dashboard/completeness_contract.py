@@ -42,6 +42,8 @@ The horizon rules are the merged P0 contract and are not re-litigated:
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import lru_cache
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -80,6 +82,7 @@ AVAILABLE = "required_and_available"
 OPTIONAL_AVAILABLE = "optional_and_available"
 WITHHELD_H21 = "intentionally_unavailable_h21_plus"
 NOT_APPLICABLE = "not_applicable"
+SUPERSEDED_BY_ACTUAL = "superseded_by_accepted_actual"
 MISSING_SOURCE_INPUT = "missing_source_input"
 MISSING_DERIVED_OUTPUT = "missing_derived_output"
 MISSING_REQUIRED_SERIES = "missing_required_series"
@@ -89,12 +92,14 @@ NON_FINITE = "non_finite"
 UNIT_INVALID = "unit_invalid"
 MISSING_UNIT = "missing_unit_declaration"
 FORMULA_INVALID = "formula_invalid"
+STALE_FORECAST_AT_ACTUAL = "stale_forecast_row_at_accepted_quarter"
 
 AVAILABILITY_STATUSES = (
     AVAILABLE,
     OPTIONAL_AVAILABLE,
     WITHHELD_H21,
     NOT_APPLICABLE,
+    SUPERSEDED_BY_ACTUAL,
     MISSING_SOURCE_INPUT,
     MISSING_DERIVED_OUTPUT,
     MISSING_REQUIRED_SERIES,
@@ -104,6 +109,7 @@ AVAILABILITY_STATUSES = (
     UNIT_INVALID,
     MISSING_UNIT,
     FORMULA_INVALID,
+    STALE_FORECAST_AT_ACTUAL,
 )
 _FAILURE_STATUSES = frozenset(
     {
@@ -116,6 +122,7 @@ _FAILURE_STATUSES = frozenset(
         UNIT_INVALID,
         MISSING_UNIT,
         FORMULA_INVALID,
+        STALE_FORECAST_AT_ACTUAL,
     }
 )
 
@@ -403,6 +410,53 @@ def _series_present(frame: pd.DataFrame, scenario: str, role: str, grain: str) -
     return set(frame[matches]["series_id"].astype(str))
 
 
+# Quarterly stream series -> canonical history file. Quarters at or before a
+# stream's latest ACCEPTED actual (canonical history target > 0) are satisfied
+# by the accepted actual itself, not by a scenario forecast row: since the
+# 2026Q1 actuals refresh, streams may hold different accepted cutoffs (exact
+# Light/Heavy actuals with a still-provisional PED quarter kept at the 0.0
+# placeholder).
+_QUARTERLY_SERIES_HISTORY_FILES = {
+    "ped_vkt_per_capita": "ped_inputs.parquet",
+    "light_ruc_net_km": "light_ruc_inputs.parquet",
+    "heavy_ruc_net_km": "heavy_ruc_inputs.parquet",
+}
+
+
+@lru_cache(maxsize=1)
+def _accepted_actual_cutoffs() -> dict[str, str]:
+    """Per-series latest accepted actual quarter, from canonical history."""
+    root = Path(__file__).resolve().parents[1]
+    out: dict[str, str] = {}
+    for series_id, filename in _QUARTERLY_SERIES_HISTORY_FILES.items():
+        path = root / "data" / "model_input_history" / filename
+        try:
+            frame = pd.read_parquet(path, columns=["period", "target"])
+            targets = pd.to_numeric(frame["target"], errors="coerce")
+            periods = frame.loc[targets.gt(0), "period"].astype(str).tolist()
+            if periods:
+                out[series_id] = max(periods, key=_quarter_key)
+        except Exception:
+            continue
+    return out
+
+
+def _quarter_key(period: str) -> int:
+    return int(str(period)[:4]) * 4 + int(str(period)[5])
+
+
+def _superseded_by_accepted_actual(series_id: str, grain: str, period: str) -> bool:
+    if str(grain) != "quarterly":
+        return False
+    cutoff = _accepted_actual_cutoffs().get(str(series_id))
+    if not cutoff:
+        return False
+    try:
+        return _quarter_key(period) <= _quarter_key(cutoff)
+    except (ValueError, IndexError):
+        return False
+
+
 def _evaluate_against_contract(
     frame: pd.DataFrame,
     *,
@@ -465,6 +519,43 @@ def _evaluate_against_contract(
                 positions = index.get((scenario, role, grain, item.series_id, period), [])
                 if not positions and "scenario_name" not in getattr(frame, "columns", []):
                     positions = index.get((role, role, grain, item.series_id, period), [])
+                if _superseded_by_accepted_actual(item.series_id, grain, period):
+                    if positions:
+                        entry = CompletenessRecord(
+                            scenario=scenario, role=role, stage=stage, time_grain=grain,
+                            period=period, series=item.series_id,
+                            horizon_state=item.horizon_rule, status=STALE_FORECAST_AT_ACTUAL,
+                            decision_facing=True, expected_unit=item.canonical_unit,
+                            observed_count=len(positions), value_status="stale_forecast_row",
+                            reason=(
+                                f"{item.series_id!r} at {period} is at or before the stream's "
+                                f"accepted actual cutoff "
+                                f"{_accepted_actual_cutoffs().get(item.series_id)}; a scenario "
+                                "forecast row must not remain once the quarter is an accepted "
+                                "actual."
+                            ),
+                            source=source, dependants=item.dependants,
+                        )
+                        if raise_on_failure:
+                            raise CompletenessContractError(entry)
+                        records.append(entry)
+                        return
+                    records.append(
+                        CompletenessRecord(
+                            scenario=scenario, role=role, stage=stage, time_grain=grain,
+                            period=period, series=item.series_id,
+                            horizon_state=item.horizon_rule, status=SUPERSEDED_BY_ACTUAL,
+                            decision_facing=True, expected_unit=item.canonical_unit,
+                            observed_count=0, value_status="accepted_actual",
+                            reason=(
+                                f"{period} is covered by the stream's accepted actual (canonical "
+                                "model_input_history); the annual seam consumes the actual and no "
+                                "scenario forecast row is required or permitted."
+                            ),
+                            source=source, dependants=item.dependants,
+                        )
+                    )
+                    return
                 matched_values = (
                     pd.Series([values[position] for position in positions])
                     if positions and values is not None
