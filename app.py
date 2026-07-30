@@ -4300,6 +4300,51 @@ def _compare_mode_lever_state(selected_metric_type: str) -> dict[str, Any]:
     }
 
 
+STREAM_VINTAGE_LABELS = {
+    "PED": "PED",
+    "LIGHT_RUC": "Light RUC",
+    "HEAVY_RUC": "Heavy RUC",
+}
+
+
+def stream_vintage_caption_text(period_rule: dict[str, Any]) -> str:
+    """Compact per-stream input-history vintage and forecast-origin caption.
+
+    Pure text builder over the committed pack manifest. Returns "" when the
+    manifest predates the per-stream seam, so an older pack renders exactly as
+    before. A provisional value is explicitly named as not an observed actual;
+    it is never rendered as one.
+    """
+    vintages = period_rule.get("stream_vintages")
+    if not isinstance(vintages, dict) or not vintages:
+        return ""
+    parts: list[str] = []
+    for stream in ("PED", "LIGHT_RUC", "HEAVY_RUC"):
+        entry = vintages.get(stream)
+        if not isinstance(entry, dict):
+            continue
+        label = STREAM_VINTAGE_LABELS.get(stream, stream)
+        accepted = str(entry.get("latest_accepted_exact_actual") or "")
+        first_forecast = str(entry.get("first_forecast_quarter") or "")
+        if not accepted or not first_forecast:
+            continue
+        piece = f"**{label}** actual to {accepted}, forecast from {first_forecast}"
+        if str(entry.get("provisional_seed") or "").strip():
+            piece += " (a provisional bridge exists for the next quarter; not an observed actual)"
+        parts.append(piece)
+    if not parts:
+        return ""
+    history_vintage = str(period_rule.get("input_history_vintage") or "")
+    prefix = f"Input-history vintage {history_vintage}. " if history_vintage else ""
+    return prefix + " · ".join(parts) + "."
+
+
+def _render_stream_vintage_caption(period_rule: dict[str, Any]) -> None:
+    text = stream_vintage_caption_text(period_rule)
+    if text:
+        st.caption(text)
+
+
 def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     del loaded
     _persist_revenue_outlook_view_state()
@@ -4353,6 +4398,13 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     # counts), the manifest, hover labels and audit tables;
     # _forecast_horizon_support_note remains available to governance views.
     # The public page renders no warning banner for it.
+
+    # Input-history vintage and the per-stream actual/forecast seam. Streams
+    # can hold different accepted cutoffs (an exact Light/Heavy quarter beside
+    # a still-provisional PED quarter), so the seam is stated per stream as a
+    # compact caption - deliberately not a warning banner - with the full
+    # table and lineage in the details/downloads expander below.
+    _render_stream_vintage_caption(period_rule if isinstance(period_rule, dict) else {})
 
     timer.start("selector metadata")
     selector_options = cached_revenue_outlook_selectors(pack_signature, pack)
@@ -4765,6 +4817,32 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                     dataframe_download(runtime_cutoff_audit, "Download CSV", "runtime_cutoff_audit.csv")
                 display_table(runtime_cutoff_audit, height=220, max_rows=20)
         timer.stop("runtime cutoff audit")
+
+    if revenue_outlook_lazy_table(
+        "Show input-history vintage by stream",
+        "revenue_outlook_show_stream_vintage_status",
+        caption="Per-stream actuals vintage is loaded only when opened.",
+    ):
+        timer.start("stream vintage status")
+        stream_vintage_status = _pack_table(pack, "stream_vintage_status")
+        with st.expander("Input-history vintage by stream", expanded=False):
+            info_panel(
+                "Each stream's latest accepted exact actual and its first forecast quarter, taken from the "
+                "committed canonical model-input history. Streams may differ: an exact actual for one stream "
+                "can coexist with a still-provisional quarter for another. A provisional value is never "
+                "displayed as an observed actual and never enters coefficient estimation."
+            )
+            if stream_vintage_status.empty:
+                warning_panel(
+                    "Stream vintage status is missing from the committed Revenue Outlook pack; rebuild it with "
+                    "scripts/rebuild_current_revenue_outlook_runtime.py."
+                )
+            else:
+                vintage_cols = st.columns([0.82, 0.18])
+                with vintage_cols[1]:
+                    dataframe_download(stream_vintage_status, "Download CSV", "stream_vintage_status.csv")
+                display_table(stream_vintage_status, height=220, max_rows=20)
+        timer.stop("stream vintage status")
 
     if revenue_outlook_lazy_table(
         "Show sensitivity impact audit",

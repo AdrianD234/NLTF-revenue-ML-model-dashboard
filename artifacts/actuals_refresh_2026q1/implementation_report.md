@@ -137,3 +137,23 @@ would lift the FY2026 PED path +1.72% vs the selected Core-revenue share;
 the prior-year seasonal share +2.00%. Activating Candidate B (or a future
 exact petrol-only VKT observation via `--ped-mode accepted`, which requires
 `--governance-approval`) is an explicit owner decision.
+
+## Which command owns a future refresh
+
+`scripts/refresh_model_actuals.py` is the **authoritative** quarterly-actuals
+refresh command and the only governed way to admit a new quarter into
+`data/model_input_history`. It is header- and period-driven: it detects
+periods newer than the accepted canonical history, so a later workbook with
+the same three main sheet schemas refreshes the next quarter **without code
+edits** (proved by the temporary-workbook variant tests in
+`tests/test_actuals_refresh_ingestion.py`).
+
+`scripts/build_model_input_actuals_workbook.py` is intentionally included as a
+**source-template / provenance utility only**. It renders the current
+canonical history into a spreadsheet with a blank trailing row so a data owner
+has somewhere to enter the next quarter's raw values. It writes nothing into
+`data/`, is not invoked by the runtime, the pack rebuild or CI, and is not an
+ingestion path. Its live Excel formulas are a convenience for whoever fills
+the sheet — ingestion never trusts them, it re-derives every engineered value
+in code and records parity against the sheet
+(`feature_parity.csv`).

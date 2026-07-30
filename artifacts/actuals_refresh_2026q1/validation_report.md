@@ -63,8 +63,18 @@ pre-existing parity/contract suites; artifact evidence is in this directory.
 
 ## Replay gates — PASS
 
-- Promoted state hashes unchanged (`promoted_state_invariance.csv`);
-  runtime parity gates green (27 AR1/vNext parity tests).
+- Promoted states carry no re-estimation (`promoted_state_invariance.csv`),
+  stated precisely because one artifact hash did change by design:
+  - the **Light and Heavy promoted-state files are unchanged**, byte for byte
+    (`light_ruc_production.joblib`, `M1/M2/M3_production.joblib`), and their
+    manifest hashes are untouched;
+  - the **PED AR(1) state artifact hash intentionally changed**, solely because
+    `input_history_sha256` was re-frozen to the refreshed canonical history.
+    Its estimated content is byte-identical: `beta`, `rho`, `last_resid`,
+    `latest_actual` (2025Q4), `train_window_start`/`_end`, `train_rows` and
+    every entry of `training_fit_levels`. The runtime gate that re-derives the
+    GLSAR from committed inputs returns delta 0.0.
+  Runtime parity gates green (27 AR1/vNext parity tests).
 - PED Candidate-A replay is byte-identical to the pre-refresh committed
   vintage (max rel diff 1.5e-16); Heavy 2.3e-15.
 - All scenarios replay directly (Base, comparison, conflict low/medium/high,
@@ -122,3 +132,51 @@ repo's governed 1e-6 parity tolerance.
   fresh clean-clone core suite run in the PR's CI checks
 - Browser/e2e Playwright phase: deselected by pytest.ini; runs via the
   governed host runner (`scripts/verify_browser_host.ps1`) per AGENTS.md.
+
+## Front-end smoke — PASS (host browser, port 8503)
+
+Run against the rebuilt AR(1)/incumbent packs on the live app. Zero Streamlit
+exception blocks; server log clean apart from the pre-existing
+`use_container_width` deprecation notices.
+
+The Revenue Outlook page renders this caption in the **default public view**
+(a caption, not a warning banner, per the governance rule):
+
+> Input-history vintage 2026Q1. **PED** actual to 2025Q4, forecast from 2026Q1
+> (a provisional bridge exists for the next quarter; not an observed actual) ·
+> **Light RUC** actual to 2026Q1, forecast from 2026Q2 · **Heavy RUC** actual
+> to 2026Q1, forecast from 2026Q2.
+
+That single line discharges the reviewer's first four checks: Light and Heavy
+2026Q1 read as accepted actuals, both start forecasting at 2026Q2, PED 2026Q1
+remains a forecast, and the provisional bridge is named as provisional rather
+than shown as an actual.
+
+The smoke also caught a real gap and it was fixed: the per-stream vintage was
+present in the pack and manifest but **not surfaced anywhere in the UI**, so
+spec §12's exposure requirement was unmet. The page now carries the caption
+above plus an analyst-gated "Input-history vintage by stream" expander with
+the `stream_vintage_status` table and its CSV download (lineage points at
+`data/model_input_history`, never at the source workbook). Both are now
+regression-gated by `tests/test_stream_vintage_exposure.py` (12 gates, both
+engines) so the exposure cannot silently regress:
+
+- pack publishes `stream_vintage_status.{csv,parquet}` with the per-stream
+  cutoffs and origins;
+- manifest `period_rule.stream_vintages` agrees with it;
+- the caption text states every stream's seam and never labels PED 2026Q1 an
+  actual;
+- the caption is silent for a pack predating the seam (older packs render
+  unchanged);
+- FY2026 mixed-year labels are per stream — Light/Heavy
+  `2025Q3; 2025Q4; 2026Q1` + `2026Q2` ("3 actual + 1 forecast"), PED
+  `2025Q3; 2025Q4` + `2026Q1; 2026Q2` ("2 actual + 2 forecast"), every FY2026
+  row flagged `nowcast_flag`;
+- no stale quarterly forecast row survives at a quarter that is now an
+  accepted actual, and PED 2026Q1 is absent from historical-actual rows.
+
+Note on the quarterly Total-NLTF chart: its Actual line still hands over at
+the FY2025/FY2026 boundary. That is the MBU26 annual-spine handover, which
+this PR deliberately does not touch — the total historical NLTF actual line
+needs the complete governed MVR/TUC/refund/admin contract, which this workbook
+does not carry.

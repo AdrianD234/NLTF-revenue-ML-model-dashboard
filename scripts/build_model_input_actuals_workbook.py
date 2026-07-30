@@ -1,15 +1,36 @@
-"""Build the PED / Light RUC / Heavy RUC model input sheet with actuals to 2025Q4.
+"""Emit a fill-in model-input SOURCE TEMPLATE for the next quarterly actual.
+
+SCOPE - this is a provenance/source-template utility, NOT an ingestion path.
+
+    Authoritative quarterly refresh command:
+        scripts/refresh_model_actuals.py
+
+    That command is the only governed way to admit a new quarter into
+    ``data/model_input_history``. It is header- and period-driven, detects
+    periods newer than the accepted canonical history without code edits,
+    regenerates every engineered feature centrally, and fails closed on
+    schema/continuity/unit/identity violations. See
+    ``artifacts/actuals_refresh_2026q1/`` for its evidence contract.
+
+This script only goes the other way: it renders the CURRENT canonical history
+into a spreadsheet whose trailing row is blank, so a data owner has somewhere
+to enter the next quarter's raw source values. It writes nothing into
+``data/`` and is not invoked by the runtime, the pack rebuild or CI. A
+workbook it produces (or any workbook with the same three main sheet schemas)
+becomes input to ``refresh_model_actuals.py``, never a substitute for it.
 
 The workbook mirrors the vendored `Master Copy revenue modelling workbook.xlsx`
 input sheets that `data/model_input_history/*.parquet` were extracted from:
 
-- rows 2002Q1 through 2025Q4 carry the official actual values verbatim;
-- one trailing row for 2026Q1 is left blank on every raw-source input cell so a
-  user can fill it, with every derived column written as a live Excel formula
-  that recomputes from those cells.
+- rows 2002Q1 through the last accepted actual carry official values verbatim;
+- one trailing blank row is left on every raw-source input cell so a user can
+  fill it, with every derived column written as a live Excel formula that
+  recomputes from those cells.
 
-Every derivation encoded here was verified numerically against the 2002Q1-2025Q4
-actuals before being written as a formula.
+Every derivation encoded here was verified numerically against the historical
+actuals before being written as a formula. The formulas are a convenience for
+the person filling the sheet; ingestion never trusts them - it re-derives
+every engineered value in code and checks parity against the sheet.
 """
 
 from __future__ import annotations
