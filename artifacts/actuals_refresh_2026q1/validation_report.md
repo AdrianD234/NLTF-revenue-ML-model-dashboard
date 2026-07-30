@@ -108,12 +108,17 @@ repo's governed 1e-6 parity tolerance.
 ## Test stack
 
 - `python -m compileall .` — PASS
+- **Full local pytest: 977 passed, 0 failed** (50 skipped =
+  requires_local_scratch; 41 deselected = e2e per pytest.ini)
 - Workbook-ingestion + plug-and-play gates: 30/30 PASS
   (`tests/test_actuals_refresh_ingestion.py`)
 - AR(1)/vNext parity: 27/27 PASS
 - Replay-seed diagnostic: PASS; sign-guard register: regenerated
 - Conflict scenario extract validation: 21/21 PASS
-- Streamlit deploy readiness: PASS
-- Full local pytest and clean-clone CI: see the PR checks section (updated
-  on the PR after push; browser/e2e phase runs via the governed host runner
-  per AGENTS.md).
+- Long-run evidence generator: PASS (0 short-run values changed vs the
+  re-frozen baseline; retired constructor absent)
+- Streamlit deploy readiness: PASS; AppTest smoke + engine switcher: 51/51
+- Replay parity fingerprint minted locally (Windows); the Linux leg and the
+  fresh clean-clone core suite run in the PR's CI checks
+- Browser/e2e Playwright phase: deselected by pytest.ini; runs via the
+  governed host runner (`scripts/verify_browser_host.ps1`) per AGENTS.md.
