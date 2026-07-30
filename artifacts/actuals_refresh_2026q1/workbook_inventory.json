@@ -1,24 +1,16 @@
 {
-  "created_at": "2026-06-10T01:47:21Z",
-  "source_basename": "Master Copy revenue modelling workbook.xlsx",
-  "source_size_bytes": 209441,
-  "source_sha256": "0c0ea8d3f95be6ba4a92316c7b2d5b7ec765cab6062cf7918844cbcb17bb6a5d",
-  "source_sheets": {
-    "ped": "PED Inputs",
-    "light_ruc": "Light RUC Inputs",
-    "heavy_ruc": "Heavy RUC Inputs"
-  },
-  "workbook_full_path_public": false,
-  "raw_workbook_vendored": true,
-  "raw_repo_relative_path": "data/source_workbooks/Master Copy revenue modelling workbook.xlsx",
-  "notes": "Compact model-input history built from the master workbook input sheets. The raw workbook is vendored at data/source_workbooks/ (sha256 verified against source_sha256). Refreshed through 2026Q1 from NLTF_model_input_sheet_actuals_to_2026Q1_complete1.xlsx (sha256 be951103cfa0...).",
-  "artifacts": [
+  "created_at": "2026-07-30T04:43:58Z",
+  "workbook": "NLTF_model_input_sheet_actuals_to_2026Q1_complete1.xlsx",
+  "workbook_sha256": "be951103cfa0fc4415583044397eea11982c2d83b0679bd97984cb0b0cf305a3",
+  "workbook_size_bytes": 162463,
+  "sheet_count": 7,
+  "sheets": [
     {
-      "stream": "PED",
-      "source_sheet": "PED Inputs",
-      "repo_relative_path": "data/model_input_history/ped_inputs.parquet",
-      "rows": 97,
-      "columns": [
+      "sheet": "PED Inputs",
+      "dimensions": "A1:AK98",
+      "max_row": 98,
+      "max_column": 37,
+      "headers": [
         "period",
         "period_label",
         "year",
@@ -53,24 +45,18 @@
         "q3_dummy",
         "q4_dummy",
         "post_2011_x_log_trend",
-        "data_status",
-        "notes",
         "log_target_lag_1",
         "log_target_lag_4",
         "diff_log_target_lag_1_lag_4"
       ],
-      "first_period": "2002Q1",
-      "last_period": "2026Q1",
-      "positive_target_rows": 96,
-      "sha256": "85e45e2d8dbf28e0d8929750e7126dc9d2a97d63c8e314479aff92a3b571290a",
-      "size_bytes": 47211
+      "formula_cells": 0
     },
     {
-      "stream": "LIGHT_RUC",
-      "source_sheet": "Light RUC Inputs",
-      "repo_relative_path": "data/model_input_history/light_ruc_inputs.parquet",
-      "rows": 97,
-      "columns": [
+      "sheet": "Light RUC Inputs",
+      "dimensions": "A1:AW98",
+      "max_row": 98,
+      "max_column": 49,
+      "headers": [
         "period",
         "period_label",
         "year",
@@ -121,18 +107,14 @@
         "log_real_gdp_lag1",
         "log_real_gdp_lag4"
       ],
-      "first_period": "2002Q1",
-      "last_period": "2026Q1",
-      "positive_target_rows": 67,
-      "sha256": "f7a74d2f974bf51e5a02796b24a45145659e43f942cd3afb652490a026fd5f75",
-      "size_bytes": 59923
+      "formula_cells": 0
     },
     {
-      "stream": "HEAVY_RUC",
-      "source_sheet": "Heavy RUC Inputs",
-      "repo_relative_path": "data/model_input_history/heavy_ruc_inputs.parquet",
-      "rows": 97,
-      "columns": [
+      "sheet": "Heavy RUC Inputs",
+      "dimensions": "A1:AL98",
+      "max_row": 98,
+      "max_column": 38,
+      "headers": [
         "period",
         "period_label",
         "year",
@@ -172,23 +154,122 @@
         "log_target_lag_4",
         "diff_log_target_lag_1_lag_4"
       ],
-      "first_period": "2002Q1",
-      "last_period": "2026Q1",
-      "positive_target_rows": 67,
-      "sha256": "5e410922777dc90d77c6ce0dcca9ede686c1395e65c386f21724c5814c1af030",
-      "size_bytes": 45607
+      "formula_cells": 2
+    },
+    {
+      "sheet": "Q1 2026 Filled Rows",
+      "dimensions": "A1:AW16",
+      "max_row": 16,
+      "max_column": 49,
+      "headers": [
+        "Q1 2026 completed model-input rows",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      "formula_cells": 0
+    },
+    {
+      "sheet": "Q1 2026 Source Map",
+      "dimensions": "A1:K130",
+      "max_row": 130,
+      "max_column": 11,
+      "headers": [
+        "Q1 2026 column-by-column lineage and replacement rules",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      "formula_cells": 0
+    },
+    {
+      "sheet": "Q1 2026 Reconciliation",
+      "dimensions": "A1:G39",
+      "max_row": 39,
+      "max_column": 7,
+      "headers": [
+        "Q1 2026 actuals, identities and PED bridge reconciliation",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      "formula_cells": 0
+    },
+    {
+      "sheet": "Agent Build Spec",
+      "dimensions": "A1:D30",
+      "max_row": 30,
+      "max_column": 4,
+      "headers": [
+        "Dashboard and ingestion specification for quarterly actuals",
+        "",
+        "",
+        ""
+      ],
+      "formula_cells": 0
     }
   ],
-  "refresh_history": [
-    {
-      "refreshed_at": "2026-07-30T04:43:18Z",
-      "workbook": "NLTF_model_input_sheet_actuals_to_2026Q1_complete1.xlsx",
-      "workbook_sha256": "be951103cfa0fc4415583044397eea11982c2d83b0679bd97984cb0b0cf305a3",
-      "periods": [
-        "2026Q1"
-      ],
-      "ped_mode": "provisional_replay_only",
-      "tool": "scripts/refresh_model_actuals.py"
-    }
-  ]
+  "defined_names": [],
+  "auxiliary_sheets": {
+    "filled_rows": "Q1 2026 Filled Rows",
+    "source_map": "Q1 2026 Source Map",
+    "reconciliation": "Q1 2026 Reconciliation",
+    "build_spec": "Agent Build Spec"
+  },
+  "formula_cell_count": 2
 }

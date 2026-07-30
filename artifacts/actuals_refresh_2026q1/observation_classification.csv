@@ -1,0 +1,2 @@
+stream,period,observation_status,target_method,eligible_for_replay,eligible_for_refit,display_as_observed_actual,data_status
+PED,2026Q1,provisional_annual_bridge,mbu26_residual_core_ped_share,conditional,False,False,Provisional quarterly PED bridge; macro inputs are official Q1 actuals

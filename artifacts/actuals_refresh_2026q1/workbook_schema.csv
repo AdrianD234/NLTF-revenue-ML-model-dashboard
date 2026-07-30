@@ -1,0 +1,196 @@
+sheet,column_index,header,max_row
+PED Inputs,1,period,98
+PED Inputs,2,period_label,98
+PED Inputs,3,year,98
+PED Inputs,4,quarter,98
+PED Inputs,5,period_index,98
+PED Inputs,6,trend_index,98
+PED Inputs,7,target,98
+PED Inputs,8,log_target,98
+PED Inputs,9,target_lag_1,98
+PED Inputs,10,target_lag_4,98
+PED Inputs,11,log_trend,98
+PED Inputs,12,nominal_gdp_sa_nzd,98
+PED Inputs,13,population,98
+PED Inputs,14,nominal_gdp_per_capita_nzd,98
+PED Inputs,15,gdp_deflator_sa,98
+PED Inputs,16,gdp_rebasing_factor,98
+PED Inputs,17,real_gdp_per_capita_nzd,98
+PED Inputs,18,log_real_gdp_per_capita,98
+PED Inputs,19,petrol_price_nominal_cents_per_litre,98
+PED Inputs,20,cpi_rebasing_factor,98
+PED Inputs,21,real_petrol_price_cents_per_litre,98
+PED Inputs,22,log_real_petrol_price,98
+PED Inputs,23,light_petrol_vkt_total_km,98
+PED Inputs,24,log_total_vkt,98
+PED Inputs,25,unemployment_percent,98
+PED Inputs,26,unemployment_rate,98
+PED Inputs,27,log_unemployment_rate,98
+PED Inputs,28,post_2011_dummy,98
+PED Inputs,29,dummy_2020,98
+PED Inputs,30,post_2020_dummy,98
+PED Inputs,31,q2_dummy,98
+PED Inputs,32,q3_dummy,98
+PED Inputs,33,q4_dummy,98
+PED Inputs,34,post_2011_x_log_trend,98
+PED Inputs,35,log_target_lag_1,98
+PED Inputs,36,log_target_lag_4,98
+PED Inputs,37,diff_log_target_lag_1_lag_4,98
+Light RUC Inputs,1,period,98
+Light RUC Inputs,2,period_label,98
+Light RUC Inputs,3,year,98
+Light RUC Inputs,4,quarter,98
+Light RUC Inputs,5,period_index,98
+Light RUC Inputs,6,trend_index,98
+Light RUC Inputs,7,target,98
+Light RUC Inputs,8,log_target,98
+Light RUC Inputs,9,target_lag_1,98
+Light RUC Inputs,10,target_lag_4,98
+Light RUC Inputs,11,log_trend,98
+Light RUC Inputs,12,nominal_gdp_sa_nzd,98
+Light RUC Inputs,13,gdp_deflator_sa,98
+Light RUC Inputs,14,gdp_rebasing_factor,98
+Light RUC Inputs,15,real_gdp_sa_nzd,98
+Light RUC Inputs,16,log_real_gdp,98
+Light RUC Inputs,17,diesel_price_nominal_cents_per_litre,98
+Light RUC Inputs,18,cpi_rebasing_factor,98
+Light RUC Inputs,19,real_diesel_price_cents_per_litre,98
+Light RUC Inputs,20,log_real_diesel_price,98
+Light RUC Inputs,21,light_ruc_revenue_nzd,98
+Light RUC Inputs,22,light_ruc_price_nominal_nzd_per_1000km,98
+Light RUC Inputs,23,real_light_ruc_price_nzd_per_1000km,98
+Light RUC Inputs,24,log_real_light_ruc_price,98
+Light RUC Inputs,25,lagged_real_light_ruc_price_nzd_per_1000km,98
+Light RUC Inputs,26,log_lagged_real_light_ruc_price,98
+Light RUC Inputs,27,q2_dummy,98
+Light RUC Inputs,28,q3_dummy,98
+Light RUC Inputs,29,q4_dummy,98
+Light RUC Inputs,30,post_2020_dummy,98
+Light RUC Inputs,31,data_status,98
+Light RUC Inputs,32,notes,98
+Light RUC Inputs,33,log_target_lag_1,98
+Light RUC Inputs,34,log_target_lag_4,98
+Light RUC Inputs,35,diff_log_target_lag_1_lag_4,98
+Light RUC Inputs,36,diesel_x_ruc_price,98
+Light RUC Inputs,37,gdp_x_post2020,98
+Light RUC Inputs,38,ruc_x_post2020,98
+Light RUC Inputs,39,diesel_x_post2020,98
+Light RUC Inputs,40,time_trend,98
+Light RUC Inputs,41,log_real_diesel_price_diff1,98
+Light RUC Inputs,42,log_real_diesel_price_lag1,98
+Light RUC Inputs,43,log_real_diesel_price_lag4,98
+Light RUC Inputs,44,log_real_light_ruc_price_diff1,98
+Light RUC Inputs,45,log_real_light_ruc_price_lag1,98
+Light RUC Inputs,46,log_real_light_ruc_price_lag4,98
+Light RUC Inputs,47,log_real_gdp_diff1,98
+Light RUC Inputs,48,log_real_gdp_lag1,98
+Light RUC Inputs,49,log_real_gdp_lag4,98
+Heavy RUC Inputs,1,period,98
+Heavy RUC Inputs,2,period_label,98
+Heavy RUC Inputs,3,year,98
+Heavy RUC Inputs,4,quarter,98
+Heavy RUC Inputs,5,period_index,98
+Heavy RUC Inputs,6,trend_index,98
+Heavy RUC Inputs,7,target,98
+Heavy RUC Inputs,8,log_target,98
+Heavy RUC Inputs,9,target_lag_1,98
+Heavy RUC Inputs,10,target_lag_4,98
+Heavy RUC Inputs,11,log_trend,98
+Heavy RUC Inputs,12,nominal_gdp_sa_nzd,98
+Heavy RUC Inputs,13,gdp_deflator_sa,98
+Heavy RUC Inputs,14,gdp_rebasing_factor,98
+Heavy RUC Inputs,15,real_gdp_sa_nzd,98
+Heavy RUC Inputs,16,log_real_gdp,98
+Heavy RUC Inputs,17,heavy_ruc_revenue_nzd,98
+Heavy RUC Inputs,18,heavy_ruc_price_nominal_nzd_per_1000km,98
+Heavy RUC Inputs,19,real_heavy_ruc_price_nzd_per_1000km,98
+Heavy RUC Inputs,20,log_real_heavy_ruc_price,98
+Heavy RUC Inputs,21,lead_real_heavy_ruc_price_nzd_per_1000km,98
+Heavy RUC Inputs,22,log_lead_real_heavy_ruc_price,98
+Heavy RUC Inputs,23,q2_dummy,98
+Heavy RUC Inputs,24,q3_dummy,98
+Heavy RUC Inputs,25,q4_dummy,98
+Heavy RUC Inputs,26,data_status,98
+Heavy RUC Inputs,27,notes,98
+Heavy RUC Inputs,28,real_diesel_price_cents_per_litre,98
+Heavy RUC Inputs,29,log_real_diesel_price,98
+Heavy RUC Inputs,30,real_light_ruc_price_nzd_per_1000km,98
+Heavy RUC Inputs,31,lagged_real_light_ruc_price_nzd_per_1000km,98
+Heavy RUC Inputs,32,log_real_light_ruc_price,98
+Heavy RUC Inputs,33,log_lagged_real_light_ruc_price,98
+Heavy RUC Inputs,34,unemployment_rate,98
+Heavy RUC Inputs,35,log_unemployment_rate,98
+Heavy RUC Inputs,36,log_target_lag_1,98
+Heavy RUC Inputs,37,log_target_lag_4,98
+Heavy RUC Inputs,38,diff_log_target_lag_1_lag_4,98
+Q1 2026 Filled Rows,1,Q1 2026 completed model-input rows,16
+Q1 2026 Filled Rows,2,,16
+Q1 2026 Filled Rows,3,,16
+Q1 2026 Filled Rows,4,,16
+Q1 2026 Filled Rows,5,,16
+Q1 2026 Filled Rows,6,,16
+Q1 2026 Filled Rows,7,,16
+Q1 2026 Filled Rows,8,,16
+Q1 2026 Filled Rows,9,,16
+Q1 2026 Filled Rows,10,,16
+Q1 2026 Filled Rows,11,,16
+Q1 2026 Filled Rows,12,,16
+Q1 2026 Filled Rows,13,,16
+Q1 2026 Filled Rows,14,,16
+Q1 2026 Filled Rows,15,,16
+Q1 2026 Filled Rows,16,,16
+Q1 2026 Filled Rows,17,,16
+Q1 2026 Filled Rows,18,,16
+Q1 2026 Filled Rows,19,,16
+Q1 2026 Filled Rows,20,,16
+Q1 2026 Filled Rows,21,,16
+Q1 2026 Filled Rows,22,,16
+Q1 2026 Filled Rows,23,,16
+Q1 2026 Filled Rows,24,,16
+Q1 2026 Filled Rows,25,,16
+Q1 2026 Filled Rows,26,,16
+Q1 2026 Filled Rows,27,,16
+Q1 2026 Filled Rows,28,,16
+Q1 2026 Filled Rows,29,,16
+Q1 2026 Filled Rows,30,,16
+Q1 2026 Filled Rows,31,,16
+Q1 2026 Filled Rows,32,,16
+Q1 2026 Filled Rows,33,,16
+Q1 2026 Filled Rows,34,,16
+Q1 2026 Filled Rows,35,,16
+Q1 2026 Filled Rows,36,,16
+Q1 2026 Filled Rows,37,,16
+Q1 2026 Filled Rows,38,,16
+Q1 2026 Filled Rows,39,,16
+Q1 2026 Filled Rows,40,,16
+Q1 2026 Filled Rows,41,,16
+Q1 2026 Filled Rows,42,,16
+Q1 2026 Filled Rows,43,,16
+Q1 2026 Filled Rows,44,,16
+Q1 2026 Filled Rows,45,,16
+Q1 2026 Filled Rows,46,,16
+Q1 2026 Filled Rows,47,,16
+Q1 2026 Filled Rows,48,,16
+Q1 2026 Filled Rows,49,,16
+Q1 2026 Source Map,1,Q1 2026 column-by-column lineage and replacement rules,130
+Q1 2026 Source Map,2,,130
+Q1 2026 Source Map,3,,130
+Q1 2026 Source Map,4,,130
+Q1 2026 Source Map,5,,130
+Q1 2026 Source Map,6,,130
+Q1 2026 Source Map,7,,130
+Q1 2026 Source Map,8,,130
+Q1 2026 Source Map,9,,130
+Q1 2026 Source Map,10,,130
+Q1 2026 Source Map,11,,130
+Q1 2026 Reconciliation,1,"Q1 2026 actuals, identities and PED bridge reconciliation",39
+Q1 2026 Reconciliation,2,,39
+Q1 2026 Reconciliation,3,,39
+Q1 2026 Reconciliation,4,,39
+Q1 2026 Reconciliation,5,,39
+Q1 2026 Reconciliation,6,,39
+Q1 2026 Reconciliation,7,,39
+Agent Build Spec,1,Dashboard and ingestion specification for quarterly actuals,30
+Agent Build Spec,2,,30
+Agent Build Spec,3,,30
+Agent Build Spec,4,,30

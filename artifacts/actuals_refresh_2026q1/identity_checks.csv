@@ -1,0 +1,2 @@
+stream,period,identity,lhs,rhs,rel_diff,tolerance,status
+PED,2026Q1,real GDP pc = nominal GDP / population * rebasing factor,21305.45576632533,21305.45576632533,0.0,1e-09,pass

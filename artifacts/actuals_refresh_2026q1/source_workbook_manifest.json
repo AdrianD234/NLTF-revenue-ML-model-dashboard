@@ -1,0 +1,21 @@
+{
+  "created_at": "2026-07-30T04:43:58Z",
+  "source_workbook": "NLTF_model_input_sheet_actuals_to_2026Q1_complete1.xlsx",
+  "source_workbook_repo_path": "references/NLTF_model_input_sheet_actuals_to_2026Q1_complete1.xlsx",
+  "sha256": "be951103cfa0fc4415583044397eea11982c2d83b0679bd97984cb0b0cf305a3",
+  "size_bytes": 162463,
+  "immutable_source_snapshot": true,
+  "runtime_reads_excel": false,
+  "expected_period": "2026Q1",
+  "ped_mode": "provisional_replay_only",
+  "history_before_sha256": {
+    "ped": "85e45e2d8dbf28e0d8929750e7126dc9d2a97d63c8e314479aff92a3b571290a",
+    "light_ruc": "f7a74d2f974bf51e5a02796b24a45145659e43f942cd3afb652490a026fd5f75",
+    "heavy_ruc": "5e410922777dc90d77c6ce0dcca9ede686c1395e65c386f21724c5814c1af030"
+  },
+  "history_after_sha256": {
+    "ped": "85e45e2d8dbf28e0d8929750e7126dc9d2a97d63c8e314479aff92a3b571290a",
+    "light_ruc": "f7a74d2f974bf51e5a02796b24a45145659e43f942cd3afb652490a026fd5f75",
+    "heavy_ruc": "5e410922777dc90d77c6ce0dcca9ede686c1395e65c386f21724c5814c1af030"
+  }
+}
