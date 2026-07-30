@@ -334,9 +334,9 @@ def main() -> int:
     index = pd.Index(FYS, name="june_year")
     mbu = pd.DataFrame(
         {
-            "mbu26_total_nltf": bridge["mbu26_total_nltf_net_revenue_million_nzd"].astype(float).reindex(index),
-            "mbu26_gross_ped": bridge["mbu26_gross_ped_revenue_million_nzd"].astype(float).reindex(index),
-            "mbu26_light_petrol_vkt": bridge["mbu26_light_petrol_vkt_million_km"].astype(float).reindex(index),
+            "mbu26_total_nltf": bridge["official_total_nltf_net_revenue_million_nzd"].astype(float).reindex(index),
+            "mbu26_gross_ped": bridge["official_gross_ped_revenue_million_nzd"].astype(float).reindex(index),
+            "mbu26_light_petrol_vkt": bridge["official_light_petrol_vkt_million_km"].astype(float).reindex(index),
             "mbu26_conventional_km": split["conventional_light_km"].astype(float).reindex(index),
             "mbu26_pool_km": split["total_light_universe_km"].astype(float).reindex(index),
         }
@@ -564,17 +564,17 @@ def main() -> int:
     )
     diag["raw_ped_vs_mbu26_pct"] = 100.0 * (
         raw_ped_vkt.loc[FORECAST_FYS]
-        / bridge["mbu26_light_petrol_vkt_million_km"].loc[FORECAST_FYS]
+        / bridge["official_light_petrol_vkt_million_km"].loc[FORECAST_FYS]
         - 1.0
     )
     diag["raw_gross_ped_rev_vs_mbu26_pct"] = 100.0 * (
         bridge["gross_ped_revenue_raw_million_nzd"].loc[FORECAST_FYS]
-        / bridge["mbu26_gross_ped_revenue_million_nzd"].loc[FORECAST_FYS]
+        / bridge["official_gross_ped_revenue_million_nzd"].loc[FORECAST_FYS]
         - 1.0
     )
     diag["optimized_gross_ped_rev_vs_mbu26_pct"] = 100.0 * (
         bridge["gross_ped_revenue_optimized_million_nzd"].loc[FORECAST_FYS]
-        / bridge["mbu26_gross_ped_revenue_million_nzd"].loc[FORECAST_FYS]
+        / bridge["official_gross_ped_revenue_million_nzd"].loc[FORECAST_FYS]
         - 1.0
     )
 
@@ -677,7 +677,7 @@ def main() -> int:
     layering["L0_raw_model_gross_ped"] = bridge["gross_ped_revenue_raw_million_nzd"].loc[FORECAST_FYS]
     layering["L1_after_lambda_migration"] = bridge["gross_ped_revenue_optimized_million_nzd"].loc[FORECAST_FYS]
     layering["L2_after_vfm_retention_overlay"] = ref_df["S4_reference_a_gross_ped"]
-    layering["mbu26_gross_ped"] = bridge["mbu26_gross_ped_revenue_million_nzd"].loc[FORECAST_FYS]
+    layering["mbu26_gross_ped"] = bridge["official_gross_ped_revenue_million_nzd"].loc[FORECAST_FYS]
     for level in ["L0_raw_model_gross_ped", "L1_after_lambda_migration", "L2_after_vfm_retention_overlay"]:
         layering[f"{level}_vs_mbu26_pct"] = 100.0 * (
             layering[level] / layering["mbu26_gross_ped"] - 1.0

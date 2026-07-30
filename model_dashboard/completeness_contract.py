@@ -592,6 +592,23 @@ def _evaluate_against_contract(
     return records
 
 
+def _default_official_comparator_scenario() -> str:
+    """Scenario name of the registered default official comparator vintage.
+
+    Falls back to the MBU26 scenario name if the registry is unavailable so
+    fixture-driven tests without a registry keep their historical behaviour.
+    """
+    try:
+        from .official_vintage import (
+            default_comparator_vintage_id,
+            official_comparator_scenario_name,
+        )
+
+        return official_comparator_scenario_name(default_comparator_vintage_id())
+    except Exception:
+        return "mbu26_official"
+
+
 def completeness_matrix(
     frames: dict[str, pd.DataFrame],
     *,
@@ -606,7 +623,7 @@ def completeness_matrix(
     roles = scenario_by_role or {
         "basecase": "current_basecase",
         "comparison": "current_comparison_1",
-        "official_comparator": "mbu26_official",
+        "official_comparator": _default_official_comparator_scenario(),
     }
     records: list[CompletenessRecord] = []
     for stage, rows in frames.items():
@@ -645,7 +662,7 @@ def validate_frame_completeness(
         scenario_by_role={
             "basecase": "current_basecase",
             "comparison": "current_comparison_1",
-            "official_comparator": "mbu26_official",
+            "official_comparator": _default_official_comparator_scenario(),
         },
         raise_on_failure=raise_on_failure,
         source=context or "production chart rows",

@@ -177,6 +177,64 @@ class OfficialVintageError(ValueError):
     """Raised when the registry, workbook or pack fails a governed check."""
 
 
+def official_comparator_trace_name(release_round: str) -> str:
+    """Chart trace name for a published vintage, e.g. ``BEFU26 official``."""
+    return f"{release_round} official"
+
+
+def official_comparator_scenario_name(vintage_id: str) -> str:
+    """Chart scenario name for a published vintage, e.g. ``befu26_official``."""
+    return f"{str(vintage_id).lower()}_official"
+
+
+def relabel_official_release_provenance(
+    frame: pd.DataFrame,
+    entry: dict[str, Any],
+) -> pd.DataFrame:
+    """Re-stamp MBU26-templated provenance text for another official vintage.
+
+    The revenue bridge, extrapolation and reconciliation builders template
+    every provenance string, source filename, trace/scenario identifier and
+    formula note on the MBU26 release token. When a different registered
+    vintage supplies the same data, this pass rewrites those tokens in one
+    governed place so provenance can never claim MBU26 for values that came
+    from another vintage. Values (numeric columns) are never touched.
+    """
+    release = str(entry["release_round"])
+    vid = str(entry["vintage_id"])
+    if vid == "MBU26" and release == "MBU26":
+        return frame
+    if frame is None or not isinstance(frame, pd.DataFrame) or frame.empty:
+        return frame
+    stems = _entry_file_stems(entry)
+    replacements = (
+        ("mbu26_official_annual.csv", f"{stems['official_annual']}.csv"),
+        ("mbu26_annual_spine.csv", f"{stems['annual_spine']}.csv"),
+        ("mbu26_formula_audit.csv", f"{stems['formula_audit']}.csv"),
+        ("mbu26_", f"{vid.lower()}_"),
+        ("MBU26", release),
+    )
+
+    def _relabel(value: Any) -> Any:
+        if not isinstance(value, str):
+            return value
+        for old, new in replacements:
+            if old in value:
+                value = value.replace(old, new)
+        return value
+
+    out = frame.copy()
+    for column in out.columns:
+        dtype = out[column].dtype
+        if dtype == object or pd.api.types.is_string_dtype(dtype):
+            mapped = out[column].map(_relabel, na_action="ignore")
+            try:
+                out[column] = mapped.astype(dtype)
+            except (TypeError, ValueError):
+                out[column] = mapped
+    return out
+
+
 @dataclass(frozen=True)
 class OfficialVintagePack:
     vintage_id: str

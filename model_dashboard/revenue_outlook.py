@@ -72,6 +72,16 @@ from .mbu26_source_spine import (
     revenue_formula_residual_frame,
     revenue_line_reconciliation_frame,
 )
+from .official_vintage import (
+    default_bridge_vintage_id,
+    default_comparator_vintage_id,
+    load_official_vintage,
+    official_comparator_scenario_name,
+    official_comparator_trace_name,
+    official_vintage_choices,
+    relabel_official_release_provenance,
+    OFFICIAL_VINTAGE_REGISTRY_PATH,
+)
 from .revenue_source_pack import (
     CURRENT_FINALIST_MODEL_IDS,
     REVENUE_FIRST_FORECAST_QUARTER,
@@ -1310,6 +1320,7 @@ def _filter_chart_rows_by_horizon_scope(
     *,
     current_cutoff_fy: int,
     official_cutoff_fy: int,
+    official_cutoff_by_scenario: dict[str, int] | None = None,
 ) -> pd.DataFrame:
     """Apply each scope's own horizon to a mixed chart-row frame.
 
@@ -1329,7 +1340,12 @@ def _filter_chart_rows_by_horizon_scope(
     is_official = out.get("scenario_role", pd.Series("", index=out.index)).astype(str).eq(
         "official_comparator"
     )
-    cutoff = np.where(is_official, official_cutoff_fy, current_cutoff_fy)
+    # Each official vintage keeps its own source horizon; unmapped official
+    # scenarios fall back to the default comparator's cutoff.
+    scenario_cutoffs = out.get("scenario_name", pd.Series("", index=out.index)).astype(str).map(
+        official_cutoff_by_scenario or {}
+    ).fillna(official_cutoff_fy)
+    cutoff = np.where(is_official, scenario_cutoffs, current_cutoff_fy)
     keep_annual = years.isna() | years.le(pd.Series(cutoff, index=out.index))
 
     # Quarterly rows are governed by HORIZON, not by their June year. FY2031
@@ -1879,8 +1895,17 @@ def ped_efficiency_scenarios_frame(
 def ped_revenue_bridge_audit_frame(
     line_reconciliation: pd.DataFrame,
     ev_phev_ped_light_drift_assumptions: pd.DataFrame,
+    *,
+    official_source_path: str = "MBU26 official",
+    official_scenario_name: str = "mbu26_official",
 ) -> pd.DataFrame:
-    """Expose the current-finalist PED revenue mechanics at FY/source-path grain."""
+    """Expose the current-finalist PED revenue mechanics at FY/source-path grain.
+
+    ``official_source_path``/``official_scenario_name`` select the official
+    comparator block whose values fill the ``official_*`` columns; the builder
+    passes the bridge-assumption vintage so the audit compares against the
+    vintage that actually supplied the rates.
+    """
 
     columns = [
         "FY",
@@ -1925,12 +1950,12 @@ def ped_revenue_bridge_audit_frame(
         "total_nltf_optimized",
         "total_nltf_optimized_million_nzd",
         "total_nltf_net_revenue_million_nzd",
-        "mbu26_ped_vkt_per_capita",
-        "mbu26_population_proxy",
-        "mbu26_light_petrol_vkt_million_km",
-        "mbu26_ped_volume_million_litres",
-        "mbu26_gross_ped_revenue_million_nzd",
-        "mbu26_total_nltf_net_revenue_million_nzd",
+        "official_ped_vkt_per_capita",
+        "official_population_proxy",
+        "official_light_petrol_vkt_million_km",
+        "official_ped_volume_million_litres",
+        "official_gross_ped_revenue_million_nzd",
+        "official_total_nltf_net_revenue_million_nzd",
         "raw_light_petrol_vkt_residual",
         "ped_volume_raw_residual",
         "ped_volume_optimized_residual",
@@ -2042,15 +2067,15 @@ def ped_revenue_bridge_audit_frame(
         population_source_status = line_text(source_path, fy, scenario_name, "gross_ped_revenue", "population_source_status")
         population_fallback_flag = "population_proxy" in f"{population_source} {population_source_status}".lower()
         population_warning = (
-            "warning_current_finalist_uses_mbu26_population_proxy"
+            "warning_current_finalist_uses_official_population_proxy"
             if population_fallback_flag and source_path.startswith("Current finalist")
             else ""
         )
-        mbu_ped_vktpc = line_value("MBU26 official", fy, "mbu26_official", "ped_vkt_per_capita")
-        mbu_light_petrol_vkt = line_value("MBU26 official", fy, "mbu26_official", "light_petrol_vkt")
-        mbu_ped_volume = line_value("MBU26 official", fy, "mbu26_official", "ped_volume")
-        mbu_gross_ped = line_value("MBU26 official", fy, "mbu26_official", "gross_ped_revenue")
-        mbu_total_nltf = line_value("MBU26 official", fy, "mbu26_official", "total_nltf_net_revenue")
+        mbu_ped_vktpc = line_value(official_source_path, fy, official_scenario_name, "ped_vkt_per_capita")
+        mbu_light_petrol_vkt = line_value(official_source_path, fy, official_scenario_name, "light_petrol_vkt")
+        mbu_ped_volume = line_value(official_source_path, fy, official_scenario_name, "ped_volume")
+        mbu_gross_ped = line_value(official_source_path, fy, official_scenario_name, "gross_ped_revenue")
+        mbu_total_nltf = line_value(official_source_path, fy, official_scenario_name, "total_nltf_net_revenue")
         mbu_population_proxy = (
             float(mbu_light_petrol_vkt) * 1_000_000.0 / float(mbu_ped_vktpc)
             if pd.notna(mbu_light_petrol_vkt) and pd.notna(mbu_ped_vktpc) and float(mbu_ped_vktpc) > 0
@@ -2100,12 +2125,12 @@ def ped_revenue_bridge_audit_frame(
                 "total_nltf_optimized": total_nltf_optimized,
                 "total_nltf_optimized_million_nzd": total_nltf_optimized,
                 "total_nltf_net_revenue_million_nzd": total_nltf_optimized,
-                "mbu26_ped_vkt_per_capita": mbu_ped_vktpc,
-                "mbu26_population_proxy": mbu_population_proxy,
-                "mbu26_light_petrol_vkt_million_km": mbu_light_petrol_vkt,
-                "mbu26_ped_volume_million_litres": mbu_ped_volume,
-                "mbu26_gross_ped_revenue_million_nzd": mbu_gross_ped,
-                "mbu26_total_nltf_net_revenue_million_nzd": mbu_total_nltf,
+                "official_ped_vkt_per_capita": mbu_ped_vktpc,
+                "official_population_proxy": mbu_population_proxy,
+                "official_light_petrol_vkt_million_km": mbu_light_petrol_vkt,
+                "official_ped_volume_million_litres": mbu_ped_volume,
+                "official_gross_ped_revenue_million_nzd": mbu_gross_ped,
+                "official_total_nltf_net_revenue_million_nzd": mbu_total_nltf,
                 "raw_light_petrol_vkt_residual": (
                     float(raw_light_petrol_vkt) - float(ped_vktpc) * float(scenario_population) / 1_000_000.0
                     if pd.notna(raw_light_petrol_vkt) and pd.notna(ped_vktpc) and pd.notna(scenario_population)
@@ -2187,13 +2212,13 @@ def ped_bridge_shape_fit_metrics_frame(ped_revenue_bridge_audit: pd.DataFrame) -
         "scenario_role",
         "series_id",
         "bridge_variant",
-        "mbu_comparator_series_id",
+        "official_comparator_series_id",
         "start_fy",
         "end_fy",
         "n_rows",
-        "correlation_vs_mbu",
-        "slope_vs_mbu",
-        "intercept_vs_mbu",
+        "correlation_vs_official",
+        "slope_vs_official",
+        "intercept_vs_official",
         "mean_error",
         "mean_abs_error",
         "rmse",
@@ -2211,30 +2236,30 @@ def ped_bridge_shape_fit_metrics_frame(ped_revenue_bridge_audit: pd.DataFrame) -
         return pd.DataFrame(columns=columns)
 
     pairs = [
-        ("raw_light_petrol_vkt_million_km", "raw_light_petrol_vkt", "mbu26_light_petrol_vkt_million_km", "light_petrol_vkt"),
+        ("raw_light_petrol_vkt_million_km", "raw_light_petrol_vkt", "official_light_petrol_vkt_million_km", "light_petrol_vkt"),
         (
             "optimized_light_petrol_vkt_million_km",
             "optimized_light_petrol_vkt",
-            "mbu26_light_petrol_vkt_million_km",
+            "official_light_petrol_vkt_million_km",
             "light_petrol_vkt",
         ),
-        ("ped_volume_raw_million_litres", "ped_volume_raw", "mbu26_ped_volume_million_litres", "ped_volume"),
+        ("ped_volume_raw_million_litres", "ped_volume_raw", "official_ped_volume_million_litres", "ped_volume"),
         (
             "ped_volume_optimized_million_litres",
             "ped_volume_optimized",
-            "mbu26_ped_volume_million_litres",
+            "official_ped_volume_million_litres",
             "ped_volume",
         ),
         (
             "gross_ped_revenue_raw_million_nzd",
             "gross_ped_revenue_raw",
-            "mbu26_gross_ped_revenue_million_nzd",
+            "official_gross_ped_revenue_million_nzd",
             "gross_ped_revenue",
         ),
         (
             "gross_ped_revenue_optimized_million_nzd",
             "gross_ped_revenue_optimized",
-            "mbu26_gross_ped_revenue_million_nzd",
+            "official_gross_ped_revenue_million_nzd",
             "gross_ped_revenue",
         ),
     ]
@@ -2267,9 +2292,9 @@ def ped_bridge_shape_fit_metrics_frame(ped_revenue_bridge_audit: pd.DataFrame) -
             mape = float((error[nonzero].abs() / y[nonzero].abs()).mean()) if nonzero.any() else np.nan
             metrics = {
                 "n_rows": int(ok.sum()),
-                "correlation_vs_mbu": corr,
-                "slope_vs_mbu": slope,
-                "intercept_vs_mbu": intercept,
+                "correlation_vs_official": corr,
+                "slope_vs_official": slope,
+                "intercept_vs_official": intercept,
                 "mean_error": float(error.mean()),
                 "mean_abs_error": float(error.abs().mean()),
                 "rmse": float(np.sqrt((error**2).mean())),
@@ -2280,7 +2305,7 @@ def ped_bridge_shape_fit_metrics_frame(ped_revenue_bridge_audit: pd.DataFrame) -
             raw_variant = variant.replace("optimized", "raw")
             if "optimized" in variant and raw_variant in fit_by_comparator:
                 raw_mae = fit_by_comparator[raw_variant].get("mean_abs_error", np.nan)
-                raw_corr = fit_by_comparator[raw_variant].get("correlation_vs_mbu", np.nan)
+                raw_corr = fit_by_comparator[raw_variant].get("correlation_vs_official", np.nan)
                 if np.isfinite(raw_mae) and metrics["mean_abs_error"] < raw_mae and (
                     not np.isfinite(raw_corr) or (np.isfinite(corr) and abs(corr) >= abs(raw_corr))
                 ):
@@ -2292,7 +2317,7 @@ def ped_bridge_shape_fit_metrics_frame(ped_revenue_bridge_audit: pd.DataFrame) -
                     "scenario_role": scenario_role,
                     "series_id": variant,
                     "bridge_variant": "optimized" if "optimized" in variant else "raw",
-                    "mbu_comparator_series_id": comparator_id,
+                    "official_comparator_series_id": comparator_id,
                     "start_fy": int(group["FY_numeric"].min()),
                     "end_fy": int(group["FY_numeric"].max()),
                     "shape_anchor_status": status,
@@ -2301,7 +2326,7 @@ def ped_bridge_shape_fit_metrics_frame(ped_revenue_bridge_audit: pd.DataFrame) -
                 }
             )
     return pd.DataFrame(rows, columns=columns).sort_values(
-        ["source_path", "mbu_comparator_series_id", "bridge_variant", "series_id"],
+        ["source_path", "official_comparator_series_id", "bridge_variant", "series_id"],
         kind="stable",
     ).reset_index(drop=True)
 
@@ -4131,13 +4156,23 @@ def build_current_revenue_outlook_runtime_pack(
     output_dir: Path | str | None = None,
     promoted_by: str = "repo_source_runtime_rebuild",
     engine: str = "ensemble",
+    official_comparator_vintage_id: str | None = None,
+    bridge_assumption_vintage_id: str | None = None,
 ) -> RevenueOutlookPack:
     """Materialize the committed Revenue Outlook pack from repo-local sources.
 
-    This is the deployment/runtime path. It uses the repo-local MBU26 annual
-    source spine plus current-finalist quarterly outputs already promoted into
-    ``data/current_revenue_outlook``. The offline workbook is never loaded by
-    Streamlit.
+    This is the deployment/runtime path. It uses the registered official
+    vintage packs (bridge-assumption vintage for rates/intensity/fixed lines;
+    every available vintage for the official comparator traces) plus
+    current-finalist quarterly outputs already promoted into
+    ``data/current_revenue_outlook``. The offline workbooks are never loaded
+    by Streamlit.
+
+    The two vintage roles are governed separately: the official comparator
+    vintage is the published forecast displayed as the external comparator;
+    the bridge-assumption vintage supplies effective rates, fuel intensity,
+    administration, refunds, MVR, TUC and fixed lines used to turn Current
+    activity into revenue. Both default to the registry flags.
     """
 
     root = Path(repo_root) if repo_root is not None else repo_root_from_here()
@@ -4146,11 +4181,40 @@ def build_current_revenue_outlook_runtime_pack(
 
     existing_manifest = _read_existing_manifest(base)
     scenario_input_wide = _read_optional_parquet(base / SCENARIO_INPUT_DIRNAME / f"{SCENARIO_INPUT_WIDE_STEM}.parquet")
-    mbu26_pack = load_mbu26_annual_spine(repo_root=root)
+    bridge_vid = str(bridge_assumption_vintage_id or default_bridge_vintage_id(root))
+    comparator_vid = str(official_comparator_vintage_id or default_comparator_vintage_id(root))
+    bridge_pack = load_official_vintage(bridge_vid, repo_root=root)
+    if bridge_pack is None:
+        raise ValueError(
+            "Cannot rebuild current Revenue Outlook runtime pack: bridge-assumption "
+            f"vintage {bridge_vid} is not materialized."
+        )
+    bridge_entry = bridge_pack.registry_entry
+    bridge_release = bridge_pack.release_round
+
+    def _bridge_relabel(frame: pd.DataFrame) -> pd.DataFrame:
+        return relabel_official_release_provenance(frame, bridge_entry)
+
+    # Every available registered vintage ships as a selectable official
+    # comparator trace; the default comparator is listed first.
+    comparator_packs: dict[str, Any] = {}
+    for vid, _display in official_vintage_choices(root):
+        pack = bridge_pack if vid == bridge_vid else load_official_vintage(vid, repo_root=root)
+        if pack is None:
+            raise ValueError(
+                f"Cannot rebuild current Revenue Outlook runtime pack: official vintage {vid} "
+                "is registered as available but not materialized."
+            )
+        comparator_packs[vid] = pack
+    if comparator_vid not in comparator_packs:
+        raise ValueError(
+            f"official comparator vintage {comparator_vid} is not registered as available"
+        )
+    mbu26_pack = comparator_packs.get("MBU26") or load_mbu26_annual_spine(repo_root=root)
     if mbu26_pack is None:
         raise ValueError(
-            "Cannot rebuild current Revenue Outlook runtime pack: "
-            f"{MBU26_SOURCE_PACK_DIR.as_posix()} is missing."
+            "Cannot rebuild current Revenue Outlook runtime pack: the MBU26 prior "
+            "official vintage pack is missing."
         )
     existing_chart_rows = _read_optional_csv(base / "revenue_chart_rows.csv")
     # The quarterly inventory is reconstituted BEFORE anything derives from it.
@@ -4174,37 +4238,52 @@ def build_current_revenue_outlook_runtime_pack(
     )
     current = current_forecast_annual_from_mbu26(
         current_outlook_chart_rows=existing_chart_rows,
-        mbu26_official_annual=mbu26_pack.official_annual,
+        mbu26_official_annual=bridge_pack.official_annual,
         scenario_input_wide=scenario_input_wide,
     )
+    # The bridge machinery templates its provenance on the MBU26 release
+    # token; the relabel pass re-stamps it for the actual bridge vintage so
+    # lineage can never claim MBU26 for values sourced from another vintage.
+    current = _bridge_relabel(current)
     if current.empty:
         raise ValueError("Cannot rebuild current Revenue Outlook runtime pack: current finalist annual rows are missing.")
-    runtime_cutoff_fy, runtime_cutoff_audit = _runtime_cutoff_fy_and_audit(current, mbu26_pack.official_annual)
+    runtime_cutoff_fy, runtime_cutoff_audit = _runtime_cutoff_fy_and_audit(current, bridge_pack.official_annual)
+    runtime_cutoff_audit = _bridge_relabel(runtime_cutoff_audit)
     current = _filter_frame_to_runtime_cutoff(current, runtime_cutoff_fy)
-    runtime_official_annual = _filter_frame_to_runtime_cutoff(mbu26_pack.official_annual, runtime_cutoff_fy)
-    # The official comparator publishes over its OWN horizon, taken from the
+    runtime_official_annual = _filter_frame_to_runtime_cutoff(bridge_pack.official_annual, runtime_cutoff_fy)
+    # Each official comparator publishes over its OWN horizon, taken from its
     # official spine. It must never be inferred from the current Base or
     # comparison rows.
-    official_comparator_cutoff_fy = int(
-        _max_numeric_year(mbu26_pack.official_annual, "FY") or runtime_cutoff_fy
-    )
-    # The official comparator's line and stack rows run to ITS OWN source
-    # horizon (FY2055), not the current-model cutoff: truncating them here is
-    # what capped the MBU26 composition chart at FY2030.
-    line_reconciliation = revenue_line_reconciliation_frame(
-        mbu26_official_annual=mbu26_pack.official_annual,
-        current_forecast_annual=current,
+    official_cutoff_by_scenario = {
+        official_comparator_scenario_name(vid): int(
+            _max_numeric_year(pack.official_annual, "FY") or runtime_cutoff_fy
+        )
+        for vid, pack in comparator_packs.items()
+    }
+    official_comparator_cutoff_fy = official_cutoff_by_scenario[
+        official_comparator_scenario_name(comparator_vid)
+    ]
+    # The official comparators' line and stack rows run to their OWN source
+    # horizons (FY2055), not the current-model cutoff: truncating them here is
+    # what capped the official composition chart at FY2030.
+    line_reconciliation = _bridge_relabel(
+        revenue_line_reconciliation_frame(
+            mbu26_official_annual=bridge_pack.official_annual,
+            current_forecast_annual=current,
+        )
     )
     # The governed FY2031-FY2050 post-model extrapolation, anchored on the
     # FY2030 econometric values this frame already carries. Appended BEFORE
     # the residual and stack frames so both see it: residuals prove its
     # aggregates close, and the composition chart gains the long-run years.
-    post_model_annual = build_post_model_extrapolation_annual(
-        line_reconciliation=line_reconciliation,
-        raw_quarterly_audit=raw_quarterly_forecast_audit,
-        scenario_input_wide=scenario_input_wide,
-        mbu26_official_annual=mbu26_pack.official_annual,
-        repo_root=root,
+    post_model_annual = _bridge_relabel(
+        build_post_model_extrapolation_annual(
+            line_reconciliation=line_reconciliation,
+            raw_quarterly_audit=raw_quarterly_forecast_audit,
+            scenario_input_wide=scenario_input_wide,
+            mbu26_official_annual=bridge_pack.official_annual,
+            repo_root=root,
+        )
     )
     if "forecast_segment" not in line_reconciliation.columns:
         line_reconciliation["forecast_segment"] = ""
@@ -4216,29 +4295,58 @@ def build_current_revenue_outlook_runtime_pack(
         ignore_index=True,
         sort=False,
     )
+    # Prior official vintages remain selectable comparators: append their
+    # official line blocks (official rows only; the current block above is
+    # shared) so reconciliation views and the composition chart can serve
+    # every registered vintage from one governed table.
+    for extra_vid, extra_pack in comparator_packs.items():
+        if extra_vid == bridge_vid:
+            continue
+        extra_block = revenue_line_reconciliation_frame(
+            mbu26_official_annual=extra_pack.official_annual,
+            current_forecast_annual=pd.DataFrame(),
+        )
+        extra_block = relabel_official_release_provenance(
+            extra_block, extra_pack.registry_entry
+        )
+        if "forecast_segment" not in extra_block.columns:
+            extra_block["forecast_segment"] = ""
+        line_reconciliation = pd.concat(
+            [line_reconciliation, extra_block], ignore_index=True, sort=False
+        )
     formula_residuals = revenue_formula_residual_frame(line_reconciliation)
     stack_components = revenue_stack_components_frame(line_reconciliation, formula_residuals)
-    ev_phev_split_assumptions = ev_phev_split_assumptions_frame(
-        runtime_official_annual,
-        current_forecast_annual=current,
-        repo_root=root,
+    ev_phev_split_assumptions = _bridge_relabel(
+        ev_phev_split_assumptions_frame(
+            runtime_official_annual,
+            current_forecast_annual=current,
+            repo_root=root,
+        )
     )
     light_ruc_horizon_availability = light_ruc_horizon_availability_frame(existing_chart_rows)
-    ev_phev_ped_light_drift_assumptions = ev_phev_ped_light_migration_assumptions_from_mbu26(
-        current_outlook_chart_rows=existing_chart_rows,
-        mbu26_official_annual=mbu26_pack.official_annual,
-        scenario_input_wide=scenario_input_wide,
-        include_disabled_extension_boundary=True,
+    ev_phev_ped_light_drift_assumptions = _bridge_relabel(
+        ev_phev_ped_light_migration_assumptions_from_mbu26(
+            current_outlook_chart_rows=existing_chart_rows,
+            mbu26_official_annual=bridge_pack.official_annual,
+            scenario_input_wide=scenario_input_wide,
+            include_disabled_extension_boundary=True,
+        )
     )
     ev_phev_ped_light_drift_assumptions = _filter_frame_to_runtime_cutoff(
         ev_phev_ped_light_drift_assumptions,
         runtime_cutoff_fy,
     )
-    ped_revenue_bridge_audit = ped_revenue_bridge_audit_frame(
-        line_reconciliation,
-        ev_phev_ped_light_drift_assumptions,
+    ped_revenue_bridge_audit = _bridge_relabel(
+        ped_revenue_bridge_audit_frame(
+            line_reconciliation,
+            ev_phev_ped_light_drift_assumptions,
+            official_source_path=official_comparator_trace_name(bridge_release),
+            official_scenario_name=official_comparator_scenario_name(bridge_vid),
+        )
     )
-    ped_bridge_shape_fit_metrics = ped_bridge_shape_fit_metrics_frame(ped_revenue_bridge_audit)
+    ped_bridge_shape_fit_metrics = _bridge_relabel(
+        ped_bridge_shape_fit_metrics_frame(ped_revenue_bridge_audit)
+    )
     ped_bridge_mode_config = ped_bridge_mode_config_frame()
     ped_efficiency_scenarios = ped_efficiency_scenarios_frame(end_fy=runtime_cutoff_fy)
     sensitivity_seed_inputs = sensitivity_seed_inputs_frame()
@@ -4292,15 +4400,26 @@ def build_current_revenue_outlook_runtime_pack(
             f"{_repo_relative(root, base / 'scenario_input_replay_mismatch_report.csv')}"
         )
 
-    series_meta = _runtime_series_metadata(mbu26_pack.series_trace_contract)
+    series_meta = _runtime_series_metadata(bridge_pack.series_trace_contract)
     quarterly_inputs = _runtime_quarterly_activity_inputs(existing_chart_rows, series_meta, scenario_role_contract=scenario_role_contract)
-    actual_rows = _runtime_mbu26_actual_rows(runtime_official_annual, series_meta)
+    # The Actual line is sourced from the bridge-assumption vintage's ACTUAL
+    # rows and is invariant to the official comparator selection: flipping the
+    # comparator vintage must never rewrite displayed history.
+    actual_rows = _bridge_relabel(_runtime_mbu26_actual_rows(runtime_official_annual, series_meta))
     current_rows = _runtime_current_rows(current, series_meta, scenario_role_contract=scenario_role_contract)
-    # Built from the unfiltered official annual: see the horizon-scope note on
-    # _filter_chart_rows_by_horizon_scope.
-    mbu26_official_rows = _runtime_mbu26_official_rows(mbu26_pack.official_annual, series_meta)
+    # Built from the unfiltered official annuals: see the horizon-scope note on
+    # _filter_chart_rows_by_horizon_scope. One official comparator trace per
+    # registered available vintage, default comparator first.
+    official_row_frames = []
+    for cmp_vid, cmp_pack in sorted(
+        comparator_packs.items(), key=lambda item: item[0] != comparator_vid
+    ):
+        cmp_rows = _runtime_mbu26_official_rows(cmp_pack.official_annual, series_meta)
+        official_row_frames.append(
+            relabel_official_release_provenance(cmp_rows, cmp_pack.registry_entry)
+        )
     chart_rows = pd.concat(
-        [quarterly_inputs, actual_rows, current_rows, mbu26_official_rows],
+        [quarterly_inputs, actual_rows, current_rows, *official_row_frames],
         ignore_index=True,
         sort=False,
     )
@@ -4312,6 +4431,7 @@ def build_current_revenue_outlook_runtime_pack(
         chart_rows,
         current_cutoff_fy=runtime_cutoff_fy,
         official_cutoff_fy=official_comparator_cutoff_fy,
+        official_cutoff_by_scenario=official_cutoff_by_scenario,
     )
     # Segment stamping and the post-model layer come AFTER the econometric
     # horizon filter, so the filter's rule (no unlabelled current value past
@@ -4323,11 +4443,13 @@ def build_current_revenue_outlook_runtime_pack(
         ignore_index=True,
         sort=False,
     )
-    horizon_contract_audit = horizon_contract_audit_frame(
-        chart_rows,
-        raw_quarterly_forecast_audit,
-        current_annual_cutoff_fy=runtime_cutoff_fy,
-        official_cutoff_fy=official_comparator_cutoff_fy,
+    horizon_contract_audit = _bridge_relabel(
+        horizon_contract_audit_frame(
+            chart_rows,
+            raw_quarterly_forecast_audit,
+            current_annual_cutoff_fy=runtime_cutoff_fy,
+            official_cutoff_fy=official_comparator_cutoff_fy,
+        )
     )
     future_revenue = _runtime_future_revenue_forecasts(current, series_meta)
     bridge_components = _runtime_bridge_components(current, series_meta)
@@ -4341,27 +4463,62 @@ def build_current_revenue_outlook_runtime_pack(
         "schema_version": REVENUE_OUTLOOK_SCHEMA_VERSION,
         "engine": engine,
         "pack_status": "explicitly_promoted_current_outlook",
-        "runtime_pack_type": "mbu26_actual_current_finalist_official_comparator",
+        "runtime_pack_type": "official_vintage_actual_current_finalist_official_comparator",
         "promotion_time": promotion_time,
         "promoted_by": promoted_by,
         "repo_relative_output_dir": _repo_relative(root, base),
         "source_policy": (
-            "committed_current_runtime_pack_only; MBU26 annual source spine is repo-local; "
-            "Streamlit does not load the offline workbook or legacy Excel forecast paths"
+            f"committed_current_runtime_pack_only; the {bridge_release} annual source pack is "
+            "repo-local; Streamlit does not load the offline workbooks or legacy Excel forecast paths"
         ),
         "runtime_policy": CURRENT_RUNTIME_POLICY,
         "allowed_traces": [
             "Actual",
-            "MBU26 official",
+            *[
+                official_comparator_trace_name(pack.release_round)
+                for vid, pack in sorted(
+                    comparator_packs.items(), key=lambda item: item[0] != comparator_vid
+                )
+            ],
             "Current finalist Base case",
             "Current finalist High population/comparison",
             PED_COMPARISON_BEHAVIOURAL_TRACE_NAME,
         ],
+        "official_vintages": {
+            "registry": OFFICIAL_VINTAGE_REGISTRY_PATH.as_posix(),
+            "official_comparator_vintage_id": comparator_vid,
+            "bridge_assumption_vintage_id": bridge_vid,
+            "default_official_comparator_trace": official_comparator_trace_name(
+                comparator_packs[comparator_vid].release_round
+            ),
+            "official_comparator_policy": (
+                "Published official vintages are immutable by default. Current policy "
+                "controls alter Current forecasts only; no official vintage receives a "
+                "Current policy overlay by default."
+            ),
+            "available": {
+                vid: {
+                    "display_name": pack.display_name,
+                    "release_round": pack.release_round,
+                    "status": str(pack.registry_entry.get("status", "")),
+                    "trace_name": official_comparator_trace_name(pack.release_round),
+                    "scenario_name": official_comparator_scenario_name(vid),
+                    "source_horizon_fy": pack.source_horizon_fy,
+                    "workbook_sha256": str(pack.registry_entry.get("workbook_sha256", "")),
+                    "source_pack_path": str(pack.registry_entry.get("source_pack_path", "")),
+                    "manifest_sha256": _sha256(pack.pack_dir / "manifest.json"),
+                }
+                for vid, pack in comparator_packs.items()
+            },
+        },
         "runtime_source_layers": {
-            "A_actuals": "MBU26 annual source rows through last complete FY2025",
-            "B_official_comparator": "MBU26 official forecast rows for FY2026+",
+            "A_actuals": f"{bridge_release} annual source rows through last complete FY2025",
+            "B_official_comparator": (
+                "Official comparator traces for every registered available vintage "
+                f"({', '.join(comparator_packs)}); default {comparator_vid} published rows for FY2026+"
+            ),
             "C_current_finalist_activity": "Promoted quarterly finalist outputs annualized by June year",
-            "D_hybrid_current_revenue": "Only PED, Light RUC and Heavy RUC revenue are replaced; all other rows use MBU26 official components.",
+            "D_hybrid_current_revenue": f"Only PED, Light RUC and Heavy RUC revenue are replaced; all other rows use {bridge_release} official components.",
             "E_ev_phev_split_audit": (
                 "Current finalist Light RUC is governed as a total light-RUC net-km model input. The optimized migration "
                 "layer allocates BEV/PHEV uptake between PED/light-petrol and total Light RUC before revenue rates are applied."
@@ -4379,6 +4536,10 @@ def build_current_revenue_outlook_runtime_pack(
             "current_light_ruc_quarterly_cutoff": LAST_DECISION_GRADE_QUARTER,
             "current_light_ruc_annual_cutoff_fy": LAST_DECISION_GRADE_ANNUAL_FY,
             "official_comparator_cutoff_fy": official_comparator_cutoff_fy,
+            "official_comparator_cutoff_by_vintage": {
+                vid: official_cutoff_by_scenario[official_comparator_scenario_name(vid)]
+                for vid in comparator_packs
+            },
             # Source-derived, never hard-coded: the raw replay keeps whatever
             # horizon the committed scenario inputs actually support.
             "raw_audit_source_horizon": _raw_audit_source_horizon(raw_quarterly_forecast_audit),
@@ -4419,15 +4580,11 @@ def build_current_revenue_outlook_runtime_pack(
                 "H13-H20; FY2030 is entirely H13-H20; FY2031 mixes H13-H20 and H21+; FY2032 "
                 "onward is entirely H21+."
             ),
-            "official_horizon_note": (
-                f"Comparative charts stop at FY{runtime_cutoff_fy}."
-                if _max_numeric_year(mbu26_pack.official_annual, "FY") and int(_max_numeric_year(mbu26_pack.official_annual, "FY") or 0) > runtime_cutoff_fy
-                else f"Comparative charts stop at FY{runtime_cutoff_fy}."
-            ),
+            "official_horizon_note": f"Comparative charts stop at FY{runtime_cutoff_fy}.",
             "light_ruc_target_semantics": (
                 "Business rule update: current-finalist Light RUC is treated as total light-RUC net km, while EV/PHEV "
                 "migration is sourced from both current PED/light-petrol activity and total Light RUC using an optimized "
-                "deterministic bridge calibrated to MBU26 light-mobility proportions. BEV/PHEV are not fixed add-ons."
+                f"deterministic bridge calibrated to {bridge_release} light-mobility proportions. BEV/PHEV are not fixed add-ons."
             ),
             "ev_phev_migration_allocation": (
                 "Default lambda_mode is optimized; alternatives are recorded for audit only and do not replace the current "
@@ -4449,7 +4606,9 @@ def build_current_revenue_outlook_runtime_pack(
         },
         "scenario_roles": scenarios,
         "join_key_contract": CANONICAL_JOIN_KEY_CONTRACT,
-        "source_hashes": _runtime_source_hashes(root, scenarios, mbu26_pack),
+        "source_hashes": _runtime_source_hashes(
+            root, scenarios, mbu26_pack, official_vintage_packs=comparator_packs
+        ),
         "mbu26_annual_spine": _mbu26_annual_spine_metadata(root, mbu26_pack),
         "revenue_source_pack": _mbu26_runtime_source_metadata(root, mbu26_pack),
         "bridge_status_by_stream": {
@@ -4458,11 +4617,11 @@ def build_current_revenue_outlook_runtime_pack(
             "HEAVY_RUC": ["available"],
         },
         "equations": {
-            "EV_PHEV_MIGRATION": "Optimized lambda allocates EV/PHEV uptake between PED/light-petrol and current finalist total Light RUC to match MBU26 light-mobility proportions with a smoothness penalty.",
-            "PED": "PED revenue = adjusted PED/light-petrol VKT after optimized EV/PHEV migration * MBU26 litres/100km * MBU26 gross PED rate.",
-            "LIGHT_RUC": "Light RUC revenue = optimized conventional Light RUC km after EV/PHEV migration * MBU26 conventional Light effective rate.",
-            "HEAVY_RUC": "Heavy RUC revenue = current finalist net km * MBU26 effective Heavy RUC rate.",
-            "ROLLUPS": "Gross FED, Net FED, Total RUC, Total RUC+PED and Total NLTF recalculate optimized PED, conventional Light RUC, Light BEV, PHEV and Heavy RUC replacement lines plus MBU26 fixed components.",
+            "EV_PHEV_MIGRATION": f"Optimized lambda allocates EV/PHEV uptake between PED/light-petrol and current finalist total Light RUC to match {bridge_release} light-mobility proportions with a smoothness penalty.",
+            "PED": f"PED revenue = adjusted PED/light-petrol VKT after optimized EV/PHEV migration * {bridge_release} litres/100km * {bridge_release} gross PED rate.",
+            "LIGHT_RUC": f"Light RUC revenue = optimized conventional Light RUC km after EV/PHEV migration * {bridge_release} conventional Light effective rate.",
+            "HEAVY_RUC": f"Heavy RUC revenue = current finalist net km * {bridge_release} effective Heavy RUC rate.",
+            "ROLLUPS": f"Gross FED, Net FED, Total RUC, Total RUC+PED and Total NLTF recalculate optimized PED, conventional Light RUC, Light BEV, PHEV and Heavy RUC replacement lines plus {bridge_release} fixed components.",
         },
         "target_semantics_audit": {
             "LIGHT_RUC": _light_ruc_target_semantics_manifest(ev_phev_split_assumptions),
@@ -4582,9 +4741,10 @@ def build_current_revenue_outlook_runtime_pack(
             "scope": "Feature-level lineage from committed scenario input artifacts to fixed finalist forecast variables.",
         },
         "rate_provenance": {
-            "future_light_heavy": "mbu26_official_annual.csv effective rates joined to current finalist net-km outputs",
-            "future_ped": "Scenario-input population where supplied plus MBU26 intensity/rate joined to optimized PED/light-petrol VKT after EV/PHEV migration",
-            "fixed_components": "mbu26_official_annual.csv official rows, excluding Light BEV and PHEV in current-finalist paths where they are allocated by the optimized PED+Light migration layer",
+            "bridge_assumption_vintage_id": bridge_vid,
+            "future_light_heavy": f"{bridge_vid.lower()} pack official-annual effective rates joined to current finalist net-km outputs",
+            "future_ped": f"Scenario-input population where supplied plus {bridge_release} intensity/rate joined to optimized PED/light-petrol VKT after EV/PHEV migration",
+            "fixed_components": f"{bridge_vid.lower()} pack official-annual rows, excluding Light BEV and PHEV in current-finalist paths where they are allocated by the optimized PED+Light migration layer",
         },
         "trace_audit": {
             "repo_relative_path": _repo_relative(root, base / "runtime_trace_audit.csv"),
@@ -4604,14 +4764,19 @@ def build_current_revenue_outlook_runtime_pack(
                 "publishes over its own source horizon. Raw model and replay evidence "
                 "keep their full source horizon as non-decision-facing audit."
             ),
-            "scope": "Dynamic Revenue Outlook runtime cutoff audit from current Base, current comparison and required MBU26 input horizons.",
+            "scope": f"Dynamic Revenue Outlook runtime cutoff audit from current Base, current comparison and required {bridge_release} input horizons.",
             "status": "available",
         },
         "revenue_line_reconciliation": {
             "repo_relative_path": _repo_relative(root, base / "revenue_line_reconciliation.csv"),
-            "scope": "Live table source for MBU26 official and current finalist line-item decomposition.",
+            "scope": "Live table source for official-vintage and current finalist line-item decomposition.",
             "source_paths": [
-                "MBU26 official",
+                *[
+                    official_comparator_trace_name(pack.release_round)
+                    for vid, pack in sorted(
+                        comparator_packs.items(), key=lambda item: item[0] != comparator_vid
+                    )
+                ],
                 "Current finalist Base case",
                 "Current finalist High population/comparison",
             ],
@@ -4683,11 +4848,15 @@ def build_current_revenue_outlook_runtime_pack(
         chart_rows,
         extra_frames={
             "runtime_trace_audit": trace_audit,
-            "trace_source_contract": mbu26_pack.trace_source_contract,
-            "series_trace_contract": mbu26_pack.series_trace_contract,
-            "series_alias_audit": mbu26_pack.series_alias_audit,
-            "path_trace_status": mbu26_pack.path_trace_status,
-            "row_reconciliation": mbu26_pack.row_reconciliation,
+            "trace_source_contract": _combined_official_trace_contract(
+                bridge_pack, comparator_packs, comparator_vid
+            ),
+            "series_trace_contract": bridge_pack.series_trace_contract,
+            "series_alias_audit": bridge_pack.series_alias_audit,
+            "path_trace_status": _combined_official_path_status(
+                bridge_pack, comparator_packs, comparator_vid
+            ),
+            "row_reconciliation": bridge_pack.row_reconciliation,
             "revenue_line_reconciliation": line_reconciliation,
             "revenue_stack_components": stack_components,
             "ev_phev_split_assumptions": ev_phev_split_assumptions,
@@ -6527,11 +6696,12 @@ def revenue_stack_components_frame(
     base["section_order"] = base["section"].astype(str).map(REVENUE_STACK_SECTION_ORDER).fillna(99).astype(int)
     base["line_order"] = base["series_id"].astype(str).map(REVENUE_STACK_SERIES_ORDER).fillna(999).astype(int)
     source_order = {
-        "MBU26 official": 0,
-        "Current finalist Base case": 1,
-        "Current finalist High population/comparison": 2,
+        "BEFU26 official": 0,
+        "MBU26 official": 1,
+        "Current finalist Base case": 2,
+        "Current finalist High population/comparison": 3,
         **{
-            trace_name: 3 + index
+            trace_name: 4 + index
             for index, trace_name in enumerate(CONFLICT_TRACE_NAMES)
         },
     }
@@ -6579,12 +6749,14 @@ def revenue_stack_components_frame(
 
 
 def _extend_current_stack_actual_history(base: pd.DataFrame) -> pd.DataFrame:
-    """Copy MBU26 actual line rows into current finalist composition paths.
+    """Copy official actual line rows into current finalist composition paths.
 
     Current finalist forecasts only begin in the source reconciliation around
     the actual anchor. Composition charts need a continuous history; the
-    historical rows are copied from the repo-local MBU26 actual spine and are
-    marked as actual anchors rather than model replacements.
+    historical rows are copied from the repo-local official actual spine of
+    the first available official source path (the default comparator /
+    bridge vintage sorts first) and are marked as actual anchors rather than
+    model replacements.
     """
 
     if base is None or base.empty or {"source_path", "FY"}.difference(base.columns):
@@ -6601,8 +6773,17 @@ def _extend_current_stack_actual_history(base: pd.DataFrame) -> pd.DataFrame:
     if not available_current_sources:
         return data.drop(columns=["FY_numeric"], errors="ignore")
 
+    official_sources = [
+        source
+        for source in ("BEFU26 official", "MBU26 official")
+        if data["source_path"].astype(str).eq(source).any()
+    ]
+    if not official_sources:
+        return data.drop(columns=["FY_numeric"], errors="ignore")
+    actual_source_path = official_sources[0]
+    actual_release = actual_source_path.removesuffix(" official")
     actual_rows = data[
-        data["source_path"].astype(str).eq("MBU26 official")
+        data["source_path"].astype(str).eq(actual_source_path)
         & data["FY_numeric"].le(REVENUE_LAST_COMPLETE_ACTUAL_FY)
     ].copy()
     if actual_rows.empty:
@@ -6621,7 +6802,7 @@ def _extend_current_stack_actual_history(base: pd.DataFrame) -> pd.DataFrame:
         history["scenario_name"] = scenario_name
         history["scenario_role"] = scenario_role
         history["fed_path"] = fed_path
-        history["source_basis"] = "MBU26 actual anchor"
+        history["source_basis"] = f"{actual_release} actual anchor"
         history["model_id"] = ""
         history["replacement_flag"] = False
         history["forecast_quarters"] = ""
@@ -7329,7 +7510,12 @@ def _fan_availability_row(
         return _fan_gap_row(series_id, series_label, fan_source, "Fan intentionally disabled; governed gap displayed.", horizon_scope="not_applicable")
     if fan_source in available_sources:
         reason = {
-            FAN_SOURCE_MBU26_ARCHIVED: "Archived forecast-error bands and MBU26 official central rows are materialized for this series.",
+            FAN_SOURCE_MBU26_ARCHIVED: (
+                "Archived forecast-error bands and MBU26 official central rows are materialized "
+                "for this series. The archived-error source contract covers the MBU26 comparator "
+                "only; other official vintages (including BEFU26) have no archived forecast-error "
+                "source and carry no official interval."
+            ),
             FAN_SOURCE_CURRENT_BACKTEST: "Current finalist annual backtest residual evidence is materialized for the mapped model stream.",
             FAN_SOURCE_SCENARIO_SPREAD: "Current finalist base and comparison rows are materialized for this series; scenario spread is not probabilistic uncertainty.",
         }.get(fan_source, "Fan source is materialized for this series.")
@@ -7382,7 +7568,11 @@ def _fan_missing_reason(series_id: str, series_label: str, fan_source: str) -> s
             return "MBU26 archived error bands are materialized for PED volume/revenue, not PED VKT per capita; no VKT-per-capita archived band is available."
         if series_id in ARCHIVED_ERROR_BAND_LABELS:
             return f"Archived error-band source exists for {ARCHIVED_ERROR_BAND_LABELS[series_id]}, but no matching horizon/central rows survived materialization."
-        return f"No MBU26 archived forecast-error band is materialized for {series_label}."
+        return (
+            f"No MBU26 archived forecast-error band is materialized for {series_label}. "
+            "Archived error bands describe the MBU26 comparator only and are never reused "
+            "for other official vintages."
+        )
     if fan_source == FAN_SOURCE_CURRENT_BACKTEST:
         if series_id in AGGREGATE_PROPAGATION_GAP_SERIES:
             return "Current finalist component uncertainty has not been propagated through this aggregate revenue formula, so no aggregate backtest-error fan is shown."
@@ -9251,8 +9441,64 @@ def _source_hashes(repo_root: Path, scenarios: Any) -> dict[str, Any]:
     return hashes
 
 
-def _runtime_source_hashes(repo_root: Path, scenarios: Any, mbu26_pack: Any) -> dict[str, Any]:
+def _combined_official_trace_contract(
+    bridge_pack: Any, comparator_packs: dict[str, Any], comparator_vid: str
+) -> pd.DataFrame:
+    """Bridge-vintage trace contract plus one official row per other vintage."""
+    frames = [bridge_pack.trace_source_contract]
+    for vid, pack in sorted(comparator_packs.items(), key=lambda item: item[0] != comparator_vid):
+        if vid == str(bridge_pack.vintage_id):
+            continue
+        contract = pack.trace_source_contract
+        frames.append(
+            contract[
+                contract.get("trace_role", pd.Series("", index=contract.index))
+                .astype(str)
+                .eq("official_external_comparator")
+            ]
+        )
+    return pd.concat(frames, ignore_index=True, sort=False)
+
+
+def _combined_official_path_status(
+    bridge_pack: Any, comparator_packs: dict[str, Any], comparator_vid: str
+) -> pd.DataFrame:
+    """Bridge-vintage path status plus one official trace row per other vintage."""
+    frames = [bridge_pack.path_trace_status]
+    for vid, pack in sorted(comparator_packs.items(), key=lambda item: item[0] != comparator_vid):
+        if vid == str(bridge_pack.vintage_id):
+            continue
+        status = pack.path_trace_status
+        frames.append(
+            status[
+                status.get("trace_id", pd.Series("", index=status.index))
+                .astype(str)
+                .eq(official_comparator_scenario_name(vid))
+            ]
+        )
+    return pd.concat(frames, ignore_index=True, sort=False)
+
+
+def _runtime_source_hashes(
+    repo_root: Path,
+    scenarios: Any,
+    mbu26_pack: Any,
+    *,
+    official_vintage_packs: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     hashes = _source_hashes(repo_root, scenarios)
+    if official_vintage_packs:
+        hashes["official_vintages"] = {
+            vid: {
+                "repo_relative_path": _repo_relative(repo_root, pack.pack_dir),
+                "manifest_sha256": _sha256(pack.pack_dir / "manifest.json"),
+                "source_release": pack.release_round,
+                "schema_version": (pack.manifest or {}).get("schema_version", ""),
+                "workbook_basename": ((pack.manifest or {}).get("workbook") or {}).get("basename", ""),
+                "workbook_sha256": ((pack.manifest or {}).get("workbook") or {}).get("sha256", ""),
+            }
+            for vid, pack in official_vintage_packs.items()
+        }
     hashes["mbu26_annual_spine"] = {
         "repo_relative_path": _repo_relative(repo_root, mbu26_pack.pack_dir),
         "manifest_sha256": _sha256(mbu26_pack.pack_dir / "manifest.json"),

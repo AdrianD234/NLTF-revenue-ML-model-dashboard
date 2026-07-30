@@ -373,7 +373,7 @@ def main() -> int:
     if s5_frame is not None:
         vfm = pd.read_csv(ROOT / "data" / "vfm_202405" / "vfm_vkt_shares.csv")
         vfm = vfm[vfm["scenario"].eq("Base_EV")].set_index("june_year")
-        mbu_total = audit["mbu26_total_nltf_net_revenue_million_nzd"].astype(float)
+        mbu_total = audit["official_total_nltf_net_revenue_million_nzd"].astype(float)
 
         rows = []
         for fy in FORECAST_FYS:
@@ -456,7 +456,7 @@ def main() -> int:
     signed = pd.DataFrame(index=pd.Index(FORECAST_FYS, name="june_year"))
     if not matrix.empty:
         m = matrix.set_index(["cell", "june_year"])["total_nltf_net_revenue"]
-        signed["mbu26_total_nltf"] = audit["mbu26_total_nltf_net_revenue_million_nzd"].loc[FORECAST_FYS]
+        signed["mbu26_total_nltf"] = audit["official_total_nltf_net_revenue_million_nzd"].loc[FORECAST_FYS]
         signed["S5_decision_facing_total_nltf"] = [
             float(s5_frame.loc[fy, "total_nltf_net_revenue"]) for fy in FORECAST_FYS
         ]

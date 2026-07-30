@@ -965,9 +965,9 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
         "total_nltf_optimized",
         "total_nltf_optimized_million_nzd",
         "total_nltf_net_revenue_million_nzd",
-        "mbu26_light_petrol_vkt_million_km",
-        "mbu26_ped_volume_million_litres",
-        "mbu26_gross_ped_revenue_million_nzd",
+        "official_light_petrol_vkt_million_km",
+        "official_ped_volume_million_litres",
+        "official_gross_ped_revenue_million_nzd",
         "vktpc_source_cell",
         "population_source_cell",
         "migration_source_cells",
@@ -1016,7 +1016,7 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     assert {"raw", "optimized"}.issubset(set(ped_bridge_shape_fit["bridge_variant"].astype(str)))
     base_light_fit = ped_bridge_shape_fit[
         ped_bridge_shape_fit["source_path"].astype(str).eq("Current finalist Base case")
-        & ped_bridge_shape_fit["mbu_comparator_series_id"].astype(str).eq("light_petrol_vkt")
+        & ped_bridge_shape_fit["official_comparator_series_id"].astype(str).eq("light_petrol_vkt")
     ]
     raw_mae = float(base_light_fit.loc[base_light_fit["bridge_variant"].astype(str).eq("raw"), "mean_abs_error"].iloc[0])
     opt_mae = float(base_light_fit.loc[base_light_fit["bridge_variant"].astype(str).eq("optimized"), "mean_abs_error"].iloc[0])
