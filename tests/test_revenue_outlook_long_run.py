@@ -449,20 +449,28 @@ def test_total_nltf_closes_to_its_leaves_across_the_long_run(line, scenario) -> 
     )
     long_run = wide.loc[wide.index >= FIRST_EXTRAPOLATION_FY]
     assert not long_run.empty
-    residual = (
-        long_run["total_nltf_net_revenue"]
-        - (long_run["total_revenue_net_admin"] - long_run["total_refunds"])
-    ).abs().max()
-    assert residual <= 1e-6, f"Total NLTF does not close: worst {residual:.3e}"
-    fed_ruc = (
-        long_run["gross_ruc_revenue"]
-        - (
-            long_run["light_ruc_net_revenue"] + long_run["heavy_ruc_net_revenue"]
-            + long_run["light_bev_ruc_net_revenue"] + long_run["heavy_bev_ruc_net_revenue"]
-            + long_run["phev_ruc_net_revenue"]
+    # Recompute from the GOVERNED registry, not hand-written arithmetic. An
+    # earlier revision of this test hard-coded gross_ruc_revenue WITHOUT the
+    # ruc_refunds term the governed expression includes, so it agreed with a
+    # constructor that had the same omission and both were wrong together.
+    from model_dashboard.mbu26_source_spine import FORMULA_DEFINITIONS
+
+    checked = 0
+    for definition in FORMULA_DEFINITIONS:
+        series = str(definition["output_series_id"])
+        if series not in long_run.columns:
+            continue
+        terms = definition["terms"]
+        if any(term not in long_run.columns for term, _ in terms):
+            continue
+        calculated = sum(long_run[term] * sign for term, sign in terms)
+        residual = (long_run[series] - calculated).abs().max()
+        assert residual <= 1e-6, (
+            f"{series} does not close over FY2031-FY2050: worst {residual:.3e} "
+            f"(expression: {definition['expression']})"
         )
-    ).abs().max()
-    assert fed_ruc <= 1e-6, f"gross RUC does not close: worst {fed_ruc:.3e}"
+        checked += 1
+    assert checked >= 10, f"only {checked} governed identities were checkable"
 
 
 def test_mbu26_revenue_levels_are_never_substituted_into_the_current_path(line) -> None:
