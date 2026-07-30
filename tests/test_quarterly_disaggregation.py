@@ -240,7 +240,9 @@ def test_quarterly_fallback_fills_mbu_trace_when_current_native_rows_exist() -> 
         & rows["row_type"].astype(str).eq("historical_actual")
         & pd.to_numeric(rows["june_year"], errors="coerce").eq(2026)
     ]
-    assert set(actual["period"].astype(str)) == {"2025Q3", "2025Q4"}
+    # Since the 2026Q1 actuals refresh, the accepted Light RUC 2026Q1 actual
+    # joins the FY2026 quarterly inventory as history.
+    assert set(actual["period"].astype(str)) == {"2025Q3", "2025Q4", "2026Q1"}
     assert not derived_mbu["period"].astype(str).isin(actual["period"].astype(str)).any()
     for fy, group in derived_mbu.groupby(pd.to_numeric(derived_mbu["june_year"], errors="coerce")):
         expected = set(_june_year_quarters(int(fy)))

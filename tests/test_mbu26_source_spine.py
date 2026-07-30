@@ -187,8 +187,17 @@ def test_current_runtime_uses_only_allowed_mbu26_trace_contract() -> None:
 
     fy2026 = displayed[displayed["period"].astype(str).eq("FY2026")]
     current_fy2026 = fy2026[fy2026["trace_role"].astype(str).eq("in_house_current_finalist")]
-    assert set(current_fy2026["actual_quarters"].dropna().astype(str)) == {"2025Q3; 2025Q4"}
-    assert set(current_fy2026["forecast_quarters"].dropna().astype(str)) == {"2026Q1; 2026Q2"}
+    # Per-stream seam since the 2026Q1 actuals refresh: PED-based rows keep
+    # the 2-actual/2-forecast FY2026 mix, Light/Heavy rows carry the accepted
+    # 2026Q1 actual (3 actual + 1 forecast).
+    assert set(current_fy2026["actual_quarters"].dropna().astype(str)) == {
+        "2025Q3; 2025Q4",
+        "2025Q3; 2025Q4; 2026Q1",
+    }
+    assert set(current_fy2026["forecast_quarters"].dropna().astype(str)) == {
+        "2026Q1; 2026Q2",
+        "2026Q2",
+    }
 
     replacements = bridge[bridge["component_type"].astype(str).eq("replacement_line")]
     assert set(replacements["stream"].dropna().unique()) == {

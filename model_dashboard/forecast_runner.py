@@ -1041,7 +1041,9 @@ def run_forecast_workbook(
         scenario_name=scenario,
         scenario_role=resolved_role,
     )
-    chart_rows = forecast_chart_rows_for_display(future, repo_root=root, latest_actual_period=validation.latest_actual_period)
+    # No explicit cutoff: each stream displays history through its own
+    # accepted actual (per-stream seam), matching the scored output rows.
+    chart_rows = forecast_chart_rows_for_display(future, repo_root=root)
     report = _forecast_validation_report(validation, capabilities)
     forecast_status = _forecast_status(validation, future)
     manifest = {
@@ -2335,6 +2337,41 @@ def _forecast_output_rows(
     ped_seed: dict[str, float] | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     selected_streams = [s for s in STREAM_ORDER if streams is None or s in set(streams)]
+
+    # Per-stream seam: quarters at or before a stream's accepted actual are
+    # canonical history and are never scored or emitted as forecast rows,
+    # regardless of which input path (committed scenario replay or uploaded
+    # workbook) supplied them. The stream's recursion then rolls from the
+    # accepted actual.
+    try:
+        accepted_cutoffs = stream_latest_accepted_periods(repo_root)
+    except Exception:
+        accepted_cutoffs = {}
+
+    def _stream_validation(stream: str) -> ForecastValidationResult:
+        cutoff = accepted_cutoffs.get(stream)
+        if not cutoff or not validation.forecast_periods:
+            return validation
+        if quarter_sort_key(cutoff) <= quarter_sort_key(validation.latest_actual_period):
+            return validation
+        periods = [
+            p for p in validation.forecast_periods if quarter_sort_key(p) > quarter_sort_key(cutoff)
+        ]
+        if periods == list(validation.forecast_periods):
+            return validation
+        assumptions = validation.assumptions
+        if assumptions is not None and not assumptions.empty and "period" in assumptions.columns:
+            keep = ~assumptions["stream"].astype(str).eq(stream) | assumptions["period"].astype(str).isin(periods)
+            assumptions = assumptions[keep]
+        return ForecastValidationResult(
+            valid=validation.valid,
+            errors=validation.errors,
+            warnings=validation.warnings,
+            assumptions=assumptions,
+            latest_actual_period=cutoff,
+            forecast_periods=periods,
+        )
+
     light_future: pd.DataFrame | None = None
     light_components: pd.DataFrame | None = None
     scorer_errors: dict[str, str] = {}
@@ -2345,7 +2382,9 @@ def _forecast_output_rows(
         and cap_lookup.get("LIGHT_RUC", {}).get("forecast_capability_available")
     ):
         try:
-            light_future, light_components = _light_ruc_forward_forecast(validation, repo_root)
+            light_future, light_components = _light_ruc_forward_forecast(
+                _stream_validation("LIGHT_RUC"), repo_root
+            )
         except Exception as exc:
             scorer_errors["LIGHT_RUC"] = f"{type(exc).__name__}: {exc}"
 
@@ -2355,17 +2394,18 @@ def _forecast_output_rows(
             continue
         if validation.valid and cap_lookup.get(stream, {}).get("forecast_capability_available"):
             try:
+                stream_validation = _stream_validation(stream)
                 if stream == "PED" and engine == "ar1":
                     from pipeline.ar1_engine import ar1_forward_forecast
 
                     vnext_outputs[stream] = ar1_forward_forecast(
-                        validation, repo_root, history_seed=ped_seed if stream == "PED" else None
+                        stream_validation, repo_root, history_seed=ped_seed if stream == "PED" else None
                     )
                 else:
                     from .vnext_forward_integration import vnext_forward_forecast
 
                     vnext_outputs[stream] = vnext_forward_forecast(
-                        validation,
+                        stream_validation,
                         repo_root,
                         stream,
                         y_seed=ped_seed if stream == "PED" else None,
@@ -2385,8 +2425,9 @@ def _forecast_output_rows(
             component_rows.append(vnext_outputs[stream][1])
             continue
         error_suffix = f" Scorer error: {scorer_errors[stream]}" if stream in scorer_errors else ""
-        future_rows.append(_gap_future_forecast_rows(validation, capabilities, stream, error_suffix=error_suffix))
-        component_rows.append(_gap_component_forecast_rows(validation, capabilities, repo_root, stream, error_suffix=error_suffix))
+        stream_validation = _stream_validation(stream)
+        future_rows.append(_gap_future_forecast_rows(stream_validation, capabilities, stream, error_suffix=error_suffix))
+        component_rows.append(_gap_component_forecast_rows(stream_validation, capabilities, repo_root, stream, error_suffix=error_suffix))
     future = pd.concat(future_rows, ignore_index=True, sort=False) if future_rows else pd.DataFrame()
     components = pd.concat(component_rows, ignore_index=True, sort=False) if component_rows else pd.DataFrame()
     future = _attach_capability_metadata(future, capabilities)

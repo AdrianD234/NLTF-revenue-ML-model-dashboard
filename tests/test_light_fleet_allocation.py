@@ -258,11 +258,31 @@ def test_a_degenerate_custom_share_vector_is_refused() -> None:
 # ------------------------------------------------------------ reproducibility
 
 
-def test_the_engine_reproduces_the_audited_checkpoint_3_candidate(anchors) -> None:
-    """The implemented Base path must match the audited P0/L1 candidate."""
+def test_the_engine_reproduces_the_audited_checkpoint_3_candidate() -> None:
+    """The implemented Base path must match the audited P0/L1 candidate.
+
+    The audited candidate was produced from the hash-pinned legacy
+    investigation snapshot (see checkpoint3bc), so the engine is replayed on
+    those SAME anchors: the audit is a fixed point in time, while the live
+    pack anchors legitimately move with each governed actuals refresh
+    (2026Q1 moved FY2026/FY2027).
+    """
     audited = ROOT / "artifacts" / "fleet_allocation_semantics" / "combined_light_fleet_paths.csv"
-    if not audited.exists():
+    snapshot = (
+        ROOT
+        / "artifacts"
+        / "fleet_allocation_semantics"
+        / "legacy_investigation_snapshot"
+        / "ev_phev_split_assumptions.csv"
+    )
+    if not audited.exists() or not snapshot.exists():
         pytest.skip("Checkpoint 3 candidate artifact is unavailable")
+    anchors = (
+        pd.read_csv(snapshot)
+        .query("scenario_name == 'current_basecase'")
+        .set_index("FY")
+        .sort_index()
+    )
     frame = pd.read_csv(audited)
     frame = frame[frame["variant"].eq("P0/L1")].set_index("june_year")
     for fy in range(2026, LAST_DECISION_GRADE_ANNUAL_FY + 1):

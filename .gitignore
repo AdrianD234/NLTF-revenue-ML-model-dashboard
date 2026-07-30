@@ -129,7 +129,7 @@ data/dashboard_evidence_pack_reproducibility/ped_inner_hpo/source_artifacts/**/*
 !data/source_workbooks/*.xlsx
 !data/source_workbooks/*.pdf
 !references/
-!references/*.xlsx
+!references/NLTF_model_input_sheet_actuals_to_*.xlsx
 
 # MoT VFM 202405 derived uptake shares (governed lineage for EV lever presets)
 !data/vfm_202405/
