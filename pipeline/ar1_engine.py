@@ -197,8 +197,18 @@ def capability_record(repo_root: Path | str) -> Dict[str, Any]:
 
 
 def _forward_log_predictions(state: Dict[str, Any], repo_root: Path | str,
-                             assumptions: pd.DataFrame) -> Dict[pd.Period, float]:
-    """Recursive log-space forecasts for the assumption periods (Period-indexed)."""
+                             assumptions: pd.DataFrame,
+                             history_seed: Optional[Dict[str, float]] = None) -> Dict[pd.Period, float]:
+    """Recursive log-space forecasts for the assumption periods (Period-indexed).
+
+    ``history_seed`` maps period string -> LEVEL for governed recursive-history
+    seeds beyond the fitted latest actual (e.g. a provisional PED annual-bridge
+    quarter under the Candidate-B replay). Seeds only feed the target-lag
+    recursion; they are never fitted on and never emitted as forecasts. The
+    AR(1) error recursion is structurally advanced (err_t = rho * err_{t-1})
+    across seeded quarters - the seed's own pseudo-residual is deliberately
+    NOT conditioned on, because the seed is not an observed actual.
+    """
     sd = vc.load_stream_data(Path(repo_root), "PED")
     future_canonical = build_future_canonical_frame(assumptions, "PED")
     needed = sorted(set(vc.LEVEL_SERIES["PED"].values()) | set(vc.BASE_SERIES["PED"].values()))
@@ -212,11 +222,32 @@ def _forward_log_predictions(state: Dict[str, Any], repo_root: Path | str,
     latest_actual = vc.parse_period(state["latest_actual"])
     y_hist = {p: float(sd.y_log.loc[p]) for p in sd.y_log.index
               if pd.notna(sd.y_log.loc[p]) and p <= latest_actual}
+    seed_quarters = 0
+    if history_seed:
+        for seed_period, seed_level in history_seed.items():
+            sp = vc.parse_period(seed_period)
+            if sp <= latest_actual:
+                raise ValueError(
+                    f"AR(1) history seed {seed_period} does not postdate the fitted latest actual "
+                    f"{state['latest_actual']}; refusing to overwrite observed history."
+                )
+            if not np.isfinite(float(seed_level)) or float(seed_level) <= 0:
+                raise ValueError(f"AR(1) history seed {seed_period} must be a positive level.")
+            y_hist[sp] = float(np.log(float(seed_level)))
+            seed_quarters = max(seed_quarters, (sp - latest_actual).n)
     beta = np.asarray(state["beta"], dtype=float)
     rho = np.asarray(state["rho"], dtype=float)
     features = list(state["features"])
     ylags = [int(v) for v in state["ylags"]]
     err_hist: List[float] = [float(state["last_resid"])]
+    first_scored = min(assumptions.index) if len(assumptions.index) else None
+    if first_scored is not None:
+        # Structurally advance the AR(1) error recursion across any quarters
+        # between the fitted origin and the first scored quarter (seeded or
+        # otherwise skipped), so err_t remains rho^(t - origin) * last_resid.
+        gap = (first_scored - latest_actual).n - 1
+        for _ in range(max(0, gap)):
+            err_hist.append(float(np.dot(rho, err_hist[-len(rho):][::-1])))
 
     out: Dict[pd.Period, float] = {}
     for p in sorted(assumptions.index):
@@ -234,11 +265,14 @@ def _forward_log_predictions(state: Dict[str, Any], repo_root: Path | str,
     return out
 
 
-def ar1_forward_forecast(validation: Any, repo_root: Path) -> Tuple[pd.DataFrame, pd.DataFrame]:
+def ar1_forward_forecast(validation: Any, repo_root: Path,
+                         history_seed: Optional[Dict[str, float]] = None) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """Score validated PED assumption rows with the AR(1) engine.
 
     Signature and output schemas mirror
     ``model_dashboard.vnext_forward_integration.vnext_forward_forecast``.
+    ``history_seed`` is the governed provisional recursive-history seed
+    (see ``_forward_log_predictions``).
     """
     capability = capability_record(repo_root)
     if not capability["forecast_capability_available"]:
@@ -253,7 +287,7 @@ def ar1_forward_forecast(validation: Any, repo_root: Path) -> Tuple[pd.DataFrame
     sub["__period__"] = sub["period"].map(vc.parse_period)
     sub = sub.set_index("__period__").sort_index()
 
-    preds_log = _forward_log_predictions(state, repo_root, sub)
+    preds_log = _forward_log_predictions(state, repo_root, sub, history_seed=history_seed)
     periods = sorted(preds_log)
     metadata = {k: capability.get(k) for k in
                 ("scorer_version", "source_artifact_hashes", "parity_status",
