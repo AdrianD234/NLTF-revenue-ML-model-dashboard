@@ -17,6 +17,7 @@ import pytest
 
 import app as dashboard
 from model_dashboard.long_run_shape_transition import (
+    PRODUCTION_LONG_RUN_TRANSITION_SCHEDULE_ID,
     STRUCTURAL_SCHEDULE_IDS,
     UNBLENDED_SCHEDULE_ID,
 )
@@ -62,7 +63,12 @@ class TestPreviewOptions:
         assert len(defaults) == 1
 
     def test_gate_28_public_default_is_the_packs_own_schedule(self, manifest):
-        """The preview cannot move the published default."""
+        """The preview cannot move the published default.
+
+        The default is now the promoted production schedule rather than the
+        unblended control. What the gate protects is unchanged: the preview
+        must reflect whatever the PACK recorded, never override it.
+        """
 
         options = dashboard._long_run_shape_preview_options(manifest)
         default = next(spec for spec in options.values() if spec["is_pack_default"])
@@ -71,7 +77,7 @@ class TestPreviewOptions:
             block.get("long_run_transition_schedule_id") or UNBLENDED_SCHEDULE_ID
         )
         assert default["schedule_id"] == expected
-        assert expected == UNBLENDED_SCHEDULE_ID
+        assert expected == PRODUCTION_LONG_RUN_TRANSITION_SCHEDULE_ID
 
     def test_options_are_registry_driven_not_hard_coded(self):
         """Gate 29 at the UI layer: no vintage literal in the option builder."""

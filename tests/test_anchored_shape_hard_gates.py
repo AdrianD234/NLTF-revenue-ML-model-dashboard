@@ -24,6 +24,7 @@ from model_dashboard import official_vintage as ov
 from model_dashboard.long_run_shape_transition import (
     FLEET_COMPOSITION_SOURCE_ID,
     LONG_RUN_SHAPE_METHOD_ID,
+    PRODUCTION_LONG_RUN_TRANSITION_SCHEDULE_ID,
     SCHEDULES,
     UNBLENDED_SCHEDULE_ID,
 )
@@ -534,7 +535,15 @@ class TestManifestVocabulary:
 class TestProductionDefaultUnchanged:
     """The public default must not move until the owner selects a candidate."""
 
-    def test_constructor_defaults_to_unblended(self, pack_inputs, shape_pack):
+    def test_constructor_still_defaults_to_unblended(self, pack_inputs, shape_pack):
+        """The LOW-LEVEL constructor keeps the neutral default.
+
+        The production decision lives in one place - the pack builder's default,
+        PRODUCTION_LONG_RUN_TRANSITION_SCHEDULE_ID - so a direct constructor
+        call in a script or test cannot silently inherit a production schedule
+        it did not ask for.
+        """
+
         frame = build_post_model_extrapolation_annual(
             line_reconciliation=pack_inputs["line_reconciliation"],
             raw_quarterly_audit=pack_inputs["raw_quarterly_audit"],
@@ -546,7 +555,15 @@ class TestProductionDefaultUnchanged:
             UNBLENDED_SCHEDULE_ID
         }
 
-    def test_committed_packs_carry_no_transition(self):
+    def test_committed_packs_record_the_promoted_production_schedule(self):
+        """Both engines must be on the SAME governed schedule.
+
+        Before promotion this asserted unblended_current. The invariant it
+        protects is unchanged - the committed packs carry exactly one governed
+        schedule and both engines agree - and it now pins the promoted one.
+        """
+
+        recorded = set()
         for relative in (
             Path("data") / "current_revenue_outlook",
             Path("data") / "engine_ar1" / "current_revenue_outlook",
@@ -557,7 +574,9 @@ class TestProductionDefaultUnchanged:
             block = manifest.get("official_vintages") or {}
             schedule = str(block.get("long_run_transition_schedule_id") or
                            UNBLENDED_SCHEDULE_ID)
-            assert schedule == UNBLENDED_SCHEDULE_ID, relative
+            assert schedule == PRODUCTION_LONG_RUN_TRANSITION_SCHEDULE_ID, relative
+            recorded.add(schedule)
+        assert len(recorded) == 1, recorded
 
     def test_unblended_reproduces_the_frozen_baseline(self, candidates, baseline):
         """The control candidate IS merged main, to within float noise."""

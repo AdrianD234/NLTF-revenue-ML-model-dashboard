@@ -38,7 +38,7 @@ IGNORED_CONSOLE = (
 )
 
 
-def _wait_for(page, predicate_js: str, timeout_ms: int = 120_000) -> None:
+def _wait_for(page, predicate_js: str, timeout_ms: int = 420_000) -> None:
     page.wait_for_function(f"() => {{ {predicate_js} }}", timeout=timeout_ms)
 
 
@@ -64,7 +64,7 @@ SCHEDULE_BY_LABEL = {
 }
 
 
-def _select_candidate(page, label: str, previous_fy2040: float | None) -> None:
+def _select_candidate(page, label: str, previous_fy2040: float | None = None) -> None:
     """Drive the real Streamlit selectbox and wait for the RERUN to land.
 
     A fixed delay is not enough: the selection triggers a full Streamlit rerun
@@ -75,6 +75,12 @@ def _select_candidate(page, label: str, previous_fy2040: float | None) -> None:
     it to match is a deterministic signal that the new render is on screen.
     """
 
+    # Read the value that is CURRENTLY on screen, immediately before clicking.
+    # Using the previous capture instead is wrong for the first selection of a
+    # run: the figure then shows the pack default, and a "has it settled?" test
+    # cannot tell "settled" from "the rerun has not started yet" - which is how
+    # Current unblended came to report the balanced value.
+    previous_fy2040 = page.evaluate("() => {" + _FY2040_JS + "return readFy2040(); }")
     page.evaluate(
         "() => { const l=[...document.querySelectorAll('label')]"
         ".find(x=>x.innerText.includes('Long-run shape method'));"
@@ -101,8 +107,10 @@ def _select_candidate(page, label: str, previous_fy2040: float | None) -> None:
         label,
     )
     schedule = SCHEDULE_BY_LABEL[label]
+    stage = "caption"
     try:
         _await_rerun(page, schedule)
+        stage = "figure"
         # The caption is rendered ABOVE the chart, so it updates while the
         # figure below is still the previous render. Waiting on the caption
         # alone reads a stale chart - which is what made three different
@@ -116,10 +124,20 @@ def _select_candidate(page, label: str, previous_fy2040: float | None) -> None:
                 + "const current = readFy2040();"
                 + "return current !== null && Math.abs(current - previous) > 1e-9; }",
                 arg=previous_fy2040,
-                timeout=180_000,
+                timeout=420_000,
             )
+        else:
+            _wait_for_stable_figure(page)
     except Exception as error:
-        raise RuntimeError(f"{label}: rerun did not land ({error})") from error
+        current = page.evaluate("() => {" + _FY2040_JS + "return readFy2040(); }")
+        caption = page.evaluate(
+            "() => { const m=document.body.innerText"
+            ".match(/Long-run construction[^\\n]*/); return m ? m[0] : '<none>'; }"
+        )
+        raise RuntimeError(
+            f"{label}: rerun did not land at stage={stage} "
+            f"(previous={previous_fy2040}, current={current}, caption={caption!r}): {error}"
+        ) from error
 
 
 _FY2040_JS = """
@@ -149,14 +167,14 @@ def _await_rerun(page, schedule: str) -> None:
         # The caption is only rendered for a non-default construction.
         page.wait_for_function(
             "() => !document.body.innerText.includes('Long-run construction')",
-            timeout=180_000,
+            timeout=420_000,
         )
     else:
         page.wait_for_function(
             "(schedule) => document.body.innerText.includes("
             "'Transition schedule: ' + schedule)",
             arg=schedule,
-            timeout=180_000,
+            timeout=420_000,
         )
     # The caption lands with the rerun; give Plotly a beat to repaint, then
     # require the long-run trace to be present before anything is read.
@@ -175,8 +193,21 @@ def _await_rerun(page, schedule: str) -> None:
             }
             return false;
         }""",
-        timeout=180_000,
+        timeout=420_000,
     )
+
+
+def _wait_for_stable_figure(page, settle_ms: int = 1500, attempts: int = 120) -> None:
+    """Poll until two consecutive reads of the FY2040 point agree."""
+
+    previous = None
+    for _ in range(attempts):
+        current = page.evaluate("() => {" + _FY2040_JS + "return readFy2040(); }")
+        if current is not None and previous is not None and abs(current - previous) < 1e-12:
+            return
+        previous = current
+        page.wait_for_timeout(settle_ms)
+    raise RuntimeError("figure never settled")
 
 
 def _figure_evidence(page) -> dict[str, object]:
@@ -262,9 +293,8 @@ def main() -> int:
                     ),
                 )
                 _goto_revenue_outlook(page)
-                previous_fy2040: float | None = None
                 for label in CANDIDATES:
-                    _select_candidate(page, label, previous_fy2040)
+                    _select_candidate(page, label)
                     slug = (
                         label.replace("BEFU26 anchored structural transition - ", "")
                         .replace(" ", "_")
@@ -277,7 +307,6 @@ def main() -> int:
                         ".match(/Long-run construction[^\\n]*/); return m ? m[0] : ''; }"
                     )
                     evidence = _figure_evidence(page)
-                    previous_fy2040 = evidence.get("fy2040_total_nltf")
                     records.append(
                         {
                             "candidate": label,

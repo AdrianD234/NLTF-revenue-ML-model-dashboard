@@ -48,6 +48,7 @@ __all__ = [
     "ANCHOR_FY",
     "FLEET_COMPOSITION_SOURCE_ID",
     "LONG_RUN_SHAPE_METHOD_ID",
+    "PRODUCTION_LONG_RUN_TRANSITION_SCHEDULE_ID",
     "SCHEDULES",
     "STRUCTURAL_SCHEDULE_IDS",
     "TRANSITION_WEIGHT_FORMULA_ID",
@@ -76,6 +77,19 @@ TRANSITION_WEIGHT_FORMULA_ID = "cubic_smoothstep_3u2_minus_2u3_v1"
 UNBLENDED_WEIGHT_FORMULA_ID = "constant_zero_v1"
 
 UNBLENDED_SCHEDULE_ID = "unblended_current"
+
+# The governed PRODUCTION default. This is the owner decision, recorded in one
+# greppable place rather than spread across call sites: every runtime pack is
+# built on this schedule unless a caller explicitly asks for another, and the
+# analyst preview reads whatever the built pack recorded.
+#
+# balanced_structural reaches equal weight around FY2037 - about a decade past
+# the estimation window. Long enough not to discard the econometrics
+# prematurely, short enough that the terminal decade is governed by an
+# externally published structural source rather than by a twenty-year
+# extrapolation of a short-run model. See
+# artifacts/anchored_structural_shape_transition/candidate_verdict.md.
+PRODUCTION_LONG_RUN_TRANSITION_SCHEDULE_ID = "balanced_structural"
 
 # The official-vintage activity series the structural shape is built from.
 # A vintage that does not carry all of these over FY2030-FY2050 cannot serve

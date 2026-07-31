@@ -275,14 +275,54 @@ class TestCacheKeying:
         )
         assert befu != mbu
 
-    def test_unblended_leaves_the_signature_untouched(self, loaded):
+    def test_unblended_also_gets_its_own_cache_key(self, loaded):
+        """With a structural schedule promoted, unblended is rebuilt data.
+
+        It therefore needs its own cache key. Exempting it was only safe while
+        the pack was itself unblended.
+        """
+
         _, signature = loaded
-        assert (
-            dashboard._shape_adjusted_signature(
-                signature, UNBLENDED_SCHEDULE_ID, SHAPE_VINTAGE
-            )
-            == signature
+        adjusted = dashboard._shape_adjusted_signature(
+            signature, UNBLENDED_SCHEDULE_ID, SHAPE_VINTAGE
         )
+        assert adjusted != signature
+        assert adjusted[-1][0] == f"long_run_shape:{UNBLENDED_SCHEDULE_ID}:{SHAPE_VINTAGE}"
+
+    def test_selecting_the_packs_own_schedule_skips_the_rebuild(self, loaded):
+        """The untouched pack keeps its untouched signature."""
+
+        pack, signature = loaded
+        block = pack.manifest.get("official_vintages") or {}
+        key = _key(str(block.get("long_run_transition_schedule_id")))
+        key = key[:9] + (str(block.get("long_run_shape_vintage_id")),)
+        returned_pack, returned_signature = dashboard._apply_long_run_shape_selection(
+            pack, signature, str(PACK_DIR), key
+        )
+        assert returned_signature == signature
+        assert returned_pack is pack
+
+    def test_unblended_selection_actually_rebuilds_the_layer(self, loaded, by_schedule):
+        """The regression the promotion introduced: unblended must differ.
+
+        Once balanced_structural is the pack default, selecting "Current
+        unblended" has to rebuild the unblended layer rather than fall through
+        to the pack - otherwise the control shows the promoted path under the
+        wrong label.
+        """
+
+        pack, _ = loaded
+        block = pack.manifest.get("official_vintages") or {}
+        promoted = str(block.get("long_run_transition_schedule_id"))
+        if promoted == UNBLENDED_SCHEDULE_ID:
+            pytest.skip("pack is built unblended; nothing to distinguish")
+        unblended = _annual(
+            by_schedule[UNBLENDED_SCHEDULE_ID], "current_basecase", "total_nltf_net_revenue"
+        )
+        promoted_path = _annual(
+            by_schedule[promoted], "current_basecase", "total_nltf_net_revenue"
+        )
+        assert float(unblended.loc[2040]) != float(promoted_path.loc[2040])
 
     def test_scope_reader_defaults_for_a_legacy_eight_tuple(self):
         legacy = (

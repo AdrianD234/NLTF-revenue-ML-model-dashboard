@@ -77,7 +77,7 @@ from .mbu26_source_spine import (
 from .long_run_shape_transition import (
     FLEET_COMPOSITION_SOURCE_ID,
     LONG_RUN_SHAPE_METHOD_ID,
-    UNBLENDED_SCHEDULE_ID,
+    PRODUCTION_LONG_RUN_TRANSITION_SCHEDULE_ID,
     resolve_schedule,
 )
 from .official_vintage import (
@@ -4183,7 +4183,7 @@ def build_current_revenue_outlook_runtime_pack(
     official_comparator_vintage_id: str | None = None,
     bridge_assumption_vintage_id: str | None = None,
     long_run_shape_vintage_id: str | None = None,
-    long_run_transition_schedule_id: str = UNBLENDED_SCHEDULE_ID,
+    long_run_transition_schedule_id: str = PRODUCTION_LONG_RUN_TRANSITION_SCHEDULE_ID,
 ) -> RevenueOutlookPack:
     """Materialize the committed Revenue Outlook pack from repo-local sources.
 

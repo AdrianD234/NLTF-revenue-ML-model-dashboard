@@ -1044,8 +1044,12 @@ def _shape_adjusted_signature(
     selection has to enter here or a switch between schedules would silently
     return another schedule's cached frames.
     """
-    if schedule_id == UNBLENDED_SCHEDULE_ID:
-        return signature
+    # The marker is appended for EVERY explicit selection, including the
+    # unblended control. Exempting unblended would have been correct only while
+    # the pack was itself unblended; with a structural schedule promoted, the
+    # rebuilt unblended frames are different data and must not share the pack's
+    # cache entry. Callers skip this entirely when the selection matches the
+    # pack, so the untouched pack keeps its untouched signature.
     marker = (f"long_run_shape:{schedule_id}:{shape_vintage_id}", 0, 0)
     return tuple(signature) + (marker,)
 
@@ -1127,7 +1131,17 @@ def _apply_long_run_shape_selection(
     """
 
     schedule_id, shape_vintage_id = _long_run_shape_scope(ev_uptake_key)
-    if schedule_id == UNBLENDED_SCHEDULE_ID or not shape_vintage_id:
+    if not shape_vintage_id:
+        return pack, signature
+    # Skip the rebuild only when the selection already MATCHES what the pack was
+    # built with. Short-circuiting on `unblended` instead was only correct while
+    # the pack itself was unblended: once a structural schedule is promoted,
+    # selecting "Current unblended" has to actively rebuild the unblended layer,
+    # or the control silently shows the promoted path under the wrong label.
+    block = pack.manifest.get("official_vintages") if isinstance(pack.manifest, dict) else None
+    pack_schedule = str((block or {}).get("long_run_transition_schedule_id") or UNBLENDED_SCHEDULE_ID)
+    pack_shape_vintage = str((block or {}).get("long_run_shape_vintage_id") or "")
+    if schedule_id == pack_schedule and shape_vintage_id == pack_shape_vintage:
         return pack, signature
     try:
         chart_rows, line_rows = cached_long_run_shape_post_model_rows(
