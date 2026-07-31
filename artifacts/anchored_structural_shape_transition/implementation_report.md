@@ -182,10 +182,19 @@ pool 2.6130 vs 2.6081), which is evidence the structural shape is stable under a
 change of vintage rather than an artefact of one release. That matters for the
 "stability under a later official vintage" criterion.
 
-## Deliberately NOT done
+## The production default IS changed
 
-- **No production default is changed.** Every committed pack still records
-  `unblended_current`, and a rebuild today reproduces merged main.
+Following the owner decision, `balanced_structural` is the production default.
+It lives in one governed place, `PRODUCTION_LONG_RUN_TRANSITION_SCHEDULE_ID`,
+which the pack builder defaults to; the low-level constructor keeps the neutral
+`unblended_current` default so a direct call cannot silently inherit it.
+
+Both runtime packs were rebuilt and audited against the merged-main baseline:
+**840 rows changed per engine, every one of them a FY2031-FY2050
+post_model_extrapolation row**. Actuals, the FY2026-FY2030 econometric window,
+promoted fitted states and both official spines are unchanged.
+
+## Deliberately NOT done
 - Exact-VFM composition is **not** replaced with official embedded shares. PR
   #11's composition-refresh candidate remains an opt-in owner decision, and the
   embedded shares appear here as audit-only comparisons.

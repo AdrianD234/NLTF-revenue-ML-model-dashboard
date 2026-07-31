@@ -1,0 +1,61 @@
+........................................................................ [  5%]
+........................................................................ [ 10%]
+........................................................................ [ 16%]
+........................................................................ [ 21%]
+........................................................................ [ 27%]
+.......................................sssssss..sss.ssss.sss..ssssss..ss [ 32%]
+ssss.ssssssssss.ssssssssss.............................................. [ 38%]
+....................s................................................... [ 43%]
+........................................................................ [ 49%]
+........................................................................ [ 54%]
+........................................................................ [ 60%]
+........................................................................ [ 65%]
+........................................................................ [ 71%]
+........................................................................ [ 76%]
+.F...................................................................... [ 82%]
+........................................................................ [ 87%]
+........................................................................ [ 93%]
+........................................................................ [ 98%]
+....................                                                     [100%]
+================================== FAILURES ===================================
+_______ test_current_revenue_outlook_runtime_artifact_hashes_are_frozen _______
+tests\test_revenue_outlook.py:2404: in test_current_revenue_outlook_runtime_artifact_hashes_are_frozen
+    assert {path.name: _sha256(path) for path in sorted(pack_dir.iterdir()) if path.is_file()} == expected_hashes
+E   AssertionError: assert {'conflict_fu...a5cb9e4', ...} == {'conflict_fu...a5cb9e4', ...}
+E     
+E     Omitting 58 identical items, use -vv to show
+E     Differing items:
+E     {'sensitivity_impact_audit.csv': '768c0da3f7c2c11c510849f07b7b2838bf2a1721df474c08e6f5b63a056492e2'} != {'sensitivity_impact_audit.csv': 'f76717f1d4a7f707e11f1ff72d5a2e39851dbb2b9bae79f4cbb1ba7dc1894f5a'}
+E     {'fan_band_rows.csv': '24e47a51b316e125a4111b5499f65731c808fc31e0d605ef80bee7cb66c9ad36'} != {'fan_band_rows.csv': 'cabb94984d250396e8b428358de6d1a73b787bbf915cf0d5a5565d0a34d12392'}
+E     {'fan_band_rows.parquet': '8b2aac6445c37ff9d51af18260093c9c8d9a6e89b6abf60f31652ca9283df53b'} != {'fan_band_rows.parquet': '79e787...
+E     
+E     ...Full output truncated (12 lines hidden), use '-vv' to show
+============================== warnings summary ===============================
+tests/test_latest_arbitration_values.py::test_mini_parquet_finalists_are_selected_from_current_recommended_flags
+tests/test_latest_arbitration_values.py::test_mini_parquet_finalists_are_selected_from_current_recommended_flags
+tests/test_latest_arbitration_values.py::test_mini_parquet_schiff_rows_are_pure_and_separate_from_finalists
+tests/test_latest_arbitration_values.py::test_mini_parquet_schiff_rows_are_pure_and_separate_from_finalists
+tests/test_latest_arbitration_values.py::test_mini_parquet_ensemble_weights_come_from_component_json
+tests/test_latest_arbitration_values.py::test_mini_parquet_ensemble_weights_come_from_component_json
+tests/test_latest_arbitration_values.py::test_mini_parquet_source_tables_are_generated_from_dashboard_data
+tests/test_latest_arbitration_values.py::test_mini_parquet_source_tables_are_generated_from_dashboard_data
+  C:\Users\Adrian Desilvestro\Repos\NLTF-revenue-ML-model-dashboard\.venv\Lib\site-packages\numpy\lib\_function_base_impl.py:3023: RuntimeWarning: invalid value encountered in divide
+    c /= stddev[:, None]
+
+tests/test_revenue_outlook.py::test_revenue_outlook_loader_uses_committed_csv_fallback_when_parquet_engine_unavailable
+  C:\Users\Adrian Desilvestro\Repos\NLTF-revenue-ML-model-dashboard\model_dashboard\revenue_outlook.py:5107: DtypeWarning: Columns (0: vktpc_source_file, 1: vktpc_source_cell, 2: vktpc_source_status, 3: population_source_file, 4: population_source_cell, 5: population_source_status, 6: model_id, 7: actual_quarters, 8: forecast_segment) have mixed types. Specify dtype option on import or set low_memory=False.
+    return pd.read_csv(csv_path)
+
+tests/test_revenue_source_app_views.py::test_revenue_outlook_composition_figure_stacks_components_and_overlays_aggregates
+  C:\Users\Adrian Desilvestro\Repos\NLTF-revenue-ML-model-dashboard\tests\test_revenue_source_app_views.py:835: DtypeWarning: Columns (0: vktpc_source_file, 1: vktpc_source_cell, 2: vktpc_source_status, 3: population_source_file, 4: population_source_cell, 5: population_source_status, 6: model_id, 7: actual_quarters, 8: forecast_segment) have mixed types. Specify dtype option on import or set low_memory=False.
+    stack = pd.read_csv(ROOT / "data/current_revenue_outlook/revenue_stack_components.csv")
+
+tests/test_revenue_source_app_views.py::test_revenue_outlook_composition_figure_uses_signed_relative_stack_semantics
+  C:\Users\Adrian Desilvestro\Repos\NLTF-revenue-ML-model-dashboard\tests\test_revenue_source_app_views.py:922: DtypeWarning: Columns (0: vktpc_source_file, 1: vktpc_source_cell, 2: vktpc_source_status, 3: population_source_file, 4: population_source_cell, 5: population_source_status, 6: model_id, 7: actual_quarters, 8: forecast_segment) have mixed types. Specify dtype option on import or set low_memory=False.
+    stack = pd.read_csv(ROOT / "data/current_revenue_outlook/revenue_stack_components.csv")
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/test_revenue_outlook.py::test_current_revenue_outlook_runtime_artifact_hashes_are_frozen
+1 failed, 1265 passed, 50 skipped, 41 deselected, 11 warnings in 2429.13s (0:40:29)
+EXIT=1
