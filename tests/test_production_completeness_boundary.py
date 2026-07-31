@@ -60,13 +60,26 @@ def test_a_missing_required_row_cannot_reach_the_dashboard(tmp_path, series, rol
     staged = tmp_path / "current_revenue_outlook"
     shutil.copytree(PACK, staged)
     rows = pd.read_parquet(staged / "revenue_chart_rows.parquet")
-    damaged = rows[
-        ~(
-            rows["series_id"].astype(str).eq(series)
-            & rows["scenario_role"].astype(str).eq(role)
-            & rows["period"].astype(str).eq(period)
+    target = (
+        rows["series_id"].astype(str).eq(series)
+        & rows["scenario_role"].astype(str).eq(role)
+        & rows["period"].astype(str).eq(period)
+    )
+    if role == "official_comparator":
+        # The pack now carries one official comparator trace per registered
+        # vintage, so the role alone matches several rows. The completeness
+        # contract governs the DEFAULT comparator scenario, so target that one
+        # and keep the injection a single-row defect.
+        from model_dashboard.official_vintage import (
+            default_comparator_vintage_id,
+            official_comparator_scenario_name,
         )
-    ]
+
+        default_scenario = official_comparator_scenario_name(
+            default_comparator_vintage_id(ROOT)
+        )
+        target &= rows["scenario_name"].astype(str).eq(default_scenario)
+    damaged = rows[~target]
     assert len(damaged) == len(rows) - 1, "the injection must remove exactly one row"
     damaged.to_parquet(staged / "revenue_chart_rows.parquet", index=False)
     _restamp_hashes(staged)

@@ -880,6 +880,12 @@ def test_forecast_run_artifacts_are_repo_ignored() -> None:
         # source_workbook_manifest.json; ingested by
         # scripts/refresh_model_actuals.py, never read at runtime)
         "references/NLTF_model_input_sheet_actuals_to_2026Q1_complete1.xlsx",
+        # governed BEFU26 official revenue-forecast vintage, vendored
+        # 2026-07-31 (sha256 pinned in the official-vintage registry at
+        # data/revenue_model_source_pack/official_vintage_registry.json and in
+        # the materialized pack manifest; ingested by
+        # scripts/materialize_official_vintage.py, never read at runtime)
+        "references/BEFU26 revenue forecast.xlsx",
     }
 
 

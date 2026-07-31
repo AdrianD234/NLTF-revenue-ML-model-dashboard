@@ -150,6 +150,59 @@ def test_befu26_published_values_match_the_workbook_pack_exactly() -> None:
     assert mismatches == [], f"displayed BEFU26 values diverge from the pack: {mismatches[:5]}"
 
 
+def test_every_revenue_bridge_uses_the_registered_bridge_vintage() -> None:
+    """No code path may bridge activity to revenue on a different vintage.
+
+    Regression gate for a real defect on this branch: the Treasury macro
+    replay still called ``load_mbu26_annual_spine`` to turn replayed activity
+    into revenue while the committed packs were rebuilt on the BEFU26 bridge.
+    Mixing the two vintages broke the Current RUC identity (Total RUC no
+    longer equalled class leaves less administration) by ~2.5e-3 - small
+    enough to slip past a chart, large enough to fail the governed 1e-6
+    reconciliation gate.
+    """
+    offenders: list[str] = []
+    for directory in ("model_dashboard", "scripts"):
+        for path in (ROOT / directory).rglob("*.py"):
+            if "__pycache__" in path.parts:
+                continue
+            rel = path.relative_to(ROOT).as_posix()
+            if rel in {
+                "model_dashboard/mbu26_source_spine.py",
+                "model_dashboard/revenue_outlook.py",
+                "scripts/materialize_mbu26_annual_spine.py",
+                "scripts/build_corrected_mbu26_reconciliation.py",
+            }:
+                continue
+            source = path.read_text(encoding="utf-8")
+            if "current_forecast_annual_from_mbu26(" in source and "load_mbu26_annual_spine" in source:
+                offenders.append(rel)
+    assert offenders == [], (
+        "these modules bridge activity to revenue using the MBU26 spine instead of the "
+        f"registered bridge-assumption vintage: {offenders}"
+    )
+
+
+def test_current_ruc_identity_closes_in_the_committed_packs() -> None:
+    """Total RUC must equal class leaves less administration, exactly."""
+    for _engine, pack_dir in RUNTIME_PACKS:
+        line = pd.read_csv(pack_dir / "revenue_line_reconciliation.csv", low_memory=False)
+        current = line[line["source_path"].astype(str).eq("Current finalist Base case")]
+        wide = current.pivot_table(index="FY", columns="series_id", values="value", aggfunc="first")
+        classes = [
+            "light_ruc_net_revenue",
+            "light_bev_ruc_net_revenue",
+            "phev_ruc_net_revenue",
+            "heavy_ruc_net_revenue",
+            "heavy_bev_ruc_net_revenue",
+        ]
+        for fy in (2026, 2027, 2028, 2029, 2030):
+            residual = wide.loc[fy, "total_ruc_net_revenue"] - (
+                sum(wide.loc[fy, series] for series in classes) - wide.loc[fy, "ruc_admin_revenue"]
+            )
+            assert abs(float(residual)) < 1e-6, f"{pack_dir.name} FY{fy} residual {residual}"
+
+
 def test_lambda_migration_path_has_not_returned() -> None:
     """The retired lambda allocation must not reappear in the runtime bridge."""
     chart = pd.read_csv(

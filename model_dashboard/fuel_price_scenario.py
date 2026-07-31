@@ -60,7 +60,6 @@ from .unit_contract import display_scale_for
 from .mbu26_source_spine import (
     FORMULA_DEFINITIONS,
     current_forecast_annual_from_mbu26,
-    load_mbu26_annual_spine,
 )
 from .rate_paths import (
     FED_POLICY_STATE_DELAYED_6M,
@@ -2388,12 +2387,23 @@ def _annual_bridge_and_factors(
         quarterly["scenario_name"].astype(str).map(scenario_roles).fillna("")
     )
 
-    mbu26 = load_mbu26_annual_spine(repo_root=repo_root)
-    if mbu26 is None or mbu26.official_annual.empty:
-        raise ValueError("The committed MBU26 annual spine is required to bridge replay activity into revenue.")
+    # The replay must bridge activity to revenue through the SAME
+    # bridge-assumption vintage the committed pack was built with. Reading the
+    # MBU26 spine here while the pack carries BEFU26 rates silently mixes
+    # vintages and breaks the Current RUC identity by ~1e-3 (Total RUC no
+    # longer equals class leaves less administration).
+    from .official_vintage import default_bridge_vintage_id, load_official_vintage
+
+    bridge_vid = default_bridge_vintage_id(repo_root)
+    bridge_pack = load_official_vintage(bridge_vid, repo_root=repo_root)
+    if bridge_pack is None or bridge_pack.official_annual.empty:
+        raise ValueError(
+            f"The committed {bridge_vid} official annual pack is required to bridge "
+            "replay activity into revenue."
+        )
     annual = current_forecast_annual_from_mbu26(
         current_outlook_chart_rows=quarterly,
-        mbu26_official_annual=mbu26.official_annual,
+        mbu26_official_annual=bridge_pack.official_annual,
         scenario_input_wide=replay_inputs,
         migration_lambda_reference_scenario=base_scenario_name,
     )
