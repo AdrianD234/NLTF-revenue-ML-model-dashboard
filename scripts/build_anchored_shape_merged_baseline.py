@@ -278,7 +278,9 @@ def _hash_frame(baseline: pd.DataFrame) -> pd.DataFrame:
         ["baseline_block", "engine"], dropna=False, observed=True
     )
     for (block, engine), frame in grouped:
-        payload = frame.drop(columns=["baseline_block"]).to_csv(index=False)
+        payload = frame.drop(columns=["baseline_block"]).to_csv(
+            index=False, float_format="%.17g"
+        )
         rows.append(
             {
                 "baseline_block": block,
@@ -299,7 +301,12 @@ def main() -> int:
     hashes = _hash_frame(baseline)
 
     baseline_path = OUT / "merged_main_baseline.csv"
-    baseline.to_csv(baseline_path, index=False)
+    # %.17g guarantees a float64 round-trips through text exactly. pandas'
+    # default formatter drops the last bits, which turned the "unchanged
+    # exactly" gates into ~1e-12 comparisons - a precision artefact of the
+    # baseline file rather than a real change. Writing full precision keeps
+    # those gates true equalities.
+    baseline.to_csv(baseline_path, index=False, float_format="%.17g")
     hashes.to_csv(OUT / "merged_main_baseline_hashes.csv", index=False)
 
     manifest = {

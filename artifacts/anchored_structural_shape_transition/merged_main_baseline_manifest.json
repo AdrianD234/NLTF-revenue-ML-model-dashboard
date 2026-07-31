@@ -1,6 +1,6 @@
 {
   "baseline_id": "anchored_structural_shape_transition_merged_main_baseline_v1",
-  "baseline_sha256": "4a36e89273c252e771a07e6b1f068ffb4d88f3ac693a2827c1694e417b33d16c",
+  "baseline_sha256": "9b5bcdd205a6fa05348c8f42d83da8c08c64ddee7d676a8cd5a17951e0f37a57",
   "blocks": {
     "econometric_forecast": "Current FY2026-FY2030; must be identical after the change",
     "historical_actual": "actuals; must be identical after the change",
