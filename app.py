@@ -204,9 +204,17 @@ from model_dashboard.ev_uptake_levers import (
     apply_uptake_levers_to_chart_rows,
 )
 from model_dashboard.mbu26_source_spine import FORMULA_DEFINITIONS
+from model_dashboard.long_run_shape_transition import (
+    FLEET_COMPOSITION_SOURCE_ID,
+    STRUCTURAL_SCHEDULE_IDS,
+    UNBLENDED_SCHEDULE_ID,
+    resolve_schedule,
+)
 from model_dashboard.official_vintage import (
     bridge_vintage_id_from_manifest,
     default_comparator_vintage_id,
+    long_run_shape_vintage_choices,
+    long_run_shape_vintage_id_from_manifest,
     official_comparator_scenario_name,
     official_comparator_trace_name,
     official_vintage_choices,
@@ -4176,6 +4184,153 @@ def _official_vintage_trace_name(vid: str, entry: dict[str, Any]) -> str:
     return str(entry.get("trace_name") or official_comparator_trace_name(release))
 
 
+_LONG_RUN_SHAPE_PREVIEW_KEY = "revenue_outlook_long_run_shape_method"
+
+
+def _long_run_shape_preview_options(manifest: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """The analyst-only long-run shape previews, built from the registry.
+
+    Options are generated from the governed schedule catalogue and the
+    registered shape-capable vintages, so a later vintage appears here without
+    a code edit. The pack's own recorded schedule is always the first option:
+    it is what the published chart shows.
+    """
+
+    block = manifest.get("official_vintages") if isinstance(manifest, dict) else None
+    block = block if isinstance(block, dict) else {}
+    pack_schedule = str(
+        block.get("long_run_transition_schedule_id") or UNBLENDED_SCHEDULE_ID
+    )
+    pack_shape_vid = str(block.get("long_run_shape_vintage_id") or "")
+
+    options: dict[str, dict[str, Any]] = {
+        "Current unblended": {
+            "schedule_id": UNBLENDED_SCHEDULE_ID,
+            "shape_vintage_id": pack_shape_vid,
+            "is_pack_default": pack_schedule == UNBLENDED_SCHEDULE_ID,
+            "role": "production_default"
+            if pack_schedule == UNBLENDED_SCHEDULE_ID
+            else "preview",
+        }
+    }
+    try:
+        shape_choices = dict(long_run_shape_vintage_choices())
+    except Exception:
+        shape_choices = {}
+    # A pack predating the shape role records no vintage. Fall back to the
+    # governed REGISTRY DEFAULT, never to whichever vintage happens to be first
+    # in the registry - that ordering is incidental and would silently promote
+    # a prior vintage to the primary preview.
+    default_shape = pack_shape_vid
+    if not default_shape:
+        try:
+            default_shape = long_run_shape_vintage_id_from_manifest(manifest)
+        except Exception:
+            default_shape = next(iter(shape_choices), "")
+    for schedule_id in STRUCTURAL_SCHEDULE_IDS:
+        schedule = resolve_schedule(schedule_id)
+        suffix = schedule_id.split("_")[0]
+        label = f"{default_shape} anchored structural transition - {suffix}"
+        options[label] = {
+            "schedule_id": schedule_id,
+            "shape_vintage_id": default_shape,
+            "is_pack_default": pack_schedule == schedule_id,
+            "role": "production_default" if pack_schedule == schedule_id else "preview",
+        }
+    for vid in shape_choices:
+        if vid == default_shape:
+            continue
+        options[f"{vid} anchored structural transition - prior-vintage audit"] = {
+            "schedule_id": "balanced_structural",
+            "shape_vintage_id": vid,
+            "is_pack_default": False,
+            "role": "audit",
+        }
+    return options
+
+
+def _render_long_run_shape_controls(manifest: dict[str, Any]) -> dict[str, Any]:
+    """Analyst-only "Long-run shape method" preview selector.
+
+    Independent of the official comparator vintage, the bridge-assumption
+    vintage, the VFM fleet-composition scenario and the transition schedule -
+    changing any one of those must not move the others. The PUBLIC default is
+    whatever the committed pack recorded, and this control cannot change it:
+    it is rendered only under the local audit controls and is a preview of
+    candidates awaiting an owner decision.
+    """
+
+    options = _long_run_shape_preview_options(manifest)
+    labels = list(options)
+    pack_label = next(
+        (label for label, spec in options.items() if spec["is_pack_default"]),
+        labels[0],
+    )
+    selected_label = pack_label
+    if should_show_local_audit_controls():
+        if (
+            _LONG_RUN_SHAPE_PREVIEW_KEY in st.session_state
+            and str(st.session_state[_LONG_RUN_SHAPE_PREVIEW_KEY]) not in options
+        ):
+            st.session_state[_LONG_RUN_SHAPE_PREVIEW_KEY] = pack_label
+        selected_label = st.selectbox(
+            "Long-run shape method",
+            labels,
+            key=_LONG_RUN_SHAPE_PREVIEW_KEY,
+            help=(
+                "Analyst preview of the FY2031-FY2050 long-run construction. "
+                "Current FY2030 remains the level anchor under every option; the "
+                "selection changes only how quickly the post-model growth shape "
+                "transitions toward the selected structural source. The official "
+                "level is not substituted, and the published default is unchanged "
+                "until an owner selects a production candidate."
+            ),
+            **_widget_default_kwargs(
+                _LONG_RUN_SHAPE_PREVIEW_KEY, index=labels.index(pack_label)
+            ),
+        )
+    spec = options.get(str(selected_label), options[pack_label])
+    schedule = resolve_schedule(str(spec["schedule_id"]))
+    return {
+        "label": str(selected_label),
+        "schedule_id": schedule.schedule_id,
+        "shape_vintage_id": str(spec["shape_vintage_id"]),
+        "anchor_fy": schedule.anchor_fy,
+        "completion_fy": schedule.completion_fy,
+        "is_pack_default": bool(spec["is_pack_default"]),
+        "role": str(spec["role"]),
+        "options": tuple(labels),
+    }
+
+
+def _long_run_shape_details_text(
+    shape_state: dict[str, Any], fleet_scenario: str
+) -> str:
+    """The governed details wording for the long-run construction.
+
+    Deliberately avoids "calibrated to", "forced to" and "blended to match":
+    none of those describe what the method does, and all three would misstate
+    it to a reader.
+    """
+
+    schedule_id = str(shape_state.get("schedule_id") or UNBLENDED_SCHEDULE_ID)
+    lines = [
+        f"Current FY{shape_state.get('anchor_fy', 2030)} level anchor",
+    ]
+    if schedule_id == UNBLENDED_SCHEDULE_ID:
+        lines.append(
+            "Long-run activity shape: Current econometric extrapolation "
+            "(no structural transition)"
+        )
+    else:
+        lines.append(
+            f"Long-run activity shape: {shape_state.get('shape_vintage_id')}"
+        )
+    lines.append(f"Fleet composition: {FLEET_COMPOSITION_SOURCE_ID} {fleet_scenario}")
+    lines.append(f"Transition schedule: {schedule_id}")
+    return "  \n".join(lines)
+
+
 def _render_official_vintage_controls(manifest: dict[str, Any]) -> dict[str, Any]:
     """Governed "Official comparator vintage" selector plus analyst overlay.
 
@@ -4773,6 +4928,10 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         # comparator vintage). Rendered in both view modes so the A/B official
         # option and the sections below the comparison stay bound to it.
         official_vintage_state = _render_official_vintage_controls(manifest)
+        # The long-run shape method is a SEPARATE analyst control: selecting a
+        # comparator vintage must not change the Current long-run shape, and
+        # vice versa.
+        long_run_shape_state = _render_long_run_shape_controls(manifest)
         selected_official_trace = str(official_vintage_state["trace_name"])
         selected_official_release = str(official_vintage_state["release_round"])
         trace_options = _apply_official_vintage_to_trace_options(trace_options, official_vintage_state)
@@ -9644,7 +9803,11 @@ def revenue_outlook_uncertainty_fan_figure(
         # labelled a scenario envelope rather than an interval.
         is_envelope = bool(suffix)
         for index, (upper, lower, name, color) in enumerate(band_specs):
-            label = "Long-run scenario envelope (not probabilistic)" if is_envelope else name
+            label = (
+                "Long-run structural scenario envelope - not probabilistic"
+                if is_envelope
+                else name
+            )
             fig.add_trace(
                 go.Scatter(
                     x=portion["period"], y=portion[f"{upper}_display"], mode="lines",
@@ -11552,6 +11715,34 @@ def _revenue_outlook_manifest_table(manifest: dict[str, Any]) -> pd.DataFrame:
         rows.append(
             ("Default official comparator trace", official_vintages.get("default_official_comparator_trace"))
         )
+        # The third governed role, reported alongside the other two so a reader
+        # can see all three sources a displayed number depends on.
+        if official_vintages.get("long_run_shape_vintage_id"):
+            rows.extend(
+                [
+                    (
+                        "Long-run shape vintage",
+                        official_vintages.get("long_run_shape_vintage_id"),
+                    ),
+                    (
+                        "Long-run shape method",
+                        official_vintages.get("long_run_shape_method_id"),
+                    ),
+                    (
+                        "Long-run transition schedule",
+                        official_vintages.get("long_run_transition_schedule_id"),
+                    ),
+                    ("Long-run anchor FY", official_vintages.get("long_run_anchor_fy")),
+                    (
+                        "Long-run transition completion FY",
+                        official_vintages.get("long_run_transition_end_fy"),
+                    ),
+                    (
+                        "Fleet composition source",
+                        official_vintages.get("fleet_composition_source_id"),
+                    ),
+                ]
+            )
         available_vintages = official_vintages.get("available", {})
         if isinstance(available_vintages, dict):
             for vintage_id, entry in sorted(available_vintages.items()):
