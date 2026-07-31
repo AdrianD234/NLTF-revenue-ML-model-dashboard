@@ -347,10 +347,25 @@ def test_no_lambda_or_shrinking_share_division_is_reintroduced() -> None:
     ]
     assert not offenders, f"a level is divided by a share: {offenders[:3]}"
     # And the sanctioned rule must be present and multiplicative.
+    #
+    # The pool is still `anchor x index`. Since the anchored structural shape
+    # transition the index is the HYBRID one - a geometric blend of the VFM
+    # pool index (the Current leg) with the selected official vintage's pool
+    # index - which under the default unblended schedule equals the VFM pool
+    # index exactly. So this asserts the multiplicative anchor x index FORM and
+    # that the VFM pool index is still the Current leg, rather than pinning one
+    # literal expression that a legitimate method change has to edit.
     assert "vfm_pool_index" in lowered
-    assert re.search(r"pool_anchor\s*\*\s*g\[.vfm_pool_index.\]", lowered), (
-        "the Light RUC pool must be anchor x index"
+    assert re.search(
+        r"pool_anchor\s*\*\s*g\[.(vfm_pool_index|h_light_ruc_pool).\]", lowered
+    ), "the Light RUC pool must be anchor x index"
+    # The VFM pool index must remain the Current leg of that blend, so the
+    # structural source can never silently replace the vendored pool path.
+    assert re.search(r'"light_ruc_pool":\s*"vfm_pool_index"', lowered), (
+        "the VFM pool index must remain the Current leg of the Light RUC blend"
     )
+    # The blend itself must be multiplicative/log-space, never additive on levels.
+    assert "geometric_blend_index" in lowered
 
 
 def test_light_ruc_long_run_pool_is_finite_and_passes_the_divergence_gate(chart) -> None:

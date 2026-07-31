@@ -1,0 +1,55 @@
+........................................................................ [  5%]
+........................................................................ [ 11%]
+........................................................................ [ 17%]
+........................................................................ [ 22%]
+............................................................sssssss..sss [ 28%]
+.ssss.sss..ssssss..ssssss.ssssssssss.ssssssssss......................... [ 34%]
+.........................................s.............................. [ 39%]
+........................................................................ [ 45%]
+........................................................................ [ 51%]
+........................................................................ [ 56%]
+........................................................................ [ 62%]
+........................................................................ [ 68%]
+........................................................................ [ 73%]
+.............................................F.......................... [ 79%]
+........................................................................ [ 85%]
+........................................................................ [ 91%]
+........................................................................ [ 96%]
+.........................................                                [100%]
+================================== FAILURES ===================================
+_________ test_no_lambda_or_shrinking_share_division_is_reintroduced __________
+tests\test_revenue_outlook_long_run.py:351: in test_no_lambda_or_shrinking_share_division_is_reintroduced
+    assert re.search(r"pool_anchor\s*\*\s*g\[.vfm_pool_index.\]", lowered), (
+E   AssertionError: the Light RUC pool must be anchor x index
+E   assert None
+E    +  where None = <function search at 0x000001359B95A980>('pool_anchor\\s*\\*\\s*g\\[.vfm_pool_index.\\]', '"""the governed fy2031-fy2050 post-model extrapolation layer.\n\np0 withheld decision-facing current values beyond h2...olumns else current\n    out.loc[unlabelled & is_forecast, "forecast_segment"] = econometric_segment\n    return out\n')
+E    +    where <function search at 0x000001359B95A980> = <module 're' from 'C:\\Conda\\anaconda3\\Lib\\re\\__init__.py'>.search
+============================== warnings summary ===============================
+tests/test_latest_arbitration_values.py::test_mini_parquet_finalists_are_selected_from_current_recommended_flags
+tests/test_latest_arbitration_values.py::test_mini_parquet_finalists_are_selected_from_current_recommended_flags
+tests/test_latest_arbitration_values.py::test_mini_parquet_schiff_rows_are_pure_and_separate_from_finalists
+tests/test_latest_arbitration_values.py::test_mini_parquet_schiff_rows_are_pure_and_separate_from_finalists
+tests/test_latest_arbitration_values.py::test_mini_parquet_ensemble_weights_come_from_component_json
+tests/test_latest_arbitration_values.py::test_mini_parquet_ensemble_weights_come_from_component_json
+tests/test_latest_arbitration_values.py::test_mini_parquet_source_tables_are_generated_from_dashboard_data
+tests/test_latest_arbitration_values.py::test_mini_parquet_source_tables_are_generated_from_dashboard_data
+  C:\Users\Adrian Desilvestro\Repos\NLTF-revenue-ML-model-dashboard\.venv\Lib\site-packages\numpy\lib\_function_base_impl.py:3023: RuntimeWarning: invalid value encountered in divide
+    c /= stddev[:, None]
+
+tests/test_revenue_outlook.py::test_revenue_outlook_loader_uses_committed_csv_fallback_when_parquet_engine_unavailable
+  C:\Users\Adrian Desilvestro\Repos\NLTF-revenue-ML-model-dashboard\model_dashboard\revenue_outlook.py:5107: DtypeWarning: Columns (0: vktpc_source_file, 1: vktpc_source_cell, 2: vktpc_source_status, 3: population_source_file, 4: population_source_cell, 5: population_source_status, 6: model_id, 7: actual_quarters, 8: forecast_segment) have mixed types. Specify dtype option on import or set low_memory=False.
+    return pd.read_csv(csv_path)
+
+tests/test_revenue_source_app_views.py::test_revenue_outlook_composition_figure_stacks_components_and_overlays_aggregates
+  C:\Users\Adrian Desilvestro\Repos\NLTF-revenue-ML-model-dashboard\tests\test_revenue_source_app_views.py:835: DtypeWarning: Columns (0: vktpc_source_file, 1: vktpc_source_cell, 2: vktpc_source_status, 3: population_source_file, 4: population_source_cell, 5: population_source_status, 6: model_id, 7: actual_quarters, 8: forecast_segment) have mixed types. Specify dtype option on import or set low_memory=False.
+    stack = pd.read_csv(ROOT / "data/current_revenue_outlook/revenue_stack_components.csv")
+
+tests/test_revenue_source_app_views.py::test_revenue_outlook_composition_figure_uses_signed_relative_stack_semantics
+  C:\Users\Adrian Desilvestro\Repos\NLTF-revenue-ML-model-dashboard\tests\test_revenue_source_app_views.py:922: DtypeWarning: Columns (0: vktpc_source_file, 1: vktpc_source_cell, 2: vktpc_source_status, 3: population_source_file, 4: population_source_cell, 5: population_source_status, 6: model_id, 7: actual_quarters, 8: forecast_segment) have mixed types. Specify dtype option on import or set low_memory=False.
+    stack = pd.read_csv(ROOT / "data/current_revenue_outlook/revenue_stack_components.csv")
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/test_revenue_outlook_long_run.py::test_no_lambda_or_shrinking_share_division_is_reintroduced
+1 failed, 1214 passed, 50 skipped, 41 deselected, 11 warnings in 1713.43s (0:28:33)
+EXIT=1
