@@ -20,6 +20,42 @@ and selectable as the prior vintage.
 | `3a1f050` | Front-end official comparator vintage selector and policy immutability |
 | `b19bbd9` | Regression and invariance gates |
 | `498ce35` | Macro-replay vintage-mix fix; remaining gate closures |
+| `5a6ffb5` | Implementation report and browser evidence |
+| `6bb08d3` | **Closure amendment**: pack bridge authoritative end to end; rate-chart source fixed; registry-driven runtime; 2x2 role matrix; fail-closed registry; leakage gates |
+| `ac0247d` | Closure follow-up: fleet-mix selector call fixed; one AppTest timeout aligned to the module helper |
+
+## Closure amendment (post-review)
+
+Two genuine runtime sourcing defects were found in review and fixed:
+
+1. **The effective-rate chart read MBU26 behind a BEFU26 caption.** The chart
+   now derives PED intensity and Light/Heavy RUC effective rates from the
+   actual bridge vintage; the caption is generated from that same vintage so
+   it cannot drift again. `_mbu26_spine` is reserved for the MBU26-only
+   synthetic counterfactual, which legitimately hashes that exact file into
+   its audit rows.
+2. **The pack's bridge vintage was not authoritative.** The macro replay
+   resolved the live registry default rather than the manifest of the pack
+   being replayed, so a pack built on MBU26 while the registry defaulted to
+   BEFU26 would have been re-bridged on BEFU26. `bridge_vintage_id` is now
+   threaded from the pack manifest through the Treasury replays, rate paths,
+   fleet mix, PED intensity/RUC rate sourcing and the fleet-mix cache
+   signature. The registry default only selects a bridge when constructing a
+   NEW pack.
+
+Runtime genericity was completed (trace names, ordering, legend defaults,
+colour maps, source options, fleet-mix labels, FED-path exclusions and fan
+allowances are all registry-generated; the hard-coded BEFU26 default is gone
+and the static gate now catches hard-coded BEFU26 defaults too). The
+completeness contract fails closed on registry errors. A bidirectional
+leakage gate proves no non-selected vintage reaches charts, composition,
+reconciliation or downloads. A permanent 2x2 comparator x bridge matrix
+builds all four packs and asserts role independence, identity closure and
+published-row immutability.
+
+The replay-parity fingerprint SHA is **unchanged** across the closure
+(`6849a6da0fcae038d9e72c0203356b21a7394c28fd312baccba66debeb11cac7`),
+confirming no replay value moved.
 
 ## Source
 
@@ -137,10 +173,14 @@ the flags, rebuild packs, review impact, merge after CI.
 
 ## Validation
 
+All results below are for the final commit `ac0247d`.
+
 | Gate | Result |
 |---|---|
 | compileall | PASS |
-| Full local pytest | **1062 passed**, 50 skipped, 45 deselected, 0 failed |
+| Full local pytest | **1109 passed**, 50 skipped, 45 deselected, 0 failed |
+| Role-independence 2x2 matrix | **28/28** |
+| Runtime genericity + leakage gates | **19/19** |
 | Official-vintage reconciliation | **25/25 checks PASS** |
 | Corrected MBU26 reconciliation | PASS (all hierarchies < 1e-6) |
 | Official policy audit | PASS |
