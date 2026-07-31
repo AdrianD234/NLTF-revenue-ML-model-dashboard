@@ -1,0 +1,83 @@
+{
+  "vintage_id": "BEFU26",
+  "release_round": "BEFU26",
+  "workbook": {
+    "path": "references/BEFU26 revenue forecast.xlsx",
+    "basename": "BEFU26 revenue forecast.xlsx",
+    "sha256": "7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff",
+    "size_bytes": 51133
+  },
+  "sheet_names": [
+    "Baseline"
+  ],
+  "source_sheet": "Baseline",
+  "used_range": "A1:BD65",
+  "max_row": 65,
+  "max_column": 56,
+  "year_span": {
+    "min_fy": 2001,
+    "max_fy": 2055,
+    "n_year_columns": 55
+  },
+  "period_block_spans": {
+    "ACTUAL": {
+      "start_fy": 2001,
+      "end_fy": 2025,
+      "n_years": 25
+    },
+    "LT_FORECAST": {
+      "start_fy": 2031,
+      "end_fy": 2055,
+      "n_years": 25
+    },
+    "ST_FORECAST": {
+      "start_fy": 2026,
+      "end_fy": 2030,
+      "n_years": 5
+    }
+  },
+  "section_row_spans": {
+    "Key volumes: Level": {
+      "start_row": 5,
+      "end_row": 14
+    },
+    "Key volumes: Annual percentage changes": {
+      "start_row": 16,
+      "end_row": 25
+    },
+    "Revenues: Level ($m ex GST)": {
+      "start_row": 27,
+      "end_row": 26
+    },
+    "Road User Charges": {
+      "start_row": 28,
+      "end_row": 38
+    },
+    "Fuel Excise Duties": {
+      "start_row": 40,
+      "end_row": 46
+    },
+    "Motor Vehicle Register": {
+      "start_row": 48,
+      "end_row": 56
+    },
+    "Track User Charges": {
+      "start_row": 58,
+      "end_row": 59
+    },
+    "TOTALS": {
+      "start_row": 61,
+      "end_row": 65
+    }
+  },
+  "numeric_cell_count": 2584,
+  "formula_count": 0,
+  "formula_policy": "static published values; no Excel formulas stored in the grid",
+  "pack": {
+    "pack_dir": "data/revenue_model_source_pack/official_vintages/befu26",
+    "schema_version": "nltf-revenue-official-vintage-v1",
+    "extracted_at": "2026-07-30T21:11:02.010977+00:00",
+    "extracted_by": "official_vintage_materializer",
+    "sentinels_validated": 12
+  }
+}

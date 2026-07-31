@@ -1,0 +1,28 @@
+{
+  "workbook_path": "references/BEFU26 revenue forecast.xlsx",
+  "workbook_basename": "BEFU26 revenue forecast.xlsx",
+  "size_bytes": 51133,
+  "sha256": "7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff",
+  "sheet": "Baseline",
+  "registry_entry_snapshot": {
+    "vintage_id": "BEFU26",
+    "display_name": "BEFU26 official",
+    "release_round": "BEFU26",
+    "release_date": null,
+    "schema_version": "nltf-revenue-official-vintage-v1",
+    "actual_start_fy": 2001,
+    "actual_end_fy": 2025,
+    "short_forecast_start_fy": 2026,
+    "short_forecast_end_fy": 2030,
+    "long_forecast_start_fy": 2031,
+    "long_forecast_end_fy": 2055,
+    "source_horizon_fy": 2055,
+    "source_pack_path": "data/revenue_model_source_pack/official_vintages/befu26",
+    "pack_format": "official_vintage_v1",
+    "available": true,
+    "is_latest": true,
+    "is_default_comparator": true,
+    "is_default_bridge_vintage": true,
+    "status": "active_official_vintage"
+  }
+}

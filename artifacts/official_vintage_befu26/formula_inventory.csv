@@ -1,0 +1,2 @@
+sheet,cell,formula,note
+Baseline,,,policy: BEFU26 publishes static values; no Excel formulas are stored in the grid. Aggregate identities are asserted from the governed formula registry and residuals reported without force-balancing.

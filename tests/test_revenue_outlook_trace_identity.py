@@ -85,6 +85,7 @@ def test_conflict_traces_have_stable_severity_order_after_high_population() -> N
 
 def test_revenue_stack_keeps_all_conflict_paths_as_distinct_ordered_sources() -> None:
     sources = [
+        ("BEFU26 official", "befu26_official", "official_comparator"),
         ("MBU26 official", "mbu26_official", "official_comparator"),
         ("Current finalist Base case", "current_basecase", "basecase"),
         ("Current finalist High population/comparison", "current_comparison_1", "comparison"),

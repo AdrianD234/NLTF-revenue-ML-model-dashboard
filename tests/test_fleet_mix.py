@@ -84,13 +84,13 @@ def test_the_fy2025_denominator_example_matches_the_hand_calc() -> None:
 def test_dashboard_fleet_petrol_vkt_uses_same_lineage_as_ped_litres() -> None:
     dashboard = load_dashboard_frame(ROOT)
     mbu = load_mbu26_frame(ROOT)
-    mbu_spine = pd.read_csv(
-        ROOT
-        / "data"
-        / "revenue_model_source_pack"
-        / "mbu26_annual_spine"
-        / "mbu26_official_annual.csv"
-    )
+    # Litres must come from the SAME bridge-assumption vintage that
+    # load_mbu26_frame now resolves through the registry (BEFU26 by default);
+    # mixing vintages here would compare against a different official baseline
+    # than the one the runtime bridge actually used.
+    from model_dashboard.fleet_mix import _spine
+
+    mbu_spine = _spine(ROOT)
     mbu_ped_litres = (
         mbu_spine[
             mbu_spine["source_series_id"].astype(str).eq("ped_volume")
@@ -138,13 +138,14 @@ def test_dashboard_fleet_petrol_vkt_uses_same_lineage_as_ped_litres() -> None:
         / float(mbu.at[2030, "light_petrol_vkt"])
         - 1.0
     )
-    # Treasury's stronger governed baseline narrows the dashboard-versus-MBU
-    # FY2030 gap from the legacy macro path's roughly -7.42%. The expected
-    # value moved from -0.0587 when the pack stopped carrying a lambda-reduced
-    # PED level: the raw bridge always restored raw PED, but the macro replay
-    # rescales relative to the pack baseline, so removing lambda from the pack
-    # shifts this by about 0.03pp. The tolerance is unchanged.
-    assert fy2030_change == pytest.approx(-0.0584, abs=0.0002)
+    # Treasury's stronger governed baseline narrows the dashboard-versus-
+    # official FY2030 gap from the legacy macro path's roughly -7.42%. The
+    # expected value moved from -0.0587 when the pack stopped carrying a
+    # lambda-reduced PED level, and from -0.0584 to -0.0590 when the bridge
+    # baseline moved from MBU26 to BEFU26 (the official petrol-VKT and litres
+    # baselines both shifted with the 2026Q1 BEFU26 refresh). The tolerance is
+    # unchanged.
+    assert fy2030_change == pytest.approx(-0.0590, abs=0.0002)
 
 
 def test_dashboard_fleet_preserves_light_and_heavy_class_pools() -> None:

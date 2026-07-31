@@ -62,11 +62,12 @@ FED_UPLIFT_DELAY_NOTE = (
     "can affect their governed quarter."
 )
 RATE_CHART_NOTE = (
-    "Effective rates per 1,000 km. Light and Heavy RUC start from MBU26 net "
-    "revenue over net km, then follow the same proportional policy change as "
-    "the selected PED path. PED (petrol excise) is converted from $/litre "
-    "using MBU26 petrol-fleet intensity, so that line also embeds fleet "
-    "efficiency. The published January-2027 path remains visible as a reference."
+    "Effective rates per 1,000 km. Light and Heavy RUC start from the bridge "
+    "vintage (BEFU26) net revenue over net km, then follow the same "
+    "proportional policy change as the selected PED path. PED (petrol excise) "
+    "is converted from $/litre using the bridge vintage petrol-fleet "
+    "intensity, so that line also embeds fleet efficiency. The published "
+    "January-2027 path remains visible as a reference."
 )
 
 _PLANNED_PATH = "Current planned path"
@@ -1194,18 +1195,33 @@ def apply_official_comparator_rate_policy_to_chart_rows(
     Official activity, administration and refunds stay fixed; only the rate is
     counterfactual, and all five official RUC class-revenue leaves are
     repriced by the same ratio.
+
+    This synthetic counterfactual is defined for the MBU26 vintage only: its
+    factor schedule is derived from the MBU26 spine. Rows belonging to any
+    other official vintage (e.g. ``befu26_official``) are never repriced;
+    generating a BEFU26 counterfactual requires a separate owner decision.
     """
     if chart_rows is None or chart_rows.empty:
         return chart_rows, pd.DataFrame()
     if str(policy_state) == FED_POLICY_STATE_PUBLISHED:
-        return chart_rows, pd.DataFrame()  # published leaves MBU26 unchanged
+        return chart_rows, pd.DataFrame()  # published leaves the official vintages unchanged
 
     factors = official_comparator_factor_map(repo_root, policy_state)
     if not factors:
         return chart_rows, pd.DataFrame()
 
+    engine_input = chart_rows
+    untouched_other_officials = pd.DataFrame()
+    if "scenario_name" in chart_rows.columns and "scenario_role" in chart_rows.columns:
+        role = chart_rows["scenario_role"].fillna("").astype(str)
+        scenario = chart_rows["scenario_name"].fillna("").astype(str)
+        other_official_mask = role.eq(OFFICIAL_SCOPE) & ~scenario.eq("mbu26_official")
+        if other_official_mask.any():
+            untouched_other_officials = chart_rows[other_official_mask]
+            engine_input = chart_rows[~other_official_mask]
+
     adjusted, audit = apply_fed_rate_policy_to_chart_rows(
-        chart_rows,
+        engine_input,
         factors,
         policy_state=policy_state,
         scenario_roles={OFFICIAL_SCOPE},
@@ -1215,6 +1231,8 @@ def apply_official_comparator_rate_policy_to_chart_rows(
             else mbu26_ruc_class_revenue_by_fy(repo_root)
         ),
     )
+    if not untouched_other_officials.empty:
+        adjusted = pd.concat([adjusted, untouched_other_officials], ignore_index=True, sort=False)
     if not audit.empty:
         audit = audit.copy()
         audit["scenario_scope"] = OFFICIAL_SCOPE

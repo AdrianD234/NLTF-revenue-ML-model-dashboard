@@ -17,8 +17,8 @@ appears anywhere, and a test bans the idiom by pattern.
 
 ## Headline results
 
-- Base Total NLTF: FY2030 $6,415.2m -> FY2050 $17,264.7m
-- Comparison Total NLTF: FY2030 $6,526.3m -> FY2050 $18,392.0m
+- Base Total NLTF: FY2030 $6,415.1m -> FY2050 $17,264.7m
+- Comparison Total NLTF: FY2030 $6,526.2m -> FY2050 $18,392.0m
 - Base Light RUC pool FY2050: 52,461 Mkm (1.093x the VFM pool, 0.282x the retired pathology)
 - Short run: 0 values changed across 4612 pre-existing rows
 - Seam continuity: worst step 5.45%
@@ -50,6 +50,7 @@ The FY2030 cap on MBU26 had two causes, both fixed:
 
 | source | first FY | last FY |
 |---|---|---|
+| BEFU26 official | 2001 | 2055 |
 | Current finalist Base case | 2001 | 2050 |
 | Current finalist High population/comparison | 2001 | 2050 |
 | MBU26 official | 2001 | 2055 |

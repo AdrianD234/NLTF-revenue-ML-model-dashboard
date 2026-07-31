@@ -35,14 +35,18 @@ ROW_KEYS = [key for key, *_ in SIX_ROWS]
 ROW_LABELS = {key: label for key, _, label, _ in SIX_ROWS}
 ROW_COLORS = {key: colour for key, _, _, colour in SIX_ROWS}
 
-MBU26_SOURCE = "MBU26 official (MoT baseline)"
+# The MoT baseline source follows the registered default bridge-assumption
+# vintage (currently BEFU26). The legacy constant name is kept as an alias so
+# existing selector plumbing keeps working.
+OFFICIAL_SOURCE = "BEFU26 official (MoT baseline)"
+MBU26_SOURCE = OFFICIAL_SOURCE  # deprecated alias; the label follows the bridge vintage
 DASHBOARD_SOURCE = "Dashboard pack (AR(1) engine, base case)"
 VFM_SOURCES = {
     "VFM 202405 - Base scenario": "Base_EV",
     "VFM 202405 - Fast scenario": "Fast_EV",
     "VFM 202405 - Slow scenario": "Slow_EV",
 }
-SOURCE_OPTIONS = [MBU26_SOURCE, *VFM_SOURCES.keys(), DASHBOARD_SOURCE]
+SOURCE_OPTIONS = [OFFICIAL_SOURCE, *VFM_SOURCES.keys(), DASHBOARD_SOURCE]
 
 DENOMINATORS = {
     "All road travel (all six rows)": ROW_KEYS,
@@ -59,7 +63,12 @@ METRIC_OPTIONS = [METRIC_KM, METRIC_SHARE, METRIC_YOY]
 
 
 def _spine(repo_root: Path) -> pd.DataFrame:
-    path = repo_root / "data" / "revenue_model_source_pack" / "mbu26_annual_spine" / "mbu26_official_annual.csv"
+    from .official_vintage import default_bridge_vintage_id, official_vintage_entry
+
+    entry = official_vintage_entry(default_bridge_vintage_id(repo_root), repo_root)
+    stems = entry.get("file_stems") or {}
+    stem = str(stems.get("official_annual", "official_annual"))
+    path = repo_root / str(entry["source_pack_path"]) / f"{stem}.csv"
     return pd.read_csv(path)
 
 

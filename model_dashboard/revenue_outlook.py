@@ -4610,7 +4610,7 @@ def build_current_revenue_outlook_runtime_pack(
             root, scenarios, mbu26_pack, official_vintage_packs=comparator_packs
         ),
         "mbu26_annual_spine": _mbu26_annual_spine_metadata(root, mbu26_pack),
-        "revenue_source_pack": _mbu26_runtime_source_metadata(root, mbu26_pack),
+        "revenue_source_pack": _mbu26_runtime_source_metadata(root, bridge_pack),
         "bridge_status_by_stream": {
             "PED": ["available"],
             "LIGHT_RUC": ["available"],
@@ -9536,14 +9536,20 @@ def _mbu26_annual_spine_metadata(repo_root: Path, mbu26_pack: Any) -> dict[str, 
     }
 
 
-def _mbu26_runtime_source_metadata(repo_root: Path, mbu26_pack: Any) -> dict[str, Any]:
-    manifest = mbu26_pack.manifest or {}
+def _mbu26_runtime_source_metadata(repo_root: Path, source_pack: Any) -> dict[str, Any]:
+    """Runtime source metadata for the bridge-assumption vintage pack.
+
+    The name is retained for compatibility; the block describes whichever
+    official vintage pack the caller passes (the bridge vintage by default).
+    """
+    manifest = source_pack.manifest or {}
     workbook = manifest.get("workbook") or {}
+    release = str(manifest.get("source_release") or MBU26_RELEASE_ROUND)
     defaults = {
         "series": "Total NLTF revenue",
-        "release_round": MBU26_RELEASE_ROUND,
+        "release_round": release,
         "revenue_path": "Net of admin fees & refunds",
-        "scenario": "MBU26 official + current finalist base/comparison",
+        "scenario": f"{release} official + current finalist base/comparison",
         "fed_path_scenario": "Current planned path",
         "view": "Annual",
         "model_basis": "Current finalist ensemble",
@@ -9552,17 +9558,17 @@ def _mbu26_runtime_source_metadata(repo_root: Path, mbu26_pack: Any) -> dict[str
         "crown_top_up": "Exclude",
     }
     return {
-        "status": "mbu26_annual_spine_vendored",
-        "repo_relative_path": _repo_relative(repo_root, mbu26_pack.pack_dir),
-        "source_pack_version": MBU26_RELEASE_ROUND,
-        "schema_version": manifest.get("schema_version", MBU26_SCHEMA_VERSION),
+        "status": "official_vintage_pack_vendored",
+        "repo_relative_path": _repo_relative(repo_root, source_pack.pack_dir),
+        "source_pack_version": release,
+        "schema_version": manifest.get("schema_version", ""),
         "raw_workbook_basename": workbook.get("basename", ""),
         "raw_workbook_sha256": workbook.get("sha256", ""),
-        "source_pack_manifest_sha256": _sha256(mbu26_pack.pack_dir / "manifest.json"),
+        "source_pack_manifest_sha256": _sha256(source_pack.pack_dir / "manifest.json"),
         "selections": defaults,
         "dashboard_default_selections": defaults,
-        "source_workbook_selections": {"release_round": MBU26_RELEASE_ROUND, "sheet": workbook.get("sheet", "MBU26")},
-        "default_selection_policy": "Revenue Outlook defaults to Total NLTF revenue from the MBU26 source spine.",
+        "source_workbook_selections": {"release_round": release, "sheet": workbook.get("sheet", "")},
+        "default_selection_policy": f"Revenue Outlook defaults to Total NLTF revenue from the {release} source pack.",
     }
 
 

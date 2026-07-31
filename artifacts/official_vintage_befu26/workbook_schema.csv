@@ -1,0 +1,59 @@
+row_index,label,section_anchor,series_id,block_type
+1,YE June,,,header
+2,Period,,,header
+4,Key volumes: Level,Key volumes: Level,,anchor
+5,Light RUC net km (m km),Key volumes: Level,light_ruc_net_km,level
+6,Heavy RUC net km (m km),Key volumes: Level,heavy_ruc_net_km,level
+7,Light BEV RUC net km (m km),Key volumes: Level,light_bev_ruc_net_km,level
+8,Heavy BEV RUC net km (m km),Key volumes: Level,heavy_bev_ruc_net_km,level
+9,PHEV RUC net km (m km),Key volumes: Level,phev_ruc_net_km,level
+10,PED volume (m L),Key volumes: Level,ped_volume,level
+11,Light petrol VKT (m km),Key volumes: Level,light_petrol_vkt,level
+12,Light petrol VKT per capita (km),Key volumes: Level,ped_vkt_per_capita,level
+13,TUC GTK (Tonne-km),Key volumes: Level,tuc_gtk,level
+15,Key volumes: Annual percentage changes,Key volumes: Annual percentage changes,,anchor
+16,Light RUC net km (m km),Key volumes: Annual percentage changes,,pct_change
+17,Heavy RUC net km (m km),Key volumes: Annual percentage changes,,pct_change
+18,Light BEV RUC net km (m km),Key volumes: Annual percentage changes,,pct_change
+19,Heavy BEV RUC net km (m km),Key volumes: Annual percentage changes,,pct_change
+20,PHEV RUC net km (m km),Key volumes: Annual percentage changes,,pct_change
+21,PED volume (m L),Key volumes: Annual percentage changes,,pct_change
+22,Light petrol VKT (m km),Key volumes: Annual percentage changes,,pct_change
+23,Light petrol VKT per capita (km),Key volumes: Annual percentage changes,,pct_change
+24,TUC GTK (Tonne-km),Key volumes: Annual percentage changes,,pct_change
+26,Revenues: Level ($m ex GST),Revenues: Level ($m ex GST),,anchor
+27,Road User Charges,Road User Charges,,anchor
+28,Light RUC net revenue (m $),Road User Charges,light_ruc_net_revenue,level
+29,Heavy RUC net revenue (m $),Road User Charges,heavy_ruc_net_revenue,level
+30,Light BEV RUC net revenue (m $),Road User Charges,light_bev_ruc_net_revenue,level
+31,Heavy BEV RUC net revenue (m $),Road User Charges,heavy_bev_ruc_net_revenue,level
+32,PHEV RUC net revenue (m $),Road User Charges,phev_ruc_net_revenue,level
+33,RUC refunds (m $),Road User Charges,ruc_refunds,level
+34,Gross RUC revenue (m $),Road User Charges,gross_ruc_revenue,level
+35,RUC admin revenue (m $),Road User Charges,ruc_admin_revenue,level
+36,RUC revenues net of admin fees (m $),Road User Charges,ruc_revenue_net_admin,level
+37,RUC revenues net of admin fees & refunds (m $),Road User Charges,total_ruc_net_revenue,level
+39,Fuel Excise Duties,Fuel Excise Duties,,anchor
+40,Gross PED revenue (m $),Fuel Excise Duties,gross_ped_revenue,level
+41,Gross LPG revenue (m $),Fuel Excise Duties,gross_lpg_revenue,level
+42,Gross CNG revenue (m $),Fuel Excise Duties,gross_cng_revenue,level
+43,Gross FED revenue (m $),Fuel Excise Duties,gross_fed_revenue,level
+44,FED refunds (m $),Fuel Excise Duties,fed_refunds,level
+45,Net FED revenue (m $),Fuel Excise Duties,net_fed_revenue,level
+47,Motor Vehicle Register,Motor Vehicle Register,,anchor
+48,MR1 revenue (m $),Motor Vehicle Register,mr1_revenue,level
+49,MR2 revenue (m $),Motor Vehicle Register,mr2_revenue,level
+50,MR13 revenue (m $),Motor Vehicle Register,coo_revenue,level
+51,Gross MVR revenue (m $),Motor Vehicle Register,gross_mvr_revenue,level
+52,MVR admin revenue (m $),Motor Vehicle Register,mvr_admin_revenue,level
+53,MVR revenues net of admin fees & COO (m $),Motor Vehicle Register,mvr_revenue_net_admin_coo,level
+54,MVR refunds (m $),Motor Vehicle Register,mvr_refunds,level
+55,"MVR revenues net of admin fees, refunds & COO (m $)",Motor Vehicle Register,net_mvr_revenue,level
+57,Track User Charges,Track User Charges,,anchor
+58,TUC net revenue (m $),Track User Charges,tuc_net_revenue,level
+60,TOTALS,TOTALS,,anchor
+61,Total gross revenues (m $),TOTALS,total_gross_revenue,level
+62,Total admin fees (m $),TOTALS,total_admin_fees,level
+63,Total revenues net of admin fees (m $),TOTALS,total_revenue_net_admin,level
+64,Total refunds (m $),TOTALS,total_refunds,level
+65,Total net revenues (m $),TOTALS,total_nltf_net_revenue,level

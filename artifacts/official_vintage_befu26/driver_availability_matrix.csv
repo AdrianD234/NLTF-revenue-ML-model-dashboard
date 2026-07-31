@@ -1,0 +1,11 @@
+driver,official_vintage,supplied_by_official_vintage,availability,causal_attribution,note
+gdp_path,BEFU26,False,unavailable_source_not_supplied,unavailable,not published at input grain by the official vintage
+population,BEFU26,False,unavailable_source_not_supplied,unavailable,only output-implied (VKT / VKT-per-capita); not independently published
+unemployment,BEFU26,False,unavailable_source_not_supplied,unavailable,not published at input grain by the official vintage
+consumer_producer_prices,BEFU26,False,unavailable_source_not_supplied,unavailable,not published at input grain by the official vintage
+fuel_prices,BEFU26,False,unavailable_source_not_supplied,unavailable,not published at input grain by the official vintage
+judgment_adjustments,BEFU26,False,unavailable_source_not_supplied,unavailable,analyst overlays are not published
+activity_levels,BEFU26,True,supplied_published_output,available_observable,"annual activity rows (km, litres, GTK) are published"
+effective_rates,BEFU26,True,supplied_published_output,available_derived,derivable as revenue/activity from published rows
+class_mix,BEFU26,True,supplied_published_output,available_derived,embedded Light-RUC class mix observable from published km rows
+fixed_rows,BEFU26,True,supplied_published_output,available_observable,admin/refunds/MVR/TUC/LPG/CNG rows are published
