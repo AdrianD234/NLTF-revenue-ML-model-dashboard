@@ -1,0 +1,18 @@
+{
+  "candidates": [
+    "unblended_current",
+    "early_structural",
+    "balanced_structural",
+    "gradual_structural"
+  ],
+  "production_default_unchanged": "unblended_current",
+  "reported_fys": [
+    2030,
+    2031,
+    2035,
+    2040,
+    2045,
+    2050
+  ],
+  "shape_vintage_id": "BEFU26"
+}
