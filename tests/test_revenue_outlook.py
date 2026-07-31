@@ -249,14 +249,20 @@ def test_committed_current_revenue_outlook_pack_is_repo_local_and_hash_backed() 
     assert manifest["mbu26_annual_spine"]["workbook_sha256"] == "9aaff21f72c0a10cfa972a29d3c4f716495c79cbd72fc28e8008a65558454e12"
     assert manifest["mbu26_annual_spine"]["sheet"] == "MBU26"
     assert manifest["source_hashes"]["mbu26_annual_spine"]["repo_relative_path"] == "data/revenue_model_source_pack/mbu26_annual_spine"
-    assert manifest["revenue_source_pack"]["status"] == "mbu26_annual_spine_vendored"
-    assert manifest["revenue_source_pack"]["source_pack_version"] == "MBU26"
-    assert manifest["revenue_source_pack"]["raw_workbook_sha256"] == "9aaff21f72c0a10cfa972a29d3c4f716495c79cbd72fc28e8008a65558454e12"
-    assert manifest["revenue_source_pack"]["selections"]["release_round"] == "MBU26"
+    # Deliberate re-freeze (official-vintage framework): the runtime source
+    # block now describes the bridge-assumption vintage (BEFU26). The MBU26
+    # prior vintage keeps its own pinned block above.
+    assert manifest["revenue_source_pack"]["status"] == "official_vintage_pack_vendored"
+    assert manifest["revenue_source_pack"]["source_pack_version"] == "BEFU26"
+    assert manifest["revenue_source_pack"]["raw_workbook_sha256"] == "7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff"
+    assert manifest["revenue_source_pack"]["selections"]["release_round"] == "BEFU26"
     assert manifest["revenue_source_pack"]["selections"]["series"] == "Total NLTF revenue"
     assert manifest["revenue_source_pack"]["dashboard_default_selections"]["series"] == "Total NLTF revenue"
-    assert manifest["revenue_source_pack"]["source_workbook_selections"]["sheet"] == "MBU26"
-    assert "MBU26 source spine" in manifest["revenue_source_pack"]["default_selection_policy"]
+    assert manifest["revenue_source_pack"]["source_workbook_selections"]["sheet"] == "Baseline"
+    assert "BEFU26 source pack" in manifest["revenue_source_pack"]["default_selection_policy"]
+    assert manifest["official_vintages"]["official_comparator_vintage_id"] == "BEFU26"
+    assert manifest["official_vintages"]["bridge_assumption_vintage_id"] == "BEFU26"
+    assert set(manifest["official_vintages"]["available"]) == {"BEFU26", "MBU26"}
     assert manifest["revenue_line_reconciliation"]["repo_relative_path"] == "data/current_revenue_outlook/revenue_line_reconciliation.csv"
     assert manifest["revenue_stack_components"]["repo_relative_path"] == "data/current_revenue_outlook/revenue_stack_components.csv"
     assert "aggregates are overlays only" in manifest["revenue_stack_components"]["scope"]
@@ -266,9 +272,21 @@ def test_committed_current_revenue_outlook_pack_is_repo_local_and_hash_backed() 
         manifest["ev_phev_ped_light_drift_assumptions"]["repo_relative_path"]
         == "data/current_revenue_outlook/ev_phev_ped_light_drift_assumptions.csv"
     )
-    assert manifest["ev_phev_ped_light_drift_assumptions"]["default_lambda_mode"] == "optimized"
-    assert manifest["ev_phev_ped_light_drift_assumptions"]["runtime_mode"] == "optimized"
-    assert float(manifest["ev_phev_ped_light_drift_assumptions"]["lambda_smoothness_penalty"]) > 0
+    # The drift table is retained for audit continuity only. The settled
+    # decision-facing architecture is the conventional anchor plus exact-VFM
+    # composition, so the manifest must describe it that way and label the
+    # lambda material as retired rather than re-freezing the obsolete story.
+    drift_block = manifest["ev_phev_ped_light_drift_assumptions"]
+    assert drift_block["decision_facing"] is False
+    assert "AUDIT ONLY, NON-DECISION-FACING" in drift_block["scope"]
+    assert "conventional_anchor" in drift_block["composition_architecture"]
+    retired = drift_block["retired_lambda_material"]
+    assert retired["status"] == "retired_from_decision_facing_use"
+    assert retired["audit_default_mode"] == "optimized"
+    assert float(retired["audit_smoothness_penalty"]) > 0
+    assert "conventional_anchor_exact_vfm" in manifest["equations"]["EV_PHEV_CLASS_COMPOSITION"] or (
+        "CONVENTIONAL class" in manifest["equations"]["EV_PHEV_CLASS_COMPOSITION"]
+    )
     assert manifest["ped_revenue_bridge_audit"]["repo_relative_path"] == "data/current_revenue_outlook/ped_revenue_bridge_audit.csv"
     assert "raw VKTpc x population" in manifest["ped_revenue_bridge_audit"]["scope"]
     assert manifest["ped_revenue_bridge_audit"]["default_bridge_mode"] == PED_BRIDGE_DEFAULT_MODE
@@ -479,7 +497,7 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     scenario_input_replay = pd.read_parquet(pack_dir / "scenario_input_replay_mismatch_report.parquet")
     scenario_input_wide = pd.read_parquet(pack_dir / "scenario_inputs" / "scenario_input_wide.parquet")
 
-    assert manifest["runtime_pack_type"] == "mbu26_actual_current_finalist_official_comparator"
+    assert manifest["runtime_pack_type"] == "official_vintage_actual_current_finalist_official_comparator"
     assert manifest["bridge_status_by_stream"] == {
         "PED": ["available"],
         "LIGHT_RUC": ["available"],
@@ -504,10 +522,12 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     assert manifest["runtime_cutoff_audit"]["repo_relative_path"] == "data/current_revenue_outlook/runtime_cutoff_audit.csv"
     assert manifest["runtime_cutoff_audit"]["runtime_cutoff_fy"] == runtime_cutoff_fy
     assert not runtime_cutoff_audit.empty
+    # The required-components audit row follows the bridge-assumption vintage
+    # (BEFU26 since the official-vintage framework).
     assert set(runtime_cutoff_audit["audit_component"].astype(str)) == {
         "current_finalist_base",
         "current_finalist_comparison",
-        "mbu26_required_components_rates_splits",
+        "befu26_required_components_rates_splits",
         "runtime_cutoff",
     }
     assert pd.to_numeric(runtime_cutoff_audit["runtime_cutoff_fy"], errors="coerce").eq(runtime_cutoff_fy).all()
@@ -965,9 +985,9 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
         "total_nltf_optimized",
         "total_nltf_optimized_million_nzd",
         "total_nltf_net_revenue_million_nzd",
-        "mbu26_light_petrol_vkt_million_km",
-        "mbu26_ped_volume_million_litres",
-        "mbu26_gross_ped_revenue_million_nzd",
+        "official_light_petrol_vkt_million_km",
+        "official_ped_volume_million_litres",
+        "official_gross_ped_revenue_million_nzd",
         "vktpc_source_cell",
         "population_source_cell",
         "migration_source_cells",
@@ -1016,7 +1036,7 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     assert {"raw", "optimized"}.issubset(set(ped_bridge_shape_fit["bridge_variant"].astype(str)))
     base_light_fit = ped_bridge_shape_fit[
         ped_bridge_shape_fit["source_path"].astype(str).eq("Current finalist Base case")
-        & ped_bridge_shape_fit["mbu_comparator_series_id"].astype(str).eq("light_petrol_vkt")
+        & ped_bridge_shape_fit["official_comparator_series_id"].astype(str).eq("light_petrol_vkt")
     ]
     raw_mae = float(base_light_fit.loc[base_light_fit["bridge_variant"].astype(str).eq("raw"), "mean_abs_error"].iloc[0])
     opt_mae = float(base_light_fit.loc[base_light_fit["bridge_variant"].astype(str).eq("optimized"), "mean_abs_error"].iloc[0])
@@ -1120,6 +1140,7 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
 
     allowed_traces = {
         "Actual",
+        "BEFU26 official",
         "MBU26 official",
         "Current finalist Base case",
         "Current finalist High population/comparison",
@@ -1256,19 +1277,30 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     # PED/FED leaves are byte-stable:
     #   light_bev_ruc_net_revenue 84.492358 -> 83.429855
     #   total_nltf_net_revenue    4635.051597 -> 4628.169746  (-6.882, -0.149%)
-    assert float(fy2026.loc[("gross_ped_revenue", "current_basecase"), "value"]) == pytest.approx(2143.356963537042, abs=1e-6)
-    assert float(fy2026.loc[("gross_fed_revenue", "current_basecase"), "value"]) == pytest.approx(2185.402126177232, abs=1e-6)
-    assert float(fy2026.loc[("net_fed_revenue", "current_basecase"), "value"]) == pytest.approx(2112.134601481632, abs=1e-6)
+    # BEFU26 bridge-vintage re-freeze: the annual bridge assumptions (PED
+    # rate/intensity, RUC effective rates, admin, refunds, MVR, TUC and fixed
+    # lines) now come from the BEFU26 official vintage instead of MBU26.
+    # Activity forecasts and the Light BEV/PHEV class rates are unchanged;
+    # the movement is fully attributed in
+    # artifacts/official_vintage_befu26/current_bridge_vintage_impact.csv:
+    #   gross_ped_revenue      2143.356964 -> 2145.034189  (+1.677)
+    #   total_nltf_net_revenue 4628.169746 -> 4599.805745  (-28.364, -0.613%)
+    # Tolerance unchanged at 1e-6; no tolerance has been widened.
+    assert float(fy2026.loc[("gross_ped_revenue", "current_basecase"), "value"]) == pytest.approx(2145.0341891615885, abs=1e-6)
+    assert float(fy2026.loc[("gross_fed_revenue", "current_basecase"), "value"]) == pytest.approx(2187.079351801779, abs=1e-6)
+    assert float(fy2026.loc[("net_fed_revenue", "current_basecase"), "value"]) == pytest.approx(2114.6925455991745, abs=1e-6)
     assert float(fy2026.loc[("light_bev_ruc_net_revenue", "current_basecase"), "value"]) == pytest.approx(83.42985462699842, abs=1e-6)
     assert float(fy2026.loc[("phev_ruc_net_revenue", "current_basecase"), "value"]) == pytest.approx(22.364680858017962, abs=1e-6)
-    assert float(fy2026.loc[("total_ruc_net_revenue", "current_basecase"), "value"]) == pytest.approx(2073.4998730636125, abs=1e-6)
-    assert float(fy2026.loc[("total_nltf_net_revenue", "current_basecase"), "value"]) == pytest.approx(4628.169745560249, abs=1e-6)
-    assert float(fy2026.loc[("gross_ped_revenue", "current_comparison_1"), "value"]) == pytest.approx(2145.627480724251, abs=1e-6)
-    assert float(fy2026.loc[("total_nltf_net_revenue", "current_comparison_1"), "value"]) == pytest.approx(4631.45598265758, abs=1e-6)
+    assert float(fy2026.loc[("total_ruc_net_revenue", "current_basecase"), "value"]) == pytest.approx(2073.8323474108515, abs=1e-6)
+    assert float(fy2026.loc[("total_nltf_net_revenue", "current_basecase"), "value"]) == pytest.approx(4599.805745017675, abs=1e-6)
+    assert float(fy2026.loc[("gross_ped_revenue", "current_comparison_1"), "value"]) == pytest.approx(2147.3065370616973, abs=1e-6)
+    assert float(fy2026.loc[("total_nltf_net_revenue", "current_comparison_1"), "value"]) == pytest.approx(4603.093811944454, abs=1e-6)
 
     anchor = current[current["period"].astype(str).eq("FY2025")].set_index(["series_id", "scenario_name"])
     assert anchor.loc[("total_nltf_net_revenue", "current_basecase"), "data_scope"] == "actual_anchor"
-    assert anchor.loc[("total_nltf_net_revenue", "current_basecase"), "source_file"] == "mbu26_annual_spine.csv"
+    # The FY2025 anchor is sourced from the bridge-assumption vintage pack
+    # (BEFU26 generic stems) since the official-vintage framework.
+    assert anchor.loc[("total_nltf_net_revenue", "current_basecase"), "source_file"] == "annual_spine.csv"
 
     assert set(bridge["bridge_status"].dropna().astype(str).unique()) == {"available"}
     replacements = bridge[bridge["component_type"].astype(str).eq("replacement_line")]
@@ -1303,6 +1335,7 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     }.issubset(audit.columns)
 
     assert set(line_reconciliation["source_path"].dropna().unique()) == {
+        "BEFU26 official",
         "MBU26 official",
         "Current finalist Base case",
         "Current finalist High population/comparison",
@@ -1404,6 +1437,7 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
         "Gross contribution stack",
     ]
     assert set(stack_components["source_path"].dropna().unique()) == {
+        "BEFU26 official",
         "MBU26 official",
         "Current finalist Base case",
         "Current finalist High population/comparison",
@@ -1540,8 +1574,10 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
         pd.to_numeric(current_stack["FY"], errors="coerce").le(2025)
         & current_stack["row_role"].astype(str).isin(["leaf", "deduction", "replacement_line"])
     ]
-    assert set(current_pre_forecast["source_file"].dropna().astype(str)) == {"mbu26_annual_spine.csv"}
-    assert set(current_pre_forecast["source_basis"].dropna().astype(str)) == {"MBU26 actual anchor"}
+    # Actual history is copied from the bridge-assumption vintage pack
+    # (BEFU26 generic stems) since the official-vintage framework.
+    assert set(current_pre_forecast["source_file"].dropna().astype(str)) == {"annual_spine.csv"}
+    assert set(current_pre_forecast["source_basis"].dropna().astype(str)) == {"BEFU26 actual anchor"}
     assert not current_pre_forecast["source_file"].astype(str).str.contains("forecast_scenario", case=False).any()
     assert current_pre_forecast["forecast_quarters"].fillna("").astype(str).str.strip().eq("").all()
     current_fy2026_replacements = current_stack[
@@ -2295,74 +2331,74 @@ def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
     expected_hashes = {
         'conflict_fuel_price_scenarios.csv': 'ad379997aa4044cdabf7d948787c926e06a434447ff076640cfab317eda53c73',
         'conflict_gdp_calibration.csv': '032606a84ed1e7716197ced405d3026b39c8c00e0a56882174b45c13eb8fb655',
-        'ev_phev_ped_light_drift_assumptions.csv': '4e311c3b4ad0d2b3589e205172b038d5eaf93cd71c15550ca74362b95b87c6b4',
-        'ev_phev_ped_light_drift_assumptions.parquet': '5cb8512b3de524b5ebbf1d0580e8f9321c7b7e4748403a43baf944d6db082699',
-        'ev_phev_split_assumptions.csv': 'c892a5c1afabbdb2d930e49de5ba71a9b74b2b2f99f6f1ebae9d10ad46a6c0a7',
-        'ev_phev_split_assumptions.parquet': '1f259fe7325208c6159e15f4375b079ff419aecda3797681a17aa74135832ad2',
-        'fan_availability.csv': '286878a9c131023f5c1ecb6d0145d447f1ade3e2e397ec1279e736bc8be0636e',
-        'fan_availability.parquet': '87c2dfd3ddf5e81a82f6258a06bb01c8e86ffb7679fd12e22a7df036096266ab',
-        'fan_band_rows.csv': '26eabe689bef59fe73f4413b7de4d52907095a182f6d5c4cd8b73a8c7ff12cc9',
-        'fan_band_rows.parquet': '7b5c15bf1c0293387484ebc1a9b865858297f3ea066e3fff3911ace4af003986',
-        'future_revenue_forecasts.csv': '6560e7ef0b83a3608dcd13adb0d3919b41ba58c3928ff9e087ac1c91d0de7194',
-        'future_revenue_forecasts.parquet': '87c7d116327d9d03175fffc1e5c0eac2babb703207ed5048d25b08456d9918e7',
-        'horizon_contract_audit.csv': 'bac941ae6c79f3d9dc9a4a70431bddf24e042ecf7b617e72d2912073d011b98b',
-        'horizon_contract_audit.parquet': '424bc5aef14f744f482ea050e7c0e759f48b5d9ee26b096b63506c1d3ad5d9d1',
-        'light_ruc_horizon_availability.csv': '7bc46c81387d263744aa35c08bf1591b8e056af78b8c8bebd407b372d6783d41',
-        'light_ruc_horizon_availability.parquet': '412ee161c660516f6878f78ffdfaf87d9048e2116d0c2bcb2c2e541af6dfdf95',
-        'manifest.json': '14b752d0cba91fe9c39d19855c5c837e6164d9dbb58f95d32940e07ebaeda891',
-        'manifest.md': 'a7dfbd1f96b5d943ae151996a3df4372f1e9c380fd54b7514bfc06bd30208076',
-        'path_trace_status.csv': '9aee7a4e7003ec6541476ca3e4afef6d8586b6c358e41db1c8e06623e5ffcaa3',
-        'path_trace_status.parquet': 'e8d295393c0586167da97d2f0c054eb77419e8c9e4acf134198c0a5f53010eaa',
+        'ev_phev_ped_light_drift_assumptions.csv': '07e1cfb9c6279a3b9a84fcfe772096b4213694880c496ce1eedac7231c8a8984',
+        'ev_phev_ped_light_drift_assumptions.parquet': '015ec183ddcfb8fe4adc17bb3b60f8ef6c357f8c9f51672fa5924399ca5cb9e4',
+        'ev_phev_split_assumptions.csv': '8690dae6c1a2a178d2402c4a7f33c6fb615d4b98298c0b49025a0e6780ac2733',
+        'ev_phev_split_assumptions.parquet': '746d006167cb676d486b235e40a6c74dfc6d28f110d0fa32ba7c798a5e84fa2c',
+        'fan_availability.csv': '9c89fa4263e8b07b1e3c8675b5f8f4d23d3668dece4fb89d1460559b2fbf83e5',
+        'fan_availability.parquet': '2bab0334fd9a7350e40840b4697ae71d259263f781e2332bc8103690b98a164d',
+        'fan_band_rows.csv': 'cabb94984d250396e8b428358de6d1a73b787bbf915cf0d5a5565d0a34d12392',
+        'fan_band_rows.parquet': '79e787104b7c2c2a7210e0bdb83cd7e268edfa0bd70e0b2a4baf6bb1605579c7',
+        'future_revenue_forecasts.csv': '93ce13e7b48a860ef1d528fe673ff06b579752d7f8d9378bc0f72b042f76d618',
+        'future_revenue_forecasts.parquet': '403c0adcbc5ede8566358b7622aea6e181527cbda7b6dbda7bf042d0b59f3576',
+        'horizon_contract_audit.csv': 'b6e117b5656c479275986187c56b3eafbe5ef2362313c7d6f9a418359ea667f7',
+        'horizon_contract_audit.parquet': '015e1a42d88eaafe2fa966800a5b499f2b90b8331a6a062b81e76d080d1c5882',
+        'light_ruc_horizon_availability.csv': 'ca87c6ac93033496a928ae07159824dac642917ba104c030161dab5ff46b063f',
+        'light_ruc_horizon_availability.parquet': '39abda810443b1d91e04b26399a96c0c30e2fe70a30cbde7440790c3145f5f48',
+        'manifest.json': 'cc60050aebdd0511dfa55d953670f931837483ba4600e1ad5e1b086d3424f362',
+        'manifest.md': 'c198d0f70eeeabacf2e9e982f5f929d5ea85514386fcb4d0b86db39942f65cc6',
+        'path_trace_status.csv': '9d9eabcd54cbba3b468b9e7153218a954e43c9efec031b2089f741c4fff20ea5',
+        'path_trace_status.parquet': '56c8b08e1d5efffa930e703c52b9e9de848e21d94c5ae9a760ca47083a4a1df1',
         'ped_bridge_mode_config.csv': '60583741fcd8484df3e4f166a82e49a06fdeb0fd353756fcfdf48a1f9786efc4',
         'ped_bridge_mode_config.parquet': '7b512297e05dfea806ccb86c984b816f3d2b7da7012be5ecef4f531dcae77c39',
-        'ped_bridge_shape_fit_metrics.csv': '14c0106508d677b04c239244d376ff466b062a7af110a13ca79080df2610dcf8',
-        'ped_bridge_shape_fit_metrics.parquet': 'c8295d58890cd15e299636c8f3336935db861e0444c5300efd5750fdafc5413e',
+        'ped_bridge_shape_fit_metrics.csv': '3a435ddaa5ecfecda0d068a453acd617e01c7b8fe2c313973d5694d125171fb8',
+        'ped_bridge_shape_fit_metrics.parquet': '2e2bf09c973c9b6a4a157f34310c56c00d8b997e53910b3b056bf5c985201040',
         'ped_efficiency_scenarios.csv': '340a91407a2d1c7565ef3b5339bb14554d55b7dd4c4c48b66b39847af268a37f',
         'ped_efficiency_scenarios.parquet': '529f9bad8f06391846215906986166528384b0e7a9dfe50dc681d998437dbd35',
-        'ped_revenue_bridge_audit.csv': '2c6a89c9a61d9b315c4455f0215ee0645453b108de2ce767c4b9348eb0d90747',
-        'ped_revenue_bridge_audit.parquet': 'd4cac9fffbeaccc96ed2b6da6b93205d4ac58cb41f62617c1ef71ef903de349a',
+        'ped_revenue_bridge_audit.csv': '3ac01f1743632d104f1c341eeb6af5bbcae42d34965b9c6d0127522a8be99858',
+        'ped_revenue_bridge_audit.parquet': '9d7bfd2ce74f299b1bc282833098f15d69cb03a6dc6e60f97f38f84ee0430730',
         'quarterly_reconstitution_audit.csv': '0960e1d20d0a8cea8a6f9042d2a704ee9d10995d70770322350a45e43bdfb304',
         'quarterly_reconstitution_audit.parquet': '02330b0320ace399dd885815c2f5d27e177f3d3b56106f6c51d2ac8682971a5f',
         'raw_quarterly_forecast_audit.csv': '2d84801c1c39073b5f340a06ed9fec644ce2faf8abb30a288a4314eaee4ec222',
         'raw_quarterly_forecast_audit.parquet': '5062e4c77f4d7e926d9a9494b51132f476623710adab1ba19f35e2b68a98f300',
-        'revenue_bridge_components.csv': 'e3b45d2ff4e3bc5be3700ff2dd48cc1b6d158360c18387051538338d901f8ba7',
-        'revenue_bridge_components.parquet': '891d08b0fef3089d4077069478cd8359bbfeae24eb1e2e0d4292e74f2c7b3d2e',
-        'revenue_chart_rows.csv': '394ff2a21d02f87648fb84b381f43ae741d1f936e6c71ad237147084398322cb',
-        'revenue_chart_rows.parquet': 'f5f922bd9284db94f33647aaa8b9ac95bb46942533d8c0ce024467873f0ed9d6',
-        'revenue_formula_residuals.csv': 'c91012796b9c9b0cf6358d0de372bb266deaa4f739a519b94bc0bf5319d980ea',
-        'revenue_formula_residuals.parquet': 'fd326bbd2618bc7dbfaf049f3145f2a1000113e8f6130a2374f94f1031036268',
-        'revenue_line_reconciliation.csv': '3c9b4a9b28497cc188a65603570546d165eccf6a83e247001e1ed99f5d57066a',
-        'revenue_line_reconciliation.parquet': '953cf7781629fe0532100d235f983ebdc3c35288d7ca53e23f31974ba6de67b2',
-        'revenue_stack_components.csv': '178eb980bbf5ec87ee81d93099d305a10bcb031c773d4f4fc99f017b070056de',
-        'revenue_stack_components.parquet': 'c4ab8d86cc9f8c9f810abbe96a55ec550d44a34f2fdad1148337da03d61a689d',
-        'row_reconciliation.csv': 'd484f5d75cce88e30ce7bcf5dd70058505cc02e5dff93f457a579f119c2fc7ce',
-        'row_reconciliation.parquet': '5d2ad8d3aa15d44cdc882ca540d6216feadc1bae3534be8e6b09dbe7026af62d',
-        'runtime_cutoff_audit.csv': 'ada67ad73c4d54cc10d1cf15d89fa7123fb6febe274a5267bdfcad304b24a7c3',
-        'runtime_cutoff_audit.parquet': '7dd18a03a7fc9bdb0c5c6388fb4316034c7090057fbb9069d6cc20ec9d81f606',
-        'runtime_trace_audit.csv': '1e8e93608389f4177e194303cae8ba2d4216df36baa50c249cc3f45119ffe61a',
-        'runtime_trace_audit.parquet': 'e473d91804a6293dcdf61f4c425cc1a4a69bb9e4cdc7412359a0ee236360d7bb',
+        'revenue_bridge_components.csv': '1a9c4f2a37329da2ab56070210c2db89c449bab2faa62362fe3a0a591c0daf9f',
+        'revenue_bridge_components.parquet': '0a0a74c594ddc41c14b7089f7cce8c801cd9d733a526f859700f614009b30cf4',
+        'revenue_chart_rows.csv': 'cf49992562a9f4668f51996545dfbb587aa24af08717d8d32948137a10ccaed3',
+        'revenue_chart_rows.parquet': '21a1e480319ddf4a5d58d0933090c80f9de5a4ba0519ce1ef9c8c3e53c718775',
+        'revenue_formula_residuals.csv': '0b79b5c7eed0026a5b6894bba4eeda4829d5ba4905b1afc553ef02b2bf7fb53a',
+        'revenue_formula_residuals.parquet': 'a19a8221d993e3a3de4cad2a03f635a8dff9a2f60f18ca7a75c7cba31f3c73fa',
+        'revenue_line_reconciliation.csv': 'fc1201d77893201d1c4270bffdbee9ca0ed49578f41943285aae62bfd641766a',
+        'revenue_line_reconciliation.parquet': 'f3a83645e90bbbdb1143b9916bf8286d4a42e44402442f397f49857b418a53f9',
+        'revenue_stack_components.csv': '72f1c98e391176baf2bb66f7f10450e4a7eed437ce17bd26d76df8e60483d766',
+        'revenue_stack_components.parquet': 'b512b0a0536357de245f84a638cf518cad3224dcf77d9d6f3409779b8e315306',
+        'row_reconciliation.csv': 'c3b08c6a325833c85b042335acb58cd858e3b7377adb92fc3570507934258c9b',
+        'row_reconciliation.parquet': '848f119deaddd1bac51883f85ff6f3b870ea583e3bcabef688d43376a3ba10ae',
+        'runtime_cutoff_audit.csv': 'ddf70dcd8ce5d2965e56bcb248a96c3efee10367e2b31e5005c2107d96aa18ed',
+        'runtime_cutoff_audit.parquet': '80a9881662173029f23d0d423f002e257abb272f8f7f980e00bbdfc3ca6584ca',
+        'runtime_trace_audit.csv': '21a1cd8b59ba2f0edb9c06d105565f625b5644b3c42628468a5687faf50de756',
+        'runtime_trace_audit.parquet': '4932e7c0fb20d441d2218fd44e0ba839d81e0783609beef3d62bf0ca7bad5917',
         'scenario_feature_lineage.csv': 'b123c97090bd282009225a0ac2cfc36226d20017412f820dfeec6af34411b30d',
         'scenario_feature_lineage.parquet': 'dbc4ac3f2693f6de0915aebd21bc85e2f794f878eaefef0eb9031de468fb00e9',
         'scenario_input_delta_audit.csv': '546a2e00c02b247368196a106499d1a1473619f5770d70794ab76428e1919cf8',
         'scenario_input_delta_audit.parquet': '578f75991a26df530ba6715c8ff1a0b842800b3c76b29914b06be1643f486c5a',
-        'scenario_input_replay_mismatch_report.csv': 'e7e428ac453af69dd9a708be0c38fcacfbe3f45d16cf1bf4defa5d779caf4419',
-        'scenario_input_replay_mismatch_report.parquet': 'fd5a346563f13cd8b1431ff5573dc11648d97ef22d0ffe05032fd8c270f40f58',
-        'scenario_role_contract.csv': '5dcfbc50bbeff276271d1b461867441e7d11be5239f9ce8ebc0bef47162bfd00',
-        'scenario_role_contract.parquet': '85d041a358f571b920c179ba9120f1a0f514bafcc91ce1d6e5622885a6d17668',
+        'scenario_input_replay_mismatch_report.csv': 'd490cb117bd39913cd604a9285b311fe28e47be6dd9c10e049d03ba070d22012',
+        'scenario_input_replay_mismatch_report.parquet': 'ff274edfb7d0a3fd999e22b0aed54a125b751edfa3dfb6830c688c95c7b4ef4a',
+        'scenario_role_contract.csv': '08b0f3e2b11ddddcfbafe9698b44af6076996cf99727350e9c2c7d39bc4dd74d',
+        'scenario_role_contract.parquet': '3ceb32bd026e46352c72bb026b9f408f584dbbb2403631746395374cadd20b09',
         'sensitivity_config.csv': '3c29b44c845f67ee27d71baa3420aa7af1a077e09904675ca6475a63fef129b1',
         'sensitivity_config.parquet': '48e4fe218d6e136c8253c5435f0d80960ccd2698b5132800ba7ba16f57f7b9f4',
-        'sensitivity_impact_audit.csv': '5d0d6afb22d98cbe01509eced3263884b3b80c70a05d0d6b0d55e087c73d1310',
-        'sensitivity_impact_audit.parquet': 'a546283383a27804fb7fe670cb935799c366b34ca30dc559a115c3f26a7e6437',
+        'sensitivity_impact_audit.csv': 'f76717f1d4a7f707e11f1ff72d5a2e39851dbb2b9bae79f4cbb1ba7dc1894f5a',
+        'sensitivity_impact_audit.parquet': '59728a20b422b495f8951fc526d8ac59831f9656b256d1e9e9a1e3fcd7ae00e9',
         'sensitivity_seed_inputs.csv': '5181058396fbdb3896ade20b3ea335955fc186af85cccd365c7d86531852f3a6',
         'sensitivity_seed_inputs.parquet': '23a8ba664690235b92fac25912b9c8ab0eefe990f94a58258b901fafa306b310',
-        'series_alias_audit.csv': 'c0330c9918d7e2f4f972d15e8465537c16d96aca607ef253353612cadd62c56d',
-        'series_alias_audit.parquet': '2600d218525ecd8916c57b5a1ea503106f51aab1fd105c95f3fc3d67d2dd05f9',
-        'series_trace_contract.csv': '2eaf18c4c54fc18a21dd68415c0aea041bd174e8d75285409a4bb83034b60e09',
-        'series_trace_contract.parquet': '7319848ee52ec052d837c924ec4e230571c606b788bde28f86d343140cb83a3c',
+        'series_alias_audit.csv': '225bd2e4407bb97aa40b515a0ad35f6501e0b15779aa3efa5ee0884290efbcf7',
+        'series_alias_audit.parquet': '09f87b5713889de262fcd8c257d3f829266e10ec10a45b520ac081b19ac96eca',
+        'series_trace_contract.csv': 'c717badc9b8056755483a6c494820b62cd44bb734a99f8e0b12fe75188bf4db6',
+        'series_trace_contract.parquet': '866482606699335a37eccac418f667a77ad93492b05e6f0e43d9aea4651c4e35',
         'stream_vintage_status.csv': 'c606a559f4f96634cace973eda9b78f4c6975f08b45842a2186a818f1a845b05',
         'stream_vintage_status.parquet': 'c9d5e63a9418cb87c505f98d55a78e4a9d813c04d7dbc26c625ddaee4fb2a73c',
-        'trace_source_contract.csv': '396a97e28c43adc892c438ce92fe16a847d87b0ad91c6f8ec1334416c85a070a',
-        'trace_source_contract.parquet': '74df6e0db3453928fcb159af4dc9d3dfb86fa712b9096d1d672dc8068099ed63',
+        'trace_source_contract.csv': '36137d8e5cac28530159151e04ac3094fedd49ffb43b5dff3aa91e00172fd95c',
+        'trace_source_contract.parquet': '85d2a78906c8756e145112e1ab2f0ef8e2e26801a390f0db83cb30629b66c971',
         'treasury_befu26_macro_path.csv': '1dd2fcbbc122ad8dd502e44ff1833f93ff26169dcd7dc47026da787adaf8aa1e',
     }
     assert {path.name: _sha256(path) for path in sorted(pack_dir.iterdir()) if path.is_file()} == expected_hashes

@@ -232,6 +232,11 @@ def test_overlay_rows_match_view_chart_rows(context) -> None:
         signature, "Total NLTF revenue", "june_year", FED, TRACES, sens, PED_BRIDGE_DEFAULT_MODE, uptake, pack
     )
     rows, _, _, _, _ = app.cached_scenario_overlay_rows(signature, sens, PED_BRIDGE_DEFAULT_MODE, uptake, pack)
+    # Layer contract: cached_scenario_overlay_rows is the unfiltered superset
+    # (every registered official vintage); the view layer applies the governed
+    # official-vintage filter. Apply it here so the two layers are comparable.
+    official_scenario, official_overlay = app._official_vintage_filter_for_key(uptake)
+    rows = app._filter_official_vintage_rows(rows, official_scenario, official_overlay)
     pd.testing.assert_frame_equal(view["chart_rows"].reset_index(drop=True), rows.reset_index(drop=True))
 
 
@@ -245,6 +250,10 @@ def test_policy_and_fuel_totals_reconcile_across_chart_line_and_stack(context) -
     line, _, stack, _ = app.cached_aligned_scenario_detail_frames(
         signature, sens, PED_BRIDGE_DEFAULT_MODE, uptake, pack
     )
+    # The detail frames are vintage-filtered; filter the raw overlay superset
+    # the same way so chart, line and stack share one official vocabulary.
+    official_scenario, official_overlay = app._official_vintage_filter_for_key(uptake)
+    rows = app._filter_official_vintage_rows(rows, official_scenario, official_overlay)
 
     chart = rows[
         rows["time_grain"].astype(str).eq("june_year")
@@ -261,10 +270,13 @@ def test_policy_and_fuel_totals_reconcile_across_chart_line_and_stack(context) -
         & stack["composition_mode"].astype(str).eq("Gross-to-net bridge audit")
     ].set_index("scenario_name")["value"].map(float)
 
+    # The official comparator scenario is whichever vintage the key selects;
+    # with the default key that is BEFU26, and the prior vintage's rows are
+    # filtered out of the displayed vocabulary.
     expected_scenarios = {
         "current_basecase",
         "current_comparison_1",
-        "mbu26_official",
+        official_scenario,
         *CONFLICT_SCENARIO_NAMES,
     }
     assert expected_scenarios <= set(chart.index)

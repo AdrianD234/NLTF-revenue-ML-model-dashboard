@@ -1,0 +1,40 @@
+series_id,source_label,worksheet_row,cell_range,sheet,workbook_basename,workbook_sha256
+light_ruc_net_km,Light RUC net km (m km),5,B5:BD5,Baseline,BEFU26 revenue forecast.xlsx,7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff
+heavy_ruc_net_km,Heavy RUC net km (m km),6,B6:BD6,Baseline,BEFU26 revenue forecast.xlsx,7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff
+light_bev_ruc_net_km,Light BEV RUC net km (m km),7,B7:BD7,Baseline,BEFU26 revenue forecast.xlsx,7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),8,B8:BD8,Baseline,BEFU26 revenue forecast.xlsx,7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff
+phev_ruc_net_km,PHEV RUC net km (m km),9,B9:BD9,Baseline,BEFU26 revenue forecast.xlsx,7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff
+ped_volume,PED volume (m L),10,B10:BD10,Baseline,BEFU26 revenue forecast.xlsx,7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff
+light_petrol_vkt,Light petrol VKT (m km),11,B11:BD11,Baseline,BEFU26 revenue forecast.xlsx,7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff
+ped_vkt_per_capita,Light petrol VKT per capita (km),12,B12:BD12,Baseline,BEFU26 revenue forecast.xlsx,7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff
+tuc_gtk,TUC GTK (Tonne-km),13,B13:BD13,Baseline,BEFU26 revenue forecast.xlsx,7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff
+light_ruc_net_revenue,Light RUC net revenue (m $),28,B28:BD28,Baseline,BEFU26 revenue forecast.xlsx,7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff
+heavy_ruc_net_revenue,Heavy RUC net revenue (m $),29,B29:BD29,Baseline,BEFU26 revenue forecast.xlsx,7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff
+light_bev_ruc_net_revenue,Light BEV RUC net revenue (m $),30,B30:BD30,Baseline,BEFU26 revenue forecast.xlsx,7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff
+heavy_bev_ruc_net_revenue,Heavy BEV RUC net revenue (m $),31,B31:BD31,Baseline,BEFU26 revenue forecast.xlsx,7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff
+phev_ruc_net_revenue,PHEV RUC net revenue (m $),32,B32:BD32,Baseline,BEFU26 revenue forecast.xlsx,7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff
+ruc_refunds,RUC refunds (m $),33,B33:BD33,Baseline,BEFU26 revenue forecast.xlsx,7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff
+gross_ruc_revenue,Gross RUC revenue (m $),34,B34:BD34,Baseline,BEFU26 revenue forecast.xlsx,7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff
+ruc_admin_revenue,RUC admin revenue (m $),35,B35:BD35,Baseline,BEFU26 revenue forecast.xlsx,7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff
+ruc_revenue_net_admin,RUC revenues net of admin fees (m $),36,B36:BD36,Baseline,BEFU26 revenue forecast.xlsx,7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff
+total_ruc_net_revenue,RUC revenues net of admin fees & refunds (m $),37,B37:BD37,Baseline,BEFU26 revenue forecast.xlsx,7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff
+gross_ped_revenue,Gross PED revenue (m $),40,B40:BD40,Baseline,BEFU26 revenue forecast.xlsx,7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff
+gross_lpg_revenue,Gross LPG revenue (m $),41,B41:BD41,Baseline,BEFU26 revenue forecast.xlsx,7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff
+gross_cng_revenue,Gross CNG revenue (m $),42,B42:BD42,Baseline,BEFU26 revenue forecast.xlsx,7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff
+gross_fed_revenue,Gross FED revenue (m $),43,B43:BD43,Baseline,BEFU26 revenue forecast.xlsx,7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff
+fed_refunds,FED refunds (m $),44,B44:BD44,Baseline,BEFU26 revenue forecast.xlsx,7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff
+net_fed_revenue,Net FED revenue (m $),45,B45:BD45,Baseline,BEFU26 revenue forecast.xlsx,7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff
+mr1_revenue,MR1 revenue (m $),48,B48:BD48,Baseline,BEFU26 revenue forecast.xlsx,7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff
+mr2_revenue,MR2 revenue (m $),49,B49:BD49,Baseline,BEFU26 revenue forecast.xlsx,7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff
+coo_revenue,MR13 revenue (m $),50,B50:BD50,Baseline,BEFU26 revenue forecast.xlsx,7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff
+gross_mvr_revenue,Gross MVR revenue (m $),51,B51:BD51,Baseline,BEFU26 revenue forecast.xlsx,7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff
+mvr_admin_revenue,MVR admin revenue (m $),52,B52:BD52,Baseline,BEFU26 revenue forecast.xlsx,7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff
+mvr_revenue_net_admin_coo,MVR revenues net of admin fees & COO (m $),53,B53:BD53,Baseline,BEFU26 revenue forecast.xlsx,7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff
+mvr_refunds,MVR refunds (m $),54,B54:BD54,Baseline,BEFU26 revenue forecast.xlsx,7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff
+net_mvr_revenue,"MVR revenues net of admin fees, refunds & COO (m $)",55,B55:BD55,Baseline,BEFU26 revenue forecast.xlsx,7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff
+tuc_net_revenue,TUC net revenue (m $),58,B58:BD58,Baseline,BEFU26 revenue forecast.xlsx,7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff
+total_gross_revenue,Total gross revenues (m $),61,B61:BD61,Baseline,BEFU26 revenue forecast.xlsx,7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff
+total_admin_fees,Total admin fees (m $),62,B62:BD62,Baseline,BEFU26 revenue forecast.xlsx,7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff
+total_revenue_net_admin,Total revenues net of admin fees (m $),63,B63:BD63,Baseline,BEFU26 revenue forecast.xlsx,7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff
+total_refunds,Total refunds (m $),64,B64:BD64,Baseline,BEFU26 revenue forecast.xlsx,7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff
+total_nltf_net_revenue,Total net revenues (m $),65,B65:BD65,Baseline,BEFU26 revenue forecast.xlsx,7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff

@@ -1,0 +1,391 @@
+baseline_source,scenario_name,scenario_role,time_grain,series_id,period,fed_path,row_type,trace_name,baseline_value,refreshed_value,delta,source_path,period_fy
+incumbent_chart_rows,actual,actual,june_year,ped_vkt_per_capita,FY2025,,historical_actual,Actual,5973.14429429917,5973.0514101063,-0.09288419286986027,,
+incumbent_chart_rows,current_basecase,basecase,june_year,ped_vkt_per_capita,FY2025,Current planned path,future_forecast,Current finalist Base case,5973.14429429917,5973.0514101063,-0.09288419286986027,,
+incumbent_chart_rows,current_comparison_1,comparison,june_year,ped_vkt_per_capita,FY2025,Current planned path,future_forecast,Current finalist comparison behavioural path,5973.14429429917,5973.0514101063,-0.09288419286986027,,
+incumbent_chart_rows,current_basecase,basecase,june_year,ped_volume,FY2026,Current planned path,future_forecast,Current finalist Base case,3060.889071656919,3063.2842870467116,2.395215389792611,,
+incumbent_chart_rows,current_comparison_1,comparison,june_year,ped_volume,FY2026,Current planned path,future_forecast,Current finalist High population/comparison,3064.1315559297523,3066.529385727319,2.3978297975668283,,
+incumbent_chart_rows,current_basecase,basecase,june_year,ped_volume,FY2027,Current planned path,future_forecast,Current finalist Base case,2988.1217042310122,2988.084597834288,-0.037106396724084334,,
+incumbent_chart_rows,current_comparison_1,comparison,june_year,ped_volume,FY2027,Current planned path,future_forecast,Current finalist High population/comparison,3007.5905901369983,3007.5532419762912,-0.03734816070709712,,
+incumbent_chart_rows,current_basecase,basecase,june_year,ped_volume,FY2028,Current planned path,future_forecast,Current finalist Base case,2981.668112816533,2981.6514518463478,-0.016660970185057522,,
+incumbent_chart_rows,current_comparison_1,comparison,june_year,ped_volume,FY2028,Current planned path,future_forecast,Current finalist High population/comparison,3019.956879710486,3019.940004790264,-0.016874920222107903,,
+incumbent_chart_rows,current_basecase,basecase,june_year,ped_volume,FY2029,Current planned path,future_forecast,Current finalist Base case,2973.980088087325,2973.97331412848,-0.006773958844860317,,
+incumbent_chart_rows,current_comparison_1,comparison,june_year,ped_volume,FY2029,Current planned path,future_forecast,Current finalist High population/comparison,3031.4181363759153,3031.4112315880257,-0.006904787889652653,,
+incumbent_chart_rows,current_basecase,basecase,june_year,ped_volume,FY2030,Current planned path,future_forecast,Current finalist Base case,2958.899456253502,2958.8957603061776,-0.0036959473245588015,,
+incumbent_chart_rows,current_comparison_1,comparison,june_year,ped_volume,FY2030,Current planned path,future_forecast,Current finalist High population/comparison,3036.036401927321,3036.0326096286026,-0.003792298718508391,,
+incumbent_chart_rows,current_basecase,basecase,june_year,gross_ped_revenue,FY2026,Current planned path,future_forecast,Current finalist Base case,2143.356963537042,2145.0341891615885,1.677225624546736,,
+incumbent_chart_rows,current_comparison_1,comparison,june_year,gross_ped_revenue,FY2026,Current planned path,future_forecast,Current finalist High population/comparison,2145.6274807242507,2147.3065370616973,1.679056337446582,,
+incumbent_chart_rows,current_basecase,basecase,june_year,gross_ped_revenue,FY2027,Current planned path,future_forecast,Current finalist Base case,2270.5040576345127,2271.1971624757975,0.6931048412848213,,
+incumbent_chart_rows,current_comparison_1,comparison,june_year,gross_ped_revenue,FY2027,Current planned path,future_forecast,Current finalist High population/comparison,2285.2973588526575,2285.99497956726,0.6976207146026354,,
+incumbent_chart_rows,current_basecase,basecase,june_year,gross_ped_revenue,FY2028,Current planned path,future_forecast,Current finalist Base case,2534.684498990492,2534.825956879315,0.14145788882296984,,
+incumbent_chart_rows,current_comparison_1,comparison,june_year,gross_ped_revenue,FY2028,Current planned path,future_forecast,Current finalist High population/comparison,2567.2333744050297,2567.3766488099523,0.14327440492252208,,
+incumbent_chart_rows,current_basecase,basecase,june_year,gross_ped_revenue,FY2029,Current planned path,future_forecast,Current finalist Base case,2676.9113070502763,2676.9622167960188,0.0509097457425014,,
+incumbent_chart_rows,current_comparison_1,comparison,june_year,gross_ped_revenue,FY2029,Current planned path,future_forecast,Current finalist High population/comparison,2728.6119090598595,2728.663802052412,0.051892992552438955,,
+incumbent_chart_rows,current_basecase,basecase,june_year,gross_ped_revenue,FY2030,Current planned path,future_forecast,Current finalist Base case,2781.659206232161,2781.6793512770555,0.02014504489443425,,
+incumbent_chart_rows,current_comparison_1,comparison,june_year,gross_ped_revenue,FY2030,Current planned path,future_forecast,Current finalist High population/comparison,2854.1755922217985,2854.196262437372,0.020670215573318274,,
+incumbent_chart_rows,current_basecase,basecase,june_year,light_ruc_net_revenue,FY2026,Current planned path,future_forecast,Current finalist Base case,867.440868646173,867.4389604921547,-0.001908154018337882,,
+incumbent_chart_rows,current_comparison_1,comparison,june_year,light_ruc_net_revenue,FY2026,Current planned path,future_forecast,Current finalist High population/comparison,868.012021335747,868.010111925335,-0.0019094104120540578,,
+incumbent_chart_rows,current_basecase,basecase,june_year,light_ruc_net_revenue,FY2027,Current planned path,future_forecast,Current finalist Base case,939.6893927655569,940.1600224373842,0.47062967182728244,,
+incumbent_chart_rows,current_comparison_1,comparison,june_year,light_ruc_net_revenue,FY2027,Current planned path,future_forecast,Current finalist High population/comparison,945.344221435419,945.8176832453779,0.4734618099589625,,
+incumbent_chart_rows,current_basecase,basecase,june_year,light_ruc_net_revenue,FY2028,Current planned path,future_forecast,Current finalist Base case,1087.3404941589715,1087.4867913007602,0.1462971417886365,,
+incumbent_chart_rows,current_comparison_1,comparison,june_year,light_ruc_net_revenue,FY2028,Current planned path,future_forecast,Current finalist High population/comparison,1099.6924709137568,1099.8404299626523,0.14795904889547273,,
+incumbent_chart_rows,current_basecase,basecase,june_year,light_ruc_net_revenue,FY2029,Current planned path,future_forecast,Current finalist Base case,1191.3931534415976,1191.438708351885,0.04555491028736469,,
+incumbent_chart_rows,current_comparison_1,comparison,june_year,light_ruc_net_revenue,FY2029,Current planned path,future_forecast,Current finalist High population/comparison,1211.3412392466093,1211.3875569053282,0.04631765871886273,,
+incumbent_chart_rows,current_basecase,basecase,june_year,light_ruc_net_revenue,FY2030,Current planned path,future_forecast,Current finalist Base case,1271.029669278332,1271.0591011588097,0.029431880477659433,,
+incumbent_chart_rows,current_comparison_1,comparison,june_year,light_ruc_net_revenue,FY2030,Current planned path,future_forecast,Current finalist High population/comparison,1299.194773882275,1299.2248579520858,0.030084069810754954,,
+incumbent_chart_rows,current_basecase,basecase,june_year,heavy_ruc_net_revenue,FY2026,Current planned path,future_forecast,Current finalist Base case,1134.8353401385034,1134.8364690215053,0.0011288830019111629,,
+incumbent_chart_rows,current_comparison_1,comparison,june_year,heavy_ruc_net_revenue,FY2026,Current planned path,future_forecast,Current finalist High population/comparison,1135.2102486241813,1135.2113778801254,0.0011292559440789773,,
+incumbent_chart_rows,current_basecase,basecase,june_year,heavy_ruc_net_revenue,FY2027,Current planned path,future_forecast,Current finalist Base case,1232.1203935629142,1232.1435318108831,0.02313824796897279,,
+incumbent_chart_rows,current_comparison_1,comparison,june_year,heavy_ruc_net_revenue,FY2027,Current planned path,future_forecast,Current finalist High population/comparison,1234.6034877580475,1234.6266726365643,0.023184878516758545,,
+incumbent_chart_rows,current_basecase,basecase,june_year,heavy_ruc_net_revenue,FY2028,Current planned path,future_forecast,Current finalist Base case,1380.3167194555558,1380.360386338277,0.043666882721254296,,
+incumbent_chart_rows,current_comparison_1,comparison,june_year,heavy_ruc_net_revenue,FY2028,Current planned path,future_forecast,Current finalist High population/comparison,1382.9353913994867,1382.9791411249635,0.04374972547680045,,
+incumbent_chart_rows,current_basecase,basecase,june_year,heavy_ruc_net_revenue,FY2029,Current planned path,future_forecast,Current finalist Base case,1474.755307492383,1474.7667479653394,0.011440472956337544,,
+incumbent_chart_rows,current_comparison_1,comparison,june_year,heavy_ruc_net_revenue,FY2029,Current planned path,future_forecast,Current finalist High population/comparison,1476.5573951125543,1476.568849565277,0.011454452722773567,,
+incumbent_chart_rows,current_basecase,basecase,june_year,heavy_ruc_net_revenue,FY2030,Current planned path,future_forecast,Current finalist Base case,1552.689025066263,1552.696507641898,0.00748257563509469,,
+incumbent_chart_rows,current_comparison_1,comparison,june_year,heavy_ruc_net_revenue,FY2030,Current planned path,future_forecast,Current finalist High population/comparison,1554.703695421354,1554.7111877059028,0.00749228454878903,,
+incumbent_chart_rows,current_basecase,basecase,june_year,gross_fed_revenue,FY2026,Current planned path,future_forecast,Current finalist Base case,2185.4021261772323,2187.079351801779,1.677225624546736,,
+incumbent_chart_rows,current_comparison_1,comparison,june_year,gross_fed_revenue,FY2026,Current planned path,future_forecast,Current finalist High population/comparison,2187.6726433644412,2189.351699701888,1.679056337446582,,
+incumbent_chart_rows,current_basecase,basecase,june_year,gross_fed_revenue,FY2027,Current planned path,future_forecast,Current finalist Base case,2313.136747454854,2313.8298522961386,0.6931048412848213,,
+incumbent_chart_rows,current_comparison_1,comparison,june_year,gross_fed_revenue,FY2027,Current planned path,future_forecast,Current finalist High population/comparison,2327.9300486729985,2328.627669387601,0.6976207146026354,,
+incumbent_chart_rows,current_basecase,basecase,june_year,gross_fed_revenue,FY2028,Current planned path,future_forecast,Current finalist Base case,2577.5378758526795,2577.6793337415024,0.14145788882296984,,
+incumbent_chart_rows,current_comparison_1,comparison,june_year,gross_fed_revenue,FY2028,Current planned path,future_forecast,Current finalist High population/comparison,2610.086751267217,2610.2300256721396,0.14327440492252208,,
+incumbent_chart_rows,current_basecase,basecase,june_year,gross_fed_revenue,FY2029,Current planned path,future_forecast,Current finalist Base case,2719.967853706387,2720.0187634521294,0.0509097457425014,,
+incumbent_chart_rows,current_comparison_1,comparison,june_year,gross_fed_revenue,FY2029,Current planned path,future_forecast,Current finalist High population/comparison,2771.66845571597,2771.7203487085226,0.051892992552438955,,
+incumbent_chart_rows,current_basecase,basecase,june_year,gross_fed_revenue,FY2030,Current planned path,future_forecast,Current finalist Base case,2824.9039840792548,2824.924129124149,0.02014504489443425,,
+incumbent_chart_rows,current_comparison_1,comparison,june_year,gross_fed_revenue,FY2030,Current planned path,future_forecast,Current finalist High population/comparison,2897.420370068892,2897.4410402844655,0.020670215573318274,,
+incumbent_chart_rows,current_basecase,basecase,june_year,net_fed_revenue,FY2026,Current planned path,future_forecast,Current finalist Base case,2112.1346014816318,2114.6925455991745,2.5579441175427746,,
+incumbent_chart_rows,current_comparison_1,comparison,june_year,net_fed_revenue,FY2026,Current planned path,future_forecast,Current finalist High population/comparison,2114.4051186688407,2116.9648934992833,2.5597748304426204,,
+incumbent_chart_rows,current_basecase,basecase,june_year,net_fed_revenue,FY2027,Current planned path,future_forecast,Current finalist Base case,2231.0317855508974,2233.1768916064866,2.1451060555891672,,
+incumbent_chart_rows,current_comparison_1,comparison,june_year,net_fed_revenue,FY2027,Current planned path,future_forecast,Current finalist High population/comparison,2245.825086769042,2247.974708697949,2.1496219289069813,,
+incumbent_chart_rows,current_basecase,basecase,june_year,net_fed_revenue,FY2028,Current planned path,future_forecast,Current finalist Base case,2485.426160851226,2486.21203148976,0.7858706385341065,,
+incumbent_chart_rows,current_comparison_1,comparison,june_year,net_fed_revenue,FY2028,Current planned path,future_forecast,Current finalist High population/comparison,2517.9750362657637,2518.7627234203974,0.7876871546336588,,
+incumbent_chart_rows,current_basecase,basecase,june_year,net_fed_revenue,FY2029,Current planned path,future_forecast,Current finalist Base case,2622.137336911685,2622.34505933574,0.20772242405519137,,
+incumbent_chart_rows,current_comparison_1,comparison,june_year,net_fed_revenue,FY2029,Current planned path,future_forecast,Current finalist High population/comparison,2673.8379389212682,2674.0466445921334,0.20870567086512892,,
+incumbent_chart_rows,current_basecase,basecase,june_year,net_fed_revenue,FY2030,Current planned path,future_forecast,Current finalist Base case,2722.490991688741,2722.446940662707,-0.04405102603368505,,
+incumbent_chart_rows,current_comparison_1,comparison,june_year,net_fed_revenue,FY2030,Current planned path,future_forecast,Current finalist High population/comparison,2795.0073776783784,2794.9638518230236,-0.043525855354801024,,
+incumbent_chart_rows,current_basecase,basecase,june_year,total_ruc_net_revenue,FY2026,Current planned path,future_forecast,Current finalist Base case,2073.4998730636125,2073.8323474108515,0.3324743472389855,,
+incumbent_chart_rows,current_comparison_1,comparison,june_year,total_ruc_net_revenue,FY2026,Current planned path,future_forecast,Current finalist High population/comparison,2074.515592973735,2074.848066437522,0.33247346378720977,,
+incumbent_chart_rows,current_basecase,basecase,june_year,total_ruc_net_revenue,FY2027,Current planned path,future_forecast,Current finalist Base case,2279.2065835079384,2280.545090691793,1.3385071838547447,,
+incumbent_chart_rows,current_comparison_1,comparison,june_year,total_ruc_net_revenue,FY2027,Current planned path,future_forecast,Current finalist High population/comparison,2288.2058570048125,2289.5472429573465,1.341385952533983,,
+incumbent_chart_rows,current_basecase,basecase,june_year,total_ruc_net_revenue,FY2028,Current planned path,future_forecast,Current finalist Base case,2659.6949380932087,2660.225385516815,0.530447423606347,,
+incumbent_chart_rows,current_comparison_1,comparison,june_year,total_ruc_net_revenue,FY2028,Current planned path,future_forecast,Current finalist High population/comparison,2677.0468804410316,2677.5790726145005,0.5321921734689568,,
+incumbent_chart_rows,current_basecase,basecase,june_year,total_ruc_net_revenue,FY2029,Current planned path,future_forecast,Current finalist Base case,2941.6335786661207,2941.7656172699285,0.13203860380781407,,
+incumbent_chart_rows,current_comparison_1,comparison,june_year,total_ruc_net_revenue,FY2029,Current planned path,future_forecast,Current finalist High population/comparison,2968.2308783986555,2968.3636937306615,0.1328153320059755,,
+incumbent_chart_rows,current_basecase,basecase,june_year,total_ruc_net_revenue,FY2030,Current planned path,future_forecast,Current finalist Base case,3195.2526967426033,3195.2112632783583,-0.04143346424507399,,
+incumbent_chart_rows,current_comparison_1,comparison,june_year,total_ruc_net_revenue,FY2030,Current planned path,future_forecast,Current finalist High population/comparison,3233.87870892825,3233.837937362252,-0.04077156599805676,,
+incumbent_chart_rows,current_basecase,basecase,june_year,net_mvr_revenue,FY2026,Current planned path,future_forecast,Current finalist Base case,425.1291935285919,393.8747745212369,-31.25441900735501,,
+incumbent_chart_rows,current_comparison_1,comparison,june_year,net_mvr_revenue,FY2026,Current planned path,future_forecast,Current finalist High population/comparison,425.1291935285919,393.8747745212369,-31.25441900735501,,
+incumbent_chart_rows,current_basecase,basecase,june_year,net_mvr_revenue,FY2027,Current planned path,future_forecast,Current finalist Base case,496.1497521504495,484.04699017200664,-12.102761978442857,,
+incumbent_chart_rows,current_comparison_1,comparison,june_year,net_mvr_revenue,FY2027,Current planned path,future_forecast,Current finalist High population/comparison,496.1497521504495,484.04699017200664,-12.102761978442857,,
+incumbent_chart_rows,current_basecase,basecase,june_year,total_fed_ruc_net_revenue,FY2026,Current planned path,future_forecast,Current finalist Base case,4185.634474545244,4188.524893010026,2.89041846478176,,
+incumbent_chart_rows,current_comparison_1,comparison,june_year,total_fed_ruc_net_revenue,FY2026,Current planned path,future_forecast,Current finalist High population/comparison,4188.920711642575,4191.812959936806,2.8922482942307397,,
+incumbent_chart_rows,current_basecase,basecase,june_year,total_fed_ruc_net_revenue,FY2027,Current planned path,future_forecast,Current finalist Base case,4510.238369058836,4513.72198229828,3.483613239443912,,
+incumbent_chart_rows,current_comparison_1,comparison,june_year,total_fed_ruc_net_revenue,FY2027,Current planned path,future_forecast,Current finalist High population/comparison,4534.030943773854,4537.521951655295,3.4910078814409644,,
+incumbent_chart_rows,current_basecase,basecase,june_year,total_fed_ruc_net_revenue,FY2028,Current planned path,future_forecast,Current finalist Base case,5145.121098944435,5146.437417006575,1.316318062139544,,
+incumbent_chart_rows,current_comparison_1,comparison,june_year,total_fed_ruc_net_revenue,FY2028,Current planned path,future_forecast,Current finalist High population/comparison,5195.021916706795,5196.341796034898,1.3198793281026155,,
+incumbent_chart_rows,current_basecase,basecase,june_year,total_fed_ruc_net_revenue,FY2029,Current planned path,future_forecast,Current finalist Base case,5563.770915577806,5564.110676605669,0.3397610278634602,,
+incumbent_chart_rows,current_comparison_1,comparison,june_year,total_fed_ruc_net_revenue,FY2029,Current planned path,future_forecast,Current finalist High population/comparison,5642.068817319923,5642.410338322795,0.3415210028715592,,
+incumbent_chart_rows,current_basecase,basecase,june_year,total_fed_ruc_net_revenue,FY2030,Current planned path,future_forecast,Current finalist Base case,5917.743688431345,5917.658203941066,-0.08548449027875904,,
+incumbent_chart_rows,current_comparison_1,comparison,june_year,total_fed_ruc_net_revenue,FY2030,Current planned path,future_forecast,Current finalist High population/comparison,6028.886086606628,6028.801789185276,-0.08429742135194829,,
+incumbent_chart_rows,current_basecase,basecase,june_year,total_nltf_net_revenue,FY2026,Current planned path,future_forecast,Current finalist Base case,4628.169745560249,4599.805745017675,-28.364000542574104,,
+incumbent_chart_rows,current_comparison_1,comparison,june_year,total_nltf_net_revenue,FY2026,Current planned path,future_forecast,Current finalist High population/comparison,4631.45598265758,4603.093811944454,-28.362170713126034,,
+incumbent_chart_rows,current_basecase,basecase,june_year,total_nltf_net_revenue,FY2027,Current planned path,future_forecast,Current finalist Base case,5023.94602090211,5015.326872163112,-8.619148738997865,,
+incumbent_chart_rows,current_comparison_1,comparison,june_year,total_nltf_net_revenue,FY2027,Current planned path,future_forecast,Current finalist High population/comparison,5047.738595617128,5039.1268415201275,-8.611754097000812,,
+incumbent_chart_rows,current_basecase,basecase,june_year,total_nltf_net_revenue,FY2028,Current planned path,future_forecast,Current finalist Base case,5652.929508913845,5654.245826975987,1.3163180621422725,,
+incumbent_chart_rows,current_comparison_1,comparison,june_year,total_nltf_net_revenue,FY2028,Current planned path,future_forecast,Current finalist High population/comparison,5702.830326676206,5704.150206004309,1.319879328103525,,
+incumbent_chart_rows,current_basecase,basecase,june_year,total_nltf_net_revenue,FY2029,Current planned path,future_forecast,Current finalist Base case,6066.171925264326,6066.5116862921905,0.3397610278643697,,
+incumbent_chart_rows,current_comparison_1,comparison,june_year,total_nltf_net_revenue,FY2029,Current planned path,future_forecast,Current finalist High population/comparison,6144.469827006445,6144.811348009316,0.3415210028715592,,
+incumbent_chart_rows,current_basecase,basecase,june_year,total_nltf_net_revenue,FY2030,Current planned path,future_forecast,Current finalist Base case,6415.185306413028,6415.09982192275,-0.08548449027784955,,
+incumbent_chart_rows,current_comparison_1,comparison,june_year,total_nltf_net_revenue,FY2030,Current planned path,future_forecast,Current finalist High population/comparison,6526.327704588313,6526.24340716696,-0.08429742135285778,,
+ar1_chart_rows,actual,actual,june_year,ped_vkt_per_capita,FY2025,,historical_actual,Actual,5973.14429429917,5973.0514101063,-0.09288419286986027,,
+ar1_chart_rows,current_basecase,basecase,june_year,ped_vkt_per_capita,FY2025,Current planned path,future_forecast,Current finalist Base case,5973.14429429917,5973.0514101063,-0.09288419286986027,,
+ar1_chart_rows,current_comparison_1,comparison,june_year,ped_vkt_per_capita,FY2025,Current planned path,future_forecast,Current finalist comparison behavioural path,5973.14429429917,5973.0514101063,-0.09288419286986027,,
+ar1_chart_rows,current_basecase,basecase,june_year,ped_volume,FY2026,Current planned path,future_forecast,Current finalist Base case,3048.3810974057587,3050.766227644052,2.3851302382931863,,
+ar1_chart_rows,current_comparison_1,comparison,june_year,ped_volume,FY2026,Current planned path,future_forecast,Current finalist High population/comparison,3051.4586366360454,3053.846248287296,2.3876116512506087,,
+ar1_chart_rows,current_basecase,basecase,june_year,ped_volume,FY2027,Current planned path,future_forecast,Current finalist Base case,2903.3191647488657,2903.2831114272785,-0.036053321587132814,,
+ar1_chart_rows,current_comparison_1,comparison,june_year,ped_volume,FY2027,Current planned path,future_forecast,Current finalist High population/comparison,2921.104706492739,2921.0684323108812,-0.03627418185760689,,
+ar1_chart_rows,current_basecase,basecase,june_year,ped_volume,FY2028,Current planned path,future_forecast,Current finalist Base case,2871.606500451903,2871.5904544841837,-0.016045967719037435,,
+ar1_chart_rows,current_comparison_1,comparison,june_year,ped_volume,FY2028,Current planned path,future_forecast,Current finalist High population/comparison,2906.3307709354935,2906.314530935436,-0.016240000057678117,,
+ar1_chart_rows,current_basecase,basecase,june_year,ped_volume,FY2029,Current planned path,future_forecast,Current finalist Base case,2855.8919719074747,2855.885466922872,-0.006504984602543118,,
+ar1_chart_rows,current_comparison_1,comparison,june_year,ped_volume,FY2029,Current planned path,future_forecast,Current finalist High population/comparison,2907.5015166289277,2907.4948940911063,-0.006622537821385777,,
+ar1_chart_rows,current_basecase,basecase,june_year,ped_volume,FY2030,Current planned path,future_forecast,Current finalist Base case,2840.9382569579348,2840.934708355387,-0.0035486025476529903,,
+ar1_chart_rows,current_comparison_1,comparison,june_year,ped_volume,FY2030,Current planned path,future_forecast,Current finalist High population/comparison,2908.8590956065495,2908.8554621644034,-0.0036334421461106103,,
+ar1_chart_rows,current_basecase,basecase,june_year,gross_ped_revenue,FY2026,Current planned path,future_forecast,Current finalist Base case,2134.5983796474093,2136.26854324547,1.6701635980607534,,
+ar1_chart_rows,current_comparison_1,comparison,june_year,gross_ped_revenue,FY2026,Current planned path,future_forecast,Current finalist High population/comparison,2136.7533957180253,2138.4252969006952,1.6719011826698988,,
+ar1_chart_rows,current_basecase,basecase,june_year,gross_ped_revenue,FY2027,Current planned path,future_forecast,Current finalist Base case,2206.0674218310605,2206.740856439173,0.6734346081125295,,
+ar1_chart_rows,current_comparison_1,comparison,june_year,gross_ped_revenue,FY2027,Current planned path,future_forecast,Current finalist High population/comparison,2219.5816453780844,2220.2592054021966,0.6775600241121538,,
+ar1_chart_rows,current_basecase,basecase,june_year,gross_ped_revenue,FY2028,Current planned path,future_forecast,Current finalist Base case,2441.1222874232876,2441.2585237103976,0.1362362871100231,,
+ar1_chart_rows,current_comparison_1,comparison,june_year,gross_ped_revenue,FY2028,Current planned path,future_forecast,Current finalist High population/comparison,2470.6410221728675,2470.7789058673366,0.1378836944691102,,
+ar1_chart_rows,current_basecase,basecase,june_year,gross_ped_revenue,FY2029,Current planned path,future_forecast,Current finalist Base case,2570.6189298093077,2570.667818076832,0.04888826752448949,,
+ar1_chart_rows,current_comparison_1,comparison,june_year,gross_ped_revenue,FY2029,Current planned path,future_forecast,Current finalist High population/comparison,2617.0732333770984,2617.123005116846,0.04977173974748439,,
+ar1_chart_rows,current_basecase,basecase,june_year,gross_ped_revenue,FY2030,Current planned path,future_forecast,Current finalist Base case,2670.7639693881993,2670.7833113190677,0.019341930868449708,,
+ar1_chart_rows,current_comparison_1,comparison,june_year,gross_ped_revenue,FY2030,Current planned path,future_forecast,Current finalist High population/comparison,2734.616299930431,2734.636104286051,0.019804355619726266,,
+ar1_chart_rows,current_basecase,basecase,june_year,light_ruc_net_revenue,FY2026,Current planned path,future_forecast,Current finalist Base case,867.440868646173,867.4389604921547,-0.001908154018337882,,
+ar1_chart_rows,current_comparison_1,comparison,june_year,light_ruc_net_revenue,FY2026,Current planned path,future_forecast,Current finalist High population/comparison,868.012021335747,868.010111925335,-0.0019094104120540578,,
+ar1_chart_rows,current_basecase,basecase,june_year,light_ruc_net_revenue,FY2027,Current planned path,future_forecast,Current finalist Base case,939.6893927655569,940.1600224373842,0.47062967182728244,,
+ar1_chart_rows,current_comparison_1,comparison,june_year,light_ruc_net_revenue,FY2027,Current planned path,future_forecast,Current finalist High population/comparison,945.344221435419,945.8176832453779,0.4734618099589625,,
+ar1_chart_rows,current_basecase,basecase,june_year,light_ruc_net_revenue,FY2028,Current planned path,future_forecast,Current finalist Base case,1087.3404941589715,1087.4867913007602,0.1462971417886365,,
+ar1_chart_rows,current_comparison_1,comparison,june_year,light_ruc_net_revenue,FY2028,Current planned path,future_forecast,Current finalist High population/comparison,1099.6924709137568,1099.8404299626523,0.14795904889547273,,
+ar1_chart_rows,current_basecase,basecase,june_year,light_ruc_net_revenue,FY2029,Current planned path,future_forecast,Current finalist Base case,1191.3931534415976,1191.438708351885,0.04555491028736469,,
+ar1_chart_rows,current_comparison_1,comparison,june_year,light_ruc_net_revenue,FY2029,Current planned path,future_forecast,Current finalist High population/comparison,1211.3412392466093,1211.3875569053282,0.04631765871886273,,
+ar1_chart_rows,current_basecase,basecase,june_year,light_ruc_net_revenue,FY2030,Current planned path,future_forecast,Current finalist Base case,1271.029669278332,1271.0591011588097,0.029431880477659433,,
+ar1_chart_rows,current_comparison_1,comparison,june_year,light_ruc_net_revenue,FY2030,Current planned path,future_forecast,Current finalist High population/comparison,1299.194773882275,1299.2248579520858,0.030084069810754954,,
+ar1_chart_rows,current_basecase,basecase,june_year,heavy_ruc_net_revenue,FY2026,Current planned path,future_forecast,Current finalist Base case,1134.8353401385034,1134.8364690215053,0.0011288830019111629,,
+ar1_chart_rows,current_comparison_1,comparison,june_year,heavy_ruc_net_revenue,FY2026,Current planned path,future_forecast,Current finalist High population/comparison,1135.2102486241813,1135.2113778801254,0.0011292559440789773,,
+ar1_chart_rows,current_basecase,basecase,june_year,heavy_ruc_net_revenue,FY2027,Current planned path,future_forecast,Current finalist Base case,1232.1203935629142,1232.1435318108831,0.02313824796897279,,
+ar1_chart_rows,current_comparison_1,comparison,june_year,heavy_ruc_net_revenue,FY2027,Current planned path,future_forecast,Current finalist High population/comparison,1234.6034877580475,1234.6266726365643,0.023184878516758545,,
+ar1_chart_rows,current_basecase,basecase,june_year,heavy_ruc_net_revenue,FY2028,Current planned path,future_forecast,Current finalist Base case,1380.3167194555558,1380.360386338277,0.043666882721254296,,
+ar1_chart_rows,current_comparison_1,comparison,june_year,heavy_ruc_net_revenue,FY2028,Current planned path,future_forecast,Current finalist High population/comparison,1382.9353913994867,1382.9791411249635,0.04374972547680045,,
+ar1_chart_rows,current_basecase,basecase,june_year,heavy_ruc_net_revenue,FY2029,Current planned path,future_forecast,Current finalist Base case,1474.755307492383,1474.7667479653394,0.011440472956337544,,
+ar1_chart_rows,current_comparison_1,comparison,june_year,heavy_ruc_net_revenue,FY2029,Current planned path,future_forecast,Current finalist High population/comparison,1476.5573951125543,1476.568849565277,0.011454452722773567,,
+ar1_chart_rows,current_basecase,basecase,june_year,heavy_ruc_net_revenue,FY2030,Current planned path,future_forecast,Current finalist Base case,1552.689025066263,1552.696507641898,0.00748257563509469,,
+ar1_chart_rows,current_comparison_1,comparison,june_year,heavy_ruc_net_revenue,FY2030,Current planned path,future_forecast,Current finalist High population/comparison,1554.703695421354,1554.7111877059028,0.00749228454878903,,
+ar1_chart_rows,current_basecase,basecase,june_year,gross_fed_revenue,FY2026,Current planned path,future_forecast,Current finalist Base case,2176.6435422875998,2178.3137058856605,1.6701635980607534,,
+ar1_chart_rows,current_comparison_1,comparison,june_year,gross_fed_revenue,FY2026,Current planned path,future_forecast,Current finalist High population/comparison,2178.798558358216,2180.4704595408857,1.6719011826698988,,
+ar1_chart_rows,current_basecase,basecase,june_year,gross_fed_revenue,FY2027,Current planned path,future_forecast,Current finalist Base case,2248.7001116514016,2249.373546259514,0.6734346081125295,,
+ar1_chart_rows,current_comparison_1,comparison,june_year,gross_fed_revenue,FY2027,Current planned path,future_forecast,Current finalist High population/comparison,2262.2143351984255,2262.8918952225376,0.6775600241121538,,
+ar1_chart_rows,current_basecase,basecase,june_year,gross_fed_revenue,FY2028,Current planned path,future_forecast,Current finalist Base case,2483.975664285475,2484.111900572585,0.1362362871100231,,
+ar1_chart_rows,current_comparison_1,comparison,june_year,gross_fed_revenue,FY2028,Current planned path,future_forecast,Current finalist High population/comparison,2513.494399035055,2513.632282729524,0.1378836944691102,,
+ar1_chart_rows,current_basecase,basecase,june_year,gross_fed_revenue,FY2029,Current planned path,future_forecast,Current finalist Base case,2613.6754764654183,2613.724364732943,0.04888826752448949,,
+ar1_chart_rows,current_comparison_1,comparison,june_year,gross_fed_revenue,FY2029,Current planned path,future_forecast,Current finalist High population/comparison,2660.129780033209,2660.1795517729565,0.04977173974748439,,
+ar1_chart_rows,current_basecase,basecase,june_year,gross_fed_revenue,FY2030,Current planned path,future_forecast,Current finalist Base case,2714.008747235293,2714.0280891661614,0.019341930868449708,,
+ar1_chart_rows,current_comparison_1,comparison,june_year,gross_fed_revenue,FY2030,Current planned path,future_forecast,Current finalist High population/comparison,2777.8610777775248,2777.8808821331445,0.019804355619726266,,
+ar1_chart_rows,current_basecase,basecase,june_year,net_fed_revenue,FY2026,Current planned path,future_forecast,Current finalist Base case,2103.3760175919992,2105.926899683056,2.550882091056792,,
+ar1_chart_rows,current_comparison_1,comparison,june_year,net_fed_revenue,FY2026,Current planned path,future_forecast,Current finalist High population/comparison,2105.5310336626153,2108.0836533382812,2.5526196756659374,,
+ar1_chart_rows,current_basecase,basecase,june_year,net_fed_revenue,FY2027,Current planned path,future_forecast,Current finalist Base case,2166.5951497474452,2168.720585569862,2.1254358224168755,,
+ar1_chart_rows,current_comparison_1,comparison,june_year,net_fed_revenue,FY2027,Current planned path,future_forecast,Current finalist High population/comparison,2180.109373294469,2182.2389345328857,2.1295612384164997,,
+ar1_chart_rows,current_basecase,basecase,june_year,net_fed_revenue,FY2028,Current planned path,future_forecast,Current finalist Base case,2391.8639492840216,2392.6445983208428,0.7806490368211598,,
+ar1_chart_rows,current_comparison_1,comparison,june_year,net_fed_revenue,FY2028,Current planned path,future_forecast,Current finalist High population/comparison,2421.3826840336014,2422.1649804777817,0.7822964441802469,,
+ar1_chart_rows,current_basecase,basecase,june_year,net_fed_revenue,FY2029,Current planned path,future_forecast,Current finalist Base case,2515.8449596707164,2516.0506606165536,0.20570094583717946,,
+ar1_chart_rows,current_comparison_1,comparison,june_year,net_fed_revenue,FY2029,Current planned path,future_forecast,Current finalist High population/comparison,2562.299263238507,2562.5058476565673,0.20658441806017436,,
+ar1_chart_rows,current_basecase,basecase,june_year,net_fed_revenue,FY2030,Current planned path,future_forecast,Current finalist Base case,2611.595754844779,2611.5509007047194,-0.04485414005966959,,
+ar1_chart_rows,current_comparison_1,comparison,june_year,net_fed_revenue,FY2030,Current planned path,future_forecast,Current finalist High population/comparison,2675.448085387011,2675.4036936717025,-0.04439171530839303,,
+ar1_chart_rows,current_basecase,basecase,june_year,total_ruc_net_revenue,FY2026,Current planned path,future_forecast,Current finalist Base case,2073.4998730636125,2073.8323474108515,0.3324743472389855,,
+ar1_chart_rows,current_comparison_1,comparison,june_year,total_ruc_net_revenue,FY2026,Current planned path,future_forecast,Current finalist High population/comparison,2074.515592973735,2074.848066437522,0.33247346378720977,,
+ar1_chart_rows,current_basecase,basecase,june_year,total_ruc_net_revenue,FY2027,Current planned path,future_forecast,Current finalist Base case,2279.2065835079384,2280.545090691793,1.3385071838547447,,
+ar1_chart_rows,current_comparison_1,comparison,june_year,total_ruc_net_revenue,FY2027,Current planned path,future_forecast,Current finalist High population/comparison,2288.2058570048125,2289.5472429573465,1.341385952533983,,
+ar1_chart_rows,current_basecase,basecase,june_year,total_ruc_net_revenue,FY2028,Current planned path,future_forecast,Current finalist Base case,2659.6949380932087,2660.225385516815,0.530447423606347,,
+ar1_chart_rows,current_comparison_1,comparison,june_year,total_ruc_net_revenue,FY2028,Current planned path,future_forecast,Current finalist High population/comparison,2677.0468804410316,2677.5790726145005,0.5321921734689568,,
+ar1_chart_rows,current_basecase,basecase,june_year,total_ruc_net_revenue,FY2029,Current planned path,future_forecast,Current finalist Base case,2941.6335786661207,2941.7656172699285,0.13203860380781407,,
+ar1_chart_rows,current_comparison_1,comparison,june_year,total_ruc_net_revenue,FY2029,Current planned path,future_forecast,Current finalist High population/comparison,2968.2308783986555,2968.3636937306615,0.1328153320059755,,
+ar1_chart_rows,current_basecase,basecase,june_year,total_ruc_net_revenue,FY2030,Current planned path,future_forecast,Current finalist Base case,3195.2526967426033,3195.2112632783583,-0.04143346424507399,,
+ar1_chart_rows,current_comparison_1,comparison,june_year,total_ruc_net_revenue,FY2030,Current planned path,future_forecast,Current finalist High population/comparison,3233.87870892825,3233.837937362252,-0.04077156599805676,,
+ar1_chart_rows,current_basecase,basecase,june_year,net_mvr_revenue,FY2026,Current planned path,future_forecast,Current finalist Base case,425.1291935285919,393.8747745212369,-31.25441900735501,,
+ar1_chart_rows,current_comparison_1,comparison,june_year,net_mvr_revenue,FY2026,Current planned path,future_forecast,Current finalist High population/comparison,425.1291935285919,393.8747745212369,-31.25441900735501,,
+ar1_chart_rows,current_basecase,basecase,june_year,net_mvr_revenue,FY2027,Current planned path,future_forecast,Current finalist Base case,496.1497521504495,484.04699017200664,-12.102761978442857,,
+ar1_chart_rows,current_comparison_1,comparison,june_year,net_mvr_revenue,FY2027,Current planned path,future_forecast,Current finalist High population/comparison,496.1497521504495,484.04699017200664,-12.102761978442857,,
+ar1_chart_rows,current_basecase,basecase,june_year,total_fed_ruc_net_revenue,FY2026,Current planned path,future_forecast,Current finalist Base case,4176.875890655612,4179.759247093907,2.883356438294868,,
+ar1_chart_rows,current_comparison_1,comparison,june_year,total_fed_ruc_net_revenue,FY2026,Current planned path,future_forecast,Current finalist High population/comparison,4180.04662663635,4182.931719775803,2.8850931394526924,,
+ar1_chart_rows,current_basecase,basecase,june_year,total_fed_ruc_net_revenue,FY2027,Current planned path,future_forecast,Current finalist Base case,4445.801733255384,4449.265676261655,3.46394300627162,,
+ar1_chart_rows,current_comparison_1,comparison,june_year,total_fed_ruc_net_revenue,FY2027,Current planned path,future_forecast,Current finalist High population/comparison,4468.315230299282,4471.786177490232,3.470947190950028,,
+ar1_chart_rows,current_basecase,basecase,june_year,total_fed_ruc_net_revenue,FY2028,Current planned path,future_forecast,Current finalist Base case,5051.55888737723,5052.869983837658,1.3110964604275068,,
+ar1_chart_rows,current_comparison_1,comparison,june_year,total_fed_ruc_net_revenue,FY2028,Current planned path,future_forecast,Current finalist High population/comparison,5098.429564474633,5099.744053092282,1.3144886176496584,,
+ar1_chart_rows,current_basecase,basecase,june_year,total_fed_ruc_net_revenue,FY2029,Current planned path,future_forecast,Current finalist Base case,5457.478538336837,5457.816277886483,0.3377395496454483,,
+ar1_chart_rows,current_comparison_1,comparison,june_year,total_fed_ruc_net_revenue,FY2029,Current planned path,future_forecast,Current finalist High population/comparison,5530.530141637162,5530.869541387228,0.33939975006614986,,
+ar1_chart_rows,current_basecase,basecase,june_year,total_fed_ruc_net_revenue,FY2030,Current planned path,future_forecast,Current finalist Base case,5806.848451587382,5806.762163983078,-0.08628760430474358,,
+ar1_chart_rows,current_comparison_1,comparison,june_year,total_fed_ruc_net_revenue,FY2030,Current planned path,future_forecast,Current finalist High population/comparison,5909.3267943152605,5909.241631033954,-0.08516328130644979,,
+ar1_chart_rows,current_basecase,basecase,june_year,total_nltf_net_revenue,FY2026,Current planned path,future_forecast,Current finalist Base case,4619.411161670616,4591.040099101557,-28.371062569059177,,
+ar1_chart_rows,current_comparison_1,comparison,june_year,total_nltf_net_revenue,FY2026,Current planned path,future_forecast,Current finalist High population/comparison,4622.581897651354,4594.212571783452,-28.369325867901352,,
+ar1_chart_rows,current_basecase,basecase,june_year,total_nltf_net_revenue,FY2027,Current planned path,future_forecast,Current finalist Base case,4959.509385098658,4950.870566126487,-8.638818972171066,,
+ar1_chart_rows,current_comparison_1,comparison,june_year,total_nltf_net_revenue,FY2027,Current planned path,future_forecast,Current finalist High population/comparison,4982.022882142556,4973.391067355064,-8.631814787492658,,
+ar1_chart_rows,current_basecase,basecase,june_year,total_nltf_net_revenue,FY2028,Current planned path,future_forecast,Current finalist Base case,5559.367297346641,5560.678393807069,1.3110964604284163,,
+ar1_chart_rows,current_comparison_1,comparison,june_year,total_nltf_net_revenue,FY2028,Current planned path,future_forecast,Current finalist High population/comparison,5606.237974444044,5607.552463061694,1.3144886176496584,,
+ar1_chart_rows,current_basecase,basecase,june_year,total_nltf_net_revenue,FY2029,Current planned path,future_forecast,Current finalist Base case,5959.8795480233575,5960.217287573004,0.3377395496463578,,
+ar1_chart_rows,current_comparison_1,comparison,june_year,total_nltf_net_revenue,FY2029,Current planned path,future_forecast,Current finalist High population/comparison,6032.9311513236835,6033.27055107375,0.33939975006614986,,
+ar1_chart_rows,current_basecase,basecase,june_year,total_nltf_net_revenue,FY2030,Current planned path,future_forecast,Current finalist Base case,6304.290069569067,6304.203781964763,-0.08628760430383409,,
+ar1_chart_rows,current_comparison_1,comparison,june_year,total_nltf_net_revenue,FY2030,Current planned path,future_forecast,Current finalist High population/comparison,6406.768412296946,6406.68324901564,-0.0851632813055403,,
+incumbent_line_reconciliation,current_basecase,,,light_petrol_vkt,,,,,31705.2291616288,31704.7370711529,-0.49209047589829424,Current finalist Base case,2025
+incumbent_line_reconciliation,current_basecase,,,ped_vkt_per_capita,,,,,5973.14429429917,5973.0514101063,-0.09288419286986027,Current finalist Base case,2025
+incumbent_line_reconciliation,current_basecase,,,ped_volume,,,,,3060.889071656919,3063.2842870467116,2.395215389792611,Current finalist Base case,2026
+incumbent_line_reconciliation,current_basecase,,,light_petrol_vkt,,,,,33078.193798508066,33077.40799863644,-0.7857998716281145,Current finalist Base case,2026
+incumbent_line_reconciliation,current_basecase,,,light_ruc_net_revenue,,,,,867.440868646173,867.4389604921547,-0.001908154018337882,Current finalist Base case,2026
+incumbent_line_reconciliation,current_basecase,,,heavy_ruc_net_revenue,,,,,1134.8353401385034,1134.8364690215053,0.0011288830019111629,Current finalist Base case,2026
+incumbent_line_reconciliation,current_basecase,,,ruc_refunds,,,,,67.8850340031132,67.4141906681215,-0.4708433349916987,Current finalist Base case,2026
+incumbent_line_reconciliation,current_basecase,,,gross_ruc_revenue,,,,,2175.9557782728057,2175.484155666798,-0.47162260600771333,Current finalist Base case,2026
+incumbent_line_reconciliation,current_basecase,,,ruc_admin_revenue,,,,,34.57087120608,34.237617587825,-0.3332536182550001,Current finalist Base case,2026
+incumbent_line_reconciliation,current_basecase,,,ruc_revenue_net_admin,,,,,2141.3849070667256,2141.246538078973,-0.13836898775252848,Current finalist Base case,2026
+incumbent_line_reconciliation,current_basecase,,,total_ruc_net_revenue,,,,,2073.4998730636125,2073.8323474108515,0.3324743472389855,Current finalist Base case,2026
+incumbent_line_reconciliation,current_basecase,,,gross_ped_revenue,,,,,2143.356963537042,2145.0341891615885,1.677225624546736,Current finalist Base case,2026
+incumbent_line_reconciliation,current_basecase,,,gross_fed_revenue,,,,,2185.4021261772323,2187.079351801779,1.677225624546736,Current finalist Base case,2026
+incumbent_line_reconciliation,current_basecase,,,fed_refunds,,,,,73.2675246956005,72.3868062026043,-0.8807184929961949,Current finalist Base case,2026
+incumbent_line_reconciliation,current_basecase,,,net_fed_revenue,,,,,2112.1346014816318,2114.6925455991745,2.5579441175427746,Current finalist Base case,2026
+incumbent_line_reconciliation,current_basecase,,,mr1_revenue,,,,,468.18252516097,436.822707962969,-31.359817198000997,Current finalist Base case,2026
+incumbent_line_reconciliation,current_basecase,,,gross_mvr_revenue,,,,,499.5565306356284,468.1967134376274,-31.359817198000997,Current finalist Base case,2026
+incumbent_line_reconciliation,current_basecase,,,mvr_revenue_net_admin_coo,,,,,426.8459632163559,395.48614601835493,-31.359817198000997,Current finalist Base case,2026
+incumbent_line_reconciliation,current_basecase,,,mvr_refunds,,,,,1.71676968776402,1.61137149711806,-0.10539819064596001,Current finalist Base case,2026
+incumbent_line_reconciliation,current_basecase,,,net_mvr_revenue,,,,,425.1291935285919,393.8747745212369,-31.25441900735501,Current finalist Base case,2026
+incumbent_line_reconciliation,current_basecase,,,total_gross_revenue,,,,,4878.320512572079,4848.166298392616,-30.154214179462542,Current finalist Base case,2026
+incumbent_line_reconciliation,current_basecase,,,total_admin_fees,,,,,107.2814386253525,106.94818500709749,-0.3332536182550001,Current finalist Base case,2026
+incumbent_line_reconciliation,current_basecase,,,total_revenue_net_admin,,,,,4771.039073946727,4741.218113385518,-29.820960561208267,Current finalist Base case,2026
+incumbent_line_reconciliation,current_basecase,,,total_refunds,,,,,142.86932838647772,141.41236836784387,-1.4569600186338505,Current finalist Base case,2026
+incumbent_line_reconciliation,current_basecase,,,total_nltf_net_revenue,,,,,4628.169745560249,4599.805745017675,-28.364000542574104,Current finalist Base case,2026
+incumbent_line_reconciliation,current_basecase,,,ped_volume,,,,,2988.1217042310122,2988.084597834288,-0.037106396724084334,Current finalist Base case,2027
+incumbent_line_reconciliation,current_basecase,,,light_ruc_net_revenue,,,,,939.6893927655569,940.1600224373842,0.47062967182728244,Current finalist Base case,2027
+incumbent_line_reconciliation,current_basecase,,,heavy_ruc_net_revenue,,,,,1232.1203935629142,1232.1435318108831,0.02313824796897279,Current finalist Base case,2027
+incumbent_line_reconciliation,current_basecase,,,ruc_refunds,,,,,79.5158512577278,78.1187556293993,-1.3970956283285005,Current finalist Base case,2027
+incumbent_line_reconciliation,current_basecase,,,gross_ruc_revenue,,,,,2394.4603105325655,2393.5569828240336,-0.9033277085318332,Current finalist Base case,2027
+incumbent_line_reconciliation,current_basecase,,,ruc_admin_revenue,,,,,35.7378757668996,34.8931365028412,-0.844739264058397,Current finalist Base case,2027
+incumbent_line_reconciliation,current_basecase,,,ruc_revenue_net_admin,,,,,2358.722434765666,2358.6638463211925,-0.058588444473571144,Current finalist Base case,2027
+incumbent_line_reconciliation,current_basecase,,,total_ruc_net_revenue,,,,,2279.2065835079384,2280.545090691793,1.3385071838547447,Current finalist Base case,2027
+incumbent_line_reconciliation,current_basecase,,,gross_ped_revenue,,,,,2270.5040576345127,2271.1971624757975,0.6931048412848213,Current finalist Base case,2027
+incumbent_line_reconciliation,current_basecase,,,gross_fed_revenue,,,,,2313.136747454854,2313.8298522961386,0.6931048412848213,Current finalist Base case,2027
+incumbent_line_reconciliation,current_basecase,,,fed_refunds,,,,,82.1049619039565,80.6529606896518,-1.452001214304687,Current finalist Base case,2027
+incumbent_line_reconciliation,current_basecase,,,net_fed_revenue,,,,,2231.0317855508974,2233.1768916064866,2.1451060555891672,Current finalist Base case,2027
+incumbent_line_reconciliation,current_basecase,,,mr1_revenue,,,,,538.983845722546,526.840027334863,-12.14381838768304,Current finalist Base case,2027
+incumbent_line_reconciliation,current_basecase,,,gross_mvr_revenue,,,,,570.3439955500369,558.2001771623538,-12.14381838768304,Current finalist Base case,2027
+incumbent_line_reconciliation,current_basecase,,,mvr_revenue_net_admin_coo,,,,,498.08551880884096,485.9417004211579,-12.14381838768304,Current finalist Base case,2027
+incumbent_line_reconciliation,current_basecase,,,mvr_refunds,,,,,1.93576665839146,1.8947102491513,-0.04105640924015996,Current finalist Base case,2027
+incumbent_line_reconciliation,current_basecase,,,net_mvr_revenue,,,,,496.1497521504495,484.04699017200664,-12.102761978442857,Current finalist Base case,2027
+incumbent_line_reconciliation,current_basecase,,,total_gross_revenue,,,,,5295.498953230282,5283.1449119753515,-12.354041254930053,Current finalist Base case,2027
+incumbent_line_reconciliation,current_basecase,,,total_admin_fees,,,,,107.9963525080955,107.15161324403711,-0.84473926405839,Current finalist Base case,2027
+incumbent_line_reconciliation,current_basecase,,,total_revenue_net_admin,,,,,5187.502600722186,5175.993298731314,-11.50930199087179,Current finalist Base case,2027
+incumbent_line_reconciliation,current_basecase,,,total_refunds,,,,,163.55657982007574,160.6664265682024,-2.890153251873329,Current finalist Base case,2027
+incumbent_line_reconciliation,current_basecase,,,total_nltf_net_revenue,,,,,5023.94602090211,5015.326872163112,-8.619148738997865,Current finalist Base case,2027
+incumbent_line_reconciliation,current_basecase,,,ped_volume,,,,,2981.668112816533,2981.6514518463478,-0.016660970185057522,Current finalist Base case,2028
+incumbent_line_reconciliation,current_basecase,,,light_ruc_net_revenue,,,,,1087.3404941589715,1087.4867913007602,0.1462971417886365,Current finalist Base case,2028
+incumbent_line_reconciliation,current_basecase,,,heavy_ruc_net_revenue,,,,,1380.3167194555558,1380.360386338277,0.043666882721254296,Current finalist Base case,2028
+incumbent_line_reconciliation,current_basecase,,,ruc_refunds,,,,,92.5467417239691,91.9223646926299,-0.6243770313392076,Current finalist Base case,2028
+incumbent_line_reconciliation,current_basecase,,,gross_ruc_revenue,,,,,2790.0314966653,2789.59708365847,-0.4344130068298,Current finalist Base case,2028
+incumbent_line_reconciliation,current_basecase,,,ruc_admin_revenue,,,,,37.7898168481218,37.4493334490253,-0.34048339909649883,Current finalist Base case,2028
+incumbent_line_reconciliation,current_basecase,,,ruc_revenue_net_admin,,,,,2752.241679817178,2752.147750209445,-0.09392960773311643,Current finalist Base case,2028
+incumbent_line_reconciliation,current_basecase,,,total_ruc_net_revenue,,,,,2659.6949380932087,2660.225385516815,0.530447423606347,Current finalist Base case,2028
+incumbent_line_reconciliation,current_basecase,,,gross_ped_revenue,,,,,2534.684498990492,2534.825956879315,0.14145788882296984,Current finalist Base case,2028
+incumbent_line_reconciliation,current_basecase,,,gross_fed_revenue,,,,,2577.5378758526795,2577.6793337415024,0.14145788882296984,Current finalist Base case,2028
+incumbent_line_reconciliation,current_basecase,,,fed_refunds,,,,,92.1117150014535,91.4673022517422,-0.6444127497113072,Current finalist Base case,2028
+incumbent_line_reconciliation,current_basecase,,,net_fed_revenue,,,,,2485.426160851226,2486.21203148976,0.7858706385341065,Current finalist Base case,2028
+incumbent_line_reconciliation,current_basecase,,,total_gross_revenue,,,,,5949.203180028822,5948.910224910816,-0.29295511800592067,Current finalist Base case,2028
+incumbent_line_reconciliation,current_basecase,,,total_admin_fees,,,,,109.6759903599811,109.3355069608846,-0.34048339909649883,Current finalist Base case,2028
+incumbent_line_reconciliation,current_basecase,,,total_revenue_net_admin,,,,,5839.527189668841,5839.574717949932,0.04752828109121765,Current finalist Base case,2028
+incumbent_line_reconciliation,current_basecase,,,total_refunds,,,,,186.5976807549958,185.32889097394528,-1.2687897810505149,Current finalist Base case,2028
+incumbent_line_reconciliation,current_basecase,,,total_nltf_net_revenue,,,,,5652.929508913845,5654.245826975987,1.3163180621422725,Current finalist Base case,2028
+incumbent_line_reconciliation,current_basecase,,,ped_volume,,,,,2973.980088087325,2973.97331412848,-0.006773958844860317,Current finalist Base case,2029
+incumbent_line_reconciliation,current_basecase,,,light_ruc_net_revenue,,,,,1191.3931534415976,1191.438708351885,0.04555491028736469,Current finalist Base case,2029
+incumbent_line_reconciliation,current_basecase,,,heavy_ruc_net_revenue,,,,,1474.755307492383,1474.7667479653394,0.011440472956337544,Current finalist Base case,2029
+incumbent_line_reconciliation,current_basecase,,,ruc_refunds,,,,,102.088910316411,101.989316940945,-0.09959337546600011,Current finalist Base case,2029
+incumbent_line_reconciliation,current_basecase,,,gross_ruc_revenue,,,,,3083.8143663540523,3083.7717683618303,-0.04259799222199945,Current finalist Base case,2029
+incumbent_line_reconciliation,current_basecase,,,ruc_admin_revenue,,,,,40.0918773715206,40.0168341509567,-0.07504322056390578,Current finalist Base case,2029
+incumbent_line_reconciliation,current_basecase,,,ruc_revenue_net_admin,,,,,3043.7224889825316,3043.7549342108737,0.03244522834211239,Current finalist Base case,2029
+incumbent_line_reconciliation,current_basecase,,,total_ruc_net_revenue,,,,,2941.6335786661207,2941.7656172699285,0.13203860380781407,Current finalist Base case,2029
+incumbent_line_reconciliation,current_basecase,,,gross_ped_revenue,,,,,2676.9113070502763,2676.9622167960188,0.0509097457425014,Current finalist Base case,2029
+incumbent_line_reconciliation,current_basecase,,,gross_fed_revenue,,,,,2719.967853706387,2720.0187634521294,0.0509097457425014,Current finalist Base case,2029
+incumbent_line_reconciliation,current_basecase,,,fed_refunds,,,,,97.8305167947018,97.6737041163894,-0.15681267831239154,Current finalist Base case,2029
+incumbent_line_reconciliation,current_basecase,,,net_fed_revenue,,,,,2622.137336911685,2622.34505933574,0.20772242405519137,Current finalist Base case,2029
+incumbent_line_reconciliation,current_basecase,,,total_gross_revenue,,,,,6379.647962619202,6379.656274372724,0.008311753521411447,Current finalist Base case,2029
+incumbent_line_reconciliation,current_basecase,,,total_admin_fees,,,,,111.61244793454449,111.53740471398059,-0.07504322056389867,Current finalist Base case,2029
+incumbent_line_reconciliation,current_basecase,,,total_revenue_net_admin,,,,,6268.035514684658,6268.118869658743,0.08335497408552328,Current finalist Base case,2029
+incumbent_line_reconciliation,current_basecase,,,total_refunds,,,,,201.86358942033127,201.60718336655287,-0.25640605377839165,Current finalist Base case,2029
+incumbent_line_reconciliation,current_basecase,,,total_nltf_net_revenue,,,,,6066.171925264326,6066.5116862921905,0.3397610278643697,Current finalist Base case,2029
+incumbent_line_reconciliation,current_basecase,,,ped_volume,,,,,2958.899456253502,2958.8957603061776,-0.0036959473245588015,Current finalist Base case,2030
+incumbent_line_reconciliation,current_basecase,,,light_ruc_net_revenue,,,,,1271.029669278332,1271.0591011588097,0.029431880477659433,Current finalist Base case,2030
+incumbent_line_reconciliation,current_basecase,,,heavy_ruc_net_revenue,,,,,1552.689025066263,1552.696507641898,0.00748257563509469,Current finalist Base case,2030
+incumbent_line_reconciliation,current_basecase,,,ruc_refunds,,,,,110.930625671315,111.156651009308,0.22602533799300772,Current finalist Base case,2030
+incumbent_line_reconciliation,current_basecase,,,gross_ruc_revenue,,,,,3348.6573314024295,3348.9202711965354,0.2629397941059324,Current finalist Base case,2030
+incumbent_line_reconciliation,current_basecase,,,ruc_admin_revenue,,,,,42.4740089885113,42.5523569088689,0.07834792035760074,Current finalist Base case,2030
+incumbent_line_reconciliation,current_basecase,,,ruc_revenue_net_admin,,,,,3306.183322413918,3306.3679142876663,0.18459187374810426,Current finalist Base case,2030
+incumbent_line_reconciliation,current_basecase,,,total_ruc_net_revenue,,,,,3195.2526967426033,3195.2112632783583,-0.04143346424507399,Current finalist Base case,2030
+incumbent_line_reconciliation,current_basecase,,,gross_ped_revenue,,,,,2781.659206232161,2781.6793512770555,0.02014504489443425,Current finalist Base case,2030
+incumbent_line_reconciliation,current_basecase,,,gross_fed_revenue,,,,,2824.9039840792548,2824.924129124149,0.02014504489443425,Current finalist Base case,2030
+incumbent_line_reconciliation,current_basecase,,,fed_refunds,,,,,102.412992390514,102.477188461442,0.0641960709279914,Current finalist Base case,2030
+incumbent_line_reconciliation,current_basecase,,,net_fed_revenue,,,,,2722.490991688741,2722.446940662707,-0.04405102603368505,Current finalist Base case,2030
+incumbent_line_reconciliation,current_basecase,,,total_gross_revenue,,,,,6744.1223919421,6744.4054767811,0.28308483900036663,Current finalist Base case,2030
+incumbent_line_reconciliation,current_basecase,,,total_admin_fees,,,,,113.64295419523751,113.72130211559511,0.07834792035760074,Current finalist Base case,2030
+incumbent_line_reconciliation,current_basecase,,,total_revenue_net_admin,,,,,6630.4794377468625,6630.684174665505,0.20473691864299326,Current finalist Base case,2030
+incumbent_line_reconciliation,current_basecase,,,total_refunds,,,,,215.29413133383392,215.5843527427549,0.2902214089209849,Current finalist Base case,2030
+incumbent_line_reconciliation,current_basecase,,,total_nltf_net_revenue,,,,,6415.185306413028,6415.09982192275,-0.08548449027784955,Current finalist Base case,2030
+incumbent_line_reconciliation,current_comparison_1,,,light_petrol_vkt,,,,,31705.2291616288,31704.7370711529,-0.49209047589829424,Current finalist High population/comparison,2025
+incumbent_line_reconciliation,current_comparison_1,,,ped_vkt_per_capita,,,,,5973.14429429917,5973.0514101063,-0.09288419286986027,Current finalist High population/comparison,2025
+incumbent_line_reconciliation,current_comparison_1,,,ped_volume,,,,,3064.1315559297523,3066.529385727319,2.3978297975668283,Current finalist High population/comparison,2026
+incumbent_line_reconciliation,current_comparison_1,,,light_petrol_vkt,,,,,33113.234442142806,33112.44864227118,-0.7857998716281145,Current finalist High population/comparison,2026
+incumbent_line_reconciliation,current_comparison_1,,,light_ruc_net_revenue,,,,,868.012021335747,868.010111925335,-0.0019094104120540578,Current finalist High population/comparison,2026
+incumbent_line_reconciliation,current_comparison_1,,,heavy_ruc_net_revenue,,,,,1135.2102486241813,1135.2113778801254,0.0011292559440789773,Current finalist High population/comparison,2026
+incumbent_line_reconciliation,current_comparison_1,,,ruc_refunds,,,,,67.8850340031132,67.4141906681215,-0.4708433349916987,Current finalist High population/comparison,2026
+incumbent_line_reconciliation,current_comparison_1,,,gross_ruc_revenue,,,,,2176.971498182928,2176.4998746934684,-0.47162348945948906,Current finalist High population/comparison,2026
+incumbent_line_reconciliation,current_comparison_1,,,ruc_admin_revenue,,,,,34.57087120608,34.237617587825,-0.3332536182550001,Current finalist High population/comparison,2026
+incumbent_line_reconciliation,current_comparison_1,,,ruc_revenue_net_admin,,,,,2142.400626976848,2142.2622571056436,-0.13836987120430422,Current finalist High population/comparison,2026
+incumbent_line_reconciliation,current_comparison_1,,,total_ruc_net_revenue,,,,,2074.515592973735,2074.848066437522,0.33247346378720977,Current finalist High population/comparison,2026
+incumbent_line_reconciliation,current_comparison_1,,,gross_ped_revenue,,,,,2145.6274807242507,2147.3065370616973,1.679056337446582,Current finalist High population/comparison,2026
+incumbent_line_reconciliation,current_comparison_1,,,gross_fed_revenue,,,,,2187.6726433644412,2189.351699701888,1.679056337446582,Current finalist High population/comparison,2026
+incumbent_line_reconciliation,current_comparison_1,,,fed_refunds,,,,,73.2675246956005,72.3868062026043,-0.8807184929961949,Current finalist High population/comparison,2026
+incumbent_line_reconciliation,current_comparison_1,,,net_fed_revenue,,,,,2114.4051186688407,2116.9648934992833,2.5597748304426204,Current finalist High population/comparison,2026
+incumbent_line_reconciliation,current_comparison_1,,,mr1_revenue,,,,,468.18252516097,436.822707962969,-31.359817198000997,Current finalist High population/comparison,2026
+incumbent_line_reconciliation,current_comparison_1,,,gross_mvr_revenue,,,,,499.5565306356284,468.1967134376274,-31.359817198000997,Current finalist High population/comparison,2026
+incumbent_line_reconciliation,current_comparison_1,,,mvr_revenue_net_admin_coo,,,,,426.8459632163559,395.48614601835493,-31.359817198000997,Current finalist High population/comparison,2026
+incumbent_line_reconciliation,current_comparison_1,,,mvr_refunds,,,,,1.71676968776402,1.61137149711806,-0.10539819064596001,Current finalist High population/comparison,2026
+incumbent_line_reconciliation,current_comparison_1,,,net_mvr_revenue,,,,,425.1291935285919,393.8747745212369,-31.25441900735501,Current finalist High population/comparison,2026
+incumbent_line_reconciliation,current_comparison_1,,,total_gross_revenue,,,,,4881.6067496694095,4851.454365319395,-30.152384350014472,Current finalist High population/comparison,2026
+incumbent_line_reconciliation,current_comparison_1,,,total_admin_fees,,,,,107.2814386253525,106.94818500709749,-0.3332536182550001,Current finalist High population/comparison,2026
+incumbent_line_reconciliation,current_comparison_1,,,total_revenue_net_admin,,,,,4774.325311044057,4744.506180312297,-29.819130731760197,Current finalist High population/comparison,2026
+incumbent_line_reconciliation,current_comparison_1,,,total_refunds,,,,,142.86932838647772,141.41236836784387,-1.4569600186338505,Current finalist High population/comparison,2026
+incumbent_line_reconciliation,current_comparison_1,,,total_nltf_net_revenue,,,,,4631.45598265758,4603.093811944454,-28.362170713126034,Current finalist High population/comparison,2026
+incumbent_line_reconciliation,current_comparison_1,,,ped_volume,,,,,3007.5905901369983,3007.5532419762912,-0.03734816070709712,Current finalist High population/comparison,2027
+incumbent_line_reconciliation,current_comparison_1,,,light_ruc_net_revenue,,,,,945.344221435419,945.8176832453779,0.4734618099589625,Current finalist High population/comparison,2027
+incumbent_line_reconciliation,current_comparison_1,,,heavy_ruc_net_revenue,,,,,1234.6034877580475,1234.6266726365643,0.023184878516758545,Current finalist High population/comparison,2027
+incumbent_line_reconciliation,current_comparison_1,,,ruc_refunds,,,,,79.5158512577278,78.1187556293993,-1.3970956283285005,Current finalist High population/comparison,2027
+incumbent_line_reconciliation,current_comparison_1,,,gross_ruc_revenue,,,,,2403.4595840294396,2402.559135089587,-0.9004489398525948,Current finalist High population/comparison,2027
+incumbent_line_reconciliation,current_comparison_1,,,ruc_admin_revenue,,,,,35.7378757668996,34.8931365028412,-0.844739264058397,Current finalist High population/comparison,2027
+incumbent_line_reconciliation,current_comparison_1,,,ruc_revenue_net_admin,,,,,2367.7217082625402,2367.665998586746,-0.055709675794332725,Current finalist High population/comparison,2027
+incumbent_line_reconciliation,current_comparison_1,,,total_ruc_net_revenue,,,,,2288.2058570048125,2289.5472429573465,1.341385952533983,Current finalist High population/comparison,2027
+incumbent_line_reconciliation,current_comparison_1,,,gross_ped_revenue,,,,,2285.2973588526575,2285.99497956726,0.6976207146026354,Current finalist High population/comparison,2027
+incumbent_line_reconciliation,current_comparison_1,,,gross_fed_revenue,,,,,2327.9300486729985,2328.627669387601,0.6976207146026354,Current finalist High population/comparison,2027
+incumbent_line_reconciliation,current_comparison_1,,,fed_refunds,,,,,82.1049619039565,80.6529606896518,-1.452001214304687,Current finalist High population/comparison,2027
+incumbent_line_reconciliation,current_comparison_1,,,net_fed_revenue,,,,,2245.825086769042,2247.974708697949,2.1496219289069813,Current finalist High population/comparison,2027
+incumbent_line_reconciliation,current_comparison_1,,,mr1_revenue,,,,,538.983845722546,526.840027334863,-12.14381838768304,Current finalist High population/comparison,2027
+incumbent_line_reconciliation,current_comparison_1,,,gross_mvr_revenue,,,,,570.3439955500369,558.2001771623538,-12.14381838768304,Current finalist High population/comparison,2027
+incumbent_line_reconciliation,current_comparison_1,,,mvr_revenue_net_admin_coo,,,,,498.08551880884096,485.9417004211579,-12.14381838768304,Current finalist High population/comparison,2027
+incumbent_line_reconciliation,current_comparison_1,,,mvr_refunds,,,,,1.93576665839146,1.8947102491513,-0.04105640924015996,Current finalist High population/comparison,2027
+incumbent_line_reconciliation,current_comparison_1,,,net_mvr_revenue,,,,,496.1497521504495,484.04699017200664,-12.102761978442857,Current finalist High population/comparison,2027
+incumbent_line_reconciliation,current_comparison_1,,,total_gross_revenue,,,,,5319.2915279453,5306.944881332367,-12.346646612933,Current finalist High population/comparison,2027
+incumbent_line_reconciliation,current_comparison_1,,,total_admin_fees,,,,,107.9963525080955,107.15161324403711,-0.84473926405839,Current finalist High population/comparison,2027
+incumbent_line_reconciliation,current_comparison_1,,,total_revenue_net_admin,,,,,5211.295175437204,5199.79326808833,-11.501907348874738,Current finalist High population/comparison,2027
+incumbent_line_reconciliation,current_comparison_1,,,total_refunds,,,,,163.55657982007574,160.6664265682024,-2.890153251873329,Current finalist High population/comparison,2027
+incumbent_line_reconciliation,current_comparison_1,,,total_nltf_net_revenue,,,,,5047.738595617128,5039.1268415201275,-8.611754097000812,Current finalist High population/comparison,2027
+incumbent_line_reconciliation,current_comparison_1,,,ped_volume,,,,,3019.956879710486,3019.940004790264,-0.016874920222107903,Current finalist High population/comparison,2028
+incumbent_line_reconciliation,current_comparison_1,,,light_ruc_net_revenue,,,,,1099.6924709137568,1099.8404299626523,0.14795904889547273,Current finalist High population/comparison,2028
+incumbent_line_reconciliation,current_comparison_1,,,heavy_ruc_net_revenue,,,,,1382.9353913994867,1382.9791411249635,0.04374972547680045,Current finalist High population/comparison,2028
+incumbent_line_reconciliation,current_comparison_1,,,ruc_refunds,,,,,92.5467417239691,91.9223646926299,-0.6243770313392076,Current finalist High population/comparison,2028
+incumbent_line_reconciliation,current_comparison_1,,,gross_ruc_revenue,,,,,2807.383439013123,2806.9507707561556,-0.43266825696719025,Current finalist High population/comparison,2028
+incumbent_line_reconciliation,current_comparison_1,,,ruc_admin_revenue,,,,,37.7898168481218,37.4493334490253,-0.34048339909649883,Current finalist High population/comparison,2028
+incumbent_line_reconciliation,current_comparison_1,,,ruc_revenue_net_admin,,,,,2769.593622165001,2769.5014373071303,-0.09218485787050668,Current finalist High population/comparison,2028
+incumbent_line_reconciliation,current_comparison_1,,,total_ruc_net_revenue,,,,,2677.0468804410316,2677.5790726145005,0.5321921734689568,Current finalist High population/comparison,2028
+incumbent_line_reconciliation,current_comparison_1,,,gross_ped_revenue,,,,,2567.2333744050297,2567.3766488099523,0.14327440492252208,Current finalist High population/comparison,2028
+incumbent_line_reconciliation,current_comparison_1,,,gross_fed_revenue,,,,,2610.086751267217,2610.2300256721396,0.14327440492252208,Current finalist High population/comparison,2028
+incumbent_line_reconciliation,current_comparison_1,,,fed_refunds,,,,,92.1117150014535,91.4673022517422,-0.6444127497113072,Current finalist High population/comparison,2028
+incumbent_line_reconciliation,current_comparison_1,,,net_fed_revenue,,,,,2517.9750362657637,2518.7627234203974,0.7876871546336588,Current finalist High population/comparison,2028
+incumbent_line_reconciliation,current_comparison_1,,,total_gross_revenue,,,,,5999.103997791183,5998.814603939139,-0.28939385204466817,Current finalist High population/comparison,2028
+incumbent_line_reconciliation,current_comparison_1,,,total_admin_fees,,,,,109.6759903599811,109.3355069608846,-0.34048339909649883,Current finalist High population/comparison,2028
+incumbent_line_reconciliation,current_comparison_1,,,total_revenue_net_admin,,,,,5889.428007431202,5889.479096978254,0.05108954705247015,Current finalist High population/comparison,2028
+incumbent_line_reconciliation,current_comparison_1,,,total_refunds,,,,,186.5976807549958,185.32889097394528,-1.2687897810505149,Current finalist High population/comparison,2028
+incumbent_line_reconciliation,current_comparison_1,,,total_nltf_net_revenue,,,,,5702.830326676206,5704.150206004309,1.319879328103525,Current finalist High population/comparison,2028
+incumbent_line_reconciliation,current_comparison_1,,,ped_volume,,,,,3031.4181363759153,3031.4112315880257,-0.006904787889652653,Current finalist High population/comparison,2029
+incumbent_line_reconciliation,current_comparison_1,,,light_ruc_net_revenue,,,,,1211.3412392466093,1211.3875569053282,0.04631765871886273,Current finalist High population/comparison,2029
+incumbent_line_reconciliation,current_comparison_1,,,heavy_ruc_net_revenue,,,,,1476.5573951125543,1476.568849565277,0.011454452722773567,Current finalist High population/comparison,2029
+incumbent_line_reconciliation,current_comparison_1,,,ruc_refunds,,,,,102.088910316411,101.989316940945,-0.09959337546600011,Current finalist High population/comparison,2029
+incumbent_line_reconciliation,current_comparison_1,,,gross_ruc_revenue,,,,,3110.411666086587,3110.369844822563,-0.04182126402383801,Current finalist High population/comparison,2029
+incumbent_line_reconciliation,current_comparison_1,,,ruc_admin_revenue,,,,,40.0918773715206,40.0168341509567,-0.07504322056390578,Current finalist High population/comparison,2029
+incumbent_line_reconciliation,current_comparison_1,,,ruc_revenue_net_admin,,,,,3070.3197887150664,3070.3530106716066,0.03322195654027382,Current finalist High population/comparison,2029
+incumbent_line_reconciliation,current_comparison_1,,,total_ruc_net_revenue,,,,,2968.2308783986555,2968.3636937306615,0.1328153320059755,Current finalist High population/comparison,2029
+incumbent_line_reconciliation,current_comparison_1,,,gross_ped_revenue,,,,,2728.6119090598595,2728.663802052412,0.051892992552438955,Current finalist High population/comparison,2029
+incumbent_line_reconciliation,current_comparison_1,,,gross_fed_revenue,,,,,2771.66845571597,2771.7203487085226,0.051892992552438955,Current finalist High population/comparison,2029
+incumbent_line_reconciliation,current_comparison_1,,,fed_refunds,,,,,97.8305167947018,97.6737041163894,-0.15681267831239154,Current finalist High population/comparison,2029
+incumbent_line_reconciliation,current_comparison_1,,,net_fed_revenue,,,,,2673.8379389212682,2674.0466445921334,0.20870567086512892,Current finalist High population/comparison,2029
+incumbent_line_reconciliation,current_comparison_1,,,total_gross_revenue,,,,,6457.945864361321,6457.955936089849,0.010071728528600943,Current finalist High population/comparison,2029
+incumbent_line_reconciliation,current_comparison_1,,,total_admin_fees,,,,,111.61244793454449,111.53740471398059,-0.07504322056389867,Current finalist High population/comparison,2029
+incumbent_line_reconciliation,current_comparison_1,,,total_revenue_net_admin,,,,,6346.333416426776,6346.418531375869,0.08511494909271278,Current finalist High population/comparison,2029
+incumbent_line_reconciliation,current_comparison_1,,,total_refunds,,,,,201.86358942033127,201.60718336655287,-0.25640605377839165,Current finalist High population/comparison,2029
+incumbent_line_reconciliation,current_comparison_1,,,total_nltf_net_revenue,,,,,6144.469827006445,6144.811348009316,0.3415210028715592,Current finalist High population/comparison,2029
+incumbent_line_reconciliation,current_comparison_1,,,ped_volume,,,,,3036.036401927321,3036.0326096286026,-0.003792298718508391,Current finalist High population/comparison,2030
+incumbent_line_reconciliation,current_comparison_1,,,light_ruc_net_revenue,,,,,1299.194773882275,1299.2248579520858,0.030084069810754954,Current finalist High population/comparison,2030
+incumbent_line_reconciliation,current_comparison_1,,,heavy_ruc_net_revenue,,,,,1554.703695421354,1554.7111877059028,0.00749228454878903,Current finalist High population/comparison,2030
+incumbent_line_reconciliation,current_comparison_1,,,ruc_refunds,,,,,110.930625671315,111.156651009308,0.22602533799300772,Current finalist High population/comparison,2030
+incumbent_line_reconciliation,current_comparison_1,,,gross_ruc_revenue,,,,,3387.283343588076,3387.546945280429,0.2636016923529496,Current finalist High population/comparison,2030
+incumbent_line_reconciliation,current_comparison_1,,,ruc_admin_revenue,,,,,42.4740089885113,42.5523569088689,0.07834792035760074,Current finalist High population/comparison,2030
+incumbent_line_reconciliation,current_comparison_1,,,ruc_revenue_net_admin,,,,,3344.809334599565,3344.99458837156,0.1852537719951215,Current finalist High population/comparison,2030
+incumbent_line_reconciliation,current_comparison_1,,,total_ruc_net_revenue,,,,,3233.87870892825,3233.837937362252,-0.04077156599805676,Current finalist High population/comparison,2030
+incumbent_line_reconciliation,current_comparison_1,,,gross_ped_revenue,,,,,2854.1755922217985,2854.196262437372,0.020670215573318274,Current finalist High population/comparison,2030
+incumbent_line_reconciliation,current_comparison_1,,,gross_fed_revenue,,,,,2897.420370068892,2897.4410402844655,0.020670215573318274,Current finalist High population/comparison,2030
+incumbent_line_reconciliation,current_comparison_1,,,fed_refunds,,,,,102.412992390514,102.477188461442,0.0641960709279914,Current finalist High population/comparison,2030
+incumbent_line_reconciliation,current_comparison_1,,,net_fed_revenue,,,,,2795.0073776783784,2794.9638518230236,-0.043525855354801024,Current finalist High population/comparison,2030
+incumbent_line_reconciliation,current_comparison_1,,,total_gross_revenue,,,,,6855.264790117385,6855.54906202531,0.2842719079253584,Current finalist High population/comparison,2030
+incumbent_line_reconciliation,current_comparison_1,,,total_admin_fees,,,,,113.64295419523751,113.72130211559511,0.07834792035760074,Current finalist High population/comparison,2030
+incumbent_line_reconciliation,current_comparison_1,,,total_revenue_net_admin,,,,,6741.6218359221475,6741.8277599097155,0.20592398756798502,Current finalist High population/comparison,2030
+incumbent_line_reconciliation,current_comparison_1,,,total_refunds,,,,,215.29413133383392,215.5843527427549,0.2902214089209849,Current finalist High population/comparison,2030
+incumbent_line_reconciliation,current_comparison_1,,,total_nltf_net_revenue,,,,,6526.327704588313,6526.24340716696,-0.08429742135285778,Current finalist High population/comparison,2030

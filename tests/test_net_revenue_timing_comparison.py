@@ -204,25 +204,32 @@ def test_base_original_timing_reconciles_to_default_dashboard_hover_benchmarks(
     # rises: 2084.543503 -> 2103.643887, +19.100384 (+0.916%). This is the
     # final displayed default front-end value, and it reconciles exactly with
     # FY2026 net_fed_revenue in artifacts/p0_light_fleet_fix/gold_path_audit.csv.
+    #
+    # BEFU26 bridge-vintage re-freeze: Net FED follows the bridge vintage's PED
+    # rate and petrol-fleet intensity, so moving the bridge from MBU26 to
+    # BEFU26 moves it: 2103.643887 -> 2106.194985 (+2.551098, +0.121%).
     # Tolerance unchanged at 1e-6 absolute; nothing has been widened.
     assert _value(
         comparison, "baseline_published", 2026, "net_fed_revenue"
-    ) == pytest.approx(2103.64388651804, abs=1e-6)
+    ) == pytest.approx(2106.1949845912095, abs=1e-6)
     # Re-promoted with the migrated packs: 2127.212804135619 ->
     # Same conventional-anchor correction as FY2026: Net FED is gross FED less
     # refunds, gross FED follows PED litres, and PED is now the raw AR(1)
     # bridge rather than the lambda-migrated one.
     #   published    2127.212722 -> 2170.099908  (+42.887187, +2.016%)
     #   shifted/off  1963.260564 -> 2002.908686  (+39.648123, +2.020%)
+    # BEFU26 bridge-vintage re-freeze (same cause as FY2026 above):
+    #   published    2170.099908 -> 2172.226414  (+2.126506, +0.098%)
+    #   shifted/off  2002.908686 -> 2004.335325  (+1.426639, +0.071%)
     # Tolerance unchanged at 1e-6 absolute.
     assert _value(
         comparison, "baseline_published", 2027, "net_fed_revenue"
-    ) == pytest.approx(2170.099908317666, abs=1e-6)
+    ) == pytest.approx(2172.2264140193133, abs=1e-6)
     # Both counterfactuals remove the January 2027 step from the whole of
     # FY2027, so they must agree exactly on the current-model scope.
     shifted = _value(comparison, "baseline_shifted_6m", 2027, "net_fed_revenue")
     no_uplift = _value(comparison, "baseline_no_uplift", 2027, "net_fed_revenue")
-    assert shifted == pytest.approx(2002.908686415975, abs=1e-6)
+    assert shifted == pytest.approx(2004.335325410929, abs=1e-6)
     assert no_uplift == pytest.approx(shifted, abs=1e-9)
 
 

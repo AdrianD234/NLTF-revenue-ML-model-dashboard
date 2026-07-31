@@ -10,6 +10,7 @@ import threading
 from pathlib import Path
 import re
 import sys
+from functools import lru_cache
 from time import perf_counter
 from typing import Any
 import zipfile
@@ -141,7 +142,7 @@ from model_dashboard.rate_paths import (
     FED_UPLIFT_DELAY_NOTE,
     FED_UPLIFT_NOTE,
     OFFICIAL_SCOPE,
-    RATE_CHART_NOTE,
+    rate_chart_note,
     apply_fed_uplift_delay_to_chart_rows,
     apply_fed_uplift_off_to_chart_rows,
     apply_official_comparator_rate_policy_to_chart_rows,
@@ -203,6 +204,15 @@ from model_dashboard.ev_uptake_levers import (
     apply_uptake_levers_to_chart_rows,
 )
 from model_dashboard.mbu26_source_spine import FORMULA_DEFINITIONS
+from model_dashboard.official_vintage import (
+    bridge_vintage_id_from_manifest,
+    default_comparator_vintage_id,
+    official_comparator_scenario_name,
+    official_comparator_trace_name,
+    official_vintage_choices,
+    official_vintage_entry,
+    official_vintage_pack_files,
+)
 from model_dashboard.revenue_outlook import (
     CURRENT_REVENUE_OUTLOOK_DIR,
     FAN_SOURCE_AUTO,
@@ -919,6 +929,99 @@ def _ped_retention_enabled(ev_uptake_key: tuple[Any, ...]) -> bool:
     return bool(ev_uptake_key[5])
 
 
+# The official comparator vintage selection rides in slots 6/7 of the uptake
+# key (appended AFTER the PED-retention slot so every existing positional read
+# keeps indexing correctly). Keys created before the selector existed resolve
+# to the governed default comparator vintage with no overlay, matching the
+# rebuilt pack's default official trace.
+@lru_cache(maxsize=1)
+def _registry_default_comparator_vintage_id() -> str:
+    """Registry-resolved default comparator; never a hard-coded release."""
+    return default_comparator_vintage_id(Path(__file__).resolve().parent)
+
+
+@lru_cache(maxsize=1)
+def _registry_official_trace_names() -> tuple[str, ...]:
+    """Official comparator trace names, default comparator first.
+
+    Generated from the registry so a newly registered vintage joins the
+    trace vocabulary, ordering, legend defaults, colour map and source-option
+    lists without any production-code edit.
+    """
+    root = Path(__file__).resolve().parent
+    names: list[str] = []
+    for vid, _display in official_vintage_choices(root):
+        entry = official_vintage_entry(vid, root)
+        names.append(
+            str(entry.get("trace_name") or official_comparator_trace_name(
+                str(entry.get("release_round") or vid)
+            ))
+        )
+    return tuple(names)
+
+
+def _official_trace_style_map() -> dict[str, tuple[str, str, float]]:
+    """Default comparator in the strong green; prior vintages muted."""
+    styles: dict[str, tuple[str, str, float]] = {}
+    for index, name in enumerate(_registry_official_trace_names()):
+        styles[name] = (
+            ("#00843D", "dash", 2.2) if index == 0 else ("#7A9E7E", "dot", 1.8)
+        )
+    return styles
+
+
+def _ordered_official_traces(selected_official_trace: str | None = None) -> list[str]:
+    """Registry official traces with the selected one first."""
+    officials = list(_registry_official_trace_names())
+    if selected_official_trace in officials:
+        officials = [selected_official_trace] + [
+            trace for trace in officials if trace != selected_official_trace
+        ]
+    return officials
+
+
+def _official_vintage_scope(ev_uptake_key: tuple[Any, ...]) -> tuple[str, bool]:
+    """Return (selected official vintage id, overlay-prior-vintages flag)."""
+    vid = (
+        str(ev_uptake_key[6])
+        if len(ev_uptake_key) > 6 and str(ev_uptake_key[6] or "").strip()
+        else _registry_default_comparator_vintage_id()
+    )
+    overlay = bool(ev_uptake_key[7]) if len(ev_uptake_key) > 7 else False
+    return vid, overlay
+
+
+def _official_vintage_filter_for_key(ev_uptake_key: tuple[Any, ...]) -> tuple[str, bool]:
+    """(selected official scenario_name, overlay flag) for row filtering."""
+    vid, overlay = _official_vintage_scope(ev_uptake_key)
+    return official_comparator_scenario_name(vid), overlay
+
+
+def _filter_official_vintage_rows(
+    frame: pd.DataFrame,
+    selected_scenario: str,
+    overlay: bool,
+) -> pd.DataFrame:
+    """Drop official-comparator rows belonging to non-selected vintages.
+
+    Applied at each consumption point AFTER cache retrieval. Frames carrying
+    scenario_role/scenario_name (chart rows, line reconciliation, stack
+    components) are filtered; frames without those columns, Actual rows and
+    current-model rows pass through untouched. With the analyst overlay on,
+    every published official vintage is kept.
+    """
+    if overlay or frame is None or not isinstance(frame, pd.DataFrame) or frame.empty:
+        return frame
+    if "scenario_role" not in frame.columns or "scenario_name" not in frame.columns:
+        return frame
+    role = frame["scenario_role"].fillna("").astype(str)
+    scenario = frame["scenario_name"].fillna("").astype(str)
+    drop = role.eq(OFFICIAL_SCOPE) & ~scenario.eq(str(selected_scenario))
+    if not drop.any():
+        return frame
+    return frame[~drop].copy()
+
+
 def _fed_policy_state_scope(ev_uptake_key: tuple[Any, ...]) -> tuple[str, str]:
     """Return (Current state, MBU26 state), retaining legacy cache keys."""
 
@@ -1095,6 +1198,10 @@ def cached_fuel_price_scenario_replay(
         scenario_inputs,
         repo_root=Path(__file__).resolve().parent,
         engine=engine,
+        # The pack being replayed decides the bridge, not the live registry.
+        bridge_vintage_id=bridge_vintage_id_from_manifest(
+            _pack.manifest, Path(__file__).resolve().parent
+        ),
     )
 
 
@@ -1137,6 +1244,10 @@ def cached_treasury_baseline_macro_replay(
         scenario_inputs,
         repo_root=Path(__file__).resolve().parent,
         engine=engine,
+        # The pack being replayed decides the bridge, not the live registry.
+        bridge_vintage_id=bridge_vintage_id_from_manifest(
+            _pack.manifest, Path(__file__).resolve().parent
+        ),
     )
 
 
@@ -1206,6 +1317,11 @@ def _apply_scenario_overlays(
             official_state = _OFFICIAL_POLICY_STATE_BY_UI_LABEL.get(str(policy))
             if official_state is None:
                 raise ValueError(f"Unknown official comparator policy state: {policy!r}")
+            # The callee is MBU26-only by contract: it returns the frame
+            # unchanged for the published state and internally splits out any
+            # official row whose scenario_name != "mbu26_official"
+            # (e.g. befu26_official) before repricing, so no other published
+            # vintage can ever be rewritten by this synthetic counterfactual.
             rows, policy_audit = apply_official_comparator_rate_policy_to_chart_rows(
                 rows,
                 repo_root,
@@ -1363,9 +1479,10 @@ def _filter_series_rows_with_fallback(
 ) -> tuple[pd.DataFrame, bool]:
     """Selected-series rows, filling any trace missing native quarters.
 
-    Current finalists carry native activity quarters, while MBU26 is governed
-    at June-year grain.  The fallback therefore operates per requested trace,
-    not only when the whole quarterly selection is empty.
+    Current finalists carry native activity quarters, while the official
+    comparator vintages are governed at June-year grain.  The fallback
+    therefore operates per requested trace, not only when the whole quarterly
+    selection is empty.
     """
     filtered = _filter_revenue_outlook_rows(
         rows,
@@ -1689,6 +1806,8 @@ def cached_aligned_scenario_detail_frames(
     chart_rows, _, _, _, _ = cached_scenario_overlay_rows(
         signature, sensitivity_key, bridge_mode, ev_uptake_key, _pack
     )
+    official_scenario, official_overlay = _official_vintage_filter_for_key(ev_uptake_key)
+    chart_rows = _filter_official_vintage_rows(chart_rows, official_scenario, official_overlay)
     line_reconciliation = _align_detail_frame_to_chart_rows(
         detail_frames["line_reconciliation"],
         chart_rows,
@@ -1696,6 +1815,9 @@ def cached_aligned_scenario_detail_frames(
         series_column="series_id",
         value_column="value",
         source_path_column="source_path",
+    )
+    line_reconciliation = _filter_official_vintage_rows(
+        line_reconciliation, official_scenario, official_overlay
     )
     formula_residuals = (
         revenue_formula_residual_frame(line_reconciliation)
@@ -1738,6 +1860,11 @@ def cached_revenue_outlook_view(
     chart_rows, ev_uptake_audit, eruc_audit, fed_uplift_audit, fuel_price_audit = cached_scenario_overlay_rows(
         signature, sensitivity_key, bridge_mode, ev_uptake_key, _pack
     )
+    # Non-selected official vintages leave every downstream frame here, so the
+    # figure, composition, reconciliation and download consumers all inherit
+    # one consistent vocabulary from the vintage selection in the uptake key.
+    official_scenario, official_overlay = _official_vintage_filter_for_key(ev_uptake_key)
+    chart_rows = _filter_official_vintage_rows(chart_rows, official_scenario, official_overlay)
     effective_current_fed_policy_state = _effective_fed_policy_state(
         current_fed_policy_state,
         _CURRENT_FED_UPLIFT_ROLES,
@@ -1841,7 +1968,15 @@ def cached_scenario_comparison_paths(
         # finalist petrol bridge keeps all petrol activity to 2050, which is
         # the implausible path the displacement lever exists to correct).
         mode = str(ev_uptake_key[0]) if ev_uptake_key else ""
-        base_trace = "MBU26 official" if mode == EV_UPTAKE_GOVERNED_OPTION else "Current finalist Base case"
+        # The governed official option follows the SELECTED comparator vintage
+        # (uptake-key slot 6; vintage ids equal release rounds for registered
+        # vintages), not a hard-coded MBU26 trace.
+        selected_vid, _ = _official_vintage_scope(ev_uptake_key)
+        base_trace = (
+            official_comparator_trace_name(selected_vid)
+            if mode == EV_UPTAKE_GOVERNED_OPTION
+            else "Current finalist Base case"
+        )
         rows = _filter_revenue_outlook_rows(
             scenario_rows,
             time_grain="june_year",
@@ -2002,9 +2137,14 @@ def cached_revenue_outlook_total_path_figure(
     _filtered_rows: pd.DataFrame,
     _cone_band: pd.DataFrame | None = None,
 ) -> go.Figure:
+    selected_vid, _ = _official_vintage_scope(ev_uptake_key)
     del signature, time_grain, fed_path, traces, sensitivity_key, bridge_mode, ev_uptake_key
     return revenue_outlook_total_path_figure(
-        _filtered_rows, selected_series=selected_series, selected_fy=selected_fy, cone_band=_cone_band
+        _filtered_rows,
+        selected_series=selected_series,
+        selected_fy=selected_fy,
+        cone_band=_cone_band,
+        selected_official_trace=official_comparator_trace_name(selected_vid),
     )
 
 
@@ -2016,6 +2156,7 @@ def cached_revenue_outlook_fan_figure(
     selected_fan_source: str,
     _fan_band_rows: pd.DataFrame,
     _fan_availability: pd.DataFrame,
+    official_fed_paths: tuple[str, ...] | None = None,
 ) -> tuple[go.Figure, str]:
     del signature
     figure = revenue_outlook_uncertainty_fan_figure(
@@ -2024,6 +2165,7 @@ def cached_revenue_outlook_fan_figure(
         selected_series=selected_series,
         fan_source=selected_fan_source,
         selected_fed_path=selected_fed_path,
+        official_fed_paths=official_fed_paths,
     )
     caption = _revenue_outlook_fan_caption(_fan_availability, selected_series, selected_fan_source)[:220]
     return figure, caption
@@ -3897,7 +4039,18 @@ def render_reproducibility_detail(stream_label: str) -> None:
 
 REVENUE_OUTLOOK_VIEW_SINGLE = "Single scenario"
 REVENUE_OUTLOOK_VIEW_COMPARE = "Compare A vs B"
-COMPARISON_MOT_OFFICIAL_OPTION = "MoT official (MBU26, no levers)"
+def _comparison_mot_official_option(release_round: str) -> str:
+    """A/B uptake option label for the governed official path of one vintage."""
+    return f"MoT official ({release_round}, no levers)"
+
+
+# Bound to the governed default comparator vintage. The rendered A/B option
+# follows the page's SELECTED comparator vintage at runtime (see
+# _render_comparison_scenario_column); this constant names the default label
+# for module-level callers and tests.
+COMPARISON_MOT_OFFICIAL_OPTION = _comparison_mot_official_option(
+    _registry_default_comparator_vintage_id()
+)
 # Single-view controls (and the whole lever accordion) unmount while the
 # comparison view is active; re-assigning their session values each run marks
 # them as programmatically set so Streamlit keeps them alive across the switch.
@@ -3914,6 +4067,8 @@ _REVENUE_OUTLOOK_PERSISTED_KEYS = (
     "revenue_outlook_mbu_fed_policy_state",
     "revenue_outlook_fed_uplift",
     "revenue_outlook_mbu_fed_uplift",
+    "revenue_outlook_official_vintage",
+    "revenue_outlook_official_vintage_overlay",
 )
 _REVENUE_OUTLOOK_PERSISTED_PREFIXES = ("revenue_outlook_legend_item_", "ev_lever_", "eruc_lever_")
 
@@ -3975,14 +4130,160 @@ def _active_lever_summary(
     if eruc_on:
         parts.append("e-RUC on")
     parts.append(f"Current: {FED_POLICY_LABELS[_normalise_fed_policy_state(fed_policy_state)]}")
-    parts.append(f"MBU26: {FED_POLICY_LABELS[_normalise_fed_policy_state(mbu_fed_policy_state)]}")
+    mbu_state = _normalise_fed_policy_state(mbu_fed_policy_state)
+    # The official comparator renders as published by default; only the
+    # explicitly selected MBU26 synthetic counterfactual is worth naming.
+    if mbu_state != FED_POLICY_PUBLISHED:
+        parts.append(f"MBU26 synthetic counterfactual: {FED_POLICY_LABELS[mbu_state]}")
     return " · ".join(parts)
+
+
+_OFFICIAL_VINTAGE_PRIOR_SUFFIX = " (prior vintage)"
+
+
+def _official_vintage_manifest_entries(
+    manifest: dict[str, Any],
+) -> tuple[str, dict[str, dict[str, Any]]]:
+    """(default comparator vintage id, available {vid: entry}) from the pack.
+
+    Packs that predate the ``official_vintages`` manifest block fall back to
+    the legacy MBU26-only vocabulary so an older pack renders as before.
+    """
+    block = manifest.get("official_vintages") if isinstance(manifest, dict) else None
+    available_raw = block.get("available") if isinstance(block, dict) else None
+    if not isinstance(available_raw, dict) or not available_raw:
+        return "MBU26", {
+            "MBU26": {
+                "display_name": "MBU26 official",
+                "release_round": "MBU26",
+                "trace_name": "MBU26 official",
+                "scenario_name": "mbu26_official",
+            }
+        }
+    available = {
+        str(vid): dict(entry)
+        for vid, entry in available_raw.items()
+        if isinstance(entry, dict)
+    }
+    default_id = str(block.get("official_comparator_vintage_id") or "")
+    if default_id not in available:
+        default_id = next(iter(available))
+    return default_id, available
+
+
+def _official_vintage_trace_name(vid: str, entry: dict[str, Any]) -> str:
+    release = str(entry.get("release_round") or vid)
+    return str(entry.get("trace_name") or official_comparator_trace_name(release))
+
+
+def _render_official_vintage_controls(manifest: dict[str, Any]) -> dict[str, Any]:
+    """Governed "Official comparator vintage" selector plus analyst overlay.
+
+    Returns the selected vintage vocabulary (id/release/trace/scenario), the
+    overlay flag and the displayed official trace names, selected first.
+    """
+    default_id, available = _official_vintage_manifest_entries(manifest)
+    ordered_ids = [default_id] + sorted(vid for vid in available if vid != default_id)
+    labels: dict[str, str] = {}
+    for vid in ordered_ids:
+        display = str(available[vid].get("display_name") or f"{vid} official")
+        labels[vid] = display if vid == default_id else display + _OFFICIAL_VINTAGE_PRIOR_SUFFIX
+    label_to_id = {label: vid for vid, label in labels.items()}
+    options = [labels[vid] for vid in ordered_ids]
+    selected_id = default_id
+    overlay = False
+    if len(options) > 1:
+        vintage_key = "revenue_outlook_official_vintage"
+        if vintage_key in st.session_state and str(st.session_state[vintage_key]) not in label_to_id:
+            # A different pack vintage set (or default flip) invalidates the
+            # persisted label; fail back to the governed default comparator.
+            st.session_state[vintage_key] = labels[default_id]
+        vintage_cols = st.columns([0.34, 0.66])
+        with vintage_cols[0]:
+            selected_label = st.selectbox(
+                "Official comparator vintage",
+                options,
+                key=vintage_key,
+                help=(
+                    "Published official comparator releases materialized in the committed "
+                    "runtime pack. The default is the pack's governed comparator vintage; "
+                    "prior vintages remain selectable for comparison and never receive "
+                    "Current policy overlays."
+                ),
+                **_widget_default_kwargs(vintage_key, index=0),
+            )
+        selected_id = label_to_id.get(str(selected_label), default_id)
+        with vintage_cols[1]:
+            if should_show_local_audit_controls():
+                overlay = st.checkbox(
+                    "Overlay prior official vintages",
+                    key="revenue_outlook_official_vintage_overlay",
+                    help=(
+                        "Analyst view: keep every published official vintage on the charts "
+                        "at once. The selected vintage stays the governed comparator; prior "
+                        "vintages render in a muted style."
+                    ),
+                    **_widget_default_kwargs("revenue_outlook_official_vintage_overlay", value=False),
+                )
+    entry = available[selected_id]
+    release = str(entry.get("release_round") or selected_id)
+    displayed_ids = [selected_id] + [
+        vid for vid in ordered_ids if overlay and vid != selected_id
+    ]
+    return {
+        "vintage_id": selected_id,
+        "release_round": release,
+        "trace_name": _official_vintage_trace_name(selected_id, entry),
+        "scenario_name": str(
+            entry.get("scenario_name") or official_comparator_scenario_name(selected_id)
+        ),
+        "overlay": bool(overlay),
+        "available": available,
+        "all_trace_names": tuple(
+            _official_vintage_trace_name(vid, available[vid]) for vid in ordered_ids
+        ),
+        "displayed_trace_names": tuple(
+            _official_vintage_trace_name(vid, available[vid]) for vid in displayed_ids
+        ),
+        "displayed_release_rounds": tuple(
+            str(available[vid].get("release_round") or vid) for vid in displayed_ids
+        ),
+        "mbu26_displayed": "MBU26" in displayed_ids,
+    }
+
+
+def _apply_official_vintage_to_trace_options(
+    trace_options: list[str],
+    official_vintage_state: dict[str, Any],
+) -> list[str]:
+    """Trace options restricted to displayed official vintages, selected first."""
+    options = list(trace_options or [])
+    all_officials = set(official_vintage_state["all_trace_names"])
+    displayed = [
+        trace
+        for trace in official_vintage_state["displayed_trace_names"]
+        if trace in set(options)
+    ]
+    ordered: list[str] = []
+    inserted = False
+    for option in options:
+        if option in all_officials:
+            if not inserted and displayed:
+                ordered.extend(displayed)
+                inserted = True
+            continue
+        ordered.append(option)
+    if not inserted and displayed:
+        anchor = 1 if ordered[:1] == ["Actual"] else 0
+        ordered[anchor:anchor] = displayed
+    return ordered
 
 
 def _render_lever_accordion(
     selected_metric_type: str,
     sensitivity_options: list[str],
     sensitivity_labels: dict[str, dict[str, str]],
+    show_official_policy_control: bool = True,
 ) -> dict[str, Any]:
     """Advanced scenario levers accordion (rendered in single-scenario view only).
 
@@ -4132,9 +4433,10 @@ def _render_lever_accordion(
         _session_fed_policy_state(
             "revenue_outlook_mbu_fed_policy_state",
             legacy_toggle_key="revenue_outlook_mbu_fed_uplift",
+            default=FED_POLICY_PUBLISHED,
         )
         st.markdown(
-            "<div class='page5-panel-title'>12c FED / proportional RUC policy</div><div class='page5-panel-sub'>Choose the original 1 January 2027 start, the six-month deferral to 1 July 2027, or no 12c uplift. The choice is carried into the PED retail-price input and proportionately into Light and Heavy RUC rates. Conventional RUC activity responds once to combined diesel-plus-RUC running cost; BEV/PHEV kilometres stay fixed because no approved class-specific charge elasticity is available. Current scenarios and MBU26 can be selected independently.</div>",
+            "<div class='page5-panel-title'>12c FED / proportional RUC policy</div><div class='page5-panel-sub'>Choose the original 1 January 2027 start, the six-month deferral to 1 July 2027, or no 12c uplift. The choice is carried into the PED retail-price input and proportionately into Light and Heavy RUC rates. Conventional RUC activity responds once to combined diesel-plus-RUC running cost; BEV/PHEV kilometres stay fixed because no approved class-specific charge elasticity is available. Current scenarios and the MBU26 official comparator counterfactual are selected independently.</div>",
             unsafe_allow_html=True,
         )
         policy_cols = st.columns([0.34, 0.34, 0.32])
@@ -4155,21 +4457,30 @@ def _render_lever_accordion(
                 ),
             )
         with policy_cols[1]:
-            mbu_fed_policy_state = st.selectbox(
-                "MBU26 12c policy",
-                list(FED_POLICY_OPTIONS),
-                format_func=lambda state: FED_POLICY_LABELS[str(state)],
-                key="revenue_outlook_mbu_fed_policy_state",
-                help=(
-                    "Scope: MBU26 comparator only. The published source pack is never overwritten. "
-                    "Original timing starts 1 Jan 2027; deferred starts 1 Jul 2027; no uplift removes "
-                    "the 12c step entirely."
-                ),
-                **_widget_default_kwargs(
-                    "revenue_outlook_mbu_fed_policy_state",
-                    index=FED_POLICY_OPTIONS.index(FED_POLICY_DELAYED_6M),
-                ),
-            )
+            if show_official_policy_control:
+                mbu_fed_policy_state = st.selectbox(
+                    "Synthetic official rate-only counterfactual — not a published forecast",
+                    list(FED_POLICY_OPTIONS),
+                    format_func=lambda state: FED_POLICY_LABELS[str(state)],
+                    key="revenue_outlook_mbu_fed_policy_state",
+                    help=(
+                        "Scope: MBU26 comparator only. The published source pack is never overwritten. "
+                        "Original timing starts 1 Jan 2027; deferred starts 1 Jul 2027; no uplift removes "
+                        "the 12c step entirely."
+                    ),
+                    **_widget_default_kwargs(
+                        "revenue_outlook_mbu_fed_policy_state",
+                        index=FED_POLICY_OPTIONS.index(FED_POLICY_PUBLISHED),
+                    ),
+                )
+                st.caption(
+                    "Applies to the MBU26 official trace only. BEFU26 has no synthetic "
+                    "policy counterfactual; generating one requires a separate owner decision."
+                )
+            else:
+                # No synthetic counterfactual exists for the displayed official
+                # vintage(s); the comparator stays exactly as published.
+                mbu_fed_policy_state = FED_POLICY_PUBLISHED
         with policy_cols[2]:
             eruc_enabled = st.toggle(
                 "Move petrol fleet to e-RUC",
@@ -4283,6 +4594,7 @@ def _compare_mode_lever_state(selected_metric_type: str) -> dict[str, Any]:
     mbu_fed_policy_state = _session_fed_policy_state(
         "revenue_outlook_mbu_fed_policy_state",
         legacy_toggle_key="revenue_outlook_mbu_fed_uplift",
+        default=FED_POLICY_PUBLISHED,
     )
     return {
         "fleet": _level("revenue_outlook_sensitivity_fleet_efficiency"),
@@ -4381,6 +4693,16 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         return
 
     manifest = pack.manifest if pack is not None and isinstance(pack.manifest, dict) else {}
+    # Bridge assumption vintage (annual rates/intensity/admin inputs); distinct
+    # from the displayed official comparator vintage and from the Treasury
+    # BEFU26 macro vintage.
+    # Authoritative for every bridge-dependent calculation on this page: the
+    # vintage recorded in THIS pack's manifest, never the live registry
+    # default. A pack built on one bridge must never be re-bridged on another.
+    bridge_vintage_id = bridge_vintage_id_from_manifest(
+        manifest, Path(__file__).resolve().parent
+    )
+    bridge_vintage_release = bridge_vintage_id
     chart_rows = _pack_table(pack, "revenue_chart_rows")
     fan_availability = _pack_table(pack, "fan_availability")
     fan_band_rows = _pack_table(pack, "fan_band_rows")
@@ -4415,8 +4737,9 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     default_fed_index = fed_path_options.index("Current planned path") if "Current planned path" in fed_path_options else 0
     trace_options = selector_options["trace_options"]
     fy_options = selector_options["fy_options"]
-    # FY2030 is the last MoT-forecast June year in MBU26; beyond it the paths
-    # are extrapolation, so the selected-FY marker defaults to the window end.
+    # FY2030 is the last MoT-forecast June year in the official vintages;
+    # beyond it the paths are extrapolation, so the selected-FY marker
+    # defaults to the window end.
     default_fy_index = fy_options.index("FY2030") if "FY2030" in fy_options else max(len(fy_options) - 1, 0)
 
     with st.container(border=True):
@@ -4446,10 +4769,19 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 format_func=_revenue_outlook_series_display_label,
             )
         selected_metric_type = _revenue_outlook_series_metric_type(chart_rows, selected_stream)
+        # Governed official comparator vintage selection (default = the pack's
+        # comparator vintage). Rendered in both view modes so the A/B official
+        # option and the sections below the comparison stay bound to it.
+        official_vintage_state = _render_official_vintage_controls(manifest)
+        selected_official_trace = str(official_vintage_state["trace_name"])
+        selected_official_release = str(official_vintage_state["release_round"])
+        trace_options = _apply_official_vintage_to_trace_options(trace_options, official_vintage_state)
         # Rows carry the planned path; the 12c counterfactual is a display
         # reprice handled by the policy selector in the lever accordion.
         selected_fed_path = fed_path_options[default_fed_index] if fed_path_options else ""
-        selected_trace_defaults = _revenue_outlook_default_traces(trace_options)
+        selected_trace_defaults = _revenue_outlook_default_traces(
+            trace_options, selected_official_trace=selected_official_trace
+        )
         if compare_mode:
             st.caption(
                 "Comparison plots June years. Time grain, FY marker and legend selections apply to "
@@ -4532,7 +4864,12 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         # selections keep driving the composition and audit sections below.
         lever_state = _compare_mode_lever_state(selected_metric_type)
     else:
-        lever_state = _render_lever_accordion(selected_metric_type, sensitivity_options, sensitivity_labels)
+        lever_state = _render_lever_accordion(
+            selected_metric_type,
+            sensitivity_options,
+            sensitivity_labels,
+            show_official_policy_control=bool(official_vintage_state["mbu26_displayed"]),
+        )
     selected_fleet_efficiency = lever_state["fleet"]
     selected_pt_mode_shift = lever_state["pt"]
     selected_freight_rail_shift = lever_state["freight"]
@@ -4545,6 +4882,10 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     eruc_lever_values = lever_state["eruc_levers"]
     fed_policy_state = _normalise_fed_policy_state(lever_state["fed_policy_state"])
     mbu_fed_policy_state = _normalise_fed_policy_state(lever_state["mbu_fed_policy_state"])
+    if not official_vintage_state["mbu26_displayed"]:
+        # The synthetic rate-only counterfactual exists for MBU26 only; while
+        # MBU26 is not displayed the official comparator stays published.
+        mbu_fed_policy_state = FED_POLICY_PUBLISHED
     ped_retention_sensitivity = bool(lever_state.get("ped_retention_sensitivity", False))
     lever_summary = _active_lever_summary(
         fleet=selected_fleet_efficiency,
@@ -4567,6 +4908,11 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         fed_policy_state,
         mbu_fed_policy_state,
         ped_retention_sensitivity,
+        # Slots 6/7 (appended at the END so existing positional reads keep
+        # indexing correctly): official comparator vintage id + overlay flag.
+        # Both invalidate every cached figure/view keyed on this tuple.
+        str(official_vintage_state["vintage_id"]),
+        bool(official_vintage_state["overlay"]),
     )
     sensitivity_key = selected_sensitivity_key(
         fleet_efficiency=selected_fleet_efficiency,
@@ -4638,6 +4984,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             selected_stream,
             selected_fed_path,
             sensitivity_labels,
+            official_vintage_state,
         )
     else:
         timer.start("main path figure")
@@ -4677,9 +5024,23 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             "Current Base, High population and Middle East conflict traces: "
             + FED_POLICY_NOTES[active_current_policy]
         )
-        total_path_notes.append(
-            "MBU26 official comparator trace: " + FED_POLICY_NOTES[active_mbu_policy]
-        )
+        if official_vintage_state["mbu26_displayed"] and active_mbu_policy != FED_POLICY_PUBLISHED:
+            # The counterfactual must never read as a published MBU26 forecast
+            # ("MBU26 deferred" / "MBU26 no uplift" are not published paths).
+            official_note = (
+                "Synthetic official rate-only counterfactual — not a published forecast. "
+                "Applies to the MBU26 official trace only: "
+                + FED_POLICY_NOTES[active_mbu_policy]
+            )
+            if selected_official_release != "MBU26":
+                official_note = (
+                    f"Official comparator: {selected_official_release} published. " + official_note
+                )
+            total_path_notes.append(official_note)
+        else:
+            total_path_notes.append(
+                f"Official comparator: {selected_official_release} published"
+            )
         total_path_notes.append(
             "Macro basis: current Base and High-population paths use the Treasury "
             "BEFU26 quarterly real-GDP forecast and June population anchors; PED "
@@ -4715,6 +5076,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 fan_availability,
                 selected_series=selected_stream,
                 selected_fed_path=selected_fed_path,
+                official_fed_paths=official_vintage_state["displayed_release_rounds"],
             )
             timer.stop("fan figure")
 
@@ -4807,7 +5169,8 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         runtime_cutoff_audit = _pack_table(pack, "runtime_cutoff_audit")
         with st.expander("Runtime cutoff audit", expanded=False):
             info_panel(
-                "Revenue Outlook charts and tables stop at the last governed common non-extrapolated horizon across current Base, current comparison and required MBU26 inputs."
+                "Revenue Outlook charts and tables stop at the last governed common non-extrapolated horizon across current Base, current comparison and required "
+                f"{bridge_vintage_release} bridge inputs."
             )
             if runtime_cutoff_audit.empty:
                 warning_panel("Runtime cutoff audit is missing from the committed Revenue Outlook pack.")
@@ -4866,7 +5229,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 f"Demand elasticity: {sensitivity_option_label('demand_elasticity', selected_demand_elasticity)}."
             )
             st.caption(
-                f"{selected_summary} Current-finalist activity/revenue rows and rollups are recalculated in this view only; MBU26 official rows are unchanged."
+                f"{selected_summary} Current-finalist activity/revenue rows and rollups are recalculated in this view only; official comparator rows are unchanged."
             )
             if sensitivity_impact_audit.empty:
                 warning_panel("Sensitivity impact audit is unavailable for the selected Revenue Outlook view.")
@@ -4913,7 +5276,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 )
                 if fallback_count:
                     warning_panel(
-                        f"{fallback_count} PED bridge rows use an MBU26 population proxy for at least one quarter. These rows are flagged in the audit table."
+                        f"{fallback_count} PED bridge rows use a {bridge_vintage_release} population proxy for at least one quarter. These rows are flagged in the audit table."
                     )
                 diag_cols = st.columns([0.62, 0.13, 0.13, 0.12])
                 fy_bridge = ped_revenue_bridge_audit[
@@ -4949,7 +5312,9 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         # data and mode machinery remain for audits, but the selectors are
         # gone; the formula-audit detail stays available on local audit runs.
         selected_stack_mode = REVENUE_STACK_MODE_BRIDGE
-        stack_source_options = _revenue_line_source_options(stack_components)
+        stack_source_options = _revenue_line_source_options(
+            stack_components, selected_official_trace=selected_official_trace
+        )
         stack_section_options = selector_options["stack_section_options"]
         stack_overlay_options = selector_options["stack_overlay_options"]
         default_stack_sections = [section for section in ["RUC", "FED", "MVR", "TUC"] if section in stack_section_options]
@@ -4989,6 +5354,12 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             selected_stack_overlays = list(default_stack_overlays)
             slider_col = comp_cols[1]
         with comp_cols[0]:
+            # A vintage flip can strip the previously stored official source
+            # from the options; clamp the session value before rendering.
+            if stack_source_options:
+                _validated_select_state(
+                    "revenue_stack_source_path", stack_source_options, stack_source_options[0]
+                )
             selected_stack_source = st.selectbox(
                 "Source path",
                 stack_source_options,
@@ -4998,14 +5369,14 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         # Source-specific FY bounds, derived AFTER the source is selected.
         # The former global bounds were computed over the whole stack frame
         # before any source choice, so the Current FY2030 cutoff silently
-        # capped MBU26 even though its rows run to FY2055.
+        # capped the official comparator even though its rows run to FY2055.
         stack_fy_min, stack_fy_max = _revenue_line_fy_bounds(
             stack_components[
                 stack_components["source_path"].astype(str).eq(str(selected_stack_source))
             ]
         )
-        # Long-run sources open at FY2050 by default; MBU26 can be extended
-        # to its own FY2055 source horizon with the slider.
+        # Long-run sources open at FY2050 by default; the official vintages
+        # can be extended to their own FY2055 source horizon with the slider.
         stack_fy_default_end = min(int(stack_fy_max), 2050)
         state_key = "revenue_stack_fy_range"
         source_state_key = "revenue_stack_fy_range_source"
@@ -5211,10 +5582,20 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         with st.container(border=True):
             st.markdown("<div class='page5-panel-title'>Revenue line reconciliation</div>", unsafe_allow_html=True)
             rec_cols = st.columns([0.35, 0.25, 0.25, 0.15])
-            source_options = _revenue_line_source_options(line_reconciliation)
+            source_options = _revenue_line_source_options(
+                line_reconciliation, selected_official_trace=selected_official_trace
+            )
             section_options = selector_options["line_section_options"]
             fy_min, fy_max = selector_options["line_fy_bounds"]
             with rec_cols[0]:
+                # A vintage flip can strip a stored official source from the
+                # options; prune the session value before rendering.
+                if "revenue_line_reconciliation_source_paths" in st.session_state:
+                    st.session_state["revenue_line_reconciliation_source_paths"] = [
+                        value
+                        for value in st.session_state["revenue_line_reconciliation_source_paths"]
+                        if value in source_options
+                    ]
                 selected_source_paths = st.multiselect(
                     "Source path",
                     source_options,
@@ -5308,12 +5689,17 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         display_table(_revenue_bridge_display_table(filtered_bridge), height=320, max_rows=240)
         timer.stop("bridge detail table")
 
-    _render_fleet_mix_explorer()
+    _render_fleet_mix_explorer(bridge_vintage_id)
 
     chart_card(
         "Effective rates per 1,000 km",
-        RATE_CHART_NOTE,
-        cached_revenue_rate_paths_figure(pack_signature, fed_policy_state, pack.revenue_chart_rows),
+        rate_chart_note(bridge_vintage_release),
+        cached_revenue_rate_paths_figure(
+            pack_signature,
+            fed_policy_state,
+            pack.revenue_chart_rows,
+            bridge_vintage_id,
+        ),
         caption=None,
         notes_as_tooltip=True,
     )
@@ -7205,7 +7591,7 @@ def _revenue_outlook_trace_options(chart_rows: pd.DataFrame) -> list[str]:
     available = set(data["trace_name"].dropna().astype(str))
     preferred = [
         "Actual",
-        "MBU26 official",
+        *_registry_official_trace_names(),
         "Current finalist Base case",
         "Current finalist High population/comparison",
         *CONFLICT_TRACE_NAMES,
@@ -7244,10 +7630,19 @@ def _comparison_scenario_defaults(prefix: str) -> dict[str, Any]:
     }
 
 
-def _render_comparison_scenario_column(prefix: str, sensitivity_labels: dict[str, dict[str, str]]) -> tuple[tuple, tuple]:
+def _render_comparison_scenario_column(
+    prefix: str,
+    sensitivity_labels: dict[str, dict[str, str]],
+    official_vintage_state: dict[str, Any],
+) -> tuple[tuple, tuple]:
     defaults = _comparison_scenario_defaults(prefix)
+    selected_vid = str(official_vintage_state["vintage_id"])
+    selected_release = str(official_vintage_state["release_round"])
+    # The governed option follows the page's SELECTED comparator vintage; a
+    # stale label from another vintage is reset by _validated_select_state.
+    mot_option = _comparison_mot_official_option(selected_release)
     uptake_options = [mode for mode in EV_UPTAKE_MODE_OPTIONS if mode != EV_UPTAKE_CUSTOM_OPTION]
-    uptake_options.append(COMPARISON_MOT_OFFICIAL_OPTION)
+    uptake_options.append(mot_option)
     keys = {
         name: f"ro_cmp_{prefix}_{name}"
         for name in ["uptake", "fleet", "pt", "freight", "eruc", "fed_policy"]
@@ -7259,13 +7654,13 @@ def _render_comparison_scenario_column(prefix: str, sensitivity_labels: dict[str
         uptake_options,
         key=keys["uptake"],
         help=(
-            f"'{COMPARISON_MOT_OFFICIAL_OPTION}' plots the governed MBU26 official path exactly as "
-            "committed; non-rate levers are locked, while the 12c policy switch remains available."
+            f"'{mot_option}' plots the governed {selected_release} official path exactly as "
+            "committed; non-rate levers are locked."
         ),
     )
-    mot_official = uptake == COMPARISON_MOT_OFFICIAL_OPTION
+    mot_official = uptake == mot_option
     if mot_official:
-        st.caption("Pure MBU26 official path - non-rate levers locked; the three-state 12c policy selector remains available.")
+        st.caption(f"Pure {selected_release} official path - non-rate levers locked.")
     levels = list(_COMPARISON_SENSITIVITY_LEVELS)
     for name in ("fleet", "pt", "freight"):
         _validated_select_state(keys[name], levels, defaults[name])
@@ -7293,35 +7688,59 @@ def _render_comparison_scenario_column(prefix: str, sensitivity_labels: dict[str
             elasticity = st.number_input("VKT elasticity", min_value=-1.0, max_value=0.0, value=-0.15, step=0.05, key=f"ro_cmp_{prefix}_eruc_elasticity")
             pump = st.number_input("Pump price ($/L incl. excise)", min_value=1.0, max_value=6.0, value=2.70, step=0.05, key=f"ro_cmp_{prefix}_eruc_pump")
         eruc_values = (float(start), float(phase), ratio / 100.0, float(elasticity), float(pump))
-    _validated_select_state(
-        keys["fed_policy"],
-        list(FED_POLICY_OPTIONS),
-        defaults["fed_policy"],
-    )
-    st.session_state.setdefault(keys["fed_policy"], defaults["fed_policy"])
-    fed_label = "MBU26 12c policy" if mot_official else "Current 12c policy"
-    fed_scope = "MBU26 official comparator only." if mot_official else "Selected current scenario only."
-    fed_policy_state = st.selectbox(
-        fed_label,
-        list(FED_POLICY_OPTIONS),
-        format_func=lambda state: FED_POLICY_LABELS[str(state)],
-        key=keys["fed_policy"],
-        help=(
-            "Original timing starts 1 Jan 2027; deferred starts 1 Jul 2027; "
-            "no uplift removes the 12c step entirely. Scope: " + fed_scope
-        ),
-    )
     if mot_official:
+        # The synthetic rate-only counterfactual is defined for MBU26 only,
+        # defaults to the published path and is hidden for other vintages.
+        official_policy_state = FED_POLICY_PUBLISHED
+        if selected_vid == "MBU26":
+            official_policy_key = f"ro_cmp_{prefix}_official_policy"
+            _validated_select_state(
+                official_policy_key, list(FED_POLICY_OPTIONS), FED_POLICY_PUBLISHED
+            )
+            st.session_state.setdefault(official_policy_key, FED_POLICY_PUBLISHED)
+            official_policy_state = st.selectbox(
+                "Synthetic official rate-only counterfactual — not a published forecast",
+                list(FED_POLICY_OPTIONS),
+                format_func=lambda state: FED_POLICY_LABELS[str(state)],
+                key=official_policy_key,
+                help=(
+                    "Original timing starts 1 Jan 2027; deferred starts 1 Jul 2027; "
+                    "no uplift removes the 12c step entirely. Scope: MBU26 official "
+                    "comparator only."
+                ),
+            )
+            st.caption(
+                "Applies to the MBU26 official trace only. BEFU26 has no synthetic "
+                "policy counterfactual; generating one requires a separate owner decision."
+            )
         sensitivity_key = selected_sensitivity_key("Off", "Off", "Off", freight_rail_shift="Off")
         ev_uptake_key: tuple[Any, ...] = (
             EV_UPTAKE_GOVERNED_OPTION,
             (),
             (),
             FED_POLICY_PUBLISHED,
-            fed_policy_state,
+            official_policy_state,
+            False,
+            selected_vid,
             False,
         )
         return sensitivity_key, ev_uptake_key
+    _validated_select_state(
+        keys["fed_policy"],
+        list(FED_POLICY_OPTIONS),
+        defaults["fed_policy"],
+    )
+    st.session_state.setdefault(keys["fed_policy"], defaults["fed_policy"])
+    fed_policy_state = st.selectbox(
+        "Current 12c policy",
+        list(FED_POLICY_OPTIONS),
+        format_func=lambda state: FED_POLICY_LABELS[str(state)],
+        key=keys["fed_policy"],
+        help=(
+            "Original timing starts 1 Jan 2027; deferred starts 1 Jul 2027; "
+            "no uplift removes the 12c step entirely. Scope: Selected current scenario only."
+        ),
+    )
     sensitivity_key = selected_sensitivity_key(fleet, pt_shift, "Off", freight_rail_shift=freight)
     ev_uptake_key = (
         uptake,
@@ -7330,6 +7749,8 @@ def _render_comparison_scenario_column(prefix: str, sensitivity_labels: dict[str
         fed_policy_state,
         FED_POLICY_PUBLISHED,
         bool(st.session_state.get("revenue_outlook_ped_retention_sensitivity", False)),
+        selected_vid,
+        False,
     )
     return sensitivity_key, ev_uptake_key
 
@@ -7360,7 +7781,12 @@ def _copy_page_settings_to_scenario_a() -> None:
 
 def _scenario_summary_text(sensitivity_key: tuple, ev_uptake_key: tuple) -> str:
     mode = str(ev_uptake_key[0])
-    parts = [COMPARISON_MOT_OFFICIAL_OPTION if mode == EV_UPTAKE_GOVERNED_OPTION else mode]
+    selected_vid, _ = _official_vintage_scope(ev_uptake_key)
+    parts = [
+        _comparison_mot_official_option(selected_vid)
+        if mode == EV_UPTAKE_GOVERNED_OPTION
+        else mode
+    ]
     for label, value in [("Fleet", sensitivity_key[0]), ("PT", sensitivity_key[1]), ("Freight", sensitivity_key[9])]:
         if value != "Off":
             parts.append(f"{label} {value}")
@@ -7368,7 +7794,10 @@ def _scenario_summary_text(sensitivity_key: tuple, ev_uptake_key: tuple) -> str:
         parts.append("e-RUC on")
     current_state, mbu26_state = _fed_policy_state_scope(ev_uptake_key)
     if mode == EV_UPTAKE_GOVERNED_OPTION:
-        parts.append(f"MBU26: {FED_POLICY_LABELS[mbu26_state]}")
+        if mbu26_state != FED_POLICY_PUBLISHED:
+            parts.append(f"MBU26 synthetic counterfactual: {FED_POLICY_LABELS[mbu26_state]}")
+        else:
+            parts.append(f"{selected_vid} official: published")
     else:
         parts.append(f"Current: {FED_POLICY_LABELS[current_state]}")
     return " · ".join(parts)
@@ -7380,6 +7809,7 @@ def _render_scenario_comparison_panel(
     comparison_series: str,
     fed_path: str,
     sensitivity_labels: dict[str, dict[str, str]],
+    official_vintage_state: dict[str, Any],
 ) -> None:
     with st.container(border=True):
         st.markdown(
@@ -7416,10 +7846,14 @@ def _render_scenario_comparison_panel(
             column_a, column_b = st.columns(2)
             with column_a:
                 st.markdown("<div class='ro-cmp-scenario-head ro-cmp-a'>Scenario A</div>", unsafe_allow_html=True)
-                sens_a, uptake_a = _render_comparison_scenario_column("a", sensitivity_labels)
+                sens_a, uptake_a = _render_comparison_scenario_column(
+                    "a", sensitivity_labels, official_vintage_state
+                )
             with column_b:
                 st.markdown("<div class='ro-cmp-scenario-head ro-cmp-b'>Scenario B</div>", unsafe_allow_html=True)
-                sens_b, uptake_b = _render_comparison_scenario_column("b", sensitivity_labels)
+                sens_b, uptake_b = _render_comparison_scenario_column(
+                    "b", sensitivity_labels, official_vintage_state
+                )
 
         result = cached_scenario_comparison_paths(
             pack_signature,
@@ -7865,19 +8299,25 @@ def _scenario_npv_component_bridge_figure(
 def cached_fleet_mix_frame(
     source: str,
     signature: tuple[tuple[str, int, int], ...],
+    bridge_vintage_id: str,
 ) -> pd.DataFrame:
     del signature
     from model_dashboard.fleet_mix import load_source_frame
 
-    return load_source_frame(Path(__file__).resolve().parent, source)
+    return load_source_frame(
+        Path(__file__).resolve().parent, source, bridge_vintage_id
+    )
 
 
-def _fleet_mix_signature() -> tuple[tuple[str, int, int], ...]:
+def _fleet_mix_signature(bridge_vintage_id: str) -> tuple[tuple[str, int, int], ...]:
     from model_dashboard.engine import engine_revenue_outlook_dir
 
     repo_root = Path(__file__).resolve().parent
+    # Stat the pack files of the vintage ACTUALLY in use, resolved through the
+    # registry, so a future default bridge is part of the invalidation key
+    # without editing this list.
     static_paths = [
-        repo_root / "data" / "revenue_model_source_pack" / "mbu26_annual_spine" / "mbu26_official_annual.csv",
+        *official_vintage_pack_files(bridge_vintage_id, repo_root),
         repo_root / "data" / "vfm_202405" / "vfm_vkt_shares.csv",
     ]
     signature: list[tuple[str, int, int]] = []
@@ -7893,15 +8333,14 @@ def _fleet_mix_signature() -> tuple[tuple[str, int, int], ...]:
     return tuple(signature)
 
 
-def _render_fleet_mix_explorer() -> None:
-    """MoT's six volume rows across MBU26 / VFM / the dashboard pack, with an
-    explicit choice of denominator - because the same BEV kilometres are 1.7%
-    of all road travel and 6.1% of the light RUC pool, and mixing those
-    silently is how trust dies."""
+def _render_fleet_mix_explorer(bridge_vintage_id: str) -> None:
+    """MoT's six volume rows across the bridge vintage / VFM / the dashboard
+    pack, with an explicit choice of denominator - because the same BEV
+    kilometres are 1.7% of all road travel and 6.1% of the light RUC pool, and
+    mixing those silently is how trust dies."""
     from model_dashboard.fleet_mix import (
         DASHBOARD_SOURCE,
         DENOMINATORS,
-        MBU26_SOURCE,
         METRIC_KM,
         METRIC_OPTIONS,
         METRIC_SHARE,
@@ -7909,18 +8348,22 @@ def _render_fleet_mix_explorer() -> None:
         ROW_COLORS,
         ROW_KEYS,
         ROW_LABELS,
-        SOURCE_OPTIONS,
         definitions_table,
         denominator_example,
+        is_official_source,
+        official_source_label,
         share_frame,
+        source_options,
         yoy_frame,
     )
 
     repo_root = Path(__file__).resolve().parent
+    official_source = official_source_label(bridge_vintage_id)
+    fleet_source_options = source_options(bridge_vintage_id)
     with st.container(border=True):
         st.markdown(
-            "<div class='page5-panel-title'>Fleet mix explorer - MoT's six volume rows across MBU26, the VFM "
-            "and this dashboard</div>",
+            f"<div class='page5-panel-title'>Fleet mix explorer - MoT's six volume rows across "
+            f"{bridge_vintage_id}, the VFM and this dashboard</div>",
             unsafe_allow_html=True,
         )
         st.caption(
@@ -7931,7 +8374,17 @@ def _render_fleet_mix_explorer() -> None:
         )
         control_cols = st.columns([0.40, 0.32, 0.28])
         with control_cols[0]:
-            source = st.selectbox("Source", SOURCE_OPTIONS, key="fleet_mix_source")
+            # A stored selection naming a different vintage is reset first, so
+            # the label can never outlive the pack it was chosen against.
+            _validated_select_state("fleet_mix_source", fleet_source_options, official_source)
+            source = st.selectbox(
+                "Source",
+                fleet_source_options,
+                key="fleet_mix_source",
+                **_widget_default_kwargs(
+                    "fleet_mix_source", index=fleet_source_options.index(official_source)
+                ),
+            )
         with control_cols[1]:
             metric = st.radio("View", METRIC_OPTIONS, key="fleet_mix_metric",
                               label_visibility="visible", horizontal=False)
@@ -7941,7 +8394,9 @@ def _render_fleet_mix_explorer() -> None:
                 denominator = st.selectbox("As a share of", list(DENOMINATORS), key="fleet_mix_denominator")
 
         try:
-            frame = cached_fleet_mix_frame(source, _fleet_mix_signature())
+            frame = cached_fleet_mix_frame(
+                source, _fleet_mix_signature(bridge_vintage_id), bridge_vintage_id
+            )
         except Exception as exc:  # pragma: no cover - defensive surface
             warning_panel(f"Fleet mix data unavailable: {exc}")
             return
@@ -7982,10 +8437,11 @@ def _render_fleet_mix_explorer() -> None:
                                   "font": {"size": 10.5}})
         st.plotly_chart(fig, use_container_width=True, key="fleet_mix_chart")
 
-        ex = denominator_example(repo_root)
+        ex = denominator_example(repo_root, bridge_vintage_id=bridge_vintage_id)
         st.markdown(
             f"<div style='background:#F0F7FF;border:1px solid #BFDBFE;border-radius:10px;padding:10px 14px;"
-            f"font-size:0.84rem;color:#1E3A5F'><b>Same kilometres, three denominators (MBU26, FY{ex['fy']}):</b> "
+            f"font-size:0.84rem;color:#1E3A5F'><b>Same kilometres, three denominators "
+            f"({bridge_vintage_id}, FY{ex['fy']}):</b> "
             f"BEV travel is {ex['light_bev_km']:,.0f}m km. Divided by all six rows "
             f"({ex['total_km']:,.0f}m km) that is <b>{ex['share_all']:.2%}</b> of all road travel; divided by all "
             f"light travel including petrol ({ex['light_all_km']:,.0f}m km) it is <b>{ex['share_light']:.2%}</b>; "
@@ -7997,15 +8453,17 @@ def _render_fleet_mix_explorer() -> None:
         st.markdown("<div class='page5-panel-title' style='margin-top:0.6rem'>What each row means, source by source</div>",
                     unsafe_allow_html=True)
         display_table(definitions_table(), height=260, max_rows=10)
-        if source == MBU26_SOURCE:
-            st.caption("MBU26 covers FY2001-FY2050 (actuals then official forecast). The VFM scenarios and the "
-                       "dashboard pack cover the forecast era, FY2025-FY2050.")
+        if is_official_source(source, bridge_vintage_id):
+            st.caption(
+                f"{bridge_vintage_id} covers FY2001-FY2050 (actuals then official forecast). "
+                "The VFM scenarios and the dashboard pack cover the forecast era, FY2025-FY2050."
+            )
         elif source == DASHBOARD_SOURCE:
             st.caption(
                 "Dashboard Base uses the raw PED bridge followed by the MoT VFM Base "
-                "petrol-retention overlay, with the FY2025 MBU26 actual as the common anchor. "
-                "Light-petrol VKT, PED litres and FED revenue therefore share one volume lineage "
-                "before policy-price, e-RUC and conflict-price responses."
+                f"petrol-retention overlay, with the FY2025 {bridge_vintage_id} actual as the "
+                "common anchor. Light-petrol VKT, PED litres and FED revenue therefore share one "
+                "volume lineage before policy-price, e-RUC and conflict-price responses."
             )
 
 
@@ -8014,9 +8472,17 @@ def cached_revenue_rate_paths_figure(
     signature: tuple[tuple[str, int, int], ...],
     fed_policy_state: str,
     _chart_rows: pd.DataFrame,
+    bridge_vintage_id: str,
 ) -> go.Figure:
     del signature
-    frame = rate_paths_frame(Path(__file__).resolve().parent, _chart_rows)
+    # The bridge vintage is part of the cache key: the displayed effective
+    # rates are derived from it, so a pack built on a different bridge must
+    # never serve a cached figure from another one.
+    frame = rate_paths_frame(
+        Path(__file__).resolve().parent,
+        _chart_rows,
+        bridge_vintage_id=bridge_vintage_id,
+    )
     return revenue_rate_paths_figure(frame, fed_policy_state=fed_policy_state)
 
 
@@ -8123,13 +8589,23 @@ def _display_period_label(period: Any) -> str:
     return text[2:] if text.startswith("FY") and text[2:].isdigit() else text
 
 
-def _revenue_outlook_default_traces(trace_options: list[str]) -> list[str]:
+def _revenue_outlook_default_traces(
+    trace_options: list[str],
+    selected_official_trace: str | None = None,
+) -> list[str]:
     options = list(trace_options or [])
+    # Default-on official trace is the SELECTED comparator vintage; overlaid
+    # prior vintages stay selectable in the legend without being default-on.
+    registry_officials = _registry_official_trace_names()
+    default_official = selected_official_trace or next(
+        (trace for trace in registry_officials if trace in options),
+        registry_officials[0] if registry_officials else "",
+    )
     # Keep the management view readable by default: show the Medium conflict
     # path and make Low/High directly available in the legend selector.
     preferred = [
         "Actual",
-        "MBU26 official",
+        default_official,
         "Current finalist Base case",
         "Current finalist High population/comparison",
         FUEL_PRICE_SCENARIO_TRACE_NAME,
@@ -8159,9 +8635,18 @@ def _revenue_outlook_fed_path_options(chart_rows: pd.DataFrame) -> list[str]:
     data = chart_rows.copy()
     if "plot_allowed" in data.columns:
         data = data[data["plot_allowed"].fillna(True).astype(bool)].copy()
-    # BEFU25/MBU26 are official-comparator release labels, not selectable FED
-    # rate paths; only in-house path-sensitive traces respond to this control.
-    values = [value for value in data["fed_path"].dropna().astype(str).unique().tolist() if value and value.lower() not in {"nan", "befu25", "mbu26"}]
+    # Official-comparator release labels are not selectable FED rate paths;
+    # only in-house path-sensitive traces respond to this control. The
+    # excluded set is registry-derived (plus the retired BEFU25 legacy label)
+    # so a newly registered vintage is excluded without an edit here.
+    excluded_releases = {"nan", "befu25"} | {
+        vid.lower() for vid, _display in official_vintage_choices(Path(__file__).resolve().parent)
+    }
+    values = [
+        value
+        for value in data["fed_path"].dropna().astype(str).unique().tolist()
+        if value and value.lower() not in excluded_releases
+    ]
     preferred = ["Current planned path", "No 2027 12c uplift", "Selected rate"]
     ordered = [value for value in preferred if value in values]
     ordered.extend(sorted(set(values).difference(ordered)))
@@ -8733,6 +9218,7 @@ def revenue_outlook_total_path_figure(
     selected_series: str,
     selected_fy: str,
     cone_band: pd.DataFrame | None = None,
+    selected_official_trace: str | None = None,
 ) -> go.Figure:
     data = _selected_revenue_outlook_series_rows(rows, selected_series)
     if data.empty:
@@ -8791,13 +9277,17 @@ def revenue_outlook_total_path_figure(
             )
     trace_styles = {
         "Actual": ("#737373", "solid", 2.4),
-        "MBU26 official": ("#00843D", "dash", 2.2),
+        # Default comparator in the strong green; prior vintages muted, so an
+        # analyst overlay of several official traces stays visually distinct.
+        # Generated from the registry, so a new vintage is styled without an
+        # edit here.
+        **_official_trace_style_map(),
         "Current finalist Base case": ("#006FAD", "solid", 2.8),
         "Current finalist High population/comparison": ("#E56B2B", "solid", 2.4),
         **CONFLICT_TRACE_STYLES,
         PED_COMPARISON_BEHAVIOURAL_TRACE_NAME: ("#C2410C", "dot", 2.4),
     }
-    trace_names = _ordered_runtime_trace_names(data)
+    trace_names = _ordered_runtime_trace_names(data, selected_official_trace)
     for trace_name in trace_names:
         group = data[data["trace_name"].astype(str).eq(trace_name)].copy()
         if group.empty:
@@ -9029,6 +9519,7 @@ def _render_revenue_outlook_fan_card(
     *,
     selected_series: str,
     selected_fed_path: str,
+    official_fed_paths: tuple[str, ...] | None = None,
 ) -> None:
     with st.container(border=True):
         st.markdown(
@@ -9061,6 +9552,7 @@ def _render_revenue_outlook_fan_card(
             selected_fan_source,
             fan_band_rows,
             fan_availability,
+            official_fed_paths,
         )
         st.plotly_chart(fig, use_container_width=True, key="chart_card_uncertainty_fan")
         st.caption(caption)
@@ -9073,6 +9565,7 @@ def revenue_outlook_uncertainty_fan_figure(
     selected_series: str,
     fan_source: str = FAN_SOURCE_AUTO,
     selected_fed_path: str | None = None,
+    official_fed_paths: tuple[str, ...] | None = None,
 ) -> go.Figure:
     selected_series_id = _revenue_outlook_fan_series_id(fan_availability, selected_series)
     resolved_source = _resolve_revenue_outlook_fan_source(fan_availability, selected_series_id, fan_source)
@@ -9085,7 +9578,23 @@ def revenue_outlook_uncertainty_fan_figure(
         & fan_band_rows.get("fan_source", pd.Series(dtype=str)).astype(str).eq(resolved_source)
     ].copy()
     if selected_fed_path and "fed_path" in data.columns:
-        allowed_fed_paths = {"", str(selected_fed_path), "MBU26"}
+        # Official fan rows are tagged with their vintage's release round; only
+        # the currently displayed official vintages stay allowed. Defaulting to
+        # every registered vintage means a newly registered release never loses
+        # its band to a stale hard-coded list.
+        resolved_official_paths = (
+            official_fed_paths
+            if official_fed_paths is not None
+            else tuple(
+                vid
+                for vid, _display in official_vintage_choices(Path(__file__).resolve().parent)
+            )
+        )
+        allowed_fed_paths = {
+            "",
+            str(selected_fed_path),
+            *(str(path) for path in resolved_official_paths),
+        }
         data = data[data["fed_path"].fillna("").astype(str).isin(allowed_fed_paths)].copy()
     for column in ["central", "lower50", "upper50", "lower80", "upper80"]:
         data[column] = pd.to_numeric(data.get(column), errors="coerce")
@@ -9562,13 +10071,17 @@ def _selected_revenue_outlook_series_rows(rows: pd.DataFrame, selected_series: s
     return rows[rows[label_column].astype(str).eq(str(selected_series))].copy()
 
 
-def _ordered_runtime_trace_names(rows: pd.DataFrame) -> list[str]:
+def _ordered_runtime_trace_names(
+    rows: pd.DataFrame,
+    selected_official_trace: str | None = None,
+) -> list[str]:
     if rows is None or rows.empty or "trace_name" not in rows.columns:
         return []
     available = set(rows["trace_name"].dropna().astype(str))
+    officials = _ordered_official_traces(selected_official_trace)
     preferred = [
         "Actual",
-        "MBU26 official",
+        *officials,
         "Current finalist Base case",
         "Current finalist High population/comparison",
         *CONFLICT_TRACE_NAMES,
@@ -9802,7 +10315,7 @@ def _scenario_color_map(rows: pd.DataFrame) -> dict[str, str]:
     palette = ["#006FAD", "#E56B2B", "#00843D", "#6B4E71", "#C2410C", "#0F766E"]
     trace_palette = {
         "Actual": "#737373",
-        "MBU26 official": "#00843D",
+        **{name: style[0] for name, style in _official_trace_style_map().items()},
         "Current finalist Base case": "#006FAD",
         "Current finalist High population/comparison": "#E56B2B",
         **CONFLICT_TRACE_COLORS,
@@ -10298,9 +10811,9 @@ def _ped_bridge_diagnostics_display_table(audit: pd.DataFrame) -> pd.DataFrame:
         "gross_ped_revenue_optimized_million_nzd": "Optimized PED revenue",
         "total_nltf_raw_million_nzd": "Raw Total NLTF",
         "total_nltf_optimized_million_nzd": "Optimized Total NLTF",
-        "mbu26_light_petrol_vkt_million_km": "MBU light-petrol VKT",
-        "mbu26_ped_volume_million_litres": "MBU PED volume",
-        "mbu26_gross_ped_revenue_million_nzd": "MBU PED revenue",
+        "official_light_petrol_vkt_million_km": "Official light-petrol VKT",
+        "official_ped_volume_million_litres": "Official PED volume",
+        "official_gross_ped_revenue_million_nzd": "Official PED revenue",
         "population_warning": "Warning",
     }
     cols = [col for col in rename if col in view.columns]
@@ -10338,10 +10851,10 @@ def _ped_bridge_shape_fit_display_table(metrics: pd.DataFrame) -> pd.DataFrame:
         "scenario_name": "Scenario",
         "series_id": "Series",
         "bridge_variant": "Variant",
-        "mbu_comparator_series_id": "MBU comparator",
+        "official_comparator_series_id": "Official comparator",
         "n_rows": "Rows",
-        "correlation_vs_mbu": "Correlation",
-        "slope_vs_mbu": "Slope",
+        "correlation_vs_official": "Correlation",
+        "slope_vs_official": "Slope",
         "mean_abs_error": "MAE",
         "rmse": "RMSE",
         "mean_abs_pct_error": "MAPE",
@@ -10472,21 +10985,20 @@ def _sensitivity_impact_display_table(audit: pd.DataFrame) -> pd.DataFrame:
     return view
 
 
-def _revenue_line_source_options(line_reconciliation: pd.DataFrame) -> list[str]:
-    if line_reconciliation is None or line_reconciliation.empty or "source_path" not in line_reconciliation.columns:
-        return [
-            "MBU26 official",
-            "Current finalist Base case",
-            "Current finalist High population/comparison",
-            *CONFLICT_TRACE_NAMES,
-        ]
-    values = [value for value in line_reconciliation["source_path"].dropna().astype(str).unique().tolist() if value]
+def _revenue_line_source_options(
+    line_reconciliation: pd.DataFrame,
+    selected_official_trace: str | None = None,
+) -> list[str]:
+    officials = _ordered_official_traces(selected_official_trace)
     preferred = [
-        "MBU26 official",
+        *officials,
         "Current finalist Base case",
         "Current finalist High population/comparison",
         *CONFLICT_TRACE_NAMES,
     ]
+    if line_reconciliation is None or line_reconciliation.empty or "source_path" not in line_reconciliation.columns:
+        return preferred
+    values = [value for value in line_reconciliation["source_path"].dropna().astype(str).unique().tolist() if value]
     ordered = [value for value in preferred if value in values]
     ordered.extend(sorted(set(values).difference(ordered)))
     return ordered or preferred
@@ -11029,6 +11541,26 @@ def _revenue_outlook_manifest_table(manifest: dict[str, Any]) -> pd.DataFrame:
         ("Source policy", manifest.get("source_policy")),
         ("Output folder", manifest.get("repo_relative_output_dir")),
     ]
+    official_vintages = manifest.get("official_vintages", {})
+    if isinstance(official_vintages, dict) and official_vintages:
+        rows.append(
+            ("Official comparator vintage", official_vintages.get("official_comparator_vintage_id"))
+        )
+        rows.append(
+            ("Bridge assumption vintage", official_vintages.get("bridge_assumption_vintage_id"))
+        )
+        rows.append(
+            ("Default official comparator trace", official_vintages.get("default_official_comparator_trace"))
+        )
+        available_vintages = official_vintages.get("available", {})
+        if isinstance(available_vintages, dict):
+            for vintage_id, entry in sorted(available_vintages.items()):
+                if not isinstance(entry, dict):
+                    continue
+                rows.append((f"Official vintage {vintage_id} status", entry.get("status")))
+                rows.append(
+                    (f"Official vintage {vintage_id} workbook SHA256", entry.get("workbook_sha256"))
+                )
     source = manifest.get("source_comparison", {}) if isinstance(manifest.get("source_comparison"), dict) else {}
     rows.append(("Comparison ID", source.get("comparison_id")))
     role_validation = source.get("scenario_role_validation", {})

@@ -592,6 +592,24 @@ def _evaluate_against_contract(
     return records
 
 
+def _default_official_comparator_scenario() -> str:
+    """Scenario name of the registered default official comparator vintage.
+
+    Deliberately FAILS CLOSED. A corrupt or missing official-vintage registry
+    is a governance failure, not something to paper over: silently falling
+    back to a hard-coded vintage would let the production completeness gate
+    validate against a comparator nobody selected. Callers that legitimately
+    need a different vocabulary (fixtures, or a pack built on another
+    comparator) must pass ``scenario_by_role`` explicitly.
+    """
+    from .official_vintage import (
+        default_comparator_vintage_id,
+        official_comparator_scenario_name,
+    )
+
+    return official_comparator_scenario_name(default_comparator_vintage_id())
+
+
 def completeness_matrix(
     frames: dict[str, pd.DataFrame],
     *,
@@ -606,7 +624,7 @@ def completeness_matrix(
     roles = scenario_by_role or {
         "basecase": "current_basecase",
         "comparison": "current_comparison_1",
-        "official_comparator": "mbu26_official",
+        "official_comparator": _default_official_comparator_scenario(),
     }
     records: list[CompletenessRecord] = []
     for stage, rows in frames.items():
@@ -645,7 +663,7 @@ def validate_frame_completeness(
         scenario_by_role={
             "basecase": "current_basecase",
             "comparison": "current_comparison_1",
-            "official_comparator": "mbu26_official",
+            "official_comparator": _default_official_comparator_scenario(),
         },
         raise_on_failure=raise_on_failure,
         source=context or "production chart rows",

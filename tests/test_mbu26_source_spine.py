@@ -158,8 +158,13 @@ def test_current_runtime_uses_only_allowed_mbu26_trace_contract() -> None:
     audit = pd.read_csv(RUNTIME_DIR / "runtime_trace_audit.csv")
     bridge = pd.read_csv(RUNTIME_DIR / "revenue_bridge_components.csv")
 
+    # Deliberate widening (official-vintage framework): the runtime pack now
+    # carries one official comparator trace per registered available vintage.
+    # BEFU26 is the default comparator; MBU26 remains selectable as the prior
+    # vintage. The set stays exhaustive so an unregistered trace still fails.
     allowed = {
         "Actual",
+        "BEFU26 official",
         "MBU26 official",
         "Current finalist Base case",
         "Current finalist High population/comparison",
@@ -169,6 +174,7 @@ def test_current_runtime_uses_only_allowed_mbu26_trace_contract() -> None:
     assert set(displayed["trace_name"].dropna().unique()) == allowed
     assert set(displayed["trace_type"].dropna().unique()) == {
         "Actual",
+        "BEFU26 official",
         "MBU26 official",
         "current finalist base",
         "current finalist comparison",

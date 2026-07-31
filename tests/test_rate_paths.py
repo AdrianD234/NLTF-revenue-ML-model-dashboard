@@ -92,7 +92,13 @@ def test_six_month_delay_moves_only_calendar_2027_q1_q2(pack_chart_rows) -> None
 def test_six_month_delay_factor_is_confined_to_fy2027(pack_chart_rows) -> None:
     factors = fed_uplift_delayed_factors(ROOT, pack_chart_rows)
     assert set(factors) == {2027}
-    assert factors[2027] == pytest.approx(0.9215585125844958, rel=1e-12)
+    # Derived from the committed pack's Current PED path, so it moves with the
+    # bridge-assumption vintage. BEFU26 bridge re-freeze: 0.9215585125844958 ->
+    # 0.9212658387203224 (-0.03%), from the BEFU26 PED rate and petrol-fleet
+    # intensity replacing MBU26's. The FY2027-only confinement (the actual
+    # governance property under test) is unchanged, as is the rel=1e-12
+    # tolerance.
+    assert factors[2027] == pytest.approx(0.9212658387203224, rel=1e-12)
 
 
 def test_any_fixed_period_ped_change_maps_to_the_same_proportional_ruc_signal() -> None:

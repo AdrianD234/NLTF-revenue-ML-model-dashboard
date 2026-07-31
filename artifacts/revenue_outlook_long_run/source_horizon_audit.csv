@@ -1,7 +1,9 @@
 frame,source_path,first_fy,last_fy,rows
+revenue_stack_components,BEFU26 official,2001,2055,4502
 revenue_stack_components,Current finalist Base case,2001,2050,4142
 revenue_stack_components,Current finalist High population/comparison,2001,2050,4142
 revenue_stack_components,MBU26 official,2001,2055,4502
+revenue_line_reconciliation,BEFU26 official,2001,2055,2141
 revenue_line_reconciliation,Current finalist Base case,2025,2050,1040
 revenue_line_reconciliation,Current finalist High population/comparison,2025,2050,1040
 revenue_line_reconciliation,MBU26 official,2001,2055,2141

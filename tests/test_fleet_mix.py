@@ -12,12 +12,13 @@ from model_dashboard.ev_uptake_levers import (
     EV_UPTAKE_PRESETS,
     apply_uptake_levers_to_chart_rows,
 )
+from model_dashboard.official_vintage import default_bridge_vintage_id
 from model_dashboard.fleet_mix import (
     DASHBOARD_SOURCE,
     DENOMINATORS,
-    MBU26_SOURCE,
     ROW_KEYS,
-    SOURCE_OPTIONS,
+    official_source_label,
+    source_options,
     definitions_table,
     denominator_example,
     load_dashboard_frame,
@@ -39,9 +40,11 @@ from model_dashboard.revenue_outlook import (
 
 
 ROOT = Path(__file__).resolve().parents[1]
+# The explorer follows the registered default bridge-assumption vintage.
+BRIDGE_VINTAGE_ID = default_bridge_vintage_id(ROOT)
 
 
-@pytest.mark.parametrize("source", SOURCE_OPTIONS)
+@pytest.mark.parametrize("source", source_options(default_bridge_vintage_id(ROOT)))
 def test_every_source_carries_the_six_rows_over_its_published_era(
     source: str,
 ) -> None:
@@ -49,10 +52,10 @@ def test_every_source_carries_the_six_rows_over_its_published_era(
 
     The current-model Light RUC path is withheld beyond H20 because the
     conventional-anchor share expansion diverges at long horizons, so the
-    dashboard source deliberately ends at FY2030 while MBU26 and the VFM
-    scenarios continue over their published horizon.
+    dashboard source deliberately ends at FY2030 while the official vintage
+    and the VFM scenarios continue over their published horizon.
     """
-    frame = load_source_frame(ROOT, source)
+    frame = load_source_frame(ROOT, source, BRIDGE_VINTAGE_ID)
     assert list(frame.columns) == ROW_KEYS
     expected = (
         (2025, 2030)
@@ -84,13 +87,13 @@ def test_the_fy2025_denominator_example_matches_the_hand_calc() -> None:
 def test_dashboard_fleet_petrol_vkt_uses_same_lineage_as_ped_litres() -> None:
     dashboard = load_dashboard_frame(ROOT)
     mbu = load_mbu26_frame(ROOT)
-    mbu_spine = pd.read_csv(
-        ROOT
-        / "data"
-        / "revenue_model_source_pack"
-        / "mbu26_annual_spine"
-        / "mbu26_official_annual.csv"
-    )
+    # Litres must come from the SAME bridge-assumption vintage that
+    # load_mbu26_frame now resolves through the registry (BEFU26 by default);
+    # mixing vintages here would compare against a different official baseline
+    # than the one the runtime bridge actually used.
+    from model_dashboard.fleet_mix import _spine
+
+    mbu_spine = _spine(ROOT)
     mbu_ped_litres = (
         mbu_spine[
             mbu_spine["source_series_id"].astype(str).eq("ped_volume")
@@ -138,13 +141,14 @@ def test_dashboard_fleet_petrol_vkt_uses_same_lineage_as_ped_litres() -> None:
         / float(mbu.at[2030, "light_petrol_vkt"])
         - 1.0
     )
-    # Treasury's stronger governed baseline narrows the dashboard-versus-MBU
-    # FY2030 gap from the legacy macro path's roughly -7.42%. The expected
-    # value moved from -0.0587 when the pack stopped carrying a lambda-reduced
-    # PED level: the raw bridge always restored raw PED, but the macro replay
-    # rescales relative to the pack baseline, so removing lambda from the pack
-    # shifts this by about 0.03pp. The tolerance is unchanged.
-    assert fy2030_change == pytest.approx(-0.0584, abs=0.0002)
+    # Treasury's stronger governed baseline narrows the dashboard-versus-
+    # official FY2030 gap from the legacy macro path's roughly -7.42%. The
+    # expected value moved from -0.0587 when the pack stopped carrying a
+    # lambda-reduced PED level, and from -0.0584 to -0.0590 when the bridge
+    # baseline moved from MBU26 to BEFU26 (the official petrol-VKT and litres
+    # baselines both shifted with the 2026Q1 BEFU26 refresh). The tolerance is
+    # unchanged.
+    assert fy2030_change == pytest.approx(-0.0590, abs=0.0002)
 
 
 def test_dashboard_fleet_preserves_light_and_heavy_class_pools() -> None:
@@ -237,5 +241,7 @@ def test_definitions_table_covers_all_six_rows_in_plain_language() -> None:
     assert len(table) == 6
     assert "diesel" in table.iloc[1]["What it contains"].lower()
     assert not table.map(lambda value: "__" in str(value)).any().any()
-    assert MBU26_SOURCE in SOURCE_OPTIONS
-    assert DASHBOARD_SOURCE in SOURCE_OPTIONS
+    # Source options and the MoT baseline label are generated per bridge
+    # vintage, so they follow the registry rather than a hard-coded release.
+    assert official_source_label(BRIDGE_VINTAGE_ID) in source_options(BRIDGE_VINTAGE_ID)
+    assert DASHBOARD_SOURCE in source_options(BRIDGE_VINTAGE_ID)
