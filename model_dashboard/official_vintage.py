@@ -32,6 +32,7 @@ import hashlib
 import json
 import math
 from dataclasses import dataclass
+from functools import lru_cache
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -282,6 +283,30 @@ def registry_path(repo_root: Path | str | None = None) -> Path:
     return root / OFFICIAL_VINTAGE_REGISTRY_PATH
 
 
+@lru_cache(maxsize=8)
+def _load_registry_cached(
+    target: str, _size: int, _mtime_ns: int
+) -> str:
+    """Parse+validate keyed on (path, size, mtime).
+
+    The registry is read on many hot UI paths (trace vocabulary, fed-path
+    exclusions, fan allowances). Re-reading and re-validating the JSON on each
+    call measurably slowed a Streamlit rerun. Keying the cache on the file's
+    size and mtime keeps temp-dir fixtures - which write their own registries -
+    correct, because a rewritten file is a different key.
+
+    Returns the JSON text so callers can hand out independent mutable copies.
+    """
+    path = Path(target)
+    text = path.read_text(encoding="utf-8")
+    issues = validate_official_vintage_registry(json.loads(text))
+    if issues:
+        raise OfficialVintageError(
+            "official vintage registry failed validation: " + "; ".join(issues)
+        )
+    return text
+
+
 def load_official_vintage_registry(
     repo_root: Path | str | None = None,
     *,
@@ -290,13 +315,11 @@ def load_official_vintage_registry(
     target = Path(path) if path is not None else registry_path(repo_root)
     if not target.exists():
         raise OfficialVintageError(f"official vintage registry missing: {target}")
-    registry = json.loads(target.read_text(encoding="utf-8"))
-    issues = validate_official_vintage_registry(registry)
-    if issues:
-        raise OfficialVintageError(
-            "official vintage registry failed validation: " + "; ".join(issues)
-        )
-    return registry
+    stat = target.stat()
+    text = _load_registry_cached(str(target), stat.st_size, stat.st_mtime_ns)
+    # A fresh object per call: callers (notably the materializer) mutate the
+    # registry they are handed.
+    return json.loads(text)
 
 
 def validate_official_vintage_registry(registry: dict[str, Any]) -> list[str]:
@@ -413,13 +436,35 @@ def official_vintage_spine_frame(
     vintage_id: str,
     repo_root: Path | str | None = None,
 ) -> pd.DataFrame:
-    """FY x series_id numeric pivot of one vintage's official annual rows."""
-    pack = load_official_vintage(vintage_id, repo_root=repo_root)
-    if pack is None:
+    """FY x series_id numeric pivot of one vintage's official annual rows.
+
+    Reads and integrity-checks only the ONE file it needs. The full-pack
+    ``load_official_vintage`` hash-validates all sixteen pack files, which is
+    the right gate for a pack consumer but far too heavy for a per-rerun rate
+    lookup - it measurably slowed the Streamlit rerun that draws the rate
+    chart. The single-file hash check keeps the governance property that a
+    tampered source cannot be silently displayed.
+    """
+    root = Path(repo_root) if repo_root is not None else repo_root_from_here()
+    entry = official_vintage_entry(str(vintage_id), root)
+    stems = _entry_file_stems(entry)
+    pack_dir = root / Path(str(entry["source_pack_path"]))
+    target = pack_dir / f"{stems['official_annual']}.csv"
+    if not target.exists():
         raise OfficialVintageError(
             f"official vintage {vintage_id} is registered but not materialized"
         )
-    return pack.official_annual.pivot_table(
+    manifest_path = pack_dir / "manifest.json"
+    if manifest_path.exists():
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        expected = str(
+            ((manifest.get("normalized_files") or {}).get(target.name) or {}).get("sha256", "")
+        ).strip()
+        if expected and sha256(target) != expected:
+            raise OfficialVintageError(
+                f"official vintage {vintage_id}: {target.name} hash mismatch"
+            )
+    return pd.read_csv(target).pivot_table(
         index="FY", columns="series_id", values="value", aggfunc="first"
     ).apply(pd.to_numeric, errors="coerce")
 

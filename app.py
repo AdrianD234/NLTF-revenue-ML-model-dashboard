@@ -8374,13 +8374,15 @@ def _render_fleet_mix_explorer(bridge_vintage_id: str) -> None:
         )
         control_cols = st.columns([0.40, 0.32, 0.28])
         with control_cols[0]:
-            # A stored selection naming a different vintage is invalidated by
-            # _validated_select_state so the label can never outlive its pack.
+            # A stored selection naming a different vintage is reset first, so
+            # the label can never outlive the pack it was chosen against.
+            _validated_select_state("fleet_mix_source", fleet_source_options, official_source)
             source = st.selectbox(
                 "Source",
                 fleet_source_options,
-                **_validated_select_state(
-                    "fleet_mix_source", fleet_source_options, official_source
+                key="fleet_mix_source",
+                **_widget_default_kwargs(
+                    "fleet_mix_source", index=fleet_source_options.index(official_source)
                 ),
             )
         with control_cols[1]:

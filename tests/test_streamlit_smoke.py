@@ -1109,7 +1109,13 @@ def test_revenue_outlook_cloud_hides_debug_toggles_and_shows_full_composition(mo
     assert pack is not None
     selectors = app.cached_revenue_outlook_selectors(revenue_outlook_signature(pack_dir, Path(__file__).resolve().parents[1]), pack)
 
-    at = AppTest.from_file(str(app_path), default_timeout=90)
+    # 120s matches _run_revenue_outlook_page, the module's own convention for
+    # this page. A cold-cache Revenue Outlook render measures ~103s, so the 90s
+    # this test uniquely used was below the page's actual cost and passed only
+    # on a warm cache. Measured identically at the pre-closure commit, so this
+    # is a pre-existing marginal timeout, not a regression: no governed value
+    # tolerance is involved.
+    at = AppTest.from_file(str(app_path), default_timeout=120)
     at.run()
     at.radio[0].set_value(app.REVENUE_OUTLOOK_PAGE)
     at.run()
@@ -1283,7 +1289,9 @@ def test_revenue_outlook_comparison_offers_mot_official_locked_scenario() -> Non
 
 def test_revenue_outlook_fleet_mix_is_always_visible_and_precedes_rates() -> None:
     source = inspect.getsource(app.render_revenue_outlook_page)
-    fleet_index = source.index("_render_fleet_mix_explorer()")
+    # The explorer now takes the pack's bridge vintage so its data and label
+    # follow the vintage actually in use.
+    fleet_index = source.index("_render_fleet_mix_explorer(bridge_vintage_id)")
     rates_index = source.index("Effective rates per 1,000 km")
     assert rates_index > source.index("Total path chart")
     assert rates_index > source.index("Show Revenue bridge detail")
@@ -1293,8 +1301,10 @@ def test_revenue_outlook_fleet_mix_is_always_visible_and_precedes_rates() -> Non
     fleet_source = inspect.getsource(app._render_fleet_mix_explorer)
     assert "st.expander" not in fleet_source
     assert "st.container(border=True)" in fleet_source
-    assert "Fleet mix explorer - MoT's six volume rows across MBU26, the VFM " in fleet_source
-    assert "and this dashboard</div>" in fleet_source
+    # The panel title names the bridge vintage rather than a hard-coded
+    # release, so a future default vintage renames itself.
+    assert "Fleet mix explorer - MoT's six volume rows across " in fleet_source
+    assert "{bridge_vintage_id}, the VFM and this dashboard</div>" in fleet_source
 
 
 def test_governance_page_cloud_visibility_can_be_overridden(monkeypatch) -> None:
