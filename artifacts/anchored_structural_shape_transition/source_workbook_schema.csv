@@ -1,0 +1,25 @@
+workbook_role,workbook,sheet,sheet_state,populated_cells,formula_count,cached_values_present,cached_values_missing,min_row,max_row,min_column,max_column,dimensions,cell_count
+mbu26_vs_vfm_structural,MBU26 v VFM202405_outputs_summary_V3 (1).xlsx,Contents,visible,23,0,0,0,1,14,1,7,A1:G14,98
+mbu26_vs_vfm_structural,MBU26 v VFM202405_outputs_summary_V3 (1).xlsx,Notes,visible,33,0,0,0,1,26,1,33,A1:AG26,858
+mbu26_vs_vfm_structural,MBU26 v VFM202405_outputs_summary_V3 (1).xlsx,Tailpipe GHG,visible,1022,597,597,0,1,37,1,51,A1:AY37,1887
+mbu26_vs_vfm_structural,MBU26 v VFM202405_outputs_summary_V3 (1).xlsx,Vehicle numbers,visible,2101,450,450,0,1,54,1,51,A1:AY54,2754
+mbu26_vs_vfm_structural,MBU26 v VFM202405_outputs_summary_V3 (1).xlsx,ZEV share,visible,3295,450,450,0,1,97,1,51,A1:AY97,4947
+mbu26_vs_vfm_structural,MBU26 v VFM202405_outputs_summary_V3 (1).xlsx,VKT,visible,3169,1500,1500,0,1,72,1,51,A1:AY72,3672
+mbu26_vs_vfm_structural,MBU26 v VFM202405_outputs_summary_V3 (1).xlsx,GHG by vehicle type,visible,2099,900,900,0,1,57,1,56,A1:BD57,3192
+mbu26_vs_vfm_structural,MBU26 v VFM202405_outputs_summary_V3 (1).xlsx,Vehicles by vehicle type,visible,2882,0,0,0,1,62,1,56,A1:BD62,3472
+mbu26_vs_vfm_structural,MBU26 v VFM202405_outputs_summary_V3 (1).xlsx,VKT by vehicle type,visible,5840,2850,2850,0,1,127,1,52,A1:AZ127,6604
+mbu26_vs_vfm_structural,MBU26 v VFM202405_outputs_summary_V3 (1).xlsx,Registrations,visible,110289,0,0,0,1,13788,1,8,A1:H13788,110304
+mbu26_vs_vfm_structural,MBU26 v VFM202405_outputs_summary_V3 (1).xlsx,Raw data (wem202405),visible,439882,1,1,0,1,31491,1,14,A1:N31491,440874
+mbu26_vs_vfm_structural,MBU26 v VFM202405_outputs_summary_V3 (1).xlsx,S-curve analysis (F&F),visible,2855,1895,1895,0,1,179,1,57,A1:BE179,10203
+vfm202405_outputs_summary,VFM202405_outputs_summary_V3.xlsx,Contents,visible,23,0,0,0,1,14,1,7,A1:G14,98
+vfm202405_outputs_summary,VFM202405_outputs_summary_V3.xlsx,Notes,visible,33,0,0,0,1,26,1,33,A1:AG26,858
+vfm202405_outputs_summary,VFM202405_outputs_summary_V3.xlsx,Tailpipe GHG,visible,1022,597,597,0,1,37,1,51,A1:AY37,1887
+vfm202405_outputs_summary,VFM202405_outputs_summary_V3.xlsx,Vehicle numbers,visible,2101,450,450,0,1,54,1,51,A1:AY54,2754
+vfm202405_outputs_summary,VFM202405_outputs_summary_V3.xlsx,ZEV share,visible,3295,450,450,0,1,97,1,51,A1:AY97,4947
+vfm202405_outputs_summary,VFM202405_outputs_summary_V3.xlsx,VKT,visible,3169,1500,1500,0,1,72,1,51,A1:AY72,3672
+vfm202405_outputs_summary,VFM202405_outputs_summary_V3.xlsx,GHG by vehicle type,visible,2099,900,900,0,1,57,1,56,A1:BD57,3192
+vfm202405_outputs_summary,VFM202405_outputs_summary_V3.xlsx,Vehicles by vehicle type,visible,2882,0,0,0,1,62,1,56,A1:BD62,3472
+vfm202405_outputs_summary,VFM202405_outputs_summary_V3.xlsx,VKT by vehicle type,visible,5840,2850,2850,0,1,127,1,52,A1:AZ127,6604
+vfm202405_outputs_summary,VFM202405_outputs_summary_V3.xlsx,Raw data (wem202405),visible,439881,0,0,0,1,31422,1,14,A1:N31422,439908
+vfm202405_outputs_summary,VFM202405_outputs_summary_V3.xlsx,Registrations,visible,110289,0,0,0,1,13788,1,8,A1:H13788,110304
+befu26_revenue_forecast,BEFU26 revenue forecast.xlsx,Baseline,visible,2697,0,0,0,1,65,1,56,A1:BD65,3640

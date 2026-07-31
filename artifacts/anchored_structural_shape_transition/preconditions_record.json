@@ -1,0 +1,105 @@
+{
+  "git": {
+    "branch": "feature/anchored-structural-shape-transition",
+    "descends_from_pr11_merge": true,
+    "head_sha": "82d2db67459226a9445fa50b7049c7cebc4032be",
+    "required_ancestor_sha": "82d2db67459226a9445fa50b7049c7cebc4032be",
+    "tracked_files_unmodified": true,
+    "untracked_paths": [
+      "scripts/build_anchored_shape_preconditions.py"
+    ]
+  },
+  "official_vintage_registry": {
+    "default_bridge_vintage_id": "BEFU26",
+    "default_comparator_vintage_id": "BEFU26",
+    "latest_vintage_id": "BEFU26",
+    "mbu26_selectable": true,
+    "registered_vintage_ids": [
+      "MBU26",
+      "BEFU26"
+    ],
+    "registry_schema_version": "nltf-official-vintage-registry-v1",
+    "roles_separately_governed": true
+  },
+  "record_id": "anchored_structural_shape_transition_preconditions_v1",
+  "runtime_packs": {
+    "ar1": {
+      "bridge_assumption_vintage_id": "BEFU26",
+      "manifest_sha256": "0be249c10ff213ca49ba9d47a10a2d4f5473712dd52549ac136d558e2223c59b",
+      "official_comparator_vintage_id": "BEFU26",
+      "pack_dir": "data/engine_ar1/current_revenue_outlook"
+    },
+    "ensemble": {
+      "bridge_assumption_vintage_id": "BEFU26",
+      "manifest_sha256": "cc60050aebdd0511dfa55d953670f931837483ba4600e1ad5e1b086d3424f362",
+      "official_comparator_vintage_id": "BEFU26",
+      "pack_dir": "data/current_revenue_outlook"
+    }
+  },
+  "supporting": {
+    "long_run_layer_first_fy": 2031,
+    "long_run_layer_last_fy": 2050,
+    "q1_2026_actuals_present": true,
+    "q1_2026_ped_mode": "provisional_replay_only",
+    "q1_2026_workbook_sha256": "be951103cfa0fc4415583044397eea11982c2d83b0679bd97984cb0b0cf305a3",
+    "stream_latest_input_period": {
+      "heavy_ruc_inputs": "2026Q1",
+      "light_ruc_inputs": "2026Q1",
+      "ped_inputs": "2026Q1"
+    },
+    "vfm_composition_source": "data/vfm_202405/vfm_vkt_shares.csv",
+    "vfm_scenarios": [
+      "Base_EV",
+      "Fast_EV",
+      "Slow_EV"
+    ],
+    "vfm_source_sha256": "81da2535b316245182abc416d1e43a418888eb9ff986b8f663b636a6e375abe8"
+  },
+  "unblended_long_run_rows": 3200,
+  "unblended_long_run_series": [
+    "coo_revenue",
+    "current_light_ruc_conventional_modelled_km",
+    "fed_refunds",
+    "gross_cng_revenue",
+    "gross_fed_revenue",
+    "gross_lpg_revenue",
+    "gross_mvr_revenue",
+    "gross_ped_revenue",
+    "gross_ruc_revenue",
+    "heavy_bev_ruc_net_km",
+    "heavy_bev_ruc_net_revenue",
+    "heavy_ruc_net_km",
+    "heavy_ruc_net_revenue",
+    "light_bev_ruc_net_km",
+    "light_bev_ruc_net_revenue",
+    "light_petrol_vkt",
+    "light_ruc_net_km",
+    "light_ruc_net_revenue",
+    "mr1_revenue",
+    "mr2_revenue",
+    "mvr_admin_revenue",
+    "mvr_refunds",
+    "mvr_revenue_net_admin_coo",
+    "net_fed_revenue",
+    "net_mvr_revenue",
+    "ped_vkt_per_capita",
+    "ped_volume",
+    "phev_ruc_net_km",
+    "phev_ruc_net_revenue",
+    "ruc_admin_revenue",
+    "ruc_refunds",
+    "ruc_revenue_net_admin",
+    "total_admin_fees",
+    "total_gross_revenue",
+    "total_nltf_net_revenue",
+    "total_refunds",
+    "total_revenue_net_admin",
+    "total_ruc_net_revenue",
+    "tuc_gtk",
+    "tuc_net_revenue"
+  ],
+  "unblended_long_run_source_paths": [
+    "Current finalist Base case",
+    "Current finalist High population/comparison"
+  ]
+}
