@@ -1,0 +1,38 @@
+{
+  "baseline_id": "anchored_structural_shape_transition_merged_main_baseline_v1",
+  "baseline_sha256": "4a36e89273c252e771a07e6b1f068ffb4d88f3ac693a2827c1694e417b33d16c",
+  "blocks": {
+    "econometric_forecast": "Current FY2026-FY2030; must be identical after the change",
+    "historical_actual": "actuals; must be identical after the change",
+    "official_comparator": "BEFU26 and MBU26 published rows; immutable",
+    "post_model_extrapolation": "the unblended FY2031-FY2050 layer being replaced"
+  },
+  "description": "Hash-pinned merged-main baseline for the anchored structural shape transition. Frozen BEFORE any candidate was calculated, from the committed packs as PR #11 left them.",
+  "packs": [
+    {
+      "bridge_assumption_vintage_id": "BEFU26",
+      "engine": "ensemble",
+      "manifest_sha256": "cc60050aebdd0511dfa55d953670f931837483ba4600e1ad5e1b086d3424f362",
+      "official_comparator_vintage_id": "BEFU26",
+      "pack_dir": "data/current_revenue_outlook"
+    },
+    {
+      "bridge_assumption_vintage_id": "BEFU26",
+      "engine": "ar1",
+      "manifest_sha256": "0be249c10ff213ca49ba9d47a10a2d4f5473712dd52549ac136d558e2223c59b",
+      "official_comparator_vintage_id": "BEFU26",
+      "pack_dir": "data/engine_ar1/current_revenue_outlook"
+    }
+  ],
+  "regenerate_with": "scripts/build_anchored_shape_merged_baseline.py",
+  "row_counts": {
+    "econometric_forecast_rows": 800,
+    "historical_actual_rows": 4044,
+    "official_comparator_rows": 4680,
+    "official_vintage_rows": 4400,
+    "post_model_extrapolation_rows": 3200,
+    "post_model_first_fy": 2031,
+    "post_model_last_fy": 2050
+  },
+  "total_rows": 22470
+}

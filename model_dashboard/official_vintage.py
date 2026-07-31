@@ -87,6 +87,57 @@ REQUIRED_REGISTRY_FIELDS: tuple[str, ...] = (
     "status",
 )
 
+# The governed vintage roles. The first three are PR #11's; the fourth is the
+# long-run SHAPE role, which is explicitly migrated rather than required, so a
+# registry written before it still validates. All four are independent: a pack
+# may compare against one vintage, price against a second and take its
+# long-run activity shape from a third.
+LATEST_FLAG = "is_latest"
+COMPARATOR_ROLE_FLAG = "is_default_comparator"
+BRIDGE_ROLE_FLAG = "is_default_bridge_vintage"
+LONG_RUN_SHAPE_ROLE_FLAG = "is_default_long_run_shape_vintage"
+
+REQUIRED_ROLE_FLAGS: tuple[str, ...] = (
+    LATEST_FLAG,
+    COMPARATOR_ROLE_FLAG,
+    BRIDGE_ROLE_FLAG,
+)
+ROLE_FLAGS: tuple[str, ...] = (*REQUIRED_ROLE_FLAGS, LONG_RUN_SHAPE_ROLE_FLAG)
+
+# Activity series a vintage must publish over its declared shape window before
+# it can serve the long-run shape role.
+LONG_RUN_SHAPE_REQUIRED_SERIES: tuple[str, ...] = (
+    "light_petrol_vkt",
+    "light_ruc_net_km",
+    "light_bev_ruc_net_km",
+    "phev_ruc_net_km",
+    "heavy_ruc_net_km",
+)
+LONG_RUN_SHAPE_DEFAULT_START_FY = 2030
+LONG_RUN_SHAPE_DEFAULT_END_FY = 2050
+
+# Pack-manifest keys for the long-run shape role. A built pack records the
+# shape vintage it was constructed with, that vintage's source hash, and the
+# governed method/schedule/anchor it used - so a replay can reproduce the pack
+# from the pack, without consulting the live registry.
+LONG_RUN_SHAPE_VINTAGE_MANIFEST_KEY = "long_run_shape_vintage_id"
+LONG_RUN_SHAPE_VINTAGE_SHA_MANIFEST_KEY = "long_run_shape_vintage_sha256"
+LONG_RUN_SHAPE_METHOD_MANIFEST_KEY = "long_run_shape_method_id"
+LONG_RUN_TRANSITION_SCHEDULE_MANIFEST_KEY = "long_run_transition_schedule_id"
+LONG_RUN_ANCHOR_FY_MANIFEST_KEY = "long_run_anchor_fy"
+LONG_RUN_TRANSITION_END_FY_MANIFEST_KEY = "long_run_transition_end_fy"
+FLEET_COMPOSITION_SOURCE_MANIFEST_KEY = "fleet_composition_source_id"
+
+LONG_RUN_SHAPE_MANIFEST_KEYS: tuple[str, ...] = (
+    LONG_RUN_SHAPE_VINTAGE_MANIFEST_KEY,
+    LONG_RUN_SHAPE_VINTAGE_SHA_MANIFEST_KEY,
+    LONG_RUN_SHAPE_METHOD_MANIFEST_KEY,
+    LONG_RUN_TRANSITION_SCHEDULE_MANIFEST_KEY,
+    LONG_RUN_ANCHOR_FY_MANIFEST_KEY,
+    LONG_RUN_TRANSITION_END_FY_MANIFEST_KEY,
+    FLEET_COMPOSITION_SOURCE_MANIFEST_KEY,
+)
+
 KNOWN_PERIOD_STATUSES: tuple[str, ...] = ("ACTUAL", "ST_FORECAST", "LT_FORECAST")
 
 # Worksheet section anchors. Rows are resolved by exact label match inside the
@@ -343,13 +394,47 @@ def validate_official_vintage_registry(registry: dict[str, Any]) -> list[str]:
         if vid in seen:
             issues.append(f"duplicate vintage_id {vid}")
         seen.add(vid)
-        for flag in ("is_latest", "is_default_comparator", "is_default_bridge_vintage"):
+        for flag in ROLE_FLAGS:
             if flag in entry and not isinstance(entry[flag], bool):
                 issues.append(f"{vid}: {flag} must be boolean")
-    for flag in ("is_latest", "is_default_comparator", "is_default_bridge_vintage"):
+        if "supports_long_run_shape" in entry and not isinstance(
+            entry["supports_long_run_shape"], bool
+        ):
+            issues.append(f"{vid}: supports_long_run_shape must be boolean")
+        if entry.get("is_default_long_run_shape_vintage") is True and not bool(
+            entry.get("supports_long_run_shape")
+        ):
+            issues.append(
+                f"{vid}: cannot be the default long-run shape vintage while "
+                "supports_long_run_shape is not true"
+            )
+        for field in ("long_run_shape_start_fy", "long_run_shape_end_fy"):
+            if field in entry and entry[field] is not None and not isinstance(
+                entry[field], int
+            ):
+                issues.append(f"{vid}: {field} must be an integer FY or null")
+    for flag in REQUIRED_ROLE_FLAGS:
         count = sum(1 for entry in vintages if isinstance(entry, dict) and entry.get(flag) is True)
         if count != 1:
             issues.append(f"exactly one vintage must set {flag}=true (found {count})")
+    # The long-run shape role is an explicitly migrated addition, so unlike the
+    # three required roles a registry may legitimately have NO owner - one
+    # written before the migration, or a fixture that has not opted in. What is
+    # never legitimate is more than one owner. A registry with no owner stays
+    # valid here and fails closed at the point of use instead:
+    # ``default_long_run_shape_vintage_id`` raises rather than falling back to
+    # another role's default, so an unowned role can never silently borrow a
+    # shape source.
+    shape_owners = sum(
+        1
+        for entry in vintages
+        if isinstance(entry, dict) and entry.get(LONG_RUN_SHAPE_ROLE_FLAG) is True
+    )
+    if shape_owners > 1:
+        issues.append(
+            f"at most one vintage may set {LONG_RUN_SHAPE_ROLE_FLAG}=true "
+            f"(found {shape_owners})"
+        )
     return issues
 
 
@@ -430,6 +515,87 @@ def comparator_vintage_id_from_manifest(
     if vid:
         return vid
     return default_comparator_vintage_id(repo_root)
+
+
+def default_long_run_shape_vintage_id(repo_root: Path | str | None = None) -> str:
+    """The registry's default long-run SHAPE vintage.
+
+    Independent of the comparator and bridge roles: it selects only the
+    external source of the FY2031-FY2050 activity growth shape. Fails closed
+    rather than falling back to another role's default, because silently
+    borrowing the comparator here would reintroduce exactly the vintage-mixing
+    the framework exists to prevent.
+    """
+    return _single_flagged(
+        load_official_vintage_registry(repo_root), LONG_RUN_SHAPE_ROLE_FLAG
+    )
+
+
+def long_run_shape_vintage_id_from_manifest(
+    manifest: dict[str, Any] | None,
+    repo_root: Path | str | None = None,
+) -> str:
+    """The long-run shape vintage an ALREADY-BUILT pack was built with.
+
+    Authoritative for every replay of that pack, exactly as
+    ``bridge_vintage_id_from_manifest`` is for rates. The live registry default
+    selects a shape source only when a NEW pack is constructed; a pack built on
+    one shape vintage must never be re-shaped at runtime on another.
+    """
+    block = manifest.get("official_vintages") if isinstance(manifest, dict) else None
+    vid = str((block or {}).get("long_run_shape_vintage_id") or "").strip()
+    if vid:
+        return vid
+    return default_long_run_shape_vintage_id(repo_root)
+
+
+def vintage_supports_long_run_shape(
+    vintage_id: str,
+    repo_root: Path | str | None = None,
+    *,
+    registry: dict[str, Any] | None = None,
+) -> bool:
+    """Whether a registered vintage may serve as the long-run shape source."""
+
+    entry = official_vintage_entry(vintage_id, repo_root, registry=registry)
+    return bool(entry.get("supports_long_run_shape"))
+
+
+def long_run_shape_window(
+    vintage_id: str,
+    repo_root: Path | str | None = None,
+    *,
+    registry: dict[str, Any] | None = None,
+) -> tuple[int, int]:
+    """The declared FY window over which a vintage can supply a shape."""
+
+    entry = official_vintage_entry(vintage_id, repo_root, registry=registry)
+    if not bool(entry.get("supports_long_run_shape")):
+        raise OfficialVintageError(
+            f"{vintage_id} is not registered as a long-run shape source "
+            "(supports_long_run_shape is not true)"
+        )
+    start = entry.get("long_run_shape_start_fy")
+    end = entry.get("long_run_shape_end_fy")
+    if start is None or end is None:
+        raise OfficialVintageError(
+            f"{vintage_id}: long_run_shape_start_fy/long_run_shape_end_fy must both "
+            "be declared for a long-run shape source"
+        )
+    return int(start), int(end)
+
+
+def long_run_shape_vintage_choices(
+    repo_root: Path | str | None = None,
+) -> tuple[tuple[str, str], ...]:
+    """(vintage_id, display_name) for every vintage that can supply a shape."""
+
+    registry = load_official_vintage_registry(repo_root)
+    return tuple(
+        (str(entry["vintage_id"]), str(entry.get("display_name") or entry["vintage_id"]))
+        for entry in registry["vintages"]
+        if bool(entry.get("available")) and bool(entry.get("supports_long_run_shape"))
+    )
 
 
 def official_vintage_spine_frame(
@@ -1380,6 +1546,66 @@ def _infer_period_blocks(columns: list[dict[str, Any]]) -> dict[str, int]:
     return blocks
 
 
+def _derive_long_run_shape_support(
+    official_annual: pd.DataFrame, entry: dict[str, Any]
+) -> dict[str, Any]:
+    """Can this vintage supply a long-run activity shape, and over what window?
+
+    A vintage qualifies when it publishes every series in
+    ``LONG_RUN_SHAPE_REQUIRED_SERIES`` with positive, finite values across a
+    contiguous FY window that covers the anchor. The window is the intersection
+    of the required series' coverage, clipped to the vintage's own horizon -
+    so a vintage that runs to FY2060 registers a longer shape window and one
+    that stops early registers a shorter one (or none at all).
+
+    Only the SHAPE role is derived here. Whether this vintage becomes the
+    DEFAULT shape source stays an explicit governance decision.
+    """
+
+    wide = official_annual.pivot_table(
+        index="FY", columns="series_id", values="value", aggfunc="first"
+    )
+    missing = [s for s in LONG_RUN_SHAPE_REQUIRED_SERIES if s not in wide.columns]
+    if missing:
+        return {
+            "supports_long_run_shape": False,
+            "long_run_shape_start_fy": None,
+            "long_run_shape_end_fy": None,
+            "long_run_shape_missing_series": sorted(missing),
+        }
+
+    scoped = wide[list(LONG_RUN_SHAPE_REQUIRED_SERIES)].apply(
+        pd.to_numeric, errors="coerce"
+    )
+    usable = scoped.notna().all(axis=1) & (scoped > 0.0).all(axis=1)
+    years = sorted(int(fy) for fy, ok in usable.items() if bool(ok))
+    if not years:
+        return {
+            "supports_long_run_shape": False,
+            "long_run_shape_start_fy": None,
+            "long_run_shape_end_fy": None,
+            "long_run_shape_missing_series": [],
+        }
+
+    # Longest contiguous run of usable years.
+    best_start = best_end = run_start = years[0]
+    for previous, current in zip(years, years[1:]):
+        if current != previous + 1:
+            run_start = current
+            continue
+        if current - run_start > best_end - best_start:
+            best_start, best_end = run_start, current
+    horizon = int(entry.get("source_horizon_fy") or best_end)
+    start, end = best_start, min(best_end, horizon)
+    supported = start <= LONG_RUN_SHAPE_DEFAULT_START_FY < end
+    return {
+        "supports_long_run_shape": bool(supported),
+        "long_run_shape_start_fy": int(start) if supported else None,
+        "long_run_shape_end_fy": int(end) if supported else None,
+        "long_run_shape_missing_series": [],
+    }
+
+
 def materialize_official_vintage(
     vintage_id: str,
     *,
@@ -1394,6 +1620,7 @@ def materialize_official_vintage(
     set_latest: bool = False,
     set_default_comparator: bool = False,
     set_default_bridge_vintage: bool = False,
+    set_default_long_run_shape_vintage: bool = False,
 ) -> dict[str, Any]:
     """Validate, extract and materialize one official vintage pack.
 
@@ -1466,6 +1693,15 @@ def materialize_official_vintage(
             "is_latest": False,
             "is_default_comparator": False,
             "is_default_bridge_vintage": False,
+            # Long-run shape support is DERIVED from the extracted spine below
+            # (a vintage either publishes the required activity series over the
+            # window or it does not), so a new vintage becomes shape-capable
+            # without a code change. The default-role flag stays off until it
+            # is explicitly requested.
+            "supports_long_run_shape": False,
+            "long_run_shape_start_fy": None,
+            "long_run_shape_end_fy": None,
+            LONG_RUN_SHAPE_ROLE_FLAG: False,
             "status": "registered_official_vintage",
         }
 
@@ -1519,6 +1755,10 @@ def materialize_official_vintage(
     sentinel_count = _validate_sentinels(annual_spine, entry)
     formula_audit = _formula_audit_frame(annual_spine, entry)
     official_annual = _official_annual_frame(annual_spine, formula_audit, entry, stems)
+    # Shape capability is derived from what the vintage actually publishes, so
+    # a later PREFU/MBU/BEFU drop gains (or is correctly denied) the long-run
+    # shape role with no code change.
+    entry.update(_derive_long_run_shape_support(official_annual, entry))
     alias_audit = _series_alias_audit_frame(annual_spine, entry)
     series_contract = _series_trace_contract_frame(entry, stems)
     trace_contract = _trace_source_contract_frame(entry, stems, workbook.name, workbook_hash)
@@ -1589,9 +1829,10 @@ def materialize_official_vintage(
     if vid not in existing_ids:
         registry["vintages"].append(entry)
     for flag, requested in (
-        ("is_latest", set_latest),
-        ("is_default_comparator", set_default_comparator),
-        ("is_default_bridge_vintage", set_default_bridge_vintage),
+        (LATEST_FLAG, set_latest),
+        (COMPARATOR_ROLE_FLAG, set_default_comparator),
+        (BRIDGE_ROLE_FLAG, set_default_bridge_vintage),
+        (LONG_RUN_SHAPE_ROLE_FLAG, set_default_long_run_shape_vintage),
     ):
         if not requested:
             continue
