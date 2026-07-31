@@ -25,9 +25,26 @@ def comparison_context():
     return pack, signature
 
 
-def _keys(fleet="Off", freight="Off", uptake=None, eruc=(), fed_on=True, mbu_fed_on=True):
+def _keys(
+    fleet="Off",
+    freight="Off",
+    uptake=None,
+    eruc=(),
+    fed_on=True,
+    mbu_fed_on=True,
+    vintage=None,
+):
+    """Build a (sensitivity, uptake) key pair.
+
+    ``vintage`` selects the official comparator vintage (uptake-key slot 6,
+    with the overlay flag in slot 7). Passing it is required for assertions
+    about a NON-default vintage such as MBU26, whose rows the view layer
+    filters out while BEFU26 is the selected comparator.
+    """
     sensitivity = app.selected_sensitivity_key(fleet, "Off", "Off", freight_rail_shift=freight)
     uptake_key = (uptake or app.DEFAULT_EV_UPTAKE_MODE, (), eruc, 0 if fed_on else 1, 0 if mbu_fed_on else 1)
+    if vintage is not None:
+        uptake_key = (*uptake_key, False, str(vintage), False)
     return sensitivity, uptake_key
 
 
@@ -94,12 +111,16 @@ def test_current_and_mbu26_uplift_switches_are_independent(comparison_context) -
     current_result = _paths(comparison_context, "Total NLTF revenue", current_on, current_mbu_switch_off)
     pd.testing.assert_series_equal(current_result["a"], current_result["b"])
 
-    mbu_on = _keys(uptake=app.EV_UPTAKE_GOVERNED_OPTION)
-    mbu_current_switch_off = _keys(uptake=app.EV_UPTAKE_GOVERNED_OPTION, fed_on=False)
+    # The synthetic rate-only counterfactual is defined for MBU26 only, so
+    # these legs explicitly select the MBU26 comparator vintage.
+    mbu_on = _keys(uptake=app.EV_UPTAKE_GOVERNED_OPTION, vintage="MBU26")
+    mbu_current_switch_off = _keys(
+        uptake=app.EV_UPTAKE_GOVERNED_OPTION, fed_on=False, vintage="MBU26"
+    )
     mbu_result = _paths(comparison_context, "Total NLTF revenue", mbu_on, mbu_current_switch_off)
     pd.testing.assert_series_equal(mbu_result["a"], mbu_result["b"])
 
-    mbu_off = _keys(uptake=app.EV_UPTAKE_GOVERNED_OPTION, mbu_fed_on=False)
+    mbu_off = _keys(uptake=app.EV_UPTAKE_GOVERNED_OPTION, mbu_fed_on=False, vintage="MBU26")
     toggled = _paths(comparison_context, "Total NLTF revenue", mbu_on, mbu_off)
     # Source-derived official no-uplift, not the current-model factor map.
     # Evidence: artifacts/p0_light_fleet_fix/official_policy_audit.csv,
@@ -152,7 +173,9 @@ def test_vkt_per_capita_uses_intensity_card_variant(comparison_context) -> None:
 
 def test_mot_official_scenario_plots_the_mbu26_official_trace(comparison_context) -> None:
     pack, _ = comparison_context
-    governed_keys = _keys(uptake=app.EV_UPTAKE_GOVERNED_OPTION)
+    # Explicitly select MBU26: the A/B "MoT official" option follows the page's
+    # selected comparator vintage, and BEFU26 is the default.
+    governed_keys = _keys(uptake=app.EV_UPTAKE_GOVERNED_OPTION, vintage="MBU26")
     result = _paths(comparison_context, "Total NLTF revenue", governed_keys, governed_keys)
     assert not result["a"].empty
     assert result["metric_type"] == "revenue"
