@@ -236,7 +236,16 @@ def test_revenue_outlook_default_sensitivity_view_uses_fast_path_and_preserves_v
     non_fuel = view["chart_rows"][
         ~view["chart_rows"]["scenario_name"].astype(str).isin(CONFLICT_SCENARIO_NAMES)
     ]
-    assert len(non_fuel) == len(expected["chart_rows"])
+    # The view applies the governed official-vintage filter (uptake-key slots
+    # 6/7); with no selection supplied it falls back to the pack's default
+    # comparator, so the raw pack must be filtered the same way to compare.
+    official_scenario, official_overlay = app._official_vintage_filter_for_key(
+        (app.EV_UPTAKE_GOVERNED_OPTION, ())
+    )
+    expected_chart_rows = app._filter_official_vintage_rows(
+        expected["chart_rows"], official_scenario, official_overlay
+    )
+    assert len(non_fuel) == len(expected_chart_rows)
     assert set(view["chart_rows"]["trace_name"].astype(str)) >= set(CONFLICT_TRACE_NAMES)
     conflict_input_audit = view["conflict_fuel_input_audit"]
     assert set(conflict_input_audit["scenario_name"].astype(str)) == set(
@@ -553,6 +562,15 @@ def test_revenue_outlook_default_figure_matches_uncached_path() -> None:
         PED_BRIDGE_DEFAULT_MODE,
         (app.EV_UPTAKE_GOVERNED_OPTION, ()),
         pack,
+    )
+    # The cached view applies the governed official-vintage filter before
+    # filtering rows; the hand-rolled uncached path must mirror that step or it
+    # compares a single-vintage figure against an all-vintage one.
+    official_scenario, official_overlay = app._official_vintage_filter_for_key(
+        (app.EV_UPTAKE_GOVERNED_OPTION, ())
+    )
+    overlay_rows = app._filter_official_vintage_rows(
+        overlay_rows, official_scenario, official_overlay
     )
     expected_rows = app._filter_revenue_outlook_rows(
         overlay_rows,
@@ -1110,15 +1128,19 @@ def test_revenue_outlook_cloud_hides_debug_toggles_and_shows_full_composition(mo
         in {
             "revenue_outlook_fed_policy_state",
             "revenue_outlook_mbu_fed_policy_state",
+            "revenue_outlook_official_vintage",
         }
     }
+    # Official-vintage governance: the default comparator is BEFU26, so the
+    # MBU26-only synthetic rate-only counterfactual control is NOT rendered.
+    # It appears only when MBU26 is displayed (selected, or overlaid), and it
+    # defaults to published rather than to a deferred counterfactual.
     assert set(policy_selectors) == {
         "revenue_outlook_fed_policy_state",
-        "revenue_outlook_mbu_fed_policy_state",
+        "revenue_outlook_official_vintage",
     }
-    assert {
-        str(selector.value) for selector in policy_selectors.values()
-    } == {app.FED_POLICY_DELAYED_6M}
+    assert str(policy_selectors["revenue_outlook_fed_policy_state"].value) == app.FED_POLICY_DELAYED_6M
+    assert str(policy_selectors["revenue_outlook_official_vintage"].value) == "BEFU26 official"
     assert any("Revenue composition over time" in str(markdown.value) for markdown in at.markdown)
     rendered_text = "\n".join([*(str(markdown.value) for markdown in at.markdown), *(str(caption.value) for caption in at.caption)])
     for forbidden in [
@@ -1185,10 +1207,28 @@ def test_revenue_outlook_activity_opens_policy_levers() -> None:
     )
     assert lever_expander.proto.expanded is True
     selectbox_keys = {selectbox.key for selectbox in at.selectbox}
-    assert {
-        "revenue_outlook_fed_policy_state",
-        "revenue_outlook_mbu_fed_policy_state",
-    }.issubset(selectbox_keys)
+    # The Current policy control is always available. The MBU26-only synthetic
+    # rate-only counterfactual is not, while BEFU26 is the selected comparator:
+    # a published official vintage is never given a policy overlay by default.
+    assert "revenue_outlook_fed_policy_state" in selectbox_keys
+    assert "revenue_outlook_official_vintage" in selectbox_keys
+    assert "revenue_outlook_mbu_fed_policy_state" not in selectbox_keys
+
+    # Selecting the MBU26 prior vintage brings the counterfactual back, and it
+    # opens on the published state rather than on a deferred counterfactual.
+    vintage = next(
+        selectbox for selectbox in at.selectbox if selectbox.key == "revenue_outlook_official_vintage"
+    )
+    vintage.set_value("MBU26 official (prior vintage)")
+    at.run()
+    assert not at.exception
+    counterfactual = next(
+        selectbox
+        for selectbox in at.selectbox
+        if selectbox.key == "revenue_outlook_mbu_fed_policy_state"
+    )
+    assert str(counterfactual.value) == app.FED_POLICY_PUBLISHED
+    assert "not a published forecast" in str(counterfactual.label)
 
 
 def test_revenue_outlook_compare_mode_swaps_total_path_for_comparison() -> None:
