@@ -1,0 +1,3 @@
+vintage_id,is_latest,is_default_comparator,is_default_bridge_vintage,is_default_long_run_shape_vintage,supports_long_run_shape,long_run_shape_start_fy,long_run_shape_end_fy
+MBU26,False,False,False,False,True,2024,2055
+BEFU26,True,True,True,True,True,2024,2055
