@@ -272,9 +272,21 @@ def test_committed_current_revenue_outlook_pack_is_repo_local_and_hash_backed() 
         manifest["ev_phev_ped_light_drift_assumptions"]["repo_relative_path"]
         == "data/current_revenue_outlook/ev_phev_ped_light_drift_assumptions.csv"
     )
-    assert manifest["ev_phev_ped_light_drift_assumptions"]["default_lambda_mode"] == "optimized"
-    assert manifest["ev_phev_ped_light_drift_assumptions"]["runtime_mode"] == "optimized"
-    assert float(manifest["ev_phev_ped_light_drift_assumptions"]["lambda_smoothness_penalty"]) > 0
+    # The drift table is retained for audit continuity only. The settled
+    # decision-facing architecture is the conventional anchor plus exact-VFM
+    # composition, so the manifest must describe it that way and label the
+    # lambda material as retired rather than re-freezing the obsolete story.
+    drift_block = manifest["ev_phev_ped_light_drift_assumptions"]
+    assert drift_block["decision_facing"] is False
+    assert "AUDIT ONLY, NON-DECISION-FACING" in drift_block["scope"]
+    assert "conventional_anchor" in drift_block["composition_architecture"]
+    retired = drift_block["retired_lambda_material"]
+    assert retired["status"] == "retired_from_decision_facing_use"
+    assert retired["audit_default_mode"] == "optimized"
+    assert float(retired["audit_smoothness_penalty"]) > 0
+    assert "conventional_anchor_exact_vfm" in manifest["equations"]["EV_PHEV_CLASS_COMPOSITION"] or (
+        "CONVENTIONAL class" in manifest["equations"]["EV_PHEV_CLASS_COMPOSITION"]
+    )
     assert manifest["ped_revenue_bridge_audit"]["repo_relative_path"] == "data/current_revenue_outlook/ped_revenue_bridge_audit.csv"
     assert "raw VKTpc x population" in manifest["ped_revenue_bridge_audit"]["scope"]
     assert manifest["ped_revenue_bridge_audit"]["default_bridge_mode"] == PED_BRIDGE_DEFAULT_MODE
@@ -2333,8 +2345,8 @@ def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
         'horizon_contract_audit.parquet': '015e1a42d88eaafe2fa966800a5b499f2b90b8331a6a062b81e76d080d1c5882',
         'light_ruc_horizon_availability.csv': 'ca87c6ac93033496a928ae07159824dac642917ba104c030161dab5ff46b063f',
         'light_ruc_horizon_availability.parquet': '39abda810443b1d91e04b26399a96c0c30e2fe70a30cbde7440790c3145f5f48',
-        'manifest.json': '6a83640fb68940910394402806fc09983cb70cad442e04b6be401cf1d1f14fec',
-        'manifest.md': 'f81e3e7a90bdbeff6b83727ffbb4a6fb0066752fe0655ae3cfb802841629e910',
+        'manifest.json': 'cc60050aebdd0511dfa55d953670f931837483ba4600e1ad5e1b086d3424f362',
+        'manifest.md': 'c198d0f70eeeabacf2e9e982f5f929d5ea85514386fcb4d0b86db39942f65cc6',
         'path_trace_status.csv': '9d9eabcd54cbba3b468b9e7153218a954e43c9efec031b2089f741c4fff20ea5',
         'path_trace_status.parquet': '56c8b08e1d5efffa930e703c52b9e9de848e21d94c5ae9a760ca47083a4a1df1',
         'ped_bridge_mode_config.csv': '60583741fcd8484df3e4f166a82e49a06fdeb0fd353756fcfdf48a1f9786efc4',

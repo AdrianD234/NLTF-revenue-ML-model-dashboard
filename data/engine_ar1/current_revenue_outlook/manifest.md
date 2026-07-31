@@ -6,9 +6,9 @@
 - Output: `data/engine_ar1/current_revenue_outlook`
 
 ## Equations
-- EV_PHEV_MIGRATION: Optimized lambda allocates EV/PHEV uptake between PED/light-petrol and current finalist total Light RUC to match BEFU26 light-mobility proportions with a smoothness penalty.
-- PED VKT per capita: PED revenue = adjusted PED/light-petrol VKT after optimized EV/PHEV migration * BEFU26 litres/100km * BEFU26 gross PED rate.
-- Light RUC volume: Light RUC revenue = optimized conventional Light RUC km after EV/PHEV migration * BEFU26 conventional Light effective rate.
+- EV_PHEV_CLASS_COMPOSITION: The Light RUC model output is the CONVENTIONAL class. The class pool is expanded from it by the MoT VFM 202405 Base uptake shares (conventional_anchor_vfm_composition_v1); Light BEV and PHEV are allocated from that pool, never added on.
+- PED VKT per capita: PED revenue = raw AR(1) PED/light-petrol VKT x scenario population * BEFU26 litres/100km * BEFU26 gross PED rate.
+- Light RUC volume: Light RUC revenue = conventional Light RUC km (preserved exactly under the Base uptake basis) * BEFU26 conventional Light effective rate.
 - Heavy RUC volume: Heavy RUC revenue = current finalist net km * BEFU26 effective Heavy RUC rate.
 - ROLLUPS: Gross FED, Net FED, Total RUC, Total RUC+PED and Total NLTF recalculate optimized PED, conventional Light RUC, Light BEV, PHEV and Heavy RUC replacement lines plus BEFU26 fixed components.
 

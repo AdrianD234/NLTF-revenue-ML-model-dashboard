@@ -374,6 +374,72 @@ def default_bridge_vintage_id(repo_root: Path | str | None = None) -> str:
     )
 
 
+def bridge_vintage_id_from_manifest(
+    manifest: dict[str, Any] | None,
+    repo_root: Path | str | None = None,
+) -> str:
+    """The bridge-assumption vintage an ALREADY-BUILT pack was built with.
+
+    This is the authoritative value for every runtime calculation that turns
+    Current activity into revenue. The live registry default selects a bridge
+    only when a NEW pack is being constructed; it must never override the
+    bridge recorded in a pack that already exists, or a pack built on one
+    vintage would be re-bridged at runtime on another - the vintage-mixing
+    defect this framework exists to prevent.
+
+    Packs predating the ``official_vintages`` manifest block fall back to the
+    registry default so an older pack still loads.
+    """
+    block = manifest.get("official_vintages") if isinstance(manifest, dict) else None
+    vid = str((block or {}).get("bridge_assumption_vintage_id") or "").strip()
+    if vid:
+        return vid
+    return default_bridge_vintage_id(repo_root)
+
+
+def comparator_vintage_id_from_manifest(
+    manifest: dict[str, Any] | None,
+    repo_root: Path | str | None = None,
+) -> str:
+    """The default official comparator vintage recorded in a built pack."""
+    block = manifest.get("official_vintages") if isinstance(manifest, dict) else None
+    vid = str((block or {}).get("official_comparator_vintage_id") or "").strip()
+    if vid:
+        return vid
+    return default_comparator_vintage_id(repo_root)
+
+
+def official_vintage_spine_frame(
+    vintage_id: str,
+    repo_root: Path | str | None = None,
+) -> pd.DataFrame:
+    """FY x series_id numeric pivot of one vintage's official annual rows."""
+    pack = load_official_vintage(vintage_id, repo_root=repo_root)
+    if pack is None:
+        raise OfficialVintageError(
+            f"official vintage {vintage_id} is registered but not materialized"
+        )
+    return pack.official_annual.pivot_table(
+        index="FY", columns="series_id", values="value", aggfunc="first"
+    ).apply(pd.to_numeric, errors="coerce")
+
+
+def official_vintage_pack_files(
+    vintage_id: str,
+    repo_root: Path | str | None = None,
+) -> tuple[Path, ...]:
+    """Pack CSV paths for a vintage, for cache-signature stat'ing.
+
+    Returned rather than hard-coded at call sites so a cache key follows
+    whichever vintage is actually in use.
+    """
+    root = Path(repo_root) if repo_root is not None else repo_root_from_here()
+    entry = official_vintage_entry(vintage_id, root)
+    stems = _entry_file_stems(entry)
+    base = root / str(entry["source_pack_path"])
+    return tuple(base / f"{stems[key]}.csv" for key in ("annual_spine", "official_annual"))
+
+
 def official_vintage_choices(
     repo_root: Path | str | None = None,
 ) -> tuple[tuple[str, str], ...]:

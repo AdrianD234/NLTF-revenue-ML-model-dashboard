@@ -2360,6 +2360,7 @@ def _annual_bridge_and_factors(
     latest_actual_period: str | None = None,
     require_conflict_factors: bool = True,
     isolate_non_ice_activity: bool = True,
+    bridge_vintage_id: str | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     quarterly = forecast_chart_rows_for_display(
         replay.future_forecasts,
@@ -2392,9 +2393,13 @@ def _annual_bridge_and_factors(
     # MBU26 spine here while the pack carries BEFU26 rates silently mixes
     # vintages and breaks the Current RUC identity by ~1e-3 (Total RUC no
     # longer equals class leaves less administration).
+    #
+    # ``bridge_vintage_id`` comes from the manifest of the pack being replayed
+    # and is authoritative; the registry default is consulted only when no
+    # pack-specific bridge was supplied (e.g. building a brand-new pack).
     from .official_vintage import default_bridge_vintage_id, load_official_vintage
 
-    bridge_vid = default_bridge_vintage_id(repo_root)
+    bridge_vid = str(bridge_vintage_id or default_bridge_vintage_id(repo_root))
     bridge_pack = load_official_vintage(bridge_vid, repo_root=repo_root)
     if bridge_pack is None or bridge_pack.official_annual.empty:
         raise ValueError(
@@ -3107,6 +3112,7 @@ def run_treasury_baseline_macro_replay(
     engine: str = "ensemble",
     *,
     latest_actual_period: str | None = None,
+    bridge_vintage_id: str | None = None,
 ) -> TreasuryBaselineMacroReplayResult:
     """Replay Treasury and legacy Base macro paths without conflict dependencies.
 
@@ -3159,6 +3165,7 @@ def run_treasury_baseline_macro_replay(
         latest_actual_period=latest_actual_period,
         require_conflict_factors=False,
         isolate_non_ice_activity=False,
+        bridge_vintage_id=bridge_vintage_id,
     )
     quarterly_factors, annual_factors = _baseline_macro_factor_frames(
         replay,
@@ -3183,6 +3190,7 @@ def run_fuel_price_scenario_replay(
     engine: str = "ensemble",
     *,
     latest_actual_period: str | None = None,
+    bridge_vintage_id: str | None = None,
 ) -> FuelPriceScenarioReplayResult:
     """Build and score Base plus Low/Medium/High under three policy states."""
 
@@ -3432,6 +3440,7 @@ def run_fuel_price_scenario_replay(
         repo_root=root,
         base_scenario_name=base_scenario_name,
         latest_actual_period=latest_actual_period,
+        bridge_vintage_id=bridge_vintage_id,
     )
     price_only_annual_bridge, _ = _annual_bridge_and_factors(
         price_only_replay,
@@ -3439,6 +3448,7 @@ def run_fuel_price_scenario_replay(
         repo_root=root,
         base_scenario_name=base_scenario_name,
         latest_actual_period=latest_actual_period,
+        bridge_vintage_id=bridge_vintage_id,
     )
     (
         baseline_macro_quarterly_factors,
@@ -5063,6 +5073,7 @@ def run_direct_treasury_scenario_replay(
     engine: str = "ensemble",
     *,
     latest_actual_period: str | None = None,
+    bridge_vintage_id: str | None = None,
 ) -> DirectTreasuryScenarioReplayResult:
     """Replay every governed current scenario on its own Treasury inputs.
 
@@ -5125,6 +5136,7 @@ def run_direct_treasury_scenario_replay(
         latest_actual_period=latest_actual_period,
         require_conflict_factors=False,
         isolate_non_ice_activity=False,
+        bridge_vintage_id=bridge_vintage_id,
     )
 
     quarterly_frames: list[pd.DataFrame] = []

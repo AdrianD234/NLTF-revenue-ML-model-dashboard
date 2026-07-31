@@ -61,14 +61,20 @@ FED_UPLIFT_DELAY_NOTE = (
     "that direct window; only explicitly rebuilt model-native lag/lead inputs "
     "can affect their governed quarter."
 )
-RATE_CHART_NOTE = (
-    "Effective rates per 1,000 km. Light and Heavy RUC start from the bridge "
-    "vintage (BEFU26) net revenue over net km, then follow the same "
-    "proportional policy change as the selected PED path. PED (petrol excise) "
-    "is converted from $/litre using the bridge vintage petrol-fleet "
-    "intensity, so that line also embeds fleet efficiency. The published "
-    "January-2027 path remains visible as a reference."
-)
+def rate_chart_note(bridge_release: str) -> str:
+    """Rate-chart caption naming the bridge vintage actually in use.
+
+    Generated rather than hard-coded so the caption can never drift from the
+    vintage the displayed rates were derived from.
+    """
+    return (
+        f"Effective rates per 1,000 km. Light and Heavy RUC start from the "
+        f"{bridge_release} bridge-vintage net revenue over net km, then follow "
+        "the same proportional policy change as the selected PED path. PED "
+        f"(petrol excise) is converted from $/litre using {bridge_release} "
+        "petrol-fleet intensity, so that line also embeds fleet efficiency. "
+        "The published January-2027 path remains visible as a reference."
+    )
 
 _PLANNED_PATH = "Current planned path"
 _NO_UPLIFT_PATH = "No 2027 12c uplift"
@@ -105,10 +111,32 @@ def _fed_rate_paths(repo_root: Path) -> pd.DataFrame:
 
 
 def _mbu26_spine(repo_root: Path) -> pd.DataFrame:
-    frame = pd.read_csv(repo_root / "data/revenue_model_source_pack/mbu26_annual_spine/mbu26_official_annual.csv")
+    """The frozen MBU26 spine, for the MBU26-ONLY synthetic counterfactual.
+
+    Deliberately vintage-specific: the rate-only counterfactual and its audit
+    derive their schedule from the MBU26 published rows and hash that exact
+    file into every audit row. Anything describing the CURRENT revenue bridge
+    must use ``_bridge_spine`` instead, which follows the bridge-assumption
+    vintage the loaded pack was actually built with.
+    """
+    frame = pd.read_csv(repo_root / _OFFICIAL_SPINE_REL)
     return frame.pivot_table(index="FY", columns="series_id", values="value", aggfunc="first").apply(
         pd.to_numeric, errors="coerce"
     )
+
+
+def _bridge_spine(repo_root: Path, bridge_vintage_id: str | None = None) -> pd.DataFrame:
+    """Official annual rows of the bridge-assumption vintage.
+
+    ``bridge_vintage_id`` should come from the loaded pack manifest so the
+    displayed effective rates always describe the vintage that actually
+    produced the Current revenue path. It falls back to the registry default
+    only when no pack-specific bridge has been supplied.
+    """
+    from .official_vintage import default_bridge_vintage_id, official_vintage_spine_frame
+
+    vid = str(bridge_vintage_id or default_bridge_vintage_id(repo_root))
+    return official_vintage_spine_frame(vid, repo_root=repo_root)
 
 
 def mbu26_ruc_class_revenue_by_fy(repo_root: Path) -> dict[int, float]:
@@ -118,6 +146,8 @@ def mbu26_ruc_class_revenue_by_fy(repo_root: Path) -> dict[int, float]:
     insufficient for a proportional rate counterfactual.  This source-backed
     pool lets the official comparator reprice all five classes while holding
     RUC administration fixed in the canonical Net RUC formula.
+
+    MBU26-specific by design: it feeds the MBU26-only synthetic counterfactual.
     """
 
     spine = _mbu26_spine(repo_root)
@@ -337,9 +367,20 @@ def fed_uplift_delayed_factors(repo_root: Path, chart_rows: pd.DataFrame) -> dic
     return factors
 
 
-def rate_paths_frame(repo_root: Path, chart_rows: pd.DataFrame) -> pd.DataFrame:
-    """Long frame of effective rates per 1,000 km for the rate chart."""
-    spine = _mbu26_spine(repo_root)
+def rate_paths_frame(
+    repo_root: Path,
+    chart_rows: pd.DataFrame,
+    *,
+    bridge_vintage_id: str | None = None,
+) -> pd.DataFrame:
+    """Long frame of effective rates per 1,000 km for the rate chart.
+
+    The base effective rates come from the BRIDGE-ASSUMPTION vintage, so the
+    chart always describes the same vintage that produced the Current revenue
+    path. Pass the loaded pack manifest's bridge vintage; omitting it falls
+    back to the registry default.
+    """
+    spine = _bridge_spine(repo_root, bridge_vintage_id)
     intensity = (spine["ped_volume"] / spine["light_petrol_vkt"] * 100).dropna()
     light = (spine["light_ruc_net_revenue"] / spine["light_ruc_net_km"] * 1000).dropna()
     heavy = (spine["heavy_ruc_net_revenue"] / spine["heavy_ruc_net_km"] * 1000).dropna()

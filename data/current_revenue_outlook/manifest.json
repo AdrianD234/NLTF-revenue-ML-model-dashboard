@@ -393,9 +393,9 @@
     ]
   },
   "equations": {
-    "EV_PHEV_MIGRATION": "Optimized lambda allocates EV/PHEV uptake between PED/light-petrol and current finalist total Light RUC to match BEFU26 light-mobility proportions with a smoothness penalty.",
-    "PED": "PED revenue = adjusted PED/light-petrol VKT after optimized EV/PHEV migration * BEFU26 litres/100km * BEFU26 gross PED rate.",
-    "LIGHT_RUC": "Light RUC revenue = optimized conventional Light RUC km after EV/PHEV migration * BEFU26 conventional Light effective rate.",
+    "EV_PHEV_CLASS_COMPOSITION": "The Light RUC model output is the CONVENTIONAL class. The class pool is expanded from it by the MoT VFM 202405 Base uptake shares (conventional_anchor_vfm_composition_v1); Light BEV and PHEV are allocated from that pool, never added on.",
+    "PED": "PED revenue = raw AR(1) PED/light-petrol VKT x scenario population * BEFU26 litres/100km * BEFU26 gross PED rate.",
+    "LIGHT_RUC": "Light RUC revenue = conventional Light RUC km (preserved exactly under the Base uptake basis) * BEFU26 conventional Light effective rate.",
     "HEAVY_RUC": "Heavy RUC revenue = current finalist net km * BEFU26 effective Heavy RUC rate.",
     "ROLLUPS": "Gross FED, Net FED, Total RUC, Total RUC+PED and Total NLTF recalculate optimized PED, conventional Light RUC, Light BEV, PHEV and Heavy RUC replacement lines plus BEFU26 fixed components."
   },
@@ -441,10 +441,20 @@
   },
   "ev_phev_ped_light_drift_assumptions": {
     "repo_relative_path": "data/current_revenue_outlook/ev_phev_ped_light_drift_assumptions.csv",
-    "scope": "Deterministic EV/PHEV migration bridge over current PED/light-petrol activity and current finalist total Light RUC, including optimized, Light-only, PED-only and MBU-ratio lambda modes.",
-    "default_lambda_mode": "optimized",
-    "lambda_smoothness_penalty": 25.0,
-    "runtime_mode": "optimized"
+    "scope": "AUDIT ONLY, NON-DECISION-FACING. Retired lambda-migration bridge over current PED/light-petrol activity and current finalist Light RUC, retained for continuity with the pre-conventional-anchor audits. It carries the per-km effective rates the class composition uses, but no decision-facing level is read from its lambda modes.",
+    "decision_facing": false,
+    "composition_architecture": "conventional_anchor_exact_vfm (conventional_anchor_vfm_composition_v1); lambda allocation is retired",
+    "retired_lambda_material": {
+      "status": "retired_from_decision_facing_use",
+      "modes_retained_for_audit": [
+        "optimized",
+        "fixed_light_only",
+        "fixed_ped_only",
+        "mbu_ratio"
+      ],
+      "audit_default_mode": "optimized",
+      "audit_smoothness_penalty": 25.0
+    }
   },
   "ped_revenue_bridge_audit": {
     "repo_relative_path": "data/current_revenue_outlook/ped_revenue_bridge_audit.csv",

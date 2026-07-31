@@ -595,18 +595,19 @@ def _evaluate_against_contract(
 def _default_official_comparator_scenario() -> str:
     """Scenario name of the registered default official comparator vintage.
 
-    Falls back to the MBU26 scenario name if the registry is unavailable so
-    fixture-driven tests without a registry keep their historical behaviour.
+    Deliberately FAILS CLOSED. A corrupt or missing official-vintage registry
+    is a governance failure, not something to paper over: silently falling
+    back to a hard-coded vintage would let the production completeness gate
+    validate against a comparator nobody selected. Callers that legitimately
+    need a different vocabulary (fixtures, or a pack built on another
+    comparator) must pass ``scenario_by_role`` explicitly.
     """
-    try:
-        from .official_vintage import (
-            default_comparator_vintage_id,
-            official_comparator_scenario_name,
-        )
+    from .official_vintage import (
+        default_comparator_vintage_id,
+        official_comparator_scenario_name,
+    )
 
-        return official_comparator_scenario_name(default_comparator_vintage_id())
-    except Exception:
-        return "mbu26_official"
+    return official_comparator_scenario_name(default_comparator_vintage_id())
 
 
 def completeness_matrix(

@@ -35,18 +35,29 @@ ROW_KEYS = [key for key, *_ in SIX_ROWS]
 ROW_LABELS = {key: label for key, _, label, _ in SIX_ROWS}
 ROW_COLORS = {key: colour for key, _, _, colour in SIX_ROWS}
 
-# The MoT baseline source follows the registered default bridge-assumption
-# vintage (currently BEFU26). The legacy constant name is kept as an alias so
-# existing selector plumbing keeps working.
-OFFICIAL_SOURCE = "BEFU26 official (MoT baseline)"
-MBU26_SOURCE = OFFICIAL_SOURCE  # deprecated alias; the label follows the bridge vintage
 DASHBOARD_SOURCE = "Dashboard pack (AR(1) engine, base case)"
 VFM_SOURCES = {
     "VFM 202405 - Base scenario": "Base_EV",
     "VFM 202405 - Fast scenario": "Fast_EV",
     "VFM 202405 - Slow scenario": "Slow_EV",
 }
-SOURCE_OPTIONS = [OFFICIAL_SOURCE, *VFM_SOURCES.keys(), DASHBOARD_SOURCE]
+
+
+def official_source_label(bridge_vintage_id: str) -> str:
+    """MoT baseline option label for the bridge vintage actually in use.
+
+    Generated rather than hard-coded so the visible label can never claim a
+    vintage the underlying frame was not read from.
+    """
+    return f"{bridge_vintage_id} official (MoT baseline)"
+
+
+def source_options(bridge_vintage_id: str) -> list[str]:
+    return [official_source_label(bridge_vintage_id), *VFM_SOURCES.keys(), DASHBOARD_SOURCE]
+
+
+def is_official_source(source: str, bridge_vintage_id: str) -> bool:
+    return str(source) == official_source_label(bridge_vintage_id)
 
 DENOMINATORS = {
     "All road travel (all six rows)": ROW_KEYS,
@@ -62,18 +73,29 @@ METRIC_YOY = "Year-on-year change (%)"
 METRIC_OPTIONS = [METRIC_KM, METRIC_SHARE, METRIC_YOY]
 
 
-def _spine(repo_root: Path) -> pd.DataFrame:
+def _spine(repo_root: Path, bridge_vintage_id: str | None = None) -> pd.DataFrame:
+    """Official annual rows of the bridge-assumption vintage in use.
+
+    ``bridge_vintage_id`` must come from the loaded runtime pack's manifest so
+    the explorer describes the same vintage that produced the pack. It falls
+    back to the registry default only when no pack-specific bridge is given.
+    """
     from .official_vintage import default_bridge_vintage_id, official_vintage_entry
 
-    entry = official_vintage_entry(default_bridge_vintage_id(repo_root), repo_root)
+    vid = str(bridge_vintage_id or default_bridge_vintage_id(repo_root))
+    entry = official_vintage_entry(vid, repo_root)
     stems = entry.get("file_stems") or {}
     stem = str(stems.get("official_annual", "official_annual"))
     path = repo_root / str(entry["source_pack_path"]) / f"{stem}.csv"
     return pd.read_csv(path)
 
 
-def load_mbu26_frame(repo_root: Path) -> pd.DataFrame:
-    spine = _spine(repo_root)
+def load_official_frame(repo_root: Path, bridge_vintage_id: str | None = None) -> pd.DataFrame:
+    return load_mbu26_frame(repo_root, bridge_vintage_id)
+
+
+def load_mbu26_frame(repo_root: Path, bridge_vintage_id: str | None = None) -> pd.DataFrame:
+    spine = _spine(repo_root, bridge_vintage_id)
     frame = (
         spine[spine["source_series_id"].isin(ROW_KEYS)]
         .pivot_table(index="FY", columns="source_series_id", values="value", aggfunc="first")
@@ -101,7 +123,7 @@ def load_vfm_frame(repo_root: Path, scenario: str) -> pd.DataFrame:
     return frame.astype(float)
 
 
-def load_dashboard_frame(repo_root: Path) -> pd.DataFrame:
+def load_dashboard_frame(repo_root: Path, bridge_vintage_id: str | None = None) -> pd.DataFrame:
     """Default dashboard Base path after its governed macro and VFM overlays.
 
     This deliberately uses the same pipeline as Revenue Outlook: select the
@@ -217,16 +239,21 @@ def load_dashboard_frame(repo_root: Path) -> pd.DataFrame:
     # actual anchor used by the pack and by MBU26 so the explorer still spans
     # the full actual-to-forecast junction.
     if 2025 not in frame.index:
-        actual_anchor = load_mbu26_frame(repo_root).loc[[2025], ROW_KEYS]
+        actual_anchor = load_mbu26_frame(repo_root, bridge_vintage_id).loc[[2025], ROW_KEYS]
         frame = pd.concat([actual_anchor, frame], axis=0).sort_index()
     return frame[ROW_KEYS].astype(float)
 
 
-def load_source_frame(repo_root: Path, source: str) -> pd.DataFrame:
-    if source == MBU26_SOURCE:
-        return load_mbu26_frame(repo_root)
+def load_source_frame(
+    repo_root: Path, source: str, bridge_vintage_id: str | None = None
+) -> pd.DataFrame:
+    from .official_vintage import default_bridge_vintage_id
+
+    vid = str(bridge_vintage_id or default_bridge_vintage_id(repo_root))
+    if is_official_source(source, vid):
+        return load_mbu26_frame(repo_root, vid)
     if source == DASHBOARD_SOURCE:
-        return load_dashboard_frame(repo_root)
+        return load_dashboard_frame(repo_root, vid)
     return load_vfm_frame(repo_root, VFM_SOURCES[source])
 
 
@@ -240,9 +267,11 @@ def yoy_frame(frame: pd.DataFrame) -> pd.DataFrame:
     return frame.pct_change() * 100.0
 
 
-def denominator_example(repo_root: Path, fy: int = 2025) -> dict[str, float]:
+def denominator_example(
+    repo_root: Path, fy: int = 2025, bridge_vintage_id: str | None = None
+) -> dict[str, float]:
     """The FY2025 predicament, computed live: same BEV km, three ratios."""
-    row = load_mbu26_frame(repo_root).loc[fy]
+    row = load_mbu26_frame(repo_root, bridge_vintage_id).loc[fy]
     bev_all = row["light_bev_ruc_net_km"] + row["heavy_bev_ruc_net_km"]
     total = row[ROW_KEYS].sum()
     light_all = row[DENOMINATORS["All light travel (incl. petrol)"]].sum()

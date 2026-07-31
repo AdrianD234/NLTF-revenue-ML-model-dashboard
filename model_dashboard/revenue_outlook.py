@@ -53,6 +53,7 @@ from .post_model_extrapolation import (
     stamp_forecast_segments,
 )
 from .light_fleet_allocation import (
+    ALLOCATION_BASIS_ID,
     EXTENDED_EVIDENCE_MAX_HORIZON,
     LAST_DECISION_GRADE_ANNUAL_FY,
     LAST_DECISION_GRADE_QUARTER,
@@ -62,6 +63,7 @@ from .mbu26_source_spine import (
     CURRENT_LIGHT_TOTAL_SERIES_ID,
     light_ruc_horizon_availability_frame,
     EV_PHEV_MIGRATION_DEFAULT_MODE,
+    EV_PHEV_MIGRATION_MODES,
     EV_PHEV_MIGRATION_SMOOTHNESS_PENALTY,
     MBU26_RELEASE_ROUND,
     MBU26_SCHEMA_VERSION,
@@ -4617,9 +4619,17 @@ def build_current_revenue_outlook_runtime_pack(
             "HEAVY_RUC": ["available"],
         },
         "equations": {
-            "EV_PHEV_MIGRATION": f"Optimized lambda allocates EV/PHEV uptake between PED/light-petrol and current finalist total Light RUC to match {bridge_release} light-mobility proportions with a smoothness penalty.",
-            "PED": f"PED revenue = adjusted PED/light-petrol VKT after optimized EV/PHEV migration * {bridge_release} litres/100km * {bridge_release} gross PED rate.",
-            "LIGHT_RUC": f"Light RUC revenue = optimized conventional Light RUC km after EV/PHEV migration * {bridge_release} conventional Light effective rate.",
+            # The decision-facing composition is the conventional-anchor /
+            # exact-VFM architecture; the lambda migration is retired from it
+            # and survives only as audit-only material (see
+            # ev_phev_ped_light_drift_assumptions.retired_lambda_material).
+            "EV_PHEV_CLASS_COMPOSITION": (
+                "The Light RUC model output is the CONVENTIONAL class. The class pool is "
+                f"expanded from it by the MoT VFM 202405 Base uptake shares ({ALLOCATION_BASIS_ID}); "
+                "Light BEV and PHEV are allocated from that pool, never added on."
+            ),
+            "PED": f"PED revenue = raw AR(1) PED/light-petrol VKT x scenario population * {bridge_release} litres/100km * {bridge_release} gross PED rate.",
+            "LIGHT_RUC": f"Light RUC revenue = conventional Light RUC km (preserved exactly under the Base uptake basis) * {bridge_release} conventional Light effective rate.",
             "HEAVY_RUC": f"Heavy RUC revenue = current finalist net km * {bridge_release} effective Heavy RUC rate.",
             "ROLLUPS": f"Gross FED, Net FED, Total RUC, Total RUC+PED and Total NLTF recalculate optimized PED, conventional Light RUC, Light BEV, PHEV and Heavy RUC replacement lines plus {bridge_release} fixed components.",
         },
@@ -4642,12 +4652,21 @@ def build_current_revenue_outlook_runtime_pack(
         "ev_phev_ped_light_drift_assumptions": {
             "repo_relative_path": _repo_relative(root, base / "ev_phev_ped_light_drift_assumptions.csv"),
             "scope": (
-                "Deterministic EV/PHEV migration bridge over current PED/light-petrol activity and current finalist total Light RUC, "
-                "including optimized, Light-only, PED-only and MBU-ratio lambda modes."
+                "AUDIT ONLY, NON-DECISION-FACING. Retired lambda-migration bridge over current "
+                "PED/light-petrol activity and current finalist Light RUC, retained for continuity "
+                "with the pre-conventional-anchor audits. It carries the per-km effective rates the "
+                "class composition uses, but no decision-facing level is read from its lambda modes."
             ),
-            "default_lambda_mode": EV_PHEV_MIGRATION_DEFAULT_MODE,
-            "lambda_smoothness_penalty": EV_PHEV_MIGRATION_SMOOTHNESS_PENALTY,
-            "runtime_mode": EV_PHEV_MIGRATION_DEFAULT_MODE,
+            "decision_facing": False,
+            "composition_architecture": (
+                f"conventional_anchor_exact_vfm ({ALLOCATION_BASIS_ID}); lambda allocation is retired"
+            ),
+            "retired_lambda_material": {
+                "status": "retired_from_decision_facing_use",
+                "modes_retained_for_audit": list(EV_PHEV_MIGRATION_MODES),
+                "audit_default_mode": EV_PHEV_MIGRATION_DEFAULT_MODE,
+                "audit_smoothness_penalty": EV_PHEV_MIGRATION_SMOOTHNESS_PENALTY,
+            },
         },
         "ped_revenue_bridge_audit": {
             "repo_relative_path": _repo_relative(root, base / "ped_revenue_bridge_audit.csv"),

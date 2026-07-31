@@ -148,3 +148,6 @@ data/dashboard_evidence_pack_reproducibility/ped_inner_hpo/source_artifacts/**/*
 
 # local task exports, workbook previews and inspection scratch
 outputs/
+
+# Playwright MCP scratch snapshots (generated during browser verification)
+.playwright-mcp/
