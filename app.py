@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import dataclasses
 import hashlib
 import html
 import io
@@ -210,6 +211,13 @@ from model_dashboard.long_run_shape_transition import (
     UNBLENDED_SCHEDULE_ID,
     resolve_schedule,
 )
+from model_dashboard.post_model_extrapolation import (
+    POST_MODEL_SEGMENT,
+    build_post_model_extrapolation_annual,
+    post_model_chart_rows,
+    post_model_line_reconciliation_rows,
+)
+from model_dashboard.official_vintage import load_official_vintage
 from model_dashboard.official_vintage import (
     bridge_vintage_id_from_manifest,
     default_comparator_vintage_id,
@@ -1003,6 +1011,142 @@ def _official_vintage_filter_for_key(ev_uptake_key: tuple[Any, ...]) -> tuple[st
     """(selected official scenario_name, overlay flag) for row filtering."""
     vid, overlay = _official_vintage_scope(ev_uptake_key)
     return official_comparator_scenario_name(vid), overlay
+
+
+def _long_run_shape_scope(ev_uptake_key: tuple[Any, ...]) -> tuple[str, str]:
+    """(transition schedule id, long-run shape vintage id) for this key.
+
+    Slots 8/9, appended at the END so every existing positional read keeps
+    indexing correctly and an older 8-tuple still resolves to the pack default.
+    """
+    schedule = (
+        str(ev_uptake_key[8])
+        if len(ev_uptake_key) > 8 and str(ev_uptake_key[8] or "").strip()
+        else UNBLENDED_SCHEDULE_ID
+    )
+    vintage = (
+        str(ev_uptake_key[9])
+        if len(ev_uptake_key) > 9 and str(ev_uptake_key[9] or "").strip()
+        else ""
+    )
+    return schedule, vintage
+
+
+def _shape_adjusted_signature(
+    signature: tuple[tuple[str, int, int], ...],
+    schedule_id: str,
+    shape_vintage_id: str,
+) -> tuple[tuple[str, int, int], ...]:
+    """Fold the shape selection INTO the pack signature.
+
+    Every downstream cache - sensitivity frames, overlay rows, detail frames,
+    figures - is keyed on this signature and not on the uptake key, so the
+    selection has to enter here or a switch between schedules would silently
+    return another schedule's cached frames.
+    """
+    if schedule_id == UNBLENDED_SCHEDULE_ID:
+        return signature
+    marker = (f"long_run_shape:{schedule_id}:{shape_vintage_id}", 0, 0)
+    return tuple(signature) + (marker,)
+
+
+@st.cache_data(show_spinner=False, max_entries=8)
+def cached_long_run_shape_post_model_rows(
+    signature: tuple[tuple[str, int, int], ...],
+    schedule_id: str,
+    shape_vintage_id: str,
+    pack_dir: str,
+    _pack: RevenueOutlookPack,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Chart and line rows for the selected long-run shape candidate.
+
+    Built through the SAME governed constructor the pack builder uses, so the
+    analyst preview and a promoted production default cannot diverge: selecting
+    ``balanced_structural`` here produces exactly what rebuilding the pack on
+    ``balanced_structural`` would produce.
+    """
+
+    root = Path(__file__).resolve().parent
+    base = Path(pack_dir)
+    bridge_vid = bridge_vintage_id_from_manifest(_pack.manifest, root)
+    bridge_pack = load_official_vintage(bridge_vid, repo_root=root)
+    shape_pack = load_official_vintage(shape_vintage_id, repo_root=root)
+    if bridge_pack is None or shape_pack is None:
+        raise ValueError(
+            f"long-run shape preview needs bridge {bridge_vid} and shape "
+            f"{shape_vintage_id}; one is not materialized."
+        )
+
+    raw_audit = pd.read_parquet(base / "raw_quarterly_forecast_audit.parquet")
+    scenario_input_wide = pd.read_parquet(
+        base / "scenario_inputs" / "scenario_input_wide.parquet"
+    )
+    extrapolation = build_post_model_extrapolation_annual(
+        line_reconciliation=_pack.revenue_line_reconciliation,
+        raw_quarterly_audit=raw_audit,
+        scenario_input_wide=scenario_input_wide,
+        mbu26_official_annual=bridge_pack.official_annual,
+        repo_root=root,
+        long_run_shape_official_annual=shape_pack.official_annual,
+        long_run_shape_vintage_id=shape_vintage_id,
+        transition_schedule_id=schedule_id,
+    )
+    chart_rows = post_model_chart_rows(_pack.revenue_chart_rows, extrapolation)
+    line_rows = post_model_line_reconciliation_rows(
+        _pack.revenue_line_reconciliation, extrapolation
+    )
+    return chart_rows, line_rows
+
+
+def _replace_post_model_rows(frame: pd.DataFrame, replacement: pd.DataFrame) -> pd.DataFrame:
+    """Swap the FY2031-FY2050 post-model block, leaving everything else alone.
+
+    Only rows already labelled ``post_model_extrapolation`` are dropped, so
+    actuals, the econometric FY2026-FY2030 path and every official published
+    row pass through untouched by construction rather than by filtering.
+    """
+    if frame is None or frame.empty or replacement is None or replacement.empty:
+        return frame
+    segment = frame.get("forecast_segment", pd.Series("", index=frame.index))
+    keep = frame[~segment.fillna("").astype(str).eq(POST_MODEL_SEGMENT)]
+    return pd.concat([keep, replacement], ignore_index=True, sort=False)
+
+
+def _apply_long_run_shape_selection(
+    pack: RevenueOutlookPack,
+    signature: tuple[tuple[str, int, int], ...],
+    pack_dir: str,
+    ev_uptake_key: tuple[Any, ...],
+) -> tuple[RevenueOutlookPack, tuple[tuple[str, int, int], ...]]:
+    """Swap the pack's post-model layer for the analyst-selected candidate.
+
+    Applied to the PACK, upstream of the sensitivity, macro-replay, VFM and
+    FED-policy overlays, because those overlays do modify FY2031-FY2050 rows.
+    Substituting after them would silently discard the macro and policy
+    treatment on exactly the years the preview is about.
+    """
+
+    schedule_id, shape_vintage_id = _long_run_shape_scope(ev_uptake_key)
+    if schedule_id == UNBLENDED_SCHEDULE_ID or not shape_vintage_id:
+        return pack, signature
+    try:
+        chart_rows, line_rows = cached_long_run_shape_post_model_rows(
+            signature, schedule_id, shape_vintage_id, pack_dir, pack
+        )
+    except Exception as error:  # pragma: no cover - surfaced in the UI
+        st.warning(
+            f"Long-run shape preview unavailable ({error}); showing the pack's "
+            "own long-run construction."
+        )
+        return pack, signature
+    adjusted = dataclasses.replace(
+        pack,
+        revenue_chart_rows=_replace_post_model_rows(pack.revenue_chart_rows, chart_rows),
+        revenue_line_reconciliation=_replace_post_model_rows(
+            pack.revenue_line_reconciliation, line_rows
+        ),
+    )
+    return adjusted, _shape_adjusted_signature(signature, schedule_id, shape_vintage_id)
 
 
 def _filter_official_vintage_rows(
@@ -4303,6 +4447,19 @@ def _render_long_run_shape_controls(manifest: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _selected_vfm_scenario_label() -> str:
+    """The VFM composition scenario currently driving the class split.
+
+    Read from the governed default rather than hard-coded, so the details text
+    stays truthful if the composition scenario ever becomes selectable.
+    """
+
+    return _VFM_PRODUCTION_SCENARIO
+
+
+_VFM_PRODUCTION_SCENARIO = "Base_EV"
+
+
 def _long_run_shape_details_text(
     shape_state: dict[str, Any], fleet_scenario: str
 ) -> str:
@@ -5072,7 +5229,25 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         # Both invalidate every cached figure/view keyed on this tuple.
         str(official_vintage_state["vintage_id"]),
         bool(official_vintage_state["overlay"]),
+        # Slots 8/9: the analyst long-run shape selection. Also folded into the
+        # pack signature, because the frames it changes are cached on that.
+        str(long_run_shape_state["schedule_id"]),
+        str(long_run_shape_state["shape_vintage_id"]),
     )
+    pack, pack_signature = _apply_long_run_shape_selection(
+        pack, pack_signature, str(pack_dir), ev_uptake_key
+    )
+    # The governed long-run details, rendered wherever a non-default long-run
+    # construction is on screen. A reader must be able to see which anchor,
+    # shape source, composition and schedule produced the FY2031-FY2050 tail
+    # without opening the manifest.
+    if str(long_run_shape_state["schedule_id"]) != UNBLENDED_SCHEDULE_ID:
+        st.caption(
+            "Long-run construction — "
+            + _long_run_shape_details_text(
+                long_run_shape_state, _selected_vfm_scenario_label()
+            ).replace("  \n", " · ")
+        )
     sensitivity_key = selected_sensitivity_key(
         fleet_efficiency=selected_fleet_efficiency,
         pt_mode_shift=selected_pt_mode_shift,

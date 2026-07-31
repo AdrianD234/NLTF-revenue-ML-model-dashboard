@@ -246,6 +246,37 @@ class TestShapeCapabilityIsDerived:
         assert derived["supports_long_run_shape"] is False
         assert "heavy_ruc_net_km" in derived["long_run_shape_missing_series"]
 
+    def test_a_vintage_that_stops_before_fy2050_is_refused(self):
+        """Eligibility must require the WHOLE window, not just the anchor.
+
+        A vintage ending at FY2044 covers the anchor and then some, but the
+        constructor needs FY2030-FY2050. Advertising it as shape-capable would
+        make it selectable and then fail at construction.
+        """
+
+        pack = ov.load_official_vintage("BEFU26", repo_root=ROOT)
+        assert pack is not None
+        annual = pack.official_annual
+        truncated = annual[pd.to_numeric(annual["FY"], errors="coerce") <= 2044]
+        entry = dict(ov.official_vintage_entry("BEFU26", ROOT))
+        entry["source_horizon_fy"] = 2044
+        derived = ov._derive_long_run_shape_support(truncated, entry)
+        assert derived["supports_long_run_shape"] is False
+        assert derived["long_run_shape_end_fy"] is None
+
+    def test_a_vintage_reaching_exactly_fy2050_is_accepted(self):
+        """The boundary is inclusive: FY2050 coverage is enough."""
+
+        pack = ov.load_official_vintage("BEFU26", repo_root=ROOT)
+        assert pack is not None
+        annual = pack.official_annual
+        exact = annual[pd.to_numeric(annual["FY"], errors="coerce") <= 2050]
+        entry = dict(ov.official_vintage_entry("BEFU26", ROOT))
+        entry["source_horizon_fy"] = 2050
+        derived = ov._derive_long_run_shape_support(exact, entry)
+        assert derived["supports_long_run_shape"] is True
+        assert derived["long_run_shape_end_fy"] == 2050
+
     def test_a_vintage_that_stops_before_the_anchor_is_refused(self):
         pack = ov.load_official_vintage("BEFU26", repo_root=ROOT)
         assert pack is not None

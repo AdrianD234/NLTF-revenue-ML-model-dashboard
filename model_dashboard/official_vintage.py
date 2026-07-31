@@ -1597,7 +1597,13 @@ def _derive_long_run_shape_support(
             best_start, best_end = run_start, current
     horizon = int(entry.get("source_horizon_fy") or best_end)
     start, end = best_start, min(best_end, horizon)
-    supported = start <= LONG_RUN_SHAPE_DEFAULT_START_FY < end
+    # The vintage must cover the WHOLE configured shape window, not merely
+    # reach past the anchor. Accepting a vintage that stops at, say, FY2044
+    # would advertise it as shape-capable and selectable, only for the
+    # constructor to fail later on missing FY2045-FY2050 observations. The
+    # eligibility check and the constructor's requirement have to be the same
+    # requirement.
+    supported = start <= LONG_RUN_SHAPE_DEFAULT_START_FY and end >= LONG_RUN_SHAPE_DEFAULT_END_FY
     return {
         "supports_long_run_shape": bool(supported),
         "long_run_shape_start_fy": int(start) if supported else None,
