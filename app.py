@@ -229,6 +229,15 @@ from model_dashboard.official_vintage import (
     official_vintage_entry,
     official_vintage_pack_files,
 )
+from model_dashboard.revenue_scenario_key import (
+    HEAVY_BEV_DEFAULT,
+    RevenueScenarioComputationKey,
+    as_scenario_key,
+)
+
+# What a helper will accept: the typed key, or a historic positional tuple from
+# an older cache entry or test. Production builds the typed key directly.
+ScenarioKeyLike = RevenueScenarioComputationKey | tuple
 from model_dashboard.revenue_outlook import (
     CURRENT_REVENUE_OUTLOOK_DIR,
     FAN_SOURCE_AUTO,
@@ -797,13 +806,29 @@ def _apply_sensitivity_for_key(
     )
 
 
+def _scenario_key(ev_uptake_key: ScenarioKeyLike) -> RevenueScenarioComputationKey:
+    """Coerce whatever a caller passed into the typed scenario key.
+
+    The single place that knows the historic positional layout exists.  Every
+    helper below reads NAMED fields, so no control can be re-interpreted by an
+    unrelated reader the way slot 6 was read both as the official comparator
+    vintage id and as the Heavy-BEV flag.
+    """
+    return as_scenario_key(
+        ev_uptake_key,
+        default_official_comparator_vintage_id=_registry_default_comparator_vintage_id(),
+        default_current_fed_policy_state=FED_POLICY_DELAYED_6M,
+    )
+
+
 @st.cache_data(show_spinner=False, max_entries=32)
-def _resolve_ev_uptake_levers(ev_uptake_key: tuple[Any, ...]) -> UptakeLevers | None:
-    mode = str(ev_uptake_key[0]) if ev_uptake_key else EV_UPTAKE_GOVERNED_OPTION
+def _resolve_ev_uptake_levers(ev_uptake_key: ScenarioKeyLike) -> UptakeLevers | None:
+    key = _scenario_key(ev_uptake_key)
+    mode = key.uptake_basis or EV_UPTAKE_GOVERNED_OPTION
     if mode == EV_UPTAKE_GOVERNED_OPTION:
         return None
     if mode == EV_UPTAKE_CUSTOM_OPTION:
-        values = ev_uptake_key[1] if len(ev_uptake_key) > 1 else ()
+        values = key.custom_ev_levers
         if len(values) != 13:
             return None
         return UptakeLevers(*[float(v) for v in values])
@@ -815,33 +840,32 @@ def _resolve_ev_uptake_levers(ev_uptake_key: tuple[Any, ...]) -> UptakeLevers | 
     return EV_UPTAKE_PRESETS.get(mode)
 
 
-def _resolve_uptake_basis(ev_uptake_key: tuple[Any, ...]) -> str | None:
+def _resolve_uptake_basis(ev_uptake_key: ScenarioKeyLike) -> str | None:
     """The exact vendored VFM scenario to compose with, or None for parametric.
 
     Returning a basis is what routes the composition through the governed
     table. Custom levers and the explicitly-labelled parametric approximation
     return None and fall back to the fitted curve.
     """
-    mode = str(ev_uptake_key[0]) if ev_uptake_key else EV_UPTAKE_GOVERNED_OPTION
+    mode = _scenario_key(ev_uptake_key).uptake_basis or EV_UPTAKE_GOVERNED_OPTION
     return mode if mode in EXACT_VFM_UPTAKE_BASES else None
 
 
-def _heavy_bev_transition_enabled(ev_uptake_key: tuple[Any, ...]) -> bool:
-    """Heavy BEV reclassification rides in slot 6 and defaults Off.
+def _heavy_bev_transition_enabled(ev_uptake_key: ScenarioKeyLike) -> bool:
+    """Heavy BEV reclassification: its own named field, and Off by default.
 
-    It previously ran unconditionally inside the light-fleet overlay, so
-    picking any light uptake basis silently moved Heavy RUC km and revenue
+    It previously rode in slot 6 of the positional key - the same slot the
+    official comparator vintage id was written to - so every production render
+    resolved ``bool("BEFU26")`` and silently moved Heavy RUC km and revenue
     into Heavy BEV against the settled HEAVY_RUC: not_reclassified contract.
-    Older keys resolve to the new default.
+    A vintage id is now a ``str`` field and cannot be read as this flag.
     """
-    if len(ev_uptake_key) <= 6:
-        return False
-    return bool(ev_uptake_key[6])
+    return _scenario_key(ev_uptake_key).heavy_bev_transition
 
 
-def _resolve_eruc_levers(ev_uptake_key: tuple[Any, ...]) -> ErucTransitionLevers | None:
-    """The e-RUC transition rides in slot 2 of the uptake key (optional)."""
-    values = ev_uptake_key[2] if len(ev_uptake_key) > 2 else ()
+def _resolve_eruc_levers(ev_uptake_key: ScenarioKeyLike) -> ErucTransitionLevers | None:
+    """The optional e-RUC transition levers for this scenario."""
+    values = _scenario_key(ev_uptake_key).eruc_levers
     if not values or len(values) != 5:
         return None
     return ErucTransitionLevers(*[float(v) for v in values])
@@ -934,15 +958,12 @@ PED_RETENTION_SENSITIVITY_HELP = (
 )
 
 
-def _ped_retention_enabled(ev_uptake_key: tuple[Any, ...]) -> bool:
-    """The PED petrol-retention sensitivity rides in slot 5 and defaults Off.
+def _ped_retention_enabled(ev_uptake_key: ScenarioKeyLike) -> bool:
+    """The PED petrol-retention sensitivity: named field, Off by default.
 
-    Older five-slot keys (cached callers and tests) therefore resolve to the
-    new default, which is the raw AR(1) Base path with no retention overlay.
+    Off means the raw AR(1) Base path with no retention overlay.
     """
-    if len(ev_uptake_key) <= 5:
-        return False
-    return bool(ev_uptake_key[5])
+    return _scenario_key(ev_uptake_key).ped_retention_sensitivity
 
 
 # The official comparator vintage selection rides in slots 6/7 of the uptake
@@ -996,40 +1017,30 @@ def _ordered_official_traces(selected_official_trace: str | None = None) -> list
     return officials
 
 
-def _official_vintage_scope(ev_uptake_key: tuple[Any, ...]) -> tuple[str, bool]:
+def _official_vintage_scope(ev_uptake_key: ScenarioKeyLike) -> tuple[str, bool]:
     """Return (selected official vintage id, overlay-prior-vintages flag)."""
-    vid = (
-        str(ev_uptake_key[6])
-        if len(ev_uptake_key) > 6 and str(ev_uptake_key[6] or "").strip()
-        else _registry_default_comparator_vintage_id()
-    )
-    overlay = bool(ev_uptake_key[7]) if len(ev_uptake_key) > 7 else False
-    return vid, overlay
+    key = _scenario_key(ev_uptake_key)
+    vid = key.official_comparator_vintage_id or _registry_default_comparator_vintage_id()
+    return vid, key.official_comparator_overlay
 
 
-def _official_vintage_filter_for_key(ev_uptake_key: tuple[Any, ...]) -> tuple[str, bool]:
+def _official_vintage_filter_for_key(ev_uptake_key: ScenarioKeyLike) -> tuple[str, bool]:
     """(selected official scenario_name, overlay flag) for row filtering."""
     vid, overlay = _official_vintage_scope(ev_uptake_key)
     return official_comparator_scenario_name(vid), overlay
 
 
-def _long_run_shape_scope(ev_uptake_key: tuple[Any, ...]) -> tuple[str, str]:
+def _long_run_shape_scope(ev_uptake_key: ScenarioKeyLike) -> tuple[str, str]:
     """(transition schedule id, long-run shape vintage id) for this key.
 
-    Slots 8/9, appended at the END so every existing positional read keeps
-    indexing correctly and an older 8-tuple still resolves to the pack default.
+    A key that names neither falls back to the unblended construction, which
+    is what a pre-selector key meant.
     """
-    schedule = (
-        str(ev_uptake_key[8])
-        if len(ev_uptake_key) > 8 and str(ev_uptake_key[8] or "").strip()
-        else UNBLENDED_SCHEDULE_ID
+    key = _scenario_key(ev_uptake_key)
+    return (
+        key.long_run_transition_schedule_id or UNBLENDED_SCHEDULE_ID,
+        key.long_run_shape_vintage_id,
     )
-    vintage = (
-        str(ev_uptake_key[9])
-        if len(ev_uptake_key) > 9 and str(ev_uptake_key[9] or "").strip()
-        else ""
-    )
-    return schedule, vintage
 
 
 def _shape_adjusted_signature(
@@ -1188,14 +1199,14 @@ def _filter_official_vintage_rows(
     return frame[~drop].copy()
 
 
-def _fed_policy_state_scope(ev_uptake_key: tuple[Any, ...]) -> tuple[str, str]:
-    """Return (Current state, MBU26 state), retaining legacy cache keys."""
-
-    current_raw: Any = ev_uptake_key[3] if len(ev_uptake_key) > 3 else FED_POLICY_DELAYED_6M
-    mbu26_raw: Any = ev_uptake_key[4] if len(ev_uptake_key) > 4 else current_raw
+def _fed_policy_state_scope(ev_uptake_key: ScenarioKeyLike) -> tuple[str, str]:
+    """Return (Current 12c policy state, official-comparator policy state)."""
+    key = _scenario_key(ev_uptake_key)
+    current = key.current_fed_policy_state or FED_POLICY_DELAYED_6M
+    official = key.official_fed_policy_state or current
     return (
-        _normalise_fed_policy_state(current_raw),
-        _normalise_fed_policy_state(mbu26_raw),
+        _normalise_fed_policy_state(current),
+        _normalise_fed_policy_state(official),
     )
 
 
@@ -1686,19 +1697,29 @@ CONE_MIN_RELATIVE_WIDTH = 1e-6
 
 def _cone_preset_key(
     preset_name: str,
-    band_controls: tuple[Any, ...],
-) -> tuple[Any, ...]:
-    """The live uptake key with ONLY the VFM composition basis swapped.
+    band_controls: RevenueScenarioComputationKey,
+) -> RevenueScenarioComputationKey:
+    """The live scenario key with ONLY the VFM composition basis swapped.
 
     Every other governed control - e-RUC, Current 12c policy, the PED
-    retention sensitivity, the official comparator vintage and overlay, the
-    long-run transition schedule and shape vintage - is carried through
-    verbatim, so the envelope is the Fast/Slow pair of the path actually on
-    screen rather than a differently-configured run that happens to share a
-    name.  ``band_controls`` is ``ev_uptake_key[1:]``; slot 0 is the basis the
-    caller is varying, which is why it is not part of the cache identity.
+    retention sensitivity, Heavy-BEV treatment, the official comparator
+    vintage and overlay, the long-run transition schedule and shape vintage -
+    is carried through verbatim, so the envelope is the Fast/Slow pair of the
+    path actually on screen rather than a differently-configured run that
+    happens to share a name.
     """
-    return (preset_name, *band_controls)
+    return _scenario_key(band_controls).replace(uptake_basis=preset_name)
+
+
+def _cone_band_controls(ev_uptake_key: ScenarioKeyLike) -> RevenueScenarioComputationKey:
+    """The band's cache identity: the live key with the basis field blanked.
+
+    The envelope always evaluates the Fast and Slow presets, so the DISPLAYED
+    basis must not be part of its identity - switching Base/Fast/Slow reuses
+    the cached band - while every other value-changing control still
+    invalidates it.
+    """
+    return _scenario_key(ev_uptake_key).replace(uptake_basis="")
 
 
 @st.cache_data(show_spinner=False, max_entries=6)
@@ -1710,7 +1731,7 @@ def cached_view_cone_band(
     traces: tuple[str, ...],
     sensitivity_key: tuple[str, str, str, str, str, str, str, str, str, str, str],
     bridge_mode: str,
-    band_controls: tuple[Any, ...],
+    band_controls: RevenueScenarioComputationKey,
     _pack: RevenueOutlookPack,
 ) -> pd.DataFrame:
     """MoT VFM Fast-Slow structural scenario envelope around the base case.
@@ -1719,10 +1740,9 @@ def cached_view_cone_band(
     governed VFM fleet-composition scenarios, so it says what the composition
     assumption is worth, not how likely any value is.
 
-    Keyed on ``band_controls`` (``ev_uptake_key[1:]``) rather than the whole
-    uptake key: the cone always evaluates the Fast and Slow presets, so
-    switching the displayed uptake basis reuses the cached band while any
-    other value-changing control still invalidates it.
+    Keyed on ``band_controls`` - the live scenario key with the displayed
+    basis field blanked - so switching the displayed uptake basis reuses the
+    cached band while any other value-changing control still invalidates it.
 
     Rows whose Fast/Slow gap does not clear ``CONE_MIN_RELATIVE_WIDTH`` at
     the trailing end are dropped rather than drawn at zero width.  The
@@ -1732,7 +1752,7 @@ def cached_view_cone_band(
     """
     bounds: dict[str, pd.Series] = {}
     for bound_name, preset_name in (("fast", "MoT VFM fast"), ("slow", "MoT VFM slow")):
-        preset_key = _cone_preset_key(preset_name, tuple(band_controls))
+        preset_key = _cone_preset_key(preset_name, band_controls)
         rows, _, _, _, _ = cached_scenario_overlay_rows(signature, sensitivity_key, bridge_mode, preset_key, _pack)
         bound_rows, _ = _filter_series_rows_with_fallback(rows, selected_series, time_grain, fed_path, traces)
         base_trace = bound_rows[
@@ -2200,7 +2220,7 @@ def cached_revenue_outlook_view(
     if ev_uptake_levers is not None:
         cone_band = cached_view_cone_band(
             signature, selected_series, time_grain, fed_path, traces,
-            sensitivity_key, bridge_mode, tuple(ev_uptake_key[1:]), _pack,
+            sensitivity_key, bridge_mode, _cone_band_controls(ev_uptake_key), _pack,
         )
     filtered_bridge = _filter_revenue_bridge_rows(
         bridge_components,
@@ -2271,10 +2291,10 @@ def cached_scenario_comparison_paths(
         # the finalist base case with the overlays switched off (the raw
         # finalist petrol bridge keeps all petrol activity to 2050, which is
         # the implausible path the displacement lever exists to correct).
-        mode = str(ev_uptake_key[0]) if ev_uptake_key else ""
+        mode = _scenario_key(ev_uptake_key).uptake_basis
         # The governed official option follows the SELECTED comparator vintage
-        # (uptake-key slot 6; vintage ids equal release rounds for registered
-        # vintages), not a hard-coded MBU26 trace.
+        # (vintage ids equal release rounds for registered vintages), not a
+        # hard-coded MBU26 trace.
         selected_vid, _ = _official_vintage_scope(ev_uptake_key)
         base_trace = (
             official_comparator_trace_name(selected_vid)
@@ -5369,22 +5389,29 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             st.caption(f"Single-view levers (still applied to the sections below the comparison): {lever_summary}")
         else:
             st.caption(f"Active levers: {lever_summary}")
-    ev_uptake_key: tuple[Any, ...] = (
-        selected_ev_uptake_mode,
-        custom_ev_levers,
-        eruc_lever_values,
-        fed_policy_state,
-        mbu_fed_policy_state,
-        ped_retention_sensitivity,
-        # Slots 6/7 (appended at the END so existing positional reads keep
-        # indexing correctly): official comparator vintage id + overlay flag.
-        # Both invalidate every cached figure/view keyed on this tuple.
-        str(official_vintage_state["vintage_id"]),
-        bool(official_vintage_state["overlay"]),
-        # Slots 8/9: the analyst long-run shape selection. Also folded into the
-        # pack signature, because the frames it changes are cached on that.
-        str(long_run_shape_state["schedule_id"]),
-        str(long_run_shape_state["shape_vintage_id"]),
+    # Every value-changing control, by NAME. The positional tuple this replaced
+    # had let the official comparator vintage id (slot 6) be read as the
+    # Heavy-BEV flag, so a non-empty vintage silently switched Heavy-BEV
+    # reclassification on in every production render.
+    ev_uptake_key = RevenueScenarioComputationKey(
+        engine=engine,
+        uptake_basis=selected_ev_uptake_mode,
+        custom_ev_levers=custom_ev_levers,
+        eruc_levers=eruc_lever_values,
+        current_fed_policy_state=fed_policy_state,
+        official_fed_policy_state=mbu_fed_policy_state,
+        ped_retention_sensitivity=ped_retention_sensitivity,
+        # Explicit, and Off unless a reader asks for it. Never inferred from
+        # another field's truthiness.
+        heavy_bev_transition=HEAVY_BEV_DEFAULT,
+        official_comparator_vintage_id=str(official_vintage_state["vintage_id"]),
+        official_comparator_overlay=bool(official_vintage_state["overlay"]),
+        ped_bridge_mode=str(selected_ped_bridge_mode),
+        bridge_vintage_id=str(bridge_vintage_id),
+        # Also folded into the pack signature, because the frames these change
+        # are cached on that.
+        long_run_transition_schedule_id=str(long_run_shape_state["schedule_id"]),
+        long_run_shape_vintage_id=str(long_run_shape_state["shape_vintage_id"]),
     )
     pack, pack_signature = _apply_long_run_shape_selection(
         pack, pack_signature, str(pack_dir), ev_uptake_key
@@ -8242,15 +8269,12 @@ def _render_comparison_scenario_column(
                 "policy counterfactual; generating one requires a separate owner decision."
             )
         sensitivity_key = selected_sensitivity_key("Off", "Off", "Off", freight_rail_shift="Off")
-        ev_uptake_key: tuple[Any, ...] = (
-            EV_UPTAKE_GOVERNED_OPTION,
-            (),
-            (),
-            FED_POLICY_PUBLISHED,
-            official_policy_state,
-            False,
-            selected_vid,
-            False,
+        ev_uptake_key = RevenueScenarioComputationKey(
+            uptake_basis=EV_UPTAKE_GOVERNED_OPTION,
+            current_fed_policy_state=FED_POLICY_PUBLISHED,
+            official_fed_policy_state=official_policy_state,
+            heavy_bev_transition=HEAVY_BEV_DEFAULT,
+            official_comparator_vintage_id=selected_vid,
         )
         return sensitivity_key, ev_uptake_key
     _validated_select_state(
@@ -8270,15 +8294,16 @@ def _render_comparison_scenario_column(
         ),
     )
     sensitivity_key = selected_sensitivity_key(fleet, pt_shift, "Off", freight_rail_shift=freight)
-    ev_uptake_key = (
-        uptake,
-        (),
-        eruc_values,
-        fed_policy_state,
-        FED_POLICY_PUBLISHED,
-        bool(st.session_state.get("revenue_outlook_ped_retention_sensitivity", False)),
-        selected_vid,
-        False,
+    ev_uptake_key = RevenueScenarioComputationKey(
+        uptake_basis=uptake,
+        eruc_levers=eruc_values,
+        current_fed_policy_state=fed_policy_state,
+        official_fed_policy_state=FED_POLICY_PUBLISHED,
+        ped_retention_sensitivity=bool(
+            st.session_state.get("revenue_outlook_ped_retention_sensitivity", False)
+        ),
+        heavy_bev_transition=HEAVY_BEV_DEFAULT,
+        official_comparator_vintage_id=selected_vid,
     )
     return sensitivity_key, ev_uptake_key
 
@@ -8307,8 +8332,9 @@ def _copy_page_settings_to_scenario_a() -> None:
     )
 
 
-def _scenario_summary_text(sensitivity_key: tuple, ev_uptake_key: tuple) -> str:
-    mode = str(ev_uptake_key[0])
+def _scenario_summary_text(sensitivity_key: tuple, ev_uptake_key: ScenarioKeyLike) -> str:
+    key = _scenario_key(ev_uptake_key)
+    mode = key.uptake_basis
     selected_vid, _ = _official_vintage_scope(ev_uptake_key)
     parts = [
         _comparison_mot_official_option(selected_vid)
@@ -8318,7 +8344,7 @@ def _scenario_summary_text(sensitivity_key: tuple, ev_uptake_key: tuple) -> str:
     for label, value in [("Fleet", sensitivity_key[0]), ("PT", sensitivity_key[1]), ("Freight", sensitivity_key[9])]:
         if value != "Off":
             parts.append(f"{label} {value}")
-    if len(ev_uptake_key) > 2 and ev_uptake_key[2]:
+    if key.eruc_levers:
         parts.append("e-RUC on")
     current_state, mbu26_state = _fed_policy_state_scope(ev_uptake_key)
     if mode == EV_UPTAKE_GOVERNED_OPTION:

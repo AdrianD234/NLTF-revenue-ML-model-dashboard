@@ -295,7 +295,7 @@ def test_base_and_comparison_scenarios_do_not_borrow_one_anothers_band(
 
 # ----------------------------- 10, 11. schedule and policy enter the band
 def test_the_selected_long_run_schedule_enters_the_band_identity(pack, signature) -> None:
-    """Slots 8/9 are carried into the Fast/Slow runs, not silently defaulted.
+    """The schedule/shape selection is carried into the Fast/Slow runs.
 
     The band VALUES are equal across schedules here, and correctly so: the
     transition schedule only reshapes FY2031-FY2050, which is exactly the
@@ -305,15 +305,19 @@ def test_the_selected_long_run_schedule_enters_the_band_identity(pack, signature
     """
     balanced = uptake_key(schedule="balanced_structural", shape_vintage="BEFU26")
     unblended = uptake_key(schedule=app.UNBLENDED_SCHEDULE_ID, shape_vintage="")
-    assert app._cone_preset_key("MoT VFM fast", tuple(balanced[1:]))[8:] == (
-        "balanced_structural", "BEFU26",
-    )
-    assert app._cone_preset_key("MoT VFM fast", tuple(unblended[1:]))[8:] == (
-        app.UNBLENDED_SCHEDULE_ID, "",
-    )
+    balanced_preset = app._cone_preset_key("MoT VFM fast", app._cone_band_controls(balanced))
+    unblended_preset = app._cone_preset_key("MoT VFM fast", app._cone_band_controls(unblended))
+    assert balanced_preset.uptake_basis == "MoT VFM fast"
+    assert app._long_run_shape_scope(balanced_preset) == ("balanced_structural", "BEFU26")
+    assert app._long_run_shape_scope(unblended_preset) == (app.UNBLENDED_SCHEDULE_ID, "")
     assert app._long_run_shape_scope(
-        app._cone_preset_key("MoT VFM slow", tuple(balanced[1:]))
+        app._cone_preset_key("MoT VFM slow", app._cone_band_controls(balanced))
     ) == ("balanced_structural", "BEFU26")
+    # The band's cache identity must exclude the displayed basis and nothing else.
+    assert app._cone_band_controls(uptake_key("MoT VFM fast")) == app._cone_band_controls(
+        uptake_key("MoT VFM slow")
+    )
+    assert app._cone_band_controls(balanced) != app._cone_band_controls(unblended)
     # And the band still computes under both selections.
     assert not view_for(pack, signature, key=balanced)["cone_band"].empty
     assert not view_for(pack, signature, key=unblended)["cone_band"].empty
