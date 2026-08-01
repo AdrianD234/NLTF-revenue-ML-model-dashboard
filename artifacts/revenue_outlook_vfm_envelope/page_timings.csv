@@ -1,0 +1,7 @@
+layout,stage,elapsed_ms
+shared,selector metadata (pack load + signature),359.2
+shared,view (cold),10920.17
+shared,VFM band construction,50.3
+shared,main Total path figure,111.65
+before (fan rendered eagerly beside the chart),separate fan figure,25.57
+after (fan behind an explicit request),separate fan figure,0.0

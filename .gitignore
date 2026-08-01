@@ -62,6 +62,8 @@ artifacts/**
 !artifacts/official_vintage_befu26/**
 !artifacts/anchored_structural_shape_transition/
 !artifacts/anchored_structural_shape_transition/**
+!artifacts/revenue_outlook_vfm_envelope/
+!artifacts/revenue_outlook_vfm_envelope/**
 data/**
 !data/.gitkeep
 !data/dashboard_evidence_pack/

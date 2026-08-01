@@ -1090,8 +1090,11 @@ def test_revenue_outlook_page_does_not_render_summary_kpi_cards() -> None:
     source = inspect.getsource(app.render_revenue_outlook_page)
     assert "_revenue_outlook_summary_cards(" not in source
     assert "kpi_grid(revenue_kpis)" not in source
-    # The fan card is deliberately BACK on the page (417f34a undone).
+    # The fan card is still reachable, but behind an explicit request: the
+    # Total path chart now carries the MoT VFM Fast-Slow range full width.
     assert "_render_revenue_outlook_fan_card(" in source
+    assert "revenue_outlook_show_fan_detail" in source
+    assert "st.columns([0.64, 0.36])" not in source
     assert "revenue_outlook_sensitivity_demand_elasticity" not in source
     assert "revenue_outlook_sensitivity_cost_ratio" not in source
     assert '"Traces"' not in source
@@ -1123,10 +1126,21 @@ def test_revenue_outlook_cloud_hides_debug_toggles_and_shows_full_composition(mo
     assert not at.exception
     # Debug toggles stay hidden on cloud. The two 12c controls are explicit
     # three-state selectors rather than ambiguous ON/OFF toggles.
+    #
+    # The last two are governance detail surfaces, not debug controls, and are
+    # deliberately available on cloud: they are how the empirical fan's source
+    # data and the VFM envelope's applicability stay reachable now that the
+    # separate fan card no longer renders by default. Both default to off, so
+    # neither is constructed unless a reader asks for it.
     assert [(toggle.label, toggle.key) for toggle in at.toggle] == [
         ("Freight rail shift", "revenue_outlook_sensitivity_freight_rail_toggle"),
         ("Move petrol fleet to e-RUC", "revenue_outlook_eruc_toggle"),
+        ("Show forecast-uncertainty fan detail", "revenue_outlook_show_fan_detail"),
+        ("Show MoT VFM Fast–Slow range audit", "revenue_outlook_show_vfm_envelope_audit"),
     ]
+    assert not any(toggle.value for toggle in at.toggle[2:]), (
+        "the detail surfaces must default to off"
+    )
     policy_selectors = {
         selectbox.key: selectbox
         for selectbox in at.selectbox

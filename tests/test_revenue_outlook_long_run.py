@@ -95,9 +95,25 @@ def test_horizon_metadata_survives_in_the_governed_pack(chart) -> None:
 
 
 # ------------------------------------------------------------------- 3-6. fan
-def test_uncertainty_fan_is_rendered_again(pack) -> None:
+def test_fan_data_stays_governed_but_is_no_longer_eagerly_rendered(pack) -> None:
+    """The fan CARD left the default layout; the fan DATA did not.
+
+    Replaces the earlier "is rendered again" pin. The owner decision moved the
+    empirical fan behind an explicit request so the Total path chart can carry
+    the MoT VFM Fast-Slow range full width, but every governed source frame,
+    availability row and audit stays exactly as committed.
+    """
     source = inspect.getsource(app.render_revenue_outlook_page)
-    assert "_render_revenue_outlook_fan_card(" in source
+    assert "_render_revenue_outlook_fan_card(" in source, (
+        "the fan must still be reachable, just not by default"
+    )
+    # Reachable only from an explicitly requested detail surface.
+    assert "revenue_outlook_show_fan_detail" in source
+    fan_call = source.index("_render_revenue_outlook_fan_card(")
+    gate = source.index("revenue_outlook_show_fan_detail")
+    assert gate < fan_call, "the fan card must sit behind its request gate"
+    # The primary layout no longer splits the row with the fan.
+    assert "st.columns([0.64, 0.36])" not in source
     assert not pack.fan_band_rows.empty
     assert not pack.fan_availability.empty
 
@@ -163,10 +179,27 @@ def test_scenario_spread_is_never_labelled_a_confidence_interval(pack) -> None:
 def test_the_vfm_composition_band_stays_separate_from_the_fan() -> None:
     """Two different concepts must not share a visual language."""
     total_path = inspect.getsource(app.revenue_outlook_total_path_figure)
-    assert "MoT VFM fast–slow range" in total_path
-    assert "rgba(0,111,173" in total_path, "the VFM cone keeps its blue"
+    assert app.VFM_ENVELOPE_LEGEND_LABEL == "MoT VFM fast–slow range"
+    assert "VFM_ENVELOPE_LEGEND_LABEL" in total_path
+    assert "VFM_ENVELOPE_FILL_COLOR" in total_path
+    assert app.VFM_ENVELOPE_FILL_COLOR.startswith("rgba(0,111,173"), "the VFM cone keeps its blue"
+    assert app.VFM_ENVELOPE_BOUNDARY_LINE["color"].startswith("rgba(0,111,173")
+    assert app.VFM_ENVELOPE_BOUNDARY_LINE["dash"] == "dot"
     fan = inspect.getsource(app.revenue_outlook_uncertainty_fan_figure)
     assert "rgba(128, 128, 128" in fan and "rgba(96, 96, 96" in fan, "the fan is gray"
+
+
+def test_the_vfm_envelope_is_never_described_as_probabilistic() -> None:
+    """The blue range is a structural scenario envelope, not an interval."""
+    note = app.VFM_ENVELOPE_NOT_PROBABILISTIC_NOTE.lower()
+    assert "not probabilistic" in note
+    assert "scenario" in note
+    # Interval words may appear only inside the disclaimer that denies them.
+    denial = "it is not a confidence, credible or prediction interval"
+    assert denial in note
+    remainder = note.replace(denial, "")
+    for banned in ("confidence", "credible", "prediction interval", "probability of"):
+        assert banned not in remainder, banned
 
 
 # --------------------------------------------------- 7, 8. short-run unchanged

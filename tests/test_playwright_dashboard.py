@@ -211,8 +211,10 @@ def test_dashboard_pages_render_without_browser_errors(page: Page) -> None:
             for title in [
                 "Revenue Outlook controls",
                 "Total path chart",
-                # Restored beside the total path chart (417f34a undone).
-                "Uncertainty fan",
+                # The uncertainty fan no longer shares this row: the Total
+                # path chart is full width and carries the MoT VFM Fast-Slow
+                # range. Its request gate stays above the fold in its place.
+                "Show forecast-uncertainty fan detail",
             ]:
                 assert_text_above_fold(page, title)
             for title in [
@@ -502,9 +504,9 @@ def test_revenue_outlook_is_responsive_without_horizontal_overflow(page: Page) -
     expect(page.get_by_text("Total path chart", exact=False).first).to_be_visible(
         timeout=90000
     )
-    expect(page.get_by_text("Uncertainty fan", exact=False).first).to_be_visible(
-        timeout=90000
-    )
+    expect(
+        page.get_by_text("Show forecast-uncertainty fan detail", exact=False).first
+    ).to_be_visible(timeout=90000)
     overflow = page.evaluate(
         """() => {
             const bad = [];
@@ -1318,11 +1320,12 @@ def assert_revenue_outlook_primary_runtime_contract(
         assert by_name["MBU26 official"]["dash"] in {"dash", "dashdot"}
     page_text = page.locator("body").inner_text(timeout=60000)
     assert selected_series in page_text
-    # The uncertainty fan card is restored on Revenue Outlook (417f34a
-    # undone). Its source control is a compact popover, not the old
-    # permanent selectbox that sat above the chart.
-    assert "Uncertainty fan" in page_text
-    assert "Fan source details" in page_text
+    # The uncertainty fan is governed but no longer eagerly rendered: only
+    # its request gate is on the default page, and the fan figure's own
+    # controls ("Fan source details") must not have been constructed.
+    assert "Show forecast-uncertainty fan detail" in page_text
+    assert "Uncertainty fan" not in page_text
+    assert "Fan source details" not in page_text
 
 
 def assert_revenue_outlook_composition_below_primary(page: Page) -> None:

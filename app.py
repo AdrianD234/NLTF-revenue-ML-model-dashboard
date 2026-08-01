@@ -1677,6 +1677,30 @@ def _filter_series_rows_with_fallback(
     return filtered, used_fallback
 
 
+# A band row counts as carrying real VFM width once the Fast/Slow gap clears
+# this fraction of the row's own level. Relative to the ROW, not to the series
+# maximum: a Total-revenue tail near $13b would otherwise swamp a genuine
+# sub-percent gap in FY2026 and read as "no range".
+CONE_MIN_RELATIVE_WIDTH = 1e-6
+
+
+def _cone_preset_key(
+    preset_name: str,
+    band_controls: tuple[Any, ...],
+) -> tuple[Any, ...]:
+    """The live uptake key with ONLY the VFM composition basis swapped.
+
+    Every other governed control - e-RUC, Current 12c policy, the PED
+    retention sensitivity, the official comparator vintage and overlay, the
+    long-run transition schedule and shape vintage - is carried through
+    verbatim, so the envelope is the Fast/Slow pair of the path actually on
+    screen rather than a differently-configured run that happens to share a
+    name.  ``band_controls`` is ``ev_uptake_key[1:]``; slot 0 is the basis the
+    caller is varying, which is why it is not part of the cache identity.
+    """
+    return (preset_name, *band_controls)
+
+
 @st.cache_data(show_spinner=False, max_entries=6)
 def cached_view_cone_band(
     signature: tuple[tuple[str, int, int], ...],
@@ -1686,24 +1710,29 @@ def cached_view_cone_band(
     traces: tuple[str, ...],
     sensitivity_key: tuple[str, str, str, str, str, str, str, str, str, str, str],
     bridge_mode: str,
-    eruc_values: tuple[float, ...],
-    current_fed_policy_state: str,
+    band_controls: tuple[Any, ...],
     _pack: RevenueOutlookPack,
 ) -> pd.DataFrame:
-    """MoT VFM fast/slow fleet-transition envelope around the base-case trace.
+    """MoT VFM Fast-Slow structural scenario envelope around the base case.
 
-    Keyed without the selected uptake levers: the cone always uses the fast
-    and slow presets, so switching the uptake basis reuses the cached band.
+    NOT a confidence, credible or prediction interval: it is the pair of
+    governed VFM fleet-composition scenarios, so it says what the composition
+    assumption is worth, not how likely any value is.
+
+    Keyed on ``band_controls`` (``ev_uptake_key[1:]``) rather than the whole
+    uptake key: the cone always evaluates the Fast and Slow presets, so
+    switching the displayed uptake basis reuses the cached band while any
+    other value-changing control still invalidates it.
+
+    Rows whose Fast/Slow gap does not clear ``CONE_MIN_RELATIVE_WIDTH`` at
+    the trailing end are dropped rather than drawn at zero width.  The
+    FY2031-FY2050 post-model layer is composition-invariant by construction,
+    so a zero-width band carried across it would draw a flat line that reads
+    as certainty about the long run.
     """
     bounds: dict[str, pd.Series] = {}
     for bound_name, preset_name in (("fast", "MoT VFM fast"), ("slow", "MoT VFM slow")):
-        preset_key = (
-            preset_name,
-            (),
-            tuple(eruc_values),
-            _normalise_fed_policy_state(current_fed_policy_state),
-            FED_POLICY_PUBLISHED,
-        )
+        preset_key = _cone_preset_key(preset_name, tuple(band_controls))
         rows, _, _, _, _ = cached_scenario_overlay_rows(signature, sensitivity_key, bridge_mode, preset_key, _pack)
         bound_rows, _ = _filter_series_rows_with_fallback(rows, selected_series, time_grain, fed_path, traces)
         base_trace = bound_rows[
@@ -1721,17 +1750,120 @@ def cached_view_cone_band(
     merged = pd.DataFrame(bounds).dropna()
     if merged.empty:
         return pd.DataFrame()
-    spread = (merged["fast"] - merged["slow"]).abs()
-    scale = merged.abs().to_numpy().max()
-    if not (scale > 0 and float(spread.max()) / scale > 1e-6):
-        return pd.DataFrame()
-    return pd.DataFrame(
+    band = pd.DataFrame(
         {
             "period": merged.index,
             "lower": merged.min(axis=1).to_numpy(),
             "upper": merged.max(axis=1).to_numpy(),
         }
     )
+    return _clip_cone_band_to_supported_periods(band)
+
+
+def _clip_cone_band_to_supported_periods(band: pd.DataFrame) -> pd.DataFrame:
+    """Keep the contiguous span the VFM composition actually moves.
+
+    Interior periods are retained even when momentarily flat, so the filled
+    area stays one continuous shape; only the leading and trailing runs of
+    composition-invariant periods are cut.  A series the VFM assumption never
+    moves returns empty - width is never fabricated for visual consistency.
+    """
+    if band is None or band.empty:
+        return pd.DataFrame()
+    level = ((band["upper"].abs() + band["lower"].abs()) / 2.0).replace(0.0, pd.NA)
+    material = ((band["upper"] - band["lower"]).abs() / level).fillna(0.0) > CONE_MIN_RELATIVE_WIDTH
+    if not bool(material.any()):
+        return pd.DataFrame()
+    order = band["period"].astype(str).map(_revenue_period_order)
+    supported = order[material]
+    keep = order.between(supported.min(), supported.max())
+    return band[keep].reset_index(drop=True)
+
+
+VFM_ENVELOPE_METHOD = "Integrated VFM Scenario Envelope"
+VFM_ENVELOPE_LEGEND_LABEL = "MoT VFM fast–slow range"
+# Brand blue, kept deliberately pale so the envelope reads as background and
+# every path stays legible above it. Raised from the original 0.10 fill /
+# 0.28 boundary once the chart went full width: at those values the dotted
+# boundaries were sub-pixel on a 1836px plot and the envelope was invisible
+# even on Light RUC, where the Fast/Slow gap reaches 12.7% of level. Tune
+# here - the two constants are the whole visual contract.
+VFM_ENVELOPE_FILL_COLOR = "rgba(0,111,173,0.16)"
+VFM_ENVELOPE_BOUNDARY_LINE = {"color": "rgba(0,111,173,0.55)", "width": 1.2, "dash": "dot"}
+VFM_ENVELOPE_NOT_PROBABILISTIC_NOTE = (
+    "MoT VFM Fast–Slow structural scenario envelope — not probabilistic. The "
+    "shaded range is the pair of governed MoT VFM fleet-composition scenarios "
+    "(Fast and Slow) run through the same engine, vintages, schedule, policy "
+    "and macro settings as the Current path it wraps. It is not a confidence, "
+    "credible or prediction interval and carries no probability. The separate "
+    "empirical 50%/80% forecast-error fan is a different concept and stops at "
+    "FY2030."
+)
+
+
+def _vfm_envelope_applicability_audit(
+    band: pd.DataFrame | None,
+    *,
+    selected_series: str,
+    time_grain: str,
+    ev_uptake_levers_available: bool,
+) -> pd.DataFrame:
+    """One row saying whether this series gets a band, and why not when it does not.
+
+    Written so a reader can tell "no band" (the VFM composition does not move
+    this series) apart from "band suppressed" (a control made the envelope
+    unavailable) without opening the code.
+    """
+    row: dict[str, Any] = {
+        "method": VFM_ENVELOPE_METHOD,
+        "selected_series": str(selected_series),
+        "time_grain": str(time_grain),
+        "band_available": False,
+        "lower_source_scenario": "",
+        "upper_source_scenario": "",
+        "first_valid_period": "",
+        "last_valid_period": "",
+        "max_width": "",
+        "max_width_pct_of_level": "",
+        "probabilistic": False,
+        "reason": "",
+    }
+    if not ev_uptake_levers_available:
+        row["reason"] = (
+            "The governed-pack option carries no VFM composition lever, so no "
+            "Fast/Slow pair exists to bound."
+        )
+        return pd.DataFrame([row])
+    if band is None or band.empty:
+        row["reason"] = (
+            "The MoT VFM Fast and Slow compositions produce the same values for "
+            "this series under the selected controls, so no range is drawn. "
+            "Width is never fabricated for visual consistency."
+        )
+        return pd.DataFrame([row])
+    width = (pd.to_numeric(band["upper"], errors="coerce") - pd.to_numeric(band["lower"], errors="coerce")).abs()
+    level = (pd.to_numeric(band["upper"], errors="coerce").abs() + pd.to_numeric(band["lower"], errors="coerce").abs()) / 2.0
+    periods = band["period"].astype(str)
+    row.update(
+        {
+            "band_available": True,
+            # min/max per period, so neither bound is nailed to one scenario:
+            # Fast is the upper bound for RUC classes and the lower bound for
+            # petrol-dependent series.
+            "lower_source_scenario": "min(MoT VFM fast, MoT VFM slow)",
+            "upper_source_scenario": "max(MoT VFM fast, MoT VFM slow)",
+            "first_valid_period": periods.iloc[0],
+            "last_valid_period": periods.iloc[-1],
+            "max_width": round(float(width.max()), 6),
+            "max_width_pct_of_level": round(float((100.0 * width / level.replace(0.0, pd.NA)).max()), 6),
+            "reason": (
+                "Clipped to the periods the VFM composition moves. The "
+                "FY2031-FY2050 post-model extrapolation layer is "
+                "composition-invariant, so the envelope is not carried across it."
+            ),
+        }
+    )
+    return pd.DataFrame([row])
 
 
 def _annual_chart_value_lookup(chart_rows: pd.DataFrame) -> tuple[dict[tuple[str, int, str], float], dict[str, str]]:
@@ -2060,15 +2192,15 @@ def cached_revenue_outlook_view(
         chart_rows, selected_series, time_grain, fed_path, traces
     )
 
-    # MoT VFM fleet-transition cone: the fast/slow scenario envelope around
-    # the base-case trace. Computed with the same pipeline so the band is
-    # exactly what the chart would show under those presets.
+    # MoT VFM Fast-Slow structural scenario envelope around the base-case
+    # trace. Computed through the same pipeline, with every non-VFM control
+    # inherited from this key, so the band is exactly what the chart would
+    # show under those two governed composition scenarios.
     cone_band = pd.DataFrame()
     if ev_uptake_levers is not None:
-        eruc_values = tuple(float(v) for v in (ev_uptake_key[2] if len(ev_uptake_key) > 2 else ()) or ())
         cone_band = cached_view_cone_band(
             signature, selected_series, time_grain, fed_path, traces,
-            sensitivity_key, bridge_mode, eruc_values, current_fed_policy_state, _pack,
+            sensitivity_key, bridge_mode, tuple(ev_uptake_key[1:]), _pack,
         )
     filtered_bridge = _filter_revenue_bridge_rows(
         bridge_components,
@@ -2089,6 +2221,12 @@ def cached_revenue_outlook_view(
         "ev_uptake_applied": ev_uptake_levers is not None and not ev_uptake_audit.empty,
         "ev_uptake_audit": ev_uptake_audit,
         "cone_band": cone_band,
+        "cone_band_audit": _vfm_envelope_applicability_audit(
+            cone_band,
+            selected_series=selected_series,
+            time_grain=time_grain,
+            ev_uptake_levers_available=ev_uptake_levers is not None,
+        ),
         "eruc_applied": eruc_levers is not None and not eruc_audit.empty,
         "eruc_audit": eruc_audit,
         "fed_uplift_off": effective_current_fed_uplift_off or effective_mbu26_fed_uplift_off,
@@ -5351,6 +5489,9 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         )
         timer.stop("main path figure")
         total_path_notes = []
+        cone_band_for_notes = view.get("cone_band")
+        if isinstance(cone_band_for_notes, pd.DataFrame) and not cone_band_for_notes.empty:
+            total_path_notes.append(VFM_ENVELOPE_NOT_PROBABILISTIC_NOTE)
         if view.get("quarterly_disaggregated"):
             total_path_notes.append(QUARTERLY_DISAGGREGATION_NOTE)
         if view.get("ev_uptake_applied"):
@@ -5404,29 +5545,68 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             CONFLICT_NOTE_BY_TRACE[trace] for trace in selected_conflict_traces
         ]
         total_path_notes.extend(conflict_notes)
-        # Restored layout (removed in 417f34a): total path beside the
-        # uncertainty fan, 64/36 on desktop. Streamlit columns stack
-        # automatically on narrow viewports.
-        primary_cols = st.columns([0.64, 0.36])
-        with primary_cols[0]:
-            chart_card(
-                "Total path chart",
-                "\n\n".join(total_path_notes),
-                main_path_figure,
-                caption="\n\n".join(conflict_notes) if conflict_notes else None,
-                notes_as_tooltip=True,
-            )
-        with primary_cols[1]:
-            timer.start("fan figure")
-            _render_revenue_outlook_fan_card(
-                pack_signature,
-                fan_band_rows,
-                fan_availability,
-                selected_series=selected_stream,
-                selected_fed_path=selected_fed_path,
-                official_fed_paths=official_vintage_state["displayed_release_rounds"],
-            )
-            timer.stop("fan figure")
+        # Integrated VFM Scenario Envelope: the governed MoT VFM Fast-Slow
+        # range now sits ON this chart, so the Total path takes the full page
+        # width and the separate uncertainty-fan card no longer competes with
+        # it for space. The fan's governed source data is unchanged and stays
+        # reachable from the collapsed detail surface below; it is not
+        # constructed unless a reader explicitly asks for it.
+        chart_card(
+            "Total path chart",
+            "\n\n".join(total_path_notes),
+            main_path_figure,
+            caption="\n\n".join(conflict_notes) if conflict_notes else None,
+            notes_as_tooltip=True,
+        )
+        _render_revenue_outlook_vfm_envelope_caption(view)
+
+    if not compare_mode and st.toggle(
+        "Show forecast-uncertainty fan detail",
+        value=False,
+        key="revenue_outlook_show_fan_detail",
+        help=(
+            "The empirical 50%/80% forecast-error fan, its source, its "
+            "supported horizon and its download. A different concept from the "
+            "MoT VFM Fast–Slow range on the chart above: the fan is an "
+            "empirical forecast-error band and stops at FY2030."
+        ),
+    ):
+        timer.start("fan figure")
+        _render_revenue_outlook_fan_card(
+            pack_signature,
+            fan_band_rows,
+            fan_availability,
+            selected_series=selected_stream,
+            selected_fed_path=selected_fed_path,
+            official_fed_paths=official_vintage_state["displayed_release_rounds"],
+        )
+        timer.stop("fan figure")
+
+    if not compare_mode and st.toggle(
+        "Show MoT VFM Fast–Slow range audit",
+        value=False,
+        key="revenue_outlook_show_vfm_envelope_audit",
+        help=(
+            "Whether the selected series receives the structural scenario "
+            "envelope, which scenarios bound it, over which years, and why it "
+            "is absent when it is."
+        ),
+    ):
+        with st.container(border=True):
+            st.caption(VFM_ENVELOPE_NOT_PROBABILISTIC_NOTE)
+            envelope_audit = view.get("cone_band_audit", pd.DataFrame())
+            if isinstance(envelope_audit, pd.DataFrame) and not envelope_audit.empty:
+                display_table(envelope_audit, height=120)
+            envelope_band = view.get("cone_band", pd.DataFrame())
+            if isinstance(envelope_band, pd.DataFrame) and not envelope_band.empty:
+                display_table(envelope_band, height=260)
+                st.download_button(
+                    "Download VFM Fast–Slow range (CSV)",
+                    envelope_band.to_csv(index=False).encode("utf-8"),
+                    file_name="revenue_outlook_vfm_fast_slow_range.csv",
+                    mime="text/csv",
+                    key="revenue_outlook_vfm_envelope_download",
+                )
 
     if revenue_outlook_lazy_table(
         "Show Middle East fuel-scenario audit",
@@ -9586,8 +9766,9 @@ def revenue_outlook_total_path_figure(
     scenario_colors = _scenario_color_map(data)
     fig = go.Figure()
 
-    # MoT VFM fleet-transition cone: fast/slow scenario envelope drawn first
-    # so every line sits above the shading.
+    # MoT VFM Fast-Slow structural scenario envelope, drawn FIRST so every
+    # line sits above the shading. A scenario envelope, not probabilistic:
+    # see VFM_ENVELOPE_NOT_PROBABILISTIC_NOTE, carried as a chart note.
     if cone_band is not None and not cone_band.empty:
         band = cone_band.copy()
         band["_order"] = band["period"].astype(str).map(_revenue_period_order)
@@ -9603,7 +9784,7 @@ def revenue_outlook_total_path_figure(
                     x=band_x,
                     y=upper,
                     mode="lines",
-                    line={"color": "rgba(0,111,173,0.28)", "width": 0.8, "dash": "dot"},
+                    line=VFM_ENVELOPE_BOUNDARY_LINE,
                     hoverinfo="skip",
                     showlegend=False,
                     name="MoT VFM fast bound",
@@ -9614,12 +9795,12 @@ def revenue_outlook_total_path_figure(
                     x=band_x,
                     y=lower,
                     mode="lines",
-                    line={"color": "rgba(0,111,173,0.28)", "width": 0.8, "dash": "dot"},
+                    line=VFM_ENVELOPE_BOUNDARY_LINE,
                     fill="tonexty",
-                    fillcolor="rgba(0,111,173,0.10)",
+                    fillcolor=VFM_ENVELOPE_FILL_COLOR,
                     hoverinfo="skip",
                     showlegend=True,
-                    name="MoT VFM fast–slow range",
+                    name=VFM_ENVELOPE_LEGEND_LABEL,
                     legendrank=1100,
                 )
             )
@@ -9860,6 +10041,71 @@ def revenue_outlook_total_path_figure(
     return fig
 
 
+def _render_revenue_outlook_vfm_envelope_caption(view: dict[str, Any]) -> None:
+    """State what the blue range is - and is not - directly under the chart.
+
+    The envelope shares the page with an empirical forecast-error fan, so the
+    distinction has to be visible without opening a tooltip or an audit.
+    """
+    audit = view.get("cone_band_audit")
+    if not isinstance(audit, pd.DataFrame) or audit.empty:
+        return
+    row = audit.iloc[0]
+    if not bool(row.get("band_available")):
+        st.caption(f"No MoT VFM Fast–Slow range for this series. {row.get('reason', '')}".strip())
+        return
+    st.caption(
+        f"{VFM_ENVELOPE_NOT_PROBABILISTIC_NOTE} Shown "
+        f"{row.get('first_valid_period', '')}–{row.get('last_valid_period', '')}; "
+        f"widest gap {float(row.get('max_width_pct_of_level') or 0.0):.2f}% of level. "
+        f"{row.get('reason', '')}"
+    )
+
+
+def _render_revenue_outlook_fan_detail_table(
+    fan_band_rows: pd.DataFrame,
+    fan_availability: pd.DataFrame,
+    *,
+    selected_series: str,
+    selected_fan_source: str,
+) -> None:
+    """The governed 50/80 values behind the fan, with their CSV.
+
+    The fan figure left the default layout; its source data did not. Every
+    column the governance surface relied on - source, lower50/upper50,
+    lower80/upper80, interpretation - is still readable and downloadable here.
+    """
+    if fan_band_rows is None or not isinstance(fan_band_rows, pd.DataFrame) or fan_band_rows.empty:
+        st.caption("No governed fan band rows are committed in this runtime pack.")
+        return
+    series_id = _revenue_outlook_fan_series_id(fan_availability, selected_series)
+    resolved = _resolve_revenue_outlook_fan_source(fan_availability, series_id, selected_fan_source)
+    data = fan_band_rows[
+        fan_band_rows.get("series_id", pd.Series(dtype=str)).astype(str).eq(str(series_id))
+    ].copy()
+    if resolved:
+        data = data[data.get("fan_source", pd.Series(dtype=str)).astype(str).eq(resolved)]
+    if data.empty:
+        st.caption(_revenue_outlook_fan_gap_message(fan_availability, series_id, selected_fan_source))
+        return
+    columns = [
+        column
+        for column in (
+            "fan_source", "fan_segment", "FY", "period", "central",
+            "lower50", "upper50", "lower80", "upper80", "unit", "interpretation",
+        )
+        if column in data.columns
+    ]
+    display_table(data[columns], height=280)
+    st.download_button(
+        "Download fan band rows (CSV)",
+        data[columns].to_csv(index=False).encode("utf-8"),
+        file_name=f"revenue_outlook_fan_band_{series_id}.csv",
+        mime="text/csv",
+        key="revenue_outlook_fan_band_download",
+    )
+
+
 def _render_revenue_outlook_fan_card(
     pack_signature: tuple[tuple[str, int, int], ...],
     fan_band_rows: pd.DataFrame,
@@ -9873,7 +10119,9 @@ def _render_revenue_outlook_fan_card(
         st.markdown(
             "<div class='gov-chart-card chart-card'>"
             "<div class='chart-card-title'>Uncertainty fan</div>"
-            "<div class='chart-card-subtitle'>Best available governed uncertainty source; details below the chart.</div>"
+            "<div class='chart-card-subtitle'>Empirical 50%/80% forecast-error band from the best "
+            "available governed source, supported to FY2030. A different concept from the MoT VFM "
+            "Fast&ndash;Slow structural scenario range on the Total path chart.</div>"
             "</div>",
             unsafe_allow_html=True,
         )
@@ -9904,6 +10152,12 @@ def _render_revenue_outlook_fan_card(
         )
         st.plotly_chart(fig, use_container_width=True, key="chart_card_uncertainty_fan")
         st.caption(caption)
+        _render_revenue_outlook_fan_detail_table(
+            fan_band_rows,
+            fan_availability,
+            selected_series=selected_series,
+            selected_fan_source=selected_fan_source,
+        )
 
 
 def revenue_outlook_uncertainty_fan_figure(
