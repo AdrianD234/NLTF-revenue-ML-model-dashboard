@@ -205,6 +205,64 @@ def test_the_legacy_tuple_round_trips_for_unmigrated_callers() -> None:
     assert as_scenario_key(production).to_legacy_uptake_tuple() == production
 
 
+def test_a_normal_production_render_never_touches_the_legacy_adapter() -> None:
+    """The adapter exists for old cache entries and old tests, not for the app.
+
+    If a production render still went through it, the positional layout would
+    remain load-bearing and a future slot could collide all over again.
+    """
+    from streamlit.testing.v1 import AppTest
+
+    calls: list[tuple] = []
+    original = RevenueScenarioComputationKey.from_legacy_uptake_tuple.__func__
+
+    def recording(cls, legacy, **kwargs):
+        calls.append(tuple(legacy or ()))
+        return original(cls, legacy, **kwargs)
+
+    RevenueScenarioComputationKey.from_legacy_uptake_tuple = classmethod(recording)
+    try:
+        harness = AppTest.from_file(str(ROOT / "app.py"), default_timeout=120)
+        harness.run()
+        harness.radio[0].set_value(app.REVENUE_OUTLOOK_PAGE)
+        harness.run()
+        assert not harness.exception
+    finally:
+        RevenueScenarioComputationKey.from_legacy_uptake_tuple = classmethod(original)
+
+    assert calls == [], (
+        f"a production Revenue Outlook render adapted {len(calls)} legacy tuple(s): "
+        f"{calls[:3]}"
+    )
+
+
+def test_the_two_collided_controls_are_now_fully_independent() -> None:
+    """Neither of the controls that shared slot 6 can move the other."""
+    base = production_shaped_key()
+    for vintage in ("BEFU26", "MBU26", ""):
+        for overlay in (False, True):
+            changed = base.replace(
+                official_comparator_vintage_id=vintage,
+                official_comparator_overlay=overlay,
+            )
+            assert app._heavy_bev_transition_enabled(changed) is app._heavy_bev_transition_enabled(
+                base
+            ), f"vintage {vintage!r} moved the Heavy-BEV resolution"
+            assert changed.heavy_bev_transition == base.heavy_bev_transition
+
+    for heavy in (False, True):
+        changed = base.replace(heavy_bev_transition=heavy)
+        assert app._official_vintage_scope(changed) == app._official_vintage_scope(base), (
+            f"heavy_bev_transition={heavy} moved the comparator resolution"
+        )
+        assert changed.official_comparator_vintage_id == base.official_comparator_vintage_id
+
+    # The pre-fix reading is unreachable: a truthy vintage id no longer
+    # produces a truthy Heavy-BEV resolution.
+    assert bool(base.official_comparator_vintage_id) is True
+    assert app._heavy_bev_transition_enabled(base) is False
+
+
 def test_the_typed_key_is_streamlit_cacheable() -> None:
     """It has to be hashable by st.cache_data, not just by Python."""
     import streamlit as st

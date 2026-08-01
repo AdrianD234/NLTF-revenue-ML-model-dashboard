@@ -213,15 +213,77 @@ def main() -> None:
             }
         )
     propagation_frame = pd.DataFrame(propagation)
-    propagation_frame["heavy_overlay_reaches_rollup"] = (
+    propagation_frame["heavy_overlay_moves_series"] = (
         propagation_frame["delta_heavy_bev_transition_on"].abs() > TOLERANCE
     )
-    propagation_frame["light_overlay_reaches_rollup"] = (
+    propagation_frame["light_overlay_moves_series"] = (
         propagation_frame["delta_vfm_fast_light_composition"].abs() > TOLERANCE
     )
+    # CORRECTION to an earlier reading of this table. The aggregates not moving
+    # under the Heavy-BEV overlay is CORRECT, not a broken rollup: the overlay
+    # is a value-preserving RECLASSIFICATION between heavy_ruc_net_revenue and
+    # heavy_bev_ruc_net_revenue, so gross_ruc_revenue and everything above it
+    # are unchanged by construction. See heavy_bev_transfer_audit.csv, and the
+    # separate Gate A reconciliation, which closes through FORMULA_DEFINITIONS
+    # in BOTH states.
+    propagation_frame["aggregate_stability_is_expected"] = propagation_frame["series_id"].isin(
+        ("total_ruc_net_revenue", "total_fed_ruc_net_revenue", "total_nltf_net_revenue")
+    )
     propagation_frame.to_csv(OUT / "heavy_bev_rollup_propagation_audit.csv", index=False)
-    print("\nrollup propagation at FY2030 (basecase):")
+    print("\nseries movement at FY2030 (basecase):")
     print(propagation_frame.to_string(index=False))
+
+    # Is the Heavy-BEV overlay a transfer, or a leak? Measured per leaf.
+    sensitivity = app.selected_sensitivity_key("Off", "Off", "Off", freight_rail_shift="Off")
+    transfer_rows = []
+    for fy in (2030, 2040, 2050):
+        pair = {}
+        for heavy in (False, True):
+            line, _residuals, _stack, _bridge = app.cached_aligned_scenario_detail_frames(
+                signature,
+                sensitivity,
+                PED_BRIDGE_DEFAULT_MODE,
+                corrected_key().replace(heavy_bev_transition=heavy),
+                pack,
+            )
+            selected = line[line["scenario_name"].astype(str).eq("current_basecase")].copy()
+            selected["_fy"] = pd.to_numeric(selected["FY"], errors="coerce")
+            selected["_value"] = pd.to_numeric(selected["value"], errors="coerce")
+            selected = selected.dropna(subset=["_fy", "_value"])
+            pair[heavy] = {
+                (str(row["series_id"]), int(row["_fy"])): float(row["_value"])
+                for _index, row in selected.iterrows()
+            }
+        for series_id in (
+            "heavy_ruc_net_km",
+            "heavy_bev_ruc_net_km",
+            "heavy_ruc_net_revenue",
+            "heavy_bev_ruc_net_revenue",
+            "gross_ruc_revenue",
+            "total_ruc_net_revenue",
+            "total_nltf_net_revenue",
+        ):
+            off_value = pair[False].get((series_id, fy))
+            on_value = pair[True].get((series_id, fy))
+            transfer_rows.append(
+                {
+                    "FY": fy,
+                    "series_id": series_id,
+                    "heavy_bev_off": off_value,
+                    "heavy_bev_on": on_value,
+                    "delta": None if off_value is None or on_value is None else on_value - off_value,
+                }
+            )
+    transfer = pd.DataFrame(transfer_rows)
+    transfer.to_csv(OUT / "heavy_bev_transfer_audit.csv", index=False)
+    print("\nHeavy-BEV overlay, per leaf (basecase):")
+    print(transfer.to_string(index=False))
+    revenue_pair = transfer[
+        transfer["series_id"].isin(("heavy_ruc_net_revenue", "heavy_bev_ruc_net_revenue"))
+    ]
+    net = revenue_pair.groupby("FY")["delta"].sum()
+    print("\nrevenue reclassification nets to zero per FY:")
+    print(net.to_string())
 
     if audit.empty:
         print("no value movement from the correction")
