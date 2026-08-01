@@ -1,0 +1,46 @@
+........................................................................ [  5%]
+........................................................................ [ 10%]
+........................................................................ [ 15%]
+........................................................................ [ 21%]
+........................................................................ [ 26%]
+.......................................sssssss..sss.ssss.sss..ssssss..ss [ 31%]
+ssss.ssssssssss.ssssssssss.............................................. [ 37%]
+....................s................................................... [ 42%]
+........................................................................ [ 47%]
+........................................................................ [ 53%]
+........................................................................ [ 58%]
+........................................................................ [ 63%]
+........................................................................ [ 69%]
+........................................................................ [ 74%]
+........................................................................ [ 79%]
+........................................................................ [ 85%]
+........................................................................ [ 90%]
+........................................................................ [ 95%]
+...........................................................              [100%]
+============================== warnings summary ===============================
+tests/test_latest_arbitration_values.py::test_mini_parquet_finalists_are_selected_from_current_recommended_flags
+tests/test_latest_arbitration_values.py::test_mini_parquet_finalists_are_selected_from_current_recommended_flags
+tests/test_latest_arbitration_values.py::test_mini_parquet_schiff_rows_are_pure_and_separate_from_finalists
+tests/test_latest_arbitration_values.py::test_mini_parquet_schiff_rows_are_pure_and_separate_from_finalists
+tests/test_latest_arbitration_values.py::test_mini_parquet_ensemble_weights_come_from_component_json
+tests/test_latest_arbitration_values.py::test_mini_parquet_ensemble_weights_come_from_component_json
+tests/test_latest_arbitration_values.py::test_mini_parquet_source_tables_are_generated_from_dashboard_data
+tests/test_latest_arbitration_values.py::test_mini_parquet_source_tables_are_generated_from_dashboard_data
+  C:\Users\Adrian Desilvestro\Repos\NLTF-revenue-ML-model-dashboard\.venv\Lib\site-packages\numpy\lib\_function_base_impl.py:3023: RuntimeWarning: invalid value encountered in divide
+    c /= stddev[:, None]
+
+tests/test_revenue_outlook.py::test_revenue_outlook_loader_uses_committed_csv_fallback_when_parquet_engine_unavailable
+  C:\Users\Adrian Desilvestro\Repos\NLTF-revenue-ML-model-dashboard\model_dashboard\revenue_outlook.py:5209: DtypeWarning: Columns (0: vktpc_source_file, 1: vktpc_source_cell, 2: vktpc_source_status, 3: population_source_file, 4: population_source_cell, 5: population_source_status, 6: model_id, 7: actual_quarters, 8: forecast_segment) have mixed types. Specify dtype option on import or set low_memory=False.
+    return pd.read_csv(csv_path)
+
+tests/test_revenue_source_app_views.py::test_revenue_outlook_composition_figure_stacks_components_and_overlays_aggregates
+  C:\Users\Adrian Desilvestro\Repos\NLTF-revenue-ML-model-dashboard\tests\test_revenue_source_app_views.py:835: DtypeWarning: Columns (0: vktpc_source_file, 1: vktpc_source_cell, 2: vktpc_source_status, 3: population_source_file, 4: population_source_cell, 5: population_source_status, 6: model_id, 7: actual_quarters, 8: forecast_segment) have mixed types. Specify dtype option on import or set low_memory=False.
+    stack = pd.read_csv(ROOT / "data/current_revenue_outlook/revenue_stack_components.csv")
+
+tests/test_revenue_source_app_views.py::test_revenue_outlook_composition_figure_uses_signed_relative_stack_semantics
+  C:\Users\Adrian Desilvestro\Repos\NLTF-revenue-ML-model-dashboard\tests\test_revenue_source_app_views.py:922: DtypeWarning: Columns (0: vktpc_source_file, 1: vktpc_source_cell, 2: vktpc_source_status, 3: population_source_file, 4: population_source_cell, 5: population_source_status, 6: model_id, 7: actual_quarters, 8: forecast_segment) have mixed types. Specify dtype option on import or set low_memory=False.
+    stack = pd.read_csv(ROOT / "data/current_revenue_outlook/revenue_stack_components.csv")
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+1305 passed, 50 skipped, 41 deselected, 11 warnings in 2115.53s (0:35:15)
+EXIT=0

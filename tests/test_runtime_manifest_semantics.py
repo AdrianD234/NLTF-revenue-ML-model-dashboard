@@ -42,6 +42,23 @@ def _manifest_text(manifest: dict) -> str:
     return json.dumps(manifest, sort_keys=True)
 
 
+def _registered_vintage_ids(manifest: dict) -> set[str]:
+    """Every vintage the pack itself records as available."""
+
+    block = manifest.get("official_vintages") or {}
+    available = block.get("available")
+    ids = set(available) if isinstance(available, dict) else set()
+    for key in (
+        "official_comparator_vintage_id",
+        "bridge_assumption_vintage_id",
+        "long_run_shape_vintage_id",
+    ):
+        value = str(block.get(key) or "")
+        if value:
+            ids.add(value)
+    return ids
+
+
 def _post_model_rows(pack_dir: Path) -> pd.DataFrame:
     frame = pd.read_parquet(pack_dir / "revenue_line_reconciliation.parquet")
     segment = frame.get("forecast_segment", pd.Series("", index=frame.index))
@@ -64,7 +81,11 @@ class TestComparatorLanguage:
         selected = str(block.get("official_comparator_vintage_id") or "")
         assert selected, engine
         text = _manifest_text(manifest)
-        registered = {"MBU26", "BEFU26", "PREFU26"}
+        # Derived from the pack's OWN available-vintage block rather than a
+        # hard-coded set: a newly registered vintage is then covered the moment
+        # it appears, instead of silently escaping the check.
+        registered = _registered_vintage_ids(manifest)
+        assert registered, engine
         for vintage in registered - {selected}:
             assert f"{vintage} official comparator" not in text, (engine, vintage)
 
@@ -219,3 +240,98 @@ class TestScheduleLanguage:
                 block.get("fleet_composition_source_id"),
             )
         assert len(set(described.values())) == 1, described
+
+
+class TestRemainingProvenanceClaims:
+    """The second sweep: statements that survived the first correction."""
+
+    def test_horizon_scope_policy_names_both_current_segments(self, pack):
+        engine, _, manifest = pack
+        policy = str((manifest.get("period_rule") or {}).get("horizon_scope_policy") or "")
+        assert policy, engine
+        lowered = policy.lower()
+        # It must no longer say decision-facing Current stops at the cutoff...
+        assert "stop at h20/fy2030" not in lowered, engine
+        # ...and must name the post-model segment and its end year.
+        assert POST_MODEL_SEGMENT in lowered, engine
+        assert str(LAST_EXTRAPOLATION_FY) in policy, engine
+
+    def test_rollups_describe_the_production_construction(self, pack):
+        engine, _, manifest = pack
+        rollups = str((manifest.get("equations") or {}).get("ROLLUPS") or "")
+        assert rollups, engine
+        assert "optimized PED" not in rollups, engine
+        lowered = rollups.lower()
+        assert "raw ped bridge" in lowered, engine
+        assert "conventional" in lowered, engine
+        assert "vfm202405" in lowered, engine
+
+    def test_light_ruc_rationale_is_the_settled_rule(self, pack):
+        engine, _, manifest = pack
+        audit = (manifest.get("target_semantics_audit") or {}).get("LIGHT_RUC") or {}
+        rationale = str(audit.get("rationale") or "")
+        assert rationale, engine
+        assert "sources EV/PHEV migration from both" not in rationale, engine
+        assert "CONVENTIONAL model forecast" in rationale, engine
+        assert "VFM202405" in rationale, engine
+
+    def test_split_assumptions_are_labelled_audit_only(self, pack):
+        engine, _, manifest = pack
+        scope = str((manifest.get("ev_phev_split_assumptions") or {}).get("scope") or "")
+        assert scope, engine
+        assert "The active current path is the PED+Light migration audit" not in scope, engine
+        lowered = scope.lower()
+        assert "audit continuity only" in lowered, engine
+        assert "no decision-facing level is sourced" in lowered, engine
+
+    def test_allocation_status_is_honest(self, pack):
+        engine, pack_dir, manifest = pack
+        status = str(
+            (manifest.get("ev_phev_split_assumptions") or {}).get("allocation_status") or ""
+        )
+        assert "superseded_by_ped_light_migration" not in status, engine
+        frame = pd.read_csv(pack_dir / "ev_phev_split_assumptions.csv")
+        values = set(frame["allocation_status"].dropna().astype(str))
+        for value in values:
+            assert "superseded_by_ped_light_migration" not in value, (engine, value)
+
+    def test_business_rule_is_canonical_and_vintage_free(self, pack):
+        """It must describe the rule, not name a vintage's shares."""
+
+        engine, pack_dir, manifest = pack
+        frame = pd.read_csv(pack_dir / "ev_phev_split_assumptions.csv")
+        rules = set(frame["business_rule"].dropna().astype(str))
+        assert rules, engine
+        registered = _registered_vintage_ids(manifest)
+        for rule in rules:
+            assert "conventional_anchor_with_exact_vfm_composition" in rule, (engine, rule)
+            for vintage in registered:
+                assert vintage.lower() not in rule.lower(), (engine, rule, vintage)
+
+    def test_ped_audit_provenance_follows_the_bridge_vintage(self, pack):
+        """These audits are built against the bridge vintage, so they must say so."""
+
+        engine, _, manifest = pack
+        bridge = str(
+            (manifest.get("official_vintages") or {}).get("bridge_assumption_vintage_id") or ""
+        )
+        assert bridge, engine
+        for key in ("ped_bridge_shape_fit_metrics", "ped_revenue_bridge_audit"):
+            scope = str((manifest.get(key) or {}).get("scope") or "")
+            assert scope, (engine, key)
+            for other in _registered_vintage_ids(manifest) - {bridge}:
+                assert other not in scope, (engine, key, other)
+
+    def test_no_stale_optimized_migration_claim_survives_anywhere(self, pack):
+        """A single sweep over the whole manifest for the retired vocabulary."""
+
+        engine, _, manifest = pack
+        text = _manifest_text(manifest)
+        for banned in (
+            "recalculate optimized PED",
+            "The active current path is the PED+Light migration audit",
+            "sources EV/PHEV migration from both PED/light-petrol activity",
+            "legacy_light_only_comparator_superseded_by_ped_light_migration",
+            "business_rule_applied_ped_light_optimized_migration",
+        ):
+            assert banned not in text, (engine, banned)

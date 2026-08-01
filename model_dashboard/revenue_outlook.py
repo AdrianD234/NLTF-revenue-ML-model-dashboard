@@ -311,6 +311,17 @@ SOURCE_COMPARISON_OUTPUT_DIR_POLICY = (
     "Source run output folders are not published in the promoted runtime manifest; "
     "scenario roles, workbook hashes, and governed output hashes are retained."
 )
+# The settled production rule for Current Light RUC rows, as one canonical
+# token. Previously the audit table stamped
+# `current_light_ruc_total_allocated_by_<vintage>_conventional_bev_phev_shares`,
+# which was neither generic (it named a vintage) nor true (the production rule
+# is the conventional anchor with exact VFM composition). Source-vintage share
+# comparisons remain available in the audit columns, explicitly as comparisons.
+CURRENT_LIGHT_RUC_BUSINESS_RULE = (
+    "current_light_ruc_conventional_anchor_with_exact_vfm_composition"
+)
+
+
 def current_runtime_policy(
     comparator_vintage_id: str,
     bridge_vintage_id: str,
@@ -4660,10 +4671,14 @@ def build_current_revenue_outlook_runtime_pack(
             "raw_audit_source_horizon": _raw_audit_source_horizon(raw_quarterly_forecast_audit),
             "horizon_contract_audit": _repo_relative(root, base / "horizon_contract_audit.csv"),
             "horizon_scope_policy": (
-                "Three horizon contracts. Current decision-facing Light RUC and every "
-                "total that depends on it stop at H20/FY2030. The official comparator "
-                "publishes over its own source horizon. Raw model and replay evidence "
-                "keep their full source horizon as non-decision-facing audit."
+                "Three horizon contracts. (1) The ECONOMETRIC Current segment - "
+                f"including decision-facing Light RUC and every total that depends on "
+                f"it - runs to H20/FY{runtime_cutoff_fy}. (2) Decision-facing Current "
+                f"continues to FY{LAST_EXTRAPOLATION_FY} as the separately labelled "
+                f"{POST_MODEL_SEGMENT} layer, anchored on the FY{runtime_cutoff_fy} "
+                "econometric level. (3) Official comparators publish over their own "
+                "source horizons. Raw model and replay evidence keep their full source "
+                "horizon as non-decision-facing audit."
             ),
             "fy2026_nowcast": "2025Q3+2025Q4 source actuals plus 2026Q1+2026Q2 current finalist forecasts",
             "rule": (
@@ -4756,7 +4771,14 @@ def build_current_revenue_outlook_runtime_pack(
             "PED": f"PED revenue = raw AR(1) PED/light-petrol VKT x scenario population * {bridge_release} litres/100km * {bridge_release} gross PED rate.",
             "LIGHT_RUC": f"Light RUC revenue = conventional Light RUC km (preserved exactly under the Base uptake basis) * {bridge_release} conventional Light effective rate.",
             "HEAVY_RUC": f"Heavy RUC revenue = current finalist net km * {bridge_release} effective Heavy RUC rate.",
-            "ROLLUPS": f"Gross FED, Net FED, Total RUC, Total RUC+PED and Total NLTF recalculate optimized PED, conventional Light RUC, Light BEV, PHEV and Heavy RUC replacement lines plus {bridge_release} fixed components.",
+            "ROLLUPS": (
+                "Gross FED, Net FED, Total RUC, Total RUC+PED and Total NLTF "
+                "recalculate the production replacement lines: PED on the raw PED "
+                "bridge (the default mode), the CONVENTIONAL Light RUC anchor with "
+                f"Light BEV and PHEV allocated by exact {FLEET_COMPOSITION_SOURCE_ID} "
+                f"class shares, the Heavy RUC replacement line, plus {bridge_release} "
+                "fixed components."
+            ),
         },
         "target_semantics_audit": {
             "LIGHT_RUC": _light_ruc_target_semantics_manifest(ev_phev_split_assumptions),
@@ -4772,8 +4794,12 @@ def build_current_revenue_outlook_runtime_pack(
         "ev_phev_split_assumptions": {
             "repo_relative_path": _repo_relative(root, base / "ev_phev_split_assumptions.csv"),
             "scope": (
-                "Legacy continuity audit for MBU26 conventional Light, Light BEV and PHEV km/revenue shares and rates, "
-                "with old fixed-add-on comparator fields. The active current path is the PED+Light migration audit."
+                "LEGACY / AUDIT CONTINUITY ONLY. Preserves prior conventional Light, "
+                "Light BEV and PHEV km/revenue shares and rates, plus the old "
+                "fixed-add-on comparator fields, so earlier evidence stays readable. "
+                "NO decision-facing level is sourced from its retired migration "
+                "allocation: the production path is the conventional Current anchor "
+                f"with exact {FLEET_COMPOSITION_SOURCE_ID} class composition."
             ),
             "allocation_status": _ev_phev_allocation_status(ev_phev_split_assumptions),
         },
@@ -4799,8 +4825,12 @@ def build_current_revenue_outlook_runtime_pack(
         "ped_revenue_bridge_audit": {
             "repo_relative_path": _repo_relative(root, base / "ped_revenue_bridge_audit.csv"),
             "scope": (
-                "Current-finalist PED bridge decomposition by FY/source path: VKTpc, scenario population, raw VKTpc x population, "
-                "optimized EV/PHEV migration VKT, PED volume/revenue, Total NLTF, MBU26 comparators and fallback flags."
+                "Current-finalist PED bridge decomposition by FY/source path: VKTpc, "
+                "scenario population, raw VKTpc x population, the retired optimized "
+                "EV/PHEV migration VKT (audit column only), PED volume/revenue, Total "
+                f"NLTF, {bridge_release} comparators and fallback flags. The production "
+                "path is the raw PED bridge; the optimized-migration columns are "
+                "retained for audit continuity and supply no decision-facing level."
             ),
             "status": "available" if not ped_revenue_bridge_audit.empty else "missing",
             "source": "data/current_revenue_outlook/revenue_line_reconciliation.csv; data/current_revenue_outlook/ev_phev_ped_light_drift_assumptions.csv",
@@ -4813,7 +4843,11 @@ def build_current_revenue_outlook_runtime_pack(
         },
         "ped_bridge_shape_fit_metrics": {
             "repo_relative_path": _repo_relative(root, base / "ped_bridge_shape_fit_metrics.csv"),
-            "scope": "FY2026-FY2050 raw-vs-optimized PED bridge shape-fit metrics against MBU26 comparators.",
+            "scope": (
+                f"FY2026-FY2050 raw-vs-optimized PED bridge shape-fit metrics against "
+                f"{bridge_release} comparators. Audit only: the production path is the "
+                "raw PED bridge and no decision-facing level is taken from these metrics."
+            ),
             "status": "available" if not ped_bridge_shape_fit_metrics.empty else "missing",
         },
         "ped_bridge_mode_config": {
@@ -4906,10 +4940,14 @@ def build_current_revenue_outlook_runtime_pack(
             "raw_audit_source_horizon": _raw_audit_source_horizon(raw_quarterly_forecast_audit),
             "horizon_contract_audit": _repo_relative(root, base / "horizon_contract_audit.csv"),
             "horizon_scope_policy": (
-                "Three horizon contracts. Current decision-facing Light RUC and every "
-                "total that depends on it stop at H20/FY2030. The official comparator "
-                "publishes over its own source horizon. Raw model and replay evidence "
-                "keep their full source horizon as non-decision-facing audit."
+                "Three horizon contracts. (1) The ECONOMETRIC Current segment - "
+                f"including decision-facing Light RUC and every total that depends on "
+                f"it - runs to H20/FY{runtime_cutoff_fy}. (2) Decision-facing Current "
+                f"continues to FY{LAST_EXTRAPOLATION_FY} as the separately labelled "
+                f"{POST_MODEL_SEGMENT} layer, anchored on the FY{runtime_cutoff_fy} "
+                "econometric level. (3) Official comparators publish over their own "
+                "source horizons. Raw model and replay evidence keep their full source "
+                "horizon as non-decision-facing audit."
             ),
             "scope": f"Dynamic Revenue Outlook runtime cutoff audit from current Base, current comparison and required {bridge_release} input horizons.",
             "status": "available",
@@ -6532,7 +6570,7 @@ def ev_phev_split_assumptions_frame(
             "target_matches_conventional_light": bool(matches_conventional),
             "target_matches_total_light_universe": bool(matches_universe),
             "target_semantics_status": target_status,
-            "business_rule": "current_light_ruc_total_allocated_by_mbu26_conventional_bev_phev_shares",
+            "business_rule": CURRENT_LIGHT_RUC_BUSINESS_RULE,
         }
         fy_groups = sorted(group for group in current_groups if group[0] == int(fy))
         if not fy_groups:
@@ -6596,7 +6634,7 @@ def ev_phev_split_assumptions_frame(
                     "old_light_bev_ruc_net_revenue_fixed_mbu": bev_rev,
                     "old_phev_ruc_net_revenue_fixed_mbu": phev_rev,
                     "extrapolated_model_extension": any(value == "extrapolated_model_extension" for value in status_values),
-                    "allocation_status": "legacy_light_only_comparator_superseded_by_ped_light_migration",
+                    "allocation_status": "legacy_split_audit_only_conventional_anchor_active",
                     "used_by_current_finalist": True,
                     "notes": (
                         "Legacy Light-only split comparator retained for governance. "
@@ -6691,9 +6729,12 @@ def _light_ruc_target_semantics_manifest(audit: pd.DataFrame) -> dict[str, Any]:
             "data/revenue_model_source_pack/mbu26_annual_spine/mbu26_annual_spine.csv",
         ],
         "rationale": (
-            "The current governed business rule sources EV/PHEV migration from both PED/light-petrol activity "
-            "and total Light RUC. The legacy split audit preserves prior model-input target evidence and old "
-            "Light-only comparators for review."
+            "Current-finalist Light RUC is anchored on the CONVENTIONAL model "
+            "forecast, preserved exactly under the Base uptake basis, with Light BEV "
+            f"and PHEV allocated from the pool by exact {FLEET_COMPOSITION_SOURCE_ID} "
+            "class shares. The legacy split audit preserves prior model-input target "
+            "evidence and the old Light-only comparators for continuity; it is not "
+            "the production rule and supplies no decision-facing level."
         ),
     }
 
@@ -6702,8 +6743,8 @@ def _ev_phev_allocation_status(audit: pd.DataFrame) -> str:
     if audit is None or audit.empty or "allocation_status" not in audit.columns:
         return "business_rule_pending_audit_rows"
     statuses = set(audit["allocation_status"].dropna().astype(str))
-    if "legacy_light_only_comparator_superseded_by_ped_light_migration" in statuses:
-        return "legacy_light_only_comparator_superseded_by_ped_light_migration"
+    if "legacy_split_audit_only_conventional_anchor_active" in statuses:
+        return "legacy_split_audit_only_conventional_anchor_active"
     if statuses:
         return sorted(statuses)[0]
     return "business_rule_pending_audit_rows"

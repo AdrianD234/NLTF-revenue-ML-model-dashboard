@@ -10,7 +10,7 @@
 - PED VKT per capita: PED revenue = raw AR(1) PED/light-petrol VKT x scenario population * BEFU26 litres/100km * BEFU26 gross PED rate.
 - Light RUC volume: Light RUC revenue = conventional Light RUC km (preserved exactly under the Base uptake basis) * BEFU26 conventional Light effective rate.
 - Heavy RUC volume: Heavy RUC revenue = current finalist net km * BEFU26 effective Heavy RUC rate.
-- ROLLUPS: Gross FED, Net FED, Total RUC, Total RUC+PED and Total NLTF recalculate optimized PED, conventional Light RUC, Light BEV, PHEV and Heavy RUC replacement lines plus BEFU26 fixed components.
+- ROLLUPS: Gross FED, Net FED, Total RUC, Total RUC+PED and Total NLTF recalculate the production replacement lines: PED on the raw PED bridge (the default mode), the CONVENTIONAL Light RUC anchor with Light BEV and PHEV allocated by exact VFM202405 class shares, the Heavy RUC replacement line, plus BEFU26 fixed components.
 
 ## Scenario Roles
 - `current_basecase`: `basecase`, workbook `None`, SHA256 `None`

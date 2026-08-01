@@ -86,7 +86,7 @@
     },
     "raw_audit_source_horizon": "2050Q4 (H100)",
     "horizon_contract_audit": "data/engine_ar1/current_revenue_outlook/horizon_contract_audit.csv",
-    "horizon_scope_policy": "Three horizon contracts. Current decision-facing Light RUC and every total that depends on it stop at H20/FY2030. The official comparator publishes over its own source horizon. Raw model and replay evidence keep their full source horizon as non-decision-facing audit.",
+    "horizon_scope_policy": "Three horizon contracts. (1) The ECONOMETRIC Current segment - including decision-facing Light RUC and every total that depends on it - runs to H20/FY2030. (2) Decision-facing Current continues to FY2050 as the separately labelled post_model_extrapolation layer, anchored on the FY2030 econometric level. (3) Official comparators publish over their own source horizons. Raw model and replay evidence keep their full source horizon as non-decision-facing audit.",
     "fy2026_nowcast": "FY2026 mixes accepted actuals and forecasts per stream (PED: actuals through 2025Q4, forecasts from 2026Q1; LIGHT_RUC: actuals through 2026Q1, forecasts from 2026Q2; HEAVY_RUC: actuals through 2026Q1, forecasts from 2026Q2)",
     "rule": "Actual line ends FY2025; FY2026 actual-to-date rows are nowcast inputs only and are not plotted as actuals. The ECONOMETRIC segment stops at FY2030, the last governed common non-extrapolated horizon; Current continues to FY2050 as the separately labelled post-model layer.",
     "input_history_vintage": "2026Q1",
@@ -382,7 +382,7 @@
     "PED": "PED revenue = raw AR(1) PED/light-petrol VKT x scenario population * BEFU26 litres/100km * BEFU26 gross PED rate.",
     "LIGHT_RUC": "Light RUC revenue = conventional Light RUC km (preserved exactly under the Base uptake basis) * BEFU26 conventional Light effective rate.",
     "HEAVY_RUC": "Heavy RUC revenue = current finalist net km * BEFU26 effective Heavy RUC rate.",
-    "ROLLUPS": "Gross FED, Net FED, Total RUC, Total RUC+PED and Total NLTF recalculate optimized PED, conventional Light RUC, Light BEV, PHEV and Heavy RUC replacement lines plus BEFU26 fixed components."
+    "ROLLUPS": "Gross FED, Net FED, Total RUC, Total RUC+PED and Total NLTF recalculate the production replacement lines: PED on the raw PED bridge (the default mode), the CONVENTIONAL Light RUC anchor with Light BEV and PHEV allocated by exact VFM202405 class shares, the Heavy RUC replacement line, plus BEFU26 fixed components."
   },
   "target_semantics_audit": {
     "LIGHT_RUC": {
@@ -411,7 +411,7 @@
         "data/model_input_history/light_ruc_inputs.parquet",
         "data/revenue_model_source_pack/mbu26_annual_spine/mbu26_annual_spine.csv"
       ],
-      "rationale": "The current governed business rule sources EV/PHEV migration from both PED/light-petrol activity and total Light RUC. The legacy split audit preserves prior model-input target evidence and old Light-only comparators for review."
+      "rationale": "Current-finalist Light RUC is anchored on the CONVENTIONAL model forecast, preserved exactly under the Base uptake basis, with Light BEV and PHEV allocated from the pool by exact VFM202405 class shares. The legacy split audit preserves prior model-input target evidence and the old Light-only comparators for continuity; it is not the production rule and supplies no decision-facing level."
     },
     "HEAVY_RUC": {
       "status": "not_reclassified",
@@ -421,8 +421,8 @@
   },
   "ev_phev_split_assumptions": {
     "repo_relative_path": "data/engine_ar1/current_revenue_outlook/ev_phev_split_assumptions.csv",
-    "scope": "Legacy continuity audit for MBU26 conventional Light, Light BEV and PHEV km/revenue shares and rates, with old fixed-add-on comparator fields. The active current path is the PED+Light migration audit.",
-    "allocation_status": "legacy_light_only_comparator_superseded_by_ped_light_migration"
+    "scope": "LEGACY / AUDIT CONTINUITY ONLY. Preserves prior conventional Light, Light BEV and PHEV km/revenue shares and rates, plus the old fixed-add-on comparator fields, so earlier evidence stays readable. NO decision-facing level is sourced from its retired migration allocation: the production path is the conventional Current anchor with exact VFM202405 class composition.",
+    "allocation_status": "legacy_split_audit_only_conventional_anchor_active"
   },
   "ev_phev_ped_light_drift_assumptions": {
     "repo_relative_path": "data/engine_ar1/current_revenue_outlook/ev_phev_ped_light_drift_assumptions.csv",
@@ -443,7 +443,7 @@
   },
   "ped_revenue_bridge_audit": {
     "repo_relative_path": "data/engine_ar1/current_revenue_outlook/ped_revenue_bridge_audit.csv",
-    "scope": "Current-finalist PED bridge decomposition by FY/source path: VKTpc, scenario population, raw VKTpc x population, optimized EV/PHEV migration VKT, PED volume/revenue, Total NLTF, MBU26 comparators and fallback flags.",
+    "scope": "Current-finalist PED bridge decomposition by FY/source path: VKTpc, scenario population, raw VKTpc x population, the retired optimized EV/PHEV migration VKT (audit column only), PED volume/revenue, Total NLTF, BEFU26 comparators and fallback flags. The production path is the raw PED bridge; the optimized-migration columns are retained for audit continuity and supply no decision-facing level.",
     "status": "available",
     "source": "data/current_revenue_outlook/revenue_line_reconciliation.csv; data/current_revenue_outlook/ev_phev_ped_light_drift_assumptions.csv",
     "default_bridge_mode": "raw_model",
@@ -451,7 +451,7 @@
   },
   "ped_bridge_shape_fit_metrics": {
     "repo_relative_path": "data/engine_ar1/current_revenue_outlook/ped_bridge_shape_fit_metrics.csv",
-    "scope": "FY2026-FY2050 raw-vs-optimized PED bridge shape-fit metrics against MBU26 comparators.",
+    "scope": "FY2026-FY2050 raw-vs-optimized PED bridge shape-fit metrics against BEFU26 comparators. Audit only: the production path is the raw PED bridge and no decision-facing level is taken from these metrics.",
     "status": "available"
   },
   "ped_bridge_mode_config": {
@@ -740,7 +740,7 @@
     "official_comparator_cutoff_fy": 2055,
     "raw_audit_source_horizon": "2050Q4 (H100)",
     "horizon_contract_audit": "data/engine_ar1/current_revenue_outlook/horizon_contract_audit.csv",
-    "horizon_scope_policy": "Three horizon contracts. Current decision-facing Light RUC and every total that depends on it stop at H20/FY2030. The official comparator publishes over its own source horizon. Raw model and replay evidence keep their full source horizon as non-decision-facing audit.",
+    "horizon_scope_policy": "Three horizon contracts. (1) The ECONOMETRIC Current segment - including decision-facing Light RUC and every total that depends on it - runs to H20/FY2030. (2) Decision-facing Current continues to FY2050 as the separately labelled post_model_extrapolation layer, anchored on the FY2030 econometric level. (3) Official comparators publish over their own source horizons. Raw model and replay evidence keep their full source horizon as non-decision-facing audit.",
     "scope": "Dynamic Revenue Outlook runtime cutoff audit from current Base, current comparison and required BEFU26 input horizons.",
     "status": "available"
   },
@@ -791,12 +791,12 @@
       "size_bytes": 66412
     },
     "ev_phev_split_assumptions.csv": {
-      "sha256": "97c2bbadb856b05b22d6add864e5876454caddc3aebecf508fa034cef9a1b1cc",
-      "size_bytes": 26692
+      "sha256": "01cdc3b0491b03e9ac8513058ddd87797797765d0ab65f818144d7b7df56ffa0",
+      "size_bytes": 26260
     },
     "ev_phev_split_assumptions.parquet": {
-      "sha256": "76ebf28c86fd322024fceeb1120fdf1aaf00142ce5f9f9d0dfa882f046e49bae",
-      "size_bytes": 42448
+      "sha256": "3e76a9493aa6d5b03bd3f336ec9ccd8156f571af1da47da9424f5eb8c176a963",
+      "size_bytes": 42372
     },
     "fan_availability.csv": {
       "sha256": "231ee728080b61cbd725754245f9682386785f6c6def900b60c86a1a62afc9c4",
