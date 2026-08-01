@@ -196,6 +196,7 @@ class RevenueScenarioComputationKey:
         conflict_fuel_state: str = "",
         default_official_comparator_vintage_id: str = "",
         default_current_fed_policy_state: str = "",
+        policy_normaliser: Any = None,
     ) -> "RevenueScenarioComputationKey":
         """Adapt a historic positional key.
 
@@ -219,6 +220,28 @@ class RevenueScenarioComputationKey:
 
         current_policy = slot(_LEGACY_CURRENT_FED_POLICY, default_current_fed_policy_state)
         official_policy = slot(_LEGACY_OFFICIAL_FED_POLICY, current_policy)
+        # Legacy keys wrote the FED policy as a 0/1 toggle, not a state name.
+        # The typed key stores TEXT, so those ints must be resolved to their
+        # policy state HERE - stringifying them to "0"/"1" would silently swap
+        # a no-uplift counterfactual for the published path. The vocabulary
+        # lives in the caller, so it supplies the normaliser.
+        for name, value in (
+            ("current_fed_policy_state", current_policy),
+            ("official_fed_policy_state", official_policy),
+        ):
+            if value is None or isinstance(value, str):
+                continue
+            if policy_normaliser is None:
+                raise ScenarioKeyValueError(
+                    f"{name}: legacy key carries a non-text policy value ({value!r}) "
+                    "and no policy_normaliser was supplied. Stringifying it would "
+                    'silently swap the policy state for "0"/"1".'
+                )
+        if policy_normaliser is not None:
+            if current_policy is not None and not isinstance(current_policy, str):
+                current_policy = policy_normaliser(current_policy)
+            if official_policy is not None and not isinstance(official_policy, str):
+                official_policy = policy_normaliser(official_policy)
         return cls(
             engine=engine,
             uptake_basis=_as_text(slot(_LEGACY_UPTAKE_BASIS, "")),

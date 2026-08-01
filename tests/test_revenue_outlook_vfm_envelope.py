@@ -21,6 +21,7 @@ import pytest
 
 import app
 from model_dashboard.ev_uptake_levers import DEFAULT_EV_UPTAKE_MODE
+from model_dashboard.revenue_chart_layers import VFM_ENVELOPE_LAYER_ID
 from model_dashboard.revenue_outlook import (
     CURRENT_REVENUE_OUTLOOK_DIR,
     FAN_SEGMENT_EMPIRICAL,
@@ -156,13 +157,34 @@ def independent_bounds(
 
 
 def figure_for(view: dict[str, Any], series: str = DEFAULT_SERIES):
+    """The envelope is now an OPT-IN chart layer, so ask for it explicitly.
+
+    It used to be drawn whenever a band existed. Under the layered contract a
+    reader chooses it from the single "Show on chart" control, so a figure
+    built without that layer id correctly has no envelope.
+    """
     return app.revenue_outlook_total_path_figure(
         view["filtered_rows"],
         selected_series=series,
         selected_fy="FY2030",
         cone_band=view.get("cone_band"),
         selected_official_trace="BEFU26 official",
+        selected_band_layers=(VFM_ENVELOPE_LAYER_ID,),
     )
+
+
+def test_the_envelope_is_absent_unless_its_layer_is_selected(pack, signature) -> None:
+    view = view_for(pack, signature)
+    without = app.revenue_outlook_total_path_figure(
+        view["filtered_rows"],
+        selected_series=DEFAULT_SERIES,
+        selected_fy="FY2030",
+        cone_band=view.get("cone_band"),
+        selected_official_trace="BEFU26 official",
+        selected_band_layers=(),
+    )
+    assert not any("MoT VFM" in str(trace.name) for trace in without.data)
+    assert not view["cone_band"].empty, "the band data must still be available"
 
 
 # ---------------------------------------------------- 1. the band exists

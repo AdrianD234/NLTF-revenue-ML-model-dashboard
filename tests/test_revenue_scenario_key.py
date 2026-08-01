@@ -254,6 +254,43 @@ def test_the_adapter_tells_slot_six_apart_by_type() -> None:
     assert adapted_legacy.official_comparator_vintage_id == ""
 
 
+@pytest.mark.parametrize(
+    "current_flag, mbu_flag, expected",
+    [
+        (0, 0, (app.FED_POLICY_DELAYED_6M, app.FED_POLICY_DELAYED_6M)),
+        (1, 0, (app.FED_POLICY_OFF, app.FED_POLICY_DELAYED_6M)),
+        (0, 1, (app.FED_POLICY_DELAYED_6M, app.FED_POLICY_OFF)),
+        (1, 1, (app.FED_POLICY_OFF, app.FED_POLICY_OFF)),
+    ],
+)
+def test_legacy_numeric_policy_toggles_keep_their_meaning(current_flag, mbu_flag, expected) -> None:
+    """0/1 in the old key means delayed/no-uplift, and must not become "0"/"1".
+
+    The typed key stores policy as TEXT. Stringifying a legacy int silently
+    swapped a no-uplift counterfactual for the published path - the FY2030
+    MBU26 total came back 6434.37 instead of 5663.62 - so the numeric
+    semantics are resolved during adaptation.
+    """
+    legacy = (app.DEFAULT_EV_UPTAKE_MODE, (), (), current_flag, mbu_flag)
+    assert app._fed_policy_state_scope(legacy) == expected
+    adapted = app._scenario_key(legacy)
+    assert adapted.current_fed_policy_state == expected[0]
+    assert adapted.official_fed_policy_state == expected[1]
+    # And with the vintage slots appended, the production-shaped legacy key.
+    with_vintage = (*legacy, False, "MBU26", False)
+    assert app._fed_policy_state_scope(with_vintage) == expected
+    assert app._official_vintage_scope(with_vintage)[0] == "MBU26"
+
+
+def test_the_bare_adapter_refuses_a_numeric_policy_rather_than_guessing() -> None:
+    """No vocabulary, no coercion. Fail closed instead of inventing "0"."""
+    legacy = (app.DEFAULT_EV_UPTAKE_MODE, (), (), 1, 0)
+    with pytest.raises(ScenarioKeyValueError, match="policy_normaliser"):
+        as_scenario_key(legacy)
+    # The app coercion point supplies one, so production is unaffected.
+    assert app._scenario_key(legacy).current_fed_policy_state == app.FED_POLICY_OFF
+
+
 def test_a_short_legacy_key_resolves_to_the_documented_defaults() -> None:
     adapted = as_scenario_key((app.DEFAULT_EV_UPTAKE_MODE, (), ()))
     assert adapted.heavy_bev_transition is False

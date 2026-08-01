@@ -1,0 +1,7 @@
+stage,mean_ms,repeats,target_ms,within_target
+"uncertainty pack load (cold, once per process)",47.385,1,100.0,True
+uncertainty band lookup (per series),0.169,20,100.0,True
+chart layer catalogue build,0.02,20,100.0,True
+"figure assembly (default: 2 bands, 4 paths)",87.127,20,100.0,True
+"figure assembly (all layers: 3 bands, all paths)",92.554,20,100.0,True
+lookup + assembly (the whole render-path cost),94.547,20,100.0,True

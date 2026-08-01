@@ -1099,8 +1099,10 @@ def test_revenue_outlook_page_does_not_render_summary_kpi_cards() -> None:
     assert "revenue_outlook_sensitivity_cost_ratio" not in source
     assert '"Traces"' not in source
     assert "revenue_outlook_traces" not in source
-    assert "Legend items" in source
-    assert 'st.popover("Select legend items"' in source
+    # One unified "Show on chart" multiselect replaced the per-trace popover.
+    assert "Show on chart" in source
+    assert "revenue_outlook_chart_layers" in source
+    assert 'st.popover("Select legend items"' not in source
 
 
 def test_revenue_outlook_cloud_hides_debug_toggles_and_shows_full_composition(monkeypatch) -> None:
@@ -1136,6 +1138,7 @@ def test_revenue_outlook_cloud_hides_debug_toggles_and_shows_full_composition(mo
         ("Freight rail shift", "revenue_outlook_sensitivity_freight_rail_toggle"),
         ("Move petrol fleet to e-RUC", "revenue_outlook_eruc_toggle"),
         ("Show forecast-uncertainty fan detail", "revenue_outlook_show_fan_detail"),
+        ("Show modelled-uncertainty audit", "revenue_outlook_show_uncertainty_audit"),
         ("Show MoT VFM Fast–Slow range audit", "revenue_outlook_show_vfm_envelope_audit"),
     ]
     assert not any(toggle.value for toggle in at.toggle[2:]), (
