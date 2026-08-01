@@ -1,0 +1,220 @@
+{
+  "workbooks": [
+    {
+      "filename": "MBU26 v VFM202405_outputs_summary_V3 (1).xlsx",
+      "modified_utc": "2026-07-31T09:24:25.794553+00:00",
+      "path": "references/MBU26 v VFM202405_outputs_summary_V3 (1).xlsx",
+      "role": "immutable source/audit input; never read by runtime code",
+      "sha256": "13f18d4e050c427ea24acfbfee884ca303829908df10bf6d79d05a3ceac443cc",
+      "sheet_count": 12,
+      "sheet_names": [
+        "Contents",
+        "Notes",
+        "Tailpipe GHG",
+        "Vehicle numbers",
+        "ZEV share",
+        "VKT",
+        "GHG by vehicle type",
+        "Vehicles by vehicle type",
+        "VKT by vehicle type",
+        "Registrations",
+        "Raw data (wem202405)",
+        "S-curve analysis (F&F)"
+      ],
+      "sheets": [
+        {
+          "cached_values_missing": 0,
+          "dimensions": "A1:G14",
+          "formula_count": 0,
+          "sheet": "Contents"
+        },
+        {
+          "cached_values_missing": 0,
+          "dimensions": "A1:AG26",
+          "formula_count": 0,
+          "sheet": "Notes"
+        },
+        {
+          "cached_values_missing": 0,
+          "dimensions": "A1:AY37",
+          "formula_count": 597,
+          "sheet": "Tailpipe GHG"
+        },
+        {
+          "cached_values_missing": 0,
+          "dimensions": "A1:AY54",
+          "formula_count": 450,
+          "sheet": "Vehicle numbers"
+        },
+        {
+          "cached_values_missing": 0,
+          "dimensions": "A1:AY97",
+          "formula_count": 450,
+          "sheet": "ZEV share"
+        },
+        {
+          "cached_values_missing": 0,
+          "dimensions": "A1:AY72",
+          "formula_count": 1500,
+          "sheet": "VKT"
+        },
+        {
+          "cached_values_missing": 0,
+          "dimensions": "A1:BD57",
+          "formula_count": 900,
+          "sheet": "GHG by vehicle type"
+        },
+        {
+          "cached_values_missing": 0,
+          "dimensions": "A1:BD62",
+          "formula_count": 0,
+          "sheet": "Vehicles by vehicle type"
+        },
+        {
+          "cached_values_missing": 0,
+          "dimensions": "A1:AZ127",
+          "formula_count": 2850,
+          "sheet": "VKT by vehicle type"
+        },
+        {
+          "cached_values_missing": 0,
+          "dimensions": "A1:H13788",
+          "formula_count": 0,
+          "sheet": "Registrations"
+        },
+        {
+          "cached_values_missing": 0,
+          "dimensions": "A1:N31491",
+          "formula_count": 1,
+          "sheet": "Raw data (wem202405)"
+        },
+        {
+          "cached_values_missing": 0,
+          "dimensions": "A1:BE179",
+          "formula_count": 1895,
+          "sheet": "S-curve analysis (F&F)"
+        }
+      ],
+      "size_bytes": 4655112,
+      "total_cached_values_missing": 0,
+      "total_formula_count": 8643,
+      "workbook_role": "mbu26_vs_vfm_structural"
+    },
+    {
+      "filename": "VFM202405_outputs_summary_V3.xlsx",
+      "modified_utc": "2026-07-07T23:34:10.681739+00:00",
+      "path": "references/VFM202405_outputs_summary_V3.xlsx",
+      "role": "immutable source/audit input; never read by runtime code",
+      "sha256": "2c49dc3e2fd6b4f083c0d8e8f52b36f34216bc37eac78ed4329347692ac4b4ab",
+      "sheet_count": 11,
+      "sheet_names": [
+        "Contents",
+        "Notes",
+        "Tailpipe GHG",
+        "Vehicle numbers",
+        "ZEV share",
+        "VKT",
+        "GHG by vehicle type",
+        "Vehicles by vehicle type",
+        "VKT by vehicle type",
+        "Raw data (wem202405)",
+        "Registrations"
+      ],
+      "sheets": [
+        {
+          "cached_values_missing": 0,
+          "dimensions": "A1:G14",
+          "formula_count": 0,
+          "sheet": "Contents"
+        },
+        {
+          "cached_values_missing": 0,
+          "dimensions": "A1:AG26",
+          "formula_count": 0,
+          "sheet": "Notes"
+        },
+        {
+          "cached_values_missing": 0,
+          "dimensions": "A1:AY37",
+          "formula_count": 597,
+          "sheet": "Tailpipe GHG"
+        },
+        {
+          "cached_values_missing": 0,
+          "dimensions": "A1:AY54",
+          "formula_count": 450,
+          "sheet": "Vehicle numbers"
+        },
+        {
+          "cached_values_missing": 0,
+          "dimensions": "A1:AY97",
+          "formula_count": 450,
+          "sheet": "ZEV share"
+        },
+        {
+          "cached_values_missing": 0,
+          "dimensions": "A1:AY72",
+          "formula_count": 1500,
+          "sheet": "VKT"
+        },
+        {
+          "cached_values_missing": 0,
+          "dimensions": "A1:BD57",
+          "formula_count": 900,
+          "sheet": "GHG by vehicle type"
+        },
+        {
+          "cached_values_missing": 0,
+          "dimensions": "A1:BD62",
+          "formula_count": 0,
+          "sheet": "Vehicles by vehicle type"
+        },
+        {
+          "cached_values_missing": 0,
+          "dimensions": "A1:AZ127",
+          "formula_count": 2850,
+          "sheet": "VKT by vehicle type"
+        },
+        {
+          "cached_values_missing": 0,
+          "dimensions": "A1:N31422",
+          "formula_count": 0,
+          "sheet": "Raw data (wem202405)"
+        },
+        {
+          "cached_values_missing": 0,
+          "dimensions": "A1:H13788",
+          "formula_count": 0,
+          "sheet": "Registrations"
+        }
+      ],
+      "size_bytes": 4493363,
+      "total_cached_values_missing": 0,
+      "total_formula_count": 6747,
+      "workbook_role": "vfm202405_outputs_summary"
+    },
+    {
+      "filename": "BEFU26 revenue forecast.xlsx",
+      "modified_utc": "2026-07-31T08:57:13.035696+00:00",
+      "path": "references/BEFU26 revenue forecast.xlsx",
+      "role": "immutable source/audit input; never read by runtime code",
+      "sha256": "7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff",
+      "sheet_count": 1,
+      "sheet_names": [
+        "Baseline"
+      ],
+      "sheets": [
+        {
+          "cached_values_missing": 0,
+          "dimensions": "A1:BD65",
+          "formula_count": 0,
+          "sheet": "Baseline"
+        }
+      ],
+      "size_bytes": 51133,
+      "total_cached_values_missing": 0,
+      "total_formula_count": 0,
+      "workbook_role": "befu26_revenue_forecast"
+    }
+  ]
+}

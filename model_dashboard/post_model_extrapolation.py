@@ -43,6 +43,17 @@ import numpy as np
 import pandas as pd
 
 from .forecast_runner import repo_root_from_here
+from .long_run_shape_transition import (
+    FLEET_COMPOSITION_SOURCE_ID,
+    LONG_RUN_SHAPE_METHOD_ID,
+    UNBLENDED_SCHEDULE_ID,
+    LongRunShapeTransitionError,
+    TransitionSchedule,
+    geometric_blend_index,
+    resolve_schedule,
+    structural_growth_indices,
+    transition_weight,
+)
 
 __all__ = [
     "ECONOMETRIC_SEGMENT",
@@ -55,7 +66,9 @@ __all__ = [
     "post_model_line_reconciliation_rows",
     "stamp_forecast_segments",
     "anchor_index_level_audit",
+    "anchor_shape_level_audit",
     "light_ruc_long_run_guard_frame",
+    "light_fleet_composition_audit",
     "post_model_growth_indices",
 ]
 
@@ -171,6 +184,10 @@ def post_model_growth_indices(
     *,
     scenario_name: str,
     repo_root: Path | str | None = None,
+    vfm_scenario: str = _VFM_DEFAULT_SCENARIO,
+    long_run_shape_official_annual: pd.DataFrame | None = None,
+    long_run_shape_vintage_id: str | None = None,
+    transition_schedule_id: str = UNBLENDED_SCHEDULE_ID,
 ) -> pd.DataFrame:
     """Anchor-normalised growth indices for one governed scenario.
 
@@ -178,9 +195,23 @@ def post_model_growth_indices(
     model's own H1-H100 output, decision_facing=false), the scenario's own
     population path, and the vendored VFM absolute pools. Every index equals
     exactly 1.0 at the FY2030 anchor by construction.
+
+    When a long-run shape source is supplied, three further column families
+    appear: ``s_*`` the structural growth indices taken from that vintage,
+    ``w`` the governed transition weight, and ``h_*`` the geometric blend of
+    the two. The ``h_*`` columns are what the constructor consumes; with the
+    default ``unblended_current`` schedule they equal the Current indices
+    exactly, so the merged-main behaviour is reproduced bit for bit.
     """
 
     root = Path(repo_root) if repo_root is not None else repo_root_from_here()
+    schedule = resolve_schedule(transition_schedule_id)
+    if schedule.is_structural and long_run_shape_official_annual is None:
+        raise PostModelExtrapolationError(
+            f"{scenario_name}: transition schedule {transition_schedule_id!r} needs a "
+            "long-run shape source, but none was supplied. The extrapolation must "
+            "fail closed rather than silently fall back to the unblended path."
+        )
     scoped = raw_quarterly_audit[
         raw_quarterly_audit["scenario_name"].astype(str).eq(scenario_name)
     ].copy()
@@ -217,7 +248,13 @@ def post_model_growth_indices(
     )
 
     vfm = pd.read_csv(root / _VFM_SHARES_RELATIVE_PATH)
-    vfm = vfm[vfm["scenario"].astype(str).eq(_VFM_DEFAULT_SCENARIO)].set_index("june_year")
+    known_scenarios = sorted(vfm["scenario"].astype(str).unique())
+    if str(vfm_scenario) not in known_scenarios:
+        raise PostModelExtrapolationError(
+            f"unknown VFM composition scenario {vfm_scenario!r}; "
+            f"vendored scenarios: {known_scenarios}"
+        )
+    vfm = vfm[vfm["scenario"].astype(str).eq(str(vfm_scenario))].set_index("june_year")
     vfm_pool = (
         _numeric(vfm["light_ruc_conventional_million_km"], "VFM conventional pool")
         + _numeric(vfm["light_ruc_bev_million_km"], "VFM BEV pool")
@@ -250,6 +287,14 @@ def post_model_growth_indices(
             "vfm_bev_share": [vfm.loc[fy, "light_ruc_bev_share"] for fy in fys],
             "vfm_phev_share": [vfm.loc[fy, "light_ruc_phev_share"] for fy in fys],
             "vfm_absolute_pool_million_km": [vfm_pool.loc[fy] for fy in fys],
+            # The annual scenario population IMPLIED by the committed quarterly
+            # path: petrol km divided by VKTpc is the VKT-weighted mean
+            # population, and it is the only definition under which
+            # `petrol = VKTpc x population` holds exactly at every FY - including
+            # the FY2030 anchor. Deriving it here rather than averaging the four
+            # quarters keeps the PED identity gate an equality rather than an
+            # approximation, and leaves the population on the scenario's own path.
+            "scenario_population": [petrol_fy.loc[fy] / vktpc_fy.loc[fy] for fy in fys],
         }
     )
     indexed = frame.set_index("fy")
@@ -273,7 +318,106 @@ def post_model_growth_indices(
         )
     for column in ("vfm_conventional_share", "vfm_bev_share", "vfm_phev_share"):
         frame[column] = frame[column] / share_sum
-    return frame
+
+    return _attach_structural_transition(
+        frame,
+        scenario_name=scenario_name,
+        schedule=schedule,
+        long_run_shape_official_annual=long_run_shape_official_annual,
+        long_run_shape_vintage_id=long_run_shape_vintage_id,
+    )
+
+
+def _attach_structural_transition(
+    frame: pd.DataFrame,
+    *,
+    scenario_name: str,
+    schedule: TransitionSchedule,
+    long_run_shape_official_annual: pd.DataFrame | None,
+    long_run_shape_vintage_id: str | None,
+) -> pd.DataFrame:
+    """Add the structural index, the transition weight and the blend.
+
+    The Current index for each stream is the one the merged extrapolator
+    already used, so ``unblended_current`` reproduces merged main exactly:
+
+    PED        the raw long-horizon petrol VKT growth
+    LIGHT RUC  the vendored VFM absolute pool index (the existing structural
+               total-pool index, which IS the unblended Current pool path)
+    HEAVY RUC  the raw long-horizon Heavy RUC growth
+
+    Only the three POOL/level indices are blended. Class composition stays with
+    the exact VFM shares, and PED VKTpc is derived from blended petrol VKT and
+    the scenario population rather than blended on its own - so the activity
+    identities cannot drift apart.
+    """
+
+    out = frame.copy()
+    out["transition_schedule_id"] = schedule.schedule_id
+    out["transition_anchor_fy"] = schedule.anchor_fy
+    out["transition_completion_fy"] = (
+        schedule.completion_fy if schedule.is_structural else pd.NA
+    )
+    out["w"] = np.asarray(
+        transition_weight(
+            out["fy"].to_numpy(),
+            anchor_fy=schedule.anchor_fy,
+            completion_fy=schedule.completion_fy,
+        ),
+        dtype=float,
+    )
+
+    current_columns = {
+        "light_petrol_vkt": "g_light_petrol_vkt",
+        "light_ruc_pool": "vfm_pool_index",
+        "heavy_ruc_net_km": "g_heavy_ruc_net_km",
+    }
+
+    if long_run_shape_official_annual is None:
+        out["long_run_shape_vintage_id"] = ""
+        for stream, current_column in current_columns.items():
+            out[f"s_{stream}"] = np.nan
+            out[f"h_{stream}"] = out[current_column].to_numpy(dtype=float)
+        return out
+
+    vintage_id = str(long_run_shape_vintage_id or "unnamed_shape_vintage")
+    try:
+        structural = structural_growth_indices(
+            long_run_shape_official_annual,
+            vintage_id=vintage_id,
+            first_fy=ANCHOR_FY,
+            last_fy=LAST_EXTRAPOLATION_FY,
+        ).set_index("fy")
+    except LongRunShapeTransitionError as error:
+        raise PostModelExtrapolationError(
+            f"{scenario_name}: long-run shape source {vintage_id} is unusable: {error}"
+        ) from error
+
+    out["long_run_shape_vintage_id"] = vintage_id
+    for stream, current_column in current_columns.items():
+        structural_index = structural.loc[out["fy"].to_numpy(), f"s_{stream}"].to_numpy(
+            dtype=float
+        )
+        current_index = out[current_column].to_numpy(dtype=float)
+        out[f"s_{stream}"] = structural_index
+        out[f"s_level_{stream}"] = structural.loc[
+            out["fy"].to_numpy(), f"s_level_{stream}"
+        ].to_numpy(dtype=float)
+        try:
+            out[f"h_{stream}"] = geometric_blend_index(
+                current_index,
+                structural_index,
+                out["w"].to_numpy(dtype=float),
+                context=f"{scenario_name} {stream}",
+            )
+        except LongRunShapeTransitionError as error:
+            raise PostModelExtrapolationError(str(error)) from error
+        _guard_growth_index(
+            out.set_index("fy")[f"h_{stream}"],
+            label=f"hybrid {stream}",
+            scenario_name=scenario_name,
+        )
+    return out
 
 
 def _current_anchors(
@@ -339,6 +483,10 @@ def build_post_model_extrapolation_annual(
     mbu26_official_annual: pd.DataFrame,
     scenario_names: tuple[str, ...] = ("current_basecase", "current_comparison_1"),
     repo_root: Path | str | None = None,
+    vfm_scenario: str = _VFM_DEFAULT_SCENARIO,
+    long_run_shape_official_annual: pd.DataFrame | None = None,
+    long_run_shape_vintage_id: str | None = None,
+    transition_schedule_id: str = UNBLENDED_SCHEDULE_ID,
 ) -> pd.DataFrame:
     """Every FY2031-FY2050 leaf and aggregate for every governed scenario.
 
@@ -346,9 +494,16 @@ def build_post_model_extrapolation_annual(
     unit, formula and segment columns. Aggregates are built from the leaves
     in this frame, so closure is by construction and separately re-checked by
     the caller's gates.
+
+    ``mbu26_official_annual`` is the BRIDGE-assumption vintage: effective
+    rates, fuel intensity and the carried fixed lines. ``long_run_shape_*`` is
+    the separately governed SHAPE vintage, used only for growth indices. The
+    two are independent by construction - the shape source supplies no level,
+    no rate and no fixed line, and the bridge source supplies no growth index.
     """
 
     official = _official_lookup(mbu26_official_annual)
+    schedule = resolve_schedule(transition_schedule_id)
     rows: list[dict[str, object]] = []
 
     def emit(scenario: str, fy: int, series: str, value: float, unit: str, formula: str) -> None:
@@ -365,8 +520,32 @@ def build_post_model_extrapolation_annual(
                 "forecast_segment": POST_MODEL_SEGMENT,
                 "value_status": POST_MODEL_VALUE_STATUS,
                 "decision_facing": True,
+                "long_run_shape_method_id": LONG_RUN_SHAPE_METHOD_ID,
+                "long_run_transition_schedule_id": schedule.schedule_id,
+                "long_run_shape_vintage_id": str(long_run_shape_vintage_id or ""),
+                "fleet_composition_source_id": FLEET_COMPOSITION_SOURCE_ID,
+                "fleet_composition_scenario": str(vfm_scenario),
             }
         )
+
+    # Provenance strings name the actual construction, so a reader of the line
+    # table can tell an unblended row from a transitioned one without consulting
+    # the manifest.
+    if schedule.is_structural:
+        shape_token = str(long_run_shape_vintage_id or "long-run shape vintage")
+        blend = (
+            f"geometrically blended toward the {shape_token} growth shape "
+            f"({schedule.schedule_id}, complete FY{schedule.completion_fy})"
+        )
+        petrol_formula = f"FY{ANCHOR_FY} petrol anchor * Current growth {blend}"
+        heavy_formula = f"FY{ANCHOR_FY} Heavy anchor * Current growth {blend}"
+        pool_formula = f"FY{ANCHOR_FY} pool anchor * VFM pool index {blend}"
+    else:
+        petrol_formula = (
+            f"FY{ANCHOR_FY} petrol anchor * raw (VKTpc x scenario population) growth"
+        )
+        heavy_formula = f"FY{ANCHOR_FY} Heavy anchor * raw long-horizon growth"
+        pool_formula = f"structural pool (FY{ANCHOR_FY} anchor * VFM pool index)"
 
     for scenario in scenario_names:
         anchors = _current_anchors(line_reconciliation, scenario)
@@ -375,6 +554,10 @@ def build_post_model_extrapolation_annual(
             scenario_input_wide,
             scenario_name=scenario,
             repo_root=repo_root,
+            vfm_scenario=vfm_scenario,
+            long_run_shape_official_annual=long_run_shape_official_annual,
+            long_run_shape_vintage_id=long_run_shape_vintage_id,
+            transition_schedule_id=transition_schedule_id,
         ).set_index("fy")
         pool_anchor = (
             anchors["light_ruc_net_km"]
@@ -385,10 +568,20 @@ def build_post_model_extrapolation_annual(
             g = growth.loc[fy]
 
             # ---------------- activity
-            vktpc = anchors["ped_vkt_per_capita"] * g["g_ped_vkt_per_capita"]
-            petrol = anchors["light_petrol_vkt"] * g["g_light_petrol_vkt"]
-            heavy = anchors["heavy_ruc_net_km"] * g["g_heavy_ruc_net_km"]
-            pool = pool_anchor * g["vfm_pool_index"]
+            # Every stream is its own FY2030 Current anchor times a HYBRID
+            # growth index. With the unblended schedule the hybrid index is the
+            # Current index, so these are the merged-main values exactly.
+            petrol = anchors["light_petrol_vkt"] * g["h_light_petrol_vkt"]
+            heavy = anchors["heavy_ruc_net_km"] * g["h_heavy_ruc_net_km"]
+            pool = pool_anchor * g["h_light_ruc_pool"]
+            # VKTpc is DERIVED from blended petrol VKT and the scenario's own
+            # population rather than blended separately, so
+            # `petrol = VKTpc x population` holds exactly instead of the two
+            # drifting apart under the blend. No official population is ever
+            # inferred: the population is the Current scenario path's own.
+            vktpc = petrol * 1_000_000.0 / g["scenario_population"]
+            # Composition stays with the exact vendored VFM shares. The blend
+            # moves the POOL only; it never touches the class split.
             conventional = pool * g["vfm_conventional_share"]
             bev = pool * g["vfm_bev_share"]
             phev = pool * g["vfm_phev_share"]
@@ -403,19 +596,17 @@ def build_post_model_extrapolation_annual(
             ped_volume = petrol * intensity / 100.0
 
             emit(scenario, fy, "ped_vkt_per_capita", vktpc, "km/person",
-                 "FY2030 VKTpc anchor * raw AR(1) long-horizon growth")
-            emit(scenario, fy, "light_petrol_vkt", petrol, "million km",
-                 "FY2030 petrol anchor * raw (VKTpc x scenario population) growth")
+                 f"{petrol_formula} / scenario population")
+            emit(scenario, fy, "light_petrol_vkt", petrol, "million km", petrol_formula)
             emit(scenario, fy, "ped_volume", ped_volume, "million litres",
-                 "extrapolated petrol VKT * MBU26 litres intensity / 100")
-            emit(scenario, fy, "heavy_ruc_net_km", heavy, "million km",
-                 "FY2030 Heavy anchor * raw long-horizon growth")
+                 "extrapolated petrol VKT * bridge-vintage litres intensity / 100")
+            emit(scenario, fy, "heavy_ruc_net_km", heavy, "million km", heavy_formula)
             emit(scenario, fy, "light_ruc_net_km", conventional, "million km",
-                 "structural pool (FY2030 anchor * VFM pool index) * exact VFM conventional share")
+                 f"{pool_formula} * exact VFM conventional share")
             emit(scenario, fy, "light_bev_ruc_net_km", bev, "million km",
-                 "structural pool * exact VFM Light BEV share")
+                 f"{pool_formula} * exact VFM Light BEV share")
             emit(scenario, fy, "phev_ruc_net_km", phev, "million km",
-                 "structural pool * exact VFM PHEV share")
+                 f"{pool_formula} * exact VFM PHEV share")
             emit(scenario, fy, "current_light_ruc_conventional_modelled_km", conventional,
                  "million km", "conventional class of the structural pool")
 
@@ -506,6 +697,119 @@ def build_post_model_extrapolation_annual(
     return pd.DataFrame(rows)
 
 
+def anchor_shape_level_audit(
+    *,
+    line_reconciliation: pd.DataFrame,
+    raw_quarterly_audit: pd.DataFrame,
+    scenario_input_wide: pd.DataFrame,
+    long_run_shape_official_annual: pd.DataFrame,
+    long_run_shape_vintage_id: str,
+    transition_schedule_id: str,
+    scenario_names: tuple[str, ...] = ("current_basecase", "current_comparison_1"),
+    repo_root: Path | str | None = None,
+    vfm_scenario: str = _VFM_DEFAULT_SCENARIO,
+) -> pd.DataFrame:
+    """Anchor, Current index, structural index, weight, blend and level.
+
+    One row per (scenario, stream, FY) showing every term of the transition
+    separately, so a reviewer can confirm by arithmetic that the level is the
+    FY2030 Current anchor times a blend of two indices - and that no official
+    LEVEL was substituted. The official level is carried alongside precisely so
+    the ratio to it is visible rather than implied.
+    """
+
+    schedule = resolve_schedule(transition_schedule_id)
+    streams = (
+        ("light_petrol_vkt", "light_petrol_vkt", "g_light_petrol_vkt"),
+        ("light_ruc_total_pool", "light_ruc_pool", "vfm_pool_index"),
+        ("heavy_ruc_net_km", "heavy_ruc_net_km", "g_heavy_ruc_net_km"),
+    )
+    rows: list[dict[str, object]] = []
+    for scenario in scenario_names:
+        anchors = _current_anchors(line_reconciliation, scenario)
+        growth = post_model_growth_indices(
+            raw_quarterly_audit,
+            scenario_input_wide,
+            scenario_name=scenario,
+            repo_root=repo_root,
+            vfm_scenario=vfm_scenario,
+            long_run_shape_official_annual=long_run_shape_official_annual,
+            long_run_shape_vintage_id=long_run_shape_vintage_id,
+            transition_schedule_id=transition_schedule_id,
+        ).set_index("fy")
+        anchor_by_stream = {
+            "light_petrol_vkt": anchors["light_petrol_vkt"],
+            "light_ruc_total_pool": (
+                anchors["light_ruc_net_km"]
+                + anchors["light_bev_ruc_net_km"]
+                + anchors["phev_ruc_net_km"]
+            ),
+            "heavy_ruc_net_km": anchors["heavy_ruc_net_km"],
+        }
+        for fy in range(FIRST_EXTRAPOLATION_FY, LAST_EXTRAPOLATION_FY + 1):
+            row = growth.loc[fy]
+            for label, stream, current_column in streams:
+                anchor = float(anchor_by_stream[label])
+                current_index = float(row[current_column])
+                structural_index = float(row[f"s_{stream}"])
+                weight = float(row["w"])
+                hybrid_index = float(row[f"h_{stream}"])
+                official_level = float(row.get(f"s_level_{stream}", np.nan))
+                official_anchor_level = float(
+                    growth.at[ANCHOR_FY, f"s_level_{stream}"]
+                    if f"s_level_{stream}" in growth.columns
+                    else np.nan
+                )
+                hybrid_level = anchor * hybrid_index
+                rows.append(
+                    {
+                        "scenario_name": scenario,
+                        "fy": fy,
+                        "series_id": label,
+                        "transition_schedule_id": schedule.schedule_id,
+                        "long_run_shape_vintage_id": long_run_shape_vintage_id,
+                        "anchor_fy": ANCHOR_FY,
+                        "current_fy2030_anchor_level": anchor,
+                        "current_growth_index": current_index,
+                        "structural_growth_index": structural_index,
+                        "transition_weight_w": weight,
+                        "model_weight": 1.0 - weight,
+                        "hybrid_growth_index": hybrid_index,
+                        "hybrid_level": hybrid_level,
+                        # Recomputed independently of the constructor so the
+                        # audit is a check, not a restatement.
+                        "recomputed_hybrid_index": current_index ** (1.0 - weight)
+                        * structural_index**weight,
+                        "official_level_same_fy": official_level,
+                        "official_level_anchor_fy": official_anchor_level,
+                        "hybrid_over_official_ratio": (
+                            hybrid_level / official_level
+                            if np.isfinite(official_level) and official_level != 0.0
+                            else np.nan
+                        ),
+                        "anchor_over_official_anchor_ratio": (
+                            anchor / official_anchor_level
+                            if np.isfinite(official_anchor_level)
+                            and official_anchor_level != 0.0
+                            else np.nan
+                        ),
+                        "official_level_substituted": False,
+                        "construction": (
+                            "current_fy2030_anchor x "
+                            "(current_index**(1-w) * structural_index**w)"
+                        ),
+                    }
+                )
+    frame = pd.DataFrame(rows)
+    drift = (frame["hybrid_growth_index"] - frame["recomputed_hybrid_index"]).abs()
+    if float(drift.max()) > 1e-12:
+        raise PostModelExtrapolationError(
+            f"anchor/shape audit does not reproduce the constructor's blend "
+            f"(worst {float(drift.max()):.3e})."
+        )
+    return frame
+
+
 def anchor_index_level_audit(
     *,
     line_reconciliation: pd.DataFrame,
@@ -576,6 +880,110 @@ def anchor_index_level_audit(
                     }
                 )
     return pd.DataFrame(rows)
+
+
+def light_fleet_composition_audit(
+    *,
+    hybrid_pool_by_fy: dict[int, float],
+    repo_root: Path | str | None = None,
+    official_shares: dict[str, pd.DataFrame] | None = None,
+) -> pd.DataFrame:
+    """Allocate one hybrid pool under every composition source, side by side.
+
+    The exact VFM Base/Fast/Slow shares are the PRODUCTION source. Official
+    embedded shares are carried here as audit comparisons only - they are never
+    the Current default, and PR #11's composition-refresh candidate stays an
+    opt-in owner decision.
+
+    Fast and Slow change the class SPLIT of a given pool; they never change the
+    pool total. That is asserted by the caller's gates and is visible here
+    because every row shares the same ``hybrid_pool_million_km``.
+    """
+
+    root = Path(repo_root) if repo_root is not None else repo_root_from_here()
+    vfm = pd.read_csv(root / _VFM_SHARES_RELATIVE_PATH)
+    rows: list[dict[str, object]] = []
+
+    for scenario in sorted(vfm["scenario"].astype(str).unique()):
+        scoped = vfm[vfm["scenario"].astype(str).eq(scenario)].set_index("june_year")
+        for fy, pool in sorted(hybrid_pool_by_fy.items()):
+            if fy not in scoped.index:
+                continue
+            shares = {
+                "conventional": float(scoped.at[fy, "light_ruc_conventional_share"]),
+                "bev": float(scoped.at[fy, "light_ruc_bev_share"]),
+                "phev": float(scoped.at[fy, "light_ruc_phev_share"]),
+            }
+            total = sum(shares.values())
+            rows.append(
+                {
+                    "composition_source": f"exact_VFM_{scenario}",
+                    "composition_role": (
+                        "production_default"
+                        if scenario == _VFM_DEFAULT_SCENARIO
+                        else "governed_alternative"
+                    ),
+                    "fy": fy,
+                    "hybrid_pool_million_km": float(pool),
+                    "conventional_share": shares["conventional"] / total,
+                    "bev_share": shares["bev"] / total,
+                    "phev_share": shares["phev"] / total,
+                    "conventional_million_km": pool * shares["conventional"] / total,
+                    "light_bev_million_km": pool * shares["bev"] / total,
+                    "phev_million_km": pool * shares["phev"] / total,
+                    "raw_share_sum": total,
+                }
+            )
+
+    for vintage_id, official_annual in (official_shares or {}).items():
+        wide = official_annual.pivot_table(
+            index="FY", columns="series_id", values="value", aggfunc="first"
+        )
+        for fy, pool in sorted(hybrid_pool_by_fy.items()):
+            if fy not in wide.index:
+                continue
+            classes = {
+                "conventional": float(wide.at[fy, "light_ruc_net_km"]),
+                "bev": float(wide.at[fy, "light_bev_ruc_net_km"]),
+                "phev": float(wide.at[fy, "phev_ruc_net_km"]),
+            }
+            total = sum(classes.values())
+            if total <= 0.0:
+                continue
+            rows.append(
+                {
+                    "composition_source": f"{vintage_id}_embedded_shares",
+                    "composition_role": "audit_only",
+                    "fy": fy,
+                    "hybrid_pool_million_km": float(pool),
+                    "conventional_share": classes["conventional"] / total,
+                    "bev_share": classes["bev"] / total,
+                    "phev_share": classes["phev"] / total,
+                    "conventional_million_km": pool * classes["conventional"] / total,
+                    "light_bev_million_km": pool * classes["bev"] / total,
+                    "phev_million_km": pool * classes["phev"] / total,
+                    "raw_share_sum": 1.0,
+                }
+            )
+
+    frame = pd.DataFrame(rows)
+    if frame.empty:
+        return frame
+    classes_sum = (
+        frame["conventional_million_km"]
+        + frame["light_bev_million_km"]
+        + frame["phev_million_km"]
+    )
+    frame["class_sum_million_km"] = classes_sum
+    frame["class_sum_minus_pool"] = classes_sum - frame["hybrid_pool_million_km"]
+    worst = float(frame["class_sum_minus_pool"].abs().max())
+    tolerance = 1e-9 * max(1.0, float(frame["hybrid_pool_million_km"].abs().max()))
+    if worst > tolerance:
+        raise PostModelExtrapolationError(
+            f"light fleet composition audit: classes do not sum to the pool "
+            f"(worst {worst:.3e} > {tolerance:.3e})."
+        )
+    return frame
 
 
 def light_ruc_long_run_guard_frame(extrapolation: pd.DataFrame) -> pd.DataFrame:

@@ -245,6 +245,11 @@ class TestPlugAndPlayReachesTheRuntime:
                 "is_latest": False,
                 "is_default_comparator": False,
                 "is_default_bridge_vintage": False,
+                # The long-run shape role is cloned from BEFU26 along with
+                # everything else, so it has to be cleared here for the same
+                # reason as the other three: a registered vintage does not
+                # inherit a default role just by being registered.
+                ov.LONG_RUN_SHAPE_ROLE_FLAG: False,
                 "status": "registered_official_vintage",
             }
         )

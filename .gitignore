@@ -60,6 +60,8 @@ artifacts/**
 !artifacts/revenue_outlook_long_run/**
 !artifacts/official_vintage_befu26/
 !artifacts/official_vintage_befu26/**
+!artifacts/anchored_structural_shape_transition/
+!artifacts/anchored_structural_shape_transition/**
 data/**
 !data/.gitkeep
 !data/dashboard_evidence_pack/

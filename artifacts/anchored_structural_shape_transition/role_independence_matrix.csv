@@ -1,0 +1,5 @@
+comparator_vintage_id,bridge_vintage_id,long_run_shape_vintage_id,transition_schedule_id,max_activity_delta_vs_reference,max_total_nltf_delta_vs_reference,activity_changed,revenue_changed,expected_activity_changed,expected_revenue_changed,comparator_affects_current,official_published_rows_changed
+BEFU26,BEFU26,BEFU26,balanced_structural,0.0,0.0,False,False,False,False,False,False
+MBU26,BEFU26,BEFU26,balanced_structural,0.0,0.0,False,False,False,False,False,False
+BEFU26,MBU26,BEFU26,balanced_structural,0.0,0.14712951799447183,False,True,False,True,False,False
+BEFU26,BEFU26,MBU26,balanced_structural,77.68958620962076,20.70242541578773,True,True,True,True,False,False

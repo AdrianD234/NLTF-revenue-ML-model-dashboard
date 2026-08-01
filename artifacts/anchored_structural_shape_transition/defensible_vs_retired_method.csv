@@ -1,0 +1,12 @@
+verdict,element,reason,retained_in_anchored_structural_shape_transition
+DEFENSIBLE,demand_and_composition_are_separate_problems,"The level/growth question and the fleet-mix question are estimated and governed separately, so neither is used to patch the other.",True
+DEFENSIBLE,vfm_as_the_fleet_transition_source,VFM202405 is a purpose-built fleet-transition projection and remains the production composition source under exact Base/Fast/Slow shares.,True
+DEFENSIBLE,official_vintage_as_an_external_structural_cross_check,A published official vintage is an externally governed long-run view; using its SHAPE as a structural source is a transparent assumption.,True
+DEFENSIBLE,transparent_base_fast_slow_composition,"Three named, published composition scenarios, selectable and auditable, rather than a fitted latent share.",True
+DEFENSIBLE,explicit_s_curve_parameters,"Four dial parameters (speed, ceiling, midpoint, derived steepness) that a reviewer can read, change and re-fit. Verified from workbook cells.",True
+DEFENSIBLE,preserving_an_activity_identity,"Classes sum to the pool and PED VKT equals VKTpc x population, so the construction cannot quietly create or destroy kilometres.",True
+RETIRED_NOT_DEFENSIBLE,lambda_treated_as_a_behavioural_estimate,Lambda was an allocation weight splitting one migration total between two streams. It was never estimated as behaviour and never weighted Current against MoT.,False
+RETIRED_NOT_DEFENSIBLE,ev_inclusive_shares_applied_to_a_conventional_only_envelope,"MBU26 proportions describe a universe containing BEV and PHEV kilometres; they were applied to a universe built from two conventional-only streams, so the optimiser had to manufacture EV km out of them.",False
+RETIRED_NOT_DEFENSIBLE,deductions_from_raw_ped_and_raw_conventional_light_ruc,"The migration total was subtracted from the econometric levels themselves, changing what the models estimated.",False
+RETIRED_NOT_DEFENSIBLE,selection_because_it_matched_an_official_level,"Choosing a construction because its level lands near a published forecast is calibration to the answer, not a method.",False
+RETIRED_NOT_DEFENSIBLE,shrinking_share_expansion,"Dividing a growing conventional forecast by a conventional share tending to zero produced the ~185,800 million km FY2050 pathology.",False

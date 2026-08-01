@@ -74,9 +74,16 @@ from .mbu26_source_spine import (
     revenue_formula_residual_frame,
     revenue_line_reconciliation_frame,
 )
+from .long_run_shape_transition import (
+    FLEET_COMPOSITION_SOURCE_ID,
+    LONG_RUN_SHAPE_METHOD_ID,
+    PRODUCTION_LONG_RUN_TRANSITION_SCHEDULE_ID,
+    resolve_schedule,
+)
 from .official_vintage import (
     default_bridge_vintage_id,
     default_comparator_vintage_id,
+    default_long_run_shape_vintage_id,
     load_official_vintage,
     official_comparator_scenario_name,
     official_comparator_trace_name,
@@ -4152,6 +4159,21 @@ def _sensitivity_display_label(record: dict[str, Any]) -> str:
     return "; ".join(str(part) for part in parts if "Off" not in str(part))
 
 
+def _official_vintage_source_sha(pack: Any) -> str:
+    """The source hash a vintage pack was materialized from.
+
+    Recorded alongside the shape vintage id so a replay can prove it is reading
+    the same published forecast, not merely one with the same name.
+    """
+
+    entry = getattr(pack, "registry_entry", None) or {}
+    manifest = getattr(pack, "manifest", None) or {}
+    workbook = manifest.get("workbook") if isinstance(manifest, dict) else None
+    if isinstance(workbook, dict) and workbook.get("sha256"):
+        return str(workbook["sha256"])
+    return str(entry.get("workbook_sha256") or "")
+
+
 def build_current_revenue_outlook_runtime_pack(
     *,
     repo_root: Path | str | None = None,
@@ -4160,6 +4182,8 @@ def build_current_revenue_outlook_runtime_pack(
     engine: str = "ensemble",
     official_comparator_vintage_id: str | None = None,
     bridge_assumption_vintage_id: str | None = None,
+    long_run_shape_vintage_id: str | None = None,
+    long_run_transition_schedule_id: str = PRODUCTION_LONG_RUN_TRANSITION_SCHEDULE_ID,
 ) -> RevenueOutlookPack:
     """Materialize the committed Revenue Outlook pack from repo-local sources.
 
@@ -4185,6 +4209,13 @@ def build_current_revenue_outlook_runtime_pack(
     scenario_input_wide = _read_optional_parquet(base / SCENARIO_INPUT_DIRNAME / f"{SCENARIO_INPUT_WIDE_STEM}.parquet")
     bridge_vid = str(bridge_assumption_vintage_id or default_bridge_vintage_id(root))
     comparator_vid = str(official_comparator_vintage_id or default_comparator_vintage_id(root))
+    # The third governed role. Resolved from the registry only when a NEW pack
+    # is being constructed; a replay of an existing pack takes it from that
+    # pack's own manifest instead (long_run_shape_vintage_id_from_manifest).
+    shape_vid = str(
+        long_run_shape_vintage_id or default_long_run_shape_vintage_id(root)
+    )
+    shape_schedule = resolve_schedule(long_run_transition_schedule_id)
     bridge_pack = load_official_vintage(bridge_vid, repo_root=root)
     if bridge_pack is None:
         raise ValueError(
@@ -4211,6 +4242,19 @@ def build_current_revenue_outlook_runtime_pack(
     if comparator_vid not in comparator_packs:
         raise ValueError(
             f"official comparator vintage {comparator_vid} is not registered as available"
+        )
+    shape_pack = comparator_packs.get(shape_vid) or load_official_vintage(
+        shape_vid, repo_root=root
+    )
+    if shape_pack is None:
+        raise ValueError(
+            "Cannot rebuild current Revenue Outlook runtime pack: long-run shape "
+            f"vintage {shape_vid} is not materialized."
+        )
+    if not bool(shape_pack.registry_entry.get("supports_long_run_shape")):
+        raise ValueError(
+            f"long-run shape vintage {shape_vid} is not registered as a long-run "
+            "shape source (supports_long_run_shape is not true)."
         )
     mbu26_pack = comparator_packs.get("MBU26") or load_mbu26_annual_spine(repo_root=root)
     if mbu26_pack is None:
@@ -4285,6 +4329,9 @@ def build_current_revenue_outlook_runtime_pack(
             scenario_input_wide=scenario_input_wide,
             mbu26_official_annual=bridge_pack.official_annual,
             repo_root=root,
+            long_run_shape_official_annual=shape_pack.official_annual,
+            long_run_shape_vintage_id=shape_vid,
+            transition_schedule_id=shape_schedule.schedule_id,
         )
     )
     if "forecast_segment" not in line_reconciliation.columns:
@@ -4490,6 +4537,23 @@ def build_current_revenue_outlook_runtime_pack(
             "registry": OFFICIAL_VINTAGE_REGISTRY_PATH.as_posix(),
             "official_comparator_vintage_id": comparator_vid,
             "bridge_assumption_vintage_id": bridge_vid,
+            # The long-run shape role, recorded so a replay of THIS pack uses
+            # the shape source it was built with rather than whichever vintage
+            # the live registry happens to default to later.
+            "long_run_shape_vintage_id": shape_vid,
+            "long_run_shape_vintage_sha256": _official_vintage_source_sha(shape_pack),
+            "long_run_shape_method_id": LONG_RUN_SHAPE_METHOD_ID,
+            "long_run_transition_schedule_id": shape_schedule.schedule_id,
+            "long_run_anchor_fy": shape_schedule.anchor_fy,
+            "long_run_transition_end_fy": (
+                shape_schedule.completion_fy if shape_schedule.is_structural else None
+            ),
+            "fleet_composition_source_id": FLEET_COMPOSITION_SOURCE_ID,
+            "long_run_shape_policy": (
+                "The long-run shape vintage supplies an FY2031-FY2050 activity GROWTH "
+                "SHAPE only. No official level, rate or fixed line is taken from it, "
+                "and the FY2030 Current anchor is unchanged under every schedule."
+            ),
             "default_official_comparator_trace": official_comparator_trace_name(
                 comparator_packs[comparator_vid].release_round
             ),
