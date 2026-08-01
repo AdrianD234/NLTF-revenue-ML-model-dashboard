@@ -119,3 +119,19 @@ this Plotly build's binary encoding), an exact-string option matcher that
 selected nothing, and — worst — waiting on the caption, which renders *above*
 the chart and so updates while the figure below is still the previous render.
 That last one photographed one stale chart four times.
+
+## Validation after promotion
+
+| Gate | Result |
+|---|---|
+| Full local pytest | **1266 passed**, 50 skipped, 41 deselected, **0 failed** |
+| Streamlit AppTest | 38/38 |
+| Deployment readiness | PASS |
+| Replay-seed diagnostic | PASS |
+| Extract validation | 34 PASS, 0 FAIL |
+| Promotion impact audit | PASS - 840 rows per engine, all FY2031-FY2050 post-model |
+| Browser evidence | 8 screenshots, 4 distinct paths, 0 console errors |
+| Runtime hash re-freeze | 13 of 71, each audited |
+
+New test counts: 34 preview behaviour, 15 conflict convergence, 18 role
+independence, 33 transition/blend, 31 hard gates, 22 front end.

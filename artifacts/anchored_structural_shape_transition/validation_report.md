@@ -8,7 +8,8 @@ merge `82d2db67459226a9445fa50b7049c7cebc4032be`.
 | Gate | Result |
 |---|---|
 | compileall (`app.py`, `model_dashboard`, `scripts`, `tests`) | PASS |
-| Full local pytest | **1215 passed**, 50 skipped, 41 deselected, **0 failed** |
+| Full local pytest (pre-promotion) | **1215 passed**, 50 skipped, 0 failed |
+| Full local pytest (promoted packs) | see closure_pass_report.md |
 | New: transition weight and geometric blend | 33/33 |
 | New: comparator × bridge × shape independence + plug-and-play | 16/16 |
 | New: hard gates | 31/31 |
@@ -110,8 +111,16 @@ architecture rather than on new evidence.
 
 ## Governed re-freezes
 
-**None.** No committed runtime-pack value changed, no artefact hash was
-re-pinned, and no contract value was re-frozen. Every pack still records
-`long_run_transition_schedule_id = unblended_current`, and a rebuild today
-reproduces merged main. The re-freeze happens only after the owner selects a
-production candidate.
+After the owner decision, `balanced_structural` is the production default and
+both packs were rebuilt.
+
+| item | scope |
+|---|---|
+| Runtime artifact hashes | **13 of 71** re-pinned, each with old -> new and cause in `runtime_hash_refreeze_audit.csv` |
+| Pack rows changed | **840 per engine**, every one a FY2031-FY2050 `post_model_extrapolation` row |
+| Actuals, FY2026-FY2030, fitted states, official spines | unchanged |
+
+No tolerance was widened. The 58 untouched pins are themselves evidence that
+the promotion reached only what it should.
+
+See `closure_pass_report.md` for the full response to the consultant review.
