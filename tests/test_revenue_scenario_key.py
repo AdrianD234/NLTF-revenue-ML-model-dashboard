@@ -19,6 +19,7 @@ from model_dashboard.official_vintage import official_vintage_choices
 from model_dashboard.revenue_scenario_key import (
     HEAVY_BEV_DEFAULT,
     RevenueScenarioComputationKey,
+    ScenarioKeyValueError,
     as_scenario_key,
 )
 
@@ -93,11 +94,75 @@ def test_every_field_has_exactly_one_meaning() -> None:
     )
 
 
-def test_no_production_helper_addresses_controls_by_tuple_position() -> None:
-    source = Path(app.__file__).read_text(encoding="utf-8")
-    offenders = re.findall(r"ev_uptake_key\[\s*\d+\s*\]", source)
+def _production_python_files() -> list[Path]:
+    """Every production module, not app.py alone."""
+    files = [ROOT / "app.py"]
+    for directory in ("model_dashboard", "pipeline", "scripts"):
+        base = ROOT / directory
+        if base.exists():
+            files.extend(sorted(base.rglob("*.py")))
+    # The key module itself owns the legacy layout by design.
+    return [
+        path
+        for path in files
+        if path.name != "revenue_scenario_key.py" and "__pycache__" not in path.parts
+    ]
+
+
+def test_no_production_module_addresses_controls_by_tuple_position() -> None:
+    offenders: list[str] = []
+    for path in _production_python_files():
+        source = path.read_text(encoding="utf-8", errors="ignore")
+        for match in re.findall(r"ev_uptake_key\[\s*\d+\s*\]", source):
+            offenders.append(f"{path.relative_to(ROOT)}: {match}")
+        if "len(ev_uptake_key)" in source:
+            offenders.append(f"{path.relative_to(ROOT)}: len(ev_uptake_key)")
     assert not offenders, offenders
-    assert "len(ev_uptake_key)" not in source
+    # Non-vacuous: the scan must actually be reading the modules that use the key.
+    scanned = [
+        path
+        for path in _production_python_files()
+        if "ev_uptake_key" in path.read_text(encoding="utf-8", errors="ignore")
+    ]
+    assert scanned, "the positional scan matched no file mentioning ev_uptake_key"
+
+
+# ------------------------------------------------------ fail-closed normalising
+@pytest.mark.parametrize(
+    "kwargs, reason",
+    [
+        ({"heavy_bev_transition": "False"}, "a truthy string is not a flag"),
+        ({"heavy_bev_transition": 1}, "an int is not a flag"),
+        ({"ped_retention_sensitivity": "yes"}, "a truthy string is not a flag"),
+        ({"official_comparator_overlay": 0}, "an int is not a flag"),
+        ({"official_comparator_vintage_id": True}, "a flag is not an id"),
+        ({"engine": False}, "a flag is not an id"),
+        ({"eruc_levers": (1.0, float("nan"))}, "NaN is not a control value"),
+        ({"eruc_levers": (1.0, float("inf"))}, "infinity is not a control value"),
+        ({"eruc_levers": ("x",)}, "a non-numeric entry must not become ()"),
+        ({"custom_ev_levers": "abc"}, "a string is not a numeric sequence"),
+        ({"custom_ev_levers": (True,)}, "a bool is not a numeric control"),
+        ({"custom_ev_levers": 5}, "a scalar is not a numeric sequence"),
+    ],
+)
+def test_invalid_control_values_raise_rather_than_normalise(kwargs, reason) -> None:
+    """A silently coerced value swaps the scenario identity for another one.
+
+    That is the same failure class as the slot-6 collision, only quieter.
+    """
+    with pytest.raises(ScenarioKeyValueError):
+        RevenueScenarioComputationKey(**kwargs)
+
+
+def test_valid_control_values_still_normalise() -> None:
+    key = RevenueScenarioComputationKey(
+        heavy_bev_transition=False,
+        eruc_levers=[2027, 3, 1.0, -0.15, 2.7],
+        official_comparator_vintage_id="  BEFU26  ",
+    )
+    assert key.eruc_levers == (2027.0, 3.0, 1.0, -0.15, 2.7)
+    assert key.official_comparator_vintage_id == "BEFU26"
+    assert key.heavy_bev_transition is False
 
 
 # --------------------------------------------- 3. deterministic serialization

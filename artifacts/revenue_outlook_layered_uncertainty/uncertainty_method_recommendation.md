@@ -1,162 +1,227 @@
-# Gate B — uncertainty method: findings and recommendation
+# Gate B (revised) — uncertainty method recommendation
 
-**Stopping for owner review, as instructed — but not with the deliverable that
-was asked for, because the empirical base does not support it.**
+**Supersedes the first Gate B pass.** That pass read only
+`annual_predictions.parquet` (58 finalist rows, H1–H3) and concluded the
+repository had no long-horizon evidence and that a saturating fit was
+unfittable. **Both conclusions were wrong.** The committed rolling-origin pack
+in `artifacts/long_horizon_validation/` carries 1 990 raw quarterly
+forecast/actual rows to H20 with per-cell samples an order of magnitude larger,
+and the curve *is* fittable — for PED it saturates cleanly.
 
-The brief's §7 assumes committed out-of-sample forecasts rich enough for
-horizon-specific quantiles with pooling and isotonic smoothing across H1–H20,
-and §8 assumes an *"observed H1-H20 width curve"* to fit a saturating
-continuation to. **Neither exists in this repository.** That finding has to be
-settled before three continuation rules are built on top of it.
+The earlier report is retained as `annual_predictions_audit.md`: its analysis of
+`annual_predictions.parquet` stands as an audit of **that file**, and only its
+repository-wide conclusion is withdrawn.
+
+Builders: `scripts/build_uncertainty_method_evidence.py`,
+`scripts/build_uncertainty_method_candidates.py`
 
 ---
 
-## 1. What the committed out-of-sample evidence actually is
+## 1. Evidence inventory — what each source actually measures
 
-`data/dashboard_evidence_pack/data/annual_predictions.parquet` — the source the
-current `Current finalist backtest error` fan already uses.
+| source | rows | horizon | model error | macro-driver error | rate error | bridge error | composition error |
+|---|---|---|---|---|---|---|---|
+| `annual_predictions.parquet` | 58 finalist | H1–H3 annual | ✅ | ❌ realised drivers | ❌ | ❌ | ❌ |
+| `long_horizon_predictions.csv` | 1 990 | H1–H20 quarters | ✅ | ❌ **actual-driver** | ❌ | ❌ | ❌ |
+| `long_horizon_june_year_errors.csv` | 1 148 | JY H1–H5 | ✅ | ❌ actual-driver | ❌ | ❌ | ❌ |
+| MBU26 archived forecast error | per governed map | published horizon | ✅ | ✅ | ✅ | partial | partial |
 
-| | |
+Two things follow, and they are the assumptions this design rests on:
+
+1. **The rolling-origin pack is actual-driver.** Exogenous inputs at each target
+   quarter are the *observed* values, so it isolates model degradation with
+   horizon and **understates** true forward error, which also carries
+   Treasury-driver error. It is used here for the horizon **shape** and for the
+   level, with that conservative bias stated. It must never be described as
+   including driver uncertainty.
+2. **The MBU26 archived source is the only one that includes driver error**, but
+   it is the official model's error, not the current finalists'. It is a
+   cross-check on the level, not a substitute.
+
+**Do not mix quarterly and annual error concepts.** Quarterly errors are wider
+than June-year-aggregated errors because within-year noise partly cancels. The
+Revenue Outlook chart is a June-year chart, so **the band basis must be the
+June-year aggregation**. The first pass's comparison of a 4.45% annual number
+against a 12.79% quarterly number was not a like-for-like comparison.
+
+---
+
+## 2. The horizon shape, on the correct (June-year) basis
+
+`long_horizon_june_year_quantiles.csv`, cohort `all_available`, all targets.
+
+**80% relative width (%)**
+
+| stream | JY H1 (FY2026) | H2 (FY2027) | H3 (FY2028) | H4 (FY2029) | H5 (FY2030) |
+|---|---|---|---|---|---|
+| PED | 3.17 | 9.78 | 12.72 | 12.46 | **12.68** |
+| HEAVY_RUC | 6.66 | 10.03 | 8.22 | 7.75 | **9.72** |
+| LIGHT_RUC | 22.30 | 23.99 | 21.42 | 20.61 | **23.11** |
+
+**50% relative width (%)**
+
+| stream | H1 | H2 | H3 | H4 | H5 |
+|---|---|---|---|---|---|
+| PED | 1.65 | 2.10 | 9.24 | 9.24 | **9.78** |
+| HEAVY_RUC | 4.51 | 3.33 | 3.66 | 1.90 | **3.17** |
+| LIGHT_RUC | 4.28 | 5.71 | 11.14 | 11.78 | **16.78** |
+
+Sample sizes per cell: PED 26/61/33/51/18, HEAVY_RUC 19/43/23/33/12,
+LIGHT_RUC 13/28/14/18/6.
+
+**Reading:** PED grows sharply to JY H3 and then flattens. HEAVY_RUC is flat and
+noisy with no trend. LIGHT_RUC is flat at a high level on the 80% band while its
+50% band is still climbing. So on the annual basis **the curve has largely
+levelled off by FY2028–FY2030**, which is the single most important input to the
+H21+ decision.
+
+### Sensitivities
+
+| variant | effect |
 |---|---|
-| total rows | 130 |
-| finalist rows (excluding the Schiff benchmark) | **58** |
-| streams | **3** — PED, LIGHT_RUC, HEAVY_RUC (volume streams) |
-| origins | 2016Q4 – 2020Q2 |
-| horizons present | **1, 2, 3** |
+| exclude 2020–2021 targets | PED collapses at short horizon (3.17 → 2.31 at H1) and only reaches 10.63 by H5; HEAVY narrows to 5.27 at H5. COVID is doing real work here. |
+| `balanced_h20` cohort | LIGHT_RUC starts far narrower (1.77 at H1) then jumps to 23.11 by H5, i.e. its apparent flatness in the headline is partly a composition effect. |
 
-Per-cell sample sizes, finalist rows only:
-
-| stream | H1 | H2 | H3 |
-|---|---|---|---|
-| HEAVY_RUC | 13 | 9 | **2** |
-| LIGHT_RUC | 4 | 5 | **1** |
-| PED | 13 | 9 | **2** |
-
-Empirical log-error widths by horizon:
-
-| stream | H | n | 50% width | 80% width |
-|---|---|---|---|---|
-| HEAVY_RUC | 1 | 13 | 3.16% | 4.86% |
-| HEAVY_RUC | 2 | 9 | 1.26% | 3.25% |
-| HEAVY_RUC | 3 | 2 | 2.22% | 3.55% |
-| LIGHT_RUC | 1 | 4 | 0.83% | 1.39% |
-| LIGHT_RUC | 2 | 5 | 0.79% | 2.92% |
-| LIGHT_RUC | 3 | **1** | **0.00%** | **0.00%** |
-| PED | 1 | 13 | 4.08% | 4.66% |
-| PED | 2 | 9 | 2.71% | 3.64% |
-| PED | 3 | 2 | 0.40% | 0.64% |
-
-### Why this blocks the design as specified
-
-1. **The supported horizon is 3 years, not 20.** FY2050 is horizon 25. That is
-   an 8× extrapolation beyond the last observed error, not the 1.25× the brief
-   envisages.
-2. **The observed width curve is decreasing and non-monotonic.** PED goes
-   4.66% → 3.64% → 0.64%; HEAVY_RUC goes 4.86% → 3.25% → 3.55%. Uncertainty
-   does not shrink with horizon — this is sampling noise at n ≤ 13, and at H3
-   it is n = 2 and n = 1.
-3. **LIGHT_RUC at H3 has n = 1**, so its quantiles collapse to a point and its
-   measured width is exactly zero. Any rule anchored on the widest *supported*
-   horizon would anchor Light RUC on a single observation.
-4. **Candidate C is unfittable.** A constrained saturating growth curve fitted
-   to the observed short-run width curve cannot be fitted to three
-   noise-dominated, downward-sloping points. Fitting it anyway would be
-   inventing the shape and calling it evidence.
-5. **Only 3 of the ~25 chartable series have any direct evidence at all**, and
-   all three are *volume* streams. There is no direct out-of-sample error for
-   any revenue series, any BEV/PHEV class, MVR, TUC, or any aggregate.
-
-The existing production fan sidesteps all of this: it computes **one** quantile
-set per stream pooled over all origins and applies that same relative width at
-every FY (`_current_finalist_backtest_fan_band_rows` takes `stream_q.iloc[0]`).
-It is already effectively candidate A, and it is honest only because it stops
-at FY2030.
+The quarterly view (`long_horizon_error_quantiles.csv`, H1–H20 with bootstrap
+intervals) tells the same story with more resolution: PED's quarterly 80% width
+goes 3.27 → 12.58 (H12) → 12.64 (H20), saturating around H9–H10.
 
 ---
 
-## 2. How much the choice matters
+## 3. Is a saturating curve fittable? Yes — but only where it has saturated
 
-Anchored on the pooled H1–H3 distribution (the only anchor with a defensible
-sample: n = 24, 10, 24):
+Fitted on the quarterly smoothed widths,
+`w(H) = w∞ − (w∞ − w₁)·exp(−k(H−1))`:
 
-| stream | 80% width at anchor | A · constant to FY2050 | B · √horizon to FY2050 | C · saturating |
-|---|---|---|---|---|
-| HEAVY_RUC | 4.94% | 4.94% | **14.26%** | unfittable |
-| LIGHT_RUC | 4.55% | 4.55% | **13.14%** | unfittable |
-| PED | 4.45% | 4.45% | **12.84%** | unfittable |
+| stream | level | k | half-life (quarters) | w∞ | RMSE |
+|---|---|---|---|---|---|
+| PED | 80 | 0.2101 | **3.3** | 13.50% | 0.63 |
+| LIGHT_RUC | 80 | 0.0622 | 11.2 | 41.21% | 1.70 |
+| HEAVY_RUC | 80 | **0.0030** | **229.7** | **69.57%** | 0.49 |
 
-**B is 2.887× A at FY2050**, and there is no evidence in this repository that
-discriminates between them. The choice would be made on judgement alone, then
-rendered as a precise-looking band on a decision-facing chart out to 2050.
+**PED's fit is genuine** — it saturates within ~3 quarters of half-life at 13.5%,
+almost exactly the plateau value. **HEAVY_RUC's fit is degenerate**: k ≈ 0.003
+means the model has fitted a near-straight ramp, so `w∞ = 69.57%` is pure
+extrapolation from a curve that never turned over. Using it for FY2050 would be
+inventing a number, not fitting one.
+
+So my earlier "unfittable" claim was wrong, and the corrected position is more
+useful: **the saturating candidate is trustworthy exactly where it agrees with
+the plateau, and untrustworthy exactly where it diverges from it.**
 
 ---
 
-## 3. Series inventory and tier assignment
+## 4. H21+ candidates (FY2031–FY2050), 80% width
 
-From `fan_availability` (85 rows, 17 series). Direct empirical evidence exists
-for six series; everything else must be derived, proxied, or declared.
+| stream | candidate | FY2030 | FY2031 | FY2040 | FY2050 |
+|---|---|---|---|---|---|
+| PED | plateau | 12.79 | 12.79 | 12.79 | **12.79** |
+| PED | saturating | 12.79 | 13.41 | 13.50 | **13.50** |
+| PED | √horizon *(stress)* | 12.79 | 14.02 | 22.16 | **28.61** |
+| HEAVY_RUC | plateau | 11.59 | 11.59 | 11.59 | **11.59** |
+| HEAVY_RUC | saturating | 11.59 | 11.54 | 17.51 | **23.43** |
+| HEAVY_RUC | √horizon *(stress)* | 11.59 | 12.70 | 20.08 | **25.93** |
+| LIGHT_RUC | plateau | 33.37 | 33.37 | 33.37 | **33.37** |
+| LIGHT_RUC | saturating | 33.37 | 36.22 | 40.68 | **41.17** |
+| LIGHT_RUC | √horizon *(stress)* | 33.37 | 36.56 | 57.80 | **74.62** |
+| any | legacy constant *(current fan)* | 4.5–4.9 | 4.5–4.9 | 4.5–4.9 | **4.5–4.9** |
 
-| tier | series | count |
+For PED, plateau and saturating differ by 0.7pp at FY2050 — the choice barely
+matters where the curve genuinely saturated. For HEAVY_RUC they differ by
+**11.8pp**, entirely on the strength of a degenerate fit.
+
+Indicative Total NLTF 80% width (bracketed between independent and comonotonic
+component aggregation — the real number needs draw-level propagation, which is
+deliberately not built at this gate): plateau 13.1% at FY2030 rising to 21.6% at
+FY2050; √horizon reaches 48.3%.
+
+---
+
+## 5. Recommendation
+
+### Band basis
+Use the **June-year aggregation** from `long_horizon_june_year_errors.csv` for
+level *and* shape. It is the same time grain as the chart, has the larger and
+more horizon-complete samples, and avoids the quarterly/annual concept mixing.
+Cross-check the level against the MBU26 archived source and record the gap as
+the estimated driver-error understatement.
+
+### Horizon segmentation
+| FY range | quarter horizon | label |
 |---|---|---|
-| **1 · direct current backtest** | `ped_vkt_per_capita`, `light_ruc_net_km`, `heavy_ruc_net_km`, `gross_ped_revenue`, `light_ruc_net_revenue`, `heavy_ruc_net_revenue` | 6 |
-| **2 · archived official error** | `light_ruc_net_km`, `heavy_ruc_net_km`, `gross_ped_revenue`, `light_ruc_net_revenue`, `heavy_ruc_net_revenue`, `total_fed_ruc_net_revenue` | 6 (overlapping) |
-| **3 · derived from uncertain parents** | `ped_volume`, `gross_fed_revenue`, `net_fed_revenue`, `total_ruc_net_revenue`, `total_fed_ruc_net_revenue`, `total_nltf_net_revenue` — reachable through `FORMULA_DEFINITIONS` once their leaves have draws | 6 |
-| **4/5 · proxy required** | `light_bev_ruc_net_km`, `light_bev_ruc_net_revenue`, `phev_ruc_net_km`, `phev_ruc_net_revenue`, `net_mvr_revenue`, `tuc_net_revenue`, `heavy_bev_ruc_net_km`, `heavy_bev_ruc_net_revenue` | 8 |
+| FY2026–FY2028 | H1–H12 | `backtest_supported` |
+| FY2029–FY2030 | H13–H20 | `extended_conditional` — actual-driver evidence, thinner samples |
+| FY2031–FY2050 | H21+ | `inferred_long_run` — no evaluation evidence |
 
-Tier 3 is the genuinely sound part of the design: propagating leaf draws
-through the governed identities is well-founded, and Gate A has just proved
-those identities close to 1e-6. The problem is entirely in what the leaves are
-anchored on beyond H3.
+The band stays visually continuous across the seams; the hover and audit carry
+the evidential state.
 
-Note that the tier-4/5 group is not a rounding error — it includes every BEV
-and PHEV class, which is exactly where the fleet transition makes the forecast
-interesting.
+### H21+ rule — **plateau at the smoothed H20 relative width**
 
----
+Grounds, in order:
 
-## 4. Recommendation
+1. **The annual curve has already levelled off** by FY2028–FY2030 for PED and
+   HEAVY_RUC. A plateau continues what the evidence shows rather than asserting
+   a trend it does not.
+2. **The saturating fit is only identified where it agrees with the plateau.**
+   Where it disagrees (HEAVY_RUC, +11.8pp at FY2050) it is extrapolating a
+   near-linear ramp with k ≈ 0.003. Adopting it would be choosing the wider band
+   for reasons the data does not supply.
+3. **Least assumptive** and trivially explainable to a governance reader: *"we
+   hold the last measured uncertainty flat beyond the evidence."*
+4. The known conservative bias (actual-driver understates driver error) argues
+   against *also* adopting the widest available continuation — two corrections
+   in the same direction stacked on top of each other would be false precision
+   of a different kind.
 
-**Do not build the FY2050 band as specified.** Three options, in the order I'd
-rank them.
+**√horizon is a stress case only**, reported in the audit, never the default:
+it triples the Light RUC band by FY2050 on no evidential basis.
 
-### Option 1 — bands to FY2030, declared scenario range beyond (recommended)
+**Retain the saturating continuation as a governed alternative** for streams
+where the fit is well identified (a k half-life below, say, 20 quarters and RMSE
+under ~1pp — PED qualifies, HEAVY_RUC does not), so the choice is per-stream and
+auditable rather than global.
 
-Give every series 50%/80% empirical bands through FY2030 using tier 1–3, with
-tier 4/5 proxies explicitly flagged. Beyond FY2030 show the **structural
-scenario range** — the VFM Fast–Slow envelope plus High population, which are
-real governed alternatives — and do not draw a probabilistic band at all.
-
-This is defensible on the evidence, keeps the layered-chart product (§3, §4,
-§5, §10, §12 all survive intact), and is honest about where empirical support
-ends. It is close to the existing contract, but with far better series
-coverage and proper draw-level propagation.
-
-### Option 2 — FY2050 bands under an explicitly declared assumption
-
-Build them, anchored on the pooled H1–H3 distribution, using **rule A
-(constant relative width)** — the least-invented of the three, and the one the
-current production fan already implies. Label every FY2031+ row
-`inferred_long_run_model_uncertainty` and state in the hover and the audit that
-it rests on a 3-year evidence base extrapolated 8×. Rule B is not
-recommendable: it produces a 2.9× wider band from the same data with nothing to
-justify the exponent.
-
-### Option 3 — commission the evidence
-
-Extend the backtest to more origins and longer horizons, and add revenue-level
-and class-level folds, then build the full design. That is a modelling
-workstream, not a dashboard one.
+### One thing the owner should see before agreeing
+On the June-year basis the **Light RUC 80% band is 21–24% at every horizon**,
+far wider than PED (3–13%) or Heavy (7–10%), on n = 6–28. Either Light RUC
+genuinely carries that much model uncertainty, or the rolling-origin evaluation
+is unusually harsh on the GBM residual-correction recipe. A 23%-wide band on the
+Light RUC chart is a striking thing to publish, so it is worth a look before it
+ships.
 
 ---
 
-## 5. What I have not built, per the stop instruction
+## 6. Revised series-tier contract
 
-No 10,000-draw simulation, no uncertainty pack, no chart-layer UI, no
-all-series browser acceptance, no full pytest run. Gate A is committed; the
-layer registry (§3) and VFM scenario paths (§4) are untouched and remain
-straightforward once the uncertainty question is settled — they do not depend
-on it.
+`uncertainty_series_contract_draft.csv`. The first pass over-assigned proxies;
+most series derive properly from an uncertain parent.
 
-**Decision needed:** which of the three options, and if Option 2, confirmation
-that a band resting on H1–H3 evidence extrapolated to H25 is one you want on a
-decision-facing chart.
+| tier | count | series |
+|---|---|---|
+| **1 · direct rolling-origin evidence** | 3 | `ped_vkt_per_capita`, `light_ruc_net_km`, `heavy_ruc_net_km` |
+| **3 · derived by draw-level propagation** | 13 | `ped_volume`, `gross_ped_revenue`, `gross_fed_revenue`, `net_fed_revenue`, `light_bev_ruc_net_km`, `phev_ruc_net_km`, `light_ruc_net_revenue`, `light_bev_ruc_net_revenue`, `phev_ruc_net_revenue`, `heavy_ruc_net_revenue`, `total_ruc_net_revenue`, `total_fed_ruc_net_revenue`, `total_nltf_net_revenue` |
+| **5 · governed conservative proxy** | 4 | `heavy_bev_ruc_net_km`, `heavy_bev_ruc_net_revenue`, `net_mvr_revenue`, `tuc_net_revenue` |
+
+Light BEV and PHEV activity now derive from the uncertain Light pool times the
+selected exact VFM shares; their revenues from uncertain km times governed
+rates; PED volume and revenue from uncertain PED activity through the governed
+bridge; every aggregate from draw-level `FORMULA_DEFINITIONS` propagation, which
+Gate A has already proved closes to 1e-6.
+
+Only four genuinely unsupported leaves remain: MVR, TUC, and the fixed Heavy-BEV
+component (whose km/revenue asymmetry is the open item from Gate A).
+
+---
+
+## 7. Stop point
+
+Not built, per instruction: the 10 000-draw pack, final chart layers, full
+browser acceptance, full pytest.
+
+**Decisions needed:**
+1. Confirm **plateau** as the H21+ default, with the per-stream saturating
+   alternative where the fit is well identified.
+2. Confirm the June-year basis and the three-state horizon labelling.
+3. Look at the Light RUC 21–24% band before it ships.
+4. Confirm the tier-5 proxy treatment for MVR, TUC and Heavy BEV.

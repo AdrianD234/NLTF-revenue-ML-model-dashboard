@@ -22,6 +22,7 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import json
+import math
 from typing import Any
 
 __all__ = [
@@ -51,17 +52,66 @@ _LEGACY_LONG_RUN_SCHEDULE = 8
 _LEGACY_LONG_RUN_SHAPE_VINTAGE = 9
 
 
-def _as_float_tuple(values: Any) -> tuple[float, ...]:
+class ScenarioKeyValueError(ValueError):
+    """An invalid control value reached the governance key.
+
+    Raised rather than normalised. Silently coercing a bad value would swap
+    the scenario identity for a different, valid-looking one - the same class
+    of failure as the slot-6 collision, just quieter.
+    """
+
+
+def _as_float_tuple(values: Any, *, field: str) -> tuple[float, ...]:
+    """Finite floats only. An unparseable or non-finite entry fails closed."""
     if values is None:
         return ()
+    if isinstance(values, (str, bytes)):
+        raise ScenarioKeyValueError(
+            f"{field}: expected a sequence of numbers, got {type(values).__name__}"
+        )
     try:
-        return tuple(float(value) for value in values)
-    except (TypeError, ValueError):
-        return ()
+        iterator = list(values)
+    except TypeError as error:
+        raise ScenarioKeyValueError(f"{field}: not iterable ({values!r})") from error
+    out: list[float] = []
+    for index, value in enumerate(iterator):
+        if isinstance(value, bool):
+            raise ScenarioKeyValueError(f"{field}[{index}]: bool is not a numeric control")
+        try:
+            number = float(value)
+        except (TypeError, ValueError) as error:
+            raise ScenarioKeyValueError(
+                f"{field}[{index}]: {value!r} is not numeric"
+            ) from error
+        if not math.isfinite(number):
+            raise ScenarioKeyValueError(f"{field}[{index}]: {value!r} is not finite")
+        out.append(number)
+    return tuple(out)
+
+
+def _as_flag(value: Any, *, field: str) -> bool:
+    """A real bool only.
+
+    ``bool("False")`` is ``True``, and ``bool("BEFU26")`` is what caused the
+    slot-6 defect in the first place. A string or an int here means a caller
+    has confused a flag with something else, so say so.
+    """
+    if isinstance(value, bool):
+        return value
+    raise ScenarioKeyValueError(
+        f"{field}: expected bool, got {type(value).__name__} ({value!r})"
+    )
 
 
 def _as_text(value: Any) -> str:
     return "" if value is None else str(value).strip()
+
+
+def _as_identifier(value: Any, *, field: str) -> str:
+    """A text control. Booleans are rejected: a flag is not an id."""
+    if isinstance(value, bool):
+        raise ScenarioKeyValueError(f"{field}: expected text, got bool ({value!r})")
+    return _as_text(value)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -96,11 +146,11 @@ class RevenueScenarioComputationKey:
         # Normalising here means two keys that mean the same thing hash and
         # serialise the same, whatever shape the caller passed in.
         for name in _TUPLE_FIELDS:
-            object.__setattr__(self, name, _as_float_tuple(getattr(self, name)))
+            object.__setattr__(self, name, _as_float_tuple(getattr(self, name), field=name))
         for name in _BOOL_FIELDS:
-            object.__setattr__(self, name, bool(getattr(self, name)))
+            object.__setattr__(self, name, _as_flag(getattr(self, name), field=name))
         for name in _TEXT_FIELDS:
-            object.__setattr__(self, name, _as_text(getattr(self, name)))
+            object.__setattr__(self, name, _as_identifier(getattr(self, name), field=name))
 
     # ------------------------------------------------------------- derivation
     def replace(self, **changes: Any) -> "RevenueScenarioComputationKey":
@@ -172,8 +222,8 @@ class RevenueScenarioComputationKey:
         return cls(
             engine=engine,
             uptake_basis=_as_text(slot(_LEGACY_UPTAKE_BASIS, "")),
-            custom_ev_levers=_as_float_tuple(slot(_LEGACY_CUSTOM_EV_LEVERS, ())),
-            eruc_levers=_as_float_tuple(slot(_LEGACY_ERUC_LEVERS, ())),
+            custom_ev_levers=_as_float_tuple(slot(_LEGACY_CUSTOM_EV_LEVERS, ()), field='custom_ev_levers'),
+            eruc_levers=_as_float_tuple(slot(_LEGACY_ERUC_LEVERS, ()), field='eruc_levers'),
             current_fed_policy_state=_as_text(current_policy),
             official_fed_policy_state=_as_text(official_policy),
             ped_retention_sensitivity=bool(slot(_LEGACY_PED_RETENTION, False)),
