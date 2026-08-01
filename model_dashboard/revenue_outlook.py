@@ -47,6 +47,9 @@ from .forecast_imports import (
 )
 from .completeness_contract import validate_frame_completeness
 from .post_model_extrapolation import (
+    FIRST_EXTRAPOLATION_FY,
+    LAST_EXTRAPOLATION_FY,
+    POST_MODEL_SEGMENT,
     build_post_model_extrapolation_annual,
     post_model_chart_rows,
     post_model_line_reconciliation_rows,
@@ -308,11 +311,27 @@ SOURCE_COMPARISON_OUTPUT_DIR_POLICY = (
     "Source run output folders are not published in the promoted runtime manifest; "
     "scenario roles, workbook hashes, and governed output hashes are retained."
 )
-CURRENT_RUNTIME_POLICY = (
-    "Revenue Outlook runtime rows are materialized from repo-local source actuals, "
-    "current finalist forecasts and the MBU26 official comparator. Source-pack "
-    "tables are retained as audit lineage and are not a second Streamlit chart engine."
-)
+def current_runtime_policy(
+    comparator_vintage_id: str,
+    bridge_vintage_id: str,
+    long_run_shape_vintage_id: str,
+) -> str:
+    """The runtime policy sentence, generated from the SELECTED vintage roles.
+
+    Previously a module constant naming MBU26 outright. That was already wrong
+    once BEFU26 became the default comparator, and it is the kind of error a
+    literal invites: the manifest is meant to explain how the rows were built,
+    so any role it names has to come from the roles actually used.
+    """
+
+    return (
+        "Revenue Outlook runtime rows are materialized from repo-local source "
+        "actuals, current finalist forecasts and the selected official vintage "
+        f"roles: {comparator_vintage_id} official comparator, {bridge_vintage_id} "
+        f"bridge assumptions (rates, fuel intensity, fixed lines) and "
+        f"{long_run_shape_vintage_id} long-run activity shape. Source-pack tables "
+        "are retained as audit lineage and are not a second Streamlit chart engine."
+    )
 REVENUE_FIRST_FORECAST_FY = 2026
 PED_EFFICIENCY_BASELINE_SCENARIO_ID = "baseline_0pct"
 PED_EFFICIENCY_DEFAULT_NOTE = (
@@ -4520,7 +4539,7 @@ def build_current_revenue_outlook_runtime_pack(
             f"committed_current_runtime_pack_only; the {bridge_release} annual source pack is "
             "repo-local; Streamlit does not load the offline workbooks or legacy Excel forecast paths"
         ),
-        "runtime_policy": CURRENT_RUNTIME_POLICY,
+        "runtime_policy": current_runtime_policy(comparator_vid, bridge_vid, shape_vid),
         "allowed_traces": [
             "Actual",
             *[
@@ -4585,13 +4604,43 @@ def build_current_revenue_outlook_runtime_pack(
             ),
             "C_current_finalist_activity": "Promoted quarterly finalist outputs annualized by June year",
             "D_hybrid_current_revenue": f"Only PED, Light RUC and Heavy RUC revenue are replaced; all other rows use {bridge_release} official components.",
-            "E_ev_phev_split_audit": (
-                "Current finalist Light RUC is governed as a total light-RUC net-km model input. The optimized migration "
-                "layer allocates BEV/PHEV uptake between PED/light-petrol and total Light RUC before revenue rates are applied."
+            "E_light_ruc_composition": (
+                "Current finalist Light RUC is anchored on the CONVENTIONAL model "
+                "forecast, preserved exactly under the Base uptake basis. Class "
+                f"composition comes from the exact {FLEET_COMPOSITION_SOURCE_ID} "
+                "Base/Fast/Slow shares. The retired lambda allocation - which split "
+                "one migration total between PED and Light RUC - is not part of the "
+                "runtime path and is retained as audit lineage only."
             ),
-            "F_runtime_cutoff": (
-                f"No extrapolated model extension is used in the current Revenue Outlook runtime path; "
-                f"current-finalist comparisons stop at FY{runtime_cutoff_fy}."
+            "F_econometric_segment": (
+                "The econometric segment runs to FY"
+                f"{runtime_cutoff_fy}. No FY2051-FY2055 gradient extension is used."
+            ),
+            "G_post_model_segment": (
+                f"FY{FIRST_EXTRAPOLATION_FY}-FY{LAST_EXTRAPOLATION_FY} Current rows "
+                "are the governed anchored structural shape transition: each stream "
+                f"holds its FY{runtime_cutoff_fy} econometric level as a fixed anchor "
+                "and its growth index is blended geometrically toward the "
+                f"{shape_vid} long-run shape on the {shape_schedule.schedule_id} "
+                "schedule. No official level is substituted. These rows are labelled "
+                f"forecast_segment={POST_MODEL_SEGMENT} and are decision-facing."
+            ),
+        },
+        # Explicit horizon boundaries. Previously a reader had to infer these
+        # from prose that predated the post-model layer and still implied
+        # Current stopped at FY2030.
+        "horizon_boundaries": {
+            "econometric_cutoff_fy": int(runtime_cutoff_fy),
+            "post_model_start_fy": int(FIRST_EXTRAPOLATION_FY),
+            "post_model_end_fy": int(LAST_EXTRAPOLATION_FY),
+            "current_display_end_fy": int(LAST_EXTRAPOLATION_FY),
+            "official_comparator_end_fy": int(official_comparator_cutoff_fy),
+            "note": (
+                "Current is displayed to FY"
+                f"{LAST_EXTRAPOLATION_FY}: econometric through FY{runtime_cutoff_fy}, "
+                f"then the governed post-model layer. The two segments are "
+                "separately labelled and the FY"
+                f"{runtime_cutoff_fy} point is shared by both."
             ),
         },
         "period_rule": {
@@ -4619,20 +4668,23 @@ def build_current_revenue_outlook_runtime_pack(
             "fy2026_nowcast": "2025Q3+2025Q4 source actuals plus 2026Q1+2026Q2 current finalist forecasts",
             "rule": (
                 "Actual line ends FY2025; FY2026 actual-to-date rows are nowcast inputs only and are not plotted as actuals. "
-                f"Current-finalist comparative charts and runtime calculations stop at FY{runtime_cutoff_fy}, "
-                "the last governed common non-extrapolated horizon."
+                f"The ECONOMETRIC segment stops at FY{runtime_cutoff_fy}, the last governed common non-extrapolated "
+                f"horizon; Current continues to FY{LAST_EXTRAPOLATION_FY} as the separately labelled post-model layer."
             ),
         },
         "data_vintage_manifest_notes": {
             # Emitted by the generator, not hand-edited, so a pack rebuild
             # cannot silently drop the horizon-support governance.
             "runtime_cutoff": (
-                f"No extrapolated model extension is used beyond FY{runtime_cutoff_fy}: the "
-                "FY2051-FY2055 gradient extension is disabled and current-finalist paths stop "
-                "where governed model and source assumptions stop. Last displayed/current "
-                f"calculation FY is FY{runtime_cutoff_fy}. This is NOT a statement that the "
+                f"The FY2051-FY2055 gradient extension remains disabled. The ECONOMETRIC "
+                f"segment stops at FY{runtime_cutoff_fy}, where governed model and source "
+                f"assumptions stop. Current is displayed to FY{LAST_EXTRAPOLATION_FY}: "
+                f"FY{FIRST_EXTRAPOLATION_FY}-FY{LAST_EXTRAPOLATION_FY} rows are the governed "
+                "anchored structural shape transition, separately labelled "
+                f"forecast_segment={POST_MODEL_SEGMENT} and anchored on the "
+                f"FY{runtime_cutoff_fy} econometric level. This is NOT a statement that the "
                 "whole displayed path is validated. See forecast_horizon_validation for the "
-                "three governed support states."
+                "three governed support states and horizon_boundaries for the explicit FYs."
             ),
             "forecast_horizon_validation": (
                 f"Model training cutoff {REVENUE_MODEL_TRAINING_CUTOFF}. Three governed support "
@@ -4646,15 +4698,24 @@ def build_current_revenue_outlook_runtime_pack(
                 "H13-H20; FY2030 is entirely H13-H20; FY2031 mixes H13-H20 and H21+; FY2032 "
                 "onward is entirely H21+."
             ),
-            "official_horizon_note": f"Comparative charts stop at FY{runtime_cutoff_fy}.",
+            "official_horizon_note": (
+                f"The econometric segment stops at FY{runtime_cutoff_fy}; Current "
+                f"continues to FY{LAST_EXTRAPOLATION_FY} as the separately labelled "
+                "post-model layer."
+            ),
             "light_ruc_target_semantics": (
-                "Business rule update: current-finalist Light RUC is treated as total light-RUC net km, while EV/PHEV "
-                "migration is sourced from both current PED/light-petrol activity and total Light RUC using an optimized "
-                f"deterministic bridge calibrated to {bridge_release} light-mobility proportions. BEV/PHEV are not fixed add-ons."
+                "Current-finalist Light RUC is anchored on the CONVENTIONAL model "
+                "forecast, preserved exactly under the Base uptake basis. Light BEV "
+                "and PHEV are allocated from the pool using the exact "
+                f"{FLEET_COMPOSITION_SOURCE_ID} shares, so classes sum to the pool "
+                "by construction."
             ),
             "ev_phev_migration_allocation": (
-                "Default lambda_mode is optimized; alternatives are recorded for audit only and do not replace the current "
-                "runtime path unless explicitly selected in governance review."
+                "The retired lambda allocation is NOT the runtime path. Lambda was a "
+                "weight splitting one migration total between PED and Light RUC; it "
+                "changed econometric levels and is retained as audit lineage only. "
+                "The runtime path preserves the conventional anchor and allocates "
+                f"classes with exact {FLEET_COMPOSITION_SOURCE_ID} shares."
             ),
             "scenario_role_contract": (
                 "PED VKT per capita is a behavioural intensity metric. Value-changing comparison PED intensity is labelled "
@@ -4701,7 +4762,10 @@ def build_current_revenue_outlook_runtime_pack(
             "LIGHT_RUC": _light_ruc_target_semantics_manifest(ev_phev_split_assumptions),
             "HEAVY_RUC": {
                 "status": "not_reclassified",
-                "decision": "Heavy BEV remains an MBU26 fixed component in current-finalist paths.",
+                "decision": (
+                    f"Heavy BEV remains a fixed component carried from the selected "
+                    f"bridge-assumption vintage ({bridge_vid}) in current-finalist paths."
+                ),
                 "rationale": "No repo-local evidence in this audit proves the Heavy RUC target includes Heavy BEV.",
             },
         },
@@ -6535,8 +6599,9 @@ def ev_phev_split_assumptions_frame(
                     "allocation_status": "legacy_light_only_comparator_superseded_by_ped_light_migration",
                     "used_by_current_finalist": True,
                     "notes": (
-                        "Legacy Light-only split comparator retained for governance. Active current-finalist "
-                        "rows use the PED-Light optimized migration audit."
+                        "Legacy Light-only split comparator retained for governance. "
+                        "Active current-finalist rows use the conventional Light RUC "
+                        f"anchor with exact {FLEET_COMPOSITION_SOURCE_ID} class shares."
                     ),
                 }
             )
@@ -6581,7 +6646,11 @@ def _light_ruc_target_semantics_manifest(audit: pd.DataFrame) -> dict[str, Any]:
     if audit is None or audit.empty:
         return {
             "status": "business_rule_pending_audit_rows",
-            "decision": "Apply the governed PED-Light optimized migration layer when current rows are available.",
+            "decision": (
+                "Apply the governed conventional Light RUC anchor with exact "
+                f"{FLEET_COMPOSITION_SOURCE_ID} class shares when current rows are "
+                "available."
+            ),
             "rationale": "No ev_phev_split_assumptions audit rows were available.",
         }
     current_rows = audit[audit.get("used_by_current_finalist", pd.Series(False, index=audit.index)).astype(bool)].copy()
@@ -6603,10 +6672,13 @@ def _light_ruc_target_semantics_manifest(audit: pd.DataFrame) -> dict[str, Any]:
     max_universe_residual = pd.to_numeric(evidence.get("target_minus_total_light_universe_km", pd.Series(dtype=float)), errors="coerce").abs().max()
     allocation_years = [int(value) for value in pd.to_numeric(current_rows.get("FY", pd.Series(dtype=float)), errors="coerce").dropna().astype(int).unique().tolist()]
     return {
-        "status": "business_rule_applied_ped_light_optimized_migration",
+        "status": "conventional_anchor_with_exact_vfm_composition",
         "decision": (
-            "Allocate EV/PHEV uptake between PED/light-petrol activity and current-finalist total Light RUC "
-            "using the optimized migration layer; retain the legacy Light-only split as an audit comparator."
+            "Anchor current-finalist Light RUC on the CONVENTIONAL model forecast, "
+            "preserved exactly under the Base uptake basis, and allocate Light BEV "
+            f"and PHEV from the pool using the exact {FLEET_COMPOSITION_SOURCE_ID} "
+            "shares. The retired optimized migration layer, which split one "
+            "migration total between PED and Light RUC, is an audit comparator only."
         ),
         "evidence_years": years,
         "allocation_years": allocation_years,

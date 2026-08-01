@@ -85,29 +85,22 @@ fixed at source to make them so: the baseline is written at `%.17g` and read
 with `float_precision="round_trip"`, because pandas loses the last bits in both
 directions by default.
 
-## Coverage limits, stated plainly
+## Coverage limits — superseded
 
-Three items in the brief's validation stack were **not** run, and I have not
-represented them as passing:
+The three gaps recorded here before the closure pass have since been closed,
+and this section is kept only so the record shows what was outstanding and
+when:
 
-- **Windows/Linux replay parity.** The Windows leg is unchanged by this branch
-  (no replay value moves under the default schedule — the unblended candidate
-  is merged main to 1 ulp), but the Linux leg comes from CI and has not run.
-- **Changed-scope Playwright browser tests and the candidate screenshots.** The
-  brief asks for desktop and laptop screenshots of all four candidate paths.
-  These have not been captured. The analyst selector is covered by 22
-  non-visual tests, but no browser evidence exists yet.
-- **Fresh clean-clone CI.** Not run locally.
+- **Windows/Linux replay parity** — both legs now pass in CI on the merge SHA
+  (`Replay parity (windows-latest)` and `Replay parity (ubuntu-latest)`).
+- **Playwright screenshots of the four candidate paths** — captured at desktop
+  and laptop widths with zero console errors, and tied to the FY2040 value read
+  off each rendered figure.
+- **Fresh clean-clone CI** — `Core clean-clone suite` passed on the merge SHA.
+- **Conflict-window convergence** — 15 tests added; convergence is proven to
+  the SELECTED hybrid Base path rather than the unblended one.
 
-Section 10's per-scenario requirements are verified in the constructor: each
-governed scenario carries its own FY2030 anchor and its own Current index, and
-both use the same structural index and schedule. The **policy-ordering and
-conflict-convergence** requirements are properties of the existing overlay
-architecture (pack → raw PED bridge → Treasury macro replay → VFM overlay →
-FED policy overlay), which this branch does not alter — the post-model layer is
-built inside the pack, upstream of every overlay. I did not add new tests for
-the conflict window, so that part of Section 10 rests on the existing
-architecture rather than on new evidence.
+See `closure_pass_report.md` for the detail.
 
 ## Governed re-freezes
 
