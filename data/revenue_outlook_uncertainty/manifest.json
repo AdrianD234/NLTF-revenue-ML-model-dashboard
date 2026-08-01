@@ -1,0 +1,45 @@
+{
+  "seed": 20260801,
+  "draws": 10000,
+  "generator": "numpy.random.default_rng(seed).multivariate_normal(cholesky) + scipy.stats.norm.cdf",
+  "marginal_method": "monotone piecewise-linear quantile map of the pooled empirical June-year sample",
+  "continuation_rule": "plateau",
+  "streams": "PED,LIGHT_RUC,HEAVY_RUC",
+  "correlation_n_aligned": 79,
+  "correlation_shrinkage": 0.0,
+  "correlation_streams": "PED,LIGHT_RUC,HEAVY_RUC",
+  "correlation_reason": "full weight on the sample estimate",
+  "rho_PED_LIGHT_RUC": 0.115385,
+  "rho_PED_HEAVY_RUC": 0.129869,
+  "rho_LIGHT_RUC_HEAVY_RUC": 0.471981,
+  "scenario_key": {
+    "engine": "",
+    "uptake_basis": "MoT VFM base",
+    "custom_ev_levers": [],
+    "eruc_levers": [],
+    "current_fed_policy_state": "delayed_6m",
+    "official_fed_policy_state": "published",
+    "ped_retention_sensitivity": false,
+    "heavy_bev_transition": false,
+    "official_comparator_vintage_id": "BEFU26",
+    "official_comparator_overlay": false,
+    "ped_bridge_mode": "",
+    "bridge_vintage_id": "",
+    "long_run_shape_vintage_id": "BEFU26",
+    "long_run_transition_schedule_id": "balanced_structural",
+    "macro_scenario_id": "",
+    "conflict_fuel_state": ""
+  },
+  "scenario_key_digest": "b5ce7ab7a3ef17577e7eca43b439acce5b8807a29f55b5c09e8a668b956237df",
+  "formula_tolerance": 1e-06,
+  "series_count": 40,
+  "fy_range": [
+    2026,
+    2050
+  ],
+  "band_rows": 1000,
+  "source_files": {
+    "june_year_errors": "artifacts/long_horizon_validation/long_horizon_june_year_errors.csv",
+    "central_path": "data/current_revenue_outlook (line reconciliation, current_basecase)"
+  }
+}

@@ -110,6 +110,10 @@ data/dashboard_evidence_pack_reproducibility/ped_inner_hpo/source_artifacts/**/*
 !data/revenue_model_source_pack/
 !data/revenue_model_source_pack/**
 
+# governed offline uncertainty pack (scripts/build_revenue_outlook_uncertainty_pack.py)
+!data/revenue_outlook_uncertainty/
+!data/revenue_outlook_uncertainty/**
+
 # vNext production reproducibility packs (governed fitted state + evidence)
 !data/dashboard_evidence_pack_reproducibility/heavy_ruc_vnext/
 !data/dashboard_evidence_pack_reproducibility/heavy_ruc_vnext/**
