@@ -267,7 +267,10 @@ def test_committed_current_revenue_outlook_pack_is_repo_local_and_hash_backed() 
     assert manifest["revenue_stack_components"]["repo_relative_path"] == "data/current_revenue_outlook/revenue_stack_components.csv"
     assert "aggregates are overlays only" in manifest["revenue_stack_components"]["scope"]
     assert manifest["ev_phev_split_assumptions"]["repo_relative_path"] == "data/current_revenue_outlook/ev_phev_split_assumptions.csv"
-    assert manifest["ev_phev_split_assumptions"]["allocation_status"] == "legacy_light_only_comparator_superseded_by_ped_light_migration"
+    # The status now says what the table IS (an audit-only legacy split beside
+    # the active conventional anchor) rather than claiming the retired
+    # PED+Light migration superseded it and is therefore the live path.
+    assert manifest["ev_phev_split_assumptions"]["allocation_status"] == "legacy_split_audit_only_conventional_anchor_active"
     assert (
         manifest["ev_phev_ped_light_drift_assumptions"]["repo_relative_path"]
         == "data/current_revenue_outlook/ev_phev_ped_light_drift_assumptions.csv"
@@ -383,8 +386,13 @@ def test_committed_current_revenue_outlook_pack_is_repo_local_and_hash_backed() 
     )
     assert manifest["scenario_input_replay_mismatch_report"]["status"] == "passed_no_mismatch"
     assert "raises" in manifest["scenario_input_replay_mismatch_report"]["fail_policy"]
-    assert manifest["target_semantics_audit"]["LIGHT_RUC"]["status"] == "business_rule_applied_ped_light_optimized_migration"
-    assert "PED/light-petrol activity and total Light RUC" in manifest["data_vintage_manifest_notes"]["light_ruc_target_semantics"]
+    # Updated to the runtime contract: Light RUC is anchored on the CONVENTIONAL
+    # forecast with exact VFM class shares. The previous assertions pinned the
+    # retired optimized-migration description.
+    assert manifest["target_semantics_audit"]["LIGHT_RUC"]["status"] == "conventional_anchor_with_exact_vfm_composition"
+    light_ruc_note = manifest["data_vintage_manifest_notes"]["light_ruc_target_semantics"]
+    assert "anchored on the CONVENTIONAL model forecast" in light_ruc_note
+    assert "VFM202405" in light_ruc_note
     assert manifest["revenue_formula_residuals"]["repo_relative_path"] == "data/current_revenue_outlook/revenue_formula_residuals.csv"
     assert manifest["series_alias_audit"]["repo_relative_path"] == "data/current_revenue_outlook/series_alias_audit.csv"
     assert manifest["fan_availability"]["repo_relative_path"] == "data/current_revenue_outlook/fan_availability.csv"
@@ -531,7 +539,13 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
         "runtime_cutoff",
     }
     assert pd.to_numeric(runtime_cutoff_audit["runtime_cutoff_fy"], errors="coerce").eq(runtime_cutoff_fy).all()
-    assert "no extrapolated model extension is used" in manifest["data_vintage_manifest_notes"]["runtime_cutoff"].lower()
+    # The invariant this protects is that the FY2051-FY2055 gradient extension
+    # stays disabled. It previously asserted "no extrapolated model extension is
+    # used", which stopped being true when the governed FY2031-FY2050 post-model
+    # layer was added: the assertion was pinning stale wording, not the property.
+    runtime_cutoff_note = manifest["data_vintage_manifest_notes"]["runtime_cutoff"].lower()
+    assert "fy2051-fy2055 gradient extension remains disabled" in runtime_cutoff_note
+    assert "econometric segment stops at fy2030" in runtime_cutoff_note
     assert f"FY{runtime_cutoff_fy}" in manifest["data_vintage_manifest_notes"]["official_horizon_note"]
     # These frames are MIXED: they carry current-model rows and official
     # comparator rows together. Asserting one scalar cutoff over the whole
@@ -865,7 +879,7 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     assert ev_phev_split["used_by_current_finalist"].astype(bool).any()
     current_split = ev_phev_split[ev_phev_split["used_by_current_finalist"].astype(bool)].copy()
     assert set(current_split["allocation_status"].dropna().astype(str)) == {
-        "legacy_light_only_comparator_superseded_by_ped_light_migration"
+        "legacy_split_audit_only_conventional_anchor_active"
     }
     assert set(current_split["source_path"].dropna().astype(str)) == {
         "Current finalist Base case",
@@ -2333,8 +2347,8 @@ def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
         'conflict_gdp_calibration.csv': '032606a84ed1e7716197ced405d3026b39c8c00e0a56882174b45c13eb8fb655',
         'ev_phev_ped_light_drift_assumptions.csv': '07e1cfb9c6279a3b9a84fcfe772096b4213694880c496ce1eedac7231c8a8984',
         'ev_phev_ped_light_drift_assumptions.parquet': '015ec183ddcfb8fe4adc17bb3b60f8ef6c357f8c9f51672fa5924399ca5cb9e4',
-        'ev_phev_split_assumptions.csv': '8690dae6c1a2a178d2402c4a7f33c6fb615d4b98298c0b49025a0e6780ac2733',
-        'ev_phev_split_assumptions.parquet': '746d006167cb676d486b235e40a6c74dfc6d28f110d0fa32ba7c798a5e84fa2c',
+        'ev_phev_split_assumptions.csv': '01cdc3b0491b03e9ac8513058ddd87797797765d0ab65f818144d7b7df56ffa0',
+        'ev_phev_split_assumptions.parquet': '3e76a9493aa6d5b03bd3f336ec9ccd8156f571af1da47da9424f5eb8c176a963',
         'fan_availability.csv': '9c89fa4263e8b07b1e3c8675b5f8f4d23d3668dece4fb89d1460559b2fbf83e5',
         'fan_availability.parquet': '2bab0334fd9a7350e40840b4697ae71d259263f781e2332bc8103690b98a164d',
         'fan_band_rows.csv': '24e47a51b316e125a4111b5499f65731c808fc31e0d605ef80bee7cb66c9ad36',
@@ -2345,8 +2359,8 @@ def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
         'horizon_contract_audit.parquet': '015e1a42d88eaafe2fa966800a5b499f2b90b8331a6a062b81e76d080d1c5882',
         'light_ruc_horizon_availability.csv': 'ca87c6ac93033496a928ae07159824dac642917ba104c030161dab5ff46b063f',
         'light_ruc_horizon_availability.parquet': '39abda810443b1d91e04b26399a96c0c30e2fe70a30cbde7440790c3145f5f48',
-        'manifest.json': 'f10a0f67ea5a89776295a56a78055a4dc51614b2312f8df8fe17bcafd8913591',
-        'manifest.md': 'c198d0f70eeeabacf2e9e982f5f929d5ea85514386fcb4d0b86db39942f65cc6',
+        'manifest.json': '072598d1557c7fbce56645817cdff03e3baccc48453bf0d639394a3368f7b04d',
+        'manifest.md': 'f021e551cf021f8be307e7ab0088e8857e40eced50375bd6d3e55e2093eca628',
         'path_trace_status.csv': '9d9eabcd54cbba3b468b9e7153218a954e43c9efec031b2089f741c4fff20ea5',
         'path_trace_status.parquet': '56c8b08e1d5efffa930e703c52b9e9de848e21d94c5ae9a760ca47083a4a1df1',
         'ped_bridge_mode_config.csv': '60583741fcd8484df3e4f166a82e49a06fdeb0fd353756fcfdf48a1f9786efc4',

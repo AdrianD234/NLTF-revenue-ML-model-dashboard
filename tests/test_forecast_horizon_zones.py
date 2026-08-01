@@ -213,9 +213,17 @@ def test_manifest_no_longer_claims_the_whole_path_is_validated():
     )
     notes = manifest["data_vintage_manifest_notes"]
     cutoff_note = notes["runtime_cutoff"].lower()
-    # The narrow claim (no FY2051-55 gradient extension) is retained ...
-    assert "no extrapolated model extension is used" in cutoff_note
-    # ... but it must no longer read as "nothing here is extrapolation".
+    # The narrow claim (no FY2051-55 gradient extension) is retained, now
+    # worded so it cannot be read as "no extrapolation is used at all". The
+    # previous phrasing, "no extrapolated model extension is used", became
+    # actively misleading once the governed FY2031-FY2050 post-model layer
+    # existed - it IS an extrapolation, just a separately governed one.
+    assert "fy2051-fy2055 gradient extension remains disabled" in cutoff_note
+    # The econometric boundary and the post-model layer are both named, so the
+    # note cannot imply Current stops at the cutoff.
+    assert "econometric segment stops at fy2030" in cutoff_note
+    assert "post_model_extrapolation" in cutoff_note
+    # ... and it must no longer read as "nothing here is extrapolation".
     assert "not a statement that the whole displayed path is validated" in cutoff_note
     assert "forecast_horizon_validation" in cutoff_note
 
