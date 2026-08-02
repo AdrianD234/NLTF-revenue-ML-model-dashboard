@@ -95,13 +95,44 @@ loader rather than recomputed per lookup; doing that removed ~650 ms.
    the distinction between `None`, `pd.NA`, `pd.NaT` and `float('nan')`, which
    `assert_frame_equal` treats as three different values.
 
+## Invalidation covers the calculation code, not just the data
+
+The digest hashes the pack's own `output_hashes`, the governed fitted state,
+the official vintage spines, the conflict/macro configuration — **and the 33
+repo-local modules that actually compute the replays**, including
+`fuel_price_scenario.py`, `forecast_runner.py`, `mbu26_source_spine.py`,
+`conflict_gdp_paths.py` and `pipeline/vnext_forward.py`.
+
+That module list is not hand-maintained. The builder captures it from
+`sys.modules` **after** running both replays, so it comes from the real import
+graph; the runtime re-hashes exactly the modules the cache recorded. A module
+added later must be imported by one of these, whose own hash then changes, so
+the closure stays complete.
+
+Without this, editing `fuel_price_scenario.py` and forgetting to bump
+`BUILDER_VERSION` would leave a cache built by the *old* calculation still
+passing its digest, and the dashboard would serve superseded results
+indefinitely. The stale message names the edited module.
+
 ## Runtime modes
 
-`REVENUE_OUTLOOK_RUNTIME_MODE` = `reference` | `fast` | `shadow`
-(default `fast`). `reference` restores the live replay unchanged, so the
-pre-existing path stays available for parity work. A missing, stale or corrupt
-cache **fails closed** with the rebuild command — it never falls back silently
-to the 52 s path and never serves stale values.
+`REVENUE_OUTLOOK_RUNTIME_MODE` = `reference` | `fast` | `shadow`.
+
+- absent or empty → `fast`;
+- an explicitly supplied unknown value **raises** — silently treating
+  `REVENUE_OUTLOOK_RUNTIME_MODE=refrence` as "fast" would hide exactly the
+  misconfiguration the operator was trying to fix;
+- `reference` restores the live replay unchanged;
+- `shadow` serves the compiled result **and** runs the live replay once per
+  (engine, digest) per process, compares all 35 frames exactly, and on any
+  discrepancy writes `shadow_mismatch.md` and raises. Verified end to end: a
+  shadow lookup takes 56 s (it really replays), the second is 0.7 ms (cached),
+  and the verdict is `35 frames identical`.
+
+A missing, stale or corrupt cache **fails closed** — never a silent fallback to
+the 52 s path, never a stale value. The Revenue Outlook page checks the cache
+before any chart work and renders a governed panel naming the reason and the
+rebuild command, rather than a raw traceback.
 
 Rebuild: `python scripts/build_revenue_outlook_replay_cache.py --all`
 

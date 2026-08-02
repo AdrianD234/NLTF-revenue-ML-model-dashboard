@@ -2,6 +2,7 @@
   "bridge_vintage_id": "BEFU26",
   "builder_version": "1",
   "bytes_on_disk": 2099190,
+  "code_module_count": 33,
   "engine": "ar1",
   "frame_count": 35,
   "frames": {
@@ -2920,6 +2921,41 @@
   "provenance": {
     "bridge_vintage_id": "BEFU26",
     "builder_version": "1",
+    "code_module_hashes": {
+      "model_dashboard/__init__.py": "40f18fc5bbc37948a1250097bb55c68711d51d6622248e75efe27cd3580809f8",
+      "model_dashboard/completeness_contract.py": "2a5ec576c757b7d4d820a060922dd5c7c7275841dc9734dcb479f9ad49a5c708",
+      "model_dashboard/conflict_fuel_paths.py": "cdf9453b4a83ae2230dd4e0d405e96e29350a1b313ce6654d7815c42927c5cce",
+      "model_dashboard/conflict_gdp_paths.py": "7beb97ff0a1a27e4268ee0e90765aecabbbc609e03f3952acbc7d5ec5bed5f25",
+      "model_dashboard/engine.py": "9bffa6e6493cc20c13ca0f2efd9924fcb81da61d713725b41ccdbdab71914d7a",
+      "model_dashboard/ev_uptake_levers.py": "ab4520eff520c2d5ce65faa4a02921e87445be515056d8a56d79170d0d277d73",
+      "model_dashboard/forecast_imports.py": "d39fd287ab25d874ef1824618a3bc9027904aa6dea1718d16414670742780a15",
+      "model_dashboard/forecast_runner.py": "123330cc285881ab042cee4231ebd57dffca6ce236f39fc28687385c8cf4644d",
+      "model_dashboard/forward_scorer_governance.py": "044a83f4c50b51de90f1185dcb1d7f44f8b087d349078ee993c5af5d36d692fc",
+      "model_dashboard/fuel_price_scenario.py": "feb79b99ac403eb38939de536a4b26dd2eb7d3f8386a50875d57dfb5141c4d8c",
+      "model_dashboard/governance_constants.py": "00b9e3a41aedbbe2dd51c0d5c4d9cb82696e2d63a284dff1f88d477dd5338568",
+      "model_dashboard/heavy_ruc_forward.py": "9ab8ff4ed010b652fbb467dfbe9672085bfe0324e69a21e7770de98ed4fb3e29",
+      "model_dashboard/light_fleet_allocation.py": "c997ccc283eb3a54a91f1c5ec009b02de35d1b1e6be03e04aeaa502479c39d37",
+      "model_dashboard/long_run_shape_transition.py": "fd4a6971d6f29d45ab0555c48a972a14987a65356c75e9d2fa811fe7664ffe23",
+      "model_dashboard/mbu26_source_spine.py": "5763d726eb91c9c41516cd9dcdd0523acc7a0442a572baef56616a1d9eb9058c",
+      "model_dashboard/official_vintage.py": "9ab13f0f24d92a9096c67fd720eccb2b84c3d6bb99a8df7aa1e7bc3e29fc2f87",
+      "model_dashboard/ped_forward.py": "92c3b5324ae798956679820a4e0b23314f2134a259c4b973d58640e6329325fa",
+      "model_dashboard/post_model_extrapolation.py": "c2f469cea30854e20e446951a91d13b5b12a0e851d5f601c79b2ce16fe791517",
+      "model_dashboard/rate_paths.py": "853d8d99ddbf31f8fda68b31438904da20f3611df84ed251abddaf099b1990fc",
+      "model_dashboard/revenue_outlook.py": "4fb996076c17da7051420e21041aa52cf003a2075e227680c19f0a88d377195e",
+      "model_dashboard/revenue_outlook_replay_cache.py": "9ff8787b0030d701a0721413d79f62ce05062212b750577d39c525c2cab94a74",
+      "model_dashboard/revenue_source_pack.py": "61b9fd2b06d4c16add928656b9bd6e5cda9dcb38b0f3d9a0f60fb5c1e2cf8c9c",
+      "model_dashboard/scenario_inputs.py": "f035a3da1e995550565f968f1f0ff2f5ee438bd5217f91440f6542b2882f8f29",
+      "model_dashboard/series_inventory_contract.py": "60c35dae271750ca184a2f4fb126c066b4358ec66f69e4d30d82bc826ce07435",
+      "model_dashboard/treasury_macro_paths.py": "ad65f9a8b83059a67e8ef5b4eea6fb152fcce6660978279d805412739bfe1480",
+      "model_dashboard/unit_contract.py": "a49bb2d53ce7223582738c089143ff581da34c8942b415f996817d75c40a549e",
+      "model_dashboard/vnext_forward_integration.py": "4ba307e891da814faee38616f317b24e45ac625fe5fbf72d24b6d981dc7b6dff",
+      "pipeline/__init__.py": "795eb74197b09ec06d088ba3f64b41de2cae1ff82fde2ae36d9af7f5d4147df8",
+      "pipeline/ar1_engine.py": "e4431b3ad97f3d1aa8070d2c9c989a825e64f84e54f10be170205348cee5ea8d",
+      "pipeline/diaglab_arms.py": "78c2843307b47c5815fe1ba520764a6f70c71462e71afe926f6331274ff3213c",
+      "pipeline/diaglab_battery.py": "a9e649ba4ec635540904189e30c3ebdbba41b2210a84955a19500bd81e2cceb4",
+      "pipeline/vnext_core.py": "92285255a22ba2f35089b1fed550249902cc0020bf4c48f0f5257476a7396250",
+      "pipeline/vnext_forward.py": "f2a864f519f4c075378848a400a6d857bc09a3f3bb8295b020a4811efe3aade3"
+    },
     "engine": "ar1",
     "pack_output_hashes": {
       "ev_phev_ped_light_drift_assumptions.csv": {
@@ -3841,6 +3877,6 @@
     ]
   },
   "schema_version": "1",
-  "source_digest": "ebcb59d2ded483878b5a6287d53a95ba839088ad34ea1dfd1a9b09876f806592",
-  "source_main_sha": "479ff2150ec532e66d0c33c7f3c852cbe03a8d04"
+  "source_digest": "fb62917608f63b214bd576b8744485b8ffe32bcdb726a942092dfc39607b9cd1",
+  "source_main_sha": "406d07e5398405458ef1c52bd0e05d721f8f0c25"
 }

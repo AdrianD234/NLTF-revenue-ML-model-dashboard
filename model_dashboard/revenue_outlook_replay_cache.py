@@ -292,19 +292,67 @@ def _tree_entries(root: Path, base: Path) -> list[tuple[str, str]]:
     return entries
 
 
+# Packages whose source can change a replay result.  The concrete module list
+# is not hard-coded: the builder records the repo-local modules the replay
+# actually imported, and the runtime re-hashes exactly those.
+_CODE_PACKAGES = ("model_dashboard", "pipeline")
+
+
+def replay_calculation_code_modules(repo_root: Path) -> dict[str, str]:
+    """Repo-local calculation modules currently loaded, path -> sha256.
+
+    Captured from ``sys.modules`` after the replay has run, so the set comes
+    from the real import graph rather than a hand-maintained list.  A module
+    that is added later must be imported by one of these, whose own hash then
+    changes, so the closure stays complete.
+    """
+    import sys
+
+    modules: dict[str, str] = {}
+    for name, module in list(sys.modules.items()):
+        if not name.startswith(_CODE_PACKAGES):
+            continue
+        origin = getattr(module, "__file__", None)
+        if not origin:
+            continue
+        path = Path(origin)
+        try:
+            relative = path.resolve().relative_to(Path(repo_root).resolve())
+        except (ValueError, OSError):
+            continue
+        if path.exists():
+            modules[relative.as_posix()] = _sha256_file(path)
+    return dict(sorted(modules.items()))
+
+
+def _hash_recorded_code_modules(repo_root: Path, recorded: dict[str, str]) -> dict[str, str]:
+    """Re-hash exactly the modules the cache was built against."""
+    current: dict[str, str] = {}
+    for relative in sorted(recorded):
+        path = Path(repo_root) / relative
+        current[relative] = _sha256_file(path) if path.exists() else "absent"
+    return current
+
+
 def replay_cache_source_digest(
     pack_manifest: dict[str, Any],
     *,
     engine: str,
     bridge_vintage_id: str | None,
     repo_root: Path,
+    code_module_hashes: dict[str, str] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     """(digest, provenance) over every value-relevant replay input.
 
     Covers the promoted pack content, the governed fitted state, the official
-    vintage spines, the conflict/macro configuration and the builder/schema
-    versions.  Content hashes only - never mtimes - so a fresh clone and a
-    working tree agree.
+    vintage spines, the conflict/macro configuration, the builder/schema
+    versions AND the calculation code itself.  Content hashes only - never
+    mtimes - so a fresh clone and a working tree agree.
+
+    Hashing the code matters as much as hashing the data: without it, editing
+    ``fuel_price_scenario.py`` and forgetting to bump ``BUILDER_VERSION`` would
+    leave a cache built by the OLD calculation still passing its digest, and
+    the dashboard would serve superseded results indefinitely.
     """
     engine = str(engine).strip().lower()
     provenance: dict[str, Any] = {
@@ -312,6 +360,7 @@ def replay_cache_source_digest(
         "builder_version": BUILDER_VERSION,
         "engine": engine,
         "bridge_vintage_id": str(bridge_vintage_id or ""),
+        "code_module_hashes": dict(code_module_hashes or {}),
         # The pack's own recorded per-file sha256 map: one value covering every
         # promoted table without re-hashing 67 MB on each load.
         "pack_output_hashes": pack_manifest.get("output_hashes", {}),
@@ -414,8 +463,15 @@ def build_replay_cache(
     for stale in frames_dir.glob("*.parquet"):
         stale.unlink()
 
+    # Captured AFTER the caller ran both replays, so sys.modules holds the real
+    # calculation import graph rather than whatever the builder imported first.
+    code_module_hashes = replay_calculation_code_modules(repo_root)
     digest, provenance = replay_cache_source_digest(
-        pack_manifest, engine=engine, bridge_vintage_id=bridge_vintage_id, repo_root=repo_root
+        pack_manifest,
+        engine=engine,
+        bridge_vintage_id=bridge_vintage_id,
+        repo_root=repo_root,
+        code_module_hashes=code_module_hashes,
     )
 
     frame_meta: dict[str, dict[str, Any]] = {}
@@ -448,6 +504,7 @@ def build_replay_cache(
         "scalars": scalars,
         "output_hashes": output_hashes,
         "frame_count": len(frame_meta),
+        "code_module_count": len(code_module_hashes),
         "row_count": total_rows,
         "bytes_on_disk": sum((frames_dir / name).stat().st_size for name in output_hashes),
         "provenance": provenance,
@@ -456,6 +513,45 @@ def build_replay_cache(
         json.dumps(manifest, indent=2, sort_keys=True, default=str) + "\n", encoding="utf-8"
     )
     return manifest
+
+
+def replay_cache_expected_digest(
+    *,
+    engine: str,
+    pack_manifest: dict[str, Any],
+    bridge_vintage_id: str | None,
+    repo_root: Path,
+) -> str:
+    """The digest the committed cache SHOULD carry, given today's sources.
+
+    Computed over the module list the cache recorded, so a caller that
+    pre-computes this agrees exactly with ``replay_cache_status``. Falls back
+    to the live import graph when no cache exists yet.
+    """
+    manifest_path = replay_cache_dir(engine, repo_root) / "manifest.json"
+    recorded: dict[str, str] = {}
+    if manifest_path.exists():
+        try:
+            recorded = dict(
+                json.loads(manifest_path.read_text(encoding="utf-8"))
+                .get("provenance", {})
+                .get("code_module_hashes", {})
+            )
+        except (OSError, json.JSONDecodeError):
+            recorded = {}
+    code_hashes = (
+        _hash_recorded_code_modules(repo_root, recorded)
+        if recorded
+        else replay_calculation_code_modules(repo_root)
+    )
+    digest, _ = replay_cache_source_digest(
+        pack_manifest,
+        engine=engine,
+        bridge_vintage_id=bridge_vintage_id,
+        repo_root=repo_root,
+        code_module_hashes=code_hashes,
+    )
+    return digest
 
 
 def replay_cache_status(
@@ -484,9 +580,32 @@ def replay_cache_status(
         return "stale", (
             f"schema {manifest.get('schema_version')!r} != {REPLAY_CACHE_SCHEMA_VERSION!r}"
         )
+    # ALWAYS re-hash the calculation modules this cache was built against, even
+    # when the caller supplies a digest. Hashing ~50 source files is cheap, and
+    # it turns "stale for some reason" into a message naming the edited module.
+    recorded_code = dict(manifest.get("provenance", {}).get("code_module_hashes", {}))
+    if not recorded_code:
+        return "stale", (
+            "cache predates calculation-code hashing and cannot prove the "
+            "replay logic is unchanged"
+        )
+    current_code = _hash_recorded_code_modules(repo_root, recorded_code)
+    if current_code != recorded_code:
+        changed = sorted(
+            name for name, value in current_code.items() if recorded_code.get(name) != value
+        )
+        return "stale", (
+            "replay calculation code changed: "
+            + ", ".join(changed[:5])
+            + (f" (+{len(changed) - 5} more)" if len(changed) > 5 else "")
+        )
     if source_digest is None:
         source_digest, _ = replay_cache_source_digest(
-            pack_manifest, engine=engine, bridge_vintage_id=bridge_vintage_id, repo_root=repo_root
+            pack_manifest,
+            engine=engine,
+            bridge_vintage_id=bridge_vintage_id,
+            repo_root=repo_root,
+            code_module_hashes=current_code,
         )
     digest = source_digest
     if str(manifest.get("source_digest")) != digest:

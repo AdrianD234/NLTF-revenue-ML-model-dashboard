@@ -21,14 +21,19 @@ reproducibility — this is what caught the `PYTHONHASHSEED` column-order defect
 | --- | --- |
 | Missing cache raises with the rebuild command | **PASS** |
 | Changed source digest ⇒ `stale`, load refuses | **PASS** |
-| Tampered frame file refused (hash validation) | **PASS** |
+| **Edited replay module alone** (no data change, no version bump) ⇒ `stale`, message names the module | **PASS** |
+| Calculation code is in the digest (33 modules, incl. `fuel_price_scenario`, `forecast_runner`, `mbu26_source_spine`, `conflict_gdp_paths`, `pipeline/vnext_forward`) | **PASS**, both engines |
+| Tampered frame refused **specifically by frame-hash validation** | **PASS** — asserts `failed hash validation` and names `fuel.annual_factors` |
 | Named fast path invokes no live replay (both replays monkeypatched to raise) | **PASS**, both engines |
 | Schema-version mismatch ⇒ stale | **PASS** (asserted via status contract) |
+| Absent / empty mode ⇒ `fast`; explicit unknown value raises | **PASS** |
+| Missing cache produces a governed page message naming the rebuild command | **PASS** |
+| Shadow mode really replays and compares | **PASS** — 56 s first lookup, 0.7 ms cached, `35 frames identical` |
 
-Note: `test_corrupt_frame_fails_hash_validation` copies the cache to a temp
-root, so the source scan for that root also differs; the assertion therefore
-accepts either the hash-validation or the stale rejection. Both are
-fail-closed, but that test does not isolate hash validation on its own.
+`test_corrupt_frame_fails_hash_validation` now reuses the committed manifest's
+own digest and materialises the recorded modules under the temp root, so the
+load reaches frame hashing and the assertion proves frame-hash rejection
+specifically rather than accepting an unrelated stale-source result.
 
 ## Determinism / invalidation
 

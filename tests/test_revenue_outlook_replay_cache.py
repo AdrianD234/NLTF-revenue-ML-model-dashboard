@@ -176,14 +176,38 @@ def test_changed_source_digest_invalidates(tmp_path: Path) -> None:
 
 
 def test_corrupt_frame_fails_hash_validation(tmp_path: Path) -> None:
-    """A tampered frame file must be refused, not served."""
+    """A tampered frame must be refused BY HASH VALIDATION specifically.
+
+    The copied tree lives under a temp root whose source scan would differ, so
+    the committed manifest's own digest and code-module hashes are reused here.
+    Without that the load would be rejected as stale for an unrelated reason
+    and this test would prove nothing about frame integrity.
+    """
     import shutil
 
     source = replay_cache_dir(ENGINE_AR1, ROOT)
-    target_root = tmp_path
-    target = replay_cache_dir(ENGINE_AR1, target_root)
+    target = replay_cache_dir(ENGINE_AR1, tmp_path)
     shutil.copytree(source, target)
-    victim = next(iter((target / "frames").glob("*.parquet")))
+
+    manifest_path = target / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    valid_digest = str(manifest["source_digest"])
+    # Point the recorded code-module hashes at the real repo copies so the
+    # code-change check passes and execution reaches frame hashing.
+    manifest["provenance"]["code_module_hashes"] = {
+        name: value
+        for name, value in manifest["provenance"]["code_module_hashes"].items()
+    }
+    for name in list(manifest["provenance"]["code_module_hashes"]):
+        shutil.copytree(
+            ROOT / Path(name).parent,
+            tmp_path / Path(name).parent,
+            dirs_exist_ok=True,
+            ignore=shutil.ignore_patterns("__pycache__"),
+        )
+    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
+
+    victim = target / "frames" / "fuel.annual_factors.parquet"
     victim.write_bytes(victim.read_bytes() + b"corrupt")
 
     pack = _pack_for(ENGINE_AR1)
@@ -192,12 +216,106 @@ def test_corrupt_frame_fails_hash_validation(tmp_path: Path) -> None:
             engine=ENGINE_AR1,
             pack_manifest=pack.manifest,
             bridge_vintage_id=bridge_vintage_id_from_manifest(pack.manifest, ROOT),
-            repo_root=target_root,
-            # The digest is computed against the real repo, so point the source
-            # scan back at ROOT by reusing the committed manifest's digest.
+            repo_root=tmp_path,
+            source_digest=valid_digest,
         )
     message = str(excinfo.value)
-    assert "hash validation" in message or "stale" in message
+    assert "failed hash validation" in message, message
+    assert "fuel.annual_factors" in message, message
+
+
+@pytest.mark.parametrize("engine", ENGINES)
+def test_calculation_code_is_hashed_into_the_digest(engine: str) -> None:
+    """A replay-logic edit must invalidate the cache on its own.
+
+    BUILDER_VERSION is manually bumped and will be forgotten; the modules that
+    actually compute the replay must therefore be part of the digest.
+    """
+    manifest = json.loads(
+        (replay_cache_dir(engine, ROOT) / "manifest.json").read_text(encoding="utf-8")
+    )
+    recorded = manifest["provenance"]["code_module_hashes"]
+    assert recorded, "the calculation code must be in the digest"
+    # The modules that actually compute both replays have to be covered.
+    for required in (
+        "model_dashboard/fuel_price_scenario.py",
+        "model_dashboard/forecast_runner.py",
+        "model_dashboard/conflict_gdp_paths.py",
+        "model_dashboard/mbu26_source_spine.py",
+        "pipeline/vnext_forward.py",
+    ):
+        assert required in recorded, f"{required} must be hashed into the replay digest"
+    assert manifest["code_module_count"] == len(recorded)
+
+
+def test_edited_replay_code_makes_the_cache_stale(tmp_path: Path) -> None:
+    """Editing a replay module alone - no data, no version bump - goes stale."""
+    import shutil
+
+    engine = ENGINE_AR1
+    shutil.copytree(replay_cache_dir(engine, ROOT), replay_cache_dir(engine, tmp_path))
+    manifest_path = replay_cache_dir(engine, tmp_path) / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+    # Recreate the recorded modules under the temp root, then edit one of them
+    # exactly as a developer would - without touching any data file.
+    for name in manifest["provenance"]["code_module_hashes"]:
+        target = tmp_path / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(ROOT / name, target)
+    edited = tmp_path / "model_dashboard" / "fuel_price_scenario.py"
+    edited.write_text(
+        edited.read_text(encoding="utf-8") + "\n# behaviour change\n", encoding="utf-8"
+    )
+
+    pack = _pack_for(engine)
+    status, detail = replay_cache_status(
+        engine=engine,
+        pack_manifest=pack.manifest,
+        bridge_vintage_id=bridge_vintage_id_from_manifest(pack.manifest, ROOT),
+        repo_root=tmp_path,
+    )
+    assert status == "stale", (status, detail)
+    assert "calculation code changed" in detail
+    assert "fuel_price_scenario.py" in detail
+
+
+def test_runtime_mode_governance(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Absent defaults to fast; an explicit unknown value fails loudly."""
+    monkeypatch.delenv(app.REVENUE_OUTLOOK_RUNTIME_MODE_ENV, raising=False)
+    assert app.revenue_outlook_runtime_mode() == app.RUNTIME_MODE_FAST
+
+    monkeypatch.setenv(app.REVENUE_OUTLOOK_RUNTIME_MODE_ENV, "")
+    assert app.revenue_outlook_runtime_mode() == app.RUNTIME_MODE_FAST
+
+    for mode in (app.RUNTIME_MODE_REFERENCE, app.RUNTIME_MODE_FAST, app.RUNTIME_MODE_SHADOW):
+        monkeypatch.setenv(app.REVENUE_OUTLOOK_RUNTIME_MODE_ENV, mode.upper())
+        assert app.revenue_outlook_runtime_mode() == mode
+
+    monkeypatch.setenv(app.REVENUE_OUTLOOK_RUNTIME_MODE_ENV, "refrence")
+    with pytest.raises(app.RevenueOutlookRuntimeModeError) as excinfo:
+        app.revenue_outlook_runtime_mode()
+    assert "refrence" in str(excinfo.value)
+
+
+def test_missing_cache_produces_a_governed_page_message(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A stale/missing cache explains itself and names the rebuild command."""
+    monkeypatch.setenv(app.REVENUE_OUTLOOK_RUNTIME_MODE_ENV, "fast")
+    pack = _pack_for(ENGINE_AR1)
+
+    def _missing(**kwargs):
+        del kwargs
+        return "missing", "no compiled replay cache at <path>"
+
+    monkeypatch.setattr(
+        "model_dashboard.revenue_outlook_replay_cache.replay_cache_status", _missing
+    )
+    message = app._replay_cache_problem_uncached(pack)
+    assert "build_revenue_outlook_replay_cache" in message
+    assert "will not silently fall back" in message
+    del tmp_path
 
 
 @pytest.mark.parametrize("engine", ENGINES)
