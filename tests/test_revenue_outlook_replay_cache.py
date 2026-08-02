@@ -15,6 +15,7 @@ import dataclasses
 import json
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -399,21 +400,25 @@ def test_fast_mode_named_path_runs_no_replay(engine: str, monkeypatch: pytest.Mo
     assert not rows.empty
 
 
-# The cross-environment bound is ABSOLUTE ONLY.
+# The cross-environment bound is |a-b| <= atol + rtol*|reference|.
 #
-# A relative test is meaningless where the reference is ~0 - a 6.9e-11 residue
-# against 0.0 reads as a 100% relative difference while being pure summation
-# noise. But a relative term is also dangerously loose at the top end: these
-# frames carry values up to 8.0e9, where rtol=1e-9 would permit a deviation of
-# 8 whole units.
+# Both terms are needed because these frames span ten orders of magnitude:
 #
-# atol=1e-9 is 1000x tighter than the repo's own governed formula closure
-# (abs_tol=1e-6) and 14x the largest deviation CI has actually produced
-# (6.9e-11). It is strict at every magnitude and correct at zero. If a future
-# environment ever produces genuine last-bit noise on the large values - one
-# ULP at 8e9 is ~2e-6 - this test fails and that gets investigated, which is
-# the right outcome for a governed value.
-_CROSS_ENVIRONMENT_RTOL = 0.0
+#   * near zero, a relative test is meaningless - a 6.9e-11 residue against
+#     0.0 is a 100% relative difference and pure summation noise. atol covers
+#     that, at 1e-9: 14x the largest near-zero residue observed and 1000x
+#     tighter than the repo's governed closure (abs_tol=1e-6).
+#
+#   * at the top end, an absolute test is impossible - one ULP of float64 at
+#     4.0e9 is ~4.8e-7, which is exactly what CI produces on
+#     `baseline_macro_quarterly_factors.base_value`. rtol covers that, at
+#     1e-13: about 450 machine epsilons, ~800x the observed 1.2e-16 relative
+#     deviation, and 10,000x tighter than the repo's governed rel_tol=1e-9.
+#
+# rtol is deliberately NOT 1e-9: on a value of 8.0e9 that would permit a
+# deviation of 8 whole units, which is no gate at all on revenue. At 1e-13 the
+# same value admits 0.0008.
+_CROSS_ENVIRONMENT_RTOL = 1e-13
 _CROSS_ENVIRONMENT_ATOL = 1e-9
 # 35 frames per engine; if a large share suddenly needs the bound, something
 # other than summation order has changed.
@@ -477,13 +482,21 @@ def test_cross_environment_bound_accepts_summation_noise_and_rejects_real_change
             ]
         }
     )
-    worst_abs, worst_excess, where = _worst_deviation(noisy, reference)
-    assert worst_abs < 1e-9, worst_abs
+    _, worst_excess, where = _worst_deviation(noisy, reference)
     assert worst_excess <= 0.0, f"summation noise must be inside the bound ({where})"
 
-    # A real change must not be absorbed, however small in RELATIVE terms:
-    # 1e-6 on 8.0e9 is 1.2e-16 relative, and must still fail.
-    for index, changed_value in ((3, -2894.2738272), (2, 8016352797.000001)):
+    # One ULP at large magnitude. At 4.0e9 that is ~4.8e-7 absolute - far above
+    # any absolute-only bound, which is why rtol exists. This is the case CI hit
+    # on baseline_macro_quarterly_factors.base_value.
+    big = pd.DataFrame({"value": [3981300101.8991847]})
+    one_ulp = pd.DataFrame({"value": [np.nextafter(3981300101.8991847, np.inf)]})
+    worst_abs, worst_excess, where = _worst_deviation(one_ulp, big)
+    assert worst_abs > 1e-7, f"expected a ~4.8e-7 ULP step, got {worst_abs:.3e}"
+    assert worst_excess <= 0.0, f"one ULP at 4e9 must be inside the bound ({where})"
+
+    # A real change must not be absorbed. A cent on a billion is 1e-11
+    # relative - still ~100x the bound at that magnitude, so it fails.
+    for index, changed_value in ((3, -2894.2738272), (2, 8016352797.01)):
         changed = reference.copy()
         changed.loc[index, "value"] = changed_value
         _, worst_excess, where = _worst_deviation(changed, reference)
@@ -547,6 +560,7 @@ def test_replay_cache_matches_reference_exactly(engine: str) -> None:
     same_environment = matches_build_environment(manifest)
 
     inexact: list[str] = []
+    violations: list[str] = []
     for name in sorted(reference):
         try:
             pd.testing.assert_frame_equal(
@@ -558,14 +572,16 @@ def test_replay_cache_matches_reference_exactly(engine: str) -> None:
                 # proving the serialisation is lossless.
                 raise
             worst_abs, worst_excess, where = _worst_deviation(compiled[name], reference[name])
-            assert worst_excess <= 0.0, (
-                f"{name} differs by more than summation noise across environments: "
-                f"max_abs={worst_abs:.3e}, exceeds atol+rtol*|ref| by "
-                f"{worst_excess:.3e} ({where}). "
-                f"Built by {manifest.get('build_environment')}, running under "
-                f"{build_environment()}."
-            )
-            inexact.append(f"{name} (max_abs={worst_abs:.2e})")
+            if worst_excess > 0.0:
+                # Collect rather than raise: failing on the first frame reports
+                # one number per CI run, which is how the bound got set from a
+                # partial view twice already.
+                violations.append(
+                    f"{name}: max_abs={worst_abs:.3e} exceeds bound by "
+                    f"{worst_excess:.3e} ({where})"
+                )
+            else:
+                inexact.append(f"{name} (max_abs={worst_abs:.2e})")
 
     if inexact:
         # Visible, never silent: a reader of the CI log sees exactly which
@@ -574,7 +590,12 @@ def test_replay_cache_matches_reference_exactly(engine: str) -> None:
             "\ncross-environment summation differences absorbed:\n  "
             + "\n  ".join(inexact)
         )
-        assert len(inexact) <= _MAX_INEXACT_FRAMES, (
-            f"{len(inexact)} of {len(reference)} frames are environment-dependent, "
-            "which is more than summation order explains: " + ", ".join(inexact)
-        )
+    assert not violations, (
+        f"{len(violations)} frame(s) differ by more than summation noise across "
+        f"environments (built by {manifest.get('build_environment')}, running under "
+        f"{build_environment()}):\n  " + "\n  ".join(violations)
+    )
+    assert len(inexact) <= _MAX_INEXACT_FRAMES, (
+        f"{len(inexact)} of {len(reference)} frames are environment-dependent, "
+        "which is more than summation order explains:\n  " + "\n  ".join(inexact)
+    )
