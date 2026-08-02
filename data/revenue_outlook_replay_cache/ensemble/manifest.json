@@ -2928,7 +2928,7 @@
       "model_dashboard/post_model_extrapolation.py": "c2f469cea30854e20e446951a91d13b5b12a0e851d5f601c79b2ce16fe791517",
       "model_dashboard/rate_paths.py": "853d8d99ddbf31f8fda68b31438904da20f3611df84ed251abddaf099b1990fc",
       "model_dashboard/revenue_outlook.py": "4fb996076c17da7051420e21041aa52cf003a2075e227680c19f0a88d377195e",
-      "model_dashboard/revenue_outlook_replay_cache.py": "9ff8787b0030d701a0721413d79f62ce05062212b750577d39c525c2cab94a74",
+      "model_dashboard/revenue_outlook_replay_cache.py": "fc9d9920939ca1046559593f2d840881978bf7f58a7fcd64ffe602d9532129e9",
       "model_dashboard/revenue_source_pack.py": "61b9fd2b06d4c16add928656b9bd6e5cda9dcb38b0f3d9a0f60fb5c1e2cf8c9c",
       "model_dashboard/scenario_inputs.py": "f035a3da1e995550565f968f1f0ff2f5ee438bd5217f91440f6542b2882f8f29",
       "model_dashboard/series_inventory_contract.py": "60c35dae271750ca184a2f4fb126c066b4358ec66f69e4d30d82bc826ce07435",
@@ -3587,8 +3587,6 @@
       "data/dashboard_evidence_pack_reproducibility/light_ruc/future_forecasts.parquet": "95fce3b0e277a0a053406445f6723ce7c3dee54926279bc90a7d73f32457b493",
       "data/dashboard_evidence_pack_reproducibility/light_ruc/horizon_profiles.parquet": "c8f94867bfcf6af246b26dd68aa5fcdac67180f18719567b25b92a41f5435fdb",
       "data/dashboard_evidence_pack_reproducibility/light_ruc/light_ruc_reproducibility_report.md": "3e78922fd0e19a7279fa1d676bf2dfa438a685782c18e102a64ae0ae462d38dd",
-      "data/dashboard_evidence_pack_reproducibility/light_ruc/light_ruc_training_fit_r2_export_manifest.json": "0b94b0b479166d035be032f0f4b4a3f4a4314433fb5dd24f9735b36bfadac80d",
-      "data/dashboard_evidence_pack_reproducibility/light_ruc/light_ruc_training_fit_r2_report.md": "2462f31e7bb73c18a34111f5396d433b0a5398948b3a3e7a8e5936ffca59769e",
       "data/dashboard_evidence_pack_reproducibility/light_ruc/manifest.json": "896697d27446db91b339c0c8588b9fa0712d174a47d8b271e3e77a9aa976dbac",
       "data/dashboard_evidence_pack_reproducibility/light_ruc/model_coefficients.parquet": "a6cd2d767ab0e2035d770b1ab981d9d28e42df4acde6bddb95fc0b292b525c70",
       "data/dashboard_evidence_pack_reproducibility/light_ruc/model_registry.parquet": "875900c938114d47fcf7c0d567272410e1af649758fe9bf11997a4f05afb9507",
@@ -3598,7 +3596,6 @@
       "data/dashboard_evidence_pack_reproducibility/light_ruc/scorecard_summary.parquet": "c03f07e22924abb4110f14f508b67db29c43eca7eaf3850a31774cd97b7b1558",
       "data/dashboard_evidence_pack_reproducibility/light_ruc/stress_horizon.parquet": "e90cfb22784adf7aaa4135608694e5404835392cfa1b8826e6b7f85ed552c784",
       "data/dashboard_evidence_pack_reproducibility/light_ruc/training_fit_predictions.parquet": "2557c6c1f476d028d0dfe365782a0599a194b0eaa00164ac4a98c99a67ab1a9e",
-      "data/dashboard_evidence_pack_reproducibility/light_ruc/training_fit_r2_summary.parquet": "d43b4cc9ac4fbdef74ef98c90fd53309e0a897e9a66ad380179bffa3f73c32ce",
       "data/dashboard_evidence_pack_reproducibility/light_ruc/training_window_trace.parquet": "12f247ad45c56622048e8755c9b94db53e25a139c167dcaa088655253100a0b0",
       "data/dashboard_evidence_pack_reproducibility/light_ruc_vnext/feature_importance.parquet": "4d3a9173d30355b13955e6448de5da812031fc39466b7257678f91a66334a22e",
       "data/dashboard_evidence_pack_reproducibility/light_ruc_vnext/fitted_model_manifest.json": "fbfe3ee43c4880b39cc9b743811b2e212d30be70639f14d58e58806a303a14cb",
@@ -3863,6 +3860,6 @@
     ]
   },
   "schema_version": "1",
-  "source_digest": "861577b38e69f8545253b8c5aaf773d7210a5270483496d3879e7ffde82c3bb5",
-  "source_main_sha": "406d07e5398405458ef1c52bd0e05d721f8f0c25"
+  "source_digest": "6acbd1279078f253fdfde51e4eb12c58feb5831c1639ba2dc8c680922fb48be5",
+  "source_main_sha": "eac7e8c31888e94cde294c167ff38777c1bc421e"
 }

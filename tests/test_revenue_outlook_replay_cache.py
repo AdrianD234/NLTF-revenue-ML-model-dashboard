@@ -280,6 +280,57 @@ def test_edited_replay_code_makes_the_cache_stale(tmp_path: Path) -> None:
     assert "fuel_price_scenario.py" in detail
 
 
+@pytest.mark.parametrize("engine", ENGINES)
+def test_digest_ignores_untracked_working_tree_files(engine: str) -> None:
+    """An untracked local file must not change the digest.
+
+    The regression this pins: the digest used to be computed by walking the
+    source trees on disk, so a developer's untracked scratch output entered it.
+    The committed cache then verified locally and read as STALE on a clean
+    clone - which is exactly how CI failed on eac7e8c.
+    """
+    from model_dashboard.revenue_outlook_replay_cache import replay_source_file_hashes
+
+    recorded = replay_source_file_hashes(ROOT, engine)
+    scratch = (
+        ROOT
+        / "data"
+        / "dashboard_evidence_pack_reproducibility"
+        / "light_ruc"
+        / "__untracked_digest_probe__.json"
+    )
+    scratch.write_text("{}", encoding="utf-8")
+    try:
+        assert replay_source_file_hashes(ROOT, engine) == recorded, (
+            "an untracked file changed the replay source digest"
+        )
+    finally:
+        scratch.unlink(missing_ok=True)
+
+
+@pytest.mark.parametrize("engine", ENGINES)
+def test_recorded_inputs_are_all_committed(engine: str) -> None:
+    """Every path in the digest must exist in a clean clone."""
+    import subprocess
+
+    manifest = json.loads(
+        (replay_cache_dir(engine, ROOT) / "manifest.json").read_text(encoding="utf-8")
+    )
+    recorded = set(manifest["provenance"]["source_hashes"]) | set(
+        manifest["provenance"]["code_module_hashes"]
+    )
+    tracked = set(
+        subprocess.run(
+            ["git", "ls-files"], cwd=ROOT, capture_output=True, text=True, check=True
+        ).stdout.split("\n")
+    )
+    untracked = sorted(name for name in recorded if name and name not in tracked)
+    assert not untracked, (
+        "these digest inputs are not committed, so a clean clone will read the "
+        f"cache as stale: {untracked[:10]}"
+    )
+
+
 def test_runtime_mode_governance(monkeypatch: pytest.MonkeyPatch) -> None:
     """Absent defaults to fast; an explicit unknown value fails loudly."""
     monkeypatch.delenv(app.REVENUE_OUTLOOK_RUNTIME_MODE_ENV, raising=False)

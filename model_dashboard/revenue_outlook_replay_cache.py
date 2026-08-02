@@ -281,7 +281,42 @@ def _sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _tracked_tree_files(tree: str, base: Path) -> list[str]:
+    """Repo-relative files under ``tree`` that are COMMITTED, not merely present.
+
+    A plain ``rglob`` walk makes the digest depend on whatever happens to be
+    sitting in the working tree. A developer's untracked scratch output then
+    produces a different digest from a clean clone, and the committed cache
+    reads as stale in CI while looking fine locally - which is exactly what
+    happened. Restricting to tracked files makes the input set identical in
+    both places.
+    """
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            ["git", "ls-files", "-z", "--", tree],
+            cwd=base,
+            capture_output=True,
+            check=True,
+        )
+    except (OSError, subprocess.SubprocessError):
+        # No git (e.g. a source tarball): fall back to the on-disk walk and say
+        # so in the manifest, so a mismatch is at least explainable.
+        root = base / tree
+        if not root.exists():
+            return []
+        return sorted(
+            path.relative_to(base).as_posix()
+            for path in root.rglob("*")
+            if path.is_file() and "__pycache__" not in path.parts
+        )
+    names = [name for name in result.stdout.decode("utf-8").split("\0") if name]
+    return sorted(name for name in names if "__pycache__" not in name)
+
+
 def _tree_entries(root: Path, base: Path) -> list[tuple[str, str]]:
+    """Retained for callers that want a plain walk; not used by the digest."""
     if not root.exists():
         return []
     entries: list[tuple[str, str]] = []
@@ -290,6 +325,29 @@ def _tree_entries(root: Path, base: Path) -> list[tuple[str, str]]:
             continue
         entries.append((path.relative_to(base).as_posix(), _sha256_file(path)))
     return entries
+
+
+def replay_source_file_hashes(repo_root: Path, engine: str) -> dict[str, str]:
+    """Every committed non-pack replay input, path -> sha256."""
+    engine = str(engine).strip().lower()
+    hashes: dict[str, str] = {}
+    for relative in (*_SOURCE_FILES, *_ENGINE_SOURCE_FILES.get(engine, ())):
+        path = Path(repo_root) / relative
+        hashes[relative] = _sha256_file(path) if path.exists() else "absent"
+    for tree in _SOURCE_TREES:
+        for relative in _tracked_tree_files(tree, Path(repo_root)):
+            path = Path(repo_root) / relative
+            hashes[relative] = _sha256_file(path) if path.exists() else "absent"
+    return dict(sorted(hashes.items()))
+
+
+def _hash_recorded_paths(repo_root: Path, recorded: dict[str, str]) -> dict[str, str]:
+    """Re-hash exactly the paths the cache recorded, walking nothing."""
+    current: dict[str, str] = {}
+    for relative in sorted(recorded):
+        path = Path(repo_root) / relative
+        current[relative] = _sha256_file(path) if path.exists() else "absent"
+    return current
 
 
 # Packages whose source can change a replay result.  The concrete module list
@@ -327,11 +385,7 @@ def replay_calculation_code_modules(repo_root: Path) -> dict[str, str]:
 
 def _hash_recorded_code_modules(repo_root: Path, recorded: dict[str, str]) -> dict[str, str]:
     """Re-hash exactly the modules the cache was built against."""
-    current: dict[str, str] = {}
-    for relative in sorted(recorded):
-        path = Path(repo_root) / relative
-        current[relative] = _sha256_file(path) if path.exists() else "absent"
-    return current
+    return _hash_recorded_paths(repo_root, recorded)
 
 
 def replay_cache_source_digest(
@@ -341,6 +395,7 @@ def replay_cache_source_digest(
     bridge_vintage_id: str | None,
     repo_root: Path,
     code_module_hashes: dict[str, str] | None = None,
+    source_file_hashes: dict[str, str] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     """(digest, provenance) over every value-relevant replay input.
 
@@ -366,14 +421,11 @@ def replay_cache_source_digest(
         "pack_output_hashes": pack_manifest.get("output_hashes", {}),
         "pack_schema_version": pack_manifest.get("schema_version", ""),
     }
-    sources: dict[str, str] = {}
-    for relative in (*_SOURCE_FILES, *_ENGINE_SOURCE_FILES.get(engine, ())):
-        path = repo_root / relative
-        sources[relative] = _sha256_file(path) if path.exists() else "absent"
-    for tree in _SOURCE_TREES:
-        for relative, digest in _tree_entries(repo_root / tree, repo_root):
-            sources[relative] = digest
-    provenance["source_hashes"] = sources
+    provenance["source_hashes"] = dict(
+        source_file_hashes
+        if source_file_hashes is not None
+        else replay_source_file_hashes(repo_root, engine)
+    )
     payload = json.dumps(provenance, sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest(), provenance
 
@@ -466,12 +518,17 @@ def build_replay_cache(
     # Captured AFTER the caller ran both replays, so sys.modules holds the real
     # calculation import graph rather than whatever the builder imported first.
     code_module_hashes = replay_calculation_code_modules(repo_root)
+    # Committed inputs only: an untracked file in the builder's working tree
+    # must not enter the digest, or the cache verifies here and reads as stale
+    # on a clean clone.
+    source_file_hashes = replay_source_file_hashes(repo_root, engine)
     digest, provenance = replay_cache_source_digest(
         pack_manifest,
         engine=engine,
         bridge_vintage_id=bridge_vintage_id,
         repo_root=repo_root,
         code_module_hashes=code_module_hashes,
+        source_file_hashes=source_file_hashes,
     )
 
     frame_meta: dict[str, dict[str, Any]] = {}
@@ -539,10 +596,25 @@ def replay_cache_expected_digest(
             )
         except (OSError, json.JSONDecodeError):
             recorded = {}
+    recorded_sources: dict[str, str] = {}
+    if manifest_path.exists():
+        try:
+            recorded_sources = dict(
+                json.loads(manifest_path.read_text(encoding="utf-8"))
+                .get("provenance", {})
+                .get("source_hashes", {})
+            )
+        except (OSError, json.JSONDecodeError):
+            recorded_sources = {}
     code_hashes = (
-        _hash_recorded_code_modules(repo_root, recorded)
+        _hash_recorded_paths(repo_root, recorded)
         if recorded
         else replay_calculation_code_modules(repo_root)
+    )
+    source_hashes = (
+        _hash_recorded_paths(repo_root, recorded_sources)
+        if recorded_sources
+        else replay_source_file_hashes(repo_root, engine)
     )
     digest, _ = replay_cache_source_digest(
         pack_manifest,
@@ -550,6 +622,7 @@ def replay_cache_expected_digest(
         bridge_vintage_id=bridge_vintage_id,
         repo_root=repo_root,
         code_module_hashes=code_hashes,
+        source_file_hashes=source_hashes,
     )
     return digest
 
@@ -580,32 +653,48 @@ def replay_cache_status(
         return "stale", (
             f"schema {manifest.get('schema_version')!r} != {REPLAY_CACHE_SCHEMA_VERSION!r}"
         )
-    # ALWAYS re-hash the calculation modules this cache was built against, even
-    # when the caller supplies a digest. Hashing ~50 source files is cheap, and
-    # it turns "stale for some reason" into a message naming the edited module.
-    recorded_code = dict(manifest.get("provenance", {}).get("code_module_hashes", {}))
-    if not recorded_code:
-        return "stale", (
-            "cache predates calculation-code hashing and cannot prove the "
-            "replay logic is unchanged"
-        )
-    current_code = _hash_recorded_code_modules(repo_root, recorded_code)
-    if current_code != recorded_code:
-        changed = sorted(
-            name for name, value in current_code.items() if recorded_code.get(name) != value
-        )
-        return "stale", (
-            "replay calculation code changed: "
-            + ", ".join(changed[:5])
-            + (f" (+{len(changed) - 5} more)" if len(changed) > 5 else "")
-        )
     if source_digest is None:
+        # Re-hash the paths the cache RECORDED - never a fresh tree walk, which
+        # would make the digest depend on untracked working-tree files and let
+        # a cache verify locally while reading as stale on a clean clone.
+        # Doing it here rather than only inside the digest lets the message
+        # name the file or module that moved.
+        recorded_code = dict(manifest.get("provenance", {}).get("code_module_hashes", {}))
+        if not recorded_code:
+            return "stale", (
+                "cache predates calculation-code hashing and cannot prove the "
+                "replay logic is unchanged"
+            )
+        current_code = _hash_recorded_paths(repo_root, recorded_code)
+        if current_code != recorded_code:
+            changed = sorted(
+                name for name, value in current_code.items() if recorded_code.get(name) != value
+            )
+            return "stale", (
+                "replay calculation code changed: "
+                + ", ".join(changed[:5])
+                + (f" (+{len(changed) - 5} more)" if len(changed) > 5 else "")
+            )
+        recorded_sources = dict(manifest.get("provenance", {}).get("source_hashes", {}))
+        current_sources = _hash_recorded_paths(repo_root, recorded_sources)
+        if current_sources != recorded_sources:
+            changed = sorted(
+                name
+                for name, value in current_sources.items()
+                if recorded_sources.get(name) != value
+            )
+            return "stale", (
+                "replay inputs changed: "
+                + ", ".join(changed[:5])
+                + (f" (+{len(changed) - 5} more)" if len(changed) > 5 else "")
+            )
         source_digest, _ = replay_cache_source_digest(
             pack_manifest,
             engine=engine,
             bridge_vintage_id=bridge_vintage_id,
             repo_root=repo_root,
             code_module_hashes=current_code,
+            source_file_hashes=current_sources,
         )
     digest = source_digest
     if str(manifest.get("source_digest")) != digest:
