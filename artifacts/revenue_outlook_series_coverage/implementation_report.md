@@ -159,7 +159,7 @@ Native rows are never rewritten or shadowed: no derived row shares a
 | Path | What it is |
 | --- | --- |
 | `model_dashboard/revenue_outlook_series_coverage.py` | contract, builders and the pure API |
-| `data/revenue_outlook_quarterly_display/` | materialised pack, 382 KB, hash-backed |
+| `data/revenue_outlook_quarterly_display/` | materialised pack, 387 KB, hash-backed |
 | `scripts/build_revenue_outlook_quarterly_display_pack.py` | the builder |
 | `scripts/build_revenue_outlook_series_coverage_diagnosis.py` | the diagnosis evidence |
 | `tests/test_revenue_outlook_series_coverage.py` | 45 tests |
@@ -180,6 +180,37 @@ and a rerun would otherwise pay it every lookup); `build_quarterly_display_pack`
 and the tests call `clear_caches()`. A pack whose sources have moved raises
 `QuarterlyDisplayPackStale` with the rebuild command rather than serving old
 numbers.
+
+## Validation
+
+Run in an isolated `git worktree` at this branch's head, so the concurrent
+edits present in the development working tree could not contaminate the result.
+
+| Check | Result |
+| --- | --- |
+| Full pytest | **1,596 passed, 50 skipped, 44 deselected, 0 failed** |
+| New coverage suite | 45 passed |
+| Official-vintage / series-identity / rate-paths | 121 passed |
+| Revenue Outlook / trace-identity / runtime-manifest | 64 passed |
+| `compileall` over `model_dashboard`, `scripts`, `tests`, `app.py` | clean |
+| Pack built twice | byte-identical |
+| Committed pack vs fresh build | identical (asserted by test) |
+| Diagnosis artifacts regenerated | byte-identical |
+
+Two notes on how that run was obtained, because both look like defects and
+neither is one:
+
+* A bare worktree fails 19 tests in `test_cone_landscape_validation`,
+  `test_curated_data` and `test_ensemble_composition_validation` with
+  `FileNotFoundError` on `artifacts/curated_data/*`. Those files are gitignored
+  and generated locally. **The same 19 fail identically on `main`** - it is an
+  environment prerequisite, not a regression. Seeding the worktree with the
+  locally generated artifacts makes all 20 pass.
+* Three attempts at a single-process full run died mid-suite with exit 127 (a
+  process kill, no failure summary), at 15%, 17% and 66% - a different point
+  each time, which is the signature of memory pressure rather than a failing
+  test. Running the same 121 test files as 13 separate processes completed
+  green end to end, which is the result above.
 
 ## Handoff to the integration agent
 
