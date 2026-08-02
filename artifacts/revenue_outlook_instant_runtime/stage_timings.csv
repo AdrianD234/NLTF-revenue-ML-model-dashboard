@@ -1,0 +1,41 @@
+mode,engine,stage,median_ms,min_ms,max_ms,samples
+reference,ar1,"import app.py",946.4,946.4,946.4,1
+reference,ar1,"pack signature",0.9,0.9,0.9,1
+reference,ar1,"pack load",470.6,470.6,470.6,1
+reference,ar1,"selector metadata",16.5,16.5,16.5,1
+reference,ar1,"fed uplift factors",81.5,81.5,81.5,1
+reference,ar1,"treasury macro replay",10190.9,10190.9,10190.9,1
+reference,ar1,"conflict/fuel replay",51473.2,51473.2,51473.2,1
+reference,ar1,"sensitivity stage frames",446.3,446.3,446.3,1
+reference,ar1,"scenario overlay rows",4005.6,4005.6,4005.6,1
+reference,ar1,"revenue outlook view (cold)",145.1,145.1,145.1,1
+reference,ensemble,"import app.py",986.7,986.7,986.7,1
+reference,ensemble,"pack signature",0.5,0.5,0.5,1
+reference,ensemble,"pack load",464.3,464.3,464.3,1
+reference,ensemble,"selector metadata",17.7,17.7,17.7,1
+reference,ensemble,"fed uplift factors",71.2,71.2,71.2,1
+reference,ensemble,"treasury macro replay",9918.1,9918.1,9918.1,1
+reference,ensemble,"conflict/fuel replay",64334.7,64334.7,64334.7,1
+reference,ensemble,"sensitivity stage frames",408.3,408.3,408.3,1
+reference,ensemble,"scenario overlay rows",4544.1,4544.1,4544.1,1
+reference,ensemble,"revenue outlook view (cold)",216.7,216.7,216.7,1
+fast,ar1,"import app.py",963.6,909.7,997.0,3
+fast,ar1,"pack signature",0.4,0.4,0.5,3
+fast,ar1,"pack load",462.7,457.7,472.3,3
+fast,ar1,"selector metadata",16.2,15.2,16.9,3
+fast,ar1,"fed uplift factors",74.5,72.1,77.3,3
+fast,ar1,"treasury macro replay",681.3,673.3,699.9,3
+fast,ar1,"conflict/fuel replay",193.4,191.3,205.2,3
+fast,ar1,"sensitivity stage frames",325.7,324.5,344.6,3
+fast,ar1,"scenario overlay rows",4616.2,4538.3,4656.0,3
+fast,ar1,"revenue outlook view (cold)",137.7,134.3,142.4,3
+fast,ensemble,"import app.py",983.5,947.1,993.8,3
+fast,ensemble,"pack signature",0.5,0.4,0.5,3
+fast,ensemble,"pack load",483.1,465.4,483.2,3
+fast,ensemble,"selector metadata",17.8,16.3,18.2,3
+fast,ensemble,"fed uplift factors",77.6,74.2,79.3,3
+fast,ensemble,"treasury macro replay",636.0,629.1,647.9,3
+fast,ensemble,"conflict/fuel replay",239.5,236.3,244.3,3
+fast,ensemble,"sensitivity stage frames",325.6,318.6,344.3,3
+fast,ensemble,"scenario overlay rows",4138.3,4112.7,4341.3,3
+fast,ensemble,"revenue outlook view (cold)",137.5,136.0,142.5,3

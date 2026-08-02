@@ -481,7 +481,12 @@ def conflict_gdp_input_audit(
 ) -> pd.DataFrame:
     """Return one scenario/stream/quarter audit row for applied GDP factors."""
 
-    required = {
+    # Ordered, not a set: ``list(some_set)`` of strings varies with
+    # PYTHONHASHSEED, so a set here gave this audit frame a different column
+    # ORDER in every process. The values were always identical, but a frame
+    # whose schema is unstable across runs cannot be committed, diffed or
+    # replay-compared.
+    required = (
         "scenario_name",
         "stream",
         "canonical_period",
@@ -491,8 +496,8 @@ def conflict_gdp_input_audit(
         "conflict_gdp_transmission_basis",
         "conflict_gdp_source_url",
         "conflict_gdp_reverse_fuel_feedback_applied",
-    }
-    missing = required.difference(scenario_inputs.columns)
+    )
+    missing = set(required).difference(scenario_inputs.columns)
     if missing:
         return pd.DataFrame()
     out = scenario_inputs[list(required)].copy()

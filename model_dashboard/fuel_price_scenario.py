@@ -3992,8 +3992,11 @@ def _first_conflict_input_divergence_period(
     if not isinstance(replay_or_audit, FuelPriceScenarioReplayResult):
         return None
     audit = replay_or_audit.input_audit
-    required = {"severity", "stream", "canonical_period", "scenario_value"}
-    if audit is None or audit.empty or not required.issubset(audit.columns):
+    # Ordered for the same reason as ``conflict_gdp_input_audit``: selecting
+    # columns through a set makes the intermediate frame's schema depend on
+    # PYTHONHASHSEED.
+    required = ("severity", "stream", "canonical_period", "scenario_value")
+    if audit is None or audit.empty or not set(required).issubset(audit.columns):
         return None
 
     work = audit[list(required)].copy()

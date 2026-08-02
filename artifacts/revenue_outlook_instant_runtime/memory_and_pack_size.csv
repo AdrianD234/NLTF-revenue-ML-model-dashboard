@@ -1,0 +1,3 @@
+engine,frames,rows,bytes_on_disk_kb,parquet_files
+ar1,35,90882,2050,35
+ensemble,35,93782,2037,35
