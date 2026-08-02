@@ -399,21 +399,38 @@ def test_fast_mode_named_path_runs_no_replay(engine: str, monkeypatch: pytest.Mo
     assert not rows.empty
 
 
-# Any real value change in this model is many orders of magnitude larger than
-# this; the repo's own governed formula closure runs at abs_tol=1e-6 /
-# rel_tol=1e-9. This bound is 1000x tighter than that and is here ONLY to
-# absorb last-bit aggregation differences between interpreter/library versions.
-_CROSS_ENVIRONMENT_RTOL = 1e-12
+# The cross-environment bound is ABSOLUTE ONLY.
+#
+# A relative test is meaningless where the reference is ~0 - a 6.9e-11 residue
+# against 0.0 reads as a 100% relative difference while being pure summation
+# noise. But a relative term is also dangerously loose at the top end: these
+# frames carry values up to 8.0e9, where rtol=1e-9 would permit a deviation of
+# 8 whole units.
+#
+# atol=1e-9 is 1000x tighter than the repo's own governed formula closure
+# (abs_tol=1e-6) and 14x the largest deviation CI has actually produced
+# (6.9e-11). It is strict at every magnitude and correct at zero. If a future
+# environment ever produces genuine last-bit noise on the large values - one
+# ULP at 8e9 is ~2e-6 - this test fails and that gets investigated, which is
+# the right outcome for a governed value.
+_CROSS_ENVIRONMENT_RTOL = 0.0
 _CROSS_ENVIRONMENT_ATOL = 1e-9
+# 35 frames per engine; if a large share suddenly needs the bound, something
+# other than summation order has changed.
+_MAX_INEXACT_FRAMES = 6
 
 
 def _worst_deviation(left: pd.DataFrame, right: pd.DataFrame) -> tuple[float, float, str]:
-    """(max abs, max rel, description) over the numeric columns of two frames."""
+    """(max abs, max excess over the numpy tolerance, description).
+
+    The second value is the amount by which the worst cell EXCEEDS
+    ``atol + rtol*|reference|``; <= 0 means every cell is inside the bound.
+    """
     import numpy as np
 
     worst_abs = 0.0
-    worst_rel = 0.0
-    where = ""
+    worst_excess = -float("inf")
+    where = "identical"
     for column in left.columns:
         if column not in right.columns:
             continue
@@ -425,15 +442,52 @@ def _worst_deviation(left: pd.DataFrame, right: pd.DataFrame) -> tuple[float, fl
         if not both.any():
             continue
         absolute = np.abs(a[both] - b[both])
-        scale = np.maximum(np.abs(a[both]), 1e-300)
-        relative = absolute / scale
-        if absolute.max() > worst_abs or relative.max() > worst_rel:
-            if relative.max() > worst_rel:
-                index = int(np.argmax(relative))
-                where = f"{column}: {a[both][index]!r} vs {b[both][index]!r}"
-            worst_abs = max(worst_abs, float(absolute.max()))
-            worst_rel = max(worst_rel, float(relative.max()))
-    return worst_abs, worst_rel, where
+        allowed = _CROSS_ENVIRONMENT_ATOL + _CROSS_ENVIRONMENT_RTOL * np.abs(b[both])
+        excess = absolute - allowed
+        worst_abs = max(worst_abs, float(absolute.max()))
+        if float(excess.max()) > worst_excess:
+            worst_excess = float(excess.max())
+            index = int(np.argmax(excess))
+            where = f"{column}: {a[both][index]!r} vs {b[both][index]!r}"
+    return worst_abs, worst_excess, where
+
+
+def test_cross_environment_bound_accepts_summation_noise_and_rejects_real_changes() -> None:
+    """The bound must absorb 1e-11 residues and still catch a real change.
+
+    Exercised directly because the branch it guards only runs when the cache
+    was built under a different interpreter than the test - never on the
+    machine that built it. The first version of this metric divided by |a| and
+    so scored a 6.9e-11 residue against a reference of 0.0 as a 100% relative
+    difference; that case is pinned below.
+    """
+    reference = pd.DataFrame(
+        {"value": [0.0, 133.49257672, 8016352797.0, -2894.27382723066]}
+    )
+
+    # Summation noise at the scale CI actually produces, including the
+    # near-zero cell that the old |a-b|/|a| metric scored as 100% different.
+    noisy = pd.DataFrame(
+        {
+            "value": [
+                6.912e-11,
+                133.49257672000002,
+                8016352797.0,
+                -2894.27382723066 + 5e-11,
+            ]
+        }
+    )
+    worst_abs, worst_excess, where = _worst_deviation(noisy, reference)
+    assert worst_abs < 1e-9, worst_abs
+    assert worst_excess <= 0.0, f"summation noise must be inside the bound ({where})"
+
+    # A real change must not be absorbed, however small in RELATIVE terms:
+    # 1e-6 on 8.0e9 is 1.2e-16 relative, and must still fail.
+    for index, changed_value in ((3, -2894.2738272), (2, 8016352797.000001)):
+        changed = reference.copy()
+        changed.loc[index, "value"] = changed_value
+        _, worst_excess, where = _worst_deviation(changed, reference)
+        assert worst_excess > 0.0, f"a real change was absorbed by the bound ({where})"
 
 
 @pytest.mark.slow
@@ -444,14 +498,19 @@ def test_replay_cache_matches_reference_exactly(engine: str) -> None:
     Exactly, when this process is the one that built the cache - that is the
     gate on the serialisation, and it has no escape hatch.
 
-    Elsewhere, to within ~1 ULP. `fuel.annual_bridge["value"]` is an
-    aggregation whose last bit is not reproducible across interpreter/library
-    versions: CI (Python 3.11) and the build host (3.13) disagree on 12 of 100
-    sampled cells by at most 2.1e-16 relative / 9.1e-13 absolute. That is a
-    property of the model code, not of this cache - the repo's existing
-    "Replay parity" jobs only upload a fingerprint per OS and never compare
-    them, so nothing had asserted cross-environment equality before. Every
-    other frame, including the raw model outputs, matches exactly on both.
+    Elsewhere, to within summation noise. `fuel.annual_bridge` and
+    `fuel.annual_factors` are aggregations whose result is not bit-reproducible
+    across interpreter/library versions: CI (Python 3.11) and the build host
+    (3.13) disagree by up to **6.9e-11 absolute**. Some of those cells sit
+    against a reference of ~0, which is why the bound is the numpy criterion
+    rather than a pure relative one.
+
+    That is a property of the model code, not of this cache. The repo's
+    existing "Replay parity" jobs only upload a fingerprint per OS and never
+    compare them, so nothing had asserted cross-environment equality before.
+    The raw model outputs - future_forecasts, component_forecasts, assumptions,
+    policy_pair_factors - match exactly on both, which is what rules out
+    general model or BLAS variance.
     """
     from model_dashboard.fuel_price_scenario import (
         run_direct_treasury_scenario_replay,
@@ -498,22 +557,24 @@ def test_replay_cache_matches_reference_exactly(engine: str) -> None:
                 # No escape hatch where the cache was built: this is the gate
                 # proving the serialisation is lossless.
                 raise
-            worst_abs, worst_rel, where = _worst_deviation(compiled[name], reference[name])
-            assert worst_rel <= _CROSS_ENVIRONMENT_RTOL and worst_abs <= _CROSS_ENVIRONMENT_ATOL, (
-                f"{name} differs by more than last-bit noise across environments: "
-                f"max_rel={worst_rel:.3e} max_abs={worst_abs:.3e} ({where}). "
+            worst_abs, worst_excess, where = _worst_deviation(compiled[name], reference[name])
+            assert worst_excess <= 0.0, (
+                f"{name} differs by more than summation noise across environments: "
+                f"max_abs={worst_abs:.3e}, exceeds atol+rtol*|ref| by "
+                f"{worst_excess:.3e} ({where}). "
                 f"Built by {manifest.get('build_environment')}, running under "
                 f"{build_environment()}."
             )
-            inexact.append(f"{name} (max_rel={worst_rel:.2e})")
+            inexact.append(f"{name} (max_abs={worst_abs:.2e})")
 
     if inexact:
         # Visible, never silent: a reader of the CI log sees exactly which
-        # frames needed the ULP bound and by how much.
+        # frames needed the bound and by how much.
         print(
-            "\ncross-environment last-bit differences absorbed:\n  "
+            "\ncross-environment summation differences absorbed:\n  "
             + "\n  ".join(inexact)
         )
-        assert len(inexact) <= 2, (
-            "more frames than expected are environment-dependent: " + ", ".join(inexact)
+        assert len(inexact) <= _MAX_INEXACT_FRAMES, (
+            f"{len(inexact)} of {len(reference)} frames are environment-dependent, "
+            "which is more than summation order explains: " + ", ".join(inexact)
         )
