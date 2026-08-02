@@ -1,0 +1,9 @@
+control_change,expectation,band_identical_to_default,rows,changes_band_cache_identity
+displayed VFM basis = MoT VFM fast,display_only,True,6,False
+displayed VFM basis = MoT VFM slow,display_only,True,6,False
+official comparator = MBU26,display_only,True,6,True
+official comparator overlay on,display_only,True,6,True
+long-run transition schedule = unblended,value_changing_outside_band_span,True,6,True
+Current 12c policy = no uplift,value_changing,False,6,True
+PED retention sensitivity on,value_changing,False,6,True
+back to the original controls,display_only,True,6,False

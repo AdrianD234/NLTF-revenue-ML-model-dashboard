@@ -229,6 +229,39 @@ from model_dashboard.official_vintage import (
     official_vintage_entry,
     official_vintage_pack_files,
 )
+from model_dashboard.revenue_scenario_key import (
+    HEAVY_BEV_DEFAULT,
+    RevenueScenarioComputationKey,
+    as_scenario_key,
+)
+from model_dashboard.revenue_chart_layers import (
+    BAND_50_FILL,
+    BAND_50_LAYER_ID,
+    BAND_80_FILL,
+    BAND_80_LAYER_ID,
+    BAND_BOUNDARY,
+    CONDITIONAL_BAND,
+    LAYER_KIND_BAND,
+    LAYER_KIND_ENVELOPE,
+    LAYER_KIND_PATH,
+    RevenueChartLayerSpec,
+    VFM_ENVELOPE_LAYER_ID,
+    VFM_FAST_TRACE_NAME,
+    VFM_SLOW_TRACE_NAME,
+    band_layer_ids,
+    build_layer_catalogue,
+    catalogue_frame,
+    default_layer_ids,
+    path_trace_names,
+)
+from model_dashboard.revenue_uncertainty_pack import (
+    band_rows_for_series,
+    load_uncertainty_pack,
+)
+
+# What a helper will accept: the typed key, or a historic positional tuple from
+# an older cache entry or test. Production builds the typed key directly.
+ScenarioKeyLike = RevenueScenarioComputationKey | tuple
 from model_dashboard.revenue_outlook import (
     CURRENT_REVENUE_OUTLOOK_DIR,
     FAN_SOURCE_AUTO,
@@ -797,13 +830,33 @@ def _apply_sensitivity_for_key(
     )
 
 
+def _scenario_key(ev_uptake_key: ScenarioKeyLike) -> RevenueScenarioComputationKey:
+    """Coerce whatever a caller passed into the typed scenario key.
+
+    The single place that knows the historic positional layout exists.  Every
+    helper below reads NAMED fields, so no control can be re-interpreted by an
+    unrelated reader the way slot 6 was read both as the official comparator
+    vintage id and as the Heavy-BEV flag.
+    """
+    return as_scenario_key(
+        ev_uptake_key,
+        default_official_comparator_vintage_id=_registry_default_comparator_vintage_id(),
+        default_current_fed_policy_state=FED_POLICY_DELAYED_6M,
+        # Historic keys wrote the FED policy as a 0/1 toggle. The typed key
+        # stores text, so the legacy numeric semantics must be resolved during
+        # adaptation, not stringified into "0"/"1".
+        policy_normaliser=_normalise_fed_policy_state,
+    )
+
+
 @st.cache_data(show_spinner=False, max_entries=32)
-def _resolve_ev_uptake_levers(ev_uptake_key: tuple[Any, ...]) -> UptakeLevers | None:
-    mode = str(ev_uptake_key[0]) if ev_uptake_key else EV_UPTAKE_GOVERNED_OPTION
+def _resolve_ev_uptake_levers(ev_uptake_key: ScenarioKeyLike) -> UptakeLevers | None:
+    key = _scenario_key(ev_uptake_key)
+    mode = key.uptake_basis or EV_UPTAKE_GOVERNED_OPTION
     if mode == EV_UPTAKE_GOVERNED_OPTION:
         return None
     if mode == EV_UPTAKE_CUSTOM_OPTION:
-        values = ev_uptake_key[1] if len(ev_uptake_key) > 1 else ()
+        values = key.custom_ev_levers
         if len(values) != 13:
             return None
         return UptakeLevers(*[float(v) for v in values])
@@ -815,33 +868,32 @@ def _resolve_ev_uptake_levers(ev_uptake_key: tuple[Any, ...]) -> UptakeLevers | 
     return EV_UPTAKE_PRESETS.get(mode)
 
 
-def _resolve_uptake_basis(ev_uptake_key: tuple[Any, ...]) -> str | None:
+def _resolve_uptake_basis(ev_uptake_key: ScenarioKeyLike) -> str | None:
     """The exact vendored VFM scenario to compose with, or None for parametric.
 
     Returning a basis is what routes the composition through the governed
     table. Custom levers and the explicitly-labelled parametric approximation
     return None and fall back to the fitted curve.
     """
-    mode = str(ev_uptake_key[0]) if ev_uptake_key else EV_UPTAKE_GOVERNED_OPTION
+    mode = _scenario_key(ev_uptake_key).uptake_basis or EV_UPTAKE_GOVERNED_OPTION
     return mode if mode in EXACT_VFM_UPTAKE_BASES else None
 
 
-def _heavy_bev_transition_enabled(ev_uptake_key: tuple[Any, ...]) -> bool:
-    """Heavy BEV reclassification rides in slot 6 and defaults Off.
+def _heavy_bev_transition_enabled(ev_uptake_key: ScenarioKeyLike) -> bool:
+    """Heavy BEV reclassification: its own named field, and Off by default.
 
-    It previously ran unconditionally inside the light-fleet overlay, so
-    picking any light uptake basis silently moved Heavy RUC km and revenue
+    It previously rode in slot 6 of the positional key - the same slot the
+    official comparator vintage id was written to - so every production render
+    resolved ``bool("BEFU26")`` and silently moved Heavy RUC km and revenue
     into Heavy BEV against the settled HEAVY_RUC: not_reclassified contract.
-    Older keys resolve to the new default.
+    A vintage id is now a ``str`` field and cannot be read as this flag.
     """
-    if len(ev_uptake_key) <= 6:
-        return False
-    return bool(ev_uptake_key[6])
+    return _scenario_key(ev_uptake_key).heavy_bev_transition
 
 
-def _resolve_eruc_levers(ev_uptake_key: tuple[Any, ...]) -> ErucTransitionLevers | None:
-    """The e-RUC transition rides in slot 2 of the uptake key (optional)."""
-    values = ev_uptake_key[2] if len(ev_uptake_key) > 2 else ()
+def _resolve_eruc_levers(ev_uptake_key: ScenarioKeyLike) -> ErucTransitionLevers | None:
+    """The optional e-RUC transition levers for this scenario."""
+    values = _scenario_key(ev_uptake_key).eruc_levers
     if not values or len(values) != 5:
         return None
     return ErucTransitionLevers(*[float(v) for v in values])
@@ -934,15 +986,12 @@ PED_RETENTION_SENSITIVITY_HELP = (
 )
 
 
-def _ped_retention_enabled(ev_uptake_key: tuple[Any, ...]) -> bool:
-    """The PED petrol-retention sensitivity rides in slot 5 and defaults Off.
+def _ped_retention_enabled(ev_uptake_key: ScenarioKeyLike) -> bool:
+    """The PED petrol-retention sensitivity: named field, Off by default.
 
-    Older five-slot keys (cached callers and tests) therefore resolve to the
-    new default, which is the raw AR(1) Base path with no retention overlay.
+    Off means the raw AR(1) Base path with no retention overlay.
     """
-    if len(ev_uptake_key) <= 5:
-        return False
-    return bool(ev_uptake_key[5])
+    return _scenario_key(ev_uptake_key).ped_retention_sensitivity
 
 
 # The official comparator vintage selection rides in slots 6/7 of the uptake
@@ -996,40 +1045,30 @@ def _ordered_official_traces(selected_official_trace: str | None = None) -> list
     return officials
 
 
-def _official_vintage_scope(ev_uptake_key: tuple[Any, ...]) -> tuple[str, bool]:
+def _official_vintage_scope(ev_uptake_key: ScenarioKeyLike) -> tuple[str, bool]:
     """Return (selected official vintage id, overlay-prior-vintages flag)."""
-    vid = (
-        str(ev_uptake_key[6])
-        if len(ev_uptake_key) > 6 and str(ev_uptake_key[6] or "").strip()
-        else _registry_default_comparator_vintage_id()
-    )
-    overlay = bool(ev_uptake_key[7]) if len(ev_uptake_key) > 7 else False
-    return vid, overlay
+    key = _scenario_key(ev_uptake_key)
+    vid = key.official_comparator_vintage_id or _registry_default_comparator_vintage_id()
+    return vid, key.official_comparator_overlay
 
 
-def _official_vintage_filter_for_key(ev_uptake_key: tuple[Any, ...]) -> tuple[str, bool]:
+def _official_vintage_filter_for_key(ev_uptake_key: ScenarioKeyLike) -> tuple[str, bool]:
     """(selected official scenario_name, overlay flag) for row filtering."""
     vid, overlay = _official_vintage_scope(ev_uptake_key)
     return official_comparator_scenario_name(vid), overlay
 
 
-def _long_run_shape_scope(ev_uptake_key: tuple[Any, ...]) -> tuple[str, str]:
+def _long_run_shape_scope(ev_uptake_key: ScenarioKeyLike) -> tuple[str, str]:
     """(transition schedule id, long-run shape vintage id) for this key.
 
-    Slots 8/9, appended at the END so every existing positional read keeps
-    indexing correctly and an older 8-tuple still resolves to the pack default.
+    A key that names neither falls back to the unblended construction, which
+    is what a pre-selector key meant.
     """
-    schedule = (
-        str(ev_uptake_key[8])
-        if len(ev_uptake_key) > 8 and str(ev_uptake_key[8] or "").strip()
-        else UNBLENDED_SCHEDULE_ID
+    key = _scenario_key(ev_uptake_key)
+    return (
+        key.long_run_transition_schedule_id or UNBLENDED_SCHEDULE_ID,
+        key.long_run_shape_vintage_id,
     )
-    vintage = (
-        str(ev_uptake_key[9])
-        if len(ev_uptake_key) > 9 and str(ev_uptake_key[9] or "").strip()
-        else ""
-    )
-    return schedule, vintage
 
 
 def _shape_adjusted_signature(
@@ -1188,14 +1227,14 @@ def _filter_official_vintage_rows(
     return frame[~drop].copy()
 
 
-def _fed_policy_state_scope(ev_uptake_key: tuple[Any, ...]) -> tuple[str, str]:
-    """Return (Current state, MBU26 state), retaining legacy cache keys."""
-
-    current_raw: Any = ev_uptake_key[3] if len(ev_uptake_key) > 3 else FED_POLICY_DELAYED_6M
-    mbu26_raw: Any = ev_uptake_key[4] if len(ev_uptake_key) > 4 else current_raw
+def _fed_policy_state_scope(ev_uptake_key: ScenarioKeyLike) -> tuple[str, str]:
+    """Return (Current 12c policy state, official-comparator policy state)."""
+    key = _scenario_key(ev_uptake_key)
+    current = key.current_fed_policy_state or FED_POLICY_DELAYED_6M
+    official = key.official_fed_policy_state or current
     return (
-        _normalise_fed_policy_state(current_raw),
-        _normalise_fed_policy_state(mbu26_raw),
+        _normalise_fed_policy_state(current),
+        _normalise_fed_policy_state(official),
     )
 
 
@@ -1677,6 +1716,113 @@ def _filter_series_rows_with_fallback(
     return filtered, used_fallback
 
 
+# A band row counts as carrying real VFM width once the Fast/Slow gap clears
+# this fraction of the row's own level. Relative to the ROW, not to the series
+# maximum: a Total-revenue tail near $13b would otherwise swamp a genuine
+# sub-percent gap in FY2026 and read as "no range".
+CONE_MIN_RELATIVE_WIDTH = 1e-6
+
+
+def _cone_preset_key(
+    preset_name: str,
+    band_controls: RevenueScenarioComputationKey,
+) -> RevenueScenarioComputationKey:
+    """The live scenario key with ONLY the VFM composition basis swapped.
+
+    Every other governed control - e-RUC, Current 12c policy, the PED
+    retention sensitivity, Heavy-BEV treatment, the official comparator
+    vintage and overlay, the long-run transition schedule and shape vintage -
+    is carried through verbatim, so the envelope is the Fast/Slow pair of the
+    path actually on screen rather than a differently-configured run that
+    happens to share a name.
+    """
+    return _scenario_key(band_controls).replace(uptake_basis=preset_name)
+
+
+@st.cache_resource(show_spinner=False)
+def cached_uncertainty_pack():
+    """One parquet read per process. The runtime never simulates."""
+    return load_uncertainty_pack(Path(__file__).resolve().parent)
+
+
+@st.cache_data(show_spinner=False, max_entries=32)
+def cached_uncertainty_band_rows(series_id: str, pack_digest: str) -> pd.DataFrame:
+    """Pure lookup: filter the materialised pack for one series."""
+    del pack_digest
+    return band_rows_for_series(cached_uncertainty_pack(), series_id)
+
+
+def _uncertainty_series_id_for_label(chart_rows: pd.DataFrame, series_label: str) -> str:
+    """Map the selector's display label to the pack's canonical series id."""
+    if chart_rows is None or chart_rows.empty:
+        return ""
+    match = chart_rows[
+        chart_rows.get("series_label", pd.Series(dtype=str)).astype(str).eq(str(series_label))
+    ]
+    if match.empty:
+        return ""
+    ids = match.get("series_id", pd.Series(dtype=str)).dropna().astype(str)
+    return str(ids.iloc[0]) if len(ids) else ""
+
+
+@st.cache_data(show_spinner=False, max_entries=6)
+def cached_vfm_scenario_paths(
+    signature: tuple[tuple[str, int, int], ...],
+    selected_series: str,
+    time_grain: str,
+    fed_path: str,
+    traces: tuple[str, ...],
+    sensitivity_key: tuple[str, str, str, str, str, str, str, str, str, str, str],
+    bridge_mode: str,
+    band_controls: RevenueScenarioComputationKey,
+    _pack: RevenueOutlookPack,
+) -> pd.DataFrame:
+    """The MoT VFM Fast and Slow paths as selectable full-horizon traces.
+
+    Each is the Current Base case recomputed with ONLY the VFM composition
+    basis swapped, so it inherits the live engine, vintages, schedule, policy
+    and macro settings.  Both run to FY2050 and stay genuinely distinct there:
+    Base, Fast and Slow share the same governed post-model Light RUC pool, and
+    the exact VFM202405 scenario shares allocate that common pool into
+    different conventional/BEV/PHEV compositions.
+    """
+    frames: list[pd.DataFrame] = []
+    for preset_name, trace_name in (
+        ("MoT VFM fast", VFM_FAST_TRACE_NAME),
+        ("MoT VFM slow", VFM_SLOW_TRACE_NAME),
+    ):
+        preset_key = _cone_preset_key(preset_name, band_controls)
+        rows, _, _, _, _ = cached_scenario_overlay_rows(
+            signature, sensitivity_key, bridge_mode, preset_key, _pack
+        )
+        selected, _ = _filter_series_rows_with_fallback(
+            rows, selected_series, time_grain, fed_path, traces
+        )
+        base = selected[
+            selected.get("trace_name", pd.Series(dtype=str)).astype(str).eq("Current finalist Base case")
+            & ~selected.get("row_type", pd.Series(dtype=str)).astype(str).eq("historical_actual")
+        ].copy()
+        if base.empty:
+            continue
+        base["trace_name"] = trace_name
+        base["scenario_name"] = f"current_{preset_name.replace(' ', '_').lower()}"
+        frames.append(base)
+    if not frames:
+        return pd.DataFrame()
+    return pd.concat(frames, ignore_index=True, sort=False)
+
+
+def _cone_band_controls(ev_uptake_key: ScenarioKeyLike) -> RevenueScenarioComputationKey:
+    """The band's cache identity: the live key with the basis field blanked.
+
+    The envelope always evaluates the Fast and Slow presets, so the DISPLAYED
+    basis must not be part of its identity - switching Base/Fast/Slow reuses
+    the cached band - while every other value-changing control still
+    invalidates it.
+    """
+    return _scenario_key(ev_uptake_key).replace(uptake_basis="")
+
+
 @st.cache_data(show_spinner=False, max_entries=6)
 def cached_view_cone_band(
     signature: tuple[tuple[str, int, int], ...],
@@ -1686,24 +1832,28 @@ def cached_view_cone_band(
     traces: tuple[str, ...],
     sensitivity_key: tuple[str, str, str, str, str, str, str, str, str, str, str],
     bridge_mode: str,
-    eruc_values: tuple[float, ...],
-    current_fed_policy_state: str,
+    band_controls: RevenueScenarioComputationKey,
     _pack: RevenueOutlookPack,
 ) -> pd.DataFrame:
-    """MoT VFM fast/slow fleet-transition envelope around the base-case trace.
+    """MoT VFM Fast-Slow structural scenario envelope around the base case.
 
-    Keyed without the selected uptake levers: the cone always uses the fast
-    and slow presets, so switching the uptake basis reuses the cached band.
+    NOT a confidence, credible or prediction interval: it is the pair of
+    governed VFM fleet-composition scenarios, so it says what the composition
+    assumption is worth, not how likely any value is.
+
+    Keyed on ``band_controls`` - the live scenario key with the displayed
+    basis field blanked - so switching the displayed uptake basis reuses the
+    cached band while any other value-changing control still invalidates it.
+
+    Rows whose Fast/Slow gap does not clear ``CONE_MIN_RELATIVE_WIDTH`` at
+    the trailing end are dropped rather than drawn at zero width, so a series
+    the composition genuinely does not move shows no band instead of a flat
+    line that would read as certainty.  Where the shares DO move the series -
+    every Light class, through FY2050 - the range now carries the whole way.
     """
     bounds: dict[str, pd.Series] = {}
     for bound_name, preset_name in (("fast", "MoT VFM fast"), ("slow", "MoT VFM slow")):
-        preset_key = (
-            preset_name,
-            (),
-            tuple(eruc_values),
-            _normalise_fed_policy_state(current_fed_policy_state),
-            FED_POLICY_PUBLISHED,
-        )
+        preset_key = _cone_preset_key(preset_name, band_controls)
         rows, _, _, _, _ = cached_scenario_overlay_rows(signature, sensitivity_key, bridge_mode, preset_key, _pack)
         bound_rows, _ = _filter_series_rows_with_fallback(rows, selected_series, time_grain, fed_path, traces)
         base_trace = bound_rows[
@@ -1721,17 +1871,120 @@ def cached_view_cone_band(
     merged = pd.DataFrame(bounds).dropna()
     if merged.empty:
         return pd.DataFrame()
-    spread = (merged["fast"] - merged["slow"]).abs()
-    scale = merged.abs().to_numpy().max()
-    if not (scale > 0 and float(spread.max()) / scale > 1e-6):
-        return pd.DataFrame()
-    return pd.DataFrame(
+    band = pd.DataFrame(
         {
             "period": merged.index,
             "lower": merged.min(axis=1).to_numpy(),
             "upper": merged.max(axis=1).to_numpy(),
         }
     )
+    return _clip_cone_band_to_supported_periods(band)
+
+
+def _clip_cone_band_to_supported_periods(band: pd.DataFrame) -> pd.DataFrame:
+    """Keep the contiguous span the VFM composition actually moves.
+
+    Interior periods are retained even when momentarily flat, so the filled
+    area stays one continuous shape; only leading and trailing runs the
+    composition does not move are cut.  A series the VFM assumption never
+    moves returns empty - width is never fabricated for visual consistency.
+    """
+    if band is None or band.empty:
+        return pd.DataFrame()
+    level = ((band["upper"].abs() + band["lower"].abs()) / 2.0).replace(0.0, pd.NA)
+    material = ((band["upper"] - band["lower"]).abs() / level).fillna(0.0) > CONE_MIN_RELATIVE_WIDTH
+    if not bool(material.any()):
+        return pd.DataFrame()
+    order = band["period"].astype(str).map(_revenue_period_order)
+    supported = order[material]
+    keep = order.between(supported.min(), supported.max())
+    return band[keep].reset_index(drop=True)
+
+
+VFM_ENVELOPE_METHOD = "Integrated VFM Scenario Envelope"
+VFM_ENVELOPE_LEGEND_LABEL = "MoT VFM fast–slow range"
+# Brand blue, kept deliberately pale so the envelope reads as background and
+# every path stays legible above it. Raised from the original 0.10 fill /
+# 0.28 boundary once the chart went full width: at those values the dotted
+# boundaries were sub-pixel on a 1836px plot and the envelope was invisible
+# even on Light RUC, where the Fast/Slow gap reaches 12.7% of level. Tune
+# here - the two constants are the whole visual contract.
+VFM_ENVELOPE_FILL_COLOR = "rgba(0,111,173,0.16)"
+VFM_ENVELOPE_BOUNDARY_LINE = {"color": "rgba(0,111,173,0.55)", "width": 1.2, "dash": "dot"}
+VFM_ENVELOPE_NOT_PROBABILISTIC_NOTE = (
+    "MoT VFM Fast–Slow structural scenario envelope — not probabilistic. The "
+    "shaded range is the pair of governed MoT VFM fleet-composition scenarios "
+    "(Fast and Slow) run through the same engine, vintages, schedule, policy "
+    "and macro settings as the Current path it wraps. It is not a confidence, "
+    "credible or prediction interval and carries no probability. The 50%/80% "
+    "conditional modelled-uncertainty bands are a different concept: they are "
+    "probabilistic within their stated evidence, and are selected separately."
+)
+
+
+def _vfm_envelope_applicability_audit(
+    band: pd.DataFrame | None,
+    *,
+    selected_series: str,
+    time_grain: str,
+    ev_uptake_levers_available: bool,
+) -> pd.DataFrame:
+    """One row saying whether this series gets a band, and why not when it does not.
+
+    Written so a reader can tell "no band" (the VFM composition does not move
+    this series) apart from "band suppressed" (a control made the envelope
+    unavailable) without opening the code.
+    """
+    row: dict[str, Any] = {
+        "method": VFM_ENVELOPE_METHOD,
+        "selected_series": str(selected_series),
+        "time_grain": str(time_grain),
+        "band_available": False,
+        "lower_source_scenario": "",
+        "upper_source_scenario": "",
+        "first_valid_period": "",
+        "last_valid_period": "",
+        "max_width": "",
+        "max_width_pct_of_level": "",
+        "probabilistic": False,
+        "reason": "",
+    }
+    if not ev_uptake_levers_available:
+        row["reason"] = (
+            "The governed-pack option carries no VFM composition lever, so no "
+            "Fast/Slow pair exists to bound."
+        )
+        return pd.DataFrame([row])
+    if band is None or band.empty:
+        row["reason"] = (
+            "The MoT VFM Fast and Slow compositions produce the same values for "
+            "this series under the selected controls, so no range is drawn. "
+            "Width is never fabricated for visual consistency."
+        )
+        return pd.DataFrame([row])
+    width = (pd.to_numeric(band["upper"], errors="coerce") - pd.to_numeric(band["lower"], errors="coerce")).abs()
+    level = (pd.to_numeric(band["upper"], errors="coerce").abs() + pd.to_numeric(band["lower"], errors="coerce").abs()) / 2.0
+    periods = band["period"].astype(str)
+    row.update(
+        {
+            "band_available": True,
+            # min/max per period, so neither bound is nailed to one scenario:
+            # Fast is the upper bound for RUC classes and the lower bound for
+            # petrol-dependent series.
+            "lower_source_scenario": "min(MoT VFM fast, MoT VFM slow)",
+            "upper_source_scenario": "max(MoT VFM fast, MoT VFM slow)",
+            "first_valid_period": periods.iloc[0],
+            "last_valid_period": periods.iloc[-1],
+            "max_width": round(float(width.max()), 6),
+            "max_width_pct_of_level": round(float((100.0 * width / level.replace(0.0, pd.NA)).max()), 6),
+            "reason": (
+                "Clipped to the periods the exact VFM202405 shares actually "
+                "move this series. The common post-model Light RUC pool is "
+                "shared by Base/Fast/Slow; only the composition differs."
+            ),
+        }
+    )
+    return pd.DataFrame([row])
 
 
 def _annual_chart_value_lookup(chart_rows: pd.DataFrame) -> tuple[dict[tuple[str, int, str], float], dict[str, str]]:
@@ -2060,15 +2313,15 @@ def cached_revenue_outlook_view(
         chart_rows, selected_series, time_grain, fed_path, traces
     )
 
-    # MoT VFM fleet-transition cone: the fast/slow scenario envelope around
-    # the base-case trace. Computed with the same pipeline so the band is
-    # exactly what the chart would show under those presets.
+    # MoT VFM Fast-Slow structural scenario envelope around the base-case
+    # trace. Computed through the same pipeline, with every non-VFM control
+    # inherited from this key, so the band is exactly what the chart would
+    # show under those two governed composition scenarios.
     cone_band = pd.DataFrame()
     if ev_uptake_levers is not None:
-        eruc_values = tuple(float(v) for v in (ev_uptake_key[2] if len(ev_uptake_key) > 2 else ()) or ())
         cone_band = cached_view_cone_band(
             signature, selected_series, time_grain, fed_path, traces,
-            sensitivity_key, bridge_mode, eruc_values, current_fed_policy_state, _pack,
+            sensitivity_key, bridge_mode, _cone_band_controls(ev_uptake_key), _pack,
         )
     filtered_bridge = _filter_revenue_bridge_rows(
         bridge_components,
@@ -2089,6 +2342,12 @@ def cached_revenue_outlook_view(
         "ev_uptake_applied": ev_uptake_levers is not None and not ev_uptake_audit.empty,
         "ev_uptake_audit": ev_uptake_audit,
         "cone_band": cone_band,
+        "cone_band_audit": _vfm_envelope_applicability_audit(
+            cone_band,
+            selected_series=selected_series,
+            time_grain=time_grain,
+            ev_uptake_levers_available=ev_uptake_levers is not None,
+        ),
         "eruc_applied": eruc_levers is not None and not eruc_audit.empty,
         "eruc_audit": eruc_audit,
         "fed_uplift_off": effective_current_fed_uplift_off or effective_mbu26_fed_uplift_off,
@@ -2133,10 +2392,10 @@ def cached_scenario_comparison_paths(
         # the finalist base case with the overlays switched off (the raw
         # finalist petrol bridge keeps all petrol activity to 2050, which is
         # the implausible path the displacement lever exists to correct).
-        mode = str(ev_uptake_key[0]) if ev_uptake_key else ""
+        mode = _scenario_key(ev_uptake_key).uptake_basis
         # The governed official option follows the SELECTED comparator vintage
-        # (uptake-key slot 6; vintage ids equal release rounds for registered
-        # vintages), not a hard-coded MBU26 trace.
+        # (vintage ids equal release rounds for registered vintages), not a
+        # hard-coded MBU26 trace.
         selected_vid, _ = _official_vintage_scope(ev_uptake_key)
         base_trace = (
             official_comparator_trace_name(selected_vid)
@@ -2299,9 +2558,11 @@ def cached_revenue_outlook_total_path_figure(
     traces: tuple[str, ...],
     sensitivity_key: tuple[str, str, str, str, str, str, str, str, str, str, str],
     bridge_mode: str,
-    ev_uptake_key: tuple[Any, ...],
+    ev_uptake_key: ScenarioKeyLike,
     _filtered_rows: pd.DataFrame,
     _cone_band: pd.DataFrame | None = None,
+    _uncertainty_rows: pd.DataFrame | None = None,
+    selected_band_layers: tuple[str, ...] = (),
 ) -> go.Figure:
     selected_vid, _ = _official_vintage_scope(ev_uptake_key)
     del signature, time_grain, fed_path, traces, sensitivity_key, bridge_mode, ev_uptake_key
@@ -2311,6 +2572,8 @@ def cached_revenue_outlook_total_path_figure(
         selected_fy=selected_fy,
         cone_band=_cone_band,
         selected_official_trace=official_comparator_trace_name(selected_vid),
+        uncertainty_rows=_uncertainty_rows,
+        selected_band_layers=selected_band_layers,
     )
 
 
@@ -5122,14 +5385,25 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             selected_fy = str(st.session_state.get("revenue_outlook_selected_fy", default_fy))
             if selected_fy not in fy_options and fy_options:
                 selected_fy = default_fy
-            selected_traces = [
-                trace
-                for trace in trace_options
-                if st.session_state.get(
-                    f"revenue_outlook_legend_item_{_widget_key(trace)}",
-                    trace in selected_trace_defaults,
-                )
-            ]
+            # Compare mode reads the persisted single-view layer selection: the
+            # A/B panel owns its own traces, but the sections below the
+            # comparison still track this choice.
+            uncertainty_pack = cached_uncertainty_pack()
+            layer_catalogue = build_layer_catalogue(
+                [*trace_options, VFM_FAST_TRACE_NAME, VFM_SLOW_TRACE_NAME],
+                default_trace_names=selected_trace_defaults,
+                uncertainty_available=uncertainty_pack.available,
+                envelope_available=True,
+            )
+            persisted = st.session_state.get("revenue_outlook_chart_layers")
+            label_to_id = {spec.label: spec.layer_id for spec in layer_catalogue}
+            selected_layer_ids = (
+                [label_to_id[label] for label in persisted if label in label_to_id]
+                if persisted
+                else default_layer_ids(layer_catalogue)
+            )
+            selected_traces = path_trace_names(layer_catalogue, selected_layer_ids)
+            selected_band_layers = tuple(band_layer_ids(layer_catalogue, selected_layer_ids))
             if not selected_traces:
                 selected_traces = selected_trace_defaults or list(trace_options[:1])
         else:
@@ -5153,21 +5427,52 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                     **fy_default_kwargs,
                 )
             with control_cols[2]:
-                selected_traces = []
-                st.markdown("<div class='control-label'>Legend items</div>", unsafe_allow_html=True)
-                with st.popover("Select legend items", use_container_width=True):
-                    st.caption("Choose which traces appear in the chart legend.")
-                    for trace in trace_options:
-                        legend_key = f"revenue_outlook_legend_item_{_widget_key(trace)}"
-                        legend_default_kwargs = {} if legend_key in st.session_state else {"value": trace in selected_trace_defaults}
-                        is_selected = st.checkbox(trace, key=legend_key, **legend_default_kwargs)
-                        if is_selected:
-                            selected_traces.append(trace)
+                # ONE control for every layer - deterministic paths, the
+                # structural VFM range and the conditional modelled-uncertainty
+                # bands - so nothing is selectable in two contradictory places.
+                uncertainty_pack = cached_uncertainty_pack()
+                layer_catalogue = build_layer_catalogue(
+                    [*trace_options, VFM_FAST_TRACE_NAME, VFM_SLOW_TRACE_NAME],
+                    default_trace_names=selected_trace_defaults,
+                    uncertainty_available=uncertainty_pack.available,
+                    envelope_available=True,
+                )
+                layer_labels = {spec.label: spec.layer_id for spec in layer_catalogue}
+                default_labels = [
+                    spec.label for spec in layer_catalogue if spec.default_selected
+                ]
+                st.markdown("<div class='control-label'>Show on chart</div>", unsafe_allow_html=True)
+                layer_default_kwargs = (
+                    {}
+                    if "revenue_outlook_chart_layers" in st.session_state
+                    else {"default": default_labels}
+                )
+                chosen_labels = st.multiselect(
+                    "Show on chart",
+                    list(layer_labels),
+                    key="revenue_outlook_chart_layers",
+                    label_visibility="collapsed",
+                    help=(
+                        "Paths are deterministic scenarios. The MoT VFM fast–slow "
+                        "range is a structural scenario envelope and is NOT "
+                        "probabilistic. The 50%/80% bands are conditional model "
+                        "forecast-error bands and exclude Treasury-driver "
+                        "forecast uncertainty."
+                    ),
+                    **layer_default_kwargs,
+                )
+                selected_layer_ids = [layer_labels[label] for label in chosen_labels if label in layer_labels]
+                if not selected_layer_ids:
+                    selected_layer_ids = default_layer_ids(layer_catalogue)
+                    st.caption("Using the default chart layers.")
+                selected_traces = path_trace_names(layer_catalogue, selected_layer_ids)
+                selected_band_layers = tuple(band_layer_ids(layer_catalogue, selected_layer_ids))
                 if not selected_traces:
                     selected_traces = selected_trace_defaults or list(trace_options[:1])
-                    st.caption("Using default legend items.")
-                else:
-                    st.caption(_revenue_outlook_trace_selection_summary(selected_traces, len(trace_options)))
+                st.caption(
+                    _revenue_outlook_trace_selection_summary(selected_traces, len(trace_options))
+                    + (f" · {len(selected_band_layers)} band layer(s)" if selected_band_layers else "")
+                )
         bridge_mode_lookup = selector_options["bridge_mode_lookup"]
         bridge_mode_options = list(bridge_mode_lookup)
         default_bridge_label = next(
@@ -5231,22 +5536,29 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             st.caption(f"Single-view levers (still applied to the sections below the comparison): {lever_summary}")
         else:
             st.caption(f"Active levers: {lever_summary}")
-    ev_uptake_key: tuple[Any, ...] = (
-        selected_ev_uptake_mode,
-        custom_ev_levers,
-        eruc_lever_values,
-        fed_policy_state,
-        mbu_fed_policy_state,
-        ped_retention_sensitivity,
-        # Slots 6/7 (appended at the END so existing positional reads keep
-        # indexing correctly): official comparator vintage id + overlay flag.
-        # Both invalidate every cached figure/view keyed on this tuple.
-        str(official_vintage_state["vintage_id"]),
-        bool(official_vintage_state["overlay"]),
-        # Slots 8/9: the analyst long-run shape selection. Also folded into the
-        # pack signature, because the frames it changes are cached on that.
-        str(long_run_shape_state["schedule_id"]),
-        str(long_run_shape_state["shape_vintage_id"]),
+    # Every value-changing control, by NAME. The positional tuple this replaced
+    # had let the official comparator vintage id (slot 6) be read as the
+    # Heavy-BEV flag, so a non-empty vintage silently switched Heavy-BEV
+    # reclassification on in every production render.
+    ev_uptake_key = RevenueScenarioComputationKey(
+        engine=engine,
+        uptake_basis=selected_ev_uptake_mode,
+        custom_ev_levers=custom_ev_levers,
+        eruc_levers=eruc_lever_values,
+        current_fed_policy_state=fed_policy_state,
+        official_fed_policy_state=mbu_fed_policy_state,
+        ped_retention_sensitivity=ped_retention_sensitivity,
+        # Explicit, and Off unless a reader asks for it. Never inferred from
+        # another field's truthiness.
+        heavy_bev_transition=HEAVY_BEV_DEFAULT,
+        official_comparator_vintage_id=str(official_vintage_state["vintage_id"]),
+        official_comparator_overlay=bool(official_vintage_state["overlay"]),
+        ped_bridge_mode=str(selected_ped_bridge_mode),
+        bridge_vintage_id=str(bridge_vintage_id),
+        # Also folded into the pack signature, because the frames these change
+        # are cached on that.
+        long_run_transition_schedule_id=str(long_run_shape_state["schedule_id"]),
+        long_run_shape_vintage_id=str(long_run_shape_state["shape_vintage_id"]),
     )
     pack, pack_signature = _apply_long_run_shape_selection(
         pack, pack_signature, str(pack_dir), ev_uptake_key
@@ -5336,6 +5648,39 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         )
     else:
         timer.start("main path figure")
+        # The optional VFM Fast/Slow scenario paths are only computed when a
+        # reader has actually selected them, so the default render never pays
+        # for two extra full overlay passes.
+        plot_rows = filtered_rows
+        if any(
+            trace in selected_traces for trace in (VFM_FAST_TRACE_NAME, VFM_SLOW_TRACE_NAME)
+        ):
+            timer.start("vfm scenario paths")
+            vfm_paths = cached_vfm_scenario_paths(
+                pack_signature,
+                selected_stream,
+                selected_time_grain,
+                selected_fed_path,
+                tuple(selected_traces),
+                sensitivity_key,
+                selected_ped_bridge_mode,
+                _cone_band_controls(ev_uptake_key),
+                pack,
+            )
+            timer.stop("vfm scenario paths")
+            if isinstance(vfm_paths, pd.DataFrame) and not vfm_paths.empty:
+                wanted = vfm_paths[
+                    vfm_paths["trace_name"].astype(str).isin(selected_traces)
+                ]
+                if not wanted.empty:
+                    plot_rows = pd.concat([filtered_rows, wanted], ignore_index=True, sort=False)
+        timer.start("uncertainty lookup")
+        uncertainty_series_id = _uncertainty_series_id_for_label(chart_rows, selected_stream)
+        uncertainty_rows = cached_uncertainty_band_rows(
+            uncertainty_series_id,
+            str(cached_uncertainty_pack().manifest.get("scenario_key_digest", "")),
+        )
+        timer.stop("uncertainty lookup")
         main_path_figure = cached_revenue_outlook_total_path_figure(
             pack_signature,
             selected_stream,
@@ -5346,11 +5691,24 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             sensitivity_key,
             selected_ped_bridge_mode,
             ev_uptake_key,
-            filtered_rows,
+            plot_rows,
             view.get("cone_band"),
+            uncertainty_rows,
+            tuple(selected_band_layers),
         )
         timer.stop("main path figure")
         total_path_notes = []
+        cone_band_for_notes = view.get("cone_band")
+        if (
+            isinstance(cone_band_for_notes, pd.DataFrame)
+            and not cone_band_for_notes.empty
+            and VFM_ENVELOPE_LAYER_ID in selected_band_layers
+        ):
+            total_path_notes.append(VFM_ENVELOPE_NOT_PROBABILISTIC_NOTE)
+        if selected_band_layers and any(
+            layer in selected_band_layers for layer in (BAND_50_LAYER_ID, BAND_80_LAYER_ID)
+        ):
+            total_path_notes.append(CONDITIONAL_BAND)
         if view.get("quarterly_disaggregated"):
             total_path_notes.append(QUARTERLY_DISAGGREGATION_NOTE)
         if view.get("ev_uptake_applied"):
@@ -5404,29 +5762,115 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             CONFLICT_NOTE_BY_TRACE[trace] for trace in selected_conflict_traces
         ]
         total_path_notes.extend(conflict_notes)
-        # Restored layout (removed in 417f34a): total path beside the
-        # uncertainty fan, 64/36 on desktop. Streamlit columns stack
-        # automatically on narrow viewports.
-        primary_cols = st.columns([0.64, 0.36])
-        with primary_cols[0]:
-            chart_card(
-                "Total path chart",
-                "\n\n".join(total_path_notes),
-                main_path_figure,
-                caption="\n\n".join(conflict_notes) if conflict_notes else None,
-                notes_as_tooltip=True,
+        # Integrated VFM Scenario Envelope: the governed MoT VFM Fast-Slow
+        # range now sits ON this chart, so the Total path takes the full page
+        # width and the separate uncertainty-fan card no longer competes with
+        # it for space. The fan's governed source data is unchanged and stays
+        # reachable from the collapsed detail surface below; it is not
+        # constructed unless a reader explicitly asks for it.
+        chart_card(
+            "Total path chart",
+            "\n\n".join(total_path_notes),
+            main_path_figure,
+            caption="\n\n".join(conflict_notes) if conflict_notes else None,
+            notes_as_tooltip=True,
+        )
+        _render_revenue_outlook_vfm_envelope_caption(view)
+
+    if not compare_mode and st.toggle(
+        "Show forecast-uncertainty fan detail",
+        value=False,
+        key="revenue_outlook_show_fan_detail",
+        help=(
+            "The empirical 50%/80% forecast-error fan, its source, its "
+            "supported horizon and its download. A different concept from the "
+            "MoT VFM Fast–Slow range on the chart above: the fan is an "
+            "empirical forecast-error band and stops at FY2030."
+        ),
+    ):
+        timer.start("fan figure")
+        _render_revenue_outlook_fan_card(
+            pack_signature,
+            fan_band_rows,
+            fan_availability,
+            selected_series=selected_stream,
+            selected_fed_path=selected_fed_path,
+            official_fed_paths=official_vintage_state["displayed_release_rounds"],
+        )
+        timer.stop("fan figure")
+
+    if not compare_mode and st.toggle(
+        "Show modelled-uncertainty audit",
+        value=False,
+        key="revenue_outlook_show_uncertainty_audit",
+        help=(
+            "The governed band values, their evidence state, the June-year "
+            "basis behind them and the pack manifest. Nothing here is built "
+            "until it is asked for."
+        ),
+    ):
+        with st.container(border=True):
+            st.caption(CONDITIONAL_BAND)
+            pack_for_audit = cached_uncertainty_pack()
+            if uncertainty_rows is not None and not uncertainty_rows.empty:
+                display_table(uncertainty_rows, height=280)
+                st.download_button(
+                    "Download modelled-uncertainty band rows (CSV)",
+                    uncertainty_rows.to_csv(index=False).encode("utf-8"),
+                    file_name=f"revenue_outlook_uncertainty_{uncertainty_series_id}.csv",
+                    mime="text/csv",
+                    key="revenue_outlook_uncertainty_download",
+                )
+            else:
+                st.caption(
+                    f"No governed uncertainty rows for series {uncertainty_series_id!r} "
+                    "in the committed pack."
+                )
+            if not pack_for_audit.basis.empty:
+                st.caption(
+                    "June-year basis: raw and weighted-isotonic quantiles with "
+                    "origin-clustered bootstrap intervals and sample counts."
+                )
+                display_table(pack_for_audit.basis, height=240)
+            if pack_for_audit.manifest:
+                st.caption(
+                    "Pack provenance — seed "
+                    f"{pack_for_audit.manifest.get('seed')}, "
+                    f"{pack_for_audit.manifest.get('draws')} draws, "
+                    f"continuation {pack_for_audit.manifest.get('continuation_rule')}, "
+                    f"scenario key {str(pack_for_audit.manifest.get('scenario_key_digest', ''))[:16]}."
+                )
+            st.caption(
+                "Chart layer catalogue — every selectable layer, its kind, draw "
+                "order and whether it is probabilistic."
             )
-        with primary_cols[1]:
-            timer.start("fan figure")
-            _render_revenue_outlook_fan_card(
-                pack_signature,
-                fan_band_rows,
-                fan_availability,
-                selected_series=selected_stream,
-                selected_fed_path=selected_fed_path,
-                official_fed_paths=official_vintage_state["displayed_release_rounds"],
-            )
-            timer.stop("fan figure")
+            display_table(pd.DataFrame(catalogue_frame(layer_catalogue)), height=280)
+
+    if not compare_mode and st.toggle(
+        "Show MoT VFM Fast–Slow range audit",
+        value=False,
+        key="revenue_outlook_show_vfm_envelope_audit",
+        help=(
+            "Whether the selected series receives the structural scenario "
+            "envelope, which scenarios bound it, over which years, and why it "
+            "is absent when it is."
+        ),
+    ):
+        with st.container(border=True):
+            st.caption(VFM_ENVELOPE_NOT_PROBABILISTIC_NOTE)
+            envelope_audit = view.get("cone_band_audit", pd.DataFrame())
+            if isinstance(envelope_audit, pd.DataFrame) and not envelope_audit.empty:
+                display_table(envelope_audit, height=120)
+            envelope_band = view.get("cone_band", pd.DataFrame())
+            if isinstance(envelope_band, pd.DataFrame) and not envelope_band.empty:
+                display_table(envelope_band, height=260)
+                st.download_button(
+                    "Download VFM Fast–Slow range (CSV)",
+                    envelope_band.to_csv(index=False).encode("utf-8"),
+                    file_name="revenue_outlook_vfm_fast_slow_range.csv",
+                    mime="text/csv",
+                    key="revenue_outlook_vfm_envelope_download",
+                )
 
     if revenue_outlook_lazy_table(
         "Show Middle East fuel-scenario audit",
@@ -8062,15 +8506,12 @@ def _render_comparison_scenario_column(
                 "policy counterfactual; generating one requires a separate owner decision."
             )
         sensitivity_key = selected_sensitivity_key("Off", "Off", "Off", freight_rail_shift="Off")
-        ev_uptake_key: tuple[Any, ...] = (
-            EV_UPTAKE_GOVERNED_OPTION,
-            (),
-            (),
-            FED_POLICY_PUBLISHED,
-            official_policy_state,
-            False,
-            selected_vid,
-            False,
+        ev_uptake_key = RevenueScenarioComputationKey(
+            uptake_basis=EV_UPTAKE_GOVERNED_OPTION,
+            current_fed_policy_state=FED_POLICY_PUBLISHED,
+            official_fed_policy_state=official_policy_state,
+            heavy_bev_transition=HEAVY_BEV_DEFAULT,
+            official_comparator_vintage_id=selected_vid,
         )
         return sensitivity_key, ev_uptake_key
     _validated_select_state(
@@ -8090,15 +8531,16 @@ def _render_comparison_scenario_column(
         ),
     )
     sensitivity_key = selected_sensitivity_key(fleet, pt_shift, "Off", freight_rail_shift=freight)
-    ev_uptake_key = (
-        uptake,
-        (),
-        eruc_values,
-        fed_policy_state,
-        FED_POLICY_PUBLISHED,
-        bool(st.session_state.get("revenue_outlook_ped_retention_sensitivity", False)),
-        selected_vid,
-        False,
+    ev_uptake_key = RevenueScenarioComputationKey(
+        uptake_basis=uptake,
+        eruc_levers=eruc_values,
+        current_fed_policy_state=fed_policy_state,
+        official_fed_policy_state=FED_POLICY_PUBLISHED,
+        ped_retention_sensitivity=bool(
+            st.session_state.get("revenue_outlook_ped_retention_sensitivity", False)
+        ),
+        heavy_bev_transition=HEAVY_BEV_DEFAULT,
+        official_comparator_vintage_id=selected_vid,
     )
     return sensitivity_key, ev_uptake_key
 
@@ -8127,8 +8569,9 @@ def _copy_page_settings_to_scenario_a() -> None:
     )
 
 
-def _scenario_summary_text(sensitivity_key: tuple, ev_uptake_key: tuple) -> str:
-    mode = str(ev_uptake_key[0])
+def _scenario_summary_text(sensitivity_key: tuple, ev_uptake_key: ScenarioKeyLike) -> str:
+    key = _scenario_key(ev_uptake_key)
+    mode = key.uptake_basis
     selected_vid, _ = _official_vintage_scope(ev_uptake_key)
     parts = [
         _comparison_mot_official_option(selected_vid)
@@ -8138,7 +8581,7 @@ def _scenario_summary_text(sensitivity_key: tuple, ev_uptake_key: tuple) -> str:
     for label, value in [("Fleet", sensitivity_key[0]), ("PT", sensitivity_key[1]), ("Freight", sensitivity_key[9])]:
         if value != "Off":
             parts.append(f"{label} {value}")
-    if len(ev_uptake_key) > 2 and ev_uptake_key[2]:
+    if key.eruc_levers:
         parts.append("e-RUC on")
     current_state, mbu26_state = _fed_policy_state_scope(ev_uptake_key)
     if mode == EV_UPTAKE_GOVERNED_OPTION:
@@ -9560,6 +10003,64 @@ def _public_segment_hover_label(row: pd.Series) -> str:
     return ""
 
 
+def _add_uncertainty_band(
+    fig: go.Figure,
+    uncertainty_rows: pd.DataFrame | None,
+    data: pd.DataFrame,
+    display_scale: float,
+    *,
+    level: str,
+    enabled: bool,
+) -> None:
+    """One conditional modelled-uncertainty band, as two traces and one legend.
+
+    Asymmetric by construction: the lower and upper edges come from separate
+    governed quantiles, so a biased error distribution stays biased on the
+    chart. The Current line may therefore sit outside the inner 50% band -
+    that is the evidence, not a defect.
+    """
+    if not enabled or uncertainty_rows is None or uncertainty_rows.empty:
+        return
+    band = uncertainty_rows.copy()
+    band["period"] = "FY" + pd.to_numeric(band["FY"], errors="coerce").astype("Int64").astype(str)
+    visible = set(data["period"].astype(str))
+    band = band[band["period"].isin(visible)]
+    lower_column, upper_column = f"lower{level}", f"upper{level}"
+    if band.empty or lower_column not in band.columns:
+        return
+    band = band.sort_values("FY")
+    lower = (pd.to_numeric(band[lower_column], errors="coerce") / display_scale).tolist()
+    upper = (pd.to_numeric(band[upper_column], errors="coerce") / display_scale).tolist()
+    periods = band["period"].astype(str).tolist()
+    states = band.get("evidence_state", pd.Series("", index=band.index)).astype(str).tolist()
+    fill = BAND_80_FILL if level == "80" else BAND_50_FILL
+    legend_rank = 1200 if level == "80" else 1100
+    fig.add_trace(
+        go.Scatter(
+            x=periods, y=upper, mode="lines", line=BAND_BOUNDARY,
+            hoverinfo="skip", showlegend=False,
+            name=f"{level}% conditional band upper",
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=periods, y=lower, mode="lines", line=BAND_BOUNDARY,
+            fill="tonexty", fillcolor=fill,
+            showlegend=True,
+            name=f"{level}% conditional modelled uncertainty",
+            legendrank=legend_rank,
+            customdata=list(zip(upper, states)),
+            hovertemplate=(
+                f"<b>{level}%% conditional modelled uncertainty</b><br>"
+                "%{y:,.2f} to %{customdata[0]:,.2f}<br>"
+                "Evidence: %{customdata[1]}<br>"
+                "Excludes Treasury-driver forecast error"
+                "<extra></extra>"
+            ),
+        )
+    )
+
+
 def revenue_outlook_total_path_figure(
     rows: pd.DataFrame,
     *,
@@ -9567,6 +10068,8 @@ def revenue_outlook_total_path_figure(
     selected_fy: str,
     cone_band: pd.DataFrame | None = None,
     selected_official_trace: str | None = None,
+    uncertainty_rows: pd.DataFrame | None = None,
+    selected_band_layers: tuple[str, ...] = (),
 ) -> go.Figure:
     data = _selected_revenue_outlook_series_rows(rows, selected_series)
     if data.empty:
@@ -9586,8 +10089,21 @@ def revenue_outlook_total_path_figure(
     scenario_colors = _scenario_color_map(data)
     fig = go.Figure()
 
-    # MoT VFM fleet-transition cone: fast/slow scenario envelope drawn first
-    # so every line sits above the shading.
+    # Governed z-order, widest and palest first so nothing buries a line:
+    #   1  80% conditional modelled uncertainty
+    #   2  MoT VFM Fast-Slow structural range
+    #   3  50% conditional modelled uncertainty
+    #   4+ deterministic paths and official comparators
+    band_layers = set(selected_band_layers)
+    _add_uncertainty_band(
+        fig, uncertainty_rows, data, display_scale,
+        level="80", enabled=BAND_80_LAYER_ID in band_layers,
+    )
+
+    # MoT VFM Fast-Slow structural scenario envelope. A scenario envelope, not
+    # probabilistic: see VFM_ENVELOPE_NOT_PROBABILISTIC_NOTE.
+    if VFM_ENVELOPE_LAYER_ID not in band_layers:
+        cone_band = None
     if cone_band is not None and not cone_band.empty:
         band = cone_band.copy()
         band["_order"] = band["period"].astype(str).map(_revenue_period_order)
@@ -9603,7 +10119,7 @@ def revenue_outlook_total_path_figure(
                     x=band_x,
                     y=upper,
                     mode="lines",
-                    line={"color": "rgba(0,111,173,0.28)", "width": 0.8, "dash": "dot"},
+                    line=VFM_ENVELOPE_BOUNDARY_LINE,
                     hoverinfo="skip",
                     showlegend=False,
                     name="MoT VFM fast bound",
@@ -9614,15 +10130,19 @@ def revenue_outlook_total_path_figure(
                     x=band_x,
                     y=lower,
                     mode="lines",
-                    line={"color": "rgba(0,111,173,0.28)", "width": 0.8, "dash": "dot"},
+                    line=VFM_ENVELOPE_BOUNDARY_LINE,
                     fill="tonexty",
-                    fillcolor="rgba(0,111,173,0.10)",
+                    fillcolor=VFM_ENVELOPE_FILL_COLOR,
                     hoverinfo="skip",
                     showlegend=True,
-                    name="MoT VFM fast–slow range",
-                    legendrank=1100,
+                    name=VFM_ENVELOPE_LEGEND_LABEL,
+                    legendrank=1150,
                 )
             )
+    _add_uncertainty_band(
+        fig, uncertainty_rows, data, display_scale,
+        level="50", enabled=BAND_50_LAYER_ID in band_layers,
+    )
     trace_styles = {
         "Actual": ("#737373", "solid", 2.4),
         # Default comparator in the strong green; prior vintages muted, so an
@@ -9634,6 +10154,11 @@ def revenue_outlook_total_path_figure(
         "Current finalist High population/comparison": ("#E56B2B", "solid", 2.4),
         **CONFLICT_TRACE_STYLES,
         PED_COMPARISON_BEHAVIOURAL_TRACE_NAME: ("#C2410C", "dot", 2.4),
+        # The two optional VFM composition scenarios: purple and teal, chosen
+        # to stay distinct from the blue Base, the orange comparison and the
+        # green official comparator under a colour-blind-conscious palette.
+        VFM_FAST_TRACE_NAME: ("#7C4DBE", "solid", 2.2),
+        VFM_SLOW_TRACE_NAME: ("#0E8C93", "solid", 2.2),
     }
     trace_names = _ordered_runtime_trace_names(data, selected_official_trace)
     for trace_name in trace_names:
@@ -9860,6 +10385,71 @@ def revenue_outlook_total_path_figure(
     return fig
 
 
+def _render_revenue_outlook_vfm_envelope_caption(view: dict[str, Any]) -> None:
+    """State what the blue range is - and is not - directly under the chart.
+
+    The envelope shares the page with an empirical forecast-error fan, so the
+    distinction has to be visible without opening a tooltip or an audit.
+    """
+    audit = view.get("cone_band_audit")
+    if not isinstance(audit, pd.DataFrame) or audit.empty:
+        return
+    row = audit.iloc[0]
+    if not bool(row.get("band_available")):
+        st.caption(f"No MoT VFM Fast–Slow range for this series. {row.get('reason', '')}".strip())
+        return
+    st.caption(
+        f"{VFM_ENVELOPE_NOT_PROBABILISTIC_NOTE} Shown "
+        f"{row.get('first_valid_period', '')}–{row.get('last_valid_period', '')}; "
+        f"widest gap {float(row.get('max_width_pct_of_level') or 0.0):.2f}% of level. "
+        f"{row.get('reason', '')}"
+    )
+
+
+def _render_revenue_outlook_fan_detail_table(
+    fan_band_rows: pd.DataFrame,
+    fan_availability: pd.DataFrame,
+    *,
+    selected_series: str,
+    selected_fan_source: str,
+) -> None:
+    """The governed 50/80 values behind the fan, with their CSV.
+
+    The fan figure left the default layout; its source data did not. Every
+    column the governance surface relied on - source, lower50/upper50,
+    lower80/upper80, interpretation - is still readable and downloadable here.
+    """
+    if fan_band_rows is None or not isinstance(fan_band_rows, pd.DataFrame) or fan_band_rows.empty:
+        st.caption("No governed fan band rows are committed in this runtime pack.")
+        return
+    series_id = _revenue_outlook_fan_series_id(fan_availability, selected_series)
+    resolved = _resolve_revenue_outlook_fan_source(fan_availability, series_id, selected_fan_source)
+    data = fan_band_rows[
+        fan_band_rows.get("series_id", pd.Series(dtype=str)).astype(str).eq(str(series_id))
+    ].copy()
+    if resolved:
+        data = data[data.get("fan_source", pd.Series(dtype=str)).astype(str).eq(resolved)]
+    if data.empty:
+        st.caption(_revenue_outlook_fan_gap_message(fan_availability, series_id, selected_fan_source))
+        return
+    columns = [
+        column
+        for column in (
+            "fan_source", "fan_segment", "FY", "period", "central",
+            "lower50", "upper50", "lower80", "upper80", "unit", "interpretation",
+        )
+        if column in data.columns
+    ]
+    display_table(data[columns], height=280)
+    st.download_button(
+        "Download fan band rows (CSV)",
+        data[columns].to_csv(index=False).encode("utf-8"),
+        file_name=f"revenue_outlook_fan_band_{series_id}.csv",
+        mime="text/csv",
+        key="revenue_outlook_fan_band_download",
+    )
+
+
 def _render_revenue_outlook_fan_card(
     pack_signature: tuple[tuple[str, int, int], ...],
     fan_band_rows: pd.DataFrame,
@@ -9873,7 +10463,9 @@ def _render_revenue_outlook_fan_card(
         st.markdown(
             "<div class='gov-chart-card chart-card'>"
             "<div class='chart-card-title'>Uncertainty fan</div>"
-            "<div class='chart-card-subtitle'>Best available governed uncertainty source; details below the chart.</div>"
+            "<div class='chart-card-subtitle'>Empirical 50%/80% forecast-error band from the best "
+            "available governed source, supported to FY2030. A different concept from the MoT VFM "
+            "Fast&ndash;Slow structural scenario range on the Total path chart.</div>"
             "</div>",
             unsafe_allow_html=True,
         )
@@ -9904,6 +10496,12 @@ def _render_revenue_outlook_fan_card(
         )
         st.plotly_chart(fig, use_container_width=True, key="chart_card_uncertainty_fan")
         st.caption(caption)
+        _render_revenue_outlook_fan_detail_table(
+            fan_band_rows,
+            fan_availability,
+            selected_series=selected_series,
+            selected_fan_source=selected_fan_source,
+        )
 
 
 def revenue_outlook_uncertainty_fan_figure(

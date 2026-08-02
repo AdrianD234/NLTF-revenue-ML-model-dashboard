@@ -1,0 +1,4 @@
+uptake_basis,vfm_scenario,first_fy,last_fy,rows,covers_fy2030_fy2050,missing_fys,all_finite,all_non_negative,max_abs_sum_minus_one
+MoT VFM base,Base_EV,2025,2050,26,True,[],True,True,1.0000000000287557e-06
+MoT VFM fast,Fast_EV,2025,2050,26,True,[],True,True,1.000000000139778e-06
+MoT VFM slow,Slow_EV,2025,2050,26,True,[],True,True,1.0000000000287557e-06

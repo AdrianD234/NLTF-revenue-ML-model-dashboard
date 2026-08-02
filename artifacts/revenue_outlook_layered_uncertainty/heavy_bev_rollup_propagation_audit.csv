@@ -1,0 +1,7 @@
+series_id,FY,base_value,delta_heavy_bev_transition_on,delta_vfm_fast_light_composition,heavy_overlay_moves_series,light_overlay_moves_series,aggregate_stability_is_expected
+heavy_ruc_net_km,2030,4230.412228687553,-38.54999462880369,0.0,True,False,False
+heavy_ruc_net_revenue,2030,1561.9346558206582,-14.233263648424327,0.0,True,False,False
+light_ruc_net_revenue,2030,1309.1303913442225,0.0,-75.68304231033744,False,True,False
+total_ruc_net_revenue,2030,3253.9373715651354,0.0,-17.358406506269603,False,True,True
+total_fed_ruc_net_revenue,2030,6017.820098865348,0.0,-17.358406506269603,False,True,True
+total_nltf_net_revenue,2030,6515.261716847033,0.0,-17.358406506269603,False,True,True
