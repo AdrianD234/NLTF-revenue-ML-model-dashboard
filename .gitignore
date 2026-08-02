@@ -66,6 +66,8 @@ artifacts/**
 !artifacts/revenue_outlook_vfm_envelope/**
 !artifacts/revenue_outlook_layered_uncertainty/
 !artifacts/revenue_outlook_layered_uncertainty/**
+!artifacts/revenue_outlook_ui_slim_2050/
+!artifacts/revenue_outlook_ui_slim_2050/**
 !artifacts/revenue_outlook_instant_runtime/
 !artifacts/revenue_outlook_instant_runtime/**
 data/**

@@ -258,6 +258,18 @@ from model_dashboard.revenue_uncertainty_pack import (
     band_rows_for_series,
     load_uncertainty_pack,
 )
+from model_dashboard.revenue_outlook_presentation_policy import (
+    REVENUE_OUTLOOK_DISPLAY_END_FY,
+    REVENUE_OUTLOOK_ENABLE_PED_RETENTION_CONTROL,
+    REVENUE_OUTLOOK_ENABLE_VFM_ANALYST_LAYERS,
+    clip_frame_to_display_horizon,
+    clip_fy_options_to_display_horizon,
+    display_end_fy,
+    display_horizon_note,
+    is_vfm_analyst_layer_label,
+    period_within_horizon,
+    terminal_display_quarter,
+)
 
 # What a helper will accept: the typed key, or a historic positional tuple from
 # an older cache entry or test. Production builds the typed key directly.
@@ -383,6 +395,8 @@ from model_dashboard.score_basis import (
     score_basis_metric_label,
 )
 from model_dashboard.ui import (
+    EXPANDED_CHART_CONTAINER_KEY,
+    EXPAND_CONTROL_CONTAINER_KEY,
     chart_card,
     dataframe_download,
     decision_brief,
@@ -990,8 +1004,50 @@ def _ped_retention_enabled(ev_uptake_key: ScenarioKeyLike) -> bool:
     """The PED petrol-retention sensitivity: named field, Off by default.
 
     Off means the raw AR(1) Base path with no retention overlay.
+
+    This still reads the key rather than the presentation policy, so a
+    historical cache entry or an evidence script that deliberately sets the
+    field keeps behaving exactly as it did. What changed is that production
+    never BUILDS a key carrying True - see
+    :func:`_production_ped_retention_sensitivity`.
     """
     return _scenario_key(ev_uptake_key).ped_retention_sensitivity
+
+
+def _production_ped_retention_sensitivity() -> bool:
+    """The retention flag every production Revenue Outlook key must carry.
+
+    The control is withdrawn (REVENUE_OUTLOOK_ENABLE_PED_RETENTION_CONTROL),
+    so this is False and session state is not consulted at all: a stale True
+    persisted by a reader's browser before the control was removed can never
+    reactivate the overlay. The typed field and the backend implementation are
+    untouched for compatibility and audit.
+    """
+    if not REVENUE_OUTLOOK_ENABLE_PED_RETENTION_CONTROL:
+        return False
+    return bool(st.session_state.get("revenue_outlook_ped_retention_sensitivity", False))
+
+
+def _discard_withdrawn_revenue_outlook_state() -> None:
+    """Drop session values written by controls that no longer exist.
+
+    Streamlit keeps a key in session state forever once a widget has written
+    it, so a reader who ticked the retention box - or selected a VFM Fast/Slow
+    layer - before the workshop build would otherwise carry that selection into
+    a page that no longer offers it. Clearing on entry keeps the withdrawn
+    state from surviving deployment while leaving every live selection alone.
+    """
+    if not REVENUE_OUTLOOK_ENABLE_PED_RETENTION_CONTROL:
+        st.session_state.pop("revenue_outlook_ped_retention_sensitivity", None)
+    if not REVENUE_OUTLOOK_ENABLE_VFM_ANALYST_LAYERS:
+        st.session_state.pop("revenue_outlook_show_vfm_envelope_audit", None)
+        persisted = st.session_state.get("revenue_outlook_chart_layers")
+        if isinstance(persisted, list):
+            kept = [
+                label for label in persisted if not is_vfm_analyst_layer_label(label)
+            ]
+            if len(kept) != len(persisted):
+                st.session_state["revenue_outlook_chart_layers"] = kept
 
 
 # The official comparator vintage selection rides in slots 6/7 of the uptake
@@ -1972,6 +2028,12 @@ def _filter_series_rows_with_fallback(
     comparator vintages are governed at June-year grain.  The fallback
     therefore operates per requested trace, not only when the whole quarterly
     selection is empty.
+
+    This is the single gate every decision-facing row passes through - the
+    Total path view, the VFM bounds and the A/B paths all call it - so the
+    FY2050 presentation horizon is applied here once. Both grains are clipped
+    by the same rule, which is what makes the annual and quarterly horizons
+    agree by construction rather than by two parallel edits.
     """
     filtered = _filter_revenue_outlook_rows(
         rows,
@@ -1984,20 +2046,19 @@ def _filter_series_rows_with_fallback(
     if time_grain == "quarterly":
         present_traces = set(filtered.get("trace_name", pd.Series(dtype=str)).dropna().astype(str))
         missing_traces = [trace for trace in traces if str(trace) not in present_traces]
-        if not missing_traces:
-            return filtered, used_fallback
-        annual = _filter_revenue_outlook_rows(
-            rows,
-            time_grain="june_year",
-            stream_labels=[selected_series],
-            fed_paths=[fed_path],
-            trace_names=missing_traces,
-        )
-        derived = _disaggregate_annual_rows_to_quarterly(annual, rows)
-        if not derived.empty:
-            filtered = pd.concat([filtered, derived], ignore_index=True, sort=False)
-            used_fallback = True
-    return filtered, used_fallback
+        if missing_traces:
+            annual = _filter_revenue_outlook_rows(
+                rows,
+                time_grain="june_year",
+                stream_labels=[selected_series],
+                fed_paths=[fed_path],
+                trace_names=missing_traces,
+            )
+            derived = _disaggregate_annual_rows_to_quarterly(annual, rows)
+            if not derived.empty:
+                filtered = pd.concat([filtered, derived], ignore_index=True, sort=False)
+                used_fallback = True
+    return clip_frame_to_display_horizon(filtered), used_fallback
 
 
 # A band row counts as carrying real VFM width once the Fast/Slow gap clears
@@ -2031,9 +2092,16 @@ def cached_uncertainty_pack():
 
 @st.cache_data(show_spinner=False, max_entries=32)
 def cached_uncertainty_band_rows(series_id: str, pack_digest: str) -> pd.DataFrame:
-    """Pure lookup: filter the materialised pack for one series."""
+    """Pure lookup: filter the materialised pack for one series.
+
+    Clipped to the presentation horizon so the band cannot outrun the paths it
+    wraps. The committed pack is not modified - only what is handed to the
+    chart and the band download.
+    """
     del pack_digest
-    return band_rows_for_series(cached_uncertainty_pack(), series_id)
+    return clip_frame_to_display_horizon(
+        band_rows_for_series(cached_uncertainty_pack(), series_id)
+    )
 
 
 def _uncertainty_series_id_for_label(chart_rows: pd.DataFrame, series_label: str) -> str:
@@ -2094,6 +2162,37 @@ def cached_vfm_scenario_paths(
     if not frames:
         return pd.DataFrame()
     return pd.concat(frames, ignore_index=True, sort=False)
+
+
+def _revenue_outlook_layer_catalogue(
+    trace_options: list[str],
+    default_trace_names: list[str],
+) -> tuple[RevenueChartLayerSpec, ...]:
+    """The "Show on chart" catalogue, with the presentation policy applied.
+
+    One construction site for both view modes, so single and compare can never
+    disagree about what is offerable. While the VFM analyst layers are paused
+    the two uptake paths and the structural range are simply absent from the
+    catalogue - which also means ``path_trace_names`` can never return them and
+    no downstream consumer asks for the overlay that would build them.
+    """
+    options = list(trace_options)
+    envelope_available = True
+    if not REVENUE_OUTLOOK_ENABLE_VFM_ANALYST_LAYERS:
+        options = [
+            trace
+            for trace in options
+            if trace not in (VFM_FAST_TRACE_NAME, VFM_SLOW_TRACE_NAME)
+        ]
+        envelope_available = False
+    else:
+        options = [*options, VFM_FAST_TRACE_NAME, VFM_SLOW_TRACE_NAME]
+    return build_layer_catalogue(
+        options,
+        default_trace_names=list(default_trace_names),
+        uncertainty_available=cached_uncertainty_pack().available,
+        envelope_available=envelope_available,
+    )
 
 
 def _cone_band_controls(ev_uptake_key: ScenarioKeyLike) -> RevenueScenarioComputationKey:
@@ -2601,8 +2700,12 @@ def cached_revenue_outlook_view(
     # trace. Computed through the same pipeline, with every non-VFM control
     # inherited from this key, so the band is exactly what the chart would
     # show under those two governed composition scenarios.
+    #
+    # While the analyst layers are paused this is skipped entirely rather than
+    # computed-and-hidden: the band costs two extra full scenario-overlay
+    # passes (one per preset) that nothing on the page would consume.
     cone_band = pd.DataFrame()
-    if ev_uptake_levers is not None:
+    if REVENUE_OUTLOOK_ENABLE_VFM_ANALYST_LAYERS and ev_uptake_levers is not None:
         cone_band = cached_view_cone_band(
             signature, selected_series, time_grain, fed_path, traces,
             sensitivity_key, bridge_mode, _cone_band_controls(ev_uptake_key), _pack,
@@ -2626,11 +2729,17 @@ def cached_revenue_outlook_view(
         "ev_uptake_applied": ev_uptake_levers is not None and not ev_uptake_audit.empty,
         "ev_uptake_audit": ev_uptake_audit,
         "cone_band": cone_band,
-        "cone_band_audit": _vfm_envelope_applicability_audit(
-            cone_band,
-            selected_series=selected_series,
-            time_grain=time_grain,
-            ev_uptake_levers_available=ev_uptake_levers is not None,
+        # Paused with the band itself: the audit describes a layer the page
+        # does not offer, so constructing it would be work with no consumer.
+        "cone_band_audit": (
+            _vfm_envelope_applicability_audit(
+                cone_band,
+                selected_series=selected_series,
+                time_grain=time_grain,
+                ev_uptake_levers_available=ev_uptake_levers is not None,
+            )
+            if REVENUE_OUTLOOK_ENABLE_VFM_ANALYST_LAYERS
+            else pd.DataFrame()
         ),
         "eruc_applied": eruc_levers is not None and not eruc_audit.empty,
         "eruc_audit": eruc_audit,
@@ -2849,8 +2958,25 @@ def cached_revenue_outlook_total_path_figure(
     selected_band_layers: tuple[str, ...] = (),
 ) -> go.Figure:
     selected_vid, _ = _official_vintage_scope(ev_uptake_key)
+    # Plotly keeps pan/zoom across a rerender while ``uirevision`` is unchanged.
+    # It is derived from this figure's CALCULATION identity - the same values
+    # that key this cache - and deliberately NOT from the expand/collapse state,
+    # so resizing the chart is not by itself a reason to throw away a reader's
+    # zoom. Any control that genuinely changes the plotted numbers changes the
+    # cache key, and therefore the revision, and the view resets as it should.
+    revision = _revenue_outlook_figure_revision(
+        signature,
+        selected_series,
+        time_grain,
+        fed_path,
+        traces,
+        sensitivity_key,
+        bridge_mode,
+        ev_uptake_key,
+        selected_band_layers,
+    )
     del signature, time_grain, fed_path, traces, sensitivity_key, bridge_mode, ev_uptake_key
-    return revenue_outlook_total_path_figure(
+    figure = revenue_outlook_total_path_figure(
         _filtered_rows,
         selected_series=selected_series,
         selected_fy=selected_fy,
@@ -2859,6 +2985,14 @@ def cached_revenue_outlook_total_path_figure(
         uncertainty_rows=_uncertainty_rows,
         selected_band_layers=selected_band_layers,
     )
+    figure.update_layout(uirevision=revision, selectionrevision=revision)
+    return figure
+
+
+def _revenue_outlook_figure_revision(*identity: Any) -> str:
+    """A short stable token for the Total path figure's calculation identity."""
+    payload = "|".join(repr(part) for part in identity)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
 
 
 @st.cache_data(show_spinner=False, max_entries=12)
@@ -5233,16 +5367,12 @@ def _render_lever_accordion(
                 help=VFM_SOURCE_NOTE + "\n\n" + SENSITIVITY_INTERPLAY_NOTE,
                 **_widget_default_kwargs("revenue_outlook_ev_uptake_basis_v2", index=list(EV_UPTAKE_MODE_OPTIONS).index(DEFAULT_EV_UPTAKE_MODE)),
             )
-        st.checkbox(
-            f"{PED_RETENTION_SENSITIVITY_LABEL} (off by default)",
-            key="revenue_outlook_ped_retention_sensitivity",
-            help=PED_RETENTION_SENSITIVITY_HELP,
-            **_widget_default_kwargs("revenue_outlook_ped_retention_sensitivity", value=False),
-        )
+        # The petrol-retention sensitivity is no longer a reader control: the
+        # rolling-origin comparison did not support the overlay as a Base path,
+        # so production always runs the raw AR(1) petrol path. See
+        # REVENUE_OUTLOOK_ENABLE_PED_RETENTION_CONTROL.
         st.caption(
-            "Base PED forecast is the raw AR(1) VKT per capita times population. "
-            "The petrol-retention curve is a structural sensitivity: a rolling-origin "
-            "comparison did not support it as the Base path."
+            "Base PED forecast is the raw AR(1) VKT per capita times population."
         )
         custom_ev_levers: tuple[float, ...] = ()
         with uptake_cols[1]:
@@ -5400,9 +5530,7 @@ def _render_lever_accordion(
         "eruc_levers": eruc_lever_values,
         "fed_policy_state": fed_policy_state,
         "mbu_fed_policy_state": mbu_fed_policy_state,
-        "ped_retention_sensitivity": bool(
-            st.session_state.get("revenue_outlook_ped_retention_sensitivity", False)
-        ),
+        "ped_retention_sensitivity": _production_ped_retention_sensitivity(),
     }
 
 
@@ -5532,6 +5660,7 @@ def _render_stream_vintage_caption(period_rule: dict[str, Any]) -> None:
 
 def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     del loaded
+    _discard_withdrawn_revenue_outlook_state()
     _persist_revenue_outlook_view_state()
     from model_dashboard.engine import active_engine, engine_revenue_outlook_dir
 
@@ -5681,12 +5810,8 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             # Compare mode reads the persisted single-view layer selection: the
             # A/B panel owns its own traces, but the sections below the
             # comparison still track this choice.
-            uncertainty_pack = cached_uncertainty_pack()
-            layer_catalogue = build_layer_catalogue(
-                [*trace_options, VFM_FAST_TRACE_NAME, VFM_SLOW_TRACE_NAME],
-                default_trace_names=selected_trace_defaults,
-                uncertainty_available=uncertainty_pack.available,
-                envelope_available=True,
+            layer_catalogue = _revenue_outlook_layer_catalogue(
+                trace_options, selected_trace_defaults
             )
             persisted = st.session_state.get("revenue_outlook_chart_layers")
             label_to_id = {spec.label: spec.layer_id for spec in layer_catalogue}
@@ -5720,15 +5845,11 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                     **fy_default_kwargs,
                 )
             with control_cols[2]:
-                # ONE control for every layer - deterministic paths, the
-                # structural VFM range and the conditional modelled-uncertainty
-                # bands - so nothing is selectable in two contradictory places.
-                uncertainty_pack = cached_uncertainty_pack()
-                layer_catalogue = build_layer_catalogue(
-                    [*trace_options, VFM_FAST_TRACE_NAME, VFM_SLOW_TRACE_NAME],
-                    default_trace_names=selected_trace_defaults,
-                    uncertainty_available=uncertainty_pack.available,
-                    envelope_available=True,
+                # ONE control for every layer - deterministic paths and the
+                # conditional modelled-uncertainty bands - so nothing is
+                # selectable in two contradictory places.
+                layer_catalogue = _revenue_outlook_layer_catalogue(
+                    trace_options, selected_trace_defaults
                 )
                 layer_labels = {spec.label: spec.layer_id for spec in layer_catalogue}
                 default_labels = [
@@ -5746,11 +5867,9 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                     key="revenue_outlook_chart_layers",
                     label_visibility="collapsed",
                     help=(
-                        "Paths are deterministic scenarios. The MoT VFM fast–slow "
-                        "range is a structural scenario envelope and is NOT "
-                        "probabilistic. The 50%/80% bands are conditional model "
-                        "forecast-error bands and exclude Treasury-driver "
-                        "forecast uncertainty."
+                        "Paths are deterministic scenarios. The 50%/80% bands are "
+                        "conditional model forecast-error bands and exclude "
+                        "Treasury-driver forecast uncertainty."
                     ),
                     **layer_default_kwargs,
                 )
@@ -5943,9 +6062,11 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         timer.start("main path figure")
         # The optional VFM Fast/Slow scenario paths are only computed when a
         # reader has actually selected them, so the default render never pays
-        # for two extra full overlay passes.
+        # for two extra full overlay passes. While the analyst layers are
+        # paused the catalogue cannot return those trace names at all, and the
+        # policy check makes that independent of any stale selection.
         plot_rows = filtered_rows
-        if any(
+        if REVENUE_OUTLOOK_ENABLE_VFM_ANALYST_LAYERS and any(
             trace in selected_traces for trace in (VFM_FAST_TRACE_NAME, VFM_SLOW_TRACE_NAME)
         ):
             timer.start("vfm scenario paths")
@@ -6061,12 +6182,14 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         # it for space. The fan's governed source data is unchanged and stays
         # reachable from the collapsed detail surface below; it is not
         # constructed unless a reader explicitly asks for it.
+        chart_expanded = _render_expand_chart_control()
         chart_card(
             "Total path chart",
             "\n\n".join(total_path_notes),
             main_path_figure,
             caption="\n\n".join(conflict_notes) if conflict_notes else None,
             notes_as_tooltip=True,
+            container_key=EXPANDED_CHART_CONTAINER_KEY if chart_expanded else None,
         )
         _render_revenue_outlook_vfm_envelope_caption(view)
 
@@ -6076,9 +6199,8 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         key="revenue_outlook_show_fan_detail",
         help=(
             "The empirical 50%/80% forecast-error fan, its source, its "
-            "supported horizon and its download. A different concept from the "
-            "MoT VFM Fast–Slow range on the chart above: the fan is an "
-            "empirical forecast-error band and stops at FY2030."
+            "supported horizon and its download. The fan is an empirical "
+            "forecast-error band and stops at FY2030."
         ),
     ):
         timer.start("fan figure")
@@ -6139,7 +6261,9 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             )
             display_table(pd.DataFrame(catalogue_frame(layer_catalogue)), height=280)
 
-    if not compare_mode and st.toggle(
+    # The MoT VFM Fast–Slow range audit is withdrawn with the layer it
+    # describes; the toggle is not rendered while the analyst surface is paused.
+    if REVENUE_OUTLOOK_ENABLE_VFM_ANALYST_LAYERS and not compare_mode and st.toggle(
         "Show MoT VFM Fast–Slow range audit",
         value=False,
         key="revenue_outlook_show_vfm_envelope_audit",
@@ -8829,9 +8953,7 @@ def _render_comparison_scenario_column(
         eruc_levers=eruc_values,
         current_fed_policy_state=fed_policy_state,
         official_fed_policy_state=FED_POLICY_PUBLISHED,
-        ped_retention_sensitivity=bool(
-            st.session_state.get("revenue_outlook_ped_retention_sensitivity", False)
-        ),
+        ped_retention_sensitivity=_production_ped_retention_sensitivity(),
         heavy_bev_transition=HEAVY_BEV_DEFAULT,
         official_comparator_vintage_id=selected_vid,
     )
@@ -9743,7 +9865,14 @@ def _revenue_outlook_fy_options(chart_rows: pd.DataFrame) -> list[str]:
     years = pd.to_numeric(chart_rows["june_year"], errors="coerce").dropna().astype(int)
     if years.empty:
         return []
-    return [f"FY{year}" for year in sorted(years.unique().tolist()) if year >= 2025]
+    # Capped at the presentation horizon: the governed packs carry FY2051-FY2055
+    # rows as audit material, and the FY marker must not offer a year no chart
+    # below it will draw.
+    return [
+        f"FY{year}"
+        for year in sorted(years.unique().tolist())
+        if 2025 <= year <= display_end_fy()
+    ]
 
 
 def _scenario_names_for_traces(chart_rows: pd.DataFrame, trace_names: list[str]) -> list[str]:
@@ -10364,7 +10493,12 @@ def revenue_outlook_total_path_figure(
     uncertainty_rows: pd.DataFrame | None = None,
     selected_band_layers: tuple[str, ...] = (),
 ) -> go.Figure:
-    data = _selected_revenue_outlook_series_rows(rows, selected_series)
+    # Clipped again here rather than trusting the caller: this builder is also
+    # reached with rows concatenated from other sources, and the chart is the
+    # surface the horizon promise is actually about.
+    data = _selected_revenue_outlook_series_rows(
+        clip_frame_to_display_horizon(rows), selected_series
+    )
     if data.empty:
         return empty_figure("Selected revenue series is unavailable in the committed runtime pack.")
     data["value_numeric"] = pd.to_numeric(data.get("value"), errors="coerce")
@@ -10678,12 +10812,44 @@ def revenue_outlook_total_path_figure(
     return fig
 
 
+REVENUE_OUTLOOK_EXPAND_CHART_KEY = "revenue_outlook_expand_chart"
+
+
+def _render_expand_chart_control() -> bool:
+    """The Expand/Collapse control that sits at the top right of the chart.
+
+    An in-app focus mode, not browser fullscreen: no permission prompt, no new
+    third-party component, and the page keeps its normal chrome. The toggle
+    only changes how much room the chart is given - it is never part of the
+    figure's calculation identity, so the plotted values cannot depend on it.
+    """
+    # A wide spacer column pushes the control to the right edge of the chart;
+    # the keyed wrapper carries the flexbox fallback, so the placement holds
+    # even if Streamlit's column weighting changes under us again.
+    spacer, control = st.columns([6, 1])
+    del spacer
+    with control, st.container(key=EXPAND_CONTROL_CONTAINER_KEY):
+        expanded = st.toggle(
+            "Expand chart",
+            key=REVENUE_OUTLOOK_EXPAND_CHART_KEY,
+            help=(
+                "Give the Total path chart a full-width, near-full-height "
+                "workspace inside the page. Switch it off to return to the "
+                "standard layout. Plotted values are identical either way."
+            ),
+            **_widget_default_kwargs(REVENUE_OUTLOOK_EXPAND_CHART_KEY, value=False),
+        )
+    return bool(expanded)
+
+
 def _render_revenue_outlook_vfm_envelope_caption(view: dict[str, Any]) -> None:
     """State what the blue range is - and is not - directly under the chart.
 
     The envelope shares the page with an empirical forecast-error fan, so the
     distinction has to be visible without opening a tooltip or an audit.
     """
+    if not REVENUE_OUTLOOK_ENABLE_VFM_ANALYST_LAYERS:
+        return
     audit = view.get("cone_band_audit")
     if not isinstance(audit, pd.DataFrame) or audit.empty:
         return
@@ -10757,8 +10923,7 @@ def _render_revenue_outlook_fan_card(
             "<div class='gov-chart-card chart-card'>"
             "<div class='chart-card-title'>Uncertainty fan</div>"
             "<div class='chart-card-subtitle'>Empirical 50%/80% forecast-error band from the best "
-            "available governed source, supported to FY2030. A different concept from the MoT VFM "
-            "Fast&ndash;Slow structural scenario range on the Total path chart.</div>"
+            "available governed source, supported to FY2030.</div>"
             "</div>",
             unsafe_allow_html=True,
         )
@@ -10852,9 +11017,9 @@ def revenue_outlook_uncertainty_fan_figure(
     data["hover_unit"] = hover_unit
     fig = go.Figure()
     is_scenario_spread = resolved_source == FAN_SOURCE_SCENARIO_SPREAD
-    # Gray fan treatment: outer 80% lighter, inner 50% darker. The light-blue
-    # MoT VFM fast-slow range on the main chart is a composition range and
-    # keeps its own colour - the concepts must not share a visual language.
+    # Gray fan treatment: outer 80% lighter, inner 50% darker, kept distinct
+    # from the slate modelled-uncertainty bands on the main chart - the
+    # concepts must not share a visual language.
     band_specs = (
         [
             ("upper80", "lower80", "Scenario spread outer range (not probabilistic)", "rgba(128, 128, 128, 0.16)"),
