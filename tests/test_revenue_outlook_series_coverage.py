@@ -711,6 +711,28 @@ def test_coverage_status_answers_every_owner_question(
     assert native == {"ped_vkt_per_capita", "light_ruc_net_km", "heavy_ruc_net_km"}
 
 
+def test_denton_split_can_preserve_a_mean_as_well_as_a_sum() -> None:
+    """The mean-preserving branch exists for level/average series; exercise it."""
+    annual = pd.array([10.0, 20.0], dtype="float64").to_numpy()
+    flat = pd.array([1.0] * 8, dtype="float64").to_numpy()
+    averaged = coverage._denton_quarterly_split(annual, flat, average=True)
+    for index, anchor in enumerate(annual):
+        quarters = averaged[4 * index : 4 * index + 4]
+        assert math.isclose(math.fsum(quarters) / 4.0, anchor, rel_tol=0, abs_tol=1e-9)
+
+
+def test_rate_indicator_carries_the_last_scheduled_rate_forward() -> None:
+    """Past the schedule's end the planned path is flat, so carrying is exact."""
+    factors = coverage._rate_indicator_factor(
+        ["2026Q4", "2027Q1", "2031Q2", "2045Q1", "2050Q2"], ROOT
+    )
+    assert factors[0] == pytest.approx(0.70024)
+    assert factors[1] == pytest.approx(0.82024)
+    # Everything after the schedule's final quarter holds its final rate.
+    assert factors[3] == pytest.approx(factors[2])
+    assert factors[4] == pytest.approx(factors[2])
+
+
 def test_denton_split_reproduces_a_flat_year_exactly() -> None:
     """A closed-form check the pack data cannot give: known input, known output."""
     values = coverage._denton_quarterly_split(

@@ -43,6 +43,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+from bisect import bisect_right
 from dataclasses import asdict, dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -1136,19 +1137,15 @@ def _rate_indicator_factor(quarters: Sequence[str], repo_root: Path | str | None
     schedule = _planned_ped_rate_by_quarter(root)
     if not schedule:
         return np.ones(len(quarters), dtype=float)
-    lookup = dict(schedule)
-    ordered = [period for period, _rate in schedule]
-    first_rate = lookup[ordered[0]]
-    last_rate = lookup[ordered[-1]]
-    first_key = _quarter_sort_key(ordered[0])
-    last_key = _quarter_sort_key(ordered[-1])
-    values: list[float] = []
+    # Step function: every quarter takes the last scheduled rate at or before
+    # it, and quarters before the schedule opens take its first. A gap inside
+    # the schedule therefore holds the prevailing rate rather than reverting.
+    keys = [_quarter_sort_key(period) for period, _rate in schedule]
+    rates = [rate for _period, rate in schedule]
+    values = []
     for period in quarters:
-        if period in lookup:
-            values.append(lookup[period])
-            continue
-        key = _quarter_sort_key(period)
-        values.append(first_rate if key < first_key else last_rate if key > last_key else first_rate)
+        index = bisect_right(keys, _quarter_sort_key(period)) - 1
+        values.append(rates[index] if index >= 0 else rates[0])
     return np.array(values, dtype=float)
 
 

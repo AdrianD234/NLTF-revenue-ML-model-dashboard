@@ -162,7 +162,7 @@ Native rows are never rewritten or shadowed: no derived row shares a
 | `data/revenue_outlook_quarterly_display/` | materialised pack, 382 KB, hash-backed |
 | `scripts/build_revenue_outlook_quarterly_display_pack.py` | the builder |
 | `scripts/build_revenue_outlook_series_coverage_diagnosis.py` | the diagnosis evidence |
-| `tests/test_revenue_outlook_series_coverage.py` | 43 tests |
+| `tests/test_revenue_outlook_series_coverage.py` | 45 tests |
 
 ## Performance
 
