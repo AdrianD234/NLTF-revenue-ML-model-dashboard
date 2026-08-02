@@ -435,6 +435,29 @@ def replay_cache_source_digest(
 # ---------------------------------------------------------------------------
 
 
+def build_environment() -> dict[str, str]:
+    """The interpreter and libraries whose float results are being frozen."""
+    import platform
+    import sys
+
+    import pyarrow
+
+    environment = {
+        "python": ".".join(str(part) for part in sys.version_info[:3]),
+        "platform": platform.system(),
+        "numpy": np.__version__,
+        "pandas": pd.__version__,
+        "pyarrow": pyarrow.__version__,
+    }
+    return dict(sorted(environment.items()))
+
+
+def matches_build_environment(manifest: dict[str, Any]) -> bool:
+    """True when this process is the one that produced the cached numbers."""
+    recorded = dict(manifest.get("build_environment", {}))
+    return bool(recorded) and recorded == build_environment()
+
+
 def replay_cache_dir(engine: str, repo_root: Path) -> Path:
     return Path(repo_root) / _CACHE_ROOT / str(engine).strip().lower()
 
@@ -553,6 +576,13 @@ def build_replay_cache(
     manifest = {
         "schema_version": REPLAY_CACHE_SCHEMA_VERSION,
         "builder_version": BUILDER_VERSION,
+        # Which interpreter/libraries produced these numbers. Recorded because
+        # `fuel.annual_bridge["value"]` is an aggregation whose last bit is not
+        # reproducible across Python/numpy/pandas versions: the exact-equality
+        # parity gate applies where the cache was built, and a ULP-bounded one
+        # applies elsewhere. Deliberately NOT part of the digest - a different
+        # interpreter must not force a 60 s rebuild.
+        "build_environment": build_environment(),
         "engine": str(engine).strip().lower(),
         "bridge_vintage_id": str(bridge_vintage_id or ""),
         "source_digest": digest,

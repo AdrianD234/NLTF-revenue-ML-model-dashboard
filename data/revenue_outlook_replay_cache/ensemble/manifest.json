@@ -1,5 +1,12 @@
 {
   "bridge_vintage_id": "BEFU26",
+  "build_environment": {
+    "numpy": "2.4.6",
+    "pandas": "3.0.3",
+    "platform": "Windows",
+    "pyarrow": "24.0.0",
+    "python": "3.13.5"
+  },
   "builder_version": "1",
   "bytes_on_disk": 2085848,
   "code_module_count": 33,
@@ -2928,7 +2935,7 @@
       "model_dashboard/post_model_extrapolation.py": "c2f469cea30854e20e446951a91d13b5b12a0e851d5f601c79b2ce16fe791517",
       "model_dashboard/rate_paths.py": "853d8d99ddbf31f8fda68b31438904da20f3611df84ed251abddaf099b1990fc",
       "model_dashboard/revenue_outlook.py": "4fb996076c17da7051420e21041aa52cf003a2075e227680c19f0a88d377195e",
-      "model_dashboard/revenue_outlook_replay_cache.py": "fc9d9920939ca1046559593f2d840881978bf7f58a7fcd64ffe602d9532129e9",
+      "model_dashboard/revenue_outlook_replay_cache.py": "6e227558b0478dde66fe00121030e894df3e2273bf9a07aa347bbfd55b9fecfb",
       "model_dashboard/revenue_source_pack.py": "61b9fd2b06d4c16add928656b9bd6e5cda9dcb38b0f3d9a0f60fb5c1e2cf8c9c",
       "model_dashboard/scenario_inputs.py": "f035a3da1e995550565f968f1f0ff2f5ee438bd5217f91440f6542b2882f8f29",
       "model_dashboard/series_inventory_contract.py": "60c35dae271750ca184a2f4fb126c066b4358ec66f69e4d30d82bc826ce07435",
@@ -3860,6 +3867,6 @@
     ]
   },
   "schema_version": "1",
-  "source_digest": "6acbd1279078f253fdfde51e4eb12c58feb5831c1639ba2dc8c680922fb48be5",
-  "source_main_sha": "eac7e8c31888e94cde294c167ff38777c1bc421e"
+  "source_digest": "dcca08e832bc030219ca5d4c1ea833d7263c41917760fc6475318ecf9926a724",
+  "source_main_sha": "8e563675d23e02e8682027f1e53ff9510daf726a"
 }

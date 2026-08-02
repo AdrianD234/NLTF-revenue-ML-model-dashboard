@@ -32,7 +32,9 @@ from model_dashboard.revenue_outlook_replay_cache import (
     ReplayCacheError,
     ReplayCacheMissing,
     ReplayCacheStale,
+    build_environment,
     load_replay_cache,
+    matches_build_environment,
     replay_cache_dir,
     replay_cache_source_digest,
     replay_cache_status,
@@ -397,10 +399,60 @@ def test_fast_mode_named_path_runs_no_replay(engine: str, monkeypatch: pytest.Mo
     assert not rows.empty
 
 
+# Any real value change in this model is many orders of magnitude larger than
+# this; the repo's own governed formula closure runs at abs_tol=1e-6 /
+# rel_tol=1e-9. This bound is 1000x tighter than that and is here ONLY to
+# absorb last-bit aggregation differences between interpreter/library versions.
+_CROSS_ENVIRONMENT_RTOL = 1e-12
+_CROSS_ENVIRONMENT_ATOL = 1e-9
+
+
+def _worst_deviation(left: pd.DataFrame, right: pd.DataFrame) -> tuple[float, float, str]:
+    """(max abs, max rel, description) over the numeric columns of two frames."""
+    import numpy as np
+
+    worst_abs = 0.0
+    worst_rel = 0.0
+    where = ""
+    for column in left.columns:
+        if column not in right.columns:
+            continue
+        a = pd.to_numeric(left[column], errors="coerce").to_numpy(dtype="float64", na_value=np.nan)
+        b = pd.to_numeric(right[column], errors="coerce").to_numpy(dtype="float64", na_value=np.nan)
+        if a.shape != b.shape:
+            return float("inf"), float("inf"), f"{column}: shape {a.shape} vs {b.shape}"
+        both = ~(np.isnan(a) | np.isnan(b))
+        if not both.any():
+            continue
+        absolute = np.abs(a[both] - b[both])
+        scale = np.maximum(np.abs(a[both]), 1e-300)
+        relative = absolute / scale
+        if absolute.max() > worst_abs or relative.max() > worst_rel:
+            if relative.max() > worst_rel:
+                index = int(np.argmax(relative))
+                where = f"{column}: {a[both][index]!r} vs {b[both][index]!r}"
+            worst_abs = max(worst_abs, float(absolute.max()))
+            worst_rel = max(worst_rel, float(relative.max()))
+    return worst_abs, worst_rel, where
+
+
 @pytest.mark.slow
 @pytest.mark.parametrize("engine", ENGINES)
 def test_replay_cache_matches_reference_exactly(engine: str) -> None:
-    """Every compiled frame equals the live replay, bit for bit."""
+    """Every compiled frame equals the live replay.
+
+    Exactly, when this process is the one that built the cache - that is the
+    gate on the serialisation, and it has no escape hatch.
+
+    Elsewhere, to within ~1 ULP. `fuel.annual_bridge["value"]` is an
+    aggregation whose last bit is not reproducible across interpreter/library
+    versions: CI (Python 3.11) and the build host (3.13) disagree on 12 of 100
+    sampled cells by at most 2.1e-16 relative / 9.1e-13 absolute. That is a
+    property of the model code, not of this cache - the repo's existing
+    "Replay parity" jobs only upload a fingerprint per OS and never compare
+    them, so nothing had asserted cross-environment equality before. Every
+    other frame, including the raw model outputs, matches exactly on both.
+    """
     from model_dashboard.fuel_price_scenario import (
         run_direct_treasury_scenario_replay,
         run_fuel_price_scenario_replay,
@@ -429,7 +481,39 @@ def test_replay_cache_matches_reference_exactly(engine: str) -> None:
     compiled = {**_frames(macro, "macro."), **_frames(fuel, "fuel.")}
 
     assert set(compiled) == set(reference)
+
+    manifest = json.loads(
+        (replay_cache_dir(engine, ROOT) / "manifest.json").read_text(encoding="utf-8")
+    )
+    same_environment = matches_build_environment(manifest)
+
+    inexact: list[str] = []
     for name in sorted(reference):
-        pd.testing.assert_frame_equal(
-            compiled[name], reference[name], check_exact=True, obj=name
+        try:
+            pd.testing.assert_frame_equal(
+                compiled[name], reference[name], check_exact=True, obj=name
+            )
+        except AssertionError:
+            if same_environment:
+                # No escape hatch where the cache was built: this is the gate
+                # proving the serialisation is lossless.
+                raise
+            worst_abs, worst_rel, where = _worst_deviation(compiled[name], reference[name])
+            assert worst_rel <= _CROSS_ENVIRONMENT_RTOL and worst_abs <= _CROSS_ENVIRONMENT_ATOL, (
+                f"{name} differs by more than last-bit noise across environments: "
+                f"max_rel={worst_rel:.3e} max_abs={worst_abs:.3e} ({where}). "
+                f"Built by {manifest.get('build_environment')}, running under "
+                f"{build_environment()}."
+            )
+            inexact.append(f"{name} (max_rel={worst_rel:.2e})")
+
+    if inexact:
+        # Visible, never silent: a reader of the CI log sees exactly which
+        # frames needed the ULP bound and by how much.
+        print(
+            "\ncross-environment last-bit differences absorbed:\n  "
+            + "\n  ".join(inexact)
+        )
+        assert len(inexact) <= 2, (
+            "more frames than expected are environment-dependent: " + ", ".join(inexact)
         )
