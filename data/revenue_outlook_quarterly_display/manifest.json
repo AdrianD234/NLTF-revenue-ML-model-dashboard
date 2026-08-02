@@ -1,0 +1,45 @@
+{
+  "builder_version": "1",
+  "contract_version": "revenue-outlook-quarterly-display-contract-v1",
+  "display_horizon_last_fy": 2050,
+  "display_horizon_last_quarter": "2050Q2",
+  "notes": "Derived quarterly rows are indicative display values benchmarked to a governed June-year total. They are not published quarterly actuals and not direct model outputs. Official-comparator quarters carry the provenance label 'derived quarterly presentation from official annual source'.",
+  "official_annual_rows": 73,
+  "official_series_restored": [
+    "light_petrol_vkt"
+  ],
+  "quarterly_rows": 8344,
+  "quarterly_traces": [
+    "Actual",
+    "BEFU26 official",
+    "Current finalist Base case",
+    "Current finalist High population/comparison",
+    "Current finalist comparison behavioural path",
+    "MBU26 official"
+  ],
+  "rebuild_command": "python scripts/build_revenue_outlook_quarterly_display_pack.py",
+  "reconciled_series_trace_years": 2093,
+  "schema_version": "nltf-revenue-outlook-quarterly-display-v1",
+  "selectable_series": [
+    "light_petrol_vkt",
+    "ped_vkt_per_capita",
+    "ped_volume",
+    "light_ruc_net_km",
+    "heavy_ruc_net_km",
+    "light_bev_ruc_net_km",
+    "phev_ruc_net_km",
+    "gross_ped_revenue",
+    "light_ruc_net_revenue",
+    "light_bev_ruc_net_revenue",
+    "phev_ruc_net_revenue",
+    "heavy_ruc_net_revenue",
+    "gross_fed_revenue",
+    "net_fed_revenue",
+    "total_ruc_net_revenue",
+    "net_mvr_revenue",
+    "total_fed_ruc_net_revenue",
+    "total_nltf_net_revenue"
+  ],
+  "source_digest": "2ebea523783938c1298bcfdfa12db22382944dda3de22ad30b1b38638aa15665",
+  "worst_relative_reconciliation_residual": 2.169692947813777e-16
+}
