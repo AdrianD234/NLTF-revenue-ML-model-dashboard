@@ -1180,7 +1180,6 @@ def derive_quarterly_rows(
                 group.sort_values("_fy").drop_duplicates("_fy", keep="last"),
                 contract=_CONTRACT_BY_SERIES[series_id],
                 chart_rows=chart_rows,
-                annual_rows=data,
             )
         )
     if not output:
@@ -1199,7 +1198,6 @@ def _derive_one_trace(
     *,
     contract: QuarterlyDisplayContract,
     chart_rows: pd.DataFrame | None,
-    annual_rows: pd.DataFrame,
 ) -> list[dict[str, Any]]:
     template = group.iloc[0].to_dict()
     trace_name = template.get("trace_name")
@@ -1239,7 +1237,6 @@ def _derive_one_trace(
             group,
             contract=contract,
             chart_rows=chart_rows,
-            annual_rows=annual_rows,
         )
         if composed is not None:
             return composed
@@ -1398,13 +1395,18 @@ def _compose_identity_quarters(
     *,
     contract: QuarterlyDisplayContract,
     chart_rows: pd.DataFrame | None,
-    annual_rows: pd.DataFrame,
 ) -> list[dict[str, Any]] | None:
     """Quarters for an accounting identity, built from its components.
 
     An independent split of a subtotal is annual-consistent but can leave
     material quarter-level residuals against its own parts. Recursing on the
     governed components keeps the identity true at every quarter.
+
+    The composed year is NOT forced onto the annual anchor. Each component
+    already closes to its own annual value, so if the source identity holds the
+    composition closes for free - and if it does not, the reconciliation audit
+    fails the build rather than papering over a broken identity with a
+    correction term.
     """
     components = _IDENTITY_COMPONENTS.get(contract.series_id, ())
     if not components or chart_rows is None or chart_rows.empty:
@@ -1434,6 +1436,14 @@ def _compose_identity_quarters(
         composed = composed.merge(extra, on=["period", "june_year"], how="inner", validate="one_to_one")
     if composed.empty:
         return None
+    # An inner join across components silently drops any quarter one of them
+    # withheld (a published-quarter handover, say). Losing a quarter that way
+    # would leave the year short WITHOUT it being recorded as handed over, so
+    # an incomplete cover falls back to the indicator split instead.
+    expected = {period for fy in years for period in june_year_quarters(fy)}
+    if set(composed["period"].astype(str)) != expected:
+        return None
+
     templates_by_fy = {int(row["_fy"]): row.to_dict() for _, row in group.iterrows()}
     annual_by_fy = {int(row["_fy"]): float(row["_value"]) for _, row in group.iterrows()}
     records: list[dict[str, Any]] = []
@@ -1442,7 +1452,7 @@ def _compose_identity_quarters(
         if year_template is None:
             continue
         total = year_rows[list(components)].sum(axis=1).to_numpy(dtype=float)
-        residual = annual_by_fy[int(fy)] - float(total.sum())
+        residual = annual_by_fy[int(fy)] - math.fsum(total.tolist())
         for offset, row in enumerate(year_rows.itertuples(index=False)):
             records.append(
                 _quarterly_record(
