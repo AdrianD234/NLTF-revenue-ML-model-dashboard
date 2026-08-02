@@ -191,6 +191,37 @@ def test_restoring_the_series_moves_no_other_official_value(chart_rows: pd.DataF
     assert not emitted & existing
 
 
+def test_restored_rows_carry_checkable_source_lineage(
+    pack: coverage.QuarterlyDisplayPack,
+) -> None:
+    """Lineage must name a file that exists and the hash governing it.
+
+    A lineage string pointing at a path that is not there is worse than none:
+    it reads as provenance and cannot be followed.
+    """
+    rows = pack.official_annual_rows
+    assert not rows.empty
+    seen_paths: set[str] = set()
+    for row in rows.itertuples(index=False):
+        lineage = str(row.source)
+        path_text, _, tail = lineage.partition("#")
+        series_and_fy, _, digest = tail.partition("@")
+        assert (ROOT / path_text).is_file(), f"lineage names a missing file: {path_text}"
+        assert series_and_fy == f"{row.series_id}:FY{int(row.june_year)}"
+        assert len(digest) == 16 and int(digest, 16) >= 0
+        seen_paths.add(path_text)
+    # Both vintages contribute, under their own registered file stems.
+    assert len(seen_paths) == 2
+
+
+def test_restored_rows_carry_no_placeholder_text(
+    pack: coverage.QuarterlyDisplayPack,
+) -> None:
+    """A missing cell must read as empty, never as the string 'nan'."""
+    for frame in (pack.official_annual_rows, pack.quarterly_rows):
+        assert not (frame.astype(str) == "nan").any().any()
+
+
 def test_no_series_outside_the_contract_is_fabricated(
     pack: coverage.QuarterlyDisplayPack,
 ) -> None:

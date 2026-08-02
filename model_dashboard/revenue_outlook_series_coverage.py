@@ -682,16 +682,37 @@ def _series_meta_for_contract() -> dict[str, dict[str, Any]]:
     }
 
 
+def _clean_text(value: Any) -> str:
+    """Text that never renders a missing value as the string ``nan``."""
+    if value is None:
+        return ""
+    try:
+        if pd.isna(value):
+            return ""
+    except (TypeError, ValueError):
+        pass
+    text = str(value).strip()
+    return "" if text.lower() in {"nan", "none", "<na>"} else text
+
+
 def _official_source_reference(vintage_id: str, repo_root: Path) -> dict[str, str]:
+    """Where a restored value came from, precisely enough to go and check it.
+
+    The official_annual stem differs per pack format (``official_annual`` for
+    the generic vintage layout, ``mbu26_official_annual`` for the legacy one),
+    so it is read from the registry rather than assumed - a lineage string
+    pointing at a file that does not exist is worse than none.
+    """
     entry = official_vintage_entry(vintage_id, repo_root=repo_root)
     pack_path = str(entry.get("source_pack_path") or "")
+    stem = str((entry.get("file_stems") or {}).get("official_annual") or "official_annual")
     manifest = repo_root / pack_path / "manifest.json"
-    manifest_sha = ""
-    if manifest.is_file():
-        manifest_sha = hashlib.sha256(manifest.read_bytes()).hexdigest()
     return {
         "source_pack_path": pack_path,
-        "manifest_sha256": manifest_sha,
+        "official_annual_relpath": f"{pack_path}/{stem}.parquet",
+        "manifest_sha256": (
+            hashlib.sha256(manifest.read_bytes()).hexdigest() if manifest.is_file() else ""
+        ),
         "workbook_sha256": str(entry.get("workbook_sha256") or ""),
         "release_round": str(entry.get("release_round") or vintage_id),
         "source_horizon_fy": str(entry.get("source_horizon_fy") or ""),
@@ -797,13 +818,20 @@ def _official_record(
 ) -> dict[str, Any]:
     fy = int(getattr(row, "fy_numeric"))
     value = float(getattr(row, "value_numeric"))
-    unit = str(getattr(row, "unit", "") or contract.unit)
-    source_cell = str(getattr(row, "source_cell", "") or "")
+    unit = _clean_text(getattr(row, "unit", "")) or contract.unit
+    source_cell = _clean_text(getattr(row, "source_cell", ""))
     release = reference["release_round"]
+    # Lineage carries the exact file, the row it came from and the hash of the
+    # pack manifest that governs it, so a restored value can be checked back to
+    # source without knowing how this module works.
     lineage = (
-        f"{reference['source_pack_path']}/official_annual.parquet"
+        f"{reference['official_annual_relpath']}"
         f"#{contract.series_id}:FY{fy}"
+        f"@{reference['manifest_sha256'][:16]}"
     )
+    source_file = _clean_text(getattr(row, "source_file", "")) or reference["official_annual_relpath"]
+    formula = _clean_text(getattr(row, "formula", ""))
+    row_role = _clean_text(getattr(row, "row_role", ""))
     if is_actual:
         return _runtime_chart_record(
             series_id=contract.series_id,
@@ -822,17 +850,17 @@ def _official_record(
             value=value,
             value_unit=unit,
             source=lineage,
-            source_file=str(getattr(row, "source_file", "") or ""),
+            source_file=source_file,
             source_cell=source_cell,
-            source_status=str(getattr(row, "period_status", "ACTUAL")),
-            value_status=str(getattr(row, "value_status", "actual")),
+            source_status=_clean_text(getattr(row, "period_status", "")) or "ACTUAL",
+            value_status=_clean_text(getattr(row, "value_status", "")) or "actual",
             data_scope="official_vintage_complete_actual_line",
             model_id="",
             anchor_flag=fy == REVENUE_LAST_COMPLETE_ACTUAL_FY,
             nowcast_flag=False,
-            formula=str(getattr(row, "formula", "") or ""),
+            formula=formula,
             source_basis=f"{release} annual source spine",
-            row_role=str(getattr(row, "row_role", "") or ""),
+            row_role=row_role,
             official_value=value,
             residual_vs_official=0.0,
         )
@@ -853,10 +881,10 @@ def _official_record(
         value=value,
         value_unit=unit,
         source=lineage,
-        source_file=str(getattr(row, "source_file", "") or ""),
+        source_file=source_file,
         source_cell=source_cell,
-        source_status=str(getattr(row, "period_status", "") or ""),
-        value_status=str(getattr(row, "value_status", "official_forecast")),
+        source_status=_clean_text(getattr(row, "period_status", "")),
+        value_status=_clean_text(getattr(row, "value_status", "")) or "official_forecast",
         data_scope="official_forecast",
         model_id="",
         fed_path=release,
@@ -866,9 +894,9 @@ def _official_record(
         release_round=release,
         anchor_flag=False,
         nowcast_flag=False,
-        formula=str(getattr(row, "formula", "") or ""),
+        formula=formula,
         source_basis=f"{release} official annual",
-        row_role=str(getattr(row, "row_role", "") or ""),
+        row_role=row_role,
         official_value=value,
         residual_vs_official=0.0,
     )
