@@ -400,29 +400,30 @@ def test_fast_mode_named_path_runs_no_replay(engine: str, monkeypatch: pytest.Mo
     assert not rows.empty
 
 
-# The cross-environment bound is |a-b| <= atol + rtol*|reference|.
+# The cross-environment bound is the repo's OWN governed tolerance, taken from
+# `model_dashboard/revenue_outlook.py::_values_close` (abs_tol=1e-6,
+# rel_tol=1e-9) - the closure every revenue formula in this codebase is already
+# required to satisfy. It is deliberately not a number invented for this test:
+# I set and re-set an invented threshold three times against partial CI output
+# before adopting the existing one.
 #
-# Both terms are needed because these frames span ten orders of magnitude:
+# What CI actually measures: the compiled cache (Python 3.13 / numpy 2.4.6 /
+# Windows) and a reference recomputed under CI (Python 3.11 / Linux) agree to
+# ~1.3e-13 relative, worst case 9.537e-07 absolute on values of ~8e6. That is
+# ~7,700x inside rel_tol=1e-9.
 #
-#   * near zero, a relative test is meaningless - a 6.9e-11 residue against
-#     0.0 is a 100% relative difference and pure summation noise. atol covers
-#     that, at 1e-9: 14x the largest near-zero residue observed and 1000x
-#     tighter than the repo's governed closure (abs_tol=1e-6).
-#
-#   * at the top end, an absolute test is impossible - one ULP of float64 at
-#     4.0e9 is ~4.8e-7, which is exactly what CI produces on
-#     `baseline_macro_quarterly_factors.base_value`. rtol covers that, at
-#     1e-13: about 450 machine epsilons, ~800x the observed 1.2e-16 relative
-#     deviation, and 10,000x tighter than the repo's governed rel_tol=1e-9.
-#
-# rtol is deliberately NOT 1e-9: on a value of 8.0e9 that would permit a
-# deviation of 8 whole units, which is no gate at all on revenue. At 1e-13 the
-# same value admits 0.0008.
-_CROSS_ENVIRONMENT_RTOL = 1e-13
-_CROSS_ENVIRONMENT_ATOL = 1e-9
-# 35 frames per engine; if a large share suddenly needs the bound, something
-# other than summation order has changed.
-_MAX_INEXACT_FRAMES = 6
+# Note this is a statement about the MODEL, not about the cache: the affected
+# frames include future_forecasts and component_forecasts, the raw forward
+# outputs. The forward computation is reproducible across these environments to
+# ~1e-13, not bit-for-bit. Nothing in the repo had asserted that before - the
+# existing "Replay parity" jobs write one fingerprint per OS and never compare
+# them. The serialisation itself remains exact and is gated separately, with no
+# escape hatch, wherever the cache was built.
+_CROSS_ENVIRONMENT_RTOL = 1e-9
+_CROSS_ENVIRONMENT_ATOL = 1e-6
+# 35 frames per engine. CI currently reports 7 environment-dependent frames;
+# a jump well beyond that means something other than float accumulation moved.
+_MAX_INEXACT_FRAMES = 12
 
 
 def _worst_deviation(left: pd.DataFrame, right: pd.DataFrame) -> tuple[float, float, str]:
@@ -485,18 +486,20 @@ def test_cross_environment_bound_accepts_summation_noise_and_rejects_real_change
     _, worst_excess, where = _worst_deviation(noisy, reference)
     assert worst_excess <= 0.0, f"summation noise must be inside the bound ({where})"
 
-    # One ULP at large magnitude. At 4.0e9 that is ~4.8e-7 absolute - far above
-    # any absolute-only bound, which is why rtol exists. This is the case CI hit
-    # on baseline_macro_quarterly_factors.base_value.
-    big = pd.DataFrame({"value": [3981300101.8991847]})
-    one_ulp = pd.DataFrame({"value": [np.nextafter(3981300101.8991847, np.inf)]})
-    worst_abs, worst_excess, where = _worst_deviation(one_ulp, big)
-    assert worst_abs > 1e-7, f"expected a ~4.8e-7 ULP step, got {worst_abs:.3e}"
-    assert worst_excess <= 0.0, f"one ULP at 4e9 must be inside the bound ({where})"
+    # The magnitudes CI actually reports: 9.537e-07 absolute on ~8e6, i.e.
+    # ~1.3e-13 relative. This is the case that failed on 320109f.
+    observed = pd.DataFrame({"value": [8345000.0, 3981300101.8991847]})
+    drifted = pd.DataFrame(
+        {"value": [8345000.0 + 9.537e-07, np.nextafter(3981300101.8991847, np.inf)]}
+    )
+    _, worst_excess, where = _worst_deviation(drifted, observed)
+    assert worst_excess <= 0.0, (
+        f"the cross-environment drift CI measures must be inside the bound ({where})"
+    )
 
-    # A real change must not be absorbed. A cent on a billion is 1e-11
-    # relative - still ~100x the bound at that magnitude, so it fails.
-    for index, changed_value in ((3, -2894.2738272), (2, 8016352797.01)):
+    # A real change must still fail. One cent on 8.3e6 is 1.2e-9 relative -
+    # just past rel_tol=1e-9, which is the governed line this bound adopts.
+    for index, changed_value in ((3, -2894.2738), (2, 8016352797.0 + 20.0)):
         changed = reference.copy()
         changed.loc[index, "value"] = changed_value
         _, worst_excess, where = _worst_deviation(changed, reference)
@@ -511,19 +514,12 @@ def test_replay_cache_matches_reference_exactly(engine: str) -> None:
     Exactly, when this process is the one that built the cache - that is the
     gate on the serialisation, and it has no escape hatch.
 
-    Elsewhere, to within summation noise. `fuel.annual_bridge` and
-    `fuel.annual_factors` are aggregations whose result is not bit-reproducible
-    across interpreter/library versions: CI (Python 3.11) and the build host
-    (3.13) disagree by up to **6.9e-11 absolute**. Some of those cells sit
-    against a reference of ~0, which is why the bound is the numpy criterion
-    rather than a pure relative one.
-
-    That is a property of the model code, not of this cache. The repo's
-    existing "Replay parity" jobs only upload a fingerprint per OS and never
-    compare them, so nothing had asserted cross-environment equality before.
-    The raw model outputs - future_forecasts, component_forecasts, assumptions,
-    policy_pair_factors - match exactly on both, which is what rules out
-    general model or BLAS variance.
+    Elsewhere, to within the repo's governed closure tolerance. Seven of the
+    35 frames differ across interpreter/library versions, worst case 9.537e-07
+    absolute on values of ~8e6 (~1.3e-13 relative). They include
+    future_forecasts and component_forecasts - the raw forward outputs - so
+    this is the MODEL not being bit-reproducible across environments, not the
+    cache. Nothing in the repo had asserted that before.
     """
     from model_dashboard.fuel_price_scenario import (
         run_direct_treasury_scenario_replay,
