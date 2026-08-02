@@ -522,17 +522,18 @@ def test_series_the_vfm_assumption_does_not_move_get_no_band(pack, signature, se
 
 
 def test_the_band_carries_no_zero_width_tail(pack, signature) -> None:
-    """The composition-invariant post-model years are cut, not drawn flat."""
+    """Both ends carry real width; flat runs are cut, not drawn.
+
+    The envelope now runs to FY2050: Base/Fast/Slow share one governed Light
+    pool and the exact VFM202405 shares allocate it differently the whole way.
+    """
     band = view_for(pack, signature)["cone_band"]
     width = (band["upper"] - band["lower"]).abs()
     level = (band["upper"].abs() + band["lower"].abs()) / 2.0
     assert (width / level > app.CONE_MIN_RELATIVE_WIDTH).iloc[0]
     assert (width / level > app.CONE_MIN_RELATIVE_WIDTH).iloc[-1]
     last_fy = int(str(band["period"].iloc[-1]).replace("FY", ""))
-    assert last_fy <= ANCHOR_FY, (
-        "the envelope must not be carried across the composition-invariant "
-        "post-model layer"
-    )
+    assert last_fy == 2050, f"the envelope stops at FY{last_fy}"
 
 
 def test_the_applicability_audit_reports_every_required_field(pack, signature) -> None:
@@ -549,7 +550,7 @@ def test_the_applicability_audit_reports_every_required_field(pack, signature) -
     assert bool(row["band_available"]) is True
     assert bool(row["probabilistic"]) is False
     assert row["first_valid_period"] == "FY2025"
-    assert row["last_valid_period"] == "FY2030"
+    assert row["last_valid_period"] == "FY2050"
     assert float(row["max_width"]) > 0
 
 
@@ -565,7 +566,7 @@ def test_both_engines_produce_the_same_presentation_contract(
         assert not band.empty
         assert list(band.columns) == ["period", "lower", "upper"]
         assert (band["upper"] >= band["lower"] - 1e-12).all()
-        assert int(str(band["period"].iloc[-1]).replace("FY", "")) <= ANCHOR_FY
+        assert int(str(band["period"].iloc[-1]).replace("FY", "")) == 2050
         figure = figure_for(view)
         band_traces = [trace for trace in figure.data if "MoT VFM" in str(trace.name)]
         assert len(band_traces) == 2

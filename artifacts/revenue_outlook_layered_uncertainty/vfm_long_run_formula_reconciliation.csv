@@ -1,0 +1,313 @@
+engine,uptake_basis,FY,output_series_id,expression,observed,recomputed,residual,closes
+ensemble,MoT VFM base,2030,gross_ruc_revenue,light_ruc_net_revenue + heavy_ruc_net_revenue + light_bev_ruc_net_revenue + heavy_bev_ruc_net_revenue + phev_ruc_net_revenue + ruc_refunds,3407.6463794833126,3407.646379483312,4.547473508864641e-13,True
+ensemble,MoT VFM base,2030,ruc_revenue_net_admin,gross_ruc_revenue - ruc_admin_revenue,3365.0940225744434,3365.0940225744434,0.0,True
+ensemble,MoT VFM base,2030,total_ruc_net_revenue,ruc_revenue_net_admin - ruc_refunds,3253.9373715651354,3253.9373715651354,0.0,True
+ensemble,MoT VFM base,2030,gross_fed_revenue,gross_ped_revenue + gross_lpg_revenue + gross_cng_revenue,2866.359915761655,2866.359915761655,0.0,True
+ensemble,MoT VFM base,2030,net_fed_revenue,gross_fed_revenue - fed_refunds,2763.882727300213,2763.882727300213,0.0,True
+ensemble,MoT VFM base,2030,gross_mvr_revenue,mr1_revenue + mr2_revenue + coo_revenue,553.0031767675906,553.0031767675906,0.0,True
+ensemble,MoT VFM base,2030,mvr_revenue_net_admin_coo,mr1_revenue + mr2_revenue - mvr_admin_revenue,481.8342315608644,481.8342315608644,0.0,True
+ensemble,MoT VFM base,2030,net_mvr_revenue,mvr_revenue_net_admin_coo - mvr_refunds,479.8837182888595,479.8837182888595,0.0,True
+ensemble,MoT VFM base,2030,total_gross_revenue,gross_ruc_revenue + gross_fed_revenue + gross_mvr_revenue + tuc_net_revenue,6844.567371705383,6844.567371705384,9.094947017729282e-13,True
+ensemble,MoT VFM base,2030,total_admin_fees,ruc_admin_revenue + mvr_admin_revenue + coo_revenue,113.72130211559511,113.72130211559511,0.0,True
+ensemble,MoT VFM base,2030,total_revenue_net_admin,total_gross_revenue - total_admin_fees,6730.846069589788,6730.846069589788,0.0,True
+ensemble,MoT VFM base,2030,total_refunds,ruc_refunds + fed_refunds + mvr_refunds,215.58435274275493,215.5843527427549,2.842170943040401e-14,True
+ensemble,MoT VFM base,2030,total_nltf_net_revenue,total_revenue_net_admin - total_refunds,6515.261716847033,6515.261716847033,0.0,True
+ensemble,MoT VFM fast,2030,gross_ruc_revenue,light_ruc_net_revenue + heavy_ruc_net_revenue + light_bev_ruc_net_revenue + heavy_bev_ruc_net_revenue + phev_ruc_net_revenue + ruc_refunds,3390.287972977043,3390.2879729770425,4.547473508864641e-13,True
+ensemble,MoT VFM fast,2030,ruc_revenue_net_admin,gross_ruc_revenue - ruc_admin_revenue,3347.735616068174,3347.735616068174,0.0,True
+ensemble,MoT VFM fast,2030,total_ruc_net_revenue,ruc_revenue_net_admin - ruc_refunds,3236.578965058866,3236.578965058866,0.0,True
+ensemble,MoT VFM fast,2030,gross_fed_revenue,gross_ped_revenue + gross_lpg_revenue + gross_cng_revenue,2866.359915761655,2866.359915761655,0.0,True
+ensemble,MoT VFM fast,2030,net_fed_revenue,gross_fed_revenue - fed_refunds,2763.882727300213,2763.882727300213,0.0,True
+ensemble,MoT VFM fast,2030,gross_mvr_revenue,mr1_revenue + mr2_revenue + coo_revenue,553.0031767675906,553.0031767675906,0.0,True
+ensemble,MoT VFM fast,2030,mvr_revenue_net_admin_coo,mr1_revenue + mr2_revenue - mvr_admin_revenue,481.8342315608644,481.8342315608644,0.0,True
+ensemble,MoT VFM fast,2030,net_mvr_revenue,mvr_revenue_net_admin_coo - mvr_refunds,479.8837182888595,479.8837182888595,0.0,True
+ensemble,MoT VFM fast,2030,total_gross_revenue,gross_ruc_revenue + gross_fed_revenue + gross_mvr_revenue + tuc_net_revenue,6827.208965199114,6827.208965199115,9.094947017729282e-13,True
+ensemble,MoT VFM fast,2030,total_admin_fees,ruc_admin_revenue + mvr_admin_revenue + coo_revenue,113.72130211559511,113.72130211559511,0.0,True
+ensemble,MoT VFM fast,2030,total_revenue_net_admin,total_gross_revenue - total_admin_fees,6713.487663083519,6713.487663083519,0.0,True
+ensemble,MoT VFM fast,2030,total_refunds,ruc_refunds + fed_refunds + mvr_refunds,215.58435274275493,215.5843527427549,2.842170943040401e-14,True
+ensemble,MoT VFM fast,2030,total_nltf_net_revenue,total_revenue_net_admin - total_refunds,6497.903310340764,6497.903310340764,0.0,True
+ensemble,MoT VFM slow,2030,gross_ruc_revenue,light_ruc_net_revenue + heavy_ruc_net_revenue + light_bev_ruc_net_revenue + heavy_bev_ruc_net_revenue + phev_ruc_net_revenue + ruc_refunds,3421.7949836510675,3421.794983651068,4.547473508864641e-13,True
+ensemble,MoT VFM slow,2030,ruc_revenue_net_admin,gross_ruc_revenue - ruc_admin_revenue,3379.2426267421984,3379.2426267421984,0.0,True
+ensemble,MoT VFM slow,2030,total_ruc_net_revenue,ruc_revenue_net_admin - ruc_refunds,3268.0859757328903,3268.0859757328903,0.0,True
+ensemble,MoT VFM slow,2030,gross_fed_revenue,gross_ped_revenue + gross_lpg_revenue + gross_cng_revenue,2866.359915761655,2866.359915761655,0.0,True
+ensemble,MoT VFM slow,2030,net_fed_revenue,gross_fed_revenue - fed_refunds,2763.882727300213,2763.882727300213,0.0,True
+ensemble,MoT VFM slow,2030,gross_mvr_revenue,mr1_revenue + mr2_revenue + coo_revenue,553.0031767675906,553.0031767675906,0.0,True
+ensemble,MoT VFM slow,2030,mvr_revenue_net_admin_coo,mr1_revenue + mr2_revenue - mvr_admin_revenue,481.8342315608644,481.8342315608644,0.0,True
+ensemble,MoT VFM slow,2030,net_mvr_revenue,mvr_revenue_net_admin_coo - mvr_refunds,479.8837182888595,479.8837182888595,0.0,True
+ensemble,MoT VFM slow,2030,total_gross_revenue,gross_ruc_revenue + gross_fed_revenue + gross_mvr_revenue + tuc_net_revenue,6858.715975873138,6858.715975873139,9.094947017729282e-13,True
+ensemble,MoT VFM slow,2030,total_admin_fees,ruc_admin_revenue + mvr_admin_revenue + coo_revenue,113.72130211559511,113.72130211559511,0.0,True
+ensemble,MoT VFM slow,2030,total_revenue_net_admin,total_gross_revenue - total_admin_fees,6744.994673757543,6744.994673757543,0.0,True
+ensemble,MoT VFM slow,2030,total_refunds,ruc_refunds + fed_refunds + mvr_refunds,215.58435274275493,215.5843527427549,2.842170943040401e-14,True
+ensemble,MoT VFM slow,2030,total_nltf_net_revenue,total_revenue_net_admin - total_refunds,6529.410321014788,6529.410321014788,0.0,True
+ensemble,MoT VFM base,2031,gross_ruc_revenue,light_ruc_net_revenue + heavy_ruc_net_revenue + light_bev_ruc_net_revenue + heavy_bev_ruc_net_revenue + phev_ruc_net_revenue + ruc_refunds,3641.834650635044,3641.8346506350445,4.547473508864641e-13,True
+ensemble,MoT VFM base,2031,ruc_revenue_net_admin,gross_ruc_revenue - ruc_admin_revenue,3600.0312610818137,3600.0312610818137,0.0,True
+ensemble,MoT VFM base,2031,total_ruc_net_revenue,ruc_revenue_net_admin - ruc_refunds,3481.89911494128,3481.8991149412795,4.547473508864641e-13,True
+ensemble,MoT VFM base,2031,gross_fed_revenue,gross_ped_revenue + gross_lpg_revenue + gross_cng_revenue,2978.9669393768945,2978.9669393768945,0.0,True
+ensemble,MoT VFM base,2031,net_fed_revenue,gross_fed_revenue - fed_refunds,2873.5384007591024,2873.5384007591024,0.0,True
+ensemble,MoT VFM base,2031,gross_mvr_revenue,mr1_revenue + mr2_revenue + coo_revenue,548.1236653539303,548.1236653539303,0.0,True
+ensemble,MoT VFM base,2031,mvr_revenue_net_admin_coo,mr1_revenue + mr2_revenue - mvr_admin_revenue,477.28853590277413,477.2885359027741,5.684341886080802e-14,True
+ensemble,MoT VFM base,2031,net_mvr_revenue,mvr_revenue_net_admin_coo - mvr_refunds,475.3303381823711,475.3303381823712,5.684341886080802e-14,True
+ensemble,MoT VFM base,2031,total_gross_revenue,gross_ruc_revenue + gross_fed_revenue + gross_mvr_revenue + tuc_net_revenue,7186.483155058693,7186.483155058694,9.094947017729282e-13,True
+ensemble,MoT VFM base,2031,total_admin_fees,ruc_admin_revenue + mvr_admin_revenue + coo_revenue,112.63851900438661,112.63851900438661,0.0,True
+ensemble,MoT VFM base,2031,total_revenue_net_admin,total_gross_revenue - total_admin_fees,7073.844636054307,7073.844636054307,0.0,True
+ensemble,MoT VFM base,2031,total_refunds,ruc_refunds + fed_refunds + mvr_refunds,225.51888247872895,225.51888247872895,0.0,True
+ensemble,MoT VFM base,2031,total_nltf_net_revenue,total_revenue_net_admin - total_refunds,6848.325753575578,6848.325753575577,9.094947017729282e-13,True
+ensemble,MoT VFM fast,2031,gross_ruc_revenue,light_ruc_net_revenue + heavy_ruc_net_revenue + light_bev_ruc_net_revenue + heavy_bev_ruc_net_revenue + phev_ruc_net_revenue + ruc_refunds,3621.5113792777715,3621.5113792777715,0.0,True
+ensemble,MoT VFM fast,2031,ruc_revenue_net_admin,gross_ruc_revenue - ruc_admin_revenue,3579.707989724541,3579.707989724541,0.0,True
+ensemble,MoT VFM fast,2031,total_ruc_net_revenue,ruc_revenue_net_admin - ruc_refunds,3461.575843584007,3461.575843584007,0.0,True
+ensemble,MoT VFM fast,2031,gross_fed_revenue,gross_ped_revenue + gross_lpg_revenue + gross_cng_revenue,2978.9669393768945,2978.9669393768945,0.0,True
+ensemble,MoT VFM fast,2031,net_fed_revenue,gross_fed_revenue - fed_refunds,2873.5384007591024,2873.5384007591024,0.0,True
+ensemble,MoT VFM fast,2031,gross_mvr_revenue,mr1_revenue + mr2_revenue + coo_revenue,548.1236653539303,548.1236653539303,0.0,True
+ensemble,MoT VFM fast,2031,mvr_revenue_net_admin_coo,mr1_revenue + mr2_revenue - mvr_admin_revenue,477.28853590277413,477.2885359027741,5.684341886080802e-14,True
+ensemble,MoT VFM fast,2031,net_mvr_revenue,mvr_revenue_net_admin_coo - mvr_refunds,475.3303381823711,475.3303381823712,5.684341886080802e-14,True
+ensemble,MoT VFM fast,2031,total_gross_revenue,gross_ruc_revenue + gross_fed_revenue + gross_mvr_revenue + tuc_net_revenue,7166.159883701421,7166.159883701422,9.094947017729282e-13,True
+ensemble,MoT VFM fast,2031,total_admin_fees,ruc_admin_revenue + mvr_admin_revenue + coo_revenue,112.63851900438661,112.63851900438661,0.0,True
+ensemble,MoT VFM fast,2031,total_revenue_net_admin,total_gross_revenue - total_admin_fees,7053.521364697034,7053.521364697034,0.0,True
+ensemble,MoT VFM fast,2031,total_refunds,ruc_refunds + fed_refunds + mvr_refunds,225.51888247872895,225.51888247872895,0.0,True
+ensemble,MoT VFM fast,2031,total_nltf_net_revenue,total_revenue_net_admin - total_refunds,6828.002482218306,6828.002482218305,9.094947017729282e-13,True
+ensemble,MoT VFM slow,2031,gross_ruc_revenue,light_ruc_net_revenue + heavy_ruc_net_revenue + light_bev_ruc_net_revenue + heavy_bev_ruc_net_revenue + phev_ruc_net_revenue + ruc_refunds,3659.179817472996,3659.179817472996,0.0,True
+ensemble,MoT VFM slow,2031,ruc_revenue_net_admin,gross_ruc_revenue - ruc_admin_revenue,3617.376427919766,3617.376427919766,0.0,True
+ensemble,MoT VFM slow,2031,total_ruc_net_revenue,ruc_revenue_net_admin - ruc_refunds,3499.2442817792316,3499.2442817792316,0.0,True
+ensemble,MoT VFM slow,2031,gross_fed_revenue,gross_ped_revenue + gross_lpg_revenue + gross_cng_revenue,2978.9669393768945,2978.9669393768945,0.0,True
+ensemble,MoT VFM slow,2031,net_fed_revenue,gross_fed_revenue - fed_refunds,2873.5384007591024,2873.5384007591024,0.0,True
+ensemble,MoT VFM slow,2031,gross_mvr_revenue,mr1_revenue + mr2_revenue + coo_revenue,548.1236653539303,548.1236653539303,0.0,True
+ensemble,MoT VFM slow,2031,mvr_revenue_net_admin_coo,mr1_revenue + mr2_revenue - mvr_admin_revenue,477.28853590277413,477.2885359027741,5.684341886080802e-14,True
+ensemble,MoT VFM slow,2031,net_mvr_revenue,mvr_revenue_net_admin_coo - mvr_refunds,475.3303381823711,475.3303381823712,5.684341886080802e-14,True
+ensemble,MoT VFM slow,2031,total_gross_revenue,gross_ruc_revenue + gross_fed_revenue + gross_mvr_revenue + tuc_net_revenue,7203.828321896645,7203.828321896645,0.0,True
+ensemble,MoT VFM slow,2031,total_admin_fees,ruc_admin_revenue + mvr_admin_revenue + coo_revenue,112.63851900438661,112.63851900438661,0.0,True
+ensemble,MoT VFM slow,2031,total_revenue_net_admin,total_gross_revenue - total_admin_fees,7091.189802892259,7091.189802892259,0.0,True
+ensemble,MoT VFM slow,2031,total_refunds,ruc_refunds + fed_refunds + mvr_refunds,225.51888247872895,225.51888247872895,0.0,True
+ensemble,MoT VFM slow,2031,total_nltf_net_revenue,total_revenue_net_admin - total_refunds,6865.6709204135295,6865.6709204135295,0.0,True
+ensemble,MoT VFM base,2040,gross_ruc_revenue,light_ruc_net_revenue + heavy_ruc_net_revenue + light_bev_ruc_net_revenue + heavy_bev_ruc_net_revenue + phev_ruc_net_revenue + ruc_refunds,6522.370238419945,6522.370238419946,9.094947017729282e-13,True
+ensemble,MoT VFM base,2040,ruc_revenue_net_admin,gross_ruc_revenue - ruc_admin_revenue,6461.474867239373,6461.474867239373,0.0,True
+ensemble,MoT VFM base,2040,total_ruc_net_revenue,ruc_revenue_net_admin - ruc_refunds,6259.456162699124,6259.456162699124,0.0,True
+ensemble,MoT VFM base,2040,gross_fed_revenue,gross_ped_revenue + gross_lpg_revenue + gross_cng_revenue,2975.9629417895653,2975.9629417895653,0.0,True
+ensemble,MoT VFM base,2040,net_fed_revenue,gross_fed_revenue - fed_refunds,2875.018680438536,2875.018680438536,0.0,True
+ensemble,MoT VFM base,2040,gross_mvr_revenue,mr1_revenue + mr2_revenue + coo_revenue,517.9563010223371,517.9563010223371,0.0,True
+ensemble,MoT VFM base,2040,mvr_revenue_net_admin_coo,mr1_revenue + mr2_revenue - mvr_admin_revenue,449.30970534129574,449.30970534129574,0.0,True
+ensemble,MoT VFM base,2040,net_mvr_revenue,mvr_revenue_net_admin_coo - mvr_refunds,447.23463984016297,447.23463984016297,0.0,True
+ensemble,MoT VFM base,2040,total_gross_revenue,gross_ruc_revenue + gross_fed_revenue + gross_mvr_revenue + tuc_net_revenue,10033.847380924672,10033.847380924673,1.8189894035458565e-12,True
+ensemble,MoT VFM base,2040,total_admin_fees,ruc_admin_revenue + mvr_admin_revenue + coo_revenue,129.5419668616133,129.5419668616133,0.0,True
+ensemble,MoT VFM base,2040,total_revenue_net_admin,total_gross_revenue - total_admin_fees,9904.305414063057,9904.305414063057,0.0,True
+ensemble,MoT VFM base,2040,total_refunds,ruc_refunds + fed_refunds + mvr_refunds,305.03803139241074,305.03803139241074,0.0,True
+ensemble,MoT VFM base,2040,total_nltf_net_revenue,total_revenue_net_admin - total_refunds,9599.267382670649,9599.267382670647,1.8189894035458565e-12,True
+ensemble,MoT VFM fast,2040,gross_ruc_revenue,light_ruc_net_revenue + heavy_ruc_net_revenue + light_bev_ruc_net_revenue + heavy_bev_ruc_net_revenue + phev_ruc_net_revenue + ruc_refunds,6503.835693204778,6503.835693204779,9.094947017729282e-13,True
+ensemble,MoT VFM fast,2040,ruc_revenue_net_admin,gross_ruc_revenue - ruc_admin_revenue,6442.940322024207,6442.940322024207,0.0,True
+ensemble,MoT VFM fast,2040,total_ruc_net_revenue,ruc_revenue_net_admin - ruc_refunds,6240.921617483958,6240.921617483958,0.0,True
+ensemble,MoT VFM fast,2040,gross_fed_revenue,gross_ped_revenue + gross_lpg_revenue + gross_cng_revenue,2975.9629417895653,2975.9629417895653,0.0,True
+ensemble,MoT VFM fast,2040,net_fed_revenue,gross_fed_revenue - fed_refunds,2875.018680438536,2875.018680438536,0.0,True
+ensemble,MoT VFM fast,2040,gross_mvr_revenue,mr1_revenue + mr2_revenue + coo_revenue,517.9563010223371,517.9563010223371,0.0,True
+ensemble,MoT VFM fast,2040,mvr_revenue_net_admin_coo,mr1_revenue + mr2_revenue - mvr_admin_revenue,449.30970534129574,449.30970534129574,0.0,True
+ensemble,MoT VFM fast,2040,net_mvr_revenue,mvr_revenue_net_admin_coo - mvr_refunds,447.23463984016297,447.23463984016297,0.0,True
+ensemble,MoT VFM fast,2040,total_gross_revenue,gross_ruc_revenue + gross_fed_revenue + gross_mvr_revenue + tuc_net_revenue,10015.312835709505,10015.312835709507,1.8189894035458565e-12,True
+ensemble,MoT VFM fast,2040,total_admin_fees,ruc_admin_revenue + mvr_admin_revenue + coo_revenue,129.5419668616133,129.5419668616133,0.0,True
+ensemble,MoT VFM fast,2040,total_revenue_net_admin,total_gross_revenue - total_admin_fees,9885.77086884789,9885.77086884789,0.0,True
+ensemble,MoT VFM fast,2040,total_refunds,ruc_refunds + fed_refunds + mvr_refunds,305.03803139241074,305.03803139241074,0.0,True
+ensemble,MoT VFM fast,2040,total_nltf_net_revenue,total_revenue_net_admin - total_refunds,9580.732837455482,9580.73283745548,1.8189894035458565e-12,True
+ensemble,MoT VFM slow,2040,gross_ruc_revenue,light_ruc_net_revenue + heavy_ruc_net_revenue + light_bev_ruc_net_revenue + heavy_bev_ruc_net_revenue + phev_ruc_net_revenue + ruc_refunds,6542.834795285424,6542.834795285423,9.094947017729282e-13,True
+ensemble,MoT VFM slow,2040,ruc_revenue_net_admin,gross_ruc_revenue - ruc_admin_revenue,6481.939424104852,6481.939424104852,0.0,True
+ensemble,MoT VFM slow,2040,total_ruc_net_revenue,ruc_revenue_net_admin - ruc_refunds,6279.920719564603,6279.920719564603,0.0,True
+ensemble,MoT VFM slow,2040,gross_fed_revenue,gross_ped_revenue + gross_lpg_revenue + gross_cng_revenue,2975.9629417895653,2975.9629417895653,0.0,True
+ensemble,MoT VFM slow,2040,net_fed_revenue,gross_fed_revenue - fed_refunds,2875.018680438536,2875.018680438536,0.0,True
+ensemble,MoT VFM slow,2040,gross_mvr_revenue,mr1_revenue + mr2_revenue + coo_revenue,517.9563010223371,517.9563010223371,0.0,True
+ensemble,MoT VFM slow,2040,mvr_revenue_net_admin_coo,mr1_revenue + mr2_revenue - mvr_admin_revenue,449.30970534129574,449.30970534129574,0.0,True
+ensemble,MoT VFM slow,2040,net_mvr_revenue,mvr_revenue_net_admin_coo - mvr_refunds,447.23463984016297,447.23463984016297,0.0,True
+ensemble,MoT VFM slow,2040,total_gross_revenue,gross_ruc_revenue + gross_fed_revenue + gross_mvr_revenue + tuc_net_revenue,10054.311937790151,10054.311937790151,0.0,True
+ensemble,MoT VFM slow,2040,total_admin_fees,ruc_admin_revenue + mvr_admin_revenue + coo_revenue,129.5419668616133,129.5419668616133,0.0,True
+ensemble,MoT VFM slow,2040,total_revenue_net_admin,total_gross_revenue - total_admin_fees,9924.769970928537,9924.769970928537,0.0,True
+ensemble,MoT VFM slow,2040,total_refunds,ruc_refunds + fed_refunds + mvr_refunds,305.03803139241074,305.03803139241074,0.0,True
+ensemble,MoT VFM slow,2040,total_nltf_net_revenue,total_revenue_net_admin - total_refunds,9619.731939536128,9619.731939536126,1.8189894035458565e-12,True
+ensemble,MoT VFM base,2050,gross_ruc_revenue,light_ruc_net_revenue + heavy_ruc_net_revenue + light_bev_ruc_net_revenue + heavy_bev_ruc_net_revenue + phev_ruc_net_revenue + ruc_refunds,11827.729456002837,11827.729456002835,1.8189894035458565e-12,True
+ensemble,MoT VFM base,2050,ruc_revenue_net_admin,gross_ruc_revenue - ruc_admin_revenue,11736.62205648483,11736.62205648483,0.0,True
+ensemble,MoT VFM base,2050,total_ruc_net_revenue,ruc_revenue_net_admin - ruc_refunds,11376.234075278322,11376.234075278324,1.8189894035458565e-12,True
+ensemble,MoT VFM base,2050,gross_fed_revenue,gross_ped_revenue + gross_lpg_revenue + gross_cng_revenue,1266.9318504423402,1266.9318504423402,0.0,True
+ensemble,MoT VFM base,2050,net_fed_revenue,gross_fed_revenue - fed_refunds,1218.975277274731,1218.975277274731,0.0,True
+ensemble,MoT VFM base,2050,gross_mvr_revenue,mr1_revenue + mr2_revenue + coo_revenue,500.30059702186173,500.30059702186173,0.0,True
+ensemble,MoT VFM base,2050,mvr_revenue_net_admin_coo,mr1_revenue + mr2_revenue - mvr_admin_revenue,432.9618042154181,432.9618042154181,0.0,True
+ensemble,MoT VFM base,2050,net_mvr_revenue,mvr_revenue_net_admin_coo - mvr_refunds,430.68793311893774,430.68793311893774,0.0,True
+ensemble,MoT VFM base,2050,total_gross_revenue,gross_ruc_revenue + gross_fed_revenue + gross_mvr_revenue + tuc_net_revenue,13612.519803159863,13612.519803159865,1.8189894035458565e-12,True
+ensemble,MoT VFM base,2050,total_admin_fees,ruc_admin_revenue + mvr_admin_revenue + coo_revenue,158.4461923244504,158.4461923244504,0.0,True
+ensemble,MoT VFM base,2050,total_revenue_net_admin,total_gross_revenue - total_admin_fees,13454.073610835412,13454.073610835412,0.0,True
+ensemble,MoT VFM base,2050,total_refunds,ruc_refunds + fed_refunds + mvr_refunds,410.61842547059655,410.61842547059655,0.0,True
+ensemble,MoT VFM base,2050,total_nltf_net_revenue,total_revenue_net_admin - total_refunds,13043.455185364817,13043.455185364815,1.8189894035458565e-12,True
+ensemble,MoT VFM fast,2050,gross_ruc_revenue,light_ruc_net_revenue + heavy_ruc_net_revenue + light_bev_ruc_net_revenue + heavy_bev_ruc_net_revenue + phev_ruc_net_revenue + ruc_refunds,11824.764100236609,11824.76410023661,1.8189894035458565e-12,True
+ensemble,MoT VFM fast,2050,ruc_revenue_net_admin,gross_ruc_revenue - ruc_admin_revenue,11733.656700718602,11733.656700718602,0.0,True
+ensemble,MoT VFM fast,2050,total_ruc_net_revenue,ruc_revenue_net_admin - ruc_refunds,11373.268719512096,11373.268719512096,0.0,True
+ensemble,MoT VFM fast,2050,gross_fed_revenue,gross_ped_revenue + gross_lpg_revenue + gross_cng_revenue,1266.9318504423402,1266.9318504423402,0.0,True
+ensemble,MoT VFM fast,2050,net_fed_revenue,gross_fed_revenue - fed_refunds,1218.975277274731,1218.975277274731,0.0,True
+ensemble,MoT VFM fast,2050,gross_mvr_revenue,mr1_revenue + mr2_revenue + coo_revenue,500.30059702186173,500.30059702186173,0.0,True
+ensemble,MoT VFM fast,2050,mvr_revenue_net_admin_coo,mr1_revenue + mr2_revenue - mvr_admin_revenue,432.9618042154181,432.9618042154181,0.0,True
+ensemble,MoT VFM fast,2050,net_mvr_revenue,mvr_revenue_net_admin_coo - mvr_refunds,430.68793311893774,430.68793311893774,0.0,True
+ensemble,MoT VFM fast,2050,total_gross_revenue,gross_ruc_revenue + gross_fed_revenue + gross_mvr_revenue + tuc_net_revenue,13609.554447393635,13609.554447393637,1.8189894035458565e-12,True
+ensemble,MoT VFM fast,2050,total_admin_fees,ruc_admin_revenue + mvr_admin_revenue + coo_revenue,158.4461923244504,158.4461923244504,0.0,True
+ensemble,MoT VFM fast,2050,total_revenue_net_admin,total_gross_revenue - total_admin_fees,13451.108255069184,13451.108255069184,0.0,True
+ensemble,MoT VFM fast,2050,total_refunds,ruc_refunds + fed_refunds + mvr_refunds,410.61842547059655,410.61842547059655,0.0,True
+ensemble,MoT VFM fast,2050,total_nltf_net_revenue,total_revenue_net_admin - total_refunds,13040.489829598591,13040.489829598588,3.637978807091713e-12,True
+ensemble,MoT VFM slow,2050,gross_ruc_revenue,light_ruc_net_revenue + heavy_ruc_net_revenue + light_bev_ruc_net_revenue + heavy_bev_ruc_net_revenue + phev_ruc_net_revenue + ruc_refunds,11831.456085318878,11831.456085318878,0.0,True
+ensemble,MoT VFM slow,2050,ruc_revenue_net_admin,gross_ruc_revenue - ruc_admin_revenue,11740.348685800871,11740.348685800871,0.0,True
+ensemble,MoT VFM slow,2050,total_ruc_net_revenue,ruc_revenue_net_admin - ruc_refunds,11379.960704594363,11379.960704594363,0.0,True
+ensemble,MoT VFM slow,2050,gross_fed_revenue,gross_ped_revenue + gross_lpg_revenue + gross_cng_revenue,1266.9318504423402,1266.9318504423402,0.0,True
+ensemble,MoT VFM slow,2050,net_fed_revenue,gross_fed_revenue - fed_refunds,1218.975277274731,1218.975277274731,0.0,True
+ensemble,MoT VFM slow,2050,gross_mvr_revenue,mr1_revenue + mr2_revenue + coo_revenue,500.30059702186173,500.30059702186173,0.0,True
+ensemble,MoT VFM slow,2050,mvr_revenue_net_admin_coo,mr1_revenue + mr2_revenue - mvr_admin_revenue,432.9618042154181,432.9618042154181,0.0,True
+ensemble,MoT VFM slow,2050,net_mvr_revenue,mvr_revenue_net_admin_coo - mvr_refunds,430.68793311893774,430.68793311893774,0.0,True
+ensemble,MoT VFM slow,2050,total_gross_revenue,gross_ruc_revenue + gross_fed_revenue + gross_mvr_revenue + tuc_net_revenue,13616.246432475904,13616.246432475906,1.8189894035458565e-12,True
+ensemble,MoT VFM slow,2050,total_admin_fees,ruc_admin_revenue + mvr_admin_revenue + coo_revenue,158.4461923244504,158.4461923244504,0.0,True
+ensemble,MoT VFM slow,2050,total_revenue_net_admin,total_gross_revenue - total_admin_fees,13457.800240151453,13457.800240151453,0.0,True
+ensemble,MoT VFM slow,2050,total_refunds,ruc_refunds + fed_refunds + mvr_refunds,410.61842547059655,410.61842547059655,0.0,True
+ensemble,MoT VFM slow,2050,total_nltf_net_revenue,total_revenue_net_admin - total_refunds,13047.181814680858,13047.181814680856,1.8189894035458565e-12,True
+ar1,MoT VFM base,2030,gross_ruc_revenue,light_ruc_net_revenue + heavy_ruc_net_revenue + light_bev_ruc_net_revenue + heavy_bev_ruc_net_revenue + phev_ruc_net_revenue + ruc_refunds,3407.6463794833126,3407.646379483312,4.547473508864641e-13,True
+ar1,MoT VFM base,2030,ruc_revenue_net_admin,gross_ruc_revenue - ruc_admin_revenue,3365.0940225744434,3365.0940225744434,0.0,True
+ar1,MoT VFM base,2030,total_ruc_net_revenue,ruc_revenue_net_admin - ruc_refunds,3253.9373715651354,3253.9373715651354,0.0,True
+ar1,MoT VFM base,2030,gross_fed_revenue,gross_ped_revenue + gross_lpg_revenue + gross_cng_revenue,2759.591439455385,2759.591439455385,0.0,True
+ar1,MoT VFM base,2030,net_fed_revenue,gross_fed_revenue - fed_refunds,2657.114250993943,2657.114250993943,0.0,True
+ar1,MoT VFM base,2030,gross_mvr_revenue,mr1_revenue + mr2_revenue + coo_revenue,553.0031767675906,553.0031767675906,0.0,True
+ar1,MoT VFM base,2030,mvr_revenue_net_admin_coo,mr1_revenue + mr2_revenue - mvr_admin_revenue,481.8342315608644,481.8342315608644,0.0,True
+ar1,MoT VFM base,2030,net_mvr_revenue,mvr_revenue_net_admin_coo - mvr_refunds,479.8837182888595,479.8837182888595,0.0,True
+ar1,MoT VFM base,2030,total_gross_revenue,gross_ruc_revenue + gross_fed_revenue + gross_mvr_revenue + tuc_net_revenue,6737.7988953991135,6737.798895399114,9.094947017729282e-13,True
+ar1,MoT VFM base,2030,total_admin_fees,ruc_admin_revenue + mvr_admin_revenue + coo_revenue,113.72130211559511,113.72130211559511,0.0,True
+ar1,MoT VFM base,2030,total_revenue_net_admin,total_gross_revenue - total_admin_fees,6624.077593283519,6624.077593283519,0.0,True
+ar1,MoT VFM base,2030,total_refunds,ruc_refunds + fed_refunds + mvr_refunds,215.58435274275493,215.5843527427549,2.842170943040401e-14,True
+ar1,MoT VFM base,2030,total_nltf_net_revenue,total_revenue_net_admin - total_refunds,6408.4932405407635,6408.4932405407635,0.0,True
+ar1,MoT VFM fast,2030,gross_ruc_revenue,light_ruc_net_revenue + heavy_ruc_net_revenue + light_bev_ruc_net_revenue + heavy_bev_ruc_net_revenue + phev_ruc_net_revenue + ruc_refunds,3390.287972977043,3390.2879729770425,4.547473508864641e-13,True
+ar1,MoT VFM fast,2030,ruc_revenue_net_admin,gross_ruc_revenue - ruc_admin_revenue,3347.735616068174,3347.735616068174,0.0,True
+ar1,MoT VFM fast,2030,total_ruc_net_revenue,ruc_revenue_net_admin - ruc_refunds,3236.578965058866,3236.578965058866,0.0,True
+ar1,MoT VFM fast,2030,gross_fed_revenue,gross_ped_revenue + gross_lpg_revenue + gross_cng_revenue,2759.591439455385,2759.591439455385,0.0,True
+ar1,MoT VFM fast,2030,net_fed_revenue,gross_fed_revenue - fed_refunds,2657.114250993943,2657.114250993943,0.0,True
+ar1,MoT VFM fast,2030,gross_mvr_revenue,mr1_revenue + mr2_revenue + coo_revenue,553.0031767675906,553.0031767675906,0.0,True
+ar1,MoT VFM fast,2030,mvr_revenue_net_admin_coo,mr1_revenue + mr2_revenue - mvr_admin_revenue,481.8342315608644,481.8342315608644,0.0,True
+ar1,MoT VFM fast,2030,net_mvr_revenue,mvr_revenue_net_admin_coo - mvr_refunds,479.8837182888595,479.8837182888595,0.0,True
+ar1,MoT VFM fast,2030,total_gross_revenue,gross_ruc_revenue + gross_fed_revenue + gross_mvr_revenue + tuc_net_revenue,6720.440488892844,6720.440488892845,9.094947017729282e-13,True
+ar1,MoT VFM fast,2030,total_admin_fees,ruc_admin_revenue + mvr_admin_revenue + coo_revenue,113.72130211559511,113.72130211559511,0.0,True
+ar1,MoT VFM fast,2030,total_revenue_net_admin,total_gross_revenue - total_admin_fees,6606.719186777249,6606.719186777249,0.0,True
+ar1,MoT VFM fast,2030,total_refunds,ruc_refunds + fed_refunds + mvr_refunds,215.58435274275493,215.5843527427549,2.842170943040401e-14,True
+ar1,MoT VFM fast,2030,total_nltf_net_revenue,total_revenue_net_admin - total_refunds,6391.134834034494,6391.134834034494,0.0,True
+ar1,MoT VFM slow,2030,gross_ruc_revenue,light_ruc_net_revenue + heavy_ruc_net_revenue + light_bev_ruc_net_revenue + heavy_bev_ruc_net_revenue + phev_ruc_net_revenue + ruc_refunds,3421.7949836510675,3421.794983651068,4.547473508864641e-13,True
+ar1,MoT VFM slow,2030,ruc_revenue_net_admin,gross_ruc_revenue - ruc_admin_revenue,3379.2426267421984,3379.2426267421984,0.0,True
+ar1,MoT VFM slow,2030,total_ruc_net_revenue,ruc_revenue_net_admin - ruc_refunds,3268.0859757328903,3268.0859757328903,0.0,True
+ar1,MoT VFM slow,2030,gross_fed_revenue,gross_ped_revenue + gross_lpg_revenue + gross_cng_revenue,2759.591439455385,2759.591439455385,0.0,True
+ar1,MoT VFM slow,2030,net_fed_revenue,gross_fed_revenue - fed_refunds,2657.114250993943,2657.114250993943,0.0,True
+ar1,MoT VFM slow,2030,gross_mvr_revenue,mr1_revenue + mr2_revenue + coo_revenue,553.0031767675906,553.0031767675906,0.0,True
+ar1,MoT VFM slow,2030,mvr_revenue_net_admin_coo,mr1_revenue + mr2_revenue - mvr_admin_revenue,481.8342315608644,481.8342315608644,0.0,True
+ar1,MoT VFM slow,2030,net_mvr_revenue,mvr_revenue_net_admin_coo - mvr_refunds,479.8837182888595,479.8837182888595,0.0,True
+ar1,MoT VFM slow,2030,total_gross_revenue,gross_ruc_revenue + gross_fed_revenue + gross_mvr_revenue + tuc_net_revenue,6751.947499566868,6751.947499566869,9.094947017729282e-13,True
+ar1,MoT VFM slow,2030,total_admin_fees,ruc_admin_revenue + mvr_admin_revenue + coo_revenue,113.72130211559511,113.72130211559511,0.0,True
+ar1,MoT VFM slow,2030,total_revenue_net_admin,total_gross_revenue - total_admin_fees,6638.226197451273,6638.226197451273,0.0,True
+ar1,MoT VFM slow,2030,total_refunds,ruc_refunds + fed_refunds + mvr_refunds,215.58435274275493,215.5843527427549,2.842170943040401e-14,True
+ar1,MoT VFM slow,2030,total_nltf_net_revenue,total_revenue_net_admin - total_refunds,6422.641844708518,6422.641844708518,0.0,True
+ar1,MoT VFM base,2031,gross_ruc_revenue,light_ruc_net_revenue + heavy_ruc_net_revenue + light_bev_ruc_net_revenue + heavy_bev_ruc_net_revenue + phev_ruc_net_revenue + ruc_refunds,3641.834650635044,3641.8346506350445,4.547473508864641e-13,True
+ar1,MoT VFM base,2031,ruc_revenue_net_admin,gross_ruc_revenue - ruc_admin_revenue,3600.0312610818137,3600.0312610818137,0.0,True
+ar1,MoT VFM base,2031,total_ruc_net_revenue,ruc_revenue_net_admin - ruc_refunds,3481.89911494128,3481.8991149412795,4.547473508864641e-13,True
+ar1,MoT VFM base,2031,gross_fed_revenue,gross_ped_revenue + gross_lpg_revenue + gross_cng_revenue,2857.6920993712192,2857.6920993712192,0.0,True
+ar1,MoT VFM base,2031,net_fed_revenue,gross_fed_revenue - fed_refunds,2752.263560753427,2752.263560753427,0.0,True
+ar1,MoT VFM base,2031,gross_mvr_revenue,mr1_revenue + mr2_revenue + coo_revenue,548.1236653539303,548.1236653539303,0.0,True
+ar1,MoT VFM base,2031,mvr_revenue_net_admin_coo,mr1_revenue + mr2_revenue - mvr_admin_revenue,477.28853590277413,477.2885359027741,5.684341886080802e-14,True
+ar1,MoT VFM base,2031,net_mvr_revenue,mvr_revenue_net_admin_coo - mvr_refunds,475.3303381823711,475.3303381823712,5.684341886080802e-14,True
+ar1,MoT VFM base,2031,total_gross_revenue,gross_ruc_revenue + gross_fed_revenue + gross_mvr_revenue + tuc_net_revenue,7065.208315053018,7065.208315053019,9.094947017729282e-13,True
+ar1,MoT VFM base,2031,total_admin_fees,ruc_admin_revenue + mvr_admin_revenue + coo_revenue,112.63851900438661,112.63851900438661,0.0,True
+ar1,MoT VFM base,2031,total_revenue_net_admin,total_gross_revenue - total_admin_fees,6952.569796048631,6952.569796048631,0.0,True
+ar1,MoT VFM base,2031,total_refunds,ruc_refunds + fed_refunds + mvr_refunds,225.51888247872895,225.51888247872895,0.0,True
+ar1,MoT VFM base,2031,total_nltf_net_revenue,total_revenue_net_admin - total_refunds,6727.050913569903,6727.050913569902,9.094947017729282e-13,True
+ar1,MoT VFM fast,2031,gross_ruc_revenue,light_ruc_net_revenue + heavy_ruc_net_revenue + light_bev_ruc_net_revenue + heavy_bev_ruc_net_revenue + phev_ruc_net_revenue + ruc_refunds,3621.5113792777715,3621.5113792777715,0.0,True
+ar1,MoT VFM fast,2031,ruc_revenue_net_admin,gross_ruc_revenue - ruc_admin_revenue,3579.707989724541,3579.707989724541,0.0,True
+ar1,MoT VFM fast,2031,total_ruc_net_revenue,ruc_revenue_net_admin - ruc_refunds,3461.575843584007,3461.575843584007,0.0,True
+ar1,MoT VFM fast,2031,gross_fed_revenue,gross_ped_revenue + gross_lpg_revenue + gross_cng_revenue,2857.6920993712192,2857.6920993712192,0.0,True
+ar1,MoT VFM fast,2031,net_fed_revenue,gross_fed_revenue - fed_refunds,2752.263560753427,2752.263560753427,0.0,True
+ar1,MoT VFM fast,2031,gross_mvr_revenue,mr1_revenue + mr2_revenue + coo_revenue,548.1236653539303,548.1236653539303,0.0,True
+ar1,MoT VFM fast,2031,mvr_revenue_net_admin_coo,mr1_revenue + mr2_revenue - mvr_admin_revenue,477.28853590277413,477.2885359027741,5.684341886080802e-14,True
+ar1,MoT VFM fast,2031,net_mvr_revenue,mvr_revenue_net_admin_coo - mvr_refunds,475.3303381823711,475.3303381823712,5.684341886080802e-14,True
+ar1,MoT VFM fast,2031,total_gross_revenue,gross_ruc_revenue + gross_fed_revenue + gross_mvr_revenue + tuc_net_revenue,7044.8850436957455,7044.885043695746,9.094947017729282e-13,True
+ar1,MoT VFM fast,2031,total_admin_fees,ruc_admin_revenue + mvr_admin_revenue + coo_revenue,112.63851900438661,112.63851900438661,0.0,True
+ar1,MoT VFM fast,2031,total_revenue_net_admin,total_gross_revenue - total_admin_fees,6932.246524691359,6932.246524691359,0.0,True
+ar1,MoT VFM fast,2031,total_refunds,ruc_refunds + fed_refunds + mvr_refunds,225.51888247872895,225.51888247872895,0.0,True
+ar1,MoT VFM fast,2031,total_nltf_net_revenue,total_revenue_net_admin - total_refunds,6706.727642212631,6706.72764221263,9.094947017729282e-13,True
+ar1,MoT VFM slow,2031,gross_ruc_revenue,light_ruc_net_revenue + heavy_ruc_net_revenue + light_bev_ruc_net_revenue + heavy_bev_ruc_net_revenue + phev_ruc_net_revenue + ruc_refunds,3659.179817472996,3659.179817472996,0.0,True
+ar1,MoT VFM slow,2031,ruc_revenue_net_admin,gross_ruc_revenue - ruc_admin_revenue,3617.376427919766,3617.376427919766,0.0,True
+ar1,MoT VFM slow,2031,total_ruc_net_revenue,ruc_revenue_net_admin - ruc_refunds,3499.2442817792316,3499.2442817792316,0.0,True
+ar1,MoT VFM slow,2031,gross_fed_revenue,gross_ped_revenue + gross_lpg_revenue + gross_cng_revenue,2857.6920993712192,2857.6920993712192,0.0,True
+ar1,MoT VFM slow,2031,net_fed_revenue,gross_fed_revenue - fed_refunds,2752.263560753427,2752.263560753427,0.0,True
+ar1,MoT VFM slow,2031,gross_mvr_revenue,mr1_revenue + mr2_revenue + coo_revenue,548.1236653539303,548.1236653539303,0.0,True
+ar1,MoT VFM slow,2031,mvr_revenue_net_admin_coo,mr1_revenue + mr2_revenue - mvr_admin_revenue,477.28853590277413,477.2885359027741,5.684341886080802e-14,True
+ar1,MoT VFM slow,2031,net_mvr_revenue,mvr_revenue_net_admin_coo - mvr_refunds,475.3303381823711,475.3303381823712,5.684341886080802e-14,True
+ar1,MoT VFM slow,2031,total_gross_revenue,gross_ruc_revenue + gross_fed_revenue + gross_mvr_revenue + tuc_net_revenue,7082.55348189097,7082.55348189097,0.0,True
+ar1,MoT VFM slow,2031,total_admin_fees,ruc_admin_revenue + mvr_admin_revenue + coo_revenue,112.63851900438661,112.63851900438661,0.0,True
+ar1,MoT VFM slow,2031,total_revenue_net_admin,total_gross_revenue - total_admin_fees,6969.914962886583,6969.914962886583,0.0,True
+ar1,MoT VFM slow,2031,total_refunds,ruc_refunds + fed_refunds + mvr_refunds,225.51888247872895,225.51888247872895,0.0,True
+ar1,MoT VFM slow,2031,total_nltf_net_revenue,total_revenue_net_admin - total_refunds,6744.396080407854,6744.396080407854,0.0,True
+ar1,MoT VFM base,2040,gross_ruc_revenue,light_ruc_net_revenue + heavy_ruc_net_revenue + light_bev_ruc_net_revenue + heavy_bev_ruc_net_revenue + phev_ruc_net_revenue + ruc_refunds,6522.370238419945,6522.370238419946,9.094947017729282e-13,True
+ar1,MoT VFM base,2040,ruc_revenue_net_admin,gross_ruc_revenue - ruc_admin_revenue,6461.474867239373,6461.474867239373,0.0,True
+ar1,MoT VFM base,2040,total_ruc_net_revenue,ruc_revenue_net_admin - ruc_refunds,6259.456162699124,6259.456162699124,0.0,True
+ar1,MoT VFM base,2040,gross_fed_revenue,gross_ped_revenue + gross_lpg_revenue + gross_cng_revenue,2837.5320756926694,2837.5320756926694,0.0,True
+ar1,MoT VFM base,2040,net_fed_revenue,gross_fed_revenue - fed_refunds,2736.5878143416403,2736.5878143416403,0.0,True
+ar1,MoT VFM base,2040,gross_mvr_revenue,mr1_revenue + mr2_revenue + coo_revenue,517.9563010223371,517.9563010223371,0.0,True
+ar1,MoT VFM base,2040,mvr_revenue_net_admin_coo,mr1_revenue + mr2_revenue - mvr_admin_revenue,449.30970534129574,449.30970534129574,0.0,True
+ar1,MoT VFM base,2040,net_mvr_revenue,mvr_revenue_net_admin_coo - mvr_refunds,447.23463984016297,447.23463984016297,0.0,True
+ar1,MoT VFM base,2040,total_gross_revenue,gross_ruc_revenue + gross_fed_revenue + gross_mvr_revenue + tuc_net_revenue,9895.416514827777,9895.416514827777,0.0,True
+ar1,MoT VFM base,2040,total_admin_fees,ruc_admin_revenue + mvr_admin_revenue + coo_revenue,129.5419668616133,129.5419668616133,0.0,True
+ar1,MoT VFM base,2040,total_revenue_net_admin,total_gross_revenue - total_admin_fees,9765.874547966163,9765.874547966163,0.0,True
+ar1,MoT VFM base,2040,total_refunds,ruc_refunds + fed_refunds + mvr_refunds,305.03803139241074,305.03803139241074,0.0,True
+ar1,MoT VFM base,2040,total_nltf_net_revenue,total_revenue_net_admin - total_refunds,9460.836516573752,9460.836516573752,0.0,True
+ar1,MoT VFM fast,2040,gross_ruc_revenue,light_ruc_net_revenue + heavy_ruc_net_revenue + light_bev_ruc_net_revenue + heavy_bev_ruc_net_revenue + phev_ruc_net_revenue + ruc_refunds,6503.835693204778,6503.835693204779,9.094947017729282e-13,True
+ar1,MoT VFM fast,2040,ruc_revenue_net_admin,gross_ruc_revenue - ruc_admin_revenue,6442.940322024207,6442.940322024207,0.0,True
+ar1,MoT VFM fast,2040,total_ruc_net_revenue,ruc_revenue_net_admin - ruc_refunds,6240.921617483958,6240.921617483958,0.0,True
+ar1,MoT VFM fast,2040,gross_fed_revenue,gross_ped_revenue + gross_lpg_revenue + gross_cng_revenue,2837.5320756926694,2837.5320756926694,0.0,True
+ar1,MoT VFM fast,2040,net_fed_revenue,gross_fed_revenue - fed_refunds,2736.5878143416403,2736.5878143416403,0.0,True
+ar1,MoT VFM fast,2040,gross_mvr_revenue,mr1_revenue + mr2_revenue + coo_revenue,517.9563010223371,517.9563010223371,0.0,True
+ar1,MoT VFM fast,2040,mvr_revenue_net_admin_coo,mr1_revenue + mr2_revenue - mvr_admin_revenue,449.30970534129574,449.30970534129574,0.0,True
+ar1,MoT VFM fast,2040,net_mvr_revenue,mvr_revenue_net_admin_coo - mvr_refunds,447.23463984016297,447.23463984016297,0.0,True
+ar1,MoT VFM fast,2040,total_gross_revenue,gross_ruc_revenue + gross_fed_revenue + gross_mvr_revenue + tuc_net_revenue,9876.88196961261,9876.88196961261,0.0,True
+ar1,MoT VFM fast,2040,total_admin_fees,ruc_admin_revenue + mvr_admin_revenue + coo_revenue,129.5419668616133,129.5419668616133,0.0,True
+ar1,MoT VFM fast,2040,total_revenue_net_admin,total_gross_revenue - total_admin_fees,9747.340002750996,9747.340002750996,0.0,True
+ar1,MoT VFM fast,2040,total_refunds,ruc_refunds + fed_refunds + mvr_refunds,305.03803139241074,305.03803139241074,0.0,True
+ar1,MoT VFM fast,2040,total_nltf_net_revenue,total_revenue_net_admin - total_refunds,9442.301971358585,9442.301971358585,0.0,True
+ar1,MoT VFM slow,2040,gross_ruc_revenue,light_ruc_net_revenue + heavy_ruc_net_revenue + light_bev_ruc_net_revenue + heavy_bev_ruc_net_revenue + phev_ruc_net_revenue + ruc_refunds,6542.834795285424,6542.834795285423,9.094947017729282e-13,True
+ar1,MoT VFM slow,2040,ruc_revenue_net_admin,gross_ruc_revenue - ruc_admin_revenue,6481.939424104852,6481.939424104852,0.0,True
+ar1,MoT VFM slow,2040,total_ruc_net_revenue,ruc_revenue_net_admin - ruc_refunds,6279.920719564603,6279.920719564603,0.0,True
+ar1,MoT VFM slow,2040,gross_fed_revenue,gross_ped_revenue + gross_lpg_revenue + gross_cng_revenue,2837.5320756926694,2837.5320756926694,0.0,True
+ar1,MoT VFM slow,2040,net_fed_revenue,gross_fed_revenue - fed_refunds,2736.5878143416403,2736.5878143416403,0.0,True
+ar1,MoT VFM slow,2040,gross_mvr_revenue,mr1_revenue + mr2_revenue + coo_revenue,517.9563010223371,517.9563010223371,0.0,True
+ar1,MoT VFM slow,2040,mvr_revenue_net_admin_coo,mr1_revenue + mr2_revenue - mvr_admin_revenue,449.30970534129574,449.30970534129574,0.0,True
+ar1,MoT VFM slow,2040,net_mvr_revenue,mvr_revenue_net_admin_coo - mvr_refunds,447.23463984016297,447.23463984016297,0.0,True
+ar1,MoT VFM slow,2040,total_gross_revenue,gross_ruc_revenue + gross_fed_revenue + gross_mvr_revenue + tuc_net_revenue,9915.881071693255,9915.881071693257,1.8189894035458565e-12,True
+ar1,MoT VFM slow,2040,total_admin_fees,ruc_admin_revenue + mvr_admin_revenue + coo_revenue,129.5419668616133,129.5419668616133,0.0,True
+ar1,MoT VFM slow,2040,total_revenue_net_admin,total_gross_revenue - total_admin_fees,9786.33910483164,9786.33910483164,0.0,True
+ar1,MoT VFM slow,2040,total_refunds,ruc_refunds + fed_refunds + mvr_refunds,305.03803139241074,305.03803139241074,0.0,True
+ar1,MoT VFM slow,2040,total_nltf_net_revenue,total_revenue_net_admin - total_refunds,9481.301073439232,9481.30107343923,1.8189894035458565e-12,True
+ar1,MoT VFM base,2050,gross_ruc_revenue,light_ruc_net_revenue + heavy_ruc_net_revenue + light_bev_ruc_net_revenue + heavy_bev_ruc_net_revenue + phev_ruc_net_revenue + ruc_refunds,11827.729456002837,11827.729456002835,1.8189894035458565e-12,True
+ar1,MoT VFM base,2050,ruc_revenue_net_admin,gross_ruc_revenue - ruc_admin_revenue,11736.62205648483,11736.62205648483,0.0,True
+ar1,MoT VFM base,2050,total_ruc_net_revenue,ruc_revenue_net_admin - ruc_refunds,11376.234075278322,11376.234075278324,1.8189894035458565e-12,True
+ar1,MoT VFM base,2050,gross_fed_revenue,gross_ped_revenue + gross_lpg_revenue + gross_cng_revenue,1220.7382564146853,1220.7382564146853,0.0,True
+ar1,MoT VFM base,2050,net_fed_revenue,gross_fed_revenue - fed_refunds,1172.7816832470762,1172.7816832470762,0.0,True
+ar1,MoT VFM base,2050,gross_mvr_revenue,mr1_revenue + mr2_revenue + coo_revenue,500.30059702186173,500.30059702186173,0.0,True
+ar1,MoT VFM base,2050,mvr_revenue_net_admin_coo,mr1_revenue + mr2_revenue - mvr_admin_revenue,432.9618042154181,432.9618042154181,0.0,True
+ar1,MoT VFM base,2050,net_mvr_revenue,mvr_revenue_net_admin_coo - mvr_refunds,430.68793311893774,430.68793311893774,0.0,True
+ar1,MoT VFM base,2050,total_gross_revenue,gross_ruc_revenue + gross_fed_revenue + gross_mvr_revenue + tuc_net_revenue,13566.326209132209,13566.326209132209,0.0,True
+ar1,MoT VFM base,2050,total_admin_fees,ruc_admin_revenue + mvr_admin_revenue + coo_revenue,158.4461923244504,158.4461923244504,0.0,True
+ar1,MoT VFM base,2050,total_revenue_net_admin,total_gross_revenue - total_admin_fees,13407.880016807758,13407.880016807758,0.0,True
+ar1,MoT VFM base,2050,total_refunds,ruc_refunds + fed_refunds + mvr_refunds,410.61842547059655,410.61842547059655,0.0,True
+ar1,MoT VFM base,2050,total_nltf_net_revenue,total_revenue_net_admin - total_refunds,12997.261591337161,12997.261591337161,0.0,True
+ar1,MoT VFM fast,2050,gross_ruc_revenue,light_ruc_net_revenue + heavy_ruc_net_revenue + light_bev_ruc_net_revenue + heavy_bev_ruc_net_revenue + phev_ruc_net_revenue + ruc_refunds,11824.764100236609,11824.76410023661,1.8189894035458565e-12,True
+ar1,MoT VFM fast,2050,ruc_revenue_net_admin,gross_ruc_revenue - ruc_admin_revenue,11733.656700718602,11733.656700718602,0.0,True
+ar1,MoT VFM fast,2050,total_ruc_net_revenue,ruc_revenue_net_admin - ruc_refunds,11373.268719512096,11373.268719512096,0.0,True
+ar1,MoT VFM fast,2050,gross_fed_revenue,gross_ped_revenue + gross_lpg_revenue + gross_cng_revenue,1220.7382564146853,1220.7382564146853,0.0,True
+ar1,MoT VFM fast,2050,net_fed_revenue,gross_fed_revenue - fed_refunds,1172.7816832470762,1172.7816832470762,0.0,True
+ar1,MoT VFM fast,2050,gross_mvr_revenue,mr1_revenue + mr2_revenue + coo_revenue,500.30059702186173,500.30059702186173,0.0,True
+ar1,MoT VFM fast,2050,mvr_revenue_net_admin_coo,mr1_revenue + mr2_revenue - mvr_admin_revenue,432.9618042154181,432.9618042154181,0.0,True
+ar1,MoT VFM fast,2050,net_mvr_revenue,mvr_revenue_net_admin_coo - mvr_refunds,430.68793311893774,430.68793311893774,0.0,True
+ar1,MoT VFM fast,2050,total_gross_revenue,gross_ruc_revenue + gross_fed_revenue + gross_mvr_revenue + tuc_net_revenue,13563.36085336598,13563.36085336598,0.0,True
+ar1,MoT VFM fast,2050,total_admin_fees,ruc_admin_revenue + mvr_admin_revenue + coo_revenue,158.4461923244504,158.4461923244504,0.0,True
+ar1,MoT VFM fast,2050,total_revenue_net_admin,total_gross_revenue - total_admin_fees,13404.91466104153,13404.91466104153,0.0,True
+ar1,MoT VFM fast,2050,total_refunds,ruc_refunds + fed_refunds + mvr_refunds,410.61842547059655,410.61842547059655,0.0,True
+ar1,MoT VFM fast,2050,total_nltf_net_revenue,total_revenue_net_admin - total_refunds,12994.296235570935,12994.296235570933,1.8189894035458565e-12,True
+ar1,MoT VFM slow,2050,gross_ruc_revenue,light_ruc_net_revenue + heavy_ruc_net_revenue + light_bev_ruc_net_revenue + heavy_bev_ruc_net_revenue + phev_ruc_net_revenue + ruc_refunds,11831.456085318878,11831.456085318878,0.0,True
+ar1,MoT VFM slow,2050,ruc_revenue_net_admin,gross_ruc_revenue - ruc_admin_revenue,11740.348685800871,11740.348685800871,0.0,True
+ar1,MoT VFM slow,2050,total_ruc_net_revenue,ruc_revenue_net_admin - ruc_refunds,11379.960704594363,11379.960704594363,0.0,True
+ar1,MoT VFM slow,2050,gross_fed_revenue,gross_ped_revenue + gross_lpg_revenue + gross_cng_revenue,1220.7382564146853,1220.7382564146853,0.0,True
+ar1,MoT VFM slow,2050,net_fed_revenue,gross_fed_revenue - fed_refunds,1172.7816832470762,1172.7816832470762,0.0,True
+ar1,MoT VFM slow,2050,gross_mvr_revenue,mr1_revenue + mr2_revenue + coo_revenue,500.30059702186173,500.30059702186173,0.0,True
+ar1,MoT VFM slow,2050,mvr_revenue_net_admin_coo,mr1_revenue + mr2_revenue - mvr_admin_revenue,432.9618042154181,432.9618042154181,0.0,True
+ar1,MoT VFM slow,2050,net_mvr_revenue,mvr_revenue_net_admin_coo - mvr_refunds,430.68793311893774,430.68793311893774,0.0,True
+ar1,MoT VFM slow,2050,total_gross_revenue,gross_ruc_revenue + gross_fed_revenue + gross_mvr_revenue + tuc_net_revenue,13570.05283844825,13570.05283844825,0.0,True
+ar1,MoT VFM slow,2050,total_admin_fees,ruc_admin_revenue + mvr_admin_revenue + coo_revenue,158.4461923244504,158.4461923244504,0.0,True
+ar1,MoT VFM slow,2050,total_revenue_net_admin,total_gross_revenue - total_admin_fees,13411.606646123799,13411.606646123799,0.0,True
+ar1,MoT VFM slow,2050,total_refunds,ruc_refunds + fed_refunds + mvr_refunds,410.61842547059655,410.61842547059655,0.0,True
+ar1,MoT VFM slow,2050,total_nltf_net_revenue,total_revenue_net_admin - total_refunds,13000.988220653202,13000.988220653202,0.0,True

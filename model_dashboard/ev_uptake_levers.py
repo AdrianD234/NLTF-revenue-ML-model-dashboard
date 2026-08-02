@@ -488,6 +488,77 @@ def _drift_rate_lookup(drift: pd.DataFrame) -> dict[tuple[str, int], dict[str, f
     return lookup
 
 
+def _implied_post_model_rate_lookup(
+    chart_rows: pd.DataFrame,
+    known: dict[tuple[str, int], dict[str, float]],
+) -> dict[tuple[str, int], dict[str, float]]:
+    """Per-class rates for the June years the drift table does not reach.
+
+    The drift/rate assumptions are the ECONOMETRIC-window table and stop at
+    FY2030.  Because ``apply_uptake_composition`` derives its FY set from that
+    lookup, every FY2031-FY2050 row was silently never visited - which is why
+    the three VFM bases produced identical long-run class values.
+
+    The post-model layer already carries governed, policy-applied km AND
+    revenue for each Light class, so its own implied rate (revenue / km) is
+    the correct per-km charge for those years.  Reallocating km by the
+    scenario shares and re-multiplying by this rate therefore changes the
+    COMPOSITION only: the pool, the rates and the single application of
+    policy are all inherited untouched.
+    """
+    if chart_rows is None or chart_rows.empty:
+        return {}
+    june_year = pd.to_numeric(chart_rows.get("june_year"), errors="coerce")
+    value = pd.to_numeric(chart_rows.get("value"), errors="coerce")
+    is_june = chart_rows.get("time_grain", pd.Series("", index=chart_rows.index)).astype(str).eq("june_year")
+    is_forecast = ~chart_rows.get("row_type", pd.Series("", index=chart_rows.index)).astype(str).eq(
+        "historical_actual"
+    )
+    scenario = chart_rows.get("scenario_name", pd.Series("", index=chart_rows.index)).astype(str)
+    series = chart_rows.get("series_id", pd.Series("", index=chart_rows.index)).astype(str)
+    eligible = (is_june & is_forecast & june_year.notna() & value.notna()).to_numpy()
+
+    totals: dict[tuple[str, int, str], float] = {}
+    for position, label in enumerate(chart_rows.index):
+        if not eligible[position]:
+            continue
+        key = (scenario.iat[position], int(june_year.iat[position]), series.iat[position])
+        totals.setdefault(key, float(value.at[label]))
+
+    rate_for_class = {
+        "conventional_light_rate": ("light_ruc_net_km", "light_ruc_net_revenue"),
+        "light_bev_rate": ("light_bev_ruc_net_km", "light_bev_ruc_net_revenue"),
+        "phev_rate": ("phev_ruc_net_km", "phev_ruc_net_revenue"),
+    }
+    # ONLY the scenarios the drift table already governs - the Current
+    # finalist paths. Official comparator rows are published values and must
+    # never be recomposed; deriving a rate for them from their own rows would
+    # have silently reallocated MBU26 and BEFU26 kilometres.
+    governed_scenarios = {scenario for scenario, _fy in known}
+    if not governed_scenarios:
+        return {}
+
+    derived: dict[tuple[str, int], dict[str, float]] = {}
+    for (scenario_name, fy, _series_id) in list(totals):
+        if scenario_name not in governed_scenarios:
+            continue
+        if (scenario_name, fy) in known or (scenario_name, fy) in derived:
+            continue
+        rates: dict[str, float] = {}
+        for rate_key, (km_series, revenue_series) in rate_for_class.items():
+            km = totals.get((scenario_name, fy, km_series))
+            revenue = totals.get((scenario_name, fy, revenue_series))
+            rates[rate_key] = (
+                float(revenue) / float(km)
+                if km not in (None, 0.0) and revenue is not None and float(km) > 0.0
+                else float("nan")
+            )
+        # Only useful where at least one class rate is real.
+        if any(np.isfinite(rate) for rate in rates.values()):
+            derived[(scenario_name, fy)] = rates
+    return derived
+
+
 def _pool_from_labels(
     labels_for: Any,
     numeric_value: pd.Series,
@@ -505,6 +576,23 @@ def _pool_from_labels(
             return None
         total += float(values.iloc[0])
     return total
+
+
+def exact_vfm_share_coverage(uptake_basis: str, *, repo_root: Path | str) -> set[int]:
+    """The June years the governed VFM table actually covers for this basis.
+
+    Used to bound the long-run composition extension to the source. Beyond the
+    table's last year the answer is "no governed share exists", not an
+    extrapolated one.
+    """
+    from .light_fleet_allocation import (
+        VFM_DEFAULT_SCENARIO,
+        VFM_SCENARIO_BY_UPTAKE_BASIS,
+        vfm_share_table,
+    )
+
+    scenario = VFM_SCENARIO_BY_UPTAKE_BASIS.get(str(uptake_basis or ""), VFM_DEFAULT_SCENARIO)
+    return {int(value) for value in vfm_share_table(repo_root, scenario).index}
 
 
 def exact_vfm_share_curves(
@@ -578,6 +666,23 @@ def apply_uptake_levers_to_chart_rows(
     rate_lookup = _drift_rate_lookup(drift_assumptions)
     if not rate_lookup:
         return chart_rows, pd.DataFrame()
+    # The drift table is the econometric-window rate source and stops at
+    # FY2030. Extend the FY set with rates implied by the governed post-model
+    # rows so the VFM composition genuinely reaches FY2031-FY2050 instead of
+    # leaving every basis with identical long-run class values.
+    #
+    # Bounded by the SOURCE's own coverage. The chart runs past FY2050 for the
+    # official comparators, and the VFM202405 table stops at FY2050, so those
+    # later years get no composition rather than an extrapolated share. Failing
+    # closed here is the point: inventing a share would be inventing a
+    # scenario.
+    extension = _implied_post_model_rate_lookup(chart_rows, rate_lookup)
+    if extension and uptake_basis is not None:
+        if repo_root is None:
+            raise ValueError("An exact VFM uptake basis requires repo_root to locate the table.")
+        covered = exact_vfm_share_coverage(uptake_basis, repo_root=repo_root)
+        extension = {key: value for key, value in extension.items() if key[1] in covered}
+    rate_lookup = {**rate_lookup, **extension}
 
     fys = sorted({fy for _, fy in rate_lookup})
     if uptake_basis is not None:

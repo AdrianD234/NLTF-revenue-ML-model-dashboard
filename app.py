@@ -1781,9 +1781,10 @@ def cached_vfm_scenario_paths(
 
     Each is the Current Base case recomputed with ONLY the VFM composition
     basis swapped, so it inherits the live engine, vintages, schedule, policy
-    and macro settings.  Both run to FY2050; they are identical to Base after
-    FY2030 because the post-model extrapolation layer is composition-invariant,
-    which is a property of the model, not of this wiring.
+    and macro settings.  Both run to FY2050 and stay genuinely distinct there:
+    Base, Fast and Slow share the same governed post-model Light RUC pool, and
+    the exact VFM202405 scenario shares allocate that common pool into
+    different conventional/BEV/PHEV compositions.
     """
     frames: list[pd.DataFrame] = []
     for preset_name, trace_name in (
@@ -1845,10 +1846,10 @@ def cached_view_cone_band(
     cached band while any other value-changing control still invalidates it.
 
     Rows whose Fast/Slow gap does not clear ``CONE_MIN_RELATIVE_WIDTH`` at
-    the trailing end are dropped rather than drawn at zero width.  The
-    FY2031-FY2050 post-model layer is composition-invariant by construction,
-    so a zero-width band carried across it would draw a flat line that reads
-    as certainty about the long run.
+    the trailing end are dropped rather than drawn at zero width, so a series
+    the composition genuinely does not move shows no band instead of a flat
+    line that would read as certainty.  Where the shares DO move the series -
+    every Light class, through FY2050 - the range now carries the whole way.
     """
     bounds: dict[str, pd.Series] = {}
     for bound_name, preset_name in (("fast", "MoT VFM fast"), ("slow", "MoT VFM slow")):
@@ -1884,8 +1885,8 @@ def _clip_cone_band_to_supported_periods(band: pd.DataFrame) -> pd.DataFrame:
     """Keep the contiguous span the VFM composition actually moves.
 
     Interior periods are retained even when momentarily flat, so the filled
-    area stays one continuous shape; only the leading and trailing runs of
-    composition-invariant periods are cut.  A series the VFM assumption never
+    area stays one continuous shape; only leading and trailing runs the
+    composition does not move are cut.  A series the VFM assumption never
     moves returns empty - width is never fabricated for visual consistency.
     """
     if band is None or band.empty:
@@ -1977,9 +1978,9 @@ def _vfm_envelope_applicability_audit(
             "max_width": round(float(width.max()), 6),
             "max_width_pct_of_level": round(float((100.0 * width / level.replace(0.0, pd.NA)).max()), 6),
             "reason": (
-                "Clipped to the periods the VFM composition moves. The "
-                "FY2031-FY2050 post-model extrapolation layer is "
-                "composition-invariant, so the envelope is not carried across it."
+                "Clipped to the periods the exact VFM202405 shares actually "
+                "move this series. The common post-model Light RUC pool is "
+                "shared by Base/Fast/Slow; only the composition differs."
             ),
         }
     )

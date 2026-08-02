@@ -204,9 +204,10 @@ def build_layer_catalogue(
                 draw_rank=10 + offset,
                 default_selected=trace in default_trace_names,
                 interpretation=(
-                    "Deterministic MoT VFM fleet-composition scenario. "
-                    "Runs to FY2050; identical to Current Base after FY2030, "
-                    "where the post-model layer is composition-invariant."
+                    "Deterministic MoT VFM fleet-composition scenario, running "
+                    "to FY2050. It shares the governed Light RUC pool with "
+                    "Current Base; the exact VFM202405 scenario shares allocate "
+                    "that common pool into a different conventional/BEV/PHEV mix."
                     if trace in (VFM_FAST_TRACE_NAME, VFM_SLOW_TRACE_NAME)
                     else "Deterministic scenario path."
                 ),

@@ -316,10 +316,11 @@ def test_the_vfm_paths_differ_from_base_inside_the_model_window(context) -> None
     assert fast_2030 != pytest.approx(slow_2030), "the two VFM paths coincide at FY2030"
     assert min(fast_2030, slow_2030) <= base_2030 <= max(fast_2030, slow_2030)
 
-    # Past FY2030 the post-model layer is composition-invariant, so they merge.
-    assert at(paths, VFM_FAST_TRACE_NAME, 2050) == pytest.approx(
-        at(paths, VFM_SLOW_TRACE_NAME, 2050)
-    )
+    # And they stay distinct to FY2050: the common governed Light pool is
+    # allocated by different exact VFM202405 shares the whole way.
+    fast_2050 = at(paths, VFM_FAST_TRACE_NAME, 2050)
+    slow_2050 = at(paths, VFM_SLOW_TRACE_NAME, 2050)
+    assert fast_2050 != pytest.approx(slow_2050), "the VFM paths merged at FY2050"
 
 
 # ------------------------------------------------------------ page contract
