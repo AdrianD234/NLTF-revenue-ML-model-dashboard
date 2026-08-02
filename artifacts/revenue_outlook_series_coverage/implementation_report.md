@@ -98,6 +98,22 @@ a fact a future change has to come back through.
   over mean-year population, so the NATIVE quarters sum to within 0.07-0.29% of
   it rather than exactly. Derived quarters, where a trace has none, partition the
   annual anchor exactly. Both facts are in the contract's `limitation` column.
+* **Rate-priced revenue** - a volume-only indicator puts a mid-year price step
+  in the wrong quarters. The planned PED path steps +12c at **2027Q1** and +6c
+  at **2028Q1**, both inside a fiscal year, so benchmarking FED revenue on VKT
+  alone spread each uplift back across the two quarters *before* it took
+  effect. `gross_ped_revenue`, `gross_fed_revenue` and `net_fed_revenue` are
+  now timed on `volume x governed quarterly $/L`, read from
+  `rate_paths.ped_quarterly_rate_schedules`. Measured on the BEFU26 path, the
+  implied effective-rate step is now 1.1702 against a governed 1.1714 at
+  2027Q1 and 1.0733 against 1.0731 at 2028Q1, while the volume path moves less
+  than 2% across the same pair - a step, not a ramp.
+* **RUC revenue** - deliberately *not* rate-timed. `rate_paths` derives
+  quarterly RUC factors only for the FED policy counterfactuals, not a base
+  nominal path, so there is no governed quarterly RUC rate schedule to time
+  against. Inventing one is exactly what section 3 forbids. The limitation is
+  recorded in the contract instead: a mid-year RUC rate change would appear
+  spread across its fiscal year.
 * **Policy steps** - the step calendar is read from
   `rate_paths.fed_policy_affected_periods` and never restated. The FY2027 12c
   window stays at 2027Q1-Q2.
@@ -146,7 +162,7 @@ Native rows are never rewritten or shadowed: no derived row shares a
 | `data/revenue_outlook_quarterly_display/` | materialised pack, 382 KB, hash-backed |
 | `scripts/build_revenue_outlook_quarterly_display_pack.py` | the builder |
 | `scripts/build_revenue_outlook_series_coverage_diagnosis.py` | the diagnosis evidence |
-| `tests/test_revenue_outlook_series_coverage.py` | 37 tests |
+| `tests/test_revenue_outlook_series_coverage.py` | 43 tests |
 
 ## Performance
 

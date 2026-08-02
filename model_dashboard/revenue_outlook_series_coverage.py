@@ -80,6 +80,7 @@ __all__ = [
     "DISPLAY_HORIZON_LAST_QUARTER",
     "QUARTERLY_DISPLAY_CONTRACT",
     "QUARTERLY_DISPLAY_PACK_DIR",
+    "PED_RATE_BASIS",
     "QuarterlyDisplayContract",
     "QuarterlyDisplayPack",
     "QuarterlyDisplayPackError",
@@ -197,6 +198,16 @@ NATIVE_PROVENANCE = "published quarterly value"
 # gets a flat one, which is the neutral allocation and is declared as such.
 NEUTRAL_SEASONAL_BASIS = "neutral_flat_indicator"
 
+# A volume indicator alone puts a mid-year price step in the wrong quarters.
+# The planned PED path steps +12c at 2027Q1 and +6c at 2028Q1 - both inside a
+# fiscal year - so benchmarking FED revenue on VKT alone spreads the uplift
+# back across the two quarters BEFORE it takes effect. Multiplying the volume
+# indicator by the governed quarterly $/L schedule makes the indicator a
+# revenue proxy and puts each step in its own quarter. The schedule is read
+# from rate_paths; it is never restated here.
+PED_RATE_BASIS = "governed_ped_quarterly_rate_schedule_planned"
+NO_RATE_BASIS = ""
+
 
 @dataclass(frozen=True)
 class QuarterlyDisplayContract:
@@ -217,6 +228,7 @@ class QuarterlyDisplayContract:
     quarterly_source: str
     derivation_method: str
     seasonal_basis: str
+    rate_basis: str
     source_window: str
     annual_reconciliation_rule: str
     positivity_rule: str
@@ -250,6 +262,7 @@ def _flow(
     source_window: str = "annual chart rows FY2001-FY2050 (Actual, current model, official comparators)",
     limitation: str = "",
     derivation_method: str = METHOD_DENTON,
+    rate_basis: str = NO_RATE_BASIS,
 ) -> QuarterlyDisplayContract:
     """An annual flow whose quarters must sum back to the June-year value."""
     return QuarterlyDisplayContract(
@@ -262,6 +275,7 @@ def _flow(
         quarterly_source=QUARTERLY_SOURCE_DERIVED,
         derivation_method=derivation_method,
         seasonal_basis=seasonal_basis,
+        rate_basis=rate_basis,
         source_window=source_window,
         annual_reconciliation_rule=RECONCILE_SUM,
         positivity_rule=POSITIVITY_REQUIRED,
@@ -297,6 +311,7 @@ def _native(
         quarterly_source=QUARTERLY_SOURCE_NATIVE,
         derivation_method=METHOD_NATIVE,
         seasonal_basis=series_id,
+        rate_basis=NO_RATE_BASIS,
         source_window=source_window,
         annual_reconciliation_rule=RECONCILE_SUM,
         positivity_rule=POSITIVITY_REQUIRED,
@@ -313,6 +328,18 @@ _NATIVE_WINDOW = "native quarterly rows to 2030Q4; annual rows beyond"
 _OFFICIAL_ONLY_LIMITATION = (
     "No native quarterly path exists for any trace; every quarter shown is derived "
     "from the June-year benchmark and is indicative display only."
+)
+_FED_AGGREGATE_LIMITATION = (
+    "Timed on the governed quarterly PED rate schedule, which prices the dominant "
+    "component. The LPG, CNG and refund components inside the FED aggregate are not "
+    "separately rate-timed. " + _OFFICIAL_ONLY_LIMITATION
+)
+_RUC_RATE_LIMITATION = (
+    "No governed quarterly RUC rate schedule exists in the pack - rate_paths derives "
+    "quarterly RUC factors only for the FED policy counterfactuals, not a base nominal "
+    "path - so this split follows net km alone and a mid-year RUC rate change would "
+    "appear spread across its fiscal year rather than stepping in its own quarter. "
+    + _OFFICIAL_ONLY_LIMITATION
 )
 
 QUARTERLY_DISPLAY_CONTRACT: tuple[QuarterlyDisplayContract, ...] = (
@@ -406,6 +433,7 @@ QUARTERLY_DISPLAY_CONTRACT: tuple[QuarterlyDisplayContract, ...] = (
         "$m nominal ex GST",
         "revenue",
         _PED_BASIS,
+        rate_basis=PED_RATE_BASIS,
         limitation=_OFFICIAL_ONLY_LIMITATION,
     ),
     _flow(
@@ -414,7 +442,7 @@ QUARTERLY_DISPLAY_CONTRACT: tuple[QuarterlyDisplayContract, ...] = (
         "$m nominal ex GST",
         "revenue",
         _LIGHT_BASIS,
-        limitation=_OFFICIAL_ONLY_LIMITATION,
+        limitation=_RUC_RATE_LIMITATION,
     ),
     _flow(
         "light_bev_ruc_net_revenue",
@@ -422,7 +450,7 @@ QUARTERLY_DISPLAY_CONTRACT: tuple[QuarterlyDisplayContract, ...] = (
         "$m nominal ex GST",
         "revenue",
         _LIGHT_BASIS,
-        limitation=_OFFICIAL_ONLY_LIMITATION,
+        limitation=_RUC_RATE_LIMITATION,
     ),
     _flow(
         "phev_ruc_net_revenue",
@@ -430,7 +458,7 @@ QUARTERLY_DISPLAY_CONTRACT: tuple[QuarterlyDisplayContract, ...] = (
         "$m nominal ex GST",
         "revenue",
         _LIGHT_BASIS,
-        limitation=_OFFICIAL_ONLY_LIMITATION,
+        limitation=_RUC_RATE_LIMITATION,
     ),
     _flow(
         "heavy_ruc_net_revenue",
@@ -438,7 +466,7 @@ QUARTERLY_DISPLAY_CONTRACT: tuple[QuarterlyDisplayContract, ...] = (
         "$m nominal ex GST",
         "revenue",
         _HEAVY_BASIS,
-        limitation=_OFFICIAL_ONLY_LIMITATION,
+        limitation=_RUC_RATE_LIMITATION,
     ),
     _flow(
         "gross_fed_revenue",
@@ -446,7 +474,8 @@ QUARTERLY_DISPLAY_CONTRACT: tuple[QuarterlyDisplayContract, ...] = (
         "$m nominal ex GST",
         "revenue",
         _PED_BASIS,
-        limitation=_OFFICIAL_ONLY_LIMITATION,
+        rate_basis=PED_RATE_BASIS,
+        limitation=_FED_AGGREGATE_LIMITATION,
     ),
     _flow(
         "net_fed_revenue",
@@ -454,7 +483,8 @@ QUARTERLY_DISPLAY_CONTRACT: tuple[QuarterlyDisplayContract, ...] = (
         "$m nominal ex GST",
         "revenue",
         _PED_BASIS,
-        limitation=_OFFICIAL_ONLY_LIMITATION,
+        rate_basis=PED_RATE_BASIS,
+        limitation=_FED_AGGREGATE_LIMITATION,
     ),
     _flow(
         "total_ruc_net_revenue",
@@ -1080,6 +1110,53 @@ def _actual_quarter_lookup(
     return lookup
 
 
+@lru_cache(maxsize=4)
+def _planned_ped_rate_by_quarter(root_text: str) -> tuple[tuple[str, float], ...]:
+    """The governed planned PED $/L, by calendar quarter, as a stable tuple.
+
+    Cached because a Denton solve asks for it once per (series, trace) and the
+    schedule is a pure function of a committed CSV.
+    """
+    from .rate_paths import ped_quarterly_rate_schedules
+
+    schedule = ped_quarterly_rate_schedules(Path(root_text))
+    planned = pd.to_numeric(schedule["planned"], errors="coerce").dropna()
+    return tuple((str(period), float(value)) for period, value in planned.items())
+
+
+def _rate_indicator_factor(quarters: Sequence[str], repo_root: Path | str | None) -> np.ndarray:
+    """Per-quarter PED rate for the indicator, carried flat past the schedule.
+
+    The schedule ends at 2031Q2 and the planned path is flat from its last
+    step, so carrying the final rate forward is exact rather than an
+    assumption. Quarters before the schedule starts take its first rate, which
+    only affects pre-2013 history where no rate change is in play.
+    """
+    root = str(Path(repo_root) if repo_root is not None else _repo_root())
+    schedule = _planned_ped_rate_by_quarter(root)
+    if not schedule:
+        return np.ones(len(quarters), dtype=float)
+    lookup = dict(schedule)
+    ordered = [period for period, _rate in schedule]
+    first_rate = lookup[ordered[0]]
+    last_rate = lookup[ordered[-1]]
+    first_key = _quarter_sort_key(ordered[0])
+    last_key = _quarter_sort_key(ordered[-1])
+    values: list[float] = []
+    for period in quarters:
+        if period in lookup:
+            values.append(lookup[period])
+            continue
+        key = _quarter_sort_key(period)
+        values.append(first_rate if key < first_key else last_rate if key > last_key else first_rate)
+    return np.array(values, dtype=float)
+
+
+def _quarter_sort_key(period: Any) -> int:
+    parts = _quarter_parts(period)
+    return 0 if parts is None else parts[0] * 4 + parts[1]
+
+
 def _native_quarter_lookup(
     chart_rows: pd.DataFrame | None,
     series_id: str,
@@ -1126,6 +1203,7 @@ _QUARTERLY_PROVENANCE_COLUMNS = (
     "annual_source_value",
     "derivation_method",
     "seasonal_basis",
+    "rate_basis",
     "annual_reconciliation_residual",
     "empirical_or_derived",
     "fixed_actual_quarters",
@@ -1139,6 +1217,7 @@ def derive_quarterly_rows(
     *,
     chart_rows: pd.DataFrame | None = None,
     apply_display_horizon: bool = True,
+    repo_root: Path | str | None = None,
 ) -> pd.DataFrame:
     """The governed quarterly builder: annual display rows in, quarters out.
 
@@ -1180,6 +1259,7 @@ def derive_quarterly_rows(
                 group.sort_values("_fy").drop_duplicates("_fy", keep="last"),
                 contract=_CONTRACT_BY_SERIES[series_id],
                 chart_rows=chart_rows,
+                repo_root=repo_root,
             )
         )
     if not output:
@@ -1198,6 +1278,7 @@ def _derive_one_trace(
     *,
     contract: QuarterlyDisplayContract,
     chart_rows: pd.DataFrame | None,
+    repo_root: Path | str | None = None,
 ) -> list[dict[str, Any]]:
     template = group.iloc[0].to_dict()
     trace_name = template.get("trace_name")
@@ -1237,6 +1318,7 @@ def _derive_one_trace(
             group,
             contract=contract,
             chart_rows=chart_rows,
+            repo_root=repo_root,
         )
         if composed is not None:
             return composed
@@ -1253,6 +1335,11 @@ def _derive_one_trace(
         [lookup.get(period, seasonal_mean.get(period[-2:], 1.0)) for period in quarters],
         dtype=float,
     )
+    # For a rate-priced revenue series the indicator is volume TIMES price, so
+    # a mid-year rate step lands in its own quarter instead of being smeared
+    # back across the two quarters that preceded it.
+    if contract.rate_basis == PED_RATE_BASIS:
+        indicator = indicator * _rate_indicator_factor(quarters, repo_root)
     values = _denton_quarterly_split(
         annual_values, indicator, average=contract.average_preserving
     )
@@ -1395,6 +1482,7 @@ def _compose_identity_quarters(
     *,
     contract: QuarterlyDisplayContract,
     chart_rows: pd.DataFrame | None,
+    repo_root: Path | str | None = None,
 ) -> list[dict[str, Any]] | None:
     """Quarters for an accounting identity, built from its components.
 
@@ -1425,7 +1513,9 @@ def _compose_identity_quarters(
                 annual = annual[annual[column].fillna("").astype(str).eq(str(template.get(column) or ""))]
         if annual.empty or annual.duplicated("june_year").any():
             return None
-        derived = derive_quarterly_rows(annual, chart_rows=chart_rows, apply_display_horizon=False)
+        derived = derive_quarterly_rows(
+            annual, chart_rows=chart_rows, apply_display_horizon=False, repo_root=repo_root
+        )
         if derived.empty:
             return None
         per_component.append(
@@ -1525,6 +1615,7 @@ def _quarterly_record(
             "annual_source_value": float(annual_value),
             "derivation_method": method,
             "seasonal_basis": seasonal_basis,
+            "rate_basis": contract.rate_basis,
             "annual_reconciliation_residual": float(residual),
             "empirical_or_derived": DERIVED,
             "fixed_actual_quarters": "; ".join(str(q) for q in fixed_quarters),
@@ -1580,6 +1671,8 @@ class QuarterlyDisplayPack:
 _PACK_SOURCE_FILES: tuple[str, ...] = (
     "data/current_revenue_outlook/revenue_chart_rows.parquet",
     "data/revenue_model_source_pack/official_vintage_registry.json",
+    # The governed quarterly PED rate schedule times the FED-priced splits.
+    "data/revenue_model_source_pack/2026_05_19/fed_rate_paths.csv",
 )
 _PACK_SOURCE_TREES: tuple[str, ...] = (
     "data/revenue_model_source_pack/official_vintages",
@@ -1668,6 +1761,7 @@ def clear_caches() -> None:
     """Drop every memoised view. Tests and the builder call this."""
     _load_pack_cached.cache_clear()
     _source_digest_cached.cache_clear()
+    _planned_ped_rate_by_quarter.cache_clear()
     _label_lookup.cache_clear()
 
 
@@ -1714,7 +1808,9 @@ def quarterly_rows_for_selected_series(
             ]
         pending = pending[~pending.get("trace_name", pd.Series(dtype=str)).astype(str).isin(served)]
         if not pending.empty:
-            blocks.append(derive_quarterly_rows(pending, chart_rows=chart_rows))
+            blocks.append(
+                derive_quarterly_rows(pending, chart_rows=chart_rows, repo_root=repo_root)
+            )
 
     if not blocks:
         return pd.DataFrame(
@@ -1920,7 +2016,7 @@ def build_quarterly_display_pack(
     governed = annual_universe[
         annual_universe["series_id"].astype(str).isin(selectable_series_ids())
     ]
-    quarterly = derive_quarterly_rows(governed, chart_rows=chart_rows)
+    quarterly = derive_quarterly_rows(governed, chart_rows=chart_rows, repo_root=root)
 
     reconciliation = annual_reconciliation_audit(quarterly)
     unreconciled = reconciliation[~reconciliation["reconciles"].astype(bool)]

@@ -490,6 +490,60 @@ def test_governed_policy_steps_keep_their_own_quarters() -> None:
             assert coverage.june_year_for_quarter(period) == fy
 
 
+def test_only_the_fed_priced_series_carry_a_rate_basis(
+    pack: coverage.QuarterlyDisplayPack,
+) -> None:
+    """RUC has no governed quarterly rate schedule, so it must not claim one."""
+    frame = coverage.quarterly_contract_frame()
+    rated = set(frame.loc[frame["rate_basis"].eq(coverage.PED_RATE_BASIS), "series_id"])
+    assert rated == {"gross_ped_revenue", "gross_fed_revenue", "net_fed_revenue"}
+    rows = pack.quarterly_rows
+    for series_id in rated:
+        block = rows[rows["series_id"].eq(series_id)]
+        assert not block.empty
+        assert block["rate_basis"].eq(coverage.PED_RATE_BASIS).all()
+    ruc = rows[rows["series_id"].eq("light_ruc_net_revenue")]
+    assert not ruc.empty
+    assert ruc["rate_basis"].eq("").all()
+
+
+@pytest.mark.parametrize(
+    ("before", "after", "rate_before", "rate_after"),
+    [
+        ("2026Q4", "2027Q1", 0.70024, 0.82024),
+        ("2027Q4", "2028Q1", 0.82024, 0.88024),
+    ],
+)
+def test_a_mid_year_rate_step_lands_in_its_own_quarter(
+    pack: coverage.QuarterlyDisplayPack,
+    before: str,
+    after: str,
+    rate_before: float,
+    rate_after: float,
+) -> None:
+    """Revenue must step where the governed schedule steps, not across the year.
+
+    Both steps sit INSIDE a fiscal year, so a volume-only indicator would
+    spread the uplift back over the two quarters that preceded it. The implied
+    effective rate - revenue growth divided by volume growth - is compared with
+    the governed rate ratio.
+    """
+    rows = pack.quarterly_rows[pack.quarterly_rows["trace_name"].eq("BEFU26 official")]
+
+    def value(series_id: str, period: str) -> float:
+        block = rows[rows["series_id"].eq(series_id) & rows["period"].eq(period)]
+        assert len(block) == 1, f"expected exactly one {series_id} row for {period}"
+        return float(block["value"].iloc[0])
+
+    revenue_growth = value("gross_ped_revenue", after) / value("gross_ped_revenue", before)
+    volume_growth = value("ped_volume", after) / value("ped_volume", before)
+    implied_rate_step = revenue_growth / volume_growth
+    governed_rate_step = rate_after / rate_before
+    assert implied_rate_step == pytest.approx(governed_rate_step, rel=0.01)
+    # And the step is a step, not a ramp: the volume path did not move like this.
+    assert volume_growth == pytest.approx(1.0, abs=0.05)
+
+
 def test_policy_step_quarters_are_present_in_the_derived_ped_display(
     pack: coverage.QuarterlyDisplayPack,
 ) -> None:
