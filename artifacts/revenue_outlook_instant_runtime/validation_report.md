@@ -15,6 +15,35 @@ The exhaustive parity test is
 in a **separate process** from the build, so it also proves cross-process
 reproducibility — this is what caught the `PYTHONHASHSEED` column-order defect.
 
+## Cross-environment reproducibility (a finding, not a cache property)
+
+Comparing the compiled cache (Python 3.13 / numpy 2.4.6 / Windows) against a
+reference recomputed under CI (Python 3.11 / Linux) shows **17 of 35 frames
+differ**, by 7.28e-12 to 9.54e-07 absolute (~1.3e-13 relative). Full list in
+`cross_environment_drift.csv`.
+
+Seven of those are the **raw forward model outputs** (`future_forecasts`,
+`component_forecasts`, `superseded_component_forecasts`). So this is the
+model's forward computation not being bit-reproducible across
+interpreter/library versions — **not** a property of the compiled cache, whose
+serialisation is exact and separately gated.
+
+Nothing in the repo had measured this before: the existing "Replay parity" CI
+jobs write one fingerprint per OS and never compare them, so they cannot fail
+on a value difference.
+
+All 17 sit inside `revenue_outlook.py::_values_close(abs_tol=1e-6,
+rel_tol=1e-9)` — the closure tolerance every revenue formula here already has
+to satisfy — with ~7,700× margin. That governed line is what the
+cross-environment gate adopts; exact equality is still required, with no escape
+hatch, wherever the cache was built.
+
+**Open governance question:** the committed cache freezes one environment's
+floats into a Linux-hosted app. At 1e-13 that is far inside anything governed,
+and it arguably improves determinism (every viewer sees the same committed
+numbers rather than values varying with the host's libraries). Building the
+cache in CI on Linux is the alternative. Not settled here.
+
 ## Fail-closed behaviour
 
 | gate | result |
