@@ -349,9 +349,28 @@ def test_derived_rows_are_labelled_derived(pack: coverage.QuarterlyDisplayPack) 
     assert not rows.empty
     assert rows["coverage_row_type"].eq(coverage.COVERAGE_ROW_TYPE_DERIVED).all()
     assert rows["empirical_or_derived"].eq("derived").all()
-    assert rows["row_type"].eq(coverage.COVERAGE_ROW_TYPE_DERIVED).all()
+    assert rows["data_scope"].eq(coverage.COVERAGE_ROW_TYPE_DERIVED).all()
+    assert rows["value_status"].eq("derived_quarterly_display").all()
     assert rows["contract_version"].eq(coverage.CONTRACT_VERSION).all()
     assert rows["annual_source_period"].astype(str).str.startswith("FY").all()
+
+
+def test_derived_rows_inherit_row_type_from_their_annual_source(
+    pack: coverage.QuarterlyDisplayPack,
+) -> None:
+    """Downstream filters key off row_type; overwriting it would hide rows.
+
+    ``_filter_revenue_outlook_rows`` keeps historical_actual rows regardless of
+    the scenario selection. A derived Actual quarter carrying a derived-only
+    row_type would fall out of that escape hatch and vanish from the chart.
+    """
+    rows = pack.quarterly_rows
+    actual = rows[rows["trace_name"].eq("Actual")]
+    assert not actual.empty
+    assert actual["row_type"].eq("historical_actual").all()
+    official = rows[rows["scenario_role"].eq("official_comparator")]
+    assert not official.empty
+    assert official["row_type"].eq("official_comparator").all()
 
 
 def test_official_derived_quarters_never_claim_to_be_published_official_data(

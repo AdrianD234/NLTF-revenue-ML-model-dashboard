@@ -1494,7 +1494,13 @@ def _quarterly_record(
             "plot_allowed": True,
             "value_status": "derived_quarterly_display",
             "data_scope": COVERAGE_ROW_TYPE_DERIVED,
-            "row_type": COVERAGE_ROW_TYPE_DERIVED,
+            # `row_type` is deliberately INHERITED from the annual row, not
+            # overwritten with the derived label. Downstream filters key off it
+            # ("historical_actual" is the escape hatch that keeps Actual rows
+            # visible under a scenario filter), so clobbering it would make a
+            # derived Actual quarter invisible. The derived status is carried by
+            # coverage_row_type, empirical_or_derived, data_scope, value_status
+            # and source_basis - five markers, none of which a filter depends on.
             "source_basis": (
                 OFFICIAL_DERIVED_PROVENANCE if is_official else CURRENT_DERIVED_PROVENANCE
             ),
