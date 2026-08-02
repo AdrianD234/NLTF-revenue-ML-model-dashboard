@@ -51,10 +51,38 @@ factors, the conflict traces and every audit surface see byte-identical frames.
 
 ## Result
 
+### Browser-visible (the number that matters to a reader)
+
+Measured with Playwright at 1920×1080 against a freshly started local server,
+from `page.goto` through clicking Revenue Outlook to the Base-case trace being
+present in Plotly's own arrays.
+
+| measurement | reference | fast | ratio |
+| --- | ---: | ---: | ---: |
+| cold: click → Revenue Outlook chart | 91,033 ms | 44,848 / 47,229 ms | **2.0×** |
+| cold: total (goto → RO chart) | 93,749 ms | 46,783 / 49,180 ms | 2.0× |
+| **warm: away and back to RO chart** | 111 ms | **129 / 112 ms** | ~1× (already fast) |
+
+**The headline is 2.0× browser-visible, not 9–11×.** The 9–11× figure below is
+Python-side and covers only the narrow call path this change touches; that path
+is roughly 7 s of a ~45 s cold page. The rest of the cold page - the VFM
+Fast/Slow envelope (which runs the overlay chain twice more), the detail,
+reconciliation, stack and composition frames, and every section below the chart
+- is untouched by this PR and is where the remaining ~38 s sits.
+
+Warm navigation at ~120 ms is the dominant experience after the first visit,
+and it was already fast before this change.
+
+### Python-side, narrow benchmark path
+
 | engine | cold path before | cold path after | ratio |
 | --- | ---: | ---: | ---: |
 | ar1 | 67,777 ms | 7,462 ms | 9.1× |
 | ensemble | 80,962 ms | 7,087 ms | 11.4× |
+
+This benchmark calls the specific cached functions in sequence; it is a valid
+measure of the replay work removed (61.3 s → 0.9 s) but it is **not** a measure
+of the page.
 
 Warm cached view is unchanged at ~12 ms (it was already fast).
 Fresh-process runs, 3 samples per engine (1 for reference, which costs ~70 s a
@@ -152,11 +180,20 @@ inside `fuel_price_scenario.py` rather than in a materialisable pure function,
 so they carry a different regression profile from this change and are left to a
 follow-up. Until they are addressed:
 
-- fresh-process target E (p95 ≤ 5 s) is **not yet met** — currently ~7.2-7.6 s;
-- warm navigation and display-only interactions (targets A, and B on a cache
-  hit) are met — ~12 ms view + ~90 ms figure;
-- **first** computation of a not-yet-cached named scenario still costs ~4.6 s,
-  so target B on a cold key is not met.
+- ✅ target A (navigate to Revenue Outlook in a running app, p50 ≤ 600 ms) —
+  **met at ~120 ms** browser-visible;
+- ❌ target E (fresh process → first meaningful chart, p95 ≤ 5 s) — **~46 s**
+  browser-visible. Removing the replays took ~46 s out of it; the remaining
+  ~45 s is other work this PR does not touch;
+- ❌ target B on a cold key (first computation of a not-yet-cached named
+  scenario) — the overlay chain alone is ~4.6 s.
 
-No browser-visible Playwright acceptance run is included in this stage; the
-timings above are Python-side and are labelled as such.
+The ~38 s gap between the 7.2 s narrow benchmark and the ~45 s cold page has
+NOT been attributed stage by stage. The prime suspect is
+`cached_view_cone_band`, which runs the whole overlay chain twice more for the
+VFM Fast and Slow bounds, plus the detail/reconciliation/stack/composition
+frames and the sections below the chart. That attribution is the first job of
+the vectorised-overlay follow-up, not something this PR resolves.
+
+Browser acceptance for this change lives in
+`tests/test_playwright_replay_cache_runtime.py` (marked `e2e`).
