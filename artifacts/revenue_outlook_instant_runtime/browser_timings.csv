@@ -1,0 +1,11 @@
+measurement,mode,sample_1_ms,sample_2_ms,notes
+app boot -> landing chart,reference,2716,,Streamlit server start excluded; measured from page.goto
+app boot -> landing chart,fast,1934,1951,
+click -> Revenue Outlook shell (controls visible),reference,10059,,
+click -> Revenue Outlook shell (controls visible),fast,5055,3574,
+click -> Revenue Outlook chart (Base case trace plotted),reference,91033,,cold process; the user-facing first-visit number
+click -> Revenue Outlook chart (Base case trace plotted),fast,44848,47229,cold process
+total cold browser-visible (goto -> RO chart),reference,93749,,
+total cold browser-visible (goto -> RO chart),fast,46783,49180,
+warm round-trip (away and back to RO chart),reference,111,,already fast before this change
+warm round-trip (away and back to RO chart),fast,129,112,

@@ -1387,18 +1387,301 @@ def cached_fed_uplift_factors(
     }
 
 
+REVENUE_OUTLOOK_RUNTIME_MODE_ENV = "REVENUE_OUTLOOK_RUNTIME_MODE"
+RUNTIME_MODE_REFERENCE = "reference"
+RUNTIME_MODE_FAST = "fast"
+RUNTIME_MODE_SHADOW = "shadow"
+_RUNTIME_MODES = (RUNTIME_MODE_REFERENCE, RUNTIME_MODE_FAST, RUNTIME_MODE_SHADOW)
+
+
+class RevenueOutlookRuntimeModeError(ValueError):
+    """An explicit REVENUE_OUTLOOK_RUNTIME_MODE value is not a known mode."""
+
+
+def revenue_outlook_runtime_mode() -> str:
+    """reference = live replay; fast = compiled cache; shadow = fast + compare.
+
+    Fast is the default: the compiled cache is a materialisation of the same
+    replay, hash-validated at load, and it fails closed rather than falling
+    back to the 52 s path.
+
+    An ABSENT variable defaults to fast. An explicitly supplied unknown value
+    raises: silently treating ``REVENUE_OUTLOOK_RUNTIME_MODE=refrence`` as
+    "fast" would hide exactly the misconfiguration the operator was trying to
+    correct.
+    """
+    raw = os.environ.get(REVENUE_OUTLOOK_RUNTIME_MODE_ENV)
+    if raw is None or not str(raw).strip():
+        return RUNTIME_MODE_FAST
+    value = str(raw).strip().lower()
+    if value not in _RUNTIME_MODES:
+        raise RevenueOutlookRuntimeModeError(
+            f"{REVENUE_OUTLOOK_RUNTIME_MODE_ENV}={raw!r} is not a known mode; "
+            f"expected one of {', '.join(_RUNTIME_MODES)}."
+        )
+    return value
+
+
+def _shadow_mismatch_path() -> Path:
+    return (
+        Path(__file__).resolve().parent
+        / "artifacts"
+        / "revenue_outlook_instant_runtime"
+        / "shadow_mismatch.md"
+    )
+
+
+@st.cache_resource(show_spinner=False, max_entries=4)
+def _shadow_compare_replays(engine: str, source_digest: str) -> str:
+    """Shadow mode: prove the compiled cache still equals the live replay.
+
+    Runs ONCE per (engine, digest) per process, not per request - the live
+    replay costs ~60 s. Any discrepancy writes a mismatch artifact and raises,
+    so shadow can never quietly serve a diverged value.
+    """
+    import dataclasses
+
+    from model_dashboard.engine import engine_revenue_outlook_dir
+    from model_dashboard.revenue_outlook_replay_cache import load_replay_cache
+
+    repo_root = Path(__file__).resolve().parent
+    pack_dir = repo_root / engine_revenue_outlook_dir(engine)
+    pack_manifest = json.loads((pack_dir / "manifest.json").read_text(encoding="utf-8"))
+    bridge = bridge_vintage_id_from_manifest(pack_manifest, repo_root)
+    scenario_inputs = pd.read_parquet(pack_dir / "scenario_inputs" / "scenario_input_wide.parquet")
+
+    compiled = load_replay_cache(
+        engine=engine,
+        pack_manifest=pack_manifest,
+        bridge_vintage_id=bridge,
+        repo_root=repo_root,
+        source_digest=source_digest,
+    )
+    live = (
+        run_direct_treasury_scenario_replay(
+            scenario_inputs, repo_root=repo_root, engine=engine, bridge_vintage_id=bridge
+        ),
+        run_fuel_price_scenario_replay(
+            scenario_inputs, repo_root=repo_root, engine=engine, bridge_vintage_id=bridge
+        ),
+    )
+
+    def _walk(obj, prefix=""):
+        out = {}
+        for field in dataclasses.fields(obj):
+            value = getattr(obj, field.name)
+            name = f"{prefix}{field.name}"
+            if isinstance(value, pd.DataFrame):
+                out[name] = value
+            elif dataclasses.is_dataclass(value) and not isinstance(value, type):
+                out.update(_walk(value, prefix=f"{name}."))
+        return out
+
+    mismatches: list[str] = []
+    for label, (compiled_result, live_result) in zip(
+        ("macro", "fuel"), zip(compiled, live, strict=True), strict=True
+    ):
+        compiled_frames = _walk(compiled_result, f"{label}.")
+        live_frames = _walk(live_result, f"{label}.")
+        for name in sorted(set(compiled_frames) | set(live_frames)):
+            if name not in compiled_frames or name not in live_frames:
+                mismatches.append(f"{name}: present in only one result")
+                continue
+            try:
+                pd.testing.assert_frame_equal(
+                    compiled_frames[name], live_frames[name], check_exact=True, obj=name
+                )
+            except AssertionError as error:
+                mismatches.append(f"{name}: {str(error).splitlines()[0]}")
+
+    if mismatches:
+        path = _shadow_mismatch_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            f"# Shadow mismatch: engine={engine} digest={source_digest[:16]}\n\n"
+            + "\n".join(f"- {line}" for line in mismatches)
+            + "\n",
+            encoding="utf-8",
+        )
+        raise RuntimeError(
+            f"Shadow mode found {len(mismatches)} compiled-vs-live replay "
+            f"discrepancies for engine {engine!r}; see {path.as_posix()}"
+        )
+    return f"shadow ok: {len(_walk(compiled[0], 'macro.')) + len(_walk(compiled[1], 'fuel.'))} frames identical"
+
+
+def _engine_for_pack(pack: RevenueOutlookPack) -> str:
+    return "ar1" if "engine_ar1" in {part.lower() for part in pack.output_dir.parts} else "ensemble"
+
+
+@st.cache_resource(show_spinner=False, max_entries=4)
+def _compiled_replay_results(engine: str, source_digest: str) -> tuple[Any, Any]:
+    """One parquet read of the compiled replay cache per engine, per process.
+
+    Keyed on the engine plus the cache's own source digest, so a rebuilt cache
+    is a different resource and a stale one can never be served.
+    """
+    from model_dashboard.revenue_outlook_replay_cache import load_replay_cache
+
+    repo_root = Path(__file__).resolve().parent
+    pack_dir = repo_root / engine_revenue_outlook_dir_for(engine)
+    manifest_path = pack_dir / "manifest.json"
+    pack_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    return load_replay_cache(
+        engine=engine,
+        pack_manifest=pack_manifest,
+        bridge_vintage_id=bridge_vintage_id_from_manifest(pack_manifest, repo_root),
+        repo_root=repo_root,
+        # Already computed by the caller; re-hashing ~48 MB here would double
+        # the cold-path cost for no extra safety.
+        source_digest=source_digest,
+    )
+
+
+def engine_revenue_outlook_dir_for(engine: str) -> Path:
+    from model_dashboard.engine import engine_revenue_outlook_dir
+
+    return engine_revenue_outlook_dir(engine)
+
+
+@st.cache_data(show_spinner=False, max_entries=4)
+def _cached_replay_source_digest(
+    engine: str,
+    signature: tuple[tuple[str, int, int], ...],
+    _pack: RevenueOutlookPack,
+) -> str:
+    """Hash every replay input once per pack signature, not once per lookup.
+
+    The scan covers ~48 MB across ~640 files (~320 ms). Keyed on the pack
+    signature so a promoted pack still invalidates it.
+    """
+    del signature
+    from model_dashboard.revenue_outlook_replay_cache import replay_cache_expected_digest
+
+    repo_root = Path(__file__).resolve().parent
+    return replay_cache_expected_digest(
+        engine=engine,
+        pack_manifest=_pack.manifest,
+        bridge_vintage_id=bridge_vintage_id_from_manifest(_pack.manifest, repo_root),
+        repo_root=repo_root,
+    )
+
+
+@st.cache_data(show_spinner=False, max_entries=4)
+def _cached_replay_cache_problem(
+    engine: str,
+    mode: str,
+    signature: tuple[tuple[str, int, int], ...],
+    _pack: RevenueOutlookPack,
+) -> str:
+    """Cached so the ~48 MB integrity scan is not repeated on every rerun."""
+    del signature
+    from model_dashboard.revenue_outlook_replay_cache import replay_cache_status
+
+    repo_root = Path(__file__).resolve().parent
+    try:
+        status, detail = replay_cache_status(
+            engine=engine,
+            pack_manifest=_pack.manifest,
+            bridge_vintage_id=bridge_vintage_id_from_manifest(_pack.manifest, repo_root),
+            repo_root=repo_root,
+        )
+    except (OSError, ValueError) as error:
+        status, detail = "corrupt", str(error)
+    if status == "ok":
+        return ""
+    rebuild = f"python scripts/build_revenue_outlook_replay_cache.py --engine {engine}"
+    reason = {
+        "missing": "has not been built",
+        "stale": "no longer matches its sources",
+        "corrupt": "could not be read",
+    }.get(status, "is unusable")
+    del mode
+    return (
+        f"The compiled Treasury-macro and conflict replay cache for the {engine!r} engine "
+        f"{reason} ({detail}). Revenue Outlook will not serve values from a cache it "
+        f"cannot prove is current, and it will not silently fall back to the slow live "
+        f"replay. Rebuild it with:  {rebuild}"
+    )
+
+
+def _revenue_outlook_replay_cache_problem(
+    pack: RevenueOutlookPack | None,
+    signature: tuple[tuple[str, int, int], ...] = (),
+) -> str:
+    """Reader-facing explanation when the compiled replay cache is unusable.
+
+    Returns "" when the page can proceed. Only fast/shadow depend on the
+    cache; reference recomputes the replays live.
+    """
+    mode = revenue_outlook_runtime_mode()
+    if pack is None or mode == RUNTIME_MODE_REFERENCE:
+        return ""
+    return _cached_replay_cache_problem(_engine_for_pack(pack), mode, signature, pack)
+
+
+def _replay_cache_problem_uncached(pack: RevenueOutlookPack) -> str:
+    """Uncached variant used by tests that monkeypatch the status function."""
+    from model_dashboard.revenue_outlook_replay_cache import replay_cache_status
+
+    repo_root = Path(__file__).resolve().parent
+    engine = _engine_for_pack(pack)
+    try:
+        status, detail = replay_cache_status(
+            engine=engine,
+            pack_manifest=pack.manifest,
+            bridge_vintage_id=bridge_vintage_id_from_manifest(pack.manifest, repo_root),
+            repo_root=repo_root,
+        )
+    except (OSError, ValueError) as error:
+        status, detail = "corrupt", str(error)
+    if status == "ok":
+        return ""
+    rebuild = f"python scripts/build_revenue_outlook_replay_cache.py --engine {engine}"
+    reason = {
+        "missing": "has not been built",
+        "stale": "no longer matches its sources",
+        "corrupt": "could not be read",
+    }.get(status, "is unusable")
+    return (
+        f"The compiled Treasury-macro and conflict replay cache for the {engine!r} engine "
+        f"{reason} ({detail}). Revenue Outlook will not serve values from a cache it "
+        f"cannot prove is current, and it will not silently fall back to the slow live "
+        f"replay. Rebuild it with:  {rebuild}"
+    )
+
+
+def _compiled_replays_for_pack(
+    pack: RevenueOutlookPack,
+    signature: tuple[tuple[str, int, int], ...],
+) -> tuple[Any, Any]:
+    """(macro, fuel) from the compiled cache, or fail closed with the rebuild."""
+    engine = _engine_for_pack(pack)
+    digest = _cached_replay_source_digest(engine, signature, pack)
+    results = _compiled_replay_results(engine, digest)
+    if revenue_outlook_runtime_mode() == RUNTIME_MODE_SHADOW:
+        _shadow_compare_replays(engine, digest)
+    return results
+
+
 @st.cache_data(show_spinner=False, max_entries=2)
 def cached_fuel_price_scenario_replay(
     signature: tuple[tuple[str, int, int], ...],
     _pack: RevenueOutlookPack,
 ) -> Any:
-    """Run the governed Low/Medium/High conflict paths once per model pack."""
-    del signature
+    """The governed Low/Medium/High conflict paths for this model pack.
+
+    The replay itself takes no reader-facing control, so in fast/shadow mode it
+    is served from the committed compiled cache instead of re-running forward
+    forecasting (measured at 44-66 s per process on the PR #15 merge commit).
+    """
     input_path = _pack.output_dir / "scenario_inputs" / "scenario_input_wide.parquet"
     if not input_path.exists():
         return None
+    if revenue_outlook_runtime_mode() != RUNTIME_MODE_REFERENCE:
+        return _compiled_replays_for_pack(_pack, signature)[1]
     scenario_inputs = pd.read_parquet(input_path)
-    engine = "ar1" if "engine_ar1" in {part.lower() for part in _pack.output_dir.parts} else "ensemble"
+    engine = _engine_for_pack(_pack)
     return run_fuel_price_scenario_replay(
         scenario_inputs,
         repo_root=Path(__file__).resolve().parent,
@@ -1439,12 +1722,13 @@ def cached_treasury_baseline_macro_replay(
     visible Base case to the legacy GDP path.
     """
 
-    del signature
     input_path = _pack.output_dir / "scenario_inputs" / "scenario_input_wide.parquet"
     if not input_path.exists():
         return None
+    if revenue_outlook_runtime_mode() != RUNTIME_MODE_REFERENCE:
+        return _compiled_replays_for_pack(_pack, signature)[0]
     scenario_inputs = pd.read_parquet(input_path)
-    engine = "ar1" if "engine_ar1" in {part.lower() for part in _pack.output_dir.parts} else "ensemble"
+    engine = _engine_for_pack(_pack)
     return run_direct_treasury_scenario_replay(
         scenario_inputs,
         repo_root=Path(__file__).resolve().parent,
@@ -5279,6 +5563,15 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             "Source policy: committed current runtime pack only. Source-pack tables are retained as audit lineage, "
             "not as a second Streamlit chart engine."
         )
+        return
+
+    # Fail closed BEFORE any chart work, with a governed message rather than a
+    # raw traceback: the compiled replay cache is what makes this page fast,
+    # and a stale one must never be served.
+    replay_cache_problem = _revenue_outlook_replay_cache_problem(pack, pack_signature)
+    if replay_cache_problem:
+        section_title(REVENUE_OUTLOOK_TITLE)
+        warning_panel(replay_cache_problem)
         return
 
     manifest = pack.manifest if pack is not None and isinstance(pack.manifest, dict) else {}

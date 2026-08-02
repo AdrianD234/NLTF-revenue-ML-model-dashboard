@@ -1,0 +1,18 @@
+frame,max_abs_deviation,notes
+fuel.annual_bridge,7.28e-12,
+fuel.annual_factors,7.28e-12,
+fuel.baseline_macro_annual_factors,7.28e-12,
+macro.baseline_macro_annual_factors,7.28e-12,
+fuel.baseline_macro_quarterly_factors,4.77e-07,
+macro.baseline_macro_quarterly_factors,4.77e-07,
+macro.scenario_replay_lineage,4.77e-07,
+fuel.policy_pair_factors,2.38e-07,
+fuel.quarterly_factors,2.38e-07,
+fuel.replay.structural_component_forecasts,2.38e-07,
+fuel.price_only_replay.component_forecasts,9.54e-07,raw forward model output
+fuel.price_only_replay.future_forecasts,9.54e-07,raw forward model output
+fuel.replay.component_forecasts,9.54e-07,raw forward model output
+fuel.replay.future_forecasts,9.54e-07,raw forward model output
+fuel.replay.superseded_component_forecasts,9.54e-07,raw forward model output
+macro.replay.component_forecasts,9.54e-07,raw forward model output
+macro.replay.future_forecasts,9.54e-07,raw forward model output
