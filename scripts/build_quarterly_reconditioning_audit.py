@@ -6,17 +6,18 @@ indicator. Normalising the indicator and the benchmarks fixed the conditioning
 and moved published values. This script proves what that movement did and did
 NOT touch, from the two committed packs rather than from a description of them.
 
-The "before" pack is read straight out of git at the commit preceding the fix,
-so the comparison cannot drift as the working tree changes.
+The "before" values come from a committed, hash-pinned snapshot under
+``pre_reconditioning_snapshot/``, not from a historical Git object: a shallow
+CI checkout may not contain the commit that published them. The snapshot's
+manifest marks it superseded and prohibited for production use.
 
     .venv\\Scripts\\python.exe scripts\\build_quarterly_reconditioning_audit.py
 """
 
 from __future__ import annotations
 
-import io
-import math
-import subprocess
+import hashlib
+import json
 import sys
 from pathlib import Path
 
@@ -33,22 +34,33 @@ from model_dashboard.revenue_outlook_series_coverage import (  # noqa: E402
 )
 
 OUT = ROOT / "artifacts" / "revenue_outlook_series_coverage"
-# The commit immediately before the reconditioning fix.
-BEFORE_REF = "6acb13b"
-AFTER_REF = "HEAD"
+SNAPSHOT = OUT / "pre_reconditioning_snapshot"
 
 # The two governed FED rate steps, both mid-fiscal-year.
 RATE_STEPS = (("2026Q4", "2027Q1", 0.70024, 0.82024), ("2027Q4", "2028Q1", 0.82024, 0.88024))
 
 
-def read_from_git(ref: str, relative: str) -> pd.DataFrame:
-    blob = subprocess.run(
-        ["git", "show", f"{ref}:{relative}"],
-        cwd=ROOT,
-        capture_output=True,
-        check=True,
-    ).stdout
-    return pd.read_parquet(io.BytesIO(blob))
+def read_pinned_snapshot() -> tuple[dict[str, pd.DataFrame], dict]:
+    """The pre-reconditioning values, verified against their pinned hashes.
+
+    A snapshot that failed its own hash would make every comparison below
+    meaningless, so this refuses to continue rather than reporting on it.
+    """
+    manifest = json.loads((SNAPSHOT / "manifest.json").read_text(encoding="utf-8"))
+    if manifest["decision_facing"] is not False:
+        raise SystemExit("the snapshot must be marked non-decision-facing")
+    if "PROHIBITED" not in manifest["production_use"]:
+        raise SystemExit("the snapshot must be marked prohibited for production use")
+    frames: dict[str, pd.DataFrame] = {}
+    for entry in manifest["files"]:
+        path = SNAPSHOT / entry["file"]
+        if hashlib.sha256(path.read_bytes()).hexdigest() != entry["sha256"]:
+            raise SystemExit(f"{entry['file']} does not match its pinned hash")
+        frame = pd.read_parquet(path)
+        if len(frame) != entry["rows"]:
+            raise SystemExit(f"{entry['file']} has {len(frame)} rows, manifest says {entry['rows']}")
+        frames[entry["file"]] = frame
+    return frames, manifest
 
 
 def key_frame(frame: pd.DataFrame) -> pd.DataFrame:
@@ -76,12 +88,14 @@ def effective_rate_step(rows: pd.DataFrame, before: str, after: str) -> float:
 
 
 def main() -> int:
-    quarterly_rel = (QUARTERLY_DISPLAY_PACK_DIR / "quarterly_rows.parquet").as_posix()
-    official_rel = (QUARTERLY_DISPLAY_PACK_DIR / "official_annual_rows.parquet").as_posix()
-
-    before = read_from_git(BEFORE_REF, quarterly_rel)
+    snapshot, snapshot_manifest = read_pinned_snapshot()
+    before = snapshot["quarterly_rows_pre_reconditioning.parquet"].rename(
+        columns={"value_before": "value", "annual_source_value_before": "annual_source_value"}
+    )
+    before_official = snapshot["official_annual_rows_pre_reconditioning.parquet"].rename(
+        columns={"value_before": "value"}
+    )
     after = pd.read_parquet(ROOT / QUARTERLY_DISPLAY_PACK_DIR / "quarterly_rows.parquet")
-    before_official = read_from_git(BEFORE_REF, official_rel)
     after_official = pd.read_parquet(ROOT / QUARTERLY_DISPLAY_PACK_DIR / "official_annual_rows.parquet")
     chart_rows = pd.read_parquet(ROOT / CURRENT_REVENUE_OUTLOOK_DIR / "revenue_chart_rows.parquet")
 
@@ -105,9 +119,30 @@ def main() -> int:
     )
 
     # 3. Official annual rows unchanged - they never went through the solve.
-    official_same = before_official.equals(after_official)
+    official_keys = ["series_id", "trace_name", "period"]
+    merged_official = before_official.merge(
+        after_official[[*official_keys, "value", "value_unit"]],
+        on=official_keys,
+        suffixes=("_before", "_after"),
+        validate="one_to_one",
+    )
+    official_delta = (
+        pd.to_numeric(merged_official["value_before"]) - pd.to_numeric(merged_official["value_after"])
+    ).abs().max()
+    units_same = bool(
+        merged_official["value_unit_before"].eq(merged_official["value_unit_after"]).all()
+    )
+    official_same = bool(
+        len(merged_official) == len(after_official) == len(before_official)
+        and official_delta == 0.0
+        and units_same
+    )
     checks.append(
-        ("Restored official annual rows unchanged", official_same, f"{len(after_official)} rows")
+        (
+            "Restored official annual rows unchanged",
+            official_same,
+            f"{len(merged_official)} rows joined, max |delta| = {official_delta:g}, units identical",
+        )
     )
 
     # 4. Native quarterly rows untouched: no derived row may occupy a published key.
@@ -223,8 +258,10 @@ def main() -> int:
     lines = [
         "# Denton reconditioning: before/after audit",
         "",
-        f"`{BEFORE_REF}` (badly scaled solve) vs `{AFTER_REF}` (normalised solve),",
-        "read from the committed packs. Generated by",
+        "Badly scaled solve vs normalised solve. The prior values come from the",
+        "hash-pinned snapshot in `pre_reconditioning_snapshot/`, captured from",
+        f"commit `{snapshot_manifest['captured_from_commit'][:12]}` and marked",
+        "superseded and prohibited for production use. Generated by",
         "`scripts/build_quarterly_reconditioning_audit.py`.",
         "",
         "## Verdict",

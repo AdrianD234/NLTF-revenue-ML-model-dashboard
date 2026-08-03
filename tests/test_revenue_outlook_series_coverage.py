@@ -769,6 +769,36 @@ def test_the_denton_solve_is_scale_invariant() -> None:
         )
 
 
+def test_the_pre_reconditioning_snapshot_is_hash_pinned_and_non_decision_facing() -> None:
+    """The before/after evidence must not rot, and must not be mistaken for data.
+
+    Follows the repo's existing legacy-snapshot contract: the prior values are
+    committed and hash-pinned rather than read back from a historical Git
+    object, because a shallow CI checkout may not contain that commit.
+    """
+    import json
+
+    snapshot = (
+        ROOT / "artifacts" / "revenue_outlook_series_coverage" / "pre_reconditioning_snapshot"
+    )
+    manifest = json.loads((snapshot / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["decision_facing"] is False
+    assert manifest["status"] == "superseded_investigation_evidence"
+    assert "PROHIBITED" in manifest["production_use"]
+    assert manifest["files"]
+    for entry in manifest["files"]:
+        path = snapshot / entry["file"]
+        assert path.exists(), entry["file"]
+        assert hashlib.sha256(path.read_bytes()).hexdigest() == entry["sha256"], entry["file"]
+        assert len(pd.read_parquet(path)) == entry["rows"], entry["file"]
+
+
+def test_no_production_code_reads_the_pre_reconditioning_snapshot() -> None:
+    """Superseded, less accurate values must never reach a runtime path."""
+    for path in sorted((ROOT / "model_dashboard").glob("*.py")):
+        assert "pre_reconditioning_snapshot" not in path.read_text(encoding="utf-8"), path.name
+
+
 def test_the_denton_system_stays_well_conditioned_at_any_indicator_scale() -> None:
     """Pin the fix at its cause, not just at its symptom.
 
