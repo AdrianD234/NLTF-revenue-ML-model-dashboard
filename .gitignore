@@ -68,6 +68,8 @@ artifacts/**
 !artifacts/revenue_outlook_layered_uncertainty/**
 !artifacts/revenue_outlook_instant_runtime/
 !artifacts/revenue_outlook_instant_runtime/**
+!artifacts/revenue_outlook_policy_runtime/
+!artifacts/revenue_outlook_policy_runtime/**
 data/**
 !data/.gitkeep
 !data/dashboard_evidence_pack/
@@ -119,6 +121,10 @@ data/dashboard_evidence_pack_reproducibility/ped_inner_hpo/source_artifacts/**/*
 # (scripts/build_revenue_outlook_replay_cache.py)
 !data/revenue_outlook_replay_cache/
 !data/revenue_outlook_replay_cache/**
+# materialised named 12c policy states + policy-aware uncertainty bands
+# (scripts/build_revenue_outlook_policy_runtime.py)
+!data/revenue_outlook_policy_runtime/
+!data/revenue_outlook_policy_runtime/**
 
 # vNext production reproducibility packs (governed fitted state + evidence)
 !data/dashboard_evidence_pack_reproducibility/heavy_ruc_vnext/

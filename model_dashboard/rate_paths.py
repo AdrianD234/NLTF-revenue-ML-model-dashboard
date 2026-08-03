@@ -101,6 +101,16 @@ _POLICY_PAIR_BY_STATE = {
     FED_POLICY_STATE_DELAYED_6M: "baseline_delayed_6m",
     FED_POLICY_STATE_NO_UPLIFT: "baseline_no_uplift",
 }
+# Beyond the fixed-finalist replay window the only governed policy factor left
+# is the scalar rate ratio. It may reprice the leaves the RATE actually
+# governs - gross petrol excise, the five nominal RUC collection leaves, and
+# the chart-carried RUC aggregates that roll them up - and nothing else.
+# Activity (km, VKT per capita, volumes) responds to a price change only
+# through the governed elasticities inside the replay; a rate ratio is not an
+# elasticity, and non-fuel revenue is not priced by the fuel rate at all.
+_RATE_PRICED_LONG_RUN_SERIES = frozenset(
+    {"gross_ped_revenue", *_RUC_REVENUE_LEAVES, *RUC_AGGREGATE_SERIES}
+)
 
 
 def _fed_rate_paths(repo_root: Path) -> pd.DataFrame:
@@ -620,13 +630,29 @@ def apply_fed_rate_policy_to_chart_rows(
                 factor = quarterly_lookup.get((series_id, str(data.at[index, "period"])), 1.0)
             elif grain == "june_year" and pd.notna(fy_value):
                 factor = annual_lookup.get((series_id, int(fy_value)), 1.0)
-                if factor == 1.0 and int(fy_value) > LAST_DECISION_GRADE_ANNUAL_FY:
+                if (
+                    factor == 1.0
+                    and int(fy_value) > LAST_DECISION_GRADE_ANNUAL_FY
+                    and series_id in _RATE_PRICED_LONG_RUN_SERIES
+                ):
                     # The fixed-finalist pair factors only span the replay's
                     # own scenario window, so beyond it every post-model year
                     # would silently receive 1.0 and the policy lever would
                     # vanish from the long run. A rate change is permanent:
                     # fall back to the governed scalar rate ratio, which
                     # carries the terminal wedge to FY2055 by construction.
+                    #
+                    # Scoped to the rate-priced series, because ``factors`` is
+                    # a RATE ratio. Applied to everything without a pair
+                    # factor it also repriced activity and non-fuel revenue:
+                    # at the FY2030/FY2031 seam ped_vkt_per_capita jumped from
+                    # 1.0058 to 0.8777 - a cheaper pump price cutting VKT by
+                    # 12%, the wrong sign - BEV/PHEV km moved against the
+                    # "no approved class-specific charge elasticity" contract,
+                    # and net_mvr_revenue was scaled by the petrol excise
+                    # ratio, which broke ``net_mvr_revenue =
+                    # mvr_revenue_net_admin_coo - mvr_refunds`` and made the
+                    # aligned detail frames raise on every no-uplift render.
                     factor = float(factors.get(int(fy_value), 1.0))
             else:
                 factor = 1.0
