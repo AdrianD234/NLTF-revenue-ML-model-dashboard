@@ -1,0 +1,302 @@
+[
+  {
+    "label": "warm_server",
+    "step": "01 open Revenue Outlook",
+    "pass": true,
+    "detail": ""
+  },
+  {
+    "label": "warm_server",
+    "step": "02 default Total NLTF chart",
+    "pass": true,
+    "detail": "13 traces: ['80% conditional band upper', '80% conditional modelled uncertainty', '50% conditional band upper', '50% conditional modelled uncertainty', 'Actual', 'BEFU26 official']"
+  },
+  {
+    "label": "warm_server",
+    "step": "03 no petrol-retention control",
+    "pass": true,
+    "detail": "absent"
+  },
+  {
+    "label": "warm_server",
+    "step": "04 no VFM Fast/Slow surface",
+    "pass": true,
+    "detail": "hits=[]"
+  },
+  {
+    "label": "warm_server",
+    "step": "05 select Light petrol VKT",
+    "pass": true,
+    "detail": "traces=['50% conditional band upper', '50% conditional modelled uncertainty', '80% conditional band upper', '80% conditional modelled uncertainty', 'Actual', 'BEFU26 official', 'BEFU26 official handover', 'Current finalist Base case', 'Current finalist Base case handover', 'Current finalist High population/comparison', 'Current finalist High population/comparison handover', 'Middle East conflict: Medium', 'Middle East conflict: Medium handover']"
+  },
+  {
+    "label": "warm_server",
+    "step": "06 Actual, Current and BEFU26 present",
+    "pass": true,
+    "detail": "actual=True current=True befu26=True"
+  },
+  {
+    "label": "warm_server",
+    "step": "07 MBU26 official path present and its own",
+    "pass": false,
+    "detail": "mbu26 traces=0"
+  },
+  {
+    "label": "warm_server",
+    "step": "08 switch to quarterly",
+    "pass": true,
+    "detail": "2.88s"
+  },
+  {
+    "label": "warm_server",
+    "step": "09 derived quarterly provenance stated",
+    "pass": false,
+    "detail": "found in hover/customdata/note surfaces"
+  },
+  {
+    "label": "warm_server",
+    "step": "10 terminal quarter is 2050Q2",
+    "pass": true,
+    "detail": "last=2030Q2"
+  },
+  {
+    "label": "warm_server",
+    "step": "10b quarterly bands are withheld, not fabricated",
+    "pass": true,
+    "detail": "band traces plotted at quarterly grain: []"
+  },
+  {
+    "label": "warm_server",
+    "step": "10c the reason is stated to the reader",
+    "pass": true,
+    "detail": "note reachable in text or tooltip surfaces"
+  },
+  {
+    "label": "warm_server",
+    "step": "11 switch published -> delayed_6m",
+    "pass": true,
+    "detail": "2.88s"
+  },
+  {
+    "label": "warm_server",
+    "step": "12 central values change",
+    "pass": false,
+    "detail": "compared 6 Current-side traces: ['Current finalist Base case', 'Current finalist High population/comparison', 'Middle East conflict: Medium', 'Current finalist Base case handover']"
+  },
+  {
+    "label": "warm_server",
+    "step": "12b band values follow the policy",
+    "pass": true,
+    "detail": "plotted arrays compared"
+  },
+  {
+    "label": "warm_server",
+    "step": "13 switch delayed_6m -> no_uplift",
+    "pass": true,
+    "detail": "3.72s"
+  },
+  {
+    "label": "warm_server",
+    "step": "14 no-uplift renders",
+    "pass": true,
+    "detail": "11 traces"
+  },
+  {
+    "label": "warm_server",
+    "step": "15 return to published",
+    "pass": true,
+    "detail": ""
+  },
+  {
+    "label": "warm_server",
+    "step": "16 policy-invariant series keeps an invariant band",
+    "pass": true,
+    "detail": "MVR central and bands identical across policy states"
+  },
+  {
+    "label": "warm_server",
+    "step": "17 expand chart",
+    "pass": true,
+    "detail": "316px -> 864px (80% of viewport) in 2.88s"
+  },
+  {
+    "label": "warm_server",
+    "step": "17b no horizontal overflow when expanded",
+    "pass": true,
+    "detail": "scrollWidth <= clientWidth"
+  },
+  {
+    "label": "warm_server",
+    "step": "18 apply a Plotly zoom",
+    "pass": true,
+    "detail": "range=[8, 18]"
+  },
+  {
+    "label": "warm_server",
+    "step": "19 collapse and expand preserves the accepted zoom behaviour",
+    "pass": true,
+    "detail": "uirevision stable (d54d8eff470db325); range after=[8, 18]"
+  },
+  {
+    "label": "warm_server",
+    "step": "20 compare mode Scenario B opens on VFM Base",
+    "pass": true,
+    "detail": "uptake combos=['Selected MoT VFM base. Uptake basis', 'Selected MoT VFM base. Uptake basis']"
+  },
+  {
+    "label": "warm_server",
+    "step": "21 no console errors",
+    "pass": true,
+    "detail": ""
+  },
+  {
+    "label": "warm_server_1440",
+    "step": "01 open Revenue Outlook",
+    "pass": true,
+    "detail": ""
+  },
+  {
+    "label": "warm_server_1440",
+    "step": "02 default Total NLTF chart",
+    "pass": true,
+    "detail": "13 traces: ['80% conditional band upper', '80% conditional modelled uncertainty', '50% conditional band upper', '50% conditional modelled uncertainty', 'Actual', 'BEFU26 official']"
+  },
+  {
+    "label": "warm_server_1440",
+    "step": "03 no petrol-retention control",
+    "pass": true,
+    "detail": "absent"
+  },
+  {
+    "label": "warm_server_1440",
+    "step": "04 no VFM Fast/Slow surface",
+    "pass": true,
+    "detail": "hits=[]"
+  },
+  {
+    "label": "warm_server_1440",
+    "step": "05 select Light petrol VKT",
+    "pass": true,
+    "detail": "traces=['50% conditional band upper', '50% conditional modelled uncertainty', '80% conditional band upper', '80% conditional modelled uncertainty', 'Actual', 'BEFU26 official', 'BEFU26 official handover', 'Current finalist Base case', 'Current finalist Base case handover', 'Current finalist High population/comparison', 'Current finalist High population/comparison handover', 'Middle East conflict: Medium', 'Middle East conflict: Medium handover']"
+  },
+  {
+    "label": "warm_server_1440",
+    "step": "06 Actual, Current and BEFU26 present",
+    "pass": true,
+    "detail": "actual=True current=True befu26=True"
+  },
+  {
+    "label": "warm_server_1440",
+    "step": "07 MBU26 official path present and its own",
+    "pass": false,
+    "detail": "mbu26 traces=0"
+  },
+  {
+    "label": "warm_server_1440",
+    "step": "08 switch to quarterly",
+    "pass": true,
+    "detail": "3.69s"
+  },
+  {
+    "label": "warm_server_1440",
+    "step": "09 derived quarterly provenance stated",
+    "pass": false,
+    "detail": "found in hover/customdata/note surfaces"
+  },
+  {
+    "label": "warm_server_1440",
+    "step": "10 terminal quarter is 2050Q2",
+    "pass": true,
+    "detail": "last=2030Q2"
+  },
+  {
+    "label": "warm_server_1440",
+    "step": "10b quarterly bands are withheld, not fabricated",
+    "pass": true,
+    "detail": "band traces plotted at quarterly grain: []"
+  },
+  {
+    "label": "warm_server_1440",
+    "step": "10c the reason is stated to the reader",
+    "pass": true,
+    "detail": "note reachable in text or tooltip surfaces"
+  },
+  {
+    "label": "warm_server_1440",
+    "step": "11 switch published -> delayed_6m",
+    "pass": true,
+    "detail": "2.87s"
+  },
+  {
+    "label": "warm_server_1440",
+    "step": "12 central values change",
+    "pass": false,
+    "detail": "compared 6 Current-side traces: ['Current finalist Base case', 'Current finalist High population/comparison', 'Middle East conflict: Medium', 'Current finalist Base case handover']"
+  },
+  {
+    "label": "warm_server_1440",
+    "step": "12b band values follow the policy",
+    "pass": true,
+    "detail": "plotted arrays compared"
+  },
+  {
+    "label": "warm_server_1440",
+    "step": "13 switch delayed_6m -> no_uplift",
+    "pass": true,
+    "detail": "3.71s"
+  },
+  {
+    "label": "warm_server_1440",
+    "step": "14 no-uplift renders",
+    "pass": true,
+    "detail": "11 traces"
+  },
+  {
+    "label": "warm_server_1440",
+    "step": "15 return to published",
+    "pass": true,
+    "detail": ""
+  },
+  {
+    "label": "warm_server_1440",
+    "step": "16 policy-invariant series keeps an invariant band",
+    "pass": true,
+    "detail": "MVR central and bands identical across policy states"
+  },
+  {
+    "label": "warm_server_1440",
+    "step": "17 expand chart",
+    "pass": true,
+    "detail": "316px -> 720px (80% of viewport) in 2.87s"
+  },
+  {
+    "label": "warm_server_1440",
+    "step": "17b no horizontal overflow when expanded",
+    "pass": true,
+    "detail": "scrollWidth <= clientWidth"
+  },
+  {
+    "label": "warm_server_1440",
+    "step": "18 apply a Plotly zoom",
+    "pass": true,
+    "detail": "range=[8, 18]"
+  },
+  {
+    "label": "warm_server_1440",
+    "step": "19 collapse and expand preserves the accepted zoom behaviour",
+    "pass": true,
+    "detail": "uirevision stable (d54d8eff470db325); range after=[8, 18]"
+  },
+  {
+    "label": "warm_server_1440",
+    "step": "20 compare mode Scenario B opens on VFM Base",
+    "pass": true,
+    "detail": "uptake combos=['Selected MoT VFM base. Uptake basis', 'Selected MoT VFM base. Uptake basis']"
+  },
+  {
+    "label": "warm_server_1440",
+    "step": "21 no console errors",
+    "pass": true,
+    "detail": ""
+  }
+]
