@@ -77,6 +77,9 @@ artifacts/**
 # integration evidence for the combined workshop release (components A + B + C)
 !artifacts/revenue_outlook_workshop_release/
 !artifacts/revenue_outlook_workshop_release/**
+# PED activity publication through FY2050 (diagnosis, identity audits, acceptance)
+!artifacts/revenue_outlook_ped_activity_2050/
+!artifacts/revenue_outlook_ped_activity_2050/**
 data/**
 !data/.gitkeep
 !data/dashboard_evidence_pack/

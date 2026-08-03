@@ -50,6 +50,7 @@ from .post_model_extrapolation import (
     FIRST_EXTRAPOLATION_FY,
     LAST_EXTRAPOLATION_FY,
     POST_MODEL_SEGMENT,
+    POST_MODEL_VALUE_STATUS,
     build_post_model_extrapolation_annual,
     post_model_chart_rows,
     post_model_line_reconciliation_rows,
@@ -2680,6 +2681,131 @@ def _append_selected_light_petrol_vkt_rows(
     )
 
 
+#: The two PED activity leaves that must publish a Current line to the FY2050
+#: presentation horizon. Deliberately a closed tuple rather than a rule over
+#: hidden line-reconciliation leaves: the line table carries many audit-only
+#: series that the chart must keep hiding, and a "publish every leaf" rule
+#: would expose all of them.
+POST_MODEL_PED_ACTIVITY_CHART_SERIES = (
+    "ped_vkt_per_capita",
+    "light_petrol_vkt",
+)
+
+
+def _append_post_model_ped_activity_chart_rows(
+    chart_rows: pd.DataFrame,
+    line_reconciliation: pd.DataFrame,
+) -> pd.DataFrame:
+    """Publish the governed FY2031-FY2050 PED activity rows to the chart.
+
+    ``ped_vkt_per_capita`` already reaches FY2050 through the pack's own
+    post-model chart rows, so in practice this adds nothing for it and the
+    membership guard below keeps it that way. ``light_petrol_vkt`` is the case
+    this exists for: it is absent from ``DISPLAY_SERIES_ORDER``, so every
+    runtime chart-row builder drops it and it never acquires an FY2030 chart
+    row to template from. Its Current values are nonetheless already
+    constructed - ``build_post_model_extrapolation_annual`` emits them and
+    ``post_model_line_reconciliation_rows`` carries them - so this is a
+    publication step, not a forecast.
+
+    Three rules make it safe to run on every bridge pass:
+
+    **Strictly additive.** A key that already carries a row for the series is
+    skipped, so the rendered FY2026-FY2030 values from
+    ``_append_selected_light_petrol_vkt_rows`` are never rewritten and the
+    econometric seam cannot move.
+
+    **The value is always the governed post-model value.** The template
+    supplies row metadata only. A row whose source is not stamped
+    ``post_model_extrapolation`` is refused rather than published, so an
+    official comparator level can never arrive here as a Current value.
+
+    **Templated from the Current path.** The template is the FY-matched
+    ``ped_vkt_per_capita`` Current row, which is itself a post-model row over
+    this window - never an official comparator row and never the raw pack.
+    """
+
+    if chart_rows is None or chart_rows.empty:
+        return pd.DataFrame() if chart_rows is None else chart_rows.copy()
+    if line_reconciliation is None or line_reconciliation.empty:
+        return chart_rows.copy()
+    # Keyed on scenario_name, NOT source_path. The two frames disagree about
+    # the comparison scenario's label - the line table calls it "Current
+    # finalist High population/comparison" while the chart calls it "Current
+    # finalist comparison behavioural path" - so a source_path/trace_name join
+    # silently publishes the Base case alone and drops the comparison.
+    required = {"series_id", "scenario_name", "FY", "value", "forecast_segment"}
+    if required.difference(line_reconciliation.columns):
+        return chart_rows.copy()
+
+    source = line_reconciliation[
+        line_reconciliation["series_id"].astype(str).isin(
+            POST_MODEL_PED_ACTIVITY_CHART_SERIES
+        )
+        & line_reconciliation["forecast_segment"].astype(str).eq(POST_MODEL_SEGMENT)
+    ].copy()
+    if source.empty:
+        return chart_rows.copy()
+    source["FY_numeric"] = pd.to_numeric(source["FY"], errors="coerce")
+    source["value_numeric"] = pd.to_numeric(source["value"], errors="coerce")
+    source = source[source["FY_numeric"].notna() & source["value_numeric"].notna()]
+    if source.empty:
+        return chart_rows.copy()
+
+    out = chart_rows.copy()
+    fy_numeric = pd.to_numeric(out.get("june_year"), errors="coerce")
+    scenario = out.get("scenario_name", pd.Series("", index=out.index)).fillna("").astype(str)
+    series = out.get("series_id", pd.Series("", index=out.index)).fillna("").astype(str)
+    grain = out.get("time_grain", pd.Series("", index=out.index)).fillna("").astype(str)
+    annual = grain.eq("june_year")
+
+    new_rows: list[pd.Series] = []
+    for record in source.to_dict("records"):
+        fy = int(record["FY_numeric"])
+        series_id = str(record["series_id"])
+        scenario_name = str(record.get("scenario_name") or "")
+        key_mask = annual & scenario.eq(scenario_name) & fy_numeric.eq(fy)
+        if bool((key_mask & series.eq(series_id)).any()):
+            continue
+        template_rows = out[key_mask & series.eq("ped_vkt_per_capita")]
+        if template_rows.empty:
+            # No governed Current template at this key. Publishing would mean
+            # inventing row metadata, so the series keeps the gap it had.
+            continue
+        row = template_rows.iloc[0].copy()
+        row["series_id"] = series_id
+        row["value"] = float(record["value_numeric"])
+        row["value_unit"] = str(record.get("unit") or row.get("value_unit") or "")
+        row["formula"] = str(record.get("formula") or row.get("formula") or "")
+        row["value_status"] = POST_MODEL_VALUE_STATUS
+        row["forecast_segment"] = POST_MODEL_SEGMENT
+        row["source"] = "post_model_structural_extrapolation"
+        row["source_basis"] = "post_model_structural_extrapolation"
+        row["source_file"] = "post_model_extrapolation"
+        row["source_cell"] = str(record.get("source_cell") or "")
+        row["official_value"] = pd.NA
+        row["residual_vs_official"] = pd.NA
+        if series_id == "light_petrol_vkt":
+            row["series_label"] = "Light petrol VKT"
+            row["metric_type"] = "activity"
+            row["stream"] = "PED"
+            row["stream_label"] = "PED"
+            row["row_role"] = "bridge_input"
+            row["revenue_basis"] = "not_applicable"
+            row["canonical_stream_key"] = "LIGHT_PETROL_VKT"
+            row["canonical_period_key"] = f"FY{fy}"
+            row["canonical_join_key"] = f"LIGHT_PETROL_VKT|FY{fy}|{scenario_name}"
+        new_rows.append(row)
+
+    if not new_rows:
+        return out
+    return pd.concat(
+        [out, pd.DataFrame(new_rows).reindex(columns=out.columns)],
+        ignore_index=True,
+        sort=False,
+    )
+
+
 def apply_ped_bridge_mode_layer(
     *,
     chart_rows: pd.DataFrame,
@@ -2744,6 +2870,14 @@ def apply_ped_bridge_mode_layer(
     adjusted_chart = _append_selected_light_petrol_vkt_rows(
         adjusted_chart,
         impact,
+    )
+    # The FY2031-FY2050 half of the same two activity leaves. Runs after the
+    # bridge pass so the FY2026-FY2030 rows it must not touch already exist,
+    # and before the scenario overlays so the published long-run rows respond
+    # to EV uptake, policy and conflict exactly as the econometric ones do.
+    adjusted_chart = _append_post_model_ped_activity_chart_rows(
+        adjusted_chart,
+        line_reconciliation,
     )
     adjusted_bridge = _apply_ped_bridge_mode_audit_to_frame(
         bridge_components,

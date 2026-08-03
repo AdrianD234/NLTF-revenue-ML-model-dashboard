@@ -1,0 +1,18 @@
+{
+  "starting_main_sha": "31b74615d9d91bb001516282fd3a1177292f1e08",
+  "branch": "fix/revenue-outlook-ped-activity-through-2050",
+  "python": "3.13.5",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "numpy": "2.4.6",
+  "pandas": "3.0.3",
+  "scipy": "1.17.1",
+  "streamlit": "1.58.0",
+  "pack_hashes": {
+    "revenue_outlook_ensemble": "976d0e015904b7ab",
+    "revenue_outlook_ar1": "712ebc9138ec52de",
+    "replay_cache": "ae57a1f473fa7d1f",
+    "policy_runtime": "dbf8a95fc13daa2d",
+    "quarterly_display_pack": "03df02267776d872",
+    "uncertainty_pack": "7c07be604e49965c"
+  }
+}
