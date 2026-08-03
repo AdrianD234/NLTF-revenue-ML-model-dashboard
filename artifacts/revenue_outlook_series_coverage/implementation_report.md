@@ -286,7 +286,16 @@ from model_dashboard.revenue_outlook_series_coverage import (
 )
 ```
 
-Two things the integration must carry:
+**Derived quarterly rows were reconditioned for numerical correctness.** Any
+value taken from a pack built before `c23a778` is superseded: the badly scaled
+solve returned display values good to about six significant figures for every
+series benchmarked on a raw net-km indicator. See
+[`reconditioning_before_after_audit.md`](reconditioning_before_after_audit.md)
+for the row-level evidence and
+[`reconditioning_row_movement.csv`](reconditioning_row_movement.csv) for every
+moved value.
+
+Three things the integration must carry:
 
 1. **`light_petrol_vkt` current-model quarters are not in the pack.** The
    Current annual rows for that series are built at runtime by
@@ -294,7 +303,11 @@ Two things the integration must carry:
    offline build cannot see them. Pass them as `annual_rows=` and they are
    derived under the identical contract. The same applies to conflict paths and
    policy states.
-2. **Derived rows must stay visibly derived.** Every row carries
+2. **Do not pin this pack by file hash across machines.** It is byte-identical
+   rebuilt on one platform and agrees to ~1e-13 relative across platforms;
+   `manifest.json` states this in `cross_platform_reproducibility`. Compare by
+   value at a tolerance.
+3. **Derived rows must stay visibly derived.** Every row carries
    `coverage_row_type=derived_quarterly_from_governed_annual`,
    `empirical_or_derived=derived`, its `derivation_method`, `seasonal_basis`,
    `annual_source_period`, `annual_source_value` and closure residual. Official

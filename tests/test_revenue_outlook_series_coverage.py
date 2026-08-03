@@ -769,6 +769,39 @@ def test_the_denton_solve_is_scale_invariant() -> None:
         )
 
 
+def test_the_denton_system_stays_well_conditioned_at_any_indicator_scale() -> None:
+    """Pin the fix at its cause, not just at its symptom.
+
+    The scale-invariance tests above would still pass with the badly scaled
+    system, because scale invariance is a property of the mathematics and the
+    bug was a property of the arithmetic. This one reconstructs the solved
+    matrix and checks its conditioning directly: unnormalised, a raw net-km
+    indicator (~3e9) drove it to ~6e9 and cost ~1e-6 of relative precision.
+    """
+    years = 25
+    shape = np.tile(np.array([1.00, 0.99, 1.01, 1.02]), years)
+
+    def condition_number(indicator: np.ndarray, *, normalise: bool) -> float:
+        size = indicator.shape[0]
+        weights = indicator / indicator.mean() if normalise else indicator
+        difference = np.diff(np.eye(size), axis=0)
+        constraint = np.zeros((years, size))
+        for year in range(years):
+            constraint[year, 4 * year : 4 * year + 4] = weights[4 * year : 4 * year + 4]
+        kkt = np.zeros((size + years, size + years))
+        kkt[:size, :size] = 2.0 * difference.T @ difference
+        kkt[:size, size:] = constraint.T
+        kkt[size:, :size] = constraint
+        return float(np.linalg.cond(kkt))
+
+    net_km_scale = shape * 3.4e9
+    assert condition_number(net_km_scale, normalise=False) > 1e8, (
+        "the unnormalised system should be the badly conditioned one"
+    )
+    for scale in (1.0, 1.8e3, 3.4e9):
+        assert condition_number(shape * scale, normalise=True) < 1e3
+
+
 def test_the_denton_solve_is_benchmark_scale_invariant() -> None:
     """Scaling every benchmark scales the answer by exactly the same factor."""
     annual = np.linspace(100.0, 300.0, 10)
