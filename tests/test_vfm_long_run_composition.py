@@ -35,6 +35,12 @@ from model_dashboard.revenue_outlook import (
 )
 from model_dashboard.revenue_scenario_key import RevenueScenarioComputationKey
 
+@pytest.fixture(scope="module", autouse=True)
+def _vfm_analyst_layers_enabled(vfm_analyst_layers_enabled):
+    """This module protects the retained Fast/Slow composition backend, so it
+    runs with the paused analyst surface deliberately switched on."""
+
+
 ROOT = Path(__file__).resolve().parents[1]
 AR1_DIR = Path("data") / "engine_ar1" / "current_revenue_outlook"
 SHARE_SOURCE = ROOT / "data" / "vfm_202405" / "vfm_vkt_shares.csv"

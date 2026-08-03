@@ -45,6 +45,14 @@ def _brand_logo_html() -> str:
     )
 
 
+# Stable container key for the expanded Total path chart. Shared by the
+# theme CSS and the Revenue Outlook page so the selector and the widget
+# can never drift apart.
+EXPANDED_CHART_CONTAINER_KEY = "revenue_outlook_total_chart_expanded"
+# Wrapper for the Expand/Collapse control that sits above that chart.
+EXPAND_CONTROL_CONTAINER_KEY = "revenue_outlook_expand_control"
+
+
 def inject_theme() -> None:
     st.markdown(
         f"""
@@ -1149,6 +1157,66 @@ def inject_theme() -> None:
             }}
             .ro-cmp-a {{ background: #002B5C; }}
             .ro-cmp-b {{ background: #F37021; }}
+            /* Expanded main chart: an enlarged workspace INSIDE the app,
+               not browser fullscreen (no permission prompt, no new component).
+               The height is viewport-relative so the same rule works on a
+               1440x900 laptop and a 1920x1080 desktop; Plotly is rendered
+               responsive by Streamlit and fills whatever box it is given, so
+               only the container needs a height. width:100% with
+               box-sizing:border-box keeps the card inside the content column -
+               the page must never scroll horizontally. */
+            /* Expand/Collapse control: pinned to the top right of the
+               chart it governs. Flexbox rather than a spacer column so the
+               position does not depend on Streamlit column weights. */
+            .st-key-{EXPAND_CONTROL_CONTAINER_KEY} {{
+                display: flex !important;
+                flex-direction: row !important;
+                justify-content: flex-end !important;
+                margin-bottom: -0.25rem;
+            }}
+            .st-key-{EXPAND_CONTROL_CONTAINER_KEY} div[data-testid="stElementContainer"] {{
+                flex: 0 0 auto;
+                margin-left: auto;
+                width: auto !important;
+            }}
+            .st-key-{EXPANDED_CHART_CONTAINER_KEY} {{
+                box-sizing: border-box;
+                width: 100%;
+            }}
+            /* The height has to be given to the whole wrapper chain, not just
+               the chart: Streamlit's element container and full-screen frame
+               keep their original height otherwise, and the taller Plotly SVG
+               is clipped by the card instead of enlarging it. */
+            .st-key-{EXPANDED_CHART_CONTAINER_KEY} div[data-testid="stElementContainer"]:has(div[data-testid="stPlotlyChart"]),
+            .st-key-{EXPANDED_CHART_CONTAINER_KEY} div[data-testid="stFullScreenFrame"],
+            .st-key-{EXPANDED_CHART_CONTAINER_KEY} div[data-testid="stPlotlyChart"] {{
+                height: 80vh;
+                min-height: 420px;
+            }}
+            /* Streamlit gives the element container a fixed flex-basis sized to
+               the collapsed chart. In a column flex layout that basis beats
+               `height`, so it has to be released or the card keeps the old
+               height and clips the taller chart. */
+            .st-key-{EXPANDED_CHART_CONTAINER_KEY} div[data-testid="stElementContainer"]:has(div[data-testid="stPlotlyChart"]) {{
+                flex: 0 0 auto !important;
+            }}
+            .st-key-{EXPANDED_CHART_CONTAINER_KEY} div[data-testid="stPlotlyChart"] > div,
+            .st-key-{EXPANDED_CHART_CONTAINER_KEY} div[data-testid="stPlotlyChart"] .js-plotly-plot,
+            .st-key-{EXPANDED_CHART_CONTAINER_KEY} div[data-testid="stPlotlyChart"] .plot-container {{
+                height: 100% !important;
+                max-width: 100%;
+                width: 100% !important;
+            }}
+            /* Short viewports would otherwise get a chart taller than the
+               screen, which reintroduces the scrolling the mode exists to
+               remove. */
+            @media (max-height: 700px) {{
+                .st-key-{EXPANDED_CHART_CONTAINER_KEY} div[data-testid="stElementContainer"]:has(div[data-testid="stPlotlyChart"]),
+                .st-key-{EXPANDED_CHART_CONTAINER_KEY} div[data-testid="stFullScreenFrame"],
+                .st-key-{EXPANDED_CHART_CONTAINER_KEY} div[data-testid="stPlotlyChart"] {{
+                    height: 74vh;
+                }}
+            }}
             /* Revenue Outlook view-mode switch: a horizontal radio rendered
                as a segmented pill control (single scenario vs A/B compare). */
             .st-key-revenue_outlook_view_mode div[data-testid="stRadio"] > label {{
@@ -1293,11 +1361,22 @@ def chart_card(
     caption: str | None = None,
     *,
     notes_as_tooltip: bool = True,
+    container_key: str | None = None,
 ) -> None:
+    """One bordered chart card.
+
+    ``container_key`` puts a stable ``st-key-<key>`` class on the wrapper so a
+    caller can restyle this one card - the expanded Revenue Outlook chart uses
+    it to claim a taller viewport-relative workspace - without a new component
+    or a global selector that would catch every chart on the page.
+    """
     key = "chart_card_" + re.sub(r"[^a-z0-9]+", "_", title.lower()).strip("_")
     if hasattr(figure, "update_layout"):
         figure.update_layout(title_text="")
-    with st.container(border=True):
+    container_kwargs: dict[str, Any] = {"border": True}
+    if container_key:
+        container_kwargs["key"] = container_key
+    with st.container(**container_kwargs):
         st.markdown(
             "<div class='gov-chart-card chart-card'>"
             f"{_chart_card_header_html(title, subtitle, caption, notes_as_tooltip=notes_as_tooltip)}"

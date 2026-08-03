@@ -585,7 +585,10 @@ def test_middle_east_paths_reconcile_net_revenue_and_quarter_timing(context) -> 
             assert float(sums.loc[fy]) == pytest.approx(float(annual.at[fy, scenario_name]), abs=1e-6)
 
 
-def test_cone_band_is_uptake_key_invariant(context) -> None:
+def test_cone_band_is_uptake_key_invariant(
+    context, vfm_analyst_layers_enabled
+) -> None:
+    """The band's cache identity, checked with the paused layer switched on."""
     pack, signature = context
     sens, _ = _default_keys()
     bands = {}

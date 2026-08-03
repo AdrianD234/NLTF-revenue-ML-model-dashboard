@@ -50,6 +50,12 @@ TRACES = (
 ALL_BANDS = (BAND_80_LAYER_ID, VFM_ENVELOPE_LAYER_ID, BAND_50_LAYER_ID)
 
 
+@pytest.fixture(scope="module", autouse=True)
+def _vfm_analyst_layers_enabled(vfm_analyst_layers_enabled):
+    """This whole module protects the retained Fast/Slow backend, so it runs
+    with the paused analyst surface deliberately switched on."""
+
+
 def production_key() -> RevenueScenarioComputationKey:
     return RevenueScenarioComputationKey(
         uptake_basis=app.DEFAULT_EV_UPTAKE_MODE,
