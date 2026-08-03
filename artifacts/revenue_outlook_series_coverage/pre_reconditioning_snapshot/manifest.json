@@ -1,0 +1,24 @@
+{
+  "captured_from_commit": "6acb13be3a335afdae315d57a0d6bc1d8cd94dd3",
+  "decision_facing": false,
+  "files": [
+    {
+      "file": "quarterly_rows_pre_reconditioning.parquet",
+      "rows": 8344,
+      "sha256": "cbaa5717a80a0a63fa75c7791c17d581a13f4dc50603ef4a0158e646bcbd6acb",
+      "source_repo_path": "data/revenue_outlook_quarterly_display/quarterly_rows.parquet"
+    },
+    {
+      "file": "official_annual_rows_pre_reconditioning.parquet",
+      "rows": 73,
+      "sha256": "a2c58e2f12939ae63d45f86dcbe5f48baebf99e3de48a5f93ecfc71bdbf3193f",
+      "source_repo_path": "data/revenue_outlook_quarterly_display/official_annual_rows.parquet"
+    }
+  ],
+  "format_note": "Parquet, not CSV. pandas to_csv does not round-trip float64 exactly in this environment - a plain round-trip moved 476 of 8344 values by up to 7.3e-12, and float_format='%.17g' moved 1458 - which would have made an exact benchmarks-unchanged comparison impossible to state.",
+  "production_use": "PROHIBITED. No runtime loader, pack builder or dashboard consumer may read this directory. These values are superseded and less accurate than the published pack.",
+  "purpose": "Quarterly display values as published by the BADLY CONDITIONED Denton solve, frozen so the reconditioning before/after audit can be regenerated without reading a historical Git object - a shallow CI checkout may not contain that commit. The unnormalised KKT system reached a condition number of ~5.8e9 on the raw net-km indicators and lost about 1e-6 of relative precision, so these values are accurate to only about six significant figures for every series benchmarked on a net-km indicator. The official annual rows are included because the audit must prove they did NOT move; they never pass through the solve.",
+  "schema_version": "nltf-legacy-investigation-snapshot-v1",
+  "status": "superseded_investigation_evidence",
+  "superseded_by": "denton_normalised_solve_v1"
+}
