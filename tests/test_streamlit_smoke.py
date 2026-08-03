@@ -245,7 +245,23 @@ def test_revenue_outlook_default_sensitivity_view_uses_fast_path_and_preserves_v
     expected_chart_rows = app._filter_official_vintage_rows(
         expected["chart_rows"], official_scenario, official_overlay
     )
-    assert len(non_fuel) == len(expected_chart_rows)
+    # The view also restores the official rows the runtime builders drop before
+    # they can become chart rows, so it is a strict SUPERSET of the raw pack
+    # rather than the same length. Equality here would assert the restoration
+    # never happened. The extra rows are pinned to exactly that: official
+    # comparators and their Actual history, for the dropped series only.
+    identity = ["series_id", "trace_name", "time_grain", "period"]
+    expected_keys = set(map(tuple, expected_chart_rows[identity].astype(str).to_numpy()))
+    actual_keys = set(map(tuple, non_fuel[identity].astype(str).to_numpy()))
+    assert expected_keys <= actual_keys, "a pack row vanished from the view"
+    restored = non_fuel[
+        ~non_fuel[identity].astype(str).apply(tuple, axis=1).isin(expected_keys)
+    ]
+    assert set(restored["series_id"].astype(str)) <= {"light_petrol_vkt"}
+    assert set(restored["row_type"].astype(str)) <= {
+        "official_comparator",
+        "historical_actual",
+    }
     assert set(view["chart_rows"]["trace_name"].astype(str)) >= set(CONFLICT_TRACE_NAMES)
     conflict_input_audit = view["conflict_fuel_input_audit"]
     assert set(conflict_input_audit["scenario_name"].astype(str)) == set(
@@ -985,6 +1001,9 @@ def test_revenue_outlook_activity_figure_cache_matches_direct_builder() -> None:
         traces,
         sensitivity_key,
         PED_BRIDGE_DEFAULT_MODE,
+        # The selected Current 12c state is part of this cache's identity now:
+        # it decides which governed rate timetable shapes the quarterly view.
+        str(view.get("current_fed_policy_state") or ""),
         view["chart_rows"],
     )
     direct_frames = []
@@ -1032,12 +1051,13 @@ def test_revenue_outlook_activity_figure_cache_matches_direct_builder() -> None:
     # non-decision-facing evidence in raw_quarterly_forecast_audit.
     assert len(base_petrol) == EXTENDED_EVIDENCE_MAX_HORIZON
     assert set(base_petrol["series_id"].astype(str)) == {"light_petrol_vkt"}
-    assert set(base_petrol["data_scope"].astype(str)).issubset(
-        {
-            "quarterly_disaggregated_from_annual",
-            "quarterly_disaggregated_from_annual_fed_policy",
-        }
-    )
+    # The display path derives through the governed coverage contract now, so
+    # the provenance vocabulary is that contract's rather than the older
+    # ad-hoc one. What matters is unchanged: these rows say they are derived.
+    assert set(base_petrol["data_scope"].astype(str)) == {
+        "derived_quarterly_from_governed_annual"
+    }
+    assert set(base_petrol["empirical_or_derived"].astype(str)) == {"derived"}
     annual_petrol = view["chart_rows"][
         view["chart_rows"]["trace_name"].astype(str).eq("Current finalist Base case")
         & view["chart_rows"]["series_id"].astype(str).eq("light_petrol_vkt")

@@ -1400,6 +1400,203 @@ def derive_quarterly_rows(
     return frame.sort_values(["series_id", "trace_name", "period"], kind="stable").reset_index(drop=True)
 
 
+#: The runtime column carrying the governed conflict quarterly delta map. It is
+#: written only by the fuel-price scenario replay, so its presence identifies a
+#: conflict trace without this module needing the scenario vocabulary.
+CONFLICT_DELTA_LINEAGE_COLUMN = "_fuel_quarterly_value_deltas"
+#: The scenario the conflict paths are a delta AGAINST.
+BASE_SCENARIO_NAME = "current_basecase"
+METHOD_BASE_PLUS_CONFLICT_DELTA = "base_quarters_plus_governed_conflict_delta"
+
+
+def _fixed_quarter_lookup(
+    chart_rows: pd.DataFrame | None,
+    contract: QuarterlyDisplayContract,
+    trace_name: Any,
+    *,
+    unit: Any = None,
+    is_actual_trace: bool = False,
+) -> dict[str, float]:
+    """Quarters held at a published value, so never derived over.
+
+    Two sources: this trace's own published quarters, and the Actual
+    observations any forecast trace must hand over from. Shared by the Denton
+    path and the conflict delta path so the two cannot disagree about which
+    quarters are already spoken for.
+    """
+    resolved_unit = unit if unit is not None else contract.unit
+    fixed = dict(_native_quarter_lookup(chart_rows, contract.series_id, trace_name, resolved_unit))
+    if not is_actual_trace:
+        for period, value in _actual_quarter_lookup(
+            chart_rows, contract.series_id, resolved_unit
+        ).items():
+            fixed.setdefault(period, value)
+    return fixed
+
+
+def _conflict_delta_map(raw: Any) -> dict[str, float]:
+    """Parse one row's governed quarter -> delta map."""
+    text = "" if raw is None else str(raw).strip()
+    if not text:
+        return {}
+    try:
+        parsed = json.loads(text)
+    except (TypeError, ValueError):
+        return {}
+    if not isinstance(parsed, dict):
+        return {}
+    out: dict[str, float] = {}
+    for period, value in parsed.items():
+        try:
+            out[str(period)] = float(value)
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
+def _has_conflict_delta_lineage(group: pd.DataFrame) -> bool:
+    """Every year in the group must carry a delta map, or none may be used."""
+    if CONFLICT_DELTA_LINEAGE_COLUMN not in group.columns:
+        return False
+    text = group[CONFLICT_DELTA_LINEAGE_COLUMN].fillna("").astype(str)
+    return bool(len(text)) and bool(text.str.len().gt(0).all())
+
+
+def _derive_conflict_trace(
+    group: pd.DataFrame,
+    *,
+    contract: QuarterlyDisplayContract,
+    chart_rows: pd.DataFrame | None,
+    repo_root: Path | str | None,
+    policy_state: str,
+) -> list[dict[str, Any]] | None:
+    """Base quarters plus the governed conflict delta. None if unavailable.
+
+    A conflict path is annual for revenue but its drivers have native quarterly
+    replay deltas, and those deltas are already causally restricted: the fuel
+    replay allocates them only from the causal floor onward, where the floor is
+    the first quarter Low/Medium/High inputs diverge. Reusing them is therefore
+    both the economically correct construction and the one that needs no new
+    seasonal assumption.
+
+    A plain Denton solve cannot do this. It is constrained to the fiscal-year
+    total, and a conflict year's total differs from Base, so it redistributes
+    across *every* quarter of that year - including quarters before the shock.
+    For FY2026, which spans 2025Q3-2026Q2 while the shock starts at 2026Q1,
+    that silently moved two pre-shock quarters by ~0.8%. A quarter before the
+    cause cannot move because of it.
+
+    Returning ``None`` means the lineage is not usable for this group and the
+    caller should fall back to the declared per-series rule.
+    """
+    if chart_rows is None or chart_rows.empty or not _has_conflict_delta_lineage(group):
+        return None
+    template = group.iloc[0].to_dict()
+    series_id = str(template.get("series_id") or "")
+    fed_path = str(template.get("fed_path") or "")
+    years = [int(fy) for fy in group["_fy"].astype(int).tolist()]
+
+    required = {"time_grain", "scenario_name", "series_id", "june_year"}
+    if required.difference(chart_rows.columns):
+        return None
+    base_annual = chart_rows[
+        chart_rows["time_grain"].astype(str).eq("june_year")
+        & chart_rows["scenario_name"].astype(str).eq(BASE_SCENARIO_NAME)
+        & chart_rows["series_id"].astype(str).eq(series_id)
+        & pd.to_numeric(chart_rows["june_year"], errors="coerce").isin(years)
+    ].copy()
+    if fed_path and "fed_path" in base_annual.columns:
+        base_annual = base_annual[base_annual["fed_path"].astype(str).eq(fed_path)]
+    if base_annual.empty:
+        return None
+
+    # The Base quarters are built by the SAME governed contract, so the conflict
+    # path inherits Base's seasonality, rate basis and policy timetable rather
+    # than acquiring its own.
+    base_quarterly = derive_quarterly_rows(
+        base_annual,
+        chart_rows=chart_rows,
+        apply_display_horizon=False,
+        repo_root=repo_root,
+        policy_state=policy_state,
+    )
+    if base_quarterly.empty:
+        return None
+    base_lookup = {
+        str(row.period): float(row.value)
+        for row in base_quarterly.itertuples()
+        if pd.notna(getattr(row, "value", np.nan))
+    }
+    # Quarters the Base derivation withheld because a published Actual already
+    # occupies them are still needed to close the year.
+    fixed_lookup = _fixed_quarter_lookup(
+        chart_rows,
+        contract,
+        template.get("trace_name"),
+        unit=template.get("value_unit"),
+    )
+    base_lookup = {**fixed_lookup, **base_lookup}
+    if not base_lookup:
+        return None
+
+    records: list[dict[str, Any]] = []
+    for year_index, fy in enumerate(years):
+        year_template = group.iloc[year_index].to_dict()
+        quarter_periods = list(june_year_quarters(fy))
+        delta_map = _conflict_delta_map(year_template.get(CONFLICT_DELTA_LINEAGE_COLUMN))
+        values = np.array(
+            [base_lookup.get(period, np.nan) + delta_map.get(period, 0.0) for period in quarter_periods],
+            dtype=float,
+        )
+        if not np.all(np.isfinite(values)):
+            return None
+
+        annual_value = float(group["_value"].to_numpy(dtype=float)[year_index])
+        benchmark = annual_value * 4.0 if contract.average_preserving else annual_value
+        achieved = float(values.mean() * 4.0 if contract.average_preserving else values.sum())
+        residual = benchmark - achieved
+        # The residual goes to an ELIGIBLE quarter - one the governed lineage
+        # already moved. Putting it anywhere else would reintroduce exactly the
+        # backwards leak this construction exists to prevent.
+        eligible = [
+            position
+            for position, period in enumerate(quarter_periods)
+            if abs(delta_map.get(period, 0.0)) > 1e-12
+        ]
+        if abs(residual) > 1e-12:
+            if not eligible:
+                # No quarter in this year is causally eligible, so the year has
+                # no conflict effect at all and must equal Base exactly.
+                if abs(residual) > 1e-6:
+                    return None
+            else:
+                target = max(eligible, key=lambda p: abs(delta_map[quarter_periods[p]]))
+                values[target] += residual
+        if contract.positivity_rule == POSITIVITY_REQUIRED and (values < 0).any():
+            return None
+
+        fixed_periods = [p for p in quarter_periods if p in fixed_lookup]
+        for position, period in enumerate(quarter_periods):
+            if period in fixed_lookup:
+                continue
+            records.append(
+                _quarterly_record(
+                    year_template,
+                    contract=contract,
+                    period=period,
+                    fy=fy,
+                    value=float(values[position]),
+                    annual_value=annual_value,
+                    residual=float(residual),
+                    fixed_quarters=fixed_periods,
+                    fixed_total=math.fsum(fixed_lookup[p] for p in fixed_periods),
+                    method=METHOD_BASE_PLUS_CONFLICT_DELTA,
+                    seasonal_basis=contract.seasonal_basis,
+                )
+            )
+    return records
+
+
 def _derive_one_trace(
     group: pd.DataFrame,
     *,
@@ -1408,6 +1605,15 @@ def _derive_one_trace(
     repo_root: Path | str | None = None,
     policy_state: str = DEFAULT_QUARTERLY_RATE_POLICY_STATE,
 ) -> list[dict[str, Any]]:
+    conflict = _derive_conflict_trace(
+        group,
+        contract=contract,
+        chart_rows=chart_rows,
+        repo_root=repo_root,
+        policy_state=policy_state,
+    )
+    if conflict is not None:
+        return conflict
     template = group.iloc[0].to_dict()
     trace_name = template.get("trace_name")
     is_actual_trace = str(template.get("row_type") or "") == "historical_actual"
@@ -1420,13 +1626,9 @@ def _derive_one_trace(
         return []
 
     unit = template.get("value_unit") or contract.unit
-    # Two sources of fixed quarters: this trace's own published quarters, and
-    # the Actual observations any forecast trace must hand over from. Both are
-    # held at their published value and withheld from the output.
-    fixed_lookup = dict(_native_quarter_lookup(chart_rows, contract.series_id, trace_name, unit))
-    if not is_actual_trace:
-        for period, value in _actual_quarter_lookup(chart_rows, contract.series_id, unit).items():
-            fixed_lookup.setdefault(period, value)
+    fixed_lookup = _fixed_quarter_lookup(
+        chart_rows, contract, trace_name, unit=unit, is_actual_trace=is_actual_trace
+    )
 
     # A June year every one of whose quarters is already published needs no
     # derivation at all, and including it would only perturb the Denton solve.

@@ -532,6 +532,184 @@ def test_light_petrol_vkt_current_rows_really_do_stop_at_fy2030() -> None:
     assert int(pd.to_numeric(official["june_year"], errors="coerce").max()) == 2050
 
 
+# ------------------------------------ conflict quarters may not leak backwards
+
+
+CONFLICT_TRACE = "Current finalist comparison behavioural path"
+BASE_TRACE = "Current finalist Base case"
+
+
+def _conflict_quarterly(engine: str, severity_scenario: str):
+    """(base quarters, conflict quarters, conflict annual) from the live path.
+
+    Uses the real overlay rows, because the governed conflict delta lineage is
+    a RUNTIME column - it does not exist in the committed pack.
+    """
+    from model_dashboard.engine import engine_revenue_outlook_dir
+    from model_dashboard.official_vintage import bridge_vintage_id_from_manifest
+    from model_dashboard.revenue_outlook import (
+        PED_BRIDGE_DEFAULT_MODE,
+        revenue_outlook_signature,
+    )
+
+    pack_dir = ROOT / engine_revenue_outlook_dir(engine)
+    signature = revenue_outlook_signature(pack_dir, ROOT)
+    pack = app.cached_load_revenue_outlook_pack(
+        str(pack_dir), str(ROOT), signature, app.REVENUE_OUTLOOK_SCHEMA_VERSION
+    )
+    block = pack.manifest.get("official_vintages", {})
+    key = app.RevenueScenarioComputationKey(
+        engine=engine,
+        uptake_basis=app.DEFAULT_EV_UPTAKE_MODE,
+        current_fed_policy_state="published",
+        official_fed_policy_state="published",
+        ped_bridge_mode=PED_BRIDGE_DEFAULT_MODE,
+        bridge_vintage_id=str(bridge_vintage_id_from_manifest(pack.manifest, ROOT) or ""),
+        official_comparator_vintage_id=str(
+            block.get("default_comparator_vintage_id") or "BEFU26"
+        ),
+        long_run_transition_schedule_id=str(
+            block.get("long_run_transition_schedule_id") or app.UNBLENDED_SCHEDULE_ID
+        ),
+        long_run_shape_vintage_id=str(block.get("long_run_shape_vintage_id") or ""),
+    )
+    sens = app.selected_sensitivity_key("Off", "Off", "Off", freight_rail_shift="Off")
+    rows, _u, _e, _p, _s = app.cached_scenario_overlay_rows(
+        signature, sens, PED_BRIDGE_DEFAULT_MODE, key, pack
+    )
+    annual = rows[
+        rows["time_grain"].astype(str).eq("june_year")
+        & rows["series_id"].astype(str).eq("total_nltf_net_revenue")
+    ]
+    conflict_annual = annual[annual["scenario_name"].astype(str).eq(severity_scenario)]
+    base_annual = annual[annual["scenario_name"].astype(str).eq("current_basecase")]
+    if conflict_annual.empty or base_annual.empty:
+        pytest.skip(f"{severity_scenario} not present for engine {engine}")
+    base_q = coverage.derive_quarterly_rows(
+        base_annual, chart_rows=rows, repo_root=ROOT, apply_display_horizon=False
+    )
+    conflict_q = coverage.derive_quarterly_rows(
+        conflict_annual, chart_rows=rows, repo_root=ROOT, apply_display_horizon=False
+    )
+    return base_q, conflict_q, conflict_annual
+
+
+@pytest.mark.parametrize("engine", ENGINES)
+@pytest.mark.parametrize(
+    "severity_scenario",
+    list(app.CONFLICT_SCENARIO_NAMES),
+)
+class TestConflictQuartersDoNotLeakBackwards:
+    """A quarter before the cause cannot move because of it.
+
+    A plain Denton solve is constrained to the fiscal-year total, and a
+    conflict year's total differs from Base, so it redistributes across every
+    quarter of that year - including the ones before the shock. FY2026 spans
+    2025Q3-2026Q2 while the shock starts at 2026Q1, so two pre-shock quarters
+    moved by ~0.8%. The construction under test builds Base quarters and adds
+    the governed delta, which is zero before the causal floor by construction.
+    """
+
+    def test_pre_causal_floor_quarters_equal_base_exactly(
+        self, engine: str, severity_scenario: str
+    ) -> None:
+        base_q, conflict_q, conflict_annual = _conflict_quarterly(engine, severity_scenario)
+        base = base_q.set_index("period")["value"].map(float)
+        conflict = conflict_q.set_index("period")["value"].map(float)
+        floor = _causal_floor(conflict_annual)
+        shared = [p for p in conflict.index if p in base.index and p < floor]
+        assert shared, "no pre-floor quarters to check"
+        for period in shared:
+            assert conflict[period] == pytest.approx(base[period], abs=1e-9), (
+                f"{severity_scenario} moved pre-shock quarter {period} "
+                f"(floor {floor}) on engine {engine}"
+            )
+
+    def test_at_least_one_post_floor_quarter_moves_non_vacuously(
+        self, engine: str, severity_scenario: str
+    ) -> None:
+        base_q, conflict_q, conflict_annual = _conflict_quarterly(engine, severity_scenario)
+        base = base_q.set_index("period")["value"].map(float)
+        conflict = conflict_q.set_index("period")["value"].map(float)
+        floor = _causal_floor(conflict_annual)
+        moved = [
+            p
+            for p in conflict.index
+            if p in base.index and p >= floor and abs(conflict[p] - base[p]) > 1e-6
+        ]
+        assert moved, "a conflict path that never differs from Base is not a conflict"
+
+    def test_quarters_sum_to_the_unchanged_conflict_annual_benchmark(
+        self, engine: str, severity_scenario: str
+    ) -> None:
+        _base_q, conflict_q, conflict_annual = _conflict_quarterly(engine, severity_scenario)
+        anchors = conflict_annual.set_index(
+            pd.to_numeric(conflict_annual["june_year"], errors="coerce")
+        )["value"].map(float)
+        for fy, group in conflict_q.groupby(
+            pd.to_numeric(conflict_q["june_year"], errors="coerce")
+        ):
+            if fy not in anchors.index or len(group) != 4:
+                continue  # partially published years close against fixed quarters
+            assert math.fsum(
+                pd.to_numeric(group["value"], errors="coerce").dropna()
+            ) == pytest.approx(float(anchors.loc[fy]), rel=0, abs=1e-6)
+
+    def test_no_duplicate_quarter_keys(self, engine: str, severity_scenario: str) -> None:
+        _base_q, conflict_q, _ = _conflict_quarterly(engine, severity_scenario)
+        assert not conflict_q.duplicated(subset=["series_id", "trace_name", "period"]).any()
+
+    def test_no_negative_values_are_introduced(
+        self, engine: str, severity_scenario: str
+    ) -> None:
+        _base_q, conflict_q, _ = _conflict_quarterly(engine, severity_scenario)
+        assert (pd.to_numeric(conflict_q["value"], errors="coerce").dropna() >= 0).all()
+
+    def test_the_derivation_is_declared_as_base_plus_delta(
+        self, engine: str, severity_scenario: str
+    ) -> None:
+        """Provenance must name the construction, not the generic solve."""
+        _base_q, conflict_q, _ = _conflict_quarterly(engine, severity_scenario)
+        methods = set(conflict_q["derivation_method"].astype(str))
+        assert coverage.METHOD_BASE_PLUS_CONFLICT_DELTA in methods
+        assert "annual_reconciliation_residual" in conflict_q.columns
+
+
+def _causal_floor(conflict_annual: pd.DataFrame) -> str:
+    """The first quarter the governed delta lineage actually moves.
+
+    Read from the lineage the fuel replay wrote, never hardcoded, so if the
+    replay's causal floor moves this test moves with it instead of silently
+    checking the wrong boundary.
+    """
+    floors: list[str] = []
+    for raw in conflict_annual.get(
+        coverage.CONFLICT_DELTA_LINEAGE_COLUMN, pd.Series(dtype=str)
+    ):
+        moved = [
+            period
+            for period, delta in coverage._conflict_delta_map(raw).items()
+            if abs(delta) > 1e-12
+        ]
+        floors.extend(moved)
+    assert floors, "the conflict lineage moves no quarter at all"
+    return min(floors)
+
+
+def test_conflict_convergence_is_intact() -> None:
+    """High must not be gentler than Low where the paths differ."""
+    base_low, low_q, _ = _conflict_quarterly("ensemble", app.CONFLICT_SCENARIO_NAMES[0])
+    _b, high_q, _ = _conflict_quarterly("ensemble", app.CONFLICT_SCENARIO_NAMES[-1])
+    base = base_low.set_index("period")["value"].map(float)
+    low = low_q.set_index("period")["value"].map(float)
+    high = high_q.set_index("period")["value"].map(float)
+    shared = [p for p in low.index if p in high.index and p in base.index]
+    moved = [p for p in shared if abs(low[p] - base[p]) > 1e-6]
+    assert moved, "no quarter differs from Base at all"
+    for period in moved:
+        assert abs(high[period] - base[period]) >= abs(low[period] - base[period]) - 1e-6
+
+
 def test_the_builder_switches_the_fast_path_off() -> None:
     """A rebuild must materialise the reference pipeline, not itself.
 
