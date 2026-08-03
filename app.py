@@ -2293,7 +2293,11 @@ def _filter_series_rows_with_fallback(
 _OFFICIAL_ROW_IDENTITY = ("series_id", "trace_name", "time_grain", "period")
 
 
-def _append_missing_official_rows(chart_rows: pd.DataFrame) -> pd.DataFrame:
+def _append_missing_official_rows(
+    chart_rows: pd.DataFrame,
+    official_scenario: str = "",
+    official_overlay: bool = False,
+) -> pd.DataFrame:
     """Add source-backed official rows the runtime builders never emitted.
 
     Strictly additive, and only where the vintage itself publishes a value:
@@ -2302,6 +2306,14 @@ def _append_missing_official_rows(chart_rows: pd.DataFrame) -> pd.DataFrame:
     substituted for an official one. The vintages stay separate traces - BEFU26
     is not filled in from MBU26 or the reverse - because a comparator that
     silently borrowed another vintage's number would be worse than a gap.
+
+    **The selected vintage is re-applied to what is appended.**
+    ``missing_official_rows`` answers for every registered vintage, because it
+    describes what the sources publish, not what this reader chose. Appending
+    that straight after the vintage filter put the non-selected vintage back
+    on the page: with BEFU26 selected, ``mbu26_official`` reappeared in
+    ``scenario_name``. Filtering here keeps "one selected comparator" true no
+    matter which stage last touched the frame.
 
     The identity check is belt and braces: the API is already a complement, so
     a duplicate here would mean the two disagreed about what a row IS, and
@@ -2320,6 +2332,10 @@ def _append_missing_official_rows(chart_rows: pd.DataFrame) -> pd.DataFrame:
         # the series simply keeps the gap it already had.
         return chart_rows
     if missing is None or missing.empty:
+        return chart_rows
+    if official_scenario:
+        missing = _filter_official_vintage_rows(missing, official_scenario, official_overlay)
+    if missing.empty:
         return chart_rows
     combined = pd.concat([chart_rows, missing], ignore_index=True, sort=False)
     identity = [column for column in _OFFICIAL_ROW_IDENTITY if column in combined.columns]
@@ -3143,8 +3159,11 @@ def cached_revenue_outlook_view(
     # rows. Light petrol VKT is the case that matters: BEFU26 and MBU26 both
     # publish it, but it is not in DISPLAY_SERIES_ORDER, so the selector
     # offered a series with no official comparator. This restores those rows
-    # from their own registered vintage source, additively.
-    chart_rows = _append_missing_official_rows(chart_rows)
+    # from their own registered vintage source, additively, and under the
+    # SAME vintage selection the filter above just applied.
+    chart_rows = _append_missing_official_rows(
+        chart_rows, official_scenario, official_overlay
+    )
     effective_current_fed_policy_state = _effective_fed_policy_state(
         current_fed_policy_state,
         _CURRENT_FED_UPLIFT_ROLES,
