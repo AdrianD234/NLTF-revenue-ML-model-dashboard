@@ -77,6 +77,7 @@ __all__ = [
     "COVERAGE_ROW_TYPE_NATIVE",
     "COVERAGE_ROW_TYPE_OFFICIAL_ANNUAL",
     "CONTRACT_VERSION",
+    "CROSS_PLATFORM_REPRODUCIBILITY",
     "DISPLAY_HORIZON_LAST_FY",
     "DISPLAY_HORIZON_LAST_QUARTER",
     "QUARTERLY_DISPLAY_CONTRACT",
@@ -126,6 +127,20 @@ DISPLAY_HORIZON_LAST_QUARTER = f"{DISPLAY_HORIZON_LAST_FY}Q2"
 
 QUARTERLY_DISPLAY_PACK_DIR = Path("data") / "revenue_outlook_quarterly_display"
 _REBUILD_COMMAND = "python scripts/build_revenue_outlook_quarterly_display_pack.py"
+
+# What reproducibility this pack actually offers, stated rather than implied.
+# The Denton solve goes through numpy.linalg.lstsq, i.e. through whatever
+# LAPACK/BLAS the platform ships, and those builds agree to a unit in the last
+# place rather than bit for bit. Rebuilding on one machine is byte-identical;
+# rebuilding on another agrees to ~1e-15 relative. Consumers that need an exact
+# comparison must compare values at a tolerance, not file hashes.
+CROSS_PLATFORM_REPRODUCIBILITY = (
+    "Byte-identical when rebuilt on the same platform. Across platforms the "
+    "values agree to about 1e-15 relative but not bit for bit, because the "
+    "Denton benchmarking solve runs through numpy.linalg.lstsq and each "
+    "platform's LAPACK/BLAS rounds the last place differently. Compare this "
+    "pack by value at a tolerance, never by file hash across machines."
+)
 
 # --------------------------------------------------------------- vocabularies
 
@@ -1991,9 +2006,11 @@ def build_quarterly_display_pack(
 ) -> QuarterlyDisplayPack:
     """Materialise the display pack from committed sources.
 
-    Deterministic by construction: the inputs are committed packs, the split is
-    a closed-form solve and the rows are sorted before writing, so building
-    twice produces byte-identical files.
+    Deterministic on a given platform: the inputs are committed packs, the
+    split is a closed-form solve and the rows are sorted before writing, so
+    building twice on one machine produces byte-identical files. Across
+    platforms see ``CROSS_PLATFORM_REPRODUCIBILITY`` - the values agree, the
+    bytes do not.
     """
     root = Path(repo_root) if repo_root is not None else _repo_root()
     pack_dir = Path(output_dir) if output_dir is not None else _pack_dir(root)
@@ -2059,11 +2076,15 @@ def build_quarterly_display_pack(
         if not quarterly.empty
         else [],
         "reconciled_series_trace_years": int(len(reconciliation)),
-        "worst_relative_reconciliation_residual": float(
-            pd.to_numeric(reconciliation["relative_residual"], errors="coerce").max()
-        )
-        if not reconciliation.empty
-        else 0.0,
+        # Rounded to three significant figures so the manifest stays byte-stable
+        # across platforms; the unrounded per-year residuals live in
+        # annual_reconciliation_audit.parquet.
+        "worst_relative_reconciliation_residual": _round_significant(
+            float(pd.to_numeric(reconciliation["relative_residual"], errors="coerce").max())
+            if not reconciliation.empty
+            else 0.0
+        ),
+        "cross_platform_reproducibility": CROSS_PLATFORM_REPRODUCIBILITY,
         "notes": (
             "Derived quarterly rows are indicative display values benchmarked to a "
             "governed June-year total. They are not published quarterly actuals and "
@@ -2090,6 +2111,13 @@ def build_quarterly_display_pack(
         series_contract=contract,
         coverage_status=coverage,
     )
+
+
+def _round_significant(value: float, digits: int = 3) -> float:
+    """Round for reporting, so a diagnostic float cannot destabilise a manifest."""
+    if not value or not math.isfinite(value):
+        return 0.0
+    return float(f"{value:.{digits}g}")
 
 
 def _write_frame(frame: pd.DataFrame, path: Path) -> None:

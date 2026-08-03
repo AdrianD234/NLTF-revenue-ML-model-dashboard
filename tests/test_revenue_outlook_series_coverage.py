@@ -17,6 +17,7 @@ import hashlib
 import math
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -621,6 +622,12 @@ def test_a_stale_pack_fails_closed(tmp_path: Path) -> None:
 
 
 def test_pack_build_is_byte_idempotent(tmp_path: Path) -> None:
+    """Two builds on ONE machine are byte-identical.
+
+    This is the portable half of reproducibility. Cross-platform byte equality
+    is a separate and weaker claim - see
+    ``test_committed_pack_matches_a_fresh_build`` for why.
+    """
     first = tmp_path / "first"
     second = tmp_path / "second"
     coverage.build_quarterly_display_pack(repo_root=ROOT, output_dir=first)
@@ -634,16 +641,112 @@ def test_pack_build_is_byte_idempotent(tmp_path: Path) -> None:
     coverage.clear_caches()
 
 
+def _numeric_columns(frame: pd.DataFrame) -> list[str]:
+    return [
+        str(column)
+        for column in frame.columns
+        if pd.api.types.is_numeric_dtype(frame[column])
+        and not pd.api.types.is_bool_dtype(frame[column])
+    ]
+
+
+def _frame_differences(
+    name: str,
+    committed: pd.DataFrame,
+    fresh: pd.DataFrame,
+    *,
+    rel_tol: float,
+) -> list[str]:
+    """Every way two pack frames disagree, structure first then numbers."""
+    problems: list[str] = []
+    if list(committed.columns) != list(fresh.columns):
+        return [f"{name}: column set/order differs"]
+    if len(committed) != len(fresh):
+        return [f"{name}: {len(committed)} committed rows vs {len(fresh)} fresh"]
+    for column in committed.columns:
+        left, right = committed[column], fresh[column]
+        if str(left.dtype) != str(right.dtype):
+            problems.append(f"{name}.{column}: dtype {left.dtype} vs {right.dtype}")
+            continue
+        if column in _numeric_columns(committed):
+            close = np.isclose(
+                pd.to_numeric(left, errors="coerce").to_numpy(dtype=float),
+                pd.to_numeric(right, errors="coerce").to_numpy(dtype=float),
+                rtol=rel_tol,
+                atol=rel_tol,
+                equal_nan=True,
+            )
+            if not close.all():
+                worst = int(np.argmin(close))
+                problems.append(
+                    f"{name}.{column}: {int((~close).sum())} value(s) outside {rel_tol:g}; "
+                    f"first at row {worst}: {left.iloc[worst]!r} vs {right.iloc[worst]!r}"
+                )
+        elif not left.equals(right):
+            problems.append(f"{name}.{column}: non-numeric values differ")
+    return problems
+
+
 def test_committed_pack_matches_a_fresh_build(tmp_path: Path) -> None:
-    """The committed pack must be what the builder produces today."""
-    fresh = tmp_path / "fresh"
-    coverage.build_quarterly_display_pack(repo_root=ROOT, output_dir=fresh)
-    committed = ROOT / coverage.QUARTERLY_DISPLAY_PACK_DIR
-    for path in sorted(fresh.iterdir()):
-        left = hashlib.sha256(path.read_bytes()).hexdigest()
-        right = hashlib.sha256((committed / path.name).read_bytes()).hexdigest()
-        assert left == right, f"{path.name} is stale; rerun the pack builder"
+    """The committed pack must be what the builder produces today.
+
+    Compared structurally-exact and numerically-tolerant rather than byte for
+    byte, because byte equality is NOT portable across platforms and asserting
+    it made this test fail on CI for a reason that was not staleness.
+
+    The Denton benchmarking solve goes through ``numpy.linalg.lstsq``, i.e.
+    through whatever LAPACK/BLAS the platform ships. Those builds agree to
+    within a unit in the last place, not bit for bit, and the reconciliation
+    audit amplifies that: its ``residual`` column is a difference of nearly
+    equal numbers, so a 1-ulp change in a quarter rewrites the residual's whole
+    mantissa. CI demonstrated exactly this shape - the source digest matched
+    (so the inputs were identical), two builds on the same Linux runner were
+    byte-identical (so the build is deterministic per platform), and only the
+    Windows-committed vs Linux-fresh comparison differed.
+
+    What staleness actually looks like - a changed contract, a dropped series,
+    a moved value, a renamed column - moves numbers by far more than 1e-9
+    relative or changes the structure outright, and both are still caught.
+    """
+    fresh_dir = tmp_path / "fresh"
+    coverage.build_quarterly_display_pack(repo_root=ROOT, output_dir=fresh_dir)
+    committed_dir = ROOT / coverage.QUARTERLY_DISPLAY_PACK_DIR
+
+    problems: list[str] = []
+    names = sorted(path.name for path in fresh_dir.iterdir())
+    assert names, "the build produced no files"
+    assert names == sorted(path.name for path in committed_dir.iterdir())
+
+    for name in names:
+        fresh_path, committed_path = fresh_dir / name, committed_dir / name
+        if name.endswith(".parquet"):
+            problems.extend(
+                _frame_differences(
+                    name,
+                    pd.read_parquet(committed_path),
+                    pd.read_parquet(fresh_path),
+                    rel_tol=1e-9,
+                )
+            )
+        else:
+            # manifest.json and the two CSVs carry no solver output, so they
+            # are held to byte equality.
+            if fresh_path.read_bytes() != committed_path.read_bytes():
+                problems.append(f"{name}: bytes differ")
+
+    assert not problems, "committed pack is stale; rerun the pack builder\n" + "\n".join(problems)
     coverage.clear_caches()
+
+
+def test_the_pack_is_only_claimed_reproducible_to_a_stated_tolerance() -> None:
+    """The manifest must state the limit, not imply bit-portability."""
+    manifest = coverage.load_quarterly_display_pack(ROOT).manifest
+    assert manifest["cross_platform_reproducibility"] == coverage.CROSS_PLATFORM_REPRODUCIBILITY
+    assert "lstsq" in coverage.CROSS_PLATFORM_REPRODUCIBILITY
+    # The one float the manifest reports is rounded, so the manifest itself
+    # stays byte-stable everywhere and can be compared exactly.
+    worst = manifest["worst_relative_reconciliation_residual"]
+    assert float(f"{worst:.3g}") == worst
 
 
 # -------------------------------------------------------------- the lookup API

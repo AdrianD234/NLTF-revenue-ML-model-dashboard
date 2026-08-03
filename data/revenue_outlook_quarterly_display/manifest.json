@@ -1,6 +1,7 @@
 {
   "builder_version": "1",
   "contract_version": "revenue-outlook-quarterly-display-contract-v1",
+  "cross_platform_reproducibility": "Byte-identical when rebuilt on the same platform. Across platforms the values agree to about 1e-15 relative but not bit for bit, because the Denton benchmarking solve runs through numpy.linalg.lstsq and each platform's LAPACK/BLAS rounds the last place differently. Compare this pack by value at a tolerance, never by file hash across machines.",
   "display_horizon_last_fy": 2050,
   "display_horizon_last_quarter": "2050Q2",
   "notes": "Derived quarterly rows are indicative display values benchmarked to a governed June-year total. They are not published quarterly actuals and not direct model outputs. Official-comparator quarters carry the provenance label 'derived quarterly presentation from official annual source'.",
@@ -41,5 +42,5 @@
     "total_nltf_net_revenue"
   ],
   "source_digest": "dc3cdc8487b305a78d3755bba90019ac518b74787dc6f891a81491dfb1a9e58a",
-  "worst_relative_reconciliation_residual": 2.169692947813777e-16
+  "worst_relative_reconciliation_residual": 2.17e-16
 }

@@ -193,8 +193,8 @@ edits present in the development working tree could not contaminate the result.
 | Official-vintage / series-identity / rate-paths | 121 passed |
 | Revenue Outlook / trace-identity / runtime-manifest | 64 passed |
 | `compileall` over `model_dashboard`, `scripts`, `tests`, `app.py` | clean |
-| Pack built twice | byte-identical |
-| Committed pack vs fresh build | identical (asserted by test) |
+| Pack built twice on one machine | byte-identical |
+| Committed pack vs fresh build | structurally identical, values within 1e-9 relative |
 | Diagnosis artifacts regenerated | byte-identical |
 
 Two notes on how that run was obtained, because both look like defects and
@@ -211,6 +211,33 @@ neither is one:
   each time, which is the signature of memory pressure rather than a failing
   test. Running the same 121 test files as 13 separate processes completed
   green end to end, which is the result above.
+
+### Reproducibility: what is and is not claimed
+
+The pack is **byte-identical when rebuilt on the same platform** and agrees to
+about **1e-15 relative across platforms**, not bit for bit. The Denton solve
+runs through `numpy.linalg.lstsq`, i.e. through whatever LAPACK/BLAS the
+platform ships, and those builds round the last place differently. The
+reconciliation audit amplifies it: `residual` is a difference of nearly equal
+numbers, so a 1-ulp change in a quarter rewrites the residual's whole mantissa.
+
+The first CI run proved this shape rather than merely suggesting it:
+
+* the source digest matched, so the inputs were byte-identical on the runner;
+* `test_pack_build_is_byte_idempotent` passed, so two builds on the same Linux
+  runner were byte-identical;
+* only the Windows-committed vs Linux-fresh comparison differed.
+
+Same inputs, deterministic per platform, differing across platforms. The
+staleness guard therefore compares the committed pack to a fresh build
+**structurally exact and numerically tolerant** (1e-9 relative) instead of by
+file hash. Probed against deliberate mutations, that catches a value moved by
+1e-6 relative, a relabelled row, a dropped row and a dropped column, while
+ignoring 1e-15 platform noise - six orders of separation between the two.
+
+`manifest.json` states the limit in `cross_platform_reproducibility`, and its
+one reported float is rounded to three significant figures so the manifest
+itself stays byte-stable everywhere.
 
 ## Handoff to the integration agent
 
