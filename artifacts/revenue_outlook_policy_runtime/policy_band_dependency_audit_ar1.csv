@@ -1,0 +1,1041 @@
+engine,series_id,FY,reference_policy_state,central_changes_under_policy,rate_changes_under_policy,activity_changes_under_policy,band_should_change,reason,central_published,central_delayed_6m,central_off
+ar1,coo_revenue,2025,published,False,False,False,False,not priced by the fuel rate and no activity response,-9.64521739130434e-05,-9.64521739130434e-05,-9.64521739130434e-05
+ar1,coo_revenue,2026,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,coo_revenue,2027,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,coo_revenue,2028,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,coo_revenue,2029,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,coo_revenue,2030,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,coo_revenue,2031,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,coo_revenue,2032,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,coo_revenue,2033,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,coo_revenue,2034,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,coo_revenue,2035,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,coo_revenue,2036,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,coo_revenue,2037,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,coo_revenue,2038,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,coo_revenue,2039,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,coo_revenue,2040,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,coo_revenue,2041,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,coo_revenue,2042,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,coo_revenue,2043,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,coo_revenue,2044,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,coo_revenue,2045,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,coo_revenue,2046,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,coo_revenue,2047,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,coo_revenue,2048,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,coo_revenue,2049,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,coo_revenue,2050,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,current_light_ruc_conventional_modelled_km,2025,published,False,False,False,False,not priced by the fuel rate and no activity response,13529.742736,13529.742736,13529.742736
+ar1,current_light_ruc_conventional_modelled_km,2026,published,False,False,False,False,not priced by the fuel rate and no activity response,12805.016492073193,12805.016492073193,12805.016492073193
+ar1,current_light_ruc_conventional_modelled_km,2027,published,False,False,False,False,not priced by the fuel rate and no activity response,12884.412921103954,12884.412921103954,12884.412921103954
+ar1,current_light_ruc_conventional_modelled_km,2028,published,False,False,False,False,not priced by the fuel rate and no activity response,13372.423680284688,13372.423680284688,13372.423680284688
+ar1,current_light_ruc_conventional_modelled_km,2029,published,False,False,False,False,not priced by the fuel rate and no activity response,13833.483861200531,13833.483861200531,13833.483861200531
+ar1,current_light_ruc_conventional_modelled_km,2030,published,False,False,False,False,not priced by the fuel rate and no activity response,14129.750867690173,14129.750867690173,14129.750867690173
+ar1,current_light_ruc_conventional_modelled_km,2031,published,False,False,False,False,not priced by the fuel rate and no activity response,13975.040162956282,13975.040162956282,13975.040162956282
+ar1,current_light_ruc_conventional_modelled_km,2032,published,False,False,False,False,not priced by the fuel rate and no activity response,13769.766914133534,13769.766914133534,13769.766914133534
+ar1,current_light_ruc_conventional_modelled_km,2033,published,False,False,False,False,not priced by the fuel rate and no activity response,13508.019574065615,13508.019574065615,13508.019574065615
+ar1,current_light_ruc_conventional_modelled_km,2034,published,False,False,False,False,not priced by the fuel rate and no activity response,13199.622187405255,13199.622187405255,13199.622187405255
+ar1,current_light_ruc_conventional_modelled_km,2035,published,False,False,False,False,not priced by the fuel rate and no activity response,12844.602916997665,12844.602916997665,12844.602916997665
+ar1,current_light_ruc_conventional_modelled_km,2036,published,False,False,False,False,not priced by the fuel rate and no activity response,12443.581128722195,12443.581128722195,12443.581128722195
+ar1,current_light_ruc_conventional_modelled_km,2037,published,False,False,False,False,not priced by the fuel rate and no activity response,11990.381660963953,11990.381660963953,11990.381660963953
+ar1,current_light_ruc_conventional_modelled_km,2038,published,False,False,False,False,not priced by the fuel rate and no activity response,11472.172586228144,11472.172586228144,11472.172586228144
+ar1,current_light_ruc_conventional_modelled_km,2039,published,False,False,False,False,not priced by the fuel rate and no activity response,10911.428835346602,10911.428835346602,10911.428835346602
+ar1,current_light_ruc_conventional_modelled_km,2040,published,False,False,False,False,not priced by the fuel rate and no activity response,10324.17350200051,10324.17350200051,10324.17350200051
+ar1,current_light_ruc_conventional_modelled_km,2041,published,False,False,False,False,not priced by the fuel rate and no activity response,9748.6417303738,9748.6417303738,9748.6417303738
+ar1,current_light_ruc_conventional_modelled_km,2042,published,False,False,False,False,not priced by the fuel rate and no activity response,9219.656159372384,9219.656159372384,9219.656159372384
+ar1,current_light_ruc_conventional_modelled_km,2043,published,False,False,False,False,not priced by the fuel rate and no activity response,8729.582427324138,8729.582427324138,8729.582427324138
+ar1,current_light_ruc_conventional_modelled_km,2044,published,False,False,False,False,not priced by the fuel rate and no activity response,8267.862352812681,8267.862352812681,8267.862352812681
+ar1,current_light_ruc_conventional_modelled_km,2045,published,False,False,False,False,not priced by the fuel rate and no activity response,7845.878538213883,7845.878538213883,7845.878538213883
+ar1,current_light_ruc_conventional_modelled_km,2046,published,False,False,False,False,not priced by the fuel rate and no activity response,7457.474598258262,7457.474598258262,7457.474598258262
+ar1,current_light_ruc_conventional_modelled_km,2047,published,False,False,False,False,not priced by the fuel rate and no activity response,7080.815416016549,7080.815416016549,7080.815416016549
+ar1,current_light_ruc_conventional_modelled_km,2048,published,False,False,False,False,not priced by the fuel rate and no activity response,6725.091690231553,6725.091690231553,6725.091690231553
+ar1,current_light_ruc_conventional_modelled_km,2049,published,False,False,False,False,not priced by the fuel rate and no activity response,6373.2890576886,6373.2890576886,6373.2890576886
+ar1,current_light_ruc_conventional_modelled_km,2050,published,False,False,False,False,not priced by the fuel rate and no activity response,6027.296699807985,6027.296699807985,6027.296699807985
+ar1,fed_refunds,2025,published,False,False,False,False,not priced by the fuel rate and no activity response,69.90077731,69.90077731,69.90077731
+ar1,fed_refunds,2026,published,False,False,False,False,not priced by the fuel rate and no activity response,72.3868062026043,72.3868062026043,72.3868062026043
+ar1,fed_refunds,2027,published,False,False,False,False,not priced by the fuel rate and no activity response,80.6529606896518,80.6529606896518,80.6529606896518
+ar1,fed_refunds,2028,published,False,False,False,False,not priced by the fuel rate and no activity response,91.4673022517422,91.4673022517422,91.4673022517422
+ar1,fed_refunds,2029,published,False,False,False,False,not priced by the fuel rate and no activity response,97.6737041163894,97.6737041163894,97.6737041163894
+ar1,fed_refunds,2030,published,False,False,False,False,not priced by the fuel rate and no activity response,102.477188461442,102.477188461442,102.477188461442
+ar1,fed_refunds,2031,published,False,False,False,False,not priced by the fuel rate and no activity response,105.428538617792,105.428538617792,105.428538617792
+ar1,fed_refunds,2032,published,False,False,False,False,not priced by the fuel rate and no activity response,107.880660403128,107.880660403128,107.880660403128
+ar1,fed_refunds,2033,published,False,False,False,False,not priced by the fuel rate and no activity response,109.618818619908,109.618818619908,109.618818619908
+ar1,fed_refunds,2034,published,False,False,False,False,not priced by the fuel rate and no activity response,110.874936585782,110.874936585782,110.874936585782
+ar1,fed_refunds,2035,published,False,False,False,False,not priced by the fuel rate and no activity response,111.445970529907,111.445970529907,111.445970529907
+ar1,fed_refunds,2036,published,False,False,False,False,not priced by the fuel rate and no activity response,111.176191918272,111.176191918272,111.176191918272
+ar1,fed_refunds,2037,published,False,False,False,False,not priced by the fuel rate and no activity response,110.042913972117,110.042913972117,110.042913972117
+ar1,fed_refunds,2038,published,False,False,False,False,not priced by the fuel rate and no activity response,107.913508675593,107.913508675593,107.913508675593
+ar1,fed_refunds,2039,published,False,False,False,False,not priced by the fuel rate and no activity response,104.840874026332,104.840874026332,104.840874026332
+ar1,fed_refunds,2040,published,False,False,False,False,not priced by the fuel rate and no activity response,100.944261351029,100.944261351029,100.944261351029
+ar1,fed_refunds,2041,published,False,False,False,False,not priced by the fuel rate and no activity response,96.3322291474112,96.3322291474112,96.3322291474112
+ar1,fed_refunds,2042,published,False,False,False,False,not priced by the fuel rate and no activity response,90.5422688383918,90.5422688383918,90.5422688383918
+ar1,fed_refunds,2043,published,False,False,False,False,not priced by the fuel rate and no activity response,84.3336057989786,84.3336057989786,84.3336057989786
+ar1,fed_refunds,2044,published,False,False,False,False,not priced by the fuel rate and no activity response,78.1830347453577,78.1830347453577,78.1830347453577
+ar1,fed_refunds,2045,published,False,False,False,False,not priced by the fuel rate and no activity response,72.2614752287827,72.2614752287827,72.2614752287827
+ar1,fed_refunds,2046,published,False,False,False,False,not priced by the fuel rate and no activity response,66.6787339973973,66.6787339973973,66.6787339973973
+ar1,fed_refunds,2047,published,False,False,False,False,not priced by the fuel rate and no activity response,61.4417326492604,61.4417326492604,61.4417326492604
+ar1,fed_refunds,2048,published,False,False,False,False,not priced by the fuel rate and no activity response,56.625431852433,56.625431852433,56.625431852433
+ar1,fed_refunds,2049,published,False,False,False,False,not priced by the fuel rate and no activity response,52.1359432142043,52.1359432142043,52.1359432142043
+ar1,fed_refunds,2050,published,False,False,False,False,not priced by the fuel rate and no activity response,47.9565731676092,47.9565731676092,47.9565731676092
+ar1,gross_cng_revenue,2025,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,gross_cng_revenue,2026,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,gross_cng_revenue,2027,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,gross_cng_revenue,2028,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,gross_cng_revenue,2029,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,gross_cng_revenue,2030,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,gross_cng_revenue,2031,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,gross_cng_revenue,2032,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,gross_cng_revenue,2033,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,gross_cng_revenue,2034,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,gross_cng_revenue,2035,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,gross_cng_revenue,2036,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,gross_cng_revenue,2037,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,gross_cng_revenue,2038,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,gross_cng_revenue,2039,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,gross_cng_revenue,2040,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,gross_cng_revenue,2041,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,gross_cng_revenue,2042,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,gross_cng_revenue,2043,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,gross_cng_revenue,2044,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,gross_cng_revenue,2045,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,gross_cng_revenue,2046,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,gross_cng_revenue,2047,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,gross_cng_revenue,2048,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,gross_cng_revenue,2049,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,gross_cng_revenue,2050,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,gross_fed_revenue,2025,published,False,False,False,False,not priced by the fuel rate and no activity response,2067.62792391,2067.62792391,2067.62792391
+ar1,gross_fed_revenue,2026,published,False,False,False,False,not priced by the fuel rate and no activity response,2178.581790793814,2178.581790793814,2178.581790793814
+ar1,gross_fed_revenue,2027,published,True,False,False,True,central moves through a governed identity term,2252.8793747089653,2084.988286100581,2084.988286100581
+ar1,gross_fed_revenue,2028,published,True,False,False,True,central moves through a governed identity term,2501.229029100793,2501.229029100793,2167.159428873098
+ar1,gross_fed_revenue,2029,published,True,False,False,True,central moves through a governed identity term,2645.038787658003,2645.038787658003,2311.8057552961372
+ar1,gross_fed_revenue,2030,published,True,False,False,True,central moves through a governed identity term,2759.591439455385,2759.591439455385,2427.064721694571
+ar1,gross_fed_revenue,2031,published,True,False,False,True,central moves through a governed identity term,2857.6920993712192,2857.6920993712192,2513.4590137523
+ar1,gross_fed_revenue,2032,published,True,False,False,True,central moves through a governed identity term,2942.744560041224,2942.744560041224,2602.038077825576
+ar1,gross_fed_revenue,2033,published,True,False,False,True,central moves through a governed identity term,3017.2436577547455,3017.2436577547455,2680.98682883417
+ar1,gross_fed_revenue,2034,published,True,False,False,True,central moves through a governed identity term,3079.0572806660252,3079.0572806660252,2748.3047182856967
+ar1,gross_fed_revenue,2035,published,True,False,False,True,central moves through a governed identity term,3122.9036031627547,3122.9036031627547,2799.145748784669
+ar1,gross_fed_revenue,2036,published,True,False,False,True,central moves through a governed identity term,3141.323389694423,3141.323389694423,2826.676118838127
+ar1,gross_fed_revenue,2037,published,True,False,False,True,central moves through a governed identity term,3126.9201990729316,3126.9201990729316,2824.0069544132148
+ar1,gross_fed_revenue,2038,published,True,False,False,True,central moves through a governed identity term,3072.711478567923,3072.711478567923,2784.5769116456213
+ar1,gross_fed_revenue,2039,published,True,False,False,True,central moves through a governed identity term,2975.5916395402965,2975.5916395402965,2705.281709342221
+ar1,gross_fed_revenue,2040,published,True,False,False,True,central moves through a governed identity term,2837.5320756926694,2837.5320756926694,2587.641627527197
+ar1,gross_fed_revenue,2041,published,True,False,False,True,central moves through a governed identity term,2664.9535144019264,2664.9535144019264,2437.299362825889
+ar1,gross_fed_revenue,2042,published,True,False,False,True,central moves through a governed identity term,2454.4865082994606,2454.4865082994606,2251.0186358059645
+ar1,gross_fed_revenue,2043,published,True,False,False,True,central moves through a governed identity term,2234.657958943051,2234.657958943051,2054.8286572364304
+ar1,gross_fed_revenue,2044,published,True,False,False,True,central moves through a governed identity term,2030.220780566434,2030.220780566434,1871.535297212399
+ar1,gross_fed_revenue,2045,published,True,False,False,True,central moves through a governed identity term,1857.5498778491994,1857.5498778491994,1716.4344227677504
+ar1,gross_fed_revenue,2046,published,True,False,False,True,central moves through a governed identity term,1710.451730532659,1710.451730532659,1584.075588673924
+ar1,gross_fed_revenue,2047,published,True,False,False,True,central moves through a governed identity term,1572.9245149185706,1572.9245149185706,1459.8527799114702
+ar1,gross_fed_revenue,2048,published,True,False,False,True,central moves through a governed identity term,1446.7917209108132,1446.7917209108132,1345.562813428825
+ar1,gross_fed_revenue,2049,published,True,False,False,True,central moves through a governed identity term,1329.5631213333777,1329.5631213333777,1238.990496316109
+ar1,gross_fed_revenue,2050,published,True,False,False,True,central moves through a governed identity term,1220.7382564146853,1220.7382564146853,1139.7541715461305
+ar1,gross_lpg_revenue,2025,published,False,False,False,False,not priced by the fuel rate and no activity response,40.94161913,40.94161913,40.94161913
+ar1,gross_lpg_revenue,2026,published,False,False,False,False,not priced by the fuel rate and no activity response,42.0451626401906,42.0451626401906,42.0451626401906
+ar1,gross_lpg_revenue,2027,published,False,False,False,False,not priced by the fuel rate and no activity response,42.6326898203412,42.6326898203412,42.6326898203412
+ar1,gross_lpg_revenue,2028,published,False,False,False,False,not priced by the fuel rate and no activity response,42.8533768621873,42.8533768621873,42.8533768621873
+ar1,gross_lpg_revenue,2029,published,False,False,False,False,not priced by the fuel rate and no activity response,43.0565466561107,43.0565466561107,43.0565466561107
+ar1,gross_lpg_revenue,2030,published,False,False,False,False,not priced by the fuel rate and no activity response,43.2447778470936,43.2447778470936,43.2447778470936
+ar1,gross_lpg_revenue,2031,published,False,False,False,False,not priced by the fuel rate and no activity response,43.4201183252799,43.4201183252799,43.4201183252799
+ar1,gross_lpg_revenue,2032,published,False,False,False,False,not priced by the fuel rate and no activity response,43.5842216228547,43.5842216228547,43.5842216228547
+ar1,gross_lpg_revenue,2033,published,False,False,False,False,not priced by the fuel rate and no activity response,43.7384421166535,43.7384421166535,43.7384421166535
+ar1,gross_lpg_revenue,2034,published,False,False,False,False,not priced by the fuel rate and no activity response,43.8839031230627,43.8839031230627,43.8839031230627
+ar1,gross_lpg_revenue,2035,published,False,False,False,False,not priced by the fuel rate and no activity response,44.0215466525324,44.0215466525324,44.0215466525324
+ar1,gross_lpg_revenue,2036,published,False,False,False,False,not priced by the fuel rate and no activity response,44.1521704507391,44.1521704507391,44.1521704507391
+ar1,gross_lpg_revenue,2037,published,False,False,False,False,not priced by the fuel rate and no activity response,44.2764560365186,44.2764560365186,44.2764560365186
+ar1,gross_lpg_revenue,2038,published,False,False,False,False,not priced by the fuel rate and no activity response,44.3949902416884,44.3949902416884,44.3949902416884
+ar1,gross_lpg_revenue,2039,published,False,False,False,False,not priced by the fuel rate and no activity response,44.5082819804597,44.5082819804597,44.5082819804597
+ar1,gross_lpg_revenue,2040,published,False,False,False,False,not priced by the fuel rate and no activity response,44.6167754628172,44.6167754628172,44.6167754628172
+ar1,gross_lpg_revenue,2041,published,False,False,False,False,not priced by the fuel rate and no activity response,44.7208607201694,44.7208607201694,44.7208607201694
+ar1,gross_lpg_revenue,2042,published,False,False,False,False,not priced by the fuel rate and no activity response,44.8208820738309,44.8208820738309,44.8208820738309
+ar1,gross_lpg_revenue,2043,published,False,False,False,False,not priced by the fuel rate and no activity response,44.9171450107643,44.9171450107643,44.9171450107643
+ar1,gross_lpg_revenue,2044,published,False,False,False,False,not priced by the fuel rate and no activity response,45.0099218130958,45.0099218130958,45.0099218130958
+ar1,gross_lpg_revenue,2045,published,False,False,False,False,not priced by the fuel rate and no activity response,45.0994562030281,45.0994562030281,45.0994562030281
+ar1,gross_lpg_revenue,2046,published,False,False,False,False,not priced by the fuel rate and no activity response,45.1859672028516,45.1859672028516,45.1859672028516
+ar1,gross_lpg_revenue,2047,published,False,False,False,False,not priced by the fuel rate and no activity response,45.2696523640375,45.2696523640375,45.2696523640375
+ar1,gross_lpg_revenue,2048,published,False,False,False,False,not priced by the fuel rate and no activity response,45.350690485262,45.350690485262,45.350690485262
+ar1,gross_lpg_revenue,2049,published,False,False,False,False,not priced by the fuel rate and no activity response,45.429243913464,45.429243913464,45.429243913464
+ar1,gross_lpg_revenue,2050,published,False,False,False,False,not priced by the fuel rate and no activity response,45.5054605024188,45.5054605024188,45.5054605024188
+ar1,gross_mvr_revenue,2025,published,False,False,False,False,not priced by the fuel rate and no activity response,359.5931046430431,359.5931046430431,359.5931046430431
+ar1,gross_mvr_revenue,2026,published,False,False,False,False,not priced by the fuel rate and no activity response,468.1967134376274,468.1967134376274,468.1967134376274
+ar1,gross_mvr_revenue,2027,published,False,False,False,False,not priced by the fuel rate and no activity response,558.2001771623538,558.2001771623538,558.2001771623538
+ar1,gross_mvr_revenue,2028,published,False,False,False,False,not priced by the fuel rate and no activity response,564.0759078180181,564.0759078180181,564.0759078180181
+ar1,gross_mvr_revenue,2029,published,False,False,False,False,not priced by the fuel rate and no activity response,558.3078428659381,558.3078428659381,558.3078428659381
+ar1,gross_mvr_revenue,2030,published,False,False,False,False,not priced by the fuel rate and no activity response,553.0031767675906,553.0031767675906,553.0031767675906
+ar1,gross_mvr_revenue,2031,published,False,False,False,False,not priced by the fuel rate and no activity response,548.1236653539303,548.1236653539303,548.1236653539303
+ar1,gross_mvr_revenue,2032,published,False,False,False,False,not priced by the fuel rate and no activity response,543.6318608697579,543.6318608697579,543.6318608697579
+ar1,gross_mvr_revenue,2033,published,False,False,False,False,not priced by the fuel rate and no activity response,539.4923403662387,539.4923403662387,539.4923403662387
+ar1,gross_mvr_revenue,2034,published,False,False,False,False,not priced by the fuel rate and no activity response,535.6722565897716,535.6722565897716,535.6722565897716
+ar1,gross_mvr_revenue,2035,published,False,False,False,False,not priced by the fuel rate and no activity response,532.1415118475148,532.1415118475148,532.1415118475148
+ar1,gross_mvr_revenue,2036,published,False,False,False,False,not priced by the fuel rate and no activity response,528.8727287182977,528.8727287182977,528.8727287182977
+ar1,gross_mvr_revenue,2037,published,False,False,False,False,not priced by the fuel rate and no activity response,525.84111683754,525.84111683754,525.84111683754
+ar1,gross_mvr_revenue,2038,published,False,False,False,False,not priced by the fuel rate and no activity response,523.0242916225482,523.0242916225482,523.0242916225482
+ar1,gross_mvr_revenue,2039,published,False,False,False,False,not priced by the fuel rate and no activity response,520.4020758793362,520.4020758793362,520.4020758793362
+ar1,gross_mvr_revenue,2040,published,False,False,False,False,not priced by the fuel rate and no activity response,517.9563010223371,517.9563010223371,517.9563010223371
+ar1,gross_mvr_revenue,2041,published,False,False,False,False,not priced by the fuel rate and no activity response,515.6706165952565,515.6706165952565,515.6706165952565
+ar1,gross_mvr_revenue,2042,published,False,False,False,False,not priced by the fuel rate and no activity response,513.5303122637637,513.5303122637637,513.5303122637637
+ar1,gross_mvr_revenue,2043,published,False,False,False,False,not priced by the fuel rate and no activity response,511.52215393912184,511.52215393912184,511.52215393912184
+ar1,gross_mvr_revenue,2044,published,False,False,False,False,not priced by the fuel rate and no activity response,509.63423431789107,509.63423431789107,509.63423431789107
+ar1,gross_mvr_revenue,2045,published,False,False,False,False,not priced by the fuel rate and no activity response,507.8558373928368,507.8558373928368,507.8558373928368
+ar1,gross_mvr_revenue,2046,published,False,False,False,False,not priced by the fuel rate and no activity response,506.17731612325764,506.17731612325764,506.17731612325764
+ar1,gross_mvr_revenue,2047,published,False,False,False,False,not priced by the fuel rate and no activity response,504.5899822904554,504.5899822904554,504.5899822904554
+ar1,gross_mvr_revenue,2048,published,False,False,False,False,not priced by the fuel rate and no activity response,503.0860075150547,503.0860075150547,503.0860075150547
+ar1,gross_mvr_revenue,2049,published,False,False,False,False,not priced by the fuel rate and no activity response,501.658334426522,501.658334426522,501.658334426522
+ar1,gross_mvr_revenue,2050,published,False,False,False,False,not priced by the fuel rate and no activity response,500.30059702186173,500.30059702186173,500.30059702186173
+ar1,gross_ped_revenue,2025,published,False,False,False,False,rate-priced but outside every affected year,2026.68630478,2026.68630478,2026.68630478
+ar1,gross_ped_revenue,2026,published,False,False,False,False,rate-priced but outside every affected year,2136.5366281536235,2136.5366281536235,2136.5366281536235
+ar1,gross_ped_revenue,2027,published,True,True,True,True,rate and the modelled activity response both changed,2210.2466848886243,2042.35559628024,2042.35559628024
+ar1,gross_ped_revenue,2028,published,True,True,True,True,rate and the modelled activity response both changed,2458.3756522386057,2458.3756522386057,2124.3060520109107
+ar1,gross_ped_revenue,2029,published,True,True,True,True,rate and the modelled activity response both changed,2601.9822410018924,2601.9822410018924,2268.7492086400266
+ar1,gross_ped_revenue,2030,published,True,True,True,True,rate and the modelled activity response both changed,2716.3466616082915,2716.3466616082915,2383.819943847477
+ar1,gross_ped_revenue,2031,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",2814.2719810459394,2814.2719810459394,2470.03889542702
+ar1,gross_ped_revenue,2032,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",2899.160338418369,2899.160338418369,2558.453856202721
+ar1,gross_ped_revenue,2033,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",2973.505215638092,2973.505215638092,2637.2483867175165
+ar1,gross_ped_revenue,2034,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",3035.1733775429625,3035.1733775429625,2704.420815162634
+ar1,gross_ped_revenue,2035,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",3078.8820565102224,3078.8820565102224,2755.124202132137
+ar1,gross_ped_revenue,2036,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",3097.171219243684,3097.171219243684,2782.523948387388
+ar1,gross_ped_revenue,2037,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",3082.643743036413,3082.643743036413,2779.7304983766962
+ar1,gross_ped_revenue,2038,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",3028.316488326235,3028.316488326235,2740.181921403933
+ar1,gross_ped_revenue,2039,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",2931.0833575598367,2931.0833575598367,2660.773427361761
+ar1,gross_ped_revenue,2040,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",2792.915300229852,2792.915300229852,2543.02485206438
+ar1,gross_ped_revenue,2041,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",2620.2326536817573,2620.2326536817573,2392.57850210572
+ar1,gross_ped_revenue,2042,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",2409.6656262256297,2409.6656262256297,2206.1977537321336
+ar1,gross_ped_revenue,2043,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",2189.740813932287,2189.740813932287,2009.9115122256662
+ar1,gross_ped_revenue,2044,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",1985.2108587533382,1985.2108587533382,1826.5253753993031
+ar1,gross_ped_revenue,2045,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",1812.4504216461714,1812.4504216461714,1671.3349665647224
+ar1,gross_ped_revenue,2046,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",1665.2657633298074,1665.2657633298074,1538.8896214710724
+ar1,gross_ped_revenue,2047,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",1527.654862554533,1527.654862554533,1414.5831275474327
+ar1,gross_ped_revenue,2048,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",1401.4410304255512,1401.4410304255512,1300.212122943563
+ar1,gross_ped_revenue,2049,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",1284.1338774199137,1284.1338774199137,1193.561252402645
+ar1,gross_ped_revenue,2050,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",1175.2327959122665,1175.2327959122665,1094.2487110437116
+ar1,gross_ruc_revenue,2025,published,False,False,False,False,not priced by the fuel rate and no activity response,2072.4662332403095,2072.4662332403095,2072.4662332403095
+ar1,gross_ruc_revenue,2026,published,False,False,False,False,not priced by the fuel rate and no activity response,2173.6716139131636,2173.6716139131636,2173.6716139131636
+ar1,gross_ruc_revenue,2027,published,True,False,False,True,central moves through a governed identity term,2395.9682244886653,2218.23712273619,2218.23712273619
+ar1,gross_ruc_revenue,2028,published,True,False,False,True,central moves through a governed identity term,2812.260006508895,2812.260006508895,2438.46595323317
+ar1,gross_ruc_revenue,2029,published,True,False,False,True,central moves through a governed identity term,3123.061333242758,3123.061333242758,2731.0966038315087
+ar1,gross_ruc_revenue,2030,published,True,False,False,True,central moves through a governed identity term,3407.6463794833126,3407.6463794833126,2998.2192749360343
+ar1,gross_ruc_revenue,2031,published,True,False,False,True,central moves through a governed identity term,3641.834650635044,3641.834650635044,3215.939469137853
+ar1,gross_ruc_revenue,2032,published,True,False,False,True,central moves through a governed identity term,3883.9219307273975,3883.9219307273975,3447.2408742763932
+ar1,gross_ruc_revenue,2033,published,True,False,False,True,central moves through a governed identity term,4137.295705017747,4137.295705017747,3689.4056736215284
+ar1,gross_ruc_revenue,2034,published,True,False,False,True,central moves through a governed identity term,4409.574245199918,4409.574245199918,3949.2965471369307
+ar1,gross_ruc_revenue,2035,published,True,False,False,True,central moves through a governed identity term,4701.470306686689,4701.470306686689,4227.679606706548
+ar1,gross_ruc_revenue,2036,published,True,False,False,True,central moves through a governed identity term,5013.314633169833,5013.314633169833,4525.006993719018
+ar1,gross_ruc_revenue,2037,published,True,False,False,True,central moves through a governed identity term,5347.887680665217,5347.887680665217,4843.882330738505
+ar1,gross_ruc_revenue,2038,published,True,False,False,True,central moves through a governed identity term,5705.7459460499485,5705.7459460499485,5184.929005560898
+ar1,gross_ruc_revenue,2039,published,True,False,False,True,central moves through a governed identity term,6096.866042931557,6096.866042931557,5557.34680186778
+ar1,gross_ruc_revenue,2040,published,True,False,False,True,central moves through a governed identity term,6522.370238419945,6522.370238419945,5962.318057231249
+ar1,gross_ruc_revenue,2041,published,True,False,False,True,central moves through a governed identity term,6975.505336432409,6975.505336432409,6393.809906354086
+ar1,gross_ruc_revenue,2042,published,True,False,False,True,central moves through a governed identity term,7461.131841934116,7461.131841934116,6856.373936610762
+ar1,gross_ruc_revenue,2043,published,True,False,False,True,central moves through a governed identity term,7963.131339928719,7963.131339928719,7335.288183473751
+ar1,gross_ruc_revenue,2044,published,True,False,False,True,central moves through a governed identity term,8463.107261423038,8463.107261423038,7813.5102029933105
+ar1,gross_ruc_revenue,2045,published,True,False,False,True,central moves through a governed identity term,8977.542312020854,8977.542312020854,8306.171211105684
+ar1,gross_ruc_revenue,2046,published,True,False,False,True,central moves through a governed identity term,9528.27296169508,9528.27296169508,8833.53847281145
+ar1,gross_ruc_revenue,2047,published,True,False,False,True,central moves through a governed identity term,10094.057624432113,10094.057624432113,9376.030538121362
+ar1,gross_ruc_revenue,2048,published,True,False,False,True,central moves through a governed identity term,10691.311714571739,10691.311714571739,9948.933546703562
+ar1,gross_ruc_revenue,2049,published,True,False,False,True,central moves through a governed identity term,11276.300214358615,11276.300214358615,10511.523671485165
+ar1,gross_ruc_revenue,2050,published,True,False,False,True,central moves through a governed identity term,11827.729456002837,11827.729456002837,11043.804850561803
+ar1,heavy_bev_ruc_net_km,2025,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,heavy_bev_ruc_net_km,2026,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,heavy_bev_ruc_net_km,2027,published,False,False,False,False,not priced by the fuel rate and no activity response,0.0,0.0,0.0
+ar1,heavy_bev_ruc_net_km,2028,published,False,False,False,False,not priced by the fuel rate and no activity response,60.5044362657779,60.5044362657779,60.5044362657779
+ar1,heavy_bev_ruc_net_km,2029,published,False,False,False,False,not priced by the fuel rate and no activity response,73.7781618539809,73.7781618539809,73.7781618539809
+ar1,heavy_bev_ruc_net_km,2030,published,False,False,False,False,not priced by the fuel rate and no activity response,88.9568688458184,88.9568688458184,88.9568688458184
+ar1,heavy_bev_ruc_net_km,2031,published,False,False,False,False,not priced by the fuel rate and no activity response,106.53370251036,106.53370251036,106.53370251036
+ar1,heavy_bev_ruc_net_km,2032,published,False,False,False,False,not priced by the fuel rate and no activity response,127.653005544349,127.653005544349,127.653005544349
+ar1,heavy_bev_ruc_net_km,2033,published,False,False,False,False,not priced by the fuel rate and no activity response,151.986120839442,151.986120839442,151.986120839442
+ar1,heavy_bev_ruc_net_km,2034,published,False,False,False,False,not priced by the fuel rate and no activity response,178.04024478685,178.04024478685,178.04024478685
+ar1,heavy_bev_ruc_net_km,2035,published,False,False,False,False,not priced by the fuel rate and no activity response,205.343859461655,205.343859461655,205.343859461655
+ar1,heavy_bev_ruc_net_km,2036,published,False,False,False,False,not priced by the fuel rate and no activity response,235.604382962282,235.604382962282,235.604382962282
+ar1,heavy_bev_ruc_net_km,2037,published,False,False,False,False,not priced by the fuel rate and no activity response,268.170316374363,268.170316374363,268.170316374363
+ar1,heavy_bev_ruc_net_km,2038,published,False,False,False,False,not priced by the fuel rate and no activity response,303.047625648449,303.047625648449,303.047625648449
+ar1,heavy_bev_ruc_net_km,2039,published,False,False,False,False,not priced by the fuel rate and no activity response,340.179175199459,340.179175199459,340.179175199459
+ar1,heavy_bev_ruc_net_km,2040,published,False,False,False,False,not priced by the fuel rate and no activity response,378.858667428341,378.858667428341,378.858667428341
+ar1,heavy_bev_ruc_net_km,2041,published,False,False,False,False,not priced by the fuel rate and no activity response,419.191239873399,419.191239873399,419.191239873399
+ar1,heavy_bev_ruc_net_km,2042,published,False,False,False,False,not priced by the fuel rate and no activity response,473.099677684064,473.099677684064,473.099677684064
+ar1,heavy_bev_ruc_net_km,2043,published,False,False,False,False,not priced by the fuel rate and no activity response,532.22886177439,532.22886177439,532.22886177439
+ar1,heavy_bev_ruc_net_km,2044,published,False,False,False,False,not priced by the fuel rate and no activity response,597.841435231306,597.841435231306,597.841435231306
+ar1,heavy_bev_ruc_net_km,2045,published,False,False,False,False,not priced by the fuel rate and no activity response,669.871523096138,669.871523096138,669.871523096138
+ar1,heavy_bev_ruc_net_km,2046,published,False,False,False,False,not priced by the fuel rate and no activity response,748.576862526381,748.576862526381,748.576862526381
+ar1,heavy_bev_ruc_net_km,2047,published,False,False,False,False,not priced by the fuel rate and no activity response,833.62655925199,833.62655925199,833.62655925199
+ar1,heavy_bev_ruc_net_km,2048,published,False,False,False,False,not priced by the fuel rate and no activity response,924.931722907332,924.931722907332,924.931722907332
+ar1,heavy_bev_ruc_net_km,2049,published,False,False,False,False,not priced by the fuel rate and no activity response,1021.87987712656,1021.87987712656,1021.87987712656
+ar1,heavy_bev_ruc_net_km,2050,published,False,False,False,False,not priced by the fuel rate and no activity response,1122.35014741051,1122.35014741051,1122.35014741051
+ar1,heavy_bev_ruc_net_revenue,2025,published,False,False,False,False,rate-priced but outside every affected year,7.73070496506989e-12,7.73070496506989e-12,7.73070496506989e-12
+ar1,heavy_bev_ruc_net_revenue,2026,published,False,False,False,False,rate-priced but outside every affected year,0.0,0.0,0.0
+ar1,heavy_bev_ruc_net_revenue,2027,published,False,False,False,False,rate-priced but outside every affected year,4.547473508864641e-13,4.547473508864641e-13,4.547473508864641e-13
+ar1,heavy_bev_ruc_net_revenue,2028,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",20.203036313505436,20.203036313505436,17.353656279799907
+ar1,heavy_bev_ruc_net_revenue,2029,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",26.0839002326652,26.0839002326652,22.60973995437098
+ar1,heavy_bev_ruc_net_revenue,2030,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",32.84776860566217,32.84776860566217,28.659553225819764
+ar1,heavy_bev_ruc_net_revenue,2031,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",40.62231738114042,40.62231738114042,40.76678249356564
+ar1,heavy_bev_ruc_net_revenue,2032,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",50.23774636001099,50.23774636001099,49.405834117887025
+ar1,heavy_bev_ruc_net_revenue,2033,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",61.72640330168633,61.72640330168633,59.789062898059456
+ar1,heavy_bev_ruc_net_revenue,2034,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",74.50506210254844,74.50506210254844,71.42342738026264
+ar1,heavy_bev_ruc_net_revenue,2035,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",88.35859639470527,88.35859639470527,84.1238284506162
+ar1,heavy_bev_ruc_net_revenue,2036,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",104.12999339197631,104.12999339197631,98.64460566577691
+ar1,heavy_bev_ruc_net_revenue,2037,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",121.59694248234337,121.59694248234337,114.79827801087959
+ar1,heavy_bev_ruc_net_revenue,2038,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",140.87231348847945,140.87231348847945,132.6911771079549
+ar1,heavy_bev_ruc_net_revenue,2039,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",161.90543068375973,161.90543068375973,152.29883742844686
+ar1,heavy_bev_ruc_net_revenue,2040,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",184.41987383988817,184.41987383988817,173.3677687773352
+ar1,heavy_bev_ruc_net_revenue,2041,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",208.6562631032648,208.6562631032648,196.10608682035127
+ar1,heavy_bev_ruc_net_revenue,2042,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",241.5277901094778,241.5277901094778,226.84601376587307
+ar1,heavy_bev_ruc_net_revenue,2043,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",278.97024949525985,278.97024949525985,261.89544106680205
+ar1,heavy_bev_ruc_net_revenue,2044,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",322.3014837564169,322.3014837564169,302.4641628778163
+ar1,heavy_bev_ruc_net_revenue,2045,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",371.7051799044966,371.7051799044966,348.76069385905976
+ar1,heavy_bev_ruc_net_revenue,2046,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",427.32165167945277,427.32165167945277,400.96376779194634
+ar1,heavy_bev_ruc_net_revenue,2047,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",489.38807158215786,489.38807158215786,459.3053358598827
+ar1,heavy_bev_ruc_net_revenue,2048,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",557.9668173281243,557.9668173281243,523.8788638878596
+ar1,heavy_bev_ruc_net_revenue,2049,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",633.427291266431,633.427291266431,595.0151089806695
+ar1,heavy_bev_ruc_net_revenue,2050,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",714.8212622435603,714.8212622435603,671.8417805882236
+ar1,heavy_ruc_net_km,2025,published,False,False,False,False,not priced by the fuel rate and no activity response,3981.873439,3981.873439,3981.873439
+ar1,heavy_ruc_net_km,2026,published,False,False,False,False,not priced by the fuel rate and no activity response,4062.241798831312,4062.241798831312,4062.241798831312
+ar1,heavy_ruc_net_km,2027,published,True,False,True,True,activity responded inside the fixed-finalist replay window,4106.886719292136,4114.0965086127335,4114.0965086127335
+ar1,heavy_ruc_net_km,2028,published,True,False,True,True,activity responded inside the fixed-finalist replay window,4153.274595045411,4153.274595045411,4167.6201774151195
+ar1,heavy_ruc_net_km,2029,published,True,False,True,True,activity responded inside the fixed-finalist replay window,4192.720215451303,4192.720215451303,4206.633507928497
+ar1,heavy_ruc_net_km,2030,published,True,False,True,True,activity responded inside the fixed-finalist replay window,4230.412228687553,4230.412228687553,4244.105071651034
+ar1,heavy_ruc_net_km,2031,published,False,False,False,False,not priced by the fuel rate and no activity response,4267.911566311923,4267.911566311923,4267.911566311923
+ar1,heavy_ruc_net_km,2032,published,False,False,False,False,not priced by the fuel rate and no activity response,4296.722306807416,4296.722306807416,4296.722306807416
+ar1,heavy_ruc_net_km,2033,published,False,False,False,False,not priced by the fuel rate and no activity response,4317.235634223176,4317.235634223176,4317.235634223176
+ar1,heavy_ruc_net_km,2034,published,False,False,False,False,not priced by the fuel rate and no activity response,4331.432056405634,4331.432056405634,4331.432056405634
+ar1,heavy_ruc_net_km,2035,published,False,False,False,False,not priced by the fuel rate and no activity response,4332.904593391855,4332.904593391855,4332.904593391855
+ar1,heavy_ruc_net_km,2036,published,False,False,False,False,not priced by the fuel rate and no activity response,4320.191418294555,4320.191418294555,4320.191418294555
+ar1,heavy_ruc_net_km,2037,published,False,False,False,False,not priced by the fuel rate and no activity response,4293.526166490142,4293.526166490142,4293.526166490142
+ar1,heavy_ruc_net_km,2038,published,False,False,False,False,not priced by the fuel rate and no activity response,4254.573259218129,4254.573259218129,4254.573259218129
+ar1,heavy_ruc_net_km,2039,published,False,False,False,False,not priced by the fuel rate and no activity response,4202.7917839877055,4202.7917839877055,4202.7917839877055
+ar1,heavy_ruc_net_km,2040,published,False,False,False,False,not priced by the fuel rate and no activity response,4139.988390396382,4139.988390396382,4139.988390396382
+ar1,heavy_ruc_net_km,2041,published,False,False,False,False,not priced by the fuel rate and no activity response,4069.4353207978606,4069.4353207978606,4069.4353207978606
+ar1,heavy_ruc_net_km,2042,published,False,False,False,False,not priced by the fuel rate and no activity response,3994.8611783682823,3994.8611783682823,3994.8611783682823
+ar1,heavy_ruc_net_km,2043,published,False,False,False,False,not priced by the fuel rate and no activity response,3918.79447433283,3918.79447433283,3918.79447433283
+ar1,heavy_ruc_net_km,2044,published,False,False,False,False,not priced by the fuel rate and no activity response,3847.6771858833663,3847.6771858833663,3847.6771858833663
+ar1,heavy_ruc_net_km,2045,published,False,False,False,False,not priced by the fuel rate and no activity response,3787.995002710367,3787.995002710367,3787.995002710367
+ar1,heavy_ruc_net_km,2046,published,False,False,False,False,not priced by the fuel rate and no activity response,3732.733320245248,3732.733320245248,3732.733320245248
+ar1,heavy_ruc_net_km,2047,published,False,False,False,False,not priced by the fuel rate and no activity response,3674.343470439415,3674.343470439415,3674.343470439415
+ar1,heavy_ruc_net_km,2048,published,False,False,False,False,not priced by the fuel rate and no activity response,3612.9334701749162,3612.9334701749162,3612.9334701749162
+ar1,heavy_ruc_net_km,2049,published,False,False,False,False,not priced by the fuel rate and no activity response,3548.5122267359834,3548.5122267359834,3548.5122267359834
+ar1,heavy_ruc_net_km,2050,published,False,False,False,False,not priced by the fuel rate and no activity response,3483.2835913255512,3483.2835913255512,3483.2835913255512
+ar1,heavy_ruc_net_revenue,2025,published,False,False,False,False,rate-priced but outside every affected year,1109.95026251304,1109.95026251304,1109.95026251304
+ar1,heavy_ruc_net_revenue,2026,published,False,False,False,False,rate-priced but outside every affected year,1134.1059888764494,1134.1059888764494,1134.1059888764494
+ar1,heavy_ruc_net_revenue,2027,published,True,True,True,True,rate and the modelled activity response both changed,1233.416405004086,1138.2992226348838,1138.2992226348838
+ar1,heavy_ruc_net_revenue,2028,published,True,True,True,True,rate and the modelled activity response both changed,1386.55564155929,1386.55564155929,1195.1134537185603
+ar1,heavy_ruc_net_revenue,2029,published,True,True,True,True,rate and the modelled activity response both changed,1482.1675915175717,1482.1675915175717,1289.0184818361574
+ar1,heavy_ruc_net_revenue,2030,published,True,True,True,True,rate and the modelled activity response both changed,1561.9346558206582,1561.9346558206582,1367.19305184195
+ar1,heavy_ruc_net_revenue,2031,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",1642.9965761252706,1642.9965761252706,1442.030292528643
+ar1,heavy_ruc_net_revenue,2032,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",1721.5892102800665,1721.5892102800665,1519.269733194873
+ar1,heavy_ruc_net_revenue,2033,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",1797.6105733778486,1797.6105733778486,1594.3289958446405
+ar1,heavy_ruc_net_revenue,2034,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",1871.5468200920322,1871.5468200920322,1667.598369917728
+ar1,heavy_ruc_net_revenue,2035,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",1940.253012397905,1940.253012397905,1736.2269598518817
+ar1,heavy_ruc_net_revenue,2036,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",2002.4303233366143,2002.4303233366143,1798.999776002646
+ar1,heavy_ruc_net_revenue,2037,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",2057.522141874573,2057.522141874573,1855.3415592618924
+ar1,heavy_ruc_net_revenue,2038,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",2105.694670318528,2105.694670318528,1905.3445998283173
+ar1,heavy_ruc_net_revenue,2039,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",2146.0925826165585,2146.0925826165585,1948.1759540397995
+ar1,heavy_ruc_net_revenue,2040,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",2179.062189343183,2179.062189343183,1984.0950068329976
+ar1,heavy_ruc_net_revenue,2041,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",2205.8577628150865,2205.8577628150865,2014.205820463529
+ar1,heavy_ruc_net_revenue,2042,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",2228.173770846697,2228.173770846697,2040.030747281179
+ar1,heavy_ruc_net_revenue,2043,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",2247.291473223277,2247.291473223277,2062.7359067426673
+ar1,heavy_ruc_net_revenue,2044,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",2266.955205992829,2266.955205992829,2085.7488212812214
+ar1,heavy_ruc_net_revenue,2045,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",2291.301357214467,2291.301357214467,2112.903079451709
+ar1,heavy_ruc_net_revenue,2046,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",2316.5156348776068,2316.5156348776068,2140.7164832119333
+ar1,heavy_ruc_net_revenue,2047,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",2338.0031219579523,2338.0031219579523,2164.952208474956
+ar1,heavy_ruc_net_revenue,2048,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",2355.686816556099,2355.686816556099,2185.530814532035
+ar1,heavy_ruc_net_revenue,2049,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",2369.4303265972812,2369.4303265972812,2202.309492664743
+ar1,heavy_ruc_net_revenue,2050,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",2380.597921237581,2380.597921237581,2216.553363629948
+ar1,light_bev_ruc_net_km,2025,published,False,False,False,False,not priced by the fuel rate and no activity response,975.927403033152,975.927403033152,975.927403033152
+ar1,light_bev_ruc_net_km,2026,published,False,False,False,False,not priced by the fuel rate and no activity response,1237.1740107408814,1237.1740107408814,1237.1740107408814
+ar1,light_bev_ruc_net_km,2027,published,False,False,False,False,not priced by the fuel rate and no activity response,1541.0531756214164,1541.0531756214164,1541.0531756214164
+ar1,light_bev_ruc_net_km,2028,published,False,False,False,False,not priced by the fuel rate and no activity response,2047.1005382667586,2047.1005382667586,2047.1005382667586
+ar1,light_bev_ruc_net_km,2029,published,False,False,False,False,not priced by the fuel rate and no activity response,2695.8212982561504,2695.8212982561504,2695.8212982561504
+ar1,light_bev_ruc_net_km,2030,published,False,False,False,False,not priced by the fuel rate and no activity response,3437.1140934214673,3437.1140934214673,3437.1140934214673
+ar1,light_bev_ruc_net_km,2031,published,False,False,False,False,not priced by the fuel rate and no activity response,4136.464957208158,4136.464957208158,4136.464957208158
+ar1,light_bev_ruc_net_km,2032,published,False,False,False,False,not priced by the fuel rate and no activity response,4916.332792766778,4916.332792766778,4916.332792766778
+ar1,light_bev_ruc_net_km,2033,published,False,False,False,False,not priced by the fuel rate and no activity response,5810.656623517291,5810.656623517291,5810.656623517291
+ar1,light_bev_ruc_net_km,2034,published,False,False,False,False,not priced by the fuel rate and no activity response,6881.453189098758,6881.453189098758,6881.453189098758
+ar1,light_bev_ruc_net_km,2035,published,False,False,False,False,not priced by the fuel rate and no activity response,8161.8272756409115,8161.8272756409115,8161.8272756409115
+ar1,light_bev_ruc_net_km,2036,published,False,False,False,False,not priced by the fuel rate and no activity response,9659.59907412921,9659.59907412921,9659.59907412921
+ar1,light_bev_ruc_net_km,2037,published,False,False,False,False,not priced by the fuel rate and no activity response,11399.789701220574,11399.789701220574,11399.789701220574
+ar1,light_bev_ruc_net_km,2038,published,False,False,False,False,not priced by the fuel rate and no activity response,13377.545681265494,13377.545681265494,13377.545681265494
+ar1,light_bev_ruc_net_km,2039,published,False,False,False,False,not priced by the fuel rate and no activity response,15629.699446091794,15629.699446091794,15629.699446091794
+ar1,light_bev_ruc_net_km,2040,published,False,False,False,False,not priced by the fuel rate and no activity response,18145.70560302013,18145.70560302013,18145.70560302013
+ar1,light_bev_ruc_net_km,2041,published,False,False,False,False,not priced by the fuel rate and no activity response,20816.414203603417,20816.414203603417,20816.414203603417
+ar1,light_bev_ruc_net_km,2042,published,False,False,False,False,not priced by the fuel rate and no activity response,23544.7199664252,23544.7199664252,23544.7199664252
+ar1,light_bev_ruc_net_km,2043,published,False,False,False,False,not priced by the fuel rate and no activity response,26226.749050876788,26226.749050876788,26226.749050876788
+ar1,light_bev_ruc_net_km,2044,published,False,False,False,False,not priced by the fuel rate and no activity response,28712.36769831297,28712.36769831297,28712.36769831297
+ar1,light_bev_ruc_net_km,2045,published,False,False,False,False,not priced by the fuel rate and no activity response,31081.76273200823,31081.76273200823,31081.76273200823
+ar1,light_bev_ruc_net_km,2046,published,False,False,False,False,not priced by the fuel rate and no activity response,33509.46313744956,33509.46313744956,33509.46313744956
+ar1,light_bev_ruc_net_km,2047,published,False,False,False,False,not priced by the fuel rate and no activity response,35904.76590433538,35904.76590433538,35904.76590433538
+ar1,light_bev_ruc_net_km,2048,published,False,False,False,False,not priced by the fuel rate and no activity response,38352.97628394901,38352.97628394901,38352.97628394901
+ar1,light_bev_ruc_net_km,2049,published,False,False,False,False,not priced by the fuel rate and no activity response,40612.41140075799,40612.41140075799,40612.41140075799
+ar1,light_bev_ruc_net_km,2050,published,False,False,False,False,not priced by the fuel rate and no activity response,42570.73758968652,42570.73758968652,42570.73758968652
+ar1,light_bev_ruc_net_revenue,2025,published,False,False,False,False,rate-priced but outside every affected year,65.88575453502638,65.88575453502638,65.88575453502638
+ar1,light_bev_ruc_net_revenue,2026,published,False,False,False,False,rate-priced but outside every affected year,83.3370955480371,83.3370955480371,83.3370955480371
+ar1,light_bev_ruc_net_revenue,2027,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",112.36347424441837,103.51663034131343,103.51663034131343
+ar1,light_bev_ruc_net_revenue,2028,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",166.53162878800077,166.53162878800077,143.04447118031558
+ar1,light_bev_ruc_net_revenue,2029,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",232.20456752529267,232.20456752529267,201.27683517932402
+ar1,light_bev_ruc_net_revenue,2030,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",309.21996941466256,309.21996941466256,269.7932477032342
+ar1,light_bev_ruc_net_revenue,2031,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",387.95904833655317,387.95904833655317,340.50509178860176
+ar1,light_bev_ruc_net_revenue,2032,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",479.90782556592876,479.90782556592876,423.5095281452591
+ar1,light_bev_ruc_net_revenue,2033,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",589.4620611727117,589.4620611727117,522.8031421244101
+ar1,light_bev_ruc_net_revenue,2034,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",724.4449844823712,724.4449844823712,645.4998946585099
+ar1,light_bev_ruc_net_revenue,2035,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",890.4553557724238,890.4553557724238,796.8200978726389
+ar1,light_bev_ruc_net_revenue,2036,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",1090.810225446041,1090.810225446041,979.9928259021596
+ar1,light_bev_ruc_net_revenue,2037,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",1330.9824465660054,1330.9824465660054,1200.1946406817901
+ar1,light_bev_ruc_net_revenue,2038,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",1613.1313459753997,1613.1313459753997,1459.6470904317168
+ar1,light_bev_ruc_net_revenue,2039,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",1944.4909080882742,1944.4909080882742,1765.1663589312298
+ar1,light_bev_ruc_net_revenue,2040,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",2326.9145580032855,2326.9145580032855,2118.7185838201985
+ar1,light_bev_ruc_net_revenue,2041,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",2749.119741798886,2749.119741798886,2510.2674698371716
+ar1,light_bev_ruc_net_revenue,2042,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",3199.4919962375207,3199.4919962375207,2929.332592190205
+ar1,light_bev_ruc_net_revenue,2043,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",3664.2702436432514,3664.2702436432514,3363.3473421810463
+ar1,light_bev_ruc_net_revenue,2044,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",4121.516821254343,4121.516821254343,3792.0682460318385
+ar1,light_bev_ruc_net_revenue,2045,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",4580.674782629701,4580.674782629701,4224.0283338160525
+ar1,light_bev_ruc_net_revenue,2046,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",5066.63082638237,5066.63082638237,4682.126881029879
+ar1,light_bev_ruc_net_revenue,2047,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",5566.136334319584,5566.136334319584,5154.150153386579
+ar1,light_bev_ruc_net_revenue,2048,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",6092.562047586725,6092.562047586725,5652.484023286157
+ar1,light_bev_ruc_net_revenue,2049,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",6607.030148732312,6607.030148732312,6141.022612710243
+ar1,light_bev_ruc_net_revenue,2050,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",7088.453516058697,7088.453516058697,6599.995464915136
+ar1,light_petrol_vkt,2025,published,False,False,False,False,not priced by the fuel rate and no activity response,31704.7370711529,31704.7370711529,31704.7370711529
+ar1,light_petrol_vkt,2026,published,False,False,False,False,not priced by the fuel rate and no activity response,32946.371722443735,32946.371722443735,32946.371722443735
+ar1,light_petrol_vkt,2027,published,True,False,True,True,activity responded inside the fixed-finalist replay window,32242.11048256905,32339.187638648003,32339.187638648003
+ar1,light_petrol_vkt,2028,published,True,False,True,True,activity responded inside the fixed-finalist replay window,32375.58680046918,32375.58680046918,32569.578806319678
+ar1,light_petrol_vkt,2029,published,True,False,True,True,activity responded inside the fixed-finalist replay window,32682.67332088302,32682.67332088302,32875.827941273055
+ar1,light_petrol_vkt,2030,published,True,False,True,True,activity responded inside the fixed-finalist replay window,32993.321829443696,32993.321829443696,33185.68258928689
+ar1,light_petrol_vkt,2031,published,False,False,False,False,not priced by the fuel rate and no activity response,32560.913261162386,32560.913261162386,32560.913261162386
+ar1,light_petrol_vkt,2032,published,False,False,False,False,not priced by the fuel rate and no activity response,32554.521427334326,32554.521427334326,32554.521427334326
+ar1,light_petrol_vkt,2033,published,False,False,False,False,not priced by the fuel rate and no activity response,32458.82399850718,32458.82399850718,32458.82399850718
+ar1,light_petrol_vkt,2034,published,False,False,False,False,not priced by the fuel rate and no activity response,32258.330277295056,32258.330277295056,32258.330277295056
+ar1,light_petrol_vkt,2035,published,False,False,False,False,not priced by the fuel rate and no activity response,31906.68354632217,31906.68354632217,31906.68354632217
+ar1,light_petrol_vkt,2036,published,False,False,False,False,not priced by the fuel rate and no activity response,31336.85611161832,31336.85611161832,31336.85611161832
+ar1,light_petrol_vkt,2037,published,False,False,False,False,not priced by the fuel rate and no activity response,30490.74572133517,30490.74572133517,30490.74572133517
+ar1,light_petrol_vkt,2038,published,False,False,False,False,not priced by the fuel rate and no activity response,29316.540649505416,29316.540649505416,29316.540649505416
+ar1,light_petrol_vkt,2039,published,False,False,False,False,not priced by the fuel rate and no activity response,27803.385916194755,27803.385916194755,27803.385916194755
+ar1,light_petrol_vkt,2040,published,False,False,False,False,not priced by the fuel rate and no activity response,25986.986989365614,25986.986989365614,25986.986989365614
+ar1,light_petrol_vkt,2041,published,False,False,False,False,not priced by the fuel rate and no activity response,23938.87251467942,23938.87251467942,23938.87251467942
+ar1,light_petrol_vkt,2042,published,False,False,False,False,not priced by the fuel rate and no activity response,21637.12076883741,21637.12076883741,21637.12076883741
+ar1,light_petrol_vkt,2043,published,False,False,False,False,not priced by the fuel rate and no activity response,19341.844264749856,19341.844264749856,19341.844264749856
+ar1,light_petrol_vkt,2044,published,False,False,False,False,not priced by the fuel rate and no activity response,17264.97824988635,17264.97824988635,17264.97824988635
+ar1,light_petrol_vkt,2045,published,False,False,False,False,not priced by the fuel rate and no activity response,15532.93206355075,15532.93206355075,15532.93206355075
+ar1,light_petrol_vkt,2046,published,False,False,False,False,not priced by the fuel rate and no activity response,14075.169696128323,14075.169696128323,14075.169696128323
+ar1,light_petrol_vkt,2047,published,False,False,False,False,not priced by the fuel rate and no activity response,12744.227200347417,12744.227200347417,12744.227200347417
+ar1,light_petrol_vkt,2048,published,False,False,False,False,not priced by the fuel rate and no activity response,11547.750171710422,11547.750171710422,11547.750171710422
+ar1,light_petrol_vkt,2049,published,False,False,False,False,not priced by the fuel rate and no activity response,10458.910759420927,10458.910759420927,10458.910759420927
+ar1,light_petrol_vkt,2050,published,False,False,False,False,not priced by the fuel rate and no activity response,9467.857423855028,9467.857423855028,9467.857423855028
+ar1,light_ruc_net_km,2025,published,False,False,False,False,not priced by the fuel rate and no activity response,12073.374168411488,12073.374168411488,12073.374168411488
+ar1,light_ruc_net_km,2026,published,False,False,False,False,not priced by the fuel rate and no activity response,12790.779603597242,12790.779603597242,12790.779603597242
+ar1,light_ruc_net_km,2027,published,True,False,True,True,activity responded inside the fixed-finalist replay window,12897.952366561178,12939.128473679877,12939.128473679877
+ar1,light_ruc_net_km,2028,published,True,False,True,True,activity responded inside the fixed-finalist replay window,13542.195255933108,13542.195255933108,13624.668383084801
+ar1,light_ruc_net_km,2029,published,True,False,True,True,activity responded inside the fixed-finalist replay window,14131.358557992657,14131.358557992657,14213.786938198622
+ar1,light_ruc_net_km,2030,published,True,False,True,True,activity responded inside the fixed-finalist replay window,14552.971035061611,14552.971035061611,14635.493104537227
+ar1,light_ruc_net_km,2031,published,False,False,False,False,not priced by the fuel rate and no activity response,14393.626371033974,14393.626371033974,14393.626371033974
+ar1,light_ruc_net_km,2032,published,False,False,False,False,not priced by the fuel rate and no activity response,14182.204692593667,14182.204692593667,14182.204692593667
+ar1,light_ruc_net_km,2033,published,False,False,False,False,not priced by the fuel rate and no activity response,13912.61738746834,13912.61738746834,13912.61738746834
+ar1,light_ruc_net_km,2034,published,False,False,False,False,not priced by the fuel rate and no activity response,13594.982754176992,13594.982754176992,13594.982754176992
+ar1,light_ruc_net_km,2035,published,False,False,False,False,not priced by the fuel rate and no activity response,13229.329799110064,13229.329799110064,13229.329799110064
+ar1,light_ruc_net_km,2036,published,False,False,False,False,not priced by the fuel rate and no activity response,12816.296439651014,12816.296439651014,12816.296439651014
+ar1,light_ruc_net_km,2037,published,False,False,False,False,not priced by the fuel rate and no activity response,12349.522553179142,12349.522553179142,12349.522553179142
+ar1,light_ruc_net_km,2038,published,False,False,False,False,not priced by the fuel rate and no activity response,11815.791864977055,11815.791864977055,11815.791864977055
+ar1,light_ruc_net_km,2039,published,False,False,False,False,not priced by the fuel rate and no activity response,11238.252484340763,11238.252484340763,11238.252484340763
+ar1,light_ruc_net_km,2040,published,False,False,False,False,not priced by the fuel rate and no activity response,10633.407435309253,10633.407435309253,10633.407435309253
+ar1,light_ruc_net_km,2041,published,False,False,False,False,not priced by the fuel rate and no activity response,10040.63709698761,10040.63709698761,10040.63709698761
+ar1,light_ruc_net_km,2042,published,False,False,False,False,not priced by the fuel rate and no activity response,9495.8071304273,9495.8071304273,9495.8071304273
+ar1,light_ruc_net_km,2043,published,False,False,False,False,not priced by the fuel rate and no activity response,8991.054506384144,8991.054506384144,8991.054506384144
+ar1,light_ruc_net_km,2044,published,False,False,False,False,not priced by the fuel rate and no activity response,8515.504800406195,8515.504800406195,8515.504800406195
+ar1,light_ruc_net_km,2045,published,False,False,False,False,not priced by the fuel rate and no activity response,8080.881551303927,8080.881551303927,8080.881551303927
+ar1,light_ruc_net_km,2046,published,False,False,False,False,not priced by the fuel rate and no activity response,7680.843975198953,7680.843975198953,7680.843975198953
+ar1,light_ruc_net_km,2047,published,False,False,False,False,not priced by the fuel rate and no activity response,7292.902940669605,7292.902940669605,7292.902940669605
+ar1,light_ruc_net_km,2048,published,False,False,False,False,not priced by the fuel rate and no activity response,6926.524430085186,6926.524430085186,6926.524430085186
+ar1,light_ruc_net_km,2049,published,False,False,False,False,not priced by the fuel rate and no activity response,6564.184458956384,6564.184458956384,6564.184458956384
+ar1,light_ruc_net_km,2050,published,False,False,False,False,not priced by the fuel rate and no activity response,6207.828794250147,6207.828794250147,6207.828794250147
+ar1,light_ruc_net_revenue,2025,published,False,False,False,False,rate-priced but outside every affected year,817.392755499028,817.392755499028,817.392755499028
+ar1,light_ruc_net_revenue,2026,published,False,False,False,False,rate-priced but outside every affected year,866.4745234882769,866.4745234882769,866.4745234882769
+ar1,light_ruc_net_revenue,2027,published,True,True,True,True,rate and the modelled activity response both changed,941.1479793914806,869.8154909573449,869.8154909573449
+ar1,light_ruc_net_revenue,2028,published,True,True,True,True,rate and the modelled activity response both changed,1101.293140132511,1101.293140132511,951.7308567097448
+ar1,light_ruc_net_revenue,2029,published,True,True,True,True,rate and the modelled activity response both changed,1217.093810678792,1217.093810678792,1061.1407093103198
+ar1,light_ruc_net_revenue,2030,published,True,True,True,True,rate and the modelled activity response both changed,1309.1303913442225,1309.1303913442225,1148.6881550476805
+ar1,light_ruc_net_revenue,2031,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",1349.97821733928,1349.97821733928,1184.8530373983144
+ar1,light_ruc_net_revenue,2032,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",1384.3959110675319,1384.3959110675319,1221.7030601054266
+ar1,light_ruc_net_revenue,2033,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",1411.3654708717315,1411.3654708717315,1251.7621598745177
+ar1,light_ruc_net_revenue,2034,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",1431.2118094459836,1431.2118094459836,1275.2480754511716
+ar1,light_ruc_net_revenue,2035,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",1443.3198810829158,1443.3198810829158,1291.5485110518446
+ar1,light_ruc_net_revenue,2036,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",1447.2802754475974,1447.2802754475974,1300.2484336158316
+ar1,light_ruc_net_revenue,2037,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",1441.8685056964368,1441.8685056964368,1300.1845798714712
+ar1,light_ruc_net_revenue,2038,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",1424.8072620382611,1424.8072620382611,1289.2414369411456
+ar1,light_ruc_net_revenue,2039,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",1398.150991576828,1398.150991576828,1269.2109203349996
+ar1,light_ruc_net_revenue,2040,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",1363.5750024668814,1363.5750024668814,1241.5718867814037
+ar1,light_ruc_net_revenue,2041,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",1326.0167382136708,1326.0167382136708,1210.8081840841405
+ar1,light_ruc_net_revenue,2042,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",1290.3852309537617,1290.3852309537617,1181.427400962039
+ar1,light_ruc_net_revenue,2043,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",1256.1851803594616,1256.1851803594616,1153.0227867277772
+ar1,light_ruc_net_revenue,2044,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",1222.358136574312,1222.358136574312,1124.6503838291749
+ar1,light_ruc_net_revenue,2045,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",1190.9199186234198,1190.9199186234198,1098.1961650382227
+ar1,light_ruc_net_revenue,2046,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",1161.343609050086,1161.343609050086,1073.209854116831
+ar1,light_ruc_net_revenue,2047,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",1130.582278377304,1130.582278377304,1046.9004841985886
+ar1,light_ruc_net_revenue,2048,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",1100.3130383411872,1100.3130383411872,1020.8352120600175
+ar1,light_ruc_net_revenue,2049,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",1067.894348705315,1067.894348705315,992.573546019476
+ar1,light_ruc_net_revenue,2050,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",1033.6655725305918,1033.6655725305918,962.4367396196271
+ar1,mr1_revenue,2025,published,False,False,False,False,not priced by the fuel rate and no activity response,329.940070075217,329.940070075217,329.940070075217
+ar1,mr1_revenue,2026,published,False,False,False,False,not priced by the fuel rate and no activity response,436.822707962969,436.822707962969,436.822707962969
+ar1,mr1_revenue,2027,published,False,False,False,False,not priced by the fuel rate and no activity response,526.840027334863,526.840027334863,526.840027334863
+ar1,mr1_revenue,2028,published,False,False,False,False,not priced by the fuel rate and no activity response,532.414039464172,532.414039464172,532.414039464172
+ar1,mr1_revenue,2029,published,False,False,False,False,not priced by the fuel rate and no activity response,526.427022508523,526.427022508523,526.427022508523
+ar1,mr1_revenue,2030,published,False,False,False,False,not priced by the fuel rate and no activity response,520.957974139895,520.957974139895,520.957974139895
+ar1,mr1_revenue,2031,published,False,False,False,False,not priced by the fuel rate and no activity response,515.950840486336,515.950840486336,515.950840486336
+ar1,mr1_revenue,2032,published,False,False,False,False,not priced by the fuel rate and no activity response,511.356724878703,511.356724878703,511.356724878703
+ar1,mr1_revenue,2033,published,False,False,False,False,not priced by the fuel rate and no activity response,507.132700736054,507.132700736054,507.132700736054
+ar1,mr1_revenue,2034,published,False,False,False,False,not priced by the fuel rate and no activity response,503.24090330059,503.24090330059,503.24090330059
+ar1,mr1_revenue,2035,published,False,False,False,False,not priced by the fuel rate and no activity response,499.647812671426,499.647812671426,499.647812671426
+ar1,mr1_revenue,2036,published,False,False,False,False,not priced by the fuel rate and no activity response,496.323673046758,496.323673046758,496.323673046758
+ar1,mr1_revenue,2037,published,False,False,False,False,not priced by the fuel rate and no activity response,493.242012398015,493.242012398015,493.242012398015
+ar1,mr1_revenue,2038,published,False,False,False,False,not priced by the fuel rate and no activity response,490.379238600523,490.379238600523,490.379238600523
+ar1,mr1_revenue,2039,published,False,False,False,False,not priced by the fuel rate and no activity response,487.714295442214,487.714295442214,487.714295442214
+ar1,mr1_revenue,2040,published,False,False,False,False,not priced by the fuel rate and no activity response,485.228366686763,485.228366686763,485.228366686763
+ar1,mr1_revenue,2041,published,False,False,False,False,not priced by the fuel rate and no activity response,482.904619501813,482.904619501813,482.904619501813
+ar1,mr1_revenue,2042,published,False,False,False,False,not priced by the fuel rate and no activity response,480.727980682862,480.727980682862,480.727980682862
+ar1,mr1_revenue,2043,published,False,False,False,False,not priced by the fuel rate and no activity response,478.684940574925,478.684940574925,478.684940574925
+ar1,mr1_revenue,2044,published,False,False,False,False,not priced by the fuel rate and no activity response,476.763380642536,476.763380642536,476.763380642536
+ar1,mr1_revenue,2045,published,False,False,False,False,not priced by the fuel rate and no activity response,474.952421405697,474.952421405697,474.952421405697
+ar1,mr1_revenue,2046,published,False,False,False,False,not priced by the fuel rate and no activity response,473.242288034574,473.242288034574,473.242288034574
+ar1,mr1_revenue,2047,published,False,False,False,False,not priced by the fuel rate and no activity response,471.624191337962,471.624191337962,471.624191337962
+ar1,mr1_revenue,2048,published,False,False,False,False,not priced by the fuel rate and no activity response,470.090222227746,470.090222227746,470.090222227746
+ar1,mr1_revenue,2049,published,False,False,False,False,not priced by the fuel rate and no activity response,468.633258020048,468.633258020048,468.633258020048
+ar1,mr1_revenue,2050,published,False,False,False,False,not priced by the fuel rate and no activity response,467.246879160906,467.246879160906,467.246879160906
+ar1,mr2_revenue,2025,published,False,False,False,False,not priced by the fuel rate and no activity response,29.65313102,29.65313102,29.65313102
+ar1,mr2_revenue,2026,published,False,False,False,False,not priced by the fuel rate and no activity response,31.3740054746584,31.3740054746584,31.3740054746584
+ar1,mr2_revenue,2027,published,False,False,False,False,not priced by the fuel rate and no activity response,31.3601498274909,31.3601498274909,31.3601498274909
+ar1,mr2_revenue,2028,published,False,False,False,False,not priced by the fuel rate and no activity response,31.6618683538461,31.6618683538461,31.6618683538461
+ar1,mr2_revenue,2029,published,False,False,False,False,not priced by the fuel rate and no activity response,31.8808203574151,31.8808203574151,31.8808203574151
+ar1,mr2_revenue,2030,published,False,False,False,False,not priced by the fuel rate and no activity response,32.0452026276956,32.0452026276956,32.0452026276956
+ar1,mr2_revenue,2031,published,False,False,False,False,not priced by the fuel rate and no activity response,32.1728248675943,32.1728248675943,32.1728248675943
+ar1,mr2_revenue,2032,published,False,False,False,False,not priced by the fuel rate and no activity response,32.2751359910549,32.2751359910549,32.2751359910549
+ar1,mr2_revenue,2033,published,False,False,False,False,not priced by the fuel rate and no activity response,32.3596396301847,32.3596396301847,32.3596396301847
+ar1,mr2_revenue,2034,published,False,False,False,False,not priced by the fuel rate and no activity response,32.4313532891816,32.4313532891816,32.4313532891816
+ar1,mr2_revenue,2035,published,False,False,False,False,not priced by the fuel rate and no activity response,32.4936991760889,32.4936991760889,32.4936991760889
+ar1,mr2_revenue,2036,published,False,False,False,False,not priced by the fuel rate and no activity response,32.5490556715397,32.5490556715397,32.5490556715397
+ar1,mr2_revenue,2037,published,False,False,False,False,not priced by the fuel rate and no activity response,32.599104439525,32.599104439525,32.599104439525
+ar1,mr2_revenue,2038,published,False,False,False,False,not priced by the fuel rate and no activity response,32.6450530220251,32.6450530220251,32.6450530220251
+ar1,mr2_revenue,2039,published,False,False,False,False,not priced by the fuel rate and no activity response,32.6877804371222,32.6877804371222,32.6877804371222
+ar1,mr2_revenue,2040,published,False,False,False,False,not priced by the fuel rate and no activity response,32.7279343355741,32.7279343355741,32.7279343355741
+ar1,mr2_revenue,2041,published,False,False,False,False,not priced by the fuel rate and no activity response,32.7659970934436,32.7659970934436,32.7659970934436
+ar1,mr2_revenue,2042,published,False,False,False,False,not priced by the fuel rate and no activity response,32.8023315809017,32.8023315809017,32.8023315809017
+ar1,mr2_revenue,2043,published,False,False,False,False,not priced by the fuel rate and no activity response,32.8372133641968,32.8372133641968,32.8372133641968
+ar1,mr2_revenue,2044,published,False,False,False,False,not priced by the fuel rate and no activity response,32.8708536753551,32.8708536753551,32.8708536753551
+ar1,mr2_revenue,2045,published,False,False,False,False,not priced by the fuel rate and no activity response,32.9034159871398,32.9034159871398,32.9034159871398
+ar1,mr2_revenue,2046,published,False,False,False,False,not priced by the fuel rate and no activity response,32.9350280886836,32.9350280886836,32.9350280886836
+ar1,mr2_revenue,2047,published,False,False,False,False,not priced by the fuel rate and no activity response,32.9657909524934,32.9657909524934,32.9657909524934
+ar1,mr2_revenue,2048,published,False,False,False,False,not priced by the fuel rate and no activity response,32.9957852873087,32.9957852873087,32.9957852873087
+ar1,mr2_revenue,2049,published,False,False,False,False,not priced by the fuel rate and no activity response,33.025076406474,33.025076406474,33.025076406474
+ar1,mr2_revenue,2050,published,False,False,False,False,not priced by the fuel rate and no activity response,33.0537178609557,33.0537178609557,33.0537178609557
+ar1,mvr_admin_revenue,2025,published,False,False,False,False,not priced by the fuel rate and no activity response,71.7641373652173,71.7641373652173,71.7641373652173
+ar1,mvr_admin_revenue,2026,published,False,False,False,False,not priced by the fuel rate and no activity response,72.7105674192725,72.7105674192725,72.7105674192725
+ar1,mvr_admin_revenue,2027,published,False,False,False,False,not priced by the fuel rate and no activity response,72.2584767411959,72.2584767411959,72.2584767411959
+ar1,mvr_admin_revenue,2028,published,False,False,False,False,not priced by the fuel rate and no activity response,71.8861735118593,71.8861735118593,71.8861735118593
+ar1,mvr_admin_revenue,2029,published,False,False,False,False,not priced by the fuel rate and no activity response,71.5205705630239,71.5205705630239,71.5205705630239
+ar1,mvr_admin_revenue,2030,published,False,False,False,False,not priced by the fuel rate and no activity response,71.1689452067262,71.1689452067262,71.1689452067262
+ar1,mvr_admin_revenue,2031,published,False,False,False,False,not priced by the fuel rate and no activity response,70.8351294511562,70.8351294511562,70.8351294511562
+ar1,mvr_admin_revenue,2032,published,False,False,False,False,not priced by the fuel rate and no activity response,70.5207338808813,70.5207338808813,70.5207338808813
+ar1,mvr_admin_revenue,2033,published,False,False,False,False,not priced by the fuel rate and no activity response,70.226068078118,70.226068078118,70.226068078118
+ar1,mvr_admin_revenue,2034,published,False,False,False,False,not priced by the fuel rate and no activity response,69.9506951716758,69.9506951716758,69.9506951716758
+ar1,mvr_admin_revenue,2035,published,False,False,False,False,not priced by the fuel rate and no activity response,69.6937645219894,69.6937645219894,69.6937645219894
+ar1,mvr_admin_revenue,2036,published,False,False,False,False,not priced by the fuel rate and no activity response,69.4542120353986,69.4542120353986,69.4542120353986
+ar1,mvr_admin_revenue,2037,published,False,False,False,False,not priced by the fuel rate and no activity response,69.2308810457719,69.2308810457719,69.2308810457719
+ar1,mvr_admin_revenue,2038,published,False,False,False,False,not priced by the fuel rate and no activity response,69.0225951048985,69.0225951048985,69.0225951048985
+ar1,mvr_admin_revenue,2039,published,False,False,False,False,not priced by the fuel rate and no activity response,68.8282013511128,68.8282013511128,68.8282013511128
+ar1,mvr_admin_revenue,2040,published,False,False,False,False,not priced by the fuel rate and no activity response,68.6465956810414,68.6465956810414,68.6465956810414
+ar1,mvr_admin_revenue,2041,published,False,False,False,False,not priced by the fuel rate and no activity response,68.4767365547289,68.4767365547289,68.4767365547289
+ar1,mvr_admin_revenue,2042,published,False,False,False,False,not priced by the fuel rate and no activity response,68.3176516493357,68.3176516493357,68.3176516493357
+ar1,mvr_admin_revenue,2043,published,False,False,False,False,not priced by the fuel rate and no activity response,68.1684400031144,68.1684400031144,68.1684400031144
+ar1,mvr_admin_revenue,2044,published,False,False,False,False,not priced by the fuel rate and no activity response,68.0282713313282,68.0282713313282,68.0282713313282
+ar1,mvr_admin_revenue,2045,published,False,False,False,False,not priced by the fuel rate and no activity response,67.8963836003967,67.8963836003967,67.8963836003967
+ar1,mvr_admin_revenue,2046,published,False,False,False,False,not priced by the fuel rate and no activity response,67.7720795706125,67.7720795706125,67.7720795706125
+ar1,mvr_admin_revenue,2047,published,False,False,False,False,not priced by the fuel rate and no activity response,67.6547227759428,67.6547227759428,67.6547227759428
+ar1,mvr_admin_revenue,2048,published,False,False,False,False,not priced by the fuel rate and no activity response,67.5437332509341,67.5437332509341,67.5437332509341
+ar1,mvr_admin_revenue,2049,published,False,False,False,False,not priced by the fuel rate and no activity response,67.4385832091796,67.4385832091796,67.4385832091796
+ar1,mvr_admin_revenue,2050,published,False,False,False,False,not priced by the fuel rate and no activity response,67.3387928064436,67.3387928064436,67.3387928064436
+ar1,mvr_refunds,2025,published,False,False,False,False,not priced by the fuel rate and no activity response,1.03557262,1.03557262,1.03557262
+ar1,mvr_refunds,2026,published,False,False,False,False,not priced by the fuel rate and no activity response,1.61137149711806,1.61137149711806,1.61137149711806
+ar1,mvr_refunds,2027,published,False,False,False,False,not priced by the fuel rate and no activity response,1.8947102491513,1.8947102491513,1.8947102491513
+ar1,mvr_refunds,2028,published,False,False,False,False,not priced by the fuel rate and no activity response,1.93922402957318,1.93922402957318,1.93922402957318
+ar1,mvr_refunds,2029,published,False,False,False,False,not priced by the fuel rate and no activity response,1.94416230921848,1.94416230921848,1.94416230921848
+ar1,mvr_refunds,2030,published,False,False,False,False,not priced by the fuel rate and no activity response,1.95051327200492,1.95051327200492,1.95051327200492
+ar1,mvr_refunds,2031,published,False,False,False,False,not priced by the fuel rate and no activity response,1.95819772040296,1.95819772040296,1.95819772040296
+ar1,mvr_refunds,2032,published,False,False,False,False,not priced by the fuel rate and no activity response,1.96713368876597,1.96713368876597,1.96713368876597
+ar1,mvr_refunds,2033,published,False,False,False,False,not priced by the fuel rate and no activity response,1.9772409500257,1.9772409500257,1.9772409500257
+ar1,mvr_refunds,2034,published,False,False,False,False,not priced by the fuel rate and no activity response,1.98844335681006,1.98844335681006,1.98844335681006
+ar1,mvr_refunds,2035,published,False,False,False,False,not priced by the fuel rate and no activity response,2.00066993516834,2.00066993516834,2.00066993516834
+ar1,mvr_refunds,2036,published,False,False,False,False,not priced by the fuel rate and no activity response,2.01385527260378,2.01385527260378,2.01385527260378
+ar1,mvr_refunds,2037,published,False,False,False,False,not priced by the fuel rate and no activity response,2.02793951629894,2.02793951629894,2.02793951629894
+ar1,mvr_refunds,2038,published,False,False,False,False,not priced by the fuel rate and no activity response,2.04286816403657,2.04286816403657,2.04286816403657
+ar1,mvr_refunds,2039,published,False,False,False,False,not priced by the fuel rate and no activity response,2.05859175234344,2.05859175234344,2.05859175234344
+ar1,mvr_refunds,2040,published,False,False,False,False,not priced by the fuel rate and no activity response,2.07506550113276,2.07506550113276,2.07506550113276
+ar1,mvr_refunds,2041,published,False,False,False,False,not priced by the fuel rate and no activity response,2.09224894798797,2.09224894798797,2.09224894798797
+ar1,mvr_refunds,2042,published,False,False,False,False,not priced by the fuel rate and no activity response,2.11010559019988,2.11010559019988,2.11010559019988
+ar1,mvr_refunds,2043,published,False,False,False,False,not priced by the fuel rate and no activity response,2.12860254401761,2.12860254401761,2.12860254401761
+ar1,mvr_refunds,2044,published,False,False,False,False,not priced by the fuel rate and no activity response,2.14771022566508,2.14771022566508,2.14771022566508
+ar1,mvr_refunds,2045,published,False,False,False,False,not priced by the fuel rate and no activity response,2.1674020558414,2.1674020558414,2.1674020558414
+ar1,mvr_refunds,2046,published,False,False,False,False,not priced by the fuel rate and no activity response,2.18765418784998,2.18765418784998,2.18765418784998
+ar1,mvr_refunds,2047,published,False,False,False,False,not priced by the fuel rate and no activity response,2.20844525863813,2.20844525863813,2.20844525863813
+ar1,mvr_refunds,2048,published,False,False,False,False,not priced by the fuel rate and no activity response,2.22975616155917,2.22975616155917,2.22975616155917
+ar1,mvr_refunds,2049,published,False,False,False,False,not priced by the fuel rate and no activity response,2.25156983943842,2.25156983943842,2.25156983943842
+ar1,mvr_refunds,2050,published,False,False,False,False,not priced by the fuel rate and no activity response,2.27387109648037,2.27387109648037,2.27387109648037
+ar1,mvr_revenue_net_admin_coo,2025,published,False,False,False,False,not priced by the fuel rate and no activity response,287.82906372999975,287.82906372999975,287.82906372999975
+ar1,mvr_revenue_net_admin_coo,2026,published,False,False,False,False,not priced by the fuel rate and no activity response,395.4861460183549,395.4861460183549,395.4861460183549
+ar1,mvr_revenue_net_admin_coo,2027,published,False,False,False,False,not priced by the fuel rate and no activity response,485.941700421158,485.941700421158,485.941700421158
+ar1,mvr_revenue_net_admin_coo,2028,published,False,False,False,False,not priced by the fuel rate and no activity response,492.1897343061588,492.1897343061588,492.1897343061588
+ar1,mvr_revenue_net_admin_coo,2029,published,False,False,False,False,not priced by the fuel rate and no activity response,486.78727230291423,486.78727230291423,486.78727230291423
+ar1,mvr_revenue_net_admin_coo,2030,published,False,False,False,False,not priced by the fuel rate and no activity response,481.8342315608644,481.8342315608644,481.8342315608644
+ar1,mvr_revenue_net_admin_coo,2031,published,False,False,False,False,not priced by the fuel rate and no activity response,477.28853590277413,477.28853590277413,477.28853590277413
+ar1,mvr_revenue_net_admin_coo,2032,published,False,False,False,False,not priced by the fuel rate and no activity response,473.1111269888766,473.1111269888766,473.1111269888766
+ar1,mvr_revenue_net_admin_coo,2033,published,False,False,False,False,not priced by the fuel rate and no activity response,469.2662722881207,469.2662722881207,469.2662722881207
+ar1,mvr_revenue_net_admin_coo,2034,published,False,False,False,False,not priced by the fuel rate and no activity response,465.7215614180958,465.7215614180958,465.7215614180958
+ar1,mvr_revenue_net_admin_coo,2035,published,False,False,False,False,not priced by the fuel rate and no activity response,462.4477473255255,462.4477473255255,462.4477473255255
+ar1,mvr_revenue_net_admin_coo,2036,published,False,False,False,False,not priced by the fuel rate and no activity response,459.4185166828991,459.4185166828991,459.4185166828991
+ar1,mvr_revenue_net_admin_coo,2037,published,False,False,False,False,not priced by the fuel rate and no activity response,456.6102357917681,456.6102357917681,456.6102357917681
+ar1,mvr_revenue_net_admin_coo,2038,published,False,False,False,False,not priced by the fuel rate and no activity response,454.00169651764963,454.00169651764963,454.00169651764963
+ar1,mvr_revenue_net_admin_coo,2039,published,False,False,False,False,not priced by the fuel rate and no activity response,451.5738745282234,451.5738745282234,451.5738745282234
+ar1,mvr_revenue_net_admin_coo,2040,published,False,False,False,False,not priced by the fuel rate and no activity response,449.30970534129574,449.30970534129574,449.30970534129574
+ar1,mvr_revenue_net_admin_coo,2041,published,False,False,False,False,not priced by the fuel rate and no activity response,447.1938800405277,447.1938800405277,447.1938800405277
+ar1,mvr_revenue_net_admin_coo,2042,published,False,False,False,False,not priced by the fuel rate and no activity response,445.212660614428,445.212660614428,445.212660614428
+ar1,mvr_revenue_net_admin_coo,2043,published,False,False,False,False,not priced by the fuel rate and no activity response,443.3537139360074,443.3537139360074,443.3537139360074
+ar1,mvr_revenue_net_admin_coo,2044,published,False,False,False,False,not priced by the fuel rate and no activity response,441.6059629865629,441.6059629865629,441.6059629865629
+ar1,mvr_revenue_net_admin_coo,2045,published,False,False,False,False,not priced by the fuel rate and no activity response,439.9594537924401,439.9594537924401,439.9594537924401
+ar1,mvr_revenue_net_admin_coo,2046,published,False,False,False,False,not priced by the fuel rate and no activity response,438.40523655264514,438.40523655264514,438.40523655264514
+ar1,mvr_revenue_net_admin_coo,2047,published,False,False,False,False,not priced by the fuel rate and no activity response,436.93525951451255,436.93525951451255,436.93525951451255
+ar1,mvr_revenue_net_admin_coo,2048,published,False,False,False,False,not priced by the fuel rate and no activity response,435.5422742641206,435.5422742641206,435.5422742641206
+ar1,mvr_revenue_net_admin_coo,2049,published,False,False,False,False,not priced by the fuel rate and no activity response,434.2197512173424,434.2197512173424,434.2197512173424
+ar1,mvr_revenue_net_admin_coo,2050,published,False,False,False,False,not priced by the fuel rate and no activity response,432.9618042154181,432.9618042154181,432.9618042154181
+ar1,net_fed_revenue,2025,published,False,False,False,False,not priced by the fuel rate and no activity response,1997.7271466,1997.7271466,1997.7271466
+ar1,net_fed_revenue,2026,published,False,False,False,False,not priced by the fuel rate and no activity response,2106.1949845912095,2106.1949845912095,2106.1949845912095
+ar1,net_fed_revenue,2027,published,True,False,False,True,central moves through a governed identity term,2172.2264140193133,2004.335325410929,2004.335325410929
+ar1,net_fed_revenue,2028,published,True,False,False,True,central moves through a governed identity term,2409.761726849051,2409.761726849051,2075.692126621356
+ar1,net_fed_revenue,2029,published,True,False,False,True,central moves through a governed identity term,2547.365083541614,2547.365083541614,2214.132051179748
+ar1,net_fed_revenue,2030,published,True,False,False,True,central moves through a governed identity term,2657.114250993943,2657.114250993943,2324.587533233129
+ar1,net_fed_revenue,2031,published,True,False,False,True,central moves through a governed identity term,2752.263560753427,2752.263560753427,2408.030475134508
+ar1,net_fed_revenue,2032,published,True,False,False,True,central moves through a governed identity term,2834.863899638096,2834.863899638096,2494.157417422448
+ar1,net_fed_revenue,2033,published,True,False,False,True,central moves through a governed identity term,2907.6248391348377,2907.6248391348377,2571.368010214262
+ar1,net_fed_revenue,2034,published,True,False,False,True,central moves through a governed identity term,2968.182344080243,2968.182344080243,2637.4297816999147
+ar1,net_fed_revenue,2035,published,True,False,False,True,central moves through a governed identity term,3011.457632632848,3011.457632632848,2687.6997782547624
+ar1,net_fed_revenue,2036,published,True,False,False,True,central moves through a governed identity term,3030.147197776151,3030.147197776151,2715.499926919855
+ar1,net_fed_revenue,2037,published,True,False,False,True,central moves through a governed identity term,3016.877285100815,3016.877285100815,2713.964040441098
+ar1,net_fed_revenue,2038,published,True,False,False,True,central moves through a governed identity term,2964.79796989233,2964.79796989233,2676.663402970028
+ar1,net_fed_revenue,2039,published,True,False,False,True,central moves through a governed identity term,2870.7507655139643,2870.7507655139643,2600.4408353158888
+ar1,net_fed_revenue,2040,published,True,False,False,True,central moves through a governed identity term,2736.5878143416403,2736.5878143416403,2486.697366176168
+ar1,net_fed_revenue,2041,published,True,False,False,True,central moves through a governed identity term,2568.6212852545154,2568.6212852545154,2340.967133678478
+ar1,net_fed_revenue,2042,published,True,False,False,True,central moves through a governed identity term,2363.9442394610687,2363.9442394610687,2160.4763669675726
+ar1,net_fed_revenue,2043,published,True,False,False,True,central moves through a governed identity term,2150.3243531440726,2150.3243531440726,1970.4950514374518
+ar1,net_fed_revenue,2044,published,True,False,False,True,central moves through a governed identity term,1952.0377458210764,1952.0377458210764,1793.3522624670413
+ar1,net_fed_revenue,2045,published,True,False,False,True,central moves through a governed identity term,1785.2884026204167,1785.2884026204167,1644.1729475389677
+ar1,net_fed_revenue,2046,published,True,False,False,True,central moves through a governed identity term,1643.7729965352617,1643.7729965352617,1517.3968546765266
+ar1,net_fed_revenue,2047,published,True,False,False,True,central moves through a governed identity term,1511.4827822693103,1511.4827822693103,1398.4110472622099
+ar1,net_fed_revenue,2048,published,True,False,False,True,central moves through a governed identity term,1390.1662890583802,1390.1662890583802,1288.937381576392
+ar1,net_fed_revenue,2049,published,True,False,False,True,central moves through a governed identity term,1277.4271781191733,1277.4271781191733,1186.8545531019047
+ar1,net_fed_revenue,2050,published,True,False,False,True,central moves through a governed identity term,1172.7816832470762,1172.7816832470762,1091.7975983785213
+ar1,net_mvr_revenue,2025,published,False,False,False,False,not priced by the fuel rate and no activity response,286.79349111,286.79349111,286.79349111
+ar1,net_mvr_revenue,2026,published,False,False,False,False,not priced by the fuel rate and no activity response,393.8747745212369,393.8747745212369,393.8747745212369
+ar1,net_mvr_revenue,2027,published,False,False,False,False,not priced by the fuel rate and no activity response,484.04699017200664,484.04699017200664,484.04699017200664
+ar1,net_mvr_revenue,2028,published,False,False,False,False,not priced by the fuel rate and no activity response,490.25051027658566,490.25051027658566,490.25051027658566
+ar1,net_mvr_revenue,2029,published,False,False,False,False,not priced by the fuel rate and no activity response,484.84310999369575,484.84310999369575,484.84310999369575
+ar1,net_mvr_revenue,2030,published,False,False,False,False,not priced by the fuel rate and no activity response,479.8837182888595,479.8837182888595,479.8837182888595
+ar1,net_mvr_revenue,2031,published,False,False,False,False,not priced by the fuel rate and no activity response,475.3303381823711,475.3303381823711,475.3303381823711
+ar1,net_mvr_revenue,2032,published,False,False,False,False,not priced by the fuel rate and no activity response,471.1439933001107,471.1439933001107,471.1439933001107
+ar1,net_mvr_revenue,2033,published,False,False,False,False,not priced by the fuel rate and no activity response,467.289031338095,467.289031338095,467.289031338095
+ar1,net_mvr_revenue,2034,published,False,False,False,False,not priced by the fuel rate and no activity response,463.73311806128567,463.73311806128567,463.73311806128567
+ar1,net_mvr_revenue,2035,published,False,False,False,False,not priced by the fuel rate and no activity response,460.4470773903571,460.4470773903571,460.4470773903571
+ar1,net_mvr_revenue,2036,published,False,False,False,False,not priced by the fuel rate and no activity response,457.4046614102953,457.4046614102953,457.4046614102953
+ar1,net_mvr_revenue,2037,published,False,False,False,False,not priced by the fuel rate and no activity response,454.58229627546916,454.58229627546916,454.58229627546916
+ar1,net_mvr_revenue,2038,published,False,False,False,False,not priced by the fuel rate and no activity response,451.95882835361306,451.95882835361306,451.95882835361306
+ar1,net_mvr_revenue,2039,published,False,False,False,False,not priced by the fuel rate and no activity response,449.51528277587994,449.51528277587994,449.51528277587994
+ar1,net_mvr_revenue,2040,published,False,False,False,False,not priced by the fuel rate and no activity response,447.23463984016297,447.23463984016297,447.23463984016297
+ar1,net_mvr_revenue,2041,published,False,False,False,False,not priced by the fuel rate and no activity response,445.10163109253966,445.10163109253966,445.10163109253966
+ar1,net_mvr_revenue,2042,published,False,False,False,False,not priced by the fuel rate and no activity response,443.1025550242281,443.1025550242281,443.1025550242281
+ar1,net_mvr_revenue,2043,published,False,False,False,False,not priced by the fuel rate and no activity response,441.22511139198986,441.22511139198986,441.22511139198986
+ar1,net_mvr_revenue,2044,published,False,False,False,False,not priced by the fuel rate and no activity response,439.4582527608978,439.4582527608978,439.4582527608978
+ar1,net_mvr_revenue,2045,published,False,False,False,False,not priced by the fuel rate and no activity response,437.7920517365987,437.7920517365987,437.7920517365987
+ar1,net_mvr_revenue,2046,published,False,False,False,False,not priced by the fuel rate and no activity response,436.21758236479513,436.21758236479513,436.21758236479513
+ar1,net_mvr_revenue,2047,published,False,False,False,False,not priced by the fuel rate and no activity response,434.7268142558745,434.7268142558745,434.7268142558745
+ar1,net_mvr_revenue,2048,published,False,False,False,False,not priced by the fuel rate and no activity response,433.3125181025614,433.3125181025614,433.3125181025614
+ar1,net_mvr_revenue,2049,published,False,False,False,False,not priced by the fuel rate and no activity response,431.96818137790393,431.96818137790393,431.96818137790393
+ar1,net_mvr_revenue,2050,published,False,False,False,False,not priced by the fuel rate and no activity response,430.68793311893774,430.68793311893774,430.68793311893774
+ar1,ped_vkt_per_capita,2025,published,False,False,False,False,not priced by the fuel rate and no activity response,5973.0514101063,5973.0514101063,5973.0514101063
+ar1,ped_vkt_per_capita,2026,published,False,False,False,False,not priced by the fuel rate and no activity response,6142.76079767832,6142.76079767832,6142.76079767832
+ar1,ped_vkt_per_capita,2027,published,True,False,True,True,activity responded inside the fixed-finalist replay window,5961.306920442689,5979.204054116386,5979.204054116386
+ar1,ped_vkt_per_capita,2028,published,True,False,True,True,activity responded inside the fixed-finalist replay window,5916.055674224165,5916.055674224165,5951.5046760820915
+ar1,ped_vkt_per_capita,2029,published,True,False,True,True,activity responded inside the fixed-finalist replay window,5902.064077713241,5902.064077713241,5936.945716563897
+ar1,ped_vkt_per_capita,2030,published,True,False,True,True,activity responded inside the fixed-finalist replay window,5888.384227680278,5888.384227680278,5922.715662904003
+ar1,ped_vkt_per_capita,2031,published,False,False,False,False,not priced by the fuel rate and no activity response,5865.077484201897,5865.077484201897,5865.077484201897
+ar1,ped_vkt_per_capita,2032,published,False,False,False,False,not priced by the fuel rate and no activity response,5825.52096871957,5825.52096871957,5825.52096871957
+ar1,ped_vkt_per_capita,2033,published,False,False,False,False,not priced by the fuel rate and no activity response,5770.886073040316,5770.886073040316,5770.886073040316
+ar1,ped_vkt_per_capita,2034,published,False,False,False,False,not priced by the fuel rate and no activity response,5698.201578261929,5698.201578261929,5698.201578261929
+ar1,ped_vkt_per_capita,2035,published,False,False,False,False,not priced by the fuel rate and no activity response,5599.687448835718,5599.687448835718,5599.687448835718
+ar1,ped_vkt_per_capita,2036,published,False,False,False,False,not priced by the fuel rate and no activity response,5464.164898051314,5464.164898051314,5464.164898051314
+ar1,ped_vkt_per_capita,2037,published,False,False,False,False,not priced by the fuel rate and no activity response,5282.295459614382,5282.295459614382,5282.295459614382
+ar1,ped_vkt_per_capita,2038,published,False,False,False,False,not priced by the fuel rate and no activity response,5046.073708935011,5046.073708935011,5046.073708935011
+ar1,ped_vkt_per_capita,2039,published,False,False,False,False,not priced by the fuel rate and no activity response,4754.718135831377,4754.718135831377,4754.718135831377
+ar1,ped_vkt_per_capita,2040,published,False,False,False,False,not priced by the fuel rate and no activity response,4415.39171672045,4415.39171672045,4415.39171672045
+ar1,ped_vkt_per_capita,2041,published,False,False,False,False,not priced by the fuel rate and no activity response,4041.882896110227,4041.882896110227,4041.882896110227
+ar1,ped_vkt_per_capita,2042,published,False,False,False,False,not priced by the fuel rate and no activity response,3633.042633209116,3633.042633209116,3633.042633209116
+ar1,ped_vkt_per_capita,2043,published,False,False,False,False,not priced by the fuel rate and no activity response,3229.883309866362,3229.883309866362,3229.883309866362
+ar1,ped_vkt_per_capita,2044,published,False,False,False,False,not priced by the fuel rate and no activity response,2867.2985214553355,2867.2985214553355,2867.2985214553355
+ar1,ped_vkt_per_capita,2045,published,False,False,False,False,not priced by the fuel rate and no activity response,2565.536767265806,2565.536767265806,2565.536767265806
+ar1,ped_vkt_per_capita,2046,published,False,False,False,False,not priced by the fuel rate and no activity response,2312.0454377670126,2312.0454377670126,2312.0454377670126
+ar1,ped_vkt_per_capita,2047,published,False,False,False,False,not priced by the fuel rate and no activity response,2081.9685060319844,2081.9685060319844,2081.9685060319844
+ar1,ped_vkt_per_capita,2048,published,False,False,False,False,not priced by the fuel rate and no activity response,1876.1862765471712,1876.1862765471712,1876.1862765471712
+ar1,ped_vkt_per_capita,2049,published,False,False,False,False,not priced by the fuel rate and no activity response,1689.98541977273,1689.98541977273,1689.98541977273
+ar1,ped_vkt_per_capita,2050,published,False,False,False,False,not priced by the fuel rate and no activity response,1521.479603481342,1521.479603481342,1521.479603481342
+ar1,ped_volume,2025,published,False,False,False,False,not priced by the fuel rate and no activity response,2894.27382723066,2894.27382723066,2894.27382723066
+ar1,ped_volume,2026,published,False,False,False,False,not priced by the fuel rate and no activity response,3051.1490748223814,3051.1490748223814,3051.1490748223814
+ar1,ped_volume,2027,published,True,False,True,True,activity responded inside the fixed-finalist replay window,2907.8955300078983,2916.6508572492858,2916.6508572492858
+ar1,ped_volume,2028,published,True,False,True,True,activity responded inside the fixed-finalist replay window,2891.724898424629,2891.724898424629,2909.0518898045993
+ar1,ped_volume,2029,published,True,False,True,True,activity responded inside the fixed-finalist replay window,2890.6742500973783,2890.6742500973783,2907.758136778461
+ar1,ped_volume,2030,published,True,False,True,True,activity responded inside the fixed-finalist replay window,2889.4008279080367,2889.4008279080367,2906.246883652928
+ar1,ped_volume,2031,published,False,False,False,False,not priced by the fuel rate and no activity response,2871.3369471624433,2871.3369471624433,2871.3369471624433
+ar1,ped_volume,2032,published,False,False,False,False,not priced by the fuel rate and no activity response,2841.920638641156,2841.920638641156,2841.920638641156
+ar1,ped_volume,2033,published,False,False,False,False,not priced by the fuel rate and no activity response,2804.8049329116125,2804.8049329116125,2804.8049329116125
+ar1,ped_volume,2034,published,False,False,False,False,not priced by the fuel rate and no activity response,2758.8924261122584,2758.8924261122584,2758.8924261122584
+ar1,ped_volume,2035,published,False,False,False,False,not priced by the fuel rate and no activity response,2700.5477626835714,2700.5477626835714,2700.5477626835714
+ar1,ped_volume,2036,published,False,False,False,False,not priced by the fuel rate and no activity response,2624.5540358479034,2624.5540358479034,2624.5540358479034
+ar1,ped_volume,2037,published,False,False,False,False,not priced by the fuel rate and no activity response,2526.6774970584042,2526.6774970584042,2526.6774970584042
+ar1,ped_volume,2038,published,False,False,False,False,not priced by the fuel rate and no activity response,2403.404734530795,2403.404734530795,2403.404734530795
+ar1,ped_volume,2039,published,False,False,False,False,not priced by the fuel rate and no activity response,2254.7248425209996,2254.7248425209996,2254.7248425209996
+ar1,ped_volume,2040,published,False,False,False,False,not priced by the fuel rate and no activity response,2084.40067656607,2084.40067656607,2084.40067656607
+ar1,ped_volume,2041,published,False,False,False,False,not priced by the fuel rate and no activity response,1898.9219918239855,1898.9219918239855,1898.9219918239855
+ar1,ped_volume,2042,published,False,False,False,False,not priced by the fuel rate and no activity response,1697.178000193376,1697.178000193376,1697.178000193376
+ar1,ped_volume,2043,published,False,False,False,False,not priced by the fuel rate and no activity response,1500.0025847145455,1500.0025847145455,1500.0025847145455
+ar1,ped_volume,2044,published,False,False,False,False,not priced by the fuel rate and no activity response,1323.6365427034655,1323.6365427034655,1323.6365427034655
+ar1,ped_volume,2045,published,False,False,False,False,not priced by the fuel rate and no activity response,1177.0804054540217,1177.0804054540217,1177.0804054540217
+ar1,ped_volume,2046,published,False,False,False,False,not priced by the fuel rate and no activity response,1054.1359924959072,1054.1359924959072,1054.1359924959072
+ar1,ped_volume,2047,published,False,False,False,False,not priced by the fuel rate and no activity response,943.1605036509144,943.1605036509144,943.1605036509144
+ar1,ped_volume,2048,published,False,False,False,False,not priced by the fuel rate and no activity response,844.3764249195306,844.3764249195306,844.3764249195306
+ar1,ped_volume,2049,published,False,False,False,False,not priced by the fuel rate and no activity response,755.4896245547855,755.4896245547855,755.4896245547855
+ar1,ped_volume,2050,published,False,False,False,False,not priced by the fuel rate and no activity response,675.5091382257311,675.5091382257311,675.5091382257311
+ar1,phev_ruc_net_km,2025,published,False,False,False,False,not priced by the fuel rate and no activity response,480.44116455536,480.44116455536,480.44116455536
+ar1,phev_ruc_net_km,2026,published,False,False,False,False,not priced by the fuel rate and no activity response,647.879998554768,647.879998554768,647.879998554768
+ar1,phev_ruc_net_km,2027,published,False,False,False,False,not priced by the fuel rate and no activity response,844.9595723514738,844.9595723514738,844.9595723514738
+ar1,phev_ruc_net_km,2028,published,False,False,False,False,not priced by the fuel rate and no activity response,1140.5757203778505,1140.5757203778505,1140.5757203778505
+ar1,phev_ruc_net_km,2029,published,False,False,False,False,not priced by the fuel rate and no activity response,1495.51845432587,1495.51845432587,1495.51845432587
+ar1,phev_ruc_net_km,2030,published,False,False,False,False,not priced by the fuel rate and no activity response,1878.889739407174,1878.889739407174,1878.889739407174
+ar1,phev_ruc_net_km,2031,published,False,False,False,False,not priced by the fuel rate and no activity response,2208.3308898987298,2208.3308898987298,2208.3308898987298
+ar1,phev_ruc_net_km,2032,published,False,False,False,False,not priced by the fuel rate and no activity response,2552.1629121592205,2552.1629121592205,2552.1629121592205
+ar1,phev_ruc_net_km,2033,published,False,False,False,False,not priced by the fuel rate and no activity response,2900.6112269694477,2900.6112269694477,2900.6112269694477
+ar1,phev_ruc_net_km,2034,published,False,False,False,False,not priced by the fuel rate and no activity response,3241.590048323908,3241.590048323908,3241.590048323908
+ar1,phev_ruc_net_km,2035,published,False,False,False,False,not priced by the fuel rate and no activity response,3557.038943726457,3557.038943726457,3557.038943726457
+ar1,phev_ruc_net_km,2036,published,False,False,False,False,not priced by the fuel rate and no activity response,3808.0126087993253,3808.0126087993253,3808.0126087993253
+ar1,phev_ruc_net_km,2037,published,False,False,False,False,not priced by the fuel rate and no activity response,3986.5925396709536,3986.5925396709536,3986.5925396709536
+ar1,phev_ruc_net_km,2038,published,False,False,False,False,not priced by the fuel rate and no activity response,4106.760316660171,4106.760316660171,4106.760316660171
+ar1,phev_ruc_net_km,2039,published,False,False,False,False,not priced by the fuel rate and no activity response,4194.449213694972,4194.449213694972,4194.449213694972
+ar1,phev_ruc_net_km,2040,published,False,False,False,False,not priced by the fuel rate and no activity response,4212.539103763076,4212.539103763076,4212.539103763076
+ar1,phev_ruc_net_km,2041,published,False,False,False,False,not priced by the fuel rate and no activity response,4141.28288784983,4141.28288784983,4141.28288784983
+ar1,phev_ruc_net_km,2042,published,False,False,False,False,not priced by the fuel rate and no activity response,4032.0506256804006,4032.0506256804006,4032.0506256804006
+ar1,phev_ruc_net_km,2043,published,False,False,False,False,not priced by the fuel rate and no activity response,3910.615496061722,3910.615496061722,3910.615496061722
+ar1,phev_ruc_net_km,2044,published,False,False,False,False,not priced by the fuel rate and no activity response,3781.652321799289,3781.652321799289,3781.652321799289
+ar1,phev_ruc_net_km,2045,published,False,False,False,False,not priced by the fuel rate and no activity response,3650.8805135255375,3650.8805135255375,3650.8805135255375
+ar1,phev_ruc_net_km,2046,published,False,False,False,False,not priced by the fuel rate and no activity response,3523.7347858533367,3523.7347858533367,3523.7347858533367
+ar1,phev_ruc_net_km,2047,published,False,False,False,False,not priced by the fuel rate and no activity response,3397.586213069626,3397.586213069626,3397.586213069626
+ar1,phev_ruc_net_km,2048,published,False,False,False,False,not priced by the fuel rate and no activity response,3283.3852853010553,3283.3852853010553,3283.3852853010553
+ar1,phev_ruc_net_km,2049,published,False,False,False,False,not priced by the fuel rate and no activity response,3166.1026521069557,3166.1026521069557,3166.1026521069557
+ar1,phev_ruc_net_km,2050,published,False,False,False,False,not priced by the fuel rate and no activity response,3042.299387722571,3042.299387722571,3042.299387722571
+ar1,phev_ruc_net_revenue,2025,published,False,False,False,False,rate-priced but outside every affected year,16.68123390320731,16.68123390320731,16.68123390320731
+ar1,phev_ruc_net_revenue,2026,published,False,False,False,False,rate-priced but outside every affected year,22.33981533227866,22.33981533227866,22.33981533227866
+ar1,phev_ruc_net_revenue,2027,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",30.92161021928033,28.487023173248186,28.487023173248186
+ar1,phev_ruc_net_revenue,2028,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",45.75419502295762,45.75419502295762,39.30115065211914
+ar1,phev_ruc_net_revenue,2029,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",63.52214634749125,63.52214634749125,55.061520610391284
+ar1,phev_ruc_net_revenue,2030,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",83.356943288799,83.356943288799,72.72861610804172
+ar1,phev_ruc_net_revenue,2031,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",102.14634531226594,102.14634531226594,89.6521187881939
+ar1,phev_ruc_net_revenue,2032,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",122.86112259134451,122.86112259134451,108.42260385043248
+ar1,phev_ruc_net_revenue,2033,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",145.10307662914647,145.10307662914647,128.69419321527772
+ar1,phev_ruc_net_revenue,2034,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",168.28714735873572,168.28714735873572,149.94835801101257
+ar1,phev_ruc_net_revenue,2035,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",191.36869517248255,191.36869517248255,171.2454436133103
+ar1,phev_ruc_net_revenue,2036,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",212.04918212098988,212.04918212098988,190.50671910599002
+ar1,phev_ruc_net_revenue,2037,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",229.5280654715555,229.5280654715555,206.9736943381684
+ar1,phev_ruc_net_revenue,2038,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",244.2085022301965,244.2085022301965,220.97284925267937
+ar1,phev_ruc_net_revenue,2039,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",257.32945926018675,257.32945926018675,233.59806042735448
+ar1,phev_ruc_net_revenue,2040,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",266.37991022645804,266.37991022645804,242.54610647906563
+ar1,phev_ruc_net_revenue,2041,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",269.70104807122,269.70104807122,246.2685627186125
+ar1,phev_ruc_net_revenue,2042,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",270.20787267997184,270.20787267997184,247.39200130477906
+ar1,phev_ruc_net_revenue,2043,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",269.4414076786529,269.4414076786529,247.31392122664246
+ar1,phev_ruc_net_revenue,2044,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",267.68425959856245,267.68425959856245,246.28723472668574
+ar1,phev_ruc_net_revenue,2045,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",265.32774132046853,265.32774132046853,244.66960661234003
+ar1,phev_ruc_net_revenue,2046,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",262.7472843071541,262.7472843071541,242.8075312624492
+ar1,phev_ruc_net_revenue,2047,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",259.7454659891725,259.7454659891725,240.52000399541336
+ar1,phev_ruc_net_revenue,2048,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",257.2039863240583,257.2039863240583,238.6256245019482
+ar1,phev_ruc_net_revenue,2049,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",254.0005852652803,254.0005852652803,236.08539731803782
+ar1,phev_ruc_net_revenue,2050,published,True,True,False,True,"rate-priced leaf: the collection rate changed, volume did not",249.80320272590004,249.80320272590004,232.58952060236157
+ar1,ruc_admin_revenue,2025,published,False,False,False,False,not priced by the fuel rate and no activity response,32.2658680521739,32.2658680521739,32.2658680521739
+ar1,ruc_admin_revenue,2026,published,False,False,False,False,not priced by the fuel rate and no activity response,34.237617587825,34.237617587825,34.237617587825
+ar1,ruc_admin_revenue,2027,published,False,False,False,False,not priced by the fuel rate and no activity response,34.8931365028412,34.8931365028412,34.8931365028412
+ar1,ruc_admin_revenue,2028,published,False,False,False,False,not priced by the fuel rate and no activity response,37.4493334490253,37.4493334490253,37.4493334490253
+ar1,ruc_admin_revenue,2029,published,False,False,False,False,not priced by the fuel rate and no activity response,40.0168341509567,40.0168341509567,40.0168341509567
+ar1,ruc_admin_revenue,2030,published,False,False,False,False,not priced by the fuel rate and no activity response,42.5523569088689,42.5523569088689,42.5523569088689
+ar1,ruc_admin_revenue,2031,published,False,False,False,False,not priced by the fuel rate and no activity response,41.8033895532304,41.8033895532304,41.8033895532304
+ar1,ruc_admin_revenue,2032,published,False,False,False,False,not priced by the fuel rate and no activity response,43.1587880680353,43.1587880680353,43.1587880680353
+ar1,ruc_admin_revenue,2033,published,False,False,False,False,not priced by the fuel rate and no activity response,44.5945823267988,44.5945823267988,44.5945823267988
+ar1,ruc_admin_revenue,2034,published,False,False,False,False,not priced by the fuel rate and no activity response,46.2262315438966,46.2262315438966,46.2262315438966
+ar1,ruc_admin_revenue,2035,published,False,False,False,False,not priced by the fuel rate and no activity response,48.0866744622314,48.0866744622314,48.0866744622314
+ar1,ruc_admin_revenue,2036,published,False,False,False,False,not priced by the fuel rate and no activity response,50.1356112200263,50.1356112200263,50.1356112200263
+ar1,ruc_admin_revenue,2037,published,False,False,False,False,not priced by the fuel rate and no activity response,52.4092761671738,52.4092761671738,52.4092761671738
+ar1,ruc_admin_revenue,2038,published,False,False,False,False,not priced by the fuel rate and no activity response,54.8879400791233,54.8879400791233,54.8879400791233
+ar1,ruc_admin_revenue,2039,published,False,False,False,False,not priced by the fuel rate and no activity response,57.7371317505342,57.7371317505342,57.7371317505342
+ar1,ruc_admin_revenue,2040,published,False,False,False,False,not priced by the fuel rate and no activity response,60.8953711805719,60.8953711805719,60.8953711805719
+ar1,ruc_admin_revenue,2041,published,False,False,False,False,not priced by the fuel rate and no activity response,64.2074073354471,64.2074073354471,64.2074073354471
+ar1,ruc_admin_revenue,2042,published,False,False,False,False,not priced by the fuel rate and no activity response,67.6518294796303,67.6518294796303,67.6518294796303
+ar1,ruc_admin_revenue,2043,published,False,False,False,False,not priced by the fuel rate and no activity response,71.0541615661232,71.0541615661232,71.0541615661232
+ar1,ruc_admin_revenue,2044,published,False,False,False,False,not priced by the fuel rate and no activity response,74.1296662442097,74.1296662442097,74.1296662442097
+ar1,ruc_admin_revenue,2045,published,False,False,False,False,not priced by the fuel rate and no activity response,77.0121331116649,77.0121331116649,77.0121331116649
+ar1,ruc_admin_revenue,2046,published,False,False,False,False,not priced by the fuel rate and no activity response,80.0022843834548,80.0022843834548,80.0022843834548
+ar1,ruc_admin_revenue,2047,published,False,False,False,False,not priced by the fuel rate and no activity response,82.9554869738818,82.9554869738818,82.9554869738818
+ar1,ruc_admin_revenue,2048,published,False,False,False,False,not priced by the fuel rate and no activity response,86.0437492764271,86.0437492764271,86.0437492764271
+ar1,ruc_admin_revenue,2049,published,False,False,False,False,not priced by the fuel rate and no activity response,88.8214065482608,88.8214065482608,88.8214065482608
+ar1,ruc_admin_revenue,2050,published,False,False,False,False,not priced by the fuel rate and no activity response,91.1073995180068,91.1073995180068,91.1073995180068
+ar1,ruc_refunds,2025,published,False,False,False,False,not priced by the fuel rate and no activity response,62.55622679,62.55622679,62.55622679
+ar1,ruc_refunds,2026,published,False,False,False,False,not priced by the fuel rate and no activity response,67.4141906681215,67.4141906681215,67.4141906681215
+ar1,ruc_refunds,2027,published,False,False,False,False,not priced by the fuel rate and no activity response,78.1187556293993,78.1187556293993,78.1187556293993
+ar1,ruc_refunds,2028,published,False,False,False,False,not priced by the fuel rate and no activity response,91.9223646926299,91.9223646926299,91.9223646926299
+ar1,ruc_refunds,2029,published,False,False,False,False,not priced by the fuel rate and no activity response,101.989316940945,101.989316940945,101.989316940945
+ar1,ruc_refunds,2030,published,False,False,False,False,not priced by the fuel rate and no activity response,111.156651009308,111.156651009308,111.156651009308
+ar1,ruc_refunds,2031,published,False,False,False,False,not priced by the fuel rate and no activity response,118.132146140534,118.132146140534,118.132146140534
+ar1,ruc_refunds,2032,published,False,False,False,False,not priced by the fuel rate and no activity response,124.930114862515,124.930114862515,124.930114862515
+ar1,ruc_refunds,2033,published,False,False,False,False,not priced by the fuel rate and no activity response,132.028119664623,132.028119664623,132.028119664623
+ar1,ruc_refunds,2034,published,False,False,False,False,not priced by the fuel rate and no activity response,139.578421718246,139.578421718246,139.578421718246
+ar1,ruc_refunds,2035,published,False,False,False,False,not priced by the fuel rate and no activity response,147.714765866256,147.714765866256,147.714765866256
+ar1,ruc_refunds,2036,published,False,False,False,False,not priced by the fuel rate and no activity response,156.614633426614,156.614633426614,156.614633426614
+ar1,ruc_refunds,2037,published,False,False,False,False,not priced by the fuel rate and no activity response,166.389578574303,166.389578574303,166.389578574303
+ar1,ruc_refunds,2038,published,False,False,False,False,not priced by the fuel rate and no activity response,177.031851999084,177.031851999084,177.031851999084
+ar1,ruc_refunds,2039,published,False,False,False,False,not priced by the fuel rate and no activity response,188.89667070595,188.89667070595,188.89667070595
+ar1,ruc_refunds,2040,published,False,False,False,False,not priced by the fuel rate and no activity response,202.018704540249,202.018704540249,202.018704540249
+ar1,ruc_refunds,2041,published,False,False,False,False,not priced by the fuel rate and no activity response,216.153782430281,216.153782430281,216.153782430281
+ar1,ruc_refunds,2042,published,False,False,False,False,not priced by the fuel rate and no activity response,231.345181106687,231.345181106687,231.345181106687
+ar1,ruc_refunds,2043,published,False,False,False,False,not priced by the fuel rate and no activity response,246.972785528816,246.972785528816,246.972785528816
+ar1,ruc_refunds,2044,published,False,False,False,False,not priced by the fuel rate and no activity response,262.291354246574,262.291354246574,262.291354246574
+ar1,ruc_refunds,2045,published,False,False,False,False,not priced by the fuel rate and no activity response,277.613332328301,277.613332328301,277.613332328301
+ar1,ruc_refunds,2046,published,False,False,False,False,not priced by the fuel rate and no activity response,293.713955398411,293.713955398411,293.713955398411
+ar1,ruc_refunds,2047,published,False,False,False,False,not priced by the fuel rate and no activity response,310.202352205942,310.202352205942,310.202352205942
+ar1,ruc_refunds,2048,published,False,False,False,False,not priced by the fuel rate and no activity response,327.579008435544,327.579008435544,327.579008435544
+ar1,ruc_refunds,2049,published,False,False,False,False,not priced by the fuel rate and no activity response,344.517513791995,344.517513791995,344.517513791995
+ar1,ruc_refunds,2050,published,False,False,False,False,not priced by the fuel rate and no activity response,360.387981206507,360.387981206507,360.387981206507
+ar1,ruc_revenue_net_admin,2025,published,False,False,False,False,not priced by the fuel rate and no activity response,2040.2003651881357,2040.2003651881357,2040.2003651881357
+ar1,ruc_revenue_net_admin,2026,published,False,False,False,False,not priced by the fuel rate and no activity response,2139.4339963253387,2139.4339963253387,2139.4339963253387
+ar1,ruc_revenue_net_admin,2027,published,True,False,False,True,central moves through a governed identity term,2361.075087985824,2183.343986233349,2183.343986233349
+ar1,ruc_revenue_net_admin,2028,published,True,False,False,True,central moves through a governed identity term,2774.8106730598697,2774.8106730598697,2401.0166197841445
+ar1,ruc_revenue_net_admin,2029,published,True,False,False,True,central moves through a governed identity term,3083.0444990918013,3083.0444990918013,2691.079769680552
+ar1,ruc_revenue_net_admin,2030,published,True,False,False,True,central moves through a governed identity term,3365.0940225744434,3365.0940225744434,2955.666918027165
+ar1,ruc_revenue_net_admin,2031,published,True,False,False,True,central moves through a governed identity term,3600.0312610818137,3600.0312610818137,3174.1360795846226
+ar1,ruc_revenue_net_admin,2032,published,True,False,False,True,central moves through a governed identity term,3840.763142659362,3840.763142659362,3404.082086208358
+ar1,ruc_revenue_net_admin,2033,published,True,False,False,True,central moves through a governed identity term,4092.7011226909485,4092.7011226909485,3644.8110912947295
+ar1,ruc_revenue_net_admin,2034,published,True,False,False,True,central moves through a governed identity term,4363.348013656021,4363.348013656021,3903.070315593034
+ar1,ruc_revenue_net_admin,2035,published,True,False,False,True,central moves through a governed identity term,4653.383632224457,4653.383632224457,4179.592932244316
+ar1,ruc_revenue_net_admin,2036,published,True,False,False,True,central moves through a governed identity term,4963.179021949806,4963.179021949806,4474.871382498992
+ar1,ruc_revenue_net_admin,2037,published,True,False,False,True,central moves through a governed identity term,5295.478404498043,5295.478404498043,4791.473054571331
+ar1,ruc_revenue_net_admin,2038,published,True,False,False,True,central moves through a governed identity term,5650.858005970826,5650.858005970826,5130.041065481775
+ar1,ruc_revenue_net_admin,2039,published,True,False,False,True,central moves through a governed identity term,6039.128911181023,6039.128911181023,5499.609670117246
+ar1,ruc_revenue_net_admin,2040,published,True,False,False,True,central moves through a governed identity term,6461.474867239373,6461.474867239373,5901.422686050678
+ar1,ruc_revenue_net_admin,2041,published,True,False,False,True,central moves through a governed identity term,6911.297929096962,6911.297929096962,6329.602499018639
+ar1,ruc_revenue_net_admin,2042,published,True,False,False,True,central moves through a governed identity term,7393.480012454485,7393.480012454485,6788.722107131131
+ar1,ruc_revenue_net_admin,2043,published,True,False,False,True,central moves through a governed identity term,7892.077178362596,7892.077178362596,7264.234021907628
+ar1,ruc_revenue_net_admin,2044,published,True,False,False,True,central moves through a governed identity term,8388.977595178829,8388.977595178829,7739.3805367491
+ar1,ruc_revenue_net_admin,2045,published,True,False,False,True,central moves through a governed identity term,8900.53017890919,8900.53017890919,8229.15907799402
+ar1,ruc_revenue_net_admin,2046,published,True,False,False,True,central moves through a governed identity term,9448.270677311626,9448.270677311626,8753.536188427996
+ar1,ruc_revenue_net_admin,2047,published,True,False,False,True,central moves through a governed identity term,10011.10213745823,10011.10213745823,9293.07505114748
+ar1,ruc_revenue_net_admin,2048,published,True,False,False,True,central moves through a governed identity term,10605.267965295312,10605.267965295312,9862.889797427135
+ar1,ruc_revenue_net_admin,2049,published,True,False,False,True,central moves through a governed identity term,11187.478807810354,11187.478807810354,10422.702264936905
+ar1,ruc_revenue_net_admin,2050,published,True,False,False,True,central moves through a governed identity term,11736.62205648483,11736.62205648483,10952.697451043796
+ar1,total_admin_fees,2025,published,False,False,False,False,not priced by the fuel rate and no activity response,104.02990896521729,104.02990896521729,104.02990896521729
+ar1,total_admin_fees,2026,published,False,False,False,False,not priced by the fuel rate and no activity response,106.94818500709749,106.94818500709749,106.94818500709749
+ar1,total_admin_fees,2027,published,False,False,False,False,not priced by the fuel rate and no activity response,107.15161324403711,107.15161324403711,107.15161324403711
+ar1,total_admin_fees,2028,published,False,False,False,False,not priced by the fuel rate and no activity response,109.3355069608846,109.3355069608846,109.3355069608846
+ar1,total_admin_fees,2029,published,False,False,False,False,not priced by the fuel rate and no activity response,111.53740471398059,111.53740471398059,111.53740471398059
+ar1,total_admin_fees,2030,published,False,False,False,False,not priced by the fuel rate and no activity response,113.72130211559511,113.72130211559511,113.72130211559511
+ar1,total_admin_fees,2031,published,False,False,False,False,not priced by the fuel rate and no activity response,112.63851900438661,112.63851900438661,112.63851900438661
+ar1,total_admin_fees,2032,published,False,False,False,False,not priced by the fuel rate and no activity response,113.6795219489166,113.6795219489166,113.6795219489166
+ar1,total_admin_fees,2033,published,False,False,False,False,not priced by the fuel rate and no activity response,114.8206504049168,114.8206504049168,114.8206504049168
+ar1,total_admin_fees,2034,published,False,False,False,False,not priced by the fuel rate and no activity response,116.1769267155724,116.1769267155724,116.1769267155724
+ar1,total_admin_fees,2035,published,False,False,False,False,not priced by the fuel rate and no activity response,117.7804389842208,117.7804389842208,117.7804389842208
+ar1,total_admin_fees,2036,published,False,False,False,False,not priced by the fuel rate and no activity response,119.5898232554249,119.5898232554249,119.5898232554249
+ar1,total_admin_fees,2037,published,False,False,False,False,not priced by the fuel rate and no activity response,121.6401572129457,121.6401572129457,121.6401572129457
+ar1,total_admin_fees,2038,published,False,False,False,False,not priced by the fuel rate and no activity response,123.9105351840218,123.9105351840218,123.9105351840218
+ar1,total_admin_fees,2039,published,False,False,False,False,not priced by the fuel rate and no activity response,126.565333101647,126.565333101647,126.565333101647
+ar1,total_admin_fees,2040,published,False,False,False,False,not priced by the fuel rate and no activity response,129.5419668616133,129.5419668616133,129.5419668616133
+ar1,total_admin_fees,2041,published,False,False,False,False,not priced by the fuel rate and no activity response,132.68414389017602,132.68414389017602,132.68414389017602
+ar1,total_admin_fees,2042,published,False,False,False,False,not priced by the fuel rate and no activity response,135.96948112896598,135.96948112896598,135.96948112896598
+ar1,total_admin_fees,2043,published,False,False,False,False,not priced by the fuel rate and no activity response,139.2226015692376,139.2226015692376,139.2226015692376
+ar1,total_admin_fees,2044,published,False,False,False,False,not priced by the fuel rate and no activity response,142.15793757553791,142.15793757553791,142.15793757553791
+ar1,total_admin_fees,2045,published,False,False,False,False,not priced by the fuel rate and no activity response,144.9085167120616,144.9085167120616,144.9085167120616
+ar1,total_admin_fees,2046,published,False,False,False,False,not priced by the fuel rate and no activity response,147.77436395406733,147.77436395406733,147.77436395406733
+ar1,total_admin_fees,2047,published,False,False,False,False,not priced by the fuel rate and no activity response,150.6102097498246,150.6102097498246,150.6102097498246
+ar1,total_admin_fees,2048,published,False,False,False,False,not priced by the fuel rate and no activity response,153.5874825273612,153.5874825273612,153.5874825273612
+ar1,total_admin_fees,2049,published,False,False,False,False,not priced by the fuel rate and no activity response,156.2599897574404,156.2599897574404,156.2599897574404
+ar1,total_admin_fees,2050,published,False,False,False,False,not priced by the fuel rate and no activity response,158.4461923244504,158.4461923244504,158.4461923244504
+ar1,total_gross_revenue,2025,published,False,False,False,False,not priced by the fuel rate and no activity response,4516.782072173352,4516.782072173352,4516.782072173352
+ar1,total_gross_revenue,2026,published,False,False,False,False,not priced by the fuel rate and no activity response,4837.856195631018,4837.856195631018,4837.856195631018
+ar1,total_gross_revenue,2027,published,True,False,False,True,central moves through a governed identity term,5224.605676052809,4878.98348569195,4878.98348569195
+ar1,total_gross_revenue,2028,published,True,False,False,True,central moves through a governed identity term,5895.122843120531,5895.122843120531,5187.259189617111
+ar1,total_gross_revenue,2029,published,True,False,False,True,central moves through a governed identity term,6343.9658634595235,6343.9658634595235,5618.768101686409
+ar1,total_gross_revenue,2030,published,True,False,False,True,central moves through a governed identity term,6737.7988953991135,6737.7988953991135,5995.845073091021
+ar1,total_gross_revenue,2031,published,True,False,False,True,central moves through a governed identity term,7065.208315053018,7065.208315053018,6295.080047936908
+ar1,total_gross_revenue,2032,published,True,False,False,True,central moves through a governed identity term,7387.8562513312045,7387.8562513312045,6610.468712664552
+ar1,total_gross_revenue,2033,published,True,False,False,True,central moves through a governed identity term,7711.5896028315565,7711.5896028315565,6927.442742514762
+ar1,total_gross_revenue,2034,published,True,False,False,True,central moves through a governed identity term,8041.861682148539,8041.861682148539,7250.831421705224
+ar1,total_gross_revenue,2035,published,True,False,False,True,central moves through a governed identity term,8374.073321389784,8374.073321389784,7576.524767031557
+ar1,total_gross_revenue,2036,published,True,False,False,True,central moves through a governed identity term,8701.068651275378,8701.068651275378,7898.113740968268
+ar1,total_gross_revenue,2037,published,True,False,False,True,central moves through a governed identity term,9018.206896268513,9018.206896268513,8211.288301682083
+ar1,total_gross_revenue,2038,published,True,False,False,True,central moves through a governed identity term,9319.039615933245,9319.039615933245,8510.088108521892
+ar1,total_gross_revenue,2039,published,True,False,False,True,central moves through a governed identity term,9610.417658044014,9610.417658044014,8800.588486782162
+ar1,total_gross_revenue,2040,published,True,False,False,True,central moves through a governed identity term,9895.416514827777,9895.416514827777,9085.473885473608
+ar1,total_gross_revenue,2041,published,True,False,False,True,central moves through a governed identity term,10173.687367122417,10173.687367122417,9364.337785468057
+ar1,total_gross_revenue,2042,published,True,False,False,True,central moves through a governed identity term,10446.706562190166,10446.706562190166,9638.480784373314
+ar1,total_gross_revenue,2043,published,True,False,False,True,central moves through a governed identity term,10726.869352503718,10726.869352503718,9919.196894342129
+ar1,total_gross_revenue,2044,published,True,False,False,True,central moves through a governed identity term,11020.520176000187,11020.520176000187,10212.237634216426
+ar1,total_gross_revenue,2045,published,True,False,False,True,central moves through a governed identity term,11360.505926955715,11360.505926955715,10548.019370959097
+ar1,total_gross_revenue,2046,published,True,False,False,True,central moves through a governed identity term,11762.459908043822,11762.459908043822,10941.349277301455
+ar1,total_gross_revenue,2047,published,True,False,False,True,central moves through a governed identity term,12189.130021333964,12189.130021333964,11358.031200016112
+ar1,total_gross_revenue,2048,published,True,False,False,True,central moves through a governed identity term,12658.74734269043,12658.74734269043,11815.140267340266
+ar1,total_gross_revenue,2049,published,True,False,False,True,central moves through a governed identity term,13125.07956981134,13125.07956981134,12269.73040192062
+ar1,total_gross_revenue,2050,published,True,False,False,True,central moves through a governed identity term,13566.326209132209,13566.326209132209,12701.41751882262
+ar1,total_nltf_net_revenue,2025,published,False,False,False,False,not priced by the fuel rate and no activity response,4279.259586488135,4279.259586488135,4279.259586488135
+ar1,total_nltf_net_revenue,2026,published,False,False,False,False,not priced by the fuel rate and no activity response,4589.495642256075,4589.495642256075,4589.495642256075
+ar1,total_nltf_net_revenue,2027,published,True,False,False,True,central moves through a governed identity term,4956.78763624057,4611.16544587971,4611.16544587971
+ar1,total_nltf_net_revenue,2028,published,True,False,False,True,central moves through a governed identity term,5600.458445185703,5600.458445185703,4892.594791682282
+ar1,total_nltf_net_revenue,2029,published,True,False,False,True,central moves through a governed identity term,6030.821275378992,6030.821275378992,5305.623513605877
+ar1,total_nltf_net_revenue,2030,published,True,False,False,True,central moves through a governed identity term,6408.4932405407635,6408.4932405407635,5666.539418232671
+ar1,total_nltf_net_revenue,2031,published,True,False,False,True,central moves through a governed identity term,6727.050913569903,6727.050913569903,5956.922646453792
+ar1,total_nltf_net_revenue,2032,published,True,False,False,True,central moves through a governed identity term,7039.398820427879,7039.398820427879,6262.011281761227
+ar1,total_nltf_net_revenue,2033,published,True,False,False,True,central moves through a governed identity term,7353.144773192084,7353.144773192084,6568.997912875289
+ar1,total_nltf_net_revenue,2034,published,True,False,False,True,central moves through a governed identity term,7673.242953772129,7673.242953772129,6882.212693328815
+ar1,total_nltf_net_revenue,2035,published,True,False,False,True,central moves through a governed identity term,7995.1314760742325,7995.1314760742325,7197.582921716006
+ar1,total_nltf_net_revenue,2036,published,True,False,False,True,central moves through a governed identity term,8311.674147402464,8311.674147402464,7508.7192370953535
+ar1,total_nltf_net_revenue,2037,published,True,False,False,True,central moves through a governed identity term,8618.106306992851,8618.106306992851,7811.187712406422
+ar1,total_nltf_net_revenue,2038,published,True,False,False,True,central moves through a governed identity term,8908.14085191051,8908.14085191051,8099.1893444991565
+ar1,total_nltf_net_revenue,2039,published,True,False,False,True,central moves through a governed identity term,9188.05618845774,9188.05618845774,8378.227017195888
+ar1,total_nltf_net_revenue,2040,published,True,False,False,True,central moves through a governed identity term,9460.836516573752,9460.836516573752,8650.893887219585
+ar1,total_nltf_net_revenue,2041,published,True,False,False,True,central moves through a governed identity term,9726.424962706562,9726.424962706562,8917.075381052202
+ar1,total_nltf_net_revenue,2042,published,True,False,False,True,central moves through a governed identity term,9986.73952552592,9986.73952552592,9178.51374770907
+ar1,total_nltf_net_revenue,2043,published,True,False,False,True,central moves through a governed identity term,10254.211757062667,10254.211757062667,9446.53929890108
+ar1,total_nltf_net_revenue,2044,published,True,False,False,True,central moves through a governed identity term,10535.740139207051,10535.740139207051,9727.457597423288
+ar1,total_nltf_net_revenue,2045,published,True,False,False,True,central moves through a governed identity term,10863.555200630728,10863.555200630728,10051.06864463411
+ar1,total_nltf_net_revenue,2046,published,True,False,False,True,central moves through a governed identity term,11252.105200506096,11252.105200506096,10430.99456976373
+ar1,total_nltf_net_revenue,2047,published,True,False,False,True,central moves through a governed identity term,11664.6672814703,11664.6672814703,10833.568460152448
+ar1,total_nltf_net_revenue,2048,published,True,False,False,True,central moves through a governed identity term,12118.725663713534,12118.725663713534,11275.11858836337
+ar1,total_nltf_net_revenue,2049,published,True,False,False,True,central moves through a governed identity term,12569.91455320826,12569.91455320826,11714.56538531754
+ar1,total_nltf_net_revenue,2050,published,True,False,False,True,central moves through a governed identity term,12997.261591337161,12997.261591337161,12132.352901027574
+ar1,total_refunds,2025,published,False,False,False,False,not priced by the fuel rate and no activity response,133.49257672,133.49257672,133.49257672
+ar1,total_refunds,2026,published,False,False,False,False,not priced by the fuel rate and no activity response,141.41236836784387,141.41236836784387,141.41236836784387
+ar1,total_refunds,2027,published,False,False,False,False,not priced by the fuel rate and no activity response,160.6664265682024,160.6664265682024,160.6664265682024
+ar1,total_refunds,2028,published,False,False,False,False,not priced by the fuel rate and no activity response,185.32889097394528,185.32889097394528,185.32889097394528
+ar1,total_refunds,2029,published,False,False,False,False,not priced by the fuel rate and no activity response,201.60718336655287,201.60718336655287,201.60718336655287
+ar1,total_refunds,2030,published,False,False,False,False,not priced by the fuel rate and no activity response,215.58435274275493,215.58435274275493,215.58435274275493
+ar1,total_refunds,2031,published,False,False,False,False,not priced by the fuel rate and no activity response,225.51888247872895,225.51888247872895,225.51888247872895
+ar1,total_refunds,2032,published,False,False,False,False,not priced by the fuel rate and no activity response,234.77790895440899,234.77790895440899,234.77790895440899
+ar1,total_refunds,2033,published,False,False,False,False,not priced by the fuel rate and no activity response,243.6241792345567,243.6241792345567,243.6241792345567
+ar1,total_refunds,2034,published,False,False,False,False,not priced by the fuel rate and no activity response,252.44180166083805,252.44180166083805,252.44180166083805
+ar1,total_refunds,2035,published,False,False,False,False,not priced by the fuel rate and no activity response,261.1614063313313,261.1614063313313,261.1614063313313
+ar1,total_refunds,2036,published,False,False,False,False,not priced by the fuel rate and no activity response,269.8046806174898,269.8046806174898,269.8046806174898
+ar1,total_refunds,2037,published,False,False,False,False,not priced by the fuel rate and no activity response,278.46043206271895,278.46043206271895,278.46043206271895
+ar1,total_refunds,2038,published,False,False,False,False,not priced by the fuel rate and no activity response,286.98822883871355,286.98822883871355,286.98822883871355
+ar1,total_refunds,2039,published,False,False,False,False,not priced by the fuel rate and no activity response,295.79613648462544,295.79613648462544,295.79613648462544
+ar1,total_refunds,2040,published,False,False,False,False,not priced by the fuel rate and no activity response,305.03803139241074,305.03803139241074,305.03803139241074
+ar1,total_refunds,2041,published,False,False,False,False,not priced by the fuel rate and no activity response,314.5782605256802,314.5782605256802,314.5782605256802
+ar1,total_refunds,2042,published,False,False,False,False,not priced by the fuel rate and no activity response,323.9975555352787,323.9975555352787,323.9975555352787
+ar1,total_refunds,2043,published,False,False,False,False,not priced by the fuel rate and no activity response,333.4349938718122,333.4349938718122,333.4349938718122
+ar1,total_refunds,2044,published,False,False,False,False,not priced by the fuel rate and no activity response,342.62209921759677,342.62209921759677,342.62209921759677
+ar1,total_refunds,2045,published,False,False,False,False,not priced by the fuel rate and no activity response,352.0422096129251,352.0422096129251,352.0422096129251
+ar1,total_refunds,2046,published,False,False,False,False,not priced by the fuel rate and no activity response,362.58034358365825,362.58034358365825,362.58034358365825
+ar1,total_refunds,2047,published,False,False,False,False,not priced by the fuel rate and no activity response,373.85253011384054,373.85253011384054,373.85253011384054
+ar1,total_refunds,2048,published,False,False,False,False,not priced by the fuel rate and no activity response,386.43419644953616,386.43419644953616,386.43419644953616
+ar1,total_refunds,2049,published,False,False,False,False,not priced by the fuel rate and no activity response,398.90502684563774,398.90502684563774,398.90502684563774
+ar1,total_refunds,2050,published,False,False,False,False,not priced by the fuel rate and no activity response,410.61842547059655,410.61842547059655,410.61842547059655
+ar1,total_revenue_net_admin,2025,published,False,False,False,False,not priced by the fuel rate and no activity response,4412.752163208135,4412.752163208135,4412.752163208135
+ar1,total_revenue_net_admin,2026,published,False,False,False,False,not priced by the fuel rate and no activity response,4730.90801062392,4730.90801062392,4730.90801062392
+ar1,total_revenue_net_admin,2027,published,True,False,False,True,central moves through a governed identity term,5117.454062808772,4771.831872447912,4771.831872447912
+ar1,total_revenue_net_admin,2028,published,True,False,False,True,central moves through a governed identity term,5785.787336159647,5785.787336159647,5077.923682656226
+ar1,total_revenue_net_admin,2029,published,True,False,False,True,central moves through a governed identity term,6232.428458745543,6232.428458745543,5507.230696972429
+ar1,total_revenue_net_admin,2030,published,True,False,False,True,central moves through a governed identity term,6624.077593283519,6624.077593283519,5882.123770975426
+ar1,total_revenue_net_admin,2031,published,True,False,False,True,central moves through a governed identity term,6952.569796048631,6952.569796048631,6182.441528932522
+ar1,total_revenue_net_admin,2032,published,True,False,False,True,central moves through a governed identity term,7274.176729382288,7274.176729382288,6496.789190715635
+ar1,total_revenue_net_admin,2033,published,True,False,False,True,central moves through a governed identity term,7596.76895242664,7596.76895242664,6812.622092109846
+ar1,total_revenue_net_admin,2034,published,True,False,False,True,central moves through a governed identity term,7925.684755432967,7925.684755432967,7134.6544949896515
+ar1,total_revenue_net_admin,2035,published,True,False,False,True,central moves through a governed identity term,8256.292882405563,8256.292882405563,7458.744328047336
+ar1,total_revenue_net_admin,2036,published,True,False,False,True,central moves through a governed identity term,8581.478828019954,8581.478828019954,7778.523917712843
+ar1,total_revenue_net_admin,2037,published,True,False,False,True,central moves through a governed identity term,8896.566739055568,8896.566739055568,8089.648144469138
+ar1,total_revenue_net_admin,2038,published,True,False,False,True,central moves through a governed identity term,9195.129080749222,9195.129080749222,8386.177573337869
+ar1,total_revenue_net_admin,2039,published,True,False,False,True,central moves through a governed identity term,9483.852324942367,9483.852324942367,8674.023153680515
+ar1,total_revenue_net_admin,2040,published,True,False,False,True,central moves through a governed identity term,9765.874547966163,9765.874547966163,8955.931918611994
+ar1,total_revenue_net_admin,2041,published,True,False,False,True,central moves through a governed identity term,10041.003223232241,10041.003223232241,9231.653641577881
+ar1,total_revenue_net_admin,2042,published,True,False,False,True,central moves through a governed identity term,10310.7370810612,10310.7370810612,9502.511303244348
+ar1,total_revenue_net_admin,2043,published,True,False,False,True,central moves through a governed identity term,10587.64675093448,10587.64675093448,9779.974292772891
+ar1,total_revenue_net_admin,2044,published,True,False,False,True,central moves through a governed identity term,10878.36223842465,10878.36223842465,10070.079696640889
+ar1,total_revenue_net_admin,2045,published,True,False,False,True,central moves through a governed identity term,11215.597410243654,11215.597410243654,10403.110854247036
+ar1,total_revenue_net_admin,2046,published,True,False,False,True,central moves through a governed identity term,11614.685544089754,11614.685544089754,10793.574913347387
+ar1,total_revenue_net_admin,2047,published,True,False,False,True,central moves through a governed identity term,12038.51981158414,12038.51981158414,11207.420990266288
+ar1,total_revenue_net_admin,2048,published,True,False,False,True,central moves through a governed identity term,12505.15986016307,12505.15986016307,11661.552784812906
+ar1,total_revenue_net_admin,2049,published,True,False,False,True,central moves through a governed identity term,12968.8195800539,12968.8195800539,12113.47041216318
+ar1,total_revenue_net_admin,2050,published,True,False,False,True,central moves through a governed identity term,13407.880016807758,13407.880016807758,12542.97132649817
+ar1,total_ruc_net_revenue,2025,published,False,False,False,False,not priced by the fuel rate and no activity response,1977.6441383981355,1977.6441383981355,1977.6441383981355
+ar1,total_ruc_net_revenue,2026,published,False,False,False,False,not priced by the fuel rate and no activity response,2072.019805657217,2072.019805657217,2072.019805657217
+ar1,total_ruc_net_revenue,2027,published,True,False,False,True,central moves through a governed identity term,2282.956332356425,2105.2252306039495,2105.2252306039495
+ar1,total_ruc_net_revenue,2028,published,True,False,False,True,central moves through a governed identity term,2682.88830836724,2682.88830836724,2309.0942550915142
+ar1,total_ruc_net_revenue,2029,published,True,False,False,True,central moves through a governed identity term,2981.055182150856,2981.055182150856,2589.090452739607
+ar1,total_ruc_net_revenue,2030,published,True,False,False,True,central moves through a governed identity term,3253.9373715651354,3253.9373715651354,2844.510267017857
+ar1,total_ruc_net_revenue,2031,published,True,False,False,True,central moves through a governed identity term,3481.89911494128,3481.89911494128,3056.0039334440885
+ar1,total_ruc_net_revenue,2032,published,True,False,False,True,central moves through a governed identity term,3715.833027796847,3715.833027796847,3279.151971345843
+ar1,total_ruc_net_revenue,2033,published,True,False,False,True,central moves through a governed identity term,3960.6730030263257,3960.6730030263257,3512.7829716301067
+ar1,total_ruc_net_revenue,2034,published,True,False,False,True,central moves through a governed identity term,4223.769591937775,4223.769591937775,3763.4918938747883
+ar1,total_ruc_net_revenue,2035,published,True,False,False,True,central moves through a governed identity term,4505.668866358201,4505.668866358201,4031.8781663780605
+ar1,total_ruc_net_revenue,2036,published,True,False,False,True,central moves through a governed identity term,4806.564388523192,4806.564388523192,4318.256749072378
+ar1,total_ruc_net_revenue,2037,published,True,False,False,True,central moves through a governed identity term,5129.088825923741,5129.088825923741,4625.0834759970285
+ar1,total_ruc_net_revenue,2038,published,True,False,False,True,central moves through a governed identity term,5473.826153971742,5473.826153971742,4953.009213482691
+ar1,total_ruc_net_revenue,2039,published,True,False,False,True,central moves through a governed identity term,5850.232240475073,5850.232240475073,5310.712999411297
+ar1,total_ruc_net_revenue,2040,published,True,False,False,True,central moves through a governed identity term,6259.456162699124,6259.456162699124,5699.403981510429
+ar1,total_ruc_net_revenue,2041,published,True,False,False,True,central moves through a governed identity term,6695.144146666681,6695.144146666681,6113.448716588358
+ar1,total_ruc_net_revenue,2042,published,True,False,False,True,central moves through a governed identity term,7162.134831347798,7162.134831347798,6557.376926024444
+ar1,total_ruc_net_revenue,2043,published,True,False,False,True,central moves through a governed identity term,7645.1043928337795,7645.1043928337795,7017.261236378812
+ar1,total_ruc_net_revenue,2044,published,True,False,False,True,central moves through a governed identity term,8126.686240932254,8126.686240932254,7477.0891825025265
+ar1,total_ruc_net_revenue,2045,published,True,False,False,True,central moves through a governed identity term,8622.916846580889,8622.916846580889,7951.545745665719
+ar1,total_ruc_net_revenue,2046,published,True,False,False,True,central moves through a governed identity term,9154.556721913215,9154.556721913215,8459.822233029585
+ar1,total_ruc_net_revenue,2047,published,True,False,False,True,central moves through a governed identity term,9700.899785252288,9700.899785252288,8982.872698941537
+ar1,total_ruc_net_revenue,2048,published,True,False,False,True,central moves through a governed identity term,10277.688956859767,10277.688956859767,9535.31078899159
+ar1,total_ruc_net_revenue,2049,published,True,False,False,True,central moves through a governed identity term,10842.96129401836,10842.96129401836,10078.184751144909
+ar1,total_ruc_net_revenue,2050,published,True,False,False,True,central moves through a governed identity term,11376.234075278322,11376.234075278322,10592.30946983729
+ar1,tuc_gtk,2025,published,False,False,False,False,not priced by the fuel rate and no activity response,8016352797.0,8016352797.0,8016352797.0
+ar1,tuc_gtk,2026,published,False,False,False,False,not priced by the fuel rate and no activity response,8224343155.99,8224343155.99,8224343155.99
+ar1,tuc_gtk,2027,published,False,False,False,False,not priced by the fuel rate and no activity response,8179315222.66,8179315222.66,8179315222.66
+ar1,tuc_gtk,2028,published,False,False,False,False,not priced by the fuel rate and no activity response,8179315222.66,8179315222.66,8179315222.66
+ar1,tuc_gtk,2029,published,False,False,False,False,not priced by the fuel rate and no activity response,8179315222.66,8179315222.66,8179315222.66
+ar1,tuc_gtk,2030,published,False,False,False,False,not priced by the fuel rate and no activity response,8179315222.66,8179315222.66,8179315222.66
+ar1,tuc_gtk,2031,published,False,False,False,False,not priced by the fuel rate and no activity response,8179315222.66,8179315222.66,8179315222.66
+ar1,tuc_gtk,2032,published,False,False,False,False,not priced by the fuel rate and no activity response,8179315222.66,8179315222.66,8179315222.66
+ar1,tuc_gtk,2033,published,False,False,False,False,not priced by the fuel rate and no activity response,8179315222.66,8179315222.66,8179315222.66
+ar1,tuc_gtk,2034,published,False,False,False,False,not priced by the fuel rate and no activity response,8179315222.66,8179315222.66,8179315222.66
+ar1,tuc_gtk,2035,published,False,False,False,False,not priced by the fuel rate and no activity response,8179315222.66,8179315222.66,8179315222.66
+ar1,tuc_gtk,2036,published,False,False,False,False,not priced by the fuel rate and no activity response,8179315222.66,8179315222.66,8179315222.66
+ar1,tuc_gtk,2037,published,False,False,False,False,not priced by the fuel rate and no activity response,8179315222.66,8179315222.66,8179315222.66
+ar1,tuc_gtk,2038,published,False,False,False,False,not priced by the fuel rate and no activity response,8179315222.66,8179315222.66,8179315222.66
+ar1,tuc_gtk,2039,published,False,False,False,False,not priced by the fuel rate and no activity response,8179315222.66,8179315222.66,8179315222.66
+ar1,tuc_gtk,2040,published,False,False,False,False,not priced by the fuel rate and no activity response,8179315222.66,8179315222.66,8179315222.66
+ar1,tuc_gtk,2041,published,False,False,False,False,not priced by the fuel rate and no activity response,8179315222.66,8179315222.66,8179315222.66
+ar1,tuc_gtk,2042,published,False,False,False,False,not priced by the fuel rate and no activity response,8179315222.66,8179315222.66,8179315222.66
+ar1,tuc_gtk,2043,published,False,False,False,False,not priced by the fuel rate and no activity response,8179315222.66,8179315222.66,8179315222.66
+ar1,tuc_gtk,2044,published,False,False,False,False,not priced by the fuel rate and no activity response,8179315222.66,8179315222.66,8179315222.66
+ar1,tuc_gtk,2045,published,False,False,False,False,not priced by the fuel rate and no activity response,8179315222.66,8179315222.66,8179315222.66
+ar1,tuc_gtk,2046,published,False,False,False,False,not priced by the fuel rate and no activity response,8179315222.66,8179315222.66,8179315222.66
+ar1,tuc_gtk,2047,published,False,False,False,False,not priced by the fuel rate and no activity response,8179315222.66,8179315222.66,8179315222.66
+ar1,tuc_gtk,2048,published,False,False,False,False,not priced by the fuel rate and no activity response,8179315222.66,8179315222.66,8179315222.66
+ar1,tuc_gtk,2049,published,False,False,False,False,not priced by the fuel rate and no activity response,8179315222.66,8179315222.66,8179315222.66
+ar1,tuc_gtk,2050,published,False,False,False,False,not priced by the fuel rate and no activity response,8179315222.66,8179315222.66,8179315222.66
+ar1,tuc_net_revenue,2025,published,False,False,False,False,not priced by the fuel rate and no activity response,17.09481038,17.09481038,17.09481038
+ar1,tuc_net_revenue,2026,published,False,False,False,False,not priced by the fuel rate and no activity response,17.4060774864124,17.4060774864124,17.4060774864124
+ar1,tuc_net_revenue,2027,published,False,False,False,False,not priced by the fuel rate and no activity response,17.5578996928248,17.5578996928248,17.5578996928248
+ar1,tuc_net_revenue,2028,published,False,False,False,False,not priced by the fuel rate and no activity response,17.5578996928248,17.5578996928248,17.5578996928248
+ar1,tuc_net_revenue,2029,published,False,False,False,False,not priced by the fuel rate and no activity response,17.5578996928248,17.5578996928248,17.5578996928248
+ar1,tuc_net_revenue,2030,published,False,False,False,False,not priced by the fuel rate and no activity response,17.5578996928248,17.5578996928248,17.5578996928248
+ar1,tuc_net_revenue,2031,published,False,False,False,False,not priced by the fuel rate and no activity response,17.5578996928248,17.5578996928248,17.5578996928248
+ar1,tuc_net_revenue,2032,published,False,False,False,False,not priced by the fuel rate and no activity response,17.5578996928248,17.5578996928248,17.5578996928248
+ar1,tuc_net_revenue,2033,published,False,False,False,False,not priced by the fuel rate and no activity response,17.5578996928248,17.5578996928248,17.5578996928248
+ar1,tuc_net_revenue,2034,published,False,False,False,False,not priced by the fuel rate and no activity response,17.5578996928248,17.5578996928248,17.5578996928248
+ar1,tuc_net_revenue,2035,published,False,False,False,False,not priced by the fuel rate and no activity response,17.5578996928248,17.5578996928248,17.5578996928248
+ar1,tuc_net_revenue,2036,published,False,False,False,False,not priced by the fuel rate and no activity response,17.5578996928248,17.5578996928248,17.5578996928248
+ar1,tuc_net_revenue,2037,published,False,False,False,False,not priced by the fuel rate and no activity response,17.5578996928248,17.5578996928248,17.5578996928248
+ar1,tuc_net_revenue,2038,published,False,False,False,False,not priced by the fuel rate and no activity response,17.5578996928248,17.5578996928248,17.5578996928248
+ar1,tuc_net_revenue,2039,published,False,False,False,False,not priced by the fuel rate and no activity response,17.5578996928248,17.5578996928248,17.5578996928248
+ar1,tuc_net_revenue,2040,published,False,False,False,False,not priced by the fuel rate and no activity response,17.5578996928248,17.5578996928248,17.5578996928248
+ar1,tuc_net_revenue,2041,published,False,False,False,False,not priced by the fuel rate and no activity response,17.5578996928248,17.5578996928248,17.5578996928248
+ar1,tuc_net_revenue,2042,published,False,False,False,False,not priced by the fuel rate and no activity response,17.5578996928248,17.5578996928248,17.5578996928248
+ar1,tuc_net_revenue,2043,published,False,False,False,False,not priced by the fuel rate and no activity response,17.5578996928248,17.5578996928248,17.5578996928248
+ar1,tuc_net_revenue,2044,published,False,False,False,False,not priced by the fuel rate and no activity response,17.5578996928248,17.5578996928248,17.5578996928248
+ar1,tuc_net_revenue,2045,published,False,False,False,False,not priced by the fuel rate and no activity response,17.5578996928248,17.5578996928248,17.5578996928248
+ar1,tuc_net_revenue,2046,published,False,False,False,False,not priced by the fuel rate and no activity response,17.5578996928248,17.5578996928248,17.5578996928248
+ar1,tuc_net_revenue,2047,published,False,False,False,False,not priced by the fuel rate and no activity response,17.5578996928248,17.5578996928248,17.5578996928248
+ar1,tuc_net_revenue,2048,published,False,False,False,False,not priced by the fuel rate and no activity response,17.5578996928248,17.5578996928248,17.5578996928248
+ar1,tuc_net_revenue,2049,published,False,False,False,False,not priced by the fuel rate and no activity response,17.5578996928248,17.5578996928248,17.5578996928248
+ar1,tuc_net_revenue,2050,published,False,False,False,False,not priced by the fuel rate and no activity response,17.5578996928248,17.5578996928248,17.5578996928248

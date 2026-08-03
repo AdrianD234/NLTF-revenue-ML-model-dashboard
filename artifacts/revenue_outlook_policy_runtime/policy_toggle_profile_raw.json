@@ -1,0 +1,602 @@
+[
+  {
+    "engine": "ar1",
+    "cold_stages": [
+      [
+        "pack signature",
+        1.7025000415742397
+      ],
+      [
+        "promoted pack load",
+        465.6896999804303
+      ],
+      [
+        "replay cache load",
+        867.774200043641
+      ],
+      [
+        "fed uplift factors",
+        72.83540000207722
+      ],
+      [
+        "sensitivity stage frames",
+        295.48690002411604
+      ],
+      [
+        "uncertainty pack load",
+        21.17779990658164
+      ]
+    ],
+    "cold_total_ms": 1724.6664999984205,
+    "selections": [
+      {
+        "policy_state": "published",
+        "transition": "cold_first_selection",
+        "total_ms": 13534.879399929196,
+        "chart_rows": 3688
+      },
+      {
+        "policy_state": "delayed_6m",
+        "transition": "published_to_delayed",
+        "total_ms": 12867.97000002116,
+        "chart_rows": 3688
+      },
+      {
+        "policy_state": "off",
+        "transition": "delayed_to_no_uplift",
+        "total_ms": 12939.371399930678,
+        "chart_rows": 3688
+      },
+      {
+        "policy_state": "published",
+        "transition": "no_uplift_to_published",
+        "total_ms": 22.68060005735606,
+        "chart_rows": 3688
+      },
+      {
+        "policy_state": "delayed_6m",
+        "transition": "repeat_previously_selected",
+        "total_ms": 21.441300050355494,
+        "chart_rows": 3688
+      }
+    ],
+    "breakdown": [
+      [
+        "macro overlay",
+        585.7518999837339
+      ],
+      [
+        "uptake allocation",
+        312.1068999171257
+      ],
+      [
+        "policy factor application",
+        322.3192000295967
+      ],
+      [
+        "conflict append",
+        2361.474100034684
+      ],
+      [
+        "detail alignment",
+        1056.4778000116348
+      ],
+      [
+        "formula rebuild",
+        658.9263000059873
+      ],
+      [
+        "stack rebuild",
+        482.1172000374645
+      ],
+      [
+        "chart-row construction",
+        8.460399927571416
+      ],
+      [
+        "uncertainty lookup",
+        1.006399979814887
+      ]
+    ]
+  },
+  {
+    "engine": "ar1",
+    "cold_stages": [
+      [
+        "pack signature",
+        0.4645000444725156
+      ],
+      [
+        "promoted pack load",
+        457.47199992183596
+      ],
+      [
+        "replay cache load",
+        859.7483000485227
+      ],
+      [
+        "fed uplift factors",
+        70.61219995375723
+      ],
+      [
+        "sensitivity stage frames",
+        291.4458999875933
+      ],
+      [
+        "uncertainty pack load",
+        5.0539999501779675
+      ]
+    ],
+    "cold_total_ms": 1684.7968999063596,
+    "selections": [
+      {
+        "policy_state": "published",
+        "transition": "cold_first_selection",
+        "total_ms": 13382.84879992716,
+        "chart_rows": 3688
+      },
+      {
+        "policy_state": "delayed_6m",
+        "transition": "published_to_delayed",
+        "total_ms": 13141.922899987549,
+        "chart_rows": 3688
+      },
+      {
+        "policy_state": "off",
+        "transition": "delayed_to_no_uplift",
+        "total_ms": 13270.121999899857,
+        "chart_rows": 3688
+      },
+      {
+        "policy_state": "published",
+        "transition": "no_uplift_to_published",
+        "total_ms": 34.21129996422678,
+        "chart_rows": 3688
+      },
+      {
+        "policy_state": "delayed_6m",
+        "transition": "repeat_previously_selected",
+        "total_ms": 21.836800035089254,
+        "chart_rows": 3688
+      }
+    ],
+    "breakdown": [
+      [
+        "macro overlay",
+        584.143599960953
+      ],
+      [
+        "uptake allocation",
+        303.6673000315204
+      ],
+      [
+        "policy factor application",
+        316.2763000000268
+      ],
+      [
+        "conflict append",
+        2305.608299910091
+      ],
+      [
+        "detail alignment",
+        1023.6113000428304
+      ],
+      [
+        "formula rebuild",
+        618.2565999915823
+      ],
+      [
+        "stack rebuild",
+        423.1936000287533
+      ],
+      [
+        "chart-row construction",
+        7.7760000713169575
+      ],
+      [
+        "uncertainty lookup",
+        1.0764000471681356
+      ]
+    ]
+  },
+  {
+    "engine": "ar1",
+    "cold_stages": [
+      [
+        "pack signature",
+        0.4144000122323632
+      ],
+      [
+        "promoted pack load",
+        456.25559997279197
+      ],
+      [
+        "replay cache load",
+        856.9942000322044
+      ],
+      [
+        "fed uplift factors",
+        79.31900001130998
+      ],
+      [
+        "sensitivity stage frames",
+        317.44599994271994
+      ],
+      [
+        "uncertainty pack load",
+        5.25519996881485
+      ]
+    ],
+    "cold_total_ms": 1715.6843999400735,
+    "selections": [
+      {
+        "policy_state": "published",
+        "transition": "cold_first_selection",
+        "total_ms": 13575.231799972244,
+        "chart_rows": 3688
+      },
+      {
+        "policy_state": "delayed_6m",
+        "transition": "published_to_delayed",
+        "total_ms": 12999.083500006236,
+        "chart_rows": 3688
+      },
+      {
+        "policy_state": "off",
+        "transition": "delayed_to_no_uplift",
+        "total_ms": 13643.60960002523,
+        "chart_rows": 3688
+      },
+      {
+        "policy_state": "published",
+        "transition": "no_uplift_to_published",
+        "total_ms": 17.584900022484362,
+        "chart_rows": 3688
+      },
+      {
+        "policy_state": "delayed_6m",
+        "transition": "repeat_previously_selected",
+        "total_ms": 17.691600020043552,
+        "chart_rows": 3688
+      }
+    ],
+    "breakdown": [
+      [
+        "macro overlay",
+        631.4448000630364
+      ],
+      [
+        "uptake allocation",
+        336.9810999138281
+      ],
+      [
+        "policy factor application",
+        341.121600009501
+      ],
+      [
+        "conflict append",
+        2502.512300037779
+      ],
+      [
+        "detail alignment",
+        1021.908099995926
+      ],
+      [
+        "formula rebuild",
+        640.6078999862075
+      ],
+      [
+        "stack rebuild",
+        458.5508999880403
+      ],
+      [
+        "chart-row construction",
+        7.737600011751056
+      ],
+      [
+        "uncertainty lookup",
+        0.9370000334456563
+      ]
+    ]
+  },
+  {
+    "engine": "ensemble",
+    "cold_stages": [
+      [
+        "pack signature",
+        0.4588000010699034
+      ],
+      [
+        "promoted pack load",
+        462.169999955222
+      ],
+      [
+        "replay cache load",
+        806.2225000467151
+      ],
+      [
+        "fed uplift factors",
+        108.62209997139871
+      ],
+      [
+        "sensitivity stage frames",
+        307.5802999082953
+      ],
+      [
+        "uncertainty pack load",
+        5.107200006023049
+      ]
+    ],
+    "cold_total_ms": 1690.160899888724,
+    "selections": [
+      {
+        "policy_state": "published",
+        "transition": "cold_first_selection",
+        "total_ms": 13316.226500086486,
+        "chart_rows": 3688
+      },
+      {
+        "policy_state": "delayed_6m",
+        "transition": "published_to_delayed",
+        "total_ms": 12538.912100018933,
+        "chart_rows": 3688
+      },
+      {
+        "policy_state": "off",
+        "transition": "delayed_to_no_uplift",
+        "total_ms": 12886.96830009576,
+        "chart_rows": 3688
+      },
+      {
+        "policy_state": "published",
+        "transition": "no_uplift_to_published",
+        "total_ms": 19.528100034222007,
+        "chart_rows": 3688
+      },
+      {
+        "policy_state": "delayed_6m",
+        "transition": "repeat_previously_selected",
+        "total_ms": 21.473199944011867,
+        "chart_rows": 3688
+      }
+    ],
+    "breakdown": [
+      [
+        "macro overlay",
+        567.415300058201
+      ],
+      [
+        "uptake allocation",
+        301.06810003053397
+      ],
+      [
+        "policy factor application",
+        297.37559997010976
+      ],
+      [
+        "conflict append",
+        2280.2702999906614
+      ],
+      [
+        "detail alignment",
+        1004.6306999865919
+      ],
+      [
+        "formula rebuild",
+        601.8976999912411
+      ],
+      [
+        "stack rebuild",
+        414.22769997734576
+      ],
+      [
+        "chart-row construction",
+        7.758500054478645
+      ],
+      [
+        "uncertainty lookup",
+        0.9363000281155109
+      ]
+    ]
+  },
+  {
+    "engine": "ensemble",
+    "cold_stages": [
+      [
+        "pack signature",
+        0.37589995190501213
+      ],
+      [
+        "promoted pack load",
+        455.3423000033945
+      ],
+      [
+        "replay cache load",
+        798.9934999495745
+      ],
+      [
+        "fed uplift factors",
+        106.25599999912083
+      ],
+      [
+        "sensitivity stage frames",
+        294.98529992997646
+      ],
+      [
+        "uncertainty pack load",
+        4.993999958969653
+      ]
+    ],
+    "cold_total_ms": 1660.946999792941,
+    "selections": [
+      {
+        "policy_state": "published",
+        "transition": "cold_first_selection",
+        "total_ms": 13424.949700012803,
+        "chart_rows": 3688
+      },
+      {
+        "policy_state": "delayed_6m",
+        "transition": "published_to_delayed",
+        "total_ms": 12735.840899986215,
+        "chart_rows": 3688
+      },
+      {
+        "policy_state": "off",
+        "transition": "delayed_to_no_uplift",
+        "total_ms": 12623.48050007131,
+        "chart_rows": 3688
+      },
+      {
+        "policy_state": "published",
+        "transition": "no_uplift_to_published",
+        "total_ms": 19.033199991099536,
+        "chart_rows": 3688
+      },
+      {
+        "policy_state": "delayed_6m",
+        "transition": "repeat_previously_selected",
+        "total_ms": 17.95440004207194,
+        "chart_rows": 3688
+      }
+    ],
+    "breakdown": [
+      [
+        "macro overlay",
+        578.6190000362694
+      ],
+      [
+        "uptake allocation",
+        309.57899999339134
+      ],
+      [
+        "policy factor application",
+        320.2642999822274
+      ],
+      [
+        "conflict append",
+        2367.597399977967
+      ],
+      [
+        "detail alignment",
+        1011.5784999215975
+      ],
+      [
+        "formula rebuild",
+        624.6960000135005
+      ],
+      [
+        "stack rebuild",
+        433.2839000271633
+      ],
+      [
+        "chart-row construction",
+        8.696200093254447
+      ],
+      [
+        "uncertainty lookup",
+        0.9676000336185098
+      ]
+    ]
+  },
+  {
+    "engine": "ensemble",
+    "cold_stages": [
+      [
+        "pack signature",
+        0.4251999780535698
+      ],
+      [
+        "promoted pack load",
+        449.2446999065578
+      ],
+      [
+        "replay cache load",
+        806.2326998915523
+      ],
+      [
+        "fed uplift factors",
+        102.48370002955198
+      ],
+      [
+        "sensitivity stage frames",
+        297.9260999709368
+      ],
+      [
+        "uncertainty pack load",
+        5.122800008393824
+      ]
+    ],
+    "cold_total_ms": 1661.4351997850463,
+    "selections": [
+      {
+        "policy_state": "published",
+        "transition": "cold_first_selection",
+        "total_ms": 13356.263900059275,
+        "chart_rows": 3688
+      },
+      {
+        "policy_state": "delayed_6m",
+        "transition": "published_to_delayed",
+        "total_ms": 12896.480499999598,
+        "chart_rows": 3688
+      },
+      {
+        "policy_state": "off",
+        "transition": "delayed_to_no_uplift",
+        "total_ms": 13026.936599984765,
+        "chart_rows": 3688
+      },
+      {
+        "policy_state": "published",
+        "transition": "no_uplift_to_published",
+        "total_ms": 33.21320004761219,
+        "chart_rows": 3688
+      },
+      {
+        "policy_state": "delayed_6m",
+        "transition": "repeat_previously_selected",
+        "total_ms": 22.765400004573166,
+        "chart_rows": 3688
+      }
+    ],
+    "breakdown": [
+      [
+        "macro overlay",
+        550.1676000421867
+      ],
+      [
+        "uptake allocation",
+        298.9837999921292
+      ],
+      [
+        "policy factor application",
+        303.02029999438673
+      ],
+      [
+        "conflict append",
+        2281.977399950847
+      ],
+      [
+        "detail alignment",
+        1029.6102000866085
+      ],
+      [
+        "formula rebuild",
+        629.0972999995574
+      ],
+      [
+        "stack rebuild",
+        416.3092999951914
+      ],
+      [
+        "chart-row construction",
+        7.4492000276222825
+      ],
+      [
+        "uncertainty lookup",
+        0.9446999756619334
+      ]
+    ]
+  }
+]
