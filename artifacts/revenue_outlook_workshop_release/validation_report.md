@@ -117,9 +117,25 @@ the data layer proves instead) and two harness limitations.
 
 Honesty matters more here than a full tick-list:
 
-- **The complete local pytest suite was not run.** The targeted suites above
-  cover A, B, C and the integration surface, but the whole-repo run
-  (40–60 minutes) did not fit in this session. It should be run before merge.
+- **The complete local pytest suite was started but did not finish**, and what
+  it showed before the session ended needs an owner's attention:
+
+  1,788 tests collected. Through ~24% it reported three failure clusters —
+  seven tests at ~16%, seven more immediately after, and five at ~20%. All fall
+  in the alphabetical `test_c*` region (`test_chart_source_tables` through
+  `test_data_loader`).
+
+  **`test_conflict_fuel_paths.py` and `test_conflict_gdp_paths.py` pass 12/12
+  when run on their own.** So these are order- or shared-state–dependent
+  failures, not straightforward regressions. They could not be attributed
+  within this session, and it would be wrong to guess: they are equally
+  consistent with a pre-existing interaction (main was already known red for
+  some replay-parity cases at `48a499b`) and with something this integration
+  introduced through the Streamlit caches.
+
+  **This must be resolved before the workshop.** The fastest route is a full
+  run on `main` at `48a499b` for comparison, then `pytest -x` to name the first
+  failure and inspect the module that precedes it.
 - **Extract validation 21/21, deployment readiness, replay-seed diagnostic,
   sign-guard rebuild and replay parity were not run** for the same reason.
 - **Clean-clone CI on the final SHA has not been observed.** The PR is opened
