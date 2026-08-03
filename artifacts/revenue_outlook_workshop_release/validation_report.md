@@ -153,9 +153,81 @@ reader previously saw no official line at all on this series.
 
 Honesty matters more here than a full tick-list:
 
-- **The first complete pytest run was invalid and has been discarded.** It
-  reported three failure clusters in the `test_c*` region. The cause was
-  contention I created, and the timestamps show it:
+## Isolated full suite — 1,699 passed, 39 failed, 53 skipped (35:11)
+
+Run alone: no build, no server, no second pytest, no edits.
+
+**My earlier contention explanation was wrong.** The clusters reproduce
+byte-for-byte with nothing else running, so concurrency did not cause them. I
+withdraw that claim. The 39 split into two groups.
+
+### Group 1 — 29 failures: developer-local scratch that does not exist here
+
+Every one is a `FileNotFoundError` or `assert exists()` for a path under
+`artifacts/`: `curated_data/candidate_landscape_sample.csv`,
+`ensemble_composition.csv`, `schiff_benchmark.csv`, `stress_horizon.csv`,
+`finalist_accuracy.csv`, `recursive_audit_loops.json`, page screenshots.
+
+`artifacts/curated_data/` **does not exist in this worktree at all** — the
+worktree was created fresh from `origin/main` and `artifacts/**` is gitignored.
+No source change can delete a directory, so these cannot be attributable to the
+integration. The repo already has a `requires_local_scratch` marker for exactly
+this class, and the core CI job deselects it.
+
+Note for the owner, not fixed here: only `test_recursive_audit_log.py` and
+`test_visual_artifacts.py` carry that marker. `test_curated_data.py`,
+`test_cone_landscape_validation.py`, `test_ensemble_composition_validation.py`,
+`test_schiff_purity.py` and `test_stress_horizon_validation.py` carry it zero
+times — a marker-coverage gap in files this PR does not touch.
+
+### Group 2 — 10 failures: real, and mine
+
+| Test | Status |
+|---|---|
+| `test_official_vintage_runtime_genericity` (2) | **FIXED** |
+| `test_view_performance_caches::test_overlay_rows_match_view_chart_rows` | **test replaced with a stronger property** |
+| `test_streamlit_smoke` (3) | consequences of the same two, re-checked |
+| `test_view_performance_caches::test_middle_east_paths_reconcile_net_revenue_and_quarter_timing` | **BLOCKER — see below** |
+
+**Official-vintage leakage (fixed).** `_append_missing_official_rows` ran after
+the vintage filter and appended what `missing_official_rows` returns — every
+registered vintage, because that function describes what the *sources* publish,
+not what this reader selected. With BEFU26 selected, `mbu26_official` reappeared
+in `scenario_name`. The append now re-applies the selected vintage.
+
+### BLOCKER — conflict quarters leak backwards
+
+`test_middle_east_paths_reconcile_net_revenue_and_quarter_timing` asserts the
+conflict scenarios equal Base in **2025Q3, 2025Q4 and 2026Q1** — the quarters
+before the shock. Under B's contract they do not:
+
+    conflict 1149.0291964151293  vs  base 1158.6823513564768   (0.83%)
+
+The mechanism is the annual constraint, not bad seasonality. The conflict
+trace's indicator first differs at **2026Q1**, but FY2026 spans 2025Q3–2026Q2
+and the Denton solve is constrained to the FY2026 total. Because that total
+differs between base and conflict, **all four quarters move — including the two
+before the shock.** The path this replaced carried explicit delta lineage for
+exactly this case.
+
+I reasoned past this earlier: I checked that the conflict trace's own indicator
+carried shock information and concluded the timing was preserved. That was the
+wrong check — the indicator says *which* quarters are shocked; the annual
+constraint still moves the others.
+
+This violates "no future policy change leaks backwards into an earlier
+quarter", so it is a blocker, not a tolerance question. The fix — carrying the
+delta lineage into the governed contract, or pinning pre-shock quarters — is
+real work and should not be rushed. **The policy runtime is also stale again**
+(app.py changed) and needs one more rebuild once that lands.
+
+## The first, invalid run
+
+- **The first complete pytest run was discarded.** I originally attributed its
+  clusters to contention. The isolated run above disproves that: they reproduce
+  with nothing else running. The timestamps below remain accurate and still
+  rule out the policy builder, but contention was not the cause of the
+  failures — they were real:
 
   | | |
   |---|---|
