@@ -1978,6 +1978,13 @@ _POST_MODEL_SHAPE_BASIS = (
     "the committed scenario-input replay"
 )
 
+#: Ceiling on the row-normalised seam system. The observed values are ~7.1e3
+#: (Base) and ~3.2e3 (comparison): the two free quarters carry near-identical
+#: populations, so the constraint rows are close to parallel and the solve is
+#: inherently a little stiff. 1e6 leaves generous headroom while still refusing
+#: a system whose solution would be dominated by rounding.
+_SEAM_MAX_CONDITION_NUMBER = 1.0e6
+
 
 class PostModelQuarterlyError(ValueError):
     """A governed input for the FY2031-FY2050 quarterly split is unusable."""
@@ -1988,6 +1995,7 @@ def post_model_ped_activity_quarterly_rows(
     *,
     raw_quarterly_audit: pd.DataFrame,
     scenario_population: pd.DataFrame,
+    native_quarters: pd.DataFrame | None = None,
     first_fy: int = 2031,
     last_fy: int = 2050,
 ) -> pd.DataFrame:
@@ -2050,6 +2058,23 @@ def post_model_ped_activity_quarterly_rows(
     shape["_raw"] = pd.to_numeric(shape.get("value"), errors="coerce")
     shape = shape[shape["_raw"].notna()]
 
+    # Published quarters this construction must hold rather than recompute.
+    # Keyed on VKT per capita alone: light petrol VKT has no native quarters,
+    # and deriving it from the held VKTpc through the identity is what keeps
+    # the pair consistent across the seam.
+    native_lookup: dict[tuple[str, str], float] = {}
+    if native_quarters is not None and not native_quarters.empty:
+        held = native_quarters[
+            native_quarters["series_id"].astype(str).eq("ped_vkt_per_capita")
+            & native_quarters["time_grain"].astype(str).eq("quarterly")
+        ].copy()
+        held["_value"] = pd.to_numeric(held.get("value"), errors="coerce")
+        held = held[held["_value"].notna()]
+        for record in held.to_dict("records"):
+            native_lookup[
+                (str(record.get("scenario_name") or ""), str(record.get("period") or ""))
+            ] = float(record["_value"])
+
     output: list[dict[str, Any]] = []
     group_columns = [
         column
@@ -2091,7 +2116,7 @@ def post_model_ped_activity_quarterly_rows(
         vktpc_by_fy = vktpc_targets.set_index("_fy")
 
         for fy in sorted(set(petrol_by_fy.index) & set(vktpc_by_fy.index)):
-            block = merged[merged["_fy"].eq(int(fy))]
+            block = merged[merged["_fy"].eq(int(fy))].sort_values("period")
             if len(block) != 4 or block["_pop"].isna().any():
                 raise PostModelQuarterlyError(
                     f"{scenario_name} FY{int(fy)}: the governed raw quarterly "
@@ -2100,37 +2125,108 @@ def post_model_ped_activity_quarterly_rows(
                 )
             target_petrol = float(petrol_by_fy.at[fy, "_value"])
             target_vktpc = float(vktpc_by_fy.at[fy, "_value"])
-            raw_petrol_sum = float(block["_raw_petrol"].sum())
-            if not np.isfinite(raw_petrol_sum) or raw_petrol_sum <= 0.0:
-                raise PostModelQuarterlyError(
-                    f"{scenario_name} FY{int(fy)}: raw petrol shape sums to "
-                    f"{raw_petrol_sum!r}; no scale factor exists."
-                )
-            scale = target_petrol / raw_petrol_sum
+            periods = [str(p) for p in block["period"]]
+            raw_vktpc = block["_raw"].to_numpy(dtype=float)
+            pops = block["_pop"].to_numpy(dtype=float)
 
-            quarter_petrol = scale * block["_raw_petrol"].to_numpy(dtype=float)
-            quarter_vktpc = scale * block["_raw"].to_numpy(dtype=float)
+            # Which quarters of this year are already published natively? The
+            # seam year is the case that matters: FY2031 spans 2030Q3-2031Q2
+            # while native rows run to 2030Q4, so two quarters are fixed and
+            # two are free. Native values are held exactly; only the free
+            # quarters absorb the benchmark.
+            fixed = [
+                index
+                for index, period in enumerate(periods)
+                if (scenario_name, period) in native_lookup
+            ]
+            free = [index for index in range(4) if index not in fixed]
+            quarter_vktpc = raw_vktpc.copy()
+            for index in fixed:
+                quarter_vktpc[index] = float(native_lookup[(scenario_name, periods[index])])
+
+            if not fixed:
+                # No native quarter: one uniform factor closes both annual
+                # constraints exactly (see the module note above).
+                raw_petrol_sum = float((raw_vktpc * pops / 1_000_000.0).sum())
+                if not np.isfinite(raw_petrol_sum) or raw_petrol_sum <= 0.0:
+                    raise PostModelQuarterlyError(
+                        f"{scenario_name} FY{int(fy)}: raw petrol shape sums to "
+                        f"{raw_petrol_sum!r}; no scale factor exists."
+                    )
+                quarter_vktpc = (target_petrol / raw_petrol_sum) * raw_vktpc
+            elif len(free) == 2:
+                # Two fixed, two free, two constraints: a unique solve.
+                #
+                #   sum_q v_q                 = target_vktpc
+                #   sum_q v_q * pop_q / 1e6   = target_petrol
+                #
+                # Both rows are normalised before solving. Unnormalised, the
+                # second row carries a ~5.6e6 population scale against the
+                # first row's 1.0 and the system reads as far worse
+                # conditioned than it is - the trap PR #17 called out.
+                fixed_vktpc = sum(quarter_vktpc[index] for index in fixed)
+                fixed_petrol = sum(
+                    quarter_vktpc[index] * pops[index] / 1_000_000.0 for index in fixed
+                )
+                matrix = np.array(
+                    [
+                        [1.0, 1.0],
+                        [pops[free[0]] / 1_000_000.0, pops[free[1]] / 1_000_000.0],
+                    ]
+                )
+                rhs = np.array(
+                    [target_vktpc - fixed_vktpc, target_petrol - fixed_petrol]
+                )
+                row_scale = np.abs(matrix).max(axis=1)
+                if not np.all(np.isfinite(row_scale)) or (row_scale <= 0.0).any():
+                    raise PostModelQuarterlyError(
+                        f"{scenario_name} FY{int(fy)}: the seam system is "
+                        "degenerate; refusing to solve it."
+                    )
+                conditioned = matrix / row_scale[:, None]
+                condition_number = float(np.linalg.cond(conditioned))
+                if condition_number > _SEAM_MAX_CONDITION_NUMBER:
+                    raise PostModelQuarterlyError(
+                        f"{scenario_name} FY{int(fy)}: the seam system is "
+                        f"ill-conditioned (cond {condition_number:.3e} > "
+                        f"{_SEAM_MAX_CONDITION_NUMBER:.0e}). Solving it would "
+                        "amplify rounding into the published quarters."
+                    )
+                solved = np.linalg.solve(conditioned, rhs / row_scale)
+                for position, index in enumerate(free):
+                    quarter_vktpc[index] = float(solved[position])
+            else:
+                raise PostModelQuarterlyError(
+                    f"{scenario_name} FY{int(fy)}: {len(fixed)} native and "
+                    f"{len(free)} free quarters. Only 0 or 2 fixed quarters "
+                    "have a governed rule; anything else needs an allocation "
+                    "assumption that has not been approved."
+                )
+
+            # The identity is imposed, never fitted: petrol is always VKTpc x
+            # population, so it cannot drift from the series beside it.
+            quarter_petrol = quarter_vktpc * pops / 1_000_000.0
             if (quarter_petrol <= 0.0).any() or (quarter_vktpc <= 0.0).any():
                 raise PostModelQuarterlyError(
-                    f"{scenario_name} FY{int(fy)}: the scaled split produced a "
+                    f"{scenario_name} FY{int(fy)}: the split produced a "
                     "non-positive quarter."
                 )
 
             petrol_residual = float(quarter_petrol.sum() - target_petrol)
             vktpc_residual = float(quarter_vktpc.sum() - target_vktpc)
-            # The VKTpc constraint is the one the single factor is not
-            # *defined* to satisfy - it closes because of how the annual
-            # population was derived. Check it explicitly.
-            if abs(vktpc_residual) > 1e-6 * max(1.0, abs(target_vktpc)):
-                raise PostModelQuarterlyError(
-                    f"{scenario_name} FY{int(fy)}: one scale factor no longer "
-                    f"closes the PED VKT per capita annual (residual "
-                    f"{vktpc_residual:.3e}). The raw shape and the annual "
-                    "constructor have diverged; a constrained correction would "
-                    "be required and must be reviewed rather than assumed."
-                )
-
-            periods = [str(p) for p in block["period"]]
+            for label, residual, target in (
+                ("PED VKT per capita", vktpc_residual, target_vktpc),
+                ("light petrol VKT", petrol_residual, target_petrol),
+            ):
+                if abs(residual) > 1e-6 * max(1.0, abs(target)):
+                    raise PostModelQuarterlyError(
+                        f"{scenario_name} FY{int(fy)}: the quarterly split no "
+                        f"longer closes the {label} annual (residual "
+                        f"{residual:.3e}). The raw shape, the native quarters "
+                        "and the annual constructor have diverged; this needs "
+                        "review rather than a widened tolerance."
+                    )
+            held_periods = [periods[index] for index in fixed]
             for series_id, values, target, residual in (
                 ("light_petrol_vkt", quarter_petrol, target_petrol, petrol_residual),
                 ("ped_vkt_per_capita", quarter_vktpc, target_vktpc, vktpc_residual),
@@ -2139,7 +2235,18 @@ def post_model_ped_activity_quarterly_rows(
                     petrol_by_fy if series_id == "light_petrol_vkt" else vktpc_by_fy
                 ).loc[fy]
                 contract = _CONTRACT_BY_SERIES[series_id]
-                for period, value in zip(periods, values):
+                held_total = sum(
+                    float(values[index]) for index in fixed
+                ) if series_id == "ped_vkt_per_capita" else 0.0
+                for index, (period, value) in enumerate(zip(periods, values)):
+                    # A natively published quarter is never re-emitted: the
+                    # native row already draws it, and a second row at the same
+                    # key would double-plot the period. Light petrol VKT has no
+                    # native quarters, so every quarter of its year is emitted
+                    # - including the two seam quarters, whose values come from
+                    # the held native VKTpc through the identity.
+                    if series_id == "ped_vkt_per_capita" and index in fixed:
+                        continue
                     output.append(
                         _quarterly_record(
                             template.to_dict(),
@@ -2149,8 +2256,10 @@ def post_model_ped_activity_quarterly_rows(
                             value=float(value),
                             annual_value=float(target),
                             residual=float(residual),
-                            fixed_quarters=(),
-                            fixed_total=0.0,
+                            fixed_quarters=held_periods
+                            if series_id == "ped_vkt_per_capita"
+                            else (),
+                            fixed_total=held_total,
                             method=METHOD_POST_MODEL_RAW_SHAPE,
                             seasonal_basis=_POST_MODEL_SHAPE_BASIS,
                         )
