@@ -162,7 +162,7 @@ def governed_key(pack, engine: str, current_state: str, official_state: str):
 
 def reference_state_frames(pack, signature, key) -> dict[str, pd.DataFrame]:
     """Run the reference pipeline for one key and collect every frame."""
-    chart_rows, _uptake, _eruc, policy_audit, _scenario = app.cached_scenario_overlay_rows(
+    chart_rows, _uptake, _eruc, policy_audit, scenario_audit = app.cached_scenario_overlay_rows(
         signature, DEFAULT_SENSITIVITY, PED_BRIDGE_DEFAULT_MODE, key, pack
     )
     line, residuals, stack, bridge = app.cached_aligned_scenario_detail_frames(
@@ -191,6 +191,9 @@ def reference_state_frames(pack, signature, key) -> dict[str, pd.DataFrame]:
         "stack_components": stack,
         "bridge_components": bridge,
         "policy_audit": policy_audit if isinstance(policy_audit, pd.DataFrame) else pd.DataFrame(),
+        "scenario_audit": (
+            scenario_audit if isinstance(scenario_audit, pd.DataFrame) else pd.DataFrame()
+        ),
         **vfm,
     }
 

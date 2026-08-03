@@ -226,13 +226,22 @@ def test_quarterly_fallback_fills_mbu_trace_when_current_native_rows_exist() -> 
     derived_mbu = selected[selected["trace_name"].astype(str).eq("MBU26 official")]
     assert not native_base.empty and not derived_mbu.empty
     assert set(native_base["data_scope"].astype(str)) == {"quarterly_current_finalist_input"}
+    # The display path now derives through the governed coverage contract, so
+    # the provenance vocabulary is that contract's, not the older ad-hoc one.
+    # These two fields are what separate a derived quarter from a published
+    # observation in every audit and download, so they are asserted exactly.
     assert set(derived_mbu["data_scope"].astype(str)) == {
-        "quarterly_disaggregated_from_annual",
-        "quarterly_disaggregated_from_annual_hybrid_actual_handover",
+        "derived_quarterly_from_governed_annual"
     }
-    assert set(derived_mbu["value_status"].astype(str)) == {
-        "interpolated",
-        "interpolated_hybrid_actual_handover",
+    assert set(derived_mbu["value_status"].astype(str)) == {"derived_quarterly_display"}
+    assert set(derived_mbu["coverage_row_type"].astype(str)) == {
+        "derived_quarterly_from_governed_annual"
+    }
+    assert set(derived_mbu["empirical_or_derived"].astype(str)) == {"derived"}
+    # An official comparator's derived quarters must never read as published
+    # official quarterly data.
+    assert set(derived_mbu["source_basis"].astype(str)) == {
+        "derived quarterly presentation from official annual source"
     }
     actual = rows[
         rows["series_id"].astype(str).eq("light_ruc_net_km")

@@ -1,0 +1,229 @@
+{
+  "captured_for": "integration/revenue-outlook-workshop-release",
+  "default_scenario_key": {
+    "cache_token": "c5f84f48b2975e0f",
+    "digest": "c5f84f48b2975e0f4c117c8a1ffcbe9f2cb90b45a424b34eb400459afe095633",
+    "fields": {
+      "bridge_vintage_id": "",
+      "conflict_fuel_state": "",
+      "current_fed_policy_state": "published",
+      "custom_ev_levers": [],
+      "engine": "ensemble",
+      "eruc_levers": [],
+      "heavy_bev_transition": false,
+      "long_run_shape_vintage_id": "",
+      "long_run_transition_schedule_id": "",
+      "macro_scenario_id": "",
+      "official_comparator_overlay": false,
+      "official_comparator_vintage_id": "MBU26",
+      "official_fed_policy_state": "published",
+      "ped_bridge_mode": "",
+      "ped_retention_sensitivity": false,
+      "uptake_basis": "MoT VFM base"
+    },
+    "serialize": "{\"bridge_vintage_id\":\"\",\"conflict_fuel_state\":\"\",\"current_fed_policy_state\":\"published\",\"custom_ev_levers\":[],\"engine\":\"ensemble\",\"eruc_levers\":[],\"heavy_bev_transition\":false,\"long_run_shape_vintage_id\":\"\",\"long_run_transition_schedule_id\":\"\",\"macro_scenario_id\":\"\",\"official_comparator_overlay\":false,\"official_comparator_vintage_id\":\"MBU26\",\"official_fed_policy_state\":\"published\",\"ped_bridge_mode\":\"\",\"ped_retention_sensitivity\":false,\"uptake_basis\":\"MoT VFM base\"}"
+  },
+  "environment": {
+    "numpy": "2.4.6",
+    "os": "Windows-11-10.0.26200-SP0",
+    "pandas": "3.0.3",
+    "python": "3.13.5"
+  },
+  "q1_2026_governance": {
+    "actuals_refresh_2026q1_files": {
+      "canonical_engineered_history.csv": "07dec92f7e2cbc60a5e1ee98c2d3aaa820d591df40aae59e52335e5833e2ac3a",
+      "canonical_raw_actuals.csv": "5ec6fc2cfefc871cb9593fd066f78d0c05cf6157562aa85c9c9284c38e2817eb",
+      "extracted_q1_raw_rows.csv": "5ec6fc2cfefc871cb9593fd066f78d0c05cf6157562aa85c9c9284c38e2817eb",
+      "feature_parity.csv": "a3853fe31e832c5758fdf9818f7a187f1957306bd3c512acb6fda2d5228998c8",
+      "front_end_impact.csv": "004d03529363bce8fa323195b808129265bcacf2dd67cb35844fce4d8553c88e",
+      "heavy_lead_replay_diagnostic.csv": "d1103d4c0105ef4e8c6b3a866be11e4edca43dedc1a44bc9344f726d2c478d51",
+      "heavy_lead_vintage_audit.csv": "00293a2e33443a598e7c5d60920786e7b1245a683d5bab7b41efcc58d9820e60",
+      "history_before_after.csv": "4aa38b123ba23ac8384c448d536a3a79e59a1bba1e5a49d1f83091ce2c2e2a85",
+      "history_cross_check.csv": "54fd73bdd9b181d16ec7ba0d707e6d159bfb06709729e575c6a0bcb2dda49726",
+      "identity_checks.csv": "397cc8c84d28030761d5fef377756a0fd740e8a4e301891bffaf9cddb38fa956",
+      "implementation_report.md": "352d5ef05f3aafa0be2904fff7d59421f162de268c9f074d81c11cd8403701ce",
+      "light_heavy_refit_comparison.csv": "b0f77f3bd249e9ea12082bfe8af5eec42ad4764932672387aa2c9bb8b5011c1d",
+      "light_heavy_refit_fy_forecast_deltas.csv": "90ef72e694f61296fb88f86a155c5995aa78d92a529d1a663672e0bac9cf8699",
+      "observation_classification.csv": "cd2c8493f118fe0f8cab3163ada3788df23f32a12a757cb7c2f2e0018cd7a3b4",
+      "ped_bridge_sensitivity.csv": "8d6a45de8f722ba2ada87b2bdbd98d52486a8678f109deb4a93916d4486c2c0a",
+      "ped_governance_candidates.csv": "127541f7a694731a23cd77fa8f978cdb48d825527b2e460662c98a6f794c0615",
+      "pre_refresh_quarterly_baseline.csv": "a9d29ae1576e9bf00f69ee5f9c922c271b5b5f02657da6b1c06d44a2e9ca1271",
+      "pre_refresh_quarterly_baseline_manifest.json": "c402bb8ad8e8f3906c17c9dbef7b67ec06d481a59ae5aad69c9a89e2da2108b7",
+      "promoted_state_invariance.csv": "6486f99353bc11ef41fd5f6d18ffe400b7033edb382433740e6882f2b594321d",
+      "q1_reconciliation.csv": "9c9fe2c8537c6fe1fe6e9be65a05730eec67a378855f861b9d0656c48f527fa3",
+      "refit_h1_backtest_evidence.csv": "0cdff30a86402c0aa49e957c56799eff106711048a303ac209b40d80e999ed2f",
+      "replay_impact_fy.csv": "d66b261aa60022554f2994e2d93cfcf2af722e768bf29914d8daf67bb684486d",
+      "replay_predictions_quarterly.csv": "34d4ddf6309621538a9501e609772c36d2453d6d2e510dadae38d68b348a4aaa",
+      "run_manifest.json": "df13ab3f320efb62d2d086e719b3730671137703c4bcdd49c515bfcf2cb26de9",
+      "runtime_pack_diff.csv": "98b7d3592639496645169024d5d49d9b4f27e816bed1c5a957f196fb86a22ecf",
+      "runtime_pack_seed_patch_audit.csv": "3b1201e9e7037480f85b7c52661193a1452a0c8fd508387b96be77e2e3312547",
+      "scenario_replay_lineage.csv": "f4e65ba8f4df82c8df5db318917edc3a569ec1d13f7ffd596d69a78c5a461106",
+      "source_lineage.csv": "8c9421856eda3a0451ef2525eb7d5ccb9e5757809d2ffa9c7245b55bbff5f0c2",
+      "source_workbook_manifest.json": "1588af6a89a19831492908065b91bac7f64b4e6fe6f65f1601b2a5c1059796be",
+      "validation_report.md": "2fecf0361ef24c10c866c6e90bf0f9f99fc234e668fcfc18bc07d50b5fdf233e",
+      "workbook_formula_inventory.csv": "870fc4d7f65c0dee6a1314315ec7725a66100c6ea819f45df388c872ddea123c",
+      "workbook_inventory.json": "3b9d3c663b635344b6b70f8d158b8608631604171b75e37b11a453963b389521",
+      "workbook_schema.csv": "1639bd6809020d42efbe08a300f348cfecdf12acce8e448696cdbea4c6c822ac"
+    },
+    "horizon_boundaries": {
+      "current_display_end_fy": 2050,
+      "econometric_cutoff_fy": 2030,
+      "note": "Current is displayed to FY2050: econometric through FY2030, then the governed post-model layer. The two segments are separately labelled and the FY2030 point is shared by both.",
+      "official_comparator_end_fy": 2055,
+      "post_model_end_fy": 2050,
+      "post_model_start_fy": 2031
+    },
+    "official_vintages": {
+      "available": {
+        "BEFU26": {
+          "display_name": "BEFU26 official",
+          "manifest_sha256": "93406dc1c609b8792796b5ca6f2ba195eea8d362a90e8ba645c10eece9d9fe20",
+          "release_round": "BEFU26",
+          "scenario_name": "befu26_official",
+          "source_horizon_fy": 2055,
+          "source_pack_path": "data/revenue_model_source_pack/official_vintages/befu26",
+          "status": "active_official_vintage",
+          "trace_name": "BEFU26 official",
+          "workbook_sha256": "7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff"
+        },
+        "MBU26": {
+          "display_name": "MBU26 official",
+          "manifest_sha256": "2c5fb4fec1431ed92de1b3971bacd559e091d58dab08bce60ea53e30b24b8c15",
+          "release_round": "MBU26",
+          "scenario_name": "mbu26_official",
+          "source_horizon_fy": 2055,
+          "source_pack_path": "data/revenue_model_source_pack/mbu26_annual_spine",
+          "status": "superseded_official_vintage_available_for_comparison",
+          "trace_name": "MBU26 official",
+          "workbook_sha256": "9aaff21f72c0a10cfa972a29d3c4f716495c79cbd72fc28e8008a65558454e12"
+        }
+      },
+      "bridge_assumption_vintage_id": "BEFU26",
+      "default_official_comparator_trace": "BEFU26 official",
+      "fleet_composition_source_id": "VFM202405",
+      "long_run_anchor_fy": 2030,
+      "long_run_shape_method_id": "anchored_structural_shape_transition_v1",
+      "long_run_shape_policy": "The long-run shape vintage supplies an FY2031-FY2050 activity GROWTH SHAPE only. No official level, rate or fixed line is taken from it, and the FY2030 Current anchor is unchanged under every schedule.",
+      "long_run_shape_vintage_id": "BEFU26",
+      "long_run_shape_vintage_sha256": "7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff",
+      "long_run_transition_end_fy": 2045,
+      "long_run_transition_schedule_id": "balanced_structural",
+      "official_comparator_policy": "Published official vintages are immutable by default. Current policy controls alter Current forecasts only; no official vintage receives a Current policy overlay by default.",
+      "official_comparator_vintage_id": "BEFU26",
+      "registry": "data/revenue_model_source_pack/official_vintage_registry.json"
+    },
+    "pack_status": "explicitly_promoted_current_outlook",
+    "period_rule": {
+      "current_light_ruc_annual_cutoff_fy": 2030,
+      "current_light_ruc_quarterly_cutoff": "2030Q4",
+      "first_forecast_quarter": "2026Q1",
+      "fy2026_nowcast": "FY2026 mixes accepted actuals and forecasts per stream (PED: actuals through 2025Q4, forecasts from 2026Q1; LIGHT_RUC: actuals through 2026Q1, forecasts from 2026Q2; HEAVY_RUC: actuals through 2026Q1, forecasts from 2026Q2)",
+      "horizon_contract_audit": "data/current_revenue_outlook/horizon_contract_audit.csv",
+      "horizon_scope_policy": "Three horizon contracts. (1) The ECONOMETRIC Current segment - including decision-facing Light RUC and every total that depends on it - runs to H20/FY2030. (2) Decision-facing Current continues to FY2050 as the separately labelled post_model_extrapolation layer, anchored on the FY2030 econometric level. (3) Official comparators publish over their own source horizons. Raw model and replay evidence keep their full source horizon as non-decision-facing audit.",
+      "input_history_vintage": "2026Q1",
+      "last_complete_actual_fy": 2025,
+      "model_training_cutoff": "2025Q4",
+      "official_comparator_cutoff_by_vintage": {
+        "BEFU26": 2055,
+        "MBU26": 2055
+      },
+      "official_comparator_cutoff_fy": 2055,
+      "raw_audit_source_horizon": "2050Q4 (H100)",
+      "rule": "Actual line ends FY2025; FY2026 actual-to-date rows are nowcast inputs only and are not plotted as actuals. The ECONOMETRIC segment stops at FY2030, the last governed common non-extrapolated horizon; Current continues to FY2050 as the separately labelled post-model layer.",
+      "runtime_cutoff_fy": 2030,
+      "stream_vintages": {
+        "HEAVY_RUC": {
+          "first_forecast_quarter": "2026Q2",
+          "latest_accepted_exact_actual": "2026Q1",
+          "observation_status": "accepted_exact_actual_through_2026Q1",
+          "provisional_seed": ""
+        },
+        "LIGHT_RUC": {
+          "first_forecast_quarter": "2026Q2",
+          "latest_accepted_exact_actual": "2026Q1",
+          "observation_status": "accepted_exact_actual_through_2026Q1",
+          "provisional_seed": ""
+        },
+        "PED": {
+          "first_forecast_quarter": "2026Q1",
+          "latest_accepted_exact_actual": "2025Q4",
+          "observation_status": "accepted_exact_actual_through_2025Q4",
+          "provisional_seed": "provisional_annual_bridge seed available for 2026Q1 (method mbu26_residual_core_ped_share; ped_mode provisional_replay_only); not an observed actual and excluded from estimation"
+        }
+      }
+    },
+    "promoted_by": "repo_source_runtime_rebuild",
+    "promotion_time": "2026-07-27T03:59:12.371742+00:00",
+    "runtime_pack_type": "official_vintage_actual_current_finalist_official_comparator",
+    "scenario_roles": [
+      {
+        "forecast_end_period": "2050Q4",
+        "forecast_horizon_quarters": 100,
+        "forecast_start_period": "2026Q1",
+        "forecast_status": "numeric_forecast_available",
+        "is_test_fixture": false,
+        "run_id": "current_revenue_outlook_current_basecase",
+        "scenario_display_name": "current_basecase",
+        "scenario_name": "current_basecase",
+        "scenario_role": "basecase",
+        "scenario_role_source": "explicit",
+        "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_basecase _2_ - Copy.xlsx",
+        "workbook_sha256": "d0644d353ee5a073602186cf7ac5c16e707d5350e16fd037b73a65528067cc6a"
+      },
+      {
+        "forecast_end_period": "2050Q4",
+        "forecast_horizon_quarters": 100,
+        "forecast_start_period": "2026Q1",
+        "forecast_status": "numeric_forecast_available",
+        "is_test_fixture": false,
+        "run_id": "current_revenue_outlook_current_comparison_1",
+        "scenario_display_name": "current_comparison_1",
+        "scenario_name": "current_comparison_1",
+        "scenario_role": "comparison",
+        "scenario_role_source": "explicit",
+        "workbook_filename": "NLTF_forecast_input_template_to_2050Q4_high_population _2_ - Copy.xlsx",
+        "workbook_sha256": "6213ce565cf1f4a058a3ea9f1af4d5476a8b0423a4d8747905c3cba128380ce1"
+      }
+    ],
+    "validation_status": "runtime_rebuilt"
+  },
+  "replay_cache": {
+    "ar1": {
+      "bridge_vintage_id": "BEFU26",
+      "frame_count": 35,
+      "row_count": 90882,
+      "source_digest": "df14ab6f41773adc67a6d80f44ad2ef440cbde70fa02b8a32bf2d9bfe5816e3d",
+      "source_main_sha": "8e563675d23e02e8682027f1e53ff9510daf726a"
+    },
+    "ensemble": {
+      "bridge_vintage_id": "BEFU26",
+      "frame_count": 35,
+      "row_count": 93782,
+      "source_digest": "dcca08e832bc030219ca5d4c1ea833d7263c41917760fc6475318ecf9926a724",
+      "source_main_sha": "8e563675d23e02e8682027f1e53ff9510daf726a"
+    }
+  },
+  "starting_main_sha": "48a499bdfb6a4d85888b3f3c27af970814048e10",
+  "starting_main_subject": "Materialize Revenue Outlook replays: cold page 91s -> 46s, warm navigation 0.12s (#16)",
+  "uncertainty_pack": {
+    "band_rows": 1000,
+    "continuation_rule": "plateau",
+    "correlation_n_aligned": 79,
+    "correlation_shrinkage": 0.0,
+    "draws": 10000,
+    "formula_tolerance": 1e-06,
+    "fy_range": [
+      2026,
+      2050
+    ],
+    "generator": "numpy.random.default_rng(seed).multivariate_normal(cholesky) + scipy.stats.norm.cdf",
+    "marginal_method": "monotone piecewise-linear quantile map of the pooled empirical June-year sample",
+    "rho_LIGHT_RUC_HEAVY_RUC": 0.471981,
+    "rho_PED_HEAVY_RUC": 0.129869,
+    "rho_PED_LIGHT_RUC": 0.115385,
+    "scenario_key_digest": "b5ce7ab7a3ef17577e7eca43b439acce5b8807a29f55b5c09e8a668b956237df",
+    "seed": 20260801,
+    "series_count": 40
+  },
+  "working_tree_clean": true
+}

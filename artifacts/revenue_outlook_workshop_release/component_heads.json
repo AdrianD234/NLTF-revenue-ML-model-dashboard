@@ -1,0 +1,34 @@
+{
+  "starting_main": {
+    "sha": "48a499bdfb6a4d85888b3f3c27af970814048e10",
+    "subject": "Materialize Revenue Outlook replays: cold page 91s -> 46s, warm navigation 0.12s (#16)",
+    "verified": "origin/main resolved to this exact commit at integration time; no later descendant existed"
+  },
+  "components": {
+    "B": {
+      "pr": 17,
+      "branch": "fix/revenue-outlook-series-quarterly-coverage",
+      "approved_head": "ace8297dfbc08a1657a09ec1d037aa8718c46264",
+      "observed_branch_tip": "ace8297dfbc08a1657a09ec1d037aa8718c46264",
+      "matches_approved": true,
+      "title": "Official series and quarterly coverage"
+    },
+    "C": {
+      "pr": 19,
+      "branch": "performance/revenue-outlook-policy-runtime",
+      "approved_head": "45a97428d1d35c7d2d39f4dd9111994f55b26c16",
+      "observed_branch_tip": "45a97428d1d35c7d2d39f4dd9111994f55b26c16",
+      "matches_approved": true,
+      "title": "Policy runtime and policy-aware uncertainty"
+    },
+    "A": {
+      "pr": 18,
+      "branch": "workshop/revenue-outlook-ui-slim-2050",
+      "approved_head": "f5b8493d1b7ea8d05ffb78b2891428554a284f47",
+      "observed_branch_tip": "f5b8493d1b7ea8d05ffb78b2891428554a284f47",
+      "matches_approved": true,
+      "title": "Workshop UI simplification"
+    }
+  },
+  "note": "Every branch tip equalled its approved SHA, so no substitution question arose. The merges name the exact commits, not the moving branch refs."
+}

@@ -66,6 +66,7 @@ __all__ = [
     "filter_official_vintage_rows",
     "load_policy_runtime",
     "policy_audit_rows",
+    "policy_scenario_audit_rows",
     "policy_calculation_code_modules",
     "normalise_policy_state",
     "policy_chart_rows",
@@ -122,6 +123,13 @@ FRAME_NAMES = (
     "stack_components",
     "bridge_components",
     "policy_audit",
+    # The combined Treasury-macro and conflict fuel-price audit the overlay
+    # chain emits alongside the rows. It is policy-dependent - the conflict
+    # append runs under the selected policy - so serving the rows from a
+    # materialised state while rebuilding this frame live would either cost
+    # the conflict append back or describe the rows with an audit computed
+    # under a different policy. Materialised for the same reason the rows are.
+    "scenario_audit",
     # The MoT VFM Fast/Slow envelope is the same overlay chain run under two
     # fixed composition presets, and it inherits the live policy state, so a
     # policy switch pays for it twice more. Profiling put it at roughly half
@@ -833,6 +841,21 @@ def policy_audit_rows(
     resolution = resolve_policy_state(runtime, key)
     _require(resolution)
     return runtime.frame(resolution.state_id, "policy_audit")
+
+
+def policy_scenario_audit_rows(
+    runtime: PolicyRuntime,
+    key: RevenueScenarioComputationKey | tuple[Any, ...] | None,
+) -> pd.DataFrame:
+    """The Treasury-macro and conflict fuel-price audit for this state.
+
+    Served from the same materialised state as the rows it describes, so the
+    conflict audit a reader opens always belongs to the policy the chart above
+    it was drawn under.
+    """
+    resolution = resolve_policy_state(runtime, key)
+    _require(resolution)
+    return runtime.frame(resolution.state_id, "scenario_audit")
 
 
 def policy_vfm_scenario_rows(

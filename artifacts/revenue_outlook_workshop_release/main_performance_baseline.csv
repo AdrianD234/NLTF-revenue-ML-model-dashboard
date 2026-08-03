@@ -1,0 +1,13 @@
+label,metric,seconds,note
+main_48a499b,cold_app_first_paint,2.3102,fresh server; Executive Summary first paint
+main_48a499b,cold_revenue_outlook_first_plot,47.0632,fresh server; first Revenue Outlook plot carrying y values
+main_48a499b,warm_navigation_p95,2.5388,p95 of 5; waits for the Streamlit rerun to clear AND a plot to carry values
+main_48a499b,warm_navigation_median,2.5363,n=5
+main_48a499b,policy_switch,41.3852,published <- delayed_6m; plotted values confirmed changed
+main_48a499b,policy_switch_p95,41.3852,p95 of the one switch that completed
+main_48a499b,policy_switch_median,41.3852,n=1
+main_48a499b,policy_switch_no_uplift,,"DID NOT COMPLETE: 180s wait exceeded because the render raised. ValueError: Aligned chart/detail formula mismatch for current_basecase, FY2031, net_mvr_revenue: chart=417.1893944133222, rebuilt=475.330338182 (app.py:2389, cached_aligned_scenario_detail_frames). This is the defect component C's rate_paths scoping fixes."
+main_48a499b,grain_switch,,"not measured on main: the Streamlit radio input is not visible to a role-based click. Measured post-integration via the label."
+main_48a499b,expand_collapse,,control does not exist on main; introduced by component A
+main_48a499b,console_errors_page_load,2,"pre-existing on main: 404 on a download-button source. Recorded so it is not attributed to this integration."
+main_48a499b,console_errors_interaction_run,0,no console errors during the interaction sequence

@@ -1,0 +1,36 @@
+selector,value,display_label,detail
+series,gross_fed_revenue,Gross FED revenue,Actual|BEFU26 official|Current finalist Base case|Current finalist High population/comparison|MBU26 official
+series,gross_ped_revenue,PED revenue,Actual|BEFU26 official|Current finalist Base case|Current finalist High population/comparison|MBU26 official
+series,heavy_ruc_net_km,Heavy RUC net km,Actual|BEFU26 official|Current finalist Base case|Current finalist High population/comparison|MBU26 official
+series,heavy_ruc_net_revenue,Heavy RUC revenue,Actual|BEFU26 official|Current finalist Base case|Current finalist High population/comparison|MBU26 official
+series,light_bev_ruc_net_km,Light BEV RUC net km,Actual|BEFU26 official|Current finalist Base case|Current finalist High population/comparison|MBU26 official
+series,light_bev_ruc_net_revenue,Light BEV RUC net revenue,Actual|BEFU26 official|Current finalist Base case|Current finalist High population/comparison|MBU26 official
+series,light_ruc_net_km,Light RUC net km,Actual|BEFU26 official|Current finalist Base case|Current finalist High population/comparison|MBU26 official
+series,light_ruc_net_revenue,Light RUC revenue,Actual|BEFU26 official|Current finalist Base case|Current finalist High population/comparison|MBU26 official
+series,net_fed_revenue,Net FED revenue,Actual|BEFU26 official|Current finalist Base case|Current finalist High population/comparison|MBU26 official
+series,net_mvr_revenue,Net MVR revenue,Actual|BEFU26 official|Current finalist Base case|Current finalist High population/comparison|MBU26 official
+series,ped_vkt_per_capita,PED VKT per capita,Actual|BEFU26 official|Current finalist Base case|Current finalist comparison behavioural path|MBU26 official
+series,ped_volume,PED volume,Actual|BEFU26 official|Current finalist Base case|Current finalist High population/comparison|MBU26 official
+series,phev_ruc_net_km,PHEV RUC net km,Actual|BEFU26 official|Current finalist Base case|Current finalist High population/comparison|MBU26 official
+series,phev_ruc_net_revenue,PHEV RUC net revenue,Actual|BEFU26 official|Current finalist Base case|Current finalist High population/comparison|MBU26 official
+series,total_fed_ruc_net_revenue,Total RUC+PED revenue,Actual|BEFU26 official|Current finalist Base case|Current finalist High population/comparison|MBU26 official
+series,total_nltf_net_revenue,Total NLTF revenue,Actual|BEFU26 official|Current finalist Base case|Current finalist High population/comparison|MBU26 official
+series,total_ruc_net_revenue,Total RUC all classes,Actual|BEFU26 official|Current finalist Base case|Current finalist High population/comparison|MBU26 official
+trace,Actual,Actual,
+trace,BEFU26 official,BEFU26 official,
+trace,Current finalist Base case,Current finalist Base case,
+trace,Current finalist High population/comparison,Current finalist High population/comparison,
+trace,Current finalist comparison behavioural path,Current finalist comparison behavioural path,
+trace,MBU26 official,MBU26 official,
+fed_path,,,
+fed_path,BEFU26,BEFU26,
+fed_path,Current planned path,Current planned path,
+fed_path,MBU26,MBU26,
+time_grain,june_year,june_year,
+time_grain,quarterly,quarterly,
+scenario,actual,actual,
+scenario,befu26_official,befu26_official,
+scenario,current_basecase,current_basecase,
+scenario,current_comparison_1,current_comparison_1,
+scenario,historical_actual,historical_actual,
+scenario,mbu26_official,mbu26_official,

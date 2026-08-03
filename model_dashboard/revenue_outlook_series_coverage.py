@@ -69,6 +69,13 @@ from .revenue_outlook import (
     _runtime_chart_columns,
     _runtime_chart_record,
 )
+# The single configured display horizon. Imported rather than restated so the
+# page filter and the quarterly pack cannot be moved apart. The presentation
+# policy imports only pandas, so this adds no Streamlit dependency here.
+from .revenue_outlook_presentation_policy import (
+    REVENUE_OUTLOOK_DISPLAY_END_FY,
+    terminal_display_quarter,
+)
 from .revenue_source_pack import REVENUE_LAST_COMPLETE_ACTUAL_FY
 from .unit_contract import display_scale_for
 
@@ -122,8 +129,16 @@ BUILDER_VERSION = "1"
 
 # The decision-facing display horizon. Official annual sources run to FY2055;
 # the dashboard stops at FY2050 and no FY2051+ display row may be generated.
-DISPLAY_HORIZON_LAST_FY = 2050
-DISPLAY_HORIZON_LAST_QUARTER = f"{DISPLAY_HORIZON_LAST_FY}Q2"
+#
+# The number is CONFIGURED once, in the presentation policy, and read here.
+# It used to be written out again as a literal, which meant the page and the
+# quarterly pack each carried their own copy of the horizon and could be moved
+# apart by a one-line edit. There is now a single value: change
+# REVENUE_OUTLOOK_DISPLAY_END_FY and both the June-year page filter and this
+# module's quarterly cut move together. The terminal quarter is likewise
+# derived from the June-year convention rather than restated.
+DISPLAY_HORIZON_LAST_FY = REVENUE_OUTLOOK_DISPLAY_END_FY
+DISPLAY_HORIZON_LAST_QUARTER = terminal_display_quarter()
 
 QUARTERLY_DISPLAY_PACK_DIR = Path("data") / "revenue_outlook_quarterly_display"
 _REBUILD_COMMAND = "python scripts/build_revenue_outlook_quarterly_display_pack.py"
@@ -581,6 +596,13 @@ _EXTRA_LABEL_ALIASES: dict[str, str] = {
     "Light petrol VKT per capita": "ped_vkt_per_capita",
     "light_petrol_vkt_per_capita": "ped_vkt_per_capita",
     "PED VKT per capita": "ped_vkt_per_capita",
+    # The RUC activity series are offered under two labels apiece. "... net km"
+    # is the pack's own series_label; "... volume" is the shorter name the
+    # Revenue Outlook stream selector puts in front of a reader. Both name the
+    # same governed series, so both must resolve - a selectable label that
+    # raises here would leave that series with no quarterly contract at all.
+    "Light RUC volume": "light_ruc_net_km",
+    "Heavy RUC volume": "heavy_ruc_net_km",
 }
 
 
@@ -1150,30 +1172,90 @@ def _actual_quarter_lookup(
     return lookup
 
 
-@lru_cache(maxsize=4)
-def _planned_ped_rate_by_quarter(root_text: str) -> tuple[tuple[str, float], ...]:
-    """The governed planned PED $/L, by calendar quarter, as a stable tuple.
+# The three governed 12c policy states, mapped onto the columns
+# ``rate_paths.ped_quarterly_rate_schedules`` already publishes. The schedule
+# is NOT duplicated here - this is a column selection over the one governed
+# source, so a change to the timetable moves the quarterly display with it.
+QUARTERLY_RATE_POLICY_COLUMNS: dict[str, str] = {
+    "published": "planned",
+    "delayed_6m": "delayed_6m",
+    "off": "no_uplift",
+}
+# What the display falls back to when a caller names no policy state. The page
+# always passes one; this keeps the offline pack build and any direct API
+# caller on the published timetable rather than on whatever was last selected.
+DEFAULT_QUARTERLY_RATE_POLICY_STATE = "published"
+
+
+def normalise_quarterly_rate_policy_state(value: Any) -> str:
+    """Fold a policy-state spelling onto a governed rate-schedule column.
+
+    Accepts the vocabulary the page and the policy runtime already use. An
+    unknown state raises rather than silently taking the published timetable:
+    showing a step in the wrong quarter is the failure this argument exists to
+    prevent, so it must not be reachable by a typo.
+    """
+    text = "" if value is None else str(value).strip().casefold()
+    if not text:
+        return DEFAULT_QUARTERLY_RATE_POLICY_STATE
+    aliases = {
+        "published": "published",
+        "original": "published",
+        "planned": "published",
+        "published_timing": "published",
+        "delayed_6m": "delayed_6m",
+        "delay_6m": "delayed_6m",
+        "shifted_6m": "delayed_6m",
+        "deferred": "delayed_6m",
+        "off": "off",
+        "no_uplift": "off",
+        "none": "off",
+    }
+    if text not in aliases:
+        raise SeriesCoverageError(
+            f"{value!r} is not a governed 12c policy state; expected one of "
+            f"{sorted(set(aliases))}"
+        )
+    return aliases[text]
+
+
+@lru_cache(maxsize=8)
+def _ped_rate_by_quarter(root_text: str, policy_state: str) -> tuple[tuple[str, float], ...]:
+    """The governed PED $/L for one policy state, by calendar quarter.
 
     Cached because a Denton solve asks for it once per (series, trace) and the
-    schedule is a pure function of a committed CSV.
+    schedule is a pure function of a committed CSV. The policy state is part
+    of the cache key, so the published and delayed timetables cannot share an
+    entry - which is exactly how a delayed step would end up drawn in the
+    published quarter.
     """
     from .rate_paths import ped_quarterly_rate_schedules
 
     schedule = ped_quarterly_rate_schedules(Path(root_text))
-    planned = pd.to_numeric(schedule["planned"], errors="coerce").dropna()
-    return tuple((str(period), float(value)) for period, value in planned.items())
+    column = QUARTERLY_RATE_POLICY_COLUMNS[policy_state]
+    rates = pd.to_numeric(schedule[column], errors="coerce").dropna()
+    return tuple((str(period), float(value)) for period, value in rates.items())
 
 
-def _rate_indicator_factor(quarters: Sequence[str], repo_root: Path | str | None) -> np.ndarray:
+def _rate_indicator_factor(
+    quarters: Sequence[str],
+    repo_root: Path | str | None,
+    policy_state: str = DEFAULT_QUARTERLY_RATE_POLICY_STATE,
+) -> np.ndarray:
     """Per-quarter PED rate for the indicator, carried flat past the schedule.
 
     The schedule ends at 2031Q2 and the planned path is flat from its last
     step, so carrying the final rate forward is exact rather than an
     assumption. Quarters before the schedule starts take its first rate, which
     only affects pre-2013 history where no rate change is in play.
+
+    ``policy_state`` selects which governed column of the schedule is read, so
+    the 12c step lands in the quarter that policy actually moves it to: the
+    published quarter under ``published``, the deferred quarter under
+    ``delayed_6m``, and nowhere at all under ``off``.
     """
     root = str(Path(repo_root) if repo_root is not None else _repo_root())
-    schedule = _planned_ped_rate_by_quarter(root)
+    schedule = _ped_rate_by_quarter(root, normalise_quarterly_rate_policy_state(policy_state))
     if not schedule:
         return np.ones(len(quarters), dtype=float)
     # Step function: every quarter takes the last scheduled rate at or before
@@ -1254,6 +1336,7 @@ def derive_quarterly_rows(
     chart_rows: pd.DataFrame | None = None,
     apply_display_horizon: bool = True,
     repo_root: Path | str | None = None,
+    policy_state: str = DEFAULT_QUARTERLY_RATE_POLICY_STATE,
 ) -> pd.DataFrame:
     """The governed quarterly builder: annual display rows in, quarters out.
 
@@ -1262,6 +1345,13 @@ def derive_quarterly_rows(
     observation are held at the actual value and withheld from the output (the
     Actual trace already draws them); the remaining quarters absorb the whole
     annual benchmark, so the year still closes exactly.
+
+    ``policy_state`` selects the governed FED rate timetable used as the
+    within-year shape for the rate-priced series. It must match the policy the
+    annual benchmarks were computed under: the benchmark fixes the year's
+    total, and the schedule decides which quarter the step lands in. Passing
+    the published schedule with delayed annual values would still reconcile,
+    and would still draw the step in the wrong quarter.
 
     Pure: it reads ``annual_rows`` and ``chart_rows`` and touches neither.
     """
@@ -1296,6 +1386,7 @@ def derive_quarterly_rows(
                 contract=_CONTRACT_BY_SERIES[series_id],
                 chart_rows=chart_rows,
                 repo_root=repo_root,
+                policy_state=policy_state,
             )
         )
     if not output:
@@ -1315,6 +1406,7 @@ def _derive_one_trace(
     contract: QuarterlyDisplayContract,
     chart_rows: pd.DataFrame | None,
     repo_root: Path | str | None = None,
+    policy_state: str = DEFAULT_QUARTERLY_RATE_POLICY_STATE,
 ) -> list[dict[str, Any]]:
     template = group.iloc[0].to_dict()
     trace_name = template.get("trace_name")
@@ -1375,7 +1467,7 @@ def _derive_one_trace(
     # a mid-year rate step lands in its own quarter instead of being smeared
     # back across the two quarters that preceded it.
     if contract.rate_basis == PED_RATE_BASIS:
-        indicator = indicator * _rate_indicator_factor(quarters, repo_root)
+        indicator = indicator * _rate_indicator_factor(quarters, repo_root, policy_state)
     values = _denton_quarterly_split(
         annual_values, indicator, average=contract.average_preserving
     )
@@ -1797,7 +1889,7 @@ def clear_caches() -> None:
     """Drop every memoised view. Tests and the builder call this."""
     _load_pack_cached.cache_clear()
     _source_digest_cached.cache_clear()
-    _planned_ped_rate_by_quarter.cache_clear()
+    _ped_rate_by_quarter.cache_clear()
     _label_lookup.cache_clear()
 
 
@@ -1811,26 +1903,32 @@ def quarterly_rows_for_selected_series(
     annual_rows: pd.DataFrame | None = None,
     chart_rows: pd.DataFrame | None = None,
     repo_root: Path | str | None = None,
+    policy_state: str = DEFAULT_QUARTERLY_RATE_POLICY_STATE,
 ) -> pd.DataFrame:
     """Quarterly display rows for one selected series.
 
     Serves the materialised pack for the traces it carries - a filter, never a
-    live disaggregation - and derives, under the same contract, only the traces
-    the pack cannot know about (runtime policy states, conflict paths and any
-    other lever-dependent annual rows the caller passes in ``annual_rows``).
+    live disaggregation - and derives, under the same contract, the traces the
+    pack cannot know about: runtime policy states, conflict paths, and any
+    other lever-dependent annual rows the caller passes in ``annual_rows``.
+
+    **Precedence.** A trace the caller supplies in ``annual_rows`` is derived
+    from those rows, and the pack fills only what is left. The caller's rows
+    are the FINAL post-policy, post-lever, post-formula annual values actually
+    on screen; the pack's are the offline baseline. Where they disagree - a
+    deferred 12c step, a conflict path, a moved lever - the pack is the stale
+    one, so serving it would draw quarters that do not sum to the annual line
+    beside them. Traces the caller does not supply (Actual, and the official
+    comparators, which no Current-side lever moves) still come from the pack
+    as a pure filter.
+
+    ``policy_state`` selects the governed FED rate timetable used as the
+    within-year shape, and must be the state the supplied annual rows were
+    computed under.
     """
     resolved = canonical_series_id(series_id)
     blocks: list[pd.DataFrame] = []
-    served: set[str] = set()
-    try:
-        pack = load_quarterly_display_pack(repo_root)
-    except QuarterlyDisplayPackError:
-        pack = None
-    if pack is not None:
-        block = pack.rows_for(resolved, trace_names=trace_names)
-        if not block.empty:
-            blocks.append(block)
-            served = set(block["trace_name"].astype(str))
+    derived_traces: set[str] = set()
 
     if annual_rows is not None and not annual_rows.empty:
         pending = annual_rows[
@@ -1842,11 +1940,27 @@ def quarterly_rows_for_selected_series(
                 .astype(str)
                 .isin([str(t) for t in trace_names])
             ]
-        pending = pending[~pending.get("trace_name", pd.Series(dtype=str)).astype(str).isin(served)]
         if not pending.empty:
+            derived_traces = set(pending.get("trace_name", pd.Series(dtype=str)).astype(str))
             blocks.append(
-                derive_quarterly_rows(pending, chart_rows=chart_rows, repo_root=repo_root)
+                derive_quarterly_rows(
+                    pending,
+                    chart_rows=chart_rows,
+                    repo_root=repo_root,
+                    policy_state=policy_state,
+                )
             )
+
+    try:
+        pack = load_quarterly_display_pack(repo_root)
+    except QuarterlyDisplayPackError:
+        pack = None
+    if pack is not None:
+        block = pack.rows_for(resolved, trace_names=trace_names)
+        if not block.empty:
+            block = block[~block["trace_name"].astype(str).isin(derived_traces)]
+            if not block.empty:
+                blocks.append(block)
 
     if not blocks:
         return pd.DataFrame(
