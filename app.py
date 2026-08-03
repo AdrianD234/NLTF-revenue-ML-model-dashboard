@@ -269,7 +269,6 @@ from model_dashboard.revenue_outlook_presentation_policy import (
     period_within_horizon,
     public_uptake_basis_options,
     sanitised_uptake_basis,
-    terminal_display_quarter,
 )
 
 # What a helper will accept: the typed key, or a historic positional tuple from
@@ -1997,8 +1996,19 @@ def cached_policy_runtime(engine: str, source_digest: str):
         return None
 
 
+#: The builder sets this False so it materialises the REFERENCE pipeline.
+#: Without it, a rebuild would answer from the pack it is about to overwrite:
+#: the output would be a copy of the previous build, and the idempotency check
+#: would pass by tautology instead of by determinism. Deleting the frames first
+#: happens to produce the same effect today, but that is an accident of build
+#: order, and a guarantee this important should be stated rather than inferred.
+POLICY_RUNTIME_FAST_PATH_ENABLED = True
+
+
 def _policy_runtime_for_pack(_pack: RevenueOutlookPack):
     """The policy runtime for this pack's engine, or None if unusable."""
+    if not POLICY_RUNTIME_FAST_PATH_ENABLED:
+        return None
     from model_dashboard.revenue_outlook_policy_runtime import policy_runtime_status
 
     engine = _engine_for_pack(_pack)
@@ -2055,6 +2065,7 @@ def _materialised_policy_overlay_rows(
         STATUS_OK,
         policy_audit_rows,
         policy_chart_rows,
+        policy_overlay_audit_rows,
         policy_scenario_audit_rows,
         resolve_policy_state,
     )
@@ -2070,15 +2081,17 @@ def _materialised_policy_overlay_rows(
     if resolve_policy_state(runtime, key).status != STATUS_OK:
         return None
     try:
-        rows = policy_chart_rows(runtime, key)
+        # Unfiltered, because this stands in for the reference overlay chain,
+        # which returns every vintage and lets its callers narrow. Filtering
+        # here would silently drop the non-selected vintage's rows from a
+        # frame every downstream consumer expects to be complete.
+        rows = policy_chart_rows(runtime, key, apply_official_vintage_filter=False)
         policy_audit = policy_audit_rows(runtime, key)
         scenario_audit = policy_scenario_audit_rows(runtime, key)
+        uptake_audit, eruc_audit = policy_overlay_audit_rows(runtime, key)
     except RuntimeError:
         return None
-    empty = pd.DataFrame()
-    # The catalogue pins the uptake basis at its default and both lever
-    # tuples empty, so a resolvable key has nothing for these two to report.
-    return rows, empty, empty, policy_audit, scenario_audit
+    return rows, uptake_audit, eruc_audit, policy_audit, scenario_audit
 
 
 @st.cache_data(show_spinner=False, max_entries=12)

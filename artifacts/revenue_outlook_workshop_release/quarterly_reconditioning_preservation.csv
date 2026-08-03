@@ -1,0 +1,7 @@
+check,observed,required,verdict
+snapshot_marked_non_decision_facing,False,False,pass
+snapshot_marked_production_prohibited,"PROHIBITED. No runtime loader, pack builder or dashboard con",PROHIBITED,pass
+no_production_reader_of_the_snapshot,none,none (model_dashboard/*.py and app.py),pass
+snapshot_hash_pinned:quarterly_rows_pre_reconditioning.parquet,cbaa5717a80a0a63,cbaa5717a80a0a63,pass
+snapshot_hash_pinned:official_annual_rows_pre_reconditioning.parquet,a2c58e2f12939ae6,a2c58e2f12939ae6,pass
+evidence_kept_in_parquet_not_csv,".json, .parquet, .parquet",.parquet for float-exact claims,pass

@@ -7,7 +7,7 @@
     "python": "3.13.5"
   },
   "builder_version": "1",
-  "bytes_on_disk": 9125455,
+  "bytes_on_disk": 9901847,
   "detail_frame_vintage_scope": {
     "overlay": false,
     "vintage_id": "BEFU26"
@@ -29,7 +29,7 @@
   "provenance": {
     "builder_version": "1",
     "code_module_hashes": {
-      "app.py": "f5f3a1a77795ce4261d389dc29eaeaf613804be5b7f547346235dabacfab957c",
+      "app.py": "8ea1c5d345aa2c08a1a1204c7cd1eba8643653f71dfb65a7c7ebedad06ba880c",
       "model_dashboard/__init__.py": "40f18fc5bbc37948a1250097bb55c68711d51d6622248e75efe27cd3580809f8",
       "model_dashboard/completeness_contract.py": "2a5ec576c757b7d4d820a060922dd5c7c7275841dc9734dcb479f9ad49a5c708",
       "model_dashboard/conflict_fuel_paths.py": "cdf9453b4a83ae2230dd4e0d405e96e29350a1b313ce6654d7815c42927c5cce",
@@ -73,7 +73,8 @@
       "model_dashboard/reproducibility_imports.py": "dd2a1000837cc3f96fe557e74e64f0b270b09362225648e1d6aedcfb5a9529ba",
       "model_dashboard/revenue_chart_layers.py": "73abc3584c6a31938a32a7e24cf19e4bbfb1aab6f482bf3683ab4ab427c61c7b",
       "model_dashboard/revenue_outlook.py": "4fb996076c17da7051420e21041aa52cf003a2075e227680c19f0a88d377195e",
-      "model_dashboard/revenue_outlook_policy_runtime.py": "5c2977ebb5216f634554de89bbafa4c8d0615e755ba90fe0b4534da9aec5ce0b",
+      "model_dashboard/revenue_outlook_policy_runtime.py": "80acce60c2198a91ae239bd06793c6c94e282e662b53b1f732661eb22423036f",
+      "model_dashboard/revenue_outlook_presentation_policy.py": "fdf1c8887e03174c3a3eb0519eb019132471d13d4065dee28253fe63c57d4775",
       "model_dashboard/revenue_outlook_replay_cache.py": "6e227558b0478dde66fe00121030e894df3e2273bf9a07aa347bbfd55b9fecfb",
       "model_dashboard/revenue_scenario_key.py": "7db26b08d290d19815adcab6a9715ea4b9aba28346c0c1f219e04e8e5ec60e4b",
       "model_dashboard/revenue_source_pack.py": "61b9fd2b06d4c16add928656b9bd6e5cda9dcb38b0f3d9a0f60fb5c1e2cf8c9c",
@@ -86,7 +87,7 @@
       "model_dashboard/score_basis.py": "db89b502c6b62ea946ebbf27a2fdcabee75f0fef3233663250687b3b99348d99",
       "model_dashboard/series_inventory_contract.py": "60c35dae271750ca184a2f4fb126c066b4358ec66f69e4d30d82bc826ce07435",
       "model_dashboard/treasury_macro_paths.py": "ad65f9a8b83059a67e8ef5b4eea6fb152fcce6660978279d805412739bfe1480",
-      "model_dashboard/ui.py": "e0d67fcc8c125abd5235e17837fcab0a0de55691e1f58309e0449dfb72388adf",
+      "model_dashboard/ui.py": "0a9b5bd38e0f26cef1a999f6e8b2705060f3a7e8980f3145faeeaab6048b04cd",
       "model_dashboard/unit_contract.py": "a49bb2d53ce7223582738c089143ff581da34c8942b415f996817d75c40a549e"
     },
     "engine": "ensemble",
@@ -445,10 +446,10 @@
     "uncertainty_scenario_key_digest": "b5ce7ab7a3ef17577e7eca43b439acce5b8807a29f55b5c09e8a668b956237df",
     "uncertainty_seed": 20260801
   },
-  "row_count": 432732,
+  "row_count": 455925,
   "schema_version": "1",
-  "source_digest": "bdeeaa9aedf504719a0a47f6949e86b926f88699b51a9f02e10ed65736f58621",
-  "source_main_sha": "48a499bdfb6a4d85888b3f3c27af970814048e10",
+  "source_digest": "9875efd26f19e275d9f2efc5e695aeadc9b5b737e222459cfce1b369aabcedb0",
+  "source_main_sha": "8a125e0eeacb116b4bae9b229126c2d6d50a0011",
   "state_count": 9,
   "states": [
     {
@@ -751,6 +752,17 @@
           "rows": 4198,
           "sha256": "be871cc0e93c208d1b46e33bfa649d58af00a8732c74c18fbd02100075eff2af"
         },
+        "eruc_audit": {
+          "columns": [],
+          "columns_name": null,
+          "dtypes": {},
+          "file": "eruc_audit.parquet",
+          "index_column": null,
+          "index_name": null,
+          "object_columns": [],
+          "rows": 0,
+          "sha256": "8b6e33d47f4e1df33f587d9b1d420f756a6c705b8496e0912c223c5d83371df9"
+        },
         "formula_residuals": {
           "columns": [
             "source_path",
@@ -887,6 +899,65 @@
           "object_columns": [],
           "rows": 0,
           "sha256": "8b6e33d47f4e1df33f587d9b1d420f756a6c705b8496e0912c223c5d83371df9"
+        },
+        "scenario_audit": {
+          "columns": [
+            "audit_type",
+            "scenario_name",
+            "scenario_role",
+            "trace_name",
+            "severity",
+            "time_grain",
+            "period",
+            "june_year",
+            "stream",
+            "series_id",
+            "transformation_basis",
+            "factor",
+            "baseline_value",
+            "adjusted_value",
+            "value_delta",
+            "scenario_note",
+            "quarterly_annual_reconciliation_delta",
+            "published_fed_baseline_value",
+            "adjusted_published_fed_value",
+            "fed_policy_delta",
+            "fed_policy",
+            "fed_affected_quarters"
+          ],
+          "columns_name": null,
+          "dtypes": {
+            "adjusted_published_fed_value": "float64",
+            "adjusted_value": "float64",
+            "audit_type": "str",
+            "baseline_value": "float64",
+            "factor": "float64",
+            "fed_affected_quarters": "str",
+            "fed_policy": "str",
+            "fed_policy_delta": "object",
+            "june_year": "int64",
+            "period": "str",
+            "published_fed_baseline_value": "float64",
+            "quarterly_annual_reconciliation_delta": "float64",
+            "scenario_name": "str",
+            "scenario_note": "str",
+            "scenario_role": "str",
+            "series_id": "str",
+            "severity": "str",
+            "stream": "str",
+            "time_grain": "str",
+            "trace_name": "str",
+            "transformation_basis": "str",
+            "value_delta": "float64"
+          },
+          "file": "scenario_audit.parquet",
+          "index_column": null,
+          "index_name": null,
+          "object_columns": [
+            "fed_policy_delta"
+          ],
+          "rows": 2525,
+          "sha256": "0d0f8fbc9afc0b2e911a8b1dbe64990c15636586879e18a65dd945667949434d"
         },
         "stack_components": {
           "columns": [
@@ -1041,6 +1112,47 @@
           ],
           "rows": 25212,
           "sha256": "a61a794b00fe82f499fe483ce130e9795c945a37bee733617df69bb9b608076e"
+        },
+        "uptake_audit": {
+          "columns": [
+            "scenario_name",
+            "june_year",
+            "light_ruc_pool_km",
+            "conventional_share",
+            "bev_share",
+            "phev_share",
+            "light_revenue_delta_vs_pack",
+            "ped_retention",
+            "ped_revenue_delta_vs_pack",
+            "heavy_bev_share",
+            "heavy_revenue_reallocated_to_bev",
+            "share_source",
+            "uptake_basis",
+            "heavy_bev_transition_enabled"
+          ],
+          "columns_name": null,
+          "dtypes": {
+            "bev_share": "float64",
+            "conventional_share": "float64",
+            "heavy_bev_share": "float64",
+            "heavy_bev_transition_enabled": "bool",
+            "heavy_revenue_reallocated_to_bev": "float64",
+            "june_year": "int64",
+            "light_revenue_delta_vs_pack": "float64",
+            "light_ruc_pool_km": "float64",
+            "ped_retention": "float64",
+            "ped_revenue_delta_vs_pack": "float64",
+            "phev_share": "float64",
+            "scenario_name": "str",
+            "share_source": "str",
+            "uptake_basis": "str"
+          },
+          "file": "uptake_audit.parquet",
+          "index_column": null,
+          "index_name": null,
+          "object_columns": [],
+          "rows": 52,
+          "sha256": "2b2e3d5940a39b78a6d93594153eb1433acb477097c99907cff1b7c2e067f6ab"
         },
         "vfm_fast_chart_rows": {
           "columns": [
@@ -1486,7 +1598,7 @@
         }
       },
       "official_fed_policy_state": "published",
-      "row_count": 47852,
+      "row_count": 50429,
       "scenario_key": {
         "bridge_vintage_id": "BEFU26",
         "conflict_fuel_state": "",
@@ -1808,6 +1920,17 @@
           "rows": 4198,
           "sha256": "37642260dbef0a516ebbef5bbab4c8e68f99a29c2a18e0790d8192bb9e15003a"
         },
+        "eruc_audit": {
+          "columns": [],
+          "columns_name": null,
+          "dtypes": {},
+          "file": "eruc_audit.parquet",
+          "index_column": null,
+          "index_name": null,
+          "object_columns": [],
+          "rows": 0,
+          "sha256": "8b6e33d47f4e1df33f587d9b1d420f756a6c705b8496e0912c223c5d83371df9"
+        },
         "formula_residuals": {
           "columns": [
             "source_path",
@@ -1977,6 +2100,65 @@
           "rows": 1,
           "sha256": "91fb152806ce125dd70feb048d37847f2f22e519d1e4ef0b22c0727f2734ef1d"
         },
+        "scenario_audit": {
+          "columns": [
+            "audit_type",
+            "scenario_name",
+            "scenario_role",
+            "trace_name",
+            "severity",
+            "time_grain",
+            "period",
+            "june_year",
+            "stream",
+            "series_id",
+            "transformation_basis",
+            "factor",
+            "baseline_value",
+            "adjusted_value",
+            "value_delta",
+            "scenario_note",
+            "quarterly_annual_reconciliation_delta",
+            "published_fed_baseline_value",
+            "adjusted_published_fed_value",
+            "fed_policy_delta",
+            "fed_policy",
+            "fed_affected_quarters"
+          ],
+          "columns_name": null,
+          "dtypes": {
+            "adjusted_published_fed_value": "float64",
+            "adjusted_value": "float64",
+            "audit_type": "str",
+            "baseline_value": "float64",
+            "factor": "float64",
+            "fed_affected_quarters": "str",
+            "fed_policy": "str",
+            "fed_policy_delta": "object",
+            "june_year": "int64",
+            "period": "str",
+            "published_fed_baseline_value": "float64",
+            "quarterly_annual_reconciliation_delta": "float64",
+            "scenario_name": "str",
+            "scenario_note": "str",
+            "scenario_role": "str",
+            "series_id": "str",
+            "severity": "str",
+            "stream": "str",
+            "time_grain": "str",
+            "trace_name": "str",
+            "transformation_basis": "str",
+            "value_delta": "float64"
+          },
+          "file": "scenario_audit.parquet",
+          "index_column": null,
+          "index_name": null,
+          "object_columns": [
+            "fed_policy_delta"
+          ],
+          "rows": 2525,
+          "sha256": "d4e9ab88a7ee4f7843f4ea4e8de7fed64156bcc1dd55eadd794b17f81fdb69c9"
+        },
         "stack_components": {
           "columns": [
             "source_path",
@@ -2130,6 +2312,47 @@
           ],
           "rows": 25212,
           "sha256": "a61a794b00fe82f499fe483ce130e9795c945a37bee733617df69bb9b608076e"
+        },
+        "uptake_audit": {
+          "columns": [
+            "scenario_name",
+            "june_year",
+            "light_ruc_pool_km",
+            "conventional_share",
+            "bev_share",
+            "phev_share",
+            "light_revenue_delta_vs_pack",
+            "ped_retention",
+            "ped_revenue_delta_vs_pack",
+            "heavy_bev_share",
+            "heavy_revenue_reallocated_to_bev",
+            "share_source",
+            "uptake_basis",
+            "heavy_bev_transition_enabled"
+          ],
+          "columns_name": null,
+          "dtypes": {
+            "bev_share": "float64",
+            "conventional_share": "float64",
+            "heavy_bev_share": "float64",
+            "heavy_bev_transition_enabled": "bool",
+            "heavy_revenue_reallocated_to_bev": "float64",
+            "june_year": "int64",
+            "light_revenue_delta_vs_pack": "float64",
+            "light_ruc_pool_km": "float64",
+            "ped_retention": "float64",
+            "ped_revenue_delta_vs_pack": "float64",
+            "phev_share": "float64",
+            "scenario_name": "str",
+            "share_source": "str",
+            "uptake_basis": "str"
+          },
+          "file": "uptake_audit.parquet",
+          "index_column": null,
+          "index_name": null,
+          "object_columns": [],
+          "rows": 52,
+          "sha256": "2b2e3d5940a39b78a6d93594153eb1433acb477097c99907cff1b7c2e067f6ab"
         },
         "vfm_fast_chart_rows": {
           "columns": [
@@ -2575,7 +2798,7 @@
         }
       },
       "official_fed_policy_state": "delayed_6m",
-      "row_count": 47853,
+      "row_count": 50430,
       "scenario_key": {
         "bridge_vintage_id": "BEFU26",
         "conflict_fuel_state": "",
@@ -2897,6 +3120,17 @@
           "rows": 4198,
           "sha256": "e03beb69b07b750c75dd566047b7bd1eed77dc215898432349d70c382d1893a2"
         },
+        "eruc_audit": {
+          "columns": [],
+          "columns_name": null,
+          "dtypes": {},
+          "file": "eruc_audit.parquet",
+          "index_column": null,
+          "index_name": null,
+          "object_columns": [],
+          "rows": 0,
+          "sha256": "8b6e33d47f4e1df33f587d9b1d420f756a6c705b8496e0912c223c5d83371df9"
+        },
         "formula_residuals": {
           "columns": [
             "source_path",
@@ -3066,6 +3300,65 @@
           "rows": 29,
           "sha256": "16363787a90c0be0b25fa05e492eb5ec42d7e87552593c12dfd5c995efe20aec"
         },
+        "scenario_audit": {
+          "columns": [
+            "audit_type",
+            "scenario_name",
+            "scenario_role",
+            "trace_name",
+            "severity",
+            "time_grain",
+            "period",
+            "june_year",
+            "stream",
+            "series_id",
+            "transformation_basis",
+            "factor",
+            "baseline_value",
+            "adjusted_value",
+            "value_delta",
+            "scenario_note",
+            "quarterly_annual_reconciliation_delta",
+            "published_fed_baseline_value",
+            "adjusted_published_fed_value",
+            "fed_policy_delta",
+            "fed_policy",
+            "fed_affected_quarters"
+          ],
+          "columns_name": null,
+          "dtypes": {
+            "adjusted_published_fed_value": "float64",
+            "adjusted_value": "float64",
+            "audit_type": "str",
+            "baseline_value": "float64",
+            "factor": "float64",
+            "fed_affected_quarters": "str",
+            "fed_policy": "str",
+            "fed_policy_delta": "object",
+            "june_year": "int64",
+            "period": "str",
+            "published_fed_baseline_value": "float64",
+            "quarterly_annual_reconciliation_delta": "float64",
+            "scenario_name": "str",
+            "scenario_note": "str",
+            "scenario_role": "str",
+            "series_id": "str",
+            "severity": "str",
+            "stream": "str",
+            "time_grain": "str",
+            "trace_name": "str",
+            "transformation_basis": "str",
+            "value_delta": "float64"
+          },
+          "file": "scenario_audit.parquet",
+          "index_column": null,
+          "index_name": null,
+          "object_columns": [
+            "fed_policy_delta"
+          ],
+          "rows": 2525,
+          "sha256": "d4e9ab88a7ee4f7843f4ea4e8de7fed64156bcc1dd55eadd794b17f81fdb69c9"
+        },
         "stack_components": {
           "columns": [
             "source_path",
@@ -3219,6 +3512,47 @@
           ],
           "rows": 25212,
           "sha256": "a61a794b00fe82f499fe483ce130e9795c945a37bee733617df69bb9b608076e"
+        },
+        "uptake_audit": {
+          "columns": [
+            "scenario_name",
+            "june_year",
+            "light_ruc_pool_km",
+            "conventional_share",
+            "bev_share",
+            "phev_share",
+            "light_revenue_delta_vs_pack",
+            "ped_retention",
+            "ped_revenue_delta_vs_pack",
+            "heavy_bev_share",
+            "heavy_revenue_reallocated_to_bev",
+            "share_source",
+            "uptake_basis",
+            "heavy_bev_transition_enabled"
+          ],
+          "columns_name": null,
+          "dtypes": {
+            "bev_share": "float64",
+            "conventional_share": "float64",
+            "heavy_bev_share": "float64",
+            "heavy_bev_transition_enabled": "bool",
+            "heavy_revenue_reallocated_to_bev": "float64",
+            "june_year": "int64",
+            "light_revenue_delta_vs_pack": "float64",
+            "light_ruc_pool_km": "float64",
+            "ped_retention": "float64",
+            "ped_revenue_delta_vs_pack": "float64",
+            "phev_share": "float64",
+            "scenario_name": "str",
+            "share_source": "str",
+            "uptake_basis": "str"
+          },
+          "file": "uptake_audit.parquet",
+          "index_column": null,
+          "index_name": null,
+          "object_columns": [],
+          "rows": 52,
+          "sha256": "2b2e3d5940a39b78a6d93594153eb1433acb477097c99907cff1b7c2e067f6ab"
         },
         "vfm_fast_chart_rows": {
           "columns": [
@@ -3664,7 +3998,7 @@
         }
       },
       "official_fed_policy_state": "off",
-      "row_count": 47881,
+      "row_count": 50458,
       "scenario_key": {
         "bridge_vintage_id": "BEFU26",
         "conflict_fuel_state": "",
@@ -3986,6 +4320,17 @@
           "rows": 4198,
           "sha256": "0039ac8cfa45c961698503839990782aaffe9f0f0f042a093976f45f1c0c5c48"
         },
+        "eruc_audit": {
+          "columns": [],
+          "columns_name": null,
+          "dtypes": {},
+          "file": "eruc_audit.parquet",
+          "index_column": null,
+          "index_name": null,
+          "object_columns": [],
+          "rows": 0,
+          "sha256": "8b6e33d47f4e1df33f587d9b1d420f756a6c705b8496e0912c223c5d83371df9"
+        },
         "formula_residuals": {
           "columns": [
             "source_path",
@@ -4159,6 +4504,65 @@
           "rows": 42,
           "sha256": "8a23825f526ae74c3cbc5f379f5ac87bda4b7f1c5dcb1973ad9f69159a270f48"
         },
+        "scenario_audit": {
+          "columns": [
+            "audit_type",
+            "scenario_name",
+            "scenario_role",
+            "trace_name",
+            "severity",
+            "time_grain",
+            "period",
+            "june_year",
+            "stream",
+            "series_id",
+            "transformation_basis",
+            "factor",
+            "baseline_value",
+            "adjusted_value",
+            "value_delta",
+            "scenario_note",
+            "quarterly_annual_reconciliation_delta",
+            "published_fed_baseline_value",
+            "adjusted_published_fed_value",
+            "fed_policy_delta",
+            "fed_policy",
+            "fed_affected_quarters"
+          ],
+          "columns_name": null,
+          "dtypes": {
+            "adjusted_published_fed_value": "float64",
+            "adjusted_value": "float64",
+            "audit_type": "str",
+            "baseline_value": "float64",
+            "factor": "float64",
+            "fed_affected_quarters": "str",
+            "fed_policy": "str",
+            "fed_policy_delta": "object",
+            "june_year": "int64",
+            "period": "str",
+            "published_fed_baseline_value": "float64",
+            "quarterly_annual_reconciliation_delta": "float64",
+            "scenario_name": "str",
+            "scenario_note": "str",
+            "scenario_role": "str",
+            "series_id": "str",
+            "severity": "str",
+            "stream": "str",
+            "time_grain": "str",
+            "trace_name": "str",
+            "transformation_basis": "str",
+            "value_delta": "float64"
+          },
+          "file": "scenario_audit.parquet",
+          "index_column": null,
+          "index_name": null,
+          "object_columns": [
+            "fed_policy_delta"
+          ],
+          "rows": 2525,
+          "sha256": "a5bab7e9551cb2a59791a0567e8d5ac8cfc68e1ebc307f1550811a90f0616565"
+        },
         "stack_components": {
           "columns": [
             "source_path",
@@ -4312,6 +4716,47 @@
           ],
           "rows": 25212,
           "sha256": "1ccabada00b9308ba1c6137522ca3ae5162bef7e19badbe92cb51b499fa5798a"
+        },
+        "uptake_audit": {
+          "columns": [
+            "scenario_name",
+            "june_year",
+            "light_ruc_pool_km",
+            "conventional_share",
+            "bev_share",
+            "phev_share",
+            "light_revenue_delta_vs_pack",
+            "ped_retention",
+            "ped_revenue_delta_vs_pack",
+            "heavy_bev_share",
+            "heavy_revenue_reallocated_to_bev",
+            "share_source",
+            "uptake_basis",
+            "heavy_bev_transition_enabled"
+          ],
+          "columns_name": null,
+          "dtypes": {
+            "bev_share": "float64",
+            "conventional_share": "float64",
+            "heavy_bev_share": "float64",
+            "heavy_bev_transition_enabled": "bool",
+            "heavy_revenue_reallocated_to_bev": "float64",
+            "june_year": "int64",
+            "light_revenue_delta_vs_pack": "float64",
+            "light_ruc_pool_km": "float64",
+            "ped_retention": "float64",
+            "ped_revenue_delta_vs_pack": "float64",
+            "phev_share": "float64",
+            "scenario_name": "str",
+            "share_source": "str",
+            "uptake_basis": "str"
+          },
+          "file": "uptake_audit.parquet",
+          "index_column": null,
+          "index_name": null,
+          "object_columns": [],
+          "rows": 52,
+          "sha256": "2b2e3d5940a39b78a6d93594153eb1433acb477097c99907cff1b7c2e067f6ab"
         },
         "vfm_fast_chart_rows": {
           "columns": [
@@ -4757,7 +5202,7 @@
         }
       },
       "official_fed_policy_state": "published",
-      "row_count": 47894,
+      "row_count": 50471,
       "scenario_key": {
         "bridge_vintage_id": "BEFU26",
         "conflict_fuel_state": "",
@@ -5079,6 +5524,17 @@
           "rows": 4198,
           "sha256": "2650a60522205214e3cd4371ea514542cb62477dba4f56c0b1290abe829b78cb"
         },
+        "eruc_audit": {
+          "columns": [],
+          "columns_name": null,
+          "dtypes": {},
+          "file": "eruc_audit.parquet",
+          "index_column": null,
+          "index_name": null,
+          "object_columns": [],
+          "rows": 0,
+          "sha256": "8b6e33d47f4e1df33f587d9b1d420f756a6c705b8496e0912c223c5d83371df9"
+        },
         "formula_residuals": {
           "columns": [
             "source_path",
@@ -5268,6 +5724,65 @@
           "rows": 43,
           "sha256": "81944cdf8476d8466b872a658a6aff0759d09c857d5837d367456975936398a6"
         },
+        "scenario_audit": {
+          "columns": [
+            "audit_type",
+            "scenario_name",
+            "scenario_role",
+            "trace_name",
+            "severity",
+            "time_grain",
+            "period",
+            "june_year",
+            "stream",
+            "series_id",
+            "transformation_basis",
+            "factor",
+            "baseline_value",
+            "adjusted_value",
+            "value_delta",
+            "scenario_note",
+            "quarterly_annual_reconciliation_delta",
+            "published_fed_baseline_value",
+            "adjusted_published_fed_value",
+            "fed_policy_delta",
+            "fed_policy",
+            "fed_affected_quarters"
+          ],
+          "columns_name": null,
+          "dtypes": {
+            "adjusted_published_fed_value": "float64",
+            "adjusted_value": "float64",
+            "audit_type": "str",
+            "baseline_value": "float64",
+            "factor": "float64",
+            "fed_affected_quarters": "str",
+            "fed_policy": "str",
+            "fed_policy_delta": "object",
+            "june_year": "int64",
+            "period": "str",
+            "published_fed_baseline_value": "float64",
+            "quarterly_annual_reconciliation_delta": "float64",
+            "scenario_name": "str",
+            "scenario_note": "str",
+            "scenario_role": "str",
+            "series_id": "str",
+            "severity": "str",
+            "stream": "str",
+            "time_grain": "str",
+            "trace_name": "str",
+            "transformation_basis": "str",
+            "value_delta": "float64"
+          },
+          "file": "scenario_audit.parquet",
+          "index_column": null,
+          "index_name": null,
+          "object_columns": [
+            "fed_policy_delta"
+          ],
+          "rows": 2525,
+          "sha256": "a5bab7e9551cb2a59791a0567e8d5ac8cfc68e1ebc307f1550811a90f0616565"
+        },
         "stack_components": {
           "columns": [
             "source_path",
@@ -5421,6 +5936,47 @@
           ],
           "rows": 25212,
           "sha256": "1ccabada00b9308ba1c6137522ca3ae5162bef7e19badbe92cb51b499fa5798a"
+        },
+        "uptake_audit": {
+          "columns": [
+            "scenario_name",
+            "june_year",
+            "light_ruc_pool_km",
+            "conventional_share",
+            "bev_share",
+            "phev_share",
+            "light_revenue_delta_vs_pack",
+            "ped_retention",
+            "ped_revenue_delta_vs_pack",
+            "heavy_bev_share",
+            "heavy_revenue_reallocated_to_bev",
+            "share_source",
+            "uptake_basis",
+            "heavy_bev_transition_enabled"
+          ],
+          "columns_name": null,
+          "dtypes": {
+            "bev_share": "float64",
+            "conventional_share": "float64",
+            "heavy_bev_share": "float64",
+            "heavy_bev_transition_enabled": "bool",
+            "heavy_revenue_reallocated_to_bev": "float64",
+            "june_year": "int64",
+            "light_revenue_delta_vs_pack": "float64",
+            "light_ruc_pool_km": "float64",
+            "ped_retention": "float64",
+            "ped_revenue_delta_vs_pack": "float64",
+            "phev_share": "float64",
+            "scenario_name": "str",
+            "share_source": "str",
+            "uptake_basis": "str"
+          },
+          "file": "uptake_audit.parquet",
+          "index_column": null,
+          "index_name": null,
+          "object_columns": [],
+          "rows": 52,
+          "sha256": "2b2e3d5940a39b78a6d93594153eb1433acb477097c99907cff1b7c2e067f6ab"
         },
         "vfm_fast_chart_rows": {
           "columns": [
@@ -5866,7 +6422,7 @@
         }
       },
       "official_fed_policy_state": "delayed_6m",
-      "row_count": 47895,
+      "row_count": 50472,
       "scenario_key": {
         "bridge_vintage_id": "BEFU26",
         "conflict_fuel_state": "",
@@ -6188,6 +6744,17 @@
           "rows": 4198,
           "sha256": "d72b538bfef2ebd3ec27d435b97cd7af034b6163e3c7d854d25cd10dd44618a0"
         },
+        "eruc_audit": {
+          "columns": [],
+          "columns_name": null,
+          "dtypes": {},
+          "file": "eruc_audit.parquet",
+          "index_column": null,
+          "index_name": null,
+          "object_columns": [],
+          "rows": 0,
+          "sha256": "8b6e33d47f4e1df33f587d9b1d420f756a6c705b8496e0912c223c5d83371df9"
+        },
         "formula_residuals": {
           "columns": [
             "source_path",
@@ -6377,6 +6944,65 @@
           "rows": 71,
           "sha256": "dce3d2e2d5f3d307c9c1a65beb0b184e346401e8c3242254bf94b29274d7e67f"
         },
+        "scenario_audit": {
+          "columns": [
+            "audit_type",
+            "scenario_name",
+            "scenario_role",
+            "trace_name",
+            "severity",
+            "time_grain",
+            "period",
+            "june_year",
+            "stream",
+            "series_id",
+            "transformation_basis",
+            "factor",
+            "baseline_value",
+            "adjusted_value",
+            "value_delta",
+            "scenario_note",
+            "quarterly_annual_reconciliation_delta",
+            "published_fed_baseline_value",
+            "adjusted_published_fed_value",
+            "fed_policy_delta",
+            "fed_policy",
+            "fed_affected_quarters"
+          ],
+          "columns_name": null,
+          "dtypes": {
+            "adjusted_published_fed_value": "float64",
+            "adjusted_value": "float64",
+            "audit_type": "str",
+            "baseline_value": "float64",
+            "factor": "float64",
+            "fed_affected_quarters": "str",
+            "fed_policy": "str",
+            "fed_policy_delta": "object",
+            "june_year": "int64",
+            "period": "str",
+            "published_fed_baseline_value": "float64",
+            "quarterly_annual_reconciliation_delta": "float64",
+            "scenario_name": "str",
+            "scenario_note": "str",
+            "scenario_role": "str",
+            "series_id": "str",
+            "severity": "str",
+            "stream": "str",
+            "time_grain": "str",
+            "trace_name": "str",
+            "transformation_basis": "str",
+            "value_delta": "float64"
+          },
+          "file": "scenario_audit.parquet",
+          "index_column": null,
+          "index_name": null,
+          "object_columns": [
+            "fed_policy_delta"
+          ],
+          "rows": 2525,
+          "sha256": "a5bab7e9551cb2a59791a0567e8d5ac8cfc68e1ebc307f1550811a90f0616565"
+        },
         "stack_components": {
           "columns": [
             "source_path",
@@ -6530,6 +7156,47 @@
           ],
           "rows": 25212,
           "sha256": "1ccabada00b9308ba1c6137522ca3ae5162bef7e19badbe92cb51b499fa5798a"
+        },
+        "uptake_audit": {
+          "columns": [
+            "scenario_name",
+            "june_year",
+            "light_ruc_pool_km",
+            "conventional_share",
+            "bev_share",
+            "phev_share",
+            "light_revenue_delta_vs_pack",
+            "ped_retention",
+            "ped_revenue_delta_vs_pack",
+            "heavy_bev_share",
+            "heavy_revenue_reallocated_to_bev",
+            "share_source",
+            "uptake_basis",
+            "heavy_bev_transition_enabled"
+          ],
+          "columns_name": null,
+          "dtypes": {
+            "bev_share": "float64",
+            "conventional_share": "float64",
+            "heavy_bev_share": "float64",
+            "heavy_bev_transition_enabled": "bool",
+            "heavy_revenue_reallocated_to_bev": "float64",
+            "june_year": "int64",
+            "light_revenue_delta_vs_pack": "float64",
+            "light_ruc_pool_km": "float64",
+            "ped_retention": "float64",
+            "ped_revenue_delta_vs_pack": "float64",
+            "phev_share": "float64",
+            "scenario_name": "str",
+            "share_source": "str",
+            "uptake_basis": "str"
+          },
+          "file": "uptake_audit.parquet",
+          "index_column": null,
+          "index_name": null,
+          "object_columns": [],
+          "rows": 52,
+          "sha256": "2b2e3d5940a39b78a6d93594153eb1433acb477097c99907cff1b7c2e067f6ab"
         },
         "vfm_fast_chart_rows": {
           "columns": [
@@ -6975,7 +7642,7 @@
         }
       },
       "official_fed_policy_state": "off",
-      "row_count": 47923,
+      "row_count": 50500,
       "scenario_key": {
         "bridge_vintage_id": "BEFU26",
         "conflict_fuel_state": "",
@@ -7297,6 +7964,17 @@
           "rows": 4198,
           "sha256": "f4cf6a5590d88c2c1c6bdc9ac215606602efd2ab92a010e6cc3f1fd3c790beb7"
         },
+        "eruc_audit": {
+          "columns": [],
+          "columns_name": null,
+          "dtypes": {},
+          "file": "eruc_audit.parquet",
+          "index_column": null,
+          "index_name": null,
+          "object_columns": [],
+          "rows": 0,
+          "sha256": "8b6e33d47f4e1df33f587d9b1d420f756a6c705b8496e0912c223c5d83371df9"
+        },
         "formula_residuals": {
           "columns": [
             "source_path",
@@ -7470,6 +8148,65 @@
           "rows": 616,
           "sha256": "cc3923384b8234723a9df7a79968f06c6e52d6a0a14af0aa96ccb04e53385b19"
         },
+        "scenario_audit": {
+          "columns": [
+            "audit_type",
+            "scenario_name",
+            "scenario_role",
+            "trace_name",
+            "severity",
+            "time_grain",
+            "period",
+            "june_year",
+            "stream",
+            "series_id",
+            "transformation_basis",
+            "factor",
+            "baseline_value",
+            "adjusted_value",
+            "value_delta",
+            "scenario_note",
+            "quarterly_annual_reconciliation_delta",
+            "published_fed_baseline_value",
+            "adjusted_published_fed_value",
+            "fed_policy_delta",
+            "fed_policy",
+            "fed_affected_quarters"
+          ],
+          "columns_name": null,
+          "dtypes": {
+            "adjusted_published_fed_value": "float64",
+            "adjusted_value": "float64",
+            "audit_type": "str",
+            "baseline_value": "float64",
+            "factor": "float64",
+            "fed_affected_quarters": "str",
+            "fed_policy": "str",
+            "fed_policy_delta": "object",
+            "june_year": "int64",
+            "period": "str",
+            "published_fed_baseline_value": "float64",
+            "quarterly_annual_reconciliation_delta": "float64",
+            "scenario_name": "str",
+            "scenario_note": "str",
+            "scenario_role": "str",
+            "series_id": "str",
+            "severity": "str",
+            "stream": "str",
+            "time_grain": "str",
+            "trace_name": "str",
+            "transformation_basis": "str",
+            "value_delta": "float64"
+          },
+          "file": "scenario_audit.parquet",
+          "index_column": null,
+          "index_name": null,
+          "object_columns": [
+            "fed_policy_delta"
+          ],
+          "rows": 2525,
+          "sha256": "ebf4b269ac28dcbefc0f3859ed3221f9fa1a10adefb7a74b30e51248d53805da"
+        },
         "stack_components": {
           "columns": [
             "source_path",
@@ -7623,6 +8360,47 @@
           ],
           "rows": 25212,
           "sha256": "31123c6a4476dea5b8c6b1c55119b28576eaf7d0b1db2e18a22b7fdf0fbe5018"
+        },
+        "uptake_audit": {
+          "columns": [
+            "scenario_name",
+            "june_year",
+            "light_ruc_pool_km",
+            "conventional_share",
+            "bev_share",
+            "phev_share",
+            "light_revenue_delta_vs_pack",
+            "ped_retention",
+            "ped_revenue_delta_vs_pack",
+            "heavy_bev_share",
+            "heavy_revenue_reallocated_to_bev",
+            "share_source",
+            "uptake_basis",
+            "heavy_bev_transition_enabled"
+          ],
+          "columns_name": null,
+          "dtypes": {
+            "bev_share": "float64",
+            "conventional_share": "float64",
+            "heavy_bev_share": "float64",
+            "heavy_bev_transition_enabled": "bool",
+            "heavy_revenue_reallocated_to_bev": "float64",
+            "june_year": "int64",
+            "light_revenue_delta_vs_pack": "float64",
+            "light_ruc_pool_km": "float64",
+            "ped_retention": "float64",
+            "ped_revenue_delta_vs_pack": "float64",
+            "phev_share": "float64",
+            "scenario_name": "str",
+            "share_source": "str",
+            "uptake_basis": "str"
+          },
+          "file": "uptake_audit.parquet",
+          "index_column": null,
+          "index_name": null,
+          "object_columns": [],
+          "rows": 52,
+          "sha256": "2b2e3d5940a39b78a6d93594153eb1433acb477097c99907cff1b7c2e067f6ab"
         },
         "vfm_fast_chart_rows": {
           "columns": [
@@ -8068,7 +8846,7 @@
         }
       },
       "official_fed_policy_state": "published",
-      "row_count": 48468,
+      "row_count": 51045,
       "scenario_key": {
         "bridge_vintage_id": "BEFU26",
         "conflict_fuel_state": "",
@@ -8390,6 +9168,17 @@
           "rows": 4198,
           "sha256": "7257627f32c9d59cbf9f102e6b1a52295d810299eb39f2a45849d05edd958847"
         },
+        "eruc_audit": {
+          "columns": [],
+          "columns_name": null,
+          "dtypes": {},
+          "file": "eruc_audit.parquet",
+          "index_column": null,
+          "index_name": null,
+          "object_columns": [],
+          "rows": 0,
+          "sha256": "8b6e33d47f4e1df33f587d9b1d420f756a6c705b8496e0912c223c5d83371df9"
+        },
         "formula_residuals": {
           "columns": [
             "source_path",
@@ -8579,6 +9368,65 @@
           "rows": 617,
           "sha256": "4840836c1f839be0ac63f587b8a9dad94af7863919e4ede185bcf1baa6f9f26b"
         },
+        "scenario_audit": {
+          "columns": [
+            "audit_type",
+            "scenario_name",
+            "scenario_role",
+            "trace_name",
+            "severity",
+            "time_grain",
+            "period",
+            "june_year",
+            "stream",
+            "series_id",
+            "transformation_basis",
+            "factor",
+            "baseline_value",
+            "adjusted_value",
+            "value_delta",
+            "scenario_note",
+            "quarterly_annual_reconciliation_delta",
+            "published_fed_baseline_value",
+            "adjusted_published_fed_value",
+            "fed_policy_delta",
+            "fed_policy",
+            "fed_affected_quarters"
+          ],
+          "columns_name": null,
+          "dtypes": {
+            "adjusted_published_fed_value": "float64",
+            "adjusted_value": "float64",
+            "audit_type": "str",
+            "baseline_value": "float64",
+            "factor": "float64",
+            "fed_affected_quarters": "str",
+            "fed_policy": "str",
+            "fed_policy_delta": "object",
+            "june_year": "int64",
+            "period": "str",
+            "published_fed_baseline_value": "float64",
+            "quarterly_annual_reconciliation_delta": "float64",
+            "scenario_name": "str",
+            "scenario_note": "str",
+            "scenario_role": "str",
+            "series_id": "str",
+            "severity": "str",
+            "stream": "str",
+            "time_grain": "str",
+            "trace_name": "str",
+            "transformation_basis": "str",
+            "value_delta": "float64"
+          },
+          "file": "scenario_audit.parquet",
+          "index_column": null,
+          "index_name": null,
+          "object_columns": [
+            "fed_policy_delta"
+          ],
+          "rows": 2525,
+          "sha256": "ebf4b269ac28dcbefc0f3859ed3221f9fa1a10adefb7a74b30e51248d53805da"
+        },
         "stack_components": {
           "columns": [
             "source_path",
@@ -8732,6 +9580,47 @@
           ],
           "rows": 25212,
           "sha256": "31123c6a4476dea5b8c6b1c55119b28576eaf7d0b1db2e18a22b7fdf0fbe5018"
+        },
+        "uptake_audit": {
+          "columns": [
+            "scenario_name",
+            "june_year",
+            "light_ruc_pool_km",
+            "conventional_share",
+            "bev_share",
+            "phev_share",
+            "light_revenue_delta_vs_pack",
+            "ped_retention",
+            "ped_revenue_delta_vs_pack",
+            "heavy_bev_share",
+            "heavy_revenue_reallocated_to_bev",
+            "share_source",
+            "uptake_basis",
+            "heavy_bev_transition_enabled"
+          ],
+          "columns_name": null,
+          "dtypes": {
+            "bev_share": "float64",
+            "conventional_share": "float64",
+            "heavy_bev_share": "float64",
+            "heavy_bev_transition_enabled": "bool",
+            "heavy_revenue_reallocated_to_bev": "float64",
+            "june_year": "int64",
+            "light_revenue_delta_vs_pack": "float64",
+            "light_ruc_pool_km": "float64",
+            "ped_retention": "float64",
+            "ped_revenue_delta_vs_pack": "float64",
+            "phev_share": "float64",
+            "scenario_name": "str",
+            "share_source": "str",
+            "uptake_basis": "str"
+          },
+          "file": "uptake_audit.parquet",
+          "index_column": null,
+          "index_name": null,
+          "object_columns": [],
+          "rows": 52,
+          "sha256": "2b2e3d5940a39b78a6d93594153eb1433acb477097c99907cff1b7c2e067f6ab"
         },
         "vfm_fast_chart_rows": {
           "columns": [
@@ -9177,7 +10066,7 @@
         }
       },
       "official_fed_policy_state": "delayed_6m",
-      "row_count": 48469,
+      "row_count": 51046,
       "scenario_key": {
         "bridge_vintage_id": "BEFU26",
         "conflict_fuel_state": "",
@@ -9499,6 +10388,17 @@
           "rows": 4198,
           "sha256": "840583ddde00a0e8de2d35b4cca22c2d50035dab67d45ebe80eff0018c6bf124"
         },
+        "eruc_audit": {
+          "columns": [],
+          "columns_name": null,
+          "dtypes": {},
+          "file": "eruc_audit.parquet",
+          "index_column": null,
+          "index_name": null,
+          "object_columns": [],
+          "rows": 0,
+          "sha256": "8b6e33d47f4e1df33f587d9b1d420f756a6c705b8496e0912c223c5d83371df9"
+        },
         "formula_residuals": {
           "columns": [
             "source_path",
@@ -9688,6 +10588,65 @@
           "rows": 645,
           "sha256": "880ae120112182d03a7f48723dff297c668f738d760e4484c9e7b3c0e5686a74"
         },
+        "scenario_audit": {
+          "columns": [
+            "audit_type",
+            "scenario_name",
+            "scenario_role",
+            "trace_name",
+            "severity",
+            "time_grain",
+            "period",
+            "june_year",
+            "stream",
+            "series_id",
+            "transformation_basis",
+            "factor",
+            "baseline_value",
+            "adjusted_value",
+            "value_delta",
+            "scenario_note",
+            "quarterly_annual_reconciliation_delta",
+            "published_fed_baseline_value",
+            "adjusted_published_fed_value",
+            "fed_policy_delta",
+            "fed_policy",
+            "fed_affected_quarters"
+          ],
+          "columns_name": null,
+          "dtypes": {
+            "adjusted_published_fed_value": "float64",
+            "adjusted_value": "float64",
+            "audit_type": "str",
+            "baseline_value": "float64",
+            "factor": "float64",
+            "fed_affected_quarters": "str",
+            "fed_policy": "str",
+            "fed_policy_delta": "object",
+            "june_year": "int64",
+            "period": "str",
+            "published_fed_baseline_value": "float64",
+            "quarterly_annual_reconciliation_delta": "float64",
+            "scenario_name": "str",
+            "scenario_note": "str",
+            "scenario_role": "str",
+            "series_id": "str",
+            "severity": "str",
+            "stream": "str",
+            "time_grain": "str",
+            "trace_name": "str",
+            "transformation_basis": "str",
+            "value_delta": "float64"
+          },
+          "file": "scenario_audit.parquet",
+          "index_column": null,
+          "index_name": null,
+          "object_columns": [
+            "fed_policy_delta"
+          ],
+          "rows": 2525,
+          "sha256": "ebf4b269ac28dcbefc0f3859ed3221f9fa1a10adefb7a74b30e51248d53805da"
+        },
         "stack_components": {
           "columns": [
             "source_path",
@@ -9841,6 +10800,47 @@
           ],
           "rows": 25212,
           "sha256": "31123c6a4476dea5b8c6b1c55119b28576eaf7d0b1db2e18a22b7fdf0fbe5018"
+        },
+        "uptake_audit": {
+          "columns": [
+            "scenario_name",
+            "june_year",
+            "light_ruc_pool_km",
+            "conventional_share",
+            "bev_share",
+            "phev_share",
+            "light_revenue_delta_vs_pack",
+            "ped_retention",
+            "ped_revenue_delta_vs_pack",
+            "heavy_bev_share",
+            "heavy_revenue_reallocated_to_bev",
+            "share_source",
+            "uptake_basis",
+            "heavy_bev_transition_enabled"
+          ],
+          "columns_name": null,
+          "dtypes": {
+            "bev_share": "float64",
+            "conventional_share": "float64",
+            "heavy_bev_share": "float64",
+            "heavy_bev_transition_enabled": "bool",
+            "heavy_revenue_reallocated_to_bev": "float64",
+            "june_year": "int64",
+            "light_revenue_delta_vs_pack": "float64",
+            "light_ruc_pool_km": "float64",
+            "ped_retention": "float64",
+            "ped_revenue_delta_vs_pack": "float64",
+            "phev_share": "float64",
+            "scenario_name": "str",
+            "share_source": "str",
+            "uptake_basis": "str"
+          },
+          "file": "uptake_audit.parquet",
+          "index_column": null,
+          "index_name": null,
+          "object_columns": [],
+          "rows": 52,
+          "sha256": "2b2e3d5940a39b78a6d93594153eb1433acb477097c99907cff1b7c2e067f6ab"
         },
         "vfm_fast_chart_rows": {
           "columns": [
@@ -10286,7 +11286,7 @@
         }
       },
       "official_fed_policy_state": "off",
-      "row_count": 48497,
+      "row_count": 51074,
       "scenario_key": {
         "bridge_vintage_id": "BEFU26",
         "conflict_fuel_state": "",

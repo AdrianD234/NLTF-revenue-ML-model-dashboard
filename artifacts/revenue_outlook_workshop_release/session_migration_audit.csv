@@ -1,0 +1,9 @@
+session_key,stale_value,expectation,value_after_entry,verdict
+revenue_outlook_ped_retention_sensitivity,True,dropped,<absent>,pass
+revenue_outlook_show_vfm_envelope_audit,True,dropped,<absent>,pass
+revenue_outlook_ev_uptake_basis_v2,MoT VFM fast,reset to VFM Base,MoT VFM base,pass
+ro_cmp_a_uptake,MoT VFM slow,reset to VFM Base,MoT VFM base,pass
+ro_cmp_b_uptake,MoT VFM fast,reset to VFM Base,MoT VFM base,pass
+revenue_outlook_selected_fy,FY2053,dropped,<absent>,pass
+revenue_outlook_fed_policy_state,delayed_12m,dropped,<absent>,pass
+revenue_outlook_chart_layers,MoT VFM Fast–Slow range + 50% modelled uncertainty,"VFM layer filtered out, live layer kept",['50% modelled uncertainty'],pass

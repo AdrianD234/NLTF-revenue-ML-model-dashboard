@@ -1,0 +1,9 @@
+{
+  "blas": "scipy-openblas",
+  "numpy": "2.4.6",
+  "os": "Windows-11-10.0.26200-SP0",
+  "pandas": "3.0.3",
+  "python": "3.13.5",
+  "scipy": "1.17.1",
+  "source_sha": "8a125e0eeacb116b4bae9b229126c2d6d50a0011"
+}

@@ -1,0 +1,4 @@
+check,groups,worst_absolute_residual,tolerance,verdict
+derived_annual_groups_reconcile,2093,3.638e-12,1e-06 absolute / 1e-12 relative (pack manifest),pass
+zero_negative_quarters,8344,0,>= 0,pass
+terminal_quarter,8344,2050Q2,2050Q2,pass

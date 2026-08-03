@@ -112,6 +112,12 @@ ACTIVITY_LEAVES = frozenset(
 
 DEFAULT_SENSITIVITY = app.selected_sensitivity_key("Off", "Off", "Off", freight_rail_shift="Off")
 
+# What gets materialised must be the REFERENCE pipeline. The page now answers a
+# catalogued key from this pack, and this builder calls the same page functions,
+# so leaving the fast path on would make a rebuild copy the pack it is about to
+# replace - the output would look reproducible while proving nothing.
+app.POLICY_RUNTIME_FAST_PATH_ENABLED = False
+
 
 def _git_head() -> str:
     try:
@@ -162,7 +168,7 @@ def governed_key(pack, engine: str, current_state: str, official_state: str):
 
 def reference_state_frames(pack, signature, key) -> dict[str, pd.DataFrame]:
     """Run the reference pipeline for one key and collect every frame."""
-    chart_rows, _uptake, _eruc, policy_audit, scenario_audit = app.cached_scenario_overlay_rows(
+    chart_rows, uptake_audit, eruc_audit, policy_audit, scenario_audit = app.cached_scenario_overlay_rows(
         signature, DEFAULT_SENSITIVITY, PED_BRIDGE_DEFAULT_MODE, key, pack
     )
     line, residuals, stack, bridge = app.cached_aligned_scenario_detail_frames(
@@ -194,6 +200,10 @@ def reference_state_frames(pack, signature, key) -> dict[str, pd.DataFrame]:
         "scenario_audit": (
             scenario_audit if isinstance(scenario_audit, pd.DataFrame) else pd.DataFrame()
         ),
+        "uptake_audit": (
+            uptake_audit if isinstance(uptake_audit, pd.DataFrame) else pd.DataFrame()
+        ),
+        "eruc_audit": eruc_audit if isinstance(eruc_audit, pd.DataFrame) else pd.DataFrame(),
         **vfm,
     }
 

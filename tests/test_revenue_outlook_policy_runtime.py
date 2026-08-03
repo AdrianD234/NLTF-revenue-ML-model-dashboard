@@ -148,6 +148,31 @@ def runtimes():
     return {engine: load_policy_runtime(engine=engine, repo_root=ROOT) for engine in ENGINES}
 
 
+@pytest.fixture
+def reference_pipeline():
+    """Make ``app.cached_scenario_overlay_rows`` mean the REFERENCE again.
+
+    The integrated page answers a catalogued key from this pack, so a test
+    that calls the page's own entry point to compute its "expected" value
+    would be comparing the pack against itself and passing by tautology.
+    Switching the fast path off is exactly what the builder does, and it is
+    what makes these comparisons a parity check rather than a file read.
+
+    The Streamlit caches are cleared on the way in and out because entries
+    computed under one setting must not leak into the other.
+    """
+    original = app.POLICY_RUNTIME_FAST_PATH_ENABLED
+    app.cached_scenario_overlay_rows.clear()
+    app.cached_aligned_scenario_detail_frames.clear()
+    app.POLICY_RUNTIME_FAST_PATH_ENABLED = False
+    try:
+        yield
+    finally:
+        app.POLICY_RUNTIME_FAST_PATH_ENABLED = original
+        app.cached_scenario_overlay_rows.clear()
+        app.cached_aligned_scenario_detail_frames.clear()
+
+
 # -------------------------------------------------------------- catalogue
 
 
@@ -181,7 +206,7 @@ def test_no_uplift_spelling_variants_resolve_to_one_state():
 
 @pytest.mark.slow
 @pytest.mark.parametrize("engine", ENGINES)
-def test_every_materialised_state_equals_the_reference_pipeline(runtimes, engine):
+def test_every_materialised_state_equals_the_reference_pipeline(runtimes, engine, reference_pipeline):
     """The whole contract, checked frame by frame on all nine states."""
     runtime = runtimes[engine]
     pack, signature = _pack_and_signature(engine)
@@ -191,7 +216,13 @@ def test_every_materialised_state_equals_the_reference_pipeline(runtimes, engine
         for official in POLICY_STATES:
             key = _governed_key(pack, engine, current, official)
             state_id = state_id_for(engine, current, official)
-            chart_rows, _u, _e, policy_audit, _s = app.cached_scenario_overlay_rows(
+            (
+                chart_rows,
+                uptake_audit,
+                eruc_audit,
+                policy_audit,
+                scenario_audit,
+            ) = app.cached_scenario_overlay_rows(
                 signature, SENSITIVITY, PED_BRIDGE_DEFAULT_MODE, key, pack
             )
             line, residuals, stack, bridge = app.cached_aligned_scenario_detail_frames(
@@ -204,6 +235,15 @@ def test_every_materialised_state_equals_the_reference_pipeline(runtimes, engine
                 "stack_components": stack,
                 "bridge_components": bridge,
                 "policy_audit": policy_audit,
+                # All three are frames the page reads back off this pack when
+                # it stands in for the overlay chain, so all three have to
+                # equal what that chain returns. The uptake audit is the one
+                # that caught a real defect: it is NOT empty at the catalogue's
+                # pinned default, and substituting an empty frame for it would
+                # have switched off the page's EV-uptake audit surface.
+                "scenario_audit": scenario_audit,
+                "uptake_audit": uptake_audit,
+                "eruc_audit": eruc_audit,
             }
             for frame_name, basis in (
                 ("vfm_fast_chart_rows", VFM_FAST_BASIS),
@@ -236,7 +276,7 @@ def test_every_materialised_state_equals_the_reference_pipeline(runtimes, engine
 
 
 @pytest.mark.parametrize("engine", ENGINES)
-def test_published_default_rows_are_preserved_exactly(runtimes, engine):
+def test_published_default_rows_are_preserved_exactly(runtimes, engine, reference_pipeline):
     """The published default is what the page shows before anyone touches it."""
     runtime = runtimes[engine]
     pack, signature = _pack_and_signature(engine)
@@ -651,7 +691,7 @@ def test_vfm_envelope_inherits_the_selected_policy_state(runtimes, engine):
 
 @pytest.mark.slow
 @pytest.mark.parametrize("engine", ENGINES)
-def test_vfm_envelope_frames_equal_the_reference_preset_run(runtimes, engine):
+def test_vfm_envelope_frames_equal_the_reference_preset_run(runtimes, engine, reference_pipeline):
     """Materialised Fast/Slow rows equal the preset overlay run exactly."""
     runtime = runtimes[engine]
     pack, signature = _pack_and_signature(engine)

@@ -66,6 +66,7 @@ __all__ = [
     "filter_official_vintage_rows",
     "load_policy_runtime",
     "policy_audit_rows",
+    "policy_overlay_audit_rows",
     "policy_scenario_audit_rows",
     "policy_calculation_code_modules",
     "normalise_policy_state",
@@ -123,6 +124,15 @@ FRAME_NAMES = (
     "stack_components",
     "bridge_components",
     "policy_audit",
+    # The EV-uptake and e-RUC allocation audits. The catalogue pins the uptake
+    # basis at its governed default and both lever tuples empty, which reads
+    # like "nothing to report" - but the default basis is itself a governed
+    # composition, and its allocation audit carries 52 rows. Substituting an
+    # empty frame for it would silently switch off the page's
+    # ``ev_uptake_applied`` flag and take the audit table and its caption with
+    # it. Materialised so the fast path returns what the reference returns.
+    "uptake_audit",
+    "eruc_audit",
     # The combined Treasury-macro and conflict fuel-price audit the overlay
     # chain emits alongside the rows. It is policy-dependent - the conflict
     # append runs under the selected policy - so serving the rows from a
@@ -778,18 +788,27 @@ def policy_chart_rows(
     series_id: str | None = None,
     time_grain: str | None = None,
     scenario_names: tuple[str, ...] | None = None,
+    apply_official_vintage_filter: bool = True,
 ) -> pd.DataFrame:
     """The chart rows for one policy state, optionally narrowed for display.
 
     The narrowing arguments are display-only: they select from the same
     materialised rows and never change a value, which is why they are not part
     of the catalogue key.
+
+    ``apply_official_vintage_filter=False`` returns the state exactly as
+    materialised. A caller substituting these rows for the reference overlay
+    chain needs that: the reference returns every vintage and lets its own
+    callers narrow, so filtering here would make the substitution drop 510
+    rows the reference would have handed back. It also keeps the vintage rule
+    in one implementation on the production path instead of composing this
+    module's copy with the page's.
     """
     resolution = resolve_policy_state(runtime, key)
     _require(resolution)
-    rows = _apply_official_vintage_filter(
-        runtime.frame(resolution.state_id, "chart_rows"), resolution
-    )
+    rows = runtime.frame(resolution.state_id, "chart_rows")
+    if apply_official_vintage_filter:
+        rows = _apply_official_vintage_filter(rows, resolution)
     if series_id:
         rows = rows[rows["series_id"].astype(str).eq(str(series_id))]
     if time_grain:
@@ -856,6 +875,24 @@ def policy_scenario_audit_rows(
     resolution = resolve_policy_state(runtime, key)
     _require(resolution)
     return runtime.frame(resolution.state_id, "scenario_audit")
+
+
+def policy_overlay_audit_rows(
+    runtime: PolicyRuntime,
+    key: RevenueScenarioComputationKey | tuple[Any, ...] | None,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """(EV-uptake, e-RUC) allocation audits for this state.
+
+    Returned together because they are the pair the overlay chain emits
+    alongside the rows, and a caller standing in for that chain needs both or
+    it is not a faithful substitute.
+    """
+    resolution = resolve_policy_state(runtime, key)
+    _require(resolution)
+    return (
+        runtime.frame(resolution.state_id, "uptake_audit"),
+        runtime.frame(resolution.state_id, "eruc_audit"),
+    )
 
 
 def policy_vfm_scenario_rows(
