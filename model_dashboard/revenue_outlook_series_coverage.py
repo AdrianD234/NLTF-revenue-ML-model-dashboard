@@ -1327,7 +1327,28 @@ _QUARTERLY_PROVENANCE_COLUMNS = (
     "fixed_actual_quarters",
     "fixed_actual_total",
     "contract_version",
+    # Population lineage for the PED activity pair. Present and empty on every
+    # other series' rows: the PED identity is the only place a restated
+    # population basis is used, and a reader must be able to tell the restated
+    # basis from the unadjusted legacy one without reading the code.
+    "population_basis",
+    "population_source",
+    "population_factor",
+    "population_factor_source",
+    "population_factor_source_period",
+    "population_factor_carry_forward",
+    "population_factor_terminal_period",
+    "population_identity_residual",
 )
+
+#: The population basis the PED identity is preserved against. NOT the
+#: unadjusted legacy population in ``scenario_input_wide``.
+POPULATION_BASIS_TREASURY_RESTATED = "treasury_baseline_macro_restatement"
+POPULATION_FACTOR_SOURCE = "baseline_macro_annual_factors"
+#: Last fiscal year for which the macro replay publishes explicit annual
+#: factors. Beyond it the overlay carries this terminal factor forward, and so
+#: does this construction.
+POPULATION_FACTOR_TERMINAL_FY = 2030
 
 
 def derive_quarterly_rows(
@@ -2235,6 +2256,27 @@ def post_model_ped_activity_quarterly_rows(
                 held_total = sum(
                     float(values[index]) for index in fixed
                 ) if series_id == "ped_vkt_per_capita" else 0.0
+                carried = int(fy) > POPULATION_FACTOR_TERMINAL_FY
+                lineage = {
+                    "population_basis": POPULATION_BASIS_TREASURY_RESTATED,
+                    "population_source": (
+                        "legacy quarterly scenario population multiplied by the "
+                        "governed Treasury baseline macro population-restatement "
+                        "factor"
+                    ),
+                    "population_factor": float(population_factor),
+                    "population_factor_source": POPULATION_FACTOR_SOURCE,
+                    "population_factor_source_period": (
+                        f"FY{POPULATION_FACTOR_TERMINAL_FY}" if carried else f"FY{int(fy)}"
+                    ),
+                    "population_factor_carry_forward": bool(carried),
+                    "population_factor_terminal_period": (
+                        f"FY{POPULATION_FACTOR_TERMINAL_FY}" if carried else ""
+                    ),
+                    "population_identity_residual": float(
+                        petrol_residual if series_id == "light_petrol_vkt" else vktpc_residual
+                    ),
+                }
                 for index, (period, value) in enumerate(zip(periods, values)):
                     # A natively published quarter is never re-emitted: the
                     # native row already draws it, and a second row at the same
@@ -2244,7 +2286,8 @@ def post_model_ped_activity_quarterly_rows(
                     # the held native VKTpc through the identity.
                     if series_id == "ped_vkt_per_capita" and index in fixed:
                         continue
-                    output.append(
+                    record = dict(lineage)
+                    record.update(
                         _quarterly_record(
                             template.to_dict(),
                             contract=contract,
@@ -2259,12 +2302,19 @@ def post_model_ped_activity_quarterly_rows(
                             fixed_total=held_total,
                             method=METHOD_POST_MODEL_RAW_SHAPE,
                             seasonal_basis=(
-                                f"{_POST_MODEL_SHAPE_BASIS}; governed population = "
-                                f"legacy scenario population x {population_factor:.9f} "
-                                "(Treasury baseline macro replay restatement)"
+                                f"{_POST_MODEL_SHAPE_BASIS}; population basis = "
+                                "legacy scenario population x Treasury baseline "
+                                f"macro population-restatement factor {population_factor:.9f}"
+                                + (
+                                    f" (terminal FY{POPULATION_FACTOR_TERMINAL_FY} "
+                                    "factor carried forward)"
+                                    if carried
+                                    else ""
+                                )
                             ),
                         )
                     )
+                    output.append(record)
 
     if not output:
         return empty

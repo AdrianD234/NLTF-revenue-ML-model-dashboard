@@ -19,6 +19,7 @@ import pandas as pd
 import pytest
 
 import app
+from model_dashboard import revenue_outlook
 from model_dashboard import revenue_outlook_policy_runtime as policy_runtime
 from model_dashboard import revenue_outlook_presentation_policy as presentation
 from model_dashboard import revenue_outlook_series_coverage as coverage
@@ -519,17 +520,38 @@ def test_no_coverage_note_when_the_current_path_reaches_the_horizon() -> None:
     ) == ""
 
 
-def test_light_petrol_vkt_current_rows_really_do_stop_at_fy2030() -> None:
-    """The premise of the note, asserted against the governed pack.
+def test_light_petrol_vkt_current_rows_now_reach_fy2050() -> None:
+    """The positive contract that replaced the FY2030 truncation premise.
 
-    If a future bridge extends the Current path to FY2050 this fails, which is
-    the point: the note would then be wrong and must go.
+    This test used to assert that the Current path stopped at FY2030, and said
+    so deliberately: "if a future bridge extends the Current path to FY2050
+    this fails, which is the point". That happened. The governed FY2031-FY2050
+    values always existed in the post-model extrapolation and in line
+    reconciliation; they were simply never published to the chart, because
+    ``light_petrol_vkt`` is absent from ``DISPLAY_SERIES_ORDER`` and so no
+    runtime chart-row builder emitted it.
+
+    The premise is now inverted: the Current path reaches FY2050 alongside the
+    officials, and both are asserted here so a regression in either direction
+    is caught.
     """
     chart = pd.read_parquet(ROOT / "data/current_revenue_outlook/revenue_chart_rows.parquet")
-    combined = app._append_missing_official_rows(chart)
+    line = pd.read_parquet(
+        ROOT / "data/current_revenue_outlook/revenue_line_reconciliation.parquet"
+    )
+    published = revenue_outlook._append_post_model_ped_activity_chart_rows(chart, line)
+    combined = app._append_missing_official_rows(published)
     petrol = combined[combined["series_id"].astype(str).eq("light_petrol_vkt")]
+
     official = petrol[petrol["trace_name"].astype(str).str.contains("official")]
     assert int(pd.to_numeric(official["june_year"], errors="coerce").max()) == 2050
+
+    current = petrol[
+        petrol["scenario_role"].astype(str).isin(["basecase", "comparison"])
+        & petrol["time_grain"].astype(str).eq("june_year")
+    ]
+    assert not current.empty, "the Current path is no longer published at all"
+    assert int(pd.to_numeric(current["june_year"], errors="coerce").max()) == 2050
 
 
 # ------------------------------------ conflict quarters may not leak backwards

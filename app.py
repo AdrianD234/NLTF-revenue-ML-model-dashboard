@@ -2408,26 +2408,42 @@ def _filter_series_rows_with_fallback(
                 gap_filled["trace_name"].astype(str).isin([str(t) for t in traces])
             ]
         if not gap_filled.empty:
-            identity = ["series_id", "trace_name", "period"]
-            present = set(
-                map(
-                    tuple,
-                    filtered.reindex(columns=identity).astype(str).to_numpy().tolist(),
+            # The joint construction is AUTHORITATIVE over the post-model
+            # window for this pair, not merely a gap filler. The generic
+            # per-trace fallback runs first and, because Light petrol VKT has
+            # no native quarters at all, had already split its whole horizon
+            # with the Denton rule - so the two series were being built by two
+            # different methods and the cross-series identity
+            #     petrol_q = vktpc_q * population_q / 1e6
+            # was not enforced between them. Superseding the derived rows here
+            # is what keeps the pair on one construction.
+            #
+            # Only DERIVED rows are superseded. A natively published quarter is
+            # never dropped, which is why the seam years keep their published
+            # values.
+            from model_dashboard import revenue_outlook_series_coverage as _coverage
+            from model_dashboard.post_model_extrapolation import FIRST_EXTRAPOLATION_FY
+
+            superseded_from = FIRST_EXTRAPOLATION_FY
+            years = pd.to_numeric(filtered.get("june_year"), errors="coerce")
+            row_type = (
+                filtered.get(
+                    "coverage_row_type", pd.Series("", index=filtered.index)
+                )
+                .fillna("")
+                .astype(str)
+            )
+            is_derived = row_type.eq(_coverage.COVERAGE_ROW_TYPE_DERIVED)
+            drop = (
+                is_derived
+                & years.ge(superseded_from)
+                & filtered["series_id"].astype(str).isin(
+                    gap_filled["series_id"].astype(str).unique()
                 )
             )
-            keep = [
-                tuple(record) not in present
-                for record in gap_filled.reindex(columns=identity)
-                .astype(str)
-                .to_numpy()
-                .tolist()
-            ]
-            gap_filled = gap_filled[keep]
-            if not gap_filled.empty:
-                filtered = pd.concat(
-                    [filtered, gap_filled], ignore_index=True, sort=False
-                )
-                used_fallback = True
+            filtered = filtered[~drop.fillna(False)]
+            filtered = pd.concat([filtered, gap_filled], ignore_index=True, sort=False)
+            used_fallback = True
     return clip_frame_to_display_horizon(filtered), used_fallback
 
 
