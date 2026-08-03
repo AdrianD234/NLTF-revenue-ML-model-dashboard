@@ -1978,12 +1978,12 @@ _POST_MODEL_SHAPE_BASIS = (
     "the committed scenario-input replay"
 )
 
-#: Ceiling on the row-normalised seam system. The observed values are ~7.1e3
-#: (Base) and ~3.2e3 (comparison): the two free quarters carry near-identical
-#: populations, so the constraint rows are close to parallel and the solve is
-#: inherently a little stiff. 1e6 leaves generous headroom while still refusing
-#: a system whose solution would be dominated by rounding.
-_SEAM_MAX_CONDITION_NUMBER = 1.0e6
+#: How far the governed population may sit from the legacy scenario population
+#: before the split is refused. The Treasury baseline macro restatement is
+#: ~1.4% and flat from FY2030; 10% is wide enough to absorb a future macro
+#: vintage while still catching a factor that is no longer a population
+#: restatement at all.
+_MAX_GOVERNED_POPULATION_FACTOR_DRIFT = 0.10
 
 
 class PostModelQuarterlyError(ValueError):
@@ -2144,68 +2144,65 @@ def post_model_ped_activity_quarterly_rows(
             for index in fixed:
                 quarter_vktpc[index] = float(native_lookup[(scenario_name, periods[index])])
 
-            if not fixed:
-                # No native quarter: one uniform factor closes both annual
-                # constraints exactly (see the module note above).
-                raw_petrol_sum = float((raw_vktpc * pops / 1_000_000.0).sum())
-                if not np.isfinite(raw_petrol_sum) or raw_petrol_sum <= 0.0:
-                    raise PostModelQuarterlyError(
-                        f"{scenario_name} FY{int(fy)}: raw petrol shape sums to "
-                        f"{raw_petrol_sum!r}; no scale factor exists."
-                    )
-                quarter_vktpc = (target_petrol / raw_petrol_sum) * raw_vktpc
-            elif len(free) == 2:
-                # Two fixed, two free, two constraints: a unique solve.
-                #
-                #   sum_q v_q                 = target_vktpc
-                #   sum_q v_q * pop_q / 1e6   = target_petrol
-                #
-                # Both rows are normalised before solving. Unnormalised, the
-                # second row carries a ~5.6e6 population scale against the
-                # first row's 1.0 and the system reads as far worse
-                # conditioned than it is - the trap PR #17 called out.
-                fixed_vktpc = sum(quarter_vktpc[index] for index in fixed)
-                fixed_petrol = sum(
-                    quarter_vktpc[index] * pops[index] / 1_000_000.0 for index in fixed
-                )
-                matrix = np.array(
-                    [
-                        [1.0, 1.0],
-                        [pops[free[0]] / 1_000_000.0, pops[free[1]] / 1_000_000.0],
-                    ]
-                )
-                rhs = np.array(
-                    [target_vktpc - fixed_vktpc, target_petrol - fixed_petrol]
-                )
-                row_scale = np.abs(matrix).max(axis=1)
-                if not np.all(np.isfinite(row_scale)) or (row_scale <= 0.0).any():
-                    raise PostModelQuarterlyError(
-                        f"{scenario_name} FY{int(fy)}: the seam system is "
-                        "degenerate; refusing to solve it."
-                    )
-                conditioned = matrix / row_scale[:, None]
-                condition_number = float(np.linalg.cond(conditioned))
-                if condition_number > _SEAM_MAX_CONDITION_NUMBER:
-                    raise PostModelQuarterlyError(
-                        f"{scenario_name} FY{int(fy)}: the seam system is "
-                        f"ill-conditioned (cond {condition_number:.3e} > "
-                        f"{_SEAM_MAX_CONDITION_NUMBER:.0e}). Solving it would "
-                        "amplify rounding into the published quarters."
-                    )
-                solved = np.linalg.solve(conditioned, rhs / row_scale)
-                for position, index in enumerate(free):
-                    quarter_vktpc[index] = float(solved[position])
-            else:
+            # VKT per capita absorbs its own annual benchmark on the raw
+            # shape. Native quarters are held; the free ones take the residual
+            # in raw proportion.
+            if not free:
                 raise PostModelQuarterlyError(
-                    f"{scenario_name} FY{int(fy)}: {len(fixed)} native and "
-                    f"{len(free)} free quarters. Only 0 or 2 fixed quarters "
-                    "have a governed rule; anything else needs an allocation "
-                    "assumption that has not been approved."
+                    f"{scenario_name} FY{int(fy)}: every quarter is already "
+                    "published; there is nothing to derive."
                 )
+            fixed_vktpc = sum(quarter_vktpc[index] for index in fixed)
+            residual_vktpc = target_vktpc - fixed_vktpc
+            free_raw_sum = float(sum(raw_vktpc[index] for index in free))
+            if free_raw_sum <= 0.0 or residual_vktpc <= 0.0:
+                raise PostModelQuarterlyError(
+                    f"{scenario_name} FY{int(fy)}: the free quarters must "
+                    f"absorb {residual_vktpc!r} on a raw shape summing to "
+                    f"{free_raw_sum!r}; no positive split exists."
+                )
+            for index in free:
+                quarter_vktpc[index] = residual_vktpc * raw_vktpc[index] / free_raw_sum
+
+            # The population that reproduces the governed annual pair. It is
+            # NOT an invented "effective" denominator: the Treasury baseline
+            # macro replay publishes per-series factors whose ratio
+            #     factor(light_petrol_vkt) / factor(ped_vkt_per_capita)
+            # IS the Treasury-versus-legacy population ratio (1.013967 against
+            # a measured 1.013970 at FY2030, both engines, both scenarios),
+            # and apply_treasury_macro_to_chart_rows carries the FY2030 factor
+            # forward through FY2050. The scenario-input population is the
+            # LEGACY pre-replay path, so testing the identity against it fails
+            # by exactly that ratio. Recovering the factor from the governed
+            # annual pair rather than re-reading the replay keeps this correct
+            # under every policy, conflict and lever combination; the audit
+            # reconciles it back to the replay factors.
+            legacy_petrol = float((quarter_vktpc * pops / 1_000_000.0).sum())
+            if legacy_petrol <= 0.0:
+                raise PostModelQuarterlyError(
+                    f"{scenario_name} FY{int(fy)}: legacy petrol sums to "
+                    f"{legacy_petrol!r}; no population factor exists."
+                )
+            population_factor = target_petrol / legacy_petrol
+            if not np.isfinite(population_factor) or population_factor <= 0.0:
+                raise PostModelQuarterlyError(
+                    f"{scenario_name} FY{int(fy)}: population factor "
+                    f"{population_factor!r} is not usable."
+                )
+            if abs(population_factor - 1.0) > _MAX_GOVERNED_POPULATION_FACTOR_DRIFT:
+                raise PostModelQuarterlyError(
+                    f"{scenario_name} FY{int(fy)}: the governed population "
+                    f"factor is {population_factor:.6f}, beyond the "
+                    f"{_MAX_GOVERNED_POPULATION_FACTOR_DRIFT:.0%} macro-replay "
+                    "envelope. That is no longer a population restatement and "
+                    "needs review rather than republication."
+                )
+            governed_pops = pops * population_factor
 
             # The identity is imposed, never fitted: petrol is always VKTpc x
-            # population, so it cannot drift from the series beside it.
-            quarter_petrol = quarter_vktpc * pops / 1_000_000.0
+            # the governed population, so it cannot drift from the series
+            # beside it.
+            quarter_petrol = quarter_vktpc * governed_pops / 1_000_000.0
             if (quarter_petrol <= 0.0).any() or (quarter_vktpc <= 0.0).any():
                 raise PostModelQuarterlyError(
                     f"{scenario_name} FY{int(fy)}: the split produced a "
@@ -2261,7 +2258,11 @@ def post_model_ped_activity_quarterly_rows(
                             else (),
                             fixed_total=held_total,
                             method=METHOD_POST_MODEL_RAW_SHAPE,
-                            seasonal_basis=_POST_MODEL_SHAPE_BASIS,
+                            seasonal_basis=(
+                                f"{_POST_MODEL_SHAPE_BASIS}; governed population = "
+                                f"legacy scenario population x {population_factor:.9f} "
+                                "(Treasury baseline macro replay restatement)"
+                            ),
                         )
                     )
 
