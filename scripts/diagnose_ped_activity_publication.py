@@ -128,12 +128,14 @@ def main() -> int:
                 (app.BASE_TRACE_NAME if hasattr(app, "BASE_TRACE_NAME")
                  else "Current finalist Base case",),
                 "published",
+                pack_dir=str(pack.output_dir),
             )
             l4_qtr, used_fb = app._filter_series_rows_with_fallback(
                 overlay, label, "quarterly", "Current planned path",
                 (app.BASE_TRACE_NAME if hasattr(app, "BASE_TRACE_NAME")
                  else "Current finalist Base case",),
                 "published",
+                pack_dir=str(pack.output_dir),
             )
 
             records.append(

@@ -2300,12 +2300,20 @@ def _post_model_ped_activity_quarters(
     if pair_annual.empty:
         return pd.DataFrame()
     native = chart_rows[chart_rows["time_grain"].astype(str).eq("quarterly")]
-    derived = coverage.post_model_ped_activity_quarterly_rows(
-        pair_annual,
-        raw_quarterly_audit=raw_audit,
-        scenario_population=population,
-        native_quarters=native,
-    )
+    try:
+        derived = coverage.post_model_ped_activity_quarterly_rows(
+            pair_annual,
+            raw_quarterly_audit=raw_audit,
+            scenario_population=population,
+            native_quarters=native,
+        )
+    except coverage.PostModelQuarterlyError:
+        # Fail closed to the PREVIOUS behaviour, never to a wrong number and
+        # never to a broken page: the quarterly view keeps the coverage it had
+        # and the annual publication is unaffected. The governed reason is
+        # raised and audited by the constructor; suppressing it here only
+        # decides that a reader sees a short series rather than an exception.
+        return pd.DataFrame()
     if derived.empty:
         return derived
     return derived[derived["series_id"].astype(str).eq(series_id)]
