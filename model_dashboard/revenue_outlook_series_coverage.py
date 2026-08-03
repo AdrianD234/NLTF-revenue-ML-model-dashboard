@@ -136,10 +136,13 @@ _REBUILD_COMMAND = "python scripts/build_revenue_outlook_quarterly_display_pack.
 # comparison must compare values at a tolerance, not file hashes.
 CROSS_PLATFORM_REPRODUCIBILITY = (
     "Byte-identical when rebuilt on the same platform. Across platforms the "
-    "values agree to about 1e-15 relative but not bit for bit, because the "
-    "Denton benchmarking solve runs through numpy.linalg.lstsq and each "
-    "platform's LAPACK/BLAS rounds the last place differently. Compare this "
-    "pack by value at a tolerance, never by file hash across machines."
+    "values agree to about 1e-13 relative but not bit for bit: the Denton "
+    "benchmarking solve runs through numpy.linalg.lstsq, and each platform's "
+    "LAPACK/BLAS rounds differently. The solve is normalised so that residual "
+    "spread is a last-place effect rather than a conditioning one - the "
+    "unnormalised system reached a condition number of ~6e9 on the raw net-km "
+    "indicators and lost ~1e-6 of relative precision. Compare this pack by "
+    "value at a tolerance, never by file hash across machines."
 )
 
 # --------------------------------------------------------------- vocabularies
@@ -1005,14 +1008,35 @@ def _denton_quarterly_split(
     A flat indicator reduces this to the Boot-Feibes-Lisman smooth split, which
     is the neutral allocation this contract names for series with no governed
     seasonal evidence.
+
+    The indicator and the benchmarks are both normalised before the solve and
+    the scale is put back afterwards. That is exactly invariant - with
+    ``x = ind * z``, dividing ``ind`` by a constant multiplies ``z`` by the
+    same constant and leaves ``x`` untouched, and a uniform benchmark scale
+    passes straight through a linear system - but it is not cosmetic. The
+    native quarterly indicators are published in raw ``net km`` (~3e9) while
+    the objective block is O(1), which drove the KKT condition number to ~6e9
+    and cost about 1e-6 of relative precision. Normalised, the condition
+    number is ~1e3 and the solve is accurate to ~1e-13, which is what makes
+    the pack agree across platforms rather than only within one.
     """
     n = int(len(annual_values))
     m = 4 * n
     ind = np.asarray(indicator, dtype=float)
     if ind.shape[0] != m or not np.all(np.isfinite(ind)) or np.any(ind <= 0):
         ind = np.ones(m, dtype=float)
+    annual = np.asarray(annual_values, dtype=float)
+
+    indicator_scale = float(np.mean(ind))
+    if not np.isfinite(indicator_scale) or indicator_scale <= 0.0:
+        indicator_scale = 1.0
+    benchmark_scale = float(np.max(np.abs(annual))) if annual.size else 1.0
+    if not np.isfinite(benchmark_scale) or benchmark_scale <= 0.0:
+        benchmark_scale = 1.0
+    unit_ind = ind / indicator_scale
+
     difference = np.diff(np.eye(m), axis=0)
-    weights = ind / 4.0 if average else ind
+    weights = unit_ind / 4.0 if average else unit_ind
     constraint = np.zeros((n, m))
     for year in range(n):
         constraint[year, 4 * year : 4 * year + 4] = weights[4 * year : 4 * year + 4]
@@ -1020,9 +1044,9 @@ def _denton_quarterly_split(
     kkt[:m, :m] = 2.0 * difference.T @ difference
     kkt[:m, m:] = constraint.T
     kkt[m:, :m] = constraint
-    rhs = np.concatenate([np.zeros(m), np.asarray(annual_values, dtype=float)])
+    rhs = np.concatenate([np.zeros(m), annual / benchmark_scale])
     solution = np.linalg.lstsq(kkt, rhs, rcond=None)[0]
-    return ind * solution[:m]
+    return unit_ind * solution[:m] * benchmark_scale
 
 
 def interpolate_end_of_period_quarters(
@@ -2076,14 +2100,16 @@ def build_quarterly_display_pack(
         if not quarterly.empty
         else [],
         "reconciled_series_trace_years": int(len(reconciliation)),
-        # Rounded to three significant figures so the manifest stays byte-stable
-        # across platforms; the unrounded per-year residuals live in
-        # annual_reconciliation_audit.parquet.
-        "worst_relative_reconciliation_residual": _round_significant(
-            float(pd.to_numeric(reconciliation["relative_residual"], errors="coerce").max())
-            if not reconciliation.empty
-            else 0.0
-        ),
+        # The measured residual is pure cancellation noise - a difference of
+        # nearly equal numbers - so it has no stable digits at ANY precision and
+        # must not be reported as an exactly-compared manifest field. What the
+        # build guarantees is the bound, and the bound is what is recorded; the
+        # per-year measurements live in annual_reconciliation_audit.parquet.
+        "all_years_reconcile": bool(reconciliation["reconciles"].all())
+        if not reconciliation.empty
+        else True,
+        "reconciliation_abs_tolerance": RECONCILIATION_ABS_TOLERANCE,
+        "reconciliation_rel_tolerance": RECONCILIATION_REL_TOLERANCE,
         "cross_platform_reproducibility": CROSS_PLATFORM_REPRODUCIBILITY,
         "notes": (
             "Derived quarterly rows are indicative display values benchmarked to a "
@@ -2111,13 +2137,6 @@ def build_quarterly_display_pack(
         series_contract=contract,
         coverage_status=coverage,
     )
-
-
-def _round_significant(value: float, digits: int = 3) -> float:
-    """Round for reporting, so a diagnostic float cannot destabilise a manifest."""
-    if not value or not math.isfinite(value):
-        return 0.0
-    return float(f"{value:.{digits}g}")
 
 
 def _write_frame(frame: pd.DataFrame, path: Path) -> None:

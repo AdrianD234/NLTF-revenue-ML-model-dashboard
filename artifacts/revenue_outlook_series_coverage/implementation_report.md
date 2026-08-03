@@ -194,6 +194,7 @@ edits present in the development working tree could not contaminate the result.
 | Revenue Outlook / trace-identity / runtime-manifest | 64 passed |
 | `compileall` over `model_dashboard`, `scripts`, `tests`, `app.py` | clean |
 | Pack built twice on one machine | byte-identical |
+| Denton solve scale-invariance | asserted for indicator and benchmark |
 | Committed pack vs fresh build | structurally identical, values within 1e-9 relative |
 | Diagnosis artifacts regenerated | byte-identical |
 
@@ -212,32 +213,62 @@ neither is one:
   test. Running the same 121 test files as 13 separate processes completed
   green end to end, which is the result above.
 
-### Reproducibility: what is and is not claimed
+### Reproducibility: what is claimed, and the bug found proving it
 
-The pack is **byte-identical when rebuilt on the same platform** and agrees to
-about **1e-15 relative across platforms**, not bit for bit. The Denton solve
-runs through `numpy.linalg.lstsq`, i.e. through whatever LAPACK/BLAS the
-platform ships, and those builds round the last place differently. The
-reconciliation audit amplifies it: `residual` is a difference of nearly equal
-numbers, so a 1-ulp change in a quarter rewrites the residual's whole mantissa.
+The first two CI runs failed on `test_committed_pack_matches_a_fresh_build`,
+and the second failure exposed a real numerical defect rather than a test
+artefact.
 
-The first CI run proved this shape rather than merely suggesting it:
+**Run 1** looked like last-place noise: the source digest matched (inputs
+byte-identical on the runner), `test_pack_build_is_byte_idempotent` passed (two
+builds on one Linux runner were identical), and only Windows-committed vs
+Linux-fresh differed. The guard was relaxed from file hashes to
+structurally-exact + numerically-tolerant.
 
-* the source digest matched, so the inputs were byte-identical on the runner;
-* `test_pack_build_is_byte_idempotent` passed, so two builds on the same Linux
-  runner were byte-identical;
-* only the Windows-committed vs Linux-fresh comparison differed.
+**Run 2** then reported the actual numbers, and they were far too big for
+last-place noise:
 
-Same inputs, deterministic per platform, differing across platforms. The
-staleness guard therefore compares the committed pack to a fresh build
-**structurally exact and numerically tolerant** (1e-9 relative) instead of by
-file hash. Probed against deliberate mutations, that catches a value moved by
-1e-6 relative, a relabelled row, a dropped row and a dropped column, while
-ignoring 1e-15 platform noise - six orders of separation between the two.
+```
+quarterly_rows.parquet.value: 3306 value(s) outside 1e-09;
+  first at row 1001: 1009.3423044531075 vs 1009.3423305782121
+```
 
-`manifest.json` states the limit in `cross_platform_reproducibility`, and its
-one reported float is rounded to three significant figures so the manifest
-itself stays byte-stable everywhere.
+That is **2.6e-8 relative** - eight orders above a ULP - across 40% of rows.
+The cause was conditioning, not rounding. The native quarterly indicators are
+published in raw `net km` (~3e9) while the Denton objective block is O(1), so
+the KKT system was badly scaled:
+
+| Indicator scale | cond(KKT) | Relative precision lost |
+| --- | --- | --- |
+| flat (1) | 6.8 | ~1e-15 |
+| VKT per capita (~1.8e3) | 3.1e3 | ~7e-13 |
+| net km (~3.4e9) | **5.8e9** | **~1e-6** |
+
+The solve now normalises the indicator and the benchmarks and puts the scale
+back afterwards. That is exactly invariant - with `x = ind * z`, dividing `ind`
+by a constant multiplies `z` by the same constant and leaves `x` alone, and a
+uniform benchmark scale passes straight through a linear system - so the
+mathematics is unchanged. The condition number is now **6.8 at every indicator
+scale**, and both invariances are pinned by tests.
+
+This was not only a reproducibility fix. Correcting it moved published values
+by up to **7.5e-6 relative** (0.02 on a 1,856 million-km quarter): the
+ill-conditioned solve had been returning display values good to only about six
+significant figures for every series benchmarked on a net-km indicator. Annual
+closure and non-negativity are unaffected.
+
+**What is claimed now:** byte-identical rebuilt on the same platform, ~1e-13
+relative across platforms. The staleness guard compares structure exactly and
+values at 1e-9 relative, and reports every difference at once. Probed against
+deliberate mutations it catches a value moved by 1e-6 relative, a relabelled
+row, a dropped row and a dropped column, while ignoring platform noise.
+
+The manifest carries the guaranteed *bound* (`all_years_reconcile`, plus both
+tolerances) and no longer reports a measured worst residual. A residual is a
+difference of nearly equal numbers, so it has no stable digits at any
+precision; publishing one as an exactly-compared field would have made the
+manifest permanently uncomparable. The per-year measurements stay in
+`annual_reconciliation_audit.parquet`.
 
 ## Handoff to the integration agent
 

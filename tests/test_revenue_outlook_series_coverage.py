@@ -593,9 +593,8 @@ def test_pack_manifest_pins_its_sources_and_contract(
     assert manifest["display_horizon_last_fy"] == coverage.DISPLAY_HORIZON_LAST_FY
     assert manifest["source_digest"] == coverage.quarterly_display_pack_source_digest(ROOT)
     assert manifest["official_series_restored"] == [LIGHT_PETROL_ID]
-    assert float(manifest["worst_relative_reconciliation_residual"]) <= (
-        coverage.RECONCILIATION_REL_TOLERANCE
-    )
+    assert manifest["all_years_reconcile"] is True
+    assert manifest["reconciled_series_trace_years"] > 1500
 
 
 def test_a_stale_pack_fails_closed(tmp_path: Path) -> None:
@@ -743,10 +742,40 @@ def test_the_pack_is_only_claimed_reproducible_to_a_stated_tolerance() -> None:
     manifest = coverage.load_quarterly_display_pack(ROOT).manifest
     assert manifest["cross_platform_reproducibility"] == coverage.CROSS_PLATFORM_REPRODUCIBILITY
     assert "lstsq" in coverage.CROSS_PLATFORM_REPRODUCIBILITY
-    # The one float the manifest reports is rounded, so the manifest itself
-    # stays byte-stable everywhere and can be compared exactly.
-    worst = manifest["worst_relative_reconciliation_residual"]
-    assert float(f"{worst:.3g}") == worst
+    assert manifest["all_years_reconcile"] is True
+    assert manifest["reconciliation_rel_tolerance"] == coverage.RECONCILIATION_REL_TOLERANCE
+    # The manifest reports the guaranteed BOUND, never a measured residual.
+    # A residual is a difference of nearly equal numbers, so it has no stable
+    # digits at any precision and would make the manifest uncomparable.
+    assert not any("residual" in key for key in manifest)
+
+
+def test_the_denton_solve_is_scale_invariant() -> None:
+    """Rescaling the indicator must not move the answer at all.
+
+    This is the property the reconditioning relies on: with ``x = ind * z``,
+    dividing the indicator by a constant multiplies ``z`` by the same constant
+    and leaves ``x`` alone. It also pins the bug that caused it - a raw net-km
+    indicator (~3e9) used to give a materially different answer from the same
+    indicator expressed in millions.
+    """
+    annual = np.linspace(100.0, 300.0, 25)
+    shape = np.tile(np.array([1.00, 0.99, 1.01, 1.02]), 25)
+    reference = coverage._denton_quarterly_split(annual, shape, average=False)
+    for scale in (1e-6, 1e3, 3.4e9):
+        scaled = coverage._denton_quarterly_split(annual, shape * scale, average=False)
+        assert np.allclose(scaled, reference, rtol=1e-12, atol=1e-12), (
+            f"indicator scale {scale:g} changed the answer"
+        )
+
+
+def test_the_denton_solve_is_benchmark_scale_invariant() -> None:
+    """Scaling every benchmark scales the answer by exactly the same factor."""
+    annual = np.linspace(100.0, 300.0, 10)
+    shape = np.tile(np.array([1.0, 0.98, 1.03, 0.99]), 10)
+    reference = coverage._denton_quarterly_split(annual, shape, average=False)
+    scaled = coverage._denton_quarterly_split(annual * 1e6, shape, average=False)
+    assert np.allclose(scaled, reference * 1e6, rtol=1e-12, atol=1e-6)
 
 
 # -------------------------------------------------------------- the lookup API
