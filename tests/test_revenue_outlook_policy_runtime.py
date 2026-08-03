@@ -821,6 +821,10 @@ def test_delayed_state_reproduces_the_committed_offline_uncertainty_pack():
     values from the policy-aware propagation proves the methodology is
     genuinely unchanged - same draws, same copula, same quantile map, same
     seam, same plateau - and that only the centre is policy-dependent.
+
+    One governed exception is carried below: Light petrol VKT FY2031-FY2050,
+    whose band is re-centred onto the now-published Current line. It is held to
+    a rigid-rescale test so a real methodology change still fails.
     """
     committed = pd.read_parquet(
         ROOT / "data" / "revenue_outlook_uncertainty" / "uncertainty_band_rows.parquet"
@@ -839,14 +843,61 @@ def test_delayed_state_reproduces_the_committed_offline_uncertainty_pack():
     assert missing.empty, f"the policy pack does not reproduce {len(missing)} committed rows"
     shared = left.index.intersection(right.index)
     assert len(shared) >= 1000, f"only {len(shared)} shared band rows; the comparison is vacuous"
-    for column in ("central", "lower80", "lower50", "draw_median", "upper50", "upper80"):
+    columns = ("central", "lower80", "lower50", "draw_median", "upper50", "upper80")
+
+    # Light petrol VKT FY2031-FY2050 is the one governed exception, and it is
+    # a RE-CENTRING rather than a methodology change. The committed pack was
+    # built before that series had any published Current line past FY2030, so
+    # its long-run band was drawn around the pre-overlay level - a centre that
+    # never appeared on the chart. Now that the line is published, the band
+    # follows it onto the Treasury-restated level.
+    #
+    # The exception is held to a strict shape: every one of the six columns
+    # must move by the SAME factor, so relative band widths, the draws, the
+    # copula, the quantile map, the seam and the plateau are all provably
+    # unchanged. A central that moved on its own - or bounds that moved by
+    # different amounts - would fail here.
+    is_recentred = np.array(
+        [
+            series_id == "light_petrol_vkt" and int(fy) >= 2031
+            for series_id, fy in shared
+        ]
+    )
+    unchanged = shared[~is_recentred]
+    assert len(unchanged) >= 900, "vacuous: too few rows held to exact reproduction"
+    for column in columns:
         np.testing.assert_allclose(
-            left.loc[shared, column].to_numpy(dtype=float),
-            right.loc[shared, column].to_numpy(dtype=float),
+            left.loc[unchanged, column].to_numpy(dtype=float),
+            right.loc[unchanged, column].to_numpy(dtype=float),
             rtol=0.0,
             atol=1e-9,
             err_msg=f"{column} drifted from the committed offline uncertainty pack",
         )
+
+    recentred = shared[is_recentred]
+    assert len(recentred) == 20, f"expected 20 re-centred rows, got {len(recentred)}"
+    factors = []
+    for column in columns:
+        before = left.loc[recentred, column].to_numpy(dtype=float)
+        after = right.loc[recentred, column].to_numpy(dtype=float)
+        moving = before != 0.0
+        assert moving.any(), f"{column} is entirely zero; the check would be vacuous"
+        factors.append(after[moving] / before[moving])
+    stacked = np.concatenate(factors)
+    np.testing.assert_allclose(
+        stacked,
+        np.full_like(stacked, stacked[0]),
+        rtol=0.0,
+        atol=1e-9,
+        err_msg=(
+            "the re-centred Light petrol VKT band did not move as one rigid "
+            "rescale, so this is a methodology change rather than a re-centring"
+        ),
+    )
+    # And the factor is the governed macro restatement, not an arbitrary shift.
+    assert 1.0 < float(stacked[0]) < 1.05, (
+        f"implausible re-centring factor {float(stacked[0])}"
+    )
 
 
 @pytest.mark.parametrize("engine", ENGINES)
