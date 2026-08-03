@@ -45,3 +45,37 @@ def real_chart_rows():
     if not path.exists():
         pytest.skip("committed revenue outlook pack is not present")
     return pd.read_csv(path, low_memory=False)
+
+
+@pytest.fixture(scope="module")
+def vfm_analyst_layers_enabled():
+    """Run a test with the paused MoT VFM Fast/Slow surface switched back on.
+
+    The public dashboard hides those layers
+    (``REVENUE_OUTLOOK_ENABLE_VFM_ANALYST_LAYERS = False``) and, deliberately,
+    hiding them also stops their calculations running - the Fast/Slow cone band
+    is simply not built. The calculation chain and its governance identities
+    are RETAINED so the feature can be restored by flipping that one constant,
+    so the tests that protect it opt in here rather than being deleted.
+
+    The view cache is cleared either side: entries computed under the other
+    setting carry a different cone band and must not leak in or out.
+
+    Module-scoped on purpose: these suites build their figure or view through
+    a module-scoped fixture, and pytest sets higher-scoped fixtures up first,
+    so a function-scoped gate would not yet be open when they are built.
+    """
+    import app
+    import model_dashboard.revenue_outlook_presentation_policy as policy
+
+    previous_policy = policy.REVENUE_OUTLOOK_ENABLE_VFM_ANALYST_LAYERS
+    previous_app = app.REVENUE_OUTLOOK_ENABLE_VFM_ANALYST_LAYERS
+    policy.REVENUE_OUTLOOK_ENABLE_VFM_ANALYST_LAYERS = True
+    app.REVENUE_OUTLOOK_ENABLE_VFM_ANALYST_LAYERS = True
+    app.cached_revenue_outlook_view.clear()
+    try:
+        yield
+    finally:
+        policy.REVENUE_OUTLOOK_ENABLE_VFM_ANALYST_LAYERS = previous_policy
+        app.REVENUE_OUTLOOK_ENABLE_VFM_ANALYST_LAYERS = previous_app
+        app.cached_revenue_outlook_view.clear()

@@ -259,16 +259,12 @@ from model_dashboard.revenue_uncertainty_pack import (
     load_uncertainty_pack,
 )
 from model_dashboard.revenue_outlook_presentation_policy import (
-    REVENUE_OUTLOOK_DISPLAY_END_FY,
     REVENUE_OUTLOOK_ENABLE_PED_RETENTION_CONTROL,
     REVENUE_OUTLOOK_ENABLE_VFM_ANALYST_LAYERS,
     clip_frame_to_display_horizon,
-    clip_fy_options_to_display_horizon,
     display_end_fy,
     display_horizon_note,
     is_vfm_analyst_layer_label,
-    period_within_horizon,
-    terminal_display_quarter,
 )
 
 # What a helper will accept: the typed key, or a historic positional tuple from
@@ -6111,7 +6107,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             tuple(selected_band_layers),
         )
         timer.stop("main path figure")
-        total_path_notes = []
+        total_path_notes = [display_horizon_note()]
         cone_band_for_notes = view.get("cone_band")
         if (
             isinstance(cone_band_for_notes, pd.DataFrame)

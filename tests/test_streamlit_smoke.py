@@ -1129,17 +1129,21 @@ def test_revenue_outlook_cloud_hides_debug_toggles_and_shows_full_composition(mo
     # Debug toggles stay hidden on cloud. The two 12c controls are explicit
     # three-state selectors rather than ambiguous ON/OFF toggles.
     #
+    # "Expand chart" is a presentation control: it gives the total path chart a
+    # near-full-height workspace and changes no plotted value.
+    #
     # The last two are governance detail surfaces, not debug controls, and are
     # deliberately available on cloud: they are how the empirical fan's source
-    # data and the VFM envelope's applicability stay reachable now that the
-    # separate fan card no longer renders by default. Both default to off, so
-    # neither is constructed unless a reader asks for it.
+    # data stays reachable now that the separate fan card no longer renders by
+    # default. Both default to off, so neither is constructed unless a reader
+    # asks for it. The MoT VFM Fast-Slow range audit is absent because that
+    # analyst layer is paused - see REVENUE_OUTLOOK_ENABLE_VFM_ANALYST_LAYERS.
     assert [(toggle.label, toggle.key) for toggle in at.toggle] == [
         ("Freight rail shift", "revenue_outlook_sensitivity_freight_rail_toggle"),
         ("Move petrol fleet to e-RUC", "revenue_outlook_eruc_toggle"),
+        ("Expand chart", "revenue_outlook_expand_chart"),
         ("Show forecast-uncertainty fan detail", "revenue_outlook_show_fan_detail"),
         ("Show modelled-uncertainty audit", "revenue_outlook_show_uncertainty_audit"),
-        ("Show MoT VFM Fast–Slow range audit", "revenue_outlook_show_vfm_envelope_audit"),
     ]
     assert not any(toggle.value for toggle in at.toggle[2:]), (
         "the detail surfaces must default to off"

@@ -1157,7 +1157,7 @@ def inject_theme() -> None:
             }}
             .ro-cmp-a {{ background: #002B5C; }}
             .ro-cmp-b {{ background: #F37021; }}
-            /* Expanded Total path chart: an enlarged workspace INSIDE the app,
+            /* Expanded main chart: an enlarged workspace INSIDE the app,
                not browser fullscreen (no permission prompt, no new component).
                The height is viewport-relative so the same rule works on a
                1440x900 laptop and a 1920x1080 desktop; Plotly is rendered

@@ -149,9 +149,33 @@ so the gap is Streamlit's rerun and re-render, not the model.
 
 - `compileall` over `app.py`, `model_dashboard/`, `scripts/`, `tests/` — clean
 - `tests/test_revenue_outlook_ui_slim_2050.py` — 35 passed
-- `tests/test_revenue_chart_layers.py` + `tests/test_revenue_outlook_vfm_envelope.py` — 57 passed (gate held open)
+- The six suites this change touches, run together — **238 passed**
+  (`test_revenue_outlook_ui_slim_2050`, `test_revenue_chart_layers`,
+  `test_revenue_outlook_vfm_envelope`, `test_vfm_long_run_composition`,
+  `test_view_performance_caches`, `test_streamlit_smoke`)
 - `tests/test_playwright_revenue_outlook_expand.py` — 7 passed
 - Zero page-originated browser console errors across the whole session
+- Streamlit deploy readiness PASS; extract validation 21/21; replay-seed
+  diagnostic PASS; replay parity fingerprint written (both CI parity jobs green)
+
+### Existing tests this change required updating, and why
+
+| Test | Change |
+|---|---|
+| `test_streamlit_smoke::..._cloud_hides_debug_toggles...` | The toggle inventory changed by design: "Expand chart" added, "Show MoT VFM Fast–Slow range audit" withdrawn. |
+| `test_streamlit_smoke::..._compare_mode_swaps_total_path...` | It asserts the chart card's title is absent while comparing. A CSS comment in `inject_theme` contained that title verbatim, and the injected `<style>` block is part of the rendered markdown — the comment was reworded rather than the assertion weakened. |
+| `test_revenue_outlook_vfm_envelope`, `test_revenue_chart_layers`, `test_vfm_long_run_composition` (module-wide) and `test_view_performance_caches::test_cone_band_is_uptake_key_invariant` (one test) | These protect the retained Fast/Slow backend, which the pause deliberately stops running. They now opt in to the shared `vfm_analyst_layers_enabled` fixture in `tests/conftest.py`, so the restore path stays covered instead of being deleted. The fixture is module-scoped because several of these suites build their figure through a module-scoped fixture, and pytest sets higher-scoped fixtures up first. |
+
+### On the full local suite
+
+A full `pytest` run inside an isolated clean worktree reports ~35 additional
+failures in `test_curated_data`, `test_schiff_purity`, `test_visual_artifacts`,
+`test_recursive_audit_log`, `test_cone_landscape_validation`,
+`test_ensemble_composition_validation` and `test_stress_horizon_validation`.
+These read `artifacts/` files that are gitignored and therefore absent from a
+fresh checkout; they are unrelated to this change. CI's clean-clone suite, which
+provisions those inputs, failed only on the two smoke tests listed above — both
+now fixed.
 
 ## Screenshots
 

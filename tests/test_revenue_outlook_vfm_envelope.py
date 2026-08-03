@@ -42,37 +42,14 @@ TRACES = (
     "BEFU26 official",
 )
 BASE_TRACE = "Current finalist Base case"
+COMPARISON_TRACE = "Current finalist High population/comparison"
 
 
 @pytest.fixture(scope="module", autouse=True)
-def _vfm_analyst_layers_enabled():
-    """Run this module with the paused analyst surface deliberately switched on.
+def _vfm_analyst_layers_enabled(vfm_analyst_layers_enabled):
+    """This whole module protects the retained Fast/Slow backend, so it runs
+    with the paused analyst surface deliberately switched on."""
 
-    The public dashboard hides the MoT VFM Fast/Slow layers
-    (``REVENUE_OUTLOOK_ENABLE_VFM_ANALYST_LAYERS = False``), and hiding them
-    also stops their calculations running - that is the point of the pause.
-    The calculation chain, its governance identities and its evidence are all
-    RETAINED so the feature can be restored by flipping that one constant, so
-    these tests keep protecting it with the gate held open. Without this the
-    suite would quietly stop covering the restore path.
-
-    The view cache is cleared on the way in and out: entries computed under the
-    other setting carry a different cone band and must not leak either way.
-    """
-    import model_dashboard.revenue_outlook_presentation_policy as policy
-
-    previous_policy = policy.REVENUE_OUTLOOK_ENABLE_VFM_ANALYST_LAYERS
-    previous_app = app.REVENUE_OUTLOOK_ENABLE_VFM_ANALYST_LAYERS
-    policy.REVENUE_OUTLOOK_ENABLE_VFM_ANALYST_LAYERS = True
-    app.REVENUE_OUTLOOK_ENABLE_VFM_ANALYST_LAYERS = True
-    app.cached_revenue_outlook_view.clear()
-    try:
-        yield
-    finally:
-        policy.REVENUE_OUTLOOK_ENABLE_VFM_ANALYST_LAYERS = previous_policy
-        app.REVENUE_OUTLOOK_ENABLE_VFM_ANALYST_LAYERS = previous_app
-        app.cached_revenue_outlook_view.clear()
-COMPARISON_TRACE = "Current finalist High population/comparison"
 
 # Series the VFM light-fleet composition genuinely reallocates, and series it
 # provably does not touch while the PED retention sensitivity is off.
