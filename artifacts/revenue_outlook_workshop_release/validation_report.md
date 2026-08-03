@@ -108,34 +108,76 @@ Outlook plot, reported honestly rather than tuned away.
 
 ## Browser acceptance
 
-22/25 at 1920×1080 and 22/25 at 1440×900. See `browser_acceptance.md` for the
-step table and, in particular, for the three checks that did not pass — one
-unverified (central-line movement, which the harness could not read and which
-the data layer proves instead) and two harness limitations.
+22/25 at 1920×1080 and 22/25 at 1440×900, plus a dedicated **policy-switch
+proof at 7/7** that closes the one check previously recorded as unverified.
+
+The step-12 failure was a harness defect. The reader used `gd.data[i].y`, the
+user-supplied trace spec, which can be empty for a drawn trace; the corrected
+reader uses `gd.calcdata` and reports that as its source, confirming the values
+were there all along. It then proves, on real plotted numbers:
+
+- 3/3 policy-sensitive central paths change under published → no-uplift;
+- 4/4 selected 50%/80% bands change with them;
+- net MVR is unchanged across the switch (10 traces, 0 moved);
+- returning to published restores the original values exactly, for both net MVR
+  and Total NLTF;
+- zero console errors.
+
+No application value was changed to satisfy the test.
+
+## Series coverage — Light petrol VKT
+
+The question was whether the final annual Current `light_petrol_vkt` rows exist
+through FY2050 after the post-model and policy layers. **They do not.** Run
+through the integrated annual path under all three policy states, the Current
+traces cover **FY2026–FY2030** (n=5) while BEFU26 and MBU26 cover FY2026–FY2050
+(n=25). The series is built from the PED bridge, whose governed econometric path
+ends at FY2030.
+
+Nothing was invented. The supported cutoff is kept — the Current quarterly
+derivation runs 2025Q3–2030Q2, matching its annual anchor exactly, while the
+official comparators' quarters run to 2050Q2 — and a **series-specific coverage
+note** now states it on the chart: which fiscal year the Current path is
+governed to, which fiscal year the officials publish to, that the gap is an
+absence of a governed path rather than a forecast of zero, and that the line is
+not extrapolated to meet them.
+
+The note is derived from the plotted rows rather than hard-coded per series, so
+any series with short Current coverage declares it, and a series whose Current
+path reaches the horizon stays silent — tested both ways.
+
+Restoring the official rows is what made this gap visible for the first time: a
+reader previously saw no official line at all on this series.
 
 ## What was NOT run
 
 Honesty matters more here than a full tick-list:
 
-- **The complete local pytest suite was started but did not finish**, and what
-  it showed before the session ended needs an owner's attention:
+- **The first complete pytest run was invalid and has been discarded.** It
+  reported three failure clusters in the `test_c*` region. The cause was
+  contention I created, and the timestamps show it:
 
-  1,788 tests collected. Through ~24% it reported three failure clusters —
-  seven tests at ~16%, seven more immediately after, and five at ~20%. All fall
-  in the alphabetical `test_c*` region (`test_chart_source_tables` through
-  `test_data_loader`).
+  | | |
+  |---|---|
+  | Policy build pair finished | **17:12:31** |
+  | Full suite ran | ~17:44 – **17:54:45** |
+  | `artifacts/chart_sources/r2_ladder_summary.csv` written | **17:46:23** |
 
-  **`test_conflict_fuel_paths.py` and `test_conflict_gdp_paths.py` pass 12/12
-  when run on their own.** So these are order- or shared-state–dependent
-  failures, not straightforward regressions. They could not be attributed
-  within this session, and it would be wrong to guess: they are equally
-  consistent with a pre-existing interaction (main was already known red for
-  some replay-parity cases at `48a499b`) and with something this integration
-  introduced through the Streamlit caches.
+  The policy builder was **not** running during the suite — it had finished 32
+  minutes earlier, so it cannot be the explanation. What *was* running
+  concurrently were three `pytest --collect-only` invocations and a
+  `pytest tests/test_conflict_fuel_paths.py tests/test_conflict_gdp_paths.py`
+  run I used for diagnosis, in the same worktree. `r2_ladder_summary.csv` — a
+  file the tests write, and the subject of the known deferred write-isolation
+  defect — was rewritten at 17:46:23, in the middle of the full run.
 
-  **This must be resolved before the workshop.** The fastest route is a full
-  run on `main` at `48a499b` for comparison, then `pytest -x` to name the first
-  failure and inspect the module that precedes it.
+  Two pytest processes sharing one worktree and one artifacts directory is
+  sufficient to explain order-dependent failures in modules that pass 12/12
+  alone. The run is therefore not evidence of anything and is not quoted as
+  such.
+
+  A single isolated run, with no concurrent build, server, edit or second
+  pytest, is the only acceptable basis for sign-off.
 - **Extract validation 21/21, deployment readiness, replay-seed diagnostic,
   sign-guard rebuild and replay parity were not run** for the same reason.
 - **Clean-clone CI on the final SHA has not been observed.** The PR is opened

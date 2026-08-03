@@ -64,26 +64,36 @@ found (10c passed). What is unconfirmed is whether it also reaches the
 **hover**. Worth an owner's eye before the workshop; the note satisfies the
 "hover **or** a directly adjacent note" requirement either way.
 
-**12 — central values change under a policy switch.** The harness read empty
-`y` arrays for the line traces from the Total-path selector while reading the
-band traces successfully, so its comparison was vacuous in both directions —
-it can neither confirm nor deny movement, and reporting it as a pass would
-have been reporting a bug as a feature.
+**12 — central values change under a policy switch. RESOLVED — see below.**
 
-This property is proven at the data layer, where it is checked more strictly
-than a browser could:
+## Policy-switch proof in the browser — 7/7
 
-- `policy_band_dependency_audit.csv` — **160 of 160** (series × state ×
-  engine) rows verdict *band follows central*: the set of fiscal years where
-  the band moves equals the set where the central path moves, exactly.
-- C's `test_bands_move_where_the_policy_moves_the_series` and
-  `test_vkt_per_capita_band_is_invariant_where_the_series_is_invariant`.
-- `test_every_materialised_state_equals_the_reference_pipeline` — all nine
-  states, both engines, exact.
+The step-12 failure was a harness defect, and it has been fixed and the
+property proven directly. `policy_switch_browser_proof.json`.
 
-Step 12b (bands moved) and step 16 (a genuinely invariant series stayed
-invariant) also both passed in the browser, and those two together are only
-consistent with the central paths moving.
+The original reader used `gd.data[i].y`. That is the *user-supplied* trace
+spec; when a trace's values arrive by another route it can be empty even though
+the trace is drawn, which is why the bands read fine and the lines read empty.
+The corrected reader tries `gd.calcdata` (what Plotly actually computed per
+point), then `gd._fullData`, then `gd.data`, and records which one supplied the
+numbers. **It reports `calcdata`** — confirming the old reader was genuinely
+vacuous rather than the values being absent.
+
+| # | Check | Result |
+|---|---|---|
+| 00 | The reader obtains non-empty central values | pass — `source=calcdata`, 3 central traces of 21 points, 4 band traces |
+| 01 | A policy-sensitive central path changes | **pass — 3/3 moved**: Current Base, High population/comparison, Middle East conflict: Medium |
+| 02 | Its selected 50%/80% bands change consistently | **pass — 4/4 moved** |
+| 03 | An invariant series (net MVR) is unchanged | **pass — 10 traces read, 0 moved** |
+| 04 | Returning to published restores the values (net MVR) | pass — all 10 identical to the first published read |
+| 05 | Returning to published restores the values (Total NLTF) | pass — central and bands both identical |
+| 06 | No console errors | pass |
+
+No application value was changed to satisfy this test; only the reader was
+fixed. The result matches the data layer exactly, where
+`policy_band_dependency_audit.csv` puts **160 of 160** rows at *band follows
+central* — the fiscal years where a band moves are precisely those where its
+central path moves.
 
 ## Not attempted
 

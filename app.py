@@ -2668,6 +2668,51 @@ VFM_ENVELOPE_NOT_PROBABILISTIC_NOTE = (
     "probabilistic within their stated evidence, and are selected separately."
 )
 
+def _current_path_coverage_note(rows: pd.DataFrame, selected_series: str) -> str:
+    """Say so when the Current path stops short of the official comparators.
+
+    Light petrol VKT is the case this exists for. It is built from the PED
+    bridge, whose governed econometric path ends at FY2030, while BEFU26 and
+    MBU26 publish it to FY2050. Restoring those official rows made the gap
+    visible for the first time: a reader now sees two official lines running
+    twenty years past the Current one and has no way, from the chart alone, to
+    tell whether the Current path is missing or genuinely ends there.
+
+    The note is derived from the plotted rows rather than hard-coded per
+    series, so any series whose Current coverage is shorter than the display
+    horizon says so, and none has to be remembered.
+
+    Nothing is extrapolated. A path the evidence does not carry to FY2050 is
+    not drawn to FY2050.
+    """
+    if rows is None or rows.empty or "june_year" not in rows.columns:
+        return ""
+    trace = rows.get("trace_name", pd.Series(dtype=str)).astype(str)
+    grain = rows.get("time_grain", pd.Series(dtype=str)).astype(str)
+    annual = rows[grain.eq("june_year")] if grain.any() else rows
+    if annual.empty:
+        return ""
+    annual_trace = annual.get("trace_name", pd.Series(dtype=str)).astype(str)
+    current = annual[annual_trace.str.startswith("Current finalist")]
+    official = annual[annual_trace.str.contains("official", case=False, na=False)]
+    if current.empty or official.empty:
+        return ""
+    current_last = pd.to_numeric(current["june_year"], errors="coerce").max()
+    official_last = pd.to_numeric(official["june_year"], errors="coerce").max()
+    if not pd.notna(current_last) or not pd.notna(official_last):
+        return ""
+    if int(current_last) >= min(int(official_last), display_end_fy()):
+        return ""
+    return (
+        f"Coverage — {selected_series}: the Current path is governed to "
+        f"FY{int(current_last)}, while the official comparators publish to "
+        f"FY{int(official_last)}. The Current line stops where its evidence "
+        "stops rather than being extrapolated to meet them, and its quarterly "
+        f"view ends at the matching quarter. The gap after FY{int(current_last)} "
+        "is an absence of a governed Current path, not a forecast of zero."
+    )
+
+
 #: Shown when a reader carries a band selection into the quarterly view.
 QUARTERLY_UNCERTAINTY_NOT_GOVERNED_NOTE = (
     "Modelled uncertainty is governed at June-year level only. The 50% and 80% "
@@ -6584,6 +6629,9 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         )
         timer.stop("main path figure")
         total_path_notes = [display_horizon_note()]
+        short_current_note = _current_path_coverage_note(plot_rows, selected_stream)
+        if short_current_note:
+            total_path_notes.append(short_current_note)
         if quarterly_grain and any(
             layer in selected_band_layers for layer in (BAND_50_LAYER_ID, BAND_80_LAYER_ID)
         ):

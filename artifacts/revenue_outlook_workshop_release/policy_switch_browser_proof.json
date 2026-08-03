@@ -1,0 +1,37 @@
+[
+  {
+    "check": "00 the reader obtains non-empty central values",
+    "pass": true,
+    "detail": "source=calcdata; 3 central traces, lengths=[21, 21, 21]; 4 band traces"
+  },
+  {
+    "check": "01 a policy-sensitive central path changes",
+    "pass": true,
+    "detail": "moved 3/3: ['Current finalist Base case', 'Current finalist High population/comparison', 'Middle East conflict: Medium']"
+  },
+  {
+    "check": "02 its selected 50%/80% bands change consistently",
+    "pass": true,
+    "detail": "moved 4/4: ['80% conditional band upper', '80% conditional modelled uncertainty', '50% conditional band upper']"
+  },
+  {
+    "check": "03 an invariant series (net MVR) is unchanged",
+    "pass": true,
+    "detail": "10 traces read, 0 moved: []"
+  },
+  {
+    "check": "04 returning to published restores the values (net MVR)",
+    "pass": true,
+    "detail": "10 traces identical to the first published read"
+  },
+  {
+    "check": "05 returning to published restores the values (Total NLTF)",
+    "pass": true,
+    "detail": "central and bands both identical to the first published read"
+  },
+  {
+    "check": "06 no console errors",
+    "pass": true,
+    "detail": ""
+  }
+]

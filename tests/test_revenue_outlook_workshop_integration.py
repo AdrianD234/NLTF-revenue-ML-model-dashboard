@@ -479,6 +479,59 @@ def test_an_uncatalogued_key_falls_back_rather_than_approximating(engine: str) -
     assert "custom_ev_levers" in resolution.detail
 
 
+def _coverage_rows(current_last: int, official_last: int) -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "trace_name": (
+                ["Current finalist Base case"] * (current_last - 2025)
+                + ["BEFU26 official"] * (official_last - 2025)
+            ),
+            "time_grain": ["june_year"] * (current_last + official_last - 4050),
+            "june_year": (
+                list(range(2026, current_last + 1)) + list(range(2026, official_last + 1))
+            ),
+            "value": [1.0] * (current_last + official_last - 4050),
+        }
+    )
+
+
+def test_a_short_current_path_is_declared_not_extrapolated() -> None:
+    """Light petrol VKT's Current path ends at FY2030; the officials run to FY2050.
+
+    Restoring the official rows made that gap visible for the first time. A
+    reader seeing two official lines run twenty years past the Current one
+    cannot tell from the chart whether the Current path is missing or genuinely
+    ends. The note says which, and nothing is drawn to FY2050 that the evidence
+    does not carry there.
+    """
+    note = app._current_path_coverage_note(
+        _coverage_rows(2030, 2050), "Light petrol VKT"
+    )
+    assert "FY2030" in note and "FY2050" in note
+    assert "extrapolated" in note.casefold()
+    assert "not a forecast of zero" in note.casefold()
+
+
+def test_no_coverage_note_when_the_current_path_reaches_the_horizon() -> None:
+    """A note on every series would train readers to ignore it."""
+    assert app._current_path_coverage_note(
+        _coverage_rows(2050, 2050), "Total NLTF revenue"
+    ) == ""
+
+
+def test_light_petrol_vkt_current_rows_really_do_stop_at_fy2030() -> None:
+    """The premise of the note, asserted against the governed pack.
+
+    If a future bridge extends the Current path to FY2050 this fails, which is
+    the point: the note would then be wrong and must go.
+    """
+    chart = pd.read_parquet(ROOT / "data/current_revenue_outlook/revenue_chart_rows.parquet")
+    combined = app._append_missing_official_rows(chart)
+    petrol = combined[combined["series_id"].astype(str).eq("light_petrol_vkt")]
+    official = petrol[petrol["trace_name"].astype(str).str.contains("official")]
+    assert int(pd.to_numeric(official["june_year"], errors="coerce").max()) == 2050
+
+
 def test_the_builder_switches_the_fast_path_off() -> None:
     """A rebuild must materialise the reference pipeline, not itself.
 
