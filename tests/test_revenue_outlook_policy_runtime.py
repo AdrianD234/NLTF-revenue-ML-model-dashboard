@@ -54,12 +54,62 @@ from model_dashboard.revenue_outlook_policy_runtime import (
     state_id_for,
     upstream_manifests,
 )
+from model_dashboard.revenue_outlook_replay_cache import matches_build_environment
 from model_dashboard.revenue_scenario_key import RevenueScenarioComputationKey
 from model_dashboard.revenue_uncertainty_policy import REPORTED_SERIES
 
 ROOT = Path(__file__).resolve().parents[1]
 ENGINES = (ENGINE_AR1, ENGINE_ENSEMBLE)
 SENSITIVITY = app.selected_sensitivity_key("Off", "Off", "Off", freight_rail_shift="Off")
+
+
+def _reference_parity(
+    expected: pd.DataFrame,
+    actual: pd.DataFrame,
+    *,
+    obj: str,
+    same_environment: bool,
+    violations: list[str],
+) -> None:
+    """Compare a materialised frame to a LIVE reference run.
+
+    Exactly, on the machine that built the pack - that is the gate on the
+    materialisation, and it has no escape hatch.
+
+    Elsewhere, to within the repo's governed closure tolerance. The forward
+    model is not bit-reproducible across interpreter and library versions:
+    PR #16 established that, and a live Linux reference reproduces cells of
+    ``fuel.replay.future_forecasts`` at float32 precision where the Windows
+    build produced float64. Asserting exact equality against a re-run on a
+    machine that did not build the pack tests the environment, not the pack.
+
+    The bound is imported from ``test_revenue_outlook_replay_cache`` rather
+    than restated, because it is a governance artefact whose own comment
+    records being set from a partial view twice. Two copies would drift.
+    """
+    try:
+        pd.testing.assert_frame_equal(expected, actual, check_exact=True, obj=obj)
+        return
+    except AssertionError:
+        if same_environment:
+            raise
+    from test_revenue_outlook_replay_cache import _worst_deviation
+
+    worst_abs, worst_excess, where = _worst_deviation(actual, expected)
+    if worst_excess > 0.0:
+        # Collected rather than raised, so one CI run reports every frame that
+        # drifted instead of only the first.
+        violations.append(
+            f"{obj}: max_abs={worst_abs:.3e} exceeds bound by {worst_excess:.3e} ({where})"
+        )
+
+
+def _built_here(engine: str) -> bool:
+    """True when this process is the one that produced the materialised pack."""
+    manifest = json.loads(
+        (policy_runtime_dir(engine, ROOT) / "manifest.json").read_text(encoding="utf-8")
+    )
+    return matches_build_environment(manifest)
 
 
 # ---------------------------------------------------------------- fixtures
@@ -135,6 +185,8 @@ def test_every_materialised_state_equals_the_reference_pipeline(runtimes, engine
     """The whole contract, checked frame by frame on all nine states."""
     runtime = runtimes[engine]
     pack, signature = _pack_and_signature(engine)
+    same_environment = _built_here(engine)
+    violations: list[str] = []
     for current in POLICY_STATES:
         for official in POLICY_STATES:
             key = _governed_key(pack, engine, current, official)
@@ -170,9 +222,17 @@ def test_every_materialised_state_equals_the_reference_pipeline(runtimes, engine
             # surfacing as a missing download months later.
             assert set(expected) == set(FRAME_NAMES)
             for name in FRAME_NAMES:
-                pd.testing.assert_frame_equal(
-                    expected[name], runtime.frame(state_id, name), check_exact=True
+                _reference_parity(
+                    expected[name],
+                    runtime.frame(state_id, name),
+                    obj=f"{state_id}/{name}",
+                    same_environment=same_environment,
+                    violations=violations,
                 )
+    assert not violations, (
+        f"{len(violations)} frame(s) exceed the governed closure tolerance:\n  "
+        + "\n  ".join(violations)
+    )
 
 
 @pytest.mark.parametrize("engine", ENGINES)
@@ -184,11 +244,15 @@ def test_published_default_rows_are_preserved_exactly(runtimes, engine):
     chart_rows, _u, _e, _p, _s = app.cached_scenario_overlay_rows(
         signature, SENSITIVITY, PED_BRIDGE_DEFAULT_MODE, key, pack
     )
-    pd.testing.assert_frame_equal(
+    violations: list[str] = []
+    _reference_parity(
         chart_rows,
         runtime.frame(state_id_for(engine, "published", "published"), "chart_rows"),
-        check_exact=True,
+        obj="published default chart_rows",
+        same_environment=_built_here(engine),
+        violations=violations,
     )
+    assert not violations, "\n  ".join(violations)
 
 
 @pytest.mark.parametrize("engine", ENGINES)
@@ -592,6 +656,8 @@ def test_vfm_envelope_frames_equal_the_reference_preset_run(runtimes, engine):
     runtime = runtimes[engine]
     pack, signature = _pack_and_signature(engine)
     key = _governed_key(pack, engine, "delayed_6m", "published")
+    same_environment = _built_here(engine)
+    violations: list[str] = []
     for bound, basis in (("fast", VFM_FAST_BASIS), ("slow", VFM_SLOW_BASIS)):
         expected, _u, _e, _p, _s = app.cached_scenario_overlay_rows(
             signature,
@@ -600,14 +666,17 @@ def test_vfm_envelope_frames_equal_the_reference_preset_run(runtimes, engine):
             key.replace(uptake_basis=basis),
             pack,
         )
-        pd.testing.assert_frame_equal(
+        _reference_parity(
             expected,
             runtime.frame(
                 state_id_for(engine, "delayed_6m", "published"),
                 f"vfm_{bound}_chart_rows",
             ),
-            check_exact=True,
+            obj=f"vfm_{bound}_chart_rows",
+            same_environment=same_environment,
+            violations=violations,
         )
+    assert not violations, "\n  ".join(violations)
 
 
 # --------------------------------------------------------- policy-aware bands
@@ -752,6 +821,61 @@ def test_reported_series_are_the_governed_inventory(runtimes, engine):
     assert "total_ruc_net_revenue" in present
     assert "net_fed_revenue" in present
     assert len(missing) < len(REPORTED_SERIES) / 2
+
+
+def test_cross_environment_gate_absorbs_model_drift_and_catches_real_changes():
+    """Exercise the non-build-environment branch of ``_reference_parity``.
+
+    That branch only runs where the pack was NOT built, so it never executes
+    on the machine that produced it - which is exactly how an escape hatch
+    ends up quietly absorbing a real difference. Pinned directly instead.
+
+    The bound is the repo's governed one, so this pins what it does rather
+    than what would be convenient. It absorbs summation-scale residues.
+    """
+    reference = pd.DataFrame({"value": [13.01761507987976, 0.0, 8016352797.0, -2894.27382723066]})
+
+    drifted = pd.DataFrame({"value": [13.0176150798797, 6.9e-11, 8016352797.0 + 1e-4, -2894.27382723071]})
+    violations: list[str] = []
+    _reference_parity(
+        reference, drifted, obj="drift", same_environment=False, violations=violations
+    )
+    assert not violations, f"the governed bound rejected summation-scale noise: {violations}"
+
+    # A real change must still be caught, and must NOT be caught by the
+    # exactness path - it has to fail the BOUND.
+    changed = pd.DataFrame({"value": [13.01761507987976, 0.0, 8016352797.0 + 20.0, -2894.2738]})
+    violations = []
+    _reference_parity(
+        reference, changed, obj="real", same_environment=False, violations=violations
+    )
+    assert violations, "a real change was absorbed by the cross-environment bound"
+
+    # On the machine that built the pack there is no bound at all.
+    with pytest.raises(AssertionError):
+        _reference_parity(
+            reference, drifted, obj="drift", same_environment=True, violations=[]
+        )
+
+    # The float32/float64 split a live Linux replay actually produces is NOT
+    # absorbed: 13.017618179321289 (a float32 grid point) against the
+    # float64-precise 13.01761507987976 is 3.1e-06 apart, and the governed
+    # bound rejects it. Pinned because that is why `main` itself is currently
+    # red on `test_replay_cache_matches_reference_exactly`; widening the bound
+    # to hide it is an owner decision, and this test makes the widening
+    # visible rather than silent.
+    float32_drift = pd.DataFrame(
+        {"value": [13.017618179321289, 0.0, 8016352797.0, -2894.27382723066]}
+    )
+    violations = []
+    _reference_parity(
+        reference, float32_drift, obj="float32", same_environment=False, violations=violations
+    )
+    assert violations, (
+        "the governed cross-environment bound now absorbs the float32 model drift; "
+        "if that was intended, the change belongs with the owner of "
+        "_CROSS_ENVIRONMENT_ATOL, not here"
+    )
 
 
 # ------------------------------------------------------------- no live work
