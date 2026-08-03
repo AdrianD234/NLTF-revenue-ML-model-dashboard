@@ -56,6 +56,72 @@ open, so the retained backend and the restore path stay covered.
 Current Base is unaffected: it still composes from the exact VFM202405 Base
 shares (`uptake_basis = "MoT VFM base"`, `share_source = exact_vendored_vfm_table`).
 
+## 2a. The uptake basis is paused with its layers
+
+Hiding the chart layers while leaving VFM Fast and VFM Slow selectable in the
+**EV uptake-basis** control left the whole-scenario composition reachable: a
+reader could still run Fast or Slow through the entire engine, they just could
+not see the dedicated lines. The pause therefore covers the basis selector too.
+
+Public uptake options are now:
+
+```
+MoT VFM base
+Custom levers
+Parametric approximation to VFM Base (audit sensitivity)
+```
+
+The pause is deliberately narrow. The parametric approximation to VFM **Base**
+also mentions VFM and survives, as do the custom levers and every official
+comparator label; only the Fast/Slow pair is withdrawn.
+
+Three surfaces were carrying it:
+
+| Surface | Before | After |
+|---|---|---|
+| Single-view "Uptake basis" | full `EV_UPTAKE_MODE_OPTIONS` | `_public_uptake_basis_options()` |
+| Compare-view "Uptake basis" (A and B) | full options minus Custom | gated options minus Custom |
+| Compare **Scenario B default** | **`"MoT VFM fast"`** | `MoT VFM base` |
+
+That third one mattered most: Scenario B *opened* on VFM Fast, so simply
+switching to Compare A vs B ran a paused composition without the reader
+choosing anything.
+
+Stale session state is reset rather than dropped, on three keys
+(`revenue_outlook_ev_uptake_basis_v2`, `ro_cmp_a_uptake`, `ro_cmp_b_uptake`):
+these selectors must always resolve to a legal composition, and Base is the
+governed default. The two remaining reads of the page's basis are sanitised at
+the point of use as well, so the guarantee does not depend on entry-time
+cleanup alone.
+
+### Proofs
+
+| Requirement | Test |
+|---|---|
+| Fast/Slow absent from single-view controls | `test_the_single_view_uptake_selector_offers_no_paused_basis` |
+| Fast/Slow absent from compare-view controls, and B opens on Base | `test_compare_mode_offers_no_paused_basis_and_opens_on_base` |
+| Stale session values reset to VFM Base | `test_a_stale_paused_basis_is_reset_to_vfm_base` (per key) and `test_a_stale_paused_basis_does_not_survive_a_real_render` |
+| No Fast/Slow scenario-overlay calculation runs | `test_no_fast_or_slow_overlay_is_computed_on_a_production_render` — every overlay pass carrying a paused basis raises, and a default render seeded with a stale Fast selection must still complete |
+| Current Base byte-identical | `test_current_base_is_unmoved_by_the_uptake_gate` — the Current Base series computed with the gate closed and open is compared with `assert_series_equal` |
+| Retained backend still passes with the gate enabled | `test_the_fast_slow_backend_still_works_when_the_gate_is_open` plus the three suites that run gate-open |
+
+### One thing deliberately left alone
+
+The **Fleet Mix Explorer's "Source" selector** still lists
+`VFM 202405 - Fast scenario` and `- Slow scenario`. Those are MoT's published
+vendored extract shown side by side with the dashboard path — reference
+material, not a composition the engine runs: `fleet_mix.load_dashboard_frame`
+always builds its dashboard column with `EV_UPTAKE_PRESETS[DEFAULT_EV_UPTAKE_MODE]`.
+Withdrawing them would drop published source material the pause was never
+about. `test_the_fleet_mix_vfm_reference_is_display_only` pins that distinction
+so it cannot drift into an engine path unnoticed.
+
+### Verified in the browser
+
+Uptake-basis dropdown lists exactly the three options above; both compare-mode
+selectors open on `MoT VFM base`; no `MoT VFM fast`/`slow` text anywhere on the
+page in either view mode; zero console errors.
+
 ## 3. Presentation horizon capped at FY2050
 
 ```python
@@ -192,9 +258,8 @@ now fixed.
 
 ## Out of scope, deliberately left alone
 
-- The EV **uptake basis** selector still offers "MoT VFM fast"/"MoT VFM slow" as
-  whole-scenario composition choices. That is a scenario input, not a chart
-  layer, and section 2 of the brief requires the exact VFM202405 class
-  allocation to be preserved. Only the chart *layers* were withdrawn.
+- The EV uptake-basis selector was withdrawn in a follow-up amendment; see
+  section 2a. The Fleet Mix Explorer's published VFM 202405 reference columns
+  are retained and explained there.
 - The R2 ladder artifact mutation and the stale legacy e2e contract are not
   touched here.

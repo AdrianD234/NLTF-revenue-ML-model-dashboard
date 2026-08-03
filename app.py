@@ -264,7 +264,10 @@ from model_dashboard.revenue_outlook_presentation_policy import (
     clip_frame_to_display_horizon,
     display_end_fy,
     display_horizon_note,
+    is_paused_vfm_uptake_basis,
     is_vfm_analyst_layer_label,
+    public_uptake_basis_options,
+    sanitised_uptake_basis,
 )
 
 # What a helper will accept: the typed key, or a historic positional tuple from
@@ -1024,6 +1027,24 @@ def _production_ped_retention_sensitivity() -> bool:
     return bool(st.session_state.get("revenue_outlook_ped_retention_sensitivity", False))
 
 
+def _public_uptake_basis_options() -> list[str]:
+    """The uptake bases the production UI offers, in their governed order.
+
+    One source for both view modes, so single and compare can never disagree
+    about which compositions a reader may run.
+    """
+    return public_uptake_basis_options(EV_UPTAKE_MODE_OPTIONS)
+
+
+# Session keys that carry an uptake basis and therefore have to be re-checked
+# against the pause on every entry.
+_UPTAKE_BASIS_STATE_KEYS = (
+    "revenue_outlook_ev_uptake_basis_v2",
+    "ro_cmp_a_uptake",
+    "ro_cmp_b_uptake",
+)
+
+
 def _discard_withdrawn_revenue_outlook_state() -> None:
     """Drop session values written by controls that no longer exist.
 
@@ -1044,6 +1065,14 @@ def _discard_withdrawn_revenue_outlook_state() -> None:
             ]
             if len(kept) != len(persisted):
                 st.session_state["revenue_outlook_chart_layers"] = kept
+        # A basis selected before the pause is reset rather than dropped: these
+        # selectors must always resolve to a legal composition, and Base is the
+        # governed default.
+        for key in _UPTAKE_BASIS_STATE_KEYS:
+            if key in st.session_state and is_paused_vfm_uptake_basis(
+                st.session_state[key]
+            ):
+                st.session_state[key] = DEFAULT_EV_UPTAKE_MODE
 
 
 # The official comparator vintage selection rides in slots 6/7 of the uptake
@@ -5356,12 +5385,21 @@ def _render_lever_accordion(
         st.markdown("<div class='page5-panel-title'>EV/PHEV uptake</div><div class='page5-panel-sub'>Light RUC fleet composition, from the MoT Vehicle Fleet Model. This sets the class mix only; it does not change total light RUC travel.</div>", unsafe_allow_html=True)
         uptake_cols = st.columns([0.30, 0.70])
         with uptake_cols[0]:
+            # The uptake basis is a whole-scenario input, so while the VFM
+            # analyst layers are paused the Fast/Slow compositions come out of
+            # this selector too. Hiding the layers while leaving the basis
+            # selectable would still let a reader run the Fast/Slow composition
+            # through the entire engine.
+            uptake_mode_options = _public_uptake_basis_options()
             selected_ev_uptake_mode = st.selectbox(
                 "Uptake basis",
-                list(EV_UPTAKE_MODE_OPTIONS),
+                uptake_mode_options,
                 key="revenue_outlook_ev_uptake_basis_v2",
                 help=VFM_SOURCE_NOTE + "\n\n" + SENSITIVITY_INTERPLAY_NOTE,
-                **_widget_default_kwargs("revenue_outlook_ev_uptake_basis_v2", index=list(EV_UPTAKE_MODE_OPTIONS).index(DEFAULT_EV_UPTAKE_MODE)),
+                **_widget_default_kwargs(
+                    "revenue_outlook_ev_uptake_basis_v2",
+                    index=uptake_mode_options.index(DEFAULT_EV_UPTAKE_MODE),
+                ),
             )
         # The petrol-retention sensitivity is no longer a reader control: the
         # rolling-origin comparison did not support the overlay as a Base path,
@@ -5548,7 +5586,10 @@ def _compare_mode_lever_state(selected_metric_type: str) -> dict[str, Any]:
         freight = str(st.session_state.get("revenue_outlook_sensitivity_freight_rail_shift", "Med"))
         if freight == "Custom":
             freight = "Med"
-    uptake_mode = str(st.session_state.get("revenue_outlook_ev_uptake_basis_v2", DEFAULT_EV_UPTAKE_MODE))
+    uptake_mode = sanitised_uptake_basis(
+        st.session_state.get("revenue_outlook_ev_uptake_basis_v2", DEFAULT_EV_UPTAKE_MODE),
+        default=DEFAULT_EV_UPTAKE_MODE,
+    )
     custom_ev_levers: tuple[float, ...] = ()
     if uptake_mode == EV_UPTAKE_CUSTOM_OPTION:
         defaults = EV_UPTAKE_PRESETS[DEFAULT_EV_UPTAKE_MODE]
@@ -8826,7 +8867,13 @@ def _validated_select_state(key: str, options: list[str], default: str) -> None:
 def _comparison_scenario_defaults(prefix: str) -> dict[str, Any]:
     is_b = prefix == "b"
     return {
-        "uptake": "MoT VFM fast" if is_b else DEFAULT_EV_UPTAKE_MODE,
+        # Scenario B opened on the VFM Fast composition, which is one of the
+        # paused analyst scenarios: while the pause is in force B has to open
+        # on Base like A, or comparing A vs B would run Fast by default.
+        "uptake": sanitised_uptake_basis(
+            "MoT VFM fast" if is_b else DEFAULT_EV_UPTAKE_MODE,
+            default=DEFAULT_EV_UPTAKE_MODE,
+        ),
         "fleet": "Off",
         "pt": "Off",
         "freight": "Off",
@@ -8846,7 +8893,9 @@ def _render_comparison_scenario_column(
     # The governed option follows the page's SELECTED comparator vintage; a
     # stale label from another vintage is reset by _validated_select_state.
     mot_option = _comparison_mot_official_option(selected_release)
-    uptake_options = [mode for mode in EV_UPTAKE_MODE_OPTIONS if mode != EV_UPTAKE_CUSTOM_OPTION]
+    uptake_options = [
+        mode for mode in _public_uptake_basis_options() if mode != EV_UPTAKE_CUSTOM_OPTION
+    ]
     uptake_options.append(mot_option)
     keys = {
         name: f"ro_cmp_{prefix}_{name}"
@@ -8958,7 +9007,10 @@ def _render_comparison_scenario_column(
 
 def _copy_page_settings_to_scenario_a() -> None:
     """Map the main-panel session values into the Scenario A keys."""
-    uptake = str(st.session_state.get("revenue_outlook_ev_uptake_basis_v2", DEFAULT_EV_UPTAKE_MODE))
+    uptake = sanitised_uptake_basis(
+        st.session_state.get("revenue_outlook_ev_uptake_basis_v2", DEFAULT_EV_UPTAKE_MODE),
+        default=DEFAULT_EV_UPTAKE_MODE,
+    )
     if uptake == EV_UPTAKE_CUSTOM_OPTION:
         uptake = DEFAULT_EV_UPTAKE_MODE
     st.session_state["ro_cmp_a_uptake"] = uptake

@@ -583,3 +583,238 @@ def test_the_rendered_chart_carries_bands_but_no_vfm_traces(rendered_page) -> No
     names = " ".join(traces).casefold()
     assert "conditional modelled uncertainty" in names, names
     assert "vfm" not in names, names
+
+
+# ============================ E. the uptake basis is gated with its layers
+# The uptake basis is a whole-SCENARIO input, not a chart layer. Leaving VFM
+# Fast/Slow selectable while their layers were hidden still let a reader run
+# those compositions through the entire engine, so the pause has to cover the
+# basis selector too.
+PAUSED_BASES = ("MoT VFM fast", "MoT VFM slow")
+UPTAKE_STATE_KEYS = (
+    "revenue_outlook_ev_uptake_basis_v2",
+    "ro_cmp_a_uptake",
+    "ro_cmp_b_uptake",
+)
+
+
+def test_the_public_uptake_options_exclude_fast_and_slow() -> None:
+    options = app._public_uptake_basis_options()
+    assert app.DEFAULT_EV_UPTAKE_MODE in options
+    for basis in PAUSED_BASES:
+        assert basis not in options, basis
+    # The pause is narrow: the parametric approximation to VFM BASE, the custom
+    # levers and the governed default all survive it.
+    assert app.EV_UPTAKE_CUSTOM_OPTION in options
+    assert any("parametric" in option.casefold() for option in options), options
+
+
+def test_the_paused_bases_are_recognised_but_vfm_base_is_not() -> None:
+    for basis in PAUSED_BASES:
+        assert app.is_paused_vfm_uptake_basis(basis) is True, basis
+    assert app.is_paused_vfm_uptake_basis(app.DEFAULT_EV_UPTAKE_MODE) is False
+    assert (
+        app.is_paused_vfm_uptake_basis(
+            "Parametric approximation to VFM Base (audit sensitivity)"
+        )
+        is False
+    )
+
+
+def test_the_single_view_uptake_selector_offers_no_paused_basis(rendered_page) -> None:
+    """No uptake-BASIS control may offer a paused composition.
+
+    Scoped to the uptake-basis selectors on purpose. The Fleet Mix Explorer has
+    its own "Source" control that lists MoT's published VFM 202405 Fast and
+    Slow scenarios; that one is reference material - see
+    test_the_fleet_mix_vfm_reference_is_display_only.
+    """
+    boxes = [
+        element
+        for element in rendered_page.get("selectbox")
+        if str(element.label) == "Uptake basis"
+    ]
+    assert boxes, "the single view rendered no uptake-basis selector"
+    for element in boxes:
+        for option in getattr(element, "options", None) or []:
+            assert not app.is_paused_vfm_uptake_basis(option), option
+        assert not app.is_paused_vfm_uptake_basis(element.value), element.value
+
+
+def test_the_fleet_mix_vfm_reference_is_display_only() -> None:
+    """The Fleet Mix Explorer keeps MoT's published Fast/Slow columns.
+
+    They are the vendored VFM 202405 extract shown side by side with the
+    dashboard path, not a composition the engine runs: the dashboard column is
+    always built with the governed default basis. Withdrawing them would drop
+    published source material the pause was never about, so this test pins the
+    distinction rather than the absence.
+    """
+    import inspect
+
+    from model_dashboard import fleet_mix
+
+    source = inspect.getsource(fleet_mix.load_dashboard_frame)
+    assert "EV_UPTAKE_PRESETS[DEFAULT_EV_UPTAKE_MODE]" in source, (
+        "the fleet-mix dashboard path no longer pins the governed default basis"
+    )
+    assert "VFM 202405 - Fast scenario" in fleet_mix.VFM_SOURCES
+
+
+def test_compare_mode_offers_no_paused_basis_and_opens_on_base() -> None:
+    """Compare view owns its own uptake selectors, including Scenario B.
+
+    Scenario B used to OPEN on VFM Fast, so without this the default A/B
+    comparison would still have run a paused composition.
+    """
+    from streamlit.testing.v1 import AppTest
+
+    for prefix in ("a", "b"):
+        assert (
+            app._comparison_scenario_defaults(prefix)["uptake"]
+            == app.DEFAULT_EV_UPTAKE_MODE
+        ), prefix
+
+    harness = AppTest.from_file(str(ROOT / "app.py"), default_timeout=300)
+    harness.run()
+    harness.radio[0].set_value(app.REVENUE_OUTLOOK_PAGE)
+    harness.run()
+    view_mode = next(
+        radio for radio in harness.get("radio") if str(radio.label) == "View"
+    )
+    view_mode.set_value(app.REVENUE_OUTLOOK_VIEW_COMPARE)
+    harness.run()
+    assert not harness.exception, harness.exception
+
+    uptake_boxes = [
+        element
+        for element in harness.get("selectbox")
+        if str(element.label) == "Uptake basis"
+    ]
+    assert uptake_boxes, "compare mode rendered no uptake-basis selector"
+    for element in uptake_boxes:
+        for option in getattr(element, "options", None) or []:
+            assert not app.is_paused_vfm_uptake_basis(option), option
+        assert not app.is_paused_vfm_uptake_basis(element.value), element.value
+
+
+@pytest.mark.parametrize("state_key", UPTAKE_STATE_KEYS)
+def test_a_stale_paused_basis_is_reset_to_vfm_base(state_key: str) -> None:
+    """Session state outlives a deployment; a stored Fast must not persist."""
+    import streamlit as st
+
+    st.session_state[state_key] = "MoT VFM fast"
+    try:
+        app._discard_withdrawn_revenue_outlook_state()
+        assert st.session_state[state_key] == app.DEFAULT_EV_UPTAKE_MODE
+    finally:
+        st.session_state.pop(state_key, None)
+
+
+def test_a_stale_paused_basis_does_not_survive_a_real_render() -> None:
+    from streamlit.testing.v1 import AppTest
+
+    harness = AppTest.from_file(str(ROOT / "app.py"), default_timeout=300)
+    for key in UPTAKE_STATE_KEYS:
+        harness.session_state[key] = "MoT VFM slow"
+    harness.run()
+    harness.radio[0].set_value(app.REVENUE_OUTLOOK_PAGE)
+    harness.run()
+    assert not harness.exception, harness.exception
+    for key in UPTAKE_STATE_KEYS:
+        assert harness.session_state[key] == app.DEFAULT_EV_UPTAKE_MODE, key
+
+
+def test_no_fast_or_slow_overlay_is_computed_on_a_production_render(monkeypatch) -> None:
+    """The point of the amendment: the COMPOSITION must not run either.
+
+    Any scenario-overlay pass carrying a paused basis raises, and a default
+    render - seeded with a stale Fast selection - has to complete anyway.
+    """
+    from streamlit.testing.v1 import AppTest
+
+    original = app.cached_scenario_overlay_rows
+
+    def guarded(signature, sensitivity_key, bridge_mode, ev_uptake_key, pack):
+        basis = app._scenario_key(ev_uptake_key).uptake_basis
+        if app.is_paused_vfm_uptake_basis(basis):
+            raise AssertionError(f"a paused composition was computed: {basis!r}")
+        return original(signature, sensitivity_key, bridge_mode, ev_uptake_key, pack)
+
+    guarded.clear = getattr(original, "clear", lambda: None)
+    monkeypatch.setattr(app, "cached_scenario_overlay_rows", guarded)
+
+    harness = AppTest.from_file(str(ROOT / "app.py"), default_timeout=300)
+    for key in UPTAKE_STATE_KEYS:
+        harness.session_state[key] = "MoT VFM fast"
+    harness.run()
+    harness.radio[0].set_value(app.REVENUE_OUTLOOK_PAGE)
+    harness.run()
+    assert not harness.exception, harness.exception
+
+
+def test_current_base_is_unmoved_by_the_uptake_gate(context, default_traces) -> None:
+    """Gating the selector must not touch a single Current Base value.
+
+    Computed with the gate closed (production) and open (the pre-amendment
+    surface) under the same production key, which has always been VFM Base.
+    """
+    import model_dashboard.revenue_outlook_presentation_policy as policy
+
+    pack, signature = context
+    sensitivity = app.selected_sensitivity_key("Off", "Off", "Off", freight_rail_shift="Off")
+
+    def current_base() -> pd.Series:
+        view = app.cached_revenue_outlook_view(
+            signature, SERIES, "june_year", FED, default_traces, sensitivity,
+            PED_BRIDGE_DEFAULT_MODE, production_key(), pack,
+        )
+        rows = view["filtered_rows"]
+        base = rows[
+            rows["trace_name"].astype(str).eq("Current finalist Base case")
+            & ~rows.get("row_type", pd.Series("", index=rows.index))
+            .astype(str)
+            .eq("historical_actual")
+        ].copy()
+        base["_fy"] = pd.to_numeric(base["june_year"], errors="coerce")
+        base = base.dropna(subset=["_fy"]).sort_values("_fy")
+        return pd.Series(
+            pd.to_numeric(base["value"], errors="coerce").to_numpy(),
+            index=base["_fy"].astype(int).to_numpy(),
+        )
+
+    gated = current_base()
+    assert not gated.empty
+
+    previous = policy.REVENUE_OUTLOOK_ENABLE_VFM_ANALYST_LAYERS
+    previous_app = app.REVENUE_OUTLOOK_ENABLE_VFM_ANALYST_LAYERS
+    policy.REVENUE_OUTLOOK_ENABLE_VFM_ANALYST_LAYERS = True
+    app.REVENUE_OUTLOOK_ENABLE_VFM_ANALYST_LAYERS = True
+    app.cached_revenue_outlook_view.clear()
+    try:
+        ungated = current_base()
+    finally:
+        policy.REVENUE_OUTLOOK_ENABLE_VFM_ANALYST_LAYERS = previous
+        app.REVENUE_OUTLOOK_ENABLE_VFM_ANALYST_LAYERS = previous_app
+        app.cached_revenue_outlook_view.clear()
+
+    pd.testing.assert_series_equal(gated, ungated)
+
+
+def test_the_fast_slow_backend_still_works_when_the_gate_is_open(
+    context, default_traces, vfm_analyst_layers_enabled
+) -> None:
+    """The retained composition must still run on demand, so it can be restored."""
+    pack, signature = context
+    sensitivity = app.selected_sensitivity_key("Off", "Off", "Off", freight_rail_shift="Off")
+
+    assert "MoT VFM fast" in app._public_uptake_basis_options()
+    paths = app.cached_vfm_scenario_paths(
+        signature, SERIES, "june_year", FED, default_traces, sensitivity,
+        PED_BRIDGE_DEFAULT_MODE, app._cone_band_controls(production_key()), pack,
+    )
+    assert isinstance(paths, pd.DataFrame) and not paths.empty
+    assert set(paths["trace_name"].astype(str)) == {
+        VFM_FAST_TRACE_NAME,
+        VFM_SLOW_TRACE_NAME,
+    }

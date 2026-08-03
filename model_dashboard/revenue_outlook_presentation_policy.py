@@ -38,11 +38,14 @@ __all__ = [
     "display_end_fy",
     "display_horizon_note",
     "fiscal_year_of_quarter",
+    "is_paused_vfm_uptake_basis",
     "is_vfm_analyst_layer_label",
     "june_year_within_horizon",
     "clip_frame_to_display_horizon",
     "clip_fy_options_to_display_horizon",
     "period_within_horizon",
+    "public_uptake_basis_options",
+    "sanitised_uptake_basis",
     "terminal_display_quarter",
 ]
 
@@ -164,13 +167,52 @@ def display_horizon_note() -> str:
 
 
 # ---------------------------------------------------------------- VFM labels
+def _names_a_fast_or_slow_vfm_scenario(text: Any) -> bool:
+    """Shared predicate for "this label refers to VFM Fast or VFM Slow".
+
+    Deliberately narrow: the parametric approximation to VFM *Base* also
+    mentions VFM and must survive the pause, as must any official comparator
+    label.
+    """
+    value = str(text or "").casefold()
+    if "vfm" not in value:
+        return False
+    return any(token in value for token in ("fast", "slow"))
+
+
 def is_vfm_analyst_layer_label(label: Any) -> bool:
     """Does this persisted "Show on chart" label name a paused VFM layer?
 
     Selections saved before the pause must be filtered out silently rather
     than raising, so a returning reader's session keeps working.
     """
-    text = str(label or "").casefold()
-    if "vfm" not in text:
-        return False
-    return any(token in text for token in ("fast", "slow"))
+    return _names_a_fast_or_slow_vfm_scenario(label)
+
+
+def is_paused_vfm_uptake_basis(value: Any) -> bool:
+    """Is this uptake basis one of the paused Fast/Slow compositions?
+
+    The uptake basis is a whole-scenario input, not a chart layer: leaving it
+    selectable would let a reader run the Fast/Slow composition through the
+    entire engine even though the layers that displayed it are withdrawn.
+    """
+    return _names_a_fast_or_slow_vfm_scenario(value)
+
+
+def public_uptake_basis_options(options: Iterable[str]) -> list[str]:
+    """The uptake bases a reader may choose while the pause is in force."""
+    if REVENUE_OUTLOOK_ENABLE_VFM_ANALYST_LAYERS:
+        return list(options)
+    return [option for option in options if not is_paused_vfm_uptake_basis(option)]
+
+
+def sanitised_uptake_basis(value: Any, *, default: str) -> str:
+    """Fall back to ``default`` when a stored basis is one of the paused pair.
+
+    Session state outlives a deployment, so a reader who had selected VFM Fast
+    before the pause must come back on VFM Base rather than silently keep
+    running the withdrawn composition.
+    """
+    if REVENUE_OUTLOOK_ENABLE_VFM_ANALYST_LAYERS:
+        return str(value)
+    return default if is_paused_vfm_uptake_basis(value) else str(value)
