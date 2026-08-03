@@ -1,0 +1,37 @@
+label,metric,seconds,note
+integrated_cold,cold_app_first_paint,2.309,
+integrated_cold,cold_revenue_outlook_first_plot,8.7196,
+integrated_cold,warm_revenue_outlook_navigation,0.0314,sample 1
+integrated_cold,warm_revenue_outlook_navigation,0.0326,sample 2
+integrated_cold,warm_revenue_outlook_navigation,0.0584,sample 3
+integrated_cold,warm_revenue_outlook_navigation,0.0335,sample 4
+integrated_cold,warm_revenue_outlook_navigation,0.0351,sample 5
+integrated_cold,warm_revenue_outlook_navigation_p95,0.0351,p95
+integrated_cold,warm_revenue_outlook_navigation_median,0.0335,median
+integrated_cold,console_errors,0,
+integrated_warm,warm_navigation_p95,2.5358,p95
+integrated_warm,warm_navigation_median,2.5353,n=5
+integrated_warm,policy_switch,7.9767,Original timing — 1 Jan 2027:changed
+integrated_warm,policy_switch,5.9338,No 12c uplift:changed
+integrated_warm,policy_switch,2.5213,Deferred 6 months — 1 Jul 2027:changed
+integrated_warm,policy_switch,2.5075,Original timing — 1 Jan 2027:changed
+integrated_warm,policy_switch_p95,5.9338,p95
+integrated_warm,policy_switch_median,4.2275,n=4
+integrated_warm,policy_switch_value_movement,0,Original timing — 1 Jan 2027:changed; No 12c uplift:changed; Deferred 6 months — 1 Jul 2027:changed; Original timing — 1 Jan 2027:changed
+integrated_warm,expand_collapse_p95,2.5331,p95
+integrated_warm,expand_collapse_median,2.5311,n=4
+integrated_warm,console_errors,0,
+integrated_warm_corrected,warm_navigation_p95,1.1194,p95
+integrated_warm_corrected,warm_navigation_median,1.1033,n=5
+integrated_warm_corrected,grain_switch_p95,1.0304,p95
+integrated_warm_corrected,grain_switch_median,0.9966,n=6
+integrated_warm_corrected,policy_switch,0.9991,Original timing — 1 Jan 2027:changed
+integrated_warm_corrected,policy_switch,0.9918,No 12c uplift:changed
+integrated_warm_corrected,policy_switch,1.0091,Deferred 6 months — 1 Jul 2027:changed
+integrated_warm_corrected,policy_switch,0.978,Original timing — 1 Jan 2027:changed
+integrated_warm_corrected,policy_switch_p95,0.9991,p95
+integrated_warm_corrected,policy_switch_median,0.9954,n=4
+integrated_warm_corrected,policy_switch_value_movement,0,Original timing — 1 Jan 2027:changed; No 12c uplift:changed; Deferred 6 months — 1 Jul 2027:changed; Original timing — 1 Jan 2027:changed
+integrated_warm_corrected,expand_collapse_p95,1.0026,p95
+integrated_warm_corrected,expand_collapse_median,1.0013,n=4
+integrated_warm_corrected,console_errors,0,

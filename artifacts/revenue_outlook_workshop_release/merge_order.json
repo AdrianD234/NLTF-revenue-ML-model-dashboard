@@ -1,0 +1,46 @@
+{
+  "branch": "integration/revenue-outlook-workshop-release",
+  "base": "48a499bdfb6a4d85888b3f3c27af970814048e10",
+  "strategy": "git merge --no-ff --no-edit <exact sha>, one component per merge, component histories preserved (no squash)",
+  "steps": [
+    {
+      "order": 1,
+      "component": "B",
+      "merged_sha": "ace8297dfbc08a1657a09ec1d037aa8718c46264",
+      "merge_commit": "7595bc7",
+      "conflicts": [],
+      "resolution": "none required; B touches no file main and the integration branch had both changed",
+      "compileall": "model_dashboard/revenue_outlook_series_coverage.py, scripts/build_revenue_outlook_quarterly_display_pack.py, scripts/build_quarterly_reconditioning_audit.py, scripts/build_revenue_outlook_series_coverage_diagnosis.py, tests/test_revenue_outlook_series_coverage.py -> OK"
+    },
+    {
+      "order": 2,
+      "component": "C",
+      "merged_sha": "45a97428d1d35c7d2d39f4dd9111994f55b26c16",
+      "merge_commit": "b21c184",
+      "conflicts": [".gitignore"],
+      "resolution": "UNION. B's data/revenue_outlook_quarterly_display exceptions and C's data/revenue_outlook_policy_runtime exceptions both kept, each with its own generating-script comment. Neither side resolved as ours or theirs. C's artifacts/revenue_outlook_policy_runtime exceptions merged without conflict.",
+      "compileall": "model_dashboard/revenue_outlook_policy_runtime.py, model_dashboard/revenue_uncertainty_policy.py, model_dashboard/rate_paths.py, scripts/build_revenue_outlook_policy_runtime.py, tests/test_revenue_outlook_policy_runtime.py -> OK",
+      "pytest_ini": "merged without conflict; retains e2e, slow (C's policy-runtime configuration) and requires_local_scratch markers. The deferred legacy e2e suite was neither re-enabled nor redesigned."
+    },
+    {
+      "order": 3,
+      "component": "A",
+      "merged_sha": "f5b8493d1b7ea8d05ffb78b2891428554a284f47",
+      "merge_commit": "b5119ac",
+      "conflicts": [".gitignore"],
+      "resolution": "UNION. B's artifacts/revenue_outlook_series_coverage exceptions and A's artifacts/revenue_outlook_ui_slim_2050 exceptions both kept, alongside the already-merged instant_runtime and policy_runtime entries. This integration's own artifacts/revenue_outlook_workshop_release exception was added in the same hunk.",
+      "app_py": "merged cleanly. B and C deliberately do not edit app.py, so A's version is the sole starting point for the final integration wiring, exactly as the brief requires."
+    }
+  ],
+  "gitignore_union_verified": [
+    "!artifacts/revenue_outlook_series_coverage/**",
+    "!artifacts/revenue_outlook_ui_slim_2050/**",
+    "!artifacts/revenue_outlook_instant_runtime/**",
+    "!artifacts/revenue_outlook_policy_runtime/**",
+    "!artifacts/revenue_outlook_workshop_release/**",
+    "!data/revenue_outlook_uncertainty/**",
+    "!data/revenue_outlook_replay_cache/**",
+    "!data/revenue_outlook_quarterly_display/**",
+    "!data/revenue_outlook_policy_runtime/**"
+  ]
+}

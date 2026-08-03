@@ -1,0 +1,18 @@
+series_id,in_rate_priced_scope,expectation,verdict
+gross_ped_revenue,yes,"the collection rate governs this leaf, so a rate ratio may reprice it",pass
+gross_ruc_revenue,yes,"the collection rate governs this leaf, so a rate ratio may reprice it",pass
+heavy_bev_ruc_net_revenue,yes,"the collection rate governs this leaf, so a rate ratio may reprice it",pass
+heavy_ruc_net_revenue,yes,"the collection rate governs this leaf, so a rate ratio may reprice it",pass
+light_bev_ruc_net_revenue,yes,"the collection rate governs this leaf, so a rate ratio may reprice it",pass
+light_ruc_net_revenue,yes,"the collection rate governs this leaf, so a rate ratio may reprice it",pass
+phev_ruc_net_revenue,yes,"the collection rate governs this leaf, so a rate ratio may reprice it",pass
+ruc_revenue_net_admin,yes,"the collection rate governs this leaf, so a rate ratio may reprice it",pass
+total_ruc_net_revenue,yes,"the collection rate governs this leaf, so a rate ratio may reprice it",pass
+ped_vkt_per_capita,no,activity or non-fuel revenue: a rate ratio is not an elasticity and must never scale it,pass
+ped_volume,no,activity or non-fuel revenue: a rate ratio is not an elasticity and must never scale it,pass
+light_petrol_vkt,no,activity or non-fuel revenue: a rate ratio is not an elasticity and must never scale it,pass
+light_ruc_net_km,no,activity or non-fuel revenue: a rate ratio is not an elasticity and must never scale it,pass
+heavy_ruc_net_km,no,activity or non-fuel revenue: a rate ratio is not an elasticity and must never scale it,pass
+light_bev_ruc_net_km,no,activity or non-fuel revenue: a rate ratio is not an elasticity and must never scale it,pass
+phev_ruc_net_km,no,activity or non-fuel revenue: a rate ratio is not an elasticity and must never scale it,pass
+net_mvr_revenue,no,activity or non-fuel revenue: a rate ratio is not an elasticity and must never scale it,pass

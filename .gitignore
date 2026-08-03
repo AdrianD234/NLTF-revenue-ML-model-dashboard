@@ -66,8 +66,17 @@ artifacts/**
 !artifacts/revenue_outlook_vfm_envelope/**
 !artifacts/revenue_outlook_layered_uncertainty/
 !artifacts/revenue_outlook_layered_uncertainty/**
+!artifacts/revenue_outlook_series_coverage/
+!artifacts/revenue_outlook_series_coverage/**
+!artifacts/revenue_outlook_ui_slim_2050/
+!artifacts/revenue_outlook_ui_slim_2050/**
 !artifacts/revenue_outlook_instant_runtime/
 !artifacts/revenue_outlook_instant_runtime/**
+!artifacts/revenue_outlook_policy_runtime/
+!artifacts/revenue_outlook_policy_runtime/**
+# integration evidence for the combined workshop release (components A + B + C)
+!artifacts/revenue_outlook_workshop_release/
+!artifacts/revenue_outlook_workshop_release/**
 data/**
 !data/.gitkeep
 !data/dashboard_evidence_pack/
@@ -119,6 +128,14 @@ data/dashboard_evidence_pack_reproducibility/ped_inner_hpo/source_artifacts/**/*
 # (scripts/build_revenue_outlook_replay_cache.py)
 !data/revenue_outlook_replay_cache/
 !data/revenue_outlook_replay_cache/**
+# governed quarterly-display pack and restored official annual rows
+# (scripts/build_revenue_outlook_quarterly_display_pack.py)
+!data/revenue_outlook_quarterly_display/
+!data/revenue_outlook_quarterly_display/**
+# materialised named 12c policy states + policy-aware uncertainty bands
+# (scripts/build_revenue_outlook_policy_runtime.py)
+!data/revenue_outlook_policy_runtime/
+!data/revenue_outlook_policy_runtime/**
 
 # vNext production reproducibility packs (governed fitted state + evidence)
 !data/dashboard_evidence_pack_reproducibility/heavy_ruc_vnext/

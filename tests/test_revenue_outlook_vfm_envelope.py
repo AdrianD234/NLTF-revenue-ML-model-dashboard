@@ -44,6 +44,13 @@ TRACES = (
 BASE_TRACE = "Current finalist Base case"
 COMPARISON_TRACE = "Current finalist High population/comparison"
 
+
+@pytest.fixture(scope="module", autouse=True)
+def _vfm_analyst_layers_enabled(vfm_analyst_layers_enabled):
+    """This whole module protects the retained Fast/Slow backend, so it runs
+    with the paused analyst surface deliberately switched on."""
+
+
 # Series the VFM light-fleet composition genuinely reallocates, and series it
 # provably does not touch while the PED retention sensitivity is off.
 APPLICABLE_SERIES = (

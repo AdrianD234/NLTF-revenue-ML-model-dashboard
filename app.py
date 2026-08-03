@@ -13,7 +13,7 @@ import re
 import sys
 from functools import lru_cache
 from time import perf_counter
-from typing import Any
+from typing import Any, Sequence
 import zipfile
 
 _RUNTIME_PYARROW24 = Path(__file__).resolve().parent / ".runtime_pyarrow24"
@@ -258,6 +258,18 @@ from model_dashboard.revenue_uncertainty_pack import (
     band_rows_for_series,
     load_uncertainty_pack,
 )
+from model_dashboard.revenue_outlook_presentation_policy import (
+    REVENUE_OUTLOOK_ENABLE_PED_RETENTION_CONTROL,
+    REVENUE_OUTLOOK_ENABLE_VFM_ANALYST_LAYERS,
+    clip_frame_to_display_horizon,
+    display_end_fy,
+    display_horizon_note,
+    is_paused_vfm_uptake_basis,
+    is_vfm_analyst_layer_label,
+    period_within_horizon,
+    public_uptake_basis_options,
+    sanitised_uptake_basis,
+)
 
 # What a helper will accept: the typed key, or a historic positional tuple from
 # an older cache entry or test. Production builds the typed key directly.
@@ -383,6 +395,8 @@ from model_dashboard.score_basis import (
     score_basis_metric_label,
 )
 from model_dashboard.ui import (
+    EXPANDED_CHART_CONTAINER_KEY,
+    EXPAND_CONTROL_CONTAINER_KEY,
     chart_card,
     dataframe_download,
     decision_brief,
@@ -990,8 +1004,110 @@ def _ped_retention_enabled(ev_uptake_key: ScenarioKeyLike) -> bool:
     """The PED petrol-retention sensitivity: named field, Off by default.
 
     Off means the raw AR(1) Base path with no retention overlay.
+
+    This still reads the key rather than the presentation policy, so a
+    historical cache entry or an evidence script that deliberately sets the
+    field keeps behaving exactly as it did. What changed is that production
+    never BUILDS a key carrying True - see
+    :func:`_production_ped_retention_sensitivity`.
     """
     return _scenario_key(ev_uptake_key).ped_retention_sensitivity
+
+
+def _production_ped_retention_sensitivity() -> bool:
+    """The retention flag every production Revenue Outlook key must carry.
+
+    The control is withdrawn (REVENUE_OUTLOOK_ENABLE_PED_RETENTION_CONTROL),
+    so this is False and session state is not consulted at all: a stale True
+    persisted by a reader's browser before the control was removed can never
+    reactivate the overlay. The typed field and the backend implementation are
+    untouched for compatibility and audit.
+    """
+    if not REVENUE_OUTLOOK_ENABLE_PED_RETENTION_CONTROL:
+        return False
+    return bool(st.session_state.get("revenue_outlook_ped_retention_sensitivity", False))
+
+
+def _public_uptake_basis_options() -> list[str]:
+    """The uptake bases the production UI offers, in their governed order.
+
+    One source for both view modes, so single and compare can never disagree
+    about which compositions a reader may run.
+    """
+    return public_uptake_basis_options(EV_UPTAKE_MODE_OPTIONS)
+
+
+# Session keys that carry an uptake basis and therefore have to be re-checked
+# against the pause on every entry.
+_UPTAKE_BASIS_STATE_KEYS = (
+    "revenue_outlook_ev_uptake_basis_v2",
+    "ro_cmp_a_uptake",
+    "ro_cmp_b_uptake",
+)
+
+
+def _discard_withdrawn_revenue_outlook_state() -> None:
+    """Drop session values written by controls that no longer exist.
+
+    Streamlit keeps a key in session state forever once a widget has written
+    it, so a reader who ticked the retention box - or selected a VFM Fast/Slow
+    layer - before the workshop build would otherwise carry that selection into
+    a page that no longer offers it. Clearing on entry keeps the withdrawn
+    state from surviving deployment while leaving every live selection alone.
+    """
+    if not REVENUE_OUTLOOK_ENABLE_PED_RETENTION_CONTROL:
+        st.session_state.pop("revenue_outlook_ped_retention_sensitivity", None)
+    if not REVENUE_OUTLOOK_ENABLE_VFM_ANALYST_LAYERS:
+        st.session_state.pop("revenue_outlook_show_vfm_envelope_audit", None)
+        persisted = st.session_state.get("revenue_outlook_chart_layers")
+        if isinstance(persisted, list):
+            kept = [
+                label for label in persisted if not is_vfm_analyst_layer_label(label)
+            ]
+            if len(kept) != len(persisted):
+                st.session_state["revenue_outlook_chart_layers"] = kept
+        # A basis selected before the pause is reset rather than dropped: these
+        # selectors must always resolve to a legal composition, and Base is the
+        # governed default.
+        for key in _UPTAKE_BASIS_STATE_KEYS:
+            if key in st.session_state and is_paused_vfm_uptake_basis(
+                st.session_state[key]
+            ):
+                st.session_state[key] = DEFAULT_EV_UPTAKE_MODE
+    _discard_out_of_horizon_revenue_outlook_state()
+    _discard_unknown_revenue_outlook_policy_state()
+
+
+def _discard_out_of_horizon_revenue_outlook_state() -> None:
+    """Drop an FY marker a previous deployment allowed past the horizon.
+
+    The selector no longer offers FY2051+, and Streamlit raises rather than
+    silently correcting when a stored value is not among a widget's options.
+    A returning reader who had FY2053 marked would otherwise hit that error on
+    entry, so the stale value is dropped and the marker falls back to its
+    default.
+    """
+    marked = st.session_state.get("revenue_outlook_selected_fy")
+    if marked is None:
+        return
+    if not period_within_horizon(marked):
+        st.session_state.pop("revenue_outlook_selected_fy", None)
+
+
+def _discard_unknown_revenue_outlook_policy_state() -> None:
+    """Reset a 12c selection this build no longer recognises.
+
+    The policy vocabulary is a closed set. A value from an older deployment
+    that does not normalise is dropped rather than coerced, because coercing
+    it would silently swap one counterfactual for another - the reader would
+    see a path they did not choose and have no way to tell.
+    """
+    for key in ("revenue_outlook_fed_policy_state", "revenue_outlook_mbu_fed_policy_state"):
+        value = st.session_state.get(key)
+        if value is None:
+            continue
+        if str(value) not in FED_POLICY_OPTIONS:
+            st.session_state.pop(key, None)
 
 
 # The official comparator vintage selection rides in slots 6/7 of the uptake
@@ -1236,6 +1352,18 @@ def _fed_policy_state_scope(ev_uptake_key: ScenarioKeyLike) -> tuple[str, str]:
         _normalise_fed_policy_state(current),
         _normalise_fed_policy_state(official),
     )
+
+
+def _current_policy_state_for_key(ev_uptake_key: ScenarioKeyLike) -> str:
+    """The Current 12c state this key computes under.
+
+    The quarterly derivation needs it to pick the governed rate timetable, and
+    the VFM preset keys carry the live policy through unchanged, so reading it
+    back off the key is what keeps a bound's quarters on the same timetable as
+    the central path they bracket.
+    """
+    current_state, _official_state = _fed_policy_state_scope(ev_uptake_key)
+    return current_state
 
 
 def _fed_uplift_off_scope(ev_uptake_key: tuple[Any, ...]) -> tuple[bool, bool]:
@@ -1846,6 +1974,126 @@ def _apply_scenario_overlays(
     return rows, uptake_audit, eruc_audit, uplift_audit
 
 
+@st.cache_resource(show_spinner=False)
+def cached_policy_runtime(engine: str, source_digest: str):
+    """The materialised policy runtime for one engine, once per process.
+
+    Held as a resource, not data: the whole point is that the per-state frames
+    are memoised on the object across reruns. Keyed on the source digest so a
+    rebuilt pack is picked up without a restart, and so a stale one can never
+    be served from a cache that outlived it.
+
+    Returns ``None`` when the pack is missing, stale or unreadable. The caller
+    then runs the reference pipeline - correct, just slower - rather than
+    serving rows it cannot prove are current.
+    """
+    del source_digest
+    from model_dashboard.revenue_outlook_policy_runtime import load_policy_runtime
+
+    try:
+        return load_policy_runtime(engine=engine, repo_root=Path(__file__).resolve().parent)
+    except RuntimeError:
+        return None
+
+
+#: The builder sets this False so it materialises the REFERENCE pipeline.
+#: Without it, a rebuild would answer from the pack it is about to overwrite:
+#: the output would be a copy of the previous build, and the idempotency check
+#: would pass by tautology instead of by determinism. Deleting the frames first
+#: happens to produce the same effect today, but that is an accident of build
+#: order, and a guarantee this important should be stated rather than inferred.
+POLICY_RUNTIME_FAST_PATH_ENABLED = True
+
+
+def _policy_runtime_for_pack(_pack: RevenueOutlookPack):
+    """The policy runtime for this pack's engine, or None if unusable."""
+    if not POLICY_RUNTIME_FAST_PATH_ENABLED:
+        return None
+    from model_dashboard.revenue_outlook_policy_runtime import policy_runtime_status
+
+    engine = _engine_for_pack(_pack)
+    repo_root = Path(__file__).resolve().parent
+    try:
+        status, detail = policy_runtime_status(engine=engine, repo_root=repo_root)
+    except (OSError, ValueError, RuntimeError):
+        return None
+    if status != "ok":
+        # Fail closed onto the reference path. A stale or corrupt pack is
+        # never served, and the page still shows correct numbers.
+        _POLICY_RUNTIME_PROBLEM[engine] = detail
+        return None
+    _POLICY_RUNTIME_PROBLEM.pop(engine, None)
+    return cached_policy_runtime(engine, _policy_runtime_source_digest(engine, repo_root))
+
+
+def _policy_runtime_source_digest(engine: str, repo_root: Path) -> str:
+    from model_dashboard.revenue_outlook_policy_runtime import policy_runtime_dir
+
+    try:
+        manifest = json.loads(
+            (policy_runtime_dir(engine, repo_root) / "manifest.json").read_text(encoding="utf-8")
+        )
+    except (OSError, ValueError):
+        return ""
+    return str(manifest.get("source_digest", ""))
+
+
+#: Why the fast path is unavailable, per engine, for the reader-facing note.
+_POLICY_RUNTIME_PROBLEM: dict[str, str] = {}
+
+
+def _materialised_policy_overlay_rows(
+    ev_uptake_key: tuple[Any, ...],
+    _pack: RevenueOutlookPack,
+    sensitivity_key: tuple[Any, ...] = (),
+    bridge_mode: str = "",
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame] | None:
+    """The five overlay frames from the materialised catalogue, or None.
+
+    ``None`` means "this key is not in the catalogue, run the reference
+    pipeline". It is never a nearest match: the catalogue pins every control
+    that changes a value, and a key differing in any of them resolves to
+    ``reference_path_required`` and comes back here as ``None``.
+
+    Two controls live OUTSIDE the typed key and so must be checked here: the
+    sensitivity key, which is a separate argument the catalogue was built at
+    its default, and the bridge mode argument, which must agree with the
+    key's own field. Serving materialised rows for a moved sensitivity lever
+    would be exactly the silent wrong answer the catalogue exists to avoid.
+    """
+    from model_dashboard.revenue_outlook_policy_runtime import (
+        STATUS_OK,
+        policy_audit_rows,
+        policy_chart_rows,
+        policy_overlay_audit_rows,
+        policy_scenario_audit_rows,
+        resolve_policy_state,
+    )
+
+    if sensitivity_key and not _is_default_sensitivity_key(tuple(sensitivity_key)):
+        return None
+    key = _scenario_key(ev_uptake_key)
+    if bridge_mode and str(bridge_mode) != str(key.ped_bridge_mode):
+        return None
+    runtime = _policy_runtime_for_pack(_pack)
+    if runtime is None:
+        return None
+    if resolve_policy_state(runtime, key).status != STATUS_OK:
+        return None
+    try:
+        # Unfiltered, because this stands in for the reference overlay chain,
+        # which returns every vintage and lets its callers narrow. Filtering
+        # here would silently drop the non-selected vintage's rows from a
+        # frame every downstream consumer expects to be complete.
+        rows = policy_chart_rows(runtime, key, apply_official_vintage_filter=False)
+        policy_audit = policy_audit_rows(runtime, key)
+        scenario_audit = policy_scenario_audit_rows(runtime, key)
+        uptake_audit, eruc_audit = policy_overlay_audit_rows(runtime, key)
+    except RuntimeError:
+        return None
+    return rows, uptake_audit, eruc_audit, policy_audit, scenario_audit
+
+
 @st.cache_data(show_spinner=False, max_entries=12)
 def cached_scenario_overlay_rows(
     signature: tuple[tuple[str, int, int], ...],
@@ -1859,7 +2107,21 @@ def cached_scenario_overlay_rows(
     Series- and grain-agnostic: the view, the VFM cone bounds and the A/B
     comparison all share this cache and filter from it, so switching series
     or grain never re-runs the overlay chain.
+
+    A key inside the materialised policy catalogue is answered from that pack
+    instead of re-running the chain. Profiling put a policy switch at ~13.5 s,
+    of which the policy arithmetic itself was 0.32 s: the cost was that
+    ``current_fed_policy_state`` is part of the cache identity, so every stage
+    downstream of it was recomputed even though the policy changed none of
+    their methods. Anything outside the catalogue still runs the reference
+    pipeline exactly as before - there is no nearest-match and no silent
+    approximation.
     """
+    materialised = _materialised_policy_overlay_rows(
+        ev_uptake_key, _pack, sensitivity_key, bridge_mode
+    )
+    if materialised is not None:
+        return materialised
     _, sensitivity_frames, _ = cached_sensitivity_stage_frames(signature, bridge_mode, sensitivity_key, _pack)
     levers = _resolve_ev_uptake_levers(ev_uptake_key)
     eruc_levers = _resolve_eruc_levers(ev_uptake_key)
@@ -1965,6 +2227,7 @@ def _filter_series_rows_with_fallback(
     time_grain: str,
     fed_path: str,
     traces: tuple[str, ...],
+    policy_state: str = "",
 ) -> tuple[pd.DataFrame, bool]:
     """Selected-series rows, filling any trace missing native quarters.
 
@@ -1972,6 +2235,26 @@ def _filter_series_rows_with_fallback(
     comparator vintages are governed at June-year grain.  The fallback
     therefore operates per requested trace, not only when the whole quarterly
     selection is empty.
+
+    The quarterly fill is ``revenue_outlook_series_coverage``'s governed
+    contract, not a local Denton solve. That module declares, per series, which
+    rule applies, against what seasonal evidence, on what rate basis and with
+    what stated limitation, and it labels every row it produces as derived. The
+    rows handed to it are the FINAL annual rows for this view - post macro
+    selection, post policy, post formula reconstruction - so the quarters
+    reconcile to the annual line a reader sees beside them rather than to a
+    pre-policy layer.
+
+    ``policy_state`` is the selected Current 12c state. It decides which
+    governed rate timetable shapes the within-year path, so a deferred step
+    appears in the deferred quarter instead of being drawn in the published one
+    and then smeared by the annual benchmark.
+
+    This is the single gate every decision-facing row passes through - the
+    Total path view, the VFM bounds and the A/B paths all call it - so the
+    FY2050 presentation horizon is applied here once. Both grains are clipped
+    by the same rule, which is what makes the annual and quarterly horizons
+    agree by construction rather than by two parallel edits.
     """
     filtered = _filter_revenue_outlook_rows(
         rows,
@@ -1984,20 +2267,116 @@ def _filter_series_rows_with_fallback(
     if time_grain == "quarterly":
         present_traces = set(filtered.get("trace_name", pd.Series(dtype=str)).dropna().astype(str))
         missing_traces = [trace for trace in traces if str(trace) not in present_traces]
-        if not missing_traces:
-            return filtered, used_fallback
-        annual = _filter_revenue_outlook_rows(
-            rows,
-            time_grain="june_year",
-            stream_labels=[selected_series],
-            fed_paths=[fed_path],
-            trace_names=missing_traces,
+        if missing_traces:
+            annual = _filter_revenue_outlook_rows(
+                rows,
+                time_grain="june_year",
+                stream_labels=[selected_series],
+                fed_paths=[fed_path],
+                trace_names=missing_traces,
+            )
+            derived = _governed_quarterly_rows(
+                selected_series,
+                annual_rows=annual,
+                chart_rows=rows,
+                trace_names=missing_traces,
+                policy_state=policy_state,
+            )
+            if not derived.empty:
+                filtered = pd.concat([filtered, derived], ignore_index=True, sort=False)
+                used_fallback = True
+    return clip_frame_to_display_horizon(filtered), used_fallback
+
+
+#: The join identity of a display row. Two rows sharing all four name the same
+#: published value, so a second one would double-plot it.
+_OFFICIAL_ROW_IDENTITY = ("series_id", "trace_name", "time_grain", "period")
+
+
+def _append_missing_official_rows(
+    chart_rows: pd.DataFrame,
+    official_scenario: str = "",
+    official_overlay: bool = False,
+) -> pd.DataFrame:
+    """Add source-backed official rows the runtime builders never emitted.
+
+    Strictly additive, and only where the vintage itself publishes a value:
+    ``missing_official_rows`` returns the complement of what is already here,
+    so no existing official value can be rewritten and no Current value can be
+    substituted for an official one. The vintages stay separate traces - BEFU26
+    is not filled in from MBU26 or the reverse - because a comparator that
+    silently borrowed another vintage's number would be worse than a gap.
+
+    **The selected vintage is re-applied to what is appended.**
+    ``missing_official_rows`` answers for every registered vintage, because it
+    describes what the sources publish, not what this reader chose. Appending
+    that straight after the vintage filter put the non-selected vintage back
+    on the page: with BEFU26 selected, ``mbu26_official`` reappeared in
+    ``scenario_name``. Filtering here keeps "one selected comparator" true no
+    matter which stage last touched the frame.
+
+    The identity check is belt and braces: the API is already a complement, so
+    a duplicate here would mean the two disagreed about what a row IS, and
+    dropping it is safer than plotting the same period twice.
+    """
+    if chart_rows is None or chart_rows.empty:
+        return chart_rows
+    from model_dashboard import revenue_outlook_series_coverage as coverage
+
+    try:
+        missing = coverage.missing_official_rows(
+            chart_rows, repo_root=Path(__file__).resolve().parent
         )
-        derived = _disaggregate_annual_rows_to_quarterly(annual, rows)
-        if not derived.empty:
-            filtered = pd.concat([filtered, derived], ignore_index=True, sort=False)
-            used_fallback = True
-    return filtered, used_fallback
+    except (OSError, ValueError):
+        # A missing or unreadable vintage source must not take the page down;
+        # the series simply keeps the gap it already had.
+        return chart_rows
+    if missing is None or missing.empty:
+        return chart_rows
+    if official_scenario:
+        missing = _filter_official_vintage_rows(missing, official_scenario, official_overlay)
+    if missing.empty:
+        return chart_rows
+    combined = pd.concat([chart_rows, missing], ignore_index=True, sort=False)
+    identity = [column for column in _OFFICIAL_ROW_IDENTITY if column in combined.columns]
+    if identity:
+        combined = combined.drop_duplicates(subset=identity, keep="first")
+    return combined.reset_index(drop=True)
+
+
+def _governed_quarterly_rows(
+    selected_series: str,
+    *,
+    annual_rows: pd.DataFrame,
+    chart_rows: pd.DataFrame,
+    trace_names: Sequence[str],
+    policy_state: str = "",
+) -> pd.DataFrame:
+    """Quarterly display rows from the governed coverage contract.
+
+    A thin adapter, deliberately: the alias resolution, the per-series rule,
+    the seasonal indicator, the rate basis and the provenance labelling all
+    live in ``revenue_outlook_series_coverage``. Duplicating any of it here is
+    how the two would drift.
+
+    A series the contract does not govern yields no quarters at all rather
+    than falling back to an undeclared split. The caller then shows the
+    annual-only note, which is the honest answer.
+    """
+    from model_dashboard import revenue_outlook_series_coverage as coverage
+
+    try:
+        coverage.canonical_series_id(selected_series)
+    except coverage.SeriesCoverageError:
+        return pd.DataFrame()
+    return coverage.quarterly_rows_for_selected_series(
+        selected_series,
+        trace_names=[str(trace) for trace in trace_names],
+        annual_rows=annual_rows,
+        chart_rows=chart_rows,
+        repo_root=Path(__file__).resolve().parent,
+        policy_state=policy_state or FED_POLICY_PUBLISHED,
+    )
 
 
 # A band row counts as carrying real VFM width once the Fast/Slow gap clears
@@ -2030,10 +2409,75 @@ def cached_uncertainty_pack():
 
 
 @st.cache_data(show_spinner=False, max_entries=32)
-def cached_uncertainty_band_rows(series_id: str, pack_digest: str) -> pd.DataFrame:
-    """Pure lookup: filter the materialised pack for one series."""
+def cached_uncertainty_band_rows(
+    series_id: str,
+    pack_digest: str,
+    policy_state: str = "",
+    scenario_key: RevenueScenarioComputationKey | None = None,
+    _pack: RevenueOutlookPack | None = None,
+) -> pd.DataFrame:
+    """Band rows for one series, under the policy state on screen.
+
+    The bands come from the policy runtime's own per-state rows when the key
+    is catalogued, so a band can never be drawn around a central path it was
+    not computed from. Where the policy leaves a series genuinely unmoved the
+    rows are identical to the default pack's by construction - the same seeded
+    draws propagate through the same identities - rather than by a copy.
+
+    ``policy_state`` is part of the cache identity for exactly that reason: it
+    is a value-changing input, and omitting it is how the default pack ends up
+    served regardless of what the reader selected.
+
+    Clipped to the presentation horizon so the band cannot outrun the paths it
+    wraps. The committed pack is not modified - only what is handed to the
+    chart and the band download.
+    """
     del pack_digest
-    return band_rows_for_series(cached_uncertainty_pack(), series_id)
+    rows = _policy_uncertainty_band_rows(series_id, policy_state, scenario_key, _pack)
+    if rows is None:
+        rows = band_rows_for_series(cached_uncertainty_pack(), series_id)
+    return clip_frame_to_display_horizon(rows)
+
+
+def _policy_uncertainty_band_rows(
+    series_id: str,
+    policy_state: str,
+    scenario_key: RevenueScenarioComputationKey | None,
+    _pack: RevenueOutlookPack | None,
+) -> pd.DataFrame | None:
+    """Per-policy band rows from the materialised runtime, or None.
+
+    ``None`` sends the caller to the default offline pack. That is the right
+    answer when no policy state was requested, when the key is outside the
+    catalogue, or when the runtime is unusable - and it is never a quiet
+    substitute for a state that exists, because a catalogued key that resolves
+    always returns its own rows here.
+    """
+    if not series_id or not policy_state or scenario_key is None or _pack is None:
+        return None
+    from model_dashboard.revenue_outlook_policy_runtime import (
+        STATUS_OK,
+        normalise_policy_state,
+        policy_uncertainty_rows,
+        resolve_policy_state,
+    )
+
+    runtime = _policy_runtime_for_pack(_pack)
+    if runtime is None:
+        return None
+    try:
+        key = scenario_key.replace(
+            current_fed_policy_state=normalise_policy_state(policy_state)
+        )
+    except (TypeError, ValueError):
+        return None
+    if resolve_policy_state(runtime, key).status != STATUS_OK:
+        return None
+    try:
+        rows = policy_uncertainty_rows(runtime, key, series_id=series_id)
+    except RuntimeError:
+        return None
+    return rows if rows is not None and not rows.empty else None
 
 
 def _uncertainty_series_id_for_label(chart_rows: pd.DataFrame, series_label: str) -> str:
@@ -2080,7 +2524,8 @@ def cached_vfm_scenario_paths(
             signature, sensitivity_key, bridge_mode, preset_key, _pack
         )
         selected, _ = _filter_series_rows_with_fallback(
-            rows, selected_series, time_grain, fed_path, traces
+            rows, selected_series, time_grain, fed_path, traces,
+            _current_policy_state_for_key(preset_key),
         )
         base = selected[
             selected.get("trace_name", pd.Series(dtype=str)).astype(str).eq("Current finalist Base case")
@@ -2094,6 +2539,37 @@ def cached_vfm_scenario_paths(
     if not frames:
         return pd.DataFrame()
     return pd.concat(frames, ignore_index=True, sort=False)
+
+
+def _revenue_outlook_layer_catalogue(
+    trace_options: list[str],
+    default_trace_names: list[str],
+) -> tuple[RevenueChartLayerSpec, ...]:
+    """The "Show on chart" catalogue, with the presentation policy applied.
+
+    One construction site for both view modes, so single and compare can never
+    disagree about what is offerable. While the VFM analyst layers are paused
+    the two uptake paths and the structural range are simply absent from the
+    catalogue - which also means ``path_trace_names`` can never return them and
+    no downstream consumer asks for the overlay that would build them.
+    """
+    options = list(trace_options)
+    envelope_available = True
+    if not REVENUE_OUTLOOK_ENABLE_VFM_ANALYST_LAYERS:
+        options = [
+            trace
+            for trace in options
+            if trace not in (VFM_FAST_TRACE_NAME, VFM_SLOW_TRACE_NAME)
+        ]
+        envelope_available = False
+    else:
+        options = [*options, VFM_FAST_TRACE_NAME, VFM_SLOW_TRACE_NAME]
+    return build_layer_catalogue(
+        options,
+        default_trace_names=list(default_trace_names),
+        uncertainty_available=cached_uncertainty_pack().available,
+        envelope_available=envelope_available,
+    )
 
 
 def _cone_band_controls(ev_uptake_key: ScenarioKeyLike) -> RevenueScenarioComputationKey:
@@ -2139,7 +2615,10 @@ def cached_view_cone_band(
     for bound_name, preset_name in (("fast", "MoT VFM fast"), ("slow", "MoT VFM slow")):
         preset_key = _cone_preset_key(preset_name, band_controls)
         rows, _, _, _, _ = cached_scenario_overlay_rows(signature, sensitivity_key, bridge_mode, preset_key, _pack)
-        bound_rows, _ = _filter_series_rows_with_fallback(rows, selected_series, time_grain, fed_path, traces)
+        bound_rows, _ = _filter_series_rows_with_fallback(
+            rows, selected_series, time_grain, fed_path, traces,
+            _current_policy_state_for_key(preset_key),
+        )
         base_trace = bound_rows[
             bound_rows.get("trace_name", pd.Series(dtype=str)).astype(str).eq("Current finalist Base case")
             & ~bound_rows.get("row_type", pd.Series(dtype=str)).astype(str).eq("historical_actual")
@@ -2203,6 +2682,62 @@ VFM_ENVELOPE_NOT_PROBABILISTIC_NOTE = (
     "credible or prediction interval and carries no probability. The 50%/80% "
     "conditional modelled-uncertainty bands are a different concept: they are "
     "probabilistic within their stated evidence, and are selected separately."
+)
+
+def _current_path_coverage_note(rows: pd.DataFrame, selected_series: str) -> str:
+    """Say so when the Current path stops short of the official comparators.
+
+    Light petrol VKT is the case this exists for. It is built from the PED
+    bridge, whose governed econometric path ends at FY2030, while BEFU26 and
+    MBU26 publish it to FY2050. Restoring those official rows made the gap
+    visible for the first time: a reader now sees two official lines running
+    twenty years past the Current one and has no way, from the chart alone, to
+    tell whether the Current path is missing or genuinely ends there.
+
+    The note is derived from the plotted rows rather than hard-coded per
+    series, so any series whose Current coverage is shorter than the display
+    horizon says so, and none has to be remembered.
+
+    Nothing is extrapolated. A path the evidence does not carry to FY2050 is
+    not drawn to FY2050.
+    """
+    if rows is None or rows.empty or "june_year" not in rows.columns:
+        return ""
+    trace = rows.get("trace_name", pd.Series(dtype=str)).astype(str)
+    grain = rows.get("time_grain", pd.Series(dtype=str)).astype(str)
+    annual = rows[grain.eq("june_year")] if grain.any() else rows
+    if annual.empty:
+        return ""
+    annual_trace = annual.get("trace_name", pd.Series(dtype=str)).astype(str)
+    current = annual[annual_trace.str.startswith("Current finalist")]
+    official = annual[annual_trace.str.contains("official", case=False, na=False)]
+    if current.empty or official.empty:
+        return ""
+    current_last = pd.to_numeric(current["june_year"], errors="coerce").max()
+    official_last = pd.to_numeric(official["june_year"], errors="coerce").max()
+    if not pd.notna(current_last) or not pd.notna(official_last):
+        return ""
+    if int(current_last) >= min(int(official_last), display_end_fy()):
+        return ""
+    return (
+        f"Coverage — {selected_series}: the Current path is governed to "
+        f"FY{int(current_last)}, while the official comparators publish to "
+        f"FY{int(official_last)}. The Current line stops where its evidence "
+        "stops rather than being extrapolated to meet them, and its quarterly "
+        f"view ends at the matching quarter. The gap after FY{int(current_last)} "
+        "is an absence of a governed Current path, not a forecast of zero."
+    )
+
+
+#: Shown when a reader carries a band selection into the quarterly view.
+QUARTERLY_UNCERTAINTY_NOT_GOVERNED_NOTE = (
+    "Modelled uncertainty is governed at June-year level only. The 50% and 80% "
+    "bands are built from seeded draws propagated through the annual revenue "
+    "identities, and no governed method exists for splitting them into "
+    "quarters — repeating an annual bound four times or dividing its width "
+    "would state a precision the evidence does not carry. The bands are "
+    "therefore withheld at quarterly grain and return when you switch back to "
+    "the June-year view; your selection is kept in the meantime."
 )
 
 
@@ -2491,6 +3026,47 @@ def _align_detail_frame_to_chart_rows(
     return out
 
 
+def _materialised_policy_detail_frames(
+    ev_uptake_key: tuple[Any, ...],
+    _pack: RevenueOutlookPack,
+    sensitivity_key: tuple[Any, ...] = (),
+    bridge_mode: str = "",
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame] | None:
+    """The four detail frames from the materialised catalogue, or None.
+
+    ``policy_detail_frames`` raises rather than answering for an official
+    vintage it was not aligned against - returning the default vintage's
+    frames would be a wrong answer that looked right - so that raise is caught
+    here and turned into the reference path.
+    """
+    from model_dashboard.revenue_outlook_policy_runtime import (
+        STATUS_OK,
+        policy_detail_frames,
+        resolve_policy_state,
+    )
+
+    if sensitivity_key and not _is_default_sensitivity_key(tuple(sensitivity_key)):
+        return None
+    key = _scenario_key(ev_uptake_key)
+    if bridge_mode and str(bridge_mode) != str(key.ped_bridge_mode):
+        return None
+    runtime = _policy_runtime_for_pack(_pack)
+    if runtime is None:
+        return None
+    if resolve_policy_state(runtime, key).status != STATUS_OK:
+        return None
+    try:
+        frames = policy_detail_frames(runtime, key)
+    except RuntimeError:
+        return None
+    return (
+        frames.line_reconciliation,
+        frames.formula_residuals,
+        frames.stack_components,
+        frames.bridge_components,
+    )
+
+
 @st.cache_data(show_spinner=False, max_entries=12)
 def cached_aligned_scenario_detail_frames(
     signature: tuple[tuple[str, int, int], ...],
@@ -2499,7 +3075,18 @@ def cached_aligned_scenario_detail_frames(
     ev_uptake_key: tuple[Any, ...],
     _pack: RevenueOutlookPack,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    """Line, residual, stack and bridge frames aligned to one overlay key."""
+    """Line, residual, stack and bridge frames aligned to one overlay key.
+
+    A catalogued key is served from the materialised policy state, so the
+    detail frames a reader opens are the same computation identity as the
+    chart above them. The alignment, formula rebuild and stack rebuild are
+    ~2.1 s of a policy switch and none of them changed method with the policy.
+    """
+    materialised = _materialised_policy_detail_frames(
+        ev_uptake_key, _pack, sensitivity_key, bridge_mode
+    )
+    if materialised is not None:
+        return materialised
     detail_frames = cached_revenue_outlook_detail_frames(
         signature,
         sensitivity_key,
@@ -2568,6 +3155,15 @@ def cached_revenue_outlook_view(
     # one consistent vocabulary from the vintage selection in the uptake key.
     official_scenario, official_overlay = _official_vintage_filter_for_key(ev_uptake_key)
     chart_rows = _filter_official_vintage_rows(chart_rows, official_scenario, official_overlay)
+    # Official rows the runtime builders drop before they can become chart
+    # rows. Light petrol VKT is the case that matters: BEFU26 and MBU26 both
+    # publish it, but it is not in DISPLAY_SERIES_ORDER, so the selector
+    # offered a series with no official comparator. This restores those rows
+    # from their own registered vintage source, additively, and under the
+    # SAME vintage selection the filter above just applied.
+    chart_rows = _append_missing_official_rows(
+        chart_rows, official_scenario, official_overlay
+    )
     effective_current_fed_policy_state = _effective_fed_policy_state(
         current_fed_policy_state,
         _CURRENT_FED_UPLIFT_ROLES,
@@ -2593,16 +3189,26 @@ def cached_revenue_outlook_view(
         else pd.DataFrame()
     )
     bridge_components = sensitivity_frames["revenue_bridge_components"]
+    # The rows handed to the quarterly derivation are these FINAL chart rows:
+    # the official comparator vintage has already been filtered, the scenario
+    # overlays, EV/e-RUC levers, conflict path and 12c policy have all been
+    # applied, and the formula rows have been rebuilt. Deriving from an earlier
+    # layer would reconcile the quarters to a number no longer on screen.
     filtered_rows, quarterly_disaggregated = _filter_series_rows_with_fallback(
-        chart_rows, selected_series, time_grain, fed_path, traces
+        chart_rows, selected_series, time_grain, fed_path, traces,
+        effective_current_fed_policy_state,
     )
 
     # MoT VFM Fast-Slow structural scenario envelope around the base-case
     # trace. Computed through the same pipeline, with every non-VFM control
     # inherited from this key, so the band is exactly what the chart would
     # show under those two governed composition scenarios.
+    #
+    # While the analyst layers are paused this is skipped entirely rather than
+    # computed-and-hidden: the band costs two extra full scenario-overlay
+    # passes (one per preset) that nothing on the page would consume.
     cone_band = pd.DataFrame()
-    if ev_uptake_levers is not None:
+    if REVENUE_OUTLOOK_ENABLE_VFM_ANALYST_LAYERS and ev_uptake_levers is not None:
         cone_band = cached_view_cone_band(
             signature, selected_series, time_grain, fed_path, traces,
             sensitivity_key, bridge_mode, _cone_band_controls(ev_uptake_key), _pack,
@@ -2626,11 +3232,17 @@ def cached_revenue_outlook_view(
         "ev_uptake_applied": ev_uptake_levers is not None and not ev_uptake_audit.empty,
         "ev_uptake_audit": ev_uptake_audit,
         "cone_band": cone_band,
-        "cone_band_audit": _vfm_envelope_applicability_audit(
-            cone_band,
-            selected_series=selected_series,
-            time_grain=time_grain,
-            ev_uptake_levers_available=ev_uptake_levers is not None,
+        # Paused with the band itself: the audit describes a layer the page
+        # does not offer, so constructing it would be work with no consumer.
+        "cone_band_audit": (
+            _vfm_envelope_applicability_audit(
+                cone_band,
+                selected_series=selected_series,
+                time_grain=time_grain,
+                ev_uptake_levers_available=ev_uptake_levers is not None,
+            )
+            if REVENUE_OUTLOOK_ENABLE_VFM_ANALYST_LAYERS
+            else pd.DataFrame()
         ),
         "eruc_applied": eruc_levers is not None and not eruc_audit.empty,
         "eruc_audit": eruc_audit,
@@ -2849,8 +3461,25 @@ def cached_revenue_outlook_total_path_figure(
     selected_band_layers: tuple[str, ...] = (),
 ) -> go.Figure:
     selected_vid, _ = _official_vintage_scope(ev_uptake_key)
+    # Plotly keeps pan/zoom across a rerender while ``uirevision`` is unchanged.
+    # It is derived from this figure's CALCULATION identity - the same values
+    # that key this cache - and deliberately NOT from the expand/collapse state,
+    # so resizing the chart is not by itself a reason to throw away a reader's
+    # zoom. Any control that genuinely changes the plotted numbers changes the
+    # cache key, and therefore the revision, and the view resets as it should.
+    revision = _revenue_outlook_figure_revision(
+        signature,
+        selected_series,
+        time_grain,
+        fed_path,
+        traces,
+        sensitivity_key,
+        bridge_mode,
+        ev_uptake_key,
+        selected_band_layers,
+    )
     del signature, time_grain, fed_path, traces, sensitivity_key, bridge_mode, ev_uptake_key
-    return revenue_outlook_total_path_figure(
+    figure = revenue_outlook_total_path_figure(
         _filtered_rows,
         selected_series=selected_series,
         selected_fy=selected_fy,
@@ -2859,6 +3488,14 @@ def cached_revenue_outlook_total_path_figure(
         uncertainty_rows=_uncertainty_rows,
         selected_band_layers=selected_band_layers,
     )
+    figure.update_layout(uirevision=revision, selectionrevision=revision)
+    return figure
+
+
+def _revenue_outlook_figure_revision(*identity: Any) -> str:
+    """A short stable token for the Total path figure's calculation identity."""
+    payload = "|".join(repr(part) for part in identity)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
 
 
 @st.cache_data(show_spinner=False, max_entries=12)
@@ -3053,6 +3690,7 @@ def cached_revenue_outlook_activity_figure(
     traces: tuple[str, ...],
     sensitivity_key: tuple[str, str, str, str, str, str, str, str, str, str, str],
     bridge_mode: str,
+    policy_state: str,
     _chart_rows: pd.DataFrame,
 ) -> go.Figure:
     del signature, sensitivity_key, bridge_mode
@@ -3070,6 +3708,7 @@ def cached_revenue_outlook_activity_figure(
             time_grain,
             selected_fed_path,
             traces,
+            policy_state,
         )
         if not selected.empty:
             activity_frames.append(selected)
@@ -5226,23 +5865,28 @@ def _render_lever_accordion(
         st.markdown("<div class='page5-panel-title'>EV/PHEV uptake</div><div class='page5-panel-sub'>Light RUC fleet composition, from the MoT Vehicle Fleet Model. This sets the class mix only; it does not change total light RUC travel.</div>", unsafe_allow_html=True)
         uptake_cols = st.columns([0.30, 0.70])
         with uptake_cols[0]:
+            # The uptake basis is a whole-scenario input, so while the VFM
+            # analyst layers are paused the Fast/Slow compositions come out of
+            # this selector too. Hiding the layers while leaving the basis
+            # selectable would still let a reader run the Fast/Slow composition
+            # through the entire engine.
+            uptake_mode_options = _public_uptake_basis_options()
             selected_ev_uptake_mode = st.selectbox(
                 "Uptake basis",
-                list(EV_UPTAKE_MODE_OPTIONS),
+                uptake_mode_options,
                 key="revenue_outlook_ev_uptake_basis_v2",
                 help=VFM_SOURCE_NOTE + "\n\n" + SENSITIVITY_INTERPLAY_NOTE,
-                **_widget_default_kwargs("revenue_outlook_ev_uptake_basis_v2", index=list(EV_UPTAKE_MODE_OPTIONS).index(DEFAULT_EV_UPTAKE_MODE)),
+                **_widget_default_kwargs(
+                    "revenue_outlook_ev_uptake_basis_v2",
+                    index=uptake_mode_options.index(DEFAULT_EV_UPTAKE_MODE),
+                ),
             )
-        st.checkbox(
-            f"{PED_RETENTION_SENSITIVITY_LABEL} (off by default)",
-            key="revenue_outlook_ped_retention_sensitivity",
-            help=PED_RETENTION_SENSITIVITY_HELP,
-            **_widget_default_kwargs("revenue_outlook_ped_retention_sensitivity", value=False),
-        )
+        # The petrol-retention sensitivity is no longer a reader control: the
+        # rolling-origin comparison did not support the overlay as a Base path,
+        # so production always runs the raw AR(1) petrol path. See
+        # REVENUE_OUTLOOK_ENABLE_PED_RETENTION_CONTROL.
         st.caption(
-            "Base PED forecast is the raw AR(1) VKT per capita times population. "
-            "The petrol-retention curve is a structural sensitivity: a rolling-origin "
-            "comparison did not support it as the Base path."
+            "Base PED forecast is the raw AR(1) VKT per capita times population."
         )
         custom_ev_levers: tuple[float, ...] = ()
         with uptake_cols[1]:
@@ -5400,9 +6044,7 @@ def _render_lever_accordion(
         "eruc_levers": eruc_lever_values,
         "fed_policy_state": fed_policy_state,
         "mbu_fed_policy_state": mbu_fed_policy_state,
-        "ped_retention_sensitivity": bool(
-            st.session_state.get("revenue_outlook_ped_retention_sensitivity", False)
-        ),
+        "ped_retention_sensitivity": _production_ped_retention_sensitivity(),
     }
 
 
@@ -5424,7 +6066,10 @@ def _compare_mode_lever_state(selected_metric_type: str) -> dict[str, Any]:
         freight = str(st.session_state.get("revenue_outlook_sensitivity_freight_rail_shift", "Med"))
         if freight == "Custom":
             freight = "Med"
-    uptake_mode = str(st.session_state.get("revenue_outlook_ev_uptake_basis_v2", DEFAULT_EV_UPTAKE_MODE))
+    uptake_mode = sanitised_uptake_basis(
+        st.session_state.get("revenue_outlook_ev_uptake_basis_v2", DEFAULT_EV_UPTAKE_MODE),
+        default=DEFAULT_EV_UPTAKE_MODE,
+    )
     custom_ev_levers: tuple[float, ...] = ()
     if uptake_mode == EV_UPTAKE_CUSTOM_OPTION:
         defaults = EV_UPTAKE_PRESETS[DEFAULT_EV_UPTAKE_MODE]
@@ -5532,6 +6177,7 @@ def _render_stream_vintage_caption(period_rule: dict[str, Any]) -> None:
 
 def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     del loaded
+    _discard_withdrawn_revenue_outlook_state()
     _persist_revenue_outlook_view_state()
     from model_dashboard.engine import active_engine, engine_revenue_outlook_dir
 
@@ -5681,12 +6327,8 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             # Compare mode reads the persisted single-view layer selection: the
             # A/B panel owns its own traces, but the sections below the
             # comparison still track this choice.
-            uncertainty_pack = cached_uncertainty_pack()
-            layer_catalogue = build_layer_catalogue(
-                [*trace_options, VFM_FAST_TRACE_NAME, VFM_SLOW_TRACE_NAME],
-                default_trace_names=selected_trace_defaults,
-                uncertainty_available=uncertainty_pack.available,
-                envelope_available=True,
+            layer_catalogue = _revenue_outlook_layer_catalogue(
+                trace_options, selected_trace_defaults
             )
             persisted = st.session_state.get("revenue_outlook_chart_layers")
             label_to_id = {spec.label: spec.layer_id for spec in layer_catalogue}
@@ -5720,15 +6362,11 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                     **fy_default_kwargs,
                 )
             with control_cols[2]:
-                # ONE control for every layer - deterministic paths, the
-                # structural VFM range and the conditional modelled-uncertainty
-                # bands - so nothing is selectable in two contradictory places.
-                uncertainty_pack = cached_uncertainty_pack()
-                layer_catalogue = build_layer_catalogue(
-                    [*trace_options, VFM_FAST_TRACE_NAME, VFM_SLOW_TRACE_NAME],
-                    default_trace_names=selected_trace_defaults,
-                    uncertainty_available=uncertainty_pack.available,
-                    envelope_available=True,
+                # ONE control for every layer - deterministic paths and the
+                # conditional modelled-uncertainty bands - so nothing is
+                # selectable in two contradictory places.
+                layer_catalogue = _revenue_outlook_layer_catalogue(
+                    trace_options, selected_trace_defaults
                 )
                 layer_labels = {spec.label: spec.layer_id for spec in layer_catalogue}
                 default_labels = [
@@ -5746,11 +6384,9 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                     key="revenue_outlook_chart_layers",
                     label_visibility="collapsed",
                     help=(
-                        "Paths are deterministic scenarios. The MoT VFM fast–slow "
-                        "range is a structural scenario envelope and is NOT "
-                        "probabilistic. The 50%/80% bands are conditional model "
-                        "forecast-error bands and exclude Treasury-driver "
-                        "forecast uncertainty."
+                        "Paths are deterministic scenarios. The 50%/80% bands are "
+                        "conditional model forecast-error bands and exclude "
+                        "Treasury-driver forecast uncertainty."
                     ),
                     **layer_default_kwargs,
                 )
@@ -5943,9 +6579,11 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         timer.start("main path figure")
         # The optional VFM Fast/Slow scenario paths are only computed when a
         # reader has actually selected them, so the default render never pays
-        # for two extra full overlay passes.
+        # for two extra full overlay passes. While the analyst layers are
+        # paused the catalogue cannot return those trace names at all, and the
+        # policy check makes that independent of any stale selection.
         plot_rows = filtered_rows
-        if any(
+        if REVENUE_OUTLOOK_ENABLE_VFM_ANALYST_LAYERS and any(
             trace in selected_traces for trace in (VFM_FAST_TRACE_NAME, VFM_SLOW_TRACE_NAME)
         ):
             timer.start("vfm scenario paths")
@@ -5969,10 +6607,29 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                     plot_rows = pd.concat([filtered_rows, wanted], ignore_index=True, sort=False)
         timer.start("uncertainty lookup")
         uncertainty_series_id = _uncertainty_series_id_for_label(chart_rows, selected_stream)
-        uncertainty_rows = cached_uncertainty_band_rows(
-            uncertainty_series_id,
-            str(cached_uncertainty_pack().manifest.get("scenario_key_digest", "")),
-        )
+        # Modelled uncertainty is governed at June-year grain only: the draws,
+        # the copula and the quantile map are all annual, and no governed
+        # quarterly contract exists. Repeating an annual bound across four
+        # quarters, or dividing its width by four, would invent a number, so
+        # the band layers are withheld at quarterly grain and the reader is
+        # told why rather than shown a fabricated interval.
+        quarterly_grain = selected_time_grain == "quarterly"
+        if quarterly_grain:
+            uncertainty_rows = pd.DataFrame()
+            band_layers_for_figure: tuple[str, ...] = tuple(
+                layer
+                for layer in selected_band_layers
+                if layer not in (BAND_50_LAYER_ID, BAND_80_LAYER_ID)
+            )
+        else:
+            uncertainty_rows = cached_uncertainty_band_rows(
+                uncertainty_series_id,
+                str(cached_uncertainty_pack().manifest.get("scenario_key_digest", "")),
+                str(view.get("current_fed_policy_state") or ""),
+                ev_uptake_key,
+                pack,
+            )
+            band_layers_for_figure = tuple(selected_band_layers)
         timer.stop("uncertainty lookup")
         main_path_figure = cached_revenue_outlook_total_path_figure(
             pack_signature,
@@ -5987,10 +6644,17 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             plot_rows,
             view.get("cone_band"),
             uncertainty_rows,
-            tuple(selected_band_layers),
+            band_layers_for_figure,
         )
         timer.stop("main path figure")
-        total_path_notes = []
+        total_path_notes = [display_horizon_note()]
+        short_current_note = _current_path_coverage_note(plot_rows, selected_stream)
+        if short_current_note:
+            total_path_notes.append(short_current_note)
+        if quarterly_grain and any(
+            layer in selected_band_layers for layer in (BAND_50_LAYER_ID, BAND_80_LAYER_ID)
+        ):
+            total_path_notes.append(QUARTERLY_UNCERTAINTY_NOT_GOVERNED_NOTE)
         cone_band_for_notes = view.get("cone_band")
         if (
             isinstance(cone_band_for_notes, pd.DataFrame)
@@ -6061,12 +6725,14 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         # it for space. The fan's governed source data is unchanged and stays
         # reachable from the collapsed detail surface below; it is not
         # constructed unless a reader explicitly asks for it.
+        chart_expanded = _render_expand_chart_control()
         chart_card(
             "Total path chart",
             "\n\n".join(total_path_notes),
             main_path_figure,
             caption="\n\n".join(conflict_notes) if conflict_notes else None,
             notes_as_tooltip=True,
+            container_key=EXPANDED_CHART_CONTAINER_KEY if chart_expanded else None,
         )
         _render_revenue_outlook_vfm_envelope_caption(view)
 
@@ -6076,9 +6742,8 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         key="revenue_outlook_show_fan_detail",
         help=(
             "The empirical 50%/80% forecast-error fan, its source, its "
-            "supported horizon and its download. A different concept from the "
-            "MoT VFM Fast–Slow range on the chart above: the fan is an "
-            "empirical forecast-error band and stops at FY2030."
+            "supported horizon and its download. The fan is an empirical "
+            "forecast-error band and stops at FY2030."
         ),
     ):
         timer.start("fan figure")
@@ -6139,7 +6804,9 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             )
             display_table(pd.DataFrame(catalogue_frame(layer_catalogue)), height=280)
 
-    if not compare_mode and st.toggle(
+    # The MoT VFM Fast–Slow range audit is withdrawn with the layer it
+    # describes; the toggle is not rendered while the analyst surface is paused.
+    if REVENUE_OUTLOOK_ENABLE_VFM_ANALYST_LAYERS and not compare_mode and st.toggle(
         "Show MoT VFM Fast–Slow range audit",
         value=False,
         key="revenue_outlook_show_vfm_envelope_audit",
@@ -6751,6 +7418,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 tuple(str(value) for value in selected_traces),
                 sensitivity_key,
                 selected_ped_bridge_mode,
+                str(view.get("current_fed_policy_state") or ""),
                 chart_rows,
             )
             chart_card(
@@ -8706,7 +9374,13 @@ def _validated_select_state(key: str, options: list[str], default: str) -> None:
 def _comparison_scenario_defaults(prefix: str) -> dict[str, Any]:
     is_b = prefix == "b"
     return {
-        "uptake": "MoT VFM fast" if is_b else DEFAULT_EV_UPTAKE_MODE,
+        # Scenario B opened on the VFM Fast composition, which is one of the
+        # paused analyst scenarios: while the pause is in force B has to open
+        # on Base like A, or comparing A vs B would run Fast by default.
+        "uptake": sanitised_uptake_basis(
+            "MoT VFM fast" if is_b else DEFAULT_EV_UPTAKE_MODE,
+            default=DEFAULT_EV_UPTAKE_MODE,
+        ),
         "fleet": "Off",
         "pt": "Off",
         "freight": "Off",
@@ -8726,7 +9400,9 @@ def _render_comparison_scenario_column(
     # The governed option follows the page's SELECTED comparator vintage; a
     # stale label from another vintage is reset by _validated_select_state.
     mot_option = _comparison_mot_official_option(selected_release)
-    uptake_options = [mode for mode in EV_UPTAKE_MODE_OPTIONS if mode != EV_UPTAKE_CUSTOM_OPTION]
+    uptake_options = [
+        mode for mode in _public_uptake_basis_options() if mode != EV_UPTAKE_CUSTOM_OPTION
+    ]
     uptake_options.append(mot_option)
     keys = {
         name: f"ro_cmp_{prefix}_{name}"
@@ -8829,9 +9505,7 @@ def _render_comparison_scenario_column(
         eruc_levers=eruc_values,
         current_fed_policy_state=fed_policy_state,
         official_fed_policy_state=FED_POLICY_PUBLISHED,
-        ped_retention_sensitivity=bool(
-            st.session_state.get("revenue_outlook_ped_retention_sensitivity", False)
-        ),
+        ped_retention_sensitivity=_production_ped_retention_sensitivity(),
         heavy_bev_transition=HEAVY_BEV_DEFAULT,
         official_comparator_vintage_id=selected_vid,
     )
@@ -8840,7 +9514,10 @@ def _render_comparison_scenario_column(
 
 def _copy_page_settings_to_scenario_a() -> None:
     """Map the main-panel session values into the Scenario A keys."""
-    uptake = str(st.session_state.get("revenue_outlook_ev_uptake_basis_v2", DEFAULT_EV_UPTAKE_MODE))
+    uptake = sanitised_uptake_basis(
+        st.session_state.get("revenue_outlook_ev_uptake_basis_v2", DEFAULT_EV_UPTAKE_MODE),
+        default=DEFAULT_EV_UPTAKE_MODE,
+    )
     if uptake == EV_UPTAKE_CUSTOM_OPTION:
         uptake = DEFAULT_EV_UPTAKE_MODE
     st.session_state["ro_cmp_a_uptake"] = uptake
@@ -9743,7 +10420,14 @@ def _revenue_outlook_fy_options(chart_rows: pd.DataFrame) -> list[str]:
     years = pd.to_numeric(chart_rows["june_year"], errors="coerce").dropna().astype(int)
     if years.empty:
         return []
-    return [f"FY{year}" for year in sorted(years.unique().tolist()) if year >= 2025]
+    # Capped at the presentation horizon: the governed packs carry FY2051-FY2055
+    # rows as audit material, and the FY marker must not offer a year no chart
+    # below it will draw.
+    return [
+        f"FY{year}"
+        for year in sorted(years.unique().tolist())
+        if 2025 <= year <= display_end_fy()
+    ]
 
 
 def _scenario_names_for_traces(chart_rows: pd.DataFrame, trace_names: list[str]) -> list[str]:
@@ -10364,7 +11048,12 @@ def revenue_outlook_total_path_figure(
     uncertainty_rows: pd.DataFrame | None = None,
     selected_band_layers: tuple[str, ...] = (),
 ) -> go.Figure:
-    data = _selected_revenue_outlook_series_rows(rows, selected_series)
+    # Clipped again here rather than trusting the caller: this builder is also
+    # reached with rows concatenated from other sources, and the chart is the
+    # surface the horizon promise is actually about.
+    data = _selected_revenue_outlook_series_rows(
+        clip_frame_to_display_horizon(rows), selected_series
+    )
     if data.empty:
         return empty_figure("Selected revenue series is unavailable in the committed runtime pack.")
     data["value_numeric"] = pd.to_numeric(data.get("value"), errors="coerce")
@@ -10678,12 +11367,44 @@ def revenue_outlook_total_path_figure(
     return fig
 
 
+REVENUE_OUTLOOK_EXPAND_CHART_KEY = "revenue_outlook_expand_chart"
+
+
+def _render_expand_chart_control() -> bool:
+    """The Expand/Collapse control that sits at the top right of the chart.
+
+    An in-app focus mode, not browser fullscreen: no permission prompt, no new
+    third-party component, and the page keeps its normal chrome. The toggle
+    only changes how much room the chart is given - it is never part of the
+    figure's calculation identity, so the plotted values cannot depend on it.
+    """
+    # A wide spacer column pushes the control to the right edge of the chart;
+    # the keyed wrapper carries the flexbox fallback, so the placement holds
+    # even if Streamlit's column weighting changes under us again.
+    spacer, control = st.columns([6, 1])
+    del spacer
+    with control, st.container(key=EXPAND_CONTROL_CONTAINER_KEY):
+        expanded = st.toggle(
+            "Expand chart",
+            key=REVENUE_OUTLOOK_EXPAND_CHART_KEY,
+            help=(
+                "Give the Total path chart a full-width, near-full-height "
+                "workspace inside the page. Switch it off to return to the "
+                "standard layout. Plotted values are identical either way."
+            ),
+            **_widget_default_kwargs(REVENUE_OUTLOOK_EXPAND_CHART_KEY, value=False),
+        )
+    return bool(expanded)
+
+
 def _render_revenue_outlook_vfm_envelope_caption(view: dict[str, Any]) -> None:
     """State what the blue range is - and is not - directly under the chart.
 
     The envelope shares the page with an empirical forecast-error fan, so the
     distinction has to be visible without opening a tooltip or an audit.
     """
+    if not REVENUE_OUTLOOK_ENABLE_VFM_ANALYST_LAYERS:
+        return
     audit = view.get("cone_band_audit")
     if not isinstance(audit, pd.DataFrame) or audit.empty:
         return
@@ -10757,8 +11478,7 @@ def _render_revenue_outlook_fan_card(
             "<div class='gov-chart-card chart-card'>"
             "<div class='chart-card-title'>Uncertainty fan</div>"
             "<div class='chart-card-subtitle'>Empirical 50%/80% forecast-error band from the best "
-            "available governed source, supported to FY2030. A different concept from the MoT VFM "
-            "Fast&ndash;Slow structural scenario range on the Total path chart.</div>"
+            "available governed source, supported to FY2030.</div>"
             "</div>",
             unsafe_allow_html=True,
         )
@@ -10852,9 +11572,9 @@ def revenue_outlook_uncertainty_fan_figure(
     data["hover_unit"] = hover_unit
     fig = go.Figure()
     is_scenario_spread = resolved_source == FAN_SOURCE_SCENARIO_SPREAD
-    # Gray fan treatment: outer 80% lighter, inner 50% darker. The light-blue
-    # MoT VFM fast-slow range on the main chart is a composition range and
-    # keeps its own colour - the concepts must not share a visual language.
+    # Gray fan treatment: outer 80% lighter, inner 50% darker, kept distinct
+    # from the slate modelled-uncertainty bands on the main chart - the
+    # concepts must not share a visual language.
     band_specs = (
         [
             ("upper80", "lower80", "Scenario spread outer range (not probabilistic)", "rgba(128, 128, 128, 0.16)"),

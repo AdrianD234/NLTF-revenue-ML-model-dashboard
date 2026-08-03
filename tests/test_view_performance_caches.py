@@ -237,7 +237,56 @@ def test_overlay_rows_match_view_chart_rows(context) -> None:
     # official-vintage filter. Apply it here so the two layers are comparable.
     official_scenario, official_overlay = app._official_vintage_filter_for_key(uptake)
     rows = app._filter_official_vintage_rows(rows, official_scenario, official_overlay)
-    pd.testing.assert_frame_equal(view["chart_rows"].reset_index(drop=True), rows.reset_index(drop=True))
+
+    # The view is no longer equal to the overlay: it also carries the official
+    # rows the runtime builders drop before they can become chart rows, because
+    # their series is not in DISPLAY_SERIES_ORDER. Equality would now assert
+    # that restoration never happened.
+    #
+    # Additive is the property that matters, so it is checked directly and more
+    # strictly than equality did: every overlay row must survive byte-for-byte,
+    # and every extra row must be a restored official one - never a Current
+    # value, never a second copy of a period already present.
+    view_rows = view["chart_rows"].reset_index(drop=True)
+    identity = ["series_id", "trace_name", "time_grain", "period"]
+    shared = view_rows.columns.intersection(rows.columns)
+    merged = rows.merge(
+        view_rows[identity].assign(_in_view=True), on=identity, how="left"
+    )
+    assert merged["_in_view"].fillna(False).all(), "an overlay row vanished from the view"
+
+    overlay_keys = set(map(tuple, rows[identity].astype(str).to_numpy()))
+    view_keys = set(map(tuple, view_rows[identity].astype(str).to_numpy()))
+    added = view_keys - overlay_keys
+    assert added, "the restored official rows are missing from the view"
+    added_rows = view_rows[
+        ~view_rows[identity].astype(str).apply(tuple, axis=1).isin(overlay_keys)
+    ]
+    # Only official comparators and their Actual history are ever restored.
+    assert set(added_rows["row_type"].astype(str)) <= {
+        "official_comparator",
+        "historical_actual",
+    }
+    # And only for the series the builders drop.
+    assert set(added_rows["series_id"].astype(str)) == {"light_petrol_vkt"}
+    # The non-selected vintage must not come back in through the append.
+    assert not app._filter_official_vintage_rows(
+        view_rows, official_scenario, official_overlay
+    ).shape[0] < view_rows.shape[0], "a non-selected vintage leaked into the view"
+    # Values shared by both layers must be untouched. check_dtype is off for
+    # one reason only: concatenating the restored rows widens some all-null
+    # string columns (rate_value) back to object. No value moves, and every
+    # reader of those columns goes through .astype(str). The VALUES are still
+    # compared exactly, which is the part that matters.
+    pd.testing.assert_frame_equal(
+        view_rows[view_rows[identity].astype(str).apply(tuple, axis=1).isin(overlay_keys)][
+            list(shared)
+        ]
+        .sort_values(identity)
+        .reset_index(drop=True),
+        rows[list(shared)].sort_values(identity).reset_index(drop=True),
+        check_dtype=False,
+    )
 
 
 def test_policy_and_fuel_totals_reconcile_across_chart_line_and_stack(context) -> None:
@@ -585,7 +634,10 @@ def test_middle_east_paths_reconcile_net_revenue_and_quarter_timing(context) -> 
             assert float(sums.loc[fy]) == pytest.approx(float(annual.at[fy, scenario_name]), abs=1e-6)
 
 
-def test_cone_band_is_uptake_key_invariant(context) -> None:
+def test_cone_band_is_uptake_key_invariant(
+    context, vfm_analyst_layers_enabled
+) -> None:
+    """The band's cache identity, checked with the paused layer switched on."""
     pack, signature = context
     sens, _ = _default_keys()
     bands = {}
