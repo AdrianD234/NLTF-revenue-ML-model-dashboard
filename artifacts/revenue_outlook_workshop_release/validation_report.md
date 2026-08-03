@@ -35,6 +35,12 @@ Order: replay caches → quarterly display → policy runtime.
 | Quarterly display | rebuilt ×2 | byte-identical both times, **and identical to the committed pack** |
 | Policy runtime (both engines) | rebuilt ×2, last | **byte-identical across two builds on both engines** |
 
+Rebuilt again after the conflict fix, with the same results: the quarterly pack
+byte-identical twice **and to the committed pack** — the conflict lineage is a
+runtime column absent from the offline pack, so the offline build never takes
+the new path — and the policy runtime byte-identical twice on both engines with
+**zero frame parquets changed**, only the digests. Both engines report `ok`.
+
 The policy runtime had to be rebuilt three separate times as defects were
 found; the byte-identity claim above is from the final pair, run strictly
 sequentially with the source tree frozen.
@@ -153,7 +159,50 @@ reader previously saw no official line at all on this series.
 
 Honesty matters more here than a full tick-list:
 
-## Isolated full suite — 1,699 passed, 39 failed, 53 skipped (35:11)
+## Isolated full suite, after the conflict fix — 1,743 passed, 32 failed, 53 skipped (36:55)
+
+Run alone. **All 10 real failures are fixed**; the 32 that remain are the
+local-scratch group below, every one a missing file under `artifacts/`.
+
+| | first isolated run | after the fixes |
+|---|---|---|
+| passed | 1,699 | **1,743** |
+| failed | 39 | **32** |
+| real failures | 10 | **0** |
+| local-scratch failures | 29 | 32 |
+
+The scratch count rises by three only because tests that previously failed
+earlier in their module now reach a later missing-file assertion.
+
+### The conflict causal fix
+
+`test_middle_east_paths_reconcile_net_revenue_and_quarter_timing` passes, and
+36 further permanent tests now guard the property across **both engines ×
+Low/Medium/High**.
+
+**Resolved causal floor: `2026Q2`** — read from the lineage, never hardcoded.
+`fuel_price_scenario._first_conflict_input_divergence_period` returns the first
+quarter at which the Low/Medium/High fuel inputs diverge in the replay's
+`input_audit`; the replay allocates deltas only from that floor onward and
+reconciles them to `conflict annual − Base annual`. The tests re-read the floor
+from the same lineage, so if the replay's floor moves they move with it rather
+than checking a stale boundary.
+
+**Construction.** Base quarters are derived first, by the same governed
+contract, so the conflict path inherits Base's seasonality, rate basis and
+policy timetable rather than acquiring its own. The governed delta is then
+added. Pre-floor quarters equal Base *by construction* — the delta is zero
+there — rather than by a rule someone has to remember. The annual residual is
+placed on a quarter the lineage already moved, and recorded in
+`annual_reconciliation_residual`; `derivation_method` names the construction
+(`base_quarters_plus_governed_conflict_delta`) so a reader is not told these
+came from the generic solve.
+
+Detection is by lineage presence, not scenario name, so the coverage module
+still needs no conflict vocabulary. Absent, unusable, or negative-producing
+lineage falls back to the declared per-series rule.
+
+## The earlier isolated run — 1,699 passed, 39 failed (35:11)
 
 Run alone: no build, no server, no second pytest, no edits.
 
@@ -195,7 +244,7 @@ registered vintage, because that function describes what the *sources* publish,
 not what this reader selected. With BEFU26 selected, `mbu26_official` reappeared
 in `scenario_name`. The append now re-applies the selected vintage.
 
-### BLOCKER — conflict quarters leak backwards
+### ~~BLOCKER~~ — conflict quarters leaked backwards (FIXED, see above)
 
 `test_middle_east_paths_reconcile_net_revenue_and_quarter_timing` asserts the
 conflict scenarios equal Base in **2025Q3, 2025Q4 and 2026Q1** — the quarters
