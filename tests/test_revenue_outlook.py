@@ -1972,6 +1972,23 @@ def test_ped_bridge_modes_materialize_raw_optimized_and_reconcile() -> None:
     assert not default_petrol.duplicated(
         ["trace_name", "scenario_name", "fed_path", "june_year"]
     ).any()
+    # The PED bridge governs the econometric window only. Light petrol VKT is
+    # now also published for FY2031-FY2050 from the post-model extrapolation,
+    # which is a separate governed constructor with no bridge audit row - so
+    # those rows are excluded here rather than being allowed to fail the
+    # bridge contract. They are asserted to be properly labelled instead, so
+    # nothing can slip out of this check merely by lacking an audit row.
+    from model_dashboard.post_model_extrapolation import POST_MODEL_VALUE_STATUS
+
+    post_model = default_petrol[
+        default_petrol["value_status"].astype(str).eq(POST_MODEL_VALUE_STATUS)
+    ]
+    assert not post_model.empty, "the post-model Light petrol VKT rows vanished"
+    assert int(pd.to_numeric(post_model["june_year"], errors="coerce").min()) == 2031
+    default_petrol = default_petrol[
+        ~default_petrol["value_status"].astype(str).eq(POST_MODEL_VALUE_STATUS)
+    ]
+    assert not default_petrol.empty
     raw_petrol = default["ped_revenue_bridge_audit"][
         default["ped_revenue_bridge_audit"]["source_path"]
         .astype(str)

@@ -2221,6 +2221,104 @@ def cached_scenario_overlay_rows(
     )
 
 
+@st.cache_data(show_spinner=False, max_entries=4)
+def cached_post_model_quarterly_inputs(
+    pack_dir: str,
+    signature: tuple[bool, int, int],
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """The two key-independent inputs to the FY2031-FY2050 quarterly split.
+
+    Both are pack-level facts - the committed raw long-horizon quarterly path
+    and the scenario population - so they do not vary with policy, scenario,
+    series or grain, and are cached on the pack directory's own signature
+    rather than on the computation key. The identity is a path string plus a
+    (exists, mtime, size) triple: no DataFrame is hashed into a cache key.
+    """
+    base = Path(pack_dir)
+    del signature  # identity only; the read is by path
+    try:
+        raw_audit = pd.read_parquet(base / "raw_quarterly_forecast_audit.parquet")
+        population = pd.read_parquet(
+            base / "scenario_inputs" / "scenario_input_wide.parquet"
+        )
+    except (OSError, ValueError):
+        return pd.DataFrame(), pd.DataFrame()
+    population = population[population.get("stream", pd.Series(dtype=str)).astype(str).eq("PED")]
+    return raw_audit, population
+
+
+def _post_model_ped_activity_quarters(
+    selected_series: str,
+    *,
+    annual_rows: pd.DataFrame,
+    chart_rows: pd.DataFrame,
+    pack_dir: str,
+) -> pd.DataFrame:
+    """FY2031-FY2050 quarters for whichever PED activity leaf is selected.
+
+    The pair is always CONSTRUCTED together - one scale factor, one identity -
+    and only then filtered to the selected series, so the two can never drift
+    apart just because a reader happened to be looking at one of them.
+
+    ``pack_dir`` is required and must be the directory the caller's chart rows
+    came from. Resolving it from the process-wide active engine instead reads
+    one engine's raw path against another engine's annual targets: with the
+    ensemble rows and an ar1 active engine the FY2032 raw shape differs by
+    ~5%, and the construction produced quarters for the wrong engine. The
+    annual-closure guard caught it, which is why it is an error rather than a
+    tolerance.
+    """
+    from model_dashboard import revenue_outlook_series_coverage as coverage
+
+    if not str(pack_dir or "").strip():
+        return pd.DataFrame()
+    try:
+        series_id = coverage.canonical_series_id(selected_series)
+    except coverage.SeriesCoverageError:
+        return pd.DataFrame()
+    if series_id not in coverage.POST_MODEL_PED_ACTIVITY_QUARTERLY_SERIES:
+        return pd.DataFrame()
+
+    resolved = Path(pack_dir)
+    raw_audit, population = cached_post_model_quarterly_inputs(
+        str(resolved), directory_signature(resolved)
+    )
+    if raw_audit.empty or population.empty:
+        return pd.DataFrame()
+
+    # Both leaves' annual targets, not just the selected one: the constructor
+    # needs the pair to solve.
+    pair_annual = chart_rows[
+        chart_rows["time_grain"].astype(str).eq("june_year")
+        & chart_rows["series_id"].astype(str).isin(
+            coverage.POST_MODEL_PED_ACTIVITY_QUARTERLY_SERIES
+        )
+        & chart_rows["trace_name"].astype(str).isin(
+            set(annual_rows.get("trace_name", pd.Series(dtype=str)).astype(str))
+        )
+    ]
+    if pair_annual.empty:
+        return pd.DataFrame()
+    native = chart_rows[chart_rows["time_grain"].astype(str).eq("quarterly")]
+    try:
+        derived = coverage.post_model_ped_activity_quarterly_rows(
+            pair_annual,
+            raw_quarterly_audit=raw_audit,
+            scenario_population=population,
+            native_quarters=native,
+        )
+    except coverage.PostModelQuarterlyError:
+        # Fail closed to the PREVIOUS behaviour, never to a wrong number and
+        # never to a broken page: the quarterly view keeps the coverage it had
+        # and the annual publication is unaffected. The governed reason is
+        # raised and audited by the constructor; suppressing it here only
+        # decides that a reader sees a short series rather than an exception.
+        return pd.DataFrame()
+    if derived.empty:
+        return derived
+    return derived[derived["series_id"].astype(str).eq(series_id)]
+
+
 def _filter_series_rows_with_fallback(
     rows: pd.DataFrame,
     selected_series: str,
@@ -2228,6 +2326,7 @@ def _filter_series_rows_with_fallback(
     fed_path: str,
     traces: tuple[str, ...],
     policy_state: str = "",
+    pack_dir: str = "",
 ) -> tuple[pd.DataFrame, bool]:
     """Selected-series rows, filling any trace missing native quarters.
 
@@ -2285,6 +2384,66 @@ def _filter_series_rows_with_fallback(
             if not derived.empty:
                 filtered = pd.concat([filtered, derived], ignore_index=True, sort=False)
                 used_fallback = True
+        # Missing PERIODS, not merely missing traces. The fill above asks
+        # whether a trace has any native quarters at all, so a Current trace
+        # whose native rows stop at 2030Q4 counts as complete and the last
+        # twenty years are silently never derived. Narrow to the two PED
+        # activity leaves: their governed FY2031-FY2050 construction exists,
+        # and widening the rule to every series would change fallback
+        # semantics far beyond what is proven here.
+        gap_filled = _post_model_ped_activity_quarters(
+            selected_series,
+            annual_rows=_filter_revenue_outlook_rows(
+                rows,
+                time_grain="june_year",
+                stream_labels=[selected_series],
+                fed_paths=[fed_path],
+                trace_names=list(traces),
+            ),
+            chart_rows=rows,
+            pack_dir=pack_dir,
+        )
+        if not gap_filled.empty:
+            gap_filled = gap_filled[
+                gap_filled["trace_name"].astype(str).isin([str(t) for t in traces])
+            ]
+        if not gap_filled.empty:
+            # The joint construction is AUTHORITATIVE over the post-model
+            # window for this pair, not merely a gap filler. The generic
+            # per-trace fallback runs first and, because Light petrol VKT has
+            # no native quarters at all, had already split its whole horizon
+            # with the Denton rule - so the two series were being built by two
+            # different methods and the cross-series identity
+            #     petrol_q = vktpc_q * population_q / 1e6
+            # was not enforced between them. Superseding the derived rows here
+            # is what keeps the pair on one construction.
+            #
+            # Only DERIVED rows are superseded. A natively published quarter is
+            # never dropped, which is why the seam years keep their published
+            # values.
+            from model_dashboard import revenue_outlook_series_coverage as _coverage
+            from model_dashboard.post_model_extrapolation import FIRST_EXTRAPOLATION_FY
+
+            superseded_from = FIRST_EXTRAPOLATION_FY
+            years = pd.to_numeric(filtered.get("june_year"), errors="coerce")
+            row_type = (
+                filtered.get(
+                    "coverage_row_type", pd.Series("", index=filtered.index)
+                )
+                .fillna("")
+                .astype(str)
+            )
+            is_derived = row_type.eq(_coverage.COVERAGE_ROW_TYPE_DERIVED)
+            drop = (
+                is_derived
+                & years.ge(superseded_from)
+                & filtered["series_id"].astype(str).isin(
+                    gap_filled["series_id"].astype(str).unique()
+                )
+            )
+            filtered = filtered[~drop.fillna(False)]
+            filtered = pd.concat([filtered, gap_filled], ignore_index=True, sort=False)
+            used_fallback = True
     return clip_frame_to_display_horizon(filtered), used_fallback
 
 
@@ -2526,6 +2685,7 @@ def cached_vfm_scenario_paths(
         selected, _ = _filter_series_rows_with_fallback(
             rows, selected_series, time_grain, fed_path, traces,
             _current_policy_state_for_key(preset_key),
+            pack_dir=str(_pack.output_dir),
         )
         base = selected[
             selected.get("trace_name", pd.Series(dtype=str)).astype(str).eq("Current finalist Base case")
@@ -2618,6 +2778,7 @@ def cached_view_cone_band(
         bound_rows, _ = _filter_series_rows_with_fallback(
             rows, selected_series, time_grain, fed_path, traces,
             _current_policy_state_for_key(preset_key),
+            pack_dir=str(_pack.output_dir),
         )
         base_trace = bound_rows[
             bound_rows.get("trace_name", pd.Series(dtype=str)).astype(str).eq("Current finalist Base case")
@@ -3197,6 +3358,7 @@ def cached_revenue_outlook_view(
     filtered_rows, quarterly_disaggregated = _filter_series_rows_with_fallback(
         chart_rows, selected_series, time_grain, fed_path, traces,
         effective_current_fed_policy_state,
+        pack_dir=str(_pack.output_dir),
     )
 
     # MoT VFM Fast-Slow structural scenario envelope around the base-case
@@ -3691,6 +3853,7 @@ def cached_revenue_outlook_activity_figure(
     sensitivity_key: tuple[str, str, str, str, str, str, str, str, str, str, str],
     bridge_mode: str,
     policy_state: str,
+    pack_dir: str,
     _chart_rows: pd.DataFrame,
 ) -> go.Figure:
     del signature, sensitivity_key, bridge_mode
@@ -3709,6 +3872,7 @@ def cached_revenue_outlook_activity_figure(
             selected_fed_path,
             traces,
             policy_state,
+            pack_dir=pack_dir,
         )
         if not selected.empty:
             activity_frames.append(selected)
@@ -7419,6 +7583,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 sensitivity_key,
                 selected_ped_bridge_mode,
                 str(view.get("current_fed_policy_state") or ""),
+                str(pack.output_dir),
                 chart_rows,
             )
             chart_card(

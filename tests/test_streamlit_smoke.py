@@ -1004,6 +1004,12 @@ def test_revenue_outlook_activity_figure_cache_matches_direct_builder() -> None:
         # The selected Current 12c state is part of this cache's identity now:
         # it decides which governed rate timetable shapes the quarterly view.
         str(view.get("current_fed_policy_state") or ""),
+        # The pack directory is part of the identity too, and is required
+        # rather than defaulted: the PED activity quarterly fill reads the raw
+        # long-horizon path and the scenario population from this pack, and
+        # resolving it from the process-wide active engine would read one
+        # engine's inputs against another engine's annual targets.
+        str(pack_dir),
         view["chart_rows"],
     )
     direct_frames = []
@@ -1020,6 +1026,8 @@ def test_revenue_outlook_activity_figure_cache_matches_direct_builder() -> None:
             "june_year",
             "Current planned path",
             traces,
+            str(view.get("current_fed_policy_state") or ""),
+            pack_dir=str(pack_dir),
         )
         if not selected.empty:
             direct_frames.append(selected)
@@ -1041,15 +1049,21 @@ def test_revenue_outlook_activity_figure_cache_matches_direct_builder() -> None:
         "quarterly",
         "Current planned path",
         traces,
+        str(view.get("current_fed_policy_state") or ""),
+        pack_dir=str(pack_dir),
     )
     assert used_fallback
     base_petrol = quarterly_petrol[
         quarterly_petrol["trace_name"].astype(str).eq("Current finalist Base case")
     ]
-    # 100 quarters was the pre-policy full source horizon. The decision-facing
-    # path now stops at H20; the 100-quarter source horizon is retained as
-    # non-decision-facing evidence in raw_quarterly_forecast_audit.
-    assert len(base_petrol) == EXTENDED_EVIDENCE_MAX_HORIZON
+    # The decision-facing path used to stop at H20, because the Current annual
+    # line stopped at FY2030 and there was nothing beyond it to disaggregate.
+    # It now runs to the FY2050 presentation horizon: the governed post-model
+    # annual rows are published, so the quarters exist to derive. 100 quarters
+    # is 2025Q3-2050Q2 inclusive - the full display horizon, not the old
+    # non-decision-facing source horizon that happened to share the number.
+    assert len(base_petrol) == 100
+    assert base_petrol["period"].astype(str).max() == "2050Q2"
     assert set(base_petrol["series_id"].astype(str)) == {"light_petrol_vkt"}
     # The display path derives through the governed coverage contract now, so
     # the provenance vocabulary is that contract's rather than the older

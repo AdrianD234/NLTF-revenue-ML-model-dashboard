@@ -7,7 +7,7 @@
     "python": "3.13.5"
   },
   "builder_version": "1",
-  "bytes_on_disk": 9901847,
+  "bytes_on_disk": 9949027,
   "detail_frame_vintage_scope": {
     "overlay": false,
     "vintage_id": "BEFU26"
@@ -29,7 +29,7 @@
   "provenance": {
     "builder_version": "1",
     "code_module_hashes": {
-      "app.py": "b951d8147088cb10323b79ae82bcedeed76b704e8486ab4b045b191e48cba740",
+      "app.py": "10956eafa26dd145fd4140522b982b835d72a8965879c42a39dc957f84aa056c",
       "model_dashboard/__init__.py": "40f18fc5bbc37948a1250097bb55c68711d51d6622248e75efe27cd3580809f8",
       "model_dashboard/completeness_contract.py": "2a5ec576c757b7d4d820a060922dd5c7c7275841dc9734dcb479f9ad49a5c708",
       "model_dashboard/conflict_fuel_paths.py": "cdf9453b4a83ae2230dd4e0d405e96e29350a1b313ce6654d7815c42927c5cce",
@@ -72,7 +72,7 @@
       "model_dashboard/rate_paths.py": "e7bd377166e1f7671fc26f2db2b80e0fbce312a928f7a264037bb94cc3af15b9",
       "model_dashboard/reproducibility_imports.py": "dd2a1000837cc3f96fe557e74e64f0b270b09362225648e1d6aedcfb5a9529ba",
       "model_dashboard/revenue_chart_layers.py": "73abc3584c6a31938a32a7e24cf19e4bbfb1aab6f482bf3683ab4ab427c61c7b",
-      "model_dashboard/revenue_outlook.py": "4fb996076c17da7051420e21041aa52cf003a2075e227680c19f0a88d377195e",
+      "model_dashboard/revenue_outlook.py": "aaf2f0421b13bb58d1dc8572fb70c13ddf3163c4174fca969b829d66de4c2081",
       "model_dashboard/revenue_outlook_policy_runtime.py": "80acce60c2198a91ae239bd06793c6c94e282e662b53b1f732661eb22423036f",
       "model_dashboard/revenue_outlook_presentation_policy.py": "fdf1c8887e03174c3a3eb0519eb019132471d13d4065dee28253fe63c57d4775",
       "model_dashboard/revenue_outlook_replay_cache.py": "6e227558b0478dde66fe00121030e894df3e2273bf9a07aa347bbfd55b9fecfb",
@@ -395,7 +395,7 @@
       "macro.replay_inputs.parquet": "d5bf3b934b245b3f2fdd0e3ce504678e32161e93e49bdee07229c6a39ed28f08",
       "macro.scenario_replay_lineage.parquet": "fca471fd7ec1734286028ef981d78014a3a1f8d3827ab5a9bae3ab9a136ee914"
     },
-    "replay_source_digest": "a988cc0e8caebcdf85aa7b7612000ec4e70800071e83af2b9c3b84eaba573c31",
+    "replay_source_digest": "f8109688ec5bba55b1e9896b1efac3778e878cc2119770d6fe3e06934b25f8e5",
     "schema_version": "1",
     "source_hashes": {
       "artifacts/long_horizon_validation/long_horizon_june_year_errors.csv": "e9f7cb0027029c7ece0b1929bf1a7dd88b2a709567d60dffa4bb7ad69999cda6",
@@ -446,10 +446,10 @@
     "uncertainty_scenario_key_digest": "b5ce7ab7a3ef17577e7eca43b439acce5b8807a29f55b5c09e8a668b956237df",
     "uncertainty_seed": 20260801
   },
-  "row_count": 455925,
+  "row_count": 459525,
   "schema_version": "1",
-  "source_digest": "6c62d0365761d4362ad935c5810a5c1a73bbd56ca7da70f0be863d42a5d3bd34",
-  "source_main_sha": "46a1402a610d42143c276351e2996ca052fb313d",
+  "source_digest": "a4fc0a810b1400b9c7984017b0c5664906aa44a6118f93ad2c61374001731710",
+  "source_main_sha": "04813720dddace3be10851808386da1242fc633a",
   "state_count": 9,
   "states": [
     {
@@ -749,8 +749,8 @@
             "fuel_price_scenario",
             "iran_war_scenario"
           ],
-          "rows": 4198,
-          "sha256": "be871cc0e93c208d1b46e33bfa649d58af00a8732c74c18fbd02100075eff2af"
+          "rows": 4298,
+          "sha256": "665f8e2709dad8ce42f0776877dd10ce8eb855e62f8211e5d39fecf6cd178b20"
         },
         "eruc_audit": {
           "columns": [],
@@ -887,7 +887,7 @@
             "ped_bridge_population_warning"
           ],
           "rows": 7221,
-          "sha256": "d0109d78128f0a9aa0351bff58e5727a3369926e437b21812a5de39175ab168d"
+          "sha256": "ce713290cbe96538644fc596d38602ee28457242538481c341ead690929d9a54"
         },
         "policy_audit": {
           "columns": [],
@@ -956,8 +956,8 @@
           "object_columns": [
             "fed_policy_delta"
           ],
-          "rows": 2525,
-          "sha256": "0d0f8fbc9afc0b2e911a8b1dbe64990c15636586879e18a65dd945667949434d"
+          "rows": 2625,
+          "sha256": "45b2b2a3f965b7fe4399702fc2cdbc1fd835b54f4277b70216e368deac0c593e"
         },
         "stack_components": {
           "columns": [
@@ -1111,7 +1111,7 @@
             "ped_bridge_population_warning"
           ],
           "rows": 25212,
-          "sha256": "a61a794b00fe82f499fe483ce130e9795c945a37bee733617df69bb9b608076e"
+          "sha256": "e6e2f6bc68c3513d5a4c7a450ce88b1d00b4752381c60b8bb284ec73de8df18d"
         },
         "uptake_audit": {
           "columns": [
@@ -1372,8 +1372,8 @@
             "fuel_price_scenario",
             "iran_war_scenario"
           ],
-          "rows": 4198,
-          "sha256": "706cba7d4bbdb52aa4a7bc9ac49a762190b201479e3d3068784768aa30f1e627"
+          "rows": 4298,
+          "sha256": "7b1e052d2953370c07d5aeab82415ac2c1b4dd439298830363a0374f6e32fa71"
         },
         "vfm_slow_chart_rows": {
           "columns": [
@@ -1593,12 +1593,12 @@
             "fuel_price_scenario",
             "iran_war_scenario"
           ],
-          "rows": 4198,
-          "sha256": "a6c7e281cfa06f824545f1196d57add88580e333c769886604e5cb52acd6b268"
+          "rows": 4298,
+          "sha256": "a36fcaad07f75bbb77aad95e128db13c0ebf6419136ae4020c6e0d5a860b3d9c"
         }
       },
       "official_fed_policy_state": "published",
-      "row_count": 50429,
+      "row_count": 50829,
       "scenario_key": {
         "bridge_vintage_id": "BEFU26",
         "conflict_fuel_state": "",
@@ -1917,8 +1917,8 @@
             "fuel_price_scenario",
             "iran_war_scenario"
           ],
-          "rows": 4198,
-          "sha256": "37642260dbef0a516ebbef5bbab4c8e68f99a29c2a18e0790d8192bb9e15003a"
+          "rows": 4298,
+          "sha256": "5c90e8a6c1cda3cf95407ebcc07d73e0f8e0c6a6fb928ad95d3817c7d21941ef"
         },
         "eruc_audit": {
           "columns": [],
@@ -2055,7 +2055,7 @@
             "ped_bridge_population_warning"
           ],
           "rows": 7221,
-          "sha256": "d0109d78128f0a9aa0351bff58e5727a3369926e437b21812a5de39175ab168d"
+          "sha256": "ce713290cbe96538644fc596d38602ee28457242538481c341ead690929d9a54"
         },
         "policy_audit": {
           "columns": [
@@ -2156,8 +2156,8 @@
           "object_columns": [
             "fed_policy_delta"
           ],
-          "rows": 2525,
-          "sha256": "d4e9ab88a7ee4f7843f4ea4e8de7fed64156bcc1dd55eadd794b17f81fdb69c9"
+          "rows": 2625,
+          "sha256": "59c77a258e543c2191a09f8fca80b90fa4aa548e8fea34e00bb88fbd19cf6e8a"
         },
         "stack_components": {
           "columns": [
@@ -2311,7 +2311,7 @@
             "ped_bridge_population_warning"
           ],
           "rows": 25212,
-          "sha256": "a61a794b00fe82f499fe483ce130e9795c945a37bee733617df69bb9b608076e"
+          "sha256": "e6e2f6bc68c3513d5a4c7a450ce88b1d00b4752381c60b8bb284ec73de8df18d"
         },
         "uptake_audit": {
           "columns": [
@@ -2572,8 +2572,8 @@
             "fuel_price_scenario",
             "iran_war_scenario"
           ],
-          "rows": 4198,
-          "sha256": "ccbd2f45e30d0939fb24c128f390de5f8953d08affd84598730b80a3312ea125"
+          "rows": 4298,
+          "sha256": "0b59dfab0f60878219ced2c05d217e02b59389698aedde2d57f56fcce63ccc45"
         },
         "vfm_slow_chart_rows": {
           "columns": [
@@ -2793,12 +2793,12 @@
             "fuel_price_scenario",
             "iran_war_scenario"
           ],
-          "rows": 4198,
-          "sha256": "f3c89160bde8a6f0c4efc612e76e65b743e8eda0acc3b012d4e53509f7eb3395"
+          "rows": 4298,
+          "sha256": "ec76a0a8ec492ce402bfcf1ec8145d4730bbe31f43f0452f7b8a3bfd5d2a59ff"
         }
       },
       "official_fed_policy_state": "delayed_6m",
-      "row_count": 50430,
+      "row_count": 50830,
       "scenario_key": {
         "bridge_vintage_id": "BEFU26",
         "conflict_fuel_state": "",
@@ -3117,8 +3117,8 @@
             "fuel_price_scenario",
             "iran_war_scenario"
           ],
-          "rows": 4198,
-          "sha256": "e03beb69b07b750c75dd566047b7bd1eed77dc215898432349d70c382d1893a2"
+          "rows": 4298,
+          "sha256": "1eec76df614f6e14029ee62eba3839f242c5c90819af8ef5c1307f73bc98372f"
         },
         "eruc_audit": {
           "columns": [],
@@ -3255,7 +3255,7 @@
             "ped_bridge_population_warning"
           ],
           "rows": 7221,
-          "sha256": "d0109d78128f0a9aa0351bff58e5727a3369926e437b21812a5de39175ab168d"
+          "sha256": "ce713290cbe96538644fc596d38602ee28457242538481c341ead690929d9a54"
         },
         "policy_audit": {
           "columns": [
@@ -3356,8 +3356,8 @@
           "object_columns": [
             "fed_policy_delta"
           ],
-          "rows": 2525,
-          "sha256": "d4e9ab88a7ee4f7843f4ea4e8de7fed64156bcc1dd55eadd794b17f81fdb69c9"
+          "rows": 2625,
+          "sha256": "59c77a258e543c2191a09f8fca80b90fa4aa548e8fea34e00bb88fbd19cf6e8a"
         },
         "stack_components": {
           "columns": [
@@ -3511,7 +3511,7 @@
             "ped_bridge_population_warning"
           ],
           "rows": 25212,
-          "sha256": "a61a794b00fe82f499fe483ce130e9795c945a37bee733617df69bb9b608076e"
+          "sha256": "e6e2f6bc68c3513d5a4c7a450ce88b1d00b4752381c60b8bb284ec73de8df18d"
         },
         "uptake_audit": {
           "columns": [
@@ -3772,8 +3772,8 @@
             "fuel_price_scenario",
             "iran_war_scenario"
           ],
-          "rows": 4198,
-          "sha256": "8837a66a93c7aa51151f79bac7b2c269b580df27a0d853abccbb792b65a72b3b"
+          "rows": 4298,
+          "sha256": "8b79cca92aab7a5c0378a0306a83492f9b9656f57362aba522f9d19dcadcdba2"
         },
         "vfm_slow_chart_rows": {
           "columns": [
@@ -3993,12 +3993,12 @@
             "fuel_price_scenario",
             "iran_war_scenario"
           ],
-          "rows": 4198,
-          "sha256": "b7c91ff68f6b949518798fdd245eef8c019e51c394b542b6c169c5a058e6d2c9"
+          "rows": 4298,
+          "sha256": "9663281801ec0720af0eaee57d3efbe5fca41f48af49baf20c8bb9403fbca8e8"
         }
       },
       "official_fed_policy_state": "off",
-      "row_count": 50458,
+      "row_count": 50858,
       "scenario_key": {
         "bridge_vintage_id": "BEFU26",
         "conflict_fuel_state": "",
@@ -4317,8 +4317,8 @@
             "fuel_price_scenario",
             "iran_war_scenario"
           ],
-          "rows": 4198,
-          "sha256": "0039ac8cfa45c961698503839990782aaffe9f0f0f042a093976f45f1c0c5c48"
+          "rows": 4298,
+          "sha256": "b71ec8930723389949c399f98339de2d0ba96558c1a2b2c7fb08a9b5140e4e3e"
         },
         "eruc_audit": {
           "columns": [],
@@ -4455,7 +4455,7 @@
             "ped_bridge_population_warning"
           ],
           "rows": 7221,
-          "sha256": "80292b0cd7456d489106498349dbac693cac29000d72eff60b4a848907cc9182"
+          "sha256": "1f3700502b6dc2729cfc786f37089f687165ed9c19c93f36000ff3c14c41aaa6"
         },
         "policy_audit": {
           "columns": [
@@ -4560,8 +4560,8 @@
           "object_columns": [
             "fed_policy_delta"
           ],
-          "rows": 2525,
-          "sha256": "a5bab7e9551cb2a59791a0567e8d5ac8cfc68e1ebc307f1550811a90f0616565"
+          "rows": 2625,
+          "sha256": "8e7ecc1a697396244b6e75a4dac0b4bc4535a072bceb4290a105804c8f86bd6a"
         },
         "stack_components": {
           "columns": [
@@ -4715,7 +4715,7 @@
             "ped_bridge_population_warning"
           ],
           "rows": 25212,
-          "sha256": "1ccabada00b9308ba1c6137522ca3ae5162bef7e19badbe92cb51b499fa5798a"
+          "sha256": "41588c7f8182d6ef054e5bb8507a83f19f621600de54b331a6a84e2f74792899"
         },
         "uptake_audit": {
           "columns": [
@@ -4976,8 +4976,8 @@
             "fuel_price_scenario",
             "iran_war_scenario"
           ],
-          "rows": 4198,
-          "sha256": "a6a654bd24cba9ea2511176de5e36f8f6329d8b16e3cbdb3ad485c42c4f8fde4"
+          "rows": 4298,
+          "sha256": "6aa9b650eb171814724f4720e4f366f708370ef94869e6c247d5ee06726d816b"
         },
         "vfm_slow_chart_rows": {
           "columns": [
@@ -5197,12 +5197,12 @@
             "fuel_price_scenario",
             "iran_war_scenario"
           ],
-          "rows": 4198,
-          "sha256": "af05cccd272fb00fa66a30bce0c1242c61b300baf951c30c7751604856d74c16"
+          "rows": 4298,
+          "sha256": "ff4787e6a00839aafe48fe664aacea33467a003128887570757184a1c19dc632"
         }
       },
       "official_fed_policy_state": "published",
-      "row_count": 50471,
+      "row_count": 50871,
       "scenario_key": {
         "bridge_vintage_id": "BEFU26",
         "conflict_fuel_state": "",
@@ -5521,8 +5521,8 @@
             "fuel_price_scenario",
             "iran_war_scenario"
           ],
-          "rows": 4198,
-          "sha256": "2650a60522205214e3cd4371ea514542cb62477dba4f56c0b1290abe829b78cb"
+          "rows": 4298,
+          "sha256": "ed6cbaf3ad2c0db025ec5a2ae00ec7f01722445e55de50b0b94d1e61b3f9c18d"
         },
         "eruc_audit": {
           "columns": [],
@@ -5659,7 +5659,7 @@
             "ped_bridge_population_warning"
           ],
           "rows": 7221,
-          "sha256": "80292b0cd7456d489106498349dbac693cac29000d72eff60b4a848907cc9182"
+          "sha256": "1f3700502b6dc2729cfc786f37089f687165ed9c19c93f36000ff3c14c41aaa6"
         },
         "policy_audit": {
           "columns": [
@@ -5780,8 +5780,8 @@
           "object_columns": [
             "fed_policy_delta"
           ],
-          "rows": 2525,
-          "sha256": "a5bab7e9551cb2a59791a0567e8d5ac8cfc68e1ebc307f1550811a90f0616565"
+          "rows": 2625,
+          "sha256": "8e7ecc1a697396244b6e75a4dac0b4bc4535a072bceb4290a105804c8f86bd6a"
         },
         "stack_components": {
           "columns": [
@@ -5935,7 +5935,7 @@
             "ped_bridge_population_warning"
           ],
           "rows": 25212,
-          "sha256": "1ccabada00b9308ba1c6137522ca3ae5162bef7e19badbe92cb51b499fa5798a"
+          "sha256": "41588c7f8182d6ef054e5bb8507a83f19f621600de54b331a6a84e2f74792899"
         },
         "uptake_audit": {
           "columns": [
@@ -6196,8 +6196,8 @@
             "fuel_price_scenario",
             "iran_war_scenario"
           ],
-          "rows": 4198,
-          "sha256": "5094fe47344b6f6f4d19e56e9a75af79168c51b3bcb28661b7a092d762d116f4"
+          "rows": 4298,
+          "sha256": "0ecf7a2db37be3ce09860b21dd1ecac1b3e5173b9526f0c2511d3a4628f49e0c"
         },
         "vfm_slow_chart_rows": {
           "columns": [
@@ -6417,12 +6417,12 @@
             "fuel_price_scenario",
             "iran_war_scenario"
           ],
-          "rows": 4198,
-          "sha256": "65432340c6136c5ef0d943cbd88811307b1248a725fb44875f35a2f23f92446d"
+          "rows": 4298,
+          "sha256": "4e1b638c9cbb72a15ef9b14e22ebe4599eb9795d51d52041645d3aec1e94224c"
         }
       },
       "official_fed_policy_state": "delayed_6m",
-      "row_count": 50472,
+      "row_count": 50872,
       "scenario_key": {
         "bridge_vintage_id": "BEFU26",
         "conflict_fuel_state": "",
@@ -6741,8 +6741,8 @@
             "fuel_price_scenario",
             "iran_war_scenario"
           ],
-          "rows": 4198,
-          "sha256": "d72b538bfef2ebd3ec27d435b97cd7af034b6163e3c7d854d25cd10dd44618a0"
+          "rows": 4298,
+          "sha256": "283c15afbe667f2926f449c89a20cae21f0dcd238ca2abffbe3f300ed1bff18c"
         },
         "eruc_audit": {
           "columns": [],
@@ -6879,7 +6879,7 @@
             "ped_bridge_population_warning"
           ],
           "rows": 7221,
-          "sha256": "80292b0cd7456d489106498349dbac693cac29000d72eff60b4a848907cc9182"
+          "sha256": "1f3700502b6dc2729cfc786f37089f687165ed9c19c93f36000ff3c14c41aaa6"
         },
         "policy_audit": {
           "columns": [
@@ -7000,8 +7000,8 @@
           "object_columns": [
             "fed_policy_delta"
           ],
-          "rows": 2525,
-          "sha256": "a5bab7e9551cb2a59791a0567e8d5ac8cfc68e1ebc307f1550811a90f0616565"
+          "rows": 2625,
+          "sha256": "8e7ecc1a697396244b6e75a4dac0b4bc4535a072bceb4290a105804c8f86bd6a"
         },
         "stack_components": {
           "columns": [
@@ -7155,7 +7155,7 @@
             "ped_bridge_population_warning"
           ],
           "rows": 25212,
-          "sha256": "1ccabada00b9308ba1c6137522ca3ae5162bef7e19badbe92cb51b499fa5798a"
+          "sha256": "41588c7f8182d6ef054e5bb8507a83f19f621600de54b331a6a84e2f74792899"
         },
         "uptake_audit": {
           "columns": [
@@ -7416,8 +7416,8 @@
             "fuel_price_scenario",
             "iran_war_scenario"
           ],
-          "rows": 4198,
-          "sha256": "4cc6afcb46489ad5c54779152e1cea66c9e944470324b2f826174d301c1ae317"
+          "rows": 4298,
+          "sha256": "6f18a05781ce17bf1b022ae22d7efeea1f2c79322db94179f588e4a98542d0b4"
         },
         "vfm_slow_chart_rows": {
           "columns": [
@@ -7637,12 +7637,12 @@
             "fuel_price_scenario",
             "iran_war_scenario"
           ],
-          "rows": 4198,
-          "sha256": "0d98dcf4af4df2d0ef886f900c6dd8464ae0c18b93e8ef25916adc07029a8c5e"
+          "rows": 4298,
+          "sha256": "d7af174e6c186c6c30ff6c3167f47ce24aa8a5a793669270593185f671d72b49"
         }
       },
       "official_fed_policy_state": "off",
-      "row_count": 50500,
+      "row_count": 50900,
       "scenario_key": {
         "bridge_vintage_id": "BEFU26",
         "conflict_fuel_state": "",
@@ -7961,8 +7961,8 @@
             "fuel_price_scenario",
             "iran_war_scenario"
           ],
-          "rows": 4198,
-          "sha256": "f4cf6a5590d88c2c1c6bdc9ac215606602efd2ab92a010e6cc3f1fd3c790beb7"
+          "rows": 4298,
+          "sha256": "9dbcb620c901b61168de43279baa793f94f214c4ab4abe2e8a1278c0d8dec38a"
         },
         "eruc_audit": {
           "columns": [],
@@ -8099,7 +8099,7 @@
             "ped_bridge_population_warning"
           ],
           "rows": 7221,
-          "sha256": "ebcca916cad0d2ed0c862acb33b8259e4463f54c58313ec32c22ffdeecea59b3"
+          "sha256": "572d4213dbc0acb55a18b48d69420ef0ed8ac64cd44c6b9308870d3aca482fa8"
         },
         "policy_audit": {
           "columns": [
@@ -8204,8 +8204,8 @@
           "object_columns": [
             "fed_policy_delta"
           ],
-          "rows": 2525,
-          "sha256": "ebf4b269ac28dcbefc0f3859ed3221f9fa1a10adefb7a74b30e51248d53805da"
+          "rows": 2625,
+          "sha256": "e248e610921023c7e54026863474bb4828582b8f7e2b00d0ac89dbbe10dcd7be"
         },
         "stack_components": {
           "columns": [
@@ -8359,7 +8359,7 @@
             "ped_bridge_population_warning"
           ],
           "rows": 25212,
-          "sha256": "31123c6a4476dea5b8c6b1c55119b28576eaf7d0b1db2e18a22b7fdf0fbe5018"
+          "sha256": "4f2c9e52869499f034dbb46fc3a282960d8ea71b60395a96fde2a1a58660cebc"
         },
         "uptake_audit": {
           "columns": [
@@ -8620,8 +8620,8 @@
             "fuel_price_scenario",
             "iran_war_scenario"
           ],
-          "rows": 4198,
-          "sha256": "8c06dee04ad8e50a9cf9fb9e5e5305641d1b11a1576772679d9e58e1640266fa"
+          "rows": 4298,
+          "sha256": "b1aef6a80360533fb9e4a2e966accd1ece1404432eeb3e4484c55bab99983a4c"
         },
         "vfm_slow_chart_rows": {
           "columns": [
@@ -8841,12 +8841,12 @@
             "fuel_price_scenario",
             "iran_war_scenario"
           ],
-          "rows": 4198,
-          "sha256": "52131df28409795ddf52318c444a3348f390694e5d3ce9ae9f0d9cad03ef176b"
+          "rows": 4298,
+          "sha256": "258f12ad3199e473c76c0e5cde4b668b6315fbe2d6a27c7801ee7fd367a53127"
         }
       },
       "official_fed_policy_state": "published",
-      "row_count": 51045,
+      "row_count": 51445,
       "scenario_key": {
         "bridge_vintage_id": "BEFU26",
         "conflict_fuel_state": "",
@@ -9165,8 +9165,8 @@
             "fuel_price_scenario",
             "iran_war_scenario"
           ],
-          "rows": 4198,
-          "sha256": "7257627f32c9d59cbf9f102e6b1a52295d810299eb39f2a45849d05edd958847"
+          "rows": 4298,
+          "sha256": "5d783c0f719a1a4e5cc5c79f248c819ca40a91fa1b5d78baa25ebbf9f32966c7"
         },
         "eruc_audit": {
           "columns": [],
@@ -9303,7 +9303,7 @@
             "ped_bridge_population_warning"
           ],
           "rows": 7221,
-          "sha256": "ebcca916cad0d2ed0c862acb33b8259e4463f54c58313ec32c22ffdeecea59b3"
+          "sha256": "572d4213dbc0acb55a18b48d69420ef0ed8ac64cd44c6b9308870d3aca482fa8"
         },
         "policy_audit": {
           "columns": [
@@ -9424,8 +9424,8 @@
           "object_columns": [
             "fed_policy_delta"
           ],
-          "rows": 2525,
-          "sha256": "ebf4b269ac28dcbefc0f3859ed3221f9fa1a10adefb7a74b30e51248d53805da"
+          "rows": 2625,
+          "sha256": "e248e610921023c7e54026863474bb4828582b8f7e2b00d0ac89dbbe10dcd7be"
         },
         "stack_components": {
           "columns": [
@@ -9579,7 +9579,7 @@
             "ped_bridge_population_warning"
           ],
           "rows": 25212,
-          "sha256": "31123c6a4476dea5b8c6b1c55119b28576eaf7d0b1db2e18a22b7fdf0fbe5018"
+          "sha256": "4f2c9e52869499f034dbb46fc3a282960d8ea71b60395a96fde2a1a58660cebc"
         },
         "uptake_audit": {
           "columns": [
@@ -9840,8 +9840,8 @@
             "fuel_price_scenario",
             "iran_war_scenario"
           ],
-          "rows": 4198,
-          "sha256": "7a245c783804a4cc6deb5f79b84771d7c5cd2dcb7b97c2515594ddc887dc9e6c"
+          "rows": 4298,
+          "sha256": "ff84f9a41e4f5d1e818ea03b96f2e9449e87377a8da889cbf923eb916e8c8c93"
         },
         "vfm_slow_chart_rows": {
           "columns": [
@@ -10061,12 +10061,12 @@
             "fuel_price_scenario",
             "iran_war_scenario"
           ],
-          "rows": 4198,
-          "sha256": "ee84eb1ca7a9443f4fc406972579171668a7f2c75d1e9d587e31131fef628dce"
+          "rows": 4298,
+          "sha256": "eda0be78d06497dca6838eb19ada4c6db83a4789ae2dc56779e09649d4cd3e7b"
         }
       },
       "official_fed_policy_state": "delayed_6m",
-      "row_count": 51046,
+      "row_count": 51446,
       "scenario_key": {
         "bridge_vintage_id": "BEFU26",
         "conflict_fuel_state": "",
@@ -10385,8 +10385,8 @@
             "fuel_price_scenario",
             "iran_war_scenario"
           ],
-          "rows": 4198,
-          "sha256": "840583ddde00a0e8de2d35b4cca22c2d50035dab67d45ebe80eff0018c6bf124"
+          "rows": 4298,
+          "sha256": "c9131a410cdd7dc44bafddb2573726b94498e5b5aa894f45d0b4514858ceec7f"
         },
         "eruc_audit": {
           "columns": [],
@@ -10523,7 +10523,7 @@
             "ped_bridge_population_warning"
           ],
           "rows": 7221,
-          "sha256": "ebcca916cad0d2ed0c862acb33b8259e4463f54c58313ec32c22ffdeecea59b3"
+          "sha256": "572d4213dbc0acb55a18b48d69420ef0ed8ac64cd44c6b9308870d3aca482fa8"
         },
         "policy_audit": {
           "columns": [
@@ -10644,8 +10644,8 @@
           "object_columns": [
             "fed_policy_delta"
           ],
-          "rows": 2525,
-          "sha256": "ebf4b269ac28dcbefc0f3859ed3221f9fa1a10adefb7a74b30e51248d53805da"
+          "rows": 2625,
+          "sha256": "e248e610921023c7e54026863474bb4828582b8f7e2b00d0ac89dbbe10dcd7be"
         },
         "stack_components": {
           "columns": [
@@ -10799,7 +10799,7 @@
             "ped_bridge_population_warning"
           ],
           "rows": 25212,
-          "sha256": "31123c6a4476dea5b8c6b1c55119b28576eaf7d0b1db2e18a22b7fdf0fbe5018"
+          "sha256": "4f2c9e52869499f034dbb46fc3a282960d8ea71b60395a96fde2a1a58660cebc"
         },
         "uptake_audit": {
           "columns": [
@@ -11060,8 +11060,8 @@
             "fuel_price_scenario",
             "iran_war_scenario"
           ],
-          "rows": 4198,
-          "sha256": "83a984220d269525e1215ff60ac107dcadc35189d2cb959a5fa59a7e6583d2b9"
+          "rows": 4298,
+          "sha256": "268fb87ff52b1656aca20f458624bd32ec221677696643f5bd1300c478cefde4"
         },
         "vfm_slow_chart_rows": {
           "columns": [
@@ -11281,12 +11281,12 @@
             "fuel_price_scenario",
             "iran_war_scenario"
           ],
-          "rows": 4198,
-          "sha256": "d0a08b5fa2e9fae012f7271f15d64c214fed168d5fc3ddc0c5db05c73eabd7d8"
+          "rows": 4298,
+          "sha256": "3a4060413ce46d24f160d72409a4e0b6b3d72e7f4d3f9dc4bd31edb0496fca43"
         }
       },
       "official_fed_policy_state": "off",
-      "row_count": 51074,
+      "row_count": 51474,
       "scenario_key": {
         "bridge_vintage_id": "BEFU26",
         "conflict_fuel_state": "",
@@ -11326,5 +11326,5 @@
     "streams": "PED,LIGHT_RUC,HEAVY_RUC"
   },
   "uncertainty_series": 40,
-  "uncertainty_sha256": "0ce5214aa8809bc4fcfa15a870780c9f7c61b22f62ab8ceab27fcae08b019491"
+  "uncertainty_sha256": "4bca261ab609ef2f8ecba1ec87eb4fc39322b57e93cc2ff5a9dd72e4a43a5d05"
 }

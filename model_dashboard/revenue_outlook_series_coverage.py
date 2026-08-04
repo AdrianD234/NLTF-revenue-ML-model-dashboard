@@ -1327,7 +1327,28 @@ _QUARTERLY_PROVENANCE_COLUMNS = (
     "fixed_actual_quarters",
     "fixed_actual_total",
     "contract_version",
+    # Population lineage for the PED activity pair. Present and empty on every
+    # other series' rows: the PED identity is the only place a restated
+    # population basis is used, and a reader must be able to tell the restated
+    # basis from the unadjusted legacy one without reading the code.
+    "population_basis",
+    "population_source",
+    "population_factor",
+    "population_factor_source",
+    "population_factor_source_period",
+    "population_factor_carry_forward",
+    "population_factor_terminal_period",
+    "population_identity_residual",
 )
+
+#: The population basis the PED identity is preserved against. NOT the
+#: unadjusted legacy population in ``scenario_input_wide``.
+POPULATION_BASIS_TREASURY_RESTATED = "treasury_baseline_macro_restatement"
+POPULATION_FACTOR_SOURCE = "baseline_macro_annual_factors"
+#: Last fiscal year for which the macro replay publishes explicit annual
+#: factors. Beyond it the overlay carries this terminal factor forward, and so
+#: does this construction.
+POPULATION_FACTOR_TERMINAL_FY = 2030
 
 
 def derive_quarterly_rows(
@@ -1954,6 +1975,357 @@ def _quarterly_record(
         }
     )
     return row
+
+
+# ------------------------------- the governed post-model PED activity quarters
+
+#: The FY2031-FY2050 quarterly rule for the two PED activity leaves. Named
+#: separately from METHOD_DENTON because it is not a benchmarking solve: the
+#: committed raw long-horizon quarterly path already carries the within-year
+#: shape, and it is scaled to the governed annual target rather than fitted.
+METHOD_POST_MODEL_RAW_SHAPE = "post_model_raw_quarterly_shape_scaled"
+
+#: Built as a pair, always. Splitting them would let PED VKT per capita and
+#: Light petrol VKT drift apart quarter by quarter even while each reconciled
+#: to its own annual total.
+POST_MODEL_PED_ACTIVITY_QUARTERLY_SERIES = (
+    "ped_vkt_per_capita",
+    "light_petrol_vkt",
+)
+
+_POST_MODEL_SHAPE_BASIS = (
+    "committed raw long-horizon quarterly PED path (decision_facing=false) "
+    "scaled to the governed post-model annual target; scenario population from "
+    "the committed scenario-input replay"
+)
+
+#: How far the governed population may sit from the legacy scenario population
+#: before the split is refused. The Treasury baseline macro restatement is
+#: ~1.4% and flat from FY2030; 10% is wide enough to absorb a future macro
+#: vintage while still catching a factor that is no longer a population
+#: restatement at all.
+_MAX_GOVERNED_POPULATION_FACTOR_DRIFT = 0.10
+
+
+class PostModelQuarterlyError(ValueError):
+    """A governed input for the FY2031-FY2050 quarterly split is unusable."""
+
+
+def post_model_ped_activity_quarterly_rows(
+    annual_rows: pd.DataFrame,
+    *,
+    raw_quarterly_audit: pd.DataFrame,
+    scenario_population: pd.DataFrame,
+    native_quarters: pd.DataFrame | None = None,
+    first_fy: int = 2031,
+    last_fy: int = 2050,
+) -> pd.DataFrame:
+    """Quarters for both PED activity leaves, from one scale factor per year.
+
+    The annual constructor derives its scenario population as exactly
+    ``petrol_fy / vktpc_fy`` off the same raw path, so a single per-fiscal-year
+    factor
+
+        scale_fy = target_petrol_fy / sum_q(raw_petrol_q)
+
+    reproduces **both** governed annual targets simultaneously, and the
+    per-quarter identity ``petrol_q = vktpc_q * pop_q / 1e6`` survives because
+    both shapes are scaled by the same number. Measured over both engines, both
+    scenarios and FY2031-FY2050 the worst relative residual is 4.0e-16 - one to
+    two ULP - so no constrained correction and no KKT solve are needed. The
+    tolerance below is a guard against that ceasing to be true, not a fitted
+    slack: it fails closed rather than publishing a split that does not close.
+
+    Both series are emitted together from the same factor, so they cannot drift
+    apart. A scenario/year whose raw shape or population is missing raises
+    rather than falling back to divide-by-four.
+    """
+
+    empty = pd.DataFrame(
+        columns=list(_runtime_chart_columns()) + list(_QUARTERLY_PROVENANCE_COLUMNS)
+    )
+    if annual_rows is None or annual_rows.empty:
+        return empty
+    if raw_quarterly_audit is None or raw_quarterly_audit.empty:
+        raise PostModelQuarterlyError(
+            "The raw long-horizon quarterly audit is empty; the FY2031-FY2050 "
+            "split has no governed shape and must not fall back to a flat one."
+        )
+    if scenario_population is None or scenario_population.empty:
+        raise PostModelQuarterlyError(
+            "No scenario population path was supplied; the quarterly PED "
+            "identity cannot be preserved without it."
+        )
+
+    targets = annual_rows.copy()
+    targets["_fy"] = pd.to_numeric(targets.get("june_year"), errors="coerce")
+    targets["_value"] = pd.to_numeric(targets.get("value"), errors="coerce")
+    targets = targets[
+        targets["_fy"].notna()
+        & targets["_value"].notna()
+        & targets["_fy"].between(first_fy, last_fy)
+        & targets["series_id"].astype(str).isin(POST_MODEL_PED_ACTIVITY_QUARTERLY_SERIES)
+    ]
+    if targets.empty:
+        return empty
+
+    population = scenario_population.copy()
+    population["_pop"] = pd.to_numeric(population.get("population"), errors="coerce")
+    population = population[population["_pop"].notna()]
+
+    shape = raw_quarterly_audit[
+        raw_quarterly_audit["series_id"].astype(str).eq("ped_vkt_per_capita")
+    ].copy()
+    shape["_raw"] = pd.to_numeric(shape.get("value"), errors="coerce")
+    shape = shape[shape["_raw"].notna()]
+
+    # Published quarters this construction must hold rather than recompute.
+    # Keyed on VKT per capita alone: light petrol VKT has no native quarters,
+    # and deriving it from the held VKTpc through the identity is what keeps
+    # the pair consistent across the seam.
+    native_lookup: dict[tuple[str, str], float] = {}
+    if native_quarters is not None and not native_quarters.empty:
+        held = native_quarters[
+            native_quarters["series_id"].astype(str).eq("ped_vkt_per_capita")
+            & native_quarters["time_grain"].astype(str).eq("quarterly")
+        ].copy()
+        held["_value"] = pd.to_numeric(held.get("value"), errors="coerce")
+        held = held[held["_value"].notna()]
+        for record in held.to_dict("records"):
+            native_lookup[
+                (str(record.get("scenario_name") or ""), str(record.get("period") or ""))
+            ] = float(record["_value"])
+
+    output: list[dict[str, Any]] = []
+    group_columns = [
+        column
+        for column in ("trace_name", "scenario_name", "fed_path")
+        if column in targets.columns
+    ]
+    for _key, trace_rows in targets.groupby(group_columns, dropna=False):
+        scenario_name = str(trace_rows["scenario_name"].iloc[0])
+        scoped_shape = shape[shape["scenario_name"].astype(str).eq(scenario_name)]
+        scoped_pop = population[
+            population["scenario_name"].astype(str).eq(scenario_name)
+        ]
+        if scoped_shape.empty or scoped_pop.empty:
+            raise PostModelQuarterlyError(
+                f"{scenario_name}: no raw quarterly shape or population path; "
+                "refusing to derive FY2031-FY2050 quarters from another scenario."
+            )
+        merged = scoped_shape.merge(
+            scoped_pop[["canonical_period", "_pop"]],
+            left_on="period",
+            right_on="canonical_period",
+            how="left",
+        )
+        merged["_fy"] = merged["period"].astype(str).map(_fy_of_quarter_period)
+        merged["_raw_petrol"] = merged["_raw"] * merged["_pop"] / 1_000_000.0
+
+        by_series = {
+            str(series_id): frame
+            for series_id, frame in trace_rows.groupby(
+                trace_rows["series_id"].astype(str)
+            )
+        }
+        petrol_targets = by_series.get("light_petrol_vkt")
+        vktpc_targets = by_series.get("ped_vkt_per_capita")
+        if petrol_targets is None or vktpc_targets is None:
+            # The pair is built jointly or not at all.
+            continue
+        petrol_by_fy = petrol_targets.set_index("_fy")
+        vktpc_by_fy = vktpc_targets.set_index("_fy")
+
+        for fy in sorted(set(petrol_by_fy.index) & set(vktpc_by_fy.index)):
+            block = merged[merged["_fy"].eq(int(fy))].sort_values("period")
+            if len(block) != 4 or block["_pop"].isna().any():
+                raise PostModelQuarterlyError(
+                    f"{scenario_name} FY{int(fy)}: the governed raw quarterly "
+                    f"shape/population covers {len(block)} of 4 quarters; "
+                    "failing closed rather than dividing the year by four."
+                )
+            target_petrol = float(petrol_by_fy.at[fy, "_value"])
+            target_vktpc = float(vktpc_by_fy.at[fy, "_value"])
+            periods = [str(p) for p in block["period"]]
+            raw_vktpc = block["_raw"].to_numpy(dtype=float)
+            pops = block["_pop"].to_numpy(dtype=float)
+
+            # Which quarters of this year are already published natively? The
+            # seam year is the case that matters: FY2031 spans 2030Q3-2031Q2
+            # while native rows run to 2030Q4, so two quarters are fixed and
+            # two are free. Native values are held exactly; only the free
+            # quarters absorb the benchmark.
+            fixed = [
+                index
+                for index, period in enumerate(periods)
+                if (scenario_name, period) in native_lookup
+            ]
+            free = [index for index in range(4) if index not in fixed]
+            quarter_vktpc = raw_vktpc.copy()
+            for index in fixed:
+                quarter_vktpc[index] = float(native_lookup[(scenario_name, periods[index])])
+
+            # VKT per capita absorbs its own annual benchmark on the raw
+            # shape. Native quarters are held; the free ones take the residual
+            # in raw proportion.
+            if not free:
+                raise PostModelQuarterlyError(
+                    f"{scenario_name} FY{int(fy)}: every quarter is already "
+                    "published; there is nothing to derive."
+                )
+            fixed_vktpc = sum(quarter_vktpc[index] for index in fixed)
+            residual_vktpc = target_vktpc - fixed_vktpc
+            free_raw_sum = float(sum(raw_vktpc[index] for index in free))
+            if free_raw_sum <= 0.0 or residual_vktpc <= 0.0:
+                raise PostModelQuarterlyError(
+                    f"{scenario_name} FY{int(fy)}: the free quarters must "
+                    f"absorb {residual_vktpc!r} on a raw shape summing to "
+                    f"{free_raw_sum!r}; no positive split exists."
+                )
+            for index in free:
+                quarter_vktpc[index] = residual_vktpc * raw_vktpc[index] / free_raw_sum
+
+            # The population that reproduces the governed annual pair. It is
+            # NOT an invented "effective" denominator: the Treasury baseline
+            # macro replay publishes per-series factors whose ratio
+            #     factor(light_petrol_vkt) / factor(ped_vkt_per_capita)
+            # IS the Treasury-versus-legacy population ratio (1.013967 against
+            # a measured 1.013970 at FY2030, both engines, both scenarios),
+            # and apply_treasury_macro_to_chart_rows carries the FY2030 factor
+            # forward through FY2050. The scenario-input population is the
+            # LEGACY pre-replay path, so testing the identity against it fails
+            # by exactly that ratio. Recovering the factor from the governed
+            # annual pair rather than re-reading the replay keeps this correct
+            # under every policy, conflict and lever combination; the audit
+            # reconciles it back to the replay factors.
+            legacy_petrol = float((quarter_vktpc * pops / 1_000_000.0).sum())
+            if legacy_petrol <= 0.0:
+                raise PostModelQuarterlyError(
+                    f"{scenario_name} FY{int(fy)}: legacy petrol sums to "
+                    f"{legacy_petrol!r}; no population factor exists."
+                )
+            population_factor = target_petrol / legacy_petrol
+            if not np.isfinite(population_factor) or population_factor <= 0.0:
+                raise PostModelQuarterlyError(
+                    f"{scenario_name} FY{int(fy)}: population factor "
+                    f"{population_factor!r} is not usable."
+                )
+            if abs(population_factor - 1.0) > _MAX_GOVERNED_POPULATION_FACTOR_DRIFT:
+                raise PostModelQuarterlyError(
+                    f"{scenario_name} FY{int(fy)}: the governed population "
+                    f"factor is {population_factor:.6f}, beyond the "
+                    f"{_MAX_GOVERNED_POPULATION_FACTOR_DRIFT:.0%} macro-replay "
+                    "envelope. That is no longer a population restatement and "
+                    "needs review rather than republication."
+                )
+            governed_pops = pops * population_factor
+
+            # The identity is imposed, never fitted: petrol is always VKTpc x
+            # the governed population, so it cannot drift from the series
+            # beside it.
+            quarter_petrol = quarter_vktpc * governed_pops / 1_000_000.0
+            if (quarter_petrol <= 0.0).any() or (quarter_vktpc <= 0.0).any():
+                raise PostModelQuarterlyError(
+                    f"{scenario_name} FY{int(fy)}: the split produced a "
+                    "non-positive quarter."
+                )
+
+            petrol_residual = float(quarter_petrol.sum() - target_petrol)
+            vktpc_residual = float(quarter_vktpc.sum() - target_vktpc)
+            for label, residual, target in (
+                ("PED VKT per capita", vktpc_residual, target_vktpc),
+                ("light petrol VKT", petrol_residual, target_petrol),
+            ):
+                if abs(residual) > 1e-6 * max(1.0, abs(target)):
+                    raise PostModelQuarterlyError(
+                        f"{scenario_name} FY{int(fy)}: the quarterly split no "
+                        f"longer closes the {label} annual (residual "
+                        f"{residual:.3e}). The raw shape, the native quarters "
+                        "and the annual constructor have diverged; this needs "
+                        "review rather than a widened tolerance."
+                    )
+            held_periods = [periods[index] for index in fixed]
+            for series_id, values, target, residual in (
+                ("light_petrol_vkt", quarter_petrol, target_petrol, petrol_residual),
+                ("ped_vkt_per_capita", quarter_vktpc, target_vktpc, vktpc_residual),
+            ):
+                template = (
+                    petrol_by_fy if series_id == "light_petrol_vkt" else vktpc_by_fy
+                ).loc[fy]
+                contract = _CONTRACT_BY_SERIES[series_id]
+                held_total = sum(
+                    float(values[index]) for index in fixed
+                ) if series_id == "ped_vkt_per_capita" else 0.0
+                carried = int(fy) > POPULATION_FACTOR_TERMINAL_FY
+                lineage = {
+                    "population_basis": POPULATION_BASIS_TREASURY_RESTATED,
+                    "population_source": (
+                        "legacy quarterly scenario population multiplied by the "
+                        "governed Treasury baseline macro population-restatement "
+                        "factor"
+                    ),
+                    "population_factor": float(population_factor),
+                    "population_factor_source": POPULATION_FACTOR_SOURCE,
+                    "population_factor_source_period": (
+                        f"FY{POPULATION_FACTOR_TERMINAL_FY}" if carried else f"FY{int(fy)}"
+                    ),
+                    "population_factor_carry_forward": bool(carried),
+                    "population_factor_terminal_period": (
+                        f"FY{POPULATION_FACTOR_TERMINAL_FY}" if carried else ""
+                    ),
+                    "population_identity_residual": float(
+                        petrol_residual if series_id == "light_petrol_vkt" else vktpc_residual
+                    ),
+                }
+                for index, (period, value) in enumerate(zip(periods, values)):
+                    # A natively published quarter is never re-emitted: the
+                    # native row already draws it, and a second row at the same
+                    # key would double-plot the period. Light petrol VKT has no
+                    # native quarters, so every quarter of its year is emitted
+                    # - including the two seam quarters, whose values come from
+                    # the held native VKTpc through the identity.
+                    if series_id == "ped_vkt_per_capita" and index in fixed:
+                        continue
+                    record = dict(lineage)
+                    record.update(
+                        _quarterly_record(
+                            template.to_dict(),
+                            contract=contract,
+                            period=period,
+                            fy=int(fy),
+                            value=float(value),
+                            annual_value=float(target),
+                            residual=float(residual),
+                            fixed_quarters=held_periods
+                            if series_id == "ped_vkt_per_capita"
+                            else (),
+                            fixed_total=held_total,
+                            method=METHOD_POST_MODEL_RAW_SHAPE,
+                            seasonal_basis=(
+                                f"{_POST_MODEL_SHAPE_BASIS}; population basis = "
+                                "legacy scenario population x Treasury baseline "
+                                f"macro population-restatement factor {population_factor:.9f}"
+                                + (
+                                    f" (terminal FY{POPULATION_FACTOR_TERMINAL_FY} "
+                                    "factor carried forward)"
+                                    if carried
+                                    else ""
+                                )
+                            ),
+                        )
+                    )
+                    output.append(record)
+
+    if not output:
+        return empty
+    return pd.DataFrame(output)
+
+
+def _fy_of_quarter_period(period: str) -> int:
+    """June year of a calendar quarter label, the repo's canonical mapping."""
+    text = str(period)
+    year, quarter = int(text[:4]), int(text[5])
+    return year + 1 if quarter >= 3 else year
 
 
 # ------------------------------------------------------------------- the pack
