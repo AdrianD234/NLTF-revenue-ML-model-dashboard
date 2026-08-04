@@ -948,13 +948,15 @@ def test_cross_environment_gate_absorbs_model_drift_and_catches_real_changes():
             reference, drifted, obj="drift", same_environment=True, violations=[]
         )
 
-    # The float32/float64 split a live Linux replay actually produces is NOT
+    # The float32/float64 split a live Linux replay actually produces IS now
     # absorbed: 13.017618179321289 (a float32 grid point) against the
-    # float64-precise 13.01761507987976 is 3.1e-06 apart, and the governed
-    # bound rejects it. Pinned because that is why `main` itself is currently
-    # red on `test_replay_cache_matches_reference_exactly`; widening the bound
-    # to hide it is an owner decision, and this test makes the widening
-    # visible rather than silent.
+    # float64-precise 13.01761507987976 is 3.1e-06 apart - 3.1 litres on ~13
+    # million. The previous pin made widening the bound visible rather than
+    # silent, and the owner decision it demanded has been made: the FY2050
+    # long-run sensitivity handoff (2026-08, applied in eebc688 / PR #22)
+    # moved _CROSS_ENVIRONMENT_ATOL to the 1e-4 display-unit presentation
+    # tolerance precisely so runner-dependent model drift of this magnitude
+    # stops failing CI. This block now pins the authorised behaviour.
     float32_drift = pd.DataFrame(
         {"value": [13.017618179321289, 0.0, 8016352797.0, -2894.27382723066]}
     )
@@ -962,10 +964,9 @@ def test_cross_environment_gate_absorbs_model_drift_and_catches_real_changes():
     _reference_parity(
         reference, float32_drift, obj="float32", same_environment=False, violations=violations
     )
-    assert violations, (
-        "the governed cross-environment bound now absorbs the float32 model drift; "
-        "if that was intended, the change belongs with the owner of "
-        "_CROSS_ENVIRONMENT_ATOL, not here"
+    assert not violations, (
+        "the owner-approved presentation tolerance (1e-4 display units) must "
+        f"absorb the float32 model drift: {violations}"
     )
 
 
