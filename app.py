@@ -1040,11 +1040,11 @@ def _public_uptake_basis_options() -> list[str]:
 
 # Session keys that carry an uptake basis and therefore have to be re-checked
 # against the pause on every entry.
-_UPTAKE_BASIS_STATE_KEYS = (
-    "revenue_outlook_ev_uptake_basis_v2",
-    "ro_cmp_a_uptake",
-    "ro_cmp_b_uptake",
-)
+_UPTAKE_BASIS_STATE_KEYS = ("revenue_outlook_ev_uptake_basis_v2",)
+
+# The A/B columns selected an uptake basis before they selected scenario
+# traces; the stale keys are dropped on entry like any withdrawn control.
+_WITHDRAWN_COMPARISON_STATE_KEYS = ("ro_cmp_a_uptake", "ro_cmp_b_uptake")
 
 
 def _discard_withdrawn_revenue_outlook_state() -> None:
@@ -1058,6 +1058,8 @@ def _discard_withdrawn_revenue_outlook_state() -> None:
     """
     if not REVENUE_OUTLOOK_ENABLE_PED_RETENTION_CONTROL:
         st.session_state.pop("revenue_outlook_ped_retention_sensitivity", None)
+    for key in _WITHDRAWN_COMPARISON_STATE_KEYS:
+        st.session_state.pop(key, None)
     if not REVENUE_OUTLOOK_ENABLE_VFM_ANALYST_LAYERS:
         st.session_state.pop("revenue_outlook_show_vfm_envelope_audit", None)
         persisted = st.session_state.get("revenue_outlook_chart_layers")
@@ -3442,10 +3444,12 @@ def cached_scenario_comparison_paths(
     ev_uptake_key_b: tuple[Any, ...],
     bridge_mode: str,
     _pack: RevenueOutlookPack,
+    trace_a: str = "",
+    trace_b: str = "",
 ) -> dict[str, Any]:
     """A/B paths for one series, filtered from the per-scenario cached rows."""
 
-    def _paths(sensitivity_key, ev_uptake_key) -> tuple[pd.Series, pd.Series, str, str]:
+    def _paths(sensitivity_key, ev_uptake_key, trace: str) -> tuple[pd.Series, pd.Series, str, str]:
         scenario_rows, _, _, _, _ = cached_scenario_overlay_rows(signature, sensitivity_key, bridge_mode, ev_uptake_key, _pack)
         # The MoT official scenario plots the governed MBU26 trace itself, not
         # the finalist base case with the overlays switched off (the raw
@@ -3456,7 +3460,9 @@ def cached_scenario_comparison_paths(
         # (vintage ids equal release rounds for registered vintages), not a
         # hard-coded MBU26 trace.
         selected_vid, _ = _official_vintage_scope(ev_uptake_key)
-        base_trace = (
+        # The caller's selected scenario trace wins; the mode-derived fallback
+        # keeps historical callers that predate per-side trace selection.
+        base_trace = trace or (
             official_comparator_trace_name(selected_vid)
             if mode == EV_UPTAKE_GOVERNED_OPTION
             else "Current finalist Base case"
@@ -3480,8 +3486,8 @@ def cached_scenario_comparison_paths(
         metric = _revenue_outlook_series_metric_type(scenario_rows, series)
         return forecast, history, str(unit or ""), str(metric or "")
 
-    forecast_a, history, unit, metric = _paths(sensitivity_key_a, ev_uptake_key_a)
-    forecast_b, _, _, _ = _paths(sensitivity_key_b, ev_uptake_key_b)
+    forecast_a, history, unit, metric = _paths(sensitivity_key_a, ev_uptake_key_a, str(trace_a))
+    forecast_b, _, _, _ = _paths(sensitivity_key_b, ev_uptake_key_b, str(trace_b))
     return {
         "history": history,
         "a": forecast_a,
@@ -9581,12 +9587,13 @@ def _validated_select_state(key: str, options: list[str], default: str) -> None:
 def _comparison_scenario_defaults(prefix: str) -> dict[str, Any]:
     is_b = prefix == "b"
     return {
-        # Scenario B opened on the VFM Fast composition, which is one of the
-        # paused analyst scenarios: while the pause is in force B has to open
-        # on Base like A, or comparing A vs B would run Fast by default.
-        "uptake": sanitised_uptake_basis(
-            "MoT VFM fast" if is_b else DEFAULT_EV_UPTAKE_MODE,
-            default=DEFAULT_EV_UPTAKE_MODE,
+        # A opens on the Base path and B on the High population comparison, so
+        # the default view compares two governed scenario traces instead of
+        # plotting the same path twice.
+        "trace": (
+            "Current finalist High population/comparison"
+            if is_b
+            else "Current finalist Base case"
         ),
         "fleet": "Off",
         "pt": "Off",
@@ -9600,33 +9607,39 @@ def _render_comparison_scenario_column(
     prefix: str,
     sensitivity_labels: dict[str, dict[str, str]],
     official_vintage_state: dict[str, Any],
-) -> tuple[tuple, tuple]:
+) -> tuple[tuple, tuple, str]:
     defaults = _comparison_scenario_defaults(prefix)
     selected_vid = str(official_vintage_state["vintage_id"])
     selected_release = str(official_vintage_state["release_round"])
     # The governed option follows the page's SELECTED comparator vintage; a
     # stale label from another vintage is reset by _validated_select_state.
     mot_option = _comparison_mot_official_option(selected_release)
-    uptake_options = [
-        mode for mode in _public_uptake_basis_options() if mode != EV_UPTAKE_CUSTOM_OPTION
+    # Each side selects a governed scenario TRACE from the committed pack; the
+    # fleet composition stays on the governed VFM Base default underneath, so
+    # the A/B choice is the scenario story, not the class-split machinery.
+    scenario_options = [
+        "Current finalist Base case",
+        "Current finalist High population/comparison",
+        *CONFLICT_TRACE_NAMES,
+        mot_option,
     ]
-    uptake_options.append(mot_option)
     keys = {
         name: f"ro_cmp_{prefix}_{name}"
-        for name in ["uptake", "fleet", "pt", "freight", "eruc", "fed_policy"]
+        for name in ["trace", "fleet", "pt", "freight", "eruc", "fed_policy"]
     }
-    _validated_select_state(keys["uptake"], uptake_options, defaults["uptake"])
-    st.session_state.setdefault(keys["uptake"], defaults["uptake"])
-    uptake = st.selectbox(
-        "Uptake basis",
-        uptake_options,
-        key=keys["uptake"],
+    _validated_select_state(keys["trace"], scenario_options, defaults["trace"])
+    st.session_state.setdefault(keys["trace"], defaults["trace"])
+    selected_scenario = st.selectbox(
+        "Scenario",
+        scenario_options,
+        key=keys["trace"],
         help=(
+            "Governed scenario traces from the committed pack. "
             f"'{mot_option}' plots the governed {selected_release} official path exactly as "
             "committed; non-rate levers are locked."
         ),
     )
-    mot_official = uptake == mot_option
+    mot_official = selected_scenario == mot_option
     if mot_official:
         st.caption(f"Pure {selected_release} official path - non-rate levers locked.")
     levels = list(_COMPARISON_SENSITIVITY_LEVELS)
@@ -9637,14 +9650,20 @@ def _render_comparison_scenario_column(
         "Fleet efficiency", levels, key=keys["fleet"], disabled=mot_official,
         format_func=lambda level: sensitivity_labels["fleet_efficiency"].get(level, str(level)),
     )
-    pt_shift = st.selectbox(
-        "PT mode shift", levels, key=keys["pt"], disabled=mot_official,
-        format_func=lambda level: sensitivity_labels["pt_mode_shift"].get(level, str(level)),
-    )
-    freight = st.selectbox(
-        "Freight rail shift", levels, key=keys["freight"], disabled=mot_official,
-        format_func=lambda level: sensitivity_labels["freight_rail_shift"].get(level, str(level)),
-    )
+    # PT and freight levers are method detail; while hidden both stay at their
+    # neutral "Off" level regardless of any persisted selection.
+    if method_detail_enabled():
+        pt_shift = st.selectbox(
+            "PT mode shift", levels, key=keys["pt"], disabled=mot_official,
+            format_func=lambda level: sensitivity_labels["pt_mode_shift"].get(level, str(level)),
+        )
+        freight = st.selectbox(
+            "Freight rail shift", levels, key=keys["freight"], disabled=mot_official,
+            format_func=lambda level: sensitivity_labels["freight_rail_shift"].get(level, str(level)),
+        )
+    else:
+        pt_shift = "Off"
+        freight = "Off"
     eruc_values: tuple[float, ...] = ()
     st.session_state.setdefault(keys["eruc"], defaults["eruc"])
     # While method detail is hidden the e-RUC transition is withdrawn from the
@@ -9693,7 +9712,7 @@ def _render_comparison_scenario_column(
             heavy_bev_transition=HEAVY_BEV_DEFAULT,
             official_comparator_vintage_id=selected_vid,
         )
-        return sensitivity_key, ev_uptake_key
+        return sensitivity_key, ev_uptake_key, official_comparator_trace_name(selected_vid)
     _validated_select_state(
         keys["fed_policy"],
         list(FED_POLICY_OPTIONS),
@@ -9712,7 +9731,9 @@ def _render_comparison_scenario_column(
     )
     sensitivity_key = selected_sensitivity_key(fleet, pt_shift, "Off", freight_rail_shift=freight)
     ev_uptake_key = RevenueScenarioComputationKey(
-        uptake_basis=uptake,
+        # The scenario selector picks a trace; the composition underneath every
+        # trace stays on the governed VFM Base default.
+        uptake_basis=DEFAULT_EV_UPTAKE_MODE,
         eruc_levers=eruc_values,
         current_fed_policy_state=fed_policy_state,
         official_fed_policy_state=FED_POLICY_PUBLISHED,
@@ -9720,18 +9741,14 @@ def _render_comparison_scenario_column(
         heavy_bev_transition=HEAVY_BEV_DEFAULT,
         official_comparator_vintage_id=selected_vid,
     )
-    return sensitivity_key, ev_uptake_key
+    return sensitivity_key, ev_uptake_key, selected_scenario
 
 
 def _copy_page_settings_to_scenario_a() -> None:
     """Map the main-panel session values into the Scenario A keys."""
-    uptake = sanitised_uptake_basis(
-        st.session_state.get("revenue_outlook_ev_uptake_basis_v2", DEFAULT_EV_UPTAKE_MODE),
-        default=DEFAULT_EV_UPTAKE_MODE,
-    )
-    if uptake == EV_UPTAKE_CUSTOM_OPTION:
-        uptake = DEFAULT_EV_UPTAKE_MODE
-    st.session_state["ro_cmp_a_uptake"] = uptake
+    # The single view plots the Base path as its selected scenario; the A/B
+    # columns select traces, so A seeds on Base rather than an uptake basis.
+    st.session_state["ro_cmp_a_trace"] = "Current finalist Base case"
     for target, source in [
         ("ro_cmp_a_fleet", "revenue_outlook_sensitivity_fleet_efficiency"),
         ("ro_cmp_a_pt", "revenue_outlook_sensitivity_pt_mode_shift"),
@@ -9750,14 +9767,21 @@ def _copy_page_settings_to_scenario_a() -> None:
     )
 
 
-def _scenario_summary_text(sensitivity_key: tuple, ev_uptake_key: ScenarioKeyLike) -> str:
+def _scenario_summary_text(
+    sensitivity_key: tuple, ev_uptake_key: ScenarioKeyLike, trace_name: str = ""
+) -> str:
     key = _scenario_key(ev_uptake_key)
     mode = key.uptake_basis
     selected_vid, _ = _official_vintage_scope(ev_uptake_key)
+    # The selected scenario trace names each side; the historical mode-derived
+    # label survives for callers that predate per-side trace selection.
     parts = [
-        _comparison_mot_official_option(selected_vid)
-        if mode == EV_UPTAKE_GOVERNED_OPTION
-        else mode
+        str(trace_name)
+        or (
+            _comparison_mot_official_option(selected_vid)
+            if mode == EV_UPTAKE_GOVERNED_OPTION
+            else mode
+        )
     ]
     for label, value in [("Fleet", sensitivity_key[0]), ("PT", sensitivity_key[1]), ("Freight", sensitivity_key[9])]:
         if value != "Off":
@@ -9822,12 +9846,12 @@ def _render_scenario_comparison_panel(
             column_a, column_b = st.columns(2)
             with column_a:
                 st.markdown("<div class='ro-cmp-scenario-head ro-cmp-a'>Scenario A</div>", unsafe_allow_html=True)
-                sens_a, uptake_a = _render_comparison_scenario_column(
+                sens_a, uptake_a, trace_a = _render_comparison_scenario_column(
                     "a", sensitivity_labels, official_vintage_state
                 )
             with column_b:
                 st.markdown("<div class='ro-cmp-scenario-head ro-cmp-b'>Scenario B</div>", unsafe_allow_html=True)
-                sens_b, uptake_b = _render_comparison_scenario_column(
+                sens_b, uptake_b, trace_b = _render_comparison_scenario_column(
                     "b", sensitivity_labels, official_vintage_state
                 )
 
@@ -9841,6 +9865,8 @@ def _render_scenario_comparison_panel(
             uptake_b,
             PED_BRIDGE_DEFAULT_MODE,
             pack,
+            trace_a=trace_a,
+            trace_b=trace_b,
         )
         a_path, b_path = result["a"], result["b"]
         if a_path.empty or b_path.empty:
@@ -9849,8 +9875,8 @@ def _render_scenario_comparison_panel(
 
         filter_summary_grid(
             [
-                ("Scenario A", _scenario_summary_text(sens_a, uptake_a)),
-                ("Scenario B", _scenario_summary_text(sens_b, uptake_b)),
+                ("Scenario A", _scenario_summary_text(sens_a, uptake_a, trace_a)),
+                ("Scenario B", _scenario_summary_text(sens_b, uptake_b, trace_b)),
                 ("Series", str(comparison_series)),
             ]
         )
@@ -9883,6 +9909,7 @@ def _render_scenario_comparison_panel(
                             pack_signature, component_series, fed_path,
                             sens_a, uptake_a, sens_b, uptake_b,
                             PED_BRIDGE_DEFAULT_MODE, pack,
+                            trace_a=trace_a, trace_b=trace_b,
                         ),
                         rate_for_npv,
                     )
@@ -10363,7 +10390,11 @@ def _render_fleet_mix_explorer(bridge_vintage_id: str) -> None:
                 ),
             )
         with control_cols[1]:
-            metric = st.radio("View", METRIC_OPTIONS, key="fleet_mix_metric",
+            # Year-on-year change is method detail; a stale session selection
+            # is reset before the radio renders with the shorter option set.
+            metric_options = list(METRIC_OPTIONS) if method_detail_enabled() else [METRIC_KM, METRIC_SHARE]
+            _validated_select_state("fleet_mix_metric", metric_options, METRIC_KM)
+            metric = st.radio("View", metric_options, key="fleet_mix_metric",
                               label_visibility="visible", horizontal=False)
         denominator = list(DENOMINATORS)[0]
         with control_cols[2]:
