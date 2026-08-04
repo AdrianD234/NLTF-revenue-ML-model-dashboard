@@ -4725,13 +4725,20 @@ def render_executive_stream_cards() -> None:
         color = BADGE_COLORS.get(card["badge"], "#334155")
         gain_html = (f"<div style='color:#15803d;font-weight:600;font-size:0.8rem;margin-top:2px'>"
                      f"{card['gain']}</div>") if card["gain"] else ""
+        # The Promote/Watch/Monitor capsule is method detail; the card keeps
+        # its stream name, model and accuracy figures either way.
+        badge_html = (
+            f"<span style='background:{color};color:#fff;border-radius:999px;padding:1px 12px;"
+            f"font-size:0.75rem;font-weight:700'>{card['badge']}</span>"
+            if method_detail_enabled()
+            else ""
+        )
         blocks.append(
             f"<div style='flex:1 1 260px;background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;"
             f"padding:14px 16px;min-width:240px'>"
             f"<div style='display:flex;justify-content:space-between;align-items:center;gap:8px'>"
             f"<span style='font-weight:700;color:#0f172a'>{card['stream']}</span>"
-            f"<span style='background:{color};color:#fff;border-radius:999px;padding:1px 12px;"
-            f"font-size:0.75rem;font-weight:700'>{card['badge']}</span></div>"
+            f"{badge_html}</div>"
             f"<div style='color:#475569;font-size:0.8rem;margin-top:4px'>{card['model']}</div>"
             f"<div style='margin-top:8px;font-size:1.25rem;font-weight:700;color:#0f4c81'>{card['mape']}"
             f"<span style='font-size:0.75rem;color:#64748b;font-weight:500'> quarterly MAPE | "
@@ -4763,6 +4770,10 @@ def render_action_card(page: str) -> None:
     """One management action card per executive page (presentation only:
     every statement is composed from the governed card inputs)."""
     if not is_executive():
+        return
+    # The recommended-decision, governance-watch and scenario-implication
+    # cards are method detail; hidden for the workshop build.
+    if page in ("Overview", "Diagnostics", "Scenario Comparison") and not method_detail_enabled():
         return
     cards = _executive_cards_safe()
     if not cards:
@@ -4844,6 +4855,8 @@ def _confidence_badges_for(card: dict[str, Any]) -> list[tuple[str, str, str]]:
 
 def render_confidence_badges() -> None:
     """Per-stream confidence strip on the Model Confidence page (executive)."""
+    if not method_detail_enabled():
+        return
     cards = _executive_cards_safe()
     if not cards:
         return
@@ -5395,8 +5408,11 @@ def render_diagnostics(loaded: LoadedRun, controls: dict[str, Any]) -> None:
     if is_executive():
         render_confidence_badges()
         render_action_card("Diagnostics")
-    render_diagnostics_r2_panel(loaded)
-    render_r2_ladder_panel(loaded)
+    # Both R2 expanders are method detail; their tables and governed sources
+    # stay available to audit runs and downloads.
+    if method_detail_enabled():
+        render_diagnostics_r2_panel(loaded)
+        render_r2_ladder_panel(loaded)
 
     qpred = common_filter(loaded.data.get("quarterly_predictions", pd.DataFrame()), controls, include_source_variant=False)
     diagnostic_qpred = central_error_window(qpred)
@@ -16463,10 +16479,11 @@ def render_scenario_comparison(loaded: LoadedRun, controls: dict[str, Any]) -> N
                 ("Baseline", baseline),
             ]
         )
-        st.caption(
-            "Fixed governed comparison from the evidence pack. Use the global Score Basis "
-            "filter to switch between paper-style and operational scorecards."
-        )
+        if method_detail_enabled():
+            st.caption(
+                "Fixed governed comparison from the evidence pack. Use the global Score Basis "
+                "filter to switch between paper-style and operational scorecards."
+            )
 
     comparison = evidence_scenario_comparison_frame(loaded, controls)
     if comparison.empty:

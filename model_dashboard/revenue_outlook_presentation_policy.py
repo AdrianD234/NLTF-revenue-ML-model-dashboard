@@ -23,7 +23,12 @@ across widgets, captions, downloads and figure builders:
     reach the selected view.
 
 ``REVENUE_OUTLOOK_ENABLE_METHOD_DETAIL``
-    Whether the page's methodological annotations are shown: the active-lever
+    Whether the dashboard's methodological annotations are shown. Despite the
+    module's Revenue Outlook name this gate now also covers the governance
+    pages: the executive Promote/Watch capsules and recommended-decision card,
+    the Model Confidence badge strip, governance-watch banner and both R2
+    expanders, and the Scenario Forecasts implication card and comparison
+    caption. On the Revenue Outlook page it hides: the active-lever
     and long-run-construction captions, the input-history vintage seam, the
     panel sub-captions inside the lever accordion, the forecast-uncertainty
     fan and modelled-uncertainty audit toggles, the freight-rail and e-RUC
