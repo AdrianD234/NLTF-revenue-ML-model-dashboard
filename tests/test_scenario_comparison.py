@@ -194,6 +194,10 @@ def test_mot_official_scenario_plots_the_mbu26_official_trace(comparison_context
         pd.to_numeric(mbu["value"], errors="coerce").to_numpy(),
         index=pd.to_numeric(mbu["june_year"], errors="coerce").to_numpy(),
     ).dropna().sort_index()
+    # The comparison reads the canonical final view, which applies the FY2050
+    # presentation horizon once for every decision-facing row; the raw pack
+    # trace runs to FY2055, so the expectation is clipped to the same horizon.
+    expected = expected[expected.index <= 2050]
     pd.testing.assert_series_equal(
         result["a"].drop(index=2027),
         expected.drop(index=2027),
@@ -338,6 +342,204 @@ def test_comparison_hovers_carry_units() -> None:
         "million km",
     )
     assert "million km" in str(paths.data[0].hovertemplate)
+
+
+# ===================== single-engine parity: the comparison page is a thin
+# consumer of the SAME canonical final view the Single scenario chart plots.
+# These tests pin that contract: a comparison side must equal the equivalent
+# Single scenario final path exactly, for every governed trace/policy pairing.
+
+BASE_TRACE = "Current finalist Base case"
+HIGH_TRACE = "Current finalist High population/comparison"
+
+
+def _typed_keys(policy=None, fleet="Off"):
+    """A (sensitivity, typed uptake) pair like the production page builds."""
+    sensitivity = app.selected_sensitivity_key(fleet, "Off", "Off", freight_rail_shift="Off")
+    uptake = app.RevenueScenarioComputationKey(
+        uptake_basis=app.DEFAULT_EV_UPTAKE_MODE,
+        current_fed_policy_state=policy or app.FED_POLICY_PUBLISHED,
+        official_fed_policy_state=app.FED_POLICY_PUBLISHED,
+    )
+    return sensitivity, uptake
+
+
+def _comparison(comparison_context, series, keys_a, keys_b, trace_a, trace_b):
+    pack, signature = comparison_context
+    return app.cached_scenario_comparison_paths(
+        signature, series, FED_PATH,
+        keys_a[0], keys_a[1], keys_b[0], keys_b[1],
+        PED_BRIDGE_DEFAULT_MODE, pack,
+        trace_a=trace_a, trace_b=trace_b,
+    )
+
+
+def _single_view_forecast(comparison_context, series, keys, trace):
+    """The final path exactly as the Single scenario view would plot it."""
+    pack, signature = comparison_context
+    view = app.cached_revenue_outlook_view(
+        signature, series, "june_year", FED_PATH, ("Actual", trace),
+        keys[0], PED_BRIDGE_DEFAULT_MODE, keys[1], pack,
+    )
+    rows = view["filtered_rows"]
+    fy = pd.to_numeric(rows["june_year"], errors="coerce")
+    values = pd.to_numeric(rows["value"], errors="coerce")
+    is_actual = rows["row_type"].astype(str).eq("historical_actual")
+    is_trace = rows["trace_name"].astype(str).eq(trace)
+    selected = is_trace & ~is_actual
+    return (
+        pd.Series(values[selected].to_numpy(), index=fy[selected].to_numpy())
+        .dropna()
+        .sort_index()
+    )
+
+
+@pytest.mark.parametrize(
+    "trace,policy",
+    [
+        (BASE_TRACE, app.FED_POLICY_PUBLISHED),
+        (BASE_TRACE, app.FED_POLICY_DELAYED_6M),
+        (BASE_TRACE, app.FED_POLICY_OFF),
+        (HIGH_TRACE, app.FED_POLICY_DELAYED_6M),
+        (app.CONFLICT_TRACE_NAMES[len(app.CONFLICT_TRACE_NAMES) // 2], app.FED_POLICY_DELAYED_6M),
+    ],
+)
+def test_comparison_side_equals_the_single_scenario_final_path(
+    comparison_context, trace, policy
+) -> None:
+    keys = _typed_keys(policy=policy)
+    result = _comparison(
+        comparison_context, "Total NLTF revenue", keys, keys, trace, trace
+    )
+    expected = _single_view_forecast(comparison_context, "Total NLTF revenue", keys, trace)
+    assert not expected.empty
+    pd.testing.assert_series_equal(result["a"], expected)
+    pd.testing.assert_series_equal(result["b"], expected)
+
+
+def test_identical_a_and_b_yield_zero_delta_cards(comparison_context) -> None:
+    keys = _typed_keys(policy=app.FED_POLICY_DELAYED_6M)
+    result = _comparison(
+        comparison_context, "Total NLTF revenue", keys, keys, BASE_TRACE, BASE_TRACE
+    )
+    pd.testing.assert_series_equal(result["a"], result["b"])
+    cards = app._scenario_comparison_cards(
+        "Total NLTF revenue", "revenue", result["a"], result["b"], result["value_unit"], None
+    )
+    assert cards[2][1] == "+$0m"
+    assert cards[3][1] == "+$0m"
+    assert cards[2][4] == "mixed"
+    assert cards[3][4] == "mixed"
+
+
+def test_changing_b_leaves_a_exactly_unchanged(comparison_context) -> None:
+    keys_a = _typed_keys(policy=app.FED_POLICY_DELAYED_6M)
+    first = _comparison(
+        comparison_context, "Total NLTF revenue",
+        keys_a, _typed_keys(policy=app.FED_POLICY_DELAYED_6M, fleet="High"),
+        BASE_TRACE, HIGH_TRACE,
+    )
+    second = _comparison(
+        comparison_context, "Total NLTF revenue",
+        keys_a, _typed_keys(policy=app.FED_POLICY_OFF),
+        BASE_TRACE, BASE_TRACE,
+    )
+    pd.testing.assert_series_equal(first["a"], second["a"])
+
+
+def test_a_and_b_share_the_fy2026_fy2050_horizon(comparison_context) -> None:
+    keys = _typed_keys(policy=app.FED_POLICY_DELAYED_6M)
+    result = _comparison(
+        comparison_context, "Total NLTF revenue", keys, keys, BASE_TRACE, HIGH_TRACE
+    )
+    for side in ("a", "b"):
+        years = sorted(int(year) for year in result[side].index if int(year) >= 2026)
+        assert years == list(range(2026, 2051)), side
+    assert app._comparison_alignment_gate(result["a"], result["b"]) == ""
+
+
+def test_alignment_gate_blocks_mismatched_horizons() -> None:
+    full = pd.Series(1.0, index=list(range(2026, 2051)))
+    short = pd.Series(1.0, index=list(range(2026, 2031)))
+    assert app._comparison_alignment_gate(full, full.copy()) == ""
+    message = app._comparison_alignment_gate(full, short)
+    assert "suppressed" in message
+    assert app._comparison_alignment_gate(full, pd.Series(dtype=float)) != ""
+
+
+_PAGE_KEY_FIELDS = dict(
+    engine="engine-x",
+    uptake_basis=None,  # filled per test
+    current_fed_policy_state=None,
+    official_fed_policy_state=None,
+    ped_retention_sensitivity=True,
+    official_comparator_vintage_id="BEFU26",
+    official_comparator_overlay=True,
+    ped_bridge_mode="mode-y",
+    bridge_vintage_id="H25",
+    long_run_shape_vintage_id="shape-z",
+    long_run_transition_schedule_id="sched-w",
+)
+
+
+def _page_key():
+    fields = dict(_PAGE_KEY_FIELDS)
+    fields["uptake_basis"] = app.DEFAULT_EV_UPTAKE_MODE
+    fields["current_fed_policy_state"] = app.FED_POLICY_DELAYED_6M
+    fields["official_fed_policy_state"] = app.FED_POLICY_PUBLISHED
+    return app.RevenueScenarioComputationKey(**fields)
+
+
+def test_scenario_b_key_clones_the_page_key_and_overrides_only_its_controls() -> None:
+    page_sens = app.selected_sensitivity_key("Off", "Off", "Off", freight_rail_shift="Off")
+    page_key = _page_key()
+    sens_b, key_b = app._comparison_scenario_b_keys(
+        page_sens, page_key,
+        fleet="High", pt_shift="Off", freight="Off",
+        eruc_values=(), fed_policy_state=app.FED_POLICY_OFF,
+    )
+    assert sens_b[0] == "High"
+    assert key_b.current_fed_policy_state == app.FED_POLICY_OFF
+    # Every field the B column does not expose inherits from the page key -
+    # this is exactly the drift the old fresh-key construction allowed.
+    for field, value in [
+        ("engine", "engine-x"),
+        ("ped_bridge_mode", "mode-y"),
+        ("bridge_vintage_id", "H25"),
+        ("long_run_shape_vintage_id", "shape-z"),
+        ("long_run_transition_schedule_id", "sched-w"),
+        ("official_comparator_vintage_id", "BEFU26"),
+        ("official_comparator_overlay", True),
+        ("ped_retention_sensitivity", True),
+    ]:
+        assert getattr(key_b, field) == value, field
+    # Identical controls reproduce the page key exactly, so "B configured
+    # like A" is byte-identical by construction.
+    sens_same, key_same = app._comparison_scenario_b_keys(
+        page_sens, page_key,
+        fleet="Off", pt_shift="Off", freight="Off",
+        eruc_values=(), fed_policy_state=app.FED_POLICY_DELAYED_6M,
+    )
+    assert sens_same == page_sens
+    assert key_same == page_key
+
+
+def test_official_comparator_keys_inherit_the_page_identity() -> None:
+    sens, key, trace = app._comparison_official_scenario_keys(
+        _page_key(),
+        official_policy_state=app.FED_POLICY_PUBLISHED,
+        selected_vid="MBU26",
+    )
+    assert key.uptake_basis == app.EV_UPTAKE_GOVERNED_OPTION
+    assert key.current_fed_policy_state == app.FED_POLICY_PUBLISHED
+    assert key.official_comparator_vintage_id == "MBU26"
+    assert key.custom_ev_levers == () and key.eruc_levers == ()
+    # Identity fields still come from the page, not module defaults.
+    assert key.engine == "engine-x"
+    assert key.bridge_vintage_id == "H25"
+    assert key.long_run_transition_schedule_id == "sched-w"
+    assert sens == app.selected_sensitivity_key("Off", "Off", "Off", freight_rail_shift="Off")
+    assert trace == app.official_comparator_trace_name("MBU26")
 
 
 def test_composition_figure_groups_by_stream() -> None:

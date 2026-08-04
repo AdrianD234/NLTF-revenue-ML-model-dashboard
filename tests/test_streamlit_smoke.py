@@ -1310,34 +1310,49 @@ def test_revenue_outlook_compare_mode_swaps_total_path_for_comparison() -> None:
 
 
 def test_revenue_outlook_compare_mode_keeps_lever_state_for_downstream() -> None:
+    """A single-view lever survives the compare switch and drives Scenario A.
+
+    The freight toggle this test used to flip is method detail and no longer
+    renders while the gate is closed; fleet efficiency is the lever that stays
+    on screen. Scenario A is the live Single scenario configuration, so the
+    persisted lever must surface in A's summary, then restore on switch-back.
+    """
     at = _run_revenue_outlook_page()
-    freight = next(t for t in at.toggle if t.key == "revenue_outlook_sensitivity_freight_rail_toggle")
-    freight.set_value(True)
+    fleet = next(
+        s for s in at.selectbox if s.key == "revenue_outlook_sensitivity_fleet_efficiency"
+    )
+    fleet.set_value("High")
     at.run()
     _view_mode_radio(at).set_value(app.REVENUE_OUTLOOK_VIEW_COMPARE)
     at.run()
     assert not at.exception
-    captions = "\n".join(str(caption.value) for caption in at.caption)
-    assert "Single-view levers" in captions
-    assert "Freight rail Med" in captions
+    rendered = "\n".join(str(markdown.value) for markdown in at.markdown)
+    assert "Fleet High" in rendered
     _view_mode_radio(at).set_value(app.REVENUE_OUTLOOK_VIEW_SINGLE)
     at.run()
     assert not at.exception
-    freight_after = next(t for t in at.toggle if t.key == "revenue_outlook_sensitivity_freight_rail_toggle")
-    assert freight_after.value is True
+    fleet_after = next(
+        s for s in at.selectbox if s.key == "revenue_outlook_sensitivity_fleet_efficiency"
+    )
+    assert str(fleet_after.value) == "High"
 
 
 def test_revenue_outlook_comparison_offers_mot_official_locked_scenario() -> None:
     at = _run_revenue_outlook_page()
     _view_mode_radio(at).set_value(app.REVENUE_OUTLOOK_VIEW_COMPARE)
     at.run()
-    uptake_b = next(s for s in at.selectbox if s.key == "ro_cmp_b_uptake")
-    assert app.COMPARISON_MOT_OFFICIAL_OPTION in uptake_b.options
-    uptake_b.set_value(app.COMPARISON_MOT_OFFICIAL_OPTION)
+    trace_b = next(s for s in at.selectbox if s.key == "ro_cmp_b_trace")
+    assert app.COMPARISON_MOT_OFFICIAL_OPTION in trace_b.options
+    trace_b.set_value(app.COMPARISON_MOT_OFFICIAL_OPTION)
     at.run()
     assert not at.exception
+    # The scenario chips name the governed official TRACE the option resolves
+    # to (the selected comparator vintage's path), not the selector label.
+    official_trace = app.official_comparator_trace_name(
+        app._registry_default_comparator_vintage_id()
+    )
     rendered = "\n".join(str(markdown.value) for markdown in at.markdown)
-    assert app.COMPARISON_MOT_OFFICIAL_OPTION in rendered
+    assert official_trace in rendered
     captions = "\n".join(str(caption.value) for caption in at.caption)
     assert "levers locked" in captions
 

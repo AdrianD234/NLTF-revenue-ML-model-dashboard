@@ -662,18 +662,18 @@ def test_the_fleet_mix_vfm_reference_is_display_only() -> None:
 
 
 def test_compare_mode_offers_no_paused_basis_and_opens_on_base() -> None:
-    """Compare view owns its own uptake selectors, including Scenario B.
+    """No A/B control can run a paused composition.
 
-    Scenario B used to OPEN on VFM Fast, so without this the default A/B
-    comparison would still have run a paused composition.
+    Scenario B used to OPEN on VFM Fast. The comparison now selects governed
+    scenario TRACES (Scenario A is the live Single scenario configuration and
+    renders no selector at all), so the assertion is that the B trace selector
+    offers no paused uptake basis anywhere.
     """
     from streamlit.testing.v1 import AppTest
 
-    for prefix in ("a", "b"):
-        assert (
-            app._comparison_scenario_defaults(prefix)["uptake"]
-            == app.DEFAULT_EV_UPTAKE_MODE
-        ), prefix
+    assert not app.is_paused_vfm_uptake_basis(
+        app._comparison_scenario_defaults("b")["trace"]
+    )
 
     harness = AppTest.from_file(str(ROOT / "app.py"), default_timeout=300)
     harness.run()
@@ -686,16 +686,18 @@ def test_compare_mode_offers_no_paused_basis_and_opens_on_base() -> None:
     harness.run()
     assert not harness.exception, harness.exception
 
-    uptake_boxes = [
-        element
-        for element in harness.get("selectbox")
-        if str(element.label) == "Uptake basis"
-    ]
-    assert uptake_boxes, "compare mode rendered no uptake-basis selector"
-    for element in uptake_boxes:
-        for option in getattr(element, "options", None) or []:
-            assert not app.is_paused_vfm_uptake_basis(option), option
-        assert not app.is_paused_vfm_uptake_basis(element.value), element.value
+    trace_box = next(
+        (
+            element
+            for element in harness.get("selectbox")
+            if str(element.key) == "ro_cmp_b_trace"
+        ),
+        None,
+    )
+    assert trace_box is not None, "compare mode rendered no Scenario B trace selector"
+    for option in getattr(trace_box, "options", None) or []:
+        assert not app.is_paused_vfm_uptake_basis(option), option
+    assert not app.is_paused_vfm_uptake_basis(trace_box.value), trace_box.value
 
 
 @pytest.mark.parametrize("state_key", UPTAKE_STATE_KEYS)

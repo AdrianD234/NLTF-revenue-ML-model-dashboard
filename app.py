@@ -3447,12 +3447,20 @@ def cached_scenario_comparison_paths(
     trace_a: str = "",
     trace_b: str = "",
 ) -> dict[str, Any]:
-    """A/B paths for one series, filtered from the per-scenario cached rows."""
+    """A/B paths for one series, read from the canonical final view.
+
+    Each side is one ``cached_revenue_outlook_view`` call - the SAME final
+    view contract the Single scenario chart consumes (official-vintage
+    filtering, restored official rows, effective policy state, the single
+    row gate with its FY2050 horizon clip) - so a comparison side can never
+    exit the pipeline earlier than the single view does. The requested
+    series is then extracted from the view's FINAL chart rows through the
+    same gate the view applies to its own selected series.
+    """
 
     def _paths(sensitivity_key, ev_uptake_key, trace: str) -> tuple[pd.Series, pd.Series, str, str]:
-        scenario_rows, _, _, _, _ = cached_scenario_overlay_rows(signature, sensitivity_key, bridge_mode, ev_uptake_key, _pack)
-        # The MoT official scenario plots the governed MBU26 trace itself, not
-        # the finalist base case with the overlays switched off (the raw
+        # The MoT official scenario plots the governed official trace itself,
+        # not the finalist base case with the overlays switched off (the raw
         # finalist petrol bridge keeps all petrol activity to 2050, which is
         # the implausible path the displacement lever exists to correct).
         mode = _scenario_key(ev_uptake_key).uptake_basis
@@ -3467,12 +3475,28 @@ def cached_scenario_comparison_paths(
             if mode == EV_UPTAKE_GOVERNED_OPTION
             else "Current finalist Base case"
         )
-        rows = _filter_revenue_outlook_rows(
-            scenario_rows,
-            time_grain="june_year",
-            stream_labels=[series],
-            fed_paths=[fed_path],
-            trace_names=[base_trace, "Actual"],
+        # One view per SIDE, keyed on the total series so every component
+        # fetch for the same configuration reuses it. The per-series rows are
+        # cut from the view's final chart rows below, through the same gate.
+        view = cached_revenue_outlook_view(
+            signature,
+            _SCENARIO_COMPARISON_TOTAL_SERIES,
+            "june_year",
+            fed_path,
+            ("Actual", base_trace),
+            sensitivity_key,
+            bridge_mode,
+            ev_uptake_key,
+            _pack,
+        )
+        rows, _ = _filter_series_rows_with_fallback(
+            view["chart_rows"],
+            series,
+            "june_year",
+            fed_path,
+            ("Actual", base_trace),
+            view["current_fed_policy_state"],
+            pack_dir=str(_pack.output_dir),
         )
         if rows is None or rows.empty:
             return pd.Series(dtype=float), pd.Series(dtype=float), "", ""
@@ -3483,7 +3507,7 @@ def cached_scenario_comparison_paths(
         history = pd.Series(values[is_actual].to_numpy(), index=fy[is_actual].to_numpy()).dropna().sort_index()
         forecast = pd.Series(values[is_base & ~is_actual].to_numpy(), index=fy[is_base & ~is_actual].to_numpy()).dropna().sort_index()
         unit = _first_non_empty(rows.get("value_unit", pd.Series(dtype=str)))
-        metric = _revenue_outlook_series_metric_type(scenario_rows, series)
+        metric = _revenue_outlook_series_metric_type(view["chart_rows"], series)
         return forecast, history, str(unit or ""), str(metric or "")
 
     forecast_a, history, unit, metric = _paths(sensitivity_key_a, ev_uptake_key_a, str(trace_a))
@@ -6790,6 +6814,9 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         )
 
     if compare_mode:
+        # In compare mode these keys are built from the persisted single-view
+        # lever state, so they ARE the current Single scenario configuration:
+        # Scenario A passes them through untouched and Scenario B clones them.
         _render_scenario_comparison_panel(
             pack_signature,
             pack,
@@ -6797,6 +6824,8 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             selected_fed_path,
             sensitivity_labels,
             official_vintage_state,
+            sensitivity_key,
+            ev_uptake_key,
         )
     else:
         timer.start("main path figure")
@@ -9623,7 +9652,18 @@ def _render_comparison_scenario_column(
     prefix: str,
     sensitivity_labels: dict[str, dict[str, str]],
     official_vintage_state: dict[str, Any],
-) -> tuple[tuple, tuple, str]:
+    page_sensitivity_key: tuple,
+    page_uptake_key: ScenarioKeyLike,
+) -> tuple[tuple, ScenarioKeyLike, str]:
+    """One comparator column whose keys CLONE the page's typed computation key.
+
+    The column's controls override only the dimensions they expose (scenario
+    trace, fleet efficiency, 12c policy and, under method detail, PT/freight/
+    e-RUC); every other field - engine, bridge mode, long-run schedule,
+    official vintage, uptake composition - inherits from the live Single
+    scenario key, so a comparator can never quietly rebuild the scenario
+    from different ingredients than the page itself uses.
+    """
     defaults = _comparison_scenario_defaults(prefix)
     selected_vid = str(official_vintage_state["vintage_id"])
     selected_release = str(official_vintage_state["release_round"])
@@ -9720,15 +9760,11 @@ def _render_comparison_scenario_column(
                 "Applies to the MBU26 official trace only. BEFU26 has no synthetic "
                 "policy counterfactual; generating one requires a separate owner decision."
             )
-        sensitivity_key = selected_sensitivity_key("Off", "Off", "Off", freight_rail_shift="Off")
-        ev_uptake_key = RevenueScenarioComputationKey(
-            uptake_basis=EV_UPTAKE_GOVERNED_OPTION,
-            current_fed_policy_state=FED_POLICY_PUBLISHED,
-            official_fed_policy_state=official_policy_state,
-            heavy_bev_transition=HEAVY_BEV_DEFAULT,
-            official_comparator_vintage_id=selected_vid,
+        return _comparison_official_scenario_keys(
+            page_uptake_key,
+            official_policy_state=official_policy_state,
+            selected_vid=selected_vid,
         )
-        return sensitivity_key, ev_uptake_key, official_comparator_trace_name(selected_vid)
     _validated_select_state(
         keys["fed_policy"],
         list(FED_POLICY_OPTIONS),
@@ -9745,29 +9781,137 @@ def _render_comparison_scenario_column(
             "no uplift removes the 12c step entirely. Scope: Selected current scenario only."
         ),
     )
-    sensitivity_key = selected_sensitivity_key(fleet, pt_shift, "Off", freight_rail_shift=freight)
-    ev_uptake_key = RevenueScenarioComputationKey(
-        # The scenario selector picks a trace; the composition underneath every
-        # trace stays on the governed VFM Base default.
-        uptake_basis=DEFAULT_EV_UPTAKE_MODE,
-        eruc_levers=eruc_values,
-        current_fed_policy_state=fed_policy_state,
-        official_fed_policy_state=FED_POLICY_PUBLISHED,
-        ped_retention_sensitivity=_production_ped_retention_sensitivity(),
-        heavy_bev_transition=HEAVY_BEV_DEFAULT,
-        official_comparator_vintage_id=selected_vid,
+    sensitivity_key, ev_uptake_key = _comparison_scenario_b_keys(
+        page_sensitivity_key,
+        page_uptake_key,
+        fleet=fleet,
+        pt_shift=pt_shift,
+        freight=freight,
+        eruc_values=eruc_values,
+        fed_policy_state=fed_policy_state,
     )
     return sensitivity_key, ev_uptake_key, selected_scenario
 
 
-def _copy_page_settings_to_scenario_a() -> None:
-    """Map the main-panel session values into the Scenario A keys."""
-    # The single view plots the Base path as its selected scenario; the A/B
-    # columns select traces, so A seeds on Base rather than an uptake basis.
-    st.session_state["ro_cmp_a_trace"] = "Current finalist Base case"
+def _page_scenario_trace_name(page_uptake_key: ScenarioKeyLike) -> str:
+    """The trace the Single scenario configuration plots as its scenario."""
+    mode = _scenario_key(page_uptake_key).uptake_basis
+    selected_vid, _ = _official_vintage_scope(page_uptake_key)
+    return (
+        official_comparator_trace_name(selected_vid)
+        if mode == EV_UPTAKE_GOVERNED_OPTION
+        else "Current finalist Base case"
+    )
+
+
+def _comparison_sensitivity_key_from_page(
+    page_sensitivity_key: tuple, fleet: str, pt_shift: str, freight: str
+) -> tuple:
+    """The page sensitivity key with the B-column levels swapped in.
+
+    The B levers are named levels, so the matching custom-percentage slots
+    clear; every other slot inherits the page value unchanged.
+    """
+    key = list(page_sensitivity_key)
+    key[0], key[3] = _normalize_sensitivity_level(fleet), ""
+    key[1], key[4] = _normalize_sensitivity_level(pt_shift), ""
+    key[9], key[10] = _normalize_sensitivity_level(freight), ""
+    return tuple(key)
+
+
+def _comparison_scenario_b_keys(
+    page_sensitivity_key: tuple,
+    page_uptake_key: ScenarioKeyLike,
+    *,
+    fleet: str,
+    pt_shift: str,
+    freight: str,
+    eruc_values: tuple[float, ...],
+    fed_policy_state: str,
+) -> tuple[tuple, RevenueScenarioComputationKey]:
+    """Scenario B's keys: the page key with only the B controls overridden."""
+    page_key = _scenario_key(page_uptake_key)
+    ev_uptake_key = page_key.replace(
+        # The B column selects a trace; if the page itself is pinned to the
+        # governed official basis, B's non-official traces need the default
+        # composition underneath instead.
+        uptake_basis=(
+            DEFAULT_EV_UPTAKE_MODE
+            if page_key.uptake_basis == EV_UPTAKE_GOVERNED_OPTION
+            else page_key.uptake_basis
+        ),
+        eruc_levers=eruc_values,
+        current_fed_policy_state=fed_policy_state,
+    )
+    return (
+        _comparison_sensitivity_key_from_page(page_sensitivity_key, fleet, pt_shift, freight),
+        ev_uptake_key,
+    )
+
+
+def _comparison_official_scenario_keys(
+    page_uptake_key: ScenarioKeyLike,
+    *,
+    official_policy_state: str,
+    selected_vid: str,
+) -> tuple[tuple, RevenueScenarioComputationKey, str]:
+    """Keys for the locked MoT-official comparator: page key, non-rate levers off."""
+    sensitivity_key = selected_sensitivity_key("Off", "Off", "Off", freight_rail_shift="Off")
+    ev_uptake_key = _scenario_key(page_uptake_key).replace(
+        uptake_basis=EV_UPTAKE_GOVERNED_OPTION,
+        custom_ev_levers=(),
+        eruc_levers=(),
+        current_fed_policy_state=FED_POLICY_PUBLISHED,
+        official_fed_policy_state=official_policy_state,
+        heavy_bev_transition=HEAVY_BEV_DEFAULT,
+        official_comparator_vintage_id=selected_vid,
+    )
+    return sensitivity_key, ev_uptake_key, official_comparator_trace_name(selected_vid)
+
+
+_COMPARISON_HORIZON_START_FY = 2026
+_COMPARISON_HORIZON_END_FY = 2050
+
+
+def _comparison_alignment_gate(a: pd.Series, b: pd.Series) -> str:
+    """Hard gate: A and B must cover identical June years inside the horizon.
+
+    The delta cards and NPV bridges silently mis-state a comparison when one
+    side is missing years, so a coverage mismatch suppresses that arithmetic
+    rather than rendering plausible-but-wrong numbers. Returns "" when the
+    horizons align, else the warning to show.
+    """
+
+    def _horizon_years(path: pd.Series) -> list[int]:
+        years = pd.to_numeric(pd.Series(path.index), errors="coerce").dropna().astype(int)
+        return sorted(
+            year
+            for year in years.unique()
+            if _COMPARISON_HORIZON_START_FY <= year <= _COMPARISON_HORIZON_END_FY
+        )
+
+    a_years, b_years = _horizon_years(a), _horizon_years(b)
+    if not a_years or not b_years:
+        return (
+            "Comparison horizon gate: one scenario has no forecast June years inside "
+            f"FY{_COMPARISON_HORIZON_START_FY}-FY{_COMPARISON_HORIZON_END_FY}."
+        )
+    if a_years != b_years:
+        return (
+            "Comparison horizon gate: the scenarios cover different June years "
+            f"(A: FY{a_years[0]}-FY{a_years[-1]}, {len(a_years)} years; "
+            f"B: FY{b_years[0]}-FY{b_years[-1]}, {len(b_years)} years). "
+            "Delta cards and NPV bridges are suppressed until both sides share one horizon."
+        )
+    return ""
+
+
+def _reset_scenario_b_to_current_page() -> None:
+    """Seed the Scenario B controls from the live Single scenario configuration."""
+    st.session_state["ro_cmp_b_trace"] = "Current finalist Base case"
     for target, source in [
-        ("ro_cmp_a_fleet", "revenue_outlook_sensitivity_fleet_efficiency"),
-        ("ro_cmp_a_pt", "revenue_outlook_sensitivity_pt_mode_shift"),
+        ("ro_cmp_b_fleet", "revenue_outlook_sensitivity_fleet_efficiency"),
+        ("ro_cmp_b_pt", "revenue_outlook_sensitivity_pt_mode_shift"),
     ]:
         level = str(st.session_state.get(source, "Off"))
         st.session_state[target] = level if level in _COMPARISON_SENSITIVITY_LEVELS else "Off"
@@ -9775,9 +9919,19 @@ def _copy_page_settings_to_scenario_a() -> None:
     if bool(st.session_state.get("revenue_outlook_sensitivity_freight_rail_toggle", False)):
         candidate = str(st.session_state.get("revenue_outlook_sensitivity_freight_rail_shift", "Med"))
         freight_level = candidate if candidate in _COMPARISON_SENSITIVITY_LEVELS else "Med"
-    st.session_state["ro_cmp_a_freight"] = freight_level
-    st.session_state["ro_cmp_a_eruc"] = bool(st.session_state.get("revenue_outlook_eruc_toggle", False))
-    st.session_state["ro_cmp_a_fed_policy"] = _session_fed_policy_state(
+    st.session_state["ro_cmp_b_freight"] = freight_level
+    eruc_on = method_detail_enabled() and bool(st.session_state.get("revenue_outlook_eruc_toggle", False))
+    st.session_state["ro_cmp_b_eruc"] = eruc_on
+    if eruc_on:
+        for target, source, fallback in [
+            ("ro_cmp_b_eruc_start", "eruc_lever_start", 2027),
+            ("ro_cmp_b_eruc_phase", "eruc_lever_phase", 3),
+            ("ro_cmp_b_eruc_ratio", "eruc_lever_ratio", 100.0),
+            ("ro_cmp_b_eruc_elasticity", "eruc_lever_elasticity", -0.15),
+            ("ro_cmp_b_eruc_pump", "eruc_lever_pump", 2.70),
+        ]:
+            st.session_state[target] = st.session_state.get(source, fallback)
+    st.session_state["ro_cmp_b_fed_policy"] = _session_fed_policy_state(
         "revenue_outlook_fed_policy_state",
         legacy_toggle_key="revenue_outlook_fed_uplift",
     )
@@ -9822,7 +9976,18 @@ def _render_scenario_comparison_panel(
     fed_path: str,
     sensitivity_labels: dict[str, dict[str, str]],
     official_vintage_state: dict[str, Any],
+    page_sensitivity_key: tuple,
+    page_uptake_key: ScenarioKeyLike,
 ) -> None:
+    """A vs B where A IS the live Single scenario computation.
+
+    Scenario A carries the page's own typed keys, untouched, so it cannot
+    drift from the Single scenario chart; Scenario B clones those keys and
+    overrides only the dimensions its controls expose. Both sides then route
+    through the canonical final view, and this panel only extracts, aligns
+    and draws - it applies no policy, vintage or lever transformations of
+    its own.
+    """
     with st.container(border=True):
         comparison_sub = (
             "<div class='page5-panel-sub'>Two policy configurations held side by side for the selected "
@@ -9850,25 +10015,38 @@ def _render_scenario_comparison_panel(
                 if discount_mode == _COMPARISON_DISCOUNT_CUSTOM:
                     custom_rate = st.number_input("Rate (% p.a.)", min_value=0.5, max_value=10.0, value=4.0, step=0.5, key="ro_cmp_discount_rate") / 100.0
             with head_cols[3]:
-                st.markdown("<div class='control-label'>Scenario A seed</div>", unsafe_allow_html=True)
+                st.markdown("<div class='control-label'>Scenario B seed</div>", unsafe_allow_html=True)
                 st.button(
-                    "Copy current page settings to A",
-                    on_click=_copy_page_settings_to_scenario_a,
-                    key="ro_cmp_copy_a",
-                    help="Maps the advanced-lever selections into Scenario A (custom selections fall back to defaults).",
+                    "Reset B to current page (A)",
+                    on_click=_reset_scenario_b_to_current_page,
+                    key="ro_cmp_reset_b",
+                    help=(
+                        "Seeds the Scenario B controls from the live Single scenario "
+                        "configuration, so B starts identical to A."
+                    ),
                     use_container_width=True,
                 )
 
+            # Scenario A is the live Single scenario computation itself - the
+            # page's typed keys pass through untouched, so A can never be a
+            # stale or partial copy of the page settings.
+            sens_a, uptake_a = page_sensitivity_key, page_uptake_key
+            trace_a = _page_scenario_trace_name(page_uptake_key)
             column_a, column_b = st.columns(2)
             with column_a:
                 st.markdown("<div class='ro-cmp-scenario-head ro-cmp-a'>Scenario A</div>", unsafe_allow_html=True)
-                sens_a, uptake_a, trace_a = _render_comparison_scenario_column(
-                    "a", sensitivity_labels, official_vintage_state
+                st.markdown("**Current Single scenario configuration**")
+                st.markdown(_scenario_summary_text(sens_a, uptake_a, trace_a))
+                st.caption(
+                    "Scenario A mirrors the Single scenario view exactly, so it "
+                    "cannot drift from the chart there. Adjust it on the Single "
+                    "scenario view."
                 )
             with column_b:
                 st.markdown("<div class='ro-cmp-scenario-head ro-cmp-b'>Scenario B</div>", unsafe_allow_html=True)
                 sens_b, uptake_b, trace_b = _render_comparison_scenario_column(
-                    "b", sensitivity_labels, official_vintage_state
+                    "b", sensitivity_labels, official_vintage_state,
+                    page_sensitivity_key, page_uptake_key,
                 )
 
         result = cached_scenario_comparison_paths(
@@ -9896,6 +10074,19 @@ def _render_scenario_comparison_panel(
                 ("Series", str(comparison_series)),
             ]
         )
+        alignment_gate = _comparison_alignment_gate(a_path, b_path)
+        if alignment_gate:
+            # The overlaid paths stay on screen (they are honest about the
+            # mismatch); every derived delta is suppressed by the gate.
+            warning_panel(alignment_gate)
+            chart_card(
+                "Scenario paths (A vs B)",
+                "Shared history in grey; Scenario A solid navy, Scenario B dashed orange. Same governed pipeline as the total path chart.",
+                _scenario_comparison_figure(result["history"], a_path, b_path, result["value_unit"]),
+                caption=None,
+                notes_as_tooltip=True,
+            )
+            return
         gov_kpi_grid(
             _scenario_comparison_cards(
                 comparison_series,
@@ -9932,6 +10123,18 @@ def _render_scenario_comparison_panel(
                     for component_series in _SCENARIO_COMPONENT_FETCH_SERIES
                 }
                 components = _scenario_npv_component_breakdown(component_npvs, npv_a, npv_b)
+                closure_gap = sum(b - a for _, a, b in components) - (npv_b - npv_a)
+                if abs(closure_gap) > _SCENARIO_COMPONENT_MATERIALITY:
+                    # The breakdown closes the governed NLTF identity by
+                    # construction; a residual above the materiality floor
+                    # means a component path came from a different snapshot
+                    # than the total, so the bridge is suppressed.
+                    warning_panel(
+                        "Comparison closure gate: the component NPV deltas differ from the "
+                        f"headline Total NLTF delta by {closure_gap:+,.1f} $m. The by-stream "
+                        "NPV charts are suppressed until the decomposition closes."
+                    )
+                    return
                 chart_card(
                     "NPV by revenue stream (A vs B)",
                     "Each revenue stream's NPV to FY2050 under Scenario A (navy) and Scenario B "
