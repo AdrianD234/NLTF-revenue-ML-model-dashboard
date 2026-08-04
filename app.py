@@ -303,6 +303,7 @@ from model_dashboard.revenue_outlook import (
     REVENUE_STACK_MODES,
     SENSITIVITY_DEFAULT_NOTE,
     SENSITIVITY_LEVELS,
+    SENSITIVITY_PT_START_FY,
     STREAM_LABELS,
     RevenueOutlookPack,
     apply_ped_bridge_mode_layer,
@@ -634,7 +635,7 @@ def sensitivity_option_label(kind: str, level: str) -> str:
         value_text = f"{value:.2f}".rstrip("0").rstrip(".")
         if "." not in value_text:
             value_text = f"{value:.1f}"
-        return f"{level} ({value_text}% p.a. from FY2030)"
+        return f"{level} ({value_text}% p.a. from FY{SENSITIVITY_PT_START_FY})"
     if kind == "freight_rail_shift":
         if level == "Off":
             return "Off (0.0% p.a.)"
@@ -655,6 +656,26 @@ def sensitivity_option_label(kind: str, level: str) -> str:
         heavy = DEMAND_ELASTICITY_LEVELS.get("HEAVY_RUC", {}).get(level, 0.0)
         return f"{level}: PED {ped:.3f} / Light RUC {light:.3f} / Heavy RUC {heavy:.3f}"
     return level
+
+
+def _uncertainty_bands_withheld_for_sensitivity(
+    sensitivity_key: tuple[str, ...],
+) -> bool:
+    """True when the annual 50/80% bands must be withheld for this key.
+
+    Fleet efficiency and PT mode shift are deterministic analyst overlays on
+    the central path. The governed draws and quantile maps describe the
+    BASELINE computation only, and rollup series cannot be re-quantiled under
+    the overlay without component-level draws, so while either lever is
+    non-Off the bands are withheld rather than drawn around a central path
+    they do not describe.
+    """
+    if not sensitivity_key or len(sensitivity_key) < 2:
+        return False
+    return (
+        _normalize_sensitivity_level(sensitivity_key[0]) != "Off"
+        or _normalize_sensitivity_level(sensitivity_key[1]) != "Off"
+    )
 
 
 def _key_float(value: float | int | None) -> str:
@@ -2892,6 +2913,17 @@ def _current_path_coverage_note(rows: pd.DataFrame, selected_series: str) -> str
         "is an absence of a governed Current path, not a forecast of zero."
     )
 
+
+#: Shown when a band selection meets a non-Off Fleet-efficiency or PT lever.
+#: The governed draws and quantile maps describe the BASELINE computation;
+#: rollup series cannot be re-quantiled under a deterministic overlay without
+#: component-level draws, so the bands are withheld rather than drawn around
+#: a central path they do not describe.
+SENSITIVITY_UNCERTAINTY_WITHHELD_NOTE = (
+    "Modelled uncertainty is governed for the baseline computation and is "
+    "withheld for this analyst sensitivity. The 50% and 80% bands return "
+    "when Fleet efficiency and PT mode shift are both Off."
+)
 
 #: Shown when a reader carries a band selection into the quarterly view.
 QUARTERLY_UNCERTAINTY_NOT_GOVERNED_NOTE = (
@@ -6048,9 +6080,11 @@ def _render_lever_accordion(
                 **_widget_default_kwargs("revenue_outlook_sensitivity_pt_mode_shift", index=sensitivity_options.index("Off")),
             )
         with sens_cols[2]:
-            # While method detail is hidden the freight-rail lever is withdrawn
-            # from view and the sensitivity stays at its neutral "Off" level.
-            freight_rail_enabled = method_detail_enabled() and st.toggle(
+            # A first-class governed lever alongside Fleet efficiency and PT
+            # mode shift: it compounds continuously through FY2050 on heavy
+            # RUC activity, so it renders with the other sensitivities rather
+            # than behind the method-detail gate.
+            freight_rail_enabled = st.toggle(
                 "Freight rail shift",
                 key="revenue_outlook_sensitivity_freight_rail_toggle",
                 help=FREIGHT_RAIL_SHIFT_NOTE,
@@ -6866,7 +6900,10 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         # the band layers are withheld at quarterly grain and the reader is
         # told why rather than shown a fabricated interval.
         quarterly_grain = selected_time_grain == "quarterly"
-        if quarterly_grain:
+        sensitivity_bands_withheld = _uncertainty_bands_withheld_for_sensitivity(
+            sensitivity_key
+        )
+        if quarterly_grain or sensitivity_bands_withheld:
             uncertainty_rows = pd.DataFrame()
             band_layers_for_figure: tuple[str, ...] = tuple(
                 layer
@@ -6907,6 +6944,15 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             layer in selected_band_layers for layer in (BAND_50_LAYER_ID, BAND_80_LAYER_ID)
         ):
             total_path_notes.append(QUARTERLY_UNCERTAINTY_NOT_GOVERNED_NOTE)
+        if (
+            sensitivity_bands_withheld
+            and not quarterly_grain
+            and any(
+                layer in selected_band_layers
+                for layer in (BAND_50_LAYER_ID, BAND_80_LAYER_ID)
+            )
+        ):
+            total_path_notes.append(SENSITIVITY_UNCERTAINTY_WITHHELD_NOTE)
         cone_band_for_notes = view.get("cone_band")
         if (
             isinstance(cone_band_for_notes, pd.DataFrame)
@@ -9658,11 +9704,12 @@ def _render_comparison_scenario_column(
     """One comparator column whose keys CLONE the page's typed computation key.
 
     The column's controls override only the dimensions they expose (scenario
-    trace, fleet efficiency, 12c policy and, under method detail, PT/freight/
-    e-RUC); every other field - engine, bridge mode, long-run schedule,
-    official vintage, uptake composition - inherits from the live Single
-    scenario key, so a comparator can never quietly rebuild the scenario
-    from different ingredients than the page itself uses.
+    trace, fleet efficiency, PT mode shift, freight rail shift, 12c policy
+    and, under method detail, e-RUC); every other field - engine, bridge
+    mode, long-run schedule, official vintage, uptake composition - inherits
+    from the live Single scenario key, so a comparator can never quietly
+    rebuild the scenario from different ingredients than the page itself
+    uses.
     """
     defaults = _comparison_scenario_defaults(prefix)
     selected_vid = str(official_vintage_state["vintage_id"])
@@ -9706,20 +9753,18 @@ def _render_comparison_scenario_column(
         "Fleet efficiency", levels, key=keys["fleet"], disabled=mot_official,
         format_func=lambda level: sensitivity_labels["fleet_efficiency"].get(level, str(level)),
     )
-    # PT and freight levers are method detail; while hidden both stay at their
-    # neutral "Off" level regardless of any persisted selection.
-    if method_detail_enabled():
-        pt_shift = st.selectbox(
-            "PT mode shift", levels, key=keys["pt"], disabled=mot_official,
-            format_func=lambda level: sensitivity_labels["pt_mode_shift"].get(level, str(level)),
-        )
-        freight = st.selectbox(
-            "Freight rail shift", levels, key=keys["freight"], disabled=mot_official,
-            format_func=lambda level: sensitivity_labels["freight_rail_shift"].get(level, str(level)),
-        )
-    else:
-        pt_shift = "Off"
-        freight = "Off"
+    # PT and freight are first-class governed levers (continuous through
+    # FY2050), so both render unconditionally; without them Scenario B could
+    # never mirror an A-side PT selection and "Reset B to A" silently
+    # diverged on exactly the lever it claimed to copy.
+    pt_shift = st.selectbox(
+        "PT mode shift", levels, key=keys["pt"], disabled=mot_official,
+        format_func=lambda level: sensitivity_labels["pt_mode_shift"].get(level, str(level)),
+    )
+    freight = st.selectbox(
+        "Freight rail shift", levels, key=keys["freight"], disabled=mot_official,
+        format_func=lambda level: sensitivity_labels["freight_rail_shift"].get(level, str(level)),
+    )
     eruc_values: tuple[float, ...] = ()
     st.session_state.setdefault(keys["eruc"], defaults["eruc"])
     # While method detail is hidden the e-RUC transition is withdrawn from the

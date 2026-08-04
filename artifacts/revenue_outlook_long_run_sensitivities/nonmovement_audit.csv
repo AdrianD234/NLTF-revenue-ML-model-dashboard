@@ -1,0 +1,15 @@
+engine,family,level,guarded_rows,moved_rows,status
+vnext,fleet_efficiency,Low,1774,0,exact_nonmovement
+vnext,fleet_efficiency,Med,1774,0,exact_nonmovement
+vnext,fleet_efficiency,High,1774,0,exact_nonmovement
+vnext,fleet_efficiency,Custom10,1774,0,exact_nonmovement
+vnext,pt_mode_shift,Low,972,0,exact_nonmovement
+vnext,pt_mode_shift,Med,972,0,exact_nonmovement
+vnext,pt_mode_shift,High,972,0,exact_nonmovement
+ar1,fleet_efficiency,Low,1774,0,exact_nonmovement
+ar1,fleet_efficiency,Med,1774,0,exact_nonmovement
+ar1,fleet_efficiency,High,1774,0,exact_nonmovement
+ar1,fleet_efficiency,Custom10,1774,0,exact_nonmovement
+ar1,pt_mode_shift,Low,972,0,exact_nonmovement
+ar1,pt_mode_shift,Med,972,0,exact_nonmovement
+ar1,pt_mode_shift,High,972,0,exact_nonmovement

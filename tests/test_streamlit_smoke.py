@@ -104,9 +104,9 @@ def test_revenue_outlook_sensitivity_labels_show_actual_assumptions() -> None:
     assert app.sensitivity_option_label("fleet_efficiency", "Low") == "Low (0.5% p.a.)"
     assert app.sensitivity_option_label("fleet_efficiency", "Med") == "Med (1.0% p.a.)"
     assert app.sensitivity_option_label("fleet_efficiency", "High") == "High (1.5% p.a.)"
-    assert app.sensitivity_option_label("pt_mode_shift", "Low") == "Low (0.25% p.a. from FY2030)"
-    assert app.sensitivity_option_label("pt_mode_shift", "Med") == "Med (0.5% p.a. from FY2030)"
-    assert app.sensitivity_option_label("pt_mode_shift", "High") == "High (1.0% p.a. from FY2030)"
+    assert app.sensitivity_option_label("pt_mode_shift", "Low") == "Low (0.25% p.a. from FY2026)"
+    assert app.sensitivity_option_label("pt_mode_shift", "Med") == "Med (0.5% p.a. from FY2026)"
+    assert app.sensitivity_option_label("pt_mode_shift", "High") == "High (1.0% p.a. from FY2026)"
     assert app.sensitivity_option_label("freight_rail_shift", "Off") == "Off (0.0% p.a.)"
     assert app.sensitivity_option_label("freight_rail_shift", "Low") == "Low (0.25% p.a. from FY2030)"
     assert app.sensitivity_option_label("freight_rail_shift", "Med") == "Med (0.5% p.a. from FY2030)"
@@ -187,7 +187,7 @@ def test_revenue_outlook_selector_metadata_is_precomputed() -> None:
     assert "FY2031" in selectors["fy_options"]
     assert selectors["stack_fy_bounds"][0] <= 2025 <= selectors["stack_fy_bounds"][1]
     assert selectors["sensitivity_labels"]["fleet_efficiency"]["High"] == "High (1.5% p.a.)"
-    assert selectors["sensitivity_labels"]["pt_mode_shift"]["High"] == "High (1.0% p.a. from FY2030)"
+    assert selectors["sensitivity_labels"]["pt_mode_shift"]["High"] == "High (1.0% p.a. from FY2026)"
     assert selectors["sensitivity_labels"]["freight_rail_shift"]["High"] == "High (1.0% p.a. from FY2030)"
     assert selectors["sensitivity_labels"]["demand_elasticity"]["Med"] == "Med: PED -0.144 / Light RUC -0.120 / Heavy RUC -0.100"
     assert set(CONFLICT_TRACE_NAMES) <= set(selectors["trace_options"])
@@ -1172,9 +1172,11 @@ def test_revenue_outlook_cloud_hides_debug_toggles_and_shows_full_composition(mo
     # default. Both default to off, so neither is constructed unless a reader
     # asks for it. The MoT VFM Fast-Slow range audit is absent because that
     # analyst layer is paused - see REVENUE_OUTLOOK_ENABLE_VFM_ANALYST_LAYERS.
-    # While the method-detail gate is closed, the freight/e-RUC levers and the
-    # two governance detail surfaces are withdrawn with the rest of the
-    # workshop copy; only the presentation control survives.
+    # Freight rail shift is a first-class governed sensitivity (continuous
+    # through FY2050) and renders regardless of the method-detail gate. While
+    # the gate is closed, the e-RUC lever and the two governance detail
+    # surfaces are withdrawn with the rest of the workshop copy; the freight
+    # lever and the presentation control survive.
     expected_toggles = (
         [
             ("Freight rail shift", "revenue_outlook_sensitivity_freight_rail_toggle"),
@@ -1184,7 +1186,10 @@ def test_revenue_outlook_cloud_hides_debug_toggles_and_shows_full_composition(mo
             ("Show modelled-uncertainty audit", "revenue_outlook_show_uncertainty_audit"),
         ]
         if app.method_detail_enabled()
-        else [("Expand chart", "revenue_outlook_expand_chart")]
+        else [
+            ("Freight rail shift", "revenue_outlook_sensitivity_freight_rail_toggle"),
+            ("Expand chart", "revenue_outlook_expand_chart"),
+        ]
     )
     assert [(toggle.label, toggle.key) for toggle in at.toggle] == expected_toggles
     assert not any(toggle.value for toggle in at.toggle[2:]), (
@@ -1325,13 +1330,42 @@ def test_revenue_outlook_compare_mode_swaps_total_path_for_comparison() -> None:
     assert "NPV to FY2050" in rendered
 
 
+def test_revenue_outlook_compare_mode_renders_pt_and_freight_for_scenario_b() -> None:
+    """Scenario B's PT and freight levers render unconditionally.
+
+    Both are first-class governed sensitivities (continuous through FY2050),
+    so they are no longer method-detail workshop copy: an A-side PT selection
+    must be mirrorable in B, and "Reset B to current page (A)" must copy it.
+    """
+    at = _run_revenue_outlook_page()
+    pt = next(
+        s for s in at.selectbox if s.key == "revenue_outlook_sensitivity_pt_mode_shift"
+    )
+    pt.set_value("Med")
+    at.run()
+    assert not at.exception
+    _view_mode_radio(at).set_value(app.REVENUE_OUTLOOK_VIEW_COMPARE)
+    at.run()
+    assert not at.exception
+    selectbox_keys = {s.key for s in at.selectbox}
+    assert "ro_cmp_b_pt" in selectbox_keys
+    assert "ro_cmp_b_freight" in selectbox_keys
+    reset = next(b for b in at.button if b.key == "ro_cmp_reset_b")
+    reset.click()
+    at.run()
+    assert not at.exception
+    b_pt = next(s for s in at.selectbox if s.key == "ro_cmp_b_pt")
+    assert str(b_pt.value) == "Med"
+    b_freight = next(s for s in at.selectbox if s.key == "ro_cmp_b_freight")
+    assert str(b_freight.value) == "Off"
+
+
 def test_revenue_outlook_compare_mode_keeps_lever_state_for_downstream() -> None:
     """A single-view lever survives the compare switch and drives Scenario A.
 
-    The freight toggle this test used to flip is method detail and no longer
-    renders while the gate is closed; fleet efficiency is the lever that stays
-    on screen. Scenario A is the live Single scenario configuration, so the
-    persisted lever must surface in A's summary, then restore on switch-back.
+    Fleet efficiency is the lever this test flips. Scenario A is the live
+    Single scenario configuration, so the persisted lever must surface in
+    A's summary, then restore on switch-back.
     """
     at = _run_revenue_outlook_page()
     fleet = next(

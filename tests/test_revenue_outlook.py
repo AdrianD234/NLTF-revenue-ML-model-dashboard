@@ -37,6 +37,7 @@ from model_dashboard.revenue_outlook import (
     PED_BRIDGE_DEFAULT_MODE,
     PED_EFFICIENCY_BASELINE_SCENARIO_ID,
     REVENUE_OUTLOOK_SCHEMA_VERSION,
+    SENSITIVITY_PT_START_FY,
     SENSITIVITY_SEED_WORKBOOK_SHA256,
     SOURCE_COMPARISON_OUTPUT_DIR_POLICY,
     apply_ped_bridge_mode_layer,
@@ -2272,7 +2273,9 @@ def test_revenue_sensitivity_pt_shift_preserves_ev_phev_shares() -> None:
         audit["source_path"].astype(str).eq("Current finalist Base case")
         & pd.to_numeric(audit["FY"], errors="coerce").eq(LAST_DECISION_GRADE_ANNUAL_FY)
     ].set_index("series_id")
-    expected_factor = (1 - 0.005) ** (LAST_DECISION_GRADE_ANNUAL_FY - 2030 + 1)
+    # Owner contract (2026-08): PT mode shift compounds from the first
+    # forecast year, so FY2030 carries five years of diversion, not one.
+    expected_factor = (1 - 0.005) ** (LAST_DECISION_GRADE_ANNUAL_FY - SENSITIVITY_PT_START_FY + 1)
     for series_id in ["light_petrol_vkt", "light_ruc_net_km", "light_bev_ruc_net_km", "phev_ruc_net_km"]:
         assert rows.loc[series_id, "adjusted"] == pytest.approx(rows.loc[series_id, "baseline"] * expected_factor)
     baseline_total = rows.loc["light_ruc_net_km", "baseline"] + rows.loc["light_bev_ruc_net_km", "baseline"] + rows.loc["phev_ruc_net_km", "baseline"]

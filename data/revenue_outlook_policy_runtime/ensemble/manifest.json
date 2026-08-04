@@ -29,7 +29,7 @@
   "provenance": {
     "builder_version": "1",
     "code_module_hashes": {
-      "app.py": "ef278baa22e5f92a7a83ad33a70a5b7f6e312ea8d3123fddb41daac87bb00df9",
+      "app.py": "02d1b54d666ea9c37e4774c080c2b4d9755ec2516d2e5286818ef300c896d2c2",
       "model_dashboard/__init__.py": "40f18fc5bbc37948a1250097bb55c68711d51d6622248e75efe27cd3580809f8",
       "model_dashboard/completeness_contract.py": "2a5ec576c757b7d4d820a060922dd5c7c7275841dc9734dcb479f9ad49a5c708",
       "model_dashboard/conflict_fuel_paths.py": "cdf9453b4a83ae2230dd4e0d405e96e29350a1b313ce6654d7815c42927c5cce",
@@ -72,7 +72,7 @@
       "model_dashboard/rate_paths.py": "e7bd377166e1f7671fc26f2db2b80e0fbce312a928f7a264037bb94cc3af15b9",
       "model_dashboard/reproducibility_imports.py": "dd2a1000837cc3f96fe557e74e64f0b270b09362225648e1d6aedcfb5a9529ba",
       "model_dashboard/revenue_chart_layers.py": "73abc3584c6a31938a32a7e24cf19e4bbfb1aab6f482bf3683ab4ab427c61c7b",
-      "model_dashboard/revenue_outlook.py": "aaf2f0421b13bb58d1dc8572fb70c13ddf3163c4174fca969b829d66de4c2081",
+      "model_dashboard/revenue_outlook.py": "4b178a33953c16908c5a49ca0e96d19d87e36f61b9752538e5c28228aca9990c",
       "model_dashboard/revenue_outlook_policy_runtime.py": "80acce60c2198a91ae239bd06793c6c94e282e662b53b1f732661eb22423036f",
       "model_dashboard/revenue_outlook_presentation_policy.py": "8144bf675983caadc0096c8e5f0e152c0c13098e4d87e58361c6dc5984fb1f81",
       "model_dashboard/revenue_outlook_replay_cache.py": "6e227558b0478dde66fe00121030e894df3e2273bf9a07aa347bbfd55b9fecfb",
@@ -395,7 +395,7 @@
       "macro.replay_inputs.parquet": "d5bf3b934b245b3f2fdd0e3ce504678e32161e93e49bdee07229c6a39ed28f08",
       "macro.scenario_replay_lineage.parquet": "fca471fd7ec1734286028ef981d78014a3a1f8d3827ab5a9bae3ab9a136ee914"
     },
-    "replay_source_digest": "f8109688ec5bba55b1e9896b1efac3778e878cc2119770d6fe3e06934b25f8e5",
+    "replay_source_digest": "556b6cdaa6172f7f03b6fc61b2fce66cc3504019870d96de297d19c20132f0ad",
     "schema_version": "1",
     "source_hashes": {
       "artifacts/long_horizon_validation/long_horizon_june_year_errors.csv": "e9f7cb0027029c7ece0b1929bf1a7dd88b2a709567d60dffa4bb7ad69999cda6",
@@ -448,8 +448,8 @@
   },
   "row_count": 459525,
   "schema_version": "1",
-  "source_digest": "0d802ed80684f94915195c4286a99d62117ae81727263ec7b9b3016e70f8ea93",
-  "source_main_sha": "d874388e02702d8fe241b708f2306be7df1e4d2a",
+  "source_digest": "49a56c586a5a21347dbb8a1dff427482964b45361cec895dfae72072e7413546",
+  "source_main_sha": "9b417f23f131543593bb0035af2bbb977a783a2e",
   "state_count": 9,
   "states": [
     {

@@ -74,6 +74,9 @@ artifacts/**
 !artifacts/revenue_outlook_instant_runtime/**
 !artifacts/revenue_outlook_policy_runtime/
 !artifacts/revenue_outlook_policy_runtime/**
+# evidence for the FY2050-continuous Fleet efficiency / PT mode shift levers
+!artifacts/revenue_outlook_long_run_sensitivities/
+!artifacts/revenue_outlook_long_run_sensitivities/**
 # integration evidence for the combined workshop release (components A + B + C)
 !artifacts/revenue_outlook_workshop_release/
 !artifacts/revenue_outlook_workshop_release/**
