@@ -86,6 +86,23 @@ and no second implementation.
   old note text) is stale until the next scheduled pack rebuild, which will
   regenerate them from the updated frames. Recorded as a limitation.
 
+## Final CI and the authorised cross-environment gate change
+
+The first clean-clone CI cycle on `b65fff3` failed on exactly two tests of
+1877: `test_replay_cache_matches_reference_exactly[ar1|ensemble]` — the
+cross-environment compiled-cache-vs-live-replay comparison (cache built on
+Windows/py3.13, CI recomputing on Linux/py3.11). Measured drift: max_abs
+6.104e-05 (fuel `future_forecasts.demand_calibrated_delta` and calibration
+closure-ratio columns), exceeding the old `abs_tol=1e-6` gate by 2.1e-06.
+Both replay-parity jobs passed; the same-environment path is byte-exact; the
+repinned caches were byte-identical to the pre-branch build, so the drift is
+runner noise, not a branch change. All four conditions of the handoff's
+section-7 authorisation held, so the CROSS-ENVIRONMENT gate only was moved
+to the presentation tolerance (`_CROSS_ENVIRONMENT_ATOL = 1e-4`, rel 1e-9
+retained); the same-environment serialisation gate, formula closure and all
+accounting tolerances are untouched. The bound's own sanity test now pins
+the observed drift as accepted and larger real changes as still caught.
+
 ## Remaining limitations
 
 1. RESOLVED on this branch (owner decision, 2026-08-04): Scenario B's PT and
