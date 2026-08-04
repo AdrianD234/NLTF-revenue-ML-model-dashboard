@@ -6080,9 +6080,11 @@ def _render_lever_accordion(
                 **_widget_default_kwargs("revenue_outlook_sensitivity_pt_mode_shift", index=sensitivity_options.index("Off")),
             )
         with sens_cols[2]:
-            # While method detail is hidden the freight-rail lever is withdrawn
-            # from view and the sensitivity stays at its neutral "Off" level.
-            freight_rail_enabled = method_detail_enabled() and st.toggle(
+            # A first-class governed lever alongside Fleet efficiency and PT
+            # mode shift: it compounds continuously through FY2050 on heavy
+            # RUC activity, so it renders with the other sensitivities rather
+            # than behind the method-detail gate.
+            freight_rail_enabled = st.toggle(
                 "Freight rail shift",
                 key="revenue_outlook_sensitivity_freight_rail_toggle",
                 help=FREIGHT_RAIL_SHIFT_NOTE,
@@ -9702,11 +9704,12 @@ def _render_comparison_scenario_column(
     """One comparator column whose keys CLONE the page's typed computation key.
 
     The column's controls override only the dimensions they expose (scenario
-    trace, fleet efficiency, 12c policy and, under method detail, PT/freight/
-    e-RUC); every other field - engine, bridge mode, long-run schedule,
-    official vintage, uptake composition - inherits from the live Single
-    scenario key, so a comparator can never quietly rebuild the scenario
-    from different ingredients than the page itself uses.
+    trace, fleet efficiency, PT mode shift, freight rail shift, 12c policy
+    and, under method detail, e-RUC); every other field - engine, bridge
+    mode, long-run schedule, official vintage, uptake composition - inherits
+    from the live Single scenario key, so a comparator can never quietly
+    rebuild the scenario from different ingredients than the page itself
+    uses.
     """
     defaults = _comparison_scenario_defaults(prefix)
     selected_vid = str(official_vintage_state["vintage_id"])
@@ -9750,20 +9753,18 @@ def _render_comparison_scenario_column(
         "Fleet efficiency", levels, key=keys["fleet"], disabled=mot_official,
         format_func=lambda level: sensitivity_labels["fleet_efficiency"].get(level, str(level)),
     )
-    # PT and freight levers are method detail; while hidden both stay at their
-    # neutral "Off" level regardless of any persisted selection.
-    if method_detail_enabled():
-        pt_shift = st.selectbox(
-            "PT mode shift", levels, key=keys["pt"], disabled=mot_official,
-            format_func=lambda level: sensitivity_labels["pt_mode_shift"].get(level, str(level)),
-        )
-        freight = st.selectbox(
-            "Freight rail shift", levels, key=keys["freight"], disabled=mot_official,
-            format_func=lambda level: sensitivity_labels["freight_rail_shift"].get(level, str(level)),
-        )
-    else:
-        pt_shift = "Off"
-        freight = "Off"
+    # PT and freight are first-class governed levers (continuous through
+    # FY2050), so both render unconditionally; without them Scenario B could
+    # never mirror an A-side PT selection and "Reset B to A" silently
+    # diverged on exactly the lever it claimed to copy.
+    pt_shift = st.selectbox(
+        "PT mode shift", levels, key=keys["pt"], disabled=mot_official,
+        format_func=lambda level: sensitivity_labels["pt_mode_shift"].get(level, str(level)),
+    )
+    freight = st.selectbox(
+        "Freight rail shift", levels, key=keys["freight"], disabled=mot_official,
+        format_func=lambda level: sensitivity_labels["freight_rail_shift"].get(level, str(level)),
+    )
     eruc_values: tuple[float, ...] = ()
     st.session_state.setdefault(keys["eruc"], defaults["eruc"])
     # While method detail is hidden the e-RUC transition is withdrawn from the

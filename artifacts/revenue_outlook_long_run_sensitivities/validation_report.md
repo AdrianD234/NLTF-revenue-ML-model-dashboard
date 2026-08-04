@@ -88,9 +88,13 @@ and no second implementation.
 
 ## Remaining limitations
 
-1. Scenario B's PT/freight levers are method-detail-gated and pinned "Off"
-   while hidden (pre-existing lever-trim decision), so an A-side PT selection
-   cannot be mirrored in B under the default presentation.
+1. RESOLVED on this branch (owner decision, 2026-08-04): Scenario B's PT and
+   freight levers now render unconditionally, and the page freight toggle is
+   no longer method-detail-gated — both are first-class governed levers
+   continuous through FY2050. "Reset B to current page (A)" now mirrors an
+   A-side PT selection (pinned by
+   `test_revenue_outlook_compare_mode_renders_pt_and_freight_for_scenario_b`).
+   The e-RUC lever remains method-detail workshop copy.
 2. Pack `sensitivity_config`/`sensitivity_seed_inputs` metadata carries the
    old PT start-year text until the next full pack rebuild (values and
    runtime behaviour are unaffected).
