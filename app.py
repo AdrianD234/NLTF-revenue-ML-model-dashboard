@@ -275,6 +275,11 @@ from model_dashboard.revenue_outlook_presentation_policy import (
 # What a helper will accept: the typed key, or a historic positional tuple from
 # an older cache entry or test. Production builds the typed key directly.
 ScenarioKeyLike = RevenueScenarioComputationKey | tuple
+from model_dashboard.revenue_outlook_excel_extract import (
+    TEMPLATE_RELATIVE_PATH as EXTRACT_TEMPLATE_RELATIVE_PATH,
+    RevenueOutlookExtractError,
+    build_revenue_outlook_extract,
+)
 from model_dashboard.revenue_outlook import (
     CURRENT_REVENUE_OUTLOOK_DIR,
     FAN_SOURCE_AUTO,
@@ -3323,6 +3328,36 @@ def cached_aligned_scenario_detail_frames(
         value_column="component_value",
     )
     return line_reconciliation, formula_residuals, stack_components, bridge_components
+
+
+@st.cache_data(show_spinner=False, max_entries=6)
+def cached_revenue_outlook_extract_bytes(
+    signature: tuple[tuple[str, int, int], ...],
+    sensitivity_key: tuple[str, ...],
+    bridge_mode: str,
+    ev_uptake_key: tuple[Any, ...],
+    traces: tuple[str, ...],
+    _pack: RevenueOutlookPack,
+):
+    """Template-matched XLSX extract bytes for the current page identity.
+
+    Reads the SAME aligned canonical detail frames as the on-page composition
+    and reconciliation tables, so every control - official vintage, Fleet
+    efficiency (including Custom %), PT mode shift, uptake basis, 12c policy
+    state, bridge mode, conflict path - is in the exported numbers, and the
+    committed pack stack supplies the scenario-invariant FY2001-FY2024
+    history columns.
+    """
+    line_reconciliation, _, stack_components, _ = cached_aligned_scenario_detail_frames(
+        signature, sensitivity_key, bridge_mode, ev_uptake_key, _pack
+    )
+    return build_revenue_outlook_extract(
+        selected_traces=traces,
+        line_reconciliation=line_reconciliation,
+        stack_components=stack_components,
+        pack_stack_components=_pack_table(_pack, "revenue_stack_components"),
+        template_path=Path(__file__).resolve().parent / EXTRACT_TEMPLATE_RELATIVE_PATH,
+    )
 
 
 @st.cache_data(show_spinner=False, max_entries=16)
@@ -7033,6 +7068,45 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             container_key=EXPANDED_CHART_CONTAINER_KEY if chart_expanded else None,
         )
         _render_revenue_outlook_vfm_envelope_caption(view)
+
+        # Template-matched forecast extract: mirrors the governed BEFU26
+        # workbook layout (rows 1-65, FY2001-FY2050, row 65 = Total net
+        # revenues) with one worksheet per selected scenario path, built from
+        # the same aligned canonical frames as the tables on this page.
+        try:
+            extract_result = cached_revenue_outlook_extract_bytes(
+                pack_signature,
+                sensitivity_key,
+                selected_ped_bridge_mode,
+                ev_uptake_key,
+                tuple(selected_traces),
+                pack,
+            )
+        except RevenueOutlookExtractError as error:
+            st.caption(f"Forecast extract unavailable: {error}")
+        else:
+            st.download_button(
+                "Download forecast extract XLSX",
+                data=extract_result.workbook_bytes,
+                file_name=(
+                    "revenue_outlook_extract_"
+                    f"{datetime.now(timezone.utc):%Y%m%d}_"
+                    f"{len(extract_result.sheet_names)}_paths.xlsx"
+                ),
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="revenue_outlook_extract_download",
+                help=(
+                    "BEFU26-format extract (rows 1-65, years to FY2050): one "
+                    "worksheet per selected scenario path, reflecting every "
+                    "control currently applied on this page, including Fleet "
+                    "efficiency and PT mode shift."
+                ),
+            )
+            if extract_result.skipped_traces:
+                st.caption(
+                    "Extract skips traces without a governed scenario path: "
+                    + ", ".join(extract_result.skipped_traces)
+                )
 
     if not compare_mode and method_detail_enabled() and st.toggle(
         "Show forecast-uncertainty fan detail",
