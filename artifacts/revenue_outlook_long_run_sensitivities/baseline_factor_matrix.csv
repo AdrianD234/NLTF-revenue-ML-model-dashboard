@@ -1,0 +1,131 @@
+engine,lever,series_id,FY,forecast_segment,baseline,adjusted_effective,ratio,current_code_exponent,owner_contract_expected_factor,audit_row_exists,first_divergent_layer
+vnext,fleet_efficiency_Med,ped_volume,2026,,3063.2842870467116,3032.651444176244,0.9899999999999998,1,0.99,True,
+vnext,fleet_efficiency_Med,ped_volume,2030,,2958.8957603061776,2813.88042674247,0.9509900498999998,5,0.9509900498999999,True,
+vnext,fleet_efficiency_Med,ped_volume,2031,post_model_extrapolation,2951.1112385497568,2951.1112385497568,1.0,6,0.941480149401,False,revenue_sensitivity_impact_audit_frame (no adjusted row: ped bridge litres/rate end FY2030)
+vnext,fleet_efficiency_Med,ped_volume,2040,post_model_extrapolation,2155.604214531386,2155.604214531386,1.0,15,0.8600583546412884,False,revenue_sensitivity_impact_audit_frame (no adjusted row: ped bridge litres/rate end FY2030)
+vnext,fleet_efficiency_Med,ped_volume,2050,post_model_extrapolation,691.7562651185796,691.7562651185796,1.0,25,0.7778213593991467,False,revenue_sensitivity_impact_audit_frame (no adjusted row: ped bridge litres/rate end FY2030)
+vnext,fleet_efficiency_Med,gross_ped_revenue,2026,,2145.0341891615885,2123.583847269972,0.9899999999999997,1,0.99,True,
+vnext,fleet_efficiency_Med,gross_ped_revenue,2030,,2781.6793512770555,2645.3493850767663,0.9509900498999999,5,0.9509900498999999,True,
+vnext,fleet_efficiency_Med,gross_ped_revenue,2031,post_model_extrapolation,2892.4608377320124,2892.4608377320124,1.0,6,0.941480149401,False,revenue_sensitivity_impact_audit_frame (no adjusted row: ped bridge litres/rate end FY2030)
+vnext,fleet_efficiency_Med,gross_ped_revenue,2040,post_model_extrapolation,2888.321837394025,2888.321837394025,1.0,15,0.8600583546412884,False,revenue_sensitivity_impact_audit_frame (no adjusted row: ped bridge litres/rate end FY2030)
+vnext,fleet_efficiency_Med,gross_ped_revenue,2050,post_model_extrapolation,1203.4991142835852,1203.4991142835852,1.0,25,0.7778213593991467,False,revenue_sensitivity_impact_audit_frame (no adjusted row: ped bridge litres/rate end FY2030)
+vnext,fleet_efficiency_Med,light_petrol_vkt,2026,,33077.40799863644,33077.40799863644,1.0,1,,True,
+vnext,fleet_efficiency_Med,light_petrol_vkt,2030,,33786.86651454969,33786.86651454969,1.0,5,,True,
+vnext,fleet_efficiency_Med,light_petrol_vkt,2031,post_model_extrapolation,34036.47205467476,34036.47205467476,1.0,6,,True,
+vnext,fleet_efficiency_Med,light_petrol_vkt,2040,post_model_extrapolation,27333.1879552974,27333.1879552974,1.0,15,,True,
+vnext,fleet_efficiency_Med,light_petrol_vkt,2050,post_model_extrapolation,9860.981003271809,9860.981003271809,1.0,25,,True,
+vnext,fleet_efficiency_Med,total_nltf_net_revenue,2026,,4599.805745017675,4578.355403126058,0.9953366852687527,1,,True,
+vnext,fleet_efficiency_Med,total_nltf_net_revenue,2030,,6415.09982192275,6278.769855722461,0.9787485822536386,5,,True,
+vnext,fleet_efficiency_Med,total_nltf_net_revenue,2031,post_model_extrapolation,6742.399475216947,6742.399475216947,1.0,6,,True,
+vnext,fleet_efficiency_Med,total_nltf_net_revenue,2040,post_model_extrapolation,9443.274222917991,9443.274222917991,1.0,15,,True,
+vnext,fleet_efficiency_Med,total_nltf_net_revenue,2050,post_model_extrapolation,12820.212970325007,12820.212970325007,1.0,25,,True,
+vnext,fleet_efficiency_Custom10,ped_volume,2026,,3063.2842870467116,2756.9558583420403,0.8999999999999999,1,0.9,True,
+vnext,fleet_efficiency_Custom10,ped_volume,2030,,2958.8957603061776,1747.198357503195,0.5904900000000001,5,0.5904900000000001,True,
+vnext,fleet_efficiency_Custom10,ped_volume,2031,post_model_extrapolation,2951.1112385497568,2951.1112385497568,1.0,6,0.531441,False,revenue_sensitivity_impact_audit_frame (no adjusted row: ped bridge litres/rate end FY2030)
+vnext,fleet_efficiency_Custom10,ped_volume,2040,post_model_extrapolation,2155.604214531386,2155.604214531386,1.0,15,0.20589113209464907,False,revenue_sensitivity_impact_audit_frame (no adjusted row: ped bridge litres/rate end FY2030)
+vnext,fleet_efficiency_Custom10,ped_volume,2050,post_model_extrapolation,691.7562651185796,691.7562651185796,1.0,25,0.0717897987691853,False,revenue_sensitivity_impact_audit_frame (no adjusted row: ped bridge litres/rate end FY2030)
+vnext,fleet_efficiency_Custom10,gross_ped_revenue,2026,,2145.0341891615885,1930.5307702454297,0.9,1,0.9,True,
+vnext,fleet_efficiency_Custom10,gross_ped_revenue,2030,,2781.6793512770555,1642.5538401355886,0.5904900000000001,5,0.5904900000000001,True,
+vnext,fleet_efficiency_Custom10,gross_ped_revenue,2031,post_model_extrapolation,2892.4608377320124,2892.4608377320124,1.0,6,0.531441,False,revenue_sensitivity_impact_audit_frame (no adjusted row: ped bridge litres/rate end FY2030)
+vnext,fleet_efficiency_Custom10,gross_ped_revenue,2040,post_model_extrapolation,2888.321837394025,2888.321837394025,1.0,15,0.20589113209464907,False,revenue_sensitivity_impact_audit_frame (no adjusted row: ped bridge litres/rate end FY2030)
+vnext,fleet_efficiency_Custom10,gross_ped_revenue,2050,post_model_extrapolation,1203.4991142835852,1203.4991142835852,1.0,25,0.0717897987691853,False,revenue_sensitivity_impact_audit_frame (no adjusted row: ped bridge litres/rate end FY2030)
+vnext,fleet_efficiency_Custom10,light_petrol_vkt,2026,,33077.40799863644,33077.40799863644,1.0,1,,True,
+vnext,fleet_efficiency_Custom10,light_petrol_vkt,2030,,33786.86651454969,33786.86651454969,1.0,5,,True,
+vnext,fleet_efficiency_Custom10,light_petrol_vkt,2031,post_model_extrapolation,34036.47205467476,34036.47205467476,1.0,6,,True,
+vnext,fleet_efficiency_Custom10,light_petrol_vkt,2040,post_model_extrapolation,27333.1879552974,27333.1879552974,1.0,15,,True,
+vnext,fleet_efficiency_Custom10,light_petrol_vkt,2050,post_model_extrapolation,9860.981003271809,9860.981003271809,1.0,25,,True,
+vnext,fleet_efficiency_Custom10,total_nltf_net_revenue,2026,,4599.805745017675,4385.302326101516,0.9533668526875292,1,,True,
+vnext,fleet_efficiency_Custom10,total_nltf_net_revenue,2030,,6415.09982192275,5275.974310781284,0.8224305867776747,5,,True,
+vnext,fleet_efficiency_Custom10,total_nltf_net_revenue,2031,post_model_extrapolation,6742.399475216947,6742.399475216947,1.0,6,,True,
+vnext,fleet_efficiency_Custom10,total_nltf_net_revenue,2040,post_model_extrapolation,9443.274222917991,9443.274222917991,1.0,15,,True,
+vnext,fleet_efficiency_Custom10,total_nltf_net_revenue,2050,post_model_extrapolation,12820.212970325007,12820.212970325007,1.0,25,,True,
+vnext,pt_mode_shift_Med,light_petrol_vkt,2026,,33077.40799863644,33077.40799863644,1.0,0,0.995,True,
+vnext,pt_mode_shift_Med,light_petrol_vkt,2030,,33786.86651454969,33617.93218197695,0.9950000000000001,1,0.975248753121875,True,
+vnext,pt_mode_shift_Med,light_petrol_vkt,2031,post_model_extrapolation,34036.47205467476,33696.95824592938,0.9900249999999999,2,0.9703725093562656,True,
+vnext,pt_mode_shift_Med,light_petrol_vkt,2040,post_model_extrapolation,27333.1879552974,25866.887602397328,0.9463545798134428,11,0.9275689688183278,True,
+vnext,pt_mode_shift_Med,light_petrol_vkt,2050,post_model_extrapolation,9860.981003271809,8875.745027541849,0.9000874278732446,21,0.8822202429488012,True,
+vnext,pt_mode_shift_Med,light_ruc_net_km,2026,,12805.016492073193,12805.016492073193,1.0,0,0.995,True,
+vnext,pt_mode_shift_Med,light_ruc_net_km,2030,,14129.750867690174,14059.102113351724,0.9950000000000001,1,0.975248753121875,True,
+vnext,pt_mode_shift_Med,light_ruc_net_km,2031,post_model_extrapolation,13975.040162956282,13835.639137330794,0.990025,2,0.9703725093562656,True,
+vnext,pt_mode_shift_Med,light_ruc_net_km,2040,post_model_extrapolation,10324.17350200051,9770.328876406775,0.946354579813443,11,0.9275689688183278,True,
+vnext,pt_mode_shift_Med,light_ruc_net_km,2050,post_model_extrapolation,6027.296699807985,5425.093983559063,0.9000874278732444,21,0.8822202429488012,True,
+vnext,pt_mode_shift_Med,ped_volume,2026,,3063.2842870467116,3063.2842870467116,1.0,0,0.995,True,
+vnext,pt_mode_shift_Med,ped_volume,2030,,2958.8957603061776,2944.101281504647,0.9950000000000001,1,0.975248753121875,True,
+vnext,pt_mode_shift_Med,ped_volume,2031,post_model_extrapolation,2951.1112385497568,2951.1112385497568,1.0,2,0.9703725093562656,False,revenue_sensitivity_impact_audit_frame (no adjusted row: ped bridge litres/rate end FY2030)
+vnext,pt_mode_shift_Med,ped_volume,2040,post_model_extrapolation,2155.604214531386,2155.604214531386,1.0,11,0.9275689688183278,False,revenue_sensitivity_impact_audit_frame (no adjusted row: ped bridge litres/rate end FY2030)
+vnext,pt_mode_shift_Med,ped_volume,2050,post_model_extrapolation,691.7562651185796,691.7562651185796,1.0,21,0.8822202429488012,False,revenue_sensitivity_impact_audit_frame (no adjusted row: ped bridge litres/rate end FY2030)
+vnext,pt_mode_shift_Med,ped_vkt_per_capita,2026,,6169.513389534369,6169.513389534369,1.0,0,0.995,True,
+vnext,pt_mode_shift_Med,ped_vkt_per_capita,2030,,6114.208933600386,6083.637888932384,0.995,1,0.975248753121875,True,
+vnext,pt_mode_shift_Med,ped_vkt_per_capita,2031,post_model_extrapolation,6112.185789710109,6051.216736457751,0.990025,2,0.9703725093562656,True,
+vnext,pt_mode_shift_Med,ped_vkt_per_capita,2040,post_model_extrapolation,4629.980213632921,4381.602979617138,0.946354579813443,11,0.9275689688183278,True,
+vnext,pt_mode_shift_Med,ped_vkt_per_capita,2050,post_model_extrapolation,1579.8297215991793,1421.9848705919092,0.9000874278732445,21,0.8822202429488012,True,
+vnext,pt_mode_shift_Med,total_nltf_net_revenue,2026,,4599.805745017675,4599.805745017675,1.0,0,,True,
+vnext,pt_mode_shift_Med,total_nltf_net_revenue,2030,,6415.09982192275,6392.930328446668,0.9965441701467651,1,,True,
+vnext,pt_mode_shift_Med,total_nltf_net_revenue,2031,post_model_extrapolation,6742.399475216947,6724.578424704993,0.9973568681924797,2,,True,
+vnext,pt_mode_shift_Med,total_nltf_net_revenue,2040,post_model_extrapolation,9443.274222917991,9237.17933716724,0.9781754843833108,11,,True,
+vnext,pt_mode_shift_Med,total_nltf_net_revenue,2050,post_model_extrapolation,12820.212970325007,12008.078082081222,0.9366519971139609,21,,True,
+ar1,fleet_efficiency_Med,ped_volume,2026,,3050.766227644052,3020.2585653676115,0.99,1,0.99,True,
+ar1,fleet_efficiency_Med,ped_volume,2030,,2840.934708355387,2701.7006400615314,0.9509900498999999,5,0.9509900498999999,True,
+ar1,fleet_efficiency_Med,ped_volume,2031,post_model_extrapolation,2823.1738268321046,2823.1738268321046,1.0,6,0.941480149401,False,revenue_sensitivity_impact_audit_frame (no adjusted row: ped bridge litres/rate end FY2030)
+ar1,fleet_efficiency_Med,ped_volume,2040,post_model_extrapolation,2049.4374373331057,2049.4374373331057,1.0,15,0.8600583546412884,False,revenue_sensitivity_impact_audit_frame (no adjusted row: ped bridge litres/rate end FY2030)
+ar1,fleet_efficiency_Med,ped_volume,2050,post_model_extrapolation,664.1783092400348,664.1783092400348,1.0,25,0.7778213593991467,False,revenue_sensitivity_impact_audit_frame (no adjusted row: ped bridge litres/rate end FY2030)
+ar1,fleet_efficiency_Med,gross_ped_revenue,2026,,2136.26854324547,2114.9058578130157,0.9900000000000002,1,0.99,True,
+ar1,fleet_efficiency_Med,gross_ped_revenue,2030,,2670.7833113190677,2539.8883545034073,0.9509900498999999,5,0.9509900498999999,True,
+ar1,fleet_efficiency_Med,gross_ped_revenue,2031,post_model_extrapolation,2767.066054831196,2767.066054831196,1.0,6,0.941480149401,False,revenue_sensitivity_impact_audit_frame (no adjusted row: ped bridge litres/rate end FY2030)
+ar1,fleet_efficiency_Med,gross_ped_revenue,2040,post_model_extrapolation,2746.067605879544,2746.067605879544,1.0,15,0.8600583546412884,False,revenue_sensitivity_impact_audit_frame (no adjusted row: ped bridge litres/rate end FY2030)
+ar1,fleet_efficiency_Med,gross_ped_revenue,2050,post_model_extrapolation,1155.5197216171653,1155.5197216171653,1.0,25,0.7778213593991467,False,revenue_sensitivity_impact_audit_frame (no adjusted row: ped bridge litres/rate end FY2030)
+ar1,fleet_efficiency_Med,light_petrol_vkt,2026,,32942.237730580084,32942.237730580084,1.0,1,,True,
+ar1,fleet_efficiency_Med,light_petrol_vkt,2030,,32439.89972726253,32439.89972726253,1.0,5,,True,
+ar1,fleet_efficiency_Med,light_petrol_vkt,2031,post_model_extrapolation,32560.913261162386,32560.913261162386,1.0,6,,True,
+ar1,fleet_efficiency_Med,light_petrol_vkt,2040,post_model_extrapolation,25986.986989365614,25986.986989365614,1.0,15,,True,
+ar1,fleet_efficiency_Med,light_petrol_vkt,2050,post_model_extrapolation,9467.857423855028,9467.857423855028,1.0,25,,True,
+ar1,fleet_efficiency_Med,total_nltf_net_revenue,2026,,4591.040099101557,4569.677413669102,0.9953468745706152,1,,True,
+ar1,fleet_efficiency_Med,total_nltf_net_revenue,2030,,6304.203781964763,6173.308825149103,0.9792368772738393,5,,True,
+ar1,fleet_efficiency_Med,total_nltf_net_revenue,2031,post_model_extrapolation,6617.004692316132,6617.004692316132,1.0,6,,True,
+ar1,fleet_efficiency_Med,total_nltf_net_revenue,2040,post_model_extrapolation,9301.01999140351,9301.01999140351,1.0,15,,True,
+ar1,fleet_efficiency_Med,total_nltf_net_revenue,2050,post_model_extrapolation,12772.233577658586,12772.233577658586,1.0,25,,True,
+ar1,fleet_efficiency_Custom10,ped_volume,2026,,3050.766227644052,2745.6896048796475,0.9000000000000002,1,0.9,True,
+ar1,fleet_efficiency_Custom10,ped_volume,2030,,2840.934708355387,1677.5435359367727,0.5904900000000001,5,0.5904900000000001,True,
+ar1,fleet_efficiency_Custom10,ped_volume,2031,post_model_extrapolation,2823.1738268321046,2823.1738268321046,1.0,6,0.531441,False,revenue_sensitivity_impact_audit_frame (no adjusted row: ped bridge litres/rate end FY2030)
+ar1,fleet_efficiency_Custom10,ped_volume,2040,post_model_extrapolation,2049.4374373331057,2049.4374373331057,1.0,15,0.20589113209464907,False,revenue_sensitivity_impact_audit_frame (no adjusted row: ped bridge litres/rate end FY2030)
+ar1,fleet_efficiency_Custom10,ped_volume,2050,post_model_extrapolation,664.1783092400348,664.1783092400348,1.0,25,0.0717897987691853,False,revenue_sensitivity_impact_audit_frame (no adjusted row: ped bridge litres/rate end FY2030)
+ar1,fleet_efficiency_Custom10,gross_ped_revenue,2026,,2136.26854324547,1922.6416889209238,0.9000000000000004,1,0.9,True,
+ar1,fleet_efficiency_Custom10,gross_ped_revenue,2030,,2670.7833113190677,1577.0708375007966,0.5904900000000002,5,0.5904900000000001,True,
+ar1,fleet_efficiency_Custom10,gross_ped_revenue,2031,post_model_extrapolation,2767.066054831196,2767.066054831196,1.0,6,0.531441,False,revenue_sensitivity_impact_audit_frame (no adjusted row: ped bridge litres/rate end FY2030)
+ar1,fleet_efficiency_Custom10,gross_ped_revenue,2040,post_model_extrapolation,2746.067605879544,2746.067605879544,1.0,15,0.20589113209464907,False,revenue_sensitivity_impact_audit_frame (no adjusted row: ped bridge litres/rate end FY2030)
+ar1,fleet_efficiency_Custom10,gross_ped_revenue,2050,post_model_extrapolation,1155.5197216171653,1155.5197216171653,1.0,25,0.0717897987691853,False,revenue_sensitivity_impact_audit_frame (no adjusted row: ped bridge litres/rate end FY2030)
+ar1,fleet_efficiency_Custom10,light_petrol_vkt,2026,,32942.237730580084,32942.237730580084,1.0,1,,True,
+ar1,fleet_efficiency_Custom10,light_petrol_vkt,2030,,32439.89972726253,32439.89972726253,1.0,5,,True,
+ar1,fleet_efficiency_Custom10,light_petrol_vkt,2031,post_model_extrapolation,32560.913261162386,32560.913261162386,1.0,6,,True,
+ar1,fleet_efficiency_Custom10,light_petrol_vkt,2040,post_model_extrapolation,25986.986989365614,25986.986989365614,1.0,15,,True,
+ar1,fleet_efficiency_Custom10,light_petrol_vkt,2050,post_model_extrapolation,9467.857423855028,9467.857423855028,1.0,25,,True,
+ar1,fleet_efficiency_Custom10,total_nltf_net_revenue,2026,,4591.040099101557,4377.413244777011,0.9534687457061524,1,,True,
+ar1,fleet_efficiency_Custom10,total_nltf_net_revenue,2030,,6304.203781964763,5210.491308146492,0.8265106091672999,5,,True,
+ar1,fleet_efficiency_Custom10,total_nltf_net_revenue,2031,post_model_extrapolation,6617.004692316132,6617.004692316132,1.0,6,,True,
+ar1,fleet_efficiency_Custom10,total_nltf_net_revenue,2040,post_model_extrapolation,9301.01999140351,9301.01999140351,1.0,15,,True,
+ar1,fleet_efficiency_Custom10,total_nltf_net_revenue,2050,post_model_extrapolation,12772.233577658586,12772.233577658586,1.0,25,,True,
+ar1,pt_mode_shift_Med,light_petrol_vkt,2026,,32942.237730580084,32942.237730580084,1.0,0,0.995,True,
+ar1,pt_mode_shift_Med,light_petrol_vkt,2030,,32439.89972726253,32277.700228626218,0.995,1,0.975248753121875,True,
+ar1,pt_mode_shift_Med,light_petrol_vkt,2031,post_model_extrapolation,32560.913261162386,32236.118151382292,0.990025,2,0.9703725093562656,True,
+ar1,pt_mode_shift_Med,light_petrol_vkt,2040,post_model_extrapolation,25986.986989365614,24592.904152938503,0.9463545798134428,11,0.9275689688183278,True,
+ar1,pt_mode_shift_Med,light_petrol_vkt,2050,post_model_extrapolation,9467.857423855028,8521.899436108275,0.9000874278732445,21,0.8822202429488012,True,
+ar1,pt_mode_shift_Med,light_ruc_net_km,2026,,12805.016492073193,12805.016492073193,1.0,0,0.995,True,
+ar1,pt_mode_shift_Med,light_ruc_net_km,2030,,14129.750867690174,14059.102113351724,0.9950000000000001,1,0.975248753121875,True,
+ar1,pt_mode_shift_Med,light_ruc_net_km,2031,post_model_extrapolation,13975.040162956282,13835.639137330794,0.990025,2,0.9703725093562656,True,
+ar1,pt_mode_shift_Med,light_ruc_net_km,2040,post_model_extrapolation,10324.17350200051,9770.328876406775,0.946354579813443,11,0.9275689688183278,True,
+ar1,pt_mode_shift_Med,light_ruc_net_km,2050,post_model_extrapolation,6027.296699807985,5425.093983559063,0.9000874278732444,21,0.8822202429488012,True,
+ar1,pt_mode_shift_Med,ped_volume,2026,,3050.766227644052,3050.766227644052,1.0,0,0.995,True,
+ar1,pt_mode_shift_Med,ped_volume,2030,,2840.934708355387,2826.7300348136105,0.9950000000000001,1,0.975248753121875,True,
+ar1,pt_mode_shift_Med,ped_volume,2031,post_model_extrapolation,2823.1738268321046,2823.1738268321046,1.0,2,0.9703725093562656,False,revenue_sensitivity_impact_audit_frame (no adjusted row: ped bridge litres/rate end FY2030)
+ar1,pt_mode_shift_Med,ped_volume,2040,post_model_extrapolation,2049.4374373331057,2049.4374373331057,1.0,11,0.9275689688183278,False,revenue_sensitivity_impact_audit_frame (no adjusted row: ped bridge litres/rate end FY2030)
+ar1,pt_mode_shift_Med,ped_volume,2050,post_model_extrapolation,664.1783092400348,664.1783092400348,1.0,21,0.8822202429488012,False,revenue_sensitivity_impact_audit_frame (no adjusted row: ped bridge litres/rate end FY2030)
+ar1,pt_mode_shift_Med,ped_vkt_per_capita,2026,,6144.321779043229,6144.321779043229,1.0,0,0.995,True,
+ar1,pt_mode_shift_Med,ped_vkt_per_capita,2030,,5870.472750433319,5841.120386681152,0.995,1,0.975248753121875,True,
+ar1,pt_mode_shift_Med,ped_vkt_per_capita,2031,post_model_extrapolation,5847.236902159696,5788.910714060653,0.9900249999999999,2,0.9703725093562656,True,
+ar1,pt_mode_shift_Med,ped_vkt_per_capita,2040,post_model_extrapolation,4401.96083564807,4165.815796974962,0.946354579813443,11,0.9275689688183278,True,
+ar1,pt_mode_shift_Med,ped_vkt_per_capita,2050,post_model_extrapolation,1516.8515177033519,1365.2989810352371,0.9000874278732445,21,0.8822202429488012,True,
+ar1,pt_mode_shift_Med,total_nltf_net_revenue,2026,,4591.040099101557,4591.040099101557,1.0,0,,True,
+ar1,pt_mode_shift_Med,total_nltf_net_revenue,2030,,6304.203781964763,6282.588768688471,0.9965713333477371,1,,True,
+ar1,pt_mode_shift_Med,total_nltf_net_revenue,2031,post_model_extrapolation,6617.004692316132,6599.183641804178,0.9973067798285457,2,,True,
+ar1,pt_mode_shift_Med,total_nltf_net_revenue,2040,post_model_extrapolation,9301.01999140351,9094.925105652757,0.9778416898424865,11,,True,
+ar1,pt_mode_shift_Med,total_nltf_net_revenue,2050,post_model_extrapolation,12772.233577658586,11960.0986894148,0.9364140278749375,21,,True,

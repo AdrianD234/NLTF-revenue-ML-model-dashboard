@@ -1,0 +1,26 @@
+{
+  "task": "fleet_efficiency_and_pt_mode_shift_through_fy2050",
+  "starting_sha": "10f4e36edb9c769eaf33b81fc6388af059f261db",
+  "base_origin_main_sha": "10f4e36edb9c769eaf33b81fc6388af059f261db",
+  "branch": "fix/revenue-outlook-fleet-pt-through-2050",
+  "worktree": "fleet-efficiency-worktree-7499d9 (session worktree, isolated checkout)",
+  "packs_inspected": [
+    "data/current_revenue_outlook",
+    "data/engine_ar1/current_revenue_outlook"
+  ],
+  "governed_constants": {
+    "REVENUE_FIRST_FORECAST_FY": 2026,
+    "SENSITIVITY_FLEET_START_FY": 2026,
+    "SENSITIVITY_PT_START_FY_current": 2030,
+    "FLEET_EFFICIENCY_LEVELS": {
+      "Low": 0.005,
+      "Med": 0.01,
+      "High": 0.015
+    },
+    "PT_MODE_SHIFT_LEVELS": {
+      "Low": 0.0025,
+      "Med": 0.005,
+      "High": 0.01
+    }
+  }
+}

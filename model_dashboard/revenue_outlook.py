@@ -378,7 +378,9 @@ DEMAND_ELASTICITY_LEVELS = {
     "HEAVY_RUC": {"Low": -0.050, "Med": -0.100, "High": -0.200},
 }
 SENSITIVITY_FLEET_START_FY = REVENUE_FIRST_FORECAST_FY
-SENSITIVITY_PT_START_FY = 2030
+# Owner decision (2026-08): PT mode shift diverts light travel from the first
+# forecast year, the same start as Fleet efficiency, not only from FY2030.
+SENSITIVITY_PT_START_FY = REVENUE_FIRST_FORECAST_FY
 SENSITIVITY_FREIGHT_START_FY = 2030
 SENSITIVITY_LIGHT_ACTIVITY_SERIES = {
     "light_petrol_vkt",
@@ -3455,7 +3457,7 @@ def sensitivity_seed_inputs_frame() -> pd.DataFrame:
             level,
             value,
             "fraction p.a.",
-            "Applied to adjusted PED/light-petrol VKT from FY2030.",
+            f"Applied to adjusted PED/light-petrol VKT from FY{SENSITIVITY_PT_START_FY}.",
         )
     for level, cell, value in [("Low", "C213", 0.0025), ("Med", "D213", 0.005), ("High", "E213", 0.010)]:
         for stream in ["LIGHT_RUC", "LIGHT_BEV", "PHEV"]:
@@ -3779,6 +3781,15 @@ def revenue_sensitivity_impact_audit_frame(
         "gap_reason",
         "status",
         "notes",
+        "forecast_segment",
+        "fleet_exponent",
+        "fleet_factor",
+        "pt_exponent",
+        "freight_exponent",
+        "base_litres_per_100km",
+        "adjusted_litres_per_100km",
+        "ped_rate_nzd_per_litre",
+        "computation_key",
     ]
     if line_reconciliation is None or line_reconciliation.empty:
         return pd.DataFrame(columns=columns)
@@ -3859,13 +3870,35 @@ def revenue_sensitivity_impact_audit_frame(
         ped_bridge = ped_record.iloc[0].to_dict() if not ped_record.empty else {}
         base_litres = _finite_float(ped_bridge.get("base_litres_per_100km"), np.nan)
         ped_rate = _finite_float(ped_bridge.get("ped_rate_nzd_per_litre"), np.nan)
+        # The PED bridge audit is governed only over the econometric segment
+        # (FY2026-FY2030). Post-model years derive the SAME scenario-specific,
+        # pre-sensitivity baseline from this FY's own line rows, so the lever
+        # stays continuous through FY2050 instead of silently ending with the
+        # bridge:  intensity = 100 * PED volume / light-petrol VKT, and the
+        # effective PED rate = gross PED revenue / PED volume.
+        litres_from_bridge = np.isfinite(base_litres)
+        rate_from_bridge = np.isfinite(ped_rate)
+        if not litres_from_bridge:
+            line_ped_volume = value("ped_volume")
+            line_light_petrol = value("light_petrol_vkt")
+            if np.isfinite(line_ped_volume) and np.isfinite(line_light_petrol) and abs(line_light_petrol) > 1e-12:
+                base_litres = 100.0 * line_ped_volume / line_light_petrol
+        if not rate_from_bridge:
+            line_ped_volume = value("ped_volume")
+            line_ped_revenue = value("gross_ped_revenue")
+            if np.isfinite(line_ped_revenue) and np.isfinite(line_ped_volume) and abs(line_ped_volume) > 1e-12:
+                ped_rate = line_ped_revenue / line_ped_volume
 
+        segment_values = group.get("forecast_segment")
+        forecast_segment = (
+            str(segment_values.iloc[0]) if segment_values is not None and len(segment_values) else ""
+        )
         pt_exponent = max(fy - SENSITIVITY_PT_START_FY + 1, 0)
-        pt_factor = float(np.power(max(1.0 - max(pt_shift, 0.0), 0.0), pt_exponent))
+        pt_factor = _cumulative_sensitivity_factor(pt_shift, pt_exponent)
         freight_exponent = max(fy - SENSITIVITY_FREIGHT_START_FY + 1, 0)
-        freight_factor = float(np.power(max(1.0 - max(freight_shift, 0.0), 0.0), freight_exponent))
+        freight_factor = _cumulative_sensitivity_factor(freight_shift, freight_exponent)
         fleet_exponent = max(fy - SENSITIVITY_FLEET_START_FY + 1, 0)
-        litres_multiplier = float(np.power(max(1.0 - max(eff_gain, 0.0), 0.0), fleet_exponent))
+        litres_multiplier = _cumulative_sensitivity_factor(eff_gain, fleet_exponent)
 
         petrol_elasticity = _sensitivity_config_value(
             config,
@@ -3900,8 +3933,30 @@ def revenue_sensitivity_impact_audit_frame(
         baseline_light_petrol = value("light_petrol_vkt")
         adjusted_light_petrol = baseline_light_petrol * ped_activity_factor if np.isfinite(baseline_light_petrol) else np.nan
         adjusted_litres = base_litres * litres_multiplier if np.isfinite(base_litres) else np.nan
-        adjusted_ped_volume = adjusted_light_petrol * adjusted_litres / 100.0 if np.isfinite(adjusted_light_petrol) and np.isfinite(adjusted_litres) else np.nan
-        adjusted_ped_revenue = adjusted_ped_volume * ped_rate if np.isfinite(adjusted_ped_volume) and np.isfinite(ped_rate) else np.nan
+        if litres_from_bridge:
+            adjusted_ped_volume = adjusted_light_petrol * adjusted_litres / 100.0 if np.isfinite(adjusted_light_petrol) and np.isfinite(adjusted_litres) else np.nan
+        else:
+            # Post-model years: apply the proportional factors directly to
+            # this FY's own baseline. Reconstructing through the derived
+            # intensity (vkt * (100*v/vkt) / 100) leaves 1-ulp residue, which
+            # would break the EXACT Off-equals-baseline and unaffected-series
+            # contracts; the direct product is bit-exact when every factor is
+            # 1.0 and yields the exact factor ratio otherwise.
+            baseline_ped_volume = value("ped_volume")
+            adjusted_ped_volume = (
+                baseline_ped_volume * ped_activity_factor * litres_multiplier
+                if np.isfinite(baseline_ped_volume)
+                else np.nan
+            )
+        if rate_from_bridge:
+            adjusted_ped_revenue = adjusted_ped_volume * ped_rate if np.isfinite(adjusted_ped_volume) and np.isfinite(ped_rate) else np.nan
+        else:
+            baseline_ped_revenue = value("gross_ped_revenue")
+            adjusted_ped_revenue = (
+                baseline_ped_revenue * ped_activity_factor * litres_multiplier
+                if np.isfinite(baseline_ped_revenue)
+                else np.nan
+            )
 
         adjusted: dict[str, float] = {}
         adjusted["light_petrol_vkt"] = adjusted_light_petrol
@@ -3981,6 +4036,21 @@ def revenue_sensitivity_impact_audit_frame(
                     "gap_reason": demand_gap,
                     "status": "gap_no_demand_overlay" if demand_gap else "adjusted",
                     "notes": SENSITIVITY_DEFAULT_NOTE,
+                    "forecast_segment": forecast_segment,
+                    "fleet_exponent": fleet_exponent,
+                    "fleet_factor": litres_multiplier,
+                    "pt_exponent": pt_exponent,
+                    "freight_exponent": freight_exponent,
+                    "base_litres_per_100km": base_litres,
+                    "adjusted_litres_per_100km": adjusted_litres,
+                    "ped_rate_nzd_per_litre": ped_rate,
+                    "computation_key": (
+                        f"fleet={fleet_selection}:{eff_gain}"
+                        f"|pt={pt_selection}:{pt_shift}"
+                        f"|freight={freight_selection}:{freight_shift}"
+                        f"|demand={demand_selection}"
+                        f"|fy={fy}"
+                    ),
                 }
             )
 
@@ -4251,6 +4321,21 @@ def _apply_sensitivity_audit_to_frame(
     if ped_positions:
         out.iloc[ped_positions, out.columns.get_loc("ped_efficiency_label")] = ped_labels
     return out.drop(columns=["_sensitivity_fy"], errors="ignore")
+
+
+def _cumulative_sensitivity_factor(rate: float, exponent: int) -> float:
+    """(1 - rate)^exponent via exp(n * log1p(-rate)).
+
+    Numerically stable for small annual rates compounded over the FY2050
+    horizon, exact 1.0 at exponent 0, and 0.0 once the rate reaches 100%
+    (where log1p is undefined and the power form would still collapse to 0).
+    """
+    if exponent <= 0:
+        return 1.0
+    rate = max(float(rate), 0.0)
+    if rate >= 1.0:
+        return 0.0
+    return float(np.exp(exponent * np.log1p(-rate)))
 
 
 def _normalize_sensitivity_selection(value: Any) -> str:

@@ -104,9 +104,9 @@ def test_revenue_outlook_sensitivity_labels_show_actual_assumptions() -> None:
     assert app.sensitivity_option_label("fleet_efficiency", "Low") == "Low (0.5% p.a.)"
     assert app.sensitivity_option_label("fleet_efficiency", "Med") == "Med (1.0% p.a.)"
     assert app.sensitivity_option_label("fleet_efficiency", "High") == "High (1.5% p.a.)"
-    assert app.sensitivity_option_label("pt_mode_shift", "Low") == "Low (0.25% p.a. from FY2030)"
-    assert app.sensitivity_option_label("pt_mode_shift", "Med") == "Med (0.5% p.a. from FY2030)"
-    assert app.sensitivity_option_label("pt_mode_shift", "High") == "High (1.0% p.a. from FY2030)"
+    assert app.sensitivity_option_label("pt_mode_shift", "Low") == "Low (0.25% p.a. from FY2026)"
+    assert app.sensitivity_option_label("pt_mode_shift", "Med") == "Med (0.5% p.a. from FY2026)"
+    assert app.sensitivity_option_label("pt_mode_shift", "High") == "High (1.0% p.a. from FY2026)"
     assert app.sensitivity_option_label("freight_rail_shift", "Off") == "Off (0.0% p.a.)"
     assert app.sensitivity_option_label("freight_rail_shift", "Low") == "Low (0.25% p.a. from FY2030)"
     assert app.sensitivity_option_label("freight_rail_shift", "Med") == "Med (0.5% p.a. from FY2030)"
@@ -187,7 +187,7 @@ def test_revenue_outlook_selector_metadata_is_precomputed() -> None:
     assert "FY2031" in selectors["fy_options"]
     assert selectors["stack_fy_bounds"][0] <= 2025 <= selectors["stack_fy_bounds"][1]
     assert selectors["sensitivity_labels"]["fleet_efficiency"]["High"] == "High (1.5% p.a.)"
-    assert selectors["sensitivity_labels"]["pt_mode_shift"]["High"] == "High (1.0% p.a. from FY2030)"
+    assert selectors["sensitivity_labels"]["pt_mode_shift"]["High"] == "High (1.0% p.a. from FY2026)"
     assert selectors["sensitivity_labels"]["freight_rail_shift"]["High"] == "High (1.0% p.a. from FY2030)"
     assert selectors["sensitivity_labels"]["demand_elasticity"]["Med"] == "Med: PED -0.144 / Light RUC -0.120 / Heavy RUC -0.100"
     assert set(CONFLICT_TRACE_NAMES) <= set(selectors["trace_options"])

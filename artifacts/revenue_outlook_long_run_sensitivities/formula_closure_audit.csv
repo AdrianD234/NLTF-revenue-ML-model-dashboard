@@ -1,0 +1,15 @@
+engine,family,level,current_residual_rows,statuses,closed
+vnext,fleet_efficiency,Low,676,reconciled,True
+vnext,fleet_efficiency,Med,676,reconciled,True
+vnext,fleet_efficiency,High,676,reconciled,True
+vnext,fleet_efficiency,Custom10,676,reconciled,True
+vnext,pt_mode_shift,Low,676,reconciled,True
+vnext,pt_mode_shift,Med,676,reconciled,True
+vnext,pt_mode_shift,High,676,reconciled,True
+ar1,fleet_efficiency,Low,676,reconciled,True
+ar1,fleet_efficiency,Med,676,reconciled,True
+ar1,fleet_efficiency,High,676,reconciled,True
+ar1,fleet_efficiency,Custom10,676,reconciled,True
+ar1,pt_mode_shift,Low,676,reconciled,True
+ar1,pt_mode_shift,Med,676,reconciled,True
+ar1,pt_mode_shift,High,676,reconciled,True
