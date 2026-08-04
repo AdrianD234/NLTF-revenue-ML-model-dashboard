@@ -266,6 +266,7 @@ from model_dashboard.revenue_outlook_presentation_policy import (
     display_horizon_note,
     is_paused_vfm_uptake_basis,
     is_vfm_analyst_layer_label,
+    method_detail_enabled,
     period_within_horizon,
     public_uptake_basis_options,
     sanitised_uptake_basis,
@@ -5977,7 +5978,12 @@ def _render_lever_accordion(
         expanded=selected_metric_type == "activity",
     )
     with lever_expander:
-        st.markdown("<div class='page5-panel-title'>Sensitivities</div><div class='page5-panel-sub'>Demand and intensity levers layered onto the current forecasts.</div>", unsafe_allow_html=True)
+        sensitivities_sub = (
+            "<div class='page5-panel-sub'>Demand and intensity levers layered onto the current forecasts.</div>"
+            if method_detail_enabled()
+            else ""
+        )
+        st.markdown(f"<div class='page5-panel-title'>Sensitivities</div>{sensitivities_sub}", unsafe_allow_html=True)
         sens_cols = st.columns([0.20, 0.20, 0.20, 0.40])
         with sens_cols[0]:
             selected_fleet_efficiency = st.selectbox(
@@ -5996,7 +6002,9 @@ def _render_lever_accordion(
                 **_widget_default_kwargs("revenue_outlook_sensitivity_pt_mode_shift", index=sensitivity_options.index("Off")),
             )
         with sens_cols[2]:
-            freight_rail_enabled = st.toggle(
+            # While method detail is hidden the freight-rail lever is withdrawn
+            # from view and the sensitivity stays at its neutral "Off" level.
+            freight_rail_enabled = method_detail_enabled() and st.toggle(
                 "Freight rail shift",
                 key="revenue_outlook_sensitivity_freight_rail_toggle",
                 help=FREIGHT_RAIL_SHIFT_NOTE,
@@ -6023,10 +6031,15 @@ def _render_lever_accordion(
                 custom_pt_shift_pct = st.number_input("Custom PT shift % p.a.", min_value=0.0, max_value=10.0, value=0.5, step=0.1)
             if selected_freight_rail_shift == "Custom":
                 custom_freight_shift_pct = st.number_input("Custom rail shift % p.a.", min_value=0.0, max_value=10.0, value=0.5, step=0.1)
-            if all(value != "Custom" for value in [selected_fleet_efficiency, selected_pt_mode_shift, selected_freight_rail_shift]):
+            if method_detail_enabled() and all(value != "Custom" for value in [selected_fleet_efficiency, selected_pt_mode_shift, selected_freight_rail_shift]):
                 st.caption("Custom inputs appear only when selected.")
     with lever_expander:
-        st.markdown("<div class='page5-panel-title'>EV/PHEV uptake</div><div class='page5-panel-sub'>Light RUC fleet composition, from the MoT Vehicle Fleet Model. This sets the class mix only; it does not change total light RUC travel.</div>", unsafe_allow_html=True)
+        uptake_sub = (
+            "<div class='page5-panel-sub'>Light RUC fleet composition, from the MoT Vehicle Fleet Model. This sets the class mix only; it does not change total light RUC travel.</div>"
+            if method_detail_enabled()
+            else ""
+        )
+        st.markdown(f"<div class='page5-panel-title'>EV/PHEV uptake</div>{uptake_sub}", unsafe_allow_html=True)
         uptake_cols = st.columns([0.30, 0.70])
         with uptake_cols[0]:
             # The uptake basis is a whole-scenario input, so while the VFM
@@ -6049,9 +6062,10 @@ def _render_lever_accordion(
         # rolling-origin comparison did not support the overlay as a Base path,
         # so production always runs the raw AR(1) petrol path. See
         # REVENUE_OUTLOOK_ENABLE_PED_RETENTION_CONTROL.
-        st.caption(
-            "Base PED forecast is the raw AR(1) VKT per capita times population."
-        )
+        if method_detail_enabled():
+            st.caption(
+                "Base PED forecast is the raw AR(1) VKT per capita times population."
+            )
         custom_ev_levers: tuple[float, ...] = ()
         with uptake_cols[1]:
             if selected_ev_uptake_mode == EV_UPTAKE_CUSTOM_OPTION:
@@ -6096,7 +6110,7 @@ def _render_lever_accordion(
                     float(heavy_mid),
                     heavy_2050 / 100.0,
                 )
-            else:
+            elif method_detail_enabled():
                 preset = EV_UPTAKE_PRESETS[selected_ev_uptake_mode]
                 st.caption(
                     f"Light BEV: peak {preset.bev_peak_speed_pp * 100:.2f} pp/yr in {preset.bev_peak_year:.0f}, "
@@ -6116,8 +6130,13 @@ def _render_lever_accordion(
             legacy_toggle_key="revenue_outlook_mbu_fed_uplift",
             default=FED_POLICY_PUBLISHED,
         )
+        fed_policy_sub = (
+            "<div class='page5-panel-sub'>Choose the original 1 January 2027 start, the six-month deferral to 1 July 2027, or no 12c uplift. The choice is carried into the PED retail-price input and proportionately into Light and Heavy RUC rates. Conventional RUC activity responds once to combined diesel-plus-RUC running cost; BEV/PHEV kilometres stay fixed because no approved class-specific charge elasticity is available. Current scenarios and the MBU26 official comparator counterfactual are selected independently.</div>"
+            if method_detail_enabled()
+            else ""
+        )
         st.markdown(
-            "<div class='page5-panel-title'>12c FED / proportional RUC policy</div><div class='page5-panel-sub'>Choose the original 1 January 2027 start, the six-month deferral to 1 July 2027, or no 12c uplift. The choice is carried into the PED retail-price input and proportionately into Light and Heavy RUC rates. Conventional RUC activity responds once to combined diesel-plus-RUC running cost; BEV/PHEV kilometres stay fixed because no approved class-specific charge elasticity is available. Current scenarios and the MBU26 official comparator counterfactual are selected independently.</div>",
+            f"<div class='page5-panel-title'>12c FED / proportional RUC policy</div>{fed_policy_sub}",
             unsafe_allow_html=True,
         )
         policy_cols = st.columns([0.34, 0.34, 0.32])
@@ -6334,6 +6353,8 @@ def stream_vintage_caption_text(period_rule: dict[str, Any]) -> str:
 
 
 def _render_stream_vintage_caption(period_rule: dict[str, Any]) -> None:
+    if not method_detail_enabled():
+        return
     text = stream_vintage_caption_text(period_rule)
     if text:
         st.caption(text)
@@ -6435,7 +6456,12 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     default_fy_index = fy_options.index("FY2030") if "FY2030" in fy_options else max(len(fy_options) - 1, 0)
 
     with st.container(border=True):
-        st.markdown("<div class='page5-panel-title'>Revenue Outlook controls</div><div class='page5-panel-sub'>Choose a view, then the series every chart below tracks.</div>", unsafe_allow_html=True)
+        controls_sub = (
+            "<div class='page5-panel-sub'>Choose a view, then the series every chart below tracks.</div>"
+            if method_detail_enabled()
+            else ""
+        )
+        st.markdown(f"<div class='page5-panel-title'>Revenue Outlook controls</div>{controls_sub}", unsafe_allow_html=True)
         view_cols = st.columns([0.42, 0.58])
         with view_cols[0]:
             st.markdown("<div class='control-label'>View</div>", unsafe_allow_html=True)
@@ -6624,7 +6650,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         fed_policy_state=fed_policy_state,
         mbu_fed_policy_state=mbu_fed_policy_state,
     )
-    if lever_summary:
+    if lever_summary and method_detail_enabled():
         if compare_mode:
             st.caption(f"Single-view levers (still applied to the sections below the comparison): {lever_summary}")
         else:
@@ -6660,7 +6686,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     # construction is on screen. A reader must be able to see which anchor,
     # shape source, composition and schedule produced the FY2031-FY2050 tail
     # without opening the manifest.
-    if str(long_run_shape_state["schedule_id"]) != UNBLENDED_SCHEDULE_ID:
+    if str(long_run_shape_state["schedule_id"]) != UNBLENDED_SCHEDULE_ID and method_detail_enabled():
         st.caption(
             "Long-run construction — "
             + _long_run_shape_details_text(
@@ -6900,7 +6926,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         )
         _render_revenue_outlook_vfm_envelope_caption(view)
 
-    if not compare_mode and st.toggle(
+    if not compare_mode and method_detail_enabled() and st.toggle(
         "Show forecast-uncertainty fan detail",
         value=False,
         key="revenue_outlook_show_fan_detail",
@@ -6921,7 +6947,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         )
         timer.stop("fan figure")
 
-    if not compare_mode and st.toggle(
+    if not compare_mode and method_detail_enabled() and st.toggle(
         "Show modelled-uncertainty audit",
         value=False,
         key="revenue_outlook_show_uncertainty_audit",
@@ -7609,18 +7635,19 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
 
     _render_fleet_mix_explorer(bridge_vintage_id)
 
-    chart_card(
-        "Effective rates per 1,000 km",
-        rate_chart_note(bridge_vintage_release),
-        cached_revenue_rate_paths_figure(
-            pack_signature,
-            fed_policy_state,
-            pack.revenue_chart_rows,
-            bridge_vintage_id,
-        ),
-        caption=None,
-        notes_as_tooltip=True,
-    )
+    if method_detail_enabled():
+        chart_card(
+            "Effective rates per 1,000 km",
+            rate_chart_note(bridge_vintage_release),
+            cached_revenue_rate_paths_figure(
+                pack_signature,
+                fed_policy_state,
+                pack.revenue_chart_rows,
+                bridge_vintage_id,
+            ),
+            caption=None,
+            notes_as_tooltip=True,
+        )
 
     if revenue_outlook_lazy_table(
         "Show Manifest, Source policy and downloads",
@@ -7639,48 +7666,51 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 dataframe_download(chart_rows, "Download revenue chart rows", "revenue_chart_rows.csv")
         timer.stop("manifest downloads")
 
-    timer.start("net revenue timing comparison export")
-    try:
-        delayed_factors = cached_fed_uplift_factors(pack_signature, pack).get("delayed_6m", {})
-        timing_replay, _ = _safe_fuel_price_scenario_replay(pack_signature, pack)
-        if timing_replay is None:
-            raise ValueError("The fixed-finalist policy replay is unavailable.")
-        net_timing_rows = net_revenue_timing_comparison_frame(
-            chart_rows,
-            delayed_factors,
-            policy_timing_rows=timing_replay.annual_bridge,
-            start_fy=2026,
-            end_fy=2030,
-        )
-    except ValueError as exc:
-        warning_panel(f"Net revenue timing comparison download is unavailable: {exc}")
-    else:
-        with st.container(border=True):
-            export_cols = st.columns([0.76, 0.24])
-            with export_cols[0]:
-                st.caption(
-                    "Download the exact FY2026-FY2030 Net FED, Net RUC and Net MVR comparison for Base "
-                    "and the Low, Medium and High Middle East paths under original 1 January 2027 timing, "
-                    "the six-month deferral to 1 July 2027, and no 12c uplift. FY2027 is the year ending "
-                    "June 2027, so deferred and no-uplift are intentionally equal in FY2027; original timing "
-                    "differs because it applies for January-June 2027. The policy paths "
-                    "carry the FED wedge into PED retail prices, apply the FED-rate percentage change to "
-                    "Light/Heavy RUC rates and all five RUC collection classes, and apply the governed medium "
-                    "retail-diesel elasticity once to a combined diesel-plus-RUC running-cost ratio for conventional "
-                    "Light/Heavy activity before rebuilding net rollups. Higher combined running costs therefore "
-                    "lower conventional activity; the structural response replaces rather than stacks on the raw "
-                    "fitted response. BEV/PHEV kilometres remain fixed absent an approved class-specific charge "
-                    "elasticity, although their RUC rates and collections still change. "
-                    "Values are NZD millions nominal ex GST with canonical series IDs."
-                )
-            with export_cols[1]:
-                dataframe_download(
-                    net_timing_rows,
-                    "Download 12c timing CSV",
-                    "net_revenue_12c_timing_comparison_fy2026_fy2030.csv",
-                )
-    finally:
-        timer.stop("net revenue timing comparison export")
+    # The 12c timing-comparison export is method detail; while hidden its
+    # replay is never requested, so the hide also skips that computation.
+    if method_detail_enabled():
+        timer.start("net revenue timing comparison export")
+        try:
+            delayed_factors = cached_fed_uplift_factors(pack_signature, pack).get("delayed_6m", {})
+            timing_replay, _ = _safe_fuel_price_scenario_replay(pack_signature, pack)
+            if timing_replay is None:
+                raise ValueError("The fixed-finalist policy replay is unavailable.")
+            net_timing_rows = net_revenue_timing_comparison_frame(
+                chart_rows,
+                delayed_factors,
+                policy_timing_rows=timing_replay.annual_bridge,
+                start_fy=2026,
+                end_fy=2030,
+            )
+        except ValueError as exc:
+            warning_panel(f"Net revenue timing comparison download is unavailable: {exc}")
+        else:
+            with st.container(border=True):
+                export_cols = st.columns([0.76, 0.24])
+                with export_cols[0]:
+                    st.caption(
+                        "Download the exact FY2026-FY2030 Net FED, Net RUC and Net MVR comparison for Base "
+                        "and the Low, Medium and High Middle East paths under original 1 January 2027 timing, "
+                        "the six-month deferral to 1 July 2027, and no 12c uplift. FY2027 is the year ending "
+                        "June 2027, so deferred and no-uplift are intentionally equal in FY2027; original timing "
+                        "differs because it applies for January-June 2027. The policy paths "
+                        "carry the FED wedge into PED retail prices, apply the FED-rate percentage change to "
+                        "Light/Heavy RUC rates and all five RUC collection classes, and apply the governed medium "
+                        "retail-diesel elasticity once to a combined diesel-plus-RUC running-cost ratio for conventional "
+                        "Light/Heavy activity before rebuilding net rollups. Higher combined running costs therefore "
+                        "lower conventional activity; the structural response replaces rather than stacks on the raw "
+                        "fitted response. BEV/PHEV kilometres remain fixed absent an approved class-specific charge "
+                        "elasticity, although their RUC rates and collections still change. "
+                        "Values are NZD millions nominal ex GST with canonical series IDs."
+                    )
+                with export_cols[1]:
+                    dataframe_download(
+                        net_timing_rows,
+                        "Download 12c timing CSV",
+                        "net_revenue_12c_timing_comparison_fy2026_fy2030.csv",
+                    )
+        finally:
+            timer.stop("net revenue timing comparison export")
 
     _render_revenue_outlook_timings(timer)
 
@@ -10363,6 +10393,8 @@ def _render_fleet_mix_explorer(bridge_vintage_id: str) -> None:
                                   "font": {"size": 10.5}})
         st.plotly_chart(fig, use_container_width=True, key="fleet_mix_chart")
 
+        if not method_detail_enabled():
+            return
         ex = denominator_example(repo_root, bridge_vintage_id=bridge_vintage_id)
         st.markdown(
             f"<div style='background:#F0F7FF;border:1px solid #BFDBFE;border-radius:10px;padding:10px 14px;"

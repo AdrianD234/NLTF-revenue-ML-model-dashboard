@@ -22,6 +22,17 @@ across widgets, captions, downloads and figure builders:
     packs still carry FY2051-FY2055 rows as audit material; they must not
     reach the selected view.
 
+``REVENUE_OUTLOOK_ENABLE_METHOD_DETAIL``
+    Whether the page's methodological annotations are shown: the active-lever
+    and long-run-construction captions, the input-history vintage seam, the
+    panel sub-captions inside the lever accordion, the forecast-uncertainty
+    fan and modelled-uncertainty audit toggles, the freight-rail sensitivity
+    toggle, the effective-rates chart, the 12c timing-comparison export and
+    the fleet-mix denominator explainer. Hidden for the workshop build, NOT
+    deleted: everything is a render gate, the underlying frames, downloads
+    and governed packs are untouched, so restoring the copy is a
+    one-constant code change.
+
 None of these is a user-facing toggle, and none of them changes a modelled
 value: every helper here filters or hides, and nothing recomputes.
 """
@@ -33,9 +44,11 @@ import pandas as pd
 
 __all__ = [
     "REVENUE_OUTLOOK_DISPLAY_END_FY",
+    "REVENUE_OUTLOOK_ENABLE_METHOD_DETAIL",
     "REVENUE_OUTLOOK_ENABLE_PED_RETENTION_CONTROL",
     "REVENUE_OUTLOOK_ENABLE_VFM_ANALYST_LAYERS",
     "display_end_fy",
+    "method_detail_enabled",
     "display_horizon_note",
     "fiscal_year_of_quarter",
     "is_paused_vfm_uptake_basis",
@@ -58,6 +71,16 @@ REVENUE_OUTLOOK_ENABLE_VFM_ANALYST_LAYERS = False
 # comparison found it worse at every horizon), so it is not offered as a reader
 # control. The typed key field survives for audit and historical cache entries.
 REVENUE_OUTLOOK_ENABLE_PED_RETENTION_CONTROL = False
+
+# Methodological annotations (captions, audit toggles, the effective-rates
+# chart, the 12c timing export, the fleet-mix denominator explainer) are hidden
+# for the workshop build. Flip to True to bring every annotation back at once;
+# each hidden surface is a render gate on this constant and nothing else.
+REVENUE_OUTLOOK_ENABLE_METHOD_DETAIL = False
+
+
+def method_detail_enabled() -> bool:
+    return bool(REVENUE_OUTLOOK_ENABLE_METHOD_DETAIL)
 
 # ---------------------------------------------------------------- horizon
 REVENUE_OUTLOOK_DISPLAY_END_FY = 2050
