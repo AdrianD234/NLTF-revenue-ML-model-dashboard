@@ -591,11 +591,12 @@ def test_the_rendered_chart_carries_bands_but_no_vfm_traces(rendered_page) -> No
 # those compositions through the entire engine, so the pause has to cover the
 # basis selector too.
 PAUSED_BASES = ("MoT VFM fast", "MoT VFM slow")
-UPTAKE_STATE_KEYS = (
-    "revenue_outlook_ev_uptake_basis_v2",
-    "ro_cmp_a_uptake",
-    "ro_cmp_b_uptake",
-)
+# The single-view basis selector still exists, so its stale value is RESET to
+# the governed default; the A/B columns select scenario traces now, so their
+# old uptake keys are WITHDRAWN controls and are dropped entirely on entry.
+UPTAKE_RESET_STATE_KEYS = ("revenue_outlook_ev_uptake_basis_v2",)
+WITHDRAWN_UPTAKE_STATE_KEYS = ("ro_cmp_a_uptake", "ro_cmp_b_uptake")
+UPTAKE_STATE_KEYS = (*UPTAKE_RESET_STATE_KEYS, *WITHDRAWN_UPTAKE_STATE_KEYS)
 
 
 def test_the_public_uptake_options_exclude_fast_and_slow() -> None:
@@ -700,7 +701,7 @@ def test_compare_mode_offers_no_paused_basis_and_opens_on_base() -> None:
     assert not app.is_paused_vfm_uptake_basis(trace_box.value), trace_box.value
 
 
-@pytest.mark.parametrize("state_key", UPTAKE_STATE_KEYS)
+@pytest.mark.parametrize("state_key", UPTAKE_RESET_STATE_KEYS)
 def test_a_stale_paused_basis_is_reset_to_vfm_base(state_key: str) -> None:
     """Session state outlives a deployment; a stored Fast must not persist."""
     import streamlit as st
@@ -709,6 +710,19 @@ def test_a_stale_paused_basis_is_reset_to_vfm_base(state_key: str) -> None:
     try:
         app._discard_withdrawn_revenue_outlook_state()
         assert st.session_state[state_key] == app.DEFAULT_EV_UPTAKE_MODE
+    finally:
+        st.session_state.pop(state_key, None)
+
+
+@pytest.mark.parametrize("state_key", WITHDRAWN_UPTAKE_STATE_KEYS)
+def test_a_stale_withdrawn_comparison_basis_is_dropped(state_key: str) -> None:
+    """The A/B uptake selectors no longer exist, so their keys are removed."""
+    import streamlit as st
+
+    st.session_state[state_key] = "MoT VFM fast"
+    try:
+        app._discard_withdrawn_revenue_outlook_state()
+        assert state_key not in st.session_state
     finally:
         st.session_state.pop(state_key, None)
 
@@ -723,8 +737,11 @@ def test_a_stale_paused_basis_does_not_survive_a_real_render() -> None:
     harness.radio[0].set_value(app.REVENUE_OUTLOOK_PAGE)
     harness.run()
     assert not harness.exception, harness.exception
-    for key in UPTAKE_STATE_KEYS:
+    for key in UPTAKE_RESET_STATE_KEYS:
         assert harness.session_state[key] == app.DEFAULT_EV_UPTAKE_MODE, key
+    for key in WITHDRAWN_UPTAKE_STATE_KEYS:
+        with pytest.raises(KeyError):
+            harness.session_state[key]
 
 
 def test_no_fast_or_slow_overlay_is_computed_on_a_production_render(monkeypatch) -> None:

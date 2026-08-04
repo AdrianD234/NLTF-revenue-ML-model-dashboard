@@ -1172,13 +1172,21 @@ def test_revenue_outlook_cloud_hides_debug_toggles_and_shows_full_composition(mo
     # default. Both default to off, so neither is constructed unless a reader
     # asks for it. The MoT VFM Fast-Slow range audit is absent because that
     # analyst layer is paused - see REVENUE_OUTLOOK_ENABLE_VFM_ANALYST_LAYERS.
-    assert [(toggle.label, toggle.key) for toggle in at.toggle] == [
-        ("Freight rail shift", "revenue_outlook_sensitivity_freight_rail_toggle"),
-        ("Move petrol fleet to e-RUC", "revenue_outlook_eruc_toggle"),
-        ("Expand chart", "revenue_outlook_expand_chart"),
-        ("Show forecast-uncertainty fan detail", "revenue_outlook_show_fan_detail"),
-        ("Show modelled-uncertainty audit", "revenue_outlook_show_uncertainty_audit"),
-    ]
+    # While the method-detail gate is closed, the freight/e-RUC levers and the
+    # two governance detail surfaces are withdrawn with the rest of the
+    # workshop copy; only the presentation control survives.
+    expected_toggles = (
+        [
+            ("Freight rail shift", "revenue_outlook_sensitivity_freight_rail_toggle"),
+            ("Move petrol fleet to e-RUC", "revenue_outlook_eruc_toggle"),
+            ("Expand chart", "revenue_outlook_expand_chart"),
+            ("Show forecast-uncertainty fan detail", "revenue_outlook_show_fan_detail"),
+            ("Show modelled-uncertainty audit", "revenue_outlook_show_uncertainty_audit"),
+        ]
+        if app.method_detail_enabled()
+        else [("Expand chart", "revenue_outlook_expand_chart")]
+    )
+    assert [(toggle.label, toggle.key) for toggle in at.toggle] == expected_toggles
     assert not any(toggle.value for toggle in at.toggle[2:]), (
         "the detail surfaces must default to off"
     )
@@ -1275,8 +1283,9 @@ def test_revenue_outlook_activity_opens_policy_levers() -> None:
     assert "revenue_outlook_official_vintage" in selectbox_keys
     assert "revenue_outlook_mbu_fed_policy_state" not in selectbox_keys
 
-    # Selecting the MBU26 prior vintage brings the counterfactual back, and it
-    # opens on the published state rather than on a deferred counterfactual.
+    # Selecting the MBU26 prior vintage brings the counterfactual back where
+    # method detail is on; while the gate is closed the synthetic rate-only
+    # counterfactual is workshop copy and must not render even for MBU26.
     vintage = next(
         selectbox for selectbox in at.selectbox if selectbox.key == "revenue_outlook_official_vintage"
     )
@@ -1284,12 +1293,19 @@ def test_revenue_outlook_activity_opens_policy_levers() -> None:
     at.run()
     assert not at.exception
     counterfactual = next(
-        selectbox
-        for selectbox in at.selectbox
-        if selectbox.key == "revenue_outlook_mbu_fed_policy_state"
+        (
+            selectbox
+            for selectbox in at.selectbox
+            if selectbox.key == "revenue_outlook_mbu_fed_policy_state"
+        ),
+        None,
     )
-    assert str(counterfactual.value) == app.FED_POLICY_PUBLISHED
-    assert "not a published forecast" in str(counterfactual.label)
+    if app.method_detail_enabled():
+        assert counterfactual is not None
+        assert str(counterfactual.value) == app.FED_POLICY_PUBLISHED
+        assert "not a published forecast" in str(counterfactual.label)
+    else:
+        assert counterfactual is None
 
 
 def test_revenue_outlook_compare_mode_swaps_total_path_for_comparison() -> None:
