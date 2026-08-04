@@ -48,26 +48,29 @@ BRIDGE_VINTAGE_ID = default_bridge_vintage_id(ROOT)
 def test_every_source_carries_the_six_rows_over_its_published_era(
     source: str,
 ) -> None:
-    """External sources run to FY2050; the current model stops at FY2030.
+    """Every source now carries its six rows to FY2050.
 
-    The current-model Light RUC path is withheld beyond H20 because the
-    conventional-anchor share expansion diverges at long horizons, so the
-    dashboard source deliberately ends at FY2030 while the official vintage
-    and the VFM scenarios continue over their published horizon.
+    This used to assert that the dashboard source stopped at FY2030, on the
+    stated grounds that "the current-model Light RUC path is withheld beyond
+    H20 because the conventional-anchor share expansion diverges at long
+    horizons". That constructor was retired: the post-model extrapolation
+    layer replaced share expansion with the structural pool index, and five of
+    the six leaves have carried governed FY2031-FY2050 values ever since.
+
+    The frame nevertheless still ended at FY2030, because the sixth leaf -
+    ``light_petrol_vkt`` - was never published to the chart, so the join
+    truncated to its horizon. Publishing it removed that truncation. The
+    dashboard source is not extrapolated past its evidence here; it has simply
+    stopped being cut short of it.
     """
     frame = load_source_frame(ROOT, source, BRIDGE_VINTAGE_ID)
     assert list(frame.columns) == ROW_KEYS
-    expected = (
-        (2025, 2030)
-        if source == DASHBOARD_SOURCE
-        else (2025, 2030, 2040, 2050)
-    )
-    for fy in expected:
+    for fy in (2025, 2030, 2040, 2050):
         assert fy in frame.index, f"{source} missing FY{fy}"
-    if source == DASHBOARD_SOURCE:
-        assert frame.index.max() == LAST_DECISION_GRADE_ANNUAL_FY, (
-            "the current-model path must stop at the last decision-grade June year"
-        )
+    assert frame.index.max() == 2050, (
+        f"{source} stops at FY{frame.index.max()}; every leaf now carries a "
+        "governed value to the FY2050 presentation horizon"
+    )
     forecast = frame.loc[2025:2050]
     assert not forecast.isna().any().any(), f"{source} has gaps in its published era"
     assert (forecast >= 0).all().all(), f"{source} has negative volumes"
