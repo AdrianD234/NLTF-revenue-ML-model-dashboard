@@ -26,12 +26,15 @@ across widgets, captions, downloads and figure builders:
     Whether the page's methodological annotations are shown: the active-lever
     and long-run-construction captions, the input-history vintage seam, the
     panel sub-captions inside the lever accordion, the forecast-uncertainty
-    fan and modelled-uncertainty audit toggles, the freight-rail sensitivity
-    toggle, the effective-rates chart, the 12c timing-comparison export and
-    the fleet-mix denominator explainer. Hidden for the workshop build, NOT
-    deleted: everything is a render gate, the underlying frames, downloads
-    and governed packs are untouched, so restoring the copy is a
-    one-constant code change.
+    fan and modelled-uncertainty audit toggles, the freight-rail and e-RUC
+    levers (pinned to their neutral defaults while hidden, in both the
+    single-view accordion and the A/B comparison columns), the synthetic
+    MBU26 rate-only counterfactual selector (pinned to the published path),
+    the effective-rates chart, the 12c timing-comparison export, the
+    composition and comparison sub-captions and the fleet-mix explainers.
+    Hidden for the workshop build, NOT deleted: everything is a render gate,
+    the underlying frames, downloads and governed packs are untouched, so
+    restoring the copy is a one-constant code change.
 
 None of these is a user-facing toggle, and none of them changes a modelled
 value: every helper here filters or hides, and nothing recomputes.

@@ -6157,7 +6157,7 @@ def _render_lever_accordion(
                 ),
             )
         with policy_cols[1]:
-            if show_official_policy_control:
+            if show_official_policy_control and method_detail_enabled():
                 mbu_fed_policy_state = st.selectbox(
                     "Synthetic official rate-only counterfactual — not a published forecast",
                     list(FED_POLICY_OPTIONS),
@@ -6182,7 +6182,9 @@ def _render_lever_accordion(
                 # vintage(s); the comparator stays exactly as published.
                 mbu_fed_policy_state = FED_POLICY_PUBLISHED
         with policy_cols[2]:
-            eruc_enabled = st.toggle(
+            # While method detail is hidden the e-RUC lever is withdrawn from
+            # view and the transition stays off with its default levers.
+            eruc_enabled = method_detail_enabled() and st.toggle(
                 "Move petrol fleet to e-RUC",
                 key="revenue_outlook_eruc_toggle",
                 help=ERUC_NOTE,
@@ -6278,7 +6280,11 @@ def _compare_mode_lever_state(selected_metric_type: str) -> dict[str, Any]:
             _lever("ev_lever_heavy_mid", defaults.heavy_bev_midpoint),
             _lever("ev_lever_heavy_2050", defaults.heavy_bev_share_2050 * 100) / 100.0,
         )
-    eruc_enabled = bool(st.session_state.get("revenue_outlook_eruc_toggle", False))
+    # With method detail hidden the e-RUC lever is not on screen, so a stale
+    # persisted toggle must not keep driving the sections below the comparison.
+    eruc_enabled = method_detail_enabled() and bool(
+        st.session_state.get("revenue_outlook_eruc_toggle", False)
+    )
     eruc_levers: tuple[float, ...] = ()
     if eruc_enabled:
         eruc_levers = (
@@ -6297,6 +6303,10 @@ def _compare_mode_lever_state(selected_metric_type: str) -> dict[str, Any]:
         legacy_toggle_key="revenue_outlook_mbu_fed_uplift",
         default=FED_POLICY_PUBLISHED,
     )
+    if not method_detail_enabled():
+        # The synthetic MBU26 counterfactual selector is not on screen, so a
+        # stale persisted state must not reprice the official comparator.
+        mbu_fed_policy_state = FED_POLICY_PUBLISHED
     return {
         "fleet": _level("revenue_outlook_sensitivity_fleet_efficiency"),
         "pt": _level("revenue_outlook_sensitivity_pt_mode_shift"),
@@ -6505,10 +6515,11 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             trace_options, selected_official_trace=selected_official_trace
         )
         if compare_mode:
-            st.caption(
-                "Comparison plots June years. Time grain, FY marker and legend selections apply to "
-                "the single-scenario view and are kept while you compare."
-            )
+            if method_detail_enabled():
+                st.caption(
+                    "Comparison plots June years. Time grain, FY marker and legend selections apply to "
+                    "the single-scenario view and are kept while you compare."
+                )
             grain_label = str(st.session_state.get("revenue_outlook_time_grain", "June-year"))
             default_fy = fy_options[default_fy_index] if fy_options else ""
             selected_fy = str(st.session_state.get("revenue_outlook_selected_fy", default_fy))
@@ -7244,10 +7255,11 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     timer.start("composition figure")
     with st.container(border=True):
         st.markdown("<div class='page5-panel-title'>Revenue composition over time</div>", unsafe_allow_html=True)
-        st.caption(
-            "Stacked build-up of Total NLTF revenue: gross components net of refunds and admin fees, "
-            "so the stack reconciles to the total path above."
-        )
+        if method_detail_enabled():
+            st.caption(
+                "Stacked build-up of Total NLTF revenue: gross components net of refunds and admin fees, "
+                "so the stack reconciles to the total path above."
+            )
         # One composition story for everyone: the net build-up that reconciles
         # to Total NLTF ('Gross-to-net bridge audit' internally). The gross
         # stack and the full formula-audit detail were analyst plumbing - the
@@ -9635,7 +9647,11 @@ def _render_comparison_scenario_column(
     )
     eruc_values: tuple[float, ...] = ()
     st.session_state.setdefault(keys["eruc"], defaults["eruc"])
-    eruc_on = st.toggle("e-RUC transition", key=keys["eruc"], help=ERUC_NOTE, disabled=mot_official)
+    # While method detail is hidden the e-RUC transition is withdrawn from the
+    # A/B columns and both scenarios compare without it.
+    eruc_on = method_detail_enabled() and st.toggle(
+        "e-RUC transition", key=keys["eruc"], help=ERUC_NOTE, disabled=mot_official
+    )
     if eruc_on and not mot_official:
         with st.popover("e-RUC levers", use_container_width=True):
             start = st.number_input("Start FY", min_value=2026, max_value=2045, value=2027, step=1, key=f"ro_cmp_{prefix}_eruc_start")
@@ -9648,7 +9664,7 @@ def _render_comparison_scenario_column(
         # The synthetic rate-only counterfactual is defined for MBU26 only,
         # defaults to the published path and is hidden for other vintages.
         official_policy_state = FED_POLICY_PUBLISHED
-        if selected_vid == "MBU26":
+        if selected_vid == "MBU26" and method_detail_enabled():
             official_policy_key = f"ro_cmp_{prefix}_official_policy"
             _validated_select_state(
                 official_policy_key, list(FED_POLICY_OPTIONS), FED_POLICY_PUBLISHED
@@ -9768,12 +9784,16 @@ def _render_scenario_comparison_panel(
     official_vintage_state: dict[str, Any],
 ) -> None:
     with st.container(border=True):
-        st.markdown(
-            "<div class='page5-panel-title'>Scenario comparison (A vs B)</div>"
+        comparison_sub = (
             "<div class='page5-panel-sub'>Two policy configurations held side by side for the selected "
             "series: overlaid paths, horizon NPV for revenue (physical quantities report cumulative and "
             "average-annual totals - the MBCM discounts monetised streams only) and adaptive delta cards. "
-            "Uses named presets; custom lever values live in the advanced levers above.</div>",
+            "Uses named presets; custom lever values live in the advanced levers above.</div>"
+            if method_detail_enabled()
+            else ""
+        )
+        st.markdown(
+            f"<div class='page5-panel-title'>Scenario comparison (A vs B)</div>{comparison_sub}",
             unsafe_allow_html=True,
         )
         with st.expander("Configure scenarios A and B", expanded=True):
@@ -10322,12 +10342,13 @@ def _render_fleet_mix_explorer(bridge_vintage_id: str) -> None:
             f"{bridge_vintage_id}, the VFM and this dashboard</div>",
             unsafe_allow_html=True,
         )
-        st.caption(
-            "Everything the class split does happens on MoT's own six volume rows. Compare the sources "
-            "on those rows directly - in kilometres, as shares of an explicitly chosen total, or as "
-            "year-on-year change. Light RUC net km is conventional (diesel) ONLY; battery-electric and "
-            "plug-in hybrid are their own rows."
-        )
+        if method_detail_enabled():
+            st.caption(
+                "Everything the class split does happens on MoT's own six volume rows. Compare the sources "
+                "on those rows directly - in kilometres, as shares of an explicitly chosen total, or as "
+                "year-on-year change. Light RUC net km is conventional (diesel) ONLY; battery-electric and "
+                "plug-in hybrid are their own rows."
+            )
         control_cols = st.columns([0.40, 0.32, 0.28])
         with control_cols[0]:
             # A stored selection naming a different vintage is reset first, so
