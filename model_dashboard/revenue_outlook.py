@@ -2691,6 +2691,10 @@ POST_MODEL_PED_ACTIVITY_CHART_SERIES = (
     "light_petrol_vkt",
 )
 
+#: The last econometric year, and so the year whose row carries the correct
+#: trace identity for the long-run rows appended after it.
+ANCHOR_FY_FOR_TEMPLATES = 2030
+
 
 def _append_post_model_ped_activity_chart_rows(
     chart_rows: pd.DataFrame,
@@ -2767,12 +2771,37 @@ def _append_post_model_ped_activity_chart_rows(
         key_mask = annual & scenario.eq(scenario_name) & fy_numeric.eq(fy)
         if bool((key_mask & series.eq(series_id)).any()):
             continue
-        template_rows = out[key_mask & series.eq("ped_vkt_per_capita")]
+        # Prefer THIS series' own anchor row for row metadata. The two PED
+        # leaves do not share trace names for every scenario: the comparison
+        # scenario is "Current finalist High population/comparison" on the
+        # Light petrol VKT rows the bridge materialises, but "Current finalist
+        # comparison behavioural path" on ped_vkt_per_capita. Templating
+        # across series published the long-run half of the comparison line
+        # under the other trace name, which drew it as a second, disconnected
+        # line with its own legend entry.
+        own_anchor = out[
+            annual
+            & scenario.eq(scenario_name)
+            & series.eq(series_id)
+            & fy_numeric.eq(ANCHOR_FY_FOR_TEMPLATES)
+        ]
+        template_rows = (
+            own_anchor if not own_anchor.empty
+            else out[key_mask & series.eq("ped_vkt_per_capita")]
+        )
         if template_rows.empty:
             # No governed Current template at this key. Publishing would mean
             # inventing row metadata, so the series keeps the gap it had.
             continue
         row = template_rows.iloc[0].copy()
+        # The period fields MUST be stamped explicitly. The template is now the
+        # FY2030 anchor rather than the FY-matched row, so inheriting them
+        # silently stamped every long-run row with june_year 2030 - twenty-one
+        # rows on one key, which the Treasury macro replay correctly refused as
+        # duplicate annual rows.
+        row["period"] = f"FY{fy}"
+        row["target_period"] = f"FY{fy}"
+        row["june_year"] = fy
         row["series_id"] = series_id
         row["value"] = float(record["value_numeric"])
         row["value_unit"] = str(record.get("unit") or row.get("value_unit") or "")
