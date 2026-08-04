@@ -16471,15 +16471,17 @@ def render_scenario_comparison(loaded: LoadedRun, controls: dict[str, Any]) -> N
     scenario_b = SCHIFF_SPEC_BENCHMARK_LABEL
     baseline = "Baseline FY25"
 
-    with st.container(border=True):
-        filter_summary_grid(
-            [
-                ("Scenario A", scenario_a),
-                ("Scenario B", scenario_b),
-                ("Baseline", baseline),
-            ]
-        )
-        if method_detail_enabled():
+    # The fixed A/B/Baseline summary grid and its caption are method detail;
+    # the labels are constants of the evidence pack, not a control.
+    if method_detail_enabled():
+        with st.container(border=True):
+            filter_summary_grid(
+                [
+                    ("Scenario A", scenario_a),
+                    ("Scenario B", scenario_b),
+                    ("Baseline", baseline),
+                ]
+            )
             st.caption(
                 "Fixed governed comparison from the evidence pack. Use the global Score Basis "
                 "filter to switch between paper-style and operational scorecards."
