@@ -1,0 +1,173 @@
+{
+  "schema_version": 1,
+  "description": "Explicit content policy for the slim Databricks App runtime bundle. Built by scripts/build_databricks_app_bundle.py, validated by scripts/validate_databricks_app_bundle.py, published to the databricks-app branch beneath app/. Classification evidence: artifacts/databricks_app_bundle/.",
+  "initial_design_source_sha": "398b78be9ee677ce19d5718d0c236c248c5ce618",
+  "maximum_file_bytes": 10485760,
+  "warning_file_bytes": 9437184,
+  "warning_exemptions": [],
+  "required_root_files": [
+    "app.py",
+    "app.yaml",
+    "requirements.txt",
+    ".streamlit/config.toml",
+    "references/BEFU26 revenue forecast.xlsx"
+  ],
+  "included_root_files": [
+    {"path": "app.py", "reason": "Streamlit entry point", "role": "runtime"},
+    {"path": "requirements.txt", "reason": "pinned runtime dependencies", "role": "deployment"},
+    {"path": "runtime.txt", "reason": "python version pin (python-3.11)", "role": "deployment"},
+    {"path": ".streamlit/config.toml", "reason": "Streamlit theme + gatherUsageStats=false", "role": "deployment"},
+    {"path": "sitecustomize.py", "reason": "repo-local parquet runtime shim; no-op when .runtime_pyarrow24 is absent", "role": "runtime"},
+    {"path": "forecast_runner_manifest.json", "reason": "governed forecast-runner contract descriptor pinning fitted-state dirs and hashes", "role": "runtime"}
+  ],
+  "included_roots": [
+    {"path": "model_dashboard", "reason": "the application package; every page imports from it", "role": "runtime"},
+    {"path": "pipeline", "reason": "imported at runtime by vnext_forward_integration and forecast_runner; hashed as replay calculation code", "role": "runtime"},
+    {"path": "assets", "reason": "model_dashboard/ui.py LOGO_ASSET_PATH", "role": "runtime"},
+    {"path": "templates", "reason": "governed forecast input template workbooks", "role": "runtime"},
+    {"path": "references", "reason": "BEFU26 revenue forecast.xlsx is the runtime template for the Revenue Outlook XLSX extract (model_dashboard/revenue_outlook_excel_extract.py TEMPLATE_RELATIVE_PATH)", "role": "runtime"},
+    {"path": "data/current_revenue_outlook", "reason": "ensemble-engine promoted Revenue Outlook runtime pack (Parquet-first)", "role": "runtime"},
+    {"path": "data/engine_ar1", "reason": "AR(1) default-engine runtime pack and evidence pack (model_dashboard/engine.py engine_default)", "role": "runtime"},
+    {"path": "data/dashboard_evidence_pack", "reason": "curated evidence pack read by data_loader and hashed by the replay digest", "role": "runtime"},
+    {
+      "path": "data/dashboard_evidence_pack_reproducibility",
+      "reason": "governed fitted state the replays load; whole tree hashed into the replay-cache digest (minus the excluded audit archive)",
+      "role": "runtime",
+      "exclude": ["data/dashboard_evidence_pack_reproducibility/ped_inner_hpo/source_artifacts/candidate_rescue"]
+    },
+    {"path": "data/model_input_history", "reason": "history parquets read by revenue_outlook and hashed by the replay digest", "role": "runtime"},
+    {"path": "data/revenue_model_source_pack", "reason": "2026_05_19 source pack, official vintage spines and registry read by revenue_source_pack/official_vintage; trees hashed by policy-runtime and quarterly-display digests", "role": "runtime"},
+    {"path": "data/revenue_outlook_policy_runtime", "reason": "materialised 12c policy states + policy-aware uncertainty bands (fail-closed governed pack)", "role": "runtime"},
+    {"path": "data/revenue_outlook_replay_cache", "reason": "compiled Treasury-macro/conflict replay cache; without it the Revenue Outlook cold path costs 68-81s", "role": "runtime"},
+    {"path": "data/revenue_outlook_quarterly_display", "reason": "governed quarterly display pack (fail-closed digest over source-pack trees)", "role": "runtime"},
+    {"path": "data/revenue_outlook_uncertainty", "reason": "uncertainty manifest chained into the policy-runtime digest", "role": "runtime"},
+    {"path": "data/vfm_202405", "reason": "MoT VFM uptake shares hashed by replay and policy digests", "role": "runtime"},
+    {"path": "data/source_workbooks", "reason": "vendored source workbooks surfaced by the reproducibility page (app.py REPRODUCIBILITY_SOURCE_WORKBOOK_PATH default)", "role": "runtime"},
+    {"path": "artifacts/chart_sources", "reason": "app.py globs artifacts/chart_sources/*.csv at runtime", "role": "runtime"},
+    {"path": "artifacts/long_horizon_validation", "reason": "long_horizon_june_year_errors.csv is hashed into the policy-runtime source digest", "role": "runtime"}
+  ],
+  "excluded_roots": [
+    ".git",
+    ".github",
+    ".devcontainer",
+    ".vscode",
+    ".idea",
+    ".venv",
+    "tests",
+    "docs",
+    "deliverables",
+    "outputs",
+    "test-output",
+    "scripts",
+    "config",
+    "deployment",
+    "build"
+  ],
+  "excluded_dir_names": [
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache"
+  ],
+  "omitted_files": [
+    {
+      "path": "data/revenue_model_source_pack/2026_05_19/canonical_revenue_long.csv",
+      "reason": "generated audit output (23.6 MiB). The loader computes the canonical frame from the normalized source tables (model_dashboard/revenue_source_pack.py canonical_revenue_long_frame); the file is not in REQUIRED_SOURCE_PACK_FILES and no manifest hash-validates it at runtime.",
+      "classification": "audit-only"
+    },
+    {
+      "path": "data/dashboard_evidence_pack_reproducibility/ped_inner_hpo/source_artifacts/candidate_rescue/candidate_rescue_outputs_run_20260521_163105_20260521_163707.zip",
+      "reason": "development/audit evidence archive (15 MiB) never read by the deployed app; excluded from the replay-cache source digest by model_dashboard/revenue_outlook_replay_cache.py _SOURCE_TREE_EXCLUSIONS.",
+      "classification": "audit-only"
+    }
+  ],
+  "parquet_replacements": [
+    {
+      "csv": "data/current_revenue_outlook/scenario_feature_lineage.csv",
+      "parquet": "data/current_revenue_outlook/scenario_feature_lineage.parquet",
+      "reason": "16 MiB lineage audit twin; runtime reads the Parquet (_read_optional_parquet); missing CSV tolerated by _parquet_twin_validates when the Parquet hash-validates"
+    },
+    {
+      "csv": "data/current_revenue_outlook/revenue_stack_components.csv",
+      "parquet": "data/current_revenue_outlook/revenue_stack_components.parquet",
+      "reason": "13 MiB stack audit twin; runtime reads the Parquet"
+    },
+    {
+      "csv": "data/current_revenue_outlook/scenario_inputs/scenario_feature_lineage.csv",
+      "parquet": "data/current_revenue_outlook/scenario_inputs/scenario_feature_lineage.parquet",
+      "reason": "16 MiB scenario-input lineage twin; combine_scenario_input_dirs globs *.parquet only and no manifest validates the CSV"
+    },
+    {
+      "csv": "data/engine_ar1/current_revenue_outlook/scenario_feature_lineage.csv",
+      "parquet": "data/engine_ar1/current_revenue_outlook/scenario_feature_lineage.parquet",
+      "reason": "AR(1) engine twin of the above"
+    },
+    {
+      "csv": "data/engine_ar1/current_revenue_outlook/revenue_stack_components.csv",
+      "parquet": "data/engine_ar1/current_revenue_outlook/revenue_stack_components.parquet",
+      "reason": "AR(1) engine twin of the above"
+    },
+    {
+      "csv": "data/engine_ar1/current_revenue_outlook/scenario_inputs/scenario_feature_lineage.csv",
+      "parquet": "data/engine_ar1/current_revenue_outlook/scenario_inputs/scenario_feature_lineage.parquet",
+      "reason": "AR(1) engine twin of the above"
+    }
+  ],
+  "external_volume_assets": [],
+  "generated_files": [
+    {
+      "path": "app.yaml",
+      "template": "deployment/databricks_app.yaml",
+      "reason": "Databricks Apps runtime command",
+      "role": "deployment"
+    }
+  ],
+  "governed_manifest_checks": [
+    {
+      "manifest": "data/current_revenue_outlook/manifest.json",
+      "required_runtime_files": [
+        "data/current_revenue_outlook/revenue_chart_rows.parquet",
+        "data/current_revenue_outlook/revenue_chart_rows.csv",
+        "data/current_revenue_outlook/scenario_feature_lineage.parquet",
+        "data/current_revenue_outlook/revenue_stack_components.parquet"
+      ]
+    },
+    {
+      "manifest": "data/engine_ar1/current_revenue_outlook/manifest.json",
+      "required_runtime_files": [
+        "data/engine_ar1/current_revenue_outlook/revenue_chart_rows.parquet",
+        "data/engine_ar1/current_revenue_outlook/scenario_feature_lineage.parquet",
+        "data/engine_ar1/current_revenue_outlook/revenue_stack_components.parquet"
+      ]
+    },
+    {
+      "manifest": "data/revenue_outlook_replay_cache/ar1/manifest.json",
+      "required_runtime_files": []
+    },
+    {
+      "manifest": "data/revenue_outlook_replay_cache/ensemble/manifest.json",
+      "required_runtime_files": []
+    },
+    {
+      "manifest": "data/revenue_outlook_policy_runtime/ar1/manifest.json",
+      "required_runtime_files": []
+    },
+    {
+      "manifest": "data/revenue_outlook_policy_runtime/ensemble/manifest.json",
+      "required_runtime_files": []
+    },
+    {
+      "manifest": "data/revenue_outlook_quarterly_display/manifest.json",
+      "required_runtime_files": [
+        "data/revenue_outlook_quarterly_display/quarterly_rows.parquet",
+        "data/revenue_outlook_quarterly_display/official_annual_rows.parquet",
+        "data/revenue_outlook_quarterly_display/series_contract.parquet",
+        "data/revenue_outlook_quarterly_display/coverage_status.parquet"
+      ]
+    },
+    {
+      "manifest": "data/revenue_model_source_pack/2026_05_19/manifest.json",
+      "required_runtime_files": []
+    }
+  ]
+}

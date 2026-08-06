@@ -1,0 +1,147 @@
+name: Publish Databricks App bundle
+
+# Builds the slim runtime bundle (scripts/build_databricks_app_bundle.py),
+# validates it fail-closed (scripts/validate_databricks_app_bundle.py), and
+# publishes ONLY the bundle to the generated `databricks-app` branch beneath
+# `app/`. Databricks Apps then deploys from:
+#
+#   Branch:           databricks-app
+#   Source code path: app
+#
+# The generated branch carries no .github/ workflows, so pushing it never
+# triggers the long main CI. The branch is owned by this workflow alone; the
+# publish step refuses to overwrite a branch whose layout it does not
+# recognise.
+#
+# Every merge to main refreshes the bundle branch automatically, so keeping
+# the deployment packaging current is nobody's manual chore. workflow_dispatch
+# stays available for recovery (re-publishing after a failed run, or forcing a
+# rebuild without a code change). Redeploying the Databricks App itself is
+# still a manual click until an auto-deploy credential arrangement exists.
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+# Newest main state wins: if two merges land close together, the older
+# in-flight publish is cancelled rather than queuing an already-obsolete
+# bundle behind it.
+concurrency:
+  group: publish-databricks-app-bundle
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: Build, validate and publish the runtime bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      # Fail before doing any work: a manual dispatch from a feature branch
+      # must never publish unmerged content into the live deployment branch.
+      - name: Require main as the publication source
+        shell: bash
+        run: |
+          if [ "${GITHUB_REF_NAME}" != "main" ]; then
+            echo "The Databricks runtime bundle may only be published from main." >&2
+            echo "Dispatched from: ${GITHUB_REF_NAME}" >&2
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install runtime dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Build the bundle
+        run: |
+          python scripts/build_databricks_app_bundle.py \
+            --source . \
+            --output build/databricks_app/app \
+            --clean
+
+      - name: Validate the bundle
+        run: |
+          python scripts/validate_databricks_app_bundle.py \
+            --bundle build/databricks_app/app \
+            --source .
+
+      # Defence in depth: re-hash every bundle file immediately before the
+      # copy, so nothing that ran between build and publish can ship content
+      # that disagrees with the manifest. Structural only, so it costs seconds.
+      - name: Re-verify the bundle immediately before publishing
+        run: |
+          python scripts/validate_databricks_app_bundle.py \
+            --bundle build/databricks_app/app \
+            --source . \
+            --skip-runtime
+
+      - name: Publish the bundle to the databricks-app branch
+        run: |
+          set -euo pipefail
+          SOURCE_SHA="$(git rev-parse HEAD)"
+          MANIFEST_SHA="$(python -c "import hashlib,pathlib;print(hashlib.sha256(pathlib.Path('build/databricks_app/app/databricks_app_bundle_manifest.json').read_bytes()).hexdigest())")"
+          BUILD_TS="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          PUBLISH_DIR="$RUNNER_TEMP/databricks-app-publish"
+          if git ls-remote --exit-code origin refs/heads/databricks-app >/dev/null 2>&1; then
+            git fetch origin databricks-app
+            git worktree add "$PUBLISH_DIR" -B databricks-app origin/databricks-app
+            # Ownership guard: only overwrite a branch this workflow created.
+            UNEXPECTED="$(cd "$PUBLISH_DIR" && git ls-tree --name-only HEAD | grep -vxE 'app|README.md' || true)"
+            if [ -n "$UNEXPECTED" ]; then
+              echo "Refusing to publish: databricks-app branch contains unexpected content:" >&2
+              echo "$UNEXPECTED" >&2
+              exit 1
+            fi
+            (cd "$PUBLISH_DIR" && git rm -rq app 2>/dev/null || true; rm -rf app README.md)
+          else
+            git worktree add --detach "$PUBLISH_DIR"
+            (cd "$PUBLISH_DIR" && git checkout --orphan databricks-app && git rm -rfq . && git clean -fdx)
+          fi
+
+          mkdir -p "$PUBLISH_DIR/app"
+          cp -R build/databricks_app/app/. "$PUBLISH_DIR/app/"
+          {
+            echo "# Generated Databricks App runtime bundle"
+            echo
+            echo "Do not edit this branch by hand. It is regenerated by the"
+            echo "'Publish Databricks App bundle' workflow on the main repository."
+            echo
+            echo "- Source main SHA: \`$SOURCE_SHA\`"
+            echo "- Bundle manifest SHA-256: \`$MANIFEST_SHA\`"
+            echo "- Built (UTC): $BUILD_TS"
+            echo
+            echo "Databricks App deployment settings: branch \`databricks-app\`,"
+            echo "source code path \`app\`."
+          } > "$PUBLISH_DIR/README.md"
+
+          cd "$PUBLISH_DIR"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Bundle is unchanged; nothing to publish."
+            exit 0
+          fi
+          git commit \
+            -m "Publish Databricks App bundle" \
+            -m "source main SHA: $SOURCE_SHA" \
+            -m "bundle manifest SHA-256: $MANIFEST_SHA" \
+            -m "build timestamp: $BUILD_TS"
+          git push origin databricks-app

@@ -9,6 +9,8 @@ tests/__pycache__/
 .runtime_*/
 .streamlit_*.pid
 output/
+# generated Databricks App bundle (scripts/build_databricks_app_bundle.py)
+build/
 *.log
 *.out
 *.err
@@ -38,6 +40,9 @@ artifacts/**
 !artifacts/actuals_refresh_2026q1/**
 !artifacts/long_horizon_validation/
 !artifacts/long_horizon_validation/**
+# Databricks App bundle classification evidence (scripts/build_databricks_app_bundle.py)
+!artifacts/databricks_app_bundle/
+!artifacts/databricks_app_bundle/**
 !artifacts/gdp_sign_guard_audit/
 !artifacts/gdp_sign_guard_audit/**
 !artifacts/ci_baseline_comparison/

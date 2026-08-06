@@ -1,0 +1,27 @@
+root,runtime_required,accessor,evidence
+app.py,yes,Streamlit entry point,imports only model_dashboard.* (app.py:33-421 plus lazy imports)
+model_dashboard/,yes,every page,application package
+pipeline/,yes,model_dashboard.vnext_forward_integration:47;122-123 and model_dashboard.forecast_runner:2038;2399,pipeline.vnext_forward / vnext_core / ar1_engine imported at runtime; hashed as replay calculation code (_CODE_PACKAGES)
+assets/,yes,model_dashboard/ui.py:26 LOGO_ASSET_PATH,logo png
+templates/,defensive,model_dashboard/forecast_imports.py TEMPLATE_FILENAME (download name only; workbook built in-memory by forecast_runner.build_forecast_input_template),included because two governed template workbooks are 50 KiB total
+references/,yes,model_dashboard/revenue_outlook_excel_extract.py:33 TEMPLATE_RELATIVE_PATH,BEFU26 revenue forecast.xlsx is the XLSX-extract template cloned per selected trace
+.streamlit/config.toml,yes,Streamlit,theme and gatherUsageStats=false
+sitecustomize.py,defensive,Python startup when repo root on sys.path,prefers repo-local .runtime_pyarrow24 wheels; no-op in the bundle where that dir is absent
+forecast_runner_manifest.json,yes,governed forecast-runner contract descriptor,pins fitted-state dirs + production state hashes
+data/current_revenue_outlook/,yes,model_dashboard/revenue_outlook.py:612-714 load_revenue_outlook_pack,Parquet-first pack; manifest output_hashes validated fail-closed at :668
+data/engine_ar1/,yes,model_dashboard/engine.py:59-72 (engine_default = ar1),default-engine pack + evidence pack
+data/dashboard_evidence_pack/,yes,evidence_pack.resolve_evidence_pack_root; replay digest _SOURCE_FILES,curated finalists/predictions parquets
+data/dashboard_evidence_pack_reproducibility/,yes,governance pages (governance_constants.py:22; light_ruc_reproducibility.py) and replay digest _SOURCE_TREES,whole tree hashed into the replay-cache digest minus the excluded candidate_rescue archive
+data/model_input_history/,yes,revenue_outlook.py _historical_activity_rows; replay digest,history parquets
+data/revenue_model_source_pack/,yes,revenue_source_pack.py:290-311; official_vintage.py:47-49; policy/quarterly digests hash official_vintages + mbu26_annual_spine trees,2026_05_19 pack minus the generated canonical_revenue_long.csv
+data/revenue_outlook_policy_runtime/,yes,revenue_outlook_policy_runtime.py load_policy_runtime (fail-closed),materialised 12c policy states
+data/revenue_outlook_replay_cache/,yes,app.py:1602-1687 load_replay_cache (default fast mode),compiled replay cache; staleness re-hashes recorded paths
+data/revenue_outlook_quarterly_display/,yes,revenue_outlook_series_coverage.py load_quarterly_display_pack (fail-closed digest),quarterly display pack
+data/revenue_outlook_uncertainty/,yes,revenue_uncertainty_pack.py:22; policy digest _SOURCE_FILES,uncertainty manifest chained into policy digest
+data/vfm_202405/,yes,replay + policy digests,vfm_vkt_shares.csv
+data/source_workbooks/,yes,app.py:433 REPRODUCIBILITY_SOURCE_WORKBOOK_PATH default,vendored source workbooks surfaced on the governance page
+artifacts/chart_sources/,yes,app.py glob artifacts/chart_sources/*.csv,r2 ladder chart sources
+artifacts/long_horizon_validation/,yes,policy digest _SOURCE_FILES long_horizon_june_year_errors.csv,hashed into policy-runtime source digest
+artifacts/curated_data/,generated,app.py:427 CURATED_DATA_DIR,UNTRACKED (rebuilt by CI/tests); the deployed app already runs without it on Streamlit Cloud
+config/,no,none,zero references from app.py / model_dashboard / pipeline
+docs/ tests/ deliverables/ outputs/ test-output/ scripts/,no,none at runtime,excluded from the bundle
