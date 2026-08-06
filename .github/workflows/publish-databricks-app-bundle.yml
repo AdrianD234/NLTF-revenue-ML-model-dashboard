@@ -29,7 +29,20 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
+      # Fail before doing any work: a manual dispatch from a feature branch
+      # must never publish unmerged content into the live deployment branch.
+      - name: Require main as the publication source
+        shell: bash
+        run: |
+          if [ "${GITHUB_REF_NAME}" != "main" ]; then
+            echo "The Databricks runtime bundle may only be published from main." >&2
+            echo "Dispatched from: ${GITHUB_REF_NAME}" >&2
+            exit 1
+          fi
+
       - uses: actions/checkout@v4
+        with:
+          ref: main
 
       - name: Set up Python
         uses: actions/setup-python@v5
