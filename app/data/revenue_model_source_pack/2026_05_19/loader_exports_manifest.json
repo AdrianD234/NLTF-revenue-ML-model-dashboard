@@ -1,0 +1,82 @@
+{
+  "created_at": "2026-05-19T00:00:00+00:00",
+  "created_at_source": "source_pack_manifest_created_at",
+  "determinism_policy": "No wall-clock timestamp is used; identical source-pack inputs produce identical export manifests.",
+  "exports": {
+    "annual_completeness_audit.csv": {
+      "role": "June-year annual actual completeness audit and chart-treatment contract.",
+      "row_count": 54,
+      "sha256": "43280775c23535c2985d35aaf8002e0d9d1242692976b0a42503d1b3e0fe7c8a"
+    },
+    "canonical_revenue_long.csv": {
+      "role": "Canonical long schema across repo-local source rows and offline lineage rows.",
+      "row_count": 39967,
+      "sha256": "334c4255bfe6cea7a3e039f40e3f41a60054ca2587ea9b1303a20b15e9385cd5"
+    },
+    "data_vintage_manifest.json": {
+      "role": "Model/source observation cutoffs and repo-local current Revenue Outlook/source-pack hashes.",
+      "row_count": null,
+      "sha256": "8ad719d1065567ec6ea8b00be1e4f99d9507fb7a7eedf85a5e41c0cce06b3686"
+    },
+    "hybrid_annual_revenue.csv": {
+      "role": "Replacement-only annual NLTF hybrid roll-up audit using source-backed PED/FED, Light RUC and Heavy RUC bridge inputs plus MOT fixed components.",
+      "row_count": 450,
+      "sha256": "643e12178e4e094d32084d6279623279e08c3d8758d728b306fd0f540d397d51"
+    },
+    "path_trace_status.csv": {
+      "role": "Availability and plotting status for required Revenue Outlook total-path traces.",
+      "row_count": 4,
+      "sha256": "b0b2b2f01c6977e869a21f620485e686c119b1895d29e1c67d12ce7afb9adfe3"
+    },
+    "reconciliation_report.csv": {
+      "role": "Hierarchy roll-up reconciliation and explicit gap report.",
+      "row_count": 84,
+      "sha256": "cda23c2e6d2a08515b8d026f832e84c718373d64e099bcc2cb4690d4b9374aa8"
+    },
+    "remaining_decisions_handoff.csv": {
+      "role": "Unresolved revenue decisions linked to runtime gaps and dashboard treatment.",
+      "row_count": 7,
+      "sha256": "14258034dba5eb6cbdc0ae6f5ce9598d1668fafd58cae0a04e3755a613106519"
+    },
+    "series_junction_audit.csv": {
+      "role": "FY2024-FY2027 source-actual/current-finalist junction audit with quarter coverage, cutoffs, nowcast components and discontinuity flags.",
+      "row_count": 176,
+      "sha256": "1460894f242f2b64634b1046981b2de18b0d3aa6f0ec70fda15d1c9435e66b70"
+    },
+    "series_role_audit.csv": {
+      "role": "Explicit role contract for modeled activity, revenue bridges, pass-through lines, deductions, overlays, and source gaps.",
+      "row_count": 78,
+      "sha256": "ac0500f60dab8eab74f98cebe860dc5937e542c46bd6696f5c2d39310ab237e7"
+    },
+    "series_trace_contract.csv": {
+      "role": "Per-series trace contract for valid controls, source actuals, primary current-finalist forecast source, bridge and cutoffs.",
+      "row_count": 25,
+      "sha256": "56e79819b036bf1ab9b99f5f4cca5185d0e4fcaebe100b51a057205b2cb57e39"
+    },
+    "source_gap_register.csv": {
+      "role": "Structured source-pack gaps for release values, FED path scenarios, Crown top-up, quarterly rows, and bridge replay.",
+      "row_count": 5,
+      "sha256": "51d115a2b73e73db0d2a81c7acbc1aac5f46b54ef4b39adda97053c4093ec308"
+    },
+    "source_pack_intake_status.csv": {
+      "role": "Repo-local source-pack intake status, hashes, and replay gaps.",
+      "row_count": 23,
+      "sha256": "a18fe3fee948bec4d8934b7162105454ead741b1092f26444f0f356073425d6c"
+    },
+    "trace_source_contract.csv": {
+      "role": "Displayed Revenue Outlook trace source contract with role, source files, model IDs, cutoffs, scenario and anchor/forecast flags.",
+      "row_count": 4,
+      "sha256": "3a8b3b66da395cad28c74622c12bb43af1a6e035eb5917e9d9e61e52539a50d5"
+    },
+    "validation_issues.csv": {
+      "role": "Loader validation warnings/errors for the source pack.",
+      "row_count": 2,
+      "sha256": "86f670ec0b78d45b5c013f2c26153cb25a74692312b0f34f6cc09dcc04429d5c"
+    }
+  },
+  "repo_relative_output_dir": "data/revenue_model_source_pack/2026_05_19",
+  "schema_version": "nltf-revenue-source-pack-loader-exports-v1",
+  "source_pack_raw_sha256": "00c6070694818d27d7c402749354d8175de999894846dce45a4abdd7f5eb3e6b",
+  "source_pack_version": "2026_05_19",
+  "validation_status": "warning"
+}

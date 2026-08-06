@@ -1,0 +1,3 @@
+severity,anchor_period,official_real_gdp_level_impact_pct,treasury_scenario,source_document,source_locator,source_url,calibration_status
+medium,2027Q1,-1.5,Scenario 2 prolonged conflict moderate supply impact,Aide Memoire T2026/568 Macroeconomic Scenarios - Middle East Conflict and Economic Impacts,p.5 paragraphs 21-22,https://www.treasury.govt.nz/sites/default/files/2026-05/mec-macroecon-scenarios-24-mar-2026.pdf,official_anchor
+high,2027Q1,-3.1,Scenario 3 prolonged conflict severe disruption,Aide Memoire T2026/568 Macroeconomic Scenarios - Middle East Conflict and Economic Impacts,p.5 paragraphs 21-22,https://www.treasury.govt.nz/sites/default/files/2026-05/mec-macroecon-scenarios-24-mar-2026.pdf,official_anchor

@@ -1,0 +1,1555 @@
+Model basis,Group,Series,Line,Unit,FY June,Value,Source sheet,Source cell
+selected_dashboard_basis,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2014,2732.0839815886848,Model annual,F6
+selected_dashboard_basis,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2015,2950.0632690743514,Model annual,G6
+selected_dashboard_basis,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2016,3214.7494378995552,Model annual,H6
+selected_dashboard_basis,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2017,3303.7167325761748,Model annual,I6
+selected_dashboard_basis,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2018,3372.407656288155,Model annual,J6
+selected_dashboard_basis,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2019,3555.2838904759124,Model annual,K6
+selected_dashboard_basis,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2020,3731.7709703157366,Model annual,L6
+selected_dashboard_basis,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2021,3928.2439112539446,Model annual,M6
+selected_dashboard_basis,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2022,3626.3273707642325,Model annual,N6
+selected_dashboard_basis,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2023,2704.906001844133,Model annual,O6
+selected_dashboard_basis,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2024,4022.949366687286,Model annual,P6
+selected_dashboard_basis,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2025,4126.31072454252,Model annual,Q6
+selected_dashboard_basis,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2026,4231.681030799155,Model annual,R6
+selected_dashboard_basis,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2027,4661.751533072341,Model annual,S6
+selected_dashboard_basis,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2028,5347.360119007773,Model annual,T6
+selected_dashboard_basis,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2029,5838.990698048532,Model annual,U6
+selected_dashboard_basis,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2030,6314.249840109758,Model annual,V6
+selected_dashboard_basis,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2031,6819.838893905783,Model annual,W6
+selected_dashboard_basis,Revenue,Total RUC+PED revenue,Actual,$m nominal ex GST,2014,2844.0938067399998,Model annual,F7
+selected_dashboard_basis,Revenue,Total RUC+PED revenue,Actual,$m nominal ex GST,2015,3051.30426054,Model annual,G7
+selected_dashboard_basis,Revenue,Total RUC+PED revenue,Actual,$m nominal ex GST,2016,3285.9421071499996,Model annual,H7
+selected_dashboard_basis,Revenue,Total RUC+PED revenue,Actual,$m nominal ex GST,2017,3385.69404103,Model annual,I7
+selected_dashboard_basis,Revenue,Total RUC+PED revenue,Actual,$m nominal ex GST,2018,3460.2416422399997,Model annual,J7
+selected_dashboard_basis,Revenue,Total RUC+PED revenue,Actual,$m nominal ex GST,2019,3666.17934731,Model annual,K7
+selected_dashboard_basis,Revenue,Total RUC+PED revenue,Actual,$m nominal ex GST,2020,3602.7678296400004,Model annual,L7
+selected_dashboard_basis,Revenue,Total RUC+PED revenue,Actual,$m nominal ex GST,2021,4075.57072141,Model annual,M7
+selected_dashboard_basis,Revenue,Total RUC+PED revenue,Actual,$m nominal ex GST,2022,3974.76788937,Model annual,N7
+selected_dashboard_basis,Revenue,Total RUC+PED revenue,Actual,$m nominal ex GST,2023,4119.810604464448,Model annual,O7
+selected_dashboard_basis,Revenue,Total RUC+PED revenue,Actual,$m nominal ex GST,2024,3853.4943681786963,Model annual,P7
+selected_dashboard_basis,Revenue,Total RUC+PED revenue,Actual,$m nominal ex GST,2025,4046.315821989565,Model annual,Q7
+selected_dashboard_basis,Revenue,Total RUC+PED revenue,Actual,$m nominal ex GST,2026,3114.329609640869,Model annual,R7
+selected_dashboard_basis,Revenue,PED revenue,Model path,$m nominal ex GST,2014,1538.7546337860879,Model annual,F8
+selected_dashboard_basis,Revenue,PED revenue,Model path,$m nominal ex GST,2015,1675.8277684850273,Model annual,G8
+selected_dashboard_basis,Revenue,PED revenue,Model path,$m nominal ex GST,2016,1825.1433926893926,Model annual,H8
+selected_dashboard_basis,Revenue,PED revenue,Model path,$m nominal ex GST,2017,1866.3490535458727,Model annual,I8
+selected_dashboard_basis,Revenue,PED revenue,Model path,$m nominal ex GST,2018,1891.8637708365613,Model annual,J8
+selected_dashboard_basis,Revenue,PED revenue,Model path,$m nominal ex GST,2019,1990.3630083338512,Model annual,K8
+selected_dashboard_basis,Revenue,PED revenue,Model path,$m nominal ex GST,2020,2052.8608387357594,Model annual,L8
+selected_dashboard_basis,Revenue,PED revenue,Model path,$m nominal ex GST,2021,2089.8321175302913,Model annual,M8
+selected_dashboard_basis,Revenue,PED revenue,Model path,$m nominal ex GST,2022,1865.560459406785,Model annual,N8
+selected_dashboard_basis,Revenue,PED revenue,Model path,$m nominal ex GST,2023,1367.739538817783,Model annual,O8
+selected_dashboard_basis,Revenue,PED revenue,Model path,$m nominal ex GST,2024,2137.099675024054,Model annual,P8
+selected_dashboard_basis,Revenue,PED revenue,Model path,$m nominal ex GST,2025,2165.1168280025167,Model annual,Q8
+selected_dashboard_basis,Revenue,PED revenue,Model path,$m nominal ex GST,2026,2156.4542998764714,Model annual,R8
+selected_dashboard_basis,Revenue,PED revenue,Model path,$m nominal ex GST,2027,2349.3523637218464,Model annual,S8
+selected_dashboard_basis,Revenue,PED revenue,Model path,$m nominal ex GST,2028,2680.6795318750796,Model annual,T8
+selected_dashboard_basis,Revenue,PED revenue,Model path,$m nominal ex GST,2029,2883.263470760643,Model annual,U8
+selected_dashboard_basis,Revenue,PED revenue,Model path,$m nominal ex GST,2030,3060.5743909796365,Model annual,V8
+selected_dashboard_basis,Revenue,PED revenue,Model path,$m nominal ex GST,2031,3240.452244302491,Model annual,W8
+selected_dashboard_basis,Revenue,PED revenue,Actual,$m nominal ex GST,2014,1626.00155652,Model annual,F9
+selected_dashboard_basis,Revenue,PED revenue,Actual,$m nominal ex GST,2015,1761.9266930899998,Model annual,G9
+selected_dashboard_basis,Revenue,PED revenue,Actual,$m nominal ex GST,2016,1906.0248969000002,Model annual,H9
+selected_dashboard_basis,Revenue,PED revenue,Actual,$m nominal ex GST,2017,1933.77670022,Model annual,I9
+selected_dashboard_basis,Revenue,PED revenue,Actual,$m nominal ex GST,2018,1933.90465553,Model annual,J9
+selected_dashboard_basis,Revenue,PED revenue,Actual,$m nominal ex GST,2019,2016.01858683,Model annual,K9
+selected_dashboard_basis,Revenue,PED revenue,Actual,$m nominal ex GST,2020,1914.6702856599998,Model annual,L9
+selected_dashboard_basis,Revenue,PED revenue,Actual,$m nominal ex GST,2021,2176.23857515,Model annual,M9
+selected_dashboard_basis,Revenue,PED revenue,Actual,$m nominal ex GST,2022,1965.6162321,Model annual,N9
+selected_dashboard_basis,Revenue,PED revenue,Actual,$m nominal ex GST,2023,2074.732468454007,Model annual,O9
+selected_dashboard_basis,Revenue,PED revenue,Actual,$m nominal ex GST,2024,2033.7691341500001,Model annual,P9
+selected_dashboard_basis,Revenue,PED revenue,Actual,$m nominal ex GST,2025,2026.68630478,Model annual,Q9
+selected_dashboard_basis,Revenue,PED revenue,Actual,$m nominal ex GST,2026,1526.14839319,Model annual,R9
+selected_dashboard_basis,Volume,PED volume,Model path,million L,2014,2874.8872165497496,Model annual,F10
+selected_dashboard_basis,Volume,PED volume,Model path,million L,2015,2964.807459636663,Model annual,G10
+selected_dashboard_basis,Volume,PED volume,Model path,million L,2016,3066.231087778699,Model annual,H10
+selected_dashboard_basis,Volume,PED volume,Model path,million L,2017,3135.456376496661,Model annual,I10
+selected_dashboard_basis,Volume,PED volume,Model path,million L,2018,3178.320964378337,Model annual,J10
+selected_dashboard_basis,Volume,PED volume,Model path,million L,2019,3201.624133825383,Model annual,K10
+selected_dashboard_basis,Volume,PED volume,Model path,million L,2020,3085.8950735610592,Model annual,L10
+selected_dashboard_basis,Volume,PED volume,Model path,million L,2021,2984.451213198748,Model annual,M10
+selected_dashboard_basis,Volume,PED volume,Model path,million L,2022,2973.9920650411773,Model annual,N10
+selected_dashboard_basis,Volume,PED volume,Model path,million L,2023,3037.8010368198807,Model annual,O10
+selected_dashboard_basis,Volume,PED volume,Model path,million L,2024,3051.9531518108847,Model annual,P10
+selected_dashboard_basis,Volume,PED volume,Model path,million L,2025,3091.9639380819676,Model annual,Q10
+selected_dashboard_basis,Volume,PED volume,Model path,million L,2026,3079.593139318621,Model annual,R10
+selected_dashboard_basis,Volume,PED volume,Model path,million L,2027,3089.5452272107345,Model annual,S10
+selected_dashboard_basis,Volume,PED volume,Model path,million L,2028,3152.8339371519023,Model annual,T10
+selected_dashboard_basis,Volume,PED volume,Model path,million L,2029,3202.7587275795327,Model annual,U10
+selected_dashboard_basis,Volume,PED volume,Model path,million L,2030,3255.0768228830266,Model annual,V10
+selected_dashboard_basis,Volume,PED volume,Model path,million L,2031,3305.76760335811,Model annual,W10
+selected_dashboard_basis,Volume,Light RUC net km,Model path,million km,2014,8506.845669483813,Model annual,F11
+selected_dashboard_basis,Volume,Light RUC net km,Model path,million km,2015,9078.464633550215,Model annual,G11
+selected_dashboard_basis,Volume,Light RUC net km,Model path,million km,2016,9888.034325804996,Model annual,H11
+selected_dashboard_basis,Volume,Light RUC net km,Model path,million km,2017,10559.040080143435,Model annual,I11
+selected_dashboard_basis,Volume,Light RUC net km,Model path,million km,2018,11204.56634405476,Model annual,J11
+selected_dashboard_basis,Volume,Light RUC net km,Model path,million km,2019,11244.417040510969,Model annual,K11
+selected_dashboard_basis,Volume,Light RUC net km,Model path,million km,2020,11232.351888159154,Model annual,L11
+selected_dashboard_basis,Volume,Light RUC net km,Model path,million km,2021,11841.437538915134,Model annual,M11
+selected_dashboard_basis,Volume,Light RUC net km,Model path,million km,2022,12368.26185663132,Model annual,N11
+selected_dashboard_basis,Volume,Light RUC net km,Model path,million km,2023,13237.834673169495,Model annual,O11
+selected_dashboard_basis,Volume,Light RUC net km,Model path,million km,2024,11292.892065973474,Model annual,P11
+selected_dashboard_basis,Volume,Light RUC net km,Model path,million km,2025,12305.239678272554,Model annual,Q11
+selected_dashboard_basis,Volume,Light RUC net km,Model path,million km,2026,13086.923761237404,Model annual,R11
+selected_dashboard_basis,Volume,Light RUC net km,Model path,million km,2027,12912.377898662222,Model annual,S11
+selected_dashboard_basis,Volume,Light RUC net km,Model path,million km,2028,13335.41437586944,Model annual,T11
+selected_dashboard_basis,Volume,Light RUC net km,Model path,million km,2029,13937.647880312397,Model annual,U11
+selected_dashboard_basis,Volume,Light RUC net km,Model path,million km,2030,14515.104899295595,Model annual,V11
+selected_dashboard_basis,Volume,Light RUC net km,Model path,million km,2031,15084.079978136939,Model annual,W11
+selected_dashboard_basis,Volume,Light RUC net km,Actual,million km,2014,8809.590297,Model annual,F12
+selected_dashboard_basis,Volume,Light RUC net km,Actual,million km,2015,9167.483044,Model annual,G12
+selected_dashboard_basis,Volume,Light RUC net km,Actual,million km,2016,9669.475028,Model annual,H12
+selected_dashboard_basis,Volume,Light RUC net km,Actual,million km,2017,10425.610839,Model annual,I12
+selected_dashboard_basis,Volume,Light RUC net km,Actual,million km,2018,11112.22716,Model annual,J12
+selected_dashboard_basis,Volume,Light RUC net km,Actual,million km,2019,11898.225208,Model annual,K12
+selected_dashboard_basis,Volume,Light RUC net km,Actual,million km,2020,11385.93681,Model annual,L12
+selected_dashboard_basis,Volume,Light RUC net km,Actual,million km,2021,11998.163013,Model annual,M12
+selected_dashboard_basis,Volume,Light RUC net km,Actual,million km,2022,12644.208208,Model annual,N12
+selected_dashboard_basis,Volume,Light RUC net km,Actual,million km,2023,13553.287615,Model annual,O12
+selected_dashboard_basis,Volume,Light RUC net km,Actual,million km,2024,10355.550659,Model annual,P12
+selected_dashboard_basis,Volume,Light RUC net km,Actual,million km,2025,12273.983872,Model annual,Q12
+selected_dashboard_basis,Volume,Light RUC net km,Actual,million km,2026,9626.938266,Model annual,R12
+selected_dashboard_basis,Volume,Heavy RUC net km,Model path,million km,2014,3649.2913429729915,Model annual,F13
+selected_dashboard_basis,Volume,Heavy RUC net km,Model path,million km,2015,3704.382057758254,Model annual,G13
+selected_dashboard_basis,Volume,Heavy RUC net km,Model path,million km,2016,3759.8733773505132,Model annual,H13
+selected_dashboard_basis,Volume,Heavy RUC net km,Model path,million km,2017,3810.8424668608177,Model annual,I13
+selected_dashboard_basis,Volume,Heavy RUC net km,Model path,million km,2018,3876.686155215679,Model annual,J13
+selected_dashboard_basis,Volume,Heavy RUC net km,Model path,million km,2019,3928.24527641087,Model annual,K13
+selected_dashboard_basis,Volume,Heavy RUC net km,Model path,million km,2020,3913.451334583326,Model annual,L13
+selected_dashboard_basis,Volume,Heavy RUC net km,Model path,million km,2021,4005.152131441771,Model annual,M13
+selected_dashboard_basis,Volume,Heavy RUC net km,Model path,million km,2022,4026.1205268419617,Model annual,N13
+selected_dashboard_basis,Volume,Heavy RUC net km,Model path,million km,2023,4176.04219947854,Model annual,O13
+selected_dashboard_basis,Volume,Heavy RUC net km,Model path,million km,2024,4120.34478140499,Model annual,P13
+selected_dashboard_basis,Volume,Heavy RUC net km,Model path,million km,2025,4108.162274312818,Model annual,Q13
+selected_dashboard_basis,Volume,Heavy RUC net km,Model path,million km,2026,4142.678703859586,Model annual,R13
+selected_dashboard_basis,Volume,Heavy RUC net km,Model path,million km,2027,4192.825425159582,Model annual,S13
+selected_dashboard_basis,Volume,Heavy RUC net km,Model path,million km,2028,4225.058773994761,Model annual,T13
+selected_dashboard_basis,Volume,Heavy RUC net km,Model path,million km,2029,4260.045840167674,Model annual,U13
+selected_dashboard_basis,Volume,Heavy RUC net km,Model path,million km,2030,4297.135424765783,Model annual,V13
+selected_dashboard_basis,Volume,Heavy RUC net km,Model path,million km,2031,4334.046812205069,Model annual,W13
+selected_dashboard_basis,Volume,Heavy RUC net km,Actual,million km,2014,3646.506756,Model annual,F14
+selected_dashboard_basis,Volume,Heavy RUC net km,Actual,million km,2015,3698.793648,Model annual,G14
+selected_dashboard_basis,Volume,Heavy RUC net km,Actual,million km,2016,3716.710068,Model annual,H14
+selected_dashboard_basis,Volume,Heavy RUC net km,Actual,million km,2017,3842.683587,Model annual,I14
+selected_dashboard_basis,Volume,Heavy RUC net km,Actual,million km,2018,4022.092402,Model annual,J14
+selected_dashboard_basis,Volume,Heavy RUC net km,Actual,million km,2019,4071.164816,Model annual,K14
+selected_dashboard_basis,Volume,Heavy RUC net km,Actual,million km,2020,3867.517432,Model annual,L14
+selected_dashboard_basis,Volume,Heavy RUC net km,Actual,million km,2021,4141.235503,Model annual,M14
+selected_dashboard_basis,Volume,Heavy RUC net km,Actual,million km,2022,4170.928916,Model annual,N14
+selected_dashboard_basis,Volume,Heavy RUC net km,Actual,million km,2023,4152.746925,Model annual,O14
+selected_dashboard_basis,Volume,Heavy RUC net km,Actual,million km,2024,3903.861766,Model annual,P14
+selected_dashboard_basis,Volume,Heavy RUC net km,Actual,million km,2025,3981.873439,Model annual,Q14
+selected_dashboard_basis,Volume,Heavy RUC net km,Actual,million km,2026,3082.755083,Model annual,R14
+selected_dashboard_basis,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2014,400.8862869562105,Model annual,F15
+selected_dashboard_basis,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2015,465.1672786862366,Model annual,G15
+selected_dashboard_basis,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2016,536.3286897197157,Model annual,H15
+selected_dashboard_basis,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2017,497.1384332863272,Model annual,I15
+selected_dashboard_basis,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2018,527.1596374210728,Model annual,J15
+selected_dashboard_basis,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2019,651.2061567605243,Model annual,K15
+selected_dashboard_basis,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2020,689.3984874173917,Model annual,L15
+selected_dashboard_basis,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2021,779.8495045025725,Model annual,M15
+selected_dashboard_basis,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2022,744.0771159872602,Model annual,N15
+selected_dashboard_basis,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2023,585.2599925360527,Model annual,O15
+selected_dashboard_basis,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2024,752.3996065444555,Model annual,P15
+selected_dashboard_basis,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2025,774.790357546907,Model annual,Q15
+selected_dashboard_basis,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2026,856.2641055736624,Model annual,R15
+selected_dashboard_basis,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2027,941.9699603832014,Model annual,S15
+selected_dashboard_basis,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2028,1084.3682005263113,Model annual,T15
+selected_dashboard_basis,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2029,1200.3774332557468,Model annual,U15
+selected_dashboard_basis,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2030,1305.8514122651277,Model annual,V15
+selected_dashboard_basis,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2031,1414.7358611494637,Model annual,W15
+selected_dashboard_basis,Revenue,Light RUC revenue,Actual,$m nominal ex GST,2014,415.12343537000004,Model annual,F16
+selected_dashboard_basis,Revenue,Light RUC revenue,Actual,$m nominal ex GST,2015,469.80848421,Model annual,G16
+selected_dashboard_basis,Revenue,Light RUC revenue,Actual,$m nominal ex GST,2016,524.52914789,Model annual,H16
+selected_dashboard_basis,Revenue,Light RUC revenue,Actual,$m nominal ex GST,2017,490.85899264999995,Model annual,I16
+selected_dashboard_basis,Revenue,Light RUC revenue,Actual,$m nominal ex GST,2018,522.8235887,Model annual,J16
+selected_dashboard_basis,Revenue,Light RUC revenue,Actual,$m nominal ex GST,2019,688.6312373,Model annual,K16
+selected_dashboard_basis,Revenue,Light RUC revenue,Actual,$m nominal ex GST,2020,698.5758703699998,Model annual,L16
+selected_dashboard_basis,Revenue,Light RUC revenue,Actual,$m nominal ex GST,2021,790.32231374,Model annual,M16
+selected_dashboard_basis,Revenue,Light RUC revenue,Actual,$m nominal ex GST,2022,839.5953969171997,Model annual,N16
+selected_dashboard_basis,Revenue,Light RUC revenue,Actual,$m nominal ex GST,2023,902.1579233939502,Model annual,O16
+selected_dashboard_basis,Revenue,Light RUC revenue,Actual,$m nominal ex GST,2024,723.37189724,Model annual,P16
+selected_dashboard_basis,Revenue,Light RUC revenue,Actual,$m nominal ex GST,2025,837.53770151,Model annual,Q16
+selected_dashboard_basis,Revenue,Light RUC revenue,Actual,$m nominal ex GST,2026,673.44991052,Model annual,R16
+selected_dashboard_basis,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2014,814.167276747701,Model annual,F17
+selected_dashboard_basis,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2015,835.0775797818468,Model annual,G17
+selected_dashboard_basis,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2016,889.0211183714674,Model annual,H17
+selected_dashboard_basis,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2017,973.9679000182033,Model annual,I17
+selected_dashboard_basis,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2018,996.2296620225594,Model annual,J17
+selected_dashboard_basis,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2019,955.4864584182512,Model annual,K17
+selected_dashboard_basis,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2020,1034.425929443073,Model annual,L17
+selected_dashboard_basis,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2021,1099.3432923435187,Model annual,M17
+selected_dashboard_basis,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2022,1043.4561223389408,Model annual,N17
+selected_dashboard_basis,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2023,784.1491978187037,Model annual,O17
+selected_dashboard_basis,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2024,1150.0061041563704,Model annual,P17
+selected_dashboard_basis,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2025,1182.6943001245318,Model annual,Q17
+selected_dashboard_basis,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2026,1179.8971094328099,Model annual,R17
+selected_dashboard_basis,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2027,1260.1969940697327,Model annual,S17
+selected_dashboard_basis,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2028,1410.4636444817409,Model annual,T17
+selected_dashboard_basis,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2029,1505.9501147101303,Model annual,U17
+selected_dashboard_basis,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2030,1586.738741271887,Model annual,V17
+selected_dashboard_basis,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2031,1668.456331060519,Model annual,W17
+selected_dashboard_basis,Revenue,Heavy RUC revenue,Actual,$m nominal ex GST,2014,813.55979115,Model annual,F18
+selected_dashboard_basis,Revenue,Heavy RUC revenue,Actual,$m nominal ex GST,2015,833.8183096399999,Model annual,G18
+selected_dashboard_basis,Revenue,Heavy RUC revenue,Actual,$m nominal ex GST,2016,878.66700453,Model annual,H18
+selected_dashboard_basis,Revenue,Heavy RUC revenue,Actual,$m nominal ex GST,2017,982.16505316,Model annual,I18
+selected_dashboard_basis,Revenue,Heavy RUC revenue,Actual,$m nominal ex GST,2018,1033.6031967600002,Model annual,J18
+selected_dashboard_basis,Revenue,Heavy RUC revenue,Actual,$m nominal ex GST,2019,990.4322618,Model annual,K18
+selected_dashboard_basis,Revenue,Heavy RUC revenue,Actual,$m nominal ex GST,2020,1021.66038778,Model annual,L18
+selected_dashboard_basis,Revenue,Heavy RUC revenue,Actual,$m nominal ex GST,2021,1136.73230031,Model annual,M18
+selected_dashboard_basis,Revenue,Heavy RUC revenue,Actual,$m nominal ex GST,2022,1183.1726618428002,Model annual,N18
+selected_dashboard_basis,Revenue,Heavy RUC revenue,Actual,$m nominal ex GST,2023,1162.5392616164913,Model annual,O18
+selected_dashboard_basis,Revenue,Heavy RUC revenue,Actual,$m nominal ex GST,2024,1089.56171388,Model annual,P18
+selected_dashboard_basis,Revenue,Heavy RUC revenue,Actual,$m nominal ex GST,2025,1146.29680501,Model annual,Q18
+selected_dashboard_basis,Revenue,Heavy RUC revenue,Actual,$m nominal ex GST,2026,893.7839354,Model annual,R18
+selected_dashboard_basis,Volume,Light BEV RUC net km,Model path,million km,2014,0,Model annual,F19
+selected_dashboard_basis,Volume,Light BEV RUC net km,Model path,million km,2015,0,Model annual,G19
+selected_dashboard_basis,Volume,Light BEV RUC net km,Model path,million km,2016,0,Model annual,H19
+selected_dashboard_basis,Volume,Light BEV RUC net km,Model path,million km,2017,0,Model annual,I19
+selected_dashboard_basis,Volume,Light BEV RUC net km,Model path,million km,2018,0,Model annual,J19
+selected_dashboard_basis,Volume,Light BEV RUC net km,Model path,million km,2019,0,Model annual,K19
+selected_dashboard_basis,Volume,Light BEV RUC net km,Model path,million km,2020,0,Model annual,L19
+selected_dashboard_basis,Volume,Light BEV RUC net km,Model path,million km,2021,0,Model annual,M19
+selected_dashboard_basis,Volume,Light BEV RUC net km,Model path,million km,2022,0,Model annual,N19
+selected_dashboard_basis,Volume,Light BEV RUC net km,Model path,million km,2023,0,Model annual,O19
+selected_dashboard_basis,Volume,Light BEV RUC net km,Model path,million km,2024,445.9283759016295,Model annual,P19
+selected_dashboard_basis,Volume,Light BEV RUC net km,Model path,million km,2025,824.7372360503007,Model annual,Q19
+selected_dashboard_basis,Volume,Light BEV RUC net km,Model path,million km,2026,1230.542762593834,Model annual,R19
+selected_dashboard_basis,Volume,Light BEV RUC net km,Model path,million km,2027,1790.3546817446943,Model annual,S19
+selected_dashboard_basis,Volume,Light BEV RUC net km,Model path,million km,2028,2253.690448428354,Model annual,T19
+selected_dashboard_basis,Volume,Light BEV RUC net km,Model path,million km,2029,2850.9490177017547,Model annual,U19
+selected_dashboard_basis,Volume,Light BEV RUC net km,Model path,million km,2030,3678.032881786407,Model annual,V19
+selected_dashboard_basis,Volume,Light BEV RUC net km,Model path,million km,2031,4650.151305717447,Model annual,W19
+selected_dashboard_basis,Volume,PHEV RUC net km,Model path,million km,2014,0,Model annual,F20
+selected_dashboard_basis,Volume,PHEV RUC net km,Model path,million km,2015,0,Model annual,G20
+selected_dashboard_basis,Volume,PHEV RUC net km,Model path,million km,2016,0,Model annual,H20
+selected_dashboard_basis,Volume,PHEV RUC net km,Model path,million km,2017,0,Model annual,I20
+selected_dashboard_basis,Volume,PHEV RUC net km,Model path,million km,2018,0,Model annual,J20
+selected_dashboard_basis,Volume,PHEV RUC net km,Model path,million km,2019,0,Model annual,K20
+selected_dashboard_basis,Volume,PHEV RUC net km,Model path,million km,2020,0,Model annual,L20
+selected_dashboard_basis,Volume,PHEV RUC net km,Model path,million km,2021,0,Model annual,M20
+selected_dashboard_basis,Volume,PHEV RUC net km,Model path,million km,2022,0,Model annual,N20
+selected_dashboard_basis,Volume,PHEV RUC net km,Model path,million km,2023,0,Model annual,O20
+selected_dashboard_basis,Volume,PHEV RUC net km,Model path,million km,2024,210.22100165821615,Model annual,P20
+selected_dashboard_basis,Volume,PHEV RUC net km,Model path,million km,2025,437.38527572198143,Model annual,Q20
+selected_dashboard_basis,Volume,PHEV RUC net km,Model path,million km,2026,638.3818328307207,Model annual,R20
+selected_dashboard_basis,Volume,PHEV RUC net km,Model path,million km,2027,985.6392293341952,Model annual,S20
+selected_dashboard_basis,Volume,PHEV RUC net km,Model path,million km,2028,1260.837003666135,Model annual,T20
+selected_dashboard_basis,Volume,PHEV RUC net km,Model path,million km,2029,1586.856711909962,Model annual,U20
+selected_dashboard_basis,Volume,PHEV RUC net km,Model path,million km,2030,2018.5550907873578,Model annual,V20
+selected_dashboard_basis,Volume,PHEV RUC net km,Model path,million km,2031,2489.184857696899,Model annual,W20
+selected_dashboard_basis,Volume,Heavy BEV RUC net km,Model path,million km,2014,0,Model annual,F21
+selected_dashboard_basis,Volume,Heavy BEV RUC net km,Model path,million km,2015,0,Model annual,G21
+selected_dashboard_basis,Volume,Heavy BEV RUC net km,Model path,million km,2016,0,Model annual,H21
+selected_dashboard_basis,Volume,Heavy BEV RUC net km,Model path,million km,2017,0,Model annual,I21
+selected_dashboard_basis,Volume,Heavy BEV RUC net km,Model path,million km,2018,0,Model annual,J21
+selected_dashboard_basis,Volume,Heavy BEV RUC net km,Model path,million km,2019,0,Model annual,K21
+selected_dashboard_basis,Volume,Heavy BEV RUC net km,Model path,million km,2020,0,Model annual,L21
+selected_dashboard_basis,Volume,Heavy BEV RUC net km,Model path,million km,2021,0,Model annual,M21
+selected_dashboard_basis,Volume,Heavy BEV RUC net km,Model path,million km,2022,0,Model annual,N21
+selected_dashboard_basis,Volume,Heavy BEV RUC net km,Model path,million km,2023,0,Model annual,O21
+selected_dashboard_basis,Volume,Heavy BEV RUC net km,Model path,million km,2024,0,Model annual,P21
+selected_dashboard_basis,Volume,Heavy BEV RUC net km,Model path,million km,2025,0,Model annual,Q21
+selected_dashboard_basis,Volume,Heavy BEV RUC net km,Model path,million km,2026,11.493575753644889,Model annual,R21
+selected_dashboard_basis,Volume,Heavy BEV RUC net km,Model path,million km,2027,57.27788514791101,Model annual,S21
+selected_dashboard_basis,Volume,Heavy BEV RUC net km,Model path,million km,2028,70.10949960960028,Model annual,T21
+selected_dashboard_basis,Volume,Heavy BEV RUC net km,Model path,million km,2029,84.80806122906822,Model annual,U21
+selected_dashboard_basis,Volume,Heavy BEV RUC net km,Model path,million km,2030,102.97883052115843,Model annual,V21
+selected_dashboard_basis,Volume,Heavy BEV RUC net km,Model path,million km,2031,124.22184658729125,Model annual,W21
+selected_dashboard_basis,Revenue,Net FED revenue,Model path,$m nominal ex GST,2014,1528.1636574860881,Model annual,F22
+selected_dashboard_basis,Revenue,Net FED revenue,Model path,$m nominal ex GST,2015,1661.5785420850273,Model annual,G22
+selected_dashboard_basis,Revenue,Net FED revenue,Model path,$m nominal ex GST,2016,1801.8644505193927,Model annual,H22
+selected_dashboard_basis,Revenue,Net FED revenue,Model path,$m nominal ex GST,2017,1845.2423485458728,Model annual,I22
+selected_dashboard_basis,Revenue,Net FED revenue,Model path,$m nominal ex GST,2018,1861.7739720865613,Model annual,J22
+selected_dashboard_basis,Revenue,Net FED revenue,Model path,$m nominal ex GST,2019,1961.4602697138512,Model annual,K22
+selected_dashboard_basis,Revenue,Net FED revenue,Model path,$m nominal ex GST,2020,2020.7221245657595,Model annual,L22
+selected_dashboard_basis,Revenue,Net FED revenue,Model path,$m nominal ex GST,2021,2062.109649740291,Model annual,M22
+selected_dashboard_basis,Revenue,Net FED revenue,Model path,$m nominal ex GST,2022,2051.0815249167854,Model annual,N22
+selected_dashboard_basis,Revenue,Net FED revenue,Model path,$m nominal ex GST,2023,2073.8079156817903,Model annual,O22
+selected_dashboard_basis,Revenue,Net FED revenue,Model path,$m nominal ex GST,2024,2110.260335924054,Model annual,P22
+selected_dashboard_basis,Revenue,Net FED revenue,Model path,$m nominal ex GST,2025,2136.1576698225167,Model annual,Q22
+selected_dashboard_basis,Revenue,Net FED revenue,Model path,$m nominal ex GST,2026,2126.523313043412,Model annual,R22
+selected_dashboard_basis,Revenue,Net FED revenue,Model path,$m nominal ex GST,2027,2310.6052983959403,Model annual,S22
+selected_dashboard_basis,Revenue,Net FED revenue,Model path,$m nominal ex GST,2028,2632.266764965964,Model annual,T22
+selected_dashboard_basis,Revenue,Net FED revenue,Model path,$m nominal ex GST,2029,2829.303071964893,Model annual,U22
+selected_dashboard_basis,Revenue,Net FED revenue,Model path,$m nominal ex GST,2030,3003.6279806976454,Model annual,V22
+selected_dashboard_basis,Revenue,Net FED revenue,Model path,$m nominal ex GST,2031,3180.7887024836414,Model annual,W22
+selected_dashboard_basis,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2014,1215.0535637039113,Model annual,F23
+selected_dashboard_basis,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2015,1300.2448584680835,Model annual,G23
+selected_dashboard_basis,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2016,1425.3498080911831,Model annual,H23
+selected_dashboard_basis,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2017,1471.1063333045306,Model annual,I23
+selected_dashboard_basis,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2018,1523.3892994436324,Model annual,J23
+selected_dashboard_basis,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2019,1606.6926151787754,Model annual,K23
+selected_dashboard_basis,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2020,1723.8244168604651,Model annual,L23
+selected_dashboard_basis,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2021,1879.1927968460907,Model annual,M23
+selected_dashboard_basis,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2022,1787.533238326201,Model annual,N23
+selected_dashboard_basis,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2023,1369.4091903547564,Model annual,O23
+selected_dashboard_basis,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2024,1938.6725033954945,Model annual,P23
+selected_dashboard_basis,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2025,2022.5694815541553,Model annual,Q23
+selected_dashboard_basis,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2026,2139.1914928414335,Model annual,R23
+selected_dashboard_basis,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2027,2386.01076493662,Model annual,S23
+selected_dashboard_basis,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2028,2752.1583024044076,Model annual,T23
+selected_dashboard_basis,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2029,3049.2792464512245,Model annual,U23
+selected_dashboard_basis,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2030,3351.0630264138003,Model annual,V23
+selected_dashboard_basis,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2031,3682.2881919374686,Model annual,W23
+selected_dashboard_basis,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2014,187.11138627,Model annual,F24
+selected_dashboard_basis,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2015,180.97377321,Model annual,G24
+selected_dashboard_basis,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2016,214.12784664,Model annual,H24
+selected_dashboard_basis,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2017,222.92673366,Model annual,I24
+selected_dashboard_basis,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2018,227.44634928,Model annual,J24
+selected_dashboard_basis,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2019,226.76755138,Model annual,K24
+selected_dashboard_basis,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2020,225.63410553,Model annual,L24
+selected_dashboard_basis,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2021,231.40607684,Model annual,M24
+selected_dashboard_basis,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2022,234.22087228,Model annual,N24
+selected_dashboard_basis,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2023,236.05552871,Model annual,O24
+selected_dashboard_basis,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2024,232.27816723,Model annual,P24
+selected_dashboard_basis,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2025,298.392465976379,Model annual,Q24
+selected_dashboard_basis,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2026,461.500674074328,Model annual,R24
+selected_dashboard_basis,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2027,534.246717008712,Model annual,S24
+selected_dashboard_basis,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2028,528.330914986474,Model annual,T24
+selected_dashboard_basis,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2029,522.91368587705,Model annual,U24
+selected_dashboard_basis,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2030,517.947689223757,Model annual,V24
+selected_dashboard_basis,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2031,513.389185291356,Model annual,W24
+selected_dashboard_basis,Revenue,TUC net revenue,Model path,$m nominal ex GST,2014,0,Model annual,F25
+selected_dashboard_basis,Revenue,TUC net revenue,Model path,$m nominal ex GST,2015,0,Model annual,G25
+selected_dashboard_basis,Revenue,TUC net revenue,Model path,$m nominal ex GST,2016,0,Model annual,H25
+selected_dashboard_basis,Revenue,TUC net revenue,Model path,$m nominal ex GST,2017,0,Model annual,I25
+selected_dashboard_basis,Revenue,TUC net revenue,Model path,$m nominal ex GST,2018,0,Model annual,J25
+selected_dashboard_basis,Revenue,TUC net revenue,Model path,$m nominal ex GST,2019,0,Model annual,K25
+selected_dashboard_basis,Revenue,TUC net revenue,Model path,$m nominal ex GST,2020,0,Model annual,L25
+selected_dashboard_basis,Revenue,TUC net revenue,Model path,$m nominal ex GST,2021,0,Model annual,M25
+selected_dashboard_basis,Revenue,TUC net revenue,Model path,$m nominal ex GST,2022,7.23441674,Model annual,N25
+selected_dashboard_basis,Revenue,TUC net revenue,Model path,$m nominal ex GST,2023,14.97376563,Model annual,O25
+selected_dashboard_basis,Revenue,TUC net revenue,Model path,$m nominal ex GST,2024,17.6100245,Model annual,P25
+selected_dashboard_basis,Revenue,TUC net revenue,Model path,$m nominal ex GST,2025,16.788875427746298,Model annual,Q25
+selected_dashboard_basis,Revenue,TUC net revenue,Model path,$m nominal ex GST,2026,16.7604700309853,Model annual,R25
+selected_dashboard_basis,Revenue,TUC net revenue,Model path,$m nominal ex GST,2027,16.7604700309853,Model annual,S25
+selected_dashboard_basis,Revenue,TUC net revenue,Model path,$m nominal ex GST,2028,16.7604700309853,Model annual,T25
+selected_dashboard_basis,Revenue,TUC net revenue,Model path,$m nominal ex GST,2029,16.7604700309853,Model annual,U25
+selected_dashboard_basis,Revenue,TUC net revenue,Model path,$m nominal ex GST,2030,16.7604700309853,Model annual,V25
+selected_dashboard_basis,Revenue,TUC net revenue,Model path,$m nominal ex GST,2031,16.7604700309853,Model annual,W25
+selected_dashboard_basis,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2014,2919.1953678586847,Model annual,F26
+selected_dashboard_basis,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2015,3131.037042284351,Model annual,G26
+selected_dashboard_basis,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2016,3428.877284539555,Model annual,H26
+selected_dashboard_basis,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2017,3526.6434662361744,Model annual,I26
+selected_dashboard_basis,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2018,3599.854005568155,Model annual,J26
+selected_dashboard_basis,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2019,3782.051441855913,Model annual,K26
+selected_dashboard_basis,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2020,3957.405075845737,Model annual,L26
+selected_dashboard_basis,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2021,4159.649988093945,Model annual,M26
+selected_dashboard_basis,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2022,3867.7826597842322,Model annual,N26
+selected_dashboard_basis,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2023,2955.9352961841328,Model annual,O26
+selected_dashboard_basis,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2024,4272.837558417285,Model annual,P26
+selected_dashboard_basis,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2025,4441.492065946646,Model annual,Q26
+selected_dashboard_basis,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2026,4709.942174904469,Model annual,R26
+selected_dashboard_basis,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2027,5212.758720112038,Model annual,S26
+selected_dashboard_basis,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2028,5892.451504025233,Model annual,T26
+selected_dashboard_basis,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2029,6378.664853956568,Model annual,U26
+selected_dashboard_basis,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2030,6848.9579993645,Model annual,V26
+selected_dashboard_basis,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2031,7349.988549228124,Model annual,W26
+selected_dashboard_basis,Revenue,Total NLTF revenue,Actual,$m nominal ex GST,2014,3130.914593957826,Model annual,F27
+selected_dashboard_basis,Revenue,Total NLTF revenue,Actual,$m nominal ex GST,2015,3339.5229079239125,Model annual,G27
+selected_dashboard_basis,Revenue,Total NLTF revenue,Actual,$m nominal ex GST,2016,3607.7065302421743,Model annual,H27
+selected_dashboard_basis,Revenue,Total NLTF revenue,Actual,$m nominal ex GST,2017,3709.0222407334786,Model annual,I27
+selected_dashboard_basis,Revenue,Total NLTF revenue,Actual,$m nominal ex GST,2018,3784.674616633043,Model annual,J27
+selected_dashboard_basis,Revenue,Total NLTF revenue,Actual,$m nominal ex GST,2019,3987.126463863913,Model annual,K27
+selected_dashboard_basis,Revenue,Total NLTF revenue,Actual,$m nominal ex GST,2020,3918.7539892656528,Model annual,L27
+selected_dashboard_basis,Revenue,Total NLTF revenue,Actual,$m nominal ex GST,2021,4398.784946763043,Model annual,M27
+selected_dashboard_basis,Revenue,Total NLTF revenue,Actual,$m nominal ex GST,2022,3918.7795892665213,Model annual,N27
+selected_dashboard_basis,Revenue,Total NLTF revenue,Actual,$m nominal ex GST,2023,3052.4360642308693,Model annual,O27
+selected_dashboard_basis,Revenue,Total NLTF revenue,Actual,$m nominal ex GST,2024,4231.953290691305,Model annual,P27
+selected_dashboard_basis,Revenue,Total NLTF revenue,Actual,$m nominal ex GST,2025,4493.732301757826,Model annual,Q27
+selected_dashboard_basis,Revenue,Total NLTF revenue,Actual,$m nominal ex GST,2026,3528.4102510530433,Model annual,R27
+selected_dashboard_basis,Error,Total NLTF revenue error %,Error,percent,2014,-0.06762216590248948,Model annual,F28
+selected_dashboard_basis,Error,Total NLTF revenue error %,Error,percent,2015,-0.06242983545490065,Model annual,G28
+selected_dashboard_basis,Error,Total NLTF revenue error %,Error,percent,2016,-0.04956867866151375,Model annual,H28
+selected_dashboard_basis,Error,Total NLTF revenue error %,Error,percent,2017,-0.04917165836709504,Model annual,I28
+selected_dashboard_basis,Error,Total NLTF revenue error %,Error,percent,2018,-0.048833950018485284,Model annual,J28
+selected_dashboard_basis,Error,Total NLTF revenue error %,Error,percent,2019,-0.05143429080231951,Model annual,K28
+selected_dashboard_basis,Error,Total NLTF revenue error %,Error,percent,2020,0.00986310615209792,Model annual,L28
+selected_dashboard_basis,Error,Total NLTF revenue error %,Error,percent,2021,-0.05436386674121733,Model annual,M28
+selected_dashboard_basis,Error,Total NLTF revenue error %,Error,percent,2022,-0.01301347226110117,Model annual,N28
+selected_dashboard_basis,Error,Total NLTF revenue error %,Error,percent,2023,-0.03161434540023766,Model annual,O28
+selected_dashboard_basis,Error,Total NLTF revenue error %,Error,percent,2024,0.009660850420043783,Model annual,P28
+selected_dashboard_basis,Error,Total NLTF revenue error %,Error,percent,2025,-0.011625133030453361,Model annual,Q28
+selected_dashboard_basis,Error,Total NLTF revenue error %,Error,percent,2026,0.33486239971635967,Model annual,R28
+selected_dashboard_basis,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2014,1615.4105802199997,Model annual,F29
+selected_dashboard_basis,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2015,1747.67746669,Model annual,G29
+selected_dashboard_basis,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2016,1882.74595473,Model annual,H29
+selected_dashboard_basis,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2017,1912.66999522,Model annual,I29
+selected_dashboard_basis,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2018,1903.81485678,Model annual,J29
+selected_dashboard_basis,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2019,1987.11584821,Model annual,K29
+selected_dashboard_basis,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2020,1882.5315714899998,Model annual,L29
+selected_dashboard_basis,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2021,2148.5161073599998,Model annual,M29
+selected_dashboard_basis,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2022,1951.9998306100001,Model annual,N29
+selected_dashboard_basis,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2023,2055.1134194540073,Model annual,O29
+selected_dashboard_basis,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2024,2006.92979505,Model annual,P29
+selected_dashboard_basis,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2025,1997.7271466000002,Model annual,Q29
+selected_dashboard_basis,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2026,1504.38889646,Model annual,R29
+selected_dashboard_basis,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2027,0,Model annual,S29
+selected_dashboard_basis,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2028,0,Model annual,T29
+selected_dashboard_basis,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2029,0,Model annual,U29
+selected_dashboard_basis,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2030,0,Model annual,V29
+selected_dashboard_basis,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2031,0,Model annual,W29
+selected_dashboard_basis,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2014,0,Model annual,F30
+selected_dashboard_basis,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2015,0,Model annual,G30
+selected_dashboard_basis,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2016,0,Model annual,H30
+selected_dashboard_basis,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2017,0,Model annual,I30
+selected_dashboard_basis,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2018,0,Model annual,J30
+selected_dashboard_basis,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2019,0,Model annual,K30
+selected_dashboard_basis,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2020,0,Model annual,L30
+selected_dashboard_basis,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2021,0,Model annual,M30
+selected_dashboard_basis,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2022,0,Model annual,N30
+selected_dashboard_basis,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2023,0,Model annual,O30
+selected_dashboard_basis,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2024,29.299553717522837,Model annual,P30
+selected_dashboard_basis,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2025,51.73623710415208,Model annual,Q30
+selected_dashboard_basis,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2026,80.24381589529041,Model annual,R30
+selected_dashboard_basis,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2027,130.5127160778769,Model annual,S30
+selected_dashboard_basis,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2028,183.33771797964667,Model annual,T30
+selected_dashboard_basis,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2029,245.56649363974037,Model annual,U30
+selected_dashboard_basis,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2030,330.8942282099141,Model annual,V30
+selected_dashboard_basis,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2031,436.13769096323966,Model annual,W30
+selected_dashboard_basis,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2014,0,Model annual,F31
+selected_dashboard_basis,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2015,0,Model annual,G31
+selected_dashboard_basis,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2016,0,Model annual,H31
+selected_dashboard_basis,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2017,0,Model annual,I31
+selected_dashboard_basis,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2018,0,Model annual,J31
+selected_dashboard_basis,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2019,0,Model annual,K31
+selected_dashboard_basis,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2020,0,Model annual,L31
+selected_dashboard_basis,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2021,0,Model annual,M31
+selected_dashboard_basis,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2022,0,Model annual,N31
+selected_dashboard_basis,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2023,0,Model annual,O31
+selected_dashboard_basis,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2024,6.967238977145962,Model annual,P31
+selected_dashboard_basis,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2025,13.348586778564586,Model annual,Q31
+selected_dashboard_basis,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2026,21.206095273544662,Model annual,R31
+selected_dashboard_basis,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2027,36.2299226266232,Model annual,S31
+selected_dashboard_basis,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2028,50.578476402066904,Model annual,T31
+selected_dashboard_basis,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2029,67.40173883837572,Model annual,U31
+selected_dashboard_basis,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2030,89.5531966027811,Model annual,V31
+selected_dashboard_basis,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2031,115.13724559276987,Model annual,W31
+selected_dashboard_basis,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2014,0,Model annual,F32
+selected_dashboard_basis,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2015,0,Model annual,G32
+selected_dashboard_basis,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2016,0,Model annual,H32
+selected_dashboard_basis,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2017,0,Model annual,I32
+selected_dashboard_basis,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2018,0,Model annual,J32
+selected_dashboard_basis,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2019,0,Model annual,K32
+selected_dashboard_basis,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2020,0,Model annual,L32
+selected_dashboard_basis,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2021,0,Model annual,M32
+selected_dashboard_basis,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2022,0,Model annual,N32
+selected_dashboard_basis,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2023,0,Model annual,O32
+selected_dashboard_basis,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2024,0,Model annual,P32
+selected_dashboard_basis,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2025,0,Model annual,Q32
+selected_dashboard_basis,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2026,1.5803666661261728,Model annual,R32
+selected_dashboard_basis,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2027,17.101171779186018,Model annual,S32
+selected_dashboard_basis,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2028,23.410263014641597,Model annual,T32
+selected_dashboard_basis,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2029,29.98346600723092,Model annual,U32
+selected_dashboard_basis,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2030,38.02544806409017,Model annual,V32
+selected_dashboard_basis,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2031,47.82106317147639,Model annual,W32
+selected_dashboard_basis,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2014,400.8862869562105,Model annual,F33
+selected_dashboard_basis,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2015,465.1672786862366,Model annual,G33
+selected_dashboard_basis,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2016,536.3286897197157,Model annual,H33
+selected_dashboard_basis,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2017,497.1384332863272,Model annual,I33
+selected_dashboard_basis,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2018,527.1596374210728,Model annual,J33
+selected_dashboard_basis,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2019,651.2061567605243,Model annual,K33
+selected_dashboard_basis,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2020,689.3984874173917,Model annual,L33
+selected_dashboard_basis,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2021,779.8495045025725,Model annual,M33
+selected_dashboard_basis,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2022,744.0771159872602,Model annual,N33
+selected_dashboard_basis,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2023,585.2599925360527,Model annual,O33
+selected_dashboard_basis,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2024,752.3996065444555,Model annual,P33
+selected_dashboard_basis,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2025,774.790357546907,Model annual,Q33
+selected_dashboard_basis,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2026,856.2641055736624,Model annual,R33
+selected_dashboard_basis,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2027,941.9699603832014,Model annual,S33
+selected_dashboard_basis,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2028,1084.3682005263113,Model annual,T33
+selected_dashboard_basis,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2029,1200.3774332557468,Model annual,U33
+selected_dashboard_basis,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2030,1305.8514122651277,Model annual,V33
+selected_dashboard_basis,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2031,1414.7358611494637,Model annual,W33
+selected_dashboard_basis,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2014,814.167276747701,Model annual,F34
+selected_dashboard_basis,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2015,835.0775797818468,Model annual,G34
+selected_dashboard_basis,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2016,889.0211183714674,Model annual,H34
+selected_dashboard_basis,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2017,973.9679000182033,Model annual,I34
+selected_dashboard_basis,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2018,996.2296620225594,Model annual,J34
+selected_dashboard_basis,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2019,955.4864584182512,Model annual,K34
+selected_dashboard_basis,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2020,1034.425929443073,Model annual,L34
+selected_dashboard_basis,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2021,1099.3432923435187,Model annual,M34
+selected_dashboard_basis,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2022,1043.4561223389408,Model annual,N34
+selected_dashboard_basis,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2023,784.1491978187037,Model annual,O34
+selected_dashboard_basis,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2024,1150.0061041563704,Model annual,P34
+selected_dashboard_basis,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2025,1182.6943001245318,Model annual,Q34
+selected_dashboard_basis,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2026,1179.8971094328099,Model annual,R34
+selected_dashboard_basis,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2027,1260.1969940697327,Model annual,S34
+selected_dashboard_basis,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2028,1410.4636444817409,Model annual,T34
+selected_dashboard_basis,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2029,1505.9501147101303,Model annual,U34
+selected_dashboard_basis,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2030,1586.738741271887,Model annual,V34
+selected_dashboard_basis,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2031,1668.456331060519,Model annual,W34
+selected_dashboard_basis,Volume,PED VKT per capita,Model path,km/person/FY,2014,6559.417475229311,Model annual,F35
+selected_dashboard_basis,Volume,PED VKT per capita,Model path,km/person/FY,2015,6625.742048296586,Model annual,G35
+selected_dashboard_basis,Volume,PED VKT per capita,Model path,km/person/FY,2016,6693.179402735072,Model annual,H35
+selected_dashboard_basis,Volume,PED VKT per capita,Model path,km/person/FY,2017,6693.974590887769,Model annual,I35
+selected_dashboard_basis,Volume,PED VKT per capita,Model path,km/person/FY,2018,6660.668467667085,Model annual,J35
+selected_dashboard_basis,Volume,PED VKT per capita,Model path,km/person/FY,2019,6612.33863666568,Model annual,K35
+selected_dashboard_basis,Volume,PED VKT per capita,Model path,km/person/FY,2020,6290.243398395771,Model annual,L35
+selected_dashboard_basis,Volume,PED VKT per capita,Model path,km/person/FY,2021,6064.473285256158,Model annual,M35
+selected_dashboard_basis,Volume,PED VKT per capita,Model path,km/person/FY,2022,6051.950302109543,Model annual,N35
+selected_dashboard_basis,Volume,PED VKT per capita,Model path,km/person/FY,2023,6101.8412267099775,Model annual,O35
+selected_dashboard_basis,Volume,PED VKT per capita,Model path,km/person/FY,2024,5991.1566414073795,Model annual,P35
+selected_dashboard_basis,Volume,PED VKT per capita,Model path,km/person/FY,2025,6019.216701102901,Model annual,Q35
+selected_dashboard_basis,Volume,PED VKT per capita,Model path,km/person/FY,2026,5966.472849076411,Model annual,R35
+selected_dashboard_basis,Volume,PED VKT per capita,Model path,km/person/FY,2027,5940.005511556976,Model annual,S35
+selected_dashboard_basis,Volume,PED VKT per capita,Model path,km/person/FY,2028,5987.013353592943,Model annual,T35
+selected_dashboard_basis,Volume,PED VKT per capita,Model path,km/person/FY,2029,6005.207807975686,Model annual,U35
+selected_dashboard_basis,Volume,PED VKT per capita,Model path,km/person/FY,2030,6025.881252248581,Model annual,V35
+selected_dashboard_basis,Volume,PED VKT per capita,Model path,km/person/FY,2031,6042.406131218168,Model annual,W35
+selected_dashboard_basis,Volume,PED VKT per capita,Actual,km/person/FY,2014,6573.478646369895,Model annual,F36
+selected_dashboard_basis,Volume,PED VKT per capita,Actual,km/person/FY,2015,6589.0997950086285,Model annual,G36
+selected_dashboard_basis,Volume,PED VKT per capita,Actual,km/person/FY,2016,6696.960617659575,Model annual,H36
+selected_dashboard_basis,Volume,PED VKT per capita,Actual,km/person/FY,2017,6739.354751171511,Model annual,I36
+selected_dashboard_basis,Volume,PED VKT per capita,Actual,km/person/FY,2018,6730.567997281689,Model annual,J36
+selected_dashboard_basis,Volume,PED VKT per capita,Actual,km/person/FY,2019,6624.908997846997,Model annual,K36
+selected_dashboard_basis,Volume,PED VKT per capita,Actual,km/person/FY,2020,6107.3688730444865,Model annual,L36
+selected_dashboard_basis,Volume,PED VKT per capita,Actual,km/person/FY,2021,6031.76090582156,Model annual,M36
+selected_dashboard_basis,Volume,PED VKT per capita,Actual,km/person/FY,2022,5852.379317063559,Model annual,N36
+selected_dashboard_basis,Volume,PED VKT per capita,Actual,km/person/FY,2023,6098.2053446307855,Model annual,O36
+selected_dashboard_basis,Volume,PED VKT per capita,Actual,km/person/FY,2024,6098.650188695321,Model annual,P36
+selected_dashboard_basis,Volume,PED VKT per capita,Actual,km/person/FY,2025,6086.697742339673,Model annual,Q36
+selected_dashboard_basis,Volume,PED VKT per capita,Actual,km/person/FY,2026,#N/A,Model annual,R36
+selected_dashboard_basis,Volume,PED VKT per capita,Actual,km/person/FY,2027,#N/A,Model annual,S36
+selected_dashboard_basis,Volume,PED VKT per capita,Actual,km/person/FY,2028,#N/A,Model annual,T36
+selected_dashboard_basis,Volume,PED VKT per capita,Actual,km/person/FY,2029,#N/A,Model annual,U36
+selected_dashboard_basis,Volume,PED VKT per capita,Actual,km/person/FY,2030,#N/A,Model annual,V36
+selected_dashboard_basis,Volume,PED VKT per capita,Actual,km/person/FY,2031,#N/A,Model annual,W36
+in_house_model,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2014,2732.0839815886848,MA Inhouse,F6
+in_house_model,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2015,2950.0632690743514,MA Inhouse,G6
+in_house_model,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2016,3214.7494378995552,MA Inhouse,H6
+in_house_model,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2017,3303.7167325761748,MA Inhouse,I6
+in_house_model,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2018,3372.407656288155,MA Inhouse,J6
+in_house_model,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2019,3555.2838904759124,MA Inhouse,K6
+in_house_model,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2020,3731.7709703157366,MA Inhouse,L6
+in_house_model,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2021,3928.2439112539446,MA Inhouse,M6
+in_house_model,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2022,3626.3273707642325,MA Inhouse,N6
+in_house_model,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2023,2704.906001844133,MA Inhouse,O6
+in_house_model,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2024,4022.949366687286,MA Inhouse,P6
+in_house_model,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2025,4126.31072454252,MA Inhouse,Q6
+in_house_model,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2026,4231.681030799155,MA Inhouse,R6
+in_house_model,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2027,4661.751533072341,MA Inhouse,S6
+in_house_model,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2028,5347.360119007773,MA Inhouse,T6
+in_house_model,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2029,5838.990698048532,MA Inhouse,U6
+in_house_model,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2030,6314.249840109758,MA Inhouse,V6
+in_house_model,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2031,6807.20169550808,MA Inhouse,W6
+in_house_model,Revenue,Total RUC+PED revenue,Actual,$m nominal ex GST,2014,2844.0938067399998,MA Inhouse,F7
+in_house_model,Revenue,Total RUC+PED revenue,Actual,$m nominal ex GST,2015,3051.30426054,MA Inhouse,G7
+in_house_model,Revenue,Total RUC+PED revenue,Actual,$m nominal ex GST,2016,3285.9421071499996,MA Inhouse,H7
+in_house_model,Revenue,Total RUC+PED revenue,Actual,$m nominal ex GST,2017,3385.69404103,MA Inhouse,I7
+in_house_model,Revenue,Total RUC+PED revenue,Actual,$m nominal ex GST,2018,3460.2416422399997,MA Inhouse,J7
+in_house_model,Revenue,Total RUC+PED revenue,Actual,$m nominal ex GST,2019,3666.17934731,MA Inhouse,K7
+in_house_model,Revenue,Total RUC+PED revenue,Actual,$m nominal ex GST,2020,3602.7678296400004,MA Inhouse,L7
+in_house_model,Revenue,Total RUC+PED revenue,Actual,$m nominal ex GST,2021,4075.57072141,MA Inhouse,M7
+in_house_model,Revenue,Total RUC+PED revenue,Actual,$m nominal ex GST,2022,3974.76788937,MA Inhouse,N7
+in_house_model,Revenue,Total RUC+PED revenue,Actual,$m nominal ex GST,2023,4119.810604464448,MA Inhouse,O7
+in_house_model,Revenue,Total RUC+PED revenue,Actual,$m nominal ex GST,2024,3853.4943681786963,MA Inhouse,P7
+in_house_model,Revenue,Total RUC+PED revenue,Actual,$m nominal ex GST,2025,4046.315821989565,MA Inhouse,Q7
+in_house_model,Revenue,Total RUC+PED revenue,Actual,$m nominal ex GST,2026,3114.329609640869,MA Inhouse,R7
+in_house_model,Revenue,PED revenue,Model path,$m nominal ex GST,2014,1538.7546337860879,MA Inhouse,F8
+in_house_model,Revenue,PED revenue,Model path,$m nominal ex GST,2015,1675.8277684850273,MA Inhouse,G8
+in_house_model,Revenue,PED revenue,Model path,$m nominal ex GST,2016,1825.1433926893926,MA Inhouse,H8
+in_house_model,Revenue,PED revenue,Model path,$m nominal ex GST,2017,1866.3490535458727,MA Inhouse,I8
+in_house_model,Revenue,PED revenue,Model path,$m nominal ex GST,2018,1891.8637708365613,MA Inhouse,J8
+in_house_model,Revenue,PED revenue,Model path,$m nominal ex GST,2019,1990.3630083338512,MA Inhouse,K8
+in_house_model,Revenue,PED revenue,Model path,$m nominal ex GST,2020,2052.8608387357594,MA Inhouse,L8
+in_house_model,Revenue,PED revenue,Model path,$m nominal ex GST,2021,2089.8321175302913,MA Inhouse,M8
+in_house_model,Revenue,PED revenue,Model path,$m nominal ex GST,2022,1865.560459406785,MA Inhouse,N8
+in_house_model,Revenue,PED revenue,Model path,$m nominal ex GST,2023,1367.739538817783,MA Inhouse,O8
+in_house_model,Revenue,PED revenue,Model path,$m nominal ex GST,2024,2137.099675024054,MA Inhouse,P8
+in_house_model,Revenue,PED revenue,Model path,$m nominal ex GST,2025,2165.1168280025167,MA Inhouse,Q8
+in_house_model,Revenue,PED revenue,Model path,$m nominal ex GST,2026,2156.4542998764714,MA Inhouse,R8
+in_house_model,Revenue,PED revenue,Model path,$m nominal ex GST,2027,2349.3523637218464,MA Inhouse,S8
+in_house_model,Revenue,PED revenue,Model path,$m nominal ex GST,2028,2680.6795318750796,MA Inhouse,T8
+in_house_model,Revenue,PED revenue,Model path,$m nominal ex GST,2029,2883.263470760643,MA Inhouse,U8
+in_house_model,Revenue,PED revenue,Model path,$m nominal ex GST,2030,3060.5743909796365,MA Inhouse,V8
+in_house_model,Revenue,PED revenue,Model path,$m nominal ex GST,2031,3236.792373343279,MA Inhouse,W8
+in_house_model,Revenue,PED revenue,Actual,$m nominal ex GST,2014,1626.00155652,MA Inhouse,F9
+in_house_model,Revenue,PED revenue,Actual,$m nominal ex GST,2015,1761.9266930899998,MA Inhouse,G9
+in_house_model,Revenue,PED revenue,Actual,$m nominal ex GST,2016,1906.0248969000002,MA Inhouse,H9
+in_house_model,Revenue,PED revenue,Actual,$m nominal ex GST,2017,1933.77670022,MA Inhouse,I9
+in_house_model,Revenue,PED revenue,Actual,$m nominal ex GST,2018,1933.90465553,MA Inhouse,J9
+in_house_model,Revenue,PED revenue,Actual,$m nominal ex GST,2019,2016.01858683,MA Inhouse,K9
+in_house_model,Revenue,PED revenue,Actual,$m nominal ex GST,2020,1914.6702856599998,MA Inhouse,L9
+in_house_model,Revenue,PED revenue,Actual,$m nominal ex GST,2021,2176.23857515,MA Inhouse,M9
+in_house_model,Revenue,PED revenue,Actual,$m nominal ex GST,2022,1965.6162321,MA Inhouse,N9
+in_house_model,Revenue,PED revenue,Actual,$m nominal ex GST,2023,2074.732468454007,MA Inhouse,O9
+in_house_model,Revenue,PED revenue,Actual,$m nominal ex GST,2024,2033.7691341500001,MA Inhouse,P9
+in_house_model,Revenue,PED revenue,Actual,$m nominal ex GST,2025,2026.68630478,MA Inhouse,Q9
+in_house_model,Revenue,PED revenue,Actual,$m nominal ex GST,2026,1526.14839319,MA Inhouse,R9
+in_house_model,Volume,PED volume,Model path,million L,2014,2874.8872165497496,MA Inhouse,F10
+in_house_model,Volume,PED volume,Model path,million L,2015,2964.807459636663,MA Inhouse,G10
+in_house_model,Volume,PED volume,Model path,million L,2016,3066.231087778699,MA Inhouse,H10
+in_house_model,Volume,PED volume,Model path,million L,2017,3135.456376496661,MA Inhouse,I10
+in_house_model,Volume,PED volume,Model path,million L,2018,3178.320964378337,MA Inhouse,J10
+in_house_model,Volume,PED volume,Model path,million L,2019,3201.624133825383,MA Inhouse,K10
+in_house_model,Volume,PED volume,Model path,million L,2020,3085.8950735610592,MA Inhouse,L10
+in_house_model,Volume,PED volume,Model path,million L,2021,2984.451213198748,MA Inhouse,M10
+in_house_model,Volume,PED volume,Model path,million L,2022,2973.9920650411773,MA Inhouse,N10
+in_house_model,Volume,PED volume,Model path,million L,2023,3037.8010368198807,MA Inhouse,O10
+in_house_model,Volume,PED volume,Model path,million L,2024,3051.9531518108847,MA Inhouse,P10
+in_house_model,Volume,PED volume,Model path,million L,2025,3091.9639380819676,MA Inhouse,Q10
+in_house_model,Volume,PED volume,Model path,million L,2026,3079.593139318621,MA Inhouse,R10
+in_house_model,Volume,PED volume,Model path,million L,2027,3089.5452272107345,MA Inhouse,S10
+in_house_model,Volume,PED volume,Model path,million L,2028,3152.8339371519023,MA Inhouse,T10
+in_house_model,Volume,PED volume,Model path,million L,2029,3202.7587275795327,MA Inhouse,U10
+in_house_model,Volume,PED volume,Model path,million L,2030,3255.0768228830266,MA Inhouse,V10
+in_house_model,Volume,PED volume,Model path,million L,2031,3302.1086105571694,MA Inhouse,W10
+in_house_model,Volume,Light RUC net km,Model path,million km,2014,8506.845669483813,MA Inhouse,F11
+in_house_model,Volume,Light RUC net km,Model path,million km,2015,9078.464633550215,MA Inhouse,G11
+in_house_model,Volume,Light RUC net km,Model path,million km,2016,9888.034325804996,MA Inhouse,H11
+in_house_model,Volume,Light RUC net km,Model path,million km,2017,10559.040080143435,MA Inhouse,I11
+in_house_model,Volume,Light RUC net km,Model path,million km,2018,11204.56634405476,MA Inhouse,J11
+in_house_model,Volume,Light RUC net km,Model path,million km,2019,11244.417040510969,MA Inhouse,K11
+in_house_model,Volume,Light RUC net km,Model path,million km,2020,11232.351888159154,MA Inhouse,L11
+in_house_model,Volume,Light RUC net km,Model path,million km,2021,11841.437538915134,MA Inhouse,M11
+in_house_model,Volume,Light RUC net km,Model path,million km,2022,12368.26185663132,MA Inhouse,N11
+in_house_model,Volume,Light RUC net km,Model path,million km,2023,13237.834673169495,MA Inhouse,O11
+in_house_model,Volume,Light RUC net km,Model path,million km,2024,11292.892065973474,MA Inhouse,P11
+in_house_model,Volume,Light RUC net km,Model path,million km,2025,12305.239678272554,MA Inhouse,Q11
+in_house_model,Volume,Light RUC net km,Model path,million km,2026,13086.923761237404,MA Inhouse,R11
+in_house_model,Volume,Light RUC net km,Model path,million km,2027,12912.377898662222,MA Inhouse,S11
+in_house_model,Volume,Light RUC net km,Model path,million km,2028,13335.41437586944,MA Inhouse,T11
+in_house_model,Volume,Light RUC net km,Model path,million km,2029,13937.647880312397,MA Inhouse,U11
+in_house_model,Volume,Light RUC net km,Model path,million km,2030,14515.104899295595,MA Inhouse,V11
+in_house_model,Volume,Light RUC net km,Model path,million km,2031,15022.309242896747,MA Inhouse,W11
+in_house_model,Volume,Light RUC net km,Actual,million km,2014,8809.590297,MA Inhouse,F12
+in_house_model,Volume,Light RUC net km,Actual,million km,2015,9167.483044,MA Inhouse,G12
+in_house_model,Volume,Light RUC net km,Actual,million km,2016,9669.475028,MA Inhouse,H12
+in_house_model,Volume,Light RUC net km,Actual,million km,2017,10425.610839,MA Inhouse,I12
+in_house_model,Volume,Light RUC net km,Actual,million km,2018,11112.22716,MA Inhouse,J12
+in_house_model,Volume,Light RUC net km,Actual,million km,2019,11898.225208,MA Inhouse,K12
+in_house_model,Volume,Light RUC net km,Actual,million km,2020,11385.93681,MA Inhouse,L12
+in_house_model,Volume,Light RUC net km,Actual,million km,2021,11998.163013,MA Inhouse,M12
+in_house_model,Volume,Light RUC net km,Actual,million km,2022,12644.208208,MA Inhouse,N12
+in_house_model,Volume,Light RUC net km,Actual,million km,2023,13553.287615,MA Inhouse,O12
+in_house_model,Volume,Light RUC net km,Actual,million km,2024,10355.550659,MA Inhouse,P12
+in_house_model,Volume,Light RUC net km,Actual,million km,2025,12273.983872,MA Inhouse,Q12
+in_house_model,Volume,Light RUC net km,Actual,million km,2026,9626.938266,MA Inhouse,R12
+in_house_model,Volume,Heavy RUC net km,Model path,million km,2014,3649.2913429729915,MA Inhouse,F13
+in_house_model,Volume,Heavy RUC net km,Model path,million km,2015,3704.382057758254,MA Inhouse,G13
+in_house_model,Volume,Heavy RUC net km,Model path,million km,2016,3759.8733773505132,MA Inhouse,H13
+in_house_model,Volume,Heavy RUC net km,Model path,million km,2017,3810.8424668608177,MA Inhouse,I13
+in_house_model,Volume,Heavy RUC net km,Model path,million km,2018,3876.686155215679,MA Inhouse,J13
+in_house_model,Volume,Heavy RUC net km,Model path,million km,2019,3928.24527641087,MA Inhouse,K13
+in_house_model,Volume,Heavy RUC net km,Model path,million km,2020,3913.451334583326,MA Inhouse,L13
+in_house_model,Volume,Heavy RUC net km,Model path,million km,2021,4005.152131441771,MA Inhouse,M13
+in_house_model,Volume,Heavy RUC net km,Model path,million km,2022,4026.1205268419617,MA Inhouse,N13
+in_house_model,Volume,Heavy RUC net km,Model path,million km,2023,4176.04219947854,MA Inhouse,O13
+in_house_model,Volume,Heavy RUC net km,Model path,million km,2024,4120.34478140499,MA Inhouse,P13
+in_house_model,Volume,Heavy RUC net km,Model path,million km,2025,4108.162274312818,MA Inhouse,Q13
+in_house_model,Volume,Heavy RUC net km,Model path,million km,2026,4142.678703859586,MA Inhouse,R13
+in_house_model,Volume,Heavy RUC net km,Model path,million km,2027,4192.825425159582,MA Inhouse,S13
+in_house_model,Volume,Heavy RUC net km,Model path,million km,2028,4225.058773994761,MA Inhouse,T13
+in_house_model,Volume,Heavy RUC net km,Model path,million km,2029,4260.045840167674,MA Inhouse,U13
+in_house_model,Volume,Heavy RUC net km,Model path,million km,2030,4297.135424765783,MA Inhouse,V13
+in_house_model,Volume,Heavy RUC net km,Model path,million km,2031,4331.438236721968,MA Inhouse,W13
+in_house_model,Volume,Heavy RUC net km,Actual,million km,2014,3646.506756,MA Inhouse,F14
+in_house_model,Volume,Heavy RUC net km,Actual,million km,2015,3698.793648,MA Inhouse,G14
+in_house_model,Volume,Heavy RUC net km,Actual,million km,2016,3716.710068,MA Inhouse,H14
+in_house_model,Volume,Heavy RUC net km,Actual,million km,2017,3842.683587,MA Inhouse,I14
+in_house_model,Volume,Heavy RUC net km,Actual,million km,2018,4022.092402,MA Inhouse,J14
+in_house_model,Volume,Heavy RUC net km,Actual,million km,2019,4071.164816,MA Inhouse,K14
+in_house_model,Volume,Heavy RUC net km,Actual,million km,2020,3867.517432,MA Inhouse,L14
+in_house_model,Volume,Heavy RUC net km,Actual,million km,2021,4141.235503,MA Inhouse,M14
+in_house_model,Volume,Heavy RUC net km,Actual,million km,2022,4170.928916,MA Inhouse,N14
+in_house_model,Volume,Heavy RUC net km,Actual,million km,2023,4152.746925,MA Inhouse,O14
+in_house_model,Volume,Heavy RUC net km,Actual,million km,2024,3903.861766,MA Inhouse,P14
+in_house_model,Volume,Heavy RUC net km,Actual,million km,2025,3981.873439,MA Inhouse,Q14
+in_house_model,Volume,Heavy RUC net km,Actual,million km,2026,3082.755083,MA Inhouse,R14
+in_house_model,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2014,400.8862869562105,MA Inhouse,F15
+in_house_model,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2015,465.1672786862366,MA Inhouse,G15
+in_house_model,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2016,536.3286897197157,MA Inhouse,H15
+in_house_model,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2017,497.1384332863272,MA Inhouse,I15
+in_house_model,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2018,527.1596374210728,MA Inhouse,J15
+in_house_model,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2019,651.2061567605243,MA Inhouse,K15
+in_house_model,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2020,689.3984874173917,MA Inhouse,L15
+in_house_model,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2021,779.8495045025725,MA Inhouse,M15
+in_house_model,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2022,744.0771159872602,MA Inhouse,N15
+in_house_model,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2023,585.2599925360527,MA Inhouse,O15
+in_house_model,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2024,752.3996065444555,MA Inhouse,P15
+in_house_model,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2025,774.790357546907,MA Inhouse,Q15
+in_house_model,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2026,856.2641055736624,MA Inhouse,R15
+in_house_model,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2027,941.9699603832014,MA Inhouse,S15
+in_house_model,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2028,1084.3682005263113,MA Inhouse,T15
+in_house_model,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2029,1200.3774332557468,MA Inhouse,U15
+in_house_model,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2030,1305.8514122651277,MA Inhouse,V15
+in_house_model,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2031,1408.942383891286,MA Inhouse,W15
+in_house_model,Revenue,Light RUC revenue,Actual,$m nominal ex GST,2014,415.12343537000004,MA Inhouse,F16
+in_house_model,Revenue,Light RUC revenue,Actual,$m nominal ex GST,2015,469.80848421,MA Inhouse,G16
+in_house_model,Revenue,Light RUC revenue,Actual,$m nominal ex GST,2016,524.52914789,MA Inhouse,H16
+in_house_model,Revenue,Light RUC revenue,Actual,$m nominal ex GST,2017,490.85899264999995,MA Inhouse,I16
+in_house_model,Revenue,Light RUC revenue,Actual,$m nominal ex GST,2018,522.8235887,MA Inhouse,J16
+in_house_model,Revenue,Light RUC revenue,Actual,$m nominal ex GST,2019,688.6312373,MA Inhouse,K16
+in_house_model,Revenue,Light RUC revenue,Actual,$m nominal ex GST,2020,698.5758703699998,MA Inhouse,L16
+in_house_model,Revenue,Light RUC revenue,Actual,$m nominal ex GST,2021,790.32231374,MA Inhouse,M16
+in_house_model,Revenue,Light RUC revenue,Actual,$m nominal ex GST,2022,839.5953969171997,MA Inhouse,N16
+in_house_model,Revenue,Light RUC revenue,Actual,$m nominal ex GST,2023,902.1579233939502,MA Inhouse,O16
+in_house_model,Revenue,Light RUC revenue,Actual,$m nominal ex GST,2024,723.37189724,MA Inhouse,P16
+in_house_model,Revenue,Light RUC revenue,Actual,$m nominal ex GST,2025,837.53770151,MA Inhouse,Q16
+in_house_model,Revenue,Light RUC revenue,Actual,$m nominal ex GST,2026,673.44991052,MA Inhouse,R16
+in_house_model,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2014,814.167276747701,MA Inhouse,F17
+in_house_model,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2015,835.0775797818468,MA Inhouse,G17
+in_house_model,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2016,889.0211183714674,MA Inhouse,H17
+in_house_model,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2017,973.9679000182033,MA Inhouse,I17
+in_house_model,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2018,996.2296620225594,MA Inhouse,J17
+in_house_model,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2019,955.4864584182512,MA Inhouse,K17
+in_house_model,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2020,1034.425929443073,MA Inhouse,L17
+in_house_model,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2021,1099.3432923435187,MA Inhouse,M17
+in_house_model,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2022,1043.4561223389408,MA Inhouse,N17
+in_house_model,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2023,784.1491978187037,MA Inhouse,O17
+in_house_model,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2024,1150.0061041563704,MA Inhouse,P17
+in_house_model,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2025,1182.6943001245318,MA Inhouse,Q17
+in_house_model,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2026,1179.8971094328099,MA Inhouse,R17
+in_house_model,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2027,1260.1969940697327,MA Inhouse,S17
+in_house_model,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2028,1410.4636444817409,MA Inhouse,T17
+in_house_model,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2029,1505.9501147101303,MA Inhouse,U17
+in_house_model,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2030,1586.738741271887,MA Inhouse,V17
+in_house_model,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2031,1667.4521207996672,MA Inhouse,W17
+in_house_model,Revenue,Heavy RUC revenue,Actual,$m nominal ex GST,2014,813.55979115,MA Inhouse,F18
+in_house_model,Revenue,Heavy RUC revenue,Actual,$m nominal ex GST,2015,833.8183096399999,MA Inhouse,G18
+in_house_model,Revenue,Heavy RUC revenue,Actual,$m nominal ex GST,2016,878.66700453,MA Inhouse,H18
+in_house_model,Revenue,Heavy RUC revenue,Actual,$m nominal ex GST,2017,982.16505316,MA Inhouse,I18
+in_house_model,Revenue,Heavy RUC revenue,Actual,$m nominal ex GST,2018,1033.6031967600002,MA Inhouse,J18
+in_house_model,Revenue,Heavy RUC revenue,Actual,$m nominal ex GST,2019,990.4322618,MA Inhouse,K18
+in_house_model,Revenue,Heavy RUC revenue,Actual,$m nominal ex GST,2020,1021.66038778,MA Inhouse,L18
+in_house_model,Revenue,Heavy RUC revenue,Actual,$m nominal ex GST,2021,1136.73230031,MA Inhouse,M18
+in_house_model,Revenue,Heavy RUC revenue,Actual,$m nominal ex GST,2022,1183.1726618428002,MA Inhouse,N18
+in_house_model,Revenue,Heavy RUC revenue,Actual,$m nominal ex GST,2023,1162.5392616164913,MA Inhouse,O18
+in_house_model,Revenue,Heavy RUC revenue,Actual,$m nominal ex GST,2024,1089.56171388,MA Inhouse,P18
+in_house_model,Revenue,Heavy RUC revenue,Actual,$m nominal ex GST,2025,1146.29680501,MA Inhouse,Q18
+in_house_model,Revenue,Heavy RUC revenue,Actual,$m nominal ex GST,2026,893.7839354,MA Inhouse,R18
+in_house_model,Volume,Light BEV RUC net km,Model path,million km,2014,0,MA Inhouse,F19
+in_house_model,Volume,Light BEV RUC net km,Model path,million km,2015,0,MA Inhouse,G19
+in_house_model,Volume,Light BEV RUC net km,Model path,million km,2016,0,MA Inhouse,H19
+in_house_model,Volume,Light BEV RUC net km,Model path,million km,2017,0,MA Inhouse,I19
+in_house_model,Volume,Light BEV RUC net km,Model path,million km,2018,0,MA Inhouse,J19
+in_house_model,Volume,Light BEV RUC net km,Model path,million km,2019,0,MA Inhouse,K19
+in_house_model,Volume,Light BEV RUC net km,Model path,million km,2020,0,MA Inhouse,L19
+in_house_model,Volume,Light BEV RUC net km,Model path,million km,2021,0,MA Inhouse,M19
+in_house_model,Volume,Light BEV RUC net km,Model path,million km,2022,0,MA Inhouse,N19
+in_house_model,Volume,Light BEV RUC net km,Model path,million km,2023,0,MA Inhouse,O19
+in_house_model,Volume,Light BEV RUC net km,Model path,million km,2024,445.9283759016295,MA Inhouse,P19
+in_house_model,Volume,Light BEV RUC net km,Model path,million km,2025,824.7372360503007,MA Inhouse,Q19
+in_house_model,Volume,Light BEV RUC net km,Model path,million km,2026,1230.542762593834,MA Inhouse,R19
+in_house_model,Volume,Light BEV RUC net km,Model path,million km,2027,1790.3546817446943,MA Inhouse,S19
+in_house_model,Volume,Light BEV RUC net km,Model path,million km,2028,2253.690448428354,MA Inhouse,T19
+in_house_model,Volume,Light BEV RUC net km,Model path,million km,2029,2850.9490177017547,MA Inhouse,U19
+in_house_model,Volume,Light BEV RUC net km,Model path,million km,2030,3678.032881786407,MA Inhouse,V19
+in_house_model,Volume,Light BEV RUC net km,Model path,million km,2031,4631.10849597707,MA Inhouse,W19
+in_house_model,Volume,PHEV RUC net km,Model path,million km,2014,0,MA Inhouse,F20
+in_house_model,Volume,PHEV RUC net km,Model path,million km,2015,0,MA Inhouse,G20
+in_house_model,Volume,PHEV RUC net km,Model path,million km,2016,0,MA Inhouse,H20
+in_house_model,Volume,PHEV RUC net km,Model path,million km,2017,0,MA Inhouse,I20
+in_house_model,Volume,PHEV RUC net km,Model path,million km,2018,0,MA Inhouse,J20
+in_house_model,Volume,PHEV RUC net km,Model path,million km,2019,0,MA Inhouse,K20
+in_house_model,Volume,PHEV RUC net km,Model path,million km,2020,0,MA Inhouse,L20
+in_house_model,Volume,PHEV RUC net km,Model path,million km,2021,0,MA Inhouse,M20
+in_house_model,Volume,PHEV RUC net km,Model path,million km,2022,0,MA Inhouse,N20
+in_house_model,Volume,PHEV RUC net km,Model path,million km,2023,0,MA Inhouse,O20
+in_house_model,Volume,PHEV RUC net km,Model path,million km,2024,210.22100165821615,MA Inhouse,P20
+in_house_model,Volume,PHEV RUC net km,Model path,million km,2025,437.38527572198143,MA Inhouse,Q20
+in_house_model,Volume,PHEV RUC net km,Model path,million km,2026,638.3818328307207,MA Inhouse,R20
+in_house_model,Volume,PHEV RUC net km,Model path,million km,2027,985.6392293341952,MA Inhouse,S20
+in_house_model,Volume,PHEV RUC net km,Model path,million km,2028,1260.837003666135,MA Inhouse,T20
+in_house_model,Volume,PHEV RUC net km,Model path,million km,2029,1586.856711909962,MA Inhouse,U20
+in_house_model,Volume,PHEV RUC net km,Model path,million km,2030,2018.5550907873578,MA Inhouse,V20
+in_house_model,Volume,PHEV RUC net km,Model path,million km,2031,2478.9914100997266,MA Inhouse,W20
+in_house_model,Volume,Heavy BEV RUC net km,Model path,million km,2014,0,MA Inhouse,F21
+in_house_model,Volume,Heavy BEV RUC net km,Model path,million km,2015,0,MA Inhouse,G21
+in_house_model,Volume,Heavy BEV RUC net km,Model path,million km,2016,0,MA Inhouse,H21
+in_house_model,Volume,Heavy BEV RUC net km,Model path,million km,2017,0,MA Inhouse,I21
+in_house_model,Volume,Heavy BEV RUC net km,Model path,million km,2018,0,MA Inhouse,J21
+in_house_model,Volume,Heavy BEV RUC net km,Model path,million km,2019,0,MA Inhouse,K21
+in_house_model,Volume,Heavy BEV RUC net km,Model path,million km,2020,0,MA Inhouse,L21
+in_house_model,Volume,Heavy BEV RUC net km,Model path,million km,2021,0,MA Inhouse,M21
+in_house_model,Volume,Heavy BEV RUC net km,Model path,million km,2022,0,MA Inhouse,N21
+in_house_model,Volume,Heavy BEV RUC net km,Model path,million km,2023,0,MA Inhouse,O21
+in_house_model,Volume,Heavy BEV RUC net km,Model path,million km,2024,0,MA Inhouse,P21
+in_house_model,Volume,Heavy BEV RUC net km,Model path,million km,2025,0,MA Inhouse,Q21
+in_house_model,Volume,Heavy BEV RUC net km,Model path,million km,2026,11.493575753644889,MA Inhouse,R21
+in_house_model,Volume,Heavy BEV RUC net km,Model path,million km,2027,57.27788514791101,MA Inhouse,S21
+in_house_model,Volume,Heavy BEV RUC net km,Model path,million km,2028,70.10949960960028,MA Inhouse,T21
+in_house_model,Volume,Heavy BEV RUC net km,Model path,million km,2029,84.80806122906822,MA Inhouse,U21
+in_house_model,Volume,Heavy BEV RUC net km,Model path,million km,2030,102.97883052115843,MA Inhouse,V21
+in_house_model,Volume,Heavy BEV RUC net km,Model path,million km,2031,124.14707995981492,MA Inhouse,W21
+in_house_model,Revenue,Net FED revenue,Model path,$m nominal ex GST,2014,1528.1636574860881,MA Inhouse,F22
+in_house_model,Revenue,Net FED revenue,Model path,$m nominal ex GST,2015,1661.5785420850273,MA Inhouse,G22
+in_house_model,Revenue,Net FED revenue,Model path,$m nominal ex GST,2016,1801.8644505193927,MA Inhouse,H22
+in_house_model,Revenue,Net FED revenue,Model path,$m nominal ex GST,2017,1845.2423485458728,MA Inhouse,I22
+in_house_model,Revenue,Net FED revenue,Model path,$m nominal ex GST,2018,1861.7739720865613,MA Inhouse,J22
+in_house_model,Revenue,Net FED revenue,Model path,$m nominal ex GST,2019,1961.4602697138512,MA Inhouse,K22
+in_house_model,Revenue,Net FED revenue,Model path,$m nominal ex GST,2020,2020.7221245657595,MA Inhouse,L22
+in_house_model,Revenue,Net FED revenue,Model path,$m nominal ex GST,2021,2062.109649740291,MA Inhouse,M22
+in_house_model,Revenue,Net FED revenue,Model path,$m nominal ex GST,2022,2051.0815249167854,MA Inhouse,N22
+in_house_model,Revenue,Net FED revenue,Model path,$m nominal ex GST,2023,2073.8079156817903,MA Inhouse,O22
+in_house_model,Revenue,Net FED revenue,Model path,$m nominal ex GST,2024,2110.260335924054,MA Inhouse,P22
+in_house_model,Revenue,Net FED revenue,Model path,$m nominal ex GST,2025,2136.1576698225167,MA Inhouse,Q22
+in_house_model,Revenue,Net FED revenue,Model path,$m nominal ex GST,2026,2126.523313043412,MA Inhouse,R22
+in_house_model,Revenue,Net FED revenue,Model path,$m nominal ex GST,2027,2310.6052983959403,MA Inhouse,S22
+in_house_model,Revenue,Net FED revenue,Model path,$m nominal ex GST,2028,2632.266764965964,MA Inhouse,T22
+in_house_model,Revenue,Net FED revenue,Model path,$m nominal ex GST,2029,2829.303071964893,MA Inhouse,U22
+in_house_model,Revenue,Net FED revenue,Model path,$m nominal ex GST,2030,3003.6279806976454,MA Inhouse,V22
+in_house_model,Revenue,Net FED revenue,Model path,$m nominal ex GST,2031,3177.1288315244283,MA Inhouse,W22
+in_house_model,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2014,1215.0535637039113,MA Inhouse,F23
+in_house_model,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2015,1300.2448584680835,MA Inhouse,G23
+in_house_model,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2016,1425.3498080911831,MA Inhouse,H23
+in_house_model,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2017,1471.1063333045306,MA Inhouse,I23
+in_house_model,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2018,1523.3892994436324,MA Inhouse,J23
+in_house_model,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2019,1606.6926151787754,MA Inhouse,K23
+in_house_model,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2020,1723.8244168604651,MA Inhouse,L23
+in_house_model,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2021,1879.1927968460907,MA Inhouse,M23
+in_house_model,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2022,1787.533238326201,MA Inhouse,N23
+in_house_model,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2023,1369.4091903547564,MA Inhouse,O23
+in_house_model,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2024,1938.6725033954945,MA Inhouse,P23
+in_house_model,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2025,2022.5694815541553,MA Inhouse,Q23
+in_house_model,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2026,2139.1914928414335,MA Inhouse,R23
+in_house_model,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2027,2386.01076493662,MA Inhouse,S23
+in_house_model,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2028,2752.1583024044076,MA Inhouse,T23
+in_house_model,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2029,3049.2792464512245,MA Inhouse,U23
+in_house_model,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2030,3351.0630264138003,MA Inhouse,V23
+in_house_model,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2031,3673.204198839536,MA Inhouse,W23
+in_house_model,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2014,187.11138627,MA Inhouse,F24
+in_house_model,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2015,180.97377321,MA Inhouse,G24
+in_house_model,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2016,214.12784664,MA Inhouse,H24
+in_house_model,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2017,222.92673366,MA Inhouse,I24
+in_house_model,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2018,227.44634928,MA Inhouse,J24
+in_house_model,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2019,226.76755138,MA Inhouse,K24
+in_house_model,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2020,225.63410553,MA Inhouse,L24
+in_house_model,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2021,231.40607684,MA Inhouse,M24
+in_house_model,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2022,234.22087228,MA Inhouse,N24
+in_house_model,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2023,236.05552871,MA Inhouse,O24
+in_house_model,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2024,232.27816723,MA Inhouse,P24
+in_house_model,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2025,298.392465976379,MA Inhouse,Q24
+in_house_model,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2026,461.500674074328,MA Inhouse,R24
+in_house_model,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2027,534.246717008712,MA Inhouse,S24
+in_house_model,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2028,528.330914986474,MA Inhouse,T24
+in_house_model,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2029,522.91368587705,MA Inhouse,U24
+in_house_model,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2030,517.947689223757,MA Inhouse,V24
+in_house_model,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2031,513.389185291356,MA Inhouse,W24
+in_house_model,Revenue,TUC net revenue,Model path,$m nominal ex GST,2014,0,MA Inhouse,F25
+in_house_model,Revenue,TUC net revenue,Model path,$m nominal ex GST,2015,0,MA Inhouse,G25
+in_house_model,Revenue,TUC net revenue,Model path,$m nominal ex GST,2016,0,MA Inhouse,H25
+in_house_model,Revenue,TUC net revenue,Model path,$m nominal ex GST,2017,0,MA Inhouse,I25
+in_house_model,Revenue,TUC net revenue,Model path,$m nominal ex GST,2018,0,MA Inhouse,J25
+in_house_model,Revenue,TUC net revenue,Model path,$m nominal ex GST,2019,0,MA Inhouse,K25
+in_house_model,Revenue,TUC net revenue,Model path,$m nominal ex GST,2020,0,MA Inhouse,L25
+in_house_model,Revenue,TUC net revenue,Model path,$m nominal ex GST,2021,0,MA Inhouse,M25
+in_house_model,Revenue,TUC net revenue,Model path,$m nominal ex GST,2022,7.23441674,MA Inhouse,N25
+in_house_model,Revenue,TUC net revenue,Model path,$m nominal ex GST,2023,14.97376563,MA Inhouse,O25
+in_house_model,Revenue,TUC net revenue,Model path,$m nominal ex GST,2024,17.6100245,MA Inhouse,P25
+in_house_model,Revenue,TUC net revenue,Model path,$m nominal ex GST,2025,16.788875427746298,MA Inhouse,Q25
+in_house_model,Revenue,TUC net revenue,Model path,$m nominal ex GST,2026,16.7604700309853,MA Inhouse,R25
+in_house_model,Revenue,TUC net revenue,Model path,$m nominal ex GST,2027,16.7604700309853,MA Inhouse,S25
+in_house_model,Revenue,TUC net revenue,Model path,$m nominal ex GST,2028,16.7604700309853,MA Inhouse,T25
+in_house_model,Revenue,TUC net revenue,Model path,$m nominal ex GST,2029,16.7604700309853,MA Inhouse,U25
+in_house_model,Revenue,TUC net revenue,Model path,$m nominal ex GST,2030,16.7604700309853,MA Inhouse,V25
+in_house_model,Revenue,TUC net revenue,Model path,$m nominal ex GST,2031,16.7604700309853,MA Inhouse,W25
+in_house_model,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2014,2919.1953678586847,MA Inhouse,F26
+in_house_model,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2015,3131.037042284351,MA Inhouse,G26
+in_house_model,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2016,3428.877284539555,MA Inhouse,H26
+in_house_model,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2017,3526.6434662361744,MA Inhouse,I26
+in_house_model,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2018,3599.854005568155,MA Inhouse,J26
+in_house_model,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2019,3782.051441855913,MA Inhouse,K26
+in_house_model,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2020,3957.405075845737,MA Inhouse,L26
+in_house_model,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2021,4159.649988093945,MA Inhouse,M26
+in_house_model,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2022,3867.7826597842322,MA Inhouse,N26
+in_house_model,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2023,2955.9352961841328,MA Inhouse,O26
+in_house_model,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2024,4272.837558417285,MA Inhouse,P26
+in_house_model,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2025,4441.492065946646,MA Inhouse,Q26
+in_house_model,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2026,4709.942174904469,MA Inhouse,R26
+in_house_model,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2027,5212.758720112038,MA Inhouse,S26
+in_house_model,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2028,5892.451504025233,MA Inhouse,T26
+in_house_model,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2029,6378.664853956568,MA Inhouse,U26
+in_house_model,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2030,6848.9579993645,MA Inhouse,V26
+in_house_model,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2031,7337.351350830421,MA Inhouse,W26
+in_house_model,Revenue,Total NLTF revenue,Actual,$m nominal ex GST,2014,3130.914593957826,MA Inhouse,F27
+in_house_model,Revenue,Total NLTF revenue,Actual,$m nominal ex GST,2015,3339.5229079239125,MA Inhouse,G27
+in_house_model,Revenue,Total NLTF revenue,Actual,$m nominal ex GST,2016,3607.7065302421743,MA Inhouse,H27
+in_house_model,Revenue,Total NLTF revenue,Actual,$m nominal ex GST,2017,3709.0222407334786,MA Inhouse,I27
+in_house_model,Revenue,Total NLTF revenue,Actual,$m nominal ex GST,2018,3784.674616633043,MA Inhouse,J27
+in_house_model,Revenue,Total NLTF revenue,Actual,$m nominal ex GST,2019,3987.126463863913,MA Inhouse,K27
+in_house_model,Revenue,Total NLTF revenue,Actual,$m nominal ex GST,2020,3918.7539892656528,MA Inhouse,L27
+in_house_model,Revenue,Total NLTF revenue,Actual,$m nominal ex GST,2021,4398.784946763043,MA Inhouse,M27
+in_house_model,Revenue,Total NLTF revenue,Actual,$m nominal ex GST,2022,3918.7795892665213,MA Inhouse,N27
+in_house_model,Revenue,Total NLTF revenue,Actual,$m nominal ex GST,2023,3052.4360642308693,MA Inhouse,O27
+in_house_model,Revenue,Total NLTF revenue,Actual,$m nominal ex GST,2024,4231.953290691305,MA Inhouse,P27
+in_house_model,Revenue,Total NLTF revenue,Actual,$m nominal ex GST,2025,4493.732301757826,MA Inhouse,Q27
+in_house_model,Revenue,Total NLTF revenue,Actual,$m nominal ex GST,2026,3528.4102510530433,MA Inhouse,R27
+in_house_model,Error,Total NLTF revenue error %,Error,percent,2014,-0.06762216590248948,MA Inhouse,F28
+in_house_model,Error,Total NLTF revenue error %,Error,percent,2015,-0.06242983545490065,MA Inhouse,G28
+in_house_model,Error,Total NLTF revenue error %,Error,percent,2016,-0.04956867866151375,MA Inhouse,H28
+in_house_model,Error,Total NLTF revenue error %,Error,percent,2017,-0.04917165836709504,MA Inhouse,I28
+in_house_model,Error,Total NLTF revenue error %,Error,percent,2018,-0.048833950018485284,MA Inhouse,J28
+in_house_model,Error,Total NLTF revenue error %,Error,percent,2019,-0.05143429080231951,MA Inhouse,K28
+in_house_model,Error,Total NLTF revenue error %,Error,percent,2020,0.00986310615209792,MA Inhouse,L28
+in_house_model,Error,Total NLTF revenue error %,Error,percent,2021,-0.05436386674121733,MA Inhouse,M28
+in_house_model,Error,Total NLTF revenue error %,Error,percent,2022,-0.01301347226110117,MA Inhouse,N28
+in_house_model,Error,Total NLTF revenue error %,Error,percent,2023,-0.03161434540023766,MA Inhouse,O28
+in_house_model,Error,Total NLTF revenue error %,Error,percent,2024,0.009660850420043783,MA Inhouse,P28
+in_house_model,Error,Total NLTF revenue error %,Error,percent,2025,-0.011625133030453361,MA Inhouse,Q28
+in_house_model,Error,Total NLTF revenue error %,Error,percent,2026,0.33486239971635967,MA Inhouse,R28
+in_house_model,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2014,1615.4105802199997,MA Inhouse,F29
+in_house_model,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2015,1747.67746669,MA Inhouse,G29
+in_house_model,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2016,1882.74595473,MA Inhouse,H29
+in_house_model,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2017,1912.66999522,MA Inhouse,I29
+in_house_model,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2018,1903.81485678,MA Inhouse,J29
+in_house_model,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2019,1987.11584821,MA Inhouse,K29
+in_house_model,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2020,1882.5315714899998,MA Inhouse,L29
+in_house_model,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2021,2148.5161073599998,MA Inhouse,M29
+in_house_model,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2022,1951.9998306100001,MA Inhouse,N29
+in_house_model,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2023,2055.1134194540073,MA Inhouse,O29
+in_house_model,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2024,2006.92979505,MA Inhouse,P29
+in_house_model,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2025,1997.7271466000002,MA Inhouse,Q29
+in_house_model,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2026,1504.38889646,MA Inhouse,R29
+in_house_model,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2027,0,MA Inhouse,S29
+in_house_model,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2028,0,MA Inhouse,T29
+in_house_model,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2029,0,MA Inhouse,U29
+in_house_model,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2030,0,MA Inhouse,V29
+in_house_model,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2031,0,MA Inhouse,W29
+in_house_model,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2014,0,MA Inhouse,F30
+in_house_model,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2015,0,MA Inhouse,G30
+in_house_model,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2016,0,MA Inhouse,H30
+in_house_model,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2017,0,MA Inhouse,I30
+in_house_model,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2018,0,MA Inhouse,J30
+in_house_model,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2019,0,MA Inhouse,K30
+in_house_model,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2020,0,MA Inhouse,L30
+in_house_model,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2021,0,MA Inhouse,M30
+in_house_model,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2022,0,MA Inhouse,N30
+in_house_model,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2023,0,MA Inhouse,O30
+in_house_model,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2024,29.299553717522837,MA Inhouse,P30
+in_house_model,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2025,51.73623710415208,MA Inhouse,Q30
+in_house_model,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2026,80.24381589529041,MA Inhouse,R30
+in_house_model,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2027,130.5127160778769,MA Inhouse,S30
+in_house_model,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2028,183.33771797964667,MA Inhouse,T30
+in_house_model,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2029,245.56649363974037,MA Inhouse,U30
+in_house_model,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2030,330.8942282099141,MA Inhouse,V30
+in_house_model,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2031,434.35166583768967,MA Inhouse,W30
+in_house_model,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2014,0,MA Inhouse,F31
+in_house_model,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2015,0,MA Inhouse,G31
+in_house_model,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2016,0,MA Inhouse,H31
+in_house_model,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2017,0,MA Inhouse,I31
+in_house_model,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2018,0,MA Inhouse,J31
+in_house_model,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2019,0,MA Inhouse,K31
+in_house_model,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2020,0,MA Inhouse,L31
+in_house_model,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2021,0,MA Inhouse,M31
+in_house_model,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2022,0,MA Inhouse,N31
+in_house_model,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2023,0,MA Inhouse,O31
+in_house_model,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2024,6.967238977145962,MA Inhouse,P31
+in_house_model,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2025,13.348586778564586,MA Inhouse,Q31
+in_house_model,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2026,21.206095273544662,MA Inhouse,R31
+in_house_model,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2027,36.2299226266232,MA Inhouse,S31
+in_house_model,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2028,50.578476402066904,MA Inhouse,T31
+in_house_model,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2029,67.40173883837572,MA Inhouse,U31
+in_house_model,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2030,89.5531966027811,MA Inhouse,V31
+in_house_model,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2031,114.66574767416269,MA Inhouse,W31
+in_house_model,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2014,0,MA Inhouse,F32
+in_house_model,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2015,0,MA Inhouse,G32
+in_house_model,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2016,0,MA Inhouse,H32
+in_house_model,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2017,0,MA Inhouse,I32
+in_house_model,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2018,0,MA Inhouse,J32
+in_house_model,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2019,0,MA Inhouse,K32
+in_house_model,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2020,0,MA Inhouse,L32
+in_house_model,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2021,0,MA Inhouse,M32
+in_house_model,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2022,0,MA Inhouse,N32
+in_house_model,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2023,0,MA Inhouse,O32
+in_house_model,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2024,0,MA Inhouse,P32
+in_house_model,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2025,0,MA Inhouse,Q32
+in_house_model,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2026,1.5803666661261728,MA Inhouse,R32
+in_house_model,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2027,17.101171779186018,MA Inhouse,S32
+in_house_model,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2028,23.410263014641597,MA Inhouse,T32
+in_house_model,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2029,29.98346600723092,MA Inhouse,U32
+in_house_model,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2030,38.02544806409017,MA Inhouse,V32
+in_house_model,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2031,47.79228063672996,MA Inhouse,W32
+in_house_model,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2014,400.8862869562105,MA Inhouse,F33
+in_house_model,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2015,465.1672786862366,MA Inhouse,G33
+in_house_model,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2016,536.3286897197157,MA Inhouse,H33
+in_house_model,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2017,497.1384332863272,MA Inhouse,I33
+in_house_model,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2018,527.1596374210728,MA Inhouse,J33
+in_house_model,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2019,651.2061567605243,MA Inhouse,K33
+in_house_model,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2020,689.3984874173917,MA Inhouse,L33
+in_house_model,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2021,779.8495045025725,MA Inhouse,M33
+in_house_model,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2022,744.0771159872602,MA Inhouse,N33
+in_house_model,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2023,585.2599925360527,MA Inhouse,O33
+in_house_model,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2024,752.3996065444555,MA Inhouse,P33
+in_house_model,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2025,774.790357546907,MA Inhouse,Q33
+in_house_model,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2026,856.2641055736624,MA Inhouse,R33
+in_house_model,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2027,941.9699603832014,MA Inhouse,S33
+in_house_model,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2028,1084.3682005263113,MA Inhouse,T33
+in_house_model,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2029,1200.3774332557468,MA Inhouse,U33
+in_house_model,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2030,1305.8514122651277,MA Inhouse,V33
+in_house_model,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2031,1408.942383891286,MA Inhouse,W33
+in_house_model,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2014,814.167276747701,MA Inhouse,F34
+in_house_model,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2015,835.0775797818468,MA Inhouse,G34
+in_house_model,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2016,889.0211183714674,MA Inhouse,H34
+in_house_model,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2017,973.9679000182033,MA Inhouse,I34
+in_house_model,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2018,996.2296620225594,MA Inhouse,J34
+in_house_model,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2019,955.4864584182512,MA Inhouse,K34
+in_house_model,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2020,1034.425929443073,MA Inhouse,L34
+in_house_model,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2021,1099.3432923435187,MA Inhouse,M34
+in_house_model,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2022,1043.4561223389408,MA Inhouse,N34
+in_house_model,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2023,784.1491978187037,MA Inhouse,O34
+in_house_model,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2024,1150.0061041563704,MA Inhouse,P34
+in_house_model,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2025,1182.6943001245318,MA Inhouse,Q34
+in_house_model,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2026,1179.8971094328099,MA Inhouse,R34
+in_house_model,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2027,1260.1969940697327,MA Inhouse,S34
+in_house_model,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2028,1410.4636444817409,MA Inhouse,T34
+in_house_model,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2029,1505.9501147101303,MA Inhouse,U34
+in_house_model,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2030,1586.738741271887,MA Inhouse,V34
+in_house_model,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2031,1667.4521207996672,MA Inhouse,W34
+in_house_model,Volume,PED VKT per capita,Model path,km/person/FY,2014,6559.417475229311,MA Inhouse,F35
+in_house_model,Volume,PED VKT per capita,Model path,km/person/FY,2015,6625.742048296586,MA Inhouse,G35
+in_house_model,Volume,PED VKT per capita,Model path,km/person/FY,2016,6693.179402735072,MA Inhouse,H35
+in_house_model,Volume,PED VKT per capita,Model path,km/person/FY,2017,6693.974590887769,MA Inhouse,I35
+in_house_model,Volume,PED VKT per capita,Model path,km/person/FY,2018,6660.668467667085,MA Inhouse,J35
+in_house_model,Volume,PED VKT per capita,Model path,km/person/FY,2019,6612.33863666568,MA Inhouse,K35
+in_house_model,Volume,PED VKT per capita,Model path,km/person/FY,2020,6290.243398395771,MA Inhouse,L35
+in_house_model,Volume,PED VKT per capita,Model path,km/person/FY,2021,6064.473285256158,MA Inhouse,M35
+in_house_model,Volume,PED VKT per capita,Model path,km/person/FY,2022,6051.950302109543,MA Inhouse,N35
+in_house_model,Volume,PED VKT per capita,Model path,km/person/FY,2023,6101.8412267099775,MA Inhouse,O35
+in_house_model,Volume,PED VKT per capita,Model path,km/person/FY,2024,5991.1566414073795,MA Inhouse,P35
+in_house_model,Volume,PED VKT per capita,Model path,km/person/FY,2025,6019.216701102901,MA Inhouse,Q35
+in_house_model,Volume,PED VKT per capita,Model path,km/person/FY,2026,5966.472849076411,MA Inhouse,R35
+in_house_model,Volume,PED VKT per capita,Model path,km/person/FY,2027,5940.005511556976,MA Inhouse,S35
+in_house_model,Volume,PED VKT per capita,Model path,km/person/FY,2028,5987.013353592943,MA Inhouse,T35
+in_house_model,Volume,PED VKT per capita,Model path,km/person/FY,2029,6005.207807975686,MA Inhouse,U35
+in_house_model,Volume,PED VKT per capita,Model path,km/person/FY,2030,6025.881252248581,MA Inhouse,V35
+in_house_model,Volume,PED VKT per capita,Model path,km/person/FY,2031,6040.955071340481,MA Inhouse,W35
+in_house_model,Volume,PED VKT per capita,Actual,km/person/FY,2014,6573.478646369895,MA Inhouse,F36
+in_house_model,Volume,PED VKT per capita,Actual,km/person/FY,2015,6589.0997950086285,MA Inhouse,G36
+in_house_model,Volume,PED VKT per capita,Actual,km/person/FY,2016,6696.960617659575,MA Inhouse,H36
+in_house_model,Volume,PED VKT per capita,Actual,km/person/FY,2017,6739.354751171511,MA Inhouse,I36
+in_house_model,Volume,PED VKT per capita,Actual,km/person/FY,2018,6730.567997281689,MA Inhouse,J36
+in_house_model,Volume,PED VKT per capita,Actual,km/person/FY,2019,6624.908997846997,MA Inhouse,K36
+in_house_model,Volume,PED VKT per capita,Actual,km/person/FY,2020,6107.3688730444865,MA Inhouse,L36
+in_house_model,Volume,PED VKT per capita,Actual,km/person/FY,2021,6031.76090582156,MA Inhouse,M36
+in_house_model,Volume,PED VKT per capita,Actual,km/person/FY,2022,5852.379317063559,MA Inhouse,N36
+in_house_model,Volume,PED VKT per capita,Actual,km/person/FY,2023,6098.2053446307855,MA Inhouse,O36
+in_house_model,Volume,PED VKT per capita,Actual,km/person/FY,2024,6098.650188695321,MA Inhouse,P36
+in_house_model,Volume,PED VKT per capita,Actual,km/person/FY,2025,6086.697742339673,MA Inhouse,Q36
+in_house_model,Volume,PED VKT per capita,Actual,km/person/FY,2026,#N/A,MA Inhouse,R36
+in_house_model,Volume,PED VKT per capita,Actual,km/person/FY,2027,#N/A,MA Inhouse,S36
+in_house_model,Volume,PED VKT per capita,Actual,km/person/FY,2028,#N/A,MA Inhouse,T36
+in_house_model,Volume,PED VKT per capita,Actual,km/person/FY,2029,#N/A,MA Inhouse,U36
+in_house_model,Volume,PED VKT per capita,Actual,km/person/FY,2030,#N/A,MA Inhouse,V36
+in_house_model,Volume,PED VKT per capita,Actual,km/person/FY,2031,#N/A,MA Inhouse,W36
+aaron_schiff_model,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2014,3348.1363667152714,MA Aaron,F6
+aaron_schiff_model,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2015,3529.2489671719095,MA Aaron,G6
+aaron_schiff_model,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2016,3751.277692464593,MA Aaron,H6
+aaron_schiff_model,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2017,3775.8676010526906,MA Aaron,I6
+aaron_schiff_model,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2018,3800.1680221104784,MA Aaron,J6
+aaron_schiff_model,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2019,3955.1953582162164,MA Aaron,K6
+aaron_schiff_model,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2020,4066.4848979216376,MA Aaron,L6
+aaron_schiff_model,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2021,4243.768305228755,MA Aaron,M6
+aaron_schiff_model,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2022,3833.6182058382265,MA Aaron,N6
+aaron_schiff_model,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2023,2912.2654132188914,MA Aaron,O6
+aaron_schiff_model,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2024,4205.620515837581,MA Aaron,P6
+aaron_schiff_model,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2025,4210.987013821867,MA Aaron,Q6
+aaron_schiff_model,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2026,4266.942394981246,MA Aaron,R6
+aaron_schiff_model,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2027,4663.620767207862,MA Aaron,S6
+aaron_schiff_model,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2028,5298.71290785061,MA Aaron,T6
+aaron_schiff_model,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2029,5743.750494399307,MA Aaron,U6
+aaron_schiff_model,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2030,6174.675075431088,MA Aaron,V6
+aaron_schiff_model,Revenue,Total RUC+PED revenue,Model path,$m nominal ex GST,2031,6619.5871595833605,MA Aaron,W6
+aaron_schiff_model,Revenue,Total RUC+PED revenue,Actual,$m nominal ex GST,2014,2844.0938067399998,MA Aaron,F7
+aaron_schiff_model,Revenue,Total RUC+PED revenue,Actual,$m nominal ex GST,2015,3051.30426054,MA Aaron,G7
+aaron_schiff_model,Revenue,Total RUC+PED revenue,Actual,$m nominal ex GST,2016,3285.9421071499996,MA Aaron,H7
+aaron_schiff_model,Revenue,Total RUC+PED revenue,Actual,$m nominal ex GST,2017,3385.69404103,MA Aaron,I7
+aaron_schiff_model,Revenue,Total RUC+PED revenue,Actual,$m nominal ex GST,2018,3460.2416422399997,MA Aaron,J7
+aaron_schiff_model,Revenue,Total RUC+PED revenue,Actual,$m nominal ex GST,2019,3666.17934731,MA Aaron,K7
+aaron_schiff_model,Revenue,Total RUC+PED revenue,Actual,$m nominal ex GST,2020,3602.7678296400004,MA Aaron,L7
+aaron_schiff_model,Revenue,Total RUC+PED revenue,Actual,$m nominal ex GST,2021,4075.57072141,MA Aaron,M7
+aaron_schiff_model,Revenue,Total RUC+PED revenue,Actual,$m nominal ex GST,2022,3974.76788937,MA Aaron,N7
+aaron_schiff_model,Revenue,Total RUC+PED revenue,Actual,$m nominal ex GST,2023,4119.810604464448,MA Aaron,O7
+aaron_schiff_model,Revenue,Total RUC+PED revenue,Actual,$m nominal ex GST,2024,3853.4943681786963,MA Aaron,P7
+aaron_schiff_model,Revenue,Total RUC+PED revenue,Actual,$m nominal ex GST,2025,4046.315821989565,MA Aaron,Q7
+aaron_schiff_model,Revenue,Total RUC+PED revenue,Actual,$m nominal ex GST,2026,3114.329609640869,MA Aaron,R7
+aaron_schiff_model,Revenue,PED revenue,Model path,$m nominal ex GST,2014,2221.8272245725198,MA Aaron,F8
+aaron_schiff_model,Revenue,PED revenue,Model path,$m nominal ex GST,2015,2318.500648459235,MA Aaron,G8
+aaron_schiff_model,Revenue,PED revenue,Model path,$m nominal ex GST,2016,2429.2158352434844,MA Aaron,H8
+aaron_schiff_model,Revenue,PED revenue,Model path,$m nominal ex GST,2017,2395.674988675129,MA Aaron,I8
+aaron_schiff_model,Revenue,PED revenue,Model path,$m nominal ex GST,2018,2359.5067602845775,MA Aaron,J8
+aaron_schiff_model,Revenue,PED revenue,Model path,$m nominal ex GST,2019,2412.680318177407,MA Aaron,K8
+aaron_schiff_model,Revenue,PED revenue,Model path,$m nominal ex GST,2020,2422.2634033779505,MA Aaron,L8
+aaron_schiff_model,Revenue,PED revenue,Model path,$m nominal ex GST,2021,2422.1320418917553,MA Aaron,M8
+aaron_schiff_model,Revenue,PED revenue,Model path,$m nominal ex GST,2022,2077.031910721839,MA Aaron,N8
+aaron_schiff_model,Revenue,PED revenue,Model path,$m nominal ex GST,2023,1491.809925259305,MA Aaron,O8
+aaron_schiff_model,Revenue,PED revenue,Model path,$m nominal ex GST,2024,2252.449554518668,MA Aaron,P8
+aaron_schiff_model,Revenue,PED revenue,Model path,$m nominal ex GST,2025,2202.404231685547,MA Aaron,Q8
+aaron_schiff_model,Revenue,PED revenue,Model path,$m nominal ex GST,2026,2130.727058042144,MA Aaron,R8
+aaron_schiff_model,Revenue,PED revenue,Model path,$m nominal ex GST,2027,2239.4749186854183,MA Aaron,S8
+aaron_schiff_model,Revenue,PED revenue,Model path,$m nominal ex GST,2028,2512.1485726542132,MA Aaron,T8
+aaron_schiff_model,Revenue,PED revenue,Model path,$m nominal ex GST,2029,2655.102215383062,MA Aaron,U8
+aaron_schiff_model,Revenue,PED revenue,Model path,$m nominal ex GST,2030,2771.261845218076,MA Aaron,V8
+aaron_schiff_model,Revenue,PED revenue,Model path,$m nominal ex GST,2031,2882.6764243994526,MA Aaron,W8
+aaron_schiff_model,Revenue,PED revenue,Actual,$m nominal ex GST,2014,1626.00155652,MA Aaron,F9
+aaron_schiff_model,Revenue,PED revenue,Actual,$m nominal ex GST,2015,1761.9266930899998,MA Aaron,G9
+aaron_schiff_model,Revenue,PED revenue,Actual,$m nominal ex GST,2016,1906.0248969000002,MA Aaron,H9
+aaron_schiff_model,Revenue,PED revenue,Actual,$m nominal ex GST,2017,1933.77670022,MA Aaron,I9
+aaron_schiff_model,Revenue,PED revenue,Actual,$m nominal ex GST,2018,1933.90465553,MA Aaron,J9
+aaron_schiff_model,Revenue,PED revenue,Actual,$m nominal ex GST,2019,2016.01858683,MA Aaron,K9
+aaron_schiff_model,Revenue,PED revenue,Actual,$m nominal ex GST,2020,1914.6702856599998,MA Aaron,L9
+aaron_schiff_model,Revenue,PED revenue,Actual,$m nominal ex GST,2021,2176.23857515,MA Aaron,M9
+aaron_schiff_model,Revenue,PED revenue,Actual,$m nominal ex GST,2022,1965.6162321,MA Aaron,N9
+aaron_schiff_model,Revenue,PED revenue,Actual,$m nominal ex GST,2023,2074.732468454007,MA Aaron,O9
+aaron_schiff_model,Revenue,PED revenue,Actual,$m nominal ex GST,2024,2033.7691341500001,MA Aaron,P9
+aaron_schiff_model,Revenue,PED revenue,Actual,$m nominal ex GST,2025,2026.68630478,MA Aaron,Q9
+aaron_schiff_model,Revenue,PED revenue,Actual,$m nominal ex GST,2026,1526.14839319,MA Aaron,R9
+aaron_schiff_model,Volume,PED volume,Model path,million L,2014,4151.085913931171,MA Aaron,F10
+aaron_schiff_model,Volume,PED volume,Model path,million L,2015,4101.798613791019,MA Aaron,G10
+aaron_schiff_model,Volume,PED volume,Model path,million L,2016,4081.0695437865133,MA Aaron,H10
+aaron_schiff_model,Volume,PED volume,Model path,million L,2017,4024.72110186669,MA Aaron,I10
+aaron_schiff_model,Volume,PED volume,Model path,million L,2018,3963.9586726103375,MA Aaron,J10
+aaron_schiff_model,Volume,PED volume,Model path,million L,2019,3881.378276023094,MA Aaron,K10
+aaron_schiff_model,Volume,PED volume,Model path,million L,2020,3641.1872457728796,MA Aaron,L10
+aaron_schiff_model,Volume,PED volume,Model path,million L,2021,3459.002687495366,MA Aaron,M10
+aaron_schiff_model,Volume,PED volume,Model path,million L,2022,3310.2521511268906,MA Aaron,N10
+aaron_schiff_model,Volume,PED volume,Model path,million L,2023,3313.366038688933,MA Aaron,O10
+aaron_schiff_model,Volume,PED volume,Model path,million L,2024,3216.6822154099564,MA Aaron,P10
+aaron_schiff_model,Volume,PED volume,Model path,million L,2025,3145.2134006705514,MA Aaron,Q10
+aaron_schiff_model,Volume,PED volume,Model path,million L,2026,3042.8525334773,MA Aaron,R10
+aaron_schiff_model,Volume,PED volume,Model path,million L,2027,2945.859901786501,MA Aaron,S10
+aaron_schiff_model,Volume,PED volume,Model path,million L,2028,2955.0192331184176,MA Aaron,T10
+aaron_schiff_model,Volume,PED volume,Model path,million L,2029,2949.563492718457,MA Aaron,U10
+aaron_schiff_model,Volume,PED volume,Model path,million L,2030,2947.6001981513455,MA Aaron,V10
+aaron_schiff_model,Volume,PED volume,Model path,million L,2031,2941.071121601354,MA Aaron,W10
+aaron_schiff_model,Volume,Light RUC net km,Model path,million km,2014,8109.490467211336,MA Aaron,F11
+aaron_schiff_model,Volume,Light RUC net km,Model path,million km,2015,8587.360355967807,MA Aaron,G11
+aaron_schiff_model,Volume,Light RUC net km,Model path,million km,2016,9242.684965064891,MA Aaron,H11
+aaron_schiff_model,Volume,Light RUC net km,Model path,million km,2017,9909.111916528796,MA Aaron,I11
+aaron_schiff_model,Volume,Light RUC net km,Model path,million km,2018,10613.83956487881,MA Aaron,J11
+aaron_schiff_model,Volume,Light RUC net km,Model path,million km,2019,10847.534807012353,MA Aaron,K11
+aaron_schiff_model,Volume,Light RUC net km,Model path,million km,2020,10762.736203574634,MA Aaron,L11
+aaron_schiff_model,Volume,Light RUC net km,Model path,million km,2021,11444.065247606386,MA Aaron,M11
+aaron_schiff_model,Volume,Light RUC net km,Model path,million km,2022,12117.454134554866,MA Aaron,N11
+aaron_schiff_model,Volume,Light RUC net km,Model path,million km,2023,13163.02319701678,MA Aaron,O11
+aaron_schiff_model,Volume,Light RUC net km,Model path,million km,2024,11479.932734066962,MA Aaron,P11
+aaron_schiff_model,Volume,Light RUC net km,Model path,million km,2025,12203.685433926095,MA Aaron,Q11
+aaron_schiff_model,Volume,Light RUC net km,Model path,million km,2026,12961.702011490455,MA Aaron,R11
+aaron_schiff_model,Volume,Light RUC net km,Model path,million km,2027,13023.156084174527,MA Aaron,S11
+aaron_schiff_model,Volume,Light RUC net km,Model path,million km,2028,13423.824333595921,MA Aaron,T11
+aaron_schiff_model,Volume,Light RUC net km,Model path,million km,2029,14012.145519928183,MA Aaron,U11
+aaron_schiff_model,Volume,Light RUC net km,Model path,million km,2030,14582.951410671829,MA Aaron,V11
+aaron_schiff_model,Volume,Light RUC net km,Model path,million km,2031,15097.503872325708,MA Aaron,W11
+aaron_schiff_model,Volume,Light RUC net km,Actual,million km,2014,8809.590297,MA Aaron,F12
+aaron_schiff_model,Volume,Light RUC net km,Actual,million km,2015,9167.483044,MA Aaron,G12
+aaron_schiff_model,Volume,Light RUC net km,Actual,million km,2016,9669.475028,MA Aaron,H12
+aaron_schiff_model,Volume,Light RUC net km,Actual,million km,2017,10425.610839,MA Aaron,I12
+aaron_schiff_model,Volume,Light RUC net km,Actual,million km,2018,11112.22716,MA Aaron,J12
+aaron_schiff_model,Volume,Light RUC net km,Actual,million km,2019,11898.225208,MA Aaron,K12
+aaron_schiff_model,Volume,Light RUC net km,Actual,million km,2020,11385.93681,MA Aaron,L12
+aaron_schiff_model,Volume,Light RUC net km,Actual,million km,2021,11998.163013,MA Aaron,M12
+aaron_schiff_model,Volume,Light RUC net km,Actual,million km,2022,12644.208208,MA Aaron,N12
+aaron_schiff_model,Volume,Light RUC net km,Actual,million km,2023,13553.287615,MA Aaron,O12
+aaron_schiff_model,Volume,Light RUC net km,Actual,million km,2024,10355.550659,MA Aaron,P12
+aaron_schiff_model,Volume,Light RUC net km,Actual,million km,2025,12273.983872,MA Aaron,Q12
+aaron_schiff_model,Volume,Light RUC net km,Actual,million km,2026,9626.938266,MA Aaron,R12
+aaron_schiff_model,Volume,Heavy RUC net km,Model path,million km,2014,3429.8435921713544,MA Aaron,F13
+aaron_schiff_model,Volume,Heavy RUC net km,Model path,million km,2015,3531.634583064477,MA Aaron,G13
+aaron_schiff_model,Volume,Heavy RUC net km,Model path,million km,2016,3619.7322455301237,MA Aaron,H13
+aaron_schiff_model,Volume,Heavy RUC net km,Model path,million km,2017,3704.884152316495,MA Aaron,I13
+aaron_schiff_model,Volume,Heavy RUC net km,Model path,million km,2018,3828.2964406722253,MA Aaron,J13
+aaron_schiff_model,Volume,Heavy RUC net km,Model path,million km,2019,3929.453699743536,MA Aaron,K13
+aaron_schiff_model,Volume,Heavy RUC net km,Model path,million km,2020,3889.419090871773,MA Aaron,L13
+aaron_schiff_model,Volume,Heavy RUC net km,Model path,million km,2021,4039.2287203437786,MA Aaron,M13
+aaron_schiff_model,Volume,Heavy RUC net km,Model path,million km,2022,4067.200024481037,MA Aaron,N13
+aaron_schiff_model,Volume,Heavy RUC net km,Model path,million km,2023,4647.7747031554545,MA Aaron,O13
+aaron_schiff_model,Volume,Heavy RUC net km,Model path,million km,2024,4322.45023842671,MA Aaron,P13
+aaron_schiff_model,Volume,Heavy RUC net km,Model path,million km,2025,4300.194674081089,MA Aaron,Q13
+aaron_schiff_model,Volume,Heavy RUC net km,Model path,million km,2026,4396.3263346746235,MA Aaron,R13
+aaron_schiff_model,Volume,Heavy RUC net km,Model path,million km,2027,4533.85807564158,MA Aaron,S13
+aaron_schiff_model,Volume,Heavy RUC net km,Model path,million km,2028,4557.378226952364,MA Aaron,T13
+aaron_schiff_model,Volume,Heavy RUC net km,Model path,million km,2029,4611.128349447671,MA Aaron,U13
+aaron_schiff_model,Volume,Heavy RUC net km,Model path,million km,2030,4676.654920571722,MA Aaron,V13
+aaron_schiff_model,Volume,Heavy RUC net km,Model path,million km,2031,4732.144236550423,MA Aaron,W13
+aaron_schiff_model,Volume,Heavy RUC net km,Actual,million km,2014,3646.506756,MA Aaron,F14
+aaron_schiff_model,Volume,Heavy RUC net km,Actual,million km,2015,3698.793648,MA Aaron,G14
+aaron_schiff_model,Volume,Heavy RUC net km,Actual,million km,2016,3716.710068,MA Aaron,H14
+aaron_schiff_model,Volume,Heavy RUC net km,Actual,million km,2017,3842.683587,MA Aaron,I14
+aaron_schiff_model,Volume,Heavy RUC net km,Actual,million km,2018,4022.092402,MA Aaron,J14
+aaron_schiff_model,Volume,Heavy RUC net km,Actual,million km,2019,4071.164816,MA Aaron,K14
+aaron_schiff_model,Volume,Heavy RUC net km,Actual,million km,2020,3867.517432,MA Aaron,L14
+aaron_schiff_model,Volume,Heavy RUC net km,Actual,million km,2021,4141.235503,MA Aaron,M14
+aaron_schiff_model,Volume,Heavy RUC net km,Actual,million km,2022,4170.928916,MA Aaron,N14
+aaron_schiff_model,Volume,Heavy RUC net km,Actual,million km,2023,4152.746925,MA Aaron,O14
+aaron_schiff_model,Volume,Heavy RUC net km,Actual,million km,2024,3903.861766,MA Aaron,P14
+aaron_schiff_model,Volume,Heavy RUC net km,Actual,million km,2025,3981.873439,MA Aaron,Q14
+aaron_schiff_model,Volume,Heavy RUC net km,Actual,million km,2026,3082.755083,MA Aaron,R14
+aaron_schiff_model,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2014,382.16087116313724,MA Aaron,F15
+aaron_schiff_model,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2015,440.0209788193745,MA Aaron,G15
+aaron_schiff_model,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2016,501.3332694309983,MA Aaron,H15
+aaron_schiff_model,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2017,466.54017704272474,MA Aaron,I15
+aaron_schiff_model,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2018,499.3639979561106,MA Aaron,J15
+aaron_schiff_model,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2019,628.1220379183778,MA Aaron,K15
+aaron_schiff_model,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2020,661.1639452389586,MA Aaron,L15
+aaron_schiff_model,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2021,753.6396941630995,MA Aaron,M15
+aaron_schiff_model,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2022,733.7882104998668,MA Aaron,N15
+aaron_schiff_model,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2023,582.1097519627668,MA Aaron,O15
+aaron_schiff_model,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2024,765.424628282627,MA Aaron,P15
+aaron_schiff_model,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2025,768.3706044050243,MA Aaron,Q15
+aaron_schiff_model,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2026,847.6241174090695,MA Aaron,R15
+aaron_schiff_model,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2027,950.0513319041789,MA Aaron,S15
+aaron_schiff_model,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2028,1091.5572494801968,MA Aaron,T15
+aaron_schiff_model,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2029,1206.7935291561118,MA Aaron,U15
+aaron_schiff_model,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2030,1311.9552236610907,MA Aaron,V15
+aaron_schiff_model,Revenue,Light RUC revenue,Model path,$m nominal ex GST,2031,1415.9948881854282,MA Aaron,W15
+aaron_schiff_model,Revenue,Light RUC revenue,Actual,$m nominal ex GST,2014,415.12343537000004,MA Aaron,F16
+aaron_schiff_model,Revenue,Light RUC revenue,Actual,$m nominal ex GST,2015,469.80848421,MA Aaron,G16
+aaron_schiff_model,Revenue,Light RUC revenue,Actual,$m nominal ex GST,2016,524.52914789,MA Aaron,H16
+aaron_schiff_model,Revenue,Light RUC revenue,Actual,$m nominal ex GST,2017,490.85899264999995,MA Aaron,I16
+aaron_schiff_model,Revenue,Light RUC revenue,Actual,$m nominal ex GST,2018,522.8235887,MA Aaron,J16
+aaron_schiff_model,Revenue,Light RUC revenue,Actual,$m nominal ex GST,2019,688.6312373,MA Aaron,K16
+aaron_schiff_model,Revenue,Light RUC revenue,Actual,$m nominal ex GST,2020,698.5758703699998,MA Aaron,L16
+aaron_schiff_model,Revenue,Light RUC revenue,Actual,$m nominal ex GST,2021,790.32231374,MA Aaron,M16
+aaron_schiff_model,Revenue,Light RUC revenue,Actual,$m nominal ex GST,2022,839.5953969171997,MA Aaron,N16
+aaron_schiff_model,Revenue,Light RUC revenue,Actual,$m nominal ex GST,2023,902.1579233939502,MA Aaron,O16
+aaron_schiff_model,Revenue,Light RUC revenue,Actual,$m nominal ex GST,2024,723.37189724,MA Aaron,P16
+aaron_schiff_model,Revenue,Light RUC revenue,Actual,$m nominal ex GST,2025,837.53770151,MA Aaron,Q16
+aaron_schiff_model,Revenue,Light RUC revenue,Actual,$m nominal ex GST,2026,673.44991052,MA Aaron,R16
+aaron_schiff_model,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2014,765.2527182859467,MA Aaron,F17
+aaron_schiff_model,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2015,796.1572437898378,MA Aaron,G17
+aaron_schiff_model,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2016,855.8764591436013,MA Aaron,H17
+aaron_schiff_model,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2017,946.8958923333258,MA Aaron,I17
+aaron_schiff_model,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2018,983.8059136236604,MA Aaron,J17
+aaron_schiff_model,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2019,955.9838238861795,MA Aaron,K17
+aaron_schiff_model,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2020,1027.7128313719036,MA Aaron,L17
+aaron_schiff_model,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2021,1108.6601831776702,MA Aaron,M17
+aaron_schiff_model,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2022,1049.5334291072343,MA Aaron,N17
+aaron_schiff_model,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2023,871.363393371077,MA Aaron,O17
+aaron_schiff_model,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2024,1206.2652819399402,MA Aaron,P17
+aaron_schiff_model,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2025,1237.9854047019867,MA Aaron,Q17
+aaron_schiff_model,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2026,1251.5149226304984,MA Aaron,R17
+aaron_schiff_model,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2027,1362.6978800923582,MA Aaron,S17
+aaron_schiff_model,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2028,1521.402812863435,MA Aaron,T17
+aaron_schiff_model,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2029,1630.059752249176,MA Aaron,U17
+aaron_schiff_model,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2030,1726.8782126957092,MA Aaron,V17
+aaron_schiff_model,Revenue,Heavy RUC revenue,Model path,$m nominal ex GST,2031,1821.7099060236278,MA Aaron,W17
+aaron_schiff_model,Revenue,Heavy RUC revenue,Actual,$m nominal ex GST,2014,813.55979115,MA Aaron,F18
+aaron_schiff_model,Revenue,Heavy RUC revenue,Actual,$m nominal ex GST,2015,833.8183096399999,MA Aaron,G18
+aaron_schiff_model,Revenue,Heavy RUC revenue,Actual,$m nominal ex GST,2016,878.66700453,MA Aaron,H18
+aaron_schiff_model,Revenue,Heavy RUC revenue,Actual,$m nominal ex GST,2017,982.16505316,MA Aaron,I18
+aaron_schiff_model,Revenue,Heavy RUC revenue,Actual,$m nominal ex GST,2018,1033.6031967600002,MA Aaron,J18
+aaron_schiff_model,Revenue,Heavy RUC revenue,Actual,$m nominal ex GST,2019,990.4322618,MA Aaron,K18
+aaron_schiff_model,Revenue,Heavy RUC revenue,Actual,$m nominal ex GST,2020,1021.66038778,MA Aaron,L18
+aaron_schiff_model,Revenue,Heavy RUC revenue,Actual,$m nominal ex GST,2021,1136.73230031,MA Aaron,M18
+aaron_schiff_model,Revenue,Heavy RUC revenue,Actual,$m nominal ex GST,2022,1183.1726618428002,MA Aaron,N18
+aaron_schiff_model,Revenue,Heavy RUC revenue,Actual,$m nominal ex GST,2023,1162.5392616164913,MA Aaron,O18
+aaron_schiff_model,Revenue,Heavy RUC revenue,Actual,$m nominal ex GST,2024,1089.56171388,MA Aaron,P18
+aaron_schiff_model,Revenue,Heavy RUC revenue,Actual,$m nominal ex GST,2025,1146.29680501,MA Aaron,Q18
+aaron_schiff_model,Revenue,Heavy RUC revenue,Actual,$m nominal ex GST,2026,893.7839354,MA Aaron,R18
+aaron_schiff_model,Volume,Light BEV RUC net km,Model path,million km,2014,0,MA Aaron,F19
+aaron_schiff_model,Volume,Light BEV RUC net km,Model path,million km,2015,0,MA Aaron,G19
+aaron_schiff_model,Volume,Light BEV RUC net km,Model path,million km,2016,0,MA Aaron,H19
+aaron_schiff_model,Volume,Light BEV RUC net km,Model path,million km,2017,0,MA Aaron,I19
+aaron_schiff_model,Volume,Light BEV RUC net km,Model path,million km,2018,0,MA Aaron,J19
+aaron_schiff_model,Volume,Light BEV RUC net km,Model path,million km,2019,0,MA Aaron,K19
+aaron_schiff_model,Volume,Light BEV RUC net km,Model path,million km,2020,0,MA Aaron,L19
+aaron_schiff_model,Volume,Light BEV RUC net km,Model path,million km,2021,0,MA Aaron,M19
+aaron_schiff_model,Volume,Light BEV RUC net km,Model path,million km,2022,0,MA Aaron,N19
+aaron_schiff_model,Volume,Light BEV RUC net km,Model path,million km,2023,0,MA Aaron,O19
+aaron_schiff_model,Volume,Light BEV RUC net km,Model path,million km,2024,433.0376710887555,MA Aaron,P19
+aaron_schiff_model,Volume,Light BEV RUC net km,Model path,million km,2025,815.7012994392938,MA Aaron,Q19
+aaron_schiff_model,Volume,Light BEV RUC net km,Model path,million km,2026,1217.4273790091097,MA Aaron,R19
+aaron_schiff_model,Volume,Light BEV RUC net km,Model path,million km,2027,1805.71453603518,MA Aaron,S19
+aaron_schiff_model,Volume,Light BEV RUC net km,Model path,million km,2028,2268.6317672099185,MA Aaron,T19
+aaron_schiff_model,Volume,Light BEV RUC net km,Model path,million km,2029,2866.1875266888937,MA Aaron,U19
+aaron_schiff_model,Volume,Light BEV RUC net km,Model path,million km,2030,3695.224745123777,MA Aaron,V19
+aaron_schiff_model,Volume,Light BEV RUC net km,Model path,million km,2031,4654.289651521778,MA Aaron,W19
+aaron_schiff_model,Volume,PHEV RUC net km,Model path,million km,2014,0,MA Aaron,F20
+aaron_schiff_model,Volume,PHEV RUC net km,Model path,million km,2015,0,MA Aaron,G20
+aaron_schiff_model,Volume,PHEV RUC net km,Model path,million km,2016,0,MA Aaron,H20
+aaron_schiff_model,Volume,PHEV RUC net km,Model path,million km,2017,0,MA Aaron,I20
+aaron_schiff_model,Volume,PHEV RUC net km,Model path,million km,2018,0,MA Aaron,J20
+aaron_schiff_model,Volume,PHEV RUC net km,Model path,million km,2019,0,MA Aaron,K20
+aaron_schiff_model,Volume,PHEV RUC net km,Model path,million km,2020,0,MA Aaron,L20
+aaron_schiff_model,Volume,PHEV RUC net km,Model path,million km,2021,0,MA Aaron,M20
+aaron_schiff_model,Volume,PHEV RUC net km,Model path,million km,2022,0,MA Aaron,N20
+aaron_schiff_model,Volume,PHEV RUC net km,Model path,million km,2023,0,MA Aaron,O20
+aaron_schiff_model,Volume,PHEV RUC net km,Model path,million km,2024,204.14402377502228,MA Aaron,P20
+aaron_schiff_model,Volume,PHEV RUC net km,Model path,million km,2025,432.5075659400735,MA Aaron,Q20
+aaron_schiff_model,Volume,PHEV RUC net km,Model path,million km,2026,631.4917123459367,MA Aaron,R20
+aaron_schiff_model,Volume,PHEV RUC net km,Model path,million km,2027,994.0952493060627,MA Aaron,S20
+aaron_schiff_model,Volume,PHEV RUC net km,Model path,million km,2028,1269.1959899752376,MA Aaron,T20
+aaron_schiff_model,Volume,PHEV RUC net km,Model path,million km,2029,1595.3385648352858,MA Aaron,U20
+aaron_schiff_model,Volume,PHEV RUC net km,Model path,million km,2030,2027.9902221130224,MA Aaron,V20
+aaron_schiff_model,Volume,PHEV RUC net km,Model path,million km,2031,2491.4000775972468,MA Aaron,W20
+aaron_schiff_model,Volume,Heavy BEV RUC net km,Model path,million km,2014,0,MA Aaron,F21
+aaron_schiff_model,Volume,Heavy BEV RUC net km,Model path,million km,2015,0,MA Aaron,G21
+aaron_schiff_model,Volume,Heavy BEV RUC net km,Model path,million km,2016,0,MA Aaron,H21
+aaron_schiff_model,Volume,Heavy BEV RUC net km,Model path,million km,2017,0,MA Aaron,I21
+aaron_schiff_model,Volume,Heavy BEV RUC net km,Model path,million km,2018,0,MA Aaron,J21
+aaron_schiff_model,Volume,Heavy BEV RUC net km,Model path,million km,2019,0,MA Aaron,K21
+aaron_schiff_model,Volume,Heavy BEV RUC net km,Model path,million km,2020,0,MA Aaron,L21
+aaron_schiff_model,Volume,Heavy BEV RUC net km,Model path,million km,2021,0,MA Aaron,M21
+aaron_schiff_model,Volume,Heavy BEV RUC net km,Model path,million km,2022,0,MA Aaron,N21
+aaron_schiff_model,Volume,Heavy BEV RUC net km,Model path,million km,2023,0,MA Aaron,O21
+aaron_schiff_model,Volume,Heavy BEV RUC net km,Model path,million km,2024,0,MA Aaron,P21
+aaron_schiff_model,Volume,Heavy BEV RUC net km,Model path,million km,2025,0,MA Aaron,Q21
+aaron_schiff_model,Volume,Heavy BEV RUC net km,Model path,million km,2026,12.497751797958134,MA Aaron,R21
+aaron_schiff_model,Volume,Heavy BEV RUC net km,Model path,million km,2027,61.93670754218039,MA Aaron,S21
+aaron_schiff_model,Volume,Heavy BEV RUC net km,Model path,million km,2028,75.62392007181904,MA Aaron,T21
+aaron_schiff_model,Volume,Heavy BEV RUC net km,Model path,million km,2029,91.79733506803257,MA Aaron,U21
+aaron_schiff_model,Volume,Heavy BEV RUC net km,Model path,million km,2030,112.0738368392815,MA Aaron,V21
+aaron_schiff_model,Volume,Heavy BEV RUC net km,Model path,million km,2031,135.63205956297068,MA Aaron,W21
+aaron_schiff_model,Revenue,Net FED revenue,Model path,$m nominal ex GST,2014,2211.2362482725202,MA Aaron,F22
+aaron_schiff_model,Revenue,Net FED revenue,Model path,$m nominal ex GST,2015,2304.251422059235,MA Aaron,G22
+aaron_schiff_model,Revenue,Net FED revenue,Model path,$m nominal ex GST,2016,2405.936893073484,MA Aaron,H22
+aaron_schiff_model,Revenue,Net FED revenue,Model path,$m nominal ex GST,2017,2374.568283675129,MA Aaron,I22
+aaron_schiff_model,Revenue,Net FED revenue,Model path,$m nominal ex GST,2018,2329.416961534577,MA Aaron,J22
+aaron_schiff_model,Revenue,Net FED revenue,Model path,$m nominal ex GST,2019,2383.7775795574075,MA Aaron,K22
+aaron_schiff_model,Revenue,Net FED revenue,Model path,$m nominal ex GST,2020,2390.1246892079507,MA Aaron,L22
+aaron_schiff_model,Revenue,Net FED revenue,Model path,$m nominal ex GST,2021,2394.409574101755,MA Aaron,M22
+aaron_schiff_model,Revenue,Net FED revenue,Model path,$m nominal ex GST,2022,2262.5529762318392,MA Aaron,N22
+aaron_schiff_model,Revenue,Net FED revenue,Model path,$m nominal ex GST,2023,2197.878302123312,MA Aaron,O22
+aaron_schiff_model,Revenue,Net FED revenue,Model path,$m nominal ex GST,2024,2225.610215418668,MA Aaron,P22
+aaron_schiff_model,Revenue,Net FED revenue,Model path,$m nominal ex GST,2025,2173.4450735055466,MA Aaron,Q22
+aaron_schiff_model,Revenue,Net FED revenue,Model path,$m nominal ex GST,2026,2100.796071209085,MA Aaron,R22
+aaron_schiff_model,Revenue,Net FED revenue,Model path,$m nominal ex GST,2027,2200.7278533595118,MA Aaron,S22
+aaron_schiff_model,Revenue,Net FED revenue,Model path,$m nominal ex GST,2028,2463.7358057450974,MA Aaron,T22
+aaron_schiff_model,Revenue,Net FED revenue,Model path,$m nominal ex GST,2029,2601.1418165873124,MA Aaron,U22
+aaron_schiff_model,Revenue,Net FED revenue,Model path,$m nominal ex GST,2030,2714.3154349360852,MA Aaron,V22
+aaron_schiff_model,Revenue,Net FED revenue,Model path,$m nominal ex GST,2031,2823.0128825806028,MA Aaron,W22
+aaron_schiff_model,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2014,1147.4135894490837,MA Aaron,F23
+aaron_schiff_model,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2015,1236.1782226092123,MA Aaron,G23
+aaron_schiff_model,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2016,1357.2097285745997,MA Aaron,H23
+aaron_schiff_model,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2017,1413.4360693760505,MA Aaron,I23
+aaron_schiff_model,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2018,1483.169911579771,MA Aaron,J23
+aaron_schiff_model,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2019,1584.1058618045574,MA Aaron,K23
+aaron_schiff_model,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2020,1688.8767766108622,MA Aaron,L23
+aaron_schiff_model,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2021,1862.29987734077,MA Aaron,M23
+aaron_schiff_model,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2022,1783.321639607101,MA Aaron,N23
+aaron_schiff_model,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2023,1453.473145333844,MA Aaron,O23
+aaron_schiff_model,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2024,2006.9083181442522,MA Aaron,P23
+aaron_schiff_model,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2025,2070.730256698888,MA Aaron,Q23
+aaron_schiff_model,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2026,2201.166092677909,MA Aaron,R23
+aaron_schiff_model,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2027,2499.414506276804,MA Aaron,S23
+aaron_schiff_model,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2028,2873.678636895196,MA Aaron,T23
+aaron_schiff_model,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2029,3183.9488383846415,MA Aaron,U23
+aaron_schiff_model,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2030,3502.629941377993,MA Aaron,V23
+aaron_schiff_model,Revenue,Total RUC forecast incl EV/PHEV,Model path,$m nominal ex GST,2031,3841.6839270242035,MA Aaron,W23
+aaron_schiff_model,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2014,187.11138627,MA Aaron,F24
+aaron_schiff_model,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2015,180.97377321,MA Aaron,G24
+aaron_schiff_model,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2016,214.12784664,MA Aaron,H24
+aaron_schiff_model,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2017,222.92673366,MA Aaron,I24
+aaron_schiff_model,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2018,227.44634928,MA Aaron,J24
+aaron_schiff_model,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2019,226.76755138,MA Aaron,K24
+aaron_schiff_model,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2020,225.63410553,MA Aaron,L24
+aaron_schiff_model,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2021,231.40607684,MA Aaron,M24
+aaron_schiff_model,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2022,234.22087228,MA Aaron,N24
+aaron_schiff_model,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2023,236.05552871,MA Aaron,O24
+aaron_schiff_model,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2024,232.27816723,MA Aaron,P24
+aaron_schiff_model,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2025,298.392465976379,MA Aaron,Q24
+aaron_schiff_model,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2026,461.500674074328,MA Aaron,R24
+aaron_schiff_model,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2027,534.246717008712,MA Aaron,S24
+aaron_schiff_model,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2028,528.330914986474,MA Aaron,T24
+aaron_schiff_model,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2029,522.91368587705,MA Aaron,U24
+aaron_schiff_model,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2030,517.947689223757,MA Aaron,V24
+aaron_schiff_model,Revenue,Net MVR revenue,Model path,$m nominal ex GST,2031,513.389185291356,MA Aaron,W24
+aaron_schiff_model,Revenue,TUC net revenue,Model path,$m nominal ex GST,2014,0,MA Aaron,F25
+aaron_schiff_model,Revenue,TUC net revenue,Model path,$m nominal ex GST,2015,0,MA Aaron,G25
+aaron_schiff_model,Revenue,TUC net revenue,Model path,$m nominal ex GST,2016,0,MA Aaron,H25
+aaron_schiff_model,Revenue,TUC net revenue,Model path,$m nominal ex GST,2017,0,MA Aaron,I25
+aaron_schiff_model,Revenue,TUC net revenue,Model path,$m nominal ex GST,2018,0,MA Aaron,J25
+aaron_schiff_model,Revenue,TUC net revenue,Model path,$m nominal ex GST,2019,0,MA Aaron,K25
+aaron_schiff_model,Revenue,TUC net revenue,Model path,$m nominal ex GST,2020,0,MA Aaron,L25
+aaron_schiff_model,Revenue,TUC net revenue,Model path,$m nominal ex GST,2021,0,MA Aaron,M25
+aaron_schiff_model,Revenue,TUC net revenue,Model path,$m nominal ex GST,2022,7.23441674,MA Aaron,N25
+aaron_schiff_model,Revenue,TUC net revenue,Model path,$m nominal ex GST,2023,14.97376563,MA Aaron,O25
+aaron_schiff_model,Revenue,TUC net revenue,Model path,$m nominal ex GST,2024,17.6100245,MA Aaron,P25
+aaron_schiff_model,Revenue,TUC net revenue,Model path,$m nominal ex GST,2025,16.788875427746298,MA Aaron,Q25
+aaron_schiff_model,Revenue,TUC net revenue,Model path,$m nominal ex GST,2026,16.7604700309853,MA Aaron,R25
+aaron_schiff_model,Revenue,TUC net revenue,Model path,$m nominal ex GST,2027,16.7604700309853,MA Aaron,S25
+aaron_schiff_model,Revenue,TUC net revenue,Model path,$m nominal ex GST,2028,16.7604700309853,MA Aaron,T25
+aaron_schiff_model,Revenue,TUC net revenue,Model path,$m nominal ex GST,2029,16.7604700309853,MA Aaron,U25
+aaron_schiff_model,Revenue,TUC net revenue,Model path,$m nominal ex GST,2030,16.7604700309853,MA Aaron,V25
+aaron_schiff_model,Revenue,TUC net revenue,Model path,$m nominal ex GST,2031,16.7604700309853,MA Aaron,W25
+aaron_schiff_model,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2014,3535.2477529852717,MA Aaron,F26
+aaron_schiff_model,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2015,3710.2227403819097,MA Aaron,G26
+aaron_schiff_model,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2016,3965.405539104593,MA Aaron,H26
+aaron_schiff_model,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2017,3998.79433471269,MA Aaron,I26
+aaron_schiff_model,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2018,4027.6143713904785,MA Aaron,J26
+aaron_schiff_model,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2019,4181.962909596217,MA Aaron,K26
+aaron_schiff_model,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2020,4292.119003451638,MA Aaron,L26
+aaron_schiff_model,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2021,4475.174382068755,MA Aaron,M26
+aaron_schiff_model,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2022,4075.0734948582267,MA Aaron,N26
+aaron_schiff_model,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2023,3163.2947075588913,MA Aaron,O26
+aaron_schiff_model,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2024,4455.50870756758,MA Aaron,P26
+aaron_schiff_model,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2025,4526.168355225992,MA Aaron,Q26
+aaron_schiff_model,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2026,4745.203539086559,MA Aaron,R26
+aaron_schiff_model,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2027,5214.627954247559,MA Aaron,S26
+aaron_schiff_model,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2028,5843.804292868069,MA Aaron,T26
+aaron_schiff_model,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2029,6283.424650307343,MA Aaron,U26
+aaron_schiff_model,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2030,6709.383234685829,MA Aaron,V26
+aaron_schiff_model,Revenue,Total NLTF revenue,Model path,$m nominal ex GST,2031,7149.736814905701,MA Aaron,W26
+aaron_schiff_model,Revenue,Total NLTF revenue,Actual,$m nominal ex GST,2014,3130.914593957826,MA Aaron,F27
+aaron_schiff_model,Revenue,Total NLTF revenue,Actual,$m nominal ex GST,2015,3339.5229079239125,MA Aaron,G27
+aaron_schiff_model,Revenue,Total NLTF revenue,Actual,$m nominal ex GST,2016,3607.7065302421743,MA Aaron,H27
+aaron_schiff_model,Revenue,Total NLTF revenue,Actual,$m nominal ex GST,2017,3709.0222407334786,MA Aaron,I27
+aaron_schiff_model,Revenue,Total NLTF revenue,Actual,$m nominal ex GST,2018,3784.674616633043,MA Aaron,J27
+aaron_schiff_model,Revenue,Total NLTF revenue,Actual,$m nominal ex GST,2019,3987.126463863913,MA Aaron,K27
+aaron_schiff_model,Revenue,Total NLTF revenue,Actual,$m nominal ex GST,2020,3918.7539892656528,MA Aaron,L27
+aaron_schiff_model,Revenue,Total NLTF revenue,Actual,$m nominal ex GST,2021,4398.784946763043,MA Aaron,M27
+aaron_schiff_model,Revenue,Total NLTF revenue,Actual,$m nominal ex GST,2022,3918.7795892665213,MA Aaron,N27
+aaron_schiff_model,Revenue,Total NLTF revenue,Actual,$m nominal ex GST,2023,3052.4360642308693,MA Aaron,O27
+aaron_schiff_model,Revenue,Total NLTF revenue,Actual,$m nominal ex GST,2024,4231.953290691305,MA Aaron,P27
+aaron_schiff_model,Revenue,Total NLTF revenue,Actual,$m nominal ex GST,2025,4493.732301757826,MA Aaron,Q27
+aaron_schiff_model,Revenue,Total NLTF revenue,Actual,$m nominal ex GST,2026,3528.4102510530433,MA Aaron,R27
+aaron_schiff_model,Error,Total NLTF revenue error %,Error,percent,2014,0.129142187336488,MA Aaron,F28
+aaron_schiff_model,Error,Total NLTF revenue error %,Error,percent,2015,0.11100382979209775,MA Aaron,G28
+aaron_schiff_model,Error,Total NLTF revenue error %,Error,percent,2016,0.0991485881304231,MA Aaron,H28
+aaron_schiff_model,Error,Total NLTF revenue error %,Error,percent,2017,0.07812627565207263,MA Aaron,I28
+aaron_schiff_model,Error,Total NLTF revenue error %,Error,percent,2018,0.06419039398783549,MA Aaron,J28
+aaron_schiff_model,Error,Total NLTF revenue error %,Error,percent,2019,0.04886638221740492,MA Aaron,K28
+aaron_schiff_model,Error,Total NLTF revenue error %,Error,percent,2020,0.09527646165304475,MA Aaron,L28
+aaron_schiff_model,Error,Total NLTF revenue error %,Error,percent,2021,0.017366030899493016,MA Aaron,M28
+aaron_schiff_model,Error,Total NLTF revenue error %,Error,percent,2022,0.03988331112568617,MA Aaron,N28
+aaron_schiff_model,Error,Total NLTF revenue error %,Error,percent,2023,0.03631808856771431,MA Aaron,O28
+aaron_schiff_model,Error,Total NLTF revenue error %,Error,percent,2024,0.0528255870328278,MA Aaron,P28
+aaron_schiff_model,Error,Total NLTF revenue error %,Error,percent,2025,0.0072180653608311844,MA Aaron,Q28
+aaron_schiff_model,Error,Total NLTF revenue error %,Error,percent,2026,0.34485595536130403,MA Aaron,R28
+aaron_schiff_model,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2014,1615.4105802199997,MA Aaron,F29
+aaron_schiff_model,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2015,1747.67746669,MA Aaron,G29
+aaron_schiff_model,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2016,1882.74595473,MA Aaron,H29
+aaron_schiff_model,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2017,1912.66999522,MA Aaron,I29
+aaron_schiff_model,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2018,1903.81485678,MA Aaron,J29
+aaron_schiff_model,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2019,1987.11584821,MA Aaron,K29
+aaron_schiff_model,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2020,1882.5315714899998,MA Aaron,L29
+aaron_schiff_model,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2021,2148.5161073599998,MA Aaron,M29
+aaron_schiff_model,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2022,1951.9998306100001,MA Aaron,N29
+aaron_schiff_model,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2023,2055.1134194540073,MA Aaron,O29
+aaron_schiff_model,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2024,2006.92979505,MA Aaron,P29
+aaron_schiff_model,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2025,1997.7271466000002,MA Aaron,Q29
+aaron_schiff_model,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2026,1504.38889646,MA Aaron,R29
+aaron_schiff_model,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2027,0,MA Aaron,S29
+aaron_schiff_model,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2028,0,MA Aaron,T29
+aaron_schiff_model,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2029,0,MA Aaron,U29
+aaron_schiff_model,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2030,0,MA Aaron,V29
+aaron_schiff_model,Revenue,Net FED revenue,Actual / benchmark,$m nominal ex GST,2031,0,MA Aaron,W29
+aaron_schiff_model,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2014,0,MA Aaron,F30
+aaron_schiff_model,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2015,0,MA Aaron,G30
+aaron_schiff_model,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2016,0,MA Aaron,H30
+aaron_schiff_model,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2017,0,MA Aaron,I30
+aaron_schiff_model,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2018,0,MA Aaron,J30
+aaron_schiff_model,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2019,0,MA Aaron,K30
+aaron_schiff_model,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2020,0,MA Aaron,L30
+aaron_schiff_model,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2021,0,MA Aaron,M30
+aaron_schiff_model,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2022,0,MA Aaron,N30
+aaron_schiff_model,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2023,0,MA Aaron,O30
+aaron_schiff_model,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2024,28.452574878470777,MA Aaron,P30
+aaron_schiff_model,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2025,51.17012103746172,MA Aaron,Q30
+aaron_schiff_model,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2026,79.34734877415556,MA Aaron,R30
+aaron_schiff_model,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2027,131.63241393576624,MA Aaron,S30
+aaron_schiff_model,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2028,184.55319426252692,MA Aaron,T30
+aaron_schiff_model,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2029,246.8790626113476,MA Aaron,U30
+aaron_schiff_model,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2030,332.44089419506054,MA Aaron,V30
+aaron_schiff_model,Revenue,Light BEV RUC net revenue,Model path,$m nominal ex GST,2031,436.5258264162278,MA Aaron,W30
+aaron_schiff_model,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2014,0,MA Aaron,F31
+aaron_schiff_model,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2015,0,MA Aaron,G31
+aaron_schiff_model,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2016,0,MA Aaron,H31
+aaron_schiff_model,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2017,0,MA Aaron,I31
+aaron_schiff_model,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2018,0,MA Aaron,J31
+aaron_schiff_model,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2019,0,MA Aaron,K31
+aaron_schiff_model,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2020,0,MA Aaron,L31
+aaron_schiff_model,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2021,0,MA Aaron,M31
+aaron_schiff_model,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2022,0,MA Aaron,N31
+aaron_schiff_model,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2023,0,MA Aaron,O31
+aaron_schiff_model,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2024,6.765833043214206,MA Aaron,P31
+aaron_schiff_model,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2025,13.204126554415502,MA Aaron,Q31
+aaron_schiff_model,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2026,20.96126299196641,MA Aaron,R31
+aaron_schiff_model,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2027,36.540747257169706,MA Aaron,S31
+aaron_schiff_model,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2028,50.913797137856555,MA Aaron,T31
+aaron_schiff_model,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2029,67.76200554137883,MA Aaron,U31
+aaron_schiff_model,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2030,89.97178620404421,MA Aaron,V31
+aaron_schiff_model,Revenue,PHEV RUC net revenue,Model path,$m nominal ex GST,2031,115.23971058926045,MA Aaron,W31
+aaron_schiff_model,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2014,0,MA Aaron,F32
+aaron_schiff_model,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2015,0,MA Aaron,G32
+aaron_schiff_model,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2016,0,MA Aaron,H32
+aaron_schiff_model,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2017,0,MA Aaron,I32
+aaron_schiff_model,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2018,0,MA Aaron,J32
+aaron_schiff_model,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2019,0,MA Aaron,K32
+aaron_schiff_model,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2020,0,MA Aaron,L32
+aaron_schiff_model,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2021,0,MA Aaron,M32
+aaron_schiff_model,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2022,0,MA Aaron,N32
+aaron_schiff_model,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2023,0,MA Aaron,O32
+aaron_schiff_model,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2024,0,MA Aaron,P32
+aaron_schiff_model,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2025,0,MA Aaron,Q32
+aaron_schiff_model,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2026,1.7184408722192437,MA Aaron,R32
+aaron_schiff_model,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2027,18.492133087331055,MA Aaron,S32
+aaron_schiff_model,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2028,25.251583151181055,MA Aaron,T32
+aaron_schiff_model,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2029,32.45448882662757,MA Aaron,U32
+aaron_schiff_model,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2030,41.3838246220887,MA Aaron,V32
+aaron_schiff_model,Revenue,Heavy BEV RUC net revenue,Model path,$m nominal ex GST,2031,52.213595809658806,MA Aaron,W32
+aaron_schiff_model,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2014,382.16087116313724,MA Aaron,F33
+aaron_schiff_model,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2015,440.0209788193745,MA Aaron,G33
+aaron_schiff_model,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2016,501.3332694309983,MA Aaron,H33
+aaron_schiff_model,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2017,466.54017704272474,MA Aaron,I33
+aaron_schiff_model,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2018,499.3639979561106,MA Aaron,J33
+aaron_schiff_model,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2019,628.1220379183778,MA Aaron,K33
+aaron_schiff_model,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2020,661.1639452389586,MA Aaron,L33
+aaron_schiff_model,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2021,753.6396941630995,MA Aaron,M33
+aaron_schiff_model,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2022,733.7882104998668,MA Aaron,N33
+aaron_schiff_model,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2023,582.1097519627668,MA Aaron,O33
+aaron_schiff_model,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2024,765.424628282627,MA Aaron,P33
+aaron_schiff_model,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2025,768.3706044050243,MA Aaron,Q33
+aaron_schiff_model,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2026,847.6241174090695,MA Aaron,R33
+aaron_schiff_model,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2027,950.0513319041789,MA Aaron,S33
+aaron_schiff_model,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2028,1091.5572494801968,MA Aaron,T33
+aaron_schiff_model,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2029,1206.7935291561118,MA Aaron,U33
+aaron_schiff_model,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2030,1311.9552236610907,MA Aaron,V33
+aaron_schiff_model,Revenue,Light conventional RUC revenue,Model path,$m nominal ex GST,2031,1415.9948881854282,MA Aaron,W33
+aaron_schiff_model,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2014,765.2527182859467,MA Aaron,F34
+aaron_schiff_model,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2015,796.1572437898378,MA Aaron,G34
+aaron_schiff_model,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2016,855.8764591436013,MA Aaron,H34
+aaron_schiff_model,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2017,946.8958923333258,MA Aaron,I34
+aaron_schiff_model,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2018,983.8059136236604,MA Aaron,J34
+aaron_schiff_model,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2019,955.9838238861795,MA Aaron,K34
+aaron_schiff_model,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2020,1027.7128313719036,MA Aaron,L34
+aaron_schiff_model,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2021,1108.6601831776702,MA Aaron,M34
+aaron_schiff_model,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2022,1049.5334291072343,MA Aaron,N34
+aaron_schiff_model,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2023,871.363393371077,MA Aaron,O34
+aaron_schiff_model,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2024,1206.2652819399402,MA Aaron,P34
+aaron_schiff_model,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2025,1237.9854047019867,MA Aaron,Q34
+aaron_schiff_model,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2026,1251.5149226304984,MA Aaron,R34
+aaron_schiff_model,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2027,1362.6978800923582,MA Aaron,S34
+aaron_schiff_model,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2028,1521.402812863435,MA Aaron,T34
+aaron_schiff_model,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2029,1630.059752249176,MA Aaron,U34
+aaron_schiff_model,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2030,1726.8782126957092,MA Aaron,V34
+aaron_schiff_model,Revenue,Heavy conventional RUC revenue,Model path,$m nominal ex GST,2031,1821.7099060236278,MA Aaron,W34
+aaron_schiff_model,Volume,PED VKT per capita,Model path,km/person/FY,2014,9092.81311060214,MA Aaron,F35
+aaron_schiff_model,Volume,PED VKT per capita,Model path,km/person/FY,2015,8842.43542473274,MA Aaron,G35
+aaron_schiff_model,Volume,PED VKT per capita,Model path,km/person/FY,2016,8630.376250996524,MA Aaron,H35
+aaron_schiff_model,Volume,PED VKT per capita,Model path,km/person/FY,2017,8357.68963623894,MA Aaron,I35
+aaron_schiff_model,Volume,PED VKT per capita,Model path,km/person/FY,2018,8105.865773485128,MA Aaron,J35
+aaron_schiff_model,Volume,PED VKT per capita,Model path,km/person/FY,2019,7846.740189132681,MA Aaron,K35
+aaron_schiff_model,Volume,PED VKT per capita,Model path,km/person/FY,2020,7286.908722334651,MA Aaron,L35
+aaron_schiff_model,Volume,PED VKT per capita,Model path,km/person/FY,2021,6914.485695035451,MA Aaron,M35
+aaron_schiff_model,Volume,PED VKT per capita,Model path,km/person/FY,2022,6656.498550005439,MA Aaron,N35
+aaron_schiff_model,Volume,PED VKT per capita,Model path,km/person/FY,2023,6591.95164801642,MA Aaron,O35
+aaron_schiff_model,Volume,PED VKT per capita,Model path,km/person/FY,2024,6277.8849057434845,MA Aaron,P35
+aaron_schiff_model,Volume,PED VKT per capita,Model path,km/person/FY,2025,6111.291328092086,MA Aaron,Q35
+aaron_schiff_model,Volume,PED VKT per capita,Model path,km/person/FY,2026,5903.059363894294,MA Aaron,R35
+aaron_schiff_model,Volume,PED VKT per capita,Model path,km/person/FY,2027,5693.853800118238,MA Aaron,S35
+aaron_schiff_model,Volume,PED VKT per capita,Model path,km/person/FY,2028,5651.98202557697,MA Aaron,T35
+aaron_schiff_model,Volume,PED VKT per capita,Model path,km/person/FY,2029,5581.361506428273,MA Aaron,U35
+aaron_schiff_model,Volume,PED VKT per capita,Model path,km/person/FY,2030,5517.219373797644,MA Aaron,V35
+aaron_schiff_model,Volume,PED VKT per capita,Model path,km/person/FY,2031,5450.163651417662,MA Aaron,W35
+aaron_schiff_model,Volume,PED VKT per capita,Actual,km/person/FY,2014,6573.478646369895,MA Aaron,F36
+aaron_schiff_model,Volume,PED VKT per capita,Actual,km/person/FY,2015,6589.0997950086285,MA Aaron,G36
+aaron_schiff_model,Volume,PED VKT per capita,Actual,km/person/FY,2016,6696.960617659575,MA Aaron,H36
+aaron_schiff_model,Volume,PED VKT per capita,Actual,km/person/FY,2017,6739.354751171511,MA Aaron,I36
+aaron_schiff_model,Volume,PED VKT per capita,Actual,km/person/FY,2018,6730.567997281689,MA Aaron,J36
+aaron_schiff_model,Volume,PED VKT per capita,Actual,km/person/FY,2019,6624.908997846997,MA Aaron,K36
+aaron_schiff_model,Volume,PED VKT per capita,Actual,km/person/FY,2020,6107.3688730444865,MA Aaron,L36
+aaron_schiff_model,Volume,PED VKT per capita,Actual,km/person/FY,2021,6031.76090582156,MA Aaron,M36
+aaron_schiff_model,Volume,PED VKT per capita,Actual,km/person/FY,2022,5852.379317063559,MA Aaron,N36
+aaron_schiff_model,Volume,PED VKT per capita,Actual,km/person/FY,2023,6098.2053446307855,MA Aaron,O36
+aaron_schiff_model,Volume,PED VKT per capita,Actual,km/person/FY,2024,6098.650188695321,MA Aaron,P36
+aaron_schiff_model,Volume,PED VKT per capita,Actual,km/person/FY,2025,6086.697742339673,MA Aaron,Q36
+aaron_schiff_model,Volume,PED VKT per capita,Actual,km/person/FY,2026,#N/A,MA Aaron,R36
+aaron_schiff_model,Volume,PED VKT per capita,Actual,km/person/FY,2027,#N/A,MA Aaron,S36
+aaron_schiff_model,Volume,PED VKT per capita,Actual,km/person/FY,2028,#N/A,MA Aaron,T36
+aaron_schiff_model,Volume,PED VKT per capita,Actual,km/person/FY,2029,#N/A,MA Aaron,U36
+aaron_schiff_model,Volume,PED VKT per capita,Actual,km/person/FY,2030,#N/A,MA Aaron,V36
+aaron_schiff_model,Volume,PED VKT per capita,Actual,km/person/FY,2031,#N/A,MA Aaron,W36

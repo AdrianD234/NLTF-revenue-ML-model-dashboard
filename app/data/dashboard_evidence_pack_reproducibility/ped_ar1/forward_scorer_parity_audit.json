@@ -1,0 +1,10 @@
+{
+  "stream": "PED",
+  "finalist_model": "PED__DIAGLAB__B__glsar__ylag1__ar1__wexp",
+  "scorer_version": "ped-ar1-forward-scorer-v1",
+  "parity_status": "passed",
+  "state_replay_max_abs_delta": 0.0,
+  "recipe_replay_max_abs_delta": 0.0,
+  "tolerance_abs": 1e-06,
+  "note": "Deterministic linear engine: parity re-fits the GLSAR from the committed input history and compares coefficients and training fits to the stored state."
+}

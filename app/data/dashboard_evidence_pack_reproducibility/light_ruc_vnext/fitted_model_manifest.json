@@ -1,0 +1,25 @@
+{
+  "created_at": "2026-06-10T23:11:22.550579+00:00",
+  "pipeline_version": "vnext-pipeline-v1.0",
+  "stream": "LIGHT_RUC",
+  "finalist_model": "dynamic_RESID_GBR_n150_d1_lr0.05_w36",
+  "note": "Promoted fitted state for the governed Light RUC finalist recipe. Decision-facing paths LOAD this state; they do not refit at score time. Refitting made Light RUC the only stream whose forecast depended on the machine running it (up to 0.48% across platforms, while PED and Heavy RUC agreed to machine epsilon). A refit implementation remains only as a non-production promotion utility.",
+  "production_states": {
+    "LIGHT": {
+      "file": "fitted_state/light_ruc_production.joblib",
+      "sha256": "41669526945c546fc66a1e6d327bde3c9077b4fe6f6f4ca24fda3709654a1294",
+      "train_window_start": "2017Q1",
+      "train_window_end": "2025Q4",
+      "train_rows": 36
+    }
+  },
+  "parity_status": "passed_fixed_recipe_identity",
+  "state_policy": {
+    "model_recipe": "dynamic_RESID_GBR_n150_d1_lr0.05_w36; Schiff-style OLS base plus GBM residual correction on the log target",
+    "fitted_state": "fitted_state/light_ruc_production.joblib, hash-gated at load",
+    "promotion_date": "2026-06-10T23:11:22.550579+00:00",
+    "runtime_behaviour": "load_light_ruc_promoted_state() in model_dashboard/forecast_runner.py; fails closed if the hash, feature contract, hyperparameters or archived training-fit replay do not match",
+    "retraining_policy": "A data update does NOT silently retrain. Refit under the pinned runtime in requirements.txt, run the backtest and parity gates, write a new state artefact with its hashes and training cutoff, review the before/after impact report, then promote. Until promotion, the existing state stays authoritative.",
+    "parity_requirement": "Windows and Linux must agree to machine epsilon, the same standard PED and Heavy RUC meet; enforced by the replay-parity CI matrix."
+  }
+}

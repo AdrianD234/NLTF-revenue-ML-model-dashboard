@@ -1,0 +1,63 @@
+{
+  "created_at": "2026-06-10T23:02:28.579922+00:00",
+  "pipeline_version": "vnext-pipeline-v1.0",
+  "stream": "PED",
+  "stream_label": "PED VKT per capita",
+  "finalist_model": "PED__VNEXT_SOLVED_CONVEX_TOP2",
+  "members": [
+    {
+      "component_label": "M1",
+      "component_model": "PED__VNEXT__dynamic_no_leads__resid_gbr_learning_rate0p05_max_depth1_n_estimators150__noylag__wexp",
+      "component_weight": 0.584392,
+      "name": "PED__VNEXT__dynamic_no_leads__resid_gbr_learning_rate0p05_max_depth1_n_estimators150__noylag__wexp",
+      "model_kind": "resid_gbr",
+      "params_json": "{\"learning_rate\": 0.05, \"loss\": \"squared_error\", \"max_depth\": 1, \"n_estimators\": 150, \"random_state\": 42, \"subsample\": 0.85}",
+      "window": null,
+      "feature_set": "dynamic_no_leads",
+      "include_target_lags": false,
+      "family_tag": "challenger_resid_gbr",
+      "base_feature_set": "schiff"
+    },
+    {
+      "component_label": "M2",
+      "component_model": "PED__VNEXT__diff__gbr_learning_rate0p05_max_depth1_n_estimators400__ylag__w56",
+      "component_weight": 0.415608,
+      "name": "PED__VNEXT__diff__gbr_learning_rate0p05_max_depth1_n_estimators400__ylag__w56",
+      "model_kind": "gbr",
+      "params_json": "{\"learning_rate\": 0.05, \"loss\": \"squared_error\", \"max_depth\": 1, \"n_estimators\": 400, \"random_state\": 42, \"subsample\": 0.85}",
+      "window": 56,
+      "feature_set": "diff",
+      "include_target_lags": true,
+      "family_tag": "challenger_gbr",
+      "base_feature_set": "schiff"
+    }
+  ],
+  "weight_solver": "slsqp_paper_horizon_mean_multistart_zero_pruned",
+  "target_column": "target",
+  "target_transform": "y_model = ln(target); prediction = exp(y_model)",
+  "lag_recursion_policy": "recursive_predicted",
+  "latest_actual": "2025Q4",
+  "history_file": "data/model_input_history/ped_inputs.parquet",
+  "history_sha256": "d1955e01e07c74ad5aff08736cc822cd914cfa2df201e1f7dd8872116219a1f9",
+  "production_states": {
+    "M1": {
+      "component_model": "PED__VNEXT__dynamic_no_leads__resid_gbr_learning_rate0p05_max_depth1_n_estimators150__noylag__wexp",
+      "file": "fitted_state/M1_production.joblib",
+      "sha256": "69ec46d0085546e82bbd06109b520f5d6f0db0d1b153a31fd245d99b26f380b9",
+      "train_window_start": "2002Q1",
+      "train_window_end": "2025Q4",
+      "train_rows": 96
+    },
+    "M2": {
+      "component_model": "PED__VNEXT__diff__gbr_learning_rate0p05_max_depth1_n_estimators400__ylag__w56",
+      "file": "fitted_state/M2_production.joblib",
+      "sha256": "f50d538f21f67cf50f6608c98ba909903f7bcfa99e7428c27cfc660317d2f4f6",
+      "train_window_start": "2012Q1",
+      "train_window_end": "2025Q4",
+      "train_rows": 56
+    }
+  },
+  "random_state": 42,
+  "sklearn_version": "1.7.2",
+  "parity_status": "passed"
+}

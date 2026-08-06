@@ -1,0 +1,82 @@
+{
+  "created_by": "Codex copy step",
+  "source_folder": "C:\\Users\\Adrian Desilvestro\\Downloads\\heavy_ruc_reproducibility_audit_heavy_ruc_repro_audit_20260527_200419_20260527_200626",
+  "note": "Source audit folder did not include parquet_write_status.json; this status records the copied durable Parquet files.",
+  "copied_parquet_files": [
+    {
+      "name": "annual_predictions.parquet",
+      "size": 10848,
+      "exists": true
+    },
+    {
+      "name": "component_predictions.parquet",
+      "size": 61868,
+      "exists": true
+    },
+    {
+      "name": "evidence_metric_comparison.parquet",
+      "size": 7411,
+      "exists": true
+    },
+    {
+      "name": "evidence_prediction_comparison.parquet",
+      "size": 3934,
+      "exists": true
+    },
+    {
+      "name": "feature_importance_global.parquet",
+      "size": 6741,
+      "exists": true
+    },
+    {
+      "name": "feature_importance.parquet",
+      "size": 6996,
+      "exists": true
+    },
+    {
+      "name": "future_forecasts.parquet",
+      "size": 5773,
+      "exists": true
+    },
+    {
+      "name": "horizon_profiles.parquet",
+      "size": 10509,
+      "exists": true
+    },
+    {
+      "name": "model_coefficients.parquet",
+      "size": 7275,
+      "exists": true
+    },
+    {
+      "name": "model_registry.parquet",
+      "size": 15868,
+      "exists": true
+    },
+    {
+      "name": "rebuilt_predictions.parquet",
+      "size": 24485,
+      "exists": true
+    },
+    {
+      "name": "scenario_sensitivities.parquet",
+      "size": 7298,
+      "exists": true
+    },
+    {
+      "name": "scorecard_summary.parquet",
+      "size": 18555,
+      "exists": true
+    },
+    {
+      "name": "stress_horizon.parquet",
+      "size": 4886,
+      "exists": true
+    },
+    {
+      "name": "training_window_trace.parquet",
+      "size": 8033,
+      "exists": true
+    }
+  ]
+}

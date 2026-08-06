@@ -1,0 +1,23 @@
+{
+  "created_at": "2026-06-10T23:03:03.416594+00:00",
+  "stream": "HEAVY_RUC",
+  "files": {
+    "training_feature_matrices.parquet": {
+      "sha256": "75aa5ff4be6ac67490ee278cec7d7d2f816979e630ee34fdb78786e42231829b",
+      "rows": 5592
+    },
+    "prediction_feature_rows.parquet": {
+      "sha256": "2858d2244809134309b951fe4bd8235a6e89e9308f318b7b0ed0ec5c138c28b6",
+      "rows": 1314
+    },
+    "component_validation_predictions.parquet": {
+      "sha256": "a07c439fcc98420fe897e4c3d65728401022d1a3243c8c642e4aca6a6f6e2c5a",
+      "rows": 1314
+    },
+    "validation_predictions.parquet": {
+      "sha256": "bebf750a954645280f3603c247433188950376f043ce07d1f29b26a7689eb81c",
+      "rows": 438
+    }
+  },
+  "feature_column_order_note": "Column order in each parquet is the exact fit/predict order."
+}

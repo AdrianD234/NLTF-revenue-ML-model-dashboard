@@ -1,0 +1,174 @@
+{
+  "schema_version": "nltf-official-vintage-registry-v1",
+  "description": "Governed registry of published official revenue-forecast vintages. Each entry maps a release round to its source workbook, layout, materialized pack and default-role flags. THREE roles are governed independently and exactly one vintage carries each: is_default_comparator (the published forecast displayed as the external comparator), is_default_bridge_vintage (effective rates, fuel intensity, administration, refunds, MVR, TUC and fixed lines used to turn Current activity into revenue) and is_default_long_run_shape_vintage (the external FY2031-FY2050 activity GROWTH SHAPE - never a level - used by the anchored structural shape transition). is_latest names the newest release. supports_long_run_shape and the long_run_shape_*_fy window are derived from what each pack actually publishes, so a later vintage becomes shape-capable without a code change. This registry names revenue-forecast vintages only; the Treasury BEFU26 macro path (treasury_befu26_macro_path.csv) is a separate macro-input vintage and is not registered here.",
+  "vintages": [
+    {
+      "vintage_id": "MBU26",
+      "display_name": "MBU26 official",
+      "release_round": "MBU26",
+      "release_date": null,
+      "source_workbook": "Revenue forecast error, annual view from BEFU 2013-25.xlsx",
+      "workbook_sha256": "9aaff21f72c0a10cfa972a29d3c4f716495c79cbd72fc28e8008a65558454e12",
+      "source_sheet": "MBU26",
+      "schema_version": "nltf-revenue-mbu26-annual-spine-v1",
+      "actual_start_fy": 2001,
+      "actual_end_fy": 2025,
+      "short_forecast_start_fy": 2026,
+      "short_forecast_end_fy": 2030,
+      "long_forecast_start_fy": 2031,
+      "long_forecast_end_fy": 2055,
+      "source_horizon_fy": 2055,
+      "source_pack_path": "data/revenue_model_source_pack/mbu26_annual_spine",
+      "pack_format": "mbu26_legacy_v1",
+      "file_stems": {
+        "annual_spine": "mbu26_annual_spine",
+        "official_annual": "mbu26_official_annual",
+        "formula_audit": "mbu26_formula_audit",
+        "row_reconciliation": "row_reconciliation",
+        "series_alias_audit": "series_alias_audit",
+        "series_trace_contract": "series_trace_contract",
+        "trace_source_contract": "trace_source_contract",
+        "path_trace_status": "path_trace_status"
+      },
+      "layout": {
+        "year_header_row": 6,
+        "period_status_row": 7,
+        "label_column": 2
+      },
+      "available": true,
+      "is_latest": false,
+      "is_default_comparator": false,
+      "is_default_bridge_vintage": false,
+      "status": "superseded_official_vintage_available_for_comparison",
+      "notes": "Legacy pack materialized by scripts/materialize_mbu26_annual_spine.py; registered here as a compatibility entry. Source values are frozen and must remain byte-identical. The source workbook is offline lineage only (not vendored in the repo).",
+      "supports_long_run_shape": true,
+      "long_run_shape_start_fy": 2024,
+      "long_run_shape_end_fy": 2055,
+      "long_run_shape_required_series_available": true,
+      "is_default_long_run_shape_vintage": false
+    },
+    {
+      "vintage_id": "BEFU26",
+      "display_name": "BEFU26 official",
+      "release_round": "BEFU26",
+      "release_date": null,
+      "source_workbook": "references/BEFU26 revenue forecast.xlsx",
+      "workbook_sha256": "7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff",
+      "source_sheet": "Baseline",
+      "schema_version": "nltf-revenue-official-vintage-v1",
+      "actual_start_fy": 2001,
+      "actual_end_fy": 2025,
+      "short_forecast_start_fy": 2026,
+      "short_forecast_end_fy": 2030,
+      "long_forecast_start_fy": 2031,
+      "long_forecast_end_fy": 2055,
+      "source_horizon_fy": 2055,
+      "source_pack_path": "data/revenue_model_source_pack/official_vintages/befu26",
+      "pack_format": "official_vintage_v1",
+      "file_stems": {
+        "annual_spine": "annual_spine",
+        "official_annual": "official_annual",
+        "formula_audit": "formula_audit",
+        "row_reconciliation": "row_reconciliation",
+        "series_alias_audit": "series_alias_audit",
+        "series_trace_contract": "series_trace_contract",
+        "trace_source_contract": "trace_source_contract",
+        "path_trace_status": "path_trace_status"
+      },
+      "layout": {
+        "year_header_row": 1,
+        "period_status_row": 2,
+        "label_column": 1
+      },
+      "allowed_missing": [
+        {
+          "series_id": "light_petrol_vkt",
+          "fys": [
+            2001,
+            2002
+          ]
+        },
+        {
+          "series_id": "ped_vkt_per_capita",
+          "fys": [
+            2001,
+            2002
+          ]
+        }
+      ],
+      "sentinels": [
+        {
+          "series_id": "total_nltf_net_revenue",
+          "fy": 2026,
+          "value": 4493.65132567772
+        },
+        {
+          "series_id": "total_nltf_net_revenue",
+          "fy": 2030,
+          "value": 6442.98776042894
+        },
+        {
+          "series_id": "total_nltf_net_revenue",
+          "fy": 2050,
+          "value": 12910.4837029366
+        },
+        {
+          "series_id": "total_nltf_net_revenue",
+          "fy": 2055,
+          "value": 14500.4528554998
+        },
+        {
+          "series_id": "light_ruc_net_km",
+          "fy": 2026,
+          "value": 12707.9889982716
+        },
+        {
+          "series_id": "ped_volume",
+          "fy": 2040,
+          "value": 1920.22768771668
+        },
+        {
+          "series_id": "tuc_gtk",
+          "fy": 2026,
+          "value": 8224343155.99
+        },
+        {
+          "series_id": "light_ruc_net_revenue",
+          "fy": 2055,
+          "value": 789.484160803912
+        },
+        {
+          "series_id": "gross_ruc_revenue",
+          "fy": 2040,
+          "value": 6434.96355570389
+        },
+        {
+          "series_id": "net_fed_revenue",
+          "fy": 2026,
+          "value": 2007.89765301342
+        },
+        {
+          "series_id": "gross_mvr_revenue",
+          "fy": 2040,
+          "value": 517.956301022337
+        },
+        {
+          "series_id": "tuc_net_revenue",
+          "fy": 2026,
+          "value": 17.4060774864124
+        }
+      ],
+      "available": true,
+      "is_latest": true,
+      "is_default_comparator": true,
+      "is_default_bridge_vintage": true,
+      "status": "active_official_vintage",
+      "notes": "BEFU26 published revenue forecast. Workbook vendored at references/BEFU26 revenue forecast.xlsx (governed input; hash pinned above). Sentinels pin the total and representative activity/revenue leaves so a shifted row mapping cannot pass by matching only the total.",
+      "supports_long_run_shape": true,
+      "long_run_shape_start_fy": 2024,
+      "long_run_shape_end_fy": 2055,
+      "long_run_shape_required_series_available": true,
+      "is_default_long_run_shape_vintage": true
+    }
+  ]
+}

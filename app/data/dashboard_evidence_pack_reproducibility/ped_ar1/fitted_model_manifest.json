@@ -1,0 +1,27 @@
+{
+  "stream": "PED",
+  "finalist_model": "PED__DIAGLAB__B__glsar__ylag1__ar1__wexp",
+  "engine": "ar1",
+  "generation": "ar1",
+  "scorer_version": "ped-ar1-forward-scorer-v1",
+  "members": [
+    {
+      "component_label": "AR1",
+      "component_model": "PED__DIAGLAB__B__glsar__ylag1__ar1__wexp",
+      "component_weight": 1.0,
+      "model_kind": "glsar_ar1",
+      "feature_set": "schiff_levels_trend_seasonal",
+      "window": "expanding",
+      "include_target_lags": true
+    }
+  ],
+  "production_states": {
+    "AR1": {
+      "file": "ar1_fitted_state.json",
+      "sha256": "361c3364836b21374f9c99f798da94742f3674b3a177484e8f4d4601f700c7a6",
+      "train_window_start": "2002Q2",
+      "train_window_end": "2025Q4",
+      "train_rows": 95
+    }
+  }
+}

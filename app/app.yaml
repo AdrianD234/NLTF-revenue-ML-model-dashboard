@@ -1,0 +1,6 @@
+# Databricks Apps runtime config, copied into the generated bundle as app.yaml.
+# Databricks supplies the host/port environment; do not hardcode either.
+command: ['streamlit', 'run', 'app.py']
+env:
+  - name: 'STREAMLIT_GATHER_USAGE_STATS'
+    value: 'false'

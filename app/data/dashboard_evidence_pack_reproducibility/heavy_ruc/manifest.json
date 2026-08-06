@@ -1,0 +1,33 @@
+{
+  "created_at": "2026-05-27T20:04:20.782653",
+  "stream": "HEAVY_RUC",
+  "stream_label": "Heavy RUC volume",
+  "finalist_model": "HEAVY_RUC__RECON_STATIC_REBUILT",
+  "source_parent_run": "C:\\Users\\Adrian Desilvestro\\Downloads\\heavy_ruc_fullgrid_rescue_closure_run_20260521_171358_20260521_175036.zip",
+  "source_workbook": "C:\\Users\\Adrian Desilvestro\\OneDrive\\Documents\\Playground\\Revenue Modeling - Strategic Review\\04 Models\\Inputs\\Master Copy revenue modelling workbook.xlsx",
+  "source_sheet": "Heavy RUC Inputs",
+  "evidence_pack": "C:\\Users\\Adrian Desilvestro\\Downloads\\stage1_dashboard_evidence_pack_dual_scorecard_gbm_light_v6_balanced_frontier\\dashboard_evidence_pack",
+  "component_weights": [
+    {
+      "component_model": "HEAVY_RUC__dynamic_no_leads__Elastic_alpha0_005_l1_ratio0_2__ylag__w64",
+      "weight": 0.469332
+    },
+    {
+      "component_model": "HEAVY_RUC__schiff__GBR_learning_rate0_06_max_depth1_n_estimators650__noylag__w64",
+      "weight": 0.281844
+    },
+    {
+      "component_model": "HEAVY_RUC__dynamic_no_leads__GBR_learning_rate0_08_max_depth1_n_estimators400__ylag__w52",
+      "weight": 0.144373
+    },
+    {
+      "component_model": "HEAVY_RUC__dynamic_no_leads__GBR_learning_rate0_08_max_depth1_n_estimators150__ylag__w40",
+      "weight": 0.104451
+    }
+  ],
+  "reproducibility_claim": "Exact fixed weighted ensemble replay from parent component predictions.",
+  "limitations": [
+    "Does not refit component models from workbook inputs.",
+    "Internal component feature importances/cofficients are unavailable without fitted model artifacts or refit instrumentation."
+  ]
+}

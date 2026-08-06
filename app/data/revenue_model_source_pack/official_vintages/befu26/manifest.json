@@ -1,0 +1,94 @@
+{
+  "schema_version": "nltf-revenue-official-vintage-v1",
+  "vintage_id": "BEFU26",
+  "source_release": "BEFU26",
+  "repo_relative_output_dir": "data/revenue_model_source_pack/official_vintages/befu26",
+  "registry": "data/revenue_model_source_pack/official_vintage_registry.json",
+  "source_policy": "Baseline worksheet only; workbook is offline lineage and is never loaded at Streamlit runtime.",
+  "workbook": {
+    "basename": "BEFU26 revenue forecast.xlsx",
+    "sha256": "7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff",
+    "size_bytes": 51133,
+    "sheet": "Baseline"
+  },
+  "extracted_at": "2026-07-30T21:11:02.010977+00:00",
+  "extracted_by": "official_vintage_materializer",
+  "sentinels_validated": 12,
+  "row_count": {
+    "annual_spine": 2145,
+    "formula_audit": 770,
+    "official_annual": 2200,
+    "row_reconciliation": 770,
+    "series_alias_audit": 9,
+    "series_trace_contract": 14,
+    "trace_source_contract": 4,
+    "path_trace_status": 4
+  },
+  "normalized_files": {
+    "annual_spine.csv": {
+      "sha256": "a88fdcd2be2c8e875091be31a3be9e1f35da620e667a2aedaa328abdb3cfeee4",
+      "size_bytes": 872639
+    },
+    "annual_spine.parquet": {
+      "sha256": "7b6a5472bd5e71e6a9ee18e066058f472c200534722fd1a0fac9cd0a91d12eea",
+      "size_bytes": 63409
+    },
+    "formula_audit.csv": {
+      "sha256": "32f96caf5caa6fcbd26d7db66ff6f095c20cdd19a55fe793c56f3fbeff181983",
+      "size_bytes": 207982
+    },
+    "formula_audit.parquet": {
+      "sha256": "b051d2bed181b8d9a273c6a430eb63e2219c7e87f291cc31e4461c7a1c64231d",
+      "size_bytes": 38041
+    },
+    "official_annual.csv": {
+      "sha256": "f72734b5a52862232f9b095c114a08644eb9af2074e9fd2fe886cd707805a5fc",
+      "size_bytes": 975819
+    },
+    "official_annual.parquet": {
+      "sha256": "fec808229990dc882747eda64bcc6d6494618ffb44e12a1af8324ed97ed626c9",
+      "size_bytes": 66820
+    },
+    "row_reconciliation.csv": {
+      "sha256": "32f96caf5caa6fcbd26d7db66ff6f095c20cdd19a55fe793c56f3fbeff181983",
+      "size_bytes": 207982
+    },
+    "row_reconciliation.parquet": {
+      "sha256": "b051d2bed181b8d9a273c6a430eb63e2219c7e87f291cc31e4461c7a1c64231d",
+      "size_bytes": 38041
+    },
+    "series_alias_audit.csv": {
+      "sha256": "4ecb934095a44563a6ba235b293fe5d184eabe6ba74b56d1fb9681c3018fcf92",
+      "size_bytes": 2173
+    },
+    "series_alias_audit.parquet": {
+      "sha256": "dc1aa511d52e9de010af355e0209747d69f308751c3ea8682179f886202391ff",
+      "size_bytes": 7387
+    },
+    "series_trace_contract.csv": {
+      "sha256": "c717badc9b8056755483a6c494820b62cd44bb734a99f8e0b12fe75188bf4db6",
+      "size_bytes": 8133
+    },
+    "series_trace_contract.parquet": {
+      "sha256": "866482606699335a37eccac418f667a77ad93492b05e6f0e43d9aea4651c4e35",
+      "size_bytes": 13422
+    },
+    "trace_source_contract.csv": {
+      "sha256": "756035b33d4579591e96146048fbf5299d1c5e3cb980d3146b399c95f72df323",
+      "size_bytes": 1858
+    },
+    "trace_source_contract.parquet": {
+      "sha256": "0674624e668bce209c412905b5f6c6f290af0ae4a81e4d55b369060ab13dcdfd",
+      "size_bytes": 10091
+    },
+    "path_trace_status.csv": {
+      "sha256": "77b4cd16f5b65809104b95b8a939ce404a9125036730c3952a8d71495d95b91f",
+      "size_bytes": 850
+    },
+    "path_trace_status.parquet": {
+      "sha256": "8eecdc681a34cb4285838d93133d4cfda50b92562b4244b92f88774d1d7c170f",
+      "size_bytes": 5985
+    }
+  },
+  "formula_policy": "BEFU26 annual value cells are stored without Excel formulas in the grid; aggregate formula contracts are asserted from the governed formula registry and residuals are reported without force-balancing."
+}

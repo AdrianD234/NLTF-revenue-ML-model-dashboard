@@ -1,0 +1,84 @@
+{
+  "created_at": "2026-06-10T23:03:03.406504+00:00",
+  "pipeline_version": "vnext-pipeline-v1.0",
+  "stream": "HEAVY_RUC",
+  "stream_label": "Heavy RUC volume",
+  "finalist_model": "HEAVY_RUC__VNEXT_SOLVED_CONVEX_TOP4",
+  "members": [
+    {
+      "component_label": "M1",
+      "component_model": "HEAVY_RUC__VNEXT__dynamic_no_leads__ridge_alpha10p0__ylag__w64",
+      "component_weight": 0.708904,
+      "name": "HEAVY_RUC__VNEXT__dynamic_no_leads__ridge_alpha10p0__ylag__w64",
+      "model_kind": "ridge",
+      "params_json": "{\"alpha\": 10.0, \"random_state\": 42}",
+      "window": 64,
+      "feature_set": "dynamic_no_leads",
+      "include_target_lags": true,
+      "family_tag": "challenger_ridge",
+      "base_feature_set": "schiff"
+    },
+    {
+      "component_label": "M2",
+      "component_model": "HEAVY_RUC__VNEXT__schiff__gbr_learning_rate0p08_max_depth1_n_estimators150__noylag__w52",
+      "component_weight": 0.212188,
+      "name": "HEAVY_RUC__VNEXT__schiff__gbr_learning_rate0p08_max_depth1_n_estimators150__noylag__w52",
+      "model_kind": "gbr",
+      "params_json": "{\"learning_rate\": 0.08, \"loss\": \"squared_error\", \"max_depth\": 1, \"n_estimators\": 150, \"random_state\": 42, \"subsample\": 0.85}",
+      "window": 52,
+      "feature_set": "schiff",
+      "include_target_lags": false,
+      "family_tag": "challenger_gbr",
+      "base_feature_set": "schiff"
+    },
+    {
+      "component_label": "M3",
+      "component_model": "HEAVY_RUC__VNEXT__dynamic_no_leads__gbr_learning_rate0p05_max_depth1_n_estimators650__ylag__w52",
+      "component_weight": 0.078908,
+      "name": "HEAVY_RUC__VNEXT__dynamic_no_leads__gbr_learning_rate0p05_max_depth1_n_estimators650__ylag__w52",
+      "model_kind": "gbr",
+      "params_json": "{\"learning_rate\": 0.05, \"loss\": \"squared_error\", \"max_depth\": 1, \"n_estimators\": 650, \"random_state\": 42, \"subsample\": 0.85}",
+      "window": 52,
+      "feature_set": "dynamic_no_leads",
+      "include_target_lags": true,
+      "family_tag": "challenger_gbr",
+      "base_feature_set": "schiff"
+    }
+  ],
+  "weight_solver": "slsqp_paper_horizon_mean_multistart_zero_pruned",
+  "target_column": "target",
+  "target_transform": "y_model = ln(target); prediction = exp(y_model)",
+  "lag_recursion_policy": "recursive_predicted",
+  "latest_actual": "2025Q4",
+  "history_file": "data/model_input_history/heavy_ruc_inputs.parquet",
+  "history_sha256": "751d6f71ac0941c2c606b4bd87980c249b798df4ddd93d1e7c372b51394dc5bb",
+  "production_states": {
+    "M1": {
+      "component_model": "HEAVY_RUC__VNEXT__dynamic_no_leads__ridge_alpha10p0__ylag__w64",
+      "file": "fitted_state/M1_production.joblib",
+      "sha256": "68f4bb94b9fad2a01fa320b437fc6a8ed9e9e9d4b8534ba1fcd73b171aca91bb",
+      "train_window_start": "2010Q1",
+      "train_window_end": "2025Q4",
+      "train_rows": 64
+    },
+    "M2": {
+      "component_model": "HEAVY_RUC__VNEXT__schiff__gbr_learning_rate0p08_max_depth1_n_estimators150__noylag__w52",
+      "file": "fitted_state/M2_production.joblib",
+      "sha256": "063d0ff45fe5327cc5c115c828ac8f4ea048b32f8df5690b955a2bacd0610c63",
+      "train_window_start": "2013Q1",
+      "train_window_end": "2025Q4",
+      "train_rows": 52
+    },
+    "M3": {
+      "component_model": "HEAVY_RUC__VNEXT__dynamic_no_leads__gbr_learning_rate0p05_max_depth1_n_estimators650__ylag__w52",
+      "file": "fitted_state/M3_production.joblib",
+      "sha256": "f64fa1c616e8d88479f5e5edf0ad21026750160be398a33c2e785dcff7b85759",
+      "train_window_start": "2013Q1",
+      "train_window_end": "2025Q4",
+      "train_rows": 52
+    }
+  },
+  "random_state": 42,
+  "sklearn_version": "1.7.2",
+  "parity_status": "passed"
+}

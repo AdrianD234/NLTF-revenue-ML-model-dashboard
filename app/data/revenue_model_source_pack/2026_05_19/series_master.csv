@@ -1,0 +1,30 @@
+Series ID,Display name,Group,Unit,Forecast role,Parent series ID,Sign,Dashboard visible,Notes
+total_nltf_net_revenue,Total NLTF revenue,Total revenue,$m nominal ex GST,aggregation,,1,True,"Root rolled-up total: Net FED + Net RUC + Net MVR + TUC, plus explicit Crown top-up policy."
+total_fed_ruc_net_revenue,Total FED+RUC net revenue,Subtotal,$m nominal ex GST,aggregation,total_nltf_net_revenue,1,False,Legacy dashboard alias: Total RUC+PED revenue.
+net_fed_revenue,Net FED revenue,FED revenue,$m nominal ex GST,aggregation,total_fed_ruc_net_revenue,1,True,Gross FED less FED refunds; optional top-up overlay.
+gross_fed_revenue,Gross FED revenue,FED revenue,$m nominal ex GST,aggregation,net_fed_revenue,1,False,Gross PED + LPG + CNG.
+gross_ped_revenue,PED revenue,FED revenue,$m nominal ex GST,econometric_bridge,gross_fed_revenue,1,True,PED VKT per capita → total VKT → PED litres → nominal PED/FED rate.
+gross_lpg_revenue,Gross LPG revenue,FED revenue,$m nominal ex GST,official_pass_through,gross_fed_revenue,1,False,Not separately modelled in the three-stream activity layer.
+gross_cng_revenue,Gross CNG revenue,FED revenue,$m nominal ex GST,official_pass_through,gross_fed_revenue,1,False,Not separately modelled in the three-stream activity layer.
+fed_refunds,FED refunds,Deduction,$m nominal ex GST,deduction,net_fed_revenue,-1,False,"Includes petrol, LPG and CNG refunds."
+total_ruc_net_revenue,Total RUC all classes,RUC revenue,$m nominal ex GST,aggregation,total_fed_ruc_net_revenue,1,False,Conventional and EV/PHEV classes aligned to selected gross/net basis.
+light_ruc_net_revenue,Light RUC revenue,RUC revenue,$m nominal ex GST,econometric_bridge,total_ruc_net_revenue,1,True,"Light RUC net km ÷ 1,000 × nominal effective average rate."
+heavy_ruc_net_revenue,Heavy RUC revenue,RUC revenue,$m nominal ex GST,econometric_bridge,total_ruc_net_revenue,1,True,"Heavy RUC net km ÷ 1,000 × class-mix-weighted nominal effective rate."
+light_bev_ruc_net_revenue,Light BEV RUC net revenue,RUC revenue,$m nominal ex GST,derived_scenario_split,total_ruc_net_revenue,1,False,Scenario split layer.
+heavy_bev_ruc_net_revenue,Heavy BEV RUC net revenue,RUC revenue,$m nominal ex GST,derived_scenario_split,total_ruc_net_revenue,1,False,Scenario split layer.
+phev_ruc_net_revenue,PHEV RUC net revenue,RUC revenue,$m nominal ex GST,derived_scenario_split,total_ruc_net_revenue,1,False,Scenario split layer.
+ruc_admin_revenue,RUC admin revenue,RUC revenue,$m nominal ex GST,official_pass_through,total_ruc_net_revenue,0,False,Used in official gross/net reconciliation.
+ruc_refunds,RUC refunds,Deduction,$m nominal ex GST,deduction,total_ruc_net_revenue,-1,False,Used in official gross/net reconciliation.
+net_mvr_revenue,Net MVR revenue,MVR/TUC revenue,$m nominal ex GST,aggregation,total_nltf_net_revenue,1,True,MR1/CVL + MR2 + COO + MVR admin revenue - MVR refunds.
+mr1_cvl_revenue,MR1 & CVL revenue,MVR/TUC revenue,$m nominal ex GST,official_pass_through,net_mvr_revenue,1,False,Official/MOT pass-through.
+mr2_revenue,MR2 revenue,MVR/TUC revenue,$m nominal ex GST,official_pass_through,net_mvr_revenue,1,False,Official/MOT pass-through.
+coo_revenue,COO revenue,MVR/TUC revenue,$m nominal ex GST,official_pass_through,net_mvr_revenue,1,False,Official/MOT pass-through.
+mvr_admin_revenue,MVR admin revenue,MVR/TUC revenue,$m nominal ex GST,official_pass_through,net_mvr_revenue,1,False,Revenue line in the workbook formula.
+mvr_refunds,MVR refunds,Deduction,$m nominal ex GST,deduction,net_mvr_revenue,-1,False,Subtracted from Net MVR.
+tuc_net_revenue,TUC net revenue,MVR/TUC revenue,$m nominal ex GST,official_pass_through,total_nltf_net_revenue,1,True,Not currently econometrically modelled.
+crown_top_up,Crown top-up / temporary fuel relief,Overlay,$m nominal ex GST,optional_overlay,total_nltf_net_revenue,1,False,Explicit Include/Exclude policy.
+ped_vkt_per_capita,PED VKT per capita,Activity,km/person,econometric_model,gross_ped_revenue,0,True,Primary modeled PED activity.
+ped_total_vkt,Total light petrol VKT,Activity,km,derived_bridge,gross_ped_revenue,0,False,VKT per capita × population.
+ped_volume,PED volume,Activity,million litres,derived_bridge,gross_ped_revenue,0,False,Log-linear VKT-to-volume bridge.
+light_ruc_net_km,Light RUC net km,Activity,km,econometric_model,light_ruc_net_revenue,0,False,Primary modeled Light RUC volume.
+heavy_ruc_net_km,Heavy RUC net km,Activity,km,econometric_model,heavy_ruc_net_revenue,0,False,Primary modeled Heavy RUC volume.

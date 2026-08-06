@@ -1,0 +1,13 @@
+Rule ID,Output series ID,Expression,Rule type,Workbook source anchor
+gross_fed,gross_fed_revenue,gross_ped_revenue + gross_lpg_revenue + gross_cng_revenue,aggregation,Forecast machinery row 150
+net_fed,net_fed_revenue,gross_fed_revenue - fed_refunds + optional PED/FED Crown top-up,aggregation_overlay,Forecast machinery row 152
+ped_total_vkt,ped_total_vkt,ped_vkt_per_capita × population,bridge,Forecast machinery row 75
+ped_volume_bridge,ped_volume,EXP(-3.319 + 1.125 × LN(total light petrol VKT in million km) - 0.031 × LN(trend index)),econometric_bridge,Model variants rows 21–23 / Forecast machinery row 76
+ped_revenue_bridge,gross_ped_revenue,"PED volume million litres × effective nominal PED/FED rate NZD/litre × 1,000,000",revenue_bridge,Forecast machinery row 77
+light_ruc_revenue_bridge,light_ruc_net_revenue,"Light RUC net km ÷ 1,000 × nominal effective Light RUC rate NZD/1,000 km",revenue_bridge,Forecast machinery rows 84 and 156
+heavy_ruc_revenue_bridge,heavy_ruc_net_revenue,"Heavy RUC net km ÷ 1,000 × nominal effective Heavy RUC rate NZD/1,000 km",revenue_bridge,Forecast machinery rows 91 and 159
+total_ruc,total_ruc_net_revenue,"Light conventional + Light BEV + PHEV + Heavy conventional + Heavy BEV, adjusted to official net-of-admin/refunds basis",aggregation_basis_adjustment,Forecast machinery rows 156–162
+net_mvr,net_mvr_revenue,MR1 & CVL + MR2 + COO + MVR admin revenue - MVR refunds,aggregation,Quarterly actuals row 31
+total_fed_ruc,total_fed_ruc_net_revenue,net_fed_revenue + total_ruc_net_revenue,subtotal,Forecast machinery row 133
+total_nltf,total_nltf_net_revenue,net_fed_revenue + total_ruc_net_revenue + net_mvr_revenue + tuc_net_revenue + explicit Crown top-up treatment,aggregation_overlay,Forecast machinery row 162
+official_total_net,total_nltf_net_revenue,source-provided Total net revenues; reconcile to category net lines,official_source_identity,Official BEFU25 row 45 / NLTF core row 41

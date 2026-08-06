@@ -1,0 +1,275 @@
+{
+  "schema_version": "dashboard_evidence_pack_v7_vnext_finalists",
+  "created_at": "2026-07-08T22:25:13.220975+00:00",
+  "description": "Dual scorecard evidence pack with balanced all-stream candidate frontier visualization samples.",
+  "default_score_basis": "schiff_paper_horizon_mean",
+  "operational_score_basis": "current_grid_operational_pooled",
+  "selected_light_ruc_model": "schiff_w36_OLS",
+  "selected_light_ruc_reason": "Best dual-scorecard governance decision score in Light RUC 2026-05-26 search",
+  "required_dashboard_rule": "Default app must use score_basis labels and must not mix operational pooled and paper horizon MAPE without explicit toggle/label.",
+  "important_semantics": {
+    "default_quarterly_mape": "paper_style_horizon_mean / schiff_paper_horizon_mean",
+    "operational_pooled_mape": "mean APE over current evidence grid row-level predictions",
+    "paper_grid": "Schiff-style test grid with horizon-specific MAPE and 2020/2021 test targets excluded",
+    "light_ruc_finalist": "dynamic residual GBM selected as accuracy-challenger finalist; paper-style metrics default, operational annual MAPE retained as watch item.",
+    "toggle_required": "Dashboard should expose Operational pooled MAPE and Paper-style horizon MAPE scorecards.",
+    "candidate_frontier": "candidate_cone includes actual Light RUC challenger rows and transparent PED/Heavy visual frontier sample rows for chart continuity; visual samples are not model-selection evidence.",
+    "candidate_cone": "Default frontier chart uses balanced all-stream visual frontier samples plus true finalist and Schiff specification anchors; frontier samples are visualization-only and excluded from governance scoring.",
+    "reproducibility_audit": "Reproducibility tables document finalist/component traceability and explicitly mark incomplete rebuild gaps."
+  },
+  "row_counts": [
+    {
+      "file": "annual_predictions.parquet",
+      "rows": 130,
+      "columns": 17,
+      "size_bytes": 14951
+    },
+    {
+      "file": "candidate_cone.parquet",
+      "rows": 400,
+      "columns": 54,
+      "size_bytes": 112225
+    },
+    {
+      "file": "chart_contract.parquet",
+      "rows": 16,
+      "columns": 5,
+      "size_bytes": 5520
+    },
+    {
+      "file": "component_predictions.parquet",
+      "rows": 3672,
+      "columns": 18,
+      "size_bytes": 145995
+    },
+    {
+      "file": "diagnostic_acf.parquet",
+      "rows": 39,
+      "columns": 12,
+      "size_bytes": 9092
+    },
+    {
+      "file": "diagnostic_evidence_series.parquet",
+      "rows": 136,
+      "columns": 13,
+      "size_bytes": 16259
+    },
+    {
+      "file": "diagnostic_pass_matrix.parquet",
+      "rows": 27,
+      "columns": 9,
+      "size_bytes": 6388
+    },
+    {
+      "file": "diagnostic_test_detail.parquet",
+      "rows": 27,
+      "columns": 21,
+      "size_bytes": 19962
+    },
+    {
+      "file": "diagnostic_tests.parquet",
+      "rows": 6,
+      "columns": 38,
+      "size_bytes": 23759
+    },
+    {
+      "file": "ensemble_components.parquet",
+      "rows": 6,
+      "columns": 15,
+      "size_bytes": 11469
+    },
+    {
+      "file": "error_distribution.parquet",
+      "rows": 756,
+      "columns": 23,
+      "size_bytes": 40841
+    },
+    {
+      "file": "feature_importance.parquet",
+      "rows": 159,
+      "columns": 11,
+      "size_bytes": 10942
+    },
+    {
+      "file": "finalists.parquet",
+      "rows": 3,
+      "columns": 33,
+      "size_bytes": 25151
+    },
+    {
+      "file": "horizon_profiles.parquet",
+      "rows": 72,
+      "columns": 16,
+      "size_bytes": 12382
+    },
+    {
+      "file": "invalid_predictions_zero_actual.parquet",
+      "rows": 24,
+      "columns": 31,
+      "size_bytes": 19895
+    },
+    {
+      "file": "light_ruc_candidate_scorecard.parquet",
+      "rows": 887,
+      "columns": 14,
+      "size_bytes": 98060
+    },
+    {
+      "file": "model_coefficients.parquet",
+      "rows": 92,
+      "columns": 14,
+      "size_bytes": 11943
+    },
+    {
+      "file": "model_registry.parquet",
+      "rows": 12,
+      "columns": 27,
+      "size_bytes": 26317
+    },
+    {
+      "file": "paired_vs_schiff.parquet",
+      "rows": 3,
+      "columns": 22,
+      "size_bytes": 15814
+    },
+    {
+      "file": "residual_predictions.parquet",
+      "rows": 756,
+      "columns": 22,
+      "size_bytes": 36845
+    },
+    {
+      "file": "scenario_comparison.parquet",
+      "rows": 3,
+      "columns": 19,
+      "size_bytes": 14111
+    },
+    {
+      "file": "scenario_sensitivities.parquet",
+      "rows": 437,
+      "columns": 13,
+      "size_bytes": 21697
+    },
+    {
+      "file": "schiff_benchmark.parquet",
+      "rows": 3,
+      "columns": 31,
+      "size_bytes": 20540
+    },
+    {
+      "file": "scorecard_annual_metric_summary.parquet",
+      "rows": 12,
+      "columns": 7,
+      "size_bytes": 5264
+    },
+    {
+      "file": "scorecard_annual_predictions.parquet",
+      "rows": 662,
+      "columns": 17,
+      "size_bytes": 28647
+    },
+    {
+      "file": "scorecard_horizon_profiles.parquet",
+      "rows": 144,
+      "columns": 16,
+      "size_bytes": 13970
+    },
+    {
+      "file": "scorecard_model_summary.parquet",
+      "rows": 12,
+      "columns": 33,
+      "size_bytes": 22925
+    },
+    {
+      "file": "scorecard_predictions.parquet",
+      "rows": 3648,
+      "columns": 22,
+      "size_bytes": 106995
+    },
+    {
+      "file": "scorecard_stress_horizon.parquet",
+      "rows": 72,
+      "columns": 15,
+      "size_bytes": 11846
+    },
+    {
+      "file": "shap_summary.parquet",
+      "rows": 6,
+      "columns": 11,
+      "size_bytes": 8107
+    },
+    {
+      "file": "stress_horizon.parquet",
+      "rows": 36,
+      "columns": 15,
+      "size_bytes": 10870
+    }
+  ],
+  "canonical_finalists": {
+    "PED VKT per capita": {
+      "model": "PED__RESCUE_static_annual_weighted_top12_capnone",
+      "paper_horizon_mean_mape": 3.237143790424483,
+      "paper_annual_mape": 2.033293734597686,
+      "operational_pooled_mape": 2.473244583116969,
+      "operational_annual_mape": 2.239648058288008
+    },
+    "Light RUC volume": {
+      "model": "dynamic_RESID_GBR_n150_d1_lr0.05_w36",
+      "quarterly_mape": 5.363206773795227,
+      "annual_mape": 1.2737736398959618,
+      "operational_pooled_mape": 8.272972483557215,
+      "selection_note": "Dynamic residual GBM W36 selected as accuracy challenger."
+    },
+    "Heavy RUC volume": {
+      "model": "HEAVY_RUC__RECON_STATIC_REBUILT",
+      "paper_horizon_mean_mape": 2.8094728159657563,
+      "paper_annual_mape": 2.061102375292297,
+      "operational_pooled_mape": 3.4843675656819766,
+      "operational_annual_mape": 2.7845962414849983
+    }
+  },
+  "schiff_specification_benchmarks": {
+    "PED VKT per capita": {
+      "model": "PED__SCHIFF_SPEC_FROM_WORKBOOK",
+      "paper_horizon_mean_mape": 4.6749169871805245,
+      "operational_pooled_mape": 4.165909755893547
+    },
+    "Light RUC volume": {
+      "model": "LIGHT_RUC__SCHIFF_SPEC_FROM_WORKBOOK",
+      "paper_horizon_mean_mape": 8.52139709000687,
+      "operational_pooled_mape": 9.527167640611022
+    },
+    "Heavy RUC volume": {
+      "model": "HEAVY_RUC__SCHIFF_SPEC_FROM_WORKBOOK",
+      "paper_horizon_mean_mape": 8.761651777033487,
+      "operational_pooled_mape": 7.800196102221683
+    }
+  },
+  "annual_metric_note": "Annual MAPE fields use the model-summary annual scorecard values; row-level annual_predictions are retained for audit but may use a broader aggregation basis.",
+  "reproducibility_audit_created_at": "2026-05-27",
+  "updated_at": "2026-06-22T12:00:35.927419+00:00",
+  "vnext_promotion": {
+    "promoted_at": "2026-06-10T23:42:11.716091+00:00",
+    "finalists": {
+      "PED": "PED__VNEXT_SOLVED_CONVEX_TOP2",
+      "HEAVY_RUC": "HEAVY_RUC__VNEXT_SOLVED_CONVEX_TOP4"
+    },
+    "legacy_finalists_archived": {
+      "PED": "PED__RESCUE_static_annual_weighted_top12_capnone",
+      "HEAVY_RUC": "HEAVY_RUC__RECON_STATIC_REBUILT"
+    },
+    "note": "PED and Heavy RUC finalists replaced by parity-gated vNext production scorers (saved fitted state; exact replay). Metrics recomputed on the identical stored evidence keysets. Schiff benchmark and Light RUC rows are unchanged. Backup of the previous pack: data/dashboard_evidence_pack_v6_backup."
+  },
+  "candidate_cone_rebuild": {
+    "rebuilt_at": "2026-06-22T12:00:35.927419+00:00",
+    "builder": "scripts/regenerate_candidate_cone.py",
+    "row_counts": {
+      "PED": 132,
+      "LIGHT_RUC": 136,
+      "HEAVY_RUC": 132
+    },
+    "note": "Candidate frontier display sample rebuilt around current finalists; display-fill rows are not governance scoring evidence."
+  },
+  "engine": "ar1",
+  "engine_note": "AR(1) alternate engine pack: the PED finalist is the GLSAR AR(1) regression from the Diagnostics Lab; Light RUC and Heavy RUC are identical to the incumbent pack."
+}

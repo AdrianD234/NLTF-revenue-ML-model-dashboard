@@ -1,0 +1,223 @@
+fed_path,quarter,FY,rate_nzd_per_litre,unit,value_status,source_note,source_sheet,source_workbook_sheet,source_workbook_row,source_cell
+Selected rate,2013Q1,2013,0.50524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,B5
+Selected rate,2013Q2,2013,0.50524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,C5
+Selected rate,2013Q3,2014,0.53524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,D5
+Selected rate,2013Q4,2014,0.53524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,E5
+Selected rate,2014Q1,2014,0.53524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,F5
+Selected rate,2014Q2,2014,0.53524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,G5
+Selected rate,2014Q3,2015,0.56524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,H5
+Selected rate,2014Q4,2015,0.56524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,I5
+Selected rate,2015Q1,2015,0.56524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,J5
+Selected rate,2015Q2,2015,0.56524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,K5
+Selected rate,2015Q3,2016,0.59524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,L5
+Selected rate,2015Q4,2016,0.59524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,M5
+Selected rate,2016Q1,2016,0.59524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,N5
+Selected rate,2016Q2,2016,0.59524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,O5
+Selected rate,2016Q3,2017,0.59524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,P5
+Selected rate,2016Q4,2017,0.59524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,Q5
+Selected rate,2017Q1,2017,0.59524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,R5
+Selected rate,2017Q2,2017,0.59524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,S5
+Selected rate,2017Q3,2018,0.59524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,T5
+Selected rate,2017Q4,2018,0.59524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,U5
+Selected rate,2018Q1,2018,0.59524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,V5
+Selected rate,2018Q2,2018,0.59524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,W5
+Selected rate,2018Q3,2019,0.59562,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,X5
+Selected rate,2018Q4,2019,0.63024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,Y5
+Selected rate,2019Q1,2019,0.63024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,Z5
+Selected rate,2019Q2,2019,0.63024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,AA5
+Selected rate,2019Q3,2020,0.66524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,AB5
+Selected rate,2019Q4,2020,0.66524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,AC5
+Selected rate,2020Q1,2020,0.66524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,AD5
+Selected rate,2020Q2,2020,0.66524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,AE5
+Selected rate,2020Q3,2021,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,AF5
+Selected rate,2020Q4,2021,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,AG5
+Selected rate,2021Q1,2021,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,AH5
+Selected rate,2021Q2,2021,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,AI5
+Selected rate,2021Q3,2022,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,AJ5
+Selected rate,2021Q4,2022,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,AK5
+Selected rate,2022Q1,2022,0.65302,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,AL5
+Selected rate,2022Q2,2022,0.45024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,AM5
+Selected rate,2022Q3,2023,0.45024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,AN5
+Selected rate,2022Q4,2023,0.45024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,AO5
+Selected rate,2023Q1,2023,0.45024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,AP5
+Selected rate,2023Q2,2023,0.45024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,AQ5
+Selected rate,2023Q3,2024,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,AR5
+Selected rate,2023Q4,2024,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,AS5
+Selected rate,2024Q1,2024,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,AT5
+Selected rate,2024Q2,2024,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,AU5
+Selected rate,2024Q3,2025,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,AV5
+Selected rate,2024Q4,2025,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,AW5
+Selected rate,2025Q1,2025,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,AX5
+Selected rate,2025Q2,2025,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,AY5
+Selected rate,2025Q3,2026,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,AZ5
+Selected rate,2025Q4,2026,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,BA5
+Selected rate,2026Q1,2026,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,5,BB5
+Selected rate,2026Q2,2026,0.70024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,5,BC5
+Selected rate,2026Q3,2027,0.70024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,5,BD5
+Selected rate,2026Q4,2027,0.70024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,5,BE5
+Selected rate,2027Q1,2027,0.82024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,5,BF5
+Selected rate,2027Q2,2027,0.82024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,5,BG5
+Selected rate,2027Q3,2028,0.82024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,5,BH5
+Selected rate,2027Q4,2028,0.82024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,5,BI5
+Selected rate,2028Q1,2028,0.88024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,5,BJ5
+Selected rate,2028Q2,2028,0.88024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,5,BK5
+Selected rate,2028Q3,2029,0.88024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,5,BL5
+Selected rate,2028Q4,2029,0.88024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,5,BM5
+Selected rate,2029Q1,2029,0.92024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,5,BN5
+Selected rate,2029Q2,2029,0.92024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,5,BO5
+Selected rate,2029Q3,2030,0.92024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,5,BP5
+Selected rate,2029Q4,2030,0.92024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,5,BQ5
+Selected rate,2030Q1,2030,0.96024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,5,BR5
+Selected rate,2030Q2,2030,0.96024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,5,BS5
+Selected rate,2030Q3,2031,0.96024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,5,BT5
+Selected rate,2030Q4,2031,0.96024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,5,BU5
+Selected rate,2031Q1,2031,1.00024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,5,BV5
+Selected rate,2031Q2,2031,1.00024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,5,BW5
+Current planned path,2013Q1,2013,0.50524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,B6
+Current planned path,2013Q2,2013,0.50524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,C6
+Current planned path,2013Q3,2014,0.53524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,D6
+Current planned path,2013Q4,2014,0.53524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,E6
+Current planned path,2014Q1,2014,0.53524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,F6
+Current planned path,2014Q2,2014,0.53524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,G6
+Current planned path,2014Q3,2015,0.56524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,H6
+Current planned path,2014Q4,2015,0.56524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,I6
+Current planned path,2015Q1,2015,0.56524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,J6
+Current planned path,2015Q2,2015,0.56524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,K6
+Current planned path,2015Q3,2016,0.59524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,L6
+Current planned path,2015Q4,2016,0.59524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,M6
+Current planned path,2016Q1,2016,0.59524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,N6
+Current planned path,2016Q2,2016,0.59524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,O6
+Current planned path,2016Q3,2017,0.59524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,P6
+Current planned path,2016Q4,2017,0.59524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,Q6
+Current planned path,2017Q1,2017,0.59524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,R6
+Current planned path,2017Q2,2017,0.59524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,S6
+Current planned path,2017Q3,2018,0.59524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,T6
+Current planned path,2017Q4,2018,0.59524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,U6
+Current planned path,2018Q1,2018,0.59524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,V6
+Current planned path,2018Q2,2018,0.59524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,W6
+Current planned path,2018Q3,2019,0.59562,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,X6
+Current planned path,2018Q4,2019,0.63024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,Y6
+Current planned path,2019Q1,2019,0.63024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,Z6
+Current planned path,2019Q2,2019,0.63024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,AA6
+Current planned path,2019Q3,2020,0.66524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,AB6
+Current planned path,2019Q4,2020,0.66524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,AC6
+Current planned path,2020Q1,2020,0.66524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,AD6
+Current planned path,2020Q2,2020,0.66524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,AE6
+Current planned path,2020Q3,2021,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,AF6
+Current planned path,2020Q4,2021,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,AG6
+Current planned path,2021Q1,2021,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,AH6
+Current planned path,2021Q2,2021,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,AI6
+Current planned path,2021Q3,2022,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,AJ6
+Current planned path,2021Q4,2022,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,AK6
+Current planned path,2022Q1,2022,0.65302,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,AL6
+Current planned path,2022Q2,2022,0.45024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,AM6
+Current planned path,2022Q3,2023,0.45024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,AN6
+Current planned path,2022Q4,2023,0.45024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,AO6
+Current planned path,2023Q1,2023,0.45024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,AP6
+Current planned path,2023Q2,2023,0.45024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,AQ6
+Current planned path,2023Q3,2024,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,AR6
+Current planned path,2023Q4,2024,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,AS6
+Current planned path,2024Q1,2024,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,AT6
+Current planned path,2024Q2,2024,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,AU6
+Current planned path,2024Q3,2025,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,AV6
+Current planned path,2024Q4,2025,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,AW6
+Current planned path,2025Q1,2025,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,AX6
+Current planned path,2025Q2,2025,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,AY6
+Current planned path,2025Q3,2026,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,AZ6
+Current planned path,2025Q4,2026,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,BA6
+Current planned path,2026Q1,2026,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,6,BB6
+Current planned path,2026Q2,2026,0.70024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,6,BC6
+Current planned path,2026Q3,2027,0.70024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,6,BD6
+Current planned path,2026Q4,2027,0.70024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,6,BE6
+Current planned path,2027Q1,2027,0.82024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,6,BF6
+Current planned path,2027Q2,2027,0.82024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,6,BG6
+Current planned path,2027Q3,2028,0.82024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,6,BH6
+Current planned path,2027Q4,2028,0.82024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,6,BI6
+Current planned path,2028Q1,2028,0.88024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,6,BJ6
+Current planned path,2028Q2,2028,0.88024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,6,BK6
+Current planned path,2028Q3,2029,0.88024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,6,BL6
+Current planned path,2028Q4,2029,0.88024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,6,BM6
+Current planned path,2029Q1,2029,0.92024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,6,BN6
+Current planned path,2029Q2,2029,0.92024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,6,BO6
+Current planned path,2029Q3,2030,0.92024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,6,BP6
+Current planned path,2029Q4,2030,0.92024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,6,BQ6
+Current planned path,2030Q1,2030,0.96024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,6,BR6
+Current planned path,2030Q2,2030,0.96024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,6,BS6
+Current planned path,2030Q3,2031,0.96024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,6,BT6
+Current planned path,2030Q4,2031,0.96024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,6,BU6
+Current planned path,2031Q1,2031,1.00024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,6,BV6
+Current planned path,2031Q2,2031,1.00024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,6,BW6
+No 2027 12c uplift,2013Q1,2013,0.50524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,B7
+No 2027 12c uplift,2013Q2,2013,0.50524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,C7
+No 2027 12c uplift,2013Q3,2014,0.53524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,D7
+No 2027 12c uplift,2013Q4,2014,0.53524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,E7
+No 2027 12c uplift,2014Q1,2014,0.53524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,F7
+No 2027 12c uplift,2014Q2,2014,0.53524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,G7
+No 2027 12c uplift,2014Q3,2015,0.56524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,H7
+No 2027 12c uplift,2014Q4,2015,0.56524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,I7
+No 2027 12c uplift,2015Q1,2015,0.56524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,J7
+No 2027 12c uplift,2015Q2,2015,0.56524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,K7
+No 2027 12c uplift,2015Q3,2016,0.59524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,L7
+No 2027 12c uplift,2015Q4,2016,0.59524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,M7
+No 2027 12c uplift,2016Q1,2016,0.59524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,N7
+No 2027 12c uplift,2016Q2,2016,0.59524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,O7
+No 2027 12c uplift,2016Q3,2017,0.59524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,P7
+No 2027 12c uplift,2016Q4,2017,0.59524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,Q7
+No 2027 12c uplift,2017Q1,2017,0.59524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,R7
+No 2027 12c uplift,2017Q2,2017,0.59524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,S7
+No 2027 12c uplift,2017Q3,2018,0.59524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,T7
+No 2027 12c uplift,2017Q4,2018,0.59524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,U7
+No 2027 12c uplift,2018Q1,2018,0.59524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,V7
+No 2027 12c uplift,2018Q2,2018,0.59524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,W7
+No 2027 12c uplift,2018Q3,2019,0.59562,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,X7
+No 2027 12c uplift,2018Q4,2019,0.63024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,Y7
+No 2027 12c uplift,2019Q1,2019,0.63024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,Z7
+No 2027 12c uplift,2019Q2,2019,0.63024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,AA7
+No 2027 12c uplift,2019Q3,2020,0.66524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,AB7
+No 2027 12c uplift,2019Q4,2020,0.66524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,AC7
+No 2027 12c uplift,2020Q1,2020,0.66524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,AD7
+No 2027 12c uplift,2020Q2,2020,0.66524,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,AE7
+No 2027 12c uplift,2020Q3,2021,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,AF7
+No 2027 12c uplift,2020Q4,2021,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,AG7
+No 2027 12c uplift,2021Q1,2021,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,AH7
+No 2027 12c uplift,2021Q2,2021,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,AI7
+No 2027 12c uplift,2021Q3,2022,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,AJ7
+No 2027 12c uplift,2021Q4,2022,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,AK7
+No 2027 12c uplift,2022Q1,2022,0.65302,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,AL7
+No 2027 12c uplift,2022Q2,2022,0.45024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,AM7
+No 2027 12c uplift,2022Q3,2023,0.45024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,AN7
+No 2027 12c uplift,2022Q4,2023,0.45024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,AO7
+No 2027 12c uplift,2023Q1,2023,0.45024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,AP7
+No 2027 12c uplift,2023Q2,2023,0.45024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,AQ7
+No 2027 12c uplift,2023Q3,2024,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,AR7
+No 2027 12c uplift,2023Q4,2024,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,AS7
+No 2027 12c uplift,2024Q1,2024,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,AT7
+No 2027 12c uplift,2024Q2,2024,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,AU7
+No 2027 12c uplift,2024Q3,2025,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,AV7
+No 2027 12c uplift,2024Q4,2025,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,AW7
+No 2027 12c uplift,2025Q1,2025,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,AX7
+No 2027 12c uplift,2025Q2,2025,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,AY7
+No 2027 12c uplift,2025Q3,2026,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,AZ7
+No 2027 12c uplift,2025Q4,2026,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,BA7
+No 2027 12c uplift,2026Q1,2026,0.70024,NZD/L,rate_path,Historical effective rate; mixed quarters day-weighted where needed,FED rates,FED rates,7,BB7
+No 2027 12c uplift,2026Q2,2026,0.70024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,7,BC7
+No 2027 12c uplift,2026Q3,2027,0.70024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,7,BD7
+No 2027 12c uplift,2026Q4,2027,0.70024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,7,BE7
+No 2027 12c uplift,2027Q1,2027,0.70024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,7,BF7
+No 2027 12c uplift,2027Q2,2027,0.70024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,7,BG7
+No 2027 12c uplift,2027Q3,2028,0.70024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,7,BH7
+No 2027 12c uplift,2027Q4,2028,0.70024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,7,BI7
+No 2027 12c uplift,2028Q1,2028,0.76024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,7,BJ7
+No 2027 12c uplift,2028Q2,2028,0.76024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,7,BK7
+No 2027 12c uplift,2028Q3,2029,0.76024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,7,BL7
+No 2027 12c uplift,2028Q4,2029,0.76024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,7,BM7
+No 2027 12c uplift,2029Q1,2029,0.80024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,7,BN7
+No 2027 12c uplift,2029Q2,2029,0.80024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,7,BO7
+No 2027 12c uplift,2029Q3,2030,0.80024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,7,BP7
+No 2027 12c uplift,2029Q4,2030,0.80024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,7,BQ7
+No 2027 12c uplift,2030Q1,2030,0.84024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,7,BR7
+No 2027 12c uplift,2030Q2,2030,0.84024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,7,BS7
+No 2027 12c uplift,2030Q3,2031,0.84024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,7,BT7
+No 2027 12c uplift,2030Q4,2031,0.84024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,7,BU7
+No 2027 12c uplift,2031Q1,2031,0.88024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,7,BV7
+No 2027 12c uplift,2031Q2,2031,0.88024,NZD/L,rate_path,Forward rate scenario; see key sources,FED rates,FED rates,7,BW7

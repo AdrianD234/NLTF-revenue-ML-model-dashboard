@@ -1,0 +1,158 @@
+{
+  "config_files": {
+    "MODEL_WORKFLOW.md": {
+      "sha256": "0e99005941628c1f973d684e583a91a7adb5d8d4d92e0d39f3571a57c494e00d"
+    },
+    "README.md": {
+      "sha256": "dbc1adb7658050dfabd9aa5bfd2d56268e4e2c269ad1343d3ff732007f0da54c"
+    },
+    "front_end_config.json": {
+      "sha256": "158319fbc0c6e93f6cbd7c34d5be5fb53420e961eb635754e8082170e9ade19f"
+    }
+  },
+  "created_at": "2026-05-19T00:00:00+00:00",
+  "distilled_workbook": {
+    "basename": "NLTF_revenue_model_distilled.xlsx",
+    "sha256": "c7b9c80011a01cc86cc374b1a1ffbf0eb69e14dccc6690e1c54ffc6d6f9ed716",
+    "status": "normalized_contract_source"
+  },
+  "normalized_files": {
+    "aggregation_rules.csv": {
+      "row_count": 12,
+      "sha256": "08d026f1adc0efe9e2fd3a26ebeb10e21bc708eecc0127a3c8d72b959f3ef78e",
+      "source_sheet": "Aggregation Rules"
+    },
+    "annual_actuals.csv": {
+      "row_count": 378,
+      "sha256": "5179e7a56e22fcb670f5bf9beb6cf4c8b638dd0ea6492248a6fa4989092cb574",
+      "source_sheet": "Annual Actuals"
+    },
+    "annual_model_paths.csv": {
+      "row_count": 1554,
+      "sha256": "03aaca82ad46356efa43bb79264a47b956b71c57cc4b6eb6c32b26bffb4e0b50",
+      "source_sheet": "Annual Model Paths"
+    },
+    "current_selections.csv": {
+      "row_count": 10,
+      "sha256": "abcad19639131dab6dee6e45cb506bdd427a80dcb9dfeedbe30d4f643bac492d",
+      "source_sheet": "Current Selections"
+    },
+    "fed_rate_paths.csv": {
+      "row_count": 222,
+      "sha256": "37eaad93d4f3c5373fe2569c62841f5216dc7ff10c8a868debc2c7ed61f25269",
+      "source_sheet": "FED rates"
+    },
+    "forecast_archive.csv": {
+      "row_count": 1973,
+      "sha256": "1b99209b1786628e2868abc2f52d7e19c33007ef8bbace0f573c76d316d8b0ec",
+      "source_sheet": "Forecast archive"
+    },
+    "formula_errors.csv": {
+      "row_count": 396,
+      "sha256": "317ac26aa8dc7a2141e15f2b31543a8f8c57162b0841572c0b88479c08009f28",
+      "source_sheet": "Formula Errors"
+    },
+    "model_coefficients.csv": {
+      "row_count": 31,
+      "sha256": "4e9827856277e37071675fb99dbddf8eca6863cd4a7aeaeb22e4f1c7a4d54f3d",
+      "source_sheet": "Model Coefficients"
+    },
+    "mot_error_bands.csv": {
+      "row_count": 89,
+      "sha256": "814ff9b8434fdeedc3d5cc5bd3c539ae338993b38048a57d4f0ccb0a18fdfda4",
+      "source_sheet": "Error bands"
+    },
+    "official_befu25_annual.csv": {
+      "row_count": 1940,
+      "sha256": "6bd2c97fa686d5863f04bb5b1e23cb0c95f765c38a1a1ddf43e49e2924eaef90",
+      "source_sheet": "Official BEFU25 annual"
+    },
+    "ped_bridge_inputs.csv": {
+      "row_count": 94,
+      "sha256": "bd3723ab9543171a9ccb76b9aa3a9a0d64b9f832bcb026b96edf00730a2295be",
+      "source_sheet": "Forecast inputs + Official BEFU25 annual + Model annual"
+    },
+    "quarterly_actuals.csv": {
+      "row_count": 2007,
+      "sha256": "f6d87c670fbbe76ef1667046228fde1e568e492a92bbd30e71a32272a926ca21",
+      "source_sheet": "Quarterly actuals + Crown top-up"
+    },
+    "release_registry.csv": {
+      "row_count": 53,
+      "sha256": "7db073bc2e5c789af628ed34a63d1c80615c95342c3ad3cacba773188a024433",
+      "source_sheet": "Release Registry"
+    },
+    "release_values.csv": {
+      "row_count": 33772,
+      "sha256": "dd89b45252f2fe24b92681d907198d50c0615601a810e59cc8f2ca465c40e15b",
+      "source_sheet": "MOT release series"
+    },
+    "series_master.csv": {
+      "row_count": 29,
+      "sha256": "f1b3f242284fd361efbd498fc6750f505653e2bb036b67baac8c713904b20006",
+      "source_sheet": "Series Master"
+    },
+    "unresolved_decisions.csv": {
+      "row_count": 7,
+      "sha256": "a3c2ee9ad8d68d79ee06f0ca23acaa893c8d653d4ff107c4a5a32d5bead66c71",
+      "source_sheet": "Open Decisions"
+    }
+  },
+  "raw_workbook": {
+    "basename": "19 05 2026 Latest NLTF revenue forecast model.xlsx",
+    "sha256": "00c6070694818d27d7c402749354d8175de999894846dce45a4abdd7f5eb3e6b",
+    "status": "verified_lineage_only_not_committed"
+  },
+  "raw_workbook_extracted_sheets": [
+    "Dashboard",
+    "Forecast machinery",
+    "Model annual",
+    "BEFU25 reconciliation",
+    "Official BEFU25 annual",
+    "NLTF core annual",
+    "EV split",
+    "Forecast archive",
+    "Error bands",
+    "Error heatmaps",
+    "Chart data",
+    "Quarterly actuals",
+    "FED rates",
+    "Crown top-up",
+    "Forecast inputs",
+    "Fuel price forecast",
+    "Official actuals",
+    "Future forecasts",
+    "Release map",
+    "MOT release series",
+    "Series logic",
+    "Validation log",
+    "Validation sweep",
+    "Dashboard data",
+    "Error samples",
+    "Model variants",
+    "FM Inhouse",
+    "FM Aaron",
+    "MA Inhouse",
+    "MA Aaron",
+    "HYEFU25 macro",
+    "Release path audit"
+  ],
+  "repo_relative_output_dir": "data/revenue_model_source_pack/2026_05_19",
+  "schema_version": "nltf-revenue-source-pack-v1",
+  "source_pack_version": "2026_05_19",
+  "source_policy": "runtime uses repo-local normalized files only; raw workbook is lineage-only and never loaded by Streamlit",
+  "workbook_sheets": [
+    "Read Me",
+    "Overview",
+    "Series Master",
+    "Aggregation Rules",
+    "Dashboard Controls",
+    "Current Selections",
+    "Model Coefficients",
+    "Annual Actuals",
+    "Annual Model Paths",
+    "Release Registry",
+    "Open Decisions",
+    "Formula Errors"
+  ]
+}

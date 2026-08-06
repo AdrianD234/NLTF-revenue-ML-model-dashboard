@@ -1,0 +1,292 @@
+{
+  "annual_completeness_rows": 54,
+  "current_finalist_anchor_fy": "FY2025",
+  "current_finalist_nowcast_actual_quarters": "2025Q3; 2025Q4",
+  "current_finalist_nowcast_forecast_quarters": "2026Q1; 2026Q2",
+  "current_finalist_nowcast_fy": "FY2026",
+  "current_outlook_chart_rows": 1048,
+  "current_outlook_model_ids": {},
+  "current_outlook_output_hashes": {
+    "ev_phev_ped_light_drift_assumptions.csv": {
+      "sha256": "b05450fca8d2c2f60490de3d653922cf8af5c8c81165f1bd3787b7f7d2f2bf1b",
+      "size_bytes": 120930
+    },
+    "ev_phev_ped_light_drift_assumptions.parquet": {
+      "sha256": "95d460270c3ca317607f37f46f9579b50c1a1212812cf9005eb29e43ff131bc4",
+      "size_bytes": 66472
+    },
+    "ev_phev_split_assumptions.csv": {
+      "sha256": "79058d7bef2b692322923e956117d3454080c95b223848e815b9057023ea72e9",
+      "size_bytes": 26569
+    },
+    "ev_phev_split_assumptions.parquet": {
+      "sha256": "a51c2f2344021a7a485a6c563e0f06c1733a6350d7b6f5fb530bda378da176b3",
+      "size_bytes": 42409
+    },
+    "fan_availability.csv": {
+      "sha256": "7d8df7d82b99740228350e6aa13f7d09394a693912c9bb4a52e0fbbf13b734d1",
+      "size_bytes": 31995
+    },
+    "fan_availability.parquet": {
+      "sha256": "8c44f18a4cb90ba5b6c383c75c36244dc4c708f93692fbae11d1553cf6cb8f5b",
+      "size_bytes": 10112
+    },
+    "fan_band_rows.csv": {
+      "sha256": "5a8a2977c88556dfb4453459f16742579e6e318867552fda3e0c56bee2d8fd9d",
+      "size_bytes": 85138
+    },
+    "fan_band_rows.parquet": {
+      "sha256": "cef1c605c36707dc0a4d508b9c9b20391ac41b6a06b9db25fa229be4e9ae2825",
+      "size_bytes": 24894
+    },
+    "future_revenue_forecasts.csv": {
+      "sha256": "749b3334c63a4a6843ba9a0e46a7192ba9baf0e36a159b85d16be590be930731",
+      "size_bytes": 55095
+    },
+    "future_revenue_forecasts.parquet": {
+      "sha256": "587c173ee0acd86ab0e951721b8a38c4c1ec51dfb42cec280e26110428ac3d31",
+      "size_bytes": 18119
+    },
+    "light_ruc_horizon_availability.csv": {
+      "sha256": "5807c790502373b1878e336e57d9f55943c1be5887b971d2d11293ec02bcd836",
+      "size_bytes": 53716
+    },
+    "light_ruc_horizon_availability.parquet": {
+      "sha256": "c1810e4fa76fc50c1ed575686b7cd7a25d5672fb32426585f708bd76357feabb",
+      "size_bytes": 8615
+    },
+    "path_trace_status.csv": {
+      "sha256": "9aee7a4e7003ec6541476ca3e4afef6d8586b6c358e41db1c8e06623e5ffcaa3",
+      "size_bytes": 842
+    },
+    "path_trace_status.parquet": {
+      "sha256": "e8d295393c0586167da97d2f0c054eb77419e8c9e4acf134198c0a5f53010eaa",
+      "size_bytes": 5904
+    },
+    "ped_bridge_mode_config.csv": {
+      "sha256": "60583741fcd8484df3e4f166a82e49a06fdeb0fd353756fcfdf48a1f9786efc4",
+      "size_bytes": 1082
+    },
+    "ped_bridge_mode_config.parquet": {
+      "sha256": "7b512297e05dfea806ccb86c984b816f3d2b7da7012be5ecef4f531dcae77c39",
+      "size_bytes": 6017
+    },
+    "ped_bridge_shape_fit_metrics.csv": {
+      "sha256": "0dac3bde992d988a1ba500a1ed776fa6e94c4ee03f200c700e280dece9872d06",
+      "size_bytes": 4757
+    },
+    "ped_bridge_shape_fit_metrics.parquet": {
+      "sha256": "30cba94f755be3a72da4ea7c7b3ea20ff9a6767f16afda6994ae1a51e81db404",
+      "size_bytes": 12824
+    },
+    "ped_efficiency_scenarios.csv": {
+      "sha256": "340a91407a2d1c7565ef3b5339bb14554d55b7dd4c4c48b66b39847af268a37f",
+      "size_bytes": 1302
+    },
+    "ped_efficiency_scenarios.parquet": {
+      "sha256": "529f9bad8f06391846215906986166528384b0e7a9dfe50dc681d998437dbd35",
+      "size_bytes": 6199
+    },
+    "ped_revenue_bridge_audit.csv": {
+      "sha256": "13dd4b1ffcd1a133b567d8c205c4b129401756e50017d5740c33f48759349b73",
+      "size_bytes": 29374
+    },
+    "ped_revenue_bridge_audit.parquet": {
+      "sha256": "d92bc539e126220aeb93678b70bffffcc36dcff149cd7b5f06ffa580c076d300",
+      "size_bytes": 57630
+    },
+    "revenue_bridge_components.csv": {
+      "sha256": "50ac5ccd1f073a1808dcee761369785c937d51b2801f2a1516a73b767f06acdb",
+      "size_bytes": 129624
+    },
+    "revenue_bridge_components.parquet": {
+      "sha256": "0c13acabc417560c26ccbf0970e2abb6fc0a96bfb831c5555b26c468ea13de6f",
+      "size_bytes": 29167
+    },
+    "revenue_chart_rows.csv": {
+      "sha256": "c7c4fa4c299422a066b35a960bfd3270c7adc96e71f9f30d031fce2e259b169e",
+      "size_bytes": 819770
+    },
+    "revenue_chart_rows.parquet": {
+      "sha256": "daed0968fbc0a8284758c76c4dafb4509c3a0f2e4931543254a6b9370fa54eb2",
+      "size_bytes": 76089
+    },
+    "revenue_formula_residuals.csv": {
+      "sha256": "3df81931302cb18422c6cadff651b8247acc2d3da11bd707bdc14db31afb979c",
+      "size_bytes": 114078
+    },
+    "revenue_formula_residuals.parquet": {
+      "sha256": "7758146a8c74bed3757aca79af85c8e3cd1e2696cbafc31396bd30f5d62629db",
+      "size_bytes": 19970
+    },
+    "revenue_line_reconciliation.csv": {
+      "sha256": "bc055a937f4240c04d7fe07b2be98515c31b9186c7c85191287b023ee21881d5",
+      "size_bytes": 719347
+    },
+    "revenue_line_reconciliation.parquet": {
+      "sha256": "5dba5ecb7d089690ec6a42cd75b538281fc614266798e839fa2e8e9986ebd87c",
+      "size_bytes": 50838
+    },
+    "revenue_stack_components.csv": {
+      "sha256": "a10074e7a31abfcf79799b85e7c81fcc98c4b2d5cc79dc30ee9b7a0d33c9259b",
+      "size_bytes": 5707642
+    },
+    "revenue_stack_components.parquet": {
+      "sha256": "db457f8724efb9b426a6a54a8656167a03529fb5849b5a174a8d82648194a48f",
+      "size_bytes": 143400
+    },
+    "row_reconciliation.csv": {
+      "sha256": "d484f5d75cce88e30ce7bcf5dd70058505cc02e5dff93f457a579f119c2fc7ce",
+      "size_bytes": 204693
+    },
+    "row_reconciliation.parquet": {
+      "sha256": "5d2ad8d3aa15d44cdc882ca540d6216feadc1bae3534be8e6b09dbe7026af62d",
+      "size_bytes": 38107
+    },
+    "runtime_cutoff_audit.csv": {
+      "sha256": "ada67ad73c4d54cc10d1cf15d89fa7123fb6febe274a5267bdfcad304b24a7c3",
+      "size_bytes": 1275
+    },
+    "runtime_cutoff_audit.parquet": {
+      "sha256": "7dd18a03a7fc9bdb0c5c6388fb4316034c7090057fbb9069d6cc20ec9d81f606",
+      "size_bytes": 5888
+    },
+    "runtime_trace_audit.csv": {
+      "sha256": "71aa225089dfc9ec3737b6cd850c3126e953cecf6b02c1f3d1a8d3b6ce5cd6e8",
+      "size_bytes": 108380
+    },
+    "runtime_trace_audit.parquet": {
+      "sha256": "8c136c84aa6d2fa58d68d22ad086a9b61605dcfe73aa61773a5256c76f499d7d",
+      "size_bytes": 22641
+    },
+    "scenario_feature_lineage.csv": {
+      "sha256": "b123c97090bd282009225a0ac2cfc36226d20017412f820dfeec6af34411b30d",
+      "size_bytes": 16657189
+    },
+    "scenario_feature_lineage.parquet": {
+      "sha256": "dbc4ac3f2693f6de0915aebd21bc85e2f794f878eaefef0eb9031de468fb00e9",
+      "size_bytes": 188310
+    },
+    "scenario_input_delta_audit.csv": {
+      "sha256": "546a2e00c02b247368196a106499d1a1473619f5770d70794ab76428e1919cf8",
+      "size_bytes": 3049895
+    },
+    "scenario_input_delta_audit.parquet": {
+      "sha256": "578f75991a26df530ba6715c8ff1a0b842800b3c76b29914b06be1643f486c5a",
+      "size_bytes": 185119
+    },
+    "scenario_input_replay_mismatch_report.csv": {
+      "sha256": "2a725101d8cd37f2a7427a47f432e2e05c451583f9a253e09d83fffa1c033d8e",
+      "size_bytes": 47016
+    },
+    "scenario_input_replay_mismatch_report.parquet": {
+      "sha256": "d9196ca95fe4e8b739bf446e60925eb5b4e821352a303412065099aa4d93f3a7",
+      "size_bytes": 21608
+    },
+    "scenario_role_contract.csv": {
+      "sha256": "70922c6c963b3428ebb2b140b1d427000121f7343564b23e20450a3c66ffb6a1",
+      "size_bytes": 18199
+    },
+    "scenario_role_contract.parquet": {
+      "sha256": "64052cdd7f59bb1f357a13ebd415de4129ae27815dabaa0054aa261d11700274",
+      "size_bytes": 20945
+    },
+    "sensitivity_config.csv": {
+      "sha256": "3c29b44c845f67ee27d71baa3420aa7af1a077e09904675ca6475a63fef129b1",
+      "size_bytes": 14173
+    },
+    "sensitivity_config.parquet": {
+      "sha256": "48e4fe218d6e136c8253c5435f0d80960ccd2698b5132800ba7ba16f57f7b9f4",
+      "size_bytes": 10806
+    },
+    "sensitivity_impact_audit.csv": {
+      "sha256": "494d841480dac7605ed778bdcf57c3e9a2325961b215933ef9dcef994fb0d5fb",
+      "size_bytes": 181389
+    },
+    "sensitivity_impact_audit.parquet": {
+      "sha256": "94c1fda33f712fb43678a7686b68a8221988590c0a127966c887a7b72e4e3b70",
+      "size_bytes": 26262
+    },
+    "sensitivity_seed_inputs.csv": {
+      "sha256": "5181058396fbdb3896ade20b3ea335955fc186af85cccd365c7d86531852f3a6",
+      "size_bytes": 9948
+    },
+    "sensitivity_seed_inputs.parquet": {
+      "sha256": "23a8ba664690235b92fac25912b9c8ab0eefe990f94a58258b901fafa306b310",
+      "size_bytes": 9962
+    },
+    "series_alias_audit.csv": {
+      "sha256": "c0330c9918d7e2f4f972d15e8465537c16d96aca607ef253353612cadd62c56d",
+      "size_bytes": 2196
+    },
+    "series_alias_audit.parquet": {
+      "sha256": "2600d218525ecd8916c57b5a1ea503106f51aab1fd105c95f3fc3d67d2dd05f9",
+      "size_bytes": 7507
+    },
+    "series_trace_contract.csv": {
+      "sha256": "2eaf18c4c54fc18a21dd68415c0aea041bd174e8d75285409a4bb83034b60e09",
+      "size_bytes": 8081
+    },
+    "series_trace_contract.parquet": {
+      "sha256": "7319848ee52ec052d837c924ec4e230571c606b788bde28f86d343140cb83a3c",
+      "size_bytes": 13434
+    },
+    "trace_source_contract.csv": {
+      "sha256": "396a97e28c43adc892c438ce92fe16a847d87b0ad91c6f8ec1334416c85a070a",
+      "size_bytes": 1979
+    },
+    "trace_source_contract.parquet": {
+      "sha256": "74df6e0db3453928fcb159af4dc9d3dfb86fa712b9096d1d672dc8068099ed63",
+      "size_bytes": 10417
+    }
+  },
+  "current_outlook_pack_status": "explicitly_promoted_current_outlook",
+  "current_outlook_promotion_time": "2026-07-27T03:59:12.371742+00:00",
+  "current_outlook_scenarios": [
+    {
+      "forecast_end_period": "2050Q4",
+      "forecast_horizon_quarters": 100,
+      "forecast_start_period": "2026Q1",
+      "scenario_name": "current_basecase",
+      "scenario_role": "basecase"
+    },
+    {
+      "forecast_end_period": "2050Q4",
+      "forecast_horizon_quarters": 100,
+      "forecast_start_period": "2026Q1",
+      "scenario_name": "current_comparison_1",
+      "scenario_role": "comparison"
+    }
+  ],
+  "first_model_forecast_fy": "FY2026",
+  "first_model_forecast_quarter": "2026Q1",
+  "last_complete_actual_fy": 2025,
+  "missing_partial_actual_quarters": "2026Q2",
+  "model_refit_cutoff": "2025Q4",
+  "model_training_cutoff": "2025Q4",
+  "partial_actual_fy": 2026,
+  "partial_actual_quarters": "2025Q3; 2025Q4; 2026Q1",
+  "policy_note": "Models are trained/refitted through 2025Q4. 2026Q1 is an observation/source actual, not a model-training row. Revenue Outlook current-finalist FY2026 uses the production-vintage forecast for 2026Q1 and 2026Q2, with 2025Q3 and 2025Q4 as actual anchors inside the June-year nowcast; it does not use observed 2026Q1 revenue as model training data.",
+  "repo_relative_current_revenue_outlook_dir": "data/current_revenue_outlook",
+  "repo_relative_source_pack_dir": "data/revenue_model_source_pack/2026_05_19",
+  "revenue_source_actual_cutoff": "2026Q1",
+  "schema_version": "nltf-revenue-data-vintage-v1",
+  "source_pack_normalized_hashes": {
+    "aggregation_rules.csv": "08d026f1adc0efe9e2fd3a26ebeb10e21bc708eecc0127a3c8d72b959f3ef78e",
+    "annual_actuals.csv": "5179e7a56e22fcb670f5bf9beb6cf4c8b638dd0ea6492248a6fa4989092cb574",
+    "annual_model_paths.csv": "03aaca82ad46356efa43bb79264a47b956b71c57cc4b6eb6c32b26bffb4e0b50",
+    "current_selections.csv": "abcad19639131dab6dee6e45cb506bdd427a80dcb9dfeedbe30d4f643bac492d",
+    "fed_rate_paths.csv": "37eaad93d4f3c5373fe2569c62841f5216dc7ff10c8a868debc2c7ed61f25269",
+    "forecast_archive.csv": "1b99209b1786628e2868abc2f52d7e19c33007ef8bbace0f573c76d316d8b0ec",
+    "formula_errors.csv": "317ac26aa8dc7a2141e15f2b31543a8f8c57162b0841572c0b88479c08009f28",
+    "model_coefficients.csv": "4e9827856277e37071675fb99dbddf8eca6863cd4a7aeaeb22e4f1c7a4d54f3d",
+    "mot_error_bands.csv": "814ff9b8434fdeedc3d5cc5bd3c539ae338993b38048a57d4f0ccb0a18fdfda4",
+    "official_befu25_annual.csv": "6bd2c97fa686d5863f04bb5b1e23cb0c95f765c38a1a1ddf43e49e2924eaef90",
+    "ped_bridge_inputs.csv": "bd3723ab9543171a9ccb76b9aa3a9a0d64b9f832bcb026b96edf00730a2295be",
+    "quarterly_actuals.csv": "f6d87c670fbbe76ef1667046228fde1e568e492a92bbd30e71a32272a926ca21",
+    "release_registry.csv": "7db073bc2e5c789af628ed34a63d1c80615c95342c3ad3cacba773188a024433",
+    "release_values.csv": "dd89b45252f2fe24b92681d907198d50c0615601a810e59cc8f2ca465c40e15b",
+    "series_master.csv": "f1b3f242284fd361efbd498fc6750f505653e2bb036b67baac8c713904b20006",
+    "unresolved_decisions.csv": "a3c2ee9ad8d68d79ee06f0ca23acaa893c8d653d4ff107c4a5a32d5bead66c71"
+  }
+}
