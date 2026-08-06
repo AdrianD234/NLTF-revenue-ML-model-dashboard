@@ -86,6 +86,20 @@ _ENGINE_SOURCE_FILES: dict[str, tuple[str, ...]] = {
     "ensemble": ("data/dashboard_evidence_pack/data/finalists.parquet",),
 }
 
+# Audit-only archives under the reproducibility tree. They are development
+# evidence the replays never read, and the candidate-rescue ZIP exceeds the
+# 10 MiB per-file limit of Databricks Apps source deployments, so the slim
+# runtime bundle cannot ship it. Excluding the directory from the digest keeps
+# the committed cache verifiable in both the full checkout and the slim bundle
+# without dropping any file a replay actually loads.
+_SOURCE_TREE_EXCLUSIONS: tuple[str, ...] = (
+    "data/dashboard_evidence_pack_reproducibility/ped_inner_hpo/source_artifacts/candidate_rescue/",
+)
+
+
+def _digest_excluded(relative: str) -> bool:
+    return any(relative.startswith(prefix) for prefix in _SOURCE_TREE_EXCLUSIONS)
+
 
 class ReplayCacheError(RuntimeError):
     """Base class: the compiled replay cache cannot be trusted."""
@@ -306,13 +320,18 @@ def _tracked_tree_files(tree: str, base: Path) -> list[str]:
         root = base / tree
         if not root.exists():
             return []
-        return sorted(
+        walked = [
             path.relative_to(base).as_posix()
             for path in root.rglob("*")
             if path.is_file() and "__pycache__" not in path.parts
-        )
+        ]
+        return sorted(name for name in walked if not _digest_excluded(name))
     names = [name for name in result.stdout.decode("utf-8").split("\0") if name]
-    return sorted(name for name in names if "__pycache__" not in name)
+    return sorted(
+        name
+        for name in names
+        if "__pycache__" not in name and not _digest_excluded(name)
+    )
 
 
 def _tree_entries(root: Path, base: Path) -> list[tuple[str, str]]:

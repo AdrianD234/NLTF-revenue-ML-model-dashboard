@@ -9154,6 +9154,13 @@ def _validate_output_hashes(pack_dir: Path, manifest: dict[str, Any]) -> list[st
         expected = str(metadata.get("sha256", "")).strip() if isinstance(metadata, dict) else ""
         path = pack_dir / name
         if not path.exists():
+            # Slim deployments (Databricks Apps rejects source files over
+            # 10 MiB) ship only the Parquet for the oversized audit CSVs. A
+            # missing CSV is tolerated ONLY when its Parquet twin is present
+            # and hash-valid, so every governed value the runtime reads is
+            # still integrity-checked; a missing Parquet stays a hard error.
+            if _parquet_twin_validates(pack_dir, name, output_hashes):
+                continue
             errors.append(f"{name} is missing.")
             continue
         if not expected:
@@ -9162,6 +9169,20 @@ def _validate_output_hashes(pack_dir: Path, manifest: dict[str, Any]) -> list[st
         if not _runtime_output_hash_matches(path, expected):
             errors.append(f"{name} hash mismatch.")
     return errors
+
+
+def _parquet_twin_validates(pack_dir: Path, csv_name: str, output_hashes: dict[str, Any]) -> bool:
+    """True when ``csv_name`` is a CSV whose same-stem Parquet twin exists in
+    the pack and matches its recorded manifest hash."""
+    if not csv_name.lower().endswith(".csv"):
+        return False
+    twin_name = csv_name[:-4] + ".parquet"
+    metadata = output_hashes.get(twin_name)
+    expected = str(metadata.get("sha256", "")).strip() if isinstance(metadata, dict) else ""
+    if not expected:
+        return False
+    twin_path = pack_dir / twin_name
+    return twin_path.exists() and _runtime_output_hash_matches(twin_path, expected)
 
 
 def _runtime_output_hash_matches(path: Path, expected: str) -> bool:

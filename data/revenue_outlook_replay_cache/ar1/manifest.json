@@ -2948,8 +2948,8 @@
       "model_dashboard/ped_forward.py": "92c3b5324ae798956679820a4e0b23314f2134a259c4b973d58640e6329325fa",
       "model_dashboard/post_model_extrapolation.py": "c2f469cea30854e20e446951a91d13b5b12a0e851d5f601c79b2ce16fe791517",
       "model_dashboard/rate_paths.py": "e7bd377166e1f7671fc26f2db2b80e0fbce312a928f7a264037bb94cc3af15b9",
-      "model_dashboard/revenue_outlook.py": "4b178a33953c16908c5a49ca0e96d19d87e36f61b9752538e5c28228aca9990c",
-      "model_dashboard/revenue_outlook_replay_cache.py": "6e227558b0478dde66fe00121030e894df3e2273bf9a07aa347bbfd55b9fecfb",
+      "model_dashboard/revenue_outlook.py": "ad9c043bc2db53710b805d94ea627eb33c4d35145e39bd0eaf8c55e490d57904",
+      "model_dashboard/revenue_outlook_replay_cache.py": "f24ea4013bb9169612a8d63008fb1ded2626bf780c272df6270fcbd6705eb518",
       "model_dashboard/revenue_source_pack.py": "61b9fd2b06d4c16add928656b9bd6e5cda9dcb38b0f3d9a0f60fb5c1e2cf8c9c",
       "model_dashboard/scenario_inputs.py": "f035a3da1e995550565f968f1f0ff2f5ee438bd5217f91440f6542b2882f8f29",
       "model_dashboard/series_inventory_contract.py": "60c35dae271750ca184a2f4fb126c066b4358ec66f69e4d30d82bc826ce07435",
@@ -3668,7 +3668,6 @@
       "data/dashboard_evidence_pack_reproducibility/ped_inner_hpo/scenario_sensitivities.parquet": "3dad4922c1f340c5f9fc4cec02b33b04445603874aa78cb0b79a394e2e8bb42f",
       "data/dashboard_evidence_pack_reproducibility/ped_inner_hpo/scorecard_summary.parquet": "f28eb68e1d2a6b4fe4a133c555565358a884fd4bb1ab72fc6d46da731dd30e9b",
       "data/dashboard_evidence_pack_reproducibility/ped_inner_hpo/selection_audit.parquet": "3fc01301c604adbee9672c3d5acefeda05c497574c98959a182551e5e99cc5f0",
-      "data/dashboard_evidence_pack_reproducibility/ped_inner_hpo/source_artifacts/candidate_rescue/candidate_rescue_outputs_run_20260521_163105_20260521_163707.zip": "d9d299aabc0c5e4af65e87341d1542ae7f3e5d31c29898140be6d4d9cb54c9e3",
       "data/dashboard_evidence_pack_reproducibility/ped_inner_hpo/source_artifacts/finalist_arbitration_run_20260520_002339/candidate_config_inventory.csv": "fcafc6ba6a8765dba734e89ffbd6b9ae187cf8c6794bbd34f957c77e45ebf8b7",
       "data/dashboard_evidence_pack_reproducibility/ped_inner_hpo/source_artifacts/finalist_arbitration_run_20260520_002339/ensemble_weights.csv": "49dd4438798f2f98380dd2cdb2f5f2864543504c0d6dfc00b8b54e3fa50d0edd",
       "data/dashboard_evidence_pack_reproducibility/ped_inner_hpo/source_artifacts/finalist_arbitration_run_20260520_002339/final_summary.csv": "98a678efcad723f657f0e2cfe73fd0467166c0fa702b6614e9acc029ab5f5d99",
@@ -3881,6 +3880,6 @@
     ]
   },
   "schema_version": "1",
-  "source_digest": "c44e45c226862e825e60dd8ef714449e4aba81467ead31f2162a76d38b5093ee",
-  "source_main_sha": "f357bd3838f515a2839700b44d4d4267e06029aa"
+  "source_digest": "8ba714d27403de5da8b7e9cc8edbefbc2f4dd4ab8cdb5e44f19de828cdce35ad",
+  "source_main_sha": "398b78be9ee677ce19d5718d0c236c248c5ce618"
 }
