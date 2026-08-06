@@ -55,6 +55,16 @@ jobs:
             --bundle build/databricks_app/app \
             --source .
 
+      # Defence in depth: re-hash every bundle file immediately before the
+      # copy, so nothing that ran between build and publish can ship content
+      # that disagrees with the manifest. Structural only, so it costs seconds.
+      - name: Re-verify the bundle immediately before publishing
+        run: |
+          python scripts/validate_databricks_app_bundle.py \
+            --bundle build/databricks_app/app \
+            --source . \
+            --skip-runtime
+
       - name: Publish the bundle to the databricks-app branch
         run: |
           set -euo pipefail

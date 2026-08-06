@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "description": "Explicit content policy for the slim Databricks App runtime bundle. Built by scripts/build_databricks_app_bundle.py, validated by scripts/validate_databricks_app_bundle.py, published to the databricks-app branch beneath app/. Classification evidence: artifacts/databricks_app_bundle/.",
-  "source_sha": "398b78be9ee677ce19d5718d0c236c248c5ce618",
+  "initial_design_source_sha": "398b78be9ee677ce19d5718d0c236c248c5ce618",
   "maximum_file_bytes": 10485760,
   "warning_file_bytes": 9437184,
   "warning_exemptions": [],

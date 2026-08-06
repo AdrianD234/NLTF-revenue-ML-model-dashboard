@@ -26,6 +26,19 @@ and published by the `Publish Databricks App bundle` workflow to the generated
 so `.git`, tests, docs, deliverables and every oversized audit file stay
 outside the app source.
 
+## Validation never touches what it publishes
+
+Rendering the app writes into `artifacts/` — the r2-ladder chart sources are
+rewritten on every render. A validator that hashed the bundle and then probed
+it in place would leave the publish workflow shipping content that no longer
+matched the manifest it had just verified. So the runtime probes run against
+disposable copies of the bundle and of the source checkout, the bundle's
+structure and manifest hashes are re-verified *after* the probes, and the
+checkout's `git status` must come back unchanged.
+`tests/test_databricks_app_bundle_contract.py` pins both halves: probes are
+proven to run outside the bundle and the checkout, and a deliberately leaky
+probe is proven to be caught.
+
 ## Classification result (evidence: oversized_file_classification.csv)
 
 - Parquet-first was already the runtime contract: every oversized pack CSV has

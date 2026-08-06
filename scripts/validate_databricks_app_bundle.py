@@ -17,6 +17,14 @@ Usage:
 
 No model fitting and no pack rebuilding happens here: everything is loaded
 from committed content, exactly as the deployed app would.
+
+The runtime probes run against DISPOSABLE COPIES of the bundle and of the
+source checkout, never against either original. Rendering the app writes into
+``artifacts/`` (the r2-ladder chart sources are rewritten on every render), so
+probing in place would mutate the bundle after its hashes were verified and
+the publish workflow would ship content that no longer matches its manifest.
+Structure and manifest hashes are therefore re-verified after the probes, and
+the source checkout's ``git status`` must be unchanged.
 """
 
 from __future__ import annotations
@@ -25,8 +33,10 @@ import argparse
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path, PurePosixPath
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -344,6 +354,57 @@ def check_compiles(bundle: Path, errors: list[str]) -> None:
             errors.append(f"bundle source failed to compile: {source.name}: {error}")
 
 
+def tracked_relatives(source: Path) -> list[str]:
+    """Tracked files of the source checkout, as bundle-style relative paths."""
+    result = subprocess.run(
+        ["git", "-C", str(source), "ls-files", "-z"],
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise BundleValidationError(
+            f"git ls-files failed in {source}; the source probe needs a git checkout"
+        )
+    return sorted(
+        entry.decode("utf-8") for entry in result.stdout.split(b"\x00") if entry
+    )
+
+
+def copy_for_probe(root: Path, relatives: list[str], destination: Path) -> None:
+    for relative in relatives:
+        source_path = root / relative
+        if not source_path.is_file():
+            continue
+        target = destination / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source_path, target)
+
+
+def run_isolated_probe(root: Path, relatives: list[str], label: str) -> dict:
+    """Probe a DISPOSABLE copy, never the publishable bundle or the checkout.
+
+    Rendering the app writes into ``artifacts/`` (the r2-ladder chart sources
+    are rewritten on every render). Probing the real bundle would therefore
+    mutate content after its manifest hashes were verified, and the publish
+    workflow would ship a bundle that no longer matches its own manifest.
+    """
+    with tempfile.TemporaryDirectory(prefix=f"nltf-{label}-probe-") as scratch:
+        workspace = Path(scratch) / label
+        workspace.mkdir(parents=True)
+        copy_for_probe(root, relatives, workspace)
+        return run_probe(workspace)
+
+
+def git_status(source: Path) -> str | None:
+    result = subprocess.run(
+        ["git", "-C", str(source), "status", "--porcelain"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return result.stdout if result.returncode == 0 else None
+
+
 def run_probe(root: Path) -> dict:
     env = os.environ.copy()
     env["PYTHONPATH"] = str(root)
@@ -395,6 +456,68 @@ def compare_parity(bundle_report: dict, source_report: dict, errors: list[str]) 
     return summary
 
 
+def validate(
+    bundle: Path,
+    source: Path,
+    policy_path: Path,
+    *,
+    skip_runtime: bool = False,
+) -> tuple[list[str], dict, dict]:
+    """(errors, parity summary, bundle manifest).
+
+    Ordering matters: the runtime probes run against disposable copies, and
+    the bundle's structure and manifest hashes are re-verified AFTERWARDS, so
+    a probe that mutated its workspace can never leave the publishable bundle
+    disagreeing with the manifest the publish workflow ships.
+    """
+    errors: list[str] = []
+    manifest = json.loads((bundle / MANIFEST_NAME).read_text(encoding="utf-8"))
+    policy = json.loads(policy_path.read_text(encoding="utf-8"))
+
+    check_structure(bundle, manifest, errors)
+    check_manifest_hashes(bundle, manifest, errors)
+    check_required(bundle, policy, errors)
+    check_replacements(bundle, source, policy, errors)
+    check_compiles(bundle, errors)
+
+    parity_summary: dict = {}
+    if skip_runtime or errors:
+        return errors, parity_summary, manifest
+
+    status_before = git_status(source)
+    bundle_report = run_isolated_probe(bundle, walk_files(bundle), "bundle")
+    source_report = run_isolated_probe(source, tracked_relatives(source), "source")
+    for report, label in ((bundle_report, "bundle"), (source_report, "source")):
+        for problem in report.get("errors", []):
+            errors.append(f"{label} probe: {problem}")
+    if not errors:
+        parity_summary = compare_parity(bundle_report, source_report, errors)
+        for engine in ("ensemble", "ar1"):
+            for check in ("replay_cache_status", "policy_runtime_status"):
+                status = bundle_report.get(f"{check}_{engine}")
+                if status != "ok":
+                    errors.append(f"bundle {check} for {engine}: {status!r}")
+
+    # Post-probe: prove the publishable bundle is byte-identical to what was
+    # hashed above, and that validation left the checkout alone.
+    contamination: list[str] = []
+    check_structure(bundle, manifest, contamination)
+    check_manifest_hashes(bundle, manifest, contamination)
+    errors.extend(
+        f"bundle was modified during validation: {problem}" for problem in contamination
+    )
+    status_after = git_status(source)
+    if status_before is not None and status_after != status_before:
+        moved = sorted(
+            set((status_after or "").splitlines()) ^ set(status_before.splitlines())
+        )
+        errors.append(
+            "validation modified the source checkout; these entries changed: "
+            + ", ".join(entry.strip() for entry in moved)
+        )
+    return errors, parity_summary, manifest
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--bundle", default="build/databricks_app/app")
@@ -419,34 +542,14 @@ def main(argv: list[str] | None = None) -> int:
     if not policy_path.is_absolute():
         policy_path = source / policy_path
 
-    errors: list[str] = []
     manifest_path = bundle / MANIFEST_NAME
     if not manifest_path.is_file():
         print(f"VALIDATION FAILED: bundle manifest missing at {manifest_path}", file=sys.stderr)
         return 1
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    policy = json.loads(policy_path.read_text(encoding="utf-8"))
 
-    check_structure(bundle, manifest, errors)
-    check_manifest_hashes(bundle, manifest, errors)
-    check_required(bundle, policy, errors)
-    check_replacements(bundle, source, policy, errors)
-    check_compiles(bundle, errors)
-
-    parity_summary = {}
-    if not args.skip_runtime and not errors:
-        bundle_report = run_probe(bundle)
-        source_report = run_probe(source)
-        for report, label in ((bundle_report, "bundle"), (source_report, "source")):
-            for problem in report.get("errors", []):
-                errors.append(f"{label} probe: {problem}")
-        if not errors:
-            parity_summary = compare_parity(bundle_report, source_report, errors)
-            for engine in ("ensemble", "ar1"):
-                for check in ("replay_cache_status", "policy_runtime_status"):
-                    status = bundle_report.get(f"{check}_{engine}")
-                    if status != "ok":
-                        errors.append(f"bundle {check} for {engine}: {status!r}")
+    errors, parity_summary, manifest = validate(
+        bundle, source, policy_path, skip_runtime=args.skip_runtime
+    )
 
     if errors:
         print("BUNDLE VALIDATION FAILED", file=sys.stderr)
