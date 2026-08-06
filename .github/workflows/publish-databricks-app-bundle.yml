@@ -12,13 +12,25 @@ name: Publish Databricks App bundle
 # triggers the long main CI. The branch is owned by this workflow alone; the
 # publish step refuses to overwrite a branch whose layout it does not
 # recognise.
+#
+# Every merge to main refreshes the bundle branch automatically, so keeping
+# the deployment packaging current is nobody's manual chore. workflow_dispatch
+# stays available for recovery (re-publishing after a failed run, or forcing a
+# rebuild without a code change). Redeploying the Databricks App itself is
+# still a manual click until an auto-deploy credential arrangement exists.
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
 
+# Newest main state wins: if two merges land close together, the older
+# in-flight publish is cancelled rather than queuing an already-obsolete
+# bundle behind it.
 concurrency:
   group: publish-databricks-app-bundle
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 permissions:
   contents: write
