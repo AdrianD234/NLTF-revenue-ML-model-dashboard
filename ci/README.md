@@ -34,18 +34,25 @@ source is present — editing a module does not reinstall anything.
 
 It never runs against your working checkout. For every invocation it:
 
-1. checks Docker is present and in Linux-container mode;
+1. checks Docker is present and in Linux-container mode (on Windows, delegates
+   through `wsl.exe` — Docker Engine in WSL publishes no Windows client);
 2. resolves the exact commit you asked for;
-3. creates a **disposable detached git worktree** at that commit;
-4. verifies the worktree is byte-exact against the commit, and refuses to run
-   if it is not (this is what `* -text` in `.gitattributes` buys — the check is
+3. creates a **disposable self-contained clone** at that commit — a clone, not
+   `git worktree add`, because a worktree's `.git` is a *file* pointing outside
+   the bind mount, and `ci_plan.py`, the planner tests and the cleanliness gate
+   all need a working repository inside the container;
+4. verifies the clone is byte-exact against the commit, and refuses to run if
+   it is not (this is what `* -text` in `.gitattributes` buys — the check is
    there so a future change to that file cannot silently invalidate results);
-5. mounts that copy into the container;
+5. mounts that copy into the container, running as the invoking user so nothing
+   root-owned is left behind;
 6. writes everything to `artifacts/ci_local/<sha>/`;
-7. checks afterwards whether the run mutated any tracked file outside
-   `artifacts/` and `data/`, and reports it if so;
-8. deletes the disposable worktree;
-9. returns the tier's real exit code;
+7. snapshots every tracked file plus everything under `data/` beforehand and
+   verifies it afterwards, on **every** exit path (an `EXIT` trap, so a failing
+   suite and the steps that run after it are covered too);
+8. deletes the disposable clone;
+9. returns the tier's real exit code — and exits 3 if the run mutated governed
+   content while otherwise passing;
 10. refuses to start while another local run holds the lock.
 
 Uncommitted work is **not** included. That is deliberate: a governed result has
