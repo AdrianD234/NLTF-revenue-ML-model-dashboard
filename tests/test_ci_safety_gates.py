@@ -717,3 +717,57 @@ def test_the_summary_requires_the_gates_lanes_not_the_planners():
     assert 'want_deployment="${{ needs.plan.outputs.run_deployment }}"' in run
     assert 'check_required "$want_replay"' in run
     assert 'check_required "$want_deployment"' in run
+
+
+# ===========================================================================
+# Hosted lanes must install what the container installs
+# ===========================================================================
+
+
+def test_every_hosted_lane_installs_the_ci_requirements():
+    """A lane that runs the suite needs the suite's dependencies.
+
+    `fast` installed ci/requirements-ci.txt; `affected` and `full-assurance` did
+    not. The suite contains tests that import scripts/ci_plan.py, which needs
+    PyYAML, so the hosted full-assurance job died on:
+
+        ModuleNotFoundError: No module named 'yaml'
+
+    It passed locally because ci/Dockerfile installs all three requirement
+    files. That gap - the container being better provisioned than the hosted
+    job it is supposed to mirror - is the thing worth preventing, not the
+    missing package.
+    """
+    workflow = _workflow()
+    offenders = []
+    for job_name, job in workflow["jobs"].items():
+        runs = " ".join(str(s.get("run", "")) for s in job.get("steps", []))
+        if "requirements-dev.txt" not in runs:
+            continue  # a lane that installs no dev deps runs no tests
+        if "pip install -r ci/requirements-ci.txt" not in runs:
+            offenders.append(job_name)
+    assert not offenders, (
+        "these hosted jobs install requirements-dev.txt but not "
+        "ci/requirements-ci.txt, so they have fewer dependencies than the "
+        f"container: {offenders}"
+    )
+
+
+def test_the_container_and_hosted_lanes_install_the_same_files():
+    """Pin the mirror explicitly, in both directions."""
+    dockerfile = (REPO_ROOT / "ci" / "Dockerfile").read_text(encoding="utf-8")
+    expected = {"requirements.txt", "requirements-dev.txt", "ci/requirements-ci.txt"}
+
+    for name in expected:
+        assert name.split("/")[-1] in dockerfile, (
+            f"ci/Dockerfile no longer installs {name}; the hosted lanes still do"
+        )
+
+    workflow = _workflow()
+    full = " ".join(
+        str(s.get("run", "")) for s in workflow["jobs"]["full-assurance"]["steps"]
+    )
+    for name in expected:
+        assert f"pip install -r {name}" in full, (
+            f"the full-assurance job must install {name}, as the container does"
+        )

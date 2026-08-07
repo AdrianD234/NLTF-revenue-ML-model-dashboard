@@ -280,6 +280,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
+          # ci/requirements-ci.txt too. The suite contains tests that import
+          # scripts/ci_plan.py, which needs PyYAML. Omitting it here failed the
+          # whole clean-clone suite with ModuleNotFoundError: No module named
+          # 'yaml' - and it passed locally because ci/Dockerfile installs all
+          # three files. Every lane installs what the container installs.
+          pip install -r ci/requirements-ci.txt
 
       - name: Rebuild curated data from the committed pack
         run: python scripts/regenerate_curated_data_from_pack.py
@@ -325,6 +331,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
+          # ci/requirements-ci.txt too. The suite contains tests that import
+          # scripts/ci_plan.py, which needs PyYAML. Omitting it here failed the
+          # whole clean-clone suite with ModuleNotFoundError: No module named
+          # 'yaml' - and it passed locally because ci/Dockerfile installs all
+          # three files. Every lane installs what the container installs.
+          pip install -r ci/requirements-ci.txt
 
       - name: Record the resolved environment
         run: |
@@ -495,6 +507,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
+          # ci/requirements-ci.txt too. The suite contains tests that import
+          # scripts/ci_plan.py, which needs PyYAML. Omitting it here failed the
+          # whole clean-clone suite with ModuleNotFoundError: No module named
+          # 'yaml' - and it passed locally because ci/Dockerfile installs all
+          # three files. Every lane installs what the container installs.
+          pip install -r ci/requirements-ci.txt
 
       - name: Build the Databricks bundle
         run: |
