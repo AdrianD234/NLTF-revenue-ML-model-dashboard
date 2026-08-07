@@ -38,6 +38,16 @@ if str(SCRIPTS) not in sys.path:
 
 import assert_governed_tree_unchanged as gate  # noqa: E402
 import plan_governed_pack_rebuilds as packs  # noqa: E402
+import ci_plan  # noqa: E402
+
+
+@pytest.fixture(scope="module")
+def config() -> dict:
+    return ci_plan.load_config()
+
+
+def plan_for(files, config, event="pull_request") -> dict:
+    return ci_plan.plan(sorted(files), config, event=event)
 
 
 # ===========================================================================
@@ -504,3 +514,119 @@ def test_affected_tier_gates_on_the_plans_pack_checks():
         "the wrapper must read the plan's pack checks and pass them through"
     )
     assert "CI_PACK_CHECKS" in wrapper
+
+
+# ===========================================================================
+# Test-lane pack needs vs merge-time pack freshness
+# ===========================================================================
+#
+# These are two different questions and conflating them creates a silent hole:
+#
+#   1. which packs must this TEST LANE load to run?          may be empty
+#   2. may this change merge with a committed pack stale?    never
+#
+# model_dashboard/ui.py is digest-bound, so a dashboard edit leaves the policy
+# runtime stale while the UI tests that edit selects pass without it. Gating the
+# lane on that pack makes the cheapest lane demand a rebuild. But letting the
+# absence of a lane requirement waive the MERGE requirement would let a stale
+# pack reach main and fail closed in production later.
+
+
+def test_dashboard_ui_edit_runs_the_light_lane(config):
+    """A UI edit selects UI tests and requires no pack to execute them."""
+    result = plan_for(["model_dashboard/ui.py"], config)
+    assert result["scopes"] == ["dashboard_ui"]
+    assert result["required_pack_status_checks"] == [], (
+        "the UI test lane must not be forced to load a governed pack"
+    )
+    assert not result["requires_full_assurance"]
+    assert result["required_test_paths"], "the lane must still run tests"
+
+
+def test_the_same_edit_still_requires_pack_freshness_before_merge(config):
+    """The cheap lane must not also waive the merge-time contract."""
+    result = plan_for(["model_dashboard/ui.py"], config)
+    assert result["requires_all_packs_current_before_merge"] is True, (
+        "a change may not merge while a committed governed pack is stale, "
+        "however few packs its own test lane needs"
+    )
+
+
+def test_merge_time_freshness_is_unconditional(config):
+    """It holds for every scope, including documentation."""
+    for changed in (
+        ["docs/ARCHITECTURE.md"],
+        ["model_dashboard/ui.py"],
+        ["model_dashboard/rate_paths.py"],
+        ["data/engine_ar1/state.parquet"],
+    ):
+        result = plan_for(changed, config)
+        assert result["requires_all_packs_current_before_merge"] is True, changed
+
+
+def test_the_hosted_merge_gate_checks_every_pack_not_the_plans_subset():
+    """The `fast` job must not be narrowed to the plan's lane requirements.
+
+    This is the wiring that actually enforces the contract. Narrowing it would
+    look like a tidy consistency fix and would silently remove the merge gate,
+    so it is asserted rather than left to review.
+    """
+    import yaml
+
+    workflow = yaml.safe_load(
+        (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    )
+    fast = workflow["jobs"]["fast"]
+    assert "if" not in fast, "the merge-time pack gate must run unconditionally"
+
+    steps = [
+        s for s in fast["steps"]
+        if "plan_governed_pack_rebuilds" in str(s.get("run", ""))
+    ]
+    assert steps, "the fast job must check governed pack status"
+    for step in steps:
+        run = str(step["run"])
+        assert "--fail-on-stale" in run, "the gate must fail, not merely report"
+        assert "--only" not in run, (
+            "the merge-time gate must cover EVERY pack. --only answers which "
+            "packs a test lane needs, which is a different question."
+        )
+
+
+def test_the_summary_requires_the_job_that_carries_the_merge_gate():
+    """A gate nothing depends on is not a gate."""
+    import yaml
+
+    workflow = yaml.safe_load(
+        (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    )
+    summary = workflow["jobs"]["summary"]
+    assert "fast" in summary["needs"]
+
+    run = " ".join(str(s.get("run", "")) for s in summary["steps"])
+    # The summary must treat a failed `fast` as fatal, not advisory.
+    assert "fast_result" in run
+    assert 'fast_result" = "success"' in run or "fast_result\" != \"success\"" in run or \
+           '[ "$fast_result" = "success" ]' in run, (
+        "the summary must require fast to have succeeded"
+    )
+
+
+def test_the_local_affected_tier_narrows_but_the_hosted_gate_does_not():
+    """Both halves of the separation, asserted together.
+
+    Read as one statement: the local lane may narrow; the merge gate may not.
+    """
+    entrypoint = (REPO_ROOT / "ci" / "entrypoint.sh").read_text(encoding="utf-8")
+    assert "--only" in entrypoint and "CI_PACK_CHECKS" in entrypoint, (
+        "the local affected tier should narrow to the plan's packs"
+    )
+
+    workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    fast_section = workflow.split("  fast:", 1)[1].split("\n  affected:", 1)[0]
+    gate_lines = [l for l in fast_section.splitlines()
+                  if "plan_governed_pack_rebuilds" in l]
+    assert gate_lines, "fast job pack gate not found"
+    assert all("--only" not in line for line in gate_lines), (
+        "the hosted merge gate must not be narrowed"
+    )

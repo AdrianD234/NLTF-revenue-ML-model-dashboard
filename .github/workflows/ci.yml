@@ -208,9 +208,25 @@ jobs:
         run: python scripts/assert_governed_tree_unchanged.py --verify "${RUNNER_TEMP}/governed_before.json"
 
       - name: Governed pack status
-        # Reports whether committed packs are stale. It does NOT rebuild them:
-        # pack building belongs in the local promotion workflow, where the
-        # rebuild can be inspected before it is committed.
+        # THE MERGE-TIME PACK CONTRACT. Deliberately gates on EVERY pack.
+        #
+        # Do NOT add --only here, and do not "align" it with the plan's
+        # required_pack_status_checks. Those answer a different question - which
+        # packs a given TEST LANE has to load - and the local affected tier
+        # narrows to them so a dashboard change is not forced to rebuild a pack
+        # its tests never open.
+        #
+        # Merging is different. model_dashboard/ui.py is digest-bound, so a
+        # dashboard edit leaves the policy runtime stale even though its tests
+        # pass. Narrowing this gate would produce:
+        #
+        #   UI tests pass fast -> pack still stale -> summary green -> stale
+        #   pack reaches main -> production fails closed later
+        #
+        # This job always runs and the summary requires it, so a stale committed
+        # pack cannot merge. It reports; it never rebuilds - pack building
+        # belongs in the local promotion workflow where the result can be
+        # inspected before it is committed.
         run: python scripts/plan_governed_pack_rebuilds.py --format human --fail-on-stale
 
   # ---------------------------------------------------------------------------

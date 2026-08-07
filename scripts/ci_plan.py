@@ -254,8 +254,28 @@ def plan(
         "risk_level": risk,
         "required_test_groups": test_groups,
         "required_test_paths": sorted(set(node_ids)),
+        # Packs this TEST LANE must load to run. May legitimately be empty: a
+        # dashboard change selects tests that never open a policy state.
         "required_pack_status_checks": pack_checks,
         "required_pack_rebuilds": [],  # owned by plan_governed_pack_rebuilds.py
+        # A DIFFERENT question, deliberately kept separate: may this change
+        # merge while a committed governed pack is stale? Never.
+        #
+        # These two are easy to conflate, and conflating them creates a silent
+        # hole. model_dashboard/ui.py is digest-bound, so any dashboard edit
+        # makes the policy runtime stale - while the UI tests that edit selects
+        # pass perfectly well without it. Gating the test lane on that pack made
+        # the cheapest lane demand a rebuild (wrong). But letting the ABSENCE of
+        # a lane requirement also waive the merge requirement would give:
+        #
+        #   UI tests pass fast -> pack still stale -> summary green -> stale
+        #   pack reaches main -> production fails closed later
+        #
+        # So the merge-time rule is unconditional and independent of selection:
+        # every committed pack must be current. The hosted `fast` job enforces
+        # it by running plan_governed_pack_rebuilds.py --fail-on-stale over ALL
+        # packs, and `fast` always runs and is required by the summary.
+        "requires_all_packs_current_before_merge": True,
         "requires_full_assurance": requires_full,
         "requires_linux_replay": requires_linux_replay,
         "requires_windows_replay": requires_windows_replay,
