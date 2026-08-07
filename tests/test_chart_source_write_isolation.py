@@ -21,6 +21,7 @@ from __future__ import annotations
 import hashlib
 import os
 import pathlib
+import re
 import subprocess
 import sys
 
@@ -187,19 +188,46 @@ def test_a_subprocess_run_also_leaves_the_tracked_files_alone():
 def test_no_test_module_hardcodes_the_tracked_chart_source_directory():
     """A new test must not quietly reintroduce the tracked path.
 
-    Two files legitimately name it: this module (which asserts about it) and
-    the bundle contract test (which builds a synthetic tree under tmp_path).
+    The first version of this guard matched only two spellings, ``ROOT / ...``
+    and ``ARTIFACTS / ...``, and missed three modules that write the path out
+    longhand - one of which failed the full tier:
+
+        FAILED tests/test_latest_arbitration_values.py::
+               test_mini_parquet_source_tables_are_generated_from_dashboard_data
+        assert PosixPath('/work/artifacts/chart_sources/
+                          overview_ensemble_composition.csv').exists()
+
+    So this now matches the DESTINATION however it is spelled: any adjacency of
+    an "artifacts" segment and a "chart_sources" segment, and the literal
+    "artifacts/chart_sources".
     """
-    allowed = {"test_chart_source_write_isolation.py", "test_databricks_app_bundle_contract.py"}
+    # Two files legitimately name it. test_forecast_runner asks git which files
+    # are TRACKED, which is a question about the tracked path by definition.
+    allowed = {
+        "test_chart_source_write_isolation.py",   # asserts about it
+        "test_databricks_app_bundle_contract.py",  # synthetic tree under tmp_path
+        "test_forecast_runner.py",                 # `git ls-files artifacts/chart_sources`
+    }
+    pattern = re.compile(
+        r'"artifacts"\s*/\s*"chart_sources"'      # "artifacts" / "chart_sources"
+        r"|'artifacts'\s*/\s*'chart_sources'"      # single-quoted variant
+        r"|artifacts/chart_sources"                # literal path
+    )
+
     offenders = []
     for path in sorted((ROOT / "tests").glob("test_*.py")):
         if path.name in allowed:
             continue
-        text = path.read_text(encoding="utf-8", errors="ignore")
-        if 'ROOT / "artifacts" / "chart_sources"' in text or \
-           'ARTIFACTS / "chart_sources"' in text:
-            offenders.append(path.name)
+        for number, line in enumerate(
+            path.read_text(encoding="utf-8", errors="ignore").splitlines(), start=1
+        ):
+            if line.lstrip().startswith("#"):
+                continue  # a comment explaining the hazard is not the hazard
+            if pattern.search(line):
+                offenders.append(f"{path.name}:{number}")
+
     assert not offenders, (
-        "these modules address the tracked chart-source directory directly; "
-        "use resolve_chart_source_output_dir(ROOT) instead: " + ", ".join(offenders)
+        "these lines address the tracked chart-source directory directly; use "
+        "resolve_chart_source_output_dir(ROOT) instead:\n  "
+        + "\n  ".join(offenders)
     )

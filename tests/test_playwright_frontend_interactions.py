@@ -9,12 +9,15 @@ import pandas as pd
 import pytest
 from playwright.sync_api import Page, expect
 
+from model_dashboard.data.chart_sources import resolve_chart_source_output_dir
 from model_dashboard.forecast_runner import TEMPLATE_FILENAME, create_completed_sample_workbook
 
 
 SCREENSHOT_DIR = Path("artifacts/screenshots")
 SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
-CHART_SOURCE_DIR = Path("artifacts/chart_sources")
+CHART_SOURCE_DIR = resolve_chart_source_output_dir(
+    Path(__file__).resolve().parents[1]
+)
 
 APP_URL = os.environ.get("STAGE1_DASHBOARD_URL", "http://localhost:8501")
 TARGET_VIEWPORT = {"width": 2048, "height": 1005}

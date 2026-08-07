@@ -9,6 +9,7 @@ import pandas as pd
 import pytest
 from playwright.sync_api import Page, expect
 
+from model_dashboard.data.chart_sources import resolve_chart_source_output_dir
 from model_dashboard.conflict_fuel_paths import (
     CONFLICT_FUEL_SCENARIO_LEVELS,
     conflict_trace_name,
@@ -16,7 +17,9 @@ from model_dashboard.conflict_fuel_paths import (
 from model_dashboard.fuel_price_scenario import POLICY_PATH_IDS
 
 pytestmark = pytest.mark.e2e
-CHART_SOURCE_DIR = Path(__file__).resolve().parents[1] / "artifacts" / "chart_sources"
+CHART_SOURCE_DIR = resolve_chart_source_output_dir(
+    Path(__file__).resolve().parents[1]
+)
 CONFLICT_TRACE_NAMES = tuple(
     conflict_trace_name(level) for level in CONFLICT_FUEL_SCENARIO_LEVELS
 )
