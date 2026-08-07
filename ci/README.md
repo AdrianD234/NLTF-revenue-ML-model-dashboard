@@ -139,3 +139,39 @@ disagreement gets attributed to the wrong cause.
 
 Until Engine is installed, non-governed iteration in the `.venv` is fine and
 hosted CI remains the authority.
+
+## Diagnostic scripts vs permanent tooling
+
+`ci/` contains both. The distinction matters when you are deciding what to trust
+and what to delete.
+
+**Permanent — these are the system:**
+
+| script | role |
+| --- | --- |
+| `Dockerfile`, `compose.yaml`, `entrypoint.sh` | the clean-room image and its tiers |
+| `requirements-ci.txt` | pinned CI-only test dependencies |
+| `change_scopes.yml` | the change-scope taxonomy `ci_plan.py` reads |
+| `install_docker_engine_wsl.sh` | one-time Docker Engine install |
+| `phase_d_preflight.sh` | run before any long local tier |
+
+**Diagnostic — written to answer one question, kept as evidence:**
+
+| script | question it answered |
+| --- | --- |
+| `phase_a_writer_matrix.sh` | do the seven evidence-pack writers produce different chart sources? (no — all identical) |
+| `phase_a_r2_values.sh` | do the PED calibration R² values move on a sequential rebuild? (no) |
+| `phase_a_diff_detail.sh` | which columns differ after regeneration? (none) |
+| `phase_a_byte_diff.sh` | then what does differ? (line endings only) |
+| `probe_uncertainty_rebuild_reproducibility.sh` | does an uncertainty rebuild reproduce the committed pack? (**no** — `light_petrol_vkt` FY2031-2050 moves 1.34%) |
+| `benchmark_test_parallelism.sh` | is xdist safe to adopt? (no — it moved a governed value) |
+| `phase2_docker_parity.sh`, `phase2_affected_scopes.sh`, `phase_d_calc_lane_rebuild.sh` | Phase 2/D acceptance drivers |
+
+The diagnostic scripts are kept rather than deleted because their findings are
+cited in `docs/FOLLOW_UP_PED_R2_DRIFT.md` and
+`artifacts/ci_optimisation/xdist_benchmark.md`, and a finding whose method
+cannot be re-run is an anecdote. `probe_uncertainty_rebuild_reproducibility.sh`
+in particular should be re-run against the other three packs — that is the first
+open question in the follow-up.
+
+None of them run in CI. None are referenced by the workflow or the tiers.
