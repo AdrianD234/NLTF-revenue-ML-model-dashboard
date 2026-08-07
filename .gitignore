@@ -195,3 +195,19 @@ outputs/
 
 # Playwright MCP scratch snapshots (generated during browser verification)
 .playwright-mcp/
+
+# CI optimisation evidence: the reports and measurements this branch is
+# judged against. Reports, CSVs and manifests are tracked; the multi-MB raw
+# run logs and JUnit XML stay ignored - they are reproducible from the
+# scripts in ci/ and would bloat every clone.
+!artifacts/ci_optimisation/
+!artifacts/ci_optimisation/**/
+!artifacts/ci_optimisation/**/*.md
+!artifacts/ci_optimisation/**/*.csv
+!artifacts/ci_optimisation/*.md
+!artifacts/ci_optimisation/*.csv
+!artifacts/ci_optimisation/*.json
+artifacts/ci_optimisation/**/*.log
+artifacts/ci_optimisation/**/*.xml
+artifacts/ci_optimisation/wide/
+artifacts/ci_optimisation/xdist/

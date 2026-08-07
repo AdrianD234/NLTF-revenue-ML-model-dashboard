@@ -1,0 +1,22 @@
+run_id,workflow,event,branch,head_sha,run_conclusion,job_name,job_conclusion,runner_class,job_wall_seconds,job_wall_hms,billed_minutes_raw,billed_minutes_weighted,job_cost_usd
+30906665375,CI,push,main,398b78be9ee6,success,Core clean-clone suite,success,UBUNTU,4449.0,1h14m09s,75,75,0.6
+30906665375,CI,push,main,398b78be9ee6,success,Replay parity (windows-latest),success,WINDOWS,148.0,0h02m28s,3,6,0.048
+30906665375,CI,push,main,398b78be9ee6,success,Replay parity (ubuntu-latest),success,UBUNTU,146.0,0h02m26s,3,3,0.024
+30906467854,CI,pull_request,feature/revenue-outlook-xlsx-extract,9028eb018da3,success,Replay parity (windows-latest),success,WINDOWS,197.0,0h03m17s,4,8,0.064
+30906467854,CI,pull_request,feature/revenue-outlook-xlsx-extract,9028eb018da3,success,Core clean-clone suite,success,UBUNTU,4371.0,1h12m51s,73,73,0.584
+30906467854,CI,pull_request,feature/revenue-outlook-xlsx-extract,9028eb018da3,success,Replay parity (ubuntu-latest),success,UBUNTU,120.0,0h02m00s,2,2,0.016
+30902233189,CI,pull_request,fix/revenue-outlook-fleet-pt-through-2050,eebc688bc9a4,failure,Core clean-clone suite,failure,UBUNTU,3464.0,0h57m44s,58,58,0.464
+30902233189,CI,pull_request,fix/revenue-outlook-fleet-pt-through-2050,eebc688bc9a4,failure,Replay parity (windows-latest),success,WINDOWS,210.0,0h03m30s,4,8,0.064
+30902233189,CI,pull_request,fix/revenue-outlook-fleet-pt-through-2050,eebc688bc9a4,failure,Replay parity (ubuntu-latest),success,UBUNTU,126.0,0h02m06s,3,3,0.024
+30883622347,CI,push,main,10f4e36edb9c,success,Core clean-clone suite,success,UBUNTU,4311.0,1h11m51s,72,72,0.576
+30883622347,CI,push,main,10f4e36edb9c,success,Replay parity (ubuntu-latest),success,UBUNTU,102.0,0h01m42s,2,2,0.016
+30883622347,CI,push,main,10f4e36edb9c,success,Replay parity (windows-latest),success,WINDOWS,197.0,0h03m17s,4,8,0.064
+30871212625,CI,pull_request,fix/revenue-outlook-ped-activity-through-2050,eb39ca807093,success,Replay parity (windows-latest),success,WINDOWS,204.0,0h03m24s,4,8,0.064
+30871212625,CI,pull_request,fix/revenue-outlook-ped-activity-through-2050,eb39ca807093,success,Replay parity (ubuntu-latest),success,UBUNTU,145.0,0h02m25s,3,3,0.024
+30871212625,CI,pull_request,fix/revenue-outlook-ped-activity-through-2050,eb39ca807093,success,Core clean-clone suite,success,UBUNTU,4396.0,1h13m16s,74,74,0.592
+30802931456,CI,push,main,31b74615d9d9,success,Core clean-clone suite,success,UBUNTU,4194.0,1h09m54s,70,70,0.56
+30802931456,CI,push,main,31b74615d9d9,success,Replay parity (windows-latest),success,WINDOWS,222.0,0h03m42s,4,8,0.064
+30802931456,CI,push,main,31b74615d9d9,success,Replay parity (ubuntu-latest),success,UBUNTU,146.0,0h02m26s,3,3,0.024
+31130362010,CI,push,main,e14654ab9ea9,failure,Replay parity (windows-latest),failure,WINDOWS,5.0,0h00m05s,1,2,0.016
+31130362010,CI,push,main,e14654ab9ea9,failure,Replay parity (ubuntu-latest),failure,UBUNTU,10.0,0h00m10s,1,1,0.008
+31130362010,CI,push,main,e14654ab9ea9,failure,Core clean-clone suite,failure,UBUNTU,9.0,0h00m09s,1,1,0.008

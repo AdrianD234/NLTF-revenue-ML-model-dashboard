@@ -1,0 +1,13 @@
+metric,before_hosted,after_local_docker,unit,note
+pytest_runtime,4165,1672,seconds,"hosted 2-CPU runner vs local 20-CPU container; same inventory + 95 branch tests"
+core_job_wall,4449,1784,seconds,"hosted core job vs Docker full tier"
+tests_passed,1910,2005,count,"1910 pre-branch baseline + 95 branch-added = 2005; nothing dropped"
+tests_skipped,53,53,count,unchanged
+fast_feedback,4449,8,seconds,"was: whole suite. now: Docker fast tier"
+dashboard_ui_change,4449,172,seconds,"was: whole suite. now: planner-selected 108 tests"
+docs_only_change,4449,0,seconds,"was: whole suite. now: no model work selected at all"
+calc_change_stale_pack,525,7,seconds,"was: 185 derived fixture errors. now: one pack-preflight diagnostic"
+weighted_billed_minutes_per_change,167,0,minutes,"was: PR + post-merge full suite. local runs are not billed"
+usd_per_completed_change,1.34,0,usd,"hosted rate; local Docker is unbilled"
+seven_day_hosted_spend,24.70,,usd,"60 runs, 2026-07-31 to 2026-08-06; 51.4% on cancelled or failed runs"
+governed_tree_verified,0,2143,files,"no cleanliness gate existed before"

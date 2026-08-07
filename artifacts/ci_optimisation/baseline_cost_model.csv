@@ -1,0 +1,8 @@
+run_id,workflow,event,branch,head_sha,conclusion,created_at,run_wall_seconds,run_wall_hms,billed_minutes_weighted,run_cost_usd
+30906665375,CI,push,main,398b78be9ee6,success,2026-08-04T11:52:53Z,4469.0,1h14m29s,84.0,0.672
+30906467854,CI,pull_request,feature/revenue-outlook-xlsx-extract,9028eb018da3,success,2026-08-04T11:50:07Z,4397.0,1h13m17s,83.0,0.664
+30902233189,CI,pull_request,fix/revenue-outlook-fleet-pt-through-2050,eebc688bc9a4,failure,2026-08-04T10:49:26Z,3473.0,0h57m53s,69.0,0.552
+30883622347,CI,push,main,10f4e36edb9c,success,2026-08-04T06:19:52Z,7681.0,2h08m01s,82.0,0.656
+30871212625,CI,pull_request,fix/revenue-outlook-ped-activity-through-2050,eb39ca807093,success,2026-08-04T02:14:52Z,4399.0,1h13m19s,85.0,0.68
+30802931456,CI,push,main,31b74615d9d9,success,2026-08-03T09:47:52Z,4198.0,1h09m58s,81.0,0.648
+31130362010,CI,push,main,e14654ab9ea9,failure,2026-08-06T23:15:59Z,28.0,0h00m28s,4.0,0.032

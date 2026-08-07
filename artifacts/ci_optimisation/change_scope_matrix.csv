@@ -1,0 +1,37 @@
+work_item,example_changed_path,scope,risk,full_assurance,linux_replay,windows_replay,browser,lane
+Nominal rather than NPV default,model_dashboard/revenue_outlook_presentation_policy.py,revenue_outlook_presentation,low,no,no,no,yes,fast+affected
+Scenario title changes,model_dashboard/labels.py,dashboard_ui,low,no,no,no,yes,fast+affected
+State persistence,model_dashboard/ui.py,dashboard_ui,low,no,no,no,yes,fast+affected
+Presentation-only captions and controls,model_dashboard/presentation.py,dashboard_ui,low,no,no,no,yes,fast+affected
+Page wiring,app.py,dashboard_ui+revenue_outlook_presentation+deployment,low,no,no,no,yes,fast+affected
+Treasury data update,data/source_workbooks/Master Copy revenue modelling workbook.xlsx,data_refresh,high,yes,yes,yes,no,full-assurance+replay
+PREFU data update,data/revenue_model_source_pack/official_vintage_registry.json,data_refresh,high,yes,yes,yes,no,full-assurance+replay
+New actuals,data/model_input_history/light_ruc_inputs.parquet,data_refresh,high,yes,yes,yes,no,full-assurance+replay
+New promoted model (fitted state),data/engine_ar1/current_revenue_outlook/state.parquet,replay_or_fitted_state,high,yes,yes,yes,no,full-assurance+replay
+Promoted finalist / arbitration,pipeline/vnext_candidates.py,model_promotion,high,yes,yes,yes,no,full-assurance+replay
+PED calibration R2 drift,model_dashboard/r2_ladder.py,governance_r2,medium,no,no,no,no,affected
+In-sample/out-of-sample source correctness,model_dashboard/score_basis.py,governance_r2,medium,no,no,no,no,affected
+Chart-source write isolation,model_dashboard/chart_sources.py,revenue_outlook_presentation,low,no,no,no,yes,fast+affected
+COVID two-year dummy,experiments/configs/covid_two_year_dummy.yml,model_experiment,none,no,no,no,no,LOCAL ONLY
+COVID trend/coefficient permutations,experiments/configs/covid_trend.yml,model_experiment,none,no,no,no,no,LOCAL ONLY
+Drop seasonality dummies,experiments/configs/no_seasonality.yml,model_experiment,none,no,no,no,no,LOCAL ONLY
+Exports/imports and lagged GDP,experiments/configs/trade_lagged_gdp.yml,model_experiment,none,no,no,no,no,LOCAL ONLY
+Clean-car discount,experiments/configs/clean_car_discount.yml,model_experiment,none,no,no,no,no,LOCAL ONLY
+Explainable / less black-box challengers,experiments/configs/explainable_challenger.yml,model_experiment,none,no,no,no,no,LOCAL ONLY
+Heavy-RUC consumption variables,experiments/configs/heavy_ruc_consumption.yml,model_experiment,none,no,no,no,no,LOCAL ONLY
+Smoothed VKT per capita,experiments/configs/smoothed_vkt_per_capita.yml,model_experiment,none,no,no,no,no,LOCAL ONLY
+Truckometer / e-RUC ingestion research,experiments/configs/truckometer.yml,model_experiment,none,no,no,no,no,LOCAL ONLY
+Error bands excluding COVID,model_dashboard/revenue_uncertainty_draws.py,uncertainty,medium,no,no,no,no,affected
+Uncertainty policy change,model_dashboard/revenue_uncertainty_policy.py,uncertainty,medium,no,no,no,no,affected
+Uncertainty pack rebuild,data/revenue_outlook_uncertainty/manifest.json,uncertainty+governed_pack,high,yes,no,no,no,full-assurance
+Documentation,docs/GOVERNANCE_RULES.md,docs_only,none,no,no,no,no,fast only
+Funding-system theoretical piece,docs/FUNDING_THEORY.md,docs_only,none,no,no,no,no,fast only
+Coefficients through time (research),model_dashboard/metrics.py,governance_r2,medium,no,no,no,no,affected
+Dependency bump,requirements.txt,dependency_or_environment,high,yes,yes,yes,no,full-assurance+replay
+Container definition change,ci/Dockerfile,dependency_or_environment,high,yes,yes,yes,no,full-assurance+replay
+Workflow change,.github/workflows/ci.yml,ci_or_workflow,medium,no,no,no,no,fast+affected
+Databricks bundle change,scripts/build_databricks_app_bundle.py,databricks_bundle,medium,no,no,no,no,affected+deployment
+Unclassified new Python module,model_dashboard/brand_new_module.py,unknown_high_risk,high,yes,yes,yes,no,full-assurance+replay
+Unclassified new data pack,data/some_new_pack/values.parquet,unknown_high_risk,high,yes,yes,yes,no,full-assurance+replay
+Diff wider than 120 files,(any),unknown_high_risk,high,yes,yes,yes,no,full-assurance+replay
+Classifier cannot read the diff,(any),unknown_high_risk,high,yes,yes,yes,no,full-assurance+replay

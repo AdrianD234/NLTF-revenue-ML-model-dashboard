@@ -1,0 +1,58 @@
+{
+  "recorded_utc": "2026-08-07T00:31:41.119369+00:00",
+  "host": {
+    "platform": "Windows-11-10.0.26200-SP0",
+    "logical_cpus": 20,
+    "ram_gb": 31.4,
+    "disk_c_free_gb": 101.5,
+    "disk_c_total_gb": 999.1
+  },
+  "docker": {
+    "installed": false,
+    "daemon_reachable": false,
+    "linux_container_mode": null,
+    "cpu_allocation": null,
+    "ram_allocation": null,
+    "note": "Docker Desktop is not installed on this machine. ci/Dockerfile, ci/compose.yaml and the scripts/ci_local.* wrappers are delivered and self-checking; the wrappers fail with an explanation rather than silently falling back to the .venv."
+  },
+  "wsl2": {
+    "available": true,
+    "default_distribution": "Ubuntu",
+    "default_version": 2,
+    "note": "WSL2 is present and running, so Docker Desktop would install with the WSL2 backend without further prerequisites."
+  },
+  "act": {
+    "installed": false,
+    "note": "optional workflow-wiring smoke tool only"
+  },
+  "gh": {
+    "installed": true,
+    "version": "gh version 2.96.0 (2026-07-02)"
+  },
+  "git": {
+    "version": "git version 2.51.0.windows.1"
+  },
+  "developer_venv": {
+    "path": ".venv (in the canonical Repos checkout)",
+    "usable": true,
+    "python": "3.13.5 | packaged by Anaconda, Inc. | (main, Jun 12 2025, 16:37:03) [MSC v.1929 64 bit (AMD64)]",
+    "faithful_to_ci": false,
+    "divergences": [
+      "Python 3.13.5 (Anaconda) vs CI 3.11",
+      "streamlit 1.58.0 installed vs requirements.txt pin 1.59.0",
+      "no pytest-xdist, no PyYAML-pinned CI extras"
+    ],
+    "consequence": "Timing shape from this environment is indicative. It cannot settle a governed numerical disagreement, because the forward model is not bit-reproducible across differing Python/numpy builds.",
+    "packages": {
+      "numpy": "2.4.6",
+      "pandas": "3.0.3",
+      "scipy": "1.17.1",
+      "sklearn": "1.7.2",
+      "pyarrow": "24.0.0",
+      "statsmodels": "0.14.6",
+      "streamlit": "1.58.0",
+      "pytest": "9.0.3",
+      "yaml": "6.0.3"
+    }
+  }
+}

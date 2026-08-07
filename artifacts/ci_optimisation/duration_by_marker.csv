@@ -1,0 +1,5 @@
+marker,tests,total_seconds,share_pct
+apptest_like,0,0,0.0
+reference_pipeline_like,147,569.46,22.73
+skipped,53,0.0,0.0
+all_executed,1910,2505.74,100.0
