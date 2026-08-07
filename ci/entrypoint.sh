@@ -143,12 +143,24 @@ case "$TIER" in
     #
     # The planner already asks for these checks; the tier simply was not running
     # them. One clear message beats 185 derived failures.
+    # Gate ONLY on the packs the change plan asked for. CI_PACK_CHECKS is set by
+    # scripts/ci_local.* from the plan's required_pack_status_checks. An empty
+    # value means the selected tests load no governed pack, so a stale one
+    # cannot affect them - and a dashboard UI change marks the policy runtime
+    # stale (ui.py is digest-bound) while its tests pass perfectly well.
     log "Governed pack status"
-    if ! python scripts/plan_governed_pack_rebuilds.py --format human --fail-on-stale; then
+    pack_gate=(--format human)
+    if [ -n "${CI_PACK_CHECKS:-}" ]; then
+      pack_gate+=(--fail-on-stale --only "$CI_PACK_CHECKS")
+      echo "gating on: $CI_PACK_CHECKS"
+    else
+      echo "the change plan requested no pack status checks; reporting only."
+    fi
+    if ! python scripts/plan_governed_pack_rebuilds.py "${pack_gate[@]}"; then
       echo "" >&2
-      echo "Refusing to run the affected selection against stale packs: every test" >&2
-      echo "that loads a governed pack would fail for that reason alone, telling" >&2
-      echo "you nothing about your change. Rebuild the packs above first." >&2
+      echo "Refusing to run the affected selection against stale packs it depends" >&2
+      echo "on: every test that loads one would fail for that reason alone,"  >&2
+      echo "telling you nothing about your change. Rebuild the packs above." >&2
       exit 4
     fi
 

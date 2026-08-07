@@ -316,9 +316,34 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="exit non-zero when any pack needs rebuilding (for CI status checks)",
     )
+    parser.add_argument(
+        "--only",
+        default="",
+        help=(
+            "comma-separated pack names to gate on. The full status is still "
+            "reported; only these decide the exit code. Used by the affected "
+            "tier, which gates on the packs its change plan actually requested."
+        ),
+    )
     args = parser.parse_args(argv)
 
     plan = build_plan(args.repo_root.resolve())
+
+    # A stale pack only matters to a lane whose selected tests load it. A
+    # dashboard UI change marks the policy runtime stale - ui.py is digest-bound
+    # - but the tests that change selects never load a policy state, and they
+    # pass. Failing them would make the cheapest, most common lane the one that
+    # demands a pack rebuild, which is precisely backwards.
+    gated = [p.strip() for p in args.only.split(",") if p.strip()]
+    if gated:
+        unknown = [p for p in gated if p not in plan["packs"]]
+        if unknown:
+            print(f"unknown pack name(s) in --only: {unknown}", file=sys.stderr)
+            return 2
+        blocking = [p for p in plan["required_rebuilds"] if p in gated]
+        plan = dict(plan)
+        plan["gated_on"] = gated
+        plan["any_stale"] = bool(blocking)
 
     if args.format == "json":
         print(json.dumps(plan, indent=2))

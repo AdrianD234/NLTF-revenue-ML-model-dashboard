@@ -462,3 +462,45 @@ def test_shell_scripts_use_lf_line_endings(relative):
         f"{relative} has CRLF line endings and will not execute in the Linux "
         "container. Convert it to LF."
     )
+
+
+# ===========================================================================
+# The affected tier gates on the plan's packs, not on every pack
+# ===========================================================================
+
+
+def test_only_flag_gates_on_the_named_packs(monkeypatch):
+    """A stale pack the selection never loads must not fail the lane.
+
+    model_dashboard/ui.py is digest-bound, so ANY dashboard change marks the
+    policy runtime stale. The tests that change selects do not load a policy
+    state and pass perfectly well. Gating on every pack made the cheapest and
+    most common lane the one that demanded a pack rebuild - exactly backwards.
+    """
+    monkeypatch.setattr(
+        packs,
+        "status_policy_runtime",
+        lambda _root: {"status": "stale", "detail": "simulated"},
+    )
+    # Gating on a pack that is fine passes, even though another is stale.
+    assert packs.main(["--only", "replay_cache", "--fail-on-stale",
+                       "--format", "json"]) == 0
+    # Gating on the stale one fails.
+    assert packs.main(["--only", "policy_runtime", "--fail-on-stale",
+                       "--format", "json"]) == 1
+
+
+def test_only_flag_rejects_an_unknown_pack_name():
+    """A typo must not silently gate on nothing."""
+    assert packs.main(["--only", "no_such_pack", "--fail-on-stale"]) == 2
+
+
+def test_affected_tier_gates_on_the_plans_pack_checks():
+    text = (REPO_ROOT / "ci" / "entrypoint.sh").read_text(encoding="utf-8")
+    assert "CI_PACK_CHECKS" in text
+    assert "--only" in text, "the tier must narrow the gate to the plan's packs"
+    wrapper = (REPO_ROOT / "scripts" / "ci_local.sh").read_text(encoding="utf-8")
+    assert "required_pack_status_checks" in wrapper, (
+        "the wrapper must read the plan's pack checks and pass them through"
+    )
+    assert "CI_PACK_CHECKS" in wrapper

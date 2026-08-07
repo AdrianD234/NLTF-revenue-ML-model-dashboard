@@ -192,6 +192,7 @@ DOCKER_IDENTITY=(--user "$(id -u):$(id -g)" -e HOME=/tmp)
 
 # --- 6b. Tier selection ------------------------------------------------------
 tier_args=()
+PACK_CHECKS=""
 if [ "$TIER" = "affected" ]; then
   section "Planning affected tests"
   if plan_json="$(docker run --rm "${DOCKER_IDENTITY[@]}" \
@@ -214,6 +215,11 @@ if [ "$TIER" = "affected" ]; then
         exit 0
       fi
       echo "selected ${#tier_args[@]} test path(s)"
+      # The tier gates on exactly the packs the plan asked for, no more.
+      PACK_CHECKS="$(printf '%s' "$plan_json" | docker run --rm -i "${DOCKER_IDENTITY[@]}" \
+        --entrypoint python nltf-ci:local -c \
+        'import json,sys; print(",".join(json.load(sys.stdin)["required_pack_status_checks"]))')"
+      echo "pack checks: ${PACK_CHECKS:-(none)}"
     fi
   else
     echo "Planner failed; escalating this run to the full tier."
@@ -229,6 +235,7 @@ started=$(date +%s)
 docker run --rm "${DOCKER_IDENTITY[@]}" \
   -e CI_SOURCE_SHA="$SHA" \
   -e CI_OUT_DIR=/out \
+  -e CI_PACK_CHECKS="${PACK_CHECKS:-}" \
   -v "${WORKTREE}:/work" \
   -v "${OUT_DIR}:/out" \
   nltf-ci:local "$TIER" "${tier_args[@]}"
