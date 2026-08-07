@@ -1,10 +1,47 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 import time
 from typing import Any
 
 import pandas as pd
+
+# Where chart source tables are written.
+#
+# The default is unchanged: <repo_root>/artifacts/chart_sources. Production, the
+# app, the Databricks bundle and any explicit promotion command all continue to
+# write exactly where they always did, because none of them set the override.
+#
+# The override exists for tests. Loading an evidence pack writes these tables as
+# a side effect, and seven test modules do that - so a test run rewrote tracked
+# files. On Linux that alone rewrote CRLF to LF (7944 bytes -> 7937, no value
+# changed), and under pytest-xdist four worker processes writing concurrently
+# moved a governed PED calibration R-squared from 0.559 to 0.580 with every test
+# still passing. See artifacts/ci_optimisation/xdist_benchmark.md.
+#
+# An environment variable rather than only a parameter, because the write is a
+# side effect several layers below the callers that need to redirect it;
+# threading a parameter through every one of them would be a far wider change to
+# governed code than this problem warrants.
+CHART_SOURCE_OUTPUT_DIR_ENV = "NLTF_CHART_SOURCE_OUTPUT_DIR"
+
+
+def resolve_chart_source_output_dir(
+    repo_root: Path | str, output_dir: Path | str | None = None
+) -> Path:
+    """The directory chart source tables are written to, and read back from.
+
+    Precedence: explicit argument, then the environment override, then the
+    committed default. Tests use the override so they never write into the
+    tracked tree; nothing else sets it.
+    """
+    if output_dir is not None:
+        return Path(output_dir)
+    override = os.environ.get(CHART_SOURCE_OUTPUT_DIR_ENV)
+    if override:
+        return Path(override)
+    return Path(repo_root) / "artifacts" / "chart_sources"
 
 from ..labels import (
     OVERVIEW_STRESS_BUCKET_ORDER,
@@ -131,9 +168,17 @@ CHART_SOURCE_FILES = {
 }
 
 
-def write_chart_source_tables(repo_root: Path, data: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
-    """Write one auditable source table for every primary dashboard chart."""
-    output_dir = repo_root / "artifacts" / "chart_sources"
+def write_chart_source_tables(
+    repo_root: Path,
+    data: dict[str, pd.DataFrame],
+    output_dir: Path | str | None = None,
+) -> dict[str, pd.DataFrame]:
+    """Write one auditable source table for every primary dashboard chart.
+
+    ``output_dir`` defaults to the committed location, so production behaviour
+    is unchanged. See ``resolve_chart_source_output_dir``.
+    """
+    output_dir = resolve_chart_source_output_dir(repo_root, output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     tables = build_chart_source_tables(data, repo_root=repo_root)
     for filename, frame in tables.items():
