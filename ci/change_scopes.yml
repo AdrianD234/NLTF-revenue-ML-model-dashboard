@@ -1,0 +1,611 @@
+# Change-scope taxonomy for the tiered CI system.
+#
+# scripts/ci_plan.py reads this file, classifies a diff into scopes, and emits
+# the test groups, pack checks and hosted jobs that diff actually requires.
+#
+# Two rules govern how this file is read, and both are fail-safe:
+#
+#   * Scopes UNION. A file may match several rules; every matching scope
+#     applies. Requirements are the union across matched scopes, so nothing is
+#     lost by a file being classified more than once.
+#
+#   * Anything unmatched becomes unknown_high_risk. A new directory, a new
+#     top-level file or a rename nobody taught this file about escalates to
+#     full assurance rather than quietly selecting no tests.
+#
+# `docs_only` is the one scope that can lower the bill, and it can only do so
+# when EVERY changed file is docs. One source file in the diff removes it.
+
+version: 1
+
+# ---------------------------------------------------------------------------
+# Named pytest selections. Groups are referenced by scopes below; ci_plan.py
+# validates that every path here still exists, so a renamed test file fails the
+# planner tests instead of silently selecting nothing.
+# ---------------------------------------------------------------------------
+test_groups:
+
+  planner:
+    description: The change classifier's own tests.
+    paths:
+      - tests/test_ci_plan.py
+
+  import_smoke:
+    description: Import surface and cold-start smoke; cheap, always worth running.
+    paths:
+      - tests/test_streamlit_cloud_import_surface.py
+      - tests/test_streamlit_smoke.py
+
+  dashboard_ui:
+    description: Widget state, filters, hovers, tooltips and executive mode.
+    paths:
+      - tests/test_streamlit_widget_state.py
+      - tests/test_filters_are_clickable.py
+      - tests/test_filter_and_hover.py
+      - tests/test_hovers_are_readable.py
+      - tests/test_reset_filters.py
+      - tests/test_summary_tooltips.py
+      - tests/test_executive_mode.py
+      - tests/test_management_model_hovers.py
+      - tests/test_diagnostic_matrix_tooltips.py
+      - tests/test_scenario_comparison.py
+
+  revenue_outlook_presentation:
+    description: What Revenue Outlook renders, from already-computed values.
+    paths:
+      - tests/test_revenue_chart_layers.py
+      - tests/test_chart_source_tables.py
+      - tests/test_chart_data_reconciliation.py
+      - tests/test_revenue_outlook_ui_slim_2050.py
+      - tests/test_revenue_outlook_workshop_integration.py
+      - tests/test_revenue_outlook_trace_identity.py
+      - tests/test_revenue_source_app_views.py
+      - tests/test_revenue_outlook_excel_extract.py
+
+  revenue_outlook_calculation:
+    description: The forward revenue computation itself and its levers.
+    paths:
+      - tests/test_revenue_outlook.py
+      - tests/test_revenue_outlook_long_run.py
+      - tests/test_revenue_outlook_long_run_sensitivities.py
+      - tests/test_revenue_outlook_series_coverage.py
+      - tests/test_revenue_outlook_ped_activity_2050.py
+      - tests/test_revenue_scenario_key.py
+      - tests/test_rate_paths.py
+      - tests/test_npv.py
+      - tests/test_ev_uptake_levers.py
+      - tests/test_fleet_mix.py
+      - tests/test_eruc_transition.py
+      - tests/test_fuel_price_scenario.py
+      - tests/test_light_fleet_allocation.py
+      - tests/test_long_run_shape_transition.py
+      - tests/test_treasury_macro_paths.py
+      - tests/test_net_revenue_timing_comparison.py
+      - tests/test_quarterly_disaggregation.py
+      - tests/test_conflict_fuel_paths.py
+      - tests/test_conflict_gdp_paths.py
+      - tests/test_vfm_long_run_composition.py
+      - tests/test_revenue_outlook_vfm_envelope.py
+      - tests/test_fleet_allocation_runtime_semantics.py
+
+  identity_and_accounting:
+    description: Formula closure, unit contracts and completeness boundaries.
+    paths:
+      - tests/test_unit_contract.py
+      - tests/test_feature_completeness.py
+      - tests/test_production_completeness_boundary.py
+      - tests/test_supported_quarter_horizon_contract.py
+      - tests/test_canonical_base_composition.py
+      - tests/test_view_invariant_sweep.py
+
+  uncertainty:
+    description: Draw construction, band basis and horizon zones.
+    paths:
+      - tests/test_revenue_uncertainty_basis.py
+      - tests/test_revenue_uncertainty_draws.py
+      - tests/test_forecast_horizon_zones.py
+
+  governed_pack:
+    description: Pack contracts, fail-closed behaviour and freshness.
+    paths:
+      - tests/test_revenue_source_pack.py
+      - tests/test_revenue_outlook_policy_runtime.py
+      - tests/test_cache_contracts.py
+      - tests/test_artifact_freshness.py
+      - tests/test_fail_closed_mutations.py
+      - tests/test_runtime_manifest_semantics.py
+      - tests/test_series_inventory_contract.py
+      - tests/test_provenance_path_normalisation.py
+
+  replay_and_fitted_state:
+    description: Replay cache, engine state and promoted fitted state.
+    paths:
+      - tests/test_revenue_outlook_replay_cache.py
+      - tests/test_ar1_engine.py
+      - tests/test_engine_switcher.py
+      - tests/test_direct_treasury_scenario_replay.py
+      - tests/test_heavy_ruc_parent_fitted_state.py
+      - tests/test_light_ruc_promoted_state.py
+      - tests/test_light_ruc_anchor_design.py
+
+  governance_r2:
+    description: R-squared ladders, score basis and governance page sourcing.
+    paths:
+      - tests/test_r2_ladder.py
+      - tests/test_r2_metrics.py
+      - tests/test_score_basis_governance.py
+      - tests/test_forward_scorer_governance.py
+      - tests/test_governance_reproducibility_page.py
+      - tests/test_page5_reproducibility_panel_contract.py
+
+  model_promotion:
+    description: Finalist identity, arbitration values and vnext parity.
+    paths:
+      - tests/test_latest_arbitration_values.py
+      - tests/test_no_stale_finalist_values.py
+      - tests/test_vnext_parity.py
+      - tests/test_metrics.py
+      - tests/test_schiff_purity.py
+      - tests/test_ensemble_composition_validation.py
+      - tests/test_candidate_cone_builder.py
+      - tests/test_cone_landscape_validation.py
+      - tests/test_long_horizon_rolling_origin.py
+      - tests/test_stress_horizon_validation.py
+      - tests/test_stress_horizon_aliases.py
+
+  data_refresh:
+    description: Source-workbook ingestion, vintages and the MBU26 spine.
+    paths:
+      - tests/test_actuals_refresh_ingestion.py
+      - tests/test_mbu26_source_spine.py
+      - tests/test_official_vintage.py
+      - tests/test_official_vintage_invariance.py
+      - tests/test_official_vintage_reconciliation.py
+      - tests/test_official_vintage_role_independence.py
+      - tests/test_official_vintage_runtime_genericity.py
+      - tests/test_official_vintage_runtime_independence.py
+      - tests/test_official_vintage_plug_and_play.py
+      - tests/test_official_comparator_policy_horizon.py
+      - tests/test_stream_vintage_exposure.py
+      - tests/test_data_loader.py
+      - tests/test_curated_data.py
+
+  deployment:
+    description: Streamlit Cloud import surface and the Databricks bundle contract.
+    paths:
+      - tests/test_streamlit_cloud_import_surface.py
+      - tests/test_databricks_app_bundle_contract.py
+      - tests/test_no_unnecessary_data_reload.py
+
+  performance:
+    description: Cache and view performance budgets.
+    paths:
+      - tests/test_performance_budget.py
+      - tests/test_view_performance_caches.py
+      - tests/test_no_unnecessary_data_reload.py
+
+  docs_contract:
+    description: Locked-backlog and evidence-artifact status checks.
+    paths:
+      - tests/test_locked_backlogs_closed.py
+      - tests/test_review_artifact_status.py
+      - tests/test_completion_evidence_artifacts.py
+
+  repo_hygiene:
+    description: >
+      Tests that scan the repository's own source tree - banned user roots,
+      historical git objects, legacy pack paths. Any script or module change
+      can trip these, so they run whenever tooling moves.
+    paths:
+      - tests/test_artifact_freshness.py
+      - tests/test_light_ruc_anchor_design.py
+      - tests/test_official_vintage_invariance.py
+      - tests/test_official_vintage_runtime_independence.py
+      - tests/test_locked_backlogs_closed.py
+
+  evidence_artifacts:
+    description: Committed evidence packs under artifacts/ and their contracts.
+    paths:
+      - tests/test_completion_evidence_artifacts.py
+      - tests/test_review_artifact_status.py
+      - tests/test_visual_artifacts.py
+      - tests/test_artifact_freshness.py
+      - tests/test_evidence_pack.py
+      - tests/test_reproducibility_audit_pack.py
+      - tests/test_recursive_audit_log.py
+      - tests/test_p1_unit_completeness_artifacts.py
+      - tests/test_p1_direct_macro_replay_artifacts.py
+      - tests/test_corrected_reconciliation_artifacts.py
+      - tests/test_light_ruc_reproducibility_pack.py
+      - tests/test_heavy_ruc_parity_debug_pack.py
+
+# ---------------------------------------------------------------------------
+# Scope definitions. `requires` fields union across every matched scope.
+# ---------------------------------------------------------------------------
+scopes:
+
+  docs_only:
+    risk: none
+    description: Prose only. Cannot move a governed number.
+    test_groups: [docs_contract]
+
+  dashboard_ui:
+    risk: low
+    description: Presentation chrome, controls and page layout.
+    test_groups: [import_smoke, dashboard_ui]
+    requires_browser: true
+
+  revenue_outlook_presentation:
+    risk: low
+    description: How already-computed Revenue Outlook values are displayed.
+    test_groups: [import_smoke, revenue_outlook_presentation, dashboard_ui]
+    requires_browser: true
+    pack_status_checks: [policy_runtime]
+
+  revenue_outlook_calculation:
+    risk: medium
+    description: The forward revenue computation, levers and scenario keys.
+    test_groups:
+      - revenue_outlook_calculation
+      - revenue_outlook_presentation
+      - identity_and_accounting
+      - governed_pack
+    pack_status_checks: [replay_cache, quarterly_display, policy_runtime]
+
+  uncertainty:
+    risk: medium
+    description: Error bands, draws and the uncertainty pack.
+    test_groups: [uncertainty, identity_and_accounting, governed_pack]
+    pack_status_checks: [uncertainty, policy_runtime]
+
+  governed_pack:
+    risk: high
+    description: A committed governed pack or its builder moved.
+    test_groups: [governed_pack, replay_and_fitted_state, revenue_outlook_calculation]
+    pack_status_checks: [replay_cache, quarterly_display, uncertainty, policy_runtime]
+    requires_full_assurance: true
+
+  data_refresh:
+    risk: high
+    description: Source workbooks, actuals, vintages or model input history.
+    test_groups: [data_refresh, model_promotion, governed_pack, revenue_outlook_calculation]
+    pack_status_checks: [replay_cache, quarterly_display, uncertainty, policy_runtime]
+    requires_full_assurance: true
+    requires_linux_replay: true
+    requires_windows_replay: true
+
+  model_experiment:
+    risk: none
+    description: Local candidate search. Never promoted by CI.
+    test_groups: []
+
+  model_promotion:
+    risk: high
+    description: A finalist, fitted state or promoted model moved.
+    test_groups: [model_promotion, governance_r2, replay_and_fitted_state, governed_pack]
+    pack_status_checks: [replay_cache, quarterly_display, uncertainty, policy_runtime]
+    requires_full_assurance: true
+    requires_linux_replay: true
+    requires_windows_replay: true
+
+  replay_or_fitted_state:
+    risk: high
+    description: Replay cache, engine state or the numerical forward model.
+    test_groups: [replay_and_fitted_state, governed_pack, revenue_outlook_calculation]
+    pack_status_checks: [replay_cache, quarterly_display, policy_runtime]
+    requires_full_assurance: true
+    requires_linux_replay: true
+    requires_windows_replay: true
+
+  governance_r2:
+    risk: medium
+    description: R-squared, score basis and governance-page sourcing.
+    test_groups: [governance_r2, identity_and_accounting]
+
+  dependency_or_environment:
+    risk: high
+    description: Pinned dependencies, runtime or container definition.
+    test_groups: [import_smoke, deployment]
+    requires_full_assurance: true
+    requires_linux_replay: true
+    requires_windows_replay: true
+
+  ci_or_workflow:
+    risk: medium
+    description: Workflows, pytest config, planner or container CI assets.
+    test_groups: [planner, import_smoke]
+
+  deployment:
+    risk: low
+    description: The runtime import surface the deployed app boots through.
+    test_groups: [import_smoke, deployment]
+
+  analysis_tooling:
+    risk: medium
+    description: >
+      Offline analysis, audit, benchmark and evidence-building scripts. These
+      do not serve the app, but several tests scan scripts/ for banned patterns,
+      so a change here can fail the suite without touching a governed number.
+      Scripts that DO build a governed pack also match a specific rule above and
+      union to a higher risk.
+    test_groups: [import_smoke, repo_hygiene]
+
+  committed_evidence:
+    risk: low
+    description: >
+      Committed evidence packs under artifacts/. These are outputs, not inputs -
+      no governed number is computed from them - but their contracts are
+      asserted, so the artifact tests run.
+    test_groups: [evidence_artifacts, docs_contract]
+
+  databricks_bundle:
+    risk: medium
+    description: The slim Databricks App runtime bundle and its validator.
+    test_groups: [deployment]
+    requires_databricks_bundle: true
+    pack_status_checks: [databricks_bundle]
+
+  unknown_high_risk:
+    risk: high
+    description: Unclassified. Escalated rather than skipped.
+    test_groups: []
+    requires_full_assurance: true
+    requires_linux_replay: true
+    requires_windows_replay: true
+
+# ---------------------------------------------------------------------------
+# File-to-scope rules. Evaluated in order; ALL matching rules contribute.
+# Patterns are pathlib-style globs against repo-relative POSIX paths.
+# ---------------------------------------------------------------------------
+rules:
+
+  # --- CI, environment and workflow -----------------------------------------
+  - scopes: [ci_or_workflow]
+    patterns:
+      - ".github/**"
+      - "pytest.ini"
+      - "ci/**"
+      - "scripts/ci_*.py"
+      - "scripts/ci_*.ps1"
+      - "scripts/ci_*.sh"
+      - "scripts/collect_hosted_ci_baseline.py"
+      - "scripts/report_ci_performance.py"
+      - "scripts/plan_governed_pack_rebuilds.py"
+      - "tests/conftest.py"
+      - ".actrc"
+      - ".dockerignore"
+
+  - scopes: [dependency_or_environment]
+    patterns:
+      - "requirements.txt"
+      - "requirements-dev.txt"
+      - "runtime.txt"
+      - "sitecustomize.py"
+      - ".devcontainer/**"
+      - "ci/Dockerfile"
+      - "ci/compose.yaml"
+
+  # --- Databricks bundle ----------------------------------------------------
+  - scopes: [databricks_bundle]
+    patterns:
+      - "scripts/build_databricks_app_bundle.py"
+      - "scripts/validate_databricks_app_bundle.py"
+      - ".github/workflows/publish-databricks-app-bundle.yml"
+      - "deployment/**"
+      - "artifacts/databricks_app_bundle/**"
+
+  # --- app.py is never docs-only or UI-only ---------------------------------
+  # It wires the pages to the governed runtime, so a change there reaches both
+  # the dashboard integration surface and the policy-runtime status.
+  - scopes: [dashboard_ui, revenue_outlook_presentation, deployment]
+    patterns:
+      - "app.py"
+
+  # --- Presentation chrome --------------------------------------------------
+  - scopes: [dashboard_ui]
+    patterns:
+      - "model_dashboard/ui.py"
+      - "model_dashboard/plots.py"
+      - "model_dashboard/labels.py"
+      - "model_dashboard/presentation.py"
+      - "model_dashboard/diagnostic_matrix.py"
+      - "model_dashboard/diagnostic_drilldown.py"
+      - "assets/**"
+      - ".streamlit/**"
+      - "config/defaults.py"
+
+  - scopes: [revenue_outlook_presentation]
+    patterns:
+      - "model_dashboard/revenue_outlook_presentation_policy.py"
+      - "model_dashboard/revenue_chart_layers.py"
+      - "model_dashboard/chart_sources.py"
+      - "model_dashboard/revenue_outlook_excel_extract.py"
+      - "templates/**"
+
+  # --- Revenue calculation --------------------------------------------------
+  - scopes: [revenue_outlook_calculation]
+    patterns:
+      - "model_dashboard/revenue_outlook.py"
+      - "model_dashboard/revenue_outlook_series_coverage.py"
+      - "model_dashboard/revenue_scenario_key.py"
+      - "model_dashboard/rate_paths.py"
+      - "model_dashboard/npv.py"
+      - "model_dashboard/ev_uptake_levers.py"
+      - "model_dashboard/fleet_mix.py"
+      - "model_dashboard/eruc_transition.py"
+      - "model_dashboard/fuel_price_scenario.py"
+      - "model_dashboard/light_fleet_allocation.py"
+      - "model_dashboard/long_run_shape_transition.py"
+      - "model_dashboard/post_model_extrapolation.py"
+      - "model_dashboard/treasury_macro_paths.py"
+      - "model_dashboard/conflict_fuel_paths.py"
+      - "model_dashboard/conflict_gdp_paths.py"
+      - "model_dashboard/scenario_inputs.py"
+      - "model_dashboard/unit_contract.py"
+      - "model_dashboard/completeness_contract.py"
+      - "model_dashboard/series_inventory_contract.py"
+      - "model_dashboard/schema.py"
+      - "model_dashboard/data_loader.py"
+      - "model_dashboard/forecast_imports.py"
+      - "model_dashboard/forecast_runner.py"
+
+  # --- Numerical forward model: replay-grade --------------------------------
+  - scopes: [replay_or_fitted_state]
+    patterns:
+      - "model_dashboard/engine.py"
+      - "model_dashboard/heavy_ruc_forward.py"
+      - "model_dashboard/ped_forward.py"
+      - "model_dashboard/vnext_forward_integration.py"
+      - "model_dashboard/revenue_outlook_replay_cache.py"
+      - "model_dashboard/light_ruc_reproducibility.py"
+      - "model_dashboard/reproducibility_imports.py"
+      - "pipeline/ar1_engine.py"
+      - "pipeline/vnext_forward.py"
+      - "pipeline/vnext_core.py"
+      - "scripts/replay_parity_fingerprint.py"
+      - "scripts/build_revenue_outlook_replay_cache.py"
+      - "scripts/build_ar1_engine_state.py"
+      - "scripts/build_ar1_runtime_pack.py"
+
+  # --- Uncertainty ----------------------------------------------------------
+  - scopes: [uncertainty]
+    patterns:
+      - "model_dashboard/revenue_uncertainty.py"
+      - "model_dashboard/revenue_uncertainty_draws.py"
+      - "model_dashboard/revenue_uncertainty_pack.py"
+      - "model_dashboard/revenue_uncertainty_policy.py"
+      - "scripts/build_revenue_outlook_uncertainty_pack.py"
+      - "scripts/build_uncertainty_method_candidates.py"
+      - "scripts/build_uncertainty_method_evidence.py"
+
+  # --- The policy runtime authority itself ----------------------------------
+  # Missed on the first pass and caught by
+  # tests/test_ci_plan.py::test_every_tracked_file_resolves_to_a_scope. It
+  # computes the digest every policy state is gated on, so it is governed_pack
+  # grade, not presentation.
+  - scopes: [governed_pack]
+    patterns:
+      - "model_dashboard/revenue_outlook_policy_runtime.py"
+
+  # Package initialisers reach everything in their package.
+  - scopes: [dashboard_ui, revenue_outlook_calculation]
+    patterns:
+      - "model_dashboard/__init__.py"
+  - scopes: [model_promotion]
+    patterns:
+      - "pipeline/__init__.py"
+
+  # --- Governance / R-squared ----------------------------------------------
+  - scopes: [governance_r2]
+    patterns:
+      - "model_dashboard/r2_ladder.py"
+      - "model_dashboard/r2_metrics.py"
+      - "model_dashboard/score_basis.py"
+      - "model_dashboard/forward_scorer_governance.py"
+      - "model_dashboard/governance_constants.py"
+      - "model_dashboard/metrics.py"
+
+  # --- Model search and promotion ------------------------------------------
+  - scopes: [model_promotion]
+    patterns:
+      - "pipeline/vnext_candidates.py"
+      - "pipeline/vnext_evidence.py"
+      - "pipeline/vnext_run.py"
+      - "pipeline/vnext_page5_compat.py"
+      - "pipeline/diaglab_*.py"
+      - "model_dashboard/official_vintage.py"
+      - "model_dashboard/mbu26_source_spine.py"
+      - "model_dashboard/evidence_pack.py"
+      - "model_dashboard/revenue_source_pack.py"
+
+  - scopes: [model_experiment]
+    patterns:
+      - "experiments/**"
+
+  # --- Governed packs on disk ----------------------------------------------
+  - scopes: [replay_or_fitted_state]
+    patterns:
+      - "data/revenue_outlook_replay_cache/**"
+      - "data/engine_ar1/**"
+
+  - scopes: [governed_pack]
+    patterns:
+      - "data/revenue_outlook_policy_runtime/**"
+      - "data/revenue_outlook_quarterly_display/**"
+      - "data/current_revenue_outlook/**"
+      - "data/dashboard_evidence_pack/**"
+      - "data/dashboard_evidence_pack_reproducibility/**"
+      - "scripts/build_revenue_outlook_policy_runtime.py"
+      - "scripts/build_revenue_outlook_quarterly_display_pack.py"
+
+  - scopes: [uncertainty, governed_pack]
+    patterns:
+      - "data/revenue_outlook_uncertainty/**"
+
+  - scopes: [data_refresh]
+    patterns:
+      - "data/source_workbooks/**"
+      - "data/model_input_history/**"
+      - "data/revenue_model_source_pack/**"
+      - "data/vfm_202405/**"
+      - "model_dashboard/data/**"
+
+  # --- Tests and docs -------------------------------------------------------
+  # A changed test file selects itself. ci_plan.py adds it to the plan directly
+  # in addition to whatever scope its subject matter implies.
+  - scopes: [ci_or_workflow]
+    patterns:
+      - "tests/**"
+
+  - scopes: [docs_only]
+    patterns:
+      - "*.md"
+      - "docs/**"
+      - "references/**"
+      - "deliverables/**"
+      - ".gitignore"
+      - ".gitattributes"
+      - ".env.example"
+      - ".agent_state.md"
+      - "LICENSE"
+
+  # --- Catch-alls, last so specific rules above still contribute ------------
+  # These are deliberately broad. They do NOT weaken the fail-safe: a script
+  # that builds a governed pack matches its specific rule as well, and scopes
+  # union, so it still escalates. What these prevent is every ordinary tooling
+  # or evidence commit forcing full assurance for no reason.
+  - scopes: [analysis_tooling]
+    patterns:
+      - "scripts/**"
+
+  - scopes: [committed_evidence]
+    patterns:
+      - "artifacts/**"
+
+  - scopes: [ci_or_workflow]
+    patterns:
+      - "run_dashboard_tests.ps1"
+
+  - scopes: [revenue_outlook_calculation]
+    patterns:
+      - "forecast_runner_manifest.json"
+
+  - scopes: [docs_only]
+    patterns:
+      - "**/.gitkeep"
+
+# ---------------------------------------------------------------------------
+# Fail-safe escalation. These are applied by ci_plan.py after rule matching.
+# ---------------------------------------------------------------------------
+failsafe:
+  # An unmatched Python file anywhere is high risk, never "probably fine".
+  unmatched_python_is_high_risk: true
+
+  # Any unmatched file at all becomes unknown_high_risk.
+  unmatched_any_is_high_risk: true
+
+  # A diff this wide is not worth classifying; run everything.
+  large_diff_file_threshold: 120
+
+  # Data files that matched no explicit data rule.
+  unclassified_data_is_high_risk: true

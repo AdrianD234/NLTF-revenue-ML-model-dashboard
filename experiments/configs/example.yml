@@ -1,0 +1,32 @@
+# Template experiment config.
+#
+# Copy this, give it a new experiment_id, and point entry_point at the callable
+# that runs your specification. Nothing here promotes anything.
+#
+# Run with:
+#   python scripts/run_model_experiment.py --config experiments/configs/example.yml --dry-run
+
+experiment_id: exp_0000_example
+description: Template experiment. Records provenance without fitting anything.
+stream: PED
+seed: 20260807
+
+# module.path:function - receives the config dict, returns a dict of metrics.
+# Left unset here so the template cannot accidentally run a real fit; --dry-run
+# records provenance without executing it.
+entry_point: null
+
+specification_changes:
+  - none - this is a template
+
+train_window: [2010Q1, 2025Q4]
+validation_windows:
+  - [2023Q1, 2025Q4]
+
+# Hashed at run time so a result can be tied to the data it used.
+input_files:
+  - data/model_input_history/light_ruc_inputs.parquet
+  - data/model_input_history/heavy_ruc_inputs.parquet
+
+# Only ever changed by a human, in a separate commit, after comparing candidates.
+promotion_status: candidate

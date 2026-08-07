@@ -1,43 +1,276 @@
 name: CI
 
-# Clean-environment verification for the governed dashboard.
+# Change-aware, tiered clean-environment verification.
 #
-# The suite is split by what it can honestly claim from committed content:
+# The old design ran one 74-minute suite for every change, on the pull request
+# and again after merge. A caption edit and a promoted fitted state cost the
+# same. Over the week to 2026-08-06 that came to 3,087 weighted billed minutes,
+# of which 51% went to runs that were cancelled or had already failed - and the
+# account hit its spending limit on 2026-08-06, so CI stopped starting at all.
 #
-#   core            blocking. Runs from committed content only, after
-#                   deterministically rebuilding artifacts/curated_data/ from
-#                   the vendored arbitration run. Tests needing developer-local
-#                   scratch that CANNOT be rebuilt (screenshots, hand-kept audit
-#                   logs) carry the requires_local_scratch marker, are excluded
-#                   here, and the count is reported rather than hidden.
+# This workflow keeps every assurance the old one gave and spends it where the
+# diff can actually reach:
 #
-#   replay-parity   the governed fixed-finalist replay on both ubuntu and
-#                   windows, to detect cross-platform numerical divergence in
-#                   the model itself rather than in the tests.
+#   plan             always. Classifies the diff (scripts/ci_plan.py).
+#   fast             always. Compile, imports, planner tests. Minutes, not hours.
+#   affected         planner-selected tests. Skipped for drafts unless forced.
+#   full-assurance   the complete clean-clone suite. Only for changes that can
+#                    move a governed number, or on demand via the ci:full label.
+#   replay-parity    ubuntu + windows, only when fitted state, numerical model
+#                    code or dependencies move.
+#   deployment       import surface and Databricks bundle, only when relevant.
+#   summary          always. The single required check.
 #
-# Browser tests stay out: pytest.ini deselects the e2e marker and the Playwright
-# host phase is a manual step per AGENTS.md. The Playwright *package* is
-# installed because marker deselection happens after collection.
+# Why `summary` is the required check and the others are not: GitHub leaves a
+# required check Pending forever when the job it names is skipped by a
+# condition. A conditional job can therefore never be a required check. The
+# summary job runs unconditionally, inspects what the plan demanded against
+# what actually happened, and fails if anything required was missed.
+
 on:
   push:
     branches: [main]
   pull_request:
+    # ready_for_review is NOT in the default set. Without it, taking a PR out of
+    # draft would not re-run CI, and the cheap draft lane would be the last word
+    # on a PR that is about to merge.
+    types: [opened, synchronize, reopened, ready_for_review, labeled]
   workflow_dispatch:
+    inputs:
+      force_full:
+        description: Run full assurance regardless of the change plan
+        type: boolean
+        default: false
+  schedule:
+    # Weekly assurance against drift nothing in a diff would predict: upstream
+    # wheels, hosted image changes, and any pack that is stale on main.
+    - cron: '17 18 * * 0'
 
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
-  core:
-    name: Core clean-clone suite
+
+  # ---------------------------------------------------------------------------
+  plan:
+    name: Plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      requires_full_assurance: ${{ steps.plan.outputs.requires_full_assurance }}
+      requires_linux_replay: ${{ steps.plan.outputs.requires_linux_replay }}
+      requires_windows_replay: ${{ steps.plan.outputs.requires_windows_replay }}
+      requires_databricks_bundle: ${{ steps.plan.outputs.requires_databricks_bundle }}
+      risk_level: ${{ steps.plan.outputs.risk_level }}
+      scopes: ${{ steps.plan.outputs.scopes }}
+      test_paths: ${{ steps.plan.outputs.test_paths }}
+      pack_checks: ${{ steps.plan.outputs.pack_checks }}
+      run_affected: ${{ steps.gate.outputs.run_affected }}
+      run_full: ${{ steps.gate.outputs.run_full }}
+      is_draft: ${{ steps.gate.outputs.is_draft }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The planner diffs head against the merge base, so it needs history.
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install the planner's only dependency
+        run: pip install PyYAML==6.0.3
+
+      - name: Classify the change
+        id: plan
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="origin/${{ github.base_ref }}"
+            HEAD="${{ github.event.pull_request.head.sha }}"
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            BASE="${{ github.event.before }}"
+            HEAD="${{ github.sha }}"
+            # A first push to a branch, or a force-push whose before-sha is gone,
+            # reports the null SHA. Fall back to the previous commit rather than
+            # classifying against nothing.
+            if [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
+              BASE="${HEAD}~1"
+            fi
+          else
+            BASE="origin/main"
+            HEAD="${{ github.sha }}"
+          fi
+          echo "Planning $BASE...$HEAD"
+          python scripts/ci_plan.py \
+            --base "$BASE" --head "$HEAD" \
+            --event "${{ github.event_name == 'pull_request' && 'pull_request' || 'push' }}" \
+            --format github-output
+
+      - name: Decide which lanes run
+        id: gate
+        run: |
+          set -euo pipefail
+          IS_DRAFT="${{ github.event_name == 'pull_request' && github.event.pull_request.draft || false }}"
+          FORCED="${{ contains(github.event.pull_request.labels.*.name, 'ci:full') || inputs.force_full || github.event_name == 'schedule' }}"
+          PLAN_FULL="${{ steps.plan.outputs.requires_full_assurance }}"
+
+          echo "is_draft=$IS_DRAFT" >> "$GITHUB_OUTPUT"
+
+          # Drafts get the cheap lane only. Intermediate pushes on a branch that
+          # is still changing are the single largest source of wasted minutes in
+          # the baseline sample.
+          if [ "$IS_DRAFT" = "true" ] && [ "$FORCED" != "true" ]; then
+            echo "run_affected=false" >> "$GITHUB_OUTPUT"
+            echo "run_full=false" >> "$GITHUB_OUTPUT"
+            echo "Draft pull request: fast lane only. Mark ready for review, or" >> "$GITHUB_STEP_SUMMARY"
+            echo "apply the \`ci:full\` label, to run the planned assurance." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # Post-merge on main is a sanity check, not a second full suite. The
+          # pull_request run already tested GitHub's synthetic merge result -
+          # the same tree that landed. Repeating it buys nothing but minutes.
+          # This holds ONLY while main is protected to require the CI summary;
+          # see docs/BRANCH_PROTECTION.md. If protection is removed, set
+          # POST_MERGE_FULL=true below.
+          POST_MERGE_FULL=false
+          if [ "${{ github.event_name }}" = "push" ] && [ "$FORCED" != "true" ]; then
+            echo "run_affected=true" >> "$GITHUB_OUTPUT"
+            echo "run_full=$POST_MERGE_FULL" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "run_affected=true" >> "$GITHUB_OUTPUT"
+          if [ "$FORCED" = "true" ] || [ "$PLAN_FULL" = "true" ]; then
+            echo "run_full=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_full=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish the plan
+        run: |
+          {
+            echo "## Change plan"
+            echo
+            echo "| field | value |"
+            echo "| --- | --- |"
+            echo "| risk | \`${{ steps.plan.outputs.risk_level }}\` |"
+            echo "| scopes | \`${{ steps.plan.outputs.scopes }}\` |"
+            echo "| changed files | ${{ steps.plan.outputs.changed_file_count }} |"
+            echo "| affected lane | ${{ steps.gate.outputs.run_affected }} |"
+            echo "| full assurance | ${{ steps.gate.outputs.run_full }} |"
+            echo "| linux replay | ${{ steps.plan.outputs.requires_linux_replay }} |"
+            echo "| windows replay | ${{ steps.plan.outputs.requires_windows_replay }} |"
+            echo "| pack checks | \`${{ steps.plan.outputs.pack_checks }}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------------
+  fast:
+    name: Fast checks
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+          pip install -r ci/requirements-ci.txt
+
+      - name: Compile all sources
+        run: python -m compileall -q .
+
+      - name: Import smoke
+        run: python -c "import app"
+
+      - name: Snapshot the governed tree
+        run: python scripts/assert_governed_tree_unchanged.py --snapshot "${RUNNER_TEMP}/governed_before.json"
+
+      - name: Change planner tests
+        run: python -m pytest -q tests/test_ci_plan.py
+
+      - name: Verify the run did not mutate governed content
+        if: always()
+        run: python scripts/assert_governed_tree_unchanged.py --verify "${RUNNER_TEMP}/governed_before.json"
+
+      - name: Governed pack status
+        # Reports whether committed packs are stale. It does NOT rebuild them:
+        # pack building belongs in the local promotion workflow, where the
+        # rebuild can be inspected before it is committed.
+        run: python scripts/plan_governed_pack_rebuilds.py --format human --fail-on-stale
+
+  # ---------------------------------------------------------------------------
+  affected:
+    name: Affected tests
+    needs: plan
+    # Skipped when the plan already demands full assurance: running the
+    # selection and then the whole suite would pay for the same tests twice.
+    if: needs.plan.outputs.run_affected == 'true' && needs.plan.outputs.run_full != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Rebuild curated data from the committed pack
+        run: python scripts/regenerate_curated_data_from_pack.py
+
+      - name: Snapshot the governed tree
+        run: python scripts/assert_governed_tree_unchanged.py --snapshot "${RUNNER_TEMP}/governed_before.json"
+
+      - name: Planner-selected tests
+        run: |
+          set -euo pipefail
+          PATHS="${{ needs.plan.outputs.test_paths }}"
+          if [ -z "$PATHS" ]; then
+            echo "The plan selected no tests for this change."
+            exit 0
+          fi
+          echo "Running: $PATHS"
+          python -m pytest -q -m "not e2e and not requires_local_scratch" $PATHS
+
+      - name: Verify the run did not mutate governed content
+        # Runs even when the suite failed: a lane that moved a governed number
+        # must say so, and a failing suite is exactly when scratch gets left
+        # behind. See artifacts/ci_optimisation/xdist_benchmark.md.
+        if: always()
+        run: python scripts/assert_governed_tree_unchanged.py --verify "${RUNNER_TEMP}/governed_before.json"
+
+  # ---------------------------------------------------------------------------
+  full-assurance:
+    name: Full clean-clone assurance
+    needs: plan
+    if: needs.plan.outputs.run_full == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: pip
@@ -75,14 +308,9 @@ jobs:
         run: python -m compileall -q .
 
       - name: Rebuild curated data from the committed pack
-        # artifacts/ is gitignored scratch, but this content is deterministically
-        # rebuildable from the vendored arbitration run, so the tests that depend
-        # on it are genuine clean-clone assurance once it is built.
         run: python scripts/regenerate_curated_data_from_pack.py
 
       - name: GDP sign-guard binding register
-        # Regenerated before the suite so the guard tests assert a fresh run
-        # rather than the committed copy, and drift fails here.
         run: python scripts/audit_gdp_sign_guard_bindings.py
 
       - name: Report clean-clone coverage
@@ -94,8 +322,19 @@ jobs:
           echo "Excluded tests need developer-local scratch that cannot be rebuilt"
           echo "from committed content (screenshots, hand-kept audit logs)."
 
+      - name: Snapshot the governed tree
+        run: python scripts/assert_governed_tree_unchanged.py --snapshot "${RUNNER_TEMP}/governed_before.json"
+
       - name: Core test suite
-        run: python -m pytest -q -m "not e2e and not requires_local_scratch"
+        run: python -m pytest -q -m "not e2e and not requires_local_scratch" --durations=25
+
+      - name: Verify the suite did not mutate governed content
+        # The clean-clone claim is not just "the tests passed" - it is also
+        # "and the tree is exactly as committed". A run that quietly rewrote a
+        # governed artifact once moved a PED calibration R-squared with every
+        # test still green; see artifacts/ci_optimisation/xdist_benchmark.md.
+        if: always()
+        run: python scripts/assert_governed_tree_unchanged.py --verify "${RUNNER_TEMP}/governed_before.json"
 
       - name: Conflict scenario extract validation
         run: |
@@ -128,15 +367,24 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: core-evidence
+          name: full-assurance-evidence
           path: |
             artifacts/long_horizon_validation/
             artifacts/gdp_sign_guard_audit/
             artifacts/ci_environment/
           if-no-files-found: ignore
+          # Timing and environment evidence is worth days, not months.
+          retention-days: 14
 
+  # ---------------------------------------------------------------------------
   replay-parity:
     name: Replay parity (${{ matrix.os }})
+    needs: plan
+    # Windows costs twice per minute, so it is asked for separately from Linux
+    # rather than always as a pair.
+    if: >-
+      needs.plan.outputs.requires_linux_replay == 'true' ||
+      needs.plan.outputs.requires_windows_replay == 'true'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     strategy:
@@ -144,10 +392,55 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
     steps:
+      - name: Skip this platform if the plan did not ask for it
+        id: want
+        shell: bash
+        run: |
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            echo "wanted=${{ needs.plan.outputs.requires_windows_replay }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "wanted=${{ needs.plan.outputs.requires_linux_replay }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.want.outputs.wanted == 'true'
+
+      - uses: actions/setup-python@v5
+        if: steps.want.outputs.wanted == 'true'
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install dependencies
+        if: steps.want.outputs.wanted == 'true'
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Governed replay fingerprint
+        if: steps.want.outputs.wanted == 'true'
+        run: python scripts/replay_parity_fingerprint.py --output artifacts/replay_parity
+
+      - name: Upload fingerprint
+        if: always() && steps.want.outputs.wanted == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: replay-fingerprint-${{ matrix.os }}
+          path: artifacts/replay_parity/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # ---------------------------------------------------------------------------
+  deployment:
+    name: Deployment surface
+    needs: plan
+    if: needs.plan.outputs.requires_databricks_bundle == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: pip
@@ -156,14 +449,107 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install -r requirements-dev.txt
 
-      - name: Governed replay fingerprint
-        run: python scripts/replay_parity_fingerprint.py --output artifacts/replay_parity
+      - name: Build the Databricks bundle
+        run: |
+          python scripts/build_databricks_app_bundle.py \
+            --source . --output build/databricks_app/app --clean
 
-      - name: Upload fingerprint
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: replay-fingerprint-${{ matrix.os }}
-          path: artifacts/replay_parity/
-          if-no-files-found: ignore
+      - name: Validate the bundle
+        run: |
+          python scripts/validate_databricks_app_bundle.py \
+            --bundle build/databricks_app/app --source .
+
+      - name: Streamlit deployment readiness
+        run: python scripts/check_streamlit_deploy_readiness.py
+
+  # ---------------------------------------------------------------------------
+  summary:
+    name: CI summary
+    # THE required check. Runs whatever happened upstream, including when every
+    # conditional job was skipped, so branch protection never waits on a job
+    # that was correctly not needed.
+    needs: [plan, fast, affected, full-assurance, replay-parity, deployment]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Verify everything the plan required actually happened
+        shell: bash
+        run: |
+          set -uo pipefail
+
+          plan_result="${{ needs.plan.result }}"
+          fast_result="${{ needs.fast.result }}"
+          affected_result="${{ needs.affected.result }}"
+          full_result="${{ needs['full-assurance'].result }}"
+          replay_result="${{ needs['replay-parity'].result }}"
+          deploy_result="${{ needs.deployment.result }}"
+
+          want_affected="${{ needs.plan.outputs.run_affected }}"
+          want_full="${{ needs.plan.outputs.run_full }}"
+          want_linux="${{ needs.plan.outputs.requires_linux_replay }}"
+          want_windows="${{ needs.plan.outputs.requires_windows_replay }}"
+          want_bundle="${{ needs.plan.outputs.requires_databricks_bundle }}"
+
+          failures=()
+
+          # The planner itself failing is fatal: without it we do not know what
+          # was required, so nothing downstream can be trusted to have covered it.
+          [ "$plan_result" = "success" ] || failures+=("plan job did not succeed (=$plan_result)")
+          [ "$fast_result" = "success" ] || failures+=("fast job did not succeed (=$fast_result)")
+
+          # A required job that was skipped is a failure, not a pass. This is the
+          # check that stops a conditional lane quietly disappearing.
+          check_required() {
+            local want="$1" name="$2" result="$3"
+            if [ "$want" = "true" ]; then
+              case "$result" in
+                success) ;;
+                skipped) failures+=("$name was required by the plan but did not run") ;;
+                *)       failures+=("$name was required and did not succeed (=$result)") ;;
+              esac
+            fi
+          }
+
+          check_required "$want_full"   "full-assurance" "$full_result"
+          check_required "$want_bundle" "deployment"     "$deploy_result"
+
+          if [ "$want_affected" = "true" ] && [ "$want_full" != "true" ]; then
+            check_required "true" "affected" "$affected_result"
+          fi
+
+          if [ "$want_linux" = "true" ] || [ "$want_windows" = "true" ]; then
+            check_required "true" "replay-parity" "$replay_result"
+          fi
+
+          {
+            echo "## CI summary"
+            echo
+            echo "| lane | required | result |"
+            echo "| --- | --- | --- |"
+            echo "| plan | always | $plan_result |"
+            echo "| fast | always | $fast_result |"
+            echo "| affected | $want_affected | $affected_result |"
+            echo "| full-assurance | $want_full | $full_result |"
+            echo "| replay-parity | linux=$want_linux windows=$want_windows | $replay_result |"
+            echo "| deployment | $want_bundle | $deploy_result |"
+            echo
+            echo "risk: \`${{ needs.plan.outputs.risk_level }}\`"
+            echo "scopes: \`${{ needs.plan.outputs.scopes }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "${#failures[@]}" -gt 0 ]; then
+            echo
+            echo "CI summary FAILED:"
+            printf '  - %s\n' "${failures[@]}"
+            {
+              echo
+              echo "### Failed"
+              printf -- '- %s\n' "${failures[@]}"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          echo "Every lane the plan required completed successfully."

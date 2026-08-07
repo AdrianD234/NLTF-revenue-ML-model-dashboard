@@ -1,0 +1,20 @@
+# CI-only test dependencies. Pinned, per the optimisation brief: an unpinned
+# test dependency would let a container rebuild change what the suite measures.
+#
+# These are NOT added to requirements.txt. Nothing here may reach the deployed
+# app, the Databricks bundle or the Streamlit Cloud import surface.
+
+# Parallel execution, benchmarked before adoption (see docs/CI_TIERS.md).
+# Installed so the benchmark can run at all; enabling it is a separate decision
+# recorded in artifacts/ci_optimisation/xdist_benchmark.md.
+pytest-xdist==3.8.0
+
+# Per-test timing export for the profile tier.
+pytest-json-report==1.5.0
+
+# The change planner reads ci/change_scopes.yml.
+PyYAML==6.0.3
+
+# Reports the BLAS threading the image resolved to, so a numerical difference
+# between local and hosted can be attributed rather than argued about.
+threadpoolctl==3.6.0
