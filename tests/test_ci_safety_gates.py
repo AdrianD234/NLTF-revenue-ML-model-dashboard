@@ -433,3 +433,32 @@ def test_local_powershell_wrapper_checks_in_finally():
         "the mutation check must survive an interrupted or crashed run"
     )
     assert "$ExitCode = 3" in finally_block
+
+
+@pytest.mark.parametrize(
+    "relative",
+    [
+        "ci/entrypoint.sh",
+        "ci/install_docker_engine_wsl.sh",
+        "ci/benchmark_test_parallelism.sh",
+        "scripts/ci_local.sh",
+    ],
+)
+def test_shell_scripts_use_lf_line_endings(relative):
+    """A CRLF shell script cannot run in the container at all.
+
+    .gitattributes pins `* -text`, so git stores whatever bytes it is given and
+    will not normalise this on the way out. A script authored or rewritten on
+    Windows therefore reaches Linux with CRLF, and the kernel tries to execute
+    an interpreter literally named "bash\\r":
+
+        /usr/bin/env: 'bash\\r': No such file or directory
+
+    That is not a subtle failure, but it is an easy one to reintroduce - it
+    happened here when a maintenance edit used Python's text-mode write.
+    """
+    data = (REPO_ROOT / relative).read_bytes()
+    assert b"\r\n" not in data, (
+        f"{relative} has CRLF line endings and will not execute in the Linux "
+        "container. Convert it to LF."
+    )
