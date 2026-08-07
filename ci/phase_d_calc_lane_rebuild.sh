@@ -1,0 +1,122 @@
+#!/usr/bin/env bash
+# Phase D step 4, second half: after rebuilding the affected packs in governed
+# order, the calculation lane passes.
+#
+# The first half is already proven - an unrebuilt digest-bound change to
+# model_dashboard/rate_paths.py fails the lane in 8 seconds with one concise
+# stale-pack diagnostic (exit 4) rather than 185 derived fixture errors.
+#
+# This proves the other half, which is the one that matters for a developer:
+# having been told what to rebuild, doing it makes the lane green.
+#
+# Everything happens in a DISPOSABLE clone. The synthetic probe commit and the
+# packs rebuilt on top of it are discarded at the end - they must never reach
+# the real branch, because they were built from a probe, not from a decision.
+#
+# Usage: bash ci/phase_d_calc_lane_rebuild.sh
+
+set -uo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+EV="$REPO_ROOT/artifacts/ci_optimisation/phase2"
+mkdir -p "$EV"
+
+BASE_SHA="$(git -C "$REPO_ROOT" rev-parse HEAD)"
+PROBE="/tmp/nltf-calcprobe-$$"
+TARGET="model_dashboard/rate_paths.py"
+
+cleanup() { rm -rf "$PROBE"; }
+trap cleanup EXIT
+
+section() { printf '\n\n############ %s ############\n' "$*"; }
+
+section "Building a disposable probe clone at $BASE_SHA"
+git clone --quiet --local "$REPO_ROOT" "$PROBE" || { echo "clone failed"; exit 2; }
+git -C "$PROBE" checkout --quiet --detach "$BASE_SHA"
+git -C "$PROBE" remote set-url origin "$REPO_ROOT"
+git -C "$PROBE" fetch --quiet origin '+refs/heads/*:refs/remotes/origin/*' 2>/dev/null || true
+
+# Match the file's line-ending convention: .gitattributes pins `* -text`, so
+# appending the wrong one corrupts the file and a repository test rejects it.
+if grep -qU $'\r' "$PROBE/$TARGET" 2>/dev/null; then eol=$'\r\n'; else eol=$'\n'; fi
+printf '%s# phase D calculation-lane probe%s' "$eol" "$eol" >> "$PROBE/$TARGET"
+git -C "$PROBE" add "$TARGET"
+git -C "$PROBE" -c user.email=ci@local -c user.name=phaseD \
+  commit --quiet -m "probe: digest-bound calculation change"
+PROBE_SHA="$(git -C "$PROBE" rev-parse HEAD)"
+echo "probe commit: ${PROBE_SHA:0:12}"
+
+run_in_probe() {
+  docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp \
+    -v "$PROBE:/work" -w /work --entrypoint python nltf-ci:local "$@"
+}
+
+section "BEFORE rebuild — pack status must report policy_runtime stale"
+run_in_probe scripts/plan_governed_pack_rebuilds.py --format human \
+  2>&1 | tee "$EV/calc_lane_before_rebuild.log" | sed -n '1,12p'
+
+stale_count=$(grep -c 'REBUILD' "$EV/calc_lane_before_rebuild.log" || echo 0)
+echo "packs flagged for rebuild: $stale_count"
+if [ "$stale_count" -eq 0 ]; then
+  echo "UNEXPECTED: a digest-bound change did not mark any pack stale." >&2
+  exit 1
+fi
+
+section "Rebuilding the affected packs in the governed order"
+# Only what the planner asked for, in the order it gave.
+run_in_probe scripts/build_revenue_outlook_policy_runtime.py --all \
+  > "$EV/calc_lane_rebuild.log" 2>&1
+rebuild_code=$?
+tail -4 "$EV/calc_lane_rebuild.log"
+echo "rebuild exit=$rebuild_code"
+[ "$rebuild_code" -eq 0 ] || exit "$rebuild_code"
+
+section "AFTER rebuild — every pack must report current"
+run_in_probe scripts/plan_governed_pack_rebuilds.py --format human --fail-on-stale \
+  2>&1 | tee "$EV/calc_lane_after_rebuild.log" | sed -n '1,10p'
+after_code="${PIPESTATUS[0]}"
+echo "pack gate exit=$after_code"
+[ "$after_code" -eq 0 ] || { echo "packs still stale after the governed rebuild" >&2; exit 1; }
+
+section "Committing the rebuilt packs in the probe clone only"
+git -C "$PROBE" add data/revenue_outlook_policy_runtime
+git -C "$PROBE" -c user.email=ci@local -c user.name=phaseD \
+  commit --quiet -m "probe: repin policy runtime"
+REBUILT_SHA="$(git -C "$PROBE" rev-parse HEAD)"
+echo "rebuilt commit: ${REBUILT_SHA:0:12}"
+
+section "Running the affected lane against the rebuilt probe"
+start=$(date +%s)
+( cd "$PROBE" && bash scripts/ci_local.sh --tier affected \
+    --base "$BASE_SHA" --ref "$REBUILT_SHA" ) \
+  > "$EV/calc_lane_after_rebuild_run.log" 2>&1
+lane_code=$?
+elapsed=$(( $(date +%s) - start ))
+
+tail -20 "$EV/calc_lane_after_rebuild_run.log"
+
+{
+  echo "base_sha=$BASE_SHA"
+  echo "probe_sha=$PROBE_SHA"
+  echo "rebuilt_sha=$REBUILT_SHA"
+  echo "lane_exit_code=$lane_code"
+  echo "elapsed_seconds=$elapsed"
+  echo "summary=$(grep -oE '[0-9]+ (passed|failed)[^=]*' "$EV/calc_lane_after_rebuild_run.log" | tail -1)"
+  echo "gate_tripped=$(grep -c 'GOVERNED TREE MUTATED' "$EV/calc_lane_after_rebuild_run.log")"
+} > "$EV/calc_lane_rebuild_result.txt"
+
+printf '\n\n############ RESULT ############\n'
+cat "$EV/calc_lane_rebuild_result.txt"
+
+if [ "$lane_code" -eq 0 ]; then
+  echo
+  echo "PROVEN: the calculation lane fails fast on an unrebuilt digest-bound"
+  echo "change, and passes once the affected packs are rebuilt in governed order."
+else
+  echo
+  echo "The lane did not pass after the governed rebuild (exit $lane_code)." >&2
+fi
+
+echo
+echo "Discarding the probe clone and its rebuilt packs."
+exit "$lane_code"
