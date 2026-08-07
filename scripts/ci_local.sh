@@ -156,11 +156,22 @@ build_args=(build -f "$REPO_ROOT/ci/Dockerfile" -t nltf-ci:local "$REPO_ROOT")
 [ "$REBUILD" -eq 1 ] && build_args+=(--no-cache)
 DOCKER_BUILDKIT=1 docker "${build_args[@]}" || fail "Image build failed."
 
-# --- 6. Tier selection -------------------------------------------------------
+# --- 6. Container identity ---------------------------------------------------
+# Run as the invoking user, not root. The container writes into the bind-mounted
+# worktree - compileall alone drops a .pyc beside every module - and root-owned
+# files in a directory this script must later delete leave it unable to clean up
+# after itself. Worse, they would leave the governed-tree gate reporting changes
+# nobody can revert.
+#
+# HOME is redirected because the invoking UID has no passwd entry inside the
+# image, so $HOME would otherwise resolve to / and be unwritable.
+DOCKER_IDENTITY=(--user "$(id -u):$(id -g)" -e HOME=/tmp)
+
+# --- 6b. Tier selection ------------------------------------------------------
 tier_args=()
 if [ "$TIER" = "affected" ]; then
   section "Planning affected tests"
-  if plan_json="$(docker run --rm \
+  if plan_json="$(docker run --rm "${DOCKER_IDENTITY[@]}" \
         -v "${WORKTREE}:/work" \
         -v "${REPO_ROOT}/.git:/repo/.git:ro" \
         -w /work --entrypoint python nltf-ci:local \
@@ -171,7 +182,7 @@ if [ "$TIER" = "affected" ]; then
       TIER="full"
     else
       # Read the selection back with the container's Python: no host Python.
-      mapfile -t tier_args < <(printf '%s' "$plan_json" | docker run --rm -i \
+      mapfile -t tier_args < <(printf '%s' "$plan_json" | docker run --rm -i "${DOCKER_IDENTITY[@]}" \
         --entrypoint python nltf-ci:local -c \
         'import json,sys; [print(p) for p in json.load(sys.stdin)["required_test_paths"]]')
       if [ "${#tier_args[@]}" -eq 0 ]; then
@@ -192,7 +203,7 @@ fi
 # --- 7. Run ------------------------------------------------------------------
 section "Running tier: $TIER"
 started=$(date +%s)
-docker run --rm \
+docker run --rm "${DOCKER_IDENTITY[@]}" \
   -e CI_SOURCE_SHA="$SHA" \
   -e CI_OUT_DIR=/out \
   -v "${WORKTREE}:/work" \
