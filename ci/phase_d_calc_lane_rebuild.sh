@@ -131,11 +131,36 @@ echo "pack gate exit=$after_code"
 [ "$after_code" -eq 0 ] || { echo "packs still stale after the governed rebuild" >&2; exit 1; }
 
 section "Committing the rebuilt packs in the probe clone only"
-git -C "$PROBE" add data/revenue_outlook_policy_runtime
+# ALL the rebuilt packs, not just the last one. An earlier version staged only
+# data/revenue_outlook_policy_runtime, so the fresh clone taken at the rebuilt
+# SHA did not receive the rebuilt replay cache - and the lane then reported
+# ReplayCacheStale 332 times, immediately after the pack status check had said
+# every pack was ok. The status check was reading the probe directory; the lane
+# was reading a clone of the commit.
+git -C "$PROBE" add \
+  data/revenue_outlook_replay_cache \
+  data/revenue_outlook_quarterly_display \
+  data/revenue_outlook_uncertainty \
+  data/revenue_outlook_policy_runtime
+
+staged="$(git -C "$PROBE" diff --cached --name-only | wc -l)"
+echo "staged $staged rebuilt pack file(s)"
+[ "$staged" -gt 0 ] || { echo "nothing staged; the rebuild produced no change" >&2; exit 1; }
+
 git -C "$PROBE" -c user.email=ci@local -c user.name=phaseD \
-  commit --quiet -m "probe: repin policy runtime"
+  commit --quiet -m "probe: rebuild affected packs in governed order"
 REBUILT_SHA="$(git -C "$PROBE" rev-parse HEAD)"
 echo "rebuilt commit: ${REBUILT_SHA:0:12}"
+
+# The commit must leave nothing behind, or the clone taken from it is not the
+# tree we just proved current.
+residual="$(git -C "$PROBE" status --porcelain -- data/)"
+if [ -n "$residual" ]; then
+  echo "FATAL: rebuilt pack content remains uncommitted:" >&2
+  echo "$residual" >&2
+  exit 1
+fi
+echo "no rebuilt pack content left uncommitted"
 
 section "Running the affected lane against the rebuilt probe"
 start=$(date +%s)
