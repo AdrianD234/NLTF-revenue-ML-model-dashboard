@@ -85,6 +85,11 @@ def collect(run_ids: list[str], out_dir: pathlib.Path) -> None:
         for job in jobs:
             started = parse_ts(job.get("started_at"))
             completed = parse_ts(job.get("completed_at"))
+            # A skipped job is never billed. Counting it as one rounded-up
+            # minute inflated the first draft-run report by 4 of 19 weighted
+            # minutes, which matters when the whole point is measuring cost.
+            if job.get("conclusion") == "skipped":
+                continue
             if started is None or completed is None:
                 continue
             job_wall_s = (completed - started).total_seconds()

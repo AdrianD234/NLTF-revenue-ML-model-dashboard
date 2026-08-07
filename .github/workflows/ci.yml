@@ -69,8 +69,15 @@ jobs:
       scopes: ${{ steps.plan.outputs.scopes }}
       test_paths: ${{ steps.plan.outputs.test_paths }}
       pack_checks: ${{ steps.plan.outputs.pack_checks }}
+      # EVERY expensive lane reads its decision from the gate step, never
+      # straight from the planner. A lane that consults the planner directly
+      # bypasses the draft suppression - which is exactly what replay-parity
+      # did, costing 13 of 19 weighted minutes on a draft that was supposed to
+      # be plan + fast only.
       run_affected: ${{ steps.gate.outputs.run_affected }}
       run_full: ${{ steps.gate.outputs.run_full }}
+      run_replay: ${{ steps.gate.outputs.run_replay }}
+      run_deployment: ${{ steps.gate.outputs.run_deployment }}
       is_draft: ${{ steps.gate.outputs.is_draft }}
     steps:
       - uses: actions/checkout@v4
@@ -119,16 +126,33 @@ jobs:
           IS_DRAFT="${{ github.event_name == 'pull_request' && github.event.pull_request.draft || false }}"
           FORCED="${{ contains(github.event.pull_request.labels.*.name, 'ci:full') || inputs.force_full || github.event_name == 'schedule' }}"
           PLAN_FULL="${{ steps.plan.outputs.requires_full_assurance }}"
+          PLAN_LINUX="${{ steps.plan.outputs.requires_linux_replay }}"
+          PLAN_WINDOWS="${{ steps.plan.outputs.requires_windows_replay }}"
+          PLAN_BUNDLE="${{ steps.plan.outputs.requires_databricks_bundle }}"
+
+          PLAN_REPLAY=false
+          if [ "$PLAN_LINUX" = "true" ] || [ "$PLAN_WINDOWS" = "true" ]; then
+            PLAN_REPLAY=true
+          fi
 
           echo "is_draft=$IS_DRAFT" >> "$GITHUB_OUTPUT"
 
           # Drafts get the cheap lane only. Intermediate pushes on a branch that
           # is still changing are the single largest source of wasted minutes in
           # the baseline sample.
+          #
+          # EVERY expensive lane is suppressed here, not just the obvious two.
+          # The first hosted draft run left replay-parity out of this decision -
+          # it read the planner directly - and both platforms ran anyway,
+          # costing 13 of 19 weighted minutes on a run that was meant to be
+          # plan + fast. Windows bills at 2x, so it was the single largest item
+          # in a "cheap" draft.
           if [ "$IS_DRAFT" = "true" ] && [ "$FORCED" != "true" ]; then
             echo "run_affected=false" >> "$GITHUB_OUTPUT"
             echo "run_full=false" >> "$GITHUB_OUTPUT"
-            echo "Draft pull request: fast lane only. Mark ready for review, or" >> "$GITHUB_STEP_SUMMARY"
+            echo "run_replay=false" >> "$GITHUB_OUTPUT"
+            echo "run_deployment=false" >> "$GITHUB_OUTPUT"
+            echo "Draft pull request: plan + fast only. Mark ready for review, or" >> "$GITHUB_STEP_SUMMARY"
             echo "apply the \`ci:full\` label, to run the planned assurance." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
@@ -143,10 +167,15 @@ jobs:
           if [ "${{ github.event_name }}" = "push" ] && [ "$FORCED" != "true" ]; then
             echo "run_affected=true" >> "$GITHUB_OUTPUT"
             echo "run_full=$POST_MERGE_FULL" >> "$GITHUB_OUTPUT"
+            echo "run_replay=$PLAN_REPLAY" >> "$GITHUB_OUTPUT"
+            echo "run_deployment=$PLAN_BUNDLE" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
+          # Ready for review, forced, or dispatched: the planner decides.
           echo "run_affected=true" >> "$GITHUB_OUTPUT"
+          echo "run_replay=$PLAN_REPLAY" >> "$GITHUB_OUTPUT"
+          echo "run_deployment=$PLAN_BUNDLE" >> "$GITHUB_OUTPUT"
           if [ "$FORCED" = "true" ] || [ "$PLAN_FULL" = "true" ]; then
             echo "run_full=true" >> "$GITHUB_OUTPUT"
           else
@@ -398,9 +427,9 @@ jobs:
     needs: plan
     # Windows costs twice per minute, so it is asked for separately from Linux
     # rather than always as a pair.
-    if: >-
-      needs.plan.outputs.requires_linux_replay == 'true' ||
-      needs.plan.outputs.requires_windows_replay == 'true'
+    # Reads the GATE, not the planner. Going straight to the planner here is
+    # what let both replay platforms run on a draft.
+    if: needs.plan.outputs.run_replay == 'true'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     strategy:
@@ -450,7 +479,7 @@ jobs:
   deployment:
     name: Deployment surface
     needs: plan
-    if: needs.plan.outputs.requires_databricks_bundle == 'true'
+    if: needs.plan.outputs.run_deployment == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -505,9 +534,15 @@ jobs:
 
           want_affected="${{ needs.plan.outputs.run_affected }}"
           want_full="${{ needs.plan.outputs.run_full }}"
-          want_linux="${{ needs.plan.outputs.requires_linux_replay }}"
-          want_windows="${{ needs.plan.outputs.requires_windows_replay }}"
-          want_bundle="${{ needs.plan.outputs.requires_databricks_bundle }}"
+          # The GATE's decisions, not the planner's. The summary must require
+          # exactly the lanes that were asked to run: on a draft the gate
+          # suppresses replay and deployment, and demanding them here would fail
+          # every draft for not doing work it was deliberately told to skip.
+          want_replay="${{ needs.plan.outputs.run_replay }}"
+          want_deployment="${{ needs.plan.outputs.run_deployment }}"
+          # Planner values are reported for context only.
+          plan_linux="${{ needs.plan.outputs.requires_linux_replay }}"
+          plan_windows="${{ needs.plan.outputs.requires_windows_replay }}"
 
           failures=()
 
@@ -530,15 +565,13 @@ jobs:
           }
 
           check_required "$want_full"   "full-assurance" "$full_result"
-          check_required "$want_bundle" "deployment"     "$deploy_result"
+          check_required "$want_deployment" "deployment" "$deploy_result"
 
           if [ "$want_affected" = "true" ] && [ "$want_full" != "true" ]; then
             check_required "true" "affected" "$affected_result"
           fi
 
-          if [ "$want_linux" = "true" ] || [ "$want_windows" = "true" ]; then
-            check_required "true" "replay-parity" "$replay_result"
-          fi
+          check_required "$want_replay" "replay-parity" "$replay_result"
 
           {
             echo "## CI summary"
@@ -549,8 +582,8 @@ jobs:
             echo "| fast | always | $fast_result |"
             echo "| affected | $want_affected | $affected_result |"
             echo "| full-assurance | $want_full | $full_result |"
-            echo "| replay-parity | linux=$want_linux windows=$want_windows | $replay_result |"
-            echo "| deployment | $want_bundle | $deploy_result |"
+            echo "| replay-parity | $want_replay (plan: linux=$plan_linux windows=$plan_windows) | $replay_result |"
+            echo "| deployment | $want_deployment | $deploy_result |"
             echo
             echo "risk: \`${{ needs.plan.outputs.risk_level }}\`"
             echo "scopes: \`${{ needs.plan.outputs.scopes }}\`"

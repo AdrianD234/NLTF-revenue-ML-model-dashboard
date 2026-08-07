@@ -630,3 +630,90 @@ def test_the_local_affected_tier_narrows_but_the_hosted_gate_does_not():
     assert all("--only" not in line for line in gate_lines), (
         "the hosted merge gate must not be narrowed"
     )
+
+
+# ===========================================================================
+# Every expensive lane must consult the draft gate
+# ===========================================================================
+#
+# The first hosted draft run exposed this: replay-parity read the planner
+# directly rather than the gate, so both platforms ran on a draft that was
+# meant to be plan + fast. It cost 13 of 19 weighted billed minutes - Windows
+# bills at 2x - which is 68% of a run whose whole purpose was to be cheap.
+#
+# Nothing in the test suite caught it, because every existing test asserted the
+# summary fails closed and the merge gate is not narrowed. None asserted that
+# draft suppression actually covers the lanes that cost money.
+
+
+def _workflow() -> dict:
+    import yaml
+
+    return yaml.safe_load(
+        (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    )
+
+
+# The lanes that cost real money, and the gate output each must consult.
+EXPENSIVE_LANES = {
+    "affected": "run_affected",
+    "full-assurance": "run_full",
+    "replay-parity": "run_replay",
+    "deployment": "run_deployment",
+}
+
+
+@pytest.mark.parametrize("job_name,gate_output", sorted(EXPENSIVE_LANES.items()))
+def test_expensive_lane_consults_the_draft_gate(job_name, gate_output):
+    """Reading `requires_*` straight from the planner bypasses draft suppression."""
+    workflow = _workflow()
+    condition = workflow["jobs"][job_name].get("if", "")
+    assert gate_output in condition, (
+        f"{job_name} must gate on needs.plan.outputs.{gate_output}; its condition "
+        f"is {condition!r}"
+    )
+    assert "requires_" not in condition, (
+        f"{job_name} reads a planner output directly, which bypasses the draft "
+        f"gate: {condition!r}"
+    )
+
+
+def test_the_gate_emits_a_decision_for_every_expensive_lane():
+    workflow = _workflow()
+    outputs = workflow["jobs"]["plan"]["outputs"]
+    for gate_output in sorted(set(EXPENSIVE_LANES.values())):
+        assert gate_output in outputs, f"the plan job must output {gate_output}"
+        assert "steps.gate.outputs" in outputs[gate_output], (
+            f"{gate_output} must come from the gate step, not the planner step"
+        )
+
+
+def test_the_draft_branch_suppresses_every_expensive_lane():
+    """The draft early-exit must set all four to false before returning."""
+    workflow = _workflow()
+    run = next(
+        s["run"] for s in workflow["jobs"]["plan"]["steps"]
+        if s.get("id") == "gate"
+    )
+    draft_block = run.split('if [ "$IS_DRAFT" = "true" ]', 1)[1].split("fi", 1)[0]
+    for gate_output in sorted(set(EXPENSIVE_LANES.values())):
+        assert f"{gate_output}=false" in draft_block, (
+            f"the draft branch must set {gate_output}=false; otherwise that lane "
+            "runs on a draft that is supposed to be plan + fast only"
+        )
+
+
+def test_the_summary_requires_the_gates_lanes_not_the_planners():
+    """Otherwise a draft fails for skipping work it was told to skip.
+
+    This is the mirror of the bug above: having suppressed replay on drafts, a
+    summary that still demanded it from the planner would fail every draft.
+    """
+    workflow = _workflow()
+    run = " ".join(
+        str(s.get("run", "")) for s in workflow["jobs"]["summary"]["steps"]
+    )
+    assert 'want_replay="${{ needs.plan.outputs.run_replay }}"' in run
+    assert 'want_deployment="${{ needs.plan.outputs.run_deployment }}"' in run
+    assert 'check_required "$want_replay"' in run
+    assert 'check_required "$want_deployment"' in run
