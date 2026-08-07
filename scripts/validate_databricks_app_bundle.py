@@ -405,7 +405,13 @@ def git_status(source: Path) -> str | None:
     return result.stdout if result.returncode == 0 else None
 
 
-def run_probe(root: Path) -> dict:
+def probe_env(root: Path) -> dict:
+    """The exact environment the probe subprocess runs under.
+
+    A function rather than inline construction so the shutdown-abort regression
+    test can assert against the very environment the gate uses, not a copy that
+    could drift.
+    """
     env = os.environ.copy()
     env["PYTHONPATH"] = str(root)
     env["NLTF_DISABLE_RUNTIME_PYARROW24"] = "1"
@@ -413,6 +419,26 @@ def run_probe(root: Path) -> dict:
     # structural check would then (correctly) reject as unmanifested files.
     env["PYTHONDONTWRITEBYTECODE"] = "1"
     env.setdefault("STREAMLIT_GATHER_USAGE_STATS", "false")
+    # The app spawns daemon cache-warmer threads per AppTest run
+    # (app.py: _start_revenue_outlook_cache_warmer). That is a warm-start
+    # optimisation for a live server; in a one-shot probe it only burns CPU
+    # and - measured, not theorised - the warmers were still inside native
+    # numpy/pyarrow code at interpreter exit in EVERY instrumented run,
+    # crashing teardown in about half of them: "terminate called without an
+    # active exception", then SIGABRT or SIGSEGV, and a publish gate failing
+    # on a coin flip (hosted runs 31219276724 and 31224208227; diagnosis under
+    # artifacts/ci_optimisation/probe_matrix/). tests/conftest.py disables the
+    # same thread for the same reason. Probe values are unaffected: the warmer
+    # precomputes caches for views the probe computes on demand anyway.
+    #
+    # A hard assignment, not setdefault: there is no configuration in which a
+    # deterministic gate should host a background warmer.
+    env["REVENUE_OUTLOOK_CACHE_WARMER"] = "0"
+    return env
+
+
+def run_probe(root: Path) -> dict:
+    env = probe_env(root)
     result = subprocess.run(
         [sys.executable, "-c", _PROBE],
         cwd=root,
