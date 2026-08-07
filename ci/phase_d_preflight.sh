@@ -22,7 +22,10 @@ ok() { printf '  ok   %s\n' "$*"; }
 echo "=== Phase D preflight ==="
 
 # 1. No pytest controller anywhere.
-running="$(pgrep -c -f '[p]ytest' 2>/dev/null || echo 0)"
+# `pgrep -c` prints 0 AND exits 1 when nothing matches, so `|| echo 0` would
+# append a second zero and the arithmetic test would fail on "0\n0".
+running="$(pgrep -c -f '[p]ytest' 2>/dev/null)" || running=0
+running="${running:-0}"
 [ "$running" -eq 0 ] || fail "$running pytest process(es) already running"
 ok "no pytest process"
 
