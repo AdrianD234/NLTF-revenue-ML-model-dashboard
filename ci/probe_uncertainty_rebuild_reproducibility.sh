@@ -85,6 +85,27 @@ for col in ("central", "lower80", "lower50", "upper50", "upper80"):
     print(f"  {col:9s} rows_over_1e-9={n:5d}  max_abs_diff={worst:.6e}  "
           f"max_rel={rel:.3e}")
 print()
+# WHICH rows moved matters more than how many: 20 of 1000 is a specific subset,
+# not diffuse numerical drift, and naming it is the first thing the follow-up
+# investigation needs.
+moved = np.zeros(len(a), dtype=bool)
+for col in ("central", "lower80", "lower50", "upper50", "upper80"):
+    if col in a.columns:
+        moved |= np.abs(a[col].to_numpy(float) - b[col].to_numpy(float)) > 1e-9
+if moved.any():
+    rows = a.loc[moved, keys].copy()
+    rows["committed_central"] = a.loc[moved, "central"].to_numpy()
+    rows["rebuilt_central"] = b.loc[moved, "central"].to_numpy()
+    rows["abs_diff"] = (rows["rebuilt_central"] - rows["committed_central"]).abs()
+    print("ROWS THAT MOVED:")
+    print(rows.to_string(index=False, max_rows=30))
+    print()
+    print("series affected:", sorted(rows["series_id"].unique()))
+    print("FY range       :", int(rows["FY"].min()), "-", int(rows["FY"].max()))
+    print("unaffected series:",
+          sorted(set(a["series_id"].unique()) - set(rows["series_id"].unique()))[:8])
+
+print()
 if worst_overall == 0:
     print("VERDICT: byte-for-byte identical values. The rebuild reproduces exactly.")
 elif worst_overall < 1e-12:
