@@ -50,41 +50,47 @@ prepare_curated_data() {
 # test still passing. See artifacts/ci_optimisation/xdist_benchmark.md. Every
 # tier now proves it left the governed tree exactly as it found it.
 GATE_SNAPSHOT="$OUT/governed_tree_before.json"
-GATE_TRIPPED=0
+GATE_ARMED=0
 
-gate_snapshot() {
-  if ! python scripts/assert_governed_tree_unchanged.py --snapshot "$GATE_SNAPSHOT" \
+# Arm the gate. From here the EXIT trap verifies on EVERY exit path - including
+# a failing test suite, a failing later step, and `exit $?` partway through a
+# tier. An explicit "verify after the suite" call would miss the steps that run
+# after it, which is exactly where a materialisation step could move a pack.
+gate_arm() {
+  if python scripts/assert_governed_tree_unchanged.py --snapshot "$GATE_SNAPSHOT" \
        > "$OUT/governed_tree_snapshot.log" 2>&1; then
+    GATE_ARMED=1
+  else
     echo "WARNING: could not snapshot the governed tree; cleanliness cannot be proven" >&2
-    GATE_SNAPSHOT=""
+    cat "$OUT/governed_tree_snapshot.log" >&2 || true
   fi
 }
 
-gate_verify() {
-  [ -n "$GATE_SNAPSHOT" ] || return 0
-  log "Verifying the run did not mutate governed content"
+# The tier's own verdict dominates. A lane that mutated governed content must
+# never report success, but it must also never mask a real test failure with a
+# cleanliness code - so a failing suite keeps its own exit status.
+gate_on_exit() {
+  local original=$?
+  [ "$GATE_ARMED" -eq 1 ] || exit "$original"
+  GATE_ARMED=0  # disarm: an exit inside the trap must not re-enter it
+
+  printf '\n=== Verifying the run did not mutate governed content ===\n'
   python scripts/assert_governed_tree_unchanged.py --verify "$GATE_SNAPSHOT" \
     > "$OUT/governed_tree_verify.log" 2>&1
-  if [ $? -ne 0 ]; then
-    GATE_TRIPPED=1
-  fi
+  local gate=$?
   cat "$OUT/governed_tree_verify.log"
-  return 0
-}
 
-# The suite's verdict dominates, but a lane that mutated governed content must
-# never report success: that is exactly the failure mode this gate exists for.
-gate_adjusted_exit() {
-  local suite_status="$1"
-  if [ "$GATE_TRIPPED" -ne 0 ]; then
+  if [ "$gate" -ne 0 ]; then
     echo "" >&2
     echo "FAILING: this lane modified tracked or governed content (see above)." >&2
-    if [ "$suite_status" -eq 0 ]; then
-      return 3
+    if [ "$original" -eq 0 ]; then
+      exit 3
     fi
   fi
-  return "$suite_status"
+  exit "$original"
 }
+
+trap gate_on_exit EXIT
 
 PYTEST_BASE=(python -m pytest -q -m "not e2e and not requires_local_scratch")
 
@@ -104,13 +110,11 @@ case "$TIER" in
     if [ "$#" -gt 0 ]; then
       log "Changed-module unit tests"
       prepare_curated_data
-      gate_snapshot
+      gate_arm
       python -m pytest -q -m "not e2e and not requires_local_scratch" \
         --junitxml="$OUT/junit_fast.xml" "$@"
       suite_status=$?
-      gate_verify
-      gate_adjusted_exit "$suite_status"
-      exit $?
+      exit "$suite_status"
     fi
     echo "No selected tests passed to the fast tier; compile + smoke + planner only."
     exit 0
@@ -128,13 +132,11 @@ case "$TIER" in
       exit 2
     fi
 
-    gate_snapshot
+    gate_arm
     log "Planner-selected tests"
     "${PYTEST_BASE[@]}" --junitxml="$OUT/junit_affected.xml" "$@"
     suite_status=$?
-    gate_verify
-    gate_adjusted_exit "$suite_status"
-    exit $?
+    exit "$suite_status"
     ;;
 
   full)
@@ -154,13 +156,12 @@ case "$TIER" in
     echo "--- excluded from the clean-clone claim ---"
     python -m pytest -q --collect-only -m "requires_local_scratch" 2>/dev/null | tail -3 || true
 
-    gate_snapshot
+    gate_arm
 
     log "Core test suite"
     "${PYTEST_BASE[@]}" --junitxml="$OUT/junit_full.xml" "$@"
     suite_status=$?
 
-    gate_verify
 
     log "Conflict scenario extract validation"
     python scripts/materialize_conflict_scenario_extract.py \
@@ -186,25 +187,22 @@ PY
 
     # The suite's verdict dominates, but a later step failing must not be lost,
     # and a lane that mutated governed content never reports success.
-    if [ "$suite_status" -ne 0 ]; then gate_adjusted_exit "$suite_status"; exit $?; fi
-    if [ "$extract_status" -ne 0 ]; then gate_adjusted_exit "$extract_status"; exit $?; fi
-    gate_adjusted_exit "$deploy_status"
-    exit $?
+    if [ "$suite_status" -ne 0 ]; then exit "$suite_status"; fi
+    if [ "$extract_status" -ne 0 ]; then exit "$extract_status"; fi
+    exit "$deploy_status"
     ;;
 
   profile)
     # Timing evidence only. No pack rebuild, no promotion.
     prepare_curated_data
-    gate_snapshot
+    gate_arm
     log "Profiling run"
     "${PYTEST_BASE[@]}" \
       --durations=200 --durations-min=0.5 \
       --junitxml="$OUT/junit_profile.xml" \
       "$@" 2>&1 | tee "$OUT/profile_run.log"
     suite_status="${PIPESTATUS[0]}"
-    gate_verify
-    gate_adjusted_exit "$suite_status"
-    exit $?
+    exit "$suite_status"
     ;;
 
   replay)

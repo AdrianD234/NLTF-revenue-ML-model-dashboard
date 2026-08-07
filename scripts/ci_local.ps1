@@ -143,6 +143,7 @@ Wait for it, or remove $LockPath if that run is definitely dead.
 $WorktreePath = Join-Path ([System.IO.Path]::GetTempPath()) "nltf-ci-$ShortSha-$PID"
 $OutDir = Join-Path $RepoRoot "artifacts/ci_local/$ShortSha"
 $ExitCode = 1
+$Elapsed = $null
 
 try {
     # -----------------------------------------------------------------------
@@ -234,36 +235,56 @@ is not evidence.
     $ExitCode = $LASTEXITCODE
     $elapsed = (Get-Date) - $started
 
-    # -----------------------------------------------------------------------
-    # 8. Did the run mutate tracked content?
-    # -----------------------------------------------------------------------
-    Write-Section 'Checking the run did not mutate tracked files'
-    $mutated = (& git -C $WorktreePath status --porcelain -- ':!artifacts' ':!data')
-    if ($mutated) {
-        Write-Host 'WARNING: the run modified tracked files:' -ForegroundColor Yellow
-        Write-Host $mutated
-        $mutated | Set-Content -Path (Join-Path $OutDir 'tracked_mutations.txt') -Encoding utf8
-    }
-    else {
-        Write-Host 'No tracked file outside artifacts/ and data/ was modified.'
-    }
-
-    [pscustomobject]@{
-        tier            = $Tier
-        source_sha      = $Sha
-        base            = $Base
-        exit_code       = $ExitCode
-        elapsed_seconds = [math]::Round($elapsed.TotalSeconds, 1)
-        started_utc     = $started.ToUniversalTime().ToString('o')
-        tracked_mutated = [bool]$mutated
-        output_dir      = $OutDir
-    } | ConvertTo-Json | Set-Content -Path (Join-Path $OutDir "result_$Tier.json") -Encoding utf8
+    $Elapsed = (Get-Date) - $started
 
     Write-Host ''
-    Write-Host ("Tier '{0}' finished in {1:mm\:ss} with exit code {2}" -f $Tier, $elapsed, $ExitCode)
+    Write-Host ("Tier '{0}' finished in {1:mm\:ss} with exit code {2}" -f $Tier, $Elapsed, $ExitCode)
     Write-Host "Artefacts: $OutDir"
 }
 finally {
+    # -----------------------------------------------------------------------
+    # 8. Did the run mutate the source copy?
+    # -----------------------------------------------------------------------
+    # In `finally` on purpose. The container's own EXIT trap is the primary
+    # gate, but if the container is killed, the run is interrupted, or docker
+    # itself fails, that trap never fires - and those are exactly the cases
+    # where a half-finished write is most likely to have been left behind.
+    # This check must therefore survive every exit path too, and it must run
+    # BEFORE the worktree is removed.
+    if ($WorktreePath -and (Test-Path $WorktreePath)) {
+        Write-Section 'Checking the run did not mutate the source copy'
+        # No path exclusions: artifacts/ and data/ are precisely where a
+        # governed value would move. The container gate knows which scratch
+        # paths are legitimately writable; here we report everything and let
+        # the reader judge.
+        $mutated = (& git -C $WorktreePath status --porcelain)
+        if ($mutated) {
+            Write-Host 'The run left the source copy modified:' -ForegroundColor Yellow
+            Write-Host ($mutated -join [Environment]::NewLine)
+            $mutated | Set-Content -Path (Join-Path $OutDir 'tracked_mutations.txt') -Encoding utf8
+            # A tier that mutated governed content must not report success.
+            if ($ExitCode -eq 0) {
+                Write-Host 'FAILING: governed or tracked content moved during this tier.' -ForegroundColor Red
+                $ExitCode = 3
+            }
+        }
+        else {
+            Write-Host 'Source copy is unchanged.'
+        }
+
+        if ($OutDir -and (Test-Path $OutDir)) {
+            [pscustomobject]@{
+                tier            = $Tier
+                source_sha      = $Sha
+                base            = $Base
+                exit_code       = $ExitCode
+                elapsed_seconds = if ($Elapsed) { [math]::Round($Elapsed.TotalSeconds, 1) } else { $null }
+                tracked_mutated = [bool]$mutated
+                output_dir      = $OutDir
+            } | ConvertTo-Json | Set-Content -Path (Join-Path $OutDir "result_$Tier.json") -Encoding utf8
+        }
+    }
+
     # -----------------------------------------------------------------------
     # 9. Always clean up. The checkout must be exactly as we found it.
     # -----------------------------------------------------------------------
