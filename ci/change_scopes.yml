@@ -175,6 +175,7 @@ test_groups:
     paths:
       - tests/test_streamlit_cloud_import_surface.py
       - tests/test_databricks_app_bundle_contract.py
+      - tests/test_bundle_probe_shutdown.py
       - tests/test_no_unnecessary_data_reload.py
 
   performance:

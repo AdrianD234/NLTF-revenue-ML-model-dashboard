@@ -1,0 +1,26 @@
+# Diagnostic image reproducing the PUBLISH job's environment, not the CI one.
+#
+# The publish workflow (.github/workflows/publish-databricks-app-bundle.yml)
+# installs ONLY requirements.txt - no requirements-dev.txt, no
+# ci/requirements-ci.txt - and pins nothing about BLAS threading. The nltf-ci
+# image differs on both counts, so it cannot host a faithful reproduction of
+# the probe's native shutdown abort: an extra wheel or a pinned thread count is
+# exactly the kind of thing that moves a teardown crash.
+#
+# Used only by ci/hotfix_probe_matrix.sh. Not part of any tier.
+
+FROM python:3.11-bookworm
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_INPUT=1
+
+WORKDIR /work
+
+COPY requirements.txt /tmp/deps/requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+    python -m pip install --upgrade pip \
+ && pip install -r /tmp/deps/requirements.txt
+
+# Record what resolved, so a matrix result names its environment.
+RUN pip freeze > /publish_env_freeze.txt && python -VV > /publish_env_python.txt
