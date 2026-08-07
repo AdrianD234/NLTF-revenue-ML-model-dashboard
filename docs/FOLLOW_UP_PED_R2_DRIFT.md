@@ -1,6 +1,97 @@
-# HIGH PRIORITY FOLLOW-UP — which PED calibration R² values are authoritative?
+# HIGH PRIORITY FOLLOW-UP — committed governed artifacts that do not reproduce
 
 **Status: open. Deliberately not answered in `performance/ci-runtime-optimisation`.**
+
+Two instances of the same class, found separately, recorded together because
+they may share a root cause and should not be investigated in isolation:
+
+| # | artifact | symptom |
+| --- | --- | --- |
+| 1 | `artifacts/chart_sources/r2_ladder_summary.csv` | a parallel test run moved PED calibration R² 0.559 → 0.580 |
+| 2 | `data/revenue_outlook_uncertainty/uncertainty_band_rows.parquet` | **rebuilding the pack reverts a governed re-centring**, moving `light_petrol_vkt` FY2031-FY2050 by up to 1.34% |
+
+The common shape: **a committed governed artifact that its own builder does not
+reproduce.** In both cases everything downstream reports healthy afterwards, so
+neither was caught by a status check — one was caught by an incidental
+`git status`, the other by two tests that exist for exactly that purpose.
+
+Instance 2 is written up first because it is the sharper of the two.
+
+---
+
+## Instance 2 — the uncertainty pack reverts a governed re-centring
+
+**Measured on an unmodified tree**, in the Python 3.11 container, by
+`ci/probe_uncertainty_rebuild_reproducibility.sh`:
+
+```
+rebuild: python scripts/build_revenue_outlook_uncertainty_pack.py   (exit 0)
+
+series affected : ['light_petrol_vkt']
+FY range        : 2031 - 2050        (20 of 1000 rows)
+max abs diff    : 508.99 units       max relative: 1.34%
+every other series reproduces exactly
+```
+
+| FY | committed central | rebuilt central | diff |
+| --- | --- | --- | --- |
+| 2031 | 34036.472055 | 34543.478009 | 507.01 |
+| 2032 | 34169.834000 | 34678.826509 | 508.99 |
+| 2040 | 27333.187955 | 27740.342052 | 407.15 |
+| 2050 | 9860.981003 | 10007.869790 | 146.89 |
+
+That FY range is not arbitrary. `tests/test_revenue_outlook_policy_runtime.py`
+records the reason in its own docstring:
+
+> One governed exception is carried below: Light petrol VKT FY2031-FY2050,
+> whose band is re-centred onto the now-published Current line. It is held to a
+> rigid-rescale test so a real methodology change still fails.
+
+So the committed pack carries a **deliberate governed re-centring that the
+builder does not carry**. Running the builder reverts it and republishes
+different band values, with no error — the rebuilt pack is internally
+consistent, and every pack status check then reports `ok`.
+
+Two tests do catch it, and did:
+
+```
+test_delayed_state_reproduces_the_committed_offline_uncertainty_pack
+test_the_uncertainty_band_rows_are_numerically_unchanged
+```
+
+Both compare at `rtol=0, atol=1e-9`. They are the only thing standing between a
+routine "the planner said rebuild it" and a silent 1.34% move in published
+bands.
+
+### What has been done about it here
+
+`scripts/plan_governed_pack_rebuilds.py` used to recommend that command with no
+qualification. It now prints the measurement inline whenever it lists the
+uncertainty pack for rebuild, and says not to run it without owner confirmation.
+Nothing else was changed; the committed pack is untouched.
+
+### What the follow-up must determine
+
+1. **How was the re-centring applied?** By hand, by a script not in the repo, or
+   by a builder path that has since changed?
+2. **Should the builder carry it?** If the re-centring is the governed answer,
+   the builder that does not reproduce it is wrong.
+3. **Or should the exception be retired?** If FY2031-FY2050 should now follow the
+   plain construction, the committed pack is what is wrong.
+4. **What should `plan_governed_pack_rebuilds.py` recommend** for a pack whose
+   builder cannot reproduce it? Today: a warning. That is a stopgap.
+5. **Are there other packs in this condition?** Only the uncertainty pack was
+   probed this way. `replay_cache`, `quarterly_display` and `policy_runtime`
+   rebuilt cleanly during the calculation-lane proof, but were not compared
+   value-by-value against their committed content the way this one was.
+
+Question 5 is the one that should be answered first: the same probe pattern
+applied to the other three packs is cheap and would establish whether this is
+one exception or a habit.
+
+---
+
+# Instance 1 — which PED calibration R² values are authoritative?
 
 Raised 2026-08-07 while benchmarking parallel test execution for the CI runtime
 optimisation. This document was rewritten once the diagnosis completed: the

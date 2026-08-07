@@ -37,6 +37,7 @@ import hashlib
 import json
 import pathlib
 import sys
+import textwrap
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
@@ -63,6 +64,31 @@ REBUILD_COMMANDS = {
     "databricks_bundle": (
         "python scripts/build_databricks_app_bundle.py "
         "--source . --output build/databricks_app/app --clean"
+    ),
+}
+
+# Packs whose committed content the plain builder does NOT reproduce.
+#
+# Measured on an unmodified tree (ci/probe_uncertainty_rebuild_reproducibility.sh):
+# rebuilding the uncertainty pack moves 20 of 1000 rows - light_petrol_vkt,
+# FY2031 to FY2050 - by up to 1.34% relative, ~509 units absolute. Every other
+# series reproduces exactly.
+#
+# That range is the governed exception recorded in
+# tests/test_revenue_outlook_policy_runtime.py: Light petrol VKT FY2031-FY2050
+# is re-centred onto the now-published Current line. The builder does not carry
+# that re-centring, so running it reverts a deliberate governance decision and
+# publishes different band values.
+#
+# This planner must not hand someone a command that quietly does that. See
+# docs/FOLLOW_UP_PED_R2_DRIFT.md.
+REBUILD_CAVEATS = {
+    "uncertainty": (
+        "WARNING: rebuilding this pack does NOT reproduce its committed content. "
+        "On an unmodified tree it moves light_petrol_vkt FY2031-FY2050 by up to "
+        "1.34% (~509 units), reverting the governed re-centring onto the "
+        "published Current line. Do not run this command to 'fix' staleness - "
+        "confirm with the owner first. See docs/FOLLOW_UP_PED_R2_DRIFT.md."
     ),
 }
 
@@ -269,6 +295,8 @@ def build_plan(root: pathlib.Path) -> dict:
 
     for name, record in packs.items():
         record["rebuild_command"] = REBUILD_COMMANDS[name]
+        if name in REBUILD_CAVEATS:
+            record["rebuild_caveat"] = REBUILD_CAVEATS[name]
         record["required"] = name in needs_rebuild
         record["order"] = REBUILD_ORDER.index(name) + 1 if name in needs_rebuild else None
 
@@ -300,6 +328,10 @@ def render_human(plan: dict) -> str:
         for index, name in enumerate(plan["required_rebuilds"], start=1):
             lines.append(f"  {index}. {name}")
             lines.append(f"       {REBUILD_COMMANDS[name]}")
+            caveat = plan["packs"][name].get("rebuild_caveat")
+            if caveat:
+                for chunk in textwrap.wrap(caveat, width=68):
+                    lines.append(f"       !! {chunk}")
         lines.append("")
         lines.append(f"Second idempotency build: {plan['second_build_reason']}")
     else:
