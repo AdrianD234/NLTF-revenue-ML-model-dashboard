@@ -201,12 +201,24 @@ def test_no_test_module_hardcodes_the_tracked_chart_source_directory():
     an "artifacts" segment and a "chart_sources" segment, and the literal
     "artifacts/chart_sources".
     """
-    # Two files legitimately name it. test_forecast_runner asks git which files
-    # are TRACKED, which is a question about the tracked path by definition.
+    # Files that legitimately name the tracked location.
+    #
+    # The Playwright pair is the subtle one, and an earlier version of this
+    # change got it wrong. Those tests do NOT generate chart sources: they read
+    # what the running Streamlit APP wrote. verify_dashboard.ps1 starts that
+    # server as a separate process, which never imports this conftest and so
+    # never sees the redirect - it writes to the production location, as it
+    # should. Pointing the tests at the test process's scratch directory made
+    # them read an empty directory.
+    #
+    # The isolation here covers the TEST SUITE writing governed evidence. It
+    # does not, and should not, redirect the application's own output.
     allowed = {
-        "test_chart_source_write_isolation.py",   # asserts about it
+        "test_chart_source_write_isolation.py",    # asserts about it
         "test_databricks_app_bundle_contract.py",  # synthetic tree under tmp_path
         "test_forecast_runner.py",                 # `git ls-files artifacts/chart_sources`
+        "test_playwright_dashboard.py",            # reads the running app's output
+        "test_playwright_frontend_interactions.py",  # reads the running app's output
     }
     pattern = re.compile(
         r'"artifacts"\s*/\s*"chart_sources"'      # "artifacts" / "chart_sources"
