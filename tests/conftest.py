@@ -21,6 +21,36 @@ os.environ.setdefault("CLOUD_PREVIEW_DEFAULT", "0")
 # add nondeterminism; the suite exercises the cold and warm paths explicitly.
 os.environ.setdefault("REVENUE_OUTLOOK_CACHE_WARMER", "0")
 
+# Chart source tables are written as a SIDE EFFECT of loading an evidence pack,
+# and seven test modules load one. Left alone, the suite therefore rewrites
+# tracked files under artifacts/chart_sources on every run:
+#
+#   * on Linux that alone rewrote CRLF to LF (7944 -> 7937 bytes, no value
+#     changed), so "the suite leaves the checkout unchanged" was simply untrue;
+#   * under pytest-xdist, four worker processes writing the same files
+#     concurrently moved a governed PED calibration R-squared from 0.559 to
+#     0.580 while every test still passed.
+#
+# See artifacts/ci_optimisation/xdist_benchmark.md and
+# docs/FOLLOW_UP_PED_R2_DRIFT.md.
+#
+# Redirect every test-run write to a process-unique scratch directory. The
+# xdist worker id and the pid both appear, so no two workers - and no two
+# concurrent runs - can ever target the same path. Production is untouched:
+# nothing outside the tests sets this variable, so the committed location
+# remains the default.
+#
+# This does NOT resolve which R-squared values are authoritative. That is a
+# governance question, tracked separately.
+_CHART_SOURCE_SCRATCH = (
+    Path(__file__).resolve().parents[1]
+    / "test-output"
+    / "chart_sources"
+    / f"{os.environ.get('PYTEST_XDIST_WORKER', 'main')}-{os.getpid()}"
+)
+_CHART_SOURCE_SCRATCH.mkdir(parents=True, exist_ok=True)
+os.environ.setdefault("NLTF_CHART_SOURCE_OUTPUT_DIR", str(_CHART_SOURCE_SCRATCH))
+
 
 @pytest.fixture
 def tmp_path() -> Path:

@@ -35,7 +35,7 @@
       "model_dashboard/conflict_fuel_paths.py": "cdf9453b4a83ae2230dd4e0d405e96e29350a1b313ce6654d7815c42927c5cce",
       "model_dashboard/conflict_gdp_paths.py": "7beb97ff0a1a27e4268ee0e90765aecabbbc609e03f3952acbc7d5ec5bed5f25",
       "model_dashboard/data/__init__.py": "be79c75dae7d7f454975cf1fa493500263fd6521e2fb8a64b1f35dd9093146a0",
-      "model_dashboard/data/chart_sources.py": "82b018bb3dd39fe0f133bdc80a3ba02c2f87d81d053d76209495b48d83c362c3",
+      "model_dashboard/data/chart_sources.py": "583ec04eba7872b5cbf240521411fcfad94d93d6c897475f066c51074f46245b",
       "model_dashboard/data/config.py": "99cf6bf93ecc333f4e0cb7ab5dcc5f3e162fc28adb35c830c000df626cf4a0de",
       "model_dashboard/data/diagnostics.py": "4a2b9856b9a1cfc560edd40cf90dab762524062f554a2bdee0556de8c93f1c49",
       "model_dashboard/data/legacy_loader.py": "06ad27a50a442e61b9226af25f354f92de5afbd84685947212b0053f082697ce",
@@ -449,8 +449,8 @@
   },
   "row_count": 459525,
   "schema_version": "1",
-  "source_digest": "c62997692ed18af55d014d2a8b4e327ef3188db7ee66971f66f675ac2c6a7d8f",
-  "source_main_sha": "398b78be9ee677ce19d5718d0c236c248c5ce618",
+  "source_digest": "c083f8899432cbffd5aa35fe2956efd7b1418a4457d8f795ecdda0abd08dc40e",
+  "source_main_sha": "d1fb67e8e6c51d30c63abbe1ca7071b7dbf57015",
   "state_count": 9,
   "states": [
     {

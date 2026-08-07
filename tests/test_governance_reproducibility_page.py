@@ -11,6 +11,7 @@ from app import (
     source_workbook_manifest,
     _pack_zip_bytes,
 )
+from model_dashboard.data.chart_sources import resolve_chart_source_output_dir
 from model_dashboard.light_ruc_reproducibility import (
     load_reproducibility_pack,
     reproducibility_stream_labels,
@@ -65,7 +66,7 @@ def test_reproducibility_page_helpers_do_not_alter_main_chart_sources() -> None:
 
 
 def _chart_source_hashes() -> dict[str, str]:
-    source_dir = ROOT / "artifacts" / "chart_sources"
+    source_dir = resolve_chart_source_output_dir(ROOT)
     return {
         path.name: hashlib.sha256(path.read_bytes()).hexdigest()
         for path in sorted(source_dir.glob("*.csv"))

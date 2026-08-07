@@ -13,6 +13,7 @@ import pandas as pd
 import pytest
 from openpyxl import load_workbook
 
+from model_dashboard.data.chart_sources import resolve_chart_source_output_dir
 from model_dashboard.forecast_runner import (
     BACKTEST_SUPPORTED_MAX_HORIZON,
     DEFAULT_FORECAST_HORIZON_QUARTERS,
@@ -829,7 +830,7 @@ def test_forecast_runner_does_not_touch_evidence_pack(tmp_path: Path) -> None:
 
 
 def test_forecast_runner_does_not_touch_chart_sources(tmp_path: Path) -> None:
-    chart_dir = ROOT / "artifacts" / "chart_sources"
+    chart_dir = resolve_chart_source_output_dir(ROOT)
     before = {
         path.relative_to(chart_dir).as_posix(): path.read_bytes()
         for path in chart_dir.glob("*.csv")

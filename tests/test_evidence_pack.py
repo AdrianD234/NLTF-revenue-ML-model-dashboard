@@ -6,6 +6,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+from model_dashboard.data.chart_sources import resolve_chart_source_output_dir
 from model_dashboard.chart_sources import CHART_SOURCE_FILES
 from model_dashboard.data.config import DEFAULT_EVIDENCE_PACK_ROOT
 from model_dashboard.evidence_pack import REQUIRED_EVIDENCE_TABLES, load_evidence_pack, resolve_evidence_pack_root
@@ -89,12 +90,12 @@ def test_all_16_panels_use_chart_contract_source_files(evidence_pack) -> None:
     for filename, (_, chart_id) in CHART_SOURCE_FILES.items():
         if chart_id in r2_source_tables:
             continue
-        table = pd.read_csv(ROOT / "artifacts" / "chart_sources" / filename)
+        table = pd.read_csv(resolve_chart_source_output_dir(ROOT) / filename)
         assert set(table["source_file"].dropna()) == {contract[aliases[chart_id]]}, filename
 
 
 def test_finalist_values_and_stale_values(evidence_pack) -> None:
-    accuracy = pd.read_csv(ROOT / "artifacts" / "chart_sources" / "overview_finalist_forecast_accuracy.csv")
+    accuracy = pd.read_csv(resolve_chart_source_output_dir(ROOT) / "overview_finalist_forecast_accuracy.csv")
     indexed = accuracy.set_index(["stream_label", "metric_name"])
     for key, expected in EXPECTED_FINALIST_MAPE.items():
         assert float(indexed.loc[key, "metric_value"]) == pytest.approx(expected, abs=0.001)
@@ -107,7 +108,7 @@ def test_finalist_values_and_stale_values(evidence_pack) -> None:
 
 
 def test_candidate_frontier_plots_more_than_100_rows(evidence_pack) -> None:
-    frontier = pd.read_csv(ROOT / "artifacts" / "chart_sources" / "overview_candidate_search_frontier.csv")
+    frontier = pd.read_csv(resolve_chart_source_output_dir(ROOT) / "overview_candidate_search_frontier.csv")
     assert len(frontier) > 100
     assert {"Selected finalist", SCHIFF_SPEC_BENCHMARK_LABEL}.issubset(set(frontier["point_type"]))
     row_text = frontier.fillna("").astype(str).agg(lambda row: " ".join(row.to_list()), axis=1)
@@ -115,7 +116,7 @@ def test_candidate_frontier_plots_more_than_100_rows(evidence_pack) -> None:
 
 
 def test_full_sample_vs_paired_semantics_are_enforced(evidence_pack) -> None:
-    gain = pd.read_csv(ROOT / "artifacts" / "chart_sources" / "schiff_paired_or_fullsample_gain.csv")
+    gain = pd.read_csv(resolve_chart_source_output_dir(ROOT) / "schiff_paired_or_fullsample_gain.csv")
     assert gain["chart_title"].str.contains("Full-sample", regex=False).all()
     assert not gain["chart_title"].str.contains("Paired Gain vs Schiff", regex=False).any()
     light = gain[gain["stream_label"].eq("Light RUC volume")]

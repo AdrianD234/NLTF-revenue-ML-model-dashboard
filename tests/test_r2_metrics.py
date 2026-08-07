@@ -5,13 +5,14 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+from model_dashboard.data.chart_sources import resolve_chart_source_output_dir
 from model_dashboard.data_loader import DEFAULT_EVIDENCE_PACK_ROOT, load_evidence_pack
 from model_dashboard.r2_metrics import calibration_r2, diagnostics_r2_summary_frame, forecast_r2
 from model_dashboard.score_basis import OPERATIONAL_SCORE_BASIS, PAPER_SCORE_BASIS
 
 
 ROOT = Path(__file__).resolve().parents[1]
-CHART_SOURCE_DIR = ROOT / "artifacts" / "chart_sources"
+CHART_SOURCE_DIR = resolve_chart_source_output_dir(ROOT)
 
 
 @pytest.fixture(scope="session", autouse=True)

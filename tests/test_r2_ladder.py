@@ -6,12 +6,13 @@ import pandas as pd
 import pytest
 
 from app import R2_LADDER_HEADER_TOOLTIPS, _r2_ladder_header_html, format_r2_for_ladder_display, r2_ladder_display_table
+from model_dashboard.data.chart_sources import resolve_chart_source_output_dir
 from model_dashboard.data_loader import DEFAULT_EVIDENCE_PACK_ROOT, load_evidence_pack
 from model_dashboard.score_basis import OPERATIONAL_SCORE_BASIS, PAPER_SCORE_BASIS
 
 
 ROOT = Path(__file__).resolve().parents[1]
-CHART_SOURCE_DIR = ROOT / "artifacts" / "chart_sources"
+CHART_SOURCE_DIR = resolve_chart_source_output_dir(ROOT)
 LIGHT_TRAINING_FIT_DIR = ROOT / "data" / "dashboard_evidence_pack_reproducibility" / "light_ruc"
 HEAVY_TRAINING_FIT_DIR = ROOT / "data" / "dashboard_evidence_pack_reproducibility" / "heavy_ruc_vnext"
 PED_TRAINING_FIT_DIR = ROOT / "data" / "dashboard_evidence_pack_reproducibility" / "ped_vnext"
