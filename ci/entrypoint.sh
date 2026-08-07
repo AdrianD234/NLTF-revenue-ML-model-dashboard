@@ -132,6 +132,26 @@ case "$TIER" in
       exit 2
     fi
 
+    # Governed pack status BEFORE the tests, and fail fast if stale.
+    #
+    # Without this, a change to a hashed policy-calculation module produces a
+    # wall of setup errors that say nothing useful:
+    #
+    #   185 errors ... ReplayCacheStale: Compiled Revenue Outlook replay cache
+    #   for engine 'ensemble' is stale (replay inputs changed since the cache
+    #   was built)
+    #
+    # The planner already asks for these checks; the tier simply was not running
+    # them. One clear message beats 185 derived failures.
+    log "Governed pack status"
+    if ! python scripts/plan_governed_pack_rebuilds.py --format human --fail-on-stale; then
+      echo "" >&2
+      echo "Refusing to run the affected selection against stale packs: every test" >&2
+      echo "that loads a governed pack would fail for that reason alone, telling" >&2
+      echo "you nothing about your change. Rebuild the packs above first." >&2
+      exit 4
+    fi
+
     gate_arm
     log "Planner-selected tests"
     "${PYTEST_BASE[@]}" --junitxml="$OUT/junit_affected.xml" "$@"

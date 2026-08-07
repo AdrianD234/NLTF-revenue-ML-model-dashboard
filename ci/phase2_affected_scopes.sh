@@ -47,11 +47,19 @@ for entry in "${SCOPES[@]}"; do
 
   branch="phase2/scope-$scope"
   git checkout --quiet -B "$branch" "$BASE_SHA"
+  # Match the file's existing line-ending convention. .gitattributes pins
+  # `* -text`, so files here are individually CRLF or LF and a probe that
+  # appends the wrong one corrupts the file rather than adding a comment:
+  #
+  #   AssertionError: mixed line endings (partial rewrite):
+  #   ['model_dashboard/rate_paths.py: 1512 CRLF, 2 bare LF']
+  #
+  # which a repository test rightly rejects.
+  if grep -qU $'\r' "$target" 2>/dev/null; then eol=$'\r\n'; else eol=$'\n'; fi
   if [ "$comment" = "<!--" ]; then
-    printf '\n<!-- phase2 scope probe: %s -->\n' "$scope" >> "$target"
+    printf '%s<!-- phase2 scope probe: %s -->%s' "$eol" "$scope" "$eol" >> "$target"
   else
-    printf '\n# phase2 scope probe: %%s\n' >> /dev/null
-    printf '\n# phase2 scope probe: %s\n' "$scope" >> "$target"
+    printf '%s# phase2 scope probe: %s%s' "$eol" "$scope" "$eol" >> "$target"
   fi
   git add "$target"
   git -c user.email=ci@local -c user.name=phase2 commit --quiet \
