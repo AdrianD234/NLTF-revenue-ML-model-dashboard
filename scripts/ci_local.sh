@@ -93,7 +93,31 @@ fi
 printf 'tier=%s sha=%s pid=%s started=%s\n' \
   "$TIER" "$SHORT_SHA" "$$" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$LOCK"
 
-WORKTREE="${TMPDIR:-/tmp}/nltf-ci-${SHORT_SHA}-$$"
+# The disposable worktree must live on the Linux filesystem, never under
+# /mnt/c. Under WSL2, /mnt/c is a 9p mount: bind-mounting a tree of this size
+# from it into a container is slow enough to distort a timed run, which would
+# make every benchmark this project produces suspect. TMPDIR is normally /tmp
+# on ext4, but check rather than assume - a TMPDIR pointing at a Windows drive
+# would silently reintroduce the problem.
+WORKTREE_BASE="${TMPDIR:-/tmp}"
+case "$WORKTREE_BASE" in
+  /mnt/*)
+    echo "NOTE: TMPDIR ($WORKTREE_BASE) is a Windows mount; using /tmp instead so" >&2
+    echo "      the timed run is not distorted by 9p filesystem overhead." >&2
+    WORKTREE_BASE=/tmp
+    ;;
+esac
+WORKTREE="${WORKTREE_BASE}/nltf-ci-${SHORT_SHA}-$$"
+
+case "$REPO_ROOT" in
+  /mnt/*)
+    echo "WARNING: this checkout is on a Windows mount ($REPO_ROOT)." >&2
+    echo "         Git metadata reads will cross the 9p boundary and timings will be" >&2
+    echo "         pessimistic. For benchmark-grade runs, clone into the Linux" >&2
+    echo "         filesystem first - see ci/README.md." >&2
+    ;;
+esac
+
 OUT_DIR="$REPO_ROOT/artifacts/ci_local/$SHORT_SHA"
 EXIT_CODE=1
 

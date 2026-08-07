@@ -63,13 +63,24 @@ function Fail([string]$Message, [int]$Code = 2) {
 }
 
 # ---------------------------------------------------------------------------
-# 1. Docker must be present and running
+# 1. Docker must be reachable - natively, or through WSL
 # ---------------------------------------------------------------------------
+# Docker Engine installed inside WSL publishes NO Windows-side docker.exe. This
+# script therefore cannot assume a native client: when one is absent but WSL is
+# present, it delegates the whole tier to scripts/ci_local.sh inside the
+# distribution, against a checkout on the Linux filesystem.
+#
+# That last part matters for more than tidiness. /mnt/c is a 9p mount, and
+# bind-mounting a large tree from it into a container is slow enough to distort
+# a timed run - which would make every benchmark this project produces suspect.
 Write-Section 'Checking Docker'
 $docker = Get-Command docker -ErrorAction SilentlyContinue
+
 if (-not $docker) {
-    Fail @'
-Docker is not on PATH.
+    $wsl = Get-Command wsl.exe -ErrorAction SilentlyContinue
+    if (-not $wsl) {
+        Fail @'
+Docker is not on PATH, and WSL is not available either.
 
 The container is the only local environment that matches CI (Python 3.11), so
 governed questions cannot be settled without it.
@@ -81,13 +92,71 @@ organisations:
     wsl
     bash ci/install_docker_engine_wsl.sh
 
-Then run the container tiers from inside WSL via scripts/ci_local.sh.
-
 Until then the honest fallback is the hosted CI, or the developer .venv for
 non-governed work only - it is a different Python and numpy build and cannot
 settle a numerical disagreement. See ci/README.md.
 '@
+    }
+
+    Write-Host 'No Windows docker client; delegating to Docker Engine inside WSL.' -ForegroundColor Cyan
+
+    # Does the distribution have a working daemon the current user can reach?
+    & wsl.exe -- bash -lc 'docker version --format "{{.Server.Os}}" >/dev/null 2>&1'
+    if ($LASTEXITCODE -ne 0) {
+        & wsl.exe -- bash -lc 'sudo -n docker version >/dev/null 2>&1'
+        if ($LASTEXITCODE -eq 0) {
+            Fail @'
+Docker inside WSL works only under sudo, and this wrapper cannot supply a
+password non-interactively.
+
+Either grant your WSL user direct access (note: docker group membership is
+equivalent to passwordless root inside that distribution - a real privilege
+decision, which is why the installer does not do it for you):
+
+    wsl -- bash -lc "sudo usermod -aG docker \$USER"
+    wsl --shutdown
+
+...or run the tiers yourself from inside WSL:
+
+    wsl
+    cd ~/nltf-ci/repo
+    sudo scripts/ci_local.sh --tier fast
+'@
+        }
+        Fail @'
+Docker is installed in WSL but the daemon is not responding. Inside WSL:
+
+    sudo systemctl status docker
+    sudo systemctl start docker
+'@
+    }
+
+    # Mirror the Windows checkout into the Linux filesystem and run there.
+    $linuxRepo = '$HOME/nltf-ci/repo'
+    $winRepoForWsl = (& wsl.exe -- wslpath -a "$RepoRoot").Trim()
+    $tierArgsForSh = @("--tier", $Tier, "--base", $Base, "--ref", $Ref)
+    if ($Engine) { $tierArgsForSh += @("--engine", $Engine) }
+    if ($Rebuild) { $tierArgsForSh += "--rebuild" }
+    $joined = $tierArgsForSh -join ' '
+
+    $bootstrap = @"
+set -e
+mkdir -p `$HOME/nltf-ci
+if [ ! -d $linuxRepo/.git ]; then
+  echo 'Cloning into the Linux filesystem (first run only)...'
+  git clone --no-checkout '$winRepoForWsl' $linuxRepo
+fi
+cd $linuxRepo
+git remote set-url origin '$winRepoForWsl'
+git fetch --quiet origin '+refs/heads/*:refs/remotes/origin/*'
+git checkout --quiet --detach $(& git -C $RepoRoot rev-parse $Ref)
+exec bash scripts/ci_local.sh $joined
+"@
+
+    & wsl.exe -- bash -lc $bootstrap
+    exit $LASTEXITCODE
 }
+
 & docker version --format '{{.Server.Os}}' 2>&1 | Out-Null
 if ($LASTEXITCODE -ne 0) {
     Fail @'
