@@ -123,22 +123,45 @@ EXIT_CODE=1
 
 cleanup() {
   if [ "$KEEP_WORKTREE" -eq 0 ] && [ -d "$WORKTREE" ]; then
-    git -C "$REPO_ROOT" worktree remove --force "$WORKTREE" >/dev/null 2>&1 || rm -rf "$WORKTREE"
-    git -C "$REPO_ROOT" worktree prune >/dev/null 2>&1 || true
+    rm -rf "$WORKTREE"
   fi
   rm -f "$LOCK"
 }
 trap cleanup EXIT
 
 # --- 4. Disposable, byte-exact source copy -----------------------------------
-section "Creating disposable worktree"
-git -C "$REPO_ROOT" worktree add --detach --quiet "$WORKTREE" "$SHA" \
-  || fail "Could not create the disposable worktree."
-echo "Worktree: $WORKTREE"
+# A CLONE, not `git worktree add`. A worktree's .git is a FILE pointing at
+# $REPO_ROOT/.git/worktrees/<name>, which is outside the bind mount - so inside
+# the container git is non-functional:
+#
+#     subprocess.CalledProcessError: Command '['git', 'ls-files']'
+#     returned non-zero exit status 128
+#
+# and ci_plan.py, the planner tests and the cleanliness gate all need a working
+# repository. A local clone is self-contained, so it works mounted.
+section "Creating disposable clone"
+# --local hardlinks the object store into the clone's OWN objects directory, so
+# the result is self-contained. --shared must NOT be used: it writes an
+# objects/info/alternates pointing at $REPO_ROOT/.git, an absolute path outside
+# the bind mount, which would reintroduce exactly the breakage this clone exists
+# to fix.
+git clone --quiet --local "$REPO_ROOT" "$WORKTREE" \
+  || fail "Could not create the disposable clone."
+if [ -e "$WORKTREE/.git/objects/info/alternates" ]; then
+  fail "The clone borrows objects from outside its own directory, so git would
+not work inside the container. Refusing to run."
+fi
+git -C "$WORKTREE" checkout --quiet --detach "$SHA" \
+  || fail "Could not check out $SHA in the disposable clone."
+# ci_plan.py diffs against origin/main, so the clone needs the source's branches
+# under refs/remotes/origin/.
+git -C "$WORKTREE" remote set-url origin "$REPO_ROOT"
+git -C "$WORKTREE" fetch --quiet origin '+refs/heads/*:refs/remotes/origin/*' 2>/dev/null || true
+echo "Clone: $WORKTREE"
 
 drift="$(git -C "$WORKTREE" status --porcelain)"
 if [ -n "$drift" ]; then
-  fail "The freshly created worktree is already dirty, so checkout is not
+  fail "The freshly created clone is already dirty, so checkout is not
 byte-exact (most likely a .gitattributes line-ending rule changed):
 
 $drift
@@ -146,7 +169,7 @@ $drift
 Refusing to run: a numerical result from a tree that does not match the commit
 is not evidence."
 fi
-echo "Worktree is byte-exact against the commit."
+echo "Clone is byte-exact against the commit."
 
 mkdir -p "$OUT_DIR"
 
