@@ -1,0 +1,12 @@
+# The build context is only ever used for the dependency layer: the Dockerfile
+# COPYs requirements files and ci/entrypoint.sh, nothing else. Source reaches the
+# container by bind mount at run time, from a disposable worktree.
+#
+# So this file is aggressive on purpose. Sending data/ (hundreds of MB of packs)
+# into the build context would make every image build slow for no benefit.
+
+*
+!requirements.txt
+!requirements-dev.txt
+!ci/requirements-ci.txt
+!ci/entrypoint.sh

@@ -1,0 +1,9 @@
+category,path_or_pattern,written_by,shared_across_tests,parallel_hazard,notes
+per-test scratch,test-output/tmp/<uuid4>,tests/conftest.py::tmp_path fixture,no,none,"Overridden conftest fixture allocates a fresh uuid4 directory per test; no two tests can collide."
+regenerated input,artifacts/curated_data/**,scripts/regenerate_curated_data_from_pack.py,yes,none,"Written once before the suite by the CI step / entrypoint, then read-only during the run."
+audit output,artifacts/gdp_sign_guard_audit/**,scripts/audit_gdp_sign_guard_bindings.py,yes,none,"Regenerated before the suite so guard tests assert a fresh run rather than the committed copy."
+evidence,artifacts/long_horizon_validation/**,test + builder scripts,yes,low,"Uploaded as CI evidence; tests read it. Written outside the parallel window."
+process-global cache,app.cached_revenue_outlook_view (in-memory),app module,yes,HIGH,"Streamlit cache_data. Cleared by tests/conftest.py::vfm_analyst_layers_enabled either side of the gate, because entries computed under the other setting carry a different cone band. Cross-worker this cache is NOT shared, so each xdist worker pays its own cold start."
+process-global flag,app.REVENUE_OUTLOOK_ENABLE_VFM_ANALYST_LAYERS,tests/conftest.py + test modules,yes,HIGH,"Module-scoped fixture mutates a module-level constant on both app and the policy module, then restores it. Safe within one process; two tests in the SAME worker interleaving would collide, which is why the fixture is module-scoped."
+process-global env,CLOUD_PREVIEW_DEFAULT / REVENUE_OUTLOOK_CACHE_WARMER,tests/conftest.py,yes,low,"Set via os.environ.setdefault at import, so every worker process inherits the same value."
+committed pack (read),data/**,none during tests,yes,none,"Read-only during the suite. Pack building is a separate, deliberate act."

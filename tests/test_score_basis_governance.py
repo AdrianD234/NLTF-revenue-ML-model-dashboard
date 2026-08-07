@@ -5,6 +5,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+from model_dashboard.data.chart_sources import resolve_chart_source_output_dir
 from model_dashboard.data_loader import DEFAULT_EVIDENCE_PACK_ROOT, load_evidence_pack
 from model_dashboard.labels import OVERVIEW_STRESS_BUCKET_ORDER, STRESS_BUCKET_ORDER
 from model_dashboard.plots import plot_ensemble_composition
@@ -71,7 +72,7 @@ def test_scenario_comparison_basis_projection_keeps_paper_and_operational_separa
 
 
 def test_chart_sources_include_score_basis_and_no_old_light_default_values(evidence_pack) -> None:
-    chart_dir = ROOT / "artifacts" / "chart_sources"
+    chart_dir = resolve_chart_source_output_dir(ROOT)
     source_files = list(chart_dir.glob("*.csv"))
     assert source_files
     multi_basis = {

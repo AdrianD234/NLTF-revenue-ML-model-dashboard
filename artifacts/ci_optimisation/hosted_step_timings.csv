@@ -1,0 +1,205 @@
+run_id,job_name,step_number,step_name,conclusion,seconds,hms,share_of_job_pct
+30906665375,Core clean-clone suite,1,Set up job,success,1.0,0h00m01s,0.0
+30906665375,Core clean-clone suite,2,Run actions/checkout@v4,success,5.0,0h00m05s,0.1
+30906665375,Core clean-clone suite,3,Set up Python,success,3.0,0h00m03s,0.1
+30906665375,Core clean-clone suite,4,Install dependencies,success,32.0,0h00m32s,0.7
+30906665375,Core clean-clone suite,5,Record the resolved environment,success,2.0,0h00m02s,0.0
+30906665375,Core clean-clone suite,6,Compile all sources,success,1.0,0h00m01s,0.0
+30906665375,Core clean-clone suite,7,Rebuild curated data from the committed pack,success,1.0,0h00m01s,0.0
+30906665375,Core clean-clone suite,8,GDP sign-guard binding register,success,96.0,0h01m36s,2.2
+30906665375,Core clean-clone suite,9,Report clean-clone coverage,success,9.0,0h00m09s,0.2
+30906665375,Core clean-clone suite,10,Core test suite,success,4165.0,1h09m25s,93.6
+30906665375,Core clean-clone suite,11,Conflict scenario extract validation,success,120.0,0h02m00s,2.7
+30906665375,Core clean-clone suite,12,Streamlit deployment readiness,success,12.0,0h00m12s,0.3
+30906665375,Core clean-clone suite,13,Upload evidence,success,0.0,0h00m00s,0.0
+30906665375,Core clean-clone suite,25,Post Set up Python,success,0.0,0h00m00s,0.0
+30906665375,Core clean-clone suite,26,Post Run actions/checkout@v4,success,1.0,0h00m01s,0.0
+30906665375,Core clean-clone suite,27,Complete job,success,0.0,0h00m00s,0.0
+30906665375,Replay parity (windows-latest),1,Set up job,success,1.0,0h00m01s,0.7
+30906665375,Replay parity (windows-latest),2,Run actions/checkout@v4,success,8.0,0h00m08s,5.4
+30906665375,Replay parity (windows-latest),3,Set up Python,success,9.0,0h00m09s,6.1
+30906665375,Replay parity (windows-latest),4,Install dependencies,success,54.0,0h00m54s,36.5
+30906665375,Replay parity (windows-latest),5,Governed replay fingerprint,success,70.0,0h01m10s,47.3
+30906665375,Replay parity (windows-latest),6,Upload fingerprint,success,1.0,0h00m01s,0.7
+30906665375,Replay parity (windows-latest),11,Post Set up Python,success,0.0,0h00m00s,0.0
+30906665375,Replay parity (windows-latest),12,Post Run actions/checkout@v4,success,2.0,0h00m02s,1.4
+30906665375,Replay parity (windows-latest),13,Complete job,success,0.0,0h00m00s,0.0
+30906665375,Replay parity (ubuntu-latest),1,Set up job,success,2.0,0h00m02s,1.4
+30906665375,Replay parity (ubuntu-latest),2,Run actions/checkout@v4,success,5.0,0h00m05s,3.4
+30906665375,Replay parity (ubuntu-latest),3,Set up Python,success,4.0,0h00m04s,2.7
+30906665375,Replay parity (ubuntu-latest),4,Install dependencies,success,28.0,0h00m28s,19.2
+30906665375,Replay parity (ubuntu-latest),5,Governed replay fingerprint,success,101.0,0h01m41s,69.2
+30906665375,Replay parity (ubuntu-latest),6,Upload fingerprint,success,2.0,0h00m02s,1.4
+30906665375,Replay parity (ubuntu-latest),11,Post Set up Python,success,0.0,0h00m00s,0.0
+30906665375,Replay parity (ubuntu-latest),12,Post Run actions/checkout@v4,success,0.0,0h00m00s,0.0
+30906665375,Replay parity (ubuntu-latest),13,Complete job,success,0.0,0h00m00s,0.0
+30906467854,Replay parity (windows-latest),1,Set up job,success,1.0,0h00m01s,0.5
+30906467854,Replay parity (windows-latest),2,Run actions/checkout@v4,success,9.0,0h00m09s,4.6
+30906467854,Replay parity (windows-latest),3,Set up Python,success,5.0,0h00m05s,2.5
+30906467854,Replay parity (windows-latest),4,Install dependencies,success,70.0,0h01m10s,35.5
+30906467854,Replay parity (windows-latest),5,Governed replay fingerprint,success,108.0,0h01m48s,54.8
+30906467854,Replay parity (windows-latest),6,Upload fingerprint,success,0.0,0h00m00s,0.0
+30906467854,Replay parity (windows-latest),11,Post Set up Python,success,0.0,0h00m00s,0.0
+30906467854,Replay parity (windows-latest),12,Post Run actions/checkout@v4,success,2.0,0h00m02s,1.0
+30906467854,Replay parity (windows-latest),13,Complete job,success,0.0,0h00m00s,0.0
+30906467854,Core clean-clone suite,1,Set up job,success,2.0,0h00m02s,0.0
+30906467854,Core clean-clone suite,2,Run actions/checkout@v4,success,4.0,0h00m04s,0.1
+30906467854,Core clean-clone suite,3,Set up Python,success,5.0,0h00m05s,0.1
+30906467854,Core clean-clone suite,4,Install dependencies,success,30.0,0h00m30s,0.7
+30906467854,Core clean-clone suite,5,Record the resolved environment,success,2.0,0h00m02s,0.0
+30906467854,Core clean-clone suite,6,Compile all sources,success,2.0,0h00m02s,0.0
+30906467854,Core clean-clone suite,7,Rebuild curated data from the committed pack,success,1.0,0h00m01s,0.0
+30906467854,Core clean-clone suite,8,GDP sign-guard binding register,success,97.0,0h01m37s,2.2
+30906467854,Core clean-clone suite,9,Report clean-clone coverage,success,10.0,0h00m10s,0.2
+30906467854,Core clean-clone suite,10,Core test suite,success,4084.0,1h08m04s,93.4
+30906467854,Core clean-clone suite,11,Conflict scenario extract validation,success,117.0,0h01m57s,2.7
+30906467854,Core clean-clone suite,12,Streamlit deployment readiness,success,11.0,0h00m11s,0.3
+30906467854,Core clean-clone suite,13,Upload evidence,success,2.0,0h00m02s,0.0
+30906467854,Core clean-clone suite,25,Post Set up Python,success,0.0,0h00m00s,0.0
+30906467854,Core clean-clone suite,26,Post Run actions/checkout@v4,success,0.0,0h00m00s,0.0
+30906467854,Core clean-clone suite,27,Complete job,success,0.0,0h00m00s,0.0
+30906467854,Replay parity (ubuntu-latest),1,Set up job,success,1.0,0h00m01s,0.8
+30906467854,Replay parity (ubuntu-latest),2,Run actions/checkout@v4,success,4.0,0h00m04s,3.3
+30906467854,Replay parity (ubuntu-latest),3,Set up Python,success,4.0,0h00m04s,3.3
+30906467854,Replay parity (ubuntu-latest),4,Install dependencies,success,28.0,0h00m28s,23.3
+30906467854,Replay parity (ubuntu-latest),5,Governed replay fingerprint,success,79.0,0h01m19s,65.8
+30906467854,Replay parity (ubuntu-latest),6,Upload fingerprint,success,1.0,0h00m01s,0.8
+30906467854,Replay parity (ubuntu-latest),11,Post Set up Python,success,0.0,0h00m00s,0.0
+30906467854,Replay parity (ubuntu-latest),12,Post Run actions/checkout@v4,success,0.0,0h00m00s,0.0
+30906467854,Replay parity (ubuntu-latest),13,Complete job,success,0.0,0h00m00s,0.0
+30902233189,Core clean-clone suite,1,Set up job,success,1.0,0h00m01s,0.0
+30902233189,Core clean-clone suite,2,Run actions/checkout@v4,success,4.0,0h00m04s,0.1
+30902233189,Core clean-clone suite,3,Set up Python,success,4.0,0h00m04s,0.1
+30902233189,Core clean-clone suite,4,Install dependencies,success,31.0,0h00m31s,0.9
+30902233189,Core clean-clone suite,5,Record the resolved environment,success,2.0,0h00m02s,0.1
+30902233189,Core clean-clone suite,6,Compile all sources,success,1.0,0h00m01s,0.0
+30902233189,Core clean-clone suite,7,Rebuild curated data from the committed pack,success,1.0,0h00m01s,0.0
+30902233189,Core clean-clone suite,8,GDP sign-guard binding register,success,79.0,0h01m19s,2.3
+30902233189,Core clean-clone suite,9,Report clean-clone coverage,success,9.0,0h00m09s,0.3
+30902233189,Core clean-clone suite,10,Core test suite,failure,3329.0,0h55m29s,96.1
+30902233189,Core clean-clone suite,11,Conflict scenario extract validation,skipped,0.0,0h00m00s,0.0
+30902233189,Core clean-clone suite,12,Streamlit deployment readiness,skipped,0.0,0h00m00s,0.0
+30902233189,Core clean-clone suite,13,Upload evidence,success,1.0,0h00m01s,0.0
+30902233189,Core clean-clone suite,25,Post Set up Python,skipped,0.0,0h00m00s,0.0
+30902233189,Core clean-clone suite,26,Post Run actions/checkout@v4,success,0.0,0h00m00s,0.0
+30902233189,Core clean-clone suite,27,Complete job,success,0.0,0h00m00s,0.0
+30902233189,Replay parity (windows-latest),1,Set up job,success,2.0,0h00m02s,1.0
+30902233189,Replay parity (windows-latest),2,Run actions/checkout@v4,success,12.0,0h00m12s,5.7
+30902233189,Replay parity (windows-latest),3,Set up Python,success,11.0,0h00m11s,5.2
+30902233189,Replay parity (windows-latest),4,Install dependencies,success,102.0,0h01m42s,48.6
+30902233189,Replay parity (windows-latest),5,Governed replay fingerprint,success,77.0,0h01m17s,36.7
+30902233189,Replay parity (windows-latest),6,Upload fingerprint,success,1.0,0h00m01s,0.5
+30902233189,Replay parity (windows-latest),11,Post Set up Python,success,0.0,0h00m00s,0.0
+30902233189,Replay parity (windows-latest),12,Post Run actions/checkout@v4,success,2.0,0h00m02s,1.0
+30902233189,Replay parity (windows-latest),13,Complete job,success,0.0,0h00m00s,0.0
+30902233189,Replay parity (ubuntu-latest),1,Set up job,success,1.0,0h00m01s,0.8
+30902233189,Replay parity (ubuntu-latest),2,Run actions/checkout@v4,success,5.0,0h00m05s,4.0
+30902233189,Replay parity (ubuntu-latest),3,Set up Python,success,4.0,0h00m04s,3.2
+30902233189,Replay parity (ubuntu-latest),4,Install dependencies,success,24.0,0h00m24s,19.0
+30902233189,Replay parity (ubuntu-latest),5,Governed replay fingerprint,success,88.0,0h01m28s,69.8
+30902233189,Replay parity (ubuntu-latest),6,Upload fingerprint,success,1.0,0h00m01s,0.8
+30902233189,Replay parity (ubuntu-latest),11,Post Set up Python,success,0.0,0h00m00s,0.0
+30902233189,Replay parity (ubuntu-latest),12,Post Run actions/checkout@v4,success,0.0,0h00m00s,0.0
+30902233189,Replay parity (ubuntu-latest),13,Complete job,success,0.0,0h00m00s,0.0
+30883622347,Core clean-clone suite,1,Set up job,success,1.0,0h00m01s,0.0
+30883622347,Core clean-clone suite,2,Run actions/checkout@v4,success,5.0,0h00m05s,0.1
+30883622347,Core clean-clone suite,3,Set up Python,success,4.0,0h00m04s,0.1
+30883622347,Core clean-clone suite,4,Install dependencies,success,31.0,0h00m31s,0.7
+30883622347,Core clean-clone suite,5,Record the resolved environment,success,2.0,0h00m02s,0.0
+30883622347,Core clean-clone suite,6,Compile all sources,success,2.0,0h00m02s,0.0
+30883622347,Core clean-clone suite,7,Rebuild curated data from the committed pack,success,1.0,0h00m01s,0.0
+30883622347,Core clean-clone suite,8,GDP sign-guard binding register,success,97.0,0h01m37s,2.3
+30883622347,Core clean-clone suite,9,Report clean-clone coverage,success,9.0,0h00m09s,0.2
+30883622347,Core clean-clone suite,10,Core test suite,success,4022.0,1h07m02s,93.3
+30883622347,Core clean-clone suite,11,Conflict scenario extract validation,success,120.0,0h02m00s,2.8
+30883622347,Core clean-clone suite,12,Streamlit deployment readiness,success,12.0,0h00m12s,0.3
+30883622347,Core clean-clone suite,13,Upload evidence,success,0.0,0h00m00s,0.0
+30883622347,Core clean-clone suite,25,Post Set up Python,success,1.0,0h00m01s,0.0
+30883622347,Core clean-clone suite,26,Post Run actions/checkout@v4,success,0.0,0h00m00s,0.0
+30883622347,Core clean-clone suite,27,Complete job,success,0.0,0h00m00s,0.0
+30883622347,Replay parity (ubuntu-latest),1,Set up job,success,3.0,0h00m03s,2.9
+30883622347,Replay parity (ubuntu-latest),2,Run actions/checkout@v4,success,5.0,0h00m05s,4.9
+30883622347,Replay parity (ubuntu-latest),3,Set up Python,success,7.0,0h00m07s,6.9
+30883622347,Replay parity (ubuntu-latest),4,Install dependencies,success,25.0,0h00m25s,24.5
+30883622347,Replay parity (ubuntu-latest),5,Governed replay fingerprint,success,59.0,0h00m59s,57.8
+30883622347,Replay parity (ubuntu-latest),6,Upload fingerprint,success,1.0,0h00m01s,1.0
+30883622347,Replay parity (ubuntu-latest),11,Post Set up Python,success,0.0,0h00m00s,0.0
+30883622347,Replay parity (ubuntu-latest),12,Post Run actions/checkout@v4,success,0.0,0h00m00s,0.0
+30883622347,Replay parity (ubuntu-latest),13,Complete job,success,0.0,0h00m00s,0.0
+30883622347,Replay parity (windows-latest),1,Set up job,success,1.0,0h00m01s,0.5
+30883622347,Replay parity (windows-latest),2,Run actions/checkout@v4,success,9.0,0h00m09s,4.6
+30883622347,Replay parity (windows-latest),3,Set up Python,success,8.0,0h00m08s,4.1
+30883622347,Replay parity (windows-latest),4,Install dependencies,success,62.0,0h01m02s,31.5
+30883622347,Replay parity (windows-latest),5,Governed replay fingerprint,success,111.0,0h01m51s,56.3
+30883622347,Replay parity (windows-latest),6,Upload fingerprint,success,1.0,0h00m01s,0.5
+30883622347,Replay parity (windows-latest),11,Post Set up Python,success,0.0,0h00m00s,0.0
+30883622347,Replay parity (windows-latest),12,Post Run actions/checkout@v4,success,2.0,0h00m02s,1.0
+30883622347,Replay parity (windows-latest),13,Complete job,success,0.0,0h00m00s,0.0
+30871212625,Replay parity (windows-latest),1,Set up job,success,2.0,0h00m02s,1.0
+30871212625,Replay parity (windows-latest),2,Run actions/checkout@v4,success,13.0,0h00m13s,6.4
+30871212625,Replay parity (windows-latest),3,Set up Python,success,8.0,0h00m08s,3.9
+30871212625,Replay parity (windows-latest),4,Install dependencies,success,65.0,0h01m05s,31.9
+30871212625,Replay parity (windows-latest),5,Governed replay fingerprint,success,110.0,0h01m50s,53.9
+30871212625,Replay parity (windows-latest),6,Upload fingerprint,success,1.0,0h00m01s,0.5
+30871212625,Replay parity (windows-latest),11,Post Set up Python,success,1.0,0h00m01s,0.5
+30871212625,Replay parity (windows-latest),12,Post Run actions/checkout@v4,success,2.0,0h00m02s,1.0
+30871212625,Replay parity (windows-latest),13,Complete job,success,0.0,0h00m00s,0.0
+30871212625,Replay parity (ubuntu-latest),1,Set up job,success,2.0,0h00m02s,1.4
+30871212625,Replay parity (ubuntu-latest),2,Run actions/checkout@v4,success,6.0,0h00m06s,4.1
+30871212625,Replay parity (ubuntu-latest),3,Set up Python,success,5.0,0h00m05s,3.4
+30871212625,Replay parity (ubuntu-latest),4,Install dependencies,success,29.0,0h00m29s,20.0
+30871212625,Replay parity (ubuntu-latest),5,Governed replay fingerprint,success,97.0,0h01m37s,66.9
+30871212625,Replay parity (ubuntu-latest),6,Upload fingerprint,success,1.0,0h00m01s,0.7
+30871212625,Replay parity (ubuntu-latest),11,Post Set up Python,success,1.0,0h00m01s,0.7
+30871212625,Replay parity (ubuntu-latest),12,Post Run actions/checkout@v4,success,0.0,0h00m00s,0.0
+30871212625,Replay parity (ubuntu-latest),13,Complete job,success,0.0,0h00m00s,0.0
+30871212625,Core clean-clone suite,1,Set up job,success,1.0,0h00m01s,0.0
+30871212625,Core clean-clone suite,2,Run actions/checkout@v4,success,5.0,0h00m05s,0.1
+30871212625,Core clean-clone suite,3,Set up Python,success,3.0,0h00m03s,0.1
+30871212625,Core clean-clone suite,4,Install dependencies,success,31.0,0h00m31s,0.7
+30871212625,Core clean-clone suite,5,Record the resolved environment,success,3.0,0h00m03s,0.1
+30871212625,Core clean-clone suite,6,Compile all sources,success,2.0,0h00m02s,0.0
+30871212625,Core clean-clone suite,7,Rebuild curated data from the committed pack,success,1.0,0h00m01s,0.0
+30871212625,Core clean-clone suite,8,GDP sign-guard binding register,success,99.0,0h01m39s,2.3
+30871212625,Core clean-clone suite,9,Report clean-clone coverage,success,10.0,0h00m10s,0.2
+30871212625,Core clean-clone suite,10,Core test suite,success,4099.0,1h08m19s,93.2
+30871212625,Core clean-clone suite,11,Conflict scenario extract validation,success,127.0,0h02m07s,2.9
+30871212625,Core clean-clone suite,12,Streamlit deployment readiness,success,13.0,0h00m13s,0.3
+30871212625,Core clean-clone suite,13,Upload evidence,success,0.0,0h00m00s,0.0
+30871212625,Core clean-clone suite,25,Post Set up Python,success,0.0,0h00m00s,0.0
+30871212625,Core clean-clone suite,26,Post Run actions/checkout@v4,success,1.0,0h00m01s,0.0
+30871212625,Core clean-clone suite,27,Complete job,success,0.0,0h00m00s,0.0
+30802931456,Core clean-clone suite,1,Set up job,success,1.0,0h00m01s,0.0
+30802931456,Core clean-clone suite,2,Run actions/checkout@v4,success,5.0,0h00m05s,0.1
+30802931456,Core clean-clone suite,3,Set up Python,success,5.0,0h00m05s,0.1
+30802931456,Core clean-clone suite,4,Install dependencies,success,32.0,0h00m32s,0.8
+30802931456,Core clean-clone suite,5,Record the resolved environment,success,4.0,0h00m04s,0.1
+30802931456,Core clean-clone suite,6,Compile all sources,success,1.0,0h00m01s,0.0
+30802931456,Core clean-clone suite,7,Rebuild curated data from the committed pack,success,1.0,0h00m01s,0.0
+30802931456,Core clean-clone suite,8,GDP sign-guard binding register,success,100.0,0h01m40s,2.4
+30802931456,Core clean-clone suite,9,Report clean-clone coverage,success,10.0,0h00m10s,0.2
+30802931456,Core clean-clone suite,10,Core test suite,success,3897.0,1h04m57s,92.9
+30802931456,Core clean-clone suite,11,Conflict scenario extract validation,success,123.0,0h02m03s,2.9
+30802931456,Core clean-clone suite,12,Streamlit deployment readiness,success,12.0,0h00m12s,0.3
+30802931456,Core clean-clone suite,13,Upload evidence,success,1.0,0h00m01s,0.0
+30802931456,Core clean-clone suite,25,Post Set up Python,success,0.0,0h00m00s,0.0
+30802931456,Core clean-clone suite,26,Post Run actions/checkout@v4,success,0.0,0h00m00s,0.0
+30802931456,Core clean-clone suite,27,Complete job,success,0.0,0h00m00s,0.0
+30802931456,Replay parity (windows-latest),1,Set up job,success,1.0,0h00m01s,0.5
+30802931456,Replay parity (windows-latest),2,Run actions/checkout@v4,success,8.0,0h00m08s,3.6
+30802931456,Replay parity (windows-latest),3,Set up Python,success,6.0,0h00m06s,2.7
+30802931456,Replay parity (windows-latest),4,Install dependencies,success,71.0,0h01m11s,32.0
+30802931456,Replay parity (windows-latest),5,Governed replay fingerprint,success,130.0,0h02m10s,58.6
+30802931456,Replay parity (windows-latest),6,Upload fingerprint,success,1.0,0h00m01s,0.5
+30802931456,Replay parity (windows-latest),11,Post Set up Python,success,0.0,0h00m00s,0.0
+30802931456,Replay parity (windows-latest),12,Post Run actions/checkout@v4,success,2.0,0h00m02s,0.9
+30802931456,Replay parity (windows-latest),13,Complete job,success,0.0,0h00m00s,0.0
+30802931456,Replay parity (ubuntu-latest),1,Set up job,success,1.0,0h00m01s,0.7
+30802931456,Replay parity (ubuntu-latest),2,Run actions/checkout@v4,success,5.0,0h00m05s,3.4
+30802931456,Replay parity (ubuntu-latest),3,Set up Python,success,8.0,0h00m08s,5.5
+30802931456,Replay parity (ubuntu-latest),4,Install dependencies,success,28.0,0h00m28s,19.2
+30802931456,Replay parity (ubuntu-latest),5,Governed replay fingerprint,success,98.0,0h01m38s,67.1
+30802931456,Replay parity (ubuntu-latest),6,Upload fingerprint,success,1.0,0h00m01s,0.7
+30802931456,Replay parity (ubuntu-latest),11,Post Set up Python,success,1.0,0h00m01s,0.7
+30802931456,Replay parity (ubuntu-latest),12,Post Run actions/checkout@v4,success,0.0,0h00m00s,0.0
+30802931456,Replay parity (ubuntu-latest),13,Complete job,success,0.0,0h00m00s,0.0

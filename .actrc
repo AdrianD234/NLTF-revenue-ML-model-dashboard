@@ -1,0 +1,26 @@
+# act configuration — WORKFLOW WIRING SMOKE TEST ONLY.
+#
+# act runs GitHub workflows locally against substitute runner images. It is
+# useful for exactly one thing here: catching a broken workflow before it costs
+# hosted minutes to discover. YAML that does not parse, a job that depends on an
+# output that is never set, an `if:` that never fires, a shell syntax error.
+#
+# It is NOT evidence for:
+#   * Windows replay parity        - act cannot run the Windows runner at all
+#   * numerical parity with hosted - substitute images, different wheels
+#   * runtime or billing figures   - different hardware entirely
+#   * clean-room independence      - it runs on your machine, against your tree
+#
+# The Docker CI in ci/ remains the local model-test authority. See ci/README.md.
+
+# Medium image: has python and the common tooling, without the ~20GB full image.
+-P ubuntu-latest=catthehacker/ubuntu:act-latest
+
+# Apple silicon and some Windows/WSL setups need this to run amd64 images.
+--container-architecture linux/amd64
+
+# Reuse containers between runs so an iteration on the YAML is seconds.
+--reuse
+
+# Keep act's artifacts out of the tracked tree.
+--artifact-server-path /tmp/act-artifacts

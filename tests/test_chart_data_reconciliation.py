@@ -17,6 +17,7 @@ from app import (
     scenario_comparison_frame,
     scenario_horizon_frame,
 )
+from model_dashboard.data.chart_sources import resolve_chart_source_output_dir
 from model_dashboard.data_loader import DEFAULT_EVIDENCE_PACK_ROOT, LoadedRun, load_evidence_pack
 from model_dashboard.metrics import governance_story_summary
 from model_dashboard.plots import (
@@ -315,7 +316,7 @@ def test_candidate_frontier_count_matches_source_table_and_trace_points(parquet_
     controls = default_controls()
     landscape = build_candidate_landscape_frame(parquet_dashboard, controls, "Balanced all-stream frontier view")
     context = candidate_frontier_count_context(parquet_dashboard, controls, landscape)
-    source = pd.read_csv(ARTIFACTS / "chart_sources" / "overview_candidate_search_frontier.csv")
+    source = pd.read_csv(resolve_chart_source_output_dir(ROOT) / "overview_candidate_search_frontier.csv")
     fig = plot_candidate_landscape(landscape)
     rendered_marker_points = sum(len(trace.x) for trace in fig.data if getattr(trace, "mode", "") and "markers" in str(trace.mode))
     assert len(source) == context["count"] == rendered_marker_points == 400

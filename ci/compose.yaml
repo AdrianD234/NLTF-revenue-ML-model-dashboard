@@ -1,0 +1,45 @@
+# Compose definition for the local clean-room CI image.
+#
+# scripts/ci_local.ps1 / ci_local.sh are the supported entry points; they build
+# the disposable source copy and set SOURCE_DIR / OUT_DIR before calling this.
+# Invoking compose directly is fine for ad-hoc work, but then the mounted tree
+# is whatever you point it at, including a dirty checkout - which is exactly the
+# ambiguity the wrappers exist to remove.
+
+name: nltf-ci
+
+services:
+  ci:
+    build:
+      context: ..
+      dockerfile: ci/Dockerfile
+    image: nltf-ci:local
+    # Read-only source mount. A test that tries to mutate the tree fails loudly
+    # here instead of silently editing a copy and passing.
+    # /work is writable on purpose. The suite legitimately writes scratch into
+    # artifacts/ (regenerate_curated_data_from_pack.py rebuilds curated data
+    # before the tests that read it), so a read-only mount would fail for a
+    # reason unrelated to the change under test.
+    #
+    # Isolation comes from SOURCE_DIR being a DISPOSABLE worktree the wrapper
+    # created and will delete, never the active checkout. The wrapper then runs
+    # `git status --porcelain` inside that copy after the container exits: a
+    # mutated tracked file is reported as a finding rather than being made
+    # impossible and therefore invisible.
+    volumes:
+      - type: bind
+        source: ${SOURCE_DIR:-..}
+        target: /work
+      - type: bind
+        source: ${OUT_DIR:-./out}
+        target: /out
+    environment:
+      CI_SOURCE_SHA: ${CI_SOURCE_SHA:-unknown}
+      CI_OUT_DIR: /out
+      # Kept at 1 to match the hosted runner's effective threading. Raise only
+      # for benchmarking, and never treat the result as governed evidence.
+      OMP_NUM_THREADS: ${CI_THREADS:-1}
+      OPENBLAS_NUM_THREADS: ${CI_THREADS:-1}
+      MKL_NUM_THREADS: ${CI_THREADS:-1}
+    working_dir: /work
+    init: true

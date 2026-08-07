@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from model_dashboard.data.chart_sources import resolve_chart_source_output_dir
 from model_dashboard.data_loader import load_parquet_dashboard
 from tests.fixtures.expected_values import EXPECTED_FIXTURE_FINALISTS
 
@@ -49,7 +50,7 @@ def test_mini_parquet_ensemble_weights_come_from_component_json() -> None:
 
 def test_mini_parquet_source_tables_are_generated_from_dashboard_data() -> None:
     loaded = load_parquet_dashboard(FIXTURE_ROOT, Path(__file__).resolve().parents[1])
-    source_dir = Path(__file__).resolve().parents[1] / "artifacts" / "chart_sources"
+    source_dir = resolve_chart_source_output_dir(Path(__file__).resolve().parents[1])
     expected = source_dir / "overview_ensemble_composition.csv"
 
     assert expected.exists()

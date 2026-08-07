@@ -6,6 +6,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+from model_dashboard.data.chart_sources import resolve_chart_source_output_dir
 from model_dashboard.chart_sources import CHART_SOURCE_FILES, CORE_COLUMNS
 from model_dashboard.data_loader import DEFAULT_EVIDENCE_PACK_ROOT, LoadedRun, load_evidence_pack
 from model_dashboard.labels import OVERVIEW_STRESS_BUCKET_ORDER, SCHIFF_SPEC_BENCHMARK_LABEL
@@ -18,7 +19,7 @@ from tests.fixtures.expected_values import (
 
 
 ROOT = Path(__file__).resolve().parents[1]
-CHART_SOURCE_DIR = ROOT / "artifacts" / "chart_sources"
+CHART_SOURCE_DIR = resolve_chart_source_output_dir(ROOT)
 EXPECTED_STREAMS = {"PED VKT per capita", "Light RUC volume", "Heavy RUC volume"}
 EXPECTED_BALANCED_FRONTIER_COUNTS = {"PED VKT per capita": 132, "Light RUC volume": 136, "Heavy RUC volume": 132}
 MULTI_SCORE_BASIS_SOURCE_FILES = {

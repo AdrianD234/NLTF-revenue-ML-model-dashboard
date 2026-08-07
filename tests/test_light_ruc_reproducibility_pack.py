@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from model_dashboard.data.chart_sources import resolve_chart_source_output_dir
 from model_dashboard.evidence_pack import load_evidence_pack
 from model_dashboard.light_ruc_reproducibility import (
     PED_INNER_HPO_AUDIT_STATUS,
@@ -418,7 +419,7 @@ def test_reproducibility_pack_does_not_modify_main_chart_source_tables() -> None
 
 
 def _chart_source_hashes() -> dict[str, str]:
-    source_dir = ROOT / "artifacts" / "chart_sources"
+    source_dir = resolve_chart_source_output_dir(ROOT)
     return {
         path.name: hashlib.sha256(path.read_bytes()).hexdigest()
         for path in sorted(source_dir.glob("*.csv"))
