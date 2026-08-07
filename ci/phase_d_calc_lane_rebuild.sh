@@ -25,7 +25,15 @@ BASE_SHA="$(git -C "$REPO_ROOT" rev-parse HEAD)"
 PROBE="/tmp/nltf-calcprobe-$$"
 TARGET="model_dashboard/rate_paths.py"
 
-cleanup() { rm -rf "$PROBE"; }
+# Preserve the script's real exit status through cleanup. A proof that reports
+# success while having failed internally is worse than no proof: the first run
+# of this script printed "CALC PROOF exit=0" immediately after "the planner
+# produced no rebuild commands".
+cleanup() {
+  local status=$?
+  rm -rf "$PROBE"
+  exit "$status"
+}
 trap cleanup EXIT
 
 section() { printf '\n\n############ %s ############\n' "$*"; }
@@ -72,10 +80,19 @@ section "Rebuilding the affected packs in the governed order"
 #
 # Hardcoding the rebuild would have proved only that I could guess; reading the
 # planner's own ordering is the thing worth proving.
+# Write the plan to a file inside the probe and read it back in ONE container
+# call. Piping one `docker run` into another needs -i on the consumer, and
+# without it the second container gets no stdin at all:
+#
+#   json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+#
+# A file avoids the whole class of problem.
+run_in_probe scripts/plan_governed_pack_rebuilds.py --format json \
+  > "$PROBE/plan.json" 2>/dev/null
+
 mapfile -t REBUILD_CMDS < <(
-  run_in_probe scripts/plan_governed_pack_rebuilds.py --format json 2>/dev/null \
-    | run_in_probe -c 'import json,sys
-plan = json.load(sys.stdin)
+  run_in_probe -c 'import json
+plan = json.load(open("/work/plan.json"))
 for name in plan["required_rebuilds"]:
     if name == "databricks_bundle":
         continue  # published from main by its own workflow, not part of this lane
