@@ -63,13 +63,48 @@ if [ "$stale_count" -eq 0 ]; then
 fi
 
 section "Rebuilding the affected packs in the governed order"
-# Only what the planner asked for, in the order it gave.
-run_in_probe scripts/build_revenue_outlook_policy_runtime.py --all \
-  > "$EV/calc_lane_rebuild.log" 2>&1
-rebuild_code=$?
-tail -4 "$EV/calc_lane_rebuild.log"
-echo "rebuild exit=$rebuild_code"
-[ "$rebuild_code" -eq 0 ] || exit "$rebuild_code"
+# Take the commands FROM the planner, in the order it gives them. An earlier
+# version hardcoded a policy_runtime rebuild and failed, because a change to
+# model_dashboard/rate_paths.py invalidates the replay cache first:
+#
+#   ReplayCacheStale: Compiled Revenue Outlook replay cache for engine 'ar1'
+#   is stale (replay inputs changed since the cache was built)
+#
+# Hardcoding the rebuild would have proved only that I could guess; reading the
+# planner's own ordering is the thing worth proving.
+mapfile -t REBUILD_CMDS < <(
+  run_in_probe scripts/plan_governed_pack_rebuilds.py --format json 2>/dev/null \
+    | run_in_probe -c 'import json,sys
+plan = json.load(sys.stdin)
+for name in plan["required_rebuilds"]:
+    if name == "databricks_bundle":
+        continue  # published from main by its own workflow, not part of this lane
+    print(plan["packs"][name]["rebuild_command"])'
+)
+
+if [ "${#REBUILD_CMDS[@]}" -eq 0 ]; then
+  echo "the planner produced no rebuild commands" >&2
+  exit 1
+fi
+
+printf 'planner ordering (%d step(s)):\n' "${#REBUILD_CMDS[@]}"
+printf '  %s\n' "${REBUILD_CMDS[@]}"
+
+: > "$EV/calc_lane_rebuild.log"
+for cmd in "${REBUILD_CMDS[@]}"; do
+  printf '\n--- %s ---\n' "$cmd" | tee -a "$EV/calc_lane_rebuild.log"
+  # shellcheck disable=SC2086
+  run_in_probe ${cmd#python } >> "$EV/calc_lane_rebuild.log" 2>&1
+  step_code=$?
+  echo "exit=$step_code" | tee -a "$EV/calc_lane_rebuild.log"
+  if [ "$step_code" -ne 0 ]; then
+    tail -12 "$EV/calc_lane_rebuild.log"
+    echo "rebuild step failed: $cmd" >&2
+    exit "$step_code"
+  fi
+done
+rebuild_code=0
+echo "all rebuild steps completed"
 
 section "AFTER rebuild — every pack must report current"
 run_in_probe scripts/plan_governed_pack_rebuilds.py --format human --fail-on-stale \
