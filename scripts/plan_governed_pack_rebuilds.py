@@ -37,7 +37,6 @@ import hashlib
 import json
 import pathlib
 import sys
-import textwrap
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
@@ -67,30 +66,13 @@ REBUILD_COMMANDS = {
     ),
 }
 
-# Packs whose committed content the plain builder does NOT reproduce.
-#
-# Measured on an unmodified tree (ci/probe_uncertainty_rebuild_reproducibility.sh):
-# rebuilding the uncertainty pack moves 20 of 1000 rows - light_petrol_vkt,
-# FY2031 to FY2050 - by up to 1.34% relative, ~509 units absolute. Every other
-# series reproduces exactly.
-#
-# That range is the governed exception recorded in
-# tests/test_revenue_outlook_policy_runtime.py: Light petrol VKT FY2031-FY2050
-# is re-centred onto the now-published Current line. The builder does not carry
-# that re-centring, so running it reverts a deliberate governance decision and
-# publishes different band values.
-#
-# This planner must not hand someone a command that quietly does that. See
-# docs/FOLLOW_UP_PED_R2_DRIFT.md.
-REBUILD_CAVEATS = {
-    "uncertainty": (
-        "WARNING: rebuilding this pack does NOT reproduce its committed content. "
-        "On an unmodified tree it moves light_petrol_vkt FY2031-FY2050 by up to "
-        "1.34% (~509 units), reverting the governed re-centring onto the "
-        "published Current line. Do not run this command to 'fix' staleness - "
-        "confirm with the owner first. See docs/FOLLOW_UP_PED_R2_DRIFT.md."
-    ),
-}
+# There are no rebuild caveats. A caveat used to warn that rebuilding the
+# uncertainty pack reverted a governed re-centring (light_petrol_vkt
+# FY2031-FY2050, docs/FOLLOW_UP_PED_R2_DRIFT.md). That was resolved by the
+# governed-artifact reproducibility follow-up: the committed pack predated the
+# published long-run Current line, the pack was rebuilt onto it, and
+# tests/test_revenue_outlook_policy_runtime.py now holds every row to exact
+# reproduction. Every builder command below reproduces its committed pack.
 
 
 def _sha256(path: pathlib.Path) -> str:
@@ -164,7 +146,7 @@ def status_quarterly_display(root: pathlib.Path) -> dict:
 
 
 def status_uncertainty(root: pathlib.Path) -> dict:
-    """Presence and integrity only. Freshness is decided by the policy runtime.
+    """Presence and content integrity. Freshness is decided by the policy runtime.
 
     The uncertainty manifest has no independent source digest. Its
     ``source_files`` entries are provenance PROSE, not a hash map - for example
@@ -174,12 +156,18 @@ def status_uncertainty(root: pathlib.Path) -> dict:
 
     Rather than invent a second opinion, freshness is left to the authority that
     already owns it: ``policy_runtime_source_digest`` chains this manifest's
-    ``scenario_key_digest``, ``seed`` and ``draws``, so a regenerated
-    uncertainty pack makes the policy runtime stale, and that is what gets
-    reported. Two independent staleness rules would eventually disagree, and the
-    disagreement would be silent.
+    content, so a regenerated uncertainty pack makes the policy runtime stale,
+    and that is what gets reported. Two independent staleness rules would
+    eventually disagree, and the disagreement would be silent.
+
+    What this status DOES verify is that the committed pack files are the ones
+    the manifest was built with (``output_hashes``). The governed-artifact
+    reproducibility follow-up found a pack whose committed content its own
+    builder no longer produced while every status here reported ok; pinning the
+    output hashes makes that condition visible instead of silent.
     """
-    manifest_path = root / "data" / "revenue_outlook_uncertainty" / "manifest.json"
+    pack_dir = root / "data" / "revenue_outlook_uncertainty"
+    manifest_path = pack_dir / "manifest.json"
     manifest = _read_json(manifest_path)
     if not manifest:
         return {"status": "missing", "detail": f"{manifest_path} is absent"}
@@ -194,12 +182,39 @@ def status_uncertainty(root: pathlib.Path) -> dict:
             "runtime cannot chain it",
         }
 
+    output_hashes = manifest.get("output_hashes")
+    if not isinstance(output_hashes, dict) or not output_hashes:
+        return {
+            "status": "stale",
+            "detail": (
+                "manifest predates output-hash pinning and cannot prove the "
+                "committed pack files are the ones its builder produced; "
+                "rebuild to pin them"
+            ),
+        }
+    mismatched = []
+    for name, expected in sorted(output_hashes.items()):
+        path = pack_dir / name
+        if not path.exists():
+            mismatched.append(f"{name} (absent)")
+        elif _sha256(path) != str(expected):
+            mismatched.append(name)
+    if mismatched:
+        return {
+            "status": "stale",
+            "detail": (
+                "committed pack content differs from the manifest's recorded "
+                "output hashes: " + ", ".join(mismatched)
+            ),
+        }
+
     rows = manifest.get("band_rows", "?")
     return {
         "status": "ok",
         "detail": (
-            f"present, scenario_key_digest {digest[:12]}, {rows} band rows; "
-            "freshness is enforced transitively via policy_runtime"
+            f"present, scenario_key_digest {digest[:12]}, {rows} band rows, "
+            "output hashes verified; freshness is enforced transitively via "
+            "policy_runtime"
         ),
     }
 
@@ -295,8 +310,6 @@ def build_plan(root: pathlib.Path) -> dict:
 
     for name, record in packs.items():
         record["rebuild_command"] = REBUILD_COMMANDS[name]
-        if name in REBUILD_CAVEATS:
-            record["rebuild_caveat"] = REBUILD_CAVEATS[name]
         record["required"] = name in needs_rebuild
         record["order"] = REBUILD_ORDER.index(name) + 1 if name in needs_rebuild else None
 
@@ -328,10 +341,6 @@ def render_human(plan: dict) -> str:
         for index, name in enumerate(plan["required_rebuilds"], start=1):
             lines.append(f"  {index}. {name}")
             lines.append(f"       {REBUILD_COMMANDS[name]}")
-            caveat = plan["packs"][name].get("rebuild_caveat")
-            if caveat:
-                for chunk in textwrap.wrap(caveat, width=68):
-                    lines.append(f"       !! {chunk}")
         lines.append("")
         lines.append(f"Second idempotency build: {plan['second_build_reason']}")
     else:

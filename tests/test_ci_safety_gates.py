@@ -24,6 +24,7 @@ for a mutation detector must not itself mutate anything.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import pathlib
 import subprocess
@@ -268,15 +269,12 @@ def test_missing_pack_manifest_reports_missing(tmp_path):
     assert packs.status_uncertainty(empty)["status"] == "missing"
 
 
-def test_uncertainty_never_infers_staleness_from_provenance_prose(tmp_path):
-    """source_files values are descriptions, not paths or hashes.
-
-    e.g. "data/current_revenue_outlook (line reconciliation, current_basecase)".
-    Treating them as paths made every clean tree look stale.
-    """
-    root = tmp_path / "repo"
+def _write_uncertainty_pack(root, *, band_bytes=b"band-rows", basis_bytes=b"basis"):
+    """A minimal uncertainty pack whose manifest pins its own content."""
     pack = root / "data" / "revenue_outlook_uncertainty"
-    pack.mkdir(parents=True)
+    pack.mkdir(parents=True, exist_ok=True)
+    (pack / "uncertainty_band_rows.parquet").write_bytes(band_bytes)
+    (pack / "june_year_basis.parquet").write_bytes(basis_bytes)
     (pack / "manifest.json").write_text(
         json.dumps(
             {
@@ -286,10 +284,25 @@ def test_uncertainty_never_infers_staleness_from_provenance_prose(tmp_path):
                     "june_year_errors": "artifacts/long_horizon_validation/x.csv",
                     "central_path": "data/current_revenue_outlook (line reconciliation)",
                 },
+                "output_hashes": {
+                    "uncertainty_band_rows.parquet": hashlib.sha256(band_bytes).hexdigest(),
+                    "june_year_basis.parquet": hashlib.sha256(basis_bytes).hexdigest(),
+                },
             }
         ),
         encoding="utf-8",
     )
+    return pack
+
+
+def test_uncertainty_never_infers_staleness_from_provenance_prose(tmp_path):
+    """source_files values are descriptions, not paths or hashes.
+
+    e.g. "data/current_revenue_outlook (line reconciliation, current_basecase)".
+    Treating them as paths made every clean tree look stale.
+    """
+    root = tmp_path / "repo"
+    _write_uncertainty_pack(root)
     record = packs.status_uncertainty(root)
     assert record["status"] == "ok", (
         "prose source_files must not be read as missing files: " + record["detail"]
@@ -298,6 +311,34 @@ def test_uncertainty_never_infers_staleness_from_provenance_prose(tmp_path):
         "the record must say where freshness is actually enforced, so an 'ok' "
         "here is not mistaken for an independent freshness proof"
     )
+
+
+def test_uncertainty_content_that_differs_from_its_manifest_is_stale(tmp_path):
+    """A committed pack the builder did not produce must be visible.
+
+    The reproducibility follow-up's founding condition: the uncertainty pack's
+    committed content differed from what its own builder produced, and every
+    status still said ok. With output hashes pinned in the manifest, editing a
+    pack file without rebuilding reads as stale.
+    """
+    root = tmp_path / "repo"
+    pack = _write_uncertainty_pack(root)
+    (pack / "uncertainty_band_rows.parquet").write_bytes(b"edited-out-of-band")
+    record = packs.status_uncertainty(root)
+    assert record["status"] == "stale"
+    assert "uncertainty_band_rows.parquet" in record["detail"]
+
+
+def test_uncertainty_manifest_without_output_hashes_is_stale(tmp_path):
+    """A manifest that cannot vouch for its files cannot report ok."""
+    root = tmp_path / "repo"
+    pack = _write_uncertainty_pack(root)
+    manifest = json.loads((pack / "manifest.json").read_text(encoding="utf-8"))
+    del manifest["output_hashes"]
+    (pack / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    record = packs.status_uncertainty(root)
+    assert record["status"] == "stale"
+    assert "output-hash" in record["detail"] or "output_hashes" in record["detail"]
 
 
 def test_uncertainty_without_a_chainable_digest_is_corrupt_not_ok(tmp_path):

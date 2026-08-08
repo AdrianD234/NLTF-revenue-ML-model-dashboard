@@ -40,16 +40,34 @@ os.environ.setdefault("REVENUE_OUTLOOK_CACHE_WARMER", "0")
 # nothing outside the tests sets this variable, so the committed location
 # remains the default.
 #
+# A plain ``setdefault`` is NOT enough. Under pytest-xdist the CONTROLLER
+# imports this conftest first and its setdefault lands in the environment the
+# workers inherit, so every worker's setdefault then keeps the controller's
+# directory and all workers share one destination - which is the incident this
+# redirect exists to prevent, merely relocated into scratch. (Measured: two
+# workers racing in one shared scratch directory produced FileNotFoundError
+# collisions in the atomic CSV writer's tmp-rename. See
+# artifacts/governed_artifact_reproducibility/r2_parallel_diagnosis.md.)
+#
+# The sentinel records the value this conftest derived. If the variable equals
+# the sentinel it was inherited from a parent test process, not set by a user,
+# and is re-derived for THIS process. A user-supplied override never matches
+# the sentinel and is always honoured.
+#
 # This does NOT resolve which R-squared values are authoritative. That is a
-# governance question, tracked separately.
+# governance question, answered in tests/test_r2_engine_identity.py.
 _CHART_SOURCE_SCRATCH = (
     Path(__file__).resolve().parents[1]
     / "test-output"
     / "chart_sources"
     / f"{os.environ.get('PYTEST_XDIST_WORKER', 'main')}-{os.getpid()}"
 )
-_CHART_SOURCE_SCRATCH.mkdir(parents=True, exist_ok=True)
-os.environ.setdefault("NLTF_CHART_SOURCE_OUTPUT_DIR", str(_CHART_SOURCE_SCRATCH))
+_CHART_SOURCE_SENTINEL = "NLTF_CHART_SOURCE_OUTPUT_DIR_AUTOSET"
+_existing = os.environ.get("NLTF_CHART_SOURCE_OUTPUT_DIR")
+if _existing is None or _existing == os.environ.get(_CHART_SOURCE_SENTINEL):
+    _CHART_SOURCE_SCRATCH.mkdir(parents=True, exist_ok=True)
+    os.environ["NLTF_CHART_SOURCE_OUTPUT_DIR"] = str(_CHART_SOURCE_SCRATCH)
+    os.environ[_CHART_SOURCE_SENTINEL] = str(_CHART_SOURCE_SCRATCH)
 
 
 @pytest.fixture

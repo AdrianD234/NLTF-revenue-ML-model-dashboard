@@ -133,6 +133,7 @@ test_groups:
     paths:
       - tests/test_r2_ladder.py
       - tests/test_r2_metrics.py
+      - tests/test_r2_engine_identity.py
       - tests/test_score_basis_governance.py
       - tests/test_forward_scorer_governance.py
       - tests/test_governance_reproducibility_page.py
