@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 import hashlib
 import json
+import os
 from pathlib import Path
 import time
 from typing import Any
@@ -769,7 +770,13 @@ Diagnostic Pass Matrix uses Pass / Watch / Fail semantics.
 
 
 def _write_csv_atomic(frame: pd.DataFrame, path: Path) -> None:
-    tmp = path.with_suffix(path.suffix + ".tmp")
+    # The tmp name carries the pid: two processes writing the same destination
+    # (e.g. two xdist workers each loading an evidence pack, racing on the
+    # untracked compat tables) must not share a tmp file, or one worker's
+    # rename deletes the other's tmp out from under it (FileNotFoundError).
+    # With unique tmps the last rename wins and, the content being identical,
+    # the result is byte-identical whichever writer that is.
+    tmp = path.with_suffix(path.suffix + f".tmp.{os.getpid()}")
     frame.to_csv(tmp, index=False)
     for attempt in range(6):
         try:
