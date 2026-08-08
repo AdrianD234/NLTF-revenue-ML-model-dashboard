@@ -1,0 +1,1011 @@
+{
+  "label": "replay_cache:committed_vs_build1",
+  "left": "/probe/snapshots/committed",
+  "right": "/work/data/revenue_outlook_replay_cache",
+  "overall_classification": "value_movement",
+  "file_count": 72,
+  "class_counts": {
+    "identical": 36,
+    "value_movement": 36
+  },
+  "files": {
+    "ar1/frames/fuel.annual_bridge.parquet": {
+      "rows": [
+        2952,
+        2952
+      ],
+      "classification": "value_movement",
+      "cells_compared": 129888,
+      "cells_different": 730,
+      "cells_outside_structural_contract": 0,
+      "max_abs_diff": 7.275957614183426e-12,
+      "max_rel_diff": 5.233498762267229e-16,
+      "first_divergence": {
+        "column": "value",
+        "row_index": 30,
+        "series_id": "mvr_revenue_net_admin_coo",
+        "FY": 2025,
+        "period": "FY2025",
+        "scenario_name": "current_basecase",
+        "scenario_role": "basecase",
+        "policy_state": "published"
+      }
+    },
+    "ar1/frames/fuel.annual_factors.parquet": {
+      "rows": [
+        738,
+        738
+      ],
+      "classification": "value_movement",
+      "cells_compared": 8856,
+      "cells_different": 431,
+      "cells_outside_structural_contract": 0,
+      "max_abs_diff": 7.275957614183426e-12,
+      "max_rel_diff": 2.0,
+      "first_divergence": {
+        "column": "base_value",
+        "row_index": 27,
+        "series_id": "gross_fed_revenue",
+        "period": "FY2028",
+        "june_year": 2028,
+        "scenario_name": "middle_east_high"
+      }
+    },
+    "ar1/frames/fuel.baseline_macro_annual_factors.parquet": {
+      "rows": [
+        246,
+        246
+      ],
+      "classification": "value_movement",
+      "cells_compared": 2706,
+      "cells_different": 181,
+      "cells_outside_structural_contract": 0,
+      "max_abs_diff": 7.275957614183426e-12,
+      "max_rel_diff": 3.3925621104052437e-12,
+      "first_divergence": {
+        "column": "base_value",
+        "row_index": 22,
+        "series_id": "mvr_revenue_net_admin_coo",
+        "period": "FY2025",
+        "june_year": 2025,
+        "scenario_name": "current_basecase"
+      }
+    },
+    "ar1/frames/fuel.baseline_macro_quarterly_factors.parquet": {
+      "rows": [
+        298,
+        298
+      ],
+      "classification": "value_movement",
+      "cells_compared": 3278,
+      "cells_different": 108,
+      "cells_outside_structural_contract": 0,
+      "max_abs_diff": 4.76837158203125e-07,
+      "max_rel_diff": 8.741437334678113e-14,
+      "first_divergence": {
+        "column": "base_value",
+        "row_index": 3,
+        "series_id": "heavy_ruc_net_km",
+        "period": "2027Q1",
+        "scenario_name": "current_basecase",
+        "stream": "HEAVY_RUC"
+      }
+    },
+    "ar1/frames/fuel.fuel_scenario_inputs.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/fuel.gdp_input_audit.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/fuel.input_audit.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/fuel.policy_pair_factors.parquet": {
+      "rows": [
+        11968,
+        11968
+      ],
+      "classification": "value_movement",
+      "cells_compared": 179520,
+      "cells_different": 3752,
+      "cells_outside_structural_contract": 0,
+      "max_abs_diff": 2.384185791015625e-07,
+      "max_rel_diff": 2.0,
+      "first_divergence": {
+        "column": "base_value",
+        "row_index": 0,
+        "series_id": "heavy_ruc_net_km",
+        "period": "2026Q2",
+        "june_year": 2026,
+        "policy_state": "published",
+        "stream": "HEAVY_RUC"
+      }
+    },
+    "ar1/frames/fuel.policy_scenario_inputs.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/fuel.price_only_replay.assumptions.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/fuel.price_only_replay.component_forecasts.parquet": {
+      "rows": [
+        11609,
+        11609
+      ],
+      "classification": "value_movement",
+      "cells_compared": 568841,
+      "cells_different": 8515,
+      "cells_outside_structural_contract": 0,
+      "max_abs_diff": 9.5367431640625e-07,
+      "max_rel_diff": 2.2180705172956872e-16,
+      "first_divergence": {
+        "column": "stored_replay_max_delta",
+        "row_index": 0,
+        "scenario_name": "__legacy_current_basecase_macro_shadow",
+        "scenario_role": "comparison",
+        "stream": "PED"
+      }
+    },
+    "ar1/frames/fuel.price_only_replay.future_forecasts.parquet": {
+      "rows": [
+        3874,
+        3874
+      ],
+      "classification": "value_movement",
+      "cells_compared": 178204,
+      "cells_different": 3300,
+      "cells_outside_structural_contract": 0,
+      "max_abs_diff": 9.5367431640625e-07,
+      "max_rel_diff": 2.2180705172956872e-16,
+      "first_divergence": {
+        "column": "stored_replay_max_delta",
+        "row_index": 0,
+        "scenario_name": "__legacy_current_basecase_macro_shadow",
+        "scenario_role": "comparison",
+        "stream": "PED"
+      }
+    },
+    "ar1/frames/fuel.price_only_replay.structural_component_forecasts.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/fuel.price_only_replay.superseded_component_forecasts.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/fuel.price_only_replay.validation_report.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/fuel.price_only_replay_inputs.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/fuel.quarterly_factors.parquet": {
+      "rows": [
+        894,
+        894
+      ],
+      "classification": "value_movement",
+      "cells_compared": 10728,
+      "cells_different": 162,
+      "cells_outside_structural_contract": 0,
+      "max_abs_diff": 2.384185791015625e-07,
+      "max_rel_diff": 6.7498460489505954e-15,
+      "first_divergence": {
+        "column": "base_value",
+        "row_index": 0,
+        "series_id": "heavy_ruc_net_km",
+        "period": "2026Q2",
+        "scenario_name": "middle_east_high",
+        "stream": "HEAVY_RUC"
+      }
+    },
+    "ar1/frames/fuel.replay.assumptions.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/fuel.replay.component_forecasts.parquet": {
+      "rows": [
+        893,
+        893
+      ],
+      "classification": "value_movement",
+      "cells_compared": 44650,
+      "cells_different": 654,
+      "cells_outside_structural_contract": 0,
+      "max_abs_diff": 9.5367431640625e-07,
+      "max_rel_diff": 2.1693839712313154e-16,
+      "first_divergence": {
+        "column": "stored_replay_max_delta",
+        "row_index": 0,
+        "scenario_name": "current_basecase",
+        "scenario_role": "basecase",
+        "stream": "PED"
+      }
+    },
+    "ar1/frames/fuel.replay.future_forecasts.parquet": {
+      "rows": [
+        3576,
+        3576
+      ],
+      "classification": "value_movement",
+      "cells_compared": 393360,
+      "cells_different": 5367,
+      "cells_outside_structural_contract": 144,
+      "max_abs_diff": 9.5367431640625e-07,
+      "max_rel_diff": 0.09090909090909091,
+      "first_divergence": {
+        "column": "stored_replay_max_delta",
+        "row_index": 0,
+        "scenario_name": "current_basecase",
+        "scenario_role": "basecase",
+        "stream": "PED"
+      }
+    },
+    "ar1/frames/fuel.replay.structural_component_forecasts.parquet": {
+      "rows": [
+        13112,
+        13112
+      ],
+      "classification": "value_movement",
+      "cells_compared": 340912,
+      "cells_different": 3202,
+      "cells_outside_structural_contract": 0,
+      "max_abs_diff": 2.384185791015625e-07,
+      "max_rel_diff": 0.09090909090909091,
+      "first_divergence": {
+        "column": "component_forecast",
+        "row_index": 45,
+        "scenario_name": "current_basecase_12c_delay_6m",
+        "stream": "PED"
+      }
+    },
+    "ar1/frames/fuel.replay.superseded_component_forecasts.parquet": {
+      "rows": [
+        9823,
+        9823
+      ],
+      "classification": "value_movement",
+      "cells_compared": 510796,
+      "cells_different": 7211,
+      "cells_outside_structural_contract": 0,
+      "max_abs_diff": 9.5367431640625e-07,
+      "max_rel_diff": 2.218070517079366e-16,
+      "first_divergence": {
+        "column": "stored_replay_max_delta",
+        "row_index": 0,
+        "scenario_name": "current_basecase_12c_delay_6m",
+        "scenario_role": "comparison",
+        "stream": "PED"
+      }
+    },
+    "ar1/frames/fuel.replay.validation_report.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/fuel.replay_inputs.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/fuel.treasury_base_inputs.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/macro.baseline_macro_annual_factors.parquet": {
+      "rows": [
+        492,
+        492
+      ],
+      "classification": "value_movement",
+      "cells_compared": 5412,
+      "cells_different": 235,
+      "cells_outside_structural_contract": 0,
+      "max_abs_diff": 7.275957614183426e-12,
+      "max_rel_diff": 3.3925621104052437e-12,
+      "first_divergence": {
+        "column": "scenario_value",
+        "row_index": 52,
+        "series_id": "heavy_ruc_net_km",
+        "period": "FY2026",
+        "june_year": 2026,
+        "scenario_name": "current_basecase"
+      }
+    },
+    "ar1/frames/macro.baseline_macro_quarterly_factors.parquet": {
+      "rows": [
+        596,
+        596
+      ],
+      "classification": "value_movement",
+      "cells_compared": 6556,
+      "cells_different": 172,
+      "cells_outside_structural_contract": 0,
+      "max_abs_diff": 4.76837158203125e-07,
+      "max_rel_diff": 8.741437334678113e-14,
+      "first_divergence": {
+        "column": "scenario_value",
+        "row_index": 0,
+        "series_id": "heavy_ruc_net_km",
+        "period": "2026Q2",
+        "scenario_name": "current_basecase",
+        "stream": "HEAVY_RUC"
+      }
+    },
+    "ar1/frames/macro.replay.assumptions.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/macro.replay.component_forecasts.parquet": {
+      "rows": [
+        3572,
+        3572
+      ],
+      "classification": "value_movement",
+      "cells_compared": 175028,
+      "cells_different": 2565,
+      "cells_outside_structural_contract": 0,
+      "max_abs_diff": 9.5367431640625e-07,
+      "max_rel_diff": 2.2235539881726767e-16,
+      "first_divergence": {
+        "column": "stored_replay_max_delta",
+        "row_index": 0,
+        "scenario_name": "current_basecase",
+        "scenario_role": "basecase",
+        "stream": "PED"
+      }
+    },
+    "ar1/frames/macro.replay.future_forecasts.parquet": {
+      "rows": [
+        1192,
+        1192
+      ],
+      "classification": "value_movement",
+      "cells_compared": 54832,
+      "cells_different": 961,
+      "cells_outside_structural_contract": 0,
+      "max_abs_diff": 9.5367431640625e-07,
+      "max_rel_diff": 2.2235539881726767e-16,
+      "first_divergence": {
+        "column": "stored_replay_max_delta",
+        "row_index": 0,
+        "scenario_name": "current_basecase",
+        "scenario_role": "basecase",
+        "stream": "PED"
+      }
+    },
+    "ar1/frames/macro.replay.structural_component_forecasts.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/macro.replay.superseded_component_forecasts.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/macro.replay.validation_report.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/macro.replay_inputs.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/macro.scenario_replay_lineage.parquet": {
+      "rows": [
+        596,
+        596
+      ],
+      "classification": "value_movement",
+      "cells_compared": 7748,
+      "cells_different": 81,
+      "cells_outside_structural_contract": 0,
+      "max_abs_diff": 4.76837158203125e-07,
+      "max_rel_diff": 2.2235539881726767e-16,
+      "first_divergence": {
+        "column": "raw_model_output",
+        "row_index": 141,
+        "period": "2036Q3",
+        "scenario_name": "current_basecase",
+        "scenario_role": "basecase",
+        "engine": "ar1",
+        "stream": "LIGHT_RUC"
+      }
+    },
+    "ar1/manifest.json": {
+      "classification": "value_movement",
+      "changed_fields": [
+        {
+          "field": "build_environment.platform",
+          "left": "Windows",
+          "right": "Linux"
+        },
+        {
+          "field": "build_environment.python",
+          "left": "3.13.5",
+          "right": "3.11.15"
+        },
+        {
+          "field": "bytes_on_disk",
+          "left": 2099190,
+          "right": 2099136
+        },
+        {
+          "field": "output_hashes.fuel.annual_bridge.parquet",
+          "left": "1a1d660587ae319e3a62a5b83b9bf0f5226616d0a66b89af78ce2094dedf5389",
+          "right": "b59b5cf8219012709946bd6c668cae95dbdfb4c47244a17916bac5895475003a"
+        },
+        {
+          "field": "output_hashes.fuel.annual_factors.parquet",
+          "left": "37387c42ddcb654f6562a5e41d766e6c13b1f15225b4660e18d8d576c77cd904",
+          "right": "24d4d5f43d8c11cbef4a005bd071c21adf3496e6e4e6c9f5fb48679660b2ed2f"
+        },
+        {
+          "field": "output_hashes.fuel.baseline_macro_annual_factors.parquet",
+          "left": "bf1660e0d5ccb63c56c675aa3a03361fcbe6a3b857d7637f3b4b328281f56ca3",
+          "right": "77ddb60922411886bdb7b42aefa84c732f1ddf51eb7a60e4099b8e4ab9440432"
+        },
+        {
+          "field": "output_hashes.fuel.baseline_macro_quarterly_factors.parquet",
+          "left": "b36480dbfcfca7fb63386992ac87efa10fd90fb8508461ba0f8aec0e80a3e575",
+          "right": "a06827d197c04b2d6e1ccab10c54f2177853564ce48cd4d58d29b65139f9e559"
+        },
+        {
+          "field": "output_hashes.fuel.policy_pair_factors.parquet",
+          "left": "68a2035581e7b1673a2ef8ee902cbf39aee0af4e5caa087233bb141fb5a74833",
+          "right": "887359fb70137e8b37932c691d16c45ea27c7a90c3197645da69f59af9919c3d"
+        },
+        {
+          "field": "output_hashes.fuel.price_only_replay.component_forecasts.parquet",
+          "left": "7d7c1513057472fe941f07c30f072dea64aa0e43b80cafc927e0d7ebd8495b21",
+          "right": "08767d196388476d800cafea75898e95092e1c6c68b09fce9f28e4effde62da5"
+        },
+        {
+          "field": "output_hashes.fuel.price_only_replay.future_forecasts.parquet",
+          "left": "e1b52aad7f49ffcce97f1a6fbd09bb92af16475a7e97e95ae85fe79719052f68",
+          "right": "c90731bbcd6f5a6d66b212f10ff01829d02ae9f03e7de20bb0a7d49f1e76a85d"
+        },
+        {
+          "field": "output_hashes.fuel.quarterly_factors.parquet",
+          "left": "b624bc30a7d2a2e77dc95bc79d1acb5b8e1875c45bfbfb1cbf8c1204de2014fb",
+          "right": "8635aafb9e41a8fae54673fff149169499a91135fb76f9b3c6c550b127881650"
+        },
+        {
+          "field": "output_hashes.fuel.replay.component_forecasts.parquet",
+          "left": "7b9312ecf61a8c41ecb4fb8d2703f1b8b6360739b28920558716e0f370676787",
+          "right": "d2497ec3563ef9d61f68e109c82474edf9990f3a074534903d76d2ba9f01b3bd"
+        },
+        {
+          "field": "output_hashes.fuel.replay.future_forecasts.parquet",
+          "left": "e4de727e10a4b6caa835c40b06b9cac1388f8f39dda9bbf731b21b6438ed3880",
+          "right": "532736a6cf83fddfdb1639e3f0e341e0d19b8ff73608089a4a9869f37ea5f480"
+        },
+        {
+          "field": "output_hashes.fuel.replay.structural_component_forecasts.parquet",
+          "left": "ae2cac083dc6c866fc41e71856731ffe86b481c2697b9a0f7a436108a58093b9",
+          "right": "65d8c468505aef14dd37fc6ba4fac2175b52dffc148c263c1fe72226bdf8e337"
+        },
+        {
+          "field": "output_hashes.fuel.replay.superseded_component_forecasts.parquet",
+          "left": "5c5d7af45fdad2680c81229afb28a802610ec9c72c8f00ec1d4d7eb7abc16e0e",
+          "right": "9d60c60ae7c73b5930ae4a53e480410e866a65f035a63f73dec5dd3b07a1b1c1"
+        },
+        {
+          "field": "output_hashes.macro.baseline_macro_annual_factors.parquet",
+          "left": "42297de3380f9541e5f7ad9a4bf60df202da429ad734434803cd843ab0ab0c17",
+          "right": "734dbbee92cb870ae2c26558b7676fbb846de633fe23393f9fa745f51eeccdcd"
+        },
+        {
+          "field": "output_hashes.macro.baseline_macro_quarterly_factors.parquet",
+          "left": "e7d29a26bb949694bf95a83824e71d6b3e19127784c2887e10ca36843bb5d19e",
+          "right": "ae661d5123613653c7bf20244666365350e27762da1095154a42dfa05bb96bd4"
+        },
+        {
+          "field": "output_hashes.macro.replay.component_forecasts.parquet",
+          "left": "ef1e997110353e676561e6b666f261788ed96cbbd96d4f4a46c6604ea8a1b1b7",
+          "right": "8704227d036cc3a3f75d8848707b5d8bb8d1627f41713f333341ba7fadeae430"
+        },
+        {
+          "field": "output_hashes.macro.replay.future_forecasts.parquet",
+          "left": "27c313fca6da3a338fc28ed7133d3e87a25d84f3d6c023a3648030f20d11314c",
+          "right": "0c6583be7228f7328c64c02c3b5d4f2998c39eccf4ac01868e32c9b5f78a2ab3"
+        },
+        {
+          "field": "output_hashes.macro.scenario_replay_lineage.parquet",
+          "left": "46c425721b54aa6e931b8b29b5fb50eeacf8bde0a2256f65294803dbe3c4b0a3",
+          "right": "0a5212520ba3b207f81e50437c2b50134076a97e01459c1f5aea42f70cf9b131"
+        },
+        {
+          "field": "source_main_sha",
+          "left": "398b78be9ee677ce19d5718d0c236c248c5ce618",
+          "right": "ac1895da9a517a0040c363b6077ae37e603ee9a0"
+        }
+      ]
+    },
+    "ensemble/frames/fuel.annual_bridge.parquet": {
+      "rows": [
+        2952,
+        2952
+      ],
+      "classification": "value_movement",
+      "cells_compared": 129888,
+      "cells_different": 615,
+      "cells_outside_structural_contract": 0,
+      "max_abs_diff": 7.275957614183426e-12,
+      "max_rel_diff": 5.233498762267229e-16,
+      "first_divergence": {
+        "column": "value",
+        "row_index": 30,
+        "series_id": "mvr_revenue_net_admin_coo",
+        "FY": 2025,
+        "period": "FY2025",
+        "scenario_name": "current_basecase",
+        "scenario_role": "basecase",
+        "policy_state": "published"
+      }
+    },
+    "ensemble/frames/fuel.annual_factors.parquet": {
+      "rows": [
+        738,
+        738
+      ],
+      "classification": "value_movement",
+      "cells_compared": 8856,
+      "cells_different": 438,
+      "cells_outside_structural_contract": 0,
+      "max_abs_diff": 7.275957614183426e-12,
+      "max_rel_diff": 2.0,
+      "first_divergence": {
+        "column": "base_value",
+        "row_index": 26,
+        "series_id": "gross_fed_revenue",
+        "period": "FY2027",
+        "june_year": 2027,
+        "scenario_name": "middle_east_high"
+      }
+    },
+    "ensemble/frames/fuel.baseline_macro_annual_factors.parquet": {
+      "rows": [
+        246,
+        246
+      ],
+      "classification": "value_movement",
+      "cells_compared": 2706,
+      "cells_different": 150,
+      "cells_outside_structural_contract": 0,
+      "max_abs_diff": 7.275957614183426e-12,
+      "max_rel_diff": 5.951036118206272e-13,
+      "first_divergence": {
+        "column": "base_value",
+        "row_index": 22,
+        "series_id": "mvr_revenue_net_admin_coo",
+        "period": "FY2025",
+        "june_year": 2025,
+        "scenario_name": "current_basecase"
+      }
+    },
+    "ensemble/frames/fuel.baseline_macro_quarterly_factors.parquet": {
+      "rows": [
+        298,
+        298
+      ],
+      "classification": "value_movement",
+      "cells_compared": 3278,
+      "cells_different": 105,
+      "cells_outside_structural_contract": 0,
+      "max_abs_diff": 4.76837158203125e-07,
+      "max_rel_diff": 8.741437334678113e-14,
+      "first_divergence": {
+        "column": "base_value",
+        "row_index": 3,
+        "series_id": "heavy_ruc_net_km",
+        "period": "2027Q1",
+        "scenario_name": "current_basecase",
+        "stream": "HEAVY_RUC"
+      }
+    },
+    "ensemble/frames/fuel.fuel_scenario_inputs.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/fuel.gdp_input_audit.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/fuel.input_audit.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/fuel.policy_pair_factors.parquet": {
+      "rows": [
+        11968,
+        11968
+      ],
+      "classification": "value_movement",
+      "cells_compared": 179520,
+      "cells_different": 3491,
+      "cells_outside_structural_contract": 0,
+      "max_abs_diff": 2.384185791015625e-07,
+      "max_rel_diff": 2.0,
+      "first_divergence": {
+        "column": "base_value",
+        "row_index": 0,
+        "series_id": "heavy_ruc_net_km",
+        "period": "2026Q2",
+        "june_year": 2026,
+        "policy_state": "published",
+        "stream": "HEAVY_RUC"
+      }
+    },
+    "ensemble/frames/fuel.policy_scenario_inputs.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/fuel.price_only_replay.assumptions.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/fuel.price_only_replay.component_forecasts.parquet": {
+      "rows": [
+        12909,
+        12909
+      ],
+      "classification": "value_movement",
+      "cells_compared": 606723,
+      "cells_different": 9799,
+      "cells_outside_structural_contract": 0,
+      "max_abs_diff": 9.5367431640625e-07,
+      "max_rel_diff": 2.2180705172956872e-16,
+      "first_divergence": {
+        "column": "stored_replay_max_delta",
+        "row_index": 0,
+        "scenario_name": "__legacy_current_basecase_macro_shadow",
+        "scenario_role": "comparison",
+        "stream": "PED"
+      }
+    },
+    "ensemble/frames/fuel.price_only_replay.future_forecasts.parquet": {
+      "rows": [
+        3874,
+        3874
+      ],
+      "classification": "value_movement",
+      "cells_compared": 170456,
+      "cells_different": 3292,
+      "cells_outside_structural_contract": 0,
+      "max_abs_diff": 9.5367431640625e-07,
+      "max_rel_diff": 2.2180705172956872e-16,
+      "first_divergence": {
+        "column": "stored_replay_max_delta",
+        "row_index": 0,
+        "scenario_name": "__legacy_current_basecase_macro_shadow",
+        "scenario_role": "comparison",
+        "stream": "PED"
+      }
+    },
+    "ensemble/frames/fuel.price_only_replay.structural_component_forecasts.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/fuel.price_only_replay.superseded_component_forecasts.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/fuel.price_only_replay.validation_report.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/fuel.price_only_replay_inputs.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/fuel.quarterly_factors.parquet": {
+      "rows": [
+        894,
+        894
+      ],
+      "classification": "value_movement",
+      "cells_compared": 10728,
+      "cells_different": 156,
+      "cells_outside_structural_contract": 0,
+      "max_abs_diff": 2.384185791015625e-07,
+      "max_rel_diff": 6.7498460489505954e-15,
+      "first_divergence": {
+        "column": "base_value",
+        "row_index": 0,
+        "series_id": "heavy_ruc_net_km",
+        "period": "2026Q2",
+        "scenario_name": "middle_east_high",
+        "stream": "HEAVY_RUC"
+      }
+    },
+    "ensemble/frames/fuel.replay.assumptions.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/fuel.replay.component_forecasts.parquet": {
+      "rows": [
+        993,
+        993
+      ],
+      "classification": "value_movement",
+      "cells_compared": 47664,
+      "cells_different": 750,
+      "cells_outside_structural_contract": 0,
+      "max_abs_diff": 9.5367431640625e-07,
+      "max_rel_diff": 2.1693839712313154e-16,
+      "first_divergence": {
+        "column": "stored_replay_max_delta",
+        "row_index": 0,
+        "scenario_name": "current_basecase",
+        "scenario_role": "basecase",
+        "stream": "PED"
+      }
+    },
+    "ensemble/frames/fuel.replay.future_forecasts.parquet": {
+      "rows": [
+        3576,
+        3576
+      ],
+      "classification": "value_movement",
+      "cells_compared": 386208,
+      "cells_different": 5314,
+      "cells_outside_structural_contract": 144,
+      "max_abs_diff": 9.5367431640625e-07,
+      "max_rel_diff": 0.09090909090909091,
+      "first_divergence": {
+        "column": "stored_replay_max_delta",
+        "row_index": 0,
+        "scenario_name": "current_basecase",
+        "scenario_role": "basecase",
+        "stream": "PED"
+      }
+    },
+    "ensemble/frames/fuel.replay.structural_component_forecasts.parquet": {
+      "rows": [
+        13112,
+        13112
+      ],
+      "classification": "value_movement",
+      "cells_compared": 340912,
+      "cells_different": 3103,
+      "cells_outside_structural_contract": 0,
+      "max_abs_diff": 2.384185791015625e-07,
+      "max_rel_diff": 0.09090909090909091,
+      "first_divergence": {
+        "column": "component_forecast",
+        "row_index": 199,
+        "scenario_name": "current_basecase_12c_delay_6m",
+        "stream": "HEAVY_RUC"
+      }
+    },
+    "ensemble/frames/fuel.replay.superseded_component_forecasts.parquet": {
+      "rows": [
+        10923,
+        10923
+      ],
+      "classification": "value_movement",
+      "cells_compared": 546150,
+      "cells_different": 8315,
+      "cells_outside_structural_contract": 0,
+      "max_abs_diff": 9.5367431640625e-07,
+      "max_rel_diff": 2.218070517079366e-16,
+      "first_divergence": {
+        "column": "stored_replay_max_delta",
+        "row_index": 0,
+        "scenario_name": "current_basecase_12c_delay_6m",
+        "scenario_role": "comparison",
+        "stream": "PED"
+      }
+    },
+    "ensemble/frames/fuel.replay.validation_report.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/fuel.replay_inputs.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/fuel.treasury_base_inputs.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/macro.baseline_macro_annual_factors.parquet": {
+      "rows": [
+        492,
+        492
+      ],
+      "classification": "value_movement",
+      "cells_compared": 5412,
+      "cells_different": 225,
+      "cells_outside_structural_contract": 0,
+      "max_abs_diff": 7.275957614183426e-12,
+      "max_rel_diff": 1.0414872281584151e-12,
+      "first_divergence": {
+        "column": "scenario_value",
+        "row_index": 52,
+        "series_id": "heavy_ruc_net_km",
+        "period": "FY2026",
+        "june_year": 2026,
+        "scenario_name": "current_basecase"
+      }
+    },
+    "ensemble/frames/macro.baseline_macro_quarterly_factors.parquet": {
+      "rows": [
+        596,
+        596
+      ],
+      "classification": "value_movement",
+      "cells_compared": 6556,
+      "cells_different": 169,
+      "cells_outside_structural_contract": 0,
+      "max_abs_diff": 4.76837158203125e-07,
+      "max_rel_diff": 1.6075748574628022e-13,
+      "first_divergence": {
+        "column": "scenario_value",
+        "row_index": 0,
+        "series_id": "heavy_ruc_net_km",
+        "period": "2026Q2",
+        "scenario_name": "current_basecase",
+        "stream": "HEAVY_RUC"
+      }
+    },
+    "ensemble/frames/macro.replay.assumptions.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/macro.replay.component_forecasts.parquet": {
+      "rows": [
+        3972,
+        3972
+      ],
+      "classification": "value_movement",
+      "cells_compared": 186684,
+      "cells_different": 2962,
+      "cells_outside_structural_contract": 0,
+      "max_abs_diff": 9.5367431640625e-07,
+      "max_rel_diff": 2.2235539881726767e-16,
+      "first_divergence": {
+        "column": "stored_replay_max_delta",
+        "row_index": 0,
+        "scenario_name": "current_basecase",
+        "scenario_role": "basecase",
+        "stream": "PED"
+      }
+    },
+    "ensemble/frames/macro.replay.future_forecasts.parquet": {
+      "rows": [
+        1192,
+        1192
+      ],
+      "classification": "value_movement",
+      "cells_compared": 52448,
+      "cells_different": 959,
+      "cells_outside_structural_contract": 0,
+      "max_abs_diff": 9.5367431640625e-07,
+      "max_rel_diff": 2.2235539881726767e-16,
+      "first_divergence": {
+        "column": "stored_replay_max_delta",
+        "row_index": 0,
+        "scenario_name": "current_basecase",
+        "scenario_role": "basecase",
+        "stream": "PED"
+      }
+    },
+    "ensemble/frames/macro.replay.structural_component_forecasts.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/macro.replay.superseded_component_forecasts.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/macro.replay.validation_report.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/macro.replay_inputs.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/macro.scenario_replay_lineage.parquet": {
+      "rows": [
+        596,
+        596
+      ],
+      "classification": "value_movement",
+      "cells_compared": 7748,
+      "cells_different": 80,
+      "cells_outside_structural_contract": 0,
+      "max_abs_diff": 4.76837158203125e-07,
+      "max_rel_diff": 2.2235539881726767e-16,
+      "first_divergence": {
+        "column": "raw_model_output",
+        "row_index": 141,
+        "period": "2036Q3",
+        "scenario_name": "current_basecase",
+        "scenario_role": "basecase",
+        "engine": "ensemble",
+        "stream": "LIGHT_RUC"
+      }
+    },
+    "ensemble/manifest.json": {
+      "classification": "value_movement",
+      "changed_fields": [
+        {
+          "field": "build_environment.platform",
+          "left": "Windows",
+          "right": "Linux"
+        },
+        {
+          "field": "build_environment.python",
+          "left": "3.13.5",
+          "right": "3.11.15"
+        },
+        {
+          "field": "bytes_on_disk",
+          "left": 2085848,
+          "right": 2085349
+        },
+        {
+          "field": "output_hashes.fuel.annual_bridge.parquet",
+          "left": "cc39b69a3fdd73598f87f13c23366fdda749f33fd5730877285402ea664a533c",
+          "right": "c60bce55da1c36fa1d17e9f027767d2aab1ab052e83e00735d7d2add3777661c"
+        },
+        {
+          "field": "output_hashes.fuel.annual_factors.parquet",
+          "left": "fcf496b9d4eeb0216a17156a3db53ac493ce3edc74b47afe3969642ce8898552",
+          "right": "1983245668440971eac2077b5b065ee002a874b3da4bb0b112a819c00dfd912d"
+        },
+        {
+          "field": "output_hashes.fuel.baseline_macro_annual_factors.parquet",
+          "left": "a43bf3b548e311ae86cb42b46d4b8eaeecb6101ec70afee014062a524492190d",
+          "right": "d68c1f0d1e5892168722260c038be8a7625b6a9d18df1fc1946a64559f140268"
+        },
+        {
+          "field": "output_hashes.fuel.baseline_macro_quarterly_factors.parquet",
+          "left": "f5b2a75fefc0a7d88759af4daa2c5af252b3fa4d3456203417d25343e2cee546",
+          "right": "bd9818a2496f8ebb56c9603a63c54310001bfc77868c275933127ad319cb6e11"
+        },
+        {
+          "field": "output_hashes.fuel.policy_pair_factors.parquet",
+          "left": "dacfda24fed7b12fcd497000f91d8817f34cb7f8dfaedccf59e8c62744a75c07",
+          "right": "35db60f4e9ea4d4a2ee257967dac5dddc1e7d8e56e462703c8aa05e6a3494efb"
+        },
+        {
+          "field": "output_hashes.fuel.price_only_replay.component_forecasts.parquet",
+          "left": "67cef6959bec0b8dcfdc307a9515d755262063a7c5de617827dd4a8761970c42",
+          "right": "904efd4b92088d38744f729aa6e3a05cbdab4f4e138e61715a8088da9dc7484e"
+        },
+        {
+          "field": "output_hashes.fuel.price_only_replay.future_forecasts.parquet",
+          "left": "a6e14ede377ebd654c7f84ea14784aa72ab8985ebb3295735caaafc290ac10d8",
+          "right": "b7df3068d3de74b0f86f8a8f3a460585e675fe3a768b68885ef095c9f32b3c85"
+        },
+        {
+          "field": "output_hashes.fuel.quarterly_factors.parquet",
+          "left": "7c651dd1cd28d18067c2602fe9cbe08d195ce78b77d85fff3441490ce67e6a33",
+          "right": "6636e939595a9e75ed00edcf6f8450a6cc47beb16ffbbdf42d1709a2104d600f"
+        },
+        {
+          "field": "output_hashes.fuel.replay.component_forecasts.parquet",
+          "left": "ed3961ae3d099a896bde0ff164193a39aba593a71fe6c19367594c65168c7a43",
+          "right": "098b323982875e2946c36139b4ce08dc944dc45cde90f7f5efad7b5ee978649a"
+        },
+        {
+          "field": "output_hashes.fuel.replay.future_forecasts.parquet",
+          "left": "6996540cceb07dd8895f227f04cc5ea673fe6098be2f4dbe6ffc94710cadb02b",
+          "right": "7f6e842d8d2a5a63b7ce319e3459fafe2ea14afbdf973261a3a4a6d737cff4cc"
+        },
+        {
+          "field": "output_hashes.fuel.replay.structural_component_forecasts.parquet",
+          "left": "5a08090eb33d2f23144fe8fa847fbe1cdfb5b25e39fddb1d950294575d11d730",
+          "right": "c373737e2ac53eae1eccec582151203a3deb1d9914912a9d93777f5ef2e929b2"
+        },
+        {
+          "field": "output_hashes.fuel.replay.superseded_component_forecasts.parquet",
+          "left": "a522ad993f262d1a651dbf6c700c80bde349fc15bec1cb95c77267a544430ba8",
+          "right": "2fd776db538414408c556a5b85539ca0332c2cf24abe50a2571b33d294d4e84a"
+        },
+        {
+          "field": "output_hashes.macro.baseline_macro_annual_factors.parquet",
+          "left": "62c35ea2736b0440fc6fd64cadba018d03446c4d5a8fefab7a53990a55588a29",
+          "right": "6c3c37a11c467c6e0074e885236b9a1d830caea44409cd640b7699a9a1dcfd48"
+        },
+        {
+          "field": "output_hashes.macro.baseline_macro_quarterly_factors.parquet",
+          "left": "a7941212fb82fce0835e8cd9485f372e2c5f456bdf175844cc16ec7314871158",
+          "right": "bbbaf13a3638b91cc7d80508811ab475586183407a7c0e12f2e49bfe92e3ebb8"
+        },
+        {
+          "field": "output_hashes.macro.replay.component_forecasts.parquet",
+          "left": "00bc51cfa92db4308e67ab1aee0949f6a8efe45e4cb8aa57d14510212a976138",
+          "right": "c6d4f2c801e287bd1b91d7689374226edb3502268af37672551a42235fd08151"
+        },
+        {
+          "field": "output_hashes.macro.replay.future_forecasts.parquet",
+          "left": "bef39e56418b7389ee2fce2303d9577378747b2b537288de0c5a6bc0178c8e9c",
+          "right": "6a9547c2aa2ffc0cf5af58c6e9e214a77ca796a84832f5d1ce03de6933b569b5"
+        },
+        {
+          "field": "output_hashes.macro.scenario_replay_lineage.parquet",
+          "left": "fca471fd7ec1734286028ef981d78014a3a1f8d3827ab5a9bae3ab9a136ee914",
+          "right": "9d8c75c8e73a612793f7bf39c40cc159bb0325dd760a37deb347def948797a8f"
+        },
+        {
+          "field": "source_main_sha",
+          "left": "398b78be9ee677ce19d5718d0c236c248c5ce618",
+          "right": "ac1895da9a517a0040c363b6077ae37e603ee9a0"
+        }
+      ]
+    }
+  }
+}

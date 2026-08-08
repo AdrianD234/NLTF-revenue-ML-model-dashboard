@@ -1,0 +1,36 @@
+{
+  "label": "quarterly_display:build1_vs_build2",
+  "left": "/probe/snapshots/build1",
+  "right": "/work/data/revenue_outlook_quarterly_display",
+  "overall_classification": "identical",
+  "file_count": 8,
+  "class_counts": {
+    "identical": 8
+  },
+  "files": {
+    "annual_reconciliation_audit.parquet": {
+      "classification": "identical"
+    },
+    "coverage_status.csv": {
+      "classification": "identical"
+    },
+    "coverage_status.parquet": {
+      "classification": "identical"
+    },
+    "manifest.json": {
+      "classification": "identical"
+    },
+    "official_annual_rows.parquet": {
+      "classification": "identical"
+    },
+    "quarterly_rows.parquet": {
+      "classification": "identical"
+    },
+    "quarterly_series_contract.csv": {
+      "classification": "identical"
+    },
+    "series_contract.parquet": {
+      "classification": "identical"
+    }
+  }
+}

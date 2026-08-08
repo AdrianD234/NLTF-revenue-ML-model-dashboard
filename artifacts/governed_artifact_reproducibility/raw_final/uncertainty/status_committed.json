@@ -1,0 +1,53 @@
+{
+  "repo_root": "/work",
+  "packs": {
+    "replay_cache": {
+      "status": "ok",
+      "detail": "all engines ok",
+      "per_engine": {
+        "ar1": "ok",
+        "ensemble": "ok"
+      },
+      "rebuild_command": "python scripts/build_revenue_outlook_replay_cache.py --all",
+      "required": false,
+      "order": null
+    },
+    "quarterly_display": {
+      "status": "ok",
+      "detail": "source digest dc3cdc8487b3",
+      "rebuild_command": "python scripts/build_revenue_outlook_quarterly_display_pack.py",
+      "required": false,
+      "order": null
+    },
+    "uncertainty": {
+      "status": "ok",
+      "detail": "present, scenario_key_digest b5ce7ab7a3ef, 1000 band rows, output hashes verified; freshness is enforced transitively via policy_runtime",
+      "rebuild_command": "python scripts/build_revenue_outlook_uncertainty_pack.py",
+      "required": false,
+      "order": null
+    },
+    "policy_runtime": {
+      "status": "ok",
+      "detail": "all engines ok",
+      "per_engine": {
+        "ar1": "ok",
+        "ensemble": "ok"
+      },
+      "rebuild_command": "python scripts/build_revenue_outlook_policy_runtime.py --all",
+      "required": false,
+      "order": null
+    },
+    "databricks_bundle": {
+      "status": "not affected",
+      "detail": "every upstream pack is ok; the bundle is republished on merge to main",
+      "rebuild_command": "python scripts/build_databricks_app_bundle.py --source . --output build/databricks_app/app --clean",
+      "required": false,
+      "order": null
+    }
+  },
+  "required_rebuilds": [],
+  "rebuild_commands": [],
+  "any_stale": false,
+  "second_idempotency_build_required": false,
+  "second_build_reason": "Not required. Run one only when the builder code or schema changed, output determinism is in doubt, or release assurance asks for it."
+}

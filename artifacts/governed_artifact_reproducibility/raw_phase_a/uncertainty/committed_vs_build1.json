@@ -1,0 +1,52 @@
+{
+  "label": "uncertainty:committed_vs_build1",
+  "left": "/probe/snapshots/committed",
+  "right": "/work/data/revenue_outlook_uncertainty",
+  "overall_classification": "value_movement",
+  "file_count": 3,
+  "class_counts": {
+    "serialization_only": 1,
+    "value_movement": 2
+  },
+  "files": {
+    "june_year_basis.parquet": {
+      "rows": [
+        15,
+        15
+      ],
+      "classification": "value_movement",
+      "cells_compared": 510,
+      "cells_different": 6,
+      "max_abs_diff": 6.938893903907228e-18,
+      "max_rel_diff": 2.717547026779418e-16,
+      "first_divergence": {
+        "column": "boot_q10_p95",
+        "row_index": 1,
+        "stream": "HEAVY_RUC"
+      }
+    },
+    "manifest.json": {
+      "classification": "serialization_only",
+      "changed_fields": []
+    },
+    "uncertainty_band_rows.parquet": {
+      "rows": [
+        1000,
+        1000
+      ],
+      "classification": "value_movement",
+      "cells_compared": 18000,
+      "cells_different": 847,
+      "max_abs_diff": 521.8057540320733,
+      "max_rel_diff": 0.014895960822545278,
+      "first_divergence": {
+        "column": "central",
+        "row_index": 5,
+        "series_id": "light_ruc_net_km",
+        "FY": 2026,
+        "period": "FY2026",
+        "engine": "ensemble"
+      }
+    }
+  }
+}

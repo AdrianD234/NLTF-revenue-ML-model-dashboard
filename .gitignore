@@ -211,3 +211,26 @@ artifacts/ci_optimisation/**/*.log
 artifacts/ci_optimisation/**/*.xml
 artifacts/ci_optimisation/wide/
 artifacts/ci_optimisation/xdist/
+
+# Governed-artifact reproducibility evidence: the pack reproducibility
+# matrix, the R2 writer/worker matrices, the uncertainty re-centring audits
+# and the reports they support. Same rule as above - reports, CSVs, JSON and
+# the small value-difference parquet are tracked; raw run logs stay ignored
+# and are reproducible from ci/probe_governed_pack_reproducibility.sh and
+# ci/phase_b_r2_matrix.sh.
+!artifacts/governed_artifact_reproducibility/
+!artifacts/governed_artifact_reproducibility/**/
+!artifacts/governed_artifact_reproducibility/*.md
+!artifacts/governed_artifact_reproducibility/*.csv
+!artifacts/governed_artifact_reproducibility/*.json
+!artifacts/governed_artifact_reproducibility/*.parquet
+!artifacts/governed_artifact_reproducibility/**/*.md
+!artifacts/governed_artifact_reproducibility/**/*.csv
+!artifacts/governed_artifact_reproducibility/**/*.json
+artifacts/governed_artifact_reproducibility/**/*.log
+# The per-probe raw diff parquets are multi-MB and reproducible from the
+# probe scripts; the collated top-level pack_value_differences.parquet is
+# tracked (it is the value-level record the report cites).
+artifacts/governed_artifact_reproducibility/raw_phase_a/**/*.parquet
+artifacts/governed_artifact_reproducibility/raw_phase_b_prefix/**/*.parquet
+artifacts/governed_artifact_reproducibility/raw_final/**/*.parquet

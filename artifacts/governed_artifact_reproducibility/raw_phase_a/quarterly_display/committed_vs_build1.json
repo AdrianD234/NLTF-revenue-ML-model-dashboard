@@ -1,0 +1,70 @@
+{
+  "label": "quarterly_display:committed_vs_build1",
+  "left": "/probe/snapshots/committed",
+  "right": "/work/data/revenue_outlook_quarterly_display",
+  "overall_classification": "value_movement",
+  "file_count": 8,
+  "class_counts": {
+    "identical": 6,
+    "value_movement": 2
+  },
+  "files": {
+    "annual_reconciliation_audit.parquet": {
+      "rows": [
+        2093,
+        2093
+      ],
+      "classification": "value_movement",
+      "cells_compared": 25116,
+      "cells_different": 796,
+      "max_abs_diff": 3.637978807091713e-12,
+      "max_rel_diff": 2.0,
+      "first_divergence": {
+        "column": "derived_sum",
+        "row_index": 10,
+        "series_id": "gross_fed_revenue",
+        "june_year": 2011,
+        "scenario_name": "actual"
+      }
+    },
+    "coverage_status.csv": {
+      "classification": "identical"
+    },
+    "coverage_status.parquet": {
+      "classification": "identical"
+    },
+    "manifest.json": {
+      "classification": "identical"
+    },
+    "official_annual_rows.parquet": {
+      "classification": "identical"
+    },
+    "quarterly_rows.parquet": {
+      "rows": [
+        8344,
+        8344
+      ],
+      "classification": "value_movement",
+      "cells_compared": 600768,
+      "cells_different": 8761,
+      "max_abs_diff": 1.127773430198431e-10,
+      "max_rel_diff": 2.0,
+      "first_divergence": {
+        "column": "value",
+        "row_index": 0,
+        "series_id": "gross_fed_revenue",
+        "period": "2000Q3",
+        "june_year": 2001,
+        "scenario_name": "actual",
+        "scenario_role": "actual",
+        "stream": "gross_fed_revenue"
+      }
+    },
+    "quarterly_series_contract.csv": {
+      "classification": "identical"
+    },
+    "series_contract.parquet": {
+      "classification": "identical"
+    }
+  }
+}

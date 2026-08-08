@@ -815,16 +815,23 @@ def test_band_rows_are_keyed_so_a_state_can_never_borrow_another(runtimes, engin
 
 
 def test_delayed_state_reproduces_the_committed_offline_uncertainty_pack():
-    """The production state's bands must be the PR #15 pack, not a lookalike.
+    """The production state's bands must be the committed pack, exactly.
 
-    The committed pack was built at (ensemble, delayed_6m). Reproducing its
+    The committed pack is built at (ensemble, delayed_6m). Reproducing its
     values from the policy-aware propagation proves the methodology is
     genuinely unchanged - same draws, same copula, same quantile map, same
     seam, same plateau - and that only the centre is policy-dependent.
 
-    One governed exception is carried below: Light petrol VKT FY2031-FY2050,
-    whose band is re-centred onto the now-published Current line. It is held to
-    a rigid-rescale test so a real methodology change still fails.
+    EVERY row is held to exact reproduction. A governed rigid-rescale
+    exception used to sit here for Light petrol VKT FY2031-FY2050: the
+    committed pack predated the published long-run Current line (the Treasury
+    macro restatement, commits 159e68e..0481372), so its long-run band was
+    drawn around a pre-overlay centre that never appeared on the chart, and
+    the runtime re-centred it by one rigid factor. The governed-artifact
+    reproducibility follow-up rebuilt the pack onto the published Current
+    line, so the exception is retired: a reappearing rigid rescale - or any
+    other movement - now fails, because it would mean the committed pack has
+    drifted off the published central path again.
     """
     committed = pd.read_parquet(
         ROOT / "data" / "revenue_outlook_uncertainty" / "uncertainty_band_rows.parquet"
@@ -844,59 +851,65 @@ def test_delayed_state_reproduces_the_committed_offline_uncertainty_pack():
     shared = left.index.intersection(right.index)
     assert len(shared) >= 1000, f"only {len(shared)} shared band rows; the comparison is vacuous"
     columns = ("central", "lower80", "lower50", "draw_median", "upper50", "upper80")
-
-    # Light petrol VKT FY2031-FY2050 is the one governed exception, and it is
-    # a RE-CENTRING rather than a methodology change. The committed pack was
-    # built before that series had any published Current line past FY2030, so
-    # its long-run band was drawn around the pre-overlay level - a centre that
-    # never appeared on the chart. Now that the line is published, the band
-    # follows it onto the Treasury-restated level.
-    #
-    # The exception is held to a strict shape: every one of the six columns
-    # must move by the SAME factor, so relative band widths, the draws, the
-    # copula, the quantile map, the seam and the plateau are all provably
-    # unchanged. A central that moved on its own - or bounds that moved by
-    # different amounts - would fail here.
-    is_recentred = np.array(
-        [
-            series_id == "light_petrol_vkt" and int(fy) >= 2031
-            for series_id, fy in shared
-        ]
-    )
-    unchanged = shared[~is_recentred]
-    assert len(unchanged) >= 900, "vacuous: too few rows held to exact reproduction"
     for column in columns:
         np.testing.assert_allclose(
-            left.loc[unchanged, column].to_numpy(dtype=float),
-            right.loc[unchanged, column].to_numpy(dtype=float),
+            left.loc[shared, column].to_numpy(dtype=float),
+            right.loc[shared, column].to_numpy(dtype=float),
             rtol=0.0,
             atol=1e-9,
             err_msg=f"{column} drifted from the committed offline uncertainty pack",
         )
 
-    recentred = shared[is_recentred]
-    assert len(recentred) == 20, f"expected 20 re-centred rows, got {len(recentred)}"
-    factors = []
-    for column in columns:
-        before = left.loc[recentred, column].to_numpy(dtype=float)
-        after = right.loc[recentred, column].to_numpy(dtype=float)
-        moving = before != 0.0
-        assert moving.any(), f"{column} is entirely zero; the check would be vacuous"
-        factors.append(after[moving] / before[moving])
-    stacked = np.concatenate(factors)
-    np.testing.assert_allclose(
-        stacked,
-        np.full_like(stacked, stacked[0]),
-        rtol=0.0,
-        atol=1e-9,
-        err_msg=(
-            "the re-centred Light petrol VKT band did not move as one rigid "
-            "rescale, so this is a methodology change rather than a re-centring"
-        ),
+
+def test_the_offline_pack_centre_is_the_published_current_line():
+    """Every offline band row is centred on the published Current base path.
+
+    This is the permanent guard for the incident the reproducibility
+    follow-up closed: the offline pack once carried a Light petrol VKT
+    FY2031-FY2050 centre that never appeared on the chart, because the pack
+    was built before the long-run Current line was published, and nothing
+    compared the two afterwards. Here the committed offline centre is held to
+    the committed policy runtime's aligned line reconciliation for the same
+    (ensemble, delayed_6m) state - the path the dashboard actually draws - so
+    a pack that drifts off the published central path reads as a failure, not
+    as a plausible band around an invisible centre.
+    """
+    committed = pd.read_parquet(
+        ROOT / "data" / "revenue_outlook_uncertainty" / "uncertainty_band_rows.parquet"
     )
-    # And the factor is the governed macro restatement, not an arbitrary shift.
-    assert 1.0 < float(stacked[0]) < 1.05, (
-        f"implausible re-centring factor {float(stacked[0])}"
+    runtime = load_policy_runtime(engine=ENGINE_ENSEMBLE, repo_root=ROOT)
+    pack, _signature = _pack_and_signature(ENGINE_ENSEMBLE)
+    frames = policy_detail_frames(
+        runtime, _governed_key(pack, ENGINE_ENSEMBLE, "delayed_6m", "published")
+    )
+    line = frames.line_reconciliation
+    base = line[line["scenario_name"].astype(str).eq("current_basecase")].copy()
+    base["FY"] = pd.to_numeric(base["FY"], errors="coerce")
+    base["value"] = pd.to_numeric(base["value"], errors="coerce")
+    base = base.dropna(subset=["FY", "value"])
+    published: dict[tuple[str, int], float] = {}
+    for _, row in base.iterrows():
+        published.setdefault((str(row["series_id"]), int(row["FY"])), float(row["value"]))
+
+    checked = 0
+    light_petrol_long_run = 0
+    for _, row in committed.iterrows():
+        key = (str(row["series_id"]), int(row["FY"]))
+        expected = published.get(key)
+        if expected is None:
+            continue
+        checked += 1
+        if key[0] == "light_petrol_vkt" and key[1] >= 2031:
+            light_petrol_long_run += 1
+        assert float(row["central"]) == pytest.approx(expected, rel=0.0, abs=1e-9), (
+            f"offline centre for {key} is {float(row['central'])}, but the "
+            f"published Current line carries {expected}; the pack has drifted "
+            "off the published central path"
+        )
+    assert checked >= 500, f"only {checked} rows covered; the comparison is vacuous"
+    assert light_petrol_long_run == 20, (
+        "the Light petrol VKT FY2031-FY2050 rows - the ones this guard exists "
+        f"for - were not all covered ({light_petrol_long_run}/20)"
     )
 
 

@@ -41,5 +41,11 @@
   "source_files": {
     "june_year_errors": "artifacts/long_horizon_validation/long_horizon_june_year_errors.csv",
     "central_path": "data/current_revenue_outlook (line reconciliation, current_basecase)"
+  },
+  "builder_version": "2",
+  "source_main_sha": "ab5f026766b7164a611d82ae809f22e1fce2929f",
+  "output_hashes": {
+    "uncertainty_band_rows.parquet": "2d0a732908f06fec0ea6dfcb6a90a0b6bdef6ceaa759338b62f66ebbdcc0e7ea",
+    "june_year_basis.parquet": "3c12c24ebafd05de9c0375b9adbd909530238aa4874152dc25679be54a17ef2a"
   }
 }

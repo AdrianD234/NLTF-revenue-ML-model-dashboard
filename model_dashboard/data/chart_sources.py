@@ -187,7 +187,12 @@ def write_chart_source_tables(
 
 
 def _write_csv_atomic(frame: pd.DataFrame, path: Path) -> None:
-    tmp = path.with_suffix(path.suffix + ".tmp")
+    # Pid-unique tmp: concurrent writers of one destination (isolated xdist
+    # workers each writing their own chart-source directory still share the
+    # untracked artifacts-root compat tables) must not share a tmp file, or
+    # one rename deletes the other's tmp (FileNotFoundError). Unique tmps make
+    # the race benign: identical content, last rename wins.
+    tmp = path.with_suffix(path.suffix + f".tmp.{os.getpid()}")
     frame.to_csv(tmp, index=False)
     for attempt in range(6):
         try:

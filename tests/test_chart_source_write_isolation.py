@@ -11,9 +11,9 @@ effect, and seven test modules load one. Before this isolation existed:
     while every test still passed.
 
 See ``artifacts/ci_optimisation/xdist_benchmark.md`` for the incident and
-``docs/FOLLOW_UP_PED_R2_DRIFT.md`` for the separate, still-open question of which
-R-squared values are authoritative. Nothing here answers that; these tests only
-ensure the tests themselves stop overwriting the evidence.
+``docs/FOLLOW_UP_PED_R2_DRIFT.md`` for its resolution: the two value sets are
+the two ENGINE identities, pinned by ``tests/test_r2_engine_identity.py``.
+These tests only ensure the tests themselves stop overwriting the evidence.
 """
 
 from __future__ import annotations
@@ -219,6 +219,7 @@ def test_no_test_module_hardcodes_the_tracked_chart_source_directory():
         "test_forecast_runner.py",                 # `git ls-files artifacts/chart_sources`
         "test_playwright_dashboard.py",            # reads the running app's output
         "test_playwright_frontend_interactions.py",  # reads the running app's output
+        "test_r2_engine_identity.py",              # READS the committed values it pins
     }
     pattern = re.compile(
         r'"artifacts"\s*/\s*"chart_sources"'      # "artifacts" / "chart_sources"

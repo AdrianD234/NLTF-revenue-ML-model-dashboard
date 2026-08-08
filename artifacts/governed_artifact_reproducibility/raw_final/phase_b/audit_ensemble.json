@@ -1,0 +1,73 @@
+{
+  "pid": 1,
+  "xdist_worker": "<none>",
+  "engine": "ensemble",
+  "evidence_root": "data/dashboard_evidence_pack",
+  "chart_output_dir": "/probe/chart_ensemble",
+  "environment": {
+    "DASHBOARD_ENGINE_DEFAULT": "<unset>",
+    "DASHBOARD_EVIDENCE_PACK_ROOT": "<unset>",
+    "NLTF_CHART_SOURCE_OUTPUT_DIR": "/probe/chart_ensemble",
+    "NLTF_FORCE_R2_LADDER_DEP_FALLBACK": "<unset>"
+  },
+  "source_hashes": {
+    "scorecard_predictions.parquet": "d9c72c8eb0e8db9d45e36bdd1e959b9927c368cfa4034e2ebd3693838113275e",
+    "diagnostic_tests.parquet": "def4530df629db9bc44ff1fb661346ae100528576227d1579d2b535caa6e2fe6",
+    "reproducibility/heavy_ruc/component_predictions.parquet": "4ba756fa2061b55c50a5dcaf9cd20aa59caa28285abd848f5986584b699109bf",
+    "reproducibility/heavy_ruc/training_fit_predictions.parquet": "b44d2ffd8b90464d0caa49bc672abd93ee44bca57ed752a2c1a5ec7e68d9d8e1",
+    "reproducibility/heavy_ruc_vnext/component_predictions.parquet": "14619cf62eed9b8dc7f6f69776785990ab28e08d31a4059144aa970b1b1e0660",
+    "reproducibility/heavy_ruc_vnext/training_fit_predictions.parquet": "d5e51efa2ede059c8b9852c08f96d251d7b97252d3b0a48ec5d2fbd4cc353562",
+    "reproducibility/light_ruc/component_predictions.parquet": "e19f109fad079f96a1839c9bfe6f89c605d4750c588dc85b76eeb8a614a8b550",
+    "reproducibility/light_ruc/training_fit_predictions.parquet": "2557c6c1f476d028d0dfe365782a0599a194b0eaa00164ac4a98c99a67ab1a9e",
+    "reproducibility/light_ruc_vnext/training_fit_predictions.parquet": "32df27605c2f80e26a6dda5a389aea5a3936cb38c6ed9817239715beb92f399f",
+    "reproducibility/ped/component_predictions.parquet": "ca72f83887edd2f4a8323b27090f740065a4015b20f40f6db1f085e61bb2f109",
+    "reproducibility/ped/training_fit_predictions.parquet": "0c73f6ddb64ad34246617334e28e1bdfa20b936beeb721706c7a0b1551a40901",
+    "reproducibility/ped_vnext/component_predictions.parquet": "0e8923c7fa4f74d885da3ef860dbfa875ca4b79372429b128a4865f7da279feb",
+    "reproducibility/ped_vnext/training_fit_predictions.parquet": "a1a68cf55fef70ac775ac8e27a9012273cd9f16cd56ff59c35094c13e1e744ff"
+  },
+  "computed_calibration_r2": {
+    "current_grid_operational_pooled": 0.5591936636031876,
+    "schiff_paper_horizon_mean": 0.9230110422702978
+  },
+  "reconstruction": {
+    "current_grid_operational_pooled": {
+      "n_rows": 606,
+      "actual_sha256": "150cc15a30d9da276b7ce03fecd176a7f4a906bbe7d77c254d1b9c27d73054e0",
+      "pred_sha256": "fda2cc553e5231a28b15c1536b1a805829aa6831d9467acbd1407851d1c6a1f5",
+      "intercept": 375.66761795635654,
+      "slope": 0.7597265011803083,
+      "sse": 2074296.9807071658,
+      "sst": 4705687.75771837,
+      "mz_calibration_r2": 0.5591936636031876
+    },
+    "schiff_paper_horizon_mean": {
+      "n_rows": 126,
+      "actual_sha256": "7386bc739538a4ddc6b682ce579584ece8841a5973b6985aaab5174e10b37099",
+      "pred_sha256": "bb9b6fb4b1cac238c72e17512fdc3c61b18cf1614d3aef78ecede2db718ec246",
+      "intercept": 286.9020329765768,
+      "slope": 0.8080873899674871,
+      "sse": 305292.8176893118,
+      "sst": 919767.0065005185,
+      "mz_calibration_r2": 0.6680759197365929
+    }
+  },
+  "diagnostic_override": {
+    "stored_calibration_r2": 0.9230110422702978,
+    "default_score_basis": "schiff_paper_horizon_mean",
+    "model": "PED__VNEXT_SOLVED_CONVEX_TOP2"
+  },
+  "written_csv": {
+    "current_grid_operational_pooled": {
+      "calibration_r2": "0.5591936636031876",
+      "model": "PED__VNEXT_SOLVED_CONVEX_TOP2",
+      "n_rows": "606"
+    },
+    "schiff_paper_horizon_mean": {
+      "calibration_r2": "0.9230110422702978",
+      "model": "PED__VNEXT_SOLVED_CONVEX_TOP2",
+      "n_rows": "126"
+    },
+    "file_sha256": "4a247e03540d54f05f9276432d28c6068ac8979d94ec5adfbae36fb19f0ad1f6"
+  },
+  "python": "3.11.15 (main, Aug  5 2026, 03:58:57) [GCC 12.2.0]"
+}

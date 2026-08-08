@@ -31,7 +31,9 @@ RUC total.
 """
 from __future__ import annotations
 
+import hashlib
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -68,6 +70,31 @@ LONG_HORIZON = ROOT / "artifacts" / "long_horizon_validation"
 PACK_DIR = ROOT / "data" / "revenue_outlook_uncertainty"
 AUDIT_DIR = ROOT / "artifacts" / "revenue_outlook_layered_uncertainty"
 FORMULA_TOLERANCE = 1e-6
+# Bumped to "2" when the manifest gained output_hashes and source_main_sha so
+# a committed pack whose bytes differ from what its builder produced reads as
+# stale in scripts/plan_governed_pack_rebuilds.py instead of silently ok.
+BUILDER_VERSION = "2"
+
+
+def _git_head() -> str:
+    try:
+        return subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return ""
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 PED_LEAVES = (
     "ped_vkt_per_capita", "ped_volume", "light_petrol_vkt",
@@ -335,6 +362,15 @@ def main() -> None:
         "source_files": {
             "june_year_errors": "artifacts/long_horizon_validation/long_horizon_june_year_errors.csv",
             "central_path": "data/current_revenue_outlook (line reconciliation, current_basecase)",
+        },
+        # Content pinning: lets the planner detect a committed pack whose
+        # bytes are not the ones this builder produced. Freshness (whether the
+        # inputs moved) remains the policy runtime's digest chain.
+        "builder_version": BUILDER_VERSION,
+        "source_main_sha": _git_head(),
+        "output_hashes": {
+            name: _sha256_file(PACK_DIR / name)
+            for name in ("uncertainty_band_rows.parquet", "june_year_basis.parquet")
         },
     }
     (PACK_DIR / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
