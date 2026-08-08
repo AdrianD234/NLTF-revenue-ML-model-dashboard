@@ -1,0 +1,69 @@
+{
+  "label": "uncertainty:committed_vs_build1",
+  "left": "/probe/snapshots/committed",
+  "right": "/work/data/revenue_outlook_uncertainty",
+  "overall_classification": "value_movement",
+  "file_count": 3,
+  "class_counts": {
+    "value_movement": 3
+  },
+  "files": {
+    "june_year_basis.parquet": {
+      "rows": [
+        15,
+        15
+      ],
+      "classification": "value_movement",
+      "cells_compared": 510,
+      "cells_different": 6,
+      "cells_outside_structural_contract": 0,
+      "max_abs_diff": 6.938893903907228e-18,
+      "max_rel_diff": 2.717547026779418e-16,
+      "first_divergence": {
+        "column": "boot_q10_p95",
+        "row_index": 1,
+        "stream": "HEAVY_RUC"
+      }
+    },
+    "manifest.json": {
+      "classification": "value_movement",
+      "changed_fields": [
+        {
+          "field": "output_hashes.june_year_basis.parquet",
+          "left": "3c12c24ebafd05de9c0375b9adbd909530238aa4874152dc25679be54a17ef2a",
+          "right": "7ac1af3da42bdbad8843a2f6e9fae72209e72e1776f1f7691f64dff4232a1320"
+        },
+        {
+          "field": "output_hashes.uncertainty_band_rows.parquet",
+          "left": "2d0a732908f06fec0ea6dfcb6a90a0b6bdef6ceaa759338b62f66ebbdcc0e7ea",
+          "right": "f1edf4d623e9b05b69eb7cb059cc536fcbc0ef0afe1136b7a4b09d7667392bc1"
+        },
+        {
+          "field": "source_main_sha",
+          "left": "ab5f026766b7164a611d82ae809f22e1fce2929f",
+          "right": "a5d90d45e5e182eda3eb14b21f323c16be0de0e5"
+        }
+      ]
+    },
+    "uncertainty_band_rows.parquet": {
+      "rows": [
+        1000,
+        1000
+      ],
+      "classification": "value_movement",
+      "cells_compared": 18000,
+      "cells_different": 682,
+      "cells_outside_structural_contract": 0,
+      "max_abs_diff": 7.275957614183426e-12,
+      "max_rel_diff": 1.3918302169166703e-14,
+      "first_divergence": {
+        "column": "central",
+        "row_index": 5,
+        "series_id": "light_ruc_net_km",
+        "FY": 2026,
+        "period": "FY2026",
+        "engine": "ensemble"
+      }
+    }
+  }
+}

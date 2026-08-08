@@ -1,0 +1,55 @@
+section,writer_or_worker,score_basis,calibration_r2,model,equals_committed_ensemble_value,equals_ar1_identity_value
+A. engine identity audits,ensemble,current_grid_operational_pooled,0.5591936636031876,PED__VNEXT_SOLVED_CONVEX_TOP2,True,False
+A. engine identity audits,ensemble,schiff_paper_horizon_mean,0.9230110422702978,PED__VNEXT_SOLVED_CONVEX_TOP2,True,False
+A. engine identity audits,ar1,current_grid_operational_pooled,0.5803595524485978,PED__VNEXT_SOLVED_CONVEX_TOP2,False,True
+A. engine identity audits,ar1,schiff_paper_horizon_mean,0.9448430187011027,PED__VNEXT_SOLVED_CONVEX_TOP2,False,True
+A. engine identity audits,<tracked chart sources>,,,,True,False
+"B. sequential writer modules, normal order",<tracked chart sources>,,,,True,False
+"B. sequential writer modules, normal order",main-1,current_grid_operational_pooled,0.5591936636031876,PED__VNEXT_SOLVED_CONVEX_TOP2,True,False
+"B. sequential writer modules, normal order",main-1,schiff_paper_horizon_mean,0.9230110422702978,PED__VNEXT_SOLVED_CONVEX_TOP2,True,False
+C/D. xdist_n2_load,<tracked chart sources>,,,,True,False
+C/D. xdist_n2_load,xdist_n2_load gw0-8,current_grid_operational_pooled,0.5591936636031876,PED__VNEXT_SOLVED_CONVEX_TOP2,True,False
+C/D. xdist_n2_load,xdist_n2_load gw0-8,schiff_paper_horizon_mean,0.9230110422702978,PED__VNEXT_SOLVED_CONVEX_TOP2,True,False
+C/D. xdist_n2_load,xdist_n2_load gw1-11,current_grid_operational_pooled,0.5591936636031876,PED__VNEXT_SOLVED_CONVEX_TOP2,True,False
+C/D. xdist_n2_load,xdist_n2_load gw1-11,schiff_paper_horizon_mean,0.9230110422702978,PED__VNEXT_SOLVED_CONVEX_TOP2,True,False
+C/D. xdist_n4_load,<tracked chart sources>,,,,True,False
+C/D. xdist_n4_load,xdist_n4_load gw0-8,current_grid_operational_pooled,0.5591936636031876,PED__VNEXT_SOLVED_CONVEX_TOP2,True,False
+C/D. xdist_n4_load,xdist_n4_load gw0-8,schiff_paper_horizon_mean,0.9230110422702978,PED__VNEXT_SOLVED_CONVEX_TOP2,True,False
+C/D. xdist_n4_load,xdist_n4_load gw1-11,current_grid_operational_pooled,0.5591936636031876,PED__VNEXT_SOLVED_CONVEX_TOP2,True,False
+C/D. xdist_n4_load,xdist_n4_load gw1-11,schiff_paper_horizon_mean,0.9230110422702978,PED__VNEXT_SOLVED_CONVEX_TOP2,True,False
+C/D. xdist_n4_load,xdist_n4_load gw2-14,current_grid_operational_pooled,0.5591936636031876,PED__VNEXT_SOLVED_CONVEX_TOP2,True,False
+C/D. xdist_n4_load,xdist_n4_load gw2-14,schiff_paper_horizon_mean,0.9230110422702978,PED__VNEXT_SOLVED_CONVEX_TOP2,True,False
+C/D. xdist_n4_load,xdist_n4_load gw3-17,current_grid_operational_pooled,0.5591936636031876,PED__VNEXT_SOLVED_CONVEX_TOP2,True,False
+C/D. xdist_n4_load,xdist_n4_load gw3-17,schiff_paper_horizon_mean,0.9230110422702978,PED__VNEXT_SOLVED_CONVEX_TOP2,True,False
+C/D. xdist_n2_loadscope,<tracked chart sources>,,,,True,False
+C/D. xdist_n2_loadscope,xdist_n2_loadscope gw0-8,current_grid_operational_pooled,0.5591936636031876,PED__VNEXT_SOLVED_CONVEX_TOP2,True,False
+C/D. xdist_n2_loadscope,xdist_n2_loadscope gw0-8,schiff_paper_horizon_mean,0.9230110422702978,PED__VNEXT_SOLVED_CONVEX_TOP2,True,False
+C/D. xdist_n2_loadscope,xdist_n2_loadscope gw1-11,current_grid_operational_pooled,0.5591936636031876,PED__VNEXT_SOLVED_CONVEX_TOP2,True,False
+C/D. xdist_n2_loadscope,xdist_n2_loadscope gw1-11,schiff_paper_horizon_mean,0.9230110422702978,PED__VNEXT_SOLVED_CONVEX_TOP2,True,False
+C/D. xdist_n4_loadscope,<tracked chart sources>,,,,True,False
+C/D. xdist_n4_loadscope,xdist_n4_loadscope gw0-8,current_grid_operational_pooled,0.5591936636031876,PED__VNEXT_SOLVED_CONVEX_TOP2,True,False
+C/D. xdist_n4_loadscope,xdist_n4_loadscope gw0-8,schiff_paper_horizon_mean,0.9230110422702978,PED__VNEXT_SOLVED_CONVEX_TOP2,True,False
+C/D. xdist_n4_loadscope,xdist_n4_loadscope gw1-11,current_grid_operational_pooled,0.5591936636031876,PED__VNEXT_SOLVED_CONVEX_TOP2,True,False
+C/D. xdist_n4_loadscope,xdist_n4_loadscope gw1-11,schiff_paper_horizon_mean,0.9230110422702978,PED__VNEXT_SOLVED_CONVEX_TOP2,True,False
+C/D. xdist_n4_loadscope,xdist_n4_loadscope gw2-14,current_grid_operational_pooled,0.5591936636031876,PED__VNEXT_SOLVED_CONVEX_TOP2,True,False
+C/D. xdist_n4_loadscope,xdist_n4_loadscope gw2-14,schiff_paper_horizon_mean,0.9230110422702978,PED__VNEXT_SOLVED_CONVEX_TOP2,True,False
+C/D. xdist_n4_loadscope,xdist_n4_loadscope gw3-17,current_grid_operational_pooled,0.5591936636031876,PED__VNEXT_SOLVED_CONVEX_TOP2,True,False
+C/D. xdist_n4_loadscope,xdist_n4_loadscope gw3-17,schiff_paper_horizon_mean,0.9230110422702978,PED__VNEXT_SOLVED_CONVEX_TOP2,True,False
+C/D. xdist_n4_loadfile,<tracked chart sources>,,,,True,False
+C/D. xdist_n4_loadfile,xdist_n4_loadfile gw0-8,current_grid_operational_pooled,0.5591936636031876,PED__VNEXT_SOLVED_CONVEX_TOP2,True,False
+C/D. xdist_n4_loadfile,xdist_n4_loadfile gw0-8,schiff_paper_horizon_mean,0.9230110422702978,PED__VNEXT_SOLVED_CONVEX_TOP2,True,False
+C/D. xdist_n4_loadfile,xdist_n4_loadfile gw1-11,current_grid_operational_pooled,0.5591936636031876,PED__VNEXT_SOLVED_CONVEX_TOP2,True,False
+C/D. xdist_n4_loadfile,xdist_n4_loadfile gw1-11,schiff_paper_horizon_mean,0.9230110422702978,PED__VNEXT_SOLVED_CONVEX_TOP2,True,False
+C/D. xdist_n4_loadfile,xdist_n4_loadfile gw2-14,current_grid_operational_pooled,0.5591936636031876,PED__VNEXT_SOLVED_CONVEX_TOP2,True,False
+C/D. xdist_n4_loadfile,xdist_n4_loadfile gw2-14,schiff_paper_horizon_mean,0.9230110422702978,PED__VNEXT_SOLVED_CONVEX_TOP2,True,False
+C/D. xdist_n4_loadfile,xdist_n4_loadfile gw3-17,current_grid_operational_pooled,0.5591936636031876,PED__VNEXT_SOLVED_CONVEX_TOP2,True,False
+C/D. xdist_n4_loadfile,xdist_n4_loadfile gw3-17,schiff_paper_horizon_mean,0.9230110422702978,PED__VNEXT_SOLVED_CONVEX_TOP2,True,False
+"F. shared destination (pre-fix world, in scratch)",<tracked chart sources>,,,,True,False
+"F. shared destination (pre-fix world, in scratch)",shared rep 1 final content,current_grid_operational_pooled,0.5591936636031876,PED__VNEXT_SOLVED_CONVEX_TOP2,True,False
+"F. shared destination (pre-fix world, in scratch)",shared rep 1 final content,schiff_paper_horizon_mean,0.9230110422702978,PED__VNEXT_SOLVED_CONVEX_TOP2,True,False
+"F. shared destination (pre-fix world, in scratch)",<tracked chart sources>,,,,True,False
+"F. shared destination (pre-fix world, in scratch)",shared rep 2 final content,current_grid_operational_pooled,0.5591936636031876,PED__VNEXT_SOLVED_CONVEX_TOP2,True,False
+"F. shared destination (pre-fix world, in scratch)",shared rep 2 final content,schiff_paper_horizon_mean,0.9230110422702978,PED__VNEXT_SOLVED_CONVEX_TOP2,True,False
+"F. shared destination (pre-fix world, in scratch)",<tracked chart sources>,,,,True,False
+"F. shared destination (pre-fix world, in scratch)",shared rep 3 final content,current_grid_operational_pooled,0.5591936636031876,PED__VNEXT_SOLVED_CONVEX_TOP2,True,False
+"F. shared destination (pre-fix world, in scratch)",shared rep 3 final content,schiff_paper_horizon_mean,0.9230110422702978,PED__VNEXT_SOLVED_CONVEX_TOP2,True,False

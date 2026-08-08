@@ -1,0 +1,73 @@
+{
+  "pid": 1,
+  "xdist_worker": "<none>",
+  "engine": "ar1",
+  "evidence_root": "data/engine_ar1/dashboard_evidence_pack",
+  "chart_output_dir": "/probe/chart_ar1",
+  "environment": {
+    "DASHBOARD_ENGINE_DEFAULT": "<unset>",
+    "DASHBOARD_EVIDENCE_PACK_ROOT": "<unset>",
+    "NLTF_CHART_SOURCE_OUTPUT_DIR": "/probe/chart_ar1",
+    "NLTF_FORCE_R2_LADDER_DEP_FALLBACK": "<unset>"
+  },
+  "source_hashes": {
+    "scorecard_predictions.parquet": "45805c8586673c4bdb7dd6e5b464a703bd933101a575628716539ae9ecf14cda",
+    "diagnostic_tests.parquet": "6f72155e9f407818c1cc20600d01f6e68cee76ab9f05962ed78b22907565b766",
+    "reproducibility/heavy_ruc/component_predictions.parquet": "4ba756fa2061b55c50a5dcaf9cd20aa59caa28285abd848f5986584b699109bf",
+    "reproducibility/heavy_ruc/training_fit_predictions.parquet": "b44d2ffd8b90464d0caa49bc672abd93ee44bca57ed752a2c1a5ec7e68d9d8e1",
+    "reproducibility/heavy_ruc_vnext/component_predictions.parquet": "14619cf62eed9b8dc7f6f69776785990ab28e08d31a4059144aa970b1b1e0660",
+    "reproducibility/heavy_ruc_vnext/training_fit_predictions.parquet": "d5e51efa2ede059c8b9852c08f96d251d7b97252d3b0a48ec5d2fbd4cc353562",
+    "reproducibility/light_ruc/component_predictions.parquet": "e19f109fad079f96a1839c9bfe6f89c605d4750c588dc85b76eeb8a614a8b550",
+    "reproducibility/light_ruc/training_fit_predictions.parquet": "2557c6c1f476d028d0dfe365782a0599a194b0eaa00164ac4a98c99a67ab1a9e",
+    "reproducibility/light_ruc_vnext/training_fit_predictions.parquet": "32df27605c2f80e26a6dda5a389aea5a3936cb38c6ed9817239715beb92f399f",
+    "reproducibility/ped/component_predictions.parquet": "ca72f83887edd2f4a8323b27090f740065a4015b20f40f6db1f085e61bb2f109",
+    "reproducibility/ped/training_fit_predictions.parquet": "0c73f6ddb64ad34246617334e28e1bdfa20b936beeb721706c7a0b1551a40901",
+    "reproducibility/ped_vnext/component_predictions.parquet": "0e8923c7fa4f74d885da3ef860dbfa875ca4b79372429b128a4865f7da279feb",
+    "reproducibility/ped_vnext/training_fit_predictions.parquet": "a1a68cf55fef70ac775ac8e27a9012273cd9f16cd56ff59c35094c13e1e744ff"
+  },
+  "computed_calibration_r2": {
+    "current_grid_operational_pooled": 0.5803595524485978,
+    "schiff_paper_horizon_mean": 0.9448430187011027
+  },
+  "reconstruction": {
+    "current_grid_operational_pooled": {
+      "n_rows": 606,
+      "actual_sha256": "150cc15a30d9da276b7ce03fecd176a7f4a906bbe7d77c254d1b9c27d73054e0",
+      "pred_sha256": "c8b104efe9ad5f0e3cb55c1a55fae987c630ef4dc27b2e6e57fefafade4fc945",
+      "intercept": 425.67264425009694,
+      "slope": 0.728643463204906,
+      "sse": 1974696.9166860913,
+      "sst": 4705687.75771837,
+      "mz_calibration_r2": 0.5803595524485978
+    },
+    "schiff_paper_horizon_mean": {
+      "n_rows": 126,
+      "actual_sha256": "7386bc739538a4ddc6b682ce579584ece8841a5973b6985aaab5174e10b37099",
+      "pred_sha256": "ae2b2c899ec049bcd8a22bba3f809132795983f8f6f46b841406202ce0fae070",
+      "intercept": 373.77387728089775,
+      "slope": 0.755254243482676,
+      "sse": 326356.64050742827,
+      "sst": 919767.0065005185,
+      "mz_calibration_r2": 0.6451746603206252
+    }
+  },
+  "diagnostic_override": {
+    "stored_calibration_r2": 0.9448430187011027,
+    "default_score_basis": "schiff_paper_horizon_mean",
+    "model": "PED__DIAGLAB__B__glsar__ylag1__ar1__wexp"
+  },
+  "written_csv": {
+    "current_grid_operational_pooled": {
+      "calibration_r2": "0.5803595524485978",
+      "model": "PED__VNEXT_SOLVED_CONVEX_TOP2",
+      "n_rows": "606"
+    },
+    "schiff_paper_horizon_mean": {
+      "calibration_r2": "0.9448430187011027",
+      "model": "PED__VNEXT_SOLVED_CONVEX_TOP2",
+      "n_rows": "126"
+    },
+    "file_sha256": "065135d1e70fafd983d04daaa4f847caf87f66b79069edae1093e3ce722d85ee"
+  },
+  "python": "3.11.15 (main, Aug  5 2026, 03:58:57) [GCC 12.2.0]"
+}

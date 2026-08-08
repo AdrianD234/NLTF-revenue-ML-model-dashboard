@@ -1,0 +1,37 @@
+engine,evidence_root,pid,xdist_worker,python,input,sha256,kind
+ensemble,data/dashboard_evidence_pack,1,<none>,3.11.15,diagnostic_tests.parquet,def4530df629db9bc44ff1fb661346ae100528576227d1579d2b535caa6e2fe6,source_file
+ensemble,data/dashboard_evidence_pack,1,<none>,3.11.15,reproducibility/heavy_ruc/component_predictions.parquet,4ba756fa2061b55c50a5dcaf9cd20aa59caa28285abd848f5986584b699109bf,source_file
+ensemble,data/dashboard_evidence_pack,1,<none>,3.11.15,reproducibility/heavy_ruc/training_fit_predictions.parquet,b44d2ffd8b90464d0caa49bc672abd93ee44bca57ed752a2c1a5ec7e68d9d8e1,source_file
+ensemble,data/dashboard_evidence_pack,1,<none>,3.11.15,reproducibility/heavy_ruc_vnext/component_predictions.parquet,14619cf62eed9b8dc7f6f69776785990ab28e08d31a4059144aa970b1b1e0660,source_file
+ensemble,data/dashboard_evidence_pack,1,<none>,3.11.15,reproducibility/heavy_ruc_vnext/training_fit_predictions.parquet,d5e51efa2ede059c8b9852c08f96d251d7b97252d3b0a48ec5d2fbd4cc353562,source_file
+ensemble,data/dashboard_evidence_pack,1,<none>,3.11.15,reproducibility/light_ruc/component_predictions.parquet,e19f109fad079f96a1839c9bfe6f89c605d4750c588dc85b76eeb8a614a8b550,source_file
+ensemble,data/dashboard_evidence_pack,1,<none>,3.11.15,reproducibility/light_ruc/training_fit_predictions.parquet,2557c6c1f476d028d0dfe365782a0599a194b0eaa00164ac4a98c99a67ab1a9e,source_file
+ensemble,data/dashboard_evidence_pack,1,<none>,3.11.15,reproducibility/light_ruc_vnext/training_fit_predictions.parquet,32df27605c2f80e26a6dda5a389aea5a3936cb38c6ed9817239715beb92f399f,source_file
+ensemble,data/dashboard_evidence_pack,1,<none>,3.11.15,reproducibility/ped/component_predictions.parquet,ca72f83887edd2f4a8323b27090f740065a4015b20f40f6db1f085e61bb2f109,source_file
+ensemble,data/dashboard_evidence_pack,1,<none>,3.11.15,reproducibility/ped/training_fit_predictions.parquet,0c73f6ddb64ad34246617334e28e1bdfa20b936beeb721706c7a0b1551a40901,source_file
+ensemble,data/dashboard_evidence_pack,1,<none>,3.11.15,reproducibility/ped_vnext/component_predictions.parquet,0e8923c7fa4f74d885da3ef860dbfa875ca4b79372429b128a4865f7da279feb,source_file
+ensemble,data/dashboard_evidence_pack,1,<none>,3.11.15,reproducibility/ped_vnext/training_fit_predictions.parquet,a1a68cf55fef70ac775ac8e27a9012273cd9f16cd56ff59c35094c13e1e744ff,source_file
+ensemble,data/dashboard_evidence_pack,1,<none>,3.11.15,scorecard_predictions.parquet,d9c72c8eb0e8db9d45e36bdd1e959b9927c368cfa4034e2ebd3693838113275e,source_file
+ensemble,data/dashboard_evidence_pack,1,<none>,3.11.15,computed:current_grid_operational_pooled,0.5591936636031876,computed_r2
+ensemble,data/dashboard_evidence_pack,1,<none>,3.11.15,computed:schiff_paper_horizon_mean,0.9230110422702978,computed_r2
+ensemble,data/dashboard_evidence_pack,1,<none>,3.11.15,reconstruction:current_grid_operational_pooled,n=606 actual=150cc15a30d9 pred=fda2cc553e52 sse=2074296.9807071658 sst=4705687.75771837 mz_r2=0.5591936636031876,selection_and_fit
+ensemble,data/dashboard_evidence_pack,1,<none>,3.11.15,reconstruction:schiff_paper_horizon_mean,n=126 actual=7386bc739538 pred=bb9b6fb4b1ca sse=305292.8176893118 sst=919767.0065005185 mz_r2=0.6680759197365929,selection_and_fit
+ensemble,data/dashboard_evidence_pack,1,<none>,3.11.15,diagnostic_tests finalist stored calibration_r2,0.9230110422702978,stored_override
+ar1,data/engine_ar1/dashboard_evidence_pack,1,<none>,3.11.15,diagnostic_tests.parquet,6f72155e9f407818c1cc20600d01f6e68cee76ab9f05962ed78b22907565b766,source_file
+ar1,data/engine_ar1/dashboard_evidence_pack,1,<none>,3.11.15,reproducibility/heavy_ruc/component_predictions.parquet,4ba756fa2061b55c50a5dcaf9cd20aa59caa28285abd848f5986584b699109bf,source_file
+ar1,data/engine_ar1/dashboard_evidence_pack,1,<none>,3.11.15,reproducibility/heavy_ruc/training_fit_predictions.parquet,b44d2ffd8b90464d0caa49bc672abd93ee44bca57ed752a2c1a5ec7e68d9d8e1,source_file
+ar1,data/engine_ar1/dashboard_evidence_pack,1,<none>,3.11.15,reproducibility/heavy_ruc_vnext/component_predictions.parquet,14619cf62eed9b8dc7f6f69776785990ab28e08d31a4059144aa970b1b1e0660,source_file
+ar1,data/engine_ar1/dashboard_evidence_pack,1,<none>,3.11.15,reproducibility/heavy_ruc_vnext/training_fit_predictions.parquet,d5e51efa2ede059c8b9852c08f96d251d7b97252d3b0a48ec5d2fbd4cc353562,source_file
+ar1,data/engine_ar1/dashboard_evidence_pack,1,<none>,3.11.15,reproducibility/light_ruc/component_predictions.parquet,e19f109fad079f96a1839c9bfe6f89c605d4750c588dc85b76eeb8a614a8b550,source_file
+ar1,data/engine_ar1/dashboard_evidence_pack,1,<none>,3.11.15,reproducibility/light_ruc/training_fit_predictions.parquet,2557c6c1f476d028d0dfe365782a0599a194b0eaa00164ac4a98c99a67ab1a9e,source_file
+ar1,data/engine_ar1/dashboard_evidence_pack,1,<none>,3.11.15,reproducibility/light_ruc_vnext/training_fit_predictions.parquet,32df27605c2f80e26a6dda5a389aea5a3936cb38c6ed9817239715beb92f399f,source_file
+ar1,data/engine_ar1/dashboard_evidence_pack,1,<none>,3.11.15,reproducibility/ped/component_predictions.parquet,ca72f83887edd2f4a8323b27090f740065a4015b20f40f6db1f085e61bb2f109,source_file
+ar1,data/engine_ar1/dashboard_evidence_pack,1,<none>,3.11.15,reproducibility/ped/training_fit_predictions.parquet,0c73f6ddb64ad34246617334e28e1bdfa20b936beeb721706c7a0b1551a40901,source_file
+ar1,data/engine_ar1/dashboard_evidence_pack,1,<none>,3.11.15,reproducibility/ped_vnext/component_predictions.parquet,0e8923c7fa4f74d885da3ef860dbfa875ca4b79372429b128a4865f7da279feb,source_file
+ar1,data/engine_ar1/dashboard_evidence_pack,1,<none>,3.11.15,reproducibility/ped_vnext/training_fit_predictions.parquet,a1a68cf55fef70ac775ac8e27a9012273cd9f16cd56ff59c35094c13e1e744ff,source_file
+ar1,data/engine_ar1/dashboard_evidence_pack,1,<none>,3.11.15,scorecard_predictions.parquet,45805c8586673c4bdb7dd6e5b464a703bd933101a575628716539ae9ecf14cda,source_file
+ar1,data/engine_ar1/dashboard_evidence_pack,1,<none>,3.11.15,computed:current_grid_operational_pooled,0.5803595524485978,computed_r2
+ar1,data/engine_ar1/dashboard_evidence_pack,1,<none>,3.11.15,computed:schiff_paper_horizon_mean,0.9448430187011027,computed_r2
+ar1,data/engine_ar1/dashboard_evidence_pack,1,<none>,3.11.15,reconstruction:current_grid_operational_pooled,n=606 actual=150cc15a30d9 pred=c8b104efe9ad sse=1974696.9166860913 sst=4705687.75771837 mz_r2=0.5803595524485978,selection_and_fit
+ar1,data/engine_ar1/dashboard_evidence_pack,1,<none>,3.11.15,reconstruction:schiff_paper_horizon_mean,n=126 actual=7386bc739538 pred=ae2b2c899ec0 sse=326356.64050742827 sst=919767.0065005185 mz_r2=0.6451746603206252,selection_and_fit
+ar1,data/engine_ar1/dashboard_evidence_pack,1,<none>,3.11.15,diagnostic_tests finalist stored calibration_r2,0.9448430187011027,stored_override

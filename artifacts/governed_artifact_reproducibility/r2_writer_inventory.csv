@@ -1,0 +1,27 @@
+caller,kind,call_site,evidence_root_resolution,engine_identity,fixture_or_trigger,writes_chart_sources,notes
+app.cached_load_evidence_pack,application,app.py:559/567,engine_evidence_root() via render_run_sidebar (app.py:4193-4224),active engine (engine_default()=ar1 when DASHBOARD_ENGINE_DEFAULT unset),st.cache_data(max_entries=2); a cache hit skips the write,yes (side effect of load_evidence_pack),the AppTest-driven writer population; wrote the AR(1) identity in the incident
+tests/test_r2_ladder.py,test,tests/test_r2_ladder.py:23,DEFAULT_EVIDENCE_PACK_ROOT (data/dashboard_evidence_pack),ensemble,session autouse fixture _write_chart_sources,yes,library caller; byte-identical committed content (writer matrix 4a247e03540d54f0)
+tests/test_r2_metrics.py,test,tests/test_r2_metrics.py:20,DEFAULT_EVIDENCE_PACK_ROOT,ensemble,session autouse fixture _write_chart_sources,yes,library caller
+tests/test_chart_source_tables.py,test,tests/test_chart_source_tables.py:37,DEFAULT_EVIDENCE_PACK_ROOT (env DASHBOARD_EVIDENCE_PACK_ROOT honoured),ensemble,session fixture parquet_dashboard,yes,library caller
+tests/test_chart_data_reconciliation.py,test,tests/test_chart_data_reconciliation.py:46,DEFAULT_EVIDENCE_PACK_ROOT,ensemble,session fixture parquet_dashboard,yes,library caller
+tests/test_evidence_pack.py,test,tests/test_evidence_pack.py:27,DEFAULT_EVIDENCE_PACK_ROOT,ensemble,session fixture evidence_pack,yes,library caller
+tests/test_score_basis_governance.py,test,tests/test_score_basis_governance.py:28,DEFAULT_EVIDENCE_PACK_ROOT,ensemble,session fixture evidence_pack,yes,library caller
+tests/test_stress_horizon_aliases.py,test,tests/test_stress_horizon_aliases.py:22,DEFAULT_EVIDENCE_PACK_ROOT,ensemble,module fixture,yes,alphabetically LAST writer in a sequential full run; masked earlier AR(1) overwrites pre-isolation
+tests/test_light_ruc_reproducibility_pack.py,test,tests/test_light_ruc_reproducibility_pack.py:390,DEFAULT_EVIDENCE_PACK_ROOT,ensemble,direct call,yes,library caller
+tests/test_performance_budget.py,test,tests/test_performance_budget.py:33,DEFAULT_EVIDENCE_PACK_ROOT,ensemble,direct call,yes,library caller
+tests/test_chart_source_write_isolation.py,test,tests/test_chart_source_write_isolation.py:149,explicit output_dir / env override,ensemble,direct call,yes (isolated),the isolation pin added by the CI-optimisation branch
+tests/test_streamlit_smoke.py,apptest,boots app.py,engine_evidence_root(),ar1 (engine default),AppTest boot,yes (pre-isolation: into the tracked dir),AR(1)-identity writer in the incident
+tests/test_revenue_outlook_ui_slim_2050.py,apptest,boots app.py,engine_evidence_root(),ar1,AppTest boot,yes,AR(1)-identity writer
+tests/test_engine_switcher.py,apptest,boots app.py; manipulates DASHBOARD_ENGINE_DEFAULT (tests/test_engine_switcher.py:31-35),engine_evidence_root(),both (switches),AppTest boot,yes,engine-dependent writer
+tests/test_revenue_scenario_key.py,apptest,boots app.py,engine_evidence_root(),ar1,AppTest boot,yes,AR(1)-identity writer
+tests/test_revenue_outlook_excel_extract.py,apptest,boots app.py,engine_evidence_root(),ar1,AppTest boot,yes,AR(1)-identity writer
+tests/test_canonical_base_composition.py,env-mutator,tests/test_canonical_base_composition.py:28,os.environ.setdefault('DASHBOARD_ENGINE_DEFAULT'~'ar1') at import,ar1 (process-wide once imported),import-time env mutation,indirect,which worker imports it decides that worker's engine default
+tests/test_corrected_reconciliation_artifacts.py,env-mutator,tests/test_corrected_reconciliation_artifacts.py:126,os.environ.setdefault('DASHBOARD_ENGINE_DEFAULT'~'ar1') at import,ar1,import-time env mutation,indirect,as above
+scripts/validate_chart_sources.py,script,scripts/validate_chart_sources.py:60,DEFAULT_EVIDENCE_PACK_ROOT; READS hardcoded artifacts/chart_sources (line 29),ensemble,manual invocation,yes,reads the governed location regardless of the env override
+scripts/validate_dashboard_data.py,script,scripts/validate_dashboard_data.py:79,DEFAULT_EVIDENCE_PACK_ROOT,ensemble,manual invocation,yes,
+scripts/validate_80_gates.py,script,scripts/validate_80_gates.py:172,DEFAULT_EVIDENCE_PACK_ROOT,ensemble,manual invocation,yes,
+scripts/validate_120_gates.py,script,scripts/validate_120_gates.py:66,DEFAULT_EVIDENCE_PACK_ROOT,ensemble,manual invocation,yes,
+scripts/validate_semantic_labels.py,script,scripts/validate_semantic_labels.py:36,DEFAULT_EVIDENCE_PACK_ROOT,ensemble,manual invocation,yes,
+scripts/validate_light_ruc_reproducibility.py,script,scripts/validate_light_ruc_reproducibility.py:256,DEFAULT_EVIDENCE_PACK_ROOT,ensemble,manual invocation,yes,
+scripts/inspect_parquet_schema.py,script,scripts/inspect_parquet_schema.py:124,DEFAULT_EVIDENCE_PACK_ROOT,ensemble,manual invocation,yes,
+scripts/benchmark_dashboard.py,script,scripts/benchmark_dashboard.py:329/361,DEFAULT_EVIDENCE_PACK_ROOT,ensemble,manual invocation,yes,

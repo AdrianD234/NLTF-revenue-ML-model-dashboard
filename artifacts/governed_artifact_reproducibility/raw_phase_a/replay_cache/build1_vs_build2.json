@@ -1,0 +1,228 @@
+{
+  "label": "replay_cache:build1_vs_build2",
+  "left": "/probe/snapshots/build1",
+  "right": "/work/data/revenue_outlook_replay_cache",
+  "overall_classification": "identical",
+  "file_count": 72,
+  "class_counts": {
+    "identical": 72
+  },
+  "files": {
+    "ar1/frames/fuel.annual_bridge.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/fuel.annual_factors.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/fuel.baseline_macro_annual_factors.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/fuel.baseline_macro_quarterly_factors.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/fuel.fuel_scenario_inputs.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/fuel.gdp_input_audit.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/fuel.input_audit.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/fuel.policy_pair_factors.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/fuel.policy_scenario_inputs.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/fuel.price_only_replay.assumptions.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/fuel.price_only_replay.component_forecasts.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/fuel.price_only_replay.future_forecasts.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/fuel.price_only_replay.structural_component_forecasts.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/fuel.price_only_replay.superseded_component_forecasts.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/fuel.price_only_replay.validation_report.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/fuel.price_only_replay_inputs.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/fuel.quarterly_factors.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/fuel.replay.assumptions.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/fuel.replay.component_forecasts.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/fuel.replay.future_forecasts.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/fuel.replay.structural_component_forecasts.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/fuel.replay.superseded_component_forecasts.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/fuel.replay.validation_report.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/fuel.replay_inputs.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/fuel.treasury_base_inputs.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/macro.baseline_macro_annual_factors.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/macro.baseline_macro_quarterly_factors.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/macro.replay.assumptions.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/macro.replay.component_forecasts.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/macro.replay.future_forecasts.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/macro.replay.structural_component_forecasts.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/macro.replay.superseded_component_forecasts.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/macro.replay.validation_report.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/macro.replay_inputs.parquet": {
+      "classification": "identical"
+    },
+    "ar1/frames/macro.scenario_replay_lineage.parquet": {
+      "classification": "identical"
+    },
+    "ar1/manifest.json": {
+      "classification": "identical"
+    },
+    "ensemble/frames/fuel.annual_bridge.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/fuel.annual_factors.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/fuel.baseline_macro_annual_factors.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/fuel.baseline_macro_quarterly_factors.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/fuel.fuel_scenario_inputs.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/fuel.gdp_input_audit.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/fuel.input_audit.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/fuel.policy_pair_factors.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/fuel.policy_scenario_inputs.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/fuel.price_only_replay.assumptions.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/fuel.price_only_replay.component_forecasts.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/fuel.price_only_replay.future_forecasts.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/fuel.price_only_replay.structural_component_forecasts.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/fuel.price_only_replay.superseded_component_forecasts.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/fuel.price_only_replay.validation_report.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/fuel.price_only_replay_inputs.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/fuel.quarterly_factors.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/fuel.replay.assumptions.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/fuel.replay.component_forecasts.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/fuel.replay.future_forecasts.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/fuel.replay.structural_component_forecasts.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/fuel.replay.superseded_component_forecasts.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/fuel.replay.validation_report.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/fuel.replay_inputs.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/fuel.treasury_base_inputs.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/macro.baseline_macro_annual_factors.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/macro.baseline_macro_quarterly_factors.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/macro.replay.assumptions.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/macro.replay.component_forecasts.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/macro.replay.future_forecasts.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/macro.replay.structural_component_forecasts.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/macro.replay.superseded_component_forecasts.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/macro.replay.validation_report.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/macro.replay_inputs.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/frames/macro.scenario_replay_lineage.parquet": {
+      "classification": "identical"
+    },
+    "ensemble/manifest.json": {
+      "classification": "identical"
+    }
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "repo_root": "/work",
+  "packs": {
+    "replay_cache": {
+      "status": "ok",
+      "detail": "all engines ok",
+      "per_engine": {
+        "ar1": "ok",
+        "ensemble": "ok"
+      },
+      "rebuild_command": "python scripts/build_revenue_outlook_replay_cache.py --all",
+      "required": false,
+      "order": null
+    },
+    "quarterly_display": {
+      "status": "ok",
+      "detail": "source digest dc3cdc8487b3",
+      "rebuild_command": "python scripts/build_revenue_outlook_quarterly_display_pack.py",
+      "required": false,
+      "order": null
+    },
+    "uncertainty": {
+      "status": "ok",
+      "detail": "present, scenario_key_digest b5ce7ab7a3ef, 1000 band rows; freshness is enforced transitively via policy_runtime",
+      "rebuild_command": "python scripts/build_revenue_outlook_uncertainty_pack.py",
+      "rebuild_caveat": "WARNING: rebuilding this pack does NOT reproduce its committed content. On an unmodified tree it moves light_petrol_vkt FY2031-FY2050 by up to 1.34% (~509 units), reverting the governed re-centring onto the published Current line. Do not run this command to 'fix' staleness - confirm with the owner first. See docs/FOLLOW_UP_PED_R2_DRIFT.md.",
+      "required": false,
+      "order": null
+    },
+    "policy_runtime": {
+      "status": "stale",
+      "detail": "ar1: the promoted pack, the compiled replay cache or the uncertainty inputs changed since the policy runtime was built; ensemble: the promoted pack, the compiled replay cache or the uncertainty inputs changed since the policy runtime was built",
+      "per_engine": {
+        "ar1": "stale",
+        "ensemble": "stale"
+      },
+      "rebuild_command": "python scripts/build_revenue_outlook_policy_runtime.py --all",
+      "required": true,
+      "order": 4
+    },
+    "databricks_bundle": {
+      "status": "affected",
+      "detail": "upstream pack(s) not ok: policy_runtime",
+      "rebuild_command": "python scripts/build_databricks_app_bundle.py --source . --output build/databricks_app/app --clean",
+      "required": true,
+      "order": 5
+    }
+  },
+  "required_rebuilds": [
+    "policy_runtime",
+    "databricks_bundle"
+  ],
+  "rebuild_commands": [
+    "python scripts/build_revenue_outlook_policy_runtime.py --all",
+    "python scripts/build_databricks_app_bundle.py --source . --output build/databricks_app/app --clean"
+  ],
+  "any_stale": true,
+  "second_idempotency_build_required": false,
+  "second_build_reason": "Not required. Run one only when the builder code or schema changed, output determinism is in doubt, or release assurance asks for it."
+}

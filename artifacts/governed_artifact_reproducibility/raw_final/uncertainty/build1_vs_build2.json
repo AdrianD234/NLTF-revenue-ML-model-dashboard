@@ -1,0 +1,21 @@
+{
+  "label": "uncertainty:build1_vs_build2",
+  "left": "/probe/snapshots/build1",
+  "right": "/work/data/revenue_outlook_uncertainty",
+  "overall_classification": "identical",
+  "file_count": 3,
+  "class_counts": {
+    "identical": 3
+  },
+  "files": {
+    "june_year_basis.parquet": {
+      "classification": "identical"
+    },
+    "manifest.json": {
+      "classification": "identical"
+    },
+    "uncertainty_band_rows.parquet": {
+      "classification": "identical"
+    }
+  }
+}
