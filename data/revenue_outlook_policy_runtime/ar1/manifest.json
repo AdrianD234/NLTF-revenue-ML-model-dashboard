@@ -440,7 +440,7 @@
       "data/revenue_model_source_pack/official_vintages/befu26/series_trace_contract.parquet": "866482606699335a37eccac418f667a77ad93492b05e6f0e43d9aea4651c4e35",
       "data/revenue_model_source_pack/official_vintages/befu26/trace_source_contract.csv": "756035b33d4579591e96146048fbf5299d1c5e3cb980d3146b399c95f72df323",
       "data/revenue_model_source_pack/official_vintages/befu26/trace_source_contract.parquet": "0674624e668bce209c412905b5f6c6f290af0ae4a81e4d55b369060ab13dcdfd",
-      "data/revenue_outlook_uncertainty/manifest.json": "eb7243f5ff392d80ffdd011366e5482a2af84d1769f0c50b01dad09282f5ee81",
+      "data/revenue_outlook_uncertainty/manifest.json": "4742f7be242949617c9910182c6de5e106a076b60994ca717a3cc9666ec5019a",
       "data/vfm_202405/vfm_vkt_shares.csv": "81da2535b316245182abc416d1e43a418888eb9ff986b8f663b636a6e375abe8"
     },
     "uncertainty_draws": 10000,
@@ -449,8 +449,8 @@
   },
   "row_count": 459525,
   "schema_version": "1",
-  "source_digest": "efdbdf2f23a6148749a326602505d18dc4b2b5c0266cab0076d90430f6d70ef1",
-  "source_main_sha": "29329bda4b5cc8f306032912cf9327a5717bcb83",
+  "source_digest": "175cc584e88630c3925a7278c07cd91c91f9d48df8d7a0295bb172ff6001d093",
+  "source_main_sha": "173f1d9956561ac1bb210708fc4c7993fa8a0f29",
   "state_count": 9,
   "states": [
     {
