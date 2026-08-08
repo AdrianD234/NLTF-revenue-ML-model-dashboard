@@ -77,4 +77,48 @@ byte-identical (proved on Windows above).
 
 ## Final local acceptance
 
-<!-- FINAL_ACCEPTANCE_RESULTS -->
+Frozen SHA: **`e2acd481fb533298fafae66eb81902379dd04fac`**. Every tier ran in
+the `nltf-ci:local` Python 3.11 container against a disposable detached
+worktree at that commit — never against the working checkout. Preconditions
+confirmed first: clean Windows worktree, clean WSL clone, no pytest process,
+no pack builder, no Streamlit server, no CI container.
+
+| # | check | result |
+| --- | --- | --- |
+| 1 | Docker **fast** | exit 0, 3s; compile + smoke + 48 planner tests; tracked files unmutated |
+| 2 | Docker **affected** (`--base origin/main`) | exit 0 — the planner classified the branch high risk (governed pack + uncertainty + committed evidence), so the lane escalated to full assurance |
+| 3 | Sequential Docker **full** tier, fresh clone of the final SHA | **exit 0, 2,080 tests: 0 failed, 0 errors, 53 skipped**, 2,027 passed; 1,904s test time, 2,024s wall |
+| 4 | Conflict extract validation | **21/21 PASS** (`status` and `passed` columns unanimous) |
+| 5 | Deployment readiness | **PASS** (`scripts/check_streamlit_deploy_readiness.py`, exit 0) |
+| 6 | Governed-tree cleanliness | **2,198 governed files verified unchanged** by the in-container gate, on every exit path |
+| 7 | Exact pack reproducibility matrix | all four packs — see the clean-room section above; uncertainty now exact, all builders byte-idempotent |
+| 8 | Revenue Outlook row parity | **identical, worst abs delta 0.0** across Light petrol VKT central/50%/80% × FY2030/FY2031/FY2050 × published/delayed/no-uplift × both engines (`revenue_outlook_row_parity.csv`) |
+
+Browser verification was not required: no rendered value changes, and row
+parity is independently proven at the value level (item 8), with no chart or
+selection logic touched on this branch.
+
+### Proof that no central forecast or revenue value moved
+
+* The policy runtime — the pack the dashboard actually reads — was rebuilt
+  twice and proven **provenance-only** both times: all 200 frames identical
+  cell by cell, only `source_digest`/`source_main_sha`/`provenance` changed.
+* Row parity against the pre-branch SHA is exactly 0.0 for every band value
+  checked, in every policy state, on both engines.
+* `governed_value_non_movement.csv`: zero unauthorised file movements across
+  all four packs versus `starting_state.json`.
+* The only governed data that moved is the offline uncertainty pack's 20
+  stale `light_petrol_vkt` FY2031–FY2050 rows, which now equal the published
+  Current line the dashboard was already drawing — so no number a reader has
+  ever seen changed.
+
+### Stop conditions
+
+None of the section-11 stop conditions was hit. In particular: no other pack
+moved governed values; the committed R² values are neither wrong nor stale
+and were not changed; the re-centring was derived from the authoritative
+Current path with no circularity (the builder reads the governed line frame,
+not the uncertainty pack); no hardcoded factor and no generic tolerance was
+introduced; no test writes to tracked governed artefacts; build 1 and build 2
+agree for every pack; and the manifests reference commits that contain the
+implementation.
