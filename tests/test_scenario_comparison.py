@@ -147,8 +147,12 @@ def test_revenue_cards_use_npv_language_and_activity_cards_do_not(comparison_con
         "Total NLTF revenue", "revenue", result["a"], result["b"], result["value_unit"], None
     )
     revenue_text = " ".join(str(part) for card in revenue_cards for part in card)
-    assert "NPV to FY2050" in revenue_text
+    assert "Cumulative nominal to FY2050" in revenue_text
     assert "Cumulative nominal delta" in revenue_text
+    assert "NPV delta" in revenue_text
+    # nominal level cards lead; the discounted delta card comes last
+    assert revenue_cards[2][0].startswith("Cumulative nominal delta")
+    assert revenue_cards[3][0].startswith("NPV delta")
 
     activity = _paths(comparison_context, "Light RUC net km", _keys(), _keys(uptake="MoT VFM fast"))
     activity_cards = app._scenario_comparison_cards(

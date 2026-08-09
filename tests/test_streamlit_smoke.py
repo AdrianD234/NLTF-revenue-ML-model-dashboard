@@ -1326,8 +1326,9 @@ def test_revenue_outlook_compare_mode_swaps_total_path_for_comparison() -> None:
     # The lever accordion disappears in compare mode (the A/B columns own the
     # levers); its persisted selections still drive the sections below.
     assert "Advanced scenario levers" not in expander_labels
-    # Default B (MoT VFM fast) differs from A, so NPV cards render immediately.
-    assert "NPV to FY2050" in rendered
+    # Default B (MoT VFM fast) differs from A, so KPI cards render immediately.
+    assert "Cumulative nominal to FY2050" in rendered
+    assert "NPV delta" in rendered
 
 
 def test_revenue_outlook_compare_mode_renders_pt_and_freight_for_scenario_b() -> None:

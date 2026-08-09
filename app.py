@@ -10229,7 +10229,13 @@ def _render_scenario_comparison_panel(
             npv_a = npv_to_horizon(a_path, rate=rate_for_npv)
             npv_b = npv_to_horizon(b_path, rate=rate_for_npv)
             if comparison_series == _SCENARIO_COMPARISON_TOTAL_SERIES:
-                component_npvs = {
+                # The by-stream views read in nominal (undiscounted) terms:
+                # rate 0.0 reuses the NPV helpers' FY2026 anchor filtering
+                # while leaving every dollar undiscounted, so the bridge total
+                # ties to the Cumulative nominal delta card.
+                nominal_a = npv_to_horizon(a_path, rate=0.0)
+                nominal_b = npv_to_horizon(b_path, rate=0.0)
+                component_totals = {
                     component_series: _scenario_component_npv(
                         cached_scenario_comparison_paths(
                             pack_signature, component_series, fed_path,
@@ -10237,44 +10243,52 @@ def _render_scenario_comparison_panel(
                             PED_BRIDGE_DEFAULT_MODE, pack,
                             trace_a=trace_a, trace_b=trace_b,
                         ),
-                        rate_for_npv,
+                        0.0,
                     )
                     for component_series in _SCENARIO_COMPONENT_FETCH_SERIES
                 }
-                components = _scenario_npv_component_breakdown(component_npvs, npv_a, npv_b)
-                closure_gap = sum(b - a for _, a, b in components) - (npv_b - npv_a)
+                components = _scenario_npv_component_breakdown(component_totals, nominal_a, nominal_b)
+                closure_gap = sum(b - a for _, a, b in components) - (nominal_b - nominal_a)
                 if abs(closure_gap) > _SCENARIO_COMPONENT_MATERIALITY:
                     # The breakdown closes the governed NLTF identity by
                     # construction; a residual above the materiality floor
                     # means a component path came from a different snapshot
                     # than the total, so the bridge is suppressed.
                     warning_panel(
-                        "Comparison closure gate: the component NPV deltas differ from the "
+                        "Comparison closure gate: the component nominal deltas differ from the "
                         f"headline Total NLTF delta by {closure_gap:+,.1f} $m. The by-stream "
-                        "NPV charts are suppressed until the decomposition closes."
+                        "charts are suppressed until the decomposition closes."
                     )
                     return
-                chart_card(
-                    "NPV by revenue stream (A vs B)",
-                    "Each revenue stream's NPV to FY2050 under Scenario A (navy) and Scenario B "
-                    "(orange), largest stream first, all streams recomputed through that scenario's "
-                    "levers. Heavy & other RUC is the RUC rollup less the light classes (heavy BEVs "
-                    "pay the same per-km RUC, so heavy electrification reshuffles within this block); "
-                    "TUC & other closes the governed NLTF identity. " + basis_note + ".",
-                    _scenario_npv_composition_figure(components, result["value_unit"]),
-                    caption=None,
-                    notes_as_tooltip=True,
-                )
-                chart_card(
-                    "NPV delta bridge by revenue stream (B − A)",
-                    "How each revenue stream contributes to the NPV gap between the scenarios: "
-                    "component deltas accumulate from zero to the total NPV delta, so gains in one "
-                    "stream (green) and losses in another (red) net out to the headline figure on the "
-                    "delta card. Streams moving less than $1m NPV are omitted. " + basis_note + ".",
-                    _scenario_npv_component_bridge_figure(npv_a, npv_b, components, result["value_unit"]),
-                    caption=None,
-                    notes_as_tooltip=True,
-                )
+                stream_col, bridge_col = st.columns(2)
+                with stream_col:
+                    chart_card(
+                        "Nominal revenue by stream (A vs B)",
+                        "Each revenue stream's cumulative nominal revenue to FY2050 under Scenario A "
+                        "(navy) and Scenario B (orange), largest stream first, all streams recomputed "
+                        "through that scenario's levers. Heavy & other RUC is the RUC rollup less the "
+                        "light classes (heavy BEVs pay the same per-km RUC, so heavy electrification "
+                        "reshuffles within this block); TUC & other closes the governed NLTF identity. "
+                        "Undiscounted, FY2026 base.",
+                        _scenario_npv_composition_figure(components, result["value_unit"]),
+                        caption=None,
+                        notes_as_tooltip=True,
+                    )
+                with bridge_col:
+                    chart_card(
+                        "Nominal delta bridge by revenue stream (B − A)",
+                        "How each revenue stream contributes to the cumulative nominal gap between "
+                        "the scenarios: component deltas accumulate from zero to the total nominal "
+                        "delta, so gains in one stream (green) and losses in another (red) net out to "
+                        "the Cumulative nominal delta card. Streams moving less than $1m are omitted. "
+                        "Undiscounted, FY2026 base.",
+                        _scenario_npv_component_bridge_figure(
+                            nominal_a, nominal_b, components, result["value_unit"],
+                            metric_label="Nominal",
+                        ),
+                        caption=None,
+                        notes_as_tooltip=True,
+                    )
             else:
                 chart_card(
                     "NPV bridge (A to B)",
@@ -10329,14 +10343,16 @@ def _scenario_comparison_cards(
         npv_a = npv_to_horizon(a, rate=discount_rate)
         npv_b = npv_to_horizon(b, rate=discount_rate)
         delta = npv_b - npv_a
-        cum_delta = cumulative_total(b) - cumulative_total(a)
+        cum_a, cum_b = cumulative_total(a), cumulative_total(b)
+        cum_delta = cum_b - cum_a
         basis = mbcm_label() if discount_rate is None else f"single rate {discount_rate:.1%} p.a."
         pct = f"{delta / npv_a:+.1%} vs A" if npv_a else "-"
+        cum_pct = f"{cum_delta / cum_a:+.1%} vs A" if cum_a else "-"
         return [
-            ("Scenario A - NPV to FY2050", _format_scenario_amount(npv_a, value_unit), f"{basis}; FY2026 base", "-", "neutral", "A"),
-            ("Scenario B - NPV to FY2050", _format_scenario_amount(npv_b, value_unit), f"{basis}; FY2026 base", "-", "neutral", "B"),
-            ("NPV delta (B - A)", _format_scenario_amount(delta, value_unit, signed=True), horizon, pct, _scenario_delta_tone(delta), "Δ"),
-            ("Cumulative nominal delta (B - A)", _format_scenario_amount(cum_delta, value_unit, signed=True), f"{horizon}, undiscounted", "-", _scenario_delta_tone(cum_delta), "Σ"),
+            ("Scenario A - Cumulative nominal to FY2050", _format_scenario_amount(cum_a, value_unit), f"{horizon}, undiscounted", "-", "neutral", "A"),
+            ("Scenario B - Cumulative nominal to FY2050", _format_scenario_amount(cum_b, value_unit), f"{horizon}, undiscounted", "-", "neutral", "B"),
+            ("Cumulative nominal delta (B - A)", _format_scenario_amount(cum_delta, value_unit, signed=True), f"{horizon}, undiscounted", cum_pct, _scenario_delta_tone(cum_delta), "Σ"),
+            ("NPV delta (B - A)", _format_scenario_amount(delta, value_unit, signed=True), f"{basis}; FY2026 base", pct, _scenario_delta_tone(delta), "Δ"),
         ]
     if is_intensity:
         avg_a, avg_b = average_annual(a), average_annual(b)
@@ -10426,7 +10442,9 @@ def _scenario_comparison_figure(history: pd.Series, a: pd.Series, b: pd.Series, 
     return fig
 
 
-def _scenario_npv_waterfall_figure(npv_a: float, npv_b: float, value_unit: str) -> go.Figure:
+def _scenario_npv_waterfall_figure(
+    npv_a: float, npv_b: float, value_unit: str, *, metric_label: str = "NPV"
+) -> go.Figure:
     scale = _display_value_scale_for_unit(value_unit)
     axis_title = _display_axis_unit(value_unit)
     delta = npv_b - npv_a
@@ -10434,7 +10452,7 @@ def _scenario_npv_waterfall_figure(npv_a: float, npv_b: float, value_unit: str) 
         go.Waterfall(
             orientation="v",
             measure=["absolute", "relative", "total"],
-            x=["Scenario A NPV", "Δ (B − A)", "Scenario B NPV"],
+            x=[f"Scenario A {metric_label}", "Δ (B − A)", f"Scenario B {metric_label}"],
             y=[npv_a / scale, delta / scale, npv_b / scale],
             increasing={"marker": {"color": "#00843D"}},
             decreasing={"marker": {"color": "#B42318"}},
@@ -10583,8 +10601,10 @@ def _scenario_npv_component_bridge_figure(
     npv_b: float,
     components: list[tuple[str, float, float]],
     value_unit: str,
+    *,
+    metric_label: str = "NPV",
 ) -> go.Figure:
-    """Delta-space bridge: component NPV deltas accumulate from zero to B − A.
+    """Delta-space bridge: component deltas accumulate from zero to B − A.
 
     Level anchors (~two orders of magnitude above the deltas) live in the KPI
     cards and the composition chart; plotting them here would flatten the
@@ -10596,13 +10616,13 @@ def _scenario_npv_component_bridge_figure(
         if abs(comp_b - comp_a) >= _SCENARIO_COMPONENT_MATERIALITY
     ]
     if not deltas:
-        return _scenario_npv_waterfall_figure(npv_a, npv_b, value_unit)
+        return _scenario_npv_waterfall_figure(npv_a, npv_b, value_unit, metric_label=metric_label)
     # gains first, largest loss lands right before the total bar
     deltas.sort(key=lambda row: row[1], reverse=True)
     scale = _display_value_scale_for_unit(value_unit)
     axis_title = _display_axis_unit(value_unit)
     total_delta = npv_b - npv_a
-    labels = [*(label for label, _ in deltas), "NPV delta (B − A)"]
+    labels = [*(label for label, _ in deltas), f"{metric_label} delta (B − A)"]
     values = [*(delta / scale for _, delta in deltas), total_delta / scale]
     bar_text = [
         *(("+" if delta >= 0 else "") + _scenario_amount_text(delta, value_unit) for _, delta in deltas),
