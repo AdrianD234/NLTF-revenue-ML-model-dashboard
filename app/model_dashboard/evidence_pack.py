@@ -11,7 +11,7 @@ from typing import Any
 
 import pandas as pd
 
-from .data.chart_sources import write_chart_source_tables
+from .data.chart_sources import CHART_SOURCE_WRITE_SCRATCH, write_chart_source_tables
 from .data.config import DashboardData, DEFAULT_EVIDENCE_PACK_ROOT
 from .data.diagnostics import DEFAULT_ACF_RESIDUAL_SCOPE, select_diagnostic_acf_scope
 from .data.manifest import write_data_source_manifest
@@ -98,7 +98,26 @@ def evidence_pack_signature(root: str | Path | None = None) -> tuple[tuple[str, 
     return tuple(signature)
 
 
-def load_evidence_pack(root: str | Path | None = None, repo_root: str | Path | None = None) -> DashboardEvidencePack:
+def load_evidence_pack(
+    root: str | Path | None = None,
+    repo_root: str | Path | None = None,
+    *,
+    materialize_chart_sources: bool = False,
+    chart_source_output_dir: str | Path | None = None,
+) -> DashboardEvidencePack:
+    """Load an evidence pack into memory.
+
+    Loading is read-only with respect to governed chart-source evidence. This
+    function used to call ``write_chart_source_tables`` unconditionally, which
+    meant that merely starting the Streamlit app republished the active engine's
+    R-squared identity over the committed one (issue #31).
+
+    Pass ``materialize_chart_sources=True`` to also write the tables, which the
+    validators and a handful of tests need. That path is SCRATCH-only: it can
+    never reach the canonical tracked directory, so callers must supply
+    ``chart_source_output_dir`` or set ``NLTF_CHART_SOURCE_OUTPUT_DIR``. Use
+    ``scripts/promote_chart_sources.py`` to publish governed evidence.
+    """
     pack_root = resolve_evidence_pack_root(root)
     manifest_path = pack_root / "manifest.json"
     data_dir = pack_root / "data"
@@ -242,7 +261,13 @@ def load_evidence_pack(root: str | Path | None = None, repo_root: str | Path | N
     source_manifest = _build_manifest_artifact(root, pack_root, manifest, data_dir, tables)
     write_data_source_manifest(repo_path, source_manifest)
     _write_compat_source_tables(repo_path, data)
-    write_chart_source_tables(repo_path, data)
+    if materialize_chart_sources:
+        write_chart_source_tables(
+            repo_path,
+            data,
+            chart_source_output_dir,
+            mode=CHART_SOURCE_WRITE_SCRATCH,
+        )
     return DashboardEvidencePack(
         run_dir=pack_root,
         data=data,
