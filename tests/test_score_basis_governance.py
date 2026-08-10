@@ -25,7 +25,8 @@ EXPECTED_BALANCED_FRONTIER_COUNTS = {"PED VKT per capita": 132, "Light RUC volum
 
 @pytest.fixture(scope="session")
 def evidence_pack():
-    return load_evidence_pack(DEFAULT_EVIDENCE_PACK_ROOT, ROOT)
+    # Chart-source materialisation is now explicit (issue #31).
+    return load_evidence_pack(DEFAULT_EVIDENCE_PACK_ROOT, ROOT, materialize_chart_sources=True)
 
 
 def test_v6_default_score_basis_is_paper_style(evidence_pack) -> None:

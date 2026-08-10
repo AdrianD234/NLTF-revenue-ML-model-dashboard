@@ -41,7 +41,66 @@ def resolve_chart_source_output_dir(
     override = os.environ.get(CHART_SOURCE_OUTPUT_DIR_ENV)
     if override:
         return Path(override)
+    return canonical_chart_source_dir(repo_root)
+
+
+# Write modes.
+#
+# The environment override above stopped tests from writing into the tracked
+# tree, but it left a second exposure open: `load_evidence_pack` materialised
+# these tables as an unconditional side effect, so simply starting the Streamlit
+# app - which sets no override and boots on the AR(1) default engine - published
+# the AR(1) identity straight over the committed ensemble one. See issue #31 and
+# docs/FOLLOW_UP_PED_R2_DRIFT.md.
+#
+# The modes make the intent explicit at the writer boundary rather than relying
+# on an undocumented environment variable:
+#
+#   READ_ONLY  compute in memory, publish nothing. Normal application execution.
+#   SCRATCH    write to a caller-chosen directory. Tests and diagnostics. Never
+#              the canonical tracked directory.
+#   PROMOTE    write to the canonical tracked directory. Only the explicit
+#              promotion command, and only for the governed engine identity.
+CHART_SOURCE_WRITE_READ_ONLY = "read_only"
+CHART_SOURCE_WRITE_SCRATCH = "scratch"
+CHART_SOURCE_WRITE_PROMOTE = "promote"
+CHART_SOURCE_WRITE_MODES = (
+    CHART_SOURCE_WRITE_READ_ONLY,
+    CHART_SOURCE_WRITE_SCRATCH,
+    CHART_SOURCE_WRITE_PROMOTE,
+)
+
+# The engine identity the committed chart-source tables carry. The AR(1) engine
+# is a legitimate second identity, but it is not the governed one: promoting it
+# into the canonical filenames is what corrupted the evidence.
+CANONICAL_CHART_SOURCE_ENGINE = "ensemble"
+
+
+class ChartSourceWriteRefused(RuntimeError):
+    """A chart-source write was refused because it lacked explicit authority."""
+
+
+def canonical_chart_source_dir(repo_root: Path | str) -> Path:
+    """The governed, tracked destination for chart-source tables."""
     return Path(repo_root) / "artifacts" / "chart_sources"
+
+
+def engine_diagnostic_chart_source_dir(repo_root: Path | str, engine: str) -> Path:
+    """Engine-keyed, noncanonical destination for diagnostic chart sources.
+
+    Two engine identities must never share one canonical filename and let
+    last-writer-wins decide the published number.
+    """
+    return Path(repo_root) / "artifacts" / "diagnostics" / "chart_sources" / str(engine)
+
+
+def _is_canonical_destination(repo_root: Path | str, output_dir: Path) -> bool:
+    canonical = canonical_chart_source_dir(repo_root)
+    try:
+        return output_dir.resolve() == canonical.resolve()
+    except OSError:
+        return Path(os.path.normcase(str(output_dir))) == Path(os.path.normcase(str(canonical)))
+
 
 from ..labels import (
     OVERVIEW_STRESS_BUCKET_ORDER,
@@ -172,18 +231,68 @@ def write_chart_source_tables(
     repo_root: Path,
     data: dict[str, pd.DataFrame],
     output_dir: Path | str | None = None,
+    *,
+    mode: str = CHART_SOURCE_WRITE_SCRATCH,
+    engine: str | None = None,
+    allow_noncanonical_engine: bool = False,
 ) -> dict[str, pd.DataFrame]:
     """Write one auditable source table for every primary dashboard chart.
 
-    ``output_dir`` defaults to the committed location, so production behaviour
-    is unchanged. See ``resolve_chart_source_output_dir``.
+    Writing into the canonical tracked directory requires ``mode`` to be
+    ``CHART_SOURCE_WRITE_PROMOTE`` *and* the governed engine identity. Every
+    other caller either supplies its own ``output_dir`` or is refused, so no
+    incidental code path can publish governed evidence.
     """
+    if mode not in CHART_SOURCE_WRITE_MODES:
+        raise ValueError(f"Unknown chart-source write mode {mode!r}; expected one of {CHART_SOURCE_WRITE_MODES}.")
+    if mode == CHART_SOURCE_WRITE_READ_ONLY:
+        raise ChartSourceWriteRefused(
+            "write_chart_source_tables was called in read-only mode. Read-only callers should use "
+            "build_chart_source_tables, which computes the same tables without publishing them."
+        )
+
     output_dir = resolve_chart_source_output_dir(repo_root, output_dir)
+    if _is_canonical_destination(repo_root, output_dir):
+        if mode != CHART_SOURCE_WRITE_PROMOTE:
+            raise ChartSourceWriteRefused(
+                f"Refusing to write governed chart-source evidence at {output_dir}. That directory holds the "
+                "committed evidence and may only be written by the explicit promotion command "
+                "(scripts/promote_chart_sources.py), which passes mode="
+                f"{CHART_SOURCE_WRITE_PROMOTE!r}. Supply an output_dir for scratch or diagnostic output."
+            )
+        resolved_engine = str(engine or CANONICAL_CHART_SOURCE_ENGINE).strip().lower()
+        if resolved_engine != CANONICAL_CHART_SOURCE_ENGINE and not allow_noncanonical_engine:
+            raise ChartSourceWriteRefused(
+                f"Refusing to promote the {resolved_engine!r} engine identity into the canonical chart-source "
+                f"tables, which carry the {CANONICAL_CHART_SOURCE_ENGINE!r} identity. Both identities are valid, "
+                "but they must not share one filename. Write engine diagnostics to "
+                f"{engine_diagnostic_chart_source_dir(repo_root, resolved_engine)} instead, or pass "
+                "allow_noncanonical_engine=True to override deliberately."
+            )
+
     output_dir.mkdir(parents=True, exist_ok=True)
     tables = build_chart_source_tables(data, repo_root=repo_root)
     for filename, frame in tables.items():
         _write_csv_atomic(frame, output_dir / filename)
     return tables
+
+
+def materialize_scratch_chart_sources(
+    repo_root: Path | str,
+    data: dict[str, pd.DataFrame],
+    label: str,
+) -> Path:
+    """Render the chart-source tables into a run-scoped scratch directory.
+
+    For validators and tooling that need to inspect freshly generated tables.
+    They used to read the tracked directory straight after triggering the load
+    side effect, which is what made a validator run indistinguishable from a
+    promotion. The destination is pid-scoped and gitignored, so concurrent runs
+    cannot collide and the governed tree is never touched.
+    """
+    output_dir = Path(repo_root) / "test-output" / "chart_sources" / f"{label}-{os.getpid()}"
+    write_chart_source_tables(repo_root, data, output_dir, mode=CHART_SOURCE_WRITE_SCRATCH)
+    return output_dir
 
 
 def _write_csv_atomic(frame: pd.DataFrame, path: Path) -> None:

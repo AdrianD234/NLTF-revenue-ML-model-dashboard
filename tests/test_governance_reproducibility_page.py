@@ -12,6 +12,7 @@ from app import (
     _pack_zip_bytes,
 )
 from model_dashboard.data.chart_sources import resolve_chart_source_output_dir
+from model_dashboard.data_loader import DEFAULT_EVIDENCE_PACK_ROOT, load_evidence_pack
 from model_dashboard.light_ruc_reproducibility import (
     load_reproducibility_pack,
     reproducibility_stream_labels,
@@ -51,6 +52,9 @@ def test_source_workbook_manifest_is_written_without_requiring_repo_workbook_cop
 
 
 def test_reproducibility_page_helpers_do_not_alter_main_chart_sources() -> None:
+    # Chart-source materialisation is now explicit (issue #31); do it here so this
+    # test does not depend on another module having populated the scratch dir.
+    load_evidence_pack(DEFAULT_EVIDENCE_PACK_ROOT, ROOT, materialize_chart_sources=True)
     before = _chart_source_hashes()
     assert before
 

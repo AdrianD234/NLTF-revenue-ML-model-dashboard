@@ -1,0 +1,47 @@
+{
+  "issue": 31,
+  "branch": "hotfix/r2-app-boot-read-only",
+  "starting_sha": "46d1f87ea9dce1b374427e284bd72936b015ca93",
+  "starting_ref": "origin/main",
+  "worktree": "supplied by the harness; no nested worktree created",
+  "python_version": "3.13.5 (Anaconda, MSC v.1929 64 bit AMD64)",
+  "streamlit_version": "1.58.0",
+  "pandas_version": "3.0.3",
+  "numpy_version": "2.4.6",
+  "active_default_engine": "ar1 (DASHBOARD_ENGINE_DEFAULT unset)",
+  "git_status_at_start": "clean",
+  "tracked_chart_source_files": [
+    "artifacts/chart_sources/r2_ladder_summary.csv",
+    "artifacts/chart_sources/r2_reproducibility_gap_register.csv",
+    "artifacts/chart_sources/r2_training_fit_detail.csv"
+  ],
+  "chart_source_files_on_disk_at_start": 3,
+  "chart_source_file_hashes": {
+    "artifacts/chart_sources/r2_ladder_summary.csv": {
+      "sha256": "86ab60c9e847332957a657754e2f130b86355fcddb2e5aa7a19132229ebfb082",
+      "bytes": 7944
+    },
+    "artifacts/chart_sources/r2_reproducibility_gap_register.csv": {
+      "sha256": "bb4ef81e9b1af7be345933fbe3ecd7f9ff917b493d9f9a7f4263a03387e492aa",
+      "bytes": 2261
+    },
+    "artifacts/chart_sources/r2_training_fit_detail.csv": {
+      "sha256": "b93a933dd12392a5879546c85d692c476c041a90a7d3a168e5ccd98b76bae4e5",
+      "bytes": 27324
+    }
+  },
+  "authoritative_ped_calibration_r2": {
+    "operational_pooled": "0.5591936636031876",
+    "paper_horizon_mean": "0.9230110422702978"
+  },
+  "ar1_engine_ped_calibration_r2": {
+    "operational_pooled": "0.5803595524485978",
+    "paper_horizon_mean": "0.9448430187011027"
+  },
+  "preconditions": {
+    "clean_working_tree": true,
+    "worktree_base_equals_origin_main": true,
+    "no_stray_python_streamlit_pytest_or_builder_processes": true,
+    "branch_protection_active_on_main": "yes (CI summary required; unchanged by this work)"
+  }
+}

@@ -7,7 +7,7 @@ from typing import Any
 
 import pandas as pd
 
-from .chart_sources import write_chart_source_tables
+from .chart_sources import CHART_SOURCE_WRITE_SCRATCH, write_chart_source_tables
 from .config import (
     DashboardData,
     PARQUET_CANDIDATE_FILE,
@@ -62,7 +62,15 @@ def load_parquet_dashboard(
     repo_root: str | Path | None = None,
     *,
     allow_csv_preview: bool = False,
+    materialize_chart_sources: bool = False,
+    chart_source_output_dir: str | Path | None = None,
 ) -> LoadedRun:
+    """Load the legacy curated-CSV dashboard payload.
+
+    Like ``load_evidence_pack``, this is read-only with respect to governed
+    chart-source evidence unless ``materialize_chart_sources`` is set, and even
+    then it can only write to a scratch destination (issue #31).
+    """
     roots = candidate_search_roots(data_root, repo_root)
     warnings: list[str] = []
     parquet_path = locate_dashboard_file(PARQUET_CANDIDATE_FILE, roots)
@@ -108,7 +116,15 @@ def load_parquet_dashboard(
     write_data_source_manifest(repo_path, source_manifest)
     metadata = _read_json_file(metadata_path) if metadata_path else {}
     candidate = normalise_parquet_candidate(raw_candidate)
-    data, status_rows, build_warnings = _build_dashboard_frames(candidate, roots, repo_path, metadata, source_path)
+    data, status_rows, build_warnings = _build_dashboard_frames(
+        candidate,
+        roots,
+        repo_path,
+        metadata,
+        source_path,
+        materialize_chart_sources=materialize_chart_sources,
+        chart_source_output_dir=chart_source_output_dir,
+    )
     warnings.extend(build_warnings)
     status = pd.DataFrame(status_rows)
     return LoadedRun(source_path.parent, data, status, tuple(warnings), source_manifest)
@@ -136,6 +152,9 @@ def _build_dashboard_frames(
     repo_root: Path,
     metadata: dict[str, Any],
     source_path: Path,
+    *,
+    materialize_chart_sources: bool = False,
+    chart_source_output_dir: str | Path | None = None,
 ) -> tuple[dict[str, pd.DataFrame], list[dict[str, Any]], list[str]]:
     warnings: list[str] = []
     status_rows = [_status_row("parquet candidate cone", source_path, len(candidate), len(candidate.columns))]
@@ -225,7 +244,12 @@ def _build_dashboard_frames(
         "curated_manifest": curated_manifest,
         "audit_tables": audit_tables,
     }
-    _write_reconciliation_source_tables(repo_root, data)
+    _write_reconciliation_source_tables(
+        repo_root,
+        data,
+        materialize_chart_sources=materialize_chart_sources,
+        chart_source_output_dir=chart_source_output_dir,
+    )
     return data, status_rows, warnings
 
 
@@ -602,7 +626,13 @@ def build_horizon_comparison_source_table(
     return pd.DataFrame(rows, columns=columns)
 
 
-def _write_reconciliation_source_tables(repo_root: Path, data: dict[str, pd.DataFrame]) -> None:
+def _write_reconciliation_source_tables(
+    repo_root: Path,
+    data: dict[str, pd.DataFrame],
+    *,
+    materialize_chart_sources: bool = False,
+    chart_source_output_dir: str | Path | None = None,
+) -> None:
     artifacts = repo_root / "artifacts"
     artifacts.mkdir(parents=True, exist_ok=True)
     source_tables = {
@@ -624,7 +654,13 @@ def _write_reconciliation_source_tables(repo_root: Path, data: dict[str, pd.Data
     }
     for filename, frame in source_tables.items():
         frame.to_csv(artifacts / filename, index=False)
-    write_chart_source_tables(repo_root, data)
+    if materialize_chart_sources:
+        write_chart_source_tables(
+            repo_root,
+            data,
+            chart_source_output_dir,
+            mode=CHART_SOURCE_WRITE_SCRATCH,
+        )
 
 
 def _status_row(dataset: str, found: Path | None, rows: int | None, columns: int | None) -> dict[str, Any]:

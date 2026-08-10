@@ -14,7 +14,11 @@ if str(ROOT) not in sys.path:
 
 import pandas as pd
 
-from model_dashboard.chart_sources import CHART_SOURCE_FILES, CORE_COLUMNS  # noqa: E402
+from model_dashboard.chart_sources import (  # noqa: E402
+    CHART_SOURCE_FILES,
+    CORE_COLUMNS,
+    materialize_scratch_chart_sources,
+)
 from model_dashboard.data.config import DEFAULT_EVIDENCE_PACK_ROOT  # noqa: E402
 from model_dashboard.evidence_pack import load_evidence_pack  # noqa: E402
 from model_dashboard.labels import OVERVIEW_STRESS_BUCKET_ORDER  # noqa: E402
@@ -23,6 +27,10 @@ from model_dashboard.score_basis import OPERATIONAL_SCORE_BASIS, PAPER_SCORE_BAS
 
 EXPECTED_STREAMS = {"PED VKT per capita", "Light RUC volume", "Heavy RUC volume"}
 EXPECTED_FRONTIER_COUNTS = {"PED VKT per capita": 132, "Light RUC volume": 136, "Heavy RUC volume": 132}
+# Rebound in validate() to a run-scoped scratch directory. This validator checks
+# the tables the current evidence pack produces; rendering them into the
+# governed tree would make a validation run indistinguishable from a promotion
+# (issue #31). Use scripts/promote_chart_sources.py to publish.
 CHART_SOURCE_DIR = ROOT / "artifacts" / "chart_sources"
 MULTI_SCORE_BASIS_SOURCE_FILES = {
     "diagnostics_r2_summary.csv",
@@ -58,6 +66,8 @@ def validate() -> list[tuple[str, str, str]]:
     args = parse_args()
     repo_root = Path(args.repo_root).expanduser()
     loaded = load_evidence_pack(args.data_root, repo_root)
+    global CHART_SOURCE_DIR
+    CHART_SOURCE_DIR = materialize_scratch_chart_sources(repo_root, loaded.data, "validate-chart-sources")
     loaded_weights = loaded.data.get("weights", pd.DataFrame())
 
     findings: list[tuple[str, str, str]] = []

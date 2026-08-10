@@ -234,3 +234,10 @@ artifacts/governed_artifact_reproducibility/**/*.log
 artifacts/governed_artifact_reproducibility/raw_phase_a/**/*.parquet
 artifacts/governed_artifact_reproducibility/raw_phase_b_prefix/**/*.parquet
 artifacts/governed_artifact_reproducibility/raw_final/**/*.parquet
+# Issue #31: evidence that normal app startup is read-only for governed
+# chart-source files. Small JSON/CSV/markdown only; no server or browser logs.
+!artifacts/r2_app_boot_read_only/
+!artifacts/r2_app_boot_read_only/**
+# Engine-keyed diagnostic chart sources are regenerable output, never governed
+# evidence. scripts/promote_chart_sources.py --engine ar1 writes here.
+artifacts/diagnostics/chart_sources/

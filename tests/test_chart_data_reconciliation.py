@@ -43,7 +43,8 @@ EXPECTED_STREAMS = {"PED VKT per capita", "Light RUC volume", "Heavy RUC volume"
 @pytest.fixture(scope="session")
 def parquet_dashboard() -> LoadedRun:
     data_root = Path(os.environ.get("DASHBOARD_EVIDENCE_PACK_ROOT", DEFAULT_EVIDENCE_PACK_ROOT)).expanduser()
-    return load_evidence_pack(data_root, ROOT)
+    # Chart-source materialisation is now explicit (issue #31).
+    return load_evidence_pack(data_root, ROOT, materialize_chart_sources=True)
 
 
 def read_source_table(name: str) -> pd.DataFrame:

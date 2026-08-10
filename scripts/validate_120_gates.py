@@ -16,7 +16,11 @@ if str(ROOT) not in sys.path:
 
 import pandas as pd
 
-from model_dashboard.chart_sources import CHART_SOURCE_FILES, CORE_COLUMNS  # noqa: E402
+from model_dashboard.chart_sources import (  # noqa: E402
+    CHART_SOURCE_FILES,
+    CORE_COLUMNS,
+    materialize_scratch_chart_sources,
+)
 from model_dashboard.data.config import DEFAULT_EVIDENCE_PACK_ROOT  # noqa: E402
 from model_dashboard.evidence_pack import load_evidence_pack  # noqa: E402
 from model_dashboard.labels import OVERVIEW_STRESS_BUCKET_ORDER  # noqa: E402
@@ -43,8 +47,14 @@ def read_text(path: str) -> str:
     return target.read_text(encoding="utf-8") if target.exists() else ""
 
 
+# Rebound in main() to a run-scoped scratch directory holding the tables the
+# current evidence pack produces. Gates must not publish governed evidence
+# (issue #31); scripts/promote_chart_sources.py is the way to publish.
+CHART_SOURCE_DIR = ROOT / "artifacts" / "chart_sources"
+
+
 def read_source(filename: str) -> pd.DataFrame:
-    path = ROOT / "artifacts" / "chart_sources" / filename
+    path = CHART_SOURCE_DIR / filename
     if not path.exists() or path.stat().st_size == 0:
         raise AssertionError(f"Missing or empty chart source table: {filename}")
     return pd.read_csv(path)
@@ -64,12 +74,14 @@ def main() -> int:
     artifacts = repo_root / "artifacts"
     artifacts.mkdir(exist_ok=True)
     loaded = load_evidence_pack(args.data_root, repo_root)
+    global CHART_SOURCE_DIR
+    CHART_SOURCE_DIR = materialize_scratch_chart_sources(repo_root, loaded.data, "validate-120-gates")
     loaded_data = loaded.data
 
     def check_all_chart_sources_exist() -> str:
         missing = []
         for filename in CHART_SOURCE_FILES:
-            path = repo_root / "artifacts" / "chart_sources" / filename
+            path = CHART_SOURCE_DIR / filename
             if not path.exists() or path.stat().st_size == 0:
                 missing.append(filename)
         if missing:

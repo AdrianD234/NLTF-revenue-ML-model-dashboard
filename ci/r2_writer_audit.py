@@ -91,7 +91,16 @@ def main() -> None:
             if path.exists():
                 source_hashes[f"reproducibility/{pack_dir.name}/{name}"] = sha256_file(path)
 
-    pack = load_evidence_pack(evidence_root, repo_root=ROOT)
+    # Materialisation is explicit now that loading is read-only (issue #31);
+    # this audit exists precisely to compare the written CSV against the
+    # calculation, so it must ask for the write. chart_dir is checked above to
+    # be somewhere other than the governed destination.
+    pack = load_evidence_pack(
+        evidence_root,
+        repo_root=ROOT,
+        materialize_chart_sources=True,
+        chart_source_output_dir=chart_dir,
+    )
     data = pack.data
 
     # ---- the writers' own calculation, via the authoritative library
