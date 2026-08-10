@@ -1,0 +1,313 @@
+engine,policy_state,series_id,series_label,row_type,june_year,value,value_unit,official_value,movement_vs_origin_main
+ar1,cur-published__off-published,gross_ped_revenue,PED revenue,future_forecast,2026,2136.5366281536235,$m nominal ex GST,2038.23929657583,0
+ar1,cur-published__off-published,gross_ped_revenue,PED revenue,future_forecast,2026,2138.6936606827244,$m nominal ex GST,2038.23929657583,0
+ar1,cur-published__off-published,gross_ped_revenue,PED revenue,future_forecast,2026,2123.559806169978,$m nominal ex GST,2038.23929657583,0
+ar1,cur-published__off-published,gross_ped_revenue,PED revenue,future_forecast,2030,2716.3466616082915,$m nominal ex GST,2707.91842670497,0
+ar1,cur-published__off-published,gross_ped_revenue,PED revenue,future_forecast,2030,2781.2945144743608,$m nominal ex GST,2707.91842670497,0
+ar1,cur-published__off-published,gross_ped_revenue,PED revenue,future_forecast,2030,2706.7946098581374,$m nominal ex GST,2707.91842670497,0
+ar1,cur-published__off-published,gross_ped_revenue,PED revenue,future_forecast,2031,2814.2719810459394,$m nominal ex GST,2707.91842670497,0
+ar1,cur-published__off-published,gross_ped_revenue,PED revenue,future_forecast,2031,2898.276909910585,$m nominal ex GST,2707.91842670497,0
+ar1,cur-published__off-published,gross_ped_revenue,PED revenue,future_forecast,2050,1175.2327959122665,$m nominal ex GST,2707.91842670497,0
+ar1,cur-published__off-published,gross_ped_revenue,PED revenue,future_forecast,2050,1203.3326138740485,$m nominal ex GST,2707.91842670497,0
+ar1,cur-published__off-published,gross_ped_revenue,PED revenue,official_comparator,2026,2062.7846868373,$m nominal ex GST,2062.7846868373,0
+ar1,cur-published__off-published,gross_ped_revenue,PED revenue,official_comparator,2026,2038.23929657583,$m nominal ex GST,2038.23929657583,0
+ar1,cur-published__off-published,gross_ped_revenue,PED revenue,official_comparator,2030,2706.16345401687,$m nominal ex GST,2706.16345401687,0
+ar1,cur-published__off-published,gross_ped_revenue,PED revenue,official_comparator,2030,2707.91842670497,$m nominal ex GST,2707.91842670497,0
+ar1,cur-published__off-published,gross_ped_revenue,PED revenue,official_comparator,2031,2771.07090986288,$m nominal ex GST,2771.07090986288,0
+ar1,cur-published__off-published,gross_ped_revenue,PED revenue,official_comparator,2031,2772.84500582012,$m nominal ex GST,2772.84500582012,0
+ar1,cur-published__off-published,gross_ped_revenue,PED revenue,official_comparator,2050,1171.50816887837,$m nominal ex GST,1171.50816887837,0
+ar1,cur-published__off-published,gross_ped_revenue,PED revenue,official_comparator,2050,1171.5863032867,$m nominal ex GST,1171.5863032867,0
+ar1,cur-published__off-published,heavy_ruc_net_revenue,Heavy RUC revenue,future_forecast,2026,1134.1059888764494,$m nominal ex GST,1144.54055343658,0
+ar1,cur-published__off-published,heavy_ruc_net_revenue,Heavy RUC revenue,future_forecast,2026,1134.4796007193393,$m nominal ex GST,1144.54055343658,0
+ar1,cur-published__off-published,heavy_ruc_net_revenue,Heavy RUC revenue,future_forecast,2026,1123.432467523277,$m nominal ex GST,1144.54055343658,0
+ar1,cur-published__off-published,heavy_ruc_net_revenue,Heavy RUC revenue,future_forecast,2030,1561.9346558206582,$m nominal ex GST,1655.80221986912,0
+ar1,cur-published__off-published,heavy_ruc_net_revenue,Heavy RUC revenue,future_forecast,2030,1563.9596216233617,$m nominal ex GST,1655.80221986912,0
+ar1,cur-published__off-published,heavy_ruc_net_revenue,Heavy RUC revenue,future_forecast,2030,1557.290827152943,$m nominal ex GST,1655.80221986912,0
+ar1,cur-published__off-published,heavy_ruc_net_revenue,Heavy RUC revenue,future_forecast,2031,1642.9965761252706,$m nominal ex GST,1655.80221986912,0
+ar1,cur-published__off-published,heavy_ruc_net_revenue,Heavy RUC revenue,future_forecast,2031,1646.1718082660163,$m nominal ex GST,1655.80221986912,0
+ar1,cur-published__off-published,heavy_ruc_net_revenue,Heavy RUC revenue,future_forecast,2050,2380.597921237581,$m nominal ex GST,1655.80221986912,0
+ar1,cur-published__off-published,heavy_ruc_net_revenue,Heavy RUC revenue,future_forecast,2050,2383.684240734065,$m nominal ex GST,1655.80221986912,0
+ar1,cur-published__off-published,heavy_ruc_net_revenue,Heavy RUC revenue,official_comparator,2026,1146.5048086003,$m nominal ex GST,1146.5048086003,0
+ar1,cur-published__off-published,heavy_ruc_net_revenue,Heavy RUC revenue,official_comparator,2026,1144.54055343658,$m nominal ex GST,1144.54055343658,0
+ar1,cur-published__off-published,heavy_ruc_net_revenue,Heavy RUC revenue,official_comparator,2030,1652.12295550638,$m nominal ex GST,1652.12295550638,0
+ar1,cur-published__off-published,heavy_ruc_net_revenue,Heavy RUC revenue,official_comparator,2030,1655.80221986912,$m nominal ex GST,1655.80221986912,0
+ar1,cur-published__off-published,heavy_ruc_net_revenue,Heavy RUC revenue,official_comparator,2031,1724.93518509883,$m nominal ex GST,1724.93518509883,0
+ar1,cur-published__off-published,heavy_ruc_net_revenue,Heavy RUC revenue,official_comparator,2031,1728.76827058322,$m nominal ex GST,1728.76827058322,0
+ar1,cur-published__off-published,heavy_ruc_net_revenue,Heavy RUC revenue,official_comparator,2050,2523.10499503596,$m nominal ex GST,2523.10499503596,0
+ar1,cur-published__off-published,heavy_ruc_net_revenue,Heavy RUC revenue,official_comparator,2050,2523.66467951243,$m nominal ex GST,2523.66467951243,0
+ar1,cur-published__off-published,light_petrol_vkt,Light petrol VKT,future_forecast,2026,32946.371722443735,million km,,0
+ar1,cur-published__off-published,light_petrol_vkt,Light petrol VKT,future_forecast,2026,32979.6341503304,million km,,0
+ar1,cur-published__off-published,light_petrol_vkt,Light petrol VKT,future_forecast,2026,32746.263193895535,million km,,0
+ar1,cur-published__off-published,light_petrol_vkt,Light petrol VKT,future_forecast,2030,32993.321829443696,million km,,0
+ar1,cur-published__off-published,light_petrol_vkt,Light petrol VKT,future_forecast,2030,33782.19220524205,million km,,0
+ar1,cur-published__off-published,light_petrol_vkt,Light petrol VKT,future_forecast,2030,32877.300585918856,million km,,0
+ar1,cur-published__off-published,light_petrol_vkt,Light petrol VKT,future_forecast,2031,33116.39984458074,million km,,0
+ar1,cur-published__off-published,light_petrol_vkt,Light petrol VKT,future_forecast,2031,34104.911556289306,million km,,0
+ar1,cur-published__off-published,light_petrol_vkt,Light petrol VKT,future_forecast,2050,9629.378316419868,million km,,0
+ar1,cur-published__off-published,light_petrol_vkt,Light petrol VKT,future_forecast,2050,9859.616766808324,million km,,0
+ar1,cur-published__off-published,light_ruc_net_revenue,Light RUC revenue,future_forecast,2026,866.4745234882769,$m nominal ex GST,860.866112388873,0
+ar1,cur-published__off-published,light_ruc_net_revenue,Light RUC revenue,future_forecast,2026,867.0431163251362,$m nominal ex GST,860.866112388873,0
+ar1,cur-published__off-published,light_ruc_net_revenue,Light RUC revenue,future_forecast,2026,856.0950780456811,$m nominal ex GST,860.866112388873,0
+ar1,cur-published__off-published,light_ruc_net_revenue,Light RUC revenue,future_forecast,2030,1309.1303913442225,$m nominal ex GST,1298.88572108412,0
+ar1,cur-published__off-published,light_ruc_net_revenue,Light RUC revenue,future_forecast,2030,1338.1440384094096,$m nominal ex GST,1298.88572108412,0
+ar1,cur-published__off-published,light_ruc_net_revenue,Light RUC revenue,future_forecast,2030,1309.1303913442223,$m nominal ex GST,1298.88572108412,0
+ar1,cur-published__off-published,light_ruc_net_revenue,Light RUC revenue,future_forecast,2030,1303.3747733881019,$m nominal ex GST,1298.88572108412,0
+ar1,cur-published__off-published,light_ruc_net_revenue,Light RUC revenue,future_forecast,2031,1349.97821733928,$m nominal ex GST,1298.88572108412,0
+ar1,cur-published__off-published,light_ruc_net_revenue,Light RUC revenue,future_forecast,2031,1379.897155744915,$m nominal ex GST,1298.88572108412,0
+ar1,cur-published__off-published,light_ruc_net_revenue,Light RUC revenue,future_forecast,2050,1033.6655725305918,$m nominal ex GST,1298.88572108412,0
+ar1,cur-published__off-published,light_ruc_net_revenue,Light RUC revenue,future_forecast,2050,1056.5742211290267,$m nominal ex GST,1298.88572108412,0
+ar1,cur-published__off-published,light_ruc_net_revenue,Light RUC revenue,official_comparator,2026,873.815974346887,$m nominal ex GST,873.815974346887,0
+ar1,cur-published__off-published,light_ruc_net_revenue,Light RUC revenue,official_comparator,2026,860.866112388873,$m nominal ex GST,860.866112388873,0
+ar1,cur-published__off-published,light_ruc_net_revenue,Light RUC revenue,official_comparator,2030,1295.55904536384,$m nominal ex GST,1295.55904536384,0
+ar1,cur-published__off-published,light_ruc_net_revenue,Light RUC revenue,official_comparator,2030,1298.88572108412,$m nominal ex GST,1298.88572108412,0
+ar1,cur-published__off-published,light_ruc_net_revenue,Light RUC revenue,official_comparator,2031,1336.15045272876,$m nominal ex GST,1336.15045272876,0
+ar1,cur-published__off-published,light_ruc_net_revenue,Light RUC revenue,official_comparator,2031,1339.5503386194,$m nominal ex GST,1339.5503386194,0
+ar1,cur-published__off-published,light_ruc_net_revenue,Light RUC revenue,official_comparator,2050,999.260459284699,$m nominal ex GST,999.260459284699,0
+ar1,cur-published__off-published,light_ruc_net_revenue,Light RUC revenue,official_comparator,2050,999.531369991112,$m nominal ex GST,999.531369991112,0
+ar1,cur-published__off-published,net_fed_revenue,Net FED revenue,future_forecast,2026,2106.1949845912095,$m nominal ex GST,2007.89765301342,0
+ar1,cur-published__off-published,net_fed_revenue,Net FED revenue,future_forecast,2026,2108.3520171203104,$m nominal ex GST,2007.89765301342,0
+ar1,cur-published__off-published,net_fed_revenue,Net FED revenue,future_forecast,2026,2093.218162607564,$m nominal ex GST,2007.89765301342,0
+ar1,cur-published__off-published,net_fed_revenue,Net FED revenue,future_forecast,2030,2657.114250993943,$m nominal ex GST,2648.68601609063,0
+ar1,cur-published__off-published,net_fed_revenue,Net FED revenue,future_forecast,2030,2722.0621038600125,$m nominal ex GST,2648.68601609063,0
+ar1,cur-published__off-published,net_fed_revenue,Net FED revenue,future_forecast,2030,2647.562199243789,$m nominal ex GST,2648.68601609063,0
+ar1,cur-published__off-published,net_fed_revenue,Net FED revenue,future_forecast,2031,2752.263560753427,$m nominal ex GST,2648.68601609063,0
+ar1,cur-published__off-published,net_fed_revenue,Net FED revenue,future_forecast,2031,2836.2684896180726,$m nominal ex GST,2648.68601609063,0
+ar1,cur-published__off-published,net_fed_revenue,Net FED revenue,future_forecast,2050,1172.7816832470762,$m nominal ex GST,2648.68601609063,0
+ar1,cur-published__off-published,net_fed_revenue,Net FED revenue,future_forecast,2050,1200.8815012088583,$m nominal ex GST,2648.68601609063,0
+ar1,cur-published__off-published,net_fed_revenue,Net FED revenue,official_comparator,2026,2031.56232478189,$m nominal ex GST,2031.56232478189,0
+ar1,cur-published__off-published,net_fed_revenue,Net FED revenue,official_comparator,2026,2007.89765301342,$m nominal ex GST,2007.89765301342,0
+ar1,cur-published__off-published,net_fed_revenue,Net FED revenue,official_comparator,2030,2646.99523947345,$m nominal ex GST,2646.99523947345,0
+ar1,cur-published__off-published,net_fed_revenue,Net FED revenue,official_comparator,2030,2648.68601609063,$m nominal ex GST,2648.68601609063,0
+ar1,cur-published__off-published,net_fed_revenue,Net FED revenue,official_comparator,2031,2709.12890389427,$m nominal ex GST,2709.12890389427,0
+ar1,cur-published__off-published,net_fed_revenue,Net FED revenue,official_comparator,2031,2710.83658552761,$m nominal ex GST,2710.83658552761,0
+ar1,cur-published__off-published,net_fed_revenue,Net FED revenue,official_comparator,2050,1169.06013491158,$m nominal ex GST,1169.06013491158,0
+ar1,cur-published__off-published,net_fed_revenue,Net FED revenue,official_comparator,2050,1169.13519062151,$m nominal ex GST,1169.13519062151,0
+ar1,cur-published__off-published,ped_vkt_per_capita,PED VKT per capita,future_forecast,2026,6142.76079767832,km/person,5860.79487488994,0
+ar1,cur-published__off-published,ped_vkt_per_capita,PED VKT per capita,future_forecast,2026,6142.229203785595,km/person,5860.79487488994,0
+ar1,cur-published__off-published,ped_vkt_per_capita,PED VKT per capita,future_forecast,2026,6105.496639661895,km/person,5860.79487488994,0
+ar1,cur-published__off-published,ped_vkt_per_capita,PED VKT per capita,future_forecast,2030,5888.384227680278,km/person,5890.93754143919,0
+ar1,cur-published__off-published,ped_vkt_per_capita,PED VKT per capita,future_forecast,2030,5865.313229982334,km/person,5890.93754143919,0
+ar1,cur-published__off-published,ped_vkt_per_capita,PED VKT per capita,future_forecast,2030,5867.644559816273,km/person,5890.93754143919,0
+ar1,cur-published__off-published,ped_vkt_per_capita,PED VKT per capita,future_forecast,2031,5865.077484201897,km/person,5890.93754143919,0
+ar1,cur-published__off-published,ped_vkt_per_capita,PED VKT per capita,future_forecast,2031,5833.847437306621,km/person,5890.93754143919,0
+ar1,cur-published__off-published,ped_vkt_per_capita,PED VKT per capita,future_forecast,2050,1521.479603481342,km/person,5890.93754143919,0
+ar1,cur-published__off-published,ped_vkt_per_capita,PED VKT per capita,future_forecast,2050,1270.9986498990381,km/person,5890.93754143919,0
+ar1,cur-published__off-published,ped_vkt_per_capita,PED VKT per capita,official_comparator,2026,5935.87599744435,km/person,5935.87599744435,0
+ar1,cur-published__off-published,ped_vkt_per_capita,PED VKT per capita,official_comparator,2026,5860.79487488994,km/person,5860.79487488994,0
+ar1,cur-published__off-published,ped_vkt_per_capita,PED VKT per capita,official_comparator,2030,5887.16953577159,km/person,5887.16953577159,0
+ar1,cur-published__off-published,ped_vkt_per_capita,PED VKT per capita,official_comparator,2030,5890.93754143919,km/person,5890.93754143919,0
+ar1,cur-published__off-published,ped_vkt_per_capita,PED VKT per capita,official_comparator,2031,5783.7523211264,km/person,5783.7523211264,0
+ar1,cur-published__off-published,ped_vkt_per_capita,PED VKT per capita,official_comparator,2031,5787.46122605502,km/person,5787.46122605502,0
+ar1,cur-published__off-published,ped_vkt_per_capita,PED VKT per capita,official_comparator,2050,1453.07421427843,km/person,1453.07421427843,0
+ar1,cur-published__off-published,ped_vkt_per_capita,PED VKT per capita,official_comparator,2050,1453.17133160906,km/person,1453.17133160906,0
+ar1,cur-published__off-published,ped_volume,PED volume,future_forecast,2026,3051.1490748223814,million litres,2910.77244455591,0
+ar1,cur-published__off-published,ped_volume,PED volume,future_forecast,2026,3054.229493720332,million litres,2910.77244455591,0
+ar1,cur-published__off-published,ped_volume,PED volume,future_forecast,2026,3032.6171115188777,million litres,2910.77244455591,0
+ar1,cur-published__off-published,ped_volume,PED volume,future_forecast,2030,2889.4008279080367,million litres,2880.43564343742,0
+ar1,cur-published__off-published,ped_volume,PED volume,future_forecast,2030,2958.48640615708,million litres,2880.43564343742,0
+ar1,cur-published__off-published,ped_volume,PED volume,future_forecast,2030,2879.2402299898113,million litres,2880.43564343742,0
+ar1,cur-published__off-published,ped_volume,PED volume,future_forecast,2031,2871.3369471624433,million litres,2880.43564343742,0
+ar1,cur-published__off-published,ped_volume,PED volume,future_forecast,2031,2957.0452431684193,million litres,2880.43564343742,0
+ar1,cur-published__off-published,ped_volume,PED volume,future_forecast,2050,675.5091382257311,million litres,2880.43564343742,0
+ar1,cur-published__off-published,ped_volume,PED volume,future_forecast,2050,691.6605627619473,million litres,2880.43564343742,0
+ar1,cur-published__off-published,ped_volume,PED volume,official_comparator,2026,2945.82526967511,million litres,2945.82526967511,0
+ar1,cur-published__off-published,ped_volume,PED volume,official_comparator,2026,2910.77244455591,million litres,2910.77244455591,0
+ar1,cur-published__off-published,ped_volume,PED volume,official_comparator,2030,2878.59330671556,million litres,2878.59330671556,0
+ar1,cur-published__off-published,ped_volume,PED volume,official_comparator,2030,2880.43564343742,million litres,2880.43564343742,0
+ar1,cur-published__off-published,ped_volume,PED volume,official_comparator,2031,2827.25640804399,million litres,2827.25640804399,0
+ar1,cur-published__off-published,ped_volume,PED volume,official_comparator,2031,2829.06995755511,million litres,2829.06995755511,0
+ar1,cur-published__off-published,ped_volume,PED volume,official_comparator,2050,673.368126706594,million litres,673.368126706594,0
+ar1,cur-published__off-published,ped_volume,PED volume,official_comparator,2050,673.413179791274,million litres,673.413179791274,0
+ar1,cur-published__off-published,total_nltf_net_revenue,Total NLTF revenue,future_forecast,2026,4589.495642256075,$m nominal ex GST,4493.65132567772,0
+ar1,cur-published__off-published,total_nltf_net_revenue,Total NLTF revenue,future_forecast,2026,4592.664226148434,$m nominal ex GST,4493.65132567772,0
+ar1,cur-published__off-published,total_nltf_net_revenue,Total NLTF revenue,future_forecast,2026,4555.465853476661,$m nominal ex GST,4493.65132567772,0
+ar1,cur-published__off-published,total_nltf_net_revenue,Total NLTF revenue,future_forecast,2030,6408.4932405407635,$m nominal ex GST,6442.98776042894,0
+ar1,cur-published__off-published,total_nltf_net_revenue,Total NLTF revenue,future_forecast,2030,6513.180205527075,$m nominal ex GST,6442.98776042894,0
+ar1,cur-published__off-published,total_nltf_net_revenue,Total NLTF revenue,future_forecast,2030,6388.5417421667735,$m nominal ex GST,6442.98776042894,0
+ar1,cur-published__off-published,total_nltf_net_revenue,Total NLTF revenue,future_forecast,2031,6727.050913569903,$m nominal ex GST,6442.98776042894,0
+ar1,cur-published__off-published,total_nltf_net_revenue,Total NLTF revenue,future_forecast,2031,6855.019763602177,$m nominal ex GST,6442.98776042894,0
+ar1,cur-published__off-published,total_nltf_net_revenue,Total NLTF revenue,future_forecast,2050,12997.261591337161,$m nominal ex GST,6442.98776042894,0
+ar1,cur-published__off-published,total_nltf_net_revenue,Total NLTF revenue,future_forecast,2050,13213.33293525748,$m nominal ex GST,6442.98776042894,0
+ar1,cur-published__off-published,total_nltf_net_revenue,Total NLTF revenue,official_comparator,2026,4563.15127995703,$m nominal ex GST,4563.15127995703,0
+ar1,cur-published__off-published,total_nltf_net_revenue,Total NLTF revenue,official_comparator,2026,4493.65132567772,$m nominal ex GST,4493.65132567772,0
+ar1,cur-published__off-published,total_nltf_net_revenue,Total NLTF revenue,official_comparator,2030,6434.36939164909,$m nominal ex GST,6434.36939164909,0
+ar1,cur-published__off-published,total_nltf_net_revenue,Total NLTF revenue,official_comparator,2030,6442.98776042894,$m nominal ex GST,6442.98776042894,0
+ar1,cur-published__off-published,total_nltf_net_revenue,Total NLTF revenue,official_comparator,2031,6701.03490698007,$m nominal ex GST,6701.03490698007,0
+ar1,cur-published__off-published,total_nltf_net_revenue,Total NLTF revenue,official_comparator,2031,6709.89785800321,$m nominal ex GST,6709.89785800321,0
+ar1,cur-published__off-published,total_nltf_net_revenue,Total NLTF revenue,official_comparator,2050,12909.5821651262,$m nominal ex GST,12909.5821651262,0
+ar1,cur-published__off-published,total_nltf_net_revenue,Total NLTF revenue,official_comparator,2050,12910.4837029366,$m nominal ex GST,12910.4837029366,0
+ar1,cur-published__off-published,total_ruc_net_revenue,Total RUC all classes,future_forecast,2026,2072.019805657217,$m nominal ex GST,2074.47282065665,0
+ar1,cur-published__off-published,total_ruc_net_revenue,Total RUC all classes,future_forecast,2026,2073.0313570204744,$m nominal ex GST,2074.47282065665,0
+ar1,cur-published__off-published,total_ruc_net_revenue,Total RUC all classes,future_forecast,2026,2050.9668388614487,$m nominal ex GST,2074.47282065665,0
+ar1,cur-published__off-published,total_ruc_net_revenue,Total RUC all classes,future_forecast,2030,3253.9373715651354,$m nominal ex GST,3296.86012635663,0
+ar1,cur-published__off-published,total_ruc_net_revenue,Total RUC all classes,future_forecast,2030,3293.676483685377,$m nominal ex GST,3296.86012635663,0
+ar1,cur-published__off-published,total_ruc_net_revenue,Total RUC all classes,future_forecast,2030,3253.937371565135,$m nominal ex GST,3296.86012635663,0
+ar1,cur-published__off-published,total_ruc_net_revenue,Total RUC all classes,future_forecast,2030,3243.5379249412995,$m nominal ex GST,3296.86012635663,0
+ar1,cur-published__off-published,total_ruc_net_revenue,Total RUC all classes,future_forecast,2031,3481.89911494128,$m nominal ex GST,3296.86012635663,0
+ar1,cur-published__off-published,total_ruc_net_revenue,Total RUC all classes,future_forecast,2031,3525.863036108908,$m nominal ex GST,3296.86012635663,0
+ar1,cur-published__off-published,total_ruc_net_revenue,Total RUC all classes,future_forecast,2050,11376.234075278322,$m nominal ex GST,3296.86012635663,0
+ar1,cur-published__off-published,total_ruc_net_revenue,Total RUC all classes,future_forecast,2050,11564.205601236858,$m nominal ex GST,3296.86012635663,0
+ar1,cur-published__off-published,total_ruc_net_revenue,Total RUC all classes,official_comparator,2026,2089.05368416013,$m nominal ex GST,2089.05368416013,0
+ar1,cur-published__off-published,total_ruc_net_revenue,Total RUC all classes,official_comparator,2026,2074.47282065665,$m nominal ex GST,2074.47282065665,0
+ar1,cur-published__off-published,total_ruc_net_revenue,Total RUC all classes,official_comparator,2030,3289.93253419396,$m nominal ex GST,3289.93253419396,0
+ar1,cur-published__off-published,total_ruc_net_revenue,Total RUC all classes,official_comparator,2030,3296.86012635663,$m nominal ex GST,3296.86012635663,0
+ar1,cur-published__off-published,total_ruc_net_revenue,Total RUC all classes,official_comparator,2031,3499.01776521061,$m nominal ex GST,3499.01776521061,0
+ar1,cur-published__off-published,total_ruc_net_revenue,Total RUC all classes,official_comparator,2031,3506.1730346004,$m nominal ex GST,3506.1730346004,0
+ar1,cur-published__off-published,total_ruc_net_revenue,Total RUC all classes,official_comparator,2050,11292.2761974029,$m nominal ex GST,11292.2761974029,0
+ar1,cur-published__off-published,total_ruc_net_revenue,Total RUC all classes,official_comparator,2050,11293.1026795033,$m nominal ex GST,11293.1026795033,0
+ensemble,cur-published__off-published,gross_ped_revenue,PED revenue,future_forecast,2026,2145.548201133949,$m nominal ex GST,2038.23929657583,0
+ensemble,cur-published__off-published,gross_ped_revenue,PED revenue,future_forecast,2026,2147.8215097802467,$m nominal ex GST,2038.23929657583,0
+ensemble,cur-published__off-published,gross_ped_revenue,PED revenue,future_forecast,2026,2129.5656987753755,$m nominal ex GST,2038.23929657583,0
+ensemble,cur-published__off-published,gross_ped_revenue,PED revenue,future_forecast,2030,2823.1151379145613,$m nominal ex GST,2707.91842670497,0
+ensemble,cur-published__off-published,gross_ped_revenue,PED revenue,future_forecast,2030,2896.714365364449,$m nominal ex GST,2707.91842670497,0
+ensemble,cur-published__off-published,gross_ped_revenue,PED revenue,future_forecast,2030,2815.9322048670465,$m nominal ex GST,2707.91842670497,0
+ensemble,cur-published__off-published,gross_ped_revenue,PED revenue,future_forecast,2031,2935.5468210516146,$m nominal ex GST,2707.91842670497,0
+ensemble,cur-published__off-published,gross_ped_revenue,PED revenue,future_forecast,2031,3032.4844534354597,$m nominal ex GST,2707.91842670497,0
+ensemble,cur-published__off-published,gross_ped_revenue,PED revenue,future_forecast,2050,1221.4263899399214,$m nominal ex GST,2707.91842670497,0
+ensemble,cur-published__off-published,gross_ped_revenue,PED revenue,future_forecast,2050,1253.2692423546796,$m nominal ex GST,2707.91842670497,0
+ensemble,cur-published__off-published,gross_ped_revenue,PED revenue,official_comparator,2026,2062.7846868373,$m nominal ex GST,2062.7846868373,0
+ensemble,cur-published__off-published,gross_ped_revenue,PED revenue,official_comparator,2026,2038.23929657583,$m nominal ex GST,2038.23929657583,0
+ensemble,cur-published__off-published,gross_ped_revenue,PED revenue,official_comparator,2030,2706.16345401687,$m nominal ex GST,2706.16345401687,0
+ensemble,cur-published__off-published,gross_ped_revenue,PED revenue,official_comparator,2030,2707.91842670497,$m nominal ex GST,2707.91842670497,0
+ensemble,cur-published__off-published,gross_ped_revenue,PED revenue,official_comparator,2031,2771.07090986288,$m nominal ex GST,2771.07090986288,0
+ensemble,cur-published__off-published,gross_ped_revenue,PED revenue,official_comparator,2031,2772.84500582012,$m nominal ex GST,2772.84500582012,0
+ensemble,cur-published__off-published,gross_ped_revenue,PED revenue,official_comparator,2050,1171.50816887837,$m nominal ex GST,1171.50816887837,0
+ensemble,cur-published__off-published,gross_ped_revenue,PED revenue,official_comparator,2050,1171.5863032867,$m nominal ex GST,1171.5863032867,0
+ensemble,cur-published__off-published,heavy_ruc_net_revenue,Heavy RUC revenue,future_forecast,2026,1134.1059888764494,$m nominal ex GST,1144.54055343658,0
+ensemble,cur-published__off-published,heavy_ruc_net_revenue,Heavy RUC revenue,future_forecast,2026,1134.4796007193393,$m nominal ex GST,1144.54055343658,0
+ensemble,cur-published__off-published,heavy_ruc_net_revenue,Heavy RUC revenue,future_forecast,2026,1123.432467523277,$m nominal ex GST,1144.54055343658,0
+ensemble,cur-published__off-published,heavy_ruc_net_revenue,Heavy RUC revenue,future_forecast,2030,1561.9346558206582,$m nominal ex GST,1655.80221986912,0
+ensemble,cur-published__off-published,heavy_ruc_net_revenue,Heavy RUC revenue,future_forecast,2030,1563.9596216233617,$m nominal ex GST,1655.80221986912,0
+ensemble,cur-published__off-published,heavy_ruc_net_revenue,Heavy RUC revenue,future_forecast,2030,1557.290827152943,$m nominal ex GST,1655.80221986912,0
+ensemble,cur-published__off-published,heavy_ruc_net_revenue,Heavy RUC revenue,future_forecast,2031,1642.9965761252706,$m nominal ex GST,1655.80221986912,0
+ensemble,cur-published__off-published,heavy_ruc_net_revenue,Heavy RUC revenue,future_forecast,2031,1646.1718082660163,$m nominal ex GST,1655.80221986912,0
+ensemble,cur-published__off-published,heavy_ruc_net_revenue,Heavy RUC revenue,future_forecast,2050,2380.597921237581,$m nominal ex GST,1655.80221986912,0
+ensemble,cur-published__off-published,heavy_ruc_net_revenue,Heavy RUC revenue,future_forecast,2050,2383.684240734065,$m nominal ex GST,1655.80221986912,0
+ensemble,cur-published__off-published,heavy_ruc_net_revenue,Heavy RUC revenue,official_comparator,2026,1146.5048086003,$m nominal ex GST,1146.5048086003,0
+ensemble,cur-published__off-published,heavy_ruc_net_revenue,Heavy RUC revenue,official_comparator,2026,1144.54055343658,$m nominal ex GST,1144.54055343658,0
+ensemble,cur-published__off-published,heavy_ruc_net_revenue,Heavy RUC revenue,official_comparator,2030,1652.12295550638,$m nominal ex GST,1652.12295550638,0
+ensemble,cur-published__off-published,heavy_ruc_net_revenue,Heavy RUC revenue,official_comparator,2030,1655.80221986912,$m nominal ex GST,1655.80221986912,0
+ensemble,cur-published__off-published,heavy_ruc_net_revenue,Heavy RUC revenue,official_comparator,2031,1724.93518509883,$m nominal ex GST,1724.93518509883,0
+ensemble,cur-published__off-published,heavy_ruc_net_revenue,Heavy RUC revenue,official_comparator,2031,1728.76827058322,$m nominal ex GST,1728.76827058322,0
+ensemble,cur-published__off-published,heavy_ruc_net_revenue,Heavy RUC revenue,official_comparator,2050,2523.10499503596,$m nominal ex GST,2523.10499503596,0
+ensemble,cur-published__off-published,heavy_ruc_net_revenue,Heavy RUC revenue,official_comparator,2050,2523.66467951243,$m nominal ex GST,2523.66467951243,0
+ensemble,cur-published__off-published,light_petrol_vkt,Light petrol VKT,future_forecast,2026,33085.33429827859,million km,,0
+ensemble,cur-published__off-published,light_petrol_vkt,Light petrol VKT,future_forecast,2026,33120.38975705886,million km,,0
+ensemble,cur-published__off-published,light_petrol_vkt,Light petrol VKT,future_forecast,2026,32838.87680402283,million km,,0
+ensemble,cur-published__off-published,light_petrol_vkt,Light petrol VKT,future_forecast,2030,34290.154354466984,million km,,0
+ensemble,cur-published__off-published,light_petrol_vkt,Light petrol VKT,future_forecast,2030,35184.106158179275,million km,,0
+ensemble,cur-published__off-published,light_petrol_vkt,Light petrol VKT,future_forecast,2030,34202.908928444784,million km,,0
+ensemble,cur-published__off-published,light_petrol_vkt,Light petrol VKT,future_forecast,2031,34543.478008938844,million km,,0
+ensemble,cur-published__off-published,light_petrol_vkt,Light petrol VKT,future_forecast,2031,35684.17280163522,million km,,0
+ensemble,cur-published__off-published,light_petrol_vkt,Light petrol VKT,future_forecast,2050,10007.869789968407,million km,,0
+ensemble,cur-published__off-published,light_petrol_vkt,Light petrol VKT,future_forecast,2050,10268.777138403673,million km,,0
+ensemble,cur-published__off-published,light_ruc_net_revenue,Light RUC revenue,future_forecast,2026,866.4745234882769,$m nominal ex GST,860.866112388873,0
+ensemble,cur-published__off-published,light_ruc_net_revenue,Light RUC revenue,future_forecast,2026,867.0431163251362,$m nominal ex GST,860.866112388873,0
+ensemble,cur-published__off-published,light_ruc_net_revenue,Light RUC revenue,future_forecast,2026,856.0950780456811,$m nominal ex GST,860.866112388873,0
+ensemble,cur-published__off-published,light_ruc_net_revenue,Light RUC revenue,future_forecast,2030,1309.1303913442225,$m nominal ex GST,1298.88572108412,0
+ensemble,cur-published__off-published,light_ruc_net_revenue,Light RUC revenue,future_forecast,2030,1338.1440384094096,$m nominal ex GST,1298.88572108412,0
+ensemble,cur-published__off-published,light_ruc_net_revenue,Light RUC revenue,future_forecast,2030,1309.1303913442223,$m nominal ex GST,1298.88572108412,0
+ensemble,cur-published__off-published,light_ruc_net_revenue,Light RUC revenue,future_forecast,2030,1303.3747733881019,$m nominal ex GST,1298.88572108412,0
+ensemble,cur-published__off-published,light_ruc_net_revenue,Light RUC revenue,future_forecast,2031,1349.97821733928,$m nominal ex GST,1298.88572108412,0
+ensemble,cur-published__off-published,light_ruc_net_revenue,Light RUC revenue,future_forecast,2031,1379.897155744915,$m nominal ex GST,1298.88572108412,0
+ensemble,cur-published__off-published,light_ruc_net_revenue,Light RUC revenue,future_forecast,2050,1033.6655725305918,$m nominal ex GST,1298.88572108412,0
+ensemble,cur-published__off-published,light_ruc_net_revenue,Light RUC revenue,future_forecast,2050,1056.5742211290267,$m nominal ex GST,1298.88572108412,0
+ensemble,cur-published__off-published,light_ruc_net_revenue,Light RUC revenue,official_comparator,2026,873.815974346887,$m nominal ex GST,873.815974346887,0
+ensemble,cur-published__off-published,light_ruc_net_revenue,Light RUC revenue,official_comparator,2026,860.866112388873,$m nominal ex GST,860.866112388873,0
+ensemble,cur-published__off-published,light_ruc_net_revenue,Light RUC revenue,official_comparator,2030,1295.55904536384,$m nominal ex GST,1295.55904536384,0
+ensemble,cur-published__off-published,light_ruc_net_revenue,Light RUC revenue,official_comparator,2030,1298.88572108412,$m nominal ex GST,1298.88572108412,0
+ensemble,cur-published__off-published,light_ruc_net_revenue,Light RUC revenue,official_comparator,2031,1336.15045272876,$m nominal ex GST,1336.15045272876,0
+ensemble,cur-published__off-published,light_ruc_net_revenue,Light RUC revenue,official_comparator,2031,1339.5503386194,$m nominal ex GST,1339.5503386194,0
+ensemble,cur-published__off-published,light_ruc_net_revenue,Light RUC revenue,official_comparator,2050,999.260459284699,$m nominal ex GST,999.260459284699,0
+ensemble,cur-published__off-published,light_ruc_net_revenue,Light RUC revenue,official_comparator,2050,999.531369991112,$m nominal ex GST,999.531369991112,0
+ensemble,cur-published__off-published,net_fed_revenue,Net FED revenue,future_forecast,2026,2115.206557571535,$m nominal ex GST,2007.89765301342,0
+ensemble,cur-published__off-published,net_fed_revenue,Net FED revenue,future_forecast,2026,2117.4798662178328,$m nominal ex GST,2007.89765301342,0
+ensemble,cur-published__off-published,net_fed_revenue,Net FED revenue,future_forecast,2026,2099.2240552129615,$m nominal ex GST,2007.89765301342,0
+ensemble,cur-published__off-published,net_fed_revenue,Net FED revenue,future_forecast,2030,2763.882727300213,$m nominal ex GST,2648.68601609063,0
+ensemble,cur-published__off-published,net_fed_revenue,Net FED revenue,future_forecast,2030,2837.4819547501006,$m nominal ex GST,2648.68601609063,0
+ensemble,cur-published__off-published,net_fed_revenue,Net FED revenue,future_forecast,2030,2756.699794252698,$m nominal ex GST,2648.68601609063,0
+ensemble,cur-published__off-published,net_fed_revenue,Net FED revenue,future_forecast,2031,2873.5384007591024,$m nominal ex GST,2648.68601609063,0
+ensemble,cur-published__off-published,net_fed_revenue,Net FED revenue,future_forecast,2031,2970.4760331429475,$m nominal ex GST,2648.68601609063,0
+ensemble,cur-published__off-published,net_fed_revenue,Net FED revenue,future_forecast,2050,1218.975277274731,$m nominal ex GST,2648.68601609063,0
+ensemble,cur-published__off-published,net_fed_revenue,Net FED revenue,future_forecast,2050,1250.8181296894893,$m nominal ex GST,2648.68601609063,0
+ensemble,cur-published__off-published,net_fed_revenue,Net FED revenue,official_comparator,2026,2031.56232478189,$m nominal ex GST,2031.56232478189,0
+ensemble,cur-published__off-published,net_fed_revenue,Net FED revenue,official_comparator,2026,2007.89765301342,$m nominal ex GST,2007.89765301342,0
+ensemble,cur-published__off-published,net_fed_revenue,Net FED revenue,official_comparator,2030,2646.99523947345,$m nominal ex GST,2646.99523947345,0
+ensemble,cur-published__off-published,net_fed_revenue,Net FED revenue,official_comparator,2030,2648.68601609063,$m nominal ex GST,2648.68601609063,0
+ensemble,cur-published__off-published,net_fed_revenue,Net FED revenue,official_comparator,2031,2709.12890389427,$m nominal ex GST,2709.12890389427,0
+ensemble,cur-published__off-published,net_fed_revenue,Net FED revenue,official_comparator,2031,2710.83658552761,$m nominal ex GST,2710.83658552761,0
+ensemble,cur-published__off-published,net_fed_revenue,Net FED revenue,official_comparator,2050,1169.06013491158,$m nominal ex GST,1169.06013491158,0
+ensemble,cur-published__off-published,net_fed_revenue,Net FED revenue,official_comparator,2050,1169.13519062151,$m nominal ex GST,1169.13519062151,0
+ensemble,cur-published__off-published,ped_vkt_per_capita,PED VKT per capita,future_forecast,2026,6168.639959079953,km/person,5860.79487488994,0
+ensemble,cur-published__off-published,ped_vkt_per_capita,PED VKT per capita,future_forecast,2026,6168.365967183541,km/person,5860.79487488994,0
+ensemble,cur-published__off-published,ped_vkt_per_capita,PED VKT per capita,future_forecast,2026,6122.744708752996,km/person,5860.79487488994,0
+ensemble,cur-published__off-published,ped_vkt_per_capita,PED VKT per capita,future_forecast,2030,6119.810756176223,km/person,5890.93754143919,0
+ensemble,cur-published__off-published,ped_vkt_per_capita,PED VKT per capita,future_forecast,2030,6108.672794855236,km/person,5890.93754143919,0
+ensemble,cur-published__off-published,ped_vkt_per_capita,PED VKT per capita,future_forecast,2030,6104.214255567496,km/person,5890.93754143919,0
+ensemble,cur-published__off-published,ped_vkt_per_capita,PED VKT per capita,future_forecast,2031,6117.785758686691,km/person,5890.93754143919,0
+ensemble,cur-published__off-published,ped_vkt_per_capita,PED VKT per capita,future_forecast,2031,6103.91113227769,km/person,5890.93754143919,0
+ensemble,cur-published__off-published,ped_vkt_per_capita,PED VKT per capita,future_forecast,2050,1581.277157546583,km/person,5890.93754143919,0
+ensemble,cur-published__off-published,ped_vkt_per_capita,PED VKT per capita,future_forecast,2050,1323.7290618750949,km/person,5890.93754143919,0
+ensemble,cur-published__off-published,ped_vkt_per_capita,PED VKT per capita,official_comparator,2026,5935.87599744435,km/person,5935.87599744435,0
+ensemble,cur-published__off-published,ped_vkt_per_capita,PED VKT per capita,official_comparator,2026,5860.79487488994,km/person,5860.79487488994,0
+ensemble,cur-published__off-published,ped_vkt_per_capita,PED VKT per capita,official_comparator,2030,5887.16953577159,km/person,5887.16953577159,0
+ensemble,cur-published__off-published,ped_vkt_per_capita,PED VKT per capita,official_comparator,2030,5890.93754143919,km/person,5890.93754143919,0
+ensemble,cur-published__off-published,ped_vkt_per_capita,PED VKT per capita,official_comparator,2031,5783.7523211264,km/person,5783.7523211264,0
+ensemble,cur-published__off-published,ped_vkt_per_capita,PED VKT per capita,official_comparator,2031,5787.46122605502,km/person,5787.46122605502,0
+ensemble,cur-published__off-published,ped_vkt_per_capita,PED VKT per capita,official_comparator,2050,1453.07421427843,km/person,1453.07421427843,0
+ensemble,cur-published__off-published,ped_vkt_per_capita,PED VKT per capita,official_comparator,2050,1453.17133160906,km/person,1453.17133160906,0
+ensemble,cur-published__off-published,ped_volume,PED volume,future_forecast,2026,3064.018338189692,million litres,2910.77244455591,0
+ensemble,cur-published__off-published,ped_volume,PED volume,future_forecast,2026,3067.2648088944475,million litres,2910.77244455591,0
+ensemble,cur-published__off-published,ped_volume,PED volume,future_forecast,2026,3041.1940174445567,million litres,2910.77244455591,0
+ensemble,cur-published__off-published,ped_volume,PED volume,future_forecast,2030,3002.9713556296933,million litres,2880.43564343742,0
+ensemble,cur-published__off-published,ped_volume,PED volume,future_forecast,2030,3081.259473907346,million litres,2880.43564343742,0
+ensemble,cur-published__off-published,ped_volume,PED volume,future_forecast,2030,2995.3308092341867,million litres,2880.43564343742,0
+ensemble,cur-published__off-published,ped_volume,PED volume,future_forecast,2031,2995.070875942167,million litres,2880.43564343742,0
+ensemble,cur-published__off-published,ped_volume,PED volume,future_forecast,2031,3093.9741117732456,million litres,2880.43564343742,0
+ensemble,cur-published__off-published,ped_volume,PED volume,future_forecast,2050,702.0606393425361,million litres,2880.43564343742,0
+ensemble,cur-published__off-published,ped_volume,PED volume,future_forecast,2050,720.3635133502729,million litres,2880.43564343742,0
+ensemble,cur-published__off-published,ped_volume,PED volume,official_comparator,2026,2945.82526967511,million litres,2945.82526967511,0
+ensemble,cur-published__off-published,ped_volume,PED volume,official_comparator,2026,2910.77244455591,million litres,2910.77244455591,0
+ensemble,cur-published__off-published,ped_volume,PED volume,official_comparator,2030,2878.59330671556,million litres,2878.59330671556,0
+ensemble,cur-published__off-published,ped_volume,PED volume,official_comparator,2030,2880.43564343742,million litres,2880.43564343742,0
+ensemble,cur-published__off-published,ped_volume,PED volume,official_comparator,2031,2827.25640804399,million litres,2827.25640804399,0
+ensemble,cur-published__off-published,ped_volume,PED volume,official_comparator,2031,2829.06995755511,million litres,2829.06995755511,0
+ensemble,cur-published__off-published,ped_volume,PED volume,official_comparator,2050,673.368126706594,million litres,673.368126706594,0
+ensemble,cur-published__off-published,ped_volume,PED volume,official_comparator,2050,673.413179791274,million litres,673.413179791274,0
+ensemble,cur-published__off-published,total_nltf_net_revenue,Total NLTF revenue,future_forecast,2026,4598.507215236401,$m nominal ex GST,4493.65132567772,0
+ensemble,cur-published__off-published,total_nltf_net_revenue,Total NLTF revenue,future_forecast,2026,4601.792075245956,$m nominal ex GST,4493.65132567772,0
+ensemble,cur-published__off-published,total_nltf_net_revenue,Total NLTF revenue,future_forecast,2026,4561.471746082059,$m nominal ex GST,4493.65132567772,0
+ensemble,cur-published__off-published,total_nltf_net_revenue,Total NLTF revenue,future_forecast,2030,6515.261716847033,$m nominal ex GST,6442.98776042894,0
+ensemble,cur-published__off-published,total_nltf_net_revenue,Total NLTF revenue,future_forecast,2030,6628.600056417163,$m nominal ex GST,6442.98776042894,0
+ensemble,cur-published__off-published,total_nltf_net_revenue,Total NLTF revenue,future_forecast,2030,6497.679337175683,$m nominal ex GST,6442.98776042894,0
+ensemble,cur-published__off-published,total_nltf_net_revenue,Total NLTF revenue,future_forecast,2031,6848.325753575578,$m nominal ex GST,6442.98776042894,0
+ensemble,cur-published__off-published,total_nltf_net_revenue,Total NLTF revenue,future_forecast,2031,6989.227307127052,$m nominal ex GST,6442.98776042894,0
+ensemble,cur-published__off-published,total_nltf_net_revenue,Total NLTF revenue,future_forecast,2050,13043.455185364817,$m nominal ex GST,6442.98776042894,0
+ensemble,cur-published__off-published,total_nltf_net_revenue,Total NLTF revenue,future_forecast,2050,13263.269563738111,$m nominal ex GST,6442.98776042894,0
+ensemble,cur-published__off-published,total_nltf_net_revenue,Total NLTF revenue,official_comparator,2026,4563.15127995703,$m nominal ex GST,4563.15127995703,0
+ensemble,cur-published__off-published,total_nltf_net_revenue,Total NLTF revenue,official_comparator,2026,4493.65132567772,$m nominal ex GST,4493.65132567772,0
+ensemble,cur-published__off-published,total_nltf_net_revenue,Total NLTF revenue,official_comparator,2030,6434.36939164909,$m nominal ex GST,6434.36939164909,0
+ensemble,cur-published__off-published,total_nltf_net_revenue,Total NLTF revenue,official_comparator,2030,6442.98776042894,$m nominal ex GST,6442.98776042894,0
+ensemble,cur-published__off-published,total_nltf_net_revenue,Total NLTF revenue,official_comparator,2031,6701.03490698007,$m nominal ex GST,6701.03490698007,0
+ensemble,cur-published__off-published,total_nltf_net_revenue,Total NLTF revenue,official_comparator,2031,6709.89785800321,$m nominal ex GST,6709.89785800321,0
+ensemble,cur-published__off-published,total_nltf_net_revenue,Total NLTF revenue,official_comparator,2050,12909.5821651262,$m nominal ex GST,12909.5821651262,0
+ensemble,cur-published__off-published,total_nltf_net_revenue,Total NLTF revenue,official_comparator,2050,12910.4837029366,$m nominal ex GST,12910.4837029366,0
+ensemble,cur-published__off-published,total_ruc_net_revenue,Total RUC all classes,future_forecast,2026,2072.019805657217,$m nominal ex GST,2074.47282065665,0
+ensemble,cur-published__off-published,total_ruc_net_revenue,Total RUC all classes,future_forecast,2026,2073.0313570204744,$m nominal ex GST,2074.47282065665,0
+ensemble,cur-published__off-published,total_ruc_net_revenue,Total RUC all classes,future_forecast,2026,2050.9668388614487,$m nominal ex GST,2074.47282065665,0
+ensemble,cur-published__off-published,total_ruc_net_revenue,Total RUC all classes,future_forecast,2030,3253.9373715651354,$m nominal ex GST,3296.86012635663,0
+ensemble,cur-published__off-published,total_ruc_net_revenue,Total RUC all classes,future_forecast,2030,3293.676483685377,$m nominal ex GST,3296.86012635663,0
+ensemble,cur-published__off-published,total_ruc_net_revenue,Total RUC all classes,future_forecast,2030,3253.937371565135,$m nominal ex GST,3296.86012635663,0
+ensemble,cur-published__off-published,total_ruc_net_revenue,Total RUC all classes,future_forecast,2030,3243.5379249412995,$m nominal ex GST,3296.86012635663,0
+ensemble,cur-published__off-published,total_ruc_net_revenue,Total RUC all classes,future_forecast,2031,3481.89911494128,$m nominal ex GST,3296.86012635663,0
+ensemble,cur-published__off-published,total_ruc_net_revenue,Total RUC all classes,future_forecast,2031,3525.863036108908,$m nominal ex GST,3296.86012635663,0
+ensemble,cur-published__off-published,total_ruc_net_revenue,Total RUC all classes,future_forecast,2050,11376.234075278322,$m nominal ex GST,3296.86012635663,0
+ensemble,cur-published__off-published,total_ruc_net_revenue,Total RUC all classes,future_forecast,2050,11564.205601236858,$m nominal ex GST,3296.86012635663,0
+ensemble,cur-published__off-published,total_ruc_net_revenue,Total RUC all classes,official_comparator,2026,2089.05368416013,$m nominal ex GST,2089.05368416013,0
+ensemble,cur-published__off-published,total_ruc_net_revenue,Total RUC all classes,official_comparator,2026,2074.47282065665,$m nominal ex GST,2074.47282065665,0
+ensemble,cur-published__off-published,total_ruc_net_revenue,Total RUC all classes,official_comparator,2030,3289.93253419396,$m nominal ex GST,3289.93253419396,0
+ensemble,cur-published__off-published,total_ruc_net_revenue,Total RUC all classes,official_comparator,2030,3296.86012635663,$m nominal ex GST,3296.86012635663,0
+ensemble,cur-published__off-published,total_ruc_net_revenue,Total RUC all classes,official_comparator,2031,3499.01776521061,$m nominal ex GST,3499.01776521061,0
+ensemble,cur-published__off-published,total_ruc_net_revenue,Total RUC all classes,official_comparator,2031,3506.1730346004,$m nominal ex GST,3506.1730346004,0
+ensemble,cur-published__off-published,total_ruc_net_revenue,Total RUC all classes,official_comparator,2050,11292.2761974029,$m nominal ex GST,11292.2761974029,0
+ensemble,cur-published__off-published,total_ruc_net_revenue,Total RUC all classes,official_comparator,2050,11293.1026795033,$m nominal ex GST,11293.1026795033,0

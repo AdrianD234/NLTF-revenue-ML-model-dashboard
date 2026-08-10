@@ -1,0 +1,42 @@
+{
+  "reproduced": true,
+  "method": "real `streamlit run app.py` server + real Chromium session (not AppTest, not pytest)",
+  "clone": "disposable clone of origin/main at 46d1f87, verified clean, 3 chart-source files",
+  "normal_configuration": {
+    "NLTF_CHART_SOURCE_OUTPUT_DIR": "unset (test-only override deliberately not used)",
+    "DASHBOARD_ENGINE_DEFAULT": "unset, so the app booted on ar1",
+    "REVENUE_OUTLOOK_CACHE_WARMER": "unset, so the normal local warmer ran"
+  },
+  "steps_exercised": [
+    "initial_boot",
+    "revenue_outlook_page",
+    "rerun"
+  ],
+  "trigger": "initial app boot alone was sufficient; navigation was not required",
+  "git_status_before": "",
+  "git_status_after": "M artifacts/chart_sources/r2_ladder_summary.csv",
+  "chart_source_files_before": 3,
+  "chart_source_files_after": 22,
+  "tracked_files_modified": [
+    "artifacts/chart_sources/r2_ladder_summary.csv"
+  ],
+  "tracked_files_unmodified": [
+    "artifacts/chart_sources/r2_reproducibility_gap_register.csv",
+    "artifacts/chart_sources/r2_training_fit_detail.csv"
+  ],
+  "untracked_files_created": 19,
+  "ped_calibration_r2_before": {
+    "current_grid_operational_pooled": "0.5591936636031876",
+    "schiff_paper_horizon_mean": "0.9230110422702978"
+  },
+  "ped_calibration_r2_after": {
+    "current_grid_operational_pooled": "0.5803595524485978",
+    "schiff_paper_horizon_mean": "0.9448430187011027"
+  },
+  "survives_whitespace_normalisation": true,
+  "git_diff_numstat_ignore_all_space": "2 insertions, 2 deletions on r2_ladder_summary.csv",
+  "engine_selector_present_in_app": false,
+  "engine_selector_note": "model_dashboard/engine.py defines render_engine_selector but app.py never calls it on this branch, so engine choice is made by DASHBOARD_ENGINE_DEFAULT. Engine switching was therefore exercised by a second host run with DASHBOARD_ENGINE_DEFAULT=ensemble.",
+  "only_one_of_three_tracked_files_changed": true,
+  "operator_observation_confirmed": true
+}

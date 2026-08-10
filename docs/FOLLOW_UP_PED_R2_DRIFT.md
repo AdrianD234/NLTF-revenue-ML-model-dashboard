@@ -176,9 +176,75 @@ noise).
 
 Remaining follow-up (not blocking, recorded for the roadmap):
 
-* `load_evidence_pack` still writes chart sources as a side effect on every
+* ~~`load_evidence_pack` still writes chart sources as a side effect on every
   call; the structural question of moving publication behind one explicit
-  materialisation command (original open question 6) remains open.
+  materialisation command (original open question 6) remains open.~~
+  **RESOLVED by `hotfix/r2-app-boot-read-only` (issue #31).** See below.
 * The quarterly display pack is byte-reproducible only on the platform that
   built it (documented in its own manifest); cross-platform comparison is by
   value at ~1e-13, which the tests already honour.
+
+---
+
+## Instance 3 — app-boot mutation of governed chart-source evidence (issue #31)
+
+**Status: resolved by `hotfix/r2-app-boot-read-only`.**
+Evidence: `artifacts/r2_app_boot_read_only/`.
+
+The write isolation recorded above fixed the *test suite*. It did not fix the
+*application*, and it is the reason nobody noticed: `tests/conftest.py`
+redirects chart-source output, so no test process could observe what a real
+`streamlit run app.py` does.
+
+Reproduced on a clean clone of `origin/main` at `46d1f87` with a real Streamlit
+server and a real browser session, in normal configuration (no
+`NLTF_CHART_SOURCE_OUTPUT_DIR`, engine default `ar1`, cache warmer on). Initial
+boot alone was enough:
+
+```
+ M artifacts/chart_sources/r2_ladder_summary.csv
+
+0.5591936636031876 -> 0.5803595524485978    (current_grid_operational_pooled)
+0.9230110422702978 -> 0.9448430187011027    (schiff_paper_horizon_mean)
+```
+
+Only `r2_ladder_summary.csv` changed; the gap register and training-fit detail
+did not. The change survived `--ignore-all-space`, so it was a genuine value
+substitution rather than a line-ending artefact.
+
+Call chain: `main()` -> `load_active_run` -> `cached_load_evidence_pack` ->
+`load_evidence_pack` -> `write_chart_source_tables`. The app boots on
+`engine_default() == "ar1"` while the committed tables carry the ensemble
+identity, so the boot republished a valid-but-different identity over the
+governed one.
+
+**Resolution.** Materialisation is opt-in at the loader boundary and guarded at
+the writer boundary:
+
+* `load_evidence_pack` / `load_parquet_dashboard` take
+  `materialize_chart_sources` (default `False`). Their materialisation path is
+  SCRATCH-only, so no load path can reach the governed directory.
+* `write_chart_source_tables` takes an explicit `mode`
+  (`READ_ONLY` / `SCRATCH` / `PROMOTE`). The canonical directory requires
+  `PROMOTE` **and** the governed `ensemble` identity; AR(1) is refused and
+  routed to `artifacts/diagnostics/chart_sources/<engine>/`.
+* `scripts/promote_chart_sources.py` is the one sanctioned publisher.
+* `scripts/check_app_boot_read_only.py` proves it with a real host process,
+  outside pytest, because AppTest inherits the redirect that hid the path.
+
+Promotion from the ensemble pack reproduces the committed bytes exactly (`git
+status` clean afterwards) and is idempotent across runs.
+
+**Keep the three facts distinct.** Engine identity collision (instance 1), test
+writer isolation (instance 1's fix), and app-boot governed-file mutation
+(instance 3) are separate problems with separate fixes. The authoritative
+ensemble R-squared definition never changed and was not in question in any of
+them:
+
+| | operational pooled | paper horizon mean |
+| --- | --- | --- |
+| ensemble (governed) | `0.5591936636031876` | `0.9230110422702978` |
+| AR(1) | `0.5803595524485978` | `0.9448430187011027` |
+
+No model, forecast or revenue value moved: the policy-runtime repin proof
+compared 200 governed frames cell by cell and found only provenance movement.

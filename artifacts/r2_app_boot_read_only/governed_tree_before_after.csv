@@ -1,0 +1,9 @@
+run,code,cache_warmer,engine_default,files_before,files_after,modified,added,removed,git_status_before,git_status_after,result
+reproduction (defect present),origin/main 46d1f87,default,ar1 (unset),3,22,1,19,0,(clean),M artifacts/chart_sources/r2_ladder_summary.csv,MUTATED
+"host, normal warmer",fix fa4c96b,default,ar1 (unset),3,3,0,0,0,(clean),(clean),UNCHANGED
+"host, warmer disabled",fix fa4c96b,off,ar1 (unset),3,3,0,0,0,(clean),(clean),UNCHANGED
+"host, ensemble engine",fix fa4c96b,default,ensemble,3,3,0,0,0,(clean),(clean),UNCHANGED
+"host, after canonical promotion",fix fa4c96b,default,ar1 (unset),22,22,0,0,0,(clean),(clean),UNCHANGED
+"host, inside Databricks bundle",fix 5b5c941,default,ar1 (unset),3,3,0,0,0,"M scripts/check_app_boot_read_only.py
+?? artifacts/r2_app_boot_read_only/","M scripts/check_app_boot_read_only.py
+?? artifacts/r2_app_boot_read_only/",UNCHANGED

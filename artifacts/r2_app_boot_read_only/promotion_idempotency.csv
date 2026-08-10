@@ -1,0 +1,14 @@
+check,result,detail
+engine promoted,ensemble,the governed identity; the default of the command
+destination,artifacts/chart_sources,"canonical, write mode promote"
+run 1 exit code,0,21 chart-source tables validated
+run 2 exit code,0,re-run for idempotency
+files written,22,3 tracked + 19 generated
+changed between runs,0,byte-identical on re-run
+tracked changed between runs,0,none
+temporary file residue,0,none
+git status after run 1,(clean),promotion reproduces the committed bytes exactly
+git status after run 2,(clean),
+operational pooled R2,0.5591936636031876,unchanged by promotion
+paper horizon mean R2,0.9230110422702978,unchanged by promotion
+app boot read-only after promotion,PASS,22 files byte-identical after a real host session
