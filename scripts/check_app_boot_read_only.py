@@ -26,6 +26,7 @@ import os
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.request
@@ -52,6 +53,15 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--server-timeout", type=float, default=DEFAULT_SERVER_TIMEOUT)
     parser.add_argument("--render-timeout", type=float, default=DEFAULT_RENDER_TIMEOUT)
     parser.add_argument("--label", default="host-process", help="Label recorded in the report.")
+    parser.add_argument(
+        "--log-dir",
+        default=None,
+        help=(
+            "Where the Streamlit server log is written. Defaults to a system temp directory, "
+            "deliberately OUTSIDE --repo-root: this check also probes the Databricks bundle, whose "
+            "manifest re-verification fails if the probe leaves files behind."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -132,6 +142,11 @@ def build_env(args: argparse.Namespace) -> dict[str, str]:
     else:
         env.pop("REVENUE_OUTLOOK_CACHE_WARMER", None)
     env["PYTHONIOENCODING"] = "utf-8"
+    # Same convention as scripts/validate_databricks_app_bundle.py and
+    # ci/Dockerfile.publish-probe: this check also probes the Databricks bundle,
+    # and __pycache__ written into it fails the manifest re-verification. A
+    # read-only check must not itself mutate what it is inspecting.
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
     return env
 
 
@@ -298,7 +313,8 @@ def main(argv: list[str] | None = None) -> int:
     before = snapshot_chart_sources(repo_root)
     status_before = git(repo_root, "status", "--porcelain")
 
-    log_path = repo_root / "test-output" / "app_boot_read_only" / f"streamlit-{port}.log"
+    log_dir = Path(args.log_dir) if args.log_dir else Path(tempfile.gettempdir()) / "nltf_app_boot_read_only"
+    log_path = log_dir / f"streamlit-{port}.log"
     process = start_server(args, repo_root, port, log_path)
     steps: list[str] = []
     error: str | None = None
