@@ -10260,6 +10260,12 @@ def _render_scenario_comparison_panel(
                         "charts are suppressed until the decomposition closes."
                     )
                     return
+                composition_figure = _scenario_npv_composition_figure(
+                    components, result["value_unit"]
+                )
+                # Side by side, the bridge matches the by-stream chart's
+                # stream-count-driven height so the row reads as one block.
+                row_height = int(composition_figure.layout.height or 360)
                 stream_col, bridge_col = st.columns(2)
                 with stream_col:
                     chart_card(
@@ -10270,7 +10276,7 @@ def _render_scenario_comparison_panel(
                         "light classes (heavy BEVs pay the same per-km RUC, so heavy electrification "
                         "reshuffles within this block); TUC & other closes the governed NLTF identity. "
                         "Undiscounted, FY2026 base.",
-                        _scenario_npv_composition_figure(components, result["value_unit"]),
+                        composition_figure,
                         caption=None,
                         notes_as_tooltip=True,
                     )
@@ -10284,7 +10290,7 @@ def _render_scenario_comparison_panel(
                         "Undiscounted, FY2026 base.",
                         _scenario_npv_component_bridge_figure(
                             nominal_a, nominal_b, components, result["value_unit"],
-                            metric_label="Nominal",
+                            metric_label="Nominal", height=row_height,
                         ),
                         caption=None,
                         notes_as_tooltip=True,
@@ -10443,7 +10449,12 @@ def _scenario_comparison_figure(history: pd.Series, a: pd.Series, b: pd.Series, 
 
 
 def _scenario_npv_waterfall_figure(
-    npv_a: float, npv_b: float, value_unit: str, *, metric_label: str = "NPV"
+    npv_a: float,
+    npv_b: float,
+    value_unit: str,
+    *,
+    metric_label: str = "NPV",
+    height: int | None = None,
 ) -> go.Figure:
     scale = _display_value_scale_for_unit(value_unit)
     axis_title = _display_axis_unit(value_unit)
@@ -10463,7 +10474,7 @@ def _scenario_npv_waterfall_figure(
     )
     fig.update_yaxes(title_text=axis_title, gridcolor="#E6EDF5", zeroline=False)
     fig.update_layout(
-        height=300,
+        height=int(height) if height else 300,
         margin={"l": 56, "r": 18, "t": 18, "b": 36},
         showlegend=False,
         plot_bgcolor="#FFFFFF",
@@ -10603,6 +10614,7 @@ def _scenario_npv_component_bridge_figure(
     value_unit: str,
     *,
     metric_label: str = "NPV",
+    height: int | None = None,
 ) -> go.Figure:
     """Delta-space bridge: component deltas accumulate from zero to B − A.
 
@@ -10616,7 +10628,9 @@ def _scenario_npv_component_bridge_figure(
         if abs(comp_b - comp_a) >= _SCENARIO_COMPONENT_MATERIALITY
     ]
     if not deltas:
-        return _scenario_npv_waterfall_figure(npv_a, npv_b, value_unit, metric_label=metric_label)
+        return _scenario_npv_waterfall_figure(
+            npv_a, npv_b, value_unit, metric_label=metric_label, height=height
+        )
     # gains first, largest loss lands right before the total bar
     deltas.sort(key=lambda row: row[1], reverse=True)
     scale = _display_value_scale_for_unit(value_unit)
@@ -10648,7 +10662,7 @@ def _scenario_npv_component_bridge_figure(
     fig.update_xaxes(tickangle=-30, tickfont={"size": 10.5})
     fig.update_yaxes(title_text=axis_title, gridcolor="#E6EDF5", zeroline=True, zerolinecolor="#CBD5E1")
     fig.update_layout(
-        height=360,
+        height=int(height) if height else 360,
         margin={"l": 56, "r": 18, "t": 30, "b": 78},
         showlegend=False,
         plot_bgcolor="#FFFFFF",
