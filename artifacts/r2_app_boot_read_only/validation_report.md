@@ -35,6 +35,34 @@ implicated, and the path was not hidden by disabling it.
 | `tests/test_app_boot_read_only.py` (new, 14 tests) | 14 passed |
 | chart-source isolation, R2 engine identity, R2 ladder/metrics, chart-source tables, evidence pack, score-basis governance, governance page, arbitration values, chart data reconciliation, artifact freshness | 109 passed |
 
+## 3b. Full local core suite, and failure triage
+
+Run as `-m "not e2e and not requires_local_scratch"`, in alphabetical chunks with
+`-p no:randomly` so the failures could be named rather than inferred from a
+progress bar.
+
+**21 failures, all pre-existing, none caused by this change.** Every one was
+reproduced at the base SHA `46d1f87` in a disposable clone, and every one has the
+same root cause: the gitignored `artifacts/curated_data/` directory does not
+exist in a fresh checkout, so the CSV read fails outright.
+
+| Module | Failures | Root cause | Bucket |
+| --- | --- | --- | --- |
+| `test_cone_landscape_validation.py` | 7 | missing `artifacts/curated_data/*.csv` | pre-existing, confirmed at 46d1f87 |
+| `test_curated_data.py` | 7 | missing `artifacts/curated_data/finalist_accuracy.csv` | pre-existing, confirmed at 46d1f87 |
+| `test_ensemble_composition_validation.py` | 5 | missing `artifacts/curated_data/ensemble_composition.csv` | pre-existing, confirmed at 46d1f87 |
+| `test_no_stale_finalist_values.py` | 2 | missing `artifacts/curated_data/finalist_accuracy.csv` | pre-existing, confirmed at 46d1f87 |
+
+None of these touch `artifacts/chart_sources`, the evidence-pack loader or the
+chart-source writer. Nothing was skipped, weakened or loosened to obtain green:
+the failures are simply not this change's, and they fail identically on `main`.
+
+Worth noting for the roadmap: these four modules read developer-local scratch
+that cannot be rebuilt from committed content, which is exactly what the
+`requires_local_scratch` marker exists for, yet they do not carry it. That is why
+they run — and fail — in the "clean-clone" selection. Pre-existing, out of scope
+here.
+
 ## 4. Mutation testing
 
 Five mutations, each reintroducing the defect a different way. **All five
