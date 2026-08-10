@@ -82,13 +82,35 @@ def governed_snapshot() -> dict[str, str]:
     return hash_tree(paths)
 
 
+def assert_pack_loaded(harness: AppTest) -> None:
+    """The app must have actually loaded its evidence pack.
+
+    app.py's load_active_run catches every exception and degrades to a warning
+    panel. Without this check, breaking the loader would leave the governed tree
+    untouched for the wrong reason and the byte-comparison below would still
+    pass on a dashboard that renders nothing.
+    """
+    rendered = " ".join(str(element.value) for element in harness.markdown)
+    for failure in ("could not be loaded", "No governed evidence pack was loaded"):
+        assert failure not in rendered, f"The app failed to load its evidence pack: {failure!r} was rendered."
+
+
 # --------------------------------------------------------------------------- #
 # A. Unit-level write contract
 # --------------------------------------------------------------------------- #
 
 
-def test_read_only_loading_produces_evidence_without_writing(tmp_path: Path) -> None:
-    """The default load computes the evidence and publishes nothing."""
+def test_read_only_loading_produces_evidence_without_writing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The default load computes the evidence and publishes nothing.
+
+    The conftest redirect is removed deliberately. With it in place a
+    reintroduced side-effect write would land harmlessly in the scratch
+    directory and this test would pass regardless - which is exactly how the
+    app-boot path escaped notice.
+    """
+    monkeypatch.delenv(CHART_SOURCE_ENV, raising=False)
     before = hash_tree(governed_files())
     empty_root = tmp_path / "repo"
     (empty_root / "artifacts").mkdir(parents=True)
@@ -278,6 +300,7 @@ def test_apptest_boot_leaves_every_governed_file_untouched(
     harness = AppTest.from_file(APP_PATH, default_timeout=300)
     harness.run()
     assert not harness.exception, f"App boot raised: {harness.exception}"
+    assert_pack_loaded(harness)
 
     after = hash_tree(governed_files())
     changed = sorted(name for name, digest in after.items() if governed_snapshot.get(name) != digest)
@@ -286,6 +309,7 @@ def test_apptest_boot_leaves_every_governed_file_untouched(
     # A normal rerun must not publish either.
     harness.run()
     assert not harness.exception, f"App rerun raised: {harness.exception}"
+    assert_pack_loaded(harness)
     after_rerun = hash_tree(governed_files())
     changed = sorted(name for name, digest in after_rerun.items() if governed_snapshot.get(name) != digest)
     assert not changed, f"A Streamlit rerun modified governed chart-source evidence: {changed}"
@@ -301,6 +325,7 @@ def test_apptest_boot_under_the_ensemble_engine_also_writes_nothing(
     harness = AppTest.from_file(APP_PATH, default_timeout=300)
     harness.run()
     assert not harness.exception, f"App boot raised: {harness.exception}"
+    assert_pack_loaded(harness)
 
     after = hash_tree(governed_files())
     changed = sorted(name for name, digest in after.items() if governed_snapshot.get(name) != digest)
