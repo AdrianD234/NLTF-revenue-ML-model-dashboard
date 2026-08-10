@@ -37,31 +37,58 @@ implicated, and the path was not hidden by disabling it.
 
 ## 3b. Full local core suite, and failure triage
 
-Run as `-m "not e2e and not requires_local_scratch"`, in alphabetical chunks with
-`-p no:randomly` so the failures could be named rather than inferred from a
-progress bar.
+Run as `-m "not e2e and not requires_local_scratch"` in alphabetical chunks with
+`-p no:randomly`, so failures could be **named** rather than inferred from a
+progress bar. One pytest process at a time.
 
-**21 failures, all pre-existing, none caused by this change.** Every one was
-reproduced at the base SHA `46d1f87` in a disposable clone, and every one has the
-same root cause: the gitignored `artifacts/curated_data/` directory does not
-exist in a fresh checkout, so the CSV read fails outright.
+Result: **2013 passed, 28 failed**, across six modules.
 
-| Module | Failures | Root cause | Bucket |
+Every one of the 28 was a missing environment prep step, not a defect. CI runs
+`python scripts/regenerate_curated_data_from_pack.py` before the test suites
+(`.github/workflows/ci.yml:291` and `:368`, `ci/entrypoint.sh:42-44`), which
+materialises the gitignored `artifacts/curated_data/*.csv`. My first local run
+skipped it, so those modules failed on `FileNotFoundError` before reaching any
+assertion.
+
+| Module | Failures | Reproduced at base `46d1f87`? | After the CI prep step |
 | --- | --- | --- | --- |
-| `test_cone_landscape_validation.py` | 7 | missing `artifacts/curated_data/*.csv` | pre-existing, confirmed at 46d1f87 |
-| `test_curated_data.py` | 7 | missing `artifacts/curated_data/finalist_accuracy.csv` | pre-existing, confirmed at 46d1f87 |
-| `test_ensemble_composition_validation.py` | 5 | missing `artifacts/curated_data/ensemble_composition.csv` | pre-existing, confirmed at 46d1f87 |
-| `test_no_stale_finalist_values.py` | 2 | missing `artifacts/curated_data/finalist_accuracy.csv` | pre-existing, confirmed at 46d1f87 |
+| `test_cone_landscape_validation.py` | 7 | yes | pass |
+| `test_curated_data.py` | 7 | yes | pass |
+| `test_ensemble_composition_validation.py` | 5 | yes | pass |
+| `test_no_stale_finalist_values.py` | 2 | yes | pass |
+| `test_schiff_purity.py` | 4 | yes | pass |
+| `test_stress_horizon_validation.py` | 3 | yes | pass |
 
-None of these touch `artifacts/chart_sources`, the evidence-pack loader or the
-chart-source writer. Nothing was skipped, weakened or loosened to obtain green:
-the failures are simply not this change's, and they fail identically on `main`.
+Named failures: `test_candidate_landscape_has_finalists`,
+`test_candidate_landscape_has_schiff_benchmarks`,
+`test_candidate_landscape_has_distribution_sample`,
+`test_candidate_landscape_has_frontier_and_top_cluster_by_stream`,
+`test_candidate_landscape_is_capped`, `test_candidate_landscape_roles_are_populated`,
+`test_candidate_landscape_default_mode_is_not_full_raw`,
+`test_curated_data_latest_values`, `test_no_stale_autogluon_finalist_values`,
+`test_candidate_landscape_sample_has_expected_roles`,
+`test_candidate_landscape_sample_is_capped`,
+`test_pure_schiff_filter_excludes_residuals_and_blends`,
+`test_stress_horizon_has_expected_buckets` (x2, two modules),
+`test_ensemble_composition_positive_weights`,
+`test_ensemble_composition_has_all_streams`, `test_ensemble_weights_are_positive`,
+`test_ensemble_component_labels_short`, `test_component_lookup_contains_full_names`,
+`test_ensemble_hover_is_readable`,
+`test_stale_autogluon_values_are_not_current_finalists`,
+`test_current_finalist_models_are_static_convex_top18_arbitration_winners`,
+`test_pure_schiff_excludes_residuals`, `test_pure_schiff_excludes_blends`,
+`test_pure_schiff_excludes_solvers`,
+`test_schiff_benchmark_page_uses_pure_schiff_only`,
+`test_light_ruc_2022_23_watchpoint_visible`, `test_stress_chart_hover_is_readable`.
 
-Worth noting for the roadmap: these four modules read developer-local scratch
-that cannot be rebuilt from committed content, which is exactly what the
-`requires_local_scratch` marker exists for, yet they do not carry it. That is why
-they run — and fail — in the "clean-clone" selection. Pre-existing, out of scope
-here.
+**Classification: bucket 1 and bucket 4 — every failure reproduces on the exact
+`origin/main` base SHA (proved by running each module in a disposable clone at
+`46d1f87`, not asserted), and every one is a missing-local-scratch case.** None
+are branch-owned. None are caused by an incorrect new test.
+
+After running the CI prep step, all 29 tests in those six modules pass. **The
+local core suite is green.** Nothing was skipped, weakened or loosened; the
+missing step was supplied instead.
 
 ## 4. Mutation testing
 
