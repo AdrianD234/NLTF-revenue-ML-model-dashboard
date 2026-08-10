@@ -18,6 +18,7 @@ if str(ROOT) not in sys.path:
 
 import pandas as pd
 
+from model_dashboard.data.chart_sources import materialize_scratch_chart_sources  # noqa: E402
 from model_dashboard.data.config import DEFAULT_EVIDENCE_PACK_ROOT  # noqa: E402
 from model_dashboard.data_loader import STALE_FINALIST_VALUES  # noqa: E402
 from model_dashboard.evidence_pack import load_evidence_pack, resolve_evidence_pack_root  # noqa: E402
@@ -130,13 +131,21 @@ def file_nonempty(relative: str) -> bool:
 
 
 def read_csv_artifact(relative: str) -> pd.DataFrame:
-    path = ROOT / relative
+    return read_csv_path(ROOT / relative)
+
+
+def read_csv_path(path: Path) -> pd.DataFrame:
     if not path.exists() or path.stat().st_size == 0:
         return pd.DataFrame()
     try:
         return pd.read_csv(path, low_memory=False)
     except Exception:
         return pd.DataFrame()
+
+
+# Rebound in main() to a run-scoped scratch directory. Gates check what the
+# evidence pack produces and must not publish governed evidence (issue #31).
+CHART_SOURCE_DIR = ROOT / "artifacts" / "chart_sources"
 
 
 def screenshot_ok(relative: str) -> bool:
@@ -170,6 +179,9 @@ def main() -> int:
     try:
         raw = pd.read_parquet(parquet_path)
         loaded = load_evidence_pack(args.data_root, args.repo_root)
+        globals()["CHART_SOURCE_DIR"] = materialize_scratch_chart_sources(
+            Path(args.repo_root), loaded.data, "validate-80-gates"
+        )
         candidate_df = loaded.data.get("candidate_df", pd.DataFrame()).copy()
         candidate_df["_gate_stream_key"] = [
             stream_key(row.get("stream"), row.get("stream_label")) for _, row in candidate_df.iterrows()
@@ -759,7 +771,7 @@ def main() -> int:
         text = safe_read(ROOT / "app.py") + safe_read(ROOT / "model_dashboard/plots.py")
         if list(actual_order) != expected_labels or "policy windows are excluded from the default view" not in text:
             return fail("Overview default stress bucket order is not locked to horizon-only buckets.")
-        source = read_csv_artifact("artifacts/chart_sources/overview_stress_horizon_checks.csv")
+        source = read_csv_path(CHART_SOURCE_DIR / "overview_stress_horizon_checks.csv")
         if not source.empty and source["stress_bucket"].astype(str).isin(["2024+", "2022-23"]).any():
             return fail("Overview default stress source table still contains policy windows.")
         return ok("Overview default stress chart is locked to horizon buckets only.")

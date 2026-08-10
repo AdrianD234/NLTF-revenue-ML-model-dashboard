@@ -13,6 +13,7 @@ if str(ROOT) not in sys.path:
 
 import pandas as pd
 
+from model_dashboard.data.chart_sources import materialize_scratch_chart_sources  # noqa: E402
 from model_dashboard.data.config import DEFAULT_EVIDENCE_PACK_ROOT  # noqa: E402
 from model_dashboard.evidence_pack import REQUIRED_EVIDENCE_TABLES, load_evidence_pack, resolve_evidence_pack_root  # noqa: E402
 from model_dashboard.labels import OVERVIEW_STRESS_BUCKET_ORDER, SCHIFF_SPEC_BENCHMARK_LABEL, STRESS_BUCKET_ORDER  # noqa: E402
@@ -77,6 +78,9 @@ def validate() -> tuple[str, list[str]]:
     findings.append(f"- [pass] Required Parquet files present: {len(REQUIRED_EVIDENCE_TABLES)}.")
 
     loaded = load_evidence_pack(pack_root, repo_root)
+    # Freshly generated into a scratch directory: this validator checks what the
+    # evidence pack produces and must not publish governed evidence (issue #31).
+    chart_source_dir = materialize_scratch_chart_sources(repo_root, loaded.data, "validate-dashboard-data")
     finalists = loaded.data["recommended"]
     for stream, (qtr, annual) in EXPECTED_FINALISTS.items():
         rows = finalists[finalists["stream_label"].eq(stream)]
@@ -111,7 +115,7 @@ def validate() -> tuple[str, list[str]]:
         stale_h12 = pd.to_numeric(summary["mape_h12"], errors="coerce").round(2).eq(20.50)
         if stale_h12.any():
             raise AssertionError("Default candidate summary still contains the old Heavy RUC 20.50 H12 Schiff-style value.")
-    frontier = pd.read_csv(repo_root / "artifacts" / "chart_sources" / "overview_candidate_search_frontier.csv")
+    frontier = pd.read_csv(chart_source_dir / "overview_candidate_search_frontier.csv")
     if not {"Selected finalist", SCHIFF_SPEC_BENCHMARK_LABEL}.issubset(set(frontier["point_type"])):
         raise AssertionError("Candidate frontier source table is missing finalist or Schiff marker rows.")
     frontier_text = frontier.fillna("").astype(str).agg(lambda row: " ".join(row.to_list()), axis=1)
@@ -137,7 +141,7 @@ def validate() -> tuple[str, list[str]]:
         rows = stress[stress["stream_label"].eq(stream)]
         if rows["stress_bucket"].astype(str).tolist() != list(STRESS_BUCKET_ORDER):
             raise AssertionError(f"Stress bucket order is wrong for {stream}.")
-    overview_stress = pd.read_csv(repo_root / "artifacts" / "chart_sources" / "overview_stress_horizon_checks.csv")
+    overview_stress = pd.read_csv(chart_source_dir / "overview_stress_horizon_checks.csv")
     for stream in EXPECTED_STREAMS:
         rows = overview_stress[overview_stress["stream_label"].eq(stream)]
         if rows["stress_bucket"].astype(str).tolist() != list(OVERVIEW_STRESS_BUCKET_ORDER):

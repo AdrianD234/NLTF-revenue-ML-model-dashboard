@@ -13,10 +13,12 @@ from model_dashboard.conflict_fuel_paths import (
     CONFLICT_FUEL_SCENARIO_LEVELS,
     conflict_trace_name,
 )
+from model_dashboard.data.chart_sources import resolve_chart_source_output_dir
+from model_dashboard.data_loader import DEFAULT_EVIDENCE_PACK_ROOT, load_evidence_pack
 from model_dashboard.fuel_price_scenario import POLICY_PATH_IDS
 
 pytestmark = pytest.mark.e2e
-CHART_SOURCE_DIR = Path(__file__).resolve().parents[1] / "artifacts" / "chart_sources"
+ROOT = Path(__file__).resolve().parents[1]
 CONFLICT_TRACE_NAMES = tuple(
     conflict_trace_name(level) for level in CONFLICT_FUEL_SCENARIO_LEVELS
 )
@@ -571,7 +573,16 @@ def test_navigation_labels_not_clipped(page: Page) -> None:
         )
 
 
-def test_latest_arbitration_values_are_visible_not_stale(page: Page) -> None:
+def test_latest_arbitration_values_are_visible_not_stale(page: Page, tmp_path: Path) -> None:
+    # Chart-source materialisation is now explicit (issue #31): generate the table
+    # into a scratch dir here instead of reading the tracked artifacts tree.
+    chart_source_dir = resolve_chart_source_output_dir(ROOT, tmp_path)
+    load_evidence_pack(
+        DEFAULT_EVIDENCE_PACK_ROOT,
+        ROOT,
+        materialize_chart_sources=True,
+        chart_source_output_dir=chart_source_dir,
+    )
     page.set_viewport_size({"width": 1680, "height": 940})
     page.goto(
         os.environ.get("STAGE1_DASHBOARD_URL", "http://localhost:8501"),
@@ -582,7 +593,7 @@ def test_latest_arbitration_values_are_visible_not_stale(page: Page) -> None:
     accuracy_info = chart_info_text(page, "Finalist Forecast Accuracy")
 
     assert "Current Parquet finalists using Paper-style horizon MAPE:" in accuracy_info
-    source = pd.read_csv(CHART_SOURCE_DIR / "overview_finalist_forecast_accuracy.csv")
+    source = pd.read_csv(chart_source_dir / "overview_finalist_forecast_accuracy.csv")
     expected_displays = (
         source.loc[
             source["score_basis"].eq("schiff_paper_horizon_mean"), "metric_display"

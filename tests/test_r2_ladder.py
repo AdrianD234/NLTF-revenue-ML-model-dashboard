@@ -20,7 +20,8 @@ PED_TRAINING_FIT_DIR = ROOT / "data" / "dashboard_evidence_pack_reproducibility"
 
 @pytest.fixture(scope="session", autouse=True)
 def _write_chart_sources() -> None:
-    load_evidence_pack(DEFAULT_EVIDENCE_PACK_ROOT, ROOT)
+    # Chart-source materialisation is now explicit (issue #31).
+    load_evidence_pack(DEFAULT_EVIDENCE_PACK_ROOT, ROOT, materialize_chart_sources=True)
 
 
 def read_source(name: str) -> pd.DataFrame:

@@ -13,6 +13,7 @@ if str(ROOT) not in sys.path:
 
 import pandas as pd
 
+from model_dashboard.data.chart_sources import materialize_scratch_chart_sources  # noqa: E402
 from model_dashboard.data.config import DEFAULT_EVIDENCE_PACK_ROOT  # noqa: E402
 from model_dashboard.diagnostic_matrix import DIAGNOSTIC_TOOLTIP_COPY  # noqa: E402
 from model_dashboard.evidence_pack import load_evidence_pack  # noqa: E402
@@ -33,7 +34,11 @@ def read_text(path: Path) -> str:
 def validate() -> list[tuple[str, str, str]]:
     args = parse_args()
     repo_root = Path(args.repo_root).expanduser()
-    load_evidence_pack(args.data_root, repo_root)
+    loaded = load_evidence_pack(args.data_root, repo_root)
+    # This used to rely on the load side effect materialising the tables into
+    # the governed tree, which meant the gain check below silently vanished on a
+    # fresh clone. Render them explicitly into scratch instead (issue #31).
+    chart_source_dir = materialize_scratch_chart_sources(repo_root, loaded.data, "validate-semantic-labels")
 
     app_text = read_text(repo_root / "app.py")
     reproducibility_imports_text = read_text(repo_root / "model_dashboard" / "reproducibility_imports.py")
@@ -150,7 +155,7 @@ def validate() -> list[tuple[str, str, str]]:
         "Diagnostic matrix tooltips are centralized, keyboard focusable, and rendered by the dashboard.",
     )
 
-    gain_source = repo_root / "artifacts" / "chart_sources" / "schiff_paired_or_fullsample_gain.csv"
+    gain_source = chart_source_dir / "schiff_paired_or_fullsample_gain.csv"
     if gain_source.exists():
         gain = pd.read_csv(gain_source)
         light = gain[gain["stream_label"].eq("Light RUC volume")]

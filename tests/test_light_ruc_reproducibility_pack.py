@@ -387,7 +387,8 @@ def test_light_ruc_replay_scorecard_metrics_match_audit_facts() -> None:
 
 
 def test_main_dashboard_finalist_kpis_unchanged_by_auxiliary_pack() -> None:
-    dashboard = load_evidence_pack(DATA_ROOT, ROOT)
+    # Chart-source materialisation is now explicit (issue #31).
+    dashboard = load_evidence_pack(DATA_ROOT, ROOT, materialize_chart_sources=True)
     recommended = dashboard.data["recommended"].set_index("stream_label")
 
     for (stream, metric_name), expected in EXPECTED_FINALIST_MAPE.items():
@@ -396,6 +397,9 @@ def test_main_dashboard_finalist_kpis_unchanged_by_auxiliary_pack() -> None:
 
 
 def test_reproducibility_pack_does_not_modify_main_chart_source_tables() -> None:
+    # Chart-source materialisation is now explicit (issue #31); do it here so this
+    # test does not depend on another test having loaded a pack first.
+    load_evidence_pack(DATA_ROOT, ROOT, materialize_chart_sources=True)
     before = _chart_source_hashes()
     assert before, "Expected existing main chart-source tables."
 

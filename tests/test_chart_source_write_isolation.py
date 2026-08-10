@@ -220,6 +220,7 @@ def test_no_test_module_hardcodes_the_tracked_chart_source_directory():
         "test_playwright_dashboard.py",            # reads the running app's output
         "test_playwright_frontend_interactions.py",  # reads the running app's output
         "test_r2_engine_identity.py",              # READS the committed values it pins
+        "test_app_boot_read_only.py",              # READS the committed values it pins
     }
     pattern = re.compile(
         r'"artifacts"\s*/\s*"chart_sources"'      # "artifacts" / "chart_sources"

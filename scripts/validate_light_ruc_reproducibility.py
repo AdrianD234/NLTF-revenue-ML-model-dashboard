@@ -15,6 +15,7 @@ if str(ROOT) not in sys.path:
 import numpy as np
 import pandas as pd
 
+from model_dashboard.data.chart_sources import materialize_scratch_chart_sources  # noqa: E402
 from model_dashboard.data.config import DEFAULT_EVIDENCE_PACK_ROOT  # noqa: E402
 from model_dashboard.evidence_pack import load_evidence_pack  # noqa: E402
 from model_dashboard.light_ruc_reproducibility import (  # noqa: E402
@@ -254,6 +255,8 @@ def validate(
     _validate_ped_inner_hpo_pack(ped_inner_hpo_pack, record)
 
     dashboard = load_evidence_pack(data_root, ROOT)
+    global CHART_SOURCE_DIR
+    CHART_SOURCE_DIR = materialize_scratch_chart_sources(ROOT, dashboard.data, "validate-light-ruc")
     recommended = dashboard.data["recommended"].set_index("stream_label")
     main_ok = True
     main_evidence: list[str] = []
@@ -603,8 +606,15 @@ def _ped_component_delta(components: pd.DataFrame) -> float | pd.NA:
     )
 
 
+# Rebound in main() to a run-scoped scratch directory holding the tables the
+# current evidence pack produces. The before/after comparison below is about
+# auxiliary views not disturbing the main tables; it must not publish governed
+# evidence to make that point (issue #31).
+CHART_SOURCE_DIR = ROOT / "artifacts" / "chart_sources"
+
+
 def _chart_source_hashes() -> dict[str, str]:
-    source_dir = ROOT / "artifacts" / "chart_sources"
+    source_dir = CHART_SOURCE_DIR
     if not source_dir.exists():
         return {}
     return {
@@ -620,7 +630,7 @@ def _changed_hash_names(before: dict[str, str], after: dict[str, str]) -> str:
 
 
 def _chart_source_auxiliary_references() -> list[str]:
-    source_dir = ROOT / "artifacts" / "chart_sources"
+    source_dir = CHART_SOURCE_DIR
     if not source_dir.exists():
         return []
     allowed_auxiliary_sources = {

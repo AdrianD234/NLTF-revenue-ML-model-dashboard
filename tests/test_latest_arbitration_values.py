@@ -49,7 +49,8 @@ def test_mini_parquet_ensemble_weights_come_from_component_json() -> None:
 
 
 def test_mini_parquet_source_tables_are_generated_from_dashboard_data() -> None:
-    loaded = load_parquet_dashboard(FIXTURE_ROOT, Path(__file__).resolve().parents[1])
+    # Chart-source materialisation is now explicit (issue #31).
+    loaded = load_parquet_dashboard(FIXTURE_ROOT, Path(__file__).resolve().parents[1], materialize_chart_sources=True)
     source_dir = resolve_chart_source_output_dir(Path(__file__).resolve().parents[1])
     expected = source_dir / "overview_ensemble_composition.csv"
 

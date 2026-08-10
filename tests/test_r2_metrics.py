@@ -17,7 +17,8 @@ CHART_SOURCE_DIR = resolve_chart_source_output_dir(ROOT)
 
 @pytest.fixture(scope="session", autouse=True)
 def _write_chart_sources() -> None:
-    load_evidence_pack(DEFAULT_EVIDENCE_PACK_ROOT, ROOT)
+    # Chart-source materialisation is now explicit (issue #31).
+    load_evidence_pack(DEFAULT_EVIDENCE_PACK_ROOT, ROOT, materialize_chart_sources=True)
 
 
 def test_forecast_r2_uses_sse_over_sst_and_allows_negative_values() -> None:

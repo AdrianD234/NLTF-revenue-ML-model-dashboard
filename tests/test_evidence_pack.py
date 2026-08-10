@@ -24,7 +24,8 @@ def evidence_pack_root() -> Path:
 
 @pytest.fixture(scope="session")
 def evidence_pack(evidence_pack_root: Path):
-    return load_evidence_pack(evidence_pack_root, ROOT)
+    # Chart-source materialisation is now explicit (issue #31).
+    return load_evidence_pack(evidence_pack_root, ROOT, materialize_chart_sources=True)
 
 
 def test_evidence_pack_required_files_load(evidence_pack_root: Path, evidence_pack) -> None:
