@@ -163,8 +163,18 @@ def build_interaction_matrix() -> pd.DataFrame:
         ruc_published = annual(published_rows, trace, "total_ruc_net_revenue")
         total_policy = annual(policy_rows, trace, "total_nltf_net_revenue")
         total_published = annual(published_rows, trace, "total_nltf_net_revenue")
+        # Strict in FY2027 (a taxed base always exists there); later window
+        # years may legitimately be equal when another lever has removed the
+        # taxed base entirely (e.g. e-RUC migrates the petrol fleet off
+        # excise, leaving no wedge to defer).
         window_moves = all(
-            fed_policy[fy] < fed_published[fy] and ruc_policy[fy] < ruc_published[fy]
+            (
+                fed_policy[fy] < fed_published[fy]
+                and ruc_policy[fy] < ruc_published[fy]
+                if fy == 2027
+                else fed_policy[fy] <= fed_published[fy] + 1e-9
+                and ruc_policy[fy] <= ruc_published[fy] + 1e-9
+            )
             for fy in window_fys
             if fy in fed_policy and fy in fed_published
         )

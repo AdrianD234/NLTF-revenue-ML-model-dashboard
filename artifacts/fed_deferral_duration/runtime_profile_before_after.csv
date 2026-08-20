@@ -1,0 +1,21 @@
+metric,engine,before_3x3,after_8x8,unit,note
+state_count,ar1,9,64,states,
+state_count,ensemble,9,64,states,
+committed_pack_bytes,ar1,9946526,70819706,bytes,frames only; excludes 117KB band rows
+committed_pack_bytes,ensemble,9949027,70834630,bytes,frames only; excludes 117KB band rows
+row_count,ar1,,3263952,rows,before value in git history manifest
+row_count,ensemble,,3263952,rows,
+reference_build_seconds,ar1,,992.5,seconds,reference pipeline cost across 64 states (single process)
+reference_build_seconds,ensemble,,1050.9,seconds,
+uncertainty_centres,ar1,3,8,centres,Current-state centres only; never 64
+uncertainty_centres,ensemble,3,8,centres,
+lookup_median_ms,ar1,,0.02,ms,target 100ms; meets
+switch_median_ms,ar1,,7.82,ms,target 200ms; meets
+first_selection_median_ms,ar1,,84.64,ms,target 500ms; meets
+repeat_selection_median_ms,ar1,,7.74,ms,target 500ms; meets
+lookup_median_ms,ensemble,,0.02,ms,target 100ms; meets
+switch_median_ms,ensemble,,7.96,ms,target 200ms; meets
+first_selection_median_ms,ensemble,,85.04,ms,target 500ms; meets
+repeat_selection_median_ms,ensemble,,7.90,ms,target 500ms; meets
+byte_identical_duplicate_frames,ar1,,406_of_704,frames,58% dedupe headroom via content-addressed blobs (owner decision; not implemented)
+byte_identical_duplicate_frames,ensemble,,406_of_704,frames,

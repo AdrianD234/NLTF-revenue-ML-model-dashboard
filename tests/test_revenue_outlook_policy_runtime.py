@@ -197,8 +197,11 @@ def test_no_uplift_spelling_variants_resolve_to_one_state():
     """
     assert normalise_policy_state("no_uplift") == normalise_policy_state("off")
     assert normalise_policy_state("delay_6m") == normalise_policy_state("delayed_6m")
+    # Every governed duration resolves; a non-governed duration fails closed.
+    assert normalise_policy_state("delayed_12m") == "delayed_12m"
+    assert normalise_policy_state("shifted_36m") == "delayed_36m"
     with pytest.raises(PolicyRuntimeError):
-        normalise_policy_state("delayed_12m")
+        normalise_policy_state("delayed_9m")
 
 
 # ------------------------------------------------------------- exactness
