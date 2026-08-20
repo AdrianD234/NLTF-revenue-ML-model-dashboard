@@ -304,6 +304,33 @@ def test_blank_line_items_stay_blank_not_zero(default_result) -> None:
 # ---------------------------------------------------------------------------
 
 
+def test_extract_skip_caption_is_gone_but_skip_logic_is_untouched(extract_context) -> None:
+    """Only the visible caption was removed; eligibility rules survive.
+
+    The dashboard no longer prints "Extract skips traces without a governed
+    scenario path: ...", but a trace with no governed source path is still
+    silently omitted from the workbook exactly as before, and the download
+    itself still builds.
+    """
+    import inspect
+
+    source = inspect.getsource(app.render_revenue_outlook_page)
+    assert "Extract skips traces without a governed scenario path" not in source
+    assert "skipped_traces" not in source
+    # No replacement warning either: the download block renders no caption
+    # about skipped traces.
+    result = _extract(
+        extract_context,
+        ("Current finalist Base case", "Current finalist comparison behavioural path"),
+    )
+    assert result.sheet_names == ["Current Base"]
+    assert result.exported_traces == ["Current finalist Base case"]
+    assert result.skipped_traces == ["Current finalist comparison behavioural path"]
+    # The workbook bytes are a real XLSX: the download continues to work.
+    workbook = _workbook(result)
+    assert workbook.sheetnames == ["Current Base"]
+
+
 def test_download_button_belongs_to_the_single_scenario_view() -> None:
     """The extract downloads from Single scenario; compare mode does not offer it."""
     from streamlit.testing.v1 import AppTest

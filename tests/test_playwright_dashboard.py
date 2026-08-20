@@ -352,9 +352,9 @@ def test_revenue_outlook_middle_east_default_keeps_timing_and_policy_selector(
     ).to_be_visible(timeout=90000)
     expect(page.locator("body")).to_contain_text(medium_trace, timeout=90000)
 
-    legend_button = page.get_by_role("button", name="Select legend items", exact=True)
-    expect(legend_button).to_be_visible(timeout=60000)
-    legend_button.click()
+    picker_button = page.get_by_role("button", name=re.compile(r"^Show on chart ·"))
+    expect(picker_button).to_be_visible(timeout=60000)
+    picker_button.click()
     for level in CONFLICT_FUEL_SCENARIO_LEVELS:
         trace_name = conflict_trace_name(level)
         checkbox = page.get_by_role("checkbox", name=trace_name, exact=True)
@@ -453,19 +453,49 @@ def test_revenue_outlook_middle_east_default_keeps_timing_and_policy_selector(
     )
     expect(levers).to_be_visible(timeout=60000)
     levers.locator("summary").click()
+    # Opening the expander reruns the script; wait for the app to settle so
+    # the press below lands on live DOM, not a stale mid-rerun copy.
+    page.wait_for_function(
+        "() => !document.querySelector('[data-testid=\"stStatusWidget\"]')",
+        timeout=90000,
+    )
     current_policy = levers.locator(
         '[role="combobox"][aria-label*="Current 12c policy"]'
     ).first
     expect(current_policy).to_be_visible(timeout=60000)
-    expect(current_policy).to_have_attribute(
-        "aria-label", re.compile("Deferred 6 months")
-    )
-    current_policy.click()
-    no_uplift = page.get_by_role("option", name="No 12c uplift", exact=True)
-    expect(no_uplift).to_be_visible(timeout=30000)
-    no_uplift.click()
-    expect(current_policy).to_have_attribute(
-        "aria-label", re.compile("No 12c uplift"), timeout=60000
+    # The governed deferral options carry duration labels ("Deferred 0.5
+    # years (6 months) — 1 Jul 2027") and the selection lives in the input
+    # value, so the check reads the value rather than a stale aria-label.
+    expect(current_policy).to_have_value(re.compile("Deferred"), timeout=60000)
+    # The combobox input only focuses on click; the selectbox's "Open"
+    # chevron opens the listbox, and react-aria only reacts to the full
+    # pointerdown/up sequence, dispatched directly at the element so no
+    # viewport or hit-target quirk can swallow it. The policy list is short
+    # and never virtualised, so the option is picked straight from the
+    # opened listbox (typeahead is avoided because the combobox input
+    # appends typed text to the existing selection).
+    page.wait_for_timeout(1000)
+    open_button = levers.locator('[data-testid="stSelectbox"]').filter(
+        has_text="Current 12c policy"
+    ).first.get_by_role("button", name="Open", exact=True)
+    listbox = page.get_by_role("listbox", name=re.compile("Current 12c policy"))
+    # A rerun scheduled just after the expander opens can unmount the widget
+    # mid-press and silently swallow the open, so the press is retried until
+    # the listbox actually appears.
+    for attempt in range(5):
+        open_button.click()
+        try:
+            expect(listbox).to_be_visible(timeout=6000)
+            break
+        except AssertionError:
+            if attempt == 4:
+                raise
+            page.wait_for_timeout(1000)
+    no_uplift = listbox.get_by_role("option", name=re.compile("No 12c uplift"))
+    expect(no_uplift.first).to_be_visible(timeout=30000)
+    no_uplift.first.click()
+    expect(current_policy).to_have_value(
+        re.compile("No 12c uplift"), timeout=60000
     )
     page.wait_for_function(
         """({traceName, period, previous}) => {
@@ -491,6 +521,70 @@ def test_revenue_outlook_middle_east_default_keeps_timing_and_policy_selector(
         timeout=90000,
     )
     assert trace_value(medium_trace, "FY2028") < delayed_fy2028
+    assert page.locator("[data-testid='stException']").count() == 0
+
+
+def test_revenue_outlook_layer_picker_toggles_a_path_and_a_band(page: Page) -> None:
+    """The compact "Show on chart" popover: open it, untick one path and one
+    band, and the chart follows without a Streamlit exception. The old chip
+    multiselect must not render at all."""
+    medium_trace = conflict_trace_name("medium")
+    page.set_viewport_size({"width": 1680, "height": 940})
+    page.goto(
+        os.environ.get("STAGE1_DASHBOARD_URL", "http://localhost:8501"),
+        wait_until="domcontentloaded",
+    )
+    wait_dashboard_ready(page)
+    click_governance_nav(page, "Revenue Outlook")
+    expect(
+        page.get_by_text("Revenue Outlook controls", exact=False).first
+    ).to_be_visible(timeout=90000)
+    expect(page.locator("body")).to_contain_text(medium_trace, timeout=90000)
+
+    # No chip collection remains: the layer control is one popover button,
+    # not a multiselect labelled "Show on chart". (Other page sections keep
+    # their own multiselects, so the check is scoped to this control.)
+    assert (
+        page.locator("div[data-testid='stMultiSelect']")
+        .filter(has=page.get_by_label("Show on chart", exact=True))
+        .count()
+        == 0
+    )
+    def _wait_app_idle() -> None:
+        page.wait_for_function(
+            "() => !document.querySelector('[data-testid=\"stStatusWidget\"]')",
+            timeout=90000,
+        )
+
+    def _toggle(name: str) -> None:
+        # Each toggle triggers a rerun that rebuilds the popover portal, so
+        # the popover is reopened fresh for every tick box.
+        picker = page.get_by_role("button", name=re.compile(r"^Show on chart ·"))
+        expect(picker).to_be_visible(timeout=60000)
+        picker.click()
+        checkbox = page.get_by_role("checkbox", name=name, exact=True)
+        expect(checkbox).to_be_attached(timeout=60000)
+        assert checkbox.is_checked()
+        # The tick box lives in the popover's fixed portal, which playwright
+        # cannot scroll into its viewport, so the click event is dispatched
+        # directly at the checkbox input.
+        checkbox.dispatch_event("click")
+        _wait_app_idle()
+        page.keyboard.press("Escape")
+
+    _toggle(medium_trace)
+    _toggle("50% conditional modelled uncertainty")
+    page.wait_for_function(
+        """(traceName) => {
+            const plots = [...document.querySelectorAll('.js-plotly-plot')];
+            const names = plots.flatMap((plot) => (plot.data || []).map((trace) => String(trace.name || '')));
+            return names.includes('Current finalist Base case') &&
+                !names.includes(traceName) &&
+                !names.includes('50% conditional modelled uncertainty');
+        }""",
+        arg=medium_trace,
+        timeout=90000,
+    )
     assert page.locator("[data-testid='stException']").count() == 0
 
 

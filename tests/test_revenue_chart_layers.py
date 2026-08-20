@@ -330,13 +330,55 @@ def test_the_vfm_paths_differ_from_base_inside_the_model_window(context) -> None
 
 
 # ------------------------------------------------------------ page contract
-def test_one_multiselect_drives_every_layer() -> None:
+def test_one_compact_picker_drives_every_layer() -> None:
     source = inspect.getsource(app.render_revenue_outlook_page)
-    assert 'st.multiselect(\n                    "Show on chart"' in source
+    assert "_render_chart_layer_picker(layer_catalogue)" in source
     assert "revenue_outlook_chart_layers" in source
-    # The old per-trace checkbox popover must be gone.
+    # The chip multiselect is gone: no widget owns the persisted-label key
+    # any more (it is a plain session value the picker mirrors into), and no
+    # multiselect is labelled "Show on chart".
+    assert 'key="revenue_outlook_chart_layers"' not in source
+    assert 'st.multiselect(\n                    "Show on chart"' not in source
+    picker_source = inspect.getsource(app._render_chart_layer_picker)
+    assert "st.popover(" in picker_source
+    assert "Show on chart" in picker_source
+    # Every catalogue layer gets exactly one tick box, by its own layer ID,
+    # and the canonical persisted selection stays the label list.
+    assert "_layer_picker_checkbox_key(spec.layer_id)" in picker_source
+    assert 'st.session_state["revenue_outlook_chart_layers"] = chosen_labels' in picker_source
+    for action in ("Select all", "Clear all", "Restore defaults"):
+        assert action in picker_source
+    # The pre-PR15 per-trace checkbox popover must stay gone.
     assert 'st.popover("Select legend items"' not in source
     assert "revenue_outlook_legend_item_" not in source
+
+
+def test_picker_selection_tracks_defaults_persistence_and_bulk_actions() -> None:
+    """The picker's state machine, exercised directly against session state."""
+    import streamlit as st
+
+    catalogue = build_layer_catalogue(
+        ["Current finalist Base case", "BEFU26 official"],
+        default_trace_names=["Current finalist Base case"],
+        uncertainty_available=True,
+        envelope_available=False,
+    )
+    checkbox_keys = [app._layer_picker_checkbox_key(spec.layer_id) for spec in catalogue]
+    try:
+        # No persisted selection: bulk "defaults" must reproduce the
+        # catalogue's own default_selected flags exactly.
+        entries = tuple((spec.layer_id, spec.default_selected) for spec in catalogue)
+        app._apply_layer_picker_action(entries, "defaults")
+        assert [
+            bool(st.session_state[key]) for key in checkbox_keys
+        ] == [spec.default_selected for spec in catalogue]
+        app._apply_layer_picker_action(entries, "all")
+        assert all(bool(st.session_state[key]) for key in checkbox_keys)
+        app._apply_layer_picker_action(entries, "none")
+        assert not any(bool(st.session_state[key]) for key in checkbox_keys)
+    finally:
+        for key in checkbox_keys:
+            st.session_state.pop(key, None)
 
 
 def test_the_runtime_never_simulates() -> None:

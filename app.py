@@ -2858,6 +2858,106 @@ def _revenue_outlook_layer_catalogue(
     )
 
 
+# Session prefix for the per-layer tick boxes inside the "Show on chart"
+# popover. The canonical persisted selection stays the LABEL list under
+# "revenue_outlook_chart_layers" - compare mode and the withdrawn-state filter
+# read that key - so the tick boxes are seeded from it and mirrored back into
+# it on every run.
+_LAYER_PICKER_KEY_PREFIX = "ro_layer_pick_"
+
+
+def _layer_picker_checkbox_key(layer_id: str) -> str:
+    return f"{_LAYER_PICKER_KEY_PREFIX}{layer_id}"
+
+
+def _apply_layer_picker_action(
+    entries: tuple[tuple[str, bool], ...], action: str
+) -> None:
+    """Bulk popover actions: tick every layer, none, or the defaults."""
+    for layer_id, default_selected in entries:
+        st.session_state[_layer_picker_checkbox_key(layer_id)] = (
+            True
+            if action == "all"
+            else False
+            if action == "none"
+            else bool(default_selected)
+        )
+
+
+def _render_chart_layer_picker(
+    layer_catalogue: tuple[RevenueChartLayerSpec, ...]
+) -> list[str]:
+    """Compact "Show on chart" popover with one tick box per layer.
+
+    Replaces the chip multiselect: closed, the control is a single button
+    carrying the selected count; open, it lists every catalogue layer grouped
+    into paths and bands. Selection is presentation state only - layer IDs,
+    defaults, draw order and band behaviour are exactly the catalogue's - and
+    the selected labels keep living in ``revenue_outlook_chart_layers`` so
+    every existing reader of that key is untouched.
+    """
+    persisted = st.session_state.get("revenue_outlook_chart_layers")
+    persisted_labels = (
+        set(persisted) if isinstance(persisted, (list, tuple, set)) else None
+    )
+    for spec in layer_catalogue:
+        checkbox_key = _layer_picker_checkbox_key(spec.layer_id)
+        if checkbox_key not in st.session_state:
+            st.session_state[checkbox_key] = bool(
+                spec.default_selected
+                if persisted_labels is None
+                else spec.label in persisted_labels
+            )
+    selected_count = sum(
+        bool(st.session_state[_layer_picker_checkbox_key(spec.layer_id)])
+        for spec in layer_catalogue
+    )
+    entries = tuple((spec.layer_id, spec.default_selected) for spec in layer_catalogue)
+    with st.popover(
+        f"Show on chart · {selected_count} selected", use_container_width=True
+    ):
+        action_columns = st.columns(3)
+        for column, (label, action) in zip(
+            action_columns,
+            [
+                ("Select all", "all"),
+                ("Clear all", "none"),
+                ("Restore defaults", "defaults"),
+            ],
+        ):
+            with column:
+                st.button(
+                    label,
+                    key=f"ro_layer_picker_{action}",
+                    on_click=_apply_layer_picker_action,
+                    args=(entries, action),
+                    use_container_width=True,
+                )
+        for group_title, layer_kinds in (
+            ("Paths", (LAYER_KIND_PATH,)),
+            ("Bands", (LAYER_KIND_BAND, LAYER_KIND_ENVELOPE)),
+        ):
+            group_specs = [
+                spec for spec in layer_catalogue if spec.layer_kind in layer_kinds
+            ]
+            if not group_specs:
+                continue
+            st.markdown(f"**{group_title}**")
+            for spec in group_specs:
+                st.checkbox(
+                    spec.display_name,
+                    key=_layer_picker_checkbox_key(spec.layer_id),
+                    help=spec.interpretation,
+                )
+    chosen_labels = [
+        spec.label
+        for spec in layer_catalogue
+        if bool(st.session_state.get(_layer_picker_checkbox_key(spec.layer_id)))
+    ]
+    st.session_state["revenue_outlook_chart_layers"] = chosen_labels
+    return chosen_labels
+
+
 def _cone_band_controls(ev_uptake_key: ScenarioKeyLike) -> RevenueScenarioComputationKey:
     """The band's cache identity: the live key with the basis field blanked.
 
@@ -6790,27 +6890,8 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                     trace_options, selected_trace_defaults
                 )
                 layer_labels = {spec.label: spec.layer_id for spec in layer_catalogue}
-                default_labels = [
-                    spec.label for spec in layer_catalogue if spec.default_selected
-                ]
                 st.markdown("<div class='control-label'>Show on chart</div>", unsafe_allow_html=True)
-                layer_default_kwargs = (
-                    {}
-                    if "revenue_outlook_chart_layers" in st.session_state
-                    else {"default": default_labels}
-                )
-                chosen_labels = st.multiselect(
-                    "Show on chart",
-                    list(layer_labels),
-                    key="revenue_outlook_chart_layers",
-                    label_visibility="collapsed",
-                    help=(
-                        "Paths are deterministic scenarios. The 50%/80% bands are "
-                        "conditional model forecast-error bands and exclude "
-                        "Treasury-driver forecast uncertainty."
-                    ),
-                    **layer_default_kwargs,
-                )
+                chosen_labels = _render_chart_layer_picker(layer_catalogue)
                 selected_layer_ids = [layer_labels[label] for label in chosen_labels if label in layer_labels]
                 if not selected_layer_ids:
                     selected_layer_ids = default_layer_ids(layer_catalogue)
@@ -7207,11 +7288,6 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                     "efficiency and PT mode shift."
                 ),
             )
-            if extract_result.skipped_traces:
-                st.caption(
-                    "Extract skips traces without a governed scenario path: "
-                    + ", ".join(extract_result.skipped_traces)
-                )
 
     if not compare_mode and method_detail_enabled() and st.toggle(
         "Show forecast-uncertainty fan detail",
@@ -10151,6 +10227,128 @@ def _comparison_alignment_gate(
     return ""
 
 
+# The A/B comparison window is PRESENTATION state: it filters already-computed
+# annual rows before aggregation and is deliberately not part of
+# RevenueScenarioComputationKey or any cache identity, because it changes no
+# scenario calculation.
+_COMPARISON_WINDOW_STATE_KEY = "ro_cmp_fy_window"
+
+
+def _comparison_fy_window_bounds(
+    a: pd.Series,
+    b: pd.Series,
+    *,
+    start_floor_fy: int = _COMPARISON_HORIZON_START_FY,
+) -> tuple[int, int] | None:
+    """The common A/B June-year horizon the comparison window can select from.
+
+    Derived from the years both sides actually publish inside the comparison
+    horizon - never hard-coded - so a shorter pack simply narrows the offered
+    range. ``start_floor_fy`` carries the selected official vintage's
+    presentation seam (``_comparison_horizon_start_fy``): under PREBU26 the
+    Current FY2026 point is a masked chart anchor, not a forecast, so the
+    window can never offer it and no pre-seam value can enter an aggregate.
+    Returns ``None`` when the sides share no June year.
+    """
+
+    def _years(path: pd.Series) -> set[int]:
+        years = pd.to_numeric(pd.Series(path.index), errors="coerce").dropna().astype(int)
+        return {
+            int(year)
+            for year in years.unique()
+            if int(start_floor_fy) <= year <= _COMPARISON_HORIZON_END_FY
+        }
+
+    common = _years(a) & _years(b)
+    if not common:
+        return None
+    return (min(common), max(common))
+
+
+def _clamp_comparison_fy_window(selected: Any, bounds: tuple[int, int]) -> tuple[int, int]:
+    """Clamp a persisted (start, end) window into the current bounds.
+
+    Never raises: a malformed, reversed or out-of-range selection - e.g. one
+    persisted before a scenario/series change shrank the common horizon -
+    falls back to the nearest legal window, or the full range when the two do
+    not intersect at all.
+    """
+    lower_fy, upper_fy = int(bounds[0]), int(bounds[1])
+    try:
+        start_fy, end_fy = int(selected[0]), int(selected[-1])
+    except (TypeError, ValueError, IndexError, KeyError):
+        return (lower_fy, upper_fy)
+    if start_fy > end_fy:
+        start_fy, end_fy = end_fy, start_fy
+    if end_fy < lower_fy or start_fy > upper_fy:
+        # No overlap with the new horizon at all: the old window is
+        # meaningless there, so fall back to the full range.
+        return (lower_fy, upper_fy)
+    return (max(start_fy, lower_fy), min(end_fy, upper_fy))
+
+
+def _comparison_fy_window_slice(path: pd.Series, start_fy: int, end_fy: int) -> pd.Series:
+    """The annual rows inside [start_fy, end_fy], selected by June-year index.
+
+    A pure filter over the already-computed series: values are never rescaled,
+    re-anchored or recomputed, so every year that survives is byte-identical
+    to the unwindowed path.
+    """
+    if path is None or len(path) == 0:
+        return pd.Series(dtype=float)
+    years = pd.to_numeric(pd.Series(path.index), errors="coerce")
+    mask = ((years >= int(start_fy)) & (years <= int(end_fy))).to_numpy()
+    return path[mask]
+
+
+def _comparison_fy_window_label(start_fy: int, end_fy: int) -> str:
+    if int(start_fy) == int(end_fy):
+        return f"FY{int(start_fy)}"
+    return f"FY{int(start_fy)}–FY{int(end_fy)}"
+
+
+def _series_fy_span(values_by_fy: pd.Series) -> tuple[int, int]:
+    """(min, max) June year of an FY-indexed series; horizon constants if empty."""
+    if values_by_fy is None or len(values_by_fy) == 0:
+        return (_COMPARISON_HORIZON_START_FY, _COMPARISON_HORIZON_END_FY)
+    years = pd.to_numeric(pd.Series(values_by_fy.index), errors="coerce").dropna().astype(int)
+    if years.empty:
+        return (_COMPARISON_HORIZON_START_FY, _COMPARISON_HORIZON_END_FY)
+    return int(years.min()), int(years.max())
+
+
+def _render_comparison_window_control(bounds: tuple[int, int]) -> tuple[int, int]:
+    """The two-handle June-year selector for the A/B analysis window.
+
+    The persisted selection lives in its own plain session key, clamped into
+    the current bounds on every run; the widget itself is stateless (its
+    value is always passed explicitly, and it carries no key). A keyed
+    range select_slider loses its range-ness when its default kwargs are
+    dropped on later runs - the session value collapses to a scalar - and a
+    keyed widget given a value every run logs Streamlit's default-vs-session
+    warning, so the plain-store pattern is the one arrangement that persists,
+    clamps and stays warning-free.
+    """
+    lower_fy, upper_fy = int(bounds[0]), int(bounds[1])
+    stored = st.session_state.get(_COMPARISON_WINDOW_STATE_KEY)
+    current = _clamp_comparison_fy_window(stored, (lower_fy, upper_fy))
+    start_fy, end_fy = st.select_slider(
+        "Comparison window",
+        options=list(range(lower_fy, upper_fy + 1)),
+        value=current,
+        format_func=lambda fy: f"FY{int(fy)}",
+        help=(
+            "June-year window for every A/B card, chart and bridge below. "
+            "Cumulative and NPV figures sum only the selected years' cash "
+            "flows; the NPV keeps the existing FY2026 discount base and "
+            "MBCM curve - factors are not rebased to the window start."
+        ),
+    )
+    selection = (int(start_fy), int(end_fy))
+    st.session_state[_COMPARISON_WINDOW_STATE_KEY] = selection
+    return selection
+
+
 def _reset_scenario_b_to_current_page() -> None:
     """Seed the Scenario B controls from the live Single scenario configuration."""
     st.session_state["ro_cmp_b_trace"] = "Current finalist Base case"
@@ -10343,36 +10541,66 @@ def _render_scenario_comparison_panel(
                 notes_as_tooltip=True,
             )
             return
+        window_bounds = _comparison_fy_window_bounds(
+            a_path, b_path, start_floor_fy=comparison_start_fy
+        )
+        if window_bounds is None:
+            warning_panel(
+                "Comparison horizon gate: the scenarios share no June years inside "
+                f"FY{int(comparison_start_fy)}-FY{_COMPARISON_HORIZON_END_FY}."
+            )
+            return
+        start_fy, end_fy = _render_comparison_window_control(window_bounds)
+        full_window = (start_fy, end_fy) == window_bounds
+        window_text = _comparison_fy_window_label(start_fy, end_fy)
+        # Presentation-side filter: the annual rows are selected AFTER the
+        # governed computation, so scenario keys, cached views and every
+        # underlying annual value are untouched by the window.
+        a_window = _comparison_fy_window_slice(a_path, start_fy, end_fy)
+        b_window = _comparison_fy_window_slice(b_path, start_fy, end_fy)
+        rate_for_npv = None if discount_mode == _COMPARISON_DISCOUNT_MBCM else custom_rate
         gov_kpi_grid(
             _scenario_comparison_cards(
                 comparison_series,
                 result["metric_type"],
-                a_path,
-                b_path,
+                a_window,
+                b_window,
                 result["value_unit"],
-                None if discount_mode == _COMPARISON_DISCOUNT_MBCM else custom_rate,
+                rate_for_npv,
                 horizon_start_fy=comparison_start_fy,
             )
         )
+        paths_note = (
+            "Shared history in grey; Scenario A solid navy, Scenario B dashed orange. "
+            "Same governed pipeline as the total path chart."
+        )
         chart_card(
             "Scenario paths (A vs B)",
-            "Shared history in grey; Scenario A solid navy, Scenario B dashed orange. Same governed pipeline as the total path chart.",
-            _scenario_comparison_figure(result["history"], a_path, b_path, result["value_unit"]),
+            paths_note if full_window else f"{paths_note} Comparison window {window_text}.",
+            _scenario_comparison_figure(
+                result["history"],
+                # The full window keeps any pre-forecast nowcast anchor for
+                # chart continuity, exactly as before the window existed.
+                a_path if full_window else a_window,
+                b_path if full_window else b_window,
+                result["value_unit"],
+            ),
             caption=None,
             notes_as_tooltip=True,
         )
         if result["metric_type"] == "revenue":
-            rate_for_npv = None if discount_mode == _COMPARISON_DISCOUNT_MBCM else custom_rate
             basis_note = mbcm_label() if rate_for_npv is None else f"Single rate {rate_for_npv:.1%} p.a."
-            npv_a = npv_to_horizon(a_path, rate=rate_for_npv)
-            npv_b = npv_to_horizon(b_path, rate=rate_for_npv)
+            npv_a = npv_to_horizon(a_window, rate=rate_for_npv)
+            npv_b = npv_to_horizon(b_window, rate=rate_for_npv)
             if comparison_series == _SCENARIO_COMPARISON_TOTAL_SERIES:
                 # The by-stream views read in nominal (undiscounted) terms:
                 # rate 0.0 reuses the NPV helpers' FY2026 anchor filtering
                 # while leaving every dollar undiscounted, so the bridge total
-                # ties to the Cumulative nominal delta card.
-                nominal_a = npv_to_horizon(a_path, rate=0.0)
-                nominal_b = npv_to_horizon(b_path, rate=0.0)
+                # ties to the Cumulative nominal delta card. Every side and
+                # component is cut to the same comparison window BEFORE
+                # aggregation, so the decomposition closes inside the window.
+                nominal_a = npv_to_horizon(a_window, rate=0.0)
+                nominal_b = npv_to_horizon(b_window, rate=0.0)
                 component_totals = {
                     component_series: _scenario_component_npv(
                         cached_scenario_comparison_paths(
@@ -10382,6 +10610,7 @@ def _render_scenario_comparison_panel(
                             trace_a=trace_a, trace_b=trace_b,
                         ),
                         0.0,
+                        window=(start_fy, end_fy),
                     )
                     for component_series in _SCENARIO_COMPONENT_FETCH_SERIES
                 }
@@ -10408,12 +10637,12 @@ def _render_scenario_comparison_panel(
                 with stream_col:
                     chart_card(
                         "Nominal revenue by stream (A vs B)",
-                        "Each revenue stream's cumulative nominal revenue to FY2050 under Scenario A "
+                        f"Each revenue stream's cumulative nominal revenue over {window_text} under Scenario A "
                         "(navy) and Scenario B (orange), largest stream first, all streams recomputed "
                         "through that scenario's levers. Heavy & other RUC is the RUC rollup less the "
                         "light classes (heavy BEVs pay the same per-km RUC, so heavy electrification "
                         "reshuffles within this block); TUC & other closes the governed NLTF identity. "
-                        "Undiscounted, FY2026 base.",
+                        f"Undiscounted, June years {window_text}.",
                         composition_figure,
                         caption=None,
                         notes_as_tooltip=True,
@@ -10425,7 +10654,7 @@ def _render_scenario_comparison_panel(
                         "the scenarios: component deltas accumulate from zero to the total nominal "
                         "delta, so gains in one stream (green) and losses in another (red) net out to "
                         "the Cumulative nominal delta card. Streams moving less than $1m are omitted. "
-                        "Undiscounted, FY2026 base.",
+                        f"Undiscounted, June years {window_text}.",
                         _scenario_npv_component_bridge_figure(
                             nominal_a, nominal_b, components, result["value_unit"],
                             metric_label="Nominal", height=row_height,
@@ -10436,7 +10665,7 @@ def _render_scenario_comparison_panel(
             else:
                 chart_card(
                     "NPV bridge (A to B)",
-                    "NPV to FY2050 from an FY2026 base. " + basis_note,
+                    f"NPV of June-year cash flows {window_text} from an FY2026 base. " + basis_note,
                     _scenario_npv_waterfall_figure(npv_a, npv_b, result["value_unit"]),
                     caption=None,
                     notes_as_tooltip=True,
@@ -10484,6 +10713,11 @@ def _scenario_comparison_cards(
     a = a[a.index >= int(horizon_start_fy)] if len(a) else a
     b = b[b.index >= int(horizon_start_fy)] if len(b) else b
     horizon = horizon_label(a if len(a) else b)
+    # The card labels follow the (possibly windowed) series they summarise, so
+    # a narrowed comparison window renames "to FY2050" and the NPV subtitle
+    # names the exact June-year range alongside the unchanged FY2026 base.
+    _, window_end_fy = _series_fy_span(a if len(a) else b)
+    window_text = _comparison_fy_window_label(*_series_fy_span(a if len(a) else b))
     is_intensity = "per capita" in label.lower() or "per capita" in str(value_unit).lower()
     if metric_type == "revenue":
         npv_a = npv_to_horizon(a, rate=discount_rate)
@@ -10495,10 +10729,10 @@ def _scenario_comparison_cards(
         pct = f"{delta / npv_a:+.1%} vs A" if npv_a else "-"
         cum_pct = f"{cum_delta / cum_a:+.1%} vs A" if cum_a else "-"
         return [
-            ("Scenario A - Cumulative nominal to FY2050", _format_scenario_amount(cum_a, value_unit), f"{horizon}, undiscounted", "-", "neutral", "A"),
-            ("Scenario B - Cumulative nominal to FY2050", _format_scenario_amount(cum_b, value_unit), f"{horizon}, undiscounted", "-", "neutral", "B"),
+            (f"Scenario A - Cumulative nominal to FY{window_end_fy}", _format_scenario_amount(cum_a, value_unit), f"{horizon}, undiscounted", "-", "neutral", "A"),
+            (f"Scenario B - Cumulative nominal to FY{window_end_fy}", _format_scenario_amount(cum_b, value_unit), f"{horizon}, undiscounted", "-", "neutral", "B"),
             ("Cumulative nominal delta (B - A)", _format_scenario_amount(cum_delta, value_unit, signed=True), f"{horizon}, undiscounted", cum_pct, _scenario_delta_tone(cum_delta), "Σ"),
-            ("NPV delta (B - A)", _format_scenario_amount(delta, value_unit, signed=True), f"{basis}; FY2026 base", pct, _scenario_delta_tone(delta), "Δ"),
+            ("NPV delta (B - A)", _format_scenario_amount(delta, value_unit, signed=True), f"{window_text}, {basis}; FY2026 base", pct, _scenario_delta_tone(delta), "Δ"),
         ]
     if is_intensity:
         avg_a, avg_b = average_annual(a), average_annual(b)
@@ -10508,7 +10742,7 @@ def _scenario_comparison_cards(
             ("Scenario A - average annual level", _format_scenario_amount(avg_a, value_unit), horizon, "-", "neutral", "A"),
             ("Scenario B - average annual level", _format_scenario_amount(avg_b, value_unit), horizon, "-", "neutral", "B"),
             ("Average level delta (B - A)", _format_scenario_amount(delta, value_unit, signed=True), horizon, "-", _scenario_delta_tone(delta), "Δ"),
-            ("FY2050 delta (B - A)", _format_scenario_amount(end_delta, value_unit, signed=True), "end of horizon", "-", _scenario_delta_tone(end_delta), "→"),
+            (f"FY{window_end_fy} delta (B - A)", _format_scenario_amount(end_delta, value_unit, signed=True), "end of window", "-", _scenario_delta_tone(end_delta), "→"),
         ]
     cum_a, cum_b = cumulative_total(a), cumulative_total(b)
     delta = cum_b - cum_a
@@ -10647,9 +10881,24 @@ _SCENARIO_COMPONENT_COLORS = {
 _SCENARIO_COMPONENT_MATERIALITY = 1.0  # $m NPV; bars below this are dropped
 
 
-def _scenario_component_npv(paths: dict[str, Any], rate: float | None) -> tuple[float, float]:
-    npv_a = npv_to_horizon(paths["a"], rate=rate)
-    npv_b = npv_to_horizon(paths["b"], rate=rate)
+def _scenario_component_npv(
+    paths: dict[str, Any],
+    rate: float | None,
+    *,
+    window: tuple[int, int] | None = None,
+) -> tuple[float, float]:
+    """Component NPV pair, optionally cut to the comparison window first.
+
+    The window is the same presentation-side June-year filter applied to the
+    headline series, so component totals close against the windowed headline
+    delta by construction; the discount anchor is untouched.
+    """
+    a_path, b_path = paths["a"], paths["b"]
+    if window is not None:
+        a_path = _comparison_fy_window_slice(a_path, window[0], window[1])
+        b_path = _comparison_fy_window_slice(b_path, window[0], window[1])
+    npv_a = npv_to_horizon(a_path, rate=rate)
+    npv_b = npv_to_horizon(b_path, rate=rate)
     return (0.0 if pd.isna(npv_a) else npv_a, 0.0 if pd.isna(npv_b) else npv_b)
 
 

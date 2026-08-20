@@ -1138,9 +1138,14 @@ def test_revenue_outlook_page_does_not_render_summary_kpi_cards() -> None:
     assert "revenue_outlook_sensitivity_cost_ratio" not in source
     assert '"Traces"' not in source
     assert "revenue_outlook_traces" not in source
-    # One unified "Show on chart" multiselect replaced the per-trace popover.
+    # One unified "Show on chart" control drives every layer; it is now a
+    # compact popover with tick boxes, not a chip multiselect and not the
+    # pre-PR15 per-trace legend popover.
     assert "Show on chart" in source
+    assert "_render_chart_layer_picker(layer_catalogue)" in source
     assert "revenue_outlook_chart_layers" in source
+    assert 'key="revenue_outlook_chart_layers"' not in source
+    assert 'st.multiselect(\n                    "Show on chart"' not in source
     assert 'st.popover("Select legend items"' not in source
 
 
@@ -1377,6 +1382,46 @@ def test_revenue_outlook_compare_mode_swaps_total_path_for_comparison() -> None:
     # Default B (MoT VFM fast) differs from A, so KPI cards render immediately.
     assert "Cumulative nominal to FY2050" in rendered
     assert "NPV delta" in rendered
+    # The comparison window defaults to the full common horizon, so the
+    # default compare screen reproduces the pre-window view exactly. Under
+    # the default PREBU26 comparator the forecast window proper begins
+    # FY2027 (FY2026 is a published actual), so that is the offered floor.
+    window = _comparison_window_slider(at)
+    assert tuple(int(v) for v in window.value) == (2027, 2050)
+
+
+def _comparison_window_slider(at: AppTest):
+    return next(
+        s for s in at.select_slider if str(s.label) == "Comparison window"
+    )
+
+
+def test_revenue_outlook_comparison_window_recalculates_and_clamps() -> None:
+    at = _run_revenue_outlook_page()
+    _view_mode_radio(at).set_value(app.REVENUE_OUTLOOK_VIEW_COMPARE)
+    at.run()
+    assert not at.exception
+    _comparison_window_slider(at).set_range(2030, 2040)
+    at.run()
+    assert not at.exception
+    rendered = "\n".join(str(markdown.value) for markdown in at.markdown)
+    # Card titles, horizon subtitles and the NPV subtitle all follow the window.
+    assert "Cumulative nominal to FY2040" in rendered
+    assert "Cumulative nominal to FY2050" not in rendered
+    assert "FY2030–FY2040" in rendered
+    # The selection survives an ordinary rerun.
+    at.run()
+    assert not at.exception
+    assert tuple(int(v) for v in _comparison_window_slider(at).value) == (2030, 2040)
+    assert tuple(at.session_state[app._COMPARISON_WINDOW_STATE_KEY]) == (2030, 2040)
+
+    # A stale persisted window outside the offered horizon is clamped on the
+    # next render rather than raising Streamlit's out-of-options error; the
+    # clamp lands on the PREBU26-seam full range, never on masked FY2026.
+    at.session_state[app._COMPARISON_WINDOW_STATE_KEY] = (1990, 2100)
+    at.run()
+    assert not at.exception
+    assert tuple(int(v) for v in _comparison_window_slider(at).value) == (2027, 2050)
 
 
 def test_revenue_outlook_compare_mode_renders_pt_and_freight_for_scenario_b() -> None:
