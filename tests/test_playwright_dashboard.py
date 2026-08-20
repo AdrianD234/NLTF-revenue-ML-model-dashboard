@@ -458,39 +458,72 @@ def test_revenue_outlook_middle_east_default_keeps_timing_and_policy_selector(
     ).first
     expect(current_policy).to_be_visible(timeout=60000)
     expect(current_policy).to_have_attribute(
-        "aria-label", re.compile("Deferred 6 months")
+        "aria-label", re.compile(r"Deferred 0\.5 years \(6 months\)")
     )
-    current_policy.click()
-    no_uplift = page.get_by_role("option", name="No 12c uplift", exact=True)
-    expect(no_uplift).to_be_visible(timeout=30000)
-    no_uplift.click()
-    expect(current_policy).to_have_attribute(
-        "aria-label", re.compile("No 12c uplift"), timeout=60000
+
+    def wait_for_trace_move(period: str, previous: float) -> None:
+        page.wait_for_function(
+            """({traceName, period, previous}) => {
+                const plot = [...document.querySelectorAll('.js-plotly-plot')].find((candidate) =>
+                    (candidate.data || []).some((trace) => trace.name === traceName)
+                );
+                if (!plot) return false;
+                const trace = (plot.data || []).find((candidate) => candidate.name === traceName);
+                const x = Array.from(trace.x || []).map(String);
+                const values = trace.y && trace.y._inputArray
+                    ? Object.keys(trace.y._inputArray)
+                        .sort((left, right) => Number(left) - Number(right))
+                        .map((key) => Number(trace.y._inputArray[key]))
+                    : Array.from(trace.y || [], Number);
+                const value = values[x.indexOf(period)];
+                return Number.isFinite(value) && Math.abs(value - previous) > 1e-6;
+            }""",
+            arg={
+                "traceName": medium_trace,
+                "period": period,
+                "previous": previous,
+            },
+            timeout=90000,
+        )
+
+    def select_policy(option_label: str, aria_pattern: str) -> None:
+        current_policy.click()
+        option = page.get_by_role("option", name=option_label, exact=True)
+        expect(option).to_be_visible(timeout=30000)
+        option.click()
+        expect(current_policy).to_have_attribute(
+            "aria-label", re.compile(aria_pattern), timeout=60000
+        )
+
+    # 18-month deferral: FY2028 is wholly inside its window, so the Medium
+    # trace must drop from the six-month value.
+    select_policy(
+        "Deferred 1.5 years (18 months) — 1 Jul 2028",
+        r"Deferred 1\.5 years \(18 months\)",
     )
-    page.wait_for_function(
-        """({traceName, period, previous}) => {
-            const plot = [...document.querySelectorAll('.js-plotly-plot')].find((candidate) =>
-                (candidate.data || []).some((trace) => trace.name === traceName)
-            );
-            if (!plot) return false;
-            const trace = (plot.data || []).find((candidate) => candidate.name === traceName);
-            const x = Array.from(trace.x || []).map(String);
-            const values = trace.y && trace.y._inputArray
-                ? Object.keys(trace.y._inputArray)
-                    .sort((left, right) => Number(left) - Number(right))
-                    .map((key) => Number(trace.y._inputArray[key]))
-                : Array.from(trace.y || [], Number);
-            const value = values[x.indexOf(period)];
-            return Number.isFinite(value) && Math.abs(value - previous) > 1e-6;
-        }""",
-        arg={
-            "traceName": medium_trace,
-            "period": "FY2028",
-            "previous": delayed_fy2028,
-        },
-        timeout=90000,
+    wait_for_trace_move("FY2028", delayed_fy2028)
+    deferred_18m_fy2028 = trace_value(medium_trace, "FY2028")
+    assert deferred_18m_fy2028 < delayed_fy2028
+    deferred_18m_fy2029 = trace_value(medium_trace, "FY2029")
+
+    # 36-month deferral: FY2028 matches the 18-month state (both windows
+    # cover it), but FY2029 is now deferred too, so it must drop.
+    select_policy(
+        "Deferred 3.0 years (36 months) — 1 Jan 2030",
+        r"Deferred 3\.0 years \(36 months\)",
     )
-    assert trace_value(medium_trace, "FY2028") < delayed_fy2028
+    wait_for_trace_move("FY2029", deferred_18m_fy2029)
+    assert trace_value(medium_trace, "FY2029") < deferred_18m_fy2029
+    assert trace_value(medium_trace, "FY2028") == pytest.approx(
+        deferred_18m_fy2028, abs=1e-6
+    )
+
+    # No uplift: FY2030 drops below the 36-month deferral (which has caught
+    # up by 1 January 2030 and collects the uplift for half of FY2030).
+    deferred_36m_fy2030 = trace_value(medium_trace, "FY2030")
+    select_policy("No 12c uplift", r"No 12c uplift")
+    wait_for_trace_move("FY2030", deferred_36m_fy2030)
+    assert trace_value(medium_trace, "FY2030") < deferred_36m_fy2030
     assert page.locator("[data-testid='stException']").count() == 0
 
 

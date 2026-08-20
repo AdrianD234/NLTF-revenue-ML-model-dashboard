@@ -66,6 +66,8 @@ test_groups:
     description: The forward revenue computation itself and its levers.
     paths:
       - tests/test_revenue_outlook.py
+      - tests/test_fed_policy_states.py
+      - tests/test_fed_deferral_interactions.py
       - tests/test_revenue_outlook_long_run.py
       - tests/test_revenue_outlook_long_run_sensitivities.py
       - tests/test_revenue_outlook_series_coverage.py
@@ -428,6 +430,7 @@ rules:
   - scopes: [revenue_outlook_calculation]
     patterns:
       - "model_dashboard/revenue_outlook.py"
+      - "model_dashboard/fed_policy_states.py"
       - "model_dashboard/revenue_outlook_series_coverage.py"
       - "model_dashboard/revenue_scenario_key.py"
       - "model_dashboard/rate_paths.py"

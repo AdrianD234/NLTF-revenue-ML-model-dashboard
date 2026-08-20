@@ -569,6 +569,32 @@ def _default_affected_periods(factors: dict[int, float], policy_state: str) -> d
     return out
 
 
+def _augment_policy_audit(audit: pd.DataFrame, policy_state: str) -> pd.DataFrame:
+    """Attach the registry's timing metadata to every policy audit row.
+
+    Additive columns only: existing consumers keep their exact column names.
+    ``affected_periods`` remains the (possibly lag/lead-extended) model
+    response window each row actually carries;
+    ``direct_rate_affected_quarters`` names the direct rate window alone so
+    the two are never conflated.
+    """
+    if audit is None or audit.empty:
+        return audit
+    spec = policy_spec(policy_state)
+    audit = audit.copy()
+    audit["policy_label"] = spec.label
+    audit["delay_months"] = spec.delay_months
+    audit["delay_quarters"] = spec.delay_quarters
+    audit["deferred_start_period"] = spec.start_period
+    if spec.is_finite_deferral:
+        audit["direct_rate_affected_quarters"] = ";".join(spec.direct_affected_quarters())
+    elif spec.is_no_uplift:
+        audit["direct_rate_affected_quarters"] = "2027Q1_onward"
+    else:
+        audit["direct_rate_affected_quarters"] = ""
+    return audit
+
+
 def _policy_row_key(data: pd.DataFrame, index: Any, fy: int) -> tuple[str, str, str, int]:
     return (
         str(data.at[index, "scenario_name"]) if "scenario_name" in data.columns else "",
@@ -975,7 +1001,7 @@ def apply_fed_rate_policy_to_chart_rows(
                 audit_row["quarterly_annual_reconciliation_delta"] = (
                     final_value - float(before_reconciliation.at[index])
                 )
-        return data, pd.DataFrame(audit_rows)
+        return data, _augment_policy_audit(pd.DataFrame(audit_rows), policy_state)
 
     audit_rows: list[dict[str, Any]] = []
     ped_delta_by_key: dict[tuple[str, str, str, int], float] = {}
@@ -1081,7 +1107,7 @@ def apply_fed_rate_policy_to_chart_rows(
         data.loc[touched, "value_status"] = policy_spec_for_state.value_status
     if "data_scope" in data.columns:
         data.loc[touched, "data_scope"] = policy_spec_for_state.data_scope
-    return data, pd.DataFrame(audit_rows)
+    return data, _augment_policy_audit(pd.DataFrame(audit_rows), policy_state)
 
 
 def _reject_official_scope(scenario_roles: set[str] | tuple[str, ...] | None, helper: str) -> None:
