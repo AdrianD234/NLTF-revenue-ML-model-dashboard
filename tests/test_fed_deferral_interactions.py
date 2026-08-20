@@ -29,13 +29,44 @@ import pytest
 import app
 from model_dashboard.engine import ENGINE_AR1, engine_revenue_outlook_dir
 from model_dashboard.fed_policy_states import FED_POLICY_SPECS, policy_spec
+from model_dashboard.official_vintage import (
+    bridge_vintage_id_from_manifest,
+    default_comparator_vintage_id,
+)
 from model_dashboard.revenue_outlook import (
     PED_BRIDGE_DEFAULT_MODE,
     PED_BRIDGE_OPTIMIZED_MODE,
     load_revenue_outlook_pack,
     revenue_outlook_signature,
 )
-from scripts.build_revenue_outlook_policy_runtime import governed_key
+from model_dashboard.revenue_scenario_key import RevenueScenarioComputationKey
+
+
+def governed_key(pack, engine: str, current_state: str, official_state: str):
+    """The builder's production key, mirrored locally.
+
+    Deliberately NOT imported from scripts/build_revenue_outlook_policy_runtime:
+    importing that module switches app.POLICY_RUNTIME_FAST_PATH_ENABLED off at
+    import time for the whole pytest process, which fails the fast-path
+    contract checks in later test modules.
+    """
+    block = pack.manifest.get("official_vintages", {}) if isinstance(pack.manifest, dict) else {}
+    return RevenueScenarioComputationKey(
+        engine=engine,
+        uptake_basis=app.DEFAULT_EV_UPTAKE_MODE,
+        current_fed_policy_state=current_state,
+        official_fed_policy_state=official_state,
+        ped_bridge_mode=PED_BRIDGE_DEFAULT_MODE,
+        bridge_vintage_id=str(bridge_vintage_id_from_manifest(pack.manifest, ROOT) or ""),
+        official_comparator_vintage_id=str(
+            block.get("official_comparator_vintage_id")
+            or default_comparator_vintage_id(ROOT)
+        ),
+        long_run_transition_schedule_id=str(
+            block.get("long_run_transition_schedule_id") or app.UNBLENDED_SCHEDULE_ID
+        ),
+        long_run_shape_vintage_id=str(block.get("long_run_shape_vintage_id") or ""),
+    )
 
 ROOT = Path(__file__).resolve().parents[1]
 BASE_TRACE = "Current finalist Base case"
