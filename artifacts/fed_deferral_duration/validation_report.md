@@ -25,7 +25,8 @@ Tested SHA: _recorded at the end of this report once final_
 | Pack idempotence: second policy-runtime build reproduces all 1,410 content files byte-for-byte (manifests differ only in the informational build-time SHA, which is excluded from the digest) | PASS | idempotency probe (2026-08-20) |
 | Clean-room fast tier | PASS (exit 0 at d533162) | `scripts/ci_local.ps1 -Tier fast` |
 | Clean-room replay fingerprint | PASS (9,536 replay rows fingerprinted, no tracked-file mutation) | `scripts/ci_local.ps1 -Tier replay` |
-| Clean-room full assurance | _recorded in the PR on the final SHA_ | `scripts/ci_local.ps1 -Tier full` |
+| Clean-room full assurance (includes the exhaustive 64-state parity walk) | PASS — 2,075 passed / 0 failed, 44/44 extract validations, no mutations, 64m45s | `scripts/ci_local.ps1 -Tier full` |
+| Hosted budget split: the exhaustive 64-state parity walk (384 reference runs/engine) exceeds the 2-CPU hosted job's 120-minute budget on its own; the hosted core job deselects it via the `exhaustive_runtime_parity` marker (stated in its coverage report) and runs a stratified 16-pair representative parity test — every legacy pair plus each new duration as Current and as official. Local full assurance and the pack builder keep the complete walk. | Implemented, documented in pytest.ini and ci.yml | `test_representative_states_equal_the_reference_pipeline` |
 
 ## Notes
 

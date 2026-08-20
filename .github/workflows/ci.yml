@@ -372,18 +372,27 @@ jobs:
 
       - name: Report clean-clone coverage
         run: |
-          python -m pytest -q --collect-only -m "not e2e and not requires_local_scratch" \
+          python -m pytest -q --collect-only -m "not e2e and not requires_local_scratch and not exhaustive_runtime_parity" \
             2>/dev/null | tail -3 || true
           echo "--- excluded from the clean-clone claim ---"
           python -m pytest -q --collect-only -m "requires_local_scratch" 2>/dev/null | tail -3 || true
           echo "Excluded tests need developer-local scratch that cannot be rebuilt"
           echo "from committed content (screenshots, hand-kept audit logs)."
+          echo "--- run in local full assurance instead of this 2-CPU job ---"
+          python -m pytest -q --collect-only -m "exhaustive_runtime_parity" 2>/dev/null | tail -3 || true
+          echo "The exhaustive 64-state runtime parity walk exceeds this runner budget;"
+          echo "the stratified representative parity test runs here."
 
       - name: Snapshot the governed tree
         run: python scripts/assert_governed_tree_unchanged.py --snapshot "${RUNNER_TEMP}/governed_before.json"
 
       - name: Core test suite
-        run: python -m pytest -q -m "not e2e and not requires_local_scratch" --durations=25
+        # exhaustive_runtime_parity (the 64-state x reference walk, 384
+        # overlay runs per engine) exceeds this 2-CPU runner's budget on its
+        # own; the stratified representative parity test still runs here, and
+        # local full assurance runs the exhaustive walk. Stated in the
+        # coverage report above.
+        run: python -m pytest -q -m "not e2e and not requires_local_scratch and not exhaustive_runtime_parity" --durations=25
 
       - name: Verify the suite did not mutate governed content
         # The clean-clone claim is not just "the tests passed" - it is also
