@@ -266,7 +266,11 @@ jobs:
     # selection and then the whole suite would pay for the same tests twice.
     if: needs.plan.outputs.run_affected == 'true' && needs.plan.outputs.run_full != 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # 90, not 45: governed-pack diffs select the policy-runtime suite, whose
+    # representative 16-pair reference-parity test alone needs ~30-40 minutes
+    # on this 2-CPU runner. The first post-merge run after the 8x8 catalogue
+    # landed timed out at 45 with zero failures.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
 
