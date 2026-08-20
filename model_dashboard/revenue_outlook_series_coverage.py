@@ -1172,15 +1172,18 @@ def _actual_quarter_lookup(
     return lookup
 
 
-# The three governed 12c policy states, mapped onto the columns
+# The eight governed 12c policy states, mapped onto the columns
 # ``rate_paths.ped_quarterly_rate_schedules`` already publishes. The schedule
 # is NOT duplicated here - this is a column selection over the one governed
-# source, so a change to the timetable moves the quarterly display with it.
-QUARTERLY_RATE_POLICY_COLUMNS: dict[str, str] = {
-    "published": "planned",
-    "delayed_6m": "delayed_6m",
-    "off": "no_uplift",
-}
+# source (derived from the canonical registry), so a change to the timetable
+# moves the quarterly display with it.
+def _quarterly_rate_policy_columns() -> dict[str, str]:
+    from .fed_policy_states import FED_POLICY_SPECS
+
+    return {spec.state_id: spec.schedule_column for spec in FED_POLICY_SPECS}
+
+
+QUARTERLY_RATE_POLICY_COLUMNS: dict[str, str] = _quarterly_rate_policy_columns()
 # What the display falls back to when a caller names no policy state. The page
 # always passes one; this keeps the offline pack build and any direct API
 # caller on the published timetable rather than on whatever was last selected.
@@ -1195,28 +1198,15 @@ def normalise_quarterly_rate_policy_state(value: Any) -> str:
     showing a step in the wrong quarter is the failure this argument exists to
     prevent, so it must not be reachable by a typo.
     """
+    from .fed_policy_states import PolicyStateError, policy_spec
+
     text = "" if value is None else str(value).strip().casefold()
     if not text:
         return DEFAULT_QUARTERLY_RATE_POLICY_STATE
-    aliases = {
-        "published": "published",
-        "original": "published",
-        "planned": "published",
-        "published_timing": "published",
-        "delayed_6m": "delayed_6m",
-        "delay_6m": "delayed_6m",
-        "shifted_6m": "delayed_6m",
-        "deferred": "delayed_6m",
-        "off": "off",
-        "no_uplift": "off",
-        "none": "off",
-    }
-    if text not in aliases:
-        raise SeriesCoverageError(
-            f"{value!r} is not a governed 12c policy state; expected one of "
-            f"{sorted(set(aliases))}"
-        )
-    return aliases[text]
+    try:
+        return policy_spec(text).state_id
+    except PolicyStateError as error:
+        raise SeriesCoverageError(str(error)) from error
 
 
 @lru_cache(maxsize=8)

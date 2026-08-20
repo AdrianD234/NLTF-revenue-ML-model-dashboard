@@ -1,0 +1,17 @@
+{
+  "generated_at_utc": "2026-08-20T03:23:49.280026+00:00",
+  "generator": "scripts/build_fed_deferral_evidence.py",
+  "outputs": {
+    "interaction_test_matrix.csv": "03c06ecd7dd3be45150a3cf0cf7150f72d99dc2bea93ef8581895ecebfb28c5b",
+    "policy_state_registry.csv": "1282a3051ad1aafbb0c24f28dd53eafe96d8acd72ad9f8ca08aa6a9a201512f7",
+    "quarterly_rate_paths.csv": "cc91b5c0723fcfa6f40c81563f59d2066bd70415993cbfc838ea5b39a253e942",
+    "scenario_matrix_inventory.csv": "dede065f1e075c0983e382094f388fed05fe8d09c4ef399d197fbeaf3bc958a1"
+  },
+  "source_hashes": {
+    "data/current_revenue_outlook/conflict_fuel_price_scenarios.csv": "ad379997aa4044cdabf7d948787c926e06a434447ff076640cfab317eda53c73",
+    "data/current_revenue_outlook/sensitivity_seed_inputs.csv": "5181058396fbdb3896ade20b3ea335955fc186af85cccd365c7d86531852f3a6",
+    "data/revenue_model_source_pack/2026_05_19/fed_rate_paths.csv": "37eaad93d4f3c5373fe2569c62841f5216dc7ff10c8a868debc2c7ed61f25269",
+    "model_dashboard/fed_policy_states.py": "3c31d59c0c9d7273b2431d7e77252dec799311b234e52ee825836be50f61b11d"
+  },
+  "source_sha": "675dc52e487ee9112cb7dcfe52d9945c43065c93"
+}

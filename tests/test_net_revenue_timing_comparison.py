@@ -14,6 +14,7 @@ from model_dashboard.conflict_fuel_paths import (
     conflict_scenario_id,
 )
 from model_dashboard.engine import ENGINE_AR1, engine_revenue_outlook_dir
+from model_dashboard.fed_policy_states import FED_POLICY_SPECS
 from model_dashboard.fuel_price_scenario import POLICY_PATH_IDS
 from model_dashboard.mbu26_source_spine import FORMULA_DEFINITIONS
 from model_dashboard.revenue_outlook import (
@@ -96,12 +97,13 @@ def test_net_ruc_alias_and_active_net_definitions_are_explicit() -> None:
     assert app._revenue_outlook_series_display_label("Total RUC all classes") == "Net RUC revenue (all classes)"
 
 
-def test_twelve_path_net_revenue_matrix_is_complete_unique_and_registry_driven(
+def test_thirty_two_path_net_revenue_matrix_is_complete_unique_and_registry_driven(
     timing_materialization,
 ) -> None:
     comparison = timing_materialization["comparison"]
     assert isinstance(comparison, pd.DataFrame)
-    assert len(comparison) == 180
+    # 32 paths x 5 fiscal years x 3 series.
+    assert len(comparison) == 480
     assert not comparison.duplicated(["path_id", "FY", "series_id"]).any()
     assert comparison["path_id"].drop_duplicates().tolist() == list(ALL_POLICY_PATH_IDS)
     assert all(
@@ -112,7 +114,7 @@ def test_twelve_path_net_revenue_matrix_is_complete_unique_and_registry_driven(
             strict=True,
         )
     )
-    assert comparison["path_order"].drop_duplicates().tolist() == list(range(12))
+    assert comparison["path_order"].drop_duplicates().tolist() == list(range(32))
     assert comparison["scenario_family_id"].drop_duplicates().tolist() == [
         "base",
         *CONFLICT_SEVERITIES,
@@ -128,15 +130,14 @@ def test_twelve_path_net_revenue_matrix_is_complete_unique_and_registry_driven(
         ),
     ]
     assert comparison["timing_id"].drop_duplicates().tolist() == [
-        "published",
-        "delayed_6m",
-        "no_uplift",
+        spec.timing_id for spec in FED_POLICY_SPECS
     ]
     assert comparison["policy_state"].drop_duplicates().tolist() == [
-        "published",
-        "delay_6m",
-        "no_uplift",
+        spec.calculation_state_id for spec in FED_POLICY_SPECS
     ]
+    # Every family carries all eight timing states.
+    per_family = comparison.groupby("scenario_family_id")["timing_id"].nunique()
+    assert per_family.eq(len(FED_POLICY_SPECS)).all()
     metadata_columns = [
         "path_id",
         "scenario_family_id",

@@ -227,10 +227,24 @@ def test_scenario_and_policy_variant_helpers_are_stable() -> None:
         load_conflict_fuel_paths(CSV_PATH)
     )
 
+    # Three severities crossed with the six finite deferrals plus no-uplift.
     variants = all_conflict_policy_variants()
-    assert len(variants) == 6
-    assert len({variant.scenario_id for variant in variants}) == 6
-    assert {variant.policy_variant for variant in variants} == {"delay_6m", "no_uplift"}
+    assert len(variants) == 21
+    assert len({variant.scenario_id for variant in variants}) == 21
+    assert {variant.policy_variant for variant in variants} == {
+        "delay_6m",
+        "delay_12m",
+        "delay_18m",
+        "delay_24m",
+        "delay_30m",
+        "delay_36m",
+        "no_uplift",
+    }
+    low_delay_12m = conflict_policy_variant("low", "delayed_12m")
+    assert low_delay_12m.scenario_id == "middle_east_low__12c_delay_12m"
+    assert low_delay_12m.display_name == (
+        "Middle East conflict: Low - 12c deferred 12 months"
+    )
     low_delay = conflict_policy_variant("low", "delay_6m")
     assert low_delay.scenario_id == "middle_east_low__12c_delay_6m"
     assert low_delay.display_name == (

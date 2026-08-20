@@ -114,8 +114,9 @@ def test_no_uplift_never_steps_by_12c() -> None:
 
 def test_a_policy_state_the_contract_does_not_know_is_refused() -> None:
     """Silently taking the published timetable would draw the wrong quarter."""
+    # delayed_12m is a governed duration now; delayed_9m is not.
     with pytest.raises(coverage.SeriesCoverageError):
-        coverage._rate_indicator_factor(["2027Q1"], ROOT, "delayed_12m")
+        coverage._rate_indicator_factor(["2027Q1"], ROOT, "delayed_9m")
 
 
 # ------------------------------------------- the derivation sees FINAL rows
@@ -435,12 +436,25 @@ def test_an_unknown_policy_selection_is_dropped_not_coerced() -> None:
     """Coercing would swap one counterfactual for another, silently."""
     import streamlit as st
 
-    st.session_state["revenue_outlook_fed_policy_state"] = "delayed_12m"
+    # delayed_9m is not a governed duration; delayed_12m now is.
+    st.session_state["revenue_outlook_fed_policy_state"] = "delayed_9m"
     app._discard_unknown_revenue_outlook_policy_state()
     assert "revenue_outlook_fed_policy_state" not in st.session_state
 
 
-@pytest.mark.parametrize("state", ["published", "delayed_6m", "off"])
+@pytest.mark.parametrize(
+    "state",
+    [
+        "published",
+        "delayed_6m",
+        "delayed_12m",
+        "delayed_18m",
+        "delayed_24m",
+        "delayed_30m",
+        "delayed_36m",
+        "off",
+    ],
+)
 def test_a_live_policy_selection_survives(state: str) -> None:
     import streamlit as st
 

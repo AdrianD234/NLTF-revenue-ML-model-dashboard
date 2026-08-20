@@ -27,6 +27,7 @@ from model_dashboard.fuel_price_scenario import (
     run_treasury_baseline_macro_replay,
 )
 from model_dashboard.conflict_fuel_paths import (
+    BASE_POLICY_VARIANT_IDS,
     CONFLICT_FUEL_SCENARIO_LEVELS,
     conflict_policy_variant_name,
     conflict_scenario_name,
@@ -34,6 +35,7 @@ from model_dashboard.conflict_fuel_paths import (
     load_conflict_fuel_price_paths,
     structural_overlay_scenario_ids,
 )
+from model_dashboard.fed_policy_states import FED_POLICY_SPECS
 from model_dashboard.forecast_runner import (
     ScenarioInputForecastReplayResult,
     replay_forecast_from_scenario_inputs,
@@ -631,12 +633,13 @@ def test_build_conflict_scenario_routes_petrol_and_diesel_without_ruc_tax_shock(
 def test_registry_ids_are_unique_and_legacy_alias_points_to_medium() -> None:
     published = [conflict_scenario_name(level) for level in CONFLICT_FUEL_SCENARIO_LEVELS]
     variants = [
-        conflict_policy_variant_name(level, state)
+        conflict_policy_variant_name(level, spec.calculation_state_id)
         for level in CONFLICT_FUEL_SCENARIO_LEVELS
-        for state in (FED_POLICY_STATE_DELAYED_6M, FED_POLICY_STATE_NO_UPLIFT)
+        for spec in FED_POLICY_SPECS
+        if not spec.is_published
     ]
     assert len(set(published)) == 3
-    assert len(set(variants)) == 6
+    assert len(set(variants)) == 21
     assert set(published).isdisjoint(variants)
     assert FUEL_PRICE_SCENARIO_NAME == conflict_scenario_name("medium")
     assert FUEL_PRICE_SCENARIO_TRACE_NAME == conflict_trace_name("medium")
@@ -983,17 +986,20 @@ def test_fixed_finalist_replay_preserves_base_and_orders_governed_conflict_paths
     scenario_inputs: pd.DataFrame,
 ) -> None:
     validation = fuel_replay.policy_validation_report.set_index("scenario_name")
+    non_published_states = tuple(
+        spec.calculation_state_id for spec in FED_POLICY_SPECS if not spec.is_published
+    )
     expected_scenarios = {
         "current_basecase",
-        BASE_DELAYED_6M_SCENARIO_NAME,
-        BASE_NO_UPLIFT_SCENARIO_NAME,
+        *(BASE_POLICY_VARIANT_IDS[state] for state in non_published_states),
         *(conflict_scenario_name(level) for level in CONFLICT_FUEL_SCENARIO_LEVELS),
         *(
             conflict_policy_variant_name(level, state)
             for level in CONFLICT_FUEL_SCENARIO_LEVELS
-            for state in (FED_POLICY_STATE_DELAYED_6M, FED_POLICY_STATE_NO_UPLIFT)
+            for state in non_published_states
         ),
     }
+    assert len(expected_scenarios) == 32
     assert set(validation.index) == expected_scenarios
     assert validation["valid"].all()
     assert set(validation["forecast_horizon_quarters"].astype(int)) == {100}
@@ -1104,11 +1110,11 @@ def test_fixed_finalist_replay_preserves_base_and_orders_governed_conflict_paths
         )
 
 
-def test_policy_replay_builds_twelve_paths_with_formula_closed_net_ruc(
+def test_policy_replay_builds_thirty_two_paths_with_formula_closed_net_ruc(
     fuel_replay,
 ) -> None:
     validation = fuel_replay.policy_validation_report.set_index("scenario_name")
-    assert len(validation) == 12
+    assert len(validation) == 32
     assert validation["valid"].all()
     # Per-stream seam: PED 100 + Light 99 + Heavy 99 scored quarters.
     assert set(validation["numeric_forecast_rows"].astype(int)) == {298}
@@ -1311,12 +1317,12 @@ def test_policy_replay_builds_twelve_paths_with_formula_closed_net_ruc(
             np.testing.assert_allclose(delayed, off, rtol=0.0, atol=1e-9)
 
 
-def test_ar1_pack_replays_twelve_paths_and_retains_source_lineage(
+def test_ar1_pack_replays_thirty_two_paths_and_retains_source_lineage(
     ar1_fuel_replay,
 ) -> None:
     _assert_governed_policy_demand_calibration(ar1_fuel_replay)
     validation = ar1_fuel_replay.policy_validation_report.set_index("scenario_name")
-    assert len(validation) == 12
+    assert len(validation) == 32
     assert validation["valid"].all()
     assert set(validation["forecast_horizon_quarters"].astype(int)) == {100}
     # Per-stream seam: PED 100 + Light 99 + Heavy 99 scored quarters.
