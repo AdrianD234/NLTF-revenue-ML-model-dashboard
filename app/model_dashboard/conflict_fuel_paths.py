@@ -17,6 +17,8 @@ from typing import Any
 
 import pandas as pd
 
+from .fed_policy_states import FED_POLICY_SPECS
+
 
 SOURCE_WORKBOOK_NAME = "FF diesel price scenarios (1).xlsx"
 SOURCE_WORKBOOK_SHEET = "Diesel Price Forecast"
@@ -144,31 +146,36 @@ class PolicyVariantSpec:
     display_name: str
 
 
+# Derived from the canonical registry: one variant per non-published governed
+# state (the six finite deferrals plus no-uplift), in display order. The
+# six-month and no-uplift entries retain their historic ids, suffixes and
+# display names exactly.
 POLICY_VARIANT_REGISTRY: Mapping[str, PolicyVariantSpec] = MappingProxyType(
     {
-        "delay_6m": PolicyVariantSpec(
-            policy_variant="delay_6m",
-            id_suffix="12c_delay_6m",
-            display_name="12c deferred six months",
-        ),
-        "no_uplift": PolicyVariantSpec(
-            policy_variant="no_uplift",
-            id_suffix="12c_no_uplift",
-            display_name="12c uplift off",
-        ),
+        spec.calculation_state_id: PolicyVariantSpec(
+            policy_variant=spec.calculation_state_id,
+            id_suffix=spec.variant_id_suffix,
+            display_name=spec.variant_display_name,
+        )
+        for spec in FED_POLICY_SPECS
+        if not spec.is_published
     }
 )
-_POLICY_VARIANT_ALIASES = MappingProxyType(
-    {
-        "delay_6m": "delay_6m",
-        "delayed_6m": "delay_6m",
-        "12c_delay_6m": "delay_6m",
-        "no_uplift": "no_uplift",
-        "off": "no_uplift",
-        "12c_off": "no_uplift",
-        "12c_no_uplift": "no_uplift",
-    }
-)
+
+
+def _policy_variant_aliases() -> dict[str, str]:
+    aliases: dict[str, str] = {}
+    for spec in FED_POLICY_SPECS:
+        if spec.is_published:
+            continue
+        aliases[spec.calculation_state_id] = spec.calculation_state_id
+        aliases[spec.state_id] = spec.calculation_state_id
+        aliases[spec.variant_id_suffix] = spec.calculation_state_id
+    aliases.update({"off": "no_uplift", "12c_off": "no_uplift"})
+    return aliases
+
+
+_POLICY_VARIANT_ALIASES = MappingProxyType(_policy_variant_aliases())
 
 
 @dataclass(frozen=True)
@@ -277,7 +284,11 @@ def conflict_policy_variant_name(severity: Any, policy_variant: str) -> str:
 
 
 def all_conflict_policy_variants() -> tuple[ConflictPolicyVariant, ...]:
-    """Return the six requested Low/Medium/High by delay/off combinations."""
+    """Every Low/Medium/High by non-published-policy combination.
+
+    Registry-driven: three severities crossed with the six finite deferrals
+    plus no-uplift (21 variants).
+    """
 
     return tuple(
         conflict_policy_variant(severity, policy_variant)

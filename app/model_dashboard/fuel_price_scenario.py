@@ -61,9 +61,18 @@ from .mbu26_source_spine import (
     FORMULA_DEFINITIONS,
     current_forecast_annual_from_mbu26,
 )
+from .fed_policy_states import (
+    FED_POLICY_SPECS,
+    FED_UPLIFT_START_PERIOD,
+    PolicyStateError,
+    finite_deferral_specs,
+    policy_spec,
+    quarter_serial,
+)
 from .rate_paths import (
     FED_POLICY_STATE_DELAYED_6M,
     FED_POLICY_STATE_NO_UPLIFT,
+    fed_policy_annual_factors,
     fed_uplift_delayed_factors,
     fed_uplift_off_factors,
     ped_quarterly_rate_schedules,
@@ -86,6 +95,11 @@ IRAN_WAR_SCENARIO_NOTE = FUEL_PRICE_SCENARIO_NOTE
 # The published paths above remain the backwards-compatible scenario IDs.
 # Policy variants are separate replay rows because changing the RUC price
 # input affects activity as well as the nominal revenue rate applied later.
+# One spec per non-published governed state, in registry display order: the
+# six finite deferrals then no-uplift.
+_NON_PUBLISHED_POLICY_SPECS = tuple(
+    spec for spec in FED_POLICY_SPECS if not spec.is_published
+)
 BASE_DELAYED_6M_SCENARIO_NAME = BASE_POLICY_VARIANT_IDS["delay_6m"]
 BASE_NO_UPLIFT_SCENARIO_NAME = BASE_POLICY_VARIANT_IDS["no_uplift"]
 IRAN_WAR_DELAYED_6M_SCENARIO_NAME = conflict_policy_variant_name(
@@ -96,22 +110,15 @@ IRAN_WAR_NO_UPLIFT_SCENARIO_NAME = conflict_policy_variant_name(
 )
 
 POLICY_VARIANT_SCENARIO_NAMES = {
-    FED_POLICY_STATE_DELAYED_6M: {
-        "baseline": BASE_DELAYED_6M_SCENARIO_NAME,
+    spec.calculation_state_id: {
+        "baseline": BASE_POLICY_VARIANT_IDS[spec.calculation_state_id],
         **{
-            level: conflict_policy_variant_name(level, FED_POLICY_STATE_DELAYED_6M)
+            level: conflict_policy_variant_name(level, spec.calculation_state_id)
             for level in CONFLICT_FUEL_SCENARIO_LEVELS
         },
-        "iran": IRAN_WAR_DELAYED_6M_SCENARIO_NAME,
-    },
-    FED_POLICY_STATE_NO_UPLIFT: {
-        "baseline": BASE_NO_UPLIFT_SCENARIO_NAME,
-        **{
-            level: conflict_policy_variant_name(level, FED_POLICY_STATE_NO_UPLIFT)
-            for level in CONFLICT_FUEL_SCENARIO_LEVELS
-        },
-        "iran": IRAN_WAR_NO_UPLIFT_SCENARIO_NAME,
-    },
+        "iran": conflict_policy_variant_name("medium", spec.calculation_state_id),
+    }
+    for spec in _NON_PUBLISHED_POLICY_SPECS
 }
 
 # Deprecated numeric constants retained for import compatibility only. Runtime
@@ -134,19 +141,22 @@ _BASE_SCENARIO_NAME = BASE_PUBLISHED_SCENARIO_NAME
 _LEGACY_BASE_MACRO_SHADOW_SCENARIO_NAME = (
     "__legacy_current_basecase_macro_shadow"
 )
+# scenario_name -> public path id. Registry-driven: the finite deferrals use
+# the shifted_{m}m suffix family (shifted_6m retains its historic id) and
+# no-uplift keeps no_uplift, for the baseline and each conflict family.
 POLICY_PATH_IDS: dict[str, str] = {
     _BASE_SCENARIO_NAME: "baseline_published",
-    BASE_DELAYED_6M_SCENARIO_NAME: "baseline_shifted_6m",
-    BASE_NO_UPLIFT_SCENARIO_NAME: "baseline_no_uplift",
+    **{
+        BASE_POLICY_VARIANT_IDS[_spec.calculation_state_id]: f"baseline_{_spec.path_suffix}"
+        for _spec in _NON_PUBLISHED_POLICY_SPECS
+    },
 }
 for _level in CONFLICT_FUEL_SCENARIO_LEVELS:
     POLICY_PATH_IDS[conflict_scenario_name(_level)] = f"{_level}_published"
-    POLICY_PATH_IDS[
-        conflict_policy_variant_name(_level, FED_POLICY_STATE_DELAYED_6M)
-    ] = f"{_level}_shifted_6m"
-    POLICY_PATH_IDS[
-        conflict_policy_variant_name(_level, FED_POLICY_STATE_NO_UPLIFT)
-    ] = f"{_level}_no_uplift"
+    for _spec in _NON_PUBLISHED_POLICY_SPECS:
+        POLICY_PATH_IDS[
+            conflict_policy_variant_name(_level, _spec.calculation_state_id)
+        ] = f"{_level}_{_spec.path_suffix}"
 _STREAM_PRICE_FIELDS = {
     "PED": "real_petrol_price_cents_per_litre",
     "LIGHT_RUC": "real_diesel_price_cents_per_litre",
@@ -165,16 +175,14 @@ _POLICY_GENERALIZED_PRICE_FIELDS = {
     "HEAVY_RUC": "real_heavy_ruc_price_nzd_per_1000km",
 }
 _POLICY_REFERENCE_SCENARIOS: dict[str, str] = {
-    BASE_DELAYED_6M_SCENARIO_NAME: _BASE_SCENARIO_NAME,
-    BASE_NO_UPLIFT_SCENARIO_NAME: _BASE_SCENARIO_NAME,
+    BASE_POLICY_VARIANT_IDS[_spec.calculation_state_id]: _BASE_SCENARIO_NAME
+    for _spec in _NON_PUBLISHED_POLICY_SPECS
 }
 for _level in CONFLICT_FUEL_SCENARIO_LEVELS:
-    _POLICY_REFERENCE_SCENARIOS[
-        conflict_policy_variant_name(_level, FED_POLICY_STATE_DELAYED_6M)
-    ] = conflict_scenario_name(_level)
-    _POLICY_REFERENCE_SCENARIOS[
-        conflict_policy_variant_name(_level, FED_POLICY_STATE_NO_UPLIFT)
-    ] = conflict_scenario_name(_level)
+    for _spec in _NON_PUBLISHED_POLICY_SPECS:
+        _POLICY_REFERENCE_SCENARIOS[
+            conflict_policy_variant_name(_level, _spec.calculation_state_id)
+        ] = conflict_scenario_name(_level)
 _POLICY_DEMAND_ELASTICITY_LEVEL = "Med"
 _POLICY_CALIBRATION_BASIS = "governed_single_generalized_running_cost_elasticity"
 _CONFLICT_CALIBRATION_BASIS = _POLICY_CALIBRATION_BASIS
@@ -780,15 +788,19 @@ def build_ruc_policy_scenario_inputs(
     no_uplift = pd.to_numeric(schedules["no_uplift"], errors="coerce")
     published_petrol_wedges_cents = ((planned - no_uplift) * 100.0).to_dict()
     if quarterly_policy_factors is None:
-        schedule_column = {
-            FED_POLICY_STATE_DELAYED_6M: "delayed_6m",
-            FED_POLICY_STATE_NO_UPLIFT: "no_uplift",
-        }.get(state)
-        if schedule_column is None:
+        try:
+            state_spec = policy_spec(state)
+        except PolicyStateError:
+            state_spec = None
+        if state_spec is None or state_spec.is_published:
+            known = ", ".join(
+                repr(spec.calculation_state_id) for spec in _NON_PUBLISHED_POLICY_SPECS
+            )
             raise ValueError(
                 "A custom policy_state requires quarterly_policy_factors; known states are "
-                f"{FED_POLICY_STATE_DELAYED_6M!r} and {FED_POLICY_STATE_NO_UPLIFT!r}."
+                f"{known}."
             )
+        schedule_column = state_spec.schedule_column
         target = pd.to_numeric(schedules[schedule_column], errors="coerce")
         valid = planned.notna() & target.notna() & planned.gt(0)
         policy_multipliers = (target[valid] / planned[valid]).to_dict()
@@ -2577,12 +2589,10 @@ def _normalise_annual_policy_factors(
 ) -> dict[str, dict[int, float]]:
     """Map app cache keys onto the public rate-path policy state names."""
 
-    aliases = {
-        "delayed_6m": FED_POLICY_STATE_DELAYED_6M,
-        FED_POLICY_STATE_DELAYED_6M: FED_POLICY_STATE_DELAYED_6M,
-        "off": FED_POLICY_STATE_NO_UPLIFT,
-        FED_POLICY_STATE_NO_UPLIFT: FED_POLICY_STATE_NO_UPLIFT,
-    }
+    aliases: dict[str, str] = {}
+    for spec in _NON_PUBLISHED_POLICY_SPECS:
+        aliases[spec.state_id] = spec.calculation_state_id
+        aliases[spec.calculation_state_id] = spec.calculation_state_id
     normalised: dict[str, dict[int, float]] = {}
     for key, factors in (annual_fed_policy_factors or {}).items():
         state = aliases.get(str(key))
@@ -2663,13 +2673,9 @@ def apply_policy_rate_factors_to_annual_bridge(
     factors_by_state = _normalise_annual_policy_factors(annual_fed_policy_factors)
 
     variant_names = {
-        BASE_DELAYED_6M_SCENARIO_NAME,
-        BASE_NO_UPLIFT_SCENARIO_NAME,
-        *(
-            conflict_policy_variant_name(level, state)
-            for level in CONFLICT_FUEL_SCENARIO_LEVELS
-            for state in (FED_POLICY_STATE_DELAYED_6M, FED_POLICY_STATE_NO_UPLIFT)
-        ),
+        scenario_name
+        for names_by_family in POLICY_VARIANT_SCENARIO_NAMES.values()
+        for scenario_name in names_by_family.values()
     }
     original = annual_bridge.copy()
     source = original[
@@ -2694,20 +2700,58 @@ def apply_policy_rate_factors_to_annual_bridge(
             for level in CONFLICT_FUEL_SCENARIO_LEVELS
         },
     }
-    display_names = {
-        BASE_DELAYED_6M_SCENARIO_NAME: "Current finalist Base case (12c delayed 6m; PED pump + proportional RUC)",
-        BASE_NO_UPLIFT_SCENARIO_NAME: "Current finalist Base case (12c off; PED pump + proportional RUC)",
-    }
-    for level in CONFLICT_FUEL_SCENARIO_LEVELS:
-        display_names[
-            conflict_policy_variant_name(level, FED_POLICY_STATE_DELAYED_6M)
-        ] = f"{conflict_trace_name(level)} (12c delayed 6m)"
-        display_names[
-            conflict_policy_variant_name(level, FED_POLICY_STATE_NO_UPLIFT)
-        ] = f"{conflict_trace_name(level)} (12c off)"
+    display_names = {}
+    for spec in _NON_PUBLISHED_POLICY_SPECS:
+        display_names[BASE_POLICY_VARIANT_IDS[spec.calculation_state_id]] = (
+            f"Current finalist Base case ({spec.short_policy_phrase}; PED pump + proportional RUC)"
+        )
+        for level in CONFLICT_FUEL_SCENARIO_LEVELS:
+            display_names[
+                conflict_policy_variant_name(level, spec.calculation_state_id)
+            ] = f"{conflict_trace_name(level)} ({spec.short_policy_phrase})"
     repriced_leaves = {"gross_ped_revenue", *_RUC_REVENUE_LEAVES}
+
+    # Fiscal year the uplift lands in (2027Q1 -> FY2027), derived rather than
+    # written as a literal so the guards below can never drift from the
+    # governed start quarter.
+    uplift_fy = int(_fiscal_year_from_quarter(FED_UPLIFT_START_PERIOD))
+
+    def _shared_window_years(spec) -> tuple[int, ...]:
+        """Fiscal years wholly inside a state's no-uplift-priced window.
+
+        A year is "shared" when every uplift-affected quarter it contains
+        carries the no-uplift rate under this state, so its bridge answer is
+        common to every state whose window also covers it. The no-uplift
+        state shares only FY2027 with the six-month replay - exactly the
+        production anchoring - because its later years have no rejoining
+        counterpart.
+        """
+        if spec.is_no_uplift:
+            return (uplift_fy,)
+        start_serial = quarter_serial(spec.start_period)
+        years: list[int] = []
+        year = uplift_fy
+        while quarter_serial(f"{year}Q2") < start_serial:
+            years.append(year)
+            year += 1
+        return tuple(years)
+
+    def _anchor_source_scenario(family: str, shared_year: int) -> str:
+        """The replay whose bridge is authoritative for one shared year.
+
+        FY2027 anchors to the six-month replay: its whole-horizon fleet
+        smoothing sees a published FY2028+ path, so its FY2027 is free of
+        later-divergence leakage (the production rule). Later shared years
+        anchor to the no-uplift replay, whose pricing is identical to every
+        deferral still inside its window over those years.
+        """
+        if shared_year == uplift_fy:
+            return POLICY_VARIANT_SCENARIO_NAMES[FED_POLICY_STATE_DELAYED_6M][family]
+        return POLICY_VARIANT_SCENARIO_NAMES[FED_POLICY_STATE_NO_UPLIFT][family]
+
     variants: list[pd.DataFrame] = []
-    for state in (FED_POLICY_STATE_DELAYED_6M, FED_POLICY_STATE_NO_UPLIFT):
+    for state_spec in _NON_PUBLISHED_POLICY_SPECS:
+        state = state_spec.calculation_state_id
         if state not in factors_by_state:
             continue
         state_factors = factors_by_state[state]
@@ -2735,27 +2779,39 @@ def apply_policy_rate_factors_to_annual_bridge(
                 .to_dict()
             )
             variant_fy = pd.to_numeric(variant[fy_column], errors="coerce")
-            for index in variant.index[variant_fy.le(2026)]:
+            for index in variant.index[variant_fy.lt(uplift_fy)]:
                 key = tuple(variant.at[index, column] for column in identity_columns)
                 if key in published_lookup:
                     variant.at[index, "value"] = published_lookup[key]
 
-            # The delayed and no-uplift input paths are identical through
-            # 2027Q2 (the end of FY2027). Whole-horizon fleet smoothing must
-            # not let their later, FY2028-onward divergence leak backwards
-            # into FY2027, so anchor that year to the matching delayed replay.
-            if state == FED_POLICY_STATE_NO_UPLIFT:
-                delayed_name = POLICY_VARIANT_SCENARIO_NAMES[FED_POLICY_STATE_DELAYED_6M][family]
-                delayed = original[original["scenario_name"].astype(str).eq(delayed_name)].copy()
-                delayed_lookup = (
-                    delayed.drop_duplicates(identity_columns, keep="first")
+            # States that share a no-uplift-priced window must carry one
+            # shared bridge answer over the years wholly inside it. Whole-
+            # horizon fleet smoothing must not let each state's later, post-
+            # window divergence leak backwards into a shared year, so those
+            # years are anchored to the authoritative shared replay. For the
+            # no-uplift state this is exactly the production rule: FY2027 is
+            # anchored to the matching six-month replay.
+            for shared_year in _shared_window_years(state_spec):
+                anchor_name = _anchor_source_scenario(family, shared_year)
+                if anchor_name == variant_name:
+                    continue  # the six-month replay is its own FY2027 anchor
+                anchor = original[
+                    original["scenario_name"].astype(str).eq(anchor_name)
+                ].copy()
+                if anchor.empty:
+                    raise ValueError(
+                        f"Annual bridge is missing anchor replay scenario {anchor_name!r} "
+                        f"for the shared FY{shared_year} window of {variant_name!r}."
+                    )
+                anchor_lookup = (
+                    anchor.drop_duplicates(identity_columns, keep="first")
                     .set_index(identity_columns)["value"]
                     .to_dict()
                 )
-                for index in variant.index[variant_fy.eq(2027)]:
+                for index in variant.index[variant_fy.eq(shared_year)]:
                     key = tuple(variant.at[index, column] for column in identity_columns)
-                    if key in delayed_lookup:
-                        variant.at[index, "value"] = delayed_lookup[key]
+                    if key in anchor_lookup:
+                        variant.at[index, "value"] = anchor_lookup[key]
 
             variant["policy_path_id"] = POLICY_PATH_IDS[variant_name]
             variant["policy_state"] = state
@@ -2779,7 +2835,7 @@ def apply_policy_rate_factors_to_annual_bridge(
             # Formula replay can introduce sub-cent floating-point noise even
             # when the underlying pre-policy row was copied.  Restore those
             # rows once more so the no-leakage invariant is bit-for-bit exact.
-            for index in variant.index[variant_fy.le(2026)]:
+            for index in variant.index[variant_fy.lt(uplift_fy)]:
                 key = tuple(variant.at[index, column] for column in identity_columns)
                 if key in published_lookup:
                     variant.at[index, "value"] = published_lookup[key]
@@ -2813,32 +2869,25 @@ def build_policy_scenario_pair_factors(
                 level,
             )
         )
-    pairs.extend(
-        [
-            (
-                "baseline_delayed_6m",
-                BASE_DELAYED_6M_SCENARIO_NAME,
-                base_scenario_name,
-                FED_POLICY_STATE_DELAYED_6M,
-                "baseline",
-            ),
-            (
-                "baseline_no_uplift",
-                BASE_NO_UPLIFT_SCENARIO_NAME,
-                base_scenario_name,
-                FED_POLICY_STATE_NO_UPLIFT,
-                "baseline",
-            ),
-        ]
-    )
+    # One baseline pair per non-published governed state, registry-driven.
     state_suffix = {
-        FED_POLICY_STATE_DELAYED_6M: "delayed_6m",
-        FED_POLICY_STATE_NO_UPLIFT: "no_uplift",
+        spec.calculation_state_id: spec.pair_state_suffix
+        for spec in _NON_PUBLISHED_POLICY_SPECS
     }
     baseline_variants = {
-        FED_POLICY_STATE_DELAYED_6M: BASE_DELAYED_6M_SCENARIO_NAME,
-        FED_POLICY_STATE_NO_UPLIFT: BASE_NO_UPLIFT_SCENARIO_NAME,
+        spec.calculation_state_id: BASE_POLICY_VARIANT_IDS[spec.calculation_state_id]
+        for spec in _NON_PUBLISHED_POLICY_SPECS
     }
+    pairs.extend(
+        (
+            f"baseline_{suffix}",
+            baseline_variants[state],
+            base_scenario_name,
+            state,
+            "baseline",
+        )
+        for state, suffix in state_suffix.items()
+    )
     for level in CONFLICT_FUEL_SCENARIO_LEVELS:
         published_name = conflict_scenario_name(level)
         for state, suffix in state_suffix.items():
@@ -3228,104 +3277,72 @@ def run_fuel_price_scenario_replay(
         )
     ]
     fuel_rows = pd.concat(fuel_frames, ignore_index=True, sort=False)
-    base_delayed_rows = build_ruc_policy_scenario_inputs(
-        base_rows,
-        root,
-        policy_state=FED_POLICY_STATE_DELAYED_6M,
-        scenario_name=BASE_DELAYED_6M_SCENARIO_NAME,
-        scenario_display_name="Current finalist Base case (12c delayed 6m; PED pump + proportional RUC)",
-    )
-    base_no_uplift_rows = build_ruc_policy_scenario_inputs(
-        base_rows,
-        root,
-        policy_state=FED_POLICY_STATE_NO_UPLIFT,
-        scenario_name=BASE_NO_UPLIFT_SCENARIO_NAME,
-        scenario_display_name="Current finalist Base case (12c off; PED pump + proportional RUC)",
-    )
-    policy_frames = [base_delayed_rows, base_no_uplift_rows]
-    price_only_base_delayed_rows = build_ruc_policy_scenario_inputs(
-        base_rows,
-        root,
-        policy_state=FED_POLICY_STATE_DELAYED_6M,
-        scenario_name=BASE_DELAYED_6M_SCENARIO_NAME,
-        scenario_display_name=(
-            "Current finalist Base case "
-            "(12c delayed 6m; price-only macro shadow)"
-        ),
-    )
-    price_only_base_no_uplift_rows = build_ruc_policy_scenario_inputs(
-        base_rows,
-        root,
-        policy_state=FED_POLICY_STATE_NO_UPLIFT,
-        scenario_name=BASE_NO_UPLIFT_SCENARIO_NAME,
-        scenario_display_name=(
-            "Current finalist Base case (12c off; price-only macro shadow)"
-        ),
-    )
-    price_only_policy_frames = [
-        price_only_base_delayed_rows,
-        price_only_base_no_uplift_rows,
-    ]
+    # One policy-variant replay per non-published governed state, for the
+    # baseline and each conflict family, plus the matching price-only macro
+    # shadow set. Registry-driven: the six-month and no-uplift scenario names
+    # and display strings are unchanged.
+    policy_frames = []
+    price_only_policy_frames = []
+    for state_spec in _NON_PUBLISHED_POLICY_SPECS:
+        state = state_spec.calculation_state_id
+        phrase = state_spec.short_policy_phrase
+        policy_frames.append(
+            build_ruc_policy_scenario_inputs(
+                base_rows,
+                root,
+                policy_state=state,
+                scenario_name=BASE_POLICY_VARIANT_IDS[state],
+                scenario_display_name=(
+                    f"Current finalist Base case ({phrase}; PED pump + proportional RUC)"
+                ),
+            )
+        )
+        price_only_policy_frames.append(
+            build_ruc_policy_scenario_inputs(
+                base_rows,
+                root,
+                policy_state=state,
+                scenario_name=BASE_POLICY_VARIANT_IDS[state],
+                scenario_display_name=(
+                    f"Current finalist Base case ({phrase}; price-only macro shadow)"
+                ),
+            )
+        )
     for level, published_rows in zip(
         CONFLICT_FUEL_SCENARIO_LEVELS, fuel_frames, strict=True
     ):
-        policy_frames.extend(
-            [
+        for state_spec in _NON_PUBLISHED_POLICY_SPECS:
+            state = state_spec.calculation_state_id
+            policy_frames.append(
                 build_ruc_policy_scenario_inputs(
                     published_rows,
                     root,
-                    policy_state=FED_POLICY_STATE_DELAYED_6M,
-                    scenario_name=conflict_policy_variant_name(
-                        level, FED_POLICY_STATE_DELAYED_6M
-                    ),
+                    policy_state=state,
+                    scenario_name=conflict_policy_variant_name(level, state),
                     scenario_display_name=(
-                        f"{conflict_trace_name(level)} (12c delayed 6m)"
+                        f"{conflict_trace_name(level)} ({state_spec.short_policy_phrase})"
                     ),
-                ),
-                build_ruc_policy_scenario_inputs(
-                    published_rows,
-                    root,
-                    policy_state=FED_POLICY_STATE_NO_UPLIFT,
-                    scenario_name=conflict_policy_variant_name(
-                        level, FED_POLICY_STATE_NO_UPLIFT
-                    ),
-                    scenario_display_name=f"{conflict_trace_name(level)} (12c off)",
-                ),
-            ]
-        )
+                )
+            )
     for level, published_rows in zip(
         CONFLICT_FUEL_SCENARIO_LEVELS,
         price_only_fuel_frames,
         strict=True,
     ):
-        price_only_policy_frames.extend(
-            [
+        for state_spec in _NON_PUBLISHED_POLICY_SPECS:
+            state = state_spec.calculation_state_id
+            price_only_policy_frames.append(
                 build_ruc_policy_scenario_inputs(
                     published_rows,
                     root,
-                    policy_state=FED_POLICY_STATE_DELAYED_6M,
-                    scenario_name=conflict_policy_variant_name(
-                        level, FED_POLICY_STATE_DELAYED_6M
-                    ),
+                    policy_state=state,
+                    scenario_name=conflict_policy_variant_name(level, state),
                     scenario_display_name=(
                         f"{conflict_trace_name(level)} "
-                        "(12c delayed 6m; price-only macro shadow)"
+                        f"({state_spec.short_policy_phrase}; price-only macro shadow)"
                     ),
-                ),
-                build_ruc_policy_scenario_inputs(
-                    published_rows,
-                    root,
-                    policy_state=FED_POLICY_STATE_NO_UPLIFT,
-                    scenario_name=conflict_policy_variant_name(
-                        level, FED_POLICY_STATE_NO_UPLIFT
-                    ),
-                    scenario_display_name=(
-                        f"{conflict_trace_name(level)} "
-                        "(12c off; price-only macro shadow)"
-                    ),
-                ),
-            ]
-        )
+                )
+            )
     policy_scenario_inputs = pd.concat(
         policy_frames,
         ignore_index=True,
@@ -3392,12 +3409,14 @@ def run_fuel_price_scenario_replay(
     replay_scenario_names = (
         base_scenario_name,
         *(conflict_scenario_name(level) for level in CONFLICT_FUEL_SCENARIO_LEVELS),
-        BASE_DELAYED_6M_SCENARIO_NAME,
-        BASE_NO_UPLIFT_SCENARIO_NAME,
         *(
-            conflict_policy_variant_name(level, state)
+            BASE_POLICY_VARIANT_IDS[spec.calculation_state_id]
+            for spec in _NON_PUBLISHED_POLICY_SPECS
+        ),
+        *(
+            conflict_policy_variant_name(level, spec.calculation_state_id)
             for level in CONFLICT_FUEL_SCENARIO_LEVELS
-            for state in (FED_POLICY_STATE_DELAYED_6M, FED_POLICY_STATE_NO_UPLIFT)
+            for spec in _NON_PUBLISHED_POLICY_SPECS
         ),
     )
     _validate_complete_numeric_replay(
@@ -3468,8 +3487,10 @@ def run_fuel_price_scenario_replay(
         "runtime policy variant",
     )
     annual_policy_factors = {
-        "delayed_6m": fed_uplift_delayed_factors(root, rate_factor_rows),
-        "off": fed_uplift_off_factors(root, rate_factor_rows),
+        spec.state_id: fed_policy_annual_factors(
+            root, rate_factor_rows, spec.calculation_state_id
+        )
+        for spec in _NON_PUBLISHED_POLICY_SPECS
     }
     annual_bridge = apply_policy_rate_factors_to_annual_bridge(
         raw_annual_bridge,
@@ -4593,10 +4614,10 @@ def _append_one_fuel_price_scenario_to_chart_rows(
     # keeps the policy activity response separate from the fuel-price response
     # and avoids composing two independently rounded annual overlays.
     current_pair_id = f"{severity}_published"
-    if fed_policy.eq(FED_POLICY_STATE_DELAYED_6M).any():
-        current_pair_id = f"{severity}_vs_baseline_delayed_6m"
-    elif fed_policy.eq(FED_POLICY_STATE_NO_UPLIFT).any():
-        current_pair_id = f"{severity}_vs_baseline_no_uplift"
+    for state_spec in _NON_PUBLISHED_POLICY_SPECS:
+        if fed_policy.eq(state_spec.calculation_state_id).any():
+            current_pair_id = f"{severity}_vs_baseline_{state_spec.pair_state_suffix}"
+            break
 
     def _pair_lookups(
         pair_id: str,
