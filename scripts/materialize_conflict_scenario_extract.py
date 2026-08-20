@@ -1508,7 +1508,7 @@ def _validation_frame(
                 pd.to_numeric(annual["FY"], errors="coerce").eq(2026)
             ][["metric_type", "series_id"]].drop_duplicates()
         )
-        * 3
+        * len(_CALC_STATE_ORDER)
     )
     shared_fy2026_range = (
         shared_fy2026_wide.max(axis=1) - shared_fy2026_wide.min(axis=1)
