@@ -114,8 +114,9 @@ def test_no_uplift_never_steps_by_12c() -> None:
 
 def test_a_policy_state_the_contract_does_not_know_is_refused() -> None:
     """Silently taking the published timetable would draw the wrong quarter."""
+    # delayed_12m is a governed duration now; delayed_9m is not.
     with pytest.raises(coverage.SeriesCoverageError):
-        coverage._rate_indicator_factor(["2027Q1"], ROOT, "delayed_12m")
+        coverage._rate_indicator_factor(["2027Q1"], ROOT, "delayed_9m")
 
 
 # ------------------------------------------- the derivation sees FINAL rows

@@ -1280,7 +1280,10 @@ def test_revenue_outlook_renders_every_governed_policy_duration() -> None:
         for selectbox in at.selectbox
         if selectbox.key == "revenue_outlook_fed_policy_state"
     )
-    assert tuple(policy.options) == tuple(app.FED_POLICY_OPTIONS)
+    # AppTest exposes the FORMATTED labels as options; values are the ids.
+    assert tuple(policy.options) == tuple(
+        app.FED_POLICY_LABELS[state] for state in app.FED_POLICY_OPTIONS
+    )
     assert len(policy.options) == 8
     # Preserved production default: the six-month deferral.
     assert str(policy.value) == app.FED_POLICY_DELAYED_6M
@@ -1293,15 +1296,18 @@ def test_revenue_outlook_renders_every_governed_policy_duration() -> None:
         policy.set_value(state)
         at.run()
         assert not at.exception, state
+        # The selection persists across the rerun and stays the source of
+        # truth for the page. Label naming on the rendered surfaces is
+        # asserted by the focused Playwright test, which sees real text;
+        # the lever-summary caption is workshop copy behind the
+        # method-detail gate and must not be asserted here.
         assert at.session_state["revenue_outlook_fed_policy_state"] == state
-        rendered = "\n".join(
-            [
-                *(str(markdown.value) for markdown in at.markdown),
-                *(str(caption.value) for caption in at.caption),
-            ]
+        policy_after = next(
+            selectbox
+            for selectbox in at.selectbox
+            if selectbox.key == "revenue_outlook_fed_policy_state"
         )
-        expected_label = app.FED_POLICY_LABELS[state]
-        assert expected_label in rendered, (state, expected_label)
+        assert str(policy_after.value) == state
 
 
 def test_revenue_outlook_activity_opens_policy_levers() -> None:
