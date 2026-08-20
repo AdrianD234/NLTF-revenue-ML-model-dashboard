@@ -20,9 +20,12 @@ Tested SHA: _recorded at the end of this report once final_
 | Interactions: 18m+PT High+Fleet High; 24m+VFM Fast+e-RUC; 30m+High conflict+High population; 36m+Freight High+PT Med; 6m at defaults; 12m+optimized PED bridge; identical configs identical; 64 unique key digests | PASS (8 tests) | `tests/test_fed_deferral_interactions.py` |
 | Interaction evidence matrix (13 combinations × MVR invariance, direct-window ordering, formula closure) | PASS (13/13) | `interaction_test_matrix.csv` |
 | e-RUC note: window years after the petrol fleet has fully migrated off excise show deferred == published for Net FED (no wedge remains to defer). Explained, not suppressed. | Documented | `interaction_test_matrix.csv`, test comments |
-| Runtime pack: 64 unique states/engine, schema/builder v2, exact live parity at build, exact round-trip, fail-closed stale/corrupt/missing, no nearest-state fallback, 6m state addressable, 8 uncertainty centres | _pending build completion_ | `tests/test_revenue_outlook_policy_runtime.py` |
-| UI: 8 labels in order both dropdowns, preserved production default (Deferred 6 months), persistence, catch-up help, A/B independence | _pending AppTest/Playwright run_ | `test_revenue_outlook_renders_every_governed_policy_duration`, `tests/test_playwright_dashboard.py` |
-| Clean-room fast/affected(/full) tiers, replay fingerprints | _pending_ | |
+| Runtime pack: 64 unique states/engine, schema/builder v2, exact live parity at build, exact round-trip, fail-closed stale/corrupt/missing, no nearest-state fallback, 6m state addressable, 8 uncertainty centres | PASS (65 runtime tests; all 704 frames round-trip exact per engine; benchmark meets every unchanged threshold) | `tests/test_revenue_outlook_policy_runtime.py`, `runtime_profile_before_after.csv` |
+| UI: 8 labels in order both dropdowns, preserved production default (Deferred 6 months), persistence, catch-up help, A/B independence | PASS (AppTest cycles all 8 states; focused Playwright test selects 6m -> 18m -> 36m -> off and verifies the rendered Medium-conflict trace moves in exactly the governed fiscal years, no exception) | `test_revenue_outlook_renders_every_governed_policy_duration`, `test_revenue_outlook_policy_duration_selector_updates_the_chart` |
+| Pack idempotence: second policy-runtime build reproduces all 1,410 content files byte-for-byte (manifests differ only in the informational build-time SHA, which is excluded from the digest) | PASS | idempotency probe (2026-08-20) |
+| Clean-room fast tier | PASS (exit 0 at d533162) | `scripts/ci_local.ps1 -Tier fast` |
+| Clean-room replay fingerprint | PASS (9,536 replay rows fingerprinted, no tracked-file mutation) | `scripts/ci_local.ps1 -Tier replay` |
+| Clean-room full assurance | _recorded in the PR on the final SHA_ | `scripts/ci_local.ps1 -Tier full` |
 
 ## Notes
 
