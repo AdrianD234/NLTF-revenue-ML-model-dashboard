@@ -42,6 +42,10 @@ from typing import Any
 
 import pandas as pd
 
+from .fed_policy_states import (
+    policy_state_aliases as _fed_policy_state_aliases,
+    policy_state_ids as _fed_policy_state_ids,
+)
 from .official_vintage import official_comparator_scenario_name
 from .revenue_outlook_replay_cache import (
     _decode_frame,
@@ -81,8 +85,13 @@ __all__ = [
     "state_id_for",
 ]
 
-POLICY_RUNTIME_SCHEMA_VERSION = "1"
-BUILDER_VERSION = "1"
+# Schema 2 / builder 2: the finite policy catalogue expanded from three
+# Current states x three official states (nine materialised states per
+# engine) to eight x eight (sixty-four), adding the 12-36 month deferrals.
+# Packs built at schema 1 fail closed as stale rather than serving a
+# catalogue that cannot answer the new states.
+POLICY_RUNTIME_SCHEMA_VERSION = "2"
+BUILDER_VERSION = "2"
 
 _PACK_ROOT = Path("data") / "revenue_outlook_policy_runtime"
 _REBUILD_COMMAND = "python scripts/build_revenue_outlook_policy_runtime.py --all"
@@ -92,24 +101,15 @@ _REBUILD_COMMAND = "python scripts/build_revenue_outlook_policy_runtime.py --all
 # the governed calculation-layer id for the same state, and the handoff's
 # name for it. Both resolve here, because a runtime that accepted only one of
 # them would fail closed on a spelling rather than on a real difference.
+# Both the state tuple and the alias table derive from the canonical
+# registry, so the runtime can never disagree with the calculation layer
+# about what a state is called.
 POLICY_PUBLISHED = "published"
 POLICY_DELAYED_6M = "delayed_6m"
 POLICY_NO_UPLIFT = "off"
-POLICY_STATES = (POLICY_PUBLISHED, POLICY_DELAYED_6M, POLICY_NO_UPLIFT)
+POLICY_STATES = _fed_policy_state_ids()
 
-_POLICY_ALIASES = {
-    "published": POLICY_PUBLISHED,
-    "original": POLICY_PUBLISHED,
-    "planned": POLICY_PUBLISHED,
-    "published_timing": POLICY_PUBLISHED,
-    "delayed_6m": POLICY_DELAYED_6M,
-    "delay_6m": POLICY_DELAYED_6M,
-    "shifted_6m": POLICY_DELAYED_6M,
-    "deferred": POLICY_DELAYED_6M,
-    "off": POLICY_NO_UPLIFT,
-    "no_uplift": POLICY_NO_UPLIFT,
-    "none": POLICY_NO_UPLIFT,
-}
+_POLICY_ALIASES = _fed_policy_state_aliases()
 
 STATUS_OK = "ok"
 STATUS_REFERENCE_REQUIRED = "reference_path_required"

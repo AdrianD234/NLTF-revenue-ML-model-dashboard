@@ -47,9 +47,8 @@ from model_dashboard.ev_uptake_levers import (
     EV_UPTAKE_PRESETS,
     apply_uptake_levers_to_chart_rows,
 )
+from model_dashboard.conflict_fuel_paths import BASE_POLICY_VARIANT_IDS
 from model_dashboard.fuel_price_scenario import (
-    BASE_DELAYED_6M_SCENARIO_NAME,
-    BASE_NO_UPLIFT_SCENARIO_NAME,
     BASE_PUBLISHED_SCENARIO_NAME,
     POLICY_PATH_IDS,
     apply_treasury_macro_to_chart_rows,
@@ -62,14 +61,13 @@ from model_dashboard.mbu26_source_spine import (
     FORMULA_DEFINITIONS,
     ROW_DEFINITIONS,
 )
+from model_dashboard.fed_policy_states import FED_POLICY_SPECS
 from model_dashboard.rate_paths import (
     FED_POLICY_STATE_DELAYED_6M,
     FED_POLICY_STATE_NO_UPLIFT,
     FED_POLICY_STATE_PUBLISHED,
-    apply_fed_uplift_delay_to_chart_rows,
-    apply_fed_uplift_off_to_chart_rows,
-    fed_uplift_delayed_factors,
-    fed_uplift_off_factors,
+    apply_fed_policy_state_to_chart_rows,
+    fed_policy_annual_factors,
     mbu26_ruc_class_revenue_by_fy,
 )
 from model_dashboard.revenue_outlook import (
@@ -81,18 +79,22 @@ from model_dashboard.revenue_outlook import (
 
 START_FY = 2026
 END_FY = 2030
-EXTRACT_VERSION = "governed-ar1-conflict-scenario-extract-v3"
+# v4: the timing dimension expanded from three states (original, deferred six
+# months, off) to eight (original, 6-36 month deferrals in six-month steps,
+# off); 32 paths in total. Values on the original twelve paths are unchanged.
+EXTRACT_VERSION = "governed-ar1-conflict-scenario-extract-v4"
 ASSUMPTIONS_FILENAME = "conflict_scenario_assumptions.csv"
 REVENUE_FILENAME = "conflict_scenario_annual_revenue.csv"
 ACTIVITY_FILENAME = "conflict_scenario_annual_activity.csv"
 VALIDATION_FILENAME = "conflict_scenario_validation.csv"
 VALUE_TOLERANCE = 1e-8
 
+# Registry-driven: one label per governed timing state, in display order.
 _POLICY_LABELS = {
-    FED_POLICY_STATE_PUBLISHED: "12c original timing: from 1 Jan 2027",
-    FED_POLICY_STATE_DELAYED_6M: "12c deferred six months: from 1 Jul 2027",
-    FED_POLICY_STATE_NO_UPLIFT: "12c uplift off",
+    spec.calculation_state_id: spec.timing_label for spec in FED_POLICY_SPECS
 }
+_POLICY_SPEC_BY_CALC_ID = {spec.calculation_state_id: spec for spec in FED_POLICY_SPECS}
+_CALC_STATE_ORDER = tuple(spec.calculation_state_id for spec in FED_POLICY_SPECS)
 _FORMULA_BY_OUTPUT = {
     str(item["output_series_id"]): str(item["expression"])
     for item in FORMULA_DEFINITIONS
@@ -128,7 +130,7 @@ _SERIES_METADATA["total_fed_ruc_net_revenue"] = {
 
 @dataclass(frozen=True)
 class ExportPath:
-    """Stable metadata for one of the 12 requested export paths."""
+    """Stable metadata for one of the 32 requested export paths."""
 
     family_id: str
     family_order: int
@@ -145,47 +147,32 @@ class ExportPath:
         return f"{self.scenario_label} - {self.policy_label}"
 
 
+def _scenario_id_for(family_severity: str, calculation_state_id: str) -> str:
+    """Replay scenario id for one family and calculation-layer policy state."""
+    spec = _POLICY_SPEC_BY_CALC_ID[calculation_state_id]
+    if not family_severity:  # baseline family
+        if spec.is_published:
+            return BASE_PUBLISHED_SCENARIO_NAME
+        return BASE_POLICY_VARIANT_IDS[calculation_state_id]
+    if spec.is_published:
+        return conflict_scenario_name(family_severity)
+    return conflict_policy_variant_name(family_severity, calculation_state_id)
+
+
 def _export_paths() -> tuple[ExportPath, ...]:
+    """The 32 public paths: four families crossed with eight timing states."""
     paths: list[ExportPath] = []
     family_specs = [
-        (
-            "base",
-            0,
-            "",
-            "Current finalist Base case",
-            {
-                FED_POLICY_STATE_PUBLISHED: BASE_PUBLISHED_SCENARIO_NAME,
-                FED_POLICY_STATE_DELAYED_6M: BASE_DELAYED_6M_SCENARIO_NAME,
-                FED_POLICY_STATE_NO_UPLIFT: BASE_NO_UPLIFT_SCENARIO_NAME,
-            },
-        ),
+        ("base", 0, "", "Current finalist Base case"),
         *[
-            (
-                severity,
-                family_order,
-                severity,
-                conflict_scenario_display_name(severity),
-                {
-                    FED_POLICY_STATE_PUBLISHED: conflict_scenario_name(severity),
-                    FED_POLICY_STATE_DELAYED_6M: conflict_policy_variant_name(
-                        severity, FED_POLICY_STATE_DELAYED_6M
-                    ),
-                    FED_POLICY_STATE_NO_UPLIFT: conflict_policy_variant_name(
-                        severity, FED_POLICY_STATE_NO_UPLIFT
-                    ),
-                },
-            )
+            (severity, family_order, severity, conflict_scenario_display_name(severity))
             for family_order, severity in enumerate(CONFLICT_SEVERITIES, start=1)
         ],
     ]
     path_order = 0
-    for family_id, family_order, severity, label, scenario_by_state in family_specs:
-        for policy_state in (
-            FED_POLICY_STATE_PUBLISHED,
-            FED_POLICY_STATE_DELAYED_6M,
-            FED_POLICY_STATE_NO_UPLIFT,
-        ):
-            scenario_id = scenario_by_state[policy_state]
+    for family_id, family_order, severity, label in family_specs:
+        for policy_state in _CALC_STATE_ORDER:
+            scenario_id = _scenario_id_for(severity, policy_state)
             paths.append(
                 ExportPath(
                     family_id=family_id,
@@ -217,6 +204,22 @@ def _parse_boolean(value: Any) -> bool:
 
 
 def _path_metadata_frame(paths: tuple[ExportPath, ...]) -> pd.DataFrame:
+    def _registry_metadata(policy_state: str) -> dict[str, Any]:
+        spec = _POLICY_SPEC_BY_CALC_ID[policy_state]
+        if spec.is_finite_deferral:
+            direct = ";".join(spec.direct_affected_quarters())
+        elif spec.is_no_uplift:
+            direct = "2027Q1_onward"
+        else:
+            direct = ""
+        return {
+            "timing_id": spec.timing_id,
+            "delay_months": spec.delay_months,
+            "delay_quarters": spec.delay_quarters,
+            "start_period": spec.start_period,
+            "direct_affected_periods": direct,
+        }
+
     return pd.DataFrame(
         [
             {
@@ -230,6 +233,13 @@ def _path_metadata_frame(paths: tuple[ExportPath, ...]) -> pd.DataFrame:
                 "conflict_severity": path.severity or "base",
                 "policy_state": path.policy_state,
                 "policy_label": path.policy_label,
+                **_registry_metadata(path.policy_state),
+                "synthetic_status": "current_model_behavioural_replay",
+                "status_note": (
+                    "Current-model path with the modelled activity response; "
+                    "only the initial 12c/L wedge is deferred and later planned "
+                    "increases retain their published dates."
+                ),
             }
             for path in paths
         ]
@@ -601,12 +611,9 @@ def _dashboard_aligned_annual_bridge(
         adjust_ped=True,
     )
     factor_maps = {
-        FED_POLICY_STATE_DELAYED_6M: fed_uplift_delayed_factors(
-            repo_root, pack.revenue_chart_rows
-        ),
-        FED_POLICY_STATE_NO_UPLIFT: fed_uplift_off_factors(
-            repo_root, pack.revenue_chart_rows
-        ),
+        state: fed_policy_annual_factors(repo_root, pack.revenue_chart_rows, state)
+        for state in _CALC_STATE_ORDER
+        if state != FED_POLICY_STATE_PUBLISHED
     }
     ruc_class_revenue = mbu26_ruc_class_revenue_by_fy(repo_root)
     path_lookup = {
@@ -621,24 +628,13 @@ def _dashboard_aligned_annual_bridge(
         },
     }
     frames: list[pd.DataFrame] = []
-    for policy_state in (
-        FED_POLICY_STATE_PUBLISHED,
-        FED_POLICY_STATE_DELAYED_6M,
-        FED_POLICY_STATE_NO_UPLIFT,
-    ):
+    for policy_state in _CALC_STATE_ORDER:
         active = visible_base.copy()
-        if policy_state == FED_POLICY_STATE_DELAYED_6M:
-            active, _ = apply_fed_uplift_delay_to_chart_rows(
+        if policy_state != FED_POLICY_STATE_PUBLISHED:
+            active, _ = apply_fed_policy_state_to_chart_rows(
                 active,
                 factor_maps[policy_state],
-                scenario_roles={"basecase", "comparison"},
-                policy_pair_factors=replay.policy_pair_factors,
-                ruc_class_revenue_by_fy=ruc_class_revenue,
-            )
-        elif policy_state == FED_POLICY_STATE_NO_UPLIFT:
-            active, _ = apply_fed_uplift_off_to_chart_rows(
-                active,
-                factor_maps[policy_state],
+                policy_state=policy_state,
                 scenario_roles={"basecase", "comparison"},
                 policy_pair_factors=replay.policy_pair_factors,
                 ruc_class_revenue_by_fy=ruc_class_revenue,
@@ -781,7 +777,7 @@ def _annual_export_frame(
     repo_root: Path,
     pack_dir: Path,
 ) -> pd.DataFrame:
-    """Select all annual bridge rows of one metric type for 12 paths."""
+    """Select all annual bridge rows of one metric type for the 32 paths."""
 
     if annual_bridge is None or annual_bridge.empty:
         raise ValueError("Governed conflict replay produced no annual bridge rows.")
@@ -1026,18 +1022,22 @@ def _validation_frame(
     validation_internal = set(
         replay.policy_validation_report["scenario_name"].dropna().astype(str)
     )
+    expected_internal_count = 4 * len(_CALC_STATE_ORDER)
     add_check(
         "internal_scenario_count",
         passed=(
             actual_internal == expected_internal
             and validation_internal == expected_internal
-            and len(expected_internal) == 12
+            and len(expected_internal) == expected_internal_count
         ),
         observed=(
             f"inputs={len(actual_internal)}; validation={len(validation_internal)}"
         ),
-        expected="12 exact Base/published-conflict/policy scenarios",
-        detail="The governed replay contains four original/published paths plus eight delayed/no-uplift variants.",
+        expected=f"{expected_internal_count} exact Base/published-conflict/policy scenarios",
+        detail=(
+            "The governed replay contains four original/published paths plus one "
+            "variant per family for each of the six deferrals and no-uplift."
+        ),
     )
 
     expected_paths = [path.policy_path_id for path in paths]
@@ -1047,7 +1047,7 @@ def _validation_frame(
     add_check(
         "export_path_count_and_order",
         passed=(
-            len(expected_paths) == 12
+            len(expected_paths) == 4 * len(_CALC_STATE_ORDER)
             and observed_assumption_paths == expected_paths
             and observed_revenue_paths == expected_paths
             and observed_activity_paths == expected_paths
@@ -1057,7 +1057,10 @@ def _validation_frame(
             f"revenue={len(observed_revenue_paths)}; "
             f"activity={len(observed_activity_paths)}"
         ),
-        expected="12 paths in Base, Low, Medium, High x original, delayed, off order",
+        expected=(
+            f"{4 * len(_CALC_STATE_ORDER)} paths in Base, Low, Medium, High x "
+            "original, the six deferrals, off order"
+        ),
         detail="All three export tables share the same stable path IDs and display order.",
     )
 
@@ -1553,34 +1556,44 @@ def _validation_frame(
     published = _annual_values_by_family(
         annual, policy_state=FED_POLICY_STATE_PUBLISHED
     )[pair_keys + ["value"]].rename(columns={"value": "published_value"})
-    delayed = _annual_values_by_family(
-        annual, policy_state=FED_POLICY_STATE_DELAYED_6M
-    )[pair_keys + ["value"]].rename(columns={"value": "delayed_value"})
     off = _annual_values_by_family(
         annual, policy_state=FED_POLICY_STATE_NO_UPLIFT
     )[pair_keys + ["value"]].rename(columns={"value": "off_value"})
-    policy_pairs = delayed.merge(
-        off,
-        on=pair_keys,
-        how="outer",
-        validate="one_to_one",
-        indicator=True,
-    )
-    policy_pairs["delta"] = (
-        pd.to_numeric(policy_pairs["delayed_value"], errors="coerce")
-        - pd.to_numeric(policy_pairs["off_value"], errors="coerce")
-    )
-    original_pairs = published.merge(
-        delayed,
-        on=pair_keys,
-        how="outer",
-        validate="one_to_one",
-        indicator=True,
-    )
-    original_pairs["delta"] = (
-        pd.to_numeric(original_pairs["published_value"], errors="coerce")
-        - pd.to_numeric(original_pairs["delayed_value"], errors="coerce")
-    )
+    policy_pairs_by_state: dict[str, pd.DataFrame] = {}
+    original_pairs_by_state: dict[str, pd.DataFrame] = {}
+    for deferral_spec in FED_POLICY_SPECS:
+        if not deferral_spec.is_finite_deferral:
+            continue
+        state = deferral_spec.calculation_state_id
+        delayed_values = _annual_values_by_family(annual, policy_state=state)[
+            pair_keys + ["value"]
+        ].rename(columns={"value": "delayed_value"})
+        state_policy_pairs = delayed_values.merge(
+            off,
+            on=pair_keys,
+            how="outer",
+            validate="one_to_one",
+            indicator=True,
+        )
+        state_policy_pairs["delta"] = (
+            pd.to_numeric(state_policy_pairs["delayed_value"], errors="coerce")
+            - pd.to_numeric(state_policy_pairs["off_value"], errors="coerce")
+        )
+        policy_pairs_by_state[state] = state_policy_pairs
+        state_original_pairs = published.merge(
+            delayed_values,
+            on=pair_keys,
+            how="outer",
+            validate="one_to_one",
+            indicator=True,
+        )
+        state_original_pairs["delta"] = (
+            pd.to_numeric(state_original_pairs["published_value"], errors="coerce")
+            - pd.to_numeric(state_original_pairs["delayed_value"], errors="coerce")
+        )
+        original_pairs_by_state[state] = state_original_pairs
+    policy_pairs = policy_pairs_by_state[FED_POLICY_STATE_DELAYED_6M]
+    original_pairs = original_pairs_by_state[FED_POLICY_STATE_DELAYED_6M]
 
     unaffected_activity_series = (
         "light_bev_ruc_net_km",
@@ -1626,7 +1639,7 @@ def _validation_frame(
         passed=(
             len(unaffected)
             == len(CONFLICT_SEVERITIES)
-            * 3
+            * len(_CALC_STATE_ORDER)
             * (END_FY - START_FY + 1)
             * len(unaffected_activity_series)
             and unaffected["_merge"].eq("both").all()
@@ -1640,7 +1653,8 @@ def _validation_frame(
             else f"comparisons={len(unaffected)}; max_abs_conflict_minus_matched_base=missing"
         ),
         expected=(
-            "135 Light BEV/PHEV/Heavy BEV annual-km comparisons equal matched "
+            f"{len(CONFLICT_SEVERITIES) * len(_CALC_STATE_ORDER) * (END_FY - START_FY + 1) * len(unaffected_activity_series)} "
+            "Light BEV/PHEV/Heavy BEV annual-km comparisons equal matched "
             f"Base within {VALUE_TOLERANCE}"
         ),
         max_abs_error=(
@@ -1839,6 +1853,177 @@ def _validation_frame(
         max_abs_error=None,
         detail="The delayed policy collects the FED/RUC uplift from FY2028 while the off path does not.",
     )
+
+    # The same identity, ordering and rejoin gates for every longer governed
+    # deferral, with windows taken from the canonical registry. The six-month
+    # checks above are the production-named originals and stay untouched.
+    for deferral_spec in FED_POLICY_SPECS:
+        if not deferral_spec.is_finite_deferral or deferral_spec.delay_months == 6:
+            continue
+        state = deferral_spec.calculation_state_id
+        timing = deferral_spec.timing_id
+        window = deferral_spec.direct_affected_quarters()
+        last_window_quarter = window[-1]
+        last_window_fy = int(last_window_quarter.split("Q")[0]) + (
+            1 if int(last_window_quarter.split("Q")[1]) >= 3 else 0
+        )
+        start_quarter = deferral_spec.start_period
+        shared_last_fy = int(start_quarter.split("Q")[0]) - (
+            0 if int(start_quarter.split("Q")[1]) >= 3 else 1
+        )
+        state_policy_pairs = policy_pairs_by_state[state]
+        state_original_pairs = original_pairs_by_state[state]
+
+        shared_rows = state_policy_pairs[
+            state_policy_pairs["FY"].between(START_FY, shared_last_fy, inclusive="both")
+        ]
+        shared_error = pd.to_numeric(shared_rows["delta"], errors="coerce").abs().max()
+        add_check(
+            f"{timing}_shared_window_delayed_off_identity",
+            passed=(
+                not state_policy_pairs["_merge"].ne("both").any()
+                and pd.notna(shared_error)
+                and float(shared_error) <= VALUE_TOLERANCE
+            ),
+            observed=(
+                f"rows={len(shared_rows)}; max_abs_delta={float(shared_error):.12g}"
+                if pd.notna(shared_error)
+                else f"rows={len(shared_rows)}; max_abs_delta=missing"
+            ),
+            expected=(
+                f"all annual {timing}/off values equal through FY{shared_last_fy} "
+                f"within {VALUE_TOLERANCE}"
+            ),
+            max_abs_error=float(shared_error) if pd.notna(shared_error) else None,
+            detail=(
+                f"The {timing} path prices exactly like no-uplift until its deferred "
+                f"start in {start_quarter}; whole-horizon model features must not "
+                "leak the later divergence backwards."
+            ),
+        )
+
+        state_fy2026 = state_original_pairs[state_original_pairs["FY"].eq(2026)]
+        state_fy2026_error = pd.to_numeric(state_fy2026["delta"], errors="coerce").abs().max()
+        add_check(
+            f"{timing}_fy2026_original_identity",
+            passed=(
+                state_fy2026["_merge"].eq("both").all()
+                and pd.notna(state_fy2026_error)
+                and float(state_fy2026_error) <= VALUE_TOLERANCE
+            ),
+            observed=(
+                f"rows={len(state_fy2026)}; max_abs_delta={float(state_fy2026_error):.12g}"
+                if pd.notna(state_fy2026_error)
+                else f"rows={len(state_fy2026)}; max_abs_delta=missing"
+            ),
+            expected=f"all FY2026 original/{timing} values equal within {VALUE_TOLERANCE}",
+            max_abs_error=float(state_fy2026_error) if pd.notna(state_fy2026_error) else None,
+            detail="No deferral changes anything before the 12c step's original January 2027 date.",
+        )
+
+        state_fy2027_tax = state_original_pairs[
+            state_original_pairs["FY"].eq(2027)
+            & state_original_pairs["series_id"].isin(
+                ["net_fed_revenue", "total_ruc_net_revenue"]
+            )
+        ]
+        state_min_fy2027 = pd.to_numeric(state_fy2027_tax["delta"], errors="coerce").min()
+        add_check(
+            f"{timing}_fy2027_original_revenue_exceeds_deferred",
+            passed=(
+                len(state_fy2027_tax) == 4 * 2
+                and state_fy2027_tax["_merge"].eq("both").all()
+                and pd.notna(state_min_fy2027)
+                and float(state_min_fy2027) > VALUE_TOLERANCE
+            ),
+            observed=(
+                f"rows={len(state_fy2027_tax)}; "
+                f"min_original_minus_deferred={float(state_min_fy2027):.12g}"
+                if pd.notna(state_min_fy2027)
+                else f"rows={len(state_fy2027_tax)}; min_original_minus_deferred=missing"
+            ),
+            expected=(
+                f"8 FY2027 Net FED/Net RUC rows with original timing strictly above {timing}"
+            ),
+            max_abs_error=None,
+            detail=(
+                "Every deferral removes the January-June 2027 uplift from FY2027 "
+                "while original timing collects it."
+            ),
+        )
+
+        rejoined = state_original_pairs[
+            state_original_pairs["FY"].between(last_window_fy + 1, END_FY, inclusive="both")
+        ].copy()
+        if not rejoined.empty:
+            rejoined_error = pd.to_numeric(rejoined["delta"], errors="coerce").abs().max()
+            rejoined_scale = pd.concat(
+                [
+                    pd.to_numeric(rejoined["published_value"], errors="coerce").abs(),
+                    pd.to_numeric(rejoined["delayed_value"], errors="coerce").abs(),
+                ],
+                axis=1,
+            ).max(axis=1)
+            rejoined_relative = (
+                pd.to_numeric(rejoined["delta"], errors="coerce").abs()
+                / rejoined_scale.clip(lower=VALUE_TOLERANCE)
+            ).max()
+            add_check(
+                f"{timing}_rejoined_original_identity",
+                passed=(
+                    rejoined["_merge"].eq("both").all()
+                    and pd.notna(rejoined_relative)
+                    and float(rejoined_relative) <= post_rejoin_relative_tolerance
+                ),
+                observed=(
+                    f"rows={len(rejoined)}; max_abs_delta={float(rejoined_error):.12g}; "
+                    f"max_relative_delta={float(rejoined_relative):.12g}"
+                    if pd.notna(rejoined_error) and pd.notna(rejoined_relative)
+                    else f"rows={len(rejoined)}; deltas=missing"
+                ),
+                expected=(
+                    f"all FY{last_window_fy + 1}-FY{END_FY} original/{timing} values within "
+                    f"{post_rejoin_relative_tolerance:.2%} after catch-up in {start_quarter}"
+                ),
+                max_abs_error=float(rejoined_error) if pd.notna(rejoined_error) else None,
+                detail=(
+                    f"The {timing} path catches up to the published rate in {start_quarter}; "
+                    "a tightly bounded residual is allowed because lagged features preserve "
+                    "genuine path dependence from the deferral window."
+                ),
+            )
+
+        state_post_revenue = state_policy_pairs[
+            state_policy_pairs["FY"].between(last_window_fy + 1, END_FY, inclusive="both")
+            & state_policy_pairs["series_id"].isin(
+                ["net_fed_revenue", "total_ruc_net_revenue"]
+            )
+        ].copy()
+        if not state_post_revenue.empty:
+            state_min_post = pd.to_numeric(state_post_revenue["delta"], errors="coerce").min()
+            add_check(
+                f"{timing}_post_window_policy_revenue_divergence",
+                passed=(
+                    state_post_revenue["_merge"].eq("both").all()
+                    and pd.notna(state_min_post)
+                    and float(state_min_post) > VALUE_TOLERANCE
+                ),
+                observed=(
+                    f"rows={len(state_post_revenue)}; "
+                    f"min_deferred_minus_off={float(state_min_post):.12g}"
+                    if pd.notna(state_min_post)
+                    else f"rows={len(state_post_revenue)}; min_deferred_minus_off=missing"
+                ),
+                expected=(
+                    f"every FY{last_window_fy + 1}-FY{END_FY} Net FED/Net RUC row with "
+                    f"{timing} revenue strictly above off"
+                ),
+                max_abs_error=None,
+                detail=(
+                    f"After catching up in {start_quarter}, the {timing} path collects the "
+                    "uplift while the off path never does."
+                ),
+            )
 
     forecast_source = replay.future_forecasts.copy()
     calibrated_required = {

@@ -32,6 +32,7 @@ __all__ = [
     "calculation_state_ids",
     "finite_deferral_specs",
     "policy_spec",
+    "policy_state_aliases",
     "policy_state_ids",
     "quarter_serial",
     "serial_quarter",
@@ -157,6 +158,26 @@ class FedPolicySpec:
         if self.is_no_uplift:
             return "12c off"
         return f"12c delayed {self.delay_months}m"
+
+    @property
+    def timing_id(self) -> str:
+        """Timing identifier used by the public extract (``delayed_6m`` etc.)."""
+        if self.is_published:
+            return "published"
+        if self.is_no_uplift:
+            return "no_uplift"
+        return self.state_id
+
+    @property
+    def timing_label(self) -> str:
+        """Reader-facing timing label used by the public extract."""
+        if self.is_published:
+            return "12c original timing: from 1 Jan 2027"
+        if self.is_no_uplift:
+            return "12c uplift off"
+        if self.delay_months == 6:
+            return "12c deferred six months: from 1 Jul 2027"
+        return f"12c deferred {self.delay_months} months: from {self.start_date_text}"
 
     @property
     def value_status(self) -> str:
@@ -325,6 +346,11 @@ def policy_spec(state: object) -> FedPolicySpec:
 def policy_state_ids() -> tuple[str, ...]:
     """The eight runtime/UI state IDs in display order."""
     return tuple(spec.state_id for spec in FED_POLICY_SPECS)
+
+
+def policy_state_aliases() -> dict[str, str]:
+    """Every accepted spelling mapped to its runtime/UI state ID."""
+    return dict(_POLICY_STATE_ALIASES)
 
 
 def calculation_state_ids() -> tuple[str, ...]:

@@ -28,6 +28,7 @@ if (
 import numpy as np
 import pandas as pd
 
+from .fed_policy_states import FED_POLICY_SPECS
 from .conflict_fuel_paths import (
     CONFLICT_FUEL_SCENARIO_LEVELS,
     conflict_scenario_name,
@@ -972,18 +973,15 @@ def net_revenue_timing_comparison_frame(
             for level in CONFLICT_FUEL_SCENARIO_LEVELS
         ),
     )
-    timing_specs = (
-        ("published", "published", "12c original timing: from 1 Jan 2027"),
-        ("delayed_6m", "delay_6m", "12c deferred six months: from 1 Jul 2027"),
-        ("no_uplift", "no_uplift", "12c uplift off"),
+    # Registry-driven: all eight governed timing states per family, in
+    # display order (published, the six finite deferrals, no uplift).
+    timing_specs = tuple(
+        (spec.timing_id, spec.calculation_state_id, spec.timing_label, spec)
+        for spec in FED_POLICY_SPECS
     )
     path_specs: tuple[tuple[str, int, str, str, str, str, str], ...] = tuple(
         (
-            (
-                f"{family_id}_published"
-                if timing_id == "published"
-                else f"{family_id}_{'shifted_6m' if timing_id == 'delayed_6m' else 'no_uplift'}"
-            ),
+            f"{family_id}_{spec.path_suffix}",
             family_order * len(timing_specs) + timing_order,
             scenario_family_id,
             scenario_label,
@@ -992,7 +990,7 @@ def net_revenue_timing_comparison_frame(
             timing_label,
         )
         for family_order, (family_id, scenario_family_id, scenario_label) in enumerate(family_specs)
-        for timing_order, (timing_id, policy_state, timing_label) in enumerate(timing_specs)
+        for timing_order, (timing_id, policy_state, timing_label, spec) in enumerate(timing_specs)
     )
     requested_paths = {item[0] for item in path_specs}
     requested_replay_paths = requested_paths | {"baseline_published"}
@@ -1137,7 +1135,9 @@ def net_revenue_timing_comparison_frame(
                 )
 
     out = pd.DataFrame(result_rows, columns=columns)
-    expected_rows = 12 * (int(end_fy) - int(start_fy) + 1) * len(NET_REVENUE_COMPARISON_SERIES)
+    expected_rows = (
+        len(path_specs) * (int(end_fy) - int(start_fy) + 1) * len(NET_REVENUE_COMPARISON_SERIES)
+    )
     if len(out) != expected_rows or out.duplicated(["path_id", "FY", "series_id"]).any():
         raise ValueError(
             f"Net-revenue timing matrix is incomplete or duplicated: expected {expected_rows} unique rows, got {len(out)}."
@@ -1150,53 +1150,58 @@ def net_revenue_timing_comparison_frame(
         columns="timing_id",
         values="value_million_nzd",
     )
-    timing["delayed_minus_off"] = timing["delayed_6m"] - timing["no_uplift"]
-    timing["published_minus_delayed"] = timing["published"] - timing["delayed_6m"]
+    timing_fy = timing.index.get_level_values("FY")
     mvr = timing.index.get_level_values("series_id") == "net_mvr_revenue"
-    if not np.allclose(timing.loc[mvr, "delayed_minus_off"], 0.0, rtol=0.0, atol=1e-9):
-        raise ValueError("The 12c FED/RUC timing policy must not change Net MVR.")
-    if not np.allclose(timing.loc[mvr, "published_minus_delayed"], 0.0, rtol=0.0, atol=1e-9):
-        raise ValueError("The original 12c timing policy must not change Net MVR.")
-    fy2026 = timing.index.get_level_values("FY") == 2026
-    if not np.allclose(
-        timing.loc[fy2026, "published_minus_delayed"],
-        0.0,
-        rtol=0.0,
-        atol=1e-9,
-    ):
-        raise ValueError("Original and deferred policy states must be identical in FY2026.")
-    if int(start_fy) <= 2027 <= int(end_fy):
-        fy2027_tax = (
-            timing.index.get_level_values("FY") == 2027
-        ) & timing.index.get_level_values("series_id").isin(
-            ["net_fed_revenue", "total_ruc_net_revenue"]
-        )
-        if not timing.loc[fy2027_tax, "published_minus_delayed"].gt(0.0).all():
-            raise ValueError("Original timing must exceed deferred timing for FY2027 Net FED and Net RUC.")
-    if int(start_fy) <= 2028 <= int(end_fy):
-        fy2028_fed = timing[
-            (timing.index.get_level_values("series_id") == "net_fed_revenue")
-            & (timing.index.get_level_values("FY") == 2028)
-        ]
-        if len(fy2028_fed) != len(family_specs) or not fy2028_fed["delayed_minus_off"].gt(0.0).all():
-            raise ValueError("The deferred 12c path must exceed no-uplift FY2028 Net FED for Base, Low, Medium and High.")
-        fy2028_ruc = timing[
-            (timing.index.get_level_values("series_id") == "total_ruc_net_revenue")
-            & (timing.index.get_level_values("FY") == 2028)
-        ]
-        if len(fy2028_ruc) != len(family_specs) or not fy2028_ruc["delayed_minus_off"].gt(0.0).all():
-            raise ValueError("The deferred 12c path must exceed no-uplift FY2028 Net RUC for Base, Low, Medium and High.")
-    pre_policy = timing.index.get_level_values("FY") <= 2027
-    if not np.allclose(timing.loc[pre_policy, "delayed_minus_off"], 0.0, rtol=0.0, atol=1e-9):
-        raise ValueError("Deferred and no-uplift states must be identical through FY2027.")
-    resumed = timing.index.get_level_values("FY") >= 2028
-    if not np.allclose(
-        timing.loc[resumed, "published_minus_delayed"],
-        0.0,
-        rtol=0.0,
-        atol=1e-9,
-    ):
-        raise ValueError("Original and deferred policy states must coincide from FY2028 onward.")
+    tax_series = timing.index.get_level_values("series_id").isin(
+        ["net_fed_revenue", "total_ruc_net_revenue"]
+    )
+    fy2026 = timing_fy == 2026
+    deferral_specs = [spec for spec in FED_POLICY_SPECS if spec.is_finite_deferral]
+    for spec in deferral_specs:
+        deferred = timing[spec.timing_id]
+        published_delta = timing["published"] - deferred
+        off_delta = deferred - timing["no_uplift"]
+        if not np.allclose(published_delta[mvr], 0.0, rtol=0.0, atol=1e-9) or not np.allclose(
+            off_delta[mvr], 0.0, rtol=0.0, atol=1e-9
+        ):
+            raise ValueError("The 12c FED/RUC timing policy must not change Net MVR.")
+        if not np.allclose(published_delta[fy2026], 0.0, rtol=0.0, atol=1e-9):
+            raise ValueError("Original and deferred policy states must be identical in FY2026.")
+        # Direct-window fiscal years: the deferral prices exactly like the
+        # no-uplift path through the last fiscal year that ends before its
+        # deferred start, so those years must match the no-uplift state.
+        shared_last_fy = int(spec.start_period.split("Q")[0])
+        shared_last_fy = shared_last_fy if int(spec.start_period.split("Q")[1]) >= 3 else shared_last_fy - 1
+        shared = timing_fy <= shared_last_fy
+        if not np.allclose(off_delta[shared], 0.0, rtol=0.0, atol=1e-9):
+            raise ValueError(
+                f"Deferred ({spec.timing_id}) and no-uplift states must be identical "
+                f"through FY{shared_last_fy}."
+            )
+        if int(start_fy) <= 2027 <= int(end_fy):
+            fy2027_tax = (timing_fy == 2027) & tax_series
+            if not published_delta[fy2027_tax].gt(0.0).all():
+                raise ValueError(
+                    "Original timing must exceed deferred timing for FY2027 Net FED and Net RUC."
+                )
+        # The first fiscal year wholly at published rates after catch-up:
+        # the deferral must have rejoined the published path.
+        window = spec.direct_affected_quarters()
+        last_window_fy = int(window[-1].split("Q")[0]) + (1 if int(window[-1].split("Q")[1]) >= 3 else 0)
+        resumed = timing_fy >= last_window_fy + 1
+        if not np.allclose(published_delta[resumed], 0.0, rtol=0.0, atol=1e-9):
+            raise ValueError(
+                f"Original and deferred ({spec.timing_id}) policy states must coincide "
+                f"from FY{last_window_fy + 1} onward."
+            )
+        # In every rejoined year that still carries an uplift wedge, the
+        # deferred path must exceed the no-uplift path for the tax series.
+        rejoined_tax = resumed & (timing_fy >= 2028) & tax_series
+        if rejoined_tax.any() and not off_delta[rejoined_tax].gt(0.0).all():
+            raise ValueError(
+                f"The deferred 12c path ({spec.timing_id}) must exceed no-uplift for "
+                "every rejoined Net FED and Net RUC year."
+            )
     if 2027 in delayed_factors and not (0.0 < float(delayed_factors[2027]) < 1.0):
         raise ValueError("The governed FY2027 delayed-rate factor must lie between zero and one.")
     return out.sort_values(["path_order", "FY", "series_order"], kind="stable").reset_index(drop=True)
