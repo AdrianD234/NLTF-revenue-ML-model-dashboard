@@ -500,10 +500,18 @@ class PolicyRuntime:
     """One engine's materialised policy states, lazily read and memoised.
 
     Holding the decoded frames per state is what makes a repeated selection a
-    dict lookup rather than a parquet read. The catalogue is tiny (three
-    Current states x three official states), so the whole engine fits in
-    memory without a bound.
+    dict lookup rather than a parquet read. With the 8x8 catalogue the whole
+    engine no longer safely fits in memory (64 states x 11 frames), so the
+    memo is BOUNDED: least-recently-inserted frames are evicted once the memo
+    exceeds sixteen states' worth. Eviction changes when a frame is re-read
+    from its hash-validated parquet, never what it equals.
     """
+
+    # Sixteen states' worth of decoded frames. Far above what a real session
+    # touches (a reader flips between a handful of states), far below the
+    # whole catalogue, which is what exhausted the clean-room container when
+    # a parity test walked all 64 states.
+    _MAX_MEMOISED_FRAMES = 16 * len(FRAME_NAMES)
 
     def __init__(
         self,
@@ -569,6 +577,8 @@ class PolicyRuntime:
                     f"Rebuild: {_REBUILD_COMMAND}"
                 )
         decoded = _decode_frame(pd.read_parquet(path), meta)
+        while len(self._frames) >= self._MAX_MEMOISED_FRAMES:
+            self._frames.pop(next(iter(self._frames)))
         self._frames[(state_id, name)] = decoded
         return decoded
 

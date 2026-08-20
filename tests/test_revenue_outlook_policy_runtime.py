@@ -272,6 +272,10 @@ def test_every_materialised_state_equals_the_reference_pipeline(runtimes, engine
                     same_environment=same_environment,
                     violations=violations,
                 )
+            # Walking all 64 states would otherwise accumulate every decoded
+            # frame in the runtime memo and exhaust the clean-room container;
+            # each state's frames are compared and released.
+            runtime._frames.clear()
     assert not violations, (
         f"{len(violations)} frame(s) exceed the governed closure tolerance:\n  "
         + "\n  ".join(violations)
