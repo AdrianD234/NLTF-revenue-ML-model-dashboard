@@ -33,10 +33,20 @@ def _read_reference(reference_dir: Path, name: str) -> pd.DataFrame | None:
     path = reference_dir / f"{name}.csv"
     if not path.exists():
         return None
-    return pd.read_csv(path)
+    # float_precision="round_trip" is load-bearing: pandas' default float
+    # parser is up to 1 ULP lossy, which would manufacture machine-epsilon
+    # "differences" on values the two trees agree on exactly.
+    return pd.read_csv(path, float_precision="round_trip")
 
 
 def _sorted_for_compare(frame: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
+    """Key-sorted copy with NORMALISED sort keys.
+
+    A CSV reference reads an empty cell as NaN while the live frame carries
+    "" (or a nullable NA), and those sort differently; normalising every key
+    to text with NaN -> "" makes the two orderings identical so the row
+    alignment compares like rows with like.
+    """
     keys = [c for c in ("scenario_name", "series_id", "stream", "pair_id", "path_id",
                         "policy_path_id", "quarter", "period", "canonical_period",
                         "target_period", "time_grain", "FY", "june_year", "fy",
@@ -44,7 +54,16 @@ def _sorted_for_compare(frame: pd.DataFrame, columns: list[str]) -> pd.DataFrame
             if c in columns]
     ordered = frame[columns].copy()
     if keys:
-        ordered = ordered.sort_values(keys, kind="stable")
+        sort_columns = []
+        for key in keys:
+            normalised = f"__sort_{key}"
+            numeric = pd.to_numeric(ordered[key], errors="coerce")
+            ordered[normalised] = [
+                f"{float(num):020.6f}" if pd.notna(num) else ("" if pd.isna(raw) else str(raw))
+                for num, raw in zip(numeric, ordered[key], strict=True)
+            ]
+            sort_columns.append(normalised)
+        ordered = ordered.sort_values(sort_columns, kind="stable").drop(columns=sort_columns)
     return ordered.reset_index(drop=True)
 
 
@@ -79,14 +98,47 @@ def compare_frames(
         return
     worst = 0.0
     worst_col = ""
+    worst_context = ""
+    key_columns = [c for c in ("scenario_name", "series_id", "pair_id", "policy_path_id",
+                               "period", "time_grain", "june_year", "FY", "trace_name")
+                   if c in columns]
+
+    def _exact_numeric(series: pd.Series) -> pd.Series:
+        """Correctly-rounded numeric parse (Python float), never pandas'.
+
+        pandas' to_numeric/arrow string parser can be 1 ULP off the nearest
+        double, which manufactures machine-epsilon differences on
+        byte-identical decimal strings.
+        """
+        def parse(value):
+            if value is None or (isinstance(value, float) and np.isnan(value)):
+                return np.nan
+            if isinstance(value, (int, float, np.integer, np.floating)):
+                return float(value)
+            try:
+                return float(str(value).strip())
+            except (TypeError, ValueError):
+                return np.nan
+
+        return pd.Series([parse(v) for v in series], index=series.index, dtype="float64")
+
     for column in columns:
         ref_col = ref[column]
         cur_col = cur[column]
         if ref_col.dtype == bool or cur_col.dtype == bool:
             ref_col = ref_col.astype(str)
             cur_col = cur_col.astype(str)
-        ref_num = pd.to_numeric(ref_col, errors="coerce").astype("float64")
-        cur_num = pd.to_numeric(cur_col, errors="coerce").astype("float64")
+        ref_num = _exact_numeric(ref_col)
+        cur_num = _exact_numeric(cur_col)
+        # A column the live pipeline stores at float32 cannot round-trip
+        # through a decimal CSV as float64: the shortest float32 repr parses
+        # to a double up to half a float32 ULP away. Compare such columns at
+        # their own storage precision - float32(parse(repr32(x))) == x is
+        # guaranteed, so this is still EXACT equality at storage precision,
+        # never a tolerance.
+        if str(current[column].dtype) in ("float32", "Float32"):
+            ref_num = ref_num.astype("float32").astype("float64")
+            cur_num = cur_num.astype("float32").astype("float64")
         numeric_mask = ref_num.notna() | cur_num.notna()
         if numeric_mask.any():
             if not (ref_num.isna() == cur_num.isna()).all():
@@ -95,13 +147,28 @@ def compare_frames(
                     "detail": f"NaN pattern differs in {column}",
                 })
                 return
-            delta = (ref_num - cur_num).abs().max()
+            deltas = (ref_num - cur_num).abs()
+            delta = deltas.max()
             if pd.notna(delta) and float(delta) > worst:
                 worst, worst_col = float(delta), column
+                worst_index = deltas.idxmax()
+                worst_context = "; ".join(
+                    f"{key}={ref.at[worst_index, key]}" for key in key_columns
+                )
         text_mask = ~numeric_mask
         if text_mask.any():
-            ref_text = ref_col[text_mask].fillna("").astype(str)
-            cur_text = cur_col[text_mask].fillna("").astype(str)
+            # A CSV cannot distinguish a missing cell from the literal
+            # strings "nan"/"None": normalise all of them to "" on both
+            # sides so representation, not content, never fails the gate.
+            def _normalise_text(series: pd.Series) -> pd.Series:
+                return (
+                    series.fillna("")
+                    .astype(str)
+                    .replace({"nan": "", "None": "", "<NA>": ""})
+                )
+
+            ref_text = _normalise_text(ref_col[text_mask])
+            cur_text = _normalise_text(cur_col[text_mask])
             if not ref_text.eq(cur_text).all():
                 bad = ref_text[~ref_text.eq(cur_text)]
                 results.append({
@@ -113,7 +180,9 @@ def compare_frames(
     results.append({
         "frame": name,
         "status": status,
-        "detail": f"max_abs_delta={worst:.3g} in {worst_col}" if worst else "exact",
+        "detail": (
+            f"max_abs_delta={worst:.3g} in {worst_col} [{worst_context}]" if worst else "exact"
+        ),
         "rows": len(ref),
         "columns": len(columns),
         "max_abs_delta": worst,

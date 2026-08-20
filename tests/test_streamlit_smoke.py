@@ -1267,6 +1267,43 @@ def test_revenue_outlook_defaults_to_single_scenario_view() -> None:
     assert "Advanced scenario levers" in expander_labels
 
 
+def test_revenue_outlook_renders_every_governed_policy_duration() -> None:
+    """The eight-state Current 12c dropdown, exercised end to end.
+
+    Every governed timing state renders without an exception, the selection
+    persists across the rerun, and the active-lever summary names the exact
+    selected label.
+    """
+    at = _run_revenue_outlook_page()
+    policy = next(
+        selectbox
+        for selectbox in at.selectbox
+        if selectbox.key == "revenue_outlook_fed_policy_state"
+    )
+    assert tuple(policy.options) == tuple(app.FED_POLICY_OPTIONS)
+    assert len(policy.options) == 8
+    # Preserved production default: the six-month deferral.
+    assert str(policy.value) == app.FED_POLICY_DELAYED_6M
+    for state in app.FED_POLICY_OPTIONS:
+        policy = next(
+            selectbox
+            for selectbox in at.selectbox
+            if selectbox.key == "revenue_outlook_fed_policy_state"
+        )
+        policy.set_value(state)
+        at.run()
+        assert not at.exception, state
+        assert at.session_state["revenue_outlook_fed_policy_state"] == state
+        rendered = "\n".join(
+            [
+                *(str(markdown.value) for markdown in at.markdown),
+                *(str(caption.value) for caption in at.caption),
+            ]
+        )
+        expected_label = app.FED_POLICY_LABELS[state]
+        assert expected_label in rendered, (state, expected_label)
+
+
 def test_revenue_outlook_activity_opens_policy_levers() -> None:
     at = _run_revenue_outlook_page()
     series = next(

@@ -2948,7 +2948,7 @@
       "model_dashboard/official_vintage.py": "9ab13f0f24d92a9096c67fd720eccb2b84c3d6bb99a8df7aa1e7bc3e29fc2f87",
       "model_dashboard/ped_forward.py": "92c3b5324ae798956679820a4e0b23314f2134a259c4b973d58640e6329325fa",
       "model_dashboard/post_model_extrapolation.py": "c2f469cea30854e20e446951a91d13b5b12a0e851d5f601c79b2ce16fe791517",
-      "model_dashboard/rate_paths.py": "55908ca19274a76229077e7ef20c9abb49347a457b318e6a8318569db10042b8",
+      "model_dashboard/rate_paths.py": "b6b2a93b89c6f5582df24e8a50a2f120bd092cd41a53f7e3a63772de0def4bb4",
       "model_dashboard/revenue_outlook.py": "00d46077b5766ddd0f797bc627d84aa1e4e8ca453e133df75d91a0fd03fa5ce3",
       "model_dashboard/revenue_outlook_replay_cache.py": "f24ea4013bb9169612a8d63008fb1ded2626bf780c272df6270fcbd6705eb518",
       "model_dashboard/revenue_source_pack.py": "61b9fd2b06d4c16add928656b9bd6e5cda9dcb38b0f3d9a0f60fb5c1e2cf8c9c",
@@ -3881,6 +3881,6 @@
     ]
   },
   "schema_version": "1",
-  "source_digest": "85f5603267175faf61f04f4d9c0e4b8f3dd137d722f37383a2cf06af439b4030",
-  "source_main_sha": "4aab336556e7919094c46f5e6ffd08bbeaac0623"
+  "source_digest": "1c8d2a93c67562d0128a6b7a4a2b35f788f8a101a2f4c673c1f76571d6de5116",
+  "source_main_sha": "be6b0b990ee32aadfaad95c721787019ad76d996"
 }

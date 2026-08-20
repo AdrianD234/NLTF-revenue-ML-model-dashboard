@@ -130,7 +130,18 @@ def _assert_policy_invariants(
         published_values = _annual(published_rows, trace, series_id)
         for fy in window_fys:
             if fy in policy_values and fy in published_values:
-                assert policy_values[fy] < published_values[fy], (state, series_id, fy)
+                # Strict in FY2027 (a taxed base always exists there); later
+                # window years may legitimately be equal when another lever
+                # has removed the taxed base entirely (e.g. e-RUC migrates
+                # the petrol fleet off excise, so no wedge remains to defer).
+                if fy == 2027:
+                    assert policy_values[fy] < published_values[fy], (state, series_id, fy)
+                else:
+                    assert policy_values[fy] <= published_values[fy] + 1e-9, (
+                        state,
+                        series_id,
+                        fy,
+                    )
         fed_delta[series_id] = {
             fy: policy_values[fy] - published_values[fy]
             for fy in sorted(set(policy_values) & set(published_values))
@@ -205,8 +216,18 @@ def test_6m_deferral_at_defaults_matches_the_production_state(outlook) -> None:
     _assert_policy_invariants(policy, published, state="delayed_6m")
     touched = policy[policy.get("_fed_policy", pd.Series(dtype=str)).astype(str).ne("")]
     assert set(touched["_fed_policy"]) == {"delay_6m"}
-    assert set(touched["value_status"]) == {"fed_uplift_delayed_6m"}
-    assert set(touched["data_scope"]) == {"fed_uplift_delay_counterfactual"}
+    # Quarterly rows the annual reconciliation touched carry the production
+    # `_quarterly_reconciled` suffix; annual rows carry the plain marker.
+    assert set(touched["value_status"]) <= {
+        "fed_uplift_delayed_6m",
+        "fed_uplift_delayed_6m_quarterly_reconciled",
+    }
+    assert "fed_uplift_delayed_6m" in set(touched["value_status"])
+    assert set(touched["data_scope"]) <= {
+        "fed_uplift_delay_counterfactual",
+        "fed_uplift_delay_counterfactual_quarterly_annual_reconciliation",
+    }
+    assert "fed_uplift_delay_counterfactual" in set(touched["data_scope"])
 
 
 def test_deferral_composes_with_the_optimized_ped_bridge_mode(outlook) -> None:

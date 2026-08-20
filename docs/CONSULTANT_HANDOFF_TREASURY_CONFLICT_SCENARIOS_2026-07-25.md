@@ -11,6 +11,13 @@ after the original EV/VFM handoff. The earlier evidence trail remains in
 [`docs/CONSULTANT_HANDOFF.md`](CONSULTANT_HANDOFF.md). Read that first if the
 review includes the MoT fleet-mix, EV-uptake or denominator rationale.
 
+> **Update (20 August 2026):** the three-state 12 c/L selector described
+> below has since been generalised to eight governed timing states
+> (deferrals of 6 to 36 months in six-month steps). The semantics described
+> here are unchanged and the six-month state is proven numerically
+> identical; see
+> [CONSULTANT_HANDOFF_FED_DEFERRAL_DURATION_2026-08-20.md](CONSULTANT_HANDOFF_FED_DEFERRAL_DURATION_2026-08-20.md).
+
 ## 1. Executive summary
 
 The current model now does five things that the earlier implementation did not do
