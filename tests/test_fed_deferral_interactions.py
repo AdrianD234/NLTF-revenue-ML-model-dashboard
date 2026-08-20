@@ -51,9 +51,13 @@ def outlook() -> dict[str, object]:
     assert pack is not None
     signature = revenue_outlook_signature(pack_dir, ROOT)
     # Interaction gates exercise the reference chain, never the materialised
-    # catalogue, so a stale or missing policy runtime cannot skew them.
+    # catalogue, so a stale or missing policy runtime cannot skew them. The
+    # production default is RESTORED afterwards - leaking False into later
+    # test modules fails their fast-path contract checks.
+    original_fast_path = app.POLICY_RUNTIME_FAST_PATH_ENABLED
     app.POLICY_RUNTIME_FAST_PATH_ENABLED = False
-    return {"pack": pack, "signature": signature}
+    yield {"pack": pack, "signature": signature}
+    app.POLICY_RUNTIME_FAST_PATH_ENABLED = original_fast_path
 
 
 def _overlay_rows(

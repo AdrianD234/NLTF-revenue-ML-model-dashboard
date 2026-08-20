@@ -37,13 +37,24 @@ def test_conflict_registry_has_stable_low_medium_high_identity_and_six_policy_va
         "Middle East conflict: High",
     ]
 
+    # One variant per non-published governed timing state: the six finite
+    # deferrals plus no-uplift, per severity (21 in total).
+    governed_policy_variants = (
+        "delay_6m",
+        "delay_12m",
+        "delay_18m",
+        "delay_24m",
+        "delay_30m",
+        "delay_36m",
+        "no_uplift",
+    )
     variants = all_conflict_policy_variants()
     assert [(variant.severity, variant.policy_variant) for variant in variants] == [
         (severity, policy_variant)
         for severity in CONFLICT_SEVERITIES
-        for policy_variant in ("delay_6m", "no_uplift")
+        for policy_variant in governed_policy_variants
     ]
-    assert len({variant.scenario_id for variant in variants}) == 6
+    assert len({variant.scenario_id for variant in variants}) == 21
     for variant in variants:
         assert variant.scenario_id == conflict_policy_variant_name(
             variant.severity,
