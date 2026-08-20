@@ -79,6 +79,10 @@ artifacts/**
 !artifacts/revenue_outlook_instant_runtime/**
 !artifacts/revenue_outlook_policy_runtime/
 !artifacts/revenue_outlook_policy_runtime/**
+# evidence for the governed 6-36 month 12c FED deferral duration selector,
+# including the legacy six-month reference the parity gate compares against
+!artifacts/fed_deferral_duration/
+!artifacts/fed_deferral_duration/**
 # evidence for the FY2050-continuous Fleet efficiency / PT mode shift levers
 !artifacts/revenue_outlook_long_run_sensitivities/
 !artifacts/revenue_outlook_long_run_sensitivities/**

@@ -38,6 +38,15 @@ from .ev_uptake_levers import (
     TOTAL_AGGREGATE_SERIES,
     reconcile_native_quarterly_activity_to_annual,
 )
+from .fed_policy_states import (
+    FED_DEFERRAL_CATCH_UP_NOTE,
+    FED_POLICY_SPECS,
+    FED_UPLIFT_START_PERIOD,
+    PolicyStateError,
+    finite_deferral_specs,
+    policy_spec,
+    quarter_serial,
+)
 from .light_fleet_allocation import LAST_DECISION_GRADE_ANNUAL_FY
 from .revenue_source_pack import REVENUE_LAST_COMPLETE_ACTUAL_FY
 
@@ -84,6 +93,13 @@ _DELAYED_QUARTERS = ("2027Q1", "2027Q2")
 
 FED_POLICY_STATE_DELAYED_6M = "delay_6m"
 FED_POLICY_STATE_NO_UPLIFT = "no_uplift"
+# All eight calculation-layer state ids, and the schedule column that answers
+# each. Derived from the canonical registry so a new duration is one registry
+# row, never an edit here. The published state maps to the planned column.
+_SCHEDULE_COLUMN_BY_STATE = {
+    spec.calculation_state_id: spec.schedule_column for spec in FED_POLICY_SPECS
+}
+_DEFERRAL_SEGMENTS = tuple(spec.schedule_column for spec in finite_deferral_specs())
 FED_POLICY_METADATA_COLUMNS = (
     "_fed_baseline_value",
     "_fed_annual_delta",
@@ -98,9 +114,28 @@ _RUC_REVENUE_LEAVES = (
     "heavy_bev_ruc_net_revenue",
 )
 _POLICY_PAIR_BY_STATE = {
-    FED_POLICY_STATE_DELAYED_6M: "baseline_delayed_6m",
+    **{
+        spec.calculation_state_id: f"baseline_{spec.pair_state_suffix}"
+        for spec in finite_deferral_specs()
+    },
     FED_POLICY_STATE_NO_UPLIFT: "baseline_no_uplift",
 }
+
+
+def _target_schedule_column(policy_state: str) -> str | None:
+    """Schedule column for a calculation-layer state; None for published.
+
+    Unknown states fail closed: a typo must never quietly produce an empty
+    factor map that reads as "no policy change".
+    """
+    state = str(policy_state)
+    try:
+        spec = policy_spec(state)
+    except PolicyStateError as error:
+        raise ValueError(str(error)) from error
+    if spec.is_published:
+        return None
+    return spec.schedule_column
 # Beyond the fixed-finalist replay window the only governed policy factor left
 # is the scalar rate ratio. It may reprice the leaves the RATE actually
 # governs - gross petrol excise, the five nominal RUC collection leaves, and
@@ -200,10 +235,14 @@ def _quarter_order(period: Any) -> tuple[int, int]:
 
 
 def ped_quarterly_rate_schedules(repo_root: Path) -> pd.DataFrame:
-    """Calendar-quarter PED $/L schedules, including the six-month delay.
+    """Calendar-quarter PED $/L schedules for every governed policy state.
 
-    The delayed scenario is deliberately narrow: only 2027Q1-Q2 take the
-    no-uplift rate.  From 2027Q3 the published planned path is unchanged.
+    Each finite deferral is deliberately narrow: only the quarters from
+    2027Q1 up to (excluding) its deferred start take the no-uplift rate.
+    From the deferred start the published planned path is unchanged, so a
+    later planned increase retains its original date and the path catches up
+    at the start quarter. The six-month column reproduces the original
+    governed scenario exactly: only 2027Q1-Q2 take the no-uplift rate.
     """
     fed = _fed_rate_paths(repo_root)
     pivot = fed.pivot_table(
@@ -219,23 +258,60 @@ def ped_quarterly_rate_schedules(repo_root: Path) -> pd.DataFrame:
     pivot["history"] = pd.to_numeric(pivot.get(_HISTORY_PATH), errors="coerce")
     pivot["planned"] = pd.to_numeric(pivot.get(_PLANNED_PATH), errors="coerce")
     pivot["no_uplift"] = pd.to_numeric(pivot.get(_NO_UPLIFT_PATH), errors="coerce")
-    pivot[_DELAYED_SEGMENT] = pivot["planned"]
-    delayed_mask = pivot["quarter"].isin(_DELAYED_QUARTERS)
-    pivot.loc[delayed_mask, _DELAYED_SEGMENT] = pivot.loc[delayed_mask, "no_uplift"]
+    quarters = set(pivot["quarter"])
+    for spec in finite_deferral_specs():
+        window = spec.direct_affected_quarters()
+        missing = [quarter for quarter in (*window, spec.start_period) if quarter not in quarters]
+        if missing:
+            raise ValueError(
+                f"The governed FED rate schedule cannot express {spec.state_id!r}: "
+                "quarters " + ", ".join(missing) + " are absent, so the deferral "
+                "cannot rejoin the planned schedule."
+            )
+        window_mask = pivot["quarter"].isin(window)
+        window_planned = pivot.loc[window_mask, "planned"]
+        window_no_uplift = pivot.loc[window_mask, "no_uplift"]
+        if window_planned.isna().any() or window_no_uplift.isna().any():
+            raise ValueError(
+                f"The governed FED rate schedule cannot express {spec.state_id!r}: "
+                "a planned or no-uplift rate inside its window is non-numeric."
+            )
+        if window_planned.le(0.0).any():
+            raise ValueError(
+                f"The governed planned FED rate is non-positive inside the "
+                f"{spec.state_id!r} window."
+            )
+        if window_no_uplift.lt(0.0).any():
+            raise ValueError(
+                f"The governed no-uplift FED rate is negative inside the "
+                f"{spec.state_id!r} window."
+            )
+        rejoin_planned = pivot.loc[pivot["quarter"].eq(spec.start_period), "planned"]
+        if rejoin_planned.isna().any():
+            raise ValueError(
+                f"The {spec.state_id!r} deferral cannot rejoin the planned schedule: "
+                f"no planned rate exists in {spec.start_period}."
+            )
+        pivot[spec.schedule_column] = pivot["planned"]
+        pivot.loc[window_mask, spec.schedule_column] = window_no_uplift
     pivot["_order"] = pivot["quarter"].map(_quarter_order)
     return (
         pivot.sort_values("_order", kind="stable")
-        .set_index("quarter")[["FY", "history", "planned", _DELAYED_SEGMENT, "no_uplift"]]
+        .set_index("quarter")[["FY", "history", "planned", *_DEFERRAL_SEGMENTS, "no_uplift"]]
     )
 
 
 def fed_policy_affected_periods(repo_root: Path, policy_state: str) -> dict[int, tuple[str, ...]]:
-    """Fiscal-year map of calendar quarters changed versus planned timing."""
+    """Fiscal-year map of calendar quarters changed versus planned timing.
+
+    These are the DIRECT rate-affected quarters: where the selected rate
+    differs from planned. The modelled activity response may extend to an
+    adjacent quarter only through the explicitly rebuilt Light-price lag and
+    Heavy-price lead inputs; that response window is reported separately by
+    the policy replay audit, never conflated with this map.
+    """
     schedules = ped_quarterly_rate_schedules(repo_root)
-    target_column = {
-        FED_POLICY_STATE_DELAYED_6M: _DELAYED_SEGMENT,
-        FED_POLICY_STATE_NO_UPLIFT: "no_uplift",
-    }.get(str(policy_state))
+    target_column = _target_schedule_column(policy_state)
     if not target_column:
         return {}
     planned = pd.to_numeric(schedules["planned"], errors="coerce")
@@ -257,10 +333,7 @@ def fed_policy_quarterly_factors(repo_root: Path, policy_state: str) -> dict[str
     """
 
     schedules = ped_quarterly_rate_schedules(repo_root)
-    target_column = {
-        FED_POLICY_STATE_DELAYED_6M: _DELAYED_SEGMENT,
-        FED_POLICY_STATE_NO_UPLIFT: "no_uplift",
-    }.get(str(policy_state))
+    target_column = _target_schedule_column(policy_state)
     if not target_column:
         return {}
     planned = pd.to_numeric(schedules["planned"], errors="coerce")
@@ -309,7 +382,7 @@ def ped_rate_change_quarterly_factors(
 
 
 def ped_rate_schedules(repo_root: Path, chart_rows: pd.DataFrame) -> pd.DataFrame:
-    """Per-FY PED $/L: history, planned, delayed and no-uplift paths."""
+    """Per-FY PED $/L: history, planned, every deferral and the no-uplift path."""
     fed = _fed_rate_paths(repo_root)
     by_path = fed.groupby(["fed_path", "FY"])["rate_nzd_per_litre"].mean()
     history = by_path.get(_HISTORY_PATH, pd.Series(dtype=float))
@@ -317,8 +390,16 @@ def ped_rate_schedules(repo_root: Path, chart_rows: pd.DataFrame) -> pd.DataFram
     no_uplift_src = by_path.get(_NO_UPLIFT_PATH, pd.Series(dtype=float))
     planned_pack = _pack_planned_ped_rates(chart_rows)
     quarterly = ped_quarterly_rate_schedules(repo_root)
-    delayed_src = quarterly.groupby("FY")[_DELAYED_SEGMENT].mean()
-    delayed_years = set(fed_policy_affected_periods(repo_root, FED_POLICY_STATE_DELAYED_6M))
+    deferral_annual_src = {
+        spec.schedule_column: quarterly.groupby("FY")[spec.schedule_column].mean()
+        for spec in finite_deferral_specs()
+    }
+    deferral_years = {
+        spec.schedule_column: set(
+            fed_policy_affected_periods(repo_root, spec.calculation_state_id)
+        )
+        for spec in finite_deferral_specs()
+    }
 
     years = sorted(
         set(history.index.astype(int))
@@ -336,18 +417,19 @@ def ped_rate_schedules(repo_root: Path, chart_rows: pd.DataFrame) -> pd.DataFram
             last_wedge = float(planned) - float(no_uplift)
         elif pd.notna(planned):
             no_uplift = float(planned) - last_wedge
-        delayed = delayed_src.get(fy, np.nan) if fy in delayed_years else planned
-        rows.append(
-            {
-                "june_year": int(fy),
-                # 'Selected rate' extends forward; only complete actual years
-                # count as history for display purposes.
-                "history": history.get(fy, np.nan) if fy <= REVENUE_LAST_COMPLETE_ACTUAL_FY else np.nan,
-                "planned": planned,
-                _DELAYED_SEGMENT: delayed,
-                "no_uplift": no_uplift,
-            }
-        )
+        row: dict[str, Any] = {
+            "june_year": int(fy),
+            # 'Selected rate' extends forward; only complete actual years
+            # count as history for display purposes.
+            "history": history.get(fy, np.nan) if fy <= REVENUE_LAST_COMPLETE_ACTUAL_FY else np.nan,
+            "planned": planned,
+        }
+        for column, annual_src in deferral_annual_src.items():
+            row[column] = (
+                annual_src.get(fy, np.nan) if fy in deferral_years[column] else planned
+            )
+        row["no_uplift"] = no_uplift
+        rows.append(row)
     return pd.DataFrame(rows).set_index("june_year")
 
 
@@ -364,17 +446,27 @@ def fed_uplift_off_factors(repo_root: Path, chart_rows: pd.DataFrame) -> dict[in
     return factors
 
 
-def fed_uplift_delayed_factors(repo_root: Path, chart_rows: pd.DataFrame) -> dict[int, float]:
-    """Per-FY PED multiplier for the initial 12c step delayed six months."""
+def fed_policy_annual_factors(
+    repo_root: Path, chart_rows: pd.DataFrame, policy_state: str
+) -> dict[int, float]:
+    """Per-FY PED multiplier for any governed policy state versus planned."""
+    target_column = _target_schedule_column(policy_state)
+    if not target_column:
+        return {}
     schedules = ped_rate_schedules(repo_root, chart_rows)
     factors: dict[int, float] = {}
     for fy, row in schedules.iterrows():
-        planned, delayed = row["planned"], row[_DELAYED_SEGMENT]
-        if pd.notna(planned) and pd.notna(delayed) and planned > 0:
-            factor = float(delayed) / float(planned)
+        planned, target = row["planned"], row[target_column]
+        if pd.notna(planned) and pd.notna(target) and planned > 0:
+            factor = float(target) / float(planned)
             if abs(factor - 1.0) > 1e-9:
                 factors[int(fy)] = factor
     return factors
+
+
+def fed_uplift_delayed_factors(repo_root: Path, chart_rows: pd.DataFrame) -> dict[int, float]:
+    """Per-FY PED multiplier for the initial 12c step delayed six months."""
+    return fed_policy_annual_factors(repo_root, chart_rows, FED_POLICY_STATE_DELAYED_6M)
 
 
 def rate_paths_frame(
@@ -401,7 +493,7 @@ def rate_paths_frame(
         for fy, value in path.items():
             schedule = schedules.loc[int(fy)] if int(fy) in schedules.index else None
             planned_rate = float(schedule["planned"]) if schedule is not None and pd.notna(schedule["planned"]) else np.nan
-            for segment in ("planned", _DELAYED_SEGMENT, "no_uplift"):
+            for segment in ("planned", *_DEFERRAL_SEGMENTS, "no_uplift"):
                 selected_rate = (
                     float(schedule[segment])
                     if schedule is not None and segment in schedule.index and pd.notna(schedule[segment])
@@ -424,7 +516,10 @@ def rate_paths_frame(
         for column, series, segment in [
             ("history", "PED (petrol excise)", "history"),
             ("planned", "PED (petrol excise)", "planned"),
-            (_DELAYED_SEGMENT, "PED (petrol excise)", _DELAYED_SEGMENT),
+            *(
+                (segment_column, "PED (petrol excise)", segment_column)
+                for segment_column in _DEFERRAL_SEGMENTS
+            ),
             ("no_uplift", "PED (petrol excise)", "no_uplift"),
         ]:
             value = row[column]
@@ -443,16 +538,35 @@ def rate_paths_frame(
 
 
 def _default_affected_periods(factors: dict[int, float], policy_state: str) -> dict[int, tuple[str, ...]]:
-    """Fallback quarter map for callers that only carry annual factors."""
+    """Fallback quarter map for callers that only carry annual factors.
+
+    Every affected fiscal year maps to its quarters from 2027Q1 onward
+    (bounded by the deferral window for a finite deferral). FY2027 therefore
+    maps to 2027Q1-Q2 only, because its earlier quarters precede the uplift.
+    """
     years = sorted(int(fy) for fy in factors)
     if not years:
         return {}
-    if policy_state == FED_POLICY_STATE_DELAYED_6M:
-        return {2027: _DELAYED_QUARTERS} if 2027 in years else {}
-    return {
-        fy: (_DELAYED_QUARTERS if fy == 2027 else tuple(f"{period}Q{quarter}" for period, quarter in [(fy - 1, 3), (fy - 1, 4), (fy, 1), (fy, 2)]))
-        for fy in years
-    }
+    spec = policy_spec(policy_state)
+    uplift_start = quarter_serial(FED_UPLIFT_START_PERIOD)
+    window_end = quarter_serial(spec.start_period) if spec.is_finite_deferral else None
+    out: dict[int, tuple[str, ...]] = {}
+    for fy in years:
+        fy_quarters = (
+            f"{fy - 1}Q3",
+            f"{fy - 1}Q4",
+            f"{fy}Q1",
+            f"{fy}Q2",
+        )
+        selected = tuple(
+            quarter
+            for quarter in fy_quarters
+            if quarter_serial(quarter) >= uplift_start
+            and (window_end is None or quarter_serial(quarter) < window_end)
+        )
+        if selected:
+            out[fy] = selected
+    return out
 
 
 def _policy_row_key(data: pd.DataFrame, index: Any, fy: int) -> tuple[str, str, str, int]:
@@ -704,16 +818,9 @@ def apply_fed_rate_policy_to_chart_rows(
             )
 
         touched = data["_fed_policy"].astype(str).eq(policy_state)
-        value_status = (
-            "fed_uplift_off"
-            if policy_state == FED_POLICY_STATE_NO_UPLIFT
-            else "fed_uplift_delayed_6m"
-        )
-        data_scope = (
-            "fed_uplift_counterfactual"
-            if policy_state == FED_POLICY_STATE_NO_UPLIFT
-            else "fed_uplift_delay_counterfactual"
-        )
+        policy_spec_for_state = policy_spec(policy_state)
+        value_status = policy_spec_for_state.value_status
+        data_scope = policy_spec_for_state.data_scope
         if "value_status" in data.columns:
             data.loc[touched, "value_status"] = value_status
         if "data_scope" in data.columns:
@@ -969,12 +1076,11 @@ def apply_fed_rate_policy_to_chart_rows(
                 data.at[index, "_fed_affected_quarters"] = ";".join(periods)
 
     touched = data["_fed_policy"].astype(str).eq(policy_state)
+    policy_spec_for_state = policy_spec(policy_state)
     if "value_status" in data.columns:
-        value_status = "fed_uplift_off" if policy_state == FED_POLICY_STATE_NO_UPLIFT else "fed_uplift_delayed_6m"
-        data.loc[touched, "value_status"] = value_status
+        data.loc[touched, "value_status"] = policy_spec_for_state.value_status
     if "data_scope" in data.columns:
-        data_scope = "fed_uplift_counterfactual" if policy_state == FED_POLICY_STATE_NO_UPLIFT else "fed_uplift_delay_counterfactual"
-        data.loc[touched, "data_scope"] = data_scope
+        data.loc[touched, "data_scope"] = policy_spec_for_state.data_scope
     return data, pd.DataFrame(audit_rows)
 
 
@@ -994,6 +1100,38 @@ def _reject_official_scope(scenario_roles: set[str] | tuple[str, ...] | None, he
             "Use apply_official_comparator_rate_policy_to_chart_rows, which sources its own "
             "schedule from the MBU26 spine and publishes over the official horizon."
         )
+
+
+def apply_fed_policy_state_to_chart_rows(
+    chart_rows: pd.DataFrame,
+    factors: dict[int, float],
+    *,
+    policy_state: str,
+    scenario_roles: set[str] | tuple[str, ...] | None = None,
+    affected_periods_by_fy: dict[int, tuple[str, ...]] | None = None,
+    policy_pair_factors: pd.DataFrame | None = None,
+    ruc_class_revenue_by_fy: dict[int, float] | None = None,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Apply any governed non-published policy state to current-model rows.
+
+    The generic entry point behind the six-month and no-uplift wrappers.
+    ``policy_state`` is a calculation-layer state id; the published state is
+    rejected because it never changes a row, and official-comparator rows are
+    rejected because they are a different calculation with their own schedule.
+    """
+    spec = policy_spec(policy_state)
+    if spec.is_published:
+        raise ValueError("The published state has no chart-row counterfactual to apply.")
+    _reject_official_scope(scenario_roles, "apply_fed_policy_state_to_chart_rows")
+    return apply_fed_rate_policy_to_chart_rows(
+        chart_rows,
+        factors,
+        policy_state=spec.calculation_state_id,
+        scenario_roles=scenario_roles,
+        affected_periods_by_fy=affected_periods_by_fy,
+        policy_pair_factors=policy_pair_factors,
+        ruc_class_revenue_by_fy=ruc_class_revenue_by_fy,
+    )
 
 
 def apply_fed_uplift_delay_to_chart_rows(
@@ -1132,13 +1270,15 @@ def official_comparator_policy_factors(
     schedule has one, and the terminal wedge only beyond it, so the comparator stays parallel to the
     planned schedule instead of stopping where the current model stops.
 
-    ``delay_6m``: identity outside the affected FY2027 window, because the
-    six-month delay only shifts the timing of the initial step.
+    finite deferrals (``delay_6m`` … ``delay_36m``): identity outside the
+    affected fiscal-year window, because a deferral only shifts the timing of
+    the initial step; later planned increases retain their published dates.
 
     Fails closed for a June year whose official published PED rate cannot be
     derived: the policy-adjusted official trace must never silently fall back
     to published values while claiming the policy was applied.
     """
+    policy_spec_for_state = policy_spec(policy_state)
     spine = _mbu26_spine(repo_root)
     for column in ("gross_ped_revenue", "ped_volume"):
         if column not in spine.columns:
@@ -1149,9 +1289,14 @@ def official_comparator_policy_factors(
     wedge_by_fy, terminal_wedge, last_source_fy, uplift_start_fy = (
         governed_no_uplift_wedge_schedule(repo_root)
     )
-    delayed_years = set(fed_policy_affected_periods(repo_root, FED_POLICY_STATE_DELAYED_6M))
-    quarterly = ped_quarterly_rate_schedules(repo_root)
-    delayed_src = quarterly.groupby("FY")[_DELAYED_SEGMENT].mean()
+    delayed_years: set[int] = set()
+    delayed_src = pd.Series(dtype=float)
+    if policy_spec_for_state.is_finite_deferral:
+        delayed_years = set(
+            fed_policy_affected_periods(repo_root, policy_spec_for_state.calculation_state_id)
+        )
+        quarterly = ped_quarterly_rate_schedules(repo_root)
+        delayed_src = quarterly.groupby("FY")[policy_spec_for_state.schedule_column].mean()
     fed = _fed_rate_paths(repo_root)
     planned_by_fy = (
         fed[fed["fed_path"].astype(str).eq(_PLANNED_PATH)].groupby("FY")["rate_nzd_per_litre"].mean()
@@ -1167,7 +1312,7 @@ def official_comparator_policy_factors(
     rows: list[dict[str, Any]] = []
     for fy in sorted(int(value) for value in published.index):
         source_rate = float(published.loc[fy])
-        if policy_state == FED_POLICY_STATE_NO_UPLIFT:
+        if policy_spec_for_state.is_no_uplift:
             if fy < uplift_start_fy:
                 continue  # the uplift does not exist yet, so no counterfactual
             if fy in wedge_by_fy:
@@ -1189,7 +1334,7 @@ def official_comparator_policy_factors(
                     "forward beyond the source schedule"
                 )
             target_rate = source_rate - nominal_wedge
-        elif policy_state == FED_POLICY_STATE_DELAYED_6M:
+        elif policy_spec_for_state.is_finite_deferral:
             if fy not in delayed_years:
                 continue  # identity outside the affected window
             if fy not in set(delayed_src.index.astype(int)) or fy not in set(

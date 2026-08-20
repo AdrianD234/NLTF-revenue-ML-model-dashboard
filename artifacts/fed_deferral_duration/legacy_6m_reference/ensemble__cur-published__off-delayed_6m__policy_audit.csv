@@ -1,0 +1,2 @@
+scenario_name,scenario_role,trace_name,fed_path,june_year,policy_state,rate_factor,baseline_ped_revenue,adjusted_ped_revenue,ped_revenue_delta,affected_periods,indicator_series_id,scenario_scope,rate_only_fixed_volumes,factor_source
+mbu26_official,official_comparator,MBU26 official,MBU26,2027,delay_6m,0.9210775544564873,2200.87789552971,2027.1792296718454,-173.6986658578644,2027Q1;2027Q2,ped_vkt_per_capita,official_comparator,True,official_comparator_policy_factors
