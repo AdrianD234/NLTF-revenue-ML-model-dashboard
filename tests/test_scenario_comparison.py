@@ -698,6 +698,27 @@ def test_comparison_figure_bridges_the_actual_seam_visually() -> None:
     ]
 
 
+def test_narrowed_window_zooms_the_paths_chart_to_selected_years() -> None:
+    """A narrowed window shows ONLY the selected June years on the paths chart.
+
+    History (and with it the seam bridge) is dropped and the x-axis clamps to
+    the window, with year-level ticks for short spans; the full-window call is
+    byte-identical to the pre-window chart with history and auto-ranging.
+    """
+    history = pd.Series([90.0, 95.0], index=[2025, 2026])
+    a = pd.Series([100.0 + i for i in range(7)], index=list(range(2027, 2034)))
+    figure = app._scenario_comparison_figure(
+        history, a, a, "$m nominal ex GST", x_window=(2027, 2033)
+    )
+    assert "Actual" not in [str(trace.name) for trace in figure.data]
+    assert tuple(figure.layout.xaxis.range) == (2026.5, 2033.5)
+    assert figure.layout.xaxis.dtick == 1
+    figure_full = app._scenario_comparison_figure(history, a, a, "$m nominal ex GST")
+    assert "Actual" in [str(trace.name) for trace in figure_full.data]
+    assert figure_full.layout.xaxis.range is None
+    assert figure_full.layout.xaxis.dtick == 5
+
+
 def test_prebu26_seam_keeps_fy2026_out_of_the_window_and_aggregates(comparison_context) -> None:
     """The window floor follows the selected vintage's presentation seam.
 

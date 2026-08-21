@@ -10596,11 +10596,14 @@ def _render_scenario_comparison_panel(
             paths_note if full_window else f"{paths_note} Comparison window {window_text}.",
             _scenario_comparison_figure(
                 result["history"],
-                # The full window keeps any pre-forecast nowcast anchor for
-                # chart continuity, exactly as before the window existed.
+                # The full window keeps the history and any pre-forecast
+                # anchor for chart continuity, exactly as before the window
+                # existed; a narrowed window zooms the axis to only the
+                # selected June years.
                 a_path if full_window else a_window,
                 b_path if full_window else b_window,
                 result["value_unit"],
+                x_window=None if full_window else (start_fy, end_fy),
             ),
             caption=None,
             notes_as_tooltip=True,
@@ -10796,9 +10799,21 @@ def _scenario_amount_text(value_in_millions: float, value_unit: str) -> str:
     return f"{scaled:,.1f}"
 
 
-def _scenario_comparison_figure(history: pd.Series, a: pd.Series, b: pd.Series, value_unit: str) -> go.Figure:
+def _scenario_comparison_figure(
+    history: pd.Series,
+    a: pd.Series,
+    b: pd.Series,
+    value_unit: str,
+    *,
+    x_window: tuple[int, int] | None = None,
+) -> go.Figure:
     if (a is None or a.empty) and (b is None or b.empty):
         return empty_figure("Selected series has no forecast rows for the chosen scenarios.")
+    if x_window is not None and history is not None and not history.empty:
+        # A narrowed comparison window zooms the chart to ONLY the selected
+        # June years: history outside the window is dropped rather than left
+        # trailing off-axis, so the paths fill the plot.
+        history = _comparison_fy_window_slice(history, x_window[0], x_window[1])
     scale = _display_value_scale_for_unit(value_unit)
     axis_title = _display_axis_unit(value_unit)
     hover_value = _scenario_hover_value_format(value_unit)
@@ -10851,7 +10866,17 @@ def _scenario_comparison_figure(history: pd.Series, a: pd.Series, b: pd.Series, 
                     name=f"{name} handover",
                 )
             )
-    fig.update_xaxes(title_text="June year ending", title_font={"size": 11, "color": "#5A6B7B"}, showgrid=False, dtick=5)
+    xaxis_kwargs: dict[str, Any] = {
+        "title_text": "June year ending",
+        "title_font": {"size": 11, "color": "#5A6B7B"},
+        "showgrid": False,
+        "dtick": 5,
+    }
+    if x_window is not None:
+        span = int(x_window[1]) - int(x_window[0])
+        xaxis_kwargs["range"] = [int(x_window[0]) - 0.5, int(x_window[1]) + 0.5]
+        xaxis_kwargs["dtick"] = 1 if span <= 12 else 5
+    fig.update_xaxes(**xaxis_kwargs)
     fig.update_yaxes(title_text=axis_title, gridcolor="#E6EDF5", zeroline=False)
     fig.update_layout(
         height=340,
