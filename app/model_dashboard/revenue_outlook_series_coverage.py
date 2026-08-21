@@ -1382,6 +1382,17 @@ def derive_quarterly_rows(
         "historical_actual"
     )
     data = data[is_actual_row | data["_fy"].ge(REVENUE_FIRST_FORECAST_FY)]
+    # An annual total an official vintage publishes as ACTUAL (PREBU26's
+    # FY2026) is never split into quarters: the vintages publish no quarterly
+    # actuals, and deriving quarters under an actual-status annual would
+    # manufacture a quarterly history that was never published. That vintage's
+    # derived quarterly path simply starts the following June year.
+    official_actual_annual = data.get(
+        "row_type", pd.Series("", index=data.index)
+    ).astype(str).eq("official_comparator") & data.get(
+        "value_status", pd.Series("", index=data.index)
+    ).astype(str).eq("actual")
+    data = data[~official_actual_annual]
     if data.empty:
         return empty
 

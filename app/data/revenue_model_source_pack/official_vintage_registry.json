@@ -159,8 +159,8 @@
         }
       ],
       "available": true,
-      "is_latest": true,
-      "is_default_comparator": true,
+      "is_latest": false,
+      "is_default_comparator": false,
       "is_default_bridge_vintage": true,
       "status": "active_official_vintage",
       "notes": "BEFU26 published revenue forecast. Workbook vendored at references/BEFU26 revenue forecast.xlsx (governed input; hash pinned above). Sentinels pin the total and representative activity/revenue leaves so a shifted row mapping cannot pass by matching only the total.",
@@ -169,6 +169,144 @@
       "long_run_shape_end_fy": 2055,
       "long_run_shape_required_series_available": true,
       "is_default_long_run_shape_vintage": true
+    },
+    {
+      "vintage_id": "PREBU26",
+      "display_name": "PREBU26 official",
+      "release_round": "PREBU26",
+      "release_date": null,
+      "source_workbook": "references/PREBU26.xlsx",
+      "workbook_sha256": "f69985432b34271d5868267d78b77ad2c746563788011b445715e4f58a25728b",
+      "source_sheet": "PREBU",
+      "schema_version": "nltf-revenue-official-vintage-v1",
+      "actual_start_fy": 2001,
+      "actual_end_fy": 2026,
+      "short_forecast_start_fy": 2027,
+      "short_forecast_end_fy": 2031,
+      "long_forecast_start_fy": 2032,
+      "long_forecast_end_fy": 2055,
+      "source_horizon_fy": 2055,
+      "source_pack_path": "data/revenue_model_source_pack/official_vintages/prebu26",
+      "pack_format": "official_vintage_v1",
+      "file_stems": {
+        "annual_spine": "annual_spine",
+        "official_annual": "official_annual",
+        "formula_audit": "formula_audit",
+        "row_reconciliation": "row_reconciliation",
+        "series_alias_audit": "series_alias_audit",
+        "series_trace_contract": "series_trace_contract",
+        "trace_source_contract": "trace_source_contract",
+        "path_trace_status": "path_trace_status"
+      },
+      "layout": {
+        "year_header_row": 1,
+        "period_status_row": 2,
+        "label_column": 1
+      },
+      "allowed_missing": [
+        {
+          "series_id": "light_petrol_vkt",
+          "fys": [
+            2001,
+            2002
+          ]
+        },
+        {
+          "series_id": "ped_vkt_per_capita",
+          "fys": [
+            2001,
+            2002
+          ]
+        }
+      ],
+      "sentinels": [
+        {
+          "series_id": "total_nltf_net_revenue",
+          "fy": 2026,
+          "value": 4491.33665247696
+        },
+        {
+          "series_id": "total_nltf_net_revenue",
+          "fy": 2030,
+          "value": 6457.08040779104
+        },
+        {
+          "series_id": "total_nltf_net_revenue",
+          "fy": 2050,
+          "value": 12955.4993074031
+        },
+        {
+          "series_id": "total_nltf_net_revenue",
+          "fy": 2055,
+          "value": 14499.124352196
+        },
+        {
+          "series_id": "net_fed_revenue",
+          "fy": 2026,
+          "value": 2022.61171268
+        },
+        {
+          "series_id": "total_ruc_net_revenue",
+          "fy": 2026,
+          "value": 2049.28050774696
+        },
+        {
+          "series_id": "light_petrol_vkt",
+          "fy": 2026,
+          "value": 31991.1088605308
+        },
+        {
+          "series_id": "ped_vkt_per_capita",
+          "fy": 2026,
+          "value": 5965.26362676545
+        },
+        {
+          "series_id": "light_ruc_net_km",
+          "fy": 2026,
+          "value": 12489.492147
+        },
+        {
+          "series_id": "ped_volume",
+          "fy": 2040,
+          "value": 1960.33670915047
+        },
+        {
+          "series_id": "tuc_gtk",
+          "fy": 2026,
+          "value": 8261539015.48
+        },
+        {
+          "series_id": "light_ruc_net_revenue",
+          "fy": 2055,
+          "value": 789.484160803912
+        },
+        {
+          "series_id": "gross_ruc_revenue",
+          "fy": 2040,
+          "value": 6563.93248565464
+        },
+        {
+          "series_id": "gross_mvr_revenue",
+          "fy": 2040,
+          "value": 523.725382047434
+        },
+        {
+          "series_id": "tuc_net_revenue",
+          "fy": 2026,
+          "value": 17.55237116
+        }
+      ],
+      "available": true,
+      "is_latest": true,
+      "is_default_comparator": true,
+      "is_default_bridge_vintage": false,
+      "status": "active_official_vintage",
+      "notes": "PREBU26 published revenue forecast (annual actuals through FY2026). Workbook vendored at references/PREBU26.xlsx (governed input; hash pinned above). Comparator role only: BEFU26 remains the default bridge-assumption and long-run-shape vintage. Sentinels pin the total and representative activity/revenue leaves so a shifted row mapping cannot pass by matching only the total.",
+      "supports_long_run_shape": true,
+      "long_run_shape_start_fy": 2024,
+      "long_run_shape_end_fy": 2055,
+      "is_default_long_run_shape_vintage": false,
+      "long_run_shape_missing_series": []
     }
   ]
 }
