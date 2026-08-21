@@ -8391,10 +8391,13 @@ def _runtime_mbu26_official_rows(official_annual: pd.DataFrame, series_meta: dic
     ].copy()
     data["FY_numeric"] = pd.to_numeric(data.get("FY"), errors="coerce")
     data["value_numeric"] = pd.to_numeric(data.get("value"), errors="coerce")
+    # Years covered by the Actual history line (which ends at the Current
+    # model's last complete actual FY) never join an official trace. Beyond
+    # that boundary every published row joins, whatever its source status: a
+    # vintage whose ACTUAL block extends past the boundary (PREBU26 publishes
+    # FY2026 as ACTUAL) still owns those years on its comparator trace, with
+    # value_status carried from the source rather than relabelled as forecast.
     data = data[data["FY_numeric"].ge(REVENUE_LAST_COMPLETE_ACTUAL_FY + 1) & data["value_numeric"].notna()].copy()
-    data = data[
-        ~data.get("period_status", pd.Series("", index=data.index)).astype(str).str.upper().eq("ACTUAL")
-    ].copy()
     records: list[dict[str, Any]] = []
     for row in data.itertuples(index=False):
         series_id = str(getattr(row, "series_id", "") or "")

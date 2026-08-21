@@ -1,0 +1,496 @@
+series_id,source_label,source_row,source_cell,FY,period_status,published_pct_change,recomputed_pct_change,detected_workbook_unit,residual,relative_residual,status
+light_ruc_net_km,Light RUC net km (m km),16,B16,2001,ACTUAL,,,fraction,,,not_computable
+light_ruc_net_km,Light RUC net km (m km),16,C16,2002,ACTUAL,0.127336188219414,0.1273361882194144,fraction,-3.885780586188048e-16,3.051591727791016e-15,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,D16,2003,ACTUAL,-0.0527644608353365,-0.05276446083533648,fraction,-2.0816681711721685e-17,3.9452088360544197e-16,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,E16,2004,ACTUAL,0.127799046740831,0.12779904674083098,fraction,2.7755575615628914e-17,2.171813978543643e-16,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,F16,2005,ACTUAL,0.103800456729833,0.10380045672983274,fraction,2.636779683484747e-16,2.54023899947535e-15,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,G16,2006,ACTUAL,-0.0663698014226496,-0.0663698014226497,fraction,9.71445146547012e-17,1.4636854800284088e-15,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,H16,2007,ACTUAL,0.0617171685100846,0.061717168510084575,fraction,2.7755575615628914e-17,4.497221159958701e-16,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,I16,2008,ACTUAL,0.0489653730317947,0.04896537303179471,fraction,-1.3877787807814457e-17,2.834204448683192e-16,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,J16,2009,ACTUAL,-0.035891309639369,-0.03589130963936904,fraction,4.163336342344337e-17,1.1599845155211581e-15,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,K16,2010,ACTUAL,0.0371025948509582,0.03710259485095824,fraction,-3.469446951953614e-17,9.350955009724905e-16,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,L16,2011,ACTUAL,-0.00143259750409352,-0.0014325975040935246,fraction,4.553649124439119e-18,3.17859629897962e-15,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,M16,2012,ACTUAL,0.0146182204071765,0.01461822040717653,fraction,-2.949029909160572e-17,2.017365881084132e-15,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,N16,2013,ACTUAL,0.0274619745316567,0.027461974531656663,fraction,3.8163916471489756e-17,1.3897003810667904e-15,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,O16,2014,ACTUAL,0.0809098636183447,0.08090986361834474,fraction,-4.163336342344337e-17,5.145647460219401e-16,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,P16,2015,ACTUAL,0.0406253565641839,0.04062535656418387,fraction,3.469446951953614e-17,8.54010215632753e-16,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,Q16,2016,ACTUAL,0.0547578851894956,0.05475788518949565,fraction,-4.85722573273506e-17,8.870367648286816e-16,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,R16,2017,ACTUAL,0.0781982278055893,0.07819822780558927,fraction,2.7755575615628914e-17,3.5493867820934254e-16,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,S16,2018,ACTUAL,0.065858617936468,0.06585861793646797,fraction,2.7755575615628914e-17,4.2144181711198325e-16,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,T16,2019,ACTUAL,0.0707327196144181,0.07073271961441785,fraction,2.498001805406602e-16,3.531607181264695e-15,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,U16,2020,ACTUAL,-0.0430558666561087,-0.04305586665610883,fraction,1.3183898417423734e-16,3.0620446042172937e-15,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,V16,2021,ACTUAL,0.0537703847488682,0.053770384748868194,fraction,6.938893903907228e-18,1.2904675940696675e-16,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,W16,2022,ACTUAL,0.0538453423494922,0.05384534234949223,fraction,-2.7755575615628914e-17,5.154684584504393e-16,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,X16,2023,ACTUAL,0.0718969026802978,0.0718969026802978,fraction,0.0,0.0,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,Y16,2024,ACTUAL,-0.235938102018947,-0.23593810201894683,fraction,-1.6653345369377348e-16,7.058353537166292e-16,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,Z16,2025,ACTUAL,0.185256513745379,0.18525651374537877,fraction,2.220446049250313e-16,1.1985792047788129e-15,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,AA16,2026,ACTUAL,0.0175581357485428,0.017558135748542814,fraction,-1.3877787807814457e-17,7.903907343332964e-16,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,AB16,2027,ST_FORECAST,0.0180579126339468,0.018057912633947515,fraction,-7.147060721024445e-16,3.957855409926234e-14,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,AC16,2028,ST_FORECAST,0.0463679334306302,0.04636793343063195,fraction,-1.7486012637846216e-15,3.771143405389395e-14,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,AD16,2029,ST_FORECAST,0.043535197481906,0.043535197481905374,fraction,6.245004513516506e-16,1.4344725359548743e-14,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,AE16,2030,ST_FORECAST,0.0396335720273668,0.039633572027362174,fraction,4.628242233906121e-15,1.1677580387432356e-13,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,AF16,2031,ST_FORECAST,0.0381134993665091,0.03811349936651487,fraction,-5.766220834146907e-15,1.5129077439719162e-13,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,AG16,2032,LT_FORECAST,-0.0144055400483633,-0.01440554004836403,fraction,7.303185833862358e-16,5.069706383338087e-14,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,AH16,2033,LT_FORECAST,-0.0183937981603775,-0.01839379816038067,fraction,3.1710745140856034e-15,1.7239911444260277e-13,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,AI16,2034,LT_FORECAST,-0.0214888312973022,-0.02148883129730239,fraction,1.9081958235744878e-16,8.879942315960357e-15,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,AJ16,2035,LT_FORECAST,-0.0247467171939887,-0.02474671719398691,fraction,-1.790234627208065e-15,7.234230759476516e-14,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,AK16,2036,LT_FORECAST,-0.0279670841648553,-0.027967084164854605,fraction,-6.938893903907228e-16,2.4810930817833088e-14,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,AL16,2037,LT_FORECAST,-0.0323454048890973,-0.03234540488910009,fraction,2.796374243274613e-15,8.645352416710506e-14,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,AM16,2038,LT_FORECAST,-0.0383815249353616,-0.038381524935361844,fraction,2.42861286636753e-16,6.327556996387054e-15,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,AN16,2039,LT_FORECAST,-0.0438470489519672,-0.0438470489519629,fraction,-4.3021142204224816e-15,9.81163914847658e-14,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,AO16,2040,LT_FORECAST,-0.0485684499571587,-0.04856844995716392,fraction,5.218048215738236e-15,1.0743699295201753e-13,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,AP16,2041,LT_FORECAST,-0.0502015229097045,-0.05020152290970059,fraction,-3.9065972678997696e-15,7.781830194527597e-14,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,AQ16,2042,LT_FORECAST,-0.0490100309643531,-0.049010030964357076,fraction,3.975986206938842e-15,8.11259680662191e-14,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,AR16,2043,LT_FORECAST,-0.0606092065525751,-0.06060920655257229,fraction,-2.8102520310824275e-15,4.636675170206726e-14,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,AS16,2044,LT_FORECAST,-0.0612531396041108,-0.061253139604110385,fraction,-4.163336342344337e-16,6.796935421192609e-15,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,AT16,2045,LT_FORECAST,-0.0609763773057882,-0.06097637730578864,fraction,4.440892098500626e-16,7.282971364845319e-15,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,AU16,2046,LT_FORECAST,-0.0615809572117357,-0.061580957211734955,fraction,-7.424616477180734e-16,1.2056675981265664e-14,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,AV16,2047,LT_FORECAST,-0.0624759819496767,-0.062475981949677406,fraction,7.077671781985373e-16,1.1328628316216355e-14,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,AW16,2048,LT_FORECAST,-0.0637483461755639,-0.06374834617556324,fraction,-6.522560269672795e-16,1.0231732524808774e-14,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,AX16,2049,LT_FORECAST,-0.065642894949321,-0.06564289494932107,fraction,6.938893903907228e-17,1.0570670152899762e-15,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,AY16,2050,LT_FORECAST,-0.0674020184444396,-0.06740201844443883,fraction,-7.771561172376096e-16,1.153016089389428e-14,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,AZ16,2051,LT_FORECAST,-0.0683893122676801,-0.06838931226768097,fraction,8.743006318923108e-16,1.2784170550951464e-14,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,BA16,2052,LT_FORECAST,-0.0694730871373992,-0.06947308713739841,fraction,-7.91033905045424e-16,1.1386191943377718e-14,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,BB16,2053,LT_FORECAST,-0.0584852623544999,-0.0584852623545008,fraction,9.020562075079397e-16,1.5423649842591857e-14,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,BC16,2054,LT_FORECAST,-0.0588339844801005,-0.05883398448010102,fraction,5.204170427930421e-16,8.845517559142351e-15,reconciled
+light_ruc_net_km,Light RUC net km (m km),16,BD16,2055,LT_FORECAST,-0.0651630411888129,-0.06516304118881178,fraction,-1.124100812432971e-15,1.7250588553346624e-14,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,B17,2001,ACTUAL,,,fraction,,,not_computable
+heavy_ruc_net_km,Heavy RUC net km (m km),17,C17,2002,ACTUAL,0.0483422319142417,0.048342231914241696,fraction,6.938893903907228e-18,1.4353689577710663e-16,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,D17,2003,ACTUAL,0.0463751256473484,0.04637512564734836,fraction,4.163336342344337e-17,8.97752035003357e-16,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,E17,2004,ACTUAL,0.0571113504334397,0.057111350433439734,fraction,-3.469446951953614e-17,6.074881657713683e-16,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,F17,2005,ACTUAL,0.0377737575581325,0.03777375755813228,fraction,2.1510571102112408e-16,5.694580706991755e-15,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,G17,2006,ACTUAL,-0.00292037921610178,-0.002920379216101776,fraction,-3.903127820947816e-18,1.3365140388027576e-15,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,H17,2007,ACTUAL,0.0419993033007333,0.041999303300733315,fraction,-1.3877787807814457e-17,3.304290004156366e-16,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,I17,2008,ACTUAL,0.00603755317575061,0.00603755317575061,fraction,0.0,0.0,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,J17,2009,ACTUAL,-0.0503273273276235,-0.05032732732762335,fraction,-1.5265566588595902e-16,3.0332559663300525e-15,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,K17,2010,ACTUAL,-0.00173326727181244,-0.0017332672718125552,fraction,1.1514227071796057e-16,6.643076494345337e-14,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,L17,2011,ACTUAL,0.0519941105796042,0.051994110579604236,fraction,-3.469446951953614e-17,6.672769114189976e-16,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,M17,2012,ACTUAL,0.0122728928165712,0.01227289281657118,fraction,2.0816681711721685e-17,1.6961511864272505e-15,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,N17,2013,ACTUAL,0.0356500856045341,0.035650085604533865,fraction,2.3592239273284576e-16,6.6177230357854144e-15,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,O17,2014,ACTUAL,0.0265170378005326,0.026517037800532828,fraction,-2.2898349882893854e-16,8.635334781788386e-15,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,P17,2015,ACTUAL,0.014338898978856,0.014338898978855985,fraction,1.5612511283791264e-17,1.0888221827082634e-15,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,Q17,2016,ACTUAL,0.00484385497138717,0.004843854971387174,fraction,-3.469446951953614e-18,7.162573967320992e-16,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,R17,2017,ACTUAL,0.0338938245639879,0.03389382456398815,fraction,-2.498001805406602e-16,7.37007946887382e-15,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,S17,2018,ACTUAL,0.0466884173359861,0.046688417335986054,fraction,4.85722573273506e-17,1.040349193629927e-15,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,T17,2019,ACTUAL,0.0122007177099159,0.012200717709915931,fraction,-3.122502256758253e-17,2.559277520387584e-15,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,U17,2020,ACTUAL,-0.0500218962395356,-0.05002189623953557,fraction,-3.469446951953614e-17,6.935856520392131e-16,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,V17,2021,ACTUAL,0.070773584298611,0.07077358429861103,fraction,-2.7755575615628914e-17,3.921742256054373e-16,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,W17,2022,ACTUAL,0.00717018217835941,0.007170182178359408,fraction,2.6020852139652106e-18,3.6290364027550935e-16,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,X17,2023,ACTUAL,-0.00435921862160071,-0.004359218621600602,fraction,-1.0755285551056204e-16,2.4672507815419262e-14,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,Y17,2024,ACTUAL,-0.0599326574662384,-0.05993265746623855,fraction,1.457167719820518e-16,2.4313417449265857e-15,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,Z17,2025,ACTUAL,0.019983205778296,0.019983205778296043,fraction,-4.163336342344337e-17,2.0834176400596236e-15,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,AA17,2026,ACTUAL,0.0199149076972962,0.019914907697296202,fraction,-3.469446951953614e-18,1.742135592435938e-16,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,AB17,2027,ST_FORECAST,0.0271000633551843,0.027100063355185222,fraction,-9.228728892196614e-16,3.405427054262153e-14,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,AC17,2028,ST_FORECAST,0.0199755145048903,0.01997551450488988,fraction,4.198030811863873e-16,2.1015883274677213e-14,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,AD17,2029,ST_FORECAST,0.0216971689513956,0.021697168951395396,fraction,2.0469737016526324e-16,9.434289359308265e-15,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,AE17,2030,ST_FORECAST,0.0206017411747625,0.0206017411747621,fraction,3.9898639947466563e-16,1.9366634892173036e-14,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,AF17,2031,ST_FORECAST,0.0176004371791298,0.017600437179130735,fraction,-9.332812300755222e-16,5.3026025466125147e-14,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,AG17,2032,LT_FORECAST,0.000237693188765986,0.00023769318876509793,fraction,8.880699994828767e-16,3.736202977025642e-12,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,AH17,2033,LT_FORECAST,-0.000888633616876855,-0.0008886336168767439,fraction,-1.111307226797642e-16,1.2505797729141994e-13,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,AI17,2034,LT_FORECAST,-0.00391484117445551,-0.003914841174455508,fraction,-1.734723475976807e-18,4.4311464978348186e-16,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,AJ17,2035,LT_FORECAST,-0.00650338833443109,-0.006503388334431648,fraction,5.577135975265435e-16,8.575738812547534e-14,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,AK17,2036,LT_FORECAST,-0.00684224180226745,-0.006842241802267557,fraction,1.0668549377257364e-16,1.559218409048588e-14,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,AL17,2037,LT_FORECAST,-0.00762042869006951,-0.00762042869006907,fraction,-4.397524011601206e-16,5.770704235225049e-14,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,AM17,2038,LT_FORECAST,-0.00821842863894173,-0.008218428638942732,fraction,1.0026701691145945e-15,1.2200266172093746e-13,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,AN17,2039,LT_FORECAST,-0.00909465906244178,-0.009094659062440558,fraction,-1.222980050563649e-15,1.3447233614444714e-13,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,AO17,2040,LT_FORECAST,-0.00980530062543095,-0.009805300625430835,fraction,-1.1449174941446927e-16,1.1676515977238445e-14,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,AP17,2041,LT_FORECAST,-0.0102766853311939,-0.01027668533119519,fraction,1.2906342661267445e-15,1.2558857496677309e-13,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,AQ17,2042,LT_FORECAST,-0.0107253346717083,-0.010725334671707332,fraction,-9.679756995950584e-16,9.025132820782827e-14,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,AR17,2043,LT_FORECAST,-0.0123525062422908,-0.012352506242290784,fraction,-1.5612511283791264e-17,1.2639144621792888e-15,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,AS17,2044,LT_FORECAST,-0.0130660418968687,-0.013066041896869662,fraction,9.62771529167128e-16,7.368501775566684e-14,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,AT17,2045,LT_FORECAST,-0.0137247518727992,-0.013724751872798757,fraction,-4.423544863740858e-16,3.2230417749904334e-14,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,AU17,2046,LT_FORECAST,-0.0151085836185985,-0.01510858361859746,fraction,-1.0408340855860843e-15,6.88902488718334e-14,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,AV17,2047,LT_FORECAST,-0.0161623440459957,-0.016162344045995147,fraction,-5.516420653606247e-16,3.41313155932549e-14,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,AW17,2048,LT_FORECAST,-0.0172326171524372,-0.017232617152437735,fraction,5.342948306008566e-16,3.1004857003120674e-14,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,AX17,2049,LT_FORECAST,-0.0183498682561494,-0.01834986825614915,fraction,-2.498001805406602e-16,1.3613186593693974e-14,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,AY17,2050,LT_FORECAST,-0.0189011144157548,-0.01890111441575515,fraction,3.5041414214731503e-16,1.8539337651711424e-14,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,AZ17,2051,LT_FORECAST,-0.0197582967984007,-0.01975829679840202,fraction,1.3183898417423734e-15,6.67258850899031e-14,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,BA17,2052,LT_FORECAST,-0.0208692982069663,-0.020869298206965037,fraction,-1.2628786905111156e-15,6.051371148118605e-14,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,BB17,2053,LT_FORECAST,-0.0213450340323011,-0.021345034032300036,fraction,-1.0651202142497596e-15,4.990014129928222e-14,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,BC17,2054,LT_FORECAST,-0.0217746749815022,-0.021774674981502762,fraction,5.620504062164855e-16,2.58121146099282e-14,reconciled
+heavy_ruc_net_km,Heavy RUC net km (m km),17,BD17,2055,LT_FORECAST,-0.0248545042657342,-0.02485450426573399,fraction,-2.1163626406917047e-16,8.515006447380476e-15,reconciled
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,B18,2001,ACTUAL,,,fraction,,,not_computable
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,C18,2002,ACTUAL,,,fraction,,,not_computable
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,D18,2003,ACTUAL,,,fraction,,,not_computable
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,E18,2004,ACTUAL,,,fraction,,,not_computable
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,F18,2005,ACTUAL,,,fraction,,,not_computable
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,G18,2006,ACTUAL,,,fraction,,,not_computable
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,H18,2007,ACTUAL,,,fraction,,,not_computable
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,I18,2008,ACTUAL,,,fraction,,,not_computable
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,J18,2009,ACTUAL,,,fraction,,,not_computable
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,K18,2010,ACTUAL,,,fraction,,,not_computable
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,L18,2011,ACTUAL,,,fraction,,,not_computable
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,M18,2012,ACTUAL,,,fraction,,,not_computable
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,N18,2013,ACTUAL,,,fraction,,,not_computable
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,O18,2014,ACTUAL,,,fraction,,,not_computable
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,P18,2015,ACTUAL,,,fraction,,,not_computable
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,Q18,2016,ACTUAL,,,fraction,,,not_computable
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,R18,2017,ACTUAL,,,fraction,,,not_computable
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,S18,2018,ACTUAL,,,fraction,,,not_computable
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,T18,2019,ACTUAL,,,fraction,,,not_computable
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,U18,2020,ACTUAL,,,fraction,,,not_computable
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,V18,2021,ACTUAL,,,fraction,,,not_computable
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,W18,2022,ACTUAL,,,fraction,,,not_computable
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,X18,2023,ACTUAL,,,fraction,,,not_computable
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,Y18,2024,ACTUAL,,,fraction,,,not_computable
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,Z18,2025,ACTUAL,0.984532376425912,0.984532376425912,fraction,0.0,0.0,reconciled
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,AA18,2026,ACTUAL,0.434364588970806,0.4343645889708061,fraction,-1.1102230246251565e-16,2.555970382520697e-16,reconciled
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,AB18,2027,ST_FORECAST,0.325604451800172,0.3256044518001744,fraction,-2.3869795029440866e-15,7.330917896690773e-15,reconciled
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,AC18,2028,ST_FORECAST,0.265349547293949,0.2653495472939471,fraction,1.887379141862766e-15,7.112803323428995e-15,reconciled
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,AD18,2029,ST_FORECAST,0.257771114552528,0.2577711145525252,fraction,2.7755575615628914e-15,1.0767527488023973e-14,reconciled
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,AE18,2030,ST_FORECAST,0.228583400029901,0.2285834000299043,fraction,-3.3029134982598407e-15,1.4449489760970127e-14,reconciled
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,AF18,2031,ST_FORECAST,0.203353262412276,0.20335326241227425,fraction,1.7486012637846216e-15,8.598835558583481e-15,reconciled
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,AG18,2032,LT_FORECAST,0.18888987436128,0.18888987436128146,fraction,-1.4710455076283324e-15,7.787847350751728e-15,reconciled
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,AH18,2033,LT_FORECAST,0.18195061436068,0.18195061436067994,fraction,5.551115123125783e-17,3.0508911127509747e-16,reconciled
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,AI18,2034,LT_FORECAST,0.186931885606625,0.18693188560662422,fraction,7.771561172376096e-16,4.157429401172584e-15,reconciled
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,AJ18,2035,LT_FORECAST,0.190071736374068,0.19007173637406738,fraction,6.106226635438361e-16,3.2125905470874994e-15,reconciled
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,AK18,2036,LT_FORECAST,0.187903327772142,0.18790332777214225,fraction,-2.498001805406602e-16,1.3294079647358675e-15,reconciled
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,AL18,2037,LT_FORECAST,0.186340517484454,0.18634051748445124,fraction,2.7478019859472624e-15,1.4746132634178966e-14,reconciled
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,AM18,2038,LT_FORECAST,0.179934771392846,0.1799347713928463,fraction,-3.0531133177191805e-16,1.6967889497319047e-15,reconciled
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,AN18,2039,LT_FORECAST,0.175926599650062,0.17592659965006674,fraction,-4.746203430272544e-15,2.69783161825054e-14,reconciled
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,AO18,2040,LT_FORECAST,0.16938694975474,0.16938694975473712,fraction,2.886579864025407e-15,1.7041335641293582e-14,reconciled
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,AP18,2041,LT_FORECAST,0.155364537722054,0.15536453772205405,fraction,-5.551115123125783e-17,3.5729615036455e-16,reconciled
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,AQ18,2042,LT_FORECAST,0.142294355804909,0.14229435580491057,fraction,-1.5543122344752192e-15,1.0923217759994807e-14,reconciled
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,AR18,2043,LT_FORECAST,0.123498427850053,0.12349842785004994,fraction,3.0531133177191805e-15,2.4721880034183334e-14,reconciled
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,AS18,2044,LT_FORECAST,0.101738567386691,0.10173856738669462,fraction,-3.622102617839573e-15,3.560206036784898e-14,reconciled
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,AT18,2045,LT_FORECAST,0.0874916181100935,0.08749161811009287,fraction,6.245004513516506e-16,7.137831769962536e-15,reconciled
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,AU18,2046,LT_FORECAST,0.0822339536692449,0.08223395366924491,fraction,-1.3877787807814457e-17,1.687598271588963e-16,reconciled
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,AV18,2047,LT_FORECAST,0.0748434635340847,0.07484346353408333,fraction,1.3739009929736312e-15,1.835699375868627e-14,reconciled
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,AW18,2048,LT_FORECAST,0.0713909497371004,0.07139094973710147,fraction,-1.0685896612017132e-15,1.49681390307429e-14,reconciled
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,AX18,2049,LT_FORECAST,0.0615396967033564,0.061539696703355906,fraction,4.926614671774132e-16,8.005588158034377e-15,reconciled
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,AY18,2050,LT_FORECAST,0.0504206077734153,0.05042060777341595,fraction,-6.453171330633722e-16,1.2798678190539642e-14,reconciled
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,AZ18,2051,LT_FORECAST,0.046010020969941,0.04601002096993945,fraction,1.5543122344752192e-15,3.3782037080372685e-14,reconciled
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,BA18,2052,LT_FORECAST,0.0366692247145239,0.03666922471452594,fraction,-2.040034807748725e-15,5.5633431675488826e-14,reconciled
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,BB18,2053,LT_FORECAST,0.0328286323281275,0.032828632328126606,fraction,8.951173136040325e-16,2.726636019000774e-14,reconciled
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,BC18,2054,LT_FORECAST,0.0284168257119826,0.028416825711981675,fraction,9.26342336171615e-16,3.2598374834703364e-14,reconciled
+light_bev_ruc_net_km,Light BEV RUC net km (m km),18,BD18,2055,LT_FORECAST,0.0274748979193224,0.02747489791932245,fraction,-4.85722573273506e-17,1.767877626696872e-15,reconciled
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,B19,2001,ACTUAL,,,fraction,,,not_computable
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,C19,2002,ACTUAL,,,fraction,,,not_computable
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,D19,2003,ACTUAL,,,fraction,,,not_computable
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,E19,2004,ACTUAL,,,fraction,,,not_computable
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,F19,2005,ACTUAL,,,fraction,,,not_computable
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,G19,2006,ACTUAL,,,fraction,,,not_computable
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,H19,2007,ACTUAL,,,fraction,,,not_computable
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,I19,2008,ACTUAL,,,fraction,,,not_computable
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,J19,2009,ACTUAL,,,fraction,,,not_computable
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,K19,2010,ACTUAL,,,fraction,,,not_computable
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,L19,2011,ACTUAL,,,fraction,,,not_computable
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,M19,2012,ACTUAL,,,fraction,,,not_computable
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,N19,2013,ACTUAL,,,fraction,,,not_computable
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,O19,2014,ACTUAL,,,fraction,,,not_computable
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,P19,2015,ACTUAL,,,fraction,,,not_computable
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,Q19,2016,ACTUAL,,,fraction,,,not_computable
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,R19,2017,ACTUAL,,,fraction,,,not_computable
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,S19,2018,ACTUAL,,,fraction,,,not_computable
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,T19,2019,ACTUAL,,,fraction,,,not_computable
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,U19,2020,ACTUAL,,,fraction,,,not_computable
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,V19,2021,ACTUAL,,,fraction,,,not_computable
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,W19,2022,ACTUAL,,,fraction,,,not_computable
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,X19,2023,ACTUAL,,,fraction,,,not_computable
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,Y19,2024,ACTUAL,,,fraction,,,not_computable
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,Z19,2025,ACTUAL,,,fraction,,,not_computable
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,AA19,2026,ACTUAL,,,fraction,,,not_computable
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,AB19,2027,ST_FORECAST,,,fraction,,,not_computable
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,AC19,2028,ST_FORECAST,,,fraction,,,not_computable
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,AD19,2029,ST_FORECAST,0.219384341671743,0.21938434167174203,fraction,9.71445146547012e-16,4.4280514240189264e-15,reconciled
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,AE19,2030,ST_FORECAST,0.20573442039851,0.20573442039851186,fraction,-1.8596235662471372e-15,9.038952075423294e-15,reconciled
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,AF19,2031,ST_FORECAST,0.197588273128763,0.19758827312876037,fraction,2.6367796834847468e-15,1.3344818706758285e-14,reconciled
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,AG19,2032,LT_FORECAST,0.198240585443506,0.1982405854435041,fraction,1.915134717478395e-15,9.660659108697915e-15,reconciled
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,AH19,2033,LT_FORECAST,0.190619216440625,0.19061921644062885,fraction,-3.858025010572419e-15,2.0239433791682054e-14,reconciled
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,AI19,2034,LT_FORECAST,0.171424367162242,0.17142436716224219,fraction,-1.942890293094024e-16,1.133380466999305e-15,reconciled
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,AJ19,2035,LT_FORECAST,0.153356424376296,0.15335642437629726,fraction,-1.2490009027033011e-15,8.14443156054926e-15,reconciled
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,AK19,2036,LT_FORECAST,0.1473651284778,0.14736512847779903,fraction,9.71445146547012e-16,6.592096492443685e-15,reconciled
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,AL19,2037,LT_FORECAST,0.138222955725781,0.13822295572578103,fraction,-2.7755575615628914e-17,2.0080293804954431e-16,reconciled
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,AM19,2038,LT_FORECAST,0.130056564730815,0.13005656473081628,fraction,-1.27675647831893e-15,9.816932201473169e-15,reconciled
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,AN19,2039,LT_FORECAST,0.122527112226456,0.12252711222645463,fraction,1.3739009929736312e-15,1.1213036592541145e-14,reconciled
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,AO19,2040,LT_FORECAST,0.113703295114685,0.11370329511468591,fraction,-9.159339953157541e-16,8.05547450838522e-15,reconciled
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,AP19,2041,LT_FORECAST,0.106458098676979,0.10645809867697897,fraction,2.7755575615628914e-17,2.607183104016014e-16,reconciled
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,AQ19,2042,LT_FORECAST,0.0927904168272671,0.09279041682726641,fraction,6.938893903907228e-16,7.478028595155787e-15,reconciled
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,AR19,2043,LT_FORECAST,0.0899373015308089,0.08993730153080959,fraction,-6.938893903907228e-16,7.715256946563146e-15,reconciled
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,AS19,2044,LT_FORECAST,0.0889020675416083,0.08890206754160879,fraction,-4.85722573273506e-16,5.463568921455888e-15,reconciled
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,AT19,2045,LT_FORECAST,0.0867742791829966,0.08677427918299685,fraction,-2.498001805406602e-16,2.878735299130065e-15,reconciled
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,AU19,2046,LT_FORECAST,0.0844245711298224,0.08442457112982216,fraction,2.498001805406602e-16,2.9588563755513203e-15,reconciled
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,AV19,2047,LT_FORECAST,0.0811825438196889,0.08118254381968892,fraction,-2.7755575615628914e-17,3.418909325787528e-16,reconciled
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,AW19,2048,LT_FORECAST,0.0777076151019802,0.07770761510198043,fraction,-2.3592239273284576e-16,3.036026680567026e-15,reconciled
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,AX19,2049,LT_FORECAST,0.0735990283266825,0.07359902832668364,fraction,-1.1379786002407855e-15,1.546186989303236e-14,reconciled
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,AY19,2050,LT_FORECAST,0.0677273325795982,0.06772733257959618,fraction,2.0261570199409107e-15,2.991638593709092e-14,reconciled
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,AZ19,2051,LT_FORECAST,0.0643697096799807,0.06436970967998468,fraction,-3.982925100842749e-15,6.187576611179299e-14,reconciled
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,BA19,2052,LT_FORECAST,0.0694955309274632,0.0694955309274583,fraction,4.898859096158503e-15,7.049171408262342e-14,reconciled
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,BB19,2053,LT_FORECAST,0.0668022463872526,0.0668022463872513,fraction,1.304512053934559e-15,1.9527966864651954e-14,reconciled
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,BC19,2054,LT_FORECAST,0.0621286360686855,0.06212863606868768,fraction,-2.1788126858268697e-15,3.5069379012570556e-14,reconciled
+heavy_bev_ruc_net_km,Heavy BEV RUC net km (m km),19,BD19,2055,LT_FORECAST,0.0649200167476156,0.06492001674761516,fraction,4.440892098500626e-16,6.840559077125873e-15,reconciled
+phev_ruc_net_km,PHEV RUC net km (m km),20,B20,2001,ACTUAL,,,fraction,,,not_computable
+phev_ruc_net_km,PHEV RUC net km (m km),20,C20,2002,ACTUAL,,,fraction,,,not_computable
+phev_ruc_net_km,PHEV RUC net km (m km),20,D20,2003,ACTUAL,,,fraction,,,not_computable
+phev_ruc_net_km,PHEV RUC net km (m km),20,E20,2004,ACTUAL,,,fraction,,,not_computable
+phev_ruc_net_km,PHEV RUC net km (m km),20,F20,2005,ACTUAL,,,fraction,,,not_computable
+phev_ruc_net_km,PHEV RUC net km (m km),20,G20,2006,ACTUAL,,,fraction,,,not_computable
+phev_ruc_net_km,PHEV RUC net km (m km),20,H20,2007,ACTUAL,,,fraction,,,not_computable
+phev_ruc_net_km,PHEV RUC net km (m km),20,I20,2008,ACTUAL,,,fraction,,,not_computable
+phev_ruc_net_km,PHEV RUC net km (m km),20,J20,2009,ACTUAL,,,fraction,,,not_computable
+phev_ruc_net_km,PHEV RUC net km (m km),20,K20,2010,ACTUAL,,,fraction,,,not_computable
+phev_ruc_net_km,PHEV RUC net km (m km),20,L20,2011,ACTUAL,,,fraction,,,not_computable
+phev_ruc_net_km,PHEV RUC net km (m km),20,M20,2012,ACTUAL,,,fraction,,,not_computable
+phev_ruc_net_km,PHEV RUC net km (m km),20,N20,2013,ACTUAL,,,fraction,,,not_computable
+phev_ruc_net_km,PHEV RUC net km (m km),20,O20,2014,ACTUAL,,,fraction,,,not_computable
+phev_ruc_net_km,PHEV RUC net km (m km),20,P20,2015,ACTUAL,,,fraction,,,not_computable
+phev_ruc_net_km,PHEV RUC net km (m km),20,Q20,2016,ACTUAL,,,fraction,,,not_computable
+phev_ruc_net_km,PHEV RUC net km (m km),20,R20,2017,ACTUAL,,,fraction,,,not_computable
+phev_ruc_net_km,PHEV RUC net km (m km),20,S20,2018,ACTUAL,,,fraction,,,not_computable
+phev_ruc_net_km,PHEV RUC net km (m km),20,T20,2019,ACTUAL,,,fraction,,,not_computable
+phev_ruc_net_km,PHEV RUC net km (m km),20,U20,2020,ACTUAL,,,fraction,,,not_computable
+phev_ruc_net_km,PHEV RUC net km (m km),20,V20,2021,ACTUAL,,,fraction,,,not_computable
+phev_ruc_net_km,PHEV RUC net km (m km),20,W20,2022,ACTUAL,,,fraction,,,not_computable
+phev_ruc_net_km,PHEV RUC net km (m km),20,X20,2023,ACTUAL,,,fraction,,,not_computable
+phev_ruc_net_km,PHEV RUC net km (m km),20,Y20,2024,ACTUAL,,,fraction,,,not_computable
+phev_ruc_net_km,PHEV RUC net km (m km),20,Z20,2025,ACTUAL,1.23203111257958,1.232031112579579,fraction,8.881784197001252e-16,7.209058364122734e-16,reconciled
+phev_ruc_net_km,PHEV RUC net km (m km),20,AA20,2026,ACTUAL,0.383259365371098,0.38325936537109806,fraction,-5.551115123125783e-17,1.4483964710818772e-16,reconciled
+phev_ruc_net_km,PHEV RUC net km (m km),20,AB20,2027,ST_FORECAST,0.388059901621204,0.38805990162120385,fraction,1.6653345369377348e-16,4.291436785868473e-16,reconciled
+phev_ruc_net_km,PHEV RUC net km (m km),20,AC20,2028,ST_FORECAST,0.28586248384735,0.2858624838473447,fraction,5.329070518200751e-15,1.8642077290025098e-14,reconciled
+phev_ruc_net_km,PHEV RUC net km (m km),20,AD20,2029,ST_FORECAST,0.251370170255457,0.25137017025546604,fraction,-9.048317650695026e-15,3.5995988074079246e-14,reconciled
+phev_ruc_net_km,PHEV RUC net km (m km),20,AE20,2030,ST_FORECAST,0.211387291790321,0.21138729179031968,fraction,1.3322676295501878e-15,6.302496324479607e-15,reconciled
+phev_ruc_net_km,PHEV RUC net km (m km),20,AF20,2031,ST_FORECAST,0.173710749990075,0.17371074999007363,fraction,1.3600232051658168e-15,7.829240304607128e-15,reconciled
+phev_ruc_net_km,PHEV RUC net km (m km),20,AG20,2032,LT_FORECAST,0.157361151529753,0.15736115152974905,fraction,3.941291737419306e-15,2.5046154651926314e-14,reconciled
+phev_ruc_net_km,PHEV RUC net km (m km),20,AH20,2033,LT_FORECAST,0.137960347147784,0.13796034714778438,fraction,-3.885780586188048e-16,2.8165923517324615e-15,reconciled
+phev_ruc_net_km,PHEV RUC net km (m km),20,AI20,2034,LT_FORECAST,0.119915240770298,0.11991524077029969,fraction,-1.6930901125533637e-15,1.4119056941198288e-14,reconciled
+phev_ruc_net_km,PHEV RUC net km (m km),20,AJ20,2035,LT_FORECAST,0.101674755307885,0.10167475530788339,fraction,1.609823385706477e-15,1.583306869863358e-14,reconciled
+phev_ruc_net_km,PHEV RUC net km (m km),20,AK20,2036,LT_FORECAST,0.073853131523488,0.07385313152349027,fraction,-2.2620794126737565e-15,3.062943122397272e-14,reconciled
+phev_ruc_net_km,PHEV RUC net km (m km),20,AL20,2037,LT_FORECAST,0.0505739309911291,0.05057393099112861,fraction,4.85722573273506e-16,9.604208408452739e-15,reconciled
+phev_ruc_net_km,PHEV RUC net km (m km),20,AM20,2038,LT_FORECAST,0.0341438454574665,0.03414384545746674,fraction,-2.3592239273284576e-16,6.909660864847113e-15,reconciled
+phev_ruc_net_km,PHEV RUC net km (m km),20,AN20,2039,LT_FORECAST,0.0289395325609794,0.028939532560979142,fraction,2.5673907444456745e-16,8.871569501117088e-15,reconciled
+phev_ruc_net_km,PHEV RUC net km (m km),20,AO20,2040,LT_FORECAST,0.0109001741896944,0.010900174189694356,fraction,4.336808689942018e-17,3.978659986959e-15,reconciled
+phev_ruc_net_km,PHEV RUC net km (m km),20,AP20,2041,LT_FORECAST,-0.0129189786955038,-0.012918978695504624,fraction,8.239936510889834e-16,6.378164021399817e-14,reconciled
+phev_ruc_net_km,PHEV RUC net km (m km),20,AQ20,2042,LT_FORECAST,-0.0157297161344329,-0.015729716134431415,fraction,-1.4849232954361469e-15,9.440242168043567e-14,reconciled
+phev_ruc_net_km,PHEV RUC net km (m km),20,AR20,2043,LT_FORECAST,-0.020780279574128,-0.02078027957412998,fraction,1.97758476261356e-15,9.516641754307855e-14,reconciled
+phev_ruc_net_km,PHEV RUC net km (m km),20,AS20,2044,LT_FORECAST,-0.0242874402735997,-0.024287440273598304,fraction,-1.394717674685353e-15,5.742547007728446e-14,reconciled
+phev_ruc_net_km,PHEV RUC net km (m km),20,AT20,2045,LT_FORECAST,-0.0277569945338308,-0.027756994533831958,fraction,1.1587952819525071e-15,4.1747865769116144e-14,reconciled
+phev_ruc_net_km,PHEV RUC net km (m km),20,AU20,2046,LT_FORECAST,-0.030008400036444,-0.030008400036443894,fraction,-1.0755285551056204e-16,3.5840916336740305e-15,reconciled
+phev_ruc_net_km,PHEV RUC net km (m km),20,AV20,2047,LT_FORECAST,-0.0309024092319559,-0.03090240923195553,fraction,-3.712308238590367e-16,1.2013005881598214e-14,reconciled
+phev_ruc_net_km,PHEV RUC net km (m km),20,AW20,2048,LT_FORECAST,-0.0294162483510375,-0.029416248351036733,fraction,-7.667477763817487e-16,2.606545087707372e-14,reconciled
+phev_ruc_net_km,PHEV RUC net km (m km),20,AX20,2049,LT_FORECAST,-0.0315144042722963,-0.031514404272298124,fraction,1.824929096727601e-15,5.790777705837058e-14,reconciled
+phev_ruc_net_km,PHEV RUC net km (m km),20,AY20,2050,LT_FORECAST,-0.0351881767502122,-0.03518817675021069,fraction,-1.5126788710517758e-15,4.2988270798734084e-14,reconciled
+phev_ruc_net_km,PHEV RUC net km (m km),20,AZ20,2051,LT_FORECAST,-0.0351557514669273,-0.03515575146692729,fraction,-1.3877787807814457e-17,3.9475156208422856e-16,reconciled
+phev_ruc_net_km,PHEV RUC net km (m km),20,BA20,2052,LT_FORECAST,-0.0393772162223556,-0.03937721622235568,fraction,8.326672684688674e-17,2.1145915032869594e-15,reconciled
+phev_ruc_net_km,PHEV RUC net km (m km),20,BB20,2053,LT_FORECAST,-0.0384116547966181,-0.0384116547966179,fraction,-2.0122792321330962e-16,5.2387204945679014e-15,reconciled
+phev_ruc_net_km,PHEV RUC net km (m km),20,BC20,2054,LT_FORECAST,-0.0358228720544359,-0.03582287205443491,fraction,-9.922618282587337e-16,2.7699114318665878e-14,reconciled
+phev_ruc_net_km,PHEV RUC net km (m km),20,BD20,2055,LT_FORECAST,-0.0383513984273134,-0.03835139842731261,fraction,-7.91033905045424e-16,2.062594683593273e-14,reconciled
+ped_volume,PED volume (m L),21,B21,2001,ACTUAL,,,fraction,,,not_computable
+ped_volume,PED volume (m L),21,C21,2002,ACTUAL,-0.0554177629749383,-0.05541776297493828,fraction,-2.0816681711721685e-17,3.7563193810503807e-16,reconciled
+ped_volume,PED volume (m L),21,D21,2003,ACTUAL,0.077979609804159,0.07797960980415675,fraction,2.248201624865942e-15,2.8830634450624045e-14,reconciled
+ped_volume,PED volume (m L),21,E21,2004,ACTUAL,0.0153298488377738,0.01532984883777555,fraction,-1.7503359872605984e-15,1.1417829397948468e-13,reconciled
+ped_volume,PED volume (m L),21,F21,2005,ACTUAL,0.0251767505005294,0.02517675050052759,fraction,1.8110513089197866e-15,7.193348120448806e-14,reconciled
+ped_volume,PED volume (m L),21,G21,2006,ACTUAL,-0.0369447214207232,-0.036944721420722915,fraction,-2.8449465006019636e-16,7.700549337492596e-15,reconciled
+ped_volume,PED volume (m L),21,H21,2007,ACTUAL,0.050177581910918,0.050177581910919145,fraction,-1.1449174941446927e-15,2.2817311048931738e-14,reconciled
+ped_volume,PED volume (m L),21,I21,2008,ACTUAL,0.004724371180856,0.004724371180856224,fraction,-2.237793284010081e-16,4.736700818678082e-14,reconciled
+ped_volume,PED volume (m L),21,J21,2009,ACTUAL,-0.0406479615995287,-0.04064796159952966,fraction,9.575673587391975e-16,2.355757388705754e-14,reconciled
+ped_volume,PED volume (m L),21,K21,2010,ACTUAL,0.0231398073846614,0.023139807384660704,fraction,6.938893903907228e-16,2.998682654768767e-14,reconciled
+ped_volume,PED volume (m L),21,L21,2011,ACTUAL,-0.0512701517910632,-0.05127015179106276,fraction,-4.440892098500626e-16,8.661749465065457e-15,reconciled
+ped_volume,PED volume (m L),21,M21,2012,ACTUAL,0.00886196438435127,0.008861964384353271,fraction,-2.0018708912772354e-15,2.2589471187807396e-13,reconciled
+ped_volume,PED volume (m L),21,N21,2013,ACTUAL,-0.00658972615749898,-0.006589726157498976,fraction,-3.469446951953614e-18,5.264933426718276e-16,reconciled
+ped_volume,PED volume (m L),21,O21,2014,ACTUAL,-0.00522609602301605,-0.005226096023018378,fraction,2.327998904760875e-15,4.4545658834188786e-13,reconciled
+ped_volume,PED volume (m L),21,P21,2015,ACTUAL,0.0260831420486054,0.026083142048605845,fraction,-4.440892098500626e-16,1.7025909264401654e-14,reconciled
+ped_volume,PED volume (m L),21,Q21,2016,ACTUAL,0.0272626872601094,0.027262687260109164,fraction,2.3592239273284576e-16,8.65367344319164e-15,reconciled
+ped_volume,PED volume (m L),21,R21,2017,ACTUAL,0.0145600424029804,0.014560042402982587,fraction,-2.1874863032067537e-15,1.5023900636159224e-13,reconciled
+ped_volume,PED volume (m L),21,S21,2018,ACTUAL,6.61686067400247e-05,6.61686067386924e-05,fraction,1.3322947346045e-15,2.0134846421444058e-11,reconciled
+ped_volume,PED volume (m L),21,T21,2019,ACTUAL,-0.00182604167203837,-0.0018260416720383699,fraction,-2.168404344971009e-19,1.1874889703642235e-16,reconciled
+ped_volume,PED volume (m L),21,U21,2020,ACTUAL,-0.112503893614243,-0.11250389361424395,fraction,9.575673587391975e-16,8.511415276190594e-15,reconciled
+ped_volume,PED volume (m L),21,V21,2021,ACTUAL,0.0798015491425794,0.07980154914257898,fraction,4.3021142204224816e-16,5.391015922179689e-15,reconciled
+ped_volume,PED volume (m L),21,W21,2022,ACTUAL,-0.0827689494864196,-0.08276894948641911,fraction,-4.85722573273506e-16,5.868415345215953e-15,reconciled
+ped_volume,PED volume (m L),21,X21,2023,ACTUAL,0.0511000037999483,0.05110000379995072,fraction,-2.4216739724636227e-15,4.7390876563221664e-14,reconciled
+ped_volume,PED volume (m L),21,Y21,2024,ACTUAL,-0.0306684201575034,-0.03066842015750415,fraction,7.494005416219807e-16,2.4435576980270777e-14,reconciled
+ped_volume,PED volume (m L),21,Z21,2025,ACTUAL,-0.0034826122842897,-0.0034826122842913643,fraction,1.6644671751997464e-15,4.779363992677207e-13,reconciled
+ped_volume,PED volume (m L),21,AA21,2026,ACTUAL,0.00996569702591077,0.009965697025912768,fraction,-1.996666720849305e-15,2.0035394570571228e-13,reconciled
+ped_volume,PED volume (m L),21,AB21,2027,ST_FORECAST,-0.00611589180120842,-0.006115891801207529,fraction,-8.907805049140904e-16,1.456501412824559e-13,reconciled
+ped_volume,PED volume (m L),21,AC21,2028,ST_FORECAST,-0.00251641247797718,-0.0025164124779770702,fraction,-1.0972125985553305e-16,4.360225551883185e-14,reconciled
+ped_volume,PED volume (m L),21,AD21,2029,ST_FORECAST,0.00102711009613166,0.0010271100961312118,fraction,4.482091781055075e-16,4.363789040666284e-13,reconciled
+ped_volume,PED volume (m L),21,AE21,2030,ST_FORECAST,-0.00063435121560762,-0.0006343512156071762,fraction,-4.4376394919831696e-16,6.995556062323668e-13,reconciled
+ped_volume,PED volume (m L),21,AF21,2031,ST_FORECAST,-0.00162309886523371,-0.0016230988652352618,fraction,1.551710149261254e-15,9.560170255163967e-13,reconciled
+ped_volume,PED volume (m L),21,AG21,2032,LT_FORECAST,-0.0209030384151903,-0.020903038415190034,fraction,-2.671474153004283e-16,1.2780314995082002e-14,reconciled
+ped_volume,PED volume (m L),21,AH21,2033,LT_FORECAST,-0.02609358686347,-0.026093586863470852,fraction,8.534839501805891e-16,3.270857144501683e-14,reconciled
+ped_volume,PED volume (m L),21,AI21,2034,LT_FORECAST,-0.0289988969436731,-0.02899889694367086,fraction,-2.2412627309620348e-15,7.728786151127036e-14,reconciled
+ped_volume,PED volume (m L),21,AJ21,2035,LT_FORECAST,-0.0336345163596827,-0.03363451635968295,fraction,2.5673907444456745e-16,7.633202502424434e-15,reconciled
+ped_volume,PED volume (m L),21,AK21,2036,LT_FORECAST,-0.0396882468759417,-0.03968824687594341,fraction,1.7139067942650854e-15,4.318424040301843e-14,reconciled
+ped_volume,PED volume (m L),21,AL21,2037,LT_FORECAST,-0.0460212202190803,-0.04602122021908106,fraction,7.632783294297951e-16,1.6585356185608676e-14,reconciled
+ped_volume,PED volume (m L),21,AM21,2038,LT_FORECAST,-0.0538408990861634,-0.053840899086160854,fraction,-2.546574062733953e-15,4.729813405713573e-14,reconciled
+ped_volume,PED volume (m L),21,AN21,2039,LT_FORECAST,-0.0617183887939602,-0.06171838879396263,fraction,2.42861286636753e-15,3.934990711560992e-14,reconciled
+ped_volume,PED volume (m L),21,AO21,2040,LT_FORECAST,-0.0692656344122515,-0.06926563441225286,fraction,1.3600232051658168e-15,1.963489133834069e-14,reconciled
+ped_volume,PED volume (m L),21,AP21,2041,LT_FORECAST,-0.0767626213212447,-0.07676262132124334,fraction,-1.3600232051658168e-15,1.7717258501038747e-14,reconciled
+ped_volume,PED volume (m L),21,AQ21,2042,LT_FORECAST,-0.0859988175873556,-0.0859988175873545,fraction,-1.096345236817342e-15,1.2748375705325414e-14,reconciled
+ped_volume,PED volume (m L),21,AR21,2043,LT_FORECAST,-0.100057481234456,-0.10005748123445712,fraction,1.124100812432971e-15,1.1234550366093571e-14,reconciled
+ped_volume,PED volume (m L),21,AS21,2044,LT_FORECAST,-0.10373981123831,-0.10373981123831244,fraction,2.4424906541753444e-15,2.354439076975399e-14,reconciled
+ped_volume,PED volume (m L),21,AT21,2045,LT_FORECAST,-0.105960827420974,-0.10596082742097279,fraction,-1.2073675392798577e-15,1.139447066115382e-14,reconciled
+ped_volume,PED volume (m L),21,AU21,2046,LT_FORECAST,-0.106979490758633,-0.10697949075863422,fraction,1.2212453270876722e-15,1.1415695835036554e-14,reconciled
+ped_volume,PED volume (m L),21,AV21,2047,LT_FORECAST,-0.107838177114105,-0.1078381771141027,fraction,-2.2898349882893854e-15,2.123399198288125e-14,reconciled
+ped_volume,PED volume (m L),21,AW21,2048,LT_FORECAST,-0.107335075040987,-0.10733507504098727,fraction,2.7755575615628914e-16,2.585881232675348e-15,reconciled
+ped_volume,PED volume (m L),21,AX21,2049,LT_FORECAST,-0.10790014750272,-0.10790014750272003,fraction,2.7755575615628914e-17,2.5723389872964934e-16,reconciled
+ped_volume,PED volume (m L),21,AY21,2050,LT_FORECAST,-0.108531614955115,-0.10853161495511576,fraction,7.632783294297951e-16,7.032774088411527e-15,reconciled
+ped_volume,PED volume (m L),21,AZ21,2051,LT_FORECAST,-0.106562916603791,-0.10656291660379036,fraction,-6.38378239159465e-16,5.990622812371095e-15,reconciled
+ped_volume,PED volume (m L),21,BA21,2052,LT_FORECAST,-0.104075005405683,-0.10407500540568315,fraction,1.5265566588595902e-16,1.4667850872638346e-15,reconciled
+ped_volume,PED volume (m L),21,BB21,2053,LT_FORECAST,-0.0940276142523325,-0.09402761425233397,fraction,1.4710455076283324e-15,1.5644824335121507e-14,reconciled
+ped_volume,PED volume (m L),21,BC21,2054,LT_FORECAST,-0.0898214124968064,-0.08982141249680631,fraction,-9.71445146547012e-17,1.0815295813585127e-15,reconciled
+ped_volume,PED volume (m L),21,BD21,2055,LT_FORECAST,-0.0932157203422453,-0.09321572034224457,fraction,-7.355227538141662e-16,7.890544117598087e-15,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,B22,2001,ACTUAL,,,fraction,,,not_computable
+light_petrol_vkt,Light petrol VKT (m km),22,C22,2002,ACTUAL,,,fraction,,,not_computable
+light_petrol_vkt,Light petrol VKT (m km),22,D22,2003,ACTUAL,,,fraction,,,not_computable
+light_petrol_vkt,Light petrol VKT (m km),22,E22,2004,ACTUAL,0.0212463901148479,0.021246390114848746,fraction,-8.465450562766819e-16,3.9844183021239255e-14,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,F22,2005,ACTUAL,0.00722875313054772,0.007228753130546384,fraction,1.3366044382401299e-15,1.8490110453379156e-13,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,G22,2006,ACTUAL,-0.00769804899989524,-0.007698048999893681,fraction,-1.5595164049031496e-15,2.0258592858069472e-13,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,H22,2007,ACTUAL,0.00463956749853467,0.004639567498533781,fraction,8.890457814381136e-16,1.9162255570569333e-13,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,I22,2008,ACTUAL,-0.0040832069574509,-0.004083206957449792,fraction,-1.1076209394111913e-15,2.712625029672675e-13,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,J22,2009,ACTUAL,-0.0171679326597136,-0.01716793265971217,fraction,-1.429412144204889e-15,8.326058661444295e-14,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,K22,2010,ACTUAL,0.00672792832879199,0.0067279283287904335,fraction,1.5569143196891844e-15,2.3141065772457343e-13,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,L22,2011,ACTUAL,-0.0116806393236401,-0.011680639323641495,fraction,1.394717674685353e-15,1.194042240361329e-13,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,M22,2012,ACTUAL,-0.012077716258282,-0.01207771625828069,fraction,-1.3097162243624894e-15,1.0844071812537618e-13,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,N22,2013,ACTUAL,-0.00014279493757352,-0.0001427949375737425,fraction,2.2250539084833765e-16,1.558216240918421e-12,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,O22,2014,ACTUAL,0.0116951126154476,0.011695112615446757,fraction,8.430756093247282e-16,7.208785729957013e-14,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,P22,2015,ACTUAL,0.0218826422839464,0.021882642283948428,fraction,-2.0296264668928643e-15,9.275052073495055e-14,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,Q22,2016,ACTUAL,0.0383978388464843,0.03839783884648318,fraction,1.124100812432971e-15,2.927510626124539e-14,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,R22,2017,ACTUAL,0.0277495546531303,0.02774955465313189,fraction,-1.592476150946709e-15,5.738744894657175e-14,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,S22,2018,ACTUAL,0.0173629325064648,0.017362932506463924,fraction,8.777700788442644e-16,5.055425277484005e-14,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,T22,2019,ACTUAL,-0.00076743969791615,-0.0007674396979155951,fraction,-5.548946718780812e-16,7.230466098967815e-13,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,U22,2020,ACTUAL,-0.0608196544004694,-0.06081965440047021,fraction,8.118505867571457e-16,1.3348490627905789e-14,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,V22,2021,ACTUAL,-0.00472448662198743,-0.0047244866219881,fraction,6.696032617270475e-16,1.4173037523498658e-13,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,W22,2022,ACTUAL,-0.0314496695440712,-0.031449669544070025,fraction,-1.1726730697603216e-15,3.7287293849529e-14,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,X22,2023,ACTUAL,0.0484831717744443,0.048483171774443834,fraction,4.649058915617843e-16,9.5890156222585e-15,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,Y22,2024,ACTUAL,0.0221959782534482,0.022195978253446658,fraction,1.5439038936193583e-15,6.955782151118374e-14,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,Z22,2025,ACTUAL,0.0140486769938797,0.014048676993879683,fraction,1.734723475976807e-17,1.2347949039845822e-15,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,AA22,2026,ACTUAL,-0.0192702451737928,-0.019270245173791722,fraction,-1.078998002057574e-15,5.5992956619205495e-14,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,AB22,2027,ST_FORECAST,0.00928560858129934,0.009285608581298677,fraction,6.626643678231403e-16,7.136466737977239e-14,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,AC22,2028,ST_FORECAST,0.00742615068990049,0.007426150689900934,fraction,-4.440892098500626e-16,5.980072697070288e-14,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,AD22,2029,ST_FORECAST,0.0111002338058164,0.011100233805815929,fraction,4.718447854656915e-16,4.250764386768773e-14,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,AE22,2030,ST_FORECAST,0.00952346408175386,0.009523464081754307,fraction,-4.475586568020162e-16,4.699536355258369e-14,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,AF22,2031,ST_FORECAST,0.0086295161977743,0.008629516197772746,fraction,1.5543122344752192e-15,1.8011580242196923e-13,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,AG22,2032,LT_FORECAST,-0.0107551528119926,-0.010755152811990909,fraction,-1.691355389077387e-15,1.572600053800906e-13,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,AH22,2033,LT_FORECAST,-0.0158838081090904,-0.01588380810909018,fraction,-2.185751579730777e-16,1.3760878781202905e-14,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,AI22,2034,LT_FORECAST,-0.0187135798540774,-0.018713579854077955,fraction,5.551115123125783e-16,2.966356606491898e-14,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,AJ22,2035,LT_FORECAST,-0.02329010655567,-0.0232901065556691,fraction,-9.020562075079397e-16,3.873130444258822e-14,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,AK22,2036,LT_FORECAST,-0.0292980115405833,-0.02929801154058309,fraction,-2.0816681711721685e-16,7.105151720923716e-15,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,AL22,2037,LT_FORECAST,-0.0355874052580318,-0.03558740525803317,fraction,1.366962099069724e-15,3.841140114482381e-14,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,AM22,2038,LT_FORECAST,-0.0433791163803657,-0.0433791163803644,fraction,-1.2975731600306517e-15,2.991239260507389e-14,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,AN22,2039,LT_FORECAST,-0.0512274303409479,-0.05122743034094768,fraction,-2.220446049250313e-16,4.3344864938022115e-15,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,AO22,2040,LT_FORECAST,-0.0587412512493336,-0.058741251249333826,fraction,2.2898349882893854e-16,3.898171965336462e-15,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,AP22,2041,LT_FORECAST,-0.0662037626727457,-0.06620376267274708,fraction,1.3739009929736312e-15,2.0752611898586248e-14,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,AQ22,2042,LT_FORECAST,-0.075429544992724,-0.07542954499272447,fraction,4.718447854656915e-16,6.255437249571148e-15,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,AR22,2043,LT_FORECAST,-0.0895264260646744,-0.08952642606467276,fraction,-1.6375789613221059e-15,1.8291570805464072e-14,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,AS22,2044,LT_FORECAST,-0.0931199135085181,-0.093119913508518,fraction,-9.71445146547012e-17,1.0432195541699579e-15,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,AT22,2045,LT_FORECAST,-0.0952405277079239,-0.09524052770792701,fraction,3.1086244689504383e-15,3.263972327498667e-14,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,AU22,2046,LT_FORECAST,-0.0961405068059638,-0.09614050680595976,fraction,-4.038436252074007e-15,4.2005564420674176e-14,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,AV22,2047,LT_FORECAST,-0.0968758756661219,-0.09687587566612288,fraction,9.853229343548264e-16,1.0170983514520014e-14,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,AW22,2048,LT_FORECAST,-0.0962297079609329,-0.09622970796093155,fraction,-1.3461454173580023e-15,1.3988875638119218e-14,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,AX22,2049,LT_FORECAST,-0.0966633567386701,-0.09666335673866999,fraction,-1.1102230246251565e-16,1.1485459041388886e-15,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,AY22,2050,LT_FORECAST,-0.0971576744248376,-0.09715767442483991,fraction,2.3175905639050143e-15,2.3853911465304537e-14,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,AZ22,2051,LT_FORECAST,-0.0950154777153404,-0.0950154777153408,fraction,4.0245584642661925e-16,4.235687238581767e-15,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,BA22,2052,LT_FORECAST,-0.092339352538797,-0.09233935253879666,fraction,-3.469446951953614e-16,3.757278837856174e-15,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,BB22,2053,LT_FORECAST,-0.0819978482095316,-0.0819978482095316,fraction,0.0,0.0,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,BC22,2054,LT_FORECAST,-0.0775936677163468,-0.0775936677163469,fraction,9.71445146547012e-17,1.251964464546576e-15,reconciled
+light_petrol_vkt,Light petrol VKT (m km),22,BD22,2055,LT_FORECAST,-0.0808250347334184,-0.08082503473341829,fraction,-1.1102230246251565e-16,1.3736128023785662e-15,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,B23,2001,ACTUAL,,,fraction,,,not_computable
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,C23,2002,ACTUAL,,,fraction,,,not_computable
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,D23,2003,ACTUAL,,,fraction,,,not_computable
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,E23,2004,ACTUAL,0.00338119742859311,0.003381197428593552,fraction,-4.419208055050916e-16,1.3069949768917034e-13,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,F23,2005,ACTUAL,-0.00562590712043509,-0.005625907120435536,fraction,4.458239333260394e-16,7.924480866501143e-14,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,G23,2006,ACTUAL,-0.0189969171720822,-0.018996917172082295,fraction,9.367506770274758e-17,4.931066807008647e-15,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,H23,2007,ACTUAL,-0.00650146120774775,-0.006501461207747861,fraction,1.1102230246251565e-16,1.7076515403984752e-14,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,I23,2008,ACTUAL,-0.0128023502832384,-0.012802350283237729,fraction,-6.713379852030243e-16,5.243865152494814e-14,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,J23,2009,ACTUAL,-0.0256370625710153,-0.025637062571016167,fraction,8.673617379884035e-16,3.383233689841653e-14,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,K23,2010,ACTUAL,-0.00471596413821951,-0.004715964138219064,fraction,-4.458239333260394e-16,9.453505587818152e-14,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,L23,2011,ACTUAL,-0.020990313537154,-0.02099031353715386,fraction,-1.3877787807814457e-16,6.611520015291867e-15,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,M23,2012,ACTUAL,-0.0181280669245795,-0.018128066924579245,fraction,-2.5673907444456745e-16,1.4162518017652696e-14,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,N23,2013,ACTUAL,-0.00627202585539655,-0.006272025855397323,fraction,7.728193085476676e-16,1.232168563021191e-13,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,O23,2014,ACTUAL,-0.00033214859220343,-0.00033214859220254134,fraction,-8.886663106777437e-16,2.675508286170434e-12,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,P23,2015,ACTUAL,0.00262145494788601,0.002621454947885571,fraction,4.393187202911264e-16,1.6758583650101436e-13,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,Q23,2016,ACTUAL,0.0162653681379663,0.01626536813796542,fraction,8.81239525796218e-16,5.417888598163935e-14,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,R23,2017,ACTUAL,0.0055391967136853,0.005539196713685968,fraction,-6.678685382510707e-16,1.205713703217896e-13,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,S23,2018,ACTUAL,-0.00196061772261702,-0.0019606177226174637,fraction,4.436555289810684e-16,2.262835451618684e-13,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,T23,2019,ACTUAL,-0.0164815428243387,-0.016481542824338336,fraction,-3.642919299551295e-16,2.2103023596624625e-14,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,U23,2020,ACTUAL,-0.0775345395050466,-0.07753453950504618,fraction,-4.163336342344337e-16,5.369653794195005e-15,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,V23,2021,ACTUAL,-0.0152561453107934,-0.015256145310794111,fraction,7.112366251504909e-16,4.661968083427161e-14,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,W23,2022,ACTUAL,-0.0321409914607563,-0.03214099146075622,fraction,-8.326672684688674e-17,2.5906707622431144e-15,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,X23,2023,ACTUAL,0.0390488885337099,0.039048888533711024,fraction,-1.124100812432971e-15,2.8787011734342486e-14,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,Y23,2024,ACTUAL,-0.00250908352117729,-0.0025090835211781792,fraction,8.890457814381136e-16,3.543308837406291e-13,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,Z23,2025,ACTUAL,0.00435823207430253,0.004358232074302526,fraction,4.336808689942018e-18,9.950843865137823e-16,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,AA23,2026,ACTUAL,-0.0293005697793954,-0.02930056977939499,fraction,-4.0939474033052647e-16,1.3972245025024213e-14,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,AB23,2027,ST_FORECAST,-0.00147529276326408,-0.00147529276326408,fraction,0.0,0.0,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,AC23,2028,ST_FORECAST,-0.00246294147788384,-0.002462941477884284,fraction,4.440892098500626e-16,1.8030847011092775e-13,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,AD23,2029,ST_FORECAST,0.00115393407008901,0.0011539340700885692,fraction,4.408366033326061e-16,3.8202928118655e-13,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,AE23,2030,ST_FORECAST,-0.000330039002163662,-0.0003300390021635513,fraction,-1.1069704181077e-16,3.3540594016192644e-13,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,AF23,2031,ST_FORECAST,-0.0011206978925854,-0.0011206978925853983,fraction,-1.734723475976807e-18,1.5478957241321121e-15,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,AG23,2032,LT_FORECAST,-0.0202346679435937,-0.020234667943593854,fraction,1.5265566588595902e-16,7.54426345475507e-15,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,AH23,2033,LT_FORECAST,-0.0252165976135073,-0.02521659761350592,fraction,-1.3808398868775384e-15,5.47591672771098e-14,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,AI23,2034,LT_FORECAST,-0.0277142355279951,-0.027714235527996456,fraction,1.3565537582138631e-15,4.894790465511832e-14,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,AJ23,2035,LT_FORECAST,-0.0320383707058672,-0.03203837070586735,fraction,1.457167719820518e-16,4.5481954535024454e-15,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,AK23,2036,LT_FORECAST,-0.0379152799052754,-0.037915279905275434,fraction,3.469446951953614e-17,9.150524434004994e-16,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,AL23,2037,LT_FORECAST,-0.0440735062769467,-0.04407350627694595,fraction,-7.494005416219807e-16,1.700342461779535e-14,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,AM23,2038,LT_FORECAST,-0.051723234314305,-0.051723234314305144,fraction,1.457167719820518e-16,2.8172401419559096e-15,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,AN23,2039,LT_FORECAST,-0.0592938120684403,-0.05929381206844153,fraction,1.2281842209915794e-15,2.07135311113732e-14,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,AO23,2040,LT_FORECAST,-0.0665949773255168,-0.06659497732551511,fraction,-1.6792123247455493e-15,2.5215299894729118e-14,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,AP23,2041,LT_FORECAST,-0.0739307497827566,-0.07393074978275682,fraction,2.220446049250313e-16,3.00341340480791e-15,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,AQ23,2042,LT_FORECAST,-0.0830174024164307,-0.08301740241643252,fraction,1.817990202823694e-15,2.189890492723776e-14,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,AR23,2043,LT_FORECAST,-0.0969377676521941,-0.09693776765219131,fraction,-2.789435349370706e-15,2.8775526989429796e-14,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,AS23,2044,LT_FORECAST,-0.100282148283809,-0.10028214828381132,fraction,2.3175905639050143e-15,2.3110699197886508e-14,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,AT23,2045,LT_FORECAST,-0.102234817817485,-0.10223481781748578,fraction,7.771561172376096e-16,7.60167752854046e-15,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,AU23,2046,LT_FORECAST,-0.103074238011016,-0.10307423801101578,fraction,-2.220446049250313e-16,2.1542201932290866e-15,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,AV23,2047,LT_FORECAST,-0.1037512231711,-0.1037512231710992,fraction,-8.049116928532385e-16,7.758093526529658e-15,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,AW23,2048,LT_FORECAST,-0.103057991948712,-0.10305799194871146,fraction,-5.412337245047638e-16,5.251739474742705e-15,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,AX23,2049,LT_FORECAST,-0.103203116635665,-0.10320311663566673,fraction,1.7208456881689926e-15,1.6674357754562935e-14,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,AY23,2050,LT_FORECAST,-0.103507455633342,-0.10350745563334196,fraction,-4.163336342344337e-17,4.0222574469343224e-16,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,AZ23,2051,LT_FORECAST,-0.101335873229906,-0.10133587322990734,fraction,1.3322676295501878e-15,1.3147048395463913e-14,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,BA23,2052,LT_FORECAST,-0.0986344730554438,-0.09863447305543871,fraction,-5.093148125467906e-15,5.1636592843206445e-14,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,BB23,2053,LT_FORECAST,-0.0883208393022445,-0.08832083930224788,fraction,3.372302437298913e-15,3.818240931518281e-14,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,BC23,2054,LT_FORECAST,-0.0837095963196544,-0.08370959631965313,fraction,-1.2628786905111156e-15,1.5086426718493444e-14,reconciled
+ped_vkt_per_capita,Light petrol VKT per capita (km),23,BD23,2055,LT_FORECAST,-0.0867641607371689,-0.0867641607371693,fraction,4.0245584642661925e-16,4.638503306056982e-15,reconciled
+tuc_gtk,TUC GTK (Tonne-km),24,B24,2001,ACTUAL,,,fraction,,,not_computable
+tuc_gtk,TUC GTK (Tonne-km),24,C24,2002,ACTUAL,,,fraction,,,not_computable
+tuc_gtk,TUC GTK (Tonne-km),24,D24,2003,ACTUAL,,,fraction,,,not_computable
+tuc_gtk,TUC GTK (Tonne-km),24,E24,2004,ACTUAL,,,fraction,,,not_computable
+tuc_gtk,TUC GTK (Tonne-km),24,F24,2005,ACTUAL,,,fraction,,,not_computable
+tuc_gtk,TUC GTK (Tonne-km),24,G24,2006,ACTUAL,,,fraction,,,not_computable
+tuc_gtk,TUC GTK (Tonne-km),24,H24,2007,ACTUAL,,,fraction,,,not_computable
+tuc_gtk,TUC GTK (Tonne-km),24,I24,2008,ACTUAL,,,fraction,,,not_computable
+tuc_gtk,TUC GTK (Tonne-km),24,J24,2009,ACTUAL,,,fraction,,,not_computable
+tuc_gtk,TUC GTK (Tonne-km),24,K24,2010,ACTUAL,,,fraction,,,not_computable
+tuc_gtk,TUC GTK (Tonne-km),24,L24,2011,ACTUAL,,,fraction,,,not_computable
+tuc_gtk,TUC GTK (Tonne-km),24,M24,2012,ACTUAL,,,fraction,,,not_computable
+tuc_gtk,TUC GTK (Tonne-km),24,N24,2013,ACTUAL,,,fraction,,,not_computable
+tuc_gtk,TUC GTK (Tonne-km),24,O24,2014,ACTUAL,,,fraction,,,not_computable
+tuc_gtk,TUC GTK (Tonne-km),24,P24,2015,ACTUAL,,,fraction,,,not_computable
+tuc_gtk,TUC GTK (Tonne-km),24,Q24,2016,ACTUAL,,,fraction,,,not_computable
+tuc_gtk,TUC GTK (Tonne-km),24,R24,2017,ACTUAL,,,fraction,,,not_computable
+tuc_gtk,TUC GTK (Tonne-km),24,S24,2018,ACTUAL,,,fraction,,,not_computable
+tuc_gtk,TUC GTK (Tonne-km),24,T24,2019,ACTUAL,,,fraction,,,not_computable
+tuc_gtk,TUC GTK (Tonne-km),24,U24,2020,ACTUAL,,,fraction,,,not_computable
+tuc_gtk,TUC GTK (Tonne-km),24,V24,2021,ACTUAL,,,fraction,,,not_computable
+tuc_gtk,TUC GTK (Tonne-km),24,W24,2022,ACTUAL,,,fraction,,,not_computable
+tuc_gtk,TUC GTK (Tonne-km),24,X24,2023,ACTUAL,0.479452424583209,0.47945242458320925,fraction,-2.220446049250313e-16,4.631212473647535e-16,reconciled
+tuc_gtk,TUC GTK (Tonne-km),24,Y24,2024,ACTUAL,-0.0794532605304241,-0.07945326053042412,fraction,1.3877787807814457e-17,1.746660579461103e-16,reconciled
+tuc_gtk,TUC GTK (Tonne-km),24,Z24,2025,ACTUAL,-0.0399177099813842,-0.03991770998138422,fraction,2.0816681711721685e-17,5.214898780874361e-16,reconciled
+tuc_gtk,TUC GTK (Tonne-km),24,AA24,2026,ACTUAL,0.0305857569756358,0.030585756975635814,fraction,-1.3877787807814457e-17,4.537336714886379e-16,reconciled
+tuc_gtk,TUC GTK (Tonne-km),24,AB24,2027,ST_FORECAST,0.0,0.0,fraction,0.0,0.0,reconciled
+tuc_gtk,TUC GTK (Tonne-km),24,AC24,2028,ST_FORECAST,0.0,0.0,fraction,0.0,0.0,reconciled
+tuc_gtk,TUC GTK (Tonne-km),24,AD24,2029,ST_FORECAST,0.0,0.0,fraction,0.0,0.0,reconciled
+tuc_gtk,TUC GTK (Tonne-km),24,AE24,2030,ST_FORECAST,0.0,0.0,fraction,0.0,0.0,reconciled
+tuc_gtk,TUC GTK (Tonne-km),24,AF24,2031,ST_FORECAST,0.0,0.0,fraction,0.0,0.0,reconciled
+tuc_gtk,TUC GTK (Tonne-km),24,AG24,2032,LT_FORECAST,0.0,0.0,fraction,0.0,0.0,reconciled
+tuc_gtk,TUC GTK (Tonne-km),24,AH24,2033,LT_FORECAST,0.0,0.0,fraction,0.0,0.0,reconciled
+tuc_gtk,TUC GTK (Tonne-km),24,AI24,2034,LT_FORECAST,0.0,0.0,fraction,0.0,0.0,reconciled
+tuc_gtk,TUC GTK (Tonne-km),24,AJ24,2035,LT_FORECAST,0.0,0.0,fraction,0.0,0.0,reconciled
+tuc_gtk,TUC GTK (Tonne-km),24,AK24,2036,LT_FORECAST,0.0,0.0,fraction,0.0,0.0,reconciled
+tuc_gtk,TUC GTK (Tonne-km),24,AL24,2037,LT_FORECAST,0.0,0.0,fraction,0.0,0.0,reconciled
+tuc_gtk,TUC GTK (Tonne-km),24,AM24,2038,LT_FORECAST,0.0,0.0,fraction,0.0,0.0,reconciled
+tuc_gtk,TUC GTK (Tonne-km),24,AN24,2039,LT_FORECAST,0.0,0.0,fraction,0.0,0.0,reconciled
+tuc_gtk,TUC GTK (Tonne-km),24,AO24,2040,LT_FORECAST,0.0,0.0,fraction,0.0,0.0,reconciled
+tuc_gtk,TUC GTK (Tonne-km),24,AP24,2041,LT_FORECAST,0.0,0.0,fraction,0.0,0.0,reconciled
+tuc_gtk,TUC GTK (Tonne-km),24,AQ24,2042,LT_FORECAST,0.0,0.0,fraction,0.0,0.0,reconciled
+tuc_gtk,TUC GTK (Tonne-km),24,AR24,2043,LT_FORECAST,0.0,0.0,fraction,0.0,0.0,reconciled
+tuc_gtk,TUC GTK (Tonne-km),24,AS24,2044,LT_FORECAST,0.0,0.0,fraction,0.0,0.0,reconciled
+tuc_gtk,TUC GTK (Tonne-km),24,AT24,2045,LT_FORECAST,0.0,0.0,fraction,0.0,0.0,reconciled
+tuc_gtk,TUC GTK (Tonne-km),24,AU24,2046,LT_FORECAST,0.0,0.0,fraction,0.0,0.0,reconciled
+tuc_gtk,TUC GTK (Tonne-km),24,AV24,2047,LT_FORECAST,0.0,0.0,fraction,0.0,0.0,reconciled
+tuc_gtk,TUC GTK (Tonne-km),24,AW24,2048,LT_FORECAST,0.0,0.0,fraction,0.0,0.0,reconciled
+tuc_gtk,TUC GTK (Tonne-km),24,AX24,2049,LT_FORECAST,0.0,0.0,fraction,0.0,0.0,reconciled
+tuc_gtk,TUC GTK (Tonne-km),24,AY24,2050,LT_FORECAST,0.0,0.0,fraction,0.0,0.0,reconciled
+tuc_gtk,TUC GTK (Tonne-km),24,AZ24,2051,LT_FORECAST,0.0,0.0,fraction,0.0,0.0,reconciled
+tuc_gtk,TUC GTK (Tonne-km),24,BA24,2052,LT_FORECAST,0.0,0.0,fraction,0.0,0.0,reconciled
+tuc_gtk,TUC GTK (Tonne-km),24,BB24,2053,LT_FORECAST,0.0,0.0,fraction,0.0,0.0,reconciled
+tuc_gtk,TUC GTK (Tonne-km),24,BC24,2054,LT_FORECAST,0.0,0.0,fraction,0.0,0.0,reconciled
+tuc_gtk,TUC GTK (Tonne-km),24,BD24,2055,LT_FORECAST,0.0,0.0,fraction,0.0,0.0,reconciled

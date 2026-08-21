@@ -261,9 +261,9 @@ def test_committed_current_revenue_outlook_pack_is_repo_local_and_hash_backed() 
     assert manifest["revenue_source_pack"]["dashboard_default_selections"]["series"] == "Total NLTF revenue"
     assert manifest["revenue_source_pack"]["source_workbook_selections"]["sheet"] == "Baseline"
     assert "BEFU26 source pack" in manifest["revenue_source_pack"]["default_selection_policy"]
-    assert manifest["official_vintages"]["official_comparator_vintage_id"] == "BEFU26"
+    assert manifest["official_vintages"]["official_comparator_vintage_id"] == "PREBU26"
     assert manifest["official_vintages"]["bridge_assumption_vintage_id"] == "BEFU26"
-    assert set(manifest["official_vintages"]["available"]) == {"BEFU26", "MBU26"}
+    assert set(manifest["official_vintages"]["available"]) == {"PREBU26", "BEFU26", "MBU26"}
     assert manifest["revenue_line_reconciliation"]["repo_relative_path"] == "data/current_revenue_outlook/revenue_line_reconciliation.csv"
     assert manifest["revenue_stack_components"]["repo_relative_path"] == "data/current_revenue_outlook/revenue_stack_components.csv"
     assert "aggregates are overlays only" in manifest["revenue_stack_components"]["scope"]
@@ -1155,6 +1155,7 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
 
     allowed_traces = {
         "Actual",
+        "PREBU26 official",
         "BEFU26 official",
         "MBU26 official",
         "Current finalist Base case",
@@ -1350,6 +1351,7 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
     }.issubset(audit.columns)
 
     assert set(line_reconciliation["source_path"].dropna().unique()) == {
+        "PREBU26 official",
         "BEFU26 official",
         "MBU26 official",
         "Current finalist Base case",
@@ -1452,6 +1454,7 @@ def test_committed_current_revenue_outlook_runtime_contract() -> None:
         "Gross contribution stack",
     ]
     assert set(stack_components["source_path"].dropna().unique()) == {
+        "PREBU26 official",
         "BEFU26 official",
         "MBU26 official",
         "Current finalist Base case",
@@ -2377,12 +2380,12 @@ def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
         'future_revenue_forecasts.parquet': '403c0adcbc5ede8566358b7622aea6e181527cbda7b6dbda7bf042d0b59f3576',
         'horizon_contract_audit.csv': 'b6e117b5656c479275986187c56b3eafbe5ef2362313c7d6f9a418359ea667f7',
         'horizon_contract_audit.parquet': '015e1a42d88eaafe2fa966800a5b499f2b90b8331a6a062b81e76d080d1c5882',
-        'light_ruc_horizon_availability.csv': 'ca87c6ac93033496a928ae07159824dac642917ba104c030161dab5ff46b063f',
-        'light_ruc_horizon_availability.parquet': '39abda810443b1d91e04b26399a96c0c30e2fe70a30cbde7440790c3145f5f48',
-        'manifest.json': '072598d1557c7fbce56645817cdff03e3baccc48453bf0d639394a3368f7b04d',
+        'light_ruc_horizon_availability.csv': 'e821e6d3911e8b58a261b063c6917e3e55b41799c7b8635a5fd125fc4ab5b718',
+        'light_ruc_horizon_availability.parquet': 'd5a9ed4747c2f34a99c5693be115b7940a3bbf6ced3c59e1a37b18ab2fdd6785',
+        'manifest.json': '2f1cc864430312fc7029275f14c521b7f4769643ca645d952f0c2d1f26563aee',
         'manifest.md': 'f021e551cf021f8be307e7ab0088e8857e40eced50375bd6d3e55e2093eca628',
-        'path_trace_status.csv': '9d9eabcd54cbba3b468b9e7153218a954e43c9efec031b2089f741c4fff20ea5',
-        'path_trace_status.parquet': '56c8b08e1d5efffa930e703c52b9e9de848e21d94c5ae9a760ca47083a4a1df1',
+        'path_trace_status.csv': '1785e543e9bed9ab4e760e4c84f4e4b56870c5e979276819f7a4cfad3e7d59ee',
+        'path_trace_status.parquet': 'b4d4125690efd900ded4a77b99fbe921488c4a9f4d59186386b6e26d9070176a',
         'ped_bridge_mode_config.csv': '60583741fcd8484df3e4f166a82e49a06fdeb0fd353756fcfdf48a1f9786efc4',
         'ped_bridge_mode_config.parquet': '7b512297e05dfea806ccb86c984b816f3d2b7da7012be5ecef4f531dcae77c39',
         'ped_bridge_shape_fit_metrics.csv': '3a435ddaa5ecfecda0d068a453acd617e01c7b8fe2c313973d5694d125171fb8',
@@ -2397,20 +2400,20 @@ def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
         'raw_quarterly_forecast_audit.parquet': '5062e4c77f4d7e926d9a9494b51132f476623710adab1ba19f35e2b68a98f300',
         'revenue_bridge_components.csv': '1a9c4f2a37329da2ab56070210c2db89c449bab2faa62362fe3a0a591c0daf9f',
         'revenue_bridge_components.parquet': '0a0a74c594ddc41c14b7089f7cce8c801cd9d733a526f859700f614009b30cf4',
-        'revenue_chart_rows.csv': 'eb5176d5ec78d52a603f405d5730b7e6212565b0d98598853b6b226936791749',
-        'revenue_chart_rows.parquet': 'da2655cd252780495b61a582471b4938e1cf2873874655d97094909e27b7c778',
-        'revenue_formula_residuals.csv': '6bebd38530a9fc92141064a02d4fe611dfd22c12142e90203eb979fe9b62955c',
-        'revenue_formula_residuals.parquet': '78044187267396940e7504a602662b48eb7c25094a1abe6930087302e9100835',
-        'revenue_line_reconciliation.csv': 'd1d57befba13fa755cec1a680c942332b0d1cefd189e5758ec42a74a18aec4d4',
-        'revenue_line_reconciliation.parquet': 'f8ddacdfcd5bc50b1982fe5bcabf6242af00257e6291c0c1b2ca4b182dec9022',
-        'revenue_stack_components.csv': '6b90610da5393a305d26a1db61a3667cb7d8f98e25f9ff77ad81ca994bccc91a',
-        'revenue_stack_components.parquet': 'e49c70d51f54d2e58c48e5045d5253d8579a619c9fe9bea4cf4c136dd02f7de8',
+        'revenue_chart_rows.csv': '6dcdb94dd8c29c4ffa76ef7476b8abf449945cfed3c564150e79bacdc2c0d732',
+        'revenue_chart_rows.parquet': '29423e7c88cc3334b2d6d2ad56a991f6224197c816579d54fb5cb51053d594d5',
+        'revenue_formula_residuals.csv': 'e1e0d6e33c49d975c7e47331f7f89344b46a5c47ce37289370dad40e18441315',
+        'revenue_formula_residuals.parquet': '96c952cbac14330b81a2322ffdb8aca70dbeadaebf2ad5361de881a637d883d3',
+        'revenue_line_reconciliation.csv': '237a7448ba7f56b8594e3426a668c41ad23d755f3fa8e33f561b5aa39fdea66c',
+        'revenue_line_reconciliation.parquet': 'c26661c2c207edae00b5f250222b16c9f976a45994936df3f83d157087a4fa7f',
+        'revenue_stack_components.csv': '99dd9befc6dcfd72f2cd4f52898e34047953b13da2c086142289fd835644f46c',
+        'revenue_stack_components.parquet': 'd9db1a00e20fc56513e09c6d68361111f5bd48db06913f44045c01152a7f8964',
         'row_reconciliation.csv': 'c3b08c6a325833c85b042335acb58cd858e3b7377adb92fc3570507934258c9b',
         'row_reconciliation.parquet': '848f119deaddd1bac51883f85ff6f3b870ea583e3bcabef688d43376a3ba10ae',
         'runtime_cutoff_audit.csv': 'ddf70dcd8ce5d2965e56bcb248a96c3efee10367e2b31e5005c2107d96aa18ed',
         'runtime_cutoff_audit.parquet': '80a9881662173029f23d0d423f002e257abb272f8f7f980e00bbdfc3ca6584ca',
-        'runtime_trace_audit.csv': '21a1cd8b59ba2f0edb9c06d105565f625b5644b3c42628468a5687faf50de756',
-        'runtime_trace_audit.parquet': '4932e7c0fb20d441d2218fd44e0ba839d81e0783609beef3d62bf0ca7bad5917',
+        'runtime_trace_audit.csv': '7b7665885dd344814b2b8628a52d1b961f5485ef3af2c214d6302beb18b80c40',
+        'runtime_trace_audit.parquet': '62222cff107f0c24661892a12ba58fa72a56a44e484a7300bb0f128f910241e2',
         'scenario_feature_lineage.csv': 'b123c97090bd282009225a0ac2cfc36226d20017412f820dfeec6af34411b30d',
         'scenario_feature_lineage.parquet': 'dbc4ac3f2693f6de0915aebd21bc85e2f794f878eaefef0eb9031de468fb00e9',
         'scenario_input_delta_audit.csv': '546a2e00c02b247368196a106499d1a1473619f5770d70794ab76428e1919cf8',
@@ -2419,20 +2422,20 @@ def test_current_revenue_outlook_runtime_artifact_hashes_are_frozen() -> None:
         'scenario_input_replay_mismatch_report.parquet': 'ff274edfb7d0a3fd999e22b0aed54a125b751edfa3dfb6830c688c95c7b4ef4a',
         'scenario_role_contract.csv': '08b0f3e2b11ddddcfbafe9698b44af6076996cf99727350e9c2c7d39bc4dd74d',
         'scenario_role_contract.parquet': '3ceb32bd026e46352c72bb026b9f408f584dbbb2403631746395374cadd20b09',
-        'sensitivity_config.csv': '3c29b44c845f67ee27d71baa3420aa7af1a077e09904675ca6475a63fef129b1',
-        'sensitivity_config.parquet': '48e4fe218d6e136c8253c5435f0d80960ccd2698b5132800ba7ba16f57f7b9f4',
-        'sensitivity_impact_audit.csv': '768c0da3f7c2c11c510849f07b7b2838bf2a1721df474c08e6f5b63a056492e2',
-        'sensitivity_impact_audit.parquet': 'c4bf77b8aceecb7f58ee04a706f61be7bd0cb4c78bed61a9f3ade0c82c5e7f89',
-        'sensitivity_seed_inputs.csv': '5181058396fbdb3896ade20b3ea335955fc186af85cccd365c7d86531852f3a6',
-        'sensitivity_seed_inputs.parquet': '23a8ba664690235b92fac25912b9c8ab0eefe990f94a58258b901fafa306b310',
+        'sensitivity_config.csv': 'd1474223454dbcac8a817523193f0c259818e471d6f7656b2338b82157f9ffd9',
+        'sensitivity_config.parquet': 'a0858ccf3b6870306c47759a642bdb4e422c4f314adf15b0228b61085dd7ff4f',
+        'sensitivity_impact_audit.csv': '5b9730925448c053d000d475e5a509b69c1825a3bdc71974e973c2b16de521ac',
+        'sensitivity_impact_audit.parquet': '90440e993055d0e843f3b2865ddb1069286f538e8d99ef5ea1a48856d176c6b0',
+        'sensitivity_seed_inputs.csv': 'ec16691e19856cacfdf5e41124fd846bf3ff43e6ad0e60dd7c104e1306751ff6',
+        'sensitivity_seed_inputs.parquet': '63b27c976dea15743298238df050ee26ec22c8db732eb6df7f16832e40c14cdb',
         'series_alias_audit.csv': '225bd2e4407bb97aa40b515a0ad35f6501e0b15779aa3efa5ee0884290efbcf7',
         'series_alias_audit.parquet': '09f87b5713889de262fcd8c257d3f829266e10ec10a45b520ac081b19ac96eca',
         'series_trace_contract.csv': 'c717badc9b8056755483a6c494820b62cd44bb734a99f8e0b12fe75188bf4db6',
         'series_trace_contract.parquet': '866482606699335a37eccac418f667a77ad93492b05e6f0e43d9aea4651c4e35',
         'stream_vintage_status.csv': 'c606a559f4f96634cace973eda9b78f4c6975f08b45842a2186a818f1a845b05',
         'stream_vintage_status.parquet': 'c9d5e63a9418cb87c505f98d55a78e4a9d813c04d7dbc26c625ddaee4fb2a73c',
-        'trace_source_contract.csv': '36137d8e5cac28530159151e04ac3094fedd49ffb43b5dff3aa91e00172fd95c',
-        'trace_source_contract.parquet': '85d2a78906c8756e145112e1ab2f0ef8e2e26801a390f0db83cb30629b66c971',
+        'trace_source_contract.csv': '13dc53313ff9d9a58d212efbb7cdcc516b86922a1ed6f84945c57e85818c0b34',
+        'trace_source_contract.parquet': 'a18bf03b2832fc3f4bb7bf8beaa81453669b0015937a11e2542def0b9f22929e',
         'treasury_befu26_macro_path.csv': '1dd2fcbbc122ad8dd502e44ff1833f93ff26169dcd7dc47026da787adaf8aa1e',
     }
     assert {path.name: _sha256(path) for path in sorted(pack_dir.iterdir()) if path.is_file()} == expected_hashes

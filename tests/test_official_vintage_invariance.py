@@ -65,15 +65,16 @@ def test_mbu26_remains_selectable_as_a_prior_vintage() -> None:
 def test_runtime_packs_separate_the_two_vintage_roles(engine: str, pack_dir: Path) -> None:
     manifest = json.loads((pack_dir / "manifest.json").read_text(encoding="utf-8"))
     block = manifest["official_vintages"]
-    assert block["official_comparator_vintage_id"] == "BEFU26"
+    assert block["official_comparator_vintage_id"] == "PREBU26"
     assert block["bridge_assumption_vintage_id"] == "BEFU26"
     # The fields are separately auditable, so an analyst can reproduce Current
     # on one vintage's bridge against another vintage's published path.
-    assert set(block["available"]) == {"BEFU26", "MBU26"}
+    assert set(block["available"]) == {"PREBU26", "BEFU26", "MBU26"}
     for vintage_id, entry in block["available"].items():
         assert entry["workbook_sha256"], f"{vintage_id} must record its workbook hash"
         assert entry["manifest_sha256"], f"{vintage_id} must record its pack manifest hash"
     assert manifest["period_rule"]["official_comparator_cutoff_by_vintage"] == {
+        "PREBU26": 2055,
         "BEFU26": 2055,
         "MBU26": 2055,
     }
@@ -91,7 +92,7 @@ def test_no_official_vintage_carries_a_current_policy_overlay_by_default(
     assert not official.empty
     # Each official vintage's rows carry its own release round as fed_path,
     # never a Current policy path.
-    assert set(official["fed_path"].dropna().astype(str)) == {"BEFU26", "MBU26"}
+    assert set(official["fed_path"].dropna().astype(str)) == {"PREBU26", "BEFU26", "MBU26"}
     for column in ("trace_name", "scenario_name"):
         values = set(official[column].dropna().astype(str))
         assert not any("deferred" in value.lower() or "uplift" in value.lower() for value in values), (

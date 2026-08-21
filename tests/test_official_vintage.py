@@ -52,10 +52,11 @@ class TestRegistry:
         assert registry["schema_version"] == ov.OFFICIAL_VINTAGE_REGISTRY_SCHEMA_VERSION
         assert ov.validate_official_vintage_registry(registry) == []
 
-    def test_befu26_is_latest_default_comparator_and_default_bridge(self):
-        assert ov.latest_official_vintage_id(ROOT) == "BEFU26"
-        assert ov.default_comparator_vintage_id(ROOT) == "BEFU26"
+    def test_prebu26_is_latest_comparator_and_befu26_remains_bridge(self):
+        assert ov.latest_official_vintage_id(ROOT) == "PREBU26"
+        assert ov.default_comparator_vintage_id(ROOT) == "PREBU26"
         assert ov.default_bridge_vintage_id(ROOT) == "BEFU26"
+        assert ov.default_long_run_shape_vintage_id(ROOT) == "BEFU26"
 
     def test_mbu26_remains_registered_and_selectable(self, registry):
         entry = ov.official_vintage_entry("MBU26", registry=registry)
@@ -66,9 +67,9 @@ class TestRegistry:
         assert entry["status"] == "superseded_official_vintage_available_for_comparison"
         assert entry["workbook_sha256"] == MBU26_WORKBOOK_SHA
         choices = dict(ov.official_vintage_choices(ROOT))
-        assert set(choices) == {"BEFU26", "MBU26"}
+        assert set(choices) == {"BEFU26", "MBU26", "PREBU26"}
         # Default comparator is listed first for the front-end selector.
-        assert ov.official_vintage_choices(ROOT)[0][0] == "BEFU26"
+        assert ov.official_vintage_choices(ROOT)[0][0] == "PREBU26"
 
     def test_befu26_entry_pins_workbook_and_horizons(self, registry):
         entry = ov.official_vintage_entry("BEFU26", registry=registry)
@@ -87,7 +88,7 @@ class TestRegistry:
         assert ov.sha256(workbook) == BEFU26_WORKBOOK_SHA
 
     def test_selection_resolution(self):
-        assert ov.resolve_official_vintage_selection(None, ROOT) == "BEFU26"
+        assert ov.resolve_official_vintage_selection(None, ROOT) == "PREBU26"
         assert ov.resolve_official_vintage_selection("MBU26", ROOT) == "MBU26"
         with pytest.raises(ov.OfficialVintageError):
             ov.resolve_official_vintage_selection("PREFU99", ROOT)

@@ -1,0 +1,5 @@
+trace_id,trace_label,availability_status,plotted,data_scope,blocking_gap_id,current_selection,user_visible_message
+actual,Actual,available,True,PREBU26 ACTUAL rows through FY2026,,PREBU26,Actuals are read from the PREBU26 annual source spine.
+prebu26_official,PREBU26 official,available,True,PREBU26 ST_FORECAST/LT_FORECAST rows,,PREBU26,Official comparator is the PREBU26 worksheet only.
+current_finalist_base,Current finalist Base case,available,True,Current finalist model output annualized to June years,,current_basecase,"Current finalist base replaces only PED, Light RUC and Heavy RUC revenue."
+current_finalist_comparison,Current finalist High population/comparison,available,True,Current finalist comparison output annualized to June years,,current_comparison_1,"Current finalist comparison replaces only PED, Light RUC and Heavy RUC revenue."

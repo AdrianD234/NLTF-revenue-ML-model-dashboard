@@ -778,7 +778,10 @@ def filter_official_vintage_rows(
     drop = role.eq(OFFICIAL_SCOPE) & ~scenario.eq(str(selected_scenario))
     if not drop.any():
         return frame
-    return frame[~drop].copy()
+    # Index reset mirrors app._filter_official_vintage_rows: the kept rows are
+    # a non-contiguous slice once the comparator and bridge vintages differ,
+    # and stale labels would make equal tables compare unequal.
+    return frame[~drop].reset_index(drop=True)
 
 
 def _apply_official_vintage_filter(

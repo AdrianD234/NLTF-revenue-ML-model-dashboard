@@ -26,7 +26,10 @@ import pytest
 
 import app
 from model_dashboard.engine import ENGINE_AR1, ENGINE_ENSEMBLE, engine_revenue_outlook_dir
-from model_dashboard.official_vintage import bridge_vintage_id_from_manifest
+from model_dashboard.official_vintage import (
+    bridge_vintage_id_from_manifest,
+    comparator_vintage_id_from_manifest,
+)
 from model_dashboard.revenue_outlook import (
     PED_BRIDGE_DEFAULT_MODE,
     revenue_outlook_signature,
@@ -133,8 +136,10 @@ def _governed_key(pack, engine: str, current_state: str, official_state: str):
         official_fed_policy_state=official_state,
         ped_bridge_mode=PED_BRIDGE_DEFAULT_MODE,
         bridge_vintage_id=str(bridge_vintage_id_from_manifest(pack.manifest, ROOT) or ""),
+        # The manifest key is official_comparator_vintage_id; the resolver
+        # also covers packs predating the block, so no release is hard-coded.
         official_comparator_vintage_id=str(
-            block.get("default_comparator_vintage_id") or "BEFU26"
+            comparator_vintage_id_from_manifest(pack.manifest, ROOT)
         ),
         long_run_transition_schedule_id=str(
             block.get("long_run_transition_schedule_id") or app.UNBLENDED_SCHEDULE_ID

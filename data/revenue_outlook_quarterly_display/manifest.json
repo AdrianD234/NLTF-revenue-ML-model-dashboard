@@ -6,21 +6,22 @@
   "display_horizon_last_fy": 2050,
   "display_horizon_last_quarter": "2050Q2",
   "notes": "Derived quarterly rows are indicative display values benchmarked to a governed June-year total. They are not published quarterly actuals and not direct model outputs. Official-comparator quarters carry the provenance label 'derived quarterly presentation from official annual source'.",
-  "official_annual_rows": 73,
+  "official_annual_rows": 97,
   "official_series_restored": [
     "light_petrol_vkt"
   ],
-  "quarterly_rows": 8344,
+  "quarterly_rows": 10072,
   "quarterly_traces": [
     "Actual",
     "BEFU26 official",
     "Current finalist Base case",
     "Current finalist High population/comparison",
     "Current finalist comparison behavioural path",
-    "MBU26 official"
+    "MBU26 official",
+    "PREBU26 official"
   ],
   "rebuild_command": "python scripts/build_revenue_outlook_quarterly_display_pack.py",
-  "reconciled_series_trace_years": 2093,
+  "reconciled_series_trace_years": 2525,
   "reconciliation_abs_tolerance": 1e-06,
   "reconciliation_rel_tolerance": 1e-12,
   "schema_version": "nltf-revenue-outlook-quarterly-display-v1",
@@ -44,5 +45,5 @@
     "total_fed_ruc_net_revenue",
     "total_nltf_net_revenue"
   ],
-  "source_digest": "dc3cdc8487b305a78d3755bba90019ac518b74787dc6f891a81491dfb1a9e58a"
+  "source_digest": "7a35cfabc902a4ce1866452d3506d1f6029a989142deb0b7a2621abf4cac94ef"
 }

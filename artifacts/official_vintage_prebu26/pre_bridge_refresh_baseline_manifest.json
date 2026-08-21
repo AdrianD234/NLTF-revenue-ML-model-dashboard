@@ -1,0 +1,7 @@
+{
+  "bridge_vintage": "BEFU26",
+  "ar1_sha256": "014899adb0a9def81dd7740f6c84d5b0c155f074eee18e9aab537f6aff69e8df",
+  "base_sha": "bf61160d86499a5d39d9dbef47e85a4b9b563d3d",
+  "ensemble_sha256": "eb5176d5ec78d52a603f405d5730b7e6212565b0d98598853b6b226936791749",
+  "captured_at_branch": "feature/prebu26-default-official"
+}

@@ -168,6 +168,7 @@ test_groups:
       - tests/test_official_vintage_runtime_genericity.py
       - tests/test_official_vintage_runtime_independence.py
       - tests/test_official_vintage_plug_and_play.py
+      - tests/test_official_vintage_prebu26.py
       - tests/test_official_comparator_policy_horizon.py
       - tests/test_stream_vintage_exposure.py
       - tests/test_data_loader.py
