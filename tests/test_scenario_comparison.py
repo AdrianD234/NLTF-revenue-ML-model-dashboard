@@ -636,6 +636,68 @@ def test_full_default_window_reproduces_the_previous_totals_exactly(comparison_c
     assert app.npv_to_horizon(b_win, rate=0.0) == app.npv_to_horizon(b, rate=0.0)
 
 
+def test_history_extends_to_the_published_fy2026_actual(comparison_context) -> None:
+    """PREBU26 publishes FY2026 as an ACTUAL; the grey history line carries it.
+
+    The forecast sides still start at FY2027, so the FY2026 point is display
+    history only - it can never reach a delta, NPV or window aggregate - and
+    its value is the published official actual byte-for-byte.
+    """
+    pack, _ = comparison_context
+    result = _paths(comparison_context, "Total NLTF revenue", _keys(), _keys())
+    history = result["history"]
+    years = sorted(int(fy) for fy in history.index)
+    assert years[-1] == 2026
+    assert min(int(fy) for fy in result["a"].index) == 2027
+    rows = pack.revenue_chart_rows
+    label_col = "series_label" if "series_label" in rows.columns else "stream_label"
+    official = rows[
+        rows["time_grain"].astype(str).eq("june_year")
+        & rows[label_col].astype(str).eq("Total NLTF revenue")
+        & rows["trace_name"].astype(str).eq("PREBU26 official")
+        & pd.to_numeric(rows["june_year"], errors="coerce").eq(2026)
+    ]
+    if "value_status" in official.columns:
+        official = official[official["value_status"].astype(str).eq("actual")]
+    expected = float(pd.to_numeric(official["value"], errors="coerce").dropna().iloc[0])
+    assert float(history.loc[2026]) == pytest.approx(expected, rel=1e-12)
+    # A published historical actual still wins where both exist: every
+    # pre-2026 history year is the grey spine's own value ordering-wise.
+    assert years == sorted(set(years)), "duplicate June years in history"
+
+
+def test_comparison_figure_bridges_the_actual_seam_visually() -> None:
+    """A connector joins the last actual to each side's first forecast year.
+
+    Display-only: it is legend-less, hover-less and drawn only when the
+    forecast starts the very next June year, so a narrowed window (or a
+    non-contiguous horizon) draws no bridge.
+    """
+    history = pd.Series([90.0, 95.0], index=[2025, 2026])
+    a = pd.Series([100.0, 101.0], index=[2027, 2028])
+    b = pd.Series([102.0, 103.0], index=[2027, 2028])
+    figure = app._scenario_comparison_figure(history, a, b, "$m nominal ex GST")
+    connectors = [
+        trace for trace in figure.data
+        if trace.showlegend is False and trace.mode == "lines"
+    ]
+    assert len(connectors) == 2
+    for trace in connectors:
+        assert [int(x) for x in trace.x] == [2026, 2027]
+        assert trace.y[0] == pytest.approx(95.0 / 1000.0)
+    # Aggregate series are untouched: the scenario traces still start at 2027.
+    scenario_traces = [t for t in figure.data if t.name in ("Scenario A", "Scenario B")]
+    for trace in scenario_traces:
+        assert min(int(x) for x in trace.x) == 2027
+    # A window that no longer starts right after the actuals draws no bridge.
+    narrowed = pd.Series([100.0], index=[2030])
+    figure_narrowed = app._scenario_comparison_figure(history, narrowed, narrowed, "$m nominal ex GST")
+    assert not [
+        trace for trace in figure_narrowed.data
+        if trace.showlegend is False and trace.mode == "lines"
+    ]
+
+
 def test_prebu26_seam_keeps_fy2026_out_of_the_window_and_aggregates(comparison_context) -> None:
     """The window floor follows the selected vintage's presentation seam.
 

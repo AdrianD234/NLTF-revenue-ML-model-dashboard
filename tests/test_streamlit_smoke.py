@@ -1425,11 +1425,12 @@ def test_revenue_outlook_comparison_window_recalculates_and_clamps() -> None:
 
 
 def test_revenue_outlook_compare_mode_renders_pt_and_freight_for_scenario_b() -> None:
-    """Scenario B's PT and freight levers render unconditionally.
+    """Both columns' PT and freight levers render unconditionally.
 
     Both are first-class governed sensitivities (continuous through FY2050),
-    so they are no longer method-detail workshop copy: an A-side PT selection
-    must be mirrorable in B, and "Reset B to current page (A)" must copy it.
+    so they are no longer method-detail workshop copy: a page-side PT
+    selection must be mirrorable in either column, and "Reset A & B to
+    current page" must copy it into both.
     """
     at = _run_revenue_outlook_page()
     pt = next(
@@ -1442,24 +1443,30 @@ def test_revenue_outlook_compare_mode_renders_pt_and_freight_for_scenario_b() ->
     at.run()
     assert not at.exception
     selectbox_keys = {s.key for s in at.selectbox}
-    assert "ro_cmp_b_pt" in selectbox_keys
-    assert "ro_cmp_b_freight" in selectbox_keys
+    for key in ("ro_cmp_a_trace", "ro_cmp_a_pt", "ro_cmp_a_freight",
+                "ro_cmp_b_trace", "ro_cmp_b_pt", "ro_cmp_b_freight"):
+        assert key in selectbox_keys, key
     reset = next(b for b in at.button if b.key == "ro_cmp_reset_b")
     reset.click()
     at.run()
     assert not at.exception
-    b_pt = next(s for s in at.selectbox if s.key == "ro_cmp_b_pt")
-    assert str(b_pt.value) == "Med"
-    b_freight = next(s for s in at.selectbox if s.key == "ro_cmp_b_freight")
-    assert str(b_freight.value) == "Off"
+    for prefix in ("a", "b"):
+        pt_box = next(s for s in at.selectbox if s.key == f"ro_cmp_{prefix}_pt")
+        assert str(pt_box.value) == "Med", prefix
+        freight_box = next(s for s in at.selectbox if s.key == f"ro_cmp_{prefix}_freight")
+        assert str(freight_box.value) == "Off", prefix
+        trace_box = next(s for s in at.selectbox if s.key == f"ro_cmp_{prefix}_trace")
+        assert str(trace_box.value) == "Current finalist Base case", prefix
 
 
 def test_revenue_outlook_compare_mode_keeps_lever_state_for_downstream() -> None:
-    """A single-view lever survives the compare switch and drives Scenario A.
+    """The A column is independently selectable; page levers survive the trip.
 
-    Fleet efficiency is the lever this test flips. Scenario A is the live
-    Single scenario configuration, so the persisted lever must surface in
-    A's summary, then restore on switch-back.
+    Scenario A no longer mirrors the Single scenario configuration: it opens
+    on the Base path with its own levers Off regardless of the page levers.
+    Selecting a lever in the A column surfaces in A's summary, and the
+    page-side lever is preserved across the compare round-trip for the
+    sections below the comparison.
     """
     at = _run_revenue_outlook_page()
     fleet = next(
@@ -1468,6 +1475,16 @@ def test_revenue_outlook_compare_mode_keeps_lever_state_for_downstream() -> None
     fleet.set_value("High")
     at.run()
     _view_mode_radio(at).set_value(app.REVENUE_OUTLOOK_VIEW_COMPARE)
+    at.run()
+    assert not at.exception
+    # A is independent: its own fleet lever opens Off, so the page's High
+    # selection must NOT leak into the A summary...
+    a_fleet = next(s for s in at.selectbox if s.key == "ro_cmp_a_fleet")
+    assert str(a_fleet.value) == "Off"
+    rendered = "\n".join(str(markdown.value) for markdown in at.markdown)
+    assert "Fleet High" not in rendered
+    # ...until it is selected in the A column itself.
+    a_fleet.set_value("High")
     at.run()
     assert not at.exception
     rendered = "\n".join(str(markdown.value) for markdown in at.markdown)

@@ -329,6 +329,33 @@ def test_the_vfm_paths_differ_from_base_inside_the_model_window(context) -> None
     assert fast_2050 != pytest.approx(slow_2050), "the VFM paths merged at FY2050"
 
 
+def test_boundary_lines_follow_actuals_and_post_model_segments(figure) -> None:
+    """Both chart boundaries are derived from the data, not hard-coded.
+
+    The amber trained-cutoff seam anchors to the last published actual of the
+    selected vintage (FY2025 under this module's pinned BEFU26; FY2026 under
+    the default PREBU26, covered by the browser contract), independent of
+    which forecast traces are ticked. The post-model boundary sits on the
+    first extrapolated June year the rows actually carry - FY2031 in the
+    current packs - not on a hard-coded FY2030.
+    """
+    annotations = list(figure.layout.annotations or ())
+    texts = [str(annotation.text) for annotation in annotations]
+    assert any("Actuals to 2025" in text for text in texts), texts
+    post_model = next(
+        annotation for annotation in annotations
+        if "Post-model extrapolation" in str(annotation.text)
+    )
+    assert str(post_model.x) == "FY2031"
+
+
+def test_conflict_low_colour_is_distinct_from_official_green() -> None:
+    """MEC Low must never read as a second green next to the official trace."""
+    low = app.CONFLICT_TRACE_COLORS[app.conflict_trace_name("low")]
+    assert low == "#DB2777"
+    assert low not in {"#00843D", "#7A9E7E", "#0F766E"}
+
+
 # ------------------------------------------------------------ page contract
 def test_one_compact_picker_drives_every_layer() -> None:
     source = inspect.getsource(app.render_revenue_outlook_page)

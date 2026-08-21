@@ -192,7 +192,9 @@ CONFLICT_NOTE_BY_TRACE = {
     for level in CONFLICT_FUEL_SCENARIO_LEVELS
 }
 CONFLICT_TRACE_STYLES = {
-    conflict_trace_name("low"): ("#0F766E", "dot", 2.3),
+    # Rose, not the former teal: the teal read as a second green against the
+    # official comparator's strong green in the legend.
+    conflict_trace_name("low"): ("#DB2777", "dot", 2.3),
     conflict_trace_name("medium"): ("#6B4E71", "dashdot", 2.6),
     conflict_trace_name("high"): ("#B42318", "longdash", 2.5),
 }
@@ -3747,12 +3749,17 @@ def cached_scenario_comparison_paths(
         # One view per SIDE, keyed on the total series so every component
         # fetch for the same configuration reuses it. The per-series rows are
         # cut from the view's final chart rows below, through the same gate.
+        # The selected vintage's official trace rides along so any June year
+        # it publishes with ACTUAL status (PREBU26 publishes FY2026 that way)
+        # can extend the grey history line to the true last actual.
+        official_trace = official_comparator_trace_name(selected_vid)
+        view_traces = tuple(dict.fromkeys(["Actual", official_trace, base_trace]))
         view = cached_revenue_outlook_view(
             signature,
             _SCENARIO_COMPARISON_TOTAL_SERIES,
             "june_year",
             fed_path,
-            ("Actual", base_trace),
+            view_traces,
             sensitivity_key,
             bridge_mode,
             ev_uptake_key,
@@ -3763,7 +3770,7 @@ def cached_scenario_comparison_paths(
             series,
             "june_year",
             fed_path,
-            ("Actual", base_trace),
+            view_traces,
             view["current_fed_policy_state"],
             pack_dir=str(_pack.output_dir),
         )
@@ -3774,6 +3781,22 @@ def cached_scenario_comparison_paths(
         is_actual = rows["row_type"].astype(str).eq("historical_actual")
         is_base = rows["trace_name"].astype(str).eq(base_trace)
         history = pd.Series(values[is_actual].to_numpy(), index=fy[is_actual].to_numpy()).dropna().sort_index()
+        # Published official ACTUALS extend the history for years the grey
+        # spine does not carry itself; a published historical actual always
+        # wins where both exist. Forecast extraction is untouched, so these
+        # points can never enter a delta, NPV or cumulative aggregate.
+        is_official_actual = rows["row_type"].astype(str).eq("official_comparator") & rows.get(
+            "value_status", pd.Series("", index=rows.index)
+        ).astype(str).eq("actual")
+        official_history = (
+            pd.Series(values[is_official_actual].to_numpy(), index=fy[is_official_actual].to_numpy())
+            .dropna()
+            .sort_index()
+        )
+        if not official_history.empty:
+            missing_years = official_history[~official_history.index.isin(history.index)]
+            if not missing_years.empty:
+                history = pd.concat([history, missing_years]).sort_index()
         forecast = pd.Series(values[is_base & ~is_actual].to_numpy(), index=fy[is_base & ~is_actual].to_numpy()).dropna().sort_index()
         unit = _first_non_empty(rows.get("value_unit", pd.Series(dtype=str)))
         metric = _revenue_outlook_series_metric_type(view["chart_rows"], series)
@@ -6780,10 +6803,11 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     default_fed_index = fed_path_options.index("Current planned path") if "Current planned path" in fed_path_options else 0
     trace_options = selector_options["trace_options"]
     fy_options = selector_options["fy_options"]
-    # FY2030 is the last MoT-forecast June year in the official vintages;
-    # beyond it the paths are extrapolation, so the selected-FY marker
-    # defaults to the window end.
-    default_fy_index = fy_options.index("FY2030") if "FY2030" in fy_options else max(len(fy_options) - 1, 0)
+    # FY2031 is the first post-model extrapolation June year under the
+    # PREBU26-era packs, so the selected-FY marker defaults to the
+    # econometric/extrapolation cutoff and coincides with the chart's
+    # post-model boundary line.
+    default_fy_index = fy_options.index("FY2031") if "FY2031" in fy_options else max(len(fy_options) - 1, 0)
 
     with st.container(border=True):
         controls_sub = (
@@ -10099,17 +10123,6 @@ def _render_comparison_scenario_column(
     return sensitivity_key, ev_uptake_key, selected_scenario
 
 
-def _page_scenario_trace_name(page_uptake_key: ScenarioKeyLike) -> str:
-    """The trace the Single scenario configuration plots as its scenario."""
-    mode = _scenario_key(page_uptake_key).uptake_basis
-    selected_vid, _ = _official_vintage_scope(page_uptake_key)
-    return (
-        official_comparator_trace_name(selected_vid)
-        if mode == EV_UPTAKE_GOVERNED_OPTION
-        else "Current finalist Base case"
-    )
-
-
 def _comparison_sensitivity_key_from_page(
     page_sensitivity_key: tuple, fleet: str, pt_shift: str, freight: str
 ) -> tuple:
@@ -10349,43 +10362,44 @@ def _render_comparison_window_control(bounds: tuple[int, int]) -> tuple[int, int
     return selection
 
 
-def _reset_scenario_b_to_current_page() -> None:
-    """Seed the Scenario B controls from the live Single scenario configuration."""
-    st.session_state["ro_cmp_b_trace"] = "Current finalist Base case"
-    for target, source in [
-        ("ro_cmp_b_fleet", "revenue_outlook_sensitivity_fleet_efficiency"),
-        ("ro_cmp_b_pt", "revenue_outlook_sensitivity_pt_mode_shift"),
-    ]:
-        level = str(st.session_state.get(source, "Off"))
-        st.session_state[target] = level if level in _COMPARISON_SENSITIVITY_LEVELS else "Off"
-    freight_level = "Off"
-    if bool(st.session_state.get("revenue_outlook_sensitivity_freight_rail_toggle", False)):
-        candidate = str(st.session_state.get("revenue_outlook_sensitivity_freight_rail_shift", "Med"))
-        freight_level = candidate if candidate in _COMPARISON_SENSITIVITY_LEVELS else "Med"
-    st.session_state["ro_cmp_b_freight"] = freight_level
-    eruc_on = method_detail_enabled() and bool(st.session_state.get("revenue_outlook_eruc_toggle", False))
-    st.session_state["ro_cmp_b_eruc"] = eruc_on
-    if eruc_on:
-        for target, source, fallback in [
-            ("ro_cmp_b_eruc_start", "eruc_lever_start", 2027),
-            ("ro_cmp_b_eruc_phase", "eruc_lever_phase", 3),
-            ("ro_cmp_b_eruc_ratio", "eruc_lever_ratio", 100.0),
-            ("ro_cmp_b_eruc_elasticity", "eruc_lever_elasticity", -0.15),
-            ("ro_cmp_b_eruc_pump", "eruc_lever_pump", 2.70),
+def _reset_scenario_columns_to_current_page() -> None:
+    """Seed both comparison columns from the live Single scenario configuration."""
+    for prefix in ("a", "b"):
+        st.session_state[f"ro_cmp_{prefix}_trace"] = "Current finalist Base case"
+        for target, source in [
+            (f"ro_cmp_{prefix}_fleet", "revenue_outlook_sensitivity_fleet_efficiency"),
+            (f"ro_cmp_{prefix}_pt", "revenue_outlook_sensitivity_pt_mode_shift"),
         ]:
-            st.session_state[target] = st.session_state.get(source, fallback)
-    st.session_state["ro_cmp_b_fed_policy"] = _session_fed_policy_state(
-        "revenue_outlook_fed_policy_state",
-        legacy_toggle_key="revenue_outlook_fed_uplift",
-    )
-    # B's synthetic official counterfactual mirrors the page too; leaving it
-    # at a stale prior selection would silently diverge from A on exactly the
-    # control this reset claims to copy.
-    st.session_state["ro_cmp_b_official_policy"] = _session_fed_policy_state(
-        "revenue_outlook_mbu_fed_policy_state",
-        legacy_toggle_key="revenue_outlook_mbu_fed_uplift",
-        default=FED_POLICY_PUBLISHED,
-    )
+            level = str(st.session_state.get(source, "Off"))
+            st.session_state[target] = level if level in _COMPARISON_SENSITIVITY_LEVELS else "Off"
+        freight_level = "Off"
+        if bool(st.session_state.get("revenue_outlook_sensitivity_freight_rail_toggle", False)):
+            candidate = str(st.session_state.get("revenue_outlook_sensitivity_freight_rail_shift", "Med"))
+            freight_level = candidate if candidate in _COMPARISON_SENSITIVITY_LEVELS else "Med"
+        st.session_state[f"ro_cmp_{prefix}_freight"] = freight_level
+        eruc_on = method_detail_enabled() and bool(st.session_state.get("revenue_outlook_eruc_toggle", False))
+        st.session_state[f"ro_cmp_{prefix}_eruc"] = eruc_on
+        if eruc_on:
+            for target, source, fallback in [
+                (f"ro_cmp_{prefix}_eruc_start", "eruc_lever_start", 2027),
+                (f"ro_cmp_{prefix}_eruc_phase", "eruc_lever_phase", 3),
+                (f"ro_cmp_{prefix}_eruc_ratio", "eruc_lever_ratio", 100.0),
+                (f"ro_cmp_{prefix}_eruc_elasticity", "eruc_lever_elasticity", -0.15),
+                (f"ro_cmp_{prefix}_eruc_pump", "eruc_lever_pump", 2.70),
+            ]:
+                st.session_state[target] = st.session_state.get(source, fallback)
+        st.session_state[f"ro_cmp_{prefix}_fed_policy"] = _session_fed_policy_state(
+            "revenue_outlook_fed_policy_state",
+            legacy_toggle_key="revenue_outlook_fed_uplift",
+        )
+        # The synthetic official counterfactual mirrors the page too; leaving
+        # it at a stale prior selection would silently diverge from the page on
+        # exactly the control this reset claims to copy.
+        st.session_state[f"ro_cmp_{prefix}_official_policy"] = _session_fed_policy_state(
+            "revenue_outlook_mbu_fed_policy_state",
+            legacy_toggle_key="revenue_outlook_mbu_fed_uplift",
+            default=FED_POLICY_PUBLISHED,
+        )
 
 
 def _scenario_summary_text(
@@ -10430,14 +10444,15 @@ def _render_scenario_comparison_panel(
     page_sensitivity_key: tuple,
     page_uptake_key: ScenarioKeyLike,
 ) -> None:
-    """A vs B where A IS the live Single scenario computation.
+    """A vs B where BOTH sides are independently configurable clones.
 
-    Scenario A carries the page's own typed keys, untouched, so it cannot
-    drift from the Single scenario chart; Scenario B clones those keys and
-    overrides only the dimensions its controls expose. Both sides then route
-    through the canonical final view, and this panel only extracts, aligns
-    and draws - it applies no policy, vintage or lever transformations of
-    its own.
+    Each column clones the page's typed keys and overrides only the
+    dimensions its controls expose (scenario trace, fleet, PT, freight,
+    12c policy and, under method detail, e-RUC), so either side can select
+    any governed scenario without drifting from the page's other
+    ingredients. Both sides then route through the canonical final view,
+    and this panel only extracts, aligns and draws - it applies no policy,
+    vintage or lever transformations of its own.
     """
     with st.container(border=True):
         comparison_sub = (
@@ -10466,32 +10481,30 @@ def _render_scenario_comparison_panel(
                 if discount_mode == _COMPARISON_DISCOUNT_CUSTOM:
                     custom_rate = st.number_input("Rate (% p.a.)", min_value=0.5, max_value=10.0, value=4.0, step=0.5, key="ro_cmp_discount_rate") / 100.0
             with head_cols[3]:
-                st.markdown("<div class='control-label'>Scenario B seed</div>", unsafe_allow_html=True)
+                st.markdown("<div class='control-label'>Scenario seed</div>", unsafe_allow_html=True)
                 st.button(
-                    "Reset B to current page (A)",
-                    on_click=_reset_scenario_b_to_current_page,
+                    "Reset A & B to current page",
+                    on_click=_reset_scenario_columns_to_current_page,
                     key="ro_cmp_reset_b",
                     help=(
-                        "Seeds the Scenario B controls from the live Single scenario "
-                        "configuration, so B starts identical to A."
+                        "Seeds both scenario columns from the live Single scenario "
+                        "configuration, so A and B start identical."
                     ),
                     use_container_width=True,
                 )
 
-            # Scenario A is the live Single scenario computation itself - the
-            # page's typed keys pass through untouched, so A can never be a
-            # stale or partial copy of the page settings.
-            sens_a, uptake_a = page_sensitivity_key, page_uptake_key
-            trace_a = _page_scenario_trace_name(page_uptake_key)
+            # BOTH columns clone the page's typed computation key and override
+            # only the dimensions their controls expose, so either side can
+            # select any governed scenario without quietly rebuilding it from
+            # different ingredients than the page itself uses. A defaults to
+            # the Base path with every lever Off - the page's own default - so
+            # the default comparison is unchanged.
             column_a, column_b = st.columns(2)
             with column_a:
                 st.markdown("<div class='ro-cmp-scenario-head ro-cmp-a'>Scenario A</div>", unsafe_allow_html=True)
-                st.markdown("**Current Single scenario configuration**")
-                st.markdown(_scenario_summary_text(sens_a, uptake_a, trace_a))
-                st.caption(
-                    "Scenario A mirrors the Single scenario view exactly, so it "
-                    "cannot drift from the chart there. Adjust it on the Single "
-                    "scenario view."
+                sens_a, uptake_a, trace_a = _render_comparison_scenario_column(
+                    "a", sensitivity_labels, official_vintage_state,
+                    page_sensitivity_key, page_uptake_key,
                 )
             with column_b:
                 st.markdown("<div class='ro-cmp-scenario-head ro-cmp-b'>Scenario B</div>", unsafe_allow_html=True)
@@ -10550,7 +10563,11 @@ def _render_scenario_comparison_panel(
                 f"FY{int(comparison_start_fy)}-FY{_COMPARISON_HORIZON_END_FY}."
             )
             return
-        start_fy, end_fy = _render_comparison_window_control(window_bounds)
+        # A partial-width column: a range spanning the full page reads as a
+        # page-level scrubber rather than one control among the selectors.
+        window_columns = st.columns([0.44, 0.56])
+        with window_columns[0]:
+            start_fy, end_fy = _render_comparison_window_control(window_bounds)
         full_window = (start_fy, end_fy) == window_bounds
         window_text = _comparison_fy_window_label(start_fy, end_fy)
         # Presentation-side filter: the annual rows are selected AFTER the
@@ -10795,6 +10812,17 @@ def _scenario_comparison_figure(history: pd.Series, a: pd.Series, b: pd.Series, 
                 hovertemplate=f"<b>Actual</b><br>{hover_value}<extra></extra>",
             )
         )
+    # The last published actual anchors a visual handover into each scenario
+    # line when the forecast starts the very next June year, so the chart
+    # reads as one continuous story across the actual/forecast seam (PREBU26:
+    # FY2026 actual into FY2027 forecasts). Display-only: the anchor never
+    # joins the scenario series the aggregates are computed from.
+    anchor_fy: int | None = None
+    anchor_value = float("nan")
+    if history is not None and not history.empty:
+        history_sorted = history.sort_index()
+        anchor_fy = int(history_sorted.index[-1])
+        anchor_value = float(history_sorted.iloc[-1])
     for series, name, color, dash in [
         (a, "Scenario A", "#002B5C", "solid"),
         (b, "Scenario B", "#F37021", "dash"),
@@ -10809,6 +10837,20 @@ def _scenario_comparison_figure(history: pd.Series, a: pd.Series, b: pd.Series, 
                 hovertemplate=f"<b>{name}</b><br>{hover_value}<extra></extra>",
             )
         )
+        series_sorted = series.sort_index()
+        first_fy = int(series_sorted.index[0])
+        if anchor_fy is not None and first_fy == anchor_fy + 1:
+            fig.add_trace(
+                go.Scatter(
+                    x=[anchor_fy, first_fy],
+                    y=[anchor_value / scale, float(series_sorted.iloc[0]) / scale],
+                    mode="lines",
+                    line={"color": color, "width": 2, "dash": dash},
+                    hoverinfo="skip",
+                    showlegend=False,
+                    name=f"{name} handover",
+                )
+            )
     fig.update_xaxes(title_text="June year ending", title_font={"size": 11, "color": "#5A6B7B"}, showgrid=False, dtick=5)
     fig.update_yaxes(title_text=axis_title, gridcolor="#E6EDF5", zeroline=False)
     fig.update_layout(
@@ -12294,25 +12336,24 @@ def revenue_outlook_total_path_figure(
             )
 
     periods = data["period"].dropna().astype(str).drop_duplicates().tolist()
-    forecast_period = _revenue_outlook_forecast_start_period(data)
     shapes: list[dict[str, Any]] = []
     annotations: list[dict[str, Any]] = []
-    if forecast_period and forecast_period in periods:
-        # Draw the history/forecast boundary on the seam where the actuals
-        # end: halfway between the last actual and the first forecast
-        # category (category axes accept numeric index coordinates).
-        boundary_index = float(periods.index(forecast_period))
-        # Actuals end where the last published actual sits: the grey history
-        # line, plus any official-comparator point the selected vintage
-        # publishes as ACTUAL (PREBU26 publishes FY2026 that way), so the
-        # dashed seam stays half a category ahead of the true last actual.
-        row_type_text = data.get("row_type", pd.Series(dtype=str)).astype(str)
-        official_actual = row_type_text.eq("official_comparator") & data.get(
-            "value_status", pd.Series("", index=data.index)
-        ).astype(str).eq("actual")
-        actual_periods = data[row_type_text.eq("historical_actual") | official_actual]["period"].astype(str)
-        preceding = [p for p in actual_periods if p in periods and periods.index(p) < boundary_index]
-        boundary_x = (periods.index(preceding[-1]) + boundary_index) / 2 if preceding else boundary_index - 0.5
+    # Actuals end where the last published actual sits: the grey history
+    # line, plus any official-comparator point the selected vintage
+    # publishes as ACTUAL (PREBU26 publishes FY2026 that way). The seam is
+    # anchored to that last actual - NOT to whichever forecast traces happen
+    # to be ticked - so the trained-cutoff marker survives any legend
+    # selection. Category axes accept numeric index coordinates, so the line
+    # sits halfway between the last actual and the next category.
+    row_type_text = data.get("row_type", pd.Series(dtype=str)).astype(str)
+    official_actual = row_type_text.eq("official_comparator") & data.get(
+        "value_status", pd.Series("", index=data.index)
+    ).astype(str).eq("actual")
+    actual_period_values = data[row_type_text.eq("historical_actual") | official_actual]["period"].astype(str)
+    actual_indices = [periods.index(p) for p in actual_period_values.unique() if p in periods]
+    if actual_indices and max(actual_indices) < len(periods) - 1:
+        last_actual_index = max(actual_indices)
+        boundary_x = last_actual_index + 0.5
         shapes.append(
             {
                 "type": "line",
@@ -12322,7 +12363,7 @@ def revenue_outlook_total_path_figure(
                 "x1": boundary_x,
                 "y0": 0,
                 "y1": 1,
-                "line": {"dash": "dash", "color": "#B45309", "width": 1.4},
+                "line": {"dash": "dash", "color": "#B45309", "width": 1.8},
             }
         )
         annotations.append(
@@ -12333,27 +12374,37 @@ def revenue_outlook_total_path_figure(
                 # Just inside the plot's top edge: the band above the chart
                 # belongs to the legend, which would collide with it there.
                 "y": 0.985,
-                "text": f"Actuals to {_display_period_label(preceding[-1])}" if preceding else f"Forecast start {_display_period_label(forecast_period)}",
+                "text": f"Actuals to {_display_period_label(periods[last_actual_index])}",
                 "showarrow": False,
                 "yanchor": "top",
                 "font": {"color": "#B45309", "size": 11},
             }
         )
     # Subtle boundary where the econometric forecast hands over to the
-    # post-model structural extrapolation. Drawn only when post-model rows
-    # are actually visible on this axis.
-    has_post_model = (
-        "forecast_segment" in data.columns
-        and data["forecast_segment"].fillna("").astype(str).eq("post_model_extrapolation").any()
+    # post-model structural extrapolation. Drawn at the FIRST extrapolated
+    # period the data actually carries (FY2031 under the PREBU26-era packs)
+    # rather than a hard-coded year, and only when post-model rows are
+    # visible on this axis.
+    post_model_indices = (
+        [
+            periods.index(p)
+            for p in data[
+                data["forecast_segment"].fillna("").astype(str).eq("post_model_extrapolation")
+            ]["period"].astype(str).unique()
+            if p in periods
+        ]
+        if "forecast_segment" in data.columns
+        else []
     )
-    if has_post_model and "FY2030" in periods:
+    if post_model_indices:
+        post_model_start = periods[min(post_model_indices)]
         shapes.append(
             {
                 "type": "line",
                 "xref": "x",
                 "yref": "paper",
-                "x0": "FY2030",
-                "x1": "FY2030",
+                "x0": post_model_start,
+                "x1": post_model_start,
                 "y0": 0,
                 "y1": 1,
                 "line": {"dash": "dot", "color": "#8A96A3", "width": 1.1},
@@ -12363,7 +12414,7 @@ def revenue_outlook_total_path_figure(
             {
                 "xref": "x",
                 "yref": "paper",
-                "x": "FY2030",
+                "x": post_model_start,
                 "y": 0.03,
                 "text": "Post-model extrapolation →",
                 "showarrow": False,
@@ -12841,25 +12892,6 @@ def _revenue_outlook_gap_figure(message: str, *, height: int) -> go.Figure:
     return fig
 
 
-def _revenue_outlook_forecast_start_period(rows: pd.DataFrame) -> str:
-    if rows is None or rows.empty:
-        return ""
-    data = rows.copy()
-    data["_period_order"] = data.get("period", pd.Series(dtype=str)).map(_revenue_period_order)
-    actual_rows = data[data.get("row_type", pd.Series(dtype=str)).astype(str).eq("historical_actual")].copy()
-    latest_actual_order = pd.to_numeric(actual_rows.get("_period_order"), errors="coerce").max() if not actual_rows.empty else pd.NA
-    current = data[
-        data.get("trace_role", pd.Series("", index=data.index)).astype(str).eq("in_house_current_finalist")
-        & data.get("row_type", pd.Series("", index=data.index)).astype(str).eq("future_forecast")
-        & ~data.get("data_scope", pd.Series("", index=data.index)).astype(str).eq("actual_anchor")
-    ].copy()
-    if pd.notna(latest_actual_order):
-        current = current[pd.to_numeric(current["_period_order"], errors="coerce").gt(float(latest_actual_order))].copy()
-    if current.empty:
-        return ""
-    return str(current.sort_values("_period_order", kind="stable").iloc[0]["period"])
-
-
 def revenue_outlook_component_figure(bridge: pd.DataFrame, *, selected_fy: str, selected_fed_path: str) -> go.Figure:
     plot = _selected_revenue_bridge_snapshot(bridge, selected_fy=selected_fy, selected_fed_path=selected_fed_path)
     if plot.empty:
@@ -13335,7 +13367,7 @@ def revenue_outlook_figure(rows: pd.DataFrame, *, metric_type: str) -> go.Figure
 
 
 def _scenario_color_map(rows: pd.DataFrame) -> dict[str, str]:
-    palette = ["#006FAD", "#E56B2B", "#00843D", "#6B4E71", "#C2410C", "#0F766E"]
+    palette = ["#006FAD", "#E56B2B", "#00843D", "#6B4E71", "#C2410C", "#DB2777"]
     trace_palette = {
         "Actual": "#737373",
         **{name: style[0] for name, style in _official_trace_style_map().items()},
