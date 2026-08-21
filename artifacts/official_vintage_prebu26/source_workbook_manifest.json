@@ -1,0 +1,28 @@
+{
+  "workbook_path": "references/PREBU26.xlsx",
+  "workbook_basename": "PREBU26.xlsx",
+  "size_bytes": 44469,
+  "sha256": "f69985432b34271d5868267d78b77ad2c746563788011b445715e4f58a25728b",
+  "sheet": "PREBU",
+  "registry_entry_snapshot": {
+    "vintage_id": "PREBU26",
+    "display_name": "PREBU26 official",
+    "release_round": "PREBU26",
+    "release_date": null,
+    "schema_version": "nltf-revenue-official-vintage-v1",
+    "actual_start_fy": 2001,
+    "actual_end_fy": 2026,
+    "short_forecast_start_fy": 2027,
+    "short_forecast_end_fy": 2031,
+    "long_forecast_start_fy": 2032,
+    "long_forecast_end_fy": 2055,
+    "source_horizon_fy": 2055,
+    "source_pack_path": "data/revenue_model_source_pack/official_vintages/prebu26",
+    "pack_format": "official_vintage_v1",
+    "available": true,
+    "is_latest": true,
+    "is_default_comparator": true,
+    "is_default_bridge_vintage": false,
+    "status": "active_official_vintage"
+  }
+}

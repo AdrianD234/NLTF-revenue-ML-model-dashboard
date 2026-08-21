@@ -588,6 +588,11 @@ def test_revenue_outlook_default_figure_matches_uncached_path() -> None:
     overlay_rows = app._filter_official_vintage_rows(
         overlay_rows, official_scenario, official_overlay
     )
+    # The cached view also masks annual Current points at or before the
+    # selected vintage's actual_end_fy; the uncached path mirrors that too.
+    overlay_rows = app._mask_current_rows_through_official_actuals(
+        overlay_rows, (app.EV_UPTAKE_GOVERNED_OPTION, ())
+    )
     expected_rows = app._filter_revenue_outlook_rows(
         overlay_rows,
         time_grain="june_year",
@@ -1205,7 +1210,7 @@ def test_revenue_outlook_cloud_hides_debug_toggles_and_shows_full_composition(mo
             "revenue_outlook_official_vintage",
         }
     }
-    # Official-vintage governance: the default comparator is BEFU26, so the
+    # Official-vintage governance: the default comparator is PREBU26, so the
     # MBU26-only synthetic rate-only counterfactual control is NOT rendered.
     # It appears only when MBU26 is displayed (selected, or overlaid), and it
     # defaults to published rather than to a deferred counterfactual.
@@ -1214,7 +1219,7 @@ def test_revenue_outlook_cloud_hides_debug_toggles_and_shows_full_composition(mo
         "revenue_outlook_official_vintage",
     }
     assert str(policy_selectors["revenue_outlook_fed_policy_state"].value) == app.FED_POLICY_DELAYED_6M
-    assert str(policy_selectors["revenue_outlook_official_vintage"].value) == "BEFU26 official"
+    assert str(policy_selectors["revenue_outlook_official_vintage"].value) == "PREBU26 official"
     assert any("Revenue composition over time" in str(markdown.value) for markdown in at.markdown)
     rendered_text = "\n".join([*(str(markdown.value) for markdown in at.markdown), *(str(caption.value) for caption in at.caption)])
     for forbidden in [

@@ -1250,6 +1250,10 @@ def assert_revenue_outlook_primary_runtime_contract(
     trace_names = {trace["name"] for trace in contract["traces"] if trace["name"]}
     allowed = {
         "Actual",
+        "PREBU26 official",
+        "PREBU26 official handover",
+        "BEFU26 official",
+        "BEFU26 official handover",
         "MBU26 official",
         "MBU26 official handover",
         "Current finalist Base case",
@@ -1291,7 +1295,8 @@ def assert_revenue_outlook_primary_runtime_contract(
     assert contract["yTitle"], (
         "Revenue Outlook primary chart should expose explicit units on the y-axis."
     )
-    assert any("Actuals to 2025" in text for text in contract["annotations"])
+    # PREBU26 publishes FY2026 as ACTUAL, so the seam annotation runs to 2026.
+    assert any("Actuals to 2026" in text for text in contract["annotations"])
 
     # A segmented path emits SEVERAL plotly traces under one name (solid
     # econometric, dashed post-model extrapolation). Keying a dict by name
@@ -1313,20 +1318,29 @@ def assert_revenue_outlook_primary_runtime_contract(
         assert actual["color"] == "#737373"
     for name in ["Current finalist Base case", expected_comparison_trace]:
         trace = by_name[name]
-        assert "FY2025" in trace["x"], f"{name} should include the FY2025 actual anchor"
+        # The annual seam follows the selected vintage's actual_end_fy:
+        # PREBU26 publishes actuals through FY2026, so the visible Current
+        # path begins FY2027 - no FY2025 anchor, no FY2026 nowcast point.
+        assert "FY2025" not in trace["x"], (
+            f"{name} must not draw the FY2025 anchor while PREBU26 owns FY2026"
+        )
+        assert "FY2026" not in trace["x"], (
+            f"{name} must not draw FY2026, published as ACTUAL by PREBU26"
+        )
+        assert "FY2027" in trace["x"], f"{name} should begin at FY2027"
         # The long-run restoration: current paths run through FY2050, with
         # the post-model segment dashed and joined to the solid one.
         assert "FY2050" in trace["x"], f"{name} should extend through FY2050"
         assert "dash" in trace["dashes"], (
             f"{name} should render its post-model segment dashed"
         )
-        assert "FY2026" in trace["x"], (
-            f"{name} should join to the FY2026 nowcast/forecast"
-        )
         assert (
             "customdata" in trace["hovertemplate"]
             or "%{customdata" in trace["hovertemplate"]
         )
+    if "PREBU26 official" in by_name:
+        assert by_name["PREBU26 official"]["color"] == "#00843D"
+        assert "FY2026" in by_name["PREBU26 official"]["x"]
     if "MBU26 official" in by_name:
         assert by_name["MBU26 official"]["dash"] in {"dash", "dashdot"}
     page_text = page.locator("body").inner_text(timeout=60000)

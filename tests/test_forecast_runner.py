@@ -887,6 +887,11 @@ def test_forecast_run_artifacts_are_repo_ignored() -> None:
         # the materialized pack manifest; ingested by
         # scripts/materialize_official_vintage.py, never read at runtime)
         "references/BEFU26 revenue forecast.xlsx",
+        # governed PREBU26 official revenue-forecast vintage, vendored
+        # 2026-08-21 (sha256 pinned in the same registry and pack manifest;
+        # ingested by scripts/materialize_official_vintage.py, never read at
+        # runtime)
+        "references/PREBU26.xlsx",
     }
 
 

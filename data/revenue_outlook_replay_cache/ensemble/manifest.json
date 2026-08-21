@@ -9,7 +9,7 @@
   },
   "builder_version": "1",
   "bytes_on_disk": 2377372,
-  "code_module_count": 31,
+  "code_module_count": 34,
   "engine": "ensemble",
   "frame_count": 35,
   "frames": {
@@ -2935,7 +2935,7 @@
       "model_dashboard/ped_forward.py": "92c3b5324ae798956679820a4e0b23314f2134a259c4b973d58640e6329325fa",
       "model_dashboard/post_model_extrapolation.py": "c2f469cea30854e20e446951a91d13b5b12a0e851d5f601c79b2ce16fe791517",
       "model_dashboard/rate_paths.py": "b6b2a93b89c6f5582df24e8a50a2f120bd092cd41a53f7e3a63772de0def4bb4",
-      "model_dashboard/revenue_outlook.py": "00d46077b5766ddd0f797bc627d84aa1e4e8ca453e133df75d91a0fd03fa5ce3",
+      "model_dashboard/revenue_outlook.py": "befd2bf4cd6c33a2ddfa9f6d9a0654a485f3fa020c93f99bfe3a6a3588701624",
       "model_dashboard/revenue_outlook_replay_cache.py": "f24ea4013bb9169612a8d63008fb1ded2626bf780c272df6270fcbd6705eb518",
       "model_dashboard/revenue_source_pack.py": "61b9fd2b06d4c16add928656b9bd6e5cda9dcb38b0f3d9a0f60fb5c1e2cf8c9c",
       "model_dashboard/scenario_inputs.py": "f035a3da1e995550565f968f1f0ff2f5ee438bd5217f91440f6542b2882f8f29",
@@ -2944,6 +2944,9 @@
       "model_dashboard/unit_contract.py": "a49bb2d53ce7223582738c089143ff581da34c8942b415f996817d75c40a549e",
       "model_dashboard/vnext_forward_integration.py": "4ba307e891da814faee38616f317b24e45ac625fe5fbf72d24b6d981dc7b6dff",
       "pipeline/__init__.py": "795eb74197b09ec06d088ba3f64b41de2cae1ff82fde2ae36d9af7f5d4147df8",
+      "pipeline/ar1_engine.py": "e4431b3ad97f3d1aa8070d2c9c989a825e64f84e54f10be170205348cee5ea8d",
+      "pipeline/diaglab_arms.py": "78c2843307b47c5815fe1ba520764a6f70c71462e71afe926f6331274ff3213c",
+      "pipeline/diaglab_battery.py": "a9e649ba4ec635540904189e30c3ebdbba41b2210a84955a19500bd81e2cceb4",
       "pipeline/vnext_core.py": "92285255a22ba2f35089b1fed550249902cc0020bf4c48f0f5257476a7396250",
       "pipeline/vnext_forward.py": "f2a864f519f4c075378848a400a6d857bc09a3f3bb8295b020a4811efe3aade3"
     },
@@ -2998,20 +3001,20 @@
         "size_bytes": 11625
       },
       "light_ruc_horizon_availability.csv": {
-        "sha256": "ca87c6ac93033496a928ae07159824dac642917ba104c030161dab5ff46b063f",
-        "size_bytes": 79100
+        "sha256": "e821e6d3911e8b58a261b063c6917e3e55b41799c7b8635a5fd125fc4ab5b718",
+        "size_bytes": 94964
       },
       "light_ruc_horizon_availability.parquet": {
-        "sha256": "39abda810443b1d91e04b26399a96c0c30e2fe70a30cbde7440790c3145f5f48",
-        "size_bytes": 9008
+        "sha256": "d5a9ed4747c2f34a99c5693be115b7940a3bbf6ced3c59e1a37b18ab2fdd6785",
+        "size_bytes": 9037
       },
       "path_trace_status.csv": {
-        "sha256": "9d9eabcd54cbba3b468b9e7153218a954e43c9efec031b2089f741c4fff20ea5",
-        "size_bytes": 987
+        "sha256": "1785e543e9bed9ab4e760e4c84f4e4b56870c5e979276819f7a4cfad3e7d59ee",
+        "size_bytes": 1134
       },
       "path_trace_status.parquet": {
-        "sha256": "56c8b08e1d5efffa930e703c52b9e9de848e21d94c5ae9a760ca47083a4a1df1",
-        "size_bytes": 5950
+        "sha256": "b4d4125690efd900ded4a77b99fbe921488c4a9f4d59186386b6e26d9070176a",
+        "size_bytes": 6015
       },
       "ped_bridge_mode_config.csv": {
         "sha256": "60583741fcd8484df3e4f166a82e49a06fdeb0fd353756fcfdf48a1f9786efc4",
@@ -3070,36 +3073,36 @@
         "size_bytes": 29202
       },
       "revenue_chart_rows.csv": {
-        "sha256": "eb5176d5ec78d52a603f405d5730b7e6212565b0d98598853b6b226936791749",
-        "size_bytes": 2201940
+        "sha256": "6dcdb94dd8c29c4ffa76ef7476b8abf449945cfed3c564150e79bacdc2c0d732",
+        "size_bytes": 2533804
       },
       "revenue_chart_rows.parquet": {
-        "sha256": "da2655cd252780495b61a582471b4938e1cf2873874655d97094909e27b7c778",
-        "size_bytes": 116448
+        "sha256": "29423e7c88cc3334b2d6d2ad56a991f6224197c816579d54fb5cb51053d594d5",
+        "size_bytes": 130989
       },
       "revenue_formula_residuals.csv": {
-        "sha256": "6bebd38530a9fc92141064a02d4fe611dfd22c12142e90203eb979fe9b62955c",
-        "size_bytes": 452632
+        "sha256": "e1e0d6e33c49d975c7e47331f7f89344b46a5c47ce37289370dad40e18441315",
+        "size_bytes": 606809
       },
       "revenue_formula_residuals.parquet": {
-        "sha256": "78044187267396940e7504a602662b48eb7c25094a1abe6930087302e9100835",
-        "size_bytes": 43652
+        "sha256": "96c952cbac14330b81a2322ffdb8aca70dbeadaebf2ad5361de881a637d883d3",
+        "size_bytes": 52807
       },
       "revenue_line_reconciliation.csv": {
-        "sha256": "d1d57befba13fa755cec1a680c942332b0d1cefd189e5758ec42a74a18aec4d4",
-        "size_bytes": 2596142
+        "sha256": "237a7448ba7f56b8594e3426a668c41ad23d755f3fa8e33f561b5aa39fdea66c",
+        "size_bytes": 3312896
       },
       "revenue_line_reconciliation.parquet": {
-        "sha256": "f8ddacdfcd5bc50b1982fe5bcabf6242af00257e6291c0c1b2ca4b182dec9022",
-        "size_bytes": 92726
+        "sha256": "c26661c2c207edae00b5f250222b16c9f976a45994936df3f83d157087a4fa7f",
+        "size_bytes": 109268
       },
       "revenue_stack_components.csv": {
-        "sha256": "6b90610da5393a305d26a1db61a3667cb7d8f98e25f9ff77ad81ca994bccc91a",
-        "size_bytes": 13555027
+        "sha256": "99dd9befc6dcfd72f2cd4f52898e34047953b13da2c086142289fd835644f46c",
+        "size_bytes": 16869548
       },
       "revenue_stack_components.parquet": {
-        "sha256": "e49c70d51f54d2e58c48e5045d5253d8579a619c9fe9bea4cf4c136dd02f7de8",
-        "size_bytes": 281788
+        "sha256": "d9db1a00e20fc56513e09c6d68361111f5bd48db06913f44045c01152a7f8964",
+        "size_bytes": 378632
       },
       "row_reconciliation.csv": {
         "sha256": "c3b08c6a325833c85b042335acb58cd858e3b7377adb92fc3570507934258c9b",
@@ -3118,12 +3121,12 @@
         "size_bytes": 5931
       },
       "runtime_trace_audit.csv": {
-        "sha256": "21a1cd8b59ba2f0edb9c06d105565f625b5644b3c42628468a5687faf50de756",
-        "size_bytes": 118561
+        "sha256": "7b7665885dd344814b2b8628a52d1b961f5485ef3af2c214d6302beb18b80c40",
+        "size_bytes": 129440
       },
       "runtime_trace_audit.parquet": {
-        "sha256": "4932e7c0fb20d441d2218fd44e0ba839d81e0783609beef3d62bf0ca7bad5917",
-        "size_bytes": 22209
+        "sha256": "62222cff107f0c24661892a12ba58fa72a56a44e484a7300bb0f128f910241e2",
+        "size_bytes": 22836
       },
       "scenario_feature_lineage.csv": {
         "sha256": "b123c97090bd282009225a0ac2cfc36226d20017412f820dfeec6af34411b30d",
@@ -3158,28 +3161,28 @@
         "size_bytes": 20937
       },
       "sensitivity_config.csv": {
-        "sha256": "3c29b44c845f67ee27d71baa3420aa7af1a077e09904675ca6475a63fef129b1",
+        "sha256": "d1474223454dbcac8a817523193f0c259818e471d6f7656b2338b82157f9ffd9",
         "size_bytes": 14173
       },
       "sensitivity_config.parquet": {
-        "sha256": "48e4fe218d6e136c8253c5435f0d80960ccd2698b5132800ba7ba16f57f7b9f4",
+        "sha256": "a0858ccf3b6870306c47759a642bdb4e422c4f314adf15b0228b61085dd7ff4f",
         "size_bytes": 10806
       },
       "sensitivity_impact_audit.csv": {
-        "sha256": "768c0da3f7c2c11c510849f07b7b2838bf2a1721df474c08e6f5b63a056492e2",
-        "size_bytes": 555985
+        "sha256": "5b9730925448c053d000d475e5a509b69c1825a3bdc71974e973c2b16de521ac",
+        "size_bytes": 748434
       },
       "sensitivity_impact_audit.parquet": {
-        "sha256": "c4bf77b8aceecb7f58ee04a706f61be7bd0cb4c78bed61a9f3ade0c82c5e7f89",
-        "size_bytes": 39374
+        "sha256": "90440e993055d0e843f3b2865ddb1069286f538e8d99ef5ea1a48856d176c6b0",
+        "size_bytes": 48732
       },
       "sensitivity_seed_inputs.csv": {
-        "sha256": "5181058396fbdb3896ade20b3ea335955fc186af85cccd365c7d86531852f3a6",
+        "sha256": "ec16691e19856cacfdf5e41124fd846bf3ff43e6ad0e60dd7c104e1306751ff6",
         "size_bytes": 9948
       },
       "sensitivity_seed_inputs.parquet": {
-        "sha256": "23a8ba664690235b92fac25912b9c8ab0eefe990f94a58258b901fafa306b310",
-        "size_bytes": 9962
+        "sha256": "63b27c976dea15743298238df050ee26ec22c8db732eb6df7f16832e40c14cdb",
+        "size_bytes": 9964
       },
       "series_alias_audit.csv": {
         "sha256": "225bd2e4407bb97aa40b515a0ad35f6501e0b15779aa3efa5ee0884290efbcf7",
@@ -3206,12 +3209,12 @@
         "size_bytes": 7364
       },
       "trace_source_contract.csv": {
-        "sha256": "36137d8e5cac28530159151e04ac3094fedd49ffb43b5dff3aa91e00172fd95c",
-        "size_bytes": 2227
+        "sha256": "13dc53313ff9d9a58d212efbb7cdcc516b86922a1ed6f84945c57e85818c0b34",
+        "size_bytes": 2556
       },
       "trace_source_contract.parquet": {
-        "sha256": "85d2a78906c8756e145112e1ab2f0ef8e2e26801a390f0db83cb30629b66c971",
-        "size_bytes": 10514
+        "sha256": "a18bf03b2832fc3f4bb7bf8beaa81453669b0015937a11e2542def0b9f22929e",
+        "size_bytes": 10666
       }
     },
     "pack_schema_version": "revenue-outlook-pack-v1",
@@ -3219,7 +3222,7 @@
     "source_hashes": {
       "data/current_revenue_outlook/conflict_fuel_price_scenarios.csv": "ad379997aa4044cdabf7d948787c926e06a434447ff076640cfab317eda53c73",
       "data/current_revenue_outlook/conflict_gdp_calibration.csv": "032606a84ed1e7716197ced405d3026b39c8c00e0a56882174b45c13eb8fb655",
-      "data/current_revenue_outlook/sensitivity_seed_inputs.csv": "5181058396fbdb3896ade20b3ea335955fc186af85cccd365c7d86531852f3a6",
+      "data/current_revenue_outlook/sensitivity_seed_inputs.csv": "ec16691e19856cacfdf5e41124fd846bf3ff43e6ad0e60dd7c104e1306751ff6",
       "data/current_revenue_outlook/treasury_befu26_macro_path.csv": "1dd2fcbbc122ad8dd502e44ff1833f93ff26169dcd7dc47026da787adaf8aa1e",
       "data/dashboard_evidence_pack/data/component_predictions.parquet": "d3042305ada3c8cf52d9d813d567f814ee56fd7856a06b69ef93efa2cdc49aa5",
       "data/dashboard_evidence_pack/data/finalists.parquet": "f710b2f9852eee137c41f17ad6687091ffda0551d951025cf074d8eb9934756e",
@@ -3864,6 +3867,6 @@
     ]
   },
   "schema_version": "1",
-  "source_digest": "e383e3659a4dd5ea8efbbdd0aa046056b81128f2a58a9ad41f694f8884fedaf2",
-  "source_main_sha": "be6b0b990ee32aadfaad95c721787019ad76d996"
+  "source_digest": "4f3ab532327ca5e8ff8731cd764b83c45aebc39633b242eefff77daac2b5800c",
+  "source_main_sha": "bf61160d86499a5d39d9dbef47e85a4b9b563d3d"
 }

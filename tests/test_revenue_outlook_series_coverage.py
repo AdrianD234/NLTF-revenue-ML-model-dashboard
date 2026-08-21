@@ -211,8 +211,9 @@ def test_restored_rows_carry_checkable_source_lineage(
         assert series_and_fy == f"{row.series_id}:FY{int(row.june_year)}"
         assert len(digest) == 16 and int(digest, 16) >= 0
         seen_paths.add(path_text)
-    # Both vintages contribute, under their own registered file stems.
-    assert len(seen_paths) == 2
+    # Every registered vintage contributes, under its own registered file
+    # stems: MBU26 (legacy stems), BEFU26 and PREBU26 (generic stems).
+    assert len(seen_paths) == 3
 
 
 def test_restored_rows_carry_no_placeholder_text(

@@ -132,6 +132,11 @@ class ExtractResult:
 def extract_sheet_name(trace_name: str, taken: set[str]) -> str:
     """A valid, unique, readable worksheet name (max 31 chars)."""
     base = EXTRACT_SHEET_NAMES.get(str(trace_name))
+    if base is None and str(trace_name).endswith(" official"):
+        # Any registered official vintage gets the same readable casing the
+        # named releases carry, so a newly registered vintage (PREBU26, a
+        # future round) needs no entry in the map above.
+        base = f"{str(trace_name)[: -len(' official')]} Official"
     if base is None:
         base = _INVALID_SHEET_CHARS.sub(" ", str(trace_name)).strip() or "Scenario"
     base = base[:31]

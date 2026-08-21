@@ -106,9 +106,11 @@ class TestPreservationGates:
     """Gates 1-6: PR #11 and everything upstream of FY2031 stay put."""
 
     def test_gate_1_pr11_registry_and_defaults_intact(self):
-        assert ov.default_comparator_vintage_id(ROOT) == "BEFU26"
+        # PREBU26 took the latest/comparator roles; the roles this suite
+        # protects - the bridge and long-run shape sources - stay on BEFU26.
+        assert ov.default_comparator_vintage_id(ROOT) == "PREBU26"
         assert ov.default_bridge_vintage_id(ROOT) == "BEFU26"
-        assert ov.latest_official_vintage_id(ROOT) == "BEFU26"
+        assert ov.latest_official_vintage_id(ROOT) == "PREBU26"
         entry = ov.official_vintage_entry("MBU26", ROOT)
         assert bool(entry["available"]) is True
 

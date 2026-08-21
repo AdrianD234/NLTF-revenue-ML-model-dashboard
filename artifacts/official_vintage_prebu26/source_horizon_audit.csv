@@ -1,0 +1,5 @@
+entity,kind,source_horizon_fy,actual_block,short_forecast_block,long_forecast_block,runtime_cutoff_fy,post_model_extension_end_fy,official_comparator_cutoff_by_vintage,source
+BEFU26,official_vintage,2055.0,FY2001-FY2025,FY2026-FY2030,FY2031-FY2055,,,,data/revenue_model_source_pack/official_vintages/befu26
+PREBU26,official_vintage,2055.0,FY2001-FY2026,FY2027-FY2031,FY2032-FY2055,,,,data/revenue_model_source_pack/official_vintages/prebu26
+current_ensemble,current_runtime_pack,,,,,2030.0,2050.0,"{""PREBU26"": 2055, ""MBU26"": 2055, ""BEFU26"": 2055}",data/current_revenue_outlook/manifest.json
+current_ar1,current_runtime_pack,,,,,2030.0,2050.0,"{""PREBU26"": 2055, ""MBU26"": 2055, ""BEFU26"": 2055}",data/engine_ar1/current_revenue_outlook/manifest.json

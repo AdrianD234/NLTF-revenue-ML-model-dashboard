@@ -92,7 +92,15 @@ def test_fleet_efficiency_high_lowers_revenue_npv(comparison_context) -> None:
 
 
 def test_fed_uplift_off_matches_delayed_fy2027_then_lowers_path(comparison_context) -> None:
-    result = _paths(comparison_context, "Total NLTF revenue", _keys(), _keys(fed_on=False))
+    # BEFU26 selected explicitly: this test asserts FY2026 behaviour, and the
+    # default PREBU26 comparator masks the Current FY2026 point (its actuals
+    # run through FY2026), so the FY2026 assertion needs the BEFU26 seam.
+    result = _paths(
+        comparison_context,
+        "Total NLTF revenue",
+        _keys(vintage="BEFU26"),
+        _keys(fed_on=False, vintage="BEFU26"),
+    )
     a, b = result["a"], result["b"]
     assert b.loc[2026] == pytest.approx(a.loc[2026])
     assert b.loc[2027] == pytest.approx(a.loc[2027])
@@ -357,13 +365,14 @@ BASE_TRACE = "Current finalist Base case"
 HIGH_TRACE = "Current finalist High population/comparison"
 
 
-def _typed_keys(policy=None, fleet="Off"):
+def _typed_keys(policy=None, fleet="Off", vintage=None):
     """A (sensitivity, typed uptake) pair like the production page builds."""
     sensitivity = app.selected_sensitivity_key(fleet, "Off", "Off", freight_rail_shift="Off")
     uptake = app.RevenueScenarioComputationKey(
         uptake_basis=app.DEFAULT_EV_UPTAKE_MODE,
         current_fed_policy_state=policy or app.FED_POLICY_PUBLISHED,
         official_fed_policy_state=app.FED_POLICY_PUBLISHED,
+        official_comparator_vintage_id=vintage,
     )
     return sensitivity, uptake
 
@@ -452,7 +461,8 @@ def test_changing_b_leaves_a_exactly_unchanged(comparison_context) -> None:
 
 
 def test_a_and_b_share_the_fy2026_fy2050_horizon(comparison_context) -> None:
-    keys = _typed_keys(policy=app.FED_POLICY_DELAYED_6M)
+    # Under BEFU26 (actuals to FY2025) the comparison window is FY2026-FY2050.
+    keys = _typed_keys(policy=app.FED_POLICY_DELAYED_6M, vintage="BEFU26")
     result = _comparison(
         comparison_context, "Total NLTF revenue", keys, keys, BASE_TRACE, HIGH_TRACE
     )
@@ -460,6 +470,20 @@ def test_a_and_b_share_the_fy2026_fy2050_horizon(comparison_context) -> None:
         years = sorted(int(year) for year in result[side].index if int(year) >= 2026)
         assert years == list(range(2026, 2051)), side
     assert app._comparison_alignment_gate(result["a"], result["b"]) == ""
+
+
+def test_a_and_b_share_the_seam_derived_horizon_under_prebu26(comparison_context) -> None:
+    """PREBU26 publishes FY2026 as actual, so the shared window is FY2027+."""
+    keys = _typed_keys(policy=app.FED_POLICY_DELAYED_6M)
+    result = _comparison(
+        comparison_context, "Total NLTF revenue", keys, keys, BASE_TRACE, HIGH_TRACE
+    )
+    for side in ("a", "b"):
+        years = sorted(int(year) for year in result[side].index if int(year) >= 2026)
+        assert years == list(range(2027, 2051)), side
+    start = app._comparison_horizon_start_fy(keys[1])
+    assert start == 2027
+    assert app._comparison_alignment_gate(result["a"], result["b"], horizon_start_fy=start) == ""
 
 
 def test_alignment_gate_blocks_mismatched_horizons() -> None:

@@ -78,6 +78,9 @@ CURRENT_BASE_TRACE = "Current finalist Base case"
 KNOWN_PUBLISHED_SOURCE_RESIDUALS: dict[str, set[tuple[str, int]]] = {
     "MBU26": {("gross_ruc_revenue", fy) for fy in (2027, 2028, 2029, 2030)},
     "BEFU26": {("gross_ruc_revenue", fy) for fy in (2027, 2028, 2029, 2030)},
+    # PREBU26's ST_FORECAST block runs FY2027-FY2031, and every year of it
+    # carries the same published gross-RUC closure defect.
+    "PREBU26": {("gross_ruc_revenue", fy) for fy in (2027, 2028, 2029, 2030, 2031)},
 }
 
 GAP_SERIES = (

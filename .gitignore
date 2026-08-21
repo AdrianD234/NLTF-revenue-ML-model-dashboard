@@ -65,6 +65,8 @@ artifacts/**
 !artifacts/revenue_outlook_long_run/**
 !artifacts/official_vintage_befu26/
 !artifacts/official_vintage_befu26/**
+!artifacts/official_vintage_prebu26/
+!artifacts/official_vintage_prebu26/**
 !artifacts/anchored_structural_shape_transition/
 !artifacts/anchored_structural_shape_transition/**
 !artifacts/revenue_outlook_vfm_envelope/
@@ -181,6 +183,7 @@ data/dashboard_evidence_pack_reproducibility/ped_inner_hpo/source_artifacts/**/*
 !references/
 !references/NLTF_model_input_sheet_actuals_to_*.xlsx
 !references/BEFU26 revenue forecast.xlsx
+!references/PREBU26.xlsx
 
 # MoT VFM 202405 derived uptake shares (governed lineage for EV lever presets)
 !data/vfm_202405/

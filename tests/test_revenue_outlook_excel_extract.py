@@ -38,7 +38,7 @@ TEMPLATE_PATH = ROOT / TEMPLATE_RELATIVE_PATH
 
 DEFAULT_TRACES = (
     "Actual",
-    "BEFU26 official",
+    "PREBU26 official",
     "Current finalist Base case",
     "Current finalist High population/comparison",
 )
@@ -107,7 +107,7 @@ def test_single_selected_path_creates_one_worksheet(extract_context) -> None:
 
 def test_three_selected_paths_create_three_worksheets(default_result) -> None:
     assert default_result.sheet_names == [
-        "BEFU26 Official",
+        "PREBU26 Official",
         "Current Base",
         "High Population",
     ]
@@ -215,7 +215,7 @@ def test_total_net_revenues_match_the_canonical_aligned_view(
     workbook = _workbook(default_result)
     for sheet, source_path in [
         ("Current Base", "Current finalist Base case"),
-        ("BEFU26 Official", "BEFU26 official"),
+        ("PREBU26 Official", "PREBU26 official"),
     ]:
         totals = _row_values(workbook[sheet], EXTRACT_LAST_ROW)
         for fy in (2026, 2030, 2050):
@@ -262,8 +262,8 @@ def test_pt_mode_shift_changes_exported_light_activity(default_result, pt_result
 def test_official_sheet_is_not_altered_by_current_only_levers(
     default_result, custom_fleet_result
 ) -> None:
-    baseline_wb = _workbook(default_result)["BEFU26 Official"]
-    adjusted_wb = _workbook(custom_fleet_result)["BEFU26 Official"]
+    baseline_wb = _workbook(default_result)["PREBU26 Official"]
+    adjusted_wb = _workbook(custom_fleet_result)["PREBU26 Official"]
     for row in ROW_SERIES:
         assert _row_values(baseline_wb, row) == _row_values(adjusted_wb, row), row
 

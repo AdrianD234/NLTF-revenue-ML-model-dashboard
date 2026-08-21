@@ -1136,6 +1136,19 @@ def _registry_default_comparator_vintage_id() -> str:
     return default_comparator_vintage_id(Path(__file__).resolve().parent)
 
 
+@lru_cache(maxsize=8)
+def _official_vintage_actual_end_fy(vintage_id: str) -> int:
+    """Last published ACTUAL FY of a registered vintage, from the registry.
+
+    Drives the annual history/forecast seam for whichever vintage is selected,
+    so the seam follows the vintage's own metadata rather than a hard-coded
+    year: BEFU26 declares FY2025, PREBU26 declares FY2026, and a future
+    release moves the seam by registration alone.
+    """
+    entry = official_vintage_entry(str(vintage_id), Path(__file__).resolve().parent)
+    return int(entry["actual_end_fy"])
+
+
 @lru_cache(maxsize=1)
 def _registry_official_trace_names() -> tuple[str, ...]:
     """Official comparator trace names, default comparator first.
@@ -1355,7 +1368,93 @@ def _filter_official_vintage_rows(
     drop = role.eq(OFFICIAL_SCOPE) & ~scenario.eq(str(selected_scenario))
     if not drop.any():
         return frame
-    return frame[~drop].copy()
+    # Index reset so a frame filtered here is identical however its source
+    # table ordered the official blocks: with the default comparator no longer
+    # the bridge vintage, the kept rows are a non-contiguous slice and stale
+    # index labels would make equal tables compare unequal.
+    return frame[~drop].reset_index(drop=True)
+
+
+# Column stamped by the annual-seam mask below, so the quarterly derivation
+# can tell "hidden by the seam" apart from "suppressed for a governed reason".
+_SEAM_MASK_COLUMN = "official_actual_seam_masked"
+
+
+def _restore_seam_masked_rows(frame: pd.DataFrame) -> pd.DataFrame:
+    """Undo ONLY the annual-seam mask, for consumers of the pre-mask rows.
+
+    The quarterly derivation reconciles derived quarters to the annual Current
+    values; the seam hides those annual points from the annual chart but must
+    not remove their quarters from the quarterly view. Rows suppressed for any
+    other reason keep plot_allowed=False.
+    """
+    if (
+        frame is None
+        or not isinstance(frame, pd.DataFrame)
+        or frame.empty
+        or _SEAM_MASK_COLUMN not in frame.columns
+        or "plot_allowed" not in frame.columns
+    ):
+        return frame
+    masked = frame[_SEAM_MASK_COLUMN].fillna(False).astype(bool)
+    if not masked.any():
+        return frame
+    out = frame.copy()
+    out.loc[masked, "plot_allowed"] = True
+    return out
+
+
+def _mask_current_rows_through_official_actuals(
+    frame: pd.DataFrame,
+    ev_uptake_key: ScenarioKeyLike,
+) -> pd.DataFrame:
+    """Hide annual Current-model points the selected vintage publishes as actual.
+
+    Presentation-layer seam only. Every annual in-house Current point at or
+    before the selected official vintage's registry ``actual_end_fy`` becomes
+    unplottable (``plot_allowed=False``), so the visible annual Current
+    forecast begins the year after the official actuals end. The FY2025 actual
+    anchor keeps plotting only while it directly abuts that seam (BEFU26 and
+    MBU26, whose actuals end FY2025); once a vintage publishes actuals past
+    the anchor, drawing it would chord across the masked years. Rows are never
+    dropped: downloads and audit frames retain them, still labelled as model
+    output, with the flag recording that they are not drawn. Quarterly rows
+    pass through untouched - the official vintages publish no quarterly
+    actuals and the quarterly seam is governed elsewhere.
+    """
+    if frame is None or not isinstance(frame, pd.DataFrame) or frame.empty:
+        return frame
+    if not {"time_grain", "trace_role", "june_year", "plot_allowed"}.issubset(frame.columns):
+        return frame
+    vid, _overlay = _official_vintage_scope(ev_uptake_key)
+    actual_end_fy = _official_vintage_actual_end_fy(vid)
+    june_year = pd.to_numeric(frame["june_year"], errors="coerce")
+    mask = (
+        frame["time_grain"].astype(str).eq("june_year")
+        & frame["trace_role"].fillna("").astype(str).eq("in_house_current_finalist")
+        & june_year.le(actual_end_fy)
+    )
+    # The anchor is identified by its flag, not by data_scope: scenario
+    # overlays re-stamp data_scope on rows they touch (ev_uptake_lever_overlay
+    # and friends) while the anchor/nowcast flags survive every overlay.
+    if "anchor_flag" in frame.columns:
+        is_anchor = frame["anchor_flag"].fillna(False).astype(bool)
+    elif "data_scope" in frame.columns:
+        is_anchor = frame["data_scope"].fillna("").astype(str).eq("actual_anchor")
+    else:
+        is_anchor = pd.Series(False, index=frame.index)
+    mask &= ~(is_anchor & june_year.eq(actual_end_fy))
+    if not mask.any():
+        return frame
+    out = frame.copy()
+    out.loc[mask, "plot_allowed"] = False
+    # The seam mask carries its own marker so consumers that legitimately need
+    # the pre-mask rows (the quarterly derivation, which must not lose the
+    # FY2026 quarters when the annual point is hidden) can restore exactly
+    # these rows without resurrecting rows suppressed for other reasons.
+    out[_SEAM_MASK_COLUMN] = out.get(_SEAM_MASK_COLUMN, False)
+    out.loc[mask, _SEAM_MASK_COLUMN] = True
+    return out
 
 
 def _fed_policy_state_scope(ev_uptake_key: ScenarioKeyLike) -> tuple[str, str]:
@@ -2385,11 +2484,17 @@ def _filter_series_rows_with_fallback(
     )
     used_fallback = False
     if time_grain == "quarterly":
+        # The quarterly derivation reads the ANNUAL Current values as its
+        # reconciliation targets; the annual seam mask is presentation-only
+        # and must not remove those targets (or the FY2026 quarters would
+        # vanish from the quarterly view). Restore exactly the seam-masked
+        # rows; every other suppression stays in force.
+        annual_source_rows = _restore_seam_masked_rows(rows)
         present_traces = set(filtered.get("trace_name", pd.Series(dtype=str)).dropna().astype(str))
         missing_traces = [trace for trace in traces if str(trace) not in present_traces]
         if missing_traces:
             annual = _filter_revenue_outlook_rows(
-                rows,
+                annual_source_rows,
                 time_grain="june_year",
                 stream_labels=[selected_series],
                 fed_paths=[fed_path],
@@ -2415,7 +2520,7 @@ def _filter_series_rows_with_fallback(
         gap_filled = _post_model_ped_activity_quarters(
             selected_series,
             annual_rows=_filter_revenue_outlook_rows(
-                rows,
+                annual_source_rows,
                 time_grain="june_year",
                 stream_labels=[selected_series],
                 fed_paths=[fed_path],
@@ -3387,6 +3492,11 @@ def cached_revenue_outlook_view(
     chart_rows = _append_missing_official_rows(
         chart_rows, official_scenario, official_overlay
     )
+    # The annual seam follows the selected vintage's own metadata: Current
+    # points at or before that vintage's actual_end_fy are masked here (rows
+    # retained, plot_allowed=False), so the figure, A/B comparison, cards and
+    # chart-row download all inherit one visibility rule.
+    chart_rows = _mask_current_rows_through_official_actuals(chart_rows, ev_uptake_key)
     effective_current_fed_policy_state = _effective_fed_policy_state(
         current_fed_policy_state,
         _CURRENT_FED_UPLIFT_ROLES,
@@ -9993,7 +10103,22 @@ _COMPARISON_HORIZON_START_FY = 2026
 _COMPARISON_HORIZON_END_FY = 2050
 
 
-def _comparison_alignment_gate(a: pd.Series, b: pd.Series) -> str:
+def _comparison_horizon_start_fy(page_uptake_key: ScenarioKeyLike) -> int:
+    """Seam-aware start of the A/B comparison window.
+
+    The forecast window proper begins the year after the selected official
+    vintage's published actuals end, so the delta cards and NPV bridges only
+    ever compare years both sides forecast: FY2026 under BEFU26/MBU26,
+    FY2027 under PREBU26 (whose FY2026 is a published actual and whose
+    Current points are masked there).
+    """
+    vid, _overlay = _official_vintage_scope(page_uptake_key)
+    return max(_COMPARISON_HORIZON_START_FY, _official_vintage_actual_end_fy(vid) + 1)
+
+
+def _comparison_alignment_gate(
+    a: pd.Series, b: pd.Series, horizon_start_fy: int = _COMPARISON_HORIZON_START_FY
+) -> str:
     """Hard gate: A and B must cover identical June years inside the horizon.
 
     The delta cards and NPV bridges silently mis-state a comparison when one
@@ -10007,14 +10132,14 @@ def _comparison_alignment_gate(a: pd.Series, b: pd.Series) -> str:
         return sorted(
             year
             for year in years.unique()
-            if _COMPARISON_HORIZON_START_FY <= year <= _COMPARISON_HORIZON_END_FY
+            if int(horizon_start_fy) <= year <= _COMPARISON_HORIZON_END_FY
         )
 
     a_years, b_years = _horizon_years(a), _horizon_years(b)
     if not a_years or not b_years:
         return (
             "Comparison horizon gate: one scenario has no forecast June years inside "
-            f"FY{_COMPARISON_HORIZON_START_FY}-FY{_COMPARISON_HORIZON_END_FY}."
+            f"FY{int(horizon_start_fy)}-FY{_COMPARISON_HORIZON_END_FY}."
         )
     if a_years != b_years:
         return (
@@ -10202,7 +10327,10 @@ def _render_scenario_comparison_panel(
                 ("Series", str(comparison_series)),
             ]
         )
-        alignment_gate = _comparison_alignment_gate(a_path, b_path)
+        comparison_start_fy = _comparison_horizon_start_fy(page_uptake_key)
+        alignment_gate = _comparison_alignment_gate(
+            a_path, b_path, horizon_start_fy=comparison_start_fy
+        )
         if alignment_gate:
             # The overlaid paths stay on screen (they are honest about the
             # mismatch); every derived delta is suppressed by the gate.
@@ -10223,6 +10351,7 @@ def _render_scenario_comparison_panel(
                 b_path,
                 result["value_unit"],
                 None if discount_mode == _COMPARISON_DISCOUNT_MBCM else custom_rate,
+                horizon_start_fy=comparison_start_fy,
             )
         )
         chart_card(
@@ -10343,15 +10472,17 @@ def _scenario_comparison_cards(
     b: pd.Series,
     value_unit: str,
     discount_rate: float | None,
+    horizon_start_fy: int = _COMPARISON_HORIZON_START_FY,
 ) -> list[tuple]:
     """Adaptive KPI cards: NPV language for revenue, physical totals otherwise.
 
     The forecast series may carry an FY2025 nowcast anchor for chart
-    continuity; card metrics cover the forecast window proper (FY2026+).
+    continuity; card metrics cover the forecast window proper, which begins
+    the year after the selected official vintage's published actuals end.
     """
     label = str(series_label or "")
-    a = a[a.index >= 2026] if len(a) else a
-    b = b[b.index >= 2026] if len(b) else b
+    a = a[a.index >= int(horizon_start_fy)] if len(a) else a
+    b = b[b.index >= int(horizon_start_fy)] if len(b) else b
     horizon = horizon_label(a if len(a) else b)
     is_intensity = "per capita" in label.lower() or "per capita" in str(value_unit).lower()
     if metric_type == "revenue":
@@ -11252,6 +11383,17 @@ def _disaggregate_annual_rows_to_quarterly(annual_rows: pd.DataFrame, chart_rows
     # FY{first}Q1 (calendar Q3) and hand over from the actuals cleanly.
     is_actual_row = data.get("row_type", pd.Series("", index=data.index)).astype(str).eq("historical_actual")
     data = data[is_actual_row | data["_june_year_numeric"].ge(REVENUE_FIRST_FORECAST_FY)]
+    # An annual total a vintage publishes as ACTUAL (PREBU26's FY2026) is
+    # never split into quarters: the vintages publish no quarterly actuals,
+    # and interpolated quarters under an actual-status row would manufacture
+    # a quarterly history that was never published. Those vintages' quarterly
+    # comparator paths simply start the following June year.
+    official_actual_annual = data.get(
+        "row_type", pd.Series("", index=data.index)
+    ).astype(str).eq("official_comparator") & data.get(
+        "value_status", pd.Series("", index=data.index)
+    ).astype(str).eq("actual")
+    data = data[~official_actual_annual]
     if data.empty:
         return pd.DataFrame()
     group_cols = [c for c in ["trace_name", "scenario_name", "fed_path"] if c in data.columns]
@@ -11860,6 +12002,19 @@ def revenue_outlook_total_path_figure(
     # from history to forecast reads as one continuous path.
     actual_group = data[data["trace_name"].astype(str).eq("Actual")]
     if not actual_group.empty:
+        # Published actual points a forecast trace can hand over from: the
+        # grey history line, plus any official-comparator point the selected
+        # vintage publishes as ACTUAL (PREBU26's FY2026). Each forecast trace
+        # bridges from the latest such point before its own first point, so a
+        # Current path that starts after the official actuals end never draws
+        # a chord across a published actual year.
+        official_actual_points = data[
+            data.get("row_type", pd.Series("", index=data.index)).astype(str).eq("official_comparator")
+            & data.get("value_status", pd.Series("", index=data.index)).astype(str).eq("actual")
+        ]
+        handover_origins = pd.concat(
+            [actual_group, official_actual_points], ignore_index=False, sort=False
+        )
         last_actual = actual_group.loc[actual_group["_period_order"].idxmax()]
         for trace_name in trace_names:
             if trace_name == "Actual":
@@ -11868,12 +12023,19 @@ def revenue_outlook_total_path_figure(
             if group.empty:
                 continue
             first_point = group.loc[group["_period_order"].idxmin()]
+            # A trace that already overlaps the grey history needs no bridge.
             if first_point["_period_order"] <= last_actual["_period_order"]:
                 continue
+            origins = handover_origins[
+                handover_origins["_period_order"] < first_point["_period_order"]
+            ]
+            if origins.empty:
+                continue
+            origin = origins.loc[origins["_period_order"].idxmax()]
             fig.add_trace(
                 go.Scatter(
-                    x=[last_actual["period"], first_point["period"]],
-                    y=[last_actual["value_display"], first_point["value_display"]],
+                    x=[origin["period"], first_point["period"]],
+                    y=[origin["value_display"], first_point["value_display"]],
                     mode="lines",
                     line={"color": "#737373", "dash": "solid", "width": 2.4},
                     hoverinfo="skip",
@@ -11891,7 +12053,15 @@ def revenue_outlook_total_path_figure(
         # end: halfway between the last actual and the first forecast
         # category (category axes accept numeric index coordinates).
         boundary_index = float(periods.index(forecast_period))
-        actual_periods = data[data.get("row_type", pd.Series(dtype=str)).astype(str).eq("historical_actual")]["period"].astype(str)
+        # Actuals end where the last published actual sits: the grey history
+        # line, plus any official-comparator point the selected vintage
+        # publishes as ACTUAL (PREBU26 publishes FY2026 that way), so the
+        # dashed seam stays half a category ahead of the true last actual.
+        row_type_text = data.get("row_type", pd.Series(dtype=str)).astype(str)
+        official_actual = row_type_text.eq("official_comparator") & data.get(
+            "value_status", pd.Series("", index=data.index)
+        ).astype(str).eq("actual")
+        actual_periods = data[row_type_text.eq("historical_actual") | official_actual]["period"].astype(str)
         preceding = [p for p in actual_periods if p in periods and periods.index(p) < boundary_index]
         boundary_x = (periods.index(preceding[-1]) + boundary_index) / 2 if preceding else boundary_index - 0.5
         shapes.append(
