@@ -237,6 +237,10 @@ def test_overlay_rows_match_view_chart_rows(context) -> None:
     # official-vintage filter. Apply it here so the two layers are comparable.
     official_scenario, official_overlay = app._official_vintage_filter_for_key(uptake)
     rows = app._filter_official_vintage_rows(rows, official_scenario, official_overlay)
+    # The view also masks annual Current points at or before the selected
+    # vintage's actual_end_fy (presentation-only); mirror it so the two
+    # layers stay comparable row for row.
+    rows = app._mask_current_rows_through_official_actuals(rows, uptake)
 
     # The view is no longer equal to the overlay: it also carries the official
     # rows the runtime builders drop before they can become chart rows, because
@@ -505,7 +509,12 @@ def test_current_and_mbu_policy_nine_state_matrix_keeps_fuel_on_current_scope(co
 
 def test_middle_east_paths_reconcile_net_revenue_and_quarter_timing(context) -> None:
     pack, signature = context
-    sens, uptake = _default_keys()
+    sens, _ = _default_keys()
+    # BEFU26 selected explicitly: this test asserts FY2026 conflict-path
+    # behaviour, and the default PREBU26 comparator masks the Current FY2026
+    # point (its actuals run through FY2026), so the FY2026 assertions need
+    # the BEFU26 seam.
+    uptake = (app.DEFAULT_EV_UPTAKE_MODE, (), (), 0, 0, False, "BEFU26", False)
     traces = ("Current finalist Base case", *CONFLICT_TRACE_NAMES)
     annual_view = app.cached_revenue_outlook_view(
         signature,

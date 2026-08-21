@@ -166,7 +166,9 @@ class TestThreeRoleMatrix:
             )
 
     def test_roles_resolve_independently_from_the_registry(self):
-        assert ov.default_comparator_vintage_id(ROOT) == "BEFU26"
+        # Independence made real: the comparator moved to PREBU26 while the
+        # bridge and long-run shape roles stayed on BEFU26.
+        assert ov.default_comparator_vintage_id(ROOT) == "PREBU26"
         assert ov.default_bridge_vintage_id(ROOT) == "BEFU26"
         assert ov.default_long_run_shape_vintage_id(ROOT) == "BEFU26"
         # Independent means separately resolvable, not merely equal today.

@@ -55,7 +55,9 @@ class TestPreviewOptions:
         options = dashboard._long_run_shape_preview_options(manifest)
         audit = [spec for spec in options.values() if spec["role"] == "audit"]
         assert audit, "the prior-vintage audit preview is missing"
-        assert all(spec["shape_vintage_id"] == "MBU26" for spec in audit)
+        # Every shape-capable vintage other than the pack's own shape source
+        # (BEFU26) is offered for audit - MBU26 and, once registered, PREBU26.
+        assert {spec["shape_vintage_id"] for spec in audit} == {"MBU26", "PREBU26"}
 
     def test_exactly_one_option_is_the_pack_default(self, manifest):
         options = dashboard._long_run_shape_preview_options(manifest)

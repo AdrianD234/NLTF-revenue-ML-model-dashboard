@@ -164,6 +164,7 @@ def test_current_runtime_uses_only_allowed_mbu26_trace_contract() -> None:
     # vintage. The set stays exhaustive so an unregistered trace still fails.
     allowed = {
         "Actual",
+        "PREBU26 official",
         "BEFU26 official",
         "MBU26 official",
         "Current finalist Base case",
@@ -174,6 +175,7 @@ def test_current_runtime_uses_only_allowed_mbu26_trace_contract() -> None:
     assert set(displayed["trace_name"].dropna().unique()) == allowed
     assert set(displayed["trace_type"].dropna().unique()) == {
         "Actual",
+        "PREBU26 official",
         "BEFU26 official",
         "MBU26 official",
         "current finalist base",
