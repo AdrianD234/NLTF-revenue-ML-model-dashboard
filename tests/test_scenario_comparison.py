@@ -698,6 +698,62 @@ def test_comparison_figure_bridges_the_actual_seam_visually() -> None:
     ]
 
 
+def test_prebu_defer_workbook_is_a_selectable_display_comparator(comparison_context) -> None:
+    """The reference workbook plots beside governed scenarios, values intact.
+
+    Display-only by construction: the workbook side bypasses the governed
+    view, the governed pack never carries its trace, and its values are the
+    workbook cells byte-for-byte (FY2026 actual, FY2027 and FY2050 pinned
+    from references/PREBU defer.xlsx).
+    """
+    import inspect
+
+    pack, signature = comparison_context
+    assert app._prebu_defer_workbook_signature() is not None, "reference workbook missing"
+    keys = _keys()
+    result = app.cached_scenario_comparison_paths(
+        signature, "Total NLTF revenue", FED_PATH,
+        keys[0], keys[1], keys[0], keys[1],
+        PED_BRIDGE_DEFAULT_MODE, pack,
+        trace_a=app.PREBU_DEFER_TRACE_NAME, trace_b="Current finalist Base case",
+    )
+    a = result["a"]
+    assert sorted(int(fy) for fy in a.index) == list(range(2027, 2051))
+    assert float(a.loc[2027]) == pytest.approx(4701.61316150315, rel=1e-12)
+    assert float(a.loc[2050]) == pytest.approx(12955.4993074031, rel=1e-12)
+    history = result["history"]
+    assert max(int(fy) for fy in history.index) == 2026
+    assert float(history.loc[2026]) == pytest.approx(4491.33665247696, rel=1e-12)
+    # The workbook shares the PREBU26 seam, so gates, cards and the window
+    # all work against a governed side.
+    assert app._comparison_alignment_gate(a, result["b"], horizon_start_fy=2027) == ""
+    assert app._comparison_fy_window_bounds(a, result["b"], start_floor_fy=2027) == (2027, 2050)
+    # Every by-stream component parses and the decomposition closes.
+    component_npvs = {}
+    for component_series in app._SCENARIO_COMPONENT_FETCH_SERIES:
+        component = app.cached_scenario_comparison_paths(
+            signature, component_series, FED_PATH,
+            keys[0], keys[1], keys[0], keys[1],
+            PED_BRIDGE_DEFAULT_MODE, pack,
+            trace_a=app.PREBU_DEFER_TRACE_NAME, trace_b="Current finalist Base case",
+        )
+        assert not component["a"].empty, component_series
+        component_npvs[component_series] = app._scenario_component_npv(component, 0.0)
+    nominal_a = app.npv_to_horizon(a, rate=0.0)
+    nominal_b = app.npv_to_horizon(result["b"], rate=0.0)
+    components = app._scenario_npv_component_breakdown(component_npvs, nominal_a, nominal_b)
+    assert sum(side_a for _, side_a, _ in components) == pytest.approx(nominal_a, abs=1e-6)
+    # The governed pack never carries the workbook trace: it is an overlay,
+    # not a governed scenario.
+    assert not pack.revenue_chart_rows["trace_name"].astype(str).eq(
+        app.PREBU_DEFER_TRACE_NAME
+    ).any()
+    # Dropdown wiring: offered only while the workbook is deployed.
+    column_source = inspect.getsource(app._render_comparison_scenario_column)
+    assert "PREBU_DEFER_TRACE_NAME" in column_source
+    assert "_prebu_defer_workbook_signature() is not None" in column_source
+
+
 def test_side_labels_carry_the_selected_scenarios() -> None:
     """Every A/B label - cards, legends, hovers, waterfall bars - names the
     scenario picked in the side's dropdown, with an A/B suffix only when both

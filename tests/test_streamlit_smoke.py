@@ -1498,6 +1498,27 @@ def test_revenue_outlook_compare_mode_keeps_lever_state_for_downstream() -> None
     assert str(fleet_after.value) == "High"
 
 
+def test_revenue_outlook_comparison_offers_the_prebu_defer_workbook() -> None:
+    """The reference workbook is a selectable, lever-locked comparator."""
+    at = _run_revenue_outlook_page()
+    _view_mode_radio(at).set_value(app.REVENUE_OUTLOOK_VIEW_COMPARE)
+    at.run()
+    assert not at.exception
+    trace_a = next(s for s in at.selectbox if s.key == "ro_cmp_a_trace")
+    assert app.PREBU_DEFER_TRACE_NAME in trace_a.options
+    trace_a.set_value(app.PREBU_DEFER_TRACE_NAME)
+    at.run()
+    assert not at.exception
+    rendered = "\n".join(str(markdown.value) for markdown in at.markdown)
+    # The workbook names its side on the cards, and the KPI grid rendered.
+    assert app.PREBU_DEFER_TRACE_NAME in rendered
+    assert "Cumulative nominal to FY2050" in rendered
+    captions = "\n".join(str(caption.value) for caption in at.caption)
+    assert "Display-only comparator" in captions
+    a_fleet = next(s for s in at.selectbox if s.key == "ro_cmp_a_fleet")
+    assert bool(a_fleet.disabled)
+
+
 def test_revenue_outlook_comparison_offers_mot_official_locked_scenario() -> None:
     at = _run_revenue_outlook_page()
     _view_mode_radio(at).set_value(app.REVENUE_OUTLOOK_VIEW_COMPARE)

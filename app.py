@@ -287,6 +287,7 @@ from model_dashboard.revenue_outlook_presentation_policy import (
 # an older cache entry or test. Production builds the typed key directly.
 ScenarioKeyLike = RevenueScenarioComputationKey | tuple
 from model_dashboard.revenue_outlook_excel_extract import (
+    ROW_SERIES as EXTRACT_ROW_SERIES,
     TEMPLATE_RELATIVE_PATH as EXTRACT_TEMPLATE_RELATIVE_PATH,
     RevenueOutlookExtractError,
     build_revenue_outlook_extract,
@@ -3704,6 +3705,110 @@ def cached_revenue_outlook_view(
     }
 
 
+# --- external reference comparison workbook (PREBU26 deferral) --------------
+# A display-only comparator the A/B panel can plot beside the governed
+# scenarios. It is parsed from a vendored reference workbook in the governed
+# BEFU26 extract layout and NEVER enters a governed computation, cache
+# identity or the forecast extract.
+PREBU_DEFER_TRACE_NAME = "PREBU26 deferral (reference workbook)"
+_PREBU_DEFER_WORKBOOK_RELATIVE = Path("references") / "PREBU defer.xlsx"
+
+
+def _prebu_defer_workbook_path() -> Path:
+    return Path(__file__).resolve().parent / _PREBU_DEFER_WORKBOOK_RELATIVE
+
+
+def _prebu_defer_workbook_signature() -> tuple[int, int] | None:
+    """Cache identity for the workbook, or None when it is not deployed.
+
+    Deployment bundles that omit references/ simply lose the dropdown
+    option; nothing else changes.
+    """
+    try:
+        stat = _prebu_defer_workbook_path().stat()
+    except OSError:
+        return None
+    return (int(stat.st_mtime_ns), int(stat.st_size))
+
+
+@st.cache_data(show_spinner=False, max_entries=2)
+def cached_prebu_defer_workbook_frames(signature: tuple[int, int]) -> dict[str, Any]:
+    """Parse the reference workbook once: series_id -> FY-indexed values.
+
+    The workbook follows the governed BEFU26 extract layout (rows 1-65,
+    "YE June" columns, a Period row classifying ACTUAL vs forecast years),
+    so the extract module's row-to-series mapping reads it in reverse.
+    """
+    del signature
+    from openpyxl import load_workbook
+
+    workbook = load_workbook(_prebu_defer_workbook_path(), data_only=True, read_only=True)
+    try:
+        worksheet = workbook[workbook.sheetnames[0]]
+        grid = list(worksheet.iter_rows(values_only=True))
+    finally:
+        workbook.close()
+    header = grid[0] if grid else ()
+    year_columns: dict[int, int] = {}
+    for column_index, value in enumerate(header[1:], start=1):
+        if isinstance(value, (int, float)) and 1990 < float(value) < 2100:
+            year_columns[column_index] = int(value)
+    period_row = grid[1] if len(grid) > 1 else ()
+    period_by_year: dict[int, str] = {}
+    for column, fy in year_columns.items():
+        value = period_row[column] if column < len(period_row) else None
+        period_by_year[fy] = str(value or "").strip()
+    series: dict[str, pd.Series] = {}
+    for row_number, series_id in EXTRACT_ROW_SERIES.items():
+        if row_number - 1 >= len(grid):
+            continue
+        row_values = grid[row_number - 1]
+        values = {
+            fy: float(row_values[column])
+            for column, fy in year_columns.items()
+            if column < len(row_values) and isinstance(row_values[column], (int, float))
+        }
+        series[series_id] = pd.Series(values, dtype=float).sort_index()
+    return {"series": series, "period_by_year": period_by_year}
+
+
+def _prebu_defer_comparison_paths(
+    series_label: str, _pack: RevenueOutlookPack
+) -> tuple[pd.Series, pd.Series, str, str]:
+    """(forecast, history, unit, metric) for one series from the workbook.
+
+    History is the workbook's ACTUAL-classified years (through FY2026, the
+    PREBU26 seam); the forecast is every later year clipped to the FY2050
+    display horizon. Units and metric type come from the governed pack's own
+    rows for the same series label, since the workbook shares the extract's
+    unit conventions.
+    """
+    empty = (pd.Series(dtype=float), pd.Series(dtype=float), "", "")
+    signature = _prebu_defer_workbook_signature()
+    if signature is None:
+        return empty
+    frames = cached_prebu_defer_workbook_frames(signature)
+    rows = _pack.revenue_chart_rows
+    label_column = "series_label" if "series_label" in rows.columns else "stream_label"
+    matching = rows[rows[label_column].astype(str).eq(str(series_label))]
+    if matching.empty or "series_id" not in matching.columns:
+        return empty
+    series_id = str(matching["series_id"].astype(str).iloc[0])
+    values = frames["series"].get(series_id)
+    if values is None or values.empty:
+        return empty
+    period_by_year = frames["period_by_year"]
+    is_actual = values.index.map(
+        lambda fy: str(period_by_year.get(int(fy), "")).upper() == "ACTUAL"
+    )
+    history = values[is_actual]
+    forecast = values[~is_actual]
+    forecast = forecast[forecast.index <= _COMPARISON_HORIZON_END_FY]
+    unit = _first_non_empty(matching.get("value_unit", pd.Series(dtype=str)))
+    metric = _revenue_outlook_series_metric_type(rows, series_label)
+    return forecast, history, str(unit or ""), str(metric or "")
+
+
 @st.cache_data(show_spinner=False, max_entries=24)
 def cached_scenario_comparison_paths(
     signature: tuple[tuple[str, int, int], ...],
@@ -3730,6 +3835,11 @@ def cached_scenario_comparison_paths(
     """
 
     def _paths(sensitivity_key, ev_uptake_key, trace: str) -> tuple[pd.Series, pd.Series, str, str]:
+        # The external reference workbook is a display-only comparator: its
+        # side bypasses the governed view entirely and can never reach a
+        # scenario key, cache identity or governed frame.
+        if trace == PREBU_DEFER_TRACE_NAME:
+            return _prebu_defer_comparison_paths(series, _pack)
         # The MoT official scenario plots the governed official trace itself,
         # not the finalist base case with the overlays switched off (the raw
         # finalist petrol bridge keeps all petrol activity to 2050, which is
@@ -10003,11 +10113,14 @@ def _render_comparison_scenario_column(
     # Each side selects a governed scenario TRACE from the committed pack; the
     # fleet composition stays on the governed VFM Base default underneath, so
     # the A/B choice is the scenario story, not the class-split machinery.
+    # The PREBU26 deferral reference workbook rides along as a display-only
+    # comparator whenever it is deployed.
     scenario_options = [
         "Current finalist Base case",
         "Current finalist High population/comparison",
         *CONFLICT_TRACE_NAMES,
         mot_option,
+        *([PREBU_DEFER_TRACE_NAME] if _prebu_defer_workbook_signature() is not None else []),
     ]
     keys = {
         name: f"ro_cmp_{prefix}_{name}"
@@ -10026,14 +10139,22 @@ def _render_comparison_scenario_column(
         ),
     )
     mot_official = selected_scenario == mot_option
+    external_workbook = selected_scenario == PREBU_DEFER_TRACE_NAME
+    levers_locked = mot_official or external_workbook
     if mot_official:
         st.caption(f"Pure {selected_release} official path - non-rate levers locked.")
+    if external_workbook:
+        st.caption(
+            "Display-only comparator from references/PREBU defer.xlsx "
+            f"({selected_release} with deferred 12c timing) - levers locked; "
+            "outside the governed pipeline."
+        )
     levels = list(_COMPARISON_SENSITIVITY_LEVELS)
     for name in ("fleet", "pt", "freight"):
         _validated_select_state(keys[name], levels, defaults[name])
         st.session_state.setdefault(keys[name], defaults[name])
     fleet = st.selectbox(
-        "Fleet efficiency", levels, key=keys["fleet"], disabled=mot_official,
+        "Fleet efficiency", levels, key=keys["fleet"], disabled=levers_locked,
         format_func=lambda level: sensitivity_labels["fleet_efficiency"].get(level, str(level)),
     )
     # PT and freight are first-class governed levers (continuous through
@@ -10041,11 +10162,11 @@ def _render_comparison_scenario_column(
     # never mirror an A-side PT selection and "Reset B to A" silently
     # diverged on exactly the lever it claimed to copy.
     pt_shift = st.selectbox(
-        "PT mode shift", levels, key=keys["pt"], disabled=mot_official,
+        "PT mode shift", levels, key=keys["pt"], disabled=levers_locked,
         format_func=lambda level: sensitivity_labels["pt_mode_shift"].get(level, str(level)),
     )
     freight = st.selectbox(
-        "Freight rail shift", levels, key=keys["freight"], disabled=mot_official,
+        "Freight rail shift", levels, key=keys["freight"], disabled=levers_locked,
         format_func=lambda level: sensitivity_labels["freight_rail_shift"].get(level, str(level)),
     )
     eruc_values: tuple[float, ...] = ()
@@ -10053,8 +10174,18 @@ def _render_comparison_scenario_column(
     # While method detail is hidden the e-RUC transition is withdrawn from the
     # A/B columns and both scenarios compare without it.
     eruc_on = method_detail_enabled() and st.toggle(
-        "e-RUC transition", key=keys["eruc"], help=ERUC_NOTE, disabled=mot_official
+        "e-RUC transition", key=keys["eruc"], help=ERUC_NOTE, disabled=levers_locked
     )
+    if external_workbook:
+        # The workbook side bypasses the governed view; the returned keys are
+        # the locked official clone purely so the cache key stays typed and
+        # page-inherited. The trace name is what selects the workbook path.
+        sensitivity_key, ev_uptake_key, _official_trace = _comparison_official_scenario_keys(
+            page_uptake_key,
+            official_policy_state=FED_POLICY_PUBLISHED,
+            selected_vid=selected_vid,
+        )
+        return sensitivity_key, ev_uptake_key, PREBU_DEFER_TRACE_NAME
     if eruc_on and not mot_official:
         with st.popover("e-RUC levers", use_container_width=True):
             start = st.number_input("Start FY", min_value=2026, max_value=2045, value=2027, step=1, key=f"ro_cmp_{prefix}_eruc_start")

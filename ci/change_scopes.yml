@@ -426,6 +426,11 @@ rules:
       - "model_dashboard/chart_sources.py"
       - "model_dashboard/revenue_outlook_excel_extract.py"
       - "templates/**"
+      # Display-only comparator workbook the A/B panel can overlay. Read at
+      # render time, never by a governed computation, so a change here is a
+      # presentation change - the docs_only match on references/** unions
+      # away whenever this file is in the diff.
+      - "references/PREBU defer.xlsx"
 
   # --- Revenue calculation --------------------------------------------------
   - scopes: [revenue_outlook_calculation]
