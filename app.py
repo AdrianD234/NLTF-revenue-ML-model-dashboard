@@ -10412,6 +10412,21 @@ def _reset_scenario_columns_to_current_page() -> None:
         )
 
 
+def _comparison_side_labels(trace_a: str, trace_b: str) -> tuple[str, str]:
+    """Display names for the two comparison sides: the SELECTED scenarios.
+
+    Every A/B label on the cards, charts and hovers carries the scenario the
+    reader actually picked. Identical selections (same trace compared under
+    different levers) get an A/B suffix so the legend, hovers and cards stay
+    distinguishable.
+    """
+    label_a = str(trace_a).strip() or "Scenario A"
+    label_b = str(trace_b).strip() or "Scenario B"
+    if label_a == label_b:
+        return f"{label_a} (A)", f"{label_b} (B)"
+    return label_a, label_b
+
+
 def _scenario_summary_text(
     sensitivity_key: tuple, ev_uptake_key: ScenarioKeyLike, trace_name: str = ""
 ) -> str:
@@ -10548,6 +10563,9 @@ def _render_scenario_comparison_panel(
                 ("Series", str(comparison_series)),
             ]
         )
+        # The selected scenarios name their own sides everywhere below: cards,
+        # legends, hovers and waterfall bars all carry the dropdown choices.
+        label_a, label_b = _comparison_side_labels(trace_a, trace_b)
         comparison_start_fy = _comparison_horizon_start_fy(page_uptake_key)
         alignment_gate = _comparison_alignment_gate(
             a_path, b_path, horizon_start_fy=comparison_start_fy
@@ -10558,8 +10576,11 @@ def _render_scenario_comparison_panel(
             warning_panel(alignment_gate)
             chart_card(
                 "Scenario paths (A vs B)",
-                "Shared history in grey; Scenario A solid navy, Scenario B dashed orange. Same governed pipeline as the total path chart.",
-                _scenario_comparison_figure(result["history"], a_path, b_path, result["value_unit"]),
+                f"Shared history in grey; {label_a} (A) solid navy, {label_b} (B) dashed orange. Same governed pipeline as the total path chart.",
+                _scenario_comparison_figure(
+                    result["history"], a_path, b_path, result["value_unit"],
+                    label_a=label_a, label_b=label_b,
+                ),
                 caption=None,
                 notes_as_tooltip=True,
             )
@@ -10595,10 +10616,12 @@ def _render_scenario_comparison_panel(
                 result["value_unit"],
                 rate_for_npv,
                 horizon_start_fy=comparison_start_fy,
+                label_a=label_a,
+                label_b=label_b,
             )
         )
         paths_note = (
-            "Shared history in grey; Scenario A solid navy, Scenario B dashed orange. "
+            f"Shared history in grey; {label_a} (A) solid navy, {label_b} (B) dashed orange. "
             "Same governed pipeline as the total path chart."
         )
         chart_card(
@@ -10614,6 +10637,8 @@ def _render_scenario_comparison_panel(
                 b_path if full_window else b_window,
                 result["value_unit"],
                 x_window=None if full_window else (start_fy, end_fy),
+                label_a=label_a,
+                label_b=label_b,
             ),
             caption=None,
             notes_as_tooltip=True,
@@ -10658,7 +10683,8 @@ def _render_scenario_comparison_panel(
                     )
                     return
                 composition_figure = _scenario_npv_composition_figure(
-                    components, result["value_unit"]
+                    components, result["value_unit"],
+                    label_a=label_a, label_b=label_b,
                 )
                 # Side by side, the bridge matches the by-stream chart's
                 # stream-count-driven height so the row reads as one block.
@@ -10667,8 +10693,8 @@ def _render_scenario_comparison_panel(
                 with stream_col:
                     chart_card(
                         "Nominal revenue by stream (A vs B)",
-                        f"Each revenue stream's cumulative nominal revenue over {window_text} under Scenario A "
-                        "(navy) and Scenario B (orange), largest stream first, all streams recomputed "
+                        f"Each revenue stream's cumulative nominal revenue over {window_text} under {label_a} "
+                        f"(A, navy) and {label_b} (B, orange), largest stream first, all streams recomputed "
                         "through that scenario's levers. Heavy & other RUC is the RUC rollup less the "
                         "light classes (heavy BEVs pay the same per-km RUC, so heavy electrification "
                         "reshuffles within this block); TUC & other closes the governed NLTF identity. "
@@ -10688,6 +10714,7 @@ def _render_scenario_comparison_panel(
                         _scenario_npv_component_bridge_figure(
                             nominal_a, nominal_b, components, result["value_unit"],
                             metric_label="Nominal", height=row_height,
+                            label_a=label_a, label_b=label_b,
                         ),
                         caption=None,
                         notes_as_tooltip=True,
@@ -10696,7 +10723,10 @@ def _render_scenario_comparison_panel(
                 chart_card(
                     "NPV bridge (A to B)",
                     f"NPV of June-year cash flows {window_text} from an FY2026 base. " + basis_note,
-                    _scenario_npv_waterfall_figure(npv_a, npv_b, result["value_unit"]),
+                    _scenario_npv_waterfall_figure(
+                        npv_a, npv_b, result["value_unit"],
+                        label_a=label_a, label_b=label_b,
+                    ),
                     caption=None,
                     notes_as_tooltip=True,
                 )
@@ -10732,6 +10762,8 @@ def _scenario_comparison_cards(
     value_unit: str,
     discount_rate: float | None,
     horizon_start_fy: int = _COMPARISON_HORIZON_START_FY,
+    label_a: str = "Scenario A",
+    label_b: str = "Scenario B",
 ) -> list[tuple]:
     """Adaptive KPI cards: NPV language for revenue, physical totals otherwise.
 
@@ -10759,8 +10791,8 @@ def _scenario_comparison_cards(
         pct = f"{delta / npv_a:+.1%} vs A" if npv_a else "-"
         cum_pct = f"{cum_delta / cum_a:+.1%} vs A" if cum_a else "-"
         return [
-            (f"Scenario A - Cumulative nominal to FY{window_end_fy}", _format_scenario_amount(cum_a, value_unit), f"{horizon}, undiscounted", "-", "neutral", "A"),
-            (f"Scenario B - Cumulative nominal to FY{window_end_fy}", _format_scenario_amount(cum_b, value_unit), f"{horizon}, undiscounted", "-", "neutral", "B"),
+            (f"{label_a} - Cumulative nominal to FY{window_end_fy}", _format_scenario_amount(cum_a, value_unit), f"{horizon}, undiscounted", "-", "neutral", "A"),
+            (f"{label_b} - Cumulative nominal to FY{window_end_fy}", _format_scenario_amount(cum_b, value_unit), f"{horizon}, undiscounted", "-", "neutral", "B"),
             ("Cumulative nominal delta (B - A)", _format_scenario_amount(cum_delta, value_unit, signed=True), f"{horizon}, undiscounted", cum_pct, _scenario_delta_tone(cum_delta), "Σ"),
             ("NPV delta (B - A)", _format_scenario_amount(delta, value_unit, signed=True), f"{window_text}, {basis}; FY2026 base", pct, _scenario_delta_tone(delta), "Δ"),
         ]
@@ -10769,8 +10801,8 @@ def _scenario_comparison_cards(
         delta = avg_b - avg_a
         end_delta = (b.iloc[-1] - a.iloc[-1]) if len(a) and len(b) else float("nan")
         return [
-            ("Scenario A - average annual level", _format_scenario_amount(avg_a, value_unit), horizon, "-", "neutral", "A"),
-            ("Scenario B - average annual level", _format_scenario_amount(avg_b, value_unit), horizon, "-", "neutral", "B"),
+            (f"{label_a} - average annual level", _format_scenario_amount(avg_a, value_unit), horizon, "-", "neutral", "A"),
+            (f"{label_b} - average annual level", _format_scenario_amount(avg_b, value_unit), horizon, "-", "neutral", "B"),
             ("Average level delta (B - A)", _format_scenario_amount(delta, value_unit, signed=True), horizon, "-", _scenario_delta_tone(delta), "Δ"),
             (f"FY{window_end_fy} delta (B - A)", _format_scenario_amount(end_delta, value_unit, signed=True), "end of window", "-", _scenario_delta_tone(end_delta), "→"),
         ]
@@ -10778,8 +10810,8 @@ def _scenario_comparison_cards(
     delta = cum_b - cum_a
     avg_delta = average_annual(b) - average_annual(a)
     return [
-        ("Scenario A - cumulative", _format_scenario_amount(cum_a, value_unit), horizon, "-", "neutral", "A"),
-        ("Scenario B - cumulative", _format_scenario_amount(cum_b, value_unit), horizon, "-", "neutral", "B"),
+        (f"{label_a} - cumulative", _format_scenario_amount(cum_a, value_unit), horizon, "-", "neutral", "A"),
+        (f"{label_b} - cumulative", _format_scenario_amount(cum_b, value_unit), horizon, "-", "neutral", "B"),
         ("Cumulative delta (B - A)", _format_scenario_amount(delta, value_unit, signed=True), horizon, "-", _scenario_delta_tone(delta), "Δ"),
         ("Average annual delta (B - A)", _format_scenario_amount(avg_delta, value_unit, signed=True), "per June year", "-", _scenario_delta_tone(avg_delta), "⌀"),
     ]
@@ -10816,6 +10848,8 @@ def _scenario_comparison_figure(
     value_unit: str,
     *,
     x_window: tuple[int, int] | None = None,
+    label_a: str = "Scenario A",
+    label_b: str = "Scenario B",
 ) -> go.Figure:
     if (a is None or a.empty) and (b is None or b.empty):
         return empty_figure("Selected series has no forecast rows for the chosen scenarios.")
@@ -10849,8 +10883,8 @@ def _scenario_comparison_figure(
         anchor_fy = int(history_sorted.index[-1])
         anchor_value = float(history_sorted.iloc[-1])
     for series, name, color, dash in [
-        (a, "Scenario A", "#002B5C", "solid"),
-        (b, "Scenario B", "#F37021", "dash"),
+        (a, label_a, "#002B5C", "solid"),
+        (b, label_b, "#F37021", "dash"),
     ]:
         if series is None or series.empty:
             continue
@@ -10906,6 +10940,8 @@ def _scenario_npv_waterfall_figure(
     *,
     metric_label: str = "NPV",
     height: int | None = None,
+    label_a: str = "Scenario A",
+    label_b: str = "Scenario B",
 ) -> go.Figure:
     scale = _display_value_scale_for_unit(value_unit)
     axis_title = _display_axis_unit(value_unit)
@@ -10914,7 +10950,7 @@ def _scenario_npv_waterfall_figure(
         go.Waterfall(
             orientation="v",
             measure=["absolute", "relative", "total"],
-            x=[f"Scenario A {metric_label}", "Δ (B − A)", f"Scenario B {metric_label}"],
+            x=[f"{label_a} {metric_label}", "Δ (B − A)", f"{label_b} {metric_label}"],
             y=[npv_a / scale, delta / scale, npv_b / scale],
             increasing={"marker": {"color": "#00843D"}},
             decreasing={"marker": {"color": "#B42318"}},
@@ -11018,7 +11054,11 @@ def _scenario_npv_component_breakdown(
 
 
 def _scenario_npv_composition_figure(
-    components: list[tuple[str, float, float]], value_unit: str
+    components: list[tuple[str, float, float]],
+    value_unit: str,
+    *,
+    label_a: str = "Scenario A",
+    label_b: str = "Scenario B",
 ) -> go.Figure:
     """Per-stream NPV comparison: one row per revenue stream, A vs B paired.
 
@@ -11040,8 +11080,8 @@ def _scenario_npv_composition_figure(
     hover_value = _scenario_hover_value_format(value_unit, axis="x")
     fig = go.Figure()
     for name, color, values, total in [
-        ("Scenario A", "#002B5C", [a for _, a, _ in material], total_a),
-        ("Scenario B", "#F37021", [b for _, _, b in material], total_b),
+        (label_a, "#002B5C", [a for _, a, _ in material], total_a),
+        (label_b, "#F37021", [b for _, _, b in material], total_b),
     ]:
         shares = [v / total if total else float("nan") for v in values]
         fig.add_trace(
@@ -11081,6 +11121,8 @@ def _scenario_npv_component_bridge_figure(
     *,
     metric_label: str = "NPV",
     height: int | None = None,
+    label_a: str = "Scenario A",
+    label_b: str = "Scenario B",
 ) -> go.Figure:
     """Delta-space bridge: component deltas accumulate from zero to B − A.
 
@@ -11095,7 +11137,8 @@ def _scenario_npv_component_bridge_figure(
     ]
     if not deltas:
         return _scenario_npv_waterfall_figure(
-            npv_a, npv_b, value_unit, metric_label=metric_label, height=height
+            npv_a, npv_b, value_unit, metric_label=metric_label, height=height,
+            label_a=label_a, label_b=label_b,
         )
     # gains first, largest loss lands right before the total bar
     deltas.sort(key=lambda row: row[1], reverse=True)

@@ -698,6 +698,52 @@ def test_comparison_figure_bridges_the_actual_seam_visually() -> None:
     ]
 
 
+def test_side_labels_carry_the_selected_scenarios() -> None:
+    """Every A/B label - cards, legends, hovers, waterfall bars - names the
+    scenario picked in the side's dropdown, with an A/B suffix only when both
+    sides selected the same trace."""
+    import inspect
+
+    assert app._comparison_side_labels(
+        "MoT official (PREBU26, no levers)", "Middle East conflict: Medium"
+    ) == ("MoT official (PREBU26, no levers)", "Middle East conflict: Medium")
+    assert app._comparison_side_labels(
+        "Current finalist Base case", "Current finalist Base case"
+    ) == ("Current finalist Base case (A)", "Current finalist Base case (B)")
+    assert app._comparison_side_labels("", "") == ("Scenario A", "Scenario B")
+
+    a = pd.Series([100.0, 101.0], index=[2027, 2028])
+    b = a + 1.0
+    cards = app._scenario_comparison_cards(
+        "Total NLTF revenue", "revenue", a, b, "$m nominal ex GST", None,
+        label_a="Alpha path", label_b="Beta path",
+    )
+    assert cards[0][0].startswith("Alpha path - Cumulative nominal")
+    assert cards[1][0].startswith("Beta path - Cumulative nominal")
+    figure = app._scenario_comparison_figure(
+        pd.Series(dtype=float), a, b, "$m nominal ex GST",
+        label_a="Alpha path", label_b="Beta path",
+    )
+    legend_names = {str(t.name) for t in figure.data if t.showlegend is not False}
+    assert {"Alpha path", "Beta path"} <= legend_names
+    for trace in figure.data:
+        if str(trace.name) in ("Alpha path", "Beta path") and trace.hovertemplate:
+            assert str(trace.name) in str(trace.hovertemplate)
+    waterfall = app._scenario_npv_waterfall_figure(
+        1000.0, 900.0, "$m nominal ex GST", label_a="Alpha path", label_b="Beta path"
+    )
+    assert list(waterfall.data[0].x) == ["Alpha path NPV", "Δ (B − A)", "Beta path NPV"]
+    composition = app._scenario_npv_composition_figure(
+        [("PED / FED (net)", 40000.0, 38000.0)], "$m nominal ex GST",
+        label_a="Alpha path", label_b="Beta path",
+    )
+    assert {str(t.name) for t in composition.data} == {"Alpha path", "Beta path"}
+    # The panel derives the labels from the selected traces and passes them on.
+    panel_source = inspect.getsource(app._render_scenario_comparison_panel)
+    assert "_comparison_side_labels(trace_a, trace_b)" in panel_source
+    assert panel_source.count("label_a=label_a") >= 4
+
+
 def test_narrowed_window_zooms_the_paths_chart_to_selected_years() -> None:
     """A narrowed window shows ONLY the selected June years on the paths chart.
 
