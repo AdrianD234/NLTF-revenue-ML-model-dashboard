@@ -349,6 +349,31 @@ def test_boundary_lines_follow_actuals_and_post_model_segments(figure) -> None:
     assert str(post_model.x) == "FY2031"
 
 
+def test_current_path_dashes_only_after_the_extrapolation_cutoff(figure) -> None:
+    """One line per series: solid through the cutoff, dashed strictly after.
+
+    The solid econometric portion runs THROUGH the first extrapolated June
+    year (FY2031 - the year the boundary line marks), the dashed post-model
+    portion starts at FY2032, and a hover-less connector joins them, so no
+    June year is drawn or hovered by two segments of the same series.
+    """
+    base = [t for t in figure.data if str(t.name) == "Current finalist Base case"]
+    solid = next(t for t in base if t.showlegend)
+    assert str(solid.x[-1]) == "FY2031"
+    dashed = [
+        t for t in base
+        if t.showlegend is False and getattr(t, "hoverinfo", None) != "skip"
+    ]
+    assert len(dashed) == 1
+    assert str(dashed[0].x[0]) == "FY2032"
+    assert dashed[0].line.dash == "dash"
+    connectors = [t for t in base if getattr(t, "hoverinfo", None) == "skip"]
+    assert len(connectors) == 1
+    assert [str(x) for x in connectors[0].x] == ["FY2031", "FY2032"]
+    hoverable_periods = [str(x) for t in (solid, dashed[0]) for x in t.x]
+    assert len(hoverable_periods) == len(set(hoverable_periods)), "a June year hovers twice"
+
+
 def test_conflict_low_colour_is_distinct_from_official_green() -> None:
     """MEC Low must never read as a second green next to the official trace."""
     low = app.CONFLICT_TRACE_COLORS[app.conflict_trace_name("low")]

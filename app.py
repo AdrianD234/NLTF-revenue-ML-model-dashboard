@@ -10333,22 +10333,34 @@ def _series_fy_span(values_by_fy: pd.Series) -> tuple[int, int]:
 def _render_comparison_window_control(bounds: tuple[int, int]) -> tuple[int, int]:
     """The two-handle June-year selector for the A/B analysis window.
 
-    The persisted selection lives in its own plain session key, clamped into
-    the current bounds on every run; the widget itself is stateless (its
-    value is always passed explicitly, and it carries no key). A keyed
-    range select_slider loses its range-ness when its default kwargs are
-    dropped on later runs - the session value collapses to a scalar - and a
-    keyed widget given a value every run logs Streamlit's default-vs-session
-    warning, so the plain-store pattern is the one arrangement that persists,
-    clamps and stays warning-free.
+    The widget's kwargs are CONSTANT for a given horizon: the full-range
+    tuple default locks select_slider into range mode (without a tuple
+    default it registers single-valued and collapses incoming range state to
+    a scalar), and constant kwargs keep the widget identity stable so a drag
+    can never land on a remounted widget and snap back. Session state is
+    never written here - an assignment would stamp an API-set value that
+    overrides the very next drag - so the widget owns its own key; a stored
+    value the current options cannot represent (stale deployment or injected
+    state) is deleted before instantiation, resetting to the full range
+    instead of raising.
     """
     lower_fy, upper_fy = int(bounds[0]), int(bounds[1])
     stored = st.session_state.get(_COMPARISON_WINDOW_STATE_KEY)
-    current = _clamp_comparison_fy_window(stored, (lower_fy, upper_fy))
+    if stored is not None:
+        try:
+            stored_pair = (int(stored[0]), int(stored[-1]))
+            valid = len(stored) == 2 and stored_pair == _clamp_comparison_fy_window(
+                stored, (lower_fy, upper_fy)
+            )
+        except (TypeError, ValueError, IndexError, KeyError):
+            valid = False
+        if not valid:
+            del st.session_state[_COMPARISON_WINDOW_STATE_KEY]
     start_fy, end_fy = st.select_slider(
         "Comparison window",
         options=list(range(lower_fy, upper_fy + 1)),
-        value=current,
+        value=(lower_fy, upper_fy),
+        key=_COMPARISON_WINDOW_STATE_KEY,
         format_func=lambda fy: f"FY{int(fy)}",
         help=(
             "June-year window for every A/B card, chart and bridge below. "
@@ -10357,9 +10369,7 @@ def _render_comparison_window_control(bounds: tuple[int, int]) -> tuple[int, int
             "MBCM curve - factors are not rebased to the window start."
         ),
     )
-    selection = (int(start_fy), int(end_fy))
-    st.session_state[_COMPARISON_WINDOW_STATE_KEY] = selection
-    return selection
+    return (int(start_fy), int(end_fy))
 
 
 def _reset_scenario_columns_to_current_page() -> None:
@@ -12302,16 +12312,34 @@ def revenue_outlook_total_path_figure(
         if post_model.empty:
             _add_path_trace(within_model, dash_style=dash, show_legend=True)
         else:
-            # Segmented current path: solid econometric years, then the same
-            # colour dashed for the post-model structural extrapolation. The
-            # dashed portion re-includes the FY2030 point so the two segments
-            # join continuously with no gap and no duplicate hover (the seam
-            # point keeps the econometric hover only).
-            _add_path_trace(within_model, dash_style=dash, show_legend=True)
-            seam = within_model.tail(1)
-            joined = pd.concat([seam, post_model], ignore_index=True)
-            joined.loc[joined.index[0], "_hover_segment"] = ""
-            _add_path_trace(joined, dash_style="dash", show_legend=False, suffix="post_model")
+            # Segmented current path: the line stays SOLID through the first
+            # extrapolated June year - the cutoff the boundary line marks
+            # (FY2031 in the current packs) - and dashes strictly after it.
+            # A hover-less connector joins the two portions, so every June
+            # year hovers exactly once and no year is drawn by two segments.
+            post_model_sorted = post_model.sort_values("_period_order", kind="stable")
+            cutoff_row = post_model_sorted.head(1)
+            solid_portion = pd.concat([within_model, cutoff_row], ignore_index=True)
+            _add_path_trace(solid_portion, dash_style=dash, show_legend=True)
+            beyond_cutoff = post_model_sorted.iloc[1:]
+            if not beyond_cutoff.empty:
+                connector = pd.concat(
+                    [cutoff_row, beyond_cutoff.head(1)], ignore_index=True
+                )
+                fig.add_trace(
+                    go.Scatter(
+                        x=connector["period"],
+                        y=connector["value_display"],
+                        mode="lines",
+                        name=trace_name,
+                        legendgroup=trace_name,
+                        showlegend=False,
+                        line={"color": color, "dash": "dash", "width": width},
+                        opacity=0.85,
+                        hoverinfo="skip",
+                    )
+                )
+                _add_path_trace(beyond_cutoff, dash_style="dash", show_legend=False, suffix="post_model")
 
     # Bridge the visual gap between the last actual and the first point of each
     # forecast trace with an actual-coloured connector segment so the handover
