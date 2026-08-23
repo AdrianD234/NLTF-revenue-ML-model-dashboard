@@ -192,7 +192,9 @@ CONFLICT_NOTE_BY_TRACE = {
     for level in CONFLICT_FUEL_SCENARIO_LEVELS
 }
 CONFLICT_TRACE_STYLES = {
-    conflict_trace_name("low"): ("#0F766E", "dot", 2.3),
+    # Rose, not the former teal: the teal read as a second green against the
+    # official comparator's strong green in the legend.
+    conflict_trace_name("low"): ("#DB2777", "dot", 2.3),
     conflict_trace_name("medium"): ("#6B4E71", "dashdot", 2.6),
     conflict_trace_name("high"): ("#B42318", "longdash", 2.5),
 }
@@ -285,6 +287,7 @@ from model_dashboard.revenue_outlook_presentation_policy import (
 # an older cache entry or test. Production builds the typed key directly.
 ScenarioKeyLike = RevenueScenarioComputationKey | tuple
 from model_dashboard.revenue_outlook_excel_extract import (
+    ROW_SERIES as EXTRACT_ROW_SERIES,
     TEMPLATE_RELATIVE_PATH as EXTRACT_TEMPLATE_RELATIVE_PATH,
     RevenueOutlookExtractError,
     build_revenue_outlook_extract,
@@ -2850,12 +2853,130 @@ def _revenue_outlook_layer_catalogue(
         envelope_available = False
     else:
         options = [*options, VFM_FAST_TRACE_NAME, VFM_SLOW_TRACE_NAME]
+    # The external reference workbook is offered exactly like it is in the
+    # A/B scenario dropdowns: only when the file is deployed, never selected
+    # by default, and always display-only (levers, policy states and
+    # sensitivities cannot move it).
+    if (
+        _prebu_defer_workbook_signature() is not None
+        and PREBU_DEFER_TRACE_NAME not in options
+    ):
+        options = [*options, PREBU_DEFER_TRACE_NAME]
     return build_layer_catalogue(
         options,
         default_trace_names=list(default_trace_names),
         uncertainty_available=cached_uncertainty_pack().available,
         envelope_available=envelope_available,
+        trace_interpretations={
+            PREBU_DEFER_TRACE_NAME: (
+                "Display-only reference path read from references/PREBU "
+                "defer.xlsx (governed BEFU26 extract layout, June years). It "
+                "bypasses the modelling engine entirely: levers, 12c policy "
+                "states and sensitivities never move it, and it is drawn only "
+                "on the June-year grain."
+            )
+        },
     )
+
+
+# Session prefix for the per-layer tick boxes inside the "Show on chart"
+# popover. The canonical persisted selection stays the LABEL list under
+# "revenue_outlook_chart_layers" - compare mode and the withdrawn-state filter
+# read that key - so the tick boxes are seeded from it and mirrored back into
+# it on every run.
+_LAYER_PICKER_KEY_PREFIX = "ro_layer_pick_"
+
+
+def _layer_picker_checkbox_key(layer_id: str) -> str:
+    return f"{_LAYER_PICKER_KEY_PREFIX}{layer_id}"
+
+
+def _apply_layer_picker_action(
+    entries: tuple[tuple[str, bool], ...], action: str
+) -> None:
+    """Bulk popover actions: tick every layer, none, or the defaults."""
+    for layer_id, default_selected in entries:
+        st.session_state[_layer_picker_checkbox_key(layer_id)] = (
+            True
+            if action == "all"
+            else False
+            if action == "none"
+            else bool(default_selected)
+        )
+
+
+def _render_chart_layer_picker(
+    layer_catalogue: tuple[RevenueChartLayerSpec, ...]
+) -> list[str]:
+    """Compact "Show on chart" popover with one tick box per layer.
+
+    Replaces the chip multiselect: closed, the control is a single button
+    carrying the selected count; open, it lists every catalogue layer grouped
+    into paths and bands. Selection is presentation state only - layer IDs,
+    defaults, draw order and band behaviour are exactly the catalogue's - and
+    the selected labels keep living in ``revenue_outlook_chart_layers`` so
+    every existing reader of that key is untouched.
+    """
+    persisted = st.session_state.get("revenue_outlook_chart_layers")
+    persisted_labels = (
+        set(persisted) if isinstance(persisted, (list, tuple, set)) else None
+    )
+    for spec in layer_catalogue:
+        checkbox_key = _layer_picker_checkbox_key(spec.layer_id)
+        if checkbox_key not in st.session_state:
+            st.session_state[checkbox_key] = bool(
+                spec.default_selected
+                if persisted_labels is None
+                else spec.label in persisted_labels
+            )
+    selected_count = sum(
+        bool(st.session_state[_layer_picker_checkbox_key(spec.layer_id)])
+        for spec in layer_catalogue
+    )
+    entries = tuple((spec.layer_id, spec.default_selected) for spec in layer_catalogue)
+    with st.popover(
+        f"Show on chart · {selected_count} selected", use_container_width=True
+    ):
+        action_columns = st.columns(3)
+        for column, (label, action) in zip(
+            action_columns,
+            [
+                ("Select all", "all"),
+                ("Clear all", "none"),
+                ("Restore defaults", "defaults"),
+            ],
+        ):
+            with column:
+                st.button(
+                    label,
+                    key=f"ro_layer_picker_{action}",
+                    on_click=_apply_layer_picker_action,
+                    args=(entries, action),
+                    use_container_width=True,
+                )
+        for group_title, layer_kinds in (
+            ("Paths", (LAYER_KIND_PATH,)),
+            ("Bands", (LAYER_KIND_BAND, LAYER_KIND_ENVELOPE)),
+        ):
+            group_specs = [
+                spec for spec in layer_catalogue if spec.layer_kind in layer_kinds
+            ]
+            if not group_specs:
+                continue
+            st.markdown(f"**{group_title}**")
+            for spec in group_specs:
+                st.checkbox(
+                    spec.display_name,
+                    key=_layer_picker_checkbox_key(spec.layer_id),
+                    help=spec.interpretation,
+                )
+    chosen_labels = [
+        spec.label
+        for spec in layer_catalogue
+        if bool(st.session_state.get(_layer_picker_checkbox_key(spec.layer_id)))
+    ]
+    st.session_state["revenue_outlook_chart_layers"] = chosen_labels
+    return chosen_labels
 
 
 def _cone_band_controls(ev_uptake_key: ScenarioKeyLike) -> RevenueScenarioComputationKey:
@@ -3602,6 +3723,146 @@ def cached_revenue_outlook_view(
     }
 
 
+# --- external reference comparison workbook (PREBU26 deferral) --------------
+# A display-only comparator the A/B panel can plot beside the governed
+# scenarios. It is parsed from a vendored reference workbook in the governed
+# BEFU26 extract layout and NEVER enters a governed computation, cache
+# identity or the forecast extract.
+PREBU_DEFER_TRACE_NAME = "PREBU26 deferral (reference workbook)"
+_PREBU_DEFER_WORKBOOK_RELATIVE = Path("references") / "PREBU defer.xlsx"
+
+
+def _prebu_defer_workbook_path() -> Path:
+    return Path(__file__).resolve().parent / _PREBU_DEFER_WORKBOOK_RELATIVE
+
+
+def _prebu_defer_workbook_signature() -> tuple[int, int] | None:
+    """Cache identity for the workbook, or None when it is not deployed.
+
+    Deployment bundles that omit references/ simply lose the dropdown
+    option; nothing else changes.
+    """
+    try:
+        stat = _prebu_defer_workbook_path().stat()
+    except OSError:
+        return None
+    return (int(stat.st_mtime_ns), int(stat.st_size))
+
+
+@st.cache_data(show_spinner=False, max_entries=2)
+def cached_prebu_defer_workbook_frames(signature: tuple[int, int]) -> dict[str, Any]:
+    """Parse the reference workbook once: series_id -> FY-indexed values.
+
+    The workbook follows the governed BEFU26 extract layout (rows 1-65,
+    "YE June" columns, a Period row classifying ACTUAL vs forecast years),
+    so the extract module's row-to-series mapping reads it in reverse.
+    """
+    del signature
+    from openpyxl import load_workbook
+
+    workbook = load_workbook(_prebu_defer_workbook_path(), data_only=True, read_only=True)
+    try:
+        worksheet = workbook[workbook.sheetnames[0]]
+        grid = list(worksheet.iter_rows(values_only=True))
+    finally:
+        workbook.close()
+    header = grid[0] if grid else ()
+    year_columns: dict[int, int] = {}
+    for column_index, value in enumerate(header[1:], start=1):
+        if isinstance(value, (int, float)) and 1990 < float(value) < 2100:
+            year_columns[column_index] = int(value)
+    period_row = grid[1] if len(grid) > 1 else ()
+    period_by_year: dict[int, str] = {}
+    for column, fy in year_columns.items():
+        value = period_row[column] if column < len(period_row) else None
+        period_by_year[fy] = str(value or "").strip()
+    series: dict[str, pd.Series] = {}
+    for row_number, series_id in EXTRACT_ROW_SERIES.items():
+        if row_number - 1 >= len(grid):
+            continue
+        row_values = grid[row_number - 1]
+        values = {
+            fy: float(row_values[column])
+            for column, fy in year_columns.items()
+            if column < len(row_values) and isinstance(row_values[column], (int, float))
+        }
+        series[series_id] = pd.Series(values, dtype=float).sort_index()
+    return {"series": series, "period_by_year": period_by_year}
+
+
+def _prebu_defer_comparison_paths(
+    series_label: str, _pack: RevenueOutlookPack
+) -> tuple[pd.Series, pd.Series, str, str]:
+    """(forecast, history, unit, metric) for one series from the workbook.
+
+    History is the workbook's ACTUAL-classified years (through FY2026, the
+    PREBU26 seam); the forecast is every later year clipped to the FY2050
+    display horizon. Units and metric type come from the governed pack's own
+    rows for the same series label, since the workbook shares the extract's
+    unit conventions.
+    """
+    empty = (pd.Series(dtype=float), pd.Series(dtype=float), "", "")
+    signature = _prebu_defer_workbook_signature()
+    if signature is None:
+        return empty
+    frames = cached_prebu_defer_workbook_frames(signature)
+    rows = _pack.revenue_chart_rows
+    label_column = "series_label" if "series_label" in rows.columns else "stream_label"
+    matching = rows[rows[label_column].astype(str).eq(str(series_label))]
+    if matching.empty or "series_id" not in matching.columns:
+        return empty
+    series_id = str(matching["series_id"].astype(str).iloc[0])
+    values = frames["series"].get(series_id)
+    if values is None or values.empty:
+        return empty
+    period_by_year = frames["period_by_year"]
+    is_actual = values.index.map(
+        lambda fy: str(period_by_year.get(int(fy), "")).upper() == "ACTUAL"
+    )
+    history = values[is_actual]
+    forecast = values[~is_actual]
+    forecast = forecast[forecast.index <= _COMPARISON_HORIZON_END_FY]
+    unit = _first_non_empty(matching.get("value_unit", pd.Series(dtype=str)))
+    metric = _revenue_outlook_series_metric_type(rows, series_label)
+    return forecast, history, str(unit or ""), str(metric or "")
+
+
+def _prebu_defer_total_path_rows(
+    selected_series: str, pack: RevenueOutlookPack
+) -> pd.DataFrame:
+    """Display-only June-year chart rows for the reference workbook path.
+
+    Forecast years only: the workbook's ACTUAL-classified years duplicate the
+    grey history line, and the figure's handover connector already bridges
+    every forecast trace from the last published actual to its first point.
+    The rows deliberately carry no forecast_segment, so the path draws as one
+    continuous line with no post-model split - the workbook has no trained
+    cutoff.
+    """
+    forecast, _history, unit, _metric = _prebu_defer_comparison_paths(
+        selected_series, pack
+    )
+    if forecast.empty:
+        return pd.DataFrame()
+    years = [int(fy) for fy in forecast.index]
+    return pd.DataFrame(
+        {
+            "trace_name": PREBU_DEFER_TRACE_NAME,
+            "series_label": str(selected_series),
+            "stream_label": str(selected_series),
+            "time_grain": "june_year",
+            "period": [f"FY{fy}" for fy in years],
+            "june_year": years,
+            "value": [float(value) for value in forecast.to_numpy()],
+            "value_unit": str(unit or ""),
+            "scenario_name": "prebu_defer_reference_workbook",
+            "fed_path": "",
+            "row_type": "reference_workbook",
+            "value_status": "reference_workbook_display_only",
+        }
+    )
+
+
 @st.cache_data(show_spinner=False, max_entries=24)
 def cached_scenario_comparison_paths(
     signature: tuple[tuple[str, int, int], ...],
@@ -3628,6 +3889,11 @@ def cached_scenario_comparison_paths(
     """
 
     def _paths(sensitivity_key, ev_uptake_key, trace: str) -> tuple[pd.Series, pd.Series, str, str]:
+        # The external reference workbook is a display-only comparator: its
+        # side bypasses the governed view entirely and can never reach a
+        # scenario key, cache identity or governed frame.
+        if trace == PREBU_DEFER_TRACE_NAME:
+            return _prebu_defer_comparison_paths(series, _pack)
         # The MoT official scenario plots the governed official trace itself,
         # not the finalist base case with the overlays switched off (the raw
         # finalist petrol bridge keeps all petrol activity to 2050, which is
@@ -3647,12 +3913,17 @@ def cached_scenario_comparison_paths(
         # One view per SIDE, keyed on the total series so every component
         # fetch for the same configuration reuses it. The per-series rows are
         # cut from the view's final chart rows below, through the same gate.
+        # The selected vintage's official trace rides along so any June year
+        # it publishes with ACTUAL status (PREBU26 publishes FY2026 that way)
+        # can extend the grey history line to the true last actual.
+        official_trace = official_comparator_trace_name(selected_vid)
+        view_traces = tuple(dict.fromkeys(["Actual", official_trace, base_trace]))
         view = cached_revenue_outlook_view(
             signature,
             _SCENARIO_COMPARISON_TOTAL_SERIES,
             "june_year",
             fed_path,
-            ("Actual", base_trace),
+            view_traces,
             sensitivity_key,
             bridge_mode,
             ev_uptake_key,
@@ -3663,7 +3934,7 @@ def cached_scenario_comparison_paths(
             series,
             "june_year",
             fed_path,
-            ("Actual", base_trace),
+            view_traces,
             view["current_fed_policy_state"],
             pack_dir=str(_pack.output_dir),
         )
@@ -3674,6 +3945,22 @@ def cached_scenario_comparison_paths(
         is_actual = rows["row_type"].astype(str).eq("historical_actual")
         is_base = rows["trace_name"].astype(str).eq(base_trace)
         history = pd.Series(values[is_actual].to_numpy(), index=fy[is_actual].to_numpy()).dropna().sort_index()
+        # Published official ACTUALS extend the history for years the grey
+        # spine does not carry itself; a published historical actual always
+        # wins where both exist. Forecast extraction is untouched, so these
+        # points can never enter a delta, NPV or cumulative aggregate.
+        is_official_actual = rows["row_type"].astype(str).eq("official_comparator") & rows.get(
+            "value_status", pd.Series("", index=rows.index)
+        ).astype(str).eq("actual")
+        official_history = (
+            pd.Series(values[is_official_actual].to_numpy(), index=fy[is_official_actual].to_numpy())
+            .dropna()
+            .sort_index()
+        )
+        if not official_history.empty:
+            missing_years = official_history[~official_history.index.isin(history.index)]
+            if not missing_years.empty:
+                history = pd.concat([history, missing_years]).sort_index()
         forecast = pd.Series(values[is_base & ~is_actual].to_numpy(), index=fy[is_base & ~is_actual].to_numpy()).dropna().sort_index()
         unit = _first_non_empty(rows.get("value_unit", pd.Series(dtype=str)))
         metric = _revenue_outlook_series_metric_type(view["chart_rows"], series)
@@ -6365,9 +6652,10 @@ def _render_lever_accordion(
                 key="revenue_outlook_fed_policy_state",
                 help=(
                     "Scope: Base, High population and all Low/Medium/High conflict traces, including "
-                    "their modelled activity response. Original timing starts 1 Jan 2027; each deferral "
-                    "starts the 12c step 6-36 months later (1 Jul 2027 through 1 Jan 2030); no uplift "
-                    "removes the 12c step entirely. "
+                    "their modelled activity response. Original timing starts 1 Jan 2027; the "
+                    "six-month deferral starts the 12c step 1 Jul 2027; longer deferrals shift the "
+                    "entire staircase by their duration (initial step 1 Jan 2028 through 1 Jan 2030); "
+                    "no uplift removes the 12c step entirely. "
                     + FED_DEFERRAL_CATCH_UP_NOTE
                 ),
                 **_widget_default_kwargs(
@@ -6384,8 +6672,9 @@ def _render_lever_accordion(
                     key="revenue_outlook_mbu_fed_policy_state",
                     help=(
                         "Scope: MBU26 comparator only. The published source pack is never overwritten. "
-                        "Original timing starts 1 Jan 2027; each deferral starts the 12c step 6-36 "
-                        "months later; no uplift removes the 12c step entirely. "
+                        "Original timing starts 1 Jan 2027; the six-month deferral starts the 12c "
+                        "step 1 Jul 2027; longer deferrals shift the entire staircase by their "
+                        "duration; no uplift removes the 12c step entirely. "
                         + FED_DEFERRAL_CATCH_UP_NOTE
                     ),
                     **_widget_default_kwargs(
@@ -6680,10 +6969,11 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     default_fed_index = fed_path_options.index("Current planned path") if "Current planned path" in fed_path_options else 0
     trace_options = selector_options["trace_options"]
     fy_options = selector_options["fy_options"]
-    # FY2030 is the last MoT-forecast June year in the official vintages;
-    # beyond it the paths are extrapolation, so the selected-FY marker
-    # defaults to the window end.
-    default_fy_index = fy_options.index("FY2030") if "FY2030" in fy_options else max(len(fy_options) - 1, 0)
+    # FY2031 is the first post-model extrapolation June year under the
+    # PREBU26-era packs, so the selected-FY marker defaults to the
+    # econometric/extrapolation cutoff and coincides with the chart's
+    # post-model boundary line.
+    default_fy_index = fy_options.index("FY2031") if "FY2031" in fy_options else max(len(fy_options) - 1, 0)
 
     with st.container(border=True):
         controls_sub = (
@@ -6790,27 +7080,8 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                     trace_options, selected_trace_defaults
                 )
                 layer_labels = {spec.label: spec.layer_id for spec in layer_catalogue}
-                default_labels = [
-                    spec.label for spec in layer_catalogue if spec.default_selected
-                ]
                 st.markdown("<div class='control-label'>Show on chart</div>", unsafe_allow_html=True)
-                layer_default_kwargs = (
-                    {}
-                    if "revenue_outlook_chart_layers" in st.session_state
-                    else {"default": default_labels}
-                )
-                chosen_labels = st.multiselect(
-                    "Show on chart",
-                    list(layer_labels),
-                    key="revenue_outlook_chart_layers",
-                    label_visibility="collapsed",
-                    help=(
-                        "Paths are deterministic scenarios. The 50%/80% bands are "
-                        "conditional model forecast-error bands and exclude "
-                        "Treasury-driver forecast uncertainty."
-                    ),
-                    **layer_default_kwargs,
-                )
+                chosen_labels = _render_chart_layer_picker(layer_catalogue)
                 selected_layer_ids = [layer_labels[label] for label in chosen_labels if label in layer_labels]
                 if not selected_layer_ids:
                     selected_layer_ids = default_layer_ids(layer_catalogue)
@@ -6819,8 +7090,13 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 selected_band_layers = tuple(band_layer_ids(layer_catalogue, selected_layer_ids))
                 if not selected_traces:
                     selected_traces = selected_trace_defaults or list(trace_options[:1])
+                path_option_count = sum(
+                    1
+                    for spec in layer_catalogue
+                    if spec.layer_kind == LAYER_KIND_PATH
+                )
                 st.caption(
-                    _revenue_outlook_trace_selection_summary(selected_traces, len(trace_options))
+                    _revenue_outlook_trace_selection_summary(selected_traces, path_option_count)
                     + (f" · {len(selected_band_layers)} band layer(s)" if selected_band_layers else "")
                 )
         bridge_mode_lookup = selector_options["bridge_mode_lookup"]
@@ -7031,6 +7307,31 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 ]
                 if not wanted.empty:
                     plot_rows = pd.concat([filtered_rows, wanted], ignore_index=True, sort=False)
+        # Display-only reference workbook path: annual rows injected at plot
+        # time exactly like the optional VFM paths, so the governed view and
+        # every cache key stay untouched when the layer is off. The workbook
+        # is annual (governed BEFU26 extract layout), so the path is withheld
+        # at quarterly grain with a note instead of an invented series.
+        prebu_defer_annual_only_note = False
+        figure_signature = pack_signature
+        if PREBU_DEFER_TRACE_NAME in selected_traces:
+            if selected_time_grain == "quarterly":
+                prebu_defer_annual_only_note = True
+            else:
+                reference_rows = _prebu_defer_total_path_rows(selected_stream, pack)
+                if not reference_rows.empty:
+                    plot_rows = pd.concat(
+                        [plot_rows, reference_rows], ignore_index=True, sort=False
+                    )
+            workbook_signature = _prebu_defer_workbook_signature()
+            if workbook_signature is not None:
+                # The figure cache hashes the pack signature but not the row
+                # frame, so the workbook's own identity must ride along or a
+                # replaced file would keep serving the old line.
+                figure_signature = (
+                    *pack_signature,
+                    ("prebu_defer_workbook", *workbook_signature),
+                )
         timer.start("uncertainty lookup")
         uncertainty_series_id = _uncertainty_series_id_for_label(chart_rows, selected_stream)
         # Modelled uncertainty is governed at June-year grain only: the draws,
@@ -7061,7 +7362,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             band_layers_for_figure = tuple(selected_band_layers)
         timer.stop("uncertainty lookup")
         main_path_figure = cached_revenue_outlook_total_path_figure(
-            pack_signature,
+            figure_signature,
             selected_stream,
             selected_fy,
             selected_time_grain,
@@ -7077,6 +7378,11 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         )
         timer.stop("main path figure")
         total_path_notes = [display_horizon_note()]
+        if prebu_defer_annual_only_note:
+            total_path_notes.append(
+                f"{PREBU_DEFER_TRACE_NAME} publishes June years only, so it is "
+                "not drawn on the quarterly grain."
+            )
         short_current_note = _current_path_coverage_note(plot_rows, selected_stream)
         if short_current_note:
             total_path_notes.append(short_current_note)
@@ -7207,11 +7513,6 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                     "efficiency and PT mode shift."
                 ),
             )
-            if extract_result.skipped_traces:
-                st.caption(
-                    "Extract skips traces without a governed scenario path: "
-                    + ", ".join(extract_result.skipped_traces)
-                )
 
     if not compare_mode and method_detail_enabled() and st.toggle(
         "Show forecast-uncertainty fan detail",
@@ -7982,10 +8283,12 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                         "the six 12c deferrals (6 to 36 months, starting 1 July 2027 through 1 January 2030), "
                         "and no 12c uplift. FY2027 is the year ending "
                         "June 2027, so every deferral equals no-uplift in FY2027; original timing "
-                        "differs because it applies for January-June 2027. Only the initial 12c/L wedge is "
-                        "deferred: later scheduled increases retain their published dates, so a deferred path "
-                        "catches up to the published rate at its selected start date, and a larger one-quarter "
-                        "increase can occur where catch-up coincides with another scheduled increase. The policy paths "
+                        "differs because it applies for January-June 2027. The six-month deferral moves only "
+                        "the initial 12c/L wedge - later scheduled increases retain their published dates and "
+                        "the path catches up at 1 July 2027 - while every longer deferral shifts the entire "
+                        "legislated staircase by its duration. The official staircase adds +4c/L every calendar "
+                        "year with no terminal step, so shifted paths never catch up: each deferred year leaves "
+                        "the rate 4c/L below original timing in every later year. The policy paths "
                         "carry the FED wedge into PED retail prices, apply the FED-rate percentage change to "
                         "Light/Heavy RUC rates and all five RUC collection classes, and apply the governed medium "
                         "retail-diesel elasticity once to a combined diesel-plus-RUC running-cost ratio for conventional "
@@ -9903,11 +10206,14 @@ def _render_comparison_scenario_column(
     # Each side selects a governed scenario TRACE from the committed pack; the
     # fleet composition stays on the governed VFM Base default underneath, so
     # the A/B choice is the scenario story, not the class-split machinery.
+    # The PREBU26 deferral reference workbook rides along as a display-only
+    # comparator whenever it is deployed.
     scenario_options = [
         "Current finalist Base case",
         "Current finalist High population/comparison",
         *CONFLICT_TRACE_NAMES,
         mot_option,
+        *([PREBU_DEFER_TRACE_NAME] if _prebu_defer_workbook_signature() is not None else []),
     ]
     keys = {
         name: f"ro_cmp_{prefix}_{name}"
@@ -9926,14 +10232,22 @@ def _render_comparison_scenario_column(
         ),
     )
     mot_official = selected_scenario == mot_option
+    external_workbook = selected_scenario == PREBU_DEFER_TRACE_NAME
+    levers_locked = mot_official or external_workbook
     if mot_official:
         st.caption(f"Pure {selected_release} official path - non-rate levers locked.")
+    if external_workbook:
+        st.caption(
+            "Display-only comparator from references/PREBU defer.xlsx "
+            f"({selected_release} with deferred 12c timing) - levers locked; "
+            "outside the governed pipeline."
+        )
     levels = list(_COMPARISON_SENSITIVITY_LEVELS)
     for name in ("fleet", "pt", "freight"):
         _validated_select_state(keys[name], levels, defaults[name])
         st.session_state.setdefault(keys[name], defaults[name])
     fleet = st.selectbox(
-        "Fleet efficiency", levels, key=keys["fleet"], disabled=mot_official,
+        "Fleet efficiency", levels, key=keys["fleet"], disabled=levers_locked,
         format_func=lambda level: sensitivity_labels["fleet_efficiency"].get(level, str(level)),
     )
     # PT and freight are first-class governed levers (continuous through
@@ -9941,11 +10255,11 @@ def _render_comparison_scenario_column(
     # never mirror an A-side PT selection and "Reset B to A" silently
     # diverged on exactly the lever it claimed to copy.
     pt_shift = st.selectbox(
-        "PT mode shift", levels, key=keys["pt"], disabled=mot_official,
+        "PT mode shift", levels, key=keys["pt"], disabled=levers_locked,
         format_func=lambda level: sensitivity_labels["pt_mode_shift"].get(level, str(level)),
     )
     freight = st.selectbox(
-        "Freight rail shift", levels, key=keys["freight"], disabled=mot_official,
+        "Freight rail shift", levels, key=keys["freight"], disabled=levers_locked,
         format_func=lambda level: sensitivity_labels["freight_rail_shift"].get(level, str(level)),
     )
     eruc_values: tuple[float, ...] = ()
@@ -9953,8 +10267,18 @@ def _render_comparison_scenario_column(
     # While method detail is hidden the e-RUC transition is withdrawn from the
     # A/B columns and both scenarios compare without it.
     eruc_on = method_detail_enabled() and st.toggle(
-        "e-RUC transition", key=keys["eruc"], help=ERUC_NOTE, disabled=mot_official
+        "e-RUC transition", key=keys["eruc"], help=ERUC_NOTE, disabled=levers_locked
     )
+    if external_workbook:
+        # The workbook side bypasses the governed view; the returned keys are
+        # the locked official clone purely so the cache key stays typed and
+        # page-inherited. The trace name is what selects the workbook path.
+        sensitivity_key, ev_uptake_key, _official_trace = _comparison_official_scenario_keys(
+            page_uptake_key,
+            official_policy_state=FED_POLICY_PUBLISHED,
+            selected_vid=selected_vid,
+        )
+        return sensitivity_key, ev_uptake_key, PREBU_DEFER_TRACE_NAME
     if eruc_on and not mot_official:
         with st.popover("e-RUC levers", use_container_width=True):
             start = st.number_input("Start FY", min_value=2026, max_value=2045, value=2027, step=1, key=f"ro_cmp_{prefix}_eruc_start")
@@ -9979,9 +10303,10 @@ def _render_comparison_scenario_column(
                 format_func=lambda state: FED_POLICY_LABELS[str(state)],
                 key=official_policy_key,
                 help=(
-                    "Original timing starts 1 Jan 2027; each deferral starts the 12c "
-                    "step 6-36 months later; no uplift removes the 12c step entirely. "
-                    "Scope: MBU26 official comparator only. "
+                    "Original timing starts 1 Jan 2027; the six-month deferral starts "
+                    "the 12c step 1 Jul 2027; longer deferrals shift the entire "
+                    "staircase by their duration; no uplift removes the 12c step "
+                    "entirely. Scope: MBU26 official comparator only. "
                     + FED_DEFERRAL_CATCH_UP_NOTE
                 ),
             )
@@ -10006,8 +10331,9 @@ def _render_comparison_scenario_column(
         format_func=lambda state: FED_POLICY_LABELS[str(state)],
         key=keys["fed_policy"],
         help=(
-            "Original timing starts 1 Jan 2027; each deferral starts the 12c step "
-            "6-36 months later; no uplift removes the 12c step entirely. "
+            "Original timing starts 1 Jan 2027; the six-month deferral starts the "
+            "12c step 1 Jul 2027; longer deferrals shift the entire staircase by "
+            "their duration; no uplift removes the 12c step entirely. "
             "Scope: Selected current scenario only. " + FED_DEFERRAL_CATCH_UP_NOTE
         ),
     )
@@ -10021,17 +10347,6 @@ def _render_comparison_scenario_column(
         fed_policy_state=fed_policy_state,
     )
     return sensitivity_key, ev_uptake_key, selected_scenario
-
-
-def _page_scenario_trace_name(page_uptake_key: ScenarioKeyLike) -> str:
-    """The trace the Single scenario configuration plots as its scenario."""
-    mode = _scenario_key(page_uptake_key).uptake_basis
-    selected_vid, _ = _official_vintage_scope(page_uptake_key)
-    return (
-        official_comparator_trace_name(selected_vid)
-        if mode == EV_UPTAKE_GOVERNED_OPTION
-        else "Current finalist Base case"
-    )
 
 
 def _comparison_sensitivity_key_from_page(
@@ -10151,43 +10466,191 @@ def _comparison_alignment_gate(
     return ""
 
 
-def _reset_scenario_b_to_current_page() -> None:
-    """Seed the Scenario B controls from the live Single scenario configuration."""
-    st.session_state["ro_cmp_b_trace"] = "Current finalist Base case"
-    for target, source in [
-        ("ro_cmp_b_fleet", "revenue_outlook_sensitivity_fleet_efficiency"),
-        ("ro_cmp_b_pt", "revenue_outlook_sensitivity_pt_mode_shift"),
-    ]:
-        level = str(st.session_state.get(source, "Off"))
-        st.session_state[target] = level if level in _COMPARISON_SENSITIVITY_LEVELS else "Off"
-    freight_level = "Off"
-    if bool(st.session_state.get("revenue_outlook_sensitivity_freight_rail_toggle", False)):
-        candidate = str(st.session_state.get("revenue_outlook_sensitivity_freight_rail_shift", "Med"))
-        freight_level = candidate if candidate in _COMPARISON_SENSITIVITY_LEVELS else "Med"
-    st.session_state["ro_cmp_b_freight"] = freight_level
-    eruc_on = method_detail_enabled() and bool(st.session_state.get("revenue_outlook_eruc_toggle", False))
-    st.session_state["ro_cmp_b_eruc"] = eruc_on
-    if eruc_on:
-        for target, source, fallback in [
-            ("ro_cmp_b_eruc_start", "eruc_lever_start", 2027),
-            ("ro_cmp_b_eruc_phase", "eruc_lever_phase", 3),
-            ("ro_cmp_b_eruc_ratio", "eruc_lever_ratio", 100.0),
-            ("ro_cmp_b_eruc_elasticity", "eruc_lever_elasticity", -0.15),
-            ("ro_cmp_b_eruc_pump", "eruc_lever_pump", 2.70),
+# The A/B comparison window is PRESENTATION state: it filters already-computed
+# annual rows before aggregation and is deliberately not part of
+# RevenueScenarioComputationKey or any cache identity, because it changes no
+# scenario calculation.
+_COMPARISON_WINDOW_STATE_KEY = "ro_cmp_fy_window"
+
+
+def _comparison_fy_window_bounds(
+    a: pd.Series,
+    b: pd.Series,
+    *,
+    start_floor_fy: int = _COMPARISON_HORIZON_START_FY,
+) -> tuple[int, int] | None:
+    """The common A/B June-year horizon the comparison window can select from.
+
+    Derived from the years both sides actually publish inside the comparison
+    horizon - never hard-coded - so a shorter pack simply narrows the offered
+    range. ``start_floor_fy`` carries the selected official vintage's
+    presentation seam (``_comparison_horizon_start_fy``): under PREBU26 the
+    Current FY2026 point is a masked chart anchor, not a forecast, so the
+    window can never offer it and no pre-seam value can enter an aggregate.
+    Returns ``None`` when the sides share no June year.
+    """
+
+    def _years(path: pd.Series) -> set[int]:
+        years = pd.to_numeric(pd.Series(path.index), errors="coerce").dropna().astype(int)
+        return {
+            int(year)
+            for year in years.unique()
+            if int(start_floor_fy) <= year <= _COMPARISON_HORIZON_END_FY
+        }
+
+    common = _years(a) & _years(b)
+    if not common:
+        return None
+    return (min(common), max(common))
+
+
+def _clamp_comparison_fy_window(selected: Any, bounds: tuple[int, int]) -> tuple[int, int]:
+    """Clamp a persisted (start, end) window into the current bounds.
+
+    Never raises: a malformed, reversed or out-of-range selection - e.g. one
+    persisted before a scenario/series change shrank the common horizon -
+    falls back to the nearest legal window, or the full range when the two do
+    not intersect at all.
+    """
+    lower_fy, upper_fy = int(bounds[0]), int(bounds[1])
+    try:
+        start_fy, end_fy = int(selected[0]), int(selected[-1])
+    except (TypeError, ValueError, IndexError, KeyError):
+        return (lower_fy, upper_fy)
+    if start_fy > end_fy:
+        start_fy, end_fy = end_fy, start_fy
+    if end_fy < lower_fy or start_fy > upper_fy:
+        # No overlap with the new horizon at all: the old window is
+        # meaningless there, so fall back to the full range.
+        return (lower_fy, upper_fy)
+    return (max(start_fy, lower_fy), min(end_fy, upper_fy))
+
+
+def _comparison_fy_window_slice(path: pd.Series, start_fy: int, end_fy: int) -> pd.Series:
+    """The annual rows inside [start_fy, end_fy], selected by June-year index.
+
+    A pure filter over the already-computed series: values are never rescaled,
+    re-anchored or recomputed, so every year that survives is byte-identical
+    to the unwindowed path.
+    """
+    if path is None or len(path) == 0:
+        return pd.Series(dtype=float)
+    years = pd.to_numeric(pd.Series(path.index), errors="coerce")
+    mask = ((years >= int(start_fy)) & (years <= int(end_fy))).to_numpy()
+    return path[mask]
+
+
+def _comparison_fy_window_label(start_fy: int, end_fy: int) -> str:
+    if int(start_fy) == int(end_fy):
+        return f"FY{int(start_fy)}"
+    return f"FY{int(start_fy)}–FY{int(end_fy)}"
+
+
+def _series_fy_span(values_by_fy: pd.Series) -> tuple[int, int]:
+    """(min, max) June year of an FY-indexed series; horizon constants if empty."""
+    if values_by_fy is None or len(values_by_fy) == 0:
+        return (_COMPARISON_HORIZON_START_FY, _COMPARISON_HORIZON_END_FY)
+    years = pd.to_numeric(pd.Series(values_by_fy.index), errors="coerce").dropna().astype(int)
+    if years.empty:
+        return (_COMPARISON_HORIZON_START_FY, _COMPARISON_HORIZON_END_FY)
+    return int(years.min()), int(years.max())
+
+
+def _render_comparison_window_control(bounds: tuple[int, int]) -> tuple[int, int]:
+    """The two-handle June-year selector for the A/B analysis window.
+
+    The widget's kwargs are CONSTANT for a given horizon: the full-range
+    tuple default locks select_slider into range mode (without a tuple
+    default it registers single-valued and collapses incoming range state to
+    a scalar), and constant kwargs keep the widget identity stable so a drag
+    can never land on a remounted widget and snap back. Session state is
+    never written here - an assignment would stamp an API-set value that
+    overrides the very next drag - so the widget owns its own key; a stored
+    value the current options cannot represent (stale deployment or injected
+    state) is deleted before instantiation, resetting to the full range
+    instead of raising.
+    """
+    lower_fy, upper_fy = int(bounds[0]), int(bounds[1])
+    stored = st.session_state.get(_COMPARISON_WINDOW_STATE_KEY)
+    if stored is not None:
+        try:
+            stored_pair = (int(stored[0]), int(stored[-1]))
+            valid = len(stored) == 2 and stored_pair == _clamp_comparison_fy_window(
+                stored, (lower_fy, upper_fy)
+            )
+        except (TypeError, ValueError, IndexError, KeyError):
+            valid = False
+        if not valid:
+            del st.session_state[_COMPARISON_WINDOW_STATE_KEY]
+    start_fy, end_fy = st.select_slider(
+        "Comparison window",
+        options=list(range(lower_fy, upper_fy + 1)),
+        value=(lower_fy, upper_fy),
+        key=_COMPARISON_WINDOW_STATE_KEY,
+        format_func=lambda fy: f"FY{int(fy)}",
+        help=(
+            "June-year window for every A/B card, chart and bridge below. "
+            "Cumulative and NPV figures sum only the selected years' cash "
+            "flows; the NPV keeps the existing FY2026 discount base and "
+            "MBCM curve - factors are not rebased to the window start."
+        ),
+    )
+    return (int(start_fy), int(end_fy))
+
+
+def _reset_scenario_columns_to_current_page() -> None:
+    """Seed both comparison columns from the live Single scenario configuration."""
+    for prefix in ("a", "b"):
+        st.session_state[f"ro_cmp_{prefix}_trace"] = "Current finalist Base case"
+        for target, source in [
+            (f"ro_cmp_{prefix}_fleet", "revenue_outlook_sensitivity_fleet_efficiency"),
+            (f"ro_cmp_{prefix}_pt", "revenue_outlook_sensitivity_pt_mode_shift"),
         ]:
-            st.session_state[target] = st.session_state.get(source, fallback)
-    st.session_state["ro_cmp_b_fed_policy"] = _session_fed_policy_state(
-        "revenue_outlook_fed_policy_state",
-        legacy_toggle_key="revenue_outlook_fed_uplift",
-    )
-    # B's synthetic official counterfactual mirrors the page too; leaving it
-    # at a stale prior selection would silently diverge from A on exactly the
-    # control this reset claims to copy.
-    st.session_state["ro_cmp_b_official_policy"] = _session_fed_policy_state(
-        "revenue_outlook_mbu_fed_policy_state",
-        legacy_toggle_key="revenue_outlook_mbu_fed_uplift",
-        default=FED_POLICY_PUBLISHED,
-    )
+            level = str(st.session_state.get(source, "Off"))
+            st.session_state[target] = level if level in _COMPARISON_SENSITIVITY_LEVELS else "Off"
+        freight_level = "Off"
+        if bool(st.session_state.get("revenue_outlook_sensitivity_freight_rail_toggle", False)):
+            candidate = str(st.session_state.get("revenue_outlook_sensitivity_freight_rail_shift", "Med"))
+            freight_level = candidate if candidate in _COMPARISON_SENSITIVITY_LEVELS else "Med"
+        st.session_state[f"ro_cmp_{prefix}_freight"] = freight_level
+        eruc_on = method_detail_enabled() and bool(st.session_state.get("revenue_outlook_eruc_toggle", False))
+        st.session_state[f"ro_cmp_{prefix}_eruc"] = eruc_on
+        if eruc_on:
+            for target, source, fallback in [
+                (f"ro_cmp_{prefix}_eruc_start", "eruc_lever_start", 2027),
+                (f"ro_cmp_{prefix}_eruc_phase", "eruc_lever_phase", 3),
+                (f"ro_cmp_{prefix}_eruc_ratio", "eruc_lever_ratio", 100.0),
+                (f"ro_cmp_{prefix}_eruc_elasticity", "eruc_lever_elasticity", -0.15),
+                (f"ro_cmp_{prefix}_eruc_pump", "eruc_lever_pump", 2.70),
+            ]:
+                st.session_state[target] = st.session_state.get(source, fallback)
+        st.session_state[f"ro_cmp_{prefix}_fed_policy"] = _session_fed_policy_state(
+            "revenue_outlook_fed_policy_state",
+            legacy_toggle_key="revenue_outlook_fed_uplift",
+        )
+        # The synthetic official counterfactual mirrors the page too; leaving
+        # it at a stale prior selection would silently diverge from the page on
+        # exactly the control this reset claims to copy.
+        st.session_state[f"ro_cmp_{prefix}_official_policy"] = _session_fed_policy_state(
+            "revenue_outlook_mbu_fed_policy_state",
+            legacy_toggle_key="revenue_outlook_mbu_fed_uplift",
+            default=FED_POLICY_PUBLISHED,
+        )
+
+
+def _comparison_side_labels(trace_a: str, trace_b: str) -> tuple[str, str]:
+    """Display names for the two comparison sides: the SELECTED scenarios.
+
+    Every A/B label on the cards, charts and hovers carries the scenario the
+    reader actually picked. Identical selections (same trace compared under
+    different levers) get an A/B suffix so the legend, hovers and cards stay
+    distinguishable.
+    """
+    label_a = str(trace_a).strip() or "Scenario A"
+    label_b = str(trace_b).strip() or "Scenario B"
+    if label_a == label_b:
+        return f"{label_a} (A)", f"{label_b} (B)"
+    return label_a, label_b
 
 
 def _scenario_summary_text(
@@ -10232,14 +10695,15 @@ def _render_scenario_comparison_panel(
     page_sensitivity_key: tuple,
     page_uptake_key: ScenarioKeyLike,
 ) -> None:
-    """A vs B where A IS the live Single scenario computation.
+    """A vs B where BOTH sides are independently configurable clones.
 
-    Scenario A carries the page's own typed keys, untouched, so it cannot
-    drift from the Single scenario chart; Scenario B clones those keys and
-    overrides only the dimensions its controls expose. Both sides then route
-    through the canonical final view, and this panel only extracts, aligns
-    and draws - it applies no policy, vintage or lever transformations of
-    its own.
+    Each column clones the page's typed keys and overrides only the
+    dimensions its controls expose (scenario trace, fleet, PT, freight,
+    12c policy and, under method detail, e-RUC), so either side can select
+    any governed scenario without drifting from the page's other
+    ingredients. Both sides then route through the canonical final view,
+    and this panel only extracts, aligns and draws - it applies no policy,
+    vintage or lever transformations of its own.
     """
     with st.container(border=True):
         comparison_sub = (
@@ -10268,32 +10732,30 @@ def _render_scenario_comparison_panel(
                 if discount_mode == _COMPARISON_DISCOUNT_CUSTOM:
                     custom_rate = st.number_input("Rate (% p.a.)", min_value=0.5, max_value=10.0, value=4.0, step=0.5, key="ro_cmp_discount_rate") / 100.0
             with head_cols[3]:
-                st.markdown("<div class='control-label'>Scenario B seed</div>", unsafe_allow_html=True)
+                st.markdown("<div class='control-label'>Scenario seed</div>", unsafe_allow_html=True)
                 st.button(
-                    "Reset B to current page (A)",
-                    on_click=_reset_scenario_b_to_current_page,
+                    "Reset A & B to current page",
+                    on_click=_reset_scenario_columns_to_current_page,
                     key="ro_cmp_reset_b",
                     help=(
-                        "Seeds the Scenario B controls from the live Single scenario "
-                        "configuration, so B starts identical to A."
+                        "Seeds both scenario columns from the live Single scenario "
+                        "configuration, so A and B start identical."
                     ),
                     use_container_width=True,
                 )
 
-            # Scenario A is the live Single scenario computation itself - the
-            # page's typed keys pass through untouched, so A can never be a
-            # stale or partial copy of the page settings.
-            sens_a, uptake_a = page_sensitivity_key, page_uptake_key
-            trace_a = _page_scenario_trace_name(page_uptake_key)
+            # BOTH columns clone the page's typed computation key and override
+            # only the dimensions their controls expose, so either side can
+            # select any governed scenario without quietly rebuilding it from
+            # different ingredients than the page itself uses. A defaults to
+            # the Base path with every lever Off - the page's own default - so
+            # the default comparison is unchanged.
             column_a, column_b = st.columns(2)
             with column_a:
                 st.markdown("<div class='ro-cmp-scenario-head ro-cmp-a'>Scenario A</div>", unsafe_allow_html=True)
-                st.markdown("**Current Single scenario configuration**")
-                st.markdown(_scenario_summary_text(sens_a, uptake_a, trace_a))
-                st.caption(
-                    "Scenario A mirrors the Single scenario view exactly, so it "
-                    "cannot drift from the chart there. Adjust it on the Single "
-                    "scenario view."
+                sens_a, uptake_a, trace_a = _render_comparison_scenario_column(
+                    "a", sensitivity_labels, official_vintage_state,
+                    page_sensitivity_key, page_uptake_key,
                 )
             with column_b:
                 st.markdown("<div class='ro-cmp-scenario-head ro-cmp-b'>Scenario B</div>", unsafe_allow_html=True)
@@ -10327,6 +10789,9 @@ def _render_scenario_comparison_panel(
                 ("Series", str(comparison_series)),
             ]
         )
+        # The selected scenarios name their own sides everywhere below: cards,
+        # legends, hovers and waterfall bars all carry the dropdown choices.
+        label_a, label_b = _comparison_side_labels(trace_a, trace_b)
         comparison_start_fy = _comparison_horizon_start_fy(page_uptake_key)
         alignment_gate = _comparison_alignment_gate(
             a_path, b_path, horizon_start_fy=comparison_start_fy
@@ -10337,42 +10802,86 @@ def _render_scenario_comparison_panel(
             warning_panel(alignment_gate)
             chart_card(
                 "Scenario paths (A vs B)",
-                "Shared history in grey; Scenario A solid navy, Scenario B dashed orange. Same governed pipeline as the total path chart.",
-                _scenario_comparison_figure(result["history"], a_path, b_path, result["value_unit"]),
+                f"Shared history in grey; {label_a} (A) solid navy, {label_b} (B) dashed orange. Same governed pipeline as the total path chart.",
+                _scenario_comparison_figure(
+                    result["history"], a_path, b_path, result["value_unit"],
+                    label_a=label_a, label_b=label_b,
+                ),
                 caption=None,
                 notes_as_tooltip=True,
             )
             return
+        window_bounds = _comparison_fy_window_bounds(
+            a_path, b_path, start_floor_fy=comparison_start_fy
+        )
+        if window_bounds is None:
+            warning_panel(
+                "Comparison horizon gate: the scenarios share no June years inside "
+                f"FY{int(comparison_start_fy)}-FY{_COMPARISON_HORIZON_END_FY}."
+            )
+            return
+        # A partial-width column: a range spanning the full page reads as a
+        # page-level scrubber rather than one control among the selectors.
+        window_columns = st.columns([0.44, 0.56])
+        with window_columns[0]:
+            start_fy, end_fy = _render_comparison_window_control(window_bounds)
+        full_window = (start_fy, end_fy) == window_bounds
+        window_text = _comparison_fy_window_label(start_fy, end_fy)
+        # Presentation-side filter: the annual rows are selected AFTER the
+        # governed computation, so scenario keys, cached views and every
+        # underlying annual value are untouched by the window.
+        a_window = _comparison_fy_window_slice(a_path, start_fy, end_fy)
+        b_window = _comparison_fy_window_slice(b_path, start_fy, end_fy)
+        rate_for_npv = None if discount_mode == _COMPARISON_DISCOUNT_MBCM else custom_rate
         gov_kpi_grid(
             _scenario_comparison_cards(
                 comparison_series,
                 result["metric_type"],
-                a_path,
-                b_path,
+                a_window,
+                b_window,
                 result["value_unit"],
-                None if discount_mode == _COMPARISON_DISCOUNT_MBCM else custom_rate,
+                rate_for_npv,
                 horizon_start_fy=comparison_start_fy,
+                label_a=label_a,
+                label_b=label_b,
             )
+        )
+        paths_note = (
+            f"Shared history in grey; {label_a} (A) solid navy, {label_b} (B) dashed orange. "
+            "Same governed pipeline as the total path chart."
         )
         chart_card(
             "Scenario paths (A vs B)",
-            "Shared history in grey; Scenario A solid navy, Scenario B dashed orange. Same governed pipeline as the total path chart.",
-            _scenario_comparison_figure(result["history"], a_path, b_path, result["value_unit"]),
+            paths_note if full_window else f"{paths_note} Comparison window {window_text}.",
+            _scenario_comparison_figure(
+                result["history"],
+                # The full window keeps the history and any pre-forecast
+                # anchor for chart continuity, exactly as before the window
+                # existed; a narrowed window zooms the axis to only the
+                # selected June years.
+                a_path if full_window else a_window,
+                b_path if full_window else b_window,
+                result["value_unit"],
+                x_window=None if full_window else (start_fy, end_fy),
+                label_a=label_a,
+                label_b=label_b,
+            ),
             caption=None,
             notes_as_tooltip=True,
         )
         if result["metric_type"] == "revenue":
-            rate_for_npv = None if discount_mode == _COMPARISON_DISCOUNT_MBCM else custom_rate
             basis_note = mbcm_label() if rate_for_npv is None else f"Single rate {rate_for_npv:.1%} p.a."
-            npv_a = npv_to_horizon(a_path, rate=rate_for_npv)
-            npv_b = npv_to_horizon(b_path, rate=rate_for_npv)
+            npv_a = npv_to_horizon(a_window, rate=rate_for_npv)
+            npv_b = npv_to_horizon(b_window, rate=rate_for_npv)
             if comparison_series == _SCENARIO_COMPARISON_TOTAL_SERIES:
                 # The by-stream views read in nominal (undiscounted) terms:
                 # rate 0.0 reuses the NPV helpers' FY2026 anchor filtering
                 # while leaving every dollar undiscounted, so the bridge total
-                # ties to the Cumulative nominal delta card.
-                nominal_a = npv_to_horizon(a_path, rate=0.0)
-                nominal_b = npv_to_horizon(b_path, rate=0.0)
+                # ties to the Cumulative nominal delta card. Every side and
+                # component is cut to the same comparison window BEFORE
+                # aggregation, so the decomposition closes inside the window.
+                nominal_a = npv_to_horizon(a_window, rate=0.0)
+                nominal_b = npv_to_horizon(b_window, rate=0.0)
                 component_totals = {
                     component_series: _scenario_component_npv(
                         cached_scenario_comparison_paths(
@@ -10382,6 +10891,7 @@ def _render_scenario_comparison_panel(
                             trace_a=trace_a, trace_b=trace_b,
                         ),
                         0.0,
+                        window=(start_fy, end_fy),
                     )
                     for component_series in _SCENARIO_COMPONENT_FETCH_SERIES
                 }
@@ -10399,7 +10909,8 @@ def _render_scenario_comparison_panel(
                     )
                     return
                 composition_figure = _scenario_npv_composition_figure(
-                    components, result["value_unit"]
+                    components, result["value_unit"],
+                    label_a=label_a, label_b=label_b,
                 )
                 # Side by side, the bridge matches the by-stream chart's
                 # stream-count-driven height so the row reads as one block.
@@ -10408,12 +10919,12 @@ def _render_scenario_comparison_panel(
                 with stream_col:
                     chart_card(
                         "Nominal revenue by stream (A vs B)",
-                        "Each revenue stream's cumulative nominal revenue to FY2050 under Scenario A "
-                        "(navy) and Scenario B (orange), largest stream first, all streams recomputed "
+                        f"Each revenue stream's cumulative nominal revenue over {window_text} under {label_a} "
+                        f"(A, navy) and {label_b} (B, orange), largest stream first, all streams recomputed "
                         "through that scenario's levers. Heavy & other RUC is the RUC rollup less the "
                         "light classes (heavy BEVs pay the same per-km RUC, so heavy electrification "
                         "reshuffles within this block); TUC & other closes the governed NLTF identity. "
-                        "Undiscounted, FY2026 base.",
+                        f"Undiscounted, June years {window_text}.",
                         composition_figure,
                         caption=None,
                         notes_as_tooltip=True,
@@ -10425,10 +10936,11 @@ def _render_scenario_comparison_panel(
                         "the scenarios: component deltas accumulate from zero to the total nominal "
                         "delta, so gains in one stream (green) and losses in another (red) net out to "
                         "the Cumulative nominal delta card. Streams moving less than $1m are omitted. "
-                        "Undiscounted, FY2026 base.",
+                        f"Undiscounted, June years {window_text}.",
                         _scenario_npv_component_bridge_figure(
                             nominal_a, nominal_b, components, result["value_unit"],
                             metric_label="Nominal", height=row_height,
+                            label_a=label_a, label_b=label_b,
                         ),
                         caption=None,
                         notes_as_tooltip=True,
@@ -10436,8 +10948,11 @@ def _render_scenario_comparison_panel(
             else:
                 chart_card(
                     "NPV bridge (A to B)",
-                    "NPV to FY2050 from an FY2026 base. " + basis_note,
-                    _scenario_npv_waterfall_figure(npv_a, npv_b, result["value_unit"]),
+                    f"NPV of June-year cash flows {window_text} from an FY2026 base. " + basis_note,
+                    _scenario_npv_waterfall_figure(
+                        npv_a, npv_b, result["value_unit"],
+                        label_a=label_a, label_b=label_b,
+                    ),
                     caption=None,
                     notes_as_tooltip=True,
                 )
@@ -10473,6 +10988,8 @@ def _scenario_comparison_cards(
     value_unit: str,
     discount_rate: float | None,
     horizon_start_fy: int = _COMPARISON_HORIZON_START_FY,
+    label_a: str = "Scenario A",
+    label_b: str = "Scenario B",
 ) -> list[tuple]:
     """Adaptive KPI cards: NPV language for revenue, physical totals otherwise.
 
@@ -10484,6 +11001,11 @@ def _scenario_comparison_cards(
     a = a[a.index >= int(horizon_start_fy)] if len(a) else a
     b = b[b.index >= int(horizon_start_fy)] if len(b) else b
     horizon = horizon_label(a if len(a) else b)
+    # The card labels follow the (possibly windowed) series they summarise, so
+    # a narrowed comparison window renames "to FY2050" and the NPV subtitle
+    # names the exact June-year range alongside the unchanged FY2026 base.
+    _, window_end_fy = _series_fy_span(a if len(a) else b)
+    window_text = _comparison_fy_window_label(*_series_fy_span(a if len(a) else b))
     is_intensity = "per capita" in label.lower() or "per capita" in str(value_unit).lower()
     if metric_type == "revenue":
         npv_a = npv_to_horizon(a, rate=discount_rate)
@@ -10495,27 +11017,27 @@ def _scenario_comparison_cards(
         pct = f"{delta / npv_a:+.1%} vs A" if npv_a else "-"
         cum_pct = f"{cum_delta / cum_a:+.1%} vs A" if cum_a else "-"
         return [
-            ("Scenario A - Cumulative nominal to FY2050", _format_scenario_amount(cum_a, value_unit), f"{horizon}, undiscounted", "-", "neutral", "A"),
-            ("Scenario B - Cumulative nominal to FY2050", _format_scenario_amount(cum_b, value_unit), f"{horizon}, undiscounted", "-", "neutral", "B"),
+            (f"{label_a} - Cumulative nominal to FY{window_end_fy}", _format_scenario_amount(cum_a, value_unit), f"{horizon}, undiscounted", "-", "neutral", "A"),
+            (f"{label_b} - Cumulative nominal to FY{window_end_fy}", _format_scenario_amount(cum_b, value_unit), f"{horizon}, undiscounted", "-", "neutral", "B"),
             ("Cumulative nominal delta (B - A)", _format_scenario_amount(cum_delta, value_unit, signed=True), f"{horizon}, undiscounted", cum_pct, _scenario_delta_tone(cum_delta), "Σ"),
-            ("NPV delta (B - A)", _format_scenario_amount(delta, value_unit, signed=True), f"{basis}; FY2026 base", pct, _scenario_delta_tone(delta), "Δ"),
+            ("NPV delta (B - A)", _format_scenario_amount(delta, value_unit, signed=True), f"{window_text}, {basis}; FY2026 base", pct, _scenario_delta_tone(delta), "Δ"),
         ]
     if is_intensity:
         avg_a, avg_b = average_annual(a), average_annual(b)
         delta = avg_b - avg_a
         end_delta = (b.iloc[-1] - a.iloc[-1]) if len(a) and len(b) else float("nan")
         return [
-            ("Scenario A - average annual level", _format_scenario_amount(avg_a, value_unit), horizon, "-", "neutral", "A"),
-            ("Scenario B - average annual level", _format_scenario_amount(avg_b, value_unit), horizon, "-", "neutral", "B"),
+            (f"{label_a} - average annual level", _format_scenario_amount(avg_a, value_unit), horizon, "-", "neutral", "A"),
+            (f"{label_b} - average annual level", _format_scenario_amount(avg_b, value_unit), horizon, "-", "neutral", "B"),
             ("Average level delta (B - A)", _format_scenario_amount(delta, value_unit, signed=True), horizon, "-", _scenario_delta_tone(delta), "Δ"),
-            ("FY2050 delta (B - A)", _format_scenario_amount(end_delta, value_unit, signed=True), "end of horizon", "-", _scenario_delta_tone(end_delta), "→"),
+            (f"FY{window_end_fy} delta (B - A)", _format_scenario_amount(end_delta, value_unit, signed=True), "end of window", "-", _scenario_delta_tone(end_delta), "→"),
         ]
     cum_a, cum_b = cumulative_total(a), cumulative_total(b)
     delta = cum_b - cum_a
     avg_delta = average_annual(b) - average_annual(a)
     return [
-        ("Scenario A - cumulative", _format_scenario_amount(cum_a, value_unit), horizon, "-", "neutral", "A"),
-        ("Scenario B - cumulative", _format_scenario_amount(cum_b, value_unit), horizon, "-", "neutral", "B"),
+        (f"{label_a} - cumulative", _format_scenario_amount(cum_a, value_unit), horizon, "-", "neutral", "A"),
+        (f"{label_b} - cumulative", _format_scenario_amount(cum_b, value_unit), horizon, "-", "neutral", "B"),
         ("Cumulative delta (B - A)", _format_scenario_amount(delta, value_unit, signed=True), horizon, "-", _scenario_delta_tone(delta), "Δ"),
         ("Average annual delta (B - A)", _format_scenario_amount(avg_delta, value_unit, signed=True), "per June year", "-", _scenario_delta_tone(avg_delta), "⌀"),
     ]
@@ -10545,9 +11067,23 @@ def _scenario_amount_text(value_in_millions: float, value_unit: str) -> str:
     return f"{scaled:,.1f}"
 
 
-def _scenario_comparison_figure(history: pd.Series, a: pd.Series, b: pd.Series, value_unit: str) -> go.Figure:
+def _scenario_comparison_figure(
+    history: pd.Series,
+    a: pd.Series,
+    b: pd.Series,
+    value_unit: str,
+    *,
+    x_window: tuple[int, int] | None = None,
+    label_a: str = "Scenario A",
+    label_b: str = "Scenario B",
+) -> go.Figure:
     if (a is None or a.empty) and (b is None or b.empty):
         return empty_figure("Selected series has no forecast rows for the chosen scenarios.")
+    if x_window is not None and history is not None and not history.empty:
+        # A narrowed comparison window zooms the chart to ONLY the selected
+        # June years: history outside the window is dropped rather than left
+        # trailing off-axis, so the paths fill the plot.
+        history = _comparison_fy_window_slice(history, x_window[0], x_window[1])
     scale = _display_value_scale_for_unit(value_unit)
     axis_title = _display_axis_unit(value_unit)
     hover_value = _scenario_hover_value_format(value_unit)
@@ -10561,9 +11097,20 @@ def _scenario_comparison_figure(history: pd.Series, a: pd.Series, b: pd.Series, 
                 hovertemplate=f"<b>Actual</b><br>{hover_value}<extra></extra>",
             )
         )
+    # The last published actual anchors a visual handover into each scenario
+    # line when the forecast starts the very next June year, so the chart
+    # reads as one continuous story across the actual/forecast seam (PREBU26:
+    # FY2026 actual into FY2027 forecasts). Display-only: the anchor never
+    # joins the scenario series the aggregates are computed from.
+    anchor_fy: int | None = None
+    anchor_value = float("nan")
+    if history is not None and not history.empty:
+        history_sorted = history.sort_index()
+        anchor_fy = int(history_sorted.index[-1])
+        anchor_value = float(history_sorted.iloc[-1])
     for series, name, color, dash in [
-        (a, "Scenario A", "#002B5C", "solid"),
-        (b, "Scenario B", "#F37021", "dash"),
+        (a, label_a, "#002B5C", "solid"),
+        (b, label_b, "#F37021", "dash"),
     ]:
         if series is None or series.empty:
             continue
@@ -10575,7 +11122,31 @@ def _scenario_comparison_figure(history: pd.Series, a: pd.Series, b: pd.Series, 
                 hovertemplate=f"<b>{name}</b><br>{hover_value}<extra></extra>",
             )
         )
-    fig.update_xaxes(title_text="June year ending", title_font={"size": 11, "color": "#5A6B7B"}, showgrid=False, dtick=5)
+        series_sorted = series.sort_index()
+        first_fy = int(series_sorted.index[0])
+        if anchor_fy is not None and first_fy == anchor_fy + 1:
+            fig.add_trace(
+                go.Scatter(
+                    x=[anchor_fy, first_fy],
+                    y=[anchor_value / scale, float(series_sorted.iloc[0]) / scale],
+                    mode="lines",
+                    line={"color": color, "width": 2, "dash": dash},
+                    hoverinfo="skip",
+                    showlegend=False,
+                    name=f"{name} handover",
+                )
+            )
+    xaxis_kwargs: dict[str, Any] = {
+        "title_text": "June year ending",
+        "title_font": {"size": 11, "color": "#5A6B7B"},
+        "showgrid": False,
+        "dtick": 5,
+    }
+    if x_window is not None:
+        span = int(x_window[1]) - int(x_window[0])
+        xaxis_kwargs["range"] = [int(x_window[0]) - 0.5, int(x_window[1]) + 0.5]
+        xaxis_kwargs["dtick"] = 1 if span <= 12 else 5
+    fig.update_xaxes(**xaxis_kwargs)
     fig.update_yaxes(title_text=axis_title, gridcolor="#E6EDF5", zeroline=False)
     fig.update_layout(
         height=340,
@@ -10595,6 +11166,8 @@ def _scenario_npv_waterfall_figure(
     *,
     metric_label: str = "NPV",
     height: int | None = None,
+    label_a: str = "Scenario A",
+    label_b: str = "Scenario B",
 ) -> go.Figure:
     scale = _display_value_scale_for_unit(value_unit)
     axis_title = _display_axis_unit(value_unit)
@@ -10603,7 +11176,7 @@ def _scenario_npv_waterfall_figure(
         go.Waterfall(
             orientation="v",
             measure=["absolute", "relative", "total"],
-            x=[f"Scenario A {metric_label}", "Δ (B − A)", f"Scenario B {metric_label}"],
+            x=[f"{label_a} {metric_label}", "Δ (B − A)", f"{label_b} {metric_label}"],
             y=[npv_a / scale, delta / scale, npv_b / scale],
             increasing={"marker": {"color": "#00843D"}},
             decreasing={"marker": {"color": "#B42318"}},
@@ -10647,9 +11220,24 @@ _SCENARIO_COMPONENT_COLORS = {
 _SCENARIO_COMPONENT_MATERIALITY = 1.0  # $m NPV; bars below this are dropped
 
 
-def _scenario_component_npv(paths: dict[str, Any], rate: float | None) -> tuple[float, float]:
-    npv_a = npv_to_horizon(paths["a"], rate=rate)
-    npv_b = npv_to_horizon(paths["b"], rate=rate)
+def _scenario_component_npv(
+    paths: dict[str, Any],
+    rate: float | None,
+    *,
+    window: tuple[int, int] | None = None,
+) -> tuple[float, float]:
+    """Component NPV pair, optionally cut to the comparison window first.
+
+    The window is the same presentation-side June-year filter applied to the
+    headline series, so component totals close against the windowed headline
+    delta by construction; the discount anchor is untouched.
+    """
+    a_path, b_path = paths["a"], paths["b"]
+    if window is not None:
+        a_path = _comparison_fy_window_slice(a_path, window[0], window[1])
+        b_path = _comparison_fy_window_slice(b_path, window[0], window[1])
+    npv_a = npv_to_horizon(a_path, rate=rate)
+    npv_b = npv_to_horizon(b_path, rate=rate)
     return (0.0 if pd.isna(npv_a) else npv_a, 0.0 if pd.isna(npv_b) else npv_b)
 
 
@@ -10692,7 +11280,11 @@ def _scenario_npv_component_breakdown(
 
 
 def _scenario_npv_composition_figure(
-    components: list[tuple[str, float, float]], value_unit: str
+    components: list[tuple[str, float, float]],
+    value_unit: str,
+    *,
+    label_a: str = "Scenario A",
+    label_b: str = "Scenario B",
 ) -> go.Figure:
     """Per-stream NPV comparison: one row per revenue stream, A vs B paired.
 
@@ -10714,8 +11306,8 @@ def _scenario_npv_composition_figure(
     hover_value = _scenario_hover_value_format(value_unit, axis="x")
     fig = go.Figure()
     for name, color, values, total in [
-        ("Scenario A", "#002B5C", [a for _, a, _ in material], total_a),
-        ("Scenario B", "#F37021", [b for _, _, b in material], total_b),
+        (label_a, "#002B5C", [a for _, a, _ in material], total_a),
+        (label_b, "#F37021", [b for _, _, b in material], total_b),
     ]:
         shares = [v / total if total else float("nan") for v in values]
         fig.add_trace(
@@ -10755,6 +11347,8 @@ def _scenario_npv_component_bridge_figure(
     *,
     metric_label: str = "NPV",
     height: int | None = None,
+    label_a: str = "Scenario A",
+    label_b: str = "Scenario B",
 ) -> go.Figure:
     """Delta-space bridge: component deltas accumulate from zero to B − A.
 
@@ -10769,7 +11363,8 @@ def _scenario_npv_component_bridge_figure(
     ]
     if not deltas:
         return _scenario_npv_waterfall_figure(
-            npv_a, npv_b, value_unit, metric_label=metric_label, height=height
+            npv_a, npv_b, value_unit, metric_label=metric_label, height=height,
+            label_a=label_a, label_b=label_b,
         )
     # gains first, largest loss lands right before the total bar
     deltas.sort(key=lambda row: row[1], reverse=True)
@@ -11919,6 +12514,9 @@ def revenue_outlook_total_path_figure(
         "Current finalist High population/comparison": ("#E56B2B", "solid", 2.4),
         **CONFLICT_TRACE_STYLES,
         PED_COMPARISON_BEHAVIOURAL_TRACE_NAME: ("#C2410C", "dot", 2.4),
+        # Display-only reference workbook: violet dash-dot so it can never be
+        # confused with a governed engine path or the post-model dash.
+        PREBU_DEFER_TRACE_NAME: ("#7C3AED", "dashdot", 2.2),
         # The two optional VFM composition scenarios: purple and teal, chosen
         # to stay distinct from the blue Base, the orange comparison and the
         # green official comparator under a colour-blind-conscious palette.
@@ -11986,16 +12584,34 @@ def revenue_outlook_total_path_figure(
         if post_model.empty:
             _add_path_trace(within_model, dash_style=dash, show_legend=True)
         else:
-            # Segmented current path: solid econometric years, then the same
-            # colour dashed for the post-model structural extrapolation. The
-            # dashed portion re-includes the FY2030 point so the two segments
-            # join continuously with no gap and no duplicate hover (the seam
-            # point keeps the econometric hover only).
-            _add_path_trace(within_model, dash_style=dash, show_legend=True)
-            seam = within_model.tail(1)
-            joined = pd.concat([seam, post_model], ignore_index=True)
-            joined.loc[joined.index[0], "_hover_segment"] = ""
-            _add_path_trace(joined, dash_style="dash", show_legend=False, suffix="post_model")
+            # Segmented current path: the line stays SOLID through the first
+            # extrapolated June year - the cutoff the boundary line marks
+            # (FY2031 in the current packs) - and dashes strictly after it.
+            # A hover-less connector joins the two portions, so every June
+            # year hovers exactly once and no year is drawn by two segments.
+            post_model_sorted = post_model.sort_values("_period_order", kind="stable")
+            cutoff_row = post_model_sorted.head(1)
+            solid_portion = pd.concat([within_model, cutoff_row], ignore_index=True)
+            _add_path_trace(solid_portion, dash_style=dash, show_legend=True)
+            beyond_cutoff = post_model_sorted.iloc[1:]
+            if not beyond_cutoff.empty:
+                connector = pd.concat(
+                    [cutoff_row, beyond_cutoff.head(1)], ignore_index=True
+                )
+                fig.add_trace(
+                    go.Scatter(
+                        x=connector["period"],
+                        y=connector["value_display"],
+                        mode="lines",
+                        name=trace_name,
+                        legendgroup=trace_name,
+                        showlegend=False,
+                        line={"color": color, "dash": "dash", "width": width},
+                        opacity=0.85,
+                        hoverinfo="skip",
+                    )
+                )
+                _add_path_trace(beyond_cutoff, dash_style="dash", show_legend=False, suffix="post_model")
 
     # Bridge the visual gap between the last actual and the first point of each
     # forecast trace with an actual-coloured connector segment so the handover
@@ -12045,25 +12661,24 @@ def revenue_outlook_total_path_figure(
             )
 
     periods = data["period"].dropna().astype(str).drop_duplicates().tolist()
-    forecast_period = _revenue_outlook_forecast_start_period(data)
     shapes: list[dict[str, Any]] = []
     annotations: list[dict[str, Any]] = []
-    if forecast_period and forecast_period in periods:
-        # Draw the history/forecast boundary on the seam where the actuals
-        # end: halfway between the last actual and the first forecast
-        # category (category axes accept numeric index coordinates).
-        boundary_index = float(periods.index(forecast_period))
-        # Actuals end where the last published actual sits: the grey history
-        # line, plus any official-comparator point the selected vintage
-        # publishes as ACTUAL (PREBU26 publishes FY2026 that way), so the
-        # dashed seam stays half a category ahead of the true last actual.
-        row_type_text = data.get("row_type", pd.Series(dtype=str)).astype(str)
-        official_actual = row_type_text.eq("official_comparator") & data.get(
-            "value_status", pd.Series("", index=data.index)
-        ).astype(str).eq("actual")
-        actual_periods = data[row_type_text.eq("historical_actual") | official_actual]["period"].astype(str)
-        preceding = [p for p in actual_periods if p in periods and periods.index(p) < boundary_index]
-        boundary_x = (periods.index(preceding[-1]) + boundary_index) / 2 if preceding else boundary_index - 0.5
+    # Actuals end where the last published actual sits: the grey history
+    # line, plus any official-comparator point the selected vintage
+    # publishes as ACTUAL (PREBU26 publishes FY2026 that way). The seam is
+    # anchored to that last actual - NOT to whichever forecast traces happen
+    # to be ticked - so the trained-cutoff marker survives any legend
+    # selection. Category axes accept numeric index coordinates, so the line
+    # sits halfway between the last actual and the next category.
+    row_type_text = data.get("row_type", pd.Series(dtype=str)).astype(str)
+    official_actual = row_type_text.eq("official_comparator") & data.get(
+        "value_status", pd.Series("", index=data.index)
+    ).astype(str).eq("actual")
+    actual_period_values = data[row_type_text.eq("historical_actual") | official_actual]["period"].astype(str)
+    actual_indices = [periods.index(p) for p in actual_period_values.unique() if p in periods]
+    if actual_indices and max(actual_indices) < len(periods) - 1:
+        last_actual_index = max(actual_indices)
+        boundary_x = last_actual_index + 0.5
         shapes.append(
             {
                 "type": "line",
@@ -12073,7 +12688,7 @@ def revenue_outlook_total_path_figure(
                 "x1": boundary_x,
                 "y0": 0,
                 "y1": 1,
-                "line": {"dash": "dash", "color": "#B45309", "width": 1.4},
+                "line": {"dash": "dash", "color": "#B45309", "width": 1.8},
             }
         )
         annotations.append(
@@ -12084,27 +12699,37 @@ def revenue_outlook_total_path_figure(
                 # Just inside the plot's top edge: the band above the chart
                 # belongs to the legend, which would collide with it there.
                 "y": 0.985,
-                "text": f"Actuals to {_display_period_label(preceding[-1])}" if preceding else f"Forecast start {_display_period_label(forecast_period)}",
+                "text": f"Actuals to {_display_period_label(periods[last_actual_index])}",
                 "showarrow": False,
                 "yanchor": "top",
                 "font": {"color": "#B45309", "size": 11},
             }
         )
     # Subtle boundary where the econometric forecast hands over to the
-    # post-model structural extrapolation. Drawn only when post-model rows
-    # are actually visible on this axis.
-    has_post_model = (
-        "forecast_segment" in data.columns
-        and data["forecast_segment"].fillna("").astype(str).eq("post_model_extrapolation").any()
+    # post-model structural extrapolation. Drawn at the FIRST extrapolated
+    # period the data actually carries (FY2031 under the PREBU26-era packs)
+    # rather than a hard-coded year, and only when post-model rows are
+    # visible on this axis.
+    post_model_indices = (
+        [
+            periods.index(p)
+            for p in data[
+                data["forecast_segment"].fillna("").astype(str).eq("post_model_extrapolation")
+            ]["period"].astype(str).unique()
+            if p in periods
+        ]
+        if "forecast_segment" in data.columns
+        else []
     )
-    if has_post_model and "FY2030" in periods:
+    if post_model_indices:
+        post_model_start = periods[min(post_model_indices)]
         shapes.append(
             {
                 "type": "line",
                 "xref": "x",
                 "yref": "paper",
-                "x0": "FY2030",
-                "x1": "FY2030",
+                "x0": post_model_start,
+                "x1": post_model_start,
                 "y0": 0,
                 "y1": 1,
                 "line": {"dash": "dot", "color": "#8A96A3", "width": 1.1},
@@ -12114,7 +12739,7 @@ def revenue_outlook_total_path_figure(
             {
                 "xref": "x",
                 "yref": "paper",
-                "x": "FY2030",
+                "x": post_model_start,
                 "y": 0.03,
                 "text": "Post-model extrapolation →",
                 "showarrow": False,
@@ -12592,25 +13217,6 @@ def _revenue_outlook_gap_figure(message: str, *, height: int) -> go.Figure:
     return fig
 
 
-def _revenue_outlook_forecast_start_period(rows: pd.DataFrame) -> str:
-    if rows is None or rows.empty:
-        return ""
-    data = rows.copy()
-    data["_period_order"] = data.get("period", pd.Series(dtype=str)).map(_revenue_period_order)
-    actual_rows = data[data.get("row_type", pd.Series(dtype=str)).astype(str).eq("historical_actual")].copy()
-    latest_actual_order = pd.to_numeric(actual_rows.get("_period_order"), errors="coerce").max() if not actual_rows.empty else pd.NA
-    current = data[
-        data.get("trace_role", pd.Series("", index=data.index)).astype(str).eq("in_house_current_finalist")
-        & data.get("row_type", pd.Series("", index=data.index)).astype(str).eq("future_forecast")
-        & ~data.get("data_scope", pd.Series("", index=data.index)).astype(str).eq("actual_anchor")
-    ].copy()
-    if pd.notna(latest_actual_order):
-        current = current[pd.to_numeric(current["_period_order"], errors="coerce").gt(float(latest_actual_order))].copy()
-    if current.empty:
-        return ""
-    return str(current.sort_values("_period_order", kind="stable").iloc[0]["period"])
-
-
 def revenue_outlook_component_figure(bridge: pd.DataFrame, *, selected_fy: str, selected_fed_path: str) -> go.Figure:
     plot = _selected_revenue_bridge_snapshot(bridge, selected_fy=selected_fy, selected_fed_path=selected_fed_path)
     if plot.empty:
@@ -13086,7 +13692,7 @@ def revenue_outlook_figure(rows: pd.DataFrame, *, metric_type: str) -> go.Figure
 
 
 def _scenario_color_map(rows: pd.DataFrame) -> dict[str, str]:
-    palette = ["#006FAD", "#E56B2B", "#00843D", "#6B4E71", "#C2410C", "#0F766E"]
+    palette = ["#006FAD", "#E56B2B", "#00843D", "#6B4E71", "#C2410C", "#DB2777"]
     trace_palette = {
         "Actual": "#737373",
         **{name: style[0] for name, style in _official_trace_style_map().items()},
