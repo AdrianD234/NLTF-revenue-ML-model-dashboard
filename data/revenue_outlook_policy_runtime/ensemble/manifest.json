@@ -29,7 +29,7 @@
   "provenance": {
     "builder_version": "2",
     "code_module_hashes": {
-      "app.py": "bef7849c4f32a792816fdc923dd965c1e2a48e78082d0b986950f84bbffbb303",
+      "app.py": "8b5110685b56cd46aebe0e2404eac7a68796669353c23eafd9a8008219ffbd14",
       "model_dashboard/__init__.py": "40f18fc5bbc37948a1250097bb55c68711d51d6622248e75efe27cd3580809f8",
       "model_dashboard/completeness_contract.py": "2a5ec576c757b7d4d820a060922dd5c7c7275841dc9734dcb479f9ad49a5c708",
       "model_dashboard/conflict_fuel_paths.py": "8f784d2c60f9813107fdbf7fe0c5b115381d199ff27471603f31eea9e2465b3d",
@@ -72,7 +72,7 @@
       "model_dashboard/r2_metrics.py": "5e8944a4258c6c5b3fb50a877cd9314dde4942dcf28140a1a22e05138ea73409",
       "model_dashboard/rate_paths.py": "436d654f466005698f2ebaf99adc45027fd4f76046f38cc6f631af027b44b292",
       "model_dashboard/reproducibility_imports.py": "dd2a1000837cc3f96fe557e74e64f0b270b09362225648e1d6aedcfb5a9529ba",
-      "model_dashboard/revenue_chart_layers.py": "73abc3584c6a31938a32a7e24cf19e4bbfb1aab6f482bf3683ab4ab427c61c7b",
+      "model_dashboard/revenue_chart_layers.py": "02ff7a97d7a340213b7ad160f26ee4a33c13ffaebefa55898d8ca6794f5e2748",
       "model_dashboard/revenue_outlook.py": "5b5a0c7b6146ac45d5eee538f1a87b5ce4511494f95ac61190a345b4a991dc55",
       "model_dashboard/revenue_outlook_excel_extract.py": "2d0a980b048de3ce266f0d27b51d8d760763bf4063540bc2bfaf4111637d82c6",
       "model_dashboard/revenue_outlook_policy_runtime.py": "7be3639e7f9462e104bc377d9efcef5231edb6b109403e7361cb0415e1287c82",
@@ -468,8 +468,8 @@
   },
   "row_count": 2739432,
   "schema_version": "2",
-  "source_digest": "2ade40dced8026a99d63a9af50475f12731849554a5fd1b7c787c54456f8c061",
-  "source_main_sha": "774a4305ed061977c2dd11b25f08c0c1bbeedeae",
+  "source_digest": "2a73468aea27cd6fd5d8aed6d9412f074e2eb23e7a71cd0d66c984ccdd8c2202",
+  "source_main_sha": "fc2f75dd1ae0f8cae3cb1430d7dc555c84692de5",
   "state_count": 64,
   "states": [
     {

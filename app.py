@@ -2853,11 +2853,29 @@ def _revenue_outlook_layer_catalogue(
         envelope_available = False
     else:
         options = [*options, VFM_FAST_TRACE_NAME, VFM_SLOW_TRACE_NAME]
+    # The external reference workbook is offered exactly like it is in the
+    # A/B scenario dropdowns: only when the file is deployed, never selected
+    # by default, and always display-only (levers, policy states and
+    # sensitivities cannot move it).
+    if (
+        _prebu_defer_workbook_signature() is not None
+        and PREBU_DEFER_TRACE_NAME not in options
+    ):
+        options = [*options, PREBU_DEFER_TRACE_NAME]
     return build_layer_catalogue(
         options,
         default_trace_names=list(default_trace_names),
         uncertainty_available=cached_uncertainty_pack().available,
         envelope_available=envelope_available,
+        trace_interpretations={
+            PREBU_DEFER_TRACE_NAME: (
+                "Display-only reference path read from references/PREBU "
+                "defer.xlsx (governed BEFU26 extract layout, June years). It "
+                "bypasses the modelling engine entirely: levers, 12c policy "
+                "states and sensitivities never move it, and it is drawn only "
+                "on the June-year grain."
+            )
+        },
     )
 
 
@@ -3807,6 +3825,42 @@ def _prebu_defer_comparison_paths(
     unit = _first_non_empty(matching.get("value_unit", pd.Series(dtype=str)))
     metric = _revenue_outlook_series_metric_type(rows, series_label)
     return forecast, history, str(unit or ""), str(metric or "")
+
+
+def _prebu_defer_total_path_rows(
+    selected_series: str, pack: RevenueOutlookPack
+) -> pd.DataFrame:
+    """Display-only June-year chart rows for the reference workbook path.
+
+    Forecast years only: the workbook's ACTUAL-classified years duplicate the
+    grey history line, and the figure's handover connector already bridges
+    every forecast trace from the last published actual to its first point.
+    The rows deliberately carry no forecast_segment, so the path draws as one
+    continuous line with no post-model split - the workbook has no trained
+    cutoff.
+    """
+    forecast, _history, unit, _metric = _prebu_defer_comparison_paths(
+        selected_series, pack
+    )
+    if forecast.empty:
+        return pd.DataFrame()
+    years = [int(fy) for fy in forecast.index]
+    return pd.DataFrame(
+        {
+            "trace_name": PREBU_DEFER_TRACE_NAME,
+            "series_label": str(selected_series),
+            "stream_label": str(selected_series),
+            "time_grain": "june_year",
+            "period": [f"FY{fy}" for fy in years],
+            "june_year": years,
+            "value": [float(value) for value in forecast.to_numpy()],
+            "value_unit": str(unit or ""),
+            "scenario_name": "prebu_defer_reference_workbook",
+            "fed_path": "",
+            "row_type": "reference_workbook",
+            "value_status": "reference_workbook_display_only",
+        }
+    )
 
 
 @st.cache_data(show_spinner=False, max_entries=24)
@@ -7036,8 +7090,13 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 selected_band_layers = tuple(band_layer_ids(layer_catalogue, selected_layer_ids))
                 if not selected_traces:
                     selected_traces = selected_trace_defaults or list(trace_options[:1])
+                path_option_count = sum(
+                    1
+                    for spec in layer_catalogue
+                    if spec.layer_kind == LAYER_KIND_PATH
+                )
                 st.caption(
-                    _revenue_outlook_trace_selection_summary(selected_traces, len(trace_options))
+                    _revenue_outlook_trace_selection_summary(selected_traces, path_option_count)
                     + (f" · {len(selected_band_layers)} band layer(s)" if selected_band_layers else "")
                 )
         bridge_mode_lookup = selector_options["bridge_mode_lookup"]
@@ -7248,6 +7307,31 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                 ]
                 if not wanted.empty:
                     plot_rows = pd.concat([filtered_rows, wanted], ignore_index=True, sort=False)
+        # Display-only reference workbook path: annual rows injected at plot
+        # time exactly like the optional VFM paths, so the governed view and
+        # every cache key stay untouched when the layer is off. The workbook
+        # is annual (governed BEFU26 extract layout), so the path is withheld
+        # at quarterly grain with a note instead of an invented series.
+        prebu_defer_annual_only_note = False
+        figure_signature = pack_signature
+        if PREBU_DEFER_TRACE_NAME in selected_traces:
+            if selected_time_grain == "quarterly":
+                prebu_defer_annual_only_note = True
+            else:
+                reference_rows = _prebu_defer_total_path_rows(selected_stream, pack)
+                if not reference_rows.empty:
+                    plot_rows = pd.concat(
+                        [plot_rows, reference_rows], ignore_index=True, sort=False
+                    )
+            workbook_signature = _prebu_defer_workbook_signature()
+            if workbook_signature is not None:
+                # The figure cache hashes the pack signature but not the row
+                # frame, so the workbook's own identity must ride along or a
+                # replaced file would keep serving the old line.
+                figure_signature = (
+                    *pack_signature,
+                    ("prebu_defer_workbook", *workbook_signature),
+                )
         timer.start("uncertainty lookup")
         uncertainty_series_id = _uncertainty_series_id_for_label(chart_rows, selected_stream)
         # Modelled uncertainty is governed at June-year grain only: the draws,
@@ -7278,7 +7362,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             band_layers_for_figure = tuple(selected_band_layers)
         timer.stop("uncertainty lookup")
         main_path_figure = cached_revenue_outlook_total_path_figure(
-            pack_signature,
+            figure_signature,
             selected_stream,
             selected_fy,
             selected_time_grain,
@@ -7294,6 +7378,11 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         )
         timer.stop("main path figure")
         total_path_notes = [display_horizon_note()]
+        if prebu_defer_annual_only_note:
+            total_path_notes.append(
+                f"{PREBU_DEFER_TRACE_NAME} publishes June years only, so it is "
+                "not drawn on the quarterly grain."
+            )
         short_current_note = _current_path_coverage_note(plot_rows, selected_stream)
         if short_current_note:
             total_path_notes.append(short_current_note)
@@ -12425,6 +12514,9 @@ def revenue_outlook_total_path_figure(
         "Current finalist High population/comparison": ("#E56B2B", "solid", 2.4),
         **CONFLICT_TRACE_STYLES,
         PED_COMPARISON_BEHAVIOURAL_TRACE_NAME: ("#C2410C", "dot", 2.4),
+        # Display-only reference workbook: violet dash-dot so it can never be
+        # confused with a governed engine path or the post-model dash.
+        PREBU_DEFER_TRACE_NAME: ("#7C3AED", "dashdot", 2.2),
         # The two optional VFM composition scenarios: purple and teal, chosen
         # to stay distinct from the blue Base, the orange comparison and the
         # green official comparator under a colour-blind-conscious palette.

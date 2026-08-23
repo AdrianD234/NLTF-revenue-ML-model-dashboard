@@ -447,3 +447,69 @@ def test_the_separate_fan_card_stays_off_the_default_layout() -> None:
     assert remainder
     assert "_render_revenue_outlook_fan_card(" not in primary
     assert "st.columns([0.64, 0.36])" not in source
+
+
+# --------------------------------------- PREBU defer reference workbook layer
+def test_prebu_defer_layer_is_offered_but_never_default() -> None:
+    assert app._prebu_defer_workbook_signature() is not None, (
+        "references/PREBU defer.xlsx must be committed for this suite"
+    )
+    catalogue = app._revenue_outlook_layer_catalogue(list(TRACES), list(TRACES))
+    spec = next(
+        s for s in catalogue if s.trace_name == app.PREBU_DEFER_TRACE_NAME
+    )
+    assert spec.layer_kind == LAYER_KIND_PATH
+    assert spec.default_selected is False
+    assert "display-only" in spec.interpretation.lower()
+    assert "references/PREBU" in spec.interpretation
+    assert spec.layer_id not in default_layer_ids(catalogue)
+    # Selecting it resolves to the workbook trace like any other path layer.
+    assert path_trace_names(catalogue, [spec.layer_id]) == [
+        app.PREBU_DEFER_TRACE_NAME
+    ]
+
+
+def test_prebu_defer_rows_carry_the_workbook_values(context) -> None:
+    pack, _signature = context
+    rows = app._prebu_defer_total_path_rows(SERIES, pack)
+    assert not rows.empty
+    assert set(rows["time_grain"]) == {"june_year"}
+    assert rows["trace_name"].eq(app.PREBU_DEFER_TRACE_NAME).all()
+    by_year = dict(zip(rows["june_year"], rows["value"]))
+    # Forecast years only: the workbook's ACTUAL years (through FY2026, the
+    # PREBU26 seam) stay on the grey history line.
+    assert min(by_year) == 2027
+    assert max(by_year) == 2050
+    assert by_year[2027] == pytest.approx(4701.61316150315)
+    assert by_year[2050] == pytest.approx(12955.4993074031)
+
+
+def test_prebu_defer_path_draws_as_one_display_only_line(context) -> None:
+    pack, signature = context
+    key = production_key()
+    sensitivity = app.selected_sensitivity_key("Off", "Off", "Off", freight_rail_shift="Off")
+    view = app.cached_revenue_outlook_view(
+        signature, SERIES, "june_year", FED, TRACES, sensitivity,
+        PED_BRIDGE_DEFAULT_MODE, key, pack,
+    )
+    reference_rows = app._prebu_defer_total_path_rows(SERIES, pack)
+    rows = pd.concat(
+        [view["filtered_rows"], reference_rows], ignore_index=True, sort=False
+    )
+    fig = app.revenue_outlook_total_path_figure(
+        rows, selected_series=SERIES, selected_fy="FY2030",
+        selected_official_trace="BEFU26 official",
+    )
+    traces = [t for t in fig.data if t.name == app.PREBU_DEFER_TRACE_NAME]
+    # One continuous line (no post-model split) plus at most the handover
+    # connector from the last published actual.
+    hoverable = [t for t in traces if t.hoverinfo != "skip"]
+    assert len(hoverable) == 1
+    line = hoverable[0]
+    assert line.line.dash == "dashdot"
+    assert line.line.color == "#7C3AED"
+    xs = list(line.x)
+    assert xs[0] == "FY2027" and xs[-1] == "FY2050"
+    # Values are the workbook's, on the figure's display scale.
+    scale = 4701.61316150315 / float(line.y[0])
+    assert float(line.y[-1]) * scale == pytest.approx(12955.4993074031)
