@@ -6598,9 +6598,10 @@ def _render_lever_accordion(
                 key="revenue_outlook_fed_policy_state",
                 help=(
                     "Scope: Base, High population and all Low/Medium/High conflict traces, including "
-                    "their modelled activity response. Original timing starts 1 Jan 2027; each deferral "
-                    "starts the 12c step 6-36 months later (1 Jul 2027 through 1 Jan 2030); no uplift "
-                    "removes the 12c step entirely. "
+                    "their modelled activity response. Original timing starts 1 Jan 2027; the "
+                    "six-month deferral starts the 12c step 1 Jul 2027; longer deferrals shift the "
+                    "entire staircase by their duration (initial step 1 Jan 2028 through 1 Jan 2030); "
+                    "no uplift removes the 12c step entirely. "
                     + FED_DEFERRAL_CATCH_UP_NOTE
                 ),
                 **_widget_default_kwargs(
@@ -6617,8 +6618,9 @@ def _render_lever_accordion(
                     key="revenue_outlook_mbu_fed_policy_state",
                     help=(
                         "Scope: MBU26 comparator only. The published source pack is never overwritten. "
-                        "Original timing starts 1 Jan 2027; each deferral starts the 12c step 6-36 "
-                        "months later; no uplift removes the 12c step entirely. "
+                        "Original timing starts 1 Jan 2027; the six-month deferral starts the 12c "
+                        "step 1 Jul 2027; longer deferrals shift the entire staircase by their "
+                        "duration; no uplift removes the 12c step entirely. "
                         + FED_DEFERRAL_CATCH_UP_NOTE
                     ),
                     **_widget_default_kwargs(
@@ -8192,10 +8194,11 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                         "the six 12c deferrals (6 to 36 months, starting 1 July 2027 through 1 January 2030), "
                         "and no 12c uplift. FY2027 is the year ending "
                         "June 2027, so every deferral equals no-uplift in FY2027; original timing "
-                        "differs because it applies for January-June 2027. Only the initial 12c/L wedge is "
-                        "deferred: later scheduled increases retain their published dates, so a deferred path "
-                        "catches up to the published rate at its selected start date, and a larger one-quarter "
-                        "increase can occur where catch-up coincides with another scheduled increase. The policy paths "
+                        "differs because it applies for January-June 2027. The six-month deferral moves only "
+                        "the initial 12c/L wedge - later scheduled increases retain their published dates and "
+                        "the path catches up at 1 July 2027 - while every longer deferral shifts the entire "
+                        "legislated staircase by its duration, so those paths stay below original timing until "
+                        "the last shifted step lands. The policy paths "
                         "carry the FED wedge into PED retail prices, apply the FED-rate percentage change to "
                         "Light/Heavy RUC rates and all five RUC collection classes, and apply the governed medium "
                         "retail-diesel elasticity once to a combined diesel-plus-RUC running-cost ratio for conventional "
@@ -10210,9 +10213,10 @@ def _render_comparison_scenario_column(
                 format_func=lambda state: FED_POLICY_LABELS[str(state)],
                 key=official_policy_key,
                 help=(
-                    "Original timing starts 1 Jan 2027; each deferral starts the 12c "
-                    "step 6-36 months later; no uplift removes the 12c step entirely. "
-                    "Scope: MBU26 official comparator only. "
+                    "Original timing starts 1 Jan 2027; the six-month deferral starts "
+                    "the 12c step 1 Jul 2027; longer deferrals shift the entire "
+                    "staircase by their duration; no uplift removes the 12c step "
+                    "entirely. Scope: MBU26 official comparator only. "
                     + FED_DEFERRAL_CATCH_UP_NOTE
                 ),
             )
@@ -10237,8 +10241,9 @@ def _render_comparison_scenario_column(
         format_func=lambda state: FED_POLICY_LABELS[str(state)],
         key=keys["fed_policy"],
         help=(
-            "Original timing starts 1 Jan 2027; each deferral starts the 12c step "
-            "6-36 months later; no uplift removes the 12c step entirely. "
+            "Original timing starts 1 Jan 2027; the six-month deferral starts the "
+            "12c step 1 Jul 2027; longer deferrals shift the entire staircase by "
+            "their duration; no uplift removes the 12c step entirely. "
             "Scope: Selected current scenario only. " + FED_DEFERRAL_CATCH_UP_NOTE
         ),
     )

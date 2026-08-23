@@ -275,6 +275,35 @@ def test_deferral_composes_with_the_optimized_ped_bridge_mode(outlook) -> None:
     _assert_policy_invariants(policy, published, state="delayed_12m")
 
 
+def test_shift_states_persist_below_published_beyond_the_initial_window(outlook) -> None:
+    """12-36 month states no longer catch up; the six-month state still does.
+
+    The six-month deferral rejoins published timing from FY2028. Every longer
+    state shifts the entire staircase, so its annual revenue stays strictly
+    below original timing after its initial deferral window, ordered by
+    duration.
+    """
+    published = _overlay_rows(outlook, current_state="published")
+    pub_total = _annual(published, BASE_TRACE, "total_nltf_net_revenue")
+    six_total = _annual(
+        _overlay_rows(outlook, current_state="delayed_6m"), BASE_TRACE, "total_nltf_net_revenue"
+    )
+    for fy in (2028, 2029, 2030):
+        assert six_total[fy] == pytest.approx(pub_total[fy], abs=1e-6), fy
+    twelve_total = _annual(
+        _overlay_rows(outlook, current_state="delayed_12m"), BASE_TRACE, "total_nltf_net_revenue"
+    )
+    # The 12-month initial window ends inside FY2028; the shortfall PERSISTS
+    # through the later staircase years instead of catching up.
+    for fy in (2029, 2030):
+        assert twelve_total[fy] < pub_total[fy] - 1e-6, fy
+    thirty_six_total = _annual(
+        _overlay_rows(outlook, current_state="delayed_36m"), BASE_TRACE, "total_nltf_net_revenue"
+    )
+    for fy in (2029, 2030):
+        assert thirty_six_total[fy] < twelve_total[fy] - 1e-6, fy
+
+
 def test_identical_configurations_produce_identical_paths(outlook) -> None:
     first = _overlay_rows(outlook, current_state="delayed_18m", pt="High")
     second = _overlay_rows(outlook, current_state="delayed_18m", pt="High")

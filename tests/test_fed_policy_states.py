@@ -66,25 +66,27 @@ EXPECTED_LABELS = (
     "Deferred 3.0 years (36 months) — 1 Jan 2030",
     "No 12c uplift",
 )
-# Direct rate-affected calendar-quarter windows per finite deferral.
+# Direct rate-affected calendar-quarter windows per finite deferral. The
+# six-month state changes only its initial window (catch-up); every longer
+# state shifts the ENTIRE staircase, so its rate differs from planned from
+# 2027Q1 until the last shifted step lands (the final legislated step sits at
+# 2031Q1, so a d-quarter shift differs through 2031Q1 + d - 1 quarters).
+
+
+def _quarter_range(first: str, last: str) -> tuple[str, ...]:
+    return tuple(
+        serial_quarter(serial)
+        for serial in range(quarter_serial(first), quarter_serial(last) + 1)
+    )
+
+
 EXPECTED_WINDOWS = {
     "delay_6m": ("2027Q1", "2027Q2"),
-    "delay_12m": ("2027Q1", "2027Q2", "2027Q3", "2027Q4"),
-    "delay_18m": ("2027Q1", "2027Q2", "2027Q3", "2027Q4", "2028Q1", "2028Q2"),
-    "delay_24m": (
-        "2027Q1", "2027Q2", "2027Q3", "2027Q4",
-        "2028Q1", "2028Q2", "2028Q3", "2028Q4",
-    ),
-    "delay_30m": (
-        "2027Q1", "2027Q2", "2027Q3", "2027Q4",
-        "2028Q1", "2028Q2", "2028Q3", "2028Q4",
-        "2029Q1", "2029Q2",
-    ),
-    "delay_36m": (
-        "2027Q1", "2027Q2", "2027Q3", "2027Q4",
-        "2028Q1", "2028Q2", "2028Q3", "2028Q4",
-        "2029Q1", "2029Q2", "2029Q3", "2029Q4",
-    ),
+    "delay_12m": _quarter_range("2027Q1", "2031Q4"),
+    "delay_18m": _quarter_range("2027Q1", "2032Q2"),
+    "delay_24m": _quarter_range("2027Q1", "2032Q4"),
+    "delay_30m": _quarter_range("2027Q1", "2033Q2"),
+    "delay_36m": _quarter_range("2027Q1", "2033Q4"),
 }
 # Governed source rates (data/revenue_model_source_pack/2026_05_19/
 # fed_rate_paths.csv): planned and no-uplift by calendar year.
@@ -153,13 +155,19 @@ def test_start_periods_follow_the_serial_rule() -> None:
         assert serial_quarter(base + spec.delay_quarters) == spec.start_period
 
 
-def test_catch_up_note_is_worded_exactly() -> None:
-    assert "Only the initial 12c/L wedge is deferred" in FED_DEFERRAL_CATCH_UP_NOTE
-    assert "retain their published dates" in FED_DEFERRAL_CATCH_UP_NOTE
+def test_deferral_semantics_note_states_both_rules() -> None:
+    assert "six-month deferral moves only the initial 12c/L wedge" in FED_DEFERRAL_CATCH_UP_NOTE
     assert "catches up to the published rate" in FED_DEFERRAL_CATCH_UP_NOTE
+    assert "shifts the entire legislated staircase" in FED_DEFERRAL_CATCH_UP_NOTE
     for spec in finite_deferral_specs():
-        if spec.delay_months != 6:
-            assert FED_DEFERRAL_CATCH_UP_NOTE in spec.note
+        assert FED_DEFERRAL_CATCH_UP_NOTE in spec.note
+        if spec.delay_months == 6:
+            assert not spec.is_staircase_shift
+            assert "no-uplift rate" in spec.note
+        else:
+            assert spec.is_staircase_shift
+            assert "ENTIRE legislated staircase" in spec.note
+            assert f"{spec.delay_quarters} calendar quarters" in spec.note
 
 
 # -------------------------------------------------------------- B. schedules
@@ -178,31 +186,61 @@ def test_each_deferral_changes_exactly_its_direct_window(quarterly) -> None:
         assert tuple(changed.index) == EXPECTED_WINDOWS[spec.calculation_state_id], spec.state_id
 
 
-def test_within_window_selected_equals_no_uplift(quarterly) -> None:
+def test_initial_window_holds_the_pre_staircase_base(quarterly) -> None:
+    """[2027Q1, start): the six-month state prices at no-uplift; every shift
+    state holds the flat pre-staircase base (the planned rate just before
+    2027Q1), because its later scheduled increases are deferred too."""
     no_uplift = pd.to_numeric(quarterly["no_uplift"], errors="coerce")
+    base_rate = float(pd.to_numeric(quarterly.at["2026Q4", "planned"]))
+    assert base_rate == pytest.approx(NO_UPLIFT_BY_YEAR[2027])
     for spec in finite_deferral_specs():
         target = pd.to_numeric(quarterly[spec.schedule_column], errors="coerce")
         for quarter in spec.direct_affected_quarters():
-            assert float(target.at[quarter]) == float(no_uplift.at[quarter]), (
-                spec.state_id,
-                quarter,
-            )
-            year = int(quarter.split("Q")[0])
-            assert float(target.at[quarter]) == pytest.approx(NO_UPLIFT_BY_YEAR[year])
-
-
-def test_at_and_after_start_selected_equals_planned(quarterly) -> None:
-    planned = pd.to_numeric(quarterly["planned"], errors="coerce")
-    order = {quarter: index for index, quarter in enumerate(quarterly.index)}
-    for spec in finite_deferral_specs():
-        target = pd.to_numeric(quarterly[spec.schedule_column], errors="coerce")
-        start_index = order[spec.start_period]
-        for quarter, position in order.items():
-            if position >= start_index and pd.notna(planned.at[quarter]):
-                assert float(target.at[quarter]) == float(planned.at[quarter]), (
+            if spec.is_staircase_shift:
+                assert float(target.at[quarter]) == pytest.approx(base_rate), (
                     spec.state_id,
                     quarter,
                 )
+            else:
+                assert float(target.at[quarter]) == float(no_uplift.at[quarter]), (
+                    spec.state_id,
+                    quarter,
+                )
+                year = int(quarter.split("Q")[0])
+                assert float(target.at[quarter]) == pytest.approx(NO_UPLIFT_BY_YEAR[year])
+
+
+def test_six_month_state_catches_up_and_shift_states_shift(quarterly) -> None:
+    """6m: planned everywhere outside its two-quarter window (byte-identical
+    to the pre-change construction). Shift states: planned shifted by exactly
+    their duration from 2027Q1 onward."""
+    planned = pd.to_numeric(quarterly["planned"], errors="coerce")
+    uplift = quarter_serial(FED_UPLIFT_START_PERIOD)
+    serial_index = {quarter_serial(str(q)): str(q) for q in quarterly.index}
+    for spec in finite_deferral_specs():
+        target = pd.to_numeric(quarterly[spec.schedule_column], errors="coerce")
+        for quarter in quarterly.index:
+            serial = quarter_serial(str(quarter))
+            if pd.isna(target.at[quarter]):
+                continue
+            if serial < uplift:
+                if pd.notna(planned.at[quarter]):
+                    assert float(target.at[quarter]) == float(planned.at[quarter]), (
+                        spec.state_id, quarter,
+                    )
+                continue
+            if spec.is_staircase_shift:
+                source = serial_index.get(serial - spec.delay_quarters)
+                assert source is not None, (spec.state_id, quarter)
+                source_rate = planned.at[source] if serial - spec.delay_quarters >= uplift else planned.at[source]
+                assert float(target.at[quarter]) == float(source_rate), (
+                    spec.state_id, quarter,
+                )
+            elif quarter not in spec.direct_affected_quarters():
+                if pd.notna(planned.at[quarter]):
+                    assert float(target.at[quarter]) == float(planned.at[quarter]), (
+                        spec.state_id, quarter,
+                    )
 
 
 def test_before_uplift_start_selected_equals_planned(quarterly) -> None:
@@ -215,39 +253,89 @@ def test_before_uplift_start_selected_equals_planned(quarterly) -> None:
                 assert float(target.at[quarter]) == float(planned.at[quarter])
 
 
-def test_catch_up_quarters_including_coincident_scheduled_increases(quarterly) -> None:
-    """The rate at each deferred start jumps to the full published rate.
+def test_six_month_catch_up_and_shifted_staircase_step_dates(quarterly) -> None:
+    """6m parity is untouched; each longer state moves EVERY step by its
+    duration.
 
-    A 12-month deferral rejoins at 2028Q1 where the separate 6c increase also
-    lands, so the one-quarter jump is 0.70024 -> 0.88024. An 18-month deferral
-    lets the 2028Q1 6c increase occur on its published date inside the window
-    (no-uplift rate steps 0.70024 -> 0.76024), then rejoins at 2028Q3.
+    The published staircase steps at 2027Q1 (+12c), 2028Q1 (+6c), 2029Q1
+    (+4c), 2030Q1 (+4c) and 2031Q1 (+4c). The six-month state still catches
+    up at 2027Q3 (0.70024 -> 0.82024) and then tracks published dates. A
+    12-month shift lands the 12c at 2028Q1, the 6c at 2029Q1, the first 4c
+    at 2030Q1 and so on; 18-36 months follow the same rule.
     """
     def rate(column: str, quarter: str) -> float:
         return float(pd.to_numeric(quarterly.at[quarter, column]))
 
-    # 6m: rejoin 2027Q3, catch-up 0.70024 -> 0.82024
+    # 6m: rejoin 2027Q3, catch-up 0.70024 -> 0.82024, published dates after.
     assert rate("delayed_6m", "2027Q2") == pytest.approx(0.70024)
     assert rate("delayed_6m", "2027Q3") == pytest.approx(0.82024)
-    # 12m: rejoin 2028Q1 coincides with the scheduled 6c step: jump to 0.88024
+    assert rate("delayed_6m", "2028Q1") == pytest.approx(0.88024)
+    assert rate("delayed_6m", "2029Q1") == pytest.approx(0.92024)
+    # 12m: every step lands four quarters late.
     assert rate("delayed_12m", "2027Q4") == pytest.approx(0.70024)
-    assert rate("delayed_12m", "2028Q1") == pytest.approx(0.88024)
-    # 18m: the scheduled 6c step occurs inside the window on its original date
-    assert rate("delayed_18m", "2027Q4") == pytest.approx(0.70024)
-    assert rate("delayed_18m", "2028Q1") == pytest.approx(0.76024)
-    assert rate("delayed_18m", "2028Q3") == pytest.approx(0.88024)
-    # 24m: rejoin 2029Q1 coincides with the scheduled 4c step
-    assert rate("delayed_24m", "2028Q4") == pytest.approx(0.76024)
-    assert rate("delayed_24m", "2029Q1") == pytest.approx(0.92024)
-    # 30m: rejoin 2029Q3 (no coincident step: planned holds 0.92024)
-    assert rate("delayed_30m", "2029Q2") == pytest.approx(0.80024)
-    assert rate("delayed_30m", "2029Q3") == pytest.approx(0.92024)
-    # 36m: rejoin 2030Q1 coincides with the scheduled 4c step
-    assert rate("delayed_36m", "2029Q4") == pytest.approx(0.80024)
-    assert rate("delayed_36m", "2030Q1") == pytest.approx(0.96024)
+    assert rate("delayed_12m", "2028Q1") == pytest.approx(0.82024)
+    assert rate("delayed_12m", "2029Q1") == pytest.approx(0.88024)
+    assert rate("delayed_12m", "2030Q1") == pytest.approx(0.92024)
+    assert rate("delayed_12m", "2031Q1") == pytest.approx(0.96024)
+    assert rate("delayed_12m", "2032Q1") == pytest.approx(1.00024)
+    # 18m: six quarters late, so the 6c step is deferred too (the path sits
+    # BELOW no-uplift in 2028Q1, which carries the separately scheduled 6c).
+    assert rate("delayed_18m", "2028Q1") == pytest.approx(0.70024)
+    assert rate("delayed_18m", "2028Q3") == pytest.approx(0.82024)
+    assert rate("delayed_18m", "2029Q3") == pytest.approx(0.88024)
+    assert rate("delayed_18m", "2030Q3") == pytest.approx(0.92024)
+    # 24m
+    assert rate("delayed_24m", "2028Q4") == pytest.approx(0.70024)
+    assert rate("delayed_24m", "2029Q1") == pytest.approx(0.82024)
+    assert rate("delayed_24m", "2030Q1") == pytest.approx(0.88024)
+    # 30m
+    assert rate("delayed_30m", "2029Q2") == pytest.approx(0.70024)
+    assert rate("delayed_30m", "2029Q3") == pytest.approx(0.82024)
+    assert rate("delayed_30m", "2030Q3") == pytest.approx(0.88024)
+    # 36m
+    assert rate("delayed_36m", "2029Q4") == pytest.approx(0.70024)
+    assert rate("delayed_36m", "2030Q1") == pytest.approx(0.82024)
+    assert rate("delayed_36m", "2031Q1") == pytest.approx(0.88024)
+    assert rate("delayed_36m", "2034Q1") == pytest.approx(1.00024)
 
 
-def test_longer_deferral_rate_never_exceeds_shorter_before_catch_up(quarterly) -> None:
+def test_every_scheduled_step_moves_by_exactly_the_stated_duration(quarterly) -> None:
+    """Step-for-step: a shift state's step quarters are the planned step
+    quarters moved by delay_quarters, with identical step sizes in order."""
+    planned = pd.to_numeric(quarterly["planned"], errors="coerce")
+    uplift = quarter_serial(FED_UPLIFT_START_PERIOD)
+
+    def steps(series: pd.Series) -> list[tuple[int, float]]:
+        found: list[tuple[int, float]] = []
+        previous = None
+        for quarter in quarterly.index:
+            value = series.at[quarter]
+            if pd.isna(value):
+                continue
+            serial = quarter_serial(str(quarter))
+            if serial < uplift - 1:
+                previous = float(value)
+                continue
+            if previous is not None and abs(float(value) - previous) > 1e-9:
+                found.append((serial, round(float(value) - previous, 5)))
+            previous = float(value)
+        return found
+
+    planned_steps = steps(planned)
+    assert [size for _, size in planned_steps][:2] == [pytest.approx(0.12), pytest.approx(0.06)]
+    for spec in finite_deferral_specs():
+        if not spec.is_staircase_shift:
+            continue
+        shifted_steps = steps(pd.to_numeric(quarterly[spec.schedule_column], errors="coerce"))
+        assert [serial for serial, _ in shifted_steps] == [
+            serial + spec.delay_quarters for serial, _ in planned_steps
+        ], spec.state_id
+        assert [size for _, size in shifted_steps] == [size for _, size in planned_steps], spec.state_id
+
+
+def test_longer_deferral_rate_never_exceeds_shorter(quarterly) -> None:
+    """Monotone in duration everywhere: a longer shift can never price above
+    a shorter one, because every step lands no earlier."""
     deferrals = finite_deferral_specs()
     for shorter, longer in zip(deferrals, deferrals[1:], strict=False):
         shorter_rate = pd.to_numeric(quarterly[shorter.schedule_column], errors="coerce")
@@ -255,8 +343,9 @@ def test_longer_deferral_rate_never_exceeds_shorter_before_catch_up(quarterly) -
         for quarter in quarterly.index:
             if pd.isna(shorter_rate.at[quarter]) or pd.isna(longer_rate.at[quarter]):
                 continue
-            if quarter_serial(str(quarter)) < quarter_serial(longer.start_period):
-                assert float(longer_rate.at[quarter]) <= float(shorter_rate.at[quarter]) + 1e-12
+            assert float(longer_rate.at[quarter]) <= float(shorter_rate.at[quarter]) + 1e-12, (
+                longer.state_id, quarter,
+            )
 
 
 def test_direct_windows_are_nested(quarterly) -> None:
@@ -268,14 +357,20 @@ def test_direct_windows_are_nested(quarterly) -> None:
 
 
 def test_affected_periods_group_by_fiscal_year() -> None:
-    periods = rate_paths.fed_policy_affected_periods(ROOT, "delay_18m")
-    assert periods == {
-        2027: ("2027Q1", "2027Q2"),
-        2028: ("2027Q3", "2027Q4", "2028Q1", "2028Q2"),
-    }
+    # 6m parity: the six-month state's affected map is byte-identical to the
+    # pre-change semantics (initial window only).
+    periods_6 = rate_paths.fed_policy_affected_periods(ROOT, "delay_6m")
+    assert periods_6 == {2027: ("2027Q1", "2027Q2")}
+    # Shift states: the map runs from 2027Q1 until the last shifted step
+    # lands (final legislated step 2031Q1 + duration - 1 quarter).
+    periods_18 = rate_paths.fed_policy_affected_periods(ROOT, "delay_18m")
+    assert set(periods_18) == {2027, 2028, 2029, 2030, 2031, 2032}
+    assert periods_18[2027] == ("2027Q1", "2027Q2")
+    assert periods_18[2028] == ("2027Q3", "2027Q4", "2028Q1", "2028Q2")
+    assert periods_18[2032] == ("2031Q3", "2031Q4", "2032Q1", "2032Q2")
     periods_36 = rate_paths.fed_policy_affected_periods(ROOT, "delay_36m")
-    assert set(periods_36) == {2027, 2028, 2029, 2030}
-    assert periods_36[2030] == ("2029Q3", "2029Q4")
+    assert set(periods_36) == {2027, 2028, 2029, 2030, 2031, 2032, 2033, 2034}
+    assert periods_36[2034] == ("2033Q3", "2033Q4")
     assert rate_paths.fed_policy_affected_periods(ROOT, "published") == {}
 
 
@@ -287,7 +382,15 @@ def test_quarterly_factors_are_exact_ratios(quarterly) -> None:
         for quarter in spec.direct_affected_quarters():
             expected = float(target.at[quarter]) / float(planned.at[quarter])
             assert factors[quarter] == expected, (spec.state_id, quarter)
-        assert factors[spec.start_period] == pytest.approx(1.0, abs=1e-15)
+        if spec.is_staircase_shift:
+            # At the deferred start the 12c has just landed but the later
+            # scheduled increases are still shifted, so the factor stays
+            # below one until the last shifted step.
+            assert factors[spec.start_period] == pytest.approx(
+                0.82024 / float(planned.at[spec.start_period]), rel=1e-12
+            )
+        else:
+            assert factors[spec.start_period] == pytest.approx(1.0, abs=1e-15)
     six_month = rate_paths.fed_policy_quarterly_factors(ROOT, "delay_6m")
     assert six_month["2027Q1"] == pytest.approx(0.70024 / 0.82024, rel=1e-15)
 

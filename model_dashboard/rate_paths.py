@@ -46,6 +46,7 @@ from .fed_policy_states import (
     finite_deferral_specs,
     policy_spec,
     quarter_serial,
+    serial_quarter,
 )
 from .light_fleet_allocation import LAST_DECISION_GRADE_ANNUAL_FY
 from .revenue_source_pack import REVENUE_LAST_COMPLETE_ACTUAL_FY
@@ -237,12 +238,19 @@ def _quarter_order(period: Any) -> tuple[int, int]:
 def ped_quarterly_rate_schedules(repo_root: Path) -> pd.DataFrame:
     """Calendar-quarter PED $/L schedules for every governed policy state.
 
-    Each finite deferral is deliberately narrow: only the quarters from
-    2027Q1 up to (excluding) its deferred start take the no-uplift rate.
-    From the deferred start the published planned path is unchanged, so a
-    later planned increase retains its original date and the path catches up
-    at the start quarter. The six-month column reproduces the original
-    governed scenario exactly: only 2027Q1-Q2 take the no-uplift rate.
+    The six-month column reproduces the original governed scenario exactly:
+    only the quarters from 2027Q1 up to (excluding) 2027Q3 take the
+    no-uplift rate, later planned increases retain their published dates,
+    and the path catches up at the deferred start.
+
+    Every longer finite deferral shifts the ENTIRE legislated staircase:
+    from 2027Q1 onward its rate is the planned rate ``delay_quarters``
+    earlier, so the initial 12c/L step and every later scheduled increase
+    move forward by exactly the selected duration. The frame is extended
+    past the governed schedule's last quarter by the longest shift - both
+    the planned and no-uplift paths carried flat, matching the no-uplift
+    path's own carried-parallel definition - so the final shifted steps can
+    land inside the frame instead of silently truncating.
     """
     fed = _fed_rate_paths(repo_root)
     pivot = fed.pivot_table(
@@ -258,7 +266,32 @@ def ped_quarterly_rate_schedules(repo_root: Path) -> pd.DataFrame:
     pivot["history"] = pd.to_numeric(pivot.get(_HISTORY_PATH), errors="coerce")
     pivot["planned"] = pd.to_numeric(pivot.get(_PLANNED_PATH), errors="coerce")
     pivot["no_uplift"] = pd.to_numeric(pivot.get(_NO_UPLIFT_PATH), errors="coerce")
+    pivot = pivot[["quarter", "FY", "history", "planned", "no_uplift"]]
+    serials = pivot["quarter"].map(quarter_serial)
+    last_serial = int(serials.max())
+    last_row = pivot.loc[serials.idxmax()]
+    max_shift_quarters = max(spec.delay_quarters for spec in finite_deferral_specs())
+    if pd.notna(last_row["planned"]) and pd.notna(last_row["no_uplift"]):
+        extension_rows = []
+        for serial in range(last_serial + 1, last_serial + max_shift_quarters + 1):
+            year, quarter_index = divmod(serial, 4)
+            extension_rows.append(
+                {
+                    "quarter": serial_quarter(serial),
+                    # Calendar Q3/Q4 belong to the NEXT June year.
+                    "FY": year + 1 if quarter_index >= 2 else year,
+                    "history": np.nan,
+                    "planned": float(last_row["planned"]),
+                    "no_uplift": float(last_row["no_uplift"]),
+                }
+            )
+        pivot = pd.concat([pivot, pd.DataFrame(extension_rows)], ignore_index=True)
     quarters = set(pivot["quarter"])
+    planned_by_serial = {
+        quarter_serial(quarter): value
+        for quarter, value in zip(pivot["quarter"], pivot["planned"])
+    }
+    uplift_serial = quarter_serial(FED_UPLIFT_START_PERIOD)
     for spec in finite_deferral_specs():
         window = spec.direct_affected_quarters()
         missing = [quarter for quarter in (*window, spec.start_period) if quarter not in quarters]
@@ -292,8 +325,25 @@ def ped_quarterly_rate_schedules(repo_root: Path) -> pd.DataFrame:
                 f"The {spec.state_id!r} deferral cannot rejoin the planned schedule: "
                 f"no planned rate exists in {spec.start_period}."
             )
-        pivot[spec.schedule_column] = pivot["planned"]
-        pivot.loc[window_mask, spec.schedule_column] = window_no_uplift
+        if spec.is_staircase_shift:
+            shifted_values = []
+            for quarter, planned_value in zip(pivot["quarter"], pivot["planned"]):
+                serial = quarter_serial(quarter)
+                if serial < uplift_serial:
+                    shifted_values.append(planned_value)
+                    continue
+                source = planned_by_serial.get(serial - spec.delay_quarters, np.nan)
+                if pd.isna(source):
+                    raise ValueError(
+                        f"The governed FED rate schedule cannot express "
+                        f"{spec.state_id!r}: no planned rate exists "
+                        f"{spec.delay_quarters} quarters before {quarter}."
+                    )
+                shifted_values.append(float(source))
+            pivot[spec.schedule_column] = shifted_values
+        else:
+            pivot[spec.schedule_column] = pivot["planned"]
+            pivot.loc[window_mask, spec.schedule_column] = window_no_uplift
     pivot["_order"] = pivot["quarter"].map(_quarter_order)
     return (
         pivot.sort_values("_order", kind="stable")
@@ -1323,10 +1373,16 @@ def official_comparator_policy_factors(
         )
         quarterly = ped_quarterly_rate_schedules(repo_root)
         delayed_src = quarterly.groupby("FY")[policy_spec_for_state.schedule_column].mean()
-    fed = _fed_rate_paths(repo_root)
-    planned_by_fy = (
-        fed[fed["fed_path"].astype(str).eq(_PLANNED_PATH)].groupby("FY")["rate_nzd_per_litre"].mean()
-    )
+        # The planned denominator comes from the SAME extended schedule frame
+        # as the delayed rates: identical to the raw annual source inside its
+        # horizon, and carried flat beyond it so a shifted staircase's final
+        # steps (through FY2034 for the 36-month state) can still be priced.
+        planned_by_fy = quarterly.groupby("FY")["planned"].mean()
+    else:
+        fed = _fed_rate_paths(repo_root)
+        planned_by_fy = (
+            fed[fed["fed_path"].astype(str).eq(_PLANNED_PATH)].groupby("FY")["rate_nzd_per_litre"].mean()
+        )
     source_sha = _sha256_of(repo_root / _OFFICIAL_SPINE_REL)
 
     published = (spine["gross_ped_revenue"] / spine["ped_volume"]).dropna()
