@@ -6,17 +6,31 @@ suffixes, scenario-name suffixes, pair IDs, display order, aliases and notes.
 Every other module derives its vocabulary from here, so adding a duration is
 one registry row rather than edits in six modules.
 
-The deferral rule generalises the governed six-month scenario exactly:
+Two deferral rules coexist, split by duration:
+
+The SIX-MONTH state reproduces the governed six-month scenario exactly -
+only the initial 12c/L wedge is deferred:
 
     before 2027Q1:                          target = planned
     from 2027Q1 up to (excluding) start:    target = no_uplift
     from the deferred start quarter onward: target = planned
 
-Only the initial 12c/L wedge is deferred.  Later planned increases retain
-their published dates, so at the selected start date the path catches up to
-the published rate; a larger one-quarter increase can occur when catch-up
-coincides with another scheduled increase.  That presentation consequence is
-deliberate and is documented in :data:`FED_DEFERRAL_CATCH_UP_NOTE`.
+Later planned increases retain their published dates, so at 1 Jul 2027 the
+path catches up to the published rate.
+
+Every LONGER finite deferral (12-36 months) shifts the ENTIRE legislated
+staircase forward by its duration - the initial 12c/L step and every later
+scheduled increase move by the same number of calendar quarters:
+
+    before 2027Q1:      target = planned
+    from 2027Q1 onward: target = planned shifted by delay_quarters
+
+Because the official staircase keeps rising (+4c/L every calendar year after
+2028, with no terminal step), a shifted path never converges back to
+published timing: each deferred year leaves the rate 4c/L below original
+timing in every later year, and the path can also sit below the no-uplift
+counterfactual while a separately scheduled increase is still deferred.
+Both rules are documented in :data:`FED_DEFERRAL_CATCH_UP_NOTE`.
 """
 from __future__ import annotations
 
@@ -41,10 +55,14 @@ __all__ = [
 FED_UPLIFT_START_PERIOD = "2027Q1"
 
 FED_DEFERRAL_CATCH_UP_NOTE = (
-    "Only the initial 12c/L wedge is deferred. Other scheduled increases "
-    "retain their published dates. At the selected start date, the path "
-    "catches up to the published rate, so a larger one-quarter increase can "
-    "occur when catch-up coincides with another scheduled increase."
+    "The six-month deferral moves only the initial 12c/L wedge: other "
+    "scheduled increases retain their published dates and the path catches "
+    "up to the published rate at 1 Jul 2027. Every longer deferral shifts "
+    "the entire legislated staircase - the initial 12c/L step and every "
+    "later scheduled increase move forward by the selected duration. "
+    "Because the official staircase adds +4c/L every calendar year with no "
+    "terminal step, a shifted path never catches up: each deferred year "
+    "leaves the rate 4c/L below original timing in every later year."
 )
 
 
@@ -102,6 +120,16 @@ class FedPolicySpec:
     @property
     def is_finite_deferral(self) -> bool:
         return not self.is_published and not self.is_no_uplift
+
+    @property
+    def is_staircase_shift(self) -> bool:
+        """Whether the state shifts the ENTIRE legislated staircase.
+
+        The six-month state keeps the governed catch-up semantics (only the
+        initial 12c/L wedge moves); every longer finite deferral moves the
+        initial step and every later scheduled increase by its duration.
+        """
+        return self.is_finite_deferral and self.delay_months > 6
 
     @property
     def schedule_column(self) -> str:
@@ -207,11 +235,16 @@ class FedPolicySpec:
         return _start_date_text(self.start_period)
 
     def direct_affected_quarters(self) -> tuple[str, ...]:
-        """Calendar quarters whose direct rate differs from planned.
+        """The INITIAL deferral window ``[2027Q1, start)``.
 
-        Finite deferrals: ``[2027Q1, start)``. No uplift: unbounded (every
-        quarter from 2027Q1), so it is expressed by the caller against the
-        governed schedule; this helper raises for it. Published: empty.
+        For the six-month state this is also the complete set of quarters
+        whose direct rate differs from planned. For staircase shifts the
+        direct-rate difference persists to the schedule horizon (the official
+        +4c/L annual step never stops, so the shifted path never converges) -
+        that full window depends on the governed schedule, so derive it from
+        ``rate_paths.fed_policy_affected_periods``. No uplift: unbounded
+        (every quarter from 2027Q1); this helper raises for it.
+        Published: empty.
         """
         if self.is_published:
             return ()
@@ -230,15 +263,28 @@ def _deferral_spec(months: int, order: int) -> FedPolicySpec:
     years = months / 12.0
     year_word = "year" if years == 1.0 else "years"
     label = f"Deferred {years:.1f} {year_word} ({months} months) — {_start_date_text(start)}"
-    note = (
-        f"The initial +12c/L step moves from 1 January 2027 to "
-        f"{_start_date_text(start)} ({start}). In calendar quarters "
-        f"{FED_UPLIFT_START_PERIOD} up to but excluding {start} the PED "
-        "retail-price input carries the no-uplift rate and the same "
-        "proportional reduction is applied to Light and Heavy RUC rates and "
-        f"real RUC model-price inputs; the published direct rate path resumes "
-        f"in {start}. " + FED_DEFERRAL_CATCH_UP_NOTE
-    )
+    if months == 6:
+        note = (
+            f"The initial +12c/L step moves from 1 January 2027 to "
+            f"{_start_date_text(start)} ({start}). In calendar quarters "
+            f"{FED_UPLIFT_START_PERIOD} up to but excluding {start} the PED "
+            "retail-price input carries the no-uplift rate and the same "
+            "proportional reduction is applied to Light and Heavy RUC rates and "
+            f"real RUC model-price inputs; the published direct rate path resumes "
+            f"in {start}. " + FED_DEFERRAL_CATCH_UP_NOTE
+        )
+    else:
+        note = (
+            f"The ENTIRE legislated staircase shifts by {months} months: the "
+            f"initial +12c/L step moves from 1 January 2027 to "
+            f"{_start_date_text(start)} ({start}) and every later scheduled "
+            f"increase moves by the same {quarters} calendar quarters, so the "
+            "PED retail-price input, the proportional Light and Heavy RUC "
+            "rates and real RUC model-price inputs all stay persistently "
+            "below original timing - the ongoing +4c/L annual steps shift "
+            "too, so the shortfall never closes. "
+            + FED_DEFERRAL_CATCH_UP_NOTE
+        )
     return FedPolicySpec(
         state_id=f"delayed_{months}m",
         calculation_state_id=f"delay_{months}m",

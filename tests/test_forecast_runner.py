@@ -892,6 +892,11 @@ def test_forecast_run_artifacts_are_repo_ignored() -> None:
         # ingested by scripts/materialize_official_vintage.py, never read at
         # runtime)
         "references/PREBU26.xlsx",
+        # PREBU26 deferral reference workbook, vendored 2026-08-22: a
+        # display-only comparator selectable in the A/B dropdowns and as a
+        # "Show on chart" path layer. Read at runtime by app.py behind its
+        # file-stat signature; it bypasses the governed engine entirely.
+        "references/PREBU defer.xlsx",
     }
 
 

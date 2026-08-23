@@ -917,16 +917,18 @@ def test_denton_split_can_preserve_a_mean_as_well_as_a_sum() -> None:
         assert math.isclose(math.fsum(quarters) / 4.0, anchor, rel_tol=0, abs_tol=1e-9)
 
 
-def test_rate_indicator_carries_the_last_scheduled_rate_forward() -> None:
-    """Past the schedule's end the planned path is flat, so carrying is exact."""
+def test_rate_indicator_follows_the_escalating_schedule() -> None:
+    """The official staircase adds +4c/L every calendar year with no terminal
+    step, so the indicator keeps stepping through the horizon instead of
+    carrying the 2031 rate flat."""
     factors = coverage._rate_indicator_factor(
         ["2026Q4", "2027Q1", "2031Q2", "2045Q1", "2050Q2"], ROOT
     )
     assert factors[0] == pytest.approx(0.70024)
     assert factors[1] == pytest.approx(0.82024)
-    # Everything after the schedule's final quarter holds its final rate.
-    assert factors[3] == pytest.approx(factors[2])
-    assert factors[4] == pytest.approx(factors[2])
+    assert factors[2] == pytest.approx(1.00024)
+    assert factors[3] == pytest.approx(1.56024)
+    assert factors[4] == pytest.approx(1.76024)
 
 
 def test_denton_split_reproduces_a_flat_year_exactly() -> None:

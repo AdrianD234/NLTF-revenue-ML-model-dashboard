@@ -570,6 +570,414 @@ def test_official_comparator_keys_inherit_the_page_identity() -> None:
     assert trace == app.official_comparator_trace_name("MBU26")
 
 
+# ===================== comparison window: a presentation-side June-year
+# filter applied to already-computed annual rows before aggregation. The
+# window is deliberately NOT part of any scenario or cache identity.
+
+
+def test_window_bounds_derive_from_the_common_horizon() -> None:
+    full = pd.Series(1.0, index=list(range(2025, 2051)))  # FY2025 nowcast anchor included
+    short = pd.Series(1.0, index=list(range(2026, 2041)))
+    assert app._comparison_fy_window_bounds(full, full) == (2026, 2050)
+    assert app._comparison_fy_window_bounds(full, short) == (2026, 2040)
+    assert app._comparison_fy_window_bounds(full, pd.Series(dtype=float)) is None
+    # The selected vintage's presentation seam floors the offered range, so
+    # under PREBU26 (actuals through FY2026) the window starts at FY2027.
+    assert app._comparison_fy_window_bounds(full, full, start_floor_fy=2027) == (2027, 2050)
+    assert app._comparison_fy_window_bounds(full, short, start_floor_fy=2027) == (2027, 2040)
+
+
+def test_window_clamp_never_raises() -> None:
+    bounds = (2026, 2050)
+    assert app._clamp_comparison_fy_window((2030, 2040), bounds) == (2030, 2040)
+    assert app._clamp_comparison_fy_window((1990, 2100), bounds) == (2026, 2050)
+    assert app._clamp_comparison_fy_window((2040, 2030), bounds) == (2030, 2040)
+    assert app._clamp_comparison_fy_window((2035, 2035), bounds) == (2035, 2035)
+    # a window with no overlap at all falls back to the full range
+    assert app._clamp_comparison_fy_window((2051, 2060), bounds) == (2026, 2050)
+    assert app._clamp_comparison_fy_window((1990, 2000), bounds) == (2026, 2050)
+    # malformed persisted state is repaired, never fatal
+    assert app._clamp_comparison_fy_window(None, bounds) == (2026, 2050)
+    assert app._clamp_comparison_fy_window("junk", bounds) == (2026, 2050)
+    assert app._clamp_comparison_fy_window((), bounds) == (2026, 2050)
+    # a shrunken horizon (e.g. a future presentation seam moving the first
+    # forecast year) clamps the old full-range selection into the new bounds
+    assert app._clamp_comparison_fy_window((2026, 2050), (2027, 2050)) == (2027, 2050)
+
+
+def test_full_default_window_reproduces_the_previous_totals_exactly(comparison_context) -> None:
+    keys_a, keys_b = _keys(), _keys(fleet="High")
+    result = _paths(comparison_context, "Total NLTF revenue", keys_a, keys_b)
+    a, b = result["a"], result["b"]
+    # The default comparator is PREBU26: its actuals run through FY2026, so
+    # the forecast window proper - and therefore the full default window -
+    # begins FY2027.
+    seam_fy = app._comparison_horizon_start_fy(keys_a[1])
+    assert seam_fy == 2027
+    bounds = app._comparison_fy_window_bounds(a, b, start_floor_fy=seam_fy)
+    assert bounds == (2027, 2050)
+    a_win = app._comparison_fy_window_slice(a, *bounds)
+    b_win = app._comparison_fy_window_slice(b, *bounds)
+    # The full-window cards are byte-identical to the unwindowed seam-aware
+    # call the panel makes on main - values, subtitles, tones, everything.
+    windowed = app._scenario_comparison_cards(
+        "Total NLTF revenue", "revenue", a_win, b_win, result["value_unit"], None,
+        horizon_start_fy=seam_fy,
+    )
+    previous = app._scenario_comparison_cards(
+        "Total NLTF revenue", "revenue", a, b, result["value_unit"], None,
+        horizon_start_fy=seam_fy,
+    )
+    assert windowed == previous
+    assert windowed[0][0] == "Scenario A - Cumulative nominal to FY2050"
+    # And the underlying aggregates are exactly equal, not approximately.
+    assert app.cumulative_total(a_win) == app.cumulative_total(a[a.index >= seam_fy])
+    assert app.npv_to_horizon(a_win) == app.npv_to_horizon(a)
+    assert app.npv_to_horizon(b_win, rate=0.0) == app.npv_to_horizon(b, rate=0.0)
+
+
+def test_history_extends_to_the_published_fy2026_actual(comparison_context) -> None:
+    """PREBU26 publishes FY2026 as an ACTUAL; the grey history line carries it.
+
+    The forecast sides still start at FY2027, so the FY2026 point is display
+    history only - it can never reach a delta, NPV or window aggregate - and
+    its value is the published official actual byte-for-byte.
+    """
+    pack, _ = comparison_context
+    result = _paths(comparison_context, "Total NLTF revenue", _keys(), _keys())
+    history = result["history"]
+    years = sorted(int(fy) for fy in history.index)
+    assert years[-1] == 2026
+    assert min(int(fy) for fy in result["a"].index) == 2027
+    rows = pack.revenue_chart_rows
+    label_col = "series_label" if "series_label" in rows.columns else "stream_label"
+    official = rows[
+        rows["time_grain"].astype(str).eq("june_year")
+        & rows[label_col].astype(str).eq("Total NLTF revenue")
+        & rows["trace_name"].astype(str).eq("PREBU26 official")
+        & pd.to_numeric(rows["june_year"], errors="coerce").eq(2026)
+    ]
+    if "value_status" in official.columns:
+        official = official[official["value_status"].astype(str).eq("actual")]
+    expected = float(pd.to_numeric(official["value"], errors="coerce").dropna().iloc[0])
+    assert float(history.loc[2026]) == pytest.approx(expected, rel=1e-12)
+    # A published historical actual still wins where both exist: every
+    # pre-2026 history year is the grey spine's own value ordering-wise.
+    assert years == sorted(set(years)), "duplicate June years in history"
+
+
+def test_comparison_figure_bridges_the_actual_seam_visually() -> None:
+    """A connector joins the last actual to each side's first forecast year.
+
+    Display-only: it is legend-less, hover-less and drawn only when the
+    forecast starts the very next June year, so a narrowed window (or a
+    non-contiguous horizon) draws no bridge.
+    """
+    history = pd.Series([90.0, 95.0], index=[2025, 2026])
+    a = pd.Series([100.0, 101.0], index=[2027, 2028])
+    b = pd.Series([102.0, 103.0], index=[2027, 2028])
+    figure = app._scenario_comparison_figure(history, a, b, "$m nominal ex GST")
+    connectors = [
+        trace for trace in figure.data
+        if trace.showlegend is False and trace.mode == "lines"
+    ]
+    assert len(connectors) == 2
+    for trace in connectors:
+        assert [int(x) for x in trace.x] == [2026, 2027]
+        assert trace.y[0] == pytest.approx(95.0 / 1000.0)
+    # Aggregate series are untouched: the scenario traces still start at 2027.
+    scenario_traces = [t for t in figure.data if t.name in ("Scenario A", "Scenario B")]
+    for trace in scenario_traces:
+        assert min(int(x) for x in trace.x) == 2027
+    # A window that no longer starts right after the actuals draws no bridge.
+    narrowed = pd.Series([100.0], index=[2030])
+    figure_narrowed = app._scenario_comparison_figure(history, narrowed, narrowed, "$m nominal ex GST")
+    assert not [
+        trace for trace in figure_narrowed.data
+        if trace.showlegend is False and trace.mode == "lines"
+    ]
+
+
+def test_prebu_defer_workbook_is_a_selectable_display_comparator(comparison_context) -> None:
+    """The reference workbook plots beside governed scenarios, values intact.
+
+    Display-only by construction: the workbook side bypasses the governed
+    view, the governed pack never carries its trace, and its values are the
+    workbook cells byte-for-byte (FY2026 actual, FY2027 and FY2050 pinned
+    from references/PREBU defer.xlsx).
+    """
+    import inspect
+
+    pack, signature = comparison_context
+    assert app._prebu_defer_workbook_signature() is not None, "reference workbook missing"
+    keys = _keys()
+    result = app.cached_scenario_comparison_paths(
+        signature, "Total NLTF revenue", FED_PATH,
+        keys[0], keys[1], keys[0], keys[1],
+        PED_BRIDGE_DEFAULT_MODE, pack,
+        trace_a=app.PREBU_DEFER_TRACE_NAME, trace_b="Current finalist Base case",
+    )
+    a = result["a"]
+    assert sorted(int(fy) for fy in a.index) == list(range(2027, 2051))
+    assert float(a.loc[2027]) == pytest.approx(4701.61316150315, rel=1e-12)
+    assert float(a.loc[2050]) == pytest.approx(12955.4993074031, rel=1e-12)
+    history = result["history"]
+    assert max(int(fy) for fy in history.index) == 2026
+    assert float(history.loc[2026]) == pytest.approx(4491.33665247696, rel=1e-12)
+    # The workbook shares the PREBU26 seam, so gates, cards and the window
+    # all work against a governed side.
+    assert app._comparison_alignment_gate(a, result["b"], horizon_start_fy=2027) == ""
+    assert app._comparison_fy_window_bounds(a, result["b"], start_floor_fy=2027) == (2027, 2050)
+    # Every by-stream component parses and the decomposition closes.
+    component_npvs = {}
+    for component_series in app._SCENARIO_COMPONENT_FETCH_SERIES:
+        component = app.cached_scenario_comparison_paths(
+            signature, component_series, FED_PATH,
+            keys[0], keys[1], keys[0], keys[1],
+            PED_BRIDGE_DEFAULT_MODE, pack,
+            trace_a=app.PREBU_DEFER_TRACE_NAME, trace_b="Current finalist Base case",
+        )
+        assert not component["a"].empty, component_series
+        component_npvs[component_series] = app._scenario_component_npv(component, 0.0)
+    nominal_a = app.npv_to_horizon(a, rate=0.0)
+    nominal_b = app.npv_to_horizon(result["b"], rate=0.0)
+    components = app._scenario_npv_component_breakdown(component_npvs, nominal_a, nominal_b)
+    assert sum(side_a for _, side_a, _ in components) == pytest.approx(nominal_a, abs=1e-6)
+    # The governed pack never carries the workbook trace: it is an overlay,
+    # not a governed scenario.
+    assert not pack.revenue_chart_rows["trace_name"].astype(str).eq(
+        app.PREBU_DEFER_TRACE_NAME
+    ).any()
+    # Dropdown wiring: offered only while the workbook is deployed.
+    column_source = inspect.getsource(app._render_comparison_scenario_column)
+    assert "PREBU_DEFER_TRACE_NAME" in column_source
+    assert "_prebu_defer_workbook_signature() is not None" in column_source
+
+
+def test_side_labels_carry_the_selected_scenarios() -> None:
+    """Every A/B label - cards, legends, hovers, waterfall bars - names the
+    scenario picked in the side's dropdown, with an A/B suffix only when both
+    sides selected the same trace."""
+    import inspect
+
+    assert app._comparison_side_labels(
+        "MoT official (PREBU26, no levers)", "Middle East conflict: Medium"
+    ) == ("MoT official (PREBU26, no levers)", "Middle East conflict: Medium")
+    assert app._comparison_side_labels(
+        "Current finalist Base case", "Current finalist Base case"
+    ) == ("Current finalist Base case (A)", "Current finalist Base case (B)")
+    assert app._comparison_side_labels("", "") == ("Scenario A", "Scenario B")
+
+    a = pd.Series([100.0, 101.0], index=[2027, 2028])
+    b = a + 1.0
+    cards = app._scenario_comparison_cards(
+        "Total NLTF revenue", "revenue", a, b, "$m nominal ex GST", None,
+        label_a="Alpha path", label_b="Beta path",
+    )
+    assert cards[0][0].startswith("Alpha path - Cumulative nominal")
+    assert cards[1][0].startswith("Beta path - Cumulative nominal")
+    figure = app._scenario_comparison_figure(
+        pd.Series(dtype=float), a, b, "$m nominal ex GST",
+        label_a="Alpha path", label_b="Beta path",
+    )
+    legend_names = {str(t.name) for t in figure.data if t.showlegend is not False}
+    assert {"Alpha path", "Beta path"} <= legend_names
+    for trace in figure.data:
+        if str(trace.name) in ("Alpha path", "Beta path") and trace.hovertemplate:
+            assert str(trace.name) in str(trace.hovertemplate)
+    waterfall = app._scenario_npv_waterfall_figure(
+        1000.0, 900.0, "$m nominal ex GST", label_a="Alpha path", label_b="Beta path"
+    )
+    assert list(waterfall.data[0].x) == ["Alpha path NPV", "Δ (B − A)", "Beta path NPV"]
+    composition = app._scenario_npv_composition_figure(
+        [("PED / FED (net)", 40000.0, 38000.0)], "$m nominal ex GST",
+        label_a="Alpha path", label_b="Beta path",
+    )
+    assert {str(t.name) for t in composition.data} == {"Alpha path", "Beta path"}
+    # The panel derives the labels from the selected traces and passes them on.
+    panel_source = inspect.getsource(app._render_scenario_comparison_panel)
+    assert "_comparison_side_labels(trace_a, trace_b)" in panel_source
+    assert panel_source.count("label_a=label_a") >= 4
+
+
+def test_narrowed_window_zooms_the_paths_chart_to_selected_years() -> None:
+    """A narrowed window shows ONLY the selected June years on the paths chart.
+
+    History (and with it the seam bridge) is dropped and the x-axis clamps to
+    the window, with year-level ticks for short spans; the full-window call is
+    byte-identical to the pre-window chart with history and auto-ranging.
+    """
+    history = pd.Series([90.0, 95.0], index=[2025, 2026])
+    a = pd.Series([100.0 + i for i in range(7)], index=list(range(2027, 2034)))
+    figure = app._scenario_comparison_figure(
+        history, a, a, "$m nominal ex GST", x_window=(2027, 2033)
+    )
+    assert "Actual" not in [str(trace.name) for trace in figure.data]
+    assert tuple(figure.layout.xaxis.range) == (2026.5, 2033.5)
+    assert figure.layout.xaxis.dtick == 1
+    figure_full = app._scenario_comparison_figure(history, a, a, "$m nominal ex GST")
+    assert "Actual" in [str(trace.name) for trace in figure_full.data]
+    assert figure_full.layout.xaxis.range is None
+    assert figure_full.layout.xaxis.dtick == 5
+
+
+def test_prebu26_seam_keeps_fy2026_out_of_the_window_and_aggregates(comparison_context) -> None:
+    """The window floor follows the selected vintage's presentation seam.
+
+    Under the default PREBU26 comparator the Current FY2026 point is a
+    published actual on the official side and masked on the Current side, so
+    it must be unselectable and unable to enter any A/B aggregate - while the
+    prior BEFU26 seam still starts at FY2026 when that vintage is selected.
+    """
+    keys = _keys()
+    result = _paths(comparison_context, "Total NLTF revenue", keys, keys)
+    a = result["a"]
+    # The governed comparison path itself publishes no pre-seam June year, so
+    # no hidden FY2026 Current annual point can reach the aggregates.
+    assert min(int(fy) for fy in a.index) == 2027
+    # Defence in depth: even a series that DID carry a pre-seam anchor point
+    # could not offer or include it once the seam floors the bounds.
+    with_anchor = pd.Series(
+        [999.0, *a.to_numpy(dtype=float)], index=[2026, *a.index]
+    )
+    bounds = app._comparison_fy_window_bounds(with_anchor, with_anchor, start_floor_fy=2027)
+    assert bounds == (2027, 2050)
+    sliced = app._comparison_fy_window_slice(with_anchor, *bounds)
+    assert 2026 not in {int(fy) for fy in sliced.index}
+    assert app.cumulative_total(sliced) == app.cumulative_total(a)
+    # And the seam-aware cards exclude the anchor even if it were fed through.
+    cards_anchor = app._scenario_comparison_cards(
+        "Total NLTF revenue", "revenue", with_anchor, with_anchor,
+        result["value_unit"], None, horizon_start_fy=2027,
+    )
+    cards_clean = app._scenario_comparison_cards(
+        "Total NLTF revenue", "revenue", a, a, result["value_unit"], None,
+        horizon_start_fy=2027,
+    )
+    assert cards_anchor == cards_clean
+    # The prior-vintage seam is untouched: BEFU26 still starts at FY2026.
+    befu_keys = _keys(vintage="BEFU26")
+    assert app._comparison_horizon_start_fy(befu_keys[1]) == 2026
+
+
+def test_selected_subrange_recalculates_a_b_and_delta_exactly(comparison_context) -> None:
+    result = _paths(comparison_context, "Total NLTF revenue", _keys(), _keys(fleet="High"))
+    a, b = result["a"], result["b"]
+    a_win = app._comparison_fy_window_slice(a, 2030, 2040)
+    b_win = app._comparison_fy_window_slice(b, 2030, 2040)
+    assert sorted(int(fy) for fy in a_win.index) == list(range(2030, 2041))
+    assert app.cumulative_total(a_win) == pytest.approx(
+        float(sum(a.loc[fy] for fy in range(2030, 2041))), rel=1e-12
+    )
+    cum_delta = app.cumulative_total(b_win) - app.cumulative_total(a_win)
+    assert cum_delta == pytest.approx(
+        float(sum(b.loc[fy] - a.loc[fy] for fy in range(2030, 2041))), rel=1e-9
+    )
+    # Every surviving year is byte-identical to the unwindowed path: the
+    # window filters, it never recomputes.
+    for fy in (2030, 2035, 2040):
+        assert a_win.loc[fy] == a.loc[fy]
+        assert b_win.loc[fy] == b.loc[fy]
+    # And slicing left the source series untouched (PREBU26 seam: the
+    # forecast series publishes FY2027-FY2050).
+    assert sorted(int(fy) for fy in a.index if int(fy) >= 2026) == list(range(2027, 2051))
+
+
+def test_window_npv_keeps_the_fy2026_discount_base(comparison_context) -> None:
+    from model_dashboard.npv import mbcm_discount_factors
+
+    result = _paths(comparison_context, "Total NLTF revenue", _keys(), _keys())
+    a = result["a"]
+    a_win = app._comparison_fy_window_slice(a, 2030, 2040)
+    # Only FY2030-FY2040 cash flows enter, but each keeps its factor relative
+    # to the existing FY2026 anchor - factors are NOT rebased to FY2030.
+    factors = mbcm_discount_factors(2040 - 2026 + 1)
+    expected = sum(float(a.loc[fy]) * factors[fy - 2026] for fy in range(2030, 2041))
+    assert app.npv_to_horizon(a_win) == pytest.approx(expected, rel=1e-12)
+    rebased = sum(
+        float(a.loc[fy]) * mbcm_discount_factors(2040 - 2030 + 1)[fy - 2030]
+        for fy in range(2030, 2041)
+    )
+    assert app.npv_to_horizon(a_win) < rebased
+
+
+def test_windowed_stream_deltas_sum_to_the_windowed_headline_delta(comparison_context) -> None:
+    window = (2030, 2040)
+    keys_a, keys_b = _keys(), _keys(uptake="MoT VFM fast")
+    total = _paths(comparison_context, "Total NLTF revenue", keys_a, keys_b)
+    nominal_a = app.npv_to_horizon(app._comparison_fy_window_slice(total["a"], *window), rate=0.0)
+    nominal_b = app.npv_to_horizon(app._comparison_fy_window_slice(total["b"], *window), rate=0.0)
+    component_npvs = {
+        series: app._scenario_component_npv(
+            _paths(comparison_context, series, keys_a, keys_b), 0.0, window=window
+        )
+        for series in app._SCENARIO_COMPONENT_FETCH_SERIES
+    }
+    components = app._scenario_npv_component_breakdown(component_npvs, nominal_a, nominal_b)
+    assert sum(a for _, a, _ in components) == pytest.approx(nominal_a, abs=1e-6)
+    assert sum(b for _, _, b in components) == pytest.approx(nominal_b, abs=1e-6)
+    assert sum(b - a for _, a, b in components) == pytest.approx(
+        nominal_b - nominal_a, abs=1e-6
+    )
+    # The waterfall built from those windowed deltas closes to the windowed
+    # headline delta (immaterial <$1m bars may be dropped, hence the floor).
+    figure = app._scenario_npv_component_bridge_figure(
+        nominal_a, nominal_b, components, total["value_unit"]
+    )
+    trace = figure.data[0]
+    dropped_budget = app._SCENARIO_COMPONENT_MATERIALITY * len(components) / 1000.0
+    assert sum(list(trace.y)[:-1]) == pytest.approx(
+        (nominal_b - nominal_a) / 1000.0, abs=dropped_budget
+    )
+
+
+def test_one_year_window_works(comparison_context) -> None:
+    result = _paths(comparison_context, "Total NLTF revenue", _keys(), _keys(fleet="High"))
+    a, b = result["a"], result["b"]
+    a_win = app._comparison_fy_window_slice(a, 2035, 2035)
+    b_win = app._comparison_fy_window_slice(b, 2035, 2035)
+    assert list(int(fy) for fy in a_win.index) == [2035]
+    assert app.cumulative_total(a_win) == pytest.approx(float(a.loc[2035]), rel=1e-12)
+    cards = app._scenario_comparison_cards(
+        "Total NLTF revenue", "revenue", a_win, b_win, result["value_unit"], None
+    )
+    assert cards[0][0] == "Scenario A - Cumulative nominal to FY2035"
+    assert cards[3][2].startswith("FY2035, ")
+    assert app._comparison_fy_window_label(2035, 2035) == "FY2035"
+
+
+def test_identical_scenarios_give_zero_delta_in_any_window(comparison_context) -> None:
+    result = _paths(comparison_context, "Total NLTF revenue", _keys(), _keys())
+    for window in ((2026, 2050), (2030, 2040), (2035, 2035)):
+        a_win = app._comparison_fy_window_slice(result["a"], *window)
+        b_win = app._comparison_fy_window_slice(result["b"], *window)
+        cards = app._scenario_comparison_cards(
+            "Total NLTF revenue", "revenue", a_win, b_win, result["value_unit"], None
+        )
+        assert cards[2][1] == "+$0m", window
+        assert cards[3][1] == "+$0m", window
+        assert cards[2][4] == "mixed" and cards[3][4] == "mixed", window
+
+
+def test_the_window_is_not_part_of_any_scenario_identity() -> None:
+    import dataclasses
+    import inspect
+
+    field_names = [field.name for field in dataclasses.fields(app.RevenueScenarioComputationKey)]
+    assert not any("window" in name.lower() for name in field_names)
+    # The cached fetch takes no window: filtering happens strictly AFTER the
+    # governed computation, so the window can never invalidate a cache entry
+    # or change an underlying annual value.
+    fetch_source = inspect.getsource(app.cached_scenario_comparison_paths)
+    assert "window" not in fetch_source
+    assert app._COMPARISON_WINDOW_STATE_KEY not in fetch_source
+    panel_source = inspect.getsource(app._render_scenario_comparison_panel)
+    assert "_render_comparison_window_control(" in panel_source
+    assert panel_source.index("cached_scenario_comparison_paths(") < panel_source.index(
+        "_render_comparison_window_control("
+    )
+
+
 def test_composition_figure_groups_by_stream() -> None:
     components = [
         ("TUC & other", 350.0, 350.0),

@@ -768,11 +768,16 @@ def test_revenue_outlook_primary_figures_use_runtime_pack_selected_series_only()
     assert "Actuals to 2025" in annotation_text
     assert "Current finalist forecast" not in trace_names
     assert not any("Schiff" in name or "selected_dashboard" in name for name in trace_names)
-    assert all(
-        getattr(trace, "x", None) is None or "FY2030" in list(trace.x)
+    # The Current path draws as several plotly traces (solid within-model
+    # portion, hover-less connector, dashed post-model portion), so the
+    # selected FY is asserted on their UNION rather than each segment.
+    base_case_years = {
+        str(x)
         for trace in total_fig.data
-        if trace.name == "Current finalist Base case"
-    )
+        if trace.name == "Current finalist Base case" and getattr(trace, "x", None) is not None
+        for x in trace.x
+    }
+    assert "FY2030" in base_case_years
 
     fan_availability = pd.read_csv(ROOT / "data/current_revenue_outlook/fan_availability.csv")
     fan_bands = pd.read_csv(ROOT / "data/current_revenue_outlook/fan_band_rows.csv")

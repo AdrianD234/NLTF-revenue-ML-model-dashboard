@@ -8,8 +8,12 @@ Sources (all committed):
   light/heavy RUC $ per km (revenue over km) and the petrol fleet intensity
   (litres per 100 km) used to express PED on a per-1,000 km basis.
 
-Beyond the legislated window the planned PED path comes from the governed
-pack itself (gross PED revenue over volume), and the no-uplift path carries
+Beyond the committed source's last legislated step the quarterly planned
+schedule carries the official +4c/L step at every 1 January (policy is +12c
+in 2027, +6c in 2028 and +4c every calendar year thereafter), and the
+no-uplift path stays one 12c wedge below it. At the annual display layer the
+planned PED path comes from the governed pack itself (gross PED revenue over
+volume, which embeds the same escalation), and the no-uplift path carries
 the last legislated wedge (12c from FY2028; 6c in FY2027) forward - i.e. the
 alternative stays parallel to the planned schedule.
 
@@ -46,6 +50,7 @@ from .fed_policy_states import (
     finite_deferral_specs,
     policy_spec,
     quarter_serial,
+    serial_quarter,
 )
 from .light_fleet_allocation import LAST_DECISION_GRADE_ANNUAL_FY
 from .revenue_source_pack import REVENUE_LAST_COMPLETE_ACTUAL_FY
@@ -90,6 +95,16 @@ _NO_UPLIFT_PATH = "No 2027 12c uplift"
 _HISTORY_PATH = "Selected rate"
 _DELAYED_SEGMENT = "delayed_6m"
 _DELAYED_QUARTERS = ("2027Q1", "2027Q2")
+# The official FED policy is +12c/L in calendar 2027, +6c/L in 2028 and +4c/L
+# in EVERY calendar year thereafter - the staircase does not stop at the
+# committed source file's last legislated step (2031Q1). The quarterly
+# schedule therefore carries the final legislated annual increment at every
+# 1 January beyond the source, through the governed scenario-input horizon
+# (scenario_input_wide runs 2026Q1-2050Q4). The published revenue pack
+# already embeds this escalation: its implied planned PED rate
+# (gross_ped_revenue / ped_volume) tracks the extended schedule's fiscal-year
+# means within ~1e-4 $/L through FY2050.
+FED_SCHEDULE_HORIZON_END_PERIOD = "2050Q4"
 
 FED_POLICY_STATE_DELAYED_6M = "delay_6m"
 FED_POLICY_STATE_NO_UPLIFT = "no_uplift"
@@ -237,12 +252,25 @@ def _quarter_order(period: Any) -> tuple[int, int]:
 def ped_quarterly_rate_schedules(repo_root: Path) -> pd.DataFrame:
     """Calendar-quarter PED $/L schedules for every governed policy state.
 
-    Each finite deferral is deliberately narrow: only the quarters from
-    2027Q1 up to (excluding) its deferred start take the no-uplift rate.
-    From the deferred start the published planned path is unchanged, so a
-    later planned increase retains its original date and the path catches up
-    at the start quarter. The six-month column reproduces the original
-    governed scenario exactly: only 2027Q1-Q2 take the no-uplift rate.
+    The six-month column reproduces the original governed scenario exactly:
+    only the quarters from 2027Q1 up to (excluding) 2027Q3 take the
+    no-uplift rate, later planned increases retain their published dates,
+    and the path catches up at the deferred start.
+
+    Every longer finite deferral shifts the ENTIRE legislated staircase:
+    from 2027Q1 onward its rate is the planned rate ``delay_quarters``
+    earlier, so the initial 12c/L step and every later scheduled increase
+    move forward by exactly the selected duration.
+
+    The official staircase does not stop at the source file's last legislated
+    step: policy is +12c in 2027, +6c in 2028 and +4c in every calendar year
+    thereafter. Beyond the committed source the planned path therefore adds
+    the final legislated annual increment (+4c/L) at every 1 January through
+    ``FED_SCHEDULE_HORIZON_END_PERIOD``, and the no-uplift path stays exactly
+    one 12c wedge below it (it keeps the 6c and every ongoing 4c step).
+    Because the staircase keeps rising, a shifted path never converges back
+    to published: each deferred year leaves the rate 4c/L below original
+    timing in every later year.
     """
     fed = _fed_rate_paths(repo_root)
     pivot = fed.pivot_table(
@@ -258,7 +286,67 @@ def ped_quarterly_rate_schedules(repo_root: Path) -> pd.DataFrame:
     pivot["history"] = pd.to_numeric(pivot.get(_HISTORY_PATH), errors="coerce")
     pivot["planned"] = pd.to_numeric(pivot.get(_PLANNED_PATH), errors="coerce")
     pivot["no_uplift"] = pd.to_numeric(pivot.get(_NO_UPLIFT_PATH), errors="coerce")
+    pivot = pivot[["quarter", "FY", "history", "planned", "no_uplift"]]
+    serials = pivot["quarter"].map(quarter_serial)
+    last_serial = int(serials.max())
+    last_row = pivot.loc[serials.idxmax()]
+    horizon_serial = quarter_serial(FED_SCHEDULE_HORIZON_END_PERIOD)
+    if (
+        pd.notna(last_row["planned"])
+        and pd.notna(last_row["no_uplift"])
+        and horizon_serial > last_serial
+    ):
+        # The final legislated annual increment (+4c/L: 2030Q1 -> 2031Q1)
+        # carries forward at every 1 January, because the official policy is
+        # +4c/L in every calendar year after 2028, not a staircase that ends.
+        source_q1 = sorted(
+            int(serial)
+            for serial, planned_value in zip(serials, pivot["planned"])
+            if int(serial) % 4 == 0 and pd.notna(planned_value)
+        )
+        if len(source_q1) < 2:
+            raise ValueError(
+                "The governed planned FED path needs at least two 1-January "
+                "steps to derive the ongoing annual increment."
+            )
+        planned_by_source_serial = {
+            int(serial): float(value)
+            for serial, value in zip(serials, pivot["planned"])
+            if pd.notna(value)
+        }
+        annual_increment = (
+            planned_by_source_serial[source_q1[-1]]
+            - planned_by_source_serial[source_q1[-2]]
+        )
+        if not np.isfinite(annual_increment) or annual_increment <= 0.0:
+            raise ValueError(
+                "The final legislated annual FED increment must be positive; "
+                f"derived {annual_increment!r}."
+            )
+        wedge = float(last_row["planned"]) - float(last_row["no_uplift"])
+        extension_rows = []
+        planned_level = float(last_row["planned"])
+        for serial in range(last_serial + 1, horizon_serial + 1):
+            year, quarter_index = divmod(serial, 4)
+            if quarter_index == 0:
+                planned_level += annual_increment
+            extension_rows.append(
+                {
+                    "quarter": serial_quarter(serial),
+                    # Calendar Q3/Q4 belong to the NEXT June year.
+                    "FY": year + 1 if quarter_index >= 2 else year,
+                    "history": np.nan,
+                    "planned": planned_level,
+                    "no_uplift": planned_level - wedge,
+                }
+            )
+        pivot = pd.concat([pivot, pd.DataFrame(extension_rows)], ignore_index=True)
     quarters = set(pivot["quarter"])
+    planned_by_serial = {
+        quarter_serial(quarter): value
+        for quarter, value in zip(pivot["quarter"], pivot["planned"])
+    }
+    uplift_serial = quarter_serial(FED_UPLIFT_START_PERIOD)
     for spec in finite_deferral_specs():
         window = spec.direct_affected_quarters()
         missing = [quarter for quarter in (*window, spec.start_period) if quarter not in quarters]
@@ -292,8 +380,25 @@ def ped_quarterly_rate_schedules(repo_root: Path) -> pd.DataFrame:
                 f"The {spec.state_id!r} deferral cannot rejoin the planned schedule: "
                 f"no planned rate exists in {spec.start_period}."
             )
-        pivot[spec.schedule_column] = pivot["planned"]
-        pivot.loc[window_mask, spec.schedule_column] = window_no_uplift
+        if spec.is_staircase_shift:
+            shifted_values = []
+            for quarter, planned_value in zip(pivot["quarter"], pivot["planned"]):
+                serial = quarter_serial(quarter)
+                if serial < uplift_serial:
+                    shifted_values.append(planned_value)
+                    continue
+                source = planned_by_serial.get(serial - spec.delay_quarters, np.nan)
+                if pd.isna(source):
+                    raise ValueError(
+                        f"The governed FED rate schedule cannot express "
+                        f"{spec.state_id!r}: no planned rate exists "
+                        f"{spec.delay_quarters} quarters before {quarter}."
+                    )
+                shifted_values.append(float(source))
+            pivot[spec.schedule_column] = shifted_values
+        else:
+            pivot[spec.schedule_column] = pivot["planned"]
+            pivot.loc[window_mask, spec.schedule_column] = window_no_uplift
     pivot["_order"] = pivot["quarter"].map(_quarter_order)
     return (
         pivot.sort_values("_order", kind="stable")
@@ -540,8 +645,10 @@ def rate_paths_frame(
 def _default_affected_periods(factors: dict[int, float], policy_state: str) -> dict[int, tuple[str, ...]]:
     """Fallback quarter map for callers that only carry annual factors.
 
-    Every affected fiscal year maps to its quarters from 2027Q1 onward
-    (bounded by the deferral window for a finite deferral). FY2027 therefore
+    Every affected fiscal year maps to its quarters from 2027Q1 onward.
+    Only the six-month catch-up state bounds the map at its deferred start:
+    a staircase shift's direct rate difference persists to the schedule
+    horizon, so its later fiscal years keep all four quarters. FY2027 always
     maps to 2027Q1-Q2 only, because its earlier quarters precede the uplift.
     """
     years = sorted(int(fy) for fy in factors)
@@ -549,7 +656,11 @@ def _default_affected_periods(factors: dict[int, float], policy_state: str) -> d
         return {}
     spec = policy_spec(policy_state)
     uplift_start = quarter_serial(FED_UPLIFT_START_PERIOD)
-    window_end = quarter_serial(spec.start_period) if spec.is_finite_deferral else None
+    window_end = (
+        quarter_serial(spec.start_period)
+        if spec.is_finite_deferral and not spec.is_staircase_shift
+        else None
+    )
     out: dict[int, tuple[str, ...]] = {}
     for fy in years:
         fy_quarters = (
@@ -1297,8 +1408,11 @@ def official_comparator_policy_factors(
     planned schedule instead of stopping where the current model stops.
 
     finite deferrals (``delay_6m`` … ``delay_36m``): identity outside the
-    affected fiscal-year window, because a deferral only shifts the timing of
-    the initial step; later planned increases retain their published dates.
+    affected fiscal-year window. For the six-month state that window is the
+    initial deferral alone (later planned increases retain their published
+    dates and the path catches up). For the 12-36 month staircase shifts the
+    window runs to the schedule horizon, because the official +4c/L annual
+    step keeps the shifted path persistently below published timing.
 
     Fails closed for a June year whose official published PED rate cannot be
     derived: the policy-adjusted official trace must never silently fall back
@@ -1323,10 +1437,16 @@ def official_comparator_policy_factors(
         )
         quarterly = ped_quarterly_rate_schedules(repo_root)
         delayed_src = quarterly.groupby("FY")[policy_spec_for_state.schedule_column].mean()
-    fed = _fed_rate_paths(repo_root)
-    planned_by_fy = (
-        fed[fed["fed_path"].astype(str).eq(_PLANNED_PATH)].groupby("FY")["rate_nzd_per_litre"].mean()
-    )
+        # The planned denominator comes from the SAME extended schedule frame
+        # as the delayed rates: identical to the raw annual source inside its
+        # horizon, and extended beyond it with the official +4c/L annual step
+        # so shifted staircases stay priced through the schedule horizon.
+        planned_by_fy = quarterly.groupby("FY")["planned"].mean()
+    else:
+        fed = _fed_rate_paths(repo_root)
+        planned_by_fy = (
+            fed[fed["fed_path"].astype(str).eq(_PLANNED_PATH)].groupby("FY")["rate_nzd_per_litre"].mean()
+        )
     source_sha = _sha256_of(repo_root / _OFFICIAL_SPINE_REL)
 
     published = (spine["gross_ped_revenue"] / spine["ped_volume"]).dropna()

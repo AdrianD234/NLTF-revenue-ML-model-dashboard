@@ -1138,9 +1138,14 @@ def test_revenue_outlook_page_does_not_render_summary_kpi_cards() -> None:
     assert "revenue_outlook_sensitivity_cost_ratio" not in source
     assert '"Traces"' not in source
     assert "revenue_outlook_traces" not in source
-    # One unified "Show on chart" multiselect replaced the per-trace popover.
+    # One unified "Show on chart" control drives every layer; it is now a
+    # compact popover with tick boxes, not a chip multiselect and not the
+    # pre-PR15 per-trace legend popover.
     assert "Show on chart" in source
+    assert "_render_chart_layer_picker(layer_catalogue)" in source
     assert "revenue_outlook_chart_layers" in source
+    assert 'key="revenue_outlook_chart_layers"' not in source
+    assert 'st.multiselect(\n                    "Show on chart"' not in source
     assert 'st.popover("Select legend items"' not in source
 
 
@@ -1377,14 +1382,55 @@ def test_revenue_outlook_compare_mode_swaps_total_path_for_comparison() -> None:
     # Default B (MoT VFM fast) differs from A, so KPI cards render immediately.
     assert "Cumulative nominal to FY2050" in rendered
     assert "NPV delta" in rendered
+    # The comparison window defaults to the full common horizon, so the
+    # default compare screen reproduces the pre-window view exactly. Under
+    # the default PREBU26 comparator the forecast window proper begins
+    # FY2027 (FY2026 is a published actual), so that is the offered floor.
+    window = _comparison_window_slider(at)
+    assert tuple(int(v) for v in window.value) == (2027, 2050)
+
+
+def _comparison_window_slider(at: AppTest):
+    return next(
+        s for s in at.select_slider if str(s.label) == "Comparison window"
+    )
+
+
+def test_revenue_outlook_comparison_window_recalculates_and_clamps() -> None:
+    at = _run_revenue_outlook_page()
+    _view_mode_radio(at).set_value(app.REVENUE_OUTLOOK_VIEW_COMPARE)
+    at.run()
+    assert not at.exception
+    _comparison_window_slider(at).set_range(2030, 2040)
+    at.run()
+    assert not at.exception
+    rendered = "\n".join(str(markdown.value) for markdown in at.markdown)
+    # Card titles, horizon subtitles and the NPV subtitle all follow the window.
+    assert "Cumulative nominal to FY2040" in rendered
+    assert "Cumulative nominal to FY2050" not in rendered
+    assert "FY2030–FY2040" in rendered
+    # The selection survives an ordinary rerun.
+    at.run()
+    assert not at.exception
+    assert tuple(int(v) for v in _comparison_window_slider(at).value) == (2030, 2040)
+    assert tuple(at.session_state[app._COMPARISON_WINDOW_STATE_KEY]) == (2030, 2040)
+
+    # A stale persisted window outside the offered horizon is clamped on the
+    # next render rather than raising Streamlit's out-of-options error; the
+    # clamp lands on the PREBU26-seam full range, never on masked FY2026.
+    at.session_state[app._COMPARISON_WINDOW_STATE_KEY] = (1990, 2100)
+    at.run()
+    assert not at.exception
+    assert tuple(int(v) for v in _comparison_window_slider(at).value) == (2027, 2050)
 
 
 def test_revenue_outlook_compare_mode_renders_pt_and_freight_for_scenario_b() -> None:
-    """Scenario B's PT and freight levers render unconditionally.
+    """Both columns' PT and freight levers render unconditionally.
 
     Both are first-class governed sensitivities (continuous through FY2050),
-    so they are no longer method-detail workshop copy: an A-side PT selection
-    must be mirrorable in B, and "Reset B to current page (A)" must copy it.
+    so they are no longer method-detail workshop copy: a page-side PT
+    selection must be mirrorable in either column, and "Reset A & B to
+    current page" must copy it into both.
     """
     at = _run_revenue_outlook_page()
     pt = next(
@@ -1397,24 +1443,30 @@ def test_revenue_outlook_compare_mode_renders_pt_and_freight_for_scenario_b() ->
     at.run()
     assert not at.exception
     selectbox_keys = {s.key for s in at.selectbox}
-    assert "ro_cmp_b_pt" in selectbox_keys
-    assert "ro_cmp_b_freight" in selectbox_keys
+    for key in ("ro_cmp_a_trace", "ro_cmp_a_pt", "ro_cmp_a_freight",
+                "ro_cmp_b_trace", "ro_cmp_b_pt", "ro_cmp_b_freight"):
+        assert key in selectbox_keys, key
     reset = next(b for b in at.button if b.key == "ro_cmp_reset_b")
     reset.click()
     at.run()
     assert not at.exception
-    b_pt = next(s for s in at.selectbox if s.key == "ro_cmp_b_pt")
-    assert str(b_pt.value) == "Med"
-    b_freight = next(s for s in at.selectbox if s.key == "ro_cmp_b_freight")
-    assert str(b_freight.value) == "Off"
+    for prefix in ("a", "b"):
+        pt_box = next(s for s in at.selectbox if s.key == f"ro_cmp_{prefix}_pt")
+        assert str(pt_box.value) == "Med", prefix
+        freight_box = next(s for s in at.selectbox if s.key == f"ro_cmp_{prefix}_freight")
+        assert str(freight_box.value) == "Off", prefix
+        trace_box = next(s for s in at.selectbox if s.key == f"ro_cmp_{prefix}_trace")
+        assert str(trace_box.value) == "Current finalist Base case", prefix
 
 
 def test_revenue_outlook_compare_mode_keeps_lever_state_for_downstream() -> None:
-    """A single-view lever survives the compare switch and drives Scenario A.
+    """The A column is independently selectable; page levers survive the trip.
 
-    Fleet efficiency is the lever this test flips. Scenario A is the live
-    Single scenario configuration, so the persisted lever must surface in
-    A's summary, then restore on switch-back.
+    Scenario A no longer mirrors the Single scenario configuration: it opens
+    on the Base path with its own levers Off regardless of the page levers.
+    Selecting a lever in the A column surfaces in A's summary, and the
+    page-side lever is preserved across the compare round-trip for the
+    sections below the comparison.
     """
     at = _run_revenue_outlook_page()
     fleet = next(
@@ -1423,6 +1475,16 @@ def test_revenue_outlook_compare_mode_keeps_lever_state_for_downstream() -> None
     fleet.set_value("High")
     at.run()
     _view_mode_radio(at).set_value(app.REVENUE_OUTLOOK_VIEW_COMPARE)
+    at.run()
+    assert not at.exception
+    # A is independent: its own fleet lever opens Off, so the page's High
+    # selection must NOT leak into the A summary...
+    a_fleet = next(s for s in at.selectbox if s.key == "ro_cmp_a_fleet")
+    assert str(a_fleet.value) == "Off"
+    rendered = "\n".join(str(markdown.value) for markdown in at.markdown)
+    assert "Fleet High" not in rendered
+    # ...until it is selected in the A column itself.
+    a_fleet.set_value("High")
     at.run()
     assert not at.exception
     rendered = "\n".join(str(markdown.value) for markdown in at.markdown)
@@ -1434,6 +1496,27 @@ def test_revenue_outlook_compare_mode_keeps_lever_state_for_downstream() -> None
         s for s in at.selectbox if s.key == "revenue_outlook_sensitivity_fleet_efficiency"
     )
     assert str(fleet_after.value) == "High"
+
+
+def test_revenue_outlook_comparison_offers_the_prebu_defer_workbook() -> None:
+    """The reference workbook is a selectable, lever-locked comparator."""
+    at = _run_revenue_outlook_page()
+    _view_mode_radio(at).set_value(app.REVENUE_OUTLOOK_VIEW_COMPARE)
+    at.run()
+    assert not at.exception
+    trace_a = next(s for s in at.selectbox if s.key == "ro_cmp_a_trace")
+    assert app.PREBU_DEFER_TRACE_NAME in trace_a.options
+    trace_a.set_value(app.PREBU_DEFER_TRACE_NAME)
+    at.run()
+    assert not at.exception
+    rendered = "\n".join(str(markdown.value) for markdown in at.markdown)
+    # The workbook names its side on the cards, and the KPI grid rendered.
+    assert app.PREBU_DEFER_TRACE_NAME in rendered
+    assert "Cumulative nominal to FY2050" in rendered
+    captions = "\n".join(str(caption.value) for caption in at.caption)
+    assert "Display-only comparator" in captions
+    a_fleet = next(s for s in at.selectbox if s.key == "ro_cmp_a_fleet")
+    assert bool(a_fleet.disabled)
 
 
 def test_revenue_outlook_comparison_offers_mot_official_locked_scenario() -> None:

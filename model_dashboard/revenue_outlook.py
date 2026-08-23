@@ -1167,11 +1167,17 @@ def net_revenue_timing_comparison_frame(
             raise ValueError("The 12c FED/RUC timing policy must not change Net MVR.")
         if not np.allclose(published_delta[fy2026], 0.0, rtol=0.0, atol=1e-9):
             raise ValueError("Original and deferred policy states must be identical in FY2026.")
-        # Direct-window fiscal years: the deferral prices exactly like the
-        # no-uplift path through the last fiscal year that ends before its
-        # deferred start, so those years must match the no-uplift state.
-        shared_last_fy = int(spec.start_period.split("Q")[0])
-        shared_last_fy = shared_last_fy if int(spec.start_period.split("Q")[1]) >= 3 else shared_last_fy - 1
+        # Direct-window fiscal years. The six-month state prices exactly like
+        # the no-uplift path through the last fiscal year that ends before
+        # its deferred start. A staircase shift matches no-uplift only while
+        # BOTH still sit at the pre-staircase base (through FY2027): beyond
+        # that the shift defers the separately scheduled increases too, so it
+        # can legitimately sit BELOW the no-uplift path.
+        if spec.is_staircase_shift:
+            shared_last_fy = 2027
+        else:
+            shared_last_fy = int(spec.start_period.split("Q")[0])
+            shared_last_fy = shared_last_fy if int(spec.start_period.split("Q")[1]) >= 3 else shared_last_fy - 1
         shared = timing_fy <= shared_last_fy
         if not np.allclose(off_delta[shared], 0.0, rtol=0.0, atol=1e-9):
             raise ValueError(
@@ -1184,24 +1190,52 @@ def net_revenue_timing_comparison_frame(
                 raise ValueError(
                     "Original timing must exceed deferred timing for FY2027 Net FED and Net RUC."
                 )
-        # The first fiscal year wholly at published rates after catch-up:
-        # the deferral must have rejoined the published path.
-        window = spec.direct_affected_quarters()
-        last_window_fy = int(window[-1].split("Q")[0]) + (1 if int(window[-1].split("Q")[1]) >= 3 else 0)
-        resumed = timing_fy >= last_window_fy + 1
-        if not np.allclose(published_delta[resumed], 0.0, rtol=0.0, atol=1e-9):
-            raise ValueError(
-                f"Original and deferred ({spec.timing_id}) policy states must coincide "
-                f"from FY{last_window_fy + 1} onward."
-            )
-        # In every rejoined year that still carries an uplift wedge, the
-        # deferred path must exceed the no-uplift path for the tax series.
-        rejoined_tax = resumed & (timing_fy >= 2028) & tax_series
-        if rejoined_tax.any() and not off_delta[rejoined_tax].gt(0.0).all():
-            raise ValueError(
-                f"The deferred 12c path ({spec.timing_id}) must exceed no-uplift for "
-                "every rejoined Net FED and Net RUC year."
-            )
+        if spec.is_staircase_shift:
+            # The whole staircase moves: the deferred path can never exceed
+            # published timing, and the shortfall PERSISTS beyond the initial
+            # deferral window instead of catching up - FY2028 must still sit
+            # strictly below published for the tax series.
+            if published_delta[tax_series].lt(-1e-9).any():
+                raise ValueError(
+                    f"The shifted staircase ({spec.timing_id}) must never exceed "
+                    "published timing for Net FED and Net RUC."
+                )
+            fy2028_tax = (timing_fy == 2028) & tax_series
+            if fy2028_tax.any() and not published_delta[fy2028_tax].gt(0.0).all():
+                raise ValueError(
+                    f"The shifted staircase ({spec.timing_id}) must stay below "
+                    "published timing in FY2028 for Net FED and Net RUC."
+                )
+            # The official staircase adds +4c/L every calendar year with no
+            # terminal step, so a shifted path never converges: the shortfall
+            # must persist to the LAST fiscal year of the matrix too.
+            final_fy_tax = (timing_fy == int(end_fy)) & tax_series
+            if final_fy_tax.any() and not published_delta[final_fy_tax].gt(0.0).all():
+                raise ValueError(
+                    f"The shifted staircase ({spec.timing_id}) must remain "
+                    f"below published timing through FY{int(end_fy)} for "
+                    "Net FED and Net RUC; a converged outer year means the "
+                    "ongoing +4c/L annual steps were not shifted."
+                )
+        else:
+            # The first fiscal year wholly at published rates after catch-up:
+            # the six-month deferral must have rejoined the published path.
+            window = spec.direct_affected_quarters()
+            last_window_fy = int(window[-1].split("Q")[0]) + (1 if int(window[-1].split("Q")[1]) >= 3 else 0)
+            resumed = timing_fy >= last_window_fy + 1
+            if not np.allclose(published_delta[resumed], 0.0, rtol=0.0, atol=1e-9):
+                raise ValueError(
+                    f"Original and deferred ({spec.timing_id}) policy states must coincide "
+                    f"from FY{last_window_fy + 1} onward."
+                )
+            # In every rejoined year that still carries an uplift wedge, the
+            # deferred path must exceed the no-uplift path for the tax series.
+            rejoined_tax = resumed & (timing_fy >= 2028) & tax_series
+            if rejoined_tax.any() and not off_delta[rejoined_tax].gt(0.0).all():
+                raise ValueError(
+                    f"The deferred 12c path ({spec.timing_id}) must exceed no-uplift for "
+                    "every rejoined Net FED and Net RUC year."
+                )
     if 2027 in delayed_factors and not (0.0 < float(delayed_factors[2027]) < 1.0):
         raise ValueError("The governed FY2027 delayed-rate factor must lie between zero and one.")
     return out.sort_values(["path_order", "FY", "series_order"], kind="stable").reset_index(drop=True)

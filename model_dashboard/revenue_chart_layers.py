@@ -139,12 +139,15 @@ def build_layer_catalogue(
     default_trace_names: list[str],
     uncertainty_available: bool,
     envelope_available: bool,
+    trace_interpretations: dict[str, str] | None = None,
 ) -> tuple[RevenueChartLayerSpec, ...]:
     """Every selectable layer, in draw order.
 
     ``trace_options`` comes from the runtime pack, so a vintage or conflict
     path that is not in this pack simply does not appear - the catalogue never
-    offers something the data cannot draw.
+    offers something the data cannot draw. ``trace_interpretations`` lets a
+    caller attach a specific help text to a trace it injected (for example a
+    display-only reference workbook path) without this module knowing it.
     """
     specs: list[RevenueChartLayerSpec] = []
 
@@ -197,19 +200,23 @@ def build_layer_catalogue(
         )
 
     # Paths, in the order they should be drawn above the shading.
+    interpretations = trace_interpretations or {}
     for offset, trace in enumerate(trace_options):
         specs.append(
             _path_spec(
                 trace,
                 draw_rank=10 + offset,
                 default_selected=trace in default_trace_names,
-                interpretation=(
-                    "Deterministic MoT VFM fleet-composition scenario, running "
-                    "to FY2050. It shares the governed Light RUC pool with "
-                    "Current Base; the exact VFM202405 scenario shares allocate "
-                    "that common pool into a different conventional/BEV/PHEV mix."
-                    if trace in (VFM_FAST_TRACE_NAME, VFM_SLOW_TRACE_NAME)
-                    else "Deterministic scenario path."
+                interpretation=interpretations.get(
+                    trace,
+                    (
+                        "Deterministic MoT VFM fleet-composition scenario, running "
+                        "to FY2050. It shares the governed Light RUC pool with "
+                        "Current Base; the exact VFM202405 scenario shares allocate "
+                        "that common pool into a different conventional/BEV/PHEV mix."
+                        if trace in (VFM_FAST_TRACE_NAME, VFM_SLOW_TRACE_NAME)
+                        else "Deterministic scenario path."
+                    ),
                 ),
             )
         )

@@ -69,6 +69,7 @@ from model_dashboard.rate_paths import (
     apply_fed_policy_state_to_chart_rows,
     fed_policy_annual_factors,
     mbu26_ruc_class_revenue_by_fy,
+    ped_quarterly_rate_schedules,
 )
 from model_dashboard.revenue_outlook import (
     PED_BRIDGE_DEFAULT_MODE,
@@ -985,6 +986,7 @@ def _validation_frame(
     revenue: pd.DataFrame,
     activity: pd.DataFrame,
     paths: tuple[ExportPath, ...],
+    repo_root: Path,
 ) -> pd.DataFrame:
     """Build and evaluate the workbook-facing validation contract."""
 
@@ -1854,23 +1856,37 @@ def _validation_frame(
         detail="The delayed policy collects the FED/RUC uplift from FY2028 while the off path does not.",
     )
 
-    # The same identity, ordering and rejoin gates for every longer governed
-    # deferral, with windows taken from the canonical registry. The six-month
-    # checks above are the production-named originals and stay untouched.
+    # The identity, ordering and horizon gates for every longer governed
+    # deferral. These states shift the ENTIRE legislated staircase
+    # (registry rule: is_staircase_shift), and the official staircase adds
+    # +4c/L every calendar year with no terminal step, so a shifted path
+    # never rejoins original timing, and its ordering against the no-uplift
+    # path follows the governed rate schedule year by year (it may sit
+    # below no-uplift while a separately scheduled increase is still
+    # deferred). The six-month checks above are the production-named
+    # originals and stay untouched.
+    schedule_fy_means = (
+        ped_quarterly_rate_schedules(repo_root)
+        .groupby("FY")
+        .mean(numeric_only=True)
+    )
+    off_fy_mean = pd.to_numeric(schedule_fy_means["no_uplift"], errors="coerce")
+    # Annual-mean rates within half a cent are treated as coincident: the
+    # replay's lagged features keep genuine path dependence, so revenue is
+    # only required to match within a small absolute noise band there.
+    rate_equality_band_nzd = 0.005
+    replay_noise_tolerance_m = 1.0
     for deferral_spec in FED_POLICY_SPECS:
         if not deferral_spec.is_finite_deferral or deferral_spec.delay_months == 6:
             continue
         state = deferral_spec.calculation_state_id
         timing = deferral_spec.timing_id
-        window = deferral_spec.direct_affected_quarters()
-        last_window_quarter = window[-1]
-        last_window_fy = int(last_window_quarter.split("Q")[0]) + (
-            1 if int(last_window_quarter.split("Q")[1]) >= 3 else 0
-        )
         start_quarter = deferral_spec.start_period
-        shared_last_fy = int(start_quarter.split("Q")[0]) - (
-            0 if int(start_quarter.split("Q")[1]) >= 3 else 1
-        )
+        # Both paths sit at the flat pre-staircase base only through FY2027:
+        # from FY2028 the shift defers the separately scheduled 6c/4c
+        # increases too, so it legitimately diverges from no-uplift in
+        # either direction.
+        shared_last_fy = 2027
         state_policy_pairs = policy_pairs_by_state[state]
         state_original_pairs = original_pairs_by_state[state]
 
@@ -1896,9 +1912,10 @@ def _validation_frame(
             ),
             max_abs_error=float(shared_error) if pd.notna(shared_error) else None,
             detail=(
-                f"The {timing} path prices exactly like no-uplift until its deferred "
-                f"start in {start_quarter}; whole-horizon model features must not "
-                "leak the later divergence backwards."
+                f"The {timing} staircase shift prices exactly like no-uplift only "
+                "while BOTH still sit at the flat pre-staircase base (through "
+                "FY2027); whole-horizon model features must not leak the later "
+                "divergence backwards."
             ),
         )
 
@@ -1952,78 +1969,104 @@ def _validation_frame(
             ),
         )
 
-        rejoined = state_original_pairs[
-            state_original_pairs["FY"].between(last_window_fy + 1, END_FY, inclusive="both")
-        ].copy()
-        if not rejoined.empty:
-            rejoined_error = pd.to_numeric(rejoined["delta"], errors="coerce").abs().max()
-            rejoined_scale = pd.concat(
-                [
-                    pd.to_numeric(rejoined["published_value"], errors="coerce").abs(),
-                    pd.to_numeric(rejoined["delayed_value"], errors="coerce").abs(),
-                ],
-                axis=1,
-            ).max(axis=1)
-            rejoined_relative = (
-                pd.to_numeric(rejoined["delta"], errors="coerce").abs()
-                / rejoined_scale.clip(lower=VALUE_TOLERANCE)
-            ).max()
-            add_check(
-                f"{timing}_rejoined_original_identity",
-                passed=(
-                    rejoined["_merge"].eq("both").all()
-                    and pd.notna(rejoined_relative)
-                    and float(rejoined_relative) <= post_rejoin_relative_tolerance
-                ),
-                observed=(
-                    f"rows={len(rejoined)}; max_abs_delta={float(rejoined_error):.12g}; "
-                    f"max_relative_delta={float(rejoined_relative):.12g}"
-                    if pd.notna(rejoined_error) and pd.notna(rejoined_relative)
-                    else f"rows={len(rejoined)}; deltas=missing"
-                ),
-                expected=(
-                    f"all FY{last_window_fy + 1}-FY{END_FY} original/{timing} values within "
-                    f"{post_rejoin_relative_tolerance:.2%} after catch-up in {start_quarter}"
-                ),
-                max_abs_error=float(rejoined_error) if pd.notna(rejoined_error) else None,
-                detail=(
-                    f"The {timing} path catches up to the published rate in {start_quarter}; "
-                    "a tightly bounded residual is allowed because lagged features preserve "
-                    "genuine path dependence from the deferral window."
-                ),
-            )
-
-        state_post_revenue = state_policy_pairs[
-            state_policy_pairs["FY"].between(last_window_fy + 1, END_FY, inclusive="both")
-            & state_policy_pairs["series_id"].isin(
+        # The staircase shift never rejoins original timing: the ongoing
+        # +4c/L annual steps shift too, so every later fiscal year keeps
+        # original tax revenue strictly above the shifted path. Activity
+        # series legitimately sit ABOVE published under a deferral (cheaper
+        # fuel and RUC raise kilometres and litres), so only the tax series
+        # carry the never-rejoins bound.
+        beyond_tax = state_original_pairs[
+            state_original_pairs["FY"].between(2028, END_FY, inclusive="both")
+            & state_original_pairs["series_id"].isin(
                 ["net_fed_revenue", "total_ruc_net_revenue"]
             )
         ].copy()
-        if not state_post_revenue.empty:
-            state_min_post = pd.to_numeric(state_post_revenue["delta"], errors="coerce").min()
-            add_check(
-                f"{timing}_post_window_policy_revenue_divergence",
-                passed=(
-                    state_post_revenue["_merge"].eq("both").all()
-                    and pd.notna(state_min_post)
-                    and float(state_min_post) > VALUE_TOLERANCE
-                ),
-                observed=(
-                    f"rows={len(state_post_revenue)}; "
-                    f"min_deferred_minus_off={float(state_min_post):.12g}"
-                    if pd.notna(state_min_post)
-                    else f"rows={len(state_post_revenue)}; min_deferred_minus_off=missing"
-                ),
-                expected=(
-                    f"every FY{last_window_fy + 1}-FY{END_FY} Net FED/Net RUC row with "
-                    f"{timing} revenue strictly above off"
-                ),
-                max_abs_error=None,
-                detail=(
-                    f"After catching up in {start_quarter}, the {timing} path collects the "
-                    "uplift while the off path never does."
-                ),
+        min_beyond_tax = pd.to_numeric(beyond_tax["delta"], errors="coerce").min()
+        add_check(
+            f"{timing}_never_rejoins_original",
+            passed=(
+                len(beyond_tax) == (END_FY - 2027) * 4 * 2
+                and beyond_tax["_merge"].eq("both").all()
+                and pd.notna(min_beyond_tax)
+                and float(min_beyond_tax) > VALUE_TOLERANCE
+            ),
+            observed=(
+                f"rows={len(beyond_tax)}; "
+                f"min_original_minus_deferred={float(min_beyond_tax):.12g}"
+                if pd.notna(min_beyond_tax)
+                else f"rows={len(beyond_tax)}; deltas=missing"
+            ),
+            expected=(
+                f"every FY2028-FY{END_FY} Net FED/Net RUC row strictly below "
+                "original timing"
+            ),
+            max_abs_error=None,
+            detail=(
+                f"The {timing} shift moves the entire staircase, including the "
+                "ongoing +4c/L annual steps, so the shortfall persists instead "
+                "of catching up at the deferred start."
+            ),
+        )
+
+        # Ordering against the no-uplift path is dictated by the governed
+        # rate schedule's fiscal-year means: above off where the shifted
+        # rate is above, below where a separately scheduled increase is
+        # still deferred, and within replay noise where they coincide.
+        state_rate_mean = pd.to_numeric(
+            schedule_fy_means[deferral_spec.schedule_column], errors="coerce"
+        )
+        ordering_failures: list[str] = []
+        ordering_observed: list[str] = []
+        for ordering_fy in range(2028, END_FY + 1):
+            rate_gap = float(state_rate_mean.get(ordering_fy)) - float(
+                off_fy_mean.get(ordering_fy)
             )
+            fy_rows = state_policy_pairs[
+                state_policy_pairs["FY"].eq(ordering_fy)
+                & state_policy_pairs["series_id"].isin(
+                    ["net_fed_revenue", "total_ruc_net_revenue"]
+                )
+            ]
+            deltas = pd.to_numeric(fy_rows["delta"], errors="coerce")
+            if len(fy_rows) != 4 * 2 or deltas.isna().any():
+                ordering_failures.append(f"FY{ordering_fy}: incomplete rows")
+                continue
+            if rate_gap > rate_equality_band_nzd:
+                ok = float(deltas.min()) > VALUE_TOLERANCE
+                regime = "above"
+            elif rate_gap < -rate_equality_band_nzd:
+                ok = float(deltas.max()) < -VALUE_TOLERANCE
+                regime = "below"
+            else:
+                ok = float(deltas.abs().max()) <= replay_noise_tolerance_m
+                regime = "coincident"
+            ordering_observed.append(
+                f"FY{ordering_fy}:{regime}(rate_gap={rate_gap:+.3f}, "
+                f"min={float(deltas.min()):.6g}, max={float(deltas.max()):.6g})"
+            )
+            if not ok:
+                ordering_failures.append(f"FY{ordering_fy}: {regime} violated")
+        add_check(
+            f"{timing}_off_ordering_follows_rate_schedule",
+            passed=(
+                not ordering_failures
+                and not state_policy_pairs["_merge"].ne("both").any()
+            ),
+            observed="; ".join(ordering_observed) or "no rows",
+            expected=(
+                "per-FY Net FED/Net RUC ordering against off matching the "
+                "governed schedule's fiscal-year mean rates (equality band "
+                f"{rate_equality_band_nzd} $/L, noise tolerance "
+                f"{replay_noise_tolerance_m} $m)"
+            ),
+            max_abs_error=None,
+            detail=(
+                f"A {timing} staircase shift can sit below the no-uplift path "
+                "while a separately scheduled increase is still deferred; the "
+                "governed quarterly schedule is the single source of truth for "
+                "which side of off each fiscal year falls on."
+            ),
+        )
 
     forecast_source = replay.future_forecasts.copy()
     calibrated_required = {
@@ -2550,6 +2593,7 @@ def materialize(repo_root: Path, output_dir: Path) -> dict[str, Path]:
         revenue=revenue,
         activity=activity,
         paths=paths,
+        repo_root=root,
     )
 
     outputs = {

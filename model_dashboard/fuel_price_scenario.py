@@ -762,7 +762,19 @@ def build_ruc_policy_scenario_inputs(
     to its real retail-price input, preserving the implicit deflator. The
     published nominal source equals the policy-free fuel path plus the
     published FED wedge, so the numerator and denominator use the same policy
-    basis. RUC receives the target/published rate multiplier because its
+    basis. This is algebraically the future-uplift decomposition: the target
+    pump price equals (published proxy - published future FED uplift) plus the
+    selected state's future uplift, so the ongoing +4c/L annual escalation
+    already embedded in the published proxy is never double-counted.
+
+    GST convention (explicit, documented decision): the pump-price wedge uses
+    the EX-GST FED rates (12/6/4 c/L) directly, matching the revenue
+    accounting basis. A GST-inclusive behavioural wedge (x1.15: 13.8/6.9/4.6)
+    would be the conceptually stricter retail-price treatment but would
+    reprice every deferral state's behavioural response; adopting it is a
+    governance decision, not a bug fix, and is deliberately not made here.
+
+    RUC receives the target/published rate multiplier because its
     finalists consume real Light/Heavy RUC price levels. Light-price lags for
     both RUC streams and the Heavy-price lead are rebuilt. Passing conflict
     rows keeps the independent petrol/diesel scenario ratios intact; nominal
@@ -825,6 +837,30 @@ def build_ruc_policy_scenario_inputs(
             petrol_price_deltas_cents[quarter] = float(planned_rate) * (float(factor) - 1.0) * 100.0
     period = scenario["canonical_period"].astype(str)
     stream = scenario["stream"].astype(str)
+    if quarterly_policy_factors is None:
+        # Fail closed if the governed schedule ever ends before the scenario
+        # inputs do: a governed policy state must never silently revert to
+        # published pricing in later quarters because the schedule ran out.
+        # Custom quarterly_policy_factors deliberately cover subsets, so the
+        # guard applies only to schedule-derived states.
+        uplift_start_serial = quarter_serial(FED_UPLIFT_START_PERIOD)
+        uncovered = sorted(
+            {
+                quarter
+                for quarter in period.unique()
+                if quarter_serial(quarter) >= uplift_start_serial
+                and quarter not in policy_multipliers
+            },
+            key=quarter_serial,
+        )
+        if uncovered:
+            raise ValueError(
+                "The governed FED schedule does not cover scenario-input quarters "
+                + ", ".join(uncovered[:4])
+                + (" ..." if len(uncovered) > 4 else "")
+                + f" for policy state {state!r}; extend the schedule horizon instead "
+                "of letting the policy silently truncate."
+            )
     nominal_petrol_path = _source_nominal_petrol_path(
         source_inputs,
         Path(repo_root),

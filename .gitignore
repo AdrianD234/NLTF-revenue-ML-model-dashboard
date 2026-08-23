@@ -184,6 +184,7 @@ data/dashboard_evidence_pack_reproducibility/ped_inner_hpo/source_artifacts/**/*
 !references/NLTF_model_input_sheet_actuals_to_*.xlsx
 !references/BEFU26 revenue forecast.xlsx
 !references/PREBU26.xlsx
+!references/PREBU defer.xlsx
 
 # MoT VFM 202405 derived uptake shares (governed lineage for EV lever presets)
 !data/vfm_202405/

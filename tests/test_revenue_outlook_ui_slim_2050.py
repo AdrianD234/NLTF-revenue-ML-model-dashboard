@@ -118,8 +118,8 @@ def rendered_page():
     # to render. Prove the page is really here before trusting an absence.
     labels = {str(element.label or "") for element in harness.get("selectbox")}
     assert "Series" in labels and "Selected FY" in labels, labels
-    assert [element for element in harness.get("multiselect")
-            if str(element.label) == "Show on chart"], "no layer selector rendered"
+    assert [key for key in harness.session_state.filtered_state
+            if str(key).startswith(app._LAYER_PICKER_KEY_PREFIX)], "no layer picker rendered"
     assert harness.get("plotly_chart"), "no chart rendered"
     return harness
 
@@ -287,10 +287,97 @@ def test_the_uncertainty_bands_are_still_offered(context) -> None:
 
 
 def test_no_vfm_layer_option_reaches_the_show_on_chart_control(rendered_page) -> None:
-    for element in rendered_page.get("multiselect"):
-        for option in getattr(element, "options", None) or []:
-            text = str(option).casefold()
-            assert not ("vfm" in text and ("fast" in text or "slow" in text)), option
+    # The picker offers one tick box per catalogue layer; a paused VFM layer
+    # must appear neither as a tick box label nor as a picker session key.
+    for element in rendered_page.get("checkbox"):
+        text = str(element.label or "").casefold()
+        assert not ("vfm" in text and ("fast" in text or "slow" in text)), element.label
+    for key in rendered_page.session_state.filtered_state:
+        text = str(key).casefold()
+        if text.startswith(app._LAYER_PICKER_KEY_PREFIX):
+            assert not ("vfm" in text and ("fast" in text or "slow" in text)), key
+
+
+def test_layer_picker_toggles_visibility_and_bulk_actions() -> None:
+    """The compact picker's full behaviour contract, on one live render.
+
+    Toggling a path or band changes only that layer's visibility; the bulk
+    actions and the empty-selection default fallback behave exactly like the
+    multiselect they replaced.
+    """
+    from streamlit.testing.v1 import AppTest
+
+    harness = AppTest.from_file(str(ROOT / "app.py"), default_timeout=300)
+    harness.run()
+    harness.radio[0].set_value(app.REVENUE_OUTLOOK_PAGE)
+    harness.run()
+    assert not harness.exception, harness.exception
+
+    def picker_state() -> dict[str, bool]:
+        return {
+            str(key): bool(value)
+            for key, value in harness.session_state.filtered_state.items()
+            if str(key).startswith(app._LAYER_PICKER_KEY_PREFIX)
+        }
+
+    initial = picker_state()
+    assert initial, "picker rendered no tick boxes"
+    default_on = {key for key, ticked in initial.items() if ticked}
+    # Defaults are the catalogue's own: both uncertainty bands ticked.
+    assert f"{app._LAYER_PICKER_KEY_PREFIX}{BAND_50_LAYER_ID}" in default_on
+    assert f"{app._LAYER_PICKER_KEY_PREFIX}{BAND_80_LAYER_ID}" in default_on
+
+    baseline = _total_path_traces(harness)
+    assert baseline is not None
+    assert any("High population" in name for name in baseline)
+    assert any("50% conditional" in name for name in baseline)
+
+    # Unticking a path hides that path and nothing else.
+    high_box = next(
+        element for element in harness.get("checkbox")
+        if str(element.label) == "Current finalist High population/comparison"
+    )
+    assert bool(high_box.value) is True
+    high_box.set_value(False)
+    harness.run()
+    assert not harness.exception
+    after_path = _total_path_traces(harness)
+    assert not any("High population" in name for name in after_path)
+    assert any("Base case" in name for name in after_path)
+    assert any("50% conditional" in name for name in after_path)
+
+    # Unticking a band hides that band and leaves the paths alone.
+    band_box = next(
+        element for element in harness.get("checkbox")
+        if str(element.label) == "50% conditional modelled uncertainty"
+    )
+    band_box.set_value(False)
+    harness.run()
+    assert not harness.exception
+    after_band = _total_path_traces(harness)
+    assert not any("50% conditional" in name for name in after_band)
+    assert any("80% conditional" in name for name in after_band)
+    assert any("Base case" in name for name in after_band)
+
+    # Bulk actions: all, none (falls back to the defaults with the same
+    # caption the multiselect used), then restore defaults.
+    next(b for b in harness.button if b.key == "ro_layer_picker_all").click()
+    harness.run()
+    assert not harness.exception
+    assert all(picker_state().values())
+    next(b for b in harness.button if b.key == "ro_layer_picker_none").click()
+    harness.run()
+    assert not harness.exception
+    assert not any(picker_state().values())
+    captions = "\n".join(str(caption.value) for caption in harness.get("caption"))
+    assert "Using the default chart layers." in captions
+    next(b for b in harness.button if b.key == "ro_layer_picker_defaults").click()
+    harness.run()
+    assert not harness.exception
+    assert {key for key, ticked in picker_state().items() if ticked} == default_on
+    restored = _total_path_traces(harness)
+    assert any("High population" in name for name in restored)
+    assert any("50% conditional" in name for name in restored)
 
 
 def test_a_persisted_vfm_selection_is_filtered_not_fatal() -> None:
