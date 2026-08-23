@@ -68,9 +68,9 @@ EXPECTED_LABELS = (
 )
 # Direct rate-affected calendar-quarter windows per finite deferral. The
 # six-month state changes only its initial window (catch-up); every longer
-# state shifts the ENTIRE staircase, so its rate differs from planned from
-# 2027Q1 until the last shifted step lands (the final legislated step sits at
-# 2031Q1, so a d-quarter shift differs through 2031Q1 + d - 1 quarters).
+# state shifts the ENTIRE staircase. Because the official staircase adds
+# +4c/L every calendar year with no terminal step, a shifted rate differs
+# from planned in EVERY quarter from 2027Q1 to the schedule horizon.
 
 
 def _quarter_range(first: str, last: str) -> tuple[str, ...]:
@@ -80,13 +80,14 @@ def _quarter_range(first: str, last: str) -> tuple[str, ...]:
     )
 
 
+SCHEDULE_HORIZON_END = rate_paths.FED_SCHEDULE_HORIZON_END_PERIOD
 EXPECTED_WINDOWS = {
     "delay_6m": ("2027Q1", "2027Q2"),
-    "delay_12m": _quarter_range("2027Q1", "2031Q4"),
-    "delay_18m": _quarter_range("2027Q1", "2032Q2"),
-    "delay_24m": _quarter_range("2027Q1", "2032Q4"),
-    "delay_30m": _quarter_range("2027Q1", "2033Q2"),
-    "delay_36m": _quarter_range("2027Q1", "2033Q4"),
+    "delay_12m": _quarter_range("2027Q1", SCHEDULE_HORIZON_END),
+    "delay_18m": _quarter_range("2027Q1", SCHEDULE_HORIZON_END),
+    "delay_24m": _quarter_range("2027Q1", SCHEDULE_HORIZON_END),
+    "delay_30m": _quarter_range("2027Q1", SCHEDULE_HORIZON_END),
+    "delay_36m": _quarter_range("2027Q1", SCHEDULE_HORIZON_END),
 }
 # Governed source rates (data/revenue_model_source_pack/2026_05_19/
 # fed_rate_paths.csv): planned and no-uplift by calendar year.
@@ -299,6 +300,47 @@ def test_six_month_catch_up_and_shifted_staircase_step_dates(quarterly) -> None:
     assert rate("delayed_36m", "2034Q1") == pytest.approx(1.00024)
 
 
+def test_official_staircase_escalates_four_cents_every_year(quarterly) -> None:
+    """The +4c/L annual step continues past the committed source (2031Q1):
+    official policy is 12c in 2027, 6c in 2028 and 4c EVERY year after, so
+    the planned path never goes flat, the no-uplift path stays one 12c wedge
+    below it, and shifted paths stay persistently below published."""
+    def rate(column: str, quarter: str) -> float:
+        return float(pd.to_numeric(quarterly.at[quarter, column]))
+
+    # Planned escalation on an ex-GST basis.
+    assert rate("planned", "2032Q1") == pytest.approx(1.04024)
+    assert rate("planned", "2038Q1") == pytest.approx(1.28024)
+    assert rate("planned", "2045Q1") == pytest.approx(1.56024)
+    assert rate("planned", "2050Q1") == pytest.approx(1.76024)
+    # Flat within a calendar year (steps land on 1 January only).
+    for year in (2033, 2040, 2049):
+        for quarter_index in (2, 3, 4):
+            assert rate("planned", f"{year}Q{quarter_index}") == pytest.approx(
+                rate("planned", f"{year}Q1")
+            )
+    # No-uplift keeps the 6c and every ongoing 4c step: exactly 12c below.
+    for quarter in ("2032Q1", "2038Q1", "2045Q1", "2050Q4"):
+        assert rate("no_uplift", quarter) == pytest.approx(rate("planned", quarter) - 0.12)
+    # Shifted staircases in outer years: 4c/L below published per deferred
+    # year, permanently (the consultant's acceptance table).
+    assert rate("delayed_12m", "2032Q1") == pytest.approx(1.00024)
+    assert rate("delayed_12m", "2038Q1") == pytest.approx(1.24024)
+    assert rate("delayed_12m", "2045Q1") == pytest.approx(1.52024)
+    assert rate("delayed_12m", "2050Q1") == pytest.approx(1.72024)
+    assert rate("delayed_24m", "2038Q1") == pytest.approx(1.20024)
+    assert rate("delayed_36m", "2038Q1") == pytest.approx(1.16024)
+    assert rate("delayed_36m", "2045Q1") == pytest.approx(1.44024)
+    assert rate("delayed_36m", "2050Q1") == pytest.approx(1.64024)
+    # In outer years a 36-month shift prices exactly like no-uplift (both
+    # 12c below published), while shorter shifts sit above it.
+    assert rate("delayed_36m", "2045Q1") == pytest.approx(rate("no_uplift", "2045Q1"))
+    assert rate("delayed_12m", "2045Q1") > rate("no_uplift", "2045Q1")
+    # The six-month state keeps tracking published dates in the outer years.
+    assert rate("delayed_6m", "2038Q1") == pytest.approx(1.28024)
+    assert rate("delayed_6m", "2050Q4") == pytest.approx(1.76024)
+
+
 def test_every_scheduled_step_moves_by_exactly_the_stated_duration(quarterly) -> None:
     """Step-for-step: a shift state's step quarters are the planned step
     quarters moved by delay_quarters, with identical step sizes in order."""
@@ -323,14 +365,24 @@ def test_every_scheduled_step_moves_by_exactly_the_stated_duration(quarterly) ->
 
     planned_steps = steps(planned)
     assert [size for _, size in planned_steps][:2] == [pytest.approx(0.12), pytest.approx(0.06)]
+    # The escalation continues to the horizon: a +4c step at every 1 January.
+    assert all(size == pytest.approx(0.04) for _, size in planned_steps[2:])
+    assert serial_quarter(planned_steps[-1][0]) == "2050Q1"
+    horizon = quarter_serial(SCHEDULE_HORIZON_END)
     for spec in finite_deferral_specs():
         if not spec.is_staircase_shift:
             continue
         shifted_steps = steps(pd.to_numeric(quarterly[spec.schedule_column], errors="coerce"))
-        assert [serial for serial, _ in shifted_steps] == [
-            serial + spec.delay_quarters for serial, _ in planned_steps
-        ], spec.state_id
-        assert [size for _, size in shifted_steps] == [size for _, size in planned_steps], spec.state_id
+        # Every planned step moves by exactly the stated duration; steps whose
+        # shifted date falls beyond the schedule horizon land outside the
+        # frame and are the only ones absent.
+        expected = [
+            (serial + spec.delay_quarters, size)
+            for serial, size in planned_steps
+            if serial + spec.delay_quarters <= horizon
+        ]
+        assert [serial for serial, _ in shifted_steps] == [serial for serial, _ in expected], spec.state_id
+        assert [size for _, size in shifted_steps] == [size for _, size in expected], spec.state_id
 
 
 def test_longer_deferral_rate_never_exceeds_shorter(quarterly) -> None:
@@ -361,16 +413,19 @@ def test_affected_periods_group_by_fiscal_year() -> None:
     # pre-change semantics (initial window only).
     periods_6 = rate_paths.fed_policy_affected_periods(ROOT, "delay_6m")
     assert periods_6 == {2027: ("2027Q1", "2027Q2")}
-    # Shift states: the map runs from 2027Q1 until the last shifted step
-    # lands (final legislated step 2031Q1 + duration - 1 quarter).
+    # Shift states: the official staircase never stops rising, so the map
+    # runs from 2027Q1 to the schedule horizon (2050Q3/Q4 belong to FY2051).
+    horizon_fy = 2051
     periods_18 = rate_paths.fed_policy_affected_periods(ROOT, "delay_18m")
-    assert set(periods_18) == {2027, 2028, 2029, 2030, 2031, 2032}
+    assert set(periods_18) == set(range(2027, horizon_fy + 1))
     assert periods_18[2027] == ("2027Q1", "2027Q2")
     assert periods_18[2028] == ("2027Q3", "2027Q4", "2028Q1", "2028Q2")
     assert periods_18[2032] == ("2031Q3", "2031Q4", "2032Q1", "2032Q2")
+    assert periods_18[2051] == ("2050Q3", "2050Q4")
     periods_36 = rate_paths.fed_policy_affected_periods(ROOT, "delay_36m")
-    assert set(periods_36) == {2027, 2028, 2029, 2030, 2031, 2032, 2033, 2034}
-    assert periods_36[2034] == ("2033Q3", "2033Q4")
+    assert set(periods_36) == set(range(2027, horizon_fy + 1))
+    assert periods_36[2034] == ("2033Q3", "2033Q4", "2034Q1", "2034Q2")
+    assert periods_36[2050] == ("2049Q3", "2049Q4", "2050Q1", "2050Q2")
     assert rate_paths.fed_policy_affected_periods(ROOT, "published") == {}
 
 

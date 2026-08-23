@@ -1206,6 +1206,17 @@ def net_revenue_timing_comparison_frame(
                     f"The shifted staircase ({spec.timing_id}) must stay below "
                     "published timing in FY2028 for Net FED and Net RUC."
                 )
+            # The official staircase adds +4c/L every calendar year with no
+            # terminal step, so a shifted path never converges: the shortfall
+            # must persist to the LAST fiscal year of the matrix too.
+            final_fy_tax = (timing_fy == int(end_fy)) & tax_series
+            if final_fy_tax.any() and not published_delta[final_fy_tax].gt(0.0).all():
+                raise ValueError(
+                    f"The shifted staircase ({spec.timing_id}) must remain "
+                    f"below published timing through FY{int(end_fy)} for "
+                    "Net FED and Net RUC; a converged outer year means the "
+                    "ongoing +4c/L annual steps were not shifted."
+                )
         else:
             # The first fiscal year wholly at published rates after catch-up:
             # the six-month deferral must have rejoined the published path.

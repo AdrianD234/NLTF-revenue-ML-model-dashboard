@@ -25,10 +25,12 @@ scheduled increase move by the same number of calendar quarters:
     before 2027Q1:      target = planned
     from 2027Q1 onward: target = planned shifted by delay_quarters
 
-so the path stays below original timing until the last shifted step lands,
-and it can also sit below the no-uplift counterfactual while a separately
-scheduled increase is still deferred.  Both rules are documented in
-:data:`FED_DEFERRAL_CATCH_UP_NOTE`.
+Because the official staircase keeps rising (+4c/L every calendar year after
+2028, with no terminal step), a shifted path never converges back to
+published timing: each deferred year leaves the rate 4c/L below original
+timing in every later year, and the path can also sit below the no-uplift
+counterfactual while a separately scheduled increase is still deferred.
+Both rules are documented in :data:`FED_DEFERRAL_CATCH_UP_NOTE`.
 """
 from __future__ import annotations
 
@@ -57,8 +59,10 @@ FED_DEFERRAL_CATCH_UP_NOTE = (
     "scheduled increases retain their published dates and the path catches "
     "up to the published rate at 1 Jul 2027. Every longer deferral shifts "
     "the entire legislated staircase - the initial 12c/L step and every "
-    "later scheduled increase move forward by the selected duration - so "
-    "the path stays below original timing until the last shifted step lands."
+    "later scheduled increase move forward by the selected duration. "
+    "Because the official staircase adds +4c/L every calendar year with no "
+    "terminal step, a shifted path never catches up: each deferred year "
+    "leaves the rate 4c/L below original timing in every later year."
 )
 
 
@@ -235,7 +239,8 @@ class FedPolicySpec:
 
         For the six-month state this is also the complete set of quarters
         whose direct rate differs from planned. For staircase shifts the
-        direct-rate difference extends until the last shifted step lands -
+        direct-rate difference persists to the schedule horizon (the official
+        +4c/L annual step never stops, so the shifted path never converges) -
         that full window depends on the governed schedule, so derive it from
         ``rate_paths.fed_policy_affected_periods``. No uplift: unbounded
         (every quarter from 2027Q1); this helper raises for it.
@@ -275,8 +280,9 @@ def _deferral_spec(months: int, order: int) -> FedPolicySpec:
             f"{_start_date_text(start)} ({start}) and every later scheduled "
             f"increase moves by the same {quarters} calendar quarters, so the "
             "PED retail-price input, the proportional Light and Heavy RUC "
-            "rates and real RUC model-price inputs all stay below original "
-            "timing until the last shifted step lands. "
+            "rates and real RUC model-price inputs all stay persistently "
+            "below original timing - the ongoing +4c/L annual steps shift "
+            "too, so the shortfall never closes. "
             + FED_DEFERRAL_CATCH_UP_NOTE
         )
     return FedPolicySpec(
