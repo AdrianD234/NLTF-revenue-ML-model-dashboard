@@ -8,7 +8,7 @@
     "python": "3.13.15"
   },
   "builder_version": "1",
-  "bytes_on_disk": 3279567,
+  "bytes_on_disk": 3298607,
   "code_module_count": 34,
   "engine": "ar1",
   "frame_count": 35,
@@ -277,7 +277,10 @@
         "conflict_gdp_stress_index",
         "conflict_gdp_transmission_basis",
         "conflict_gdp_source_url",
-        "conflict_gdp_reverse_fuel_feedback_applied"
+        "conflict_gdp_reverse_fuel_feedback_applied",
+        "conflict_unemployment_gap_pp",
+        "conflict_unemployment_source_url",
+        "conflict_unemployment_basis"
       ],
       "columns_name": null,
       "dtypes": {
@@ -290,6 +293,9 @@
         "conflict_gdp_source_url": "str",
         "conflict_gdp_stress_index": "float64",
         "conflict_gdp_transmission_basis": "str",
+        "conflict_unemployment_basis": "str",
+        "conflict_unemployment_gap_pp": "float64",
+        "conflict_unemployment_source_url": "str",
         "diff_log_real_gdp": "str",
         "diff_log_target_lag_1_lag_4": "str",
         "gdp_heavy_ruc_price_interaction": "str",
@@ -553,7 +559,10 @@
         "conflict_gdp_stress_index",
         "conflict_gdp_transmission_basis",
         "conflict_gdp_source_url",
-        "conflict_gdp_reverse_fuel_feedback_applied"
+        "conflict_gdp_reverse_fuel_feedback_applied",
+        "conflict_unemployment_gap_pp",
+        "conflict_unemployment_source_url",
+        "conflict_unemployment_basis"
       ],
       "columns_name": null,
       "dtypes": {
@@ -566,6 +575,9 @@
         "conflict_gdp_source_url": "str",
         "conflict_gdp_stress_index": "float64",
         "conflict_gdp_transmission_basis": "str",
+        "conflict_unemployment_basis": "str",
+        "conflict_unemployment_gap_pp": "float64",
+        "conflict_unemployment_source_url": "str",
         "diff_log_real_gdp": "str",
         "diff_log_target_lag_1_lag_4": "str",
         "gdp_heavy_ruc_price_interaction": "str",
@@ -1307,6 +1319,9 @@
         "conflict_gdp_transmission_basis",
         "conflict_gdp_source_url",
         "conflict_gdp_reverse_fuel_feedback_applied",
+        "conflict_unemployment_gap_pp",
+        "conflict_unemployment_source_url",
+        "conflict_unemployment_basis",
         "policy_source_nominal_petrol_cpl",
         "policy_target_nominal_petrol_cpl",
         "policy_nominal_petrol_ratio",
@@ -1339,6 +1354,9 @@
         "conflict_gdp_source_url": "str",
         "conflict_gdp_stress_index": "float64",
         "conflict_gdp_transmission_basis": "str",
+        "conflict_unemployment_basis": "str",
+        "conflict_unemployment_gap_pp": "float64",
+        "conflict_unemployment_source_url": "str",
         "diff_log_real_gdp": "float64",
         "diff_log_target_lag_1_lag_4": "float64",
         "gdp_heavy_ruc_price_interaction": "float64",
@@ -2056,6 +2074,9 @@
         "conflict_gdp_transmission_basis",
         "conflict_gdp_source_url",
         "conflict_gdp_reverse_fuel_feedback_applied",
+        "conflict_unemployment_gap_pp",
+        "conflict_unemployment_source_url",
+        "conflict_unemployment_basis",
         "policy_source_nominal_petrol_cpl",
         "policy_target_nominal_petrol_cpl",
         "policy_nominal_petrol_ratio",
@@ -2077,6 +2098,9 @@
         "conflict_gdp_source_url": "str",
         "conflict_gdp_stress_index": "float64",
         "conflict_gdp_transmission_basis": "str",
+        "conflict_unemployment_basis": "str",
+        "conflict_unemployment_gap_pp": "float64",
+        "conflict_unemployment_source_url": "str",
         "diff_log_real_gdp": "str",
         "diff_log_target_lag_1_lag_4": "str",
         "gdp_heavy_ruc_price_interaction": "str",
@@ -2889,30 +2913,30 @@
     }
   },
   "output_hashes": {
-    "fuel.annual_bridge.parquet": "225b9851b7306a4a39aa745c067949f9172451561e06e53b5674e11dcbe9b3d7",
-    "fuel.annual_factors.parquet": "37387c42ddcb654f6562a5e41d766e6c13b1f15225b4660e18d8d576c77cd904",
+    "fuel.annual_bridge.parquet": "92ee3e1d9ab042e079b594504b3cf8caa993a58ecbba26086f9b602a068d9339",
+    "fuel.annual_factors.parquet": "f72450f11e5bba0ec3f8e4acd951fbf18aadde5ce5a872f802ef9bf83236bce9",
     "fuel.baseline_macro_annual_factors.parquet": "bf1660e0d5ccb63c56c675aa3a03361fcbe6a3b857d7637f3b4b328281f56ca3",
     "fuel.baseline_macro_quarterly_factors.parquet": "b36480dbfcfca7fb63386992ac87efa10fd90fb8508461ba0f8aec0e80a3e575",
-    "fuel.fuel_scenario_inputs.parquet": "7189c48e2b0481d71be0bd9b6841459c918ac8db6d058b8f4f4172bdccdc1406",
+    "fuel.fuel_scenario_inputs.parquet": "fca63f0a8918bed34432dd0615de92a44e208ba20a62fbf7340034731f8a2508",
     "fuel.gdp_input_audit.parquet": "7518b8d97dfbce2b54c40844d4f0fce486f926383e0cb29fbd96fb1b8dd486cc",
-    "fuel.input_audit.parquet": "95132a78329c8645ff05f0251e207174517bb943fe8d0b55be888ae6b1b29372",
-    "fuel.policy_pair_factors.parquet": "7fa38ad09e569dbd7bd324f943810362f15e1717a1e9feadea2d060569216899",
-    "fuel.policy_scenario_inputs.parquet": "8fad754ee6876c18bfb180c6a0ff08c0df44f18dda5fcb4e38fa748f26ca8a39",
-    "fuel.price_only_replay.assumptions.parquet": "5cf68ff3ac1d678b94ae5f4d1858a2f33dfa9ef3b0c2a28cba1dcac38e844871",
+    "fuel.input_audit.parquet": "9a70ea1cb29db129f5835f1296e5d7d77b3520830f4480cb768746b8eef08557",
+    "fuel.policy_pair_factors.parquet": "d8b910630e354dde283a9e6600dae94ab4245b41d48cea1d67bc31b654474417",
+    "fuel.policy_scenario_inputs.parquet": "53265504f13bc64ddaefdda439ac2d9309f2f91af28b185cad8371cce01f8fef",
+    "fuel.price_only_replay.assumptions.parquet": "21ea49efb0f555d49e9f1f90cb013d8237f3faa5a803a49e465d01a12815d4e2",
     "fuel.price_only_replay.component_forecasts.parquet": "44e9498d7d36d4927c1e70ab6c8bfbda4aceed2d824537bc60fce18cb6c71ce8",
     "fuel.price_only_replay.future_forecasts.parquet": "e8096effc66d40ab558dca4ef3ee43d4870f493bedb281460b62e20f893768d4",
     "fuel.price_only_replay.structural_component_forecasts.parquet": "8b6e33d47f4e1df33f587d9b1d420f756a6c705b8496e0912c223c5d83371df9",
     "fuel.price_only_replay.superseded_component_forecasts.parquet": "8b6e33d47f4e1df33f587d9b1d420f756a6c705b8496e0912c223c5d83371df9",
     "fuel.price_only_replay.validation_report.parquet": "fe9e7969b6271c7429f795d40995c3e8881e1dbbc04521a35ec4debcee7e3e92",
-    "fuel.price_only_replay_inputs.parquet": "f08b3f4a0c89e25d56cfb8e60d85afeb2aed94b09b1933b9d71739536893ada6",
-    "fuel.quarterly_factors.parquet": "b624bc30a7d2a2e77dc95bc79d1acb5b8e1875c45bfbfb1cbf8c1204de2014fb",
-    "fuel.replay.assumptions.parquet": "49784c23966fdc05072753e521d60d0183874ce3feae69979a77d3b84123ce25",
+    "fuel.price_only_replay_inputs.parquet": "53c7fbf51944e0ae100ad82aa8c6776d4cdb0aaa21875499569e12a419db7a76",
+    "fuel.quarterly_factors.parquet": "3908fe3078994d4366bed7419ecc8c625ffd67e42711fd4c021e25d8e9b46168",
+    "fuel.replay.assumptions.parquet": "4f78f44d4be52d80d872beafcedd9c9914ebd41919ef33a2ffb8ad929e4a0d5b",
     "fuel.replay.component_forecasts.parquet": "7b9312ecf61a8c41ecb4fb8d2703f1b8b6360739b28920558716e0f370676787",
-    "fuel.replay.future_forecasts.parquet": "96efdd4351b58e3098fccca57dfab5bff0be72523f2cf813525fcfacaf3b3b8f",
-    "fuel.replay.structural_component_forecasts.parquet": "71eb9ba73d4de538fff52bfca7eb5c4b11a6e03e4e12eddfe7001b565c239bd6",
-    "fuel.replay.superseded_component_forecasts.parquet": "cdc8e8723dff4aa435941cddcea292df654578bc0b50131a68d51e5173a26d7a",
-    "fuel.replay.validation_report.parquet": "ec40ecc478c1336ab665394d4ee40c6a6aab58f903da9495beafaaebb6fa9e09",
-    "fuel.replay_inputs.parquet": "5541eeeedc6a227cce83987175e59112d4f119952fcd06da30f562748892b920",
+    "fuel.replay.future_forecasts.parquet": "7ab6b35e76a67484a7f58195cc48d3c779c3749c8107f28ba51c96f5b6200f17",
+    "fuel.replay.structural_component_forecasts.parquet": "87f04e0bc44e1a692eca3c7372f440dd743b7052bef7071475ec516c17e2068c",
+    "fuel.replay.superseded_component_forecasts.parquet": "3c3aa11a00692273f4434a06da2498740c71461083565d1a5a843ec5378e46e6",
+    "fuel.replay.validation_report.parquet": "6999f343fdf5fcc7c4f68960cca8a33c90785a1ed5db235201df366d4088ffa0",
+    "fuel.replay_inputs.parquet": "877b55ed07d6a81097602c6d06dadb84a2fb5e8bcbd7908f8c39bf34d79eb1bd",
     "fuel.treasury_base_inputs.parquet": "b044faceb07144d42d84af21923ee3c5c5c92ba9ba0dd5847af21d52bda75014",
     "macro.baseline_macro_annual_factors.parquet": "42297de3380f9541e5f7ad9a4bf60df202da429ad734434803cd843ab0ab0c17",
     "macro.baseline_macro_quarterly_factors.parquet": "e7d29a26bb949694bf95a83824e71d6b3e19127784c2887e10ca36843bb5d19e",
@@ -2931,25 +2955,25 @@
     "code_module_hashes": {
       "model_dashboard/__init__.py": "40f18fc5bbc37948a1250097bb55c68711d51d6622248e75efe27cd3580809f8",
       "model_dashboard/completeness_contract.py": "2a5ec576c757b7d4d820a060922dd5c7c7275841dc9734dcb479f9ad49a5c708",
-      "model_dashboard/conflict_fuel_paths.py": "8f784d2c60f9813107fdbf7fe0c5b115381d199ff27471603f31eea9e2465b3d",
-      "model_dashboard/conflict_gdp_paths.py": "7beb97ff0a1a27e4268ee0e90765aecabbbc609e03f3952acbc7d5ec5bed5f25",
+      "model_dashboard/conflict_fuel_paths.py": "542e8fed674d164fae0620f8c1d0d0a45e6275af21ddfa3f99d862ec19b958e5",
+      "model_dashboard/conflict_gdp_paths.py": "418a549da02d7fb719da070c12857ce37366cee815e4283e4492dbacf0f8ccf9",
       "model_dashboard/engine.py": "9bffa6e6493cc20c13ca0f2efd9924fcb81da61d713725b41ccdbdab71914d7a",
       "model_dashboard/ev_uptake_levers.py": "ab4520eff520c2d5ce65faa4a02921e87445be515056d8a56d79170d0d277d73",
       "model_dashboard/fed_policy_states.py": "5fba4bbf4b289d2a554607274a5d09cf0e21464392b6b49355b50572f8c7a3bb",
       "model_dashboard/forecast_imports.py": "d39fd287ab25d874ef1824618a3bc9027904aa6dea1718d16414670742780a15",
       "model_dashboard/forecast_runner.py": "123330cc285881ab042cee4231ebd57dffca6ce236f39fc28687385c8cf4644d",
       "model_dashboard/forward_scorer_governance.py": "044a83f4c50b51de90f1185dcb1d7f44f8b087d349078ee993c5af5d36d692fc",
-      "model_dashboard/fuel_price_scenario.py": "7618fbfde9464e4356f76cbd609080034582d83a02652373526a69bddf5e0761",
+      "model_dashboard/fuel_price_scenario.py": "881ca72197a4a0d00346c995a6dfe70b7a723ecae3b57c9822ff53f41813ae62",
       "model_dashboard/governance_constants.py": "00b9e3a41aedbbe2dd51c0d5c4d9cb82696e2d63a284dff1f88d477dd5338568",
       "model_dashboard/heavy_ruc_forward.py": "9ab8ff4ed010b652fbb467dfbe9672085bfe0324e69a21e7770de98ed4fb3e29",
       "model_dashboard/light_fleet_allocation.py": "c997ccc283eb3a54a91f1c5ec009b02de35d1b1e6be03e04aeaa502479c39d37",
-      "model_dashboard/long_run_shape_transition.py": "fd4a6971d6f29d45ab0555c48a972a14987a65356c75e9d2fa811fe7664ffe23",
+      "model_dashboard/long_run_shape_transition.py": "31296566e1f4fa3e6ef61c3d0ad078a642861fbf3f20455fd9312dbda2c9eaee",
       "model_dashboard/mbu26_source_spine.py": "5763d726eb91c9c41516cd9dcdd0523acc7a0442a572baef56616a1d9eb9058c",
       "model_dashboard/official_vintage.py": "9ab13f0f24d92a9096c67fd720eccb2b84c3d6bb99a8df7aa1e7bc3e29fc2f87",
       "model_dashboard/ped_forward.py": "92c3b5324ae798956679820a4e0b23314f2134a259c4b973d58640e6329325fa",
-      "model_dashboard/post_model_extrapolation.py": "c2f469cea30854e20e446951a91d13b5b12a0e851d5f601c79b2ce16fe791517",
+      "model_dashboard/post_model_extrapolation.py": "9c5171e058f7044e14f275a3b164d0ab1105b85e05a50072a3d457930e0a4d0e",
       "model_dashboard/rate_paths.py": "436d654f466005698f2ebaf99adc45027fd4f76046f38cc6f631af027b44b292",
-      "model_dashboard/revenue_outlook.py": "5b5a0c7b6146ac45d5eee538f1a87b5ce4511494f95ac61190a345b4a991dc55",
+      "model_dashboard/revenue_outlook.py": "193e74584369e8d6ce8d0e67337067e59f290c48e4204280f4ebca01cf823b47",
       "model_dashboard/revenue_outlook_replay_cache.py": "f24ea4013bb9169612a8d63008fb1ded2626bf780c272df6270fcbd6705eb518",
       "model_dashboard/revenue_source_pack.py": "61b9fd2b06d4c16add928656b9bd6e5cda9dcb38b0f3d9a0f60fb5c1e2cf8c9c",
       "model_dashboard/scenario_inputs.py": "f035a3da1e995550565f968f1f0ff2f5ee438bd5217f91440f6542b2882f8f29",
@@ -2991,11 +3015,11 @@
         "size_bytes": 10889
       },
       "fan_band_rows.csv": {
-        "sha256": "03ede61c67223effca382e32f1b7f2f04e964cb243fc91175e324f30f00e9d8a",
-        "size_bytes": 271996
+        "sha256": "02ea9fd3445bd4d853ded0e1a3de66049dc3cce8dffdd5d040fff86f35bc9c55",
+        "size_bytes": 272022
       },
       "fan_band_rows.parquet": {
-        "sha256": "45cc49a6a2dc7ee29e6d4461a8902ff08f8fca6bb039dde9885605242f71589c",
+        "sha256": "2c0f0453658700a057e907ee91ea0a15599f3496f132aecc98f3152472c56e6b",
         "size_bytes": 41630
       },
       "future_revenue_forecasts.csv": {
@@ -3087,36 +3111,36 @@
         "size_bytes": 29242
       },
       "revenue_chart_rows.csv": {
-        "sha256": "f5bc2f69df582e884be38e475e2ea4146e1a9217dee7dcf3c98fb61553e936be",
-        "size_bytes": 2542381
+        "sha256": "4406a452fdf4f1786efa951cf93dcfd04f138815765f22af8870bc45103ce07d",
+        "size_bytes": 2546192
       },
       "revenue_chart_rows.parquet": {
-        "sha256": "c755ff56a4fdbfa7d824925d8c52dcae0a8d6dce4d937e47d9c83c1eb634e07e",
-        "size_bytes": 131003
+        "sha256": "1ebcece6e1924977d98a3379208fe4512a89d23829449bd4eeaffe0ed343f2e8",
+        "size_bytes": 131051
       },
       "revenue_formula_residuals.csv": {
-        "sha256": "7c80cdd094a0dd05ddbc6a44a65495e434fb7c3bc069cb1a8d6feaa61b93312a",
-        "size_bytes": 606815
+        "sha256": "d2b836a658d33a0c7fcfee5a9af5611a8c00932b7c2873903ad99ce9f582100e",
+        "size_bytes": 606923
       },
       "revenue_formula_residuals.parquet": {
-        "sha256": "ee43a9108922d93ae6a65343614ed5f05592aa85b597b9e166b1b04110f7d1bd",
-        "size_bytes": 52835
+        "sha256": "046102366536621e308a9e2e887cf262565e2ff5009b0501fb3980851bdd8104",
+        "size_bytes": 52813
       },
       "revenue_line_reconciliation.csv": {
-        "sha256": "1b9fa320ee2b30967e09dd51c2bd733819d93781774313f1bbc29313d5ae7177",
-        "size_bytes": 3319232
+        "sha256": "158a466644ce608da63663774ce3a307e96c4f7c8bbc6558b19d56bd84598c16",
+        "size_bytes": 3323806
       },
       "revenue_line_reconciliation.parquet": {
-        "sha256": "f064c9d1bf1b37db1a40bc4dc71abce99366b487358c166daa9c16cbb7255dfb",
-        "size_bytes": 109303
+        "sha256": "95a1501e7db6746816b71d5327411e28756f3c9fc02daaf3b50eaff525c5c699",
+        "size_bytes": 109319
       },
       "revenue_stack_components.csv": {
-        "sha256": "42aa6914f604a71e8efa1871d0306581210d0fe592eec83c08aa4c96aab98c25",
-        "size_bytes": 16871588
+        "sha256": "a4a3bb54436b6a6d9d9b6c8bfe3f79d9e395b324eacf368c5e52aba086e8b058",
+        "size_bytes": 16865697
       },
       "revenue_stack_components.parquet": {
-        "sha256": "4ecb9fd67da672b02c9efbd0a65cec3c707398a583e1264bd7a24492a253aafe",
-        "size_bytes": 378816
+        "sha256": "0f9f212dd9546a3fdf0e6da7097202d0ca3e455c2e10704a563435229362c1c9",
+        "size_bytes": 378815
       },
       "row_reconciliation.csv": {
         "sha256": "c3b08c6a325833c85b042335acb58cd858e3b7377adb92fc3570507934258c9b",
@@ -3183,12 +3207,12 @@
         "size_bytes": 10806
       },
       "sensitivity_impact_audit.csv": {
-        "sha256": "501613bf25b96abc752293ae07d02b3b5537c6147cb2dc849a12f66c75f043b1",
-        "size_bytes": 748579
+        "sha256": "1bf7bba6d17b856833f31b07d9d3d99be9b2030095b5ab3f3a4d0fdb772237b9",
+        "size_bytes": 748565
       },
       "sensitivity_impact_audit.parquet": {
-        "sha256": "6e918b638ba36be7d4e7775e22ad2e6efc87681a6ecf1d62adda2e44bd3ea4cf",
-        "size_bytes": 48817
+        "sha256": "1c9372beb58ddab644f15403c4218dc29d3fe09a66f7d75bbdcda2ce08af603d",
+        "size_bytes": 48724
       },
       "sensitivity_seed_inputs.csv": {
         "sha256": "ec16691e19856cacfdf5e41124fd846bf3ff43e6ad0e60dd7c104e1306751ff6",
@@ -3234,7 +3258,7 @@
     "pack_schema_version": "revenue-outlook-pack-v1",
     "schema_version": "1",
     "source_hashes": {
-      "data/current_revenue_outlook/conflict_fuel_price_scenarios.csv": "ad379997aa4044cdabf7d948787c926e06a434447ff076640cfab317eda53c73",
+      "data/current_revenue_outlook/conflict_fuel_price_scenarios.csv": "7daf48033da3b9e3f8655aa7cacd302ebd1876b28e2fa03d20b66ea029f782a6",
       "data/current_revenue_outlook/conflict_gdp_calibration.csv": "032606a84ed1e7716197ced405d3026b39c8c00e0a56882174b45c13eb8fb655",
       "data/current_revenue_outlook/sensitivity_seed_inputs.csv": "ec16691e19856cacfdf5e41124fd846bf3ff43e6ad0e60dd7c104e1306751ff6",
       "data/current_revenue_outlook/treasury_befu26_macro_path.csv": "1dd2fcbbc122ad8dd502e44ff1833f93ff26169dcd7dc47026da787adaf8aa1e",
@@ -3899,6 +3923,6 @@
     ]
   },
   "schema_version": "1",
-  "source_digest": "e7b70e43da67813784ae88b3da4253c47f319c990354ee2ee6c75ed01983a54f",
-  "source_main_sha": "774a4305ed061977c2dd11b25f08c0c1bbeedeae"
+  "source_digest": "7cddd27289dcb9730fb13fffcf8debcd9d09a7fc17667a5f0a3fe4bb25a87f78",
+  "source_main_sha": "d5cffec7f6b967a65b113e83eac692c677454d4f"
 }

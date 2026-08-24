@@ -47,6 +47,9 @@ import pandas as pd
 __all__ = [
     "ANCHOR_FY",
     "FLEET_COMPOSITION_SOURCE_ID",
+    "GROWTH_HANDOVER_BLEND_KIND",
+    "GROWTH_HANDOVER_FORMULA_ID",
+    "LEVEL_BLEND_KIND",
     "LONG_RUN_SHAPE_METHOD_ID",
     "PRODUCTION_LONG_RUN_TRANSITION_SCHEDULE_ID",
     "SCHEDULES",
@@ -57,6 +60,8 @@ __all__ = [
     "TransitionSchedule",
     "complete_transition_ratio_identity",
     "geometric_blend_index",
+    "growth_handover_index",
+    "handover_ratio_identity",
     "resolve_schedule",
     "structural_growth_indices",
     "transition_weight",
@@ -76,6 +81,21 @@ FLEET_COMPOSITION_SOURCE_ID = "VFM202405"
 TRANSITION_WEIGHT_FORMULA_ID = "cubic_smoothstep_3u2_minus_2u3_v1"
 UNBLENDED_WEIGHT_FORMULA_ID = "constant_zero_v1"
 
+# The two governed blend mechanics. LEVEL_BLEND is the original v1 geometric
+# blend of level INDICES: log I_hybrid = (1-w) log I_current + w log I_struct.
+# Its growth rate carries an extra term dw * (log I_struct - log I_current) -
+# a level pull toward the structural curve that re-applies every year while w
+# moves, so a Current path that has already crossed the official curve keeps
+# getting dragged back toward it and the delta-vs-official can oscillate
+# around zero. GROWTH_HANDOVER removes exactly that term: the same weight is
+# applied to the two GROWTH RATES instead, the level integrates the blended
+# growth once, and once the handover completes the path simply continues on
+# the structural growth rate from wherever it is - one-way, no pull-back.
+LEVEL_BLEND_KIND = "level_blend"
+GROWTH_HANDOVER_BLEND_KIND = "growth_handover"
+GROWTH_HANDOVER_FORMULA_ID = "one_way_growth_rate_handover_v1"
+LEVEL_BLEND_FORMULA_ID = "geometric_level_index_blend_v1"
+
 UNBLENDED_SCHEDULE_ID = "unblended_current"
 
 # The governed PRODUCTION default. This is the owner decision, recorded in one
@@ -83,13 +103,14 @@ UNBLENDED_SCHEDULE_ID = "unblended_current"
 # built on this schedule unless a caller explicitly asks for another, and the
 # analyst preview reads whatever the built pack recorded.
 #
-# balanced_structural reaches equal weight around FY2037 - about a decade past
-# the estimation window. Long enough not to discard the econometrics
-# prematurely, short enough that the terminal decade is governed by an
-# externally published structural source rather than by a twenty-year
-# extrapolation of a short-run model. See
-# artifacts/anchored_structural_shape_transition/candidate_verdict.md.
-PRODUCTION_LONG_RUN_TRANSITION_SCHEDULE_ID = "balanced_structural"
+# growth_handover_fy2035 hands the post-model growth rate over to the
+# structural source across FY2031-FY2035 and then continues on that trajectory.
+# It replaced balanced_structural (the level blend completing FY2045) as the
+# production default because the level blend's year-by-year pull toward the
+# official curve made the cumulative delta versus the official comparator
+# oscillate through zero, which mis-stated scenario risk in the long run. The
+# level-blend schedules remain governed candidates for the analyst preview.
+PRODUCTION_LONG_RUN_TRANSITION_SCHEDULE_ID = "growth_handover_fy2035"
 
 # The official-vintage activity series the structural shape is built from.
 # A vintage that does not carry all of these over FY2030-FY2050 cannot serve
@@ -130,10 +151,15 @@ class TransitionSchedule:
     anchor_fy: int
     completion_fy: int | None
     description: str
+    blend_kind: str = LEVEL_BLEND_KIND
 
     @property
     def is_structural(self) -> bool:
         return self.completion_fy is not None
+
+    @property
+    def is_growth_handover(self) -> bool:
+        return self.is_structural and self.blend_kind == GROWTH_HANDOVER_BLEND_KIND
 
     @property
     def formula_id(self) -> str:
@@ -141,6 +167,16 @@ class TransitionSchedule:
             TRANSITION_WEIGHT_FORMULA_ID
             if self.is_structural
             else UNBLENDED_WEIGHT_FORMULA_ID
+        )
+
+    @property
+    def blend_formula_id(self) -> str:
+        if not self.is_structural:
+            return UNBLENDED_WEIGHT_FORMULA_ID
+        return (
+            GROWTH_HANDOVER_FORMULA_ID
+            if self.is_growth_handover
+            else LEVEL_BLEND_FORMULA_ID
         )
 
 
@@ -187,6 +223,35 @@ SCHEDULES: dict[str, TransitionSchedule] = {
             description=(
                 "Reliance moves to the structural shape across the whole "
                 "post-model horizon, completing only at the final year."
+            ),
+        ),
+        TransitionSchedule(
+            schedule_id="growth_handover_fy2035",
+            display_name="One-way growth handover (complete FY2035)",
+            anchor_fy=ANCHOR_FY,
+            completion_fy=2035,
+            blend_kind=GROWTH_HANDOVER_BLEND_KIND,
+            description=(
+                "The post-model GROWTH RATE hands over from the econometric "
+                "extrapolation to the structural source across FY2031-FY2035. "
+                "After the handover the path continues on the structural growth "
+                "trajectory from wherever it is: no level is ever pulled back "
+                "toward the official curve, so the delta versus the official "
+                "comparator cannot oscillate through zero by construction. The "
+                "production default."
+            ),
+        ),
+        TransitionSchedule(
+            schedule_id="growth_handover_fy2040",
+            display_name="One-way growth handover (complete FY2040)",
+            anchor_fy=ANCHOR_FY,
+            completion_fy=2040,
+            blend_kind=GROWTH_HANDOVER_BLEND_KIND,
+            description=(
+                "The one-way growth-rate handover spread across a decade: the "
+                "econometric growth rate remains informative for longer before "
+                "the structural source takes over. Same no-pull-back mechanics "
+                "as the FY2035 handover."
             ),
         ),
     )
@@ -508,6 +573,114 @@ def geometric_blend_index(
     return blended if blended.ndim else float(blended)
 
 
+def growth_handover_index(
+    current_index: np.ndarray | pd.Series,
+    structural_index: np.ndarray | pd.Series,
+    weight: np.ndarray | pd.Series,
+    *,
+    context: str = "long-run growth handover",
+) -> np.ndarray:
+    """One-way growth-rate handover between two anchored growth indices.
+
+        dlog(I_hybrid)_t = (1 - w_t) * dlog(I_current)_t + w_t * dlog(I_structural)_t
+        I_hybrid_anchor  = 1        (both inputs are 1.0 at the anchor)
+
+    The arrays must be ordered by FY starting AT the anchor year, where both
+    indices equal exactly 1.0. Each year's growth is a convex combination of
+    the two input growth rates under the same governed weight path the level
+    blend uses - but the level integrates that blended growth ONCE. Compare
+    the level blend, whose growth rate carries the extra term
+    ``dw * (log I_structural - log I_current)``: that term is a pull toward
+    the structural LEVEL curve that re-applies while the weight moves, and it
+    is what made the delta versus the official comparator oscillate around
+    zero. Here the term is absent by construction, so:
+
+    - the FY2030 anchor is an exact fixed point (the first element is 1.0);
+    - after the completion year ``w == 1`` and the hybrid grows at exactly the
+      structural rate, so ``I_hybrid_t / I_structural_t`` is CONSTANT from the
+      completion year onward (see ``handover_ratio_identity``) - the path
+      keeps the level it earned during the handover instead of being dragged
+      to the anchor-year ratio;
+    - the handover is one-way: no future weight change ever revisits a level
+      already integrated.
+    """
+
+    current = np.asarray(current_index, dtype=float)
+    structural = np.asarray(structural_index, dtype=float)
+    w = np.asarray(weight, dtype=float)
+
+    if current.ndim != 1 or current.shape != structural.shape or current.shape != w.shape:
+        raise LongRunShapeTransitionError(
+            f"{context}: handover inputs must be equal-length 1-D arrays."
+        )
+    if current.size < 2:
+        raise LongRunShapeTransitionError(
+            f"{context}: a growth handover needs at least the anchor year and one step."
+        )
+    for array, label in ((current, "current"), (structural, "structural")):
+        if not np.isfinite(array).all():
+            raise LongRunShapeTransitionError(f"{context}: {label} index is non-finite.")
+        if (array <= 0.0).any():
+            raise LongRunShapeTransitionError(
+                f"{context}: {label} index is non-positive; growth rates need "
+                "strictly positive index paths."
+            )
+        if abs(float(array[0]) - 1.0) > 1e-12:
+            raise LongRunShapeTransitionError(
+                f"{context}: {label} index is {float(array[0])!r} at the anchor; "
+                "a growth handover requires exactly 1.0 there."
+            )
+    if not np.isfinite(w).all() or w.min() < 0.0 or w.max() > 1.0:
+        raise LongRunShapeTransitionError(f"{context}: weight outside [0, 1] or non-finite.")
+
+    dlog_current = np.diff(np.log(current))
+    dlog_structural = np.diff(np.log(structural))
+    # w_t governs the growth INTO year t, so the anchor-year weight is unused.
+    w_step = w[1:]
+    dlog_hybrid = (1.0 - w_step) * dlog_current + w_step * dlog_structural
+    hybrid = np.exp(np.concatenate(([0.0], np.cumsum(dlog_hybrid))))
+    # The anchor is an exact fixed point rather than a rounded one.
+    hybrid[0] = 1.0
+    if not np.isfinite(hybrid).all() or (hybrid <= 0.0).any():
+        raise LongRunShapeTransitionError(f"{context}: handover index is non-finite or non-positive.")
+    return hybrid
+
+
+def handover_ratio_identity(
+    *,
+    hybrid_level_completion: float,
+    structural_level_completion: float,
+    structural_level_fy: float,
+    hybrid_level_fy: float,
+) -> dict[str, float]:
+    """Evidence that a completed handover CONTINUES rather than reverts.
+
+    At and after the completion year ``w = 1``, so the hybrid grows at exactly
+    the structural rate and
+
+        hybrid_t / structural_t == hybrid_completion / structural_completion
+
+    holds identically for every t at or after completion. The constant is the
+    ratio the path EARNED during the handover - not the anchor-year ratio the
+    level blend enforces - which is precisely the one-way property: the path
+    keeps going from where the handover left it, with no gravity back toward
+    the official curve.
+    """
+
+    if structural_level_fy == 0.0 or structural_level_completion == 0.0:
+        raise LongRunShapeTransitionError(
+            "handover ratio identity needs non-zero structural levels at the "
+            "completion year and the year under test."
+        )
+    observed = float(hybrid_level_fy) / float(structural_level_fy)
+    expected = float(hybrid_level_completion) / float(structural_level_completion)
+    return {
+        "observed_ratio": observed,
+        "expected_completion_ratio": expected,
+        "abs_residual": abs(observed - expected),
+    }
+
+
 def complete_transition_ratio_identity(
     *,
     current_anchor: float,
@@ -554,6 +727,8 @@ def schedule_catalogue_frame() -> pd.DataFrame:
                 if schedule.is_structural
                 else pd.NA,
                 "is_structural": schedule.is_structural,
+                "blend_kind": schedule.blend_kind if schedule.is_structural else "none",
+                "blend_formula_id": schedule.blend_formula_id,
                 "formula_id": schedule.formula_id,
                 "long_run_shape_method_id": LONG_RUN_SHAPE_METHOD_ID,
                 "fleet_composition_source_id": FLEET_COMPOSITION_SOURCE_ID,

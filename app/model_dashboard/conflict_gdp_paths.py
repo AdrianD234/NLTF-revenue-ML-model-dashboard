@@ -514,3 +514,632 @@ def conflict_gdp_input_audit(
     return out.sort_values(
         ["scenario_name", "stream", "period"], kind="stable"
     ).reset_index(drop=True)
+
+
+# ---------------------------------------------------------------------------
+# Conflict unemployment channel
+#
+# The Treasury note's Annex 1 summary table publishes annual (June-quarter)
+# unemployment rates for the base case and each conflict scenario.  Scenario 2
+# (medium) and Scenario 3 (high) are official anchors; Scenario 1 (low) shows
+# no material unemployment response and carries no anchor here.  The gaps are
+# applied additively to the raw ``unemployment_rate`` scenario-input field
+# (stored as a fraction, so a +0.8pp gap adds 0.008); the fixed-finalist
+# replay recomputes ``log_unemployment_rate`` and every unemp__* feature from
+# that raw field, so no derived column is ever adjusted directly.
+# ---------------------------------------------------------------------------
+
+CONFLICT_UNEMPLOYMENT_CALIBRATION_CSV = (
+    Path(__file__).resolve().parents[1]
+    / "data"
+    / "current_revenue_outlook"
+    / "conflict_unemployment_calibration.csv"
+)
+
+_UNEMPLOYMENT_CALIBRATION_REQUIRED_COLUMNS = (
+    "severity",
+    "calendar_year",
+    "official_unemployment_rate_pct",
+    "base_unemployment_rate_pct",
+    "unemployment_gap_pp",
+    "treasury_scenario",
+    "source_document",
+    "source_locator",
+    "source_url",
+    "calibration_status",
+)
+_UNEMPLOYMENT_ANCHOR_YEARS = (2026, 2027, 2028)
+# Treasury Annex 1 summary table (p.7): unemployment rate, % June quarter.
+# Base 5.3/4.7/4.4; Scenario 2 5.4/5.5/4.7; Scenario 3 5.7/6.6/5.4.
+_UNEMPLOYMENT_GAP_PP_BY_SEVERITY_YEAR = {
+    "medium": {2026: 0.1, 2027: 0.8, 2028: 0.3},
+    "high": {2026: 0.4, 2027: 1.9, 2028: 1.0},
+}
+_UNEMPLOYMENT_GAP_SANITY_BOUND_PP = 3.0
+# The Treasury unemployment rates are June-QUARTER point values, so the
+# natural anchor quarter for calendar year Y is YQ2.  Quarters at or before
+# 2026Q3 are observed common history shared by every severity (the same rule
+# the governed fuel paths follow): severity-specific divergence may only
+# begin at the first prospective quarter, 2026Q4.  The 2026Q2 anchor
+# therefore falls inside observed history; it is recorded in the path frame
+# for lineage (``treasury_anchor_gap_pp``) and as the linear-interpolation
+# origin, but it is never applied as an adjustment.
+_UNEMPLOYMENT_OBSERVED_HISTORY_LAST_PERIOD = "2026Q3"
+_UNEMPLOYMENT_ANCHOR_QUARTER = 2
+_UNEMPLOYMENT_HOLD_QUARTERS = {"medium": 0, "high": 4}
+_UNEMPLOYMENT_TAPER_QUARTERS = 4
+_UNEMPLOYMENT_DERIVATION_BASIS = {
+    "low": (
+        "no_treasury_unemployment_anchor; zero_gap_all_quarters "
+        "(Scenario 1 shows no material unemployment response)"
+    ),
+    "medium": (
+        "Treasury_Scenario2_June_quarter_anchors_2026Q2_2027Q2_2028Q2; "
+        "observed_common_history_zero_through_2026Q3_with_2026Q2_anchor_"
+        "recorded_not_applied; linear_interpolation_between_anchors_from_"
+        "2026Q4; linear_taper_to_zero_2028Q3_to_2029Q2"
+    ),
+    "high": (
+        "Treasury_Scenario3_June_quarter_anchors_2026Q2_2027Q2_2028Q2; "
+        "observed_common_history_zero_through_2026Q3_with_2026Q2_anchor_"
+        "recorded_not_applied; linear_interpolation_between_anchors_from_"
+        "2026Q4; hold_2028Q2_gap_through_2029Q2_as_high_GDP_path_has_no_"
+        "recovery_in_window; linear_taper_to_zero_2029Q3_to_2030Q2"
+    ),
+}
+_UNEMPLOYMENT_NO_ANCHOR_BASIS = (
+    "no_treasury_unemployment_anchor; zero_gap_all_quarters"
+)
+# Streams whose finalist templates carry the raw ``unemployment_rate`` user
+# field (see ``forecast_runner.STREAM_COLUMNS``).  LIGHT_RUC has no
+# unemployment input, so its rows are left byte-identical.
+_UNEMPLOYMENT_RATE_STREAMS = ("PED", "HEAVY_RUC")
+
+
+def load_conflict_unemployment_calibration(
+    repo_root: Path | str | None = None,
+) -> pd.DataFrame:
+    """Load and fail-closed validate the Treasury unemployment anchors."""
+
+    root = (
+        Path(repo_root)
+        if repo_root is not None
+        else Path(__file__).resolve().parents[1]
+    )
+    path = (
+        root
+        / "data"
+        / "current_revenue_outlook"
+        / CONFLICT_UNEMPLOYMENT_CALIBRATION_CSV.name
+    )
+    if not path.exists():
+        raise FileNotFoundError(
+            f"Conflict unemployment calibration is missing: {path}"
+        )
+    frame = pd.read_csv(path)
+    missing = set(_UNEMPLOYMENT_CALIBRATION_REQUIRED_COLUMNS).difference(
+        frame.columns
+    )
+    if missing:
+        raise ValueError(
+            "Conflict unemployment calibration is missing columns: "
+            + ", ".join(sorted(missing))
+        )
+    selected = frame.copy()
+    selected["severity"] = (
+        selected["severity"].fillna("").astype(str).str.strip().str.casefold()
+    )
+    allowed = set(_UNEMPLOYMENT_GAP_PP_BY_SEVERITY_YEAR)
+    observed_severities = set(selected["severity"])
+    if not observed_severities.issubset(allowed):
+        raise ValueError(
+            "Conflict unemployment calibration contains unknown severities: "
+            + ", ".join(sorted(observed_severities.difference(allowed)))
+        )
+    if "medium" not in observed_severities:
+        raise ValueError(
+            "Conflict unemployment calibration must contain the medium "
+            "(Scenario 2) anchors."
+        )
+    selected["calendar_year"] = pd.to_numeric(
+        selected["calendar_year"], errors="coerce"
+    )
+    if selected["calendar_year"].isna().any():
+        raise ValueError(
+            "Conflict unemployment calibration calendar_year must be numeric."
+        )
+    selected["calendar_year"] = selected["calendar_year"].astype(int)
+    if selected.duplicated(["severity", "calendar_year"], keep=False).any():
+        raise ValueError(
+            "Conflict unemployment calibration contains duplicate "
+            "severity-year rows."
+        )
+    for severity in sorted(observed_severities):
+        years = tuple(
+            sorted(
+                selected.loc[
+                    selected["severity"].eq(severity), "calendar_year"
+                ].tolist()
+            )
+        )
+        if years != _UNEMPLOYMENT_ANCHOR_YEARS:
+            raise ValueError(
+                f"Conflict unemployment {severity} anchors must cover exactly "
+                f"{_UNEMPLOYMENT_ANCHOR_YEARS}."
+            )
+    for column in (
+        "official_unemployment_rate_pct",
+        "base_unemployment_rate_pct",
+        "unemployment_gap_pp",
+    ):
+        selected[column] = pd.to_numeric(selected[column], errors="coerce")
+        if (
+            selected[column].isna().any()
+            or (~np.isfinite(selected[column])).any()
+        ):
+            raise ValueError(
+                f"Conflict unemployment calibration column {column!r} must be finite."
+            )
+    if (
+        selected["official_unemployment_rate_pct"].le(0.0).any()
+        or selected["base_unemployment_rate_pct"].le(0.0).any()
+    ):
+        raise ValueError(
+            "Conflict unemployment calibration rates must be positive."
+        )
+    if not np.allclose(
+        selected["unemployment_gap_pp"],
+        selected["official_unemployment_rate_pct"]
+        - selected["base_unemployment_rate_pct"],
+        rtol=0.0,
+        atol=1e-9,
+    ):
+        raise ValueError(
+            "Conflict unemployment gaps must equal official minus base rates."
+        )
+    for row in selected.itertuples(index=False):
+        expected = _UNEMPLOYMENT_GAP_PP_BY_SEVERITY_YEAR[row.severity][
+            int(row.calendar_year)
+        ]
+        if not np.isclose(
+            float(row.unemployment_gap_pp), expected, rtol=0.0, atol=1e-12
+        ):
+            raise ValueError(
+                "Conflict unemployment anchors no longer match the Treasury "
+                "Annex 1 gaps."
+            )
+    if (
+        selected["unemployment_gap_pp"].lt(0.0).any()
+        or selected["unemployment_gap_pp"]
+        .gt(_UNEMPLOYMENT_GAP_SANITY_BOUND_PP)
+        .any()
+    ):
+        raise ValueError(
+            "Conflict unemployment gaps must be within "
+            f"[0, {_UNEMPLOYMENT_GAP_SANITY_BOUND_PP}] percentage points."
+        )
+    if not selected["source_url"].astype(str).eq(
+        TREASURY_CONFLICT_GDP_URL
+    ).all():
+        raise ValueError(
+            "Conflict unemployment calibration source URL is not the governed "
+            "Treasury note."
+        )
+    for column in (
+        "treasury_scenario",
+        "source_document",
+        "source_locator",
+        "calibration_status",
+    ):
+        if selected[column].fillna("").astype(str).str.strip().eq("").any():
+            raise ValueError(
+                f"Conflict unemployment calibration lineage column {column!r} "
+                "must be populated."
+            )
+    return selected.sort_values(
+        ["severity", "calendar_year"], kind="stable"
+    ).reset_index(drop=True)
+
+
+def build_conflict_unemployment_paths(
+    repo_root: Path | str | None = None,
+    *,
+    calibration: pd.DataFrame | None = None,
+) -> pd.DataFrame:
+    """Derive quarterly additive unemployment gaps (pp) per severity.
+
+    The Treasury values are June-quarter points, so each calendar-year anchor
+    sits at YQ2.  Quarters at or before 2026Q3 are observed common history and
+    carry an exactly-zero gap for every severity; the 2026Q2 anchor is
+    recorded for lineage and used as the interpolation origin but never
+    applied.  Intermediate quarters interpolate linearly between anchors,
+    starting to apply at 2026Q4.  After the last anchor (2028Q2) the medium
+    gap tapers linearly to exactly zero by 2029Q2; the high gap is held
+    through 2029Q2 (its GDP path has no recovery inside the governed window)
+    and tapers linearly to exactly zero by 2030Q2.  Low has no Treasury
+    unemployment anchor and carries a zero gap everywhere.
+    """
+
+    root = (
+        Path(repo_root)
+        if repo_root is not None
+        else Path(__file__).resolve().parents[1]
+    )
+    anchors = (
+        load_conflict_unemployment_calibration(root)
+        if calibration is None
+        else calibration.copy()
+    )
+    gaps_by_severity: dict[str, dict[int, float]] = {}
+    for row in anchors.itertuples(index=False):
+        gaps_by_severity.setdefault(str(row.severity), {})[
+            int(row.calendar_year)
+        ] = float(row.unemployment_gap_pp)
+    order = {period: position for position, period in enumerate(EXPECTED_PERIODS)}
+    history_cutoff = order[_UNEMPLOYMENT_OBSERVED_HISTORY_LAST_PERIOD]
+    rows: list[dict[str, Any]] = []
+    for severity in CONFLICT_FUEL_SCENARIO_LEVELS:
+        gaps_by_year = gaps_by_severity.get(severity)
+        if severity == "low" or not gaps_by_year:
+            basis = (
+                _UNEMPLOYMENT_DERIVATION_BASIS["low"]
+                if severity == "low"
+                else _UNEMPLOYMENT_NO_ANCHOR_BASIS
+            )
+            for period in EXPECTED_PERIODS:
+                rows.append(
+                    {
+                        "severity": severity,
+                        "period": period,
+                        "unemployment_gap_pp": 0.0,
+                        "treasury_anchor_gap_pp": np.nan,
+                        "source_status": "no_official_anchor",
+                        "derivation_basis": basis,
+                        "source_url": TREASURY_CONFLICT_GDP_URL,
+                    }
+                )
+            continue
+        anchor_position_by_gap = sorted(
+            (
+                order[f"{year}Q{_UNEMPLOYMENT_ANCHOR_QUARTER}"],
+                gaps_by_year[year],
+            )
+            for year in gaps_by_year
+        )
+        anchor_positions = [position for position, _ in anchor_position_by_gap]
+        anchor_gaps = [gap for _, gap in anchor_position_by_gap]
+        anchor_gap_by_position = dict(anchor_position_by_gap)
+        last_position = anchor_positions[-1]
+        last_gap = anchor_gaps[-1]
+        hold_end = last_position + _UNEMPLOYMENT_HOLD_QUARTERS[severity]
+        taper_end = hold_end + _UNEMPLOYMENT_TAPER_QUARTERS
+        for period in EXPECTED_PERIODS:
+            position = order[period]
+            if position <= last_position:
+                raw_gap = float(
+                    np.interp(position, anchor_positions, anchor_gaps)
+                )
+            elif position <= hold_end:
+                raw_gap = last_gap
+            elif position <= taper_end:
+                raw_gap = (
+                    last_gap
+                    * (taper_end - position)
+                    / _UNEMPLOYMENT_TAPER_QUARTERS
+                )
+            else:
+                raw_gap = 0.0
+            if position <= history_cutoff:
+                # Observed common history: severity-specific divergence must
+                # not leak backwards into FY2026 annual totals.
+                gap = 0.0
+                status = (
+                    "official_anchor_not_applied_observed_history"
+                    if position in anchor_gap_by_position
+                    else "observed_common_history"
+                )
+            elif position in anchor_gap_by_position:
+                gap = anchor_gap_by_position[position]
+                status = "official_anchor"
+            elif position < last_position:
+                gap = raw_gap
+                status = "derived_linear_interpolation"
+            elif position <= hold_end:
+                gap = raw_gap
+                status = "derived_recovery_hold"
+            elif position <= taper_end:
+                gap = raw_gap
+                status = "derived_recovery_taper"
+            else:
+                gap = 0.0
+                status = "recovered"
+            rows.append(
+                {
+                    "severity": severity,
+                    "period": period,
+                    "unemployment_gap_pp": gap,
+                    "treasury_anchor_gap_pp": (
+                        anchor_gap_by_position[position]
+                        if position in anchor_gap_by_position
+                        else np.nan
+                    ),
+                    "source_status": status,
+                    "derivation_basis": _UNEMPLOYMENT_DERIVATION_BASIS[
+                        severity
+                    ],
+                    "source_url": TREASURY_CONFLICT_GDP_URL,
+                }
+            )
+    out = pd.DataFrame(rows)
+    validate_conflict_unemployment_paths(out, calibration=anchors)
+    return out.reset_index(drop=True)
+
+
+def validate_conflict_unemployment_paths(
+    frame: pd.DataFrame,
+    *,
+    calibration: pd.DataFrame | None = None,
+) -> None:
+    """Validate anchors, bounds, ordering, history and end-of-window recovery."""
+
+    required = {
+        "severity",
+        "period",
+        "unemployment_gap_pp",
+        "treasury_anchor_gap_pp",
+        "source_status",
+        "derivation_basis",
+        "source_url",
+    }
+    missing = required.difference(frame.columns)
+    if missing:
+        raise ValueError(
+            "Conflict unemployment paths are missing columns: "
+            + ", ".join(sorted(missing))
+        )
+    out = frame.copy()
+    out["severity"] = out["severity"].astype(str)
+    out["period"] = out["period"].astype(str)
+    out["unemployment_gap_pp"] = pd.to_numeric(
+        out["unemployment_gap_pp"], errors="coerce"
+    )
+    if (
+        out["unemployment_gap_pp"].isna().any()
+        or (~np.isfinite(out["unemployment_gap_pp"])).any()
+    ):
+        raise ValueError("Conflict unemployment gaps must be finite.")
+    if out["unemployment_gap_pp"].lt(0.0).any():
+        raise ValueError("Conflict unemployment gaps must be non-negative.")
+    if out["unemployment_gap_pp"].gt(_UNEMPLOYMENT_GAP_SANITY_BOUND_PP).any():
+        raise ValueError(
+            "Conflict unemployment gaps exceed the "
+            f"{_UNEMPLOYMENT_GAP_SANITY_BOUND_PP}pp sanity bound."
+        )
+    if set(out["severity"]) != set(CONFLICT_FUEL_SCENARIO_LEVELS):
+        raise ValueError(
+            "Conflict unemployment paths require low, medium and high severities."
+        )
+    if out.duplicated(["severity", "period"], keep=False).any():
+        raise ValueError(
+            "Conflict unemployment paths contain duplicate severity-period rows."
+        )
+    order = {period: position for position, period in enumerate(EXPECTED_PERIODS)}
+    for severity in CONFLICT_FUEL_SCENARIO_LEVELS:
+        group = out[out["severity"].eq(severity)].copy()
+        group["_order"] = group["period"].map(order)
+        if group["_order"].isna().any():
+            raise ValueError(
+                f"Conflict unemployment severity {severity!r} has ungoverned quarters."
+            )
+        group = group.sort_values("_order", kind="stable")
+        if tuple(group["period"]) != tuple(EXPECTED_PERIODS):
+            raise ValueError(
+                f"Conflict unemployment severity {severity!r} does not have "
+                "the exact governed quarters."
+            )
+    final_period = EXPECTED_PERIODS[-1]
+    final_gaps = out[out["period"].eq(final_period)]["unemployment_gap_pp"]
+    if not final_gaps.eq(0.0).all():
+        raise ValueError(
+            "Conflict unemployment gaps must reach exactly zero by "
+            f"{final_period}."
+        )
+    # Observed common history: quarters at or before 2026Q3 are shared by all
+    # severities (mirroring the governed fuel-path rule), so severity-specific
+    # gaps must be exactly zero there or future path differences would leak
+    # backwards into FY2026 annual totals.
+    history_positions = [
+        period
+        for period in EXPECTED_PERIODS
+        if order[period] <= order[_UNEMPLOYMENT_OBSERVED_HISTORY_LAST_PERIOD]
+    ]
+    history_gaps = out[out["period"].isin(history_positions)][
+        "unemployment_gap_pp"
+    ]
+    if not history_gaps.eq(0.0).all():
+        raise ValueError(
+            "Conflict unemployment gaps must be exactly zero for every "
+            f"severity through {_UNEMPLOYMENT_OBSERVED_HISTORY_LAST_PERIOD} "
+            "(observed common history)."
+        )
+    low_gaps = out[out["severity"].eq("low")]["unemployment_gap_pp"]
+    if not low_gaps.eq(0.0).all():
+        raise ValueError(
+            "Conflict unemployment low severity must carry a zero gap everywhere."
+        )
+    pivot = out.pivot(
+        index="period", columns="severity", values="unemployment_gap_pp"
+    )
+    if ((pivot["medium"] - pivot["high"]) > 1e-12).any() or (
+        (pivot["low"] - pivot["medium"]) > 1e-12
+    ).any():
+        raise ValueError(
+            "Conflict unemployment gaps violate high >= medium >= low ordering."
+        )
+    anchors = (
+        load_conflict_unemployment_calibration()
+        if calibration is None
+        else calibration.copy()
+    )
+    anchor_values = pd.to_numeric(out["treasury_anchor_gap_pp"], errors="coerce")
+    for row in anchors.itertuples(index=False):
+        severity = str(row.severity)
+        year = int(row.calendar_year)
+        expected_gap = float(row.unemployment_gap_pp)
+        anchor_period = f"{year}Q{_UNEMPLOYMENT_ANCHOR_QUARTER}"
+        anchor_mask = out["severity"].eq(severity) & out["period"].eq(
+            anchor_period
+        )
+        if int(anchor_mask.sum()) != 1:
+            raise ValueError(
+                f"Conflict unemployment {severity} path is missing its "
+                f"{anchor_period} Treasury anchor row."
+            )
+        recorded = float(anchor_values[anchor_mask].iloc[0])
+        if not np.isclose(recorded, expected_gap, rtol=0.0, atol=1e-12):
+            raise ValueError(
+                f"Conflict unemployment {severity} path no longer records its "
+                f"{anchor_period} Treasury anchor."
+            )
+        applied = float(out.loc[anchor_mask, "unemployment_gap_pp"].iloc[0])
+        expected_applied = (
+            0.0
+            if order[anchor_period]
+            <= order[_UNEMPLOYMENT_OBSERVED_HISTORY_LAST_PERIOD]
+            else expected_gap
+        )
+        if not np.isclose(applied, expected_applied, rtol=0.0, atol=1e-12):
+            raise ValueError(
+                f"Conflict unemployment {severity} path no longer meets its "
+                f"{anchor_period} Treasury anchor."
+            )
+    calibrated_severities = set(anchors["severity"].astype(str))
+    for severity in ("medium", "high"):
+        if severity in calibrated_severities:
+            continue
+        uncalibrated = out[out["severity"].eq(severity)]
+        if not uncalibrated["unemployment_gap_pp"].eq(0.0).all() or not (
+            uncalibrated["source_status"].astype(str).eq("no_official_anchor").all()
+        ):
+            raise ValueError(
+                f"Conflict unemployment {severity} severity has no Treasury "
+                "anchor and must carry an explicit zero gap."
+            )
+    if not out["source_url"].astype(str).eq(TREASURY_CONFLICT_GDP_URL).all():
+        raise ValueError(
+            "Conflict unemployment path source URL is not the Treasury "
+            "scenario note."
+        )
+
+
+def apply_conflict_unemployment_impact(
+    scenario_inputs: pd.DataFrame,
+    *,
+    severity: str,
+    repo_root: Path | str | None = None,
+    unemployment_paths: pd.DataFrame | None = None,
+) -> pd.DataFrame:
+    """Apply one conflict unemployment gap to the raw unemployment_rate field.
+
+    The gap is additive in percentage points; ``unemployment_rate`` is stored
+    as a fraction, so a +0.8pp gap adds 0.008.  Derived fields such as
+    ``log_unemployment_rate`` are never touched because the fixed-finalist
+    replay recomputes them from the raw field.
+    """
+
+    normalised = str(severity).strip().casefold()
+    if normalised not in CONFLICT_FUEL_SCENARIO_LEVELS:
+        raise ValueError(
+            f"Unknown conflict unemployment severity {severity!r}; expected "
+            + ", ".join(CONFLICT_FUEL_SCENARIO_LEVELS)
+            + "."
+        )
+    required = {"stream", "canonical_period", "unemployment_rate"}
+    missing = required.difference(scenario_inputs.columns)
+    if missing:
+        raise ValueError(
+            "Scenario inputs cannot receive a conflict unemployment path "
+            "without columns: " + ", ".join(sorted(missing))
+        )
+    paths = (
+        build_conflict_unemployment_paths(repo_root)
+        if unemployment_paths is None
+        else unemployment_paths.copy()
+    )
+    validate_conflict_unemployment_paths(paths)
+    selected = paths[paths["severity"].astype(str).eq(normalised)].copy()
+    if selected.empty:
+        raise ValueError(
+            f"Conflict unemployment paths have no {normalised!r} rows."
+        )
+    gap_by_period = selected.set_index("period")[
+        "unemployment_gap_pp"
+    ].to_dict()
+    basis = str(selected["derivation_basis"].iloc[0])
+
+    out = scenario_inputs.copy()
+    period = out["canonical_period"].astype(str)
+    stream = out["stream"].astype(str)
+    consuming = stream.isin(_UNEMPLOYMENT_RATE_STREAMS)
+    # The audit gap is recorded only on rows whose stream actually receives
+    # the adjustment, so the audit frame reflects applied changes.
+    out["conflict_unemployment_gap_pp"] = np.where(
+        consuming, period.map(gap_by_period).fillna(0.0), 0.0
+    )
+    out["conflict_unemployment_source_url"] = TREASURY_CONFLICT_GDP_URL
+    out["conflict_unemployment_basis"] = basis
+    field = "unemployment_rate"
+    values = pd.to_numeric(out.loc[consuming, field], errors="coerce")
+    gaps = pd.to_numeric(
+        out.loc[consuming, "conflict_unemployment_gap_pp"], errors="coerce"
+    )
+    if (
+        values.isna().any()
+        or gaps.isna().any()
+        or values.le(0.0).any()
+        or gaps.lt(0.0).any()
+    ):
+        raise ValueError(
+            "Conflict unemployment impact requires positive unemployment "
+            "rates and non-negative gaps."
+        )
+    adjusted = values.to_numpy(dtype=float) + gaps.to_numpy(dtype=float) / 100.0
+    if not np.isfinite(adjusted).all() or (adjusted <= 0.0).any():
+        raise ValueError(
+            "Conflict unemployment impact produced non-positive adjusted rates."
+        )
+    if pd.api.types.is_string_dtype(out[field].dtype):
+        out.loc[consuming, field] = [
+            format(float(value), ".17g") for value in adjusted
+        ]
+    else:
+        out.loc[consuming, field] = adjusted
+    return out.reset_index(drop=True)
+
+
+def conflict_unemployment_input_audit(
+    scenario_inputs: pd.DataFrame,
+) -> pd.DataFrame:
+    """Return one scenario/stream/quarter audit row for applied unemployment gaps."""
+
+    # Ordered, not a set, for the same PYTHONHASHSEED schema-stability reason
+    # as ``conflict_gdp_input_audit``.
+    required = (
+        "scenario_name",
+        "stream",
+        "canonical_period",
+        "conflict_unemployment_gap_pp",
+        "conflict_unemployment_source_url",
+        "conflict_unemployment_basis",
+    )
+    missing = set(required).difference(scenario_inputs.columns)
+    if missing:
+        return pd.DataFrame()
+    out = scenario_inputs[list(required)].copy()
+    out = out.rename(columns={"canonical_period": "period"})
+    out["conflict_unemployment_gap_pp"] = pd.to_numeric(
+        out["conflict_unemployment_gap_pp"], errors="coerce"
+    )
+    return out.sort_values(
+        ["scenario_name", "stream", "period"], kind="stable"
+    ).reset_index(drop=True)
