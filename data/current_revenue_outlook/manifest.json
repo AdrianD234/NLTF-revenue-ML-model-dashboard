@@ -7,7 +7,7 @@
   "promoted_by": "repo_source_runtime_rebuild",
   "repo_relative_output_dir": "data/current_revenue_outlook",
   "source_policy": "committed_current_runtime_pack_only; the BEFU26 annual source pack is repo-local; Streamlit does not load the offline workbooks or legacy Excel forecast paths",
-  "runtime_policy": "Revenue Outlook runtime rows are materialized from repo-local source actuals, current finalist forecasts and the selected official vintage roles: PREBU26 official comparator, BEFU26 bridge assumptions (rates, fuel intensity, fixed lines) and BEFU26 long-run activity shape. Source-pack tables are retained as audit lineage and are not a second Streamlit chart engine.",
+  "runtime_policy": "Revenue Outlook runtime rows are materialized from repo-local source actuals, current finalist forecasts and the selected official vintage roles: PREBU26 official comparator, BEFU26 bridge assumptions (rates, fuel intensity, fixed lines) and PREBU26 long-run activity shape. Source-pack tables are retained as audit lineage and are not a second Streamlit chart engine.",
   "allowed_traces": [
     "Actual",
     "PREBU26 official",
@@ -21,12 +21,12 @@
     "registry": "data/revenue_model_source_pack/official_vintage_registry.json",
     "official_comparator_vintage_id": "PREBU26",
     "bridge_assumption_vintage_id": "BEFU26",
-    "long_run_shape_vintage_id": "BEFU26",
-    "long_run_shape_vintage_sha256": "7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff",
+    "long_run_shape_vintage_id": "PREBU26",
+    "long_run_shape_vintage_sha256": "f69985432b34271d5868267d78b77ad2c746563788011b445715e4f58a25728b",
     "long_run_shape_method_id": "anchored_structural_shape_transition_v1",
-    "long_run_transition_schedule_id": "balanced_structural",
+    "long_run_transition_schedule_id": "growth_handover_fy2035",
     "long_run_anchor_fy": 2030,
-    "long_run_transition_end_fy": 2045,
+    "long_run_transition_end_fy": 2035,
     "fleet_composition_source_id": "VFM202405",
     "long_run_shape_policy": "The long-run shape vintage supplies an FY2031-FY2050 activity GROWTH SHAPE only. No official level, rate or fixed line is taken from it, and the FY2030 Current anchor is unchanged under every schedule.",
     "default_official_comparator_trace": "PREBU26 official",
@@ -74,7 +74,7 @@
     "D_hybrid_current_revenue": "Only PED, Light RUC and Heavy RUC revenue are replaced; all other rows use BEFU26 official components.",
     "E_light_ruc_composition": "Current finalist Light RUC is anchored on the CONVENTIONAL model forecast, preserved exactly under the Base uptake basis. Class composition comes from the exact VFM202405 Base/Fast/Slow shares. The retired lambda allocation - which split one migration total between PED and Light RUC - is not part of the runtime path and is retained as audit lineage only.",
     "F_econometric_segment": "The econometric segment runs to FY2030. No FY2051-FY2055 gradient extension is used.",
-    "G_post_model_segment": "FY2031-FY2050 Current rows are the governed anchored structural shape transition: each stream holds its FY2030 econometric level as a fixed anchor and its growth index is blended geometrically toward the BEFU26 long-run shape on the balanced_structural schedule. No official level is substituted. These rows are labelled forecast_segment=post_model_extrapolation and are decision-facing."
+    "G_post_model_segment": "FY2031-FY2050 Current rows are the governed anchored structural shape transition: each stream holds its FY2030 econometric level as a fixed anchor and its growth RATE hands over one-way to the PREBU26 long-run growth shape on the growth_handover_fy2035 schedule, continuing on that trajectory after completion with no pull-back toward the official curve. No official level is substituted. These rows are labelled forecast_segment=post_model_extrapolation and are decision-facing."
   },
   "horizon_boundaries": {
     "econometric_cutoff_fy": 2030,
@@ -861,11 +861,11 @@
       "size_bytes": 10851
     },
     "fan_band_rows.csv": {
-      "sha256": "24e47a51b316e125a4111b5499f65731c808fc31e0d605ef80bee7cb66c9ad36",
-      "size_bytes": 268676
+      "sha256": "9652660a9246b363c8068baa56a03907d6476f852508093b8c10842dc2b0cca3",
+      "size_bytes": 268695
     },
     "fan_band_rows.parquet": {
-      "sha256": "8b2aac6445c37ff9d51af18260093c9c8d9a6e89b6abf60f31652ca9283df53b",
+      "sha256": "fd91445f710adab45e1bbea71e29a0c3ea39759b996560742595f362fa27f0af",
       "size_bytes": 41586
     },
     "future_revenue_forecasts.csv": {
@@ -957,36 +957,36 @@
       "size_bytes": 29202
     },
     "revenue_chart_rows.csv": {
-      "sha256": "6dcdb94dd8c29c4ffa76ef7476b8abf449945cfed3c564150e79bacdc2c0d732",
-      "size_bytes": 2533804
+      "sha256": "c4ccf2050fe1e74c988fbe0e9ecd3370dc822274b5b0016c46d40a5983375264",
+      "size_bytes": 2537616
     },
     "revenue_chart_rows.parquet": {
-      "sha256": "29423e7c88cc3334b2d6d2ad56a991f6224197c816579d54fb5cb51053d594d5",
-      "size_bytes": 130989
+      "sha256": "5ab9901d02f2f5bf3bd90d4afeac9b5c5ae077587fec4900f739ed7d76b16e0f",
+      "size_bytes": 131037
     },
     "revenue_formula_residuals.csv": {
-      "sha256": "e1e0d6e33c49d975c7e47331f7f89344b46a5c47ce37289370dad40e18441315",
-      "size_bytes": 606809
+      "sha256": "4dd7cb3276d06f5924b6bec5d10217dca4a21b2db3721eadce73782f320c322a",
+      "size_bytes": 606582
     },
     "revenue_formula_residuals.parquet": {
-      "sha256": "96c952cbac14330b81a2322ffdb8aca70dbeadaebf2ad5361de881a637d883d3",
-      "size_bytes": 52807
+      "sha256": "c3e055a7ff819b3882d0a8c21102b3818e4aa187b4bdbc25b442815087d8dad0",
+      "size_bytes": 52769
     },
     "revenue_line_reconciliation.csv": {
-      "sha256": "237a7448ba7f56b8594e3426a668c41ad23d755f3fa8e33f561b5aa39fdea66c",
-      "size_bytes": 3312896
+      "sha256": "e217c5bcbb6b703afbb9ba68a1b83388ebafe75127feba507aa51ec1e2978eac",
+      "size_bytes": 3317481
     },
     "revenue_line_reconciliation.parquet": {
-      "sha256": "c26661c2c207edae00b5f250222b16c9f976a45994936df3f83d157087a4fa7f",
-      "size_bytes": 109268
+      "sha256": "6e9d5818e3a18ce508edaa2d8d8ccf5e1faacfb4d298be84acdd0a8c7c271621",
+      "size_bytes": 109284
     },
     "revenue_stack_components.csv": {
-      "sha256": "99dd9befc6dcfd72f2cd4f52898e34047953b13da2c086142289fd835644f46c",
-      "size_bytes": 16869548
+      "sha256": "887361b74f9808b8a770c2a1f2f68d466dedf80e3d2c43639b57b293a7b13db1",
+      "size_bytes": 16871260
     },
     "revenue_stack_components.parquet": {
-      "sha256": "d9db1a00e20fc56513e09c6d68361111f5bd48db06913f44045c01152a7f8964",
-      "size_bytes": 378632
+      "sha256": "a2820470c74c3a801f7cb6d2378ca50346aabe7551ae61a46c20f887629aeb68",
+      "size_bytes": 378737
     },
     "row_reconciliation.csv": {
       "sha256": "c3b08c6a325833c85b042335acb58cd858e3b7377adb92fc3570507934258c9b",
@@ -1053,12 +1053,12 @@
       "size_bytes": 10806
     },
     "sensitivity_impact_audit.csv": {
-      "sha256": "5b9730925448c053d000d475e5a509b69c1825a3bdc71974e973c2b16de521ac",
-      "size_bytes": 748434
+      "sha256": "bf8ba0d5afbf2e6bd22e3625aed74f851e0486119f43924bc21b12a6c7ad280e",
+      "size_bytes": 748484
     },
     "sensitivity_impact_audit.parquet": {
-      "sha256": "90440e993055d0e843f3b2865ddb1069286f538e8d99ef5ea1a48856d176c6b0",
-      "size_bytes": 48732
+      "sha256": "fb447e9cbec5010fad610b59a3733b179a4220dc5f51b70ad30d622338090c0e",
+      "size_bytes": 48699
     },
     "sensitivity_seed_inputs.csv": {
       "sha256": "ec16691e19856cacfdf5e41124fd846bf3ff43e6ad0e60dd7c104e1306751ff6",

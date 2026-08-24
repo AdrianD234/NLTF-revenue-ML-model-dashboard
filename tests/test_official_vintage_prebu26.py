@@ -352,12 +352,30 @@ class TestCurrentValuesInvariant:
     def test_all_non_prebu26_chart_rows_match_the_pinned_baseline(
         self, pack_dir, baseline_name
     ):
+        """Adding PREBU26 roles must not move Current values it does not own.
+
+        The FY2031-FY2050 post-model rows are excluded: PREBU26 legitimately
+        owns that layer since the long-run shape role moved to it (the
+        one-way growth handover promotion), and the promotion audit
+        separately proves ONLY that layer moved. Everything else - actuals,
+        the econometric window, the other official spines - must still match
+        the baseline frozen before PREBU26 carried any role.
+        """
         new = pd.read_csv(ROOT / pack_dir / "revenue_chart_rows.csv", low_memory=False)
         old = pd.read_csv(BASELINE_DIR / baseline_name, low_memory=False)
-        new_wo = new[~new["scenario_name"].astype(str).eq("prebu26_official")].reset_index(
-            drop=True
+
+        def _outside_shape_scope(frame: pd.DataFrame) -> pd.DataFrame:
+            scoped = frame[~frame["scenario_name"].astype(str).eq("prebu26_official")]
+            segment = scoped.get(
+                "forecast_segment", pd.Series("", index=scoped.index)
+            )
+            return scoped[
+                ~segment.fillna("").astype(str).eq("post_model_extrapolation")
+            ].reset_index(drop=True)
+
+        pd.testing.assert_frame_equal(
+            _outside_shape_scope(new), _outside_shape_scope(old)
         )
-        pd.testing.assert_frame_equal(new_wo, old.reset_index(drop=True))
 
 
 class TestBridgeCaptionsStayBefu26:
@@ -369,15 +387,23 @@ class TestBridgeCaptionsStayBefu26:
         assert "PREBU26" not in note
 
     def test_current_rows_bridge_provenance_stays_befu26(self, runtime_pack):
+        """PREBU26 may appear ONLY as the long-run growth-shape source.
+
+        The bridge assumptions - effective rates, fuel intensity, carried
+        fixed lines - stay BEFU26, so any provenance string naming PREBU26
+        must be a shape-transition formula ("growth shape"), never a rate or
+        bridge caption.
+        """
         line = runtime_pack.revenue_line_reconciliation
         current = line[line["source_path"].astype(str).eq("Current finalist Base case")]
-        text = " ".join(
-            str(value)
+        offenders = [
+            value
             for column in ("bridge_method", "formula", "source_basis", "notes")
             if column in current.columns
             for value in current[column].dropna().astype(str).unique()
-        )
-        assert "PREBU26" not in text
+            if "PREBU26" in value and "growth shape" not in value
+        ]
+        assert not offenders, offenders[:3]
 
     def test_official_vintages_block_keeps_bridge_befu26(self):
         import json
