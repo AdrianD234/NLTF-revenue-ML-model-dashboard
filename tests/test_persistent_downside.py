@@ -150,6 +150,35 @@ class TestConstructionGates:
         with pytest.raises(pdm.PersistentDownsideError, match="High conflict"):
             _build(base, high)
 
+    def test_zero_central_years_are_carried_not_rejected(self):
+        """A lever can zero a demand leaf (full eRUC displaces gross PED).
+
+        Zero times any wedge is zero: the year is carried at 0.0 with its own
+        phase, the ratchet is untouched, and the missing-High gate does not
+        fire for it - the shape of the CI failure this pins.
+        """
+        base, high = _synthetic_values()
+        for fy in (2029, 2035):
+            base[("gross_ped_revenue", fy)] = 0.0
+        del high[("gross_ped_revenue", 2029)]
+        values = _build(base, high)
+        leaf = values[values["series_id"].eq("gross_ped_revenue")].set_index("fy")
+        for fy in (2029, 2035):
+            assert float(leaf.at[fy, "value"]) == 0.0
+            assert str(leaf.at[fy, "phase"]) == "zero_central_carried"
+        # Positive years around the zeros still take the ratchet/wedge.
+        assert float(leaf.at[2028, "factor"]) == pytest.approx(0.96)
+        assert float(leaf.at[2030, "factor"]) == pytest.approx(0.96)
+        assert float(leaf.at[2050, "factor"]) == pytest.approx(
+            float(np.exp(-pdm.PERSISTENT_DOWNSIDE_TERMINAL_WEDGE))
+        )
+
+    def test_negative_central_still_fails_closed(self):
+        base, high = _synthetic_values()
+        base[("gross_ped_revenue", 2029)] = -1.0
+        with pytest.raises(pdm.PersistentDownsideError, match="non-negative"):
+            _build(base, high)
+
     def test_class_shares_survive_the_wedge(self):
         """Pool-first allocation: one wedge moves the pool, never the split."""
         values = _build()

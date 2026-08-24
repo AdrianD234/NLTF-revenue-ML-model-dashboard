@@ -265,7 +265,9 @@ def build_persistent_downside_annual_values(
             continue
         short_run = [fy for fy in series_fys if fy <= last_short_run_fy]
         missing_high = [
-            fy for fy in short_run if (series, fy) not in high_values
+            fy
+            for fy in short_run
+            if base_values[(series, fy)] > 0.0 and (series, fy) not in high_values
         ]
         if missing_high:
             raise PersistentDownsideError(
@@ -275,10 +277,29 @@ def build_persistent_downside_annual_values(
         ratchet = 1.0
         for fy in short_run:
             base = base_values[(series, fy)]
-            if base <= 0.0:
+            if base < 0.0:
                 raise PersistentDownsideError(
-                    f"{series} FY{fy}: central value {base!r} must be positive."
+                    f"{series} FY{fy}: central value {base!r} must be non-negative."
                 )
+            if base == 0.0:
+                # A lever can legitimately zero a demand leaf (the full eRUC
+                # transition displaces gross PED revenue entirely). Zero times
+                # any wedge is zero: carry it, leave the ratchet untouched,
+                # and exclude the year from the leaf monotonicity gates via
+                # its own phase.
+                leaf_values[(series, fy)] = 0.0
+                rows.append(
+                    {
+                        "series_id": series,
+                        "fy": fy,
+                        "value": 0.0,
+                        "factor": 1.0,
+                        "wedge": 0.0,
+                        "phase": "zero_central_carried",
+                        "basis": "central_value_is_zero_under_active_levers",
+                    }
+                )
+                continue
             ratio = high_values[(series, fy)] / base
             ratchet = min(ratchet, min(ratio, 1.0))
             value = base * ratchet
@@ -306,10 +327,24 @@ def build_persistent_downside_annual_values(
                 if (series, fy) not in base_values:
                     continue
                 base = base_values[(series, fy)]
-                if base <= 0.0:
+                if base < 0.0:
                     raise PersistentDownsideError(
-                        f"{series} FY{fy}: central value {base!r} must be positive."
+                        f"{series} FY{fy}: central value {base!r} must be non-negative."
                     )
+                if base == 0.0:
+                    leaf_values[(series, fy)] = 0.0
+                    rows.append(
+                        {
+                            "series_id": series,
+                            "fy": fy,
+                            "value": 0.0,
+                            "factor": 1.0,
+                            "wedge": 0.0,
+                            "phase": "zero_central_carried",
+                            "basis": "central_value_is_zero_under_active_levers",
+                        }
+                    )
+                    continue
                 factor = float(wedge.at[fy, "factor"])
                 value = base * factor
                 leaf_values[(series, fy)] = value
