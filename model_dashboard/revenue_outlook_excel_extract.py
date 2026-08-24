@@ -100,9 +100,10 @@ ROW_SERIES: dict[int, str] = {**LEVEL_ROW_SERIES, **REVENUE_ROW_SERIES}
 EXTRACT_SHEET_NAMES: dict[str, str] = {
     "Current finalist Base case": "Current Base",
     "Current finalist High population/comparison": "High Population",
-    "Middle East conflict: Low": "Conflict Low",
-    "Middle East conflict: Medium": "Conflict Medium",
+    "Current conditions baseline": "Central Baseline",
+    "Temporary fuel shock (Treasury Medium)": "Temporary Shock",
     "Middle East conflict: High": "Conflict High",
+    "Persistent downside": "Persistent Downside",
     "BEFU26 official": "BEFU26 Official",
     "MBU26 official": "MBU26 Official",
 }

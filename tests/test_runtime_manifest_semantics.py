@@ -222,9 +222,18 @@ class TestScheduleLanguage:
         joined = " ".join(str(v) for v in layers.values())
         if schedule == UNBLENDED_SCHEDULE_ID:
             assert "blended geometrically" not in joined, engine
+            assert "hands over one-way" not in joined, engine
         else:
             assert schedule in joined, (engine, schedule)
-            assert "blended geometrically" in joined, engine
+            # The description must name the construction the schedule
+            # actually performs: level blend or one-way growth handover.
+            from model_dashboard.long_run_shape_transition import resolve_schedule
+
+            if resolve_schedule(schedule).is_growth_handover:
+                assert "hands over one-way" in joined, engine
+                assert "blended geometrically" not in joined, engine
+            else:
+                assert "blended geometrically" in joined, engine
 
     def test_both_engines_describe_the_same_governed_construction(self):
         """A divergence between engines would be a governance defect."""

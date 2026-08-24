@@ -7,10 +7,16 @@ import pandas as pd
 import pytest
 
 from model_dashboard.conflict_gdp_paths import (
+    TREASURY_CONFLICT_GDP_URL,
     apply_conflict_gdp_impact,
+    apply_conflict_unemployment_impact,
     build_conflict_gdp_paths,
+    build_conflict_unemployment_paths,
+    conflict_unemployment_input_audit,
     load_conflict_gdp_calibration,
+    load_conflict_unemployment_calibration,
     validate_conflict_gdp_paths,
+    validate_conflict_unemployment_paths,
 )
 from model_dashboard.conflict_fuel_paths import EXPECTED_PERIODS
 
@@ -114,3 +120,456 @@ def test_conflict_gdp_calibration_is_exact_and_source_backed() -> None:
         "official_real_gdp_level_impact_pct"
     ].to_dict() == {"high": -3.1, "medium": -1.5}
     assert calibration["source_url"].astype(str).str.startswith("https://").all()
+
+
+# ---------------------------------------------------------------------------
+# Conflict unemployment channel
+# ---------------------------------------------------------------------------
+
+UNEMPLOYMENT_CSV = (
+    ROOT / "data" / "current_revenue_outlook" / "conflict_unemployment_calibration.csv"
+)
+EXPECTED_UNEMPLOYMENT_GAPS = {
+    ("medium", 2026): 0.1,
+    ("medium", 2027): 0.8,
+    ("medium", 2028): 0.3,
+    ("high", 2026): 0.4,
+    ("high", 2027): 1.9,
+    ("high", 2028): 1.0,
+}
+
+
+def _base_scenario_input_rows() -> pd.DataFrame:
+    inputs = pd.read_parquet(INPUT_PATH)
+    return (
+        inputs[inputs["role"].astype(str).str.casefold().eq("basecase")]
+        .copy()
+        .reset_index(drop=True)
+    )
+
+
+def _calibration_root_with(frame: pd.DataFrame, tmp_path) -> "Path":
+    directory = tmp_path / "data" / "current_revenue_outlook"
+    directory.mkdir(parents=True, exist_ok=True)
+    frame.to_csv(directory / "conflict_unemployment_calibration.csv", index=False)
+    return tmp_path
+
+
+def test_conflict_unemployment_calibration_is_exact_and_source_backed() -> None:
+    calibration = load_conflict_unemployment_calibration(ROOT)
+    assert len(calibration) == 6
+    observed = {
+        (str(row.severity), int(row.calendar_year)): float(row.unemployment_gap_pp)
+        for row in calibration.itertuples(index=False)
+    }
+    assert observed == pytest.approx(EXPECTED_UNEMPLOYMENT_GAPS, abs=1e-12)
+    assert calibration["source_url"].astype(str).eq(TREASURY_CONFLICT_GDP_URL).all()
+    assert calibration["calibration_status"].astype(str).eq("official_anchor").all()
+    np.testing.assert_allclose(
+        calibration["unemployment_gap_pp"],
+        calibration["official_unemployment_rate_pct"]
+        - calibration["base_unemployment_rate_pct"],
+        rtol=0.0,
+        atol=1e-9,
+    )
+
+
+def test_conflict_unemployment_calibration_fails_closed_on_missing_file(
+    tmp_path,
+) -> None:
+    with pytest.raises(FileNotFoundError, match="calibration is missing"):
+        load_conflict_unemployment_calibration(tmp_path)
+
+
+def test_conflict_unemployment_calibration_fails_closed_on_missing_columns(
+    tmp_path,
+) -> None:
+    calibration = pd.read_csv(UNEMPLOYMENT_CSV)
+    broken = calibration.drop(columns=["unemployment_gap_pp"])
+    root = _calibration_root_with(broken, tmp_path)
+    with pytest.raises(ValueError, match="missing columns"):
+        load_conflict_unemployment_calibration(root)
+
+
+def test_conflict_unemployment_calibration_fails_closed_on_tampered_gap(
+    tmp_path,
+) -> None:
+    calibration = pd.read_csv(UNEMPLOYMENT_CSV)
+    tampered = calibration.copy()
+    tampered.loc[
+        tampered["severity"].eq("medium") & tampered["calendar_year"].eq(2027),
+        ["official_unemployment_rate_pct", "unemployment_gap_pp"],
+    ] = [5.2, 0.5]
+    root = _calibration_root_with(tampered, tmp_path)
+    with pytest.raises(ValueError, match="no longer match the Treasury"):
+        load_conflict_unemployment_calibration(root)
+
+
+def test_conflict_unemployment_calibration_fails_closed_on_wrong_url(
+    tmp_path,
+) -> None:
+    calibration = pd.read_csv(UNEMPLOYMENT_CSV)
+    tampered = calibration.copy()
+    tampered.loc[0, "source_url"] = "https://example.com/not-the-treasury-note.pdf"
+    root = _calibration_root_with(tampered, tmp_path)
+    with pytest.raises(ValueError, match="source URL"):
+        load_conflict_unemployment_calibration(root)
+
+
+def test_conflict_unemployment_calibration_fails_closed_on_missing_year(
+    tmp_path,
+) -> None:
+    calibration = pd.read_csv(UNEMPLOYMENT_CSV)
+    truncated = calibration[~calibration["calendar_year"].eq(2028)]
+    root = _calibration_root_with(truncated, tmp_path)
+    with pytest.raises(ValueError, match="cover exactly"):
+        load_conflict_unemployment_calibration(root)
+
+
+def test_conflict_unemployment_paths_quarterly_mapping_and_taper() -> None:
+    paths = build_conflict_unemployment_paths(ROOT)
+    assert len(paths) == 3 * len(EXPECTED_PERIODS)
+    assert not paths.duplicated(["severity", "period"]).any()
+    gaps = paths.set_index(["severity", "period"])["unemployment_gap_pp"]
+    # Observed common history: exactly zero for every severity through
+    # 2026Q3, so future path differences cannot leak backwards into FY2026.
+    for severity in ("low", "medium", "high"):
+        for period in ("2026Q1", "2026Q2", "2026Q3"):
+            assert float(gaps.at[(severity, period)]) == 0.0
+    # June-quarter anchors are applied at Q2 from 2027; the 2026Q2 anchor is
+    # recorded for lineage but never applied.
+    anchor_records = paths.set_index(["severity", "period"])[
+        "treasury_anchor_gap_pp"
+    ]
+    statuses = paths.set_index(["severity", "period"])["source_status"]
+    for (severity, year), gap in EXPECTED_UNEMPLOYMENT_GAPS.items():
+        anchor_period = f"{year}Q2"
+        assert float(anchor_records.at[(severity, anchor_period)]) == pytest.approx(
+            gap, abs=1e-12
+        )
+        if year == 2026:
+            assert float(gaps.at[(severity, anchor_period)]) == 0.0
+            assert (
+                statuses.at[(severity, anchor_period)]
+                == "official_anchor_not_applied_observed_history"
+            )
+        else:
+            assert float(gaps.at[(severity, anchor_period)]) == pytest.approx(
+                gap, abs=1e-12
+            )
+            assert statuses.at[(severity, anchor_period)] == "official_anchor"
+    # Linear interpolation between June anchors, applying only from 2026Q4.
+    for severity, expected_by_period in (
+        (
+            "medium",
+            (
+                ("2026Q4", 0.45),
+                ("2027Q1", 0.625),
+                ("2027Q3", 0.675),
+                ("2027Q4", 0.55),
+                ("2028Q1", 0.425),
+            ),
+        ),
+        (
+            "high",
+            (
+                ("2026Q4", 1.15),
+                ("2027Q1", 1.525),
+                ("2027Q3", 1.675),
+                ("2027Q4", 1.45),
+                ("2028Q1", 1.225),
+            ),
+        ),
+    ):
+        for period, expected in expected_by_period:
+            assert float(gaps.at[(severity, period)]) == pytest.approx(
+                expected, abs=1e-12
+            )
+    # Medium tapers linearly to exactly zero by 2029Q2 and stays zero.
+    for period, expected in (
+        ("2028Q3", 0.225),
+        ("2028Q4", 0.15),
+        ("2029Q1", 0.075),
+        ("2029Q2", 0.0),
+    ):
+        assert float(gaps.at[("medium", period)]) == pytest.approx(
+            expected, abs=1e-12
+        )
+    assert float(gaps.at[("medium", "2029Q2")]) == 0.0
+    for period in ("2029Q3", "2029Q4", "2030Q1", "2030Q2", "2030Q3", "2030Q4"):
+        assert float(gaps.at[("medium", period)]) == 0.0
+    # High holds the 2028Q2 gap through 2029Q2 then tapers to exactly zero by
+    # 2030Q2 and stays zero.
+    for period in ("2028Q3", "2028Q4", "2029Q1", "2029Q2"):
+        assert float(gaps.at[("high", period)]) == pytest.approx(1.0, abs=1e-12)
+    for period, expected in (
+        ("2029Q3", 0.75),
+        ("2029Q4", 0.5),
+        ("2030Q1", 0.25),
+        ("2030Q2", 0.0),
+    ):
+        assert float(gaps.at[("high", period)]) == pytest.approx(
+            expected, abs=1e-12
+        )
+    assert float(gaps.at[("high", "2030Q2")]) == 0.0
+    for period in ("2030Q3", "2030Q4"):
+        assert float(gaps.at[("high", period)]) == 0.0
+    # Every severity ends the governed window at exactly zero.
+    for severity in ("low", "medium", "high"):
+        assert float(gaps.at[(severity, "2030Q4")]) == 0.0
+    low = paths[paths["severity"].eq("low")]
+    assert low["unemployment_gap_pp"].eq(0.0).all()
+    assert low["source_status"].astype(str).eq("no_official_anchor").all()
+    assert paths["source_url"].astype(str).eq(TREASURY_CONFLICT_GDP_URL).all()
+
+
+def test_conflict_unemployment_paths_validation_rejects_tampering() -> None:
+    paths = build_conflict_unemployment_paths(ROOT)
+    negative = paths.copy()
+    negative.loc[0, "unemployment_gap_pp"] = -0.1
+    with pytest.raises(ValueError, match="non-negative"):
+        validate_conflict_unemployment_paths(negative)
+    unbounded = paths.copy()
+    unbounded.loc[
+        unbounded["severity"].eq("high")
+        & unbounded["period"].eq("2027Q1"),
+        "unemployment_gap_pp",
+    ] = 5.0
+    with pytest.raises(ValueError, match="sanity bound"):
+        validate_conflict_unemployment_paths(unbounded)
+    unrecovered = paths.copy()
+    unrecovered.loc[
+        unrecovered["severity"].eq("medium")
+        & unrecovered["period"].eq("2030Q4"),
+        "unemployment_gap_pp",
+    ] = 0.05
+    with pytest.raises(ValueError, match="exactly zero"):
+        validate_conflict_unemployment_paths(unrecovered)
+    # A gap leaking into observed common history must be rejected.
+    leaking = paths.copy()
+    leaking.loc[
+        leaking["severity"].eq("medium") & leaking["period"].eq("2026Q2"),
+        "unemployment_gap_pp",
+    ] = 0.1
+    with pytest.raises(ValueError, match="observed common history"):
+        validate_conflict_unemployment_paths(leaking)
+    off_anchor = paths.copy()
+    off_anchor.loc[
+        off_anchor["severity"].eq("medium")
+        & off_anchor["period"].eq("2027Q2"),
+        "unemployment_gap_pp",
+    ] = 0.9
+    with pytest.raises(ValueError, match="no longer meets"):
+        validate_conflict_unemployment_paths(off_anchor)
+    unrecorded = paths.copy()
+    unrecorded.loc[
+        unrecorded["severity"].eq("high") & unrecorded["period"].eq("2027Q2"),
+        "treasury_anchor_gap_pp",
+    ] = 1.5
+    with pytest.raises(ValueError, match="no longer records"):
+        validate_conflict_unemployment_paths(unrecorded)
+
+
+def test_conflict_unemployment_transform_adjusts_only_unemployment_rate() -> None:
+    base = _base_scenario_input_rows()
+    transformed = apply_conflict_unemployment_impact(
+        base,
+        severity="medium",
+        repo_root=ROOT,
+    )
+    added = {
+        "conflict_unemployment_gap_pp",
+        "conflict_unemployment_source_url",
+        "conflict_unemployment_basis",
+    }
+    assert added.issubset(transformed.columns)
+    untouched = [
+        column
+        for column in base.columns
+        if column != "unemployment_rate"
+    ]
+    pd.testing.assert_frame_equal(
+        transformed[untouched],
+        base[untouched],
+        check_exact=True,
+        check_dtype=True,
+    )
+    # log_unemployment_rate stays byte-identical: the replay recomputes it.
+    assert (
+        transformed["log_unemployment_rate"] == base["log_unemployment_rate"]
+    ).all()
+    # LIGHT_RUC has no unemployment input and stays byte-identical.
+    light_mask = base["stream"].astype(str).eq("LIGHT_RUC")
+    assert (
+        transformed.loc[light_mask, "unemployment_rate"]
+        == base.loc[light_mask, "unemployment_rate"]
+    ).all()
+    # String dtype is preserved for the adjusted field.
+    assert pd.api.types.is_string_dtype(transformed["unemployment_rate"].dtype)
+    period = transformed["canonical_period"].astype(str)
+    for stream in ("PED", "HEAVY_RUC"):
+        stream_mask = transformed["stream"].astype(str).eq(stream)
+        for check_period, gap in (
+            ("2026Q4", 0.45),
+            ("2027Q1", 0.625),
+            ("2027Q2", 0.8),
+            ("2028Q2", 0.3),
+            ("2028Q4", 0.15),
+        ):
+            mask = stream_mask & period.eq(check_period)
+            before = float(
+                pd.to_numeric(base.loc[mask.values, "unemployment_rate"]).iloc[0]
+            )
+            after = float(
+                pd.to_numeric(transformed.loc[mask, "unemployment_rate"]).iloc[0]
+            )
+            assert after - before == pytest.approx(gap / 100.0, abs=1e-15)
+        # Observed common history (through 2026Q3) and quarters beyond the
+        # governed window carry a zero gap: numerically unchanged to within
+        # the 1-ULP pandas string-parse noise of the string-dtype round trip.
+        for zero_period in ("2026Q1", "2026Q2", "2026Q3", "2029Q2", "2035Q1"):
+            zero_mask = stream_mask & period.eq(zero_period)
+            before = float(
+                pd.to_numeric(
+                    base.loc[zero_mask.values, "unemployment_rate"]
+                ).iloc[0]
+            )
+            after = float(
+                pd.to_numeric(
+                    transformed.loc[zero_mask, "unemployment_rate"]
+                ).iloc[0]
+            )
+            assert after == pytest.approx(before, rel=1e-13)
+    assert (
+        pd.to_numeric(
+            transformed.loc[light_mask, "conflict_unemployment_gap_pp"]
+        )
+        .eq(0.0)
+        .all()
+    )
+
+
+def test_conflict_unemployment_transform_rejects_unknown_severity() -> None:
+    base = _base_scenario_input_rows()
+    with pytest.raises(ValueError, match="Unknown conflict unemployment severity"):
+        apply_conflict_unemployment_impact(base, severity="extreme", repo_root=ROOT)
+
+
+def test_conflict_unemployment_low_severity_is_numerically_neutral() -> None:
+    base = _base_scenario_input_rows()
+    transformed = apply_conflict_unemployment_impact(
+        base,
+        severity="low",
+        repo_root=ROOT,
+    )
+    # Numerically neutral to within the 1-ULP pandas string-parse noise of
+    # the string-dtype round trip (the gap added is exactly 0.0).
+    np.testing.assert_allclose(
+        pd.to_numeric(
+            transformed.loc[
+                transformed["stream"].astype(str).ne("LIGHT_RUC"),
+                "unemployment_rate",
+            ]
+        ),
+        pd.to_numeric(
+            base.loc[
+                base["stream"].astype(str).ne("LIGHT_RUC"), "unemployment_rate"
+            ]
+        ),
+        rtol=1e-13,
+        atol=0.0,
+    )
+    assert transformed["conflict_unemployment_gap_pp"].eq(0.0).all()
+
+
+def test_combined_conflict_macro_layer_touches_gdp_and_unemployment_only() -> None:
+    """The fuel_price_scenario macro layer chains GDP then unemployment.
+
+    ``apply_conflict_gdp_impact`` keeps its tight GDP-only contract (asserted
+    above); this test pins the union behaviour of the combined macro layer as
+    wired in ``run_fuel_price_scenario_replay``.
+    """
+
+    base = _base_scenario_input_rows()
+    combined = apply_conflict_unemployment_impact(
+        apply_conflict_gdp_impact(base, severity="medium", repo_root=ROOT),
+        severity="medium",
+        repo_root=ROOT,
+    )
+    macro_fields = {
+        "real_gdp_per_capita_nzd",
+        "real_gdp_sa_nzd",
+        "unemployment_rate",
+    }
+    untouched = [column for column in base.columns if column not in macro_fields]
+    pd.testing.assert_frame_equal(
+        combined[untouched],
+        base[untouched],
+        check_exact=True,
+        check_dtype=True,
+    )
+    period = combined["canonical_period"].astype(str)
+    ped = combined["stream"].astype(str).eq("PED")
+    base_period = base["canonical_period"].astype(str)
+    base_ped = base["stream"].astype(str).eq("PED")
+    gdp_before = float(
+        pd.to_numeric(
+            base.loc[base_ped & base_period.eq("2027Q1"), "real_gdp_per_capita_nzd"]
+        ).iloc[0]
+    )
+    gdp_after = float(
+        pd.to_numeric(
+            combined.loc[ped & period.eq("2027Q1"), "real_gdp_per_capita_nzd"]
+        ).iloc[0]
+    )
+    assert gdp_after / gdp_before == pytest.approx(0.985, abs=1e-12)
+    unemp_before = float(
+        pd.to_numeric(
+            base.loc[base_ped & base_period.eq("2027Q2"), "unemployment_rate"]
+        ).iloc[0]
+    )
+    unemp_after = float(
+        pd.to_numeric(
+            combined.loc[ped & period.eq("2027Q2"), "unemployment_rate"]
+        ).iloc[0]
+    )
+    assert unemp_after - unemp_before == pytest.approx(0.008, abs=1e-15)
+    # FY2026 safety: observed-common-history quarters stay numerically
+    # unchanged by the unemployment channel for every severity.
+    for history_period in ("2026Q1", "2026Q2", "2026Q3"):
+        before = float(
+            pd.to_numeric(
+                base.loc[
+                    base_ped & base_period.eq(history_period),
+                    "unemployment_rate",
+                ]
+            ).iloc[0]
+        )
+        after = float(
+            pd.to_numeric(
+                combined.loc[
+                    ped & period.eq(history_period), "unemployment_rate"
+                ]
+            ).iloc[0]
+        )
+        assert after == pytest.approx(before, rel=1e-13)
+
+
+def test_conflict_unemployment_audit_has_stable_column_order() -> None:
+    base = _base_scenario_input_rows()
+    transformed = apply_conflict_unemployment_impact(
+        base,
+        severity="medium",
+        repo_root=ROOT,
+    )
+    audit = conflict_unemployment_input_audit(transformed)
+    assert list(audit.columns) == [
+        "scenario_name",
+        "stream",
+        "period",
+        "conflict_unemployment_gap_pp",
+        "conflict_unemployment_source_url",
+        "conflict_unemployment_basis",
+    ]
+    assert len(audit) == len(transformed)
+    assert conflict_unemployment_input_audit(base).empty

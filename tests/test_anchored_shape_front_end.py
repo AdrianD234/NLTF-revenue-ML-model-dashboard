@@ -56,8 +56,9 @@ class TestPreviewOptions:
         audit = [spec for spec in options.values() if spec["role"] == "audit"]
         assert audit, "the prior-vintage audit preview is missing"
         # Every shape-capable vintage other than the pack's own shape source
-        # (BEFU26) is offered for audit - MBU26 and, once registered, PREBU26.
-        assert {spec["shape_vintage_id"] for spec in audit} == {"MBU26", "PREBU26"}
+        # (PREBU26 since the handover promotion) is offered for audit -
+        # BEFU26 and MBU26.
+        assert {spec["shape_vintage_id"] for spec in audit} == {"MBU26", "BEFU26"}
 
     def test_exactly_one_option_is_the_pack_default(self, manifest):
         options = dashboard._long_run_shape_preview_options(manifest)
@@ -126,6 +127,27 @@ class TestSelectorIndependence:
 
 class TestGovernedWording:
     def test_details_text_carries_the_four_required_lines(self, manifest):
+        """Worded from the production default: the FY2035 growth handover on
+        the PREBU26 shape source."""
+
+        state = {
+            "schedule_id": PRODUCTION_LONG_RUN_TRANSITION_SCHEDULE_ID,
+            "shape_vintage_id": "PREBU26",
+            "anchor_fy": ANCHOR_FY,
+            "completion_fy": 2035,
+        }
+        text = dashboard._long_run_shape_details_text(state, "Base_EV")
+        assert f"Current FY{ANCHOR_FY} level anchor" in text
+        assert "Long-run activity shape: PREBU26" in text
+        assert "Fleet composition: VFM202405 Base_EV" in text
+        assert (
+            f"Transition schedule: {PRODUCTION_LONG_RUN_TRANSITION_SCHEDULE_ID}"
+            in text
+        )
+
+    def test_details_text_names_a_level_blend_candidate_when_selected(self, manifest):
+        """The level blends stay governed candidates with truthful wording."""
+
         state = {
             "schedule_id": "balanced_structural",
             "shape_vintage_id": "BEFU26",
@@ -133,9 +155,7 @@ class TestGovernedWording:
             "completion_fy": 2045,
         }
         text = dashboard._long_run_shape_details_text(state, "Base_EV")
-        assert f"Current FY{ANCHOR_FY} level anchor" in text
         assert "Long-run activity shape: BEFU26" in text
-        assert "Fleet composition: VFM202405 Base_EV" in text
         assert "Transition schedule: balanced_structural" in text
 
     def test_unblended_details_do_not_name_a_structural_source(self):

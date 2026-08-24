@@ -50,6 +50,7 @@ from .long_run_shape_transition import (
     LongRunShapeTransitionError,
     TransitionSchedule,
     geometric_blend_index,
+    growth_handover_index,
     resolve_schedule,
     structural_growth_indices,
     transition_weight,
@@ -404,12 +405,20 @@ def _attach_structural_transition(
             out["fy"].to_numpy(), f"s_level_{stream}"
         ].to_numpy(dtype=float)
         try:
-            out[f"h_{stream}"] = geometric_blend_index(
-                current_index,
-                structural_index,
-                out["w"].to_numpy(dtype=float),
-                context=f"{scenario_name} {stream}",
-            )
+            if schedule.is_growth_handover:
+                out[f"h_{stream}"] = growth_handover_index(
+                    current_index,
+                    structural_index,
+                    out["w"].to_numpy(dtype=float),
+                    context=f"{scenario_name} {stream}",
+                )
+            else:
+                out[f"h_{stream}"] = geometric_blend_index(
+                    current_index,
+                    structural_index,
+                    out["w"].to_numpy(dtype=float),
+                    context=f"{scenario_name} {stream}",
+                )
         except LongRunShapeTransitionError as error:
             raise PostModelExtrapolationError(str(error)) from error
         _guard_growth_index(
@@ -533,10 +542,16 @@ def build_post_model_extrapolation_annual(
     # the manifest.
     if schedule.is_structural:
         shape_token = str(long_run_shape_vintage_id or "long-run shape vintage")
-        blend = (
-            f"geometrically blended toward the {shape_token} growth shape "
-            f"({schedule.schedule_id}, complete FY{schedule.completion_fy})"
-        )
+        if schedule.is_growth_handover:
+            blend = (
+                f"with the growth rate handed over one-way to the {shape_token} "
+                f"growth shape ({schedule.schedule_id}, complete FY{schedule.completion_fy})"
+            )
+        else:
+            blend = (
+                f"geometrically blended toward the {shape_token} growth shape "
+                f"({schedule.schedule_id}, complete FY{schedule.completion_fy})"
+            )
         petrol_formula = f"FY{ANCHOR_FY} petrol anchor * Current growth {blend}"
         heavy_formula = f"FY{ANCHOR_FY} Heavy anchor * Current growth {blend}"
         pool_formula = f"FY{ANCHOR_FY} pool anchor * VFM pool index {blend}"
@@ -746,6 +761,27 @@ def anchor_shape_level_audit(
             ),
             "heavy_ruc_net_km": anchors["heavy_ruc_net_km"],
         }
+        # Recompute each hybrid index independently of the constructor so the
+        # audit is a check, not a restatement. The level blend is a per-year
+        # closed form; the growth handover integrates its recurrence from the
+        # anchor, so it is recomputed as a series per stream up front.
+        recomputed_by_stream: dict[str, pd.Series] = {}
+        if schedule.is_growth_handover:
+            ordered_fys = sorted(growth.index)
+            for _, stream, current_column in streams:
+                current_series = growth.loc[ordered_fys, current_column].to_numpy(dtype=float)
+                structural_series = growth.loc[ordered_fys, f"s_{stream}"].to_numpy(dtype=float)
+                weight_series = growth.loc[ordered_fys, "w"].to_numpy(dtype=float)
+                recomputed = np.ones(len(ordered_fys), dtype=float)
+                for position in range(1, len(ordered_fys)):
+                    step_weight = weight_series[position]
+                    recomputed[position] = recomputed[position - 1] * (
+                        (current_series[position] / current_series[position - 1])
+                        ** (1.0 - step_weight)
+                        * (structural_series[position] / structural_series[position - 1])
+                        ** step_weight
+                    )
+                recomputed_by_stream[stream] = pd.Series(recomputed, index=ordered_fys)
         for fy in range(FIRST_EXTRAPOLATION_FY, LAST_EXTRAPOLATION_FY + 1):
             row = growth.loc[fy]
             for label, stream, current_column in streams:
@@ -776,10 +812,11 @@ def anchor_shape_level_audit(
                         "model_weight": 1.0 - weight,
                         "hybrid_growth_index": hybrid_index,
                         "hybrid_level": hybrid_level,
-                        # Recomputed independently of the constructor so the
-                        # audit is a check, not a restatement.
-                        "recomputed_hybrid_index": current_index ** (1.0 - weight)
-                        * structural_index**weight,
+                        "recomputed_hybrid_index": (
+                            float(recomputed_by_stream[stream].loc[fy])
+                            if schedule.is_growth_handover
+                            else current_index ** (1.0 - weight) * structural_index**weight
+                        ),
                         "official_level_same_fy": official_level,
                         "official_level_anchor_fy": official_anchor_level,
                         "hybrid_over_official_ratio": (
@@ -795,7 +832,10 @@ def anchor_shape_level_audit(
                         ),
                         "official_level_substituted": False,
                         "construction": (
-                            "current_fy2030_anchor x "
+                            "current_fy2030_anchor x cumulative "
+                            "((c_t/c_{t-1})**(1-w_t) * (s_t/s_{t-1})**w_t) from the anchor"
+                            if schedule.is_growth_handover
+                            else "current_fy2030_anchor x "
                             "(current_index**(1-w) * structural_index**w)"
                         ),
                     }

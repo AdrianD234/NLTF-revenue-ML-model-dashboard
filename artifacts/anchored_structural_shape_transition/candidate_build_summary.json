@@ -3,7 +3,9 @@
     "unblended_current",
     "early_structural",
     "balanced_structural",
-    "gradual_structural"
+    "gradual_structural",
+    "growth_handover_fy2035",
+    "growth_handover_fy2040"
   ],
   "production_default_unchanged": "unblended_current",
   "reported_fys": [
@@ -14,5 +16,5 @@
     2045,
     2050
   ],
-  "shape_vintage_id": "BEFU26"
+  "shape_vintage_id": "PREBU26"
 }

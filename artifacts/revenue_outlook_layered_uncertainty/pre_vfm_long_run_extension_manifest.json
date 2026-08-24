@@ -1,7 +1,7 @@
 {
   "pre_amendment_head": "ac144a40d9eecf32c58533e6a916522fdb3abba5",
   "pr": 15,
-  "baseline_rows": 20628,
+  "baseline_rows": 23508,
   "engines": [
     "ensemble",
     "ar1"
@@ -39,29 +39,29 @@
   "runtime_pack_manifest": {
     "official_vintages": {
       "registry": "data/revenue_model_source_pack/official_vintage_registry.json",
-      "official_comparator_vintage_id": "BEFU26",
+      "official_comparator_vintage_id": "PREBU26",
       "bridge_assumption_vintage_id": "BEFU26",
-      "long_run_shape_vintage_id": "BEFU26",
-      "long_run_shape_vintage_sha256": "7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff",
+      "long_run_shape_vintage_id": "PREBU26",
+      "long_run_shape_vintage_sha256": "f69985432b34271d5868267d78b77ad2c746563788011b445715e4f58a25728b",
       "long_run_shape_method_id": "anchored_structural_shape_transition_v1",
-      "long_run_transition_schedule_id": "balanced_structural",
+      "long_run_transition_schedule_id": "growth_handover_fy2035",
       "long_run_anchor_fy": 2030,
-      "long_run_transition_end_fy": 2045,
+      "long_run_transition_end_fy": 2035,
       "fleet_composition_source_id": "VFM202405",
       "long_run_shape_policy": "The long-run shape vintage supplies an FY2031-FY2050 activity GROWTH SHAPE only. No official level, rate or fixed line is taken from it, and the FY2030 Current anchor is unchanged under every schedule.",
-      "default_official_comparator_trace": "BEFU26 official",
+      "default_official_comparator_trace": "PREBU26 official",
       "official_comparator_policy": "Published official vintages are immutable by default. Current policy controls alter Current forecasts only; no official vintage receives a Current policy overlay by default.",
       "available": {
-        "BEFU26": {
-          "display_name": "BEFU26 official",
-          "release_round": "BEFU26",
+        "PREBU26": {
+          "display_name": "PREBU26 official",
+          "release_round": "PREBU26",
           "status": "active_official_vintage",
-          "trace_name": "BEFU26 official",
-          "scenario_name": "befu26_official",
+          "trace_name": "PREBU26 official",
+          "scenario_name": "prebu26_official",
           "source_horizon_fy": 2055,
-          "workbook_sha256": "7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff",
-          "source_pack_path": "data/revenue_model_source_pack/official_vintages/befu26",
-          "manifest_sha256": "93406dc1c609b8792796b5ca6f2ba195eea8d362a90e8ba645c10eece9d9fe20"
+          "workbook_sha256": "f69985432b34271d5868267d78b77ad2c746563788011b445715e4f58a25728b",
+          "source_pack_path": "data/revenue_model_source_pack/official_vintages/prebu26",
+          "manifest_sha256": "2a58bf0158a0de279ae178e05cb7d4c127a96d0c8860763944d6c6d5a9ef2179"
         },
         "MBU26": {
           "display_name": "MBU26 official",
@@ -73,6 +73,17 @@
           "workbook_sha256": "9aaff21f72c0a10cfa972a29d3c4f716495c79cbd72fc28e8008a65558454e12",
           "source_pack_path": "data/revenue_model_source_pack/mbu26_annual_spine",
           "manifest_sha256": "2c5fb4fec1431ed92de1b3971bacd559e091d58dab08bce60ea53e30b24b8c15"
+        },
+        "BEFU26": {
+          "display_name": "BEFU26 official",
+          "release_round": "BEFU26",
+          "status": "active_official_vintage",
+          "trace_name": "BEFU26 official",
+          "scenario_name": "befu26_official",
+          "source_horizon_fy": 2055,
+          "workbook_sha256": "7d6e5b19119ca8b5272ca2205c0735719033d82484ce674cfb595e6f45d085ff",
+          "source_pack_path": "data/revenue_model_source_pack/official_vintages/befu26",
+          "manifest_sha256": "93406dc1c609b8792796b5ca6f2ba195eea8d362a90e8ba645c10eece9d9fe20"
         }
       }
     },
@@ -85,8 +96,9 @@
       "current_light_ruc_annual_cutoff_fy": 2030,
       "official_comparator_cutoff_fy": 2055,
       "official_comparator_cutoff_by_vintage": {
-        "BEFU26": 2055,
-        "MBU26": 2055
+        "PREBU26": 2055,
+        "MBU26": 2055,
+        "BEFU26": 2055
       },
       "raw_audit_source_horizon": "2050Q4 (H100)",
       "horizon_contract_audit": "data/current_revenue_outlook/horizon_contract_audit.csv",

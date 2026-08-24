@@ -234,7 +234,9 @@ def test_revenue_outlook_default_sensitivity_view_uses_fast_path_and_preserves_v
     assert view["revenue_formula_residuals"].empty
     assert view["revenue_stack_components"].empty
     non_fuel = view["chart_rows"][
-        ~view["chart_rows"]["scenario_name"].astype(str).isin(CONFLICT_SCENARIO_NAMES)
+        ~view["chart_rows"]["scenario_name"].astype(str).isin(
+            [*CONFLICT_SCENARIO_NAMES, "persistent_downside"]
+        )
     ]
     # The view applies the governed official-vintage filter (uptake-key slots
     # 6/7); with no selection supplied it falls back to the pack's default
@@ -579,6 +581,12 @@ def test_revenue_outlook_default_figure_matches_uncached_path() -> None:
         (app.EV_UPTAKE_GOVERNED_OPTION, ()),
         pack,
     )
+    # The cached view derives the Persistent downside trace and re-tethers the
+    # High population comparison to the central-conditions path before the
+    # vintage filter; the hand-rolled uncached path mirrors both, in the same
+    # order, or it compares figures built from different scenario ladders.
+    overlay_rows, _ = app._append_persistent_downside_rows(overlay_rows)
+    overlay_rows = app._retether_high_population_to_central(overlay_rows)
     # The cached view applies the governed official-vintage filter before
     # filtering rows; the hand-rolled uncached path must mirror that step or it
     # compares a single-vintage figure against an all-vintage one.

@@ -1,8 +1,10 @@
 """PREBU26 default-comparator acceptance gates.
 
 PREBU26 (the PREFU-round 2026 release) becomes the latest and default official
-comparator - the green official line - while BEFU26 keeps the bridge and
-long-run-shape roles. These tests pin the whole bounded scope:
+comparator - the green official line - while BEFU26 keeps the bridge role.
+Since the long-run handover promotion PREBU26 also owns the long-run shape
+role; the bridge is the only default role left on BEFU26. These tests pin the
+whole bounded scope:
 
 - PREBU26 materializes and round-trips exactly (registry hash, sentinels);
 - registry roles: PREBU26 latest/default comparator, BEFU26 bridge/shape;
@@ -104,24 +106,26 @@ def _visible_current_annual(frame: pd.DataFrame) -> pd.DataFrame:
 
 
 class TestRegistryRoles:
-    def test_prebu26_is_latest_and_default_comparator_only(self, registry):
+    def test_prebu26_is_latest_comparator_and_long_run_shape(self, registry):
         entry = ov.official_vintage_entry("PREBU26", registry=registry)
         assert entry["is_latest"] is True
         assert entry["is_default_comparator"] is True
         assert entry["is_default_bridge_vintage"] is False
-        assert entry["is_default_long_run_shape_vintage"] is False
+        # The long-run shape role moved to PREBU26 with the growth-handover
+        # promotion; the bridge role deliberately did not.
+        assert entry["is_default_long_run_shape_vintage"] is True
         assert entry["workbook_sha256"] == PREBU26_WORKBOOK_SHA
         assert entry["source_workbook"] == "references/PREBU26.xlsx"
         assert entry["source_sheet"] == "PREBU"
 
-    def test_befu26_keeps_bridge_and_long_run_shape(self, registry):
+    def test_befu26_keeps_bridge_only(self, registry):
         entry = ov.official_vintage_entry("BEFU26", registry=registry)
         assert entry["is_latest"] is False
         assert entry["is_default_comparator"] is False
         assert entry["is_default_bridge_vintage"] is True
-        assert entry["is_default_long_run_shape_vintage"] is True
+        assert entry["is_default_long_run_shape_vintage"] is False
         assert ov.default_bridge_vintage_id(ROOT) == "BEFU26"
-        assert ov.default_long_run_shape_vintage_id(ROOT) == "BEFU26"
+        assert ov.default_long_run_shape_vintage_id(ROOT) == "PREBU26"
         assert ov.default_comparator_vintage_id(ROOT) == "PREBU26"
         assert ov.latest_official_vintage_id(ROOT) == "PREBU26"
 
@@ -199,7 +203,7 @@ class TestDefaultChartVocabulary:
         block = runtime_pack.manifest["official_vintages"]
         assert block["official_comparator_vintage_id"] == "PREBU26"
         assert block["bridge_assumption_vintage_id"] == "BEFU26"
-        assert block["long_run_shape_vintage_id"] == "BEFU26"
+        assert block["long_run_shape_vintage_id"] == "PREBU26"
         assert block["default_official_comparator_trace"] == "PREBU26 official"
         assert set(block["available"]) == {"PREBU26", "BEFU26", "MBU26"}
 
@@ -348,12 +352,30 @@ class TestCurrentValuesInvariant:
     def test_all_non_prebu26_chart_rows_match_the_pinned_baseline(
         self, pack_dir, baseline_name
     ):
+        """Adding PREBU26 roles must not move Current values it does not own.
+
+        The FY2031-FY2050 post-model rows are excluded: PREBU26 legitimately
+        owns that layer since the long-run shape role moved to it (the
+        one-way growth handover promotion), and the promotion audit
+        separately proves ONLY that layer moved. Everything else - actuals,
+        the econometric window, the other official spines - must still match
+        the baseline frozen before PREBU26 carried any role.
+        """
         new = pd.read_csv(ROOT / pack_dir / "revenue_chart_rows.csv", low_memory=False)
         old = pd.read_csv(BASELINE_DIR / baseline_name, low_memory=False)
-        new_wo = new[~new["scenario_name"].astype(str).eq("prebu26_official")].reset_index(
-            drop=True
+
+        def _outside_shape_scope(frame: pd.DataFrame) -> pd.DataFrame:
+            scoped = frame[~frame["scenario_name"].astype(str).eq("prebu26_official")]
+            segment = scoped.get(
+                "forecast_segment", pd.Series("", index=scoped.index)
+            )
+            return scoped[
+                ~segment.fillna("").astype(str).eq("post_model_extrapolation")
+            ].reset_index(drop=True)
+
+        pd.testing.assert_frame_equal(
+            _outside_shape_scope(new), _outside_shape_scope(old)
         )
-        pd.testing.assert_frame_equal(new_wo, old.reset_index(drop=True))
 
 
 class TestBridgeCaptionsStayBefu26:
@@ -365,15 +387,23 @@ class TestBridgeCaptionsStayBefu26:
         assert "PREBU26" not in note
 
     def test_current_rows_bridge_provenance_stays_befu26(self, runtime_pack):
+        """PREBU26 may appear ONLY as the long-run growth-shape source.
+
+        The bridge assumptions - effective rates, fuel intensity, carried
+        fixed lines - stay BEFU26, so any provenance string naming PREBU26
+        must be a shape-transition formula ("growth shape"), never a rate or
+        bridge caption.
+        """
         line = runtime_pack.revenue_line_reconciliation
         current = line[line["source_path"].astype(str).eq("Current finalist Base case")]
-        text = " ".join(
-            str(value)
+        offenders = [
+            value
             for column in ("bridge_method", "formula", "source_basis", "notes")
             if column in current.columns
             for value in current[column].dropna().astype(str).unique()
-        )
-        assert "PREBU26" not in text
+            if "PREBU26" in value and "growth shape" not in value
+        ]
+        assert not offenders, offenders[:3]
 
     def test_official_vintages_block_keeps_bridge_befu26(self):
         import json
@@ -385,7 +415,9 @@ class TestBridgeCaptionsStayBefu26:
             manifest = json.loads((pack_dir / "manifest.json").read_text(encoding="utf-8"))
             block = manifest["official_vintages"]
             assert block["bridge_assumption_vintage_id"] == "BEFU26"
-            assert block["long_run_shape_vintage_id"] == "BEFU26"
+            # The shape role follows the registry promotion; only the BRIDGE
+            # is the invariant this class protects.
+            assert block["long_run_shape_vintage_id"] == "PREBU26"
 
 
 class TestPublishedValuesImmuneToControls:

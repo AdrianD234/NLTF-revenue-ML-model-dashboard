@@ -243,12 +243,12 @@ def test_scenario_and_policy_variant_helpers_are_stable() -> None:
     low_delay_12m = conflict_policy_variant("low", "delayed_12m")
     assert low_delay_12m.scenario_id == "middle_east_low__12c_delay_12m"
     assert low_delay_12m.display_name == (
-        "Middle East conflict: Low - 12c deferred 12 months"
+        "Current conditions baseline - 12c deferred 12 months"
     )
     low_delay = conflict_policy_variant("low", "delay_6m")
     assert low_delay.scenario_id == "middle_east_low__12c_delay_6m"
     assert low_delay.display_name == (
-        "Middle East conflict: Low - 12c deferred six months"
+        "Current conditions baseline - 12c deferred six months"
     )
     assert (
         conflict_policy_variant_name("low", "delayed_6m")

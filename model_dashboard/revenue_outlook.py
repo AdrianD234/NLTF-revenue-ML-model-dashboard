@@ -4918,9 +4918,18 @@ def build_current_revenue_outlook_runtime_pack(
                 f"FY{FIRST_EXTRAPOLATION_FY}-FY{LAST_EXTRAPOLATION_FY} Current rows "
                 "are the governed anchored structural shape transition: each stream "
                 f"holds its FY{runtime_cutoff_fy} econometric level as a fixed anchor "
-                "and its growth index is blended geometrically toward the "
-                f"{shape_vid} long-run shape on the {shape_schedule.schedule_id} "
-                "schedule. No official level is substituted. These rows are labelled "
+                + (
+                    "and its growth RATE hands over one-way to the "
+                    f"{shape_vid} long-run growth shape on the "
+                    f"{shape_schedule.schedule_id} schedule, continuing on that "
+                    "trajectory after completion with no pull-back toward the "
+                    "official curve. "
+                    if shape_schedule.is_growth_handover
+                    else "and its growth index is blended geometrically toward the "
+                    f"{shape_vid} long-run shape on the {shape_schedule.schedule_id} "
+                    "schedule. "
+                )
+                + "No official level is substituted. These rows are labelled "
                 f"forecast_segment={POST_MODEL_SEGMENT} and are decision-facing."
             ),
         },
@@ -7592,6 +7601,24 @@ def revenue_outlook_fan_tables(
 INTERVAL_UNAVAILABLE_STRUCTURAL_OVERLAY = "unavailable_structural_overlay"
 
 
+def _fan_excluded_scenario_ids() -> frozenset[str]:
+    """Scenario IDs no probabilistic interval may be drawn against.
+
+    The structural-overlay scenarios display a governed counterfactual layer
+    rather than the raw fitted replay the fan sources describe, and the
+    persistent downside is a central-relative wedge scenario: its severity is
+    BENCHMARKED against the conditional bands, so drawing those same bands
+    around it would present the calibration evidence as an independent
+    interval.
+    """
+
+    from .persistent_downside import PERSISTENT_DOWNSIDE_SCENARIO_ID
+
+    return frozenset(
+        structural_overlay_scenario_ids() | {PERSISTENT_DOWNSIDE_SCENARIO_ID}
+    )
+
+
 def _append_structural_overlay_fan_gaps(
     availability: pd.DataFrame,
     chart_rows: pd.DataFrame,
@@ -7607,7 +7634,7 @@ def _append_structural_overlay_fan_gaps(
         return availability
     if "scenario_name" not in chart_rows.columns:
         return availability
-    overlay = structural_overlay_scenario_ids()
+    overlay = _fan_excluded_scenario_ids()
     present = sorted(
         {
             str(value)
@@ -7683,7 +7710,7 @@ def _assert_no_structural_overlay_fan_bands(bands: pd.DataFrame) -> None:
 
     if bands is None or bands.empty or "scenario_name" not in bands.columns:
         return
-    overlay = structural_overlay_scenario_ids()
+    overlay = _fan_excluded_scenario_ids()
     offending = bands[bands["scenario_name"].astype(str).isin(overlay)]
     if not offending.empty:
         detail = (

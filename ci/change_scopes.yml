@@ -86,6 +86,7 @@ test_groups:
       - tests/test_quarterly_disaggregation.py
       - tests/test_conflict_fuel_paths.py
       - tests/test_conflict_gdp_paths.py
+      - tests/test_persistent_downside.py
       - tests/test_vfm_long_run_composition.py
       - tests/test_revenue_outlook_vfm_envelope.py
       - tests/test_fleet_allocation_runtime_semantics.py
@@ -451,6 +452,7 @@ rules:
       - "model_dashboard/treasury_macro_paths.py"
       - "model_dashboard/conflict_fuel_paths.py"
       - "model_dashboard/conflict_gdp_paths.py"
+      - "model_dashboard/persistent_downside.py"
       - "model_dashboard/scenario_inputs.py"
       - "model_dashboard/unit_contract.py"
       - "model_dashboard/completeness_contract.py"

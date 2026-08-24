@@ -266,29 +266,61 @@ def test_overlay_rows_match_view_chart_rows(context) -> None:
     added_rows = view_rows[
         ~view_rows[identity].astype(str).apply(tuple, axis=1).isin(overlay_keys)
     ]
-    # Only official comparators and their Actual history are ever restored.
-    assert set(added_rows["row_type"].astype(str)) <= {
+    # The view may add exactly two things beyond the overlay layer: restored
+    # official comparator rows (with their Actual history) for series the
+    # runtime builders drop, and the derived Persistent downside trace, which
+    # is constructed FROM the fully-overlaid central and High rows and so can
+    # only exist at this layer.
+    downside_added = added_rows[
+        added_rows["scenario_name"].astype(str).eq("persistent_downside")
+    ]
+    official_added = added_rows[
+        ~added_rows["scenario_name"].astype(str).eq("persistent_downside")
+    ]
+    assert not downside_added.empty, "the derived persistent downside trace is missing"
+    assert set(downside_added["time_grain"].astype(str)) == {"june_year"}
+    assert set(official_added["row_type"].astype(str)) <= {
         "official_comparator",
         "historical_actual",
     }
     # And only for the series the builders drop.
-    assert set(added_rows["series_id"].astype(str)) == {"light_petrol_vkt"}
+    assert set(official_added["series_id"].astype(str)) == {"light_petrol_vkt"}
     # The non-selected vintage must not come back in through the append.
     assert not app._filter_official_vintage_rows(
         view_rows, official_scenario, official_overlay
     ).shape[0] < view_rows.shape[0], "a non-selected vintage leaked into the view"
-    # Values shared by both layers must be untouched. check_dtype is off for
-    # one reason only: concatenating the restored rows widens some all-null
-    # string columns (rate_value) back to object. No value moves, and every
-    # reader of those columns goes through .astype(str). The VALUES are still
-    # compared exactly, which is the part that matters.
+    # Values shared by both layers must be untouched, with one documented
+    # exception: the High population comparison is re-tethered at the view
+    # layer to the central-conditions path (its demand leaves scaled by the
+    # central/Base response ratio, aggregates rebuilt additively), so its
+    # VALUES may differ while every other scenario stays byte-identical.
+    # check_dtype is off for one reason only: concatenating the restored rows
+    # widens some all-null string columns (rate_value) back to object. No
+    # value moves, and every reader of those columns goes through .astype(str).
+    shared_view = view_rows[
+        view_rows[identity].astype(str).apply(tuple, axis=1).isin(overlay_keys)
+    ]
+    retethered = "current_comparison_1"
     pd.testing.assert_frame_equal(
-        view_rows[view_rows[identity].astype(str).apply(tuple, axis=1).isin(overlay_keys)][
+        shared_view[~shared_view["scenario_name"].astype(str).eq(retethered)][
             list(shared)
         ]
         .sort_values(identity)
         .reset_index(drop=True),
-        rows[list(shared)].sort_values(identity).reset_index(drop=True),
+        rows[~rows["scenario_name"].astype(str).eq(retethered)][list(shared)]
+        .sort_values(identity)
+        .reset_index(drop=True),
+        check_dtype=False,
+    )
+    # The re-tether moves values only; every non-value column stays identical.
+    non_value = [column for column in shared if column != "value"]
+    pd.testing.assert_frame_equal(
+        shared_view[shared_view["scenario_name"].astype(str).eq(retethered)][non_value]
+        .sort_values(identity)
+        .reset_index(drop=True),
+        rows[rows["scenario_name"].astype(str).eq(retethered)][non_value]
+        .sort_values(identity)
+        .reset_index(drop=True),
         check_dtype=False,
     )
 

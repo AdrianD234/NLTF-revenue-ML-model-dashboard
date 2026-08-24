@@ -321,7 +321,11 @@ jobs:
     needs: plan
     if: needs.plan.outputs.run_full == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    # The suite crossed the previous 120-minute cap when the persistent
+    # downside, the growth-handover candidates and the conflict macro channel
+    # landed (pytest alone measured 1h49 on the hosted runner); 150 leaves
+    # ~25 minutes of headroom rather than cancelling a green run at the wire.
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@v4
 

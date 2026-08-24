@@ -32,12 +32,17 @@ from model_dashboard.post_model_extrapolation import (
 
 ROOT = Path(__file__).resolve().parents[1]
 PACK_DIR = ROOT / "data" / "current_revenue_outlook"
+# A governed, selectable shape vintage for the preview-selection tests. Not
+# necessarily the PACK default (PREBU26 since the handover promotion): what is
+# under test here is that SELECTING a candidate changes the plotted values.
 SHAPE_VINTAGE = "BEFU26"
 SCHEDULES = (
     UNBLENDED_SCHEDULE_ID,
     "early_structural",
     "balanced_structural",
     "gradual_structural",
+    "growth_handover_fy2035",
+    "growth_handover_fy2040",
 )
 
 
@@ -116,7 +121,19 @@ class TestSelectionChangesTheLongRun:
         assert len(set(round(v, 6) for v in values.values())) == len(SCHEDULES), values
 
     def test_fy2040_orders_as_the_schedules_predict(self, by_schedule):
-        """Slower transition -> closer to the unblended path at FY2040."""
+        """Slower transition -> closer to the unblended path at FY2040.
+
+        Within each blend family, later completion keeps more of the (higher)
+        Current growth by FY2040. The two handover schedules interleave with
+        the level blends: each handover completes earlier than the level blend
+        it sits beside, so by FY2040 it has carried the (lower) structural
+        growth for longer - but, being one-way, it never gives back the level
+        earned before its completion, which is why growth_handover_fy2035
+        still sits above early_structural (fully collapsed onto the structural
+        index at FY2040) and growth_handover_fy2040 above balanced_structural.
+        The chain is written from the actual arithmetic of the committed pack,
+        not assumed.
+        """
 
         fy2040 = {
             schedule: float(
@@ -126,10 +143,38 @@ class TestSelectionChangesTheLongRun:
         }
         assert (
             fy2040["early_structural"]
+            < fy2040["growth_handover_fy2035"]
             < fy2040["balanced_structural"]
+            < fy2040["growth_handover_fy2040"]
             < fy2040["gradual_structural"]
             < fy2040[UNBLENDED_SCHEDULE_ID]
         ), fy2040
+
+    def test_fy2050_handover_keeps_its_earned_level(self, by_schedule):
+        """No-pull-back, visible on the chart output.
+
+        Every completed level blend ends FY2050 at anchor x structural index -
+        the same value regardless of completion year - while the handovers end
+        at the level they earned before completing, which is higher here
+        because the Current growth exceeds the structural growth during the
+        handover window.
+        """
+
+        fy2050 = {
+            schedule: float(
+                _annual(rows, "current_basecase", "total_nltf_net_revenue").loc[2050]
+            )
+            for schedule, rows in by_schedule.items()
+        }
+        assert fy2050["early_structural"] == pytest.approx(
+            fy2050["balanced_structural"], rel=1e-9
+        )
+        assert fy2050["early_structural"] == pytest.approx(
+            fy2050["gradual_structural"], rel=1e-9
+        )
+        assert fy2050["growth_handover_fy2035"] > fy2050["balanced_structural"]
+        assert fy2050["growth_handover_fy2040"] > fy2050["growth_handover_fy2035"]
+        assert fy2050["growth_handover_fy2040"] < fy2050[UNBLENDED_SCHEDULE_ID]
 
     def test_every_long_run_year_is_affected(self, by_schedule):
         """Every published FY2032-FY2050 chart year moves, not just FY2040.

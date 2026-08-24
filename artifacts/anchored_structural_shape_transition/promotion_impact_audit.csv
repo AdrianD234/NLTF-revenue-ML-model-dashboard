@@ -1,3 +1,3 @@
 engine,recorded_schedule,recorded_shape_vintage,joined_rows,changed_rows,changed_segments,changed_fy_min,changed_fy_max,max_abs_delta
-ensemble,balanced_structural,BEFU26,6362,840,['post_model_extrapolation'],2031,2050,33447.01847163723
-ar1,balanced_structural,BEFU26,6362,840,['post_model_extrapolation'],2031,2050,27699.291941651834
+ensemble,growth_handover_fy2035,PREBU26,6362,840,['post_model_extrapolation'],2031,2050,33094.20522853246
+ar1,growth_handover_fy2035,PREBU26,6362,840,['post_model_extrapolation'],2031,2050,27462.28348374372

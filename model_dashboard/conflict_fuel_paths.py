@@ -105,19 +105,29 @@ class ConflictFuelPathSpec:
 
 SCENARIO_REGISTRY: Mapping[str, ConflictFuelPathSpec] = MappingProxyType(
     {
+        # The LOW path is the PUBLIC CENTRAL case: it contains the fuel-price
+        # increase that has actually occurred and its short normalisation, so
+        # it - not the no-shock technical Base it converges to - is the path
+        # presented as "where we are". The scenario_id stays middle_east_low
+        # for cache, replay and pack stability; only the reader-facing name
+        # carries the role.
         "low": ConflictFuelPathSpec(
             severity="low",
             scenario_id="middle_east_low",
-            display_name="Middle East conflict: Low",
+            display_name="Current conditions baseline",
             convergence_period="2027Q1",
             prospective_peak_period="2026Q4",
             prospective_peak_diesel_cpl=231.8973950959,
             source_workbook_cells="Diesel Price Forecast!B5:B7",
         ),
+        # MEDIUM is a source-faithful TEMPORARY shock: Treasury's Scenario 2
+        # fuel, GDP and unemployment assumptions travel together and recover.
+        # It is deliberately NOT the persistent ten-year downside - that risk
+        # story has its own scenario (persistent_downside).
         "medium": ConflictFuelPathSpec(
             severity="medium",
             scenario_id="middle_east_medium",
-            display_name="Middle East conflict: Medium",
+            display_name="Temporary fuel shock (Treasury Medium)",
             convergence_period="2028Q1",
             prospective_peak_period="2026Q4",
             prospective_peak_diesel_cpl=315.0,
@@ -231,13 +241,19 @@ def conflict_scenario_note(severity: Any) -> str:
     spec = SCENARIO_REGISTRY[_normalise_severity(severity)]
     if spec.severity == "low":
         shape = (
-            "The observed 2026Q3 premium halves in 2026Q4 and converges "
-            "to the nominal Base path in 2027Q1."
+            "The public central case: it carries the fuel-price increase that "
+            "has actually occurred. The observed 2026Q3 premium halves in "
+            "2026Q4 and converges to the no-shock technical reference path in "
+            "2027Q1; the no-shock Base remains available as a technical and "
+            "calibration reference only."
         )
     elif spec.severity == "medium":
         shape = (
-            "The supplied Medium decay shape is rebased to 315 c/L diesel "
-            "in 2026Q4 and converges to the nominal Base path in 2028Q1."
+            "A temporary Treasury-style shock whose macro assumptions travel "
+            "together and recover: the supplied Medium decay shape is rebased "
+            "to 315 c/L diesel in 2026Q4 and converges to the nominal Base "
+            "path in 2028Q1, with the matching Treasury Scenario 2 GDP and "
+            "unemployment paths applied and recovering alongside it."
         )
     else:
         shape = (
