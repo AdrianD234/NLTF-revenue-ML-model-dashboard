@@ -761,8 +761,8 @@ def test_side_labels_carry_the_selected_scenarios() -> None:
     import inspect
 
     assert app._comparison_side_labels(
-        "MoT official (PREBU26, no levers)", "Middle East conflict: Medium"
-    ) == ("MoT official (PREBU26, no levers)", "Middle East conflict: Medium")
+        "MoT official (PREBU26, no levers)", "Temporary fuel shock (Treasury Medium)"
+    ) == ("MoT official (PREBU26, no levers)", "Temporary fuel shock (Treasury Medium)")
     assert app._comparison_side_labels(
         "Current finalist Base case", "Current finalist Base case"
     ) == ("Current finalist Base case (A)", "Current finalist Base case (B)")

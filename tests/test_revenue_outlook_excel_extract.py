@@ -117,9 +117,9 @@ def test_three_selected_paths_create_three_worksheets(default_result) -> None:
 def test_conflict_trace_exports_from_the_aligned_frames(extract_context) -> None:
     result = _extract(
         extract_context,
-        ("Current finalist Base case", "Middle East conflict: Medium"),
+        ("Current finalist Base case", "Temporary fuel shock (Treasury Medium)"),
     )
-    assert result.sheet_names == ["Current Base", "Conflict Medium"]
+    assert result.sheet_names == ["Current Base", "Temporary Shock"]
 
 
 def test_every_sheet_is_a1_ay65_with_no_fy2051_columns(default_result) -> None:

@@ -191,16 +191,28 @@ CONFLICT_NOTE_BY_TRACE = {
     conflict_trace_name(level): conflict_scenario_note(level)
     for level in CONFLICT_FUEL_SCENARIO_LEVELS
 }
+from model_dashboard.persistent_downside import (
+    PERSISTENT_DOWNSIDE_NOTE,
+    PERSISTENT_DOWNSIDE_SCENARIO_ID,
+    PERSISTENT_DOWNSIDE_TRACE_NAME,
+    PersistentDownsideError,
+    apply_persistent_downside_to_chart_rows,
+)
+
 CONFLICT_TRACE_STYLES = {
     # Rose, not the former teal: the teal read as a second green against the
     # official comparator's strong green in the legend.
     conflict_trace_name("low"): ("#DB2777", "dot", 2.3),
     conflict_trace_name("medium"): ("#6B4E71", "dashdot", 2.6),
     conflict_trace_name("high"): ("#B42318", "longdash", 2.5),
+    # Near-black brown, solid-adjacent dash: the persistent downside is a
+    # risk path, not another conflict severity, and reads darkest of the set.
+    PERSISTENT_DOWNSIDE_TRACE_NAME: ("#7C2D12", "dash", 2.8),
 }
 CONFLICT_TRACE_COLORS = {
     trace_name: style[0] for trace_name, style in CONFLICT_TRACE_STYLES.items()
 }
+CONFLICT_NOTE_BY_TRACE[PERSISTENT_DOWNSIDE_TRACE_NAME] = PERSISTENT_DOWNSIDE_NOTE
 from model_dashboard.ev_uptake_levers import (
     CUSTOM_OPTION as EV_UPTAKE_CUSTOM_OPTION,
     DEFAULT_EV_UPTAKE_MODE,
@@ -3599,6 +3611,19 @@ def cached_revenue_outlook_view(
     chart_rows, ev_uptake_audit, eruc_audit, fed_uplift_audit, fuel_price_audit = cached_scenario_overlay_rows(
         signature, sensitivity_key, bridge_mode, ev_uptake_key, _pack
     )
+    # The Persistent downside is DERIVED from the fully-overlaid central and
+    # High conflict rows, so uptake, eRUC, policy timing and sensitivities
+    # compose with it exactly as they composed with its inputs. When the
+    # conflict replay is unavailable there is no High response to ratchet, so
+    # the trace is simply absent rather than approximated.
+    chart_rows, persistent_downside_audit = _append_persistent_downside_rows(chart_rows)
+    # High population is a POPULATION overlay on the public central case (the
+    # current-conditions Low path), not on the obsolete no-shock Base it was
+    # historically tethered to. The re-tether multiplies each High-population
+    # value by the central/Base response ratio for its own series and period;
+    # the ratio is identity from the Low path's 2027Q1 convergence onward, so
+    # only the observed-fuel-shock quarters actually move.
+    chart_rows = _retether_high_population_to_central(chart_rows)
     # Non-selected official vintages leave every downstream frame here, so the
     # figure, composition, reconciliation and download consumers all inherit
     # one consistent vocabulary from the vintage selection in the uptake key.
@@ -3718,9 +3743,153 @@ def cached_revenue_outlook_view(
         "fuel_price_scenario_audit": fuel_price_audit,
         "conflict_fuel_input_audit": conflict_input_audit,
         "conflict_gdp_input_audit": conflict_gdp_input_audit,
+        "persistent_downside_applied": not persistent_downside_audit.empty,
+        "persistent_downside_audit": persistent_downside_audit,
         # Compatibility for older callers while the exported schema migrates.
         "iran_war_input_audit": conflict_input_audit,
     }
+
+
+def _retether_high_population_to_central(chart_rows: pd.DataFrame) -> pd.DataFrame:
+    """Re-tether the High population comparison to the central conditions path.
+
+    ``comparison_new = comparison * (low / base)`` per (series, grain,
+    period). The Low path converges to Base at 2027Q1, so the ratio is
+    exactly 1 from there on and the long run is untouched; the overlay only
+    moves the quarters where the central case carries the observed fuel
+    shock the no-shock Base omits. Skipped entirely when the conflict rows
+    are absent (no replay), because there is no central-conditions response
+    to tether to.
+    """
+    if (
+        chart_rows is None
+        or chart_rows.empty
+        or "scenario_name" not in chart_rows.columns
+    ):
+        return chart_rows
+    names = set(chart_rows["scenario_name"].dropna().astype(str))
+    low_scenario = conflict_scenario_name("low")
+    if low_scenario not in names or "current_comparison_1" not in names:
+        return chart_rows
+
+    def _ratio_lookup(scenario: str) -> dict[tuple[str, str, str], float]:
+        scoped = chart_rows[chart_rows["scenario_name"].astype(str).eq(scenario)]
+        lookup: dict[tuple[str, str, str], float] = {}
+        for row in scoped.itertuples():
+            value = pd.to_numeric(pd.Series([row.value]), errors="coerce").iloc[0]
+            if pd.notna(value):
+                lookup[
+                    (str(row.series_id), str(row.time_grain), str(row.period))
+                ] = float(value)
+        return lookup
+
+    from model_dashboard.ev_uptake_levers import (
+        FED_AGGREGATE_SERIES,
+        RUC_AGGREGATE_SERIES,
+        TOTAL_AGGREGATE_SERIES,
+    )
+    from model_dashboard.persistent_downside import DEMAND_LEAF_SERIES
+
+    ped_leaves = ("gross_ped_revenue",)
+    ruc_leaves = (
+        "light_ruc_net_revenue",
+        "heavy_ruc_net_revenue",
+        "light_bev_ruc_net_revenue",
+        "phev_ruc_net_revenue",
+    )
+
+    low_values = _ratio_lookup(low_scenario)
+    base_values = _ratio_lookup("current_basecase")
+    out = chart_rows.copy()
+    mask = out["scenario_name"].astype(str).eq("current_comparison_1")
+
+    # Pass 1: scale each demand LEAF by its own central/Base response ratio,
+    # recording the value delta per (grain, period) so the aggregates can be
+    # rebuilt ADDITIVELY - the same closure rule the conflict overlay and the
+    # persistent downside use - instead of picking up second-order cross
+    # terms from an aggregate-level ratio.
+    leaf_deltas: dict[tuple[str, str, str], float] = {}
+    aggregate_indices: list[int] = []
+    for index in out.index[mask]:
+        series_id = str(out.at[index, "series_id"])
+        grain = str(out.at[index, "time_grain"])
+        period = str(out.at[index, "period"])
+        if (
+            series_id in RUC_AGGREGATE_SERIES
+            or series_id in FED_AGGREGATE_SERIES
+            or series_id in TOTAL_AGGREGATE_SERIES
+        ):
+            aggregate_indices.append(index)
+            continue
+        if series_id not in DEMAND_LEAF_SERIES:
+            continue
+        key = (series_id, grain, period)
+        low = low_values.get(key)
+        base = base_values.get(key)
+        if low is None or base is None or abs(base) <= 1e-12:
+            continue
+        ratio = low / base
+        if not np.isfinite(ratio) or ratio == 1.0:
+            continue
+        value = pd.to_numeric(pd.Series([out.at[index, "value"]]), errors="coerce").iloc[0]
+        if pd.isna(value):
+            continue
+        adjusted = float(value) * ratio
+        out.at[index, "value"] = adjusted
+        leaf_deltas[key] = adjusted - float(value)
+
+    if not leaf_deltas:
+        return chart_rows
+
+    def _delta_sum(leaves: tuple[str, ...], grain: str, period: str) -> float:
+        return sum(
+            leaf_deltas.get((series, grain, period), 0.0) for series in leaves
+        )
+
+    # Pass 2: rebuild every aggregate additively from its affected leaves.
+    for index in aggregate_indices:
+        series_id = str(out.at[index, "series_id"])
+        grain = str(out.at[index, "time_grain"])
+        period = str(out.at[index, "period"])
+        if series_id in RUC_AGGREGATE_SERIES:
+            delta = _delta_sum(ruc_leaves, grain, period)
+        elif series_id in FED_AGGREGATE_SERIES:
+            delta = _delta_sum(ped_leaves, grain, period)
+        else:
+            delta = _delta_sum(ped_leaves, grain, period) + _delta_sum(
+                ruc_leaves, grain, period
+            )
+        if delta == 0.0:
+            continue
+        value = pd.to_numeric(pd.Series([out.at[index, "value"]]), errors="coerce").iloc[0]
+        if pd.isna(value):
+            continue
+        out.at[index, "value"] = float(value) + delta
+    return out
+
+
+def _append_persistent_downside_rows(
+    chart_rows: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Append the Persistent downside trace when its inputs are on the frame.
+
+    The derivation needs BOTH the central basecase and the High conflict
+    response (the ratcheted short-run seam). A frame without the conflict
+    traces - the replay was unavailable - simply does not offer the trace;
+    a frame WITH them that still fails construction is a real defect and
+    raises, because silently dropping a governed risk trace is exactly the
+    kind of quiet fallback this dashboard bans.
+    """
+    if (
+        chart_rows is None
+        or chart_rows.empty
+        or "scenario_name" not in chart_rows.columns
+    ):
+        return chart_rows, pd.DataFrame()
+    names = set(chart_rows["scenario_name"].dropna().astype(str))
+    if conflict_scenario_name("high") not in names:
+        return chart_rows, pd.DataFrame()
+    return apply_persistent_downside_to_chart_rows(chart_rows)
 
 
 # --- external reference comparison workbook (PREBU26 deferral) --------------
@@ -6240,7 +6409,13 @@ def _long_run_shape_preview_options(manifest: dict[str, Any]) -> dict[str, dict[
             default_shape = next(iter(shape_choices), "")
     for schedule_id in STRUCTURAL_SCHEDULE_IDS:
         schedule = resolve_schedule(schedule_id)
-        suffix = schedule_id.split("_")[0]
+        # The label must stay unique per schedule: the growth-handover ids
+        # share a first token, so a naive prefix would collapse two options
+        # into one and silently drop a governed candidate.
+        if schedule.is_growth_handover:
+            suffix = f"growth handover FY{schedule.completion_fy}"
+        else:
+            suffix = schedule_id.split("_")[0]
         label = f"{default_shape} anchored structural transition - {suffix}"
         options[label] = {
             "schedule_id": schedule_id,
@@ -7428,7 +7603,8 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             view.get("mbu26_fed_policy_state", mbu_fed_policy_state)
         )
         total_path_notes.append(
-            "Current Base, High population and Middle East conflict traces: "
+            "Current Base, High population, current-conditions/fuel-shock and "
+            "persistent-downside traces: "
             + FED_POLICY_NOTES[active_current_policy]
         )
         if official_vintage_state["mbu26_displayed"] and active_mbu_policy != FED_POLICY_PUBLISHED:
@@ -7618,7 +7794,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             "elasticity effects, policy timing and convergence periods."
         ),
     ):
-        with st.expander("Middle East conflict: fuel-price scenario audit", expanded=False):
+        with st.expander("Fuel-price scenario audit (current conditions / shock paths)", expanded=False):
             st.caption(
                 "The committed Low, Medium and High nominal price paths are converted to ratios "
                 "against their nominal base paths, then applied to the model's real petrol and "
@@ -10138,13 +10314,16 @@ def _revenue_outlook_trace_options(chart_rows: pd.DataFrame) -> list[str]:
         "Current finalist Base case",
         "Current finalist High population/comparison",
         *CONFLICT_TRACE_NAMES,
+        PERSISTENT_DOWNSIDE_TRACE_NAME,
         PED_COMPARISON_BEHAVIOURAL_TRACE_NAME,
     ]
     # Selector metadata is built from the immutable pack before runtime
     # scenario overlays are appended. A valid Base trace is therefore the
-    # availability anchor for the three registered conflict traces.
+    # availability anchor for the three registered conflict traces and the
+    # persistent downside derived from them.
     if "Current finalist Base case" in available:
         available.update(CONFLICT_TRACE_NAMES)
+        available.add(PERSISTENT_DOWNSIDE_TRACE_NAME)
     ordered = [trace for trace in preferred if trace in available]
     ordered.extend(sorted(available.difference(ordered)))
     return ordered
@@ -10212,6 +10391,7 @@ def _render_comparison_scenario_column(
         "Current finalist Base case",
         "Current finalist High population/comparison",
         *CONFLICT_TRACE_NAMES,
+        PERSISTENT_DOWNSIDE_TRACE_NAME,
         mot_option,
         *([PREBU_DEFER_TRACE_NAME] if _prebu_defer_workbook_signature() is not None else []),
     ]

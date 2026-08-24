@@ -48,7 +48,9 @@ from .conflict_fuel_paths import (
 )
 from .conflict_gdp_paths import (
     apply_conflict_gdp_impact,
+    apply_conflict_unemployment_impact,
     build_conflict_gdp_paths,
+    build_conflict_unemployment_paths,
     conflict_gdp_input_audit,
 )
 from .forecast_runner import (
@@ -3299,12 +3301,22 @@ def run_fuel_price_scenario_replay(
         )
         for level in CONFLICT_FUEL_SCENARIO_LEVELS
     ]
+    conflict_unemployment_paths = build_conflict_unemployment_paths(root)
+    # Both macro adjustments land on the same input layer: the price-only
+    # frames stay untouched so the structural overlay's macro model factor
+    # (macro-adjusted replay / price-only replay) captures the GDP and
+    # unemployment responses together.
     fuel_frames = [
-        apply_conflict_gdp_impact(
-            price_only_rows,
+        apply_conflict_unemployment_impact(
+            apply_conflict_gdp_impact(
+                price_only_rows,
+                severity=level,
+                repo_root=root,
+                gdp_paths=conflict_gdp_paths,
+            ),
             severity=level,
             repo_root=root,
-            gdp_paths=conflict_gdp_paths,
+            unemployment_paths=conflict_unemployment_paths,
         )
         for level, price_only_rows in zip(
             CONFLICT_FUEL_SCENARIO_LEVELS,

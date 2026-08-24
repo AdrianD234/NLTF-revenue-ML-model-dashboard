@@ -31,9 +31,12 @@ def test_conflict_registry_has_stable_low_medium_high_identity_and_six_policy_va
         "middle_east_medium",
         "middle_east_high",
     ]
+    # The LOW path is the public central case and MEDIUM is explicitly a
+    # temporary Treasury shock; the scenario_ids above stay stable while the
+    # reader-facing names carry the scenario hierarchy.
     assert [conflict_scenario_display_name(severity) for severity in CONFLICT_SEVERITIES] == [
-        "Middle East conflict: Low",
-        "Middle East conflict: Medium",
+        "Current conditions baseline",
+        "Temporary fuel shock (Treasury Medium)",
         "Middle East conflict: High",
     ]
 
