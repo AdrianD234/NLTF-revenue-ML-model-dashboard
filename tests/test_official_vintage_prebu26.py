@@ -1,8 +1,10 @@
 """PREBU26 default-comparator acceptance gates.
 
 PREBU26 (the PREFU-round 2026 release) becomes the latest and default official
-comparator - the green official line - while BEFU26 keeps the bridge and
-long-run-shape roles. These tests pin the whole bounded scope:
+comparator - the green official line - while BEFU26 keeps the bridge role.
+Since the long-run handover promotion PREBU26 also owns the long-run shape
+role; the bridge is the only default role left on BEFU26. These tests pin the
+whole bounded scope:
 
 - PREBU26 materializes and round-trips exactly (registry hash, sentinels);
 - registry roles: PREBU26 latest/default comparator, BEFU26 bridge/shape;
@@ -104,24 +106,26 @@ def _visible_current_annual(frame: pd.DataFrame) -> pd.DataFrame:
 
 
 class TestRegistryRoles:
-    def test_prebu26_is_latest_and_default_comparator_only(self, registry):
+    def test_prebu26_is_latest_comparator_and_long_run_shape(self, registry):
         entry = ov.official_vintage_entry("PREBU26", registry=registry)
         assert entry["is_latest"] is True
         assert entry["is_default_comparator"] is True
         assert entry["is_default_bridge_vintage"] is False
-        assert entry["is_default_long_run_shape_vintage"] is False
+        # The long-run shape role moved to PREBU26 with the growth-handover
+        # promotion; the bridge role deliberately did not.
+        assert entry["is_default_long_run_shape_vintage"] is True
         assert entry["workbook_sha256"] == PREBU26_WORKBOOK_SHA
         assert entry["source_workbook"] == "references/PREBU26.xlsx"
         assert entry["source_sheet"] == "PREBU"
 
-    def test_befu26_keeps_bridge_and_long_run_shape(self, registry):
+    def test_befu26_keeps_bridge_only(self, registry):
         entry = ov.official_vintage_entry("BEFU26", registry=registry)
         assert entry["is_latest"] is False
         assert entry["is_default_comparator"] is False
         assert entry["is_default_bridge_vintage"] is True
-        assert entry["is_default_long_run_shape_vintage"] is True
+        assert entry["is_default_long_run_shape_vintage"] is False
         assert ov.default_bridge_vintage_id(ROOT) == "BEFU26"
-        assert ov.default_long_run_shape_vintage_id(ROOT) == "BEFU26"
+        assert ov.default_long_run_shape_vintage_id(ROOT) == "PREBU26"
         assert ov.default_comparator_vintage_id(ROOT) == "PREBU26"
         assert ov.latest_official_vintage_id(ROOT) == "PREBU26"
 
@@ -199,7 +203,7 @@ class TestDefaultChartVocabulary:
         block = runtime_pack.manifest["official_vintages"]
         assert block["official_comparator_vintage_id"] == "PREBU26"
         assert block["bridge_assumption_vintage_id"] == "BEFU26"
-        assert block["long_run_shape_vintage_id"] == "BEFU26"
+        assert block["long_run_shape_vintage_id"] == "PREBU26"
         assert block["default_official_comparator_trace"] == "PREBU26 official"
         assert set(block["available"]) == {"PREBU26", "BEFU26", "MBU26"}
 
@@ -385,7 +389,9 @@ class TestBridgeCaptionsStayBefu26:
             manifest = json.loads((pack_dir / "manifest.json").read_text(encoding="utf-8"))
             block = manifest["official_vintages"]
             assert block["bridge_assumption_vintage_id"] == "BEFU26"
-            assert block["long_run_shape_vintage_id"] == "BEFU26"
+            # The shape role follows the registry promotion; only the BRIDGE
+            # is the invariant this class protects.
+            assert block["long_run_shape_vintage_id"] == "PREBU26"
 
 
 class TestPublishedValuesImmuneToControls:

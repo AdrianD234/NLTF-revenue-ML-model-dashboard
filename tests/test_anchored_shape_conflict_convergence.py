@@ -32,8 +32,10 @@ from model_dashboard.post_model_extrapolation import (
 ROOT = Path(__file__).resolve().parents[1]
 PACK_DIR = ROOT / "data" / "current_revenue_outlook"
 CONFLICT_SCENARIOS = ("middle_east_low", "middle_east_medium", "middle_east_high")
-ACTIVE_SCHEDULE = "balanced_structural"
-SHAPE_VINTAGE = "BEFU26"
+# The production construction since the handover promotion: convergence is
+# asserted against the governed default the published chart actually shows.
+ACTIVE_SCHEDULE = "growth_handover_fy2035"
+SHAPE_VINTAGE = "PREBU26"
 
 # The last FY the governed conflict window touches.
 CONFLICT_WINDOW_LAST_FY = max(

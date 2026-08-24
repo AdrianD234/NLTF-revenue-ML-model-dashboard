@@ -163,12 +163,12 @@
       "is_default_comparator": false,
       "is_default_bridge_vintage": true,
       "status": "active_official_vintage",
-      "notes": "BEFU26 published revenue forecast. Workbook vendored at references/BEFU26 revenue forecast.xlsx (governed input; hash pinned above). Sentinels pin the total and representative activity/revenue leaves so a shifted row mapping cannot pass by matching only the total.",
+      "notes": "BEFU26 published revenue forecast. Workbook vendored at references/BEFU26 revenue forecast.xlsx (governed input; hash pinned above). Bridge-assumption role only: PREBU26 is the default comparator and long-run-shape vintage. Sentinels pin the total and representative activity/revenue leaves so a shifted row mapping cannot pass by matching only the total.",
       "supports_long_run_shape": true,
       "long_run_shape_start_fy": 2024,
       "long_run_shape_end_fy": 2055,
       "long_run_shape_required_series_available": true,
-      "is_default_long_run_shape_vintage": true
+      "is_default_long_run_shape_vintage": false
     },
     {
       "vintage_id": "PREBU26",
@@ -301,11 +301,12 @@
       "is_default_comparator": true,
       "is_default_bridge_vintage": false,
       "status": "active_official_vintage",
-      "notes": "PREBU26 published revenue forecast (annual actuals through FY2026). Workbook vendored at references/PREBU26.xlsx (governed input; hash pinned above). Comparator role only: BEFU26 remains the default bridge-assumption and long-run-shape vintage. Sentinels pin the total and representative activity/revenue leaves so a shifted row mapping cannot pass by matching only the total.",
+      "notes": "PREBU26 published revenue forecast (annual actuals through FY2026). Workbook vendored at references/PREBU26.xlsx (governed input; hash pinned above). Default comparator AND default long-run-shape vintage: the FY2031-FY2050 structural growth shape hands over to PREBU26. BEFU26 remains the default bridge-assumption vintage only. Sentinels pin the total and representative activity/revenue leaves so a shifted row mapping cannot pass by matching only the total.",
       "supports_long_run_shape": true,
       "long_run_shape_start_fy": 2024,
       "long_run_shape_end_fy": 2055,
-      "is_default_long_run_shape_vintage": false,
+      "long_run_shape_required_series_available": true,
+      "is_default_long_run_shape_vintage": true,
       "long_run_shape_missing_series": []
     }
   ]

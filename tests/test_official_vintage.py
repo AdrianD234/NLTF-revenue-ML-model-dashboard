@@ -56,7 +56,7 @@ class TestRegistry:
         assert ov.latest_official_vintage_id(ROOT) == "PREBU26"
         assert ov.default_comparator_vintage_id(ROOT) == "PREBU26"
         assert ov.default_bridge_vintage_id(ROOT) == "BEFU26"
-        assert ov.default_long_run_shape_vintage_id(ROOT) == "BEFU26"
+        assert ov.default_long_run_shape_vintage_id(ROOT) == "PREBU26"
 
     def test_mbu26_remains_registered_and_selectable(self, registry):
         entry = ov.official_vintage_entry("MBU26", registry=registry)

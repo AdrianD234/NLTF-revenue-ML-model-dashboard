@@ -27,6 +27,13 @@ from model_dashboard.long_run_shape_transition import (
     PRODUCTION_LONG_RUN_TRANSITION_SCHEDULE_ID,
     SCHEDULES,
     UNBLENDED_SCHEDULE_ID,
+    handover_ratio_identity,
+)
+
+GROWTH_HANDOVER_SCHEDULE_IDS = tuple(
+    schedule_id
+    for schedule_id, schedule in SCHEDULES.items()
+    if schedule.is_growth_handover
 )
 from model_dashboard.post_model_extrapolation import (
     ANCHOR_FY,
@@ -106,8 +113,9 @@ class TestPreservationGates:
     """Gates 1-6: PR #11 and everything upstream of FY2031 stay put."""
 
     def test_gate_1_pr11_registry_and_defaults_intact(self):
-        # PREBU26 took the latest/comparator roles; the roles this suite
-        # protects - the bridge and long-run shape sources - stay on BEFU26.
+        # PREBU26 holds the latest/comparator roles and, since the long-run
+        # handover promotion, the shape role too. The bridge-assumption role
+        # this suite protects stays on BEFU26.
         assert ov.default_comparator_vintage_id(ROOT) == "PREBU26"
         assert ov.default_bridge_vintage_id(ROOT) == "BEFU26"
         assert ov.latest_official_vintage_id(ROOT) == "PREBU26"
@@ -117,7 +125,7 @@ class TestPreservationGates:
     def test_gate_1b_committed_registry_owns_the_shape_role(self):
         """The optional role must actually be owned in production."""
 
-        assert ov.default_long_run_shape_vintage_id(ROOT) == "BEFU26"
+        assert ov.default_long_run_shape_vintage_id(ROOT) == "PREBU26"
 
     def test_gate_2_fy2025_actuals_unchanged(self, baseline):
         actuals = baseline[
@@ -264,7 +272,13 @@ class TestAnchorAndShapeGates:
             assert observed == pytest.approx(expected, rel=1e-12)
 
     def test_gate_13_official_level_is_never_substituted(self, candidates, shape_pack):
-        """The terminal ratio is the ANCHOR ratio, not 1.0."""
+        """The terminal ratio is the ANCHOR ratio, not 1.0.
+
+        This is the LEVEL-BLEND identity: a completed geometric blend equals
+        anchor x structural index, so the ratio collapses to the anchor-year
+        ratio. The growth-handover schedules obey a different completed-
+        transition identity (the EARNED ratio) covered by the gates below.
+        """
 
         official = shape_pack.official_annual.pivot_table(
             index="FY", columns="series_id", values="value", aggfunc="first"
@@ -282,6 +296,93 @@ class TestAnchorAndShapeGates:
         assert max(ratios) - min(ratios) < 1e-12
         # ...and NOT 1.0, which is what substituting the official level would give.
         assert abs(ratios[0] - 1.0) > 1e-3
+
+    @pytest.mark.parametrize("schedule_id", GROWTH_HANDOVER_SCHEDULE_IDS)
+    def test_gate_12h_completed_handover_grows_at_the_structural_rate(
+        self, candidates, shape_pack, schedule_id
+    ):
+        """From completion onward the hybrid growth IS the official growth."""
+
+        official = shape_pack.official_annual.pivot_table(
+            index="FY", columns="series_id", values="value", aggfunc="first"
+        )
+        completion = int(SCHEDULES[schedule_id].completion_fy)
+        frame = candidates[schedule_id]
+        petrol = (
+            frame[
+                frame["scenario_name"].eq(BASE_SCENARIO)
+                & frame["series_id"].eq("light_petrol_vkt")
+            ]
+            .set_index("fy")["value"]
+            .sort_index()
+        )
+        for fy in (completion + 1, 2045, 2050):
+            observed = petrol.loc[fy] / petrol.loc[completion]
+            expected = (
+                official.at[fy, "light_petrol_vkt"]
+                / official.at[completion, "light_petrol_vkt"]
+            )
+            assert observed == pytest.approx(expected, rel=1e-12), (schedule_id, fy)
+
+    @pytest.mark.parametrize("schedule_id", GROWTH_HANDOVER_SCHEDULE_IDS)
+    def test_gate_13h_completed_handover_keeps_the_earned_ratio(
+        self, candidates, shape_pack, pack_inputs, schedule_id
+    ):
+        """The one-way property, as an equality on the committed inputs.
+
+        Post-completion, hybrid_t / official_t is constant AND equal to the
+        completion-year ratio - the ratio the path EARNED during the handover.
+        It is NOT the anchor-year ratio (the level-blend identity) and NOT 1.0
+        (level substitution): the handover never pulls the path back toward
+        either.
+        """
+
+        official = shape_pack.official_annual.pivot_table(
+            index="FY", columns="series_id", values="value", aggfunc="first"
+        )
+        completion = int(SCHEDULES[schedule_id].completion_fy)
+        frame = candidates[schedule_id]
+        petrol = (
+            frame[
+                frame["scenario_name"].eq(BASE_SCENARIO)
+                & frame["series_id"].eq("light_petrol_vkt")
+            ]
+            .set_index("fy")["value"]
+            .sort_index()
+        )
+        post_years = [fy for fy in petrol.index if fy >= completion]
+        assert post_years[0] == completion
+        for fy in post_years:
+            identity = handover_ratio_identity(
+                hybrid_level_completion=float(petrol.loc[completion]),
+                structural_level_completion=float(
+                    official.at[completion, "light_petrol_vkt"]
+                ),
+                structural_level_fy=float(official.at[fy, "light_petrol_vkt"]),
+                hybrid_level_fy=float(petrol.loc[fy]),
+            )
+            assert identity["abs_residual"] < 1e-12 * abs(
+                identity["expected_completion_ratio"]
+            ), (schedule_id, fy)
+
+        # The constant is the EARNED ratio: not 1.0, and not the anchor ratio.
+        line = pack_inputs["line_reconciliation"]
+        anchor = float(
+            pd.to_numeric(
+                line[
+                    line["source_path"].eq("Current finalist Base case")
+                    & pd.to_numeric(line["FY"], errors="coerce").eq(ANCHOR_FY)
+                    & line["series_id"].eq("light_petrol_vkt")
+                ]["value"],
+                errors="coerce",
+            ).iloc[0]
+        )
+        anchor_ratio = anchor / float(official.at[ANCHOR_FY, "light_petrol_vkt"])
+        earned = float(petrol.loc[completion]) / float(
+            official.at[completion, "light_petrol_vkt"]
+        )
+        assert abs(earned - 1.0) > 1e-3, schedule_id
+        assert abs(earned - anchor_ratio) > 1e-3, (schedule_id, earned, anchor_ratio)
 
 
 class TestMethodPurityGates:

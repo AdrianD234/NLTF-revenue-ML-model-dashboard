@@ -166,11 +166,12 @@ class TestThreeRoleMatrix:
             )
 
     def test_roles_resolve_independently_from_the_registry(self):
-        # Independence made real: the comparator moved to PREBU26 while the
-        # bridge and long-run shape roles stayed on BEFU26.
+        # Independence made real: the comparator and long-run shape roles
+        # moved to PREBU26 (in separate promotions) while the bridge role
+        # stayed on BEFU26.
         assert ov.default_comparator_vintage_id(ROOT) == "PREBU26"
         assert ov.default_bridge_vintage_id(ROOT) == "BEFU26"
-        assert ov.default_long_run_shape_vintage_id(ROOT) == "BEFU26"
+        assert ov.default_long_run_shape_vintage_id(ROOT) == "PREBU26"
         # Independent means separately resolvable, not merely equal today.
         registry = ov.load_official_vintage_registry(ROOT)
         flags = {
@@ -198,7 +199,7 @@ class TestPackManifestIsAuthoritative:
         assert (
             ov.long_run_shape_vintage_id_from_manifest(manifest, ROOT) == "MBU26"
         )
-        assert ov.default_long_run_shape_vintage_id(ROOT) == "BEFU26"
+        assert ov.default_long_run_shape_vintage_id(ROOT) == "PREBU26"
 
     def test_pack_without_the_block_falls_back_to_the_registry(self):
         assert (
