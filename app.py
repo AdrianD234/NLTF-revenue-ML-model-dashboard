@@ -299,6 +299,7 @@ from model_dashboard.revenue_outlook_presentation_policy import (
 # an older cache entry or test. Production builds the typed key directly.
 ScenarioKeyLike = RevenueScenarioComputationKey | tuple
 from model_dashboard.revenue_outlook_excel_extract import (
+    NON_EXPORTABLE_TRACE_REASONS,
     ROW_SERIES as EXTRACT_ROW_SERIES,
     TEMPLATE_RELATIVE_PATH as EXTRACT_TEMPLATE_RELATIVE_PATH,
     RevenueOutlookExtractError,
@@ -3587,7 +3588,75 @@ def cached_revenue_outlook_extract_bytes(
         stack_components=stack_components,
         pack_stack_components=_pack_table(_pack, "revenue_stack_components"),
         template_path=Path(__file__).resolve().parent / EXTRACT_TEMPLATE_RELATIVE_PATH,
+        extra_value_frames=_extract_extra_value_frames(
+            signature, sensitivity_key, bridge_mode, ev_uptake_key, _pack
+        ),
     )
+
+
+def _extract_extra_value_frames(
+    signature: tuple[tuple[str, int, int], ...],
+    sensitivity_key: tuple[str, ...],
+    bridge_mode: str,
+    ev_uptake_key: tuple[Any, ...],
+    _pack: RevenueOutlookPack,
+) -> tuple[pd.DataFrame, ...]:
+    """The FINAL displayed values, as extract value frames.
+
+    Two gaps this closes, both caught by the extract-coverage gate:
+
+    - Derived traces exist only at the view layer. The persistent downside
+      is constructed from the fully-overlaid central and High rows, and the
+      High population comparison is re-tethered to the central-conditions
+      path, so the aligned detail frames alone under-describe what the chart
+      shows. Replaying the same view-layer steps here means every exported
+      cell matches the on-screen value wherever both layers carry one.
+    - The PREBU26 deferral reference workbook is display-only by design and
+      never enters a governed frame; its sheet is built from the vendored
+      workbook's own series instead.
+    """
+    rows, _, _, _, _ = cached_scenario_overlay_rows(
+        signature, sensitivity_key, bridge_mode, ev_uptake_key, _pack
+    )
+    rows, _ = _append_persistent_downside_rows(rows)
+    rows = _retether_high_population_to_central(rows)
+    official_scenario, official_overlay = _official_vintage_filter_for_key(ev_uptake_key)
+    rows = _filter_official_vintage_rows(rows, official_scenario, official_overlay)
+
+    annual = rows[rows["time_grain"].astype(str).eq("june_year")].copy()
+    annual["FY"] = pd.to_numeric(annual["june_year"], errors="coerce")
+    annual["value"] = pd.to_numeric(annual["value"], errors="coerce")
+    annual = annual.dropna(subset=["FY", "value"])
+    view_frame = pd.DataFrame(
+        {
+            "source_path": annual["trace_name"].astype(str),
+            "series_id": annual["series_id"].astype(str),
+            "FY": annual["FY"].astype(int),
+            "value": annual["value"].astype(float),
+        }
+    )
+
+    frames: list[pd.DataFrame] = [view_frame]
+    workbook_signature = _prebu_defer_workbook_signature()
+    if workbook_signature is not None:
+        workbook_frames = cached_prebu_defer_workbook_frames(workbook_signature)
+        records: list[dict[str, Any]] = []
+        for series_id, values in (workbook_frames.get("series") or {}).items():
+            for fy, value in values.items():
+                number = pd.to_numeric(pd.Series([value]), errors="coerce").iloc[0]
+                if pd.isna(number):
+                    continue
+                records.append(
+                    {
+                        "source_path": PREBU_DEFER_TRACE_NAME,
+                        "series_id": str(series_id),
+                        "FY": int(fy),
+                        "value": float(number),
+                    }
+                )
+        if records:
+            frames.append(pd.DataFrame(records))
+    return tuple(frames)
 
 
 @st.cache_data(show_spinner=False, max_entries=16)
@@ -7689,6 +7758,23 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                     "efficiency and PT mode shift."
                 ),
             )
+            # A selected trace with no sheet must never disappear silently:
+            # declared exclusions state their reason, and anything else is a
+            # defect the reader should see (CI keeps that bucket empty).
+            if extract_result.declared_non_exportable:
+                st.caption(
+                    "Not exported (by design): "
+                    + "; ".join(
+                        f"{trace} - {NON_EXPORTABLE_TRACE_REASONS.get(trace, 'declared non-exportable')}"
+                        for trace in extract_result.declared_non_exportable
+                    )
+                )
+            if extract_result.skipped_traces:
+                st.warning(
+                    "Selected traces missing from the extract (no governed "
+                    "value source resolved - this is a defect): "
+                    + ", ".join(extract_result.skipped_traces)
+                )
 
     if not compare_mode and method_detail_enabled() and st.toggle(
         "Show forecast-uncertainty fan detail",
