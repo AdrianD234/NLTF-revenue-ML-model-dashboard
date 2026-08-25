@@ -11877,6 +11877,15 @@ _SCENARIO_COMPONENT_FETCH_SERIES = (
     "RUC transition collection costs",
     "RUC transition one-off costs",
 )
+#: Components that legitimately resolve to NO rows when their policy is
+#: inactive (a side without a fleetwide FED->RUC transition has no petrol RUC
+#: or transition-cost series at all). The breakdown treats an absent path as
+#: exactly zero; every other fetched component must always resolve.
+_SCENARIO_COMPONENT_SPARSE_SERIES = (
+    "Light petrol RUC revenue",
+    "RUC transition collection costs",
+    "RUC transition one-off costs",
+)
 _SCENARIO_COMPONENT_COLORS = {
     "PED / FED (net)": "#00843D",
     "Light RUC (conventional)": "#006FAD",

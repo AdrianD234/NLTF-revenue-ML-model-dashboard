@@ -143,7 +143,10 @@ class RevenueScenarioComputationKey:
     # Applied as a deterministic overlay AFTER the policy-runtime state is
     # read, so it must never multiply the materialised catalogue - it is
     # registered in the runtime's post-cache overlay fields, not pinned.
-    fed_ruc_transition: str = ""
+    # Defaults to the literal neutral state (not "") so a clone that writes
+    # the neutral state explicitly is byte-identical to a default key -
+    # "B configured like A" must reproduce the page key exactly.
+    fed_ruc_transition: str = "off"
 
     # ------------------------------------------------------------ normalising
     def __post_init__(self) -> None:
