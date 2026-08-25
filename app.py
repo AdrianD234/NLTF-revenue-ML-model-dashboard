@@ -305,6 +305,20 @@ from model_dashboard.revenue_outlook_excel_extract import (
     RevenueOutlookExtractError,
     build_revenue_outlook_extract,
 )
+from model_dashboard.fed_ruc_transition import (
+    FED_RUC_TRANSITION_LABELS,
+    FED_RUC_TRANSITION_MANAGED,
+    FED_RUC_TRANSITION_NOTE,
+    FED_RUC_TRANSITION_OFF,
+    FED_RUC_TRANSITION_STATES,
+    FED_RUC_TRANSITION_STRESS,
+    TRANSITION_SERIES_LABELS as FED_RUC_TRANSITION_SERIES_LABELS,
+    FedRucTransitionError,
+    apply_fed_ruc_transition_to_chart_rows,
+    apply_fed_ruc_transition_to_quarterly_rows,
+    fed_ruc_transition_marker_present,
+    normalise_fed_ruc_transition_state,
+)
 from model_dashboard.revenue_outlook import (
     CURRENT_REVENUE_OUTLOOK_DIR,
     FAN_SOURCE_AUTO,
@@ -708,6 +722,20 @@ def _uncertainty_bands_withheld_for_sensitivity(
     )
 
 
+def _uncertainty_bands_withheld_for_fed_ruc_transition(
+    ev_uptake_key: "ScenarioKeyLike",
+) -> bool:
+    """True when the 50/80% bands must be withheld for the FED->RUC transition.
+
+    The governed draws describe the baseline collection channel. Transition
+    compliance risk (leakage) is a separate, non-probabilistic assumption set,
+    so drawing the model-error bands around a transition path would present
+    them as leakage-risk intervals they are not. Withheld rather than
+    mislabelled.
+    """
+    return _fed_ruc_transition_state(ev_uptake_key) != FED_RUC_TRANSITION_OFF
+
+
 def _key_float(value: float | int | None) -> str:
     if value is None:
         return ""
@@ -1019,6 +1047,36 @@ def _normalise_fed_policy_state(value: Any) -> str:
     return FED_POLICY_DELAYED_6M
 
 
+# ---------------------------------------------------------------- FED -> RUC
+# The fleetwide transition selector: a separate policy axis from the 12c
+# timing states above. The timing selector keeps setting the LEVEL and TIMING
+# of the road-charge staircase; the transition moves the COLLECTION CHANNEL
+# (all FED replaced by RUC from 1 Jan 2028, with governed compliance leakage).
+FED_RUC_TRANSITION_SESSION_KEY = "revenue_outlook_fed_ruc_transition"
+FED_RUC_TRANSITION_OPTIONS = list(FED_RUC_TRANSITION_STATES)
+FED_RUC_TRANSITION_SELECTOR_LABEL = "FED → RUC transition"
+FED_RUC_TRANSITION_HELP = (
+    "Fleetwide replacement of fuel excise duty with road user charges from "
+    "1 January 2028. Managed leakage assumes 70% debt recovery on known "
+    "non-compliance easing to 9% gross long run with a 5% unrecoverable "
+    "terminal rate ($34m one-off, $16m/yr collection cost); leakage stress "
+    "assumes 50% recovery, 12% gross long run and an 11% unrecoverable "
+    "terminal rate ($111m one-off, $31m/yr). Leakage applies only to the "
+    "newly enrolled petrol base. Composes with the 12c timing selector: the "
+    "staircase level and timing still come from that control, expressed "
+    "through RUC once the transition starts."
+)
+
+
+def _session_fed_ruc_transition_state() -> str:
+    """The persisted transition state, defaulting to no fleetwide transition."""
+    raw = st.session_state.get(FED_RUC_TRANSITION_SESSION_KEY, FED_RUC_TRANSITION_OFF)
+    try:
+        return normalise_fed_ruc_transition_state(raw)
+    except FedRucTransitionError:
+        return FED_RUC_TRANSITION_OFF
+
+
 PED_RETENTION_SENSITIVITY_LABEL = "VFM petrol-retention sensitivity"
 PED_RETENTION_SENSITIVITY_HELP = (
     "Structural sensitivity only. A rolling-origin comparison against the raw "
@@ -1138,6 +1196,19 @@ def _discard_unknown_revenue_outlook_policy_state() -> None:
         if value is None:
             continue
         if str(value) not in FED_POLICY_OPTIONS:
+            st.session_state.pop(key, None)
+    # Same closed-set rule for the FED->RUC transition selector (single view
+    # and both A/B columns): an unrecognised persisted value is dropped, not
+    # coerced into a transition the reader did not choose.
+    for key in (
+        FED_RUC_TRANSITION_SESSION_KEY,
+        "ro_cmp_a_fed_ruc_transition",
+        "ro_cmp_b_fed_ruc_transition",
+    ):
+        value = st.session_state.get(key)
+        if value is None:
+            continue
+        if str(value) not in FED_RUC_TRANSITION_OPTIONS:
             st.session_state.pop(key, None)
 
 
@@ -2230,6 +2301,79 @@ def _materialised_policy_overlay_rows(
     return rows, uptake_audit, eruc_audit, policy_audit, scenario_audit
 
 
+@st.cache_data(show_spinner=False)
+def _cached_ped_rate_schedule() -> pd.DataFrame:
+    """The governed quarterly FED rate schedule, read once per session."""
+    from model_dashboard.rate_paths import ped_quarterly_rate_schedules
+
+    return ped_quarterly_rate_schedules(Path(__file__).resolve().parent)
+
+
+def _fed_ruc_transition_state(ev_uptake_key: ScenarioKeyLike) -> str:
+    """The validated FED->RUC transition state carried by the typed key."""
+    return normalise_fed_ruc_transition_state(
+        _scenario_key(ev_uptake_key).fed_ruc_transition
+    )
+
+
+def _apply_fed_ruc_transition_overlay(
+    rows: pd.DataFrame,
+    ev_uptake_key: ScenarioKeyLike,
+    _pack: RevenueOutlookPack,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Fold the fleetwide FED->RUC transition into fully-overlaid rows.
+
+    Runs at the END of the overlay chain - after the policy-runtime state is
+    loaded (fast path) or the reference chain has applied the selected timing
+    state (slow path) - so the transition composes with every uptake, VFM,
+    sensitivity, timing and conflict treatment those rows already carry, and
+    the materialised 8x8 catalogue is never multiplied. Off is a no-op.
+    """
+    state = _fed_ruc_transition_state(ev_uptake_key)
+    if state == FED_RUC_TRANSITION_OFF or rows is None or rows.empty:
+        return rows, pd.DataFrame()
+    key = _scenario_key(ev_uptake_key)
+    return apply_fed_ruc_transition_to_chart_rows(
+        rows,
+        _cached_ped_rate_schedule(),
+        state,
+        policy_state=key.current_fed_policy_state or FED_POLICY_DELAYED_6M,
+        drift_assumptions=_pack_table(_pack, "ev_phev_ped_light_drift_assumptions"),
+    )
+
+
+@st.cache_data(show_spinner=False, max_entries=12)
+def cached_fed_ruc_transition_audit(
+    signature: tuple[tuple[str, int, int], ...],
+    sensitivity_key: tuple[str, ...],
+    bridge_mode: str,
+    ev_uptake_key: tuple[Any, ...],
+    _pack: RevenueOutlookPack,
+) -> pd.DataFrame:
+    """The quarterly transition audit for one key (empty when off).
+
+    Re-derives the audit by re-running the deterministic transform on the
+    same pre-transition rows the overlay cache used, so the audited numbers
+    are exactly the displayed ones without widening the overlay tuple.
+    """
+    state = _fed_ruc_transition_state(ev_uptake_key)
+    if state == FED_RUC_TRANSITION_OFF:
+        return pd.DataFrame()
+    key = _scenario_key(ev_uptake_key)
+    off_key = key.replace(fed_ruc_transition=FED_RUC_TRANSITION_OFF)
+    rows, _, _, _, _ = cached_scenario_overlay_rows(
+        signature, sensitivity_key, bridge_mode, off_key, _pack
+    )
+    _, audit = apply_fed_ruc_transition_to_chart_rows(
+        rows,
+        _cached_ped_rate_schedule(),
+        state,
+        policy_state=key.current_fed_policy_state or FED_POLICY_DELAYED_6M,
+        drift_assumptions=_pack_table(_pack, "ev_phev_ped_light_drift_assumptions"),
+    )
+    return audit
+
+
 @st.cache_data(show_spinner=False, max_entries=12)
 def cached_scenario_overlay_rows(
     signature: tuple[tuple[str, int, int], ...],
@@ -2257,7 +2401,9 @@ def cached_scenario_overlay_rows(
         ev_uptake_key, _pack, sensitivity_key, bridge_mode
     )
     if materialised is not None:
-        return materialised
+        rows, uptake_audit, eruc_audit, policy_audit, scenario_audit = materialised
+        rows, _ = _apply_fed_ruc_transition_overlay(rows, ev_uptake_key, _pack)
+        return rows, uptake_audit, eruc_audit, policy_audit, scenario_audit
     _, sensitivity_frames, _ = cached_sensitivity_stage_frames(signature, bridge_mode, sensitivity_key, _pack)
     levers = _resolve_ev_uptake_levers(ev_uptake_key)
     eruc_levers = _resolve_eruc_levers(ev_uptake_key)
@@ -2338,6 +2484,7 @@ def cached_scenario_overlay_rows(
     if not replay_status_audit.empty:
         uplift_audit = pd.concat([uplift_audit, replay_status_audit], ignore_index=True, sort=False)
     if not replay_available:
+        rows, _ = _apply_fed_ruc_transition_overlay(rows, ev_uptake_key, _pack)
         return rows, uptake_audit, eruc_audit, uplift_audit, pd.DataFrame()
     rows, fuel_audit = append_fuel_price_scenario_to_chart_rows(rows, fuel_replay)
     scenario_audits = [
@@ -2348,6 +2495,7 @@ def cached_scenario_overlay_rows(
         if scenario_audits
         else pd.DataFrame()
     )
+    rows, _ = _apply_fed_ruc_transition_overlay(rows, ev_uptake_key, _pack)
     return (
         rows,
         uptake_audit,
@@ -2586,6 +2734,14 @@ def _filter_series_rows_with_fallback(
             filtered = filtered[~drop.fillna(False)]
             filtered = pd.concat([filtered, gap_filled], ignore_index=True, sort=False)
             used_fallback = True
+    if time_grain == "quarterly" and fed_ruc_transition_marker_present(rows):
+        # The annual rows carry an active FED->RUC transition (the overlay
+        # stamps every touched row). The quarterly derivation above spread the
+        # transition year's surviving FED across all four quarters because the
+        # rate staircase does not know the duty stops at 1 Jan 2028; this
+        # re-expresses the transition at quarterly grain, zeroing the
+        # post-transition quarters and preserving each fiscal-year sum.
+        filtered = apply_fed_ruc_transition_to_quarterly_rows(filtered)
     return clip_frame_to_display_horizon(filtered), used_fallback
 
 
@@ -3161,6 +3317,18 @@ SENSITIVITY_UNCERTAINTY_WITHHELD_NOTE = (
     "when Fleet efficiency and PT mode shift are both Off."
 )
 
+#: Shown when a band selection meets an active FED->RUC transition. The
+#: governed draws describe the baseline collection channel; transition
+#: compliance leakage is a separate assumption set, so the model-error bands
+#: are withheld rather than presented as leakage-risk intervals.
+FED_RUC_TRANSITION_UNCERTAINTY_WITHHELD_NOTE = (
+    "Modelled uncertainty is governed for the baseline collection channel "
+    "and is withheld while a fleetwide FED → RUC transition is selected: the "
+    "50% and 80% bands describe model error, not transition-compliance risk, "
+    "and would misread as leakage-risk intervals. They return when the "
+    "transition selector is set to No fleetwide transition."
+)
+
 #: Shown when a reader carries a band selection into the quarterly view.
 QUARTERLY_UNCERTAINTY_NOT_GOVERNED_NOTE = (
     "Modelled uncertainty is governed at June-year level only. The 50% and 80% "
@@ -3341,6 +3509,19 @@ def _reconcile_aligned_revenue_formula_rows(
             values[hidden_ruc_leaf] = hidden_value
             changed_indices.add(hidden_index)
 
+        # FED->RUC transition costs are explicit chart-carried series with no
+        # counterpart line in the governed spine's formula registry. They
+        # reduce Total NLTF (and only Total NLTF) on the chart, so the
+        # rebuilt identity subtracts them here; every other identity closes
+        # through the aligned leaves. Zero whenever no transition is active.
+        transition_costs = sum(
+            chart_values.get((scenario_name, fy, cost_series)) or 0.0
+            for cost_series in (
+                "fed_ruc_transition_collection_cost",
+                "fed_ruc_transition_oneoff_cost",
+            )
+        )
+
         for formula in FORMULA_DEFINITIONS:
             output = str(formula["output_series_id"])
             output_index = index_by_series.get(output)
@@ -3350,6 +3531,8 @@ def _reconcile_aligned_revenue_formula_rows(
             if any(str(series_id) not in values for series_id, _ in terms):
                 continue
             calculated = sum(values[str(series_id)] * float(sign) for series_id, sign in terms)
+            if output == "total_nltf_net_revenue":
+                calculated -= transition_costs
             if output in direct_series:
                 observed = values.get(output)
                 if observed is None or not np.isclose(observed, calculated, rtol=0.0, atol=1e-6):
@@ -3398,6 +3581,69 @@ def _align_detail_frame_to_chart_rows(
         series = values if isinstance(values, pd.Series) else pd.Series(values, index=out.index)
         extracted = series.astype(str).str.extract(r"(\d{4})", expand=False)
         return pd.to_numeric(extracted, errors="coerce")
+
+    # FED->RUC transition: the chart rows carry the transition-adjusted FED
+    # aggregates, but the spine's hidden FED leaves (LPG, CNG and the fixed
+    # refund line) exist only in these detail frames. Scale them by the same
+    # pre-transition share the overlay applied to gross FED so the governed
+    # identities (gross_fed = ped + lpg + cng; net_fed = gross_fed -
+    # fed_refunds) keep closing exactly - FED refunds retire with the duty.
+    if "scenario_name" in out.columns and series_column == "series_id":
+        transition_pairs = sorted(
+            {
+                (scenario, fy)
+                for (scenario, fy, series_id) in values
+                if series_id == "light_petrol_ruc_net_revenue"
+            }
+        )
+        if transition_pairs:
+            fy_all = detail_fy(out.get(fy_column))
+            scenario_all = out["scenario_name"].astype(str)
+            series_all = out[series_column].astype(str)
+            for scenario, fy_value in transition_pairs:
+                new_gross = values.get((scenario, fy_value, "gross_fed_revenue"))
+                new_ped = values.get((scenario, fy_value, "gross_ped_revenue"))
+                new_net = values.get((scenario, fy_value, "net_fed_revenue"))
+                if new_gross is None or new_ped is None or new_net is None:
+                    continue
+                pair_mask = scenario_all.eq(scenario) & fy_all.eq(fy_value)
+                # Residual assignment from the chart's own exact identities:
+                # LPG+CNG must equal gross FED minus petrol excise, and the
+                # refund line must equal gross minus net FED. Deriving a scale
+                # factor from the detail frame's old gross instead leaves a
+                # sub-$1m wedge wherever detail and chart layers differ in the
+                # last decimals, and the formula replay below fails closed on
+                # exactly that wedge.
+                lpg_cng_target = float(new_gross) - float(new_ped)
+                lpg_mask = pair_mask & series_all.eq("gross_lpg_revenue")
+                cng_mask = pair_mask & series_all.eq("gross_cng_revenue")
+                if lpg_mask.any() and cng_mask.any():
+                    lpg_old = pd.to_numeric(
+                        out.loc[lpg_mask, value_column], errors="coerce"
+                    ).iloc[0]
+                    cng_old = pd.to_numeric(
+                        out.loc[cng_mask, value_column], errors="coerce"
+                    ).iloc[0]
+                    denominator = (0.0 if pd.isna(lpg_old) else float(lpg_old)) + (
+                        0.0 if pd.isna(cng_old) else float(cng_old)
+                    )
+                    if abs(denominator) > 1e-12:
+                        share = lpg_cng_target / denominator
+                        out.loc[lpg_mask, value_column] = float(lpg_old) * share
+                        out.loc[cng_mask, value_column] = float(cng_old) * share
+                    else:
+                        out.loc[lpg_mask, value_column] = lpg_cng_target
+                        out.loc[cng_mask, value_column] = 0.0
+                refunds_mask = pair_mask & series_all.eq("fed_refunds")
+                if refunds_mask.any():
+                    out.loc[refunds_mask, value_column] = float(new_gross) - float(
+                        new_net
+                    )
+                touched_mask = pair_mask & series_all.isin(
+                    ("gross_lpg_revenue", "gross_cng_revenue", "fed_refunds")
+                )
+                if touched_mask.any() and "value_status" in out.columns:
+                    out.loc[touched_mask, "value_status"] = "fed_ruc_transition"
 
     if "scenario_name" in out.columns:
         existing_scenarios = set(out["scenario_name"].dropna().astype(str))
@@ -3582,6 +3828,15 @@ def cached_revenue_outlook_extract_bytes(
     line_reconciliation, _, stack_components, _ = cached_aligned_scenario_detail_frames(
         signature, sensitivity_key, bridge_mode, ev_uptake_key, _pack
     )
+    transition_state = _fed_ruc_transition_state(ev_uptake_key)
+    scenario_note = (
+        "FED -> RUC transition: "
+        + FED_RUC_TRANSITION_LABELS[transition_state]
+        + " (rows 66-69 carry the transition lines; official comparator sheets "
+        "stay published)."
+        if transition_state != FED_RUC_TRANSITION_OFF
+        else ""
+    )
     return build_revenue_outlook_extract(
         selected_traces=traces,
         line_reconciliation=line_reconciliation,
@@ -3591,6 +3846,7 @@ def cached_revenue_outlook_extract_bytes(
         extra_value_frames=_extract_extra_value_frames(
             signature, sensitivity_key, bridge_mode, ev_uptake_key, _pack
         ),
+        scenario_note=scenario_note,
     )
 
 
@@ -3865,6 +4121,10 @@ def _retether_high_population_to_central(chart_rows: pd.DataFrame) -> pd.DataFra
         "heavy_ruc_net_revenue",
         "light_bev_ruc_net_revenue",
         "phev_ruc_net_revenue",
+        # Present only when the FED->RUC transition overlay is active; the
+        # shock window (pre-2027Q1) predates the transition, so this is a
+        # correctness guard rather than a live adjustment today.
+        "light_petrol_ruc_net_revenue",
     )
 
     low_values = _ratio_lookup(low_scenario)
@@ -6326,6 +6586,7 @@ _REVENUE_OUTLOOK_PERSISTED_KEYS = (
     "revenue_outlook_mbu_fed_uplift",
     "revenue_outlook_official_vintage",
     "revenue_outlook_official_vintage_overlay",
+    FED_RUC_TRANSITION_SESSION_KEY,
 )
 _REVENUE_OUTLOOK_PERSISTED_PREFIXES = ("revenue_outlook_legend_item_", "ev_lever_", "eruc_lever_")
 
@@ -6373,6 +6634,7 @@ def _active_lever_summary(
     eruc_on: bool,
     fed_policy_state: str,
     mbu_fed_policy_state: str,
+    fed_ruc_transition: str = FED_RUC_TRANSITION_OFF,
 ) -> str:
     """One-line summary of non-default levers, shown while the accordion is closed."""
     parts: list[str] = []
@@ -6387,6 +6649,11 @@ def _active_lever_summary(
     if eruc_on:
         parts.append("e-RUC on")
     parts.append(f"Current: {FED_POLICY_LABELS[_normalise_fed_policy_state(fed_policy_state)]}")
+    transition_state = normalise_fed_ruc_transition_state(fed_ruc_transition)
+    if transition_state != FED_RUC_TRANSITION_OFF:
+        parts.append(
+            f"FED → RUC transition: {FED_RUC_TRANSITION_LABELS[transition_state]}"
+        )
     mbu_state = _normalise_fed_policy_state(mbu_fed_policy_state)
     # The official comparator renders as published by default; only the
     # explicitly selected MBU26 synthetic counterfactual is worth naming.
@@ -6907,6 +7174,17 @@ def _render_lever_accordion(
                     index=FED_POLICY_OPTIONS.index(FED_POLICY_DELAYED_6M),
                 ),
             )
+            fed_ruc_transition_state = st.selectbox(
+                FED_RUC_TRANSITION_SELECTOR_LABEL,
+                FED_RUC_TRANSITION_OPTIONS,
+                format_func=lambda state: FED_RUC_TRANSITION_LABELS[str(state)],
+                key=FED_RUC_TRANSITION_SESSION_KEY,
+                help=FED_RUC_TRANSITION_HELP,
+                **_widget_default_kwargs(
+                    FED_RUC_TRANSITION_SESSION_KEY,
+                    index=FED_RUC_TRANSITION_OPTIONS.index(FED_RUC_TRANSITION_OFF),
+                ),
+            )
         with policy_cols[1]:
             if show_official_policy_control and method_detail_enabled():
                 mbu_fed_policy_state = st.selectbox(
@@ -6982,6 +7260,7 @@ def _render_lever_accordion(
         "eruc_levers": eruc_lever_values,
         "fed_policy_state": fed_policy_state,
         "mbu_fed_policy_state": mbu_fed_policy_state,
+        "fed_ruc_transition": normalise_fed_ruc_transition_state(fed_ruc_transition_state),
         "ped_retention_sensitivity": _production_ped_retention_sensitivity(),
     }
 
@@ -7073,6 +7352,7 @@ def _compare_mode_lever_state(selected_metric_type: str) -> dict[str, Any]:
         "eruc_levers": eruc_levers,
         "fed_policy_state": fed_policy_state,
         "mbu_fed_policy_state": mbu_fed_policy_state,
+        "fed_ruc_transition": _session_fed_ruc_transition_state(),
     }
 
 
@@ -7392,6 +7672,9 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         # MBU26 is not displayed the official comparator stays published.
         mbu_fed_policy_state = FED_POLICY_PUBLISHED
     ped_retention_sensitivity = bool(lever_state.get("ped_retention_sensitivity", False))
+    fed_ruc_transition_state = normalise_fed_ruc_transition_state(
+        lever_state.get("fed_ruc_transition", FED_RUC_TRANSITION_OFF)
+    )
     lever_summary = _active_lever_summary(
         fleet=selected_fleet_efficiency,
         pt_shift=selected_pt_mode_shift,
@@ -7400,6 +7683,7 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         eruc_on=eruc_enabled,
         fed_policy_state=fed_policy_state,
         mbu_fed_policy_state=mbu_fed_policy_state,
+        fed_ruc_transition=fed_ruc_transition_state,
     )
     if lever_summary and method_detail_enabled():
         if compare_mode:
@@ -7429,6 +7713,10 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         # are cached on that.
         long_run_transition_schedule_id=str(long_run_shape_state["schedule_id"]),
         long_run_shape_vintage_id=str(long_run_shape_state["shape_vintage_id"]),
+        # Fleetwide FED->RUC transition: a post-catalogue overlay, so it rides
+        # the typed key (every downstream cache re-keys) without multiplying
+        # the materialised policy catalogue.
+        fed_ruc_transition=fed_ruc_transition_state,
     )
     pack, pack_signature = _apply_long_run_shape_selection(
         pack, pack_signature, str(pack_dir), ev_uptake_key
@@ -7588,7 +7876,10 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         sensitivity_bands_withheld = _uncertainty_bands_withheld_for_sensitivity(
             sensitivity_key
         )
-        if quarterly_grain or sensitivity_bands_withheld:
+        fed_ruc_bands_withheld = _uncertainty_bands_withheld_for_fed_ruc_transition(
+            ev_uptake_key
+        )
+        if quarterly_grain or sensitivity_bands_withheld or fed_ruc_bands_withheld:
             uncertainty_rows = pd.DataFrame()
             band_layers_for_figure: tuple[str, ...] = tuple(
                 layer
@@ -7643,6 +7934,15 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             )
         ):
             total_path_notes.append(SENSITIVITY_UNCERTAINTY_WITHHELD_NOTE)
+        if (
+            fed_ruc_bands_withheld
+            and not quarterly_grain
+            and any(
+                layer in selected_band_layers
+                for layer in (BAND_50_LAYER_ID, BAND_80_LAYER_ID)
+            )
+        ):
+            total_path_notes.append(FED_RUC_TRANSITION_UNCERTAINTY_WITHHELD_NOTE)
         cone_band_for_notes = view.get("cone_band")
         if (
             isinstance(cone_band_for_notes, pd.DataFrame)
@@ -7676,6 +7976,14 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
             "persistent-downside traces: "
             + FED_POLICY_NOTES[active_current_policy]
         )
+        active_fed_ruc_transition = _fed_ruc_transition_state(ev_uptake_key)
+        if active_fed_ruc_transition != FED_RUC_TRANSITION_OFF:
+            total_path_notes.append(
+                "FED → RUC transition: "
+                + FED_RUC_TRANSITION_LABELS[active_fed_ruc_transition]
+                + ". "
+                + FED_RUC_TRANSITION_NOTE
+            )
         if official_vintage_state["mbu26_displayed"] and active_mbu_policy != FED_POLICY_PUBLISHED:
             # The counterfactual must never read as a published MBU26 forecast
             # ("MBU26 deferred" / "MBU26 no uplift" are not published paths).
@@ -8094,157 +8402,217 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
     timer.start("composition figure")
     with st.container(border=True):
         st.markdown("<div class='page5-panel-title'>Revenue composition over time</div>", unsafe_allow_html=True)
-        if method_detail_enabled():
-            st.caption(
-                "Stacked build-up of Total NLTF revenue: gross components net of refunds and admin fees, "
-                "so the stack reconciles to the total path above."
+        if _fed_ruc_transition_state(ev_uptake_key) != FED_RUC_TRANSITION_OFF:
+            # The stacked build-up decomposes the collection channel by class
+            # from the governed detail frames, whose hidden Heavy-BEV solve
+            # would absorb the newly transitioned petrol RUC as a phantom
+            # class. Withheld rather than mislabelled; the A/B by-stream
+            # breakdown and the transition audit carry the decomposition.
+            info_panel(
+                "The revenue composition build-up is withheld while a fleetwide "
+                "FED → RUC transition is selected: the stack decomposes the "
+                "baseline collection channel and would misattribute newly "
+                "transitioned petrol RUC and transition costs. Use the A/B "
+                "by-stream breakdown and the FED → RUC transition audit for the "
+                "transition decomposition; the build-up returns when the "
+                "transition selector is set to No fleetwide transition."
             )
-        # One composition story for everyone: the net build-up that reconciles
-        # to Total NLTF ('Gross-to-net bridge audit' internally). The gross
-        # stack and the full formula-audit detail were analyst plumbing - the
-        # data and mode machinery remain for audits, but the selectors are
-        # gone; the formula-audit detail stays available on local audit runs.
-        selected_stack_mode = REVENUE_STACK_MODE_BRIDGE
-        stack_source_options = _revenue_line_source_options(
-            stack_components, selected_official_trace=selected_official_trace
-        )
-        stack_section_options = selector_options["stack_section_options"]
-        stack_overlay_options = selector_options["stack_overlay_options"]
-        default_stack_sections = [section for section in ["RUC", "FED", "MVR", "TUC"] if section in stack_section_options]
-        default_stack_overlays = _revenue_stack_default_overlays(selected_stack_mode, stack_overlay_options)
-        # Two selectors carry the story (source path + FY zoom); the section
-        # and overlay multiselects duplicated the defaults for everyone and
-        # stay available on local audit runs only.
-        show_detail_selector = should_show_local_audit_controls()
-        if show_detail_selector:
-            comp_cols = st.columns([0.19, 0.16, 0.17, 0.16, 0.16, 0.16])
-            with comp_cols[1]:
-                selected_stack_detail_level = st.selectbox(
-                    "Detail level",
-                    list(REVENUE_STACK_DETAIL_LEVELS),
-                    index=0,
-                    key="revenue_stack_detail_level",
-                )
-            with comp_cols[3]:
-                selected_stack_sections = st.multiselect(
-                    "Section filter",
-                    stack_section_options,
-                    default=default_stack_sections or stack_section_options,
-                    key="revenue_stack_sections",
-                )
-            with comp_cols[4]:
-                selected_stack_overlays = st.multiselect(
-                    "Aggregate overlays",
-                    stack_overlay_options,
-                    default=default_stack_overlays,
-                    key=f"revenue_stack_overlays_{selected_stack_mode}_{selected_stack_detail_level}",
-                )
-            slider_col = comp_cols[2]
         else:
-            comp_cols = st.columns([0.26, 0.48, 0.26])
-            selected_stack_detail_level = REVENUE_STACK_DETAIL_CLEAN
-            selected_stack_sections = default_stack_sections or list(stack_section_options)
-            selected_stack_overlays = list(default_stack_overlays)
-            slider_col = comp_cols[1]
-        with comp_cols[0]:
-            # A vintage flip can strip the previously stored official source
-            # from the options; clamp the session value before rendering.
-            if stack_source_options:
-                _validated_select_state(
-                    "revenue_stack_source_path", stack_source_options, stack_source_options[0]
+            if method_detail_enabled():
+                st.caption(
+                    "Stacked build-up of Total NLTF revenue: gross components net of refunds and admin fees, "
+                    "so the stack reconciles to the total path above."
                 )
-            selected_stack_source = st.selectbox(
-                "Source path",
-                stack_source_options,
-                index=0,
-                key="revenue_stack_source_path",
+            # One composition story for everyone: the net build-up that reconciles
+            # to Total NLTF ('Gross-to-net bridge audit' internally). The gross
+            # stack and the full formula-audit detail were analyst plumbing - the
+            # data and mode machinery remain for audits, but the selectors are
+            # gone; the formula-audit detail stays available on local audit runs.
+            selected_stack_mode = REVENUE_STACK_MODE_BRIDGE
+            stack_source_options = _revenue_line_source_options(
+                stack_components, selected_official_trace=selected_official_trace
             )
-        # Source-specific FY bounds, derived AFTER the source is selected.
-        # The former global bounds were computed over the whole stack frame
-        # before any source choice, so the Current FY2030 cutoff silently
-        # capped the official comparator even though its rows run to FY2055.
-        stack_fy_min, stack_fy_max = _revenue_line_fy_bounds(
-            stack_components[
-                stack_components["source_path"].astype(str).eq(str(selected_stack_source))
-            ]
-        )
-        # Long-run sources open at FY2050 by default; the official vintages
-        # can be extended to their own FY2055 source horizon with the slider.
-        stack_fy_default_end = min(int(stack_fy_max), 2050)
-        state_key = "revenue_stack_fy_range"
-        source_state_key = "revenue_stack_fy_range_source"
-        stored_range = st.session_state.get(state_key)
-        source_changed = st.session_state.get(source_state_key) != selected_stack_source
-        out_of_bounds = (
-            not isinstance(stored_range, (tuple, list))
-            or len(stored_range) != 2
-            or int(stored_range[0]) < int(stack_fy_min)
-            or int(stored_range[1]) > int(stack_fy_max)
-        )
-        if source_changed or out_of_bounds:
-            st.session_state[state_key] = (int(stack_fy_min), stack_fy_default_end)
-        st.session_state[source_state_key] = selected_stack_source
-        with slider_col:
-            selected_stack_fy_range = st.slider(
-                "FY range / horizon",
-                min_value=int(stack_fy_min),
-                max_value=int(stack_fy_max),
-                key=state_key,
+            stack_section_options = selector_options["stack_section_options"]
+            stack_overlay_options = selector_options["stack_overlay_options"]
+            default_stack_sections = [section for section in ["RUC", "FED", "MVR", "TUC"] if section in stack_section_options]
+            default_stack_overlays = _revenue_stack_default_overlays(selected_stack_mode, stack_overlay_options)
+            # Two selectors carry the story (source path + FY zoom); the section
+            # and overlay multiselects duplicated the defaults for everyone and
+            # stay available on local audit runs only.
+            show_detail_selector = should_show_local_audit_controls()
+            if show_detail_selector:
+                comp_cols = st.columns([0.19, 0.16, 0.17, 0.16, 0.16, 0.16])
+                with comp_cols[1]:
+                    selected_stack_detail_level = st.selectbox(
+                        "Detail level",
+                        list(REVENUE_STACK_DETAIL_LEVELS),
+                        index=0,
+                        key="revenue_stack_detail_level",
+                    )
+                with comp_cols[3]:
+                    selected_stack_sections = st.multiselect(
+                        "Section filter",
+                        stack_section_options,
+                        default=default_stack_sections or stack_section_options,
+                        key="revenue_stack_sections",
+                    )
+                with comp_cols[4]:
+                    selected_stack_overlays = st.multiselect(
+                        "Aggregate overlays",
+                        stack_overlay_options,
+                        default=default_stack_overlays,
+                        key=f"revenue_stack_overlays_{selected_stack_mode}_{selected_stack_detail_level}",
+                    )
+                slider_col = comp_cols[2]
+            else:
+                comp_cols = st.columns([0.26, 0.48, 0.26])
+                selected_stack_detail_level = REVENUE_STACK_DETAIL_CLEAN
+                selected_stack_sections = default_stack_sections or list(stack_section_options)
+                selected_stack_overlays = list(default_stack_overlays)
+                slider_col = comp_cols[1]
+            with comp_cols[0]:
+                # A vintage flip can strip the previously stored official source
+                # from the options; clamp the session value before rendering.
+                if stack_source_options:
+                    _validated_select_state(
+                        "revenue_stack_source_path", stack_source_options, stack_source_options[0]
+                    )
+                selected_stack_source = st.selectbox(
+                    "Source path",
+                    stack_source_options,
+                    index=0,
+                    key="revenue_stack_source_path",
+                )
+            # Source-specific FY bounds, derived AFTER the source is selected.
+            # The former global bounds were computed over the whole stack frame
+            # before any source choice, so the Current FY2030 cutoff silently
+            # capped the official comparator even though its rows run to FY2055.
+            stack_fy_min, stack_fy_max = _revenue_line_fy_bounds(
+                stack_components[
+                    stack_components["source_path"].astype(str).eq(str(selected_stack_source))
+                ]
             )
+            # Long-run sources open at FY2050 by default; the official vintages
+            # can be extended to their own FY2055 source horizon with the slider.
+            stack_fy_default_end = min(int(stack_fy_max), 2050)
+            state_key = "revenue_stack_fy_range"
+            source_state_key = "revenue_stack_fy_range_source"
+            stored_range = st.session_state.get(state_key)
+            source_changed = st.session_state.get(source_state_key) != selected_stack_source
+            out_of_bounds = (
+                not isinstance(stored_range, (tuple, list))
+                or len(stored_range) != 2
+                or int(stored_range[0]) < int(stack_fy_min)
+                or int(stored_range[1]) > int(stack_fy_max)
+            )
+            if source_changed or out_of_bounds:
+                st.session_state[state_key] = (int(stack_fy_min), stack_fy_default_end)
+            st.session_state[source_state_key] = selected_stack_source
+            with slider_col:
+                selected_stack_fy_range = st.slider(
+                    "FY range / horizon",
+                    min_value=int(stack_fy_min),
+                    max_value=int(stack_fy_max),
+                    key=state_key,
+                )
 
-        selected_stack_sections_tuple = tuple(str(value) for value in selected_stack_sections)
-        selected_stack_fy_range_tuple = (int(selected_stack_fy_range[0]), int(selected_stack_fy_range[1]))
-        selected_stack_overlays_tuple = tuple(str(value) for value in selected_stack_overlays)
-        chart_stack = cached_revenue_outlook_composition_stack(
-            pack_signature,
-            selected_stack_source,
-            selected_stack_mode,
-            selected_stack_sections_tuple,
-            selected_stack_fy_range_tuple,
-            selected_stack_overlays_tuple,
-            tuple(str(value) for value in stack_section_options),
-            sensitivity_key,
-            selected_ped_bridge_mode,
-            stack_components,
-        )
-        composition_figure = cached_revenue_outlook_composition_figure(
-            pack_signature,
-            selected_stack_source,
-            selected_stack_mode,
-            selected_stack_detail_level,
-            selected_stack_sections_tuple,
-            selected_stack_fy_range_tuple,
-            selected_stack_overlays_tuple,
-            sensitivity_key,
-            selected_ped_bridge_mode,
-            chart_stack,
-        )
-        stack_gap_banner, stack_display = cached_revenue_outlook_composition_table_view(
-            pack_signature,
-            selected_stack_source,
-            selected_stack_mode,
-            selected_stack_sections_tuple,
-            selected_stack_fy_range_tuple,
-            selected_stack_overlays_tuple,
-            sensitivity_key,
-            selected_ped_bridge_mode,
-            chart_stack,
-        )
-        chart_card(
-            "Revenue composition over time",
-            "",
-            composition_figure,
-            caption=None,
-            notes_as_tooltip=False,
-        )
-        if stack_gap_banner:
-            warning_panel(stack_gap_banner)
-        if should_show_local_audit_controls():
-            table_cols = st.columns([0.82, 0.18])
-            with table_cols[1]:
-                dataframe_download(chart_stack, "Download CSV", "revenue_stack_components.csv")
-            display_table(stack_display, height=360, max_rows=720)
+            selected_stack_sections_tuple = tuple(str(value) for value in selected_stack_sections)
+            selected_stack_fy_range_tuple = (int(selected_stack_fy_range[0]), int(selected_stack_fy_range[1]))
+            selected_stack_overlays_tuple = tuple(str(value) for value in selected_stack_overlays)
+            chart_stack = cached_revenue_outlook_composition_stack(
+                pack_signature,
+                selected_stack_source,
+                selected_stack_mode,
+                selected_stack_sections_tuple,
+                selected_stack_fy_range_tuple,
+                selected_stack_overlays_tuple,
+                tuple(str(value) for value in stack_section_options),
+                sensitivity_key,
+                selected_ped_bridge_mode,
+                stack_components,
+            )
+            composition_figure = cached_revenue_outlook_composition_figure(
+                pack_signature,
+                selected_stack_source,
+                selected_stack_mode,
+                selected_stack_detail_level,
+                selected_stack_sections_tuple,
+                selected_stack_fy_range_tuple,
+                selected_stack_overlays_tuple,
+                sensitivity_key,
+                selected_ped_bridge_mode,
+                chart_stack,
+            )
+            stack_gap_banner, stack_display = cached_revenue_outlook_composition_table_view(
+                pack_signature,
+                selected_stack_source,
+                selected_stack_mode,
+                selected_stack_sections_tuple,
+                selected_stack_fy_range_tuple,
+                selected_stack_overlays_tuple,
+                sensitivity_key,
+                selected_ped_bridge_mode,
+                chart_stack,
+            )
+            chart_card(
+                "Revenue composition over time",
+                "",
+                composition_figure,
+                caption=None,
+                notes_as_tooltip=False,
+            )
+            if stack_gap_banner:
+                warning_panel(stack_gap_banner)
+            if should_show_local_audit_controls():
+                table_cols = st.columns([0.82, 0.18])
+                with table_cols[1]:
+                    dataframe_download(chart_stack, "Download CSV", "revenue_stack_components.csv")
+                display_table(stack_display, height=360, max_rows=720)
     timer.stop("composition figure")
+
+    if _fed_ruc_transition_state(ev_uptake_key) != FED_RUC_TRANSITION_OFF and revenue_outlook_lazy_table(
+        "Show FED → RUC transition audit",
+        "revenue_outlook_show_fed_ruc_transition_audit",
+        caption="FED → RUC transition audit is computed only when opened.",
+    ):
+        timer.start("FED->RUC transition audit")
+        transition_audit = cached_fed_ruc_transition_audit(
+            pack_signature,
+            sensitivity_key,
+            selected_ped_bridge_mode,
+            ev_uptake_key,
+            pack,
+        )
+        with st.expander("FED → RUC transition audit", expanded=False):
+            if transition_audit.empty:
+                warning_panel(
+                    "The FED → RUC transition audit is unavailable for this key."
+                )
+            else:
+                info_panel(FED_RUC_TRANSITION_NOTE)
+                is_annual = transition_audit["quarter"].astype(str).eq("FY total")
+                audit_cols = st.columns([0.82, 0.18])
+                with audit_cols[1]:
+                    dataframe_download(
+                        transition_audit, "Download CSV", "fed_ruc_transition_audit.csv"
+                    )
+                st.caption(
+                    "Annual rollup per scenario and June year: gross newly-transitioned "
+                    "petrol RUC, leakage, collected revenue, PHEV full-rate uplift, net "
+                    "FED removed, transition costs and the foregone non-road FED audit "
+                    "against the documents' ~$150m annual reference (reported, never "
+                    "re-subtracted)."
+                )
+                display_table(transition_audit[is_annual], height=320, max_rows=400)
+                st.caption(
+                    "Quarterly accounting: FY2028 contains exactly two pre-transition "
+                    "and two post-transition calendar quarters; leakage ages step at "
+                    "1 January. Quarterly VKT is the governed annual split equally "
+                    "across the year (stated assumption); the rate follows the selected "
+                    "timing state's staircase."
+                )
+                display_table(transition_audit[~is_annual], height=320, max_rows=800)
+        timer.stop("FED->RUC transition audit")
 
     if revenue_outlook_lazy_table(
         "Show EV/PHEV PED-Light migration audit",
@@ -10442,6 +10810,7 @@ def _comparison_scenario_defaults(prefix: str) -> dict[str, Any]:
         "freight": "Off",
         "eruc": False,
         "fed_policy": FED_POLICY_DELAYED_6M,
+        "fed_ruc_transition": FED_RUC_TRANSITION_OFF,
     }
 
 
@@ -10483,7 +10852,7 @@ def _render_comparison_scenario_column(
     ]
     keys = {
         name: f"ro_cmp_{prefix}_{name}"
-        for name in ["trace", "fleet", "pt", "freight", "eruc", "fed_policy"]
+        for name in ["trace", "fleet", "pt", "freight", "eruc", "fed_policy", "fed_ruc_transition"]
     }
     _validated_select_state(keys["trace"], scenario_options, defaults["trace"])
     st.session_state.setdefault(keys["trace"], defaults["trace"])
@@ -10603,6 +10972,19 @@ def _render_comparison_scenario_column(
             "Scope: Selected current scenario only. " + FED_DEFERRAL_CATCH_UP_NOTE
         ),
     )
+    _validated_select_state(
+        keys["fed_ruc_transition"],
+        FED_RUC_TRANSITION_OPTIONS,
+        defaults["fed_ruc_transition"],
+    )
+    st.session_state.setdefault(keys["fed_ruc_transition"], defaults["fed_ruc_transition"])
+    fed_ruc_transition_state = st.selectbox(
+        FED_RUC_TRANSITION_SELECTOR_LABEL,
+        FED_RUC_TRANSITION_OPTIONS,
+        format_func=lambda state: FED_RUC_TRANSITION_LABELS[str(state)],
+        key=keys["fed_ruc_transition"],
+        help=FED_RUC_TRANSITION_HELP + " Scope: Selected current scenario only.",
+    )
     sensitivity_key, ev_uptake_key = _comparison_scenario_b_keys(
         page_sensitivity_key,
         page_uptake_key,
@@ -10611,6 +10993,7 @@ def _render_comparison_scenario_column(
         freight=freight,
         eruc_values=eruc_values,
         fed_policy_state=fed_policy_state,
+        fed_ruc_transition=fed_ruc_transition_state,
     )
     return sensitivity_key, ev_uptake_key, selected_scenario
 
@@ -10639,6 +11022,7 @@ def _comparison_scenario_b_keys(
     freight: str,
     eruc_values: tuple[float, ...],
     fed_policy_state: str,
+    fed_ruc_transition: str = FED_RUC_TRANSITION_OFF,
 ) -> tuple[tuple, RevenueScenarioComputationKey]:
     """Scenario B's keys: the page key with only the B controls overridden."""
     page_key = _scenario_key(page_uptake_key)
@@ -10653,6 +11037,7 @@ def _comparison_scenario_b_keys(
         ),
         eruc_levers=eruc_values,
         current_fed_policy_state=fed_policy_state,
+        fed_ruc_transition=normalise_fed_ruc_transition_state(fed_ruc_transition),
     )
     return (
         _comparison_sensitivity_key_from_page(page_sensitivity_key, fleet, pt_shift, freight),
@@ -10676,6 +11061,10 @@ def _comparison_official_scenario_keys(
         official_fed_policy_state=official_policy_state,
         heavy_bev_transition=HEAVY_BEV_DEFAULT,
         official_comparator_vintage_id=selected_vid,
+        # Published official traces and the display-only deferral workbook
+        # never carry the fleetwide FED->RUC transition: the selector is
+        # locked to its neutral state on these comparator sides.
+        fed_ruc_transition=FED_RUC_TRANSITION_OFF,
     )
     return sensitivity_key, ev_uptake_key, official_comparator_trace_name(selected_vid)
 
@@ -10902,6 +11291,9 @@ def _reset_scenario_columns_to_current_page() -> None:
             legacy_toggle_key="revenue_outlook_mbu_fed_uplift",
             default=FED_POLICY_PUBLISHED,
         )
+        st.session_state[f"ro_cmp_{prefix}_fed_ruc_transition"] = (
+            _session_fed_ruc_transition_state()
+        )
 
 
 def _comparison_side_labels(trace_a: str, trace_b: str) -> tuple[str, str]:
@@ -10948,6 +11340,9 @@ def _scenario_summary_text(
             parts.append(f"{selected_vid} official: published")
     else:
         parts.append(f"Current: {FED_POLICY_LABELS[current_state]}")
+    transition_state = _fed_ruc_transition_state(ev_uptake_key)
+    if transition_state != FED_RUC_TRANSITION_OFF:
+        parts.append(f"FED → RUC: {FED_RUC_TRANSITION_LABELS[transition_state]}")
     return " · ".join(parts)
 
 
@@ -11473,14 +11868,24 @@ _SCENARIO_COMPONENT_FETCH_SERIES = (
     "PHEV RUC net revenue",
     "Total RUC all classes",
     "Net MVR revenue",
+    # FED->RUC transition overlay series. Empty (NPV 0) unless a side selects
+    # a fleetwide transition: newly transitioned petrol RUC must be split out
+    # of the RUC rollup or it would appear as a phantom Heavy & other
+    # residual, and the transition costs must stay a visible audited line
+    # rather than vanishing into TUC & other.
+    "Light petrol RUC revenue",
+    "RUC transition collection costs",
+    "RUC transition one-off costs",
 )
 _SCENARIO_COMPONENT_COLORS = {
     "PED / FED (net)": "#00843D",
     "Light RUC (conventional)": "#006FAD",
+    "Light petrol RUC": "#3E9BD5",
     "Light BEV RUC": "#4CA7D8",
     "PHEV RUC": "#9CCBE8",
     "Heavy & other RUC": "#102A43",
     "Net MVR": "#94A3B8",
+    "RUC transition costs": "#B45309",
     "TUC & other": "#CBD5E1",
 }
 _SCENARIO_COMPONENT_MATERIALITY = 1.0  # $m NPV; bars below this are dropped
@@ -11529,18 +11934,36 @@ def _scenario_npv_component_breakdown(
     phev = pair("PHEV RUC net revenue")
     ruc = pair("Total RUC all classes")
     mvr = pair("Net MVR revenue")
-    heavy = (ruc[0] - light[0] - bev[0] - phev[0], ruc[1] - light[1] - bev[1] - phev[1])
+    # FED->RUC transition series: all zero unless a side carries a fleetwide
+    # transition. Newly transitioned petrol RUC is inside the RUC rollup, so
+    # it must be subtracted from the heavy remainder like the light classes;
+    # the transition costs reduce Total NLTF outside the rollup, so they are
+    # shown as their own (negative) audited component and added back into the
+    # TUC & other residual so the identity still closes exactly.
+    petrol = pair("Light petrol RUC revenue")
+    costs = tuple(
+        a + b
+        for a, b in zip(
+            pair("RUC transition collection costs"), pair("RUC transition one-off costs")
+        )
+    )
+    heavy = (
+        ruc[0] - light[0] - bev[0] - phev[0] - petrol[0],
+        ruc[1] - light[1] - bev[1] - phev[1] - petrol[1],
+    )
     residual = (
-        npv_a_total - fed[0] - ruc[0] - mvr[0],
-        npv_b_total - fed[1] - ruc[1] - mvr[1],
+        npv_a_total - fed[0] - ruc[0] - mvr[0] + costs[0],
+        npv_b_total - fed[1] - ruc[1] - mvr[1] + costs[1],
     )
     return [
         ("PED / FED (net)", fed[0], fed[1]),
         ("Light RUC (conventional)", light[0], light[1]),
+        ("Light petrol RUC", petrol[0], petrol[1]),
         ("Light BEV RUC", bev[0], bev[1]),
         ("PHEV RUC", phev[0], phev[1]),
         ("Heavy & other RUC", heavy[0], heavy[1]),
         ("Net MVR", mvr[0], mvr[1]),
+        ("RUC transition costs", -costs[0], -costs[1]),
         ("TUC & other", residual[0], residual[1]),
     ]
 

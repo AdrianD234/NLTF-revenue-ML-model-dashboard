@@ -126,6 +126,13 @@ DEMAND_LEAF_SERIES: tuple[str, ...] = (
     "light_ruc_net_revenue",
     "light_bev_ruc_net_revenue",
     "phev_ruc_net_revenue",
+    # FED->RUC transition overlay series: petrol RUC collections and their
+    # leakage both scale with petrol VKT, so the demand wedge applies. The
+    # transition COST series are deliberately absent - implementation and
+    # collection costs do not scale with a demand wedge and stay central.
+    # Absent series are skipped, so the off state is unaffected.
+    "light_petrol_ruc_net_revenue",
+    "fed_ruc_transition_leakage",
 )
 
 _PED_REVENUE_LEAVES = ("gross_ped_revenue",)
@@ -134,6 +141,10 @@ _RUC_REVENUE_LEAVES = (
     "heavy_ruc_net_revenue",
     "light_bev_ruc_net_revenue",
     "phev_ruc_net_revenue",
+    # Newly transitioned petrol RUC joins the RUC rollup when the fleetwide
+    # FED->RUC transition overlay is active (leakage is informational and is
+    # already netted out of the collected series, so it is not a rollup leaf).
+    "light_petrol_ruc_net_revenue",
 )
 
 _MONOTONE_TOLERANCE = 1e-9

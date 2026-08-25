@@ -179,6 +179,13 @@ _CATALOGUE_FIELDS = (
 _POST_CACHE_OVERLAY_FIELDS = (
     "official_comparator_vintage_id",
     "official_comparator_overlay",
+    # The fleetwide FED->RUC transition is a deterministic accounting overlay
+    # applied AFTER the materialised rows are read (app.py folds it into the
+    # overlay-row chain), so any transition state is answered by the same
+    # cached state. Pinning it - or making it a catalogue dimension - would
+    # triple the 64-state catalogue for a transform that is pure arithmetic
+    # on the rows it already has.
+    "fed_ruc_transition",
 )
 # Everything else must match the governed default the pack was built at. These
 # are the fields whose value the catalogue PINS; a different value is a
