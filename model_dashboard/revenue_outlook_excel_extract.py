@@ -104,11 +104,30 @@ EXTRACT_SHEET_NAMES: dict[str, str] = {
     "Temporary fuel shock (Treasury Medium)": "Temporary Shock",
     "Middle East conflict: High": "Conflict High",
     "Persistent downside": "Persistent Downside",
+    "PREBU26 deferral (reference workbook)": "PREBU26 Deferral Ref",
     "BEFU26 official": "BEFU26 Official",
     "MBU26 official": "MBU26 Official",
 }
 #: Traces that are columns of every sheet, not scenario paths of their own.
 NON_SCENARIO_TRACES = ("Actual",)
+
+#: The DECLARED reasons a selectable chart trace has no sheet of its own.
+#: Every selectable trace must either export or appear here with a reason -
+#: there is no silent third bucket, and CI asserts exactly that. The
+#: behavioural-path literal is pinned against
+#: revenue_outlook.PED_COMPARISON_BEHAVIOURAL_TRACE_NAME by a test rather
+#: than an import, so this module stays free of the heavy runtime module.
+NON_EXPORTABLE_TRACE_REASONS: dict[str, str] = {
+    "Actual": (
+        "Actual history is the FY2001-FY2025 columns of every exported "
+        "sheet, not a scenario path of its own."
+    ),
+    "Current finalist comparison behavioural path": (
+        "A single-series behavioural relabel of the comparison PED intensity "
+        "trace (ped_vkt_per_capita only); it is not a scenario path and a "
+        "template sheet for it would be one populated row."
+    ),
+}
 
 #: Actual-year history is scenario-invariant; paths without their own
 #: pre-forecast rows (the conflict reforecasts) read it from Base.
@@ -126,8 +145,13 @@ class ExtractResult:
     workbook_bytes: bytes
     sheet_names: list[str]
     exported_traces: list[str]
+    #: Selected traces that SHOULD have exported but resolved to no governed
+    #: value source. Always a defect: the UI warns on it and CI keeps it empty.
     skipped_traces: list[str]
     blank_rows: dict[str, list[str]] = field(default_factory=dict)
+    #: Selected traces excluded by declared policy (see
+    #: NON_EXPORTABLE_TRACE_REASONS), reported so the exclusion is loud.
+    declared_non_exportable: list[str] = field(default_factory=list)
 
 
 def extract_sheet_name(trace_name: str, taken: set[str]) -> str:
@@ -192,16 +216,25 @@ def build_revenue_outlook_extract(
     stack_components: pd.DataFrame,
     pack_stack_components: pd.DataFrame,
     template_path: Path,
+    extra_value_frames: tuple[pd.DataFrame, ...] | list[pd.DataFrame] = (),
 ) -> ExtractResult:
     """One template-cloned worksheet per selected scenario path.
 
-    Values coalesce per (path, series, FY) from, in order: the ALIGNED line
-    reconciliation (the final overlaid computation, FY2025+), the aligned
-    stack components, the committed pack stack (which carries the
-    FY2001-FY2024 history), then the Base-case history for reforecast paths
-    that have no pre-forecast rows of their own. A cell with no governed
-    value in any source is left blank - never zero-filled - and the whole-row
-    blanks are reported per sheet.
+    Values coalesce per (path, series, FY) from, in order: the caller's
+    ``extra_value_frames`` (the FINAL displayed view values - derived traces
+    like the persistent downside and the reference workbook exist only
+    there, and the on-screen value must win wherever both layers carry one),
+    then the ALIGNED line reconciliation (the final overlaid computation,
+    FY2025+), the aligned stack components, the committed pack stack (which
+    carries the FY2001-FY2024 history), then the Base-case history for
+    reforecast paths that have no pre-forecast rows of their own. A cell
+    with no governed value in any source is left blank - never zero-filled -
+    and the whole-row blanks are reported per sheet.
+
+    A selected trace listed in ``NON_EXPORTABLE_TRACE_REASONS`` is reported
+    under ``declared_non_exportable``; any other selected trace that
+    resolves to no source lands in ``skipped_traces``, which is always a
+    defect for the caller to surface.
     """
     from openpyxl import load_workbook
 
@@ -210,6 +243,7 @@ def build_revenue_outlook_extract(
         raise RevenueOutlookExtractError(f"extract template missing: {template_path}")
 
     lookups = [
+        *[_value_lookup(frame) for frame in extra_value_frames],
         _value_lookup(line_reconciliation),
         _value_lookup(stack_components),
         _value_lookup(pack_stack_components),
@@ -218,10 +252,15 @@ def build_revenue_outlook_extract(
     for lookup in lookups:
         available_paths.update(path for path, _, _ in lookup)
 
+    declared: list[str] = [
+        str(trace)
+        for trace in selected_traces
+        if str(trace) in NON_EXPORTABLE_TRACE_REASONS
+    ]
     ordered_traces = [
         str(trace)
         for trace in selected_traces
-        if str(trace) not in NON_SCENARIO_TRACES
+        if str(trace) not in NON_EXPORTABLE_TRACE_REASONS
     ]
     exportable: list[tuple[str, str]] = []
     skipped: list[str] = []
@@ -330,6 +369,7 @@ def build_revenue_outlook_extract(
         exported_traces=[trace for trace, _ in exportable],
         skipped_traces=skipped,
         blank_rows=blank_rows,
+        declared_non_exportable=declared,
     )
 
 

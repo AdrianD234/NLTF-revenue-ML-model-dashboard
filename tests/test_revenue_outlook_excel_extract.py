@@ -304,31 +304,176 @@ def test_blank_line_items_stay_blank_not_zero(default_result) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_extract_skip_caption_is_gone_but_skip_logic_is_untouched(extract_context) -> None:
-    """Only the visible caption was removed; eligibility rules survive.
+def test_behavioural_path_is_declared_non_exportable_not_silently_skipped(
+    extract_context,
+) -> None:
+    """A selected trace with no sheet must be DECLARED, never silent.
 
-    The dashboard no longer prints "Extract skips traces without a governed
-    scenario path: ...", but a trace with no governed source path is still
-    silently omitted from the workbook exactly as before, and the download
-    itself still builds.
+    The behavioural path is a single-series relabel of the comparison PED
+    intensity trace, so it has no scenario sheet by stated policy: it lands
+    in ``declared_non_exportable`` with a reason, ``skipped_traces`` stays
+    empty (that bucket is always a defect), and the download still builds.
     """
-    import inspect
-
-    source = inspect.getsource(app.render_revenue_outlook_page)
-    assert "Extract skips traces without a governed scenario path" not in source
-    assert "skipped_traces" not in source
-    # No replacement warning either: the download block renders no caption
-    # about skipped traces.
     result = _extract(
         extract_context,
         ("Current finalist Base case", "Current finalist comparison behavioural path"),
     )
     assert result.sheet_names == ["Current Base"]
     assert result.exported_traces == ["Current finalist Base case"]
-    assert result.skipped_traces == ["Current finalist comparison behavioural path"]
+    assert result.skipped_traces == []
+    assert result.declared_non_exportable == [
+        "Current finalist comparison behavioural path"
+    ]
     # The workbook bytes are a real XLSX: the download continues to work.
     workbook = _workbook(result)
     assert workbook.sheetnames == ["Current Base"]
+
+
+def test_declared_registry_pins_the_runtime_trace_names() -> None:
+    """The literals in NON_EXPORTABLE_TRACE_REASONS cannot drift.
+
+    The extract module deliberately avoids importing the heavy runtime
+    module, so the behavioural-path literal is pinned here against the
+    runtime constant instead.
+    """
+    from model_dashboard.revenue_outlook import PED_COMPARISON_BEHAVIOURAL_TRACE_NAME
+    from model_dashboard.revenue_outlook_excel_extract import (
+        NON_EXPORTABLE_TRACE_REASONS,
+    )
+
+    assert PED_COMPARISON_BEHAVIOURAL_TRACE_NAME in NON_EXPORTABLE_TRACE_REASONS
+    assert "Actual" in NON_EXPORTABLE_TRACE_REASONS
+    for reason in NON_EXPORTABLE_TRACE_REASONS.values():
+        assert reason.strip()
+
+
+# ---------------------------------------------------------------------------
+# extract coverage gate: every selectable trace exports or is declared
+# ---------------------------------------------------------------------------
+
+
+def _full_picker_inventory(pack) -> list[str]:
+    """The Show-on-chart trace inventory, built the way the page builds it."""
+    options = list(app._revenue_outlook_trace_options(pack.revenue_chart_rows))
+    if (
+        app._prebu_defer_workbook_signature() is not None
+        and app.PREBU_DEFER_TRACE_NAME not in options
+    ):
+        options.append(app.PREBU_DEFER_TRACE_NAME)
+    return options
+
+
+def test_every_selectable_trace_is_exported_or_declared(extract_context) -> None:
+    """The gate this file exists for: no silent third bucket, ever.
+
+    Every trace the Show-on-chart picker can offer must either produce a
+    worksheet or appear in the declared non-exportable registry with a
+    stated reason. A newly added trace that does neither fails CI here
+    instead of silently vanishing from the reader's download.
+    """
+    pack, _ = extract_context
+    options = _full_picker_inventory(pack)
+    assert len(options) >= 8, options
+    result = _extract(extract_context, tuple(options))
+    assert result.skipped_traces == [], (
+        "selected traces silently missing from the extract: "
+        f"{result.skipped_traces}"
+    )
+    accounted = set(result.exported_traces) | set(result.declared_non_exportable)
+    assert accounted == set(options)
+    assert len(result.sheet_names) == len(result.exported_traces)
+
+
+def test_persistent_downside_sheet_matches_the_displayed_view(extract_context) -> None:
+    """The exported downside totals are the on-screen downside totals."""
+    pack, signature = extract_context
+    traces = (
+        "Actual",
+        "Current finalist Base case",
+        "Middle East conflict: High",
+        "Persistent downside",
+    )
+    result = _extract(extract_context, traces)
+    assert "Persistent Downside" in result.sheet_names
+    workbook = _workbook(result)
+    downside_totals = _row_values(workbook["Persistent Downside"], EXTRACT_LAST_ROW)
+    base_totals = _row_values(workbook["Current Base"], EXTRACT_LAST_ROW)
+
+    view = app.cached_revenue_outlook_view(
+        signature,
+        "Total NLTF revenue",
+        "june_year",
+        "Current planned path",
+        traces,
+        app.selected_sensitivity_key("Off", "Off", "Off"),
+        PED_BRIDGE_DEFAULT_MODE,
+        _default_uptake_key(),
+        pack,
+    )
+    chart = view["chart_rows"]
+    displayed = chart[
+        chart["scenario_name"].astype(str).eq("persistent_downside")
+        & chart["series_id"].astype(str).eq("total_nltf_net_revenue")
+        & chart["time_grain"].astype(str).eq("june_year")
+    ].set_index("june_year")["value"]
+    for fy in (2035, 2042, 2050):
+        assert downside_totals[fy] == pytest.approx(float(displayed.loc[fy]), abs=1e-9)
+        # And the downside stays below the central sheet - the wedge survives
+        # the round-trip into the workbook.
+        assert downside_totals[fy] < base_totals[fy]
+
+
+def test_high_population_sheet_matches_the_retethered_view(extract_context) -> None:
+    """The exported comparison values are the re-tethered on-screen values.
+
+    Before the extract read the final view layer, the High population sheet
+    exported pre-retether values while the chart showed re-tethered ones.
+    """
+    pack, signature = extract_context
+    traces = ("Actual", "Current finalist High population/comparison")
+    result = _extract(extract_context, traces)
+    workbook = _workbook(result)
+    exported = _row_values(workbook["High Population"], EXTRACT_LAST_ROW)
+
+    view = app.cached_revenue_outlook_view(
+        signature,
+        "Total NLTF revenue",
+        "june_year",
+        "Current planned path",
+        traces,
+        app.selected_sensitivity_key("Off", "Off", "Off"),
+        PED_BRIDGE_DEFAULT_MODE,
+        _default_uptake_key(),
+        pack,
+    )
+    chart = view["chart_rows"]
+    displayed = chart[
+        chart["scenario_name"].astype(str).eq("current_comparison_1")
+        & chart["series_id"].astype(str).eq("total_nltf_net_revenue")
+        & chart["time_grain"].astype(str).eq("june_year")
+    ].set_index("june_year")["value"]
+    for fy in (2027, 2030, 2040):
+        assert exported[fy] == pytest.approx(float(displayed.loc[fy]), abs=1e-9)
+
+
+def test_prebu_defer_reference_workbook_exports_its_own_series(extract_context) -> None:
+    """The display-only reference workbook gets a sheet from its own values."""
+    workbook_signature = app._prebu_defer_workbook_signature()
+    if workbook_signature is None:
+        pytest.skip("references/PREBU defer.xlsx is not deployed in this checkout")
+    result = _extract(
+        extract_context,
+        ("Actual", "Current finalist Base case", app.PREBU_DEFER_TRACE_NAME),
+    )
+    assert "PREBU26 Deferral Ref" in result.sheet_names
+    workbook = _workbook(result)
+    exported = _row_values(workbook["PREBU26 Deferral Ref"], EXTRACT_LAST_ROW)
+    frames = app.cached_prebu_defer_workbook_frames(workbook_signature)
+    source = frames["series"].get("total_nltf_net_revenue")
+    assert source is not None and not source.empty
+    for fy in (2030, 2040, 2050):
+        if fy in source.index:
+            assert exported[fy] == pytest.approx(float(source.loc[fy]), abs=1e-9)
 
 
 def test_download_button_belongs_to_the_single_scenario_view() -> None:
