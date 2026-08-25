@@ -10,7 +10,9 @@ exported numbers.
 
 Layout contract:
 
-* rows 1-65 exactly, row 65 = Total net revenues (m $);
+* rows 1-65 exactly, row 65 = Total net revenues (m $); rows 66-69 exist
+  ONLY while a fleetwide FED->RUC transition is selected, carrying the
+  transition's Light petrol RUC, leakage and cost lines below the total;
 * years in columns B:AY = FY2001-FY2050 (the template's FY2051-FY2055
   columns AZ:BD are removed - the one intentional difference);
 * row 2 period labels: ACTUAL through FY2025, ST_FORECAST FY2026-FY2030,
@@ -94,6 +96,24 @@ REVENUE_ROW_SERIES: dict[int, str] = {
     65: "total_nltf_net_revenue",
 }
 ROW_SERIES: dict[int, str] = {**LEVEL_ROW_SERIES, **REVENUE_ROW_SERIES}
+
+#: FED->RUC transition rows, appended BELOW the template's pinned 1-65 layout
+#: and written only when the exported path actually carries transition values
+#: (i.e. a fleetwide FED->RUC transition is selected). The default extract
+#: therefore stays byte-identical to the governed template layout, and the
+#: bundle validator's row-65 total parity is untouched.
+TRANSITION_ROW_SERIES: dict[int, str] = {
+    66: "light_petrol_ruc_net_revenue",
+    67: "fed_ruc_transition_leakage",
+    68: "fed_ruc_transition_collection_cost",
+    69: "fed_ruc_transition_oneoff_cost",
+}
+TRANSITION_ROW_LABELS: dict[int, str] = {
+    66: "Light petrol RUC (m $)",
+    67: "RUC transition leakage (m $)",
+    68: "RUC transition collection costs (m $)",
+    69: "RUC transition one-off costs (m $)",
+}
 
 #: Readable worksheet names for the governed traces; anything else is
 #: sanitised from the trace name itself.
@@ -217,6 +237,7 @@ def build_revenue_outlook_extract(
     pack_stack_components: pd.DataFrame,
     template_path: Path,
     extra_value_frames: tuple[pd.DataFrame, ...] | list[pd.DataFrame] = (),
+    scenario_note: str = "",
 ) -> ExtractResult:
     """One template-cloned worksheet per selected scenario path.
 
@@ -333,6 +354,31 @@ def build_revenue_outlook_extract(
                 missing.append(label)
                 worksheet.cell(row=row, column=1).comment = _blank_row_comment()
 
+        # FED->RUC transition rows: appended below the pinned template layout
+        # only when this path carries transition values, so the default
+        # extract keeps the exact governed 1-65 shape.
+        has_transition_values = any(
+            cell_value(source_path, series_id, year) is not None
+            for series_id in TRANSITION_ROW_SERIES.values()
+            for year in range(FIRST_EXTRACT_FY, LAST_EXTRACT_FY + 1)
+        )
+        if has_transition_values:
+            total_label_cell = worksheet.cell(row=EXTRACT_LAST_ROW, column=1)
+            for row, series_id in TRANSITION_ROW_SERIES.items():
+                label_cell = worksheet.cell(row=row, column=1)
+                label_cell.value = TRANSITION_ROW_LABELS[row]
+                if total_label_cell.has_style:
+                    label_cell._style = total_label_cell._style
+                for year in range(FIRST_EXTRACT_FY, LAST_EXTRACT_FY + 1):
+                    column = FIRST_DATA_COLUMN + (year - FIRST_EXTRACT_FY)
+                    value_cell = worksheet.cell(row=row, column=column)
+                    value_cell.value = cell_value(source_path, series_id, year)
+                    template_value_cell = worksheet.cell(
+                        row=EXTRACT_LAST_ROW, column=column
+                    )
+                    if template_value_cell.has_style:
+                        value_cell._style = template_value_cell._style
+
         for level_row, pct_row in PCT_ROW_BY_LEVEL_ROW.items():
             row_values = levels.get(level_row, {})
             for year in range(FIRST_EXTRACT_FY, LAST_EXTRACT_FY + 1):
@@ -351,6 +397,7 @@ def build_revenue_outlook_extract(
     workbook.properties.description = (
         "Revenue Outlook forecast extract; layout mirrors the governed BEFU26 "
         "extract with the horizon ending FY2050. "
+        + (f"{scenario_note.strip()} " if scenario_note.strip() else "")
         + (
             "Rows left blank (no governed value for the path): "
             + "; ".join(

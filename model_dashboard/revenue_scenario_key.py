@@ -139,6 +139,14 @@ class RevenueScenarioComputationKey:
     long_run_transition_schedule_id: str = ""
     macro_scenario_id: str = ""
     conflict_fuel_state: str = ""
+    # Fleetwide FED->RUC transition state ("off" | "managed" | "stress").
+    # Applied as a deterministic overlay AFTER the policy-runtime state is
+    # read, so it must never multiply the materialised catalogue - it is
+    # registered in the runtime's post-cache overlay fields, not pinned.
+    # Defaults to the literal neutral state (not "") so a clone that writes
+    # the neutral state explicitly is byte-identical to a default key -
+    # "B configured like A" must reproduce the page key exactly.
+    fed_ruc_transition: str = "off"
 
     # ------------------------------------------------------------ normalising
     def __post_init__(self) -> None:
@@ -301,6 +309,7 @@ _TEXT_FIELDS = (
     "long_run_transition_schedule_id",
     "macro_scenario_id",
     "conflict_fuel_state",
+    "fed_ruc_transition",
 )
 _TUPLE_FIELDS = ("custom_ev_levers", "eruc_levers")
 

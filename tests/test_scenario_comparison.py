@@ -737,7 +737,14 @@ def test_prebu_defer_workbook_is_a_selectable_display_comparator(comparison_cont
             PED_BRIDGE_DEFAULT_MODE, pack,
             trace_a=app.PREBU_DEFER_TRACE_NAME, trace_b="Current finalist Base case",
         )
-        assert not component["a"].empty, component_series
+        if component_series in app._SCENARIO_COMPONENT_SPARSE_SERIES:
+            # FED->RUC transition series exist only while a side selects a
+            # fleetwide transition; neither side here does, so the paths are
+            # legitimately absent and contribute exactly zero below.
+            assert component["a"].empty, component_series
+            assert component["b"].empty, component_series
+        else:
+            assert not component["a"].empty, component_series
         component_npvs[component_series] = app._scenario_component_npv(component, 0.0)
     nominal_a = app.npv_to_horizon(a, rate=0.0)
     nominal_b = app.npv_to_horizon(result["b"], rate=0.0)

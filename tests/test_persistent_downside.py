@@ -131,12 +131,11 @@ class TestConstructionGates:
                     values["series_id"].eq(series) & values["fy"].eq(fy)
                 ]["value"].iloc[0]
                 - base[(series, fy)]
-                for series in ("gross_ped_revenue", *(
-                    "light_ruc_net_revenue",
-                    "heavy_ruc_net_revenue",
-                    "light_bev_ruc_net_revenue",
-                    "phev_ruc_net_revenue",
-                ))
+                # The rebuild bases are the module's own leaf registries, so a
+                # deliberately added revenue leaf (the FED->RUC transition's
+                # petrol RUC line) keeps this gate green by construction while
+                # an aggregate that drifted from its leaves still fails it.
+                for series in (*pdm._PED_REVENUE_LEAVES, *pdm._RUC_REVENUE_LEAVES)
             )
             expected = base[("total_nltf_net_revenue", fy)] + leaf_delta
             assert float(total.at[fy, "value"]) == pytest.approx(expected, rel=1e-12)
